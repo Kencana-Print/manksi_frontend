@@ -1,0 +1,44 @@
+/* =========================================
+   GLOBAL MANKSI TYPOGRAPHY (11px)
+   ========================================= */
+
+@import "vue-toastification/dist/index.css";
+
+/* 1. Paksa font family saja, JANGAN paksa ukuran base html/body */
+html,
+body,
+.v-application {
+  font-family: "Roboto", sans-serif !important;
+}
+
+/* 2. Sesuaikan Data Table Vuetify agar rapat dan kecil (11px) */
+.v-data-table .v-table__wrapper > table > thead > tr > th,
+.v-data-table .v-table__wrapper > table > tbody > tr > td {
+  font-size: 11px !important;
+  padding-top: 4px !important;
+  padding-bottom: 4px !important;
+  height: auto !important; /* Menghilangkan tinggi fix bawaan vuetify */
+}
+
+/* 3. Terapkan 11px HANYA pada inputan form yang diset "compact" (khas Delphi) */
+.v-input--density-compact .v-field__input,
+.v-input--density-compact .v-label,
+.v-input--density-compact .v-list-item-title {
+  font-size: 11px !important;
+}
+
+/* 4. Kecilkan tombol yang diset "small" atau "compact" saja */
+.v-btn--density-compact,
+.v-btn--size-small {
+  font-size: 11px !important;
+}
+
+/* 5. Kembalikan ukuran normal KHUSUS untuk halaman Login (login-wrapper) */
+.login-wrapper .v-field__input,
+.login-wrapper .v-label,
+.login-wrapper .v-btn {
+  font-size: 1rem !important; /* Ukuran normal */
+}
+.login-wrapper .text-body-1 {
+  font-size: 1rem !important;
+}

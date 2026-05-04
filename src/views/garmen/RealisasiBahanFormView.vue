@@ -1,0 +1,748 @@
+<script setup lang="ts">
+import { ref, computed, onMounted } from "vue";
+import { useRoute } from "vue-router";
+import { useToast } from "vue-toastification";
+import { useForm } from "@/composables/useForm";
+import { realisasiBahanFormService } from "@/services/garmen/realisasiBahanFormService";
+import BaseForm from "@/components/BaseForm.vue";
+import MintaBahanSearchModal from "@/components/lookups/MintaBahanSearchModal.vue";
+
+const route = useRoute();
+const toast = useToast();
+
+const initialData = {
+  nomor: "",
+  tanggal: new Date().toISOString().substring(0, 10),
+  noMinta: "",
+  keterangan: "",
+  spk: "",
+  namaSpk: "",
+  jumlahSpk: 0,
+  mkb: "", // <-- TAMBAHAN
+  jumlah: 0, // <-- TAMBAHAN (Input Kuning)
+  gudangAsal: "",
+  gudangAsalNama: "",
+  gudangProduksi: "",
+  gudangProduksiNama: "",
+  isUtama: 1,
+  barcodes: [] as any[],
+  details: [] as any[],
+};
+
+const {
+  formData,
+  isEditMode,
+  isLoading,
+  isSaving,
+  showSaveDialog,
+  showCancelDialog,
+  showCloseDialog,
+  executeSave,
+  executeCancel,
+  executeClose,
+  fetchData,
+} = useForm({
+  menuId: "108",
+  initialData,
+  fetchApi: async () => {
+    const res = await realisasiBahanFormService.getDetail(
+      route.params.nomor as string,
+    );
+    const h = res.data.data.header;
+
+    // Hitung Roll dari Barcode (Tabel Atas)
+    const summaryRoll: Record<string, number> = {};
+    const barcodesMap =
+      res.data.data.barcodes?.map((b: any) => {
+        const qty = Number(b.promind2_jumlah) || 0;
+        if (b.promind2_bhn_kode) {
+          summaryRoll[b.promind2_bhn_kode] =
+            (summaryRoll[b.promind2_bhn_kode] || 0) + 1;
+        }
+        return {
+          barcode: b.promind2_barcode,
+          kode: b.promind2_bhn_kode,
+          nama: b.Bhn_Name,
+          satuan: b.Bhn_satuan,
+          stok: Number(b.stok) || 0,
+          jumlah: qty,
+        };
+      }) || [];
+
+    // Mapping Kebutuhan (Tabel Bawah)
+    const detailsMap =
+      res.data.data.details?.map((d: any) => {
+        const minta = Number(d.minta) || 0;
+        const sudah = 0; // (bisa disesuaikan jika diload dari backend)
+        return {
+          kode: d.promind_bhn_kode,
+          kodem: d.promind_kodem,
+          nama: d.Bhn_Name,
+          satuan: d.Bhn_satuan,
+          stk: Number(d.Stk) || 0,
+          minta: minta,
+          sudah: sudah,
+          kurang: minta - sudah,
+          netto: Number(d.promind_jumlah) || 0,
+          gross: Number(d.promind_gross) || 0,
+          roll: summaryRoll[d.promind_bhn_kode] || 0, // <-- Set Nilai Roll
+          relaxtgl: d.promind_relaxtgl
+            ? d.promind_relaxtgl.substring(0, 10)
+            : "",
+          relaxpic: d.promind_relaxpic,
+          ket: d.promind_keterangan,
+        };
+      }) || [];
+
+    return {
+      nomor: h.promin_nomor,
+      tanggal: h.promin_tanggal ? h.promin_tanggal.substring(0, 10) : "",
+      noMinta: h.promin_minta,
+      keterangan: h.promin_keterangan,
+      spk: h.promin_spk_nomor,
+      namaSpk: h.namaspk,
+      jumlahSpk: h.jumlahspk,
+      mkb: h.promin_mkb, // <-- MAPPING MKB
+      jumlah: h.promin_jumlah || 0, // <-- MAPPING JUMLAH
+      gudangAsal: h.promin_gdg_asal,
+      gudangAsalNama: getNamaGudangAsal(h.promin_gdg_asal),
+      gudangProduksi: h.promin_gdgp_kode,
+      gudangProduksiNama: getNamaGudangProduksi(h.promin_gdgp_kode),
+      isUtama: h.isstatus,
+      barcodes: barcodesMap,
+      details: detailsMap,
+      pin_acc: h.pin_acc,
+      pin_dipakai: h.pin_dipakai,
+    };
+  },
+  submitApi: async (data: typeof initialData) => {
+    const nomor = isEditMode.value ? (route.params.nomor as string) : undefined;
+    return await realisasiBahanFormService.saveData(data, nomor);
+  },
+  onSuccess: (res: any) => {
+    const nomorTersimpan = res.data?.data?.nomor || formData.value.nomor;
+
+    // Gunakan window.confirm bawaan browser untuk memblokir layar dan menanyakan aksi cetak
+    if (
+      window.confirm(
+        `Berhasil disimpan dengan nomor: ${nomorTersimpan}\n\nAkan dicetak?`,
+      )
+    ) {
+      window.open(
+        `/garmen/bahan-baku/realisasi-minta/print/${encodeURIComponent(nomorTersimpan)}`,
+        "_blank",
+      );
+    }
+  },
+});
+
+const showMintaModal = ref(false);
+
+// Fungsi Helper untuk Nama Gudang
+const getNamaGudangAsal = (cab: string) => {
+  if (cab === "P01") return "GUDANG BAHAN BAKU SRANDAKAN";
+  if (cab === "P04") return "GUDANG BAHAN BAKU JERON";
+  if (cab === "P05") return "GUDANG BAHAN BAKU P5";
+  return "GUDANG BAHAN BAKU";
+};
+
+const getNamaGudangProduksi = (kode: string) => {
+  if (kode === "GP015") return "GD POTONG P1";
+  if (kode === "GP001") return "GD POTONG P4";
+  return "GUDANG PRODUKSI";
+};
+
+// Fungsi Format Angka (agar rapi dan membuang 0.199999)
+const num = (val: number | string) => {
+  return Number(val || 0).toLocaleString("id-ID", { maximumFractionDigits: 2 });
+};
+
+// --- 1. KETIKA NO. PERMINTAAN DIPILIH ---
+const onMintaSelected = async (item: any) => {
+  try {
+    const res = await realisasiBahanFormService.getPermintaanInfo(item.Nomor);
+    const data = res.data.data;
+
+    const h = data.header; // <- Ini kuncinya, tampung data header ke variabel h
+
+    formData.value.noMinta = h.nomorMinta;
+    formData.value.spk = h.spk;
+    formData.value.namaSpk = h.namaSpk;
+    formData.value.jumlahSpk = h.jumlahSpk;
+    formData.value.mkb = h.mkb_nomor || h.mkb || "";
+    formData.value.jumlah = 0;
+
+    // PERBAIKAN: Gunakan variabel "h", BUKAN "header" agar tidak crash!
+    formData.value.gudangAsal = h.gudangBahanKode;
+    formData.value.gudangAsalNama = h.gudangBahanNama;
+    formData.value.gudangProduksi = h.gudangProduksiKode;
+    formData.value.gudangProduksiNama = h.gudangProduksiNama;
+
+    formData.value.barcodes = [];
+
+    formData.value.details = data.details.map((d: any) => {
+      d.kurang = Number((d.minta - d.sudah).toFixed(2));
+      d.roll = 0;
+      d.netto = 0; // Pastikan default 0 agar tidak undefined
+      d.gross = 0;
+      return d;
+    });
+
+    toast.success("Data permintaan berhasil dimuat.");
+  } catch (error: any) {
+    console.error("Error Detail:", error);
+    toast.error(
+      error.response?.data?.message || "Gagal mengambil data permintaan.",
+    );
+  }
+};
+
+// --- 2. LOGIKA TABEL 1 (BARCODE) & SINKRONISASI KE TABEL 2 ---
+const addBarcodeRow = () => {
+  if (!formData.value.noMinta)
+    return toast.warning("Pilih No. Permintaan terlebih dahulu.");
+  formData.value.barcodes.push({
+    barcode: "",
+    kode: "",
+    nama: "",
+    satuan: "",
+    stok: 0,
+    jumlah: 0,
+  });
+};
+
+const removeBarcodeRow = (index: number) => {
+  const deletedKode = formData.value.barcodes[index].kode;
+  formData.value.barcodes.splice(index, 1);
+  recalculateNetto(deletedKode);
+};
+
+const onBarcodeEntered = async (item: any, index: number) => {
+  if (!item.barcode) return;
+  try {
+    const res = await realisasiBahanFormService.getBarcodeInfo(item.barcode);
+    const data = res.data.data;
+
+    const isDuplicate = formData.value.barcodes.some(
+      (b, i) => b.barcode === data.barcode && i !== index,
+    );
+    if (isDuplicate) {
+      toast.warning("Barcode ini sudah di-scan di baris lain.");
+      item.barcode = "";
+      return;
+    }
+
+    item.kode = data.kode;
+    item.nama = data.nama;
+    item.satuan = data.satuan;
+    item.stok = data.stok;
+    item.jumlah = data.stok;
+
+    recalculateNetto(item.kode);
+  } catch (error: any) {
+    toast.error(error.response?.data?.message || "Barcode tidak ditemukan.");
+    item.barcode = "";
+  }
+};
+
+// Inti Keajaiban: Hitung akumulasi qty dari Tabel 1, lempar ke Tabel 2
+const recalculateNetto = (changedKode?: string) => {
+  if (!formData.value.barcodes || !formData.value.details) return;
+
+  // Kita tambahkan penampung kdsup dan nmsup
+  const summary: Record<
+    string,
+    { qty: number; count: number; kdsup: string; nmsup: string }
+  > = {};
+
+  formData.value.barcodes.forEach((b) => {
+    if (b && b.kode) {
+      if (!summary[b.kode]) {
+        summary[b.kode] = { qty: 0, count: 0, kdsup: "", nmsup: "" };
+      }
+      summary[b.kode].qty += Number(b.jumlah) || 0;
+      summary[b.kode].count += 1;
+
+      // Ambil supplier dari barcode terakhir yang di-scan (sama seperti logic Delphi)
+      if (b.kdsup) {
+        summary[b.kode].kdsup = b.kdsup;
+        summary[b.kode].nmsup = b.nmsup;
+      }
+    }
+  });
+
+  formData.value.details.forEach((d) => {
+    if (!d) return;
+    if (changedKode && d.kode !== changedKode) return;
+
+    const hasBarcode = formData.value.barcodes.some(
+      (b) => b && b.kode === d.kode,
+    );
+
+    if (hasBarcode && summary[d.kode]) {
+      d.netto = summary[d.kode].qty;
+      d.gross = summary[d.kode].qty;
+      d.roll = summary[d.kode].count;
+
+      // AUTO FILL SUPPLIER! (Replikasi getsupplier Delphi)
+      if (summary[d.kode].kdsup) {
+        d.kdsup = summary[d.kode].kdsup;
+        d.nmsup = summary[d.kode].nmsup; // Jika ada field nmsup di UI
+      }
+    } else if (changedKode === d.kode) {
+      d.netto = 0;
+      d.gross = 0;
+      d.roll = 0;
+      // Opsional: Hapus kdsup jika barcode dihapus semua
+      // d.kdsup = "";
+    }
+  });
+};
+
+const validateBeforeSave = () => {
+  // 1. Validasi Permintaan
+  if (!formData.value.noMinta) {
+    return toast.warning("No. Permintaan wajib diisi.");
+  }
+
+  // 2. Validasi SPK
+  if (!formData.value.spk) {
+    return toast.warning("Nomor SPK harus di isi.");
+  }
+
+  // 3. Validasi Gudang Asal
+  if (!formData.value.gudangAsal) {
+    return toast.warning("Gudang asal tidak boleh kosong.");
+  }
+
+  // 4. Validasi Gudang Produksi
+  if (!formData.value.gudangProduksi) {
+    return toast.warning("Gudang Produksi tidak boleh kosong.");
+  }
+
+  // 5. Validasi Gudang Sama (Delphi: if edtGudang.Text = edtGudang2.Text)
+  if (formData.value.gudangAsal === formData.value.gudangProduksi) {
+    return toast.warning(
+      "Gudang Produksi tidak boleh sama dengan gudang asal.",
+    );
+  }
+
+  // 6. Validasi Tabel Kosong
+  if (!formData.value.details || formData.value.details.length === 0) {
+    return toast.warning("Detail harus diisi.");
+  }
+
+  // 7. Validasi Netto 0 (Delphi: if tq=0 then showMessage('Netto masih kosong semua'))
+  const totalNetto = formData.value.details.reduce(
+    (sum, d) => sum + (Number(d.netto) || 0),
+    0,
+  );
+  if (totalNetto === 0) {
+    return toast.warning(
+      "Netto masih kosong semua! Silakan scan barang atau isi manual.",
+    );
+  }
+
+  // Jika semua lolos, tampilkan dialog konfirmasi bawaan (Yakin ingin simpan?)
+  showSaveDialog.value = true;
+};
+
+// --- TRIGGER FETCH DATA UNTUK MODE EDIT ---
+onMounted(async () => {
+  if (isEditMode.value) {
+    await fetchData(); // Tunggu sampai data selesai ditarik dari DB
+    recalculateNetto(); // REPLIKASI DELPHI: Panggil hitung otomatis setelah data barcode dimuat
+  }
+});
+</script>
+
+<template>
+  <BaseForm
+    :title="(isEditMode ? 'Ubah' : 'Baru') + ' Realisasi Permintaan'"
+    menu-id="108"
+    icon="mdi-clipboard-check-outline"
+    :is-loading="isLoading"
+    :is-saving="isSaving"
+    v-model:showSaveDialog="showSaveDialog"
+    v-model:showCancelDialog="showCancelDialog"
+    v-model:showCloseDialog="showCloseDialog"
+    @validate-save="validateBeforeSave"
+    @confirm-save="executeSave"
+    @confirm-cancel="executeCancel"
+    @confirm-close="executeClose"
+  >
+    <template #left-column>
+      <div class="desktop-form-section header-section">
+        <div class="text-caption font-weight-bold mb-3 text-primary">
+          HEADER REALISASI
+        </div>
+
+        <v-text-field
+          v-model="formData.nomor"
+          label="No. Realisasi"
+          density="compact"
+          variant="outlined"
+          readonly
+          placeholder="Otomatis"
+          hide-details
+          class="mb-2 bg-grey-lighten-4"
+        />
+        <v-text-field
+          v-model="formData.tanggal"
+          type="date"
+          label="Tgl. Realisasi"
+          density="compact"
+          variant="outlined"
+          hide-details
+          class="mb-2"
+        />
+        <v-text-field
+          v-model="formData.noMinta"
+          label="No. Permintaan"
+          density="compact"
+          variant="outlined"
+          hide-details
+          class="mb-2"
+          append-inner-icon="mdi-magnify"
+          readonly
+          @click:append-inner="showMintaModal = true"
+          color="primary"
+        />
+        <v-textarea
+          v-model="formData.keterangan"
+          label="Keterangan"
+          density="compact"
+          variant="outlined"
+          rows="2"
+          hide-details
+          class="mb-4"
+        />
+
+        <div
+          class="text-caption font-weight-bold mb-2 text-blue-grey-darken-2 border-t pt-3"
+        >
+          INFO SPK & GUDANG
+        </div>
+        <v-text-field
+          v-model="formData.spk"
+          label="SPK"
+          density="compact"
+          variant="outlined"
+          readonly
+          hide-details
+          class="mb-2 bg-grey-lighten-4"
+        />
+        <v-textarea
+          v-model="formData.namaSpk"
+          label="Nama SPK"
+          density="compact"
+          variant="outlined"
+          rows="2"
+          readonly
+          hide-details
+          class="mb-2 bg-grey-lighten-4"
+        />
+        <v-row dense class="mb-2">
+          <v-col cols="5">
+            <v-text-field
+              v-model="formData.jumlahSpk"
+              label="Jml SPK"
+              density="compact"
+              variant="outlined"
+              readonly
+              hide-details
+              class="bg-grey-lighten-4"
+            />
+          </v-col>
+          <v-col cols="7">
+            <v-text-field
+              v-model="formData.mkb"
+              label="No. MKB"
+              density="compact"
+              variant="outlined"
+              readonly
+              hide-details
+              class="bg-grey-lighten-4"
+            />
+          </v-col>
+        </v-row>
+        <v-text-field
+          :model-value="
+            formData.gudangAsal
+              ? `${formData.gudangAsal} - ${formData.gudangAsalNama}`
+              : ''
+          "
+          label="Gudang Bahan"
+          density="compact"
+          variant="outlined"
+          readonly
+          hide-details
+          class="mb-2 bg-grey-lighten-4"
+        />
+        <v-text-field
+          :model-value="
+            formData.gudangProduksi
+              ? `${formData.gudangProduksi} - ${formData.gudangProduksiNama}`
+              : ''
+          "
+          label="Gudang Produksi"
+          density="compact"
+          variant="outlined"
+          readonly
+          hide-details
+          class="mb-2 bg-grey-lighten-4"
+        />
+
+        <div class="mt-3 d-flex align-center" style="gap: 16px">
+          <div>
+            <div class="text-caption font-weight-bold mb-1">
+              Status Realisasi
+            </div>
+            <v-radio-group
+              v-model="formData.isUtama"
+              inline
+              hide-details
+              density="compact"
+            >
+              <v-radio label="Utama" :value="1" color="primary"></v-radio>
+              <v-radio label="Susulan" :value="0" color="primary"></v-radio>
+            </v-radio-group>
+          </div>
+
+          <!-- Input Jumlah Kuning disebelah Status -->
+          <div style="width: 140px">
+            <v-text-field
+              v-model="formData.jumlah"
+              label="Jumlah"
+              type="number"
+              step="any"
+              density="compact"
+              variant="outlined"
+              hide-details
+              bg-color="yellow-lighten-4"
+              class="font-weight-bold"
+            />
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <template #right-column>
+      <v-card
+        border
+        flat
+        style="
+          display: flex;
+          flex-direction: column;
+          height: 100%;
+          overflow: hidden;
+        "
+      >
+        <!-- TABEL 1: SCAN BARCODE -->
+        <div
+          class="bg-blue-grey-darken-3 text-white px-3 py-1 font-weight-bold text-caption d-flex align-center"
+        >
+          <v-icon size="small" class="mr-2">mdi-barcode-scan</v-icon> Tabel Scan
+          Fisik (Barcode)
+        </div>
+        <div class="table-container" style="flex: 2; overflow: auto">
+          <table class="manksi-table">
+            <thead>
+              <tr>
+                <th width="40">No</th>
+                <th width="140">Barcode</th>
+                <th width="110">Kode</th>
+                <th>Nama Bahan</th>
+                <th width="60">Satuan</th>
+                <th width="80">Stok</th>
+                <th width="90" class="bg-yellow-darken-2">Jumlah</th>
+                <th width="40"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(item, index) in formData.barcodes" :key="index">
+                <td class="text-center">{{ index + 1 }}</td>
+                <td>
+                  <input
+                    v-model="item.barcode"
+                    class="cell-input fw-bold text-primary"
+                    placeholder="Scan di sini..."
+                    @change="onBarcodeEntered(item, index)"
+                  />
+                </td>
+                <td class="bg-grey-lighten-4">{{ item.kode }}</td>
+                <td class="bg-grey-lighten-4">{{ item.nama }}</td>
+                <td class="text-center bg-grey-lighten-4">{{ item.satuan }}</td>
+                <td class="tr bg-grey-lighten-4">{{ item.stok }}</td>
+                <td class="bg-yellow-lighten-5">
+                  <input
+                    type="number"
+                    step="any"
+                    v-model.number="item.jumlah"
+                    class="cell-input tr fw-bold text-primary"
+                    @input="recalculateNetto(item.kode)"
+                  />
+                </td>
+                <td class="text-center">
+                  <v-btn
+                    icon="mdi-delete"
+                    size="x-small"
+                    variant="text"
+                    color="error"
+                    @click="removeBarcodeRow(index)"
+                  />
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="pa-2 bg-grey-lighten-4 text-right">
+          <v-btn
+            size="x-small"
+            color="primary"
+            prepend-icon="mdi-plus"
+            @click="addBarcodeRow"
+            >Tambah Barcode</v-btn
+          >
+        </div>
+
+        <v-divider :thickness="3" color="primary"></v-divider>
+
+        <!-- TABEL 2: KEBUTUHAN PERMINTAAN -->
+        <div
+          class="bg-teal-darken-3 text-white px-3 py-1 font-weight-bold text-caption d-flex align-center"
+        >
+          <v-icon size="small" class="mr-2">mdi-clipboard-list-outline</v-icon>
+          Tabel Pemenuhan Kebutuhan (Otomatis)
+        </div>
+        <div
+          class="table-container"
+          style="flex: 1; max-height: 35%; overflow: auto"
+        >
+          <table class="manksi-table">
+            <thead>
+              <tr>
+                <th width="40">No</th>
+                <th width="110">Kode</th>
+                <th>Nama Bahan</th>
+                <th width="50">Sat</th>
+                <th width="65">Stok</th>
+                <th width="60" class="bg-green-darken-2">Minta</th>
+                <th width="60">Sudah</th>
+                <th width="60">Kurang</th>
+                <th width="75" class="bg-yellow-darken-2">Netto</th>
+                <th width="75">Gross</th>
+                <th width="50">Roll</th>
+                <th width="110">Tgl Relax</th>
+                <th width="90">PIC Relax</th>
+                <th width="130">Keterangan</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(dtl, index) in formData.details" :key="index">
+                <td class="text-center">{{ index + 1 }}</td>
+                <td class="fw-bold text-primary">{{ dtl.kode }}</td>
+                <td>{{ dtl.nama }}</td>
+                <td class="text-center">{{ dtl.satuan }}</td>
+                <td class="tr">{{ num(dtl.stk) }}</td>
+                <td
+                  class="tr font-weight-bold text-green-darken-3 bg-green-lighten-5"
+                >
+                  {{ num(dtl.minta) }}
+                </td>
+                <td class="tr">{{ num(dtl.sudah) }}</td>
+                <td class="tr text-red-darken-2">{{ num(dtl.kurang) }}</td>
+                <td class="bg-yellow-lighten-5 px-2 tr fw-bold text-primary">
+                  {{ num(dtl.netto) }}
+                </td>
+                <td>
+                  <input
+                    type="number"
+                    step="any"
+                    v-model.number="dtl.gross"
+                    class="cell-input tr fw-bold"
+                  />
+                </td>
+                <td class="tr px-2">{{ dtl.roll }}</td>
+                <td>
+                  <input
+                    type="date"
+                    v-model="dtl.relaxtgl"
+                    class="cell-input"
+                  />
+                </td>
+                <td>
+                  <input
+                    type="text"
+                    v-model="dtl.relaxpic"
+                    class="cell-input"
+                    placeholder="PIC..."
+                  />
+                </td>
+                <td>
+                  <input
+                    v-model="dtl.ket"
+                    class="cell-input"
+                    placeholder="Opsional..."
+                  />
+                </td>
+              </tr>
+              <tr v-if="formData.details.length === 0">
+                <td colspan="10" class="text-center text-grey py-8 font-italic">
+                  Pilih No. Permintaan untuk memuat daftar bahan.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </v-card>
+    </template>
+  </BaseForm>
+
+  <MintaBahanSearchModal v-model="showMintaModal" @selected="onMintaSelected" />
+</template>
+
+<style scoped>
+.manksi-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+.manksi-table th {
+  color: white;
+  padding: 6px;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+/* Default th color for unstyled headers */
+.manksi-table th:not(.bg-yellow-darken-2):not(.bg-green-darken-2) {
+  background: #455a64;
+}
+.manksi-table td {
+  border: 1px solid #e0e0e0;
+  padding: 0;
+  height: 28px;
+}
+.cell-input {
+  width: 100%;
+  height: 100%;
+  border: none;
+  padding: 0 6px;
+  outline: none;
+  background: transparent;
+}
+.cell-input:focus {
+  background: #e3f2fd;
+}
+.table-container {
+  overflow: auto;
+}
+.tr {
+  text-align: right;
+}
+.fw-bold {
+  font-weight: bold;
+}
+</style>

@@ -1,0 +1,308 @@
+<script setup lang="ts">
+import { ref, onMounted } from "vue";
+import { useRoute } from "vue-router";
+import api from "@/services/api";
+
+const route = useRoute();
+const nomorMAP = route.params.nomor as string;
+const printData = ref<any>(null);
+const isLoading = ref(true);
+const imageError = ref(false);
+
+const getImageUrl = (filename: string) => {
+  if (!filename) return "";
+  // Fallback mekanisme (Jika gambar utama gagal, gunakan folder mintaharga)
+  return imageError.value
+    ? `${import.meta.env.VITE_API_URL}/images/mintaharga/${filename}`
+    : `${import.meta.env.VITE_API_URL}/images/${filename}`;
+};
+
+const handleImgError = () => {
+  if (!imageError.value) imageError.value = true;
+};
+
+const fmtDate = (val: string) => {
+  if (!val) return "";
+  const d = new Date(val);
+  return `${String(d.getDate()).padStart(2, "0")}-${String(d.getMonth() + 1).padStart(2, "0")}-${d.getFullYear()}`;
+};
+
+onMounted(async () => {
+  try {
+    const res = await api.get(
+      `/garmen/cetak-bast/form/print/${encodeURIComponent(nomorMAP)}`,
+    );
+    printData.value = res.data.data;
+    setTimeout(() => {
+      window.print();
+    }, 800);
+  } catch (e) {
+    console.error(e);
+  } finally {
+    isLoading.value = false;
+  }
+});
+</script>
+
+<template>
+  <div v-if="!isLoading && printData" class="print-wrapper">
+    <div v-for="copy in 2" :key="copy" class="print-column">
+      <div class="header-title">BERITA ACARA SERAH TERIMA MAP</div>
+
+      <table class="w-100 info-table">
+        <tr>
+          <td width="22%">Nomor Memo</td>
+          <td width="2%">:</td>
+          <td>
+            {{ printData.header.MSPK_Nomor || printData.header.mspk_nomor }}
+          </td>
+        </tr>
+        <tr>
+          <td>Tanggal</td>
+          <td>:</td>
+          <td>
+            {{
+              fmtDate(
+                printData.header.Mspk_Tanggal || printData.header.mspk_tanggal,
+              )
+            }}
+          </td>
+        </tr>
+        <tr>
+          <td>Nama Desain</td>
+          <td>:</td>
+          <td>
+            {{ printData.header.Mspk_nama || printData.header.mspk_nama }}
+          </td>
+        </tr>
+        <tr>
+          <td>Ukuran</td>
+          <td>:</td>
+          <td>
+            {{ printData.header.Mspk_ukuran || printData.header.mspk_ukuran }}
+          </td>
+        </tr>
+        <tr>
+          <td>Kain</td>
+          <td>:</td>
+          <td>
+            {{ printData.header.Mspk_kain || printData.header.mspk_kain }}
+          </td>
+        </tr>
+        <tr>
+          <td>Finishing</td>
+          <td>:</td>
+          <td>
+            {{
+              printData.header.Mspk_finishing || printData.header.mspk_finishing
+            }}
+          </td>
+        </tr>
+        <tr>
+          <td class="align-top">Catatan</td>
+          <td class="align-top">:</td>
+          <td style="white-space: pre-wrap">
+            {{
+              printData.header.Mspk_keterangan ||
+              printData.header.mspk_keterangan
+            }}
+          </td>
+        </tr>
+      </table>
+
+      <div
+        class="d-flex justify-space-between mt-2 font-weight-bold"
+        style="font-size: 11px"
+      >
+        <div>
+          Jumlah :
+          {{
+            printData.header.mspk_jumlah_jadi ||
+            printData.header.Mspk_jumlah ||
+            0
+          }}
+        </div>
+        <div>
+          Gramasi :
+          {{ printData.header.mspk_gramasi || printData.header.Mspk_gramasi }}
+        </div>
+        <div>
+          {{ printData.header.mspk_tipe || printData.header.Mspk_tipe }}
+        </div>
+      </div>
+
+      <table class="detail-table mt-1 w-100">
+        <thead>
+          <tr>
+            <th width="8%">No</th>
+            <th width="35%">Kesesuaian</th>
+            <th width="10%">Status</th>
+            <th>Keterangan</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="d in printData.details" :key="d.no">
+            <td class="text-center">{{ d.no }}</td>
+            <td>{{ d.kesesuaian }}</td>
+            <td class="text-center font-weight-bold">{{ d.status }}</td>
+            <td>{{ d.keterangan }}</td>
+          </tr>
+          <tr v-if="!printData.details || printData.details.length === 0">
+            <td colspan="4" class="text-center text-grey py-2">
+              Belum ada data kesesuaian BAST
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="image-box mt-2">
+        <img
+          v-if="printData.header.Mspk_image || printData.header.mspk_image"
+          :src="
+            getImageUrl(
+              printData.header.Mspk_image || printData.header.mspk_image,
+            )
+          "
+          @error="handleImgError"
+          class="map-image"
+        />
+        <div v-else class="text-grey text-center mt-10">Tidak ada gambar</div>
+      </div>
+
+      <div class="footer-section mt-4 d-flex justify-space-between align-end">
+        <div class="lembar-text">
+          Lembar 1 : Arsip Garment<br />
+          Lembar 2 : Marketing Officer
+        </div>
+        <div class="ttd-box">
+          <div class="text-center mb-1">
+            Boyolali, {{ fmtDate(new Date().toISOString()) }}
+          </div>
+          <table class="w-100 ttd-table">
+            <tr>
+              <th width="50%">PIC Proofing</th>
+              <th width="50%">Garment Manager</th>
+            </tr>
+            <tr>
+              <td class="ttd-space"></td>
+              <td class="ttd-space"></td>
+            </tr>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+@media print {
+  @page {
+    size: landscape;
+    margin: 0.5cm;
+  }
+  body {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
+
+.print-wrapper {
+  display: flex;
+  justify-content: space-between;
+  font-family: "Arial", sans-serif;
+  color: #000;
+  padding: 10px;
+}
+
+.print-column {
+  width: 48%; /* Dua kolom */
+  border: 1px dashed transparent; /* Panduan potong jika diperlukan */
+  display: flex;
+  flex-direction: column;
+}
+
+.header-title {
+  border: 1px solid #000;
+  padding: 4px;
+  font-weight: bold;
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+
+.info-table {
+  font-size: 11px;
+}
+.info-table td {
+  padding: 2px 0;
+}
+.align-top {
+  vertical-align: top;
+}
+
+.detail-table {
+  border-collapse: collapse;
+  font-size: 11px;
+}
+.detail-table th,
+.detail-table td {
+  border: 1px solid #000;
+  padding: 4px;
+}
+.detail-table th {
+  font-weight: normal;
+}
+
+.image-box {
+  border: 1px solid #000;
+  height: 180px; /* Alokasi ruang untuk gambar */
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+}
+
+.map-image {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.footer-section {
+  font-size: 11px;
+}
+.lembar-text {
+  line-height: 1.4;
+}
+
+.ttd-box {
+  width: 220px;
+}
+.ttd-table {
+  border-collapse: collapse;
+}
+.ttd-table th,
+.ttd-table td {
+  border: 1px solid #000;
+  text-align: center;
+  font-weight: normal;
+}
+.ttd-space {
+  height: 60px;
+}
+.w-100 {
+  width: 100%;
+}
+.mt-1 {
+  margin-top: 4px;
+}
+.mt-2 {
+  margin-top: 8px;
+}
+.mt-4 {
+  margin-top: 16px;
+}
+.mb-1 {
+  margin-bottom: 4px;
+}
+</style>
