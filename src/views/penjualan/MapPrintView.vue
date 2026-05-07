@@ -29,8 +29,17 @@ onMounted(async () => {
     );
     rawData.value = res.data.data;
 
-    // Beri jeda sedikit agar render selesai, lalu print otomatis
     setTimeout(() => {
+      // Set page size sebelum print
+      if (layoutMode === "horizontal") {
+        const style = document.createElement("style");
+        style.textContent = "@page { size: A4 landscape; margin: 10mm; }";
+        document.head.appendChild(style);
+      } else {
+        const style = document.createElement("style");
+        style.textContent = "@page { size: A4 portrait; margin: 10mm; }";
+        document.head.appendChild(style);
+      }
       window.print();
     }, 800);
   } catch (error: any) {
@@ -327,28 +336,7 @@ const tglIndo = (dateStr: string) => {
     </div>
   </div>
 </template>
-
 <style scoped>
-@media print {
-  @page {
-    margin: 10mm;
-  }
-  .vertikal {
-    @page {
-      size: portrait;
-    }
-  }
-  .horizontal {
-    @page {
-      size: landscape;
-    }
-  }
-  body {
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-}
-
 .loading-state,
 .error-state {
   display: flex;
@@ -375,10 +363,10 @@ const tglIndo = (dateStr: string) => {
 
 .print-container.vertikal {
   max-width: 210mm;
-} /* A4 Portrait */
+}
 .print-container.horizontal {
   max-width: 297mm;
-} /* A4 Landscape */
+}
 
 .outer-table {
   width: 100%;
@@ -441,7 +429,6 @@ const tglIndo = (dateStr: string) => {
   border: 1px solid #000;
 }
 
-/* Vertikal: Gambar Kiri Bawah */
 .bottom-left-content {
   display: flex;
   gap: 10px;
@@ -461,7 +448,6 @@ const tglIndo = (dateStr: string) => {
   line-height: 1.3;
 }
 
-/* Horizontal */
 .horizontal-details {
   display: flex;
   font-size: 9px;
@@ -508,7 +494,6 @@ pre {
   margin-top: 8px;
 }
 
-/* Tanda Tangan */
 .ttd-table {
   width: 180px;
   border-collapse: collapse;
@@ -547,7 +532,6 @@ pre {
   font-style: italic;
 }
 
-/* Catatan Kanan */
 .catatan-wrap {
   display: flex;
   font-size: 10px;
@@ -567,4 +551,15 @@ pre {
   margin: 0;
   line-height: 1.4;
 }
+
+@media print {
+  body {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
+</style>
+
+<style>
+/* @page dikontrol via JS di onMounted — tidak ada di sini */
 </style>
