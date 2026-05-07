@@ -4,6 +4,7 @@ import { useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
 import BaseForm from "@/components/BaseForm.vue";
 import { useForm } from "@/composables/useForm";
+import { IconPrinter } from "@tabler/icons-vue";
 import api from "@/services/api";
 
 import MapSearchModal from "@/components/lookups/MapSearchModal.vue";
@@ -395,7 +396,7 @@ onMounted(() => {
   <BaseForm
     :title="isEditMode ? 'Ubah BAST MAP' : 'Cetak BAST MAP Baru'"
     menu-id="117"
-    icon="mdi-printer-check"
+    :icon="IconPrinter"
     :is-loading="isLoading"
     :is-saving="isSaving"
     v-model:show-save-dialog="showSaveDialog"
@@ -939,13 +940,12 @@ onMounted(() => {
           >Tidak</v-btn
         >
         <v-spacer></v-spacer>
-        <v-btn
-          color="primary"
-          variant="elevated"
-          prepend-icon="mdi-printer"
-          @click="handlePrint"
-          >Ya, Cetak</v-btn
-        >
+        <v-btn color="primary" variant="elevated" @click="handlePrint">
+          <template #prepend
+            ><IconPrinter :size="15" :stroke-width="1.7"
+          /></template>
+          Ya, Cetak
+        </v-btn>
       </v-card-actions>
     </v-card>
   </v-dialog>

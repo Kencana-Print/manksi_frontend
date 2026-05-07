@@ -5,6 +5,7 @@ import { useBrowse } from "@/composables/useBrowse";
 import { useToast } from "vue-toastification";
 import BaseBrowse from "@/components/BaseBrowse.vue";
 import SimpleMasterFormDialog from "@/components/dialogs/SimpleMasterFormDialog.vue";
+import { IconListDetails, IconShape } from "@tabler/icons-vue";
 
 const toast = useToast();
 
@@ -57,7 +58,7 @@ const handleEdit = async (item: any) => {
   <BaseBrowse
     title="Master Jenis Barang"
     menu-id="14"
-    icon="mdi-format-list-bulleted-type"
+    :icon="IconListDetails"
     :headers="headers"
     :items="items ?? []"
     :is-loading="isLoading"
@@ -78,7 +79,7 @@ const handleEdit = async (item: any) => {
     :is-new-mode="isNewMode"
     :edit-data="editData"
     title="Jenis Barang"
-    icon="mdi-shape-outline"
+    :icon="IconShape"
     api-endpoint="/master/jenis-barang"
     @saved="fetchData"
   />

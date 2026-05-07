@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from "vue";
 import api from "@/services/api";
+import { IconPuzzle, IconX, IconSearch } from "@tabler/icons-vue";
 
 interface Bahan {
   Kode: string;
@@ -105,24 +106,24 @@ const selectItem = (item: any) => {
   >
     <v-card class="lookup-card rounded-lg">
       <v-card-title class="bg-primary text-white d-flex align-center pa-2 px-4">
-        <v-icon start color="white" size="small">mdi-puzzle</v-icon>
-        <span class="text-subtitle-2 font-weight-bold"
-          >CARI KOMPONEN {{ isBordir ? "(KHUSUS BORDIR)" : "" }}</span
-        >
+        <IconPuzzle :size="16" :stroke-width="1.7" color="white" class="mr-2" />
+        <span class="text-subtitle-2 font-weight-bold">
+          CARI KOMPONEN {{ isBordir ? "(KHUSUS BORDIR)" : "" }}
+        </span>
         <v-spacer></v-spacer>
         <v-btn
-          icon="mdi-close"
           variant="text"
           size="small"
-          color="white"
           @click="emit('update:modelValue', false)"
-        ></v-btn>
+        >
+          <IconX :size="16" :stroke-width="2" color="white" />
+        </v-btn>
       </v-card-title>
+
       <v-card-text class="pa-3 bg-grey-lighten-4">
         <v-text-field
           v-model="search"
           @input="onSearchInput"
-          prepend-inner-icon="mdi-magnify"
           label="Cari Kode atau Nama Komponen..."
           variant="outlined"
           density="compact"
@@ -131,7 +132,16 @@ const selectItem = (item: any) => {
           class="mb-3"
           autofocus
           clearable
-        ></v-text-field>
+        >
+          <template #prepend-inner>
+            <IconSearch
+              :size="15"
+              :stroke-width="1.7"
+              style="opacity: 0.55; margin-top: 1px"
+            />
+          </template>
+        </v-text-field>
+
         <v-data-table-server
           v-model:page="page"
           v-model:items-per-page="itemsPerPage"

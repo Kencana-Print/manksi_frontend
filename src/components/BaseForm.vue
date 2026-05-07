@@ -1,10 +1,16 @@
 <script setup lang="ts">
 import PageLayout from "@/components/PageLayout.vue";
+import {
+  IconDeviceFloppy,
+  IconX,
+  IconAlertTriangle,
+  IconCircleX,
+} from "@tabler/icons-vue";
 
 const props = defineProps<{
   title: string;
   menuId: string;
-  icon?: string;
+  icon?: any;
   isLoading?: boolean;
   isSaving?: boolean;
   itemName?: string; // Teks khusus di dialog (Opsional)
@@ -31,24 +37,35 @@ const emit = defineEmits([
         color="primary"
         @click="emit('validate-save')"
         :loading="isSaving"
-        prepend-icon="mdi-content-save"
-        >Simpan</v-btn
       >
+        <template #prepend>
+          <span class="d-flex align-center">
+            <IconDeviceFloppy :size="15" :stroke-width="1.7" />
+          </span>
+        </template>
+        Simpan
+      </v-btn>
       <v-btn
         size="small"
         variant="outlined"
         class="mx-2"
         @click="showCancelDialog = true"
-        >Batal</v-btn
       >
+        Batal
+      </v-btn>
       <v-btn
         size="small"
         variant="tonal"
         color="error"
         @click="showCloseDialog = true"
-        prepend-icon="mdi-close"
-        >Tutup</v-btn
       >
+        <template #prepend>
+          <span class="d-flex align-center">
+            <IconX :size="15" :stroke-width="2" />
+          </span>
+        </template>
+        Tutup
+      </v-btn>
     </template>
 
     <v-overlay
@@ -122,7 +139,12 @@ const emit = defineEmits([
     <v-dialog v-model="showCancelDialog" max-width="400px">
       <v-card class="rounded-lg">
         <v-card-title class="text-h6 pa-4 d-flex align-center">
-          <v-icon color="warning" class="mr-2">mdi-alert</v-icon>
+          <IconAlertTriangle
+            :size="20"
+            :stroke-width="1.7"
+            color="#f57c00"
+            class="mr-2"
+          />
           Konfirmasi Reset
         </v-card-title>
         <v-card-text class="pa-4 pt-0">
@@ -145,7 +167,12 @@ const emit = defineEmits([
     <v-dialog v-model="showCloseDialog" max-width="400px">
       <v-card class="rounded-lg">
         <v-card-title class="text-h6 pa-4 d-flex align-center">
-          <v-icon color="error" class="mr-2">mdi-close-circle</v-icon>
+          <IconCircleX
+            :size="20"
+            :stroke-width="1.7"
+            color="#c62828"
+            class="mr-2"
+          />
           Konfirmasi Tutup
         </v-card-title>
         <v-card-text class="pa-4 pt-0">

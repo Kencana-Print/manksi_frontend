@@ -3,6 +3,13 @@ import { computed, ref, watch, onMounted } from "vue";
 import { useToast } from "vue-toastification";
 import { penawaranFormService } from "@/services/penjualan/penawaranFormService";
 import api from "@/services/api";
+import {
+  IconPlus,
+  IconAlertTriangle,
+  IconX,
+  IconPhotoOff,
+  IconExternalLink,
+} from "@tabler/icons-vue";
 
 import PerusahaanSearchModal from "@/components/lookups/PerusahaanSearchModal.vue";
 import CustomerSearchModal from "@/components/lookups/CustomerSearchModal.vue";
@@ -603,13 +610,12 @@ const rp = (val: any) =>
       <div class="d-flex align-center justify-space-between mb-2 flex-shrink-0">
         <div class="form-title mb-0">Rincian Barang</div>
         <div class="d-flex gap-2">
-          <v-btn
-            size="x-small"
-            color="primary"
-            prepend-icon="mdi-plus"
-            @click="addDetail"
-            >Tambah Baris</v-btn
-          >
+          <v-btn size="x-small" color="primary" @click="addDetail">
+            <template #prepend
+              ><IconPlus :size="13" :stroke-width="2"
+            /></template>
+            Tambah Baris
+          </v-btn>
         </div>
       </div>
 
@@ -892,7 +898,13 @@ const rp = (val: any) =>
   <v-dialog v-model="confirmDialog" max-width="400px" persistent>
     <v-card class="rounded-lg">
       <v-card-title class="text-h6 pa-4 d-flex align-center">
-        <v-icon color="warning" class="mr-2">mdi-alert</v-icon> Peringatan
+        <IconAlertTriangle
+          color="orange"
+          class="mr-2"
+          :size="20"
+          :stroke-width="1.7"
+        />
+        Peringatan
       </v-card-title>
       <v-card-text class="pa-4 pt-0 text-body-2 text-grey-darken-3">
         Belum ada kalkulasi harga untuk No. Permintaan ini. <br />
@@ -915,12 +927,13 @@ const rp = (val: any) =>
       >
         <span class="text-subtitle-1 font-weight-bold">Preview Desain</span>
         <v-btn
-          icon="mdi-close"
           variant="text"
           size="small"
           color="white"
           @click="showPreviewDialog = false"
-        ></v-btn>
+        >
+          <IconX :size="18" :stroke-width="2" />
+        </v-btn>
       </v-card-title>
       <v-card-text class="pa-4 text-center bg-grey-lighten-4">
         <v-img
@@ -944,9 +957,7 @@ const rp = (val: any) =>
             <div
               class="d-flex flex-column align-center justify-center fill-height text-grey"
             >
-              <v-icon size="48" color="grey-lighten-1"
-                >mdi-image-off-outline</v-icon
-              >
+              <IconPhotoOff :size="48" color="#bdbdbd" />
               <div class="text-subtitle-2 mt-2">Gagal memuat gambar</div>
               <div class="text-caption mt-1">{{ previewImageUrl }}</div>
             </div>
@@ -958,10 +969,12 @@ const rp = (val: any) =>
         <v-btn
           color="primary"
           variant="text"
-          prepend-icon="mdi-open-in-new"
           :href="previewImageUrl"
           target="_blank"
         >
+          <template #prepend
+            ><IconExternalLink :size="15" :stroke-width="1.7"
+          /></template>
           Buka di Tab Baru
         </v-btn>
       </v-card-actions>

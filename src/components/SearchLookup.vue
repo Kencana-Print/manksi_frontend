@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from "vue";
 import api from "@/services/api";
+import { IconX, IconSearch } from "@tabler/icons-vue";
 
 interface LookupItem {
   Kode: string;
@@ -74,24 +75,32 @@ const selectItem = (item: any) => {
         >
         <v-spacer></v-spacer>
         <v-btn
-          icon="mdi-close"
           variant="text"
           size="small"
           @click="emit('update:modelValue', false)"
-        ></v-btn>
+        >
+          <IconX :size="16" :stroke-width="2" color="white" />
+        </v-btn>
       </v-card-title>
 
       <v-card-text class="pa-2">
         <v-text-field
           v-model="search"
-          prepend-inner-icon="mdi-magnify"
           label="Pencarian..."
           variant="outlined"
           density="compact"
           hide-details
           class="mb-2"
           autofocus
-        ></v-text-field>
+        >
+          <template #prepend-inner>
+            <IconSearch
+              :size="15"
+              :stroke-width="1.7"
+              style="opacity: 0.55; margin-top: 1px"
+            />
+          </template>
+        </v-text-field>
 
         <v-data-table
           :headers="headers"
@@ -119,7 +128,8 @@ const selectItem = (item: any) => {
   font-size: 11px !important;
 }
 .lookup-table :deep(thead th) {
-  background-color: #f5f5f5 !important;
+  background-color: #1565c0 !important;
+  color: white !important;
   height: 30px !important;
 }
 .lookup-table :deep(tbody tr) {

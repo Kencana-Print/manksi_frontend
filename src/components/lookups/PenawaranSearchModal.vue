@@ -1,6 +1,13 @@
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
 import api from "@/services/api";
+import {
+  IconFileText,
+  IconSearch,
+  IconDatabaseOff,
+  IconChevronLeft,
+  IconChevronRight,
+} from "@tabler/icons-vue";
 
 const props = defineProps<{ modelValue: boolean; custKode?: string }>();
 const emit = defineEmits(["update:modelValue", "selected"]);
@@ -95,16 +102,14 @@ const close = () => emit("update:modelValue", false);
     <div class="lkp-card">
       <!-- Header -->
       <div class="lkp-header">
-        <v-icon size="14" color="white" class="mr-2"
-          >mdi-file-document-outline</v-icon
-        >
+        <IconFileText :size="14" :stroke-width="1.7" color="white" />
         <span>Pilih Surat Penawaran</span>
         <button class="lkp-close" @click="close">✕</button>
       </div>
 
       <!-- Search -->
       <div class="lkp-search">
-        <v-icon size="16" color="#9e9e9e">mdi-magnify</v-icon>
+        <IconSearch :size="16" :stroke-width="1.7" color="#9e9e9e" />
         <input
           v-model="search"
           type="text"
@@ -130,7 +135,7 @@ const close = () => emit("update:modelValue", false);
 
         <!-- Empty -->
         <div v-else-if="items.length === 0" class="lkp-state">
-          <v-icon size="32" color="#bdbdbd">mdi-database-off-outline</v-icon>
+          <IconDatabaseOff :size="32" :stroke-width="1.3" color="#bdbdbd" />
           <span>{{
             search ? `Tidak ada hasil untuk "${search}"` : "Tidak ada data"
           }}</span>
@@ -170,7 +175,7 @@ const close = () => emit("update:modelValue", false);
             :disabled="currentPage === 1"
             @click="prevPage"
           >
-            <v-icon size="13">mdi-chevron-left</v-icon>
+            <IconChevronLeft :size="13" :stroke-width="2" />
           </button>
           <span class="page-txt">{{ currentPage }} / {{ totalPages }}</span>
           <button
@@ -178,7 +183,7 @@ const close = () => emit("update:modelValue", false);
             :disabled="currentPage === totalPages"
             @click="nextPage"
           >
-            <v-icon size="13">mdi-chevron-right</v-icon>
+            <IconChevronRight :size="13" :stroke-width="2" />
           </button>
         </div>
 

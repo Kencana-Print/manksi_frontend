@@ -3,6 +3,7 @@ import { ref, computed, watch, onMounted } from "vue";
 import api from "@/services/api";
 import { useToast } from "vue-toastification";
 import JenisKainSearchModal from "@/components/lookups/JenisKainSearchModal.vue";
+import { IconLock } from "@tabler/icons-vue";
 
 const toast = useToast();
 const showKainModal = ref(false);
@@ -295,7 +296,7 @@ const rows8 = Array.from({ length: 8 }, (_, i) => i + 1);
   <div class="tk-root">
     <!-- Alert kalkulasi terkunci -->
     <div v-if="formData.isKalkulasiLocked" class="tk-alert error">
-      <v-icon size="13" class="mr-1">mdi-lock</v-icon>
+      <IconLock :size="13" class="mr-1" />
       Akses Ditolak: Kalkulasi ini terkunci karena terakhir dimodifikasi oleh
       departemen FINANCE.
     </div>

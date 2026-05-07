@@ -8,6 +8,14 @@ import { useAuthStore } from "@/stores/authStore";
 import api from "@/services/api";
 import MapSearchModal from "@/components/lookups/MapSearchModal.vue";
 import * as XLSX from "xlsx"; // Pastikan Anda sudah install xlsx
+import {
+  IconTruckDelivery,
+  IconPrinter,
+  IconFileSpreadsheet,
+  IconChevronDown,
+  IconSearch,
+  IconFileDescription,
+} from "@tabler/icons-vue";
 
 const router = useRouter();
 const toast = useToast();
@@ -300,7 +308,7 @@ const submitPengajuan = async () => {
   <BaseBrowse
     title="Surat Jalan PO Internal MAP"
     :menu-id="menuId"
-    icon="mdi-truck-delivery-outline"
+    :icon="IconTruckDelivery"
     :headers="headers"
     :items="items ?? []"
     item-value="Nomor"
@@ -373,7 +381,7 @@ const submitPengajuan = async () => {
             disabled
           />
           <button class="f-btn-lookup" @click="showMapModal = true">
-            <v-icon size="12">mdi-magnify</v-icon>
+            <IconSearch :size="12" :stroke-width="1.7" />
           </button>
         </div>
       </div>
@@ -384,20 +392,27 @@ const submitPengajuan = async () => {
         size="small"
         variant="flat"
         color="blue-grey"
-        prepend-icon="mdi-printer"
         :disabled="selected.length === 0"
         @click="cetak"
-        >Cetak</v-btn
       >
+        <template #prepend
+          ><IconPrinter :size="15" :stroke-width="1.7"
+        /></template>
+        Cetak
+      </v-btn>
+
       <v-btn
         size="small"
         variant="flat"
         color="green-darken-1"
-        prepend-icon="mdi-file-excel"
         :loading="isExporting"
         @click="exportDetail"
-        >Export Detail</v-btn
       >
+        <template #prepend
+          ><IconFileSpreadsheet :size="15" :stroke-width="1.7"
+        /></template>
+        Export Detail
+      </v-btn>
 
       <v-menu v-if="selected.length > 0">
         <template v-slot:activator="{ props }">
@@ -406,16 +421,19 @@ const submitPengajuan = async () => {
             variant="flat"
             size="small"
             v-bind="props"
-            append-icon="mdi-chevron-down"
             class="ml-2"
-            >Aksi SJ</v-btn
           >
+            Aksi SJ
+            <template #append
+              ><IconChevronDown :size="14" :stroke-width="2"
+            /></template>
+          </v-btn>
         </template>
         <v-list density="compact">
           <v-list-item @click="pengajuanPerubahan">
-            <template v-slot:prepend
-              ><v-icon size="small">mdi-file-document-edit</v-icon></template
-            >
+            <template #prepend
+              ><IconFileDescription :size="16" :stroke-width="1.7"
+            /></template>
             <v-list-item-title>Pengajuan Perubahan Data</v-list-item-title>
           </v-list-item>
         </v-list>
@@ -512,9 +530,14 @@ const submitPengajuan = async () => {
   <v-dialog v-model="dialogAlasan" max-width="500px" persistent>
     <v-card class="rounded-lg">
       <v-card-title
-        class="bg-primary text-white pa-3 text-subtitle-1 font-weight-bold"
+        class="bg-primary text-white pa-3 text-subtitle-1 font-weight-bold d-flex align-center"
       >
-        <v-icon start color="white">mdi-file-document-edit</v-icon>
+        <IconFileDescription
+          :size="18"
+          :stroke-width="1.7"
+          color="white"
+          class="mr-2"
+        />
         Pengajuan Perubahan Surat Jalan
       </v-card-title>
       <v-card-text class="pa-4 pt-4">

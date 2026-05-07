@@ -5,6 +5,7 @@ import { useBrowse } from "@/composables/useBrowse";
 import { useToast } from "vue-toastification";
 import BaseBrowse from "@/components/BaseBrowse.vue";
 import SupplierFormDialog from "@/components/dialogs/SupplierFormDialog.vue";
+import { IconTruck } from "@tabler/icons-vue";
 
 const toast = useToast();
 
@@ -70,7 +71,7 @@ const handleEdit = async (item: any) => {
   <BaseBrowse
     title="Master Supplier"
     menu-id="12"
-    icon="mdi-truck-outline"
+    :icon="IconTruck"
     :headers="headers"
     :items="items ?? []"
     :is-loading="isLoading"

@@ -1,12 +1,34 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from "vue";
 import PageLayout from "@/components/PageLayout.vue";
+import {
+  IconPlus,
+  IconPencil,
+  IconTrash,
+  IconTable,
+  IconFileSpreadsheet,
+  IconX,
+  IconRefresh,
+  IconFilterOff,
+  IconChevronLeft,
+  IconChevronRight,
+  IconChevronsLeft,
+  IconChevronsRight,
+  IconChevronUp,
+  IconChevronDown,
+  IconFilter,
+  IconAdjustmentsHorizontal,
+  IconSearch,
+  IconSearchOff,
+  IconDatabaseOff,
+  IconAlertTriangle,
+} from "@tabler/icons-vue";
 
 const props = withDefaults(
   defineProps<{
     title: string;
     menuId: string;
-    icon?: string;
+    icon?: any;
     headers: any[];
     items: any[];
     isLoading?: boolean;
@@ -31,7 +53,7 @@ const props = withDefaults(
     summaryLabel?: string; // label di kiri, cth: "Total Nominal"
   }>(),
   {
-    icon: "mdi-table",
+    icon: () => IconTable,
     isLoading: false,
     searchPlaceholder: "Cari data...",
     itemValue: "Kode",
@@ -460,9 +482,6 @@ const confirmDelete = () => {
 };
 
 // ── Empty state ────────────────────────────────────────────────────────
-const emptyStateIcon = computed(() =>
-  search.value ? "mdi-magnify-close" : "mdi-database-off-outline",
-);
 const emptyStateText = computed(() =>
   search.value
     ? `Tidak ada hasil untuk "${search.value}"`
@@ -485,47 +504,49 @@ defineExpose({ clearSelection, search });
   <PageLayout :title="title" :menu-id="menuId" :icon="icon">
     <!-- Tombol aksi di header PageLayout — tidak ikut scroll -->
     <template #header-actions>
-      <v-btn
-        v-if="canInsert"
-        size="small"
-        color="primary"
-        prepend-icon="mdi-plus"
-        @click="emit('add')"
-        >Baru</v-btn
-      >
+      <v-btn v-if="canInsert" size="small" color="primary" @click="emit('add')">
+        <template #prepend><IconPlus :size="15" :stroke-width="2" /></template>
+        Baru
+      </v-btn>
       <v-btn
         v-if="canEdit"
         size="small"
-        prepend-icon="mdi-pencil"
         :disabled="!isSingleSelected"
         @click="emit('edit', internalSelected[0])"
-        >Ubah</v-btn
       >
+        <template #prepend
+          ><IconPencil :size="15" :stroke-width="1.7"
+        /></template>
+        Ubah
+      </v-btn>
       <v-btn
         v-if="canDelete"
         size="small"
         color="error"
-        prepend-icon="mdi-delete"
         :disabled="!isSingleSelected"
         @click="requestDelete(internalSelected[0])"
-        >Hapus</v-btn
       >
+        <template #prepend
+          ><IconTrash :size="15" :stroke-width="1.7"
+        /></template>
+        Hapus
+      </v-btn>
       <v-btn
         v-if="canExport"
         size="small"
         color="green"
-        prepend-icon="mdi-file-excel"
         @click="emit('export')"
-        >Export</v-btn
       >
+        <template #prepend
+          ><IconFileSpreadsheet :size="15" :stroke-width="1.7"
+        /></template>
+        Export
+      </v-btn>
       <slot name="extra-actions" :selected="internalSelected" />
-      <v-btn
-        size="small"
-        variant="text"
-        prepend-icon="mdi-close"
-        @click="$router.back()"
-        >Tutup</v-btn
-      >
+      <v-btn size="small" variant="text" @click="$router.back()">
+        <template #prepend><IconX :size="15" :stroke-width="2" /></template>
+        Tutup
+      </v-btn>
     </template>
 
     <!-- Main Content -->
@@ -537,31 +558,42 @@ defineExpose({ clearSelection, search });
         <v-text-field
           :model-value="search"
           @update:model-value="onSearch"
-          prepend-inner-icon="mdi-magnify"
           :placeholder="searchPlaceholder"
           variant="outlined"
           density="compact"
           hide-details
           clearable
           class="search-field"
-        />
+        >
+          <template #prepend-inner>
+            <IconSearch
+              :size="15"
+              :stroke-width="1.7"
+              style="opacity: 0.55; margin-top: 1px"
+            />
+          </template>
+        </v-text-field>
         <v-btn
           @click="emit('refresh')"
           color="primary"
-          icon="mdi-refresh"
           variant="text"
           :loading="isLoading"
           size="small"
-        />
-        <!-- Reset column filter — muncul kalau ada filter aktif -->
+          icon
+        >
+          <IconRefresh :size="18" :stroke-width="1.7" />
+        </v-btn>
+        <!-- Reset column filter -->
         <v-btn
           v-if="activeFilterCount > 0"
           size="small"
           color="warning"
           variant="tonal"
-          prepend-icon="mdi-filter-off"
           @click="columnFilters = {}"
         >
+          <template #prepend
+            ><IconFilterOff :size="15" :stroke-width="1.7"
+          /></template>
           Reset Filter ({{ activeFilterCount }})
         </v-btn>
         <v-spacer />
@@ -593,6 +625,9 @@ defineExpose({ clearSelection, search });
             class="base-table"
             :row-props="resolvedRowProps"
             @click:row="handleRowClick"
+            sort-asc-icon=""
+            sort-desc-icon=""
+            :cell-props="({ value }) => ({ title: value ?? '' })"
           >
             <!-- Custom header dengan tombol filter + resize per kolom -->
             <template #headers="{ columns, isSorted, getSortIcon, toggleSort }">
@@ -612,11 +647,17 @@ defineExpose({ clearSelection, search });
                         @click="col.sortable !== false && toggleSort(col)"
                       >
                         {{ col.title }}
-                        <v-icon
-                          v-if="isSorted(col)"
-                          :icon="getSortIcon(col)"
-                          size="11"
-                          class="ml-1"
+                        <IconChevronUp
+                          v-if="
+                            isSorted(col) && getSortIcon(col) === '$sortAsc'
+                          "
+                          :size="11"
+                          style="display: inline; vertical-align: middle"
+                        />
+                        <IconChevronDown
+                          v-else-if="isSorted(col)"
+                          :size="11"
+                          style="display: inline; vertical-align: middle"
                         />
                       </span>
                       <button
@@ -626,11 +667,16 @@ defineExpose({ clearSelection, search });
                         @click.stop="openColFilter(col.key, $event)"
                         :title="`Filter ${col.title}`"
                       >
-                        <v-icon size="11">{{
-                          colHasFilter(col.key)
-                            ? "mdi-filter"
-                            : "mdi-filter-outline"
-                        }}</v-icon>
+                        <IconFilter
+                          v-if="colHasFilter(col.key)"
+                          :size="10"
+                          :stroke-width="2"
+                        />
+                        <IconAdjustmentsHorizontal
+                          v-else
+                          :size="10"
+                          :stroke-width="2"
+                        />
                       </button>
                     </div>
                     <!-- Resize handle — strip vertikal di tepi kanan th -->
@@ -669,7 +715,18 @@ defineExpose({ clearSelection, search });
             <!-- Empty state informatif -->
             <template #no-data>
               <div class="empty-state">
-                <v-icon :icon="emptyStateIcon" size="40" class="empty-icon" />
+                <IconSearchOff
+                  v-if="search"
+                  :size="40"
+                  :stroke-width="1.3"
+                  class="empty-icon"
+                />
+                <IconDatabaseOff
+                  v-else
+                  :size="40"
+                  :stroke-width="1.3"
+                  class="empty-icon"
+                />
                 <div class="empty-text">{{ emptyStateText }}</div>
                 <div class="empty-subtext">{{ emptyStateSubtext }}</div>
                 <v-btn
@@ -736,7 +793,7 @@ defineExpose({ clearSelection, search });
             @click="goToPage(1)"
             title="Halaman pertama"
           >
-            <v-icon size="15">mdi-chevron-double-left</v-icon>
+            <IconChevronsLeft :size="15" :stroke-width="2" />
           </button>
           <button
             class="page-btn icon-btn"
@@ -744,7 +801,7 @@ defineExpose({ clearSelection, search });
             @click="goToPage(currentPage - 1)"
             title="Sebelumnya"
           >
-            <v-icon size="15">mdi-chevron-left</v-icon>
+            <IconChevronLeft :size="15" :stroke-width="2" />
           </button>
 
           <button
@@ -763,7 +820,7 @@ defineExpose({ clearSelection, search });
             @click="goToPage(currentPage + 1)"
             title="Berikutnya"
           >
-            <v-icon size="15">mdi-chevron-right</v-icon>
+            <IconChevronRight :size="15" :stroke-width="2" />
           </button>
           <button
             class="page-btn icon-btn"
@@ -771,7 +828,7 @@ defineExpose({ clearSelection, search });
             @click="goToPage(totalPages)"
             title="Halaman terakhir"
           >
-            <v-icon size="15">mdi-chevron-double-right</v-icon>
+            <IconChevronsRight :size="15" :stroke-width="2" />
           </button>
 
           <!-- Jump input -->
@@ -813,7 +870,11 @@ defineExpose({ clearSelection, search });
         <v-card-item>
           <template #prepend>
             <v-avatar color="error" variant="tonal" size="40">
-              <v-icon icon="mdi-delete-alert-outline" />
+              <IconAlertTriangle
+                :size="22"
+                :stroke-width="1.7"
+                color="#c62828"
+              />
             </v-avatar>
           </template>
           <v-card-title class="text-body-1 font-weight-bold"
@@ -909,7 +970,7 @@ defineExpose({ clearSelection, search });
   min-height: 0;
   gap: 8px;
   padding: 8px;
-  overflow: hidden; /* browse-content tidak scroll */
+  overflow: hidden;
 }
 
 /* ── Filter bar ── */
@@ -917,8 +978,8 @@ defineExpose({ clearSelection, search });
   display: flex;
   align-items: center;
   gap: 8px;
-  background: #f5f5f5;
-  border: 1px solid #e0e0e0;
+  background: rgb(var(--v-theme-surface));
+  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
   border-radius: 6px;
   padding: 7px 12px;
   flex-shrink: 0;
@@ -926,7 +987,6 @@ defineExpose({ clearSelection, search });
 }
 
 .search-field {
-  /* Lebar wajar — tidak terlalu sempit, tidak full width */
   width: 220px;
   min-width: 160px;
   flex-shrink: 0;
@@ -937,7 +997,7 @@ defineExpose({ clearSelection, search });
 .search-field :deep(.v-field) {
   height: 34px;
   font-size: 12px;
-  background: white;
+  background: rgb(var(--v-theme-surface));
 }
 .search-field :deep(.v-field__input) {
   padding-top: 0;
@@ -994,25 +1054,32 @@ defineExpose({ clearSelection, search });
   letter-spacing: 0.03em;
   height: 34px !important;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .base-table :deep(tbody td) {
   font-size: 12px;
   height: 28px !important;
   padding: 0 8px !important;
-  border-bottom: 1px solid #f0f0f0 !important;
+  border-bottom: 1px solid rgba(var(--v-border-color), var(--v-border-opacity)) !important;
+
+  /* 3 baris di bawah ini adalah KUNCI truncation (ellipsis) */
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
 }
 .base-table :deep(tbody tr:nth-of-type(odd)) {
-  background-color: #fafafa;
+  background-color: rgba(var(--v-theme-on-surface), 0.02);
 }
 .base-table :deep(tbody tr:hover) {
-  background-color: #eeeeee !important;
+  background-color: rgba(var(--v-theme-primary), 0.06) !important;
 }
 .base-table :deep(tbody tr.row-selected) {
-  background-color: #bbdefb !important;
-  color: #0d47a1 !important;
+  background-color: rgba(var(--v-theme-primary), 0.15) !important;
+  color: rgb(var(--v-theme-primary)) !important;
 }
 .base-table :deep(tbody tr.row-selected:hover) {
-  background-color: #90caf9 !important;
+  background-color: rgba(var(--v-theme-primary), 0.22) !important;
 }
 
 /* ── Empty state ── */
@@ -1024,41 +1091,42 @@ defineExpose({ clearSelection, search });
   gap: 6px;
 }
 .empty-icon {
-  color: #bdbdbd;
+  color: rgba(var(--v-theme-on-surface), 0.3);
   margin-bottom: 4px;
 }
 .empty-text {
   font-size: 13px;
   font-weight: 600;
-  color: #616161;
+  color: rgba(var(--v-theme-on-surface), 0.6);
 }
 .empty-subtext {
   font-size: 11px;
-  color: #9e9e9e;
+  color: rgba(var(--v-theme-on-surface), 0.4);
 }
 
 /* ── Expanded row ── */
 .expanded-cell {
   padding: 0 !important;
-  background-color: #f8f9fa;
+  background-color: rgba(var(--v-theme-surface-variant), 0.35) !important;
 }
 .expanded-inner {
-  padding: 6px 10px 6px 10px;
+  padding: 6px 10px;
   width: 100%;
   box-sizing: border-box;
 }
 .expanded-wrapper {
-  border: 1px solid #ddd;
+  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
   border-radius: 4px;
   overflow: hidden;
-  background: white;
+  background: rgb(var(--v-theme-surface));
 }
 
-/* Paksa semua konten dalam detail konsisten dengan tabel utama */
+/* Detail table dalam expanded */
 .expanded-wrapper :deep(table) {
   font-size: 11px !important;
   border-collapse: collapse;
   width: 100%;
+  background: rgb(var(--v-theme-surface));
 }
 .expanded-wrapper :deep(thead tr) {
   background: #1565c0 !important;
@@ -1075,8 +1143,16 @@ defineExpose({ clearSelection, search });
   font-size: 11px !important;
   padding: 3px 7px !important;
   height: 26px !important;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
   vertical-align: middle;
+  color: rgb(var(--v-theme-on-surface));
+  background: rgb(var(--v-theme-surface));
+}
+.expanded-wrapper :deep(tbody tr:nth-of-type(even) td) {
+  background: rgba(var(--v-theme-on-surface), 0.02);
+}
+.expanded-wrapper :deep(tbody tr:hover td) {
+  background: rgba(var(--v-theme-primary), 0.06) !important;
 }
 
 /* ── Summary bar (sticky, sync scroll horizontal) ── */
@@ -1119,12 +1195,12 @@ defineExpose({ clearSelection, search });
   padding: 4px 2px;
   flex-shrink: 0;
   flex-grow: 0;
-  border-top: 1px solid #e0e0e0;
+  border-top: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
 }
 
 .page-info {
   font-size: 12px;
-  color: #757575;
+  color: rgba(var(--v-theme-on-surface), 0.5);
   white-space: nowrap;
 }
 
@@ -1138,12 +1214,12 @@ defineExpose({ clearSelection, search });
   min-width: 30px;
   height: 30px;
   padding: 0 7px;
-  border: 1px solid #e0e0e0;
+  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
   border-radius: 6px;
-  background: white;
+  background: rgb(var(--v-theme-surface));
   font-size: 12px;
   font-weight: 500;
-  color: #424242;
+  color: rgb(var(--v-theme-on-surface));
   cursor: pointer;
   transition:
     background 0.15s,
@@ -1155,13 +1231,13 @@ defineExpose({ clearSelection, search });
   line-height: 1;
 }
 .page-btn:hover:not(:disabled) {
-  background-color: #e3f2fd;
-  border-color: #90caf9;
-  color: #1565c0;
+  background-color: rgba(var(--v-theme-primary), 0.1);
+  border-color: rgba(var(--v-theme-primary), 0.4);
+  color: rgb(var(--v-theme-primary));
 }
 .page-btn.active {
-  background-color: #1976d2;
-  border-color: #1976d2;
+  background-color: rgb(var(--v-theme-primary));
+  border-color: rgb(var(--v-theme-primary));
   color: white;
   font-weight: 700;
 }
@@ -1173,11 +1249,12 @@ defineExpose({ clearSelection, search });
 .jump-input {
   width: 46px;
   height: 30px;
-  border: 1px solid #e0e0e0;
+  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
   border-radius: 6px;
   text-align: center;
   font-size: 12px;
-  color: #424242;
+  color: rgb(var(--v-theme-on-surface));
+  background: rgb(var(--v-theme-surface));
   outline: none;
   margin-left: 6px;
   transition: border-color 0.15s;
@@ -1189,12 +1266,12 @@ defineExpose({ clearSelection, search });
   -webkit-appearance: none;
 }
 .jump-input:focus {
-  border-color: #1976d2;
+  border-color: rgb(var(--v-theme-primary));
 }
 
 .page-of {
   font-size: 12px;
-  color: #9e9e9e;
+  color: rgba(var(--v-theme-on-surface), 0.4);
   white-space: nowrap;
   margin-left: 4px;
 }
@@ -1207,16 +1284,16 @@ defineExpose({ clearSelection, search });
 .per-page-select {
   height: 30px;
   padding: 0 4px;
-  border: 1px solid #e0e0e0;
+  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
   border-radius: 6px;
   font-size: 12px;
-  color: #424242;
-  background: white;
+  color: rgb(var(--v-theme-on-surface));
+  background: rgb(var(--v-theme-surface));
   cursor: pointer;
   outline: none;
 }
 .per-page-select:focus {
-  border-color: #1976d2;
+  border-color: rgb(var(--v-theme-primary));
 }
 
 /* ── Custom header ── */
@@ -1307,10 +1384,11 @@ defineExpose({ clearSelection, search });
 /* ── Column Filter Dropdown — global (tidak scoped) ── */
 <style>
 .col-filter-dropdown {
-  background: white;
-  border: 1px solid #d0d0d0;
+  background: var(--v-theme-surface, white);
+  background: rgb(var(--v-theme-surface));
+  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
   border-radius: 6px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
   width: 220px;
   display: flex;
   flex-direction: column;
@@ -1324,15 +1402,17 @@ defineExpose({ clearSelection, search });
 .cfd-search-input {
   width: 100%;
   height: 28px;
-  border: 1px solid #ccc;
+  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
   border-radius: 4px;
   padding: 0 8px;
   font-size: 12px;
   outline: none;
   box-sizing: border-box;
+  background: rgb(var(--v-theme-surface));
+  color: rgb(var(--v-theme-on-surface));
 }
 .cfd-search-input:focus {
-  border-color: #1976d2;
+  border-color: rgb(var(--v-theme-primary));
 }
 
 .cfd-actions {
@@ -1345,7 +1425,7 @@ defineExpose({ clearSelection, search });
   background: none;
   border: none;
   font-size: 11px;
-  color: #1976d2;
+  color: rgb(var(--v-theme-primary));
   cursor: pointer;
   padding: 2px 0;
 }
@@ -1356,13 +1436,13 @@ defineExpose({ clearSelection, search });
   color: #c62828;
 }
 .cfd-sep {
-  color: #ccc;
+  color: rgba(var(--v-border-color), var(--v-border-opacity));
   font-size: 11px;
 }
 
 .cfd-divider {
   height: 1px;
-  background: #eeeeee;
+  background: rgba(var(--v-border-color), var(--v-border-opacity));
   margin: 0;
 }
 
@@ -1379,18 +1459,18 @@ defineExpose({ clearSelection, search });
   padding: 3px 10px;
   cursor: pointer;
   font-size: 12px;
-  color: #212121;
+  color: rgb(var(--v-theme-on-surface));
   transition: background 0.1s;
 }
 .cfd-item:hover {
-  background: #f5f5f5;
+  background: rgba(var(--v-theme-on-surface), 0.06);
 }
 .cfd-item input[type="checkbox"] {
   width: 13px;
   height: 13px;
   cursor: pointer;
   flex-shrink: 0;
-  accent-color: #1976d2;
+  accent-color: rgb(var(--v-theme-primary));
 }
 .cfd-val {
   overflow: hidden;
@@ -1401,18 +1481,18 @@ defineExpose({ clearSelection, search });
 .cfd-empty {
   padding: 8px 10px;
   font-size: 11px;
-  color: #9e9e9e;
+  color: rgba(var(--v-theme-on-surface), 0.4);
   text-align: center;
 }
 
 .cfd-footer {
   padding: 6px 8px;
-  border-top: 1px solid #eeeeee;
+  border-top: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
   display: flex;
   justify-content: flex-end;
 }
 .cfd-ok-btn {
-  background: #1976d2;
+  background: rgb(var(--v-theme-primary));
   color: white;
   border: none;
   border-radius: 4px;
@@ -1422,6 +1502,82 @@ defineExpose({ clearSelection, search });
   cursor: pointer;
 }
 .cfd-ok-btn:hover {
-  background: #1557a8;
+  opacity: 0.88;
+}
+:deep(.v-data-table__th--sortable .v-icon) {
+  display: none;
+}
+:deep(.base-th .v-icon) {
+  display: none !important;
+}
+
+.base-table :deep(tbody td) {
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  height: 28px !important;
+  max-height: 28px !important;
+  max-width: 0 !important; /* KUNCI: paksa ellipsis bekerja di td */
+  padding: 0 8px !important;
+}
+
+.base-table :deep(tbody tr) {
+  height: 28px !important;
+  max-height: 28px !important;
+}
+
+.base-table :deep(table) {
+  table-layout: fixed !important;
+  width: 100% !important;
+}
+
+/* ── MENGATASI BARIS MELAR KARENA TOMBOL EXPAND VUETIFY (AGRESIF) ── */
+
+/* 1. Paksa tinggi baris tabel sekeras mungkin */
+.base-table :deep(.v-data-table__wrapper table tbody tr) {
+  height: 28px !important;
+  max-height: 28px !important;
+}
+
+.base-table :deep(.v-data-table__wrapper table tbody td) {
+  height: 28px !important;
+  max-height: 28px !important;
+  box-sizing: border-box !important; /* Mencegah padding menambah tinggi */
+}
+
+/* 2. Target SEMUA kemungkinan class tombol expand Vuetify */
+.base-table :deep(.v-data-table__expand-icon),
+.base-table :deep(td:first-child .v-btn),
+.base-table :deep(td button.v-btn--icon) {
+  height: 20px !important;
+  width: 20px !important;
+  min-height: 20px !important;
+  min-width: 20px !important;
+  padding: 0 !important;
+  margin: 0 auto !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* 3. Kecilkan icon di dalam tombol */
+.base-table :deep(.v-data-table__expand-icon .v-icon),
+.base-table :deep(td:first-child .v-btn .v-icon) {
+  font-size: 16px !important;
+}
+
+/* 4. Sembunyikan elemen ripple (efek klik) yang sering memakan ruang */
+.base-table :deep(td:first-child .v-btn__overlay),
+.base-table :deep(td:first-child .v-ripple__container) {
+  display: none !important;
+}
+
+/* 5. Khusus sel pertama (tempat panah expand berada), persempit ruangnya */
+.base-table :deep(td:first-child) {
+  padding-left: 2px !important;
+  padding-right: 2px !important;
+  width: 32px !important;
+  min-width: 32px !important;
+  max-width: 32px !important;
 }
 </style>

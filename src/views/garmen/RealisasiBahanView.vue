@@ -6,6 +6,12 @@ import * as XLSX from "xlsx";
 import BaseBrowse from "@/components/BaseBrowse.vue";
 import { useBrowse } from "@/composables/useBrowse";
 import { realisasiBahanService } from "@/services/garmen/realisasiBahanService";
+import {
+  IconClipboardCheck,
+  IconFileDescription,
+  IconPrinter,
+  IconFileSpreadsheet,
+} from "@tabler/icons-vue";
 
 const router = useRouter();
 const toast = useToast();
@@ -208,7 +214,7 @@ const getNomorClass = (item: any) => {
   <BaseBrowse
     title="Realisasi Permintaan Bahan"
     menu-id="108"
-    icon="mdi-clipboard-check-outline"
+    :icon="IconClipboardCheck"
     :headers="headers"
     :items="items ?? []"
     :is-loading="isLoading"
@@ -268,31 +274,40 @@ const getNomorClass = (item: any) => {
       <v-btn
         v-if="canEdit"
         size="small"
-        prepend-icon="mdi-file-document-edit-outline"
         color="orange-darken-3"
         :disabled="selected.length === 0"
         @click="onAjukanPerubahan"
-        >Pengajuan</v-btn
       >
+        <template #prepend
+          ><IconFileDescription :size="15" :stroke-width="1.7"
+        /></template>
+        Pengajuan
+      </v-btn>
 
       <v-btn
         size="small"
-        prepend-icon="mdi-printer"
         color="grey-darken-3"
         :disabled="selected.length === 0"
         @click="onPrint"
-        >Cetak</v-btn
       >
+        <template #prepend>
+          <IconPrinter :size="15" :stroke-width="1.7" />
+        </template>
+        Cetak
+      </v-btn>
 
       <v-btn
         v-if="canExport"
         size="small"
-        prepend-icon="mdi-file-excel-box"
         color="teal-darken-2"
         :loading="isExportingDetail"
         @click="onExportDetail"
-        >Export Detail</v-btn
       >
+        <template #prepend
+          ><IconFileSpreadsheet :size="15" :stroke-width="1.7"
+        /></template>
+        Export Detail
+      </v-btn>
     </template>
 
     <!-- Custom Column Styling -->
@@ -356,9 +371,7 @@ const getNomorClass = (item: any) => {
   <v-dialog v-model="actionDialog" max-width="400px" persistent>
     <div class="close-dlg">
       <div class="close-dlg-header" style="background: #ef6c00">
-        <v-icon size="14" color="white" class="mr-2"
-          >mdi-file-document-edit</v-icon
-        >
+        <IconFileDescription :size="14" color="white" class="mr-2" />
         Pengajuan Perubahan
         <button class="dlg-x" @click="actionDialog = false">✕</button>
       </div>

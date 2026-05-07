@@ -4,6 +4,7 @@ import type { VForm } from "vuetify/components";
 import api from "@/services/api";
 import { useToast } from "vue-toastification";
 import CustomerSearchModal from "@/components/lookups/CustomerSearchModal.vue";
+import { IconUsers, IconSearch, IconX } from "@tabler/icons-vue";
 
 const props = defineProps<{
   modelValue: boolean;
@@ -162,9 +163,7 @@ const divisiItems = [
     <v-card class="cus-dialog-card">
       <!-- Header -->
       <div class="cus-header">
-        <v-icon size="14" color="white" class="mr-2"
-          >mdi-account-group-outline</v-icon
-        >
+        <IconUsers :size="15" :stroke-width="1.7" color="white" class="mr-2" />
         <span>{{ isNewMode ? "TAMBAH" : "UBAH" }} MASTER CUSTOMER</span>
         <v-spacer />
         <button class="cus-close-btn" @click="dialogVisible = false">✕</button>
@@ -514,22 +513,22 @@ const divisiItems = [
                       class="f-input"
                     >
                       <template #append-inner>
-                        <v-icon
-                          color="primary"
-                          size="18"
+                        <IconSearch
+                          :size="16"
+                          :stroke-width="1.7"
+                          color="#1565c0"
                           style="cursor: pointer"
                           @mousedown.prevent="showCustomerModal = true"
-                          >mdi-magnify</v-icon
-                        >
-                        <v-icon
+                        />
+                        <IconX
                           v-if="formData.KodeInduk"
-                          color="error"
-                          size="16"
+                          :size="14"
+                          :stroke-width="2"
+                          color="#c62828"
                           class="ml-1"
                           style="cursor: pointer"
                           @click.stop="formData.KodeInduk = ''"
-                          >mdi-close</v-icon
-                        >
+                        />
                       </template>
                     </v-text-field>
                   </div>
@@ -557,7 +556,7 @@ const divisiItems = [
           :disabled="isSaving"
         >
           <span v-if="isSaving">Menyimpan...</span>
-          <span v-else>💾 Simpan (F10)</span>
+          <span v-else>Simpan (F10)</span>
         </button>
       </div>
     </v-card>

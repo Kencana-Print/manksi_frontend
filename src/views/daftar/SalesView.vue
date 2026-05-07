@@ -5,6 +5,7 @@ import { useBrowse } from "@/composables/useBrowse";
 import { useToast } from "vue-toastification";
 import BaseBrowse from "@/components/BaseBrowse.vue";
 import SalesFormDialog from "@/components/dialogs/SalesFormDialog.vue";
+import { IconTie } from "@tabler/icons-vue";
 
 const toast = useToast();
 
@@ -78,7 +79,7 @@ const handleDelete = async (item: any) => {
   <BaseBrowse
     title="Master Sales"
     menu-id="23"
-    icon="mdi-account-tie"
+    :icon="IconTie"
     :headers="headers"
     :items="items ?? []"
     :is-loading="isLoading"

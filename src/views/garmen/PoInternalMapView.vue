@@ -8,6 +8,12 @@ import { useAuthStore } from "@/stores/authStore";
 import api from "@/services/api";
 import MapSearchModal from "@/components/lookups/MapSearchModal.vue";
 import * as XLSX from "xlsx";
+import {
+  IconShoppingCartDown,
+  IconSearch,
+  IconPrinter,
+  IconFileSpreadsheet,
+} from "@tabler/icons-vue";
 
 const router = useRouter();
 const toast = useToast();
@@ -299,7 +305,7 @@ const exportDetail = async () => {
   <BaseBrowse
     title="PO Internal MAP"
     :menu-id="menuId"
-    icon="mdi-cart-arrow-down"
+    :icon="IconShoppingCartDown"
     :headers="headers"
     :items="items ?? []"
     item-value="Nomor"
@@ -372,7 +378,7 @@ const exportDetail = async () => {
             disabled
           />
           <button class="f-btn-lookup" @click="showMapModal = true">
-            <v-icon size="12">mdi-magnify</v-icon>
+            <IconSearch :size="12" :stroke-width="1.7" />
           </button>
         </div>
       </div>
@@ -400,20 +406,26 @@ const exportDetail = async () => {
         size="small"
         variant="flat"
         color="blue-grey"
-        prepend-icon="mdi-printer"
         :disabled="selected.length === 0"
         @click="cetak"
-        >Cetak</v-btn
       >
+        <template #prepend
+          ><IconPrinter :size="15" :stroke-width="1.7"
+        /></template>
+        Cetak
+      </v-btn>
       <v-btn
         size="small"
         variant="flat"
         color="green-darken-1"
-        prepend-icon="mdi-file-excel"
         :loading="isExporting"
         @click="exportDetail"
-        >Export Detail</v-btn
       >
+        <template #prepend
+          ><IconFileSpreadsheet :size="15" :stroke-width="1.7"
+        /></template>
+        Export Detail
+      </v-btn>
     </template>
 
     <template #item.Tanggal="{ item }">{{ fmtDate(item.Tanggal) }}</template>

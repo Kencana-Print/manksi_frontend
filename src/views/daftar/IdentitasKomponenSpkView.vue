@@ -4,6 +4,7 @@ import { useRouter } from "vue-router";
 import api from "@/services/api";
 import { useToast } from "vue-toastification";
 import BaseBrowse from "@/components/BaseBrowse.vue";
+import { IconListDetails } from "@tabler/icons-vue";
 
 const router = useRouter();
 const toast = useToast();
@@ -124,7 +125,7 @@ fetchData();
   <BaseBrowse
     title="Browse Identitas Komponen SPK"
     menu-id="18"
-    icon="mdi-format-list-bulleted-type"
+    :icon="IconListDetails"
     :headers="headers"
     :items="items"
     :is-loading="isLoading"

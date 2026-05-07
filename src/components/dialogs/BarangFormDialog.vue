@@ -3,6 +3,7 @@ import { ref, watch, computed } from "vue";
 import type { VForm } from "vuetify/components";
 import api from "@/services/api";
 import { useToast } from "vue-toastification";
+import { IconShirt, IconPhoto } from "@tabler/icons-vue";
 
 const props = defineProps<{
   modelValue: boolean;
@@ -122,9 +123,7 @@ const handleSave = async () => {
     <v-card class="brg-dialog-card">
       <!-- Header -->
       <div class="brg-header">
-        <v-icon size="14" color="white" class="mr-2"
-          >mdi-tshirt-crew-outline</v-icon
-        >
+        <IconShirt :size="15" :stroke-width="1.7" color="white" class="mr-2" />
         <span>{{ isNewMode ? "TAMBAH" : "UBAH" }} MASTER BARANG</span>
         <v-spacer />
         <button class="brg-close-btn" @click="dialogVisible = false">✕</button>
@@ -322,7 +321,7 @@ const handleSave = async () => {
                     class="brg-img"
                   />
                   <div v-else class="brg-img-empty">
-                    <v-icon size="36" color="#bdbdbd">mdi-image-outline</v-icon>
+                    <IconPhoto :size="36" :stroke-width="1.3" color="#bdbdbd" />
                     <span>Tidak ada design</span>
                   </div>
                 </div>
@@ -347,10 +346,11 @@ const handleSave = async () => {
                   </div>
                   <button
                     type="button"
-                    class="brg-upload-btn"
-                    @click="openFileDialog"
+                    class="brg-btn-save"
+                    @click="handleSave"
+                    :disabled="isSaving"
                   >
-                    📁 Upload
+                    {{ isSaving ? "Menyimpan..." : "Simpan (F10)" }}
                   </button>
                 </div>
 

@@ -5,6 +5,18 @@ import { useToast } from "vue-toastification";
 import BaseBrowse from "@/components/BaseBrowse.vue";
 import { useBrowse } from "@/composables/useBrowse";
 import { penawaranService } from "@/services/penjualan/penawaranService";
+import {
+  IconFileText,
+  IconPrinter,
+  IconFileSpreadsheet,
+  IconInfoCircle,
+  IconDeviceFloppy,
+  IconX,
+  IconPhoto,
+  IconPhotoOff,
+  IconLayoutColumns,
+  IconLayoutRows,
+} from "@tabler/icons-vue";
 
 const router = useRouter();
 const toast = useToast();
@@ -219,7 +231,7 @@ const totalStatusGrid = computed(() => {
   <BaseBrowse
     title="Penawaran"
     :menu-id="menuId"
-    icon="mdi-file-document-outline"
+    :icon="IconFileText"
     :headers="headers"
     :items="items ?? []"
     item-value="Nomor"
@@ -285,28 +297,32 @@ const totalStatusGrid = computed(() => {
         size="small"
         variant="flat"
         color="blue-grey"
-        prepend-icon="mdi-printer"
         :disabled="selected.length === 0"
         @click="openPrintDialog(selected[0])"
-        >Cetak</v-btn
       >
-      <v-btn
-        size="small"
-        variant="flat"
-        color="teal-darken-1"
-        prepend-icon="mdi-microsoft-excel"
-      >
-        Export Detail</v-btn
-      >
+        <template #prepend
+          ><IconPrinter :size="15" :stroke-width="1.7"
+        /></template>
+        Cetak
+      </v-btn>
+      <v-btn size="small" variant="flat" color="teal-darken-1">
+        <template #prepend
+          ><IconFileSpreadsheet :size="15" :stroke-width="1.7"
+        /></template>
+        Export Detail
+      </v-btn>
       <v-btn
         size="small"
         variant="flat"
         color="indigo"
-        prepend-icon="mdi-information-outline"
         :disabled="selected.length === 0"
         @click="openStatusModal(selected[0])"
-        >Status</v-btn
       >
+        <template #prepend
+          ><IconInfoCircle :size="15" :stroke-width="1.7"
+        /></template>
+        Status
+      </v-btn>
     </template>
 
     <!-- Format kolom Tanggal -->
@@ -450,7 +466,7 @@ const totalStatusGrid = computed(() => {
           :disabled="isSavingStatus"
           @click="saveStatus"
         >
-          <v-icon size="13" class="mr-1">mdi-content-save</v-icon>
+          <IconDeviceFloppy :size="13" class="mr-1" />
           {{ isSavingStatus ? "Menyimpan..." : "Simpan" }}
         </button>
         <button
@@ -458,7 +474,7 @@ const totalStatusGrid = computed(() => {
           :disabled="isSavingStatus"
           @click="statusDialog = false"
         >
-          <v-icon size="13" class="mr-1">mdi-close</v-icon>
+          <IconX :size="13" class="mr-1" />
           Batal
         </button>
       </div>
@@ -468,7 +484,12 @@ const totalStatusGrid = computed(() => {
   <v-dialog v-model="showPrintDialog" max-width="450px" persistent>
     <v-card class="rounded-lg">
       <v-card-title class="bg-primary text-white d-flex align-center pa-3">
-        <v-icon start color="white">mdi-printer</v-icon>
+        <IconPrinter
+          :size="18"
+          :stroke-width="1.7"
+          color="white"
+          class="mr-2"
+        />
         <span class="text-subtitle-1 font-weight-bold"
           >Cetak Surat Penawaran</span
         >
@@ -481,20 +502,18 @@ const totalStatusGrid = computed(() => {
             gambar/desain?
           </div>
           <div class="d-flex flex-column gap-2">
-            <v-btn
-              color="primary"
-              variant="flat"
-              prepend-icon="mdi-image"
-              @click="printStep = 2"
-              >Cetak Dengan Gambar</v-btn
-            >
-            <v-btn
-              color="info"
-              variant="tonal"
-              prepend-icon="mdi-image-off"
-              @click="cetakTanpaGambar"
-              >Cetak Tanpa Gambar</v-btn
-            >
+            <v-btn color="primary" variant="flat" @click="printStep = 2">
+              <template #prepend
+                ><IconPhoto :size="15" :stroke-width="1.7"
+              /></template>
+              Cetak Dengan Gambar
+            </v-btn>
+            <v-btn color="info" variant="tonal" @click="cetakTanpaGambar">
+              <template #prepend
+                ><IconPhotoOff :size="15" :stroke-width="1.7"
+              /></template>
+              Cetak Tanpa Gambar
+            </v-btn>
           </div>
         </template>
 
@@ -506,17 +525,19 @@ const totalStatusGrid = computed(() => {
             <v-btn
               color="primary"
               variant="flat"
-              prepend-icon="mdi-table-split-cell"
               @click="pilihGambarHorizontal"
-              >Gambar Horizontal (Kanan)</v-btn
             >
-            <v-btn
-              color="info"
-              variant="tonal"
-              prepend-icon="mdi-table-row"
-              @click="pilihGambarVertikal"
-              >Gambar Vertikal (Bawah)</v-btn
-            >
+              <template #prepend
+                ><IconLayoutColumns :size="15" :stroke-width="1.7"
+              /></template>
+              Gambar Horizontal (Kanan)
+            </v-btn>
+            <v-btn color="info" variant="tonal" @click="pilihGambarVertikal">
+              <template #prepend
+                ><IconLayoutRows :size="15" :stroke-width="1.7"
+              /></template>
+              Gambar Vertikal (Bawah)
+            </v-btn>
           </div>
         </template>
       </v-card-text>

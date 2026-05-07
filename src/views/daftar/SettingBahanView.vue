@@ -5,6 +5,7 @@ import { useBrowse } from "@/composables/useBrowse";
 import BaseBrowse from "@/components/BaseBrowse.vue";
 import SimpleMasterFormDialog from "@/components/dialogs/SimpleMasterFormDialog.vue";
 import ConfirmDeleteDialog from "@/components/dialogs/ConfirmDeleteDialog.vue";
+import { IconRuler2 } from "@tabler/icons-vue";
 
 // ID 28 untuk Setting Bahan
 const {
@@ -61,7 +62,7 @@ const executeDelete = async () => {
   <BaseBrowse
     title="Setting Bahan"
     menu-id="28"
-    icon="mdi-ruler-square"
+    :icon="IconRuler2"
     :headers="headers"
     :items="items ?? []"
     :is-loading="isLoading"
@@ -82,7 +83,7 @@ const executeDelete = async () => {
     :is-new-mode="isNewMode"
     :edit-data="editData"
     title="Setting Bahan"
-    icon="mdi-ruler-square"
+    :icon="IconRuler2"
     api-endpoint="/master/setting"
     :code-max-length="2"
     @saved="fetchData"

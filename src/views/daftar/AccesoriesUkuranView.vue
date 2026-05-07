@@ -5,6 +5,7 @@ import { useBrowse } from "@/composables/useBrowse";
 import BaseBrowse from "@/components/BaseBrowse.vue";
 import SimpleMasterFormDialog from "@/components/dialogs/SimpleMasterFormDialog.vue";
 import ConfirmDeleteDialog from "@/components/dialogs/ConfirmDeleteDialog.vue";
+import { IconRuler } from "@tabler/icons-vue";
 
 // ID 33 untuk Ukuran Accesories
 const {
@@ -62,7 +63,7 @@ const executeDelete = async () => {
   <BaseBrowse
     title="Ukuran Accesories"
     menu-id="33"
-    icon="mdi-ruler"
+    :icon="IconRuler"
     :headers="headers"
     :items="items ?? []"
     :is-loading="isLoading"
@@ -83,7 +84,7 @@ const executeDelete = async () => {
     :is-new-mode="isNewMode"
     :edit-data="editData"
     title="Ukuran Accesories"
-    icon="mdi-ruler"
+    :icon="IconRuler"
     api-endpoint="/master/acc-ukuran"
     :code-max-length="3"
     @saved="fetchData"

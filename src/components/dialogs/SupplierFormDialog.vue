@@ -3,6 +3,7 @@ import { ref, watch, computed } from "vue";
 import type { VForm } from "vuetify/components";
 import api from "@/services/api";
 import { useToast } from "vue-toastification";
+import { IconTruck, IconBuildingBank } from "@tabler/icons-vue";
 
 const props = defineProps<{
   modelValue: boolean;
@@ -140,7 +141,7 @@ const jenisItems = [
     <v-card class="sup-dialog-card">
       <!-- Header -->
       <div class="sup-header">
-        <v-icon size="15" color="white" class="mr-2">mdi-truck-outline</v-icon>
+        <IconTruck :size="15" :stroke-width="1.7" color="white" class="mr-2" />
         <span>{{ isNewMode ? "TAMBAH" : "UBAH" }} MASTER SUPPLIER</span>
         <v-spacer />
         <button class="sup-close-btn" @click="dialogVisible = false">✕</button>
@@ -383,10 +384,15 @@ const jenisItems = [
           <!-- ── Seksi 2: Rekening ── -->
           <div class="sup-section" style="padding: 0">
             <div class="rek-header">
-              <span
-                ><v-icon size="13" class="mr-1">mdi-bank</v-icon>DATA
-                REKENING</span
-              >
+              <span>
+                <IconBuildingBank
+                  :size="13"
+                  :stroke-width="1.7"
+                  class="mr-1"
+                  style="vertical-align: middle"
+                />
+                DATA REKENING
+              </span>
               <button type="button" class="rek-add-btn" @click="addRekening">
                 + Tambah Rekening
               </button>
@@ -468,7 +474,7 @@ const jenisItems = [
           :disabled="isSaving"
         >
           <span v-if="isSaving">Menyimpan...</span>
-          <span v-else>💾 Simpan (F10)</span>
+          <span v-else>Simpan (F10)</span>
         </button>
       </div>
     </v-card>

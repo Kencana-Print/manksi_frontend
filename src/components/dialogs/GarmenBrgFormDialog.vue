@@ -4,6 +4,7 @@ import type { VForm } from "vuetify/components";
 import api from "@/services/api";
 import { useToast } from "vue-toastification";
 import SearchLookup from "@/components/SearchLookup.vue";
+import { IconShirt, IconSearch } from "@tabler/icons-vue";
 
 const props = defineProps<{
   modelValue: boolean;
@@ -210,9 +211,12 @@ const handleSave = async () => {
       <div class="dlg-card">
         <!-- Header -->
         <div class="dlg-header">
-          <v-icon size="14" color="white" class="mr-2"
-            >mdi-tshirt-crew-outline</v-icon
-          >
+          <IconShirt
+            :size="15"
+            :stroke-width="1.7"
+            color="white"
+            class="mr-2"
+          />
           <span
             >{{ isNewMode ? "Tambah" : "Ubah" }} Barang {{ jenisGarmen }}</span
           >
@@ -303,9 +307,12 @@ const handleSave = async () => {
                     class="f-inp"
                     style="cursor: pointer"
                   />
-                  <v-icon size="13" color="#1565c0" class="lookup-icon"
-                    >mdi-magnify</v-icon
-                  >
+                  <IconSearch
+                    :size="13"
+                    color="#1565c0"
+                    class="lookup-icon"
+                    :stroke-width="1.7"
+                  />
                 </div>
               </div>
               <div class="f-field" style="flex: 1">

@@ -4,6 +4,7 @@ import api from "@/services/api";
 import { useBrowse } from "@/composables/useBrowse";
 import BaseBrowse from "@/components/BaseBrowse.vue";
 import StdOutputFormDialog from "@/components/dialogs/StdOutputFormDialog.vue";
+import { IconChartBar } from "@tabler/icons-vue";
 
 // ID 29 untuk Standar Output
 const {
@@ -46,7 +47,7 @@ const handleEdit = (item: any) => {
   <BaseBrowse
     title="Standar Output per Hari"
     menu-id="29"
-    icon="mdi-chart-timeline-variant"
+    :icon="IconChartBar"
     :headers="headers"
     :items="items ?? []"
     :is-loading="isLoading"

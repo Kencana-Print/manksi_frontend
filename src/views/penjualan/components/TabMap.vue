@@ -3,6 +3,7 @@ import { ref, computed, watch, onMounted } from "vue";
 import { useToast } from "vue-toastification";
 import { mapFormService } from "@/services/penjualan/mapFormService";
 import api from "@/services/api";
+import { IconUpload, IconMaximize, IconPhoto } from "@tabler/icons-vue";
 
 import PerusahaanSearchModal from "@/components/lookups/PerusahaanSearchModal.vue";
 import CustomerSearchModal from "@/components/lookups/CustomerSearchModal.vue";
@@ -890,14 +891,14 @@ const setPenawaranDetail = (v: any) => {
         </div>
         <div class="f-row mb-2">
           <button type="button" class="f-upload-btn" @click="fileRef?.click()">
-            <v-icon size="13" class="mr-1">mdi-upload</v-icon> Upload
+            <IconUpload :size="13" class="mr-1" /> Upload
           </button>
           <button
             type="button"
             class="f-upload-btn blue ml-1"
             @click="displayImageUrl && (showPreviewDialog = true)"
           >
-            <v-icon size="13" class="mr-1">mdi-fullscreen</v-icon> Full Screen
+            <IconMaximize :size="13" class="mr-1" /> Full Screen
           </button>
         </div>
 
@@ -911,7 +912,7 @@ const setPenawaranDetail = (v: any) => {
             style="cursor: pointer"
           />
           <div v-else class="f-img-empty">
-            <v-icon size="28" color="#bdbdbd">mdi-image-outline</v-icon>
+            <IconPhoto :size="28" color="#bdbdbd" />
             <div>No Image available</div>
           </div>
         </div>

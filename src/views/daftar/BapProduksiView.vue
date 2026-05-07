@@ -6,6 +6,7 @@ import { useToast } from "vue-toastification";
 import { useRouter } from "vue-router";
 import BaseBrowse from "@/components/BaseBrowse.vue";
 import BapAjukanEditDialog from "@/components/dialogs/BapAjukanEditDialog.vue";
+import { IconAlertCircle, IconPrinter, IconPencil } from "@tabler/icons-vue";
 
 const toast = useToast();
 const router = useRouter();
@@ -122,7 +123,7 @@ const handlePrint = () => {
   <BaseBrowse
     title="BAP dan Komplain Produksi"
     menu-id="142"
-    icon="mdi-alert-circle-outline"
+    :icon="IconAlertCircle"
     :headers="headers"
     :items="items ?? []"
     :is-loading="isLoading"
@@ -174,21 +175,27 @@ const handlePrint = () => {
         size="small"
         color="indigo"
         variant="elevated"
-        prepend-icon="mdi-printer"
         :disabled="selected.length === 0"
         @click="handlePrint"
-        >Cetak</v-btn
       >
+        <template #prepend
+          ><IconPrinter :size="15" :stroke-width="1.7"
+        /></template>
+        Cetak
+      </v-btn>
       <v-btn
         size="small"
         color="warning"
         variant="elevated"
-        prepend-icon="mdi-pencil-outline"
         :disabled="selected.length === 0"
         v-if="canEdit"
         @click="handleAjukanEdit(selected[0])"
-        >Ajukan Perubahan</v-btn
       >
+        <template #prepend
+          ><IconPencil :size="15" :stroke-width="1.7"
+        /></template>
+        Ajukan Perubahan
+      </v-btn>
     </template>
 
     <template #filter-right>

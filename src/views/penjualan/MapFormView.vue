@@ -6,6 +6,12 @@ import { useRouter } from "vue-router";
 import api from "@/services/api"; // Untuk lookup generic seperti divisi
 import { mapFormService } from "@/services/penjualan/mapFormService";
 import BaseForm from "@/components/BaseForm.vue";
+import {
+  IconFileDescription,
+  IconPrinter,
+  IconLayoutSidebarRight,
+  IconLayoutSidebarRightCollapse,
+} from "@tabler/icons-vue";
 
 // Import Komponen Tab
 import TabMap from "./components/TabMap.vue";
@@ -373,7 +379,7 @@ const tabs = [{ title: "MAP" }, { title: "Lain-Lain" }];
         : 'Tambah Pra Surat Perintah Kerja'
     "
     menu-id="162"
-    icon="mdi-file-document-edit-outline"
+    :icon="IconFileDescription"
     :is-loading="isLoading"
     :is-saving="isSaving"
     item-name="MAP"
@@ -423,7 +429,12 @@ const tabs = [{ title: "MAP" }, { title: "Lain-Lain" }];
   <v-dialog v-model="showPrintDialog" max-width="450px" persistent>
     <v-card class="rounded-lg">
       <v-card-title class="bg-primary text-white d-flex align-center pa-3">
-        <v-icon start color="white">mdi-printer</v-icon>
+        <IconPrinter
+          :size="18"
+          :stroke-width="1.7"
+          color="white"
+          class="mr-2"
+        />
         <span class="text-subtitle-1 font-weight-bold"
           >Cetak Pra SPK (MAP)</span
         >
@@ -434,20 +445,16 @@ const tabs = [{ title: "MAP" }, { title: "Lain-Lain" }];
           Data berhasil disimpan! Pilih orientasi cetak untuk dokumen ini:
         </div>
         <div class="d-flex flex-column gap-2">
-          <v-btn
-            color="primary"
-            variant="flat"
-            prepend-icon="mdi-format-page-portrait"
-            @click="pilihGambarVertikal"
-          >
+          <v-btn color="primary" variant="flat" @click="pilihGambarVertikal">
+            <template #prepend
+              ><IconLayoutSidebarRight :size="15" :stroke-width="1.7"
+            /></template>
             Cetak Vertikal (Portrait)
           </v-btn>
-          <v-btn
-            color="info"
-            variant="tonal"
-            prepend-icon="mdi-format-page-landscape"
-            @click="pilihGambarHorizontal"
-          >
+          <v-btn color="info" variant="tonal" @click="pilihGambarHorizontal">
+            <template #prepend
+              ><IconLayoutSidebarRightCollapse :size="15" :stroke-width="1.7"
+            /></template>
             Cetak Horizontal (Landscape)
           </v-btn>
         </div>

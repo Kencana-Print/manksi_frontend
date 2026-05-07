@@ -2,6 +2,7 @@
 import { ref, watch } from "vue";
 import { useToast } from "vue-toastification";
 import { updateSjMapService } from "@/services/penjualan/updateSjMapService";
+import { IconTruckDelivery, IconDeviceFloppy } from "@tabler/icons-vue";
 
 const props = defineProps<{ modelValue: boolean; nomor: string }>();
 const emit = defineEmits(["update:modelValue", "refresh"]);
@@ -77,7 +78,7 @@ watch(
     <div class="dlg-card">
       <!-- Header -->
       <div class="dlg-header">
-        <v-icon size="15" color="white" class="mr-2">mdi-truck-check</v-icon>
+        <IconTruckDelivery :size="15" :stroke-width="1.7" color="white" />
         <span>Update Status SJ : {{ nomor }}</span>
         <button class="dlg-close" @click="close">✕</button>
       </div>
@@ -312,7 +313,7 @@ watch(
         <!-- Footer -->
         <div class="dlg-footer">
           <button class="dlg-btn save" :disabled="isSaving" @click="handleSave">
-            <v-icon size="13" class="mr-1">mdi-content-save</v-icon>
+            <IconDeviceFloppy :size="14" :stroke-width="1.7" class="mr-1" />
             {{ isSaving ? "Menyimpan..." : "Simpan Perubahan" }}
           </button>
           <button class="dlg-btn cancel" :disabled="isSaving" @click="close">

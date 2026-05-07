@@ -3,13 +3,14 @@ import { ref, watch, computed } from "vue";
 import type { VForm } from "vuetify/components";
 import api from "@/services/api";
 import { useToast } from "vue-toastification";
+import { IconX } from "@tabler/icons-vue";
 
 const props = defineProps<{
   modelValue: boolean;
   isNewMode: boolean;
   editData?: any;
   title: string;
-  icon: string;
+  icon: any; // ← komponen Tabler, bukan string MDI
   apiEndpoint: string;
   codeMaxLength?: number;
 }>();
@@ -68,18 +69,20 @@ const handleSave = async () => {
   <v-dialog v-model="dialogVisible" persistent max-width="450px">
     <v-card class="dialog-card">
       <v-card-title class="bg-primary text-white d-flex align-center pa-2 px-4">
-        <v-icon start color="white" size="small">{{ icon }}</v-icon>
+        <component
+          :is="icon"
+          :size="16"
+          :stroke-width="1.7"
+          color="white"
+          class="mr-2"
+        />
         <span class="text-subtitle-2 font-weight-bold">
           {{ isNewMode ? "TAMBAH" : "UBAH" }} {{ title.toUpperCase() }}
         </span>
         <v-spacer></v-spacer>
-        <v-btn
-          icon="mdi-close"
-          variant="text"
-          size="small"
-          color="white"
-          @click="dialogVisible = false"
-        ></v-btn>
+        <v-btn variant="text" size="small" @click="dialogVisible = false">
+          <IconX :size="16" :stroke-width="2" color="white" />
+        </v-btn>
       </v-card-title>
 
       <v-card-text class="pa-4">

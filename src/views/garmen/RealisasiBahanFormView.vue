@@ -6,9 +6,20 @@ import { useForm } from "@/composables/useForm";
 import { realisasiBahanFormService } from "@/services/garmen/realisasiBahanFormService";
 import BaseForm from "@/components/BaseForm.vue";
 import MintaBahanSearchModal from "@/components/lookups/MintaBahanSearchModal.vue";
+import {
+  IconClipboardCheck,
+  IconSearch,
+  IconBarcode,
+  IconListDetails,
+  IconTrash,
+  IconPlus,
+} from "@tabler/icons-vue";
 
 const route = useRoute();
 const toast = useToast();
+
+const showPrintDialog = ref(false);
+const savedNomor = ref("");
 
 const initialData = {
   nomor: "",
@@ -120,19 +131,8 @@ const {
     return await realisasiBahanFormService.saveData(data, nomor);
   },
   onSuccess: (res: any) => {
-    const nomorTersimpan = res.data?.data?.nomor || formData.value.nomor;
-
-    // Gunakan window.confirm bawaan browser untuk memblokir layar dan menanyakan aksi cetak
-    if (
-      window.confirm(
-        `Berhasil disimpan dengan nomor: ${nomorTersimpan}\n\nAkan dicetak?`,
-      )
-    ) {
-      window.open(
-        `/garmen/bahan-baku/realisasi-minta/print/${encodeURIComponent(nomorTersimpan)}`,
-        "_blank",
-      );
-    }
+    savedNomor.value = res.data?.data?.nomor || formData.value.nomor;
+    showPrintDialog.value = true;
   },
 });
 
@@ -347,6 +347,14 @@ const validateBeforeSave = () => {
   showSaveDialog.value = true;
 };
 
+const doCetak = () => {
+  showPrintDialog.value = false;
+  window.open(
+    `/garmen/bahan-baku/realisasi-minta/print/${encodeURIComponent(savedNomor.value)}`,
+    "_blank",
+  );
+};
+
 // --- TRIGGER FETCH DATA UNTUK MODE EDIT ---
 onMounted(async () => {
   if (isEditMode.value) {
@@ -360,7 +368,7 @@ onMounted(async () => {
   <BaseForm
     :title="(isEditMode ? 'Ubah' : 'Baru') + ' Realisasi Permintaan'"
     menu-id="108"
-    icon="mdi-clipboard-check-outline"
+    :icon="IconClipboardCheck"
     :is-loading="isLoading"
     :is-saving="isSaving"
     v-model:showSaveDialog="showSaveDialog"
@@ -403,11 +411,19 @@ onMounted(async () => {
           variant="outlined"
           hide-details
           class="mb-2"
-          append-inner-icon="mdi-magnify"
           readonly
           @click:append-inner="showMintaModal = true"
           color="primary"
-        />
+        >
+          <template #append-inner>
+            <IconSearch
+              :size="16"
+              :stroke-width="1.7"
+              style="cursor: pointer"
+              @click="showMintaModal = true"
+            />
+          </template>
+        </v-text-field>
         <v-textarea
           v-model="formData.keterangan"
           label="Keterangan"
@@ -542,8 +558,8 @@ onMounted(async () => {
         <div
           class="bg-blue-grey-darken-3 text-white px-3 py-1 font-weight-bold text-caption d-flex align-center"
         >
-          <v-icon size="small" class="mr-2">mdi-barcode-scan</v-icon> Tabel Scan
-          Fisik (Barcode)
+          <IconBarcode :size="14" :stroke-width="1.7" class="mr-2" />
+          <span>Tabel Scan Fisik (Barcode)</span>
         </div>
         <div class="table-container" style="flex: 2; overflow: auto">
           <table class="manksi-table">
@@ -585,25 +601,25 @@ onMounted(async () => {
                 </td>
                 <td class="text-center">
                   <v-btn
-                    icon="mdi-delete"
                     size="x-small"
                     variant="text"
                     color="error"
                     @click="removeBarcodeRow(index)"
-                  />
+                  >
+                    <IconTrash :size="14" :stroke-width="1.7" />
+                  </v-btn>
                 </td>
               </tr>
             </tbody>
           </table>
         </div>
         <div class="pa-2 bg-grey-lighten-4 text-right">
-          <v-btn
-            size="x-small"
-            color="primary"
-            prepend-icon="mdi-plus"
-            @click="addBarcodeRow"
-            >Tambah Barcode</v-btn
-          >
+          <v-btn size="x-small" color="primary" @click="addBarcodeRow">
+            <template #prepend
+              ><IconPlus :size="13" :stroke-width="2"
+            /></template>
+            Tambah Barcode
+          </v-btn>
         </div>
 
         <v-divider :thickness="3" color="primary"></v-divider>
@@ -612,8 +628,8 @@ onMounted(async () => {
         <div
           class="bg-teal-darken-3 text-white px-3 py-1 font-weight-bold text-caption d-flex align-center"
         >
-          <v-icon size="small" class="mr-2">mdi-clipboard-list-outline</v-icon>
-          Tabel Pemenuhan Kebutuhan (Otomatis)
+          <IconListDetails :size="14" :stroke-width="1.7" class="mr-2" />
+          <span>Tabel Pemenuhan Kebutuhan (Otomatis)</span>
         </div>
         <div
           class="table-container"
@@ -700,6 +716,27 @@ onMounted(async () => {
   </BaseForm>
 
   <MintaBahanSearchModal v-model="showMintaModal" @selected="onMintaSelected" />
+
+  <v-dialog v-model="showPrintDialog" max-width="400px" persistent>
+    <v-card class="rounded-lg">
+      <v-card-title class="bg-primary text-white pa-3">
+        Simpan Berhasil
+      </v-card-title>
+      <v-card-text class="pa-4 text-center">
+        Realisasi <b>{{ savedNomor }}</b> tersimpan.<br />Cetak dokumen ini
+        sekarang?
+      </v-card-text>
+      <v-card-actions class="pa-3 border-t bg-grey-lighten-4">
+        <v-btn variant="text" color="error" @click="showPrintDialog = false">
+          Tidak
+        </v-btn>
+        <v-spacer />
+        <v-btn color="primary" variant="elevated" @click="doCetak">
+          Ya, Cetak
+        </v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
 </template>
 
 <style scoped>

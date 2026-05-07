@@ -4,6 +4,7 @@ import api from "@/services/api";
 import { useBrowse } from "@/composables/useBrowse";
 import BaseBrowse from "@/components/BaseBrowse.vue";
 import KomponenFormDialog from "@/components/dialogs/KomponenFormDialog.vue";
+import { IconPuzzle } from "@tabler/icons-vue";
 
 // ID 10 untuk Master Komponen
 const {
@@ -58,7 +59,7 @@ const handleEdit = async (item: any) => {
   <BaseBrowse
     title="Master Komponen"
     menu-id="10"
-    icon="mdi-puzzle-outline"
+    :icon="IconPuzzle"
     :headers="headers"
     :items="items ?? []"
     :is-loading="isLoading"

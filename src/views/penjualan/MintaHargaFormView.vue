@@ -6,6 +6,7 @@ import { useToast } from "vue-toastification";
 import BaseForm from "@/components/BaseForm.vue";
 import TabPermintaan from "./components/TabPermintaan.vue";
 import TabKalkulasi from "./components/TabKalkulasi.vue";
+import { IconCash, IconCalculator } from "@tabler/icons-vue";
 
 type MintaHargaForm = typeof initialData;
 
@@ -290,8 +291,8 @@ onMounted(() => {
 
 const currentTab = ref(0);
 const tabs = [
-  { text: "1. Price Request", icon: "mdi-cash-multiple" },
-  { text: "2. Get Price (Kalkulasi)", icon: "mdi-calculator" },
+  { text: "1. Price Request", icon: IconCash },
+  { text: "2. Get Price (Kalkulasi)", icon: IconCalculator },
 ];
 
 const handleImageSelected = (file: File) => {
@@ -303,7 +304,7 @@ const handleImageSelected = (file: File) => {
   <BaseForm
     :title="isEditMode ? 'Ubah Permintaan Harga' : 'Tambah Permintaan Harga'"
     menu-id="166"
-    icon="mdi-cash-multiple"
+    :icon="IconCash"
     :is-loading="isLoading"
     :is-saving="isSaving"
     item-name="Permintaan Harga"
@@ -324,7 +325,7 @@ const handleImageSelected = (file: File) => {
           :class="{ active: currentTab === idx }"
           @click="currentTab = idx"
         >
-          <v-icon size="13" class="mr-1">{{ tab.icon }}</v-icon>
+          <component :is="tab.icon" :size="13" class="mr-1" />
           {{ tab.text }}
         </button>
       </div>

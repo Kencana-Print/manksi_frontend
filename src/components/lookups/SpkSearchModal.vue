@@ -1,6 +1,11 @@
 <script setup lang="ts">
-import { ref, watch } from "vue";
+import { ref, watch, computed } from "vue";
 import api from "@/services/api";
+import {
+  IconClipboardSearch,
+  IconSearch,
+  IconDatabaseOff,
+} from "@tabler/icons-vue";
 
 const props = defineProps<{ modelValue: boolean }>();
 const emit = defineEmits(["update:modelValue", "selected"]);
@@ -32,8 +37,6 @@ const visiblePages = computed(() => {
   if (end - start < 4) start = Math.max(1, end - 4);
   return Array.from({ length: end - start + 1 }, (_, i) => start + i);
 });
-
-import { computed } from "vue";
 
 let debounce: ReturnType<typeof setTimeout> | null = null;
 
@@ -104,9 +107,7 @@ const selectItem = (item: any) => {
     <div class="lookup-card">
       <!-- Header -->
       <div class="lookup-header">
-        <v-icon size="15" color="white" class="mr-2"
-          >mdi-clipboard-search-outline</v-icon
-        >
+        <IconClipboardSearch :size="15" :stroke-width="1.7" color="white" />
         <span>Cari Data SPK</span>
         <span class="lookup-header-sub">Divisi 3, 4, 6</span>
         <v-spacer />
@@ -117,7 +118,7 @@ const selectItem = (item: any) => {
 
       <!-- Search -->
       <div class="lookup-search">
-        <v-icon size="16" color="#9e9e9e">mdi-magnify</v-icon>
+        <IconSearch :size="16" :stroke-width="1.7" color="#9e9e9e" />
         <input
           :value="search"
           @input="onSearch(($event.target as HTMLInputElement).value)"
@@ -138,7 +139,7 @@ const selectItem = (item: any) => {
           <span>Memuat data...</span>
         </div>
         <div v-else-if="items.length === 0" class="lookup-state">
-          <v-icon size="32" color="#bdbdbd">mdi-database-off-outline</v-icon>
+          <IconDatabaseOff :size="32" :stroke-width="1.3" color="#bdbdbd" />
           <span>{{
             search ? `Tidak ada hasil untuk "${search}"` : "Tidak ada data"
           }}</span>

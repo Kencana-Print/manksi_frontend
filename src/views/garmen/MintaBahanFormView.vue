@@ -9,6 +9,14 @@ import BaseForm from "@/components/BaseForm.vue";
 import SpkSearchModal from "@/components/lookups/SpkSearchModal.vue";
 import BahanSearchModal from "@/components/lookups/BahanSearchModal.vue";
 import api from "@/services/api";
+import {
+  IconBox,
+  IconSearch,
+  IconTrash,
+  IconPlus,
+  IconCircleCheck,
+  IconPrinter,
+} from "@tabler/icons-vue";
 
 interface DetailItem {
   kode: string;
@@ -287,7 +295,7 @@ watch(
   <BaseForm
     :title="(isEditMode ? 'Ubah' : 'Baru') + ' Permintaan Bahan Baku'"
     menu-id="127"
-    icon="mdi-texture"
+    :icon="IconBox"
     :is-loading="isLoading"
     :is-saving="isSaving"
     v-model:showSaveDialog="showSaveDialog"
@@ -352,11 +360,19 @@ watch(
           variant="outlined"
           hide-details
           class="mb-2"
-          append-inner-icon="mdi-magnify"
           readonly
           @click:append-inner="showSpkModal = true"
           color="primary"
-        />
+        >
+          <template #append-inner>
+            <IconSearch
+              :size="16"
+              :stroke-width="1.7"
+              style="cursor: pointer"
+              @click="showSpkModal = true"
+            />
+          </template>
+        </v-text-field>
 
         <v-textarea
           v-model="formData.namaSpk"
@@ -433,13 +449,14 @@ watch(
                       @click="openBahanLookup(Number(index))"
                     />
                     <v-btn
-                      icon="mdi-magnify"
                       size="x-small"
                       variant="text"
                       density="comfortable"
                       color="primary"
                       @click="openBahanLookup(Number(index))"
-                    ></v-btn>
+                    >
+                      <IconSearch :size="14" :stroke-width="1.7" />
+                    </v-btn>
                   </div>
                 </td>
 
@@ -484,12 +501,13 @@ watch(
                 <td><input v-model="item.ket" class="cell-input" /></td>
                 <td class="text-center">
                   <v-btn
-                    icon="mdi-delete"
                     size="x-small"
                     variant="text"
                     color="error"
                     @click="formData.details.splice(index, 1)"
-                  />
+                  >
+                    <IconTrash :size="14" :stroke-width="1.7" />
+                  </v-btn>
                 </td>
               </tr>
             </tbody>
@@ -501,15 +519,18 @@ watch(
             size="x-small"
             color="primary"
             variant="flat"
-            prepend-icon="mdi-plus"
             @click="
               formData.details.push({
                 komponen: 'BODY',
                 pcs: formData.jumlahSpk,
               })
             "
-            >Tambah Baris</v-btn
           >
+            <template #prepend
+              ><IconPlus :size="14" :stroke-width="2"
+            /></template>
+            Tambah Baris
+          </v-btn>
           <v-spacer />
           <div class="text-caption font-weight-bold">
             Total Qty:
@@ -542,9 +563,7 @@ watch(
         Simpan Berhasil
       </v-card-title>
       <v-card-text class="pa-4 text-center mt-2">
-        <v-icon size="48" color="success" class="mb-3"
-          >mdi-check-circle-outline</v-icon
-        >
+        <IconCircleCheck :size="48" color="green" class="mb-3" />
         <div class="text-body-1 font-weight-medium">
           Permintaan Bahan berhasil disimpan!
         </div>
@@ -557,13 +576,12 @@ watch(
           >Tutup</v-btn
         >
         <v-spacer></v-spacer>
-        <v-btn
-          color="primary"
-          variant="elevated"
-          prepend-icon="mdi-printer"
-          @click="doPrint"
-          >Ya, Cetak</v-btn
-        >
+        <v-btn color="primary" variant="elevated" @click="doPrint">
+          <template #prepend
+            ><IconPrinter :size="15" :stroke-width="1.7"
+          /></template>
+          Ya, Cetak
+        </v-btn>
       </v-card-actions>
     </v-card>
   </v-dialog>

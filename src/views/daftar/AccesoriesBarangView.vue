@@ -5,6 +5,7 @@ import { useBrowse } from "@/composables/useBrowse";
 import BaseBrowse from "@/components/BaseBrowse.vue";
 import SimpleMasterFormDialog from "@/components/dialogs/SimpleMasterFormDialog.vue";
 import ConfirmDeleteDialog from "@/components/dialogs/ConfirmDeleteDialog.vue";
+import { IconShape } from "@tabler/icons-vue";
 
 // ID 31 untuk Barang Accesories
 const {
@@ -62,7 +63,7 @@ const executeDelete = async () => {
   <BaseBrowse
     title="Barang Accesories"
     menu-id="31"
-    icon="mdi-shape-outline"
+    :icon="IconShape"
     :headers="headers"
     :items="items ?? []"
     :is-loading="isLoading"
@@ -83,7 +84,7 @@ const executeDelete = async () => {
     :is-new-mode="isNewMode"
     :edit-data="editData"
     title="Barang Accesories"
-    icon="mdi-shape-outline"
+    :icon="IconShape"
     api-endpoint="/master/acc-barang"
     :code-max-length="2"
     @saved="fetchData"

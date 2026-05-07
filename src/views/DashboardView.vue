@@ -1,6 +1,12 @@
 <script setup lang="ts">
 import { ref, onMounted } from "vue";
 import { useAuthStore } from "@/stores/authStore";
+import {
+  IconLayoutDashboard,
+  IconAlertTriangle,
+  IconX,
+  IconClipboardList,
+} from "@tabler/icons-vue";
 
 const authStore = useAuthStore();
 const isSpkDialogVisible = ref(false);
@@ -101,7 +107,11 @@ const sisaClass = (item: any): string => {
           <v-col cols="12" md="8">
             <div class="manksi-panel content-panel fill-height">
               <div class="panel-header bg-grey-lighten-3 text-primary">
-                <v-icon size="14" class="mr-1">mdi-bulletin-board</v-icon>
+                <IconLayoutDashboard
+                  :size="14"
+                  :stroke-width="1.6"
+                  class="mr-1"
+                />
                 Papan Informasi
               </div>
               <div class="panel-body pa-3">
@@ -115,7 +125,11 @@ const sisaClass = (item: any): string => {
               <div
                 class="panel-header bg-error-lighten-5 text-error border-error-bottom"
               >
-                <v-icon size="14" class="mr-1">mdi-clock-alert-outline</v-icon>
+                <IconAlertTriangle
+                  :size="14"
+                  :stroke-width="1.7"
+                  class="mr-1"
+                />
                 Ringkasan SPK Urgent
               </div>
               <div class="panel-body pa-3">
@@ -155,7 +169,7 @@ const sisaClass = (item: any): string => {
         <div class="spk-header">
           <div class="spk-header-left">
             <div class="spk-header-icon">
-              <v-icon size="18" color="white">mdi-clock-alert</v-icon>
+              <IconClipboardList :size="18" :stroke-width="1.6" color="white" />
             </div>
             <div>
               <div class="spk-header-title">SPK Akan / Sudah Dateline</div>
@@ -172,7 +186,7 @@ const sisaClass = (item: any): string => {
             color="white"
             @click="closeSpkDialog"
           >
-            <v-icon>mdi-close</v-icon>
+            <IconX :size="18" :stroke-width="2" />
           </v-btn>
         </div>
 
@@ -386,6 +400,14 @@ const sisaClass = (item: any): string => {
 }
 .spk-table td.col-num {
   text-align: right;
+}
+
+/* Izinkan kolom nama wrap teks */
+.spk-table td.col-nama {
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: unset !important;
+  word-break: break-word;
 }
 
 /* Lebar kolom — total harus <= 960px */

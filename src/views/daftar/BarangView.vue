@@ -5,6 +5,7 @@ import { useBrowse } from "@/composables/useBrowse";
 import { useToast } from "vue-toastification";
 import BaseBrowse from "@/components/BaseBrowse.vue";
 import BarangFormDialog from "@/components/dialogs/BarangFormDialog.vue";
+import { IconPackage } from "@tabler/icons-vue";
 
 const toast = useToast();
 
@@ -62,7 +63,7 @@ const handleEdit = async (item: any) => {
   <BaseBrowse
     title="Master Barang"
     menu-id="19"
-    icon="mdi-tshirt-crew-outline"
+    :icon="IconPackage"
     :headers="headers"
     :items="items ?? []"
     :is-loading="isLoading"

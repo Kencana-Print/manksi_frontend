@@ -6,6 +6,12 @@ import { useBrowse } from "@/composables/useBrowse";
 import { useAuthStore } from "@/stores/authStore";
 import api from "@/services/api";
 import * as XLSX from "xlsx";
+import {
+  IconDiscountCheckFilled,
+  IconAlertCircle,
+  IconCircleCheck,
+  IconFileSpreadsheet,
+} from "@tabler/icons-vue";
 
 const toast = useToast();
 const authStore = useAuthStore();
@@ -146,7 +152,7 @@ const fmtDate = (val: string) => {
   <BaseBrowse
     title="Approval Surat Jalan MAP"
     :menu-id="menuId"
-    icon="mdi-check-decagram-outline"
+    :icon="IconDiscountCheckFilled"
     :headers="headers"
     :items="items ?? []"
     item-value="Nomor"
@@ -195,9 +201,11 @@ const fmtDate = (val: string) => {
         size="small"
         variant="flat"
         :color="filterState.notApproved ? 'orange-darken-2' : 'blue-grey'"
-        prepend-icon="mdi-alert-circle-outline"
         @click="toggleShowNotApproved"
       >
+        <template #prepend
+          ><IconAlertCircle :size="15" :stroke-width="1.7"
+        /></template>
         {{
           filterState.notApproved ? "Show All Data" : "Show All Not Approved"
         }}
@@ -207,10 +215,12 @@ const fmtDate = (val: string) => {
         size="small"
         variant="flat"
         color="success"
-        prepend-icon="mdi-check-circle"
         :disabled="selected.length === 0 || selected[0].Approved === 'Y'"
         @click="executeApprove"
       >
+        <template #prepend
+          ><IconCircleCheck :size="15" :stroke-width="1.7"
+        /></template>
         Approve
       </v-btn>
 
@@ -218,11 +228,14 @@ const fmtDate = (val: string) => {
         size="small"
         variant="flat"
         color="green-darken-1"
-        prepend-icon="mdi-file-excel"
         :loading="isExporting"
         @click="exportDetail"
-        >Export Detail</v-btn
       >
+        <template #prepend
+          ><IconFileSpreadsheet :size="15" :stroke-width="1.7"
+        /></template>
+        Export Detail
+      </v-btn>
     </template>
 
     <template #item.Tanggal="{ item }">{{ fmtDate(item.Tanggal) }}</template>

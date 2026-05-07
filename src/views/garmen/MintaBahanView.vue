@@ -7,6 +7,16 @@ import { useBrowse } from "@/composables/useBrowse";
 import { mintaBahanService } from "@/services/garmen/mintaBahanService";
 import { useAuthStore } from "@/stores/authStore";
 import api from "@/services/api";
+import {
+  IconBox,
+  IconHelmet,
+  IconTie,
+  IconFileDescription,
+  IconPrinter,
+  IconCircleX,
+  IconCheck,
+  IconShieldCheck,
+} from "@tabler/icons-vue";
 
 const router = useRouter();
 const toast = useToast();
@@ -353,7 +363,7 @@ const num = (val: number) => new Intl.NumberFormat("id-ID").format(val || 0);
   <BaseBrowse
     title="Permintaan Bahan Baku"
     menu-id="127"
-    icon="mdi-texture"
+    :icon="IconBox"
     :headers="headers"
     :items="items ?? []"
     :is-loading="isLoading"
@@ -441,50 +451,63 @@ const num = (val: number) => new Intl.NumberFormat("id-ID").format(val || 0);
       <v-btn
         v-if="authStore.user?.bagian?.toUpperCase().includes('GUDANG')"
         size="small"
-        prepend-icon="mdi-account-hard-hat"
         color="teal-darken-2"
         :disabled="selected.length === 0"
         @click="onApproveGudang"
-        >Apv. Gudang</v-btn
       >
+        <template #prepend>
+          <IconHelmet :size="15" :stroke-width="1.7" />
+        </template>
+        Apv. Gudang
+      </v-btn>
 
       <v-btn
         v-if="authStore.user?.flags?.isManager"
         size="small"
-        prepend-icon="mdi-account-tie"
         color="indigo-darken-2"
         :disabled="selected.length === 0"
         @click="onApproveManager"
-        >Apv. Manager</v-btn
       >
+        <template #prepend><IconTie :size="15" :stroke-width="1.7" /></template>
+        Apv. Manager
+      </v-btn>
 
       <v-btn
         v-if="canEdit"
         size="small"
-        prepend-icon="mdi-file-document-edit-outline"
         color="orange-darken-3"
         :disabled="selected.length === 0"
         @click="onAjukanPerubahan"
-        >Pengajuan</v-btn
       >
+        <template #prepend
+          ><IconFileDescription :size="15" :stroke-width="1.7"
+        /></template>
+        Pengajuan
+      </v-btn>
 
       <v-btn
         size="small"
-        prepend-icon="mdi-printer"
         color="grey-darken-3"
         :disabled="selected.length === 0"
         @click="onPrint"
-        >Cetak</v-btn
       >
+        <template #prepend
+          ><IconPrinter :size="15" :stroke-width="1.7"
+        /></template>
+        Cetak
+      </v-btn>
       <v-btn
         v-if="canEdit"
         size="small"
-        prepend-icon="mdi-close-circle-outline"
         color="red-darken-3"
         :disabled="selected.length === 0"
         @click="openCloseDialog"
-        >Close Transaksi</v-btn
       >
+        <template #prepend
+          ><IconCircleX :size="15" :stroke-width="1.7"
+        /></template>
+        Close Transaksi
+      </v-btn>
     </template>
 
     <!-- ── Kolom custom ── -->
@@ -624,7 +647,6 @@ const num = (val: number) => new Intl.NumberFormat("id-ID").format(val || 0);
                           rel.WaktuApprove
                         }}</span>
                         <v-btn
-                          v-else
                           size="x-small"
                           color="primary"
                           variant="flat"
@@ -637,7 +659,12 @@ const num = (val: number) => new Intl.NumberFormat("id-ID").format(val || 0);
                             )
                           "
                         >
-                          <v-icon size="small" start>mdi-check</v-icon> ACC
+                          <IconCheck
+                            :size="14"
+                            :stroke-width="2"
+                            class="mr-1"
+                          />
+                          ACC
                         </v-btn>
                       </td>
                       <td class="tr" style="font-weight: 700">
@@ -726,9 +753,7 @@ const num = (val: number) => new Intl.NumberFormat("id-ID").format(val || 0);
   <v-dialog v-model="closeDialog" max-width="400px" persistent>
     <div class="close-dlg">
       <div class="close-dlg-header">
-        <v-icon size="14" color="white" class="mr-2"
-          >mdi-close-circle-outline</v-icon
-        >
+        <IconCircleX :size="14" color="white" class="mr-2" />
         Close Transaksi
         <button class="dlg-x" @click="closeDialog = false">✕</button>
       </div>
@@ -753,13 +778,12 @@ const num = (val: number) => new Intl.NumberFormat("id-ID").format(val || 0);
   <v-dialog v-model="actionDialog" max-width="400px" persistent>
     <div class="close-dlg">
       <div class="close-dlg-header" style="background: #1565c0">
-        <v-icon size="14" color="white" class="mr-2">
-          {{
-            actionType === "AJUKAN"
-              ? "mdi-file-document-edit"
-              : "mdi-shield-check"
-          }}
-        </v-icon>
+        <component
+          :is="actionType === 'AJUKAN' ? IconFileDescription : IconShieldCheck"
+          :size="14"
+          color="white"
+          class="mr-2"
+        />
         {{
           actionType === "GUDANG"
             ? "Approve Gudang"

@@ -3,6 +3,7 @@ import { ref, watch, computed } from "vue";
 import QrcodeVue from "qrcode.vue";
 import { approveReturBahanFormService } from "@/services/garmen/approveReturBahanFormService";
 import { useToast } from "vue-toastification";
+import { IconX, IconPrinter } from "@tabler/icons-vue";
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
@@ -113,12 +114,13 @@ const printBarcode = () => {
       >
         <span>Cetak Barcode: {{ nomor }}</span>
         <v-btn
-          icon="mdi-close"
           variant="text"
           size="small"
           @click="isOpen = false"
           density="comfortable"
-        ></v-btn>
+        >
+          <IconX :size="18" :stroke-width="2" />
+        </v-btn>
       </v-card-title>
 
       <v-card-text class="pa-4 pb-6 bg-grey-lighten-4">
@@ -134,11 +136,11 @@ const printBarcode = () => {
             <span class="text-caption text-grey-darken-1"
               >Preview Stiker ({{ barcodes.length }} Item)</span
             >
-            <v-btn
-              color="success"
-              prepend-icon="mdi-printer"
-              @click="printBarcode"
-            >
+
+            <v-btn color="success" @click="printBarcode">
+              <template #prepend
+                ><IconPrinter :size="15" :stroke-width="1.7"
+              /></template>
               Cetak Sekarang
             </v-btn>
           </div>

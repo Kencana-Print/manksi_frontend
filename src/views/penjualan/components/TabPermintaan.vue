@@ -4,6 +4,16 @@ import api from "@/services/api";
 import { useToast } from "vue-toastification";
 import CustomerSearchModal from "@/components/lookups/CustomerSearchModal.vue";
 import SalesSearchModal from "@/components/lookups/SalesSearchModal.vue";
+import {
+  IconLock,
+  IconSearch,
+  IconPhoto,
+  IconDiscountCheck,
+  IconClock,
+  IconX,
+  IconPhotoOff,
+  IconExternalLink,
+} from "@tabler/icons-vue";
 
 const props = defineProps<{ formData: any; isEdit: boolean }>();
 const toast = useToast();
@@ -118,7 +128,7 @@ const onFileChange = (e: Event) => {
     <!-- Alert tutup buku -->
     <div v-if="formData.isTutupBuku" class="tp-alert-wrap">
       <div class="tp-alert warning">
-        <v-icon size="13" class="mr-1">mdi-lock</v-icon>
+        <IconLock :size="13" class="mr-1" />
         Periode ini sudah ditutup. Anda tidak dapat mengubah data ini.
       </div>
     </div>
@@ -232,13 +242,12 @@ const onFileChange = (e: Event) => {
             style="max-width: 100px; background: #ddeeff"
           >
             <template #append-inner>
-              <v-icon
-                size="13"
+              <IconSearch
+                :size="13"
                 color="primary"
                 style="cursor: pointer"
                 @mousedown.prevent="showCustModal = true"
-                >mdi-magnify</v-icon
-              >
+              />
             </template>
           </v-text-field>
           <v-text-field
@@ -264,13 +273,12 @@ const onFileChange = (e: Event) => {
             style="max-width: 100px; background: #ddeeff"
           >
             <template #append-inner>
-              <v-icon
-                size="13"
+              <IconSearch
+                :size="13"
                 color="primary"
                 style="cursor: pointer"
                 @mousedown.prevent="showSalesModal = true"
-                >mdi-magnify</v-icon
-              >
+              />
             </template>
           </v-text-field>
           <v-text-field
@@ -478,7 +486,7 @@ const onFileChange = (e: Event) => {
             @click="showPreviewDialog = true"
           />
           <div v-else class="tp-img-empty">
-            <v-icon size="28" color="#bdbdbd">mdi-image-outline</v-icon>
+            <IconPhoto :size="28" color="#bdbdbd" />
             <div class="mt-1">Belum ada gambar</div>
           </div>
         </div>
@@ -501,13 +509,11 @@ const onFileChange = (e: Event) => {
           class="tp-status-badge mt-2"
           :class="formData.StatusEdit === 'ACC' ? 'st-acc' : 'st-wait'"
         >
-          <v-icon size="12" class="mr-1">
-            {{
-              formData.StatusEdit === "ACC"
-                ? "mdi-check-decagram"
-                : "mdi-clock-outline"
-            }}
-          </v-icon>
+          <component
+            :is="formData.StatusEdit === 'ACC' ? IconDiscountCheck : IconClock"
+            :size="12"
+            class="mr-1"
+          />
           Status Approval: <strong>{{ formData.StatusEdit }}</strong>
         </div>
       </div>
@@ -524,12 +530,13 @@ const onFileChange = (e: Event) => {
       >
         <span class="text-subtitle-1 font-weight-bold">Preview Desain</span>
         <v-btn
-          icon="mdi-close"
           variant="text"
           size="small"
           color="white"
           @click="showPreviewDialog = false"
-        ></v-btn>
+        >
+          <IconX :size="18" :stroke-width="2" />
+        </v-btn>
       </v-card-title>
       <v-card-text class="pa-4 text-center bg-grey-lighten-4">
         <v-img
@@ -553,9 +560,7 @@ const onFileChange = (e: Event) => {
             <div
               class="d-flex flex-column align-center justify-center fill-height text-grey"
             >
-              <v-icon size="48" color="grey-lighten-1"
-                >mdi-image-off-outline</v-icon
-              >
+              <IconPhotoOff :size="48" color="#bdbdbd" />
               <div class="text-subtitle-2 mt-2">Gagal memuat gambar</div>
             </div>
           </template>
@@ -566,10 +571,12 @@ const onFileChange = (e: Event) => {
         <v-btn
           color="primary"
           variant="text"
-          prepend-icon="mdi-open-in-new"
           :href="displayImageUrl"
           target="_blank"
         >
+          <template #prepend
+            ><IconExternalLink :size="15" :stroke-width="1.7"
+          /></template>
           Buka di Tab Baru
         </v-btn>
       </v-card-actions>

@@ -6,6 +6,7 @@ import BaseBrowse from "@/components/BaseBrowse.vue";
 import { useBrowse } from "@/composables/useBrowse";
 import { updateSjMapService } from "@/services/penjualan/updateSjMapService";
 import UpdateSjMapFormDialog from "@/components/dialogs/UpdateSjMapFormDialog.vue";
+import { IconTruckDelivery, IconEdit } from "@tabler/icons-vue";
 
 const router = useRouter();
 const toast = useToast();
@@ -93,7 +94,7 @@ const onUpdateStatus = () => {
   <BaseBrowse
     title="Update Status Surat Jalan Memo"
     menu-id="164"
-    icon="mdi-truck-check-outline"
+    :icon="IconTruckDelivery"
     :headers="headers"
     :items="items ?? []"
     :is-loading="isLoading"
@@ -130,10 +131,12 @@ const onUpdateStatus = () => {
       <v-btn
         size="small"
         color="orange-darken-2"
-        prepend-icon="mdi-square-edit-outline"
         :disabled="selected.length === 0"
         @click="onUpdateStatus"
       >
+        <template #prepend
+          ><IconEdit :size="15" :stroke-width="1.7"
+        /></template>
         Update Status
       </v-btn>
     </template>

@@ -5,6 +5,14 @@ import { useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/authStore";
 import BaseForm from "@/components/BaseForm.vue";
 import { poInternalMapFormService } from "@/services/garmen/poInternalMapFormService";
+import {
+  IconShoppingCartDown,
+  IconPlus,
+  IconCircleCheck,
+  IconPhoto,
+  IconPrinter,
+  IconTrash,
+} from "@tabler/icons-vue";
 
 // Modals
 import PabrikSearchModal from "@/components/lookups/PabrikSearchModal.vue";
@@ -339,7 +347,7 @@ const confirmPrint = () => {
   <BaseForm
     :title="isEditMode ? 'Ubah PO Internal MAP' : 'Tambah PO Internal MAP'"
     menu-id="138"
-    icon="mdi-cart-arrow-down"
+    :icon="IconShoppingCartDown"
     :is-loading="isLoading"
     :is-saving="isSaving"
     item-name="PO Internal MAP"
@@ -443,14 +451,12 @@ const confirmPrint = () => {
           >
             Detail Item PO
           </div>
-          <v-btn
-            size="small"
-            variant="tonal"
-            color="primary"
-            prepend-icon="mdi-plus"
-            @click="addRow"
-            >Tambah Baris</v-btn
-          >
+          <v-btn size="small" variant="tonal" color="primary" @click="addRow">
+            <template #prepend
+              ><IconPlus :size="14" :stroke-width="2"
+            /></template>
+            Tambah Baris
+          </v-btn>
         </div>
 
         <div
@@ -503,12 +509,8 @@ const confirmPrint = () => {
                   </div>
                 </td>
                 <td class="text-center">
-                  <v-icon v-if="row.Gambar" size="14" color="success"
-                    >mdi-check-circle</v-icon
-                  >
-                  <v-icon v-else size="14" color="grey-lighten-1"
-                    >mdi-image-outline</v-icon
-                  >
+                  <IconCircleCheck v-if="row.Gambar" :size="14" color="green" />
+                  <IconPhoto v-else :size="14" color="#bdbdbd" />
                 </td>
                 <td class="bg-grey-lighten-4">{{ row.NamaMAP }}</td>
                 <td class="bg-grey-lighten-4">{{ row.Bahan }}</td>
@@ -540,12 +542,13 @@ const confirmPrint = () => {
                 </td>
                 <td class="text-center">
                   <v-btn
-                    icon="mdi-delete"
                     size="x-small"
                     variant="text"
                     color="error"
                     @click="removeRow(Number(idx))"
-                  ></v-btn>
+                  >
+                    <IconTrash :size="14" :stroke-width="1.7" />
+                  </v-btn>
                 </td>
               </tr>
             </tbody>
@@ -570,7 +573,12 @@ const confirmPrint = () => {
   <v-dialog v-model="showPrintDialog" max-width="400px" persistent>
     <v-card class="rounded-lg">
       <v-card-title class="bg-primary text-white d-flex align-center pa-3">
-        <v-icon start color="white">mdi-printer</v-icon>
+        <IconPrinter
+          :size="18"
+          :stroke-width="1.7"
+          color="white"
+          class="mr-2"
+        />
         <span class="text-subtitle-1 font-weight-bold">Simpan Berhasil</span>
       </v-card-title>
 
@@ -587,13 +595,12 @@ const confirmPrint = () => {
           >Tidak, Tutup</v-btn
         >
         <v-spacer></v-spacer>
-        <v-btn
-          color="primary"
-          variant="elevated"
-          prepend-icon="mdi-printer"
-          @click="confirmPrint"
-          >Ya, Cetak</v-btn
-        >
+        <v-btn color="primary" variant="elevated" @click="confirmPrint">
+          <template #prepend
+            ><IconPrinter :size="15" :stroke-width="1.7"
+          /></template>
+          Ya, Cetak
+        </v-btn>
       </v-card-actions>
     </v-card>
   </v-dialog>

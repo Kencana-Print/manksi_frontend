@@ -5,8 +5,8 @@ import { useToast } from "vue-toastification";
 import BaseBrowse from "@/components/BaseBrowse.vue";
 import { useBrowse } from "@/composables/useBrowse";
 import { bastService } from "@/services/garmen/bastService";
-import api from "@/services/api";
 import * as XLSX from "xlsx";
+import { IconPrinter, IconFileSpreadsheet } from "@tabler/icons-vue";
 
 const router = useRouter();
 const toast = useToast();
@@ -109,7 +109,7 @@ const fmtDate = (val: string) => {
   <BaseBrowse
     title="Cetak BAST MAP"
     :menu-id="menuId"
-    icon="mdi-printer-check"
+    :icon="IconPrinter"
     :headers="headers"
     :items="items ?? []"
     item-value="Nomor"
@@ -174,19 +174,25 @@ const fmtDate = (val: string) => {
         size="small"
         variant="flat"
         color="blue-grey"
-        prepend-icon="mdi-printer"
         :disabled="selected.length === 0"
         @click="cetak"
-        >Cetak</v-btn
       >
+        <template #prepend
+          ><IconPrinter :size="15" :stroke-width="1.7"
+        /></template>
+        Cetak
+      </v-btn>
       <v-btn
         size="small"
         variant="flat"
         color="green-darken-1"
-        prepend-icon="mdi-file-excel"
         @click="exportExcel(true)"
-        >Export Detail</v-btn
       >
+        <template #prepend
+          ><IconFileSpreadsheet :size="15" :stroke-width="1.7"
+        /></template>
+        Export Detail
+      </v-btn>
     </template>
 
     <template #item.Tanggal="{ item }">{{ fmtDate(item.Tanggal) }}</template>

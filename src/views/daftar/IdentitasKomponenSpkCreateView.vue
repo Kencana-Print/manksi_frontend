@@ -6,6 +6,15 @@ import { useForm } from "@/composables/useForm";
 import BaseForm from "@/components/BaseForm.vue";
 import SpkSearchModal from "@/components/lookups/SpkSearchModal.vue";
 import BahanSearchModal from "@/components/lookups/BahanSearchModal.vue";
+import {
+  IconListDetails,
+  IconScissors,
+  IconPrinter,
+  IconNeedle,
+  IconPlus,
+  IconTrash,
+  IconSearch,
+} from "@tabler/icons-vue";
 
 const toast = useToast();
 const lookupOptions = ref<any[]>([]);
@@ -180,7 +189,7 @@ const onBahanSelect = (
         : 'Tambah Identitas Komponen SPK'
     "
     menu-id="18"
-    icon="mdi-format-list-bulleted-type"
+    :icon="IconListDetails"
     :is-loading="isLoading"
     :is-saving="isSaving"
     item-name="Identitas Komponen SPK"
@@ -211,15 +220,14 @@ const onBahanSelect = (
           placeholder="Ketik lalu Enter"
         >
           <template #append-inner>
-            <!-- FIX 1: pakai @mousedown.prevent agar tidak ada blur sebelum klik -->
-            <v-icon
+            <IconSearch
               v-if="!isEditMode"
-              class="cursor-pointer"
-              color="primary"
+              :size="16"
+              :stroke-width="1.7"
+              color="#1565c0"
+              style="cursor: pointer"
               @mousedown.prevent="openSpkModal"
-            >
-              mdi-magnify
-            </v-icon>
+            />
           </template>
         </v-text-field>
 
@@ -300,14 +308,23 @@ const onBahanSelect = (
           density="compact"
           class="tab-header"
         >
-          <v-tab value="potong" class="font-weight-bold">
-            <v-icon start size="16">mdi-content-cut</v-icon>POTONG
+          <v-tab value="potong">
+            <template #prepend
+              ><IconScissors :size="16" :stroke-width="1.7" class="mr-1"
+            /></template>
+            POTONG
           </v-tab>
-          <v-tab value="cetak" class="font-weight-bold">
-            <v-icon start size="16">mdi-printer</v-icon>CETAK
+          <v-tab value="cetak">
+            <template #prepend
+              ><IconPrinter :size="16" :stroke-width="1.7" class="mr-1"
+            /></template>
+            CETAK
           </v-tab>
-          <v-tab value="bordir" class="font-weight-bold">
-            <v-icon start size="16">mdi-needle</v-icon>BORDIR
+          <v-tab value="bordir">
+            <template #prepend
+              ><IconNeedle :size="16" :stroke-width="1.7" class="mr-1"
+            /></template>
+            BORDIR
           </v-tab>
         </v-tabs>
 
@@ -319,15 +336,20 @@ const onBahanSelect = (
               <div class="tab-content">
                 <div class="tab-content-header">
                   <span class="tab-content-title text-blue-darken-3">
-                    <v-icon size="15" class="mr-1">mdi-content-cut</v-icon
-                    >KOMPONEN POTONG
+                    <IconScissors
+                      :size="15"
+                      :stroke-width="1.7"
+                      class="mr-1"
+                    />KOMPONEN POTONG
                   </span>
                   <v-btn
                     size="small"
                     color="blue-darken-3"
-                    prepend-icon="mdi-plus"
                     @click="addRow('ListPotong')"
                   >
+                    <template #prepend
+                      ><IconPlus :size="14" :stroke-width="2"
+                    /></template>
                     Tambah
                   </v-btn>
                 </div>
@@ -356,18 +378,26 @@ const onBahanSelect = (
                           placeholder="Klik u/ Cari"
                           class="cursor-pointer"
                           @click="openBahanModal('ListPotong', idx)"
-                          append-inner-icon="mdi-magnify"
+                        >
+                          <template #append-inner>
+                            <IconSearch
+                              :size="14"
+                              :stroke-width="1.7"
+                              color="#1565c0"
+                              style="cursor: pointer"
+                            /> </template
                         ></v-text-field>
                       </td>
                       <td>{{ item.Nama }}</td>
                       <td class="text-center">
                         <v-btn
-                          icon="mdi-delete"
                           color="error"
                           variant="text"
                           size="small"
                           @click="removeRow('ListPotong', idx)"
-                        />
+                        >
+                          <IconTrash :size="16" :stroke-width="1.7" />
+                        </v-btn>
                       </td>
                     </tr>
                     <tr v-if="formData.ListPotong.length === 0">
@@ -385,15 +415,20 @@ const onBahanSelect = (
               <div class="tab-content">
                 <div class="tab-content-header">
                   <span class="tab-content-title text-orange-darken-3">
-                    <v-icon size="15" class="mr-1">mdi-printer</v-icon>KOMPONEN
-                    CETAK
+                    <IconPrinter
+                      :size="15"
+                      :stroke-width="1.7"
+                      class="mr-1"
+                    />KOMPONEN CETAK
                   </span>
                   <v-btn
                     size="small"
                     color="orange-darken-3"
-                    prepend-icon="mdi-plus"
                     @click="addRow('ListCetak')"
                   >
+                    <template #prepend
+                      ><IconPlus :size="14" :stroke-width="2"
+                    /></template>
                     Tambah
                   </v-btn>
                 </div>
@@ -422,18 +457,26 @@ const onBahanSelect = (
                           placeholder="Klik u/ Cari"
                           class="cursor-pointer"
                           @click="openBahanModal('ListCetak', idx)"
-                          append-inner-icon="mdi-magnify"
+                        >
+                          <template #append-inner>
+                            <IconSearch
+                              :size="14"
+                              :stroke-width="1.7"
+                              color="#1565c0"
+                              style="cursor: pointer"
+                            /> </template
                         ></v-text-field>
                       </td>
                       <td>{{ item.Nama }}</td>
                       <td class="text-center">
                         <v-btn
-                          icon="mdi-delete"
                           color="error"
                           variant="text"
                           size="small"
                           @click="removeRow('ListCetak', idx)"
-                        />
+                        >
+                          <IconTrash :size="16" :stroke-width="1.7" />
+                        </v-btn>
                       </td>
                     </tr>
                     <tr v-if="formData.ListCetak.length === 0">
@@ -451,15 +494,20 @@ const onBahanSelect = (
               <div class="tab-content">
                 <div class="tab-content-header">
                   <span class="tab-content-title text-purple-darken-3">
-                    <v-icon size="15" class="mr-1">mdi-needle</v-icon>KOMPONEN
-                    BORDIR
+                    <IconNeedle
+                      :size="15"
+                      :stroke-width="1.7"
+                      class="mr-1"
+                    />KOMPONEN BORDIR
                   </span>
                   <v-btn
                     size="small"
                     color="purple-darken-3"
-                    prepend-icon="mdi-plus"
                     @click="addRow('ListBordir')"
                   >
+                    <template #prepend
+                      ><IconPlus :size="14" :stroke-width="2"
+                    /></template>
                     Tambah
                   </v-btn>
                 </div>
@@ -489,18 +537,25 @@ const onBahanSelect = (
                           placeholder="Klik u/ Cari"
                           class="cursor-pointer"
                           @click="openBahanModal('ListBordir', idx)"
-                          append-inner-icon="mdi-magnify"
+                          ><template #append-inner>
+                            <IconSearch
+                              :size="14"
+                              :stroke-width="1.7"
+                              color="#1565c0"
+                              style="cursor: pointer"
+                            /> </template
                         ></v-text-field>
                       </td>
                       <td>{{ item.Nama }}</td>
                       <td class="text-center">
                         <v-btn
-                          icon="mdi-delete"
                           color="error"
                           variant="text"
                           size="small"
                           @click="removeRow('ListBordir', idx)"
-                        />
+                        >
+                          <IconTrash :size="16" :stroke-width="1.7" />
+                        </v-btn>
                       </td>
                     </tr>
                     <tr v-if="formData.ListBordir.length === 0">

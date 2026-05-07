@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, watch } from "vue";
+import { IconPrinter } from "@tabler/icons-vue";
 
 const props = defineProps<{
   formData: any;
@@ -106,7 +107,7 @@ const textForOption1 = computed(() => {
         variant="tonal"
         density="compact"
         class="mt-6 text-caption"
-        icon="mdi-printer"
+        :icon="IconPrinter"
       >
         Keterangan yang dicentang akan dicetak pada bagian bawah surat
         penawaran.

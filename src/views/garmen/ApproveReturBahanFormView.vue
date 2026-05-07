@@ -6,6 +6,11 @@ import { useForm } from "@/composables/useForm";
 import { approveReturBahanFormService } from "@/services/garmen/approveReturBahanFormService";
 import BaseForm from "@/components/BaseForm.vue";
 import ApproveReturBarcodeDialog from "./ApproveReturBarcodeDialog.vue";
+import {
+  IconDiscountCheckFilled,
+  IconListDetails,
+  IconBarcode,
+} from "@tabler/icons-vue";
 
 const route = useRoute();
 const toast = useToast();
@@ -32,8 +37,6 @@ const initialData = {
 // State untuk Print Dialog
 const showPrintDialog = ref(false);
 const nomorToPrint = ref("");
-// Flag internal untuk mencegah router.back() dipanggil oleh onSuccess jika user klik tombol Print
-const isPrinting = ref(false);
 
 const {
   formData,
@@ -73,19 +76,8 @@ const {
   },
   onSuccess: (res: any) => {
     const noTersimpan = res.data?.data?.nomor || formData.value.nomor;
-
-    // Tanyakan apakah ingin cetak barcode
-    if (
-      window.confirm(
-        `Berhasil di-approve dengan nomor: ${noTersimpan}\n\nApakah ingin cetak desain report (Barcode)?`,
-      )
-    ) {
-      isPrinting.value = true; // Kunci agar tidak goBack() otomatis dari executeSave
-      nomorToPrint.value = noTersimpan;
-      showPrintDialog.value = true;
-    } else {
-      toast.success("Data berhasil disimpan.");
-    }
+    nomorToPrint.value = noTersimpan;
+    showPrintDialog.value = true;
   },
 });
 
@@ -120,9 +112,8 @@ const validateSave = () => {
 
 // Menangani event klik "Tutup" pada dialog Print
 const onDialogClose = (isOpen: boolean) => {
-  if (!isOpen && isPrinting.value) {
-    isPrinting.value = false;
-    goBack(); // Kembali ke Browse setelah dialog print ditutup
+  if (!isOpen) {
+    goBack();
   }
 };
 
@@ -163,7 +154,7 @@ const numFormat = (val: any) =>
   <BaseForm
     title="Approve Retur Material"
     menuId="137"
-    icon="mdi-check-decagram-outline"
+    :icon="IconDiscountCheckFilled"
     :is-loading="isLoading"
     :is-saving="isSaving"
     v-model:showSaveDialog="showSaveDialog"
@@ -263,7 +254,7 @@ const numFormat = (val: any) =>
           <div
             class="bg-blue-grey-darken-3 text-white px-3 py-1 font-weight-bold text-caption d-flex align-center"
           >
-            <v-icon size="small" class="mr-2">mdi-format-list-bulleted</v-icon>
+            <IconListDetails :size="14" :stroke-width="1.7" class="mr-2" />
             Detail Barang Retur
           </div>
           <div class="table-container flex-grow-1">
@@ -357,7 +348,7 @@ const numFormat = (val: any) =>
           <div
             class="bg-teal-darken-3 text-white px-3 py-1 font-weight-bold text-caption d-flex align-center"
           >
-            <v-icon size="small" class="mr-2">mdi-barcode</v-icon>
+            <IconBarcode :size="14" :stroke-width="1.7" class="mr-2" />
             Rincian Barcode / Roll
           </div>
           <div class="table-container flex-grow-1">

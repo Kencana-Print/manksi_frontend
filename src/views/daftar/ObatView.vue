@@ -3,6 +3,7 @@ import { ref, computed } from "vue";
 import api from "@/services/api";
 import { useBrowse } from "@/composables/useBrowse";
 import { useAuthStore } from "@/stores/authStore";
+import { IconFlask } from "@tabler/icons-vue";
 
 import BaseBrowse from "@/components/BaseBrowse.vue";
 import ObatFormDialog from "@/components/dialogs/ObatFormDialog.vue";
@@ -88,7 +89,7 @@ const handleEdit = async (item: any) => {
   <BaseBrowse
     title="Master Obat"
     menu-id="24"
-    icon="mdi-flask-outline"
+    :icon="IconFlask"
     :headers="headers"
     :items="items ?? []"
     :is-loading="isLoading"

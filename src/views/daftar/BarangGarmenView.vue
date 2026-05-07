@@ -3,6 +3,7 @@ import { ref, computed, watch, onMounted } from "vue";
 import api from "@/services/api";
 import { useBrowse } from "@/composables/useBrowse";
 import { useAuthStore } from "@/stores/authStore";
+import { IconShirt } from "@tabler/icons-vue";
 
 import BaseBrowse from "@/components/BaseBrowse.vue";
 import ConfirmDeleteDialog from "@/components/dialogs/ConfirmDeleteDialog.vue";
@@ -199,7 +200,7 @@ const handleEdit = async (item: any) => {
   <BaseBrowse
     title="Barang Garmen"
     menu-id="58"
-    icon="mdi-tshirt-crew-outline"
+    :icon="IconShirt"
     :headers="headers"
     :items="items ?? []"
     :is-loading="isLoading"

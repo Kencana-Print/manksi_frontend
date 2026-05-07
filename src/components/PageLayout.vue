@@ -1,20 +1,23 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { IconFileText } from "@tabler/icons-vue";
 
 interface Props {
   title: string;
-  icon?: string;
+  icon?: any;
   loading?: boolean;
   desktopMode?: boolean;
   maxWidth?: string;
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  icon: "mdi-file-document-outline",
+  icon: IconFileText, // default Tabler component
   loading: false,
   desktopMode: true,
   maxWidth: "100%",
 });
+
+const isTablerIcon = computed(() => typeof props.icon !== "string");
 
 const emit = defineEmits<{
   "update:loading": [value: boolean];
@@ -38,7 +41,14 @@ const loadingModel = computed({
     <!-- Ini BUKAN scroll container, jadi sticky di children akan bekerja -->
     <div class="page-header">
       <div class="page-title-section">
-        <v-icon size="small" class="title-icon">{{ icon }}</v-icon>
+        <component
+          v-if="isTablerIcon"
+          :is="icon"
+          :size="18"
+          :stroke-width="1.6"
+          class="title-icon"
+        />
+        <v-icon v-else size="small" class="title-icon">{{ icon }}</v-icon>
         <h1 class="page-title">{{ title }}</h1>
       </div>
 
@@ -92,7 +102,7 @@ const loadingModel = computed({
 }
 
 .desktop-mode {
-  height: calc(100vh - 64px); /* sesuai app bar height 64px */
+  height: calc(100vh - 64px);
   padding: 8px 12px;
   gap: 6px;
 }
@@ -119,13 +129,13 @@ const loadingModel = computed({
 }
 
 .title-icon {
-  color: #555;
+  color: rgba(var(--v-theme-on-surface), 0.55);
 }
 
 .page-title {
   font-size: 1rem;
   font-weight: 600;
-  color: #212121;
+  color: rgb(var(--v-theme-on-surface));
   margin: 0;
 }
 
@@ -137,35 +147,28 @@ const loadingModel = computed({
   display: flex;
   align-items: center;
   gap: 8px;
-  /* Tidak perlu sticky — sudah di luar scroll container */
 }
 
 /* ── Area konten ── */
 .content-area {
   flex: 1 1 0;
-  min-height: 0; /* wajib untuk flex child bisa scroll */
+  min-height: 0;
   position: relative;
   display: flex;
   flex-direction: column;
-  background: #ffffff;
-  border: 1px solid #dcdcdc;
+  background: rgb(var(--v-theme-surface));
+  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
   border-radius: 4px;
-  overflow: hidden; /* clip konten agar tidak keluar border-radius */
+  overflow: hidden;
 }
 
-/*
-  .content-wrapper TIDAK overflow:auto di sini.
-  Biarkan komponen anak (BaseBrowse) yang mengatur scrollnya sendiri
-  via .table-wrap dan .browse-content.
-  Ini mencegah double scroll container yang membingungkan sticky.
-*/
 .content-wrapper {
   flex: 1 1 0;
   min-height: 0;
   display: flex;
   flex-direction: column;
   padding: var(--wrapper-padding, 16px);
-  overflow: hidden; /* biarkan anak yang scroll */
+  overflow: hidden;
 }
 
 .desktop-mode .content-wrapper {
@@ -175,6 +178,6 @@ const loadingModel = computed({
 /* ── Footer / Status Bar ── */
 .content-footer {
   flex-shrink: 0;
-  border-top: 1px solid #e0e0e0;
+  border-top: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
 }
 </style>

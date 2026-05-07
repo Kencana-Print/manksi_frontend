@@ -4,6 +4,7 @@ import type { VForm } from "vuetify/components";
 import api from "@/services/api";
 import { useToast } from "vue-toastification";
 import { useAuthStore } from "@/stores/authStore";
+import { IconFlask, IconX } from "@tabler/icons-vue";
 
 const props = defineProps<{
   modelValue: boolean;
@@ -126,18 +127,14 @@ const handleSave = async () => {
   <v-dialog v-model="dialogVisible" persistent max-width="600px">
     <v-card class="dialog-card">
       <v-card-title class="bg-primary text-white d-flex align-center pa-2 px-4">
-        <v-icon start color="white" size="small">mdi-flask-outline</v-icon>
+        <IconFlask :size="16" :stroke-width="1.7" color="white" class="mr-2" />
         <span class="text-subtitle-2 font-weight-bold">
           {{ isNewMode ? "TAMBAH" : "UBAH" }} MASTER OBAT
         </span>
         <v-spacer></v-spacer>
-        <v-btn
-          icon="mdi-close"
-          variant="text"
-          size="small"
-          color="white"
-          @click="dialogVisible = false"
-        ></v-btn>
+        <v-btn variant="text" size="small" @click="dialogVisible = false">
+          <IconX :size="16" :stroke-width="2" color="white" />
+        </v-btn>
       </v-card-title>
 
       <v-card-text class="pa-4">

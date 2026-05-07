@@ -6,6 +6,11 @@ import { useBrowse } from "@/composables/useBrowse";
 import { returBahanService } from "@/services/garmen/returBahanService";
 import { useAuthStore } from "@/stores/authStore";
 import BaseBrowse from "@/components/BaseBrowse.vue";
+import {
+  IconArrowBackUp,
+  IconPrinter,
+  IconFileDescription,
+} from "@tabler/icons-vue";
 
 const router = useRouter();
 const toast = useToast();
@@ -169,7 +174,7 @@ const submitPengajuan = async () => {
   <BaseBrowse
     title="Daftar Retur Permintaan Bahan"
     menu-id="110"
-    icon="mdi-arrow-u-left-top-bold"
+    :icon="IconArrowBackUp"
     :headers="headers"
     :items="items"
     :is-loading="isLoading"
@@ -230,20 +235,27 @@ const submitPengajuan = async () => {
     <template #extra-actions="{ selected }">
       <v-btn
         size="small"
-        prepend-icon="mdi-printer"
         color="grey-darken-3"
         :disabled="selected.length === 0"
         @click="onPrint(selected[0])"
-        >Cetak</v-btn
       >
+        <template #prepend
+          ><IconPrinter :size="15" :stroke-width="1.7"
+        /></template>
+        Cetak
+      </v-btn>
+
       <v-btn
         size="small"
-        prepend-icon="mdi-file-document-edit-outline"
         color="warning"
         :disabled="selected.length === 0 || !canEdit"
         @click="openPengajuan(selected[0])"
-        >Pengajuan</v-btn
       >
+        <template #prepend
+          ><IconFileDescription :size="15" :stroke-width="1.7"
+        /></template>
+        Pengajuan
+      </v-btn>
     </template>
 
     <!-- Format kolom (diinject langsung ke BaseBrowse) -->
@@ -297,9 +309,7 @@ const submitPengajuan = async () => {
   <v-dialog v-model="showPengajuanDialog" max-width="480px" persistent>
     <div class="dlg-card">
       <div class="dlg-header">
-        <v-icon size="14" color="white" class="mr-2"
-          >mdi-file-document-edit-outline</v-icon
-        >
+        <IconFileDescription :size="14" color="white" class="mr-2" />
         Pengajuan Perubahan Data
         <button class="dlg-close" @click="showPengajuanDialog = false">
           ✕

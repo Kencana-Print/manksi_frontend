@@ -6,6 +6,7 @@ import { useAuthStore } from "@/stores/authStore";
 import BaseForm from "@/components/BaseForm.vue";
 import { useForm } from "@/composables/useForm";
 import api from "@/services/api";
+import { IconTruckDelivery, IconCheck, IconX } from "@tabler/icons-vue";
 
 // Modals
 import PabrikSearchModal from "@/components/lookups/PabrikSearchModal.vue";
@@ -208,7 +209,7 @@ const handlePrint = () => {
         : 'Tambah Surat Jalan PO Internal'
     "
     menu-id="139"
-    icon="mdi-truck-delivery-outline"
+    :icon="IconTruckDelivery"
     :is-loading="isLoading"
     :is-saving="isSaving"
     v-model:show-save-dialog="showSaveDialog"
@@ -342,9 +343,8 @@ const handlePrint = () => {
                 </td>
                 <td class="bg-grey-lighten-4 text-center">{{ row.KodeMAP }}</td>
                 <td class="text-center">
-                  <v-icon :color="row.HasBast ? 'success' : 'error'" size="16">
-                    {{ row.HasBast ? "mdi-check-bold" : "mdi-close-thick" }}
-                  </v-icon>
+                  <IconCheck v-if="row.HasBast" :size="16" color="green" />
+                  <IconX v-else :size="16" color="red" />
                 </td>
                 <td class="bg-grey-lighten-4">{{ row.NamaMAP }}</td>
                 <td class="bg-grey-lighten-4">{{ row.Bahan }}</td>

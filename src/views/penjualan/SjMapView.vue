@@ -6,6 +6,14 @@ import BaseBrowse from "@/components/BaseBrowse.vue";
 import { useBrowse } from "@/composables/useBrowse";
 import { sjMapService } from "@/services/penjualan/sjMapService";
 import * as XLSX from "xlsx";
+import {
+  IconTruckDelivery,
+  IconPrinter,
+  IconTable,
+  IconKey,
+  IconLockOpen,
+  IconSend,
+} from "@tabler/icons-vue";
 
 const router = useRouter();
 const toast = useToast();
@@ -269,7 +277,7 @@ const getNomorClass = (ngedit: string) => {
   <BaseBrowse
     title="Surat Jalan MAP"
     menu-id="163"
-    icon="mdi-truck-delivery-outline"
+    :icon="IconTruckDelivery"
     :headers="headers"
     :items="items ?? []"
     :is-loading="isLoading"
@@ -323,29 +331,29 @@ const getNomorClass = (ngedit: string) => {
       <v-btn
         size="small"
         color="grey-darken-3"
-        prepend-icon="mdi-printer"
         :disabled="selected.length === 0"
         @click="actCetak"
       >
+        <template #prepend
+          ><IconPrinter :size="15" :stroke-width="1.7"
+        /></template>
         Cetak
       </v-btn>
 
-      <v-btn
-        size="small"
-        color="indigo"
-        prepend-icon="mdi-file-table"
-        @click="actExportDetail"
-      >
+      <v-btn size="small" color="indigo" @click="actExportDetail">
+        <template #prepend
+          ><IconTable :size="15" :stroke-width="1.7"
+        /></template>
         Export Detail
       </v-btn>
 
       <v-btn
         size="small"
         color="purple"
-        prepend-icon="mdi-key-variant"
         :disabled="selected.length === 0"
         @click="actPengajuan"
       >
+        <template #prepend><IconKey :size="15" :stroke-width="1.7" /></template>
         Pengajuan
       </v-btn>
     </template>
@@ -403,7 +411,12 @@ const getNomorClass = (ngedit: string) => {
       <v-card-title
         class="bg-purple text-white text-subtitle-1 font-weight-bold pa-3 d-flex align-center"
       >
-        <v-icon start>mdi-lock-open-outline</v-icon>
+        <IconLockOpen
+          :size="18"
+          :stroke-width="1.7"
+          color="white"
+          class="mr-2"
+        />
         Pengajuan Perubahan Data
       </v-card-title>
       <v-card-text class="pa-4">
@@ -436,10 +449,12 @@ const getNomorClass = (ngedit: string) => {
         <v-btn
           color="purple"
           variant="elevated"
-          prepend-icon="mdi-send"
           :loading="isPinLoading"
           @click="submitPengajuan"
         >
+          <template #prepend
+            ><IconSend :size="15" :stroke-width="1.7"
+          /></template>
           Kirim Ajukan
         </v-btn>
       </v-card-actions>

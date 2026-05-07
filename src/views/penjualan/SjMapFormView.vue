@@ -4,6 +4,11 @@ import { useForm } from "@/composables/useForm";
 import BaseForm from "@/components/BaseForm.vue";
 import api from "@/services/api";
 import { useToast } from "vue-toastification";
+import {
+  IconTruckDelivery,
+  IconShieldCheck,
+  IconPrinter,
+} from "@tabler/icons-vue";
 
 import MapSearchModal from "@/components/lookups/MapSearchModal.vue";
 import PerusahaanSearchModal from "@/components/lookups/PerusahaanSearchModal.vue";
@@ -147,7 +152,6 @@ const onPerushSelected = (item: any) => {
 };
 
 const onCusSelected = (item: any) => {
-  // Jika sudah ada detail barang, tampilkan dialog konfirmasi (Ganti window.confirm)
   if (formData.value.details.length > 0) {
     pendingCusItem.value = item;
     showCusConfirm.value = true;
@@ -263,7 +267,7 @@ onMounted(() => {
   <BaseForm
     :title="isEditMode ? 'Ubah Surat Jalan MAP' : 'Buat Surat Jalan MAP Baru'"
     menu-id="163"
-    icon="mdi-truck-delivery"
+    :icon="IconTruckDelivery"
     :is-loading="isLoading"
     :is-saving="isSaving"
     v-model:show-save-dialog="showSaveDialog"
@@ -416,9 +420,7 @@ onMounted(() => {
 
         <!-- PIN Status -->
         <div v-if="formData.pinStatus" class="pin-panel">
-          <v-icon color="primary" size="16" class="mr-1"
-            >mdi-shield-check</v-icon
-          >
+          <IconShieldCheck :size="16" color="#1565c0" class="mr-1" />
           <div>
             Status PIN:
             <strong>{{
@@ -553,7 +555,12 @@ onMounted(() => {
       <v-card-title
         class="bg-primary text-white pa-3 text-subtitle-1 d-flex align-center"
       >
-        <v-icon start color="white">mdi-printer-check</v-icon>
+        <IconPrinter
+          :size="18"
+          :stroke-width="1.7"
+          color="white"
+          class="mr-2"
+        />
         Simpan Berhasil
       </v-card-title>
 
@@ -571,12 +578,10 @@ onMounted(() => {
           >TIDAK (KEMBALI)</v-btn
         >
         <v-spacer />
-        <v-btn
-          color="primary"
-          variant="elevated"
-          prepend-icon="mdi-printer"
-          @click="confirmPrint"
-        >
+        <v-btn color="primary" variant="elevated" @click="confirmPrint">
+          <template #prepend
+            ><IconPrinter :size="15" :stroke-width="1.7"
+          /></template>
           YA, CETAK
         </v-btn>
       </v-card-actions>

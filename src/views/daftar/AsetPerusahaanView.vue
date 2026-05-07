@@ -4,6 +4,7 @@ import api from "@/services/api";
 import { useBrowse } from "@/composables/useBrowse";
 import BaseBrowse from "@/components/BaseBrowse.vue";
 import SparepartFormDialog from "@/components/dialogs/SparepartFormDialog.vue";
+import { IconBuilding } from "@tabler/icons-vue";
 
 // ID 38 untuk Master Aset Perusahaan
 // Menggunakan API endpoint dari sparepart karena tabelnya sama
@@ -57,7 +58,7 @@ const handleEdit = async (item: any) => {
   <BaseBrowse
     title="Master Aset Perusahaan"
     menu-id="38"
-    icon="mdi-domain"
+    :icon="IconBuilding"
     :headers="headers"
     :items="items ?? []"
     :is-loading="isLoading"

@@ -1,6 +1,11 @@
 <script setup lang="ts">
 import { ref, watch, computed } from "vue";
 import api from "@/services/api";
+import {
+  IconListNumbers,
+  IconSearch,
+  IconDatabaseOff,
+} from "@tabler/icons-vue";
 
 const props = defineProps<{ modelValue: boolean; penawaranNomor: string }>();
 const emit = defineEmits(["update:modelValue", "selected"]);
@@ -58,9 +63,7 @@ const selectItem = (item: any) => {
   >
     <div class="lookup-card">
       <div class="lookup-header">
-        <v-icon size="15" color="white" class="mr-2"
-          >mdi-format-list-numbered</v-icon
-        >
+        <IconListNumbers :size="15" :stroke-width="1.7" color="white" />
         <span>Pilih Detail Penawaran</span>
         <v-spacer />
         <button class="lookup-close" @click="emit('update:modelValue', false)">
@@ -69,7 +72,7 @@ const selectItem = (item: any) => {
       </div>
 
       <div class="lookup-search">
-        <v-icon size="16" color="#9e9e9e">mdi-magnify</v-icon>
+        <IconSearch :size="16" :stroke-width="1.7" color="#9e9e9e" />
         <input
           v-model="search"
           type="text"
@@ -88,7 +91,7 @@ const selectItem = (item: any) => {
           <span>Memuat data...</span>
         </div>
         <div v-else-if="filteredItems.length === 0" class="lookup-state">
-          <v-icon size="32" color="#bdbdbd">mdi-database-off-outline</v-icon>
+          <IconDatabaseOff :size="32" :stroke-width="1.3" color="#bdbdbd" />
           <span>Tidak ada data detail</span>
         </div>
         <table v-else class="lookup-table">

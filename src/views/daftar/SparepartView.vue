@@ -4,6 +4,7 @@ import api from "@/services/api";
 import { useBrowse } from "@/composables/useBrowse";
 import BaseBrowse from "@/components/BaseBrowse.vue";
 import SparepartFormDialog from "@/components/dialogs/SparepartFormDialog.vue";
+import { IconSettings2 } from "@tabler/icons-vue";
 
 // ID 35 untuk Master Sparepart
 const {
@@ -56,7 +57,7 @@ const handleEdit = async (item: any) => {
   <BaseBrowse
     title="Master Sparepart"
     menu-id="35"
-    icon="mdi-cog-outline"
+    :icon="IconSettings2"
     :headers="headers"
     :items="items ?? []"
     :is-loading="isLoading"

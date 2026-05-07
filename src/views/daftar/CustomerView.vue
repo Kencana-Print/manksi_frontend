@@ -5,6 +5,7 @@ import { useBrowse } from "@/composables/useBrowse";
 import { useToast } from "vue-toastification";
 import BaseBrowse from "@/components/BaseBrowse.vue";
 import CustomerFormDialog from "@/components/dialogs/CustomerFormDialog.vue";
+import { IconUsers } from "@tabler/icons-vue";
 
 const toast = useToast();
 
@@ -103,7 +104,7 @@ const handleDelete = async (item: any) => {
   <BaseBrowse
     title="Master Customer"
     menu-id="20"
-    icon="mdi-account-group-outline"
+    :icon="IconUsers"
     :headers="headers"
     :items="items ?? []"
     :is-loading="isLoading"

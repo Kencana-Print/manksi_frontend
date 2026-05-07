@@ -6,6 +6,12 @@ import { useBrowse } from "@/composables/useBrowse";
 import { approveReturBahanService } from "@/services/garmen/approveReturBahanService";
 import BaseBrowse from "@/components/BaseBrowse.vue";
 import ApproveReturBarcodeDialog from "./ApproveReturBarcodeDialog.vue";
+import {
+  IconDiscountCheckFilled,
+  IconCircleCheck,
+  IconBarcode,
+  IconFileSpreadsheet,
+} from "@tabler/icons-vue";
 
 const router = useRouter();
 const toast = useToast();
@@ -197,7 +203,7 @@ const onCetakBarcode = (item: any) => {
   <BaseBrowse
     title="Approve Retur Permintaan Bahan"
     menu-id="137"
-    icon="mdi-check-decagram-outline"
+    :icon="IconDiscountCheckFilled"
     :headers="headers"
     :items="items"
     :is-loading="isLoading"
@@ -247,7 +253,6 @@ const onCetakBarcode = (item: any) => {
     <template #extra-actions="{ selected }">
       <v-btn
         size="small"
-        prepend-icon="mdi-check-circle-outline"
         :color="
           selected[0]?.NoApprov && selected[0].NoApprov.trim() !== ''
             ? 'warning'
@@ -256,6 +261,9 @@ const onCetakBarcode = (item: any) => {
         :disabled="selected.length === 0"
         @click="onApprove(selected[0])"
       >
+        <template #prepend>
+          <IconCircleCheck :size="15" :stroke-width="1.7" />
+        </template>
         {{
           selected[0]?.NoApprov && selected[0].NoApprov.trim() !== ""
             ? "Ubah / Cek"
@@ -265,7 +273,6 @@ const onCetakBarcode = (item: any) => {
 
       <v-btn
         size="small"
-        prepend-icon="mdi-barcode"
         color="grey-darken-3"
         class="ml-2"
         :disabled="
@@ -274,18 +281,25 @@ const onCetakBarcode = (item: any) => {
           selected[0].NoApprov.trim() === ''
         "
         @click="onCetakBarcode(selected[0])"
-        >Cetak Barcode</v-btn
       >
+        <template #prepend>
+          <IconBarcode :size="15" :stroke-width="1.7" />
+        </template>
+        Cetak Barcode
+      </v-btn>
 
       <v-btn
         size="small"
-        prepend-icon="mdi-file-excel"
         color="green-darken-3"
         variant="outlined"
         class="ml-2"
         @click="onExportDetail"
-        >Export Detail</v-btn
       >
+        <template #prepend>
+          <IconFileSpreadsheet :size="15" :stroke-width="1.7" />
+        </template>
+        Export Detail
+      </v-btn>
     </template>
 
     <!-- Kustomisasi Tampilan Kolom Tanggal -->

@@ -5,6 +5,7 @@ import { useBrowse } from "@/composables/useBrowse";
 import BaseBrowse from "@/components/BaseBrowse.vue";
 import SimpleMasterFormDialog from "@/components/dialogs/SimpleMasterFormDialog.vue";
 import ConfirmDeleteDialog from "@/components/dialogs/ConfirmDeleteDialog.vue";
+import { IconPalette } from "@tabler/icons-vue";
 
 // ID 32 untuk Warna Accesories
 const {
@@ -62,7 +63,7 @@ const executeDelete = async () => {
   <BaseBrowse
     title="Warna Accesories"
     menu-id="32"
-    icon="mdi-palette-outline"
+    :icon="IconPalette"
     :headers="headers"
     :items="items ?? []"
     :is-loading="isLoading"
@@ -83,7 +84,7 @@ const executeDelete = async () => {
     :is-new-mode="isNewMode"
     :edit-data="editData"
     title="Warna Accesories"
-    icon="mdi-palette-outline"
+    :icon="IconPalette"
     api-endpoint="/master/acc-warna"
     :code-max-length="3"
     @saved="fetchData"

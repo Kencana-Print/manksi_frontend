@@ -8,6 +8,13 @@ import { useAuthStore } from "@/stores/authStore";
 import BaseForm from "@/components/BaseForm.vue";
 import RealisasiMintaSearchModal from "@/components/lookups/RealisasiMintaSearchModal.vue";
 import RealisasiMintaDetailSearchModal from "@/components/lookups/RealisasiMintaDetailSearchModal.vue";
+import {
+  IconArrowBackUp,
+  IconListDetails,
+  IconSearch,
+  IconTrash,
+  IconPlus,
+} from "@tabler/icons-vue";
 
 const route = useRoute();
 const toast = useToast();
@@ -49,6 +56,9 @@ const initialData = {
 
 const listGudangBahan = ref<any[]>([]);
 const listGudangProduksi = ref<any[]>([]);
+
+const showPrintDialog = ref(false);
+const savedNomor = ref("");
 
 const {
   formData,
@@ -118,19 +128,8 @@ const {
     return await returBahanFormService.saveData(data, nomor);
   },
   onSuccess: (res: any) => {
-    const nomorTersimpan = res.data?.data?.nomor || formData.value.nomor;
-
-    // Replikasi logic Delphi: if MessageDlg(...) = mrYes then cetak
-    if (
-      window.confirm(
-        `Berhasil disimpan dengan nomor: ${nomorTersimpan}\n\nAkan dicetak?`,
-      )
-    ) {
-      window.open(
-        `/garmen/bahan-baku/retur-bahan/print/${encodeURIComponent(nomorTersimpan)}`,
-        "_blank",
-      );
-    }
+    savedNomor.value = res.data?.data?.nomor || formData.value.nomor;
+    showPrintDialog.value = true;
   },
 });
 
@@ -300,6 +299,14 @@ const validateBeforeSave = () => {
   showSaveDialog.value = true;
 };
 
+const doCetak = () => {
+  showPrintDialog.value = false;
+  window.open(
+    `/garmen/bahan-baku/retur-bahan/print/${encodeURIComponent(savedNomor.value)}`,
+    "_blank",
+  );
+};
+
 const numFormat = (val: any) =>
   Number(val || 0).toLocaleString("id-ID", { maximumFractionDigits: 2 });
 </script>
@@ -308,7 +315,7 @@ const numFormat = (val: any) =>
   <BaseForm
     :title="(isEditMode ? 'Ubah' : 'Baru') + ' Retur Permintaan Bahan'"
     menu-id="110"
-    icon="mdi-arrow-u-left-top-bold"
+    :icon="IconArrowBackUp"
     :is-loading="isLoading"
     :is-saving="isSaving"
     v-model:showSaveDialog="showSaveDialog"
@@ -407,7 +414,7 @@ const numFormat = (val: any) =>
         <div
           class="bg-blue-grey-darken-3 text-white px-3 py-1 font-weight-bold text-caption d-flex align-center"
         >
-          <v-icon size="small" class="mr-2">mdi-format-list-bulleted</v-icon>
+          <IconListDetails :size="14" :stroke-width="1.7" class="mr-2" />
           Daftar Barang yang Diretur
         </div>
 
@@ -445,11 +452,12 @@ const numFormat = (val: any) =>
                       @keyup.f1="openMintaLookup(index)"
                     />
                     <v-btn
-                      icon="mdi-magnify"
                       size="x-small"
                       variant="text"
                       @click="openMintaLookup(index)"
-                    />
+                    >
+                      <IconSearch :size="14" :stroke-width="1.7" />
+                    </v-btn>
                   </div>
                 </td>
                 <td class="bg-grey-lighten-4 px-2">{{ item.kode }}</td>
@@ -512,12 +520,13 @@ const numFormat = (val: any) =>
 
                 <td class="text-center">
                   <v-btn
-                    icon="mdi-delete"
                     size="x-small"
                     variant="text"
                     color="error"
                     @click="removeRow(index)"
-                  />
+                  >
+                    <IconTrash :size="14" :stroke-width="1.7" />
+                  </v-btn>
                 </td>
               </tr>
             </tbody>
@@ -525,13 +534,12 @@ const numFormat = (val: any) =>
         </div>
 
         <div class="pa-2 bg-grey-lighten-4 text-right">
-          <v-btn
-            size="x-small"
-            color="primary"
-            prepend-icon="mdi-plus"
-            @click="addRow"
-            >Tambah Baris</v-btn
-          >
+          <v-btn size="x-small" color="primary" @click="addRow">
+            <template #prepend
+              ><IconPlus :size="13" :stroke-width="2"
+            /></template>
+            Tambah Baris
+          </v-btn>
         </div>
       </v-card>
     </template>
@@ -548,6 +556,27 @@ const numFormat = (val: any) =>
     :gudang-produksi="formData.gudangProduksi"
     @selected="onDetailSelected"
   />
+
+  <v-dialog v-model="showPrintDialog" max-width="400px" persistent>
+    <v-card class="rounded-lg">
+      <v-card-title class="bg-primary text-white pa-3">
+        Simpan Berhasil
+      </v-card-title>
+      <v-card-text class="pa-4 text-center">
+        Retur <b>{{ savedNomor }}</b> tersimpan.<br />Cetak dokumen ini
+        sekarang?
+      </v-card-text>
+      <v-card-actions class="pa-3 border-t bg-grey-lighten-4">
+        <v-btn variant="text" color="error" @click="showPrintDialog = false">
+          Tidak
+        </v-btn>
+        <v-spacer />
+        <v-btn color="primary" variant="elevated" @click="doCetak">
+          Ya, Cetak
+        </v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
 </template>
 
 <style scoped>

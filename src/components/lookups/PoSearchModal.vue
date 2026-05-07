@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch, computed } from "vue";
 import api from "@/services/api";
+import { IconFileSearch, IconSearch } from "@tabler/icons-vue";
 
 const props = defineProps<{ modelValue: boolean; cabangTujuan: string }>();
 const emit = defineEmits(["update:modelValue", "selected"]);
@@ -54,17 +55,21 @@ const selectItem = (item: any) => {
   >
     <div class="lookup-card">
       <div class="lookup-header">
-        <v-icon size="15" color="white" class="mr-2"
-          >mdi-file-find-outline</v-icon
-        >
+        <IconFileSearch
+          :size="15"
+          :stroke-width="1.7"
+          color="white"
+          class="mr-2"
+        />
         <span>Pilih Nomor PO Internal</span>
         <v-spacer />
         <button class="lookup-close" @click="emit('update:modelValue', false)">
           ✕
         </button>
       </div>
+
       <div class="lookup-search">
-        <v-icon size="16" color="#9e9e9e">mdi-magnify</v-icon>
+        <IconSearch :size="16" :stroke-width="1.7" color="#9e9e9e" />
         <input
           v-model="search"
           type="text"
@@ -148,10 +153,11 @@ const selectItem = (item: any) => {
   border-collapse: collapse;
 }
 .lookup-table th {
-  background: #f5f5f5;
+  background: #1565c0;
+  color: white;
   padding: 7px 10px;
   text-align: left;
-  border-bottom: 2px solid #e0e0e0;
+  border: 1px solid #0d47a1;
 }
 .lookup-table td {
   padding: 5px 10px;

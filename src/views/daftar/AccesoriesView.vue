@@ -4,6 +4,7 @@ import api from "@/services/api";
 import { useBrowse } from "@/composables/useBrowse";
 import BaseBrowse from "@/components/BaseBrowse.vue";
 import GarmenBrgFormDialog from "@/components/dialogs/GarmenBrgFormDialog.vue";
+import { IconPaperclip } from "@tabler/icons-vue";
 
 // ID 30 untuk Master Accesories
 const {
@@ -94,7 +95,7 @@ const rowPropsFn = (data: any) => {
   <BaseBrowse
     title="Master Accesories"
     menu-id="30"
-    icon="mdi-necklace"
+    :icon="IconPaperclip"
     :headers="headers"
     :items="items ?? []"
     :is-loading="isLoading"

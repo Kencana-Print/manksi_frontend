@@ -5,6 +5,13 @@ import api from "@/services/api";
 import { useToast } from "vue-toastification";
 import { useAuthStore } from "@/stores/authStore";
 import SearchLookup from "@/components/SearchLookup.vue";
+import {
+  IconDatabase,
+  IconX,
+  IconSearch,
+  IconHelpCircle,
+  IconAlertTriangle,
+} from "@tabler/icons-vue";
 
 const props = defineProps<{
   modelValue: boolean;
@@ -187,17 +194,23 @@ const executeSave = async () => {
         <v-card-title
           class="bg-primary text-white d-flex align-center pa-2 px-4"
         >
-          <v-icon start color="white">mdi-database-edit</v-icon>
-          <span class="text-subtitle-2 font-weight-bold">{{
-            isNewMode ? "TAMBAH MASTER BAHAN" : "UBAH MASTER BAHAN"
-          }}</span>
+          <IconDatabase
+            :size="16"
+            :stroke-width="1.7"
+            color="white"
+            class="mr-2"
+          />
+          <span class="text-subtitle-2 font-weight-bold">
+            {{ isNewMode ? "TAMBAH MASTER BAHAN" : "UBAH MASTER BAHAN" }}
+          </span>
           <v-spacer></v-spacer>
           <v-btn
-            icon="mdi-close"
             variant="text"
             size="small"
             @click="confirmCancelDialogVisible = true"
-          ></v-btn>
+          >
+            <IconX :size="16" :stroke-width="2" color="white" />
+          </v-btn>
         </v-card-title>
 
         <v-card-text class="pa-4">
@@ -239,9 +252,17 @@ const executeSave = async () => {
                 density="compact"
                 readonly
                 hide-details="auto"
-                append-inner-icon="mdi-magnify"
-                @click:control="openLookup('jenis', 'Jenis Bahan', 'jenis')"
-              />
+              >
+                <template #append-inner>
+                  <IconSearch
+                    :size="15"
+                    :stroke-width="1.7"
+                    color="#1565c0"
+                    style="cursor: pointer"
+                    @click="openLookup('jenis', 'Jenis Bahan', 'jenis')"
+                  />
+                </template>
+              </v-text-field>
             </v-col>
             <v-col cols="6" md="3">
               <v-text-field
@@ -251,9 +272,17 @@ const executeSave = async () => {
                 density="compact"
                 readonly
                 hide-details="auto"
-                append-inner-icon="mdi-magnify"
-                @click:control="openLookup('warna', 'Warna Bahan', 'warna')"
-              />
+              >
+                <template #append-inner>
+                  <IconSearch
+                    :size="15"
+                    :stroke-width="1.7"
+                    color="#1565c0"
+                    style="cursor: pointer"
+                    @click="openLookup('warna', 'Warna Bahan', 'warna')"
+                  />
+                </template>
+              </v-text-field>
             </v-col>
             <v-col cols="6" md="3">
               <v-text-field
@@ -263,11 +292,17 @@ const executeSave = async () => {
                 density="compact"
                 readonly
                 hide-details="auto"
-                append-inner-icon="mdi-magnify"
-                @click:control="
-                  openLookup('gramasi', 'Gramasi Bahan', 'gramasi')
-                "
-              />
+              >
+                <template #append-inner>
+                  <IconSearch
+                    :size="15"
+                    :stroke-width="1.7"
+                    color="#1565c0"
+                    style="cursor: pointer"
+                    @click="openLookup('gramasi', 'Gramasi Bahan', 'gramasi')"
+                  />
+                </template>
+              </v-text-field>
             </v-col>
             <v-col cols="6" md="3">
               <v-text-field
@@ -277,11 +312,17 @@ const executeSave = async () => {
                 density="compact"
                 readonly
                 hide-details="auto"
-                append-inner-icon="mdi-magnify"
-                @click:control="
-                  openLookup('setting', 'Setting Bahan', 'setting')
-                "
-              />
+              >
+                <template #append-inner>
+                  <IconSearch
+                    :size="15"
+                    :stroke-width="1.7"
+                    color="#1565c0"
+                    style="cursor: pointer"
+                    @click="openLookup('setting', 'Setting Bahan', 'setting')"
+                  />
+                </template>
+              </v-text-field>
             </v-col>
 
             <v-col cols="12" md="6">
@@ -401,10 +442,15 @@ const executeSave = async () => {
 
   <v-dialog v-model="confirmDialogVisible" max-width="400px">
     <v-card class="rounded-lg">
-      <v-card-title class="text-subtitle-1 font-weight-bold pa-4"
-        ><v-icon color="primary" class="mr-2">mdi-help-circle</v-icon
-        >Konfirmasi</v-card-title
-      >
+      <v-card-title class="text-subtitle-1 font-weight-bold pa-4">
+        <IconHelpCircle
+          :size="18"
+          :stroke-width="1.7"
+          color="#1565c0"
+          class="mr-2"
+        />
+        Konfirmasi
+      </v-card-title>
       <v-card-text class="pa-4 pt-0 text-body-2"
         >Yakin ingin menyimpan data bahan ini?</v-card-text
       >
@@ -422,10 +468,15 @@ const executeSave = async () => {
 
   <v-dialog v-model="confirmCancelDialogVisible" max-width="400px">
     <v-card class="rounded-lg">
-      <v-card-title class="text-subtitle-1 font-weight-bold pa-4 text-error"
-        ><v-icon color="error" class="mr-2">mdi-alert</v-icon
-        >Batalkan</v-card-title
-      >
+      <v-card-title class="text-subtitle-1 font-weight-bold pa-4 text-error">
+        <IconAlertTriangle
+          :size="18"
+          :stroke-width="1.7"
+          color="#c62828"
+          class="mr-2"
+        />
+        Batalkan
+      </v-card-title>
       <v-card-text class="pa-4 pt-0 text-body-2"
         >Perubahan belum disimpan. Yakin ingin keluar?</v-card-text
       >

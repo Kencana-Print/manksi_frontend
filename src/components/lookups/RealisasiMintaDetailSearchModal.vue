@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from "vue";
 import api from "@/services/api";
+import { IconPackage } from "@tabler/icons-vue";
 
 const props = defineProps<{
   modelValue: boolean;
@@ -48,9 +49,7 @@ const selectItem = (item: any) => {
   >
     <div class="lookup-card">
       <div class="lookup-header bg-teal-darken-3">
-        <v-icon size="15" color="white" class="mr-2"
-          >mdi-package-variant-closed</v-icon
-        >
+        <IconPackage :size="15" :stroke-width="1.7" color="white" />
         <span>Pilih Bahan dari Realisasi: {{ nomorRealisasi }}</span>
         <v-spacer />
         <button class="lookup-close" @click="emit('update:modelValue', false)">
@@ -193,7 +192,7 @@ const selectItem = (item: any) => {
   position: sticky;
   top: 0;
   z-index: 1;
-  background: #f5f5f5;
+  background: #1565c0;
 }
 .lookup-table th {
   padding: 7px 10px;
@@ -201,8 +200,9 @@ const selectItem = (item: any) => {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: #424242;
-  border-bottom: 2px solid #e0e0e0;
+  color: white;
+  border: 1px solid #0d47a1;
+  border-bottom: none;
   text-align: left;
   white-space: nowrap;
 }

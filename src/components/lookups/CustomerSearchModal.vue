@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from "vue";
 import api from "@/services/api";
+import { IconUsers, IconX, IconSearch } from "@tabler/icons-vue";
 
 interface Customer {
   Kode: string;
@@ -101,25 +102,24 @@ const selectItem = (item: Customer) => {
   >
     <v-card class="lookup-card rounded-lg">
       <v-card-title class="bg-primary text-white d-flex align-center pa-2 px-4">
-        <v-icon start color="white" size="small">mdi-account-search</v-icon>
+        <IconUsers :size="16" :stroke-width="1.7" color="white" class="mr-2" />
         <span class="text-subtitle-2 font-weight-bold"
           >CARI DATA CUSTOMER (INDUK)</span
         >
         <v-spacer></v-spacer>
         <v-btn
-          icon="mdi-close"
           variant="text"
           size="small"
-          color="white"
           @click="emit('update:modelValue', false)"
-        ></v-btn>
+        >
+          <IconX :size="16" :stroke-width="2" color="white" />
+        </v-btn>
       </v-card-title>
 
       <v-card-text class="pa-3 bg-grey-lighten-4">
         <v-text-field
           v-model="search"
           @input="onSearchInput"
-          prepend-inner-icon="mdi-magnify"
           label="Cari Kode atau Nama Customer..."
           variant="outlined"
           density="compact"
@@ -128,7 +128,15 @@ const selectItem = (item: Customer) => {
           class="mb-3"
           autofocus
           clearable
-        ></v-text-field>
+        >
+          <template #prepend-inner>
+            <IconSearch
+              :size="15"
+              :stroke-width="1.7"
+              style="opacity: 0.55; margin-top: 1px"
+            />
+          </template>
+        </v-text-field>
 
         <v-data-table-server
           :headers="headers"
@@ -157,8 +165,8 @@ const selectItem = (item: Customer) => {
   font-size: 11px !important;
 }
 .lookup-table :deep(thead th) {
-  background-color: #f5f5f5 !important;
-  color: #424242 !important;
+  background-color: #1565c0 !important;
+  color: white !important;
   font-weight: bold !important;
   height: 32px !important;
   white-space: nowrap;

@@ -3,6 +3,7 @@ import { ref } from "vue";
 import api from "@/services/api";
 import { useToast } from "vue-toastification";
 import { useBrowse } from "@/composables/useBrowse";
+import { IconBox } from "@tabler/icons-vue";
 
 // Components
 import BaseBrowse from "@/components/BaseBrowse.vue";
@@ -106,7 +107,7 @@ const executeDelete = async () => {
   <BaseBrowse
     title="Master Bahan"
     menu-id="11"
-    icon="mdi-texture"
+    :icon="IconBox"
     :headers="headers"
     :items="items ?? []"
     :is-loading="isLoading"

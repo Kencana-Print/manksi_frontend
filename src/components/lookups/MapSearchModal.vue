@@ -1,6 +1,13 @@
 <script setup lang="ts">
 import { ref, watch, computed } from "vue";
 import api from "@/services/api";
+import {
+  IconClipboardText,
+  IconSearch,
+  IconDatabaseOff,
+  IconChevronLeft,
+  IconChevronRight,
+} from "@tabler/icons-vue";
 
 const props = defineProps<{
   modelValue: boolean;
@@ -100,9 +107,7 @@ const prevPage = () => {
   >
     <div class="lookup-card">
       <div class="lookup-header">
-        <v-icon size="15" color="white" class="mr-2"
-          >mdi-clipboard-text-outline</v-icon
-        >
+        <IconClipboardText :size="15" :stroke-width="1.7" color="white" />
         <span>Pilih MAP Garmen</span>
         <v-spacer />
         <button class="lookup-close" @click="emit('update:modelValue', false)">
@@ -111,7 +116,7 @@ const prevPage = () => {
       </div>
 
       <div class="lookup-search">
-        <v-icon size="16" color="#9e9e9e">mdi-magnify</v-icon>
+        <IconSearch :size="16" :stroke-width="1.7" color="#9e9e9e" />
         <input
           v-model="search"
           type="text"
@@ -130,7 +135,7 @@ const prevPage = () => {
           <span>Memuat data...</span>
         </div>
         <div v-else-if="filteredItems.length === 0" class="lookup-state">
-          <v-icon size="32" color="#bdbdbd">mdi-database-off-outline</v-icon>
+          <IconDatabaseOff :size="32" :stroke-width="1.3" color="#bdbdbd" />
           <span>{{
             search ? `Tidak ada hasil untuk "${search}"` : "Tidak ada data"
           }}</span>
@@ -173,7 +178,7 @@ const prevPage = () => {
             :disabled="currentPage === 1"
             @click="prevPage"
           >
-            <v-icon size="14">mdi-chevron-left</v-icon>
+            <IconChevronLeft :size="14" :stroke-width="2" />
           </button>
           <span class="page-info"
             >Hal {{ currentPage }} / {{ totalPages }}</span
@@ -183,7 +188,7 @@ const prevPage = () => {
             :disabled="currentPage === totalPages"
             @click="nextPage"
           >
-            <v-icon size="14">mdi-chevron-right</v-icon>
+            <IconChevronRight :size="14" :stroke-width="2" />
           </button>
         </div>
 
@@ -283,7 +288,7 @@ const prevPage = () => {
   position: sticky;
   top: 0;
   z-index: 1;
-  background: #f5f5f5;
+  background: #1565c0;
 }
 .lookup-table th {
   padding: 7px 10px;
@@ -291,8 +296,9 @@ const prevPage = () => {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: #424242;
-  border-bottom: 2px solid #e0e0e0;
+  color: white;
+  border: 1px solid #0d47a1;
+  border-bottom: none;
   text-align: left;
   white-space: nowrap;
 }

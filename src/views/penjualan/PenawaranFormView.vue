@@ -5,6 +5,14 @@ import { useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
 import BaseForm from "@/components/BaseForm.vue";
 import { penawaranFormService } from "@/services/penjualan/penawaranFormService";
+import {
+  IconFileText,
+  IconPrinter,
+  IconPhoto,
+  IconPhotoOff,
+  IconLayoutColumns,
+  IconLayoutRows,
+} from "@tabler/icons-vue";
 
 // Import Komponen Tab
 import TabPenawaranInput from "./components/TabPenawaranInput.vue";
@@ -208,7 +216,7 @@ const tabs = [{ title: "Sheet 1 (Input)" }, { title: "Sheet 2 (Keterangan)" }];
   <BaseForm
     :title="isEditMode ? 'Ubah Penawaran' : 'Tambah Penawaran'"
     menu-id="151"
-    icon="mdi-file-document-outline"
+    :icon="IconFileText"
     :is-loading="isLoading"
     :is-saving="isSaving"
     item-name="Penawaran"
@@ -248,7 +256,12 @@ const tabs = [{ title: "Sheet 1 (Input)" }, { title: "Sheet 2 (Keterangan)" }];
   <v-dialog v-model="showPrintDialog" max-width="450px" persistent>
     <v-card class="rounded-lg">
       <v-card-title class="bg-primary text-white d-flex align-center pa-3">
-        <v-icon start color="white">mdi-printer</v-icon>
+        <IconPrinter
+          :size="18"
+          :stroke-width="1.7"
+          color="white"
+          class="mr-2"
+        />
         <span class="text-subtitle-1 font-weight-bold"
           >Cetak Surat Penawaran</span
         >
@@ -261,20 +274,18 @@ const tabs = [{ title: "Sheet 1 (Input)" }, { title: "Sheet 2 (Keterangan)" }];
             gambar/desain?
           </div>
           <div class="d-flex flex-column gap-2">
-            <v-btn
-              color="primary"
-              variant="flat"
-              prepend-icon="mdi-image"
-              @click="printStep = 2"
-              >Cetak Dengan Gambar</v-btn
-            >
-            <v-btn
-              color="info"
-              variant="tonal"
-              prepend-icon="mdi-image-off"
-              @click="cetakTanpaGambar"
-              >Cetak Tanpa Gambar</v-btn
-            >
+            <v-btn color="primary" variant="flat" @click="printStep = 2">
+              <template #prepend
+                ><IconPhoto :size="15" :stroke-width="1.7"
+              /></template>
+              Cetak Dengan Gambar
+            </v-btn>
+            <v-btn color="info" variant="tonal" @click="cetakTanpaGambar">
+              <template #prepend
+                ><IconPhotoOff :size="15" :stroke-width="1.7"
+              /></template>
+              Cetak Tanpa Gambar
+            </v-btn>
           </div>
         </template>
 
@@ -286,17 +297,19 @@ const tabs = [{ title: "Sheet 1 (Input)" }, { title: "Sheet 2 (Keterangan)" }];
             <v-btn
               color="primary"
               variant="flat"
-              prepend-icon="mdi-table-split-cell"
               @click="pilihGambarHorizontal"
-              >Gambar Horizontal (Kanan)</v-btn
             >
-            <v-btn
-              color="info"
-              variant="tonal"
-              prepend-icon="mdi-table-row"
-              @click="pilihGambarVertikal"
-              >Gambar Vertikal (Bawah)</v-btn
-            >
+              <template #prepend
+                ><IconLayoutColumns :size="15" :stroke-width="1.7"
+              /></template>
+              Gambar Horizontal (Kanan)
+            </v-btn>
+            <v-btn color="info" variant="tonal" @click="pilihGambarVertikal">
+              <template #prepend
+                ><IconLayoutRows :size="15" :stroke-width="1.7"
+              /></template>
+              Gambar Vertikal (Bawah)
+            </v-btn>
           </div>
         </template>
       </v-card-text>

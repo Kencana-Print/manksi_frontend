@@ -6,6 +6,15 @@ import { useToast } from "vue-toastification";
 import { useRouter } from "vue-router";
 import { AxiosError } from "axios";
 import { useTheme } from "vuetify";
+import {
+  IconSun,
+  IconMoon,
+  IconUser,
+  IconLock,
+  IconEye,
+  IconEyeOff,
+  IconAlertTriangle,
+} from "@tabler/icons-vue";
 
 // --- IMPORT ASSETS ---
 import logoUrl from "@/assets/logo.png"; // Pastikan aset ini ada
@@ -132,11 +141,8 @@ const proceedFromDefaultPassword = () => {
               : 'blue-grey-darken-2'
           "
         >
-          <v-icon>{{
-            theme.global.current.value.dark
-              ? "mdi-weather-sunny"
-              : "mdi-weather-night"
-          }}</v-icon>
+          <IconSun v-if="theme.global.current.value.dark" :size="18" />
+          <IconMoon v-else :size="18" />
           <v-tooltip activator="parent" location="left">Ganti Tema</v-tooltip>
         </v-btn>
 
@@ -201,10 +207,13 @@ const proceedFromDefaultPassword = () => {
                   color="primary"
                   density="compact"
                   hide-details
-                  prepend-inner-icon="mdi-account-outline"
                   class="custom-input"
                   autofocus
-                ></v-text-field>
+                >
+                  <template #prepend-inner
+                    ><IconUser :size="16" :stroke-width="1.7"
+                  /></template>
+                </v-text-field>
               </div>
 
               <div class="mb-8 input-group" style="animation-delay: 0.1s">
@@ -228,13 +237,21 @@ const proceedFromDefaultPassword = () => {
                   color="primary"
                   density="compact"
                   hide-details
-                  prepend-inner-icon="mdi-lock-outline"
-                  :append-inner-icon="
-                    showPassword ? 'mdi-eye-outline' : 'mdi-eye-off-outline'
-                  "
-                  @click:append-inner="showPassword = !showPassword"
                   class="custom-input"
-                ></v-text-field>
+                >
+                  <template #prepend-inner
+                    ><IconLock :size="16" :stroke-width="1.7"
+                  /></template>
+                  <template #append-inner>
+                    <component
+                      :is="showPassword ? IconEye : IconEyeOff"
+                      :size="16"
+                      :stroke-width="1.7"
+                      style="cursor: pointer"
+                      @click="showPassword = !showPassword"
+                    />
+                  </template>
+                </v-text-field>
               </div>
 
               <v-btn
@@ -257,7 +274,7 @@ const proceedFromDefaultPassword = () => {
     <v-dialog v-model="isDefaultPasswordVisible" persistent max-width="400px">
       <v-card>
         <v-card-title class="bg-warning text-white d-flex align-center">
-          <v-icon start>mdi-alert</v-icon>
+          <IconAlertTriangle :size="18" :stroke-width="1.7" class="mr-2" />
           Peringatan Keamanan
         </v-card-title>
         <v-card-text class="pt-4">

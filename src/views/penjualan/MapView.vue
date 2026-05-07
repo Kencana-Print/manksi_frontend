@@ -6,6 +6,21 @@ import BaseBrowse from "@/components/BaseBrowse.vue";
 import { useBrowse } from "@/composables/useBrowse";
 import { mapService } from "@/services/penjualan/mapService";
 import { useAuthStore } from "@/stores/authStore";
+import {
+  IconClipboardText,
+  IconPrinter,
+  IconPhoto,
+  IconChevronDown,
+  IconFileDescription,
+  IconDiscountCheck,
+  IconLock,
+  IconLockOpen,
+  IconX,
+  IconPhotoOff,
+  IconExternalLink,
+  IconLayoutSidebarRight,
+  IconLayoutSidebarRightCollapse,
+} from "@tabler/icons-vue";
 
 const router = useRouter();
 const toast = useToast();
@@ -283,7 +298,7 @@ const toggleCloseData = async (isClose: "Y" | "N") => {
   <BaseBrowse
     title="Memo Approval Produk (MAP)"
     :menu-id="menuId"
-    icon="mdi-clipboard-text-outline"
+    :icon="IconClipboardText"
     :headers="headers"
     :items="items ?? []"
     item-value="Nomor"
@@ -342,59 +357,60 @@ const toggleCloseData = async (isClose: "Y" | "N") => {
         size="small"
         variant="flat"
         color="blue-grey"
-        prepend-icon="mdi-printer"
         :disabled="selected.length === 0"
         @click="cetak"
       >
+        <template #prepend
+          ><IconPrinter :size="15" :stroke-width="1.7"
+        /></template>
         Cetak
       </v-btn>
       <v-btn
         size="small"
         variant="flat"
         color="teal-darken-1"
-        prepend-icon="mdi-image-outline"
         :disabled="selected.length === 0"
         @click="lihatGambar"
       >
+        <template #prepend
+          ><IconPhoto :size="15" :stroke-width="1.7"
+        /></template>
         Lihat Gambar
       </v-btn>
 
       <v-menu v-if="selected.length > 0">
         <template v-slot:activator="{ props }">
-          <v-btn
-            color="primary"
-            variant="flat"
-            size="small"
-            v-bind="props"
-            append-icon="mdi-chevron-down"
-          >
+          <v-btn color="primary" variant="flat" size="small" v-bind="props">
             Aksi MAP
+            <template #append
+              ><IconChevronDown :size="14" :stroke-width="2"
+            /></template>
           </v-btn>
         </template>
         <v-list density="compact">
           <v-list-item @click="pengajuanPerubahan">
-            <template v-slot:prepend
-              ><v-icon size="small">mdi-file-document-edit</v-icon></template
-            >
+            <template #prepend
+              ><IconFileDescription :size="16" :stroke-width="1.7"
+            /></template>
             <v-list-item-title>Pengajuan Perubahan</v-list-item-title>
           </v-list-item>
           <v-list-item @click="approvalMap">
-            <template v-slot:prepend
-              ><v-icon size="small">mdi-check-decagram</v-icon></template
-            >
+            <template #prepend
+              ><IconDiscountCheck :size="16" :stroke-width="1.7"
+            /></template>
             <v-list-item-title>Approval MAP</v-list-item-title>
           </v-list-item>
           <v-divider></v-divider>
           <v-list-item @click="toggleCloseData('Y')">
-            <template v-slot:prepend
-              ><v-icon size="small">mdi-lock</v-icon></template
-            >
+            <template #prepend
+              ><IconLock :size="16" :stroke-width="1.7"
+            /></template>
             <v-list-item-title>Close Data</v-list-item-title>
           </v-list-item>
           <v-list-item @click="toggleCloseData('N')">
-            <template v-slot:prepend
-              ><v-icon size="small">mdi-lock-open</v-icon></template
-            >
+            <template #prepend
+              ><IconLockOpen :size="16" :stroke-width="1.7"
+            /></template>
             <v-list-item-title>Open Data</v-list-item-title>
           </v-list-item>
         </v-list>
@@ -424,7 +440,16 @@ const toggleCloseData = async (isClose: "Y" | "N") => {
     <template #item.HargaRiil="{ item }">{{ fmtNum(item.HargaRiil) }}</template>
 
     <template #item.Keterangan="{ item }">
-      <div style="white-space: pre-wrap; font-size: 11px; line-height: 1.3">
+      <div
+        style="
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          display: block;
+          font-size: 11px;
+        "
+        :title="item.Keterangan"
+      >
         {{ item.Keterangan }}
       </div>
     </template>
@@ -465,8 +490,29 @@ const toggleCloseData = async (isClose: "Y" | "N") => {
           'bg-yellow pa-1 rounded font-weight-bold':
             item.Design_Baru === 'Y' && item.Design_Done === 'N',
         }"
+        style="
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          display: block;
+        "
+        :title="item.Nama"
       >
         {{ item.Nama }}
+      </div>
+    </template>
+
+    <template #item.Customer="{ item }">
+      <div
+        style="
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          display: block;
+        "
+        :title="item.Customer"
+      >
+        {{ item.Customer }}
       </div>
     </template>
   </BaseBrowse>
@@ -478,12 +524,13 @@ const toggleCloseData = async (isClose: "Y" | "N") => {
       >
         <span>Gambar MAP: {{ selected[0]?.Nomor }}</span>
         <v-btn
-          icon="mdi-close"
           variant="text"
           size="small"
           color="white"
           @click="dialogGambar = false"
-        ></v-btn>
+        >
+          <IconX :size="18" :stroke-width="2" />
+        </v-btn>
       </v-card-title>
 
       <v-card-text class="pa-4 text-center bg-grey-lighten-4">
@@ -512,9 +559,7 @@ const toggleCloseData = async (isClose: "Y" | "N") => {
             <div
               class="d-flex flex-column align-center justify-center fill-height text-grey"
             >
-              <v-icon size="48" color="grey-lighten-1"
-                >mdi-image-off-outline</v-icon
-              >
+              <IconPhotoOff :size="48" color="#bdbdbd" />
               <div class="text-subtitle-2 mt-2">
                 Gambar tidak tersedia di server
               </div>
@@ -529,13 +574,10 @@ const toggleCloseData = async (isClose: "Y" | "N") => {
 
       <v-card-actions class="bg-white pa-2 border-t">
         <v-spacer></v-spacer>
-        <v-btn
-          color="primary"
-          variant="text"
-          prepend-icon="mdi-open-in-new"
-          :href="gambarUrl"
-          target="_blank"
-        >
+        <v-btn color="primary" variant="text" :href="gambarUrl" target="_blank">
+          <template #prepend
+            ><IconExternalLink :size="15" :stroke-width="1.7"
+          /></template>
           Buka di Tab Baru
         </v-btn>
       </v-card-actions>
@@ -545,9 +587,14 @@ const toggleCloseData = async (isClose: "Y" | "N") => {
   <v-dialog v-model="dialogAlasan" max-width="500px" persistent>
     <v-card class="rounded-lg">
       <v-card-title
-        class="bg-primary text-white pa-3 text-subtitle-1 font-weight-bold"
+        class="bg-primary text-white pa-3 text-subtitle-1 font-weight-bold d-flex align-center"
       >
-        <v-icon start color="white">mdi-file-document-edit</v-icon>
+        <IconFileDescription
+          :size="18"
+          :stroke-width="1.7"
+          color="white"
+          class="mr-2"
+        />
         Pengajuan Perubahan Data MAP
       </v-card-title>
       <v-card-text class="pa-4 pt-4">
@@ -579,7 +626,12 @@ const toggleCloseData = async (isClose: "Y" | "N") => {
   <v-dialog v-model="showPrintDialog" max-width="450px">
     <v-card class="rounded-lg">
       <v-card-title class="bg-primary text-white d-flex align-center pa-3">
-        <v-icon start color="white">mdi-printer</v-icon>
+        <IconPrinter
+          :size="18"
+          :stroke-width="1.7"
+          color="white"
+          class="mr-2"
+        />
         <span class="text-subtitle-1 font-weight-bold"
           >Cetak Surat Pra SPK (MAP)</span
         >
@@ -594,17 +646,21 @@ const toggleCloseData = async (isClose: "Y" | "N") => {
           <v-btn
             color="primary"
             variant="flat"
-            prepend-icon="mdi-format-page-portrait"
             @click="pilihGambarVertikalBrowse"
           >
+            <template #prepend
+              ><IconLayoutSidebarRight :size="15" :stroke-width="1.7"
+            /></template>
             Cetak Vertikal (Portrait)
           </v-btn>
           <v-btn
             color="info"
             variant="tonal"
-            prepend-icon="mdi-format-page-landscape"
             @click="pilihGambarHorizontalBrowse"
           >
+            <template #prepend
+              ><IconLayoutSidebarRightCollapse :size="15" :stroke-width="1.7"
+            /></template>
             Cetak Horizontal (Landscape)
           </v-btn>
         </div>

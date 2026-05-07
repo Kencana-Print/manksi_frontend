@@ -3,6 +3,7 @@ import { ref, onMounted } from "vue";
 import { useRoute } from "vue-router";
 import api from "@/services/api";
 import logoKencana from "@/assets/logo.png";
+import { IconPrinter } from "@tabler/icons-vue";
 
 const route = useRoute();
 const data = ref<any>(null);
@@ -155,7 +156,7 @@ onMounted(loadPrintData);
       style="bottom: 20px; right: 20px"
       @click="handlePrint"
     >
-      <v-icon>mdi-printer</v-icon>
+      <IconPrinter :size="20" :stroke-width="1.7" />
     </v-btn>
   </div>
 </template>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { IconAlertCircle } from "@tabler/icons-vue";
 
 // 1. Definisikan Props
 const props = defineProps<{
@@ -26,7 +27,12 @@ const handleConfirm = () => {
   <v-dialog v-model="dialogVisible" max-width="400px" persistent>
     <v-card class="confirm-dialog-card rounded-lg">
       <v-card-title class="d-flex align-center pa-4 bg-error-lighten-5">
-        <v-icon color="error" class="mr-2">mdi-alert-circle-outline</v-icon>
+        <IconAlertCircle
+          :size="20"
+          :stroke-width="1.7"
+          color="#c62828"
+          class="mr-2"
+        />
         <span class="text-subtitle-1 font-weight-bold text-error">
           Konfirmasi Hapus
         </span>

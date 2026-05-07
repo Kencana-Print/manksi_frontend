@@ -8,6 +8,7 @@ import type { VForm } from "vuetify/components";
 import BaseForm from "@/components/BaseForm.vue";
 import SpkProduksiSearchModal from "@/components/lookups/SpkProduksiSearchModal.vue";
 import BagianProduksiSearchModal from "@/components/lookups/BagianProduksiSearchModal.vue";
+import { IconAlertCircle } from "@tabler/icons-vue";
 
 interface BapData {
   Nomor: string;
@@ -201,7 +202,7 @@ const handlePreSave = async () => {
   <BaseForm
     title="Berita Acara dan Komplain Produksi"
     menu-id="142"
-    icon="mdi-file-document-alert-outline"
+    :icon="IconAlertCircle"
     :is-loading="isLoading"
     :is-saving="isSaving"
     item-name="BAP Produksi"

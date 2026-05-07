@@ -5,6 +5,7 @@ import { useBrowse } from "@/composables/useBrowse";
 import BaseBrowse from "@/components/BaseBrowse.vue";
 import SimpleMasterFormDialog from "@/components/dialogs/SimpleMasterFormDialog.vue";
 import ConfirmDeleteDialog from "@/components/dialogs/ConfirmDeleteDialog.vue";
+import { IconWeight } from "@tabler/icons-vue";
 
 // ID 27 untuk Gramasi Bahan
 const {
@@ -61,7 +62,7 @@ const executeDelete = async () => {
   <BaseBrowse
     title="Gramasi Bahan"
     menu-id="27"
-    icon="mdi-weight"
+    :icon="IconWeight"
     :headers="headers"
     :items="items ?? []"
     :is-loading="isLoading"
@@ -82,7 +83,7 @@ const executeDelete = async () => {
     :is-new-mode="isNewMode"
     :edit-data="editData"
     title="Gramasi Bahan"
-    icon="mdi-weight"
+    :icon="IconWeight"
     api-endpoint="/master/gramasi"
     :code-max-length="2"
     @saved="fetchData"

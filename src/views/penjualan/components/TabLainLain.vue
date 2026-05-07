@@ -1,6 +1,12 @@
 <script setup lang="ts">
 import { ref, computed } from "vue";
 import { useToast } from "vue-toastification";
+import {
+  IconCheck,
+  IconUpload,
+  IconMaximize,
+  IconPhoto,
+} from "@tabler/icons-vue";
 
 const props = defineProps<{ formData: any; isEdit: boolean }>();
 const emit = defineEmits(["upload-email"]);
@@ -116,7 +122,7 @@ const onEmailChange = (e: Event) => {
         </table>
       </div>
       <button type="button" class="ll-update-btn" @click="updateToKetUkuran">
-        <v-icon size="13" class="mr-1">mdi-check</v-icon> Update ke Ket. Ukuran
+        <IconCheck :size="13" class="mr-1" /> Update ke Ket. Ukuran
       </button>
     </div>
 
@@ -226,14 +232,14 @@ const onEmailChange = (e: Event) => {
           class="ll-upload-btn"
           @click="fileEmailRef?.click()"
         >
-          <v-icon size="13" class="mr-1">mdi-upload</v-icon> Upload
+          <IconUpload :size="13" class="mr-1" /> Upload
         </button>
         <button
           type="button"
           class="ll-upload-btn blue"
           @click="displayEmailUrl && (showEmailDialog = true)"
         >
-          <v-icon size="13" class="mr-1">mdi-fullscreen</v-icon> Full Screen
+          <IconMaximize :size="13" class="mr-1" /> Full Screen
         </button>
       </div>
 
@@ -246,7 +252,7 @@ const onEmailChange = (e: Event) => {
           style="cursor: pointer"
         />
         <div v-else class="ll-img-empty">
-          <v-icon size="28" color="#bdbdbd">mdi-image-outline</v-icon>
+          <IconPhoto :size="28" color="#bdbdbd" />
           <div>No Image available</div>
         </div>
       </div>

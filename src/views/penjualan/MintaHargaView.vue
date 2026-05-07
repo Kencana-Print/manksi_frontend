@@ -5,6 +5,7 @@ import api from "@/services/api";
 import { useBrowse } from "@/composables/useBrowse";
 import { useToast } from "vue-toastification";
 import BaseBrowse from "@/components/BaseBrowse.vue";
+import { IconCash, IconPencilOff, IconSend } from "@tabler/icons-vue";
 
 const toast = useToast();
 const router = useRouter();
@@ -68,9 +69,9 @@ const headers = [
   { title: "NOMOR", key: "Nomor", width: "140px" },
   { title: "DIVISI", key: "Divisi", width: "120px" },
   { title: "TANGGAL", key: "Tanggal", width: "100px", align: "center" },
-  { title: "CUSTOMER", key: "Customer", minWidth: "150px" },
-  { title: "SALES", key: "Sales", minWidth: "120px" },
-  { title: "NAMA PEKERJAAN", key: "NamaPekerjaan", minWidth: "250px" },
+  { title: "CUSTOMER", key: "Customer", width: "180px" },
+  { title: "SALES", key: "Sales", width: "130px" },
+  { title: "NAMA PEKERJAAN", key: "NamaPekerjaan", width: "220px" },
   { title: "Rencana Order", key: "RencanaOrder", width: "130px", align: "end" },
   { title: "Harga Lama", key: "HargaLama", width: "120px", align: "end" },
   { title: "Harga Budget", key: "HargaBudget", width: "120px", align: "end" },
@@ -80,14 +81,14 @@ const headers = [
     width: "120px",
     align: "center",
   },
-  { title: "Kain", key: "Kain", minWidth: "150px" },
+  { title: "Kain", key: "Kain", width: "150px" },
   { title: "Panjang", key: "Panjang", width: "90px", align: "end" },
   { title: "Lebar", key: "Lebar", width: "90px", align: "end" },
-  { title: "Ukuran", key: "Ukuran", minWidth: "120px" },
+  { title: "Ukuran", key: "Ukuran", width: "120px" },
   { title: "Gramasi", key: "Gramasi", width: "100px" },
-  { title: "Finishing", key: "Finishing", minWidth: "150px" },
+  { title: "Finishing", key: "Finishing", width: "150px" },
   { title: "Sublim", key: "Sublim", width: "100px" },
-  { title: "Keterangan", key: "Keterangan", minWidth: "200px" },
+  { title: "Keterangan", key: "Keterangan", width: "200px" },
   { title: "Harga MAP", key: "HargaMAP", width: "120px", align: "end" },
   {
     title: "Harga Kalkulasi",
@@ -102,12 +103,11 @@ const headers = [
     align: "center",
   },
   { title: "No. Kalkulasi", key: "NoKalkulasi", width: "130px" },
-  { title: "Ket. Kalkulasi", key: "KeteranganKalkulasi", minWidth: "150px" },
+  { title: "Ket. Kalkulasi", key: "KeteranganKalkulasi", width: "150px" },
   { title: "Status", key: "Status", width: "100px" },
   { title: "Approved", key: "Approved", width: "150px", align: "center" },
   { title: "Di Apv Oleh", key: "diApvOleh", width: "120px" },
 ];
-
 // ── Row coloring ──────────────────────────────────────────────────────
 const rowPropsFn = (data: any) => {
   const item = data.item?.raw || data.item;
@@ -191,7 +191,7 @@ const submitPengajuan = async () => {
   <BaseBrowse
     title="Permintaan Harga"
     menu-id="166"
-    icon="mdi-cash-multiple"
+    :icon="IconCash"
     :headers="headers"
     :items="items ?? []"
     :is-loading="isLoading"
@@ -250,12 +250,15 @@ const submitPengajuan = async () => {
         size="small"
         color="warning"
         variant="elevated"
-        prepend-icon="mdi-pencil-lock-outline"
         :disabled="selected.length === 0"
         :loading="isPinLoading"
         @click="openPengajuanEdit"
-        >Pengajuan Perubahan Data</v-btn
       >
+        <template #prepend
+          ><IconPencilOff :size="15" :stroke-width="1.7"
+        /></template>
+        Pengajuan Perubahan Data
+      </v-btn>
     </template>
 
     <!-- ── Legend kanan ── -->
@@ -338,7 +341,7 @@ const submitPengajuan = async () => {
   <v-dialog v-model="showPinDialog" max-width="480px" persistent>
     <div class="pin-card">
       <div class="pin-header">
-        <v-icon size="15" color="white" class="mr-2">mdi-pencil-lock</v-icon>
+        <IconPencilOff :size="15" color="white" class="mr-2" />
         <span>Pengajuan Perubahan Data</span>
         <button class="pin-close" @click="showPinDialog = false">✕</button>
       </div>
@@ -367,7 +370,7 @@ const submitPengajuan = async () => {
           :disabled="isPinLoading"
           @click="submitPengajuan"
         >
-          <v-icon size="13" class="mr-1">mdi-send</v-icon>
+          <IconSend :size="13" class="mr-1" />
           {{ isPinLoading ? "Mengajukan..." : "Ajukan Sekarang" }}
         </button>
         <button
