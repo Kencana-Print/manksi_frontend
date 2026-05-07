@@ -286,6 +286,12 @@ const menuItems: NavItem[] = [
     menuId: 2,
     items: [
       {
+        title: "Memo Kebutuhan Bahan", // Nama disingkat agar rapi di sidebar
+        to: "/pembelian/mkb",
+        icon: IconFileText,
+        menuId: 51,
+      },
+      {
         title: "Pesanan Pembelian",
         to: "/pembelian/pesanan",
         icon: IconFileText,

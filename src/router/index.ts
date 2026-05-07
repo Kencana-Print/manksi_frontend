@@ -348,6 +348,19 @@ const router = createRouter({
       },
     },
 
+    // ── Pembelian ─────────────────────────────────────────────────────
+    {
+      path: "/pembelian/mkb",
+      name: "MkbBrowse",
+      component: () => import("@/views/pembelian/MkbView.vue"),
+      meta: {
+        title: "Memo Kebutuhan Bahan (MKB)",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "51",
+      },
+    },
+
     // ── Garmen ──────────────────────────────────────────────────────────
     {
       path: "/garmen/bahan-baku/minta-bahan",
