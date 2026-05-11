@@ -51,6 +51,7 @@ import {
   IconPackage,
   IconAlertCircle,
   IconFileDescription,
+  IconShoppingCartCopy,
 } from "@tabler/icons-vue";
 
 interface NavItem {
@@ -490,7 +491,6 @@ const menuItems: NavItem[] = [
         icon: IconFileDescription,
         menuId: 150,
       },
-      { divider: true },
       {
         title: "Permintaan Harga",
         to: "/penjualan/minta-harga",
@@ -502,6 +502,12 @@ const menuItems: NavItem[] = [
         to: "/penjualan/penawaran",
         icon: IconFileText,
         menuId: 151,
+      },
+      {
+        title: "Sales Order",
+        to: "/penjualan/sales-order",
+        icon: IconShoppingCartCopy,
+        menuId: 172,
       },
       { divider: true },
       {

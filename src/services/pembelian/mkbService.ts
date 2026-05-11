@@ -7,6 +7,9 @@ export const mkbService = {
   getLinkedPo: (nomor: string) =>
     api.get(`/pembelian/mkb/${encodeURIComponent(nomor)}/po`),
 
+  getDetailData: (nomor: string) =>
+    api.get(`/pembelian/mkb/${encodeURIComponent(nomor)}/detail`),
+
   deleteData: (nomor: string, tglTransaksi: string) =>
     api.delete(`/pembelian/mkb/${encodeURIComponent(nomor)}`, {
       data: { tglTransaksi },

@@ -26,7 +26,13 @@ export function useForm<
   const authStore = useAuthStore();
 
   const isEditMode = computed(
-    () => !!(route.params.kode || route.params.nomor),
+    () =>
+      !!(
+        route.params.kode ||
+        route.params.nomor ||
+        route.query.nomor ||
+        route.query.kode
+      ),
   );
 
   const isLoading = ref(false);
@@ -63,7 +69,8 @@ export function useForm<
       formData.value = data;
       originalData.value = JSON.parse(JSON.stringify(data)); // snapshot setelah fetch
     } catch (e) {
-      toast.error("Gagal memuat data.");
+      console.error("Error pada useForm fetchData:", e);
+      toast.error("Gagal memuat data form.");
       goBack();
     } finally {
       isLoading.value = false;

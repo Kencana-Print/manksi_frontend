@@ -360,6 +360,38 @@ const router = createRouter({
         menuId: "51",
       },
     },
+    {
+      path: "/pembelian/mkb/create",
+      name: "MkbFormCreate",
+      component: () => import("@/views/pembelian/MkbFormView.vue"),
+      meta: {
+        title: "Buat Memo Kebutuhan Bahan",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "51",
+      },
+    },
+    {
+      path: "/pembelian/mkb/edit/:nomor",
+      name: "MkbFormEdit",
+      component: () => import("@/views/pembelian/MkbFormView.vue"),
+      meta: {
+        title: "Ubah Memo Kebutuhan Bahan",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "51",
+      },
+    },
+    {
+      path: "/pembelian/mkb/print",
+      name: "MkbPrint",
+      component: () => import("@/views/pembelian/MkbPrintView.vue"),
+      meta: {
+        title: "Cetak MKB",
+        layout: "BlankLayout",
+        requiresAuth: true,
+      },
+    },
 
     // ── Garmen ──────────────────────────────────────────────────────────
     {
@@ -869,6 +901,41 @@ const router = createRouter({
         title: "Cetak Penawaran",
         layout: "BlankLayout", // WAJIB BlankLayout
         requiresAuth: true,
+      },
+    },
+    {
+      path: "/penjualan/sales-order",
+      name: "SalesOrderBrowse",
+      component: () => import("@/views/penjualan/SalesOrderView.vue"),
+      meta: {
+        title: "Sales Order",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "172",
+      },
+    },
+    {
+      path: "/penjualan/sales-order/create",
+      name: "SalesOrderCreate",
+      component: () => import("@/views/penjualan/SalesOrderFormView.vue"),
+      meta: {
+        title: "Tambah Sales Order",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "172",
+        browseRoute: "SalesOrderBrowse",
+      },
+    },
+    {
+      path: "/penjualan/sales-order/edit/:nomor",
+      name: "SalesOrderEdit",
+      component: () => import("@/views/penjualan/SalesOrderFormView.vue"),
+      meta: {
+        title: "Ubah Sales Order",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "172",
+        browseRoute: "SalesOrderBrowse",
       },
     },
 

@@ -34,6 +34,7 @@ watch(
   { deep: true },
 );
 
+// --- PENAMBAHAN KOLOM ALAMAT, PLAN, & CREATED ---
 const headers = [
   { title: "Nomor", key: "Nomor", width: "130px" },
   { title: "Tanggal", key: "Tanggal", width: "100px", align: "center" },
@@ -46,8 +47,11 @@ const headers = [
   { title: "Kain", key: "Kain", width: "160px" },
   { title: "Finishing", key: "Finishing", width: "160px" },
   { title: "Customer", key: "Customer", width: "200px" },
+  { title: "Alamat", key: "Alamat", width: "250px" }, // Ditambahkan
   { title: "Keterangan", key: "Keterangan", width: "250px" },
+  { title: "Plan", key: "Plan", width: "70px", align: "center" }, // Ditambahkan
   { title: "User", key: "usr", width: "100px" },
+  { title: "Created", key: "Created", width: "140px", align: "center" }, // Ditambahkan
 ];
 
 const {
@@ -79,33 +83,43 @@ watch([dtAwal, dtAkhir], () => {
   fetchData();
 });
 
+// ── EXPANDED ROWS LOGIC (DOUBLE API CALL) ──
 const expandedRows = ref<any[]>([]);
 const poCache = ref<Record<string, any[]>>({});
-const poLoading = ref<Record<string, boolean>>({});
+const dtlCache = ref<Record<string, any[]>>({});
+const expandedLoading = ref<Record<string, boolean>>({});
 
 const onUpdateExpanded = async (newExpanded: any[]) => {
   expandedRows.value = newExpanded;
   const newlyExpanded = newExpanded.filter(
-    (item) => !poCache.value[item.Nomor] && !poLoading.value[item.Nomor],
+    (item) => !dtlCache.value[item.Nomor] && !expandedLoading.value[item.Nomor],
   );
 
   for (const item of newlyExpanded) {
     const nomor = item.Nomor;
-    poLoading.value[nomor] = true;
+    expandedLoading.value[nomor] = true;
     try {
-      const res = await mkbService.getLinkedPo(nomor);
-      poCache.value[nomor] = res.data.data;
+      const [poRes, dtlRes] = await Promise.all([
+        mkbService.getLinkedPo(nomor),
+        mkbService.getDetailData(nomor),
+      ]);
+      poCache.value[nomor] = poRes.data.data;
+      dtlCache.value[nomor] = dtlRes.data.data;
     } catch {
-      toast.error(`Gagal memuat detail PO untuk ${nomor}`);
+      toast.error(`Gagal memuat rincian untuk ${nomor}`);
     } finally {
-      poLoading.value[nomor] = false;
+      expandedLoading.value[nomor] = false;
     }
   }
 };
 
 const onAdd = () => router.push("/pembelian/mkb/create");
-const onEdit = (item: any) =>
-  router.push(`/pembelian/mkb/edit/${encodeURIComponent(item.Nomor)}`);
+const onEdit = (item: any) => {
+  // DOUBLE ENCODE: "MKB/1356/2026" -> "MKB%252F1356%252F2026"
+  // Vue router akan membacanya sebagai SATU parameter utuh
+  const safeNomor = encodeURIComponent(encodeURIComponent(item.Nomor));
+  router.push(`/pembelian/mkb/edit/${safeNomor}`);
+};
 const onDelete = async (item: any) => {
   try {
     await mkbService.deleteData(item.Nomor, item.Tanggal);
@@ -118,11 +132,16 @@ const onDelete = async (item: any) => {
 
 const onPrint = () => {
   if (!selectedItem.value) return toast.warning("Pilih data yang akan dicetak");
-  toast.info("Fitur cetak sedang disiapkan: " + selectedItem.value.Nomor);
+
+  // Menggunakan rute cetak dengan encodeURIComponent dua kali untuk menangani garis miring
+  const safeNomor = encodeURIComponent(
+    encodeURIComponent(selectedItem.value.Nomor),
+  );
+  window.open(`/pembelian/mkb/print?nomor=${safeNomor}`, "_blank");
 };
 
 const onExportDetail = () =>
-  toast.info("Fitur export detail akan memuat DTL terlebih dahulu...");
+  toast.info("Fitur export detail akan disiapkan...");
 
 // Dialog Pengajuan PIN
 const pinDialog = ref(false);
@@ -181,6 +200,20 @@ const formatTgl = (val: string) => {
   if (!val) return "";
   const d = new Date(val);
   return `${String(d.getDate()).padStart(2, "0")}-${String(d.getMonth() + 1).padStart(2, "0")}-${d.getFullYear()}`;
+};
+
+// Formatter untuk tanggal beserta Jam (Created)
+const formatWaktu = (val: string) => {
+  if (!val) return "";
+  const d = new Date(val);
+  return `${String(d.getDate()).padStart(2, "0")}-${String(d.getMonth() + 1).padStart(2, "0")}-${d.getFullYear()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+};
+
+const formatQty = (val: any) => {
+  return Number(val || 0).toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 };
 </script>
 
@@ -244,15 +277,15 @@ const formatTgl = (val: string) => {
         </div>
         <div class="legend-item">
           <div class="legend-dot" style="background: #000"></div>
-          Belum Ready dan kedatangan partial
+          Kedatangan partial
         </div>
         <div class="legend-item">
           <div class="legend-dot" style="background: #e65100"></div>
-          Ready sebagian dan sudah po
+          Ready sebagian, sudah po
         </div>
         <div class="legend-item">
           <div class="legend-dot" style="background: #6a1b9a"></div>
-          Ready sebagian dan belum po
+          Ready sebagian, belum po
         </div>
         <div class="legend-item">
           <div
@@ -314,50 +347,131 @@ const formatTgl = (val: string) => {
     <template #item.Dateline="{ item }">{{
       formatTgl((item.raw || item).Dateline)
     }}</template>
+    <template #item.Created="{ item }">{{
+      formatWaktu((item.raw || item).Created)
+    }}</template>
 
     <template #detail="{ item }">
       <div class="det-wrap">
-        <div class="text-caption font-weight-bold mb-1 text-primary">
-          Informasi PO Terkait: {{ item.Nomor }}
-        </div>
         <v-progress-linear
-          v-if="poLoading[item.Nomor]"
+          v-if="expandedLoading[item.Nomor]"
           indeterminate
           color="primary"
           height="2"
+          class="mb-2"
         />
-        <table v-else class="dt">
-          <thead>
-            <tr>
-              <th style="text-align: left">No. PO</th>
-              <th style="text-align: center; width: 110px">Tanggal</th>
-              <th style="text-align: center; width: 70px">Link</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="po in poCache[item.Nomor]" :key="po.nomor">
-              <td style="font-weight: 600; color: #1565c0">{{ po.nomor }}</td>
-              <td style="text-align: center">{{ po.tanggal }}</td>
-              <td style="text-align: center">
-                <v-chip
-                  size="x-small"
-                  :color="po.link === 'Y' ? 'green' : 'grey'"
-                  >{{ po.link }}</v-chip
+
+        <div v-else class="d-flex flex-column gap-3">
+          <div class="border rounded overflow-hidden">
+            <div
+              class="bg-blue-lighten-4 px-3 py-1 text-caption font-weight-bold"
+            >
+              Detail Data MKB: {{ item.Nomor }}
+            </div>
+            <div class="table-scroll-x">
+              <table class="dt">
+                <thead>
+                  <tr>
+                    <th>NOPO</th>
+                    <th>Komponen</th>
+                    <th>Warna</th>
+                    <th>Jenis</th>
+                    <th>Babaran</th>
+                    <th>Kode</th>
+                    <th>Nama Bahan</th>
+                    <th>Satuan</th>
+                    <th>Gramasi</th>
+                    <th class="text-right">Butuh</th>
+                    <th class="text-right">Ready</th>
+                    <th class="text-right">Akan PO</th>
+                    <th class="text-right">Sudah PO</th>
+                    <th class="text-right">Terima</th>
+                    <th class="text-right">Kurang</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(dtl, i) in dtlCache[item.Nomor]" :key="i">
+                    <td>{{ dtl.Nopo }}</td>
+                    <td>{{ dtl.Komponen }}</td>
+                    <td>{{ dtl.Warna }}</td>
+                    <td>{{ dtl.Jenis }}</td>
+                    <td>{{ dtl.Babaran }}</td>
+                    <td>{{ dtl.Kode }}</td>
+                    <td>{{ dtl.NamaBahan }}</td>
+                    <td>{{ dtl.Satuan }}</td>
+                    <td>{{ dtl.Gramasi }}</td>
+                    <td class="text-right">{{ formatQty(dtl.Butuh) }}</td>
+                    <td class="text-right">{{ formatQty(dtl.Ready) }}</td>
+                    <td class="text-right">{{ formatQty(dtl.Akan_PO) }}</td>
+                    <td class="text-right">{{ formatQty(dtl.SudahPO) }}</td>
+                    <td class="text-right">{{ formatQty(dtl.Terima) }}</td>
+                    <td class="text-right">{{ formatQty(dtl.Kurang) }}</td>
+                  </tr>
+                  <tr
+                    v-if="
+                      !dtlCache[item.Nomor] || dtlCache[item.Nomor].length === 0
+                    "
+                  >
+                    <td
+                      colspan="15"
+                      class="text-center text-grey py-2 font-italic"
+                    >
+                      Tidak ada rincian bahan
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="border rounded overflow-hidden" style="max-width: 400px">
+            <div
+              class="bg-blue-lighten-5 px-3 py-1 text-caption font-weight-bold"
+            >
+              Informasi PO Terkait
+            </div>
+            <table class="dt">
+              <thead>
+                <tr>
+                  <th style="text-align: left">No. PO</th>
+                  <th style="text-align: center; width: 110px">Tanggal</th>
+                  <th style="text-align: center; width: 70px">Link</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="po in poCache[item.Nomor]" :key="po.nomor">
+                  <td style="font-weight: 600; color: #1565c0">
+                    {{ po.nomor }}
+                  </td>
+                  <td style="text-align: center">{{ po.tanggal }}</td>
+                  <td style="text-align: center">
+                    <v-chip
+                      size="x-small"
+                      :color="po.link === 'Y' ? 'green' : 'grey'"
+                      >{{ po.link }}</v-chip
+                    >
+                  </td>
+                </tr>
+                <tr
+                  v-if="
+                    !poCache[item.Nomor] || poCache[item.Nomor].length === 0
+                  "
                 >
-              </td>
-            </tr>
-            <tr v-if="!poCache[item.Nomor] || poCache[item.Nomor].length === 0">
-              <td colspan="3" class="text-center text-grey py-2 font-italic">
-                Tidak ada PO terkait
-              </td>
-            </tr>
-          </tbody>
-        </table>
+                  <td
+                    colspan="3"
+                    class="text-center text-grey py-2 font-italic"
+                  >
+                    Tidak ada PO terkait
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </template>
   </BaseBrowse>
 
-  <!-- Dialog Pengajuan PIN -->
   <v-dialog v-model="pinDialog" max-width="400px" persistent>
     <v-card class="rounded-lg">
       <v-card-title class="bg-primary text-white pa-3">
@@ -468,11 +582,16 @@ const formatTgl = (val: string) => {
   padding: 8px 12px 10px 48px;
   background: #f5f6f8;
 }
+
+.table-scroll-x {
+  overflow-x: auto;
+  max-width: 100%;
+}
+
 .dt {
   width: 100%;
   border-collapse: collapse;
   font-size: 11px;
-  max-width: 400px;
   background: white;
   border: 1px solid #d0d0d0;
   border-radius: 4px;
@@ -485,12 +604,14 @@ const formatTgl = (val: string) => {
   font-size: 10px;
   font-weight: 700;
   border: 1px solid rgba(0, 0, 0, 0.1);
+  white-space: nowrap;
 }
 .dt td {
   border-bottom: 1px solid #eeeeee;
   padding: 4px 8px;
   vertical-align: middle;
   font-size: 11px;
+  white-space: nowrap;
 }
 .dt tbody tr:nth-of-type(even) td {
   background: #fafafa;

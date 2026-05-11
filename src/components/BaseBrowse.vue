@@ -984,11 +984,14 @@ defineExpose({ clearSelection, search });
   padding: 7px 12px;
   flex-shrink: 0;
   min-height: 50px;
+  height: auto; /* ← dari fixed jadi auto */
+  flex-wrap: wrap; /* ← biar bisa wrap kalau perlu */
+  align-items: center;
 }
 
 .search-field {
-  width: 220px;
-  min-width: 160px;
+  width: 160px; /* dari 220px */
+  min-width: 120px;
   flex-shrink: 0;
 }
 .search-field :deep(.v-input__control) {
@@ -1111,7 +1114,7 @@ defineExpose({ clearSelection, search });
 }
 .expanded-inner {
   padding: 6px 10px;
-  width: 100%;
+  width: auto; /* ← dari 100% jadi auto */
   box-sizing: border-box;
 }
 .expanded-wrapper {
@@ -1119,6 +1122,8 @@ defineExpose({ clearSelection, search });
   border-radius: 4px;
   overflow: hidden;
   background: rgb(var(--v-theme-surface));
+  display: inline-block;
+  max-width: fit-content; /* ← lebar pas konten */
 }
 
 /* Detail table dalam expanded */
@@ -1579,5 +1584,15 @@ defineExpose({ clearSelection, search });
   width: 32px !important;
   min-width: 32px !important;
   max-width: 32px !important;
+}
+
+.expanded-wrapper {
+  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+  border-radius: 4px;
+  overflow: hidden; /* sudah ada */
+  background: rgb(var(--v-theme-surface));
+  display: inline-block; /* ← KUNCI: lebar mengikuti konten, bukan parent */
+  min-width: 300px; /* minimal agar tidak terlalu kecil */
+  max-width: 100%; /* tidak melebihi lebar container */
 }
 </style>
