@@ -1,17 +1,15 @@
 <script setup lang="ts">
 import { ref, watch, computed } from "vue";
 import api from "@/services/api";
-import { IconShirt, IconSearch, IconDatabaseOff } from "@tabler/icons-vue";
+import { IconFileText, IconSearch, IconDatabaseOff } from "@tabler/icons-vue";
 
 const props = defineProps<{ modelValue: boolean }>();
 const emit = defineEmits(["update:modelValue", "selected"]);
 
 const search = ref("");
 const items = ref<any[]>([]);
-const selectedItems = ref<any[]>([]);
 const isLoading = ref(false);
 
-// Pagination
 const currentPage = ref(1);
 const perPage = ref(50);
 const totalItems = ref(0);
@@ -24,7 +22,6 @@ const pageStart = computed(() =>
 const pageEnd = computed(() =>
   Math.min(currentPage.value * perPage.value, totalItems.value),
 );
-
 const visiblePages = computed(() => {
   const total = totalPages.value,
     cur = currentPage.value;
@@ -40,7 +37,7 @@ let debounce: ReturnType<typeof setTimeout> | null = null;
 const fetchData = async () => {
   isLoading.value = true;
   try {
-    const res = await api.get("/lookups/barang-kaosan", {
+    const res = await api.get("/lookups/po-greige", {
       params: {
         q: search.value,
         page: currentPage.value,
@@ -50,7 +47,7 @@ const fetchData = async () => {
     items.value = res.data.data.items;
     totalItems.value = res.data.data.total;
   } catch (e) {
-    console.error("Gagal memuat Barang Kaosan:", e);
+    console.error("Gagal memuat PO Greige:", e);
   } finally {
     isLoading.value = false;
   }
@@ -74,42 +71,13 @@ watch(
     if (isOpen) {
       search.value = "";
       currentPage.value = 1;
-      selectedItems.value = []; // Reset pilihan saat modal dibuka
       fetchData();
     }
   },
 );
 
-// Toggle pilihan checkbox
-const toggleSelection = (item: any) => {
-  const i = selectedItems.value.indexOf(item);
-  if (i === -1) selectedItems.value.push(item);
-  else selectedItems.value.splice(i, 1);
-};
-
-// Toggle pilih semua baris yang terlihat
-const toggleAll = (e: Event) => {
-  const isChecked = (e.target as HTMLInputElement).checked;
-  if (isChecked) {
-    // Tambahkan item yang belum terpilih
-    items.value.forEach((item) => {
-      if (!selectedItems.value.includes(item)) selectedItems.value.push(item);
-    });
-  } else {
-    // Hapus hanya item yang terlihat di halaman ini
-    selectedItems.value = selectedItems.value.filter(
-      (sel) => !items.value.includes(sel),
-    );
-  }
-};
-
-const isAllVisibleSelected = computed(() => {
-  if (items.value.length === 0) return false;
-  return items.value.every((item) => selectedItems.value.includes(item));
-});
-
-const submitSelection = () => {
-  emit("selected", selectedItems.value);
+const selectItem = (item: any) => {
+  emit("selected", item);
   emit("update:modelValue", false);
 };
 </script>
@@ -122,8 +90,8 @@ const submitSelection = () => {
   >
     <div class="lookup-card">
       <div class="lookup-header">
-        <IconShirt :size="15" :stroke-width="1.7" color="white" />
-        <span>Cari Barang Kaosan (DC)</span>
+        <IconFileText :size="15" :stroke-width="1.7" color="white" />
+        <span>Cari PO Greige</span>
         <v-spacer />
         <button class="lookup-close" @click="emit('update:modelValue', false)">
           ✕
@@ -136,7 +104,7 @@ const submitSelection = () => {
           :value="search"
           @input="onSearch(($event.target as HTMLInputElement).value)"
           type="text"
-          placeholder="Cari barcode, kode, atau nama barang..."
+          placeholder="Cari nomor PO Greige atau keterangan..."
           class="search-input"
           autofocus
         />
@@ -159,41 +127,21 @@ const submitSelection = () => {
         <table v-else class="lookup-table">
           <thead>
             <tr>
-              <th style="width: 36px; text-align: center">
-                <input
-                  type="checkbox"
-                  :checked="isAllVisibleSelected"
-                  @change="toggleAll"
-                  style="accent-color: #1565c0"
-                />
-              </th>
-              <th style="width: 120px">BARCODE</th>
-              <th style="width: 100px">KODE</th>
-              <th>NAMA KAOS</th>
-              <th style="width: 80px">UKURAN</th>
+              <th style="width: 140px">NOMOR PO</th>
+              <th style="width: 120px">TANGGAL</th>
+              <th>KETERANGAN</th>
             </tr>
           </thead>
           <tbody>
             <tr
               v-for="item in items"
-              :key="item.Barcode"
+              :key="item.Nomor"
               class="lookup-row"
-              :class="{ selected: selectedItems.includes(item) }"
-              @click="toggleSelection(item)"
+              @click="selectItem(item)"
             >
-              <td style="text-align: center">
-                <input
-                  type="checkbox"
-                  :checked="selectedItems.includes(item)"
-                  @click.stop
-                  @change="toggleSelection(item)"
-                  style="accent-color: #1565c0"
-                />
-              </td>
-              <td class="td-kode">{{ item.Barcode }}</td>
-              <td class="td-kode text-grey">{{ item.Kode }}</td>
-              <td>{{ item.Nama }}</td>
-              <td class="font-weight-bold">{{ item.Ukuran }}</td>
+              <td class="td-kode">{{ item.Nomor }}</td>
+              <td class="font-weight-bold">{{ item.Tanggal }}</td>
+              <td>{{ item.Keterangan || "-" }}</td>
             </tr>
           </tbody>
         </table>
@@ -247,19 +195,12 @@ const submitSelection = () => {
             {{ n }} / hal
           </option>
         </select>
-
-        <div class="ml-auto d-flex gap-2">
-          <button class="btn-batal" @click="emit('update:modelValue', false)">
-            Batal
-          </button>
-          <button
-            class="btn-import"
-            :disabled="selectedItems.length === 0"
-            @click="submitSelection"
-          >
-            Import Terpilih ({{ selectedItems.length }})
-          </button>
-        </div>
+        <button
+          class="btn-batal ml-auto"
+          @click="emit('update:modelValue', false)"
+        >
+          Batal
+        </button>
       </div>
     </div>
   </v-dialog>
@@ -380,10 +321,6 @@ const submitSelection = () => {
 .lookup-row:hover td {
   background: #eceff1;
 }
-.lookup-row.selected td {
-  background: #e3f2fd;
-  color: #1565c0;
-}
 .td-kode {
   font-family: monospace;
   font-weight: 600;
@@ -454,9 +391,6 @@ const submitSelection = () => {
 .ml-auto {
   margin-left: auto;
 }
-.gap-2 {
-  gap: 8px;
-}
 .btn-batal {
   background: transparent;
   border: 1px solid #bdbdbd;
@@ -468,22 +402,5 @@ const submitSelection = () => {
 }
 .btn-batal:hover {
   background: #f0f0f0;
-}
-.btn-import {
-  background: #1565c0;
-  border: none;
-  border-radius: 4px;
-  padding: 4px 14px;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  color: white;
-}
-.btn-import:hover {
-  background: #0d47a1;
-}
-.btn-import:disabled {
-  background: #bdbdbd;
-  cursor: default;
 }
 </style>

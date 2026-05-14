@@ -39,7 +39,7 @@ const activeTab = ref(0);
 const lookupOptions = ref({
   divisi: [] as any[],
   kepentingan: [] as string[],
-  ketPo: [] as string[],
+  ketPo: [] as { ket: string; acc: string }[],
   // Tambahan state dropdown
   panjang: [] as string[],
   lebar: [] as string[],
@@ -78,15 +78,66 @@ const showHistoryAlokasiModal = ref(false);
 const showBarangKaosanModal = ref(false);
 const activeKaosanIndex = ref(-1);
 
+// --- HELPER TIMEZONE (ANTI MUNDUR 1 HARI) ---
+
+// 1. Helper untuk data baru (Sesuai kalender lokal komputer)
+const getTodayLocal = (addDays = 0) => {
+  const d = new Date();
+  d.setDate(d.getDate() + addDays);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+// 2. Helper untuk data dari Database (Menetralisir UTC API)
+const getLocalDateString = (val: string | null | undefined): string => {
+  if (!val) return "";
+  const s = String(val);
+  // Jika format ISO dengan timezone (ada T dan Z), shift +7 jam dulu
+  if (s.includes("T") && (s.endsWith("Z") || s.includes("+00"))) {
+    const d = new Date(s);
+    if (isNaN(d.getTime())) return "";
+    // Shift ke WIB (+7)
+    const wib = new Date(d.getTime() + 7 * 60 * 60 * 1000);
+    return wib.toISOString().substring(0, 10);
+  }
+  // Sudah format YYYY-MM-DD, ambil langsung
+  return s.substring(0, 10);
+};
+
+const todayLocal = getTodayLocal(0);
+const datelineLocal = getTodayLocal(7);
+
+const toLocalDateStr = (val: string | null | undefined): string => {
+  if (!val) return "";
+  // Ambil 10 karakter pertama saja (YYYY-MM-DD), buang time & timezone
+  return String(val).substring(0, 10);
+};
+
+const toDisplayDateTime = (isoStr: string): string => {
+  if (!isoStr) return "";
+  const d = new Date(isoStr);
+  if (isNaN(d.getTime())) return "";
+  // Shift +7 jam untuk WIB
+  d.setHours(d.getHours() + 7);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return (
+    `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ` +
+    `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+  );
+};
+
+const imageToUpload = ref<File | null>(null);
+
 // Data Kosong Default (Baru)
 const defaultData = {
   spk_nomor: "",
-  spk_tanggal: new Date().toISOString().substring(0, 10),
-  spk_dateline: new Date(new Date().setDate(new Date().getDate() + 7))
-    .toISOString()
-    .substring(0, 10),
-  spk_tgl_po: "",
-  spk_datelinepo: "",
+  spk_tanggal: todayLocal,
+  spk_dateline: datelineLocal,
+  spk_tgl_po: todayLocal,
+  spk_datelinepo: todayLocal,
+  spk_tglaccproof: todayLocal,
   spk_cus_kode: "",
   Customer: "",
   spk_sal_kode: "",
@@ -94,6 +145,7 @@ const defaultData = {
   spk_jo_kode: "",
   JenisOrder: "",
   spk_nama: "",
+  spk_nama2: "",
   spk_ukuran: "",
   spk_jumlah: 0,
   spk_kain: "",
@@ -112,12 +164,53 @@ const defaultData = {
   spk_statuskerja: "STANDART",
   spk_keterangan: "",
   spk_ketpo: "",
+  ketpo_acc: "",
   spk_lama: "",
   spk_label: 0,
   spk_cmo: "",
   isCmoChecked: false,
+  spk_pending: "NORMAL",
+  spk_ketpending: "",
+  spk_accpending: "",
+  cus_perfect: "N",
 
   // Array untuk Tabel Detail
+  spk_repeat: "",
+  spk_nomormemo: "", // No. SJ Memo
+  spk_memo: "",
+  spk_mppb: "",
+  jmlmppb: 0,
+  spk_invdc: "", // Ambil stok DC / No. Pesanan
+  jmlinvdc: 0,
+  mkb: "",
+  dtmkb: "",
+
+  spk_desain: "",
+  spk_newdesign: "N",
+
+  spk_warna_badan: "",
+  spk_warna_lengan: "",
+  spk_warna_lain: "",
+
+  spk_pinjo: "",
+
+  spk_mpotong: "N",
+  spk_mcetak: "N",
+  spk_mbordir: "N",
+  spk_mjahit: "N",
+  spk_mfinishing: "N",
+
+  spk_ppotong: "N",
+  spk_pcetak: "N",
+  spk_pbordir: "N",
+  spk_pjahit: "N",
+  spk_pfinishing: "N",
+
+  pin_customer: "N",
+  kepentingan_acc: "",
+
+  spk_iscetak: "N",
+
   Alokasi: [],
   Kaosan: [],
   Sizes: [],
@@ -145,17 +238,52 @@ const {
     // Mapping dari API Backend ke bentuk format input form
     return {
       ...d.header,
+      spk_accpending: d.header.spk_accpending || "",
       spk_cmo: d.header.spk_cmo || "",
       Customer: d.header.cus_nama,
       Sales: d.header.sal_nama,
       JenisOrder: d.header.jo_nama,
       NamaPerusahaan: d.header.perush_nama,
+      CustKaosanNama: d.header.cusk || "",
 
-      spk_tanggal: d.header.spk_tanggal?.substring(0, 10) || "",
-      spk_dateline: d.header.spk_dateline?.substring(0, 10) || "",
-      spk_tgl_po: d.header.spk_tgl_po?.substring(0, 10) || "",
-      spk_datelinepo: d.header.spk_datelinepo?.substring(0, 10) || "",
+      spk_tanggal: getLocalDateString(d.header.spk_tanggal),
+      spk_dateline: getLocalDateString(d.header.spk_dateline),
+      spk_tgl_po: getLocalDateString(d.header.spk_tgl_po),
+      spk_datelinepo: getLocalDateString(d.header.spk_datelinepo),
+      spk_tglaccproof: getLocalDateString(d.header.spk_tglaccproof),
+
+      spk_iscetak: d.header.spk_iscetak || d.header.mspk_iscetak || "N",
+
       isCmoChecked: false,
+
+      date_create: d.header.date_create
+        ? new Date(d.header.date_create).toLocaleString("id-ID", {
+            timeZone: "Asia/Jakarta", // ← tambahkan ini
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+          })
+        : "",
+
+      // Pastikan mapping nama propertinya tepat
+      cus_perfect: d.header.cus_perfect || "N",
+      spk_pinjo: d.header.spk_pinjo || "",
+      // Data Tambahan dari Join Subquery Backend
+      mkb: d.header.mkb || "",
+      dtmkb: d.header.dtmkb || "",
+      jmlmppb: d.header.jmlmppb || 0,
+      jmlinvdc: d.header.jmlinvdc || 0,
+
+      // Fallback Checkbox (jika di DB null)
+      spk_newdesign: d.header.spk_newdesign || "N",
+      spk_mpotong: d.header.spk_mpotong || "N",
+      spk_mcetak: d.header.spk_mcetak || "N",
+      spk_mbordir: d.header.spk_mbordir || "N",
+      spk_mjahit: d.header.spk_mjahit || "N",
+      spk_mfinishing: d.header.spk_mfinishing || "N",
 
       Alokasi: d.alokasi || [],
       Kaosan: d.dtlKaosan || [],
@@ -196,13 +324,41 @@ const {
         spk_lama: data.spk_lama,
         spk_label: data.spk_label,
         spk_cmo: data.spk_cmo,
+        spk_pinjo: data.spk_pinjo,
+        spk_accpending: data.spk_accpending,
       },
       alokasi: data.Alokasi,
       dtlKaosan: data.Kaosan,
       dtlSize: data.Sizes,
     };
 
-    return await salesOrderFormService.saveData(payload);
+    const res = await salesOrderFormService.saveData(payload);
+
+    // Nomor SPK baru hasil dari DB (jika IsNewMode)
+    const nomorSPK = res.data?.nomor || data.spk_nomor;
+
+    // 2. Upload Gambar (Jika ada file yang dipilih)
+    if (imageToUpload.value && nomorSPK) {
+      try {
+        const formDataUpload = new FormData();
+        formDataUpload.append("gambar", imageToUpload.value);
+        formDataUpload.append("spkNomor", nomorSPK);
+        formDataUpload.append("cabang", data.spk_cab); // Misal: "HO-", "P01"
+
+        await api.post(
+          "/penjualan/sales-order/form/upload-gambar",
+          formDataUpload,
+          {
+            headers: { "Content-Type": "multipart/form-data" },
+          },
+        );
+      } catch (err) {
+        toast.error("Data SPK tersimpan, tetapi gagal upload gambar.");
+        console.error(err);
+      }
+    }
+
+    return res;
   },
 });
 
@@ -351,10 +507,16 @@ const setCust = (v: any) => {
   formData.value.spk_cus_kode = v.Kode || v.cus_kode;
   formData.value.Customer = v.Nama || v.cus_nama;
   formData.value.cus_perfect = v.cus_perfect || "N";
+
+  // Panggil validasi (Cek Riwayat Piutang) langsung di parent
+  handleFieldBlur("customer", formData.value.spk_cus_kode);
 };
 const setCustKaosan = (v: any) => {
   formData.value.spk_cus_kaosan = v.Kode || v.cus_kode;
-  formData.value.CustKaosanNama = v.Nama || v.cus_nama; // Buat properti baru di formData
+  formData.value.CustKaosanNama = v.Nama || v.cus_nama;
+
+  // Panggil validasi (Cek Riwayat Piutang) langsung di parent
+  handleFieldBlur("custKaosan", formData.value.spk_cus_kaosan);
 };
 const setSales = (v: any) => {
   formData.value.spk_sal_kode = v.Kode || v.sal_kode;
@@ -431,7 +593,9 @@ const loadDataMemo = async (nomor: string) => {
       formData.value.KetUkuran = h.mspk_ukuran || "";
       formData.value.spk_gramasi = h.mspk_gramasi || "";
       formData.value.spk_kain = h.mspk_kain || "";
-      formData.value.spk_finishing = h.mspk_finishing || "";
+      formData.value.spk_finishing = h.mspk_finishing
+        ? String(h.mspk_finishing).trim()
+        : "";
       formData.value.spk_jumlah = Number(h.mspk_rencana_order) || 0;
       formData.value.spk_keterangan = h.mspk_keterangan || "";
       formData.value.spk_nomor_po = h.mspk_nomor_po || "";
@@ -443,11 +607,19 @@ const loadDataMemo = async (nomor: string) => {
       formData.value.spk_hargariil = Number(h.mspk_hargariil) || 0;
 
       if (
+        h.mspk_dateline &&
+        String(h.mspk_dateline).length >= 10 &&
+        !String(h.mspk_dateline).startsWith("0000")
+      ) {
+        formData.value.spk_dateline = getLocalDateString(h.mspk_dateline);
+      }
+
+      if (
         h.mspk_tgl_po &&
         String(h.mspk_tgl_po).length >= 10 &&
         !String(h.mspk_tgl_po).startsWith("0000")
       ) {
-        formData.value.spk_tgl_po = String(h.mspk_tgl_po).substring(0, 10);
+        formData.value.spk_tgl_po = getLocalDateString(h.mspk_tgl_po);
       }
 
       if (h.mspk_cab2) {
@@ -496,8 +668,11 @@ const setMemo = (v: any) => {
   // Panggil auto-fill
   loadDataMemo(nomor);
 };
-const setStokDc = (v: any) =>
-  (formData.value.spk_invdc = v.Nomor || v.inv_nomor);
+const setStokDc = (v: any) => {
+  formData.value.spk_invdc = v.Nomor || v.inv_nomor;
+  formData.value.jmlinvdc = v.Qty || 0; // Set label qty
+  formData.value.spk_jumlah = v.Qty || 0; // Auto-isi jumlah SPK
+};
 const setRepeat = (v: any) =>
   (formData.value.spk_repeat = v.Nomor || v.spk_nomor);
 const setSpkLama = (v: any) =>
@@ -516,6 +691,17 @@ const handleFieldBlur = async (type: string, value: string) => {
     });
     const result = res.data;
 
+    // Jika Customer nunggak, backend akan mengirim result.pin = 'Y' dan result.warn
+    if (type === "customer" || type === "custKaosan") {
+      if (result.pin === "Y") {
+        formData.value.pin_customer = "Y"; // Langsung lock PIN di UI
+        toast.error(`Perhatian: ${result.warn}`, { timeout: 10000 }); // Munculkan notifikasi agak lama
+      } else {
+        formData.value.pin_customer = "N"; // Aman
+      }
+      return; // Selesai
+    }
+
     if (result.warn && !confirm(result.warn)) {
       if (type === "memo") formData.value.spk_memo = "";
       return;
@@ -530,6 +716,7 @@ const handleFieldBlur = async (type: string, value: string) => {
       formData.value.jmlmppb = result.data.jumlah;
     } else if (type === "invdc" && result.data?.jumlah) {
       formData.value.spk_jumlah = result.data.jumlah;
+      formData.value.jmlinvdc = result.data.jumlah;
       toast.success(`Jumlah SPK otomatis terisi: ${result.data.jumlah}`);
     }
   } catch (e: any) {
@@ -537,49 +724,162 @@ const handleFieldBlur = async (type: string, value: string) => {
     toast.error(errMsg);
 
     // Kosongkan field jika invalid (Sesuai Delphi .Clear & .SetFocus)
+    if (type === "customer") {
+      formData.value.spk_cus_kode = "";
+      formData.value.Customer = "";
+    }
+    if (type === "custKaosan") {
+      formData.value.spk_cus_kaosan = "";
+      formData.value.CustKaosanNama = "";
+    }
     if (type === "memo") formData.value.spk_memo = "";
     if (type === "mppb") {
       formData.value.spk_mppb = "";
       formData.value.jmlmppb = 0;
     }
-    if (type === "invdc") formData.value.spk_invdc = "";
+    if (type === "invdc") {
+      formData.value.spk_invdc = "";
+      formData.value.jmlinvdc = 0; // <--- UPDATE INI
+    }
     if (type === "spklama") formData.value.spk_lama = "";
   }
 };
 
 // Upload Image Logic
 const uploadImageMain = (file: File) => {
-  // Disiapkan untuk upload gambar SPK ke backend
-  // Biasanya dikirim sebagai FormData menggunakan api terpisah
-  console.log("Image main to upload:", file);
+  imageToUpload.value = file;
 };
 
 const validateSave = () => {
-  if (!formData.value.spk_cus_kode) {
+  const fd = formData.value;
+  const divisiStr = String(fd.spk_divisi).charAt(0);
+  const qtyPesan = Number(fd.spk_jumlah) || 0;
+
+  // 1. Validasi Field Wajib Dasar
+  if (!fd.spk_perush_kode) {
+    toast.warning("Perusahaan belum dipilih.");
+    return;
+  }
+  if (!fd.spk_cus_kode) {
     toast.warning("Customer belum dipilih.");
     return;
   }
-  if (!formData.value.spk_nama?.trim()) {
+  if (!fd.spk_sal_kode) {
+    toast.warning("Sales belum dipilih.");
+    return;
+  }
+  if (!fd.spk_jo_kode) {
+    toast.warning("Jenis Order belum dipilih.");
+    return;
+  }
+  if (!fd.spk_nama?.trim()) {
     toast.warning("Nama SPK wajib diisi.");
     return;
   }
+  if (!fd.spk_cab) {
+    toast.warning("Workshop (Cabang) belum dipilih.");
+    return;
+  }
 
-  // --- VALIDASI SPK LAMA BERDASARKAN KET. PO (Migrasi Delphi) ---
-  const ketPo = formData.value.spk_ketpo;
-  const requiresSpkLama = [
+  // 2. Validasi Tanggal PO
+  if (fd.spk_tgl_po && fd.spk_datelinepo) {
+    if (new Date(fd.spk_datelinepo) < new Date(fd.spk_tgl_po)) {
+      toast.warning("Tanggal Dateline PO harus >= Tanggal PO.");
+      return;
+    }
+  }
+
+  // 3. Validasi Divisi 1 & 5 (Spanduk/MMT)
+  if (divisiStr === "1" || divisiStr === "5") {
+    if (!fd.spk_panjang || !fd.spk_lebar) {
+      toast.warning(
+        "Ukuran Panjang dan Lebar harus diisi untuk divisi MMT/Spanduk.",
+      );
+      return;
+    }
+  }
+
+  // 4. Validasi Harga 0
+  if (Number(fd.spk_harga) === 0 && !fd.spk_ketpo && divisiStr !== "3") {
+    toast.warning("Jika harga 0, Ket.PO wajib dipilih.");
+    return;
+  }
+
+  // 5. Validasi SPK Lama (Ket. PO)
+  const reqSpkLama = [
     "BARANG PENDUKUNG",
     "BARANG PER SET",
     "PRODUK PENGGANTI",
     "JASA TAMBAHAN",
   ];
-
-  if (requiresSpkLama.includes(ketPo) && !formData.value.spk_lama?.trim()) {
-    toast.warning(`Untuk Ket. PO "${ketPo}", SPK Lama harus diisi!`);
-    // (Di sini kita tidak pakai .SetFocus manual karena Toast sudah cukup jelas,
-    // tapi proses save digagalkan via return)
+  if (reqSpkLama.includes(fd.spk_ketpo) && !fd.spk_lama?.trim()) {
+    toast.warning(`Untuk Ket. PO "${fd.spk_ketpo}", SPK Lama harus diisi!`);
     return;
   }
 
+  // 6. Validasi Total Qty Alokasi vs Jumlah Pesanan
+  if (fd.Alokasi && fd.Alokasi.length > 0) {
+    const sumAlokasi = fd.Alokasi.reduce(
+      (acc: number, curr: any) => acc + (Number(curr.jumlah) || 0),
+      0,
+    );
+    if (sumAlokasi > 0 && sumAlokasi !== qtyPesan) {
+      toast.warning("Jumlah SPK vs Total Qty Alokasi beda. Silahkan cek dulu.");
+      return;
+    }
+  }
+
+  // 7. Validasi Detail Kaosan (Khusus Divisi 3)
+  if (divisiStr === "3") {
+    if (!fd.Kaosan || fd.Kaosan.length === 0) {
+      toast.warning("Detail barang kaosan harus diisi.");
+      return;
+    }
+    const sumKaosan = fd.Kaosan.reduce(
+      (acc: number, curr: any) => acc + (Number(curr.qtyorder) || 0),
+      0,
+    );
+    if (sumKaosan === 0) {
+      toast.warning("Detail barang kaosan Qty Order harus diisi.");
+      return;
+    }
+    if (sumKaosan !== qtyPesan) {
+      toast.warning(
+        "Jumlah SPK vs Total Qty Order di Detail Barang Kaosan harus sama.",
+      );
+      return;
+    }
+  }
+
+  // 8. Validasi Detail Size (Khusus Divisi 3, 4, 6 - Non Pengerjaan)
+  if (["3", "4", "6"].includes(divisiStr)) {
+    const isPengerjaan = ["BR", "SB", "SD", "PL", "DP", "TG", "PM"].some(
+      (sub) => fd.spk_jo_kode?.includes(sub),
+    );
+
+    if (!isPengerjaan) {
+      const sumSize = fd.Sizes
+        ? fd.Sizes.reduce(
+            (acc: number, curr: any) => acc + (Number(curr.qty) || 0),
+            0,
+          )
+        : 0;
+      if (sumSize === 0) {
+        toast.warning(
+          "Divisi Garmen/Kaosan: Qty Order di Detail Size harus diisi.",
+        );
+        return;
+      }
+      if (sumSize !== qtyPesan) {
+        toast.warning(
+          "Jumlah SPK vs Total Qty Order di Detail Size harus sama.",
+        );
+        return;
+      }
+    }
+  }
+
+  // Lolos semua validasi, buka konfirmasi simpan
   showSaveDialog.value = true;
 };
 
@@ -635,38 +935,53 @@ const handleOpenLookupBarang = (index: number) => {
 };
 
 // Setter Data Barang Kaosan (Sesuai void loadbrg Delphi)
-const setBarangKaosan = (v: any) => {
-  if (activeKaosanIndex.value < 0) return;
+const setBarangKaosan = (selectedItems: any[]) => {
+  if (!selectedItems || selectedItems.length === 0) return;
+
   const idx = activeKaosanIndex.value;
+  let isFirstItem = true;
 
-  // 1. Cek duplikasi (Jika kode & ukuran sama di baris lain)
-  const exists = formData.value.Kaosan.some(
-    (k: any, i: number) =>
-      i !== idx && k.kode === v.Kode && k.ukuran === v.Ukuran,
-  );
-  if (exists) {
-    toast.warning("Barang dan ukuran ini sudah diinput di baris lain.");
-    return;
-  }
+  selectedItems.forEach((v) => {
+    // 1. Cek duplikasi
+    const exists = formData.value.Kaosan.some(
+      (k: any, i: number) =>
+        i !== idx && k.kode === v.Kode && k.ukuran === v.Ukuran,
+    );
 
-  // 2. Set Data Barang
-  const row = formData.value.Kaosan[idx];
-  row.kode = v.Kode;
-  row.nama = v.Nama;
-  row.ukuran = v.Ukuran;
-  row.qtyorder = 1; // Default qty sesuai Delphi
+    if (exists) {
+      toast.warning(`Barang ${v.Nama} (${v.Ukuran}) sudah ada, dilewati.`);
+      return;
+    }
 
-  // 3. Tambahkan qty ke Detail Size (CDS4)
-  if (!formData.value.Sizes) formData.value.Sizes = [];
-  const sizeRow = formData.value.Sizes.find((s: any) => s.size === v.Ukuran);
-  if (sizeRow) {
-    sizeRow.qty += 1;
-  } else {
-    // Opsional: Jika ukurannya belum ada di tabel Size, tambahkan baru
-    formData.value.Sizes.push({ size: v.Ukuran, qty: 1, lb: 0, pb: 0 });
-  }
+    // 2. Set Data Barang Kaosan
+    if (isFirstItem && idx >= 0 && !formData.value.Kaosan[idx].kode) {
+      // Jika ini item pertama dan baris pemanggil masih kosong, isi di situ
+      formData.value.Kaosan[idx].kode = v.Kode;
+      formData.value.Kaosan[idx].nama = v.Nama;
+      formData.value.Kaosan[idx].ukuran = v.Ukuran;
+      formData.value.Kaosan[idx].qtyorder = 1;
+      isFirstItem = false;
+    } else {
+      // Jika item berikutnya, tambahkan baris baru di bawahnya
+      formData.value.Kaosan.push({
+        kode: v.Kode,
+        nama: v.Nama,
+        ukuran: v.Ukuran,
+        qtyorder: 1,
+      });
+    }
 
-  // Reset index
+    // 3. Tambahkan qty ke Detail Size
+    if (!formData.value.Sizes) formData.value.Sizes = [];
+    const sizeRow = formData.value.Sizes.find((s: any) => s.size === v.Ukuran);
+    if (sizeRow) {
+      sizeRow.qty += 1;
+    } else {
+      formData.value.Sizes.push({ size: v.Ukuran, qty: 1, lb: 0, pb: 0 });
+    }
+  });
+
+  // Reset index pemanggil
   activeKaosanIndex.value = -1;
 };
 </script>
@@ -681,7 +996,7 @@ const setBarangKaosan = (v: any) => {
     v-model:show-save-dialog="showSaveDialog"
     v-model:show-cancel-dialog="showCancelDialog"
     v-model:show-close-dialog="showCloseDialog"
-    @validate-save="() => (showSaveDialog = true)"
+    @validate-save="validateSave"
     @confirm-save="executeSave"
     @confirm-cancel="executeCancel"
     @confirm-close="executeClose"
@@ -714,6 +1029,7 @@ const setBarangKaosan = (v: any) => {
             @open-lookup="(type) => handleLookup(type)"
             @field-blur="handleFieldBlur"
             @confirm-uncheck-cmo="handleConfirmCmo"
+            @switch-tab="(val) => (activeTab = val)"
           />
         </v-window-item>
         <v-window-item :value="1">

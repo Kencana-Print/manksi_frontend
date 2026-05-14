@@ -122,6 +122,7 @@ const pendingDeleteItem = ref<any>(null);
 // Restore filterState ke parent saat mount jika ada nilai tersimpan
 onMounted(() => {
   if (saved?.filterState && Object.keys(saved.filterState).length > 0) {
+    // Emit synchronously sebelum parent melakukan fetch
     emit("update:filterState", saved.filterState);
   }
 });
@@ -498,6 +499,16 @@ const clearSelection = () => {
   internalSelected.value = [];
 };
 defineExpose({ clearSelection, search });
+
+watch(
+  () => filteredItems.value.length,
+  () => {
+    // Reset ke halaman 1 jika halaman sekarang melebihi total halaman
+    if (currentPage.value > totalPages.value) {
+      currentPage.value = 1;
+    }
+  },
+);
 </script>
 
 <template>
@@ -966,6 +977,7 @@ defineExpose({ clearSelection, search });
 .browse-content {
   display: flex;
   flex-direction: column;
+  height: 100%;
   flex: 1 1 0;
   min-height: 0;
   gap: 8px;
@@ -987,6 +999,7 @@ defineExpose({ clearSelection, search });
   height: auto; /* ← dari fixed jadi auto */
   flex-wrap: wrap; /* ← biar bisa wrap kalau perlu */
   align-items: center;
+  z-index: 5;
 }
 
 .search-field {
@@ -1026,7 +1039,7 @@ defineExpose({ clearSelection, search });
   flex-direction: column;
   border: 1px solid #e0e0e0;
   border-radius: 6px;
-  overflow: hidden;
+  overflow: auto;
   flex: 1; /* isi sisa ruang vertikal */
   min-height: 0; /* wajib agar flex child bisa scroll */
 }

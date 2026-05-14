@@ -1,17 +1,115 @@
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref, computed, onMounted, onUnmounted } from "vue";
 import { useAuthStore } from "@/stores/authStore";
+import { dashboardService } from "@/services/dashboard/dashboardService";
 import {
   IconLayoutDashboard,
-  IconAlertTriangle,
   IconX,
   IconClipboardList,
+  IconFileAlert,
+  IconRefresh,
+  IconChartBar,
 } from "@tabler/icons-vue";
 
 const authStore = useAuthStore();
 const isSpkDialogVisible = ref(false);
 
-onMounted(() => {
+// ── Role helpers ──
+const bagian = computed(() =>
+  (authStore.user?.bagian || "").toUpperCase().trim(),
+);
+
+const isSuperViewer = computed(() =>
+  ["EDP", "DIREKSI", "OWNER", "IT"].includes(bagian.value),
+);
+
+const showPenawaran = computed(
+  () => bagian.value === "MARKETING" || isSuperViewer.value,
+);
+
+// ── State Dashboard ──
+const penSummary = ref({ TotalPenawaran: 0, SudahSpk: 0, BelumSpk: 0 });
+const penawaranBelumSpk = ref<any[]>([]);
+const spkSummary = ref({
+  TotalAktif: 0,
+  Terlambat: 0,
+  DeadlineHariIni: 0,
+  SegeredDeadline: 0,
+  Selesai: 0,
+});
+const realisasiRows = ref<any[]>([]);
+const isLoadingDashboard = ref(false);
+
+// ── Infinite scroll state (Penawaran Belum SPK) ──
+const PEN_PAGE_SIZE = 20;
+const penOffset = ref(0);
+const penHasMore = ref(true);
+const isLoadingMorePen = ref(false);
+const penListEl = ref<HTMLElement | null>(null);
+let penScrollObserver: IntersectionObserver | null = null;
+const penSentinelEl = ref<HTMLElement | null>(null);
+
+const loadMorePenawaran = async () => {
+  if (!penHasMore.value || isLoadingMorePen.value) return;
+  isLoadingMorePen.value = true;
+  try {
+    const res = await dashboardService.getPenawaranBelumSpk(
+      PEN_PAGE_SIZE,
+      penOffset.value,
+    );
+    const rows: any[] = res.data.data;
+    penawaranBelumSpk.value.push(...rows);
+    penOffset.value += rows.length;
+    if (rows.length < PEN_PAGE_SIZE) penHasMore.value = false;
+  } catch {
+    /* silent */
+  } finally {
+    isLoadingMorePen.value = false;
+  }
+};
+
+const setupPenObserver = () => {
+  if (penScrollObserver) penScrollObserver.disconnect();
+  penScrollObserver = new IntersectionObserver(
+    (entries) => {
+      if (entries[0].isIntersecting) loadMorePenawaran();
+    },
+    { threshold: 0.1 },
+  );
+  if (penSentinelEl.value) penScrollObserver.observe(penSentinelEl.value);
+};
+
+const loadDashboard = async () => {
+  isLoadingDashboard.value = true;
+  // Reset infinite scroll state
+  penawaranBelumSpk.value = [];
+  penOffset.value = 0;
+  penHasMore.value = true;
+  try {
+    const [spkSumRes] = await Promise.allSettled([
+      dashboardService.getSpkSummary(),
+    ]);
+    if (spkSumRes.status === "fulfilled")
+      spkSummary.value = spkSumRes.value.data.data;
+
+    if (showPenawaran.value) {
+      const [sumRes, realisasiRes] = await Promise.allSettled([
+        dashboardService.getPenawaranSummary(),
+        dashboardService.getRealisasiSummary(),
+      ]);
+      if (sumRes.status === "fulfilled")
+        penSummary.value = sumRes.value.data.data;
+      if (realisasiRes.status === "fulfilled")
+        realisasiRows.value = realisasiRes.value.data.data;
+      // Load batch pertama
+      await loadMorePenawaran();
+    }
+  } finally {
+    isLoadingDashboard.value = false;
+  }
+};
+
+onMounted(async () => {
   if (
     authStore.spkUrgent &&
     authStore.spkUrgent.length > 0 &&
@@ -19,6 +117,13 @@ onMounted(() => {
   ) {
     isSpkDialogVisible.value = true;
   }
+  await loadDashboard();
+  // Setup observer setelah DOM siap
+  setTimeout(setupPenObserver, 300);
+});
+
+onUnmounted(() => {
+  penScrollObserver?.disconnect();
 });
 
 const closeSpkDialog = () => {
@@ -26,37 +131,64 @@ const closeSpkDialog = () => {
   sessionStorage.setItem("hasSeenSpk", "true");
 };
 
-// ── Helper functions untuk status dateline ──
+// ── Penawaran helpers ──
+const konversiRate = computed(() => {
+  if (!penSummary.value.TotalPenawaran) return 0;
+  return Math.round(
+    (penSummary.value.SudahSpk / penSummary.value.TotalPenawaran) * 100,
+  );
+});
+const umurClass = (hari: number) => {
+  if (hari >= 14) return "umur-danger";
+  if (hari >= 7) return "umur-warn";
+  return "umur-ok";
+};
+
+// ── Realisasi helpers ──
+const totalNominal = computed(() =>
+  realisasiRows.value.reduce((s, r) => s + Number(r.Nominal || 0), 0),
+);
+const totalClose = computed(() =>
+  realisasiRows.value.reduce((s, r) => s + Number(r.Close || 0), 0),
+);
+const pctGlobal = computed(() =>
+  totalNominal.value
+    ? Math.round((totalClose.value / totalNominal.value) * 100)
+    : 0,
+);
+const barPct = (nominal: number, close: number, batal: number) => ({
+  close: nominal ? Math.round((close / nominal) * 100) : 0,
+  batal: nominal ? Math.round((batal / nominal) * 100) : 0,
+  open: nominal ? Math.round(((nominal - close - batal) / nominal) * 100) : 0,
+});
+const shortNum = (n: number) => {
+  if (n >= 1_000_000_000) return (n / 1_000_000_000).toFixed(1) + "M";
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + "jt";
+  if (n >= 1_000) return (n / 1_000).toFixed(0) + "rb";
+  return String(n);
+};
+
+// ── Dialog SPK helpers ──
 const parseDate = (dateStr: string): Date | null => {
   if (!dateStr) return null;
   const parts = dateStr.split("-").map(Number);
-  // Coba format DD-MM-YYYY dulu, fallback ke YYYY-MM-DD
-  if (parts[2] > 1000) {
-    // format YYYY-MM-DD
-    return new Date(parts[0], parts[1] - 1, parts[2]);
-  }
-  // format DD-MM-YYYY
+  if (parts[2] > 1000) return new Date(parts[0], parts[1] - 1, parts[2]);
   return new Date(parts[2], parts[1] - 1, parts[0]);
 };
-
-const isOverdue = (dateline: string): boolean => {
+const isOverdue = (dateline: string) => {
   const dl = parseDate(dateline);
   if (!dl) return false;
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   return dl < today;
 };
-
-const isToday = (dateline: string): boolean => {
+const isToday = (dateline: string) => {
   const dl = parseDate(dateline);
   if (!dl) return false;
-  const today = new Date();
-  return dl.toDateString() === today.toDateString();
+  return dl.toDateString() === new Date().toDateString();
 };
-
-const sisa = (item: any): number => (item.QtyOrder ?? 0) - (item.QtyJadi ?? 0);
-
-const sisaClass = (item: any): string => {
+const sisa = (item: any) => (item.QtyOrder ?? 0) - (item.QtyJadi ?? 0);
+const sisaClass = (item: any) => {
   const s = sisa(item);
   if (s > 0) return "val-danger";
   if (s === 0) return "val-done";
@@ -65,97 +197,347 @@ const sisaClass = (item: any): string => {
 </script>
 
 <template>
-  <div class="app-layout">
-    <Navbar />
-
-    <v-main class="bg-grey-lighten-4">
-      <v-container fluid class="pa-3">
+  <v-container fluid class="pa-3">
+    <!-- ── Header ── -->
+    <div
+      class="manksi-panel header-panel mb-3 d-flex justify-space-between align-center"
+    >
+      <div>
         <div
-          class="manksi-panel header-panel mb-3 d-flex justify-space-between align-center"
+          class="text-primary font-weight-bold"
+          style="font-size: 13px; margin-bottom: 2px"
         >
+          DASHBOARD MANKSI
+        </div>
+        <div class="text-grey-darken-2" style="font-size: 12px">
+          Selamat datang kembali,
+          <strong>{{ authStore.userName }}</strong>
+          ({{ authStore.userCabang }})
+        </div>
+      </div>
+      <div class="d-flex align-center" style="gap: 8px">
+        <v-btn
+          icon
+          variant="text"
+          size="small"
+          :loading="isLoadingDashboard"
+          title="Refresh Dashboard"
+          @click="loadDashboard"
+        >
+          <IconRefresh :size="16" :stroke-width="1.7" />
+        </v-btn>
+        <div class="text-right text-grey-darken-2" style="font-size: 12px">
           <div>
-            <div
-              class="text-primary font-weight-bold"
-              style="font-size: 13px; margin-bottom: 2px"
-            >
-              DASHBOARD MANKSI
-            </div>
-            <div class="text-grey-darken-2">
-              Selamat datang kembali,
-              <strong>{{ authStore.userName }}</strong> ({{
-                authStore.userCabang
-              }})
-            </div>
+            Bagian:
+            <strong class="text-black">{{
+              authStore.user?.bagian || "-"
+            }}</strong>
           </div>
-          <div class="text-right text-grey-darken-2">
-            <div>
-              Divisi:
-              <strong class="text-black">{{
-                authStore.user?.bagian || "-"
-              }}</strong>
-            </div>
-            <div>
-              Gudang Jadi:
-              <strong class="text-black">{{
-                authStore.gudangJadi?.nama || "-"
-              }}</strong>
+          <div>
+            Gudang Jadi:
+            <strong class="text-black">{{
+              authStore.gudangJadi?.nama || "-"
+            }}</strong>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Row 1: SPK Summary Cards ── -->
+    <v-row dense class="mb-2">
+      <v-col cols="6" sm="3">
+        <div class="sum-card">
+          <div class="sum-label">SPK Aktif</div>
+          <div class="sum-value text-primary">
+            {{ isLoadingDashboard ? "—" : spkSummary.TotalAktif }}
+          </div>
+        </div>
+      </v-col>
+      <v-col cols="6" sm="3">
+        <div class="sum-card">
+          <div class="sum-label">Terlambat</div>
+          <div class="sum-value text-error">
+            {{ isLoadingDashboard ? "—" : spkSummary.Terlambat }}
+          </div>
+        </div>
+      </v-col>
+      <v-col cols="6" sm="3">
+        <div class="sum-card">
+          <div class="sum-label">Deadline Hari Ini</div>
+          <div class="sum-value text-warning">
+            {{ isLoadingDashboard ? "—" : spkSummary.DeadlineHariIni }}
+          </div>
+        </div>
+      </v-col>
+      <v-col cols="6" sm="3">
+        <div class="sum-card">
+          <div class="sum-label">Segera Deadline (≤3hr)</div>
+          <div class="sum-value" style="color: #e65100">
+            {{ isLoadingDashboard ? "—" : spkSummary.SegeredDeadline }}
+          </div>
+        </div>
+      </v-col>
+    </v-row>
+
+    <!-- ── Row 2: Panel konten ── -->
+    <v-row dense>
+      <!-- Papan Informasi -->
+      <v-col cols="12" :md="showPenawaran ? 3 : 12">
+        <div class="manksi-panel content-panel fill-height">
+          <div class="panel-header bg-grey-lighten-3 text-primary">
+            <IconLayoutDashboard :size="14" :stroke-width="1.6" class="mr-1" />
+            Papan Informasi
+          </div>
+          <div class="panel-body pa-3">
+            <p class="text-caption text-grey font-italic mb-0">
+              Belum ada informasi terbaru hari ini.
+            </p>
+          </div>
+        </div>
+      </v-col>
+
+      <!-- Penawaran Belum SPK -->
+      <v-col v-if="showPenawaran" cols="12" md="4">
+        <div class="manksi-panel content-panel fill-height">
+          <div class="panel-header panel-header--warning">
+            <IconFileAlert :size="14" :stroke-width="1.7" class="mr-1" />
+            Penawaran Belum SPK
+            <span v-if="penSummary.BelumSpk" class="badge-count ml-auto">
+              {{ penSummary.BelumSpk }}
+            </span>
+          </div>
+          <div class="panel-body">
+            <v-progress-linear
+              v-if="isLoadingDashboard"
+              indeterminate
+              color="warning"
+              height="2"
+            />
+            <template v-else>
+              <div class="pen-summary-bar">
+                <div class="pen-stat">
+                  <span class="pen-stat-val text-primary">{{
+                    penSummary.TotalPenawaran
+                  }}</span>
+                  <span class="pen-stat-lbl">Total</span>
+                </div>
+                <div class="pen-stat">
+                  <span class="pen-stat-val text-success">{{
+                    penSummary.SudahSpk
+                  }}</span>
+                  <span class="pen-stat-lbl">Ada SPK</span>
+                </div>
+                <div class="pen-stat">
+                  <span class="pen-stat-val text-error">{{
+                    penSummary.BelumSpk
+                  }}</span>
+                  <span class="pen-stat-lbl">Belum SPK</span>
+                </div>
+                <div class="pen-stat">
+                  <span
+                    class="pen-stat-val"
+                    :class="
+                      konversiRate >= 80
+                        ? 'text-success'
+                        : konversiRate >= 50
+                          ? 'text-warning'
+                          : 'text-error'
+                    "
+                  >
+                    {{ konversiRate }}%
+                  </span>
+                  <span class="pen-stat-lbl">Konversi</span>
+                </div>
+              </div>
+              <div
+                v-if="penawaranBelumSpk.length || isLoadingMorePen"
+                class="pen-list"
+                ref="penListEl"
+              >
+                <div
+                  v-for="p in penawaranBelumSpk"
+                  :key="p.Nomor"
+                  class="pen-item"
+                  :class="umurClass(p.UmurHari)"
+                >
+                  <div class="pen-item-top">
+                    <span class="pen-nomor">{{ p.Nomor }}</span>
+                    <div class="d-flex align-center" style="gap: 6px">
+                      <span class="pen-divisi">{{ p.Divisi || "" }}</span>
+                      <span class="pen-age" :class="umurClass(p.UmurHari)"
+                        >{{ p.UmurHari }}h</span
+                      >
+                    </div>
+                  </div>
+                  <div class="pen-cus">{{ p.NamaCustomer }}</div>
+                  <div v-if="p.Keterangan" class="pen-ket">
+                    {{ p.Keterangan }}
+                  </div>
+                </div>
+                <!-- Sentinel untuk IntersectionObserver -->
+                <div ref="penSentinelEl" class="pen-sentinel">
+                  <span v-if="isLoadingMorePen" class="pen-loading"
+                    >Memuat...</span
+                  >
+                  <span
+                    v-else-if="!penHasMore && penawaranBelumSpk.length"
+                    class="pen-end"
+                  >
+                    {{ penawaranBelumSpk.length }} penawaran
+                  </span>
+                </div>
+              </div>
+              <div
+                v-else-if="!isLoadingDashboard"
+                class="text-center text-grey py-3 text-caption"
+              >
+                Semua penawaran sudah ada SPK-nya 🎉
+              </div>
+            </template>
+          </div>
+        </div>
+      </v-col>
+
+      <!-- Realisasi Penawaran per Divisi -->
+      <v-col v-if="showPenawaran" cols="12" md="5">
+        <div class="manksi-panel content-panel fill-height">
+          <div class="panel-header panel-header--blue">
+            <IconChartBar :size="14" :stroke-width="1.7" class="mr-1" />
+            Realisasi Penawaran
+            <span class="panel-header-sub ml-1">(bulan ini)</span>
+            <span
+              v-if="totalNominal"
+              class="ml-auto pct-badge"
+              :class="
+                pctGlobal >= 80
+                  ? 'pct-good'
+                  : pctGlobal >= 50
+                    ? 'pct-mid'
+                    : 'pct-low'
+              "
+            >
+              {{ pctGlobal }}% close
+            </span>
+          </div>
+          <div class="panel-body">
+            <v-progress-linear
+              v-if="isLoadingDashboard"
+              indeterminate
+              color="primary"
+              height="2"
+            />
+            <template v-else-if="realisasiRows.length">
+              <!-- Total row -->
+              <div class="real-total-row">
+                <span class="real-total-lbl">Total Nominal</span>
+                <span class="real-total-val">{{ shortNum(totalNominal) }}</span>
+                <span class="real-total-close"
+                  >Close {{ shortNum(totalClose) }}</span
+                >
+              </div>
+
+              <!-- Per-divisi bar rows -->
+              <div class="real-list">
+                <div
+                  v-for="row in realisasiRows"
+                  :key="row.Divisi"
+                  class="real-row"
+                >
+                  <!-- Label + angka -->
+                  <div class="real-meta">
+                    <span class="real-divisi">{{
+                      row.Divisi || "LAINNYA"
+                    }}</span>
+                    <span class="real-nominal">{{
+                      shortNum(Number(row.Nominal))
+                    }}</span>
+                  </div>
+                  <!-- Stacked bar -->
+                  <div class="real-bar-wrap">
+                    <div class="real-bar">
+                      <div
+                        class="real-seg real-seg--close"
+                        :style="{
+                          width:
+                            barPct(
+                              Number(row.Nominal),
+                              Number(row.Close),
+                              Number(row.Batal),
+                            ).close + '%',
+                        }"
+                        :title="`Close: ${shortNum(Number(row.Close))}`"
+                      />
+                      <div
+                        class="real-seg real-seg--batal"
+                        :style="{
+                          width:
+                            barPct(
+                              Number(row.Nominal),
+                              Number(row.Close),
+                              Number(row.Batal),
+                            ).batal + '%',
+                        }"
+                        :title="`Batal: ${shortNum(Number(row.Batal))}`"
+                      />
+                      <div
+                        class="real-seg real-seg--open"
+                        :style="{
+                          width:
+                            barPct(
+                              Number(row.Nominal),
+                              Number(row.Close),
+                              Number(row.Batal),
+                            ).open + '%',
+                        }"
+                        :title="`Open: ${shortNum(Number(row.Nominal) - Number(row.Close) - Number(row.Batal))}`"
+                      />
+                    </div>
+                    <span class="real-pct">
+                      {{
+                        barPct(
+                          Number(row.Nominal),
+                          Number(row.Close),
+                          Number(row.Batal),
+                        ).close
+                      }}%
+                    </span>
+                  </div>
+                  <!-- Detail angka kecil -->
+                  <div class="real-detail">
+                    <span class="rd-close"
+                      >✓ {{ shortNum(Number(row.Close)) }}</span
+                    >
+                    <span v-if="Number(row.Batal) > 0" class="rd-batal"
+                      >✕ {{ shortNum(Number(row.Batal)) }}</span
+                    >
+                    <span class="rd-open"
+                      >○
+                      {{
+                        shortNum(
+                          Number(row.Nominal) -
+                            Number(row.Close) -
+                            Number(row.Batal),
+                        )
+                      }}</span
+                    >
+                  </div>
+                </div>
+              </div>
+
+              <!-- Legend -->
+              <div class="real-legend">
+                <span class="leg-dot leg-close" />Close
+                <span class="leg-dot leg-batal" />Batal
+                <span class="leg-dot leg-open" />Open
+              </div>
+            </template>
+            <div v-else class="text-center text-grey py-3 text-caption">
+              Belum ada data penawaran bulan ini.
             </div>
           </div>
         </div>
-
-        <v-row dense>
-          <v-col cols="12" md="8">
-            <div class="manksi-panel content-panel fill-height">
-              <div class="panel-header bg-grey-lighten-3 text-primary">
-                <IconLayoutDashboard
-                  :size="14"
-                  :stroke-width="1.6"
-                  class="mr-1"
-                />
-                Papan Informasi
-              </div>
-              <div class="panel-body pa-3">
-                <p>Belum ada informasi terbaru hari ini.</p>
-              </div>
-            </div>
-          </v-col>
-
-          <v-col cols="12" md="4">
-            <div class="manksi-panel content-panel fill-height">
-              <div
-                class="panel-header bg-error-lighten-5 text-error border-error-bottom"
-              >
-                <IconAlertTriangle
-                  :size="14"
-                  :stroke-width="1.7"
-                  class="mr-1"
-                />
-                Ringkasan SPK Urgent
-              </div>
-              <div class="panel-body pa-3">
-                <div
-                  v-if="authStore.spkUrgent && authStore.spkUrgent.length > 0"
-                >
-                  <v-alert
-                    density="compact"
-                    type="error"
-                    variant="tonal"
-                    class="mb-0 py-1"
-                  >
-                    Ada
-                    <strong>{{ authStore.spkUrgent.length }} SPK</strong> yang
-                    akan/sudah Dateline!
-                  </v-alert>
-                </div>
-                <div v-else class="text-center text-grey py-3">
-                  Aman, tidak ada SPK urgent.
-                </div>
-              </div>
-            </div>
-          </v-col>
-        </v-row>
-      </v-container>
-    </v-main>
+      </v-col>
+    </v-row>
 
     <!-- ── Dialog SPK Urgent ── -->
     <v-dialog
@@ -165,7 +547,6 @@ const sisaClass = (item: any): string => {
       :max-height="'90vh'"
     >
       <v-card class="spk-dialog-card" rounded="lg">
-        <!-- Header -->
         <div class="spk-header">
           <div class="spk-header-left">
             <div class="spk-header-icon">
@@ -190,7 +571,6 @@ const sisaClass = (item: any): string => {
           </v-btn>
         </div>
 
-        <!-- Tabel — tidak ada scroll horizontal, semua kolom muat -->
         <div class="spk-table-wrap">
           <table class="spk-table">
             <thead>
@@ -247,13 +627,12 @@ const sisaClass = (item: any): string => {
           </table>
         </div>
 
-        <!-- Footer -->
         <div class="spk-footer">
           <div class="spk-legend">
-            <span class="legend-dot overdue" />
-            <span>Sudah lewat dateline</span>
-            <span class="legend-dot today" style="margin-left: 12px" />
-            <span>Dateline hari ini</span>
+            <span class="legend-dot overdue" /><span>Sudah lewat dateline</span>
+            <span class="legend-dot today" style="margin-left: 12px" /><span
+              >Dateline hari ini</span
+            >
           </div>
           <v-btn
             color="primary"
@@ -266,22 +645,13 @@ const sisaClass = (item: any): string => {
         </div>
       </v-card>
     </v-dialog>
-  </div>
+  </v-container>
 </template>
 
 <style scoped>
-.app-layout {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-}
-.v-main {
-  min-height: calc(100vh - 64px);
-}
-
-/* ── Panel Dashboard ── */
+/* ── Panel ── */
 .manksi-panel {
-  background-color: #ffffff;
+  background: #fff;
   border: 1px solid #e0e0e0;
   border-radius: 4px;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
@@ -303,22 +673,321 @@ const sisaClass = (item: any): string => {
   align-items: center;
   font-size: 12px;
 }
-.border-error-bottom {
-  border-bottom: 1px solid #ffcdd2;
+.panel-header--warning {
+  background: #fffde7;
+  color: #f57f17;
+  border-bottom: 1px solid #fff9c4;
+}
+.panel-header--blue {
+  background: #e3f2fd;
+  color: #1565c0;
+  border-bottom: 1px solid #bbdefb;
+}
+.panel-header-sub {
+  font-size: 10px;
+  color: #9e9e9e;
+  font-weight: 400;
+}
+.badge-count {
+  background: #f57f17;
+  color: white;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  line-height: 1.4;
+}
+.pct-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: 10px;
+  line-height: 1.4;
+}
+.pct-good {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+.pct-mid {
+  background: #fff8e1;
+  color: #f57f17;
+}
+.pct-low {
+  background: #ffebee;
+  color: #c62828;
 }
 .panel-body {
   flex-grow: 1;
+  overflow: hidden;
 }
 
-/* ── Dialog Card ── */
+/* ── Summary Cards ── */
+.sum-card {
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  padding: 8px 12px;
+  text-align: center;
+}
+.sum-label {
+  font-size: 10px;
+  color: #757575;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 2px;
+}
+.sum-value {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+/* ── Penawaran Summary Bar ── */
+.pen-summary-bar {
+  display: flex;
+  border-bottom: 1px solid #f0f0f0;
+  padding: 6px 0;
+}
+.pen-stat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  border-right: 1px solid #f0f0f0;
+}
+.pen-stat:last-child {
+  border-right: none;
+}
+.pen-stat-val {
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+.pen-stat-lbl {
+  font-size: 9px;
+  color: #9e9e9e;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* ── Penawaran List ── */
+.pen-list {
+  max-height: 320px;
+  overflow-y: auto;
+}
+.pen-item {
+  padding: 5px 12px;
+  border-bottom: 1px solid #f5f5f5;
+  font-size: 11px;
+}
+.pen-item.umur-danger {
+  background: #fff5f5;
+}
+.pen-item.umur-warn {
+  background: #fffde7;
+}
+.pen-item-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.pen-nomor {
+  font-family: monospace;
+  font-weight: 700;
+  color: #1565c0;
+  font-size: 11px;
+}
+.pen-divisi {
+  font-size: 10px;
+  color: #9e9e9e;
+}
+.pen-age {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+.pen-age.umur-danger {
+  background: #ffebee;
+  color: #c62828;
+}
+.pen-age.umur-warn {
+  background: #fff8e1;
+  color: #f57f17;
+}
+.pen-age.umur-ok {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+.pen-cus {
+  color: #424242;
+  margin-top: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pen-ket {
+  font-size: 10px;
+  color: #9e9e9e;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pen-sentinel {
+  padding: 6px 12px;
+  text-align: center;
+}
+.pen-loading {
+  font-size: 10px;
+  color: #9e9e9e;
+  font-style: italic;
+}
+.pen-end {
+  font-size: 10px;
+  color: #bdbdbd;
+}
+
+/* ── Realisasi Panel ── */
+.real-total-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 12px;
+  border-bottom: 1px solid #f0f0f0;
+  background: #fafafa;
+}
+.real-total-lbl {
+  font-size: 10px;
+  color: #9e9e9e;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.real-total-val {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1565c0;
+}
+.real-total-close {
+  font-size: 11px;
+  color: #2e7d32;
+  font-weight: 600;
+  margin-left: auto;
+}
+
+.real-list {
+  max-height: 260px;
+  overflow-y: auto;
+}
+.real-row {
+  padding: 6px 12px;
+  border-bottom: 1px solid #f5f5f5;
+}
+
+.real-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 3px;
+}
+.real-divisi {
+  font-size: 11px;
+  font-weight: 700;
+  color: #1565c0;
+}
+.real-nominal {
+  font-size: 10px;
+  color: #757575;
+}
+
+.real-bar-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 2px;
+}
+.real-bar {
+  flex: 1;
+  height: 8px;
+  background: #f0f0f0;
+  border-radius: 4px;
+  overflow: hidden;
+  display: flex;
+}
+.real-seg {
+  height: 100%;
+  transition: width 0.3s;
+}
+.real-seg--close {
+  background: #43a047;
+}
+.real-seg--batal {
+  background: #e53935;
+}
+.real-seg--open {
+  background: #90caf9;
+}
+.real-pct {
+  font-size: 10px;
+  font-weight: 700;
+  color: #2e7d32;
+  min-width: 28px;
+  text-align: right;
+}
+
+.real-detail {
+  display: flex;
+  gap: 8px;
+  font-size: 10px;
+}
+.rd-close {
+  color: #2e7d32;
+}
+.rd-batal {
+  color: #c62828;
+}
+.rd-open {
+  color: #1565c0;
+}
+
+.real-legend {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  font-size: 10px;
+  color: #757575;
+  border-top: 1px solid #f0f0f0;
+  background: #fafafa;
+}
+.leg-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 3px;
+}
+.leg-close {
+  background: #43a047;
+  margin-left: 8px;
+}
+.leg-batal {
+  background: #e53935;
+  margin-left: 8px;
+}
+.leg-open {
+  background: #90caf9;
+  margin-left: 8px;
+}
+
+/* ── Dialog SPK ── */
 .spk-dialog-card {
   display: flex;
   flex-direction: column;
   max-height: 88vh;
   overflow: hidden;
 }
-
-/* ── Dialog Header ── */
 .spk-header {
   background: linear-gradient(135deg, #c62828 0%, #e53935 100%);
   padding: 12px 16px;
@@ -345,34 +1014,28 @@ const sisaClass = (item: any): string => {
   font-size: 14px;
   font-weight: 700;
   color: white;
-  line-height: 1.3;
 }
 .spk-header-sub {
   font-size: 11px;
   color: rgba(255, 255, 255, 0.8);
   margin-top: 1px;
 }
-
-/* ── Tabel ── */
 .spk-table-wrap {
   flex: 1;
   overflow-y: auto;
-  overflow-x: hidden; /* tidak ada scroll horizontal */
+  overflow-x: hidden;
 }
-
 .spk-table {
   width: 100%;
   border-collapse: collapse;
-  table-layout: fixed; /* KUNCI: lebar kolom dikontrol, tidak auto-expand */
+  table-layout: fixed;
 }
-
 .spk-table thead tr {
   background: #f5f5f5;
   position: sticky;
   top: 0;
   z-index: 1;
 }
-
 .spk-table th {
   padding: 8px 10px;
   font-size: 11px;
@@ -387,13 +1050,11 @@ const sisaClass = (item: any): string => {
 .spk-table th.col-num {
   text-align: right;
 }
-
 .spk-table td {
   padding: 6px 10px;
   font-size: 12px;
   color: #212121;
   border-bottom: 1px solid #f0f0f0;
-  /* overflow hidden + ellipsis agar teks panjang tidak jebol kolom */
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -401,22 +1062,18 @@ const sisaClass = (item: any): string => {
 .spk-table td.col-num {
   text-align: right;
 }
-
-/* Izinkan kolom nama wrap teks */
 .spk-table td.col-nama {
   white-space: normal !important;
   overflow: visible !important;
   text-overflow: unset !important;
   word-break: break-word;
 }
-
-/* Lebar kolom — total harus <= 960px */
 .col-spk {
   width: 130px;
 }
 .col-nama {
   width: auto;
-} /* sisanya untuk nama */
+}
 .col-customer {
   width: 110px;
 }
@@ -438,27 +1095,21 @@ const sisaClass = (item: any): string => {
 .col-ws {
   width: 110px;
 }
-
-/* Row states */
 .row-overdue td {
-  background-color: #fff5f5;
+  background: #fff5f5;
 }
 .row-today td {
-  background-color: #fffde7;
+  background: #fffde7;
 }
 .spk-table tbody tr:hover td {
-  background-color: #e8f4fd !important;
+  background: #e8f4fd !important;
 }
-
-/* SPK badge */
 .spk-badge {
   font-family: monospace;
   font-size: 11px;
   font-weight: 600;
   color: #1565c0;
 }
-
-/* Dateline badge */
 .dl-badge {
   display: inline-block;
   padding: 2px 7px;
@@ -476,8 +1127,6 @@ const sisaClass = (item: any): string => {
   background: #fff8e1;
   color: #f57f17;
 }
-
-/* ── Footer ── */
 .spk-footer {
   display: flex;
   align-items: center;
@@ -506,8 +1155,6 @@ const sisaClass = (item: any): string => {
 .legend-dot.today {
   background: #ffe082;
 }
-
-/* Sisa qty classes */
 .val-danger {
   color: #c62828;
   font-weight: 700;

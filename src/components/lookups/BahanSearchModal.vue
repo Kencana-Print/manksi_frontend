@@ -19,6 +19,7 @@ const props = defineProps<{
   modelValue: boolean;
   isBordir?: boolean;
   mode?: "komponen" | "all"; // Tambahkan ini
+  mkbFilter?: string;
 }>();
 const emit = defineEmits(["update:modelValue", "selected"]);
 
@@ -46,6 +47,7 @@ const fetchData = async () => {
         limit: itemsPerPage.value,
         isBordir: props.isBordir,
         mode: props.mode,
+        mkb: props.mkbFilter,
       },
     });
     // Pastikan mapping data sesuai dengan res.data.data.items

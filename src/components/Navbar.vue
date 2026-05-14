@@ -52,6 +52,7 @@ import {
   IconAlertCircle,
   IconFileDescription,
   IconShoppingCartCopy,
+  IconReportAnalytics,
 } from "@tabler/icons-vue";
 
 interface NavItem {
@@ -220,12 +221,12 @@ const menuItems: NavItem[] = [
         menuId: 35,
       },
       { title: "Obat", to: "/daftar/obat", icon: IconFlask, menuId: 24 },
-      {
-        title: "Aset Perusahaan",
-        to: "/daftar/aset-perusahaan",
-        icon: IconBuildingBank,
-        menuId: 38,
-      },
+      // {
+      //   title: "Aset Perusahaan",
+      //   to: "/daftar/aset-perusahaan",
+      //   icon: IconBuildingBank,
+      //   menuId: 38,
+      // },
       {
         title: "Komponen",
         to: "/daftar/komponen",
@@ -293,14 +294,10 @@ const menuItems: NavItem[] = [
         menuId: 51,
       },
       {
-        title: "Pesanan Pembelian",
-        to: "/pembelian/pesanan",
+        title: "PO Bahan",
+        to: "/pembelian/po-bahan",
         icon: IconFileText,
-      },
-      {
-        title: "Penerimaan Barang",
-        to: "/pembelian/terima",
-        icon: IconTruckDelivery,
+        menuId: 52,
       },
     ],
   },
@@ -349,9 +346,9 @@ const menuItems: NavItem[] = [
           { divider: true },
           {
             title: "BPB",
-            to: "/garmen/bahan/bpb",
+            to: "/garmen/bahan-baku/bpb-bahan",
             icon: IconTruckDelivery,
-            menuId: 109,
+            menuId: 101,
           },
           {
             title: "Retur Pembelian",
@@ -411,9 +408,9 @@ const menuItems: NavItem[] = [
           },
           {
             title: "Minta Pembelian",
-            to: "/garmen/barang/minta-beli",
+            to: "/garmen/barang/permintaan-pembelian",
             icon: IconShoppingCart,
-            menuId: 118,
+            menuId: 65,
           },
           {
             title: "PO",
@@ -464,12 +461,6 @@ const menuItems: NavItem[] = [
         ],
       },
       { divider: true },
-      { title: "SPK Garmen", to: "/garmen/spk", icon: IconFileText },
-      {
-        title: "Progress Produksi",
-        to: "/garmen/progress",
-        icon: IconChartLine,
-      },
       { divider: true },
       {
         title: "Cetak BAST",
@@ -565,13 +556,21 @@ const menuItems: NavItem[] = [
     items: [
       {
         title: "Laporan Penjualan",
-        to: "/laporan/penjualan",
         icon: IconChartBar,
-      },
-      {
-        title: "Laporan Pembelian",
-        to: "/laporan/pembelian",
-        icon: IconChartLine,
+        menuId: 965, // <-- Sesuai instruksi Anda (ID 965)
+        subItems: [
+          {
+            title: "Penawaran vs SPK",
+            to: "/laporan/penjualan/penawaran-vs-spk",
+            icon: IconReportAnalytics,
+            menuId: 301,
+          },
+          {
+            title: "Realisasi Penawaran",
+            to: "/laporan/penjualan/realisasi-penawaran",
+            icon: IconReportAnalytics,
+          },
+        ],
       },
     ],
   },

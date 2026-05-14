@@ -212,6 +212,8 @@ const emit = defineEmits([
 }
 .right-column {
   flex-grow: 1;
+  overflow: hidden;
+  min-width: 0;
 }
 
 :deep(.desktop-form-section) {

@@ -6,6 +6,7 @@ import { useAuthStore } from "@/stores/authStore";
 import BaseBrowse from "@/components/BaseBrowse.vue";
 import { useBrowse } from "@/composables/useBrowse";
 import { salesOrderService } from "@/services/penjualan/salesOrderService";
+import { salesOrderFormService } from "@/services/penjualan/salesOrderFormService";
 import CustomerSearchModal from "@/components/lookups/CustomerSearchModal.vue";
 import {
   IconShoppingCartCopy,
@@ -21,6 +22,8 @@ import {
   IconX,
   IconLockSquare,
   IconPalette,
+  IconLayoutSidebarRight,
+  IconLayoutSidebarRightCollapse,
 } from "@tabler/icons-vue";
 
 const authStore = useAuthStore();
@@ -53,6 +56,12 @@ const pendingDesigns = ref<any[]>([]);
 const selectedDesigns = ref<any[]>([]);
 const isDesignLoading = ref(false);
 const isDesignSaving = ref(false);
+
+// --- STATE & HANDLER DIALOG CETAK ---
+const showPrintDialog = ref(false);
+const nomorToPrint = ref("");
+const printWithAlokasi = ref(false);
+const hasAlokasi = ref(false);
 
 const {
   items,
@@ -276,10 +285,74 @@ const onDelete = async (item: any) => {
   }
 };
 
+// Fungsi trigger membuka modal cetak
+const openPrintDialog = async (item: any) => {
+  if (!item) return;
+
+  if (item.Aktif === "N") {
+    toast.warning("SO tersebut statusnya pasif.\nTidak bisa dicetak.");
+    return;
+  }
+
+  const isMarketing = authStore.user?.bagian?.toUpperCase() === "MARKETING";
+
+  if (!isMarketing) {
+    if (item.AccPending === "N") {
+      toast.warning("SO tersebut statusnya Pending.\nTidak bisa dicetak.");
+      return;
+    }
+    if (!item.CMO || String(item.CMO).trim() === "") {
+      toast.warning(
+        "SO tersebut belum diapprove oleh Chief Marketing.\nTidak bisa dicetak.",
+      );
+      return;
+    }
+  }
+
+  nomorToPrint.value = item.Nomor;
+  printWithAlokasi.value = false;
+  hasAlokasi.value = false;
+
+  // 👇 MENGINTIP DETAIL KE BACKEND UNTUK MENGECEK ALOKASI 👇
+  try {
+    const res = await salesOrderFormService.getDetail(item.Nomor);
+    const alokasiData = res.data?.data?.alokasi || [];
+
+    // Cek apakah array alokasi benar-benar ada isinya (kota/alamat tidak kosong)
+    hasAlokasi.value =
+      alokasiData.length > 0 &&
+      alokasiData.some((a: any) => a.kota || a.alamat);
+  } catch (error) {
+    console.error("Gagal mengecek data alokasi", error);
+  }
+  // 👆 SAMPAI SINI 👆
+
+  showPrintDialog.value = true;
+};
+
+// Tombol Cetak dari atas tabel
 const onPrint = () => {
   if (!selectedItem.value) return;
+  openPrintDialog(selectedItem.value); // Kirim seluruh objek item untuk divalidasi
+};
+
+const onPrintRow = (item: any) => {
+  openPrintDialog(item);
+};
+
+// Aksi eksekusi layout ke tab baru
+const pilihCetakVertikal = () => {
+  showPrintDialog.value = false;
   window.open(
-    `/penjualan/sales-order/print/${encodeURIComponent(selectedItem.value.Nomor)}`,
+    `/penjualan/sales-order/print/${encodeURIComponent(nomorToPrint.value)}?layout=vertikal&alokasi=${printWithAlokasi.value}`,
+    "_blank",
+  );
+};
+
+const pilihCetakHorizontal = () => {
+  showPrintDialog.value = false;
+  window.open(
+    `/penjualan/sales-order/print/${encodeURIComponent(nomorToPrint.value)}?layout=horizontal&alokasi=${printWithAlokasi.value}`,
     "_blank",
   );
 };
@@ -319,14 +392,14 @@ const submitPin = async () => {
 const onApproveSpk = async () => {
   if (!selectedItem.value) return;
   if (
-    confirm(`Yakin ingin menyetujui (Approve) SPK ${selectedItem.value.Nomor}?`)
+    confirm(`Yakin ingin menyetujui (Approve) SO ${selectedItem.value.Nomor}?`)
   ) {
     try {
       await salesOrderService.approveCmo(selectedItem.value.Nomor);
-      toast.success("SPK berhasil di-approve.");
+      toast.success("SO berhasil di-approve.");
       fetchData();
     } catch (e: any) {
-      toast.error(e.response?.data?.message || "Gagal approve SPK.");
+      toast.error(e.response?.data?.message || "Gagal approve SO.");
     }
   }
 };
@@ -350,37 +423,37 @@ const submitCloseSpk = async () => {
       isClose: true,
       alasan: alasanClose.value,
     });
-    toast.success("SPK berhasil diclose.");
+    toast.success("SO berhasil diclose.");
     showCloseSpkDialog.value = false;
     fetchData();
   } catch (e: any) {
-    toast.error(e.response?.data?.message || "Gagal close SPK.");
+    toast.error(e.response?.data?.message || "Gagal close SO.");
   }
 };
 
 const onBatalCloseSpk = async () => {
   if (!selectedItem.value) return;
   if (selectedItem.value.Status === "Open")
-    return toast.warning("SPK ini belum Close. Tidak perlu dibatalkan.");
+    return toast.warning("SO ini belum Close. Tidak perlu dibatalkan.");
   if (
     selectedItem.value.Status === "Closed" &&
     !selectedItem.value.AlasanClose
   ) {
     return toast.warning(
-      "SPK ini diclose Otomatis. Tidak bisa dibatalkan manual.",
+      "SO ini diclose Otomatis. Tidak bisa dibatalkan manual.",
     );
   }
 
   if (
     confirm(
-      `Yakin ingin membatalkan Close untuk SPK ${selectedItem.value.Nomor}?`,
+      `Yakin ingin membatalkan Close untuk SO ${selectedItem.value.Nomor}?`,
     )
   ) {
     try {
       await salesOrderService.toggleClose(selectedItem.value.Nomor, {
         isClose: false,
       });
-      toast.success("Close SPK berhasil dibatalkan.");
+      toast.success("Close SO berhasil dibatalkan.");
       fetchData();
     } catch (e: any) {
       toast.error(e.response?.data?.message || "Gagal membatalkan close.");
@@ -409,9 +482,7 @@ const openDesignDialog = async () => {
 
 const submitDesignStatus = async () => {
   if (selectedDesigns.value.length === 0) {
-    return toast.warning(
-      "Pilih minimal satu SPK yang desainnya sudah selesai.",
-    );
+    return toast.warning("Pilih minimal satu SO yang desainnya sudah selesai.");
   }
 
   isDesignSaving.value = true;
@@ -886,6 +957,55 @@ const formatWaktu = (v: string) => {
         >
           Simpan Ceklis
         </v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
+
+  <v-dialog v-model="showPrintDialog" max-width="450px">
+    <v-card class="rounded-lg">
+      <v-card-title class="bg-primary text-white d-flex align-center pa-3">
+        <IconPrinter :size="18" class="mr-2" />
+        <span class="text-subtitle-1 font-weight-bold"
+          >Cetak Surat Perintah Kerja</span
+        >
+      </v-card-title>
+      <v-card-text class="pa-4 text-center">
+        <div class="text-body-1 mb-4 text-grey-darken-3">
+          Pilih orientasi cetak untuk SPK <b>{{ nomorToPrint }}</b
+          >:
+        </div>
+
+        <div v-if="hasAlokasi" class="d-flex justify-center mb-4">
+          <v-checkbox
+            v-model="printWithAlokasi"
+            label="Cetak Dengan Alokasi Pengiriman?"
+            color="primary"
+            hide-details
+            density="compact"
+          ></v-checkbox>
+        </div>
+
+        <div class="d-flex flex-column gap-2">
+          <v-btn color="primary" variant="flat" @click="pilihCetakVertikal">
+            <template #prepend><IconLayoutSidebarRight :size="15" /></template>
+            Cetak Vertikal (Portrait Image)
+          </v-btn>
+          <v-btn color="info" variant="tonal" @click="pilihCetakHorizontal">
+            <template #prepend
+              ><IconLayoutSidebarRightCollapse :size="15"
+            /></template>
+            Cetak Horizontal (Landscape Image)
+          </v-btn>
+        </div>
+      </v-card-text>
+      <v-card-actions class="pa-3 border-t bg-grey-lighten-4">
+        <v-btn
+          variant="text"
+          color="grey-darken-1"
+          @click="showPrintDialog = false"
+          >Batal</v-btn
+        >
+        <v-spacer></v-spacer>
       </v-card-actions>
     </v-card>
   </v-dialog>

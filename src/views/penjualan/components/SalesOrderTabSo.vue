@@ -1,8 +1,14 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
-import { IconUpload, IconMaximize, IconPhoto } from "@tabler/icons-vue";
+import { computed, ref, watch } from "vue";
+import {
+  IconUpload,
+  IconMaximize,
+  IconPhoto,
+  IconExclamationCircle,
+} from "@tabler/icons-vue";
 import { useToast } from "vue-toastification";
 import { useAuthStore } from "@/stores/authStore";
+import api from "@/services/api";
 
 const props = defineProps<{
   formData: any;
@@ -24,6 +30,7 @@ const emit = defineEmits([
   "open-fullscreen",
   "field-blur",
   "confirm-uncheck-cmo",
+  "switch-tab",
 ]);
 const toast = useToast();
 const authStore = useAuthStore();
@@ -39,6 +46,10 @@ const isDivisiSatuAtauLima = computed(() => {
 const tipeSpkOptions = ["", "Premium", "Medium", "Reguler"];
 const pendingOptions = ["NORMAL", "PENDING SEBAGIAN", "PENDING PENUH"];
 
+const showPreviewDialog = ref(false);
+
+const isImageError = ref(false);
+
 const fileRef = ref<HTMLInputElement | null>(null);
 const displayImageUrl = computed(() => {
   if (props.formData.MainImageBlob) return props.formData.MainImageBlob;
@@ -50,15 +61,26 @@ const displayImageUrl = computed(() => {
   return `http://103.94.238.252:8888/file-gambar/${encodeURIComponent(props.formData.spk_nomor)}.jpg`;
 });
 
+const onImageError = () => {
+  isImageError.value = true;
+};
+
 const onFileChange = (e: Event) => {
   const file = (e.target as HTMLInputElement).files?.[0];
   if (!file) return;
+  // Di Delphi maksimal 1 MB
   if (file.size > 1_000_000) {
     toast.error("Ukuran gambar tidak boleh > 1 Mb.");
     return;
   }
+
+  isImageError.value = false;
+
+  // Update state lokal untuk Preview (URL Blob sementara)
   props.formData.MainImageName = file.name;
   props.formData.MainImageBlob = URL.createObjectURL(file);
+
+  // Lepmpar file aslinya ke Komponen Induk (SalesOrderFormView.vue)
   emit("upload-main", file);
 };
 
@@ -71,6 +93,231 @@ const toggleCmo = () => {
     emit("confirm-uncheck-cmo");
   }
 };
+
+const handleJumlahBlur = () => {
+  const qty = Number(props.formData.spk_jumlah) || 0;
+  const mppb = Number(props.formData.jmlmppb) || 0;
+
+  // Peringatan Beda MPPB
+  if (props.formData.spk_mppb && mppb !== 0 && qty !== 0 && qty !== mppb) {
+    toast.warning(
+      `Jumlah SPK beda dengan jumlah di MPPB.\nJumlah di MPPB = ${mppb}`,
+      { timeout: 8000 },
+    );
+  }
+
+  // Auto-Navigasi Tab
+  const divStr = String(props.formData.spk_divisi).charAt(0);
+  if ((divStr === "3" || divStr === "4" || divStr === "6") && qty > 0) {
+    emit("switch-tab", 2); // Pindah ke Tab Kaosan/Detail Size
+  }
+};
+
+const handlePinJoClick = () => {
+  if (authStore.user?.cabangKaos === "KDC") {
+    const isAcc = confirm(
+      "Akan di ACC Jenis Order ini?\n\nOK = Acc\nBatal = Tolak",
+    );
+    if (isAcc) {
+      props.formData.spk_pinjo = "ACC";
+      toast.success(
+        "ACC Jenis Order berhasil. Lakukan simpan data untuk melanjutkan.",
+      );
+    } else {
+      const isTolak = confirm("Tolak Jenis Order ini?");
+      if (isTolak) {
+        props.formData.spk_pinjo = "TOLAK";
+        toast.info("Tolak Jenis Order. Lakukan simpan data untuk melanjutkan.");
+      }
+    }
+  } else {
+    toast.error("Akses Ditolak: Hanya cabang KDC yang berhak ACC Jenis Order.");
+  }
+};
+
+const pendingAccDisplay = computed(() => {
+  if (props.formData.spk_pending === "NORMAL") return "";
+  if (props.formData.spk_accpending === "ACC") return "ACC";
+  if (props.formData.spk_accpending === "N") return "TOLAK";
+  return "MINTA ACC";
+});
+
+const handleAccPendingClick = () => {
+  if (props.formData.spk_pending !== "NORMAL") {
+    if (authStore.user?.bagian?.toUpperCase() !== "MARKETING") {
+      toast.error("Hanya CMO (Marketing) yang boleh ACC Pending.");
+      return;
+    }
+    const isAcc = confirm(
+      "Akan di ACC status Pending ini?\n\nOK = Acc\nCancel = Tidak Acc",
+    );
+    if (isAcc) {
+      props.formData.spk_accpending = "ACC";
+      toast.success(
+        "ACC Pending berhasil. Lakukan simpan data untuk melanjutkan.",
+      );
+    } else {
+      props.formData.spk_accpending = "N";
+      toast.info(
+        "Status ACC Pending ditolak. Lakukan simpan data untuk melanjutkan.",
+      );
+    }
+  }
+};
+
+// Tambahkan helper ini untuk menambah hari pada YYYY-MM-DD
+const addDaysToDate = (dateStr: string, days: number) => {
+  if (!dateStr) return "";
+  const d = new Date(dateStr);
+  d.setDate(d.getDate() + days);
+
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+// --- WATCHER AUTO-DATELINE (MIGRASI DELPHI) ---
+watch(
+  [
+    () => props.formData.spk_tanggal,
+    () => props.formData.spk_divisi,
+    () => props.formData.spk_jo_kode,
+    () => props.formData.spk_statuskerja, // Kepentingan
+    () => props.formData.spk_dateline, // User ganti dateline manual
+  ],
+  async ([tglSpk, divisi, joKode, kepentingan, userDateline], oldVals) => {
+    // Hindari eksekusi jika data utama belum lengkap
+    if (!tglSpk || !divisi || !kepentingan) return;
+
+    try {
+      // Panggil API Backend (Ganti path sesuai nama endpoint yg Anda buat)
+      const res = await api.get("/penjualan/sales-order/form/dateline-limits", {
+        params: { divisi, joKode, kepentingan },
+      });
+
+      const { minHari, maxHari, isKebal } = res.data.data;
+
+      // Jika ada status pengecualian (seperti kaosan maklun), skip koreksi
+      if (isKebal) return;
+
+      const dateSpk = new Date(String(tglSpk)).getTime();
+      const dateDateline = new Date(String(userDateline)).getTime();
+
+      const minDate = dateSpk + minHari * 86400000; // ms dalam 1 hari
+      const maxDate = dateSpk + maxHari * 86400000;
+
+      // KOREKSI OTOMATIS: Jika terlalu cepat atau terlalu lambat
+      if (dateDateline < minDate || dateDateline > maxDate) {
+        // Otomatis kembalikan ke batas maksimal yang diizinkan
+        const correctedDate = addDaysToDate(String(tglSpk), maxHari);
+
+        // Cek agar tidak terjadi infinite loop
+        if (props.formData.spk_dateline !== correctedDate) {
+          props.formData.spk_dateline = correctedDate;
+          toast.info(
+            `Dateline disesuaikan otomatis menjadi batas maksimal (${maxHari} hari) sesuai aturan SLA.`,
+          );
+        }
+      }
+    } catch (e) {
+      console.error("Gagal menarik aturan Dateline", e);
+    }
+  },
+  { deep: false },
+);
+
+watch(
+  () => props.formData.spk_pending,
+  (newStatus) => {
+    if (newStatus === "NORMAL") {
+      props.formData.spk_ppotong = "N";
+      props.formData.spk_pcetak = "N";
+      props.formData.spk_pbordir = "N";
+      props.formData.spk_pjahit = "N";
+      props.formData.spk_pfinishing = "N";
+      props.formData.spk_ketpending = "";
+    } else if (newStatus === "PENDING PENUH") {
+      props.formData.spk_ppotong = "Y";
+      props.formData.spk_pcetak = "Y";
+      props.formData.spk_pbordir = "Y";
+      props.formData.spk_pjahit = "Y";
+      props.formData.spk_pfinishing = "Y";
+    }
+  },
+);
+
+watch(
+  () => props.formData.spk_ketpo,
+  (newKet) => {
+    if (!newKet) {
+      props.formData.ketpo_acc = "";
+      return;
+    }
+    const selectedOption = props.lookupOptions.ketPo.find(
+      (opt) => opt.ket === newKet,
+    );
+    if (selectedOption && selectedOption.acc === "Y") {
+      props.formData.ketpo_acc = "MINTA ACC";
+      props.formData.spk_aktif = "N";
+    } else {
+      props.formData.ketpo_acc = "";
+    }
+  },
+);
+
+// --- MIGRASI: cbbstatuskerjaChange (Validasi Kepentingan) ---
+watch(
+  () => props.formData.spk_statuskerja,
+  async (newStatus, oldStatus) => {
+    // 1. Cek apakah Customer sudah diisi
+    const isDiv3 = String(props.formData.spk_divisi).startsWith("3");
+    const custKode = isDiv3
+      ? props.formData.spk_cus_kaosan
+      : props.formData.spk_cus_kode;
+
+    if (!custKode && newStatus !== "STANDART") {
+      toast.warning(
+        "Customer silahkan di isi dulu sebelum mengubah tingkat kepentingan.",
+      );
+      props.formData.spk_statuskerja = "STANDART"; // Kembalikan ke Standart
+      return;
+    }
+
+    // 2. Validasi Khusus TOP URGENT (Bukan Kaosan & Bukan Jenis KS)
+    if (
+      newStatus === "TOP URGENT" &&
+      !isDiv3 &&
+      props.formData.spk_jo_kode !== "KS"
+    ) {
+      try {
+        const res = await api.get(
+          "/penjualan/sales-order/form/check-top-urgent",
+          {
+            params: { cusKode: custKode, divisi: props.formData.spk_divisi },
+          },
+        );
+
+        if (res.data.berhak) {
+          props.formData.kepentingan_acc = ""; // Aman
+        } else {
+          props.formData.kepentingan_acc = "MINTA ACC";
+          props.formData.spk_aktif = "N"; // Mengikuti logika Timer1Timer
+          toast.warning(
+            "Status Customer belum mencapai syarat TOP URGENT. Membutuhkan ACC.",
+          );
+        }
+      } catch (error) {
+        console.error("Gagal mengecek hak prioritas", error);
+      }
+    } else {
+      // Jika bukan TOP URGENT, hapus status ACC jika tidak dikunci
+      if (props.formData.kepentingan_acc !== "ACC") {
+        props.formData.kepentingan_acc = "";
+      }
+    }
+  },
+);
 </script>
 
 <template>
@@ -85,6 +332,7 @@ const toggleCmo = () => {
             v-model="formData.spk_divisi"
             class="inp sel"
             style="width: 165px"
+            :disabled="isEdit"
           >
             <option
               v-for="d in lookupOptions.divisi"
@@ -152,6 +400,7 @@ const toggleCmo = () => {
             v-model="formData.spk_tanggal"
             class="idate"
             style="width: 140px"
+            :disabled="isEdit"
           />
           <label class="lbl ml-2" style="width: 55px">Created</label>
           <input
@@ -175,11 +424,16 @@ const toggleCmo = () => {
         <!-- Perusahaan / Repeat dari SPK -->
         <div class="fr">
           <label class="lbl">Perusahaan</label>
-          <div class="igrp" style="width: 335px">
+          <div
+            class="igrp"
+            style="width: 335px"
+            :class="{ 'bg-grey-lighten-3': isEdit }"
+          >
             <input
               v-model="formData.spk_perush_kode"
               class="inp"
               style="width: 60px; background: #ddeeff"
+              :disabled="isEdit"
             />
             <input
               :value="formData.NamaPerusahaan"
@@ -191,12 +445,13 @@ const toggleCmo = () => {
               type="button"
               class="blkp"
               @mousedown.prevent="$emit('open-lookup', 'perusahaan')"
+              :disabled="isEdit"
             >
               &#128269;
             </button>
           </div>
           <label class="lbl ml-2" style="width: 110px">Repeat Dari SPK</label>
-          <div class="igrp" style="flex: 1">
+          <div class="igrp" style="width: 180px">
             <input v-model="formData.spk_repeat" class="inp" style="flex: 1" />
             <button
               type="button"
@@ -238,6 +493,7 @@ const toggleCmo = () => {
             v-model="formData.cus_perfect"
             class="inp sel"
             style="width: 55px"
+            :disabled="isEdit"
           >
             <option value="Y">Y</option>
             <option value="N">N</option>
@@ -245,36 +501,48 @@ const toggleCmo = () => {
         </div>
 
         <!-- Cust Kaosan (divisi 3 saja) -->
-        <div class="fr" v-if="isDivisiTiga">
-          <label class="lbl">Cust Kaosan</label>
-          <div class="igrp" style="width: 335px">
-            <input
-              v-model="formData.spk_cus_kaosan"
-              class="inp"
-              style="width: 60px; background: #ddeeff"
-            />
-            <input
-              :value="formData.CustKaosanNama"
-              readonly
-              class="inp ro"
-              style="flex: 1"
-            />
-            <button
-              type="button"
-              class="blkp"
-              @mousedown.prevent="$emit('open-lookup', 'custKaosan')"
-            >
-              &#128269;
-            </button>
-          </div>
+        <div class="fr">
+          <template v-if="isDivisiTiga">
+            <label class="lbl">Cust Kaosan</label>
+            <div class="igrp" style="width: 335px">
+              <input
+                v-model="formData.spk_cus_kaosan"
+                class="inp"
+                style="width: 60px; background: #ddeeff"
+              />
+              <input
+                :value="formData.CustKaosanNama"
+                readonly
+                class="inp ro"
+                style="flex: 1"
+              />
+              <button
+                type="button"
+                class="blkp"
+                @mousedown.prevent="$emit('open-lookup', 'custKaosan')"
+              >
+                &#128269;
+              </button>
+            </div>
+          </template>
+
+          <template v-else>
+            <div style="width: 415px"></div>
+          </template>
+
           <label class="lbl ml-auto text-grey" style="width: 80px"
             >Pin Customer</label
           >
           <input
             v-model="formData.pin_customer"
             readonly
-            class="inp ro text-center"
-            style="width: 50px"
+            class="inp ro text-center font-weight-bold"
+            style="width: 55px"
+            :style="
+              formData.pin_customer !== 'N'
+                ? 'background: #ffeb3b !important; color: #c62828 !important;'
+                : ''
+            "
           />
         </div>
 
@@ -282,15 +550,19 @@ const toggleCmo = () => {
 
         <!-- Referensi + Stok DC berdampingan -->
         <div class="fr align-start">
-          <!-- Referensi kiri -->
           <div class="ref-col">
             <div class="fr">
               <label class="lbl">Jenis Order</label>
-              <div class="igrp" style="width: 255px">
+              <div
+                class="igrp"
+                style="width: 255px"
+                :class="{ 'bg-grey-lighten-3': isEdit }"
+              >
                 <input
                   v-model="formData.spk_jo_kode"
                   class="inp"
                   style="width: 50px; background: #ddeeff"
+                  :disabled="isEdit"
                 />
                 <input
                   :value="formData.JenisOrder"
@@ -302,9 +574,25 @@ const toggleCmo = () => {
                   type="button"
                   class="blkp"
                   @mousedown.prevent="$emit('open-lookup', 'jenisOrder')"
+                  :disabled="isEdit"
                 >
                   &#128269;
                 </button>
+              </div>
+              <div
+                v-if="formData.spk_pinjo"
+                class="ml-2 d-flex align-center"
+                style="
+                  color: #d32f2f;
+                  font-weight: 700;
+                  font-size: 11px;
+                  cursor: pointer;
+                "
+                @click="handlePinJoClick"
+                title="Klik untuk ACC (Khusus KDC)"
+              >
+                <IconExclamationCircle :size="14" class="mr-1" />
+                {{ formData.spk_pinjo }}
               </div>
             </div>
             <div class="fr">
@@ -322,6 +610,14 @@ const toggleCmo = () => {
                   {{ o }}
                 </option>
               </select>
+              <div
+                v-if="formData.kepentingan_acc"
+                class="ml-2 d-flex align-center"
+                style="color: #d32f2f; font-weight: 700; font-size: 11px"
+              >
+                <IconExclamationCircle :size="14" class="mr-1" />
+                {{ formData.kepentingan_acc }}
+              </div>
             </div>
             <div class="fr">
               <label class="lbl">No. Penawaran</label>
@@ -407,7 +703,7 @@ const toggleCmo = () => {
             </div>
           </div>
 
-          <!-- Stok DC fieldset — langsung di kanan referensi -->
+          <!-- Stok DC fieldset -->
           <div class="fieldset-box ml-2" style="width: 262px; flex-shrink: 0">
             <div class="fieldset-legend">Ambil stok dari Gudang DC</div>
             <div class="fr" style="justify-content: center; margin-top: 4px">
@@ -431,6 +727,13 @@ const toggleCmo = () => {
                   &#128269;
                 </button>
               </div>
+              <span
+                v-if="!isDivisiTiga && formData.jmlinvdc > 0"
+                class="ml-2 font-weight-bold text-primary"
+                style="font-size: 11px"
+              >
+                {{ formData.jmlinvdc.toLocaleString("id-ID") }}
+              </span>
             </div>
             <div class="fr mt-2">
               <label class="lbl" style="width: 85px">Nomor PO</label>
@@ -511,61 +814,58 @@ const toggleCmo = () => {
             type="number"
             class="inp text-right"
             style="width: 110px"
+            @blur="handleJumlahBlur"
           />
         </div>
 
         <!-- Ukuran -->
         <div class="fr">
-          <label class="lbl">Ukuran</label>
-          <input
-            v-model="formData.spk_ukuran"
-            class="inp"
-            style="width: 110px"
-          />
           <template v-if="isDivisiSatuAtauLima">
-            <!-- Panjang: native select + fallback input jika tidak ada di list -->
-            <select
+            <label class="lbl">Ukuran</label>
+            <v-combobox
               v-model="formData.spk_panjang"
-              class="inp sel ml-1"
-              style="width: 75px"
-            >
-              <option value="">-</option>
-              <option v-for="o in lookupOptions.panjang" :key="o" :value="o">
-                {{ o }}
-              </option>
-            </select>
+              :items="lookupOptions.panjang"
+              variant="outlined"
+              density="compact"
+              hide-details
+              class="f-vselect"
+              style="width: 80px"
+            />
             <span class="mx-1 sep-txt">X</span>
-            <select
+            <v-combobox
               v-model="formData.spk_lebar"
-              class="inp sel"
-              style="width: 75px"
-            >
-              <option value="">-</option>
-              <option v-for="o in lookupOptions.lebar" :key="o" :value="o">
-                {{ o }}
-              </option>
-            </select>
+              :items="lookupOptions.lebar"
+              variant="outlined"
+              density="compact"
+              hide-details
+              class="f-vselect"
+              style="width: 80px"
+            />
             <span class="ml-1 sep-txt">Mtr</span>
+
+            <label class="lbl ml-2" style="width: 80px">Ket. Ukuran</label>
+            <input v-model="formData.spk_ukuran" class="inp" style="flex: 1" />
           </template>
-          <label class="lbl ml-2" style="width: 80px">Ket. Ukuran</label>
-          <input v-model="formData.KetUkuran" class="inp" style="flex: 1" />
+
+          <template v-else>
+            <label class="lbl">Ket. Ukuran</label>
+            <input v-model="formData.spk_ukuran" class="inp" style="flex: 1" />
+          </template>
         </div>
 
         <!-- Gramasi -->
         <div class="fr">
           <label class="lbl">Gramasi</label>
-          <template v-if="isDivisiSatuAtauLima">
-            <select
-              v-model="formData.spk_gramasi"
-              class="inp sel"
-              style="width: 260px"
-            >
-              <option value="">-</option>
-              <option v-for="o in lookupOptions.gramasi" :key="o" :value="o">
-                {{ o }}
-              </option>
-            </select>
-          </template>
+          <v-combobox
+            v-if="isDivisiSatuAtauLima"
+            v-model="formData.spk_gramasi"
+            :items="lookupOptions.gramasi"
+            variant="outlined"
+            density="compact"
+            hide-details
+            class="f-vselect"
+            style="max-width: 300px"
+          />
           <input
             v-else
             v-model="formData.spk_gramasi"
@@ -577,18 +877,16 @@ const toggleCmo = () => {
         <!-- Kain -->
         <div class="fr">
           <label class="lbl">Kain</label>
-          <template v-if="isDivisiSatuAtauLima">
-            <select
-              v-model="formData.spk_kain"
-              class="inp sel"
-              style="flex: 1; max-width: 420px"
-            >
-              <option value="">-</option>
-              <option v-for="o in lookupOptions.kain" :key="o" :value="o">
-                {{ o }}
-              </option>
-            </select>
-          </template>
+          <v-combobox
+            v-if="isDivisiSatuAtauLima"
+            v-model="formData.spk_kain"
+            :items="lookupOptions.kain"
+            variant="outlined"
+            density="compact"
+            hide-details
+            class="f-vselect"
+            style="flex: 1; max-width: 420px"
+          />
           <input
             v-else
             v-model="formData.spk_kain"
@@ -600,18 +898,16 @@ const toggleCmo = () => {
         <!-- Finishing -->
         <div class="fr">
           <label class="lbl">Finishing</label>
-          <template v-if="isDivisiSatuAtauLima">
-            <select
-              v-model="formData.spk_finishing"
-              class="inp sel"
-              style="flex: 1; max-width: 420px"
-            >
-              <option value="">-</option>
-              <option v-for="o in lookupOptions.finishing" :key="o" :value="o">
-                {{ o }}
-              </option>
-            </select>
-          </template>
+          <v-combobox
+            v-if="isDivisiSatuAtauLima"
+            v-model="formData.spk_finishing"
+            :items="lookupOptions.finishing"
+            variant="outlined"
+            density="compact"
+            hide-details
+            class="f-vselect"
+            style="flex: 1; max-width: 420px"
+          />
           <input
             v-else
             v-model="formData.spk_finishing"
@@ -678,141 +974,29 @@ const toggleCmo = () => {
           </div>
         </div>
 
-        <!-- Bag Desain / Design Baru / Tgl Acc Proof / Dateline SPK / Ket.PO / SPK Lama -->
-        <div class="fr mt-1">
-          <label class="lbl">Bag. Desain</label>
-          <input
-            v-model="formData.spk_desain"
-            class="inp"
-            style="width: 145px"
-          />
-          <label class="chk-lbl ml-2 design-baru-lbl">
+        <!-- Warna — satu baris horizontal di kolom kiri -->
+        <div class="fieldset-box mt-1">
+          <div class="fieldset-legend">Warna</div>
+          <div class="fr" style="gap: 5px">
+            <label class="lbl" style="width: 48px">Badan</label>
             <input
-              type="checkbox"
-              v-model="formData.spk_newdesign"
-              true-value="Y"
-              false-value="N"
-            />
-            Design Baru
-          </label>
-          <label class="lbl ml-auto" style="width: 75px">Tgl Acc Proof</label>
-          <input
-            type="date"
-            v-model="formData.spk_tglaccproof"
-            class="idate ml-1"
-            style="width: 140px"
-          />
-        </div>
-
-        <div class="fr">
-          <label class="lbl">Dateline SPK</label>
-          <input
-            type="date"
-            v-model="formData.spk_dateline"
-            class="idate"
-            style="width: 140px"
-          />
-          <label class="lbl ml-2" style="width: 50px">Ket.PO</label>
-          <select
-            v-model="formData.spk_ketpo"
-            class="inp sel"
-            style="width: 185px"
-          >
-            <option v-for="o in lookupOptions.ketPo" :key="o" :value="o">
-              {{ o }}
-            </option>
-          </select>
-          <label class="lbl ml-2" style="width: 60px">SPK Lama</label>
-          <div class="igrp" style="flex: 1">
-            <input
-              v-model="formData.spk_lama"
+              v-model="formData.spk_warna_badan"
               class="inp"
-              style="flex: 1; background: #ddeeff"
-              @change="$emit('field-blur', 'spklama', formData.spk_lama)"
+              style="width: 130px"
             />
-            <button
-              type="button"
-              class="blkp"
-              @mousedown.prevent="$emit('open-lookup', 'spkLama')"
-            >
-              &#128269;
-            </button>
-          </div>
-        </div>
-
-        <!-- Workshop -->
-        <div class="fr">
-          <label class="lbl">Workshop</label>
-          <div class="igrp" style="width: 260px">
+            <label class="lbl" style="width: 52px">Lengan</label>
             <input
-              v-model="formData.spk_cab"
+              v-model="formData.spk_warna_lengan"
               class="inp"
-              style="width: 50px; background: #ddeeff"
+              style="width: 130px"
             />
+            <label class="lbl" style="width: 40px">Lain2</label>
             <input
-              :value="formData.spk_workshop"
-              readonly
-              class="inp ro"
+              v-model="formData.spk_warna_lain"
+              class="inp"
               style="flex: 1"
             />
-            <button
-              type="button"
-              class="blkp"
-              @mousedown.prevent="$emit('open-lookup', 'workshop')"
-            >
-              &#128269;
-            </button>
           </div>
-        </div>
-
-        <!-- Mitra Luar -->
-        <div class="fr mt-1 shaded-row">
-          <label class="lbl">Mitra Luar</label>
-          <label class="chk-lbl mr-3"
-            ><input
-              type="checkbox"
-              v-model="formData.spk_mpotong"
-              true-value="Y"
-              false-value="N"
-            />
-            Potong</label
-          >
-          <label class="chk-lbl mr-3"
-            ><input
-              type="checkbox"
-              v-model="formData.spk_mcetak"
-              true-value="Y"
-              false-value="N"
-            />
-            Cetak</label
-          >
-          <label class="chk-lbl mr-3"
-            ><input
-              type="checkbox"
-              v-model="formData.spk_mbordir"
-              true-value="Y"
-              false-value="N"
-            />
-            Bordir</label
-          >
-          <label class="chk-lbl mr-3"
-            ><input
-              type="checkbox"
-              v-model="formData.spk_mjahit"
-              true-value="Y"
-              false-value="N"
-            />
-            Jahit</label
-          >
-          <label class="chk-lbl">
-            <input
-              type="checkbox"
-              v-model="formData.spk_mfinishing"
-              true-value="Y"
-              false-value="N"
-            />
-            Finishing</label
-          >
         </div>
       </div>
     </div>
@@ -828,7 +1012,7 @@ const toggleCmo = () => {
           <button
             type="button"
             class="btn-upload blue ml-1"
-            @click="displayImageUrl && $emit('open-fullscreen')"
+            @click="displayImageUrl && (showPreviewDialog = true)"
           >
             <IconMaximize :size="13" class="mr-1" /> Full Screen
           </button>
@@ -838,9 +1022,12 @@ const toggleCmo = () => {
         </div>
         <div class="img-box">
           <img
-            v-if="displayImageUrl"
+            v-if="displayImageUrl && !isImageError"
             :src="displayImageUrl"
             class="img-preview"
+            style="cursor: pointer"
+            @click="showPreviewDialog = true"
+            @error="onImageError"
           />
           <div v-else class="img-empty">
             <IconPhoto :size="32" color="#bdbdbd" />
@@ -938,43 +1125,213 @@ const toggleCmo = () => {
             style="flex: 1"
             :disabled="formData.spk_pending === 'NORMAL'"
           />
+          <span
+            v-if="pendingAccDisplay"
+            class="acc-badge ml-2"
+            style="cursor: pointer"
+            @click="handleAccPendingClick"
+            title="Klik untuk ACC Pending (Khusus CMO)"
+          >
+            {{ pendingAccDisplay }}
+          </span>
         </div>
       </div>
 
-      <!-- Warna fieldset — di bawah pending -->
+      <!-- Info Tambahan: Bag.Desain s.d Mitra Luar -->
       <div class="fieldset-box mt-2">
-        <div class="fieldset-legend">Warna</div>
+        <div class="fieldset-legend" style="color: #1565c0">Info Tambahan</div>
+
         <div class="fr">
-          <label class="lbl" style="width: 46px">Badan</label>
+          <label class="lbl" style="width: 72px">Bag. Desain</label>
+          <input v-model="formData.spk_desain" class="inp" style="flex: 1" />
+          <label class="chk-lbl ml-1 design-baru-lbl">
+            <input
+              type="checkbox"
+              v-model="formData.spk_newdesign"
+              true-value="Y"
+              false-value="N"
+            />
+            Design Baru
+          </label>
+        </div>
+
+        <div class="fr">
+          <label class="lbl" style="width: 72px">Tgl Acc Proof</label>
           <input
-            v-model="formData.spk_warna_badan"
-            class="inp"
+            type="date"
+            v-model="formData.spk_tglaccproof"
+            class="idate"
             style="flex: 1"
           />
         </div>
+
         <div class="fr">
-          <label class="lbl" style="width: 46px">Lengan</label>
+          <label class="lbl" style="width: 72px">Ket.PO</label>
+          <select v-model="formData.spk_ketpo" class="inp sel" style="flex: 1">
+            <option
+              v-for="o in lookupOptions.ketPo"
+              :key="o.ket"
+              :value="o.ket"
+            >
+              {{ o.ket }}
+            </option>
+          </select>
+          <span v-if="formData.ketpo_acc === 'MINTA ACC'" class="acc-badge ml-1"
+            >MINTA ACC</span
+          >
+        </div>
+
+        <div class="fr">
+          <label class="lbl" style="width: 72px">Dateline SPK</label>
           <input
-            v-model="formData.spk_warna_lengan"
-            class="inp"
+            type="date"
+            v-model="formData.spk_dateline"
+            class="idate"
             style="flex: 1"
           />
         </div>
+
         <div class="fr">
-          <label class="lbl" style="width: 46px">Lain2</label>
-          <input
-            v-model="formData.spk_warna_lain"
-            class="inp"
-            style="flex: 1"
-          />
+          <label class="lbl" style="width: 72px">SPK Lama</label>
+          <div class="igrp" style="flex: 1">
+            <input
+              v-model="formData.spk_lama"
+              class="inp"
+              style="flex: 1; background: #ddeeff"
+              @change="$emit('field-blur', 'spklama', formData.spk_lama)"
+            />
+            <button
+              type="button"
+              class="blkp"
+              @mousedown.prevent="$emit('open-lookup', 'spkLama')"
+            >
+              &#128269;
+            </button>
+          </div>
         </div>
+
+        <div class="fr">
+          <label class="lbl" style="width: 72px">Workshop</label>
+          <div class="igrp" style="flex: 1">
+            <input
+              v-model="formData.spk_cab"
+              class="inp"
+              style="width: 44px; background: #ddeeff"
+            />
+            <input
+              :value="formData.spk_workshop"
+              readonly
+              class="inp ro"
+              style="flex: 1"
+            />
+            <button
+              type="button"
+              class="blkp"
+              @mousedown.prevent="$emit('open-lookup', 'workshop')"
+            >
+              &#128269;
+            </button>
+          </div>
+        </div>
+
+        <div class="fr mt-1 shaded-row" style="flex-wrap: wrap; gap: 3px">
+          <span
+            style="
+              width: 72px;
+              flex-shrink: 0;
+              font-weight: 600;
+              color: #333;
+              font-size: 11px;
+            "
+            >Mitra Luar</span
+          >
+          <label class="chk-lbl mr-2"
+            ><input
+              type="checkbox"
+              v-model="formData.spk_mpotong"
+              true-value="Y"
+              false-value="N"
+            />
+            Potong</label
+          >
+          <label class="chk-lbl mr-2"
+            ><input
+              type="checkbox"
+              v-model="formData.spk_mcetak"
+              true-value="Y"
+              false-value="N"
+            />
+            Cetak</label
+          >
+          <label class="chk-lbl mr-2"
+            ><input
+              type="checkbox"
+              v-model="formData.spk_mbordir"
+              true-value="Y"
+              false-value="N"
+            />
+            Bordir</label
+          >
+          <label class="chk-lbl mr-2"
+            ><input
+              type="checkbox"
+              v-model="formData.spk_mjahit"
+              true-value="Y"
+              false-value="N"
+            />
+            Jahit</label
+          >
+          <label class="chk-lbl">
+            <input
+              type="checkbox"
+              v-model="formData.spk_mfinishing"
+              true-value="Y"
+              false-value="N"
+            />
+            Finishing</label
+          >
+        </div>
+      </div>
+
+      <div
+        v-if="formData.spk_iscetak === 'Y'"
+        class="d-flex align-center mt-2 px-1"
+        style="color: #d32f2f; font-weight: 600; font-size: 11px"
+      >
+        <IconExclamationCircle :size="15" class="mr-1" />
+        Spk ini sudah dicetak oleh Produksi, Jangan lupa info jika ada revisi.
       </div>
     </div>
   </div>
+
+  <!-- Preview Dialog -->
+  <v-dialog v-model="showPreviewDialog" max-width="800px">
+    <div class="preview-card">
+      <div class="preview-header">
+        <span>Preview Design SPK</span>
+        <button class="preview-close" @click="showPreviewDialog = false">
+          ✕
+        </button>
+      </div>
+      <div class="preview-body">
+        <v-img
+          :src="displayImageUrl"
+          max-height="75vh"
+          contain
+          class="bg-white rounded"
+        >
+          <template #placeholder>
+            <div class="d-flex align-center justify-center fill-height">
+              <v-progress-circular indeterminate color="primary" />
+            </div>
+          </template>
+        </v-img>
+      </div>
+    </div>
+  </v-dialog>
 </template>
 
 <style scoped>
-/* ══ Root layout ══ */
 .so-layout {
   display: flex;
   gap: 8px;
@@ -998,14 +1355,12 @@ const toggleCmo = () => {
   flex-direction: column;
 }
 
-/* ══ Section ══ */
 .so-section {
   background: white;
   border: 1px solid #bdbdbd;
   padding: 7px 10px;
 }
 
-/* ══ Fieldset-style box ══ */
 .fieldset-box {
   border: 1px solid #9e9e9e;
   padding: 7px 8px 6px;
@@ -1025,7 +1380,6 @@ const toggleCmo = () => {
   white-space: nowrap;
 }
 
-/* ══ Form row ══ */
 .fr {
   display: flex;
   align-items: center;
@@ -1043,7 +1397,6 @@ const toggleCmo = () => {
   min-width: 0;
 }
 
-/* ══ Label ══ */
 .lbl {
   width: 80px;
   flex-shrink: 0;
@@ -1053,7 +1406,6 @@ const toggleCmo = () => {
   font-size: 11px;
 }
 
-/* ══ Input ══ */
 .inp {
   height: 24px;
   border: 1px solid #a0a0a0;
@@ -1094,7 +1446,6 @@ const toggleCmo = () => {
   border-color: #1565c0;
 }
 
-/* ══ Input group ══ */
 .igrp {
   display: flex;
   border: 1px solid #a0a0a0;
@@ -1127,7 +1478,6 @@ const toggleCmo = () => {
   background: #d0d0d0;
 }
 
-/* ══ Misc ══ */
 .divider {
   height: 1px;
   background: #e0e0e0;
@@ -1192,7 +1542,6 @@ const toggleCmo = () => {
   color: #757575;
 }
 
-/* ══ Gambar ══ */
 .img-box {
   border: 1px solid #ccc;
   background: #f0f0f0;
@@ -1230,7 +1579,80 @@ const toggleCmo = () => {
   opacity: 0.88;
 }
 
-/* ══ Spacing utils ══ */
+.acc-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  background: #ffeb3b;
+  color: #c62828;
+  font-weight: 700;
+  font-size: 9px;
+  padding: 0 6px;
+  border: 1px solid #fbc02d;
+  border-radius: 2px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  align-self: center;
+  letter-spacing: 0.03em;
+}
+
+.preview-card {
+  background: white;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #1565c0;
+  color: white;
+  padding: 9px 14px;
+  font-size: 13px;
+  font-weight: 700;
+}
+.preview-close {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 16px;
+  cursor: pointer;
+  line-height: 1;
+}
+.preview-close:hover {
+  color: white;
+}
+.preview-body {
+  padding: 16px;
+  background: #f5f5f5;
+}
+
+/* Vuetify combobox compact */
+.f-vselect :deep(.v-field) {
+  min-height: 24px !important;
+  height: 24px !important;
+  font-size: 11px;
+  background: white;
+  border-radius: 0;
+}
+.f-vselect :deep(.v-field__input) {
+  min-height: 24px !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  font-size: 11px;
+}
+.f-vselect :deep(.v-input__control) {
+  min-height: 24px !important;
+}
+.f-vselect :deep(.v-list-item) {
+  min-height: 28px !important;
+  padding: 0 10px !important;
+}
+.f-vselect :deep(.v-list-item-title) {
+  font-size: 11px !important;
+}
+
+/* Spacing utils */
 .ml-1 {
   margin-left: 4px;
 }

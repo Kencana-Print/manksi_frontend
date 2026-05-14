@@ -392,6 +392,51 @@ const router = createRouter({
         requiresAuth: true,
       },
     },
+    {
+      path: "/pembelian/po-bahan",
+      name: "PoBahan",
+      component: () => import("@/views/pembelian/PoBahanView.vue"),
+      meta: {
+        title: "PO Bahan",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "52",
+      },
+    },
+    {
+      path: "/pembelian/po-bahan/create",
+      name: "PoBahanCreate",
+      component: () => import("@/views/pembelian/PoBahanFormView.vue"),
+      meta: {
+        title: "Buat PO Bahan Baru",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "52",
+        browseRoute: "PoBahan",
+      },
+    },
+    {
+      path: "/pembelian/po-bahan/edit/:nomor",
+      name: "PoBahanEdit",
+      component: () => import("@/views/pembelian/PoBahanFormView.vue"),
+      meta: {
+        title: "Ubah PO Bahan",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "52",
+        browseRoute: "PoBahan",
+      },
+    },
+    {
+      path: "/pembelian/po-bahan/print/:nomor",
+      name: "PoBahanPrint",
+      component: () => import("@/views/pembelian/PoBahanPrintView.vue"),
+      meta: {
+        title: "Cetak PO Bahan",
+        layout: "BlankLayout", // Gunakan layout kosong agar sidebar/header aplikasi tidak ikut tercetak
+        requiresAuth: true,
+      },
+    },
 
     // ── Garmen ──────────────────────────────────────────────────────────
     {
@@ -546,6 +591,51 @@ const router = createRouter({
         browseRoute: "GarmenApproveReturBahan", // Helper back button
       },
     },
+    {
+      path: "/garmen/bahan-baku/bpb-bahan",
+      name: "BpbBahanBrowse",
+      component: () => import("@/views/garmen/BpbBahanView.vue"),
+      meta: {
+        title: "Browse BPB Bahan",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "101",
+      },
+    },
+    {
+      path: "/garmen/bahan-baku/bpb-bahan/form",
+      name: "BpbBahanCreate",
+      component: () => import("@/views/garmen/BpbBahanFormView.vue"),
+      meta: {
+        title: "Tambah BPB Bahan",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "101",
+        browseRoute: "BpbBahanBrowse",
+      },
+    },
+    {
+      path: "/garmen/bahan-baku/bpb-bahan/form/:nomor",
+      name: "BpbBahanEdit",
+      component: () => import("@/views/garmen/BpbBahanFormView.vue"),
+      meta: {
+        title: "Ubah BPB Bahan",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "101",
+        browseRoute: "BpbBahanBrowse",
+      },
+    },
+    {
+      path: "/garmen/bahan-baku/bpb-bahan/print/:nomor",
+      name: "BpbBahanPrint",
+      component: () => import("@/views/garmen/BpbBahanPrintView.vue"),
+      meta: {
+        title: "Cetak BPB Bahan",
+        layout: "BlankLayout", // Penting agar navbar tidak ikut terprint
+        requiresAuth: true,
+      },
+    },
 
     {
       path: "/garmen/barang/permintaan",
@@ -630,6 +720,52 @@ const router = createRouter({
       meta: {
         title: "Cetak Realisasi Permintaan",
         layout: "BlankLayout", // WAJIB BLANK LAYOUT
+        requiresAuth: true,
+      },
+    },
+    {
+      path: "/garmen/barang/permintaan-pembelian",
+      name: "PermintaanPembelianGarmen",
+      component: () => import("@/views/garmen/PermintaanPembelianView.vue"),
+      meta: {
+        title: "Permintaan Pembelian Garmen",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "65",
+      },
+    },
+    {
+      path: "/garmen/barang/permintaan-pembelian/create",
+      name: "PermintaanPembelianFormCreate",
+      component: () => import("@/views/garmen/PermintaanPembelianFormView.vue"),
+      meta: {
+        title: "Tambah Permintaan Pembelian",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "65",
+        browseRoute: "PermintaanPembelianGarmen",
+      },
+    },
+    {
+      path: "/garmen/barang/permintaan-pembelian/edit/:nomor",
+      name: "PermintaanPembelianFormEdit",
+      component: () => import("@/views/garmen/PermintaanPembelianFormView.vue"),
+      meta: {
+        title: "Ubah Permintaan Pembelian",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "65",
+        browseRoute: "PermintaanPembelianGarmen",
+      },
+    },
+    {
+      path: "/garmen/barang/permintaan-pembelian/print/:nomor",
+      name: "PermintaanPembelianPrint",
+      component: () =>
+        import("@/views/garmen/PermintaanPembelianPrintView.vue"),
+      meta: {
+        title: "Cetak Permintaan Pembelian",
+        layout: "BlankLayout", // Wajib menggunakan BlankLayout agar sidebar/navbar hilang
         requiresAuth: true,
       },
     },
@@ -938,6 +1074,16 @@ const router = createRouter({
         browseRoute: "SalesOrderBrowse",
       },
     },
+    {
+      path: "/penjualan/sales-order/print/:nomor",
+      name: "SalesOrderPrint",
+      component: () => import("@/views/penjualan/SalesOrderPrintView.vue"),
+      meta: {
+        title: "Cetak SPK",
+        layout: "BlankLayout",
+        requiresAuth: true,
+      },
+    },
 
     {
       path: "/penjualan/invoice-proforma",
@@ -1067,6 +1213,29 @@ const router = createRouter({
         layout: "DefaultLayout",
         requiresAuth: true,
         menuId: "164",
+      },
+    },
+
+    // ── Laporan ───────────────────────────────────────────────────
+    {
+      path: "/laporan/penjualan/penawaran-vs-spk",
+      name: "LapPenawaranVsSpk",
+      component: () => import("@/views/laporan/PenawaranVsSpkView.vue"),
+      meta: {
+        title: "Penawaran vs SPK",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "301",
+      },
+    },
+    {
+      path: "/laporan/penjualan/realisasi-penawaran",
+      name: "LapRealisasiPenawaran",
+      component: () => import("@/views/laporan/RealisasiPenawaranView.vue"),
+      meta: {
+        title: "Laporan Realisasi Penawaran",
+        layout: "DefaultLayout",
+        requiresAuth: true,
       },
     },
 
