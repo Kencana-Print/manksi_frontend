@@ -20,10 +20,24 @@ const isEdit = computed(
 );
 const nomorParam = computed(() => route.params.nomor as string);
 
+const formatDateLocal = (value?: string | Date) => {
+  if (!value) return "";
+
+  const d = new Date(value);
+
+  if (isNaN(d.getTime())) return "";
+
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+};
+
 const initialData = {
   nomor: "",
   proret_log: "",
-  tanggal: new Date().toISOString().substring(0, 10),
+  tanggal: formatDateLocal(new Date()),
   tgl_retur: "",
   keterangan: "",
   gudangAsal: "",
@@ -60,8 +74,8 @@ const {
     return {
       nomor: isEdit.value ? header.proret_nomor : "",
       proret_log: isEdit.value ? header.proret_log : header.proret_nomor,
-      tanggal: new Date().toISOString().substring(0, 10),
-      tgl_retur: new Date(header.proret_tanggal).toISOString().substring(0, 10),
+      tanggal: formatDateLocal(new Date()),
+      tgl_retur: formatDateLocal(header.proret_tanggal),
       keterangan: header.proret_keterangan,
       gudangAsal: header.proret_gdg_tujuan,
       namaGudangAsal: header.gdg_nama,
@@ -278,7 +292,7 @@ const numFormat = (val: any) =>
               </thead>
               <tbody>
                 <tr v-for="(item, index) in formData.details" :key="index">
-                  <td class="text-center">{{ index + 1 }}</td>
+                  <td class="text-center">{{ Number(index) + 1 }}</td>
                   <td class="bg-grey-lighten-4 px-2">{{ item.nominta }}</td>
                   <td class="bg-grey-lighten-4 px-2">{{ item.kode }}</td>
                   <td
@@ -395,7 +409,8 @@ const numFormat = (val: any) =>
                     {{
                       numFormat(
                         formData.barcodes.reduce(
-                          (acc, cur) => acc + Number(cur.jumlah || 0),
+                          (acc: number, cur: any) =>
+                            acc + Number(cur.jumlah || 0),
                           0,
                         ),
                       )

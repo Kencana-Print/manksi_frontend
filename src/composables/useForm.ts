@@ -59,7 +59,7 @@ export function useForm<
     }
   };
 
-  const originalData = ref<T>({ ...options.initialData });
+  const originalData = ref<T>(JSON.parse(JSON.stringify(options.initialData)));
 
   const fetchData = async () => {
     if (!options.fetchApi) return;
@@ -100,10 +100,9 @@ export function useForm<
   const executeCancel = () => {
     showCancelDialog.value = false;
     if (isEditMode.value) {
-      // Edit mode: reset ke data original dari server
       formData.value = JSON.parse(JSON.stringify(originalData.value));
     } else {
-      // Tambah baru: reset ke initialData
+      // Deep copy initialData supaya tidak ada referensi tersisa
       formData.value = JSON.parse(JSON.stringify(options.initialData));
     }
   };

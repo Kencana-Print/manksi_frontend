@@ -41,10 +41,17 @@ const lookupOptions = ref({
 
 const toISODate = (val: any) => {
   if (!val) return "";
+
   const d = new Date(val);
-  // Jika formatnya 1899 (null di Delphi), kembalikan kosong
+
+  // Handle tanggal null Delphi
   if (d.getFullYear() <= 1900) return "";
-  return d.toISOString().substring(0, 10);
+
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
 };
 
 const initialData = {

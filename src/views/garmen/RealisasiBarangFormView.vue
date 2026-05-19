@@ -11,6 +11,18 @@ import { IconListCheck, IconSearch } from "@tabler/icons-vue";
 // Modal Pencarian Permintaan
 import PermintaanBarangSearchModal from "@/components/lookups/PermintaanBarangSearchModal.vue";
 
+interface DetailItem {
+  kode: string;
+  nama: string;
+  satuan: string;
+  stk: number;
+  minta: number;
+  sudah: number;
+  kurang: number;
+  jumlah: number;
+  ket: string;
+}
+
 const route = useRoute();
 const toast = useToast();
 
@@ -22,9 +34,23 @@ const showMintaModal = ref(false);
 const showPrintDialog = ref(false);
 const savedNomor = ref("");
 
+const formatDateLocal = (value?: string | Date) => {
+  if (!value) return "";
+
+  const d = new Date(value);
+
+  if (isNaN(d.getTime())) return "";
+
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+};
+
 const initialData = {
   nomor: "",
-  tanggal: new Date().toISOString().substring(0, 10),
+  tanggal: formatDateLocal(new Date()),
   jenis: sessionStorage.getItem("last_jenis_realisasi") || "ACCESORIES",
   noMinta: "",
   cabMinta: "",
@@ -36,7 +62,7 @@ const initialData = {
   mkaTanggal: "",
   peminta: "",
   approve: "",
-  details: [] as any[],
+  details: [] as DetailItem[],
 };
 
 const {
@@ -59,7 +85,7 @@ const {
 
     return {
       nomor: header.re_nomor,
-      tanggal: new Date(header.re_tanggal).toISOString().substring(0, 10),
+      tanggal: formatDateLocal(header.re_tanggal),
       jenis: header.re_jenis,
       noMinta: header.re_minta,
       cabMinta: reqHeader.min_cab,
@@ -68,9 +94,7 @@ const {
       namaSpk: header.spknama,
       jumlahSpk: header.spkjml || 0,
       mka: header.re_mka,
-      mkaTanggal: header.mkb_tanggal
-        ? new Date(header.mkb_tanggal).toISOString().substring(0, 10)
-        : "",
+      mkaTanggal: formatDateLocal(header.mkb_tanggal),
       peminta: header.peminta,
       approve: header.apv,
       details: details,
@@ -107,9 +131,7 @@ const onMintaSelected = async (item: any) => {
     formData.value.namaSpk = header.namaspk;
     formData.value.jumlahSpk = header.jumlahspk || 0;
     formData.value.mka = header.mkb_nomor;
-    formData.value.mkaTanggal = header.mkb_tanggal
-      ? new Date(header.mkb_tanggal).toISOString().substring(0, 10)
-      : "";
+    formData.value.mkaTanggal = formatDateLocal(header.mkb_tanggal);
 
     formData.value.details = details;
     toast.success("Detail rincian barang berhasil ditarik.");
@@ -134,7 +156,7 @@ const validateSave = () => {
   }
 
   const totalQty = formData.value.details.reduce(
-    (sum, d) => sum + (Number(d.jumlah) || 0),
+    (sum: number, d: DetailItem) => sum + (Number(d.jumlah) || 0),
     0,
   );
 
@@ -315,7 +337,9 @@ const numFmt = (val: any) =>
             </thead>
             <tbody>
               <tr v-for="(item, index) in formData.details" :key="index">
-                <td class="text-center bg-grey-lighten-4">{{ index + 1 }}</td>
+                <td class="text-center bg-grey-lighten-4">
+                  {{ Number(index) + 1 }}
+                </td>
                 <td
                   class="bg-grey-lighten-4 font-weight-bold text-primary px-2"
                 >

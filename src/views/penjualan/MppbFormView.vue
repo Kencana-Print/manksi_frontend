@@ -14,6 +14,7 @@ import {
   IconExternalLink,
   IconFileDescription,
 } from "@tabler/icons-vue";
+import type { AxiosResponse } from "axios";
 
 const route = useRoute();
 const router = useRouter();
@@ -55,6 +56,16 @@ const uploadDocName = ref("");
 const showPreviewDialog = ref(false);
 const previewUrlActive = ref("");
 
+const formatDateLocal = (value: string | Date) => {
+  const d = new Date(value);
+
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+};
+
 const emptyData = {
   nomor: "",
   tanggal: new Date().toISOString().substring(0, 10),
@@ -69,6 +80,7 @@ const emptyData = {
   date_create: "",
   user_create: "",
   pin_status: "",
+  isTutupBuku: false,
   imgDesainLokal: "",
   imgDokumenLokal: "",
 };
@@ -93,7 +105,7 @@ const {
 
     return {
       nomor: h.mpb_nomor,
-      tanggal: new Date(h.mpb_tanggal).toISOString().substring(0, 10),
+      tanggal: formatDateLocal(h.mpb_tanggal),
       divisi: String(h.mpb_divisi),
       namaProduk: h.mpb_nama,
       ukuran: h.mpb_ukuran,
@@ -105,6 +117,7 @@ const {
       date_create: h.date_create,
       user_create: h.user_create,
       pin_status: h.pin_status,
+      isTutupBuku: h.isTutupBuku || false,
       imgDesainLokal: "",
       imgDokumenLokal: "",
     };
@@ -118,18 +131,25 @@ const {
     let uploadDesainPromise = Promise.resolve();
     let uploadDocPromise = Promise.resolve();
 
+    const uploads: Promise<any>[] = [];
+
     if (fileRef.value?.files?.[0]) {
-      uploadDesainPromise = mppbFormService.uploadGambar(
-        nomorTersimpan,
-        "desain",
-        fileRef.value.files[0],
+      uploads.push(
+        mppbFormService.uploadGambar(
+          nomorTersimpan,
+          "desain",
+          fileRef.value.files[0],
+        ),
       );
     }
+
     if (fileDocRef.value?.files?.[0]) {
-      uploadDocPromise = mppbFormService.uploadGambar(
-        nomorTersimpan,
-        "dokumen",
-        fileDocRef.value.files[0],
+      uploads.push(
+        mppbFormService.uploadGambar(
+          nomorTersimpan,
+          "dokumen",
+          fileDocRef.value.files[0],
+        ),
       );
     }
 
@@ -144,9 +164,7 @@ const {
   },
 });
 
-const isTutupBuku = computed(() => {
-  return ["WAIT", "TOLAK", "MINTA"].includes(formData.value.pin_status);
-});
+const isTutupBuku = computed(() => !!formData.value.isTutupBuku);
 
 // ── FUNGSI GAMBAR ──
 const onFileChange = (e: Event, tipe: "desain" | "dokumen") => {

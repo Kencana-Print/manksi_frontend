@@ -82,7 +82,7 @@ const updateToKetUkuran = () => {
             </thead>
             <tbody>
               <tr v-for="(row, idx) in formData.Kaosan" :key="'k-' + idx">
-                <td class="tc bg-lbl">{{ idx + 1 }}</td>
+                <td class="tc bg-lbl">{{ Number(idx) + 1 }}</td>
                 <td class="p0">
                   <div class="cell-grp">
                     <input
@@ -128,7 +128,7 @@ const updateToKetUkuran = () => {
                   <button
                     type="button"
                     class="btn-del"
-                    @click="removeKaosanRow(idx)"
+                    @click="removeKaosanRow(Number(idx))"
                   >
                     <IconTrash :size="13" />
                   </button>
@@ -236,7 +236,7 @@ const updateToKetUkuran = () => {
                   <button
                     type="button"
                     class="btn-del"
-                    @click="removeSizeRow(idx)"
+                    @click="removeSizeRow(Number(idx))"
                   >
                     <IconTrash :size="13" />
                   </button>

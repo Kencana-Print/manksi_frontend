@@ -17,6 +17,15 @@ import {
   IconLock,
 } from "@tabler/icons-vue";
 
+interface DtlLinkItem {
+  no: number;
+  nomor: string;
+  tanggal: string;
+  kode: string;
+  qtylink: number;
+  link: number;
+}
+
 const route = useRoute();
 const router = useRouter();
 const toast = useToast();
@@ -39,9 +48,28 @@ const selectedRowIdx = ref(-1);
 // State untuk dropdown komponen
 const listKomponen = ref<string[]>([]);
 
+const formatDateLocal = (value?: string | Date) => {
+  if (!value) return "";
+
+  // YYYY-MM-DD langsung return
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return value;
+  }
+
+  const d = new Date(value);
+
+  if (isNaN(d.getTime())) return "";
+
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+};
+
 const emptyData = {
   nomor: "",
-  tanggal: new Date().toISOString().substring(0, 10),
+  tanggal: formatDateLocal(new Date()),
   keterangan: "",
   nomorSpk: "",
   spkLama: "",
@@ -50,7 +78,7 @@ const emptyData = {
   jumlahSpk: 0,
   memoSpk: "",
   dtlBahan: [] as any[],
-  dtlLink: [] as any[],
+  dtlLink: [] as DtlLinkItem[],
   dtlPlan: [] as any[],
   dtlMap: [] as any[],
   pin_status: "",
@@ -81,15 +109,14 @@ const {
     // HELPER 2: Parsing tanggal aman
     const parseDateSafe = (v: any) => {
       if (!v || v === "0000-00-00" || v === "0000-00-00 00:00:00") return "";
-      const dt = new Date(v);
-      return isNaN(dt.getTime()) ? "" : dt.toISOString().substring(0, 10);
+
+      return formatDateLocal(v);
     };
 
     return {
       nomor: val(h, "mkb_nomor"),
       tanggal:
-        parseDateSafe(val(h, "mkb_tanggal")) ||
-        new Date().toISOString().substring(0, 10),
+        parseDateSafe(val(h, "mkb_tanggal")) || formatDateLocal(new Date()),
       keterangan: val(h, "mkb_note") || "",
       nomorSpk: val(h, "mkb_spk_nomor") || "",
       spkLama: val(h, "mkb_spk_nomor") || "",
@@ -217,7 +244,7 @@ const onSpkSelected = async (spk: any) => {
     // Isi Planning (Kecuali MAP)
     if (!isMapMode.value) {
       formData.value.dtlPlan = planning.map((p: any) => ({
-        tanggal: p.plan_tanggal.substring(0, 10),
+        tanggal: formatDateLocal(p.plan_tanggal),
         jumlah: p.plan_datang,
       }));
     }
@@ -351,7 +378,7 @@ const onPoSelected = (po: any) => {
 
   // Hapus link lama untuk baris nomor (nourut) ini (Fungsi hapuslink di Delphi)
   formData.value.dtlLink = formData.value.dtlLink.filter(
-    (l) => l.no !== rowBahan.no,
+    (l: DtlLinkItem) => l.no !== rowBahan.no,
   );
 
   // Tambah link baru
@@ -539,10 +566,10 @@ const onPoSelected = (po: any) => {
               <tr
                 v-for="(row, idx) in formData.dtlBahan"
                 :key="idx"
-                :class="{ 'bg-blue-lighten-5': selectedRowIdx === idx }"
-                @click="selectedRowIdx = idx"
+                :class="{ 'bg-blue-lighten-5': selectedRowIdx === Number(idx) }"
+                @click="selectedRowIdx = Number(idx)"
               >
-                <td class="tc bg-grey-lighten-4">{{ idx + 1 }}</td>
+                <td class="tc bg-grey-lighten-4">{{ Number(idx) + 1 }}</td>
                 <td style="padding: 0">
                   <select
                     v-model="row.komponen"
@@ -575,7 +602,10 @@ const onPoSelected = (po: any) => {
                       readonly
                       placeholder="Pilih Bahan..."
                     />
-                    <button class="btn-gi-search" @click="openBahanModal(idx)">
+                    <button
+                      class="btn-gi-search"
+                      @click="openBahanModal(Number(idx))"
+                    >
                       <IconSearch :size="12" />
                     </button>
                   </div>
@@ -629,7 +659,10 @@ const onPoSelected = (po: any) => {
                   <input type="text" v-model="row.keterangan" class="gi" />
                 </td>
                 <td class="tc">
-                  <button class="btn-gi-del" @click="removeRowBahan(idx)">
+                  <button
+                    class="btn-gi-del"
+                    @click="removeRowBahan(Number(idx))"
+                  >
                     <IconTrash :size="13" />
                   </button>
                 </td>
@@ -703,7 +736,7 @@ const onPoSelected = (po: any) => {
               </thead>
               <tbody>
                 <tr v-for="(m, idx) in formData.dtlMap" :key="idx">
-                  <td class="tc">{{ idx + 1 }}</td>
+                  <td class="tc">{{ Number(idx) + 1 }}</td>
                   <td>{{ m.komponen }}</td>
                   <td>{{ m.size }}</td>
                   <td class="tr">{{ m.babaran }}</td>
@@ -758,7 +791,7 @@ const onPoSelected = (po: any) => {
               </thead>
               <tbody>
                 <tr v-for="(p, idx) in formData.dtlPlan" :key="idx">
-                  <td class="tc">{{ idx + 1 }}</td>
+                  <td class="tc">{{ Number(idx) + 1 }}</td>
                   <td>
                     <input
                       type="date"
@@ -776,7 +809,10 @@ const onPoSelected = (po: any) => {
                     />
                   </td>
                   <td class="tc">
-                    <button class="btn-gi-del" @click="removeRowPlan(idx)">
+                    <button
+                      class="btn-gi-del"
+                      @click="removeRowPlan(Number(idx))"
+                    >
                       <IconTrash :size="13" />
                     </button>
                   </td>

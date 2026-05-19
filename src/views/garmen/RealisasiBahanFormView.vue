@@ -15,15 +15,50 @@ import {
   IconPlus,
 } from "@tabler/icons-vue";
 
+interface RealisasiFormData {
+  nomor: string;
+  tanggal: string;
+  noMinta: string;
+  keterangan: string;
+  spk: string;
+  namaSpk: string;
+  jumlahSpk: number;
+  mkb: string;
+  jumlah: number;
+  gudangAsal: string;
+  gudangAsalNama: string;
+  gudangProduksi: string;
+  gudangProduksiNama: string;
+  isUtama: number;
+  barcodes: any[];
+  details: any[];
+  pin_acc?: string;
+  pin_dipakai?: string;
+}
+
 const route = useRoute();
 const toast = useToast();
 
 const showPrintDialog = ref(false);
 const savedNomor = ref("");
 
-const initialData = {
+const formatDateLocal = (value?: string | Date) => {
+  if (!value) return "";
+
+  const d = new Date(value);
+
+  if (isNaN(d.getTime())) return "";
+
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+};
+
+const initialData: RealisasiFormData = {
   nomor: "",
-  tanggal: new Date().toISOString().substring(0, 10),
+  tanggal: formatDateLocal(new Date()),
   noMinta: "",
   keterangan: "",
   spk: "",
@@ -52,10 +87,10 @@ const {
   executeCancel,
   executeClose,
   fetchData,
-} = useForm({
+} = useForm<RealisasiFormData>({
   menuId: "108",
   initialData,
-  fetchApi: async () => {
+  fetchApi: async (): Promise<RealisasiFormData> => {
     const res = await realisasiBahanFormService.getDetail(
       route.params.nomor as string,
     );
@@ -97,9 +132,7 @@ const {
           netto: Number(d.promind_jumlah) || 0,
           gross: Number(d.promind_gross) || 0,
           roll: summaryRoll[d.promind_bhn_kode] || 0, // <-- Set Nilai Roll
-          relaxtgl: d.promind_relaxtgl
-            ? d.promind_relaxtgl.substring(0, 10)
-            : "",
+          relaxtgl: formatDateLocal(d.promind_relaxtgl),
           relaxpic: d.promind_relaxpic,
           ket: d.promind_keterangan,
         };
@@ -107,7 +140,7 @@ const {
 
     return {
       nomor: h.promin_nomor,
-      tanggal: h.promin_tanggal ? h.promin_tanggal.substring(0, 10) : "",
+      tanggal: formatDateLocal(h.promin_tanggal),
       noMinta: h.promin_minta,
       keterangan: h.promin_keterangan,
       spk: h.promin_spk_nomor,
@@ -126,7 +159,7 @@ const {
       pin_dipakai: h.pin_dipakai,
     };
   },
-  submitApi: async (data: typeof initialData) => {
+  submitApi: async (data: RealisasiFormData): Promise<any> => {
     const nomor = isEditMode.value ? (route.params.nomor as string) : undefined;
     return await realisasiBahanFormService.saveData(data, nomor);
   },

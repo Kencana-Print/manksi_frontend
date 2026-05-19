@@ -28,7 +28,20 @@ const toast = useToast();
 
 const isEditMode = computed(() => !!route.params.nomor);
 const isPo = ref(route.query.type !== "NON");
-const todayLocal = new Date().toISOString().substring(0, 10);
+const formatDateLocal = (value?: string | Date) => {
+  if (!value) return "";
+
+  const d = new Date(value);
+
+  if (isNaN(d.getTime())) return "";
+
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+};
+const todayLocal = formatDateLocal(new Date());
 
 // ── Modal state ──
 const showSupModal = ref(false);
@@ -80,6 +93,7 @@ const {
   executeSave,
   executeCancel,
   executeClose,
+  goBack,
 } = useForm({
   menuId: "101",
   initialData: defaultData,
@@ -98,8 +112,8 @@ const {
         bpb_nomor: noBpb,
         bpb_po_nomor: noPo,
         bpb_keterangan: ketBpb,
-        bpb_tanggal: tglBpb ? tglBpb.substring(0, 10) : todayLocal,
-        bpb_jatuhtempo: tglTempo ? tglTempo.substring(0, 10) : todayLocal,
+        bpb_tanggal: formatDateLocal(tglBpb || new Date()),
+        bpb_jatuhtempo: formatDateLocal(tglTempo || new Date()),
         sup_nama: d.header.nmsup || "",
         sup_alamat: d.header.alamat || "",
         sup_kota: d.header.kota || "",
@@ -148,7 +162,7 @@ const loadPoData = async () => {
     formData.value.header.sup_kota = header.sup_kota;
     const dt = new Date(formData.value.header.bpb_tanggal);
     dt.setDate(dt.getDate() + (Number(header.jatuhtempo_days) || 0));
-    formData.value.header.bpb_jatuhtempo = dt.toISOString().substring(0, 10);
+    formData.value.header.bpb_jatuhtempo = formatDateLocal(dt);
     formData.value.poItems = poDetails.map((d: any) => ({ ...d, terima: 0 }));
     formData.value.items = items.map((d: any) => ({
       kode: d.kode,
@@ -671,7 +685,7 @@ const printBarcodeAll = () => {
             </thead>
             <tbody>
               <tr v-for="(item, idx) in formData.items" :key="idx">
-                <td class="tc gt-lbl">{{ idx + 1 }}</td>
+                <td class="tc gt-lbl">{{ Number(idx) + 1 }}</td>
                 <td class="p0">
                   <div class="cell-grp">
                     <input v-model="item.kode" class="ci" readonly />
@@ -679,7 +693,7 @@ const printBarcodeAll = () => {
                       v-if="!isPo"
                       type="button"
                       class="ci-btn"
-                      @click="openLookupBahan(idx)"
+                      @click="openLookupBahan(Number(idx))"
                     >
                       <IconSearch :size="11" />
                     </button>
@@ -717,7 +731,7 @@ const printBarcodeAll = () => {
                     v-model.number="item.jumlahyard"
                     type="number"
                     class="ci tr fw bg-yellow-light"
-                    @blur="onJumlahYardChange(idx)"
+                    @blur="onJumlahYardChange(Number(idx))"
                   />
                 </td>
                 <td class="p0">
@@ -725,7 +739,7 @@ const printBarcodeAll = () => {
                     v-model.number="item.jumlah"
                     type="number"
                     class="ci tr fw bg-yellow-light"
-                    @blur="onJumlahChange(idx)"
+                    @blur="onJumlahChange(Number(idx))"
                   />
                 </td>
                 <td class="p0">
@@ -738,7 +752,7 @@ const printBarcodeAll = () => {
                         ? 'bg-red text-white'
                         : 'bg-yellow-light'
                     "
-                    @blur="onRollChange(idx)"
+                    @blur="onRollChange(Number(idx))"
                   />
                 </td>
                 <td class="p0"><input v-model="item.gramasi" class="ci" /></td>
@@ -750,12 +764,12 @@ const printBarcodeAll = () => {
                       v-model="item.spk"
                       class="ci"
                       placeholder="..."
-                      @change="onSpkChange(idx)"
+                      @change="onSpkChange(Number(idx))"
                     />
                     <button
                       type="button"
                       class="ci-btn"
-                      @click="openLookupSpk(idx)"
+                      @click="openLookupSpk(Number(idx))"
                       title="Cari SPK (F1)"
                     >
                       <IconSearch :size="11" />
@@ -774,7 +788,7 @@ const printBarcodeAll = () => {
                   <button
                     type="button"
                     class="btn-del"
-                    @click="removeItem(idx)"
+                    @click="removeItem(Number(idx))"
                   >
                     ✕
                   </button>
@@ -817,7 +831,9 @@ const printBarcodeAll = () => {
                 </thead>
                 <tbody>
                   <tr v-for="(p, i) in formData.poItems" :key="i">
-                    <td class="tc gt-lbl">{{ p.nourut || i + 1 }}</td>
+                    <td class="tc gt-lbl">
+                      {{ p.nourut || Number(i) + 1 }}
+                    </td>
                     <td class="px-1">{{ p.kode }}</td>
                     <td class="px-1" :title="p.nama">{{ p.nama }}</td>
                     <td class="px-1" :title="p.namaext">{{ p.namaext }}</td>
@@ -874,7 +890,7 @@ const printBarcodeAll = () => {
                       class="tc gt-lbl"
                       :class="{ 'bg-red text-white': b.barcodex }"
                     >
-                      {{ b.no || i + 1 }}
+                      {{ b.no || Number(i) + 1 }}
                     </td>
                     <td class="px-1">{{ b.kode }}</td>
                     <td class="px-1" :title="b.nama">{{ b.nama }}</td>

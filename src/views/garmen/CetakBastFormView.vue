@@ -85,6 +85,20 @@ function normalizeHeader(h: any) {
   };
 }
 
+const formatDateLocal = (value?: string | Date) => {
+  if (!value) return "";
+
+  const d = new Date(value);
+
+  if (isNaN(d.getTime())) return "";
+
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+};
+
 const initialData: {
   header: Header;
   checklist: any[];
@@ -104,7 +118,7 @@ const initialData: {
 } = {
   header: {
     mspk_nomor: "",
-    mspk_tanggal: new Date().toISOString().substring(0, 10),
+    mspk_tanggal: formatDateLocal(new Date()),
     mspk_nama: "",
     mspk_nama2: "",
     mspk_ukuran: "",
@@ -438,11 +452,7 @@ onMounted(() => {
           <label class="f-lbl">Tanggal</label>
           <input
             type="date"
-            :value="
-              formData.header.mspk_tanggal
-                ? formData.header.mspk_tanggal.substring(0, 10)
-                : formData.header.mspk_tanggal
-            "
+            :value="formatDateLocal(formData.header.mspk_tanggal)"
             @input="(e: any) => (formData.header.mspk_tanggal = e.target.value)"
             class="f-date"
             style="width: 140px"

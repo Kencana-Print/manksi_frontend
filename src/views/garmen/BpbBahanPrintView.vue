@@ -136,7 +136,7 @@ const numFmt = (v: any) =>
         </thead>
         <tbody>
           <tr v-for="(item, idx) in data.items" :key="idx">
-            <td class="tc">{{ idx + 1 }}</td>
+            <td class="tc">{{ Number(idx) + 1 }}</td>
             <td>{{ item.kode }}</td>
             <td class="text-truncate">{{ item.nama }}</td>
             <td class="tc">{{ item.satuan }}</td>

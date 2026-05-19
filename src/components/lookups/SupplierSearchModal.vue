@@ -3,7 +3,10 @@ import { ref, watch, computed } from "vue";
 import api from "@/services/api";
 import { IconTruck, IconSearch, IconDatabaseOff } from "@tabler/icons-vue";
 
-const props = defineProps<{ modelValue: boolean }>();
+const props = defineProps<{
+  modelValue: boolean;
+  jenis?: string;
+}>();
 const emit = defineEmits(["update:modelValue", "selected"]);
 
 const search = ref("");
@@ -40,6 +43,7 @@ const fetchData = async () => {
     const res = await api.get("/lookups/supplier", {
       params: {
         q: search.value,
+        jenis: props.jenis,
         page: currentPage.value,
         limit: perPage.value,
       },

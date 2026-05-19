@@ -241,7 +241,7 @@ const grandTotal = computed(() => subTotal.value + ppnValue.value);
         </thead>
         <tbody>
           <tr v-for="(item, index) in dataPO.items" :key="index">
-            <td class="tc">{{ index + 1 }}.</td>
+            <td class="tc">{{ Number(index) + 1 }}.</td>
             <td class="tc" v-if="isBahan">{{ item.pod_bhn_kode }}</td>
             <td>{{ item.pod_namaext || item.bhn_name }}</td>
             <td class="tc">{{ item.satuan_print }}</td>

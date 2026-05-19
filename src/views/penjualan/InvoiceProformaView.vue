@@ -354,7 +354,7 @@ onMounted(() => {
               </thead>
               <tbody>
                 <tr v-for="(dtl, i) in item.details" :key="i">
-                  <td class="tc">{{ i + 1 }}</td>
+                  <td class="tc">{{ Number(i) + 1 }}</td>
                   <td style="font-weight: 600; color: #00796b">
                     {{ dtl.Kode }}
                   </td>

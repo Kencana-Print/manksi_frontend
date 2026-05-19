@@ -23,7 +23,29 @@ const authStore = useAuthStore();
 const showPrintDialog = ref(false);
 const savedNomor = ref("");
 
-const getLocalDate = () => new Date().toISOString().substring(0, 10);
+const getLocalDate = () => {
+  const d = new Date();
+
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+};
+
+const formatDateLocal = (value?: string | Date) => {
+  if (!value) return "";
+
+  const d = new Date(value);
+
+  if (isNaN(d.getTime())) return "";
+
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+};
 
 const createEmptyRow = () => ({
   NomorPO: "",
@@ -76,7 +98,7 @@ const {
     const d: any = res.data.data;
     return {
       Nomor: d.header.poisj_nomor,
-      Tanggal: d.header.poisj_tanggal.substring(0, 10),
+      Tanggal: formatDateLocal(d.header.poisj_tanggal),
       GudangAsal: d.header.poisj_cab,
       GudangAsalNama: d.header.namacab,
       Tujuan: d.header.poisj_tujuan,

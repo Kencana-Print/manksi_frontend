@@ -33,8 +33,14 @@ const headers = [
   { title: "ALAMAT", key: "Alamat", minWidth: "250px" },
   { title: "KOTA", key: "Kota", width: "120px" },
   { title: "TELP", key: "Telp", width: "120px" },
+  { title: "FAX", key: "Fax", width: "120px" },
   { title: "CONTACT", key: "Contact", width: "120px" },
   { title: "HP", key: "HP", width: "120px" },
+  { title: "TARGET MITRA", key: "TargetMitra", width: "120px", align: "right" },
+  { title: "KETERANGAN", key: "Keterangan", minWidth: "200px" },
+  { title: "AKTIF", key: "Aktif", width: "80px", align: "center" },
+  { title: "USER CREATE", key: "Usr", width: "110px" },
+  { title: "DATE CREATE", key: "Created", width: "150px" },
 ];
 
 // Pewarnaan jika Aktif = 'N' / Pasif

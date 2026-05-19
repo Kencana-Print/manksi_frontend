@@ -10,14 +10,24 @@ const router = useRouter();
 const toast = useToast();
 
 // ── Filter tanggal — persistence diurus BaseBrowse via filterState ────
-const today = new Date().toISOString().split("T")[0];
-const firstDayOfMonth = new Date(
-  new Date().getFullYear(),
-  new Date().getMonth(),
-  1,
-)
-  .toISOString()
-  .split("T")[0];
+const formatDateLocal = (value?: string | Date) => {
+  if (!value) return "";
+
+  const d = new Date(value);
+
+  if (isNaN(d.getTime())) return "";
+
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+};
+
+const today = formatDateLocal(new Date());
+const firstDayOfMonth = formatDateLocal(
+  new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+);
 
 const filterDate = ref({
   start: firstDayOfMonth,

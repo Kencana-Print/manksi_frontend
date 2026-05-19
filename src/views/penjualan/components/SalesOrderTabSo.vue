@@ -16,7 +16,7 @@ const props = defineProps<{
   lookupOptions: {
     divisi: any[];
     kepentingan: string[];
-    ketPo: string[];
+    ketPo: { ket: string; acc: string }[];
     panjang: string[];
     lebar: string[];
     kain: string[];

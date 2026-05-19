@@ -21,11 +21,18 @@ import SpkSearchModal from "@/components/lookups/SpkSearchModal.vue";
 import BarangGarmenSearchModal from "@/components/lookups/BarangGarmenSearchModal.vue";
 
 const route = useRoute();
+const jenisFromQuery =
+  typeof route.query.jenis === "string" ? route.query.jenis : "";
 const toast = useToast();
 const authStore = useAuthStore();
 
 const isEdit = computed(() => !!route.params.nomor);
 const nomorParam = computed(() => route.params.nomor as string);
+const formTitle = computed(() =>
+  isEdit.value
+    ? `Ubah Permintaan ${formData.value.jenis || "Barang"} Garmen`
+    : `Permintaan ${formData.value.jenis || "Barang"} Garmen`,
+);
 
 // State untuk memunculkan Modal
 const showGudangModal = ref(false);
@@ -33,11 +40,25 @@ const showSpkModal = ref(false);
 const showBarangModal = ref(false);
 const activeRowIndex = ref(0);
 
+const formatDateLocal = (value?: string | Date) => {
+  if (!value) return "";
+
+  const d = new Date(value);
+
+  if (isNaN(d.getTime())) return "";
+
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+};
+
 // Initial Data Structure (Tambah field Jumlah, Divisi, MKA)
 const initialData = {
   nomor: "",
-  tanggal: new Date().toISOString().substring(0, 10),
-  jenis: "ACCESORIES",
+  tanggal: formatDateLocal(new Date()),
+  jenis: jenisFromQuery || "ACCESORIES",
   cabang: authStore.userCabang === "ALL" ? "" : authStore.userCabang,
   gudangPeminta: "",
   namaGudangPeminta: "",
@@ -94,7 +115,7 @@ const {
 
     return {
       nomor: header.min_nomor,
-      tanggal: new Date(header.min_tanggal).toISOString().substring(0, 10),
+      tanggal: formatDateLocal(header.min_tanggal),
       jenis: header.min_jenis,
       cabang: header.min_cab,
       gudangPeminta: header.min_gp,
@@ -104,11 +125,20 @@ const {
       jumlahSpk: header.jumlahspk || 0,
       divisiSpk: header.nama_divisi || "",
       mkaNomor: header.mkb_nomor || "",
-      mkaTanggal: header.mkb_tanggal
-        ? new Date(header.mkb_tanggal).toISOString().substring(0, 10)
-        : "",
+      mkaTanggal: formatDateLocal(header.mkb_tanggal),
       keterangan: header.min_ket,
       bagian: header.min_bagian,
+
+      spkFlags: {
+        isPendingSebagian: false,
+        accPending: "Y",
+        potong: "N",
+        cetak: "N",
+        bordir: "N",
+        jahit: "N",
+        finishing: "N",
+      },
+
       details: details.length
         ? details
         : [
@@ -136,12 +166,19 @@ const {
 onMounted(() => {
   if (!isEdit.value) {
     const bag = (authStore.user?.bagian || "").toUpperCase();
-    if (bag === "GA") {
+
+    // Prioritas 1: dari query param (dikirim browse)
+    if (jenisFromQuery) {
+      formData.value.jenis = jenisFromQuery;
+    }
+    // Prioritas 2: default per bagian (fallback kalau tidak ada query)
+    else if (bag === "GA") {
       formData.value.jenis = "ATK/RTK";
     } else if (bag === "TEKNISI" || bag === "IT") {
       formData.value.jenis = "SPAREPART";
       formData.value.bagian = bag;
     }
+    // Else: tetap default ACCESORIES dari initialData
   }
 });
 
@@ -263,9 +300,7 @@ const processSpkData = (
 
   if (mka) {
     formData.value.mkaNomor = mka.mkb_nomor;
-    formData.value.mkaTanggal = new Date(mka.mkb_tanggal)
-      .toISOString()
-      .substring(0, 10);
+    formData.value.mkaTanggal = formatDateLocal(mka.mkb_tanggal);
     toast.success("Data MKA berhasil ditarik otomatis.");
   } else {
     formData.value.mkaNomor = "";
@@ -458,7 +493,7 @@ const numFormat = (val: any) =>
 
 <template>
   <BaseForm
-    title="Form Permintaan Barang Garmen"
+    :title="formTitle"
     menuId="60"
     :icon="IconPackage"
     :is-loading="isLoading"
@@ -702,7 +737,9 @@ const numFormat = (val: any) =>
             </thead>
             <tbody>
               <tr v-for="(item, index) in formData.details" :key="index">
-                <td class="text-center bg-grey-lighten-4">{{ index + 1 }}</td>
+                <td class="text-center bg-grey-lighten-4">
+                  {{ Number(index) + 1 }}
+                </td>
                 <td class="bg-yellow-lighten-5">
                   <div class="d-flex align-center w-100 h-100 pr-1">
                     <input
@@ -710,13 +747,13 @@ const numFormat = (val: any) =>
                       class="cell-input cursor-pointer"
                       placeholder="[F1] Cari"
                       readonly
-                      @click="openBarangModal(index)"
+                      @click="openBarangModal(Number(index))"
                     />
                     <IconSearch
                       :size="15"
                       color="primary"
                       class="cursor-pointer"
-                      @click="openBarangModal(index)"
+                      @click="openBarangModal(Number(index))"
                     />
                   </div>
                 </td>
@@ -758,7 +795,7 @@ const numFormat = (val: any) =>
                     size="x-small"
                     variant="text"
                     color="error"
-                    @click="removeRow(index)"
+                    @click="removeRow(Number(index))"
                   >
                     <IconTrash :size="14" :stroke-width="1.7" />
                   </v-btn>

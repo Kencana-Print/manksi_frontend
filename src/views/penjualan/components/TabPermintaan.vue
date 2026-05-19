@@ -24,38 +24,50 @@ const showSalesModal = ref(false);
 const fileRef = ref<HTMLInputElement | null>(null);
 const uploadName = ref("");
 
+const imageError = ref(false);
+
+watch(
+  () => props.formData.PathImage,
+  () => {
+    imageError.value = false;
+  },
+);
+
 // ── STATE UNTUK MODAL PREVIEW ──
 const showPreviewDialog = ref(false);
 
-// ── COMPUTED UNTUK URL GAMBAR (Lokal atau Server) ──
+// ── COMPUTED UNTUK URL GAMBAR (Lokal Backend atau VPS Server) ──
 const displayImageUrl = computed(() => {
-  // 1. Prioritas utama: Jika user baru saja klik "Upload" (URL berwujud blob lokal)
+  if (imageError.value || !props.formData.PathImage) return "";
+
+  // 1. Prioritas Pertama: Preview lokal (Blob)
+  if (props.formData.PathImage.startsWith("blob:")) {
+    return props.formData.PathImage;
+  }
+
+  // 2. Prioritas Kedua: Jika PathImage sudah berupa URL lengkap (Mencegah Double Base URL)
   if (
-    props.formData.PathImage &&
-    props.formData.PathImage.startsWith("blob:")
+    props.formData.PathImage.startsWith("http://") ||
+    props.formData.PathImage.startsWith("https://")
   ) {
     return props.formData.PathImage;
   }
 
-  // 2. Jika mode Edit, ambil dari VPS menggunakan format Regex yang sudah paten
-  if (props.isEdit) {
-    const identifier = props.formData.Gambar || props.formData.Nomor;
-    if (!identifier) return "";
+  // 3. Prioritas Ketiga: Gambar dari backend lokal Web Node.js
+  if (props.formData.PathImage) {
+    const baseURL = api.defaults.baseURL
+      ? api.defaults.baseURL.replace(/\/api\/?$/, "")
+      : "";
+    const cleanPath = props.formData.PathImage.startsWith("/")
+      ? props.formData.PathImage
+      : `/${props.formData.PathImage}`;
+    return `${baseURL}${cleanPath}`;
+  }
 
-    let cleanName = identifier;
-    const matchMH = cleanName.match(/(MH\.\d{4}\.\d+)/i);
-
-    if (matchMH) {
-      cleanName = matchMH[1];
-      return `http://103.94.238.252:8888/file-gambar/mintaharga/${cleanName}.jpg`;
-    } else if (props.formData.Gambar) {
-      // Fallback untuk upload manual jika bukan nomor MH
-      cleanName = cleanName.replace(/.*imagemintaharga/i, "");
-      cleanName = cleanName.replace(/.*Downloads/i, "");
-      cleanName = cleanName.replace(/\\/g, "/").split("/").pop() || "";
-      cleanName = cleanName.replace(/\.(jpe?g|png)$/i, "");
-      return `http://103.94.238.252:8888/file-gambar/${encodeURIComponent(cleanName)}.jpg`;
-    }
+  // 4. Prioritas Keempat (Fallback): Gambar lama dari server Delphi VPS
+  if (props.isEdit && props.formData.Nomor) {
+    const nomorClean = encodeURIComponent(props.formData.Nomor);
+    return `http://103.94.238.252:8888/file-gambar/mintaharga/${nomorClean}.jpg`;
   }
 
   return "";
@@ -484,10 +496,11 @@ const onFileChange = (e: Event) => {
             style="cursor: pointer"
             title="Klik untuk melihat ukuran penuh"
             @click="showPreviewDialog = true"
+            @error="imageError = true"
           />
           <div v-else class="tp-img-empty">
-            <IconPhoto :size="28" color="#bdbdbd" />
-            <div class="mt-1">Belum ada gambar</div>
+            <IconPhotoOff :size="28" color="#bdbdbd" />
+            <div class="mt-1">Belum ada gambar / Gambar tidak ditemukan</div>
           </div>
         </div>
         <div class="tp-upload-row">

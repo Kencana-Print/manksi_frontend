@@ -11,14 +11,26 @@ import { IconAlertCircle, IconPrinter, IconPencil } from "@tabler/icons-vue";
 const toast = useToast();
 const router = useRouter();
 
+const formatDateLocal = (value?: string | Date) => {
+  if (!value) return "";
+
+  const d = new Date(value);
+
+  if (isNaN(d.getTime())) return "";
+
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+};
+
 // Default Tanggal: Awal Bulan sd Hari Ini
 const getFirstDayOfMonth = () => {
   const date = new Date();
-  return new Date(date.getFullYear(), date.getMonth(), 1)
-    .toISOString()
-    .substr(0, 10);
+  return formatDateLocal(new Date(date.getFullYear(), date.getMonth(), 1));
 };
-const getToday = () => new Date().toISOString().substr(0, 10);
+const getToday = () => formatDateLocal(new Date());
 
 const startDate = ref(getFirstDayOfMonth());
 const endDate = ref(getToday());
@@ -141,32 +153,21 @@ const handlePrint = () => {
     @export="exportToExcel('Data_BAP_Produksi')"
   >
     <template #filter-left>
-      <div
-        class="d-flex align-center bg-white px-3 py-1 rounded border mr-2"
-        style="gap: 12px"
-      >
-        <span class="text-caption font-weight-bold">Periode</span>
-        <v-text-field
+      <div class="f-group">
+        <span class="f-label">Periode</span>
+        <input
+          type="date"
           v-model="startDate"
-          type="date"
-          variant="underlined"
-          density="compact"
-          hide-details
-          class="text-caption"
-          style="width: 110px"
+          class="f-date"
           @change="fetchData"
-        ></v-text-field>
-        <span class="text-caption">sd</span>
-        <v-text-field
+        />
+        <span class="f-sep">s/d</span>
+        <input
+          type="date"
           v-model="endDate"
-          type="date"
-          variant="underlined"
-          density="compact"
-          hide-details
-          class="text-caption"
-          style="width: 110px"
+          class="f-date"
           @change="fetchData"
-        ></v-text-field>
+        />
       </div>
     </template>
 
@@ -199,39 +200,29 @@ const handlePrint = () => {
     </template>
 
     <template #filter-right>
-      <div
-        class="d-flex align-center bg-white pa-1 px-3 rounded border mr-2"
-        style="gap: 12px"
-      >
-        <div class="d-flex align-center">
-          <div
-            class="bg-red mr-1"
-            style="width: 14px; height: 14px; border-radius: 2px"
-          ></div>
-          <span class="text-caption font-weight-bold text-red"
-            >Belum di Approve</span
-          >
+      <div class="legend-box">
+        <div class="legend-row">
+          <span class="legend-title">Font:</span>
+          <div class="legend-item">
+            <div class="legend-dot" style="background: #e53935"></div>
+            Belum Approve
+          </div>
         </div>
-        <v-divider vertical class="mx-2"></v-divider>
-        <div class="text-caption font-weight-bold mr-1">
-          Back Color (No. BAP):
-        </div>
-        <div class="d-flex align-center">
-          <div
-            class="bg-blue mr-1"
-            style="width: 14px; height: 14px; border-radius: 2px"
-          ></div>
-          <span class="text-caption mr-2">Nunggu Acc</span>
-          <div
-            class="bg-green mr-1"
-            style="width: 14px; height: 14px; border-radius: 2px"
-          ></div>
-          <span class="text-caption mr-2">Sudah Acc</span>
-          <div
-            class="bg-red mr-1"
-            style="width: 14px; height: 14px; border-radius: 2px"
-          ></div>
-          <span class="text-caption">Tolak</span>
+        <div class="legend-divider" />
+        <div class="legend-row">
+          <span class="legend-title">Back (No. BAP):</span>
+          <div class="legend-item">
+            <div class="legend-dot" style="background: #1565c0"></div>
+            Nunggu Acc
+          </div>
+          <div class="legend-item">
+            <div class="legend-dot" style="background: #2e7d32"></div>
+            Sudah Acc
+          </div>
+          <div class="legend-item">
+            <div class="legend-dot" style="background: #c62828"></div>
+            Tolak
+          </div>
         </div>
       </div>
     </template>
@@ -263,3 +254,74 @@ const handlePrint = () => {
     @saved="fetchData"
   />
 </template>
+
+<style scoped>
+.f-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.f-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #555;
+  white-space: nowrap;
+}
+.f-sep {
+  font-size: 11px;
+  color: #777;
+}
+.f-date {
+  height: 28px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  padding: 0 6px;
+  font-size: 12px;
+  background: white;
+  outline: none;
+}
+.f-date:focus {
+  border-color: #1565c0;
+}
+
+.legend-box {
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  padding: 4px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.legend-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+}
+.legend-title {
+  font-size: 10px;
+  font-weight: 700;
+  color: #555;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  color: #424242;
+  white-space: nowrap;
+}
+.legend-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+.legend-divider {
+  height: 1px;
+  background: #eeeeee;
+}
+</style>

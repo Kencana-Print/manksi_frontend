@@ -28,6 +28,18 @@ const showPrintDialog = ref(false);
 const printStep = ref(1); // 1 = Pilih Gambar/Tidak, 2 = Pilih Orientasi
 const savedNomor = ref(""); // Menyimpan nomor yang baru saja di-save
 
+const formatDateLocal = (value?: string | Date) => {
+  if (!value) return "";
+
+  const d = new Date(value);
+
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+};
+
 // Sesuai dengan field di database dan UI Delphi
 const initialData = {
   Nomor: "",
@@ -99,7 +111,7 @@ const {
     return {
       Nomor: d.pen_nomor,
       Divisi: String(d.pen_divisi),
-      Tanggal: d.pen_tanggal?.substring(0, 10) ?? "",
+      Tanggal: formatDateLocal(d.pen_tanggal),
       Tipe: d.pen_tipe,
       PerushKode: d.pen_perush_kode,
       NamaPerusahaan: d.perush_nama || "Kencana Print", // <--- Tambahkan Ini

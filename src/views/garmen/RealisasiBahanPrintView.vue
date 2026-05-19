@@ -108,7 +108,7 @@ onMounted(async () => {
         </thead>
         <tbody>
           <tr v-for="(item, idx) in printData.details" :key="idx">
-            <td class="text-center">{{ idx + 1 }}</td>
+            <td class="text-center">{{ Number(idx) + 1 }}</td>
             <td>{{ item.kode }}</td>
             <td>{{ item.nama }}</td>
             <td class="text-center">{{ item.satuan }}</td>
@@ -147,6 +147,7 @@ onMounted(async () => {
   }
   body {
     -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
 }
 

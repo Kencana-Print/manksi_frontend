@@ -769,6 +769,142 @@ const router = createRouter({
         requiresAuth: true,
       },
     },
+    {
+      path: "/garmen/barang/mutasi-out",
+      name: "MutasiOutGarmenBrowse",
+      component: () => import("@/views/garmen/MutasiOutBarangView.vue"),
+      meta: {
+        title: "Mutasi Out Garmen",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "70",
+      },
+    },
+    {
+      path: "/garmen/barang/mutasi-out/create",
+      name: "MutasiOutGarmenFormCreate",
+      component: () => import("@/views/garmen/MutasiOutBarangFormView.vue"),
+      meta: {
+        title: "Tambah Mutasi Out",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "70",
+        browseRoute: "MutasiOutGarmenBrowse",
+      },
+    },
+    {
+      path: "/garmen/barang/mutasi-out/edit/:nomor",
+      name: "MutasiOutGarmenFormEdit",
+      component: () => import("@/views/garmen/MutasiOutBarangFormView.vue"),
+      meta: {
+        title: "Ubah Mutasi Out",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "70",
+        browseRoute: "MutasiOutGarmenBrowse",
+      },
+    },
+    {
+      path: "/garmen/barang/mutasi-out/print/:nomor",
+      name: "MutasiOutGarmenPrint",
+      component: () => import("@/views/garmen/MutasiOutBarangPrintView.vue"),
+      meta: {
+        title: "Cetak Mutasi Out Garmen",
+        layout: "BlankLayout", // WAJIB
+        requiresAuth: true,
+      },
+    },
+    {
+      path: "/garmen/barang/mutasi-in",
+      name: "MutasiInGarmenBrowse",
+      component: () => import("@/views/garmen/MutasiInBarangView.vue"),
+      meta: {
+        title: "Mutasi In Garmen",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "69", // Sesuai ID di database Delphi
+      },
+    },
+    {
+      path: "/garmen/barang/po-nonbahan",
+      name: "PoNonBahanGarmenBrowse",
+      component: () => import("@/views/garmen/PoNonBahanView.vue"),
+      meta: {
+        title: "PO Non Bahan Garmen",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "66", // Menu ID sesuai Delphi
+      },
+    },
+    {
+      path: "/garmen/barang/po-nonbahan/create",
+      name: "PoNonBahanGarmenFormCreate",
+      component: () => import("@/views/garmen/PoNonBahanFormView.vue"), // Placeholder
+      meta: {
+        title: "Tambah PO Non Bahan",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "66",
+        browseRoute: "PoNonBahanGarmenBrowse",
+      },
+    },
+    {
+      path: "/garmen/barang/po-nonbahan/edit/:nomor",
+      name: "PoNonBahanGarmenFormEdit",
+      component: () => import("@/views/garmen/PoNonBahanFormView.vue"), // Placeholder
+      meta: {
+        title: "Ubah PO Non Bahan",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "66",
+        browseRoute: "PoNonBahanGarmenBrowse",
+      },
+    },
+    {
+      path: "/garmen/barang/po-nonbahan/print/:nomor",
+      name: "PoNonBahanGarmenPrint",
+      component: () => import("@/views/garmen/PoNonBahanPrintView.vue"), // Placeholder
+      meta: {
+        title: "Cetak PO Non Bahan",
+        layout: "BlankLayout",
+        requiresAuth: true,
+      },
+    },
+    {
+      path: "/garmen/barang/bpb-nonbahan",
+      name: "BpbNonBahanGarmenBrowse",
+      component: () => import("@/views/garmen/BpbNonBahanView.vue"),
+      meta: {
+        title: "BPB Non Bahan Garmen",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "67",
+      },
+    },
+    {
+      path: "/garmen/barang/bpb-nonbahan/create",
+      name: "BpbNonBahanGarmenFormCreate",
+      component: () => import("@/views/garmen/BpbNonBahanFormView.vue"),
+      meta: {
+        title: "Tambah BPB Non Bahan",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "67",
+        browseRoute: "BpbNonBahanGarmenBrowse",
+      },
+    },
+    {
+      path: "/garmen/barang/bpb-nonbahan/edit/:nomor",
+      name: "BpbNonBahanGarmenFormEdit",
+      component: () => import("@/views/garmen/BpbNonBahanFormView.vue"),
+      meta: {
+        title: "Ubah BPB Non Bahan",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "67",
+        browseRoute: "BpbNonBahanGarmenBrowse",
+      },
+    },
 
     {
       path: "/garmen/po-internal-map",
@@ -1218,9 +1354,35 @@ const router = createRouter({
 
     // ── Laporan ───────────────────────────────────────────────────
     {
+      path: "/laporan/gudang-garmen/po-bahan-vs-mkb",
+      name: "LapPoBahanVsMkb",
+      component: () =>
+        import("@/views/laporan/gudang-garmen/PoBahanVsMkbView.vue"),
+      meta: {
+        title: "PO Bahan vs MKB",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "511",
+      },
+    },
+    {
+      path: "/laporan/gudang-garmen/po-bahan-vs-bpb",
+      name: "LapPoBahanVsBpb",
+      component: () =>
+        import("@/views/laporan/gudang-garmen/PoBahanVsBpbView.vue"),
+      meta: {
+        title: "PO Bahan vs BPB",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "512",
+      },
+    },
+
+    {
       path: "/laporan/penjualan/penawaran-vs-spk",
       name: "LapPenawaranVsSpk",
-      component: () => import("@/views/laporan/PenawaranVsSpkView.vue"),
+      component: () =>
+        import("@/views/laporan/penjualan/PenawaranVsSpkView.vue"),
       meta: {
         title: "Penawaran vs SPK",
         layout: "DefaultLayout",
@@ -1231,11 +1393,25 @@ const router = createRouter({
     {
       path: "/laporan/penjualan/realisasi-penawaran",
       name: "LapRealisasiPenawaran",
-      component: () => import("@/views/laporan/RealisasiPenawaranView.vue"),
+      component: () =>
+        import("@/views/laporan/penjualan/RealisasiPenawaranView.vue"),
       meta: {
         title: "Laporan Realisasi Penawaran",
         layout: "DefaultLayout",
         requiresAuth: true,
+      },
+    },
+
+    // ── Tools ───────────────────────────────────────────────────
+    {
+      path: "/tools/users",
+      name: "MasterUser",
+      component: () => import("@/views/tools/UserView.vue"),
+      meta: {
+        title: "Master User",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        // Tidak perlu menuId karena backend menggunakan requireAdmin
       },
     },
 
@@ -1265,7 +1441,7 @@ const router = createRouter({
 });
 
 // ── Navigation Guard ──────────────────────────────────────────────────
-router.beforeEach((to, _from, next) => {
+router.beforeEach((to, _from) => {
   const authStore = useAuthStore();
 
   // Update judul tab browser
@@ -1274,21 +1450,23 @@ router.beforeEach((to, _from, next) => {
 
   // 1. Belum login → ke Login
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
-    return next({ name: "Login" });
+    return { name: "Login" }; // Gunakan return object, bukan next()
   }
 
   // 2. Sudah login tapi buka halaman Login → ke Dashboard
   if (to.name === "Login" && authStore.isAuthenticated) {
-    return next({ name: "Dashboard" });
+    return { name: "Dashboard" };
   }
 
-  // 3. Punya menuId tapi tidak ada hak akses → ke 403 (bukan Dashboard)
-  //    Sertakan path asal sebagai query agar halaman 403 bisa tampilkan info
+  // 3. Punya menuId tapi tidak ada hak akses → ke 403
+  // Perhatikan: Karena menu Master User tidak punya to.meta.menuId, blok ini akan dilewati.
+  // Ini aman karena Master User tidak mewajibkan menuId, melainkan cukup proteksi Admin dari backend/URL
   if (to.meta.menuId && !authStore.can(to.meta.menuId as string, "view")) {
-    return next({ name: "Unauthorized", query: { from: to.fullPath } });
+    return { name: "Unauthorized", query: { from: to.fullPath } };
   }
 
-  next();
+  // Jika semua kondisi aman, router otomatis melanjutkan perjalanan tanpa return apa pun
+  // (Sama dengan memanggil next() tanpa parameter di versi Vue Router lama)
 });
 
 export default router;

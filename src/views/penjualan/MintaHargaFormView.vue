@@ -17,6 +17,18 @@ type RouteParams = {
 const selectedImageFile = ref<File | null>(null);
 const toast = useToast();
 
+const formatDateLocal = (value?: string | Date) => {
+  if (!value) return "";
+
+  const d = new Date(value);
+
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+};
+
 const initialData = {
   Nomor: "",
   Tanggal: new Date().toISOString().substring(0, 10),
@@ -137,7 +149,7 @@ const {
     const d: any = res.data.data;
     return {
       Nomor: d.mh_nomor,
-      Tanggal: d.mh_tanggal?.substring(0, 10) ?? "",
+      Tanggal: formatDateLocal(d.mh_tanggal),
       Divisi: d.mh_divisi,
       CustKode: d.mh_cus_kode,
       CustNama: d.mh_cus_nama,
@@ -147,7 +159,7 @@ const {
       RencanaOrder: Number(d.mh_jmlorder) || 0,
       HargaLama: Number(d.mh_harga) || 0,
       HargaBudget: Number(d.mh_budget) || 0,
-      TanggalOrderTerakhir: d.mh_dateorder?.substring(0, 10) ?? "",
+      TanggalOrderTerakhir: formatDateLocal(d.mh_dateorder),
       Kain: d.mh_kain,
       Ukuran: d.mh_ukuran,
       Panjang: Number(d.mh_panjang) || 0,

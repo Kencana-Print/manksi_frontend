@@ -2,8 +2,15 @@
 import { ref, watch, computed } from "vue";
 import { useBrowse } from "@/composables/useBrowse";
 import BaseBrowse from "@/components/BaseBrowse.vue";
-import { realisasiPenawaranService } from "@/services/laporan/realisasiPenawaranService";
+import { realisasiPenawaranService } from "@/services/laporan/penjualan/realisasiPenawaranService";
 import { IconReportAnalytics } from "@tabler/icons-vue";
+
+interface RealisasiPenawaranItem {
+  Nominal: number;
+  Close: number;
+  Batal: number;
+  Open: number;
+}
 
 // Gunakan local date — JANGAN pakai toISOString() karena UTC bisa mundur 1 hari di WIB
 const toLocalDate = (d: Date) => {
@@ -58,8 +65,16 @@ const num = (val: any) =>
 const pct = (val: any) => (Number(val) || 0).toFixed(2) + "%";
 
 const grandTotal = computed(() =>
-  items.value.reduce(
-    (acc: any, curr: any) => {
+  (items.value ?? []).reduce(
+    (
+      acc: {
+        nominal: number;
+        close: number;
+        batal: number;
+        open: number;
+      },
+      curr: RealisasiPenawaranItem,
+    ) => {
       acc.nominal += Number(curr.Nominal) || 0;
       acc.close += Number(curr.Close) || 0;
       acc.batal += Number(curr.Batal) || 0;
@@ -89,7 +104,7 @@ const pctOpen = computed(() =>
     menu-id="302"
     :icon="IconReportAnalytics"
     :headers="masterHeaders"
-    :items="items"
+    :items="items ?? []"
     :is-loading="isLoading"
     :can-insert="false"
     :can-edit="false"

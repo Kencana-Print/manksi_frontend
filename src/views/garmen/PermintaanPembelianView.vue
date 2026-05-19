@@ -17,6 +17,27 @@ import {
   IconFileDescription,
 } from "@tabler/icons-vue";
 
+interface ExportDetailItem {
+  Nomor: string;
+  Jenis: string;
+  Tanggal: string;
+  Keterangan: string;
+  "Minta Ke": string;
+  Priority: string;
+  User: string;
+  Bagian: string;
+  Cabang: string;
+  Status: string;
+  "Kode Barang": string;
+  "Nama Barang": string;
+  Satuan: string;
+  Jumlah: number;
+  Terima: number;
+  "Ket Pembelian": string;
+  Spesifikasi: string;
+  Kegunaan: string;
+}
+
 const router = useRouter();
 const toast = useToast();
 const authStore = useAuthStore();
@@ -187,12 +208,13 @@ const onCloseManual = async () => {
 const isExportingDetail = ref(false);
 const onExportDetail = async () => {
   if (!canExport.value) return toast.error("Anda tidak memiliki akses Export.");
-  if (items.value.length === 0) return toast.warning("Tidak ada data.");
+  if (!items.value || items.value.length === 0)
+    return toast.warning("Tidak ada data.");
 
   isExportingDetail.value = true;
   toast.info("Menyiapkan export detail...");
   try {
-    const allDetails = [];
+    const allDetails: ExportDetailItem[] = [];
     for (const item of items.value) {
       let detail = detailsData.value[item.Nomor];
       if (!detail) {

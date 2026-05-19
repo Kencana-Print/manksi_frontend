@@ -50,6 +50,18 @@ type RouteParams = {
 
 const toast = useToast();
 
+const formatDateLocal = (value?: string | Date) => {
+  if (!value) return "";
+
+  const d = new Date(value);
+
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+};
+
 const initialData = {
   header: {
     sj_nomor: "",
@@ -99,7 +111,7 @@ const {
     return {
       header: {
         sj_nomor: raw.header.SJ_Nomor,
-        sj_tanggal: raw.header.SJ_Tanggal?.substring(0, 10),
+        sj_tanggal: formatDateLocal(raw.header.SJ_Tanggal),
         sj_divisi: String(raw.header.sj_divisi),
         sj_perush_kode: raw.header.SJ_Perush_kode,
         perush_nama: raw.header.perush_nama,

@@ -17,7 +17,7 @@ const headers = [
   { title: "NOMOR", key: "Nomor", width: "140px" },
   { title: "TANGGAL", key: "Tanggal", width: "100px" },
   { title: "NAMA PRODUK", key: "NamaProduk", minWidth: "200px" },
-  { title: "JUMLAH", key: "Jumlah", width: "90px", align: "right" },
+  { title: "JUMLAH", key: "Jumlah", width: "90px", align: "end" as const },
   { title: "KETERANGAN", key: "Keterangan", minWidth: "150px" },
 ];
 

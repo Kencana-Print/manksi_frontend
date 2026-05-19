@@ -2,7 +2,7 @@
 import { ref, watch, onMounted } from "vue";
 import { useBrowse } from "@/composables/useBrowse";
 import BaseBrowse from "@/components/BaseBrowse.vue";
-import { penawaranVsSpkService } from "@/services/laporan/penawaranVsSpkService";
+import { penawaranVsSpkService } from "@/services/laporan/penjualan/penawaranVsSpkService";
 import api from "@/services/api";
 import { IconReportAnalytics } from "@tabler/icons-vue";
 
@@ -121,7 +121,7 @@ const formatTgl = (v: string) => {
     menu-id="301"
     :icon="IconReportAnalytics"
     :headers="masterHeaders"
-    :items="items"
+    :items="items ?? []"
     :is-loading="isLoading"
     :can-insert="false"
     :can-edit="false"

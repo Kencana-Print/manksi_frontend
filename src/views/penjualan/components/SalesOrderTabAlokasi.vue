@@ -161,7 +161,7 @@ const handleExcelUpload = (e: Event) => {
           </thead>
           <tbody>
             <tr v-for="(row, idx) in formData.Alokasi" :key="idx">
-              <td class="ll-td-ctr ll-td-lbl">{{ idx + 1 }}</td>
+              <td class="ll-td-ctr ll-td-lbl">{{ Number(idx) + 1 }}</td>
               <td class="ll-td-inp">
                 <input
                   type="text"
@@ -205,7 +205,7 @@ const handleExcelUpload = (e: Event) => {
                 <button
                   type="button"
                   class="btn-del"
-                  @click="removeRow(idx)"
+                  @click="removeRow(Number(idx))"
                   title="Hapus Baris"
                 >
                   <IconTrash :size="14" />

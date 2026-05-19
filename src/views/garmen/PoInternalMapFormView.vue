@@ -34,6 +34,20 @@ const getLocalDate = () => {
   return `${year}-${month}-${day}`;
 };
 
+const formatDateLocal = (value?: string | Date) => {
+  if (!value) return "";
+
+  const d = new Date(value);
+
+  if (isNaN(d.getTime())) return "";
+
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+};
+
 const createEmptyRow = () => ({
   KodeMAP: "",
   NamaMAP: "",
@@ -80,9 +94,7 @@ const mapDataToForm = (backendData: any) => {
 
   return {
     Nomor: header.poi_nomor || "",
-    Tanggal: header.poi_tanggal
-      ? header.poi_tanggal.substring(0, 10)
-      : getLocalDate(),
+    Tanggal: formatDateLocal(header.poi_tanggal || new Date()),
     GudangAsal: header.poi_cab || "",
     GudangAsalNama: header.namacab || "",
     Tujuan: header.poi_sup || "",
@@ -102,7 +114,7 @@ const mapDataToForm = (backendData: any) => {
                 d.poid_dateline &&
                 !d.poid_dateline.startsWith("1899") &&
                 !d.poid_dateline.startsWith("0000")
-                  ? d.poid_dateline.substring(0, 10)
+                  ? formatDateLocal(d.poid_dateline)
                   : "",
               Keterangan: d.poid_ket || "",
               Gambar: false,

@@ -23,7 +23,25 @@ const route = useRoute();
 const toast = useToast();
 
 const isEditMode = computed(() => !!route.params.nomor);
-const todayLocal = new Date().toISOString().substring(0, 10);
+const formatDateLocal = (value?: string | Date) => {
+  if (!value) return "";
+
+  // YYYY-MM-DD jangan diparse ulang
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return value;
+  }
+
+  const d = new Date(value);
+
+  if (isNaN(d.getTime())) return "";
+
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+};
+const todayLocal = formatDateLocal(new Date());
 
 // ── Modal state ──
 const showSupModal = ref(false);
@@ -83,9 +101,7 @@ const {
     return {
       header: {
         ...d.header,
-        po_tanggal: d.header.po_tanggal
-          ? d.header.po_tanggal.substring(0, 10)
-          : todayLocal,
+        po_tanggal: formatDateLocal(d.header.po_tanggal || new Date()),
         po_jenis: Number(d.header.po_jenis) || 3,
         sup_nama: d.header.sup_nama || "",
         sup_alamat: d.header.sup_alamat || "",
@@ -115,9 +131,7 @@ const {
         mkb: row.pod_mkb_nomor || "",
       })),
       delivery: (d.delivery || []).map((row: any) => ({
-        tanggal: row.pod2_tanggal
-          ? row.pod2_tanggal.substring(0, 10)
-          : todayLocal,
+        tanggal: formatDateLocal(row.pod2_tanggal || new Date()),
         jumlah: Number(row.pod2_jumlah) || 0,
         kode: row.pod2_bhn_kode || "",
         nama: row.bhn_name || "",
@@ -207,7 +221,9 @@ const setMppb = async (v: any) => {
 
     // PERBAIKAN DI SINI: Tambahkan satu tingkat .data lagi
     // Karena struktur backend-mu: data { data { jumlah } }
-    formData.value.header.tgl_mppb = res.data.data.data.tanggal;
+    formData.value.header.tgl_mppb = formatDateLocal(
+      res.data.data.data.tanggal,
+    );
     formData.value.header.jmlmppb = res.data.data.data.jumlah;
   } catch (e: any) {
     toast.error(e.response?.data?.message || "Gagal memvalidasi MPPB.");
@@ -704,14 +720,14 @@ const validateSave = () => {
             </thead>
             <tbody>
               <tr v-for="(row, idx) in formData.items" :key="idx">
-                <td class="tc gt-lbl">{{ idx + 1 }}</td>
+                <td class="tc gt-lbl">{{ Number(idx) + 1 }}</td>
                 <td class="p0">
                   <div class="cell-grp">
                     <input v-model="row.kode" class="ci" readonly />
                     <button
                       type="button"
                       class="ci-btn"
-                      @click="openLookupBahan(idx)"
+                      @click="openLookupBahan(Number(idx))"
                     >
                       <IconSearch :size="12" />
                     </button>
@@ -739,7 +755,7 @@ const validateSave = () => {
                     v-model.number="row.roll"
                     type="number"
                     class="ci tr"
-                    @blur="recalcRow(idx)"
+                    @blur="recalcRow(Number(idx))"
                   />
                 </td>
                 <td class="p0">
@@ -747,7 +763,7 @@ const validateSave = () => {
                     v-model.number="row.jumlah"
                     type="number"
                     class="ci tr fw bg-yellow-light"
-                    @blur="recalcRow(idx)"
+                    @blur="recalcRow(Number(idx))"
                   />
                 </td>
                 <td class="p0">
@@ -755,7 +771,7 @@ const validateSave = () => {
                     v-model.number="row.harga"
                     type="number"
                     class="ci tr bg-yellow-light"
-                    @blur="recalcRow(idx)"
+                    @blur="recalcRow(Number(idx))"
                   />
                 </td>
                 <td class="p0">
@@ -763,7 +779,7 @@ const validateSave = () => {
                     v-model.number="row.diskon"
                     type="number"
                     class="ci tr bg-yellow-light"
-                    @blur="recalcRow(idx)"
+                    @blur="recalcRow(Number(idx))"
                   />
                 </td>
                 <td class="p0">
@@ -779,7 +795,7 @@ const validateSave = () => {
                     <button
                       type="button"
                       class="ci-btn"
-                      @click="openLookupSpk(idx)"
+                      @click="openLookupSpk(Number(idx))"
                     >
                       <IconSearch :size="12" />
                     </button>
@@ -791,7 +807,7 @@ const validateSave = () => {
                     <button
                       type="button"
                       class="ci-btn"
-                      @click="openLookupMkb(idx)"
+                      @click="openLookupMkb(Number(idx))"
                     >
                       <IconSearch :size="12" />
                     </button>
@@ -801,7 +817,7 @@ const validateSave = () => {
                   <button
                     type="button"
                     class="btn-del"
-                    @click="removeItem(idx)"
+                    @click="removeItem(Number(idx))"
                     title="Hapus"
                   >
                     ✕
@@ -843,7 +859,7 @@ const validateSave = () => {
                 </thead>
                 <tbody>
                   <tr v-for="(d, idx) in formData.delivery" :key="idx">
-                    <td class="tc gt-lbl">{{ idx + 1 }}</td>
+                    <td class="tc gt-lbl">{{ Number(idx) + 1 }}</td>
                     <td class="p0">
                       <input type="date" v-model="d.tanggal" class="ci w-100" />
                     </td>
@@ -860,7 +876,7 @@ const validateSave = () => {
                         <button
                           type="button"
                           class="ci-btn"
-                          @click="openDeliveryBahan(idx)"
+                          @click="openDeliveryBahan(Number(idx))"
                         >
                           <IconSearch :size="12" />
                         </button>
@@ -873,7 +889,7 @@ const validateSave = () => {
                       <button
                         type="button"
                         class="btn-del"
-                        @click="removeDelivery(idx)"
+                        @click="removeDelivery(Number(idx))"
                         title="Hapus"
                       >
                         ✕

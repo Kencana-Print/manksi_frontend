@@ -16,7 +16,7 @@ const totalItems = ref(0);
 const headers = [
   { title: "NOMOR INVOICE", key: "Nomor", width: "160px" },
   { title: "TANGGAL", key: "Tanggal", width: "100px" },
-  { title: "TOTAL QTY", key: "Qty", width: "100px", align: "right" },
+  { title: "TOTAL QTY", key: "Qty", width: "100px", align: "end" as const },
   { title: "KETERANGAN", key: "Keterangan", minWidth: "200px" },
 ];
 

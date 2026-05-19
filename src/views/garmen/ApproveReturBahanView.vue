@@ -52,6 +52,8 @@ const {
   },
   // Batal Approve di-mapping ke deleteApi
   deleteApi: async (nomor) => {
+    if (!items.value) return;
+
     const item = items.value.find((i: any) => i.Nomor === nomor);
     // VALIDASI: Jika tidak ada NoApprov (berarti belum di-approve) -> Error
     if (!item?.NoApprov || item.NoApprov.trim() === "") {
@@ -205,7 +207,7 @@ const onCetakBarcode = (item: any) => {
     menu-id="137"
     :icon="IconDiscountCheckFilled"
     :headers="headers"
-    :items="items"
+    :items="items ?? []"
     :is-loading="isLoading"
     item-value="Nomor"
     show-expand
@@ -329,7 +331,7 @@ const onCetakBarcode = (item: any) => {
           </thead>
           <tbody>
             <tr v-for="(d, i) in item.details" :key="i">
-              <td class="tc">{{ i + 1 }}</td>
+              <td class="tc">{{ Number(i) + 1 }}</td>
               <td style="font-weight: 600; color: #1565c0">{{ d.Kode }}</td>
               <td>{{ d.Nama }}</td>
               <td class="tc">{{ d.Satuan }}</td>

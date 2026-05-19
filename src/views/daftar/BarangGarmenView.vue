@@ -140,6 +140,8 @@ const headers = computed(() => {
     { title: "STOK", key: "Stok", width: "80px", align: "right" },
     { title: "SAFETY", key: "Safety", width: "80px", align: "right" },
     { title: "AKTIF", key: "Aktif", width: "70px", align: "center" },
+    { title: "USER CREATE", key: "Usr", width: "110px" },
+    { title: "DATE CREATE", key: "Created", width: "160px" },
   ];
 });
 

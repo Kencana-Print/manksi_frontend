@@ -142,7 +142,10 @@ const onAdd = async () => {
         );
       }
     }
-    router.push("/garmen/barang/permintaan/form");
+    // Pass jenis dari filter ke form
+    router.push(
+      `/garmen/barang/permintaan/form?jenis=${filterState.value.jenis}`,
+    );
   } catch (e: any) {
     toast.error(e.response?.data?.message || "Gagal memverifikasi akses.");
   }
@@ -399,7 +402,9 @@ const num = (val: number) => new Intl.NumberFormat("id-ID").format(val || 0);
         />
       </div>
 
-      <div class="filter-group ml-3">
+      <div class="filter-divider" />
+
+      <div class="filter-group">
         <span class="filter-label">Cabang</span>
         <select
           v-model="filterState.cabang"
@@ -413,18 +418,21 @@ const num = (val: number) => new Intl.NumberFormat("id-ID").format(val || 0);
         </select>
       </div>
 
-      <div class="filter-group ml-3">
+      <div class="filter-divider" />
+
+      <div class="filter-group">
         <span class="filter-label">Jenis</span>
-        <select
-          v-model="filterState.jenis"
-          class="date-inp"
-          style="width: 120px"
-          @change="fetchData"
-        >
-          <option v-for="jns in jenisOptions" :key="jns" :value="jns">
-            {{ jns }}
-          </option>
-        </select>
+        <div class="radio-wrap">
+          <label v-for="jns in jenisOptions" :key="jns" class="radio-label">
+            <input
+              type="radio"
+              v-model="filterState.jenis"
+              :value="jns"
+              @change="fetchData"
+            />
+            {{ jns === "ATK/RTK" ? "ATK" : jns === "ACCESORIES" ? "ACC" : jns }}
+          </label>
+        </div>
       </div>
 
       <div class="filter-divider" />
@@ -538,7 +546,7 @@ const num = (val: number) => new Intl.NumberFormat("id-ID").format(val || 0);
               </thead>
               <tbody>
                 <tr v-for="(dtl, i) in item.details" :key="i">
-                  <td class="tc">{{ i + 1 }}</td>
+                  <td class="tc">{{ Number(i) + 1 }}</td>
                   <td style="font-weight: 600; color: #1565c0">
                     {{ dtl.Kode }}
                   </td>
@@ -605,7 +613,7 @@ const num = (val: number) => new Intl.NumberFormat("id-ID").format(val || 0);
                     }"
                     @click="selectRealisasi(item.Nomor, rel.NoRealisasi)"
                   >
-                    <td class="tc">{{ i + 1 }}</td>
+                    <td class="tc">{{ Number(i) + 1 }}</td>
                     <td style="font-weight: 700; color: #00796b">
                       {{ rel.NoRealisasi }}
                     </td>
@@ -684,7 +692,7 @@ const num = (val: number) => new Intl.NumberFormat("id-ID").format(val || 0);
                       )"
                       :key="j"
                     >
-                      <td class="tc">{{ j + 1 }}</td>
+                      <td class="tc">{{ Number(j) + 1 }}</td>
                       <td style="font-weight: 600; color: #1565c0">
                         {{ dtl.Kode }}
                       </td>
@@ -1020,5 +1028,33 @@ const num = (val: number) => new Intl.NumberFormat("id-ID").format(val || 0);
 }
 .dlg-btn.cancel:hover {
   background: #d0d0d0;
+}
+
+.radio-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: white;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  padding: 0 8px;
+  height: 28px;
+}
+.radio-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #424242;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.radio-label input[type="radio"] {
+  accent-color: #1565c0;
+  cursor: pointer;
+  width: 13px;
+  height: 13px;
+  margin: 0;
 }
 </style>

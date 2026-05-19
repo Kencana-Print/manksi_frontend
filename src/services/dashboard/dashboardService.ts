@@ -12,4 +12,8 @@ export const dashboardService = {
 
   getRealisasiSummary: () =>
     api.get("/laporan/penjualan/realisasi-penawaran/dashboard-summary"),
+
+  getPoBahanSisa: () => api.get("/dashboard/po-bahan-sisa"),
+
+  getPoBahanBpbSummary: () => api.get("/dashboard/po-bahan-bpb-summary"),
 };

@@ -3,6 +3,9 @@ import { ref, computed, onMounted, onUnmounted } from "vue";
 import { useAuthStore } from "@/stores/authStore";
 import logoSrc from "@/assets/logo.png";
 
+import { usePasswordDialog } from "@/composables/usePasswordDialog";
+import ChangePasswordDialog from "@/components/dialogs/ChangePasswordDialog.vue";
+
 import {
   IconFolder,
   IconLayoutList,
@@ -53,6 +56,7 @@ import {
   IconFileDescription,
   IconShoppingCartCopy,
   IconReportAnalytics,
+  IconFileAnalytics,
 } from "@tabler/icons-vue";
 
 interface NavItem {
@@ -65,6 +69,7 @@ interface NavItem {
   items?: NavItem[];
   subItems?: NavItem[];
   model?: { value: boolean };
+  adminOnly?: boolean;
 }
 
 const authStore = useAuthStore();
@@ -76,7 +81,7 @@ const openedGroups = ref<string[]>([]);
 const availableNavWidth = ref(9999);
 const showDesktopNav = computed(() => availableNavWidth.value >= 1050);
 
-const fileMenu = ref(false);
+const toolsMenu = ref(false);
 const daftarMenu = ref(false);
 const pembelianMenu = ref(false);
 const garmenMenu = ref(false);
@@ -101,7 +106,13 @@ const userRoleConfig = computed(() => {
   return { icon: IconTie, color: "indigo-darken-2" };
 });
 
+const isAdmin = computed(() => {
+  const kode = authStore.user?.kode?.toUpperCase() || "";
+  return kode === "ADMIN" || kode === "DEVELOPER";
+});
+
 const hasAccess = (item: NavItem): boolean => {
+  if (item.adminOnly && !isAdmin.value) return false; // Cek admin
   if (item.menuId && !authStore.can(item.menuId.toString(), "view"))
     return false;
   if (item.subItems?.length) return item.subItems.some((s) => hasAccess(s));
@@ -117,15 +128,6 @@ const openMenu = (targetModel: { value: boolean }) => {
 };
 
 const menuItems: NavItem[] = [
-  {
-    title: "File",
-    icon: IconFolder,
-    model: fileMenu,
-    items: [
-      { title: "Pengaturan Profil", to: "/file/profil", icon: IconSettings },
-      { title: "Log Aktivitas", to: "/file/log", icon: IconHistory },
-    ],
-  },
   {
     title: "Daftar",
     icon: IconLayoutList,
@@ -413,16 +415,28 @@ const menuItems: NavItem[] = [
             menuId: 65,
           },
           {
-            title: "PO",
-            to: "/garmen/barang/po",
-            icon: IconFileInvoice,
-            menuId: 121,
+            title: "Mutasi In",
+            to: "/garmen/barang/mutasi-in",
+            icon: IconTruckDelivery,
+            menuId: 69,
           },
           {
-            title: "BPB",
-            to: "/garmen/barang/bpb",
+            title: "Mutasi Out",
+            to: "/garmen/barang/mutasi-out",
             icon: IconTruckDelivery,
-            menuId: 122,
+            menuId: 70,
+          },
+          {
+            title: "PO Non Bahan",
+            to: "/garmen/barang/po-nonbahan",
+            icon: IconFileInvoice,
+            menuId: 66,
+          },
+          {
+            title: "BPB Non Bahan",
+            to: "/garmen/barang/bpb-nonbahan",
+            icon: IconPackage,
+            menuId: 67,
           },
           {
             title: "Retur Pembelian",
@@ -555,6 +569,25 @@ const menuItems: NavItem[] = [
     menuId: 9,
     items: [
       {
+        title: "Laporan Gudang Garmen",
+        icon: IconBuildingWarehouse, // Import IconBuildingWarehouse di atas
+        menuId: 960,
+        subItems: [
+          {
+            title: "PO Bahan vs MKB",
+            to: "/laporan/gudang-garmen/po-bahan-vs-mkb",
+            icon: IconFileAnalytics, // Import IconFileAnalytics di atas
+            menuId: 511,
+          },
+          {
+            title: "PO Bahan vs BPB",
+            to: "/laporan/gudang-garmen/po-bahan-vs-bpb",
+            icon: IconTruckDelivery,
+            menuId: 512,
+          },
+        ],
+      },
+      {
         title: "Laporan Penjualan",
         icon: IconChartBar,
         menuId: 965, // <-- Sesuai instruksi Anda (ID 965)
@@ -574,6 +607,16 @@ const menuItems: NavItem[] = [
       },
     ],
   },
+  {
+    title: "Tools",
+    icon: IconTool,
+    model: toolsMenu,
+    adminOnly: true, // Hanya muncul untuk Admin/Developer
+    items: [
+      { title: "Master User", to: "/tools/users", icon: IconUsers },
+      { divider: true },
+    ],
+  },
 ];
 
 const closeMenus = () => {
@@ -590,9 +633,11 @@ const handleLogout = async () => {
   await authStore.logout();
 };
 
-const openPasswordDialog = () => {
-  alert("Dialog Ganti Password belum diimplementasi.");
+const { openPasswordDialog } = usePasswordDialog();
+
+const openPasswordDialogHandler = () => {
   closeMenus();
+  openPasswordDialog(); // Membuka modal kustom global
 };
 
 const handleScroll = () => {
@@ -827,7 +872,7 @@ onUnmounted(() => {
             </div>
           </div>
           <v-divider class="my-1" />
-          <v-list-item class="um-item" @click="openPasswordDialog">
+          <v-list-item class="drw-item" @click="openPasswordDialogHandler">
             <template #prepend>
               <IconLock :size="15" :stroke-width="1.5" class="ic mr-2" />
             </template>
@@ -1009,6 +1054,8 @@ onUnmounted(() => {
       </div>
     </template>
   </v-navigation-drawer>
+
+  <ChangePasswordDialog />
 </template>
 
 <style scoped>

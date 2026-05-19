@@ -519,7 +519,7 @@ const formatWaktu = (v: string) => {
     menu-id="172"
     :icon="IconShoppingCartCopy"
     :headers="headers"
-    :items="items"
+    :items="items ?? []"
     :is-loading="isLoading"
     v-model:selected="selected"
     v-model:filter-state="filterState"

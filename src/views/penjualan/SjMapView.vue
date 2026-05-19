@@ -23,7 +23,15 @@ const expanded = ref([]);
 
 const today = new Date();
 const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
-const formatDate = (d: Date) => d.toISOString().substring(0, 10);
+const formatDateLocal = (value: string | Date) => {
+  const d = new Date(value);
+
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+};
 
 // --- STATE PENGAJUAN PIN 5 ---
 const showPinModal = ref(false);
@@ -37,8 +45,8 @@ const pinData = ref({
 });
 
 const filterState = ref({
-  startDate: formatDate(firstDay),
-  endDate: formatDate(today),
+  startDate: formatDateLocal(firstDay),
+  endDate: formatDateLocal(today),
 });
 
 const {
@@ -298,20 +306,19 @@ const getNomorClass = (ngedit: string) => {
     @export="exportToExcel('SJ_MAP')"
   >
     <template #filter-left>
-      <div
-        class="d-flex align-center gap-2 mr-4 bg-white px-2 py-1 border rounded"
-      >
+      <div class="f-group">
+        <span class="f-label">Tanggal</span>
         <input
           type="date"
           v-model="filterState.startDate"
-          class="date-inp"
+          class="f-date"
           @change="fetchData"
         />
-        <span class="text-caption">s.d</span>
+        <span class="f-sep">s/d</span>
         <input
           type="date"
           v-model="filterState.endDate"
-          class="date-inp"
+          class="f-date"
           @change="fetchData"
         />
       </div>
@@ -324,7 +331,7 @@ const getNomorClass = (ngedit: string) => {
     </template>
 
     <template #item.Tanggal="{ item }">
-      {{ item.Tanggal ? item.Tanggal.substring(0, 10) : "" }}
+      {{ item.Tanggal ? formatDateLocal(item.Tanggal) : "" }}
     </template>
 
     <template #extra-actions="{ selected }">
@@ -359,48 +366,60 @@ const getNomorClass = (ngedit: string) => {
     </template>
 
     <template #detail="{ item }">
-      <div class="pa-2 bg-grey-lighten-4">
-        <table class="sub-table">
-          <thead>
-            <tr>
-              <th width="150">Nomor Memo</th>
-              <th>Nama Pekerjaan</th>
-              <th width="150">Ukuran</th>
-              <th width="100" class="text-right">Jumlah</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="d in item.children" :key="d['Nomor Memo']">
-              <td class="font-weight-bold text-primary">
-                {{ d["Nomor Memo"] }}
-              </td>
-              <td>{{ d.Nama }}</td>
-              <td>{{ d.Ukuran }}</td>
-              <td class="text-right font-weight-bold">{{ d.Jumlah }}</td>
-            </tr>
-            <tr v-if="!item.children || item.children.length === 0">
-              <td colspan="4" class="text-center pa-4 text-grey">
-                Data detail tidak ditemukan
-              </td>
-            </tr>
-          </tbody>
-        </table>
+      <div class="expand-wrap">
+        <div class="tbl-header">Detail Memo — {{ item.Nomor }}</div>
+        <div class="tbl-wrap">
+          <table class="gt">
+            <thead>
+              <tr>
+                <th style="width: 160px">Nomor Memo</th>
+                <th style="min-width: 220px">Nama Pekerjaan</th>
+                <th style="width: 130px">Ukuran</th>
+                <th style="width: 90px; text-align: right">Jumlah</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="d in item.children"
+                :key="d['Nomor Memo']"
+                class="tr-det"
+              >
+                <td class="fw text-primary fw-mono">{{ d["Nomor Memo"] }}</td>
+                <td>{{ d.Nama }}</td>
+                <td>{{ d.Ukuran }}</td>
+                <td class="tr fw">{{ d.Jumlah }}</td>
+              </tr>
+              <tr v-if="!item.children?.length">
+                <td
+                  colspan="4"
+                  class="text-center text-grey py-3 text-caption font-italic"
+                >
+                  Data detail tidak ditemukanconst handleRowProps = (data: any)
+                  => {
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </template>
 
     <template #filter-right>
-      <div class="d-flex align-center gap-3 text-caption ml-4">
-        <div class="d-flex align-center gap-1">
-          <div class="dot bg-blue"></div>
-          Nunggu Acc
-        </div>
-        <div class="d-flex align-center gap-1">
-          <div class="dot bg-green"></div>
-          Sudah Acc
-        </div>
-        <div class="d-flex align-center gap-1">
-          <div class="dot bg-red"></div>
-          Tolak
+      <div class="legend-box">
+        <div class="legend-row">
+          <span class="legend-title">Back (No. SJ):</span>
+          <div class="legend-item">
+            <div class="legend-dot" style="background: #1565c0"></div>
+            Nunggu Acc
+          </div>
+          <div class="legend-item">
+            <div class="legend-dot" style="background: #2e7d32"></div>
+            Sudah Acc
+          </div>
+          <div class="legend-item">
+            <div class="legend-dot" style="background: #c62828"></div>
+            Tolak
+          </div>
         </div>
       </div>
     </template>
@@ -463,12 +482,120 @@ const getNomorClass = (ngedit: string) => {
 </template>
 
 <style scoped>
-.date-inp {
-  border: none;
-  outline: none;
-  font-size: 12px;
-  width: 110px;
+/* ── Filter bar ── */
+.f-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
+.f-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #555;
+  white-space: nowrap;
+}
+.f-sep {
+  font-size: 11px;
+  color: #777;
+}
+.f-date {
+  height: 28px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  padding: 0 6px;
+  font-size: 12px;
+  background: white;
+  outline: none;
+}
+.f-date:focus {
+  border-color: #1565c0;
+}
+
+/* ── Legend ── */
+.legend-box {
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  padding: 4px 8px;
+}
+.legend-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+}
+.legend-title {
+  font-size: 10px;
+  font-weight: 700;
+  color: #555;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  color: #424242;
+  white-space: nowrap;
+}
+.legend-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+/* ── Expand ── */
+.expand-wrap {
+  background: #eceff1;
+}
+.tbl-header {
+  background: #37474f;
+  color: white;
+  padding: 5px 10px;
+  font-size: 11px;
+  font-weight: 700;
+}
+.tbl-wrap {
+  overflow-x: auto;
+  border: 1px solid #bdbdbd;
+  border-top: none;
+  background: white;
+}
+.gt {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+.gt thead th {
+  background: #f0f4f8;
+  border: 1px solid #bdbdbd;
+  padding: 5px 6px;
+  font-size: 10px;
+  font-weight: 700;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  text-align: left;
+}
+.gt tbody td {
+  border: 1px solid #e8e8e8;
+  height: 26px;
+  padding: 0 6px;
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tr-det td {
+  background: #fafafa;
+}
+.tr-det:hover td {
+  background: #e3f2fd;
+}
+
+/* ── Nomor badge ── */
 .nomor-badge {
   padding: 2px 8px;
   font-weight: 700;
@@ -477,49 +604,30 @@ const getNomorClass = (ngedit: string) => {
   font-family: monospace;
 }
 .cell-wait {
-  background-color: #2196f3;
+  background: #2196f3;
   color: white;
 }
 .cell-tolak {
-  background-color: #f44336;
+  background: #f44336;
   color: white;
 }
 .cell-acc {
-  background-color: #4caf50;
+  background: #4caf50;
   color: white;
 }
 
-.sub-table {
-  width: 100%;
-  border-collapse: collapse;
-  border: 1px solid #ccc;
-  background: white;
+/* ── Utility ── */
+.fw {
+  font-weight: 700;
 }
-.sub-table th {
-  background: #f5f5f5;
-  padding: 6px 10px;
+.fw-mono {
+  font-family: monospace;
   font-size: 11px;
-  text-align: left;
-  border-bottom: 2px solid #ddd;
 }
-.sub-table td {
-  padding: 6px 10px;
-  font-size: 11px;
-  border-bottom: 1px solid #eee;
+.tr {
+  text-align: right;
 }
-
-.dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-}
-.gap-1 {
-  gap: 4px;
-}
-.gap-2 {
-  gap: 8px;
-}
-.gap-3 {
-  gap: 12px;
+.text-primary {
+  color: #1565c0;
 }
 </style>

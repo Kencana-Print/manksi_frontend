@@ -52,13 +52,14 @@ const {
     return res.data.data || [];
   },
   // Pastikan deleteApi mengirimkan data yang cukup untuk divalidasi backend
-  deleteApi: async (nomor) => {
-    // Logika validasi delete sama dengan edit (RETL Approved / RETP Role)
-    const item = items.value.find((i) => i.Nomor === nomor);
+  deleteApi: async (nomor: string): Promise<void> => {
+    const item = (items.value ?? []).find((i: any) => i.Nomor === nomor);
+
     if (item && item.Nomor.startsWith("RETL") && item.NoApprov) {
       throw new Error("Data sudah di-approve.");
     }
-    return await returBahanService.deleteData(nomor);
+
+    await returBahanService.deleteData(nomor);
   },
 });
 
@@ -176,7 +177,7 @@ const submitPengajuan = async () => {
     menu-id="110"
     :icon="IconArrowBackUp"
     :headers="headers"
-    :items="items"
+    :items="items ?? []"
     :is-loading="isLoading"
     item-value="Nomor"
     show-expand
@@ -288,7 +289,7 @@ const submitPengajuan = async () => {
           </thead>
           <tbody>
             <tr v-for="(d, i) in item.details" :key="i">
-              <td class="tc">{{ i + 1 }}</td>
+              <td class="tc">{{ Number(i) + 1 }}</td>
               <td style="font-weight: 600; color: #1565c0">{{ d.Kode }}</td>
               <td>{{ d.Nama }}</td>
               <td class="tc">{{ d.Satuan }}</td>

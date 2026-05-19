@@ -13,7 +13,20 @@ const toast = useToast();
 
 const today = new Date();
 const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
-const formatDate = (d: Date) => d.toISOString().substring(0, 10);
+const formatDateLocal = (value?: string | Date) => {
+  if (!value) return "";
+
+  const d = new Date(value);
+
+  if (isNaN(d.getTime())) return "";
+
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+};
+const formatDate = (d: Date) => formatDateLocal(d);
 const showDialog = ref(false);
 const selectedNomor = ref("");
 
@@ -108,20 +121,19 @@ const onUpdateStatus = () => {
     @export="exportToExcel('Update_Status_SJ_MAP')"
   >
     <template #filter-left>
-      <div
-        class="d-flex align-center gap-2 mr-4 bg-white px-2 py-1 border rounded"
-      >
+      <div class="f-group">
+        <span class="f-label">Tanggal</span>
         <input
           type="date"
           v-model="filterState.startDate"
-          class="date-inp"
+          class="f-date"
           @change="fetchData"
         />
-        <span class="text-caption">s.d</span>
+        <span class="f-sep">s/d</span>
         <input
           type="date"
           v-model="filterState.endDate"
-          class="date-inp"
+          class="f-date"
           @change="fetchData"
         />
       </div>
@@ -142,42 +154,47 @@ const onUpdateStatus = () => {
     </template>
 
     <template #filter-right>
-      <div class="d-flex align-center gap-2 text-caption ml-4">
-        <div class="dot bg-blue"></div>
-        <span class="text-blue font-weight-bold">Tidak Ada Status</span>
+      <div class="legend-box">
+        <div class="legend-row">
+          <span class="legend-title">Font:</span>
+          <div class="legend-item">
+            <div class="legend-dot" style="background: #1565c0"></div>
+            Tidak Ada Status
+          </div>
+        </div>
       </div>
     </template>
 
     <template #item.Tanggal="{ item }">
-      {{ item.Tanggal ? item.Tanggal.substring(0, 10) : "" }}
+      {{ formatDateLocal(item.Tanggal) }}
     </template>
     <template #item.Tanggal_kirim="{ item }">
-      {{ item.Tanggal_kirim ? item.Tanggal_kirim.substring(0, 10) : "-" }}
+      {{ item.Tanggal_kirim ? formatDateLocal(item.Tanggal_kirim) : "-" }}
     </template>
     <template #item.Tanggal_terima="{ item }">
-      {{ item.Tanggal_terima ? item.Tanggal_terima.substring(0, 10) : "-" }}
+      {{ item.Tanggal_terima ? formatDateLocal(item.Tanggal_terima) : "-" }}
     </template>
     <template #item.Biaya_Kirim="{ item }">
       {{ formatRupiah(item.Biaya_Kirim) }}
     </template>
 
     <template #item.Tanggal_kembali="{ item }">
-      {{ item.Tanggal_kembali ? item.Tanggal_kembali.substring(0, 10) : "-" }}
+      {{ item.Tanggal_kembali ? formatDateLocal(item.Tanggal_kembali) : "-" }}
     </template>
     <template #item.Tanggal_terima_sj="{ item }">
       {{
-        item.Tanggal_terima_sj ? item.Tanggal_terima_sj.substring(0, 10) : "-"
+        item.Tanggal_terima_sj ? formatDateLocal(item.Tanggal_terima_sj) : "-"
       }}
     </template>
     <template #item.Tanggal_konfirmasi="{ item }">
       {{
-        item.Tanggal_konfirmasi ? item.Tanggal_konfirmasi.substring(0, 10) : "-"
+        item.Tanggal_konfirmasi ? formatDateLocal(item.Tanggal_konfirmasi) : "-"
       }}
     </template>
     <template #item.Tanggal_serahterima="{ item }">
       {{
         item.Tanggal_serahterima
-          ? item.Tanggal_serahterima.substring(0, 10)
+          ? formatDateLocal(item.Tanggal_serahterima)
           : "-"
       }}
     </template>
@@ -191,18 +208,65 @@ const onUpdateStatus = () => {
 </template>
 
 <style scoped>
-.date-inp {
-  border: none;
-  outline: none;
+.f-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.f-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #555;
+  white-space: nowrap;
+}
+.f-sep {
+  font-size: 11px;
+  color: #777;
+}
+.f-date {
+  height: 28px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  padding: 0 6px;
   font-size: 12px;
-  width: 110px;
+  background: white;
+  outline: none;
 }
-.dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
+.f-date:focus {
+  border-color: #1565c0;
 }
-.gap-2 {
-  gap: 8px;
+
+.legend-box {
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  padding: 4px 8px;
+}
+.legend-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+}
+.legend-title {
+  font-size: 10px;
+  font-weight: 700;
+  color: #555;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  color: #424242;
+  white-space: nowrap;
+}
+.legend-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  flex-shrink: 0;
 }
 </style>

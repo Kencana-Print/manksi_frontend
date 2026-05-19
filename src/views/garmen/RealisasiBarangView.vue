@@ -318,17 +318,18 @@ const submitAjukan = async () => {
       </div>
 
       <div class="filter-group ml-3">
-        <span class="filter-label">Cabang</span>
-        <select
-          v-model="filterState.cabang"
-          class="date-inp"
-          style="width: 80px"
-          @change="fetchData"
-        >
-          <option v-for="cab in cabangOptions" :key="cab" :value="cab">
-            {{ cab }}
-          </option>
-        </select>
+        <span class="filter-label">Jenis</span>
+        <div class="radio-wrap">
+          <label v-for="jns in jenisOptions" :key="jns" class="radio-label">
+            <input
+              type="radio"
+              v-model="filterState.jenis"
+              :value="jns"
+              @change="fetchData"
+            />
+            {{ jns === "ATK/RTK" ? "ATK" : jns === "ACCESORIES" ? "ACC" : jns }}
+          </label>
+        </div>
       </div>
 
       <div class="filter-group ml-3">
@@ -418,7 +419,7 @@ const submitAjukan = async () => {
               </thead>
               <tbody>
                 <tr v-for="(dtl, i) in item.details" :key="i">
-                  <td class="tc">{{ i + 1 }}</td>
+                  <td class="tc">{{ Number(i) + 1 }}</td>
                   <td style="font-weight: 600; color: #00796b">
                     {{ dtl.Kode }}
                   </td>
@@ -664,5 +665,33 @@ const submitAjukan = async () => {
   background: #e0e0e0;
   color: #424242;
   margin-left: auto;
+}
+
+.radio-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: white;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  padding: 0 8px;
+  height: 28px;
+}
+.radio-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #424242;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.radio-label input[type="radio"] {
+  accent-color: #1565c0;
+  cursor: pointer;
+  width: 13px;
+  height: 13px;
+  margin: 0;
 }
 </style>

@@ -15,6 +15,22 @@ import {
   IconSearch,
 } from "@tabler/icons-vue";
 
+interface ExportDetailRow {
+  "No. BPB": string;
+  "No. PO": string;
+  "Tanggal BPB": string;
+  Gudang: string;
+  Supplier: string;
+  "Kode Bahan": string;
+  "Nama Bahan": string;
+  Satuan: string;
+  Jumlah: number;
+  Roll: number;
+  Gramasi: string;
+  Warna: string;
+  Setting: string;
+}
+
 const router = useRouter();
 const toast = useToast();
 
@@ -192,13 +208,13 @@ const onPrint = () => {
 
 // --- EXPORT DETAIL (FUNGSIKAN MENGGUNAKAN XLSX) ---
 const exportDetail = async () => {
-  if (items.value.length === 0) {
+  if (!items.value || items.value.length === 0) {
     return toast.warning("Tidak ada data untuk diexport.");
   }
   toast.info("Menyiapkan data detail untuk diexport... Mohon tunggu.");
 
   try {
-    const allDetails = [];
+    const allDetails: ExportDetailRow[] = [];
 
     // Loop untuk mengumpulkan detail dari setiap baris di tabel Master
     for (const item of items.value) {
@@ -302,7 +318,7 @@ const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
     menu-id="101"
     :icon="IconTruckDelivery"
     :headers="headers"
-    :items="items"
+    :items="items ?? []"
     :is-loading="isLoading"
     v-model:selected="selected"
     v-model:filter-state="filterState"

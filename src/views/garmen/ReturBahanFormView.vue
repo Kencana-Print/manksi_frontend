@@ -16,6 +16,34 @@ import {
   IconPlus,
 } from "@tabler/icons-vue";
 
+interface ReturBahanDetail {
+  nominta: string;
+  kode: string;
+  nama: string;
+  satuan: string;
+  minta: number;
+  jumlah: number;
+  roll: number;
+  sudah: number;
+  approve?: number;
+  ket: string;
+  spk: string;
+  kdsup: string;
+  nmsup: string;
+}
+
+interface ReturBahanFormData {
+  nomor: string;
+  tanggal: string;
+  keterangan: string;
+  gudangAsal: string;
+  gudangProduksi: string;
+  isUtama: number;
+  details: ReturBahanDetail[];
+  pin_acc: string;
+  pin_dipakai: string;
+}
+
 const route = useRoute();
 const toast = useToast();
 const authStore = useAuthStore();
@@ -25,7 +53,21 @@ const showMintaModal = ref(false);
 const showDetailModal = ref(false);
 const activeRowIndex = ref(-1);
 
-const emptyRow = {
+const formatDateLocal = (value?: string | Date) => {
+  if (!value) return "";
+
+  const d = new Date(value);
+
+  if (isNaN(d.getTime())) return "";
+
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+};
+
+const emptyRow: ReturBahanDetail = {
   nominta: "",
   kode: "",
   nama: "",
@@ -41,9 +83,9 @@ const emptyRow = {
   nmsup: "",
 };
 
-const initialData = {
+const initialData: ReturBahanFormData = {
   nomor: "",
-  tanggal: new Date().toISOString().substring(0, 10),
+  tanggal: formatDateLocal(new Date()),
   keterangan: "",
   gudangAsal: "",
   gudangProduksi: "",
@@ -72,10 +114,10 @@ const {
   executeCancel,
   executeClose,
   fetchData,
-} = useForm({
+} = useForm<ReturBahanFormData>({
   menuId: "110",
   initialData,
-  fetchApi: async () => {
+  fetchApi: async (): Promise<ReturBahanFormData> => {
     const res = await returBahanFormService.getDetail(
       route.params.nomor as string,
     );
@@ -101,10 +143,11 @@ const {
 
     return {
       nomor: header.proret_nomor,
-      tanggal: header.proret_tanggal.substring(0, 10),
+      tanggal: formatDateLocal(header.proret_tanggal),
       keterangan: header.proret_keterangan,
       gudangAsal: header.proret_gdg_tujuan,
       gudangProduksi: header.proret_gdg_produksi,
+      isUtama: header.isstatus || 1,
       pin_acc: header.pin_acc,
       pin_dipakai: header.pin_dipakai,
       details: details.map((d: any) => ({
@@ -123,8 +166,10 @@ const {
       })),
     };
   },
-  submitApi: async (data) => {
-    const nomor = isEditMode.value ? (route.params.nomor as string) : undefined;
+  submitApi: async (data: ReturBahanFormData): Promise<any> => {
+    const nomor: string | undefined = isEditMode.value
+      ? (route.params.nomor as string)
+      : undefined;
     return await returBahanFormService.saveData(data, nomor);
   },
   onSuccess: (res: any) => {
@@ -162,8 +207,11 @@ const addRow = () => {
     kode: "",
     nama: "",
     satuan: "",
+    minta: 0,
     jumlah: 0,
     roll: 1,
+    sudah: 0,
+    approve: 0,
     ket: "",
     spk: "",
     kdsup: "",
@@ -203,7 +251,7 @@ const searchRealisasi = async (index: number) => {
 
     // Cek duplikasi
     const isDuplicate = formData.value.details.some(
-      (d, i) =>
+      (d: ReturBahanDetail, i: number) =>
         d.kode === item.kode && d.nominta === item.nominta && i !== index,
     );
     if (isDuplicate) return toast.warning("Barang ini sudah ada di daftar.");
@@ -257,7 +305,7 @@ const onDetailSelected = (item: any) => {
 
   // Cek apakah barang ini sudah ada di baris lain (Duplikasi)
   const isDuplicate = details.some(
-    (d, idx) =>
+    (d: ReturBahanDetail, idx: number) =>
       d.kode === item.Kode &&
       d.nominta === item.NoMinta &&
       idx !== activeRowIndex.value,
@@ -289,11 +337,15 @@ const validateBeforeSave = () => {
     );
   }
 
-  const validDetails = formData.value.details.filter((d) => d.kode && d.nama);
+  const validDetails = formData.value.details.filter(
+    (d: ReturBahanDetail) => d.kode && d.nama,
+  );
   if (validDetails.length === 0)
     return toast.warning("Detail barang masih kosong.");
 
-  const zeroQty = validDetails.some((d) => Number(d.jumlah) <= 0);
+  const zeroQty = validDetails.some(
+    (d: ReturBahanDetail) => Number(d.jumlah) <= 0,
+  );
   if (zeroQty) return toast.warning("Jumlah retur tidak boleh 0.");
 
   showSaveDialog.value = true;
@@ -441,7 +493,7 @@ const numFormat = (val: any) =>
             </thead>
             <tbody>
               <tr v-for="(item, index) in formData.details" :key="index">
-                <td class="text-center">{{ index + 1 }}</td>
+                <td class="text-center">{{ Number(index) + 1 }}</td>
                 <!-- Kolom No. Realisasi Minta dengan F1 Lookup -->
                 <td>
                   <div class="d-flex align-center px-1">
@@ -449,12 +501,12 @@ const numFormat = (val: any) =>
                       v-model="item.nominta"
                       class="cell-input text-primary font-weight-bold"
                       placeholder="F1..."
-                      @keyup.f1="openMintaLookup(index)"
+                      @keyup.f1="openMintaLookup(Number(index))"
                     />
                     <v-btn
                       size="x-small"
                       variant="text"
-                      @click="openMintaLookup(index)"
+                      @click="openMintaLookup(Number(index))"
                     >
                       <IconSearch :size="14" :stroke-width="1.7" />
                     </v-btn>
@@ -523,7 +575,7 @@ const numFormat = (val: any) =>
                     size="x-small"
                     variant="text"
                     color="error"
-                    @click="removeRow(index)"
+                    @click="removeRow(Number(index))"
                   >
                     <IconTrash :size="14" :stroke-width="1.7" />
                   </v-btn>

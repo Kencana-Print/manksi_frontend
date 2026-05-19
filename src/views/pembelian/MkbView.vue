@@ -17,8 +17,28 @@ const toast = useToast();
 
 const today = new Date();
 const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
-const dtAwal = ref(firstDay.toISOString().substring(0, 10));
-const dtAkhir = ref(today.toISOString().substring(0, 10));
+
+const formatDateLocal = (value?: string | Date) => {
+  if (!value) return "";
+
+  // Handle YYYY-MM-DD supaya tidak dianggap UTC
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return value;
+  }
+
+  const d = new Date(value);
+
+  if (isNaN(d.getTime())) return "";
+
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+};
+
+const dtAwal = ref(formatDateLocal(firstDay));
+const dtAkhir = ref(formatDateLocal(today));
 
 const filterState = ref({
   dtAwal: dtAwal.value,
@@ -198,14 +218,26 @@ const getSpkStyle = (ngedit: string) => {
 
 const formatTgl = (val: string) => {
   if (!val) return "";
+
+  // YYYY-MM-DD langsung split, jangan new Date
+  if (/^\d{4}-\d{2}-\d{2}$/.test(val)) {
+    const [y, m, d] = val.split("-");
+    return `${d}-${m}-${y}`;
+  }
+
   const d = new Date(val);
+
   return `${String(d.getDate()).padStart(2, "0")}-${String(d.getMonth() + 1).padStart(2, "0")}-${d.getFullYear()}`;
 };
 
 // Formatter untuk tanggal beserta Jam (Created)
 const formatWaktu = (val: string) => {
   if (!val) return "";
+
   const d = new Date(val);
+
+  if (isNaN(d.getTime())) return val;
+
   return `${String(d.getDate()).padStart(2, "0")}-${String(d.getMonth() + 1).padStart(2, "0")}-${d.getFullYear()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 };
 

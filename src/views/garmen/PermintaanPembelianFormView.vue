@@ -18,7 +18,9 @@ const toast = useToast();
 
 const isEditMode = computed(() => !!route.params.nomor);
 // Ambil jenis dari Query Params jika Baru, atau akan di-override data DB jika Edit
-const formJenis = ref(route.query.jenis || "ACCESORIES");
+const formJenis = ref(
+  typeof route.query.jenis === "string" ? route.query.jenis : "ACCESORIES",
+);
 
 const todayLocal = new Date().toISOString().substring(0, 10);
 
@@ -247,7 +249,7 @@ const removeRealisasiRow = (idx: number) => {
   if (confirm("Hapus Realisasi ini?")) {
     const row = activeItemRealisasi.value[idx];
     // Hapus dari state utama
-    const globalIdx = formData.value.realisasi.findIndex((r) => r === row);
+    const globalIdx = formData.value.realisasi.findIndex((r: any) => r === row);
     formData.value.realisasi.splice(globalIdx, 1);
   }
 };
@@ -419,10 +421,10 @@ const onSaveRealisasi = async () => {
                 <tr
                   v-for="(item, idx) in formData.items"
                   :key="idx"
-                  :class="{ 'active-row': activeGridIndex === idx }"
-                  @click="activeGridIndex = idx"
+                  :class="{ 'active-row': activeGridIndex === Number(idx) }"
+                  @click="activeGridIndex = Number(idx)"
                 >
-                  <td class="text-center gt-lbl">{{ idx + 1 }}</td>
+                  <td class="text-center gt-lbl">{{ Number(idx) + 1 }}</td>
                   <td class="p0">
                     <div class="cell-grp">
                       <input
@@ -433,7 +435,7 @@ const onSaveRealisasi = async () => {
                       <button
                         type="button"
                         class="ci-btn"
-                        @click.stop="openLookupBarang(idx)"
+                        @click.stop="openLookupBarang(Number(idx))"
                       >
                         <IconSearch :size="12" />
                       </button>
@@ -467,7 +469,7 @@ const onSaveRealisasi = async () => {
                       v-model.number="item.jumlah"
                       type="number"
                       class="ci text-right font-weight-bold"
-                      @input="recalcTotal(idx)"
+                      @input="recalcTotal(Number(idx))"
                     />
                   </td>
 
@@ -476,7 +478,7 @@ const onSaveRealisasi = async () => {
                       v-model.number="item.harga"
                       type="number"
                       class="ci text-right"
-                      @input="recalcTotal(idx)"
+                      @input="recalcTotal(Number(idx))"
                     />
                   </td>
                   <td v-if="isDetailRinci" class="p0">
@@ -498,7 +500,7 @@ const onSaveRealisasi = async () => {
                     <button
                       type="button"
                       class="btn-del"
-                      @click.stop="removeItem(idx)"
+                      @click.stop="removeItem(Number(idx))"
                       title="Hapus Baris"
                     >
                       ✕
@@ -551,7 +553,7 @@ const onSaveRealisasi = async () => {
               </thead>
               <tbody>
                 <tr v-for="(r, idx) in activeItemRealisasi" :key="idx">
-                  <td class="text-center gt-lbl">{{ idx + 1 }}</td>
+                  <td class="text-center gt-lbl">{{ Number(idx) + 1 }}</td>
                   <td class="text-center">{{ r.tanggal }}</td>
                   <td class="text-right font-weight-bold text-success">
                     {{ r.jumlah }}
@@ -561,7 +563,10 @@ const onSaveRealisasi = async () => {
                     <input v-model="r.ket" class="ci" :readonly="!isFinance" />
                   </td>
                   <td v-if="isFinance" class="text-center">
-                    <button @click="removeRealisasiRow(idx)" class="text-error">
+                    <button
+                      @click="removeRealisasiRow(Number(idx))"
+                      class="text-error"
+                    >
                       ✕
                     </button>
                   </td>

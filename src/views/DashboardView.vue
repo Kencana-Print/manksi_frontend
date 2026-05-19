@@ -1,30 +1,35 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from "vue";
+import { useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/authStore";
 import { dashboardService } from "@/services/dashboard/dashboardService";
 import {
-  IconLayoutDashboard,
   IconX,
   IconClipboardList,
   IconFileAlert,
   IconRefresh,
   IconChartBar,
+  IconTruckDelivery,
 } from "@tabler/icons-vue";
 
 const authStore = useAuthStore();
+const router = useRouter();
 const isSpkDialogVisible = ref(false);
 
 // ── Role helpers ──
 const bagian = computed(() =>
   (authStore.user?.bagian || "").toUpperCase().trim(),
 );
-
 const isSuperViewer = computed(() =>
   ["EDP", "DIREKSI", "OWNER", "IT"].includes(bagian.value),
 );
-
 const showPenawaran = computed(
   () => bagian.value === "MARKETING" || isSuperViewer.value,
+);
+const showPoBpb = computed(
+  () =>
+    ["PEMBELIAN", "GUDANG", "PPIC"].includes(bagian.value) ||
+    isSuperViewer.value,
 );
 
 // ── State Dashboard ──
@@ -38,6 +43,7 @@ const spkSummary = ref({
   Selesai: 0,
 });
 const realisasiRows = ref<any[]>([]);
+const poBpbSummary = ref({ TotalPO: 0, Open: 0, OnProses: 0, Close: 0 });
 const isLoadingDashboard = ref(false);
 
 // ── Infinite scroll state (Penawaran Belum SPK) ──
@@ -81,7 +87,6 @@ const setupPenObserver = () => {
 
 const loadDashboard = async () => {
   isLoadingDashboard.value = true;
-  // Reset infinite scroll state
   penawaranBelumSpk.value = [];
   penOffset.value = 0;
   penHasMore.value = true;
@@ -92,6 +97,14 @@ const loadDashboard = async () => {
     if (spkSumRes.status === "fulfilled")
       spkSummary.value = spkSumRes.value.data.data;
 
+    if (showPoBpb.value) {
+      const [poBpbRes] = await Promise.allSettled([
+        dashboardService.getPoBahanBpbSummary(),
+      ]);
+      if (poBpbRes.status === "fulfilled")
+        poBpbSummary.value = poBpbRes.value.data.data;
+    }
+
     if (showPenawaran.value) {
       const [sumRes, realisasiRes] = await Promise.allSettled([
         dashboardService.getPenawaranSummary(),
@@ -101,7 +114,6 @@ const loadDashboard = async () => {
         penSummary.value = sumRes.value.data.data;
       if (realisasiRes.status === "fulfilled")
         realisasiRows.value = realisasiRes.value.data.data;
-      // Load batch pertama
       await loadMorePenawaran();
     }
   } finally {
@@ -118,7 +130,6 @@ onMounted(async () => {
     isSpkDialogVisible.value = true;
   }
   await loadDashboard();
-  // Setup observer setelah DOM siap
   setTimeout(setupPenObserver, 300);
 });
 
@@ -279,32 +290,17 @@ const sisaClass = (item: any) => {
       </v-col>
     </v-row>
 
-    <!-- ── Row 2: Panel konten ── -->
-    <v-row dense>
-      <!-- Papan Informasi -->
-      <v-col cols="12" :md="showPenawaran ? 3 : 12">
-        <div class="manksi-panel content-panel fill-height">
-          <div class="panel-header bg-grey-lighten-3 text-primary">
-            <IconLayoutDashboard :size="14" :stroke-width="1.6" class="mr-1" />
-            Papan Informasi
-          </div>
-          <div class="panel-body pa-3">
-            <p class="text-caption text-grey font-italic mb-0">
-              Belum ada informasi terbaru hari ini.
-            </p>
-          </div>
-        </div>
-      </v-col>
-
+    <!-- ── Row 2: Panel Penawaran (Marketing + Super Viewer) ── -->
+    <v-row v-if="showPenawaran" dense class="mb-2">
       <!-- Penawaran Belum SPK -->
-      <v-col v-if="showPenawaran" cols="12" md="4">
+      <v-col cols="12" md="4">
         <div class="manksi-panel content-panel fill-height">
           <div class="panel-header panel-header--warning">
             <IconFileAlert :size="14" :stroke-width="1.7" class="mr-1" />
             Penawaran Belum SPK
-            <span v-if="penSummary.BelumSpk" class="badge-count ml-auto">
-              {{ penSummary.BelumSpk }}
-            </span>
+            <span v-if="penSummary.BelumSpk" class="badge-count ml-auto">{{
+              penSummary.BelumSpk
+            }}</span>
           </div>
           <div class="panel-body">
             <v-progress-linear
@@ -374,7 +370,6 @@ const sisaClass = (item: any) => {
                     {{ p.Keterangan }}
                   </div>
                 </div>
-                <!-- Sentinel untuk IntersectionObserver -->
                 <div ref="penSentinelEl" class="pen-sentinel">
                   <span v-if="isLoadingMorePen" class="pen-loading"
                     >Memuat...</span
@@ -399,7 +394,7 @@ const sisaClass = (item: any) => {
       </v-col>
 
       <!-- Realisasi Penawaran per Divisi -->
-      <v-col v-if="showPenawaran" cols="12" md="5">
+      <v-col cols="12" md="8">
         <div class="manksi-panel content-panel fill-height">
           <div class="panel-header panel-header--blue">
             <IconChartBar :size="14" :stroke-width="1.7" class="mr-1" />
@@ -427,7 +422,6 @@ const sisaClass = (item: any) => {
               height="2"
             />
             <template v-else-if="realisasiRows.length">
-              <!-- Total row -->
               <div class="real-total-row">
                 <span class="real-total-lbl">Total Nominal</span>
                 <span class="real-total-val">{{ shortNum(totalNominal) }}</span>
@@ -435,15 +429,12 @@ const sisaClass = (item: any) => {
                   >Close {{ shortNum(totalClose) }}</span
                 >
               </div>
-
-              <!-- Per-divisi bar rows -->
               <div class="real-list">
                 <div
                   v-for="row in realisasiRows"
                   :key="row.Divisi"
                   class="real-row"
                 >
-                  <!-- Label + angka -->
                   <div class="real-meta">
                     <span class="real-divisi">{{
                       row.Divisi || "LAINNYA"
@@ -452,7 +443,6 @@ const sisaClass = (item: any) => {
                       shortNum(Number(row.Nominal))
                     }}</span>
                   </div>
-                  <!-- Stacked bar -->
                   <div class="real-bar-wrap">
                     <div class="real-bar">
                       <div
@@ -502,7 +492,6 @@ const sisaClass = (item: any) => {
                       }}%
                     </span>
                   </div>
-                  <!-- Detail angka kecil -->
                   <div class="real-detail">
                     <span class="rd-close"
                       >✓ {{ shortNum(Number(row.Close)) }}</span
@@ -523,8 +512,6 @@ const sisaClass = (item: any) => {
                   </div>
                 </div>
               </div>
-
-              <!-- Legend -->
               <div class="real-legend">
                 <span class="leg-dot leg-close" />Close
                 <span class="leg-dot leg-batal" />Batal
@@ -534,6 +521,111 @@ const sisaClass = (item: any) => {
             <div v-else class="text-center text-grey py-3 text-caption">
               Belum ada data penawaran bulan ini.
             </div>
+          </div>
+        </div>
+      </v-col>
+    </v-row>
+
+    <!-- ── Row 3: PO Bahan vs BPB (Pembelian / Gudang / PPIC / Super Viewer) ── -->
+    <v-row v-if="showPoBpb" dense class="mb-2">
+      <v-col cols="12">
+        <div class="manksi-panel content-panel">
+          <div class="panel-header panel-header--teal">
+            <IconTruckDelivery :size="14" :stroke-width="1.7" class="mr-1" />
+            PO Bahan vs BPB
+            <span class="panel-header-sub ml-1">(bulan ini)</span>
+            <button
+              class="po-bpb-link ml-auto"
+              @click="router.push('/laporan/gudang-garmen/po-bahan-vs-bpb')"
+            >
+              Lihat Detail →
+            </button>
+          </div>
+          <div class="panel-body">
+            <v-progress-linear
+              v-if="isLoadingDashboard"
+              indeterminate
+              color="teal"
+              height="2"
+            />
+            <template v-else>
+              <div class="po-bpb-summary">
+                <div class="po-bpb-stat">
+                  <span class="po-bpb-val text-primary">{{
+                    poBpbSummary.TotalPO
+                  }}</span>
+                  <span class="po-bpb-lbl">Total PO</span>
+                </div>
+                <div class="po-bpb-divider" />
+                <div
+                  class="po-bpb-stat clickable"
+                  @click="router.push('/laporan/gudang-garmen/po-bahan-vs-bpb')"
+                >
+                  <span class="po-bpb-val" style="color: #c62828">{{
+                    poBpbSummary.Open
+                  }}</span>
+                  <span class="po-bpb-lbl">OPEN</span>
+                </div>
+                <div class="po-bpb-divider" />
+                <div class="po-bpb-stat">
+                  <span class="po-bpb-val" style="color: #0277bd">{{
+                    poBpbSummary.OnProses
+                  }}</span>
+                  <span class="po-bpb-lbl">ON PROSES</span>
+                </div>
+                <div class="po-bpb-divider" />
+                <div class="po-bpb-stat">
+                  <span class="po-bpb-val text-success">{{
+                    poBpbSummary.Close
+                  }}</span>
+                  <span class="po-bpb-lbl">CLOSE</span>
+                </div>
+                <div class="po-bpb-bar-wrap">
+                  <div class="po-bpb-bar">
+                    <div
+                      class="po-bpb-seg seg-open"
+                      :style="{
+                        width: poBpbSummary.TotalPO
+                          ? (poBpbSummary.Open / poBpbSummary.TotalPO) * 100 +
+                            '%'
+                          : '0%',
+                      }"
+                      :title="`OPEN: ${poBpbSummary.Open}`"
+                    />
+                    <div
+                      class="po-bpb-seg seg-onproses"
+                      :style="{
+                        width: poBpbSummary.TotalPO
+                          ? (poBpbSummary.OnProses / poBpbSummary.TotalPO) *
+                              100 +
+                            '%'
+                          : '0%',
+                      }"
+                      :title="`ON PROSES: ${poBpbSummary.OnProses}`"
+                    />
+                    <div
+                      class="po-bpb-seg seg-close"
+                      :style="{
+                        width: poBpbSummary.TotalPO
+                          ? (poBpbSummary.Close / poBpbSummary.TotalPO) * 100 +
+                            '%'
+                          : '0%',
+                      }"
+                      :title="`CLOSE: ${poBpbSummary.Close}`"
+                    />
+                  </div>
+                  <div class="po-bpb-legend">
+                    <span class="leg-dot" style="background: #c62828" />OPEN
+                    <span class="leg-dot ml-2" style="background: #0277bd" />ON
+                    PROSES
+                    <span
+                      class="leg-dot ml-2"
+                      style="background: #43a047"
+                    />CLOSE
+                  </div>
+                </div>
+              </div>
+            </template>
           </div>
         </div>
       </v-col>
@@ -683,6 +775,11 @@ const sisaClass = (item: any) => {
   color: #1565c0;
   border-bottom: 1px solid #bbdefb;
 }
+.panel-header--teal {
+  background: #e0f2f1;
+  color: #00695c;
+  border-bottom: 1px solid #b2dfdb;
+}
 .panel-header-sub {
   font-size: 10px;
   color: #9e9e9e;
@@ -743,7 +840,7 @@ const sisaClass = (item: any) => {
   line-height: 1.2;
 }
 
-/* ── Penawaran Summary Bar ── */
+/* ── Penawaran ── */
 .pen-summary-bar {
   display: flex;
   border-bottom: 1px solid #f0f0f0;
@@ -771,8 +868,6 @@ const sisaClass = (item: any) => {
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
-
-/* ── Penawaran List ── */
 .pen-list {
   max-height: 320px;
   overflow-y: auto;
@@ -849,7 +944,7 @@ const sisaClass = (item: any) => {
   color: #bdbdbd;
 }
 
-/* ── Realisasi Panel ── */
+/* ── Realisasi ── */
 .real-total-row {
   display: flex;
   align-items: baseline;
@@ -875,7 +970,6 @@ const sisaClass = (item: any) => {
   font-weight: 600;
   margin-left: auto;
 }
-
 .real-list {
   max-height: 260px;
   overflow-y: auto;
@@ -884,7 +978,6 @@ const sisaClass = (item: any) => {
   padding: 6px 12px;
   border-bottom: 1px solid #f5f5f5;
 }
-
 .real-meta {
   display: flex;
   justify-content: space-between;
@@ -900,7 +993,6 @@ const sisaClass = (item: any) => {
   font-size: 10px;
   color: #757575;
 }
-
 .real-bar-wrap {
   display: flex;
   align-items: center;
@@ -935,7 +1027,6 @@ const sisaClass = (item: any) => {
   min-width: 28px;
   text-align: right;
 }
-
 .real-detail {
   display: flex;
   gap: 8px;
@@ -950,7 +1041,6 @@ const sisaClass = (item: any) => {
 .rd-open {
   color: #1565c0;
 }
-
 .real-legend {
   display: flex;
   align-items: center;
@@ -978,6 +1068,93 @@ const sisaClass = (item: any) => {
 }
 .leg-open {
   background: #90caf9;
+  margin-left: 8px;
+}
+
+/* ── PO BPB Panel ── */
+.po-bpb-link {
+  font-size: 10px;
+  font-weight: 700;
+  color: #00695c;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+.po-bpb-link:hover {
+  text-decoration: underline;
+}
+.po-bpb-summary {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  gap: 0;
+  flex-wrap: wrap;
+}
+.po-bpb-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 16px;
+  gap: 2px;
+}
+.po-bpb-stat.clickable {
+  cursor: pointer;
+}
+.po-bpb-stat.clickable:hover .po-bpb-val {
+  text-decoration: underline;
+}
+.po-bpb-val {
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+.po-bpb-lbl {
+  font-size: 9px;
+  color: #9e9e9e;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.po-bpb-divider {
+  width: 1px;
+  height: 32px;
+  background: #e0e0e0;
+  flex-shrink: 0;
+}
+.po-bpb-bar-wrap {
+  flex: 1;
+  min-width: 200px;
+  padding: 0 16px;
+}
+.po-bpb-bar {
+  height: 10px;
+  background: #f0f0f0;
+  border-radius: 5px;
+  overflow: hidden;
+  display: flex;
+  margin-bottom: 4px;
+}
+.po-bpb-seg {
+  height: 100%;
+  transition: width 0.3s;
+}
+.seg-open {
+  background: #c62828;
+}
+.seg-onproses {
+  background: #0277bd;
+}
+.seg-close {
+  background: #43a047;
+}
+.po-bpb-legend {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: #757575;
+}
+.ml-2 {
   margin-left: 8px;
 }
 

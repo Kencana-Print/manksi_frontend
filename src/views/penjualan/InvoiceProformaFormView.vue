@@ -39,6 +39,18 @@ const emptyRow = { kode: "", nama: "", ukuran: "", jumlah: 0, harga: 0 };
 const showPrintDialog = ref(false);
 const savedNomor = ref("");
 
+const formatDateLocal = (value?: string | Date) => {
+  if (!value) return "";
+
+  const d = new Date(value);
+
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+};
+
 const initialData = {
   nomor: "",
   tanggal: new Date().toISOString().substring(0, 10),
@@ -91,10 +103,8 @@ const {
 
     return {
       nomor: header.inv_nomor,
-      tanggal: new Date(header.inv_tanggal).toISOString().substring(0, 10),
-      tanggalTempo: new Date(header.inv_tanggal_tempo)
-        .toISOString()
-        .substring(0, 10),
+      tanggal: formatDateLocal(header.inv_tanggal),
+      tanggalTempo: formatDateLocal(header.inv_tanggal_tempo),
       divisi: header.inv_divisi,
       keterangan: header.inv_keterangan,
       kodePerush: header.inv_perush_kode,
@@ -134,7 +144,13 @@ onMounted(async () => {
 // --- KALKULASI TOTAL ---
 const totalNominal = computed(() => {
   return formData.value.details.reduce(
-    (sum, d) => sum + (Number(d.jumlah) || 0) * (Number(d.harga) || 0),
+    (
+      sum: number,
+      d: {
+        jumlah: number | string;
+        harga: number | string;
+      },
+    ) => sum + (Number(d.jumlah) || 0) * (Number(d.harga) || 0),
     0,
   );
 });
@@ -219,7 +235,12 @@ const onBarangSelected = (item: any) => {
 
   // Cek duplikasi
   const isDup = formData.value.details.some(
-    (d, idx) => d.kode === item.Kode && idx !== activeRowIndex.value,
+    (
+      d: {
+        kode: string;
+      },
+      idx: number,
+    ) => d.kode === item.Kode && idx !== activeRowIndex.value,
   );
   if (isDup) return toast.warning("Barang ini sudah ada di daftar.");
 
@@ -248,7 +269,8 @@ const validateSave = () => {
   if (!formData.value.cusKode) return toast.warning("Customer belum dipilih.");
 
   const valid = formData.value.details.filter(
-    (d) => d.kode && Number(d.jumlah) > 0,
+    (d: { kode: string; jumlah: number | string }) =>
+      d.kode && Number(d.jumlah) > 0,
   );
   if (valid.length === 0)
     return toast.warning("Detail barang masih kosong / jumlah 0.");
@@ -462,19 +484,21 @@ const num = (val: any) =>
             </thead>
             <tbody>
               <tr v-for="(item, index) in formData.details" :key="index">
-                <td class="text-center bg-grey-lighten-4">{{ index + 1 }}</td>
+                <td class="text-center bg-grey-lighten-4">
+                  {{ Number(index) + 1 }}
+                </td>
                 <td>
                   <div class="d-flex align-center">
                     <input
                       v-model="item.kode"
                       class="cell-input text-primary font-weight-bold"
                       placeholder="F1..."
-                      @keyup.f1="openBarangModal(index)"
+                      @keyup.f1="openBarangModal(Number(index))"
                     />
                     <button
                       type="button"
                       class="btn-icon-only"
-                      @click="openBarangModal(index)"
+                      @click="openBarangModal(Number(index))"
                     >
                       <span class="d-flex align-center justify-center"
                         ><IconSearch :size="13"
@@ -519,7 +543,7 @@ const num = (val: any) =>
                     size="x-small"
                     variant="text"
                     color="error"
-                    @click="removeRow(index)"
+                    @click="removeRow(Number(index))"
                   >
                     <span class="d-flex align-center justify-center"
                       ><IconTrash :size="14" :stroke-width="1.7"

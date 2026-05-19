@@ -35,10 +35,24 @@ const router = useRouter();
 const toast = useToast();
 const authStore = useAuthStore();
 
+const formatDateLocal = (value?: string | Date) => {
+  if (!value) return "";
+
+  const d = new Date(value);
+
+  if (isNaN(d.getTime())) return "";
+
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+};
+
 // 1. Initial State
 const initialData = {
   nomor: "",
-  tanggal: new Date().toISOString().substring(0, 10),
+  tanggal: formatDateLocal(new Date()),
   cabang: authStore.userCabang || "P04",
   divisi: "CUTING",
   spk: "",
@@ -76,7 +90,7 @@ const {
     const h = res.data.data.header;
     return {
       nomor: h.min_nomor,
-      tanggal: h.min_tanggal.substring(0, 10),
+      tanggal: formatDateLocal(h.min_tanggal),
       cabang: h.min_cab,
       divisi: h.min_divisi,
       spk: h.min_spk_nomor,
@@ -84,7 +98,7 @@ const {
       jumlahSpk: h.jumlahspk,
       keterangan: h.min_ket,
       mkbNomor: h.mkb_nomor,
-      mkbTanggal: h.mkb_tanggal,
+      mkbTanggal: formatDateLocal(h.mkb_tanggal),
       status: h.min_close === 0 ? "OPEN" : "CLOSED",
       pin_acc: h.pin_acc,
       pin_dipakai: h.pin_dipakai,
