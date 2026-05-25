@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { ref } from "vue";
+import { useToast } from "vue-toastification";
 import api from "@/services/api";
 import { useBrowse } from "@/composables/useBrowse";
 import BaseBrowse from "@/components/BaseBrowse.vue";
 import SimpleMasterFormDialog from "@/components/dialogs/SimpleMasterFormDialog.vue";
-import ConfirmDeleteDialog from "@/components/dialogs/ConfirmDeleteDialog.vue";
 import { IconPalette } from "@tabler/icons-vue";
+
+const toast = useToast();
 
 // ID 26 sesuai permintaan untuk Warna Bahan
 const {
@@ -34,7 +36,6 @@ const headers = [
 const showDialog = ref(false);
 const isNewMode = ref(true);
 const editData = ref(null);
-const showDelete = ref(false);
 
 const handleAdd = () => {
   isNewMode.value = true;
@@ -47,13 +48,15 @@ const handleEdit = (item: any) => {
   showDialog.value = true;
 };
 
-const executeDelete = async () => {
+const handleDelete = async (item: any) => {
   try {
-    await api.delete(`/master/warna-bahan/${selected.value[0].Kode}`);
-    showDelete.value = false;
+    await api.delete(`/master/warna-bahan/${item.Kode}`);
+
+    toast.success(`Warna bahan ${item.Nama} berhasil dihapus.`);
+
     fetchData();
   } catch (e: any) {
-    // Error ditangani oleh interceptor/toast global yang ada di backend
+    // Error ditangani global/interceptor
   }
 };
 </script>
@@ -74,7 +77,7 @@ const executeDelete = async () => {
     @refresh="fetchData"
     @add="handleAdd"
     @edit="handleEdit"
-    @delete="showDelete = true"
+    @delete="handleDelete"
     @export="exportToExcel('Data_Warna_Bahan')"
   />
 
@@ -87,11 +90,5 @@ const executeDelete = async () => {
     api-endpoint="/master/warna-bahan"
     :code-max-length="3"
     @saved="fetchData"
-  />
-
-  <ConfirmDeleteDialog
-    v-model="showDelete"
-    :item-name="selected[0]?.Nama"
-    @confirm="executeDelete"
   />
 </template>

@@ -70,7 +70,7 @@ const rowPropsFn = (data: any) => {
 
 const showDialog = ref(false);
 const isNewMode = ref(true);
-const editData = ref(null);
+const editData = ref<any | null>(null);
 
 const handleAdd = () => {
   isNewMode.value = true;
@@ -82,7 +82,50 @@ const handleEdit = async (item: any) => {
   try {
     isNewMode.value = false;
     const res = await api.get(`/master/customer/${item.Kode}`);
-    editData.value = res.data.data;
+    const data = res.data.data;
+
+    // Mapping lengkap berdasarkan JSON yang Anda berikan
+    editData.value = {
+      // Data Utama
+      Kode: data.Cus_kode,
+      Nama: data.Cus_nama,
+      Alamat: data.Cus_alamat,
+      Kota: data.Cus_kota,
+      Contact: data.Cus_CP,
+      Telp: data.Cus_telp,
+      Telp2: data.cus_telp2,
+      Fax: data.Cus_fax,
+      Email: data.cus_email,
+      JenisUsaha: data.cus_jenisusaha,
+
+      // Atribut Booleans / Status
+      Korporasi: data.cus_korporasi, // 'Y'/'N'
+      Aktif: data.cus_aktif === 0 ? "YA" : "TIDAK", // Jika cus_aktif 0 = Pasif/TIDAK
+      Prioritas: data.cus_prioritas, // 'Y'/'N'
+      Keramat: data.cus_keramat, // 'Y'/'N'
+      Perfect: data.cus_perfect, // 'Y'/'N'
+      Spanduk: data.cus_spanduk === "Y",
+      Garmen: data.cus_garmen === "Y",
+      Mmt: data.cus_mmt === "Y",
+
+      // Data NPWP
+      NpwpKode: data.Cus_npwp,
+      NpwpNama: data.Cus_nama_npwp,
+      NpwpAlamat: data.Cus_alamat_npwp,
+      NpwpKota: data.Cus_kota_npwp,
+
+      // Financial
+      DiscPersen: data.cus_disc_persen,
+      Top: data.cus_top,
+
+      // Induk Customer
+      KodeInduk: data.cus_kodei || "",
+      // Tambahkan info nama induk jika perlu ditampilkan di form
+      NamaInduk: data.namai || "",
+      AlamatInduk: data.alamati || "",
+      KotaInduk: data.kotai || "",
+    };
+
     showDialog.value = true;
   } catch (error) {
     toast.error("Gagal memuat detail customer");

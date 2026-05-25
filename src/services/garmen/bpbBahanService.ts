@@ -11,7 +11,9 @@ export const bpbBahanService = {
 
   // Hapus data
   delete: (nomor: string) =>
-    api.delete(`/garmen/bahan-baku/bpb-bahan/${nomor}`),
+    api.delete(
+      `/garmen/bahan-baku/bpb-bahan/delete/${encodeURIComponent(nomor)}`,
+    ),
 
   // Pengajuan PIN Perubahan Data
   requestPin: (payload: { nomor: string; alasan: string }) =>

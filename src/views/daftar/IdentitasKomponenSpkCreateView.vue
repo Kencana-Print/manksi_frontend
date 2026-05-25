@@ -58,8 +58,13 @@ const {
   menuId: "18",
   initialData,
   submitApi: async (data) => {
-    if (!data.NomorSPK) throw new Error("Nomor SPK tidak boleh kosong.");
+    if (!data.NomorSPK) {
+      throw new Error("Nomor SPK tidak boleh kosong.");
+    }
+
     await api.post("/master/komponen-spk-form/save", data);
+
+    toast.success("Identitas Komponen SPK berhasil disimpan.");
   },
   onSuccessRoute: "/daftar/komponen-spk",
 });

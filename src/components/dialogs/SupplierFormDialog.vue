@@ -296,8 +296,12 @@ const jenisItems = [
 
             <!-- Baris 5: Keterangan | TOP + TargetMitra + NPWP -->
             <div class="sup-row" style="align-items: flex-start">
-              <div class="sup-field" style="flex: 1">
+              <div
+                class="sup-field"
+                style="width: 420px; flex-shrink: 0; align-self: stretch"
+              >
                 <label class="sup-label">Keterangan</label>
+
                 <v-textarea
                   v-model="formData.Keterangan"
                   variant="outlined"
@@ -757,5 +761,9 @@ const jenisItems = [
 .sup-btn-cancel:disabled {
   opacity: 0.5;
   cursor: default;
+}
+
+.sup-input :deep(textarea) {
+  resize: none;
 }
 </style>

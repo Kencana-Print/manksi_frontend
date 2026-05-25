@@ -26,7 +26,6 @@ const dialogVisible = computed({
 
 const emptyForm = () => ({
   Kode: "",
-  KodeInduk: "",
   Nama: "",
   Alamat: "",
   Kota: "",
@@ -49,6 +48,10 @@ const emptyForm = () => ({
   Garmen: false,
   Mmt: false,
   Perfect: "",
+  KodeInduk: "",
+  NamaInduk: "",
+  AlamatInduk: "",
+  KotaInduk: "",
 });
 
 const formData = ref(emptyForm());
@@ -71,37 +74,13 @@ watch(
   () => props.modelValue,
   (isOpen) => {
     if (!isOpen) return;
-    // Reload jika kosong (misal pertama kali gagal)
-    if (jenisUsahaOptions.value.length === 0) loadLookups();
+
     if (props.isNewMode) {
       formData.value = emptyForm();
-    } else {
-      const ed = props.editData;
+    } else if (props.editData) {
       formData.value = {
-        Kode: ed.cus_kode,
-        KodeInduk: ed.cus_kodei || "",
-        Nama: ed.cus_nama,
-        Alamat: ed.cus_alamat,
-        Kota: ed.cus_kota,
-        Telp: ed.cus_telp || "",
-        Telp2: ed.cus_telp2 || "",
-        Fax: ed.cus_fax || "",
-        Contact: ed.cus_cp || "",
-        Email: ed.cus_email || "",
-        Korporasi: ed.cus_korporasi || "N",
-        JenisUsaha: ed.cus_jenisusaha || "",
-        NpwpKode: ed.cus_npwp || "",
-        NpwpNama: ed.cus_nama_npwp || "",
-        NpwpAlamat: ed.cus_alamat_npwp || "",
-        NpwpKota: ed.cus_kota_npwp || "",
-        DiscPersen: Number(ed.cus_disc_persen) || 0,
-        Top: Number(ed.cus_top) || 0,
-        Prioritas: ed.cus_prioritas || "N",
-        Keramat: ed.cus_keramat || "N",
-        Spanduk: ed.cus_spanduk === "Y",
-        Garmen: ed.cus_garmen === "Y",
-        Mmt: ed.cus_mmt === "Y",
-        Perfect: ed.cus_perfect || "",
+        ...emptyForm(),
+        ...props.editData,
       };
     }
     formRef.value?.resetValidation();
@@ -110,6 +89,9 @@ watch(
 
 const handleCustomerSelected = (cus: any) => {
   formData.value.KodeInduk = cus.Kode;
+  formData.value.NamaInduk = cus.Nama;
+  formData.value.AlamatInduk = cus.Alamat; // Asumsi Modal lookup mengirim ini
+  formData.value.KotaInduk = cus.Kota; // Asumsi Modal lookup mengirim ini
 };
 
 const handleSave = async () => {
@@ -517,7 +499,6 @@ const divisiItems = [
                       <template #append-inner>
                         <IconSearch
                           :size="16"
-                          :stroke-width="1.7"
                           color="#1565c0"
                           style="cursor: pointer"
                           @mousedown.prevent="showCustomerModal = true"
@@ -525,15 +506,32 @@ const divisiItems = [
                         <IconX
                           v-if="formData.KodeInduk"
                           :size="14"
-                          :stroke-width="2"
                           color="#c62828"
                           class="ml-1"
                           style="cursor: pointer"
-                          @click.stop="formData.KodeInduk = ''"
+                          @click.stop="
+                            formData.KodeInduk = '';
+                            formData.NamaInduk = '';
+                            formData.AlamatInduk = '';
+                            formData.KotaInduk = '';
+                          "
                         />
                       </template>
                     </v-text-field>
                   </div>
+                </div>
+
+                <div
+                  v-if="formData.KodeInduk"
+                  class="mt-2 pa-2 bg-grey-lighten-4 rounded text-caption"
+                >
+                  <div class="font-weight-bold text-primary">
+                    {{ formData.NamaInduk }}
+                  </div>
+                  <div class="text-grey-darken-1">
+                    {{ formData.AlamatInduk }}
+                  </div>
+                  <div class="text-grey-darken-1">{{ formData.KotaInduk }}</div>
                 </div>
               </div>
             </div>

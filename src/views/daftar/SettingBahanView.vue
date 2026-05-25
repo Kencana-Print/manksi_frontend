@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { ref } from "vue";
+import { useToast } from "vue-toastification";
 import api from "@/services/api";
 import { useBrowse } from "@/composables/useBrowse";
 import BaseBrowse from "@/components/BaseBrowse.vue";
 import SimpleMasterFormDialog from "@/components/dialogs/SimpleMasterFormDialog.vue";
-import ConfirmDeleteDialog from "@/components/dialogs/ConfirmDeleteDialog.vue";
 import { IconRuler2 } from "@tabler/icons-vue";
+
+const toast = useToast();
 
 // ID 28 untuk Setting Bahan
 const {
@@ -34,7 +36,6 @@ const headers = [
 const showDialog = ref(false);
 const isNewMode = ref(true);
 const editData = ref(null);
-const showDelete = ref(false);
 
 const handleAdd = () => {
   isNewMode.value = true;
@@ -47,13 +48,15 @@ const handleEdit = (item: any) => {
   showDialog.value = true;
 };
 
-const executeDelete = async () => {
+const handleDelete = async (item: any) => {
   try {
-    await api.delete(`/master/setting/${selected.value[0].Kode}`);
-    showDelete.value = false;
+    await api.delete(`/master/setting/${item.Kode}`);
+
+    toast.success(`Setting bahan ${item.Nama} berhasil dihapus.`);
+
     fetchData();
   } catch (e: any) {
-    // Error akan ditangkap otomatis oleh global toast / catch block
+    // Error ditangani global/interceptor
   }
 };
 </script>
@@ -74,7 +77,7 @@ const executeDelete = async () => {
     @refresh="fetchData"
     @add="handleAdd"
     @edit="handleEdit"
-    @delete="showDelete = true"
+    @delete="handleDelete"
     @export="exportToExcel('Data_Setting_Bahan')"
   />
 
@@ -87,11 +90,5 @@ const executeDelete = async () => {
     api-endpoint="/master/setting"
     :code-max-length="2"
     @saved="fetchData"
-  />
-
-  <ConfirmDeleteDialog
-    v-model="showDelete"
-    :item-name="selected[0]?.Nama"
-    @confirm="executeDelete"
   />
 </template>

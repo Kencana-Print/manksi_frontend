@@ -267,7 +267,15 @@ onMounted(async () => {
   fetchData();
   try {
     const res = await salesOrderService.getWorkshops();
-    listWorkshop.value = res.data.data; // Sekarang res.data.data berisi array ["HO-", "P01", ...]
+    // Cek isi data yang diterima
+    const data = res.data.data;
+
+    if (Array.isArray(data)) {
+      listWorkshop.value = data.map((w) => {
+        // Jika itemnya objek, ambil property-nya. Jika string, gunakan langsung.
+        return typeof w === "object" ? w.kode : w;
+      });
+    }
   } catch (e) {
     console.error("Gagal load workshop:", e);
   }
@@ -616,7 +624,9 @@ const formatWaktu = (v: string) => {
         <span class="f-label">Workshop</span>
         <select v-model="workshop" class="f-select">
           <option value="ALL">SEMUA WORKSHOP</option>
-          <option v-for="w in listWorkshop" :key="w" :value="w">{{ w }}</option>
+          <option v-for="w in listWorkshop" :key="w" :value="w">
+            {{ w }}
+          </option>
         </select>
       </div>
       <div class="f-divider" />

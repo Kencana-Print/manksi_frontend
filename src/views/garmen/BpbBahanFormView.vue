@@ -210,13 +210,23 @@ const onMkbSelected = (v: any) => {
 const setMkbDetail = (item: any) => {
   const idx = activeMkbGridIndex.value;
   if (idx < 0) return;
+
   const row = formData.value.items[idx];
+
+  // 1. Data Utama dari MKB Detail
   row.kode = item.Kode;
   row.nama = item.Nama;
   row.satuan = item.Satuan;
   row.mkb = selectedMkbNomor.value;
-  row.harga = 0;
   row.jumlah = Number(item.Jumlah) || 0;
+
+  // 2. Update SPK dan Nama SPK (yang akan menjadi Ket. PO di Browse)
+  // Berdasarkan data dari modal detail MKB
+  row.spk = item.Spk || "";
+  row.namaspk = item.NamaSpk || item.nama_spk || "";
+
+  // 3. Reset helper lainnya
+  row.harga = 0;
 };
 
 // ── Grid logic ──

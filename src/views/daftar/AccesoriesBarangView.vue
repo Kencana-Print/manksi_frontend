@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { ref } from "vue";
+import { useToast } from "vue-toastification";
 import api from "@/services/api";
 import { useBrowse } from "@/composables/useBrowse";
 import BaseBrowse from "@/components/BaseBrowse.vue";
 import SimpleMasterFormDialog from "@/components/dialogs/SimpleMasterFormDialog.vue";
-import ConfirmDeleteDialog from "@/components/dialogs/ConfirmDeleteDialog.vue";
 import { IconShape } from "@tabler/icons-vue";
+
+const toast = useToast();
 
 // ID 31 untuk Barang Accesories
 const {
@@ -34,7 +36,6 @@ const headers = [
 const showDialog = ref(false);
 const isNewMode = ref(true);
 const editData = ref(null);
-const showDelete = ref(false);
 
 const handleAdd = () => {
   isNewMode.value = true;
@@ -48,13 +49,15 @@ const handleEdit = (item: any) => {
   showDialog.value = true;
 };
 
-const executeDelete = async () => {
+const handleDelete = async (item: any) => {
   try {
-    await api.delete(`/master/acc-barang/${selected.value[0].Kode}`);
-    showDelete.value = false;
+    await api.delete(`/master/acc-barang/${item.Kode}`);
+
+    toast.success(`Barang accesories ${item.Nama} berhasil dihapus.`);
+
     fetchData();
   } catch (e: any) {
-    // Error constraint (sedang dipakai di Master Accesories) ditangkap oleh interceptor/toast global
+    // Error ditangani global/interceptor
   }
 };
 </script>
@@ -75,7 +78,7 @@ const executeDelete = async () => {
     @refresh="fetchData"
     @add="handleAdd"
     @edit="handleEdit"
-    @delete="showDelete = true"
+    @delete="handleDelete"
     @export="exportToExcel('Data_Barang_Accesories')"
   />
 
@@ -88,11 +91,5 @@ const executeDelete = async () => {
     api-endpoint="/master/acc-barang"
     :code-max-length="2"
     @saved="fetchData"
-  />
-
-  <ConfirmDeleteDialog
-    v-model="showDelete"
-    :item-name="selected[0]?.Nama"
-    @confirm="executeDelete"
   />
 </template>

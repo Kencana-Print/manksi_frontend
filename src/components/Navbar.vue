@@ -179,17 +179,10 @@ const menuItems: NavItem[] = [
         menuId: 58,
       },
       {
-        title: "Accesories",
+        title: "Pengaturan Accesories",
         icon: IconPaperclip,
         menuId: 901,
         subItems: [
-          {
-            title: "Master Accesories",
-            to: "/daftar/accesories/master",
-            icon: IconListDetails,
-            menuId: 30,
-          },
-          { divider: true },
           {
             title: "Barang",
             to: "/daftar/accesories/barang",

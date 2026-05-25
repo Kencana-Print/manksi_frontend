@@ -876,32 +876,63 @@ watch(
     </div>
 
     <!-- Delete Confirmation Dialog -->
-    <v-dialog v-model="deleteDialog" max-width="400" persistent>
-      <v-card rounded="lg">
-        <v-card-item>
-          <template #prepend>
-            <v-avatar color="error" variant="tonal" size="40">
-              <IconAlertTriangle
-                :size="22"
-                :stroke-width="1.7"
-                color="#c62828"
-              />
-            </v-avatar>
-          </template>
-          <v-card-title class="text-body-1 font-weight-bold"
-            >Hapus Data</v-card-title
+    <v-dialog v-model="deleteDialog" max-width="400px" persistent>
+      <v-card class="confirm-dialog-card rounded-lg">
+        <v-card-title class="d-flex align-center pa-4 bg-error-lighten-5">
+          <IconAlertTriangle
+            :size="20"
+            :stroke-width="1.7"
+            color="#c62828"
+            class="mr-2"
+          />
+          <span class="text-subtitle-1 font-weight-bold text-error">
+            Konfirmasi Hapus
+          </span>
+        </v-card-title>
+
+        <v-card-text class="pa-5 pt-4">
+          <div class="text-body-2 mb-1">
+            Apakah Anda yakin ingin menghapus data ini?
+          </div>
+
+          <div
+            v-if="pendingDeleteItem"
+            class="text-body-2 font-weight-black text-decoration-underline"
           >
-        </v-card-item>
-        <v-card-text class="text-body-2 pb-1">
-          Apakah kamu yakin ingin menghapus data ini? Tindakan ini
-          <strong>tidak dapat dibatalkan</strong>.
+            {{
+              pendingDeleteItem.Nama ||
+              pendingDeleteItem.nama ||
+              pendingDeleteItem.Kode ||
+              pendingDeleteItem.kode
+            }}
+          </div>
+
+          <div class="text-caption text-grey-darken-1 mt-3">
+            Tindakan ini tidak dapat dibatalkan.
+          </div>
         </v-card-text>
-        <v-card-actions class="pa-4 pt-2">
+
+        <v-divider />
+
+        <v-card-actions class="pa-3 bg-grey-lighten-4">
           <v-spacer />
-          <v-btn variant="text" @click="deleteDialog = false">Batal</v-btn>
-          <v-btn color="error" variant="flat" @click="confirmDelete"
-            >Ya, Hapus</v-btn
+
+          <v-btn
+            variant="text"
+            class="font-weight-bold"
+            @click="deleteDialog = false"
           >
+            Batal
+          </v-btn>
+
+          <v-btn
+            color="error"
+            variant="elevated"
+            class="font-weight-bold px-6"
+            @click="confirmDelete"
+          >
+            Ya, Hapus
+          </v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -1607,5 +1638,17 @@ watch(
   display: inline-block; /* ← KUNCI: lebar mengikuti konten, bukan parent */
   min-width: 300px; /* minimal agar tidak terlalu kecil */
   max-width: 100%; /* tidak melebihi lebar container */
+}
+
+.confirm-dialog-card :deep(*) {
+  font-size: 11px !important;
+}
+
+.confirm-dialog-card :deep(.text-subtitle-1) {
+  font-size: 13px !important;
+}
+
+.bg-error-lighten-5 {
+  background-color: #ffebee;
 }
 </style>

@@ -8,7 +8,6 @@ import { IconBox } from "@tabler/icons-vue";
 // Components
 import BaseBrowse from "@/components/BaseBrowse.vue";
 import MasterBahanFormDialog from "@/components/dialogs/MasterBahanFormDialog.vue";
-import ConfirmDeleteDialog from "@/components/dialogs/ConfirmDeleteDialog.vue";
 
 const toast = useToast();
 
@@ -60,8 +59,6 @@ const isNewMode = ref(true);
 const selectedBahanData = ref(null);
 
 // --- STATE DIALOG HAPUS ---
-const showDelete = ref(false);
-const itemToDelete = ref<any>(null);
 const isDeleting = ref(false);
 
 // 4. Action Handlers
@@ -83,20 +80,18 @@ const handleEdit = async (item: any) => {
   }
 };
 
-const confirmDelete = (item: any) => {
-  itemToDelete.value = item;
-  showDelete.value = true;
-};
-
-const executeDelete = async () => {
+const handleDelete = async (item: any) => {
   isDeleting.value = true;
+
   try {
-    await api.delete(`/master/bahan/${itemToDelete.value.Kode}`);
-    toast.success(`Bahan ${itemToDelete.value.Nama} berhasil dihapus.`);
-    showDelete.value = false;
-    fetchData(); // Refresh tabel
+    await api.delete(`/master/bahan/${item.Kode}`);
+
+    toast.success(`Bahan ${item.Nama} berhasil dihapus.`);
+    fetchData();
   } catch (e: any) {
-    toast.error(e.response?.data?.message || "Gagal menghapus data.");
+    const pesanError = e.response?.data?.message || "Gagal menghapus data.";
+
+    toast.error(pesanError);
   } finally {
     isDeleting.value = false;
   }
@@ -121,7 +116,7 @@ const executeDelete = async () => {
     @refresh="fetchData"
     @add="handleAdd"
     @edit="handleEdit"
-    @delete="confirmDelete"
+    @delete="handleDelete"
     @export="exportToExcel('Data_Master_Bahan')"
   >
     <template #filter-right-prepend>
@@ -156,13 +151,6 @@ const executeDelete = async () => {
     :is-new-mode="isNewMode"
     :bahan-data="selectedBahanData"
     @saved="fetchData"
-  />
-
-  <ConfirmDeleteDialog
-    v-model="showDelete"
-    :item-name="`Bahan ${itemToDelete?.Nama}`"
-    :is-loading="isDeleting"
-    @confirm="executeDelete"
   />
 </template>
 

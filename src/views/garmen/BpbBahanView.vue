@@ -269,18 +269,15 @@ const exportDetail = async () => {
 
 // --- HANDLER PENGAJUAN PIN ---
 const openPinDialog = () => {
-  if (selected.value.length === 0) {
-    return toast.warning("Pilih data terlebih dahulu.");
-  }
+  if (selected.value.length === 0) return toast.warning("Pilih data...");
 
-  // --- TAMBAHAN VALIDASI LOGIKA (Adaptasi Delphi) ---
-  // Jika user bisa klik tombol "Ubah" (canEdit), berarti sebenarnya
-  // dia tidak butuh PIN untuk mengedit data ini.
+  // LOGIKA INI MASALAHNYA:
+  // Jika Ngedit === "" dan canEdit === true, dia tetap menjalankan pinDialog = true
   if (selectedItem.value.Ngedit === "" && canEdit.value) {
-    // Catatan: Jika ingin 100% presisi seperti Delphi, Anda bisa hit API /cek-tutup-buku di sini
     toast.info(
       "Tidak perlu pengajuan perubahan data. Transaksi masih terbuka.",
     );
+    return;
   }
 
   alasanPin.value = "";

@@ -21,6 +21,18 @@ const fetchData = async () => {
     const res = await api.get("/lookups/mkb-detail", {
       params: { nomor: props.mkbNomor },
     });
+
+    // --- CEK WARNING DARI BACKEND SEPERTI DELPHI ---
+    const warningMsg = res.data.data.warning;
+    if (warningMsg) {
+      // confirm() akan menghentikan eksekusi sampai user milih OK/Cancel
+      if (!window.confirm(warningMsg)) {
+        // Jika user pilih Cancel (No), tutup modal detail dan batalkan load
+        emit("update:modelValue", false);
+        return;
+      }
+    }
+
     items.value = res.data.data.items || [];
   } catch (e) {
     console.error("Gagal memuat Detail MKB", e);
