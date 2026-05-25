@@ -42,6 +42,19 @@ const router = useRouter();
 const toast = useToast();
 const authStore = useAuthStore();
 
+const getCabangDefault = () => {
+  const bagian = (authStore.user?.bagian || "").toUpperCase();
+  const exemptBagian = ["FINANCE", "AUDIT", "EDP", "DIREKSI"];
+
+  // Bagian yang dikecualikan → default ALL
+  if (exemptBagian.includes(bagian)) return "ALL";
+
+  // Punya cabang spesifik → pakai cabang sendiri
+  if (authStore.user?.cabang) return authStore.user.cabang;
+
+  return "ALL";
+};
+
 // --- STATE FILTER (FIX TIMEZONE BUG) ---
 const getLocalDate = (d = new Date()) => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -54,7 +67,7 @@ const filterState = ref({
   ),
   dtAkhir: getLocalDate(currDate),
   jenis: "ACCESORIES", // Default sesuai Delphi
-  cabang: authStore.user?.cabang || "ALL",
+  cabang: getCabangDefault(),
 });
 
 // --- BROWSE SETUP ---
@@ -396,7 +409,7 @@ const submitEstimasi = async () => {
         >
           <option value="ALL">ALL</option>
           <option
-            v-for="c in ['P01', 'P02', 'P03', 'P04', 'HO-']"
+            v-for="c in ['P01', 'P02', 'P03', 'P04', 'P05', 'HO-']"
             :key="c"
             :value="c"
           >

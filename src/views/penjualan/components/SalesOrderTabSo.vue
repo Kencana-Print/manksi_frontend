@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, ref, watch, nextTick } from "vue";
 import {
   IconUpload,
   IconMaximize,
@@ -50,19 +50,47 @@ const showPreviewDialog = ref(false);
 
 const isImageError = ref(false);
 
+const isAutoSettingDateline = ref(false);
+
+const isInitialLoad = ref(true);
+
 const fileRef = ref<HTMLInputElement | null>(null);
 const displayImageUrl = computed(() => {
   if (props.formData.MainImageBlob) return props.formData.MainImageBlob;
-  if (!props.isEdit) {
-    if (props.formData.spk_memo)
-      return `http://103.94.238.252:8888/file-gambar/${encodeURIComponent(props.formData.spk_memo)}.jpg`;
-    return "";
+
+  const getBaseUrl = () => api.defaults.baseURL?.replace(/\/api\/?$/, "") || "";
+
+  const base = getBaseUrl();
+  const cab = props.formData.spk_cab || "HO-";
+
+  if (props.isEdit) {
+    if (props.formData.spk_memo) {
+      return `${base}/images/${cab}/map/${encodeURIComponent(props.formData.spk_memo)}.jpg`;
+    }
+    return `${base}/images/${cab}/${encodeURIComponent(props.formData.spk_nomor)}.jpg`;
   }
-  return `http://103.94.238.252:8888/file-gambar/${encodeURIComponent(props.formData.spk_nomor)}.jpg`;
+
+  // Edit mode: gambar SPK (bukan MAP) — tidak pakai subfolder map
+  return `${base}/images/${cab}/${encodeURIComponent(props.formData.spk_nomor)}.jpg`;
 });
 
-const onImageError = () => {
-  isImageError.value = true;
+const onImageError = (e: Event) => {
+  const img = e.target as HTMLImageElement;
+  const currentSrc = img.src;
+
+  // Jika sudah dari VPS, stop
+  if (currentSrc.includes("103.94.238.252")) {
+    isImageError.value = true;
+    return;
+  }
+
+  // Fallback ke VPS
+  const nomor = props.formData.spk_memo || props.formData.spk_nomor;
+  if (nomor) {
+    img.src = `http://103.94.238.252:8888/file-gambar/${encodeURIComponent(nomor)}.jpg`;
+  } else {
+    isImageError.value = true;
+  }
 };
 
 const onFileChange = (e: Event) => {
@@ -183,48 +211,57 @@ watch(
     () => props.formData.spk_tanggal,
     () => props.formData.spk_divisi,
     () => props.formData.spk_jo_kode,
-    () => props.formData.spk_statuskerja, // Kepentingan
-    () => props.formData.spk_dateline, // User ganti dateline manual
+    () => props.formData.spk_statuskerja,
+    () => props.formData.spk_dateline,
   ],
   async ([tglSpk, divisi, joKode, kepentingan, userDateline], oldVals) => {
-    // Hindari eksekusi jika data utama belum lengkap
     if (!tglSpk || !divisi || !kepentingan) return;
 
+    const datelineChanged = userDateline !== oldVals?.[4];
+    const otherChanged =
+      tglSpk !== oldVals?.[0] ||
+      divisi !== oldVals?.[1] ||
+      joKode !== oldVals?.[2] ||
+      kepentingan !== oldVals?.[3];
+
+    // Skip jika user edit dateline langsung (bukan initial load & bukan perubahan field lain)
+    if (datelineChanged && !otherChanged && !isInitialLoad.value) return;
+    if (isAutoSettingDateline.value) return;
+
     try {
-      // Panggil API Backend (Ganti path sesuai nama endpoint yg Anda buat)
       const res = await api.get("/penjualan/sales-order/form/dateline-limits", {
         params: { divisi, joKode, kepentingan },
       });
 
       const { minHari, maxHari, isKebal } = res.data.data;
-
-      // Jika ada status pengecualian (seperti kaosan maklun), skip koreksi
       if (isKebal) return;
 
       const dateSpk = new Date(String(tglSpk)).getTime();
       const dateDateline = new Date(String(userDateline)).getTime();
-
-      const minDate = dateSpk + minHari * 86400000; // ms dalam 1 hari
+      const minDate = dateSpk + minHari * 86400000;
       const maxDate = dateSpk + maxHari * 86400000;
 
-      // KOREKSI OTOMATIS: Jika terlalu cepat atau terlalu lambat
       if (dateDateline < minDate || dateDateline > maxDate) {
-        // Otomatis kembalikan ke batas maksimal yang diizinkan
         const correctedDate = addDaysToDate(String(tglSpk), maxHari);
-
-        // Cek agar tidak terjadi infinite loop
         if (props.formData.spk_dateline !== correctedDate) {
+          isAutoSettingDateline.value = true;
           props.formData.spk_dateline = correctedDate;
-          toast.info(
-            `Dateline disesuaikan otomatis menjadi batas maksimal (${maxHari} hari) sesuai aturan SLA.`,
-          );
+          if (!isInitialLoad.value) {
+            toast.info(
+              `Dateline disesuaikan otomatis menjadi batas maksimal (${maxHari} hari) sesuai aturan SLA.`,
+            );
+          }
+          await nextTick();
+          isAutoSettingDateline.value = false;
         }
       }
     } catch (e) {
       console.error("Gagal menarik aturan Dateline", e);
+    } finally {
+      isInitialLoad.value = false;
     }
   },
-  { deep: false },
+  { deep: false, immediate: true },
 );
 
 watch(
@@ -389,6 +426,7 @@ watch(
             class="inp"
             style="width: 55px"
             :disabled="formData.isRevisi !== 'Y'"
+            v-select-on-focus
           />
         </div>
 
@@ -660,7 +698,7 @@ watch(
               </div>
             </div>
             <div class="fr">
-              <label class="lbl">No. Memo</label>
+              <label class="lbl">No. MAP</label>
               <div class="igrp" style="width: 210px">
                 <input
                   v-model="formData.spk_memo"
@@ -815,6 +853,7 @@ watch(
             class="inp text-right"
             style="width: 110px"
             @blur="handleJumlahBlur"
+            v-select-on-focus
           />
         </div>
 
@@ -952,6 +991,7 @@ watch(
               type="number"
               class="inp text-right"
               style="width: 90px"
+              v-select-on-focus
             />
             <label class="lbl text-right ml-1" style="width: 62px"
               >Harga Riil</label
@@ -961,6 +1001,7 @@ watch(
               type="number"
               class="inp text-right"
               style="width: 90px"
+              v-select-on-focus
             />
             <label class="lbl text-right ml-1" style="width: 48px"
               >Return</label
@@ -970,6 +1011,7 @@ watch(
               type="number"
               class="inp text-right"
               style="width: 90px"
+              v-select-on-focus
             />
           </div>
         </div>

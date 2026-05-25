@@ -100,6 +100,7 @@ const handleSave = async () => {
                 density="compact"
                 hide-details="auto"
                 class="mb-2 bg-white"
+                v-select-on-focus
               ></v-text-field>
             </v-col>
             <v-col cols="12" sm="6">
@@ -111,6 +112,7 @@ const handleSave = async () => {
                 density="compact"
                 hide-details="auto"
                 class="mb-2 bg-white"
+                v-select-on-focus
               ></v-text-field>
             </v-col>
             <v-col cols="12" sm="6">
@@ -122,6 +124,7 @@ const handleSave = async () => {
                 density="compact"
                 hide-details="auto"
                 class="mb-2 bg-white"
+                v-select-on-focus
               ></v-text-field>
             </v-col>
             <v-col cols="12" sm="6">
@@ -133,6 +136,7 @@ const handleSave = async () => {
                 density="compact"
                 hide-details="auto"
                 class="mb-2 bg-white"
+                v-select-on-focus
               ></v-text-field>
             </v-col>
             <v-col cols="12" sm="6">
@@ -144,6 +148,7 @@ const handleSave = async () => {
                 density="compact"
                 hide-details="auto"
                 class="mb-2 bg-white"
+                v-select-on-focus
               ></v-text-field>
             </v-col>
             <v-col cols="12" sm="6">
@@ -155,6 +160,7 @@ const handleSave = async () => {
                 density="compact"
                 hide-details="auto"
                 class="mb-2 bg-white"
+                v-select-on-focus
               ></v-text-field>
             </v-col>
             <v-col cols="12" sm="6">
@@ -166,6 +172,7 @@ const handleSave = async () => {
                 density="compact"
                 hide-details="auto"
                 class="mb-2 bg-white"
+                v-select-on-focus
               ></v-text-field>
             </v-col>
             <v-col cols="12" sm="6">
@@ -177,6 +184,7 @@ const handleSave = async () => {
                 density="compact"
                 hide-details="auto"
                 class="mb-2 bg-white"
+                v-select-on-focus
               ></v-text-field>
             </v-col>
           </v-row>

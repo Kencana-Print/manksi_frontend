@@ -244,63 +244,51 @@ const onFileChange = (e: Event) => {
         <!-- Customer -->
         <div class="tp-row">
           <label class="tp-lbl">Customer</label>
-          <v-text-field
-            v-model="formData.CustKode"
-            variant="outlined"
-            density="compact"
-            readonly
-            hide-details
-            class="f-inp"
-            style="max-width: 100px; background: #ddeeff"
-          >
-            <template #append-inner>
-              <IconSearch
-                :size="13"
-                color="primary"
-                style="cursor: pointer"
-                @mousedown.prevent="showCustModal = true"
-              />
-            </template>
-          </v-text-field>
-          <v-text-field
+          <div class="tp-inp-grp" style="width: 100px">
+            <input
+              v-model="formData.CustKode"
+              class="tp-inp-field"
+              readonly
+              style="background: #ddeeff; font-weight: 600"
+            />
+            <button
+              type="button"
+              class="tp-lkp-btn"
+              @mousedown.prevent="showCustModal = true"
+            >
+              <IconSearch :size="13" />
+            </button>
+          </div>
+          <input
             v-model="formData.CustNama"
-            variant="outlined"
-            density="compact"
+            class="tp-inp-field flex-1"
             :readonly="!!formData.CustKode"
-            hide-details
-            class="f-inp"
           />
         </div>
 
         <!-- Sales -->
         <div class="tp-row">
           <label class="tp-lbl">Sales</label>
-          <v-text-field
-            v-model="formData.SalesKode"
-            variant="outlined"
-            density="compact"
-            readonly
-            hide-details
-            class="f-inp"
-            style="max-width: 100px; background: #ddeeff"
-          >
-            <template #append-inner>
-              <IconSearch
-                :size="13"
-                color="primary"
-                style="cursor: pointer"
-                @mousedown.prevent="showSalesModal = true"
-              />
-            </template>
-          </v-text-field>
-          <v-text-field
+          <div class="tp-inp-grp" style="width: 100px">
+            <input
+              v-model="formData.SalesKode"
+              class="tp-inp-field"
+              readonly
+              style="background: #ddeeff; font-weight: 600"
+            />
+            <button
+              type="button"
+              class="tp-lkp-btn"
+              @mousedown.prevent="showSalesModal = true"
+            >
+              <IconSearch :size="13" />
+            </button>
+          </div>
+          <input
             v-model="formData.SalesNama"
-            variant="outlined"
-            density="compact"
+            class="tp-inp-field flex-1"
             readonly
-            bg-color="grey-lighten-3"
-            hide-details
-            class="f-inp"
+            style="background: #f5f5f5"
           />
         </div>
 
@@ -327,6 +315,7 @@ const onFileChange = (e: Event) => {
             hide-details
             class="f-inp"
             style="max-width: 100px"
+            v-select-on-focus
           />
         </div>
 
@@ -341,6 +330,7 @@ const onFileChange = (e: Event) => {
             hide-details
             class="f-inp"
             style="max-width: 130px"
+            v-select-on-focus
           />
           <label class="tp-lbl" style="margin-left: 20px; width: 90px"
             >Harga Budget</label
@@ -353,6 +343,7 @@ const onFileChange = (e: Event) => {
             hide-details
             class="f-inp"
             style="max-width: 130px"
+            v-select-on-focus
           />
         </div>
 
@@ -389,6 +380,7 @@ const onFileChange = (e: Event) => {
             hide-details
             class="f-inp"
             style="max-width: 72px"
+            v-select-on-focus
           />
           <span class="tp-sep">x</span>
           <v-text-field
@@ -399,6 +391,7 @@ const onFileChange = (e: Event) => {
             hide-details
             class="f-inp"
             style="max-width: 72px"
+            v-select-on-focus
           />
           <span class="tp-sep">Mtr</span>
           <label class="tp-lbl" style="width: 70px; margin-left: 12px"
@@ -844,5 +837,54 @@ const onFileChange = (e: Event) => {
   background: #fff8e1;
   color: #f57f17;
   border: 1px solid #ffe082;
+}
+
+.tp-inp-grp {
+  display: flex;
+  height: 26px;
+  border: 1px solid #bdbdbd;
+  border-radius: 4px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.tp-inp-field {
+  flex: 1;
+  height: 26px;
+  border: 1px solid #bdbdbd;
+  border-radius: 4px;
+  padding: 0 6px;
+  font-size: 12px;
+  outline: none;
+  background: white;
+  min-width: 0;
+  box-sizing: border-box;
+}
+.tp-inp-field:focus {
+  border-color: #1565c0;
+}
+.tp-inp-grp .tp-inp-field {
+  border: none;
+  border-radius: 0;
+  height: 100%;
+}
+.tp-lkp-btn {
+  width: 26px;
+  height: 100%;
+  background: #f0f0f0;
+  border: none;
+  border-left: 1px solid #bdbdbd;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #1565c0;
+  flex-shrink: 0;
+}
+.tp-lkp-btn:hover {
+  background: #e3f2fd;
+}
+.flex-1 {
+  flex: 1;
+  min-width: 0;
 }
 </style>

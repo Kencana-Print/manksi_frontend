@@ -101,6 +101,7 @@ const onEmailChange = (e: Event) => {
                   type="number"
                   v-model.number="row.qty"
                   class="ll-cell tr"
+                  v-select-on-focus
                 />
               </td>
               <td class="ll-td-inp">
@@ -108,6 +109,7 @@ const onEmailChange = (e: Event) => {
                   type="number"
                   v-model.number="row.lb"
                   class="ll-cell tr"
+                  v-select-on-focus
                 />
               </td>
               <td class="ll-td-inp">
@@ -115,6 +117,7 @@ const onEmailChange = (e: Event) => {
                   type="number"
                   v-model.number="row.pb"
                   class="ll-cell tr"
+                  v-select-on-focus
                 />
               </td>
             </tr>

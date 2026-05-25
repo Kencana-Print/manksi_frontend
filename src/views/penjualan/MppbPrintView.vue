@@ -3,12 +3,15 @@ import { ref, onMounted } from "vue";
 import { useRoute } from "vue-router";
 import { mppbFormService } from "@/services/penjualan/mppbFormService";
 import logoImg from "@/assets/logo.png"; // Mengambil logo dari folder assets
+import api from "@/services/api";
 
 const route = useRoute();
 const nomor = route.params.nomor as string;
 
 const header = ref<any>({});
 const isReady = ref(false);
+
+const desainError = ref<Record<number, boolean>>({});
 
 const fetchData = async () => {
   try {
@@ -45,15 +48,40 @@ const formatTgl = (val: string) => {
   return `${String(d.getDate()).padStart(2, "0")} ${m[d.getMonth()]} ${d.getFullYear()}`;
 };
 
+const getBaseUrl = () => api.defaults.baseURL?.replace(/\/api\/?$/, "") || "";
+
 // Sembunyikan gambar jika gagal dimuat (misal gambar ttd tidak ada)
 const hideImg = (e: Event) => {
   (e.target as HTMLImageElement).style.display = "none";
 };
 
+const getDesainUrl = (nomor: string) => {
+  if (!nomor) return "";
+  return `${getBaseUrl()}/images/mppb/${encodeURIComponent(nomor)}.jpg`;
+};
+
 const getSignatureUrl = (kodeUser: string) => {
   if (!kodeUser) return "";
-  const cleanName = kodeUser.trim().toUpperCase();
-  return `http://103.94.238.252:8888/file-gambar/${encodeURIComponent(cleanName)}.jpg`;
+  return `${getBaseUrl()}/images/ttd/${encodeURIComponent(kodeUser.trim().toUpperCase())}.jpg`;
+};
+
+// Fallback ke VPS kalau gambar lokal tidak ada
+const onDesainError = (e: Event, nomor: string, idx: number) => {
+  const el = e.target as HTMLImageElement;
+  if (el.src.includes("8888")) {
+    el.style.display = "none";
+    return;
+  }
+  el.src = `http://103.94.238.252:8888/file-gambar/${encodeURIComponent(nomor)}.jpg`;
+};
+
+const onTtdError = (e: Event, kodeUser: string) => {
+  const el = e.target as HTMLImageElement;
+  if (el.src.includes("8888")) {
+    el.style.opacity = "0";
+    return;
+  }
+  el.src = `http://103.94.238.252:8888/file-gambar/${encodeURIComponent(kodeUser.trim().toUpperCase())}.jpg`;
 };
 
 onMounted(() => {
@@ -112,8 +140,8 @@ onMounted(() => {
           <div class="fw-bold mb-1">DESAIN :</div>
           <div class="img-wrap">
             <img
-              :src="`http://103.94.238.252:8888/file-gambar/${header.mpb_nomor}.jpg`"
-              @error="hideImg"
+              :src="getDesainUrl(header.mpb_nomor)"
+              @error="onDesainError($event, header.mpb_nomor, i)"
               class="desain-img"
             />
           </div>
@@ -135,10 +163,8 @@ onMounted(() => {
           >
             <img
               :src="getSignatureUrl(header.user_create)"
+              @error="onTtdError($event, header.user_create)"
               class="sig-img"
-              @error="
-                (e) => ((e.target as HTMLImageElement).style.opacity = '0')
-              "
             />
           </td>
           <td class="sig-space"></td>

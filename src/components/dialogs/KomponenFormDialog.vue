@@ -186,6 +186,7 @@ const handleSave = async () => {
                 readonly
                 bg-color="grey-lighten-4"
                 hide-details="auto"
+                v-select-on-focus
               ></v-text-field>
             </v-col>
             <v-col cols="12" md="4" class="mt-2">
@@ -198,6 +199,7 @@ const handleSave = async () => {
                 readonly
                 bg-color="grey-lighten-4"
                 hide-details="auto"
+                v-select-on-focus
               ></v-text-field>
             </v-col>
             <v-col cols="12" md="4" class="mt-2">
@@ -208,6 +210,7 @@ const handleSave = async () => {
                 variant="outlined"
                 density="compact"
                 hide-details="auto"
+                v-select-on-focus
               ></v-text-field>
             </v-col>
 

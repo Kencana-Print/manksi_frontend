@@ -380,6 +380,7 @@ const handlePrint = () => {
                     type="number"
                     v-model.number="row.JumlahSJ"
                     class="f-inp-cell text-right"
+                    v-select-on-focus
                   />
                 </td>
                 <td class="p-0">
@@ -387,6 +388,7 @@ const handlePrint = () => {
                     type="number"
                     v-model.number="row.Koli"
                     class="f-inp-cell text-right"
+                    v-select-on-focus
                   />
                 </td>
                 <td class="bg-grey-lighten-4 text-right">{{ row.SudahSJ }}</td>

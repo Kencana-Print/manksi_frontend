@@ -28,6 +28,8 @@ const isAllCabangAllowed = computed(() => {
 
 const cabangOptions = ref<string[]>([]);
 
+const showTerimaDialog = ref(false);
+
 // Akses filter jenis
 const showFilterAcc = computed(() => {
   return [
@@ -190,27 +192,6 @@ const getDetailItems = (nomor: string) => {
 // ── Actions ──
 const isSaving = ref(false);
 
-const onTerimaMutasi = async () => {
-  if (!selectedItem.value)
-    return toast.warning("Pilih data yang akan diterima.");
-  if (selectedItem.value.NoTerima) {
-    return toast.warning("Mutasi tersebut sudah diterima.");
-  }
-
-  if (confirm(`Yakin ingin menerima Mutasi ${selectedItem.value.Nomor}?`)) {
-    isSaving.value = true;
-    try {
-      await mutasiInBarangService.terimaMutasi(selectedItem.value.Nomor);
-      toast.success("Mutasi berhasil diterima.");
-      fetchData();
-    } catch (e: any) {
-      toast.error(e.response?.data?.message || "Gagal menerima mutasi.");
-    } finally {
-      isSaving.value = false;
-    }
-  }
-};
-
 // Export Detail Manual (Export Master + Rincian Detailnya)
 const onExportDetail = () => {
   if (!canExport.value) return toast.error("Hak akses ditolak");
@@ -287,6 +268,28 @@ const formatQty = (val: any) => {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
+};
+
+const openTerimaDialog = () => {
+  if (!selectedItem.value)
+    return toast.warning("Pilih data yang akan diterima.");
+  if (selectedItem.value.NoTerima)
+    return toast.warning("Mutasi tersebut sudah diterima.");
+  showTerimaDialog.value = true;
+};
+
+const confirmTerimaMutasi = async () => {
+  isSaving.value = true;
+  try {
+    await mutasiInBarangService.terimaMutasi(selectedItem.value.Nomor);
+    toast.success("Mutasi berhasil diterima.");
+    showTerimaDialog.value = false;
+    fetchData();
+  } catch (e: any) {
+    toast.error(e.response?.data?.message || "Gagal menerima mutasi.");
+  } finally {
+    isSaving.value = false;
+  }
 };
 </script>
 
@@ -395,7 +398,7 @@ const formatQty = (val: any) => {
         color="primary"
         :disabled="selected.length === 0"
         :loading="isSaving"
-        @click="onTerimaMutasi"
+        @click="openTerimaDialog"
       >
         <template #prepend><IconCheck :size="15" :stroke-width="2" /></template>
         Terima
@@ -480,6 +483,38 @@ const formatQty = (val: any) => {
       </div>
     </template>
   </BaseBrowse>
+
+  <v-dialog v-model="showTerimaDialog" max-width="400px" persistent>
+    <v-card class="rounded-lg">
+      <v-card-title
+        class="bg-primary text-white pa-3 text-subtitle-1 d-flex align-center"
+      >
+        <IconCheck :size="16" color="white" class="mr-2" />
+        Konfirmasi Terima Mutasi
+      </v-card-title>
+      <v-card-text class="pa-4 text-body-2">
+        Yakin ingin menerima mutasi:
+        <div class="font-weight-bold text-primary mt-1" style="font-size: 13px">
+          {{ selectedItem?.Nomor }}
+        </div>
+        <div class="text-caption text-grey mt-1">
+          {{ selectedItem?.Keterangan }}
+        </div>
+      </v-card-text>
+      <v-card-actions class="pa-3 border-t bg-grey-lighten-4">
+        <v-spacer />
+        <v-btn variant="text" @click="showTerimaDialog = false">Batal</v-btn>
+        <v-btn
+          color="primary"
+          variant="elevated"
+          :loading="isSaving"
+          @click="confirmTerimaMutasi"
+        >
+          Ya, Terima
+        </v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
 </template>
 
 <style scoped>

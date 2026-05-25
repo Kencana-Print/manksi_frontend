@@ -533,6 +533,7 @@ const numFormat = (val: any) =>
                     v-model.number="item.jumlah"
                     class="cell-input tr fw-bold"
                     step="any"
+                    v-select-on-focus
                   />
                 </td>
                 <td class="bg-yellow-lighten-5">
@@ -540,6 +541,7 @@ const numFormat = (val: any) =>
                     type="number"
                     v-model.number="item.roll"
                     class="cell-input tr fw-bold"
+                    v-select-on-focus
                   />
                 </td>
 

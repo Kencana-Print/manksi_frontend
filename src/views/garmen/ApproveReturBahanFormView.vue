@@ -316,6 +316,7 @@ const numFormat = (val: any) =>
                       class="cell-input tr fw-bold"
                       step="any"
                       readonly
+                      v-select-on-focus
                     />
                   </td>
                   <td class="bg-yellow-lighten-5">
@@ -324,6 +325,7 @@ const numFormat = (val: any) =>
                       v-model.number="item.roll"
                       class="cell-input tr fw-bold"
                       @change="onRollChange(item)"
+                      v-select-on-focus
                     />
                   </td>
 
@@ -393,6 +395,7 @@ const numFormat = (val: any) =>
                       v-model.number="bc.jumlah"
                       class="cell-input tr fw-bold"
                       step="any"
+                      v-select-on-focus
                     />
                   </td>
                 </tr>

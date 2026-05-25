@@ -252,6 +252,7 @@ watch(
                   v-model.number="form.header.biaya_kirim"
                   class="f-inp"
                   style="max-width: 120px; text-align: right"
+                  v-select-on-focus
                 />
               </div>
             </div>

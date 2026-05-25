@@ -406,6 +406,7 @@ const divisiItems = [
                     hide-details
                     class="f-input"
                     style="max-width: 100px"
+                    v-select-on-focus
                   />
                   <label class="f-label" style="margin-left: 8px"
                     >T.O.P (Hari)</label
@@ -418,6 +419,7 @@ const divisiItems = [
                     hide-details
                     class="f-input"
                     style="max-width: 80px"
+                    v-select-on-focus
                   />
                 </div>
 

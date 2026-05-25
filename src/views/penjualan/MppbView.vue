@@ -126,23 +126,32 @@ const cetak = () => {
 };
 
 // --- ACTION APPROVAL ---
-const toggleApprove = async () => {
+
+const showApproveDialog = ref(false);
+const approveItem = ref<any>(null);
+const isApproveLoading = ref(false);
+
+const openApproveDialog = () => {
   if (selected.value.length === 0) return;
-  const item = selected.value[0];
-  const isApproveNow = item.Approve === "Y";
+  approveItem.value = selected.value[0];
+  showApproveDialog.value = true;
+};
 
-  const msg = isApproveNow ? "Akan Batal Approve?" : "Yakin akan di Approve?";
-  if (!confirm(msg)) return;
-
-  isLoading.value = true;
+const confirmToggleApprove = async () => {
+  if (!approveItem.value) return;
+  isApproveLoading.value = true;
   try {
-    const res = await mppbService.toggleApprove(item.Nomor, item.Approve);
+    const res = await mppbService.toggleApprove(
+      approveItem.value.Nomor,
+      approveItem.value.Approve,
+    );
     toast.success(res.data.message);
+    showApproveDialog.value = false;
     fetchData();
   } catch (e: any) {
     toast.error(e.response?.data?.message || "Gagal update status approve.");
   } finally {
-    isLoading.value = false;
+    isApproveLoading.value = false;
   }
 };
 
@@ -248,7 +257,7 @@ const submitPengajuan = async () => {
         :color="selected[0]?.Approve === 'Y' ? 'error' : 'success'"
         variant="elevated"
         :disabled="selected.length === 0"
-        @click="toggleApprove"
+        @click="openApproveDialog"
       >
         <template #prepend>
           <span class="d-flex align-center">
@@ -380,6 +389,77 @@ const submitPengajuan = async () => {
           class="dlg-btn cancel"
           :disabled="isPinLoading"
           @click="showPinDialog = false"
+        >
+          Batal
+        </button>
+      </div>
+    </div>
+  </v-dialog>
+
+  <v-dialog v-model="showApproveDialog" max-width="380px" persistent>
+    <div class="close-dlg">
+      <div
+        class="close-dlg-header"
+        :style="
+          approveItem?.Approve === 'Y'
+            ? 'background:#c62828'
+            : 'background:#2e7d32'
+        "
+      >
+        <span class="d-flex align-center mr-2">
+          <IconDiscountCheck
+            v-if="approveItem?.Approve !== 'Y'"
+            size="16"
+            color="white"
+          />
+          <IconPencilOff v-else size="16" color="white" />
+        </span>
+        {{
+          approveItem?.Approve === "Y" ? "Batal Approve" : "Konfirmasi Approve"
+        }}
+        <button class="dlg-x" @click="showApproveDialog = false">✕</button>
+      </div>
+      <div class="close-dlg-body">
+        <div class="f-lbl-sm mb-1">
+          {{
+            approveItem?.Approve === "Y"
+              ? "Yakin ingin membatalkan approve untuk:"
+              : "Yakin ingin meng-approve:"
+          }}
+        </div>
+        <div
+          class="mt-2"
+          style="font-size: 13px; font-weight: 700; color: #1565c0"
+        >
+          {{ approveItem?.Nomor }}
+        </div>
+        <div style="font-size: 11px; color: #555; margin-top: 4px">
+          {{ approveItem?.NamaProduk }}
+        </div>
+      </div>
+      <div class="close-dlg-footer">
+        <button
+          class="dlg-btn text-white"
+          :style="
+            approveItem?.Approve === 'Y'
+              ? 'background:#c62828'
+              : 'background:#2e7d32'
+          "
+          :disabled="isApproveLoading"
+          @click="confirmToggleApprove"
+        >
+          {{
+            isApproveLoading
+              ? "Memproses..."
+              : approveItem?.Approve === "Y"
+                ? "Ya, Batal Approve"
+                : "Ya, Approve"
+          }}
+        </button>
+        <button
+          class="dlg-btn cancel"
+          :disabled="isApproveLoading"
+          @click="showApproveDialog = false"
         >
           Batal
         </button>

@@ -167,6 +167,9 @@ const {
 const isTutupBuku = computed(() => !!formData.value.isTutupBuku);
 
 // ── FUNGSI GAMBAR ──
+const desainError = ref(false);
+const dokumenError = ref(false);
+
 const onFileChange = (e: Event, tipe: "desain" | "dokumen") => {
   const file = (e.target as HTMLInputElement).files?.[0];
   if (!file) return;
@@ -178,26 +181,44 @@ const onFileChange = (e: Event, tipe: "desain" | "dokumen") => {
   }
 
   if (tipe === "desain") {
+    desainError.value = false;
     uploadName.value = file.name;
     formData.value.imgDesainLokal = URL.createObjectURL(file);
   } else {
+    dokumenError.value = false;
     uploadDocName.value = file.name;
     formData.value.imgDokumenLokal = URL.createObjectURL(file);
   }
 };
 
+// Tambah state untuk tracking apakah gambar exist
+const desainExists = ref(false);
+const dokumenExists = ref(false);
+
+// Cek saat edit mode
+onMounted(async () => {
+  loadDivisi();
+  if (isEdit.value && formData.value.nomor) {
+    // Cek keberadaan gambar via HEAD request atau langsung pakai error handler
+    // Cukup pakai flag, biarkan <img> onError yang handle
+  }
+});
+
 const displayImgDesain = computed(() => {
   if (formData.value.imgDesainLokal) return formData.value.imgDesainLokal;
+  // Saat edit, coba load — biarkan @error di template yang handle
   if (isEdit.value && formData.value.nomor) {
-    return `http://103.94.238.252:8888/file-gambar/${encodeURIComponent(formData.value.nomor)}.jpg`;
+    const base = api.defaults.baseURL?.replace(/\/api\/?$/, "") || "";
+    return `${base}/images/mppb/${encodeURIComponent(formData.value.nomor)}.jpg`;
   }
-  return "";
+  return ""; // Kosong = tampilkan empty state
 });
 
 const displayImgDokumen = computed(() => {
   if (formData.value.imgDokumenLokal) return formData.value.imgDokumenLokal;
   if (isEdit.value && formData.value.nomor) {
-    return `http://103.94.238.252:8888/file-gambar/${encodeURIComponent(formData.value.nomor)}-doc.jpg`;
+    const base = api.defaults.baseURL?.replace(/\/api\/?$/, "") || "";
+    return `${base}/images/mppb/${encodeURIComponent(formData.value.nomor)}-doc.jpg`;
   }
   return "";
 });
@@ -378,6 +399,7 @@ const formatWaktu = (dt: string) => {
               hide-details
               class="f-inp"
               style="max-width: 150px"
+              v-select-on-focus
             />
           </div>
 
@@ -401,18 +423,23 @@ const formatWaktu = (dt: string) => {
           style="background: #e3f2fd; border-color: #90caf9"
         >
           <div class="tp-sec-title">Upload Desain</div>
+          <!-- Upload Desain -->
           <div class="tp-img-box">
             <img
-              v-if="displayImgDesain"
+              v-if="displayImgDesain && !desainError"
               :src="displayImgDesain"
               class="tp-img"
               @click="openPreview(displayImgDesain)"
+              @error="desainError = true"
             />
             <div v-else class="tp-img-empty">
-              <IconPhoto :size="28" color="#90caf9" />
-              <div class="mt-1">No Image available</div>
+              <IconPhotoOff :size="28" color="#90caf9" />
+              <div class="mt-1" style="color: #90caf9">
+                Belum ada gambar desain
+              </div>
             </div>
           </div>
+
           <div class="tp-upload-row">
             <input
               ref="fileRef"
@@ -446,18 +473,22 @@ const formatWaktu = (dt: string) => {
               class="f-inp"
             />
           </div>
+
+          <!-- Upload Dokumen -->
           <div class="tp-img-box" style="height: 120px">
             <img
-              v-if="displayImgDokumen"
+              v-if="displayImgDokumen && !dokumenError"
               :src="displayImgDokumen"
               class="tp-img"
               @click="openPreview(displayImgDokumen)"
+              @error="dokumenError = true"
             />
             <div v-else class="tp-img-empty">
-              <IconPhoto :size="28" color="#bdbdbd" />
-              <div class="mt-1">No Image available</div>
+              <IconPhotoOff :size="24" color="#bdbdbd" />
+              <div class="mt-1">Belum ada gambar dokumen</div>
             </div>
           </div>
+
           <div class="tp-upload-row">
             <input
               ref="fileDocRef"

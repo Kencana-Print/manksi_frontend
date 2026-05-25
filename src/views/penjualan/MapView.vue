@@ -6,6 +6,7 @@ import BaseBrowse from "@/components/BaseBrowse.vue";
 import { useBrowse } from "@/composables/useBrowse";
 import { mapService } from "@/services/penjualan/mapService";
 import { useAuthStore } from "@/stores/authStore";
+import api from "@/services/api";
 import {
   IconClipboardText,
   IconPrinter,
@@ -183,12 +184,19 @@ const goDelete = async (item: any) => {
 // Aksi Ekstra
 const lihatGambar = () => {
   if (selected.value.length === 0) return;
-  const nomor = selected.value[0].Nomor;
-
-  // Arahkan langsung ke port 8888 yang baru kita buat
-  gambarUrl.value = `http://103.94.238.252:8888/file-gambar/${nomor}.jpg`;
-
+  const item = selected.value[0];
+  const base = api.defaults.baseURL?.replace(/\/api\/?$/, "") || "";
+  const cab = item.Cab || "HO-";
+  // Coba dari backend lokal dulu
+  gambarUrl.value = `${base}/images/${cab}/map/${encodeURIComponent(item.Nomor)}.jpg`;
   dialogGambar.value = true;
+};
+
+const onGambarError = () => {
+  // Fallback ke VPS kalau backend lokal tidak ada
+  if (!gambarUrl.value.includes("8888")) {
+    gambarUrl.value = `http://103.94.238.252:8888/file-gambar/${encodeURIComponent(selected.value[0]?.Nomor)}.jpg`;
+  }
 };
 
 const cetak = () => {
@@ -256,16 +264,21 @@ const submitPengajuan = async () => {
   }
 };
 
-const approvalMap = async () => {
+const showApprovalDialog = ref(false);
+const approvalItem = ref<any>(null);
+
+const openApprovalDialog = () => {
   if (selected.value.length === 0) return;
-  const item = selected.value[0];
+  approvalItem.value = selected.value[0];
+  showApprovalDialog.value = true;
+};
 
-  if (!confirm(`Yakin akan di-approve untuk MAP ${item.Nomor}?`)) return;
-
+const confirmApproval = async () => {
   isLoading.value = true;
   try {
-    await mapService.approveCmo(item.Nomor);
+    await mapService.approveCmo(approvalItem.value.Nomor);
     toast.success("Berhasil di-approve.");
+    showApprovalDialog.value = false;
     fetchData();
   } catch (error: any) {
     toast.error(error.response?.data?.message || "Gagal approve.");
@@ -274,20 +287,28 @@ const approvalMap = async () => {
   }
 };
 
-const toggleCloseData = async (isClose: "Y" | "N") => {
+const showCloseDialog = ref(false);
+const closeAction = ref<"Y" | "N">("Y");
+const closeItem = ref<any>(null);
+
+const openCloseDialog = (isClose: "Y" | "N") => {
   if (selected.value.length === 0) return;
-  const item = selected.value[0];
+  closeAction.value = isClose;
+  closeItem.value = selected.value[0];
+  showCloseDialog.value = true;
+};
 
-  const actionText = isClose === "Y" ? "di-Close" : "di-Open";
-  if (!confirm(`Yakin ingin ${actionText}?`)) return;
-
+const confirmToggleClose = async () => {
   isLoading.value = true;
   try {
-    await mapService.toggleClose(item.Nomor, isClose);
-    toast.success(`Berhasil ${actionText}.`);
+    await mapService.toggleClose(closeItem.value.Nomor, closeAction.value);
+    toast.success(
+      `Berhasil ${closeAction.value === "Y" ? "di-Close" : "di-Open"}.`,
+    );
+    showCloseDialog.value = false;
     fetchData();
   } catch (error: any) {
-    toast.error(error.response?.data?.message || `Gagal ${actionText}.`);
+    toast.error(error.response?.data?.message || "Gagal.");
   } finally {
     isLoading.value = false;
   }
@@ -394,20 +415,20 @@ const toggleCloseData = async (isClose: "Y" | "N") => {
             /></template>
             <v-list-item-title>Pengajuan Perubahan</v-list-item-title>
           </v-list-item>
-          <v-list-item @click="approvalMap">
+          <v-list-item @click="openApprovalDialog">
             <template #prepend
               ><IconDiscountCheck :size="16" :stroke-width="1.7"
             /></template>
             <v-list-item-title>Approval MAP</v-list-item-title>
           </v-list-item>
           <v-divider></v-divider>
-          <v-list-item @click="toggleCloseData('Y')">
+          <v-list-item @click="openCloseDialog('Y')">
             <template #prepend
               ><IconLock :size="16" :stroke-width="1.7"
             /></template>
             <v-list-item-title>Close Data</v-list-item-title>
           </v-list-item>
-          <v-list-item @click="toggleCloseData('N')">
+          <v-list-item @click="openCloseDialog('N')">
             <template #prepend
               ><IconLockOpen :size="16" :stroke-width="1.7"
             /></template>
@@ -556,17 +577,16 @@ const toggleCloseData = async (isClose: "Y" | "N") => {
           </template>
 
           <template v-slot:error>
+            <div v-if="!gambarUrl.includes('8888')" class="fill-height">
+              <!-- Auto retry ke VPS -->
+              {{ onGambarError() }}
+            </div>
             <div
+              v-else
               class="d-flex flex-column align-center justify-center fill-height text-grey"
             >
               <IconPhotoOff :size="48" color="#bdbdbd" />
-              <div class="text-subtitle-2 mt-2">
-                Gambar tidak tersedia di server
-              </div>
-              <div class="text-caption">
-                Pastikan file {{ selected[0]?.Nomor }}.jpg ada di folder
-                /mnt/image
-              </div>
+              <div class="text-subtitle-2 mt-2">Gambar tidak tersedia</div>
             </div>
           </template>
         </v-img>
@@ -672,6 +692,121 @@ const toggleCloseData = async (isClose: "Y" | "N") => {
       </v-card-actions>
     </v-card>
   </v-dialog>
+
+  <v-dialog v-model="showApprovalDialog" max-width="380px" persistent>
+    <div class="close-dlg">
+      <div class="close-dlg-header" style="background: #2e7d32">
+        <IconDiscountCheck size="16" color="white" class="mr-2" />
+        Konfirmasi Approval MAP
+        <button class="dlg-x" @click="showApprovalDialog = false">✕</button>
+      </div>
+      <div class="close-dlg-body">
+        <div class="f-lbl-sm mb-1">Yakin ingin meng-approve MAP:</div>
+        <div
+          style="
+            font-size: 13px;
+            font-weight: 700;
+            color: #1565c0;
+            margin-top: 6px;
+          "
+        >
+          {{ approvalItem?.Nomor }}
+        </div>
+        <div style="font-size: 11px; color: #555; margin-top: 4px">
+          {{ approvalItem?.Nama }}
+        </div>
+        <div style="font-size: 11px; color: #555; margin-top: 2px">
+          MO: {{ approvalItem?.MO }}
+        </div>
+      </div>
+      <div class="close-dlg-footer">
+        <button
+          class="dlg-btn text-white"
+          style="background: #2e7d32"
+          :disabled="isLoading"
+          @click="confirmApproval"
+        >
+          {{ isLoading ? "Memproses..." : "Ya, Approve" }}
+        </button>
+        <button
+          class="dlg-btn cancel"
+          :disabled="isLoading"
+          @click="showApprovalDialog = false"
+        >
+          Batal
+        </button>
+      </div>
+    </div>
+  </v-dialog>
+
+  <v-dialog v-model="showCloseDialog" max-width="380px" persistent>
+    <div class="close-dlg">
+      <div
+        class="close-dlg-header"
+        :style="
+          closeAction === 'Y' ? 'background:#c62828' : 'background:#2e7d32'
+        "
+      >
+        <component
+          :is="closeAction === 'Y' ? IconLock : IconLockOpen"
+          size="16"
+          color="white"
+          class="mr-2"
+        />
+        {{
+          closeAction === "Y" ? "Konfirmasi Close Data" : "Konfirmasi Open Data"
+        }}
+        <button class="dlg-x" @click="showCloseDialog = false">✕</button>
+      </div>
+      <div class="close-dlg-body">
+        <div class="f-lbl-sm mb-1">
+          {{
+            closeAction === "Y"
+              ? "Yakin ingin meng-Close MAP:"
+              : "Yakin ingin meng-Open MAP:"
+          }}
+        </div>
+        <div
+          style="
+            font-size: 13px;
+            font-weight: 700;
+            color: #1565c0;
+            margin-top: 6px;
+          "
+        >
+          {{ closeItem?.Nomor }}
+        </div>
+        <div style="font-size: 11px; color: #555; margin-top: 4px">
+          {{ closeItem?.Nama }}
+        </div>
+      </div>
+      <div class="close-dlg-footer">
+        <button
+          class="dlg-btn text-white"
+          :style="
+            closeAction === 'Y' ? 'background:#c62828' : 'background:#2e7d32'
+          "
+          :disabled="isLoading"
+          @click="confirmToggleClose"
+        >
+          {{
+            isLoading
+              ? "Memproses..."
+              : closeAction === "Y"
+                ? "Ya, Close"
+                : "Ya, Open"
+          }}
+        </button>
+        <button
+          class="dlg-btn cancel"
+          :disabled="isLoading"
+          @click="showCloseDialog = false"
+        >
+          Batal
+        </button>
+      </div>
+    </div>
+  </v-dialog>
 </template>
 
 <style scoped>
@@ -756,5 +891,58 @@ const toggleCloseData = async (isClose: "Y" | "N") => {
 :deep(.row-active-open td) {
   color: #d32f2f !important; /* Merah */
   font-weight: 600 !important;
+}
+
+.close-dlg {
+  background: white;
+  border-radius: 8px;
+  overflow: hidden;
+  font-family: sans-serif;
+  font-size: 12px;
+}
+.close-dlg-header {
+  display: flex;
+  align-items: center;
+  padding: 9px 14px;
+  font-size: 13px;
+  font-weight: 700;
+  color: white;
+}
+.dlg-x {
+  margin-left: auto;
+  background: transparent;
+  border: none;
+  color: white;
+  font-size: 15px;
+  cursor: pointer;
+}
+.close-dlg-body {
+  padding: 14px;
+}
+.f-lbl-sm {
+  font-size: 11px;
+  font-weight: 600;
+  color: #424242;
+}
+.close-dlg-footer {
+  display: flex;
+  gap: 8px;
+  padding: 10px 14px;
+  border-top: 1px solid #e0e0e0;
+  background: #fafafa;
+}
+.dlg-btn {
+  height: 28px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.dlg-btn.cancel {
+  background: #e0e0e0;
+  color: #424242;
+  margin-left: auto;
 }
 </style>

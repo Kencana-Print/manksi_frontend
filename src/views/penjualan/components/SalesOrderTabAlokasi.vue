@@ -199,6 +199,7 @@ const handleExcelUpload = (e: Event) => {
                   type="number"
                   v-model.number="row.jumlah"
                   class="ll-cell tr font-weight-bold"
+                  v-select-on-focus
                 />
               </td>
               <td class="ll-td-ctr">

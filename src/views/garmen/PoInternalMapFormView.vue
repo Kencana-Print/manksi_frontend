@@ -535,6 +535,7 @@ const confirmPrint = () => {
                     type="number"
                     v-model.number="row.JumlahPO"
                     class="f-inp-cell text-right"
+                    v-select-on-focus
                   />
                 </td>
                 <td class="p-0">

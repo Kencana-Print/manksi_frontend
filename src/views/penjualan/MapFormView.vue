@@ -25,8 +25,8 @@ const mainImageFile = ref<File | null>(null);
 const emailImageFile = ref<File | null>(null);
 
 const router = useRouter();
-const showPrintDialog = ref(false);
-const savedNomor = ref("");
+// const showPrintDialog = ref(false);
+// const savedNomor = ref("");
 
 // ── STATE LOOKUPS ──
 const lookupOptions = ref({
@@ -110,7 +110,7 @@ const initialData = {
   RevisiNote: "",
   TipeRevisi: 1, // 0 = External, 1 = Internal
   Keterangan: "",
-  StatusEdit: "MINTA",
+  StatusEdit: "",
   isTutupBuku: false,
   MainImageName: "",
   MainImageBlob: "",
@@ -134,7 +134,7 @@ const mapMapData = (rawData: any) => {
   // Ekstrak array tambahan bawaan backend
   d.sizes = rawData.Sizes || [];
   d.komponen = rawData.Komponen || [];
-  d.statusedit = rawData.StatusEdit || "MINTA";
+  d.statusedit = rawData.StatusEdit ?? "";
   d.istutupbuku = rawData.isTutupBuku || false;
 
   // 2. Mapping ke struktur formData
@@ -225,17 +225,19 @@ const {
   },
   submitApi: async (dataToSave) => {
     // ── 0. ValidASI DELPHI: CEK STATUS EDIT SEBELUM SIMPAN ──
-    const status = dataToSave.StatusEdit;
-    // Jika data sedang dalam proses pengajuan (MINTA, WAIT, TOLAK), cegah penyimpanan
-    if (status === "MINTA" || status === "WAIT" || status === "TOLAK") {
-      throw new Error(
-        "Transaksi tsb sudah diclose.\nSilahkan minta approve untuk bisa menyimpan perubahan data.",
-      );
+    if (isEditMode.value) {
+      const status = dataToSave.StatusEdit;
+      if (isEditMode.value && (status === "WAIT" || status === "TOLAK")) {
+        throw new Error(
+          "Transaksi tsb sudah diclose.\nSilahkan minta approve untuk bisa menyimpan perubahan data.",
+        );
+      }
     }
 
     // 1. Validasi Minimum sebelum kirim
     if (!dataToSave.Cab) throw new Error("Kode Workshop MAP wajib diisi.");
     if (!dataToSave.Nama) throw new Error("Nama Pekerjaan wajib diisi.");
+    if (!dataToSave.JoKode) throw new Error("Jenis Order wajib diisi.");
 
     // 2. Simpan Data Form
     const res = await mapFormService.save(dataToSave, !isEditMode.value);
@@ -269,10 +271,7 @@ const {
   },
   onSuccess: (res: any) => {
     toast.success("Data MAP berhasil disimpan.");
-    // Tangkap nomor dari respons backend
-    savedNomor.value = res.data?.nomor || formData.value.Nomor;
-    // Tampilkan dialog cetak
-    showPrintDialog.value = true;
+    router.push("/penjualan/map");
   },
 });
 
@@ -352,28 +351,28 @@ const handleEmailUpload = (file: File) => {
 };
 
 // ── Logika Navigasi Cetak ──
-const closePrintAndExit = () => {
-  showPrintDialog.value = false;
-  router.push("/penjualan/map"); // Kembali ke browse list
-};
+// const closePrintAndExit = () => {
+//   showPrintDialog.value = false;
+//   router.push("/penjualan/map"); // Kembali ke browse list
+// };
 
-const pilihGambarVertikal = () => {
-  showPrintDialog.value = false;
-  window.open(
-    `/penjualan/map/print/${encodeURIComponent(savedNomor.value)}?layout=vertikal`,
-    "_blank",
-  );
-  router.push("/penjualan/map");
-};
+// const pilihGambarVertikal = () => {
+//   showPrintDialog.value = false;
+//   window.open(
+//     `/penjualan/map/print/${encodeURIComponent(savedNomor.value)}?layout=vertikal`,
+//     "_blank",
+//   );
+//   router.push("/penjualan/map");
+// };
 
-const pilihGambarHorizontal = () => {
-  showPrintDialog.value = false;
-  window.open(
-    `/penjualan/map/print/${encodeURIComponent(savedNomor.value)}?layout=horizontal`,
-    "_blank",
-  );
-  router.push("/penjualan/map");
-};
+// const pilihGambarHorizontal = () => {
+//   showPrintDialog.value = false;
+//   window.open(
+//     `/penjualan/map/print/${encodeURIComponent(savedNomor.value)}?layout=horizontal`,
+//     "_blank",
+//   );
+//   router.push("/penjualan/map");
+// };
 
 const tabs = [{ title: "MAP" }, { title: "Lain-Lain" }];
 </script>
@@ -382,8 +381,8 @@ const tabs = [{ title: "MAP" }, { title: "Lain-Lain" }];
   <BaseForm
     :title="
       isEditMode
-        ? 'Ubah Pra Surat Perintah Kerja'
-        : 'Tambah Pra Surat Perintah Kerja'
+        ? 'Ubah Memo Approval Produk (MAP)'
+        : 'Tambah Memo Approval Produk (MAP)'
     "
     menu-id="162"
     :icon="IconFileDescription"
@@ -433,7 +432,7 @@ const tabs = [{ title: "MAP" }, { title: "Lain-Lain" }];
     </div>
   </BaseForm>
 
-  <v-dialog v-model="showPrintDialog" max-width="450px" persistent>
+  <!-- <v-dialog v-model="showPrintDialog" max-width="450px" persistent>
     <v-card class="rounded-lg">
       <v-card-title class="bg-primary text-white d-flex align-center pa-3">
         <IconPrinter
@@ -474,7 +473,7 @@ const tabs = [{ title: "MAP" }, { title: "Lain-Lain" }];
         <v-spacer></v-spacer>
       </v-card-actions>
     </v-card>
-  </v-dialog>
+  </v-dialog> -->
 </template>
 
 <style scoped>

@@ -528,6 +528,7 @@ const formatQty = (val: any) =>
                     class="ci tr fw text-success"
                     :readonly="isEditMode"
                     :class="{ ro: isEditMode }"
+                    @focus="(e) => (e.target as HTMLInputElement).select()"
                   />
                 </td>
                 <td class="tc p0">

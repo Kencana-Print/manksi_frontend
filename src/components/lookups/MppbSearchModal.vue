@@ -120,7 +120,13 @@ watch(
           class="lookup-table border rounded elevation-1"
           @click:row="onRowClick"
           :items-per-page-options="[25, 50, 100]"
-        />
+        >
+          <template #item.Keterangan="{ item }">
+            <span class="ket-truncate" :title="item.Keterangan">
+              {{ item.Keterangan }}
+            </span>
+          </template>
+        </v-data-table-server>
       </v-card-text>
     </v-card>
   </v-dialog>
@@ -142,5 +148,26 @@ watch(
 }
 .lookup-table :deep(tbody tr:hover td) {
   background-color: #e3f2fd !important;
+}
+
+.ket-truncate {
+  display: block;
+  max-width: 200px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: default;
+}
+
+/* Paksa semua baris tinggi sama */
+.lookup-table :deep(tbody tr td) {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 0; /* trick agar ellipsis bekerja di td */
+}
+
+.lookup-table :deep(tbody tr) {
+  height: 36px !important;
 }
 </style>

@@ -449,6 +449,7 @@ const handleSave = async () => {
                 type="number"
                 class="f-inp"
                 style="text-align: right"
+                v-select-on-focus
               />
             </div>
             <div class="f-field" style="flex: 1">

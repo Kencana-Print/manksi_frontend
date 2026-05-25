@@ -8,6 +8,7 @@ import { useBrowse } from "@/composables/useBrowse";
 import { salesOrderService } from "@/services/penjualan/salesOrderService";
 import { salesOrderFormService } from "@/services/penjualan/salesOrderFormService";
 import CustomerSearchModal from "@/components/lookups/CustomerSearchModal.vue";
+import api from "@/services/api";
 import {
   IconShoppingCartCopy,
   IconPrinter,
@@ -62,6 +63,9 @@ const showPrintDialog = ref(false);
 const nomorToPrint = ref("");
 const printWithAlokasi = ref(false);
 const hasAlokasi = ref(false);
+
+const showApproveDialog = ref(false);
+const showBatalCloseDialog = ref(false);
 
 const {
   items,
@@ -357,12 +361,74 @@ const pilihCetakHorizontal = () => {
   );
 };
 
+const openApproveDialog = () => {
+  if (!selectedItem.value) return;
+  showApproveDialog.value = true;
+};
+
+const confirmApprove = async () => {
+  try {
+    await salesOrderService.approveCmo(selectedItem.value.Nomor);
+    toast.success("SO berhasil di-approve.");
+    showApproveDialog.value = false;
+    fetchData();
+  } catch (e: any) {
+    toast.error(e.response?.data?.message || "Gagal approve SO.");
+  }
+};
+
+const openBatalCloseDialog = () => {
+  if (!selectedItem.value) return;
+  if (selectedItem.value.Status === "Open")
+    return toast.warning("SO ini belum Close. Tidak perlu dibatalkan.");
+  if (selectedItem.value.Status === "Closed" && !selectedItem.value.AlasanClose)
+    return toast.warning(
+      "SO ini diclose Otomatis. Tidak bisa dibatalkan manual.",
+    );
+  showBatalCloseDialog.value = true;
+};
+
+const confirmBatalClose = async () => {
+  try {
+    await salesOrderService.toggleClose(selectedItem.value.Nomor, {
+      isClose: false,
+    });
+    toast.success("Close SO berhasil dibatalkan.");
+    showBatalCloseDialog.value = false;
+    fetchData();
+  } catch (e: any) {
+    toast.error(e.response?.data?.message || "Gagal membatalkan close.");
+  }
+};
+
 // State Gambar
 const dialogGambar = ref(false);
 const gambarUrl = ref("");
+const gambarFallbackStep = ref(0);
+const onGambarError = () => {
+  if (!selectedItem.value) return;
+  const base = (api.defaults.baseURL || "").replace(/\/api\/?$/, "");
+  const nomor = selectedItem.value.Nomor;
+  const cab = selectedItem.value.Cab || "HO-";
+  const map = selectedItem.value.MAP || ""; // kolom MAP dari browse
+
+  if (gambarFallbackStep.value === 0 && map) {
+    // Fallback ke folder /map/
+    gambarFallbackStep.value = 1;
+    gambarUrl.value = `${base}/images/${cab}/map/${encodeURIComponent(map)}.jpg`;
+  } else if (gambarFallbackStep.value <= 1) {
+    // Fallback ke VPS
+    gambarFallbackStep.value = 2;
+    gambarUrl.value = `http://103.94.238.252:8888/file-gambar/${encodeURIComponent(nomor)}.jpg`;
+  }
+};
 const onLihatGambar = () => {
   if (!selectedItem.value) return;
-  gambarUrl.value = `http://103.94.238.252:8888/file-gambar/${selectedItem.value.Nomor}.jpg`;
+  gambarFallbackStep.value = 0;
+  const base = (api.defaults.baseURL || "").replace(/\/api\/?$/, "");
+  const nomor = selectedItem.value.Nomor;
+  const cab = selectedItem.value.Cab || "HO-";
+  gambarUrl.value = `${base}/images/${cab}/${encodeURIComponent(nomor)}.jpg`;
   dialogGambar.value = true;
 };
 
@@ -766,14 +832,14 @@ const formatWaktu = (v: string) => {
             /></template>
             <v-list-item-title>Pengajuan Perubahan Data</v-list-item-title>
           </v-list-item>
-          <v-list-item @click="onApproveSpk" :disabled="!canEdit">
+          <v-list-item @click="openApproveDialog" :disabled="!canEdit">
             <template #prepend
               ><IconCheck :size="14" class="mr-2 text-success"
             /></template>
             <v-list-item-title>Approval SPK</v-list-item-title>
           </v-list-item>
           <v-divider class="my-1"></v-divider>
-          <v-list-item @click="openCloseSpk" :disabled="!canDelete">
+          <v-list-item @click="openBatalCloseDialog" :disabled="!canDelete">
             <template #prepend
               ><IconLockSquare :size="14" class="mr-2 text-warning"
             /></template>
@@ -869,6 +935,7 @@ const formatWaktu = (v: string) => {
       <v-card-text class="pa-4 text-center bg-grey-lighten-4">
         <v-img
           :src="gambarUrl"
+          @error="onGambarError"
           max-height="600"
           contain
           class="bg-white rounded border"
@@ -1006,6 +1073,58 @@ const formatWaktu = (v: string) => {
           >Batal</v-btn
         >
         <v-spacer></v-spacer>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
+
+  <v-dialog v-model="showApproveDialog" max-width="380px" persistent>
+    <v-card rounded="lg">
+      <v-card-title
+        class="bg-success text-white pa-3 text-subtitle-1 d-flex align-center"
+      >
+        <IconCheck :size="16" color="white" class="mr-2" />
+        Konfirmasi Approval SO
+      </v-card-title>
+      <v-card-text class="pa-4 text-body-2">
+        Yakin ingin menyetujui (Approve) SO:
+        <div class="font-weight-bold text-primary mt-1">
+          {{ selectedItem?.Nomor }}
+        </div>
+        <div class="text-caption text-grey mt-1">{{ selectedItem?.Nama }}</div>
+      </v-card-text>
+      <v-card-actions class="pa-3 border-t bg-grey-lighten-4">
+        <v-spacer />
+        <v-btn variant="text" @click="showApproveDialog = false">Batal</v-btn>
+        <v-btn color="success" variant="elevated" @click="confirmApprove"
+          >Ya, Approve</v-btn
+        >
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
+
+  <v-dialog v-model="showBatalCloseDialog" max-width="380px" persistent>
+    <v-card rounded="lg">
+      <v-card-title
+        class="bg-error text-white pa-3 text-subtitle-1 d-flex align-center"
+      >
+        <IconX :size="16" color="white" class="mr-2" />
+        Konfirmasi Batal Close
+      </v-card-title>
+      <v-card-text class="pa-4 text-body-2">
+        Yakin ingin membatalkan Close untuk SO:
+        <div class="font-weight-bold text-primary mt-1">
+          {{ selectedItem?.Nomor }}
+        </div>
+        <div class="text-caption text-grey mt-1">{{ selectedItem?.Nama }}</div>
+      </v-card-text>
+      <v-card-actions class="pa-3 border-t bg-grey-lighten-4">
+        <v-spacer />
+        <v-btn variant="text" @click="showBatalCloseDialog = false"
+          >Batal</v-btn
+        >
+        <v-btn color="error" variant="elevated" @click="confirmBatalClose"
+          >Ya, Batal Close</v-btn
+        >
       </v-card-actions>
     </v-card>
   </v-dialog>

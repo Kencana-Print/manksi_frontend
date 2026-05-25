@@ -1,24 +1,39 @@
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref, onMounted, computed } from "vue";
 import { useRoute } from "vue-router";
 import api from "@/services/api";
 
 const route = useRoute();
 const nomorMAP = route.params.nomor as string;
 const printData = ref<any>(null);
+
 const isLoading = ref(true);
-const imageError = ref(false);
 
-const getImageUrl = (filename: string) => {
-  if (!filename) return "";
-  // Fallback mekanisme (Jika gambar utama gagal, gunakan folder mintaharga)
-  return imageError.value
-    ? `${import.meta.env.VITE_API_URL}/images/mintaharga/${filename}`
-    : `${import.meta.env.VITE_API_URL}/images/${filename}`;
-};
+const mainImageUrl = computed(() => {
+  if (!printData.value?.header) return "";
+  const nomor =
+    printData.value.header.MSPK_Nomor || printData.value.header.mspk_nomor;
+  const cab = printData.value.header.mspk_cab || "HO-";
+  const base =
+    api.defaults.baseURL?.replace(/\/api\/?$/, "") ||
+    import.meta.env.VITE_API_URL ||
+    "";
 
-const handleImgError = () => {
-  if (!imageError.value) imageError.value = true;
+  return `${base}/images/${cab}/map/${encodeURIComponent(nomor)}.jpg`;
+});
+
+const handleImgError = (e: Event) => {
+  const img = e.target as HTMLImageElement;
+  if (img.dataset.tried === "true") {
+    img.style.display = "none"; // Sembunyikan jika fallback juga gagal
+    return;
+  }
+  img.dataset.tried = "true";
+
+  const nomor =
+    printData.value.header.MSPK_Nomor || printData.value.header.mspk_nomor;
+  // Fallback 1: Ambil langsung dari VPS pusat Manksi berdasarkan Nomor MAP
+  img.src = `http://103.94.238.252:8888/file-gambar/${encodeURIComponent(nomor)}.jpg`;
 };
 
 const fmtDate = (val: string) => {
@@ -156,17 +171,7 @@ onMounted(async () => {
       </table>
 
       <div class="image-box mt-2">
-        <img
-          v-if="printData.header.Mspk_image || printData.header.mspk_image"
-          :src="
-            getImageUrl(
-              printData.header.Mspk_image || printData.header.mspk_image,
-            )
-          "
-          @error="handleImgError"
-          class="map-image"
-        />
-        <div v-else class="text-grey text-center mt-10">Tidak ada gambar</div>
+        <img :src="mainImageUrl" @error="handleImgError" class="map-image" />
       </div>
 
       <div class="footer-section mt-4 d-flex justify-space-between align-end">
@@ -197,26 +202,41 @@ onMounted(async () => {
 <style scoped>
 @media print {
   @page {
-    size: landscape;
-    margin: 0.5cm;
+    size: A4 landscape;
+    margin: 5mm; /* Margin kertas printer */
   }
   body {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
+    background: #fff;
+  }
+  .print-wrapper {
+    width: 100% !important;
+    height: auto !important;
+    min-height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
   }
 }
 
 .print-wrapper {
+  width: 297mm; /* Kunci presisi ukuran A4 Landscape */
+  height: 210mm;
+  margin: 20px auto; /* Posisikan ke tengah layar */
+  padding: 10mm; /* Simulasi margin tepi kertas */
+  background: #fff;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2); /* Efek kertas melayang */
   display: flex;
   justify-content: space-between;
   font-family: "Arial", sans-serif;
   color: #000;
-  padding: 10px;
+  box-sizing: border-box;
+  overflow: hidden; /* Cegah elemen meluber keluar dari batas kertas */
 }
 
 .print-column {
-  width: 48%; /* Dua kolom */
-  border: 1px dashed transparent; /* Panduan potong jika diperlukan */
+  width: 48%; /* Akan mengambil 48% dari fixed 297mm */
   display: flex;
   flex-direction: column;
 }

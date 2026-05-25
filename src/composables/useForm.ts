@@ -1,5 +1,5 @@
 // src/composables/useForm.ts
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, nextTick } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
 import { useAuthStore } from "@/stores/authStore";
@@ -80,15 +80,15 @@ export function useForm<
   const executeSave = async () => {
     isSaving.value = true;
     try {
-      const response = await options.submitApi(formData.value as T); // Tangkap response
+      const response = await options.submitApi(formData.value as T);
       showSaveDialog.value = false;
 
-      // Jika ada callback onSuccess (untuk cetak), jalankan dulu
       if (options.onSuccess) {
+        await nextTick();
         options.onSuccess(response);
+      } else {
+        goBack();
       }
-
-      goBack();
     } catch (e: unknown) {
       const err = e as AxiosError<any>;
       toast.error(err.response?.data?.message || "Gagal menyimpan data.");

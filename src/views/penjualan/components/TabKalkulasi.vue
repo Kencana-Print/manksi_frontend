@@ -401,6 +401,7 @@ const rows8 = Array.from({ length: 8 }, (_, i) => i + 1);
               type="number"
               class="tk-inp"
               style="width: 90px; text-align: right"
+              v-select-on-focus
             />
           </div>
 
@@ -514,6 +515,7 @@ const rows8 = Array.from({ length: 8 }, (_, i) => i + 1);
                     v-model.number="item.Harga"
                     type="number"
                     class="tk-cell tr"
+                    v-select-on-focus
                   />
                 </td>
                 <td class="tc">
@@ -544,6 +546,7 @@ const rows8 = Array.from({ length: 8 }, (_, i) => i + 1);
               v-model.number="kal.Bordir.Cm"
               type="number"
               class="tk-pl-inp"
+              v-select-on-focus
             />
           </div>
           <div v-for="n in rows8" :key="'b' + n" class="tk-pl-row">
@@ -553,12 +556,14 @@ const rows8 = Array.from({ length: 8 }, (_, i) => i + 1);
               v-model.number="kal.Bordir[`P${n}`]"
               type="number"
               class="tk-pl-inp"
+              v-select-on-focus
             />
             <span class="tk-pl-eq">L=</span>
             <input
               v-model.number="kal.Bordir[`L${n}`]"
               type="number"
               class="tk-pl-inp"
+              v-select-on-focus
             />
           </div>
           <div class="tk-pl-result">
@@ -583,6 +588,7 @@ const rows8 = Array.from({ length: 8 }, (_, i) => i + 1);
               v-model.number="kal.Dtf.Cm"
               type="number"
               class="tk-pl-inp"
+              v-select-on-focus
             />
           </div>
           <div v-for="n in rows8" :key="'d' + n" class="tk-pl-row">
@@ -592,12 +598,14 @@ const rows8 = Array.from({ length: 8 }, (_, i) => i + 1);
               v-model.number="kal.Dtf[`P${n}`]"
               type="number"
               class="tk-pl-inp"
+              v-select-on-focus
             />
             <span class="tk-pl-eq">L=</span>
             <input
               v-model.number="kal.Dtf[`L${n}`]"
               type="number"
               class="tk-pl-inp"
+              v-select-on-focus
             />
           </div>
           <div class="tk-pl-result">

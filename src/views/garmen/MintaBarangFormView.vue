@@ -781,6 +781,7 @@ const numFormat = (val: any) =>
                     class="cell-input tr fw-bold"
                     min="0"
                     step="any"
+                    v-select-on-focus
                   />
                 </td>
                 <td class="bg-yellow-lighten-5">

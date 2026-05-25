@@ -484,6 +484,7 @@ watch(
                     v-model.number="item.babaran"
                     class="cell-input tr"
                     @input="calculateJumlah(item)"
+                    v-select-on-focus
                   />
                 </td>
                 <td>
@@ -492,6 +493,7 @@ watch(
                     v-model.number="item.pcs"
                     class="cell-input tr"
                     @input="calculateJumlah(item)"
+                    v-select-on-focus
                   />
                 </td>
                 <td class="bg-yellow-lighten-5">
@@ -499,6 +501,7 @@ watch(
                     type="number"
                     v-model.number="item.jumlah"
                     class="cell-input tr fw-bold"
+                    v-select-on-focus
                   />
                 </td>
                 <td>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, nextTick } from "vue";
 import { useRoute } from "vue-router";
+import { useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
 import BaseForm from "@/components/BaseForm.vue";
 import { useForm } from "@/composables/useForm";
@@ -32,6 +33,7 @@ import HistoryAlokasiModal from "@/components/lookups/HistoryAlokasiModal.vue";
 import BarangKaosanSearchModal from "@/components/lookups/BarangKaosanSearchModal.vue";
 
 const route = useRoute();
+const router = useRouter();
 const toast = useToast();
 const isEditMode = computed(() => !!route.params.nomor);
 const activeTab = ref(0);
@@ -294,10 +296,12 @@ const {
     // Siapkan Payload ke Backend
     const payload = {
       isEdit: isEditMode.value,
+      isSalesOrder: true,
       header: {
         spk_nomor: data.spk_nomor,
         spk_tanggal: data.spk_tanggal,
         spk_dateline: data.spk_dateline,
+        spk_nomor_po: data.spk_nomor_po || "",
         spk_tgl_po: data.spk_tgl_po || null,
         spk_datelinepo: data.spk_datelinepo || null,
         spk_cus_kode: data.spk_cus_kode,
@@ -326,6 +330,10 @@ const {
         spk_cmo: data.spk_cmo,
         spk_pinjo: data.spk_pinjo,
         spk_accpending: data.spk_accpending,
+        spk_nomormemo: data.spk_nomormemo, // ← No SJ Memo
+        spk_memo: data.spk_memo, // ← No MAP
+        spk_tipe: data.spk_tipe, // ← Tipe SPK
+        spk_nama2: data.spk_nama2, // ← Nama Ext
       },
       alokasi: data.Alokasi,
       dtlKaosan: data.Kaosan,
@@ -359,6 +367,10 @@ const {
     }
 
     return res;
+  },
+  onSuccess: (res: any) => {
+    toast.success("Sales Order berhasil disimpan!");
+    router.push({ name: "SalesOrderBrowse" });
   },
 });
 
@@ -602,7 +614,6 @@ const loadDataMemo = async (nomor: string) => {
       formData.value.spk_sablon = h.mspk_sablon || "N";
       formData.value.spk_bordir = h.mspk_bordir || "N";
       formData.value.spk_sublim = h.mspk_sublim || "N";
-      formData.value.spk_cmo = h.mspk_cmo || "";
       formData.value.spk_harga = Number(h.mspk_harga) || 0;
       formData.value.spk_hargariil = Number(h.mspk_hargariil) || 0;
 
@@ -848,34 +859,6 @@ const validateSave = () => {
         "Jumlah SPK vs Total Qty Order di Detail Barang Kaosan harus sama.",
       );
       return;
-    }
-  }
-
-  // 8. Validasi Detail Size (Khusus Divisi 3, 4, 6 - Non Pengerjaan)
-  if (["3", "4", "6"].includes(divisiStr)) {
-    const isPengerjaan = ["BR", "SB", "SD", "PL", "DP", "TG", "PM"].some(
-      (sub) => fd.spk_jo_kode?.includes(sub),
-    );
-
-    if (!isPengerjaan) {
-      const sumSize = fd.Sizes
-        ? fd.Sizes.reduce(
-            (acc: number, curr: any) => acc + (Number(curr.qty) || 0),
-            0,
-          )
-        : 0;
-      if (sumSize === 0) {
-        toast.warning(
-          "Divisi Garmen/Kaosan: Qty Order di Detail Size harus diisi.",
-        );
-        return;
-      }
-      if (sumSize !== qtyPesan) {
-        toast.warning(
-          "Jumlah SPK vs Total Qty Order di Detail Size harus sama.",
-        );
-        return;
-      }
     }
   }
 

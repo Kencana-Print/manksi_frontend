@@ -379,6 +379,7 @@ const executeSave = async () => {
                 variant="outlined"
                 density="compact"
                 hide-details="auto"
+                v-select-on-focus
               />
             </v-col>
 

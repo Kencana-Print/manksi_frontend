@@ -18,6 +18,15 @@ import "vue-toastification/dist/index.css"; // <-- [TAMBAHKAN BARIS INI]
 
 const app = createApp(App);
 
+app.directive("select-on-focus", {
+  mounted(el: HTMLInputElement) {
+    el.addEventListener("focus", () => el.select());
+  },
+  unmounted(el: HTMLInputElement) {
+    el.removeEventListener("focus", () => el.select());
+  },
+});
+
 registerPlugins(app);
 
 app.mount("#app");

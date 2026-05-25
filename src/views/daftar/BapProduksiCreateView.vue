@@ -456,6 +456,7 @@ const handlePreSave = async () => {
                 bg-color="white"
                 class="f-inp"
                 style="max-width: 90px"
+                v-select-on-focus
               />
               <label
                 class="f-lbl"
@@ -471,6 +472,7 @@ const handlePreSave = async () => {
                 hide-details
                 class="f-inp"
                 style="max-width: 130px"
+                v-select-on-focus
               />
               <label
                 class="f-lbl"

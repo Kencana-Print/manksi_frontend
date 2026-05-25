@@ -320,6 +320,7 @@ const jenisItems = [
                       density="compact"
                       hide-details
                       class="sup-input"
+                      v-select-on-focus
                     />
                   </div>
                   <div class="sup-field" style="flex: 1">
@@ -331,6 +332,7 @@ const jenisItems = [
                       density="compact"
                       hide-details
                       class="sup-input"
+                      v-select-on-focus
                     />
                   </div>
                 </div>

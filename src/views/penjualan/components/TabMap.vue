@@ -105,44 +105,43 @@ const isDivisiSatuAtauLima = computed(() => {
 
 // ── Image ──
 const fileRef = ref<HTMLInputElement | null>(null);
+const getBaseUrl = () => api.defaults.baseURL?.replace(/\/api\/?$/, "") || "";
+
 const displayImageUrl = computed(() => {
+  // 1. Blob lokal (baru dipilih user)
   if (props.formData.MainImageBlob) return props.formData.MainImageBlob;
-  if (!props.isEdit && !props.formData.MintaHarga) return "";
-  const id = props.formData.MintaHarga || props.formData.Nomor;
-  if (!id) return "";
-  let name = id;
-  const m = name.match(/(MH\.\d{4}\.\d+)/i);
-  if (m) {
-    name = m[1];
-    return `http://103.94.238.252:8888/file-gambar/mintaharga/${encodeURIComponent(name)}.jpg`;
-  } else {
-    name =
-      name
-        .replace(/.*imagemintaharga/i, "")
-        .replace(/.*Downloads/i, "")
-        .replace(/\\/g, "/")
-        .split("/")
-        .pop()
-        ?.replace(/\.(jpe?g|png)$/i, "") || "";
-    return `http://103.94.238.252:8888/file-gambar/${encodeURIComponent(name)}.jpg`;
+
+  // 2. Edit mode — coba dari backend lokal dulu
+  if (props.isEdit && props.formData.Nomor) {
+    const base = getBaseUrl();
+    const cab = props.formData.Cab || "HO-";
+    return `${base}/images/${cab}/map/${encodeURIComponent(props.formData.Nomor)}.jpg`;
   }
+
+  // 3. Dari Minta Harga — fallback ke VPS
+  if (props.formData.MintaHarga) {
+    const mh = props.formData.MintaHarga;
+    const base = getBaseUrl();
+    return `${base}/images/mppb/${encodeURIComponent(mh)}.jpg`;
+  }
+
+  return "";
 });
 
 const handleFallbackImage = (e: Event) => {
   const img = e.target as HTMLImageElement;
-  if (img.dataset.fallbackTried === "true") return; // Hindari loop tak berujung
+  if (img.dataset.fallbackTried === "true") {
+    img.style.display = "none";
+    return;
+  }
+  img.dataset.fallbackTried = "true";
 
-  const currentSrc = img.src;
-  if (currentSrc.includes("/file-gambar/mintaharga/")) {
-    img.src = currentSrc.replace("/file-gambar/mintaharga/", "/file-gambar/");
-    img.dataset.fallbackTried = "true";
-  } else if (
-    currentSrc.includes("/file-gambar/") &&
-    !currentSrc.includes("blob:")
-  ) {
-    const filename = currentSrc.split("/").pop();
-    img.src = `http://103.94.238.252:8888/file-gambar/mintaharga/${filename}`;
-    img.dataset.fallbackTried = "true";
+  // Fallback ke VPS mintaharga
+  const mhNomor = props.formData.MintaHarga || props.formData.Nomor;
+  if (mhNomor) {
+    img.src = `http://103.94.238.252:8888/file-gambar/mintaharga/${encodeURIComponent(mhNomor)}.jpg`;
+  } else {
+    img.style.display = "none";
   }
 };
 
@@ -167,47 +166,42 @@ const handleMintaHargaSelected = async (item: any) => {
   props.formData.MintaHarga = item.Nomor;
 
   try {
-    // Memanggil endpoint backend yang menjalankan loadMintaHarga()
-    // Sesuaikan endpoint-nya jika berbeda (misal: /penjualan/map/minta-harga/)
     const res = await api.get(`/penjualan/map-form/minta-harga/${item.Nomor}`);
     const data = res.data.data;
 
     if (data) {
       if (data.mh_divisi) props.formData.Divisi = String(data.mh_divisi);
-      // Mapping otomatis ke field MAP
+
       props.formData.CustKode = data.mh_cus_kode || props.formData.CustKode;
       props.formData.CustNama = data.cus_nama || props.formData.CustNama;
       props.formData.CustPerfect =
         data.cus_perfect || props.formData.CustPerfect;
-
       props.formData.SalesKode = data.mh_sal_kode || props.formData.SalesKode;
       props.formData.SalesNama = data.sal_nama || props.formData.SalesNama;
 
-      props.formData.Nama = data.mh_barang || props.formData.Nama;
-      props.formData.Jumlah = Number(data.mh_qty) || props.formData.Jumlah;
-      props.formData.RencanaOrder =
-        Number(data.mh_qty) || props.formData.RencanaOrder;
+      // ← Ini yang belum ada — Nama Pekerjaan dari mh_nama
+      props.formData.Nama = data.mh_nama || props.formData.Nama;
+      props.formData.Nama2 = data.mh_nama || props.formData.Nama2;
 
-      props.formData.Ukuran = data.mh_ukuran || props.formData.Ukuran;
+      // ← Rencana Order dari mh_jmlorder
+      props.formData.RencanaOrder =
+        Number(data.mh_jmlorder) || props.formData.RencanaOrder;
+      props.formData.Jumlah = Number(data.mh_jmlorder) || props.formData.Jumlah;
+
+      // Harga — prioritas kalkulasi dulu, fallback ke harga biasa (sesuai Delphi)
+      props.formData.HargaJual =
+        Number(data.mh_harga_kalkulasi) ||
+        Number(data.mh_harga) ||
+        props.formData.HargaJual;
+
+      props.formData.Kain = data.mh_kain || props.formData.Kain;
       props.formData.Panjang =
         Number(data.mh_panjang) || props.formData.Panjang;
       props.formData.Lebar = Number(data.mh_lebar) || props.formData.Lebar;
-
-      // Jika Anda punya properti mh_ketukuran di DB, tambahkan. Jika tidak abaikan.
-      // props.formData.KetUkuran = data.mh_ketukuran || props.formData.KetUkuran;
-
+      props.formData.KetUkuran = data.mh_ukuran || props.formData.KetUkuran; // ← mh_ukuran → KetUkuran
       props.formData.Gramasi = data.mh_gramasi || props.formData.Gramasi;
-      props.formData.Kain = data.mh_kain || props.formData.Kain;
       props.formData.Finishing = data.mh_finishing || props.formData.Finishing;
-
-      if (data.mh_dateline && data.mh_dateline !== "0000-00-00") {
-        props.formData.DateLine = data.mh_dateline.substring(0, 10);
-      }
-
-      props.formData.HargaJual =
-        Number(data.mh_harga) || props.formData.HargaJual;
-      props.formData.HargaRiil =
-        Number(data.mh_hargariil) || props.formData.HargaRiil;
+      props.formData.Keterangan = data.mh_ket || props.formData.Keterangan;
 
       toast.success("Berhasil menarik detail Permintaan Harga.");
     }
@@ -300,8 +294,22 @@ const setPenawaranDetail = (v: any) => {
             MO ({{ formData.UserCreate || "ADMIN" }})
           </label>
           <label class="chk-lbl ml-2">
-            <input type="checkbox" v-model="formData.IsCmo" />
-            CMO {{ formData.Cmo ? "(" + formData.Cmo + ")" : "" }}
+            <input
+              type="checkbox"
+              v-model="formData.IsCmo"
+              @change="
+                (e: any) => {
+                  if (e.target.checked && !formData.Cmo) {
+                    formData.Cmo = formData.UserCreate;
+                  } else if (!e.target.checked) {
+                    formData.Cmo = '';
+                  }
+                }
+              "
+            />
+            CMO<span v-if="formData.IsCmo && formData.Cmo" class="cmo-name"
+              >({{ formData.Cmo }})</span
+            >
           </label>
           <span
             class="ml-auto f-status"
@@ -494,7 +502,11 @@ const setPenawaranDetail = (v: any) => {
 
         <div class="f-row">
           <label class="f-lbl">Jenis Order</label>
-          <div class="inp-grp" style="max-width: 320px">
+          <div
+            class="inp-grp"
+            style="max-width: 320px"
+            :style="!formData.JoKode ? 'border-color:#e53935' : ''"
+          >
             <input
               v-model="formData.JoKode"
               class="f-inp"
@@ -529,16 +541,12 @@ const setPenawaranDetail = (v: any) => {
             type="number"
             class="f-inp"
             style="width: 90px; text-align: right"
+            v-select-on-focus
           />
         </div>
 
         <div class="f-row">
           <label class="f-lbl">Ukuran</label>
-          <input
-            v-model="formData.Ukuran"
-            class="f-inp"
-            style="max-width: 100px"
-          />
           <template v-if="isDivisiSatuAtauLima">
             <v-combobox
               v-model="formData.Panjang"
@@ -566,6 +574,7 @@ const setPenawaranDetail = (v: any) => {
               type="number"
               class="f-inp ml-1"
               style="width: 58px; text-align: right"
+              v-select-on-focus
             />
             <span class="f-sep">X</span>
             <input
@@ -573,6 +582,7 @@ const setPenawaranDetail = (v: any) => {
               type="number"
               class="f-inp"
               style="width: 58px; text-align: right"
+              v-select-on-focus
             />
           </template>
           <span class="f-sep">Mtr</span>
@@ -750,6 +760,7 @@ const setPenawaranDetail = (v: any) => {
             type="number"
             class="f-inp"
             style="width: 80px; text-align: right"
+            v-select-on-focus
           />
           <label class="f-lbl ml-2" style="width: 65px">Harga Jual</label>
           <input
@@ -757,6 +768,7 @@ const setPenawaranDetail = (v: any) => {
             type="number"
             class="f-inp"
             style="width: 90px; text-align: right"
+            v-select-on-focus
           />
           <label class="f-lbl ml-2" style="width: 65px">Harga Riil</label>
           <input
@@ -764,6 +776,7 @@ const setPenawaranDetail = (v: any) => {
             type="number"
             class="f-inp"
             style="width: 90px; text-align: right"
+            v-select-on-focus
           />
         </div>
 
@@ -807,6 +820,7 @@ const setPenawaranDetail = (v: any) => {
             class="f-inp"
             style="width: 60px; text-align: right"
             :disabled="formData.IsRevisi === 'N'"
+            v-select-on-focus
           />
         </div>
 
@@ -1336,5 +1350,11 @@ const setPenawaranDetail = (v: any) => {
 .f-lkp-inp:hover {
   border-color: #1565c0;
   background: #e8f4ff !important;
+}
+
+.cmo-name {
+  margin-left: 3px;
+  font-weight: 700;
+  color: #1565c0;
 }
 </style>

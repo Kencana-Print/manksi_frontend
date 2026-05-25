@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref, computed, watch } from "vue";
+import { ref, computed, watch, nextTick } from "vue";
 import { useRoute } from "vue-router";
+import { useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
 import BaseForm from "@/components/BaseForm.vue";
 import { useForm } from "@/composables/useForm";
@@ -20,6 +21,7 @@ import SpkSearchModal from "@/components/lookups/SpkSearchModal.vue";
 import MkbSearchModal from "@/components/lookups/MkbSearchModal.vue";
 
 const route = useRoute();
+const router = useRouter();
 const toast = useToast();
 
 const isEditMode = computed(() => !!route.params.nomor);
@@ -159,6 +161,11 @@ const {
       urutPin: data.urutPin,
     });
   },
+  onSuccess: (res: any) => {
+    const nomor = res.data?.data?.nomor || res.data?.nomor || "";
+    toast.success(`PO berhasil disimpan dengan nomor: ${nomor}`);
+    router.push("/pembelian/po-bahan");
+  },
 });
 
 const isGreige = computed(() => formData.value.header.po_jenis === 1);
@@ -237,12 +244,38 @@ const setPoGreige = async (v: any) => {
   formData.value.header.po_greige = nomor;
   try {
     const res = await poBahanFormService.validateField("greige", nomor);
-    formData.value.items = res.data.items.map((it: any) => ({
-      ...it,
-      jumlah: it.sisa_jumlah,
+    const d = res.data.data; // ← tambah .data
+
+    // Auto-fill header dari PO Greige (sesuai Delphi edtpoGreigeExit)
+    formData.value.header.po_keterangan = d.header.po_keterangan || "";
+    formData.value.header.po_sup_kode = d.header.po_sup_kode || "";
+    formData.value.header.sup_nama = d.header.sup_nama || "";
+    formData.value.header.sup_alamat = d.header.sup_alamat || "";
+    formData.value.header.sup_kota = d.header.sup_kota || "";
+    formData.value.header.po_mppb_nomor = d.header.po_mppb_nomor || "";
+    formData.value.header.po_note = d.header.po_note || "";
+    formData.value.header.po_status_ppn = Number(d.header.po_status_ppn) || 0;
+    formData.value.header.po_ppn = Number(d.header.po_ppn) || 0;
+
+    // Auto-fill items
+    formData.value.items = d.items.map((it: any) => ({
+      kode: it.kode,
+      nama: it.nama,
+      namaext: it.namaext,
+      satuan: it.satuan,
+      gramasia: it.gramasia || "",
+      gramasi: it.gramasi || "",
+      setting: it.setting || "",
+      jenis: it.jenis || "",
       roll: 0,
-      total: it.sisa_jumlah * it.harga * (1 - it.diskon / 100),
+      jumlah: it.sisa_jumlah,
+      harga: it.harga,
+      diskon: it.diskon || 0,
+      total: it.sisa_jumlah * it.harga * (1 - (it.diskon || 0) / 100),
+      spk: it.spk || "",
+      mkb: it.mkb || "",
     }));
+
     toast.success("Berhasil memuat sisa detail PO Greige.");
   } catch (e: any) {
     toast.error(e.response?.data?.message || "Gagal menarik data PO Greige.");
@@ -290,6 +323,10 @@ const setBahan = (v: any) => {
     ? `GREIGE ${v.Nama || v.bhn_name}`
     : v.Nama || v.bhn_name;
   formData.value.items[i].satuan = v.Satuan || v.bhn_satuan || "";
+  formData.value.items[i].gramasia = v.Gramasi || ""; // ← auto dari master
+  formData.value.items[i].gramasi = v.Gramasi || ""; // ← sama, readonly
+  formData.value.items[i].setting = v.Setting || "";
+  formData.value.items[i].jenis = v.Jenis || "";
   formData.value.items[i].harga = Number(v.Harga || v.bhn_hargabeli) || 0;
   recalcRow(i);
 };
@@ -642,6 +679,7 @@ const validateSave = () => {
             class="inp text-right"
             style="width: 60px"
             :disabled="formData.header.po_status_ppn === 0"
+            v-select-on-focus
           />
         </div>
 
@@ -704,8 +742,7 @@ const validateSave = () => {
                 <th style="width: 160px">Nama Bahan</th>
                 <th style="width: 120px">Nama External</th>
                 <th style="width: 50px" class="tc">Sat</th>
-                <th style="width: 75px">Gramasi Awal</th>
-                <th style="width: 75px">Gramasi Akhir</th>
+                <th style="width: 80px">Gramasi</th>
                 <th style="width: 50px">Setting</th>
                 <th style="width: 80px">Jenis Bahan</th>
                 <th style="width: 50px" class="tr" v-if="isCelup">Roll</th>
@@ -740,9 +777,8 @@ const validateSave = () => {
                 <td class="p0">
                   <input v-model="row.satuan" class="ci tc ro" readonly />
                 </td>
-                <td class="p0"><input v-model="row.gramasia" class="ci" /></td>
                 <td class="p0">
-                  <input v-model="row.gramasi" class="ci ro" readonly />
+                  <input :value="row.gramasia" readonly class="ci ro" />
                 </td>
                 <td class="p0">
                   <input v-model="row.setting" class="ci ro" readonly />
@@ -756,6 +792,7 @@ const validateSave = () => {
                     type="number"
                     class="ci tr"
                     @blur="recalcRow(Number(idx))"
+                    v-select-on-focus
                   />
                 </td>
                 <td class="p0">
@@ -764,6 +801,7 @@ const validateSave = () => {
                     type="number"
                     class="ci tr fw bg-yellow-light"
                     @blur="recalcRow(Number(idx))"
+                    v-select-on-focus
                   />
                 </td>
                 <td class="p0">
@@ -772,6 +810,7 @@ const validateSave = () => {
                     type="number"
                     class="ci tr bg-yellow-light"
                     @blur="recalcRow(Number(idx))"
+                    v-select-on-focus
                   />
                 </td>
                 <td class="p0">
@@ -780,6 +819,7 @@ const validateSave = () => {
                     type="number"
                     class="ci tr bg-yellow-light"
                     @blur="recalcRow(Number(idx))"
+                    v-select-on-focus
                   />
                 </td>
                 <td class="p0">
@@ -868,6 +908,7 @@ const validateSave = () => {
                         v-model.number="d.jumlah"
                         type="number"
                         class="ci tr fw w-100"
+                        v-select-on-focus
                       />
                     </td>
                     <td class="p0">
@@ -942,6 +983,7 @@ const validateSave = () => {
                         v-model.number="r.jumlah"
                         type="number"
                         class="ci tr fw w-100"
+                        v-select-on-focus
                       />
                     </td>
                   </tr>

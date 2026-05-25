@@ -42,7 +42,15 @@ const totalAlokasi = computed(() => {
 
 const mainImageUrl = computed(() => {
   if (!data.value?.spk_nomor) return "";
-  return `http://103.94.238.252:8888/file-gambar/${encodeURIComponent(data.value.spk_nomor)}.jpg`;
+  const base = (api.defaults.baseURL || "").replace(/\/api\/?$/, "");
+  const cab = data.value.spk_cab || "HO-";
+  const memo = data.value.spk_memo;
+
+  // Jika ada MAP, coba folder map dulu
+  if (memo) {
+    return `${base}/images/${cab}/map/${encodeURIComponent(memo)}.jpg`;
+  }
+  return `${base}/images/${cab}/${encodeURIComponent(data.value.spk_nomor)}.jpg`;
 });
 
 const getSignatureUrl = (kodeUser: string) => {
@@ -54,7 +62,14 @@ const handleSignatureError = (e: Event) => {
   (e.target as HTMLImageElement).style.opacity = "0";
 };
 const handleImageError = (e: Event) => {
-  (e.target as HTMLImageElement).style.display = "none";
+  const img = e.target as HTMLImageElement;
+  if (!img.src.includes("103.94.238.252")) {
+    // Fallback ke VPS
+    const nomor = data.value.spk_memo || data.value.spk_nomor;
+    img.src = `http://103.94.238.252:8888/file-gambar/${encodeURIComponent(nomor)}.jpg`;
+  } else {
+    img.style.display = "none";
+  }
 };
 
 // ── Date helpers (no timezone shift) ──
@@ -150,9 +165,6 @@ onMounted(async () => {
     updateStatusCetak(printNomor);
 
     setTimeout(() => {
-      const style = document.createElement("style");
-      style.textContent = "@page { size: A4 landscape; margin: 8mm 10mm; }";
-      document.head.appendChild(style);
       window.print();
     }, 1000);
   } catch {
@@ -162,7 +174,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div v-if="isError" class="loading-state">Data SPK tidak ditemukan.</div>
+  <div v-if="isError" class="loading-state">Data SO tidak ditemukan.</div>
   <div v-else-if="!isLoaded" class="loading-state">
     Mempersiapkan Dokumen Cetak...
   </div>
@@ -180,17 +192,17 @@ onMounted(async () => {
           <table class="info-table">
             <tbody>
               <tr>
-                <td class="w-label">Nomor SPK</td>
+                <td class="w-label">Nomor SO</td>
                 <td class="w-colon">:</td>
                 <td>
                   <span class="fw">{{ data.spk_nomor }}</span
                   ><span v-if="data.spk_tipe" class="ml-8 text-xs"
-                    >Tipe SPK : <strong>{{ data.spk_tipe }}</strong></span
+                    >Tipe SO : <strong>{{ data.spk_tipe }}</strong></span
                   >
                 </td>
               </tr>
               <tr>
-                <td class="w-label">Tanggal SPK</td>
+                <td class="w-label">Tanggal SO</td>
                 <td class="w-colon">:</td>
                 <td>{{ tglIndo(data.spk_tanggal) }}</td>
               </tr>
@@ -335,14 +347,14 @@ onMounted(async () => {
           <table class="info-table">
             <tbody>
               <tr>
-                <td class="w-label">Nomor SPK</td>
+                <td class="w-label">Nomor SO</td>
                 <td class="w-colon">:</td>
                 <td class="w-val-td">{{ data.spk_nomor }}</td>
-                <td class="text-right pr-1" v-if="data.spk_tipe">Tipe SPK :</td>
+                <td class="text-right pr-1" v-if="data.spk_tipe">Tipe SO :</td>
                 <td class="fw" v-if="data.spk_tipe">{{ data.spk_tipe }}</td>
               </tr>
               <tr>
-                <td class="w-label">Tanggal SPK</td>
+                <td class="w-label">Tanggal SO</td>
                 <td class="w-colon">:</td>
                 <td colspan="3">{{ tglIndo(data.spk_tanggal) }}</td>
               </tr>
@@ -640,8 +652,9 @@ onMounted(async () => {
 }
 .print-wrapper {
   display: flex;
+  flex-wrap: wrap; /* ← tambah ini */
   width: 297mm;
-  height: 209mm;
+  min-height: 209mm;
   margin: 0 auto;
   box-sizing: border-box;
 }
@@ -659,7 +672,11 @@ onMounted(async () => {
   border-right: 1px dotted #999;
 }
 .alokasi-panel {
-  padding-left: 15mm;
+  flex: 0 0 100%;
+  width: 100%;
+  padding: 7mm 10mm;
+  break-before: page;
+  page-break-before: always;
 }
 
 /* ══ GARMEN BODY ══ */
@@ -1079,6 +1096,18 @@ onMounted(async () => {
   }
 }
 @media print {
+  @page {
+    size: A4 landscape;
+    margin: 8mm 10mm;
+  }
+  .print-wrapper {
+    width: 100%;
+    height: auto; /* ← jangan fixed height */
+  }
+  .alokasi-panel {
+    page-break-before: always;
+    break-before: page;
+  }
   body {
     margin: 0;
     padding: 0;
@@ -1089,14 +1118,6 @@ onMounted(async () => {
   .print-container {
     padding: 0;
     background: transparent;
-  }
-  .print-wrapper {
-    box-shadow: none;
-    width: 100%;
-    height: 100%;
-  }
-  .bg-grey td {
-    background: #f0f0f0 !important;
   }
 }
 </style>

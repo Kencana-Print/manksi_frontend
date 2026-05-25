@@ -19,6 +19,8 @@ import GudangBahanSearchModal from "@/components/lookups/GudangBahanSearchModal.
 import PoBahanSearchModal from "@/components/lookups/PoBahanSearchModal.vue";
 import BahanSearchModal from "@/components/lookups/BahanSearchModal.vue";
 import SpkSearchModal from "@/components/lookups/SpkSearchModal.vue";
+import MkbSearchModal from "@/components/lookups/MkbSearchModal.vue";
+import MkbDetailSearchModal from "@/components/lookups/MkbDetailSearchModal.vue";
 
 import BpbBahanBarcodeDialog from "./BpbBahanBarcodeDialog.vue";
 
@@ -50,6 +52,10 @@ const showBahanModal = ref(false);
 const showPoModal = ref(false);
 const activeGridIndex = ref(-1);
 const showSpkModal = ref(false);
+const showMkbModal = ref(false);
+const activeMkbGridIndex = ref(-1);
+const showMkbDetailModal = ref(false);
+const selectedMkbNomor = ref("");
 
 const showBarcodeDialog = ref(false);
 const printMode = ref({
@@ -188,6 +194,29 @@ const loadPoData = async () => {
     toast.error(e.response?.data?.message || "Gagal menarik data PO.");
     formData.value.header.bpb_po_nomor = "";
   }
+};
+
+const openLookupMkb = (i: number) => {
+  if (isPo.value) return;
+  activeMkbGridIndex.value = i;
+  showMkbModal.value = true;
+};
+
+const onMkbSelected = (v: any) => {
+  selectedMkbNomor.value = v.Nomor || v.mkb_nomor;
+  showMkbDetailModal.value = true;
+};
+
+const setMkbDetail = (item: any) => {
+  const idx = activeMkbGridIndex.value;
+  if (idx < 0) return;
+  const row = formData.value.items[idx];
+  row.kode = item.Kode;
+  row.nama = item.Nama;
+  row.satuan = item.Satuan;
+  row.mkb = selectedMkbNomor.value;
+  row.harga = 0;
+  row.jumlah = Number(item.Jumlah) || 0;
 };
 
 // ── Grid logic ──
@@ -665,6 +694,7 @@ const printBarcodeAll = () => {
             <thead>
               <tr>
                 <th style="width: 32px" class="tc">No</th>
+                <th v-if="!isPo" style="width: 90px">MKB</th>
                 <th style="width: 90px">Kode</th>
                 <th style="width: 160px">Nama Bahan</th>
                 <th style="width: 48px" class="tc">Sat</th>
@@ -686,6 +716,18 @@ const printBarcodeAll = () => {
             <tbody>
               <tr v-for="(item, idx) in formData.items" :key="idx">
                 <td class="tc gt-lbl">{{ Number(idx) + 1 }}</td>
+                <td v-if="!isPo" class="p0">
+                  <div class="cell-grp">
+                    <input v-model="item.mkb" class="ci" readonly />
+                    <button
+                      type="button"
+                      class="ci-btn"
+                      @click="openLookupMkb(Number(idx))"
+                    >
+                      <IconSearch :size="11" />
+                    </button>
+                  </div>
+                </td>
                 <td class="p0">
                   <div class="cell-grp">
                     <input v-model="item.kode" class="ci" readonly />
@@ -732,6 +774,7 @@ const printBarcodeAll = () => {
                     type="number"
                     class="ci tr fw bg-yellow-light"
                     @blur="onJumlahYardChange(Number(idx))"
+                    v-select-on-focus
                   />
                 </td>
                 <td class="p0">
@@ -740,6 +783,7 @@ const printBarcodeAll = () => {
                     type="number"
                     class="ci tr fw bg-yellow-light"
                     @blur="onJumlahChange(Number(idx))"
+                    v-select-on-focus
                   />
                 </td>
                 <td class="p0">
@@ -753,6 +797,7 @@ const printBarcodeAll = () => {
                         : 'bg-yellow-light'
                     "
                     @blur="onRollChange(Number(idx))"
+                    v-select-on-focus
                   />
                 </td>
                 <td class="p0"><input v-model="item.gramasi" class="ci" /></td>
@@ -795,7 +840,7 @@ const printBarcodeAll = () => {
                 </td>
               </tr>
               <tr v-if="formData.items.length === 0">
-                <td :colspan="isPo ? 16 : 17" class="empty-row">
+                <td :colspan="isPo ? 16 : 18" class="empty-row">
                   Tidak ada data rincian bahan.
                 </td>
               </tr>
@@ -847,6 +892,7 @@ const printBarcodeAll = () => {
                         type="number"
                         class="ci tr fw bg-yellow-light"
                         readonly
+                        v-select-on-focus
                       />
                     </td>
                     <td class="px-1">{{ p.mkb }}</td>
@@ -904,6 +950,7 @@ const printBarcodeAll = () => {
                           'bg-blue text-white':
                             b.barcodex && Number(b.jumlahx) !== 0,
                         }"
+                        v-select-on-focus
                       />
                     </td>
                     <td class="tc">
@@ -933,6 +980,12 @@ const printBarcodeAll = () => {
     </template>
   </BaseForm>
 
+  <MkbSearchModal v-model="showMkbModal" @selected="onMkbSelected" />
+  <MkbDetailSearchModal
+    v-model="showMkbDetailModal"
+    :mkb-nomor="selectedMkbNomor"
+    @selected="setMkbDetail"
+  />
   <SupplierSearchModal v-model="showSupModal" @selected="setSup" />
   <GudangBahanSearchModal v-model="showGdgModal" @selected="setGudang" />
   <PoBahanSearchModal v-model="showPoModal" @selected="setPo" />

@@ -96,7 +96,7 @@ const {
     return {
       header: d.header,
       items: d.detail.map((item: any) => ({
-        Kode: item.pod_brg_kode,
+        Kode: item.Kode || item.kode || "",
         Nama: item.Nama,
         Satuan: item.Satuan,
         ket: item.pod_ket,
@@ -105,8 +105,8 @@ const {
         sudah: item.sudah,
         belum: item.belum,
         bpb: item.bpb,
-        jumlah: item.pod_jumlah,
-        harga: item.pod_harga,
+        jumlah: item.jumlah,
+        harga: item.harga,
         total: item.pod_jumlah * item.pod_harga,
       })),
     };
@@ -430,6 +430,7 @@ const onPrintCancel = () => {
                     :class="{ ro: item.bpb > 0 || formData.header.isTutupBuku }"
                     :readonly="item.bpb > 0 || formData.header.isTutupBuku"
                     @input="recalcTotal(Number(idx))"
+                    v-select-on-focus
                   />
                 </td>
                 <td v-if="canSeeBeli" class="p0">
@@ -440,6 +441,7 @@ const onPrintCancel = () => {
                     :class="{ ro: item.bpb > 0 || formData.header.isTutupBuku }"
                     :readonly="item.bpb > 0 || formData.header.isTutupBuku"
                     @input="recalcTotal(Number(idx))"
+                    v-select-on-focus
                   />
                 </td>
                 <td

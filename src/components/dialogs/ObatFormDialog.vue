@@ -214,6 +214,7 @@ const handleSave = async () => {
                 variant="outlined"
                 density="compact"
                 hide-details="auto"
+                v-select-on-focus
               ></v-text-field>
             </v-col>
 
@@ -251,6 +252,7 @@ const handleSave = async () => {
                   variant="outlined"
                   density="compact"
                   hide-details="auto"
+                  v-select-on-focus
                 ></v-text-field>
               </v-col>
             </template>

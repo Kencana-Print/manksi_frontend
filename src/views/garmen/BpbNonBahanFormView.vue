@@ -47,8 +47,6 @@ const formatDateLocal = (value?: string | Date) => {
 const showMintaModal = ref(false);
 const showPoModal = ref(false);
 const showSupModal = ref(false);
-const showPrintDialog = ref(false);
-const nomorToPrint = ref("");
 const activeSpkIndex = ref(-1);
 const showSpkModal = ref(false);
 
@@ -132,9 +130,7 @@ const {
   },
   onSuccess: (res: any) => {
     toast.success("BPB Berhasil disimpan!");
-    nomorToPrint.value =
-      res.data?.data?.bpb_nomor || formData.value.header.bpb_nomor;
-    showPrintDialog.value = true;
+    router.push({ name: "BpbNonBahanGarmenBrowse" });
   },
 });
 
@@ -258,18 +254,6 @@ const validateSave = () => {
 };
 
 // --- DIALOG CETAK ---
-const onPrintConfirm = () => {
-  const safeNomor = encodeURIComponent(nomorToPrint.value);
-  window.open(`/garmen/barang/bpb-nonbahan/print/${safeNomor}`, "_blank");
-  showPrintDialog.value = false;
-  router.push({ name: "BpbNonBahanGarmenBrowse" });
-};
-
-const onPrintCancel = () => {
-  showPrintDialog.value = false;
-  router.push({ name: "BpbNonBahanGarmenBrowse" });
-};
-
 const formatQty = (val: any) => {
   return Number(val || 0).toLocaleString("en-US", {
     minimumFractionDigits: 2,
@@ -535,6 +519,7 @@ watch(
                     :readonly="
                       formData.header.isTutupBuku || formData.header.hasVoucher
                     "
+                    v-select-on-focus
                   />
                 </td>
 
@@ -608,29 +593,6 @@ watch(
     @selected="setSupplier"
   />
   <SpkSearchModal v-model="showSpkModal" @selected="setSpk" />
-
-  <v-dialog v-model="showPrintDialog" max-width="400px" persistent>
-    <v-card rounded="lg">
-      <v-card-title
-        class="bg-primary text-white pa-3 text-subtitle-1 d-flex align-center"
-      >
-        <IconPrinter :size="18" class="mr-2" /> Konfirmasi Cetak
-      </v-card-title>
-      <v-card-text class="pa-4 text-body-2">
-        BPB Non-Bahan berhasil disimpan dengan nomor
-        <span class="font-weight-bold text-primary">{{ nomorToPrint }}</span
-        >.<br /><br />
-        Apakah Anda ingin langsung mencetak dokumen ini?
-      </v-card-text>
-      <v-card-actions class="pa-3 border-t bg-grey-lighten-4">
-        <v-spacer />
-        <v-btn variant="text" @click="onPrintCancel">Tidak</v-btn>
-        <v-btn color="primary" variant="elevated" @click="onPrintConfirm"
-          >Ya, Cetak</v-btn
-        >
-      </v-card-actions>
-    </v-card>
-  </v-dialog>
 </template>
 
 <style scoped>

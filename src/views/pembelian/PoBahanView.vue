@@ -141,10 +141,8 @@ const rowPropsFn = (data: any) => {
 
   if (item.Status === "OPEN")
     classes.push("text-error"); // Merah
-  else if (item.Status === "ONPROSES")
-    classes.push("text-primary"); // Biru
-  else if (item.Status === "CLOSE" || item.Status === "DICLOSE")
-    classes.push("text-grey-darken-1");
+  else if (item.Status === "ONPROSES") classes.push("text-primary"); // Biru
+  // CLOSE/DICLOSE → tidak ada class tambahan, default hitam
 
   return { class: classes.join(" ") };
 };
@@ -421,8 +419,11 @@ const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
                 <th width="100" class="tr">Qty BPB</th>
                 <th width="100" class="tr">Qty Retur</th>
                 <th width="100" class="tr">Harga</th>
-                <th width="120">No. SPK</th>
+                <th width="80" class="tr">Disc</th>
                 <th width="80" class="text-center">Status</th>
+                <th width="120">No. MKB</th>
+                <th width="120">No. SPK</th>
+                <th width="200">Nama SPK</th>
               </tr>
             </thead>
             <tbody>
@@ -436,7 +437,7 @@ const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
                 <td class="tr">{{ numFmt(d.QtyBpb) }}</td>
                 <td class="tr text-error">{{ numFmt(d.QtyRetur) }}</td>
                 <td class="tr">{{ numFmt(d.Harga) }}</td>
-                <td>{{ d.SPK || "-" }}</td>
+                <td class="tr">{{ numFmt(d.Disc) }}</td>
                 <td class="text-center">
                   <v-chip
                     size="x-small"
@@ -451,6 +452,9 @@ const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
                     {{ d.Status_barang }}
                   </v-chip>
                 </td>
+                <td>{{ d.MKB || "-" }}</td>
+                <td>{{ d.SPK || "-" }}</td>
+                <td>{{ d.Nama_SPK || "-" }}</td>
               </tr>
               <tr
                 v-if="

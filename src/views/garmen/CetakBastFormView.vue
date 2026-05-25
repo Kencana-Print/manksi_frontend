@@ -191,6 +191,10 @@ const onMapSelected = async (map: any) => {
       `/garmen/cetak-bast/form/${encodeURIComponent(map.Nomor)}`,
     );
     const data = res.data.data;
+
+    // ← Normalisasi header dulu
+    data.header = normalizeHeader(data.header);
+
     if (data.lock) {
       data.isLocked = true;
       data.isApproved = data.lock.apv === "Y";
@@ -416,11 +420,15 @@ onMounted(() => {
     v-model:show-save-dialog="showSaveDialog"
     v-model:show-cancel-dialog="showCancelDialog"
     v-model:show-close-dialog="showCloseDialog"
-    @confirm-save="
+    @validate-save="
       () => {
-        if (validateBeforeSave()) executeSave();
+        // Cek validasi DULU sebelum buka dialog
+        if (validateBeforeSave()) {
+          showSaveDialog = true;
+        }
       }
     "
+    @confirm-save="executeSave"
     @confirm-cancel="executeCancel"
     @confirm-close="executeClose"
   >
@@ -532,6 +540,7 @@ onMounted(() => {
             "
             class="f-inp f-yellow"
             style="max-width: 100px; text-align: right; font-weight: 600"
+            v-select-on-focus
           />
         </div>
 
@@ -661,7 +670,7 @@ onMounted(() => {
                   <td class="p0">
                     <input v-model="c.keterangan" class="cell-inp" />
                   </td>
-                  <td class="tc muted">{{ c.user_create || "ANA" }}</td>
+                  <td class="tc muted">{{ c.user_create || "" }}</td>
                   <td class="muted">{{ fmtDateTime(c.date_create) }}</td>
                   <td class="tc muted">{{ c.user_modify || "" }}</td>
                   <td class="muted">{{ fmtDateTime(c.date_modify) }}</td>
@@ -719,6 +728,7 @@ onMounted(() => {
                       @change="onBabaranChange(k)"
                       class="cell-inp tr fw"
                       :style="k.babaran < k.babarank ? 'color:#d32f2f' : ''"
+                      v-select-on-focus
                     />
                   </td>
                   <td class="p0">
@@ -831,6 +841,7 @@ onMounted(() => {
                     type="number"
                     v-model.number="a.qty"
                     class="cell-inp tr"
+                    v-select-on-focus
                   />
                 </td>
                 <td class="tc">
@@ -876,6 +887,7 @@ onMounted(() => {
                     type="number"
                     v-model.number="s.babaran"
                     class="cell-inp tr"
+                    v-select-on-focus
                   />
                 </td>
                 <td class="tc">

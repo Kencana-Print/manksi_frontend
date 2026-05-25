@@ -49,51 +49,37 @@ onMounted(async () => {
   }
 });
 
+const getBaseUrl = () => api.defaults.baseURL?.replace(/\/api\/?$/, "") || "";
+
 // URL Builder Utama
 const mainImageUrl = computed(() => {
   if (!rawData.value) return "";
-  const identifier = getVal("mspk_mh_nomor") || getVal("mspk_nomor");
-  if (!identifier) return "";
-
-  let cleanName = identifier;
-  const matchMH = cleanName.match(/(MH\.\d{4}\.\d+)/i);
-
-  if (matchMH) {
-    cleanName = matchMH[1];
-    // Jika format MH, arahkan default ke folder mintaharga
-    return `http://103.94.238.252:8888/file-gambar/mintaharga/${encodeURIComponent(cleanName)}.jpg`;
-  } else {
-    cleanName =
-      cleanName
-        .replace(/.*imagemintaharga/i, "")
-        .replace(/.*Downloads/i, "")
-        .replace(/\\/g, "/")
-        .split("/")
-        .pop() || "";
-    // Jika bukan MH, arahkan ke root file-gambar (sesuai root \\103.94.238.252\image\)
-    return `http://103.94.238.252:8888/file-gambar/${encodeURIComponent(cleanName)}.jpg`;
-  }
+  const nomor = getVal("mspk_nomor");
+  const cab = getVal("mspk_cab") || "HO-";
+  const base = getBaseUrl();
+  // Prioritas: backend lokal dulu
+  return `${base}/images/${cab}/map/${encodeURIComponent(nomor)}.jpg`;
 });
 
 // Handler Fallback jika gambar gagal dimuat
 const handleImageError = (e: Event) => {
   const img = e.target as HTMLImageElement;
-  const currentSrc = img.src;
+  if (img.dataset.tried === "true") {
+    img.style.display = "none";
+    return;
+  }
+  img.dataset.tried = "true";
 
-  // Jika sedang mencoba memuat dari folder /mintaharga/ dan gagal, coba cari di root /file-gambar/
-  if (currentSrc.includes("/file-gambar/mintaharga/")) {
-    img.src = currentSrc.replace("/file-gambar/mintaharga/", "/file-gambar/");
-  }
-  // Jika sedang mencoba dari root /file-gambar/ dan gagal, coba cari di folder /mintaharga/
-  else if (
-    currentSrc.includes("/file-gambar/") &&
-    !currentSrc.includes("/mintaharga/")
-  ) {
-    const filename = currentSrc.split("/").pop();
-    img.src = `http://103.94.238.252:8888/file-gambar/mintaharga/${filename}`;
-  }
-  // Jika kedua opsi sudah dicoba dan tetap gagal, sembunyikan gambar
-  else {
+  // Fallback 1: VPS folder map
+  const nomor = getVal("mspk_nomor");
+  const mhNomor = getVal("mspk_mh_nomor");
+
+  if (!img.src.includes("8888")) {
+    img.src = `http://103.94.238.252:8888/file-gambar/${encodeURIComponent(nomor)}.jpg`;
+  } else if (mhNomor && !img.src.includes("mintaharga")) {
+    // Fallback 2: VPS mintaharga
+    img.src = `http://103.94.238.252:8888/file-gambar/mintaharga/${encodeURIComponent(mhNomor)}.jpg`;
+  } else {
     img.style.display = "none";
   }
 };

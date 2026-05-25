@@ -268,6 +268,7 @@ const handleSave = async () => {
                       hide-details
                       class="brg-input"
                       style="max-width: 120px"
+                      v-select-on-focus
                     />
                   </div>
                 </div>
@@ -286,6 +287,7 @@ const handleSave = async () => {
                       hide-details
                       class="brg-input"
                       style="max-width: 160px"
+                      v-select-on-focus
                     />
                   </div>
                 </div>
@@ -302,6 +304,7 @@ const handleSave = async () => {
                       hide-details
                       class="brg-input"
                       style="max-width: 160px"
+                      v-select-on-focus
                     />
                   </div>
                 </div>

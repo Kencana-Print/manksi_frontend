@@ -470,6 +470,7 @@ const onSaveRealisasi = async () => {
                       type="number"
                       class="ci text-right font-weight-bold"
                       @input="recalcTotal(Number(idx))"
+                      v-select-on-focus
                     />
                   </td>
 
@@ -479,6 +480,7 @@ const onSaveRealisasi = async () => {
                       type="number"
                       class="ci text-right"
                       @input="recalcTotal(Number(idx))"
+                      v-select-on-focus
                     />
                   </td>
                   <td v-if="isDetailRinci" class="p0">

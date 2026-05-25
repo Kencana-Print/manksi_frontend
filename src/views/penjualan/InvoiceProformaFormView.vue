@@ -520,6 +520,7 @@ const num = (val: any) =>
                     class="cell-input tr fw-bold"
                     step="any"
                     min="0"
+                    v-select-on-focus
                   />
                 </td>
                 <td class="bg-yellow-lighten-5">
@@ -529,6 +530,7 @@ const num = (val: any) =>
                     class="cell-input tr fw-bold"
                     step="any"
                     min="0"
+                    v-select-on-focus
                   />
                 </td>
                 <td
@@ -630,6 +632,7 @@ const num = (val: any) =>
                   class="f-inp"
                   style="width: 50px; text-align: center; height: 22px"
                   :disabled="formData.stsPpn === 0"
+                  v-select-on-focus
                 />
               </div>
               <span class="sum-val text-orange-darken-3">{{

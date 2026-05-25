@@ -72,6 +72,7 @@ const textForOption1 = computed(() => {
               class="k-inp tr"
               placeholder="0"
               :disabled="!isChecked(1)"
+              v-select-on-focus
             />
             <span class="text-caption text-grey-darken-1">x</span>
             <input
@@ -80,6 +81,7 @@ const textForOption1 = computed(() => {
               class="k-inp tr"
               placeholder="0"
               :disabled="!isChecked(1)"
+              v-select-on-focus
             />
             <span class="text-caption text-grey-darken-1">cm.</span>
           </div>

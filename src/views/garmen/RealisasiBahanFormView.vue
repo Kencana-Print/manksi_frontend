@@ -570,6 +570,7 @@ onMounted(async () => {
               hide-details
               bg-color="yellow-lighten-4"
               class="font-weight-bold"
+              v-select-on-focus
             />
           </div>
         </div>
@@ -630,6 +631,7 @@ onMounted(async () => {
                     v-model.number="item.jumlah"
                     class="cell-input tr fw-bold text-primary"
                     @input="recalculateNetto(item.kode)"
+                    v-select-on-focus
                   />
                 </td>
                 <td class="text-center">
@@ -710,6 +712,7 @@ onMounted(async () => {
                     step="any"
                     v-model.number="dtl.gross"
                     class="cell-input tr fw-bold"
+                    v-select-on-focus
                   />
                 </td>
                 <td class="tr px-2">{{ dtl.roll }}</td>

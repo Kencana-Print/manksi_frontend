@@ -129,11 +129,12 @@ const {
       dtlBahan: (d.dtlBahan || []).map((b: any) => {
         // Ambil nilai Jumlah dan Ready
         const jumlahVal = Number(val(b, "mkbd_jumlah")) || 0;
-        const readyVal = Number(val(b, "mkbd_jumlah_rs")) || 0;
-
-        // KALKULASI ULANG PAKSA: Jika Butuh > Ready, maka sisa kekurangannya di-PO-kan
-        const calcPo =
-          jumlahVal > readyVal ? Number((jumlahVal - readyVal).toFixed(2)) : 0;
+        const readyVal = Number(
+          b.mkbd_jumlah_rs ?? b.mkbd_jumlah_RS ?? b.MKBD_JUMLAH_RS ?? 0,
+        );
+        const poVal = Number(
+          b.mkbd_jumlah_po ?? b.mkbd_jumlah_PO ?? b.MKBD_JUMLAH_PO ?? 0,
+        );
 
         return {
           no: val(b, "mkbd_nourut"),
@@ -148,7 +149,7 @@ const {
           gramasi: val(b, "gramasi"),
           jumlah: jumlahVal,
           ready: readyVal,
-          po: calcPo, // <--- HASIL KALKULASI DIMASUKKAN KE SINI
+          po: poVal,
           tglbeli: parseDateSafe(val(b, "mkbd_tglbeli")),
           keterangan: val(b, "mkbd_keterangan") || "",
         };
@@ -296,8 +297,14 @@ const onBahanSelected = (bahan: any) => {
   }
 };
 
-const removeRowBahan = (index: number) =>
+const removeRowBahan = (index: number) => {
   formData.value.dtlBahan.splice(index, 1);
+  // Reset selectedRowIdx kalau index yang dihapus adalah yang aktif
+  // atau index aktif sekarang melebihi panjang array
+  if (selectedRowIdx.value >= formData.value.dtlBahan.length) {
+    selectedRowIdx.value = formData.value.dtlBahan.length - 1;
+  }
+};
 const addRowPlan = () =>
   formData.value.dtlPlan.push({ tanggal: "", jumlah: 0 });
 const removeRowPlan = (index: number) =>
@@ -555,7 +562,7 @@ const onPoSelected = (po: any) => {
                 </th>
                 <th style="width: 72px" class="tr">Ready</th>
                 <th style="width: 72px" class="tr bg-red-darken-2 text-white">
-                  Akan PO
+                  Jumlah PO
                 </th>
                 <th style="width: 110px">Tgl Beli</th>
                 <th style="width: 160px">Keterangan</th>
@@ -589,6 +596,7 @@ const onPoSelected = (po: any) => {
                     v-model="row.babaran"
                     class="gi tr"
                     @input="recalcRowBahan(row)"
+                    v-select-on-focus
                   />
                 </td>
                 <td><input type="text" v-model="row.warna" class="gi" /></td>
@@ -634,6 +642,7 @@ const onPoSelected = (po: any) => {
                     v-model="row.jumlah"
                     class="gi tr fw bg-blue-lighten-5"
                     @input="recalcRowBahan(row)"
+                    v-select-on-focus
                   />
                 </td>
                 <td>
@@ -643,15 +652,16 @@ const onPoSelected = (po: any) => {
                     class="gi tr gi-ro"
                     readonly
                     tabindex="-1"
+                    v-select-on-focus
                   />
                 </td>
                 <td>
                   <input
                     type="number"
-                    :value="row.po"
-                    class="gi tr fw gi-ro text-red-darken-2 bg-red-lighten-5"
-                    readonly
-                    tabindex="-1"
+                    v-model="row.po"
+                    class="gi tr fw"
+                    style="color: #c62828; background: #ffebee"
+                    v-select-on-focus
                   />
                 </td>
                 <td><input type="date" v-model="row.tglbeli" class="gi" /></td>
@@ -783,7 +793,7 @@ const onPoSelected = (po: any) => {
                 <tr>
                   <th style="width: 32px">No</th>
                   <th>Tanggal</th>
-                  <th class="tr" style="background: #fff9c4">
+                  <th class="tr" style="background: #f57f17; color: white">
                     Jumlah Datang (Pcs)
                   </th>
                   <th style="width: 36px"></th>
@@ -805,7 +815,8 @@ const onPoSelected = (po: any) => {
                       type="number"
                       v-model="p.jumlah"
                       class="gi tr fw"
-                      style="background: #fffde7"
+                      style="background: #fff8e1; color: #212121"
+                      v-select-on-focus
                     />
                   </td>
                   <td class="tc">

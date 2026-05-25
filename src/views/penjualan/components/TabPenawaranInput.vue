@@ -301,6 +301,16 @@ const removeGambar = (index: number) => {
 
 const rp = (val: any) =>
   new Intl.NumberFormat("id-ID").format(Number(val) || 0);
+
+const dpChecked = ref(false);
+
+watch(
+  () => props.formData.DpPer,
+  (val) => {
+    dpChecked.value = Number(val) > 0;
+  },
+  { immediate: true },
+);
 </script>
 
 <template>
@@ -541,10 +551,10 @@ const rp = (val: any) =>
             <label class="chk font-weight-bold" style="width: 90px">
               <input
                 type="checkbox"
-                :checked="formData.DpPer > 0"
+                v-model="dpChecked"
                 @change="
                   (e: any) => {
-                    if (!e.target.checked) formData.DpPer = 0;
+                    if (!e.target.checked) props.formData.DpPer = 0;
                   }
                 "
               />
@@ -556,7 +566,10 @@ const rp = (val: any) =>
                 v-model="formData.DpPer"
                 class="f-inp"
                 style="width: 50px; text-align: right"
-                :disabled="formData.DpPer === 0 && !formData.DpPer"
+                :disabled="!dpChecked"
+                min="0"
+                max="100"
+                v-select-on-focus
               />
               <span>% =</span>
               <input
@@ -697,6 +710,7 @@ const rp = (val: any) =>
                   v-model="row.Panjang"
                   class="cell-inp tr"
                   :disabled="!!row.Spk"
+                  v-select-on-focus
                 />
               </td>
               <td>
@@ -705,6 +719,7 @@ const rp = (val: any) =>
                   v-model="row.Lebar"
                   class="cell-inp tr"
                   :disabled="!!row.Spk"
+                  v-select-on-focus
                 />
               </td>
               <td>
@@ -722,6 +737,7 @@ const rp = (val: any) =>
                   class="cell-inp tr"
                   @input="hitungTotalBaris(row)"
                   :disabled="!!row.Spk"
+                  v-select-on-focus
                 />
               </td>
               <td>
@@ -730,6 +746,7 @@ const rp = (val: any) =>
                   v-model="row.Harga"
                   class="cell-inp tr"
                   @input="hitungTotalBaris(row)"
+                  v-select-on-focus
                 />
               </td>
               <td class="tr fw text-blue-darken-3">{{ rp(row.Nominal) }}</td>

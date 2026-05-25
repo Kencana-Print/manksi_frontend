@@ -122,6 +122,7 @@ const updateToKetUkuran = () => {
                     type="number"
                     v-model.number="row.qtyorder"
                     class="ci tr fw text-blue"
+                    v-select-on-focus
                   />
                 </td>
                 <td class="tc">
@@ -224,13 +225,24 @@ const updateToKetUkuran = () => {
                     type="number"
                     v-model.number="row.qty"
                     class="ci tr fw text-blue"
+                    v-select-on-focus
                   />
                 </td>
                 <td class="p0">
-                  <input type="number" v-model.number="row.lb" class="ci tr" />
+                  <input
+                    type="number"
+                    v-model.number="row.lb"
+                    class="ci tr"
+                    v-select-on-focus
+                  />
                 </td>
                 <td class="p0">
-                  <input type="number" v-model.number="row.pb" class="ci tr" />
+                  <input
+                    type="number"
+                    v-model.number="row.pb"
+                    class="ci tr"
+                    v-select-on-focus
+                  />
                 </td>
                 <td class="tc">
                   <button

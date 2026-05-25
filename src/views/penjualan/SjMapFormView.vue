@@ -156,6 +156,7 @@ const showCusModal = ref(false);
 const activeRowIdx = ref(-1);
 const showCusConfirm = ref(false);
 const pendingCusItem = ref<any>(null);
+const divisiOptions = ref<any[]>([]);
 
 const onPerushSelected = (item: any) => {
   // Mapping field dari PerusahaanSearchModal (perush_kode & perush_nama)
@@ -270,7 +271,22 @@ const skipPrint = () => {
   goBack(); // Kembali ke halaman browse tanpa cetak
 };
 
+const loadDivisi = async () => {
+  try {
+    const res = await api.get("/lookups/divisi");
+    divisiOptions.value = res.data.data
+      .filter((d: any) => d.kode !== 0)
+      .map((d: any) => ({
+        value: String(d.kode),
+        label: `${d.kode} - ${d.nama}`,
+      }));
+  } catch {
+    console.error("Gagal memuat divisi");
+  }
+};
+
 onMounted(() => {
+  loadDivisi();
   if (isEditMode.value) fetchData();
 });
 </script>
@@ -302,9 +318,9 @@ onMounted(() => {
             class="f-inp f-sel"
             :disabled="isEditMode || formData.details.length > 0"
           >
-            <option value="1">1 - SPANDUK</option>
-            <option value="2">2 - GARMENT</option>
-            <option value="4">4 - MMT</option>
+            <option v-for="d in divisiOptions" :key="d.value" :value="d.value">
+              {{ d.label }}
+            </option>
           </select>
         </div>
 
@@ -458,10 +474,10 @@ onMounted(() => {
             <thead>
               <tr>
                 <th style="width: 32px">No</th>
-                <th style="width: 150px">Kode MAP</th>
+                <th style="width: 180px">Kode MAP</th>
                 <th style="text-align: left">Nama Pekerjaan / Ukuran</th>
                 <th style="width: 130px; text-align: left">Bahan</th>
-                <th class="th-yellow" style="width: 70px; text-align: right">
+                <th class="th-yellow" style="width: 90px; text-align: right">
                   Jumlah
                 </th>
                 <th style="width: 70px; text-align: right">Jml Kirim</th>
@@ -511,7 +527,15 @@ onMounted(() => {
                     type="number"
                     v-model.number="d.jumlah"
                     class="cell-inp tr"
-                    style="font-weight: 600; background: #fffde7"
+                    style="
+                      font-weight: 600;
+                      background: #fffde7;
+                      width: 100%;
+                      height: 28px;
+                      padding: 0 6px;
+                      box-sizing: border-box;
+                    "
+                    v-select-on-focus
                   />
                 </td>
                 <td class="tr muted">{{ d.jumlah_kirim }}</td>
@@ -810,24 +834,15 @@ onMounted(() => {
   align-items: center;
   height: 28px;
   background: white;
-}
-.cell-lkp {
-  width: 26px;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #e3f2fd;
   border: none;
-  border-left: 1px solid #bbdefb;
-  cursor: pointer;
+  overflow: hidden;
 }
-.cell-lkp:hover {
-  background: #bbdefb;
-}
+
 .cell-inp {
   flex: 1;
-  height: 100%;
+  min-width: 0;
+  width: 100%;
+  height: 28px;
   border: none;
   background: transparent;
   outline: none;
@@ -835,25 +850,32 @@ onMounted(() => {
   padding: 0 6px;
   font-family: inherit;
   color: #212121;
+  box-sizing: border-box;
+}
+.cell-inp.tr {
+  text-align: right;
 }
 .cell-inp:focus {
-  background: #fffde7;
+  background: #fffde7 !important;
+  box-shadow: inset 0 0 0 1.5px #f9a825;
 }
 .cell-lkp {
-  width: 26px;
+  width: 28px;
   height: 100%;
+  flex-shrink: 0;
   background: #e3f2fd;
   border: none;
   border-left: 1px solid #bbdefb;
   cursor: pointer;
   font-size: 11px;
   color: #1565c0;
-  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .cell-lkp:hover {
   background: #bbdefb;
 }
-
 .del-btn {
   width: 22px;
   height: 22px;
