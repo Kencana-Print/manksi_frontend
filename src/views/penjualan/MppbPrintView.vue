@@ -50,7 +50,10 @@ const formatTgl = (val: string) => {
 
 const VPS_BASE = "http://103.94.238.252:8888/file-gambar";
 
-const getBaseUrl = () => api.defaults.baseURL?.replace(/\/api\/?$/, "") || "";
+const getBaseUrl = () =>
+  import.meta.env.VITE_API_URL?.replace(/\/api\/?$/, "") ||
+  api.defaults.baseURL?.replace(/\/api\/?$/, "") ||
+  `${window.location.protocol}//${window.location.hostname}:3088`;
 
 const getDesainUrl = (nomor: string) => {
   if (!nomor) return "";
@@ -62,7 +65,6 @@ const getSignatureUrl = (kodeUser: string) => {
   return `${getBaseUrl()}/images/ttd/${encodeURIComponent(kodeUser.trim().toUpperCase())}.jpg`;
 };
 
-// Fallback lokal → VPS → sembunyikan
 const onDesainError = (e: Event, nomor: string) => {
   const el = e.target as HTMLImageElement;
   if (!el.src.includes("8888")) {
