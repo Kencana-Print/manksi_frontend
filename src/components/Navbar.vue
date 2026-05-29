@@ -598,6 +598,24 @@ const menuItems: NavItem[] = [
           },
         ],
       },
+      {
+        title: "Laporan Marketing",
+        icon: IconChartBar,
+        menuId: 966,
+        subItems: [
+          {
+            title: "Penawaran vs MAP",
+            to: "/laporan/marketing/penawaran-vs-map",
+            icon: IconReportAnalytics,
+          },
+          {
+            title: "Kunjungan Sales",
+            to: "/laporan/marketing/kunjungan-sales",
+            icon: IconTruckDelivery,
+            menuId: 313,
+          },
+        ],
+      },
     ],
   },
   {

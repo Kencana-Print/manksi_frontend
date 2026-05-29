@@ -1379,6 +1379,31 @@ const router = createRouter({
     },
 
     {
+      path: "/laporan/marketing/penawaran-vs-map",
+      name: "LapPenawaranVsMap",
+      component: () =>
+        import("@/views/laporan/marketing/PenawaranVsMapView.vue"),
+      meta: {
+        title: "Penawaran vs MAP",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "966",
+      },
+    },
+    {
+      path: "/laporan/marketing/kunjungan-sales",
+      name: "LapKunjunganSales",
+      component: () =>
+        import("@/views/laporan/marketing/KunjunganSalesView.vue"),
+      meta: {
+        title: "Laporan Kunjungan Sales",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "313",
+      },
+    },
+
+    {
       path: "/laporan/penjualan/penawaran-vs-spk",
       name: "LapPenawaranVsSpk",
       component: () =>

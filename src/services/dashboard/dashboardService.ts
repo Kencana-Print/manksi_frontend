@@ -16,4 +16,11 @@ export const dashboardService = {
   getPoBahanSisa: () => api.get("/dashboard/po-bahan-sisa"),
 
   getPoBahanBpbSummary: () => api.get("/dashboard/po-bahan-bpb-summary"),
+
+  getPenawaranBelumMap: (limit = 20, offset = 0) =>
+    api.get("/dashboard/penawaran-belum-map", { params: { limit, offset } }),
+
+  getPenawaranMapSummary: () => api.get("/dashboard/penawaran-map-summary"),
+
+  getKunjunganSalesSummary: () => api.get("/dashboard/kunjungan-sales-summary"),
 };

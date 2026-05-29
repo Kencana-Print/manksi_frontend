@@ -10,6 +10,8 @@ import {
   IconRefresh,
   IconChartBar,
   IconTruckDelivery,
+  IconAlertTriangle,
+  IconWalk,
 } from "@tabler/icons-vue";
 
 const authStore = useAuthStore();
@@ -24,13 +26,26 @@ const isSuperViewer = computed(() =>
   ["EDP", "DIREKSI", "OWNER", "IT"].includes(bagian.value),
 );
 const showPenawaran = computed(
-  () => bagian.value === "MARKETING" || isSuperViewer.value,
+  () => ["MARKETING", "FINANCE"].includes(bagian.value) || isSuperViewer.value,
 );
 const showPoBpb = computed(
   () =>
     ["PEMBELIAN", "GUDANG", "PPIC"].includes(bagian.value) ||
     isSuperViewer.value,
 );
+const showPenawaranMap = computed(
+  () => bagian.value === "MARKETING" || isSuperViewer.value,
+);
+
+const RANGE_DAYS = 90;
+
+const mapSummary = ref({
+  TotalPenawaran: 0,
+  SudahMAP: 0,
+  BelumMAP: 0,
+  BelumMAPAdaClose: 0,
+});
+const penawaranBelumMap = ref<any[]>([]);
 
 // ── State Dashboard ──
 const penSummary = ref({ TotalPenawaran: 0, SudahSpk: 0, BelumSpk: 0 });
@@ -45,6 +60,7 @@ const spkSummary = ref({
 const realisasiRows = ref<any[]>([]);
 const poBpbSummary = ref({ TotalPO: 0, Open: 0, OnProses: 0, Close: 0 });
 const isLoadingDashboard = ref(false);
+const kunjunganRows = ref<any[]>([]);
 
 // ── Infinite scroll state (Penawaran Belum SPK) ──
 const PEN_PAGE_SIZE = 20;
@@ -85,11 +101,54 @@ const setupPenObserver = () => {
   if (penSentinelEl.value) penScrollObserver.observe(penSentinelEl.value);
 };
 
+// ── Infinite scroll state (Penawaran Belum MAP) ──
+const MAP_PAGE_SIZE = 20;
+const mapOffset = ref(0);
+const mapHasMore = ref(true);
+const isLoadingMoreMap = ref(false);
+const mapSentinelEl = ref<HTMLElement | null>(null);
+let mapScrollObserver: IntersectionObserver | null = null;
+
+const loadMoreMap = async () => {
+  if (!mapHasMore.value || isLoadingMoreMap.value) return;
+  isLoadingMoreMap.value = true;
+  try {
+    const res = await dashboardService.getPenawaranBelumMap(
+      MAP_PAGE_SIZE,
+      mapOffset.value,
+    );
+    const rows: any[] = res.data.data;
+    penawaranBelumMap.value.push(...rows);
+    mapOffset.value += rows.length;
+    if (rows.length < MAP_PAGE_SIZE) mapHasMore.value = false;
+  } catch {
+    /* silent */
+  } finally {
+    isLoadingMoreMap.value = false;
+  }
+};
+
+const setupMapObserver = () => {
+  if (mapScrollObserver) mapScrollObserver.disconnect();
+  mapScrollObserver = new IntersectionObserver(
+    (entries) => {
+      if (entries[0].isIntersecting) loadMoreMap();
+    },
+    { threshold: 0.1 },
+  );
+  if (mapSentinelEl.value) mapScrollObserver.observe(mapSentinelEl.value);
+};
+
 const loadDashboard = async () => {
   isLoadingDashboard.value = true;
   penawaranBelumSpk.value = [];
   penOffset.value = 0;
   penHasMore.value = true;
+
+  penawaranBelumMap.value = [];
+  mapOffset.value = 0;
+  mapHasMore.value = true;
+
   try {
     const [spkSumRes] = await Promise.allSettled([
       dashboardService.getSpkSummary(),
@@ -106,15 +165,24 @@ const loadDashboard = async () => {
     }
 
     if (showPenawaran.value) {
-      const [sumRes, realisasiRes] = await Promise.allSettled([
-        dashboardService.getPenawaranSummary(),
-        dashboardService.getRealisasiSummary(),
-      ]);
+      const [sumRes, realisasiRes, mapSumRes, kunjunganRes] =
+        await Promise.allSettled([
+          dashboardService.getPenawaranSummary(),
+          dashboardService.getRealisasiSummary(),
+          dashboardService.getPenawaranMapSummary(),
+          dashboardService.getKunjunganSalesSummary(),
+        ]);
       if (sumRes.status === "fulfilled")
         penSummary.value = sumRes.value.data.data;
       if (realisasiRes.status === "fulfilled")
         realisasiRows.value = realisasiRes.value.data.data;
-      await loadMorePenawaran();
+      if (mapSumRes.status === "fulfilled")
+        mapSummary.value = mapSumRes.value.data.data;
+      if (kunjunganRes.status === "fulfilled")
+        kunjunganRows.value = kunjunganRes.value.data.data || [];
+
+      // Load batch pertama keduanya paralel
+      await Promise.allSettled([loadMorePenawaran(), loadMoreMap()]);
     }
   } finally {
     isLoadingDashboard.value = false;
@@ -130,11 +198,15 @@ onMounted(async () => {
     isSpkDialogVisible.value = true;
   }
   await loadDashboard();
-  setTimeout(setupPenObserver, 300);
+  setTimeout(() => {
+    setupPenObserver();
+    setupMapObserver(); // ← tambah ini
+  }, 300);
 });
 
 onUnmounted(() => {
   penScrollObserver?.disconnect();
+  mapScrollObserver?.disconnect();
 });
 
 const closeSpkDialog = () => {
@@ -520,6 +592,201 @@ const sisaClass = (item: any) => {
             </template>
             <div v-else class="text-center text-grey py-3 text-caption">
               Belum ada data penawaran bulan ini.
+            </div>
+          </div>
+        </div>
+      </v-col>
+    </v-row>
+
+    <!-- ── Row 2b: Penawaran Belum MAP ── -->
+    <v-row v-if="showPenawaran" dense class="mb-2">
+      <v-col cols="12">
+        <div class="manksi-panel content-panel">
+          <div class="panel-header panel-header--orange">
+            <IconAlertTriangle :size="14" :stroke-width="1.7" class="mr-1" />
+            Penawaran Belum Ada MAP
+            <span class="panel-header-sub ml-1">
+              ({{ RANGE_DAYS }} hari terakhir · belum ada MAP & belum close)
+            </span>
+            <span
+              v-if="mapSummary.BelumMAPAdaClose"
+              class="badge-count ml-2"
+              style="background: #e65100"
+            >
+              {{ mapSummary.BelumMAPAdaClose }} perlu perhatian
+            </span>
+            <span
+              class="ml-auto d-flex align-center"
+              style="gap: 12px; font-size: 11px"
+            >
+              <span
+                >Total: <b>{{ mapSummary.TotalPenawaran }}</b></span
+              >
+              <span style="color: #2e7d32"
+                >Ada MAP: <b>{{ mapSummary.SudahMAP }}</b></span
+              >
+              <span style="color: #c62828"
+                >Belum MAP: <b>{{ mapSummary.BelumMAP }}</b></span
+              >
+            </span>
+          </div>
+          <div class="panel-body">
+            <v-progress-linear
+              v-if="isLoadingDashboard"
+              indeterminate
+              color="orange"
+              height="2"
+            />
+            <template v-else-if="penawaranBelumMap.length || isLoadingMoreMap">
+              <div class="map-list">
+                <div
+                  v-for="p in penawaranBelumMap"
+                  :key="p.Nomor"
+                  class="map-item"
+                  :class="
+                    p.UmurHari >= 14
+                      ? 'map-danger'
+                      : p.UmurHari >= 7
+                        ? 'map-warn'
+                        : ''
+                  "
+                  @click="router.push('/laporan/marketing/penawaran-vs-map')"
+                  style="cursor: pointer"
+                >
+                  <div class="map-item-top">
+                    <span class="map-nomor">{{ p.Nomor }}</span>
+                    <div class="d-flex align-center" style="gap: 5px">
+                      <span
+                        class="map-close-badge"
+                        style="background: #e8f5e9; color: #2e7d32"
+                      >
+                        {{ p.JmlItem }} item
+                      </span>
+                      <span class="pen-age" :class="umurClass(p.UmurHari)">
+                        {{ p.UmurHari }}h
+                      </span>
+                    </div>
+                  </div>
+                  <div class="map-cus">{{ p.NamaCustomer }}</div>
+                  <div v-if="p.Keterangan" class="pen-ket">
+                    {{ p.Keterangan }}
+                  </div>
+                </div>
+
+                <!-- Sentinel lazy load -->
+                <div
+                  ref="mapSentinelEl"
+                  style="width: 100%; padding: 6px 12px; text-align: center"
+                >
+                  <span v-if="isLoadingMoreMap" class="pen-loading"
+                    >Memuat...</span
+                  >
+                  <span
+                    v-else-if="!mapHasMore && penawaranBelumMap.length"
+                    class="pen-end"
+                  >
+                    {{ penawaranBelumMap.length }} penawaran
+                  </span>
+                </div>
+              </div>
+            </template>
+            <div v-else class="text-center text-grey py-3 text-caption">
+              Semua penawaran sudah ada MAP-nya 🎉
+            </div>
+          </div>
+        </div>
+      </v-col>
+    </v-row>
+
+    <!-- ── Row 2c: Kunjungan Sales ── -->
+    <v-row v-if="showPenawaran" dense class="mb-2">
+      <v-col cols="12">
+        <div class="manksi-panel content-panel">
+          <div class="panel-header panel-header--green">
+            <IconWalk :size="14" :stroke-width="1.7" class="mr-1" />
+            Kunjungan Sales
+            <span class="panel-header-sub ml-1">(bulan ini)</span>
+            <button
+              class="po-bpb-link ml-auto"
+              @click="router.push('/laporan/marketing/kunjungan-sales')"
+            >
+              Lihat Detail →
+            </button>
+          </div>
+          <div class="panel-body">
+            <v-progress-linear
+              v-if="isLoadingDashboard"
+              indeterminate
+              color="green"
+              height="2"
+            />
+            <template v-else-if="kunjunganRows.length">
+              <div class="knj-wrap">
+                <div
+                  v-for="row in kunjunganRows"
+                  :key="row.Nama_Sales"
+                  class="knj-row"
+                >
+                  <!-- Nama + angka -->
+                  <div class="knj-meta">
+                    <span class="knj-sales">{{ row.Nama_Sales }}</span>
+                    <div class="knj-stats">
+                      <span class="knj-badge done">✓ {{ row.Done }}</span>
+                      <span class="knj-badge failed">✕ {{ row.Failed }}</span>
+                      <span class="knj-badge unplan">+ {{ row.Unplan }}</span>
+                      <span class="knj-total">{{ row.Total }} total</span>
+                    </div>
+                  </div>
+                  <!-- Progress bar -->
+                  <div class="knj-bar-wrap">
+                    <div class="knj-bar">
+                      <div
+                        class="knj-seg knj-done"
+                        :style="{
+                          width: row.Total
+                            ? (row.Done / row.Total) * 100 + '%'
+                            : '0%',
+                        }"
+                        :title="`Done: ${row.Done}`"
+                      />
+                      <div
+                        class="knj-seg knj-unplan"
+                        :style="{
+                          width: row.Total
+                            ? (row.Unplan / row.Total) * 100 + '%'
+                            : '0%',
+                        }"
+                        :title="`Unplan: ${row.Unplan}`"
+                      />
+                      <div
+                        class="knj-seg knj-failed"
+                        :style="{
+                          width: row.Total
+                            ? (row.Failed / row.Total) * 100 + '%'
+                            : '0%',
+                        }"
+                        :title="`Failed: ${row.Failed}`"
+                      />
+                    </div>
+                    <span class="knj-pct">
+                      {{
+                        row.Total
+                          ? Math.round((row.Done / row.Total) * 100)
+                          : 0
+                      }}%
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <!-- Legend -->
+              <div class="real-legend">
+                <span class="leg-dot" style="background: #43a047" />Done
+                <span class="leg-dot ml-2" style="background: #90caf9" />Unplan
+                <span class="leg-dot ml-2" style="background: #e53935" />Failed
+              </div>
+            </template>
+            <div v-else class="text-center text-grey py-3 text-caption">
+              Belum ada data kunjungan bulan ini.
             </div>
           </div>
         </div>
@@ -1342,5 +1609,148 @@ const sisaClass = (item: any) => {
 .val-warn {
   color: #f57f17;
   font-weight: 600;
+}
+
+.panel-header--orange {
+  background: #fff3e0;
+  color: #e65100;
+  border-bottom: 1px solid #ffe0b2;
+}
+.map-list {
+  display: flex;
+  flex-wrap: wrap;
+  max-height: 200px;
+  overflow-y: auto;
+}
+.map-item {
+  width: 25%;
+  padding: 6px 12px;
+  border-bottom: 1px solid #f5f5f5;
+  border-right: 1px solid #f5f5f5;
+  font-size: 11px;
+  transition: background 0.1s;
+}
+.map-item:hover {
+  background: #fff8e1 !important;
+}
+.map-item.map-danger {
+  background: #fff5f5;
+}
+.map-item.map-warn {
+  background: #fffde7;
+}
+.map-item-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2px;
+}
+.map-nomor {
+  font-family: monospace;
+  font-weight: 700;
+  color: #1565c0;
+  font-size: 11px;
+}
+.map-cus {
+  color: #424242;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.map-close-badge {
+  font-size: 9px;
+  font-weight: 700;
+  background: #ffebee;
+  color: #c62828;
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
+.panel-header--green {
+  background: #e8f5e9;
+  color: #2e7d32;
+  border-bottom: 1px solid #c8e6c9;
+}
+.knj-wrap {
+  padding: 4px 0;
+  max-height: 220px;
+  overflow-y: auto;
+}
+.knj-row {
+  padding: 5px 12px;
+  border-bottom: 1px solid #f5f5f5;
+}
+.knj-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 3px;
+}
+.knj-sales {
+  font-size: 11px;
+  font-weight: 700;
+  color: #1565c0;
+  text-transform: uppercase;
+}
+.knj-stats {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.knj-badge {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+.knj-badge.done {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+.knj-badge.failed {
+  background: #ffebee;
+  color: #c62828;
+}
+.knj-badge.unplan {
+  background: #e3f2fd;
+  color: #1565c0;
+}
+.knj-total {
+  font-size: 9px;
+  color: #9e9e9e;
+  margin-left: 2px;
+}
+.knj-bar-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.knj-bar {
+  flex: 1;
+  height: 7px;
+  background: #f0f0f0;
+  border-radius: 4px;
+  overflow: hidden;
+  display: flex;
+}
+.knj-seg {
+  height: 100%;
+  transition: width 0.3s;
+}
+.knj-done {
+  background: #43a047;
+}
+.knj-unplan {
+  background: #90caf9;
+}
+.knj-failed {
+  background: #e53935;
+}
+.knj-pct {
+  font-size: 10px;
+  font-weight: 700;
+  color: #2e7d32;
+  min-width: 28px;
+  text-align: right;
 }
 </style>
