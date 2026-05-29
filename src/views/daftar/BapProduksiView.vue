@@ -62,10 +62,12 @@ const headers = [
   { title: "CAB", key: "Cab", width: "60px", align: "center" },
   { title: "TIPE", key: "Tipe", width: "120px" },
   { title: "BAGIAN", key: "Bagian", width: "120px" },
-  { title: "MASALAH", key: "Masalah", minWidth: "250px" },
-  { title: "SUMBER MASALAH", key: "SumberMasalah", minWidth: "250px" },
-  { title: "SOLUSI", key: "Solusi", minWidth: "250px" },
-  { title: "PERTANGGUNGJAWABAN", key: "Pertanggungjawaban", minWidth: "250px" },
+  { title: "KATEGORI", key: "Kategori", width: "200px" }, // ← baru
+  { title: "KARYAWAN TERLIBAT", key: "Karyawan", width: "220px" }, // ← baru
+  { title: "MASALAH", key: "Masalah", minWidth: "200px" },
+  { title: "SUMBER MASALAH", key: "SumberMasalah", minWidth: "200px" },
+  { title: "SOLUSI", key: "Solusi", minWidth: "200px" },
+  { title: "PERTANGGUNGJAWABAN", key: "Pertanggungjawaban", minWidth: "200px" },
   { title: "SPK", key: "SPK", width: "120px" },
   { title: "CREATED", key: "Created", width: "100px" },
   { title: "APPROVE", key: "Approve", width: "100px" },
@@ -246,6 +248,31 @@ const handlePrint = () => {
         {{ item.raw?.Nomor || item.Nomor }}
       </div>
     </template>
+
+    <template #item.Kategori="{ item }">
+      <div v-if="item.Kategori" class="kat-chips-browse">
+        <span
+          v-for="kat in item.Kategori.split(', ')"
+          :key="kat"
+          class="kat-chip-browse"
+          >{{ kat }}</span
+        >
+      </div>
+      <span v-else class="text-grey text-caption">-</span>
+    </template>
+
+    <template #item.Karyawan="{ item }">
+      <div v-if="item.Karyawan" class="kar-browse">
+        <div
+          v-for="kar in item.Karyawan.split('; ')"
+          :key="kar"
+          class="kar-browse-item"
+        >
+          {{ kar }}
+        </div>
+      </div>
+      <span v-else class="text-grey text-caption">-</span>
+    </template>
   </BaseBrowse>
 
   <BapAjukanEditDialog
@@ -323,5 +350,33 @@ const handlePrint = () => {
 .legend-divider {
   height: 1px;
   background: #eeeeee;
+}
+
+.kat-chips-browse {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  padding: 2px 0;
+}
+.kat-chip-browse {
+  font-size: 9px;
+  font-weight: 600;
+  background: #e3f2fd;
+  color: #1565c0;
+  border: 1px solid #90caf9;
+  border-radius: 10px;
+  padding: 1px 6px;
+  white-space: nowrap;
+}
+.kar-browse {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 2px 0;
+}
+.kar-browse-item {
+  font-size: 10px;
+  color: #212121;
+  white-space: nowrap;
 }
 </style>

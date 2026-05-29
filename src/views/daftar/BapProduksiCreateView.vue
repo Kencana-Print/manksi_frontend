@@ -8,6 +8,7 @@ import type { VForm } from "vuetify/components";
 import BaseForm from "@/components/BaseForm.vue";
 import SpkProduksiSearchModal from "@/components/lookups/SpkProduksiSearchModal.vue";
 import BagianProduksiSearchModal from "@/components/lookups/BagianProduksiSearchModal.vue";
+import KaryawanSearchModal from "@/components/lookups/KaryawanSearchModal.vue";
 import { IconAlertCircle } from "@tabler/icons-vue";
 
 interface BapData {
@@ -28,6 +29,8 @@ interface BapData {
   Approve: string | boolean;
   StatusEdit: string;
   UrutPin5: number;
+  Kategori: string[];
+  Karyawan: { nik: string; nama: string }[];
 }
 
 interface SaveResponse {
@@ -64,7 +67,18 @@ const initialBapData = {
   Approve: false,
   StatusEdit: "",
   UrutPin5: 0,
+  Kategori: [] as string[],
+  Karyawan: [] as { nik: string; nama: string }[],
 };
+
+const KATEGORI_OPTIONS = [
+  "Manusia",
+  "Mesin",
+  "Metode",
+  "Material",
+  "Pengukuran",
+  "Lingkungan",
+];
 
 const {
   isEditMode,
@@ -146,6 +160,19 @@ const totalHarga = computed(
 const formatCurrency = (val: number) =>
   new Intl.NumberFormat("id-ID").format(val);
 
+// Modal karyawan
+const showKaryawanModal = ref(false);
+
+const addKaryawan = (item: any) => {
+  const exists = formData.value.Karyawan.find((k) => k.nik === item.Nik);
+  if (exists) return toast.warning("Karyawan sudah ditambahkan.");
+  formData.value.Karyawan.push({ nik: item.Nik, nama: item.Nama });
+};
+
+const removeKaryawan = (idx: number) => {
+  formData.value.Karyawan.splice(idx, 1);
+};
+
 const openBagianModal = () => {
   if (!formData.value.Cab) {
     toast.warning("Pilih cabang terlebih dahulu!");
@@ -215,77 +242,61 @@ const handlePreSave = async () => {
     @confirm-close="executeClose"
   >
     <template #right-column>
-      <!-- Status alert -->
-      <div v-if="isEditMode && statusPengajuan" class="bap-alert-wrap">
-        <div v-if="statusPengajuan === 'WAIT'" class="bap-alert info">
-          ℹ Menunggu ACC Perubahan Data dari Pusat.
+      <div class="bap-scroll-wrap">
+        <div v-if="isEditMode && statusPengajuan" class="bap-alert-wrap">
+          <div v-if="statusPengajuan === 'WAIT'" class="bap-alert info">
+            ℹ Menunggu ACC Perubahan Data dari Pusat.
+          </div>
+          <div v-if="statusPengajuan === 'ACC'" class="bap-alert success">
+            ✔ Pengajuan ACC. Silakan lakukan perubahan dan simpan.
+          </div>
+          <div v-if="statusPengajuan === 'TOLAK'" class="bap-alert error">
+            ✖ Pengajuan Perubahan Ditolak.
+          </div>
+          <div v-if="statusPengajuan === 'MINTA'" class="bap-alert warning">
+            ⚠ Transaksi sudah ditutup. Ajukan perubahan data.
+          </div>
         </div>
-        <div v-if="statusPengajuan === 'ACC'" class="bap-alert success">
-          ✔ Pengajuan ACC. Silakan lakukan perubahan dan simpan.
-        </div>
-        <div v-if="statusPengajuan === 'TOLAK'" class="bap-alert error">
-          ✖ Pengajuan Perubahan Ditolak.
-        </div>
-        <div v-if="statusPengajuan === 'MINTA'" class="bap-alert warning">
-          ⚠ Transaksi sudah ditutup. Ajukan perubahan data.
-        </div>
-      </div>
 
-      <v-form ref="vFormRef" :disabled="isFormDisabled">
-        <div class="bap-section">
-          <!-- ── Header: Nomor, Tanggal, Cabang, Tipe, Approve ── -->
-          <div class="bap-header-grid">
-            <!-- Kiri: field-field header -->
-            <div class="bap-fields">
-              <!-- Nomor -->
-              <div class="f-row">
-                <label class="f-lbl">Nomor</label>
-                <v-text-field
-                  v-model="formData.Nomor"
-                  variant="outlined"
-                  density="compact"
-                  readonly
-                  bg-color="blue-lighten-5"
-                  hide-details
-                  class="f-inp"
-                  style="max-width: 200px"
-                >
-                  <template #append-inner>
-                    <span v-if="!isEditMode" class="nomor-hint"
-                      >&larr; Kosong=Baru</span
-                    >
-                  </template>
-                </v-text-field>
-              </div>
-
-              <!-- Tanggal -->
-              <div class="f-row">
-                <label class="f-lbl">Tanggal</label>
-                <input
-                  type="date"
-                  v-model="formData.Tanggal"
-                  class="bap-date-input"
-                />
-              </div>
-
-              <!-- Cabang -->
-              <div class="f-row">
-                <label class="f-lbl">Cabang</label>
-                <v-select
-                  v-model="formData.Cab"
-                  :items="cabangOptions"
-                  variant="outlined"
-                  density="compact"
-                  hide-details
-                  class="f-inp"
-                  style="max-width: 160px"
-                />
-              </div>
-
-              <!-- Tipe -->
-              <div class="f-row">
-                <label class="f-lbl">Tipe</label>
-                <div class="d-flex align-center gap-4">
+        <v-form ref="vFormRef" :disabled="isFormDisabled">
+          <div class="bap-section">
+            <!-- ── TOP: Header kiri + Approve+Karyawan kanan ── -->
+            <div class="bap-top">
+              <!-- KIRI: field header -->
+              <div class="bap-fields">
+                <div class="f-row">
+                  <label class="f-lbl">Nomor</label>
+                  <input
+                    :value="formData.Nomor"
+                    readonly
+                    class="f-inp ro"
+                    style="width: 180px"
+                    placeholder="← Kosong=Baru"
+                  />
+                </div>
+                <div class="f-row">
+                  <label class="f-lbl">Tanggal</label>
+                  <input
+                    type="date"
+                    v-model="formData.Tanggal"
+                    class="f-inp idate"
+                    style="width: 150px"
+                  />
+                </div>
+                <div class="f-row">
+                  <label class="f-lbl">Cabang</label>
+                  <select
+                    v-model="formData.Cab"
+                    class="f-inp isel"
+                    style="width: 120px"
+                  >
+                    <option v-for="c in cabangOptions" :key="c" :value="c">
+                      {{ c }}
+                    </option>
+                  </select>
+                </div>
+                <div class="f-row">
+                  <label class="f-lbl">Tipe</label>
                   <label class="radio-label">
                     <input
                       type="radio"
@@ -294,7 +305,7 @@ const handlePreSave = async () => {
                     />
                     Berita Acara
                   </label>
-                  <label class="radio-label">
+                  <label class="radio-label ml-2">
                     <input
                       type="radio"
                       v-model="formData.Tipe"
@@ -303,196 +314,182 @@ const handlePreSave = async () => {
                     Komplain Produksi
                   </label>
                 </div>
+                <div class="f-row">
+                  <label class="f-lbl">Bagian</label>
+                  <input
+                    :value="formData.BagKode"
+                    readonly
+                    class="f-inp ro cur-ptr"
+                    style="width: 110px"
+                    @click="openBagianModal"
+                    placeholder="Klik..."
+                  />
+                  <input
+                    :value="formData.BagNama"
+                    readonly
+                    class="f-inp ro ml-1"
+                    style="flex: 1"
+                  />
+                </div>
+                <div class="f-row">
+                  <label class="f-lbl">Kategori</label>
+                  <div class="f-multi-check">
+                    <label
+                      v-for="kat in KATEGORI_OPTIONS"
+                      :key="kat"
+                      class="kat-chip"
+                      :class="{ active: formData.Kategori.includes(kat) }"
+                    >
+                      <input
+                        type="checkbox"
+                        :value="kat"
+                        v-model="formData.Kategori"
+                        style="display: none"
+                      />
+                      {{ kat }}
+                    </label>
+                  </div>
+                </div>
               </div>
 
-              <!-- Kode Bagian -->
-              <div class="f-row">
-                <label class="f-lbl">Kode Bagian</label>
-                <v-text-field
-                  v-model="formData.BagKode"
-                  variant="outlined"
-                  density="compact"
-                  readonly
-                  bg-color="blue-lighten-5"
-                  hide-details
-                  class="f-inp cursor-pointer"
-                  style="max-width: 130px"
-                  :rules="[(v) => !!v || '']"
-                  @click="openBagianModal"
-                />
-                <label class="f-lbl" style="margin-left: 8px; text-align: left"
-                  >Bagian</label
+              <!-- KANAN: Approve + Karyawan -->
+              <div class="bap-right-panel">
+                <!-- Approve -->
+                <label
+                  class="approve-label"
+                  :class="{ active: formData.Approve }"
                 >
-                <v-text-field
-                  v-model="formData.BagNama"
-                  variant="outlined"
-                  density="compact"
-                  readonly
-                  bg-color="grey-lighten-4"
-                  hide-details
-                  class="f-inp"
-                  style="max-width: 260px"
-                  :rules="[(v) => !!v || 'Bagian wajib diisi']"
-                />
+                  <input
+                    type="checkbox"
+                    v-model="formData.Approve"
+                    :disabled="!hasAccKorAccess"
+                  />
+                  <span>APPROVE</span>
+                </label>
+
+                <!-- Karyawan Terlibat -->
+                <div class="kar-panel">
+                  <div class="kar-panel-header">
+                    <span class="kar-panel-title">Karyawan Terlibat</span>
+                    <button
+                      type="button"
+                      class="btn-add-kar"
+                      @click="showKaryawanModal = true"
+                    >
+                      + Tambah
+                    </button>
+                  </div>
+                  <div v-if="formData.Karyawan.length === 0" class="kar-empty">
+                    Belum ada.
+                  </div>
+                  <div v-else class="kar-list">
+                    <div
+                      v-for="(kar, idx) in formData.Karyawan"
+                      :key="kar.nik"
+                      class="kar-item"
+                    >
+                      <div class="kar-nik">{{ kar.nik }}</div>
+                      <div class="kar-nama">{{ kar.nama }}</div>
+                      <button
+                        type="button"
+                        class="btn-del-kar"
+                        @click="removeKaryawan(idx)"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
-            <!-- Kanan: Approve -->
-            <div class="bap-approve-box">
-              <label
-                class="approve-label"
-                :class="{ active: formData.Approve }"
-              >
-                <input
-                  type="checkbox"
-                  v-model="formData.Approve"
-                  :disabled="!hasAccKorAccess"
-                />
-                <span>APPROVE</span>
-              </label>
-            </div>
-          </div>
+            <div class="bap-divider" />
 
-          <div class="bap-divider" />
-
-          <!-- ── Body: 4 textarea dalam 2 kolom ── -->
-          <div class="bap-textarea-grid">
-            <div class="bap-textarea-col">
+            <!-- ── TEXTAREA 2x2 ── -->
+            <div class="bap-textarea-grid">
               <div class="bap-ta-item">
                 <label class="bap-ta-label"
                   >Permasalahan <span class="req">*</span></label
                 >
-                <v-textarea
+                <textarea
                   v-model="formData.Masalah"
-                  variant="outlined"
-                  density="compact"
-                  rows="5"
-                  hide-details="auto"
-                  bg-color="white"
                   class="bap-ta"
-                  :rules="[(v) => !!v || 'Wajib diisi']"
+                  rows="5"
+                  :class="{ 'ta-error': !formData.Masalah }"
                 />
+              </div>
+              <div class="bap-ta-item">
+                <label class="bap-ta-label">Solusi</label>
+                <textarea v-model="formData.Solusi" class="bap-ta" rows="5" />
               </div>
               <div class="bap-ta-item">
                 <label class="bap-ta-label">Sumber Masalah</label>
-                <v-textarea
+                <textarea
                   v-model="formData.SumberMasalah"
-                  variant="outlined"
-                  density="compact"
-                  rows="5"
-                  hide-details
-                  bg-color="white"
                   class="bap-ta"
-                />
-              </div>
-            </div>
-            <div class="bap-textarea-col">
-              <div class="bap-ta-item">
-                <label class="bap-ta-label">Solusi</label>
-                <v-textarea
-                  v-model="formData.Solusi"
-                  variant="outlined"
-                  density="compact"
                   rows="5"
-                  hide-details
-                  bg-color="white"
-                  class="bap-ta"
                 />
               </div>
               <div class="bap-ta-item">
                 <label class="bap-ta-label">Pertanggungjawaban</label>
-                <v-textarea
+                <textarea
                   v-model="formData.Pertanggungjawaban"
-                  variant="outlined"
-                  density="compact"
-                  rows="5"
-                  hide-details
-                  bg-color="white"
                   class="bap-ta"
+                  rows="5"
+                />
+              </div>
+            </div>
+
+            <div class="bap-divider" />
+
+            <!-- ── FOOTER: SPK + angka ── -->
+            <div class="bap-footer-grid">
+              <div class="f-row">
+                <label class="f-lbl">SPK</label>
+                <input
+                  :value="formData.SPK"
+                  readonly
+                  class="f-inp ro cur-ptr"
+                  style="width: 140px"
+                  @click="showSpkModal = true"
+                  placeholder="Klik..."
+                />
+                <input
+                  :value="formData.SpkNama"
+                  readonly
+                  class="f-inp ro ml-1"
+                  style="flex: 1"
+                />
+              </div>
+              <div class="f-row">
+                <label class="f-lbl">Jumlah SPK</label>
+                <input
+                  v-model.number="formData.Jumlah"
+                  type="number"
+                  class="f-inp tr"
+                  style="width: 90px"
+                  v-select-on-focus
+                />
+                <label class="f-lbl ml-2">Harga</label>
+                <input
+                  v-model.number="formData.Harga"
+                  type="number"
+                  class="f-inp tr"
+                  style="width: 130px"
+                  v-select-on-focus
+                />
+                <label class="f-lbl ml-2">Total</label>
+                <input
+                  :value="formatCurrency(totalHarga)"
+                  readonly
+                  class="f-inp ro tr fw"
+                  style="width: 150px"
                 />
               </div>
             </div>
           </div>
-
-          <div class="bap-divider" />
-
-          <!-- ── Footer: SPK + Jumlah + Harga + Total ── -->
-          <div class="bap-footer-grid">
-            <!-- SPK -->
-            <div class="f-row">
-              <label class="f-lbl">SPK</label>
-              <v-text-field
-                v-model="formData.SPK"
-                variant="outlined"
-                density="compact"
-                readonly
-                bg-color="blue-lighten-5"
-                hide-details
-                class="f-inp cursor-pointer"
-                style="max-width: 150px"
-                @click="showSpkModal = true"
-              />
-              <v-text-field
-                v-model="formData.SpkNama"
-                variant="outlined"
-                density="compact"
-                readonly
-                bg-color="grey-lighten-4"
-                hide-details
-                class="f-inp"
-                style="max-width: 300px"
-              />
-            </div>
-
-            <!-- Jumlah + Harga + Total dalam satu baris -->
-            <div class="f-row">
-              <label class="f-lbl">Jumlah SPK</label>
-              <v-text-field
-                v-model.number="formData.Jumlah"
-                type="number"
-                variant="outlined"
-                density="compact"
-                hide-details
-                bg-color="white"
-                class="f-inp"
-                style="max-width: 90px"
-                v-select-on-focus
-              />
-              <label
-                class="f-lbl"
-                style="margin-left: 8px; text-align: left; width: 50px"
-                >Harga</label
-              >
-              <v-text-field
-                v-model.number="formData.Harga"
-                type="number"
-                variant="outlined"
-                density="compact"
-                bg-color="grey-lighten-4"
-                hide-details
-                class="f-inp"
-                style="max-width: 130px"
-                v-select-on-focus
-              />
-              <label
-                class="f-lbl"
-                style="margin-left: 8px; text-align: left; width: 40px"
-                >Total</label
-              >
-              <v-text-field
-                :model-value="formatCurrency(totalHarga)"
-                variant="outlined"
-                density="compact"
-                readonly
-                bg-color="grey-lighten-4"
-                hide-details
-                class="f-inp font-weight-bold"
-                style="max-width: 140px"
-              />
-            </div>
-          </div>
-        </div>
-      </v-form>
+        </v-form>
+      </div>
     </template>
   </BaseForm>
 
@@ -505,25 +502,31 @@ const handlePreSave = async () => {
     v-model="showSpkModal"
     @selected="handleSpkSelected"
   />
+  <KaryawanSearchModal v-model="showKaryawanModal" @selected="addKaryawan" />
 </template>
 
 <style scoped>
-/* ── Wrapper section ── */
 .bap-section {
   background: white;
   border: 1px solid #e0e0e0;
   border-radius: 4px;
   padding: 12px 14px;
-  font-size: 12px;
+  font-size: 11px;
   font-family: "Segoe UI", system-ui, sans-serif;
 }
 
-/* ── Alert status ── */
+.bap-scroll-wrap {
+  height: 100%;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+/* ── Alert ── */
 .bap-alert-wrap {
   margin-bottom: 8px;
 }
 .bap-alert {
-  padding: 6px 12px;
+  padding: 5px 10px;
   border-radius: 4px;
   font-size: 11px;
   font-weight: 600;
@@ -550,29 +553,124 @@ const handlePreSave = async () => {
   border: 1px solid #ffe082;
 }
 
-/* ── Header grid: fields kiri + approve kanan ── */
-.bap-header-grid {
+/* ── Top split ── */
+.bap-top {
   display: flex;
-  align-items: flex-start;
   gap: 16px;
+  align-items: flex-start;
 }
+
+/* ── Left fields ── */
 .bap-fields {
   flex: 1;
-  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 5px;
+  min-width: 0;
 }
-.bap-approve-box {
+.f-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 26px;
+}
+.f-lbl {
+  width: 72px;
   flex-shrink: 0;
-  padding-top: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #555;
+  text-align: right;
+  white-space: nowrap;
+}
+.ml-1 {
+  margin-left: 4px;
+}
+.ml-2 {
+  margin-left: 8px;
+}
+
+/* ── Inputs ── */
+.f-inp {
+  height: 26px;
+  border: 1px solid #a0a0a0;
+  padding: 0 6px;
+  font-size: 11px;
+  font-family: inherit;
+  outline: none;
+  border-radius: 2px;
+  background: white;
+  color: #212121;
+  min-width: 0;
+  box-sizing: border-box;
+}
+.f-inp:focus {
+  border-color: #1565c0;
+}
+.f-inp.ro {
+  background: #dde8f0 !important;
+  color: #444 !important;
+}
+.f-inp.tr {
+  text-align: right;
+}
+.f-inp.fw {
+  font-weight: 700;
+}
+.idate {
+  height: 26px;
+}
+.isel {
+  height: 26px;
+  cursor: pointer;
+}
+.cur-ptr {
+  cursor: pointer;
+}
+
+/* ── Kategori chips ── */
+.f-multi-check {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.kat-chip {
+  padding: 2px 10px;
+  border-radius: 12px;
+  border: 1px solid #bdbdbd;
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  color: #555;
+  background: #f5f5f5;
+  user-select: none;
+  transition: all 0.12s;
+  white-space: nowrap;
+}
+.kat-chip.active {
+  background: #1565c0;
+  color: white;
+  border-color: #1565c0;
+}
+.kat-chip:hover:not(.active) {
+  background: #e3f2fd;
+  border-color: #90caf9;
+}
+
+/* ── Right panel: Approve + Karyawan ── */
+.bap-right-panel {
+  flex-shrink: 0;
+  width: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 .approve-label {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 4px;
-  padding: 10px 16px;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 12px;
   border: 2px solid #e0e0e0;
   border-radius: 6px;
   cursor: pointer;
@@ -583,8 +681,8 @@ const handlePreSave = async () => {
   transition: all 0.15s;
 }
 .approve-label input[type="checkbox"] {
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
   accent-color: #2e7d32;
   cursor: pointer;
 }
@@ -594,77 +692,102 @@ const handlePreSave = async () => {
   color: #2e7d32;
 }
 
-/* ── Field row (label + input) ── */
-.f-row {
+/* ── Karyawan panel ── */
+.kar-panel {
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  overflow: hidden;
+  flex: 1;
+}
+.kar-panel-header {
   display: flex;
   align-items: center;
-  gap: 6px;
+  justify-content: space-between;
+  background: #f5f5f5;
+  padding: 4px 8px;
+  border-bottom: 1px solid #e0e0e0;
 }
-.f-lbl {
-  width: 88px;
-  flex-shrink: 0;
-  font-size: 11px;
-  font-weight: 600;
+.kar-panel-title {
+  font-size: 10px;
+  font-weight: 700;
   color: #555;
-  text-align: right;
+  text-transform: uppercase;
+}
+.btn-add-kar {
+  height: 20px;
+  padding: 0 7px;
+  background: #e3f2fd;
+  border: 1px solid #90caf9;
+  color: #1565c0;
+  font-size: 10px;
+  font-weight: 600;
+  border-radius: 2px;
+  cursor: pointer;
+}
+.btn-add-kar:hover {
+  background: #bbdefb;
+}
+.kar-empty {
+  font-size: 10px;
+  color: #9e9e9e;
+  font-style: italic;
+  padding: 8px;
+  text-align: center;
+}
+.kar-list {
+  max-height: 160px;
+  overflow-y: auto;
+}
+.kar-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 6px;
+  border-bottom: 1px solid #f0f0f0;
+  font-size: 10px;
+}
+.kar-item:last-child {
+  border-bottom: none;
+}
+.kar-nik {
+  font-family: monospace;
+  font-weight: 700;
+  color: #1565c0;
+  width: 80px;
+  flex-shrink: 0;
+  font-size: 10px;
+}
+.kar-nama {
+  flex: 1;
+  color: #212121;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
-.f-inp {
-  min-width: 0;
+.btn-del-kar {
+  background: transparent;
+  border: none;
+  color: #d32f2f;
+  cursor: pointer;
+  font-size: 11px;
+  padding: 0 3px;
+  flex-shrink: 0;
+}
+.btn-del-kar:hover {
+  color: #b71c1c;
 }
 
-/* Vuetify field compact */
-.f-inp :deep(.v-field),
-.bap-ta :deep(.v-field) {
-  font-size: 12px;
-}
-.f-inp :deep(.v-field) {
-  min-height: 30px;
-  height: 30px;
-}
-.f-inp :deep(.v-field__input) {
-  min-height: 30px;
-  padding-top: 0;
-  padding-bottom: 0;
-  font-size: 12px;
-}
-.f-inp :deep(.v-input__control) {
-  min-height: 30px;
-}
-
-/* Date input native */
-.bap-date-input {
-  height: 30px;
-  border: 1px solid #bdbdbd;
-  border-radius: 4px;
-  padding: 0 8px;
-  font-size: 12px;
-  outline: none;
-  background: white;
-  color: #212121;
-}
-.bap-date-input:focus {
-  border-color: #1976d2;
-}
-
-/* Radio */
+/* ── Radio ── */
 .radio-label {
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 12px;
+  font-size: 11px;
   cursor: pointer;
   white-space: nowrap;
 }
 .radio-label input[type="radio"] {
   accent-color: #1565c0;
-  cursor: pointer;
-}
-
-.req {
-  color: #e53935;
-}
-.cursor-pointer {
   cursor: pointer;
 }
 
@@ -675,15 +798,10 @@ const handlePreSave = async () => {
   margin: 10px 0;
 }
 
-/* ── Textarea 2 kolom ── */
+/* ── Textarea 2x2 ── */
 .bap-textarea-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
-}
-.bap-textarea-col {
-  display: flex;
-  flex-direction: column;
   gap: 10px;
 }
 .bap-ta-item {
@@ -696,23 +814,32 @@ const handlePreSave = async () => {
   font-weight: 600;
   color: #555;
 }
-.bap-ta :deep(.v-field__input) {
-  font-size: 12px;
-  padding-top: 6px;
+.req {
+  color: #e53935;
+}
+.bap-ta {
+  width: 100%;
+  border: 1px solid #a0a0a0;
+  border-radius: 2px;
+  padding: 5px 7px;
+  font-size: 11px;
+  font-family: inherit;
+  outline: none;
+  resize: vertical;
+  box-sizing: border-box;
+  color: #212121;
+}
+.bap-ta:focus {
+  border-color: #1565c0;
+}
+.ta-error {
+  border-color: #e53935 !important;
 }
 
-/* ── Footer SPK + angka ── */
+/* ── Footer ── */
 .bap-footer-grid {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-}
-
-/* ── Nomor hint ── */
-.nomor-hint {
-  font-size: 10px;
-  color: #e53935;
-  font-weight: 700;
-  white-space: nowrap;
+  gap: 5px;
 }
 </style>

@@ -1,11 +1,7 @@
 <script setup lang="ts">
 import { ref, watch, computed } from "vue";
 import api from "@/services/api";
-import {
-  IconClipboardText,
-  IconSearch,
-  IconDatabaseOff,
-} from "@tabler/icons-vue";
+import { IconUsers, IconSearch, IconDatabaseOff } from "@tabler/icons-vue";
 
 const props = defineProps<{ modelValue: boolean }>();
 const emit = defineEmits(["update:modelValue", "selected"]);
@@ -13,11 +9,10 @@ const emit = defineEmits(["update:modelValue", "selected"]);
 const search = ref("");
 const items = ref<any[]>([]);
 const isLoading = ref(false);
-
-// Pagination
 const currentPage = ref(1);
 const perPage = ref(50);
 const totalItems = ref(0);
+
 const totalPages = computed(() =>
   Math.max(1, Math.ceil(totalItems.value / perPage.value)),
 );
@@ -27,7 +22,6 @@ const pageStart = computed(() =>
 const pageEnd = computed(() =>
   Math.min(currentPage.value * perPage.value, totalItems.value),
 );
-
 const visiblePages = computed(() => {
   const total = totalPages.value,
     cur = currentPage.value;
@@ -38,12 +32,12 @@ const visiblePages = computed(() => {
   return Array.from({ length: end - start + 1 }, (_, i) => start + i);
 });
 
-let debounce: ReturnType<typeof setTimeout> | null = null;
+let timer: ReturnType<typeof setTimeout> | null = null;
 
 const fetchData = async () => {
   isLoading.value = true;
   try {
-    const res = await api.get("/lookups/spk-produksi", {
+    const res = await api.get("/lookups/karyawan", {
       params: {
         q: search.value,
         page: currentPage.value,
@@ -53,17 +47,16 @@ const fetchData = async () => {
     items.value = res.data.data.items;
     totalItems.value = res.data.data.total;
   } catch (e) {
-    console.error("Gagal memuat SPK Produksi:", e);
+    console.error(e);
   } finally {
     isLoading.value = false;
   }
 };
 
-const onSearch = (val: string) => {
-  search.value = val;
+const onSearch = () => {
   currentPage.value = 1;
-  if (debounce) clearTimeout(debounce);
-  debounce = setTimeout(fetchData, 500);
+  if (timer) clearTimeout(timer);
+  timer = setTimeout(fetchData, 400);
 };
 
 const goToPage = (p: number) => {
@@ -73,8 +66,8 @@ const goToPage = (p: number) => {
 
 watch(
   () => props.modelValue,
-  (isOpen) => {
-    if (isOpen) {
+  (v) => {
+    if (v) {
       search.value = "";
       currentPage.value = 1;
       fetchData();
@@ -82,7 +75,7 @@ watch(
   },
 );
 
-const selectItem = (item: any) => {
+const select = (item: any) => {
   emit("selected", item);
   emit("update:modelValue", false);
 };
@@ -92,44 +85,47 @@ const selectItem = (item: any) => {
   <v-dialog
     :model-value="modelValue"
     @update:model-value="emit('update:modelValue', $event)"
-    max-width="820px"
+    max-width="520px"
   >
     <div class="lookup-card">
-      <!-- Header -->
       <div class="lookup-header">
-        <IconClipboardText :size="15" :stroke-width="1.7" color="white" />
-        <span>Cari SPK Produksi</span>
+        <IconUsers :size="15" color="white" />
+        <span>Cari Karyawan</span>
         <v-spacer />
         <button class="lookup-close" @click="emit('update:modelValue', false)">
           ✕
         </button>
       </div>
 
-      <!-- Search -->
-
       <div class="lookup-search">
-        <IconSearch :size="16" :stroke-width="1.7" color="#9e9e9e" />
+        <IconSearch :size="16" color="#9e9e9e" />
         <input
-          :value="search"
-          @input="onSearch(($event.target as HTMLInputElement).value)"
+          v-model="search"
+          @input="onSearch"
           type="text"
-          placeholder="Cari nomor SPK atau nama..."
+          placeholder="Cari NIK atau Nama..."
           class="search-input"
           autofocus
         />
-        <button v-if="search" class="search-clear" @click="onSearch('')">
+        <button
+          v-if="search"
+          class="search-clear"
+          @click="
+            search = '';
+            onSearch();
+          "
+        >
           ✕
         </button>
       </div>
 
-      <!-- Table -->
       <div class="lookup-table-wrap">
         <div v-if="isLoading" class="lookup-state">
           <v-progress-circular indeterminate color="primary" size="24" />
-          <span>Memuat data...</span>
+          <span>Memuat...</span>
         </div>
         <div v-else-if="items.length === 0" class="lookup-state">
-          <IconDatabaseOff :size="32" :stroke-width="1.3" color="#bdbdbd" />
+          <IconDatabaseOff :size="32" color="#bdbdbd" />
           <span>{{
             search ? `Tidak ada hasil untuk "${search}"` : "Tidak ada data"
           }}</span>
@@ -137,40 +133,28 @@ const selectItem = (item: any) => {
         <table v-else class="lookup-table">
           <thead>
             <tr>
-              <th style="width: 130px">NOMOR SPK</th>
-              <th>NAMA</th>
-              <th style="width: 80px; text-align: right">JUMLAH</th>
-              <th style="width: 90px">UKURAN</th>
-              <th style="width: 110px">KAIN</th>
-              <th style="width: 110px">FINISHING</th>
+              <th style="width: 130px">NIK</th>
+              <th>NAMA KARYAWAN</th>
             </tr>
           </thead>
           <tbody>
             <tr
               v-for="item in items"
-              :key="item.Nomor"
+              :key="item.Nik"
               class="lookup-row"
-              @click="selectItem(item)"
+              @click="select(item)"
             >
-              <td class="td-kode">{{ item.Nomor }}</td>
+              <td class="td-kode">{{ item.Nik }}</td>
               <td>{{ item.Nama }}</td>
-              <td style="text-align: right">
-                {{ Number(item.Jumlah || 0).toLocaleString("id-ID") }}
-              </td>
-              <td>{{ item.Ukuran }}</td>
-              <td>{{ item.Kain }}</td>
-              <td>{{ item.Finishing }}</td>
             </tr>
           </tbody>
         </table>
       </div>
 
-      <!-- Footer: pagination -->
       <div class="lookup-footer">
-        <span class="footer-count"
-          >{{ pageStart }}–{{ pageEnd }} dari {{ totalItems }} data</span
-        >
-
+        <span class="footer-count">
+          {{ pageStart }}–{{ pageEnd }} dari {{ totalItems }} karyawan
+        </span>
         <div class="page-controls">
           <button
             class="page-btn"
@@ -210,7 +194,6 @@ const selectItem = (item: any) => {
             »
           </button>
         </div>
-
         <select v-model="perPage" class="per-page-select" @change="goToPage(1)">
           <option v-for="n in [25, 50, 100]" :key="n" :value="n">
             {{ n }} / hal
@@ -240,22 +223,20 @@ const selectItem = (item: any) => {
   padding: 9px 14px;
   font-size: 13px;
   font-weight: 700;
-  letter-spacing: 0.03em;
-  flex-shrink: 0;
   gap: 6px;
+  flex-shrink: 0;
 }
 .lookup-close {
+  margin-left: auto;
   background: transparent;
   border: none;
   color: rgba(255, 255, 255, 0.8);
   font-size: 15px;
   cursor: pointer;
-  padding: 0 2px;
 }
 .lookup-close:hover {
   color: white;
 }
-
 .lookup-search {
   display: flex;
   align-items: center;
@@ -282,18 +263,12 @@ const selectItem = (item: any) => {
   color: #9e9e9e;
   font-size: 13px;
   cursor: pointer;
-  padding: 0;
 }
-.search-clear:hover {
-  color: #424242;
-}
-
 .lookup-table-wrap {
   flex: 1;
   overflow-y: auto;
-  overflow-x: auto;
   min-height: 200px;
-  max-height: 420px;
+  max-height: 380px;
 }
 .lookup-state {
   display: flex;
@@ -305,7 +280,6 @@ const selectItem = (item: any) => {
   color: #9e9e9e;
   font-size: 12px;
 }
-
 .lookup-table {
   width: 100%;
   border-collapse: collapse;
@@ -317,14 +291,12 @@ const selectItem = (item: any) => {
   background: #1565c0;
 }
 .lookup-table th {
-  padding: 7px 10px;
+  padding: 6px 10px;
   font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
   color: white;
   border: 1px solid #0d47a1;
-  border-bottom: none;
   text-align: left;
   white-space: nowrap;
 }
@@ -332,12 +304,10 @@ const selectItem = (item: any) => {
   padding: 5px 10px;
   font-size: 12px;
   border-bottom: 1px solid #f0f0f0;
-  color: #212121;
   white-space: nowrap;
 }
 .lookup-row {
   cursor: pointer;
-  transition: background 0.1s;
 }
 .lookup-row:hover td {
   background: #e3f2fd;
@@ -348,11 +318,9 @@ const selectItem = (item: any) => {
   font-weight: 600;
   color: #1565c0;
 }
-
 .lookup-footer {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   padding: 7px 12px;
   border-top: 1px solid #e0e0e0;
   background: #fafafa;
@@ -368,6 +336,7 @@ const selectItem = (item: any) => {
   display: flex;
   align-items: center;
   gap: 2px;
+  margin-left: 4px;
 }
 .page-btn {
   min-width: 28px;
@@ -379,7 +348,6 @@ const selectItem = (item: any) => {
   font-size: 12px;
   color: #424242;
   cursor: pointer;
-  transition: all 0.12s;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -409,5 +377,6 @@ const selectItem = (item: any) => {
   background: white;
   cursor: pointer;
   outline: none;
+  margin-left: auto;
 }
 </style>
