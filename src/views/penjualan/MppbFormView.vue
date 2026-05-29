@@ -2,6 +2,7 @@
 import { computed, ref, onMounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
+import { useAuthStore } from "@/stores/authStore";
 import { useForm } from "@/composables/useForm";
 import api from "@/services/api";
 import BaseForm from "@/components/BaseForm.vue";
@@ -19,6 +20,7 @@ import type { AxiosResponse } from "axios";
 const route = useRoute();
 const router = useRouter();
 const toast = useToast();
+const authStore = useAuthStore();
 
 const isEdit = computed(() => !!route.params.nomor);
 const nomorParam = computed(() => route.params.nomor as string);
@@ -31,14 +33,25 @@ const divisiOptions = ref<any[]>([]);
 
 const loadDivisi = async () => {
   try {
-    // Sesuaikan endpoint divisi yang biasa dipakai
     const res = await api.get("/lookups/divisi");
+    const bagian = (authStore.user?.bagian || "").toUpperCase();
+    const isMarketing = bagian === "MARKETING";
+
     divisiOptions.value = res.data.data
-      .filter((d: any) => d.kode !== 0) // Menghilangkan opsi "0 - ALL"
+      .filter((d: any) => {
+        if (d.kode === 0) return false; // hapus ALL
+        if (isMarketing && (d.kode === 3 || d.kode === 6)) return false; // hide kaosan & fit-u
+        return true;
+      })
       .map((d: any) => ({
         value: String(d.kode),
         title: `${d.kode} - ${d.nama}`,
       }));
+
+    // Auto-set default ke divisi pertama yang tersedia jika mode create
+    if (!isEdit.value && divisiOptions.value.length > 0) {
+      formData.value.divisi = divisiOptions.value[0].value;
+    }
   } catch {
     console.error("Gagal memuat divisi");
   }

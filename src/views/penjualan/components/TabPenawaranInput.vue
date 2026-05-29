@@ -27,34 +27,52 @@ const toast = useToast();
 // ── State untuk Preview Gambar ──
 const showPreviewDialog = ref(false);
 const previewImageUrl = ref("");
+const previewImageUrlFallback = ref("");
+
+const VPS_BASE = "http://103.94.238.252:8888/file-gambar";
+
+const getBaseUrl = () =>
+  import.meta.env.VITE_API_BASE_URL?.replace(/\/api\/?$/, "") ||
+  api.defaults.baseURL?.replace(/\/api\/?$/, "") ||
+  `${window.location.protocol}//${window.location.hostname}:3088`;
 
 const previewGambar = (row: any) => {
   const identifier = row.NoPermintaan || row.Gambar;
-
   if (!identifier) {
     toast.warning("Tidak ada data Nomor Permintaan atau Gambar.");
     return;
   }
 
   let cleanName = identifier;
-
-  // 1. CARI POLA MH: Cari teks dengan format MH.YYYY.XXXX (contoh: MH.2026.1726)
   const matchMH = cleanName.match(/(MH\.\d{4}\.\d+)/i);
 
   if (matchMH) {
-    // Jika ketemu, langsung ambil nama bersihnya. Dijamin 100% cuma "MH.xxxx.xxxx"
     cleanName = matchMH[1];
+    // Coba lokal dulu
+    previewImageUrl.value = `${getBaseUrl()}/images/mintaharga/${cleanName}.jpg`;
+    // Siapkan fallback VPS
+    previewImageUrlFallback.value = `${VPS_BASE}/mintaharga/${cleanName}.jpg`;
   } else {
-    // 2. FALLBACK JIKA BUKAN MH: Pembersihan sapu jagat untuk file upload manual
-    cleanName = cleanName.replace(/.*imagemintaharga/i, ""); // Hapus IP & folder
-    cleanName = cleanName.replace(/.*Downloads/i, ""); // Hapus folder Windows
+    cleanName = cleanName.replace(/.*imagemintaharga/i, "");
+    cleanName = cleanName.replace(/.*Downloads/i, "");
     cleanName = cleanName.replace(/\\/g, "/").split("/").pop() || "";
     cleanName = cleanName.replace(/\.(jpe?g|png)$/i, "");
+    // Upload manual — langsung ke VPS
+    previewImageUrl.value = `${VPS_BASE}/mintaharga/${cleanName}.jpg`;
+    previewImageUrlFallback.value = "";
   }
 
-  // 3. Paksa URL mengarah ke folder mintaharga
-  previewImageUrl.value = `http://103.94.238.252:8888/file-gambar/mintaharga/${cleanName}.jpg`;
   showPreviewDialog.value = true;
+};
+
+// Handler error gambar di preview — fallback ke VPS
+const onPreviewImgError = (e: Event) => {
+  const el = e.target as HTMLImageElement;
+  if (!el.src.includes("8888")) {
+    // Ekstrak nama file dari URL lokal
+    const fileName = el.src.split("/").pop() || "";
+    el.src = `${VPS_BASE}/mintaharga/${fileName}`;
+  }
 };
 
 // ── Opsi Dropdown ──
@@ -63,6 +81,7 @@ const tipeOptions = ["Premium", "Medium"];
 const statusHargaOptions = [
   { value: 0, label: "Belum PPN" },
   { value: 1, label: "Sudah PPN" },
+  { value: 2, label: "Disembunyikan" },
 ];
 
 const loadDivisi = async () => {
@@ -239,6 +258,28 @@ const openRekening = () => {
 const handlePerushSelected = (item: any) => {
   props.formData.PerushKode = item.perush_kode || item.Kode;
   props.formData.NamaPerusahaan = item.perush_nama || item.Nama;
+
+  // Auto-fill TTD dari data perusahaan (sudah di-join saat load)
+  if (item.ttd_nama) {
+    props.formData.TtdNama = item.ttd_nama;
+    props.formData.TtdJabatan = item.ttd_jabatan || "";
+  } else {
+    // Fallback: fetch terpisah jika belum ada
+    loadDigitalSign(props.formData.PerushKode);
+  }
+};
+
+const loadDigitalSign = async (kode: string) => {
+  if (!kode) return;
+  try {
+    const res = await api.get(`/lookups/digital-sign/${kode}`);
+    if (res.data.data) {
+      props.formData.TtdNama = res.data.data.nama || "";
+      props.formData.TtdJabatan = res.data.data.jabatan || "";
+    }
+  } catch {
+    // Tidak ada data = biarkan kosong
+  }
 };
 const handleCustSelected = (item: any) => {
   props.formData.CustKode = item.Kode || item.cus_kode;
@@ -963,20 +1004,23 @@ watch(
             <div
               class="d-flex flex-column align-center justify-center fill-height"
             >
-              <v-progress-circular
-                indeterminate
-                color="primary"
-                size="40"
-              ></v-progress-circular>
+              <v-progress-circular indeterminate color="primary" size="40" />
             </div>
           </template>
           <template v-slot:error>
             <div
               class="d-flex flex-column align-center justify-center fill-height text-grey"
             >
-              <IconPhotoOff :size="48" color="#bdbdbd" />
-              <div class="text-subtitle-2 mt-2">Gagal memuat gambar</div>
-              <div class="text-caption mt-1">{{ previewImageUrl }}</div>
+              <!-- Auto-retry ke VPS jika lokal gagal -->
+              <img
+                :src="previewImageUrlFallback"
+                style="max-width: 100%; max-height: 560px; object-fit: contain"
+                @error="previewImageUrlFallback = ''"
+              />
+              <template v-if="!previewImageUrlFallback">
+                <IconPhotoOff :size="48" color="#bdbdbd" />
+                <div class="text-subtitle-2 mt-2">Gagal memuat gambar</div>
+              </template>
             </div>
           </template>
         </v-img>

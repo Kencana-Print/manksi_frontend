@@ -140,12 +140,50 @@ const internalSelected = computed({
 });
 const isSingleSelected = computed(() => internalSelected.value.length === 1);
 
+// ── Column Order (Drag & Drop) ──────────────────────────────────────
+const colOrderKey = computed(() => `browse_colorder_${props.menuId}`);
+
+const loadColOrder = (): string[] => {
+  try {
+    const raw = localStorage.getItem(colOrderKey.value);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+};
+
+const saveColOrder = (order: string[]) => {
+  try {
+    localStorage.setItem(colOrderKey.value, JSON.stringify(order));
+  } catch {}
+};
+
+const colOrder = ref<string[]>(loadColOrder());
+
+const orderedHeaders = computed(() => {
+  if (colOrder.value.length === 0) return props.headers;
+  const map = new Map(props.headers.map((h: any) => [h.key, h]));
+  const ordered: any[] = [];
+  for (const key of colOrder.value) {
+    if (map.has(key)) ordered.push(map.get(key));
+  }
+  for (const h of props.headers) {
+    if (!colOrder.value.includes(h.key)) ordered.push(h);
+  }
+  return ordered;
+});
+
+const resetColOrder = () => {
+  colOrder.value = [];
+  localStorage.removeItem(colOrderKey.value);
+};
+
 // ── Headers ────────────────────────────────────────────────────────────
 const finalHeaders = computed(() => {
-  if (!props.showExpand) return props.headers;
+  if (!props.showExpand) return orderedHeaders.value;
   return [
     { title: "", key: "data-table-expand", width: "48px", sortable: false },
-    ...props.headers,
+    ...orderedHeaders.value,
   ];
 });
 
@@ -500,6 +538,106 @@ const clearSelection = () => {
 };
 defineExpose({ clearSelection, search });
 
+// ── Column Drag (Pointer-based, bukan HTML5 drag) ────────────────────
+const dragSrcKey = ref<string | null>(null);
+const dragOverKey = ref<string | null>(null);
+const isDragging = ref(false);
+
+// Pointer drag state
+let pointerDragKey: string | null = null;
+let autoScrollTimer: number | null = null;
+
+const onColPointerDown = (key: string, e: PointerEvent) => {
+  if (key === "data-table-expand") return;
+  // Hanya dari drag handle (class col-drag-handle)
+  const target = e.target as HTMLElement;
+  if (!target.classList.contains("col-drag-handle")) return;
+
+  pointerDragKey = key;
+  dragSrcKey.value = key;
+  isDragging.value = true;
+
+  // Capture pointer agar tetap track meski keluar elemen
+  (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+};
+
+const onColPointerMove = (e: PointerEvent) => {
+  if (!isDragging.value || !pointerDragKey) return;
+
+  // Cari th di bawah pointer
+  const els = document.elementsFromPoint(e.clientX, e.clientY);
+  const th = els.find(
+    (el) => el.tagName === "TH" && el.hasAttribute("data-col-key"),
+  ) as HTMLElement | undefined;
+
+  if (th) {
+    const key = th.getAttribute("data-col-key");
+    if (key && key !== pointerDragKey) {
+      dragOverKey.value = key;
+    }
+  }
+
+  // Auto-scroll horizontal saat pointer mendekati tepi tabel
+  const wrapper = tableWrapRef.value?.querySelector(
+    ".v-table__wrapper",
+  ) as HTMLElement | null;
+  if (!wrapper) return;
+
+  const rect = wrapper.getBoundingClientRect();
+  const EDGE = 80; // px dari tepi mulai scroll
+  const SPEED = 12;
+
+  if (autoScrollTimer) {
+    clearInterval(autoScrollTimer);
+    autoScrollTimer = null;
+  }
+
+  if (e.clientX < rect.left + EDGE) {
+    autoScrollTimer = window.setInterval(() => {
+      wrapper.scrollLeft -= SPEED;
+    }, 16);
+  } else if (e.clientX > rect.right - EDGE) {
+    autoScrollTimer = window.setInterval(() => {
+      wrapper.scrollLeft += SPEED;
+    }, 16);
+  }
+};
+
+const onColPointerUp = () => {
+  if (!isDragging.value) return;
+
+  if (autoScrollTimer) {
+    clearInterval(autoScrollTimer);
+    autoScrollTimer = null;
+  }
+
+  if (
+    pointerDragKey &&
+    dragOverKey.value &&
+    pointerDragKey !== dragOverKey.value
+  ) {
+    const currentOrder = orderedHeaders.value
+      .map((h) => h.key)
+      .filter((k) => k && k !== "data-table-expand");
+
+    const srcIdx = currentOrder.indexOf(pointerDragKey);
+    const tgtIdx = currentOrder.indexOf(dragOverKey.value);
+
+    if (srcIdx !== -1 && tgtIdx !== -1) {
+      const newOrder = [...currentOrder];
+      newOrder.splice(srcIdx, 1);
+      newOrder.splice(tgtIdx, 0, pointerDragKey);
+      colOrder.value = newOrder;
+      saveColOrder(newOrder);
+    }
+  }
+
+  pointerDragKey = null;
+  dragSrcKey.value = null;
+  dragOverKey.value = null;
+  isDragging.value = false;
+};
+
 watch(
   () => filteredItems.value.length,
   () => {
@@ -607,6 +745,18 @@ watch(
           /></template>
           Reset Filter ({{ activeFilterCount }})
         </v-btn>
+
+        <v-btn
+          v-if="colOrder.length > 0"
+          size="small"
+          color="blue-grey"
+          variant="tonal"
+          @click="resetColOrder"
+          title="Reset urutan kolom ke default"
+        >
+          <template #prepend><IconAdjustmentsHorizontal :size="15" /></template>
+          Reset Kolom
+        </v-btn>
         <v-spacer />
         <slot name="filter-right" />
       </div>
@@ -648,10 +798,33 @@ watch(
                   :key="String(col.key ?? col.title ?? '')"
                 >
                   <th
+                    :data-col-key="col.key"
                     :style="colStyle(col)"
-                    :class="['base-th', col.align ? `text-${col.align}` : '']"
+                    :class="[
+                      'base-th',
+                      col.align ? `text-${col.align}` : '',
+                      dragOverKey === col.key && dragSrcKey !== col.key
+                        ? 'col-drag-over'
+                        : '',
+                      dragSrcKey === col.key ? 'col-dragging' : '',
+                    ]"
+                    @pointerdown="
+                      col.key &&
+                      col.key !== 'data-table-expand' &&
+                      onColPointerDown(col.key, $event)
+                    "
+                    @pointermove="onColPointerMove($event)"
+                    @pointerup="onColPointerUp"
+                    @pointercancel="onColPointerUp"
                   >
                     <div class="th-inner">
+                      <!-- Drag handle icon -->
+                      <span
+                        v-if="col.key && col.key !== 'data-table-expand'"
+                        class="col-drag-handle"
+                        title="Drag untuk pindah kolom"
+                        >⠿</span
+                      >
                       <span
                         class="th-title"
                         :class="{ sortable: col.sortable !== false }"
@@ -676,7 +849,6 @@ watch(
                         class="col-filter-btn"
                         :class="{ active: colHasFilter(col.key) }"
                         @click.stop="openColFilter(col.key, $event)"
-                        :title="`Filter ${col.title}`"
                       >
                         <IconFilter
                           v-if="colHasFilter(col.key)"
@@ -690,7 +862,6 @@ watch(
                         />
                       </button>
                     </div>
-                    <!-- Resize handle — strip vertikal di tepi kanan th -->
                     <div
                       v-if="col.key && col.key !== 'data-table-expand'"
                       class="col-resize-handle"
@@ -1650,5 +1821,26 @@ watch(
 
 .bg-error-lighten-5 {
   background-color: #ffebee;
+}
+
+.col-dragging {
+  opacity: 0.5;
+  background-color: #0a3d91 !important;
+}
+.col-drag-over {
+  background-color: #0d47a1 !important;
+  box-shadow: inset 3px 0 0 #ffd54f;
+}
+.col-drag-handle {
+  cursor: grab;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 14px;
+  flex-shrink: 0;
+  margin-right: 3px;
+  user-select: none;
+  touch-action: none; /* penting untuk pointer events */
+}
+.col-drag-handle:active {
+  cursor: grabbing;
 }
 </style>

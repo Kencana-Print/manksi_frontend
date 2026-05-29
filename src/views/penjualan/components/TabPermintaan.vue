@@ -2,6 +2,7 @@
 import { ref, watch, onMounted, computed } from "vue";
 import api from "@/services/api";
 import { useToast } from "vue-toastification";
+import { useAuthStore } from "@/stores/authStore";
 import CustomerSearchModal from "@/components/lookups/CustomerSearchModal.vue";
 import SalesSearchModal from "@/components/lookups/SalesSearchModal.vue";
 import {
@@ -17,6 +18,7 @@ import {
 
 const props = defineProps<{ formData: any; isEdit: boolean }>();
 const toast = useToast();
+const authStore = useAuthStore();
 const emit = defineEmits(["image-selected"]);
 
 const showCustModal = ref(false);
@@ -89,10 +91,18 @@ watch(
 const loadDivisi = async () => {
   try {
     const res = await api.get("/penjualan/minta-harga/divisi");
-    divisiOptions.value = res.data.data.map((d: any) => ({
-      value: String(d.Kode),
-      title: `${d.Kode} - ${d.Nama}`,
-    }));
+    const bagian = (authStore.user?.bagian || "").toUpperCase();
+    const isMarketing = bagian === "MARKETING";
+
+    divisiOptions.value = res.data.data
+      .filter((d: any) => {
+        if (isMarketing && (d.Kode === 3 || d.Kode === 6)) return false;
+        return true;
+      })
+      .map((d: any) => ({
+        value: String(d.Kode),
+        title: `${d.Kode} - ${d.Nama}`,
+      }));
   } catch {
     console.error("Gagal load divisi");
   }
