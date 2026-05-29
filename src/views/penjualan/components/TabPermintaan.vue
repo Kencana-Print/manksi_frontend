@@ -136,6 +136,35 @@ const onCustKodeEnter = async () => {
   }
 };
 
+const onSalesKodeEnter = async () => {
+  if (isOpeningModal.value) return;
+  const kode = props.formData.SalesKode?.trim();
+  if (!kode) {
+    props.formData.SalesNama = "";
+    return;
+  }
+  try {
+    const res = await api.get("/lookups/sales", {
+      params: { q: kode, limit: 1 },
+    });
+    const items = res.data.data.items || res.data.data || [];
+    const exact = items.find(
+      (s: any) =>
+        (s.sal_kode || s.Kode || "").toUpperCase() === kode.toUpperCase(),
+    );
+    if (exact) {
+      props.formData.SalesKode = exact.sal_kode || exact.Kode;
+      props.formData.SalesNama = exact.sal_nama || exact.Nama;
+    } else {
+      toast.error("Kode sales tidak ditemukan.");
+      props.formData.SalesKode = "";
+      props.formData.SalesNama = "";
+    }
+  } catch {
+    toast.error("Gagal memvalidasi kode sales.");
+  }
+};
+
 const handleCustSelected = (item: any) => {
   const kode = item.cus_kode || item.Kode || item.kode;
   const nama = item.cus_nama || item.Nama || item.nama;
@@ -310,13 +339,19 @@ const onFileChange = (e: Event) => {
             <input
               v-model="formData.SalesKode"
               class="tp-inp-field"
-              readonly
               style="background: #ddeeff; font-weight: 600"
+              placeholder="Kode..."
+              @keydown.enter.prevent="onSalesKodeEnter"
+              @blur="onSalesKodeEnter"
             />
             <button
               type="button"
               class="tp-lkp-btn"
-              @mousedown.prevent="showSalesModal = true"
+              @mousedown.prevent="
+                isOpeningModal = true;
+                showSalesModal = true;
+              "
+              @click="isOpeningModal = false"
             >
               <IconSearch :size="13" />
             </button>
