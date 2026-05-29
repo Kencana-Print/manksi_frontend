@@ -204,24 +204,47 @@ onMounted(async () => {
   }
 });
 
+const VPS_BASE = "http://103.94.238.252:8888/file-gambar";
+
+const getLocalImgUrl = (nomor: string, tipe: "desain" | "dokumen") => {
+  const base = api.defaults.baseURL?.replace(/\/api\/?$/, "") || "";
+  return tipe === "desain"
+    ? `${base}/images/mppb/${encodeURIComponent(nomor)}.jpg`
+    : `${base}/images/mppb/${encodeURIComponent(nomor)}-doc.jpg`;
+};
+
 const displayImgDesain = computed(() => {
   if (formData.value.imgDesainLokal) return formData.value.imgDesainLokal;
-  // Saat edit, coba load — biarkan @error di template yang handle
-  if (isEdit.value && formData.value.nomor) {
-    const base = api.defaults.baseURL?.replace(/\/api\/?$/, "") || "";
-    return `${base}/images/mppb/${encodeURIComponent(formData.value.nomor)}.jpg`;
-  }
-  return ""; // Kosong = tampilkan empty state
+  if (isEdit.value && formData.value.nomor)
+    return getLocalImgUrl(formData.value.nomor, "desain");
+  return "";
 });
 
 const displayImgDokumen = computed(() => {
   if (formData.value.imgDokumenLokal) return formData.value.imgDokumenLokal;
-  if (isEdit.value && formData.value.nomor) {
-    const base = api.defaults.baseURL?.replace(/\/api\/?$/, "") || "";
-    return `${base}/images/mppb/${encodeURIComponent(formData.value.nomor)}-doc.jpg`;
-  }
+  if (isEdit.value && formData.value.nomor)
+    return getLocalImgUrl(formData.value.nomor, "dokumen");
   return "";
 });
+
+// Fallback ke VPS kalau lokal gagal
+const onDesainImgError = (e: Event) => {
+  const el = e.target as HTMLImageElement;
+  if (!el.src.includes("8888") && formData.value.nomor) {
+    el.src = `${VPS_BASE}/${encodeURIComponent(formData.value.nomor)}.jpg`;
+  } else {
+    desainError.value = true;
+  }
+};
+
+const onDokumenImgError = (e: Event) => {
+  const el = e.target as HTMLImageElement;
+  if (!el.src.includes("8888") && formData.value.nomor) {
+    el.src = `${VPS_BASE}/${encodeURIComponent(formData.value.nomor)}-doc.jpg`;
+  } else {
+    dokumenError.value = true;
+  }
+};
 
 const openPreview = (url: string) => {
   if (!url) return;
@@ -430,7 +453,7 @@ const formatWaktu = (dt: string) => {
               :src="displayImgDesain"
               class="tp-img"
               @click="openPreview(displayImgDesain)"
-              @error="desainError = true"
+              @error="onDesainImgError($event)"
             />
             <div v-else class="tp-img-empty">
               <IconPhotoOff :size="28" color="#90caf9" />
@@ -481,7 +504,7 @@ const formatWaktu = (dt: string) => {
               :src="displayImgDokumen"
               class="tp-img"
               @click="openPreview(displayImgDokumen)"
-              @error="dokumenError = true"
+              @error="onDokumenImgError($event)"
             />
             <div v-else class="tp-img-empty">
               <IconPhotoOff :size="24" color="#bdbdbd" />

@@ -106,7 +106,6 @@ const selectItem = (item: any) => {
       </div>
 
       <!-- Search -->
-
       <div class="lookup-search">
         <IconSearch :size="16" :stroke-width="1.7" color="#9e9e9e" />
         <input

@@ -48,12 +48,9 @@ const formatTgl = (val: string) => {
   return `${String(d.getDate()).padStart(2, "0")} ${m[d.getMonth()]} ${d.getFullYear()}`;
 };
 
-const getBaseUrl = () => api.defaults.baseURL?.replace(/\/api\/?$/, "") || "";
+const VPS_BASE = "http://103.94.238.252:8888/file-gambar";
 
-// Sembunyikan gambar jika gagal dimuat (misal gambar ttd tidak ada)
-const hideImg = (e: Event) => {
-  (e.target as HTMLImageElement).style.display = "none";
-};
+const getBaseUrl = () => api.defaults.baseURL?.replace(/\/api\/?$/, "") || "";
 
 const getDesainUrl = (nomor: string) => {
   if (!nomor) return "";
@@ -65,23 +62,23 @@ const getSignatureUrl = (kodeUser: string) => {
   return `${getBaseUrl()}/images/ttd/${encodeURIComponent(kodeUser.trim().toUpperCase())}.jpg`;
 };
 
-// Fallback ke VPS kalau gambar lokal tidak ada
-const onDesainError = (e: Event, nomor: string, idx: number) => {
+// Fallback lokal → VPS → sembunyikan
+const onDesainError = (e: Event, nomor: string) => {
   const el = e.target as HTMLImageElement;
-  if (el.src.includes("8888")) {
+  if (!el.src.includes("8888")) {
+    el.src = `${VPS_BASE}/${encodeURIComponent(nomor)}.jpg`;
+  } else {
     el.style.display = "none";
-    return;
   }
-  el.src = `http://103.94.238.252:8888/file-gambar/${encodeURIComponent(nomor)}.jpg`;
 };
 
 const onTtdError = (e: Event, kodeUser: string) => {
   const el = e.target as HTMLImageElement;
-  if (el.src.includes("8888")) {
+  if (!el.src.includes("8888")) {
+    el.src = `${VPS_BASE}/${encodeURIComponent(kodeUser.trim().toUpperCase())}.jpg`;
+  } else {
     el.style.opacity = "0";
-    return;
   }
-  el.src = `http://103.94.238.252:8888/file-gambar/${encodeURIComponent(kodeUser.trim().toUpperCase())}.jpg`;
 };
 
 onMounted(() => {
@@ -140,9 +137,9 @@ onMounted(() => {
           <div class="fw-bold mb-1">DESAIN :</div>
           <div class="img-wrap">
             <img
-              :src="getDesainUrl(header.mpb_nomor)"
-              @error="onDesainError($event, header.mpb_nomor, i)"
-              class="desain-img"
+              :src="getSignatureUrl(header.user_create)"
+              @error="onTtdError($event, header.user_create)"
+              class="sig-img"
             />
           </div>
         </div>
