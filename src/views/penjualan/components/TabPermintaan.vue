@@ -23,6 +23,7 @@ const showCustModal = ref(false);
 const showSalesModal = ref(false);
 const fileRef = ref<HTMLInputElement | null>(null);
 const uploadName = ref("");
+const isOpeningModal = ref(false);
 
 const imageError = ref(false);
 
@@ -40,12 +41,10 @@ const showPreviewDialog = ref(false);
 const displayImageUrl = computed(() => {
   if (imageError.value || !props.formData.PathImage) return "";
 
-  // 1. Prioritas Pertama: Preview lokal (Blob)
   if (props.formData.PathImage.startsWith("blob:")) {
     return props.formData.PathImage;
   }
 
-  // 2. Prioritas Kedua: Jika PathImage sudah berupa URL lengkap (Mencegah Double Base URL)
   if (
     props.formData.PathImage.startsWith("http://") ||
     props.formData.PathImage.startsWith("https://")
@@ -53,21 +52,16 @@ const displayImageUrl = computed(() => {
     return props.formData.PathImage;
   }
 
-  // 3. Prioritas Ketiga: Gambar dari backend lokal Web Node.js
   if (props.formData.PathImage) {
-    const baseURL = api.defaults.baseURL
-      ? api.defaults.baseURL.replace(/\/api\/?$/, "")
-      : "";
+    // Gunakan VITE_API_BASE_URL, bukan dari api.defaults.baseURL
+    const base =
+      import.meta.env.VITE_API_BASE_URL?.replace(/\/api\/?$/, "") ||
+      api.defaults.baseURL?.replace(/\/api\/?$/, "") ||
+      `${window.location.protocol}//${window.location.hostname}:3088`;
     const cleanPath = props.formData.PathImage.startsWith("/")
       ? props.formData.PathImage
       : `/${props.formData.PathImage}`;
-    return `${baseURL}${cleanPath}`;
-  }
-
-  // 4. Prioritas Keempat (Fallback): Gambar lama dari server Delphi VPS
-  if (props.isEdit && props.formData.Nomor) {
-    const nomorClean = encodeURIComponent(props.formData.Nomor);
-    return `http://103.94.238.252:8888/file-gambar/mintaharga/${nomorClean}.jpg`;
+    return `${base}${cleanPath}`;
   }
 
   return "";
@@ -104,6 +98,43 @@ const loadDivisi = async () => {
   }
 };
 onMounted(loadDivisi);
+
+const onCustKodeEnter = async () => {
+  if (isOpeningModal.value) return;
+
+  const kode = props.formData.CustKode?.trim();
+  if (!kode) {
+    props.formData.CustNama = "";
+    return;
+  }
+  try {
+    const res = await api.get("/lookups/customer", {
+      params: { q: kode, limit: 1 },
+    });
+    const items = res.data.data.items || res.data.data || [];
+    const exact = items.find(
+      (c: any) =>
+        (c.cus_kode || c.Kode || "").toUpperCase() === kode.toUpperCase(),
+    );
+    if (exact) {
+      const aktif = exact.cus_aktif ?? exact.Aktif ?? 0;
+      if (aktif === 1 || aktif === "1" || aktif === "N") {
+        toast.warning("Status Customer Pasif.");
+        props.formData.CustKode = "";
+        props.formData.CustNama = "";
+        return;
+      }
+      props.formData.CustKode = exact.cus_kode || exact.Kode;
+      props.formData.CustNama = exact.cus_nama || exact.Nama;
+    } else {
+      toast.error("Kode customer tidak ditemukan.");
+      props.formData.CustKode = "";
+      props.formData.CustNama = "";
+    }
+  } catch {
+    toast.error("Gagal memvalidasi kode customer.");
+  }
+};
 
 const handleCustSelected = (item: any) => {
   const kode = item.cus_kode || item.Kode || item.kode;
@@ -248,13 +279,19 @@ const onFileChange = (e: Event) => {
             <input
               v-model="formData.CustKode"
               class="tp-inp-field"
-              readonly
               style="background: #ddeeff; font-weight: 600"
+              placeholder="Kode..."
+              @keydown.enter.prevent="onCustKodeEnter"
+              @blur="onCustKodeEnter"
             />
             <button
               type="button"
               class="tp-lkp-btn"
-              @mousedown.prevent="showCustModal = true"
+              @mousedown.prevent="
+                isOpeningModal = true;
+                showCustModal = true;
+              "
+              @click="isOpeningModal = false"
             >
               <IconSearch :size="13" />
             </button>

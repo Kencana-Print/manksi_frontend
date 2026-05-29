@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import { useForm } from "@/composables/useForm";
 import api from "@/services/api";
 import { useToast } from "vue-toastification";
@@ -16,6 +17,7 @@ type RouteParams = {
 
 const selectedImageFile = ref<File | null>(null);
 const toast = useToast();
+const router = useRouter();
 
 const formatDateLocal = (value?: string | Date) => {
   if (!value) return "";
@@ -282,9 +284,7 @@ const {
         await api.post(
           `/penjualan/minta-harga-form/upload-image/${nomor}`,
           imgData,
-          {
-            headers: { "Content-Type": "multipart/form-data" },
-          },
+          { headers: { "Content-Type": "multipart/form-data" } },
         );
         toast.success("Data dan gambar berhasil disimpan!");
       } catch {
@@ -293,8 +293,9 @@ const {
     } else {
       toast.success("Data berhasil disimpan!");
     }
+    // ← tambah navigasi manual karena onSuccessRoute tidak jalan saat ada onSuccess
+    router.push("/penjualan/minta-harga");
   },
-  onSuccessRoute: "/penjualan/minta-harga",
 });
 
 onMounted(() => {
