@@ -435,18 +435,85 @@ const totalStatusGrid = computed(() => {
                 <td class="tr">{{ num(d.Qty) }}</td>
                 <td class="tr">{{ rp(d.Harga) }}</td>
                 <td class="tr fw">{{ rp(d.Nominal) }}</td>
+
                 <td class="td-inp">
-                  <select v-model="d.Status" class="cell-inp">
+                  <select
+                    v-model="d.Status"
+                    class="cell-inp"
+                    @change="
+                      if (d.Status === '' || d.Status === 'OPEN') {
+                        d.KetBatal = '';
+                      } else {
+                        d.KetConfirm = '';
+                      }
+                    "
+                  >
                     <option value="">OPEN</option>
                     <option value="BATAL">BATAL</option>
                     <option value="CLOSE">CLOSE</option>
                   </select>
                 </td>
+
                 <td class="td-inp">
-                  <input type="text" v-model="d.KetBatal" class="cell-inp" />
+                  <select
+                    v-model="d.KetBatal"
+                    class="cell-inp"
+                    :disabled="d.Status !== 'BATAL' && d.Status !== 'CLOSE'"
+                  >
+                    <option value=""></option>
+                    <option value="ALT QTY">ALT QTY</option>
+                    <option value="ALT UKURAN">ALT UKURAN</option>
+                    <option value="DIBAGI DENGAN VENDOR LAIN">
+                      DIBAGI DENGAN VENDOR LAIN
+                    </option>
+                    <option value="HANYA ALTERNATIF BAHAN">
+                      HANYA ALTERNATIF BAHAN
+                    </option>
+                    <option value="HANYA TANYA-TANYA">HANYA TANYA-TANYA</option>
+                    <option value="KALAH HARGA">KALAH HARGA</option>
+                    <option value="KALAH TENDER">KALAH TENDER</option>
+                    <option value="LAIN-LAIN">LAIN-LAIN</option>
+                    <option value="SAMPLE KALAH KUALITAS">
+                      SAMPLE KALAH KUALITAS
+                    </option>
+                    <option value="TIDAK JADI PRODUKSI DULU">
+                      TIDAK JADI PRODUKSI DULU
+                    </option>
+                    <option value="TUTUP BUKU">TUTUP BUKU</option>
+                    <option value="UPDATE PENAWARAN">UPDATE PENAWARAN</option>
+                    <option value="WAKTU PENGERJAAN LAMA">
+                      WAKTU PENGERJAAN LAMA
+                    </option>
+                  </select>
                 </td>
+
                 <td class="td-inp">
-                  <input type="text" v-model="d.KetConfirm" class="cell-inp" />
+                  <select
+                    v-model="d.KetConfirm"
+                    class="cell-inp"
+                    :disabled="d.Status === 'BATAL' || d.Status === 'CLOSE'"
+                  >
+                    <option value=""></option>
+                    <option value="MENUNGGU HASIL TENDER">
+                      MENUNGGU HASIL TENDER
+                    </option>
+                    <option value="MENUNGGU INFO">MENUNGGU INFO</option>
+                    <option value="NUNGGU DATA UKURAN">
+                      NUNGGU DATA UKURAN
+                    </option>
+                    <option value="NUNGGU FILE DESAIN">
+                      NUNGGU FILE DESAIN
+                    </option>
+                    <option value="NUNGGU MATCHING KAIN">
+                      NUNGGU MATCHING KAIN
+                    </option>
+                    <option value="NUNGGU PO">NUNGGU PO</option>
+                    <option value="PROJECT DIHOLD">PROJECT DIHOLD</option>
+                    <option value="SAMPEL BELUM JADI">SAMPEL BELUM JADI</option>
+                    <option value="TANYA ALTERNATIF BAHAN">
+                      TANYA ALTERNATIF BAHAN
+                    </option>
+                  </select>
                 </td>
               </tr>
               <tr class="total-row">
