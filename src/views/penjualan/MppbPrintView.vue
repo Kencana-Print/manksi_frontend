@@ -137,9 +137,9 @@ onMounted(() => {
           <div class="fw-bold mb-1">DESAIN :</div>
           <div class="img-wrap">
             <img
-              :src="getSignatureUrl(header.user_create)"
-              @error="onTtdError($event, header.user_create)"
-              class="sig-img"
+              :src="getDesainUrl(header.mpb_nomor)"
+              @error="onDesainError($event, header.mpb_nomor)"
+              class="desain-img"
             />
           </div>
         </div>

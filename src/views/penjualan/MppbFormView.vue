@@ -208,9 +208,12 @@ const VPS_BASE = "http://103.94.238.252:8888/file-gambar";
 
 const getLocalImgUrl = (nomor: string, tipe: "desain" | "dokumen") => {
   const base = api.defaults.baseURL?.replace(/\/api\/?$/, "") || "";
-  return tipe === "desain"
-    ? `${base}/images/mppb/${encodeURIComponent(nomor)}.jpg`
-    : `${base}/images/mppb/${encodeURIComponent(nomor)}-doc.jpg`;
+  const url =
+    tipe === "desain"
+      ? `${base}/images/mppb/${encodeURIComponent(nomor)}.jpg`
+      : `${base}/images/mppb/${encodeURIComponent(nomor)}-doc.jpg`;
+  console.log("Local img URL:", url); // ← hapus setelah debug
+  return url;
 };
 
 const displayImgDesain = computed(() => {
