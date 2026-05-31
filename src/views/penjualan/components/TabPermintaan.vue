@@ -206,21 +206,21 @@ const onFileChange = (e: Event) => {
 </script>
 
 <template>
-  <div class="tp-layout">
-    <div class="tp-wrapper">
-      <!-- Alert di luar flex row, di atas segalanya -->
-      <div v-if="formData.isTutupBuku" class="tp-alert-wrap">
-        <div class="tp-alert warning">
-          <IconLock :size="13" class="mr-1" />
-          Periode ini sudah ditutup. Anda tidak dapat mengubah data ini.
-        </div>
+  <div class="tp-wrapper">
+    <!-- Alert di atas -->
+    <div v-if="formData.isTutupBuku" class="tp-alert-wrap">
+      <div class="tp-alert warning">
+        <IconLock :size="13" class="mr-1" />
+        Periode ini sudah ditutup. Anda tidak dapat mengubah data ini.
       </div>
+    </div>
 
-      <div
-        class="tp-layout"
-        :style="formData.isTutupBuku ? 'pointer-events:none;opacity:0.8' : ''"
-      >
-        <div class="tp-left">
+    <div
+      class="tp-layout"
+      :style="formData.isTutupBuku ? 'pointer-events:none;opacity:0.8' : ''"
+    >
+      <div class="tp-left">
+        <div class="tp-section">
           <!-- Divisi + Status -->
           <div class="tp-row">
             <label class="tp-lbl">Divisi</label>
@@ -688,15 +688,8 @@ const onFileChange = (e: Event) => {
   display: flex;
   flex-direction: column;
   height: 100%;
-}
-
-.tp-layout {
-  flex: 1;
-  display: flex;
-  flex-direction: row;
-  gap: 10px;
-  align-items: flex-start;
-  /* hapus duplicate flex-direction: column dari definisi pertama */
+  font-family: "Segoe UI", system-ui, sans-serif;
+  font-size: 12px;
 }
 
 .tp-alert-wrap {
@@ -717,13 +710,16 @@ const onFileChange = (e: Event) => {
   border: 1px solid #ffe082;
 }
 
-/* Inner layout: kiri + kanan */
-.tp-layout {
+/* Row utama kiri + kanan */
+.tp-inner {
+  flex: 1;
   display: flex;
   flex-direction: row;
   gap: 10px;
   align-items: flex-start;
+  min-height: 0;
 }
+
 .tp-left {
   flex: 1;
   min-width: 0;
