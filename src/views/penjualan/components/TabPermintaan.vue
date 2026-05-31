@@ -216,7 +216,7 @@ const onFileChange = (e: Event) => {
     </div>
 
     <div
-      class="tp-layout"
+      class="tp-inner"
       :style="formData.isTutupBuku ? 'pointer-events:none;opacity:0.8' : ''"
     >
       <div class="tp-left">
