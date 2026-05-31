@@ -57,6 +57,7 @@ import {
   IconShoppingCartCopy,
   IconReportAnalytics,
   IconFileAnalytics,
+  IconClipboardText,
 } from "@tabler/icons-vue";
 
 interface NavItem {
@@ -84,6 +85,7 @@ const showDesktopNav = computed(() => availableNavWidth.value >= 1050);
 const toolsMenu = ref(false);
 const daftarMenu = ref(false);
 const pembelianMenu = ref(false);
+const ppicMenu = ref(false);
 const garmenMenu = ref(false);
 const penjualanMenu = ref(false);
 const hutangMenu = ref(false);
@@ -297,6 +299,20 @@ const menuItems: NavItem[] = [
     ],
   },
   {
+    title: "PPIC",
+    icon: IconClipboardText, // ← import IconClipboardText dari tabler
+    model: ppicMenu,
+    menuId: 9000,
+    items: [
+      {
+        title: "Cetak BAST",
+        to: "/garmen/cetak-bast",
+        icon: IconPrinter,
+        menuId: 117,
+      },
+    ],
+  },
+  {
     title: "Garmen",
     icon: IconShirt,
     model: garmenMenu,
@@ -466,14 +482,6 @@ const menuItems: NavItem[] = [
             menuId: 140,
           },
         ],
-      },
-      { divider: true },
-      { divider: true },
-      {
-        title: "Cetak BAST",
-        to: "/garmen/cetak-bast",
-        icon: IconPrinter,
-        menuId: 117,
       },
     ],
   },
