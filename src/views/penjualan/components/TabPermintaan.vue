@@ -207,402 +207,413 @@ const onFileChange = (e: Event) => {
 
 <template>
   <div class="tp-layout">
-    <!-- Alert tutup buku -->
-    <div v-if="formData.isTutupBuku" class="tp-alert-wrap">
-      <div class="tp-alert warning">
-        <IconLock :size="13" class="mr-1" />
-        Periode ini sudah ditutup. Anda tidak dapat mengubah data ini.
-      </div>
-    </div>
-
-    <!-- ── Kolom kiri ── -->
-    <div
-      class="tp-left"
-      :style="formData.isTutupBuku ? 'pointer-events:none;opacity:0.8' : ''"
-    >
-      <div class="tp-section">
-        <!-- Divisi + Status -->
-        <div class="tp-row">
-          <label class="tp-lbl">Divisi</label>
-          <v-select
-            v-model="formData.Divisi"
-            :items="divisiOptions"
-            variant="outlined"
-            density="compact"
-            :readonly="isEdit"
-            hide-details
-            class="f-inp"
-            style="max-width: 170px"
-          />
-          <label class="tp-lbl" style="width: 50px; margin-left: 20px"
-            >Status</label
-          >
-          <v-select
-            v-model="formData.Status"
-            :items="statusOptions"
-            variant="outlined"
-            density="compact"
-            hide-details
-            class="f-inp"
-            style="max-width: 110px"
-          />
+    <div class="tp-wrapper">
+      <!-- Alert di luar flex row, di atas segalanya -->
+      <div v-if="formData.isTutupBuku" class="tp-alert-wrap">
+        <div class="tp-alert warning">
+          <IconLock :size="13" class="mr-1" />
+          Periode ini sudah ditutup. Anda tidak dapat mengubah data ini.
         </div>
-
-        <!-- Nomor -->
-        <div class="tp-row">
-          <label class="tp-lbl">Nomor</label>
-          <v-text-field
-            v-model="formData.Nomor"
-            variant="outlined"
-            density="compact"
-            readonly
-            bg-color="grey-lighten-4"
-            hide-details
-            class="f-inp"
-            style="max-width: 180px"
-          >
-            <template #append-inner>
-              <span v-if="!isEdit" class="hint-new">Baru= Nomor Otomatis</span>
-            </template>
-          </v-text-field>
-        </div>
-
-        <!-- Tanggal + Created sejajar -->
-        <div class="tp-row">
-          <label class="tp-lbl">Tanggal</label>
-          <input
-            type="date"
-            v-model="formData.Tanggal"
-            class="tp-date"
-            style="width: 130px"
-            :disabled="isEdit"
-          />
-          <label class="tp-lbl" style="margin-left: 20px; width: 55px"
-            >Created</label
-          >
-          <input
-            :value="formData.Created || '—'"
-            readonly
-            class="tp-inp-ro"
-            style="width: 180px"
-          />
-        </div>
-
-        <!-- User + Customer Perfect sejajar -->
-        <div class="tp-row">
-          <label class="tp-lbl">User</label>
-          <input
-            :value="formData.User || '—'"
-            readonly
-            class="tp-inp-ro"
-            style="width: 130px"
-          />
-          <label class="tp-lbl" style="margin-left: 20px; width: 120px"
-            >Customer Perfect</label
-          >
-          <v-select
-            v-model="formData.Perfect"
-            :items="perfectOptions"
-            variant="outlined"
-            density="compact"
-            hide-details
-            class="f-inp"
-            style="max-width: 80px"
-          />
-        </div>
-
-        <!-- Customer -->
-        <div class="tp-row">
-          <label class="tp-lbl">Customer</label>
-          <div class="tp-inp-grp" style="width: 100px">
-            <input
-              v-model="formData.CustKode"
-              class="tp-inp-field"
-              style="background: #ddeeff; font-weight: 600"
-              placeholder="Kode..."
-              @keydown.enter.prevent="onCustKodeEnter"
-              @blur="onCustKodeEnter"
-            />
-            <button
-              type="button"
-              class="tp-lkp-btn"
-              @mousedown.prevent="
-                isOpeningModal = true;
-                showCustModal = true;
-              "
-              @click="isOpeningModal = false"
-            >
-              <IconSearch :size="13" />
-            </button>
-          </div>
-          <input
-            v-model="formData.CustNama"
-            class="tp-inp-field flex-1"
-            :readonly="!!formData.CustKode"
-          />
-        </div>
-
-        <!-- Sales -->
-        <div class="tp-row">
-          <label class="tp-lbl">Sales</label>
-          <div class="tp-inp-grp" style="width: 100px">
-            <input
-              v-model="formData.SalesKode"
-              class="tp-inp-field"
-              style="background: #ddeeff; font-weight: 600"
-              placeholder="Kode..."
-              @keydown.enter.prevent="onSalesKodeEnter"
-              @blur="onSalesKodeEnter"
-            />
-            <button
-              type="button"
-              class="tp-lkp-btn"
-              @mousedown.prevent="
-                isOpeningModal = true;
-                showSalesModal = true;
-              "
-              @click="isOpeningModal = false"
-            >
-              <IconSearch :size="13" />
-            </button>
-          </div>
-          <input
-            v-model="formData.SalesNama"
-            class="tp-inp-field flex-1"
-            readonly
-            style="background: #f5f5f5"
-          />
-        </div>
-
-        <!-- Nama Pekerjaan -->
-        <div class="tp-row">
-          <label class="tp-lbl">Nama Pekerjaan</label>
-          <v-text-field
-            v-model="formData.NamaPekerjaan"
-            variant="outlined"
-            density="compact"
-            hide-details
-            class="f-inp"
-          />
-        </div>
-
-        <!-- Rencana Order -->
-        <div class="tp-row">
-          <label class="tp-lbl">Rencana Order</label>
-          <v-text-field
-            v-model.number="formData.RencanaOrder"
-            type="number"
-            variant="outlined"
-            density="compact"
-            hide-details
-            class="f-inp"
-            style="max-width: 100px"
-            v-select-on-focus
-          />
-        </div>
-
-        <!-- Harga Lama + Budget -->
-        <div class="tp-row">
-          <label class="tp-lbl">Harga Lama</label>
-          <v-text-field
-            v-model.number="formData.HargaLama"
-            type="number"
-            variant="outlined"
-            density="compact"
-            hide-details
-            class="f-inp"
-            style="max-width: 130px"
-            v-select-on-focus
-          />
-          <label class="tp-lbl" style="margin-left: 20px; width: 90px"
-            >Harga Budget</label
-          >
-          <v-text-field
-            v-model.number="formData.HargaBudget"
-            type="number"
-            variant="outlined"
-            density="compact"
-            hide-details
-            class="f-inp"
-            style="max-width: 130px"
-            v-select-on-focus
-          />
-        </div>
-
-        <!-- Tgl Order Terakhir -->
-        <div class="tp-row">
-          <label class="tp-lbl">Tgl Order Terakhir</label>
-          <input
-            type="date"
-            v-model="formData.TanggalOrderTerakhir"
-            class="tp-date"
-          />
-        </div>
-
-        <!-- Kain -->
-        <div class="tp-row">
-          <label class="tp-lbl">Kain</label>
-          <v-text-field
-            v-model="formData.Kain"
-            variant="outlined"
-            density="compact"
-            hide-details
-            class="f-inp"
-          />
-        </div>
-
-        <!-- Ukuran P x L + Ket -->
-        <div class="tp-row">
-          <label class="tp-lbl">Ukuran (PxL)</label>
-          <v-text-field
-            v-model.number="formData.Panjang"
-            type="number"
-            variant="outlined"
-            density="compact"
-            hide-details
-            class="f-inp"
-            style="max-width: 72px"
-            v-select-on-focus
-          />
-          <span class="tp-sep">x</span>
-          <v-text-field
-            v-model.number="formData.Lebar"
-            type="number"
-            variant="outlined"
-            density="compact"
-            hide-details
-            class="f-inp"
-            style="max-width: 72px"
-            v-select-on-focus
-          />
-          <span class="tp-sep">Mtr</span>
-          <label class="tp-lbl" style="width: 70px; margin-left: 12px"
-            >Ket. Ukuran</label
-          >
-          <v-text-field
-            v-model="formData.Ukuran"
-            variant="outlined"
-            density="compact"
-            hide-details
-            class="f-inp"
-          />
-        </div>
-
-        <!-- Gramasi -->
-        <div class="tp-row">
-          <label class="tp-lbl">Gramasi</label>
-          <v-text-field
-            v-model="formData.Gramasi"
-            variant="outlined"
-            density="compact"
-            hide-details
-            class="f-inp"
-            style="max-width: 180px"
-          />
-        </div>
-
-        <!-- Finishing -->
-        <div class="tp-row">
-          <label class="tp-lbl">Finishing</label>
-          <v-text-field
-            v-model="formData.Finishing"
-            variant="outlined"
-            density="compact"
-            hide-details
-            class="f-inp"
-          />
-        </div>
-
-        <!-- Sublim -->
-        <div class="tp-row">
-          <label class="tp-lbl">Sublim</label>
-          <label class="chk-label">
-            <input
-              type="checkbox"
-              :checked="formData.Sublim === 'PREMIUM'"
-              @change="
-                formData.Sublim = ($event.target as HTMLInputElement).checked
-                  ? 'PREMIUM'
-                  : ''
-              "
-            />
-            Premium
-          </label>
-          <label class="chk-label" style="margin-left: 12px">
-            <input
-              type="checkbox"
-              :checked="formData.Sublim === 'MEDIUM'"
-              @change="
-                formData.Sublim = ($event.target as HTMLInputElement).checked
-                  ? 'MEDIUM'
-                  : ''
-              "
-            />
-            Medium
-          </label>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── Kolom kanan: Keterangan + Design ── -->
-    <div class="tp-right">
-      <div class="tp-section" style="flex-shrink: 0">
-        <div class="tp-sec-title">Keterangan</div>
-        <v-textarea
-          v-model="formData.Keterangan"
-          variant="outlined"
-          density="compact"
-          rows="6"
-          hide-details
-          class="f-inp"
-        />
       </div>
 
       <div
-        class="tp-section"
-        style="flex: 1; display: flex; flex-direction: column"
+        class="tp-layout"
+        :style="formData.isTutupBuku ? 'pointer-events:none;opacity:0.8' : ''"
       >
-        <div class="tp-sec-title">Design</div>
-        <div class="tp-img-box">
-          <img
-            v-if="displayImageUrl"
-            :src="displayImageUrl"
-            class="tp-img"
-            style="cursor: pointer"
-            title="Klik untuk melihat ukuran penuh"
-            @click="showPreviewDialog = true"
-            @error="imageError = true"
-          />
-          <div v-else class="tp-img-empty">
-            <IconPhotoOff :size="28" color="#bdbdbd" />
-            <div class="mt-1">Belum ada gambar / Gambar tidak ditemukan</div>
+        <div class="tp-left">
+          <!-- Divisi + Status -->
+          <div class="tp-row">
+            <label class="tp-lbl">Divisi</label>
+            <v-select
+              v-model="formData.Divisi"
+              :items="divisiOptions"
+              variant="outlined"
+              density="compact"
+              :readonly="isEdit"
+              hide-details
+              class="f-inp"
+              style="max-width: 170px"
+            />
+            <label class="tp-lbl" style="width: 50px; margin-left: 20px"
+              >Status</label
+            >
+            <v-select
+              v-model="formData.Status"
+              :items="statusOptions"
+              variant="outlined"
+              density="compact"
+              hide-details
+              class="f-inp"
+              style="max-width: 110px"
+            />
+          </div>
+
+          <!-- Nomor -->
+          <div class="tp-row">
+            <label class="tp-lbl">Nomor</label>
+            <v-text-field
+              v-model="formData.Nomor"
+              variant="outlined"
+              density="compact"
+              readonly
+              bg-color="grey-lighten-4"
+              hide-details
+              class="f-inp"
+              style="max-width: 180px"
+            >
+              <template #append-inner>
+                <span v-if="!isEdit" class="hint-new"
+                  >Baru= Nomor Otomatis</span
+                >
+              </template>
+            </v-text-field>
+          </div>
+
+          <!-- Tanggal + Created sejajar -->
+          <div class="tp-row">
+            <label class="tp-lbl">Tanggal</label>
+            <input
+              type="date"
+              v-model="formData.Tanggal"
+              class="tp-date"
+              style="width: 130px"
+              :disabled="isEdit"
+            />
+            <label class="tp-lbl" style="margin-left: 20px; width: 55px"
+              >Created</label
+            >
+            <input
+              :value="formData.Created || '—'"
+              readonly
+              class="tp-inp-ro"
+              style="width: 180px"
+            />
+          </div>
+
+          <!-- User + Customer Perfect sejajar -->
+          <div class="tp-row">
+            <label class="tp-lbl">User</label>
+            <input
+              :value="formData.User || '—'"
+              readonly
+              class="tp-inp-ro"
+              style="width: 130px"
+            />
+            <label class="tp-lbl" style="margin-left: 20px; width: 120px"
+              >Customer Perfect</label
+            >
+            <v-select
+              v-model="formData.Perfect"
+              :items="perfectOptions"
+              variant="outlined"
+              density="compact"
+              hide-details
+              class="f-inp"
+              style="max-width: 80px"
+            />
+          </div>
+
+          <!-- Customer -->
+          <div class="tp-row">
+            <label class="tp-lbl">Customer</label>
+            <div class="tp-inp-grp" style="width: 100px">
+              <input
+                v-model="formData.CustKode"
+                class="tp-inp-field"
+                style="background: #ddeeff; font-weight: 600"
+                placeholder="Kode..."
+                @keydown.enter.prevent="onCustKodeEnter"
+                @blur="onCustKodeEnter"
+              />
+              <button
+                type="button"
+                class="tp-lkp-btn"
+                @mousedown.prevent="
+                  isOpeningModal = true;
+                  showCustModal = true;
+                "
+                @click="isOpeningModal = false"
+              >
+                <IconSearch :size="13" />
+              </button>
+            </div>
+            <input
+              v-model="formData.CustNama"
+              class="tp-inp-field flex-1"
+              :readonly="!!formData.CustKode"
+            />
+          </div>
+
+          <!-- Sales -->
+          <div class="tp-row">
+            <label class="tp-lbl">Sales</label>
+            <div class="tp-inp-grp" style="width: 100px">
+              <input
+                v-model="formData.SalesKode"
+                class="tp-inp-field"
+                style="background: #ddeeff; font-weight: 600"
+                placeholder="Kode..."
+                @keydown.enter.prevent="onSalesKodeEnter"
+                @blur="onSalesKodeEnter"
+              />
+              <button
+                type="button"
+                class="tp-lkp-btn"
+                @mousedown.prevent="
+                  isOpeningModal = true;
+                  showSalesModal = true;
+                "
+                @click="isOpeningModal = false"
+              >
+                <IconSearch :size="13" />
+              </button>
+            </div>
+            <input
+              v-model="formData.SalesNama"
+              class="tp-inp-field flex-1"
+              readonly
+              style="background: #f5f5f5"
+            />
+          </div>
+
+          <!-- Nama Pekerjaan -->
+          <div class="tp-row">
+            <label class="tp-lbl">Nama Pekerjaan</label>
+            <v-text-field
+              v-model="formData.NamaPekerjaan"
+              variant="outlined"
+              density="compact"
+              hide-details
+              class="f-inp"
+            />
+          </div>
+
+          <!-- Rencana Order -->
+          <div class="tp-row">
+            <label class="tp-lbl">Rencana Order</label>
+            <v-text-field
+              v-model.number="formData.RencanaOrder"
+              type="number"
+              variant="outlined"
+              density="compact"
+              hide-details
+              class="f-inp"
+              style="max-width: 100px"
+              v-select-on-focus
+            />
+          </div>
+
+          <!-- Harga Lama + Budget -->
+          <div class="tp-row">
+            <label class="tp-lbl">Harga Lama</label>
+            <v-text-field
+              v-model.number="formData.HargaLama"
+              type="number"
+              variant="outlined"
+              density="compact"
+              hide-details
+              class="f-inp"
+              style="max-width: 130px"
+              v-select-on-focus
+            />
+            <label class="tp-lbl" style="margin-left: 20px; width: 90px"
+              >Harga Budget</label
+            >
+            <v-text-field
+              v-model.number="formData.HargaBudget"
+              type="number"
+              variant="outlined"
+              density="compact"
+              hide-details
+              class="f-inp"
+              style="max-width: 130px"
+              v-select-on-focus
+            />
+          </div>
+
+          <!-- Tgl Order Terakhir -->
+          <div class="tp-row">
+            <label class="tp-lbl">Tgl Order Terakhir</label>
+            <input
+              type="date"
+              v-model="formData.TanggalOrderTerakhir"
+              class="tp-date"
+            />
+          </div>
+
+          <!-- Kain -->
+          <div class="tp-row">
+            <label class="tp-lbl">Kain</label>
+            <v-text-field
+              v-model="formData.Kain"
+              variant="outlined"
+              density="compact"
+              hide-details
+              class="f-inp"
+            />
+          </div>
+
+          <!-- Ukuran P x L + Ket -->
+          <div class="tp-row">
+            <label class="tp-lbl">Ukuran (PxL)</label>
+            <v-text-field
+              v-model.number="formData.Panjang"
+              type="number"
+              variant="outlined"
+              density="compact"
+              hide-details
+              class="f-inp"
+              style="max-width: 72px"
+              v-select-on-focus
+            />
+            <span class="tp-sep">x</span>
+            <v-text-field
+              v-model.number="formData.Lebar"
+              type="number"
+              variant="outlined"
+              density="compact"
+              hide-details
+              class="f-inp"
+              style="max-width: 72px"
+              v-select-on-focus
+            />
+            <span class="tp-sep">Mtr</span>
+            <label class="tp-lbl" style="width: 70px; margin-left: 12px"
+              >Ket. Ukuran</label
+            >
+            <v-text-field
+              v-model="formData.Ukuran"
+              variant="outlined"
+              density="compact"
+              hide-details
+              class="f-inp"
+            />
+          </div>
+
+          <!-- Gramasi -->
+          <div class="tp-row">
+            <label class="tp-lbl">Gramasi</label>
+            <v-text-field
+              v-model="formData.Gramasi"
+              variant="outlined"
+              density="compact"
+              hide-details
+              class="f-inp"
+              style="max-width: 180px"
+            />
+          </div>
+
+          <!-- Finishing -->
+          <div class="tp-row">
+            <label class="tp-lbl">Finishing</label>
+            <v-text-field
+              v-model="formData.Finishing"
+              variant="outlined"
+              density="compact"
+              hide-details
+              class="f-inp"
+            />
+          </div>
+
+          <!-- Sublim -->
+          <div class="tp-row">
+            <label class="tp-lbl">Sublim</label>
+            <label class="chk-label">
+              <input
+                type="checkbox"
+                :checked="formData.Sublim === 'PREMIUM'"
+                @change="
+                  formData.Sublim = ($event.target as HTMLInputElement).checked
+                    ? 'PREMIUM'
+                    : ''
+                "
+              />
+              Premium
+            </label>
+            <label class="chk-label" style="margin-left: 12px">
+              <input
+                type="checkbox"
+                :checked="formData.Sublim === 'MEDIUM'"
+                @change="
+                  formData.Sublim = ($event.target as HTMLInputElement).checked
+                    ? 'MEDIUM'
+                    : ''
+                "
+              />
+              Medium
+            </label>
           </div>
         </div>
-        <div class="tp-upload-row">
-          <input
-            ref="fileRef"
-            type="file"
-            accept="image/*"
-            style="display: none"
-            @change="onFileChange"
+      </div>
+
+      <!-- ── Kolom kanan: Keterangan + Design ── -->
+      <div class="tp-right">
+        <div class="tp-section" style="flex-shrink: 0">
+          <div class="tp-sec-title">Keterangan</div>
+          <v-textarea
+            v-model="formData.Keterangan"
+            variant="outlined"
+            density="compact"
+            rows="6"
+            hide-details
+            class="f-inp"
           />
-          <div class="tp-upload-name">{{ uploadName || "Pilih file..." }}</div>
-          <button class="tp-upload-btn" type="button" @click="fileRef?.click()">
-            Upload
-          </button>
         </div>
-        <div class="tp-img-hint">Ukuran Maksimal 1 Mb</div>
+
         <div
-          v-if="formData.StatusEdit"
-          class="tp-status-badge mt-2"
-          :class="formData.StatusEdit === 'ACC' ? 'st-acc' : 'st-wait'"
+          class="tp-section"
+          style="flex: 1; display: flex; flex-direction: column"
         >
-          <component
-            :is="formData.StatusEdit === 'ACC' ? IconDiscountCheck : IconClock"
-            :size="12"
-            class="mr-1"
-          />
-          Status Approval: <strong>{{ formData.StatusEdit }}</strong>
+          <div class="tp-sec-title">Design</div>
+          <div class="tp-img-box">
+            <img
+              v-if="displayImageUrl"
+              :src="displayImageUrl"
+              class="tp-img"
+              style="cursor: pointer"
+              title="Klik untuk melihat ukuran penuh"
+              @click="showPreviewDialog = true"
+              @error="imageError = true"
+            />
+            <div v-else class="tp-img-empty">
+              <IconPhotoOff :size="28" color="#bdbdbd" />
+              <div class="mt-1">Belum ada gambar / Gambar tidak ditemukan</div>
+            </div>
+          </div>
+          <div class="tp-upload-row">
+            <input
+              ref="fileRef"
+              type="file"
+              accept="image/*"
+              style="display: none"
+              @change="onFileChange"
+            />
+            <div class="tp-upload-name">
+              {{ uploadName || "Pilih file..." }}
+            </div>
+            <button
+              class="tp-upload-btn"
+              type="button"
+              @click="fileRef?.click()"
+            >
+              Upload
+            </button>
+          </div>
+          <div class="tp-img-hint">Ukuran Maksimal 1 Mb</div>
+          <div
+            v-if="formData.StatusEdit"
+            class="tp-status-badge mt-2"
+            :class="formData.StatusEdit === 'ACC' ? 'st-acc' : 'st-wait'"
+          >
+            <component
+              :is="
+                formData.StatusEdit === 'ACC' ? IconDiscountCheck : IconClock
+              "
+              :size="12"
+              class="mr-1"
+            />
+            Status Approval: <strong>{{ formData.StatusEdit }}</strong>
+          </div>
         </div>
       </div>
     </div>
@@ -673,17 +684,24 @@ const onFileChange = (e: Event) => {
 </template>
 
 <style scoped>
-.tp-layout {
+.tp-wrapper {
   display: flex;
   flex-direction: column;
-  gap: 0;
-  font-family: "Segoe UI", system-ui, sans-serif;
-  font-size: 12px;
+  height: 100%;
 }
 
-/* Alert tutup buku */
+.tp-layout {
+  flex: 1;
+  display: flex;
+  flex-direction: row;
+  gap: 10px;
+  align-items: flex-start;
+  /* hapus duplicate flex-direction: column dari definisi pertama */
+}
+
 .tp-alert-wrap {
   margin-bottom: 8px;
+  flex-shrink: 0;
 }
 .tp-alert {
   display: flex;
