@@ -1843,4 +1843,72 @@ watch(
 .col-drag-handle:active {
   cursor: grabbing;
 }
+
+/* Tambahkan di bagian bawah <style scoped> */
+
+/* 1400px ke bawah */
+@media (max-width: 1400px) {
+  .search-field {
+    width: 140px;
+    min-width: 100px;
+  }
+  .filter-bar {
+    padding: 6px 10px;
+    gap: 6px;
+  }
+}
+
+/* 1280px ke bawah */
+@media (max-width: 1280px) {
+  .search-field {
+    width: 120px;
+    min-width: 90px;
+  }
+  /* Pagination: sembunyikan jump input */
+  .jump-input,
+  .page-of {
+    display: none;
+  }
+  /* Kurangi jumlah page button */
+  .page-btn:not(.icon-btn):not(.active) {
+    display: none;
+  }
+  .page-btn.active {
+    display: flex;
+  }
+}
+
+/* 1024px ke bawah */
+@media (max-width: 1024px) {
+  .browse-content {
+    padding: 6px;
+    gap: 6px;
+  }
+  .filter-bar {
+    padding: 5px 8px;
+    gap: 4px;
+    min-height: 44px;
+  }
+  .search-field {
+    width: 110px;
+  }
+  /* Pagination ringkas */
+  .pagination-bar {
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 4px 6px;
+  }
+  .page-info {
+    font-size: 11px;
+  }
+  .per-page-select {
+    height: 26px;
+    font-size: 11px;
+  }
+  .page-btn {
+    min-width: 26px;
+    height: 26px;
+    font-size: 11px;
+  }
+}
 </style>

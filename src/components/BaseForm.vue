@@ -191,6 +191,7 @@ const emit = defineEmits([
 </template>
 
 <style scoped>
+/* Ganti style scoped yang ada */
 .form-grid-container :deep(*) {
   font-size: 11px !important;
 }
@@ -200,10 +201,24 @@ const emit = defineEmits([
   display: grid;
   grid-template-columns: 320px 1fr;
   gap: 16px;
+  overflow: hidden;
 }
 .form-grid-container.single-column {
   grid-template-columns: 1fr;
 }
+.form-grid-container.two-column {
+  grid-template-columns: 320px 1fr;
+}
+.form-grid-container.three-column {
+  grid-template-columns: 280px 1fr 200px;
+}
+.form-grid-container.custom-layout {
+  display: block;
+  padding: 0;
+  height: calc(100vh - 120px);
+  overflow: hidden;
+}
+
 .left-column,
 .right-column {
   display: flex;
@@ -212,8 +227,21 @@ const emit = defineEmits([
 }
 .right-column {
   flex-grow: 1;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
   min-width: 0;
+}
+.center-column {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex-grow: 1;
+}
+.full-column {
+  height: 100%;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 :deep(.desktop-form-section) {
@@ -224,38 +252,78 @@ const emit = defineEmits([
   margin-bottom: 12px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05) !important;
 }
-
 :deep(.header-section) {
   border-top: 3px solid #1976d2 !important;
 }
 
-.form-grid-container.custom-layout {
-  display: block; /* Matikan CSS Grid agar full lebar & tinggi */
-  padding: 0; /* Hilangkan padding default container */
-  height: calc(100vh - 120px); /* Sesuaikan tinggi agar tidak dobel scroll */
-  overflow: hidden;
+/* ── Responsive breakpoints ── */
+
+/* 1600px ke bawah — kolom kiri sedikit lebih kecil */
+@media (max-width: 1600px) {
+  .form-grid-container.two-column {
+    grid-template-columns: 290px 1fr;
+  }
+  .form-grid-container.three-column {
+    grid-template-columns: 260px 1fr 180px;
+  }
 }
 
-.full-column {
-  height: 100%;
-  width: 100%;
-  display: flex;
-  flex-direction: column;
+/* 1400px ke bawah */
+@media (max-width: 1400px) {
+  .form-grid-container.two-column {
+    grid-template-columns: 260px 1fr;
+  }
+  .form-grid-container.three-column {
+    grid-template-columns: 240px 1fr 160px;
+  }
+  .form-grid-container {
+    gap: 12px;
+    padding: 10px;
+  }
 }
 
-/* 3-column layout untuk BAST MAP dan form sejenis */
-.form-grid-container.three-column {
-  grid-template-columns: 280px 1fr 200px;
-}
-.center-column {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  flex-grow: 1;
+/* 1280px ke bawah — layout mulai kolaps ke single column */
+@media (max-width: 1280px) {
+  .form-grid-container.two-column {
+    grid-template-columns: 240px 1fr;
+  }
+  .form-grid-container.three-column {
+    grid-template-columns: 220px 1fr;
+    /* kolom ketiga wrap ke bawah */
+    grid-template-rows: auto auto;
+  }
+  .form-grid-container.three-column .center-column {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .form-grid-container.three-column .right-column {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
 }
 
-/* Rename class lama agar tidak konflik */
-.form-grid-container.two-column {
-  grid-template-columns: 320px 1fr;
+/* 1024px ke bawah — semua stack vertikal */
+@media (max-width: 1024px) {
+  .form-grid-container,
+  .form-grid-container.two-column,
+  .form-grid-container.three-column {
+    grid-template-columns: 1fr !important;
+    grid-template-rows: auto !important;
+    height: auto;
+    min-height: calc(100vh - 180px);
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+  .form-grid-container .left-column,
+  .form-grid-container .center-column,
+  .form-grid-container .right-column {
+    grid-column: 1 !important;
+    grid-row: auto !important;
+    overflow: visible;
+    min-height: unset;
+  }
+  .right-column {
+    overflow: visible;
+  }
 }
 </style>
