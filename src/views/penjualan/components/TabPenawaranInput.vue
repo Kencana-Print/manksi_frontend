@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch, onMounted } from "vue";
 import { useToast } from "vue-toastification";
+import { useAuthStore } from "@/stores/authStore";
 import { penawaranFormService } from "@/services/penjualan/penawaranFormService";
 import api from "@/services/api";
 import {
@@ -23,6 +24,7 @@ const props = defineProps<{
 }>();
 
 const toast = useToast();
+const authStore = useAuthStore();
 
 // ── State untuk Preview Gambar ──
 const showPreviewDialog = ref(false);
@@ -43,13 +45,16 @@ const previewGambar = (row: any) => {
     return;
   }
 
+  // Ambil kode cabang user login (fallback ke 'HO-' jika kosong)
+  const cabang = authStore.user?.cabang || "HO-";
+
   let cleanName = identifier;
   const matchMH = cleanName.match(/(MH\.\d{4}\.\d+)/i);
 
   if (matchMH) {
     cleanName = matchMH[1];
-    // Coba lokal dulu
-    previewImageUrl.value = `${getBaseUrl()}/images/mintaharga/${cleanName}.jpg`;
+    // Sisipkan variabel cabang ke dalam path URL lokal
+    previewImageUrl.value = `${getBaseUrl()}/images/${cabang}/mintaharga/${cleanName}.jpg`;
     // Siapkan fallback VPS
     previewImageUrlFallback.value = `${VPS_BASE}/mintaharga/${cleanName}.jpg`;
   } else {
@@ -57,9 +62,10 @@ const previewGambar = (row: any) => {
     cleanName = cleanName.replace(/.*Downloads/i, "");
     cleanName = cleanName.replace(/\\/g, "/").split("/").pop() || "";
     cleanName = cleanName.replace(/\.(jpe?g|png)$/i, "");
-    // Upload manual — langsung ke VPS
-    previewImageUrl.value = `${VPS_BASE}/mintaharga/${cleanName}.jpg`;
-    previewImageUrlFallback.value = "";
+
+    // Upload manual — arahkan ke folder cabang lokal terlebih dahulu
+    previewImageUrl.value = `${getBaseUrl()}/images/${cabang}/mintaharga/${cleanName}.jpg`;
+    previewImageUrlFallback.value = `${VPS_BASE}/mintaharga/${cleanName}.jpg`;
   }
 
   showPreviewDialog.value = true;

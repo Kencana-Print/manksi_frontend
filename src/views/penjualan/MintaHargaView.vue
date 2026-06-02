@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref, onMounted, computed, watch } from "vue";
 import { useRouter } from "vue-router";
 import api from "@/services/api";
 import { useBrowse } from "@/composables/useBrowse";
@@ -17,11 +17,35 @@ const getPlus5 = () => {
   d.setDate(d.getDate() + 5);
   return d.toISOString().substr(0, 10);
 };
-
-const startDate = ref(getToday());
-const endDate = ref(getPlus5());
-const divisiKode = ref("0");
+const filterState = ref<Record<string, any>>({});
 const divisiOptions = ref<any[]>([{ Kode: "0", Nama: "ALL" }]);
+
+const startDate = computed({
+  get: () => filterState.value.startDate ?? getToday(),
+  set: (v) => {
+    filterState.value = { ...filterState.value, startDate: v };
+  },
+});
+const endDate = computed({
+  get: () => filterState.value.endDate ?? getPlus5(),
+  set: (v) => {
+    filterState.value = { ...filterState.value, endDate: v };
+  },
+});
+const divisiKode = computed({
+  get: () => filterState.value.divisiKode ?? "0",
+  set: (v) => {
+    filterState.value = { ...filterState.value, divisiKode: v };
+  },
+});
+
+watch(
+  filterState,
+  () => {
+    fetchData();
+  },
+  { deep: true },
+);
 
 const loadDivisi = async () => {
   try {
@@ -202,6 +226,7 @@ const submitPengajuan = async () => {
     :can-export="canExport"
     :row-props-fn="rowPropsFn"
     item-value="Nomor"
+    v-model:filter-state="filterState"
     @refresh="fetchData"
     @add="handleAdd"
     @edit="handleEdit"
@@ -216,14 +241,14 @@ const submitPengajuan = async () => {
           type="date"
           v-model="startDate"
           class="date-inp"
-          @change="fetchData"
+          @change="startDate = ($event.target as HTMLInputElement).value"
         />
         <span class="filter-sep">s/d</span>
         <input
           type="date"
           v-model="endDate"
           class="date-inp"
-          @change="fetchData"
+          @change="endDate = ($event.target as HTMLInputElement).value"
         />
       </div>
 
@@ -231,7 +256,11 @@ const submitPengajuan = async () => {
 
       <div class="filter-group">
         <span class="filter-label">Divisi</span>
-        <select v-model="divisiKode" class="filter-select" @change="fetchData">
+        <select
+          :value="divisiKode"
+          class="filter-select"
+          @change="divisiKode = ($event.target as HTMLSelectElement).value"
+        >
           <option
             v-for="opt in divisiOptions"
             :key="opt.Kode"
