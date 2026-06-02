@@ -30,6 +30,8 @@ const authStore = useAuthStore();
 const showPreviewDialog = ref(false);
 const previewImageUrl = ref("");
 const previewImageUrlFallback = ref("");
+const isPreviewLoading = ref(false);
+const isPreviewError = ref(false);
 
 const VPS_BASE = "http://103.94.238.252:8888/file-gambar";
 
@@ -45,39 +47,42 @@ const previewGambar = (row: any) => {
     return;
   }
 
-  // Ambil kode cabang user login (fallback ke 'HO-' jika kosong)
   const cabang = authStore.user?.cabang || "HO-";
 
-  let cleanName = identifier;
+  // Replace "/" dengan "." untuk jaga-jaga formatnya MH/2026/1521
+  let cleanName = identifier.replace(/\//g, ".");
   const matchMH = cleanName.match(/(MH\.\d{4}\.\d+)/i);
 
   if (matchMH) {
     cleanName = matchMH[1];
-    // Sisipkan variabel cabang ke dalam path URL lokal
-    previewImageUrl.value = `${getBaseUrl()}/images/${cabang}/mintaharga/${cleanName}.jpg`;
-    // Siapkan fallback VPS
-    previewImageUrlFallback.value = `${VPS_BASE}/mintaharga/${cleanName}.jpg`;
   } else {
     cleanName = cleanName.replace(/.*imagemintaharga/i, "");
     cleanName = cleanName.replace(/.*Downloads/i, "");
     cleanName = cleanName.replace(/\\/g, "/").split("/").pop() || "";
     cleanName = cleanName.replace(/\.(jpe?g|png)$/i, "");
-
-    // Upload manual — arahkan ke folder cabang lokal terlebih dahulu
-    previewImageUrl.value = `${getBaseUrl()}/images/${cabang}/mintaharga/${cleanName}.jpg`;
-    previewImageUrlFallback.value = `${VPS_BASE}/mintaharga/${cleanName}.jpg`;
   }
 
+  previewImageUrl.value = `${getBaseUrl()}/images/${cabang}/mintaharga/${cleanName}.jpg`;
+  previewImageUrlFallback.value = `${VPS_BASE}/mintaharga/${cleanName}.jpg`;
+
+  isPreviewLoading.value = true;
+  isPreviewError.value = false;
   showPreviewDialog.value = true;
 };
 
-// Handler error gambar di preview — fallback ke VPS
-const onPreviewImgError = (e: Event) => {
+// Handler otomatis pindah ke VPS jika link lokal 404
+const handlePreviewError = (e: Event) => {
   const el = e.target as HTMLImageElement;
-  if (!el.src.includes("8888")) {
-    // Ekstrak nama file dari URL lokal
-    const fileName = el.src.split("/").pop() || "";
-    el.src = `${VPS_BASE}/mintaharga/${fileName}`;
+  if (
+    previewImageUrlFallback.value &&
+    el.src !== previewImageUrlFallback.value
+  ) {
+    el.src = previewImageUrlFallback.value;
+    // Update state URL utama agar tombol "Buka di Tab Baru" ikut mengarah ke VPS
+    previewImageUrl.value = previewImageUrlFallback.value;
+  } else {
+    isPreviewLoading.value = false;
+    isPreviewError.value = true;
   }
 };
 
@@ -1004,38 +1009,48 @@ watch(
           <IconX :size="18" :stroke-width="2" />
         </v-btn>
       </v-card-title>
-      <v-card-text class="pa-4 text-center bg-grey-lighten-4">
-        <v-img
+
+      <v-card-text
+        class="pa-4 text-center bg-grey-lighten-4"
+        style="
+          min-height: 350px;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          align-items: center;
+        "
+      >
+        <v-progress-circular
+          v-if="isPreviewLoading"
+          indeterminate
+          color="primary"
+          size="40"
+        />
+
+        <img
+          v-show="!isPreviewLoading && !isPreviewError"
           :src="previewImageUrl"
-          max-height="600"
-          contain
-          class="bg-white rounded border"
+          style="
+            max-width: 100%;
+            max-height: 560px;
+            object-fit: contain;
+            border-radius: 4px;
+            border: 1px solid #e0e0e0;
+            background: white;
+          "
+          @load="isPreviewLoading = false"
+          @error="handlePreviewError"
+        />
+
+        <div
+          v-if="isPreviewError"
+          class="d-flex flex-column align-center justify-center text-grey"
         >
-          <template v-slot:placeholder>
-            <div
-              class="d-flex flex-column align-center justify-center fill-height"
-            >
-              <v-progress-circular indeterminate color="primary" size="40" />
-            </div>
-          </template>
-          <template v-slot:error>
-            <div
-              class="d-flex flex-column align-center justify-center fill-height text-grey"
-            >
-              <!-- Auto-retry ke VPS jika lokal gagal -->
-              <img
-                :src="previewImageUrlFallback"
-                style="max-width: 100%; max-height: 560px; object-fit: contain"
-                @error="previewImageUrlFallback = ''"
-              />
-              <template v-if="!previewImageUrlFallback">
-                <IconPhotoOff :size="48" color="#bdbdbd" />
-                <div class="text-subtitle-2 mt-2">Gagal memuat gambar</div>
-              </template>
-            </div>
-          </template>
-        </v-img>
+          <IconPhotoOff :size="48" color="#bdbdbd" />
+          <div class="text-subtitle-2 mt-2">Gagal memuat gambar desain</div>
+        </div>
       </v-card-text>
+
       <v-card-actions class="bg-white pa-2 border-t">
         <v-spacer></v-spacer>
         <v-btn
