@@ -106,6 +106,11 @@ const loadDivisi = async () => {
 
 onMounted(() => {
   loadDivisi();
+
+  // Auto-load TTD jika PerushKode default sudah terisi saat buka form (Mode Baru)
+  if (!props.isEdit && props.formData.PerushKode) {
+    loadDigitalSign(props.formData.PerushKode);
+  }
 });
 
 // ── Logika Form & Kalkulasi ──
