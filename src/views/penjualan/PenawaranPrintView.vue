@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from "vue";
 import { useRoute } from "vue-router";
+import { useAuthStore } from "@/stores/authStore";
 import { penawaranFormService } from "@/services/penjualan/penawaranFormService";
 
 // Import Logo
@@ -14,6 +15,7 @@ import signKP from "@/assets/pen_kp.jpg";
 import signMD from "@/assets/pen_md.jpg";
 
 const route = useRoute();
+const authStore = useAuthStore();
 const data = ref<any>(null);
 const isLoading = ref(true);
 
@@ -52,12 +54,17 @@ const digitalSignImage = computed(() => {
   return signKP;
 });
 
+const getBaseUrl = () =>
+  import.meta.env.VITE_API_BASE_URL?.replace(/\/api\/?$/, "") ||
+  `${window.location.protocol}//${window.location.hostname}:3088`;
+
 const getProductImageUrl = (row: any) => {
   const identifier =
     row.pend_mintaharga || row.pend_nopermintaan || row.pend_gambar;
 
   if (!identifier) return "";
 
+  const cabang = authStore.user?.cabang || "HO-";
   let cleanName = identifier;
   const matchMH = cleanName.match(/(MH\.\d{4}\.\d+)/i);
 
@@ -70,7 +77,7 @@ const getProductImageUrl = (row: any) => {
     cleanName = cleanName.replace(/\.(jpe?g|png)$/i, "");
   }
 
-  return `http://103.94.238.252:8888/file-gambar/mintaharga/${cleanName}.jpg`;
+  return `${getBaseUrl()}/images/${cabang}/mintaharga/${cleanName}.jpg`;
 };
 
 const pageBorderColor = computed(() => {
@@ -346,6 +353,26 @@ const grandTotal = computed(() => {
                 :src="getProductImageUrl(row)"
                 class="row-image"
                 :class="layoutOption === 'vert' ? 'img-vert' : 'img-horz'"
+                @error="
+                  (e) => {
+                    const el = e.target as HTMLImageElement;
+                    if (!el.src.includes('8888')) {
+                      const match = (
+                        row.pend_mintaharga ||
+                        row.pend_nopermintaan ||
+                        ''
+                      ).match(/(MH\.\d{4}\.\d+)/i);
+                      const name = match
+                        ? match[1]
+                        : (row.pend_gambar || '')
+                            .split('/')
+                            .pop()
+                            ?.replace(/\.(jpe?g|png)$/i, '') || '';
+                      if (name)
+                        el.src = `http://103.94.238.252:8888/file-gambar/mintaharga/${name}.jpg`;
+                    }
+                  }
+                "
               />
             </td>
           </tr>
