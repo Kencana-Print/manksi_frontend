@@ -254,6 +254,75 @@ const showMintaHargaModal = ref(false);
 const showRekeningModal = ref(false);
 const activeRowIndex = ref<number | null>(null);
 
+const isOpeningModal = ref(false);
+
+const onCustKodeEnter = async () => {
+  if (isOpeningModal.value) return;
+
+  const kode = props.formData.CustKode?.trim();
+  if (!kode) {
+    props.formData.NamaCustomer = "";
+    return;
+  }
+  try {
+    const res = await api.get("/lookups/customer", {
+      params: { q: kode, limit: 1 },
+    });
+    const items = res.data.data.items || res.data.data || [];
+    const exact = items.find(
+      (c: any) =>
+        (c.cus_kode || c.Kode || "").toUpperCase() === kode.toUpperCase(),
+    );
+    if (exact) {
+      const aktif = exact.cus_aktif ?? exact.Aktif ?? 0;
+      if (aktif === 1 || aktif === "1" || aktif === "N") {
+        toast.warning("Status Customer Pasif.");
+        props.formData.CustKode = "";
+        props.formData.NamaCustomer = "";
+        return;
+      }
+      props.formData.CustKode = exact.cus_kode || exact.Kode;
+      props.formData.NamaCustomer = exact.cus_nama || exact.Nama;
+      props.formData.Up = exact.CP || exact.cus_cp || props.formData.Up;
+    } else {
+      toast.error("Kode customer tidak ditemukan.");
+      props.formData.CustKode = "";
+      props.formData.NamaCustomer = "";
+    }
+  } catch {
+    toast.error("Gagal memvalidasi kode customer.");
+  }
+};
+
+const onSalesKodeEnter = async () => {
+  if (isOpeningModal.value) return;
+  const kode = props.formData.SalesKode?.trim();
+  if (!kode) {
+    props.formData.NamaSales = "";
+    return;
+  }
+  try {
+    const res = await api.get("/lookups/sales", {
+      params: { q: kode, limit: 1 },
+    });
+    const items = res.data.data.items || res.data.data || [];
+    const exact = items.find(
+      (s: any) =>
+        (s.sal_kode || s.Kode || "").toUpperCase() === kode.toUpperCase(),
+    );
+    if (exact) {
+      props.formData.SalesKode = exact.sal_kode || exact.Kode;
+      props.formData.NamaSales = exact.sal_nama || exact.Nama;
+    } else {
+      toast.error("Kode sales tidak ditemukan.");
+      props.formData.SalesKode = "";
+      props.formData.NamaSales = "";
+    }
+  } catch {
+    toast.error("Gagal memvalidasi kode sales.");
+  }
+};
+
 const openMintaHargaModal = (index: number) => {
   if (!props.formData.CustKode) {
     toast.warning("Pilih Customer terlebih dahulu.");
@@ -444,6 +513,8 @@ watch(
                 class="f-inp"
                 style="width: 70px"
                 @dblclick="showCustModal = true"
+                @keydown.enter.prevent="onCustKodeEnter"
+                @blur="onCustKodeEnter"
               />
               <input
                 :value="formData.NamaCustomer"
@@ -454,7 +525,11 @@ watch(
               <button
                 class="btn-lookup"
                 type="button"
-                @click="showCustModal = true"
+                @mousedown.prevent="
+                  isOpeningModal = true;
+                  showCustModal = true;
+                "
+                @click="isOpeningModal = false"
               >
                 🔍
               </button>
@@ -479,6 +554,8 @@ watch(
                 class="f-inp"
                 style="width: 70px"
                 @dblclick="showSalesModal = true"
+                @keydown.enter.prevent="onSalesKodeEnter"
+                @blur="onSalesKodeEnter"
               />
               <input
                 :value="formData.NamaSales"
@@ -489,7 +566,11 @@ watch(
               <button
                 class="btn-lookup"
                 type="button"
-                @click="showSalesModal = true"
+                @mousedown.prevent="
+                  isOpeningModal = true;
+                  showSalesModal = true;
+                "
+                @click="isOpeningModal = false"
               >
                 🔍
               </button>
