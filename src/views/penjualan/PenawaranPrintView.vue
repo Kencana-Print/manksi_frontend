@@ -59,18 +59,16 @@ const getBaseUrl = () =>
   `${window.location.protocol}//${window.location.hostname}:3088`;
 
 const getProductImageUrl = (row: any) => {
-  // Gunakan fallback berbagai kemungkinan key dari backend
+  // Ambil identifier dari format key default atau format alias database
   const identifier =
-    row.NoPermintaan ||
-    row.Gambar ||
-    row.pend_mintaharga ||
-    row.pend_nopermintaan ||
-    row.pend_gambar;
+    row.NoPermintaan || row.Gambar || row.pend_minta || row.pend_gambar;
 
   if (!identifier) return "";
 
   const cabang = authStore.user?.cabang || "HO-";
-  let cleanName = identifier;
+
+  // Ubah MH/2026/2183 menjadi MH.2026.2183 agar sesuai dengan nama file fisik
+  let cleanName = identifier.replace(/\//g, ".");
   const matchMH = cleanName.match(/(MH\.\d{4}\.\d+)/i);
 
   if (matchMH) {
@@ -384,6 +382,43 @@ const grandTotal = computed(() => {
                             ?.replace(/\.(jpe?g|png)$/i, '') || '';
                       if (name)
                         el.src = `http://103.94.238.252:8888/file-gambar/mintaharga/${name}.jpg`;
+                    }
+                  }
+                "
+              />
+            </td>
+            <td class="text-center pa-1">
+              <img
+                v-if="
+                  row.NoPermintaan ||
+                  row.Gambar ||
+                  row.pend_minta ||
+                  row.pend_gambar
+                "
+                :src="getProductImageUrl(row)"
+                class="row-image"
+                :class="layoutOption === 'vert' ? 'img-vert' : 'img-horz'"
+                @error="
+                  (e) => {
+                    const el = e.target as HTMLImageElement;
+                    if (!el.src.includes('8888')) {
+                      let identifier =
+                        row.NoPermintaan ||
+                        row.Gambar ||
+                        row.pend_minta ||
+                        row.pend_gambar ||
+                        '';
+                      identifier = identifier.replace(/\//g, '.');
+                      const match = identifier.match(/(MH\.\d{4}\.\d+)/i);
+                      const name = match
+                        ? match[1]
+                        : identifier
+                            .split('/')
+                            .pop()
+                            ?.replace(/\.(jpe?g|png)$/i, '') || '';
+                      if (name) {
+                        el.src = `http://103.94.238.252:8888/file-gambar/mintaharga/${name}.jpg`;
+                      }
                     }
                   }
                 "
