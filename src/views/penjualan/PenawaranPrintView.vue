@@ -355,43 +355,6 @@ const grandTotal = computed(() => {
                 v-if="
                   row.NoPermintaan ||
                   row.Gambar ||
-                  row.pend_mintaharga ||
-                  row.pend_nopermintaan ||
-                  row.pend_gambar
-                "
-                :src="getProductImageUrl(row)"
-                class="row-image"
-                :class="layoutOption === 'vert' ? 'img-vert' : 'img-horz'"
-                @error="
-                  (e) => {
-                    const el = e.target as HTMLImageElement;
-                    if (!el.src.includes('8888')) {
-                      const identifier =
-                        row.NoPermintaan ||
-                        row.Gambar ||
-                        row.pend_mintaharga ||
-                        row.pend_nopermintaan ||
-                        row.pend_gambar ||
-                        '';
-                      const match = identifier.match(/(MH\.\d{4}\.\d+)/i);
-                      const name = match
-                        ? match[1]
-                        : identifier
-                            .split('/')
-                            .pop()
-                            ?.replace(/\.(jpe?g|png)$/i, '') || '';
-                      if (name)
-                        el.src = `http://103.94.238.252:8888/file-gambar/mintaharga/${name}.jpg`;
-                    }
-                  }
-                "
-              />
-            </td>
-            <td class="text-center pa-1">
-              <img
-                v-if="
-                  row.NoPermintaan ||
-                  row.Gambar ||
                   row.pend_minta ||
                   row.pend_gambar
                 "
@@ -399,28 +362,7 @@ const grandTotal = computed(() => {
                 class="row-image"
                 :class="layoutOption === 'vert' ? 'img-vert' : 'img-horz'"
                 @error="
-                  (e) => {
-                    const el = e.target as HTMLImageElement;
-                    if (!el.src.includes('8888')) {
-                      let identifier =
-                        row.NoPermintaan ||
-                        row.Gambar ||
-                        row.pend_minta ||
-                        row.pend_gambar ||
-                        '';
-                      identifier = identifier.replace(/\//g, '.');
-                      const match = identifier.match(/(MH\.\d{4}\.\d+)/i);
-                      const name = match
-                        ? match[1]
-                        : identifier
-                            .split('/')
-                            .pop()
-                            ?.replace(/\.(jpe?g|png)$/i, '') || '';
-                      if (name) {
-                        el.src = `http://103.94.238.252:8888/file-gambar/mintaharga/${name}.jpg`;
-                      }
-                    }
-                  }
+                  ($event.target as HTMLImageElement).style.display = 'none'
                 "
               />
             </td>
@@ -512,11 +454,18 @@ const grandTotal = computed(() => {
         </div>
 
         <div class="signature-section">
-          <div class="text-center mb-10">Hormat Kami,</div>
+          <div
+            class="text-center"
+            :class="data.pen_digitalsign === 'Y' ? 'mb-1' : 'mb-10'"
+          >
+            Hormat Kami,
+          </div>
           <div v-if="data.pen_digitalsign === 'Y'" class="digital-stamp">
             <img :src="digitalSignImage" class="sign-image" />
           </div>
-          <div class="text-center font-weight-bold text-decoration-underline">
+          <div
+            class="text-center font-weight-bold text-decoration-underline sig-name"
+          >
             {{ data.pen_ttd }}
           </div>
           <div class="text-center">{{ data.pen_ttd_jabatan }}</div>
@@ -583,7 +532,7 @@ const grandTotal = computed(() => {
 }
 
 .print-container {
-  border: 2px solid; /* Warna dari :style computed */
+  border: 2px solid;
   padding: 20px 25px;
   background: white;
   font-family: "Arial", "Helvetica", sans-serif;
@@ -615,29 +564,28 @@ const grandTotal = computed(() => {
 /* Header MD & KP */
 .header-top-row {
   display: flex;
-  gap: 30px; /* Memberi jarak antara logo dan Our Services */
-  align-items: flex-start; /* Sejajarkan ke atas */
+  gap: 30px;
+  align-items: flex-start;
 }
 .company-logo-mdkp {
-  max-height: 85px; /* <-- UKURAN LOGO DIPERBESAR */
+  max-height: 85px;
   width: auto;
   object-fit: contain;
 }
 .our-services {
-  font-size: 11px; /* Sedikit diperbesar agar pas dengan logo */
+  font-size: 11px;
   line-height: 1.3;
   padding-top: 5px;
 }
 .company-info-mdkp {
-  font-size: 12px; /* Ukuran font alamat diperbesar sedikit */
+  font-size: 12px;
   line-height: 1.4;
 }
 .text-lg {
-  font-size: 18px; /* Ukuran Nama Perusahaan dibesarkan sesuai gambar */
+  font-size: 18px;
   letter-spacing: 0.5px;
 }
 
-/* Tujuan MD & KP (Dalam Kotak) */
 .mdkp-meta-section {
   display: flex;
   gap: 15px;
@@ -691,6 +639,7 @@ const grandTotal = computed(() => {
 .detail-table td {
   border: 1px solid #000;
   padding: 4px 6px;
+  overflow: hidden; /* Mencegah sel tabel membesar karena gambar */
 }
 .detail-table th {
   font-weight: bold;
@@ -700,19 +649,20 @@ const grandTotal = computed(() => {
   vertical-align: top !important;
 }
 
-/* Gambar Detail */
+/* Gambar Detail - Pembatasan agar tidak out of bounds */
 .row-image {
   object-fit: contain;
   display: block;
   margin: 0 auto;
+  max-width: 100%; /* SANGAT PENTING: Mencegah tabel meluber ke samping */
 }
 .row-image.img-vert {
-  max-height: 140px;
-  width: 100%;
+  max-height: 110px; /* Diperkecil sedikit agar aman */
+  width: auto;
 }
 .row-image.img-horz {
-  max-height: 70px;
-  width: 100%;
+  max-height: 60px;
+  width: auto;
 }
 
 .total-row td {
@@ -734,7 +684,6 @@ const grandTotal = computed(() => {
   margin-bottom: 3px;
 }
 
-/* BACKGROUND KUNING FIXED */
 .note-box-yellow {
   background-color: yellow !important;
   padding: 6px 10px;
@@ -751,6 +700,7 @@ const grandTotal = computed(() => {
   vertical-align: top;
 }
 
+/* Tanda Tangan - Dirapikan agar lebih dekat dengan teks */
 .signature-section {
   width: 180px;
   display: flex;
@@ -759,18 +709,25 @@ const grandTotal = computed(() => {
   justify-content: flex-end;
 }
 .digital-stamp {
-  height: 80px;
+  height: 65px; /* Kurangi tinggi area TTD */
   width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 2px;
+  margin-top: -8px; /* Tarik gambar TTD ke atas */
+  margin-bottom: -12px; /* Tarik teks nama ke atas mendekati gambar */
+  position: relative;
+  z-index: 1;
 }
 .sign-image {
-  max-width: 160px;
+  max-width: 140px;
   max-height: 100%;
   object-fit: contain;
   mix-blend-mode: multiply;
+}
+.sig-name {
+  position: relative;
+  z-index: 2;
 }
 
 /* Page Footer JA */
@@ -828,9 +785,6 @@ const grandTotal = computed(() => {
 }
 .mb-10 {
   margin-bottom: 40px;
-}
-.d-inline-block {
-  display: inline-block;
 }
 .text-sm {
   font-size: 11px;
