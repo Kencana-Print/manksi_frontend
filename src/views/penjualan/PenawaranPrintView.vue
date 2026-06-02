@@ -59,8 +59,13 @@ const getBaseUrl = () =>
   `${window.location.protocol}//${window.location.hostname}:3088`;
 
 const getProductImageUrl = (row: any) => {
+  // Gunakan fallback berbagai kemungkinan key dari backend
   const identifier =
-    row.pend_mintaharga || row.pend_nopermintaan || row.pend_gambar;
+    row.NoPermintaan ||
+    row.Gambar ||
+    row.pend_mintaharga ||
+    row.pend_nopermintaan ||
+    row.pend_gambar;
 
   if (!identifier) return "";
 
@@ -349,7 +354,13 @@ const grandTotal = computed(() => {
             </td>
             <td class="text-center pa-1">
               <img
-                v-if="row.pend_mintaharga || row.pend_gambar"
+                v-if="
+                  row.NoPermintaan ||
+                  row.Gambar ||
+                  row.pend_mintaharga ||
+                  row.pend_nopermintaan ||
+                  row.pend_gambar
+                "
                 :src="getProductImageUrl(row)"
                 class="row-image"
                 :class="layoutOption === 'vert' ? 'img-vert' : 'img-horz'"
@@ -357,14 +368,17 @@ const grandTotal = computed(() => {
                   (e) => {
                     const el = e.target as HTMLImageElement;
                     if (!el.src.includes('8888')) {
-                      const match = (
+                      const identifier =
+                        row.NoPermintaan ||
+                        row.Gambar ||
                         row.pend_mintaharga ||
                         row.pend_nopermintaan ||
-                        ''
-                      ).match(/(MH\.\d{4}\.\d+)/i);
+                        row.pend_gambar ||
+                        '';
+                      const match = identifier.match(/(MH\.\d{4}\.\d+)/i);
                       const name = match
                         ? match[1]
-                        : (row.pend_gambar || '')
+                        : identifier
                             .split('/')
                             .pop()
                             ?.replace(/\.(jpe?g|png)$/i, '') || '';
