@@ -95,7 +95,7 @@ const onImageError = (e: Event) => {
 
   let fallbackUrl = "";
   if (props.formData.spk_memo) {
-    fallbackUrl = `http://103.94.238.252:8888/file-gambar/map/${encodeURIComponent(nomor)}.jpg`;
+    fallbackUrl = `http://103.94.238.252:8888/file-gambar/${encodeURIComponent(nomor)}.jpg`;
   } else {
     fallbackUrl = `http://103.94.238.252:8888/file-gambar/${encodeURIComponent(nomor)}.jpg`;
   }

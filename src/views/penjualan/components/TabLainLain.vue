@@ -51,7 +51,7 @@ const displayEmailUrl = computed(() => {
         .pop()
         ?.replace(/\.(jpe?g|png)$/i, "") || "";
   }
-  return `http://103.94.238.252:8888/file-gambar/map/${encodeURIComponent(name)}-email.jpg`;
+  return `http://103.94.238.252:8888/file-gambar/${encodeURIComponent(name)}-email.jpg`;
 });
 
 const onEmailChange = (e: Event) => {
