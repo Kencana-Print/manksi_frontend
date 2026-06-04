@@ -82,7 +82,7 @@ const drawer = ref(false);
 const drawerExpanded = ref<string[]>([]);
 const openedGroups = ref<string[]>([]);
 const availableNavWidth = ref(9999);
-const showDesktopNav = computed(() => availableNavWidth.value >= 1050);
+const showDesktopNav = computed(() => availableNavWidth.value >= 1200);
 
 const toolsMenu = ref(false);
 const daftarMenu = ref(false);
@@ -977,7 +977,7 @@ onUnmounted(() => {
     </div>
     <v-divider />
 
-    <v-list density="compact" nav v-model:opened="drawerExpanded">
+    <v-list density="compact" v-model:opened="drawerExpanded">
       <template
         v-for="menu in menuItems.filter((m) => hasAccess(m))"
         :key="menu.title"
@@ -1153,7 +1153,9 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   flex: 1 1 auto;
+  overflow: hidden;
   min-width: 0;
+  justify-content: center;
 }
 
 .nav-btn {
@@ -1161,12 +1163,12 @@ onUnmounted(() => {
   align-items: center;
   gap: 5px;
   height: 34px;
-  padding: 0 11px;
+  padding: 0 7px;
   border: none;
   background: transparent;
   border-radius: 7px;
   cursor: pointer;
-  font-size: 0.84rem;
+  font-size: 0.78rem;
   font-weight: 600;
   color: rgb(var(--v-theme-on-surface));
   font-family: inherit;
@@ -1344,5 +1346,62 @@ onUnmounted(() => {
 
 :deep(.v-list-group__header .v-list-item__append .v-icon) {
   display: none;
+}
+
+/* Matikan semua indent calculation Vuetify */
+:deep(.v-navigation-drawer .v-list-group) {
+  --prepend-width: 0px;
+  --list-indent-size: 0px;
+}
+
+/* Force padding semua item */
+:deep(.v-navigation-drawer .v-list-item.v-list-item--nav) {
+  padding-inline-start: 8px !important;
+}
+
+/* Level 2 */
+:deep(.v-navigation-drawer .v-list-group__items .v-list-item--nav) {
+  padding-inline-start: 14px !important;
+}
+
+/* Level 3 */
+:deep(
+  .v-navigation-drawer
+    .v-list-group__items
+    .v-list-group__items
+    .v-list-item--nav
+) {
+  padding-inline-start: 22px !important;
+}
+
+/* Hapus spacer Vuetify yang bikin indent */
+:deep(.v-navigation-drawer .v-list-item__prepend > .v-list-item__spacer),
+:deep(.v-navigation-drawer .v-list-item__append > .v-list-item__spacer) {
+  display: none !important;
+  width: 0 !important;
+  min-width: 0 !important;
+  flex: none !important;
+}
+
+/* Padding ulang karena spacer sudah dihapus */
+:deep(.v-navigation-drawer .v-list-item) {
+  padding-inline-start: 12px !important;
+  padding-left: 12px !important;
+}
+:deep(.v-navigation-drawer .v-list-group__items > .v-list-item),
+:deep(
+  .v-navigation-drawer
+    .v-list-group__items
+    > .v-list-group
+    > .v-list-group__header
+) {
+  padding-inline-start: 16px !important;
+  padding-left: 16px !important;
+}
+:deep(
+  .v-navigation-drawer .v-list-group__items .v-list-group__items > .v-list-item
+) {
+  padding-inline-start: 24px !important;
+  padding-left: 24px !important;
 }
 </style>
