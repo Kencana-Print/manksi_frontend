@@ -55,8 +55,11 @@ const isInitialLoad = ref(true);
 const workshopCache = ref<any[]>([]);
 
 const fileRef = ref<HTMLInputElement | null>(null);
+const resolvedImageUrl = ref("");
+
 const displayImageUrl = computed(() => {
   if (props.formData.MainImageBlob) return props.formData.MainImageBlob;
+  if (resolvedImageUrl.value) return resolvedImageUrl.value; // ← pakai fallback jika sudah resolved
 
   const base =
     import.meta.env.VITE_API_BASE_URL?.replace(/\/api\/?$/, "") ||
@@ -65,14 +68,11 @@ const displayImageUrl = computed(() => {
 
   const cab = props.formData.spk_cab || "HO-";
   const nomor = props.formData.spk_memo || props.formData.spk_nomor;
-
   if (!nomor) return "";
 
-  // Jika ada MAP, gambar diambil dari subfolder map
   if (props.formData.spk_memo) {
     return `${base}/images/${cab}/map/${encodeURIComponent(props.formData.spk_memo)}.jpg`;
   }
-
   return `${base}/images/${cab}/${encodeURIComponent(nomor)}.jpg`;
 });
 
@@ -80,24 +80,33 @@ const onImageError = (e: Event) => {
   const img = e.target as HTMLImageElement;
 
   if (img.dataset.fallbackTried === "true") {
-    // VPS juga gagal — sembunyikan img, tampilkan placeholder
     isImageError.value = true;
     img.style.display = "none";
+    resolvedImageUrl.value = "";
     return;
   }
   img.dataset.fallbackTried = "true";
 
   const nomor = props.formData.spk_memo || props.formData.spk_nomor;
-  if (nomor) {
-    if (props.formData.spk_memo) {
-      img.src = `http://103.94.238.252:8888/file-gambar/map/${encodeURIComponent(nomor)}.jpg`;
-    } else {
-      img.src = `http://103.94.238.252:8888/file-gambar/${encodeURIComponent(nomor)}.jpg`;
-    }
-  } else {
+  if (!nomor) {
     isImageError.value = true;
+    return;
   }
+
+  let fallbackUrl = "";
+  if (props.formData.spk_memo) {
+    fallbackUrl = `http://103.94.238.252:8888/file-gambar/map/${encodeURIComponent(nomor)}.jpg`;
+  } else {
+    fallbackUrl = `http://103.94.238.252:8888/file-gambar/${encodeURIComponent(nomor)}.jpg`;
+  }
+  img.src = fallbackUrl;
+  resolvedImageUrl.value = fallbackUrl; // ← simpan URL yang berhasil
 };
+
+watch([() => props.formData.spk_nomor, () => props.formData.spk_memo], () => {
+  resolvedImageUrl.value = "";
+  isImageError.value = false;
+});
 
 const onFileChange = (e: Event) => {
   const file = (e.target as HTMLInputElement).files?.[0];
