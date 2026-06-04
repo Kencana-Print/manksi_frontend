@@ -41,6 +41,8 @@ const headers = [
   { title: "CONTACT", key: "Contact", width: "130px" },
   { title: "EMAIL", key: "Email", width: "150px" },
   { title: "PIUTANG", key: "Piutang", width: "120px", align: "right" },
+  { title: "PLAFON", key: "Plafon", width: "120px", align: "right" },
+  { title: "STATUS PLAFON", key: "PlafonAcc", width: "130px", align: "center" },
   { title: "STATUS", key: "Status", width: "110px", align: "center" },
   { title: "JENIS USAHA", key: "JenisUsaha", width: "130px" },
   { title: "NPWP", key: "NPWP", width: "150px" },
@@ -63,8 +65,12 @@ const formatCurrency = (val: any) => {
 
 const rowPropsFn = (data: any) => {
   const item = data.item?.raw || data.item;
-  if (item.Pasif === "YA") return { class: "text-red" }; // Customer Pasif warna merah
-  if (item.Induk) return { class: "text-blue" }; // Customer Cabang/Anak warna biru
+  if (item.Pasif === "YA") return { class: "row-passive" };
+  if (item.PlafonAcc === "PENDING_MANAGER")
+    return { class: "row-pending-manager" };
+  if (item.PlafonAcc === "PENDING_DIREKSI")
+    return { class: "row-pending-direksi" };
+  if (item.Induk) return { class: "row-induk" };
   return {};
 };
 
@@ -117,6 +123,8 @@ const handleEdit = async (item: any) => {
       // Financial
       DiscPersen: data.cus_disc_persen,
       Top: data.cus_top,
+      Plafon: data.cus_plafon || 0,
+      PlafonAcc: data.cus_plafon_acc || "",
 
       // Induk Customer
       KodeInduk: data.cus_kodei || "",
@@ -187,6 +195,35 @@ const handleDelete = async (item: any) => {
       </div>
     </template>
 
+    <template #item.Plafon="{ item }">
+      {{
+        item.Plafon > 0
+          ? new Intl.NumberFormat("id-ID").format(item.Plafon)
+          : "-"
+      }}
+    </template>
+
+    <template #item.PlafonAcc="{ item }">
+      <span
+        v-if="item.PlafonAcc"
+        class="text-caption font-weight-bold"
+        :class="
+          item.PlafonAcc === 'ACC'
+            ? 'text-success'
+            : item.PlafonAcc === 'TOLAK'
+              ? 'text-error'
+              : item.PlafonAcc === 'PENDING_MANAGER'
+                ? 'text-orange-darken-3'
+                : item.PlafonAcc === 'PENDING_DIREKSI'
+                  ? 'text-deep-purple-darken-2'
+                  : ''
+        "
+      >
+        {{ item.PlafonAcc }}
+      </span>
+      <span v-else class="text-grey-lighten-1">—</span>
+    </template>
+
     <template #item.Piutang="{ item }">
       {{ formatCurrency(item.raw ? item.raw.Piutang : item.Piutang) }}
     </template>
@@ -223,3 +260,19 @@ const handleDelete = async (item: any) => {
     @saved="fetchData"
   />
 </template>
+
+<style scoped>
+:deep(table tbody tr.row-passive td) {
+  color: #e53935 !important;
+}
+:deep(table tbody tr.row-pending-manager td) {
+  color: #e65100 !important;
+}
+:deep(table tbody tr.row-pending-direksi td) {
+  color: #6a1b9a !important;
+  font-weight: 600 !important;
+}
+:deep(table tbody tr.row-induk td) {
+  color: #1565c0 !important;
+}
+</style>

@@ -58,3 +58,24 @@ body,
 .v-navigation-drawer .v-list-group__items .v-list-group__items > .v-list-item {
   padding-inline-start: 24px !important;
 }
+
+/* Global — tidak perlu :deep() */
+table tbody tr.row-pending td {
+  color: #c62828 !important;
+  font-weight: 600 !important;
+}
+
+table tbody tr.row-passive td {
+  color: #e53935 !important;
+}
+table tbody tr.row-pending-manager td {
+  color: #e65100 !important;
+  font-weight: 600 !important;
+}
+table tbody tr.row-pending-direksi td {
+  color: #6a1b9a !important;
+  font-weight: 600 !important;
+}
+table tbody tr.row-induk td {
+  color: #1565c0 !important;
+}

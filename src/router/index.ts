@@ -1589,6 +1589,17 @@ const router = createRouter({
         // Tidak perlu menuId karena backend menggunakan requireAdmin
       },
     },
+    {
+      path: "/tools/approval",
+      name: "ToolsApproval",
+      component: () => import("@/views/tools/approval/ToolsApprovalView.vue"),
+      meta: {
+        title: "Tools Approval",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        // Tidak perlu menuId tunggal di meta sini, karena divalidasi di dalam halamannya
+      },
+    },
 
     // ── Error Pages ───────────────────────────────────────────────────
     {

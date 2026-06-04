@@ -60,6 +60,7 @@ import {
   IconCash,
   IconBuildingBank,
   IconScissors,
+  IconShieldCheck,
 } from "@tabler/icons-vue";
 
 interface NavItem {
@@ -670,6 +671,7 @@ const menuItems: NavItem[] = [
     adminOnly: true, // Hanya muncul untuk Admin/Developer
     items: [
       { title: "Master User", to: "/tools/users", icon: IconUsers },
+      { title: "Approval", to: "/tools/approval", icon: IconShieldCheck },
       { divider: true },
     ],
   },

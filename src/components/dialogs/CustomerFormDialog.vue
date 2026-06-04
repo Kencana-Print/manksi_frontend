@@ -3,6 +3,7 @@ import { ref, watch, computed, onMounted } from "vue";
 import type { VForm } from "vuetify/components";
 import api from "@/services/api";
 import { useToast } from "vue-toastification";
+import { useAuthStore } from "@/stores/authStore";
 import CustomerSearchModal from "@/components/lookups/CustomerSearchModal.vue";
 import { IconUsers, IconSearch, IconX } from "@tabler/icons-vue";
 
@@ -14,6 +15,8 @@ const props = defineProps<{
 
 const emit = defineEmits(["update:modelValue", "saved"]);
 const toast = useToast();
+const authStore = useAuthStore();
+
 const formRef = ref<VForm | null>(null);
 const isSaving = ref(false);
 const showCustomerModal = ref(false);
@@ -23,6 +26,8 @@ const dialogVisible = computed({
   get: () => props.modelValue,
   set: (val) => emit("update:modelValue", val),
 });
+
+const isManager = computed(() => authStore.isManager);
 
 const emptyForm = () => ({
   Kode: "",
@@ -52,9 +57,18 @@ const emptyForm = () => ({
   NamaInduk: "",
   AlamatInduk: "",
   KotaInduk: "",
+  Plafon: 0,
 });
 
 const formData = ref(emptyForm());
+
+const plafonWarning = computed(() => {
+  const p = formData.value.Plafon || 0;
+  if (p > 20_000_000)
+    return { text: "Butuh ACC Direksi/Owner", color: "#c62828" };
+  if (p > 0) return { text: "Butuh ACC Manager", color: "#e65100" };
+  return null;
+});
 
 const loadLookups = async () => {
   try {
@@ -102,6 +116,38 @@ const handleSave = async () => {
       toast.warning("Korporasi: NPWP wajib diisi!");
       return;
     }
+    // Validasi format NPWP (xx.xxx.xxx.x-xxx.xxx = 20 karakter)
+    if (formData.value.Korporasi === "Y" && formData.value.NpwpKode) {
+      const npwp = formData.value.NpwpKode.trim();
+      const validPos: Record<number, string> = {
+        2: ".",
+        6: ".",
+        10: ".",
+        12: "-",
+        16: ".",
+      };
+      let npwpValid = npwp.length === 20;
+      if (npwpValid) {
+        for (let i = 0; i < npwp.length; i++) {
+          const expected = validPos[i];
+          if (expected) {
+            if (npwp[i] !== expected) {
+              npwpValid = false;
+              break;
+            }
+          } else {
+            if (!/\d/.test(npwp[i])) {
+              npwpValid = false;
+              break;
+            }
+          }
+        }
+      }
+      if (!npwpValid) {
+        toast.warning("Format NPWP tidak valid. Contoh: 02.843.715.0-651.000");
+        return;
+      }
+    }
     if (!formData.value.NpwpNama) {
       toast.warning("Korporasi: Nama NPWP wajib diisi!");
       return;
@@ -118,11 +164,32 @@ const handleSave = async () => {
   isSaving.value = true;
   try {
     if (props.isNewMode) {
-      await api.post("/master/customer", formData.value);
-      toast.success("Berhasil menyimpan Customer");
+      const res = await api.post("/master/customer", formData.value);
+      const plafonAcc = res.data.data?.plafonAcc;
+      if (plafonAcc === "PENDING_MANAGER") {
+        toast.success("Customer disimpan. Plafon menunggu ACC Manager.");
+      } else if (plafonAcc === "PENDING_DIREKSI") {
+        toast.success("Customer disimpan. Plafon > 20jt menunggu ACC Direksi.");
+      } else {
+        toast.success("Customer berhasil disimpan.");
+      }
     } else {
-      await api.put(`/master/customer/${formData.value.Kode}`, formData.value);
-      toast.success("Berhasil memperbarui Customer");
+      const res = await api.put(
+        `/master/customer/${formData.value.Kode}`,
+        formData.value,
+      );
+      const plafonAcc = res.data.data?.plafonAcc;
+      if (plafonAcc === "PENDING_MANAGER") {
+        toast.success(
+          "Customer diperbarui. Plafon berubah, menunggu ACC Manager.",
+        );
+      } else if (plafonAcc === "PENDING_DIREKSI") {
+        toast.success(
+          "Customer diperbarui. Plafon > 20jt menunggu ACC Direksi.",
+        );
+      } else {
+        toast.success("Customer berhasil diperbarui.");
+      }
     }
     dialogVisible.value = false;
     emit("saved");
@@ -405,26 +472,55 @@ const divisiItems = [
                   />
                 </div>
 
+                <div class="f-row">
+                  <label class="f-label">Plafon (Rp)</label>
+                  <v-text-field
+                    v-model.number="formData.Plafon"
+                    type="number"
+                    variant="outlined"
+                    density="compact"
+                    hide-details
+                    class="f-input"
+                    style="max-width: 160px"
+                    v-select-on-focus
+                  />
+                  <span
+                    v-if="plafonWarning"
+                    class="text-caption font-weight-bold ml-2"
+                    :style="{ color: plafonWarning.color }"
+                  >
+                    ⚠ {{ plafonWarning.text }}
+                  </span>
+                </div>
+
                 <!-- Prioritas & Perfect dalam satu baris -->
                 <div class="f-row">
                   <label class="f-label">Prioritas</label>
                   <div class="d-flex align-center gap-3">
-                    <label class="radio-label"
-                      ><input
+                    <label
+                      class="radio-label"
+                      :class="{ 'opacity-50': !isManager }"
+                    >
+                      <input
                         type="radio"
                         v-model="formData.Prioritas"
                         value="Y"
+                        :disabled="!isManager"
                       />
-                      Ya</label
+                      Ya
+                    </label>
+                    <label
+                      class="radio-label"
+                      :class="{ 'opacity-50': !isManager }"
                     >
-                    <label class="radio-label"
-                      ><input
+                      <input
                         type="radio"
                         v-model="formData.Prioritas"
                         value="N"
+                        :disabled="!isManager"
                       />
-                      Tidak</label
-                    >
+                      Tidak
+                    </label>
                   </div>
                   <label class="f-label" style="margin-left: 8px"
                     >Perfect</label
@@ -440,29 +536,6 @@ const divisiItems = [
                   />
                 </div>
 
-                <!-- Keramat -->
-                <div class="f-row">
-                  <label class="f-label">Keramat</label>
-                  <div class="d-flex align-center gap-3">
-                    <label class="radio-label text-error"
-                      ><input
-                        type="radio"
-                        v-model="formData.Keramat"
-                        value="Y"
-                      />
-                      Ya</label
-                    >
-                    <label class="radio-label"
-                      ><input
-                        type="radio"
-                        v-model="formData.Keramat"
-                        value="N"
-                      />
-                      Tidak</label
-                    >
-                  </div>
-                </div>
-
                 <!-- Divisi -->
                 <div class="f-row" style="align-items: flex-start">
                   <label class="f-label" style="padding-top: 4px">Divisi</label>
@@ -471,9 +544,16 @@ const divisiItems = [
                       v-for="d in divisiItems"
                       :key="d.key"
                       class="divisi-item"
-                      :class="{ active: formData[d.key] }"
+                      :class="{
+                        active: formData[d.key],
+                        'opacity-50': !isManager,
+                      }"
                     >
-                      <input type="checkbox" v-model="formData[d.key]" />
+                      <input
+                        type="checkbox"
+                        v-model="formData[d.key]"
+                        :disabled="!isManager"
+                      />
                       {{ d.label }}
                     </label>
                   </div>
@@ -783,5 +863,10 @@ const divisiItems = [
 .cus-btn-cancel:disabled {
   opacity: 0.5;
   cursor: default;
+}
+
+.opacity-50 {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 </style>
