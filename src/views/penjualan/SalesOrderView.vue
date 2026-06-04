@@ -36,20 +36,69 @@ const isTimDesain = computed(
 );
 
 // --- FILTERS ---
-const today = new Date().toISOString().substring(0, 10);
-const dtAwal = ref(today);
-const dtAkhir = ref(today);
-const workshop = ref("ALL");
-const selectedCustomer = ref<{ kode: string; nama: string } | null>(null);
 const listWorkshop = ref<string[]>([]);
 const showCusModal = ref(false);
 
+const today = new Date().toISOString().substring(0, 10);
+const SESSION_KEY = "so_browse_filter";
+
+const savedFilter = (() => {
+  try {
+    return JSON.parse(sessionStorage.getItem(SESSION_KEY) || "{}");
+  } catch {
+    return {};
+  }
+})();
+
 const filterState = ref({
-  dtAwal: dtAwal.value,
-  dtAkhir: dtAkhir.value,
-  workshop: workshop.value,
-  customer: selectedCustomer.value?.kode || "",
+  dtAwal: savedFilter.dtAwal || today,
+  dtAkhir: savedFilter.dtAkhir || today,
+  workshop: savedFilter.workshop || "ALL",
+  customer: savedFilter.customer || "",
+  cusNama: savedFilter.cusNama || "",
 });
+
+const dtAwal = computed({
+  get: () => filterState.value.dtAwal,
+  set: (v) => {
+    filterState.value = { ...filterState.value, dtAwal: v };
+  },
+});
+const dtAkhir = computed({
+  get: () => filterState.value.dtAkhir,
+  set: (v) => {
+    filterState.value = { ...filterState.value, dtAkhir: v };
+  },
+});
+const workshop = computed({
+  get: () => filterState.value.workshop,
+  set: (v) => {
+    filterState.value = { ...filterState.value, workshop: v };
+  },
+});
+const selectedCustomer = computed({
+  get: () =>
+    filterState.value.customer
+      ? { kode: filterState.value.customer, nama: filterState.value.cusNama }
+      : null,
+  set: (v: { kode: string; nama: string } | null) => {
+    filterState.value = {
+      ...filterState.value,
+      customer: v?.kode || "",
+      cusNama: v?.nama || "",
+    };
+  },
+});
+
+// Watch filterState → simpan ke sessionStorage + fetch
+watch(
+  filterState,
+  (val) => {
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify(val));
+    fetchData();
+  },
+  { deep: true },
+);
 
 // --- STATE MODAL DESAIN ---
 const showDesignDialog = ref(false);
@@ -264,24 +313,19 @@ const getNomorStyle = (ngedit: string) => {
 
 // --- HANDLERS ---
 onMounted(async () => {
-  fetchData();
   try {
     const res = await salesOrderService.getWorkshops();
-    // Cek isi data yang diterima
     const data = res.data.data;
-
     if (Array.isArray(data)) {
-      listWorkshop.value = data.map((w) => {
-        // Jika itemnya objek, ambil property-nya. Jika string, gunakan langsung.
-        return typeof w === "object" ? w.kode : w;
-      });
+      listWorkshop.value = data.map((w) =>
+        typeof w === "object" ? w.kode : w,
+      );
     }
   } catch (e) {
     console.error("Gagal load workshop:", e);
   }
+  fetchData(); // ← tetap panggil sekali di mount
 });
-
-watch([dtAwal, dtAkhir, workshop], () => fetchData());
 
 const onAdd = () => router.push("/penjualan/sales-order/create");
 const onEdit = (item: any) =>
@@ -868,7 +912,7 @@ const formatWaktu = (v: string) => {
 
   <CustomerSearchModal
     v-model="showCusModal"
-    @selected="(c) => (selectedCustomer = { kode: c.Kode, nama: c.Nama })"
+    @click="selectedCustomer = null"
   />
 
   <v-dialog v-model="pinDialog" max-width="400">
