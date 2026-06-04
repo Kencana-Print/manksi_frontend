@@ -23,6 +23,7 @@ const props = defineProps<{
 }>();
 const emit = defineEmits(["update-revisi-note", "upload-main"]);
 const toast = useToast();
+const isOpeningModal = ref(false);
 
 // ── Modal states ──
 const showPerushModal = ref(false);
@@ -37,6 +38,7 @@ const showRefModal = ref(false);
 const showPreviewDialog = ref(false);
 const showPenawaranDetailModal = ref(false);
 const selectedPenawaranNomor = ref("");
+const workshopCache = ref<any[]>([]);
 
 // ── Dropdown options ──
 const tipeSpkOptions = ["Premium", "Medium", ""];
@@ -69,6 +71,17 @@ watch(
       props.formData.NamaPerusahaan = "Sukiman Setyo Manunggal";
       props.formData.CustKode = "DC";
       props.formData.CustNama = "KAOSAN DC";
+    }
+  },
+  { immediate: true },
+);
+
+watch(
+  () => props.formData.Referensi,
+  (newVal) => {
+    // Jalankan hanya jika bukan mode edit (alias form baru) dan referensi punya isi
+    if (!props.isEdit && newVal && String(newVal).trim().length > 0) {
+      props.formData.IsRevisi = "Y";
     }
   },
   { immediate: true },
@@ -271,6 +284,189 @@ const setPenawaranDetail = (v: any) => {
   // Hanya simpan ID detail — tidak mengisi field lain
   props.formData.PenawaranId = v.id || v.ID;
 };
+
+// ── Generic lookup ──
+const lookupByKode = async (endpoint: string, kode: string) => {
+  if (!kode?.trim()) return null;
+  const res = await api.get(endpoint, { params: { q: kode.trim(), limit: 1 } });
+  const items = res.data.data?.items || res.data.data || [];
+  return (
+    items.find(
+      (i: any) =>
+        (
+          i.Kode ||
+          i.perush_kode ||
+          i.cus_kode ||
+          i.sal_kode ||
+          i.jo_kode ||
+          i.pab_kode ||
+          ""
+        )
+          .toString()
+          .toUpperCase() === kode.trim().toUpperCase(),
+    ) || null
+  );
+};
+
+const onPerushKodeEnter = async () => {
+  if (isOpeningModal.value) return;
+  const kode = props.formData.PerushKode?.trim();
+  if (!kode) {
+    props.formData.NamaPerusahaan = "";
+    return;
+  }
+  try {
+    const item = await lookupByKode("/lookups/perusahaan", kode);
+    if (item) {
+      props.formData.PerushKode = item.Kode || item.perush_kode;
+      props.formData.NamaPerusahaan = item.Nama || item.perush_nama;
+    } else {
+      toast.error("Kode perusahaan tidak ditemukan.");
+      props.formData.PerushKode = "";
+      props.formData.NamaPerusahaan = "";
+    }
+  } catch {
+    toast.error("Gagal validasi kode perusahaan.");
+  }
+};
+
+const onCustKodeEnter = async () => {
+  if (isOpeningModal.value) return;
+  const kode = props.formData.CustKode?.trim();
+  if (!kode) {
+    props.formData.CustNama = "";
+    return;
+  }
+  try {
+    const item = await lookupByKode("/lookups/customer", kode);
+    if (item) {
+      const aktif = item.cus_aktif ?? item.Aktif ?? 0;
+      if (aktif === 1 || aktif === "1") {
+        toast.warning("Status Customer Pasif.");
+        props.formData.CustKode = "";
+        props.formData.CustNama = "";
+        return;
+      }
+      props.formData.CustKode = item.Kode || item.cus_kode;
+      props.formData.CustNama = item.Nama || item.cus_nama;
+      props.formData.CustPerfect = item.cus_perfect || "N";
+    } else {
+      toast.error("Kode customer tidak ditemukan.");
+      props.formData.CustKode = "";
+      props.formData.CustNama = "";
+    }
+  } catch {
+    toast.error("Gagal validasi kode customer.");
+  }
+};
+
+const onSalesKodeEnter = async () => {
+  if (isOpeningModal.value) return;
+  const kode = props.formData.SalesKode?.trim();
+  if (!kode) {
+    props.formData.SalesNama = "";
+    return;
+  }
+  try {
+    const item = await lookupByKode("/lookups/sales", kode);
+    if (item) {
+      props.formData.SalesKode = item.Kode || item.sal_kode;
+      props.formData.SalesNama = item.Nama || item.sal_nama;
+    } else {
+      toast.error("Kode sales tidak ditemukan.");
+      props.formData.SalesKode = "";
+      props.formData.SalesNama = "";
+    }
+  } catch {
+    toast.error("Gagal validasi kode sales.");
+  }
+};
+
+const onJoKodeEnter = async () => {
+  if (isOpeningModal.value) return;
+  const kode = props.formData.JoKode?.trim();
+  if (!kode) {
+    props.formData.JenisOrder = "";
+    return;
+  }
+  try {
+    const res = await api.get("/lookups/jenis-order", {
+      params: { q: kode, divisi: props.formData.Divisi, limit: 1 },
+    });
+    const items = res.data.data?.items || res.data.data || [];
+    const item = items.find(
+      (i: any) =>
+        (i.Kode || i.jo_kode || "").toUpperCase() === kode.toUpperCase(),
+    );
+    if (item) {
+      props.formData.JoKode = item.Kode || item.jo_kode;
+      props.formData.JenisOrder = item.Nama || item.jo_nama;
+    } else {
+      toast.error("Kode jenis order tidak ditemukan.");
+      props.formData.JoKode = "";
+      props.formData.JenisOrder = "";
+    }
+  } catch {
+    toast.error("Gagal validasi kode jenis order.");
+  }
+};
+
+const getWorkshopByKode = async (kode: string) => {
+  if (workshopCache.value.length === 0) {
+    const res = await api.get("/lookups/cabang-pabrik");
+    workshopCache.value = res.data.data?.items || res.data.data || [];
+  }
+  return (
+    workshopCache.value.find(
+      (i: any) =>
+        (i.pab_kode || i.Kode || "").toUpperCase() === kode.toUpperCase(),
+    ) || null
+  );
+};
+
+const onCabMapKodeEnter = async () => {
+  if (isOpeningModal.value) return;
+  const kode = props.formData.Cab?.trim();
+  if (!kode) {
+    props.formData.Workshop = "";
+    return;
+  }
+  try {
+    const item = await getWorkshopByKode(kode);
+    if (item) {
+      props.formData.Cab = item.pab_kode || item.Kode;
+      props.formData.Workshop = item.pab_nama || item.Nama;
+    } else {
+      toast.error("Kode workshop tidak ditemukan.");
+      props.formData.Cab = "";
+      props.formData.Workshop = "";
+    }
+  } catch {
+    toast.error("Gagal validasi kode workshop.");
+  }
+};
+
+const onCabSpkKodeEnter = async () => {
+  if (isOpeningModal.value) return;
+  const kode = props.formData.Cab2?.trim();
+  if (!kode) {
+    props.formData.Workshop2 = "";
+    return;
+  }
+  try {
+    const item = await getWorkshopByKode(kode);
+    if (item) {
+      props.formData.Cab2 = item.pab_kode || item.Kode;
+      props.formData.Workshop2 = item.pab_nama || item.Nama;
+    } else {
+      toast.error("Kode workshop tidak ditemukan.");
+      props.formData.Cab2 = "";
+      props.formData.Workshop2 = "";
+    }
+  } catch {
+    toast.error("Gagal validasi kode workshop.");
+  }
+};
 </script>
 
 <template>
@@ -358,6 +554,8 @@ const setPenawaranDetail = (v: any) => {
               class="f-inp"
               style="width: 50px; background: #ddeeff"
               :disabled="isEdit"
+              @keydown.enter.prevent="onPerushKodeEnter"
+              @blur="onPerushKodeEnter"
             />
             <input
               :value="formData.NamaPerusahaan"
@@ -368,7 +566,11 @@ const setPenawaranDetail = (v: any) => {
             <button
               type="button"
               class="btn-lkp"
-              @mousedown.prevent="showPerushModal = true"
+              @mousedown.prevent="
+                isOpeningModal = true;
+                showPerushModal = true;
+              "
+              @click="isOpeningModal = false"
             >
               🔍
             </button>
@@ -459,6 +661,8 @@ const setPenawaranDetail = (v: any) => {
               v-model="formData.CustKode"
               class="f-inp"
               style="width: 70px; background: #ddeeff"
+              @keydown.enter.prevent="onCustKodeEnter"
+              @blur="onCustKodeEnter"
             />
             <input
               :value="formData.CustNama"
@@ -469,7 +673,11 @@ const setPenawaranDetail = (v: any) => {
             <button
               type="button"
               class="btn-lkp"
-              @mousedown.prevent="showCustModal = true"
+              @mousedown.prevent="
+                isOpeningModal = true;
+                showCustModal = true;
+              "
+              @click="isOpeningModal = false"
             >
               🔍
             </button>
@@ -483,6 +691,8 @@ const setPenawaranDetail = (v: any) => {
               v-model="formData.SalesKode"
               class="f-inp"
               style="width: 60px; background: #ddeeff"
+              @keydown.enter.prevent="onSalesKodeEnter"
+              @blur="onSalesKodeEnter"
             />
             <input
               :value="formData.SalesNama"
@@ -493,7 +703,11 @@ const setPenawaranDetail = (v: any) => {
             <button
               type="button"
               class="btn-lkp"
-              @mousedown.prevent="showSalesModal = true"
+              @mousedown.prevent="
+                isOpeningModal = true;
+                showSalesModal = true;
+              "
+              @click="isOpeningModal = false"
             >
               🔍
             </button>
@@ -512,6 +726,8 @@ const setPenawaranDetail = (v: any) => {
               class="f-inp"
               style="width: 60px"
               :disabled="isEdit"
+              @keydown.enter.prevent="onJoKodeEnter"
+              @blur="onJoKodeEnter"
             />
             <input
               :value="formData.JenisOrder"
@@ -522,7 +738,11 @@ const setPenawaranDetail = (v: any) => {
             <button
               type="button"
               class="btn-lkp"
-              @mousedown.prevent="showJoModal = true"
+              @mousedown.prevent="
+                isOpeningModal = true;
+                showJoModal = true;
+              "
+              @click="isOpeningModal = false"
             >
               🔍
             </button>
@@ -686,6 +906,8 @@ const setPenawaranDetail = (v: any) => {
               v-model="formData.Cab"
               class="f-inp"
               style="width: 48px; background: #ddeeff"
+              @keydown.enter.prevent="onCabMapKodeEnter"
+              @blur="onCabMapKodeEnter"
             />
             <input
               :value="formData.Workshop"
@@ -696,7 +918,11 @@ const setPenawaranDetail = (v: any) => {
             <button
               type="button"
               class="btn-lkp"
-              @mousedown.prevent="showCabMapModal = true"
+              @mousedown.prevent="
+                isOpeningModal = true;
+                showCabMapModal = true;
+              "
+              @click="isOpeningModal = false"
             >
               🔍
             </button>
@@ -719,6 +945,8 @@ const setPenawaranDetail = (v: any) => {
               v-model="formData.Cab2"
               class="f-inp"
               style="width: 48px; background: #ddeeff"
+              @keydown.enter.prevent="onCabSpkKodeEnter"
+              @blur="onCabSpkKodeEnter"
             />
             <input
               :value="formData.Workshop2"
@@ -729,7 +957,11 @@ const setPenawaranDetail = (v: any) => {
             <button
               type="button"
               class="btn-lkp"
-              @mousedown.prevent="showCabSpkModal = true"
+              @mousedown.prevent="
+                isOpeningModal = true;
+                showCabSpkModal = true;
+              "
+              @click="isOpeningModal = false"
             >
               🔍
             </button>

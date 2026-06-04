@@ -42,11 +42,15 @@ const totalAlokasi = computed(() => {
 
 const mainImageUrl = computed(() => {
   if (!data.value?.spk_nomor) return "";
-  const base = (api.defaults.baseURL || "").replace(/\/api\/?$/, "");
+
+  const base =
+    import.meta.env.VITE_API_BASE_URL?.replace(/\/api\/?$/, "") ||
+    (api.defaults.baseURL || "").replace(/\/api\/?$/, "") ||
+    `${window.location.protocol}//${window.location.hostname}:3088`;
+
   const cab = data.value.spk_cab || "HO-";
   const memo = data.value.spk_memo;
 
-  // Jika ada MAP, coba folder map dulu
   if (memo) {
     return `${base}/images/${cab}/map/${encodeURIComponent(memo)}.jpg`;
   }
@@ -63,10 +67,21 @@ const handleSignatureError = (e: Event) => {
 };
 const handleImageError = (e: Event) => {
   const img = e.target as HTMLImageElement;
-  if (!img.src.includes("103.94.238.252")) {
-    // Fallback ke VPS
-    const nomor = data.value.spk_memo || data.value.spk_nomor;
-    img.src = `http://103.94.238.252:8888/file-gambar/${encodeURIComponent(nomor)}.jpg`;
+
+  // Jika sudah fallback ke VPS, sembunyikan
+  if (img.dataset.fallbackTried === "true") {
+    img.style.display = "none";
+    return;
+  }
+  img.dataset.fallbackTried = "true";
+
+  const nomor = data.value.spk_memo || data.value.spk_nomor;
+  if (nomor) {
+    if (data.value.spk_memo) {
+      img.src = `http://103.94.238.252:8888/file-gambar/map/${encodeURIComponent(nomor)}.jpg`;
+    } else {
+      img.src = `http://103.94.238.252:8888/file-gambar/${encodeURIComponent(nomor)}.jpg`;
+    }
   } else {
     img.style.display = "none";
   }

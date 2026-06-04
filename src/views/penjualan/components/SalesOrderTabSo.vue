@@ -34,6 +34,7 @@ const emit = defineEmits([
 ]);
 const toast = useToast();
 const authStore = useAuthStore();
+const isOpeningModal = ref(false);
 
 const isDivisiTiga = computed(() =>
   String(props.formData.spk_divisi).startsWith("3"),
@@ -47,47 +48,52 @@ const tipeSpkOptions = ["", "Premium", "Medium", "Reguler"];
 const pendingOptions = ["NORMAL", "PENDING SEBAGIAN", "PENDING PENUH"];
 
 const showPreviewDialog = ref(false);
-
 const isImageError = ref(false);
-
 const isAutoSettingDateline = ref(false);
-
 const isInitialLoad = ref(true);
+
+const workshopCache = ref<any[]>([]);
 
 const fileRef = ref<HTMLInputElement | null>(null);
 const displayImageUrl = computed(() => {
   if (props.formData.MainImageBlob) return props.formData.MainImageBlob;
 
-  const getBaseUrl = () => api.defaults.baseURL?.replace(/\/api\/?$/, "") || "";
+  const base =
+    import.meta.env.VITE_API_BASE_URL?.replace(/\/api\/?$/, "") ||
+    api.defaults.baseURL?.replace(/\/api\/?$/, "") ||
+    `${window.location.protocol}//${window.location.hostname}:3088`;
 
-  const base = getBaseUrl();
   const cab = props.formData.spk_cab || "HO-";
+  const nomor = props.formData.spk_memo || props.formData.spk_nomor;
 
-  if (props.isEdit) {
-    if (props.formData.spk_memo) {
-      return `${base}/images/${cab}/map/${encodeURIComponent(props.formData.spk_memo)}.jpg`;
-    }
-    return `${base}/images/${cab}/${encodeURIComponent(props.formData.spk_nomor)}.jpg`;
+  if (!nomor) return "";
+
+  // Jika ada MAP, gambar diambil dari subfolder map
+  if (props.formData.spk_memo) {
+    return `${base}/images/${cab}/map/${encodeURIComponent(props.formData.spk_memo)}.jpg`;
   }
 
-  // Edit mode: gambar SPK (bukan MAP) — tidak pakai subfolder map
-  return `${base}/images/${cab}/${encodeURIComponent(props.formData.spk_nomor)}.jpg`;
+  return `${base}/images/${cab}/${encodeURIComponent(nomor)}.jpg`;
 });
 
 const onImageError = (e: Event) => {
   const img = e.target as HTMLImageElement;
-  const currentSrc = img.src;
 
-  // Jika sudah dari VPS, stop
-  if (currentSrc.includes("103.94.238.252")) {
+  if (img.dataset.fallbackTried === "true") {
+    // VPS juga gagal — sembunyikan img, tampilkan placeholder
     isImageError.value = true;
+    img.style.display = "none";
     return;
   }
+  img.dataset.fallbackTried = "true";
 
-  // Fallback ke VPS
   const nomor = props.formData.spk_memo || props.formData.spk_nomor;
   if (nomor) {
-    img.src = `http://103.94.238.252:8888/file-gambar/${encodeURIComponent(nomor)}.jpg`;
+    if (props.formData.spk_memo) {
+      img.src = `http://103.94.238.252:8888/file-gambar/map/${encodeURIComponent(nomor)}.jpg`;
+    } else {
+      img.src = `http://103.94.238.252:8888/file-gambar/${encodeURIComponent(nomor)}.jpg`;
+    }
   } else {
     isImageError.value = true;
   }
@@ -190,6 +196,191 @@ const handleAccPendingClick = () => {
         "Status ACC Pending ditolak. Lakukan simpan data untuk melanjutkan.",
       );
     }
+  }
+};
+
+// ── Generic lookup by kode ──
+const lookupByKode = async (
+  endpoint: string,
+  kode: string,
+  kodeField: string,
+  namaField: string,
+) => {
+  if (!kode?.trim()) return null;
+  const res = await api.get(endpoint, { params: { q: kode.trim(), limit: 1 } });
+  const items = res.data.data?.items || res.data.data || [];
+  return (
+    items.find((i: any) => {
+      // Coba semua kemungkinan casing: kodeField asli, kapital huruf pertama, all caps
+      const val =
+        i[kodeField] ||
+        i[kodeField.charAt(0).toUpperCase() + kodeField.slice(1)] ||
+        i["Kode"] ||
+        i["kode"] ||
+        "";
+      return val.toString().toUpperCase() === kode.trim().toUpperCase();
+    }) || null
+  );
+};
+
+// Perusahaan
+const onPerushKodeEnter = async () => {
+  if (isOpeningModal.value) return;
+  const kode = props.formData.spk_perush_kode?.trim();
+  if (!kode) {
+    props.formData.NamaPerusahaan = "";
+    return;
+  }
+  try {
+    const item = await lookupByKode(
+      "/lookups/perusahaan",
+      kode,
+      "perush_kode",
+      "perush_nama",
+    );
+    if (item) {
+      props.formData.spk_perush_kode = item.perush_kode || item.Kode;
+      props.formData.NamaPerusahaan = item.perush_nama || item.Nama;
+    } else {
+      toast.error("Kode perusahaan tidak ditemukan.");
+      props.formData.spk_perush_kode = "";
+      props.formData.NamaPerusahaan = "";
+    }
+  } catch {
+    toast.error("Gagal validasi kode perusahaan.");
+  }
+};
+
+// Customer
+const onCustKodeEnter = async () => {
+  if (isOpeningModal.value) return;
+  const kode = props.formData.spk_cus_kode?.trim();
+  if (!kode) {
+    props.formData.Customer = "";
+    return;
+  }
+  try {
+    const res = await api.get("/lookups/customer", {
+      params: { q: kode, limit: 1 },
+    });
+    const items = res.data.data?.items || res.data.data || [];
+    const item = items.find(
+      (i: any) =>
+        (i.Kode || i.cus_kode || "").toUpperCase() === kode.toUpperCase(),
+    );
+    if (item) {
+      const aktif = item.cus_aktif ?? item.Aktif ?? 0;
+      if (aktif === 1 || aktif === "1") {
+        toast.warning("Status Customer Pasif.");
+        props.formData.spk_cus_kode = "";
+        props.formData.Customer = "";
+        return;
+      }
+      props.formData.spk_cus_kode = item.Kode || item.cus_kode;
+      props.formData.Customer = item.Nama || item.cus_nama;
+      props.formData.cus_perfect = item.cus_perfect || "N";
+      emit("field-blur", "customer", props.formData.spk_cus_kode);
+    } else {
+      toast.error("Kode customer tidak ditemukan.");
+      props.formData.spk_cus_kode = "";
+      props.formData.Customer = "";
+    }
+  } catch {
+    toast.error("Gagal validasi kode customer.");
+  }
+};
+
+// Jenis Order
+const onJoKodeEnter = async () => {
+  if (isOpeningModal.value) return;
+  const kode = props.formData.spk_jo_kode?.trim();
+  if (!kode) {
+    props.formData.JenisOrder = "";
+    return;
+  }
+  try {
+    const res = await api.get("/lookups/jenis-order", {
+      params: { q: kode, divisi: props.formData.spk_divisi, limit: 1 },
+    });
+    const items = res.data.data?.items || res.data.data || [];
+    const item = items.find(
+      (i: any) =>
+        (i.jo_kode || i.Kode || "").toUpperCase() === kode.toUpperCase(),
+    );
+    if (item) {
+      props.formData.spk_jo_kode = item.jo_kode || item.Kode;
+      props.formData.JenisOrder = item.jo_nama || item.Nama;
+    } else {
+      toast.error("Kode jenis order tidak ditemukan.");
+      props.formData.spk_jo_kode = "";
+      props.formData.JenisOrder = "";
+    }
+  } catch {
+    toast.error("Gagal validasi kode jenis order.");
+  }
+};
+
+// Sales
+const onSalesKodeEnter = async () => {
+  if (isOpeningModal.value) return;
+  const kode = props.formData.spk_sal_kode?.trim();
+  if (!kode) {
+    props.formData.Sales = "";
+    return;
+  }
+  try {
+    const item = await lookupByKode(
+      "/lookups/sales",
+      kode,
+      "sal_kode",
+      "sal_nama",
+    );
+    if (item) {
+      props.formData.spk_sal_kode = item.sal_kode || item.Kode;
+      props.formData.Sales = item.sal_nama || item.Nama;
+    } else {
+      toast.error("Kode sales tidak ditemukan.");
+      props.formData.spk_sal_kode = "";
+      props.formData.Sales = "";
+    }
+  } catch {
+    toast.error("Gagal validasi kode sales.");
+  }
+};
+
+const getWorkshopByKode = async (kode: string) => {
+  if (workshopCache.value.length === 0) {
+    const res = await api.get("/lookups/cabang-pabrik");
+    workshopCache.value = res.data.data?.items || res.data.data || [];
+  }
+  return (
+    workshopCache.value.find(
+      (i: any) =>
+        (i.pab_kode || i.Kode || "").toUpperCase() === kode.toUpperCase(),
+    ) || null
+  );
+};
+
+// Workshop (Pabrik/Cabang)
+const onWorkshopKodeEnter = async () => {
+  if (isOpeningModal.value) return;
+  const kode = props.formData.spk_cab?.trim();
+  if (!kode) {
+    props.formData.spk_workshop = "";
+    return;
+  }
+  try {
+    const item = await getWorkshopByKode(kode);
+    if (item) {
+      props.formData.spk_cab = item.pab_kode || item.Kode;
+      props.formData.spk_workshop = item.pab_nama || item.Nama;
+    } else {
+      toast.error("Kode workshop tidak ditemukan.");
+      props.formData.spk_cab = "";
+      props.formData.spk_workshop = "";
+    }
+  } catch {
+    toast.error("Gagal validasi kode workshop.");
   }
 };
 
@@ -307,7 +498,6 @@ watch(
 watch(
   () => props.formData.spk_statuskerja,
   async (newStatus, oldStatus) => {
-    // 1. Cek apakah Customer sudah diisi
     const isDiv3 = String(props.formData.spk_divisi).startsWith("3");
     const custKode = isDiv3
       ? props.formData.spk_cus_kaosan
@@ -317,11 +507,10 @@ watch(
       toast.warning(
         "Customer silahkan di isi dulu sebelum mengubah tingkat kepentingan.",
       );
-      props.formData.spk_statuskerja = "STANDART"; // Kembalikan ke Standart
+      props.formData.spk_statuskerja = "STANDART";
       return;
     }
 
-    // 2. Validasi Khusus TOP URGENT (Bukan Kaosan & Bukan Jenis KS)
     if (
       newStatus === "TOP URGENT" &&
       !isDiv3 &&
@@ -330,16 +519,23 @@ watch(
       try {
         const res = await api.get(
           "/penjualan/sales-order/form/check-top-urgent",
-          {
-            params: { cusKode: custKode, divisi: props.formData.spk_divisi },
-          },
+          { params: { cusKode: custKode, divisi: props.formData.spk_divisi } },
         );
 
         if (res.data.berhak) {
-          props.formData.kepentingan_acc = ""; // Aman
+          props.formData.kepentingan_acc = "";
+          // Restore aktif jika sebelumnya PASIF karena kepentingan
+          if (
+            props.formData.spk_aktif === "N" &&
+            props.formData.pin_customer === "N" &&
+            !props.formData.ketpo_acc &&
+            !props.formData.spk_pinjo
+          ) {
+            props.formData.spk_aktif = "Y";
+          }
         } else {
           props.formData.kepentingan_acc = "MINTA ACC";
-          props.formData.spk_aktif = "N"; // Mengikuti logika Timer1Timer
+          props.formData.spk_aktif = "N";
           toast.warning(
             "Status Customer belum mencapai syarat TOP URGENT. Membutuhkan ACC.",
           );
@@ -348,11 +544,33 @@ watch(
         console.error("Gagal mengecek hak prioritas", error);
       }
     } else {
-      // Jika bukan TOP URGENT, hapus status ACC jika tidak dikunci
+      // Bukan TOP URGENT — hapus acc jika bukan sudah di-ACC
       if (props.formData.kepentingan_acc !== "ACC") {
         props.formData.kepentingan_acc = "";
+        // Restore aktif jika sebelumnya PASIF hanya karena kepentingan
+        if (
+          props.formData.spk_aktif === "N" &&
+          props.formData.pin_customer === "N" &&
+          !props.formData.ketpo_acc &&
+          !props.formData.spk_pinjo
+        ) {
+          props.formData.spk_aktif = "Y";
+        }
       }
     }
+  },
+);
+
+watch(
+  () => props.formData.spk_nomor,
+  () => {
+    isImageError.value = false;
+  },
+);
+watch(
+  () => props.formData.spk_memo,
+  () => {
+    isImageError.value = false;
   },
 );
 </script>
@@ -472,6 +690,8 @@ watch(
               class="inp"
               style="width: 60px; background: #ddeeff"
               :disabled="isEdit"
+              @keydown.enter.prevent="onPerushKodeEnter"
+              @blur="onPerushKodeEnter"
             />
             <input
               :value="formData.NamaPerusahaan"
@@ -482,7 +702,11 @@ watch(
             <button
               type="button"
               class="blkp"
-              @mousedown.prevent="$emit('open-lookup', 'perusahaan')"
+              @mousedown.prevent="
+                isOpeningModal = true;
+                $emit('open-lookup', 'perusahaan');
+              "
+              @click="isOpeningModal = false"
               :disabled="isEdit"
             >
               &#128269;
@@ -509,6 +733,8 @@ watch(
               v-model="formData.spk_cus_kode"
               class="inp"
               style="width: 60px; background: #ddeeff"
+              @keydown.enter.prevent="onCustKodeEnter"
+              @blur="onCustKodeEnter"
             />
             <input
               :value="formData.Customer"
@@ -519,7 +745,11 @@ watch(
             <button
               type="button"
               class="blkp"
-              @mousedown.prevent="$emit('open-lookup', 'customer')"
+              @mousedown.prevent="
+                isOpeningModal = true;
+                $emit('open-lookup', 'customer');
+              "
+              @click="isOpeningModal = false"
             >
               &#128269;
             </button>
@@ -601,6 +831,8 @@ watch(
                   class="inp"
                   style="width: 50px; background: #ddeeff"
                   :disabled="isEdit"
+                  @keydown.enter.prevent="onJoKodeEnter"
+                  @blur="onJoKodeEnter"
                 />
                 <input
                   :value="formData.JenisOrder"
@@ -611,7 +843,11 @@ watch(
                 <button
                   type="button"
                   class="blkp"
-                  @mousedown.prevent="$emit('open-lookup', 'jenisOrder')"
+                  @mousedown.prevent="
+                    isOpeningModal = true;
+                    $emit('open-lookup', 'jenisOrder');
+                  "
+                  @click="isOpeningModal = false"
                   :disabled="isEdit"
                 >
                   &#128269;
@@ -775,11 +1011,22 @@ watch(
             </div>
             <div class="fr mt-2">
               <label class="lbl" style="width: 85px">Nomor PO</label>
-              <input
-                v-model="formData.spk_nomor_po"
-                class="inp"
-                style="flex: 1"
-              />
+              <div class="igrp" style="flex: 1">
+                <input
+                  v-model="formData.spk_nomor_po"
+                  class="inp"
+                  style="flex: 1"
+                  placeholder="Ketik PO / Ambil Setoran..."
+                />
+                <button
+                  type="button"
+                  class="blkp"
+                  title="Cari dari Setoran Pembayaran"
+                  @mousedown.prevent="emit('open-lookup', 'setoranPembayaran')"
+                >
+                  &#128269;
+                </button>
+              </div>
             </div>
             <div class="fr">
               <label class="lbl" style="width: 85px">Tanggal PO</label>
@@ -819,6 +1066,8 @@ watch(
               v-model="formData.spk_sal_kode"
               class="inp"
               style="width: 60px; background: #ddeeff"
+              @keydown.enter.prevent="onSalesKodeEnter"
+              @blur="onSalesKodeEnter"
             />
             <input
               :value="formData.Sales"
@@ -829,7 +1078,11 @@ watch(
             <button
               type="button"
               class="blkp"
-              @mousedown.prevent="$emit('open-lookup', 'sales')"
+              @mousedown.prevent="
+                isOpeningModal = true;
+                $emit('open-lookup', 'sales');
+              "
+              @click="isOpeningModal = false"
             >
               &#128269;
             </button>
@@ -1259,6 +1512,8 @@ watch(
               v-model="formData.spk_cab"
               class="inp"
               style="width: 44px; background: #ddeeff"
+              @keydown.enter.prevent="onWorkshopKodeEnter"
+              @blur="onWorkshopKodeEnter"
             />
             <input
               :value="formData.spk_workshop"
@@ -1269,7 +1524,11 @@ watch(
             <button
               type="button"
               class="blkp"
-              @mousedown.prevent="$emit('open-lookup', 'workshop')"
+              @mousedown.prevent="
+                isOpeningModal = true;
+                $emit('open-lookup', 'workshop');
+              "
+              @click="isOpeningModal = false"
             >
               &#128269;
             </button>

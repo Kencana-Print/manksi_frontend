@@ -50,6 +50,59 @@ type RouteParams = {
 
 const toast = useToast();
 
+const onCusKodeEnter = async () => {
+  const kode = (formData.value.header.sj_cus_kode || "").trim();
+  if (!kode) {
+    formData.value.header.cus_nama = "";
+    return;
+  }
+  try {
+    const res = await api.get("/lookups/customer", {
+      params: { q: kode, limit: 1 },
+    });
+    const items = res.data.data.items || res.data.data || [];
+    const exact = items.find(
+      (c: any) =>
+        (c.cus_kode || c.Kode || "").toUpperCase() === kode.toUpperCase(),
+    );
+    if (exact) {
+      const aktif = exact.cus_aktif ?? exact.Aktif ?? 0;
+      if (aktif === 1 || aktif === "1") {
+        toast.warning("Status Customer Pasif.");
+        formData.value.header.sj_cus_kode = "";
+        formData.value.header.cus_nama = "";
+        return;
+      }
+      formData.value.header.sj_cus_kode = exact.cus_kode || exact.Kode;
+      formData.value.header.cus_nama = exact.cus_nama || exact.Nama;
+      formData.value.header.sj_alamat_customer =
+        exact.cus_alamat || exact.Alamat || "";
+      formData.value.header.sj_kota_customer =
+        exact.cus_kota || exact.Kota || "";
+
+      if (formData.value.details.filter((d) => d.kode).length === 0) {
+        formData.value.details = [
+          {
+            kode: "",
+            nama: "",
+            ukuran: "",
+            bahan: "",
+            jumlah: 0,
+            jumlah_kirim: 0,
+            kurang: 0,
+          },
+        ];
+      }
+    } else {
+      toast.error("Kode customer tidak ditemukan.");
+      formData.value.header.sj_cus_kode = "";
+      formData.value.header.cus_nama = "";
+    }
+  } catch {
+    toast.error("Gagal memvalidasi kode customer.");
+  }
+};
+
 const formatDateLocal = (value?: string | Date) => {
   if (!value) return "";
 
@@ -108,6 +161,29 @@ const {
 
     const raw: any = res.data.data;
 
+    const mappedDetails = (raw.details || []).map(
+      (d: any): SjDetail => ({
+        kode: d.SJD_MSPK_Nomor || d.sjd_mspk_nomor,
+        nama: d.mspk_nama,
+        ukuran: d.SJD_Ukuran || d.sjd_ukuran || "",
+        bahan: d.mspk_kain,
+        jumlah: Number(d.SJD_Jumlah || d.sjd_jumlah) || 0,
+        jumlah_kirim: Number(d.jml_kirim_lama) || 0,
+        kurang: Number(d.sisa_order) || 0,
+      }),
+    );
+
+    // Tambah baris kosong di akhir untuk siap input baru
+    mappedDetails.push({
+      kode: "",
+      nama: "",
+      ukuran: "",
+      bahan: "",
+      jumlah: 0,
+      jumlah_kirim: 0,
+      kurang: 0,
+    });
+
     return {
       header: {
         sj_nomor: raw.header.SJ_Nomor,
@@ -129,7 +205,7 @@ const {
           nama: d.mspk_nama,
           ukuran: d.SJD_Ukuran,
           bahan: d.mspk_kain,
-          jumlah: Number(d.SJD_Jumlah) || 0,
+          jumlah: Number(d.SJD_Jumlah || d.sjd_jumlah) || 0,
           jumlah_kirim: Number(d.jml_kirim_lama) || 0,
           kurang: Number(d.sisa_order) || 0,
         }),
@@ -139,7 +215,9 @@ const {
   },
   submitApi: async (data: SjForm): Promise<unknown> => {
     return await api.post("/penjualan/sj-map/form", {
-      ...data,
+      header: data.header,
+      details: data.details.filter((d) => d.kode), // ← buang baris kosong
+      pinStatus: data.pinStatus,
       isEdit: isEditMode.value,
     });
   },
@@ -165,7 +243,8 @@ const onPerushSelected = (item: any) => {
 };
 
 const onCusSelected = (item: any) => {
-  if (formData.value.details.length > 0) {
+  const filledDetails = formData.value.details.filter((d) => d.kode);
+  if (filledDetails.length > 0) {
     pendingCusItem.value = item;
     showCusConfirm.value = true;
   } else {
@@ -178,7 +257,17 @@ const applyCustomer = (item: any) => {
   formData.value.header.cus_nama = item.Nama;
   formData.value.header.sj_alamat_customer = item.Alamat;
   formData.value.header.sj_kota_customer = item.Kota; // Sekarang Kota terisi karena backend sudah diupdate
-  formData.value.details = [];
+  formData.value.details = [
+    {
+      kode: "",
+      nama: "",
+      ukuran: "",
+      bahan: "",
+      jumlah: 0,
+      jumlah_kirim: 0,
+      kurang: 0,
+    },
+  ];
   showCusConfirm.value = false;
 };
 
@@ -208,6 +297,20 @@ const onMapSelected = async (item: any) => {
       ...data, // Berisi: kode, nama, ukuran, bahan, jumlah_kirim, kurang
       jumlah: data.kurang, // Isi otomatis jumlah kirim dengan sisa order
     };
+
+    const details = formData.value.details;
+    const last = details[details.length - 1];
+    if (last && last.kode) {
+      details.push({
+        kode: "",
+        nama: "",
+        ukuran: "",
+        bahan: "",
+        jumlah: 0,
+        jumlah_kirim: 0,
+        kurang: 0,
+      });
+    }
   } catch (e: any) {
     toast.error(e.response?.data?.message || "Gagal memproses MAP.");
   }
@@ -216,6 +319,11 @@ const onMapSelected = async (item: any) => {
 const addRow = () => {
   if (!formData.value.header.sj_cus_kode)
     return toast.warning("Pilih Customer terlebih dahulu.");
+
+  // Cek apakah baris terakhir masih kosong — jangan tambah lagi
+  const last = formData.value.details[formData.value.details.length - 1];
+  if (last && !last.kode) return; // baris kosong sudah ada
+
   formData.value.details.push({
     kode: "",
     nama: "",
@@ -241,8 +349,14 @@ const validateSave = () => {
     return toast.error("Perusahaan belum diisi");
   if (!formData.value.header.cus_nama)
     return toast.error("Customer belum diisi");
-  if (formData.value.details.length === 0)
-    return toast.error("Surat Jalan tidak ada detail");
+  const filledDetails = formData.value.details.filter((d) => d.kode);
+  for (const d of filledDetails) {
+    if (Number(d.jumlah) > Number(d.kurang)) {
+      return toast.error(
+        `Jumlah Kirim MAP ${d.kode} melebihi sisa order (${d.kurang})`,
+      );
+    }
+  }
 
   // Validasi jumlah kirim vs sisa order
   for (const d of formData.value.details) {
@@ -287,7 +401,20 @@ const loadDivisi = async () => {
 
 onMounted(() => {
   loadDivisi();
-  if (isEditMode.value) fetchData();
+  if (isEditMode.value) {
+    fetchData();
+  } else {
+    // Mode baru: sediakan 1 baris kosong siap pakai
+    formData.value.details.push({
+      kode: "",
+      nama: "",
+      ukuran: "",
+      bahan: "",
+      jumlah: 0,
+      jumlah_kirim: 0,
+      kurang: 0,
+    });
+  }
 });
 </script>
 
@@ -381,9 +508,16 @@ onMounted(() => {
           <div class="inp-grp" style="flex: 1">
             <input
               v-model="formData.header.sj_cus_kode"
-              class="f-inp f-ro"
-              readonly
-              style="width: 60px; flex: none"
+              class="f-inp"
+              style="
+                width: 60px;
+                flex: none;
+                background: #ddeeff;
+                font-weight: 600;
+              "
+              placeholder="Kode"
+              @keydown.enter.prevent="onCusKodeEnter"
+              @blur="onCusKodeEnter"
             />
             <input
               v-model="formData.header.cus_nama"
@@ -475,7 +609,8 @@ onMounted(() => {
               <tr>
                 <th style="width: 32px">No</th>
                 <th style="width: 180px">Kode MAP</th>
-                <th style="text-align: left">Nama Pekerjaan / Ukuran</th>
+                <th style="text-align: left">Nama Pekerjaan</th>
+                <th style="width: 100px; text-align: left">Ukuran</th>
                 <th style="width: 130px; text-align: left">Bahan</th>
                 <th class="th-yellow" style="width: 90px; text-align: right">
                   Jumlah
@@ -517,9 +652,14 @@ onMounted(() => {
                   <div style="font-weight: 500; font-size: 11px">
                     {{ d.nama }}
                   </div>
-                  <div style="font-size: 10px; color: #757575">
-                    {{ d.ukuran }}
-                  </div>
+                </td>
+                <td class="p0">
+                  <input
+                    v-model="d.ukuran"
+                    class="cell-inp"
+                    placeholder="Ukuran..."
+                    style="width: 100%; height: 28px; padding: 0 6px"
+                  />
                 </td>
                 <td style="font-size: 11px; color: #555">{{ d.bahan }}</td>
                 <td class="p0">

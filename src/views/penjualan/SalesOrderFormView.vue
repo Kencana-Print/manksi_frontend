@@ -31,6 +31,7 @@ import MapSearchModal from "@/components/lookups/MapSearchModal.vue";
 import MppbSearchModal from "@/components/lookups/MppbSearchModal.vue";
 import HistoryAlokasiModal from "@/components/lookups/HistoryAlokasiModal.vue";
 import BarangKaosanSearchModal from "@/components/lookups/BarangKaosanSearchModal.vue";
+import SetoranSearchModal from "@/components/lookups/SetoranSearchModal.vue";
 
 const route = useRoute();
 const router = useRouter();
@@ -63,12 +64,11 @@ const showWorkshopModal = ref(false);
 const showStokDcModal = ref(false);
 const showSoKaosanModal = ref(false);
 const showSpkLamaModal = ref(false);
-
-// Placeholder untuk modal yang belum dibuat komponennya
 const showSjMemoModal = ref(false);
 const showMemoModal = ref(false);
 const showMppbModal = ref(false);
 const showRepeatModal = ref(false);
+const showSetoranModal = ref(false);
 
 const isLoadingMemo = ref(false);
 
@@ -334,6 +334,10 @@ const {
         spk_memo: data.spk_memo, // ← No MAP
         spk_tipe: data.spk_tipe, // ← Tipe SPK
         spk_nama2: data.spk_nama2, // ← Nama Ext
+        spk_aktif: data.spk_aktif, // ← tambah ini
+        kepentingan_acc: data.kepentingan_acc, // ← tambah ini (untuk disimpan ke pin)
+        pin_customer: data.pin_customer, // ← tambah ini
+        ketpo_acc: data.ketpo_acc, // ← tambah ini
       },
       alokasi: data.Alokasi,
       dtlKaosan: data.Kaosan,
@@ -506,6 +510,13 @@ const handleLookup = (type: string) => {
       break;
     case "spkLama": // <--- TAMBAHKAN INI
       showSpkLamaModal.value = true;
+      break;
+    case "setoranPembayaran":
+      if (!formData.value.spk_cus_kode) {
+        toast.warning("Silahkan pilih Customer terlebih dahulu.");
+        return;
+      }
+      showSetoranModal.value = true;
       break;
   }
 };
@@ -692,6 +703,15 @@ const setMppb = (v: any) => {
   formData.value.spk_mppb = v.Nomor || v.mpb_nomor;
   formData.value.jmlmppb = v.Jumlah || v.mpb_jmlorder || 0;
 };
+// Setter untuk menampung hasil pilihan setoran pembayaran ke Nomor PO
+const setSetoranPembayaran = (v: any) => {
+  formData.value.spk_nomor_po = v.Nomor;
+  // Tanggal PO disesuaikan otomatis dengan tanggal transaksi setoran
+  if (v.Tanggal) {
+    formData.value.spk_tgl_po = getLocalDateString(v.Tanggal);
+  }
+  toast.success(`Nomor PO diisi menggunakan nomor setoran: ${v.Nomor}`);
+};
 
 // --- VALIDASI ON BLUR (MIRIP DELPHI ON EXIT) ---
 const handleFieldBlur = async (type: string, value: string) => {
@@ -761,7 +781,7 @@ const uploadImageMain = (file: File) => {
   imageToUpload.value = file;
 };
 
-const validateSave = () => {
+const validateSave = async () => {
   const fd = formData.value;
   const divisiStr = String(fd.spk_divisi).charAt(0);
   const qtyPesan = Number(fd.spk_jumlah) || 0;
@@ -859,6 +879,70 @@ const validateSave = () => {
         "Jumlah SPK vs Total Qty Order di Detail Barang Kaosan harus sama.",
       );
       return;
+    }
+  }
+
+  // 8. Validasi Dateline Range (Sesuai btnsimpanClick Delphi)
+  if (fd.kepentingan_acc !== "ACC") {
+    try {
+      const res = await api.get("/penjualan/sales-order/form/dateline-limits", {
+        params: {
+          divisi: fd.spk_divisi,
+          joKode: fd.spk_jo_kode,
+          kepentingan: fd.spk_statuskerja,
+        },
+      });
+      const { minHari, maxHari, isKebal } = res.data.data;
+      console.log("dateline check:", {
+        minHari,
+        maxHari,
+        isKebal,
+        tglSpk: fd.spk_tanggal,
+        tglDateline: fd.spk_dateline,
+        dt1: new Date(new Date(fd.spk_tanggal).getTime() + minHari * 86400000)
+          .toISOString()
+          .substring(0, 10),
+        dt2: new Date(new Date(fd.spk_tanggal).getTime() + maxHari * 86400000)
+          .toISOString()
+          .substring(0, 10),
+      });
+
+      if (!isKebal && fd.spk_tanggal && fd.spk_dateline) {
+        const tglSpk = new Date(fd.spk_tanggal).getTime();
+        const tglDateline = new Date(fd.spk_dateline).getTime();
+        const dt1 = tglSpk + minHari * 86400000;
+        const dt2 = tglSpk + maxHari * 86400000;
+
+        if (tglDateline < dt1 || tglDateline > dt2) {
+          const fmtDate = (ts: number) => {
+            const d = new Date(ts);
+            return `${String(d.getDate()).padStart(2, "0")}-${String(d.getMonth() + 1).padStart(2, "0")}-${d.getFullYear()}`;
+          };
+
+          // Khusus divisi 6 + TOP URGENT + dateline < minimum → MINTA ACC, bukan reject
+          if (
+            divisiStr === "6" &&
+            fd.spk_statuskerja === "TOP URGENT" &&
+            tglDateline < dt1
+          ) {
+            if (fd.kepentingan_acc !== "ACC") {
+              formData.value.kepentingan_acc = "MINTA ACC";
+              formData.value.spk_aktif = "N";
+              toast.warning(
+                "Dateline < batas minimum. Membutuhkan ACC kepentingan.",
+              );
+            }
+            // Tetap lanjut simpan (sesuai Delphi yang tidak exit di sini)
+          } else {
+            toast.warning(
+              `Valid Dateline Range: ${fmtDate(dt1)} s/d ${fmtDate(dt2)}`,
+            );
+            return; // Batalkan simpan
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Gagal validasi dateline range", e);
     }
   }
 
@@ -1067,6 +1151,11 @@ const setBarangKaosan = (selectedItems: any[]) => {
       <SoKaosanSearchModal
         v-model="showSoKaosanModal"
         @selected="setSoKaosan"
+      />
+      <SetoranSearchModal
+        v-model="showSetoranModal"
+        :cust-kode="formData.spk_cus_kode"
+        @selected="setSetoranPembayaran"
       />
 
       <v-dialog v-model="showConfirmCmoDialog" max-width="320px" persistent>

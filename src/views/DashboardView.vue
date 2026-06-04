@@ -23,7 +23,7 @@ const bagian = computed(() =>
   (authStore.user?.bagian || "").toUpperCase().trim(),
 );
 const isSuperViewer = computed(() =>
-  ["EDP", "DIREKSI", "OWNER", "IT"].includes(bagian.value),
+  ["EDP", "DIREKSI", "OWNER", "IT", "AUDIT"].includes(bagian.value),
 );
 const showPenawaran = computed(
   () => ["MARKETING", "FINANCE"].includes(bagian.value) || isSuperViewer.value,
@@ -212,6 +212,12 @@ onUnmounted(() => {
 const closeSpkDialog = () => {
   isSpkDialogVisible.value = false;
   sessionStorage.setItem("hasSeenSpk", "true");
+};
+
+const goToKunjunganDetail = (namaSales?: string) => {
+  const query: Record<string, string> = {};
+  if (namaSales) query.sales = namaSales;
+  router.push({ path: "/laporan/marketing/kunjungan-sales", query });
 };
 
 // ── Penawaran helpers ──
@@ -699,6 +705,7 @@ const sisaClass = (item: any) => {
     </v-row>
 
     <!-- ── Row 2c: Kunjungan Sales ── -->
+    <!-- ── Row 2c: Kunjungan Sales ── -->
     <v-row v-if="showPenawaran" dense class="mb-2">
       <v-col cols="12">
         <div class="manksi-panel content-panel">
@@ -706,11 +713,9 @@ const sisaClass = (item: any) => {
             <IconWalk :size="14" :stroke-width="1.7" class="mr-1" />
             Kunjungan Sales
             <span class="panel-header-sub ml-1">(bulan ini)</span>
-            <button
-              class="po-bpb-link ml-auto"
-              @click="router.push('/laporan/marketing/kunjungan-sales')"
-            >
-              Lihat Detail →
+            <!-- Tombol lihat detail tanpa filter sales (semua) -->
+            <button class="po-bpb-link ml-auto" @click="goToKunjunganDetail()">
+              Lihat Semua →
             </button>
           </div>
           <div class="panel-body">
@@ -727,7 +732,7 @@ const sisaClass = (item: any) => {
                   :key="row.Nama_Sales"
                   class="knj-row"
                 >
-                  <!-- Nama + angka -->
+                  <!-- Baris atas: Nama + badge angka + tombol detail -->
                   <div class="knj-meta">
                     <span class="knj-sales">{{ row.Nama_Sales }}</span>
                     <div class="knj-stats">
@@ -735,9 +740,32 @@ const sisaClass = (item: any) => {
                       <span class="knj-badge failed">✕ {{ row.Failed }}</span>
                       <span class="knj-badge unplan">+ {{ row.Unplan }}</span>
                       <span class="knj-total">{{ row.Total }} total</span>
+                      <!-- Nominal badge -->
+                      <span
+                        v-if="row.NominalPenawaran"
+                        class="knj-nominal-badge"
+                        title="Total nominal penawaran bulan ini"
+                      >
+                        P: {{ shortNum(row.NominalPenawaran) }}
+                      </span>
+                      <span
+                        v-if="row.NominalMintaHarga"
+                        class="knj-nominal-badge knj-nominal-badge--mh"
+                        title="Total nominal minta harga bulan ini"
+                      >
+                        MH: {{ shortNum(row.NominalMintaHarga) }}
+                      </span>
+                      <!-- Tombol detail per sales -->
+                      <button
+                        class="knj-detail-btn"
+                        @click="goToKunjunganDetail(row.Nama_Sales)"
+                        title="Lihat detail kunjungan sales ini"
+                      >
+                        Detail →
+                      </button>
                     </div>
                   </div>
-                  <!-- Progress bar -->
+                  <!-- Progress bar (tidak berubah) -->
                   <div class="knj-bar-wrap">
                     <div class="knj-bar">
                       <div
@@ -783,6 +811,8 @@ const sisaClass = (item: any) => {
                 <span class="leg-dot" style="background: #43a047" />Done
                 <span class="leg-dot ml-2" style="background: #90caf9" />Unplan
                 <span class="leg-dot ml-2" style="background: #e53935" />Failed
+                <span class="leg-dot ml-2" style="background: #7c4dff" />📋 =
+                Penawaran bulan ini · MH = Minta Harga
               </div>
             </template>
             <div v-else class="text-center text-grey py-3 text-caption">
@@ -1752,5 +1782,37 @@ const sisaClass = (item: any) => {
   color: #2e7d32;
   min-width: 28px;
   text-align: right;
+}
+
+/* Badge nominal penawaran/MH per sales */
+.knj-nominal-badge {
+  font-size: 9px;
+  font-weight: 700;
+  background: #ede7f6;
+  color: #4527a0;
+  padding: 1px 6px;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+
+/* Tombol detail per-sales */
+.knj-detail-btn {
+  font-size: 9px;
+  font-weight: 700;
+  color: #2e7d32;
+  background: none;
+  border: 1px solid #c8e6c9;
+  border-radius: 3px;
+  padding: 1px 6px;
+  cursor: pointer;
+  line-height: 1.4;
+}
+.knj-detail-btn:hover {
+  background: #e8f5e9;
+}
+
+.knj-nominal-badge--mh {
+  background: #f3e5f5;
+  color: #6a1b9a;
 }
 </style>

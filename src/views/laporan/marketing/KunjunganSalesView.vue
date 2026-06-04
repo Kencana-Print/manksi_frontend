@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { ref, watch, onMounted } from "vue";
+import { useRoute } from "vue-router";
 import BaseBrowse from "@/components/BaseBrowse.vue";
 import { useBrowse } from "@/composables/useBrowse";
 import { kunjunganSalesService } from "@/services/laporan/marketing/kunjunganSalesService";
 import { IconUsers, IconCheck, IconX } from "@tabler/icons-vue";
+
+const route = useRoute();
 
 const today = new Date();
 const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -23,6 +26,16 @@ const formatDateLocal = (value?: string | Date) => {
 
 const dtAwal = ref(formatDateLocal(firstDay));
 const dtAkhir = ref(formatDateLocal(today));
+
+const shortNum = (n: number) => {
+  if (n >= 1_000_000_000) return (n / 1_000_000_000).toFixed(1) + "M";
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + "jt";
+  if (n >= 1_000) return (n / 1_000).toFixed(0) + "rb";
+  return String(n);
+};
+
+// ── Filter sales (bisa diisi dari query param dashboard) ──
+const filterSales = ref<string>("");
 
 const filterState = ref({
   startDate: dtAwal.value,
@@ -77,8 +90,8 @@ const fetchApi = async () => {
   const response = await kunjunganSalesService.getBrowse({
     startDate: filterState.value.startDate,
     endDate: filterState.value.endDate,
+    sales: filterSales.value || undefined,
   });
-  // Ambil data array summary dari struktur backend
   summarySales.value = response.data?.summary || [];
   return response.data?.data || [];
 };
@@ -89,13 +102,31 @@ const { items, isLoading, fetchData, exportToExcel } = useBrowse({
   immediate: false,
 });
 
-onMounted(() => fetchData());
+onMounted(() => {
+  // ── Baca query param ?sales=NamaSales dari dashboard ──
+  if (route.query.sales) {
+    filterSales.value = String(route.query.sales);
+  }
+  fetchData();
+});
 
 watch([dtAwal, dtAkhir], () => {
   filterState.value.startDate = dtAwal.value;
   filterState.value.endDate = dtAkhir.value;
   fetchData();
 });
+
+// Watch filterSales dengan debounce ringan
+let salesDebounce: ReturnType<typeof setTimeout> | null = null;
+watch(filterSales, () => {
+  if (salesDebounce) clearTimeout(salesDebounce);
+  salesDebounce = setTimeout(() => fetchData(), 400);
+});
+
+const clearSalesFilter = () => {
+  filterSales.value = "";
+  fetchData();
+};
 
 const formatDate = (val: string) => {
   if (!val || val.startsWith("0000")) return "-";
@@ -112,7 +143,7 @@ const getStatusColor = (status: string) => {
 const rowPropsFn = (data: any) => {
   const item = data.item?.raw || data.item;
   if (item.status_kunjungan === "failed") {
-    return { style: "background-color: #ffebee;" }; // Highlight kemerahan jika failed
+    return { style: "background-color: #ffebee;" };
   }
   return {};
 };
@@ -134,6 +165,7 @@ const rowPropsFn = (data: any) => {
   >
     <template #filter-left>
       <div class="filter-group">
+        <!-- Filter tanggal -->
         <input
           type="date"
           v-model="dtAwal"
@@ -147,6 +179,29 @@ const rowPropsFn = (data: any) => {
           class="date-inp"
           @change="fetchData"
         />
+
+        <!-- Filter nama sales -->
+        <div class="sales-filter-wrap">
+          <input
+            type="text"
+            v-model="filterSales"
+            class="date-inp sales-inp"
+            placeholder="🔍 Filter sales..."
+          />
+          <button
+            v-if="filterSales"
+            class="sales-clear-btn"
+            @click="clearSalesFilter"
+            title="Hapus filter sales"
+          >
+            ✕
+          </button>
+        </div>
+
+        <!-- Chip info jika filter sales aktif (dari dashboard) -->
+        <div v-if="filterSales" class="sales-active-chip">
+          Sales: <strong>{{ filterSales }}</strong>
+        </div>
       </div>
     </template>
 
@@ -190,12 +245,13 @@ const rowPropsFn = (data: any) => {
     </template>
   </BaseBrowse>
 
-  <v-dialog v-model="summaryDialog" max-width="650px">
+  <!-- ── Dialog Summary per Sales ── -->
+  <v-dialog v-model="summaryDialog" max-width="720px">
     <v-card class="rounded-lg">
       <v-card-title class="bg-indigo text-white d-flex align-center pa-3">
-        <span class="text-subtitle-1 font-weight-bold"
-          >Summary Kunjungan Per Sales</span
-        >
+        <span class="text-subtitle-1 font-weight-bold">
+          Summary Kunjungan Per Sales
+        </span>
         <v-spacer />
         <v-btn
           icon
@@ -218,6 +274,8 @@ const rowPropsFn = (data: any) => {
                 <th>FAILED</th>
                 <th>UNPLAN</th>
                 <th>TOTAL</th>
+                <th title="Total nominal penawaran bulan ini">NOMINAL PEN.</th>
+                <th title="Total nominal minta harga bulan ini">NOMINAL MH</th>
               </tr>
             </thead>
             <tbody>
@@ -231,14 +289,72 @@ const rowPropsFn = (data: any) => {
                 <td class="bg-grey-lighten-4 font-weight-bold">
                   {{ sm.total }}
                 </td>
+                <td>
+                  <span
+                    class="nominal-chip"
+                    :class="sm.NominalPenawaran > 0 ? 'chip-pen' : 'chip-zero'"
+                  >
+                    {{ shortNum(sm.NominalPenawaran || 0) }}
+                  </span>
+                </td>
+                <td>
+                  <span
+                    class="nominal-chip"
+                    :class="sm.NominalMintaHarga > 0 ? 'chip-mh' : 'chip-zero'"
+                  >
+                    {{ shortNum(sm.NominalMintaHarga || 0) }}
+                  </span>
+                </td>
               </tr>
               <tr v-if="summarySales.length === 0">
-                <td colspan="5" class="text-center text-grey py-4 font-italic">
+                <td colspan="7" class="text-center text-grey py-4 font-italic">
                   Tidak ada rekap data pada periode ini
                 </td>
               </tr>
             </tbody>
+            <!-- ── Total row ── -->
+            <tfoot v-if="summarySales.length > 0">
+              <tr class="summary-total-row">
+                <td style="text-align: left" class="font-weight-bold">TOTAL</td>
+                <td class="font-weight-bold text-green">
+                  {{ summarySales.reduce((s, r) => s + r.done, 0) }}
+                </td>
+                <td class="font-weight-bold text-red">
+                  {{ summarySales.reduce((s, r) => s + r.failed, 0) }}
+                </td>
+                <td class="font-weight-bold text-orange">
+                  {{ summarySales.reduce((s, r) => s + r.unplan, 0) }}
+                </td>
+                <td class="font-weight-bold">
+                  {{ summarySales.reduce((s, r) => s + r.total, 0) }}
+                </td>
+                <td style="color: #1565c0">
+                  {{
+                    shortNum(
+                      summarySales.reduce(
+                        (s, r) => s + (r.NominalPenawaran || 0),
+                        0,
+                      ),
+                    )
+                  }}
+                </td>
+                <td style="color: #6a1b9a">
+                  {{
+                    shortNum(
+                      summarySales.reduce(
+                        (s, r) => s + (r.NominalMintaHarga || 0),
+                        0,
+                      ),
+                    )
+                  }}
+                </td>
+              </tr>
+            </tfoot>
           </table>
+        </div>
+        <div class="summary-note">
+          * Penawaran & Minta Harga dihitung berdasarkan bulan berjalan (bukan
+          range filter tanggal)
         </div>
       </v-card-text>
     </v-card>
@@ -250,6 +366,7 @@ const rowPropsFn = (data: any) => {
   display: flex;
   align-items: center;
   gap: 6px;
+  flex-wrap: wrap;
 }
 .filter-sep {
   font-size: 12px;
@@ -270,6 +387,40 @@ const rowPropsFn = (data: any) => {
 }
 .date-inp:focus {
   border-color: rgb(var(--v-theme-primary));
+}
+
+/* Filter sales */
+.sales-filter-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.sales-inp {
+  width: 150px;
+  padding-right: 22px;
+}
+.sales-clear-btn {
+  position: absolute;
+  right: 5px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 10px;
+  color: #9e9e9e;
+  line-height: 1;
+  padding: 0;
+}
+.sales-clear-btn:hover {
+  color: #c62828;
+}
+.sales-active-chip {
+  font-size: 10px;
+  background: #e3f2fd;
+  color: #1565c0;
+  border: 1px solid #bbdefb;
+  border-radius: 12px;
+  padding: 2px 10px;
+  white-space: nowrap;
 }
 
 /* Styling Tabel Rekap Summary */
@@ -298,6 +449,39 @@ const rowPropsFn = (data: any) => {
 .summary-table tbody tr:hover {
   background: #f5f5f5;
 }
+.summary-total-row td {
+  background: #e8eaf6;
+  border-top: 2px solid #9fa8da;
+}
+
+/* Nominal chips */
+.nominal-chip {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+.chip-pen {
+  background: #e3f2fd;
+  color: #1565c0;
+}
+.chip-mh {
+  background: #f3e5f5;
+  color: #6a1b9a;
+}
+.chip-zero {
+  background: #f5f5f5;
+  color: #bdbdbd;
+}
+
+.summary-note {
+  margin-top: 8px;
+  font-size: 10px;
+  color: #9e9e9e;
+  font-style: italic;
+}
+
 .text-green {
   color: #2e7d32;
 }

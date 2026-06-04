@@ -1352,6 +1352,144 @@ const router = createRouter({
       },
     },
 
+    // ── Piutang ───────────────────────────────────────────────────
+    {
+      path: "/piutang/penerimaan/giro",
+      name: "PenerimaanGiro",
+      component: () => import("@/views/piutang/penerimaan/GiroView.vue"),
+      meta: {
+        title: "Penerimaan Giro",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "251",
+      },
+    },
+    {
+      path: "/piutang/penerimaan/giro/create",
+      name: "PenerimaanGiroCreate",
+      component: () => import("@/views/piutang/penerimaan/GiroFormView.vue"),
+      meta: {
+        title: "Tambah Penerimaan Giro",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "251",
+      },
+    },
+    {
+      path: "/piutang/penerimaan/giro/edit/:nomor",
+      name: "PenerimaanGiroEdit",
+      component: () => import("@/views/piutang/penerimaan/GiroFormView.vue"),
+      meta: {
+        title: "Ubah Penerimaan Giro",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "251",
+      },
+    },
+    {
+      path: "/piutang/penerimaan/cash",
+      name: "PenerimaanCash",
+      component: () => import("@/views/piutang/penerimaan/CashView.vue"),
+      meta: {
+        title: "Penerimaan Cash",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "252",
+      },
+    },
+    {
+      path: "/piutang/penerimaan/cash/create",
+      name: "PenerimaanCashCreate",
+      component: () => import("@/views/piutang/penerimaan/CashFormView.vue"),
+      meta: {
+        title: "Tambah Penerimaan Cash",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "252",
+      },
+    },
+    {
+      path: "/piutang/penerimaan/cash/edit/:nomor",
+      name: "PenerimaanCashEdit",
+      component: () => import("@/views/piutang/penerimaan/CashFormView.vue"),
+      meta: {
+        title: "Ubah Penerimaan Cash",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "252",
+      },
+    },
+    {
+      path: "/piutang/penerimaan/transfer",
+      name: "PenerimaanTransfer",
+      component: () => import("@/views/piutang/penerimaan/TransferView.vue"),
+      meta: {
+        title: "Penerimaan Transfer",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "253",
+      },
+    },
+    {
+      path: "/piutang/penerimaan/transfer/create",
+      name: "PenerimaanTransferCreate",
+      component: () =>
+        import("@/views/piutang/penerimaan/TransferFormView.vue"),
+      meta: {
+        title: "Tambah Penerimaan Transfer",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "253",
+      },
+    },
+    {
+      path: "/piutang/penerimaan/transfer/edit/:nomor",
+      name: "PenerimaanTransferEdit",
+      component: () =>
+        import("@/views/piutang/penerimaan/TransferFormView.vue"),
+      meta: {
+        title: "Ubah Penerimaan Transfer",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "253",
+      },
+    },
+    {
+      path: "/piutang/penerimaan/potongan",
+      name: "PenerimaanPotongan",
+      component: () => import("@/views/piutang/penerimaan/PotonganView.vue"),
+      meta: {
+        title: "Penerimaan Potongan",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "254",
+      },
+    },
+    {
+      path: "/piutang/penerimaan/potongan/create",
+      name: "PenerimaanPotonganCreate",
+      component: () =>
+        import("@/views/piutang/penerimaan/PotonganFormView.vue"),
+      meta: {
+        title: "Tambah Penerimaan Potongan",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "254",
+      },
+    },
+    {
+      path: "/piutang/penerimaan/potongan/edit/:nomor",
+      name: "PenerimaanPotonganEdit",
+      component: () =>
+        import("@/views/piutang/penerimaan/PotonganFormView.vue"),
+      meta: {
+        title: "Ubah Penerimaan Potongan",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "254",
+      },
+    },
+
     // ── Laporan ───────────────────────────────────────────────────
     {
       path: "/laporan/gudang-garmen/po-bahan-vs-mkb",
@@ -1375,6 +1513,18 @@ const router = createRouter({
         layout: "DefaultLayout",
         requiresAuth: true,
         menuId: "512",
+      },
+    },
+    {
+      path: "/laporan/gudang-garmen/stok-bahan-barcode",
+      name: "LapStokBahanBarcode",
+      component: () =>
+        import("@/views/laporan/gudang-garmen/LaporanStokBahanBarcodeView.vue"),
+      meta: {
+        title: "Laporan Stok Bahan Barcode",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "501",
       },
     },
 

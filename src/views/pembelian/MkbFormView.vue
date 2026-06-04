@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, ref, onMounted } from "vue";
+import { computed, ref, onMounted, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
 import { useForm } from "@/composables/useForm";
 import { mkbFormService } from "@/services/pembelian/mkbFormService";
+import { laporanStokBahanBarcodeService } from "@/services/laporan/gudang-garmen/laporanStokBahanBarcodeService";
 import api from "@/services/api";
 import BaseForm from "@/components/BaseForm.vue";
 import SpkSearchModal from "@/components/lookups/SpkSearchModal.vue";
@@ -129,6 +130,10 @@ const {
       dtlBahan: (d.dtlBahan || []).map((b: any) => {
         // Ambil nilai Jumlah dan Ready
         const jumlahVal = Number(val(b, "mkbd_jumlah")) || 0;
+        const allowanceVal =
+          val(b, "mkbd_allowance") !== null
+            ? Number(val(b, "mkbd_allowance"))
+            : "";
         const readyVal = Number(
           b.mkbd_jumlah_rs ?? b.mkbd_jumlah_RS ?? b.MKBD_JUMLAH_RS ?? 0,
         );
@@ -148,6 +153,7 @@ const {
           satuan: val(b, "mkbd_bhn_satuan"),
           gramasi: val(b, "gramasi"),
           jumlah: jumlahVal,
+          allowance: allowanceVal,
           ready: readyVal,
           po: poVal,
           tglbeli: parseDateSafe(val(b, "mkbd_tglbeli")),
@@ -269,12 +275,34 @@ const addRowBahan = () => {
     satuan: "",
     gramasi: "",
     jumlah: 0,
+    allowance: "",
     ready: 0,
     po: 0,
     tglbeli: "",
     keterangan: "",
   });
 };
+
+// Auto Trailing Row: Memastikan selalu ada baris kosong di paling bawah untuk input baru (Replikasi Grid Delphi)
+watch(
+  () => formData.value.dtlBahan,
+  (newRows) => {
+    // 1. Jika awal buka form data masih kosong (Mode Baru), otomatis pancing 1 baris kosong
+    if (!newRows || newRows.length === 0) {
+      addRowBahan();
+      return;
+    }
+
+    // 2. Cek baris paling terakhir
+    const lastRow = newRows[newRows.length - 1];
+
+    // Jika baris terakhir sudah mulai diisi (komponen atau kode bahan terisi), otomatis buatkan baris kosong baru di bawahnya
+    if (lastRow.komponen || lastRow.kode || lastRow.namaBahan) {
+      addRowBahan();
+    }
+  },
+  { deep: true, immediate: true },
+);
 
 const openBahanModal = (index: number) => {
   activeBahanRowIndex.value = index;
@@ -288,9 +316,9 @@ const onBahanSelected = (bahan: any) => {
     row.kode = bahan.Kode || bahan.Bhn_kode;
     row.namaBahan = bahan.Nama || bahan.bhn_name;
     row.satuan = bahan.Satuan || bahan.Bhn_satuan;
-
-    // Auto-fill Gramasi dan Stok (Ready) yang disesuaikan
     row.gramasi = bahan.Gramasi || bahan.gramasi || "";
+
+    // Langsung ambil stok dari hasil lookup backend
     row.ready = Number(bahan.Stok || 0);
 
     recalcRowBahan(row);
@@ -560,6 +588,7 @@ const onPoSelected = (po: any) => {
                 >
                   Jumlah
                 </th>
+                <th style="width: 72px" class="tr">Allowance</th>
                 <th style="width: 72px" class="tr">Ready</th>
                 <th style="width: 72px" class="tr bg-red-darken-2 text-white">
                   Jumlah PO
@@ -642,6 +671,15 @@ const onPoSelected = (po: any) => {
                     v-model="row.jumlah"
                     class="gi tr fw bg-blue-lighten-5"
                     @input="recalcRowBahan(row)"
+                    v-select-on-focus
+                  />
+                </td>
+                <td>
+                  <input
+                    type="number"
+                    v-model="row.allowance"
+                    class="gi tr"
+                    placeholder="-"
                     v-select-on-focus
                   />
                 </td>

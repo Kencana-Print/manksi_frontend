@@ -40,9 +40,18 @@ const getLocalDate = () => {
   return `${year}-${month}-${day}`;
 };
 
+const getFutureLocalDate = (daysAhead: number) => {
+  const d = new Date();
+  d.setDate(d.getDate() + daysAhead);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
 const filterState = ref({
   startDate: getLocalDate(),
-  endDate: getLocalDate(),
+  endDate: getFutureLocalDate(5),
 });
 
 // --- STATE UNTUK MODAL GAMBAR & ALASAN ---

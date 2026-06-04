@@ -29,7 +29,6 @@ import {
   IconPaperclip,
   IconTool,
   IconFlask,
-  IconBuildingBank,
   IconPuzzle,
   IconTruck,
   IconUsers,
@@ -58,6 +57,9 @@ import {
   IconReportAnalytics,
   IconFileAnalytics,
   IconClipboardText,
+  IconCash,
+  IconBuildingBank,
+  IconScissors,
 } from "@tabler/icons-vue";
 
 interface NavItem {
@@ -559,8 +561,37 @@ const menuItems: NavItem[] = [
     model: piutangMenu,
     menuId: 8,
     items: [
-      { title: "Daftar Piutang", to: "/piutang/daftar", icon: IconListDetails },
-      { title: "Terima Piutang", to: "/piutang/terima", icon: IconReceipt },
+      {
+        title: "Penerimaan",
+        icon: IconLayoutList, // Menambahkan icon agar konsisten dengan submenu lainnya
+        menuId: 950,
+        subItems: [
+          {
+            title: "Giro",
+            to: "/piutang/penerimaan/giro",
+            icon: IconCreditCard,
+            menuId: 251,
+          },
+          {
+            title: "Cash",
+            to: "/piutang/penerimaan/cash",
+            icon: IconCash,
+            menuId: 252,
+          },
+          {
+            title: "Transfer",
+            to: "/piutang/penerimaan/transfer",
+            icon: IconBuildingBank,
+            menuId: 253,
+          },
+          {
+            title: "Potongan",
+            to: "/piutang/penerimaan/potongan",
+            icon: IconScissors,
+            menuId: 254,
+          },
+        ],
+      },
     ],
   },
   {
@@ -574,6 +605,12 @@ const menuItems: NavItem[] = [
         icon: IconBuildingWarehouse, // Import IconBuildingWarehouse di atas
         menuId: 960,
         subItems: [
+          {
+            title: "Stok Bahan Barcode",
+            to: "/laporan/gudang-garmen/stok-bahan-barcode",
+            icon: IconFileDescription,
+            menuId: 501,
+          },
           {
             title: "PO Bahan vs MKB",
             to: "/laporan/gudang-garmen/po-bahan-vs-mkb",
