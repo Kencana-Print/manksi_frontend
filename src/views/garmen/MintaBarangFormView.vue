@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, onMounted } from "vue";
+import { computed, ref, onMounted, watch } from "vue";
 import { useRoute } from "vue-router";
 import { useToast } from "vue-toastification";
 import { useForm } from "@/composables/useForm";
@@ -391,6 +391,143 @@ const onBarangSelected = (item: any) => {
   formData.value.details[i].satuan = item.Satuan;
 };
 
+// ─────────────────────────────────────────────
+// KEYBOARD HANDLERS: GUDANG PRODUKSI
+// ─────────────────────────────────────────────
+
+const onGudangKeydown = (e: KeyboardEvent) => {
+  if (e.key === "F1") {
+    e.preventDefault();
+    showGudangModal.value = true;
+  }
+};
+
+const onGudangEnter = async () => {
+  const kode = (formData.value.gudangPeminta || "").trim().toUpperCase();
+  if (!kode) return;
+
+  try {
+    isLoading.value = true;
+    const res = await mintaBarangFormService.getGudangByKode(
+      kode,
+      formData.value.cabang,
+    );
+    const item = res.data.data;
+    onGudangSelected(item);
+  } catch (e: any) {
+    toast.error(e.response?.data?.message || "Kode gudang tidak ditemukan.");
+    formData.value.gudangPeminta = "";
+    formData.value.namaGudangPeminta = "";
+  } finally {
+    isLoading.value = false;
+  }
+};
+
+// ─────────────────────────────────────────────
+// KEYBOARD HANDLERS: NO. SPK / MEMO
+// ─────────────────────────────────────────────
+
+const onSpkKeydown = (e: KeyboardEvent) => {
+  if (e.key === "F1") {
+    e.preventDefault();
+    showSpkModal.value = true;
+  }
+};
+
+const onSpkEnter = async () => {
+  const nomor = (formData.value.spk || "").trim().toUpperCase();
+  if (!nomor) return;
+
+  try {
+    isLoading.value = true;
+    const res = await api.get(
+      `/garmen/barang/permintaan/form/validate-spk/${encodeURIComponent(nomor)}`,
+    );
+    const d = res.data.data;
+    processSpkData(res.data.data, nomor, d.spk?.Nama || "", d.spk?.Jumlah || 0);
+  } catch (e: any) {
+    toast.error(e.response?.data?.message || "Nomor SPK tidak ditemukan.");
+    formData.value.spk = "";
+    formData.value.namaSpk = "";
+    formData.value.jumlahSpk = 0;
+    formData.value.divisiSpk = "";
+    formData.value.mkaNomor = "";
+    formData.value.mkaTanggal = "";
+  } finally {
+    isLoading.value = false;
+  }
+};
+
+// ─────────────────────────────────────────────
+// KEYBOARD HANDLERS: KODE BARANG DI GRID
+// ─────────────────────────────────────────────
+
+const onBarangKeydown = (e: KeyboardEvent, index: number) => {
+  if (e.key === "F1") {
+    e.preventDefault();
+    openBarangModal(index);
+  }
+};
+
+const onBarangEnter = async (index: number) => {
+  const kode = (formData.value.details[index]?.kode || "").trim().toUpperCase();
+  if (!kode) {
+    openBarangModal(index);
+    return;
+  }
+
+  try {
+    isLoading.value = true;
+    const res = await mintaBarangFormService.getBarangByKode(
+      kode,
+      formData.value.jenis,
+      formData.value.cabang,
+      authStore.user?.bagian || "",
+    );
+    const item = res.data.data;
+
+    // Cek duplikat
+    const isDuplicate = formData.value.details.some(
+      (d: any, idx: number) => idx !== index && d.kode === item.Kode,
+    );
+    if (isDuplicate) {
+      toast.error(`Kode ${item.Kode} sudah diinput di baris lain.`);
+      formData.value.details[index].kode = "";
+      return;
+    }
+
+    formData.value.details[index].kode = item.Kode;
+    formData.value.details[index].nama = item.Nama;
+    formData.value.details[index].satuan = item.Satuan;
+  } catch (e: any) {
+    toast.error(e.response?.data?.message || "Kode barang tidak ditemukan.");
+    formData.value.details[index].kode = "";
+    formData.value.details[index].nama = "";
+    formData.value.details[index].satuan = "";
+  } finally {
+    isLoading.value = false;
+  }
+};
+
+// ─────────────────────────────────────────────
+// AUTO TRAILING ROW
+// ─────────────────────────────────────────────
+
+watch(
+  () => formData.value.details,
+  (rows) => {
+    if (!rows || rows.length === 0) {
+      addRow();
+      return;
+    }
+    const lastRow = rows[rows.length - 1];
+    if (lastRow.kode && lastRow.kode.trim() !== "") {
+      addRow();
+    }
+  },
+  { deep: true, immediate: true },
+);
+
 // Fungsi untuk mereset data saat Jenis Permintaan diubah
 const onJenisChange = () => {
   // 1. Kosongkan grid detail
@@ -584,123 +721,124 @@ const numFormat = (val: any) =>
         v-if="
           isAccesories && formData.cabang !== 'P03' && formData.cabang !== 'P05'
         "
-        class="desktop-form-section"
+        class="desktop-form-section mt-2"
       >
         <div class="tm-sec-title">INFO GUDANG, SPK & MKA</div>
 
-        <!-- Gudang kode -->
-        <div class="f-row">
-          <label class="f-lbl">Gudang Produksi</label>
-          <div class="inp-grp" style="width: 90px">
-            <input
-              :value="formData.gudangPeminta"
-              readonly
-              class="f-inp"
-              style="
-                flex: 1;
-                background: #ddeeff;
-                cursor: pointer;
-                font-weight: 600;
-              "
-              @mousedown.prevent="openGudangModal"
-            />
-            <button
-              type="button"
-              class="btn-lkp"
-              @mousedown.prevent="openGudangModal"
+        <!-- ── Gudang Produksi ── -->
+        <div class="info-field-group">
+          <label class="info-lbl">Gudang Produksi</label>
+          <div class="info-inp-wrap">
+            <div class="info-igrp">
+              <input
+                v-model="formData.gudangPeminta"
+                class="info-inp info-inp-blue"
+                placeholder="F1 / kode + Enter"
+                @keydown="onGudangKeydown"
+                @keydown.enter.prevent="onGudangEnter"
+              />
+              <button
+                type="button"
+                class="info-btn"
+                title="Cari Gudang (F1)"
+                @click="showGudangModal = true"
+              >
+                <IconSearch :size="13" color="#1565c0" />
+              </button>
+            </div>
+            <div
+              v-if="formData.namaGudangPeminta"
+              class="info-nama"
+              :title="formData.namaGudangPeminta"
             >
-              🔍
-            </button>
+              {{ formData.namaGudangPeminta }}
+            </div>
           </div>
         </div>
-        <!-- Nama gudang -->
-        <div class="f-row">
-          <input
-            :value="formData.namaGudangPeminta"
-            readonly
-            class="f-inp f-ro w-100"
-          />
-        </div>
 
-        <!-- SPK nomor -->
-        <div class="f-row" style="margin-top: 6px">
-          <label class="f-lbl">No. SPK / Memo</label>
-          <div class="inp-grp" style="flex: 1">
-            <input
-              :value="formData.spk"
-              readonly
-              class="f-inp"
-              style="
-                flex: 1;
-                background: #ddeeff;
-                cursor: pointer;
-                font-weight: 600;
-              "
-              @mousedown.prevent="openSpkModal"
-            />
-            <button
-              type="button"
-              class="btn-lkp"
-              @mousedown.prevent="openSpkModal"
+        <!-- ── No. SPK / Memo ── -->
+        <div class="info-field-group">
+          <label class="info-lbl">No. SPK / Memo</label>
+          <div class="info-inp-wrap">
+            <div class="info-igrp">
+              <input
+                v-model="formData.spk"
+                class="info-inp info-inp-blue"
+                placeholder="F1 / nomor + Enter"
+                @keydown="onSpkKeydown"
+                @keydown.enter.prevent="onSpkEnter"
+              />
+              <button
+                type="button"
+                class="info-btn"
+                title="Cari SPK (F1)"
+                @click="showSpkModal = true"
+              >
+                <IconSearch :size="13" color="#1565c0" />
+              </button>
+            </div>
+            <div
+              v-if="formData.namaSpk"
+              class="info-nama"
+              :title="formData.namaSpk"
             >
-              🔍
-            </button>
+              {{ formData.namaSpk }}
+            </div>
           </div>
         </div>
-        <!-- Nama SPK -->
-        <div class="f-row">
-          <input :value="formData.namaSpk" readonly class="f-inp f-ro w-100" />
+
+        <!-- ── Jml SPK ── -->
+        <div class="info-field-group">
+          <label class="info-lbl">Jml SPK</label>
+          <div class="info-inp-wrap">
+            <input
+              :value="formData.jumlahSpk"
+              readonly
+              class="info-inp info-ro"
+              style="width: 70px; text-align: right"
+            />
+          </div>
         </div>
 
-        <!-- Jumlah + Divisi -->
-        <div class="f-row" style="margin-top: 6px">
-          <label class="f-lbl">Jml SPK</label>
-          <input
-            :value="formData.jumlahSpk"
-            readonly
-            class="f-inp f-ro"
-            style="width: 55px; text-align: right; flex-shrink: 0"
-          />
-          <span
-            style="
-              font-size: 11px;
-              font-weight: 500;
-              color: #555;
-              white-space: nowrap;
-              margin: 0 4px;
-              flex-shrink: 0;
-            "
-            >Divisi</span
-          >
-          <input
-            :value="formData.divisiSpk"
-            readonly
-            class="f-inp f-ro"
-            style="flex: 1; min-width: 0"
-          />
+        <!-- ── Divisi ── -->
+        <div class="info-field-group">
+          <label class="info-lbl">Divisi</label>
+          <div class="info-inp-wrap">
+            <input
+              :value="formData.divisiSpk"
+              readonly
+              class="info-inp info-ro"
+              style="width: 100%"
+              :title="formData.divisiSpk"
+            />
+          </div>
         </div>
 
-        <!-- No MKA -->
-        <div class="f-row" style="margin-top: 6px">
-          <label class="f-lbl">No. MKA</label>
-          <input
-            :value="formData.mkaNomor"
-            readonly
-            class="f-inp f-ro"
-            style="flex: 1"
-            placeholder="—"
-          />
+        <!-- ── No. MKA ── -->
+        <div class="info-field-group">
+          <label class="info-lbl">No. MKA</label>
+          <div class="info-inp-wrap">
+            <input
+              :value="formData.mkaNomor || '—'"
+              readonly
+              class="info-inp info-ro"
+              style="width: 100%"
+            />
+          </div>
         </div>
-        <!-- Tgl MKA -->
-        <div class="f-row">
-          <label class="f-lbl">Tgl. MKA</label>
-          <input
-            :value="formData.mkaTanggal"
-            type="date"
-            readonly
-            class="f-date f-ro"
-            style="width: 135px"
-          />
+
+        <!-- ── Tgl. MKA ── -->
+        <div class="info-field-group" style="margin-bottom: 0">
+          <label class="info-lbl">Tgl. MKA</label>
+          <div class="info-inp-wrap">
+            <input
+              :value="formData.mkaTanggal"
+              type="date"
+              readonly
+              class="info-inp info-ro"
+              style="width: 100%; box-sizing: border-box"
+            />
+          </div>
         </div>
       </div>
     </template>
@@ -741,20 +879,27 @@ const numFormat = (val: any) =>
                   {{ Number(index) + 1 }}
                 </td>
                 <td class="bg-yellow-lighten-5">
-                  <div class="d-flex align-center w-100 h-100 pr-1">
+                  <div class="cell-kode-wrap">
                     <input
-                      v-model="item.kode"
-                      class="cell-input cursor-pointer"
-                      placeholder="[F1] Cari"
-                      readonly
-                      @click="openBarangModal(Number(index))"
+                      v-model="formData.details[Number(index)].kode"
+                      class="cell-input"
+                      placeholder="F1 / kode"
+                      style="
+                        text-transform: uppercase;
+                        font-weight: 600;
+                        color: #1565c0;
+                      "
+                      @keydown="onBarangKeydown($event, Number(index))"
+                      @keydown.enter.prevent="onBarangEnter(Number(index))"
                     />
-                    <IconSearch
-                      :size="15"
-                      color="primary"
-                      class="cursor-pointer"
+                    <button
+                      type="button"
+                      class="cell-search-btn"
                       @click="openBarangModal(Number(index))"
-                    />
+                      title="Cari Barang (F1)"
+                    >
+                      <IconSearch :size="12" color="#1565c0" />
+                    </button>
                   </div>
                 </td>
                 <td
@@ -893,66 +1038,183 @@ const numFormat = (val: any) =>
   color: #1565c0;
   margin-bottom: 6px;
 }
-.f-row {
+
+/* Kode barang di grid */
+.cell-kode-wrap {
   display: flex;
   align-items: center;
-  gap: 5px;
-  margin-bottom: 4px;
-  min-height: 26px;
+  height: 100%;
+  width: 100%;
 }
-.f-lbl {
+.cell-kode-wrap .cell-input {
+  flex: 1;
+}
+.cell-search-btn {
+  width: 24px;
+  min-width: 24px;
+  height: 100%;
+  background: #e3f2fd;
+  border: none;
+  border-left: 1px solid #e0e0e0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.cell-search-btn:hover {
+  background: #bbdefb;
+}
+.desktop-form-section:last-child {
+  margin-bottom: 0;
+}
+
+.ml-1 {
+  margin-left: 4px;
+}
+
+.w-100 {
+  width: 100%;
+}
+
+/* ── Fix footer — tidak ada area kosong putih ── */
+.desktop-form-section {
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+
+/* Pastikan section terakhir tidak ada margin extra */
+.desktop-form-section.mt-2:last-child {
+  margin-bottom: 0;
+  padding-bottom: 10px;
+}
+
+/* Tgl MKA input penuh */
+.info-field-group:last-child .info-inp {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Hapus gap kosong di bawah section terakhir */
+.left-column > *:last-child,
+aside > *:last-child {
+  margin-bottom: 0 !important;
+}
+
+/* ── INFO GUDANG/SPK/MKA — Layout Responsif ── */
+.info-field-group {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-bottom: 6px;
+  min-height: 28px;
+  flex-wrap: wrap; /* wrap di layar kecil */
+}
+
+.info-lbl {
   width: 110px;
   flex-shrink: 0;
   font-size: 11px;
+  font-weight: 600;
+  color: #37474f;
+  white-space: nowrap;
+  padding-top: 5px;
+}
+
+.info-inp-wrap {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+/* Baris inline (jml + divisi) */
+.info-row-inline {
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: nowrap;
+  overflow: hidden;
+}
+.info-row-inline .info-inp:first-child {
+  width: 55px !important;
+  min-width: 55px;
+  flex-shrink: 0;
+}
+
+.info-sep {
+  font-size: 11px;
   font-weight: 500;
-  color: #333;
+  color: #555;
+  white-space: nowrap;
+  flex-shrink: 0;
+  padding: 0 2px;
+}
+
+.info-row-inline .info-inp:last-child {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
-.f-inp {
-  height: 26px;
+
+.info-igrp {
+  display: flex;
   border: 1px solid #bdbdbd;
-  border-radius: 3px;
-  padding: 0 5px;
-  font-size: 12px;
+  border-radius: 4px;
+  overflow: hidden;
+  height: 28px;
+  width: 100%;
+}
+
+.info-inp {
+  height: 28px;
+  border: 1px solid #bdbdbd;
+  border-radius: 4px;
+  padding: 0 7px;
+  font-size: 11px;
   outline: none;
   background: white;
   color: #212121;
   box-sizing: border-box;
   font-family: inherit;
+  min-width: 0;
 }
-.f-ro {
+
+/* Di dalam igrp, hapus border karena sudah dari wrapper */
+.info-igrp .info-inp {
+  border: none;
+  border-radius: 0;
+  flex: 1;
+  height: 100%;
+}
+
+.info-inp-blue {
+  background: #ddeeff !important;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+.info-inp-blue::placeholder {
+  font-weight: 400;
+  text-transform: none;
+  color: #90a4ae;
+}
+
+.info-ro {
   background: #f0f0f0 !important;
   color: #555 !important;
 }
-.f-date {
-  height: 26px;
-  border: 1px solid #bdbdbd;
-  border-radius: 3px;
-  padding: 0 4px;
-  font-size: 12px;
-  outline: none;
-  background: white;
-  box-sizing: border-box;
-}
-.inp-grp {
-  display: flex;
-  border: 1px solid #bdbdbd;
-  border-radius: 3px;
-  overflow: hidden;
-  height: 26px;
-  background: white;
-}
-.inp-grp .f-inp {
-  border: none;
-  height: 24px;
-  border-radius: 0;
-}
-.inp-grp .f-inp + .f-inp {
-  border-left: 1px solid #e0e0e0;
-}
-.btn-lkp {
-  width: 24px;
-  background: #f5f5f5;
+
+/* Tombol search — selalu terlihat, tidak terpotong */
+.info-btn {
+  width: 30px;
+  min-width: 30px;
+  height: 100%;
+  background: #e3f2fd;
   border: none;
   border-left: 1px solid #bdbdbd;
   cursor: pointer;
@@ -961,14 +1223,71 @@ const numFormat = (val: any) =>
   align-items: center;
   justify-content: center;
 }
-.btn-lkp:hover {
-  background: #e0e0e0;
-}
-.ml-1 {
-  margin-left: 4px;
+.info-btn:hover {
+  background: #bbdefb;
 }
 
-.w-100 {
+/* Nama hasil lookup — tampil di bawah input */
+.info-nama {
+  font-size: 11px;
+  color: #1565c0;
+  font-weight: 600;
+  padding: 2px 6px;
+  background: #f0f7ff;
+  border: 1px solid #bbdefb;
+  border-radius: 3px;
+  min-height: 20px;
+  /* Izinkan wrap agar nama panjang tidak terpotong */
+  white-space: normal;
+  overflow: visible;
+  word-break: break-word;
+  line-height: 1.4;
+}
+
+/* ── Responsif: layar < 480px ── */
+@media (max-width: 480px) {
+  .info-field-group {
+    flex-direction: column;
+    gap: 3px;
+  }
+  .info-lbl {
+    width: 100%;
+    padding-top: 0;
+  }
+  .info-inp-wrap {
+    width: 100%;
+  }
+  .info-row-inline {
+    flex-direction: row; /* tetap inline untuk jml+divisi */
+  }
+}
+
+/* ── Fix cell kode di grid — tidak terpotong ── */
+.cell-kode-wrap {
+  display: flex;
+  align-items: center;
+  height: 100%;
   width: 100%;
+  overflow: hidden;
+}
+.cell-kode-wrap .cell-input {
+  flex: 1;
+  min-width: 0;
+}
+.cell-search-btn {
+  width: 26px;
+  min-width: 26px;
+  height: 100%;
+  background: #e3f2fd;
+  border: none;
+  border-left: 1px solid #e0e0e0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.cell-search-btn:hover {
+  background: #bbdefb;
 }
 </style>

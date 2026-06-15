@@ -22,6 +22,17 @@ export const bpbNonBahanFormService = {
       },
     ),
 
+  getSupplierByKode: (kode: string, jenis: string) =>
+    api.get(
+      `/garmen/barang/bpb-nonbahan/supplier/${encodeURIComponent(kode)}`,
+      {
+        params: { jenis },
+      },
+    ),
+
+  getSpkByNomor: (nomor: string) =>
+    api.get(`/garmen/barang/bpb-nonbahan/spk/${encodeURIComponent(nomor)}`),
+
   saveData: (payload: any) =>
     api.post("/garmen/barang/bpb-nonbahan/form/save", payload),
 };

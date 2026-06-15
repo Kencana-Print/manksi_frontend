@@ -127,7 +127,7 @@ onMounted(() => fetchData());
           <th style="width: 110px">Kode Barang</th>
           <th>Nama Barang</th>
           <th style="width: 80px" class="text-center">Satuan</th>
-          <th style="width: 80px" class="text-center">Banyak</th>
+          <th style="width: 80px" class="text-center">Qty</th>
           <th style="width: 100px" class="text-right">Harga</th>
           <th style="width: 110px" class="text-right">Jumlah</th>
         </tr>

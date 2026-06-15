@@ -6,7 +6,12 @@ import { useAuthStore } from "@/stores/authStore";
 import BaseForm from "@/components/BaseForm.vue";
 import { useForm } from "@/composables/useForm";
 import api from "@/services/api";
-import { IconTruckDelivery, IconCheck, IconX } from "@tabler/icons-vue";
+import {
+  IconTruckDelivery,
+  IconCheck,
+  IconSearch,
+  IconX,
+} from "@tabler/icons-vue";
 
 // Modals
 import PabrikSearchModal from "@/components/lookups/PabrikSearchModal.vue";
@@ -181,11 +186,19 @@ const setTujuan = (v: any) => {
 };
 
 const loadPoToGrid = async (nomorPo: string, idx: number) => {
+  if (!nomorPo.trim()) return;
+
   try {
+    isLoading.value = true;
     const res = await api.get(
-      `/garmen/po-internal-map/surat-jalan/form/load-po?nomorPo=${nomorPo}`,
+      `/garmen/po-internal-map/surat-jalan/form/load-po?nomorPo=${encodeURIComponent(nomorPo)}`,
     );
     const items = res.data.data;
+    if (!items || items.length === 0) {
+      toast.warning("Nomor PO tidak memiliki item yang bisa dimuat.");
+      return;
+    }
+
     formData.value.Details.splice(idx, 1);
     items.forEach((item: any) => {
       formData.value.Details.push({
@@ -194,7 +207,7 @@ const loadPoToGrid = async (nomorPo: string, idx: number) => {
         NamaMAP: item.Nama_MAP,
         Bahan: item.Bahan,
         Ukuran: item.Ukuran,
-        QtyMAP: item.Qty_MAP, // Set data baru
+        QtyMAP: item.Qty_MAP,
         JumlahPO: item.Qty_PO,
         JumlahSJ: item.Sisa_PO,
         Koli: 0,
@@ -206,7 +219,13 @@ const loadPoToGrid = async (nomorPo: string, idx: number) => {
     });
     formData.value.Details.push(createEmptyRow());
   } catch (e: any) {
-    toast.error("Gagal memuat item PO.");
+    // ← Teruskan pesan dari backend dengan benar
+    const msg = e.response?.data?.message || "Nomor PO tidak ditemukan.";
+    toast.error(msg);
+    // Reset field Nomor PO di baris yang bersangkutan
+    formData.value.Details[idx].NomorPO = "";
+  } finally {
+    isLoading.value = false;
   }
 };
 
@@ -269,7 +288,7 @@ const handlePrint = () => {
               v-model="formData.GudangAsal"
               readonly
               class="f-inp f-ro"
-              style="width: 50px"
+              style="width: 55px; flex: none"
             />
             <input
               v-model="formData.GudangAsalNama"
@@ -280,9 +299,10 @@ const handlePrint = () => {
             <button
               type="button"
               class="btn-lkp"
+              title="Cari Gudang Asal"
               @click="showPabrikAsalModal = true"
             >
-              🔍
+              <IconSearch :size="13" color="#1565c0" />
             </button>
           </div>
         </div>
@@ -293,7 +313,7 @@ const handlePrint = () => {
               v-model="formData.Tujuan"
               readonly
               class="f-inp f-ro"
-              style="width: 50px"
+              style="width: 55px; flex: none"
             />
             <input
               v-model="formData.TujuanNama"
@@ -304,9 +324,10 @@ const handlePrint = () => {
             <button
               type="button"
               class="btn-lkp"
+              title="Cari Tujuan"
               @click="showPabrikTujuanModal = true"
             >
-              🔍
+              <IconSearch :size="13" color="#1565c0" />
             </button>
           </div>
         </div>
@@ -345,21 +366,28 @@ const handlePrint = () => {
               <tr v-for="(row, idx) in formData.Details" :key="idx">
                 <td class="text-center">{{ idx + 1 }}</td>
                 <td>
-                  <div class="inp-grp">
+                  <div class="cell-grp">
                     <input
                       v-model="row.NomorPO"
-                      class="f-inp"
-                      @keyup.enter="loadPoToGrid(row.NomorPO, idx)"
+                      class="f-inp-cell"
+                      placeholder="Enter / F1"
+                      style="text-transform: uppercase"
+                      @keydown.f1.prevent="
+                        activeRowIdx = idx;
+                        showPoModal = true;
+                      "
+                      @keydown.enter.prevent="loadPoToGrid(row.NomorPO, idx)"
                     />
                     <button
                       type="button"
-                      class="btn-lkp"
+                      class="cell-btn"
+                      title="Cari PO (F1)"
                       @click="
                         activeRowIdx = idx;
                         showPoModal = true;
                       "
                     >
-                      🔍
+                      <IconSearch :size="11" color="#1565c0" />
                     </button>
                   </div>
                 </td>
@@ -480,23 +508,65 @@ const handlePrint = () => {
   font-size: 11px;
   padding: 0 4px;
 }
+/* ── Header lookups ── */
 .inp-grp {
   display: flex;
-  border: 1px solid #ccc;
+  border: 1px solid #bdbdbd;
   border-radius: 3px;
   height: 26px;
   overflow: hidden;
   background: white;
+  min-width: 0;
 }
 .inp-grp .f-inp {
   border: none;
+  min-width: 0;
+  height: 100%;
 }
 .btn-lkp {
-  width: 24px;
-  background: #eee;
-  border-left: 1px solid #ccc;
+  width: 28px;
+  min-width: 28px;
+  height: 100%;
+  background: #e3f2fd;
+  border: none;
+  border-left: 1px solid #bdbdbd;
   cursor: pointer;
-  font-size: 11px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.btn-lkp:hover {
+  background: #bbdefb;
+}
+
+/* ── Nomor PO di grid ── */
+.cell-grp {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  width: 100%;
+  min-width: 0;
+}
+.cell-grp .f-inp-cell {
+  flex: 1;
+  min-width: 0;
+}
+.cell-btn {
+  width: 22px;
+  min-width: 22px;
+  height: 100%;
+  background: #e3f2fd;
+  border: none;
+  border-left: 1px solid #ddd;
+  cursor: pointer;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.cell-btn:hover {
+  background: #bbdefb;
 }
 .form-table {
   width: 100%;

@@ -263,6 +263,58 @@ const onSpkSelected = async (spk: any) => {
   }
 };
 
+// ─────────────────────────────────────────────
+// KEYBOARD HANDLER: SPK / MEMO / SO FIELD
+// ─────────────────────────────────────────────
+
+// F1 → buka modal SPK
+const onSpkKeydown = (e: KeyboardEvent) => {
+  if (e.key === "F1") {
+    e.preventDefault();
+    openSpkModal();
+  }
+};
+
+// Enter → fetch langsung dari input nomor SPK
+const onSpkEnter = async () => {
+  const nomor = (formData.value.nomorSpk || "").trim();
+  if (!nomor) return;
+  if (isTutupBuku.value && isEdit.value) return;
+
+  try {
+    isLoading.value = true;
+    const res = await mkbFormService.checkSpk(nomor, formData.value.nomor);
+    const { info, planning } = res.data.data;
+
+    formData.value.nomorSpk = info.Nomor;
+    formData.value.namaSpk = info.Nama;
+    formData.value.jumlahSpk = info.Jumlah;
+    formData.value.jenisOrder = info.JenisOrder;
+    formData.value.memoSpk = info.Memo;
+
+    formData.value.dtlBahan.forEach(recalcRowBahan);
+
+    if (!isMapMode.value) {
+      formData.value.dtlPlan = planning.map((p: any) => ({
+        tanggal: formatDateLocal(p.plan_tanggal),
+        jumlah: p.plan_datang,
+      }));
+    }
+
+    toast.success(`SPK ${info.Nomor} berhasil dimuat.`);
+  } catch (e: any) {
+    toast.error(e.response?.data?.message || "Nomor SPK tidak ditemukan.");
+    // Reset field SPK jika tidak ditemukan
+    formData.value.nomorSpk = "";
+    formData.value.namaSpk = "";
+    formData.value.jumlahSpk = 0;
+    formData.value.jenisOrder = "";
+    formData.value.memoSpk = "";
+  } finally {
+    isLoading.value = false;
+  }
+};
+
 const addRowBahan = () => {
   formData.value.dtlBahan.push({
     komponen: "",
@@ -502,16 +554,33 @@ const onPoSelected = (po: any) => {
             <label class="f-lbl">Nomor SPK</label>
             <div class="inp-grp" style="width: 200px">
               <input
-                :value="formData.nomorSpk"
-                readonly
-                class="f-inp f-ro"
-                style="flex: 1"
-                placeholder="F1..."
+                v-model="formData.nomorSpk"
+                class="f-inp"
+                :class="{ 'f-ro': isTutupBuku && isEdit }"
+                :readonly="isTutupBuku && isEdit"
+                placeholder="F1 / ketik + Enter"
+                style="flex: 1; text-transform: uppercase"
+                @keydown="onSpkKeydown"
+                @keydown.enter.prevent="onSpkEnter"
               />
-              <button type="button" class="btn-lkp" @click="openSpkModal">
+              <button
+                type="button"
+                class="btn-lkp"
+                :disabled="isTutupBuku && isEdit"
+                :title="'Cari SPK/Memo/SO (F1)'"
+                @click="openSpkModal"
+              >
                 <IconSearch :size="14" />
               </button>
             </div>
+            <!-- Indikator loading saat enter -->
+            <span
+              v-if="isLoading"
+              class="text-caption text-grey ml-2"
+              style="font-size: 10px"
+            >
+              Memuat...
+            </span>
           </div>
           <div class="f-row">
             <label class="f-lbl">Product</label>
@@ -1053,6 +1122,10 @@ const onPoSelected = (po: any) => {
 }
 .btn-lkp:hover {
   background: #e0e0e0;
+}
+.btn-lkp:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 /* ── Bahan Section ── */

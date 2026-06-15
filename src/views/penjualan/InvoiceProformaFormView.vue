@@ -255,6 +255,143 @@ const onBarangSelected = (item: any) => {
   }
 };
 
+// ─────────────────────────────────────────────
+// KEYBOARD HANDLERS: PERUSAHAAN
+// ─────────────────────────────────────────────
+
+const onPerushKeydown = (e: KeyboardEvent) => {
+  if (e.key === "F1") {
+    e.preventDefault();
+    showPerushModal.value = true;
+  }
+};
+
+const onPerushEnter = async () => {
+  const kode = (formData.value.kodePerush || "").trim().toUpperCase();
+  if (!kode) {
+    showPerushModal.value = true;
+    return;
+  }
+
+  try {
+    isLoading.value = true;
+    const res = await invoiceProformaFormService.getPerusahaanByKode(kode);
+    onPerushSelected(res.data.data);
+  } catch (e: any) {
+    toast.error(e.response?.data?.message || "Perusahaan tidak ditemukan.");
+    formData.value.kodePerush = "";
+    formData.value.namaPerush = "";
+  } finally {
+    isLoading.value = false;
+  }
+};
+
+// ─────────────────────────────────────────────
+// KEYBOARD HANDLERS: CUSTOMER
+// ─────────────────────────────────────────────
+
+const onCusKeydown = (e: KeyboardEvent) => {
+  if (e.key === "F1") {
+    e.preventDefault();
+    showCusModal.value = true;
+  }
+};
+
+const onCusEnter = async () => {
+  const kode = (formData.value.cusKode || "").trim().toUpperCase();
+  if (!kode) {
+    showCusModal.value = true;
+    return;
+  }
+
+  try {
+    isLoading.value = true;
+    const res = await invoiceProformaFormService.getCustomerByKode(kode);
+    onCusSelected(res.data.data);
+  } catch (e: any) {
+    toast.error(e.response?.data?.message || "Customer tidak ditemukan.");
+    formData.value.cusKode = "";
+    formData.value.cusNama = "";
+    formData.value.alamatCus = "";
+    formData.value.kotaCus = "";
+  } finally {
+    isLoading.value = false;
+  }
+};
+
+// ─────────────────────────────────────────────
+// KEYBOARD HANDLERS: REKENING BANK
+// ─────────────────────────────────────────────
+
+const onRekKeydown = (e: KeyboardEvent) => {
+  if (e.key === "F1") {
+    e.preventDefault();
+    openRekModal();
+  }
+};
+
+const onRekEnter = async () => {
+  const rek = (formData.value.rekBank || "").trim();
+  if (!rek) {
+    openRekModal();
+    return;
+  }
+
+  try {
+    isLoading.value = true;
+    const res = await invoiceProformaFormService.getRekeningByNomor(
+      rek,
+      formData.value.kodePerush,
+    );
+    onRekSelected(res.data.data);
+  } catch (e: any) {
+    toast.error(e.response?.data?.message || "Rekening tidak ditemukan.");
+    formData.value.rekBank = "";
+    formData.value.namaBank = "";
+    formData.value.atasNama = "";
+  } finally {
+    isLoading.value = false;
+  }
+};
+
+// ─────────────────────────────────────────────
+// KEYBOARD HANDLERS: KODE BARANG DI GRID
+// ─────────────────────────────────────────────
+
+const onBarangKeydown = (e: KeyboardEvent, index: number) => {
+  if (e.key === "F1") {
+    e.preventDefault();
+    openBarangModal(index);
+  }
+};
+
+const onBarangEnter = async (index: number) => {
+  const kode = (formData.value.details[index]?.kode || "").trim().toUpperCase();
+  if (!kode) {
+    openBarangModal(index);
+    return;
+  }
+
+  if (!formData.value.kodePerush || !formData.value.cusKode) {
+    return toast.warning("Perusahaan dan Customer harus dipilih dulu.");
+  }
+
+  try {
+    isLoading.value = true;
+    const res = await invoiceProformaFormService.getBarangByKode(
+      kode,
+      formData.value.kodePerush,
+      formData.value.cusKode,
+    );
+    onBarangSelected(res.data.data);
+  } catch (e: any) {
+    toast.error(e.response?.data?.message || "Kode barang tidak ditemukan.");
+    formData.value.details[index].kode = "";
+  } finally {
+    isLoading.value = false;
+  }
+};
+
 const addRow = () => formData.value.details.push({ ...emptyRow });
 const removeRow = (index: number) => {
   formData.value.details.splice(index, 1);
@@ -370,21 +507,22 @@ const num = (val: any) =>
           <label class="f-lbl">Perusahaan</label>
           <div class="inp-grp" style="flex: 1">
             <input
-              :value="formData.namaPerush"
+              :value="formData.namaPerush || formData.kodePerush"
               readonly
               class="f-inp f-ro"
               style="flex: 1; cursor: pointer"
+              :placeholder="'Klik / F1 cari...'"
               @click="showPerushModal = true"
-              placeholder="F1..."
             />
             <button
               type="button"
               class="btn-lkp"
+              title="Cari Perusahaan (F1)"
               @click="showPerushModal = true"
+              @keydown.f1.prevent="showPerushModal = true"
+              tabindex="0"
             >
-              <span class="d-flex align-center justify-center w-100"
-                ><IconSearch :size="14"
-              /></span>
+              <IconSearch :size="14" color="#1565c0" />
             </button>
           </div>
         </div>
@@ -393,17 +531,22 @@ const num = (val: any) =>
           <label class="f-lbl">Customer</label>
           <div class="inp-grp" style="flex: 1">
             <input
-              :value="formData.cusNama"
+              :value="formData.cusNama || formData.cusKode"
               readonly
               class="f-inp f-ro"
               style="flex: 1; cursor: pointer"
+              placeholder="Klik / F1 cari..."
               @click="showCusModal = true"
-              placeholder="F1..."
             />
-            <button type="button" class="btn-lkp" @click="showCusModal = true">
-              <span class="d-flex align-center justify-center w-100"
-                ><IconSearch :size="14"
-              /></span>
+            <button
+              type="button"
+              class="btn-lkp"
+              title="Cari Customer (F1)"
+              @click="showCusModal = true"
+              @keydown.f1.prevent="showCusModal = true"
+              tabindex="0"
+            >
+              <IconSearch :size="14" color="#1565c0" />
             </button>
           </div>
         </div>
@@ -488,21 +631,22 @@ const num = (val: any) =>
                   {{ Number(index) + 1 }}
                 </td>
                 <td>
-                  <div class="d-flex align-center">
+                  <div class="d-flex align-center h-100">
                     <input
                       v-model="item.kode"
                       class="cell-input text-primary font-weight-bold"
-                      placeholder="F1..."
-                      @keyup.f1="openBarangModal(Number(index))"
+                      placeholder="F1 / kode"
+                      style="text-transform: uppercase"
+                      @keydown="onBarangKeydown($event, Number(index))"
+                      @keydown.enter.prevent="onBarangEnter(Number(index))"
                     />
                     <button
                       type="button"
                       class="btn-icon-only"
+                      title="Cari Barang (F1)"
                       @click="openBarangModal(Number(index))"
                     >
-                      <span class="d-flex align-center justify-center"
-                        ><IconSearch :size="13"
-                      /></span>
+                      <IconSearch :size="13" color="#1565c0" />
                     </button>
                   </div>
                 </td>
@@ -576,15 +720,31 @@ const num = (val: any) =>
               <label class="f-lbl" style="width: 70px">Rek. Bank</label>
               <div class="inp-grp" style="width: 260px">
                 <input
-                  :value="formData.rekBank"
+                  v-model="formData.rekBank"
+                  class="f-inp"
+                  style="
+                    flex: none;
+                    width: 90px;
+                    background: #ddeeff;
+                    font-weight: 600;
+                  "
+                  placeholder="F1 / nomor"
+                  @keydown="onRekKeydown"
+                  @keydown.enter.prevent="onRekEnter"
+                />
+                <input
+                  :value="formData.namaBank"
                   readonly
                   class="f-inp f-ro"
-                  style="flex: 1; cursor: pointer"
-                  @click="openRekModal"
-                  placeholder="F1..."
+                  style="flex: 1"
                 />
-                <button type="button" class="btn-lkp" @click="openRekModal">
-                  <IconSearch :size="14" />
+                <button
+                  type="button"
+                  class="btn-lkp"
+                  title="Cari Rekening (F1)"
+                  @click="openRekModal"
+                >
+                  <IconSearch :size="13" color="#1565c0" />
                 </button>
               </div>
             </div>
@@ -814,8 +974,10 @@ const num = (val: any) =>
   border-radius: 0;
 }
 .btn-lkp {
-  width: 26px;
-  background: #f5f5f5;
+  width: 28px;
+  min-width: 28px;
+  height: 100%;
+  background: #e3f2fd;
   border: none;
   border-left: 1px solid #bdbdbd;
   cursor: pointer;
@@ -823,10 +985,28 @@ const num = (val: any) =>
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #424242;
 }
-.btn-lkp:hover:not(:disabled) {
-  background: #e0e0e0;
+.btn-lkp:hover {
+  background: #bbdefb;
+}
+
+.btn-icon-only {
+  width: 24px;
+  min-width: 24px;
+  height: 100%;
+  padding: 0;
+  background: #e3f2fd;
+  border: none;
+  border-left: 1px solid #eeeeee;
+  cursor: pointer;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #1565c0;
+}
+.btn-icon-only:hover {
+  background: #bbdefb;
 }
 
 .summary-footer {

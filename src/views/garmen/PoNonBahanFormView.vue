@@ -52,7 +52,10 @@ const showPrintDialog = ref(false);
 const nomorToPrint = ref("");
 
 // Hak Akses Flags dari Token User
-const canSeeSup = computed(() => !!authStore.user?.flags?.lihatSup);
+const canSeeSup = computed(() => {
+  const bagian = authStore.user?.bagian?.toUpperCase() || "";
+  return !!authStore.user?.flags?.lihatSup || bagian === "FINANCE";
+});
 const canSeeBeli = computed(() => !!authStore.user?.flags?.lihatBeli);
 
 // --- HELPER FORMATTING UTK METRIC DAN KATA DI TEMPLATE ---
@@ -71,6 +74,51 @@ const formatQty = (val: any) => {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
+};
+
+const grandTotal = computed(() =>
+  formData.value.items.reduce(
+    (sum: number, item: any) => sum + (Number(item.total) || 0),
+    0,
+  ),
+);
+
+const formatCurrency = (val: number) =>
+  new Intl.NumberFormat("id-ID", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(val);
+
+// Format angka dengan separator ribuan untuk display
+const formatHarga = (val: any) => {
+  const num = Number(val) || 0;
+  if (num === 0) return "";
+  return new Intl.NumberFormat("id-ID").format(num);
+};
+
+// Saat input harga — simpan nilai mentah ke item, recalc total
+const onHargaInput = (e: Event, idx: number) => {
+  const raw = (e.target as HTMLInputElement).value
+    .replace(/\./g, "")
+    .replace(/,/g, "");
+  const num = Number(raw) || 0;
+  formData.value.items[idx].harga = num;
+  recalcTotal(idx);
+};
+
+// Saat focus — tampilkan angka polos tanpa separator
+const onHargaFocus = (e: Event, idx: number) => {
+  const input = e.target as HTMLInputElement;
+  const num = Number(formData.value.items[idx].harga) || 0;
+  input.value = num === 0 ? "" : String(num);
+  input.select();
+};
+
+// Saat blur — format ulang dengan separator
+const onHargaBlur = (e: Event, idx: number) => {
+  const input = e.target as HTMLInputElement;
+  const num = Number(formData.value.items[idx].harga) || 0;
+  input.value = num === 0 ? "" : new Intl.NumberFormat("id-ID").format(num);
 };
 
 const {
@@ -164,6 +212,70 @@ const setSupplier = (v: any) => {
   formData.value.header.sup_nama = v.Nama;
   formData.value.header.sup_alamat = v.Alamat;
   formData.value.header.sup_kota = v.Kota;
+};
+
+// F1 → buka modal
+const onMintaKeydown = (e: KeyboardEvent) => {
+  if (e.key === "F1") {
+    e.preventDefault();
+    if (!isEditMode.value) showMintaModal.value = true;
+  }
+};
+
+// Enter → fetch detail langsung dari input
+const onMintaEnter = async () => {
+  const nomor = formData.value.header.po_mb_nomor.trim();
+  if (!nomor || isEditMode.value) return;
+
+  try {
+    isLoading.value = true;
+    const res = await poNonBahanFormService.getPermintaanDetail(
+      nomor,
+      formData.value.header.po_nomor,
+    );
+    // Ambil header info dari baris pertama
+    const firstRow = res.data.data?.[0];
+    if (firstRow) {
+      formData.value.header.tglminta = firstRow.tglminta || "";
+      formData.value.header.mb_cab = firstRow.cab || "";
+    }
+    formData.value.items = res.data.data;
+  } catch (e: any) {
+    toast.error(e.response?.data?.message || "No. Permintaan tidak ditemukan.");
+    formData.value.header.po_mb_nomor = "";
+  } finally {
+    isLoading.value = false;
+  }
+};
+
+// F1 → buka modal supplier
+const onSupKeydown = (e: KeyboardEvent) => {
+  if (e.key === "F1") {
+    e.preventDefault();
+    if (!formData.value.header.hasBpb) showSupModal.value = true;
+  }
+};
+
+// Enter → fetch supplier langsung dari input kode
+const onSupEnter = async () => {
+  const kode = formData.value.header.po_sup_kode.trim();
+  if (!kode || formData.value.header.hasBpb) return;
+
+  try {
+    isLoading.value = true;
+    const res = await poNonBahanFormService.getSupplierByKode(kode);
+    const sup = res.data.data;
+    if (!sup) throw new Error("Supplier tidak ditemukan.");
+    setSupplier(sup);
+  } catch (e: any) {
+    toast.error(e.response?.data?.message || "Kode supplier tidak ditemukan.");
+    formData.value.header.po_sup_kode = "";
+    formData.value.header.sup_nama = "";
+    formData.value.header.sup_alamat = "";
+    formData.value.header.sup_kota = "";
+  } finally {
+    isLoading.value = false;
+  }
 };
 
 const recalcTotal = (idx: number) => {
@@ -270,20 +382,24 @@ const onPrintCancel = () => {
 
         <div class="fr">
           <label class="lbl">No. Permintaan</label>
-          <div class="cell-grp w-100">
+          <div class="cell-grp">
             <input
               v-model="formData.header.po_mb_nomor"
-              class="inp ro"
-              placeholder="F1 / Cari..."
-              readonly
+              class="inp"
+              :class="{ ro: isEditMode }"
+              placeholder="F1 / ketik + Enter"
+              :readonly="isEditMode"
+              @keydown="onMintaKeydown"
+              @keydown.enter.prevent="onMintaEnter"
             />
             <button
               type="button"
               class="ci-btn"
               :disabled="isEditMode"
               @click="showMintaModal = true"
+              title="Cari No. Permintaan (F1)"
             >
-              <IconSearch :size="12" />
+              <IconSearch :size="13" />
             </button>
           </div>
         </div>
@@ -304,20 +420,24 @@ const onPrintCancel = () => {
           <div class="sep mt-2 mb-2" />
           <div class="fr">
             <label class="lbl">Supplier</label>
-            <div class="cell-grp w-100">
+            <div class="cell-grp">
               <input
                 v-model="formData.header.po_sup_kode"
-                class="inp ro font-weight-bold text-primary"
-                placeholder="F1 / Cari..."
-                readonly
+                class="inp font-weight-bold text-primary"
+                :class="{ ro: formData.header.hasBpb }"
+                placeholder="F1 / kode + Enter"
+                :readonly="formData.header.hasBpb"
+                @keydown="onSupKeydown"
+                @keydown.enter.prevent="onSupEnter"
               />
               <button
                 type="button"
                 class="ci-btn"
                 :disabled="formData.header.hasBpb"
                 @click="showSupModal = true"
+                title="Cari Supplier (F1)"
               >
-                <IconSearch :size="12" />
+                <IconSearch :size="13" />
               </button>
             </div>
           </div>
@@ -435,13 +555,15 @@ const onPrintCancel = () => {
                 </td>
                 <td v-if="canSeeBeli" class="p0">
                   <input
-                    v-model.number="item.harga"
-                    type="number"
+                    :value="formatHarga(item.harga)"
+                    type="text"
+                    inputmode="numeric"
                     class="ci text-right"
                     :class="{ ro: item.bpb > 0 || formData.header.isTutupBuku }"
                     :readonly="item.bpb > 0 || formData.header.isTutupBuku"
-                    @input="recalcTotal(Number(idx))"
-                    v-select-on-focus
+                    @focus="onHargaFocus($event, Number(idx))"
+                    @blur="onHargaBlur($event, Number(idx))"
+                    @input="onHargaInput($event, Number(idx))"
                   />
                 </td>
                 <td
@@ -459,6 +581,20 @@ const onPrintCancel = () => {
                 </td>
               </tr>
             </tbody>
+            <tfoot v-if="canSeeBeli">
+              <tr class="footer-row">
+                <td
+                  colspan="10"
+                  class="text-right font-weight-bold footer-lbl pr-3"
+                >
+                  GRAND TOTAL
+                </td>
+                <td class="text-right font-weight-bold footer-total px-2">
+                  {{ formatCurrency(grandTotal) }}
+                </td>
+                <td v-if="isDetailRinci" colspan="2" class="footer-empty"></td>
+              </tr>
+            </tfoot>
           </table>
         </div>
       </div>
@@ -612,30 +748,43 @@ const onPrintCancel = () => {
 }
 .cell-grp {
   display: flex;
-  align-items: center;
-  height: 26px;
+  align-items: stretch;
+  height: 28px;
   border: 1px solid #bdbdbd;
   border-radius: 4px;
   overflow: hidden;
   background: white;
+  flex: 1;
+  min-width: 0;
 }
 .cell-grp .inp {
   border: none;
   height: 100%;
+  flex: 1;
+  min-width: 0;
+  padding: 0 6px;
+  background: transparent;
 }
 .ci-btn {
-  width: 26px;
+  width: 28px;
+  min-width: 28px;
   height: 100%;
-  background: #eeeeee;
+  background: #e3f2fd;
   border: none;
   border-left: 1px solid #bdbdbd;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
+  color: #1565c0;
 }
 .ci-btn:hover:not(:disabled) {
-  background: #e0e0e0;
+  background: #bbdefb;
+}
+.ci-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 .det-wrap {
   padding: 8px 12px;
@@ -649,5 +798,31 @@ const onPrintCancel = () => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.footer-row {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  background: #e8f5e9;
+}
+.footer-lbl {
+  font-size: 12px;
+  color: #1b5e20;
+  background: #e8f5e9;
+  border: 1px solid #a5d6a7;
+  padding: 6px 12px;
+  letter-spacing: 0.03em;
+}
+.footer-total {
+  font-size: 13px;
+  color: #b71c1c;
+  background: #e8f5e9;
+  border: 1px solid #a5d6a7;
+  white-space: nowrap;
+}
+.footer-empty {
+  background: #e8f5e9;
+  border: 1px solid #a5d6a7;
 }
 </style>

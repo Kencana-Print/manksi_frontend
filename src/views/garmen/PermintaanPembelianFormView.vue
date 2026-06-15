@@ -162,6 +162,66 @@ const setBarang = (v: any) => {
   }
 };
 
+// ─────────────────────────────────────────────
+// KEYBOARD HANDLERS: KODE BARANG DI GRID
+// ─────────────────────────────────────────────
+
+const onKodeKeydown = (e: KeyboardEvent, idx: number) => {
+  if (e.key === "F1") {
+    e.preventDefault();
+    openLookupBarang(idx);
+  }
+};
+
+const onKodeEnter = async (idx: number) => {
+  const kode = (formData.value.items[idx]?.kode || "").trim().toUpperCase();
+
+  // Kosong → buka modal
+  if (!kode) {
+    openLookupBarang(idx);
+    return;
+  }
+
+  try {
+    isLoading.value = true;
+    const res = await permintaanPembelianFormService.getBarangByKode(
+      kode,
+      formJenis.value,
+      authStore.user?.cabang || "HO-",
+      authStore.user?.bagian || "",
+    );
+    const item = res.data.data;
+
+    // Cek duplikat
+    const isDuplicate = formData.value.items.some(
+      (d: any, i: number) => i !== idx && d.kode === item.Kode,
+    );
+    if (isDuplicate) {
+      toast.error(`Kode ${item.Kode} sudah diinput di baris lain.`);
+      formData.value.items[idx].kode = "";
+      return;
+    }
+
+    formData.value.items[idx].kode = item.Kode;
+    formData.value.items[idx].nama = item.Nama;
+    formData.value.items[idx].satuan = item.Satuan;
+    formData.value.items[idx].harga = 0;
+    recalcTotal(idx);
+
+    // Auto tambah baris jika ini baris terakhir
+    if (idx === formData.value.items.length - 1) {
+      addItem();
+    }
+  } catch (e: any) {
+    toast.error(e.response?.data?.message || "Kode barang tidak ditemukan.");
+    formData.value.items[idx].kode = "";
+    formData.value.items[idx].nama = "";
+    formData.value.items[idx].satuan = "";
+  } finally {
+    isLoading.value = false;
+  }
+};
+
 const recalcTotal = (i: number) => {
   const row = formData.value.items[i];
   row.total = (Number(row.jumlah) || 0) * (Number(row.harga) || 0);
@@ -430,14 +490,19 @@ const onSaveRealisasi = async () => {
                       <input
                         v-model="item.kode"
                         class="ci font-weight-bold text-primary"
-                        readonly
+                        placeholder="F1 / kode"
+                        style="text-transform: uppercase"
+                        @keydown="onKodeKeydown($event, Number(idx))"
+                        @keydown.enter.prevent="onKodeEnter(Number(idx))"
+                        @focus="activeGridIndex = Number(idx)"
                       />
                       <button
                         type="button"
                         class="ci-btn"
+                        title="Cari Barang (F1)"
                         @click.stop="openLookupBarang(Number(idx))"
                       >
-                        <IconSearch :size="12" />
+                        <IconSearch :size="12" color="#1565c0" />
                       </button>
                     </div>
                   </td>
@@ -758,23 +823,29 @@ const onSaveRealisasi = async () => {
   display: flex;
   align-items: center;
   height: 25px;
+  width: 100%;
+  overflow: hidden;
 }
 .cell-grp .ci {
   flex: 1;
+  min-width: 0;
 }
 .ci-btn {
-  width: 22px;
+  width: 24px;
+  min-width: 24px;
   height: 25px;
-  background: #eee;
+  background: #e3f2fd;
   border: none;
   border-left: 1px solid #ccc;
   cursor: pointer;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
+  color: #1565c0;
 }
 .ci-btn:hover {
-  background: #e0e0e0;
+  background: #bbdefb;
 }
 .btn-del {
   width: 100%;

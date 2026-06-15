@@ -3,7 +3,12 @@ import { ref, computed, watch, onMounted } from "vue";
 import { useToast } from "vue-toastification";
 import { mapFormService } from "@/services/penjualan/mapFormService";
 import api from "@/services/api";
-import { IconUpload, IconMaximize, IconPhoto } from "@tabler/icons-vue";
+import {
+  IconUpload,
+  IconMaximize,
+  IconPhoto,
+  IconSearch,
+} from "@tabler/icons-vue";
 
 import PerusahaanSearchModal from "@/components/lookups/PerusahaanSearchModal.vue";
 import CustomerSearchModal from "@/components/lookups/CustomerSearchModal.vue";
@@ -14,6 +19,7 @@ import PenawaranSearchModal from "@/components/lookups/PenawaranSearchModal.vue"
 import PenawaranDetailSearchModal from "@/components/lookups/PenawaranDetailSearchModal.vue";
 import PabrikSearchModal from "@/components/lookups/PabrikSearchModal.vue";
 import ReferensiMapSearchModal from "@/components/lookups/ReferensiMapSearchModal.vue";
+import SetoranSearchModal from "@/components/lookups/SetoranSearchModal.vue";
 
 const props = defineProps<{
   formData: any;
@@ -35,6 +41,8 @@ const showPenawaranModal = ref(false);
 const showCabMapModal = ref(false);
 const showCabSpkModal = ref(false);
 const showRefModal = ref(false);
+const showSetoranModal = ref(false);
+
 const showPreviewDialog = ref(false);
 const showPenawaranDetailModal = ref(false);
 const selectedPenawaranNomor = ref("");
@@ -467,6 +475,73 @@ const onCabSpkKodeEnter = async () => {
     toast.error("Gagal validasi kode workshop.");
   }
 };
+
+// ── F1 handlers untuk setiap input kode ──
+const onPerushF1 = (e: KeyboardEvent) => {
+  if (e.key === "F1") {
+    e.preventDefault();
+    showPerushModal.value = true;
+  }
+};
+const onCustF1 = (e: KeyboardEvent) => {
+  if (e.key === "F1") {
+    e.preventDefault();
+    showCustModal.value = true;
+  }
+};
+const onSalesF1 = (e: KeyboardEvent) => {
+  if (e.key === "F1") {
+    e.preventDefault();
+    showSalesModal.value = true;
+  }
+};
+const onJoF1 = (e: KeyboardEvent) => {
+  if (e.key === "F1") {
+    e.preventDefault();
+    if (!props.isEdit) showJoModal.value = true;
+  }
+};
+const onCabMapF1 = (e: KeyboardEvent) => {
+  if (e.key === "F1") {
+    e.preventDefault();
+    showCabMapModal.value = true;
+  }
+};
+const onCabSpkF1 = (e: KeyboardEvent) => {
+  if (e.key === "F1") {
+    e.preventDefault();
+    showCabSpkModal.value = true;
+  }
+};
+const onRefF1 = (e: KeyboardEvent) => {
+  if (e.key === "F1") {
+    e.preventDefault();
+    if (props.formData.IsRevisi !== "N" && !props.formData.Referensi)
+      showRefModal.value = true;
+  }
+};
+
+// ─────────────────────────────────────────────
+// HANDLER: SEARCH SETORAN / DP CUSTOMER
+// ─────────────────────────────────────────────
+
+const openSetoranModal = () => {
+  if (!props.formData.CustKode) {
+    toast.warning("Customer harus dipilih dulu sebelum mencari DP.");
+    return;
+  }
+  showSetoranModal.value = true;
+};
+
+const setSetoranPembayaran = (v: any) => {
+  props.formData.NomorPO = v.Nomor;
+  if (v.Tanggal) {
+    // Normalisasi tanggal ke YYYY-MM-DD
+    const tgl = String(v.Tanggal).substring(0, 10);
+    props.formData.TglPO = tgl;
+  }
+  toast.success(`Nomor PO diisi dari setoran: ${v.Nomor}`);
+};
 </script>
 
 <template>
@@ -554,6 +629,7 @@ const onCabSpkKodeEnter = async () => {
               class="f-inp"
               style="width: 50px; background: #ddeeff"
               :disabled="isEdit"
+              @keydown="onPerushF1"
               @keydown.enter.prevent="onPerushKodeEnter"
               @blur="onPerushKodeEnter"
             />
@@ -566,13 +642,16 @@ const onCabSpkKodeEnter = async () => {
             <button
               type="button"
               class="btn-lkp"
+              title="Cari Perusahaan (F1)"
               @mousedown.prevent="
                 isOpeningModal = true;
                 showPerushModal = true;
               "
               @click="isOpeningModal = false"
+              @keydown.f1.prevent="showPerushModal = true"
+              tabindex="0"
             >
-              🔍
+              <IconSearch :size="13" color="#1565c0" />
             </button>
           </div>
         </div>
@@ -603,11 +682,30 @@ const onCabSpkKodeEnter = async () => {
 
         <div class="f-row">
           <label class="f-lbl">Nomor PO</label>
-          <input
-            v-model="formData.NomorPO"
-            class="f-inp"
-            style="max-width: 200px"
-          />
+          <div class="inp-grp" style="max-width: 320px">
+            <input
+              v-model="formData.NomorPO"
+              class="f-inp"
+              style="flex: 1"
+              placeholder="Ketik PO atau cari DP..."
+            />
+            <button
+              type="button"
+              class="btn-lkp"
+              title="Cari DP dari Penerimaan"
+              :disabled="!formData.CustKode"
+              @click="openSetoranModal"
+            >
+              <IconSearch :size="13" color="#1565c0" />
+            </button>
+          </div>
+          <span
+            v-if="!formData.NomorPO && formData.CustKode"
+            class="ml-1"
+            style="font-size: 10px; color: #f57c00; font-style: italic"
+          >
+            ⚠ Wajib diisi atau cari dari Penerimaan
+          </span>
         </div>
 
         <div class="f-row">
@@ -661,6 +759,7 @@ const onCabSpkKodeEnter = async () => {
               v-model="formData.CustKode"
               class="f-inp"
               style="width: 70px; background: #ddeeff"
+              @keydown="onCustF1"
               @keydown.enter.prevent="onCustKodeEnter"
               @blur="onCustKodeEnter"
             />
@@ -673,13 +772,16 @@ const onCabSpkKodeEnter = async () => {
             <button
               type="button"
               class="btn-lkp"
+              title="Cari Customer (F1)"
               @mousedown.prevent="
                 isOpeningModal = true;
                 showCustModal = true;
               "
               @click="isOpeningModal = false"
+              @keydown.f1.prevent="showCustModal = true"
+              tabindex="0"
             >
-              🔍
+              <IconSearch :size="13" color="#1565c0" />
             </button>
           </div>
         </div>
@@ -691,6 +793,7 @@ const onCabSpkKodeEnter = async () => {
               v-model="formData.SalesKode"
               class="f-inp"
               style="width: 60px; background: #ddeeff"
+              @keydown="onSalesF1"
               @keydown.enter.prevent="onSalesKodeEnter"
               @blur="onSalesKodeEnter"
             />
@@ -703,30 +806,30 @@ const onCabSpkKodeEnter = async () => {
             <button
               type="button"
               class="btn-lkp"
+              title="Cari Sales (F1)"
               @mousedown.prevent="
                 isOpeningModal = true;
                 showSalesModal = true;
               "
               @click="isOpeningModal = false"
+              @keydown.f1.prevent="showSalesModal = true"
+              tabindex="0"
             >
-              🔍
+              <IconSearch :size="13" color="#1565c0" />
             </button>
           </div>
         </div>
 
         <div class="f-row">
           <label class="f-lbl">Jenis Order</label>
-          <div
-            class="inp-grp"
-            style="max-width: 320px"
-            :style="!formData.JoKode ? 'border-color:#e53935' : ''"
-          >
+          <div class="inp-grp" style="max-width: 320px">
             <input
               v-model="formData.JoKode"
               class="f-inp"
               style="width: 60px"
               :disabled="isEdit"
               @keydown.enter.prevent="onJoKodeEnter"
+              @keydown.f1.prevent="!isEdit && (showJoModal = true)"
               @blur="onJoKodeEnter"
             />
             <input
@@ -738,13 +841,17 @@ const onCabSpkKodeEnter = async () => {
             <button
               type="button"
               class="btn-lkp"
+              :disabled="isEdit"
+              title="Cari Jenis Order (F1)"
               @mousedown.prevent="
                 isOpeningModal = true;
                 showJoModal = true;
               "
               @click="isOpeningModal = false"
+              @keydown.f1.prevent="showJoModal = true"
+              tabindex="0"
             >
-              🔍
+              <IconSearch :size="13" color="#1565c0" />
             </button>
           </div>
         </div>
@@ -906,6 +1013,7 @@ const onCabSpkKodeEnter = async () => {
               v-model="formData.Cab"
               class="f-inp"
               style="width: 48px; background: #ddeeff"
+              @keydown="onCabMapF1"
               @keydown.enter.prevent="onCabMapKodeEnter"
               @blur="onCabMapKodeEnter"
             />
@@ -918,13 +1026,16 @@ const onCabSpkKodeEnter = async () => {
             <button
               type="button"
               class="btn-lkp"
+              title="Cari Workshop (F1)"
               @mousedown.prevent="
                 isOpeningModal = true;
                 showCabMapModal = true;
               "
               @click="isOpeningModal = false"
+              @keydown.f1.prevent="showCabMapModal = true"
+              tabindex="0"
             >
-              🔍
+              <IconSearch :size="13" color="#1565c0" />
             </button>
           </div>
           <label class="chk-lbl ml-auto design-baru-lbl">
@@ -945,6 +1056,7 @@ const onCabSpkKodeEnter = async () => {
               v-model="formData.Cab2"
               class="f-inp"
               style="width: 48px; background: #ddeeff"
+              @keydown="onCabSpkF1"
               @keydown.enter.prevent="onCabSpkKodeEnter"
               @blur="onCabSpkKodeEnter"
             />
@@ -957,13 +1069,16 @@ const onCabSpkKodeEnter = async () => {
             <button
               type="button"
               class="btn-lkp"
+              title="Cari Workshop SPK (F1)"
               @mousedown.prevent="
                 isOpeningModal = true;
                 showCabSpkModal = true;
               "
               @click="isOpeningModal = false"
+              @keydown.f1.prevent="showCabSpkModal = true"
+              tabindex="0"
             >
-              🔍
+              <IconSearch :size="13" color="#1565c0" />
             </button>
           </div>
         </div>
@@ -1064,14 +1179,18 @@ const onCabSpkKodeEnter = async () => {
               class="f-inp"
               style="flex: 1"
               :disabled="formData.IsRevisi === 'N' || !!formData.Referensi"
+              @keydown="onRefF1"
             />
             <button
               type="button"
               class="btn-lkp"
               :disabled="formData.IsRevisi === 'N' || !!formData.Referensi"
+              title="Cari Referensi MAP (F1)"
               @mousedown.prevent="showRefModal = true"
+              @keydown.f1.prevent="showRefModal = true"
+              tabindex="0"
             >
-              🔍
+              <IconSearch :size="13" color="#1565c0" />
             </button>
           </div>
         </div>
@@ -1201,6 +1320,11 @@ const onCabSpkKodeEnter = async () => {
   <PabrikSearchModal v-model="showCabMapModal" @selected="setCabMap" />
   <PabrikSearchModal v-model="showCabSpkModal" @selected="setCabSpk" />
   <ReferensiMapSearchModal v-model="showRefModal" @selected="setRef" />
+  <SetoranSearchModal
+    v-model="showSetoranModal"
+    :cust-kode="formData.CustKode"
+    @selected="setSetoranPembayaran"
+  />
 
   <!-- Preview dialog -->
   <v-dialog v-model="showPreviewDialog" max-width="800px">
@@ -1373,24 +1497,26 @@ const onCabSpkKodeEnter = async () => {
   border-left: 1px solid #e0e0e0;
 }
 .btn-lkp {
-  width: 24px;
-  background: #f5f5f5;
+  width: 26px;
+  min-width: 26px;
+  background: #e3f2fd;
   border: none;
   border-left: 1px solid #bdbdbd;
   cursor: pointer;
-  /* Hapus font-size jika menggunakan v-icon agar tidak konflik */
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0; /* Pastikan tidak ada padding yang mendorong icon */
+  padding: 0;
+  height: 100%;
 }
 .btn-lkp:hover:not(:disabled) {
-  background: #e0e0e0;
+  background: #bbdefb;
 }
 .btn-lkp:disabled {
   background: #eeeeee;
   cursor: not-allowed;
+  opacity: 0.5;
 }
 
 .inp-grp {

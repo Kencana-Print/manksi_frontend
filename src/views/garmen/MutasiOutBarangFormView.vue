@@ -244,6 +244,107 @@ const setBarang = async (v: any) => {
   if (i === formData.value.Detail.length - 1) addItem();
 };
 
+// ─────────────────────────────────────────────
+// KEYBOARD HANDLERS: NO. PERMINTAAN (Finance only)
+// ─────────────────────────────────────────────
+
+const onPermintaanKeydown = (e: KeyboardEvent, idx: number) => {
+  // Hanya berlaku untuk Finance
+  if (!isFinance.value) return;
+
+  if (e.key === "F1") {
+    e.preventDefault();
+    openLookupPermintaan(idx);
+  }
+};
+
+const onPermintaanEnter = async (idx: number) => {
+  // Hanya berlaku untuk Finance
+  if (!isFinance.value) return;
+
+  const nomor = (formData.value.Detail[idx]?.NoPermintaan || "")
+    .trim()
+    .toUpperCase();
+
+  // Kosong → tidak lakukan apapun (jangan buka modal)
+  if (!nomor) return;
+
+  try {
+    isLoading.value = true;
+    await setPermintaanFinance(nomor);
+  } catch (e: any) {
+    toast.error(e.response?.data?.message || "No. Permintaan tidak ditemukan.");
+    formData.value.Detail[idx].NoPermintaan = "";
+  } finally {
+    isLoading.value = false;
+  }
+};
+
+// ─────────────────────────────────────────────
+// KEYBOARD HANDLERS: KODE BARANG (non-Finance only)
+// ─────────────────────────────────────────────
+
+const onKodeKeydown = (e: KeyboardEvent, idx: number) => {
+  // Hanya berlaku untuk non-Finance
+  if (isFinance.value) return;
+
+  if (e.key === "F1") {
+    e.preventDefault();
+    openLookupBarang(idx);
+  }
+};
+
+const onKodeEnter = async (idx: number) => {
+  // Hanya berlaku untuk non-Finance
+  if (isFinance.value) return;
+
+  const kode = (formData.value.Detail[idx]?.Kode || "").trim().toUpperCase();
+
+  // Kosong → tidak lakukan apapun (jangan buka modal)
+  if (!kode) return;
+
+  try {
+    isLoading.value = true;
+
+    const res = await mutasiOutBarangFormService.searchBarang({
+      jenis: formJenis.value,
+      bagian: formData.value.Bagian,
+      cabang: formData.value.CabangAsal,
+      search: kode,
+    });
+
+    const found = res.data.data?.find(
+      (item: any) => (item.Kode || item.brg_kode) === kode,
+    );
+    if (!found) throw new Error("Kode barang tidak ditemukan.");
+
+    const isDuplicate = formData.value.Detail.some(
+      (d: any, i: number) => i !== idx && d.Kode === kode,
+    );
+    if (isDuplicate) {
+      toast.error(`Kode ${kode} sudah ada di baris lain.`);
+      formData.value.Detail[idx].Kode = "";
+      return;
+    }
+
+    formData.value.Detail[idx].Kode = kode;
+    formData.value.Detail[idx].Nama = found.Nama || found.brg_nama;
+    formData.value.Detail[idx].Satuan = found.Satuan || found.brg_satuan;
+    formData.value.Detail[idx].Stok = Number(found.Stok) || 0;
+    formData.value.Detail[idx].StokReal = Number(found.Stok) || 0;
+    formData.value.Detail[idx].Jumlah = 0;
+
+    if (idx === formData.value.Detail.length - 1) addItem();
+  } catch (e: any) {
+    toast.error(e.response?.data?.message || "Kode barang tidak ditemukan.");
+    formData.value.Detail[idx].Kode = "";
+    formData.value.Detail[idx].Nama = "";
+    formData.value.Detail[idx].Satuan = "";
+  } finally {
+    isLoading.value = false;
+  }
+};
+
 // --- VALIDASI ---
 const validateSave = () => {
   if (!formData.value.CabangTujuan) return toast.warning("Tujuan harus diisi.");
@@ -454,17 +555,30 @@ const formatQty = (val: any) =>
                 <td class="p0">
                   <div class="cell-grp">
                     <input
-                      :value="item.NoPermintaan"
-                      class="ci fw text-primary ro"
-                      readonly
+                      v-model="item.NoPermintaan"
+                      class="ci fw text-primary"
+                      :class="{ ro: isEditMode || !isFinance }"
+                      :readonly="isEditMode || !isFinance"
+                      :placeholder="isFinance ? 'F1 / nomor + Enter' : ''"
+                      style="text-transform: uppercase"
+                      @keydown="
+                        isFinance
+                          ? onPermintaanKeydown($event, Number(idx))
+                          : undefined
+                      "
+                      @keydown.enter.prevent="
+                        isFinance ? onPermintaanEnter(Number(idx)) : undefined
+                      "
+                      @focus="activeGridIndex = Number(idx)"
                     />
                     <button
-                      v-if="!isEditMode && formData.Bagian === 'FINANCE'"
+                      v-if="!isEditMode && isFinance"
                       type="button"
                       class="ci-btn"
+                      title="Cari Permintaan (F1)"
                       @click.stop="openLookupPermintaan(Number(idx))"
                     >
-                      <IconSearch :size="12" />
+                      <IconSearch :size="12" color="#1565c0" />
                     </button>
                   </div>
                 </td>
@@ -472,17 +586,30 @@ const formatQty = (val: any) =>
                 <td class="p0">
                   <div class="cell-grp">
                     <input
-                      :value="item.Kode"
-                      class="ci fw text-primary ro"
-                      readonly
+                      v-model="item.Kode"
+                      class="ci fw text-primary"
+                      :class="{ ro: isEditMode }"
+                      :readonly="isEditMode"
+                      :placeholder="!isFinance ? 'F1 / kode + Enter' : ''"
+                      style="text-transform: uppercase"
+                      @keydown="
+                        !isFinance
+                          ? onKodeKeydown($event, Number(idx))
+                          : undefined
+                      "
+                      @keydown.enter.prevent="
+                        !isFinance ? onKodeEnter(Number(idx)) : undefined
+                      "
+                      @focus="activeGridIndex = Number(idx)"
                     />
                     <button
-                      v-if="!isEditMode && formData.Bagian !== 'FINANCE'"
+                      v-if="!isEditMode && !isFinance"
                       type="button"
                       class="ci-btn"
+                      title="Cari Barang (F1)"
                       @click.stop="openLookupBarang(Number(idx))"
                     >
-                      <IconSearch :size="12" />
+                      <IconSearch :size="12" color="#1565c0" />
                     </button>
                   </div>
                 </td>
@@ -768,11 +895,18 @@ const formatQty = (val: any) =>
   display: flex;
   align-items: center;
   height: 25px;
+  width: 100%;
+  overflow: hidden;
+}
+.cell-grp .ci {
+  flex: 1;
+  min-width: 0;
 }
 .ci-btn {
-  width: 22px;
+  width: 24px;
+  min-width: 24px;
   flex-shrink: 0;
-  background: #eeeeee;
+  background: #e3f2fd;
   border: none;
   border-left: 1px solid #e0e0e0;
   cursor: pointer;
@@ -780,6 +914,10 @@ const formatQty = (val: any) =>
   display: flex;
   align-items: center;
   justify-content: center;
+  color: #1565c0;
+}
+.ci-btn:hover {
+  background: #bbdefb;
 }
 .btn-del {
   width: 100%;

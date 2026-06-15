@@ -234,6 +234,12 @@ const {
       }
     }
 
+    if (!dataToSave.NomorPO?.trim()) {
+      throw new Error(
+        "Nomor PO harus diisi.\nJika tidak ada PO tertulis, cari DP Customer dari Penerimaan (tombol 🔍 di sebelah field Nomor PO).",
+      );
+    }
+
     // 1. Validasi Minimum sebelum kirim
     if (!dataToSave.Cab) throw new Error("Kode Workshop MAP wajib diisi.");
     if (!dataToSave.Nama) throw new Error("Nama Pekerjaan wajib diisi.");

@@ -23,4 +23,9 @@ export const dashboardService = {
   getPenawaranMapSummary: () => api.get("/dashboard/penawaran-map-summary"),
 
   getKunjunganSalesSummary: () => api.get("/dashboard/kunjungan-sales-summary"),
+
+  getPiutangDashboard: () => api.get("/dashboard/piutang-dashboard"),
+
+  getPiutangOverdue: (limit = 20, offset = 0) =>
+    api.get("/dashboard/piutang-overdue", { params: { limit, offset } }),
 };

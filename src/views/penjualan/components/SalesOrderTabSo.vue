@@ -5,6 +5,7 @@ import {
   IconMaximize,
   IconPhoto,
   IconExclamationCircle,
+  IconSearch,
 } from "@tabler/icons-vue";
 import { useToast } from "vue-toastification";
 import { useAuthStore } from "@/stores/authStore";
@@ -393,6 +394,92 @@ const onWorkshopKodeEnter = async () => {
   }
 };
 
+// ── F1 handlers — tangkap di input, emit ke parent ──
+const onPerushF1 = (e: KeyboardEvent) => {
+  if (e.key === "F1") {
+    e.preventDefault();
+    if (!props.isEdit) emit("open-lookup", "perusahaan");
+  }
+};
+const onCustF1 = (e: KeyboardEvent) => {
+  if (e.key === "F1") {
+    e.preventDefault();
+    emit("open-lookup", "customer");
+  }
+};
+const onCustKaosanF1 = (e: KeyboardEvent) => {
+  if (e.key === "F1") {
+    e.preventDefault();
+    emit("open-lookup", "custKaosan");
+  }
+};
+const onJoF1 = (e: KeyboardEvent) => {
+  if (e.key === "F1") {
+    e.preventDefault();
+    if (!props.isEdit) emit("open-lookup", "jenisOrder");
+  }
+};
+const onSalesF1 = (e: KeyboardEvent) => {
+  if (e.key === "F1") {
+    e.preventDefault();
+    emit("open-lookup", "sales");
+  }
+};
+const onWorkshopF1 = (e: KeyboardEvent) => {
+  if (e.key === "F1") {
+    e.preventDefault();
+    emit("open-lookup", "workshop");
+  }
+};
+const onPenawaranF1 = (e: KeyboardEvent) => {
+  if (e.key === "F1") {
+    e.preventDefault();
+    emit("open-lookup", "penawaran");
+  }
+};
+const onSjMemoF1 = (e: KeyboardEvent) => {
+  if (e.key === "F1") {
+    e.preventDefault();
+    emit("open-lookup", "sjMemo");
+  }
+};
+const onMemoF1 = (e: KeyboardEvent) => {
+  if (e.key === "F1") {
+    e.preventDefault();
+    emit("open-lookup", "memo");
+  }
+};
+const onMppbF1 = (e: KeyboardEvent) => {
+  if (e.key === "F1") {
+    e.preventDefault();
+    emit("open-lookup", "mppb");
+  }
+};
+const onInvDcF1 = (e: KeyboardEvent) => {
+  if (e.key === "F1") {
+    e.preventDefault();
+    emit("open-lookup", isDivisiTiga.value ? "soKaosan" : "stokDc");
+  }
+};
+const onRepeatF1 = (e: KeyboardEvent) => {
+  if (e.key === "F1") {
+    e.preventDefault();
+    emit("open-lookup", "repeat");
+  }
+};
+const onSpkLamaF1 = (e: KeyboardEvent) => {
+  if (e.key === "F1") {
+    e.preventDefault();
+    emit("open-lookup", "spkLama");
+  }
+};
+const onNomorPoF1 = (e: KeyboardEvent) => {
+  if (e.key === "F1") {
+    e.preventDefault();
+    emit("open-lookup", "setoranPembayaran");
+  }
+};
+
 // Tambahkan helper ini untuk menambah hari pada YYYY-MM-DD
 const addDaysToDate = (dateStr: string, days: number) => {
   if (!dateStr) return "";
@@ -699,6 +786,7 @@ watch(
               class="inp"
               style="width: 60px; background: #ddeeff"
               :disabled="isEdit"
+              @keydown="onPerushF1"
               @keydown.enter.prevent="onPerushKodeEnter"
               @blur="onPerushKodeEnter"
             />
@@ -711,25 +799,32 @@ watch(
             <button
               type="button"
               class="blkp"
+              title="Cari Perusahaan (F1)"
+              :disabled="isEdit"
               @mousedown.prevent="
                 isOpeningModal = true;
                 $emit('open-lookup', 'perusahaan');
               "
               @click="isOpeningModal = false"
-              :disabled="isEdit"
             >
-              &#128269;
+              <IconSearch :size="12" color="#1565c0" />
             </button>
           </div>
           <label class="lbl ml-2" style="width: 110px">Repeat Dari SPK</label>
           <div class="igrp" style="width: 180px">
-            <input v-model="formData.spk_repeat" class="inp" style="flex: 1" />
+            <input
+              v-model="formData.spk_repeat"
+              class="inp"
+              style="flex: 1"
+              @keydown="onRepeatF1"
+            />
             <button
               type="button"
               class="blkp"
+              title="Cari SPK (F1)"
               @mousedown.prevent="$emit('open-lookup', 'repeat')"
             >
-              &#128269;
+              <IconSearch :size="12" color="#1565c0" />
             </button>
           </div>
         </div>
@@ -742,6 +837,7 @@ watch(
               v-model="formData.spk_cus_kode"
               class="inp"
               style="width: 60px; background: #ddeeff"
+              @keydown="onCustF1"
               @keydown.enter.prevent="onCustKodeEnter"
               @blur="onCustKodeEnter"
             />
@@ -754,13 +850,14 @@ watch(
             <button
               type="button"
               class="blkp"
+              title="Cari Customer (F1)"
               @mousedown.prevent="
                 isOpeningModal = true;
                 $emit('open-lookup', 'customer');
               "
               @click="isOpeningModal = false"
             >
-              &#128269;
+              <IconSearch :size="12" color="#1565c0" />
             </button>
           </div>
           <label class="lbl ml-auto perfect-lbl" style="width: 90px"
@@ -786,6 +883,7 @@ watch(
                 v-model="formData.spk_cus_kaosan"
                 class="inp"
                 style="width: 60px; background: #ddeeff"
+                @keydown="onCustKaosanF1"
               />
               <input
                 :value="formData.CustKaosanNama"
@@ -796,9 +894,10 @@ watch(
               <button
                 type="button"
                 class="blkp"
+                title="Cari Customer Kaosan (F1)"
                 @mousedown.prevent="$emit('open-lookup', 'custKaosan')"
               >
-                &#128269;
+                <IconSearch :size="12" color="#1565c0" />
               </button>
             </div>
           </template>
@@ -840,6 +939,7 @@ watch(
                   class="inp"
                   style="width: 50px; background: #ddeeff"
                   :disabled="isEdit"
+                  @keydown="onJoF1"
                   @keydown.enter.prevent="onJoKodeEnter"
                   @blur="onJoKodeEnter"
                 />
@@ -852,14 +952,15 @@ watch(
                 <button
                   type="button"
                   class="blkp"
+                  title="Cari Jenis Order (F1)"
+                  :disabled="isEdit"
                   @mousedown.prevent="
                     isOpeningModal = true;
                     $emit('open-lookup', 'jenisOrder');
                   "
                   @click="isOpeningModal = false"
-                  :disabled="isEdit"
                 >
-                  &#128269;
+                  <IconSearch :size="12" color="#1565c0" />
                 </button>
               </div>
               <div
@@ -908,14 +1009,16 @@ watch(
                 <input
                   v-model="formData.spk_pen_nomor"
                   class="inp"
-                  style="flex: 1"
+                  style="flex: 1; background: #ddeeff"
+                  @keydown="onPenawaranF1"
                 />
                 <button
                   type="button"
                   class="blkp"
+                  title="Cari Penawaran (F1)"
                   @mousedown.prevent="$emit('open-lookup', 'penawaran')"
                 >
-                  &#128269;
+                  <IconSearch :size="12" color="#1565c0" />
                 </button>
               </div>
               <input
@@ -932,13 +1035,15 @@ watch(
                   v-model="formData.spk_nomormemo"
                   class="inp"
                   style="flex: 1"
+                  @keydown="onSjMemoF1"
                 />
                 <button
                   type="button"
                   class="blkp"
+                  title="Cari SJ Memo (F1)"
                   @mousedown.prevent="$emit('open-lookup', 'sjMemo')"
                 >
-                  &#128269;
+                  <IconSearch :size="12" color="#1565c0" />
                 </button>
               </div>
             </div>
@@ -946,17 +1051,18 @@ watch(
               <label class="lbl">No. MAP</label>
               <div class="igrp" style="width: 210px">
                 <input
-                  v-model="formData.spk_memo"
+                  v-model="formData.spk_nomormemo"
                   class="inp"
-                  style="flex: 1; background: #ddeeff"
-                  @change="$emit('field-blur', 'memo', formData.spk_memo)"
+                  style="flex: 1"
+                  @keydown="onSjMemoF1"
                 />
                 <button
                   type="button"
                   class="blkp"
-                  @mousedown.prevent="$emit('open-lookup', 'memo')"
+                  title="Cari SJ Memo (F1)"
+                  @mousedown.prevent="$emit('open-lookup', 'sjMemo')"
                 >
-                  &#128269;
+                  <IconSearch :size="12" color="#1565c0" />
                 </button>
               </div>
             </div>
@@ -967,14 +1073,16 @@ watch(
                   v-model="formData.spk_mppb"
                   class="inp"
                   style="flex: 1; background: #ddeeff"
+                  @keydown="onMppbF1"
                   @change="$emit('field-blur', 'mppb', formData.spk_mppb)"
                 />
                 <button
                   type="button"
                   class="blkp"
+                  title="Cari MPPB (F1)"
                   @mousedown.prevent="$emit('open-lookup', 'mppb')"
                 >
-                  &#128269;
+                  <IconSearch :size="12" color="#1565c0" />
                 </button>
               </div>
               <input
@@ -998,16 +1106,18 @@ watch(
                   :placeholder="
                     isDivisiTiga ? 'No. SO DTF / SO' : 'No. Invoice DC'
                   "
+                  @keydown="onInvDcF1"
                   @change="$emit('field-blur', 'invdc', formData.spk_invdc)"
                 />
                 <button
                   type="button"
                   class="blkp"
+                  title="Cari (F1)"
                   @mousedown.prevent="
                     $emit('open-lookup', isDivisiTiga ? 'soKaosan' : 'stokDc')
                   "
                 >
-                  &#128269;
+                  <IconSearch :size="12" color="#1565c0" />
                 </button>
               </div>
               <span
@@ -1025,15 +1135,17 @@ watch(
                   v-model="formData.spk_nomor_po"
                   class="inp"
                   style="flex: 1"
-                  placeholder="Ketik PO / Ambil Setoran..."
+                  placeholder="Ketik PO atau F1 cari DP..."
+                  @keydown="onNomorPoF1"
                 />
                 <button
                   type="button"
                   class="blkp"
-                  title="Cari dari Setoran Pembayaran"
-                  @mousedown.prevent="emit('open-lookup', 'setoranPembayaran')"
+                  title="Cari DP dari Penerimaan (F1)"
+                  :disabled="!formData.spk_cus_kode"
+                  @mousedown.prevent="$emit('open-lookup', 'setoranPembayaran')"
                 >
-                  &#128269;
+                  <IconSearch :size="12" color="#1565c0" />
                 </button>
               </div>
             </div>
@@ -1075,6 +1187,7 @@ watch(
               v-model="formData.spk_sal_kode"
               class="inp"
               style="width: 60px; background: #ddeeff"
+              @keydown="onSalesF1"
               @keydown.enter.prevent="onSalesKodeEnter"
               @blur="onSalesKodeEnter"
             />
@@ -1087,13 +1200,14 @@ watch(
             <button
               type="button"
               class="blkp"
+              title="Cari Sales (F1)"
               @mousedown.prevent="
                 isOpeningModal = true;
                 $emit('open-lookup', 'sales');
               "
               @click="isOpeningModal = false"
             >
-              &#128269;
+              <IconSearch :size="12" color="#1565c0" />
             </button>
           </div>
         </div>
@@ -1502,14 +1616,16 @@ watch(
               v-model="formData.spk_lama"
               class="inp"
               style="flex: 1; background: #ddeeff"
+              @keydown="onSpkLamaF1"
               @change="$emit('field-blur', 'spklama', formData.spk_lama)"
             />
             <button
               type="button"
               class="blkp"
+              title="Cari SPK Lama (F1)"
               @mousedown.prevent="$emit('open-lookup', 'spkLama')"
             >
-              &#128269;
+              <IconSearch :size="12" color="#1565c0" />
             </button>
           </div>
         </div>
@@ -1521,6 +1637,7 @@ watch(
               v-model="formData.spk_cab"
               class="inp"
               style="width: 44px; background: #ddeeff"
+              @keydown="onWorkshopF1"
               @keydown.enter.prevent="onWorkshopKodeEnter"
               @blur="onWorkshopKodeEnter"
             />
@@ -1533,13 +1650,14 @@ watch(
             <button
               type="button"
               class="blkp"
+              title="Cari Workshop (F1)"
               @mousedown.prevent="
                 isOpeningModal = true;
                 $emit('open-lookup', 'workshop');
               "
               @click="isOpeningModal = false"
             >
-              &#128269;
+              <IconSearch :size="12" color="#1565c0" />
             </button>
           </div>
         </div>
@@ -1773,19 +1891,26 @@ watch(
   border-left: 1px solid #ccc;
 }
 .blkp {
-  width: 22px;
+  width: 24px;
+  min-width: 24px;
   flex-shrink: 0;
-  background: #e0e0e0;
+  background: #e3f2fd;
   border: none;
   border-left: 1px solid #a0a0a0;
   cursor: pointer;
-  font-size: 11px;
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 0;
+  height: 100%;
 }
-.blkp:hover {
-  background: #d0d0d0;
+.blkp:hover:not(:disabled) {
+  background: #bbdefb;
+}
+.blkp:disabled {
+  background: #f5f5f5;
+  cursor: not-allowed;
+  opacity: 0.45;
 }
 
 .divider {

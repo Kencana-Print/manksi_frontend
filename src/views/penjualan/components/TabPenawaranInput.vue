@@ -5,6 +5,7 @@ import { useAuthStore } from "@/stores/authStore";
 import { penawaranFormService } from "@/services/penjualan/penawaranFormService";
 import api from "@/services/api";
 import {
+  IconSearch,
   IconPlus,
   IconAlertTriangle,
   IconX,
@@ -379,6 +380,67 @@ const handleRekeningSelected = (item: any) => {
   props.formData.Rekening = item.Rekening;
 };
 
+// ── F1 handlers ──
+const onPerushF1 = (e: KeyboardEvent) => {
+  if (e.key === "F1") {
+    e.preventDefault();
+    showPerushModal.value = true;
+  }
+};
+const onCustF1 = (e: KeyboardEvent) => {
+  if (e.key === "F1") {
+    e.preventDefault();
+    if (!isOpeningModal.value) showCustModal.value = true;
+  }
+};
+const onSalesF1 = (e: KeyboardEvent) => {
+  if (e.key === "F1") {
+    e.preventDefault();
+    if (!isOpeningModal.value) showSalesModal.value = true;
+  }
+};
+const onRekF1 = (e: KeyboardEvent) => {
+  if (e.key === "F1") {
+    e.preventDefault();
+    openRekening();
+  }
+};
+const onMintaF1 = (e: KeyboardEvent, idx: number) => {
+  if (e.key === "F1") {
+    e.preventDefault();
+    openMintaHargaModal(idx);
+  }
+};
+
+// Enter handler Perusahaan
+const onPerushKodeEnter = async () => {
+  if (isOpeningModal.value) return;
+  const kode = props.formData.PerushKode?.trim();
+  if (!kode) {
+    props.formData.NamaPerusahaan = "";
+    return;
+  }
+  try {
+    const res = await api.get("/lookups/perusahaan", {
+      params: { q: kode, limit: 1 },
+    });
+    const items = res.data.data?.items || res.data.data || [];
+    const exact = items.find(
+      (p: any) =>
+        (p.perush_kode || p.Kode || "").toUpperCase() === kode.toUpperCase(),
+    );
+    if (exact) {
+      handlePerushSelected(exact);
+    } else {
+      toast.error("Kode perusahaan tidak ditemukan.");
+      props.formData.PerushKode = "";
+      props.formData.NamaPerusahaan = "";
+    }
+  } catch {
+    toast.error("Gagal memvalidasi kode perusahaan.");
+  }
+};
+
 // State untuk menghandle upload gambar
 const fileInput = ref<HTMLInputElement | null>(null);
 const activeUploadIndex = ref<number | null>(null);
@@ -488,8 +550,10 @@ watch(
               <input
                 v-model="formData.PerushKode"
                 class="f-inp"
-                style="width: 50px"
-                @dblclick="showPerushModal = true"
+                style="width: 50px; flex: none; background: #ddeeff"
+                @keydown="onPerushF1"
+                @keydown.enter.prevent="onPerushKodeEnter"
+                @blur="onPerushKodeEnter"
               />
               <input
                 :value="formData.NamaPerusahaan || 'Kencana Print'"
@@ -499,20 +563,31 @@ watch(
               <button
                 class="btn-lookup"
                 type="button"
-                @click="showPerushModal = true"
+                title="Cari Perusahaan (F1)"
+                @mousedown.prevent="
+                  isOpeningModal = true;
+                  showPerushModal = true;
+                "
+                @click="isOpeningModal = false"
               >
-                🔍
+                <IconSearch :size="12" color="#1565c0" />
               </button>
             </div>
           </div>
+
           <div class="f-row">
             <label>Customer</label>
             <div class="inp-group flex-1">
               <input
                 v-model="formData.CustKode"
                 class="f-inp"
-                style="width: 70px"
-                @dblclick="showCustModal = true"
+                style="
+                  width: 70px;
+                  flex: none;
+                  background: #ddeeff;
+                  font-weight: 600;
+                "
+                @keydown="onCustF1"
                 @keydown.enter.prevent="onCustKodeEnter"
                 @blur="onCustKodeEnter"
               />
@@ -525,16 +600,18 @@ watch(
               <button
                 class="btn-lookup"
                 type="button"
+                title="Cari Customer (F1)"
                 @mousedown.prevent="
                   isOpeningModal = true;
                   showCustModal = true;
                 "
                 @click="isOpeningModal = false"
               >
-                🔍
+                <IconSearch :size="12" color="#1565c0" />
               </button>
             </div>
           </div>
+
           <div class="f-row">
             <label>UP (Attention)</label>
             <input
@@ -552,8 +629,13 @@ watch(
               <input
                 v-model="formData.SalesKode"
                 class="f-inp"
-                style="width: 70px"
-                @dblclick="showSalesModal = true"
+                style="
+                  width: 70px;
+                  flex: none;
+                  background: #ddeeff;
+                  font-weight: 600;
+                "
+                @keydown="onSalesF1"
                 @keydown.enter.prevent="onSalesKodeEnter"
                 @blur="onSalesKodeEnter"
               />
@@ -566,16 +648,18 @@ watch(
               <button
                 class="btn-lookup"
                 type="button"
+                title="Cari Sales (F1)"
                 @mousedown.prevent="
                   isOpeningModal = true;
                   showSalesModal = true;
                 "
                 @click="isOpeningModal = false"
               >
-                🔍
+                <IconSearch :size="12" color="#1565c0" />
               </button>
             </div>
           </div>
+
           <div class="f-row">
             <label>Marketing</label>
             <div class="inp-group flex-1">
@@ -672,19 +756,22 @@ watch(
                 v-model="formData.Rekening"
                 class="f-inp flex-1"
                 placeholder="Pilih Rekening"
-                @dblclick="openRekening"
                 :disabled="formData.Rekening === ''"
+                @keydown="onRekF1"
+                @keydown.enter.prevent="openRekening"
               />
               <button
                 class="btn-lookup"
                 type="button"
-                @click="openRekening"
+                title="Cari Rekening (F1)"
                 :disabled="formData.Rekening === ''"
+                @click="openRekening"
               >
-                🔍
+                <IconSearch :size="12" color="#1565c0" />
               </button>
             </div>
           </div>
+
           <div class="f-row">
             <label class="chk font-weight-bold" style="width: 90px">
               <input
@@ -797,24 +884,33 @@ watch(
           <tbody>
             <tr v-for="(row, idx) in formData.Details" :key="idx">
               <td class="tc">{{ Number(idx) + 1 }}</td>
-              <td>
+              <td style="padding: 0">
                 <div class="inp-group w-100" style="border-radius: 2px">
                   <input
                     type="text"
                     v-model="row.NoPermintaan"
                     class="f-inp flex-1 text-blue fw"
-                    readonly
-                    @dblclick="!row.Spk && openMintaHargaModal(Number(idx))"
+                    :readonly="!!row.Spk"
+                    :style="
+                      !row.Spk ? 'background: #ddeeff; cursor: pointer' : ''
+                    "
                     :disabled="!!row.Spk"
+                    @keydown="
+                      !row.Spk ? onMintaF1($event, Number(idx)) : undefined
+                    "
+                    @keydown.enter.prevent="
+                      !row.Spk ? openMintaHargaModal(Number(idx)) : undefined
+                    "
                   />
                   <button
                     type="button"
                     class="btn-lookup"
+                    title="Cari Permintaan Harga (F1)"
                     @click="openMintaHargaModal(Number(idx))"
                     :disabled="!!row.Spk"
-                    style="width: 20px; font-size: 10px"
+                    style="width: 22px"
                   >
-                    🔍
+                    <IconSearch :size="11" color="#1565c0" />
                   </button>
                 </div>
               </td>
@@ -1242,7 +1338,7 @@ watch(
 }
 .min-h-0 {
   min-height: 0;
-} /* Penting agar flex child bisa scroll */
+}
 
 .inp-group {
   display: flex;
@@ -1250,29 +1346,46 @@ watch(
   border: 1px solid #bdbdbd;
   border-radius: 3px;
   overflow: hidden;
+  height: 26px;
+  align-items: stretch;
 }
+
 .inp-group .f-inp {
   border: none;
   border-radius: 0;
-  height: 22px;
+  height: 100%;
+  padding: 0 6px;
+  flex: 1;
+  min-width: 0;
+  box-sizing: border-box;
 }
+
 .inp-group .f-inp:not(:last-child) {
   border-right: 1px solid #e0e0e0;
 }
 .btn-lookup {
-  width: 24px;
-  background: #f5f5f5;
+  width: 26px;
+  min-width: 26px;
+  height: 100%;
+  background: #e3f2fd;
+  border: none;
   border-left: 1px solid #bdbdbd;
   cursor: pointer;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
+  padding: 0;
+  box-sizing: border-box;
 }
 .btn-lookup:hover:not(:disabled) {
-  background: #e0e0e0;
+  background: #bbdefb;
 }
-
+.btn-lookup:disabled {
+  background: #f5f5f5;
+  cursor: not-allowed;
+  opacity: 0.45;
+}
 .chk {
   display: flex;
   align-items: center;
@@ -1360,5 +1473,44 @@ watch(
   color: #212121;
   min-width: 120px;
   text-align: right;
+}
+
+/* Override untuk btn-lookup di dalam cell tabel */
+.grid-table .inp-group {
+  border: none;
+  border-radius: 2px;
+  overflow: hidden;
+  height: 24px;
+}
+
+.grid-table .inp-group .f-inp {
+  border: none;
+  height: 22px;
+  border-right: 1px solid #e0e0e0;
+}
+
+.grid-table .inp-group .btn-lookup {
+  width: 24px;
+  min-width: 24px;
+  height: 24px; /* ← fixed height, bukan 100% */
+  background: #e3f2fd;
+  border: none;
+  border-left: 1px solid #bdbdbd;
+  cursor: pointer;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.grid-table .inp-group .btn-lookup:hover:not(:disabled) {
+  background: #bbdefb;
+}
+
+.grid-table .inp-group .btn-lookup:disabled {
+  background: #f5f5f5;
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 </style>

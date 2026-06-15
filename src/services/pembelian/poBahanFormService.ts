@@ -4,6 +4,9 @@ export const poBahanFormService = {
   validateField: (type: string, value: string) =>
     api.get("/pembelian/po-bahan/form/validate", { params: { type, value } }),
 
+  getSupplierByKode: (kode: string) =>
+    api.get(`/pembelian/po-bahan/supplier/${encodeURIComponent(kode)}`),
+
   getDetail: (nomor: string) =>
     api.get(`/pembelian/po-bahan/form/detail/${encodeURIComponent(nomor)}`),
 

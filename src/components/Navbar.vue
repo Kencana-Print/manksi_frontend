@@ -61,6 +61,7 @@ import {
   IconBuildingBank,
   IconScissors,
   IconShieldCheck,
+  IconFileSpreadsheet,
 } from "@tabler/icons-vue";
 
 interface NavItem {
@@ -91,7 +92,6 @@ const pembelianMenu = ref(false);
 const ppicMenu = ref(false);
 const garmenMenu = ref(false);
 const penjualanMenu = ref(false);
-const hutangMenu = ref(false);
 const piutangMenu = ref(false);
 const laporanMenu = ref(false);
 
@@ -547,16 +547,6 @@ const menuItems: NavItem[] = [
     ],
   },
   {
-    title: "Hutang",
-    icon: IconCreditCardPay,
-    model: hutangMenu,
-    menuId: 7,
-    items: [
-      { title: "Daftar Hutang", to: "/hutang/daftar", icon: IconListDetails },
-      { title: "Bayar Hutang", to: "/hutang/bayar", icon: IconReceipt },
-    ],
-  },
-  {
     title: "Piutang",
     icon: IconCreditCard,
     model: piutangMenu,
@@ -564,7 +554,7 @@ const menuItems: NavItem[] = [
     items: [
       {
         title: "Penerimaan",
-        icon: IconLayoutList, // Menambahkan icon agar konsisten dengan submenu lainnya
+        icon: IconLayoutList,
         menuId: 950,
         subItems: [
           {
@@ -613,9 +603,15 @@ const menuItems: NavItem[] = [
             menuId: 501,
           },
           {
+            title: "Kartu Stok Barang",
+            to: "/laporan/gudang-garmen/kartu-stok-barang",
+            icon: IconFileSpreadsheet,
+            menuId: 503,
+          },
+          {
             title: "PO Bahan vs MKB",
             to: "/laporan/gudang-garmen/po-bahan-vs-mkb",
-            icon: IconFileAnalytics, // Import IconFileAnalytics di atas
+            icon: IconFileAnalytics,
             menuId: 511,
           },
           {
@@ -659,6 +655,29 @@ const menuItems: NavItem[] = [
             to: "/laporan/marketing/kunjungan-sales",
             icon: IconTruckDelivery,
             menuId: 313,
+          },
+        ],
+      },
+      {
+        title: "Laporan Piutang",
+        icon: IconCreditCard,
+        menuId: 968,
+        subItems: [
+          {
+            title: "Detail Piutang",
+            to: "/laporan/piutang/detail-piutang",
+            icon: IconFileInvoice,
+            // Sengaja tanpa menuId, agar mengikuti hak akses parent-nya (968)
+          },
+          {
+            title: "Rekap Piutang",
+            to: "/laporan/piutang/rekap-piutang",
+            icon: IconFileAnalytics, // Pastikan di-import di menu definition
+          },
+          {
+            title: "Kartu Piutang",
+            to: "/laporan/piutang/kartu-piutang",
+            icon: IconFileDescription,
           },
         ],
       },

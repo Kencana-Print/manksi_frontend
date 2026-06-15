@@ -219,17 +219,37 @@ const emit = defineEmits([
   overflow: hidden;
 }
 
-.left-column,
+.left-column {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-bottom: 12px; /* ← ruang napas di bawah */
+  scrollbar-width: thin;
+  scrollbar-color: #bdbdbd transparent;
+}
+
+.left-column::-webkit-scrollbar {
+  width: 4px;
+}
+.left-column::-webkit-scrollbar-track {
+  background: transparent;
+}
+.left-column::-webkit-scrollbar-thumb {
+  background: #bdbdbd;
+  border-radius: 2px;
+}
+.left-column::-webkit-scrollbar-thumb:hover {
+  background: #9e9e9e;
+}
+
 .right-column {
   display: flex;
   flex-direction: column;
   min-height: 0;
-}
-.right-column {
-  flex-grow: 1;
   overflow-y: auto;
   overflow-x: hidden;
-  min-width: 0;
 }
 .center-column {
   display: flex;

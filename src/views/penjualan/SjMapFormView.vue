@@ -8,6 +8,7 @@ import {
   IconTruckDelivery,
   IconShieldCheck,
   IconPrinter,
+  IconSearch,
 } from "@tabler/icons-vue";
 
 import MapSearchModal from "@/components/lookups/MapSearchModal.vue";
@@ -100,6 +101,107 @@ const onCusKodeEnter = async () => {
     }
   } catch {
     toast.error("Gagal memvalidasi kode customer.");
+  }
+};
+
+// ─────────────────────────────────────────────
+// KEYBOARD HANDLERS: PERUSAHAAN
+// ─────────────────────────────────────────────
+
+const onPerushKodeEnter = async () => {
+  const kode = (formData.value.header.sj_perush_kode || "")
+    .trim()
+    .toUpperCase();
+  if (!kode) {
+    showPerushModal.value = true;
+    return;
+  }
+
+  try {
+    isLoading.value = true;
+    const res = await api.get(
+      `/lookups/perusahaan/${encodeURIComponent(kode)}`,
+    );
+    const item = res.data.data;
+    formData.value.header.sj_perush_kode = item.perush_kode;
+    formData.value.header.perush_nama = item.perush_nama;
+  } catch (e: any) {
+    toast.error(
+      e.response?.data?.message || "Kode perusahaan tidak ditemukan.",
+    );
+    formData.value.header.sj_perush_kode = "";
+    formData.value.header.perush_nama = "";
+  } finally {
+    isLoading.value = false;
+  }
+};
+
+// ─────────────────────────────────────────────
+// KEYBOARD HANDLERS: MAP DI GRID
+// ─────────────────────────────────────────────
+
+const onMapKeydown = (e: KeyboardEvent, idx: number) => {
+  if (e.key === "F1") {
+    e.preventDefault();
+    activeRowIdx.value = idx;
+    showMapModal.value = true;
+  }
+};
+
+const onMapEnter = async (idx: number) => {
+  const nomor = (formData.value.details[idx]?.kode || "").trim().toUpperCase();
+  if (!nomor) {
+    activeRowIdx.value = idx;
+    showMapModal.value = true;
+    return;
+  }
+
+  if (!formData.value.header.sj_cus_kode) {
+    return toast.warning("Pilih Customer terlebih dahulu.");
+  }
+
+  try {
+    isLoading.value = true;
+    const res = await api.get("/penjualan/sj-map/form/item-details", {
+      params: {
+        nomorMap: nomor,
+        cusKode: formData.value.header.sj_cus_kode,
+        divisi: formData.value.header.sj_divisi,
+      },
+    });
+    const data = res.data.data;
+
+    // Cek duplikat
+    if (
+      formData.value.details.some(
+        (d: any, i: number) => d.kode === data.kode && i !== idx,
+      )
+    ) {
+      toast.error("Nomor MAP ini sudah diinputkan.");
+      formData.value.details[idx].kode = "";
+      return;
+    }
+
+    formData.value.details[idx] = { ...data, jumlah: data.kurang };
+
+    // Auto trailing row
+    const last = formData.value.details[formData.value.details.length - 1];
+    if (last && last.kode) {
+      formData.value.details.push({
+        kode: "",
+        nama: "",
+        ukuran: "",
+        bahan: "",
+        jumlah: 0,
+        jumlah_kirim: 0,
+        kurang: 0,
+      });
+    }
+  } catch (e: any) {
+    toast.error(e.response?.data?.message || "Nomor MAP tidak ditemukan.");
+    formData.value.details[idx].kode = "";
+  } finally {
+    isLoading.value = false;
   }
 };
 
@@ -466,25 +568,35 @@ onMounted(() => {
           <div class="inp-grp" style="flex: 1">
             <input
               v-model="formData.header.sj_perush_kode"
-              class="f-inp f-ro"
-              readonly
-              style="width: 60px; flex: none"
+              class="f-inp"
+              style="
+                width: 60px;
+                flex: none;
+                background: #ddeeff;
+                font-weight: 600;
+                text-transform: uppercase;
+              "
               placeholder="Kode"
+              :readonly="isEditMode"
+              :class="{ 'f-ro': isEditMode }"
+              @keydown.f1.prevent="showPerushModal = true"
+              @keydown.enter.prevent="onPerushKodeEnter"
             />
             <input
               v-model="formData.header.perush_nama"
               class="f-inp f-ro"
               readonly
               style="flex: 1"
-              placeholder="Pilih Perusahaan..."
+              placeholder="Nama perusahaan..."
             />
             <button
               type="button"
               class="btn-lkp"
-              @mousedown.prevent="showPerushModal = true"
+              title="Cari Perusahaan (F1)"
               :disabled="isEditMode"
+              @mousedown.prevent="showPerushModal = true"
             >
-              🔍
+              <IconSearch :size="13" color="#1565c0" />
             </button>
           </div>
         </div>
@@ -628,23 +740,25 @@ onMounted(() => {
                     <input
                       v-model="d.kode"
                       class="cell-inp"
-                      readonly
-                      style="font-weight: 600; color: #1565c0; cursor: pointer"
-                      placeholder="Cari MAP..."
-                      @mousedown.prevent="
-                        activeRowIdx = i;
-                        showMapModal = true;
+                      style="
+                        font-weight: 600;
+                        color: #1565c0;
+                        text-transform: uppercase;
                       "
+                      placeholder="F1 / nomor MAP"
+                      @keydown="onMapKeydown($event, i)"
+                      @keydown.enter.prevent="onMapEnter(i)"
                     />
                     <button
                       type="button"
                       class="cell-lkp"
+                      title="Cari MAP (F1)"
                       @mousedown.prevent="
                         activeRowIdx = i;
                         showMapModal = true;
                       "
                     >
-                      🔍
+                      <IconSearch :size="12" color="#1565c0" />
                     </button>
                   </div>
                 </td>
@@ -888,18 +1002,20 @@ onMounted(() => {
   border-radius: 0;
 }
 .btn-lkp {
-  width: 26px;
-  background: #f5f5f5;
+  width: 28px;
+  min-width: 28px;
+  height: 100%;
+  background: #e3f2fd;
   border: none;
   border-left: 1px solid #bdbdbd;
   cursor: pointer;
-  font-size: 11px;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 .btn-lkp:hover:not(:disabled) {
-  background: #e0e0e0;
+  background: #bbdefb;
 }
 .btn-lkp:disabled {
   opacity: 0.4;
@@ -1001,14 +1117,13 @@ onMounted(() => {
 }
 .cell-lkp {
   width: 28px;
+  min-width: 28px;
   height: 100%;
   flex-shrink: 0;
   background: #e3f2fd;
   border: none;
   border-left: 1px solid #bbdefb;
   cursor: pointer;
-  font-size: 11px;
-  color: #1565c0;
   display: flex;
   align-items: center;
   justify-content: center;

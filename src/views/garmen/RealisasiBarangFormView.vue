@@ -142,6 +142,47 @@ const onMintaSelected = async (item: any) => {
   }
 };
 
+// ─────────────────────────────────────────────
+// KEYBOARD HANDLERS: NO. PERMINTAAN
+// ─────────────────────────────────────────────
+
+const onMintaKeydown = (e: KeyboardEvent) => {
+  if (e.key === "F1") {
+    e.preventDefault();
+    openMintaModal();
+  }
+};
+
+const onMintaEnter = async () => {
+  const nomor = (formData.value.noMinta || "").trim().toUpperCase();
+  if (!nomor || isEdit.value) return;
+
+  try {
+    isLoading.value = true;
+    const res = await realisasiBarangFormService.getPermintaanDetail(nomor);
+    const { header, details } = res.data.data;
+
+    formData.value.noMinta = header.min_nomor;
+    formData.value.cabMinta = header.min_cab;
+    formData.value.peminta = header.user_create;
+    formData.value.spk = header.min_spk_nomor;
+    formData.value.namaSpk = header.namaspk;
+    formData.value.jumlahSpk = header.jumlahspk || 0;
+    formData.value.mka = header.mkb_nomor;
+    formData.value.mkaTanggal = formatDateLocal(header.mkb_tanggal);
+    formData.value.details = details;
+
+    toast.success("Detail rincian barang berhasil ditarik.");
+  } catch (error: any) {
+    toast.error(
+      error.response?.data?.message || "No. Permintaan tidak ditemukan.",
+    );
+    formData.value.noMinta = "";
+  } finally {
+    isLoading.value = false;
+  }
+};
+
 // --- VALIDASI SIMPAN ---
 const validateSave = () => {
   if (!canSave.value)
@@ -221,26 +262,31 @@ const numFmt = (val: any) =>
 
         <div class="f-row mb-2">
           <label class="f-lbl">No. Permintaan</label>
-          <div class="inp-grp" style="flex: 1">
+          <div class="inp-grp" style="flex: 1; min-width: 0">
             <input
-              :value="formData.noMinta"
-              readonly
+              v-model="formData.noMinta"
               class="f-inp"
               style="
                 flex: 1;
+                min-width: 0;
                 background: #ddeeff;
-                cursor: pointer;
                 font-weight: 600;
+                text-transform: uppercase;
               "
-              @mousedown.prevent="openMintaModal"
+              placeholder="F1 / nomor + Enter"
+              :readonly="isEdit"
+              :class="{ 'f-ro': isEdit }"
+              @keydown="onMintaKeydown"
+              @keydown.enter.prevent="onMintaEnter"
             />
             <button
               type="button"
               class="btn-lkp"
-              @mousedown.prevent="openMintaModal"
               :disabled="isEdit"
+              title="Cari Permintaan (F1)"
+              @click="openMintaModal"
             >
-              <IconSearch :size="14" :stroke-width="1.7" />
+              <IconSearch :size="13" color="#1565c0" />
             </button>
           </div>
         </div>
@@ -536,36 +582,82 @@ const numFmt = (val: any) =>
 .inp-grp {
   display: flex;
   border: 1px solid #bdbdbd;
-  border-radius: 3px;
+  border-radius: 4px;
   overflow: hidden;
-  height: 26px;
+  height: 28px;
   background: white;
+  min-width: 0; /* ← kunci agar flex child tidak overflow */
+  width: 100%;
+  box-sizing: border-box;
 }
 .inp-grp .f-inp {
   border: none;
-  height: 24px;
   border-radius: 0;
+  flex: 1;
+  min-width: 0; /* ← izinkan shrink */
+  height: 100%;
+  padding: 0 6px;
 }
 .btn-lkp {
-  width: 26px;
-  background: #f5f5f5;
+  width: 30px;
+  min-width: 30px; /* ← tidak boleh lebih kecil dari ini */
+  height: 100%;
+  background: #e3f2fd;
   border: none;
   border-left: 1px solid #bdbdbd;
   cursor: pointer;
-  flex-shrink: 0;
+  flex-shrink: 0; /* ← tidak boleh menyusut */
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #424242;
+  color: #1565c0;
 }
 .btn-lkp:hover:not(:disabled) {
-  background: #e0e0e0;
+  background: #bbdefb;
 }
 .btn-lkp:disabled {
-  opacity: 0.5;
+  opacity: 0.45;
   cursor: not-allowed;
+  background: #f5f5f5;
 }
 .w-100 {
   width: 100%;
+}
+
+/* ── Field row responsif ── */
+.f-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  flex-wrap: nowrap; /* default satu baris */
+}
+
+/* Label lebar fixed tapi tidak shrink */
+.f-lbl {
+  width: 90px;
+  min-width: 70px; /* ← boleh sedikit menyusut di layar kecil */
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: #555;
+  white-space: nowrap;
+}
+
+/* Layar < 400px: label di atas, input di bawah */
+@media (max-width: 400px) {
+  .f-row {
+    flex-wrap: wrap;
+    gap: 2px;
+  }
+  .f-lbl {
+    width: 100%;
+    min-width: unset;
+  }
+  .inp-grp,
+  .f-inp,
+  .w-100 {
+    width: 100% !important;
+  }
 }
 </style>

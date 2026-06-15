@@ -16,6 +16,9 @@ export const poNonBahanFormService = {
       },
     ),
 
+  getSupplierByKode: (kode: string) =>
+    api.get(`/garmen/barang/po-nonbahan/supplier/${encodeURIComponent(kode)}`),
+
   saveData: (payload: any) =>
     // Tambahkan /barang sebelum /po-nonbahan-form
     api.post("/garmen/barang/po-nonbahan-form/save", payload),

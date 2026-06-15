@@ -1492,6 +1492,30 @@ const router = createRouter({
 
     // ── Laporan ───────────────────────────────────────────────────
     {
+      path: "/laporan/gudang-garmen/stok-bahan-barcode",
+      name: "LapStokBahanBarcode",
+      component: () =>
+        import("@/views/laporan/gudang-garmen/LaporanStokBahanBarcodeView.vue"),
+      meta: {
+        title: "Laporan Stok Bahan Barcode",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "501",
+      },
+    },
+    {
+      path: "/laporan/gudang-garmen/kartu-stok-barang",
+      name: "LapKartuStokBarang",
+      component: () =>
+        import("@/views/laporan/gudang-garmen/KartuStokBarangView.vue"),
+      meta: {
+        title: "Kartu Stok Barang",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "503",
+      },
+    },
+    {
       path: "/laporan/gudang-garmen/po-bahan-vs-mkb",
       name: "LapPoBahanVsMkb",
       component: () =>
@@ -1513,18 +1537,6 @@ const router = createRouter({
         layout: "DefaultLayout",
         requiresAuth: true,
         menuId: "512",
-      },
-    },
-    {
-      path: "/laporan/gudang-garmen/stok-bahan-barcode",
-      name: "LapStokBahanBarcode",
-      component: () =>
-        import("@/views/laporan/gudang-garmen/LaporanStokBahanBarcodeView.vue"),
-      meta: {
-        title: "Laporan Stok Bahan Barcode",
-        layout: "DefaultLayout",
-        requiresAuth: true,
-        menuId: "501",
       },
     },
 
@@ -1574,6 +1586,40 @@ const router = createRouter({
         title: "Laporan Realisasi Penawaran",
         layout: "DefaultLayout",
         requiresAuth: true,
+      },
+    },
+
+    {
+      path: "/laporan/piutang/detail-piutang",
+      name: "LapDetailPiutang",
+      component: () => import("@/views/laporan/piutang/DetailPiutangView.vue"),
+      meta: {
+        title: "Laporan Detail Piutang",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "968", // Pakai ID parent sebagai penjaga halaman
+      },
+    },
+    {
+      path: "/laporan/piutang/rekap-piutang",
+      name: "LapRekapPiutang",
+      component: () => import("@/views/laporan/piutang/RekapPiutangView.vue"),
+      meta: {
+        title: "Laporan Rekap Piutang",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "968",
+      },
+    },
+    {
+      path: "/laporan/piutang/kartu-piutang",
+      name: "LapKartuPiutang",
+      component: () => import("@/views/laporan/piutang/KartuPiutangView.vue"),
+      meta: {
+        title: "Laporan Kartu Piutang",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "968", // Parent Menu ID Laporan Piutang
       },
     },
 

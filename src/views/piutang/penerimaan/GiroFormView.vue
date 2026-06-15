@@ -170,6 +170,57 @@ const handleCustSelected = (item: any) => {
   }
 };
 
+// ── F1 handlers ──
+const onPerushF1 = (e: KeyboardEvent) => {
+  if (e.key === "F1") {
+    e.preventDefault();
+    if (!isEdit.value) showPerushModal.value = true;
+  }
+};
+
+const onRekeningF1 = (e: KeyboardEvent) => {
+  if (e.key === "F1") {
+    e.preventDefault();
+    showRekeningModal.value = true;
+  }
+};
+
+const onCustRowF1 = (e: KeyboardEvent, idx: number) => {
+  if (e.key === "F1") {
+    e.preventDefault();
+    openCustModal(idx);
+  }
+};
+
+// Enter handler Perusahaan (lookup by kode)
+const onPerushKodeEnter = async () => {
+  if (isOpeningModal.value) return;
+  const kode = formData.value.cabang?.trim();
+  if (!kode) {
+    formData.value.namaPerusahaan = "";
+    return;
+  }
+  try {
+    const res = await api.get("/lookups/perusahaan", {
+      params: { q: kode, limit: 1 },
+    });
+    const items = res.data.data?.items || res.data.data || [];
+    const exact = items.find(
+      (p: any) =>
+        (p.perush_kode || p.Kode || "").toUpperCase() === kode.toUpperCase(),
+    );
+    if (exact) {
+      handlePerushSelected(exact);
+    } else {
+      toast.error("Kode perusahaan tidak ditemukan.");
+      formData.value.cabang = "";
+      formData.value.namaPerusahaan = "";
+    }
+  } catch {
+    toast.error("Gagal memvalidasi kode perusahaan.");
+  }
+};
+
 // --- VALIDASI KETIK MANUAL KODE CUSTOMER (Murni Frontend) ---
 const validateCustomerKode = async (idx: number) => {
   if (isOpeningModal.value) return;
@@ -305,23 +356,40 @@ const validateBeforeSave = () => {
               <input
                 type="text"
                 v-model="formData.cabang"
-                readonly
-                class="f-inp f-ro"
-                style="width: 60px"
+                class="f-inp"
+                style="
+                  width: 60px;
+                  flex: none;
+                  background: #ddeeff;
+                  font-weight: 600;
+                  text-transform: uppercase;
+                "
+                :readonly="isEdit"
+                :class="{ 'f-ro': isEdit }"
+                placeholder="Kode"
+                @keydown="onPerushF1"
+                @keydown.enter.prevent="onPerushKodeEnter"
+                @blur="onPerushKodeEnter"
               />
               <input
                 type="text"
                 :value="formData.namaPerusahaan"
                 readonly
                 class="f-inp f-ro flex-1"
+                placeholder="Nama Perusahaan..."
               />
               <button
                 type="button"
                 class="btn-lkp"
                 :disabled="isEdit"
-                @click="showPerushModal = true"
+                title="Cari Perusahaan (F1)"
+                @mousedown.prevent="
+                  isOpeningModal = true;
+                  showPerushModal = true;
+                "
+                @click="isOpeningModal = false"
               >
-                <IconSearch :size="14" />
+                <IconSearch :size="13" color="#1565c0" />
               </button>
             </div>
           </div>
@@ -351,21 +419,27 @@ const validateBeforeSave = () => {
                 v-model="formData.rekKode"
                 readonly
                 class="f-inp f-ro"
-                style="width: 70px"
+                style="width: 70px; flex: none"
+                placeholder="Kode"
               />
               <input
                 type="text"
                 :value="formData.namaAccount"
                 readonly
                 class="f-inp f-ro flex-1"
-                placeholder="Pilih Bank Account..."
+                placeholder="Klik atau F1 untuk cari..."
+                style="cursor: pointer"
+                @click="showRekeningModal = true"
               />
               <button
                 type="button"
                 class="btn-lkp"
+                title="Cari Account (F1)"
+                tabindex="0"
                 @click="showRekeningModal = true"
+                @keydown.f1.prevent="showRekeningModal = true"
               >
-                <IconSearch :size="14" />
+                <IconSearch :size="13" color="#1565c0" />
               </button>
             </div>
           </div>
@@ -428,7 +502,8 @@ const validateBeforeSave = () => {
                         type="text"
                         v-model="row.kode"
                         class="gi text-uppercase"
-                        placeholder="Ketik & Enter..."
+                        placeholder="F1 / kode + Enter"
+                        @keydown="onCustRowF1($event, Number(idx))"
                         @keydown.enter.prevent="
                           validateCustomerKode(Number(idx))
                         "
@@ -437,13 +512,14 @@ const validateBeforeSave = () => {
                       <button
                         type="button"
                         class="btn-gi-search"
+                        title="Cari Customer (F1)"
                         @mousedown.prevent="
                           isOpeningModal = true;
                           openCustModal(Number(idx));
                         "
                         @click="isOpeningModal = false"
                       >
-                        <IconSearch :size="12" />
+                        <IconSearch :size="12" color="white" />
                       </button>
                     </div>
                   </td>
@@ -607,23 +683,34 @@ const validateBeforeSave = () => {
   border-radius: 3px;
   overflow: hidden;
   height: 26px;
+  align-items: stretch;
 }
 .inp-grp .f-inp {
   border: none;
   height: 100%;
+  min-width: 0;
 }
 .btn-lkp {
-  width: 26px;
-  background: #f5f5f5;
+  width: 28px;
+  min-width: 28px;
+  height: 100%;
+  background: #e3f2fd;
   border: none;
   border-left: 1px solid #bdbdbd;
   cursor: pointer;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 0;
 }
-.btn-lkp:hover {
-  background: #e0e0e0;
+.btn-lkp:hover:not(:disabled) {
+  background: #bbdefb;
+}
+.btn-lkp:disabled {
+  background: #f5f5f5;
+  cursor: not-allowed;
+  opacity: 0.45;
 }
 
 /* Grid Table Nested */

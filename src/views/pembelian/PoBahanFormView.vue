@@ -283,6 +283,69 @@ const setPoGreige = async (v: any) => {
   }
 };
 
+// ─────────────────────────────────────────────
+// KEYBOARD HANDLERS: MPPB FIELD
+// ─────────────────────────────────────────────
+
+const onMppbKeydown = (e: KeyboardEvent) => {
+  if (e.key === "F1") {
+    e.preventDefault();
+    showMppbModal.value = true;
+  }
+};
+
+const onMppbEnter = async () => {
+  const nomor = (formData.value.header.po_mppb_nomor || "").trim();
+  if (!nomor) return;
+
+  try {
+    isLoading.value = true;
+    const res = await poBahanFormService.validateField("mppb", nomor);
+    formData.value.header.tgl_mppb = formatDateLocal(
+      res.data.data.data.tanggal,
+    );
+    formData.value.header.jmlmppb = res.data.data.data.jumlah;
+  } catch (e: any) {
+    toast.error(e.response?.data?.message || "No. MPPB tidak ditemukan.");
+    formData.value.header.po_mppb_nomor = "";
+    formData.value.header.tgl_mppb = "";
+    formData.value.header.jmlmppb = 0;
+  } finally {
+    isLoading.value = false;
+  }
+};
+
+// ─────────────────────────────────────────────
+// KEYBOARD HANDLERS: SUPPLIER FIELD
+// ─────────────────────────────────────────────
+
+const onSupKeydown = (e: KeyboardEvent) => {
+  if (e.key === "F1") {
+    e.preventDefault();
+    showSupModal.value = true;
+  }
+};
+
+const onSupEnter = async () => {
+  const kode = (formData.value.header.po_sup_kode || "").trim();
+  if (!kode) return;
+
+  try {
+    isLoading.value = true;
+    const res = await poBahanFormService.getSupplierByKode(kode);
+    const sup = res.data.data;
+    setSup(sup);
+  } catch (e: any) {
+    toast.error(e.response?.data?.message || "Kode supplier tidak ditemukan.");
+    formData.value.header.po_sup_kode = "";
+    formData.value.header.sup_nama = "";
+    formData.value.header.sup_alamat = "";
+    formData.value.header.sup_kota = "";
+  } finally {
+    isLoading.value = false;
+  }
+};
+
 // ── Items grid ──
 const addItem = () =>
   formData.value.items.push({
@@ -302,7 +365,36 @@ const addItem = () =>
     spk: "",
     mkb: "",
   });
+
+// ─────────────────────────────────────────────
+// AUTO TRAILING ROW — selalu ada 1 baris kosong
+// di paling bawah untuk input baru (pola MKB)
+// ─────────────────────────────────────────────
+
+watch(
+  () => formData.value.items,
+  (rows) => {
+    // Mode baru & items masih kosong → pancing 1 baris kosong
+    if (!rows || rows.length === 0) {
+      addItem();
+      return;
+    }
+
+    // Cek baris terakhir
+    const lastRow = rows[rows.length - 1];
+
+    // Jika baris terakhir sudah mulai diisi → tambah baris kosong baru
+    if (lastRow.kode || lastRow.nama) {
+      addItem();
+    }
+  },
+  { deep: true, immediate: true },
+);
 const removeItem = (i: number) => {
+  // Jangan hapus jika ini satu-satunya baris dan masih kosong
+  if (formData.value.items.length === 1 && !formData.value.items[0].kode) {
+    return;
+  }
   const kode = formData.value.items[i].kode;
   formData.value.items.splice(i, 1);
   if (isCelup.value && kode)
@@ -451,6 +543,14 @@ const setBahanHandler = (v: any) => {
 
 // ── Validate ──
 const validateSave = () => {
+  // Filter baris trailing kosong dulu sebelum validasi
+  const validItems = formData.value.items.filter(
+    (r: any) => r.kode && r.kode.trim() !== "",
+  );
+
+  if (validItems.length === 0)
+    return toast.warning("Tidak ada detail, tidak dapat disimpan.");
+
   // 1. Validasi Tutup Buku
   if (formData.value.isTutupBuku)
     return toast.warning(
@@ -475,8 +575,7 @@ const validateSave = () => {
   if (formData.value.items.length === 0)
     return toast.warning("Tidak ada detail, tidak dapat disimpan.");
 
-  for (const [idx, r] of formData.value.items.entries()) {
-    if (!r.kode) continue;
+  for (const [idx, r] of validItems.entries()) {
     if ((Number(r.jumlah) || 0) <= 0)
       return toast.warning(
         `Baris ${idx + 1}: Jumlah PO harus diisi, tidak dapat disimpan.`,
@@ -488,6 +587,9 @@ const validateSave = () => {
     if (isCelup.value && (Number(r.roll) || 0) <= 0)
       return toast.warning(`Baris ${idx + 1}: PO Celup Roll harus diisi.`);
   }
+
+  // Ganti items dengan yang valid sebelum submit
+  formData.value.items = validItems;
 
   // 5. Validasi Delivery Commitment (Khusus PO Bahan)
   if (isBahan.value) {
@@ -593,10 +695,17 @@ const validateSave = () => {
             <input
               v-model="formData.header.po_mppb_nomor"
               class="inp"
-              style="background: #ddeeff"
-              @change="setMppb({ Nomor: formData.header.po_mppb_nomor })"
+              style="background: #ddeeff; text-transform: uppercase"
+              placeholder="F1 / ketik + Enter"
+              @keydown="onMppbKeydown"
+              @keydown.enter.prevent="onMppbEnter"
             />
-            <button type="button" class="blkp" @click="showMppbModal = true">
+            <button
+              type="button"
+              class="blkp"
+              title="Cari MPPB (F1)"
+              @click="showMppbModal = true"
+            >
               <IconSearch :size="13" />
             </button>
           </div>
@@ -628,10 +737,17 @@ const validateSave = () => {
             <input
               v-model="formData.header.po_sup_kode"
               class="inp"
-              style="background: #ddeeff"
-              readonly
+              style="background: #ddeeff; text-transform: uppercase"
+              placeholder="F1 / Enter"
+              @keydown="onSupKeydown"
+              @keydown.enter.prevent="onSupEnter"
             />
-            <button type="button" class="blkp" @click="showSupModal = true">
+            <button
+              type="button"
+              class="blkp"
+              title="Cari Supplier (F1)"
+              @click="showSupModal = true"
+            >
               <IconSearch :size="13" />
             </button>
           </div>

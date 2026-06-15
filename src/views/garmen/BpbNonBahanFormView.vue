@@ -211,6 +211,126 @@ const setSpk = (v: any) => {
   formData.value.detail[i].namaspk = v.Nama;
 };
 
+// ─────────────────────────────────────────────
+// KEYBOARD HANDLERS: NO. PERMINTAAN
+// ─────────────────────────────────────────────
+
+const onMintaKeydown = (e: KeyboardEvent) => {
+  if (e.key === "F1") {
+    e.preventDefault();
+    if (!isEditMode.value && formData.value.header.bpb_mb_nomor === "")
+      showMintaModal.value = true;
+  }
+};
+
+const onMintaEnter = async () => {
+  const nomor = (formData.value.header.bpb_mb_nomor || "").trim().toUpperCase();
+  if (!nomor || isEditMode.value) return;
+
+  try {
+    isLoading.value = true;
+    await setPermintaan({ Nomor: nomor });
+  } catch (e: any) {
+    toast.error(e.response?.data?.message || "No. Permintaan tidak ditemukan.");
+    formData.value.header.bpb_mb_nomor = "";
+  } finally {
+    isLoading.value = false;
+  }
+};
+
+// ─────────────────────────────────────────────
+// KEYBOARD HANDLERS: NO. PO
+// ─────────────────────────────────────────────
+
+const onPoKeydown = (e: KeyboardEvent) => {
+  if (e.key === "F1") {
+    e.preventDefault();
+    if (!isEditMode.value && formData.value.header.bpb_mb_nomor === "")
+      showPoModal.value = true;
+  }
+};
+
+const onPoEnter = async () => {
+  const nomor = (formData.value.header.bpb_po_nomor || "").trim().toUpperCase();
+  if (!nomor || isEditMode.value) return;
+
+  try {
+    isLoading.value = true;
+    await setPo({ Nomor: nomor });
+  } catch (e: any) {
+    toast.error(e.response?.data?.message || "No. PO tidak ditemukan.");
+    formData.value.header.bpb_po_nomor = "";
+  } finally {
+    isLoading.value = false;
+  }
+};
+
+// ─────────────────────────────────────────────
+// KEYBOARD HANDLERS: SUPPLIER
+// ─────────────────────────────────────────────
+
+const onSupKeydown = (e: KeyboardEvent) => {
+  if (e.key === "F1") {
+    e.preventDefault();
+    if (!isSupLocked.value) showSupModal.value = true;
+  }
+};
+
+const onSupEnter = async () => {
+  const kode = (formData.value.header.bpb_sup_kode || "").trim().toUpperCase();
+  if (!kode || isSupLocked.value) return;
+
+  try {
+    isLoading.value = true;
+    const res = await bpbNonBahanFormService.getSupplierByKode(
+      kode,
+      formJenis.value,
+    );
+    setSupplier(res.data.data);
+  } catch (e: any) {
+    toast.error(e.response?.data?.message || "Kode supplier tidak ditemukan.");
+    formData.value.header.bpb_sup_kode = "";
+    formData.value.header.sup_nama = "";
+    formData.value.header.sup_alamat = "";
+    formData.value.header.sup_kota = "";
+  } finally {
+    isLoading.value = false;
+  }
+};
+
+// ─────────────────────────────────────────────
+// KEYBOARD HANDLERS: SPK DI GRID
+// ─────────────────────────────────────────────
+
+const onSpkKeydown = (e: KeyboardEvent, idx: number) => {
+  if (e.key === "F1") {
+    e.preventDefault();
+    openSpkModal(idx);
+  }
+};
+
+const onSpkEnter = async (idx: number) => {
+  const nomor = (formData.value.detail[idx]?.spk || "").trim().toUpperCase();
+  if (!nomor) {
+    openSpkModal(idx);
+    return;
+  }
+
+  try {
+    isLoading.value = true;
+    const res = await bpbNonBahanFormService.getSpkByNomor(nomor);
+    const spk = res.data.data;
+    formData.value.detail[idx].spk = spk.Nomor;
+    formData.value.detail[idx].namaspk = spk.Nama;
+  } catch (e: any) {
+    toast.error(e.response?.data?.message || "Nomor SPK tidak ditemukan.");
+    formData.value.detail[idx].spk = "";
+    formData.value.detail[idx].namaspk = "";
+  } finally {
+    isLoading.value = false;
+  }
+};
+
 // --- VALIDATION BEFORE SAVE ---
 const validateSave = () => {
   // 1. PIN status
@@ -333,24 +453,46 @@ watch(
           />
         </div>
 
+        <div class="fr mt-1">
+          <label class="lbl">Cabang</label>
+          <input
+            :value="authStore.user?.cabang || ''"
+            class="inp ro font-weight-bold text-primary"
+            readonly
+          />
+        </div>
+        <div class="fr mt-1">
+          <label class="lbl">Bagian</label>
+          <input
+            :value="authStore.user?.bagian || ''"
+            class="inp ro"
+            readonly
+          />
+        </div>
+
         <div class="sep mt-2 mb-2" />
 
         <div class="fr">
           <label class="lbl">No. Permintaan</label>
-          <div class="cell-grp w-100">
+          <div class="lkp-grp">
             <input
               v-model="formData.header.bpb_mb_nomor"
-              class="inp ro"
-              placeholder="F1 / Cari..."
-              readonly
+              class="inp"
+              :class="{ ro: isEditMode || formData.header.bpb_mb_nomor !== '' }"
+              :readonly="isEditMode || formData.header.bpb_mb_nomor !== ''"
+              placeholder="F1 / nomor + Enter"
+              style="text-transform: uppercase"
+              @keydown="onMintaKeydown"
+              @keydown.enter.prevent="onMintaEnter"
             />
             <button
               type="button"
-              class="ci-btn"
+              class="lkp-btn"
               :disabled="isEditMode || formData.header.bpb_mb_nomor !== ''"
+              title="Cari Permintaan (F1)"
               @click="showMintaModal = true"
             >
-              <IconSearch :size="12" />
+              <IconSearch :size="12" color="#1565c0" />
             </button>
           </div>
         </div>
@@ -365,20 +507,25 @@ watch(
 
         <div class="fr mt-1">
           <label class="lbl">No. PO</label>
-          <div class="cell-grp w-100">
+          <div class="lkp-grp">
             <input
               v-model="formData.header.bpb_po_nomor"
-              class="inp ro"
-              placeholder="F1 / Cari..."
-              readonly
+              class="inp"
+              :class="{ ro: isEditMode || formData.header.bpb_mb_nomor !== '' }"
+              :readonly="isEditMode || formData.header.bpb_mb_nomor !== ''"
+              placeholder="F1 / nomor + Enter"
+              style="text-transform: uppercase"
+              @keydown="onPoKeydown"
+              @keydown.enter.prevent="onPoEnter"
             />
             <button
               type="button"
-              class="ci-btn"
+              class="lkp-btn"
               :disabled="isEditMode || formData.header.bpb_mb_nomor !== ''"
+              title="Cari PO (F1)"
               @click="showPoModal = true"
             >
-              <IconSearch :size="12" />
+              <IconSearch :size="12" color="#1565c0" />
             </button>
           </div>
         </div>
@@ -399,20 +546,25 @@ watch(
           <div class="sep mt-2 mb-2" />
           <div class="fr">
             <label class="lbl">Supplier</label>
-            <div class="cell-grp w-100">
+            <div class="lkp-grp">
               <input
                 v-model="formData.header.bpb_sup_kode"
-                class="inp ro font-weight-bold text-primary"
-                placeholder="F1 / Cari..."
-                readonly
+                class="inp font-weight-bold text-primary"
+                :class="{ ro: isSupLocked }"
+                :readonly="isSupLocked"
+                placeholder="F1 / kode + Enter"
+                style="text-transform: uppercase"
+                @keydown="onSupKeydown"
+                @keydown.enter.prevent="onSupEnter"
               />
               <button
                 type="button"
-                class="ci-btn"
+                class="lkp-btn"
                 :disabled="isSupLocked"
+                title="Cari Supplier (F1)"
                 @click="showSupModal = true"
               >
-                <IconSearch :size="12" />
+                <IconSearch :size="12" color="#1565c0" />
               </button>
             </div>
           </div>
@@ -524,13 +676,23 @@ watch(
                 </td>
 
                 <td v-if="formJenis === 'ACCESORIES'" class="p0">
-                  <div class="cell-grp">
+                  <div class="spk-grp">
                     <input
-                      :value="item.spk || item.Spk"
+                      v-model="formData.detail[Number(idx)].spk"
                       class="ci fw-mono"
-                      readonly
-                      @click="openSpkModal(Number(idx))"
-                      style="cursor: pointer"
+                      placeholder="F1 / nomor"
+                      style="text-transform: uppercase"
+                      :readonly="
+                        formData.header.isTutupBuku ||
+                        formData.header.hasVoucher
+                      "
+                      :class="{
+                        ro:
+                          formData.header.isTutupBuku ||
+                          formData.header.hasVoucher,
+                      }"
+                      @keydown="onSpkKeydown($event, Number(idx))"
+                      @keydown.enter.prevent="onSpkEnter(Number(idx))"
                     />
                     <button
                       type="button"
@@ -539,9 +701,10 @@ watch(
                         formData.header.isTutupBuku ||
                         formData.header.hasVoucher
                       "
+                      title="Cari SPK (F1)"
                       @click.stop="openSpkModal(Number(idx))"
                     >
-                      <IconSearch :size="12" />
+                      <IconSearch :size="12" color="#1565c0" />
                     </button>
                   </div>
                 </td>
@@ -572,6 +735,15 @@ watch(
               </tr>
             </tbody>
           </table>
+        </div>
+
+        <!-- ── Footer info gudang tujuan ── -->
+        <div class="tbl-footer-info">
+          <span class="footer-icon">📦</span>
+          Barang akan disimpan ke gudang:
+          <span class="footer-cabang">{{ authStore.user?.cabang || "—" }}</span>
+          <span class="footer-sep">|</span>
+          <span class="footer-bagian">{{ authStore.user?.bagian || "—" }}</span>
         </div>
       </div>
     </template>
@@ -668,6 +840,7 @@ watch(
   border-top: none;
   background: white;
   overflow: auto;
+  border-radius: 0;
 }
 .gt {
   width: 100%;
@@ -713,36 +886,107 @@ watch(
 .ci:focus:not(.ro) {
   background: #fffde7;
 }
+/* ── Lookup group di header — tidak terpotong di layar kecil ── */
+.lkp-grp {
+  display: flex;
+  flex: 1;
+  border: 1px solid #bdbdbd;
+  border-radius: 4px;
+  overflow: hidden;
+  height: 28px;
+  background: white;
+  min-width: 0;
+}
+.lkp-grp .inp {
+  flex: 1;
+  border: none;
+  border-radius: 0;
+  min-width: 0;
+  height: 100%;
+  padding: 0 6px;
+}
+.lkp-btn {
+  width: 30px;
+  min-width: 30px;
+  height: 100%;
+  background: #e3f2fd;
+  border: none;
+  border-left: 1px solid #bdbdbd;
+  cursor: pointer;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.lkp-btn:hover:not(:disabled) {
+  background: #bbdefb;
+}
+.lkp-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  background: #f5f5f5;
+}
+/* ── SPK cell di grid — inline, tidak turun ke bawah ── */
+.spk-grp {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  width: 100%;
+  min-width: 0;
+}
+.spk-grp .ci {
+  flex: 1;
+  min-width: 0;
+}
+.spk-grp .ci-btn {
+  width: 26px;
+  min-width: 26px;
+  height: 100%;
+  flex-shrink: 0;
+}
+
+/* Fix .cell-grp di header agar sama konsisten */
 .cell-grp {
   display: flex;
   align-items: center;
   height: 26px;
+  width: 100%;
+  min-width: 0;
   border: 1px solid #bdbdbd;
   border-radius: 4px;
   overflow: hidden;
   background: white;
 }
 .cell-grp .inp {
+  flex: 1;
+  min-width: 0;
   border: none;
   height: 100%;
+  padding: 0 6px;
 }
+
+/* ── ci-btn di grid — tetap tidak terpotong ── */
 .ci-btn {
   width: 26px;
+  min-width: 26px;
   height: 100%;
-  background: #eeeeee;
+  background: #e3f2fd;
   border: none;
   border-left: 1px solid #bdbdbd;
   cursor: pointer;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
+  color: #1565c0;
 }
 .ci-btn:hover:not(:disabled) {
-  background: #e0e0e0;
+  background: #bbdefb;
 }
 .ci-btn:disabled {
-  opacity: 0.5;
+  opacity: 0.45;
   cursor: not-allowed;
+  background: #f5f5f5;
 }
 .fw-mono {
   font-family: monospace;
@@ -752,5 +996,38 @@ watch(
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.tbl-footer-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  background: #e8f5e9;
+  border: 1px solid #bdbdbd;
+  border-top: none; /* nyambung ke tbl-wrap */
+  border-radius: 0 0 4px 4px;
+  font-size: 11px;
+  color: #2e7d32;
+  font-weight: 500;
+  flex-shrink: 0; /* tidak ikut flex-grow */
+}
+.footer-icon {
+  font-size: 13px;
+}
+.footer-cabang {
+  font-weight: 700;
+  color: #1565c0;
+  background: #e3f2fd;
+  padding: 1px 6px;
+  border-radius: 3px;
+  border: 1px solid #90caf9;
+}
+.footer-bagian {
+  font-weight: 700;
+  color: #1b5e20;
+}
+.footer-sep {
+  color: #a5d6a7;
 }
 </style>
