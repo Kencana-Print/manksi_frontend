@@ -82,6 +82,39 @@ interface GudangBahanData {
   topStok: StokItem[];
   bahanBarcode: BahanBarcodeItem[];
 }
+interface RealisasiMetric {
+  TotalPenawaran: number;
+  KonversiCepat: number;
+  KonversiNormal: number;
+  KonversiLambat: number;
+  KonversiSangatLambat: number;
+  BelumKonversi: number;
+  RataRataHari: number;
+}
+interface RealisasiTren {
+  Bulan: string;
+  TotalPenawaran: number;
+  Konversi: number;
+  RataRataHari: number;
+}
+interface RealisasiDistribusi {
+  Bucket: string;
+  Jumlah: number;
+}
+interface RealisasiData {
+  metric: RealisasiMetric;
+  tren: RealisasiTren[];
+  distribusi: RealisasiDistribusi[];
+  tabelDetail: {
+    NomorPenawaran: string;
+    TglPenawaran: string;
+    Customer: string;
+    TotalSPK: number;
+    SpkPertama: string | null;
+    TglSpkPertama: string | null;
+    HariKonversi: number | null;
+  }[];
+}
 
 const authStore = useAuthStore();
 const router = useRouter();
@@ -93,6 +126,7 @@ watch(activeTab, async (tab) => {
   if (tab === "marketing") {
     setupPenObserver();
     setupMapObserver();
+    setupRpDetailObserver();
   }
   if (tab === "finance") {
     setupOverdueObserver();
@@ -158,6 +192,20 @@ const gudangBahanData = ref<GudangBahanData>({
   bahanBarcode: [],
 });
 const isLoadingGudangBahan = ref(false);
+const realisasiPenawaranData = ref<RealisasiData>({
+  metric: {
+    TotalPenawaran: 0,
+    KonversiCepat: 0,
+    KonversiNormal: 0,
+    KonversiLambat: 0,
+    KonversiSangatLambat: 0,
+    BelumKonversi: 0,
+    RataRataHari: 0,
+  },
+  tren: [],
+  distribusi: [],
+  tabelDetail: [],
+});
 const piutangData = ref<PiutangData>({
   summary: {
     TotalDebet: 0,
@@ -391,6 +439,56 @@ const setupBahanObserver = () => {
   bahanScrollObserver.observe(bahanSentinelEl.value);
 };
 
+// ── Infinite scroll: Realisasi Penawaran Detail ──
+interface RealisasiDetailItem {
+  NomorPenawaran: string;
+  TglPenawaran: string;
+  Customer: string;
+  TotalSPK: number;
+  SpkPertama: string | null;
+  TglSpkPertama: string | null;
+  HariKonversi: number | null;
+}
+
+const RP_DETAIL_PAGE_SIZE = 20;
+const rpDetailList = ref<RealisasiDetailItem[]>([]);
+const rpDetailOffset = ref(0);
+const rpDetailHasMore = ref(true);
+const isLoadingMoreRpDetail = ref(false);
+const rpDetailSentinelEl = ref<HTMLElement | null>(null);
+let rpDetailScrollObserver: IntersectionObserver | null = null;
+
+const loadMoreRpDetail = async () => {
+  if (!rpDetailHasMore.value || isLoadingMoreRpDetail.value) return;
+  isLoadingMoreRpDetail.value = true;
+  try {
+    const res = await dashboardService.getRealisasiPenawaranDetail(
+      RP_DETAIL_PAGE_SIZE,
+      rpDetailOffset.value,
+    );
+    const rows: RealisasiDetailItem[] = res.data.data;
+    rpDetailList.value.push(...rows);
+    rpDetailOffset.value += rows.length;
+    if (rows.length < RP_DETAIL_PAGE_SIZE) rpDetailHasMore.value = false;
+  } catch {
+    /* silent */
+  } finally {
+    isLoadingMoreRpDetail.value = false;
+  }
+};
+
+const setupRpDetailObserver = () => {
+  if (rpDetailScrollObserver) rpDetailScrollObserver.disconnect();
+  if (!rpDetailSentinelEl.value) return;
+  rpDetailScrollObserver = new IntersectionObserver(
+    (entries) => {
+      if (entries[0].isIntersecting) loadMoreRpDetail();
+    },
+    { threshold: 0.1 },
+  );
+  rpDetailScrollObserver.observe(rpDetailSentinelEl.value);
+};
+
 // ── Load Dashboard ──
 const loadDashboard = async () => {
   isLoadingDashboard.value = true;
@@ -417,12 +515,17 @@ const loadDashboard = async () => {
     }
 
     if (showPenawaran.value) {
-      const [sumRes, realisasiRes, mapSumRes, kunjunganRes] =
+      rpDetailList.value = [];
+      rpDetailOffset.value = 0;
+      rpDetailHasMore.value = true;
+
+      const [sumRes, realisasiRes, mapSumRes, kunjunganRes, realisasiPenRes] =
         await Promise.allSettled([
           dashboardService.getPenawaranSummary(),
           dashboardService.getRealisasiSummary(),
           dashboardService.getPenawaranMapSummary(),
           dashboardService.getKunjunganSalesSummary(),
+          dashboardService.getRealisasiPenawaranDashboard(),
         ]);
       if (sumRes.status === "fulfilled")
         penSummary.value = sumRes.value.data.data;
@@ -432,8 +535,18 @@ const loadDashboard = async () => {
         mapSummary.value = mapSumRes.value.data.data;
       if (kunjunganRes.status === "fulfilled")
         kunjunganRows.value = kunjunganRes.value.data.data || [];
+      if (
+        realisasiPenRes.status === "fulfilled" &&
+        realisasiPenRes.value?.data?.data
+      ) {
+        realisasiPenawaranData.value = realisasiPenRes.value.data.data;
+      }
 
-      await Promise.allSettled([loadMorePenawaran(), loadMoreMap()]);
+      await Promise.allSettled([
+        loadMorePenawaran(),
+        loadMoreMap(),
+        loadMoreRpDetail(),
+      ]);
     }
 
     if (showPiutang.value) {
@@ -544,6 +657,7 @@ onMounted(async () => {
   if (activeTab.value === "marketing") {
     setupPenObserver();
     setupMapObserver();
+    setupRpDetailObserver();
   }
   if (activeTab.value === "finance") {
     setupOverdueObserver();
@@ -560,6 +674,7 @@ onUnmounted(() => {
   overdueScrollObserver?.disconnect();
   bufferScrollObserver?.disconnect();
   bahanScrollObserver?.disconnect();
+  rpDetailScrollObserver?.disconnect();
 });
 
 const closeSpkDialog = () => {
@@ -617,6 +732,19 @@ const bufferColor = (pct: number): string => {
   if (pct < 50) return "#f57f17";
   return "#2e7d32";
 };
+
+// Persentase per bucket
+const realisasiPct = computed(() => {
+  const total = realisasiPenawaranData.value.metric.TotalPenawaran || 1;
+  const m = realisasiPenawaranData.value.metric;
+  return {
+    cepat: Math.round((m.KonversiCepat / total) * 100),
+    normal: Math.round((m.KonversiNormal / total) * 100),
+    lambat: Math.round((m.KonversiLambat / total) * 100),
+    sangatLambat: Math.round((m.KonversiSangatLambat / total) * 100),
+    belum: Math.round((m.BelumKonversi / total) * 100),
+  };
+});
 // ── Collection rate bulan ini ──
 const collectionRate = computed(() => {
   const debet = piutangData.value.summary.TotalDebet || 0;
@@ -828,13 +956,10 @@ const sisaClass = (item: any) => {
               <div style="flex: 1; min-width: 0">
                 <div class="shortcut-title">Marketing</div>
                 <div class="shortcut-sub">
-                  <span v-if="isLoadingDashboard || isLoadingGudangBahan"
-                    >Memuat...</span
-                  >
+                  <span v-if="isLoadingDashboard">Memuat...</span>
                   <span v-else>
-                    {{ gudangBahanData.metric.JmlBawahBuffer }} bahan penolong
-                    bawah buffer · {{ gudangBahanData.metric.JmlMinus }} bahan
-                    utama minus
+                    {{ penSummary.BelumSpk }} penawaran belum SPK ·
+                    {{ mapSummary.BelumMAP }} belum MAP
                   </span>
                 </div>
               </div>
@@ -903,14 +1028,120 @@ const sisaClass = (item: any) => {
            TAB MARKETING
       ════════════════════════════════════════ -->
       <v-window-item value="marketing">
-        <!-- Row 1: Penawaran Belum SPK + Realisasi -->
+        <!-- ── Row 1: 3 panel sejajar ── -->
         <v-row dense class="mb-2">
+          <!-- Penawaran Belum MAP -->
+          <v-col cols="12" md="5">
+            <div class="manksi-panel content-panel fill-height">
+              <div class="panel-header panel-header--orange">
+                <IconAlertTriangle
+                  :size="14"
+                  :stroke-width="1.7"
+                  class="mr-1"
+                />
+                Belum MAP
+                <span
+                  v-if="mapSummary.BelumMAPAdaClose"
+                  class="badge-count ml-1"
+                  style="background: #e65100"
+                >
+                  {{ mapSummary.BelumMAPAdaClose }} perlu perhatian
+                </span>
+                <span
+                  class="ml-auto d-flex align-center"
+                  style="gap: 8px; font-size: 11px"
+                >
+                  <span
+                    >Total: <b>{{ mapSummary.TotalPenawaran }}</b></span
+                  >
+                  <span style="color: #2e7d32"
+                    >MAP: <b>{{ mapSummary.SudahMAP }}</b></span
+                  >
+                  <span style="color: #c62828"
+                    >Belum: <b>{{ mapSummary.BelumMAP }}</b></span
+                  >
+                </span>
+              </div>
+              <div class="panel-body">
+                <v-progress-linear
+                  v-if="isLoadingDashboard"
+                  indeterminate
+                  color="orange"
+                  height="2"
+                />
+                <template
+                  v-else-if="penawaranBelumMap.length || isLoadingMoreMap"
+                >
+                  <div class="map-list">
+                    <div
+                      v-for="p in penawaranBelumMap"
+                      :key="p.Nomor"
+                      class="map-item"
+                      :class="
+                        p.UmurHari >= 14
+                          ? 'map-danger'
+                          : p.UmurHari >= 7
+                            ? 'map-warn'
+                            : ''
+                      "
+                      style="cursor: pointer"
+                      @click="
+                        router.push('/laporan/marketing/penawaran-vs-map')
+                      "
+                    >
+                      <div class="map-item-top">
+                        <span class="map-nomor">{{ p.Nomor }}</span>
+                        <div class="d-flex align-center" style="gap: 5px">
+                          <span
+                            class="map-close-badge"
+                            style="background: #e8f5e9; color: #2e7d32"
+                          >
+                            {{ p.JmlItem }} item
+                          </span>
+                          <span class="pen-age" :class="umurClass(p.UmurHari)"
+                            >{{ p.UmurHari }}h</span
+                          >
+                        </div>
+                      </div>
+                      <div class="map-cus">{{ p.NamaCustomer }}</div>
+                      <div v-if="p.Keterangan" class="pen-ket">
+                        {{ p.Keterangan }}
+                      </div>
+                    </div>
+                    <div
+                      ref="mapSentinelEl"
+                      style="
+                        width: 100%;
+                        padding: 8px;
+                        text-align: center;
+                        flex-basis: 100%;
+                      "
+                    >
+                      <span v-if="isLoadingMoreMap" class="pen-loading"
+                        >Memuat...</span
+                      >
+                      <span
+                        v-else-if="!mapHasMore && penawaranBelumMap.length"
+                        class="pen-end"
+                      >
+                        {{ penawaranBelumMap.length }} penawaran
+                      </span>
+                    </div>
+                  </div>
+                </template>
+                <div v-else class="text-center text-grey py-3 text-caption">
+                  Semua penawaran sudah ada MAP-nya 🎉
+                </div>
+              </div>
+            </div>
+          </v-col>
+
           <!-- Penawaran Belum SPK -->
-          <v-col cols="12" md="4">
+          <v-col cols="12" md="3">
             <div class="manksi-panel content-panel fill-height">
               <div class="panel-header panel-header--warning">
                 <IconFileAlert :size="14" :stroke-width="1.7" class="mr-1" />
-                Penawaran Belum SPK
+                Belum SPK
                 <span v-if="penSummary.BelumSpk" class="badge-count ml-auto">
                   {{ penSummary.BelumSpk }}
                 </span>
@@ -940,7 +1171,7 @@ const sisaClass = (item: any) => {
                       <span class="pen-stat-val text-error">{{
                         penSummary.BelumSpk
                       }}</span>
-                      <span class="pen-stat-lbl">Belum SPK</span>
+                      <span class="pen-stat-lbl">Belum</span>
                     </div>
                     <div class="pen-stat">
                       <span
@@ -1002,8 +1233,8 @@ const sisaClass = (item: any) => {
             </div>
           </v-col>
 
-          <!-- Realisasi Penawaran per Divisi -->
-          <v-col cols="12" md="8">
+          <!-- Realisasi per Divisi -->
+          <v-col cols="12" md="4">
             <div class="manksi-panel content-panel fill-height">
               <div class="panel-header panel-header--blue">
                 <IconChartBar :size="14" :stroke-width="1.7" class="mr-1" />
@@ -1066,7 +1297,6 @@ const sisaClass = (item: any) => {
                                   Number(row.Batal),
                                 ).close + '%',
                             }"
-                            :title="`Close: ${shortNum(Number(row.Close))}`"
                           />
                           <div
                             class="real-seg real-seg--batal"
@@ -1078,7 +1308,6 @@ const sisaClass = (item: any) => {
                                   Number(row.Batal),
                                 ).batal + '%',
                             }"
-                            :title="`Batal: ${shortNum(Number(row.Batal))}`"
                           />
                           <div
                             class="real-seg real-seg--open"
@@ -1090,7 +1319,6 @@ const sisaClass = (item: any) => {
                                   Number(row.Batal),
                                 ).open + '%',
                             }"
-                            :title="`Open: ${shortNum(Number(row.Nominal) - Number(row.Close) - Number(row.Batal))}`"
                           />
                         </div>
                         <span class="real-pct">
@@ -1107,19 +1335,19 @@ const sisaClass = (item: any) => {
                         <span class="rd-close"
                           >✓ {{ shortNum(Number(row.Close)) }}</span
                         >
-                        <span v-if="Number(row.Batal) > 0" class="rd-batal">
-                          ✕ {{ shortNum(Number(row.Batal)) }}
-                        </span>
-                        <span class="rd-open">
-                          ○
+                        <span v-if="Number(row.Batal) > 0" class="rd-batal"
+                          >✕ {{ shortNum(Number(row.Batal)) }}</span
+                        >
+                        <span class="rd-open"
+                          >○
                           {{
                             shortNum(
                               Number(row.Nominal) -
                                 Number(row.Close) -
                                 Number(row.Batal),
                             )
-                          }}
-                        </span>
+                          }}</span
+                        >
                       </div>
                     </div>
                   </div>
@@ -1137,118 +1365,430 @@ const sisaClass = (item: any) => {
           </v-col>
         </v-row>
 
-        <!-- Row 2: Penawaran Belum MAP -->
+        <!-- ── Row 2: Waktu Realisasi + Tabel Detail ── -->
         <v-row dense class="mb-2">
           <v-col cols="12">
             <div class="manksi-panel content-panel">
-              <div class="panel-header panel-header--orange">
-                <IconAlertTriangle
-                  :size="14"
-                  :stroke-width="1.7"
-                  class="mr-1"
-                />
-                Penawaran Belum Ada MAP
-                <span class="panel-header-sub ml-1">(semua data)</span>
+              <div class="panel-header panel-header--blue">
+                <IconChartBar :size="14" :stroke-width="1.7" class="mr-1" />
+                Waktu realisasi penawaran → SPK
+                <span class="panel-header-sub ml-1">(90 hari terakhir)</span>
                 <span
-                  v-if="mapSummary.BelumMAPAdaClose"
-                  class="badge-count ml-2"
-                  style="background: #e65100"
+                  v-if="realisasiPenawaranData.metric.RataRataHari"
+                  class="ml-auto pct-badge"
+                  :class="
+                    realisasiPenawaranData.metric.RataRataHari <= 14
+                      ? 'pct-good'
+                      : realisasiPenawaranData.metric.RataRataHari <= 30
+                        ? 'pct-mid'
+                        : 'pct-low'
+                  "
                 >
-                  {{ mapSummary.BelumMAPAdaClose }} perlu perhatian
-                </span>
-                <span
-                  class="ml-auto d-flex align-center"
-                  style="gap: 12px; font-size: 11px"
-                >
-                  <span
-                    >Total: <b>{{ mapSummary.TotalPenawaran }}</b></span
-                  >
-                  <span style="color: #2e7d32"
-                    >Ada MAP: <b>{{ mapSummary.SudahMAP }}</b></span
-                  >
-                  <span style="color: #c62828"
-                    >Belum MAP: <b>{{ mapSummary.BelumMAP }}</b></span
-                  >
+                  Rata-rata
+                  {{ realisasiPenawaranData.metric.RataRataHari }} hari
                 </span>
               </div>
               <div class="panel-body">
                 <v-progress-linear
                   v-if="isLoadingDashboard"
                   indeterminate
-                  color="orange"
+                  color="primary"
                   height="2"
                 />
-                <template
-                  v-else-if="penawaranBelumMap.length || isLoadingMoreMap"
-                >
-                  <div class="map-list">
+                <template v-else>
+                  <!-- Metric mini + stacked bar + tren — layout 2 kolom -->
+                  <div
+                    style="
+                      display: flex;
+                      gap: 0;
+                      border-bottom: 1px solid #f0f0f0;
+                    "
+                  >
+                    <!-- Kiri: metric + stacked bar -->
                     <div
-                      v-for="p in penawaranBelumMap"
-                      :key="p.Nomor"
-                      class="map-item"
-                      :class="
-                        p.UmurHari >= 14
-                          ? 'map-danger'
-                          : p.UmurHari >= 7
-                            ? 'map-warn'
-                            : ''
-                      "
-                      style="cursor: pointer"
-                      @click="
-                        router.push('/laporan/marketing/penawaran-vs-map')
+                      style="
+                        flex: 1;
+                        padding: 10px 12px;
+                        border-right: 1px solid #f0f0f0;
                       "
                     >
-                      <div class="map-item-top">
-                        <span class="map-nomor">{{ p.Nomor }}</span>
-                        <div class="d-flex align-center" style="gap: 5px">
-                          <span
-                            class="map-close-badge"
-                            style="background: #e8f5e9; color: #2e7d32"
-                          >
-                            {{ p.JmlItem }} item
+                      <div
+                        class="rp-summary"
+                        style="
+                          padding: 0 0 8px;
+                          border-bottom: 1px solid #f5f5f5;
+                          margin-bottom: 8px;
+                        "
+                      >
+                        <div class="rp-stat" style="padding: 2px 10px">
+                          <span class="rp-val" style="color: #212121">{{
+                            realisasiPenawaranData.metric.TotalPenawaran
+                          }}</span>
+                          <span class="rp-lbl">Total</span>
+                        </div>
+                        <div class="rp-divider" />
+                        <div class="rp-stat" style="padding: 2px 10px">
+                          <span class="rp-val" style="color: #2e7d32"
+                            >{{ realisasiPenawaranData.metric.KonversiCepat }}
+                            <span class="rp-pct"
+                              >({{ realisasiPct.cepat }}%)</span
+                            >
                           </span>
-                          <span class="pen-age" :class="umurClass(p.UmurHari)"
-                            >{{ p.UmurHari }}h</span
+                          <span class="rp-lbl">Cepat ≤7hr</span>
+                        </div>
+                        <div class="rp-divider" />
+                        <div class="rp-stat" style="padding: 2px 10px">
+                          <span class="rp-val" style="color: #185fa5"
+                            >{{ realisasiPenawaranData.metric.KonversiNormal }}
+                            <span class="rp-pct"
+                              >({{ realisasiPct.normal }}%)</span
+                            >
+                          </span>
+                          <span class="rp-lbl">Normal 8–30hr</span>
+                        </div>
+                        <div class="rp-divider" />
+                        <div class="rp-stat" style="padding: 2px 10px">
+                          <span class="rp-val" style="color: #854f0b"
+                            >{{ realisasiPenawaranData.metric.KonversiLambat }}
+                            <span class="rp-pct"
+                              >({{ realisasiPct.lambat }}%)</span
+                            >
+                          </span>
+                          <span class="rp-lbl">Lambat 31–90hr</span>
+                        </div>
+                        <div class="rp-divider" />
+                        <div class="rp-stat" style="padding: 2px 10px">
+                          <span class="rp-val" style="color: #c62828"
+                            >{{
+                              realisasiPenawaranData.metric.KonversiSangatLambat
+                            }}
+                            <span class="rp-pct"
+                              >({{ realisasiPct.sangatLambat }}%)</span
+                            >
+                          </span>
+                          <span class="rp-lbl">&gt;90hr</span>
+                        </div>
+                        <div class="rp-divider" />
+                        <div class="rp-stat" style="padding: 2px 10px">
+                          <span class="rp-val" style="color: #616161"
+                            >{{ realisasiPenawaranData.metric.BelumKonversi }}
+                            <span class="rp-pct"
+                              >({{ realisasiPct.belum }}%)</span
+                            >
+                          </span>
+                          <span class="rp-lbl">Belum SPK</span>
+                        </div>
+                      </div>
+
+                      <!-- Stacked bar -->
+                      <div v-if="realisasiPenawaranData.metric.TotalPenawaran">
+                        <div class="rp-stack">
+                          <div
+                            class="rp-seg"
+                            :style="{
+                              width: realisasiPct.cepat + '%',
+                              background: '#2e7d32',
+                            }"
+                          >
+                            <span v-if="realisasiPct.cepat >= 8"
+                              >{{ realisasiPct.cepat }}%</span
+                            >
+                          </div>
+                          <div
+                            class="rp-seg"
+                            :style="{
+                              width: realisasiPct.normal + '%',
+                              background: '#185FA5',
+                            }"
+                          >
+                            <span v-if="realisasiPct.normal >= 8"
+                              >{{ realisasiPct.normal }}%</span
+                            >
+                          </div>
+                          <div
+                            class="rp-seg"
+                            :style="{
+                              width: realisasiPct.lambat + '%',
+                              background: '#f57f17',
+                            }"
+                          >
+                            <span v-if="realisasiPct.lambat >= 8"
+                              >{{ realisasiPct.lambat }}%</span
+                            >
+                          </div>
+                          <div
+                            class="rp-seg"
+                            :style="{
+                              width: realisasiPct.sangatLambat + '%',
+                              background: '#c62828',
+                            }"
+                          >
+                            <span v-if="realisasiPct.sangatLambat >= 8"
+                              >{{ realisasiPct.sangatLambat }}%</span
+                            >
+                          </div>
+                          <div
+                            class="rp-seg"
+                            :style="{
+                              width: realisasiPct.belum + '%',
+                              background: '#bdbdbd',
+                            }"
+                          >
+                            <span v-if="realisasiPct.belum >= 8"
+                              >{{ realisasiPct.belum }}%</span
+                            >
+                          </div>
+                        </div>
+                        <div class="rp-legend">
+                          <span
+                            ><span
+                              class="leg-dot"
+                              style="background: #2e7d32"
+                            />Cepat ≤7hr</span
+                          >
+                          <span
+                            ><span
+                              class="leg-dot"
+                              style="background: #185fa5"
+                            />Normal 8–30hr</span
+                          >
+                          <span
+                            ><span
+                              class="leg-dot"
+                              style="background: #f57f17"
+                            />Lambat 31–90hr</span
+                          >
+                          <span
+                            ><span
+                              class="leg-dot"
+                              style="background: #c62828"
+                            />&gt;90hr</span
+                          >
+                          <span
+                            ><span
+                              class="leg-dot"
+                              style="background: #bdbdbd"
+                            />Belum SPK</span
                           >
                         </div>
                       </div>
-                      <div class="map-cus">{{ p.NamaCustomer }}</div>
-                      <div v-if="p.Keterangan" class="pen-ket">
-                        {{ p.Keterangan }}
-                      </div>
                     </div>
 
-                    <!-- Sentinel lazy load MAP -->
+                    <!-- Kanan: tren per bulan -->
                     <div
-                      ref="mapSentinelEl"
-                      style="
-                        width: 100%;
-                        padding: 8px;
-                        text-align: center;
-                        flex-basis: 100%;
-                      "
+                      v-if="realisasiPenawaranData.tren.length"
+                      style="width: 280px; flex-shrink: 0; padding: 10px 12px"
                     >
-                      <span v-if="isLoadingMoreMap" class="pen-loading"
+                      <div class="rp-tren-title">
+                        Tren rata-rata hari / bulan
+                      </div>
+                      <div class="rp-tren-list">
+                        <div
+                          v-for="t in realisasiPenawaranData.tren"
+                          :key="t.Bulan"
+                          class="rp-tren-row"
+                        >
+                          <span class="rp-tren-bulan">{{ t.Bulan }}</span>
+                          <div class="rp-tren-bar-wrap">
+                            <div class="rp-tren-track">
+                              <div
+                                class="rp-tren-fill"
+                                :style="{
+                                  width:
+                                    Math.min(100, (t.RataRataHari / 60) * 100) +
+                                    '%',
+                                  background:
+                                    t.RataRataHari <= 14
+                                      ? '#2e7d32'
+                                      : t.RataRataHari <= 30
+                                        ? '#185FA5'
+                                        : '#c62828',
+                                }"
+                              />
+                              <div
+                                class="rp-target-line"
+                                style="left: calc(14 / 60 * 100%)"
+                              />
+                            </div>
+                          </div>
+                          <span
+                            class="rp-tren-val"
+                            :style="{
+                              color:
+                                t.RataRataHari <= 14
+                                  ? '#2e7d32'
+                                  : t.RataRataHari <= 30
+                                    ? '#185FA5'
+                                    : '#c62828',
+                            }"
+                          >
+                            {{
+                              t.RataRataHari !== null
+                                ? t.RataRataHari + " hr"
+                                : "—"
+                            }}
+                          </span>
+                          <span class="rp-tren-konversi"
+                            >{{ t.Konversi }}/{{ t.TotalPenawaran }}</span
+                          >
+                        </div>
+                      </div>
+                      <div class="rp-legend" style="margin-top: 6px">
+                        <span
+                          style="display: flex; align-items: center; gap: 4px"
+                        >
+                          <span
+                            style="
+                              width: 12px;
+                              height: 2px;
+                              border-top: 2px dashed #9e9e9e;
+                              display: inline-block;
+                            "
+                          ></span>
+                          Target 14 hari
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Tabel detail — infinite scroll -->
+                  <div
+                    style="
+                      overflow-x: auto;
+                      max-height: 320px;
+                      overflow-y: auto;
+                    "
+                  >
+                    <table class="rp-tbl">
+                      <thead>
+                        <tr>
+                          <th style="width: 160px">No. penawaran</th>
+                          <th style="width: 95px; text-align: center">
+                            Tgl penawaran
+                          </th>
+                          <th style="min-width: 160px">Customer</th>
+                          <th style="width: 70px; text-align: center">
+                            Total SPK
+                          </th>
+                          <th style="width: 150px">SPK pertama</th>
+                          <th style="width: 95px; text-align: center">
+                            Tgl SPK
+                          </th>
+                          <th style="width: 70px; text-align: right">Hari</th>
+                          <th style="width: 90px; text-align: center">
+                            Status
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr v-for="(row, idx) in rpDetailList" :key="idx">
+                          <td
+                            style="
+                              font-family: monospace;
+                              color: #1565c0;
+                              font-weight: 600;
+                            "
+                          >
+                            {{ row.NomorPenawaran }}
+                          </td>
+                          <td style="text-align: center">
+                            {{ row.TglPenawaran }}
+                          </td>
+                          <td
+                            style="
+                              overflow: hidden;
+                              text-overflow: ellipsis;
+                              white-space: nowrap;
+                              max-width: 160px;
+                            "
+                            :title="row.Customer"
+                          >
+                            {{ row.Customer }}
+                          </td>
+                          <td style="text-align: center; font-weight: 600">
+                            {{ row.TotalSPK || "—" }}
+                          </td>
+                          <td
+                            style="
+                              font-family: monospace;
+                              font-size: 10px;
+                              color: #424242;
+                            "
+                          >
+                            {{ row.SpkPertama || "—" }}
+                          </td>
+                          <td style="text-align: center">
+                            {{ row.TglSpkPertama || "—" }}
+                          </td>
+                          <td
+                            style="text-align: right; font-weight: 600"
+                            :style="{
+                              color:
+                                row.HariKonversi === null
+                                  ? '#9e9e9e'
+                                  : row.HariKonversi <= 7
+                                    ? '#2e7d32'
+                                    : row.HariKonversi <= 30
+                                      ? '#185FA5'
+                                      : '#c62828',
+                            }"
+                          >
+                            {{
+                              row.HariKonversi !== null ? row.HariKonversi : "—"
+                            }}
+                          </td>
+                          <td style="text-align: center">
+                            <span
+                              v-if="row.HariKonversi === null"
+                              class="rp-badge rp-badge--none"
+                              >Belum</span
+                            >
+                            <span
+                              v-else-if="row.HariKonversi <= 7"
+                              class="rp-badge rp-badge--fast"
+                              >Cepat</span
+                            >
+                            <span
+                              v-else-if="row.HariKonversi <= 30"
+                              class="rp-badge rp-badge--mid"
+                              >Normal</span
+                            >
+                            <span
+                              v-else-if="row.HariKonversi <= 90"
+                              class="rp-badge rp-badge--slow"
+                              >Lambat</span
+                            >
+                            <span v-else class="rp-badge rp-badge--vslow"
+                              >&gt;90hr</span
+                            >
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+
+                    <!-- Sentinel -->
+                    <div
+                      ref="rpDetailSentinelEl"
+                      style="padding: 6px; text-align: center"
+                    >
+                      <span v-if="isLoadingMoreRpDetail" class="pen-loading"
                         >Memuat...</span
                       >
                       <span
-                        v-else-if="!mapHasMore && penawaranBelumMap.length"
+                        v-else-if="!rpDetailHasMore && rpDetailList.length"
                         class="pen-end"
                       >
-                        {{ penawaranBelumMap.length }} penawaran ditampilkan
+                        {{ rpDetailList.length }} penawaran ditampilkan
                       </span>
                     </div>
                   </div>
                 </template>
-                <div v-else class="text-center text-grey py-3 text-caption">
-                  Semua penawaran sudah ada MAP-nya 🎉
-                </div>
               </div>
             </div>
           </v-col>
         </v-row>
 
-        <!-- Row 3: Kunjungan Sales -->
+        <!-- ── Row 3: Kunjungan Sales ── -->
         <v-row dense>
           <v-col cols="12">
             <div class="manksi-panel content-panel">
@@ -1305,7 +1845,6 @@ const sisaClass = (item: any) => {
                           <button
                             class="knj-detail-btn"
                             @click="goToKunjunganDetail(row.Nama_Sales)"
-                            title="Lihat detail kunjungan sales ini"
                           >
                             Detail →
                           </button>
@@ -1320,7 +1859,6 @@ const sisaClass = (item: any) => {
                                 ? (row.Done / row.Total) * 100 + '%'
                                 : '0%',
                             }"
-                            :title="`Done: ${row.Done}`"
                           />
                           <div
                             class="knj-seg knj-unplan"
@@ -1329,7 +1867,6 @@ const sisaClass = (item: any) => {
                                 ? (row.Unplan / row.Total) * 100 + '%'
                                 : '0%',
                             }"
-                            :title="`Unplan: ${row.Unplan}`"
                           />
                           <div
                             class="knj-seg knj-failed"
@@ -1338,7 +1875,6 @@ const sisaClass = (item: any) => {
                                 ? (row.Failed / row.Total) * 100 + '%'
                                 : '0%',
                             }"
-                            :title="`Failed: ${row.Failed}`"
                           />
                         </div>
                         <span class="knj-pct">
@@ -2784,14 +3320,13 @@ const sisaClass = (item: any) => {
 
 /* ── MAP List ── */
 .map-list {
-  display: flex;
-  flex-wrap: wrap;
-  max-height: 200px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  max-height: 280px;
   overflow-y: auto;
 }
 .map-item {
-  width: 25%;
-  padding: 6px 12px;
+  padding: 6px 10px;
   border-bottom: 1px solid #f5f5f5;
   border-right: 1px solid #f5f5f5;
   font-size: 11px;
@@ -3502,5 +4037,196 @@ const sisaClass = (item: any) => {
   font-size: 9px;
   color: #9e9e9e;
   margin-top: 2px;
+}
+/* ── Realisasi Penawaran ── */
+.rp-summary {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  border-bottom: 1px solid #f0f0f0;
+  flex-wrap: wrap;
+  gap: 0;
+}
+.rp-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 4px 14px;
+  gap: 2px;
+}
+.rp-divider {
+  width: 1px;
+  height: 28px;
+  background: #e0e0e0;
+  flex-shrink: 0;
+}
+.rp-val {
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+.rp-pct {
+  font-size: 10px;
+  font-weight: 400;
+  color: #9e9e9e;
+  margin-left: 2px;
+}
+.rp-lbl {
+  font-size: 9px;
+  color: #9e9e9e;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+.rp-stack-wrap {
+  padding: 10px 12px 6px;
+  border-bottom: 1px solid #f0f0f0;
+}
+.rp-stack {
+  display: flex;
+  height: 22px;
+  border-radius: 3px;
+  overflow: hidden;
+  width: 100%;
+}
+.rp-seg {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  color: white;
+  transition: width 0.4s;
+  min-width: 0;
+  overflow: hidden;
+}
+.rp-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 5px 0 2px;
+  font-size: 10px;
+  color: #757575;
+}
+.rp-tren-wrap {
+  padding: 8px 12px;
+}
+.rp-tren-title {
+  font-size: 10px;
+  font-weight: 600;
+  color: #9e9e9e;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 6px;
+}
+.rp-tren-list {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.rp-tren-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.rp-tren-bulan {
+  font-size: 10px;
+  color: #616161;
+  width: 55px;
+  flex-shrink: 0;
+  font-weight: 500;
+}
+.rp-tren-bar-wrap {
+  flex: 1;
+}
+.rp-tren-track {
+  height: 10px;
+  background: #f0f0f0;
+  border-radius: 3px;
+  overflow: visible;
+  position: relative;
+}
+.rp-tren-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.4s;
+}
+.rp-target-line {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 1px;
+  background: #9e9e9e;
+  border-left: 2px dashed #9e9e9e;
+}
+.rp-tren-val {
+  font-size: 10px;
+  font-weight: 700;
+  width: 38px;
+  text-align: right;
+  flex-shrink: 0;
+}
+.rp-tren-konversi {
+  font-size: 10px;
+  color: #9e9e9e;
+  width: 38px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+/* ── Tabel realisasi detail ── */
+.rp-tbl {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+  min-width: 700px;
+}
+.rp-tbl thead th {
+  background: #e3f2fd;
+  color: #1565c0;
+  font-weight: 600;
+  padding: 6px 10px;
+  text-align: left;
+  border-bottom: 1px solid #bbdefb;
+  white-space: nowrap;
+}
+.rp-tbl tbody td {
+  padding: 5px 10px;
+  border-bottom: 1px solid #f0f0f0;
+  color: var(--color-text-primary, #212121);
+}
+.rp-tbl tbody tr:last-child td {
+  border-bottom: none;
+}
+.rp-tbl tbody tr:hover td {
+  background: #f5f5f5;
+}
+.rp-badge {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 600;
+}
+.rp-badge--fast {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+.rp-badge--mid {
+  background: #e3f2fd;
+  color: #185fa5;
+}
+.rp-badge--slow {
+  background: #fff8e1;
+  color: #854f0b;
+}
+.rp-badge--vslow {
+  background: #ffebee;
+  color: #c62828;
+}
+.rp-badge--none {
+  background: #f5f5f5;
+  color: #757575;
 }
 </style>

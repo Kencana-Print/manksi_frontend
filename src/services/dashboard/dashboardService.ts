@@ -38,4 +38,12 @@ export const dashboardService = {
 
   getGudangBahanBarcode: (limit = 20, offset = 0) =>
     api.get("/dashboard/gudang-bahan-barcode", { params: { limit, offset } }),
+
+  getRealisasiPenawaranDashboard: () =>
+    api.get("/dashboard/realisasi-penawaran"),
+
+  getRealisasiPenawaranDetail: (limit = 20, offset = 0) =>
+    api.get("/dashboard/realisasi-penawaran-detail", {
+      params: { limit, offset },
+    }),
 };
