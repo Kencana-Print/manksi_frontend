@@ -28,4 +28,14 @@ export const dashboardService = {
 
   getPiutangOverdue: (limit = 20, offset = 0) =>
     api.get("/dashboard/piutang-overdue", { params: { limit, offset } }),
+
+  getPenerimaanSummary: () => api.get("/dashboard/penerimaan-summary"),
+
+  getGudangBahanDashboard: () => api.get("/dashboard/gudang-bahan-dashboard"),
+
+  getGudangBahanBuffer: (limit = 20, offset = 0) =>
+    api.get("/dashboard/gudang-bahan-buffer", { params: { limit, offset } }),
+
+  getGudangBahanBarcode: (limit = 20, offset = 0) =>
+    api.get("/dashboard/gudang-bahan-barcode", { params: { limit, offset } }),
 };

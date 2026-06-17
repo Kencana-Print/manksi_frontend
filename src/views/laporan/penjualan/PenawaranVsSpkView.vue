@@ -2,6 +2,11 @@
 import { ref, watch, onMounted } from "vue";
 import { useBrowse } from "@/composables/useBrowse";
 import BaseBrowse from "@/components/BaseBrowse.vue";
+import {
+  exportExcel,
+  exportExcelSingle,
+  type ExcelColumn,
+} from "@/utils/excelExport";
 import { penawaranVsSpkService } from "@/services/laporan/penjualan/penawaranVsSpkService";
 import api from "@/services/api";
 import { IconReportAnalytics } from "@tabler/icons-vue";
@@ -90,20 +95,79 @@ const onUpdateExpanded = async (val: any[]) => {
   }
 };
 
-const onExportDetail = () => {
-  const allDetails = Object.values(detailData.value).flat();
-  if (!allDetails.length) {
-    alert(
-      "Expand baris terlebih dahulu untuk memuat detail SPK yang akan diexport.",
+const isExportingDetail = ref(false);
+
+const onExportDetail = async () => {
+  isExportingDetail.value = true;
+  try {
+    const res = await penawaranVsSpkService.getAllDetail({
+      startDate: filters.value.startDate,
+      endDate: filters.value.endDate,
+      divisi: filters.value.divisi,
+    });
+
+    const allDetail: any[] = res.data.data;
+
+    if (!allDetail.length) {
+      alert("Tidak ada data detail pada range tanggal ini.");
+      return;
+    }
+
+    // Format tanggal untuk Excel
+    const fmt = (v: string) => {
+      if (!v) return "";
+      const s = String(v).substring(0, 10);
+      const [y, m, d] = s.split("-");
+      return `${d}/${m}/${y}`;
+    };
+
+    const rows = allDetail.map((r) => ({
+      ...r,
+      TglPenawaran: fmt(r.TglPenawaran),
+      TglSPK: fmt(r.TglSPK),
+      Jumlah: Number(r.Jumlah) || 0,
+    }));
+
+    const masterCols: ExcelColumn[] = [
+      { header: "No. Penawaran", key: "NomorPenawaran", width: 22 },
+      {
+        header: "Tgl Penawaran",
+        key: "TglPenawaran",
+        width: 14,
+        align: "center",
+      },
+      { header: "Divisi", key: "Divisi", width: 20 },
+      { header: "Customer", key: "NamaCustomer", width: 35 },
+      { header: "Keterangan", key: "Keterangan", width: 30 },
+      { header: "No. SPK", key: "NomorSPK", width: 20 },
+      { header: "Tgl SPK", key: "TglSPK", width: 14, align: "center" },
+      { header: "Nama SPK", key: "NamaSPK", width: 35 },
+      {
+        header: "Jumlah",
+        key: "Jumlah",
+        width: 12,
+        align: "right",
+        numFmt: "#,##0",
+      },
+    ];
+
+    await exportExcel(
+      `Laporan_Penawaran_vs_SPK_${filters.value.startDate}_sd_${filters.value.endDate}.xlsx`,
+      [
+        {
+          sheetName: "Detail Penawaran vs SPK",
+          columns: masterCols,
+          rows,
+          title: `Laporan Penawaran vs SPK — ${filters.value.startDate} s/d ${filters.value.endDate}`,
+          headerColor: "1565C0",
+        },
+      ],
     );
-    return;
+  } catch (e: any) {
+    alert(e.response?.data?.message || "Gagal export detail.");
+  } finally {
+    isExportingDetail.value = false;
   }
-  import("xlsx").then((XLSX) => {
-    const ws = XLSX.utils.json_to_sheet(allDetails);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "DetailSPK");
-    XLSX.writeFile(wb, "Laporan_Detail_SPK.xlsx");
-  });
 };
 
 // Format tanggal: YYYY-MM-DDT... → DD/MM/YYYY
@@ -170,6 +234,7 @@ const formatTgl = (v: string) => {
         v-if="canExport"
         size="small"
         color="teal-darken-1"
+        :loading="isExportingDetail"
         @click="onExportDetail"
       >
         Export Detail

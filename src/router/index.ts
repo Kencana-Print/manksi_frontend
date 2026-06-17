@@ -1622,6 +1622,29 @@ const router = createRouter({
         menuId: "968", // Parent Menu ID Laporan Piutang
       },
     },
+    {
+      path: "/laporan/piutang/daftar-penerimaan",
+      name: "LapDaftarPenerimaan",
+      component: () =>
+        import("@/views/laporan/piutang/DaftarPenerimaanView.vue"),
+      meta: {
+        title: "Laporan Daftar Penerimaan",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "968", // Mengikuti hak akses parent menu piutang
+      },
+    },
+    {
+      path: "/laporan/piutang/cek-gagal-link",
+      name: "LapCekGagalLink",
+      component: () => import("@/views/laporan/piutang/CekGagalLinkView.vue"),
+      meta: {
+        title: "Cek Gagal Link Pembayaran",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "968", // Mengikuti parent Laporan Piutang
+      },
+    },
 
     // ── Tools ───────────────────────────────────────────────────
     {

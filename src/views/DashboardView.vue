@@ -15,6 +15,7 @@ import {
   IconLayoutDashboard,
   IconCoin,
   IconChevronRight,
+  IconPackage,
 } from "@tabler/icons-vue";
 
 interface OverdueItem {
@@ -28,6 +29,11 @@ interface Top5Item {
   Customer: string;
   Saldo: number;
 }
+interface TrendItem {
+  Bulan: string;
+  TotalTagihan: number;
+  TotalPenerimaan: number;
+}
 interface PiutangData {
   summary: {
     TotalDebet: number;
@@ -39,6 +45,42 @@ interface PiutangData {
   };
   top5: Top5Item[];
   overdue: OverdueItem[];
+  trend: TrendItem[];
+}
+interface GudangBahanMetric {
+  TotalJenis: number;
+  JmlBawahBuffer: number;
+  TotalBarcode: number;
+  JmlMinus: number;
+}
+interface BufferItem {
+  Kode: string;
+  Nama: string;
+  Satuan: string;
+  Buffer: number;
+  StokAkhir: number;
+}
+interface StokItem {
+  Kode: string;
+  Nama: string;
+  Satuan: string;
+  Buffer: number;
+  StokAkhir: number;
+}
+interface BahanBarcodeItem {
+  Kode: string;
+  Nama: string;
+  Satuan: string;
+  Buffer: number;
+  Masuk: number;
+  Keluar: number;
+  Stok: number;
+}
+interface GudangBahanData {
+  metric: GudangBahanMetric;
+  detailBawahBuffer: BufferItem[];
+  topStok: StokItem[];
+  bahanBarcode: BahanBarcodeItem[];
 }
 
 const authStore = useAuthStore();
@@ -54,6 +96,10 @@ watch(activeTab, async (tab) => {
   }
   if (tab === "finance") {
     setupOverdueObserver();
+  }
+  if (tab === "gudang-bahan") {
+    setupBufferObserver();
+    setupBahanObserver();
   }
 });
 
@@ -78,6 +124,11 @@ const showPoBpb = computed(
 const showPiutang = computed(() =>
   ["FINANCE", "DIREKSI", "OWNER", "AUDIT", "EDP", "IT"].includes(bagian.value),
 );
+const showGudangBahan = computed(
+  () =>
+    ["PEMBELIAN", "GUDANG", "PPIC"].includes(bagian.value) ||
+    isSuperViewer.value,
+);
 
 // ── State Dashboard ──
 const mapSummary = ref({
@@ -100,6 +151,13 @@ const realisasiRows = ref<any[]>([]);
 const poBpbSummary = ref({ TotalPO: 0, Open: 0, OnProses: 0, Close: 0 });
 const isLoadingDashboard = ref(false);
 const kunjunganRows = ref<any[]>([]);
+const gudangBahanData = ref<GudangBahanData>({
+  metric: { TotalJenis: 0, JmlBawahBuffer: 0, TotalBarcode: 0, JmlMinus: 0 },
+  detailBawahBuffer: [],
+  topStok: [],
+  bahanBarcode: [],
+});
+const isLoadingGudangBahan = ref(false);
 const piutangData = ref<PiutangData>({
   summary: {
     TotalDebet: 0,
@@ -111,6 +169,28 @@ const piutangData = ref<PiutangData>({
   },
   top5: [],
   overdue: [],
+  trend: [],
+});
+
+// ── State Penerimaan ──
+const penerimaanSummary = ref({
+  TotalPenerimaanBulanIni: 0,
+  JmlTransaksiBulanIni: 0,
+  SaldoBelumAplikasi: 0,
+});
+
+// Coverage rate: penerimaan bulan ini vs invoice bulan ini
+const coverageRate = computed(() => {
+  const invoice = piutangData.value.summary.InvoiceBulanIni || 0;
+  const penerima = penerimaanSummary.value.TotalPenerimaanBulanIni || 0;
+  if (!invoice) return 0;
+  return Math.round((penerima / invoice) * 100);
+});
+
+const coverageRateColor = computed(() => {
+  if (coverageRate.value >= 100) return "#2e7d32";
+  if (coverageRate.value >= 70) return "#f57f17";
+  return "#c62828";
 });
 
 // ── Infinite scroll: Penawaran Belum SPK ──
@@ -231,6 +311,86 @@ const setupOverdueObserver = () => {
     overdueScrollObserver.observe(overdueSentinelEl.value);
 };
 
+// ── Infinite scroll: Bahan Penolong Bawah Buffer ──
+const BUFFER_PAGE_SIZE = 20;
+const bufferList = ref<BufferItem[]>([]);
+const bufferOffset = ref(0);
+const bufferHasMore = ref(true);
+const isLoadingMoreBuffer = ref(false);
+const bufferSentinelEl = ref<HTMLElement | null>(null);
+let bufferScrollObserver: IntersectionObserver | null = null;
+
+const loadMoreBuffer = async () => {
+  if (!bufferHasMore.value || isLoadingMoreBuffer.value) return;
+  isLoadingMoreBuffer.value = true;
+  try {
+    const res = await dashboardService.getGudangBahanBuffer(
+      BUFFER_PAGE_SIZE,
+      bufferOffset.value,
+    );
+    const rows: BufferItem[] = res.data.data;
+    bufferList.value.push(...rows);
+    bufferOffset.value += rows.length;
+    if (rows.length < BUFFER_PAGE_SIZE) bufferHasMore.value = false;
+  } catch {
+    /* silent */
+  } finally {
+    isLoadingMoreBuffer.value = false;
+  }
+};
+
+const setupBufferObserver = () => {
+  if (bufferScrollObserver) bufferScrollObserver.disconnect();
+  if (!bufferSentinelEl.value) return;
+  bufferScrollObserver = new IntersectionObserver(
+    (entries) => {
+      if (entries[0].isIntersecting) loadMoreBuffer();
+    },
+    { threshold: 0.1 },
+  );
+  bufferScrollObserver.observe(bufferSentinelEl.value);
+};
+
+// ── Infinite scroll: Stok Bahan Utama (Barcode) ──
+const BAHAN_PAGE_SIZE = 20;
+const bahanList = ref<BahanBarcodeItem[]>([]);
+const bahanOffset = ref(0);
+const bahanHasMore = ref(true);
+const isLoadingMoreBahan = ref(false);
+const bahanSentinelEl = ref<HTMLElement | null>(null);
+let bahanScrollObserver: IntersectionObserver | null = null;
+
+const loadMoreBahan = async () => {
+  if (!bahanHasMore.value || isLoadingMoreBahan.value) return;
+  isLoadingMoreBahan.value = true;
+  try {
+    const res = await dashboardService.getGudangBahanBarcode(
+      BAHAN_PAGE_SIZE,
+      bahanOffset.value,
+    );
+    const rows: BahanBarcodeItem[] = res.data.data;
+    bahanList.value.push(...rows);
+    bahanOffset.value += rows.length;
+    if (rows.length < BAHAN_PAGE_SIZE) bahanHasMore.value = false;
+  } catch {
+    /* silent */
+  } finally {
+    isLoadingMoreBahan.value = false;
+  }
+};
+
+const setupBahanObserver = () => {
+  if (bahanScrollObserver) bahanScrollObserver.disconnect();
+  if (!bahanSentinelEl.value) return;
+  bahanScrollObserver = new IntersectionObserver(
+    (entries) => {
+      if (entries[0].isIntersecting) loadMoreBahan();
+    },
+    { threshold: 0.1 },
+  );
+  bahanScrollObserver.observe(bahanSentinelEl.value);
+};
+
 // ── Load Dashboard ──
 const loadDashboard = async () => {
   isLoadingDashboard.value = true;
@@ -283,18 +443,56 @@ const loadDashboard = async () => {
       overdueHasMore.value = true;
 
       // Load summary + top5 saja (bukan overdue — itu lazy)
-      const [piutangRes] = await Promise.allSettled([
+      const [piutangRes, penerimaanRes] = await Promise.allSettled([
         dashboardService.getPiutangDashboard(),
+        dashboardService.getPenerimaanSummary(),
       ]);
       if (piutangRes.status === "fulfilled" && piutangRes.value?.data?.data) {
         // Ambil summary + top5, overdue load terpisah via infinite scroll
         piutangData.value.summary = piutangRes.value.data.data.summary;
         piutangData.value.top5 = piutangRes.value.data.data.top5;
+        piutangData.value.trend = piutangRes.value.data.data.trend;
         piutangData.value.overdue = []; // kosongkan, ganti pakai overdueList
+      }
+
+      if (
+        penerimaanRes.status === "fulfilled" &&
+        penerimaanRes.value?.data?.data
+      ) {
+        penerimaanSummary.value = penerimaanRes.value.data.data;
       }
 
       // Load batch pertama overdue
       await loadMoreOverdue();
+    }
+
+    if (showGudangBahan.value) {
+      // Reset semua infinite scroll
+      bufferList.value = [];
+      bufferOffset.value = 0;
+      bufferHasMore.value = true;
+      bahanList.value = [];
+      bahanOffset.value = 0;
+      bahanHasMore.value = true;
+
+      isLoadingGudangBahan.value = true;
+      try {
+        // Load metric + topStok saja (buffer & barcode via lazy scroll)
+        const [gbRes] = await Promise.allSettled([
+          dashboardService.getGudangBahanDashboard(),
+        ]);
+        if (gbRes.status === "fulfilled" && gbRes.value?.data?.data) {
+          gudangBahanData.value.metric = gbRes.value.data.data.metric;
+          gudangBahanData.value.topStok = gbRes.value.data.data.topStok;
+          // Kosongkan — diganti pakai lazy list
+          gudangBahanData.value.detailBawahBuffer = [];
+          gudangBahanData.value.bahanBarcode = [];
+        }
+        // Load batch pertama keduanya paralel
+        await Promise.allSettled([loadMoreBuffer(), loadMoreBahan()]);
+      } finally {
+        isLoadingGudangBahan.value = false;
+      }
     }
   } finally {
     isLoadingDashboard.value = false;
@@ -303,12 +501,33 @@ const loadDashboard = async () => {
 
 onMounted(async () => {
   // Auto-select tab berdasarkan bagian user
-  if (!showPenawaran.value && !showPiutang.value && showPoBpb.value) {
+  if (
+    !showPenawaran.value &&
+    !showPiutang.value &&
+    !showGudangBahan.value &&
+    showPoBpb.value
+  ) {
     activeTab.value = "gudang";
-  } else if (!showPenawaran.value && showPiutang.value && !showPoBpb.value) {
+  } else if (
+    !showPenawaran.value &&
+    showPiutang.value &&
+    !showPoBpb.value &&
+    !showGudangBahan.value
+  ) {
     activeTab.value = "finance";
-  } else if (showPenawaran.value && !showPiutang.value && !showPoBpb.value) {
+  } else if (
+    showPenawaran.value &&
+    !showPiutang.value &&
+    !showPoBpb.value &&
+    !showGudangBahan.value
+  ) {
     activeTab.value = "marketing";
+  } else if (
+    !showPenawaran.value &&
+    !showPiutang.value &&
+    showGudangBahan.value
+  ) {
+    activeTab.value = "gudang-bahan";
   }
 
   if (
@@ -329,12 +548,18 @@ onMounted(async () => {
   if (activeTab.value === "finance") {
     setupOverdueObserver();
   }
+  if (activeTab.value === "gudang-bahan") {
+    setupBufferObserver();
+    setupBahanObserver();
+  }
 });
 
 onUnmounted(() => {
   penScrollObserver?.disconnect();
   mapScrollObserver?.disconnect();
   overdueScrollObserver?.disconnect();
+  bufferScrollObserver?.disconnect();
+  bahanScrollObserver?.disconnect();
 });
 
 const closeSpkDialog = () => {
@@ -381,6 +606,16 @@ const shortNum = (n: number) => {
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + "jt";
   if (n >= 1_000) return (n / 1_000).toFixed(0) + "rb";
   return String(n);
+};
+const bufferPct = (stok: number, buffer: number): number => {
+  if (!buffer) return 100;
+  return Math.min(100, Math.round((stok / buffer) * 100));
+};
+
+const bufferColor = (pct: number): string => {
+  if (pct < 20) return "#c62828";
+  if (pct < 50) return "#f57f17";
+  return "#2e7d32";
 };
 // ── Collection rate bulan ini ──
 const collectionRate = computed(() => {
@@ -534,6 +769,14 @@ const sisaClass = (item: any) => {
         <IconTruckDelivery :size="14" class="mr-1" :stroke-width="1.7" />
         Gudang Garmen
       </v-tab>
+      <v-tab
+        v-if="showGudangBahan"
+        value="gudang-bahan"
+        class="text-caption font-weight-bold"
+      >
+        <IconPackage :size="14" class="mr-1" :stroke-width="1.7" />
+        Gudang Bahan
+      </v-tab>
     </v-tabs>
 
     <v-window v-model="activeTab">
@@ -579,23 +822,26 @@ const sisaClass = (item: any) => {
 
         <!-- Shortcut cards ke tab lain -->
         <v-row dense>
-          <v-col v-if="showPenawaran" cols="12" sm="4">
+          <v-col v-if="showPenawaran" cols="12" sm="3">
             <div class="shortcut-card" @click="activeTab = 'marketing'">
               <IconChartBar :size="20" color="#1565c0" :stroke-width="1.5" />
               <div style="flex: 1; min-width: 0">
                 <div class="shortcut-title">Marketing</div>
                 <div class="shortcut-sub">
-                  <span v-if="isLoadingDashboard">Memuat...</span>
+                  <span v-if="isLoadingDashboard || isLoadingGudangBahan"
+                    >Memuat...</span
+                  >
                   <span v-else>
-                    {{ penSummary.BelumSpk }} penawaran belum SPK ·
-                    {{ mapSummary.BelumMAP }} belum MAP
+                    {{ gudangBahanData.metric.JmlBawahBuffer }} bahan penolong
+                    bawah buffer · {{ gudangBahanData.metric.JmlMinus }} bahan
+                    utama minus
                   </span>
                 </div>
               </div>
               <IconChevronRight :size="16" color="#9e9e9e" />
             </div>
           </v-col>
-          <v-col v-if="showPiutang" cols="12" sm="4">
+          <v-col v-if="showPiutang" cols="12" sm="3">
             <div class="shortcut-card" @click="activeTab = 'finance'">
               <IconCoin :size="20" color="#6a1b9a" :stroke-width="1.5" />
               <div style="flex: 1; min-width: 0">
@@ -612,7 +858,25 @@ const sisaClass = (item: any) => {
               <IconChevronRight :size="16" color="#9e9e9e" />
             </div>
           </v-col>
-          <v-col v-if="showPoBpb" cols="12" sm="4">
+          <v-col v-if="showGudangBahan" cols="12" sm="3">
+            <div class="shortcut-card" @click="activeTab = 'gudang-bahan'">
+              <IconPackage :size="20" color="#5c6bc0" :stroke-width="1.5" />
+              <div style="flex: 1; min-width: 0">
+                <div class="shortcut-title">Gudang Bahan</div>
+                <div class="shortcut-sub">
+                  <span v-if="isLoadingDashboard || isLoadingGudangBahan"
+                    >Memuat...</span
+                  >
+                  <span v-else>
+                    {{ gudangBahanData.metric.JmlBawahBuffer }} item bawah
+                    buffer · {{ gudangBahanData.metric.JmlMinus }} barcode minus
+                  </span>
+                </div>
+              </div>
+              <IconChevronRight :size="16" color="#9e9e9e" />
+            </div>
+          </v-col>
+          <v-col v-if="showPoBpb" cols="12" sm="3">
             <div class="shortcut-card" @click="activeTab = 'gudang'">
               <IconTruckDelivery
                 :size="20"
@@ -1116,7 +1380,8 @@ const sisaClass = (item: any) => {
       ════════════════════════════════════════ -->
       <v-window-item value="finance">
         <!-- Metric cards piutang -->
-        <v-row dense class="mb-3">
+        <!-- Metric cards piutang — 5 card dalam 2 baris -->
+        <v-row dense class="mb-2">
           <v-col cols="6" sm="3">
             <div class="sum-card">
               <div class="sum-label">Total Outstanding</div>
@@ -1126,6 +1391,7 @@ const sisaClass = (item: any) => {
                   shortNum(piutangData.summary.TotalOutstanding)
                 }}</span>
               </div>
+              <div class="sum-sub">sisa belum terbayar</div>
             </div>
           </v-col>
           <v-col cols="6" sm="3">
@@ -1137,21 +1403,25 @@ const sisaClass = (item: any) => {
                   shortNum(piutangData.summary.InvoiceBulanIni)
                 }}</span>
               </div>
+              <div class="sum-sub">tagihan baru diterbitkan</div>
             </div>
           </v-col>
           <v-col cols="6" sm="3">
             <div class="sum-card">
-              <div class="sum-label">Terima Bulan Ini</div>
+              <div class="sum-label">Penerimaan Bulan Ini</div>
               <div class="sum-value text-success">
                 <span v-if="isLoadingDashboard">—</span>
                 <span v-else>{{
-                  shortNum(piutangData.summary.TerimaBulanIni)
+                  shortNum(penerimaanSummary.TotalPenerimaanBulanIni)
                 }}</span>
+              </div>
+              <div class="sum-sub">
+                <span v-if="!isLoadingDashboard">
+                  {{ penerimaanSummary.JmlTransaksiBulanIni }} transaksi
+                </span>
               </div>
             </div>
           </v-col>
-
-          <!-- Collection Rate — card baru -->
           <v-col cols="6" sm="3">
             <div class="sum-card">
               <div class="sum-label">Collection Rate</div>
@@ -1170,17 +1440,78 @@ const sisaClass = (item: any) => {
                       }"
                     />
                   </div>
-                  <span class="cr-sub">piutang lunas / total historis</span>
+                  <span class="cr-sub">kredit / debet historis</span>
                 </div>
               </template>
             </div>
           </v-col>
         </v-row>
 
-        <!-- Invoice Overdue + Top 5 -->
+        <!-- Baris 2: Coverage + Saldo belum aplikasi -->
+        <v-row dense class="mb-3">
+          <v-col cols="6" sm="3">
+            <div class="sum-card">
+              <div class="sum-label">Coverage Bulan Ini</div>
+              <div v-if="isLoadingDashboard" class="sum-value">—</div>
+              <template v-else>
+                <div class="sum-value" :style="{ color: coverageRateColor }">
+                  {{ coverageRate }}%
+                </div>
+                <div class="cr-bar-wrap">
+                  <div class="cr-bar">
+                    <div
+                      class="cr-fill"
+                      :style="{
+                        width: Math.min(100, coverageRate) + '%',
+                        background: coverageRateColor,
+                      }"
+                    />
+                  </div>
+                  <span class="cr-sub">penerimaan / invoice bln ini</span>
+                </div>
+              </template>
+            </div>
+          </v-col>
+          <v-col cols="6" sm="3">
+            <div class="sum-card">
+              <div class="sum-label">Belum Diaplikasi</div>
+              <div class="sum-value" style="color: #e65100">
+                <span v-if="isLoadingDashboard">—</span>
+                <span v-else>{{
+                  shortNum(penerimaanSummary.SaldoBelumAplikasi)
+                }}</span>
+              </div>
+              <div class="sum-sub">penerimaan belum ke invoice</div>
+            </div>
+          </v-col>
+          <v-col cols="6" sm="3">
+            <div class="sum-card">
+              <div class="sum-label">Invoice Overdue</div>
+              <div class="sum-value text-error">
+                <span v-if="isLoadingDashboard">—</span>
+                <span v-else>{{ piutangData.summary.overdueTotal }}</span>
+              </div>
+              <div class="sum-sub">melewati jatuh tempo</div>
+            </div>
+          </v-col>
+          <v-col cols="6" sm="3">
+            <div class="sum-card">
+              <div class="sum-label">Terima Bulan Ini (Kredit)</div>
+              <div class="sum-value text-success">
+                <span v-if="isLoadingDashboard">—</span>
+                <span v-else>{{
+                  shortNum(piutangData.summary.TerimaBulanIni)
+                }}</span>
+              </div>
+              <div class="sum-sub">diaplikasikan ke invoice</div>
+            </div>
+          </v-col>
+        </v-row>
+
+        <!-- ── Baris 3: Panel utama 3 kolom ── -->
         <v-row dense>
           <!-- Panel Invoice Overdue -->
-          <v-col cols="12" md="6">
+          <v-col cols="12" md="4">
             <div class="manksi-panel content-panel fill-height">
               <div
                 class="panel-header"
@@ -1257,9 +1588,9 @@ const sisaClass = (item: any) => {
                     </div>
                   </div>
 
-                  <!-- List overdue dengan infinite scroll -->
+                  <!-- List overdue infinite scroll -->
                   <template v-if="overdueList.length || isLoadingMoreOverdue">
-                    <div class="overdue-list">
+                    <div class="overdue-list" style="max-height: 380px">
                       <div
                         v-for="inv in overdueList"
                         :key="inv.Invoice"
@@ -1332,8 +1663,8 @@ const sisaClass = (item: any) => {
             </div>
           </v-col>
 
-          <!-- Panel Top 5 Piutang -->
-          <v-col cols="12" md="6">
+          <!-- Panel Top Piutang -->
+          <v-col cols="12" md="4">
             <div class="manksi-panel content-panel fill-height">
               <div
                 class="panel-header"
@@ -1344,7 +1675,7 @@ const sisaClass = (item: any) => {
                 "
               >
                 <IconChartBar :size="14" :stroke-width="1.7" class="mr-1" />
-                Top 5 Piutang Terbesar
+                Top Piutang Terbesar
               </div>
               <div class="panel-body pa-2">
                 <v-progress-linear
@@ -1395,6 +1726,453 @@ const sisaClass = (item: any) => {
                     </div>
                   </div>
                 </template>
+              </div>
+            </div>
+          </v-col>
+
+          <!-- Panel Trend 6 Bulan -->
+          <v-col cols="12" md="4">
+            <div class="manksi-panel content-panel fill-height">
+              <div
+                class="panel-header"
+                style="
+                  background: #e3f2fd;
+                  color: #1565c0;
+                  border-bottom: 1px solid #bbdefb;
+                "
+              >
+                <IconChartBar :size="14" :stroke-width="1.7" class="mr-1" />
+                Trend Tagihan vs Penerimaan
+                <span class="panel-header-sub ml-1">(6 bln)</span>
+              </div>
+              <div class="panel-body pa-3">
+                <v-progress-linear
+                  v-if="isLoadingDashboard"
+                  indeterminate
+                  color="blue"
+                  height="2"
+                />
+                <template v-else>
+                  <div
+                    class="knj-wrap"
+                    style="
+                      max-height: 450px;
+                      overflow-y: auto;
+                      overflow-x: hidden;
+                    "
+                  >
+                    <div
+                      v-for="(t, i) in piutangData.trend"
+                      :key="i"
+                      class="mb-3"
+                    >
+                      <div
+                        class="d-flex justify-space-between align-center mb-1"
+                      >
+                        <span
+                          class="font-weight-bold"
+                          style="font-size: 11px; color: #424242"
+                        >
+                          {{ t.Bulan }}
+                        </span>
+                      </div>
+                      <div class="d-flex align-center gap-2 mb-1">
+                        <div class="trend-lbl-mini text-primary">Tagihan</div>
+                        <div class="trend-bar-bg">
+                          <div
+                            class="trend-fill bg-primary"
+                            :style="{
+                              width: Math.max(t.TotalTagihan, t.TotalPenerimaan)
+                                ? (t.TotalTagihan /
+                                    Math.max(
+                                      t.TotalTagihan,
+                                      t.TotalPenerimaan,
+                                    )) *
+                                    100 +
+                                  '%'
+                                : '0%',
+                            }"
+                          />
+                        </div>
+                        <div class="trend-val-mini">
+                          {{ shortNum(t.TotalTagihan) }}
+                        </div>
+                      </div>
+                      <div class="d-flex align-center gap-2">
+                        <div class="trend-lbl-mini text-success">Terima</div>
+                        <div class="trend-bar-bg">
+                          <div
+                            class="trend-fill bg-success"
+                            :style="{
+                              width: Math.max(t.TotalTagihan, t.TotalPenerimaan)
+                                ? (t.TotalPenerimaan /
+                                    Math.max(
+                                      t.TotalTagihan,
+                                      t.TotalPenerimaan,
+                                    )) *
+                                    100 +
+                                  '%'
+                                : '0%',
+                            }"
+                          />
+                        </div>
+                        <div class="trend-val-mini">
+                          {{ shortNum(t.TotalPenerimaan) }}
+                        </div>
+                      </div>
+                      <v-divider
+                        v-if="i !== piutangData.trend.length - 1"
+                        class="mt-2"
+                        color="#f0f0f0"
+                      />
+                    </div>
+                    <div
+                      v-if="piutangData.trend.length === 0"
+                      class="text-center text-grey text-caption py-2"
+                    >
+                      Belum ada data trend.
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </v-col>
+        </v-row>
+      </v-window-item>
+
+      <!-- ════════════════════════════════════════
+     TAB GUDANG BAHAN
+════════════════════════════════════════ -->
+      <v-window-item value="gudang-bahan">
+        <!-- Metric cards -->
+        <v-row dense class="mb-3">
+          <v-col cols="6" sm="3">
+            <div class="sum-card">
+              <div class="sum-label">Total bahan penolong</div>
+              <div class="sum-value text-primary">
+                <span v-if="isLoadingGudangBahan">—</span>
+                <span v-else>{{
+                  fmtNum(gudangBahanData.metric.TotalJenis)
+                }}</span>
+              </div>
+              <div class="sum-sub">aksesori garmen aktif (tgarmen_brg)</div>
+            </div>
+          </v-col>
+          <v-col cols="6" sm="3">
+            <div class="sum-card">
+              <div class="sum-label">Bahan penolong bawah buffer</div>
+              <div class="sum-value text-error">
+                <span v-if="isLoadingGudangBahan">—</span>
+                <span v-else>{{ gudangBahanData.metric.JmlBawahBuffer }}</span>
+              </div>
+              <div class="sum-sub">aksesori perlu reorder segera</div>
+            </div>
+          </v-col>
+          <v-col cols="6" sm="3">
+            <div class="sum-card">
+              <div class="sum-label">Total barcode bahan utama</div>
+              <div class="sum-value text-success">
+                <span v-if="isLoadingGudangBahan">—</span>
+                <span v-else>{{
+                  fmtNum(gudangBahanData.metric.TotalBarcode)
+                }}</span>
+              </div>
+              <div class="sum-sub">roll/lot bahan kain di sistem</div>
+            </div>
+          </v-col>
+          <v-col cols="6" sm="3">
+            <div class="sum-card">
+              <div class="sum-label">Bahan utama stok minus</div>
+              <div class="sum-value" style="color: #e65100">
+                <span v-if="isLoadingGudangBahan">—</span>
+                <span v-else>{{ gudangBahanData.metric.JmlMinus }}</span>
+              </div>
+              <div class="sum-sub">stok negatif perlu investigasi</div>
+            </div>
+          </v-col>
+        </v-row>
+
+        <!-- Panel row 1: Buffer alert + Top stok -->
+        <v-row dense class="mb-2">
+          <!-- Stok di bawah buffer -->
+          <v-col cols="12" md="6">
+            <div class="manksi-panel content-panel fill-height">
+              <div
+                class="panel-header"
+                style="
+                  background: #fff8e1;
+                  color: #854f0b;
+                  border-bottom: 1px solid #ffe0b2;
+                "
+              >
+                <IconAlertTriangle
+                  :size="14"
+                  :stroke-width="1.7"
+                  class="mr-1"
+                />
+                Bahan penolong di bawah buffer
+                <span
+                  v-if="gudangBahanData.metric.JmlBawahBuffer"
+                  class="badge-count ml-auto"
+                  style="background: #854f0b"
+                >
+                  {{ gudangBahanData.metric.JmlBawahBuffer }} item
+                </span>
+              </div>
+              <div class="panel-body">
+                <v-progress-linear
+                  v-if="isLoadingGudangBahan"
+                  indeterminate
+                  color="warning"
+                  height="2"
+                />
+                <template v-else-if="bufferList.length || isLoadingMoreBuffer">
+                  <div class="gb-list">
+                    <div
+                      v-for="item in bufferList"
+                      :key="item.Kode"
+                      class="gb-row"
+                    >
+                      <div class="gb-nama" :title="item.Nama">
+                        {{ item.Nama }}
+                      </div>
+                      <div class="gb-bar-wrap">
+                        <div class="gb-bar-track">
+                          <div
+                            class="gb-bar-fill"
+                            :style="{
+                              width:
+                                bufferPct(item.StokAkhir, item.Buffer) + '%',
+                              background: bufferColor(
+                                bufferPct(item.StokAkhir, item.Buffer),
+                              ),
+                            }"
+                          />
+                        </div>
+                        <span
+                          class="gb-bar-val"
+                          :style="{
+                            color: bufferColor(
+                              bufferPct(item.StokAkhir, item.Buffer),
+                            ),
+                          }"
+                        >
+                          {{ fmtNum(item.StokAkhir) }} /
+                          {{ fmtNum(item.Buffer) }} {{ item.Satuan }}
+                        </span>
+                      </div>
+                      <span
+                        class="gb-pct"
+                        :style="{
+                          color: bufferColor(
+                            bufferPct(item.StokAkhir, item.Buffer),
+                          ),
+                        }"
+                      >
+                        {{ bufferPct(item.StokAkhir, item.Buffer) }}%
+                      </span>
+                    </div>
+
+                    <!-- Sentinel -->
+                    <div
+                      ref="bufferSentinelEl"
+                      style="padding: 6px; text-align: center"
+                    >
+                      <span v-if="isLoadingMoreBuffer" class="pen-loading"
+                        >Memuat...</span
+                      >
+                      <span
+                        v-else-if="!bufferHasMore && bufferList.length"
+                        class="pen-end"
+                      >
+                        {{ bufferList.length }} item ditampilkan
+                      </span>
+                    </div>
+                  </div>
+                </template>
+                <div v-else class="text-center text-grey py-3 text-caption">
+                  Semua stok di atas buffer 🎉
+                </div>
+              </div>
+            </div>
+          </v-col>
+
+          <!-- Top stok terbesar -->
+          <v-col cols="12" md="6">
+            <div class="manksi-panel content-panel fill-height">
+              <div class="panel-header panel-header--blue">
+                <IconChartBar :size="14" :stroke-width="1.7" class="mr-1" />
+                Top stok bahan penolong terbesar
+                <span class="panel-header-sub ml-1">(aksesori)</span>
+              </div>
+              <div class="panel-body">
+                <v-progress-linear
+                  v-if="isLoadingGudangBahan"
+                  indeterminate
+                  color="primary"
+                  height="2"
+                />
+                <template v-else-if="gudangBahanData.topStok.length">
+                  <div class="gb-list">
+                    <div
+                      v-for="item in gudangBahanData.topStok"
+                      :key="item.Kode"
+                      class="gb-row"
+                    >
+                      <div class="gb-nama" :title="item.Nama">
+                        {{ item.Nama }}
+                      </div>
+                      <div class="gb-bar-wrap">
+                        <div class="gb-bar-track">
+                          <div
+                            class="gb-bar-fill"
+                            :style="{
+                              width: gudangBahanData.topStok[0]?.StokAkhir
+                                ? (item.StokAkhir /
+                                    gudangBahanData.topStok[0].StokAkhir) *
+                                    100 +
+                                  '%'
+                                : '0%',
+                              background: '#185FA5',
+                            }"
+                          />
+                        </div>
+                        <span class="gb-bar-val">
+                          {{ fmtNum(item.StokAkhir) }} {{ item.Satuan }}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </template>
+                <div v-else class="text-center text-grey py-3 text-caption">
+                  Belum ada data stok.
+                </div>
+              </div>
+            </div>
+          </v-col>
+        </v-row>
+
+        <!-- Panel row 2: Stok bahan barcode -->
+        <v-row dense>
+          <v-col cols="12">
+            <div class="manksi-panel content-panel">
+              <div class="panel-header panel-header--teal">
+                <IconPackage :size="14" :stroke-width="1.7" class="mr-1" />
+                Stok bahan utama (barcode)
+                <span class="panel-header-sub ml-1"
+                  >masuk / keluar / saldo per jenis</span
+                >
+                <button
+                  class="po-bpb-link ml-auto"
+                  @click="
+                    router.push('/laporan/gudang-garmen/stok-bahan-barcode')
+                  "
+                >
+                  Lihat Detail →
+                </button>
+              </div>
+              <div class="panel-body">
+                <v-progress-linear
+                  v-if="isLoadingGudangBahan"
+                  indeterminate
+                  color="teal"
+                  height="2"
+                />
+                <template v-else-if="bahanList.length || isLoadingMoreBahan">
+                  <div
+                    style="
+                      overflow-x: auto;
+                      max-height: 400px;
+                      overflow-y: auto;
+                    "
+                  >
+                    <table class="gb-tbl">
+                      <thead>
+                        <tr>
+                          <th>Nama bahan</th>
+                          <th class="tr">Masuk</th>
+                          <th class="tr">Keluar</th>
+                          <th class="tr">Stok</th>
+                          <th class="tc">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr v-for="item in bahanList" :key="item.Kode">
+                          <td
+                            :title="item.Nama"
+                            style="
+                              max-width: 220px;
+                              overflow: hidden;
+                              text-overflow: ellipsis;
+                              white-space: nowrap;
+                            "
+                          >
+                            {{ item.Nama || item.Kode }}
+                          </td>
+                          <td class="tr" style="color: #2e7d32">
+                            +{{ fmtNum(item.Masuk) }}
+                          </td>
+                          <td class="tr" style="color: #c62828">
+                            -{{ fmtNum(item.Keluar) }}
+                          </td>
+                          <td
+                            class="tr"
+                            :style="{
+                              fontWeight: '600',
+                              color:
+                                item.Stok < 0
+                                  ? '#c62828'
+                                  : item.Stok === 0
+                                    ? '#f57f17'
+                                    : '#212121',
+                            }"
+                          >
+                            {{ fmtNum(item.Stok) }}
+                          </td>
+                          <td class="tc">
+                            <span
+                              v-if="item.Stok < 0"
+                              class="gb-badge gb-badge--danger"
+                              >Minus</span
+                            >
+                            <span
+                              v-else-if="item.Stok === 0"
+                              class="gb-badge gb-badge--warn"
+                              >Nol</span
+                            >
+                            <span
+                              v-else-if="item.Buffer && item.Stok < item.Buffer"
+                              class="gb-badge gb-badge--warn"
+                              >Bawah buffer</span
+                            >
+                            <span v-else class="gb-badge gb-badge--ok"
+                              >Aman</span
+                            >
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+
+                    <!-- Sentinel di luar tabel tapi dalam scroll wrapper -->
+                    <div
+                      ref="bahanSentinelEl"
+                      style="padding: 6px; text-align: center"
+                    >
+                      <span v-if="isLoadingMoreBahan" class="pen-loading"
+                        >Memuat...</span
+                      >
+                      <span
+                        v-else-if="!bahanHasMore && bahanList.length"
+                        class="pen-end"
+                      >
+                        {{ bahanList.length }} bahan ditampilkan
+                      </span>
+                    </div>
+                  </div>
+                </template>
+                <div v-else class="text-center text-grey py-3 text-caption">
+                  Belum ada data bahan barcode.
+                </div>
               </div>
             </div>
           </v-col>
@@ -2578,5 +3356,151 @@ const sisaClass = (item: any) => {
 .overdue-critical {
   border-left-color: #b71c1c;
   background: #ffcdd2;
+}
+
+/* ── Trend Cashflow ── */
+.trend-lbl-mini {
+  font-size: 9px;
+  font-weight: 700;
+  width: 45px;
+  text-transform: uppercase;
+}
+.trend-val-mini {
+  font-size: 10px;
+  font-weight: 700;
+  width: 45px;
+  text-align: right;
+  color: #616161;
+}
+.trend-bar-bg {
+  flex: 1;
+  height: 6px;
+  background: #f5f5f5;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.trend-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.4s ease;
+}
+.sum-sub {
+  font-size: 9px;
+  color: #9e9e9e;
+  margin-top: 2px;
+}
+
+/* ── Gudang Bahan ── */
+.gb-list {
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+.gb-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px;
+  border-bottom: 1px solid #f5f5f5;
+}
+.gb-row:last-child {
+  border-bottom: none;
+}
+.gb-nama {
+  width: 130px;
+  flex-shrink: 0;
+  font-size: 11px;
+  color: #424242;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gb-bar-wrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.gb-bar-track {
+  flex: 1;
+  height: 10px;
+  background: #f0f0f0;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.gb-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s;
+}
+.gb-bar-val {
+  font-size: 10px;
+  color: #616161;
+  white-space: nowrap;
+  min-width: 80px;
+  text-align: right;
+}
+.gb-pct {
+  font-size: 10px;
+  font-weight: 700;
+  min-width: 32px;
+  text-align: right;
+  flex-shrink: 0;
+}
+.gb-tbl {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+  min-width: 500px;
+}
+.gb-tbl thead th {
+  background: #e0f2f1;
+  color: #00695c;
+  font-weight: 600;
+  padding: 6px 10px;
+  text-align: left;
+  border-bottom: 1px solid #b2dfdb;
+  white-space: nowrap;
+}
+.gb-tbl tbody td {
+  padding: 6px 10px;
+  border-bottom: 1px solid #f0f0f0;
+}
+.gb-tbl tbody tr:last-child td {
+  border-bottom: none;
+}
+.gb-tbl tbody tr:hover td {
+  background: #f5f5f5;
+}
+.gb-tbl .tr {
+  text-align: right;
+}
+.gb-tbl .tc {
+  text-align: center;
+}
+.gb-badge {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 600;
+}
+.gb-badge--ok {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+.gb-badge--warn {
+  background: #fff8e1;
+  color: #f57f17;
+}
+.gb-badge--danger {
+  background: #ffebee;
+  color: #c62828;
+}
+.sum-sub {
+  font-size: 9px;
+  color: #9e9e9e;
+  margin-top: 2px;
 }
 </style>

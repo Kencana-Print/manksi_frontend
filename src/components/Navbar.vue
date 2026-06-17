@@ -62,6 +62,8 @@ import {
   IconScissors,
   IconShieldCheck,
   IconFileSpreadsheet,
+  IconCurrencyDollar,
+  IconLinkOff,
 } from "@tabler/icons-vue";
 
 interface NavItem {
@@ -678,6 +680,17 @@ const menuItems: NavItem[] = [
             title: "Kartu Piutang",
             to: "/laporan/piutang/kartu-piutang",
             icon: IconFileDescription,
+          },
+          { divider: true },
+          {
+            title: "Daftar Penerimaan",
+            to: "/laporan/piutang/daftar-penerimaan",
+            icon: IconCurrencyDollar,
+          },
+          {
+            title: "Cek Gagal Link",
+            to: "/laporan/piutang/cek-gagal-link",
+            icon: IconLinkOff,
           },
         ],
       },

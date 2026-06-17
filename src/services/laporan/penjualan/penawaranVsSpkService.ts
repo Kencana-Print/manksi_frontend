@@ -10,4 +10,7 @@ export const penawaranVsSpkService = {
     api.get(
       `/laporan/penjualan/penawaran-vs-spk/detail/${encodeURIComponent(nomor)}`,
     ),
+
+  getAllDetail: (params: any) =>
+    api.get("/laporan/penjualan/penawaran-vs-spk/all-detail", { params }),
 };
