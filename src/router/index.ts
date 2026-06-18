@@ -1489,6 +1489,52 @@ const router = createRouter({
         menuId: "254",
       },
     },
+    {
+      path: "/piutang/pelunasan",
+      name: "PelunasanPiutangBrowse",
+      component: () => import("@/views/piutang/PelunasanView.vue"),
+      meta: {
+        title: "Pelunasan Piutang",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "255",
+      },
+    },
+    {
+      path: "/piutang/pelunasan/create",
+      name: "PelunasanPiutangCreate",
+      component: () => import("@/views/piutang/PelunasanFormView.vue"),
+      meta: {
+        title: "Input Pelunasan Piutang",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "255", // Tetap menggunakan menuId parent agar hak akses sinkron
+        browseRoute: "PelunasanPiutangBrowse", // Untuk tombol back useForm
+      },
+    },
+    {
+      path: "/piutang/pelunasan/edit/:nomor",
+      name: "PelunasanPiutangEdit",
+      component: () => import("@/views/piutang/PelunasanFormView.vue"),
+      meta: {
+        title: "Ubah Pelunasan Piutang",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "255",
+        browseRoute: "PelunasanPiutangBrowse",
+      },
+    },
+    {
+      path: "/piutang/pelunasan/print/:nomor",
+      name: "PelunasanPiutangPrint",
+      component: () => import("@/views/piutang/PelunasanPrintView.vue"),
+      meta: {
+        title: "Cetak Pelunasan Piutang",
+        layout: "BlankLayout",
+        requiresAuth: true,
+        menuId: "255",
+      },
+    },
 
     // ── Laporan ───────────────────────────────────────────────────
     {
@@ -1513,6 +1559,18 @@ const router = createRouter({
         layout: "DefaultLayout",
         requiresAuth: true,
         menuId: "503",
+      },
+    },
+    {
+      path: "/laporan/gudang-garmen/spk-belum-mkb",
+      name: "LapSpkBelumMkb",
+      component: () =>
+        import("@/views/laporan/gudang-garmen/SpkBelumMkbView.vue"),
+      meta: {
+        title: "Laporan SPK Belum Ada MKB",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "510",
       },
     },
     {
@@ -1553,6 +1611,65 @@ const router = createRouter({
       },
     },
     {
+      path: "/laporan/marketing/map-belum-realisasi",
+      name: "LapMapBelumRealisasi",
+      component: () =>
+        import("@/views/laporan/marketing/MapBelumRealisasiView.vue"),
+      meta: {
+        title: "MAP Belum Terealisasi",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "966",
+      },
+    },
+    {
+      path: "/laporan/marketing/spk-belum-closing",
+      name: "LapSpkBelumClosing",
+      component: () =>
+        import("@/views/laporan/marketing/SpkBelumClosingView.vue"),
+      meta: {
+        title: "SPK Belum Closing",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "966",
+      },
+    },
+    {
+      path: "/laporan/marketing/realisasi-penjualan",
+      name: "LapRealisasiPenjualan",
+      component: () =>
+        import("@/views/laporan/marketing/RealisasiPenjualanView.vue"),
+      meta: {
+        title: "Realisasi Penjualan",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "966",
+      },
+    },
+    {
+      path: "/laporan/marketing/rekap-map",
+      name: "LapRekapMap",
+      component: () => import("@/views/laporan/marketing/RekapMapView.vue"),
+      meta: {
+        title: "Rekap MAP",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "311",
+      },
+    },
+    {
+      path: "/laporan/marketing/rekap-penawaran",
+      name: "LapRekapPenawaran",
+      component: () =>
+        import("@/views/laporan/marketing/RekapPenawaranView.vue"),
+      meta: {
+        title: "Rekap Penawaran",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "310",
+      },
+    },
+    {
       path: "/laporan/marketing/kunjungan-sales",
       name: "LapKunjunganSales",
       component: () =>
@@ -1586,6 +1703,28 @@ const router = createRouter({
         title: "Laporan Realisasi Penawaran",
         layout: "DefaultLayout",
         requiresAuth: true,
+      },
+    },
+    {
+      path: "/laporan/penjualan/map-vs-sj",
+      name: "LapMapVsSj",
+      component: () => import("@/views/laporan/penjualan/MapVsSjView.vue"),
+      meta: {
+        title: "Laporan MAP vs Surat Jalan",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "307",
+      },
+    },
+    {
+      path: "/laporan/penjualan/map-vs-spk",
+      name: "LapMapVsSpk",
+      component: () => import("@/views/laporan/penjualan/MapVsSpkView.vue"),
+      meta: {
+        title: "Laporan MAP vs SPK",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "308",
       },
     },
 

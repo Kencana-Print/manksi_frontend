@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, onUnmounted } from "vue";
 import { useRouter } from "vue-router";
 import { useTheme } from "vuetify";
 import { useAuthStore } from "@/stores/authStore";
@@ -11,6 +11,8 @@ import {
   IconSun,
   IconBell,
   IconPackage,
+  IconClipboardList,
+  IconClock,
 } from "@tabler/icons-vue";
 
 import { version as appVersion } from "../../package.json";
@@ -24,10 +26,30 @@ const toggleTheme = () => {
   localStorage.setItem("manksi-theme", theme.global.name.value);
 };
 
+// ── Jam real-time ──
+const currentTime = ref("");
+let clockInterval: ReturnType<typeof setInterval> | null = null;
+
+const updateClock = () => {
+  currentTime.value = new Date().toLocaleTimeString("id-ID", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  });
+};
+
 onMounted(() => {
+  updateClock();
+  clockInterval = setInterval(updateClock, 1000);
+
   const savedTheme = localStorage.getItem("manksi-theme");
   if (savedTheme) theme.global.name.value = savedTheme;
   if (canSeeNotif.value) loadNotifications();
+});
+
+onUnmounted(() => {
+  if (clockInterval) clearInterval(clockInterval);
 });
 
 // ── Role ──
@@ -78,6 +100,20 @@ const loadNotifications = async () => {
           label: "PO ada sisa MKB",
           count: sisa,
           route: "/laporan/gudang-garmen/po-bahan-vs-mkb",
+        });
+      }
+
+      // ── SPK belum MKB ──
+      const mkbRes = await dashboardService.getSpkBelumMkbCount();
+      const mkbCount = Number(mkbRes.data.data ?? 0);
+      if (mkbCount > 0) {
+        items.push({
+          id: "spk-belum-mkb",
+          icon: IconClipboardList,
+          color: "#6a1b9a",
+          label: "SPK belum ada MKB",
+          count: mkbCount,
+          route: "/laporan/gudang-garmen/spk-belum-mkb",
         });
       }
     }
@@ -193,7 +229,7 @@ const onClickOutside = () => {
 
       <v-spacer />
 
-      <!-- Kanan: toggle theme + versi -->
+      <!-- Kanan: toggle theme + versi + jam -->
       <v-btn
         icon
         variant="text"
@@ -211,6 +247,22 @@ const onClickOutside = () => {
 
       <div class="text-medium-emphasis">
         v{{ appVersion }} &copy; 2026 IT Kencana
+      </div>
+
+      <span class="mx-2 text-disabled">|</span>
+
+      <div
+        class="d-flex align-center"
+        style="
+          gap: 4px;
+          font-size: 11px;
+          font-weight: 600;
+          color: #1565c0;
+          font-variant-numeric: tabular-nums;
+        "
+      >
+        <IconClock :size="13" :stroke-width="1.7" style="opacity: 0.8" />
+        {{ currentTime }}
       </div>
     </v-footer>
   </v-app>

@@ -64,6 +64,13 @@ import {
   IconFileSpreadsheet,
   IconCurrencyDollar,
   IconLinkOff,
+  IconFileAlert,
+  IconClipboardList,
+  IconClipboardX,
+  IconTrendingUp,
+  IconLayoutGrid,
+  IconCoin,
+  IconReportSearch,
 } from "@tabler/icons-vue";
 
 interface NavItem {
@@ -585,6 +592,12 @@ const menuItems: NavItem[] = [
           },
         ],
       },
+      {
+        title: "Pelunasan",
+        to: "/piutang/pelunasan",
+        icon: IconCoin,
+        menuId: 255,
+      },
     ],
   },
   {
@@ -610,6 +623,13 @@ const menuItems: NavItem[] = [
             icon: IconFileSpreadsheet,
             menuId: 503,
           },
+          { divider: true },
+          {
+            title: "SPK Belum Ada MKB",
+            to: "/laporan/gudang-garmen/spk-belum-mkb",
+            icon: IconFileAlert,
+            menuId: 510,
+          },
           {
             title: "PO Bahan vs MKB",
             to: "/laporan/gudang-garmen/po-bahan-vs-mkb",
@@ -627,7 +647,7 @@ const menuItems: NavItem[] = [
       {
         title: "Laporan Penjualan",
         icon: IconChartBar,
-        menuId: 965, // <-- Sesuai instruksi Anda (ID 965)
+        menuId: 965,
         subItems: [
           {
             title: "Penawaran vs SPK",
@@ -640,6 +660,18 @@ const menuItems: NavItem[] = [
             to: "/laporan/penjualan/realisasi-penawaran",
             icon: IconReportAnalytics,
           },
+          {
+            title: "MAP vs Surat Jalan",
+            to: "/laporan/penjualan/map-vs-sj",
+            icon: IconTruckDelivery,
+            menuId: 307,
+          },
+          {
+            title: "MAP vs SPK",
+            to: "/laporan/penjualan/map-vs-spk",
+            icon: IconClipboardList, // Bisa disesuaikan ikonnya
+            menuId: 308,
+          },
         ],
       },
       {
@@ -651,6 +683,34 @@ const menuItems: NavItem[] = [
             title: "Penawaran vs MAP",
             to: "/laporan/marketing/penawaran-vs-map",
             icon: IconReportAnalytics,
+          },
+          {
+            title: "MAP Belum Terealisasi",
+            to: "/laporan/marketing/map-belum-realisasi",
+            icon: IconFileAlert,
+          },
+          {
+            title: "SPK Belum Closing",
+            to: "/laporan/marketing/spk-belum-closing",
+            icon: IconClipboardX,
+          },
+          {
+            title: "Realisasi Penjualan",
+            to: "/laporan/marketing/realisasi-penjualan",
+            icon: IconTrendingUp,
+            menuId: 966,
+          },
+          {
+            title: "Rekap MAP",
+            to: "/laporan/marketing/rekap-map",
+            icon: IconLayoutGrid,
+            menuId: 311,
+          },
+          {
+            title: "Rekap Penawaran",
+            to: "/laporan/marketing/rekap-penawaran",
+            icon: IconReportSearch,
+            menuId: 310,
           },
           {
             title: "Kunjungan Sales",

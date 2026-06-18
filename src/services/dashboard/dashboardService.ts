@@ -46,4 +46,33 @@ export const dashboardService = {
     api.get("/dashboard/realisasi-penawaran-detail", {
       params: { limit, offset },
     }),
+
+  getMapVsSpkDashboard: (startDate?: string, endDate?: string) =>
+    api.get("/dashboard/map-vs-spk-dashboard", {
+      params: { startDate, endDate },
+    }),
+  getMapBelumSpk: (
+    limit: number,
+    offset: number,
+    startDate?: string,
+    endDate?: string,
+  ) =>
+    api.get("/dashboard/map-belum-spk", {
+      params: { limit, offset, startDate, endDate },
+    }),
+  getMapVsSjDashboard: (startDate?: string, endDate?: string) =>
+    api.get("/dashboard/map-vs-sj-dashboard", {
+      params: { startDate, endDate },
+    }),
+  getMapBelumKirim: (
+    limit: number,
+    offset: number,
+    startDate?: string,
+    endDate?: string,
+  ) =>
+    api.get("/dashboard/map-belum-kirim", {
+      params: { limit, offset, startDate, endDate },
+    }),
+
+  getSpkBelumMkbCount: () => api.get("/dashboard/spk-belum-mkb-count"),
 };

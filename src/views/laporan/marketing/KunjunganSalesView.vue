@@ -4,7 +4,13 @@ import { useRoute } from "vue-router";
 import BaseBrowse from "@/components/BaseBrowse.vue";
 import { useBrowse } from "@/composables/useBrowse";
 import { kunjunganSalesService } from "@/services/laporan/marketing/kunjunganSalesService";
-import { IconUsers, IconCheck, IconX } from "@tabler/icons-vue";
+import {
+  IconUsers,
+  IconCheck,
+  IconX,
+  IconMapPin,
+  IconMapPinOff,
+} from "@tabler/icons-vue";
 
 const route = useRoute();
 
@@ -46,6 +52,12 @@ const filterState = ref({
 const summarySales = ref<any[]>([]);
 const summaryDialog = ref(false);
 
+// Preview map dialog
+const mapDialog = ref(false);
+const mapItem = ref<any>(null);
+const mapAddress = ref("");
+const isGeocoding = ref(false);
+
 watch(
   filterState,
   (newVal) => {
@@ -79,6 +91,13 @@ const headers = [
     sortable: false,
   },
   { title: "STATUS", key: "status_kunjungan", width: "100px", align: "center" },
+  {
+    title: "LOKASI",
+    key: "lokasi",
+    width: "80px",
+    align: "center",
+    sortable: false,
+  },
   { title: "KODE CUS", key: "Cus_Kode", width: "100px" },
   { title: "NAMA CUSTOMER", key: "Cus_Nama", minWidth: "200px" },
   { title: "ALAMAT CUSTOMER", key: "Cus_Alamat", minWidth: "250px" },
@@ -94,6 +113,44 @@ const fetchApi = async () => {
   });
   summarySales.value = response.data?.summary || [];
   return response.data?.data || [];
+};
+
+const hasLocation = (item: any) =>
+  item.Latitude &&
+  item.Longitude &&
+  item.Latitude !== "0" &&
+  item.Longitude !== "0" &&
+  item.Latitude !== "" &&
+  item.Longitude !== "";
+
+const openGoogleMaps = (item: any) => {
+  if (!hasLocation(item)) return;
+  window.open(
+    `https://www.google.com/maps?q=${item.Latitude},${item.Longitude}`,
+    "_blank",
+  );
+};
+
+const openMapPreview = async (item: any) => {
+  if (!hasLocation(item)) return;
+  mapItem.value = item;
+  mapAddress.value = "";
+  mapDialog.value = true;
+
+  // Reverse geocode via Nominatim (gratis, no API key)
+  isGeocoding.value = true;
+  try {
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?lat=${item.Latitude}&lon=${item.Longitude}&format=json`,
+      { headers: { "Accept-Language": "id" } },
+    );
+    const data = await res.json();
+    mapAddress.value = data.display_name || "";
+  } catch {
+    mapAddress.value = "";
+  } finally {
+    isGeocoding.value = false;
+  }
 };
 
 const { items, isLoading, fetchData, exportToExcel } = useBrowse({
@@ -243,6 +300,39 @@ const rowPropsFn = (data: any) => {
         {{ item.status_kunjungan }}
       </v-chip>
     </template>
+
+    <template #item.lokasi="{ item }">
+      <div class="d-flex align-center justify-center" style="gap: 4px">
+        <v-btn
+          v-if="hasLocation(item)"
+          icon
+          variant="text"
+          size="x-small"
+          color="green"
+          title="Lihat di Google Maps"
+          @click.stop="openGoogleMaps(item)"
+        >
+          <IconMapPin :size="14" :stroke-width="1.7" />
+        </v-btn>
+        <v-btn
+          v-if="hasLocation(item)"
+          icon
+          variant="text"
+          size="x-small"
+          color="primary"
+          title="Preview lokasi"
+          @click.stop="openMapPreview(item)"
+        >
+          <IconMapPin :size="14" :stroke-width="1.7" style="opacity: 0.6" />
+        </v-btn>
+        <IconMapPinOff
+          v-else
+          :size="14"
+          :stroke-width="1.5"
+          style="color: #bdbdbd"
+        />
+      </div>
+    </template>
   </BaseBrowse>
 
   <!-- ── Dialog Summary per Sales ── -->
@@ -357,6 +447,104 @@ const rowPropsFn = (data: any) => {
           range filter tanggal)
         </div>
       </v-card-text>
+    </v-card>
+  </v-dialog>
+
+  <!-- ── Dialog Preview Lokasi ── -->
+  <v-dialog v-model="mapDialog" max-width="680px">
+    <v-card class="rounded-lg" style="overflow: hidden">
+      <div
+        style="
+          background: #1565c0;
+          padding: 10px 16px;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        "
+      >
+        <IconMapPin :size="18" color="white" :stroke-width="1.7" />
+        <span style="font-size: 13px; font-weight: 700; color: white; flex: 1">
+          Lokasi Kunjungan — {{ mapItem?.Cus_Nama || "" }}
+        </span>
+        <v-btn
+          icon
+          variant="text"
+          color="white"
+          density="compact"
+          @click="mapDialog = false"
+        >
+          <IconX :size="16" />
+        </v-btn>
+      </div>
+
+      <!-- Info bar -->
+      <div
+        style="
+          padding: 8px 16px;
+          background: #e3f2fd;
+          border-bottom: 1px solid #bbdefb;
+          font-size: 11px;
+        "
+      >
+        <div style="display: flex; gap: 16px; align-items: center">
+          <span style="color: #616161">
+            Koordinat:
+            <strong style="font-family: monospace">
+              {{ mapItem?.Latitude }}, {{ mapItem?.Longitude }}
+            </strong>
+          </span>
+          <span v-if="isGeocoding" style="color: #9e9e9e; font-style: italic"
+            >Mencari alamat...</span
+          >
+          <span
+            v-else-if="mapAddress"
+            style="
+              color: #1565c0;
+              flex: 1;
+              overflow: hidden;
+              text-overflow: ellipsis;
+              white-space: nowrap;
+            "
+          >
+            📍 {{ mapAddress }}
+          </span>
+        </div>
+      </div>
+
+      <!-- Embed Google Maps via iframe (tidak butuh API key) -->
+      <div style="position: relative; height: 380px">
+        <iframe
+          v-if="mapItem"
+          :src="`https://maps.google.com/maps?q=${mapItem.Latitude},${mapItem.Longitude}&z=16&output=embed`"
+          style="width: 100%; height: 100%; border: none"
+          loading="lazy"
+          allowfullscreen
+        />
+      </div>
+
+      <!-- Footer actions -->
+      <div
+        style="
+          padding: 10px 16px;
+          border-top: 1px solid #e0e0e0;
+          display: flex;
+          justify-content: flex-end;
+          gap: 8px;
+        "
+      >
+        <v-btn
+          size="small"
+          color="green"
+          variant="flat"
+          @click="openGoogleMaps(mapItem)"
+        >
+          <template #prepend><IconMapPin :size="14" /></template>
+          Buka Google Maps
+        </v-btn>
+        <v-btn size="small" variant="text" @click="mapDialog = false"
+          >Tutup</v-btn
+        >
+      </div>
     </v-card>
   </v-dialog>
 </template>

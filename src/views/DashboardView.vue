@@ -127,6 +127,8 @@ watch(activeTab, async (tab) => {
     setupPenObserver();
     setupMapObserver();
     setupRpDetailObserver();
+    setupMapSpkObserver();
+    setupMapKirimObserver();
   }
   if (tab === "finance") {
     setupOverdueObserver();
@@ -489,6 +491,174 @@ const setupRpDetailObserver = () => {
   rpDetailScrollObserver.observe(rpDetailSentinelEl.value);
 };
 
+// ── Filter global MAP ──
+const mapFilter = ref({
+  startDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1)
+    .toISOString()
+    .substring(0, 10),
+  endDate: new Date().toISOString().substring(0, 10),
+});
+
+// ── State MAP vs SPK ──
+interface MapVsSpkMetric {
+  TotalMAP: number;
+  SudahSPK: number;
+  BelumSPK: number;
+  TotalNilai: number;
+  NilaiSudahSPK: number;
+  NilaiBelumSPK: number;
+}
+interface MapDivisiItem {
+  Divisi: string;
+  TotalMAP: number;
+  SudahSPK: number;
+  NilaiSPK: number;
+  NilaiPotensi: number;
+}
+interface MapBelumSpkItem {
+  Nomor: string;
+  Tanggal: string;
+  Divisi: string;
+  NamaCustomer: string;
+  NamaMAP: string;
+  Jumlah: number;
+  NilaiPotensi: number;
+  UmurHari: number;
+}
+const mapSpkMetric = ref<MapVsSpkMetric>({
+  TotalMAP: 0,
+  SudahSPK: 0,
+  BelumSPK: 0,
+  TotalNilai: 0,
+  NilaiSudahSPK: 0,
+  NilaiBelumSPK: 0,
+});
+const mapDivisi = ref<MapDivisiItem[]>([]);
+
+// ── State MAP vs SJ ──
+interface MapVsSjMetric {
+  TotalMAP: number;
+  BelumKirim: number;
+  SebagianKirim: number;
+  LunasKirim: number;
+  TotalQtyOrder: number;
+  TotalQtyKirim: number;
+}
+interface MapBelumKirimItem {
+  Nomor: string;
+  Tanggal: string;
+  Divisi: string;
+  NamaCustomer: string;
+  NamaMAP: string;
+  QtyOrder: number;
+  QtyKirim: number;
+  Dateline: string;
+}
+const mapSjMetric = ref<MapVsSjMetric>({
+  TotalMAP: 0,
+  BelumKirim: 0,
+  SebagianKirim: 0,
+  LunasKirim: 0,
+  TotalQtyOrder: 0,
+  TotalQtyKirim: 0,
+});
+
+// ── Infinite scroll: MAP belum SPK ──
+const MAP_SPK_PAGE_SIZE = 20;
+const mapSpkList = ref<MapBelumSpkItem[]>([]);
+const mapSpkOffset = ref(0);
+const mapSpkHasMore = ref(true);
+const isLoadingMoreMapSpk = ref(false);
+const mapSpkSentinelEl = ref<HTMLElement | null>(null);
+let mapSpkScrollObserver: IntersectionObserver | null = null;
+
+const loadMoreMapSpk = async () => {
+  if (!mapSpkHasMore.value || isLoadingMoreMapSpk.value) return;
+  isLoadingMoreMapSpk.value = true;
+  try {
+    const res = await dashboardService.getMapBelumSpk(
+      MAP_SPK_PAGE_SIZE,
+      mapSpkOffset.value,
+      mapFilter.value.startDate,
+      mapFilter.value.endDate,
+    );
+    const rows: MapBelumSpkItem[] = res.data.data;
+    mapSpkList.value.push(...rows);
+    mapSpkOffset.value += rows.length;
+    if (rows.length < MAP_SPK_PAGE_SIZE) mapSpkHasMore.value = false;
+  } catch {
+  } finally {
+    isLoadingMoreMapSpk.value = false;
+  }
+};
+
+const setupMapSpkObserver = () => {
+  if (mapSpkScrollObserver) mapSpkScrollObserver.disconnect();
+  if (!mapSpkSentinelEl.value) return;
+  mapSpkScrollObserver = new IntersectionObserver(
+    (entries) => {
+      if (entries[0].isIntersecting) loadMoreMapSpk();
+    },
+    { threshold: 0.1 },
+  );
+  mapSpkScrollObserver.observe(mapSpkSentinelEl.value);
+};
+
+// ── Infinite scroll: MAP belum kirim ──
+const MAP_KIRIM_PAGE_SIZE = 20;
+const mapKirimList = ref<MapBelumKirimItem[]>([]);
+const mapKirimOffset = ref(0);
+const mapKirimHasMore = ref(true);
+const isLoadingMoreMapKirim = ref(false);
+const mapKirimSentinelEl = ref<HTMLElement | null>(null);
+let mapKirimScrollObserver: IntersectionObserver | null = null;
+
+const loadMoreMapKirim = async () => {
+  if (!mapKirimHasMore.value || isLoadingMoreMapKirim.value) return;
+  isLoadingMoreMapKirim.value = true;
+  try {
+    const res = await dashboardService.getMapBelumKirim(
+      MAP_KIRIM_PAGE_SIZE,
+      mapKirimOffset.value,
+      mapFilter.value.startDate,
+      mapFilter.value.endDate,
+    );
+    const rows: MapBelumKirimItem[] = res.data.data;
+    mapKirimList.value.push(...rows);
+    mapKirimOffset.value += rows.length;
+    if (rows.length < MAP_KIRIM_PAGE_SIZE) mapKirimHasMore.value = false;
+  } catch {
+  } finally {
+    isLoadingMoreMapKirim.value = false;
+  }
+};
+
+const setupMapKirimObserver = () => {
+  if (mapKirimScrollObserver) mapKirimScrollObserver.disconnect();
+  if (!mapKirimSentinelEl.value) return;
+  mapKirimScrollObserver = new IntersectionObserver(
+    (entries) => {
+      if (entries[0].isIntersecting) loadMoreMapKirim();
+    },
+    { threshold: 0.1 },
+  );
+  mapKirimScrollObserver.observe(mapKirimSentinelEl.value);
+};
+
+// ── Computed helpers MAP ──
+const mapSpkRate = computed(() => {
+  if (!mapSpkMetric.value.TotalMAP) return 0;
+  return Math.round(
+    (mapSpkMetric.value.SudahSPK / mapSpkMetric.value.TotalMAP) * 100,
+  );
+});
+const mapKirimRate = computed(() => {
+  if (!mapSjMetric.value.TotalQtyOrder) return 0;
+  return Math.round(
+    (mapSjMetric.value.TotalQtyKirim / mapSjMetric.value.TotalQtyOrder) * 100,
+  );
+});
+
 // ── Load Dashboard ──
 const loadDashboard = async () => {
   isLoadingDashboard.value = true;
@@ -518,6 +688,12 @@ const loadDashboard = async () => {
       rpDetailList.value = [];
       rpDetailOffset.value = 0;
       rpDetailHasMore.value = true;
+      mapSpkList.value = [];
+      mapSpkOffset.value = 0;
+      mapSpkHasMore.value = true;
+      mapKirimList.value = [];
+      mapKirimOffset.value = 0;
+      mapKirimHasMore.value = true;
 
       const [sumRes, realisasiRes, mapSumRes, kunjunganRes, realisasiPenRes] =
         await Promise.allSettled([
@@ -547,6 +723,25 @@ const loadDashboard = async () => {
         loadMoreMap(),
         loadMoreRpDetail(),
       ]);
+
+      const [mapVsSpkRes, mapVsSjRes] = await Promise.allSettled([
+        dashboardService.getMapVsSpkDashboard(
+          mapFilter.value.startDate,
+          mapFilter.value.endDate,
+        ),
+        dashboardService.getMapVsSjDashboard(
+          mapFilter.value.startDate,
+          mapFilter.value.endDate,
+        ),
+      ]);
+      if (mapVsSpkRes.status === "fulfilled" && mapVsSpkRes.value?.data?.data) {
+        mapSpkMetric.value = mapVsSpkRes.value.data.data.metric;
+        mapDivisi.value = mapVsSpkRes.value.data.data.divisi;
+      }
+      if (mapVsSjRes.status === "fulfilled" && mapVsSjRes.value?.data?.data) {
+        mapSjMetric.value = mapVsSjRes.value.data.data;
+      }
+      await Promise.allSettled([loadMoreMapSpk(), loadMoreMapKirim()]);
     }
 
     if (showPiutang.value) {
@@ -612,6 +807,43 @@ const loadDashboard = async () => {
   }
 };
 
+const reloadMapPanels = async () => {
+  if (isLoadingDashboard.value) return;
+  isLoadingDashboard.value = true;
+  mapSpkList.value = [];
+  mapSpkOffset.value = 0;
+  mapSpkHasMore.value = true;
+  mapKirimList.value = [];
+  mapKirimOffset.value = 0;
+  mapKirimHasMore.value = true;
+
+  try {
+    const [mapVsSpkRes, mapVsSjRes] = await Promise.allSettled([
+      dashboardService.getMapVsSpkDashboard(
+        mapFilter.value.startDate,
+        mapFilter.value.endDate,
+      ),
+      dashboardService.getMapVsSjDashboard(
+        mapFilter.value.startDate,
+        mapFilter.value.endDate,
+      ),
+    ]);
+    if (mapVsSpkRes.status === "fulfilled" && mapVsSpkRes.value?.data?.data) {
+      mapSpkMetric.value = mapVsSpkRes.value.data.data.metric;
+      mapDivisi.value = mapVsSpkRes.value.data.data.divisi;
+    }
+    if (mapVsSjRes.status === "fulfilled" && mapVsSjRes.value?.data?.data) {
+      mapSjMetric.value = mapVsSjRes.value.data.data;
+    }
+    await Promise.allSettled([loadMoreMapSpk(), loadMoreMapKirim()]);
+  } finally {
+    isLoadingDashboard.value = false;
+    await nextTick();
+    setupMapSpkObserver();
+    setupMapKirimObserver();
+  }
+};
+
 onMounted(async () => {
   // Auto-select tab berdasarkan bagian user
   if (
@@ -658,6 +890,8 @@ onMounted(async () => {
     setupPenObserver();
     setupMapObserver();
     setupRpDetailObserver();
+    setupMapSpkObserver();
+    setupMapKirimObserver();
   }
   if (activeTab.value === "finance") {
     setupOverdueObserver();
@@ -675,6 +909,8 @@ onUnmounted(() => {
   bufferScrollObserver?.disconnect();
   bahanScrollObserver?.disconnect();
   rpDetailScrollObserver?.disconnect();
+  mapSpkScrollObserver?.disconnect();
+  mapKirimScrollObserver?.disconnect();
 });
 
 const closeSpkDialog = () => {
@@ -1032,7 +1268,7 @@ const sisaClass = (item: any) => {
         <v-row dense class="mb-2">
           <!-- Penawaran Belum MAP -->
           <v-col cols="12" md="5">
-            <div class="manksi-panel content-panel fill-height">
+            <div class="manksi-panel content-panel">
               <div class="panel-header panel-header--orange">
                 <IconAlertTriangle
                   :size="14"
@@ -1905,6 +2141,511 @@ const sisaClass = (item: any) => {
                 <div v-else class="text-center text-grey py-3 text-caption">
                   Belum ada data kunjungan bulan ini.
                 </div>
+              </div>
+            </div>
+          </v-col>
+        </v-row>
+
+        <!-- ── Row 4: Filter + MAP vs SPK / SJ ── -->
+        <v-row dense class="mt-2 mb-1">
+          <v-col cols="12">
+            <div class="d-flex align-center" style="gap: 8px; padding: 0 2px">
+              <span class="text-caption text-grey-darken-1 font-weight-bold"
+                >Filter MAP:</span
+              >
+              <input
+                type="date"
+                v-model="mapFilter.startDate"
+                class="map-date-inp"
+              />
+              <span class="text-caption text-grey">s.d</span>
+              <input
+                type="date"
+                v-model="mapFilter.endDate"
+                class="map-date-inp"
+              />
+              <button class="map-filter-btn" @click="reloadMapPanels">
+                Terapkan
+              </button>
+            </div>
+          </v-col>
+        </v-row>
+
+        <v-row dense>
+          <!-- Panel 1: Konversi MAP → SPK -->
+          <v-col cols="12" md="4">
+            <div class="manksi-panel content-panel fill-height">
+              <div class="panel-header panel-header--blue">
+                <IconChartBar :size="14" :stroke-width="1.7" class="mr-1" />
+                Konversi MAP → SPK
+                <span
+                  class="ml-auto pct-badge"
+                  :class="
+                    mapSpkRate >= 80
+                      ? 'pct-good'
+                      : mapSpkRate >= 50
+                        ? 'pct-mid'
+                        : 'pct-low'
+                  "
+                >
+                  {{ mapSpkRate }}% konversi
+                </span>
+              </div>
+              <div class="panel-body">
+                <v-progress-linear
+                  v-if="isLoadingDashboard"
+                  indeterminate
+                  color="primary"
+                  height="2"
+                />
+                <template v-else>
+                  <!-- Metric mini -->
+                  <div class="pen-summary-bar">
+                    <div class="pen-stat">
+                      <span class="pen-stat-val text-primary">{{
+                        mapSpkMetric.TotalMAP
+                      }}</span>
+                      <span class="pen-stat-lbl">Total MAP</span>
+                    </div>
+                    <div class="pen-stat">
+                      <span class="pen-stat-val text-success">{{
+                        mapSpkMetric.SudahSPK
+                      }}</span>
+                      <span class="pen-stat-lbl">Sudah SPK</span>
+                    </div>
+                    <div class="pen-stat">
+                      <span class="pen-stat-val text-error">{{
+                        mapSpkMetric.BelumSPK
+                      }}</span>
+                      <span class="pen-stat-lbl">Belum SPK</span>
+                    </div>
+                  </div>
+
+                  <!-- Nilai per divisi -->
+                  <div class="real-list" style="max-height: 160px">
+                    <div
+                      v-for="row in mapDivisi"
+                      :key="row.Divisi"
+                      class="real-row"
+                    >
+                      <div class="real-meta">
+                        <span class="real-divisi">{{ row.Divisi }}</span>
+                        <span class="real-nominal">
+                          SPK {{ shortNum(row.NilaiSPK) }} | Pot
+                          {{ shortNum(row.NilaiPotensi) }}
+                        </span>
+                      </div>
+                      <div class="real-bar-wrap">
+                        <div class="real-bar">
+                          <div
+                            class="real-seg real-seg--close"
+                            :style="{
+                              width:
+                                row.NilaiSPK + row.NilaiPotensi
+                                  ? (row.NilaiSPK /
+                                      (row.NilaiSPK + row.NilaiPotensi)) *
+                                      100 +
+                                    '%'
+                                  : '0%',
+                            }"
+                          />
+                          <div
+                            class="real-seg real-seg--open"
+                            :style="{
+                              width:
+                                row.NilaiSPK + row.NilaiPotensi
+                                  ? (row.NilaiPotensi /
+                                      (row.NilaiSPK + row.NilaiPotensi)) *
+                                      100 +
+                                    '%'
+                                  : '0%',
+                            }"
+                          />
+                        </div>
+                        <span class="real-pct">
+                          {{
+                            row.NilaiSPK + row.NilaiPotensi
+                              ? Math.round(
+                                  (row.NilaiSPK /
+                                    (row.NilaiSPK + row.NilaiPotensi)) *
+                                    100,
+                                )
+                              : 0
+                          }}%
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="real-legend">
+                    <span class="leg-dot leg-close" />Sudah SPK
+                    <span class="leg-dot leg-open" />Potensi
+                  </div>
+
+                  <!-- Divider -->
+                  <div
+                    style="
+                      border-top: 1px solid #f0f0f0;
+                      padding: 5px 12px 0;
+                      font-size: 10px;
+                      color: #9e9e9e;
+                      font-weight: 600;
+                    "
+                  >
+                    MAP BELUM SPK
+                  </div>
+
+                  <!-- Infinite scroll list -->
+                  <div class="pen-list" style="max-height: 200px">
+                    <div
+                      v-for="m in mapSpkList"
+                      :key="m.Nomor"
+                      class="pen-item"
+                      :class="
+                        m.UmurHari >= 14
+                          ? 'umur-danger'
+                          : m.UmurHari >= 7
+                            ? 'umur-warn'
+                            : ''
+                      "
+                    >
+                      <div class="pen-item-top">
+                        <span class="pen-nomor">{{ m.Nomor }}</span>
+                        <div class="d-flex align-center" style="gap: 5px">
+                          <span class="pen-divisi">{{ m.Divisi }}</span>
+                          <span class="pen-age" :class="umurClass(m.UmurHari)"
+                            >{{ m.UmurHari }}h</span
+                          >
+                        </div>
+                      </div>
+                      <div class="pen-cus">{{ m.NamaCustomer }}</div>
+                      <div class="d-flex justify-space-between mt-1">
+                        <span class="pen-ket">{{ m.NamaMAP }}</span>
+                        <span
+                          style="
+                            font-size: 10px;
+                            color: #6a1b9a;
+                            font-weight: 600;
+                          "
+                        >
+                          {{ shortNum(m.NilaiPotensi) }}
+                        </span>
+                      </div>
+                    </div>
+                    <div ref="mapSpkSentinelEl" class="pen-sentinel">
+                      <span v-if="isLoadingMoreMapSpk" class="pen-loading"
+                        >Memuat...</span
+                      >
+                      <span
+                        v-else-if="!mapSpkHasMore && mapSpkList.length"
+                        class="pen-end"
+                      >
+                        {{ mapSpkList.length }} MAP belum SPK
+                      </span>
+                    </div>
+                  </div>
+                  <div
+                    v-if="!mapSpkList.length && !isLoadingMoreMapSpk"
+                    class="text-center text-grey py-3 text-caption"
+                  >
+                    Semua MAP sudah ada SPK-nya 🎉
+                  </div>
+                </template>
+              </div>
+            </div>
+          </v-col>
+
+          <!-- Panel 2: Status Pengiriman MAP -->
+          <v-col cols="12" md="4">
+            <div class="manksi-panel content-panel fill-height">
+              <div class="panel-header panel-header--teal">
+                <IconTruckDelivery
+                  :size="14"
+                  :stroke-width="1.7"
+                  class="mr-1"
+                />
+                Status Pengiriman MAP
+                <span class="ml-auto" style="font-size: 11px">
+                  {{ mapKirimRate }}% terkirim
+                </span>
+              </div>
+              <div class="panel-body">
+                <v-progress-linear
+                  v-if="isLoadingDashboard"
+                  indeterminate
+                  color="teal"
+                  height="2"
+                />
+                <template v-else>
+                  <!-- 3 bucket card -->
+                  <div
+                    class="aging-wrap"
+                    style="grid-template-columns: repeat(3, 1fr)"
+                  >
+                    <div
+                      class="aging-chip"
+                      style="background: #ffebee; color: #c62828"
+                    >
+                      <span class="aging-count">{{
+                        mapSjMetric.BelumKirim
+                      }}</span>
+                      <span class="aging-label">Belum Kirim</span>
+                    </div>
+                    <div
+                      class="aging-chip"
+                      style="background: #fff8e1; color: #f57f17"
+                    >
+                      <span class="aging-count">{{
+                        mapSjMetric.SebagianKirim
+                      }}</span>
+                      <span class="aging-label">Sebagian</span>
+                    </div>
+                    <div
+                      class="aging-chip"
+                      style="background: #e8f5e9; color: #2e7d32"
+                    >
+                      <span class="aging-count">{{
+                        mapSjMetric.LunasKirim
+                      }}</span>
+                      <span class="aging-label">Lunas Kirim</span>
+                    </div>
+                  </div>
+
+                  <!-- Progress bar qty -->
+                  <div
+                    style="padding: 8px 12px; border-bottom: 1px solid #f0f0f0"
+                  >
+                    <div class="d-flex justify-space-between mb-1">
+                      <span style="font-size: 10px; color: #9e9e9e"
+                        >Total qty terkirim</span
+                      >
+                      <span
+                        style="
+                          font-size: 10px;
+                          font-weight: 700;
+                          color: #00695c;
+                        "
+                      >
+                        {{ fmtNum(mapSjMetric.TotalQtyKirim) }} /
+                        {{ fmtNum(mapSjMetric.TotalQtyOrder) }}
+                      </span>
+                    </div>
+                    <div class="cr-bar">
+                      <div
+                        class="cr-fill"
+                        :style="{
+                          width: mapSjMetric.TotalQtyOrder
+                            ? Math.min(
+                                100,
+                                (mapSjMetric.TotalQtyKirim /
+                                  mapSjMetric.TotalQtyOrder) *
+                                  100,
+                              ) + '%'
+                            : '0%',
+                          background: '#00897b',
+                        }"
+                      />
+                    </div>
+                  </div>
+
+                  <!-- Divider label -->
+                  <div
+                    style="
+                      border-top: 1px solid #f0f0f0;
+                      padding: 5px 12px 0;
+                      font-size: 10px;
+                      color: #9e9e9e;
+                      font-weight: 600;
+                    "
+                  >
+                    MAP BELUM / SEBAGIAN KIRIM
+                  </div>
+
+                  <!-- Infinite scroll -->
+                  <div class="pen-list" style="max-height: 280px">
+                    <div
+                      v-for="m in mapKirimList"
+                      :key="m.Nomor"
+                      class="pen-item"
+                      :class="m.QtyKirim === 0 ? 'umur-danger' : 'umur-warn'"
+                    >
+                      <div class="pen-item-top">
+                        <span class="pen-nomor">{{ m.Nomor }}</span>
+                        <span class="pen-divisi">{{ m.Divisi }}</span>
+                      </div>
+                      <div class="pen-cus">{{ m.NamaCustomer }}</div>
+                      <div class="d-flex justify-space-between mt-1">
+                        <span class="pen-ket">DL: {{ m.Dateline }}</span>
+                        <span
+                          :style="{
+                            fontSize: '10px',
+                            fontWeight: '700',
+                            color: m.QtyKirim === 0 ? '#c62828' : '#f57f17',
+                          }"
+                        >
+                          {{ fmtNum(m.QtyKirim) }}/{{ fmtNum(m.QtyOrder) }} pcs
+                        </span>
+                      </div>
+                    </div>
+                    <div ref="mapKirimSentinelEl" class="pen-sentinel">
+                      <span v-if="isLoadingMoreMapKirim" class="pen-loading"
+                        >Memuat...</span
+                      >
+                      <span
+                        v-else-if="!mapKirimHasMore && mapKirimList.length"
+                        class="pen-end"
+                      >
+                        {{ mapKirimList.length }} MAP ditampilkan
+                      </span>
+                    </div>
+                  </div>
+                  <div
+                    v-if="!mapKirimList.length && !isLoadingMoreMapKirim"
+                    class="text-center text-grey py-3 text-caption"
+                  >
+                    Semua MAP sudah lunas kirim 🎉
+                  </div>
+                </template>
+              </div>
+            </div>
+          </v-col>
+
+          <!-- Panel 3: Nilai Pipeline MAP -->
+          <v-col cols="12" md="4">
+            <div class="manksi-panel content-panel fill-height">
+              <div
+                class="panel-header"
+                style="
+                  background: #f3e5f5;
+                  color: #6a1b9a;
+                  border-bottom: 1px solid #e1bee7;
+                "
+              >
+                <IconCoin :size="14" :stroke-width="1.7" class="mr-1" />
+                Nilai Pipeline MAP
+                <span class="panel-header-sub ml-1"
+                  >({{ mapFilter.startDate }} s.d {{ mapFilter.endDate }})</span
+                >
+              </div>
+              <div class="panel-body">
+                <v-progress-linear
+                  v-if="isLoadingDashboard"
+                  indeterminate
+                  color="purple"
+                  height="2"
+                />
+                <template v-else>
+                  <!-- Total nilai -->
+                  <div
+                    style="
+                      padding: 8px 12px;
+                      border-bottom: 1px solid #f0f0f0;
+                      display: flex;
+                      gap: 0;
+                      background: #fafafa;
+                    "
+                  >
+                    <div class="pen-stat">
+                      <span
+                        class="pen-stat-val"
+                        style="color: #6a1b9a; font-size: 14px"
+                      >
+                        {{ shortNum(mapSpkMetric.TotalNilai) }}
+                      </span>
+                      <span class="pen-stat-lbl">Total Nilai</span>
+                    </div>
+                    <div class="pen-stat">
+                      <span
+                        class="pen-stat-val text-success"
+                        style="font-size: 14px"
+                      >
+                        {{ shortNum(mapSpkMetric.NilaiSudahSPK) }}
+                      </span>
+                      <span class="pen-stat-lbl">Confirmed (SPK)</span>
+                    </div>
+                    <div class="pen-stat">
+                      <span
+                        class="pen-stat-val text-warning"
+                        style="font-size: 14px"
+                      >
+                        {{ shortNum(mapSpkMetric.NilaiBelumSPK) }}
+                      </span>
+                      <span class="pen-stat-lbl">Potensi</span>
+                    </div>
+                  </div>
+
+                  <!-- Bar per divisi -->
+                  <div class="knj-wrap" style="max-height: 360px">
+                    <div
+                      v-for="row in mapDivisi"
+                      :key="row.Divisi"
+                      class="knj-row"
+                    >
+                      <div class="knj-meta mb-1">
+                        <span class="knj-sales" style="color: #4a148c">{{
+                          row.Divisi
+                        }}</span>
+                        <span
+                          class="knj-pct"
+                          style="color: #6a1b9a; font-weight: 700"
+                        >
+                          {{ shortNum(row.NilaiSPK + row.NilaiPotensi) }}
+                        </span>
+                      </div>
+                      <div class="knj-bar-wrap">
+                        <div class="knj-bar" style="background: #f3e5f5">
+                          <!-- SPK (confirmed) -->
+                          <div
+                            class="knj-seg"
+                            style="background: #7b1fa2"
+                            :style="{
+                              width: mapSpkMetric.TotalNilai
+                                ? (row.NilaiSPK / mapSpkMetric.TotalNilai) *
+                                    100 +
+                                  '%'
+                                : '0%',
+                            }"
+                          />
+                          <!-- Potensi -->
+                          <div
+                            class="knj-seg"
+                            style="background: #ce93d8"
+                            :style="{
+                              width: mapSpkMetric.TotalNilai
+                                ? (row.NilaiPotensi / mapSpkMetric.TotalNilai) *
+                                    100 +
+                                  '%'
+                                : '0%',
+                            }"
+                          />
+                        </div>
+                      </div>
+                      <div class="real-detail mt-1">
+                        <span style="color: #7b1fa2"
+                          >✓ {{ shortNum(row.NilaiSPK) }}</span
+                        >
+                        <span style="color: #9c27b0"
+                          >○ {{ shortNum(row.NilaiPotensi) }}</span
+                        >
+                        <span style="color: #9e9e9e"
+                          >{{ row.SudahSPK }}/{{ row.TotalMAP }} MAP</span
+                        >
+                      </div>
+                    </div>
+                    <div
+                      v-if="!mapDivisi.length"
+                      class="text-center text-grey py-3 text-caption"
+                    >
+                      Belum ada data MAP di periode ini.
+                    </div>
+                  </div>
+                  <div class="real-legend">
+                    <span
+                      class="leg-dot"
+                      style="background: #7b1fa2"
+                    />Confirmed (SPK)
+                    <span class="leg-dot" style="background: #ce93d8" />Potensi
+                  </div>
+                </template>
               </div>
             </div>
           </v-col>
@@ -3322,8 +4063,15 @@ const sisaClass = (item: any) => {
 .map-list {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  max-height: 280px;
+  max-height: 320px;
   overflow-y: auto;
+  align-content: start;
+}
+.map-list::after {
+  content: "";
+  flex: auto;
+  grid-column: 1 / -1;
+  height: 0;
 }
 .map-item {
   padding: 6px 10px;
@@ -4228,5 +4976,31 @@ const sisaClass = (item: any) => {
 .rp-badge--none {
   background: #f5f5f5;
   color: #757575;
+}
+
+.map-date-inp {
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  padding: 3px 7px;
+  font-size: 11px;
+  color: #424242;
+  background: white;
+  outline: none;
+}
+.map-date-inp:focus {
+  border-color: #1867c0;
+}
+.map-filter-btn {
+  background: #1867c0;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.map-filter-btn:hover {
+  background: #1565c0;
 }
 </style>
