@@ -165,8 +165,20 @@ const {
 
     const data = res.data.data;
 
+    // Normalisasi header
     data.header = normalizeHeader(data.header);
 
+    if (data.aksesoris && data.aksesoris.length > 0) {
+      data.aksesoris = data.aksesoris.map((acc: any) => ({
+        kode: acc.kode || "",
+        nama: acc.acc_nama || acc.nama || "", // Ambil dari acc_nama
+        satuan: acc.acc_satuan || acc.satuan || "", // Ambil dari acc_satuan
+        qty: Number(acc.qty) || 0,
+        note: acc.acc_note || acc.note || "", // Ambil dari acc_note
+      }));
+    }
+
+    // Set status lock
     if (data.lock) {
       data.isLocked = true;
       data.isApproved = data.lock.apv === "Y";
