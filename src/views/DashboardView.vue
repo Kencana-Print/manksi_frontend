@@ -125,6 +125,10 @@ const activeTab = ref("overview");
 
 watch(activeTab, async (tab) => {
   await nextTick();
+  if (tab === "overview") {
+    // Re-render chart karena container size mungkin berubah
+    if (trendData.value.length) renderTrendChart();
+  }
   if (tab === "marketing") {
     setupPenObserver();
     setupMapObserver();
@@ -669,6 +673,11 @@ const renderTrendChart = async () => {
   if (!trendChartEl.value || !trendData.value.length) return;
   const win = window as any;
   if (!win.c3) return;
+
+  // ── Destroy chart lama kalau ada ──
+  if (trendChartEl.value.innerHTML) {
+    trendChartEl.value.innerHTML = "";
+  }
 
   win.c3.generate({
     bindto: trendChartEl.value,
