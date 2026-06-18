@@ -13,6 +13,13 @@ import {
   IconPackage,
   IconClipboardList,
   IconClock,
+  IconCreditCard,
+  IconCurrencyDollar,
+  IconShieldCheck,
+  IconFileInvoice,
+  IconHistory,
+  IconTrash,
+  IconCoin,
 } from "@tabler/icons-vue";
 
 import { version as appVersion } from "../../package.json";
@@ -79,9 +86,21 @@ interface NotifItem {
 const notifItems = ref<NotifItem[]>([]);
 const isLoading = ref(false);
 const showPopover = ref(false);
+const approvalCount = ref({
+  piutang: 0,
+  harga_nol: 0,
+  prioritas: 0,
+  inv_blm_sj: 0,
+  perubahan: 0,
+  hapus: 0,
+  plafon: 0,
+});
 
 const totalCount = computed(() =>
   notifItems.value.reduce((s, n) => s + n.count, 0),
+);
+const totalApprovalPending = computed(() =>
+  Object.values(approvalCount.value).reduce((s, n) => s + n, 0),
 );
 
 const loadNotifications = async () => {
@@ -103,7 +122,6 @@ const loadNotifications = async () => {
         });
       }
 
-      // ── SPK belum MKB ──
       const mkbRes = await dashboardService.getSpkBelumMkbCount();
       const mkbCount = Number(mkbRes.data.data ?? 0);
       if (mkbCount > 0) {
@@ -118,7 +136,82 @@ const loadNotifications = async () => {
       }
     }
 
-    // Tambah kategori lain di sini nanti
+    // ── Approval Pending ──
+    if (authStore.canSeeApproval) {
+      try {
+        const apvRes = await dashboardService.getApprovalPendingCount();
+        const apv = apvRes.data.data || {};
+
+        const apvList = [
+          {
+            id: "apv-piutang",
+            icon: IconCreditCard,
+            color: "#e65100",
+            label: "Piutang >90 Hari",
+            count: Number(apv.piutang ?? 0),
+            route: "/tools/approval",
+          },
+          {
+            id: "apv-harga-nol",
+            icon: IconCurrencyDollar,
+            color: "#c62828",
+            label: "SPK Harga 0",
+            count: Number(apv.harga_nol ?? 0),
+            route: "/tools/approval",
+          },
+          {
+            id: "apv-prioritas",
+            icon: IconShieldCheck,
+            color: "#2e7d32",
+            label: "SPK Prioritas",
+            count: Number(apv.prioritas ?? 0),
+            route: "/tools/approval",
+          },
+          {
+            id: "apv-inv-blm-sj",
+            icon: IconFileInvoice,
+            color: "#1565c0",
+            label: "Invoice Belum SJ",
+            count: Number(apv.inv_blm_sj ?? 0),
+            route: "/tools/approval",
+          },
+          {
+            id: "apv-perubahan",
+            icon: IconHistory,
+            color: "#6a1b9a",
+            label: "Perubahan Data",
+            count: Number(apv.perubahan ?? 0),
+            route: "/tools/approval",
+          },
+          {
+            id: "apv-hapus",
+            icon: IconTrash,
+            color: "#c62828",
+            label: "Hapus Data",
+            count: Number(apv.hapus ?? 0),
+            route: "/tools/approval",
+          },
+          {
+            id: "apv-plafon",
+            icon: IconCoin,
+            color: "#f57f17",
+            label: "Plafon Customer",
+            count: Number(apv.plafon ?? 0),
+            route: "/tools/approval",
+          },
+        ];
+
+        for (const a of apvList) {
+          if (a.count > 0) items.push(a);
+        }
+
+        const total = apvList.reduce((s, a) => s + a.count, 0);
+        authStore.setApprovalPendingTotal(total);
+      } catch {
+        /* silent */
+      }
+    }
+
     notifItems.value = items;
   } catch {
     /* silent */
@@ -129,6 +222,24 @@ const loadNotifications = async () => {
 
 const onNotifClick = (item: NotifItem) => {
   showPopover.value = false;
+  // Kalau route ke approval, tambah query param type
+  if (item.route === "/tools/approval" && item.id.startsWith("apv-")) {
+    // Map notif id ke approval type id
+    const typeMap: Record<string, string> = {
+      "apv-piutang": "piutang_90",
+      "apv-harga-nol": "harga_nol",
+      "apv-prioritas": "prioritas",
+      "apv-inv-blm-sj": "invoice_blmsj",
+      "apv-perubahan": "perubahan_data",
+      "apv-hapus": "hapus_data",
+      "apv-plafon": "plafon_manager",
+    };
+    const type = typeMap[item.id];
+    if (type) {
+      router.push({ path: "/tools/approval", query: { type } });
+      return;
+    }
+  }
   router.push(item.route);
 };
 
@@ -468,5 +579,21 @@ const onClickOutside = () => {
 }
 .notif-refresh:hover {
   text-decoration: underline;
+}
+.notif-section-title {
+  font-size: 9px;
+  font-weight: 700;
+  color: rgba(var(--v-theme-on-surface), 0.4);
+  letter-spacing: 0.08em;
+  padding: 4px 14px 2px;
+}
+.notif-badge {
+  font-size: 10px;
+  font-weight: 700;
+  color: white;
+  padding: 1px 6px;
+  border-radius: 8px;
+  min-width: 20px;
+  text-align: center;
 }
 </style>

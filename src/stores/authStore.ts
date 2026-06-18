@@ -81,6 +81,7 @@ export const useAuthStore = defineStore(
     const spkUrgent = ref<SpkUrgentItem[]>([]);
     const isSessionExpired = ref(false);
     const isOnline = ref(navigator.onLine);
+    const approvalPendingTotal = ref(0);
     let heartbeatInterval: number;
 
     // --- GETTERS ---
@@ -114,6 +115,11 @@ export const useAuthStore = defineStore(
     const canLihatHarga = computed(() => user.value?.flags.lihatHarga === 1);
     const canLihatBeli = computed(() => user.value?.flags.lihatBeli === 1);
     const isManager = computed(() => user.value?.flags.isManager === 1);
+    const canSeeApproval = computed(() =>
+      [256, 257, 258, 259, 260, 261, 262, 263].some((id) =>
+        permissions.value.filter((p) => p.id === id).some((p) => p.view),
+      ),
+    );
 
     // --- CONNECTIVITY HELPERS ---
     const checkServerStatus = async () => {
@@ -176,6 +182,10 @@ export const useAuthStore = defineStore(
       isSessionExpired.value = true;
     }
 
+    function setApprovalPendingTotal(n: number) {
+      approvalPendingTotal.value = n;
+    }
+
     return {
       // State
       token,
@@ -184,6 +194,7 @@ export const useAuthStore = defineStore(
       spkUrgent,
       isSessionExpired,
       isOnline,
+      approvalPendingTotal,
       // Getters
       isAuthenticated,
       userName,
@@ -195,6 +206,7 @@ export const useAuthStore = defineStore(
       canLihatHarga,
       canLihatBeli,
       isManager,
+      canSeeApproval,
       // Actions
       setLoginData,
       logout,
@@ -202,6 +214,7 @@ export const useAuthStore = defineStore(
       handleSessionExpired,
       initConnectivityCheck,
       clearConnectivityCheck,
+      setApprovalPendingTotal,
     };
   },
   {

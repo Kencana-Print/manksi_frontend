@@ -10,12 +10,14 @@ import {
   IconRefresh,
   IconChartBar,
   IconTruckDelivery,
-  IconAlertTriangle,
   IconWalk,
   IconLayoutDashboard,
   IconCoin,
   IconChevronRight,
   IconPackage,
+  IconAlertTriangle,
+  IconTrendingUp,
+  IconActivity,
 } from "@tabler/icons-vue";
 
 interface OverdueItem {
@@ -221,6 +223,9 @@ const piutangData = ref<PiutangData>({
   overdue: [],
   trend: [],
 });
+const aktivitasList = ref<any[]>([]);
+const trendData = ref<any[]>([]);
+const trendChartEl = ref<HTMLElement | null>(null);
 
 // ── State Penerimaan ──
 const penerimaanSummary = ref({
@@ -659,6 +664,41 @@ const mapKirimRate = computed(() => {
   );
 });
 
+const renderTrendChart = async () => {
+  await nextTick();
+  if (!trendChartEl.value || !trendData.value.length) return;
+  const win = window as any;
+  if (!win.c3) return;
+
+  win.c3.generate({
+    bindto: trendChartEl.value,
+    size: { height: 160 },
+    data: {
+      x: "label",
+      columns: [
+        ["label", ...trendData.value.map((r: any) => r.label)],
+        ["SPK Baru", ...trendData.value.map((r: any) => r.spk_baru)],
+        ["Penawaran", ...trendData.value.map((r: any) => r.penawaran_baru)],
+      ],
+      type: "line",
+      colors: { "SPK Baru": "#1565c0", Penawaran: "#f57f17" },
+    },
+    axis: {
+      x: { type: "category", tick: { rotate: 0, multiline: false } },
+      y: { min: 0, padding: { bottom: 0 } },
+    },
+    legend: { position: "inset" },
+    grid: { y: { show: true } },
+    tooltip: { grouped: true },
+  });
+};
+
+const jenisColor: Record<string, string> = {
+  SPK: "#1565c0",
+  PENAWARAN: "#6a1b9a",
+  INVOICE: "#2e7d32",
+};
+
 // ── Load Dashboard ──
 const loadDashboard = async () => {
   isLoadingDashboard.value = true;
@@ -670,6 +710,16 @@ const loadDashboard = async () => {
   mapHasMore.value = true;
 
   try {
+    const [rAktivitas, rTrend] = await Promise.allSettled([
+      dashboardService.getAktivitasHariIni(),
+      dashboardService.getTrendSpk7Hari(),
+    ]);
+    if (rAktivitas.status === "fulfilled")
+      aktivitasList.value = rAktivitas.value.data.data || [];
+    if (rTrend.status === "fulfilled") {
+      trendData.value = rTrend.value.data.data || [];
+      renderTrendChart();
+    }
     const [spkSumRes] = await Promise.allSettled([
       dashboardService.getSpkSummary(),
     ]);
@@ -1255,6 +1305,82 @@ const sisaClass = (item: any) => {
                 </div>
               </div>
               <IconChevronRight :size="16" color="#9e9e9e" />
+            </div>
+          </v-col>
+        </v-row>
+
+        <!-- ── Row 3: Trend Chart + Aktivitas Hari Ini ── -->
+        <v-row dense class="mt-2">
+          <!-- Trend 7 Hari -->
+          <v-col cols="12" md="5">
+            <div
+              class="manksi-panel"
+              style="height: 280px; display: flex; flex-direction: column"
+            >
+              <div class="panel-header">
+                <IconTrendingUp
+                  :size="14"
+                  style="color: #1565c0"
+                  class="mr-1"
+                />
+                <span>Trend 7 Hari Terakhir</span>
+              </div>
+              <div
+                style="
+                  flex: 1;
+                  min-height: 0;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                "
+              >
+                <div v-if="!trendData.length" class="empty-hint">
+                  Memuat data...
+                </div>
+                <div v-else ref="trendChartEl" style="width: 100%" />
+              </div>
+            </div>
+          </v-col>
+
+          <!-- Aktivitas Hari Ini -->
+          <v-col cols="12" md="7">
+            <div
+              class="manksi-panel"
+              style="height: 280px; display: flex; flex-direction: column"
+            >
+              <div class="panel-header">
+                <IconActivity :size="14" style="color: #6a1b9a" class="mr-1" />
+                <span>Aktivitas Hari Ini</span>
+                <span class="ms-auto text-caption text-medium-emphasis">
+                  {{ aktivitasList.length }} transaksi
+                </span>
+              </div>
+              <div style="flex: 1; overflow-y: auto">
+                <div v-if="!aktivitasList.length" class="empty-hint">
+                  Belum ada aktivitas hari ini
+                </div>
+                <div v-else class="aktivitas-list">
+                  <div
+                    v-for="(item, i) in aktivitasList"
+                    :key="i"
+                    class="aktivitas-item"
+                  >
+                    <span
+                      class="jenis-badge"
+                      :style="{
+                        background: jenisColor[item.jenis] + '18',
+                        color: jenisColor[item.jenis],
+                      }"
+                    >
+                      {{ item.jenis }}
+                    </span>
+                    <span class="akt-nomor">{{ item.nomor }}</span>
+                    <span class="akt-nama">{{ item.nama }}</span>
+                    <span class="akt-divisi">{{ item.divisi }}</span>
+                    <span class="akt-jam ms-auto">{{ item.jam }}</span>
+                  </div>
+                </div>
+              </div>
             </div>
           </v-col>
         </v-row>
@@ -5002,5 +5128,64 @@ const sisaClass = (item: any) => {
 }
 .map-filter-btn:hover {
   background: #1565c0;
+}
+/* ── Aktivitas list ── */
+.aktivitas-list {
+  display: flex;
+  flex-direction: column;
+}
+.aktivitas-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px;
+  border-bottom: 1px solid #f5f5f5;
+  font-size: 11px;
+}
+.aktivitas-item:hover {
+  background: #f5f9ff;
+}
+.jenis-badge {
+  flex-shrink: 0;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 3px;
+  text-transform: uppercase;
+  width: 72px;
+  text-align: center;
+}
+.akt-nomor {
+  font-family: monospace;
+  font-weight: 600;
+  color: #1565c0;
+  width: 160px;
+  flex-shrink: 0;
+}
+.akt-nama {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #212121;
+}
+.akt-divisi {
+  width: 100px;
+  flex-shrink: 0;
+  color: #757575;
+  font-size: 10px;
+}
+.akt-jam {
+  flex-shrink: 0;
+  color: #9e9e9e;
+  font-size: 10px;
+  font-family: monospace;
+}
+
+.empty-hint {
+  text-align: center;
+  padding: 24px;
+  font-size: 12px;
+  color: #bdbdbd;
 }
 </style>

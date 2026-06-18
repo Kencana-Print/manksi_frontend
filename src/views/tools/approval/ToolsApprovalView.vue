@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { ref, computed, defineAsyncComponent } from "vue";
+import { ref, computed, defineAsyncComponent, watch } from "vue";
 import { useAuthStore } from "@/stores/authStore";
+import { useRoute } from "vue-router";
 
 const authStore = useAuthStore();
+const route = useRoute();
 
 // Daftar menu approval beserta MENU_ID aslinya
 const allApprovals = [
@@ -36,6 +38,17 @@ const availableApprovals = computed(() => {
 // Pilih otomatis opsi pertama yang tersedia
 const selectedApproval = ref(
   availableApprovals.value.length > 0 ? availableApprovals.value[0].id : "",
+);
+
+watch(
+  () => route.query.type,
+  (typeParam) => {
+    if (typeParam) {
+      const found = availableApprovals.value.find((a) => a.id === typeParam);
+      if (found) selectedApproval.value = found.id;
+    }
+  },
+  { immediate: true }, // ← immediate supaya juga jalan saat pertama kali load
 );
 
 // Lazy Load Sub-Komponen

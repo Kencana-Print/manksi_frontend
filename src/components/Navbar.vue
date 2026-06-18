@@ -860,7 +860,12 @@ onUnmounted(() => {
             <v-badge
               color="error"
               dot
-              :model-value="menu.title === 'Garmen' && hasSpkNotif"
+              :model-value="
+                (menu.title === 'Garmen' && hasSpkNotif) ||
+                (menu.title === 'Tools' &&
+                  authStore.canSeeApproval &&
+                  authStore.approvalPendingTotal > 0)
+              "
               offset-x="10"
               offset-y="10"
             >
@@ -975,6 +980,22 @@ onUnmounted(() => {
                   <v-list-item-title class="nav-item-title">{{
                     item.title
                   }}</v-list-item-title>
+                  <template #append>
+                    <span
+                      v-if="
+                        item.to === '/tools/approval' &&
+                        authStore.canSeeApproval &&
+                        authStore.approvalPendingTotal > 0
+                      "
+                      class="approval-count-badge"
+                    >
+                      {{
+                        authStore.approvalPendingTotal > 99
+                          ? "99+"
+                          : authStore.approvalPendingTotal
+                      }}
+                    </span>
+                  </template>
                 </v-list-item>
               </template>
             </v-list>
@@ -1497,5 +1518,19 @@ onUnmounted(() => {
 ) {
   padding-inline-start: 24px !important;
   padding-left: 24px !important;
+}
+.approval-count-badge {
+  font-size: 10px;
+  font-weight: 700;
+  background: #e53935;
+  color: white;
+  padding: 1px 6px;
+  border-radius: 8px;
+  min-width: 18px;
+  text-align: center;
+  line-height: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
 }
 </style>
