@@ -207,6 +207,8 @@ const onFileChange = (e: Event, tipe: "desain" | "dokumen") => {
 // Tambah state untuk tracking apakah gambar exist
 const desainExists = ref(false);
 const dokumenExists = ref(false);
+const activeDesainUrl = ref("");
+const activeDokumenUrl = ref("");
 
 // Cek saat edit mode
 onMounted(async () => {
@@ -252,7 +254,9 @@ const displayImgDokumen = computed(() => {
 const onDesainImgError = (e: Event) => {
   const el = e.target as HTMLImageElement;
   if (!el.src.includes("8888") && formData.value.nomor) {
-    el.src = `${VPS_BASE}/${encodeURIComponent(formData.value.nomor)}.jpg`;
+    const vpsUrl = `${VPS_BASE}/${encodeURIComponent(formData.value.nomor)}.jpg`;
+    el.src = vpsUrl;
+    activeDesainUrl.value = vpsUrl; // ← update active URL
   } else {
     desainError.value = true;
   }
@@ -261,7 +265,9 @@ const onDesainImgError = (e: Event) => {
 const onDokumenImgError = (e: Event) => {
   const el = e.target as HTMLImageElement;
   if (!el.src.includes("8888") && formData.value.nomor) {
-    el.src = `${VPS_BASE}/${encodeURIComponent(formData.value.nomor)}-doc.jpg`;
+    const vpsUrl = `${VPS_BASE}/${encodeURIComponent(formData.value.nomor)}-doc.jpg`;
+    el.src = vpsUrl;
+    activeDokumenUrl.value = vpsUrl; // ← update active URL
   } else {
     dokumenError.value = true;
   }
@@ -473,7 +479,7 @@ const formatWaktu = (dt: string) => {
               v-if="displayImgDesain && !desainError"
               :src="displayImgDesain"
               class="tp-img"
-              @click="openPreview(displayImgDesain)"
+              @click="openPreview(($event.target as HTMLImageElement).src)"
               @error="onDesainImgError($event)"
             />
             <div v-else class="tp-img-empty">
@@ -524,7 +530,7 @@ const formatWaktu = (dt: string) => {
               v-if="displayImgDokumen && !dokumenError"
               :src="displayImgDokumen"
               class="tp-img"
-              @click="openPreview(displayImgDokumen)"
+              @click="openPreview(($event.target as HTMLImageElement).src)"
               @error="onDokumenImgError($event)"
             />
             <div v-else class="tp-img-empty">
@@ -791,6 +797,7 @@ const formatWaktu = (dt: string) => {
   object-fit: contain;
   cursor: pointer;
   transition: transform 0.2s;
+  pointer-events: auto !important;
 }
 .tp-img:hover {
   transform: scale(1.02);
