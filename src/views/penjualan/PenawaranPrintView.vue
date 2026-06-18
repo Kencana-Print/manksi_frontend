@@ -58,6 +58,8 @@ const getBaseUrl = () =>
   import.meta.env.VITE_API_BASE_URL?.replace(/\/api\/?$/, "") ||
   `${window.location.protocol}//${window.location.hostname}:3088`;
 
+const VPS_BASE = "http://103.94.238.252:8888/file-gambar";
+
 const getProductImageUrl = (row: any) => {
   // Ambil identifier dari format key default atau format alias database
   const identifier =
@@ -81,6 +83,36 @@ const getProductImageUrl = (row: any) => {
   }
 
   return `${getBaseUrl()}/images/${cabang}/mintaharga/${cleanName}.jpg`;
+};
+
+const getProductImageUrlVps = (row: any) => {
+  const identifier =
+    row.NoPermintaan || row.Gambar || row.pend_minta || row.pend_gambar;
+  if (!identifier) return "";
+
+  let cleanName = identifier.replace(/\//g, ".");
+  const matchMH = cleanName.match(/(MH\.\d{4}\.\d+)/i);
+
+  if (matchMH) {
+    cleanName = matchMH[1];
+  } else {
+    cleanName = cleanName.replace(/.*imagemintaharga/i, "");
+    cleanName = cleanName.replace(/.*Downloads/i, "");
+    cleanName = cleanName.replace(/\\/g, "/").split("/").pop() || "";
+    cleanName = cleanName.replace(/\.(jpe?g|png)$/i, "");
+  }
+
+  return `${VPS_BASE}/mintaharga/${cleanName}.jpg`;
+};
+
+const handleImageError = (e: Event, row: any) => {
+  const el = e.target as HTMLImageElement;
+  const vpsUrl = getProductImageUrlVps(row);
+  if (el.src !== vpsUrl) {
+    el.src = vpsUrl;
+  } else {
+    el.style.display = "none";
+  }
 };
 
 const pageBorderColor = computed(() => {
@@ -361,9 +393,7 @@ const grandTotal = computed(() => {
                 :src="getProductImageUrl(row)"
                 class="row-image"
                 :class="layoutOption === 'vert' ? 'img-vert' : 'img-horz'"
-                @error="
-                  ($event.target as HTMLImageElement).style.display = 'none'
-                "
+                @error="handleImageError($event, row)"
               />
             </td>
           </tr>
