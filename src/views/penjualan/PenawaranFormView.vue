@@ -47,6 +47,7 @@ const initialData = {
   Tanggal: new Date().toISOString().substring(0, 10),
   Tipe: "Premium",
   PerushKode: "KP", // Kencana Print (default)
+  NamaPerusahaan: "Kencana Print",
   CustKode: "",
   SalesKode: "",
   Keterangan: "",
@@ -71,6 +72,7 @@ const initialData = {
   DigitalSign: "N",
   StatusEdit: "MINTA",
   isTutupBuku: false,
+  SampleText: "",
   Details: [
     // Inisialisasi minimal 1 baris kosong
     {
@@ -114,9 +116,9 @@ const {
       Tanggal: formatDateLocal(d.pen_tanggal),
       Tipe: d.pen_tipe,
       PerushKode: d.pen_perush_kode,
-      NamaPerusahaan: d.perush_nama || "Kencana Print", // <--- Tambahkan Ini
+      NamaPerusahaan: d.Perush_nama || d.perush_nama || "",
       CustKode: d.pen_cus_kode,
-      NamaCustomer: d.cus_nama || "", // <--- Tambahkan Ini
+      NamaCustomer: d.cus_nama || "",
       SalesKode: d.pen_sal_kode,
       NamaSales: d.sal_nama || "",
       Keterangan: d.pen_keterangan,
@@ -141,6 +143,7 @@ const {
       DigitalSign: d.pen_digitalsign || "N",
       StatusEdit: d.StatusEdit,
       isTutupBuku: d.isTutupBuku,
+      SampleText: d.pen_sample || "",
       Details: (d.Details || []).map((det: any) => ({
         ID: det.pend_id,
         NoPermintaan: det.pend_minta,

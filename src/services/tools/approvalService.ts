@@ -77,4 +77,13 @@ export const approvalService = {
     cus_kode: string;
     status_acc: string;
   }) => api.post("/tools/approval/plafon-direksi/otorisasi", payload),
+
+  // --- MUTASI TANPA PLAN (MENU_ID: 266) ---
+  getMutasiNoPlanList: (params: any) =>
+    api.get("/tools/approval/mutasi-noplan", { params }),
+
+  submitMutasiNoPlanOtorisasi: (payload: {
+    nomor: string;
+    status_acc: string;
+  }) => api.post("/tools/approval/mutasi-noplan/otorisasi", payload),
 };

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref, onMounted, computed } from "vue";
 import { useToast } from "vue-toastification";
 import api from "@/services/api";
 import { useForm } from "@/composables/useForm";
@@ -10,7 +10,6 @@ import {
   IconListDetails,
   IconScissors,
   IconPrinter,
-  IconNeedle,
   IconPlus,
   IconTrash,
   IconSearch,
@@ -23,10 +22,15 @@ const showSpkModal = ref(false);
 const activeTab = ref("potong");
 // State Modal Bahan
 const showBahanModal = ref(false);
-const activeBahanType = ref<"ListPotong" | "ListCetak" | "ListBordir">(
-  "ListPotong",
-);
+const activeBahanType = ref<"ListPotong" | "ListCetakBordir">("ListPotong");
 const activeBahanIndex = ref(-1);
+const prosesOptions = computed(() => {
+  const opts: string[] = [];
+  if (formData.value.Cetak) opts.push("SABLON", "SUBLIM");
+  if (formData.value.Bordir) opts.push("BORDIR");
+  if (!opts.includes("DTF")) opts.push("DTF");
+  return opts;
+});
 
 const initialData = {
   NomorSPK: "",
@@ -37,8 +41,7 @@ const initialData = {
   Cetak: false,
   Bordir: false,
   ListPotong: [] as any[],
-  ListCetak: [] as any[],
-  ListBordir: [] as any[],
+  ListCetakBordir: [] as any[],
 };
 
 const {
@@ -114,7 +117,7 @@ const handleSpkSelected = (spk: any) => {
 
 // Fungsi Buka Modal Bahan (klik input Kode di tabel)
 const openBahanModal = (
-  listName: "ListPotong" | "ListCetak" | "ListBordir",
+  listName: "ListPotong" | "ListCetakBordir",
   index: number,
 ) => {
   activeBahanType.value = listName;
@@ -124,18 +127,16 @@ const openBahanModal = (
 
 // Handle Saat Komponen Dipilih dari Modal
 const handleBahanSelected = (bahan: any) => {
-  const listName = activeBahanType.value;
+  const listName = activeBahanType.value; // "ListPotong" | "ListCetakBordir"
   const index = activeBahanIndex.value;
 
-  // Cek Duplikat
   const isDuplicate = formData.value[listName].some(
-    (row, i) => row.Kode === bahan.Kode && i !== index,
+    (row: any, i: number) => row.Kode === bahan.Kode && i !== index,
   );
   if (isDuplicate) {
     toast.warning(`Kode ${bahan.Kode} sudah ada di baris lain.`);
     return;
   }
-
   formData.value[listName][index].Kode = bahan.Kode;
   formData.value[listName][index].Nama = bahan.Nama;
 };
@@ -149,40 +150,25 @@ onMounted(() => {
 });
 
 // ── Grid manipulation ──────────────────────────────────────────────────
-const addRow = (listName: "ListPotong" | "ListCetak" | "ListBordir") => {
-  formData.value[listName].push({ Kode: null, Nama: "" });
+const addRow = (listName: "ListPotong" | "ListCetakBordir") => {
+  if (listName === "ListCetakBordir") {
+    formData.value.ListCetakBordir.push({
+      Kode: null,
+      Nama: "",
+      Proses: "DTF",
+      Penempatan: "",
+      Ukuran: "",
+    });
+  } else {
+    formData.value.ListPotong.push({ Kode: null, Nama: "" });
+  }
 };
 
 const removeRow = (
-  listName: "ListPotong" | "ListCetak" | "ListBordir",
+  listName: "ListPotong" | "ListCetakBordir",
   index: number,
 ) => {
   formData.value[listName].splice(index, 1);
-};
-
-// FIX 3: gunakan listName yang benar dan options yang sesuai
-const onBahanSelect = (
-  itemKode: string,
-  index: number,
-  listName: "ListPotong" | "ListCetak" | "ListBordir",
-) => {
-  // Bordir pakai lookupBordirOptions, sisanya lookupOptions
-  const options =
-    listName === "ListBordir" ? lookupBordirOptions.value : lookupOptions.value;
-  const found = options.find((x) => x.Kode === itemKode);
-
-  if (found) {
-    const isDuplicate = formData.value[listName].some(
-      (row, i) => row.Kode === itemKode && i !== index,
-    );
-    if (isDuplicate) {
-      toast.warning(`Kode ${itemKode} sudah ada di baris lain.`);
-      formData.value[listName][index].Kode = null;
-      formData.value[listName][index].Nama = "";
-      return;
-    }
-    formData.value[listName][index].Nama = found.Nama;
-  }
 };
 </script>
 
@@ -319,17 +305,11 @@ const onBahanSelect = (
             /></template>
             POTONG
           </v-tab>
-          <v-tab value="cetak">
+          <v-tab value="cetakbordir">
             <template #prepend
               ><IconPrinter :size="16" :stroke-width="1.7" class="mr-1"
             /></template>
-            CETAK
-          </v-tab>
-          <v-tab value="bordir">
-            <template #prepend
-              ><IconNeedle :size="16" :stroke-width="1.7" class="mr-1"
-            /></template>
-            BORDIR
+            SECOND PROCESS
           </v-tab>
         </v-tabs>
 
@@ -415,21 +395,18 @@ const onBahanSelect = (
               </div>
             </v-window-item>
 
-            <!-- CETAK -->
-            <v-window-item value="cetak">
+            <!-- SECOND PROCESS (Cetak + Bordir gabung) -->
+            <v-window-item value="cetakbordir">
               <div class="tab-content">
                 <div class="tab-content-header">
                   <span class="tab-content-title text-orange-darken-3">
-                    <IconPrinter
-                      :size="15"
-                      :stroke-width="1.7"
-                      class="mr-1"
-                    />KOMPONEN CETAK
+                    <IconPrinter :size="15" :stroke-width="1.7" class="mr-1" />
+                    KOMPONEN SECOND PROCESS
                   </span>
                   <v-btn
                     size="small"
                     color="orange-darken-3"
-                    @click="addRow('ListCetak')"
+                    @click="addRow('ListCetakBordir')"
                   >
                     <template #prepend
                       ><IconPlus :size="14" :stroke-width="2"
@@ -441,17 +418,20 @@ const onBahanSelect = (
                   <thead>
                     <tr>
                       <th class="col-no">No</th>
-                      <th class="col-kode">Kode Komponen</th>
-                      <th>Nama Komponen</th>
+                      <th style="width: 160px">Kode</th>
+                      <th>Nama</th>
+                      <th style="width: 110px">Proses</th>
+                      <th style="width: 130px">Penempatan</th>
+                      <th style="width: 100px">Ukuran</th>
                       <th class="col-aksi text-center">Aksi</th>
                     </tr>
                   </thead>
                   <tbody>
                     <tr
-                      v-for="(item, idx) in formData.ListCetak"
-                      :key="'c' + idx"
+                      v-for="(item, idx) in formData.ListCetakBordir"
+                      :key="'cb' + idx"
                     >
-                      <td>{{ idx + 1 }}</td>
+                      <td>{{ (idx as number) + 1 }}</td>
                       <td class="pa-1">
                         <v-text-field
                           v-model="item.Kode"
@@ -461,7 +441,9 @@ const onBahanSelect = (
                           hide-details
                           placeholder="Klik u/ Cari"
                           class="cursor-pointer"
-                          @click="openBahanModal('ListCetak', idx)"
+                          @click="
+                            openBahanModal('ListCetakBordir', idx as number)
+                          "
                         >
                           <template #append-inner>
                             <IconSearch
@@ -469,102 +451,51 @@ const onBahanSelect = (
                               :stroke-width="1.7"
                               color="#1565c0"
                               style="cursor: pointer"
-                            /> </template
-                        ></v-text-field>
+                            />
+                          </template>
+                        </v-text-field>
                       </td>
                       <td>{{ item.Nama }}</td>
-                      <td class="text-center">
-                        <v-btn
-                          color="error"
-                          variant="text"
-                          size="small"
-                          @click="removeRow('ListCetak', idx)"
-                        >
-                          <IconTrash :size="16" :stroke-width="1.7" />
-                        </v-btn>
-                      </td>
-                    </tr>
-                    <tr v-if="formData.ListCetak.length === 0">
-                      <td colspan="4" class="text-center text-grey py-4">
-                        Belum ada data
-                      </td>
-                    </tr>
-                  </tbody>
-                </v-table>
-              </div>
-            </v-window-item>
-
-            <!-- BORDIR -->
-            <v-window-item value="bordir">
-              <div class="tab-content">
-                <div class="tab-content-header">
-                  <span class="tab-content-title text-purple-darken-3">
-                    <IconNeedle
-                      :size="15"
-                      :stroke-width="1.7"
-                      class="mr-1"
-                    />KOMPONEN BORDIR
-                  </span>
-                  <v-btn
-                    size="small"
-                    color="purple-darken-3"
-                    @click="addRow('ListBordir')"
-                  >
-                    <template #prepend
-                      ><IconPlus :size="14" :stroke-width="2"
-                    /></template>
-                    Tambah
-                  </v-btn>
-                </div>
-                <v-table density="compact" class="komponen-table">
-                  <thead>
-                    <tr>
-                      <th class="col-no">No</th>
-                      <th class="col-kode">Kode Komponen</th>
-                      <th>Nama Komponen</th>
-                      <th class="col-aksi text-center">Aksi</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr
-                      v-for="(item, idx) in formData.ListBordir"
-                      :key="'b' + idx"
-                    >
-                      <td>{{ idx + 1 }}</td>
                       <td class="pa-1">
-                        <!-- FIX 3: gunakan lookupBordirOptions untuk Bordir -->
-                        <v-text-field
-                          v-model="item.Kode"
-                          readonly
+                        <v-select
+                          v-model="item.Proses"
+                          :items="prosesOptions"
                           variant="outlined"
                           density="compact"
                           hide-details
-                          placeholder="Klik u/ Cari"
-                          class="cursor-pointer"
-                          @click="openBahanModal('ListBordir', idx)"
-                          ><template #append-inner>
-                            <IconSearch
-                              :size="14"
-                              :stroke-width="1.7"
-                              color="#1565c0"
-                              style="cursor: pointer"
-                            /> </template
-                        ></v-text-field>
+                        />
                       </td>
-                      <td>{{ item.Nama }}</td>
+                      <td class="pa-1">
+                        <v-text-field
+                          v-model="item.Penempatan"
+                          variant="outlined"
+                          density="compact"
+                          hide-details
+                          placeholder="Mis: Kanan Atas"
+                        />
+                      </td>
+                      <td class="pa-1">
+                        <v-text-field
+                          v-model="item.Ukuran"
+                          variant="outlined"
+                          density="compact"
+                          hide-details
+                          placeholder="Mis: 10x10 cm"
+                        />
+                      </td>
                       <td class="text-center">
                         <v-btn
                           color="error"
                           variant="text"
                           size="small"
-                          @click="removeRow('ListBordir', idx)"
+                          @click="removeRow('ListCetakBordir', idx as number)"
                         >
                           <IconTrash :size="16" :stroke-width="1.7" />
                         </v-btn>
                       </td>
                     </tr>
-                    <tr v-if="formData.ListBordir.length === 0">
-                      <td colspan="4" class="text-center text-grey py-4">
+                    <tr v-if="!formData.ListCetakBordir.length">
+                      <td colspan="7" class="text-center text-grey py-4">
                         Belum ada data
                       </td>
                     </tr>
@@ -582,7 +513,6 @@ const onBahanSelect = (
       <BahanSearchModal
         v-model="showBahanModal"
         mode="komponen"
-        :is-bordir="activeBahanType === 'ListBordir'"
         @selected="handleBahanSelected"
       />
     </template>

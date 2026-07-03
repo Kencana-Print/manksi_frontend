@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import api from "@/services/api";
 import { useToast } from "vue-toastification";
@@ -33,6 +33,20 @@ const filterDate = ref({
   start: firstDayOfMonth,
   end: today,
 });
+
+let filterTimer: ReturnType<typeof setTimeout> | null = null;
+
+watch(
+  filterDate,
+  () => {
+    expandedData.value = {};
+    expandedRows.value = [];
+    if (filterTimer) clearTimeout(filterTimer);
+    filterTimer = setTimeout(fetchData, 400);
+  },
+  { deep: true },
+);
+
 // BaseBrowse akan emit update:filterState saat restore,
 // kita terima dan terapkan ke filterDate
 const onFilterStateRestored = (state: Record<string, any>) => {

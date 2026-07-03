@@ -948,7 +948,11 @@ const onPoSelected = (po: any) => {
     </div>
   </BaseForm>
 
-  <SpkSearchModal v-model="showSpkModal" @selected="onSpkSelected" />
+  <SpkSearchModal
+    v-model="showSpkModal"
+    filter-mode="so"
+    @selected="onSpkSelected"
+  />
   <BahanSearchModal
     v-model="showBahanModal"
     @selected="onBahanSelected"

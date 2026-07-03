@@ -4,7 +4,7 @@ import { useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
 import BaseForm from "@/components/BaseForm.vue";
 import { useForm } from "@/composables/useForm";
-import { IconPrinter } from "@tabler/icons-vue";
+import { IconPrinter, IconSearch } from "@tabler/icons-vue";
 import api from "@/services/api";
 
 import MapSearchModal from "@/components/lookups/MapSearchModal.vue";
@@ -234,6 +234,11 @@ const onBahanSelected = (item: any) => {
   }
 };
 
+const openBahanModal = (idx: number) => {
+  activeBahanIdx.value = idx;
+  showBahanModal.value = true;
+};
+
 const onBabaranChange = async (k: any) => {
   const rencanaSize =
     formData.value.header.mspk_rencana_size ||
@@ -303,6 +308,12 @@ const fmtDateTime = (val: string) => {
   return `${p(d.getDate())}-${p(d.getMonth() + 1)}-${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
 };
 
+const onKeteranganFocus = (c: any) => {
+  if (c.keterangan === "-") {
+    c.keterangan = "";
+  }
+};
+
 const onAccSelected = (item: any) => {
   if (activeAccIdx.value >= 0) {
     const row = formData.value.aksesoris[activeAccIdx.value];
@@ -311,6 +322,11 @@ const onAccSelected = (item: any) => {
     row.satuan = item.Satuan;
     row.note = item.Note;
   }
+};
+
+const openAccModal = (idx: number) => {
+  activeAccIdx.value = idx;
+  showAccModal.value = true;
 };
 
 const addBahanRow = () =>
@@ -463,7 +479,7 @@ onMounted(() => {
               class="btn-lkp"
               @click="showMapModal = true"
             >
-              🔍
+              <IconSearch :size="12" color="#1565c0" />
             </button>
           </div>
         </div>
@@ -680,7 +696,11 @@ onMounted(() => {
                     </select>
                   </td>
                   <td class="p0">
-                    <input v-model="c.keterangan" class="cell-inp" />
+                    <input
+                      v-model="c.keterangan"
+                      class="cell-inp"
+                      @focus="onKeteranganFocus(c)"
+                    />
                   </td>
                   <td class="tc muted">{{ c.user_create || "" }}</td>
                   <td class="muted">{{ fmtDateTime(c.date_create) }}</td>
@@ -749,8 +769,9 @@ onMounted(() => {
                         v-model="k.kode"
                         class="cell-inp tc"
                         style="font-family: monospace; background: #e3f2fd"
-                        readonly
-                        placeholder="Cari..."
+                        placeholder="F1/Enter cari..."
+                        @keydown.enter.prevent="openBahanModal(i)"
+                        @keydown.f1.prevent="openBahanModal(i)"
                       />
                       <button
                         type="button"
@@ -760,12 +781,9 @@ onMounted(() => {
                           border-left: 1px solid #ddd;
                           background: #e3f2fd;
                         "
-                        @click="
-                          activeBahanIdx = i;
-                          showBahanModal = true;
-                        "
+                        @click="openBahanModal(i)"
                       >
-                        🔍
+                        <IconSearch :size="12" color="#1565c0" />
                       </button>
                     </div>
                   </td>
@@ -827,19 +845,17 @@ onMounted(() => {
                       v-model="a.kode"
                       class="cell-inp tc"
                       style="font-family: monospace"
-                      readonly
-                      placeholder="Cari..."
+                      placeholder="F1/Enter cari..."
+                      @keydown.enter.prevent="openAccModal(i)"
+                      @keydown.f1.prevent="openAccModal(i)"
                     />
                     <button
                       type="button"
                       class="btn-lkp"
                       style="border: none; border-left: 1px solid #ddd"
-                      @click="
-                        activeAccIdx = i;
-                        showAccModal = true;
-                      "
+                      @click="openAccModal(i)"
                     >
-                      🔍
+                      <IconSearch :size="12" color="#1565c0" />
                     </button>
                   </div>
                 </td>

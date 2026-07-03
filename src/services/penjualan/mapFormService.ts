@@ -17,6 +17,33 @@ export const mapFormService = {
     );
   },
 
+  getNamaSuggestions: (q: string, divisi: string, cusKode: string) =>
+    api.get("/penjualan/map-form/nama-suggestions", {
+      params: { q, divisi, cusKode },
+    }),
+
+  checkDuplikatNama: (
+    nama: string,
+    divisi: string,
+    cusKode: string,
+    excludeNomor = "",
+  ) =>
+    api.get("/penjualan/map-form/check-duplikat", {
+      params: { nama, divisi, cusKode, excludeNomor },
+    }),
+
+  getKatalogCustomer(
+    cusKode: string,
+    divisi: string = "",
+    keyword: string = "",
+    page: number = 1,
+    limit: number = 20,
+  ) {
+    return api.get(`/penjualan/map-form/katalog/customer/${cusKode}`, {
+      params: { divisi, q: keyword, page, limit },
+    });
+  },
+
   getById(nomor: string) {
     const safeNomor = encodeURIComponent(nomor);
     return api.get(`/penjualan/map-form/${safeNomor}`);

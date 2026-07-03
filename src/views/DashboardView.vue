@@ -1,5 +1,13 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch, nextTick } from "vue";
+import {
+  ref,
+  computed,
+  onMounted,
+  onUnmounted,
+  watch,
+  nextTick,
+  type Ref,
+} from "vue";
 import { useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/authStore";
 import { dashboardService } from "@/services/dashboard/dashboardService";
@@ -128,6 +136,7 @@ watch(activeTab, async (tab) => {
   if (tab === "overview") {
     // Re-render chart karena container size mungkin berubah
     if (trendData.value.length) renderTrendChart();
+    setupAktObserver();
   }
   if (tab === "marketing") {
     setupPenObserver();
@@ -668,6 +677,65 @@ const mapKirimRate = computed(() => {
   );
 });
 
+const AKT_PAGE_SIZE = 20;
+const aktOffset = ref(0);
+const aktHasMore = ref(true);
+const isLoadingMoreAkt = ref(false);
+const aktSentinelEl = ref<HTMLElement | null>(null);
+let aktScrollObserver: IntersectionObserver | null = null;
+
+// Menu ID per jenis — untuk filter permission
+const JENIS_MENU_ID: Record<string, string> = {
+  SPK: "152", // atau menu SPK yang sesuai
+  MAP: "162",
+  PENAWARAN: "151",
+  INVOICE: "157",
+};
+
+// Filter berdasarkan permission user
+const filterAktivitasByPermission = (list: any[]) => {
+  return list.filter((item) => {
+    const menuId = JENIS_MENU_ID[item.jenis];
+    if (!menuId) return true; // kalau tidak ada definisi, tampilkan
+    return authStore.can(menuId, "view");
+  });
+};
+
+const loadMoreAktivitas = async () => {
+  if (!aktHasMore.value || isLoadingMoreAkt.value) return;
+  isLoadingMoreAkt.value = true;
+  try {
+    const res = await dashboardService.getAktivitasHariIni(
+      AKT_PAGE_SIZE,
+      aktOffset.value,
+    );
+    const rows: any[] = res.data.data || [];
+    const filtered = filterAktivitasByPermission(rows);
+    aktivitasList.value.push(...filtered);
+    aktOffset.value += rows.length;
+    if (rows.length < AKT_PAGE_SIZE) aktHasMore.value = false;
+
+    // ← tambah ini: update count setiap kali ada data baru masuk
+    animatedAktivitasCount.value = aktivitasList.value.length;
+  } catch {
+    /* silent */
+  } finally {
+    isLoadingMoreAkt.value = false;
+  }
+};
+
+const setupAktObserver = () => {
+  if (aktScrollObserver) aktScrollObserver.disconnect();
+  if (!aktSentinelEl.value) return;
+  aktScrollObserver = new IntersectionObserver(
+    (entries) => {
+      if (entries[0].isIntersecting) loadMoreAktivitas();
+    },
+    { threshold: 0.1 },
+  );
+  aktScrollObserver.observe(aktSentinelEl.value);
+};
+
 const renderTrendChart = async () => {
   await nextTick();
   if (!trendChartEl.value || !trendData.value.length) return;
@@ -704,8 +772,92 @@ const renderTrendChart = async () => {
 
 const jenisColor: Record<string, string> = {
   SPK: "#1565c0",
+  MAP: "#00695c",
   PENAWARAN: "#6a1b9a",
   INVOICE: "#2e7d32",
+};
+
+// Ref untuk animasi
+const animatedSpkAktif = ref(0);
+const animatedTerlambat = ref(0);
+const animatedDeadlineHariIni = ref(0);
+const animatedSegera = ref(0);
+const animatedAktivitasCount = ref(0);
+
+// Animasi count-up
+const animateNumber = (target: Ref<number>, newVal: number, duration = 600) => {
+  const start = target.value;
+  const diff = newVal - start;
+  if (diff === 0) return;
+
+  const startTime = performance.now();
+  const step = (now: number) => {
+    const elapsed = now - startTime;
+    const progress = Math.min(elapsed / duration, 1);
+    // Easing: ease-out cubic
+    const eased = 1 - Math.pow(1 - progress, 3);
+    target.value = Math.round(start + diff * eased);
+    if (progress < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+};
+
+// Polling ringan — hanya SPK summary + aktivitas
+let pollingTimer: ReturnType<typeof setInterval> | null = null;
+
+const pollLightData = async () => {
+  try {
+    const [rSpk, rAktivitas] = await Promise.allSettled([
+      dashboardService.getSpkSummary(),
+      dashboardService.getAktivitasHariIni(50, 0), // ← 50 item terbaru, offset 0
+    ]);
+
+    if (rSpk.status === "fulfilled") {
+      const d = rSpk.value.data.data;
+      animateNumber(animatedSpkAktif, d.TotalAktif);
+      animateNumber(animatedTerlambat, d.Terlambat);
+      animateNumber(animatedDeadlineHariIni, d.DeadlineHariIni);
+      animateNumber(animatedSegera, d.SegeredDeadline);
+      // Update data asli juga
+      spkSummary.value = d;
+    }
+
+    if (rAktivitas.status === "fulfilled") {
+      const newList: any[] = rAktivitas.value.data.data || [];
+      const filtered = filterAktivitasByPermission(newList);
+      const existingNomors = new Set(
+        aktivitasList.value.map((a: any) => a.nomor),
+      );
+      const brandNew = filtered.filter(
+        (a: any) => !existingNomors.has(a.nomor),
+      );
+
+      if (brandNew.length > 0) {
+        newAktivitasIds.value = new Set(brandNew.map((a: any) => a.nomor));
+        aktivitasList.value = [...brandNew, ...aktivitasList.value]; // prepend di atas
+        animateNumber(animatedAktivitasCount, aktivitasList.value.length);
+        setTimeout(() => {
+          newAktivitasIds.value = new Set();
+        }, 3000);
+      }
+    }
+  } catch {
+    /* silent */
+  }
+};
+
+const newAktivitasIds = ref<Set<string>>(new Set());
+
+const startPolling = () => {
+  stopPolling();
+  pollingTimer = setInterval(pollLightData, 30_000); // 30 detik
+};
+
+const stopPolling = () => {
+  if (pollingTimer) {
+    clearInterval(pollingTimer);
+    pollingTimer = null;
+  }
 };
 
 // ── Load Dashboard ──
@@ -719,12 +871,19 @@ const loadDashboard = async () => {
   mapHasMore.value = true;
 
   try {
-    const [rAktivitas, rTrend] = await Promise.allSettled([
-      dashboardService.getAktivitasHariIni(),
+    aktivitasList.value = [];
+    aktOffset.value = 0;
+    aktHasMore.value = true;
+
+    const [rTrend] = await Promise.allSettled([
       dashboardService.getTrendSpk7Hari(),
     ]);
-    if (rAktivitas.status === "fulfilled")
-      aktivitasList.value = rAktivitas.value.data.data || [];
+    if (rTrend.status === "fulfilled") {
+      trendData.value = rTrend.value.data.data || [];
+      renderTrendChart();
+    }
+
+    await loadMoreAktivitas();
     if (rTrend.status === "fulfilled") {
       trendData.value = rTrend.value.data.data || [];
       renderTrendChart();
@@ -732,8 +891,14 @@ const loadDashboard = async () => {
     const [spkSumRes] = await Promise.allSettled([
       dashboardService.getSpkSummary(),
     ]);
-    if (spkSumRes.status === "fulfilled")
-      spkSummary.value = spkSumRes.value.data.data;
+    if (spkSumRes.status === "fulfilled") {
+      spkSummary.value = spkSumRes.value.data.data; // ← isi dulu
+      animatedSpkAktif.value = spkSummary.value.TotalAktif;
+      animatedTerlambat.value = spkSummary.value.Terlambat;
+      animatedDeadlineHariIni.value = spkSummary.value.DeadlineHariIni;
+      animatedSegera.value = spkSummary.value.SegeredDeadline;
+    }
+    animatedAktivitasCount.value = aktivitasList.value.length;
 
     if (showPoBpb.value) {
       const [poBpbRes] = await Promise.allSettled([
@@ -942,6 +1107,7 @@ onMounted(async () => {
   }
 
   await loadDashboard();
+  startPolling();
 
   // Setup observer untuk tab yang aktif saat ini
   await nextTick();
@@ -959,9 +1125,14 @@ onMounted(async () => {
     setupBufferObserver();
     setupBahanObserver();
   }
+  if (activeTab.value === "overview") {
+    setupAktObserver();
+  }
 });
 
 onUnmounted(() => {
+  stopPolling();
+  aktScrollObserver?.disconnect();
   penScrollObserver?.disconnect();
   mapScrollObserver?.disconnect();
   overdueScrollObserver?.disconnect();
@@ -1213,7 +1384,7 @@ const sisaClass = (item: any) => {
             <div class="sum-card">
               <div class="sum-label">SPK Aktif</div>
               <div class="sum-value text-primary">
-                {{ isLoadingDashboard ? "—" : spkSummary.TotalAktif }}
+                {{ isLoadingDashboard ? "—" : animatedSpkAktif }}
               </div>
             </div>
           </v-col>
@@ -1221,7 +1392,7 @@ const sisaClass = (item: any) => {
             <div class="sum-card">
               <div class="sum-label">Terlambat</div>
               <div class="sum-value text-error">
-                {{ isLoadingDashboard ? "—" : spkSummary.Terlambat }}
+                {{ isLoadingDashboard ? "—" : animatedTerlambat }}
               </div>
             </div>
           </v-col>
@@ -1229,7 +1400,7 @@ const sisaClass = (item: any) => {
             <div class="sum-card">
               <div class="sum-label">Deadline Hari Ini</div>
               <div class="sum-value text-warning">
-                {{ isLoadingDashboard ? "—" : spkSummary.DeadlineHariIni }}
+                {{ isLoadingDashboard ? "—" : animatedDeadlineHariIni }}
               </div>
             </div>
           </v-col>
@@ -1237,7 +1408,7 @@ const sisaClass = (item: any) => {
             <div class="sum-card">
               <div class="sum-label">Segera Deadline (≤3hr)</div>
               <div class="sum-value" style="color: #e65100">
-                {{ isLoadingDashboard ? "—" : spkSummary.SegeredDeadline }}
+                {{ isLoadingDashboard ? "—" : animatedSegera }}
               </div>
             </div>
           </v-col>
@@ -1361,11 +1532,15 @@ const sisaClass = (item: any) => {
                 <IconActivity :size="14" style="color: #6a1b9a" class="mr-1" />
                 <span>Aktivitas Hari Ini</span>
                 <span class="ms-auto text-caption text-medium-emphasis">
-                  {{ aktivitasList.length }} transaksi
+                  {{ animatedAktivitasCount
+                  }}{{ aktHasMore ? "+" : "" }} transaksi
                 </span>
               </div>
               <div style="flex: 1; overflow-y: auto">
-                <div v-if="!aktivitasList.length" class="empty-hint">
+                <div
+                  v-if="!aktivitasList.length && !isLoadingMoreAkt"
+                  class="empty-hint"
+                >
                   Belum ada aktivitas hari ini
                 </div>
                 <div v-else class="aktivitas-list">
@@ -1373,6 +1548,9 @@ const sisaClass = (item: any) => {
                     v-for="(item, i) in aktivitasList"
                     :key="i"
                     class="aktivitas-item"
+                    :class="{
+                      'aktivitas-item--new': newAktivitasIds.has(item.nomor),
+                    }"
                   >
                     <span
                       class="jenis-badge"
@@ -1387,6 +1565,22 @@ const sisaClass = (item: any) => {
                     <span class="akt-nama">{{ item.nama }}</span>
                     <span class="akt-divisi">{{ item.divisi }}</span>
                     <span class="akt-jam ms-auto">{{ item.jam }}</span>
+                  </div>
+
+                  <!-- Sentinel -->
+                  <div
+                    ref="aktSentinelEl"
+                    style="padding: 6px; text-align: center"
+                  >
+                    <span v-if="isLoadingMoreAkt" class="pen-loading"
+                      >Memuat...</span
+                    >
+                    <span
+                      v-else-if="!aktHasMore && aktivitasList.length"
+                      class="pen-end"
+                    >
+                      {{ aktivitasList.length }} aktivitas
+                    </span>
                   </div>
                 </div>
               </div>
@@ -5196,5 +5390,19 @@ const sisaClass = (item: any) => {
   padding: 24px;
   font-size: 12px;
   color: #bdbdbd;
+}
+
+.aktivitas-item--new {
+  background: #e8f5e9 !important;
+  animation: highlight-fade 3s ease-out forwards;
+}
+
+@keyframes highlight-fade {
+  0% {
+    background: #c8e6c9;
+  }
+  100% {
+    background: transparent;
+  }
 }
 </style>

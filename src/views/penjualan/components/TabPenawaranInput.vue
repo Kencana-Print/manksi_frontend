@@ -25,9 +25,6 @@ const props = defineProps<{
 }>();
 
 const toast = useToast();
-const NOTE_SPANDUK_DEFAULT =
-  "Dikarenakan proses drying, ukuran jadi spanduk/umbul akan mengalami penyusutan ±5 cm.";
-
 const authStore = useAuthStore();
 
 // ── State untuk Preview Gambar ──
@@ -150,29 +147,6 @@ const dpNominal = computed(() => {
   if (!props.formData.DpPer) return 0;
   return (Number(props.formData.DpPer) / 100) * grandTotal.value;
 });
-
-watch(
-  () => props.formData.Divisi,
-  (newDivisi, oldDivisi) => {
-    // Hanya auto-fill saat mode baru (bukan edit) dan Note masih kosong
-    // Atau saat user ganti divisi dari non-spanduk ke spanduk
-    if (newDivisi === "1") {
-      if (
-        !props.formData.Note ||
-        props.formData.Note === NOTE_SPANDUK_DEFAULT
-      ) {
-        props.formData.Note = NOTE_SPANDUK_DEFAULT;
-      }
-    } else {
-      // Kalau pindah dari spanduk ke divisi lain, hapus note default
-      // hanya jika note-nya masih berisi teks default (tidak diubah user)
-      if (props.formData.Note === NOTE_SPANDUK_DEFAULT) {
-        props.formData.Note = "";
-      }
-    }
-  },
-  { immediate: true },
-);
 
 // ── Aksi Tabel Detail ──
 const addDetail = () => {

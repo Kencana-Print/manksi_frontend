@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from "vue";
+import { ref, computed, watch, onMounted, onBeforeUnmount } from "vue";
 import { useToast } from "vue-toastification";
 import { mapFormService } from "@/services/penjualan/mapFormService";
 import api from "@/services/api";
@@ -127,6 +127,13 @@ const isDivisiSatuAtauLima = computed(() => {
 // ── Image ──
 const fileRef = ref<HTMLInputElement | null>(null);
 const getBaseUrl = () => api.defaults.baseURL?.replace(/\/api\/?$/, "") || "";
+const resolvedImageUrl = ref("");
+watch(
+  () => props.formData.Nomor,
+  () => {
+    resolvedImageUrl.value = ""; // reset saat ganti record
+  },
+);
 
 const displayImageUrl = computed(() => {
   // 1. Blob lokal (baru dipilih user)
@@ -156,14 +163,18 @@ const handleFallbackImage = (e: Event) => {
     return;
   }
   img.dataset.fallbackTried = "true";
-
-  // Fallback ke VPS mintaharga
   const mhNomor = props.formData.MintaHarga || props.formData.Nomor;
   if (mhNomor) {
-    img.src = `http://103.94.238.252:8888/file-gambar/mintaharga/${encodeURIComponent(mhNomor)}.jpg`;
+    const fallbackUrl = `http://103.94.238.252:8888/file-gambar/mintaharga/${encodeURIComponent(mhNomor)}.jpg`;
+    img.src = fallbackUrl;
+    resolvedImageUrl.value = fallbackUrl; // ← catat URL yg akhirnya berhasil dipakai
   } else {
     img.style.display = "none";
   }
+};
+
+const onMainImageLoad = () => {
+  resolvedImageUrl.value = displayImageUrl.value;
 };
 
 const onFileChange = (e: Event) => {
@@ -475,6 +486,67 @@ const onCabSpkKodeEnter = async () => {
     toast.error("Gagal validasi kode workshop.");
   }
 };
+
+// ── Autocomplete Nama Pekerjaan ──
+const namaSuggestions = ref<Array<{ nama: string; frekuensi: number }>>([]);
+const showNamaSuggestions = ref(false);
+const namaInputRef = ref<HTMLElement | null>(null);
+let namaDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+const fetchNamaSuggestions = async (val: string) => {
+  const divisi = props.formData.Divisi
+    ? String(props.formData.Divisi).charAt(0)
+    : "";
+  const cusKode = props.formData.CustKode || "";
+
+  // Minimal 2 karakter dan harus ada divisi + customer dulu
+  if (!val || val.length < 2 || !divisi || !cusKode) {
+    namaSuggestions.value = [];
+    showNamaSuggestions.value = false;
+    return;
+  }
+
+  try {
+    const res = await mapFormService.getNamaSuggestions(val, divisi, cusKode);
+    namaSuggestions.value = res.data.data || [];
+    showNamaSuggestions.value = namaSuggestions.value.length > 0;
+  } catch {
+    namaSuggestions.value = [];
+    showNamaSuggestions.value = false;
+  }
+};
+
+const onNamaInput = (e: Event) => {
+  const val = (e.target as HTMLInputElement).value;
+  props.formData.Nama = val;
+  if (namaDebounceTimer) clearTimeout(namaDebounceTimer);
+  namaDebounceTimer = setTimeout(() => fetchNamaSuggestions(val), 300);
+};
+
+const selectNamaSuggestion = (item: { nama: string }) => {
+  props.formData.Nama = item.nama;
+  props.formData.Nama2 = item.nama;
+  showNamaSuggestions.value = false;
+  namaSuggestions.value = [];
+};
+
+const onNamaBlur = () => {
+  // Delay agar click pada suggestion sempat tereksekusi dulu
+  setTimeout(() => {
+    showNamaSuggestions.value = false;
+  }, 200);
+};
+
+const onNamaFocus = () => {
+  if (props.formData.Nama && props.formData.Nama.length >= 2) {
+    fetchNamaSuggestions(props.formData.Nama);
+  }
+};
+
+// Cleanup timer saat unmount
+onBeforeUnmount(() => {
+  if (namaDebounceTimer) clearTimeout(namaDebounceTimer);
+});
 
 // ── F1 handlers untuk setiap input kode ──
 const onPerushF1 = (e: KeyboardEvent) => {
@@ -856,9 +928,33 @@ const setSetoranPembayaran = (v: any) => {
           </div>
         </div>
 
-        <div class="f-row">
+        <div class="f-row" style="position: relative">
           <label class="f-lbl">Nama Pekerjaan</label>
-          <input v-model="formData.Nama" class="f-inp" style="flex: 1" />
+          <div style="flex: 1; position: relative">
+            <input
+              ref="namaInputRef"
+              :value="formData.Nama"
+              class="f-inp"
+              style="width: 100%"
+              autocomplete="off"
+              placeholder="Ketik nama pekerjaan..."
+              @input="onNamaInput"
+              @focus="onNamaFocus"
+              @blur="onNamaBlur"
+            />
+            <!-- Dropdown suggestions -->
+            <div v-if="showNamaSuggestions" class="nama-suggestions">
+              <div
+                v-for="(item, idx) in namaSuggestions"
+                :key="idx"
+                class="nama-suggestion-item"
+                @mousedown.prevent="selectNamaSuggestion(item)"
+              >
+                <span class="suggestion-nama">{{ item.nama }}</span>
+                <span class="suggestion-freq">{{ item.frekuensi }}x</span>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div class="f-row">
@@ -1261,7 +1357,10 @@ const setSetoranPembayaran = (v: any) => {
           <button
             type="button"
             class="f-upload-btn blue ml-1"
-            @click="displayImageUrl && (showPreviewDialog = true)"
+            @click="
+              (resolvedImageUrl || displayImageUrl) &&
+              (showPreviewDialog = true)
+            "
           >
             <IconMaximize :size="13" class="mr-1" /> Full Screen
           </button>
@@ -1274,6 +1373,7 @@ const setSetoranPembayaran = (v: any) => {
             class="f-img"
             @click="showPreviewDialog = true"
             @error="handleFallbackImage"
+            @load="onMainImageLoad"
             style="cursor: pointer"
           />
           <div v-else class="f-img-empty">
@@ -1337,7 +1437,7 @@ const setSetoranPembayaran = (v: any) => {
       </div>
       <div class="preview-body">
         <v-img
-          :src="displayImageUrl"
+          :src="resolvedImageUrl || displayImageUrl"
           max-height="600"
           contain
           class="bg-white rounded"
@@ -1594,6 +1694,59 @@ const setSetoranPembayaran = (v: any) => {
   accent-color: #1565c0;
   flex-shrink: 0;
   margin-top: 2px;
+}
+
+/* ── Autocomplete Nama Pekerjaan ── */
+.nama-suggestions {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: white;
+  border: 1px solid #1565c0;
+  border-top: none;
+  border-radius: 0 0 4px 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 999;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.nama-suggestion-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 10px;
+  cursor: pointer;
+  font-size: 12px;
+  border-bottom: 1px solid #f0f0f0;
+  transition: background 0.1s;
+}
+
+.nama-suggestion-item:last-child {
+  border-bottom: none;
+}
+
+.nama-suggestion-item:hover {
+  background: #e3f2fd;
+}
+
+.suggestion-nama {
+  flex: 1;
+  color: #212121;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.suggestion-freq {
+  font-size: 10px;
+  color: #9e9e9e;
+  margin-left: 8px;
+  white-space: nowrap;
+  background: #f5f5f5;
+  padding: 1px 5px;
+  border-radius: 10px;
 }
 
 /* ── Image ── */

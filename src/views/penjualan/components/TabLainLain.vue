@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { ref, computed, watch } from "vue";
 import { useToast } from "vue-toastification";
+import api from "@/services/api";
 import {
   IconCheck,
   IconUpload,
@@ -25,34 +26,48 @@ const updateToKetUkuran = () => {
   const parts = props.formData.Sizes.filter((x: any) => Number(x.qty) > 0).map(
     (x: any) => `${x.size}=${x.qty}`,
   );
-  props.formData.Ukuran = parts.join(", ");
+  props.formData.KetUkuran = parts.join(", ");
   toast.success("Berhasil di-update ke Ket. Ukuran");
 };
 
 // Email image
 const showEmailDialog = ref(false);
+const isEmailImageError = ref(false);
+
+watch(
+  () => props.formData.EmailImageBlob,
+  () => {
+    isEmailImageError.value = false; // reset begitu ada gambar baru dipilih
+  },
+);
 const fileEmailRef = ref<HTMLInputElement | null>(null);
 
+const getBaseUrl = () => api.defaults.baseURL?.replace(/\/api\/?$/, "") || "";
+
+watch(
+  () => props.formData.EmailImageBlob,
+  () => {
+    isEmailImageError.value = false; // reset begitu ada gambar baru dipilih
+  },
+);
+
 const displayEmailUrl = computed(() => {
+  if (isEmailImageError.value) return "";
+  // Blob lokal (baru dipilih user, belum ke-refresh dari server)
   if (props.formData.EmailImageBlob) return props.formData.EmailImageBlob;
   if (!props.isEdit) return "";
-  const id = props.formData.Nomor;
-  if (!id) return "";
-  let name = id;
-  const m = name.match(/(MH\.\d{4}\.\d+)/i);
-  if (m) name = m[1];
-  else {
-    name =
-      name
-        .replace(/.*imagemintaharga/i, "")
-        .replace(/.*Downloads/i, "")
-        .replace(/\\/g, "/")
-        .split("/")
-        .pop()
-        ?.replace(/\.(jpe?g|png)$/i, "") || "";
-  }
-  return `http://103.94.238.252:8888/file-gambar/${encodeURIComponent(name)}-email.jpg`;
+  const nomor = props.formData.Nomor;
+  if (!nomor) return "";
+
+  // Sesuai path processImage backend: public/images/{cab}/map/{nomor}-email.jpg
+  const base = getBaseUrl();
+  const cab = props.formData.Cab || "HO-";
+  return `${base}/images/${cab}/map/${encodeURIComponent(nomor)}-email.jpg`;
 });
+
+const onEmailImageError = () => {
+  isEmailImageError.value = true;
+};
 
 const onEmailChange = (e: Event) => {
   const file = (e.target as HTMLInputElement).files?.[0];
@@ -61,6 +76,7 @@ const onEmailChange = (e: Event) => {
     toast.error("Ukuran gambar Screenshot Email tidak boleh > 500 Kb.");
     return;
   }
+  isEmailImageError.value = false;
   props.formData.EmailImageName = file.name;
   props.formData.EmailImageBlob = URL.createObjectURL(file);
   emit("upload-email", file);
@@ -252,6 +268,7 @@ const onEmailChange = (e: Event) => {
           :src="displayEmailUrl"
           class="ll-img"
           @click="showEmailDialog = true"
+          @error="onEmailImageError"
           style="cursor: pointer"
         />
         <div v-else class="ll-img-empty">

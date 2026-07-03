@@ -12,8 +12,10 @@ import api from "@/services/api";
 
 // Komponen per Tab (Asumsi kita pisah filenya agar rapi)
 import TabSpk from "./components/SalesOrderTabSo.vue";
+import TabUkuran from "./components/SalesOrderTabUkuran.vue";
 import TabAlokasi from "./components/SalesOrderTabAlokasi.vue";
 import TabKaosan from "./components/SalesOrderTabKaosan.vue";
+import SalesOrderTabKatalog from "./components/SalesOrderTabKatalog.vue";
 
 // --- IMPORT MODAL PENCARIAN ---
 import PerusahaanSearchModal from "@/components/lookups/PerusahaanSearchModal.vue";
@@ -175,6 +177,11 @@ const defaultData = {
   spk_ketpending: "",
   spk_accpending: "",
   cus_perfect: "N",
+  spk_sizekhusus: "N",
+  spk_varian_ukuran: "LENGAN_PENDEK",
+  spk_sablon: "N",
+  spk_bordir: "N",
+  spk_sublim: "N",
 
   // Array untuk Tabel Detail
   spk_repeat: "",
@@ -212,6 +219,7 @@ const defaultData = {
   kepentingan_acc: "",
 
   spk_iscetak: "N",
+  spk_standar_ukuran: "KENCANA",
 
   Alokasi: [],
   Kaosan: [],
@@ -255,6 +263,8 @@ const {
       spk_tglaccproof: getLocalDateString(d.header.spk_tglaccproof),
 
       spk_iscetak: d.header.spk_iscetak || d.header.mspk_iscetak || "N",
+      spk_standar_ukuran: d.header.spk_standar_ukuran || "KENCANA",
+      spk_varian_ukuran: d.header.spk_varian_ukuran || "LENGAN_PENDEK",
 
       isCmoChecked: false,
 
@@ -286,10 +296,17 @@ const {
       spk_mbordir: d.header.spk_mbordir || "N",
       spk_mjahit: d.header.spk_mjahit || "N",
       spk_mfinishing: d.header.spk_mfinishing || "N",
+      spk_sizekhusus: d.header.spk_sizekhusus || "N",
+      spk_sablon: d.header.spk_sablon || "N",
+      spk_bordir: d.header.spk_bordir || "N",
+      spk_sublim: d.header.spk_sublim || "N",
 
       Alokasi: d.alokasi || [],
       Kaosan: d.dtlKaosan || [],
-      Sizes: d.dtlSize || [],
+      Sizes: (() => {
+        // akan di-merge di onMounted setelah init-sizes load
+        return d.dtlSize || [];
+      })(),
     };
   },
   submitApi: async (data: any) => {
@@ -338,6 +355,12 @@ const {
         kepentingan_acc: data.kepentingan_acc, // ← tambah ini (untuk disimpan ke pin)
         pin_customer: data.pin_customer, // ← tambah ini
         ketpo_acc: data.ketpo_acc, // ← tambah ini
+        spk_sizekhusus: data.spk_sizekhusus,
+        spk_standar_ukuran: data.spk_standar_ukuran,
+        spk_varian_ukuran: data.spk_varian_ukuran,
+        spk_sablon: data.spk_sablon,
+        spk_bordir: data.spk_bordir,
+        spk_sublim: data.spk_sublim,
       },
       alokasi: data.Alokasi,
       dtlKaosan: data.Kaosan,
@@ -421,10 +444,11 @@ watch(
 // Panggil API saat form di-mount
 onMounted(async () => {
   try {
-    const [resDivisi, resKepentingan, resKetPo] = await Promise.all([
+    const [resDivisi, resKepentingan, resKetPo, resSizes] = await Promise.all([
       api.get("/lookups/divisi"),
       api.get("/lookups/kepentingan-spk"),
       api.get("/lookups/ket-po"),
+      api.get("/penjualan/sales-order/form/init-sizes"),
     ]);
 
     lookupOptions.value.divisi = resDivisi.data.data.map((d: any) => ({
@@ -433,6 +457,25 @@ onMounted(async () => {
     }));
     lookupOptions.value.kepentingan = resKepentingan.data.data;
     lookupOptions.value.ketPo = resKetPo.data.data;
+
+    // ← definisikan fullSizes dari response
+    const fullSizes: any[] = resSizes.data.data || [];
+
+    if (!isEditMode.value) {
+      formData.value.Sizes = fullSizes;
+    } else {
+      // fetchData sudah dipanggil otomatis oleh useForm saat isEditMode
+      // tunggu sebentar sampai formData terisi, lalu merge
+      await nextTick();
+
+      const existingSizes: any[] = formData.value.Sizes || [];
+      formData.value.Sizes = fullSizes.map((row: any) => {
+        const found = existingSizes.find((e: any) => e.size === row.size);
+        return found
+          ? { ...row, qty: found.qty, lb: found.lb, pb: found.pb }
+          : row;
+      });
+    }
   } catch (error) {
     console.error("Gagal menarik data lookup dropdown:", error);
   }
@@ -464,6 +507,51 @@ watch(
     }
   },
   { immediate: true },
+);
+
+// Watch: saat spk_standar_ukuran berubah ke KENCANA, auto-fill dari endpoint.
+// spk_divisi DITAMBAHKAN sbg dependency — sebelumnya cuma dicek sbg guard di
+// dalam, bukan trigger, sehingga saat loadDataMemo (tarik dari MAP) mengubah
+// spk_divisi PALING TERAKHIR (setelah jo_kode), watcher ini tidak pernah
+// retrigger dan detail ukuran (LD/PB/dst) selalu kosong utk data dari MAP.
+watch(
+  [
+    () => formData.value.spk_standar_ukuran,
+    () => formData.value.spk_jo_kode,
+    () => formData.value.spk_varian_ukuran,
+    () => formData.value.spk_divisi, // ← tambahan
+  ],
+  async ([standar, joKode, varian]) => {
+    if (standar !== "KENCANA") return;
+    if (String(formData.value.spk_divisi).charAt(0) !== "4") return;
+    if (!joKode) return;
+    try {
+      const res = await api.get("/penjualan/sales-order/form/standar-ukuran", {
+        params: { joKode, varian: varian || "STANDAR" },
+      });
+      const standarData: any[] = res.data.data || [];
+      formData.value.Sizes = standarData.map((s: any) => {
+        const existing = (formData.value.Sizes || []).find(
+          (e: any) => e.size === s.size,
+        );
+        return existing ? { ...s, qty: existing.qty } : s;
+      });
+    } catch (e) {
+      console.error("Gagal load standar ukuran", e);
+    }
+  },
+);
+
+// Watch: saat jo_kode berubah dan standar KENCANA, reload standar
+watch(
+  () => formData.value.spk_jo_kode,
+  async (newJo) => {
+    if (formData.value.spk_standar_ukuran !== "KENCANA") return;
+    if (String(formData.value.spk_divisi).charAt(0) !== "4") return;
+    if (!newJo) return;
+    // trigger watch standar_ukuran dengan cara reassign
+    formData.value.spk_standar_ukuran = "KENCANA";
+  },
 );
 
 // --- HANDLER EVENT MODAL DARI TAB ---
@@ -619,6 +707,7 @@ const loadDataMemo = async (nomor: string) => {
       formData.value.spk_finishing = h.mspk_finishing
         ? String(h.mspk_finishing).trim()
         : "";
+      formData.value.spk_tipe = h.mspk_tipe || "";
       formData.value.spk_jumlah = Number(h.mspk_rencana_order) || 0;
       formData.value.spk_keterangan = h.mspk_keterangan || "";
       formData.value.spk_nomor_po = h.mspk_nomor_po || "";
@@ -809,6 +898,13 @@ const validateSave = async () => {
   }
   if (!fd.spk_cab) {
     toast.warning("Workshop (Cabang) belum dipilih.");
+    return;
+  }
+
+  if (!fd.spk_nomor_po?.trim()) {
+    toast.warning(
+      "Nomor PO harus diisi.\nJika tidak ada PO tertulis, cari DP Customer dari Penerimaan (tombol 🔍 di sebelah field Nomor PO).",
+    );
     return;
   }
 
@@ -1051,6 +1147,15 @@ const setBarangKaosan = (selectedItems: any[]) => {
   // Reset index pemanggil
   activeKaosanIndex.value = -1;
 };
+
+const onPilihKatalog = (item: any) => {
+  formData.value.spk_nama = item.nama || "";
+  formData.value.spk_kain = item.kain || "";
+  formData.value.spk_ukuran = item.ukuran || "";
+  formData.value.spk_finishing = item.finishing || "";
+  toast.success(`SO ${item.nomor} dipilih sebagai referensi.`);
+  activeTab.value = 0; // Kembali ke tab SO
+};
 </script>
 
 <template>
@@ -1068,26 +1173,51 @@ const setBarangKaosan = (selectedItems: any[]) => {
     @confirm-cancel="executeCancel"
     @confirm-close="executeClose"
   >
-    <!-- Slot default, bukan #content -->
-    <v-card class="elevation-0 fill-height d-flex flex-column bg-transparent">
-      <v-tabs
-        v-model="activeTab"
-        color="primary"
-        density="compact"
-        class="flex-shrink-0"
-      >
-        <v-tab :value="0" class="text-caption font-weight-bold">SO</v-tab>
-        <v-tab :value="1" class="text-caption font-weight-bold">Alokasi</v-tab>
-        <v-tab
-          v-if="isDivisiTiga"
-          :value="2"
-          class="text-caption font-weight-bold"
-          >Kaosan / Detail Size</v-tab
+    <div class="pf-container">
+      <!-- ── Tab Nav ── -->
+      <div class="pf-tab-nav">
+        <button
+          class="pf-tab-btn"
+          :class="{ active: activeTab === 0 }"
+          @click="activeTab = 0"
         >
-      </v-tabs>
+          SO
+        </button>
+        <button
+          class="pf-tab-btn"
+          :class="{ active: activeTab === 3 }"
+          @click="activeTab = 3"
+        >
+          Detail Ukuran
+        </button>
+        <button
+          class="pf-tab-btn"
+          :class="{ active: activeTab === 1 }"
+          @click="activeTab = 1"
+        >
+          Alokasi
+        </button>
+        <button
+          v-if="isDivisiTiga"
+          class="pf-tab-btn"
+          :class="{ active: activeTab === 2 }"
+          @click="activeTab = 2"
+        >
+          Kaosan / Detail Size
+        </button>
+        <button
+          class="pf-tab-btn"
+          :class="{ active: activeTab === 4 }"
+          @click="activeTab = 4"
+        >
+          Katalog SO
+        </button>
+      </div>
 
-      <v-window v-model="activeTab" class="flex-grow-1 overflow-auto pa-2">
-        <v-window-item :value="0" class="fill-height">
+      <!-- ── Tab Body ── -->
+      <div class="pf-tab-body">
+        <!-- Tab SO -->
+        <div v-show="activeTab === 0" class="pf-tab-pane h-100">
           <TabSpk
             :formData="formData"
             :isEdit="isEditMode"
@@ -1098,108 +1228,189 @@ const setBarangKaosan = (selectedItems: any[]) => {
             @confirm-uncheck-cmo="handleConfirmCmo"
             @switch-tab="(val) => (activeTab = val)"
           />
-        </v-window-item>
-        <v-window-item :value="1">
+        </div>
+
+        <!-- Tab Alokasi -->
+        <div v-show="activeTab === 1" class="pf-tab-pane h-100">
           <TabAlokasi
             :formData="formData"
             @open-history-alokasi="handleOpenHistoryAlokasi"
           />
-        </v-window-item>
-        <v-window-item v-if="isDivisiTiga" :value="2">
+        </div>
+
+        <!-- Tab Kaosan -->
+        <div
+          v-if="isDivisiTiga"
+          v-show="activeTab === 2"
+          class="pf-tab-pane h-100"
+        >
           <TabKaosan
             :formData="formData"
             @open-lookup-barang="handleOpenLookupBarang"
           />
-        </v-window-item>
-      </v-window>
+        </div>
 
-      <PerusahaanSearchModal v-model="showPerushModal" @selected="setPerush" />
-      <CustomerSearchModal v-model="showCustModal" @selected="setCust" />
+        <!-- Tab Detail Ukuran -->
+        <div v-show="activeTab === 3" class="pf-tab-pane h-100">
+          <TabUkuran :form-data="formData" :is-edit="isEditMode" />
+        </div>
 
-      <CustomerSearchModal
-        v-model="showCustKaosanModal"
-        is-kaosan
-        @selected="setCustKaosan"
-      />
-      <SalesSearchModal v-model="showSalesModal" @selected="setSales" />
-      <JenisOrderSearchModal
-        v-model="showJoModal"
-        :divisi="formData.spk_divisi"
-        @selected="setJo"
-      />
-      <PabrikSearchModal v-model="showWorkshopModal" @selected="setWorkshop" />
-      <PenawaranSearchModal
-        v-model="showPenawaranModal"
-        :cust-kode="formData.spk_cus_kode"
-        @selected="setPenawaran"
-      />
-      <PenawaranDetailSearchModal
-        v-model="showPenawaranDetailModal"
-        :penawaran-nomor="selectedPenawaranNomor"
-        @selected="setPenawaranDetail"
-      />
+        <!-- Tab Katalog SO -->
+        <div
+          v-show="activeTab === 4"
+          class="pf-tab-pane h-100"
+          style="padding: 0; overflow: hidden"
+        >
+          <SalesOrderTabKatalog
+            :cust-kode="formData.spk_cus_kode"
+            :cust-nama="formData.Customer"
+            @pilih="onPilihKatalog"
+          />
+        </div>
+      </div>
+    </div>
 
-      <SjMemoSearchModal v-model="showSjMemoModal" @selected="setSjMemo" />
-      <MapSearchModal v-model="showMemoModal" @selected="setMemo" />
-      <MppbSearchModal v-model="showMppbModal" @selected="setMppb" />
+    <!-- ── Modals ── -->
+    <PerusahaanSearchModal v-model="showPerushModal" @selected="setPerush" />
+    <CustomerSearchModal v-model="showCustModal" @selected="setCust" />
+    <CustomerSearchModal
+      v-model="showCustKaosanModal"
+      is-kaosan
+      @selected="setCustKaosan"
+    />
+    <SalesSearchModal v-model="showSalesModal" @selected="setSales" />
+    <JenisOrderSearchModal
+      v-model="showJoModal"
+      :divisi="formData.spk_divisi"
+      @selected="setJo"
+    />
+    <PabrikSearchModal v-model="showWorkshopModal" @selected="setWorkshop" />
+    <PenawaranSearchModal
+      v-model="showPenawaranModal"
+      :cust-kode="formData.spk_cus_kode"
+      @selected="setPenawaran"
+    />
+    <PenawaranDetailSearchModal
+      v-model="showPenawaranDetailModal"
+      :penawaran-nomor="selectedPenawaranNomor"
+      @selected="setPenawaranDetail"
+    />
+    <SjMemoSearchModal v-model="showSjMemoModal" @selected="setSjMemo" />
+    <MapSearchModal v-model="showMemoModal" @selected="setMemo" />
+    <MppbSearchModal v-model="showMppbModal" @selected="setMppb" />
+    <SpkSearchModal v-model="showRepeatModal" @selected="setRepeat" />
+    <SpkSearchModal v-model="showSpkLamaModal" @selected="setSpkLama" />
+    <InvDcSearchModal v-model="showStokDcModal" @selected="setStokDc" />
+    <SoKaosanSearchModal v-model="showSoKaosanModal" @selected="setSoKaosan" />
+    <SetoranSearchModal
+      v-model="showSetoranModal"
+      :cust-kode="formData.spk_cus_kode"
+      @selected="setSetoranPembayaran"
+    />
+    <HistoryAlokasiModal
+      v-model="showHistoryAlokasiModal"
+      :cust-kode="formData.spk_cus_kode"
+      @selected="appendHistoryAlokasi"
+    />
+    <BarangKaosanSearchModal
+      v-model="showBarangKaosanModal"
+      @selected="setBarangKaosan"
+    />
 
-      <SpkSearchModal v-model="showRepeatModal" @selected="setRepeat" />
-
-      <SpkSearchModal v-model="showSpkLamaModal" @selected="setSpkLama" />
-
-      <InvDcSearchModal v-model="showStokDcModal" @selected="setStokDc" />
-      <SoKaosanSearchModal
-        v-model="showSoKaosanModal"
-        @selected="setSoKaosan"
-      />
-      <SetoranSearchModal
-        v-model="showSetoranModal"
-        :cust-kode="formData.spk_cus_kode"
-        @selected="setSetoranPembayaran"
-      />
-
-      <v-dialog v-model="showConfirmCmoDialog" max-width="320px" persistent>
-        <v-card class="rounded-lg">
-          <v-card-title
-            class="bg-primary text-white d-flex align-center pa-3 text-subtitle-1"
+    <!-- Dialog Konfirmasi Batal CMO -->
+    <v-dialog v-model="showConfirmCmoDialog" max-width="320px" persistent>
+      <v-card class="rounded-lg">
+        <v-card-title
+          class="bg-primary text-white d-flex align-center pa-3 text-subtitle-1"
+        >
+          <v-icon icon="mdi-help-circle" class="mr-2" size="24" />
+          Konfirmasi
+        </v-card-title>
+        <v-card-text class="pa-5 text-center text-body-1 font-weight-medium">
+          Batal Approve?
+        </v-card-text>
+        <v-card-actions class="pa-3 bg-grey-lighten-4 justify-center gap-2">
+          <v-btn
+            color="primary"
+            variant="elevated"
+            @click="keepApproveCmo"
+            width="100"
+            >Approve</v-btn
           >
-            <v-icon icon="mdi-help-circle" class="mr-2" size="24"></v-icon>
-            Konfirmasi
-          </v-card-title>
-          <v-card-text class="pa-5 text-center text-body-1 font-weight-medium">
-            Batal Approve?
-          </v-card-text>
-          <v-card-actions class="pa-3 bg-grey-lighten-4 justify-center gap-2">
-            <v-btn
-              color="primary"
-              variant="elevated"
-              @click="keepApproveCmo"
-              width="100"
-            >
-              Approve
-            </v-btn>
-            <v-btn
-              color="grey-darken-1"
-              variant="outlined"
-              @click="removeApproveCmo"
-              width="100"
-            >
-              Batal
-            </v-btn>
-          </v-card-actions>
-        </v-card>
-      </v-dialog>
-
-      <HistoryAlokasiModal
-        v-model="showHistoryAlokasiModal"
-        :cust-kode="formData.spk_cus_kode"
-        @selected="appendHistoryAlokasi"
-      />
-
-      <BarangKaosanSearchModal
-        v-model="showBarangKaosanModal"
-        @selected="setBarangKaosan"
-      />
-    </v-card>
+          <v-btn
+            color="grey-darken-1"
+            variant="outlined"
+            @click="removeApproveCmo"
+            width="100"
+            >Batal</v-btn
+          >
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </BaseForm>
 </template>
+
+<style scoped>
+.pf-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #f4f5f7;
+}
+
+.pf-tab-nav {
+  display: flex;
+  background: #e0e0e0;
+  border-bottom: 2px solid #bdbdbd;
+  padding: 4px 8px 0;
+  flex-shrink: 0;
+}
+
+.pf-tab-btn {
+  padding: 6px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #555;
+  background: #eeeeee;
+  border: 1px solid #ccc;
+  border-bottom: none;
+  border-radius: 4px 4px 0 0;
+  cursor: pointer;
+  margin-right: 4px;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+.pf-tab-btn:hover {
+  background: #e0e0e0;
+  color: #333;
+}
+.pf-tab-btn.active {
+  background: white;
+  color: #1565c0;
+  border-color: #bdbdbd;
+  border-bottom: 2px solid white;
+  margin-bottom: -2px;
+}
+
+.pf-tab-body {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.pf-tab-pane {
+  padding: 8px;
+  overflow-y: auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.h-100 {
+  height: 100%;
+}
+</style>

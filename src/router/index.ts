@@ -268,7 +268,7 @@ const router = createRouter({
         title: "Master Jenis Barang",
         layout: "DefaultLayout",
         requiresAuth: true,
-        menuId: "14", // Di navbar sub-menu Bahan kamu sebelumnya kasih ID 25, pastikan sesuai DB. Saya asumsikan ID-nya 14 (Sesuai delphi dan prompt-mu) atau 25.
+        menuId: "14",
       },
     },
     {
@@ -438,6 +438,131 @@ const router = createRouter({
       },
     },
 
+    // ── PPIC ──────────────────────────────────────────────────────────
+    {
+      path: "/garmen/cetak-bast",
+      name: "CetakBastBrowse",
+      component: () => import("@/views/garmen/CetakBastView.vue"),
+      meta: {
+        title: "Cetak BAST",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "117",
+      },
+    },
+    {
+      path: "/garmen/cetak-bast/create",
+      name: "CetakBastFormCreate",
+      component: () => import("@/views/garmen/CetakBastFormView.vue"),
+      meta: {
+        title: "Buat BAST Baru",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "117",
+      },
+    },
+    {
+      path: "/garmen/cetak-bast/edit/:nomor",
+      name: "CetakBastFormEdit",
+      component: () => import("@/views/garmen/CetakBastFormView.vue"),
+      meta: {
+        title: "Ubah BAST",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "117",
+      },
+    },
+    {
+      path: "/garmen/cetak-bast/print/:nomor",
+      name: "CetakBastPrint",
+      component: () => import("@/views/garmen/CetakBastPrintView.vue"),
+      meta: {
+        title: "Cetak BAST MAP",
+        layout: "BlankLayout",
+        requiresAuth: true,
+      },
+    },
+    {
+      path: "/ppic/spk",
+      name: "PpicSpkBrowse",
+      component: () => import("@/views/ppic/SpkView.vue"),
+      meta: {
+        title: "SPK (Surat Perintah Kerja)",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "152",
+      },
+    },
+    {
+      path: "/ppic/spk/create",
+      name: "PpicSpkCreate",
+      component: () => import("@/views/ppic/SpkFormView.vue"),
+      meta: {
+        title: "Buat SPK",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "152",
+        browseRoute: "PpicSpkBrowse",
+      },
+    },
+    {
+      path: "/ppic/spk/edit/:nomor",
+      name: "PpicSpkEdit",
+      component: () => import("@/views/ppic/SpkFormView.vue"),
+      meta: {
+        title: "Ubah SPK",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "152",
+        browseRoute: "PpicSpkBrowse",
+      },
+    },
+    {
+      path: "/ppic/spk/print/:nomor",
+      name: "PpicSpkPrint",
+      component: () => import("@/views/ppic/SpkPrintView.vue"),
+      meta: {
+        title: "Cetak SPK",
+        layout: "BlankLayout",
+        requiresAuth: true,
+      },
+    },
+    {
+      path: "/ppic/planning-spk",
+      name: "PpicPlanningSpk",
+      component: () => import("@/views/ppic/PlanningSpkView.vue"),
+      meta: {
+        title: "Planning SPK PPIC",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "56",
+      },
+    },
+    {
+      path: "/ppic/planning-spk/create",
+      name: "PpicPlanningSpkCreate",
+      component: () => import("@/views/ppic/PlanningSpkFormView.vue"),
+      meta: {
+        title: "Buat Planning SPK PPIC",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "56",
+        browseRoute: "PpicPlanningSpk",
+      },
+    },
+    {
+      path: "/ppic/planning-spk/edit/:nomor",
+      name: "PpicPlanningSpkEdit",
+      component: () => import("@/views/ppic/PlanningSpkFormView.vue"),
+      meta: {
+        title: "Ubah Planning SPK PPIC",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "56",
+        browseRoute: "PpicPlanningSpk",
+      },
+    },
+
     // ── Garmen ──────────────────────────────────────────────────────────
     {
       path: "/garmen/bahan-baku/minta-bahan",
@@ -588,7 +713,7 @@ const router = createRouter({
         layout: "DefaultLayout",
         requiresAuth: true,
         menuId: "137",
-        browseRoute: "GarmenApproveReturBahan", // Helper back button
+        browseRoute: "GarmenApproveReturBahan",
       },
     },
     {
@@ -632,11 +757,109 @@ const router = createRouter({
       component: () => import("@/views/garmen/BpbBahanPrintView.vue"),
       meta: {
         title: "Cetak BPB Bahan",
-        layout: "BlankLayout", // Penting agar navbar tidak ikut terprint
+        layout: "BlankLayout",
         requiresAuth: true,
       },
     },
 
+    {
+      path: "/garmen/bahan-jadi/stbj",
+      name: "StbjBrowse",
+      component: () => import("@/views/garmen/StbjView.vue"),
+      meta: {
+        title: "Surat Terima Barang Jadi",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "105",
+      },
+    },
+    {
+      path: "/garmen/bahan-jadi/stbj",
+      name: "StbjBrowse",
+      component: () => import("@/views/garmen/StbjView.vue"),
+      meta: {
+        title: "Surat Terima Bahan Jadi",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "105",
+      },
+    },
+    {
+      path: "/garmen/bahan-jadi/stbj/create",
+      name: "StbjFormCreate",
+      component: () => import("@/views/garmen/StbjFormView.vue"),
+      meta: {
+        title: "Tambah STBJ",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "105",
+        browseRoute: "StbjBrowse",
+      },
+    },
+    {
+      path: "/garmen/bahan-jadi/stbj/edit",
+      name: "StbjFormEdit",
+      component: () => import("@/views/garmen/StbjFormView.vue"),
+      meta: {
+        title: "Ubah STBJ",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "105",
+        browseRoute: "StbjBrowse",
+      },
+    },
+    {
+      path: "/garmen/bahan-jadi/stbj/print",
+      name: "StbjPrint",
+      component: () => import("@/views/garmen/StbjPrintView.vue"),
+      meta: {
+        title: "Cetak STBJ",
+        layout: "BlankLayout",
+        requiresAuth: true,
+      },
+    },
+
+    {
+      path: "/garmen/mka",
+      name: "GarmenMkaBrowse",
+      component: () => import("@/views/garmen/MkaView.vue"),
+      meta: {
+        title: "MKA",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "57",
+      },
+    },
+    {
+      path: "/garmen/mka/create",
+      name: "GarmenMkaCreate",
+      component: () => import("@/views/garmen/MkaFormView.vue"),
+      meta: {
+        title: "Buat MKA",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "57",
+        browseRoute: "GarmenMkaBrowse",
+      },
+    },
+    {
+      path: "/garmen/mka/edit/:nomor",
+      name: "GarmenMkaEdit",
+      component: () => import("@/views/garmen/MkaFormView.vue"),
+      meta: {
+        title: "Ubah MKA",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "57",
+        browseRoute: "GarmenMkaBrowse",
+      },
+    },
+    {
+      path: "/garmen/mka/print/:nomor",
+      name: "GarmenMkaPrint",
+      component: () => import("@/views/garmen/MkaPrintView.vue"),
+      meta: { title: "Cetak MKA", layout: "BlankLayout", requiresAuth: true },
+    },
     {
       path: "/garmen/barang/permintaan",
       name: "GarmenPermintaanBarang",
@@ -676,7 +899,7 @@ const router = createRouter({
       path: "/garmen/barang/permintaan/print/:nomor",
       name: "MintaBarangPrint",
       component: () => import("@/views/garmen/MintaBarangPrintView.vue"),
-      meta: { requiresAuth: true, layout: "BlankLayout" }, // pastikan layout blank agar navbar tidak ikut ter-print
+      meta: { requiresAuth: true, layout: "BlankLayout" },
     },
     {
       path: "/garmen/barang/realisasi",
@@ -719,7 +942,7 @@ const router = createRouter({
       component: () => import("@/views/garmen/RealisasiBarangPrintView.vue"),
       meta: {
         title: "Cetak Realisasi Permintaan",
-        layout: "BlankLayout", // WAJIB BLANK LAYOUT
+        layout: "BlankLayout",
         requiresAuth: true,
       },
     },
@@ -765,7 +988,7 @@ const router = createRouter({
         import("@/views/garmen/PermintaanPembelianPrintView.vue"),
       meta: {
         title: "Cetak Permintaan Pembelian",
-        layout: "BlankLayout", // Wajib menggunakan BlankLayout agar sidebar/navbar hilang
+        layout: "BlankLayout",
         requiresAuth: true,
       },
     },
@@ -810,7 +1033,7 @@ const router = createRouter({
       component: () => import("@/views/garmen/MutasiOutBarangPrintView.vue"),
       meta: {
         title: "Cetak Mutasi Out Garmen",
-        layout: "BlankLayout", // WAJIB
+        layout: "BlankLayout",
         requiresAuth: true,
       },
     },
@@ -822,7 +1045,7 @@ const router = createRouter({
         title: "Mutasi In Garmen",
         layout: "DefaultLayout",
         requiresAuth: true,
-        menuId: "69", // Sesuai ID di database Delphi
+        menuId: "69",
       },
     },
     {
@@ -833,13 +1056,13 @@ const router = createRouter({
         title: "PO Non Bahan Garmen",
         layout: "DefaultLayout",
         requiresAuth: true,
-        menuId: "66", // Menu ID sesuai Delphi
+        menuId: "66",
       },
     },
     {
       path: "/garmen/barang/po-nonbahan/create",
       name: "PoNonBahanGarmenFormCreate",
-      component: () => import("@/views/garmen/PoNonBahanFormView.vue"), // Placeholder
+      component: () => import("@/views/garmen/PoNonBahanFormView.vue"),
       meta: {
         title: "Tambah PO Non Bahan",
         layout: "DefaultLayout",
@@ -851,7 +1074,7 @@ const router = createRouter({
     {
       path: "/garmen/barang/po-nonbahan/edit/:nomor",
       name: "PoNonBahanGarmenFormEdit",
-      component: () => import("@/views/garmen/PoNonBahanFormView.vue"), // Placeholder
+      component: () => import("@/views/garmen/PoNonBahanFormView.vue"),
       meta: {
         title: "Ubah PO Non Bahan",
         layout: "DefaultLayout",
@@ -863,7 +1086,7 @@ const router = createRouter({
     {
       path: "/garmen/barang/po-nonbahan/print/:nomor",
       name: "PoNonBahanGarmenPrint",
-      component: () => import("@/views/garmen/PoNonBahanPrintView.vue"), // Placeholder
+      component: () => import("@/views/garmen/PoNonBahanPrintView.vue"),
       meta: {
         title: "Cetak PO Non Bahan",
         layout: "BlankLayout",
@@ -905,6 +1128,117 @@ const router = createRouter({
         browseRoute: "BpbNonBahanGarmenBrowse",
       },
     },
+    {
+      path: "/garmen/po-jasa",
+      name: "PoJasaBrowse",
+      component: () => import("@/views/garmen/PoJasaView.vue"),
+      meta: {
+        title: "PO Jasa",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "102",
+      },
+    },
+    {
+      path: "/garmen/po-jasa/create",
+      name: "PoJasaFormCreate",
+      component: () => import("@/views/garmen/PoJasaFormView.vue"),
+      meta: {
+        title: "Tambah PO Jasa",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "102",
+        browseRoute: "PoJasaBrowse",
+      },
+    },
+    {
+      path: "/garmen/po-jasa/edit/:nomor",
+      name: "PoJasaFormEdit",
+      component: () => import("@/views/garmen/PoJasaFormView.vue"),
+      meta: {
+        title: "Ubah PO Jasa",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "102",
+        browseRoute: "PoJasaBrowse",
+      },
+    },
+    {
+      path: "/garmen/po-jasa/print/:nomor",
+      name: "PoJasaPrint",
+      component: () => import("@/views/garmen/PoJasaPrintView.vue"),
+      meta: {
+        title: "Cetak PO Jasa",
+        layout: "BlankLayout",
+        requiresAuth: true,
+      },
+    },
+    {
+      path: "/garmen/po-jasa/print-sj/:nomor",
+      name: "PoJasaPrintSJ",
+      component: () => import("@/views/garmen/PoJasaPrintSjView.vue"),
+      meta: {
+        title: "Cetak SJ PO Jasa",
+        layout: "BlankLayout",
+        requiresAuth: true,
+      },
+    },
+    {
+      path: "/garmen/approve-po-jasa",
+      name: "ApprovePOJasa",
+      component: () => import("@/views/garmen/ApprovePoJasaView.vue"),
+      meta: {
+        title: "Approve PO Jasa",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "113",
+      },
+    },
+    {
+      path: "/garmen/bpb-jasa",
+      name: "BpbJasaBrowse",
+      component: () => import("@/views/garmen/BpbJasaView.vue"),
+      meta: {
+        title: "BPB Jasa",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "104",
+      },
+    },
+    {
+      path: "/garmen/bpb-jasa/create",
+      name: "BpbJasaFormCreate",
+      component: () => import("@/views/garmen/BpbJasaFormView.vue"),
+      meta: {
+        title: "Tambah BPB Jasa",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "104",
+        browseRoute: "BpbJasaBrowse",
+      },
+    },
+    {
+      path: "/garmen/bpb-jasa/edit",
+      name: "BpbJasaFormEdit",
+      component: () => import("@/views/garmen/BpbJasaFormView.vue"),
+      meta: {
+        title: "Ubah BPB Jasa",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "104",
+        browseRoute: "BpbJasaBrowse",
+      },
+    },
+    {
+      path: "/garmen/bpb-jasa/print",
+      name: "BpbJasaPrint",
+      component: () => import("@/views/garmen/BpbJasaPrintView.vue"),
+      meta: {
+        title: "Cetak BPB Jasa",
+        layout: "BlankLayout",
+        requiresAuth: true,
+      },
+    },
 
     {
       path: "/garmen/po-internal-map",
@@ -914,7 +1248,7 @@ const router = createRouter({
         title: "PO Internal MAP",
         layout: "DefaultLayout",
         requiresAuth: true,
-        menuId: "138", // Sesuai instruksi: Menu ID = 138
+        menuId: "138",
       },
     },
     {
@@ -945,7 +1279,7 @@ const router = createRouter({
       component: () => import("@/views/garmen/PoInternalMapPrintView.vue"),
       meta: {
         title: "Cetak PO Internal MAP",
-        layout: "BlankLayout", // Wajib agar full layar putih
+        layout: "BlankLayout",
         requiresAuth: true,
       },
     },
@@ -969,7 +1303,7 @@ const router = createRouter({
         layout: "DefaultLayout",
         requiresAuth: true,
         menuId: "139",
-        browseRoute: "PoInternalMapSjBrowse", // Helper untuk tombol kembali
+        browseRoute: "PoInternalMapSjBrowse",
       },
     },
     {
@@ -987,7 +1321,7 @@ const router = createRouter({
     {
       path: "/garmen/po-internal-map/surat-jalan/print/:nomor",
       name: "PoInternalMapSjPrint",
-      component: () => import("@/views/garmen/PoInternalMapSjPrintView.vue"), // Pastikan file print sudah dibuat
+      component: () => import("@/views/garmen/PoInternalMapSjPrintView.vue"),
       meta: {
         title: "Cetak SJ MAP",
         layout: "BlankLayout",
@@ -1005,45 +1339,46 @@ const router = createRouter({
         menuId: "140",
       },
     },
+
     {
-      path: "/garmen/cetak-bast",
-      name: "CetakBastBrowse",
-      component: () => import("@/views/garmen/CetakBastView.vue"),
+      path: "/garmen/mutasi-produksi",
+      name: "MutasiProduksiBrowse",
+      component: () => import("@/views/garmen/MutasiProduksiView.vue"),
       meta: {
-        title: "Cetak BAST",
+        title: "Mutasi Produksi",
         layout: "DefaultLayout",
         requiresAuth: true,
-        menuId: "117",
+        menuId: "109",
       },
     },
     {
-      path: "/garmen/cetak-bast/create",
-      name: "CetakBastFormCreate",
-      component: () => import("@/views/garmen/CetakBastFormView.vue"),
+      path: "/garmen/mutasi-produksi/create",
+      name: "MutasiProduksiCreate",
+      component: () => import("@/views/garmen/MutasiProduksiFormView.vue"),
       meta: {
-        title: "Buat BAST Baru",
+        title: "Tambah Mutasi Produksi",
         layout: "DefaultLayout",
         requiresAuth: true,
-        menuId: "117",
+        menuId: "109",
       },
     },
     {
-      path: "/garmen/cetak-bast/edit/:nomor",
-      name: "CetakBastFormEdit",
-      component: () => import("@/views/garmen/CetakBastFormView.vue"),
+      path: "/garmen/mutasi-produksi/edit/:nomor",
+      name: "MutasiProduksiEdit",
+      component: () => import("@/views/garmen/MutasiProduksiFormView.vue"),
       meta: {
-        title: "Ubah BAST",
+        title: "Ubah Mutasi Produksi",
         layout: "DefaultLayout",
         requiresAuth: true,
-        menuId: "117",
+        menuId: "109",
       },
     },
     {
-      path: "/garmen/cetak-bast/print/:nomor",
-      name: "CetakBastPrint",
-      component: () => import("@/views/garmen/CetakBastPrintView.vue"),
+      path: "/garmen/mutasi-produksi/print",
+      name: "MutasiProduksiPrint",
+      component: () => import("@/views/garmen/MutasiProduksiPrintView.vue"),
       meta: {
-        title: "Cetak BAST MAP",
+        title: "Cetak Mutasi Produksi",
         layout: "BlankLayout",
         requiresAuth: true,
       },
@@ -1215,12 +1550,203 @@ const router = createRouter({
       name: "SalesOrderPrint",
       component: () => import("@/views/penjualan/SalesOrderPrintView.vue"),
       meta: {
-        title: "Cetak SPK",
+        title: "Cetak Sales Order",
         layout: "BlankLayout",
         requiresAuth: true,
       },
     },
-
+    {
+      path: "/penjualan/pra-sj",
+      name: "PraSJBrowse",
+      component: () => import("@/views/penjualan/PraSJView.vue"),
+      meta: {
+        title: "Pra Surat Jalan",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "168",
+      },
+    },
+    {
+      path: "/penjualan/pra-sj/create",
+      name: "PraSJFormCreate",
+      component: () => import("@/views/penjualan/PraSJFormView.vue"),
+      meta: {
+        title: "Tambah Pra SJ",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "168",
+        browseRoute: "PraSJBrowse",
+      },
+    },
+    {
+      path: "/penjualan/pra-sj/edit",
+      name: "PraSJFormEdit",
+      component: () => import("@/views/penjualan/PraSJFormView.vue"),
+      meta: {
+        title: "Ubah Pra SJ",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "168",
+        browseRoute: "PraSJBrowse",
+      },
+    },
+    {
+      path: "/penjualan/surat-jalan",
+      name: "SuratJalanBrowse",
+      component: () => import("@/views/penjualan/SuratJalanView.vue"),
+      meta: {
+        title: "Surat Jalan",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "153",
+      },
+    },
+    {
+      path: "/penjualan/surat-jalan/create",
+      name: "SuratJalanFormCreate",
+      component: () => import("@/views/penjualan/SuratJalanFormView.vue"),
+      meta: {
+        title: "Tambah Surat Jalan",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "153",
+        browseRoute: "SuratJalanBrowse",
+      },
+    },
+    {
+      path: "/penjualan/surat-jalan/edit",
+      name: "SuratJalanFormEdit",
+      component: () => import("@/views/penjualan/SuratJalanFormView.vue"),
+      meta: {
+        title: "Ubah Surat Jalan",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "153",
+        browseRoute: "SuratJalanBrowse",
+      },
+    },
+    {
+      path: "/penjualan/surat-jalan/print",
+      name: "SuratJalanPrint",
+      component: () => import("@/views/penjualan/SuratJalanPrintView.vue"),
+      meta: {
+        title: "Cetak Surat Jalan",
+        layout: "BlankLayout",
+        requiresAuth: true,
+      },
+    },
+    {
+      path: "/penjualan/sj-tak-normal",
+      name: "SjTakNormalBrowse",
+      component: () => import("@/views/penjualan/SjTakNormalView.vue"),
+      meta: {
+        title: "Surat Jalan Tak Normal",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "154",
+      },
+    },
+    {
+      path: "/penjualan/sj-tak-normal/create",
+      name: "SjTakNormalFormCreate",
+      component: () => import("@/views/penjualan/SjTakNormalFormView.vue"),
+      meta: {
+        title: "Tambah Surat Jalan Tak Normal",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "154",
+        browseRoute: "SjTakNormalBrowse",
+      },
+    },
+    {
+      path: "/penjualan/sj-tak-normal/edit",
+      name: "SjTakNormalFormEdit",
+      component: () => import("@/views/penjualan/SjTakNormalFormView.vue"),
+      meta: {
+        title: "Ubah Surat Jalan Tak Normal",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "154",
+        browseRoute: "SjTakNormalBrowse",
+      },
+    },
+    {
+      path: "/penjualan/sj-tak-normal/print",
+      name: "SjTakNormalPrint",
+      component: () => import("@/views/penjualan/SjTakNormalPrintView.vue"),
+      meta: {
+        title: "Cetak Surat Jalan Tak Normal",
+        layout: "BlankLayout",
+        requiresAuth: true,
+      },
+    },
+    {
+      path: "/penjualan/update-status-sj",
+      name: "UpdateStatusSjBrowse",
+      component: () => import("@/views/penjualan/UpdateStatusSjView.vue"),
+      meta: {
+        title: "Update Status Surat Jalan",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "155",
+      },
+    },
+    {
+      path: "/penjualan/approval-sj",
+      name: "ApprovalSjBrowse",
+      component: () => import("@/views/penjualan/ApprovalSjView.vue"),
+      meta: {
+        title: "Approval Surat Jalan",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "165",
+      },
+    },
+    {
+      path: "/penjualan/invoice",
+      name: "InvoiceBrowse",
+      component: () => import("@/views/penjualan/InvoiceView.vue"),
+      meta: {
+        title: "Invoice",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "156",
+      },
+    },
+    {
+      path: "/penjualan/invoice/create",
+      name: "InvoiceFormCreate",
+      component: () => import("@/views/penjualan/InvoiceFormView.vue"),
+      meta: {
+        title: "Tambah Invoice",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "156",
+        browseRoute: "InvoiceBrowse",
+      },
+    },
+    {
+      path: "/penjualan/invoice/edit",
+      name: "InvoiceFormEdit",
+      component: () => import("@/views/penjualan/InvoiceFormView.vue"),
+      meta: {
+        title: "Ubah Invoice",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "156",
+        browseRoute: "InvoiceBrowse",
+      },
+    },
+    {
+      path: "/penjualan/invoice/print",
+      name: "InvoicePrint",
+      component: () => import("@/views/penjualan/InvoicePrintView.vue"),
+      meta: {
+        title: "Cetak Invoice",
+        layout: "BlankLayout",
+        requiresAuth: true,
+      },
+    },
     {
       path: "/penjualan/invoice-proforma",
       name: "InvoiceProformaBrowse",
@@ -1241,7 +1767,7 @@ const router = createRouter({
         layout: "DefaultLayout",
         requiresAuth: true,
         menuId: "157",
-        browseRoute: "InvoiceProformaBrowse", // Helper kembali
+        browseRoute: "InvoiceProformaBrowse",
       },
     },
     {
@@ -1266,7 +1792,118 @@ const router = createRouter({
         requiresAuth: true,
       },
     },
-
+    {
+      path: "/penjualan/invoice-tak-normal",
+      name: "InvoiceTakNormalBrowse",
+      component: () => import("@/views/penjualan/InvoiceTakNormalView.vue"),
+      meta: {
+        title: "Invoice Tak Normal",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "158",
+      },
+    },
+    {
+      path: "/penjualan/invoice-tak-normal/create",
+      name: "InvoiceTakNormalFormCreate",
+      component: () => import("@/views/penjualan/InvoiceTakNormalFormView.vue"),
+      meta: {
+        title: "Tambah Invoice Tak Normal",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "158",
+        browseRoute: "InvoiceTakNormalBrowse",
+      },
+    },
+    {
+      path: "/penjualan/invoice-tak-normal/edit",
+      name: "InvoiceTakNormalFormEdit",
+      component: () => import("@/views/penjualan/InvoiceTakNormalFormView.vue"),
+      meta: {
+        title: "Ubah Invoice Tak Normal",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "158",
+        browseRoute: "InvoiceTakNormalBrowse",
+      },
+    },
+    {
+      path: "/penjualan/invoice-tak-normal/print",
+      name: "InvoiceTakNormalPrint",
+      component: () =>
+        import("@/views/penjualan/InvoiceTakNormalPrintView.vue"),
+      meta: {
+        title: "Cetak Invoice Tak Normal",
+        layout: "BlankLayout",
+        requiresAuth: true,
+      },
+    },
+    {
+      path: "/penjualan/cetak-kuitansi",
+      name: "CetakKuitansiBrowse",
+      component: () => import("@/views/penjualan/CetakKuitansiView.vue"),
+      meta: {
+        title: "Cetak Kuitansi",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "1317",
+      },
+    },
+    {
+      path: "/penjualan/cetak-kuitansi/create",
+      name: "CetakKuitansiFormCreate",
+      component: () => import("@/views/penjualan/CetakKuitansiFormView.vue"),
+      meta: {
+        title: "Cetak Kuitansi",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "1317",
+        browseRoute: "CetakKuitansiBrowse",
+      },
+    },
+    {
+      path: "/penjualan/cetak-kuitansi/print",
+      name: "CetakKuitansiPrint",
+      component: () => import("@/views/penjualan/CetakKuitansiPrintView.vue"),
+      meta: {
+        title: "Cetak Kuitansi",
+        layout: "BlankLayout",
+        requiresAuth: true,
+      },
+    },
+    {
+      path: "/penjualan/cetak-faktur-pajak",
+      name: "CetakFakturPajakBrowse",
+      component: () => import("@/views/penjualan/CetakFakturPajakView.vue"),
+      meta: {
+        title: "Cetak Faktur Pajak",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "159",
+      },
+    },
+    {
+      path: "/penjualan/cetak-faktur-pajak/print",
+      name: "CetakFakturPajakPrint",
+      component: () =>
+        import("@/views/penjualan/CetakFakturPajakPrintView.vue"),
+      meta: {
+        title: "Cetak Faktur Pajak",
+        layout: "BlankLayout",
+        requiresAuth: true,
+      },
+    },
+    {
+      path: "/penjualan/export-csv-pajak",
+      name: "ExportCsvPajakBrowse",
+      component: () => import("@/views/penjualan/ExportCsvPajakView.vue"),
+      meta: {
+        title: "Export CSV ke Faktur Pajak",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "160",
+      },
+    },
     {
       path: "/penjualan/map",
       name: "MapBrowse",
@@ -1349,6 +1986,53 @@ const router = createRouter({
         layout: "DefaultLayout",
         requiresAuth: true,
         menuId: "164",
+      },
+    },
+
+    {
+      path: "/penjualan/jadwal-kirim",
+      name: "JadwalKirimBrowse",
+      component: () => import("@/views/penjualan/JadwalKirimView.vue"),
+      meta: {
+        title: "Jadwal Kirim",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "119",
+      },
+    },
+    {
+      path: "/penjualan/jadwal-kirim/create",
+      name: "JadwalKirimCreate",
+      component: () => import("@/views/penjualan/JadwalKirimFormView.vue"),
+      meta: {
+        title: "Tambah Jadwal Kirim",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "119",
+        browseRoute: "JadwalKirimBrowse",
+      },
+    },
+    {
+      path: "/penjualan/jadwal-kirim/edit/:nomor",
+      name: "JadwalKirimEdit",
+      component: () => import("@/views/penjualan/JadwalKirimFormView.vue"),
+      meta: {
+        title: "Ubah Jadwal Kirim",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "119",
+        browseRoute: "JadwalKirimBrowse",
+      },
+    },
+    {
+      path: "/penjualan/jadwal-kirim/print",
+      name: "JadwalKirimPrint",
+      component: () => import("@/views/penjualan/JadwalKirimPrintView.vue"),
+      meta: {
+        title: "Cetak Jadwal Kirim",
+        layout: "BlankLayout",
+        requiresAuth: true,
+        menuId: "119",
       },
     },
 

@@ -643,10 +643,15 @@ const num = (val: number) => new Intl.NumberFormat("id-ID").format(val || 0);
                       </td>
                       <td class="tc">{{ rel.TglRealisasi }}</td>
                       <td class="tc">
-                        <span v-if="rel.WaktuApprove">{{
-                          rel.WaktuApprove
-                        }}</span>
+                        <span
+                          v-if="rel.WaktuApprove"
+                          style="font-weight: 600; color: #2e7d32"
+                        >
+                          {{ rel.WaktuApprove }}
+                        </span>
+
                         <v-btn
+                          v-else
                           size="x-small"
                           color="primary"
                           variant="flat"

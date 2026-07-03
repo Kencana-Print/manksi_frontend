@@ -29,6 +29,7 @@ const isLoading = ref(false);
 const page = ref(1);
 const itemsPerPage = ref(50);
 const totalItems = ref(0);
+let requestSeq = 0;
 
 const headers = [
   { title: "KODE", key: "Kode", width: "120px" },
@@ -38,6 +39,7 @@ const headers = [
 let searchTimeout: ReturnType<typeof setTimeout> | null = null;
 
 const fetchData = async () => {
+  const mySeq = ++requestSeq; // tandai request ini sbg "yang terbaru"
   isLoading.value = true;
   try {
     const res = await api.get("/lookups/bahan", {
@@ -50,13 +52,18 @@ const fetchData = async () => {
         mkb: props.mkbFilter,
       },
     });
-    // Pastikan mapping data sesuai dengan res.data.data.items
+    // Kalau ada request LAIN yang dikirim setelah ini (mySeq bukan lagi
+    // yang terbaru), buang hasilnya — mencegah response request lama
+    // (misal fetch awal tanpa filter) menimpa hasil pencarian yang
+    // sudah lebih baru & relevan.
+    if (mySeq !== requestSeq) return;
     items.value = res.data.data.items;
     totalItems.value = res.data.data.total;
   } catch (error) {
+    if (mySeq !== requestSeq) return;
     console.error("Gagal memuat data bahan");
   } finally {
-    isLoading.value = false;
+    if (mySeq === requestSeq) isLoading.value = false;
   }
 };
 

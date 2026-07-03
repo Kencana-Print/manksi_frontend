@@ -1051,16 +1051,17 @@ watch(
               <label class="lbl">No. MAP</label>
               <div class="igrp" style="width: 210px">
                 <input
-                  v-model="formData.spk_nomormemo"
+                  v-model="formData.spk_memo"
                   class="inp"
                   style="flex: 1"
-                  @keydown="onSjMemoF1"
+                  @keydown="onMemoF1"
+                  @change="$emit('field-blur', 'memo', formData.spk_memo)"
                 />
                 <button
                   type="button"
                   class="blkp"
-                  title="Cari SJ Memo (F1)"
-                  @mousedown.prevent="$emit('open-lookup', 'sjMemo')"
+                  title="Cari MAP (F1)"
+                  @mousedown.prevent="$emit('open-lookup', 'memo')"
                 >
                   <IconSearch :size="12" color="#1565c0" />
                 </button>
@@ -1129,12 +1130,25 @@ watch(
               </span>
             </div>
             <div class="fr mt-2">
-              <label class="lbl" style="width: 85px">Nomor PO</label>
+              <label class="lbl" style="width: 85px">
+                Nomor PO
+                <span
+                  v-if="!formData.spk_nomor_po && formData.spk_cus_kode"
+                  title="Wajib diisi atau cari dari Penerimaan"
+                  style="color: #f57c00; margin-left: 2px"
+                  >⚠</span
+                >
+              </label>
               <div class="igrp" style="flex: 1">
                 <input
                   v-model="formData.spk_nomor_po"
                   class="inp"
                   style="flex: 1"
+                  :style="
+                    !formData.spk_nomor_po && formData.spk_cus_kode
+                      ? 'border-color: #f57c00; background: #fffde7;'
+                      : ''
+                  "
                   placeholder="Ketik PO atau F1 cari DP..."
                   @keydown="onNomorPoF1"
                 />
@@ -1265,6 +1279,41 @@ watch(
           <template v-else>
             <label class="lbl">Ket. Ukuran</label>
             <input v-model="formData.spk_ukuran" class="inp" style="flex: 1" />
+            <div
+              v-if="String(formData.spk_divisi).charAt(0) === '4'"
+              class="standar-radio ml-2"
+            >
+              <label class="chk-lbl">
+                <input
+                  type="radio"
+                  v-model="formData.spk_standar_ukuran"
+                  value="KENCANA"
+                  style="accent-color: #1565c0"
+                />
+                Std. Kencana
+              </label>
+              <!-- ← dropdown varian, hanya muncul saat Kencana -->
+              <select
+                v-if="formData.spk_standar_ukuran === 'KENCANA'"
+                v-model="formData.spk_varian_ukuran"
+                class="inp sel ml-1"
+                style="height: 22px; font-size: 10px; padding: 0 3px"
+              >
+                <option value="LENGAN_PENDEK">Standar (L.Pendek)</option>
+                <option value="LENGAN_PANJANG">Kaos L.Panjang</option>
+                <option value="RAGLAN_LP">Raglan L.Panjang</option>
+                <option value="KEMEJA_WANITA">Kemeja Wanita</option>
+              </select>
+              <label class="chk-lbl ml-1">
+                <input
+                  type="radio"
+                  v-model="formData.spk_standar_ukuran"
+                  value="KLIEN"
+                  style="accent-color: #1565c0"
+                />
+                Std. Klien
+              </label>
+            </div>
           </template>
         </div>
 
@@ -1975,6 +2024,17 @@ watch(
 }
 .text-grey {
   color: #757575;
+}
+.standar-radio {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  background: #f5f5f5;
+  border: 1px solid #e0e0e0;
+  border-radius: 3px;
+  padding: 2px 8px;
+  height: 24px;
 }
 
 .img-box {

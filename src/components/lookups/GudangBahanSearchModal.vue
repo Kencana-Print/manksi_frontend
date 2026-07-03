@@ -7,7 +7,10 @@ import {
   IconDatabaseOff,
 } from "@tabler/icons-vue";
 
-const props = defineProps<{ modelValue: boolean }>();
+const props = defineProps<{
+  modelValue: boolean;
+  mode?: string;
+}>();
 const emit = defineEmits(["update:modelValue", "selected"]);
 
 const search = ref("");
@@ -46,6 +49,7 @@ const fetchData = async () => {
         q: search.value,
         page: currentPage.value,
         limit: perPage.value,
+        mode: props.mode || "",
       },
     });
     items.value = res.data.data.items;

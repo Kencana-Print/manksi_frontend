@@ -5,8 +5,15 @@ import { IconPackage, IconSearch, IconDatabaseOff } from "@tabler/icons-vue";
 
 const props = defineProps<{
   modelValue: boolean;
-  perushKode: string;
-  cusKode: string;
+  perushKode?: string;
+  cusKode?: string;
+  // Opsional — override sumber data. Kalau tidak di-supply, tetap pakai
+  // endpoint default /lookups/barang-inv-proforma seperti semula.
+  fetchFn?: (
+    q: string,
+    page: number,
+    limit: number,
+  ) => Promise<{ items: any[]; total: number }>;
 }>();
 const emit = defineEmits(["update:modelValue", "selected"]);
 
@@ -40,20 +47,29 @@ const visiblePages = computed(() => {
 let debounce: ReturnType<typeof setTimeout> | null = null;
 
 const fetchData = async () => {
-  if (!props.perushKode || !props.cusKode) return;
   isLoading.value = true;
   try {
-    const res = await api.get("/lookups/barang-inv-proforma", {
-      params: {
-        perush: props.perushKode,
-        cus: props.cusKode,
-        q: search.value,
-        page: currentPage.value,
-        limit: perPage.value,
-      },
-    });
-    items.value = res.data.data.items;
-    totalItems.value = res.data.data.total;
+    if (props.fetchFn) {
+      const { items: rows, total } = await props.fetchFn(
+        search.value,
+        currentPage.value,
+        perPage.value,
+      );
+      items.value = rows;
+      totalItems.value = total;
+    } else {
+      const res = await api.get("/lookups/barang-inv-proforma", {
+        params: {
+          q: search.value,
+          page: currentPage.value,
+          limit: perPage.value,
+          perushKode: props.perushKode,
+          cusKode: props.cusKode,
+        },
+      });
+      items.value = res.data.data.items;
+      totalItems.value = res.data.data.total;
+    }
   } catch (e) {
     console.error("Gagal memuat barang:", e);
   } finally {

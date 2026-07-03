@@ -6,16 +6,12 @@ import { useRouter } from "vue-router";
 import api from "@/services/api"; // Untuk lookup generic seperti divisi
 import { mapFormService } from "@/services/penjualan/mapFormService";
 import BaseForm from "@/components/BaseForm.vue";
-import {
-  IconFileDescription,
-  IconPrinter,
-  IconLayoutSidebarRight,
-  IconLayoutSidebarRightCollapse,
-} from "@tabler/icons-vue";
+import { IconFileDescription } from "@tabler/icons-vue";
 
 // Import Komponen Tab
 import TabMap from "./components/TabMap.vue";
 import TabLainLain from "./components/TabLainLain.vue";
+import TabKatalog from "./components/TabKatalog.vue";
 
 const toast = useToast();
 const currentTab = ref(0);
@@ -53,6 +49,11 @@ const toISODate = (val: any) => {
 
   return `${year}-${month}-${day}`;
 };
+
+const duplikatList = ref<
+  Array<{ mspk_nomor: string; tgl_formatted: string; mspk_jo_kode: string }>
+>([]);
+const showDuplikatDialog = ref(false);
 
 const initialData = {
   Nomor: "",
@@ -224,26 +225,12 @@ const {
     return mapMapData(res.data.data);
   },
   submitApi: async (dataToSave) => {
-    // ── 0. ValidASI DELPHI: CEK STATUS EDIT SEBELUM SIMPAN ──
     if (isEditMode.value) {
       const status = dataToSave.StatusEdit;
-      if (isEditMode.value && (status === "WAIT" || status === "TOLAK")) {
-        throw new Error(
-          "Transaksi tsb sudah diclose.\nSilahkan minta approve untuk bisa menyimpan perubahan data.",
-        );
+      if (status === "WAIT" || status === "TOLAK") {
+        throw new Error("Transaksi sudah diclose.");
       }
     }
-
-    if (!dataToSave.NomorPO?.trim()) {
-      throw new Error(
-        "Nomor PO harus diisi.\nJika tidak ada PO tertulis, cari DP Customer dari Penerimaan (tombol 🔍 di sebelah field Nomor PO).",
-      );
-    }
-
-    // 1. Validasi Minimum sebelum kirim
-    if (!dataToSave.Cab) throw new Error("Kode Workshop MAP wajib diisi.");
-    if (!dataToSave.Nama) throw new Error("Nama Pekerjaan wajib diisi.");
-    if (!dataToSave.JoKode) throw new Error("Jenis Order wajib diisi.");
 
     // 2. Simpan Data Form
     const res = await mapFormService.save(dataToSave, !isEditMode.value);
@@ -327,6 +314,74 @@ const loadSpkInformasi = async (divisiKode: any) => {
   }
 };
 
+// Tambah fungsi validateSave di MapFormView.vue
+const validateSave = async () => {
+  // Cek status edit
+  if (isEditMode.value) {
+    const status = formData.value.StatusEdit;
+    if (status === "WAIT" || status === "TOLAK") {
+      toast.error(
+        "Transaksi sudah diclose. Silahkan minta approve untuk bisa menyimpan perubahan data.",
+      );
+      return;
+    }
+  }
+
+  // Validasi NomorPO — harus ada sebelum dialog konfirmasi
+  if (!formData.value.NomorPO?.trim()) {
+    toast.warning(
+      "Nomor PO harus diisi.\nJika tidak ada PO tertulis, cari DP Customer dari Penerimaan (tombol 🔍 di sebelah field Nomor PO).",
+    );
+    return;
+  }
+
+  if (!formData.value.Cab) {
+    toast.warning("Kode Workshop MAP wajib diisi.");
+    return;
+  }
+
+  if (!formData.value.Nama) {
+    toast.warning("Nama Pekerjaan wajib diisi.");
+    return;
+  }
+
+  if (!formData.value.JoKode) {
+    toast.warning("Jenis Order wajib diisi.");
+    return;
+  }
+
+  try {
+    const divisi = String(formData.value.Divisi || "").charAt(0);
+    const cusKode = formData.value.CustKode || "";
+    const excludeNomor = isEditMode.value ? formData.value.Nomor : "";
+
+    if (divisi && cusKode && formData.value.Nama) {
+      const res = await mapFormService.checkDuplikatNama(
+        formData.value.Nama,
+        divisi,
+        cusKode,
+        excludeNomor,
+      );
+      const duplikats = res.data.data || [];
+      if (duplikats.length > 0) {
+        duplikatList.value = duplikats;
+        showDuplikatDialog.value = true;
+        return; // Tunggu konfirmasi user
+      }
+    }
+  } catch {
+    // Jika gagal cek duplikat, tetap lanjutkan save
+  }
+
+  // Semua valid & tidak duplikat
+  showSaveDialog.value = true;
+};
+
+const confirmSaveMeskiDuplikat = () => {
+  showDuplikatDialog.value = false;
+  showSaveDialog.value = true;
+};
+
 // Pantau perubahan Divisi — { immediate: true } agar langsung load saat mount
 watch(
   () => formData.value.Divisi,
@@ -380,7 +435,11 @@ const handleEmailUpload = (file: File) => {
 //   router.push("/penjualan/map");
 // };
 
-const tabs = [{ title: "MAP" }, { title: "Lain-Lain" }];
+const tabs = [
+  { title: "MAP" },
+  { title: "Lain-Lain" },
+  { title: "Katalog Pesanan" },
+];
 </script>
 
 <template>
@@ -398,7 +457,7 @@ const tabs = [{ title: "MAP" }, { title: "Lain-Lain" }];
     v-model:show-save-dialog="showSaveDialog"
     v-model:show-cancel-dialog="showCancelDialog"
     v-model:show-close-dialog="showCloseDialog"
-    @validate-save="showSaveDialog = true"
+    @validate-save="validateSave"
     @confirm-save="executeSave"
     @confirm-cancel="executeCancel"
     @confirm-close="executeClose"
@@ -432,6 +491,17 @@ const tabs = [{ title: "MAP" }, { title: "Lain-Lain" }];
             :form-data="formData"
             :is-edit="isEditMode"
             @upload-email="handleEmailUpload"
+          />
+        </div>
+
+        <div
+          v-show="currentTab === 2"
+          class="pf-tab-pane h-100"
+          style="padding: 0; overflow: hidden"
+        >
+          <TabKatalog
+            :cust-kode="formData.CustKode"
+            :cust-nama="formData.CustNama"
           />
         </div>
       </div>
@@ -480,6 +550,61 @@ const tabs = [{ title: "MAP" }, { title: "Lain-Lain" }];
       </v-card-actions>
     </v-card>
   </v-dialog> -->
+
+  <!-- Dialog Konfirmasi Duplikat Nama -->
+  <v-dialog v-model="showDuplikatDialog" max-width="520px" persistent>
+    <v-card class="rounded-lg">
+      <v-card-title
+        class="bg-orange-darken-2 text-white d-flex align-center pa-3"
+      >
+        <span class="text-subtitle-1 font-weight-bold"
+          >⚠ Nama Pekerjaan Sudah Pernah Diinput</span
+        >
+      </v-card-title>
+
+      <v-card-text class="pa-4">
+        <div class="text-body-2 mb-3 text-grey-darken-3">
+          Nama pekerjaan <strong>"{{ formData.Nama }}"</strong> sudah pernah
+          diinput untuk customer dan divisi yang sama:
+        </div>
+        <v-table density="compact" class="rounded border">
+          <thead>
+            <tr style="background: #fff3e0">
+              <th class="text-left" style="font-size: 11px">Nomor MAP</th>
+              <th class="text-left" style="font-size: 11px">Tanggal</th>
+              <th class="text-left" style="font-size: 11px">Jenis Order</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(d, i) in duplikatList" :key="i">
+              <td style="font-size: 11px; font-weight: 600; color: #e65100">
+                {{ d.mspk_nomor }}
+              </td>
+              <td style="font-size: 11px">{{ d.tgl_formatted }}</td>
+              <td style="font-size: 11px">{{ d.mspk_jo_kode }}</td>
+            </tr>
+          </tbody>
+        </v-table>
+        <div class="mt-3 text-body-2 text-grey-darken-1">
+          Apakah Anda yakin ingin menyimpan dengan nama yang sama?
+        </div>
+      </v-card-text>
+
+      <v-card-actions class="pa-3 border-t bg-grey-lighten-4">
+        <v-btn variant="text" color="grey" @click="showDuplikatDialog = false">
+          Batal (Ganti Nama)
+        </v-btn>
+        <v-spacer />
+        <v-btn
+          variant="flat"
+          color="orange-darken-2"
+          @click="confirmSaveMeskiDuplikat"
+        >
+          Lanjutkan Simpan
+        </v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
 </template>
 
 <style scoped>

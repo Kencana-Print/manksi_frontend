@@ -7,7 +7,13 @@ import {
   IconDatabaseOff,
 } from "@tabler/icons-vue";
 
-const props = defineProps<{ modelValue: boolean }>();
+const props = defineProps<{
+  modelValue: boolean;
+  filterMode?: "so" | "spk-ppic" | "mutasi" | "sj" | "all";
+  cusKode?: string;
+  perushKode?: string;
+  divisi?: string | number;
+}>();
 const emit = defineEmits(["update:modelValue", "selected"]);
 
 const search = ref("");
@@ -58,6 +64,10 @@ const fetchData = async () => {
         q: search.value,
         page: currentPage.value,
         limit: perPage.value,
+        filterMode: props.filterMode ?? "all",
+        cusKode: props.cusKode ?? "",
+        perushKode: props.perushKode ?? "",
+        divisi: props.divisi ?? "",
       },
     });
     items.value = res.data.data.items;
@@ -149,10 +159,10 @@ const selectItem = (item: any) => {
             <tr>
               <th style="width: 120px">NOMOR</th>
               <th>NAMA PEKERJAAN</th>
+              <th style="min-width: 140px">NAMA PRODUK</th>
               <th style="width: 88px">TANGGAL</th>
               <th style="width: 72px; text-align: right">JUMLAH</th>
               <th style="width: 90px">UKURAN</th>
-              <th style="width: 90px">KAIN</th>
             </tr>
           </thead>
           <tbody>
@@ -164,12 +174,12 @@ const selectItem = (item: any) => {
             >
               <td class="td-kode">{{ item.Nomor }}</td>
               <td>{{ item.Nama }}</td>
+              <td>{{ item.Nama2 }}</td>
               <td>{{ formatDate(item.Tanggal) }}</td>
               <td style="text-align: right">
                 {{ Number(item.Jumlah).toLocaleString("id-ID") }}
               </td>
               <td>{{ item.Ukuran }}</td>
-              <td>{{ item.Kain }}</td>
             </tr>
           </tbody>
         </table>

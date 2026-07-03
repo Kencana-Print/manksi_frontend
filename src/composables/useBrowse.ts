@@ -98,6 +98,6 @@ export function useBrowse<T = any>(options: UseBrowseOptions<T>) {
     selectedItem,
     fetchData,
     clearSelection,
-    exportToExcel, // <-- Return fungsinya agar bisa dipanggil di View
+    exportToExcel,
   };
 }

@@ -28,8 +28,7 @@ const isComplexTtd = computed(() => isKaosan.value);
 
 const numCopies = computed(() => {
   if (withAlokasi.value) return 1;
-  if (isGarmen.value) return 1;
-  return 2;
+  return 2; // semua divisi 2 copy
 });
 
 const totalAlokasi = computed(() => {
@@ -197,8 +196,12 @@ onMounted(async () => {
     <div class="print-wrapper">
       <!-- ══ GARMEN: 2 panel terpisah kiri & kanan ══ -->
       <template v-if="isGarmen">
-        <!-- Panel Kiri: Info + Gambar + Size + Komponen + TTD -->
-        <div class="print-half border-right">
+        <div
+          v-for="copy in numCopies"
+          :key="'garmen-' + copy"
+          class="print-half"
+          :class="{ 'border-right': copy === 1 }"
+        >
           <div class="header-row">
             <div class="title-main">SALES ORDER</div>
             <div class="title-po">PO : {{ data.spk_nomor_po || "-" }}</div>
@@ -210,10 +213,10 @@ onMounted(async () => {
                 <td class="w-label">Nomor SO</td>
                 <td class="w-colon">:</td>
                 <td>
-                  <span class="fw">{{ data.spk_nomor }}</span
-                  ><span v-if="data.spk_tipe" class="ml-8 text-xs"
-                    >Tipe SO : <strong>{{ data.spk_tipe }}</strong></span
-                  >
+                  <span class="fw">{{ data.spk_nomor }}</span>
+                  <span v-if="data.spk_tipe" class="ml-8 text-xs">
+                    Tipe SO : <strong>{{ data.spk_tipe }}</strong>
+                  </span>
                 </td>
               </tr>
               <tr>
@@ -266,32 +269,27 @@ onMounted(async () => {
                 <td class="w-colon">:</td>
                 <td>{{ data.spk_cab }} ({{ data.spk_workshop }})</td>
               </tr>
+              <tr>
+                <td class="w-label align-top">Keterangan</td>
+                <td class="w-colon align-top">:</td>
+                <td>
+                  <pre class="val-pre">{{ data.spk_keterangan }}</pre>
+                </td>
+              </tr>
             </tbody>
           </table>
 
-          <!-- Gambar + Size + Komponen -->
-          <div class="garmen-img-row">
-            <div class="garmen-img-box">
-              <img
-                :src="mainImageUrl"
-                @error="handleImageError"
-                class="garmen-img"
-              />
-            </div>
-            <div class="garmen-info-col">
-              <div v-if="data.ketKomponen" class="garmen-komp-box">
-                <div class="spec-title fw">Keterangan Komponen :</div>
-                <pre class="val-pre">{{ data.ketKomponen }}</pre>
-              </div>
-              <div v-if="formatSizeDetail" class="garmen-size-box mt-1">
-                <div class="spec-title">Size : LEBAR &amp; PANJANG BADAN</div>
-                <pre class="val-pre">{{ formatSizeDetail }}</pre>
-              </div>
-            </div>
-          </div>
-
           <div class="fw text-xs mt-1">
             DIKERJAKAN DI {{ data.spk_cab }} {{ data.spk_workshop }}
+          </div>
+
+          <!-- Gambar desain saja, tanpa size detail dan ketKomponen -->
+          <div class="garmen-img-center">
+            <img
+              :src="mainImageUrl"
+              @error="handleImageError"
+              class="garmen-img-fit"
+            />
           </div>
 
           <div class="bottom-ttd-wrapper mt-auto">
@@ -323,23 +321,10 @@ onMounted(async () => {
               <qrcode-vue :value="data.spk_nomor" :size="60" level="L" />
             </div>
           </div>
-          <div class="footer-note">
-            Dibuat Oleh: {{ data.sal_nama }} {{ formatWaktu(data.date_create) }}
-          </div>
-        </div>
 
-        <!-- Panel Kanan: Ket Gudang + Ket Produksi -->
-        <div class="print-half">
-          <div class="ket-section">
-            <div class="ket-title">Ket. Gudang/pembelian:</div>
-            <div class="ket-space-gudang"></div>
-          </div>
-          <div class="ket-section" style="margin-top: 16px">
-            <div class="ket-title">Ket. Produksi:</div>
-            <div v-if="data.spk_repeat" class="fw text-xs mb-1">
-              Repeat Order: {{ data.spk_repeat }}
-            </div>
-            <pre class="val-pre ket-produksi">{{ data.spk_keterangan }}</pre>
+          <div class="footer-note">
+            Dibuat Oleh: {{ data.user_create }}
+            {{ formatWaktu(data.date_create) }}
           </div>
         </div>
       </template>
@@ -605,7 +590,8 @@ onMounted(async () => {
             <qrcode-vue :value="data.spk_nomor" :size="65" level="L" />
           </div>
           <div class="footer-note">
-            Dibuat Oleh: {{ data.sal_nama }} {{ formatWaktu(data.date_create) }}
+            Dibuat Oleh: {{ data.user_create }}
+            {{ formatWaktu(data.date_create) }}
           </div>
         </div>
       </template>
@@ -682,6 +668,8 @@ onMounted(async () => {
   padding: 7mm 10mm 7mm 9mm;
   box-sizing: border-box;
   min-width: 0;
+  height: 209mm;
+  overflow: hidden;
 }
 .border-right {
   border-right: 1px dotted #999;
@@ -748,25 +736,20 @@ onMounted(async () => {
 }
 
 /* Gambar + Size + Komponen dalam satu baris */
-.garmen-img-row {
+.garmen-img-center {
+  flex: 1; /* isi sisa ruang antara info table dan TTD */
   display: flex;
-  gap: 8px;
-  align-items: flex-start;
-  margin-top: 6px;
-  flex: 1;
-  min-height: 0;
-}
-.garmen-img-box {
-  flex: 0 0 auto;
-  display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: center;
-  width: 220px; /* fixed width untuk gambar */
+  min-height: 0;
+  overflow: hidden;
+  padding: 8px 0;
 }
-.garmen-img {
-  width: 220px; /* isi penuh box */
-  max-height: 220px; /* proporsional — browser akan scale height otomatis */
-  object-fit: contain; /* aspect ratio tetap terjaga */
+
+.garmen-img-fit {
+  max-width: 100%;
+  max-height: 100%; /* tidak melebihi flex container */
+  object-fit: contain;
 }
 .garmen-size-box {
   flex: 0 0 200px;
@@ -1114,6 +1097,14 @@ onMounted(async () => {
   @page {
     size: A4 landscape;
     margin: 8mm 10mm;
+  }
+  body {
+    zoom: 90%;
+    margin: 0;
+    padding: 0;
+    background: white;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
   .print-wrapper {
     width: 100%;

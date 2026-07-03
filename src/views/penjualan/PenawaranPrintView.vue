@@ -150,9 +150,71 @@ const parsedKeterangan = computed(() => {
       case "6":
         result.push(`- Garansi barang sesuai yang dipesan.`);
         break;
+      case "7":
+        result.push(
+          `- Dikarenakan proses drying, ukuran jadi spanduk/umbul akan mengalami penyusutan ±5 cm.`,
+        );
+        break;
     }
   });
   return result;
+});
+
+const SAMPLE_OPTIONS = [
+  { id: 1, jenis: "Baju Uniform (Kemeja)", biaya: 400000 },
+  { id: 2, jenis: "Celana", biaya: 300000 },
+  { id: 3, jenis: "Celemek", biaya: 200000 },
+  { id: 4, jenis: "Jaket", biaya: 500000 },
+  { id: 5, jenis: "Jas Almamater", biaya: 500000 },
+  { id: 6, jenis: "Kaos Krah", biaya: 350000 },
+  { id: 7, jenis: "Kaos Oblong", biaya: 200000 },
+  { id: 8, jenis: "Rompi", biaya: 500000 },
+  { id: 9, jenis: "Wearpack", biaya: 900000 },
+];
+const SAMPLE_OPTIONS_SPANDUK = [
+  { id: 1, text: "Pembuatan sampel dikenakan biaya Rp 1.000.000 / desain." },
+  { id: 2, text: "Jika ACC bisa dijadikan DP." },
+  {
+    id: 3,
+    text: "Jika ada revisi desain dikenakan biaya ganti film Rp 500.000.",
+  },
+];
+const SAMPLE_OPTIONS_MMT = [
+  { id: 1, text: "Harga sesuai pricelist ritailer." },
+];
+
+const fmtRupiah = (n: number) =>
+  "Rp. " + n.toLocaleString("id-ID").replace(/,/g, ".");
+
+const divisiStr = computed(() => String(data.value?.pen_divisi || ""));
+const isGarmenSample = computed(() => divisiStr.value === "4");
+const isSpandukSample = computed(() => divisiStr.value === "1");
+const isMmtSample = computed(() => divisiStr.value === "5");
+
+const selectedSampleIds = computed(() => {
+  if (!data.value?.pen_sample) return [] as number[];
+  return data.value.pen_sample
+    .split(",")
+    .map((s: string) => Number(s.trim()))
+    .filter((n: number) => !isNaN(n) && n > 0);
+});
+
+// Khusus Garmen — {id, jenis, biaya}
+const parsedSampleGarmen = computed(() => {
+  if (!isGarmenSample.value) return [];
+  return SAMPLE_OPTIONS.filter((opt) =>
+    selectedSampleIds.value.includes(opt.id),
+  );
+});
+
+// Khusus Spanduk/MMT — {id, text}
+const parsedSampleList = computed(() => {
+  const source = isSpandukSample.value
+    ? SAMPLE_OPTIONS_SPANDUK
+    : isMmtSample.value
+      ? SAMPLE_OPTIONS_MMT
+      : [];
+  return source.filter((opt) => selectedSampleIds.value.includes(opt.id));
 });
 
 const grandTotal = computed(() => {
@@ -453,6 +515,27 @@ const grandTotal = computed(() => {
           <div v-if="parsedKeterangan.length > 0" class="mt-3 text-sm">
             <div v-for="(ket, idx) in parsedKeterangan" :key="idx">
               {{ ket }}
+            </div>
+          </div>
+
+          <div v-if="parsedSampleGarmen.length > 0" class="mt-3 text-sm">
+            <div>- Rincian Biaya Sampel :</div>
+            <div
+              v-for="s in parsedSampleGarmen"
+              :key="s.id"
+              style="padding-left: 8px"
+            >
+              {{ s.jenis }} : {{ fmtRupiah(s.biaya) }}
+            </div>
+          </div>
+          <div v-else-if="parsedSampleList.length > 0" class="mt-3 text-sm">
+            <div>- Ketentuan Sample :</div>
+            <div
+              v-for="s in parsedSampleList"
+              :key="s.id"
+              style="padding-left: 8px"
+            >
+              {{ s.text }}
             </div>
           </div>
 

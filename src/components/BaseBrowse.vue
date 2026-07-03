@@ -51,6 +51,7 @@ const props = withDefaults(
     // Summary bar — opsional, tampilkan total nilai kolom tertentu di footer
     summaryKey?: string; // key kolom yang akan di-sum, cth: "Nominal"
     summaryLabel?: string; // label di kiri, cth: "Total Nominal"
+    beforeDelete?: (item: any) => Promise<boolean> | boolean;
   }>(),
   {
     icon: () => IconTable,
@@ -510,7 +511,11 @@ const resolvedRowProps = (data: any) => {
 };
 
 // ── Delete confirmation ────────────────────────────────────────────────
-const requestDelete = (item: any) => {
+const requestDelete = async (item: any) => {
+  if (props.beforeDelete) {
+    const allowed = await props.beforeDelete(item);
+    if (!allowed) return; // gagal validasi → dialog tidak dibuka
+  }
   pendingDeleteItem.value = item;
   deleteDialog.value = true;
 };
@@ -547,8 +552,8 @@ const isDragging = ref(false);
 let pointerDragKey: string | null = null;
 let autoScrollTimer: number | null = null;
 
-const onColPointerDown = (key: string, e: PointerEvent) => {
-  if (key === "data-table-expand") return;
+const onColPointerDown = (key: string | null | undefined, e: PointerEvent) => {
+  if (!key || key === "data-table-expand") return;
   // Hanya dari drag handle (class col-drag-handle)
   const target = e.target as HTMLElement;
   if (!target.classList.contains("col-drag-handle")) return;
@@ -557,7 +562,6 @@ const onColPointerDown = (key: string, e: PointerEvent) => {
   dragSrcKey.value = key;
   isDragging.value = true;
 
-  // Capture pointer agar tetap track meski keluar elemen
   (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
 };
 
@@ -808,11 +812,7 @@ watch(
                         : '',
                       dragSrcKey === col.key ? 'col-dragging' : '',
                     ]"
-                    @pointerdown="
-                      col.key &&
-                      col.key !== 'data-table-expand' &&
-                      onColPointerDown(col.key, $event)
-                    "
+                    @pointerdown="onColPointerDown(col.key, $event)"
                     @pointermove="onColPointerMove($event)"
                     @pointerup="onColPointerUp"
                     @pointercancel="onColPointerUp"
@@ -1077,6 +1077,9 @@ watch(
               pendingDeleteItem.kode
             }}
           </div>
+
+          <!-- Slot opsional — parent bisa nyisipin warning tambahan -->
+          <slot name="delete-warning" :item="pendingDeleteItem" />
 
           <div class="text-caption text-grey-darken-1 mt-3">
             Tindakan ini tidak dapat dibatalkan.

@@ -57,7 +57,8 @@ export const dashboardService = {
     }),
   getSpkBelumMkbCount: () => api.get("/dashboard/spk-belum-mkb-count"),
   getSpkDeadlineKritis: () => api.get("/dashboard/spk-deadline-kritis"),
-  getAktivitasHariIni: () => api.get("/dashboard/aktivitas-hari-ini"),
+  getAktivitasHariIni: (limit = 20, offset = 0) =>
+    api.get("/dashboard/aktivitas-hari-ini", { params: { limit, offset } }),
   getTrendSpk7Hari: () => api.get("/dashboard/trend-spk-7hari"),
   getApprovalPendingCount: () => api.get("/dashboard/approval-pending-count"),
 };

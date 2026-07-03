@@ -41,7 +41,7 @@ const cabangOptions = ref<string[]>(["ALL"]);
 const jenisOptions = ["ACCESORIES", "OBAT", "SPAREPART", "ATK/RTK"];
 
 onMounted(async () => {
-  // 1. Set default Jenis berdasarkan Bagian User (Sesuai FormCreate Delphi)
+  // 1. Set default Jenis berdasarkan Bagian User
   const bagian = (authStore.user?.bagian || "").toUpperCase();
   if (bagian === "GA") {
     filterState.value.jenis = "ATK/RTK";
@@ -58,6 +58,16 @@ onMounted(async () => {
   } catch {
     /* silent */
   }
+
+  // 3. Default cabang dari user — kecuali HO tetap ALL
+  const userCabang = (authStore.user?.cabang || "").toUpperCase();
+  if (userCabang && userCabang !== "HO-" && userCabang !== "HO") {
+    // Pastikan cabang user ada di list options
+    if (cabangOptions.value.includes(userCabang)) {
+      filterState.value.cabang = userCabang;
+    }
+  }
+  // HO → tetap "ALL" (sudah default dari filterState)
 });
 
 const {

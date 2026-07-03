@@ -11,7 +11,7 @@ const allApprovals = [
   { id: "piutang_90", label: "Approve SPK Piutang > 90 hari", menuId: "256" },
   { id: "harga_nol", label: "Approve SPK Harga 0", menuId: "257" },
   { id: "prioritas", label: "Approve SPK Klien Prioritas", menuId: "258" },
-  { id: "perubahan_data", label: "Approve Perubahan Data", menuId: "259" }, // <-- Daftarkan di sini
+  { id: "perubahan_data", label: "Approve Perubahan Data", menuId: "259" },
   {
     id: "invoice_blmsj",
     label: "Approve Invoice Belum Buat SJ",
@@ -27,6 +27,11 @@ const allApprovals = [
     id: "plafon_direksi",
     label: "Approve Plafon Customer (Direksi)",
     menuId: "264",
+  },
+  {
+    id: "mutasi_noplan",
+    label: "Approve Mutasi Produksi Tanpa Planning",
+    menuId: "266",
   },
 ];
 
@@ -76,6 +81,9 @@ const ApprovalPlafonManagerComponent = defineAsyncComponent(
 const ApprovalPlafonDireksiComponent = defineAsyncComponent(
   () => import("./components/ApprovalPlafonDireksi.vue"),
 );
+const ApprovalMutasiNoPlanComponent = defineAsyncComponent(
+  () => import("./components/ApprovalMutasiNoPlan.vue"),
+);
 
 // Logic Penentuan Komponen Dinamis
 const currentComponent = computed(() => {
@@ -83,7 +91,7 @@ const currentComponent = computed(() => {
   if (selectedApproval.value === "harga_nol") return ApprovalHargaNolComponent;
   if (selectedApproval.value === "prioritas") return ApprovalPrioritasComponent;
   if (selectedApproval.value === "perubahan_data")
-    return ApprovalPerubahanDataComponent; // <-- Tambahkan kondisi
+    return ApprovalPerubahanDataComponent;
   if (selectedApproval.value === "invoice_blmsj")
     return ApprovalInvoiceBlmSjComponent;
   if (selectedApproval.value === "hapus_data")
@@ -92,6 +100,8 @@ const currentComponent = computed(() => {
     return ApprovalPlafonManagerComponent;
   if (selectedApproval.value === "plafon_direksi")
     return ApprovalPlafonDireksiComponent;
+  if (selectedApproval.value === "mutasi_noplan")
+    return ApprovalMutasiNoPlanComponent;
   return null;
 });
 </script>

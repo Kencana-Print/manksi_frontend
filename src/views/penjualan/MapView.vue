@@ -126,7 +126,7 @@ const headers = [
   { title: "No. Referensi", key: "NoReferensi", width: "140px" },
   { title: "Estimasi Jadi", key: "EstimasiJadi", width: "100px" },
   { title: "Close", key: "CloseStatus", width: "70px", align: "center" },
-  { title: "SPK", key: "SPK", width: "160px" },
+  { title: "SO", key: "SPK", width: "160px" },
   { title: "Tgl. Desain", key: "Design_Tanggal", width: "100px" },
   { title: "User Desain", key: "Design_User", width: "100px" },
   { title: "Note Desain", key: "Design_Note", width: "150px" },
@@ -377,7 +377,7 @@ const confirmToggleClose = async () => {
         </div>
         <div class="legend-item">
           <div class="legend-box bg-black"></div>
-          <span>= Close (Aktif dan Sudah Jadi SPK)</span>
+          <span>= Close (Aktif dan Sudah Jadi SO)</span>
         </div>
       </div>
     </template>
@@ -662,7 +662,7 @@ const confirmToggleClose = async () => {
           class="mr-2"
         />
         <span class="text-subtitle-1 font-weight-bold"
-          >Cetak Surat Pra SPK (MAP)</span
+          >Cetak Surat Pra SO (MAP)</span
         >
       </v-card-title>
       <v-card-text class="pa-4 text-center">

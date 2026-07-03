@@ -91,11 +91,12 @@ const selectedCustomer = computed({
 });
 
 // Watch filterState → simpan ke sessionStorage + fetch
+const isInitialized = ref(false);
 watch(
   filterState,
   (val) => {
     sessionStorage.setItem(SESSION_KEY, JSON.stringify(val));
-    fetchData();
+    if (isInitialized.value) fetchData();
   },
   { deep: true },
 );
@@ -144,6 +145,8 @@ const {
 // --- HEADERS ---
 const headers = [
   { title: "Nomor", key: "Nomor", width: "135px", fixed: true },
+  { title: "SPK PPIC", key: "SpkPpic", width: "155px" },
+  { title: "Tgl SPK PPIC", key: "TglSpkPpic", width: "110px", align: "center" },
   { title: "MO", key: "MO", width: "80px" },
   { title: "CMO", key: "CMO", width: "80px" },
   { title: "Tanggal", key: "Tanggal", width: "100px", align: "center" },
@@ -166,9 +169,6 @@ const headers = [
   { title: "Finishing", key: "Finishing", width: "150px" },
   { title: "Harga", key: "Harga", width: "100px", align: "right" },
   { title: "Pesan", key: "Pesan", width: "80px", align: "right" },
-  { title: "Pra SJ", key: "Prasj", width: "80px", align: "right" },
-  { title: "Kirim", key: "Kirim", width: "80px", align: "right" },
-  { title: "Kurang", key: "Kurang", width: "80px", align: "right" },
   { title: "Sales", key: "Sales", width: "120px" },
   { title: "Created", key: "Created", width: "140px", align: "center" },
   { title: "Group Customer", key: "GroupCustomer", width: "150px" },
@@ -181,51 +181,12 @@ const headers = [
   { title: "No Penawaran", key: "NoPenawaran", width: "130px" },
   { title: "MAP", key: "MAP", width: "130px" },
   { title: "Repeat", key: "Repeat", width: "80px" },
-
-  // --- Kolom Produksi ---
-  { title: "Potong", key: "Potong", width: "80px", align: "right" },
-  { title: "Qc Potong", key: "QcPotong", width: "80px", align: "right" },
-  { title: "Bordir", key: "Bordir", width: "80px", align: "right" },
-  { title: "Cetak", key: "Cetak", width: "80px", align: "right" },
-  { title: "Qc Cetak", key: "QcCetak", width: "80px", align: "right" },
-  { title: "DC", key: "DC", width: "80px", align: "right" },
-  { title: "Jahit", key: "Jahit", width: "80px", align: "right" },
-  { title: "Lipat", key: "Lipat", width: "80px", align: "right" },
-  { title: "Jadi", key: "Jadi", width: "80px", align: "right" },
-
-  // --- Kolom Kekurangan Produksi ---
-  { title: "Kurang Jadi", key: "Kurang_Jadi", width: "90px", align: "right" },
-  {
-    title: "Kurang Potong",
-    key: "Kurang_Potong",
-    width: "90px",
-    align: "right",
-  },
-  {
-    title: "Kurang Bordir",
-    key: "Kurang_Bordir",
-    width: "90px",
-    align: "right",
-  },
-  { title: "Kurang Cetak", key: "Kurang_Cetak", width: "90px", align: "right" },
-  {
-    title: "Kurang Qc Cetak",
-    key: "Kurang_QcCetak",
-    width: "110px",
-    align: "right",
-  },
-  { title: "Kurang Jahit", key: "Kurang_Jahit", width: "90px", align: "right" },
-  { title: "Kurang Lipat", key: "Kurang_Lipat", width: "90px", align: "right" },
-
-  // --- Kolom Status & ACC ---
   { title: "Aktif", key: "Aktif", width: "60px", align: "center" },
   { title: "Acc", key: "Acc", width: "60px", align: "center" },
   { title: "Acc H0", key: "AccH0", width: "60px", align: "center" },
   { title: "Acc JO", key: "AccJO", width: "80px", align: "center" },
   { title: "Acc Pending", key: "AccPending", width: "90px", align: "center" },
   { title: "MPPB", key: "MPPB", width: "120px" },
-
-  // --- Kolom Design ---
   {
     title: "Design Tgl",
     key: "Design_Tanggal",
@@ -236,7 +197,6 @@ const headers = [
   { title: "Design Note", key: "Design_Note", width: "200px" },
   { title: "Design Baru", key: "Design_Baru", width: "90px", align: "center" },
   { title: "Design Done", key: "Design_Done", width: "90px", align: "center" },
-
   { title: "Keterangan", key: "Keterangan", width: "250px" },
   { title: "Pesanan/Invoice", key: "Pesanan/Invoice", width: "150px" },
 ];
@@ -273,32 +233,32 @@ const rowPropsFn = (data: any) => {
   const classes: string[] = ["font-weight-bold"];
   let style = "";
 
-  // 1. Logika Font Color
-  if (item.Status === "Open") {
-    classes.push("text-red-darken-1"); // clRed
-  }
-
-  if (item.Aktif === "N") {
-    if (item.Acc === "Y" || item.AccH0 === "Y" || item.AccJO === "ACC") {
-      classes.push("text-blue-darken-2"); // clBlue
-    } else {
-      classes.push("text-grey-darken-1"); // clGrayText
-    }
+  if (item.SpkPpic) {
+    // JIKA SUDAH JADI SPK PPIC: Paksa warna hitam dan abaikan status Open/Pasif
+    style = "color: #212121 !important;";
   } else {
-    // Jika Aktif Y tapi ada penolakan
-    if (item.Acc === "N" || item.AccH0 === "N" || item.AccJO === "TOLAK") {
-      classes.push("text-green-darken-2"); // clGreen
+    // JIKA BELUM ADA SPK PPIC: Jalankan logika warna default
+    if (item.Status === "Open") {
+      classes.push("text-red-darken-1");
+    }
+
+    if (item.Aktif === "N") {
+      if (item.Acc === "Y" || item.AccH0 === "Y" || item.AccJO === "ACC") {
+        classes.push("text-blue-darken-2");
+      } else {
+        classes.push("text-grey-darken-1");
+      }
+    } else {
+      if (item.Acc === "N" || item.AccH0 === "N" || item.AccJO === "TOLAK") {
+        classes.push("text-green-darken-2");
+      }
+    }
+
+    if (item.Pending !== "NORMAL") {
+      if (item.AccPending === "N") classes.push("text-fuchsia-darken-1");
+      else if (item.AccPending === "ACC") classes.push("text-orange-darken-3");
     }
   }
-
-  // Pending Status
-  if (item.Pending !== "NORMAL") {
-    if (item.AccPending === "N") classes.push("text-fuchsia-darken-1");
-    else if (item.AccPending === "ACC") classes.push("text-orange-darken-3");
-  }
-
-  // 2. Logika Nama SPK Kuning (Design Status)
-  // Di handle via template slot Nama
 
   return { class: classes.join(" "), style };
 };
@@ -324,7 +284,8 @@ onMounted(async () => {
   } catch (e) {
     console.error("Gagal load workshop:", e);
   }
-  fetchData(); // ← tetap panggil sekali di mount
+  isInitialized.value = true;
+  fetchData();
 });
 
 const onAdd = () => router.push("/penjualan/sales-order/create");
@@ -771,32 +732,16 @@ const formatWaktu = (v: string) => {
 
     <template #item.Harga="{ item }">{{ numFmt(item.Harga) }}</template>
     <template #item.Pesan="{ item }">{{ numFmt(item.Pesan) }}</template>
-    <template #item.Kirim="{ item }">{{ numFmt(item.Kirim) }}</template>
-    <template #item.Kurang="{ item }">{{ numFmt(item.Kurang) }}</template>
 
-    <template
-      v-for="col in [
-        'Potong',
-        'QcPotong',
-        'Bordir',
-        'Cetak',
-        'QcCetak',
-        'DC',
-        'Jahit',
-        'Lipat',
-        'Jadi',
-        'Kurang_Jadi',
-        'Kurang_Potong',
-        'Kurang_Bordir',
-        'Kurang_Cetak',
-        'Kurang_QcCetak',
-        'Kurang_Jahit',
-        'Kurang_Lipat',
-      ]"
-      :key="col"
-      v-slot:[`item.${col}`]="{ item }"
-    >
-      {{ numFmt(item[col]) }}
+    <template #item.TglSpkPpic="{ item }">{{
+      formatTgl(item.TglSpkPpic)
+    }}</template>
+
+    <template #item.Status="{ item }">
+      <span v-if="item.SpkPpic" class="text-black font-weight-bold"
+        >Closed (PPIC)</span
+      >
+      <span v-else>{{ item.Status }}</span>
     </template>
 
     <template #detail="{ item }">
@@ -814,7 +759,7 @@ const formatWaktu = (v: string) => {
           <table class="size-table">
             <thead>
               <tr>
-                <th width="150">Nomor SPK</th>
+                <th width="150">Nomor SO</th>
                 <th width="80">Size</th>
                 <th width="100" class="tr">Qty Pesan</th>
                 <th width="100" class="tr">Sudah Stbj</th>
@@ -890,14 +835,14 @@ const formatWaktu = (v: string) => {
             <template #prepend
               ><IconCheck :size="14" class="mr-2 text-success"
             /></template>
-            <v-list-item-title>Approval SPK</v-list-item-title>
+            <v-list-item-title>Approval SO</v-list-item-title>
           </v-list-item>
           <v-divider class="my-1"></v-divider>
           <v-list-item @click="openBatalCloseDialog" :disabled="!canDelete">
             <template #prepend
               ><IconLockSquare :size="14" class="mr-2 text-warning"
             /></template>
-            <v-list-item-title>Close SPK</v-list-item-title>
+            <v-list-item-title>Close SO</v-list-item-title>
           </v-list-item>
           <v-list-item @click="onBatalCloseSpk" :disabled="!canDelete">
             <template #prepend
@@ -946,11 +891,11 @@ const formatWaktu = (v: string) => {
   <v-dialog v-model="showCloseSpkDialog" max-width="400">
     <v-card rounded="lg">
       <v-card-title class="bg-warning text-white pa-3 text-subtitle-1"
-        >Close SPK</v-card-title
+        >Close SO</v-card-title
       >
       <v-card-text class="pa-4">
         <p class="text-caption mb-2">
-          Menutup SPK Nomor: <b>{{ selectedItem?.Nomor }}</b>
+          Menutup SO Nomor: <b>{{ selectedItem?.Nomor }}</b>
         </p>
         <v-textarea
           v-model="alasanClose"
@@ -977,7 +922,7 @@ const formatWaktu = (v: string) => {
       <v-card-title
         class="bg-primary text-white d-flex justify-space-between align-center pa-3"
       >
-        <span>Gambar SPK: {{ selected[0]?.Nomor }}</span>
+        <span>Gambar SO: {{ selected[0]?.Nomor }}</span>
         <v-btn
           variant="text"
           size="small"
@@ -1053,7 +998,7 @@ const formatWaktu = (v: string) => {
           <template #headers>
             <tr>
               <th width="40"></th>
-              <th width="150" class="text-left font-weight-bold">Nomor SPK</th>
+              <th width="150" class="text-left font-weight-bold">Nomor SO</th>
               <th class="text-left font-weight-bold">Nama Pesanan</th>
             </tr>
           </template>
@@ -1092,7 +1037,7 @@ const formatWaktu = (v: string) => {
       </v-card-title>
       <v-card-text class="pa-4 text-center">
         <div class="text-body-1 mb-4 text-grey-darken-3">
-          Pilih orientasi cetak untuk SPK <b>{{ nomorToPrint }}</b
+          Pilih orientasi cetak untuk SO <b>{{ nomorToPrint }}</b
           >:
         </div>
 

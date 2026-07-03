@@ -7,7 +7,8 @@ import { useToast } from "vue-toastification";
 import BaseForm from "@/components/BaseForm.vue";
 import TabPermintaan from "./components/TabPermintaan.vue";
 import TabKalkulasi from "./components/TabKalkulasi.vue";
-import { IconCash, IconCalculator } from "@tabler/icons-vue";
+import TabKatalogMintaHarga from "./components/TabKatalogMintaHarga.vue";
+import { IconCash, IconCalculator, IconPhoto } from "@tabler/icons-vue";
 
 type MintaHargaForm = typeof initialData;
 
@@ -306,6 +307,7 @@ const currentTab = ref(0);
 const tabs = [
   { text: "1. Price Request", icon: IconCash },
   { text: "2. Get Price (Kalkulasi)", icon: IconCalculator },
+  { text: "3. Katalog Desain", icon: IconPhoto },
 ];
 
 const handleImageSelected = (file: File) => {
@@ -352,6 +354,16 @@ const handleImageSelected = (file: File) => {
         </div>
         <div v-show="currentTab === 1" class="mh-tab-pane">
           <TabKalkulasi :form-data="formData" :is-edit="isEditMode" />
+        </div>
+        <div
+          v-show="currentTab === 2"
+          class="mh-tab-pane"
+          style="padding: 0; overflow: hidden; height: 100%"
+        >
+          <TabKatalogMintaHarga
+            :cust-kode="formData.CustKode"
+            :cust-nama="formData.CustNama"
+          />
         </div>
       </div>
     </div>

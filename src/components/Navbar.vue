@@ -71,6 +71,14 @@ import {
   IconLayoutGrid,
   IconCoin,
   IconReportSearch,
+  IconCalendarStats,
+  IconBuildingFactory2,
+  IconClipboardCheck,
+  IconFileCheck,
+  IconReceipt2,
+  IconFileDots,
+  IconTruckOff,
+  IconReceiptTax,
 } from "@tabler/icons-vue";
 
 interface NavItem {
@@ -312,15 +320,27 @@ const menuItems: NavItem[] = [
   },
   {
     title: "PPIC",
-    icon: IconClipboardText, // ← import IconClipboardText dari tabler
+    icon: IconClipboardText,
     model: ppicMenu,
     menuId: 9000,
     items: [
       {
-        title: "Cetak BAST",
+        title: "Cetak BAST-MAP",
         to: "/garmen/cetak-bast",
         icon: IconPrinter,
         menuId: 117,
+      },
+      {
+        title: "SPK (Surat Perintah Kerja)",
+        to: "/ppic/spk",
+        icon: IconClipboardText,
+        menuId: 152,
+      },
+      {
+        title: "Planning SPK PPIC",
+        to: "/ppic/planning-spk",
+        icon: IconCalendarStats,
+        menuId: 56,
       },
     ],
   },
@@ -393,6 +413,25 @@ const menuItems: NavItem[] = [
             menuId: 112,
           },
         ],
+      },
+      {
+        title: "Bahan Jadi",
+        icon: IconShirt, // atau IconBox, sesuaikan
+        menuId: 921,
+        subItems: [
+          {
+            title: "Surat Terima Barang Jadi (STBJ)",
+            to: "/garmen/bahan-jadi/stbj",
+            icon: IconClipboardCheck,
+            menuId: 105,
+          },
+        ],
+      },
+      {
+        title: "MKA (Memo Kebutuhan Accesories)",
+        to: "/garmen/mka",
+        icon: IconNotes,
+        menuId: 57,
       },
       {
         title: "Barang",
@@ -468,7 +507,24 @@ const menuItems: NavItem[] = [
         ],
       },
       { divider: true },
-      { title: "MKB", to: "/garmen/mkb", icon: IconNotes, menuId: 999 },
+      {
+        title: "PO Jasa",
+        to: "/garmen/po-jasa",
+        icon: IconClipboardList,
+        menuId: 102,
+      },
+      {
+        title: "Approve PO Jasa",
+        to: "/garmen/approve-po-jasa",
+        icon: IconClipboardCheck,
+        menuId: 113,
+      },
+      {
+        title: "Bukti Penerimaan Jasa (BPB Jasa)",
+        to: "/garmen/bpb-jasa",
+        icon: IconFileCheck,
+        menuId: 104,
+      },
       { divider: true },
       {
         title: "PO Internal MAP",
@@ -494,6 +550,13 @@ const menuItems: NavItem[] = [
             menuId: 140,
           },
         ],
+      },
+      { divider: true },
+      {
+        title: "Mutasi Produksi",
+        to: "/garmen/mutasi-produksi",
+        icon: IconBuildingFactory2,
+        menuId: 109,
       },
     ],
   },
@@ -529,14 +592,75 @@ const menuItems: NavItem[] = [
       },
       { divider: true },
       {
-        title: "Invoice Proforma",
-        to: "/penjualan/invoice-proforma",
-        icon: IconFileInvoice, // Menggunakan Tabler Icon
-        menuId: 157,
+        title: "Pra Surat Jalan",
+        to: "/penjualan/pra-sj",
+        icon: IconFileDots,
+        menuId: 168,
+      },
+      {
+        title: "Surat Jalan",
+        to: "/penjualan/surat-jalan",
+        icon: IconTruck,
+        menuId: 153,
+      },
+      {
+        title: "Surat Jalan Tak Normal",
+        to: "/penjualan/sj-tak-normal",
+        icon: IconTruckOff,
+        menuId: 154,
+      },
+      {
+        title: "Update Status Surat Jalan",
+        to: "/penjualan/update-status-sj",
+        icon: IconTruckDelivery,
+        menuId: 155,
+      },
+      {
+        title: "Approval Surat Jalan",
+        to: "/penjualan/approval-sj",
+        icon: IconClipboardCheck,
+        menuId: 165,
       },
       { divider: true },
       {
-        title: "MAP",
+        title: "Invoice",
+        to: "/penjualan/invoice",
+        icon: IconReceipt,
+        menuId: 156,
+      },
+      {
+        title: "Invoice Proforma",
+        to: "/penjualan/invoice-proforma",
+        icon: IconFileInvoice,
+        menuId: 157,
+      },
+      {
+        title: "Invoice Tak Normal",
+        to: "/penjualan/invoice-tak-normal",
+        icon: IconReceipt2,
+        menuId: 158,
+      },
+      {
+        title: "Cetak Kuitansi",
+        to: "/penjualan/cetak-kuitansi",
+        icon: IconReceipt2,
+        menuId: 1317,
+      },
+      {
+        title: "Cetak Faktur Pajak",
+        to: "/penjualan/cetak-faktur-pajak",
+        icon: IconReceiptTax,
+        menuId: 159,
+      },
+      {
+        title: "Export CSV ke Faktur Pajak",
+        to: "/penjualan/export-csv-pajak",
+        icon: IconFileSpreadsheet,
+        menuId: 160,
+      },
+      { divider: true },
+      {
+        title: "MAP (Memo Approval Produk)",
         to: "/penjualan/map",
         icon: IconFileInvoice,
         menuId: 162,
@@ -552,6 +676,13 @@ const menuItems: NavItem[] = [
         to: "/penjualan/update-sj-map",
         icon: IconChecks,
         menuId: 164,
+      },
+      { divider: true },
+      {
+        title: "Jadwal Kirim",
+        to: "/penjualan/jadwal-kirim",
+        icon: IconTruckDelivery,
+        menuId: 119,
       },
     ],
   },
