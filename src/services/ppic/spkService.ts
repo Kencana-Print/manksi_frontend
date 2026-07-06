@@ -26,4 +26,13 @@ export const spkService = {
     api.put(`/ppic/spk/${encodeURIComponent(nomor)}/approve`),
 
   getWorkshops: () => api.get("/lookups/cabang-pabrik"),
+
+  checkPrintPermission: (nomor: string) =>
+    api.get(`/ppic/spk/${encodeURIComponent(nomor)}/print-check`),
+  requestPrintApproval: (nomor: string, alasan: string) =>
+    api.post(`/ppic/spk/${encodeURIComponent(nomor)}/request-print-approval`, {
+      alasan,
+    }),
+  recordPrint: (nomor: string) =>
+    api.post(`/ppic/spk/${encodeURIComponent(nomor)}/record-print`),
 };

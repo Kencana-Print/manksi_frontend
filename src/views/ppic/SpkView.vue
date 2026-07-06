@@ -150,6 +150,12 @@ const headers = [
   { title: "Date PO", key: "DatePO", width: "100px", align: "center" },
   { title: "Dateline PO", key: "DatelinePO", width: "100px", align: "center" },
   { title: "Status", key: "Status", width: "80px", align: "center" },
+  {
+    title: "Status Cetak",
+    key: "CetakStatusDisplay",
+    width: "120px",
+    align: "center",
+  },
   { title: "Alasan Close", key: "AlasanClose", width: "150px" },
   { title: "No Penawaran", key: "NoPenawaran", width: "130px" },
   { title: "MAP", key: "MAP", width: "130px" },
@@ -413,6 +419,12 @@ const onExport = async () => {
 const dialogGambar = ref(false);
 const gambarUrl = ref("");
 const gambarFallbackStep = ref(0);
+const showPrintApprovalDialog = ref(false);
+const printApprovalAlasan = ref("");
+const printCheckInfo = ref<{ count: number; approvalStatus: string } | null>(
+  null,
+);
+
 const onGambarError = () => {
   if (!selectedItem.value) return;
   const base = (api.defaults.baseURL || "").replace(/\/api\/?$/, "");
@@ -438,16 +450,62 @@ const onLihatGambar = () => {
 };
 
 // --- CETAK ---
-const onPrint = () => {
+const onPrint = async () => {
   if (!selectedItem.value) return;
   if (selectedItem.value.Aktif === "N") {
     toast.warning("SPK tersebut statusnya pasif. Tidak bisa dicetak.");
     return;
   }
-  window.open(
-    `/ppic/spk/print/${encodeURIComponent(selectedItem.value.Nomor)}`,
-    "_blank",
-  );
+  const nomor = selectedItem.value.Nomor;
+  try {
+    const res = await spkService.checkPrintPermission(nomor);
+    const info = res.data.data;
+    if (!info.allowed) {
+      printCheckInfo.value = info;
+
+      // Sudah pernah minta approval dan masih menunggu — cukup beritahu,
+      // jangan buka dialog isi alasan lagi (mencegah user isi ulang
+      // alasan padahal pengajuan lama masih aktif).
+      if (info.approvalStatus === "WAIT") {
+        toast.info("Pengajuan cetak ulang masih menunggu approval manager.");
+        return;
+      }
+
+      // Belum pernah ajukan ("") atau pengajuan sebelumnya ditolak
+      // ("TOLAK") — keduanya butuh dialog baru untuk isi alasan.
+      if (info.approvalStatus === "TOLAK") {
+        toast.error(
+          "Pengajuan cetak ulang sebelumnya DITOLAK. Ajukan ulang jika perlu.",
+        );
+      } else {
+        toast.warning(
+          `SPK ini sudah pernah dicetak (${info.count}x). Cetak berikutnya butuh approval manager.`,
+        );
+      }
+      printApprovalAlasan.value = "";
+      showPrintApprovalDialog.value = true;
+      return;
+    }
+    window.open(`/ppic/spk/print/${encodeURIComponent(nomor)}`, "_blank");
+    await spkService.recordPrint(nomor);
+    fetchData();
+  } catch (e: any) {
+    toast.error(e.response?.data?.message || "Gagal memeriksa izin cetak.");
+  }
+};
+
+const submitPrintApproval = async () => {
+  if (!selectedItem.value) return;
+  try {
+    await spkService.requestPrintApproval(
+      selectedItem.value.Nomor,
+      printApprovalAlasan.value,
+    );
+    toast.success("Pengajuan approval cetak ulang berhasil dikirim.");
+    showPrintApprovalDialog.value = false;
+  } catch (e: any) {
+    toast.error(e.response?.data?.message || "Gagal mengirim pengajuan.");
+  }
 };
 
 // --- APPROVE ---
@@ -675,6 +733,33 @@ const formatWaktu = (v: string) => {
       <v-chip v-if="item.IsSO" size="x-small" color="primary" variant="tonal"
         >SO</v-chip
       >
+    </template>
+
+    <template #item.CetakStatusDisplay="{ item }">
+      <span v-if="Number(item.CetakCount) === 0" class="cetak-badge badge-grey">
+        Belum Dicetak
+      </span>
+      <span
+        v-else-if="item.CetakApprovalStatus === 'WAIT'"
+        class="cetak-badge badge-blue"
+      >
+        Cetak {{ item.CetakCount }}x · Nunggu ACC
+      </span>
+      <span
+        v-else-if="item.CetakApprovalStatus === 'TOLAK'"
+        class="cetak-badge badge-red"
+      >
+        Cetak {{ item.CetakCount }}x · Ditolak
+      </span>
+      <span
+        v-else-if="item.CetakApprovalStatus === 'ACC_READY'"
+        class="cetak-badge badge-green"
+      >
+        Cetak {{ item.CetakCount }}x · Siap Cetak
+      </span>
+      <span v-else class="cetak-badge badge-neutral">
+        Sudah Dicetak {{ item.CetakCount }}x
+      </span>
     </template>
 
     <template #item.Tanggal="{ item }">{{ formatTgl(item.Tanggal) }}</template>
@@ -950,6 +1035,39 @@ const formatWaktu = (v: string) => {
       </v-card-text>
     </v-card>
   </v-dialog>
+
+  <v-dialog v-model="showPrintApprovalDialog" max-width="400">
+    <v-card rounded="lg">
+      <v-card-title class="bg-warning text-white pa-3 text-subtitle-1">
+        Cetak Ulang Butuh Approval
+      </v-card-title>
+      <v-card-text class="pa-4">
+        <p class="text-caption mb-2">
+          SPK <b>{{ selectedItem?.Nomor }}</b> sudah pernah dicetak
+          <b>{{ printCheckInfo?.count }}x</b>. Ajukan approval ke Manager untuk
+          mencetak lagi.
+        </p>
+        <v-textarea
+          v-model="printApprovalAlasan"
+          label="Alasan cetak ulang"
+          variant="outlined"
+          density="compact"
+          rows="3"
+          hide-details
+          autofocus
+        />
+      </v-card-text>
+      <v-card-actions class="pa-3 border-t">
+        <v-spacer />
+        <v-btn variant="text" @click="showPrintApprovalDialog = false"
+          >Tutup</v-btn
+        >
+        <v-btn color="warning" variant="elevated" @click="submitPrintApproval">
+          Ajukan Approval
+        </v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
 </template>
 
 <style scoped>
@@ -1088,5 +1206,33 @@ const formatWaktu = (v: string) => {
 .legend-divider {
   height: 1px;
   background: #eeeeee;
+}
+.cetak-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 9.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.badge-grey {
+  background: #f5f5f5;
+  color: #757575;
+}
+.badge-neutral {
+  background: #eceff1;
+  color: #455a64;
+}
+.badge-blue {
+  background: #e3f2fd;
+  color: #1565c0;
+}
+.badge-red {
+  background: #ffebee;
+  color: #c62828;
+}
+.badge-green {
+  background: #e8f5e9;
+  color: #2e7d32;
 }
 </style>

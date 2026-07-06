@@ -18,12 +18,27 @@ export function useBrowse<T = any>(options: UseBrowseOptions<T>) {
   const isLoading = ref(false);
   const selected = ref<T[]>([]);
 
-  // Permissions berdasarkan Menu ID dari tmenu
-  const canView = computed(() => authStore.can(options.menuId, "view"));
-  const canInsert = computed(() => authStore.can(options.menuId, "insert"));
-  const canEdit = computed(() => authStore.can(options.menuId, "edit"));
-  const canDelete = computed(() => authStore.can(options.menuId, "delete"));
-  const canExport = computed(() => authStore.can(options.menuId, "view")); // Export pakai hak akses view
+  // Modul dengan menuId kosong sengaja berada DI LUAR sistem permission
+  // thakuser/checkPermission (misal: Master User yang di-gate via
+  // requireAdmin di backend). Untuk kasus ini, composable tidak boleh
+  // menolak — biarkan backend yang jadi satu-satunya penjaga akses.
+  const hasMenuId = computed(() => !!options.menuId);
+
+  const canView = computed(() =>
+    hasMenuId.value ? authStore.can(options.menuId, "view") : true,
+  );
+  const canInsert = computed(() =>
+    hasMenuId.value ? authStore.can(options.menuId, "insert") : true,
+  );
+  const canEdit = computed(() =>
+    hasMenuId.value ? authStore.can(options.menuId, "edit") : true,
+  );
+  const canDelete = computed(() =>
+    hasMenuId.value ? authStore.can(options.menuId, "delete") : true,
+  );
+  const canExport = computed(() =>
+    hasMenuId.value ? authStore.can(options.menuId, "view") : true,
+  );
 
   const isSingleSelected = computed(() => selected.value.length === 1);
   const selectedItem = computed(() => selected.value[0] || null);

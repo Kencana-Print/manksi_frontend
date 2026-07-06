@@ -86,4 +86,12 @@ export const approvalService = {
     nomor: string;
     status_acc: string;
   }) => api.post("/tools/approval/mutasi-noplan/otorisasi", payload),
+
+  // --- SPK PRINT APPROVAL (MENU_ID: 267) ---
+  getSpkCetakUlangList: (params: any) =>
+    api.get("/tools/approval/spk-cetak-ulang", { params }),
+  submitSpkCetakUlangOtorisasi: (payload: {
+    nomor: string;
+    status_acc: string;
+  }) => api.post("/tools/approval/spk-cetak-ulang/otorisasi", payload),
 };

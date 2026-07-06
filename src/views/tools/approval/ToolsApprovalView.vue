@@ -33,6 +33,7 @@ const allApprovals = [
     label: "Approve Mutasi Produksi Tanpa Planning",
     menuId: "266",
   },
+  { id: "spk_cetak_ulang", label: "Approve Cetak SPK > 1 Kali", menuId: "267" },
 ];
 
 // Tampilkan hanya yang memiliki akses 'view'
@@ -84,6 +85,9 @@ const ApprovalPlafonDireksiComponent = defineAsyncComponent(
 const ApprovalMutasiNoPlanComponent = defineAsyncComponent(
   () => import("./components/ApprovalMutasiNoPlan.vue"),
 );
+const ApprovalSpkCetakUlangComponent = defineAsyncComponent(
+  () => import("./components/ApprovalSpkCetakUlang.vue"),
+);
 
 // Logic Penentuan Komponen Dinamis
 const currentComponent = computed(() => {
@@ -102,6 +106,8 @@ const currentComponent = computed(() => {
     return ApprovalPlafonDireksiComponent;
   if (selectedApproval.value === "mutasi_noplan")
     return ApprovalMutasiNoPlanComponent;
+  if (selectedApproval.value === "spk_cetak_ulang")
+    return ApprovalSpkCetakUlangComponent;
   return null;
 });
 </script>

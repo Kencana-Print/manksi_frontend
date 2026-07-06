@@ -2482,6 +2482,18 @@ const router = createRouter({
       },
     },
     {
+      path: "/tools/users/create",
+      name: "UserFormCreate",
+      component: () => import("@/views/tools/UserFormView.vue"),
+      meta: { title: "Buat User", layout: "DefaultLayout", requiresAuth: true },
+    },
+    {
+      path: "/tools/users/edit/:kode",
+      name: "UserFormEdit",
+      component: () => import("@/views/tools/UserFormView.vue"),
+      meta: { title: "Ubah User", layout: "DefaultLayout", requiresAuth: true },
+    },
+    {
       path: "/tools/approval",
       name: "ToolsApproval",
       component: () => import("@/views/tools/approval/ToolsApprovalView.vue"),
