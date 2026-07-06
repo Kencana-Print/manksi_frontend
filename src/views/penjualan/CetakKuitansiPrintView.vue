@@ -1,12 +1,10 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from "vue";
+import { ref, onMounted } from "vue";
 import { useRoute } from "vue-router";
-import { useAuthStore } from "@/stores/authStore";
 import { cetakKuitansiService as svc } from "@/services/penjualan/cetakKuitansiService";
 import KuitansiDocument from "./components/KuitansiDocument.vue";
 
 const route = useRoute();
-const authStore = useAuthStore();
 const nomor = route.query.nomor as string;
 
 const header = ref<any>({});
@@ -16,16 +14,6 @@ const isLoading = ref(true);
 
 const doPrint = () => window.print();
 const doClose = () => window.close();
-
-const formatPrintedAt = () => {
-  const d = new Date();
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${pad(d.getDate())}-${pad(d.getMonth() + 1)}-${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-};
-const printedAtDisplay = ref(formatPrintedAt());
-const printedByDisplay = computed(
-  () => authStore.user?.nama || authStore.user?.kode || "-",
-);
 
 const fetchData = async () => {
   try {
@@ -63,9 +51,6 @@ onMounted(() => {
 
       <div class="page">
         <KuitansiDocument :header="header" :detail="detail" />
-        <div class="printed-info">
-          Dicetak oleh: {{ printedByDisplay }} — {{ printedAtDisplay }}
-        </div>
       </div>
     </template>
   </div>
@@ -123,12 +108,7 @@ onMounted(() => {
   border: 1px solid #ccc;
   box-sizing: border-box;
 }
-.printed-info {
-  font-size: 7.5pt;
-  color: #777;
-  text-align: right;
-  padding: 0 12mm 8mm;
-}
+
 @media print {
   .no-print {
     display: none !important;

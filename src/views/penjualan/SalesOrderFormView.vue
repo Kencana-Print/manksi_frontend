@@ -509,49 +509,40 @@ watch(
   { immediate: true },
 );
 
-// Watch: saat spk_standar_ukuran berubah ke KENCANA, auto-fill dari endpoint.
-// spk_divisi DITAMBAHKAN sbg dependency — sebelumnya cuma dicek sbg guard di
-// dalam, bukan trigger, sehingga saat loadDataMemo (tarik dari MAP) mengubah
-// spk_divisi PALING TERAKHIR (setelah jo_kode), watcher ini tidak pernah
-// retrigger dan detail ukuran (LD/PB/dst) selalu kosong utk data dari MAP.
+// --- Fungsi bersama: load standar ukuran Kencana ---
+const fetchStandarUkuranSizes = async () => {
+  if (formData.value.spk_standar_ukuran !== "KENCANA") return;
+  if (!["3", "4"].includes(String(formData.value.spk_divisi).charAt(0))) return;
+  if (!formData.value.spk_jo_kode) return;
+
+  try {
+    const res = await api.get("/penjualan/sales-order/form/standar-ukuran", {
+      params: {
+        joKode: formData.value.spk_jo_kode,
+        varian: formData.value.spk_varian_ukuran || "STANDAR",
+      },
+    });
+    const standarData: any[] = res.data.data || [];
+    formData.value.Sizes = standarData.map((s: any) => {
+      const existing = (formData.value.Sizes || []).find(
+        (e: any) => e.size === s.size,
+      );
+      return existing ? { ...s, qty: existing.qty } : s;
+    });
+  } catch (e) {
+    console.error("Gagal load standar ukuran", e);
+  }
+};
+
+// Watch: setiap kali standar/jo_kode/varian/divisi berubah, langsung fetch
 watch(
   [
     () => formData.value.spk_standar_ukuran,
     () => formData.value.spk_jo_kode,
     () => formData.value.spk_varian_ukuran,
-    () => formData.value.spk_divisi, // ← tambahan
+    () => formData.value.spk_divisi,
   ],
-  async ([standar, joKode, varian]) => {
-    if (standar !== "KENCANA") return;
-    if (String(formData.value.spk_divisi).charAt(0) !== "4") return;
-    if (!joKode) return;
-    try {
-      const res = await api.get("/penjualan/sales-order/form/standar-ukuran", {
-        params: { joKode, varian: varian || "STANDAR" },
-      });
-      const standarData: any[] = res.data.data || [];
-      formData.value.Sizes = standarData.map((s: any) => {
-        const existing = (formData.value.Sizes || []).find(
-          (e: any) => e.size === s.size,
-        );
-        return existing ? { ...s, qty: existing.qty } : s;
-      });
-    } catch (e) {
-      console.error("Gagal load standar ukuran", e);
-    }
-  },
-);
-
-// Watch: saat jo_kode berubah dan standar KENCANA, reload standar
-watch(
-  () => formData.value.spk_jo_kode,
-  async (newJo) => {
-    if (formData.value.spk_standar_ukuran !== "KENCANA") return;
-    if (String(formData.value.spk_divisi).charAt(0) !== "4") return;
-    if (!newJo) return;
-    // trigger watch standar_ukuran dengan cara reassign
-    formData.value.spk_standar_ukuran = "KENCANA";
-  },
+  fetchStandarUkuranSizes,
 );
 
 // --- HANDLER EVENT MODAL DARI TAB ---

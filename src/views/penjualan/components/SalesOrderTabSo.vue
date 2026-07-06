@@ -1280,7 +1280,7 @@ watch(
             <label class="lbl">Ket. Ukuran</label>
             <input v-model="formData.spk_ukuran" class="inp" style="flex: 1" />
             <div
-              v-if="String(formData.spk_divisi).charAt(0) === '4'"
+              v-if="['3', '4'].includes(String(formData.spk_divisi).charAt(0))"
               class="standar-radio ml-2"
             >
               <label class="chk-lbl">
@@ -1292,7 +1292,6 @@ watch(
                 />
                 Std. Kencana
               </label>
-              <!-- ← dropdown varian, hanya muncul saat Kencana -->
               <select
                 v-if="formData.spk_standar_ukuran === 'KENCANA'"
                 v-model="formData.spk_varian_ukuran"

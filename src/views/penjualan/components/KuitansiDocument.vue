@@ -247,7 +247,7 @@ const total2 = computed(() =>
   font-size: 10.5pt;
 }
 .kwt-sign-space {
-  height: 40px;
+  height: 80px;
 }
 .kwt-sign-name {
   font-weight: 700;

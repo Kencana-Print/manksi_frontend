@@ -110,50 +110,87 @@ const padC = (str: string, len: number) => {
   return s.padStart(padStart, " ").padEnd(len, " ");
 };
 
+// ── Konstanta kertas dot matrix — 21cm (lebar cetak) x 27,8cm (panjang feed) ──
+// Lebar cetak sudah dikalibrasi 80 kolom (10 CPI standar).
+// Panjang 27,8cm ÷ 2,54 = 10,94" → pada 6 LPI (baris/inch) standar = ~65 baris.
+const PAGE_LINES = 65;
+
 // ── FUNGSI GENERATE TXT ──
 const generateTxt = () => {
   const h = header.value;
   const d = details.value;
   const line = "-".repeat(80);
-  const empty = " ".repeat(80);
-  let txt = "";
 
-  // 1. KOP PERUSAHAAN
-  txt += `${h.perush_nama || ""}\n`;
-  txt += `${h.perushd_alamat || h.perush_alamat || ""}\n`;
-  txt += `${h.perush_kota || ""}\n`;
-  if (h.perush_telp) txt += `Telp: ${h.perush_telp}\n`;
-  txt += `\n`;
+  // ── Bangun header (kop + judul + info) sebagai array baris ──
+  const buildHeaderLines = (): string[] => {
+    const lines: string[] = [];
+    lines.push(h.perush_nama || "");
+    lines.push(h.perushd_alamat || h.perush_alamat || "");
+    lines.push(h.perush_kota || "");
+    if (h.perush_telp) lines.push(`Telp: ${h.perush_telp}`);
+    lines.push("");
+    lines.push(padC("I N V O I C E   P R O F O R M A", 80));
+    lines.push("");
+    const noInv = padR(`Nomor      : ${h.inv_nomor || ""}`, 40);
+    const cusNama = padR(`Customer : ${h.cus_nama || ""}`, 40);
+    lines.push(`${noInv}${cusNama}`);
+    const tglInv = padR(`Tanggal    : ${dFormat(h.inv_tanggal)}`, 40);
+    const cusAlmt = padR(
+      `           ${h.inv_cus_alamat || h.cus_alamat || ""}`,
+      40,
+    );
+    lines.push(`${tglInv}${cusAlmt}`);
+    const ketInv = padR(`Keterangan : ${h.inv_keterangan || ""}`, 40);
+    const cusTelp = padR(
+      `           ${h.cus_telp ? h.cus_telp + " / " : ""}${h.cus_fax || ""}`,
+      40,
+    );
+    lines.push(`${ketInv}${cusTelp}`);
+    lines.push("");
+    lines.push(line);
+    lines.push(
+      `${padR("NO", 4)}${padR("SPK", 15)}${padR("NAMA BARANG", 23)}${padR("UKURAN", 8)}${padL("JML", 7)}${padL("HARGA", 11)}${padL("TOTAL", 12)}`,
+    );
+    lines.push(line);
+    return lines;
+  };
 
-  // 2. JUDUL
-  txt += `${padC("I N V O I C E   P R O F O R M A", 80)}\n\n`;
+  // ── Bangun footer (summary + TTD) sebagai array baris ──
+  const buildFooterLines = (): string[] => {
+    const lines: string[] = [];
+    lines.push(line);
+    const lblTot =
+      padR("Total", 15) + ":" + padL(numFmt(totalNominal.value), 19);
+    lines.push(
+      `${padR("Terbilang : " + terbilang(grandTotal.value) + " Rupiah", 45)}${lblTot}`,
+    );
+    const lblPpn =
+      padR("Total PPN", 15) + ":" + padL(numFmt(totalPpn.value), 19);
+    lines.push(`${padR("", 45)}${lblPpn}`);
+    const lblGTot =
+      padR("Grand Total", 15) + ":" + padL(numFmt(grandTotal.value), 19);
+    lines.push(`${padR("", 45)}${lblGTot}`);
+    const lblDP = padR("Uang Muka", 15) + ":" + padL(numFmt(h.uang_muka), 19);
+    lines.push(`${padR("", 45)}${lblDP}`);
+    const lblSisa =
+      padR("Nilai Piutang", 15) + ":" + padL(numFmt(nilaiPiutang.value), 19);
+    lines.push(`${padR("", 45)}${lblSisa}`);
+    lines.push("");
+    lines.push(
+      `Di bayarkan ke:                          Dibuat oleh,         Mengetahui,`,
+    );
+    lines.push(`REKENING : ${padR(h.inv_rekening || "", 30)}`);
+    lines.push(`ATAS NAMA: ${padR(h.perushd_atasnama || "", 30)}`);
+    lines.push(`BANK     : ${padR(h.perushd_bank || "", 30)}`);
+    lines.push("");
+    lines.push("");
+    lines.push(
+      `                                         (          )         (          )`,
+    );
+    return lines;
+  };
 
-  // 3. HEADER INFO (Kiri 40 char, Kanan 40 char)
-  const noInv = padR(`Nomor      : ${h.inv_nomor || ""}`, 40);
-  const cusNama = padR(`Customer : ${h.cus_nama || ""}`, 40);
-  txt += `${noInv}${cusNama}\n`;
-
-  const tglInv = padR(`Tanggal    : ${dFormat(h.inv_tanggal)}`, 40);
-  const cusAlmt = padR(
-    `           ${h.inv_cus_alamat || h.cus_alamat || ""}`,
-    40,
-  );
-  txt += `${tglInv}${cusAlmt}\n`;
-
-  const ketInv = padR(`Keterangan : ${h.inv_keterangan || ""}`, 40);
-  const cusTelp = padR(
-    `           ${h.cus_telp ? h.cus_telp + " / " : ""}${h.cus_fax || ""}`,
-    40,
-  );
-  txt += `${ketInv}${cusTelp}\n\n`;
-
-  // 4. TABEL BARANG (Total 80 char)
-  // No(4) SPK(15) Nama(23) Ukuran(8) Jml(7) Harga(11) Total(12)
-  txt += `${line}\n`;
-  txt += `${padR("NO", 4)}${padR("SPK", 15)}${padR("NAMA BARANG", 23)}${padR("UKURAN", 8)}${padL("JML", 7)}${padL("HARGA", 11)}${padL("TOTAL", 12)}\n`;
-  txt += `${line}\n`;
-
-  d.forEach((item, idx) => {
+  const dataLineOf = (item: any, idx: number) => {
     const no = padR(String(idx + 1), 4);
     const spk = padR(item.kode || "", 15);
     const nama = padR(item.nama || "", 23);
@@ -164,38 +201,31 @@ const generateTxt = () => {
       numFmt((Number(item.jumlah) || 0) * (Number(item.harga) || 0)),
       12,
     );
-    txt += `${no}${spk}${nama}${ukur}${jml}${hrg}${tot}\n`;
-  });
-  txt += `${line}\n`;
+    return `${no}${spk}${nama}${ukur}${jml}${hrg}${tot}`;
+  };
 
-  // 5. KAKI / SUMMARY
-  // Kiri Terbilang (45 char), Kanan Summary (35 char)
-  const lblTot = padR("Total", 15) + ":" + padL(numFmt(totalNominal.value), 19);
-  txt += `${padR("Terbilang : " + terbilang(grandTotal.value) + " Rupiah", 45)}${lblTot}\n`;
+  const headerLines = buildHeaderLines();
+  const footerLines = buildFooterLines();
+  const dataLines = d.map((item, idx) => dataLineOf(item, idx));
+  const bodyLines = [...headerLines, ...dataLines, line];
 
-  const lblPpn = padR("Total PPN", 15) + ":" + padL(numFmt(totalPpn.value), 19);
-  txt += `${padR("", 45)}${lblPpn}\n`;
+  const pages: string[][] = [];
 
-  const lblGTot =
-    padR("Grand Total", 15) + ":" + padL(numFmt(grandTotal.value), 19);
-  txt += `${padR("", 45)}${lblGTot}\n`;
+  if (bodyLines.length + footerLines.length <= PAGE_LINES) {
+    // Muat dalam satu halaman — footer langsung menyatu di bawah data.
+    pages.push([...bodyLines, ...footerLines]);
+  } else {
+    // Data terlalu panjang: genapkan halaman ini dengan baris kosong,
+    // lalu footer dimulai bersih di halaman baru (form-feed) — supaya
+    // blok summary+TTD tidak pernah terpotong di tengah.
+    const padToPage = Math.max(0, PAGE_LINES - bodyLines.length);
+    pages.push([...bodyLines, ...Array(padToPage).fill("")]);
+    pages.push([...footerLines]);
+  }
 
-  const lblDP = padR("Uang Muka", 15) + ":" + padL(numFmt(h.uang_muka), 19);
-  txt += `${padR("", 45)}${lblDP}\n`;
-
-  const lblSisa =
-    padR("Nilai Piutang", 15) + ":" + padL(numFmt(nilaiPiutang.value), 19);
-  txt += `${padR("", 45)}${lblSisa}\n\n`;
-
-  // 6. TANDA TANGAN
-  txt += `Di bayarkan ke:                          Dibuat oleh,         Mengetahui,\n`;
-  txt += `REKENING : ${padR(h.inv_rekening || "", 30)}\n`;
-  txt += `ATAS NAMA: ${padR(h.perushd_atasnama || "", 30)}\n`;
-  txt += `BANK     : ${padR(h.perushd_bank || "", 30)}\n`;
-  txt += `\n\n\n`;
-  txt += `                                         (          )         (          )\n`;
-
-  return txt;
+  // Pisahkan antar halaman dengan form-feed (\f) agar printer fisik
+  // pindah ke halaman/lembar baru dengan bersih.
+  return pages.map((p) => p.join("\n")).join("\n\f\n");
 };
 
 // ── Eksekusi & Download ──

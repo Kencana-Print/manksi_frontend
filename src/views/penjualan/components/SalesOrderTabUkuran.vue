@@ -9,8 +9,8 @@ const props = defineProps<{
 
 const toast = useToast();
 
-const isDivisiGarmen = computed(
-  () => String(props.formData.spk_divisi).charAt(0) === "4",
+const isDivisiGarmenAtauKaosan = computed(() =>
+  ["3", "4"].includes(String(props.formData.spk_divisi).charAt(0)),
 );
 
 const isStandarKlien = computed(
@@ -18,7 +18,7 @@ const isStandarKlien = computed(
 );
 
 const isLbPbEditable = computed(
-  () => !isDivisiGarmen.value || isStandarKlien.value,
+  () => !isDivisiGarmenAtauKaosan.value || isStandarKlien.value,
 );
 
 // Kategori ukuran berdasarkan jenis order
@@ -77,7 +77,7 @@ const updateKetUkuran = () => {
             <th class="th-num">Qty</th>
 
             <!-- Kolom Atasan -->
-            <template v-if="showKolomAtasan && isDivisiGarmen">
+            <template v-if="showKolomAtasan && isDivisiGarmenAtauKaosan">
               <th class="th-num">LD</th>
               <th class="th-num">PB</th>
               <th class="th-num">PL Pendek</th>
@@ -88,7 +88,7 @@ const updateKetUkuran = () => {
             </template>
 
             <!-- Kolom Bawahan -->
-            <template v-if="showKolomBawahan && isDivisiGarmen">
+            <template v-if="showKolomBawahan && isDivisiGarmenAtauKaosan">
               <th class="th-num">L. Pinggang</th>
               <th class="th-num">P. Celana</th>
               <th class="th-num">L. Panggul</th>
@@ -118,7 +118,7 @@ const updateKetUkuran = () => {
             </td>
 
             <!-- Kolom Atasan -->
-            <template v-if="showKolomAtasan && isDivisiGarmen">
+            <template v-if="showKolomAtasan && isDivisiGarmenAtauKaosan">
               <td class="td-num">
                 <input
                   type="number"
@@ -199,7 +199,7 @@ const updateKetUkuran = () => {
             </template>
 
             <!-- Kolom Bawahan -->
-            <template v-if="showKolomBawahan && isDivisiGarmen">
+            <template v-if="showKolomBawahan && isDivisiGarmenAtauKaosan">
               <td class="td-num">
                 <input
                   type="number"
@@ -285,7 +285,7 @@ const updateKetUkuran = () => {
             <td class="td-total-lbl">Total</td>
             <td class="td-total-val">{{ totalQty }}</td>
             <td
-              v-if="isDivisiGarmen && kategoriUkuran"
+              v-if="isDivisiGarmenAtauKaosan && kategoriUkuran"
               :colspan="
                 kategoriUkuran === 'WEARPACK'
                   ? 14

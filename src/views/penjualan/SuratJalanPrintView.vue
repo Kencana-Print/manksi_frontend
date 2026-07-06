@@ -98,7 +98,7 @@ const wrapText = (text: string, maxWidth: number): string[] => {
   return lines.length ? lines : [""];
 };
 
-const generateTxt = (copyLabel = "") => {
+const generateTxt = () => {
   const h = header.value;
   const rows = detail.value;
   const LINE = "-".repeat(120);
@@ -191,7 +191,6 @@ const generateTxt = (copyLabel = "") => {
     25,
   )}\n`;
 
-  if (copyLabel) txt = `--- ${copyLabel} ---\n` + txt;
   return txt;
 };
 
@@ -200,12 +199,12 @@ const totalJumlah = computed(() =>
 );
 
 const downloadTxt = () => {
-  let content = generateTxt("LEMBAR PUTIH");
-  content += "\f";
-  content += generateTxt("LEMBAR MERAH");
-  content += "\f";
-  content += generateTxt("LEMBAR KUNING");
-
+  // Kertas continuous-form yang dipakai printer ini sudah karbon
+  // rangkap (biasanya 4 lapis), sehingga SATU kali cetak otomatis
+  // menghasilkan salinan fisik ke seluruh lapisan kertas. Tidak perlu
+  // generate teks berulang per "lembar" — itu justru bikin isi
+  // tercetak 3x lipat di atas kertas yang sama.
+  const content = generateTxt();
   const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -253,8 +252,10 @@ onMounted(() => {
       <h2>File Dot Matrix Siap</h2>
       <p>
         File <b>SuratJalan_{{ nomor.replace(/\//g, "_") }}.txt</b> telah
-        diunduh.<br />
-        Terdiri dari 3 lembar (Putih · Merah · Kuning) dalam 1 file.
+        diunduh.
+        <br />
+        Cukup 1x cetak — kertas continuous-form sudah karbon rangkap otomatis
+        menghasilkan salinan ke semua lembar.
       </p>
       <div class="dm-steps">
         <b>Cara cetak ke Dot Matrix:</b>

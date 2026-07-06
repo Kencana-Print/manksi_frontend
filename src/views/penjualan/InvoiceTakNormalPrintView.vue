@@ -115,91 +115,136 @@ const terbilang = (n: number): string => {
   return val === 0 ? "Nol" : f(val).trim();
 };
 
-// ── Datetime cetak (bukan tanggal input transaksi) — di-freeze sekali
-// saat halaman render, dipakai di footer inkjet & txt dot matrix ──
-const formatPrintedAt = () => {
-  const d = new Date();
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${pad(d.getDate())}-${pad(d.getMonth() + 1)}-${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-};
-const printedAtDisplay = ref(formatPrintedAt());
+// ── Konstanta kertas dot matrix — 21cm (lebar cetak) x 27,8cm (panjang feed) ──
+// Lebar 21cm ÷ 2,54 = 8,27" → pada pitch NORMAL 10 CPI = ~80 karakter/baris.
+const PAGE_WIDTH = 80;
+// Panjang 27,8cm ÷ 2,54 = 10,94" → pada 6 LPI (baris/inch) standar = ~65 baris.
+const PAGE_LINES = 65;
 
 // ── Generate TXT (Dot Matrix) — sesuai Delphi doslipINV2 ──────────────
-// CATATAN: fixed 30 baris/halaman (tidak ada pilihan Standart/Full
-// seperti Invoice biasa — di Delphi Tak Normal cuma "i mod 30" tanpa
-// dialog pilihan mode).
+// Fixed baris/halaman (tidak ada pilihan Standart/Full seperti Invoice
+// biasa), dikalibrasi ulang ke lebar 80 kolom & tinggi ~65 baris agar
+// sesuai kertas fisik 21cm x 27,8cm, dan footer tidak pernah kepotong
+// di tengah halaman.
 const generateTxt = () => {
   const h = header.value;
   const rows = detail.value;
   const t = totals.value;
-  const LINE = "-".repeat(120);
-  let txt = "";
+  const LINE = "-".repeat(PAGE_WIDTH);
 
-  const cAlamat = h.inv_cus_alamat || h.cus_alamat || "";
-  const alamatLines = wrapText(cAlamat, 60);
-  const xRecord = 30;
-
-  const printHeader = () => {
-    txt += `${padR(h.perush_nama || "", 120)}\n`;
-    txt += `${padR(h.perush_alamat || "", 120)}\n`;
-    txt += `${padR(h.perush_telp || "", 120)}\n`;
-    txt += "\n";
-    txt += `${padC("I N V O I C E", 120)}\n\n`;
-    txt += `${padR("Nomor      : " + (h.inv_nomor || ""), 60)} ${padR("Customer : " + (h.cus_nama || ""), 60)}\n`;
-    txt += `${padR("Tanggal    : " + (h.inv_tanggal_fmt || ""), 60)} ${padR(alamatLines[0] || "", 60)}\n`;
-    txt += `${padR("Keterangan : " + (h.inv_keterangan || ""), 60)} ${padR(alamatLines[1] || "", 60)}\n`;
+  const buildHeaderLines = (): string[] => {
+    const cAlamat = h.inv_cus_alamat || h.cus_alamat || "";
+    const alamatLines = wrapText(cAlamat, 34);
+    const lines: string[] = [];
+    lines.push(padR(h.perush_nama || "", PAGE_WIDTH));
+    lines.push(padR(h.perush_alamat || "", PAGE_WIDTH));
+    lines.push(padR(h.perush_telp || "", PAGE_WIDTH));
+    lines.push("");
+    lines.push(padC("I N V O I C E", PAGE_WIDTH));
+    lines.push("");
+    lines.push(
+      `${padR("Nomor      : " + (h.inv_nomor || ""), 40)}${padR("Customer : " + (h.cus_nama || ""), 40)}`,
+    );
+    lines.push(
+      `${padR("Tanggal    : " + (h.inv_tanggal_fmt || ""), 40)}${padR(alamatLines[0] || "", 40)}`,
+    );
+    lines.push(
+      `${padR("Keterangan : " + (h.inv_keterangan || ""), 40)}${padR(alamatLines[1] || "", 40)}`,
+    );
     for (let i = 2; i < alamatLines.length; i++) {
-      txt += `${padR("", 60)} ${padR(alamatLines[i], 60)}\n`;
+      lines.push(`${padR("", 40)}${padR(alamatLines[i], 40)}`);
     }
-    txt += `${padR("", 60)} ${padR((h.cus_telp || "") + "/" + (h.cus_fax || ""), 60)}\n`;
-    txt += `${LINE}\n`;
-    txt += `${padR("No", 3)} ${padR("SPK", 12)} ${padR("Nama", 40)} ${padR("Ukuran", 20)} ${padL("Jumlah", 10)} ${padL("Harga", 14)} ${padL("Total", 15)}\n`;
-    txt += `${LINE}\n`;
+    lines.push(
+      `${padR("", 40)}${padR((h.cus_telp || "") + "/" + (h.cus_fax || ""), 40)}`,
+    );
+    lines.push(LINE);
+    lines.push(
+      `${padR("No", 3)} ${padR("SPK", 10)} ${padR("Nama", 24)} ${padR("Ukuran", 13)} ${padL("Jumlah", 8)} ${padL("Harga", 10)} ${padL("Total", 10)}`,
+    );
+    lines.push(LINE);
+    return lines;
   };
 
-  printHeader();
+  // Tidak ada baris Disc — modul ini tidak punya konsep diskon
+  const buildFooterLines = (): string[] => {
+    const lines: string[] = [];
+    lines.push(LINE);
+    const TERBILANG = terbilang(t.grandTotal) + " Rupiah";
+    const tb1 = TERBILANG.substring(0, 28);
+    const tb2 = TERBILANG.length > 28 ? TERBILANG.substring(28, 56) : "";
+    lines.push(
+      `${padR("Terbilang : " + tb1, 55)} ${padR("Total", 12)}: ${padL(num(t.totalBarang), 12)}`,
+    );
+    lines.push(
+      `${padR(tb2, 55)} ${padR("Total PPN", 12)}: ${padL(num(t.totalPpn), 12)}`,
+    );
+    lines.push(
+      `${padR("", 55)} ${padR("Grand Total", 12)}: ${padL(num(t.grandTotal), 12)}`,
+    );
+    lines.push(
+      `${padR("", 55)} ${padR("Uang Muka", 12)}: ${padL(num(t.uangMuka), 12)}`,
+    );
+    lines.push(
+      `${padR("", 55)} ${padR("Nilai Piutang", 12)}: ${padL(num(t.nilaiPiutang), 12)}`,
+    );
+    lines.push("");
+    lines.push(
+      `${padR("Di bayarkan ke", 25)}${padR("Dibuat oleh,", 28)}${padR("Mengetahui,", 27)}`,
+    );
+    lines.push(padR("REKENING : " + (h.inv_rekening || ""), 50));
+    lines.push(padR("ATAS NAMA: " + (h.perushd_atasnama || ""), 50));
+    lines.push(padR("BANK     : " + (h.perushd_bank || ""), 50));
+    lines.push("");
+    lines.push("");
+    lines.push(
+      `${padR("", 25)}${padR("(               )", 28)}${padR("(               )", 27)}`,
+    );
+    return lines;
+  };
 
-  rows.forEach((r: any, i: number) => {
-    const lineNum = i + 1;
-    txt += `${padR(String(lineNum), 3)} `;
-    txt += `${padR(r.invd_spk_nomor || "", 12)} `;
-    txt += `${padR(r.nama_barang || "", 40)} `;
-    txt += `${padR(r.invd_ukuran || "", 20)} `;
-    txt += `${padL(num(r.invd_jumlah), 10)} `;
-    txt += `${padL(num(r.invd_harga), 14)} `;
-    txt += `${padL(num(Number(r.invd_jumlah) * Number(r.invd_harga)), 15)}\n`;
+  const headerLines = buildHeaderLines();
+  const footerLines = buildFooterLines();
+  const dataLineOf = (r: any, lineNum: number) =>
+    `${padR(String(lineNum), 3)} ${padR(r.invd_spk_nomor || "", 10)} ${padR(r.nama_barang || "", 24)} ${padR(r.invd_ukuran || "", 13)} ${padL(num(r.invd_jumlah), 8)} ${padL(num(r.invd_harga), 10)} ${padL(num(Number(r.invd_jumlah) * Number(r.invd_harga)), 10)}`;
 
-    if (lineNum % xRecord === 0 && lineNum < rows.length) {
-      txt += `${LINE}\n`;
-      txt += "\n".repeat(5);
-      printHeader();
+  const maxDataLinesPerPage = Math.max(1, PAGE_LINES - headerLines.length - 1);
+  const xRecord = Math.min(30, maxDataLinesPerPage);
+
+  const chunks: any[][] = [];
+  for (let i = 0; i < rows.length; i += xRecord) {
+    chunks.push(rows.slice(i, i + xRecord));
+  }
+  if (chunks.length === 0) chunks.push([]);
+
+  const pages: string[][] = [];
+
+  chunks.forEach((chunk, ci) => {
+    const startNum = ci * xRecord;
+    const dataLines = chunk.map((r: any, i: number) =>
+      dataLineOf(r, startNum + i + 1),
+    );
+    const isLastChunk = ci === chunks.length - 1;
+    const page = [...headerLines, ...dataLines];
+
+    if (isLastChunk) {
+      const blankPad = Math.max(0, xRecord - chunk.length);
+      page.push(...Array(blankPad).fill(""));
+      page.push(LINE);
+      if (page.length + footerLines.length <= PAGE_LINES) {
+        page.push(...footerLines);
+        pages.push(page);
+      } else {
+        pages.push(page);
+        pages.push([...footerLines]);
+      }
+    } else {
+      page.push(LINE);
+      pages.push(page);
     }
   });
 
-  const sisa = xRecord - (rows.length % xRecord || xRecord);
-  txt += "\n".repeat(Math.max(0, sisa));
-
-  txt += `${LINE}\n`;
-
-  // Tidak ada baris Disc — modul ini tidak punya konsep diskon
-  const TERBILANG = terbilang(t.grandTotal) + " Rupiah";
-  txt += `${padR("Terbilang : " + TERBILANG.substring(0, 48), 81)} ${padR("Total         :", 15)} ${padL(num(t.totalBarang), 21)}\n`;
-  txt += `${padR(TERBILANG.length > 48 ? TERBILANG.substring(48, 108) : "", 81)} ${padR("Total PPN     :", 15)} ${padL(num(t.totalPpn), 21)}\n`;
-  txt += `${padR(TERBILANG.length > 108 ? TERBILANG.substring(108, 168) : "", 81)} ${padR("Grand Total   :", 15)} ${padL(num(t.grandTotal), 21)}\n`;
-  txt += `${padR("", 81)} ${padR("Uang Muka     :", 15)} ${padL(num(t.uangMuka), 21)}\n`;
-  txt += `${padR("", 81)} ${padR("Nilai Piutang :", 15)} ${padL(num(t.nilaiPiutang), 21)}\n\n`;
-
-  txt += `${padR("Di bayarkan ke ", 25)} ${padR("", 40)} ${padR("Dibuat oleh,", 30)} ${padR("Mengetahui,", 30)}\n`;
-  txt += `${padR("REKENING : " + (h.inv_rekening || ""), 65)}\n`;
-  txt += `${padR("ATAS NAMA: " + (h.perushd_atasnama || ""), 65)}\n`;
-  txt += `${padR("BANK     : " + (h.perushd_bank || ""), 65)}\n\n`;
-  txt += `${padR(" ", 65)} ${padR("(               )", 30)} ${padR("(               )", 30)}\n\n`;
-
-  // Datetime cetak (bukan tanggal input transaksi)
-  txt += `${LINE}\n`;
-  txt += `${padR("Dibuat oleh : " + (h.user_create || ""), 60)} ${padR("Dicetak : " + printedAtDisplay.value, 60)}\n`;
-
-  return txt;
+  // Form-feed (\f) antar halaman agar printer fisik pindah lembar bersih.
+  return pages.map((p) => p.join("\n")).join("\n\f\n");
 };
 
 const downloadTxt = () => {
@@ -420,9 +465,6 @@ onMounted(() => {
             <span>( ....................... )</span>
             <span>( ....................... )</span>
           </div>
-
-          <!-- Datetime cetak — bukan tanggal input transaksi -->
-          <div class="printed-at">Dicetak: {{ printedAtDisplay }}</div>
         </div>
       </div>
     </template>
@@ -722,15 +764,6 @@ onMounted(() => {
 }
 .ttd-paren {
   font-size: 8pt;
-}
-
-.printed-at {
-  font-size: 6.5pt;
-  color: #777;
-  text-align: right;
-  margin-top: 4px;
-  position: relative;
-  z-index: 1;
 }
 
 @media print {
