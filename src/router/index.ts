@@ -921,7 +921,7 @@ const router = createRouter({
         layout: "DefaultLayout",
         requiresAuth: true,
         menuId: "62",
-        browseRoute: "GarmenRealisasiBarang", // Fungsi "kembali" di BaseForm
+        browseRoute: "GarmenRealisasiBarang",
       },
     },
     {
@@ -1381,6 +1381,52 @@ const router = createRouter({
         title: "Cetak Mutasi Produksi",
         layout: "BlankLayout",
         requiresAuth: true,
+      },
+    },
+    {
+      path: "/garmen/lhk-pola",
+      name: "LhkPolaBrowse",
+      component: () => import("@/views/garmen/LhkPolaView.vue"),
+      meta: {
+        title: "LHK Pola",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "174",
+      },
+    },
+    {
+      path: "/garmen/lhk-pola",
+      name: "LhkPolaBrowse",
+      component: () => import("@/views/garmen/LhkPolaView.vue"),
+      meta: {
+        title: "LHK Pola",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "174",
+      },
+    },
+    {
+      path: "/garmen/lhk-pola/create",
+      name: "LhkPolaCreate",
+      component: () => import("@/views/garmen/LhkPolaFormView.vue"),
+      meta: {
+        title: "Buat LHK Pola",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "174",
+        browseRoute: "LhkPolaBrowse",
+      },
+    },
+    {
+      path: "/garmen/lhk-pola/edit/:nomor",
+      name: "LhkPolaEdit",
+      component: () => import("@/views/garmen/LhkPolaFormView.vue"),
+      meta: {
+        title: "Ubah LHK Pola",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "174",
+        browseRoute: "LhkPolaBrowse",
       },
     },
 

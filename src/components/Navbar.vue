@@ -79,6 +79,7 @@ import {
   IconFileDots,
   IconTruckOff,
   IconReceiptTax,
+  IconRuler2,
 } from "@tabler/icons-vue";
 
 interface NavItem {
@@ -305,7 +306,7 @@ const menuItems: NavItem[] = [
     menuId: 2,
     items: [
       {
-        title: "Memo Kebutuhan Bahan", // Nama disingkat agar rapi di sidebar
+        title: "Memo Kebutuhan Bahan (MKB)",
         to: "/pembelian/mkb",
         icon: IconFileText,
         menuId: 51,
@@ -557,6 +558,13 @@ const menuItems: NavItem[] = [
         to: "/garmen/mutasi-produksi",
         icon: IconBuildingFactory2,
         menuId: 109,
+      },
+      { divider: true },
+      {
+        title: "LHK Pola",
+        to: "/garmen/lhk-pola",
+        icon: IconRuler2,
+        menuId: 174,
       },
     ],
   },
