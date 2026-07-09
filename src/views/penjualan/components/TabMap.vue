@@ -135,22 +135,29 @@ watch(
   },
 );
 
+const imageCacheBust = ref(0);
+
+watch(
+  () => props.formData,
+  () => {
+    imageCacheBust.value = Date.now();
+  },
+  { flush: "post" },
+);
+
 const displayImageUrl = computed(() => {
-  // 1. Blob lokal (baru dipilih user)
   if (props.formData.MainImageBlob) return props.formData.MainImageBlob;
 
-  // 2. Edit mode — coba dari backend lokal dulu
   if (props.isEdit && props.formData.Nomor) {
     const base = getBaseUrl();
     const cab = props.formData.Cab || "HO-";
-    return `${base}/images/${cab}/map/${encodeURIComponent(props.formData.Nomor)}.jpg`;
+    return `${base}/images/${cab}/map/${encodeURIComponent(props.formData.Nomor)}.jpg?v=${imageCacheBust.value}`;
   }
 
-  // 3. Dari Minta Harga — fallback ke VPS
   if (props.formData.MintaHarga) {
     const mh = props.formData.MintaHarga;
     const base = getBaseUrl();
-    return `${base}/images/mppb/${encodeURIComponent(mh)}.jpg`;
+    return `${base}/images/mppb/${encodeURIComponent(mh)}.jpg?v=${imageCacheBust.value}`;
   }
 
   return "";
@@ -170,6 +177,23 @@ const handleFallbackImage = (e: Event) => {
     resolvedImageUrl.value = fallbackUrl; // ← catat URL yg akhirnya berhasil dipakai
   } else {
     img.style.display = "none";
+  }
+};
+
+// Handler khusus buat v-img (Vuetify) — beda tipe event dari native <img>.
+// v-img emit src (string) yang gagal, bukan Event DOM.
+const handlePreviewImageError = (failedSrc: string | undefined) => {
+  // Kalau yang gagal itu masih URL utama (belum sempat fallback),
+  // coba fallback ke VPS legacy — sama logic-nya kayak handleFallbackImage,
+  // tapi tanpa akses ke elemen <img> DOM (karena v-img gak kasih itu).
+  if (resolvedImageUrl.value?.includes("8888")) {
+    // Sudah pernah dicoba fallback juga & tetap gagal — nyerah, biarin slot #error nampil
+    return;
+  }
+  const mhNomor = props.formData.MintaHarga || props.formData.Nomor;
+  if (mhNomor) {
+    const fallbackUrl = `http://103.94.238.252:8888/file-gambar/mintaharga/${encodeURIComponent(mhNomor)}.jpg`;
+    resolvedImageUrl.value = fallbackUrl;
   }
 };
 
@@ -1441,10 +1465,18 @@ const setSetoranPembayaran = (v: any) => {
           max-height="600"
           contain
           class="bg-white rounded"
+          @error="handlePreviewImageError"
         >
           <template #placeholder>
             <div class="d-flex align-center justify-center fill-height">
               <v-progress-circular indeterminate color="primary" />
+            </div>
+          </template>
+          <template #error>
+            <div
+              class="d-flex align-center justify-center fill-height text-grey"
+            >
+              Gambar tidak tersedia
             </div>
           </template>
         </v-img>
