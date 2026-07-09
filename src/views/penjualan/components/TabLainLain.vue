@@ -34,10 +34,22 @@ const updateToKetUkuran = () => {
 const showEmailDialog = ref(false);
 const isEmailImageError = ref(false); // ← tetap dipakai buat state "beneran kosong"
 
+// Sekarang watch keseluruhan objek formData — begitu useForm nge-replace
+// formData.value dengan hasil fetchApi() baru (misal abis Save → refetch),
+// reference-nya beda → watcher ini nge-fire → kasih kesempatan retry load gambar.
+watch(
+  () => props.formData,
+  () => {
+    isEmailImageError.value = false;
+  },
+  { flush: "post" },
+);
+
+// Tetep pertahankan watcher spesifik utk Blob biar reset instan pas user pilih file baru
 watch(
   () => props.formData.EmailImageBlob,
   () => {
-    isEmailImageError.value = false; // reset begitu ada gambar baru dipilih
+    isEmailImageError.value = false;
   },
 );
 const fileEmailRef = ref<HTMLInputElement | null>(null);
