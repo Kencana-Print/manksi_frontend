@@ -32,7 +32,7 @@ const updateToKetUkuran = () => {
 
 // Email image
 const showEmailDialog = ref(false);
-const isEmailImageError = ref(false);
+const isEmailImageError = ref(false); // ← tetap dipakai buat state "beneran kosong"
 
 watch(
   () => props.formData.EmailImageBlob,
@@ -44,13 +44,6 @@ const fileEmailRef = ref<HTMLInputElement | null>(null);
 
 const getBaseUrl = () => api.defaults.baseURL?.replace(/\/api\/?$/, "") || "";
 
-watch(
-  () => props.formData.EmailImageBlob,
-  () => {
-    isEmailImageError.value = false; // reset begitu ada gambar baru dipilih
-  },
-);
-
 const displayEmailUrl = computed(() => {
   if (isEmailImageError.value) return "";
   // Blob lokal (baru dipilih user, belum ke-refresh dari server)
@@ -59,14 +52,28 @@ const displayEmailUrl = computed(() => {
   const nomor = props.formData.Nomor;
   if (!nomor) return "";
 
-  // Sesuai path processImage backend: public/images/{cab}/map/{nomor}-email.jpg
+  // Prioritas 1: backend lokal, sesuai path processImage: public/images/{cab}/map/{nomor}-email.jpg
   const base = getBaseUrl();
   const cab = props.formData.Cab || "HO-";
   return `${base}/images/${cab}/map/${encodeURIComponent(nomor)}-email.jpg`;
 });
 
-const onEmailImageError = () => {
-  isEmailImageError.value = true;
+// ← DIGANTI: sekarang fallback ke VPS legacy (data lama sebelum fitur
+// Screenshot Email ada di web — pakai gambar desain utama sebagai best-effort)
+const onEmailImageError = (e: Event) => {
+  const img = e.target as HTMLImageElement;
+  if (img.dataset.tried === "true") {
+    isEmailImageError.value = true; // sudah dicoba VPS juga & tetap gagal → beneran kosong
+    return;
+  }
+  img.dataset.tried = "true";
+
+  const nomor = props.formData.Nomor;
+  if (nomor) {
+    img.src = `http://103.94.238.252:8888/file-gambar/${encodeURIComponent(nomor)}.jpg`;
+  } else {
+    isEmailImageError.value = true;
+  }
 };
 
 const onEmailChange = (e: Event) => {
