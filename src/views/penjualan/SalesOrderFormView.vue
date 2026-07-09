@@ -134,6 +134,12 @@ const toDisplayDateTime = (isoStr: string): string => {
 
 const imageToUpload = ref<File | null>(null);
 
+const accBuktiFile = ref<File | null>(null);
+const wasApprovedOnLoad = ref(false);
+const uploadAccBukti = (file: File) => {
+  accBuktiFile.value = file;
+};
+
 // Data Kosong Default (Baru)
 const defaultData = {
   spk_nomor: "",
@@ -175,6 +181,10 @@ const defaultData = {
   isCmoChecked: false,
   spk_pending: "NORMAL",
   spk_ketpending: "",
+  spk_acc_customer: "N",
+  spk_acc_tanggal: "",
+  AccBuktiName: "",
+  AccBuktiBlob: "",
   spk_accpending: "",
   cus_perfect: "N",
   spk_sizekhusus: "N",
@@ -224,6 +234,10 @@ const defaultData = {
   Alokasi: [],
   Kaosan: [],
   Sizes: [],
+
+  Komponen: [] as any[],
+  spk_acc_customer_display: "N",
+  spk_acc_tanggal_display: "",
 };
 
 // Menggunakan composable useForm standar
@@ -307,6 +321,17 @@ const {
         // akan di-merge di onMounted setelah init-sizes load
         return d.dtlSize || [];
       })(),
+
+      Komponen: d.komponen || [],
+      spk_acc_customer_display: d.header.map_acc_customer || "N",
+      spk_acc_tanggal_display: d.header.map_acc_tanggal
+        ? getLocalDateString(d.header.map_acc_tanggal)
+        : "",
+
+      spk_acc_customer: d.header.spk_acc_customer || "N",
+      spk_acc_tanggal: d.header.spk_acc_tanggal
+        ? getLocalDateString(d.header.spk_acc_tanggal)
+        : "",
     };
   },
   submitApi: async (data: any) => {
@@ -361,10 +386,13 @@ const {
         spk_sablon: data.spk_sablon,
         spk_bordir: data.spk_bordir,
         spk_sublim: data.spk_sublim,
+        spk_acc_customer: data.spk_acc_customer,
+        spk_acc_tanggal: data.spk_acc_tanggal || null,
       },
       alokasi: data.Alokasi,
       dtlKaosan: data.Kaosan,
       dtlSize: data.Sizes,
+      dtlKetKomponen: data.Komponen,
     };
 
     const res = await salesOrderFormService.saveData(payload);
@@ -390,6 +418,27 @@ const {
       } catch (err) {
         toast.error("Data SPK tersimpan, tetapi gagal upload gambar.");
         console.error(err);
+      }
+    }
+    if (accBuktiFile.value && nomorSPK) {
+      try {
+        const formDataAcc = new FormData();
+        formDataAcc.append("gambar", accBuktiFile.value);
+        formDataAcc.append("spkNomor", nomorSPK);
+        formDataAcc.append("cabang", data.spk_cab);
+        formDataAcc.append("type", "ACC");
+        await api.post(
+          "/penjualan/sales-order/form/upload-gambar",
+          formDataAcc,
+          {
+            headers: { "Content-Type": "multipart/form-data" },
+          },
+        );
+      } catch (err) {
+        toast.error(
+          "Data tersimpan, TAPI bukti persetujuan customer GAGAL terupload. Mohon buka ulang & upload ulang.",
+          { timeout: 10000 },
+        );
       }
     }
 
@@ -444,12 +493,14 @@ watch(
 // Panggil API saat form di-mount
 onMounted(async () => {
   try {
-    const [resDivisi, resKepentingan, resKetPo, resSizes] = await Promise.all([
-      api.get("/lookups/divisi"),
-      api.get("/lookups/kepentingan-spk"),
-      api.get("/lookups/ket-po"),
-      api.get("/penjualan/sales-order/form/init-sizes"),
-    ]);
+    const [resDivisi, resKepentingan, resKetPo, resSizes, resKomponen] =
+      await Promise.all([
+        api.get("/lookups/divisi"),
+        api.get("/lookups/kepentingan-spk"),
+        api.get("/lookups/ket-po"),
+        api.get("/penjualan/sales-order/form/init-sizes"),
+        salesOrderFormService.getKomponenMaster(),
+      ]);
 
     lookupOptions.value.divisi = resDivisi.data.data.map((d: any) => ({
       value: String(d.kode),
@@ -463,6 +514,7 @@ onMounted(async () => {
 
     if (!isEditMode.value) {
       formData.value.Sizes = fullSizes;
+      formData.value.Komponen = resKomponen.data.data || [];
     } else {
       // fetchData sudah dipanggil otomatis oleh useForm saat isEditMode
       // tunggu sebentar sampai formData terisi, lalu merge
@@ -475,6 +527,10 @@ onMounted(async () => {
           ? { ...row, qty: found.qty, lb: found.lb, pb: found.pb }
           : row;
       });
+    }
+
+    if (isEditMode.value) {
+      wasApprovedOnLoad.value = formData.value.spk_acc_customer === "Y";
     }
   } catch (error) {
     console.error("Gagal menarik data lookup dropdown:", error);
@@ -707,6 +763,10 @@ const loadDataMemo = async (nomor: string) => {
       formData.value.spk_sublim = h.mspk_sublim || "N";
       formData.value.spk_harga = Number(h.mspk_harga) || 0;
       formData.value.spk_hargariil = Number(h.mspk_hargariil) || 0;
+      formData.value.spk_acc_customer_display = h.mspk_acc_customer || "N";
+      formData.value.spk_acc_tanggal_display = h.mspk_acc_tanggal
+        ? getLocalDateString(h.mspk_acc_tanggal)
+        : "";
 
       if (
         h.mspk_dateline &&
@@ -904,6 +964,31 @@ const validateSave = async () => {
     if (new Date(fd.spk_datelinepo) < new Date(fd.spk_tgl_po)) {
       toast.warning("Tanggal Dateline PO harus >= Tanggal PO.");
       return;
+    }
+  }
+
+  // ← BARU: Gate Persetujuan Customer — HANYA untuk SO tanpa referensi MAP
+  if (!fd.spk_memo) {
+    if (!isEditMode.value) {
+      if (fd.spk_acc_customer !== "Y") {
+        toast.warning(
+          "Customer belum menyetujui pesanan ini. SO tidak bisa disimpan.",
+        );
+        return;
+      }
+      if (!fd.spk_acc_tanggal) {
+        toast.warning("Tanggal persetujuan customer wajib diisi.");
+        return;
+      }
+      if (!accBuktiFile.value) {
+        toast.warning("Bukti screenshot persetujuan customer wajib diupload.");
+        return;
+      }
+    } else if (!wasApprovedOnLoad.value && fd.spk_acc_customer === "Y") {
+      if (!fd.spk_acc_tanggal) {
+        toast.warning("Tanggal persetujuan customer wajib diisi.");
+        return;
+      }
     }
   }
 
@@ -1243,7 +1328,11 @@ const onPilihKatalog = (item: any) => {
 
         <!-- Tab Detail Ukuran -->
         <div v-show="activeTab === 3" class="pf-tab-pane h-100">
-          <TabUkuran :form-data="formData" :is-edit="isEditMode" />
+          <TabUkuran
+            :form-data="formData"
+            :is-edit="isEditMode"
+            @upload-acc-bukti="uploadAccBukti"
+          />
         </div>
 
         <!-- Tab Katalog SO -->

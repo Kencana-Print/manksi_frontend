@@ -19,6 +19,13 @@ const currentTab = ref(0);
 // File holder untuk upload setelah save
 const mainImageFile = ref<File | null>(null);
 const emailImageFile = ref<File | null>(null);
+const accBuktiFile = ref<File | null>(null);
+const handleAccBuktiUpload = (file: File) => {
+  accBuktiFile.value = file;
+};
+
+const isAccImageErrorFromChild = ref(false);
+const wasApprovedOnLoad = ref(false);
 
 const router = useRouter();
 // const showPrintDialog = ref(false);
@@ -109,6 +116,10 @@ const initialData = {
   RevisiNo: 0,
   Referensi: "",
   RevisiNote: "",
+  AccCustomer: "N",
+  AccTanggal: "",
+  AccBuktiName: "",
+  AccBuktiBlob: "",
   TipeRevisi: 1, // 0 = External, 1 = Internal
   Keterangan: "",
   StatusEdit: "",
@@ -193,6 +204,8 @@ const mapMapData = (rawData: any) => {
     RencanaSize: d.mspk_rencana_size || "BRAKEDOWN SIZE",
     IsRevisi: d.mspk_revisi || "N",
     RevisiNo: Number(d.mspk_revisi_no) || 0,
+    AccCustomer: d.mspk_acc_customer || "N",
+    AccTanggal: toISODate(d.mspk_acc_tanggal),
     Referensi: d.mspk_referensi || "",
     RevisiNote: d.mspk_revisi_note || "",
     TipeRevisi: Number(d.mspk_tipe_revisi) || 0,
@@ -254,10 +267,25 @@ const {
           "EMAIL",
         );
       }
+      if (accBuktiFile.value) {
+        await mapFormService.uploadGambar(
+          accBuktiFile.value,
+          savedNomor,
+          dataToSave.Cab,
+          "ACC",
+        );
+      }
     } catch (imgError: any) {
-      toast.warning(
-        `Data tersimpan, namun upload gambar gagal: ${imgError.message}`,
-      );
+      if (accBuktiFile.value) {
+        toast.error(
+          `Data tersimpan, TAPI bukti persetujuan customer GAGAL terupload: ${imgError.message}. Mohon buka ulang & upload ulang buktinya.`,
+          { timeout: 10000 },
+        );
+      } else {
+        toast.warning(
+          `Data tersimpan, namun upload gambar gagal: ${imgError.message}`,
+        );
+      }
     }
 
     return res;
@@ -332,6 +360,39 @@ const validateSave = async () => {
     return;
   }
 
+  const wasAlreadyApprovedOnLoad = wasApprovedOnLoad.value; // ← lihat catatan di bawah
+
+  if (!isEditMode.value) {
+    // CREATE — hard block, sesuai semula
+    if (formData.value.AccCustomer !== "Y") {
+      toast.warning(
+        "Customer belum menyetujui pesanan ini. MAP tidak bisa disimpan.",
+      );
+      return;
+    }
+    if (!formData.value.AccTanggal) {
+      toast.warning("Tanggal persetujuan customer wajib diisi.");
+      return;
+    }
+    if (!accBuktiFile.value) {
+      toast.warning("Bukti screenshot persetujuan customer wajib diupload.");
+      return;
+    }
+  } else if (!wasAlreadyApprovedOnLoad) {
+    // EDIT & sebelumnya belum approved — bebas diedit, TAPI kalau user
+    // sekarang nyentang Y, wajib lengkap dulu.
+    if (formData.value.AccCustomer === "Y") {
+      if (!formData.value.AccTanggal) {
+        toast.warning("Tanggal persetujuan customer wajib diisi.");
+        return;
+      }
+      if (!accBuktiFile.value && isAccImageErrorFromChild.value) {
+        toast.warning("Bukti screenshot persetujuan customer wajib diupload.");
+        return;
+      }
+    }
+  }
+
   // Validasi NomorPO — harus ada sebelum dialog konfirmasi
   if (!formData.value.NomorPO?.trim()) {
     toast.warning(
@@ -398,11 +459,10 @@ watch(
 
 onMounted(async () => {
   await loadInitData();
-  // Paksa load dropdown untuk divisi default
   await loadSpkInformasi(String(formData.value.Divisi));
   if (isEditMode.value) {
     await fetchData();
-    // Reload setelah fetch karena divisi bisa berubah
+    wasApprovedOnLoad.value = formData.value.AccCustomer === "Y"; // ← BARU
     await loadSpkInformasi(String(formData.value.Divisi));
   }
 });
@@ -496,6 +556,8 @@ const tabs = [
             :form-data="formData"
             :is-edit="isEditMode"
             @upload-email="handleEmailUpload"
+            @upload-acc-bukti="handleAccBuktiUpload"
+            @acc-bukti-status="(exists) => (isAccImageErrorFromChild = !exists)"
           />
         </div>
 

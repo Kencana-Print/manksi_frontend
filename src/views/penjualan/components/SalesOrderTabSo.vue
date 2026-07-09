@@ -1067,6 +1067,32 @@ watch(
                 </button>
               </div>
             </div>
+            <div v-if="formData.spk_memo" class="fr" style="margin-top: -2px">
+              <span
+                v-if="formData.spk_acc_customer_display === 'Y'"
+                style="
+                  font-size: 10px;
+                  color: #2e7d32;
+                  font-weight: 600;
+                  padding-left: 90px;
+                "
+              >
+                ✅ Customer sudah setuju ({{
+                  formData.spk_acc_tanggal_display
+                }})
+              </span>
+              <span
+                v-else
+                style="
+                  font-size: 10px;
+                  color: #c62828;
+                  font-weight: 600;
+                  padding-left: 90px;
+                "
+              >
+                ⚠ MAP ini belum ada persetujuan customer
+              </span>
+            </div>
             <div class="fr">
               <label class="lbl">No. MPPB</label>
               <div class="igrp" style="width: 155px">

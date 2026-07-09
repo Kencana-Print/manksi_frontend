@@ -10,7 +10,11 @@ import {
 } from "@tabler/icons-vue";
 
 const props = defineProps<{ formData: any; isEdit: boolean }>();
-const emit = defineEmits(["upload-email"]);
+const emit = defineEmits([
+  "upload-email",
+  "upload-acc-bukti",
+  "acc-bukti-status",
+]);
 const toast = useToast();
 
 const totalQtySize = computed(
@@ -36,15 +40,24 @@ const isEmailImageError = ref(false); // ← tetap dipakai buat state "beneran k
 
 const emailCacheBust = ref(0);
 
+// ── Persetujuan Customer ──
+const showAccDialog = ref(false);
+const isAccImageError = ref(false);
+const fileAccRef = ref<HTMLInputElement | null>(null);
+
 // GANTI kedua watcher EmailImageBlob yang duplikat jadi 1 watcher di formData:
 watch(
   () => props.formData,
   () => {
     isEmailImageError.value = false;
+    isAccImageError.value = false; // ← tambahan
     emailCacheBust.value = Date.now();
+    accCacheBust.value = Date.now(); // ← tambahan
   },
   { flush: "post" },
 );
+
+const accCacheBust = ref(0);
 
 watch(
   () => props.formData.EmailImageBlob,
@@ -52,6 +65,14 @@ watch(
     isEmailImageError.value = false;
   },
 );
+
+watch(
+  () => props.formData.AccBuktiBlob,
+  () => {
+    isAccImageError.value = false;
+  },
+);
+
 const fileEmailRef = ref<HTMLInputElement | null>(null);
 
 const getBaseUrl = () => api.defaults.baseURL?.replace(/\/api\/?$/, "") || "";
@@ -98,6 +119,52 @@ const onEmailChange = (e: Event) => {
   props.formData.EmailImageBlob = URL.createObjectURL(file);
   emit("upload-email", file);
 };
+
+const displayAccUrl = computed(() => {
+  if (isAccImageError.value) return "";
+  if (props.formData.AccBuktiBlob) return props.formData.AccBuktiBlob;
+  if (!props.isEdit) return "";
+  const nomor = props.formData.Nomor;
+  if (!nomor) return "";
+
+  const base = getBaseUrl();
+  const cab = props.formData.Cab || "HO-";
+  // Data baru, tidak ada legacy VPS — tidak perlu fallback
+  return `${base}/images/${cab}/map/${encodeURIComponent(nomor)}-acc.jpg?v=${accCacheBust.value}`;
+});
+
+const onAccImageError = () => {
+  isAccImageError.value = true;
+};
+
+const onAccChange = (e: Event) => {
+  const file = (e.target as HTMLInputElement).files?.[0];
+  if (!file) return;
+  if (file.size > 1_000_000) {
+    toast.error("Ukuran bukti screenshot tidak boleh > 1 Mb.");
+    return;
+  }
+  isAccImageError.value = false;
+  props.formData.AccBuktiName = file.name;
+  props.formData.AccBuktiBlob = URL.createObjectURL(file);
+  emit("upload-acc-bukti", file);
+};
+
+// Toggle checkbox — reset field pendukung kalau di-uncheck
+watch(
+  () => props.formData.AccCustomer,
+  (val) => {
+    if (val !== "Y") {
+      // Tidak menghapus data yang sudah tersimpan di server, cuma
+      // mengosongkan supaya validateSave di parent tegas menolak
+      // sampai user isi ulang dengan sadar.
+    }
+  },
+);
+
+watch(isAccImageError, (val) => {
+  emit("acc-bukti-status", !val); // true = ada bukti, false = tidak ada
+});
 </script>
 
 <template>
@@ -302,6 +369,114 @@ const onEmailChange = (e: Event) => {
         @change="onEmailChange"
       />
     </div>
+
+    <!-- ── 4. Persetujuan Customer ── -->
+    <div
+      class="ll-card"
+      style="
+        width: 280px;
+        flex-shrink: 0;
+        display: flex;
+        flex-direction: column;
+      "
+    >
+      <div class="ll-card-title">Persetujuan Customer</div>
+
+      <label class="chk-lbl mb-2" style="font-size: 12px">
+        <input
+          type="checkbox"
+          v-model="formData.AccCustomer"
+          true-value="Y"
+          false-value="N"
+          style="accent-color: #1565c0"
+        />
+        Customer Sudah Setuju
+      </label>
+
+      <template v-if="formData.AccCustomer === 'Y'">
+        <div class="mb-2">
+          <label
+            style="
+              font-size: 10px;
+              color: #757575;
+              display: block;
+              margin-bottom: 2px;
+            "
+            >Tanggal Persetujuan</label
+          >
+          <input
+            type="date"
+            v-model="formData.AccTanggal"
+            style="
+              width: 100%;
+              height: 26px;
+              border: 1px solid #bdbdbd;
+              border-radius: 3px;
+              padding: 0 6px;
+              font-size: 12px;
+              box-sizing: border-box;
+            "
+          />
+        </div>
+
+        <div class="ll-upload-name">
+          {{ formData.AccBuktiName || "Bukti Screenshot Persetujuan" }}
+        </div>
+
+        <div class="ll-upload-row">
+          <button
+            type="button"
+            class="ll-upload-btn"
+            @click="fileAccRef?.click()"
+          >
+            <IconUpload :size="13" class="mr-1" /> Upload
+          </button>
+          <button
+            type="button"
+            class="ll-upload-btn blue"
+            @click="displayAccUrl && (showAccDialog = true)"
+          >
+            <IconMaximize :size="13" class="mr-1" /> Full Screen
+          </button>
+        </div>
+
+        <div class="ll-img-box" style="flex: 1">
+          <img
+            v-if="displayAccUrl"
+            :src="displayAccUrl"
+            class="ll-img"
+            @click="showAccDialog = true"
+            @error="onAccImageError"
+            style="cursor: pointer"
+          />
+          <div v-else class="ll-img-empty">
+            <IconPhoto :size="28" color="#bdbdbd" />
+            <div>Bukti belum diupload</div>
+          </div>
+        </div>
+
+        <input
+          ref="fileAccRef"
+          type="file"
+          accept="image/*"
+          style="display: none"
+          @change="onAccChange"
+        />
+      </template>
+      <template v-else>
+        <div
+          style="
+            font-size: 11px;
+            color: #f57c00;
+            padding: 8px;
+            background: #fff8e1;
+            border-radius: 4px;
+          "
+        >
+          ⚠ MAP tidak bisa disimpan sebelum ada persetujuan customer.
+        </div>
+      </template>
+    </div>
   </div>
 
   <!-- Preview dialog -->
@@ -316,6 +491,29 @@ const onEmailChange = (e: Event) => {
       <div class="preview-body">
         <v-img
           :src="displayEmailUrl"
+          max-height="600"
+          contain
+          class="bg-white rounded"
+        >
+          <template #placeholder>
+            <div class="d-flex align-center justify-center fill-height">
+              <v-progress-circular indeterminate color="primary" />
+            </div>
+          </template>
+        </v-img>
+      </div>
+    </div>
+  </v-dialog>
+
+  <v-dialog v-model="showAccDialog" max-width="800px">
+    <div class="preview-card">
+      <div class="preview-header">
+        <span>Preview Bukti Persetujuan Customer</span>
+        <button class="preview-close" @click="showAccDialog = false">✕</button>
+      </div>
+      <div class="preview-body">
+        <v-img
+          :src="displayAccUrl"
           max-height="600"
           contain
           class="bg-white rounded"

@@ -105,6 +105,12 @@ const headers = [
   { title: "Workshop", key: "Workshop", width: "120px" },
   { title: "Workshop SPK", key: "WorkshopSPK", width: "130px" },
   { title: "Aktif", key: "Aktif", width: "60px", align: "center" },
+  {
+    title: "Acc. Customer",
+    key: "AccCustomer",
+    width: "110px",
+    align: "center",
+  },
   { title: "Nama", key: "Nama", minWidth: "250px" },
   { title: "Surat Jalan", key: "Surat_Jalan", width: "140px" },
   { title: "Ukuran", key: "Ukuran", width: "120px" },
@@ -379,6 +385,12 @@ const confirmToggleClose = async () => {
           <div class="legend-box bg-black"></div>
           <span>= Close (Aktif dan Sudah Jadi SO)</span>
         </div>
+        <div class="legend-item">
+          <v-chip color="error" size="x-small" density="comfortable"
+            >Belum</v-chip
+          >
+          <span>= Belum ada persetujuan customer</span>
+        </div>
       </div>
     </template>
 
@@ -512,6 +524,27 @@ const confirmToggleClose = async () => {
           >ACC</v-chip
         >
       </div>
+    </template>
+
+    <template #item.AccCustomer="{ item }">
+      <v-chip
+        v-if="item.AccCustomer === 'Y'"
+        color="success"
+        size="x-small"
+        density="comfortable"
+        class="font-weight-bold"
+      >
+        ✓ {{ fmtDate(item.AccTanggal) }}
+      </v-chip>
+      <v-chip
+        v-else
+        color="error"
+        size="x-small"
+        density="comfortable"
+        class="font-weight-bold"
+      >
+        Belum
+      </v-chip>
     </template>
 
     <template #item.Nama="{ item }">
