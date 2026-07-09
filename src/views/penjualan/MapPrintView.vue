@@ -288,7 +288,9 @@ const tglIndo = (dateStr: string) => {
                         ((e.target as HTMLImageElement).style.opacity = '0')
                     "
                   />
-                  <div class="ttd-name">{{ getVal("user_create") }}</div>
+                  <div class="ttd-name">
+                    {{ getVal("user_nama") || getVal("user_create") }}
+                  </div>
                 </td>
                 <td class="ttd-box">
                   <div class="ttd-title">CMO</div>
@@ -305,7 +307,8 @@ const tglIndo = (dateStr: string) => {
               </tr>
               <tr>
                 <td colspan="2" class="ttd-footer">
-                  Dibuat Oleh: {{ getVal("sal_nama") }}
+                  Dibuat Oleh:
+                  {{ getVal("user_nama") || getVal("user_create") }}
                   {{
                     getVal("created_formatted")
                       ? getVal("created_formatted").substring(0, 11)
