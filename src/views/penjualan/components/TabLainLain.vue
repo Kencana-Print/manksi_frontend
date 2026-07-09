@@ -34,18 +34,18 @@ const updateToKetUkuran = () => {
 const showEmailDialog = ref(false);
 const isEmailImageError = ref(false); // ← tetap dipakai buat state "beneran kosong"
 
-// Sekarang watch keseluruhan objek formData — begitu useForm nge-replace
-// formData.value dengan hasil fetchApi() baru (misal abis Save → refetch),
-// reference-nya beda → watcher ini nge-fire → kasih kesempatan retry load gambar.
+const emailCacheBust = ref(0);
+
+// GANTI kedua watcher EmailImageBlob yang duplikat jadi 1 watcher di formData:
 watch(
   () => props.formData,
   () => {
     isEmailImageError.value = false;
+    emailCacheBust.value = Date.now();
   },
   { flush: "post" },
 );
 
-// Tetep pertahankan watcher spesifik utk Blob biar reset instan pas user pilih file baru
 watch(
   () => props.formData.EmailImageBlob,
   () => {
@@ -58,16 +58,14 @@ const getBaseUrl = () => api.defaults.baseURL?.replace(/\/api\/?$/, "") || "";
 
 const displayEmailUrl = computed(() => {
   if (isEmailImageError.value) return "";
-  // Blob lokal (baru dipilih user, belum ke-refresh dari server)
   if (props.formData.EmailImageBlob) return props.formData.EmailImageBlob;
   if (!props.isEdit) return "";
   const nomor = props.formData.Nomor;
   if (!nomor) return "";
 
-  // Prioritas 1: backend lokal, sesuai path processImage: public/images/{cab}/map/{nomor}-email.jpg
   const base = getBaseUrl();
   const cab = props.formData.Cab || "HO-";
-  return `${base}/images/${cab}/map/${encodeURIComponent(nomor)}-email.jpg`;
+  return `${base}/images/${cab}/map/${encodeURIComponent(nomor)}-email.jpg?v=${emailCacheBust.value}`;
 });
 
 // ← DIGANTI: sekarang fallback ke VPS legacy (data lama sebelum fitur
