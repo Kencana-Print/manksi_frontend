@@ -440,6 +440,39 @@ const router = createRouter({
 
     // ── PPIC ──────────────────────────────────────────────────────────
     {
+      path: "/ppic/proof",
+      name: "ProofBrowse",
+      component: () => import("@/views/ppic/ProofView.vue"),
+      meta: {
+        title: "Proof Garmen",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "122",
+      },
+    },
+    {
+      path: "/ppic/proof/create",
+      name: "ProofCreate",
+      component: () => import("@/views/ppic/ProofFormView.vue"),
+      meta: {
+        title: "Buat Proof",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "122",
+      },
+    },
+    {
+      path: "/ppic/proof/edit/:nomor",
+      name: "ProofEdit",
+      component: () => import("@/views/ppic/ProofFormView.vue"),
+      meta: {
+        title: "Ubah Proof",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "122",
+      },
+    },
+    {
       path: "/garmen/cetak-bast",
       name: "CetakBastBrowse",
       component: () => import("@/views/garmen/CetakBastView.vue"),

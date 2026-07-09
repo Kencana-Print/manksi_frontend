@@ -326,6 +326,12 @@ const menuItems: NavItem[] = [
     menuId: 9000,
     items: [
       {
+        title: "Proof Garmen",
+        to: "/ppic/proof",
+        icon: IconClipboardCheck,
+        menuId: 122,
+      },
+      {
         title: "Cetak BAST-MAP",
         to: "/garmen/cetak-bast",
         icon: IconPrinter,

@@ -327,6 +327,11 @@ const validateSave = async () => {
     }
   }
 
+  if (!formData.value.PerushKode?.trim()) {
+    toast.warning("Perusahaan harus diisi.");
+    return;
+  }
+
   // Validasi NomorPO — harus ada sebelum dialog konfirmasi
   if (!formData.value.NomorPO?.trim()) {
     toast.warning(

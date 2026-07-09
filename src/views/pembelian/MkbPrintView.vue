@@ -80,7 +80,7 @@ const numFmt = (val: any) =>
         </div>
         <div class="info-right">
           <div class="info-row">
-            <span class="lbl">No SPK</span><span class="colon">:</span>
+            <span class="lbl">No SO</span><span class="colon">:</span>
             <span class="val">{{ header.NoSPK }}</span>
           </div>
           <div class="info-row">

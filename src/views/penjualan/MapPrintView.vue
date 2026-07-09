@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from "vue";
+import { ref, onMounted, computed, watch, nextTick } from "vue";
 import { useRoute } from "vue-router";
 import api from "@/services/api";
 
@@ -7,19 +7,38 @@ const route = useRoute();
 const rawData = ref<any>(null);
 const isLoading = ref(true);
 const isError = ref(false);
+const imageLoaded = ref(false); // ← BARU: flag gambar utama sudah selesai (berhasil/gagal total)
 
 const printNomor = route.params.nomor as string;
-// Ambil parameter layout dari URL (default vertikal)
 const layoutMode = (route.query.layout as string) || "vertikal";
 
-// 1. Fungsi Normalisasi Data
 const getVal = (key: string) => {
   if (!rawData.value) return "";
-  // Cari key yang cocok tanpa mempedulikan huruf besar/kecil
   const foundKey = Object.keys(rawData.value).find(
     (k) => k.toLowerCase() === key.toLowerCase(),
   );
   return foundKey ? rawData.value[foundKey] : "";
+};
+
+// ← BARU: tunggu gambar selesai loading (max 4 detik biar gak nge-block print
+// selamanya kalau memang gak ada gambar sama sekali)
+const waitForImage = () => {
+  return new Promise<void>((resolve) => {
+    if (imageLoaded.value) {
+      resolve();
+      return;
+    }
+    const stop = watch(imageLoaded, (val) => {
+      if (val) {
+        stop();
+        resolve();
+      }
+    });
+    setTimeout(() => {
+      stop();
+      resolve();
+    }, 4000);
+  });
 };
 
 onMounted(async () => {
@@ -28,67 +47,71 @@ onMounted(async () => {
       `/penjualan/map-form/print/${encodeURIComponent(printNomor)}`,
     );
     rawData.value = res.data.data;
+    isLoading.value = false; // dipindah ke sini biar <img> langsung render & mulai loading
 
-    setTimeout(() => {
-      // Set page size sebelum print
-      if (layoutMode === "horizontal") {
-        const style = document.createElement("style");
-        style.textContent = "@page { size: A4 landscape; margin: 10mm; }";
-        document.head.appendChild(style);
-      } else {
-        const style = document.createElement("style");
-        style.textContent = "@page { size: A4 portrait; margin: 10mm; }";
-        document.head.appendChild(style);
-      }
-      window.print();
-    }, 800);
+    await nextTick(); // pastikan <img :src="mainImageUrl"> sudah ada di DOM
+    await waitForImage(); // ← tunggu gambar utama beres, baru lanjut print
+
+    if (layoutMode === "horizontal") {
+      const style = document.createElement("style");
+      style.textContent = "@page { size: A4 landscape; margin: 10mm; }";
+      document.head.appendChild(style);
+    } else {
+      const style = document.createElement("style");
+      style.textContent = "@page { size: A4 portrait; margin: 10mm; }";
+      document.head.appendChild(style);
+    }
+    window.print();
   } catch (error: any) {
     isError.value = true;
-  } finally {
     isLoading.value = false;
   }
 });
 
 const getBaseUrl = () => api.defaults.baseURL?.replace(/\/api\/?$/, "") || "";
 
-// URL Builder Utama
 const mainImageUrl = computed(() => {
   if (!rawData.value) return "";
   const nomor = getVal("mspk_nomor");
   const cab = getVal("mspk_cab") || "HO-";
   const base = getBaseUrl();
-  // Prioritas: backend lokal dulu
+  // Prioritas 1: backend lokal (folder cabang/map) — sama persis kayak MapFormView
   return `${base}/images/${cab}/map/${encodeURIComponent(nomor)}.jpg`;
 });
 
-// Handler Fallback jika gambar gagal dimuat
+// ← DIGANTI: fallback disamain persis TabMap.vue (handleFallbackImage).
+// Hapus percobaan "file-gambar/{nomor}.jpg" yang gak sesuai struktur folder VPS,
+// langsung ke fallback legacy mintaharga (program lama)
 const handleImageError = (e: Event) => {
   const img = e.target as HTMLImageElement;
   if (img.dataset.tried === "true") {
     img.style.display = "none";
+    imageLoaded.value = true; // sudah exhaust semua opsi, unblock print
     return;
   }
   img.dataset.tried = "true";
 
-  // Fallback 1: VPS folder map
-  const nomor = getVal("mspk_nomor");
   const mhNomor = getVal("mspk_mh_nomor");
+  const nomor = getVal("mspk_nomor");
+  const fallbackKey = mhNomor || nomor;
 
-  if (!img.src.includes("8888")) {
-    img.src = `http://103.94.238.252:8888/file-gambar/${encodeURIComponent(nomor)}.jpg`;
-  } else if (mhNomor && !img.src.includes("mintaharga")) {
-    // Fallback 2: VPS mintaharga
-    img.src = `http://103.94.238.252:8888/file-gambar/mintaharga/${encodeURIComponent(mhNomor)}.jpg`;
+  if (fallbackKey) {
+    img.src = `http://103.94.238.252:8888/file-gambar/mintaharga/${encodeURIComponent(fallbackKey)}.jpg`;
   } else {
     img.style.display = "none";
+    imageLoaded.value = true;
   }
+};
+
+// ← BARU: dipanggil dari @load di template
+const handleImageLoad = () => {
+  imageLoaded.value = true;
 };
 
 // Gambar Tanda Tangan
 const getSignatureUrl = (kodeUser: string) => {
   if (!kodeUser) return "";
   const cleanName = kodeUser.trim().toUpperCase();
-  // Karena ttd ada di root \image, kita arahkan ke root /file-gambar/
   return `http://103.94.238.252:8888/file-gambar/${encodeURIComponent(cleanName)}.jpg`;
 };
 
@@ -223,7 +246,12 @@ const tglIndo = (dateStr: string) => {
 
             <div v-if="layoutMode === 'vertikal'" class="bottom-left-content">
               <div class="image-area">
-                <img :src="mainImageUrl" alt="" @error="handleImageError" />
+                <img
+                  :src="mainImageUrl"
+                  alt=""
+                  @error="handleImageError"
+                  @load="handleImageLoad"
+                />
               </div>
               <div class="details-area">
                 <div v-if="getVal('ketkomponen')" class="komponen-box">
@@ -318,6 +346,7 @@ const tglIndo = (dateStr: string) => {
         alt=""
         class="img-horizontal"
         @error="handleImageError"
+        @load="handleImageLoad"
       />
     </div>
   </div>
