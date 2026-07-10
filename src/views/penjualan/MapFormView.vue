@@ -386,7 +386,7 @@ const validateSave = async () => {
         toast.warning("Tanggal persetujuan customer wajib diisi.");
         return;
       }
-      if (!accBuktiFile.value && isAccImageErrorFromChild.value) {
+      if (!accBuktiFile.value) {
         toast.warning("Bukti screenshot persetujuan customer wajib diupload.");
         return;
       }

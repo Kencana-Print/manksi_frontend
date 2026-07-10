@@ -28,7 +28,8 @@ const isComplexTtd = computed(() => isKaosan.value);
 
 const numCopies = computed(() => {
   if (withAlokasi.value) return 1;
-  return 2; // semua divisi 2 copy
+  if (isGarmen.value) return 1; // Garmen: 1 lembar, tidak digandakan
+  return 2;
 });
 
 const totalAlokasi = computed(() => {
@@ -199,97 +200,115 @@ onMounted(async () => {
         <div
           v-for="copy in numCopies"
           :key="'garmen-' + copy"
-          class="print-half"
-          :class="{ 'border-right': copy === 1 }"
+          class="print-half full-width"
         >
           <div class="header-row">
             <div class="title-main">SALES ORDER</div>
             <div class="title-po">PO : {{ data.spk_nomor_po || "-" }}</div>
           </div>
 
-          <table class="info-table">
-            <tbody>
-              <tr>
-                <td class="w-label">Nomor SO</td>
-                <td class="w-colon">:</td>
-                <td>
-                  <span class="fw">{{ data.spk_nomor }}</span>
-                  <span v-if="data.spk_tipe" class="ml-8 text-xs">
-                    Tipe SO : <strong>{{ data.spk_tipe }}</strong>
-                  </span>
-                </td>
-              </tr>
-              <tr>
-                <td class="w-label">Tanggal SO</td>
-                <td class="w-colon">:</td>
-                <td>{{ tglIndo(data.spk_tanggal) }}</td>
-              </tr>
-              <tr>
-                <td class="w-label">Jenis Order</td>
-                <td class="w-colon">:</td>
-                <td>{{ data.jo_nama }}</td>
-              </tr>
-              <tr>
-                <td class="w-label">Nama Desain</td>
-                <td class="w-colon">:</td>
-                <td class="fw">{{ data.spk_nama }}</td>
-              </tr>
-              <tr>
-                <td class="w-label">Jumlah</td>
-                <td class="w-colon">:</td>
-                <td>{{ Number(data.spk_jumlah).toLocaleString("id-ID") }}</td>
-              </tr>
-              <tr>
-                <td class="w-label">Ukuran</td>
-                <td class="w-colon">:</td>
-                <td>{{ data.sizeStr }}</td>
-              </tr>
-              <tr>
-                <td class="w-label">Bahan</td>
-                <td class="w-colon">:</td>
-                <td>{{ data.spk_kain }}</td>
-              </tr>
-              <tr>
-                <td class="w-label">Gramasi</td>
-                <td class="w-colon">:</td>
-                <td>{{ data.spk_gramasi || "-" }}</td>
-              </tr>
-              <tr>
-                <td class="w-label">Finishing</td>
-                <td class="w-colon">:</td>
-                <td>{{ data.spk_finishing }}</td>
-              </tr>
-              <tr>
-                <td class="w-label">Date Line</td>
-                <td class="w-colon">:</td>
-                <td class="fw">{{ tglIndo(data.spk_dateline) }}</td>
-              </tr>
-              <tr>
-                <td class="w-label">Workshop</td>
-                <td class="w-colon">:</td>
-                <td>{{ data.spk_cab }} ({{ data.spk_workshop }})</td>
-              </tr>
-              <tr>
-                <td class="w-label align-top">Keterangan</td>
-                <td class="w-colon align-top">:</td>
-                <td>
-                  <pre class="val-pre">{{ data.spk_keterangan }}</pre>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+          <div class="garmen-body">
+            <!-- ── Kolom kiri: info table ── -->
+            <div class="garmen-kiri">
+              <table class="info-table">
+                <tbody>
+                  <tr>
+                    <td class="w-label">Nomor SO</td>
+                    <td class="w-colon">:</td>
+                    <td>
+                      <span class="fw">{{ data.spk_nomor }}</span>
+                      <span v-if="data.spk_tipe" class="ml-8 text-xs">
+                        Tipe SO : <strong>{{ data.spk_tipe }}</strong>
+                      </span>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td class="w-label">Tanggal SO</td>
+                    <td class="w-colon">:</td>
+                    <td>{{ tglIndo(data.spk_tanggal) }}</td>
+                  </tr>
+                  <tr>
+                    <td class="w-label">Jenis Order</td>
+                    <td class="w-colon">:</td>
+                    <td>{{ data.jo_nama }}</td>
+                  </tr>
+                  <tr>
+                    <td class="w-label">Nama Desain</td>
+                    <td class="w-colon">:</td>
+                    <td class="fw">{{ data.spk_nama }}</td>
+                  </tr>
+                  <tr>
+                    <td class="w-label">Jumlah</td>
+                    <td class="w-colon">:</td>
+                    <td>
+                      {{ Number(data.spk_jumlah).toLocaleString("id-ID") }}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td class="w-label">Ukuran</td>
+                    <td class="w-colon">:</td>
+                    <td>{{ data.sizeStr }}</td>
+                  </tr>
+                  <tr>
+                    <td class="w-label">Bahan</td>
+                    <td class="w-colon">:</td>
+                    <td>{{ data.spk_kain }}</td>
+                  </tr>
+                  <tr>
+                    <td class="w-label">Gramasi</td>
+                    <td class="w-colon">:</td>
+                    <td>{{ data.spk_gramasi || "-" }}</td>
+                  </tr>
+                  <tr>
+                    <td class="w-label">Finishing</td>
+                    <td class="w-colon">:</td>
+                    <td>{{ data.spk_finishing }}</td>
+                  </tr>
+                  <tr>
+                    <td class="w-label">Date Line</td>
+                    <td class="w-colon">:</td>
+                    <td class="fw">{{ tglIndo(data.spk_dateline) }}</td>
+                  </tr>
+                  <tr>
+                    <td class="w-label">Workshop</td>
+                    <td class="w-colon">:</td>
+                    <td>{{ data.spk_cab }} ({{ data.spk_workshop }})</td>
+                  </tr>
+                </tbody>
+              </table>
 
-          <div class="fw text-xs mt-1">
-            DIKERJAKAN DI {{ data.spk_cab }} {{ data.spk_workshop }}
-          </div>
+              <div class="fw text-xs mt-1">
+                DIKERJAKAN DI {{ data.spk_cab }} {{ data.spk_workshop }}
+              </div>
 
-          <!-- Gambar desain saja, tanpa size detail dan ketKomponen -->
-          <div class="garmen-img-center">
-            <img
-              :src="mainImageUrl"
-              @error="handleImageError"
-              class="garmen-img-fit"
-            />
+              <div class="garmen-img-center">
+                <img
+                  :src="mainImageUrl"
+                  @error="handleImageError"
+                  class="garmen-img-fit"
+                />
+              </div>
+
+              <div v-if="data.ketKomponen" class="ket-box ket-section mt-2">
+                <div class="ket-title">Keterangan Komponen :</div>
+                <pre class="ket-produksi">{{ data.ketKomponen }}</pre>
+              </div>
+
+              <div class="ket-box ket-section mt-2">
+                <div class="ket-title">Size : Lebar &amp; Panjang Badan</div>
+                <pre class="ket-produksi">{{
+                  formatSizeDetail || (data.sizeStr ? data.sizeStr : "-")
+                }}</pre>
+              </div>
+            </div>
+
+            <!-- ── Kolom kanan: Ket. Produksi ── -->
+            <div class="garmen-kanan">
+              <div class="ket-box ket-section">
+                <div class="ket-title">Ket. Produksi :</div>
+                <pre class="ket-produksi">{{ data.spk_keterangan }}</pre>
+              </div>
+            </div>
           </div>
 
           <div class="bottom-ttd-wrapper mt-auto">
@@ -670,6 +689,10 @@ onMounted(async () => {
   min-width: 0;
   height: 209mm;
   overflow: hidden;
+}
+.print-half.full-width {
+  flex: 0 0 100%;
+  width: 100%;
 }
 .border-right {
   border-right: 1px dotted #999;

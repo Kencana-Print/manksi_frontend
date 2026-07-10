@@ -123,6 +123,7 @@ const onEmailChange = (e: Event) => {
 const displayAccUrl = computed(() => {
   if (isAccImageError.value) return "";
   if (props.formData.AccBuktiBlob) return props.formData.AccBuktiBlob;
+  if (props.formData.AccCustomer !== "Y") return "";
   if (!props.isEdit) return "";
   const nomor = props.formData.Nomor;
   if (!nomor) return "";
