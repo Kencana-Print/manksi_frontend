@@ -329,9 +329,16 @@ const resolveSpk = async (tab: TabKey, idx: number, nomor: string) => {
   const rows = formData.value.detail[tab];
   const row = rows[idx];
 
-  const isDup = rows.some((r, i) => i !== idx && r.NomorSPK === nomor);
+  const isDup = rows.some(
+    (r, i) =>
+      i !== idx &&
+      r.NomorSPK === nomor &&
+      r.plan_tgl_jadwal === row.plan_tgl_jadwal,
+  );
   if (isDup) {
-    toast.warning(`SPK ${nomor} sudah ada di baris lain pada tab ini.`);
+    toast.warning(
+      `SPK ${nomor} sudah ada di baris lain pada tanggal ${row.plan_tgl_jadwal} untuk tab ini.`,
+    );
     row.NomorSPK = "";
     return;
   }
@@ -919,12 +926,11 @@ watch(
                     </td>
                     <td style="padding: 0">
                       <input
-                        type="date"
-                        v-model="row.plan_tgl_jadwal"
-                        class="gi"
-                        :min="formData.pl_tgl1"
-                        :max="formData.pl_tgl2"
-                        @change="clampToPeriode('koli', idx as number)"
+                        type="number"
+                        v-model.number="row.plan_qty_jadwal"
+                        min="0"
+                        class="gi tr yellow-cell"
+                        v-select-on-focus
                       />
                     </td>
                     <td class="tc" style="padding: 0">

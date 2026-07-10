@@ -37,6 +37,7 @@ const emit = defineEmits([
         color="primary"
         @click="emit('validate-save')"
         :loading="isSaving"
+        :disabled="isSaving"
       >
         <template #prepend>
           <span class="d-flex align-center">
@@ -130,6 +131,7 @@ const emit = defineEmits([
             variant="elevated"
             @click="emit('confirm-save')"
             :loading="isSaving"
+            :disabled="isSaving"
             >Ya, Simpan</v-btn
           >
         </v-card-actions>

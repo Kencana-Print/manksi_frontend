@@ -245,6 +245,22 @@ const onJumlahChange = (idx: number) => {
     if (pi !== -1) formData.value.poItems[pi].terima = row.jumlah;
   }
 };
+// Sinkron Grid 2 (Realisasi PO per-SPK) → Grid 1 (Rekap per Kode Bahan).
+// Grid 1 itu agregat lintas SPK, jadi jumlah-nya harus dihitung ulang
+// dari total SEMUA baris Grid 2 yang kodenya sama, bukan 1:1 per baris.
+const onPoTerimaChange = (idx: number) => {
+  const po = formData.value.poItems[idx];
+  const kode = po.kode;
+
+  const totalTerima = formData.value.poItems
+    .filter((p: any) => p.kode === kode)
+    .reduce((s: number, p: any) => s + (Number(p.terima) || 0), 0);
+
+  const itemRow = formData.value.items.find((r: any) => r.kode === kode);
+  if (itemRow) {
+    itemRow.jumlah = totalTerima;
+  }
+};
 const onRollChange = async (idx: number) => {
   const row = formData.value.items[idx];
   const targetRoll = Number(row.roll) || 0;
@@ -901,7 +917,7 @@ const printBarcodeAll = () => {
                         v-model.number="p.terima"
                         type="number"
                         class="ci tr fw bg-yellow-light"
-                        readonly
+                        @blur="onPoTerimaChange(Number(i))"
                         v-select-on-focus
                       />
                     </td>
