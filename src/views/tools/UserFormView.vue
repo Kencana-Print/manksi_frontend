@@ -29,6 +29,9 @@ const header = ref<UserHeaderState>({
   nama: "",
   password: "",
   divisi: 0,
+  bagian: "",
+  cabang: "",
+  cabangKaos: "",
   aktif: true,
   editReport: false,
   lihatBeli: false,
@@ -41,6 +44,9 @@ interface UserHeaderState {
   nama: string;
   password: string;
   divisi: number;
+  bagian: string;
+  cabang: string;
+  cabangKaos: string;
   aktif: boolean;
   editReport: boolean;
   lihatBeli: boolean;
@@ -51,6 +57,35 @@ interface UserHeaderState {
 
 const menuGrid = ref<MenuGridRow[]>([]);
 const cekAllChecked = ref(false);
+
+const BAGIAN_OPTIONS = [
+  "ADMIN",
+  "AUDIT",
+  "CETAK",
+  "DESAIN",
+  "DIREKSI",
+  "DM",
+  "DTF",
+  "EDP",
+  "FINANCE",
+  "GA",
+  "GUDANG",
+  "IT",
+  "JAHIT",
+  "KIRIM",
+  "LIPAT",
+  "MARKETING",
+  "OWNER",
+  "PEMBELIAN",
+  "PPIC",
+  "POTONG",
+  "PRES DTF",
+  "PRODUKSI",
+  "QCCETAK",
+  "QCPOTONG",
+  "TEKNISI",
+];
+const cabangOptions = ref<string[]>([]);
 
 // ── Load data ──────────────────────────────────────────────────────────
 const loadData = async () => {
@@ -68,7 +103,19 @@ const loadData = async () => {
   }
 };
 
-onMounted(loadData);
+const loadCabangOptions = async () => {
+  try {
+    const res = await userFormService.getCabangOptions();
+    cabangOptions.value = (res.data.data || []).map((c: any) => c.Kode);
+  } catch (e) {
+    console.error("Gagal memuat daftar cabang", e);
+  }
+};
+
+onMounted(() => {
+  loadData();
+  loadCabangOptions();
+});
 
 // ── Validasi kode unik (mode Baru saja) ─────────────────────────────────
 const kodeCheckState = ref<"idle" | "checking" | "available" | "taken">("idle");
@@ -321,6 +368,34 @@ const newMenuCount = computed(
                 {{ d.label }}
               </label>
             </div>
+          </div>
+
+          <div class="fr">
+            <label class="lbl">Cabang</label>
+            <select v-model="header.cabang" class="inp">
+              <option value="">-- Pilih --</option>
+              <option v-for="c in cabangOptions" :key="c" :value="c">
+                {{ c }}
+              </option>
+            </select>
+          </div>
+          <div class="fr">
+            <label class="lbl">Cabang Kaos</label>
+            <select v-model="header.cabangKaos" class="inp">
+              <option value="">-- Pilih --</option>
+              <option v-for="c in cabangOptions" :key="c" :value="c">
+                {{ c }}
+              </option>
+            </select>
+          </div>
+          <div class="fr">
+            <label class="lbl">Bagian</label>
+            <select v-model="header.bagian" class="inp">
+              <option value="">-- Pilih --</option>
+              <option v-for="b in BAGIAN_OPTIONS" :key="b" :value="b">
+                {{ b }}
+              </option>
+            </select>
           </div>
           <div class="divider" />
           <div class="chk-grid">

@@ -36,6 +36,7 @@ export const userFormService = {
   searchUsers: (q: string) => api.get(`${BASE}/search`, { params: { q } }),
   getPermissionsForCopy: (kode: string) =>
     api.get(`${BASE}/permissions/${encodeURIComponent(kode)}`),
+  getCabangOptions: () => api.get("/lookups/cabang-pabrik"), // ← BARU
   create: (payload: any) => api.post(BASE, payload),
   update: (kode: string, payload: any) =>
     api.put(`${BASE}/${encodeURIComponent(kode)}`, payload),

@@ -32,6 +32,8 @@ const { items, isLoading, selected, fetchData, exportToExcel } = useBrowse({
 const headers = [
   { title: "KODE USER", key: "Kode", width: "150px" },
   { title: "NAMA USER", key: "Nama", minWidth: "300px" },
+  { title: "CABANG", key: "Cabang", width: "100px", align: "center" },
+  { title: "BAGIAN", key: "Bagian", width: "130px" },
   { title: "AKTIF", key: "Aktif", width: "120px", align: "center" },
 ];
 
