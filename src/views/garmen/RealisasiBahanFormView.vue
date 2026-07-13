@@ -265,11 +265,29 @@ const onBarcodeEntered = async (item: any, index: number) => {
       return;
     }
 
+    // ← BARU: cek apakah kode bahan hasil scan ada di daftar kebutuhan
+    // (Tabel 2, yang bersumber dari MKB/Minta Bahan). Tidak di-block,
+    // cuma diberi peringatan — bisa saja ini kasus tambahan/pengganti
+    // yang memang sah tapi belum tercatat di MKB.
+    const isMatchMkb =
+      formData.value.details.length === 0 ||
+      formData.value.details.some((d: any) => d.kode === data.kode);
+
     item.kode = data.kode;
     item.nama = data.nama;
     item.satuan = data.satuan;
     item.stok = data.stok;
     item.jumlah = data.stok;
+    item.kdsup = data.kdsup;
+    item.nmsup = data.nmsup;
+    item.mismatchMkb = !isMatchMkb;
+
+    if (!isMatchMkb) {
+      toast.warning(
+        `⚠ Bahan "${data.nama}" (${data.kode}) hasil scan TIDAK terdaftar di kebutuhan MKB/Permintaan ini. Pastikan barcode sudah benar.`,
+        { timeout: 8000 },
+      );
+    }
 
     recalculateNetto(item.kode);
   } catch (error: any) {
@@ -373,6 +391,14 @@ const validateBeforeSave = () => {
   if (totalNetto === 0) {
     return toast.warning(
       "Netto masih kosong semua! Silakan scan barang atau isi manual.",
+    );
+  }
+
+  const hasMismatch = formData.value.barcodes.some((b: any) => b.mismatchMkb);
+  if (hasMismatch) {
+    toast.warning(
+      "⚠ Ada bahan hasil scan yang tidak sesuai MKB/Permintaan. Cek ulang sebelum simpan.",
+      { timeout: 6000 },
     );
   }
 
@@ -610,7 +636,11 @@ onMounted(async () => {
               </tr>
             </thead>
             <tbody>
-              <tr v-for="(item, index) in formData.barcodes" :key="index">
+              <tr
+                v-for="(item, index) in formData.barcodes"
+                :key="index"
+                :class="{ 'row-mismatch': item.mismatchMkb }"
+              >
                 <td class="text-center">{{ index + 1 }}</td>
                 <td>
                   <input
@@ -620,7 +650,15 @@ onMounted(async () => {
                     @change="onBarcodeEntered(item, index)"
                   />
                 </td>
-                <td class="bg-grey-lighten-4">{{ item.kode }}</td>
+                <td class="bg-grey-lighten-4">
+                  {{ item.kode }}
+                  <span
+                    v-if="item.mismatchMkb"
+                    title="Tidak sesuai MKB/Permintaan"
+                    class="mismatch-badge"
+                    >⚠</span
+                  >
+                </td>
                 <td class="bg-grey-lighten-4">{{ item.nama }}</td>
                 <td class="text-center bg-grey-lighten-4">{{ item.satuan }}</td>
                 <td class="tr bg-grey-lighten-4">{{ item.stok }}</td>
@@ -817,5 +855,14 @@ onMounted(async () => {
 }
 .fw-bold {
   font-weight: bold;
+}
+.row-mismatch td {
+  background: #ffebee !important;
+}
+.mismatch-badge {
+  color: #c62828;
+  font-weight: 700;
+  margin-left: 4px;
+  cursor: help;
 }
 </style>

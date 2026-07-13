@@ -128,7 +128,6 @@ const {
       pin_status: h.pin_status,
 
       dtlBahan: (d.dtlBahan || []).map((b: any) => {
-        // Ambil nilai Jumlah dan Ready
         const jumlahVal = Number(val(b, "mkbd_jumlah")) || 0;
         const allowanceVal =
           val(b, "mkbd_allowance") !== null
@@ -140,6 +139,8 @@ const {
         const poVal = Number(
           b.mkbd_jumlah_po ?? b.mkbd_jumlah_PO ?? b.MKBD_JUMLAH_PO ?? 0,
         );
+        const namaBahanVal = val(b, "bhn_name");
+        const allowanceInfo = getAllowanceInfo(namaBahanVal);
 
         return {
           no: val(b, "mkbd_nourut"),
@@ -149,11 +150,13 @@ const {
           warna: val(b, "mkbd_warna"),
           jenis: val(b, "mkbd_jenis"),
           kode: val(b, "mkbd_bhn_kode"),
-          namaBahan: val(b, "bhn_name"),
+          namaBahan: namaBahanVal,
           satuan: val(b, "mkbd_bhn_satuan"),
           gramasi: val(b, "gramasi"),
           jumlah: jumlahVal,
           allowance: allowanceVal,
+          allowanceManual: true,
+          allowanceLocked: allowanceInfo.locked,
           ready: readyVal,
           po: poVal,
           tglbeli: parseDateSafe(val(b, "mkbd_tglbeli")),
@@ -227,6 +230,47 @@ const recalcRowBahan = (row: any) => {
   row.po = butuh > ready ? Number((butuh - ready).toFixed(2)) : 0;
 };
 
+// ── ALLOWANCE OTOMATIS BERDASARKAN JENIS BAHAN ──
+// Jenis diambil dari kata pertama nama bahan, misal:
+// "PE30 PUTIH 130-140 45\"" -> kata pertama "PE30"
+const PE_GROUP = ["PE30", "PE24", "PE20", "PE30DK", "PE40DK", "HYGET"];
+const COMBED_GROUP = ["CM16", "CM20", "CM24", "CM30"];
+
+const getAllowanceInfo = (namaBahan: string) => {
+  if (!namaBahan) return { percent: 0.05, locked: false };
+  const firstWord = namaBahan.trim().split(/\s+/)[0].toUpperCase();
+
+  if (PE_GROUP.includes(firstWord)) return { percent: 0.02, locked: false };
+  if (COMBED_GROUP.includes(firstWord)) return { percent: 0.05, locked: true };
+  return { percent: 0.05, locked: false }; // jenis lain
+};
+
+// Hitung ulang default allowance untuk 1 baris. Untuk COMBED (locked),
+// SELALU dipaksa ulang (user tidak bisa override). Untuk jenis lain,
+// hanya dihitung ulang kalau user belum pernah edit manual
+// (row.allowanceManual masih false).
+const applyAllowanceDefault = (row: any) => {
+  const info = getAllowanceInfo(row.namaBahan);
+  row.allowanceLocked = info.locked;
+  if (info.locked || !row.allowanceManual) {
+    row.allowance = Number(
+      ((Number(row.jumlah) || 0) * info.percent).toFixed(2),
+    );
+  }
+};
+
+// Gabungan: recalc jumlah (dari babaran/qty SPK) lalu recalc allowance
+// dari jumlah yang baru. Dipakai di semua titik yang tadinya cuma
+// panggil recalcRowBahan saja.
+const recalcRowFull = (row: any) => {
+  recalcRowBahan(row);
+  applyAllowanceDefault(row);
+};
+
+const onAllowanceInput = (row: any) => {
+  if (!row.allowanceLocked) row.allowanceManual = true;
+};
+
 const openSpkModal = () => {
   if (isTutupBuku.value && isEdit.value) return;
   showSpkModal.value = true;
@@ -246,7 +290,7 @@ const onSpkSelected = async (spk: any) => {
     formData.value.memoSpk = info.Memo;
 
     // Rekalkulasi rincian bahan (Babaran)
-    formData.value.dtlBahan.forEach(recalcRowBahan);
+    formData.value.dtlBahan.forEach(recalcRowFull);
 
     // Isi Planning (Kecuali MAP)
     if (!isMapMode.value) {
@@ -292,7 +336,7 @@ const onSpkEnter = async () => {
     formData.value.jenisOrder = info.JenisOrder;
     formData.value.memoSpk = info.Memo;
 
-    formData.value.dtlBahan.forEach(recalcRowBahan);
+    formData.value.dtlBahan.forEach(recalcRowFull);
 
     if (!isMapMode.value) {
       formData.value.dtlPlan = planning.map((p: any) => ({
@@ -328,6 +372,8 @@ const addRowBahan = () => {
     gramasi: "",
     jumlah: 0,
     allowance: "",
+    allowanceManual: false,
+    allowanceLocked: false,
     ready: 0,
     po: 0,
     tglbeli: "",
@@ -369,11 +415,10 @@ const onBahanSelected = (bahan: any) => {
     row.namaBahan = bahan.Nama || bahan.bhn_name;
     row.satuan = bahan.Satuan || bahan.Bhn_satuan;
     row.gramasi = bahan.Gramasi || bahan.gramasi || "";
-
-    // Langsung ambil stok dari hasil lookup backend
     row.ready = Number(bahan.Stok || 0);
 
-    recalcRowBahan(row);
+    row.allowanceManual = false; // ← BARU: bahan baru, default segar lagi
+    recalcRowFull(row); // ← DIGANTI dari recalcRowBahan(row)
   }
 };
 
@@ -693,7 +738,7 @@ const onPoSelected = (po: any) => {
                     type="number"
                     v-model="row.babaran"
                     class="gi tr"
-                    @input="recalcRowBahan(row)"
+                    @input="recalcRowFull(row)"
                     v-select-on-focus
                   />
                 </td>
@@ -739,7 +784,7 @@ const onPoSelected = (po: any) => {
                     type="number"
                     v-model="row.jumlah"
                     class="gi tr fw bg-blue-lighten-5"
-                    @input="recalcRowBahan(row)"
+                    @input="recalcRowFull(row)"
                     v-select-on-focus
                   />
                 </td>
@@ -748,7 +793,15 @@ const onPoSelected = (po: any) => {
                     type="number"
                     v-model="row.allowance"
                     class="gi tr"
+                    :class="{ 'gi-ro': row.allowanceLocked }"
+                    :readonly="row.allowanceLocked"
+                    :title="
+                      row.allowanceLocked
+                        ? 'Allowance COMBED tetap, tidak bisa diubah'
+                        : ''
+                    "
                     placeholder="-"
+                    @input="onAllowanceInput(row)"
                     v-select-on-focus
                   />
                 </td>

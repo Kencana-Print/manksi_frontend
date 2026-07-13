@@ -5,7 +5,11 @@ import { useToast } from "vue-toastification";
 import { useForm } from "@/composables/useForm";
 import { planningSpkFormService } from "@/services/ppic/planningSpkFormService";
 import BaseForm from "@/components/BaseForm.vue";
+import api from "@/services/api";
+
 import SpkSearchModal from "@/components/lookups/SpkSearchModal.vue";
+import SupplierSearchModal from "@/components/lookups/SupplierSearchModal.vue";
+
 import {
   IconCalendarStats,
   IconSearch,
@@ -24,8 +28,11 @@ interface TabRow {
   plan_qty_po: number;
   plan_qty_jadwal: number;
   plan_line_kelompok: string; // tidak dipakai di koli
+  supplierKode: string;
+  supplierNama: string;
   _key: number;
   _spkLoading: boolean;
+  _supplierLoading: boolean;
   _spkDetail: string;
 }
 
@@ -129,9 +136,12 @@ const emptyRow = (defaultTgl: string): TabRow => ({
   plan_qty_po: 0,
   plan_qty_jadwal: 0,
   plan_line_kelompok: "",
+  supplierKode: "",
+  supplierNama: "",
   _spkDetail: "",
   _key: newKey(),
   _spkLoading: false,
+  _supplierLoading: false,
 });
 
 const mapRow = (r: any, defaultTgl: string): TabRow => ({
@@ -143,9 +153,12 @@ const mapRow = (r: any, defaultTgl: string): TabRow => ({
   plan_qty_po: Number(r.plan_qty_po) || 0,
   plan_qty_jadwal: Number(r.plan_qty_jadwal) || 0,
   plan_line_kelompok: r.plan_line_kelompok ?? "",
+  supplierKode: r.supplierKode ?? "",
+  supplierNama: r.supplierNama ?? "",
   _spkDetail: r.NamaSPK ? `${r.NomorSPK} | ${r.NamaSPK} | ${r.QtySPK} pcs` : "",
   _key: newKey(),
   _spkLoading: false,
+  _supplierLoading: false,
 });
 
 const emptyData: FormState = {
@@ -249,19 +262,36 @@ const {
       detail: {
         cutting: (payload.detail.cutting as TabRow[])
           .filter((r) => r.NomorSPK && r.plan_tgl_jadwal)
-          .map(({ _key, _spkLoading, NamaSPK, QtySPK, ...r }) => r),
+          .map(
+            ({
+              _key,
+              _spkLoading,
+              _supplierLoading,
+              NamaSPK,
+              QtySPK,
+              supplierKode,
+              supplierNama,
+              ...r
+            }) => r,
+          ),
         sewing: (payload.detail.sewing as TabRow[])
           .filter((r) => r.NomorSPK && r.plan_tgl_jadwal)
-          .map(({ _key, _spkLoading, NamaSPK, QtySPK, ...r }) => r),
+          .map(
+            ({ _key, _spkLoading, _supplierLoading, NamaSPK, QtySPK, ...r }) =>
+              r,
+          ),
         koli: (payload.detail.koli as TabRow[])
           .filter((r) => r.NomorSPK && r.plan_tgl_jadwal)
           .map(
             ({
               _key,
               _spkLoading,
+              _supplierLoading,
               NamaSPK,
               QtySPK,
               plan_line_kelompok,
+              supplierKode,
+              supplierNama,
               ...r
             }) => r,
           ),
@@ -294,6 +324,7 @@ const LINE_OPTIONS = [
   "LINE I",
   "LINE J",
   "LINE K",
+  "LINE EXTERNAL",
 ];
 
 const openSpkModal = (tab: TabKey, idx: number) => {
@@ -401,6 +432,66 @@ const resolveSpk = async (tab: TabKey, idx: number, nomor: string) => {
   }
 };
 
+// ─── Handler Supplier ──────────────────────────────────────────────────────────────
+const isExternalLine = (row: TabRow) =>
+  row.plan_line_kelompok === "LINE EXTERNAL";
+
+const showSupplierModal = ref(false);
+const activeSupplierRowIdx = ref(-1);
+
+const openSupplierModal = (idx: number) => {
+  activeSupplierRowIdx.value = idx;
+  showSupplierModal.value = true;
+};
+
+const onSupplierKeydown = (e: KeyboardEvent, idx: number) => {
+  if (e.key === "F1") {
+    e.preventDefault();
+    openSupplierModal(idx);
+  }
+};
+
+const onSupplierEnter = async (idx: number) => {
+  const row = formData.value.detail.sewing[idx];
+  const kode = row.supplierKode?.trim();
+  if (!kode) {
+    row.supplierNama = "";
+    return;
+  }
+  row._supplierLoading = true;
+  try {
+    const res = await api.get("/lookups/supplier", {
+      params: { q: kode, limit: 1 },
+    });
+    const items = res.data.data?.items || res.data.data || [];
+    const item = items.find(
+      (i: any) =>
+        (i.Kode || i.sup_kode || "").toUpperCase() === kode.toUpperCase(),
+    );
+    if (item) {
+      row.supplierKode = item.Kode || item.sup_kode;
+      row.supplierNama = item.Nama || item.sup_nama;
+    } else {
+      toast.error("Kode supplier tidak ditemukan.");
+      row.supplierKode = "";
+      row.supplierNama = "";
+    }
+  } catch {
+    toast.error("Gagal memvalidasi supplier.");
+  } finally {
+    row._supplierLoading = false;
+  }
+};
+
+const onSupplierSelected = (item: any) => {
+  const idx = activeSupplierRowIdx.value;
+  if (idx < 0) return;
+  const row = formData.value.detail.sewing[idx];
+  row.supplierKode = item.Kode || item.sup_kode;
+  row.supplierNama = item.Nama || item.sup_nama;
+  showSupplierModal.value = false;
+};
+
 // ─── Row helpers ──────────────────────────────────────────────────────────────
 const addRow = (tab: TabKey) => {
   const defaultTgl =
@@ -428,6 +519,16 @@ const validateSave = () => {
     formData.value.detail.koli.some((r) => r.NomorSPK);
   if (!hasData)
     return toast.warning("Minimal isi satu baris SPK di salah satu tab.");
+
+  // ← BARU
+  const missingSupplier = formData.value.detail.sewing.some(
+    (r) => r.NomorSPK && isExternalLine(r) && !r.supplierKode,
+  );
+  if (missingSupplier) {
+    return toast.warning(
+      "Isi Supplier untuk baris Sewing dengan Line Eksternal.",
+    );
+  }
 
   showSaveDialog.value = true;
 };
@@ -609,6 +710,7 @@ watch(
                     <th style="width: 80px" class="tr">Qty PO</th>
                     <th style="width: 85px" class="tr bg-yellow">Qty Jadwal</th>
                     <th style="width: 150px">Line/Kelompok</th>
+
                     <th style="width: 32px"></th>
                   </tr>
                 </thead>
@@ -733,6 +835,8 @@ watch(
                     <th style="width: 80px" class="tr">Qty PO</th>
                     <th style="width: 85px" class="tr bg-yellow">Qty Jadwal</th>
                     <th style="width: 150px">Line/Kelompok</th>
+                    <th style="width: 130px">Supplier</th>
+                    <th style="width: 160px">Nama Supplier</th>
                     <th style="width: 32px"></th>
                   </tr>
                 </thead>
@@ -819,6 +923,45 @@ watch(
                         </option>
                       </select>
                     </td>
+                    <td style="padding: 0">
+                      <template v-if="isExternalLine(row)">
+                        <div class="gi-group">
+                          <input
+                            v-model="row.supplierKode"
+                            class="gi"
+                            style="text-transform: uppercase"
+                            placeholder="F1/Enter"
+                            @keydown="
+                              (e) => onSupplierKeydown(e, idx as number)
+                            "
+                            @keydown.enter.prevent="
+                              onSupplierEnter(idx as number)
+                            "
+                          />
+                          <button
+                            class="btn-gi-lkp"
+                            :class="{ loading: row._supplierLoading }"
+                            @click="openSupplierModal(idx as number)"
+                          >
+                            <IconSearch :size="11" />
+                          </button>
+                        </div>
+                      </template>
+                      <template v-else>
+                        <span
+                          class="ro-cell"
+                          style="
+                            display: block;
+                            text-align: center;
+                            color: #bdbdbd;
+                          "
+                          >—</span
+                        >
+                      </template>
+                    </td>
+                    <td class="ro-cell" :title="row.supplierNama">
+                      {{ isExternalLine(row) ? row.supplierNama || "—" : "—" }}
+                    </td>
                     <td class="tc" style="padding: 0">
                       <button
                         type="button"
@@ -830,7 +973,7 @@ watch(
                     </td>
                   </tr>
                   <tr v-if="!formData.detail.sewing.length">
-                    <td colspan="10" class="empty-row">Klik + Tambah Baris</td>
+                    <td colspan="12" class="empty-row">Klik + Tambah Baris</td>
                   </tr>
                 </tbody>
               </table>
@@ -960,6 +1103,12 @@ watch(
     v-model="showSpkModal"
     filter-mode="spk-ppic"
     @selected="onSpkSelected"
+  />
+
+  <!-- Supplier Modal -->
+  <SupplierSearchModal
+    v-model="showSupplierModal"
+    @selected="onSupplierSelected"
   />
 
   <!-- Dialog Riwayat -->

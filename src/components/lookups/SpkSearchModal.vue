@@ -9,7 +9,7 @@ import {
 
 const props = defineProps<{
   modelValue: boolean;
-  filterMode?: "so" | "spk-ppic" | "mutasi" | "sj" | "all";
+  filterMode?: "so" | "spk-ppic" | "mutasi" | "sj" | "spk-map" | "all";
   cusKode?: string;
   perushKode?: string;
   divisi?: string | number;

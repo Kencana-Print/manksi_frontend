@@ -565,7 +565,11 @@ watch(
     </template>
   </BaseForm>
 
-  <SpkSearchModal v-model="showSpkModal" @selected="onSpkSelected" />
+  <SpkSearchModal
+    v-model="showSpkModal"
+    filter-mode="spk-map"
+    @selected="onSpkSelected"
+  />
   <BahanSearchModal
     v-model="showBahanModal"
     mode="all"
