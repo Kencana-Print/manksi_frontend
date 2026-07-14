@@ -139,7 +139,7 @@ const mitraLuarText = computed(() => {
 const formatSizeDetail = computed(() => {
   if (!data.value.sizeDetails?.length) return "";
   return data.value.sizeDetails
-    .map((sz: any) => `${sz.size}=  L: ${sz.lb || 0}   P: ${sz.pb || 0}`)
+    .map((sz: any) => `${sz.size}=  L: ${sz.ld || 0}   P: ${sz.pb || 0}`) 
     .join("\n");
 });
 
