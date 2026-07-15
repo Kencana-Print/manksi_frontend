@@ -292,6 +292,17 @@ const getGambarUrl = (row: any) => {
   return `${base}/images/lhkpola/${encodeURIComponent(row.gambar)}`;
 };
 
+// ── Preview gambar full screen ──
+const showImagePreview = ref(false);
+const previewImageUrl = ref("");
+
+const openImagePreview = (row: any) => {
+  const url = getGambarUrl(row);
+  if (!url) return;
+  previewImageUrl.value = url;
+  showImagePreview.value = true;
+};
+
 // ── Validasi sebelum simpan ────────────────────────────────────────────
 const validateSave = () => {
   if (!formData.value.tanggal) {
@@ -443,6 +454,8 @@ const validateSave = () => {
                     v-if="getGambarUrl(row)"
                     :src="getGambarUrl(row)"
                     class="cell-thumb"
+                    style="cursor: pointer"
+                    @click="openImagePreview(row)"
                     @error="
                       (e) =>
                         ((e.target as HTMLImageElement).style.display = 'none')
@@ -530,6 +543,8 @@ const validateSave = () => {
                     v-if="getGambarUrl(row)"
                     :src="getGambarUrl(row)"
                     class="cell-thumb"
+                    style="cursor: pointer"
+                    @click="openImagePreview(row)"
                     @error="
                       (e) =>
                         ((e.target as HTMLImageElement).style.display = 'none')
@@ -561,6 +576,39 @@ const validateSave = () => {
     </div>
 
     <SpkPolaSearchModal v-model="showSpkModal" @selected="onSpkSelected" />
+
+    <!-- ── Preview Gambar Full Screen ── -->
+    <v-dialog v-model="showImagePreview" max-width="800px">
+      <div class="preview-card">
+        <div class="preview-header">
+          <span>Preview Gambar</span>
+          <button class="preview-close" @click="showImagePreview = false">
+            ✕
+          </button>
+        </div>
+        <div class="preview-body">
+          <v-img
+            :src="previewImageUrl"
+            max-height="600"
+            contain
+            class="bg-white rounded"
+          >
+            <template #placeholder>
+              <div class="d-flex align-center justify-center fill-height">
+                <v-progress-circular indeterminate color="primary" />
+              </div>
+            </template>
+            <template #error>
+              <div
+                class="d-flex align-center justify-center fill-height text-grey"
+              >
+                Gambar tidak tersedia
+              </div>
+            </template>
+          </v-img>
+        </div>
+      </div>
+    </v-dialog>
   </BaseForm>
 </template>
 
@@ -736,5 +784,34 @@ const validateSave = () => {
 .cell-file-inp {
   font-size: 9px;
   width: 90px;
+}
+.preview-card {
+  background: white;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #1565c0;
+  color: white;
+  padding: 9px 14px;
+  font-size: 13px;
+  font-weight: 700;
+}
+.preview-close {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 16px;
+  cursor: pointer;
+}
+.preview-close:hover {
+  color: white;
+}
+.preview-body {
+  padding: 16px;
+  background: #f5f5f5;
 }
 </style>
