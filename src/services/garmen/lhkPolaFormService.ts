@@ -13,4 +13,19 @@ export const lhkPolaFormService = {
     api.get(`${BASE}/lookup/search-spk`, { params: { q } }),
   getSpkByNomor: (nomor: string) =>
     api.get(`${BASE}/lookup/spk/${encodeURIComponent(nomor)}`),
+  uploadGambar: (
+    file: File,
+    lhkNomor: string,
+    tab: "marker" | "grading",
+    spkNomor: string,
+  ) => {
+    const formData = new FormData();
+    formData.append("gambar", file);
+    formData.append("lhkNomor", lhkNomor);
+    formData.append("tab", tab);
+    formData.append("spkNomor", spkNomor);
+    return api.post(`${BASE}/upload-gambar`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+  },
 };

@@ -7,6 +7,7 @@ import { useForm } from "@/composables/useForm";
 import { lhkPolaFormService } from "@/services/garmen/lhkPolaFormService";
 import SpkPolaSearchModal from "@/components/lookups/SpkPolaSearchModal.vue";
 import { IconRuler2, IconSearch, IconTrash, IconPlus } from "@tabler/icons-vue";
+import api from "@/services/api";
 
 const route = useRoute();
 const router = useRouter();
@@ -15,8 +16,9 @@ const toast = useToast();
 const isEditMode = computed(() => !!route.params.nomor);
 const activeTab = ref(0);
 
-const MESIN_OPTIONS = ["CUTTING", "MARKER", "DUPLEK", "MIKA"];
-const FOR_OPTIONS = ["CNC", "CUTTING", "COSTING", "MB WINNI"];
+// Tambah state file holder — per baris, keyed by spkNomor
+const markerImageFiles = ref<Record<string, File>>({});
+const gradingImageFiles = ref<Record<string, File>>({});
 
 const emptyMarkerRow = () => ({
   spkNomor: "",
@@ -24,8 +26,8 @@ const emptyMarkerRow = () => ({
   lebarKain: "",
   size: "",
   tujuanProses: "",
-  mesin: "",
   keterangan: "",
+  gambar: "",
 });
 const emptyGradingRow = () => ({
   spkNomor: "",
@@ -33,6 +35,7 @@ const emptyGradingRow = () => ({
   divisi: "",
   gradingSize: "",
   keterangan: "",
+  gambar: "",
 });
 
 const defaultData = {
@@ -72,8 +75,8 @@ const {
               lebarKain: r.lebarKain || "",
               size: r.size || "",
               tujuanProses: r.tujuanProses || "",
-              mesin: r.mesin || "",
               keterangan: r.keterangan || "",
+              gambar: r.gambar || "",
             }))
           : [emptyMarkerRow()],
       grading:
@@ -84,6 +87,7 @@ const {
               divisi: r.divisi || "",
               gradingSize: r.gradingSize || "",
               keterangan: r.keterangan || "",
+              gambar: r.gambar || "",
             }))
           : [emptyGradingRow()],
     };
@@ -95,10 +99,37 @@ const {
       marker: data.marker,
       grading: data.grading,
     };
-    if (isEditMode.value) {
-      return lhkPolaFormService.update(String(route.params.nomor), payload);
+    const res = isEditMode.value
+      ? await lhkPolaFormService.update(String(route.params.nomor), payload)
+      : await lhkPolaFormService.create(payload);
+
+    const savedNomor = res.data.data.nomor;
+
+    // Upload gambar per baris yang ada file baru dipilih
+    try {
+      for (const [spkNomor, file] of Object.entries(markerImageFiles.value)) {
+        await lhkPolaFormService.uploadGambar(
+          file,
+          savedNomor,
+          "marker",
+          spkNomor,
+        );
+      }
+      for (const [spkNomor, file] of Object.entries(gradingImageFiles.value)) {
+        await lhkPolaFormService.uploadGambar(
+          file,
+          savedNomor,
+          "grading",
+          spkNomor,
+        );
+      }
+    } catch (imgError: any) {
+      toast.warning(
+        `Data tersimpan, namun ada gambar gagal terupload: ${imgError.message}`,
+      );
     }
-    return lhkPolaFormService.create(payload);
+
+    return res;
   },
   onSuccess: () => {
     toast.success(
@@ -231,6 +262,36 @@ const onGradingSpkEnter = async (idx: number) => {
   }
 };
 
+const onMarkerImageChange = (e: Event, idx: number) => {
+  const file = (e.target as HTMLInputElement).files?.[0];
+  const row = formData.value.marker[idx];
+  if (!file || !row.spkNomor) return;
+  if (file.size > 1_000_000) {
+    toast.error("Ukuran gambar tidak boleh > 1 Mb.");
+    return;
+  }
+  markerImageFiles.value[row.spkNomor] = file;
+  row.gambar = URL.createObjectURL(file); // preview sementara
+};
+const onGradingImageChange = (e: Event, idx: number) => {
+  const file = (e.target as HTMLInputElement).files?.[0];
+  const row = formData.value.grading[idx];
+  if (!file || !row.spkNomor) return;
+  if (file.size > 1_000_000) {
+    toast.error("Ukuran gambar tidak boleh > 1 Mb.");
+    return;
+  }
+  gradingImageFiles.value[row.spkNomor] = file;
+  row.gambar = URL.createObjectURL(file);
+};
+
+const getGambarUrl = (row: any) => {
+  if (!row.gambar) return "";
+  if (row.gambar.startsWith("blob:")) return row.gambar; // preview lokal
+  const base = api.defaults.baseURL?.replace(/\/api\/?$/, "") || "";
+  return `${base}/images/lhkpola/${encodeURIComponent(row.gambar)}`;
+};
+
 // ── Validasi sebelum simpan ────────────────────────────────────────────
 const validateSave = () => {
   if (!formData.value.tanggal) {
@@ -322,8 +383,8 @@ const validateSave = () => {
               <th style="width: 100px">Lebar Kain</th>
               <th style="width: 110px">Size</th>
               <th style="width: 100px">For</th>
-              <th style="width: 100px">Mesin</th>
               <th style="width: 160px">Keterangan</th>
+              <th style="width: 90px">Gambar</th>
               <th style="width: 36px"></th>
             </tr>
           </thead>
@@ -369,20 +430,32 @@ const validateSave = () => {
                 <input
                   v-model="row.tujuanProses"
                   class="cell-inp"
-                  list="for-options"
                   placeholder="CUTTING"
                 />
               </td>
-              <td>
-                <input
-                  v-model="row.mesin"
-                  class="cell-inp"
-                  list="mesin-options"
-                  placeholder="MARKER"
-                />
-              </td>
+
               <td>
                 <input v-model="row.keterangan" class="cell-inp" />
+              </td>
+              <td>
+                <div class="cell-img-cell">
+                  <img
+                    v-if="getGambarUrl(row)"
+                    :src="getGambarUrl(row)"
+                    class="cell-thumb"
+                    @error="
+                      (e) =>
+                        ((e.target as HTMLImageElement).style.display = 'none')
+                    "
+                  />
+                  <input
+                    type="file"
+                    accept="image/*"
+                    class="cell-file-inp"
+                    :disabled="!row.spkNomor"
+                    @change="onMarkerImageChange($event, Number(idx))"
+                  />
+                </div>
               </td>
               <td class="tc">
                 <button
@@ -397,12 +470,6 @@ const validateSave = () => {
             </tr>
           </tbody>
         </table>
-        <datalist id="for-options">
-          <option v-for="o in FOR_OPTIONS" :key="o" :value="o" />
-        </datalist>
-        <datalist id="mesin-options">
-          <option v-for="o in MESIN_OPTIONS" :key="o" :value="o" />
-        </datalist>
       </div>
 
       <!-- ── Tab: Pola/Grading ── -->
@@ -416,6 +483,7 @@ const validateSave = () => {
               <th style="width: 110px">Divisi</th>
               <th style="width: 160px">Grading Size</th>
               <th style="width: 180px">Keterangan</th>
+              <th style="width: 90px">Gambar</th>
               <th style="width: 36px"></th>
             </tr>
           </thead>
@@ -455,6 +523,26 @@ const validateSave = () => {
               </td>
               <td>
                 <input v-model="row.keterangan" class="cell-inp" />
+              </td>
+              <td>
+                <div class="cell-img-cell">
+                  <img
+                    v-if="getGambarUrl(row)"
+                    :src="getGambarUrl(row)"
+                    class="cell-thumb"
+                    @error="
+                      (e) =>
+                        ((e.target as HTMLImageElement).style.display = 'none')
+                    "
+                  />
+                  <input
+                    type="file"
+                    accept="image/*"
+                    class="cell-file-inp"
+                    :disabled="!row.spkNomor"
+                    @change="onGradingImageChange($event, Number(idx))"
+                  />
+                </div>
               </td>
               <td class="tc">
                 <button
@@ -630,5 +718,23 @@ const validateSave = () => {
 }
 .btn-del:hover {
   background: #ffcdd2;
+}
+
+.cell-img-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.cell-thumb {
+  width: 40px;
+  height: 40px;
+  object-fit: cover;
+  border: 1px solid #ddd;
+  border-radius: 3px;
+}
+.cell-file-inp {
+  font-size: 9px;
+  width: 90px;
 }
 </style>
