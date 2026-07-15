@@ -276,47 +276,57 @@ const tglIndo = (dateStr: string) => {
               </div>
             </div>
 
-            <table class="ttd-table">
-              <tr>
-                <td class="ttd-box">
-                  <div class="ttd-title">MO</div>
-                  <img
-                    :src="getSignatureUrl(getVal('user_create'))"
-                    class="ttd-img"
-                    @error="
-                      (e) =>
-                        ((e.target as HTMLImageElement).style.opacity = '0')
-                    "
-                  />
-                  <div class="ttd-name">
+            <div :class="layoutMode === 'horizontal' ? 'ttd-with-image' : ''">
+              <img
+                v-if="layoutMode === 'horizontal'"
+                :src="mainImageUrl"
+                alt=""
+                class="img-horizontal-inline"
+                @error="handleImageError"
+                @load="handleImageLoad"
+              />
+              <table class="ttd-table">
+                <tr>
+                  <td class="ttd-box">
+                    <div class="ttd-title">MO</div>
+                    <img
+                      :src="getSignatureUrl(getVal('user_create'))"
+                      class="ttd-img"
+                      @error="
+                        (e) =>
+                          ((e.target as HTMLImageElement).style.opacity = '0')
+                      "
+                    />
+                    <div class="ttd-name">
+                      {{ getVal("user_nama") || getVal("user_create") }}
+                    </div>
+                  </td>
+                  <td class="ttd-box">
+                    <div class="ttd-title">CMO</div>
+                    <img
+                      :src="getSignatureUrl(getVal('mspk_cmo'))"
+                      class="ttd-img"
+                      @error="
+                        (e) =>
+                          ((e.target as HTMLImageElement).style.opacity = '0')
+                      "
+                    />
+                    <div class="ttd-name">{{ getVal("mspk_cmo") || "-" }}</div>
+                  </td>
+                </tr>
+                <tr>
+                  <td colspan="2" class="ttd-footer">
+                    Dibuat Oleh:
                     {{ getVal("user_nama") || getVal("user_create") }}
-                  </div>
-                </td>
-                <td class="ttd-box">
-                  <div class="ttd-title">CMO</div>
-                  <img
-                    :src="getSignatureUrl(getVal('mspk_cmo'))"
-                    class="ttd-img"
-                    @error="
-                      (e) =>
-                        ((e.target as HTMLImageElement).style.opacity = '0')
-                    "
-                  />
-                  <div class="ttd-name">{{ getVal("mspk_cmo") || "-" }}</div>
-                </td>
-              </tr>
-              <tr>
-                <td colspan="2" class="ttd-footer">
-                  Dibuat Oleh:
-                  {{ getVal("user_nama") || getVal("user_create") }}
-                  {{
-                    getVal("created_formatted")
-                      ? getVal("created_formatted").substring(0, 11)
-                      : ""
-                  }}
-                </td>
-              </tr>
-            </table>
+                    {{
+                      getVal("created_formatted")
+                        ? getVal("created_formatted").substring(0, 11)
+                        : ""
+                    }}
+                  </td>
+                </tr>
+              </table>
+            </div>
 
             <div class="footer-note">
               Note : SETIAP MEMO WAJIB MEMBUAT 2 ALTERNATIF<br />PRINTING DALAM
@@ -342,18 +352,9 @@ const tglIndo = (dateStr: string) => {
         </tr>
       </tbody>
     </table>
-
-    <div v-if="layoutMode === 'horizontal'" class="horizontal-image-container">
-      <img
-        :src="mainImageUrl"
-        alt=""
-        class="img-horizontal"
-        @error="handleImageError"
-        @load="handleImageLoad"
-      />
-    </div>
   </div>
 </template>
+
 <style scoped>
 .loading-state,
 .error-state {
@@ -481,17 +482,18 @@ const tglIndo = (dateStr: string) => {
   padding-left: 8px;
 }
 
-.horizontal-image-container {
-  margin-top: 5px;
-  text-align: center;
-  border: 1px solid #000;
-  border-top: none;
-  padding: 5px;
+.ttd-with-image {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-bottom: 10px;
 }
-.img-horizontal {
-  max-width: 100%;
-  max-height: 380px;
+.img-horizontal-inline {
+  max-width: 140px;
+  max-height: 140px;
   object-fit: contain;
+  flex-shrink: 0;
 }
 
 pre {

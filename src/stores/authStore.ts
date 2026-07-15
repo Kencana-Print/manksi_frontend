@@ -18,6 +18,8 @@ interface UserFlags {
   lihatCus: number;
   isManager: number;
   accKor: number;
+  cmo: number;
+  cmo3: number;
 }
 
 interface User {
@@ -115,6 +117,7 @@ export const useAuthStore = defineStore(
     const canLihatHarga = computed(() => user.value?.flags.lihatHarga === 1);
     const canLihatBeli = computed(() => user.value?.flags.lihatBeli === 1);
     const isManager = computed(() => user.value?.flags.isManager === 1);
+    const isCmo = computed(() => user.value?.flags.cmo === 1);
     const canSeeApproval = computed(() =>
       [256, 257, 258, 259, 260, 261, 262, 263].some((id) =>
         permissions.value.filter((p) => p.id === id).some((p) => p.view),
@@ -206,6 +209,7 @@ export const useAuthStore = defineStore(
       canLihatHarga,
       canLihatBeli,
       isManager,
+      isCmo,
       canSeeApproval,
       // Actions
       setLoginData,

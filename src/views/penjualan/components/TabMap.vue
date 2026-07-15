@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onBeforeUnmount } from "vue";
 import { useToast } from "vue-toastification";
+import { useAuthStore } from "@/stores/authStore";
 import { mapFormService } from "@/services/penjualan/mapFormService";
 import api from "@/services/api";
 import {
@@ -21,6 +22,7 @@ import PabrikSearchModal from "@/components/lookups/PabrikSearchModal.vue";
 import ReferensiMapSearchModal from "@/components/lookups/ReferensiMapSearchModal.vue";
 import SetoranSearchModal from "@/components/lookups/SetoranSearchModal.vue";
 
+const authStore = useAuthStore();
 const props = defineProps<{
   formData: any;
   isEdit: boolean;
@@ -666,9 +668,14 @@ const setSetoranPembayaran = (v: any) => {
               v-model="formData.IsCmo"
               @change="
                 (e: any) => {
-                  if (e.target.checked && !formData.Cmo) {
-                    formData.Cmo = formData.UserCreate;
-                  } else if (!e.target.checked) {
+                  if (e.target.checked) {
+                    if (!authStore.isCmo) {
+                      toast.warning('Anda tidak memiliki hak CMO.');
+                      e.target.checked = false;
+                      return;
+                    }
+                    formData.Cmo = authStore.user?.kode || '';
+                  } else {
                     formData.Cmo = '';
                   }
                 }
