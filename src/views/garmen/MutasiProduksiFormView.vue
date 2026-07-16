@@ -546,6 +546,26 @@ const onMutasi = async (val: string) => {
       mutasiProduksiFormService.getNamaGudang(asal),
       mutasiProduksiFormService.getNamaGudang(tujuan),
     ]);
+
+    // FIX (samain dengan jalur manual selectGdg): validasi pending/planning/LHK
+    // WAJIB dijalankan di sini juga — sebelumnya jalur tombol Jenis Mutasi
+    // skip validasi ini sama sekali, beda dari Delphi yang selalu konsisten.
+    if (fd.value.NomorSpk) {
+      try {
+        await mutasiProduksiFormService.cekGudangAsal({
+          nomorSpk: fd.value.NomorSpk,
+          gdgAsal: asal,
+          ckcetak: fd.value.ckCetak,
+          ckbordir: fd.value.ckBordir,
+          lbldivisi: fd.value.Divisi,
+        });
+      } catch (e: any) {
+        toast.error(e.response?.data?.message || "Validasi gagal.");
+        fd.value.JenisMutasi = ""; // batalkan pilihan mutasi, jangan lanjut set gudang
+        return;
+      }
+    }
+
     fd.value.GdgAsal = asal;
     fd.value.NamaGdgAsal = rA.data.data?.gdgp_nama || "";
     fd.value.GdgTujuan = tujuan;
