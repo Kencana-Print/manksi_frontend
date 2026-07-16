@@ -249,10 +249,9 @@ const {
 
       const d = res.data.data;
       const h = d.header;
-      const gdgAsal = h.MPH_gdgasal || "";
-      const cab = h.MPH_cab || userCab.value || "P04";
+      const gdgAsal = h.mph_gdgasal || "";
+      const cab = h.mph_cab || userCab.value || "P04";
 
-      // Derive JenisMutasi dari GdgAsal + Cab
       const GUDANG_TO_MUTASI: Record<string, Record<string, string>> = {
         P04: {
           GP001: "1",
@@ -306,11 +305,11 @@ const {
             : std - actual
           : 0;
       return {
-        Nomor: h.MPH_nomor || "",
+        Nomor: h.mph_nomor || "",
         Tanggal: h.mph_tanggal || todayWIB(),
-        Cab: h.MPH_cab || userCab.value || "P04",
-        Keterangan: h.MPH_keterangan || "",
-        NomorSpk: h.MPH_SPK_nomor || "",
+        Cab: h.mph_cab || userCab.value || "P04",
+        Keterangan: h.mph_keterangan || "",
+        NomorSpk: h.mph_spk_nomor || "",
         NamaSpk: h.spk_nama || "",
         JenisBarang: h.jo_nama || "",
         Finishing: h.finishing || "",
@@ -323,10 +322,10 @@ const {
         JenisMutasi: jenisMutasi,
         GdgAsal: gdgAsal,
         NamaGdgAsal: h.nama_gdg_asal || "",
-        GdgTujuan: h.MPH_gdgtujuan || "",
+        GdgTujuan: h.mph_gdgtujuan || "",
         NamaGdgTujuan: h.nama_gdg_tujuan || "",
-        Kelompok: h.MPH_kelompok || "",
-        KelompokTujuan: h.MPH_kelompok_tujuan || "",
+        Kelompok: h.mph_kelompok || "",
+        KelompokTujuan: h.mph_kelompok_tujuan || "",
         Jumlah: j,
         Komponen: h.mph_komponen || "",
         BabaranStd: std,
@@ -345,7 +344,7 @@ const {
         Gramasi: h.gramasi || "",
         Setting: h.sett || "",
         SupKode: h.supkode || "",
-        SupplierKain: h.MPH_supplierkain || "",
+        SupplierKain: h.mph_supplierkain || "",
         LhkSudah: Number(h.lhk_sudah) || 0,
         LhkKurang: Number(h.lhk_kurang) || 0,
         Alasan: h.mph_alasan || "",
@@ -1104,9 +1103,9 @@ const validateSave = async () => {
     tab.value = "d";
     return;
   }
-
   for (const r of valid) {
-    if (r.kode === "LL-000400") {
+    if (!isDC.value && r.kode === "LL-000400") {
+      // ← tambah !isDC.value
       const tq =
         (r.jumlah || 0) +
         (r.bslini || 0) +
