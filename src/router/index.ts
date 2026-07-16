@@ -2313,6 +2313,18 @@ const router = createRouter({
       },
     },
     {
+      path: "/laporan/gudang-garmen/kartu-stok-bahan",
+      name: "LapKartuStokBahan",
+      component: () =>
+        import("@/views/laporan/gudang-garmen/KartuStokBahanView.vue"),
+      meta: {
+        title: "Kartu Stok Bahan",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "502",
+      },
+    },
+    {
       path: "/laporan/gudang-garmen/kartu-stok-barang",
       name: "LapKartuStokBarang",
       component: () =>

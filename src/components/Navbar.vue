@@ -753,7 +753,7 @@ const menuItems: NavItem[] = [
     items: [
       {
         title: "Laporan Gudang Garmen",
-        icon: IconBuildingWarehouse, // Import IconBuildingWarehouse di atas
+        icon: IconBuildingWarehouse,
         menuId: 960,
         subItems: [
           {
@@ -761,6 +761,12 @@ const menuItems: NavItem[] = [
             to: "/laporan/gudang-garmen/stok-bahan-barcode",
             icon: IconFileDescription,
             menuId: 501,
+          },
+          {
+            title: "Kartu Stok Bahan",
+            to: "/laporan/gudang-garmen/kartu-stok-bahan",
+            icon: IconClipboardList,
+            menuId: 502,
           },
           {
             title: "Kartu Stok Barang",
