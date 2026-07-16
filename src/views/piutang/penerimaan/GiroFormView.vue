@@ -456,13 +456,9 @@ const validateBeforeSave = () => {
 
           <div class="f-row">
             <label class="f-lbl">Nilai Giro</label>
-            <v-number-input
-              v-model="formData.debet"
-              variant="outlined"
-              density="compact"
-              hide-details
-              class="f-inp-num flex-1"
-            />
+            <div class="f-inp flex-1" style="padding: 0">
+              <NumberInputIDR v-model="formData.debet" placeholder="0" />
+            </div>
           </div>
 
           <div class="f-row">
@@ -663,17 +659,6 @@ const validateBeforeSave = () => {
   border: 1px solid #bdbdbd;
   border-radius: 3px;
   padding: 0 4px;
-  font-size: 12px;
-}
-
-/* Number Input Override size to tight */
-.f-inp-num :deep(.v-field) {
-  height: 26px !important;
-  min-height: 26px !important;
-}
-.f-inp-num :deep(.v-field__input) {
-  padding: 0 6px !important;
-  min-height: 26px !important;
   font-size: 12px;
 }
 
