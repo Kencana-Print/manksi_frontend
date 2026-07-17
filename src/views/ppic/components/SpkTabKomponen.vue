@@ -1,43 +1,33 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from "vue";
-import { useToast } from "vue-toastification";
-import { spkFormService } from "@/services/ppic/spkFormService";
-import BahanSearchModal from "@/components/lookups/BahanSearchModal.vue";
-import {
-  IconScissors,
-  IconPrinter,
-  IconPlus,
-  IconTrash,
-  IconSearch,
-} from "@tabler/icons-vue";
+import { ref, computed, watch, onMounted } from "vue";
+import api from "@/services/api";
+import { IconScissors, IconPrinter, IconInfoCircle } from "@tabler/icons-vue";
+
+interface CetakBordirRow {
+  Kode: string;
+  Nama: string;
+  Proses: string;
+  Penempatan: string;
+  Ukuran: string;
+}
 
 const props = defineProps<{
   formData: any;
   isEdit: boolean;
 }>();
 
-const toast = useToast();
 const activeTab = ref("potong");
+const isLoading = ref(false);
+const loadError = ref("");
 
-const lookupOptions = ref<any[]>([]);
-const lookupBordirOptions = ref<any[]>([]);
-
-const showBahanModal = ref(false);
-const activeBahanType = ref<"ListPotong" | "ListCetakBordir">("ListPotong");
-const activeBahanIndex = ref(-1);
-
-const loadLookups = async () => {
-  try {
-    const [resAll, resBordir] = await Promise.all([
-      spkFormService.getKomponenMaster(),
-      spkFormService.getKomponenMaster(true),
-    ]);
-    lookupOptions.value = resAll.data.data;
-    lookupBordirOptions.value = resBordir.data.data;
-  } catch {
-    toast.error("Gagal memuat lookup bahan.");
-  }
-};
+const identifier = computed(
+  () => props.formData.so_map || props.formData.so_nomor || "",
+);
+const identifierLabel = computed(() =>
+  props.formData.so_map
+    ? `MAP ${props.formData.so_map}`
+    : `SO ${props.formData.so_nomor}`,
+);
 
 const ensureKomponenStruct = () => {
   if (!props.formData.KomponenSpk) {
@@ -45,240 +35,89 @@ const ensureKomponenStruct = () => {
   }
 };
 
-// ── Pastikan selalu ada minimal 1 baris kosong di kedua list ──
-const ensureTrailingEmptyRowPotong = () => {
-  ensureKomponenStruct();
-  const rows = props.formData.KomponenSpk.ListPotong;
-  const last = rows[rows.length - 1];
-  if (rows.length === 0 || (last && last.Kode)) {
-    rows.push({ Kode: null, Nama: "" });
-  }
-};
-
-const ensureTrailingEmptyRowCetakBordir = () => {
-  ensureKomponenStruct();
-  const rows = props.formData.KomponenSpk.ListCetakBordir;
-  const last = rows[rows.length - 1];
-  if (
-    rows.length === 0 ||
-    (last && (last.Kode || last.Penempatan || last.Ukuran))
-  ) {
-    rows.push({
-      Kode: null,
-      Nama: "",
-      Proses: prosesOptions.value[0] || "DTF",
-      Penempatan: "",
-      Ukuran: "",
-    });
-  }
-};
-
-// onMounted sebagai jaring pengaman utama — tidak bergantung sepenuhnya pada watcher,
-// karena formData bisa diisi parent (mode edit) atau SpkTabOrder (mode create) dengan
-// timing yang berbeda-beda relatif terhadap mount komponen ini.
-onMounted(() => {
-  loadLookups();
-  ensureKomponenStruct();
-  ensureTrailingEmptyRowPotong();
-  ensureTrailingEmptyRowCetakBordir();
-});
-
-watch(
-  () => props.formData.so_nomor,
-  (nomor) => {
-    if (nomor) {
-      ensureKomponenStruct();
-      ensureTrailingEmptyRowPotong();
-      ensureTrailingEmptyRowCetakBordir();
-    }
-  },
-);
-
 const prosesOptions = computed(() => {
   const opsi: string[] = [];
   if (props.formData.so_sablon === "Y") opsi.push("SABLON");
   if (props.formData.so_bordir === "Y") opsi.push("BORDIR");
   if (props.formData.so_sublim === "Y") opsi.push("SUBLIM");
-
-  // DTF hanya kalau tidak ada proses dari SO
   if (opsi.length === 0) opsi.push("DTF");
-
   return opsi;
 });
 
-const listPotong = computed<any[]>(
-  () => props.formData.KomponenSpk?.ListPotong || [],
-);
-const listCetakBordir = computed<any[]>(
+const loadKomponenFromProof = async () => {
+  loadError.value = "";
+  ensureKomponenStruct();
+  if (!identifier.value) {
+    props.formData.KomponenSpk.ListPotong = [];
+    props.formData.KomponenSpk.ListCetakBordir = [];
+    return;
+  }
+  isLoading.value = true;
+  try {
+    const res = await api.get(
+      `/ppic/spk/form/komponen-from-proof/${encodeURIComponent(identifier.value)}`,
+    );
+    const proofPotong = res.data.data.ListPotong || [];
+    const proofCetakBordir = res.data.data.ListCetakBordir || [];
+
+    // POTONG — full replace, tidak ada field manual di baris ini.
+    props.formData.KomponenSpk.ListPotong = proofPotong.map((p: any) => ({
+      Kode: p.Kode,
+      Nama: p.Nama,
+    }));
+
+    // SECOND PROCESS — Kode/Nama ikut Proof, tapi Proses/Penempatan/Ukuran
+    // yang sudah diisi user sebelumnya (mode edit, atau di sesi ini)
+    // dipertahankan, dicocokkan per Kode.
+    const existingByKode = new Map<string, CetakBordirRow>(
+      (props.formData.KomponenSpk.ListCetakBordir || []).map((r: any) => [
+        r.Kode,
+        r,
+      ]),
+    );
+    props.formData.KomponenSpk.ListCetakBordir = proofCetakBordir.map(
+      (p: any) => {
+        const existing = existingByKode.get(p.Kode);
+        return {
+          Kode: p.Kode,
+          Nama: p.Nama,
+          Proses: existing?.Proses || p.Proses,
+          Penempatan: existing?.Penempatan || "",
+          Ukuran: existing?.Ukuran || "",
+        };
+      },
+    );
+  } catch (e: any) {
+    console.error("Gagal load komponen dari Proof:", e);
+    loadError.value =
+      e.response?.data?.message || e.message || "Gagal memuat data.";
+    props.formData.KomponenSpk.ListPotong = [];
+    props.formData.KomponenSpk.ListCetakBordir = [];
+  } finally {
+    isLoading.value = false;
+  }
+};
+
+onMounted(loadKomponenFromProof);
+watch(identifier, loadKomponenFromProof);
+
+const listPotong = computed(() => props.formData.KomponenSpk?.ListPotong || []);
+const listCetakBordir = computed(
   () => props.formData.KomponenSpk?.ListCetakBordir || [],
 );
-
-const lookupKodeBahan = (kode: string, isBordir: boolean) => {
-  const options = isBordir ? lookupBordirOptions.value : lookupOptions.value;
-  const input = kode.trim().toUpperCase();
-
-  // 1. Exact match dulu (kode lengkap)
-  let found = options.find((i: any) => (i.Kode || "").toUpperCase() === input);
-  if (found) return found;
-
-  // 2. Kalau input hanya digit (3-6 angka), cocokkan dengan suffix kode
-  if (/^\d{1,6}$/.test(input)) {
-    const padded = input.padStart(6, "0"); // "450" → "000450"
-    found = options.find((i: any) => {
-      const kodeUpper = (i.Kode || "").toUpperCase();
-      return kodeUpper.endsWith(padded) || kodeUpper.endsWith(input);
-    });
-    if (found) return found;
-  }
-
-  return null;
-};
-
-// ── POTONG ──
-const onKodePotongEnter = (idx: number) => {
-  ensureKomponenStruct();
-  const row = props.formData.KomponenSpk.ListPotong[idx];
-  const kode = row.Kode?.trim();
-  if (!kode) {
-    row.Nama = "";
-    return;
-  }
-  const found = lookupKodeBahan(kode, false);
-  if (found) {
-    row.Kode = found.Kode;
-    row.Nama = found.Nama;
-    ensureTrailingEmptyRowPotong();
-  } else {
-    toast.error("Kode komponen tidak ditemukan.");
-    row.Kode = null;
-    row.Nama = "";
-  }
-};
-
-const onKodePotongF1 = (e: KeyboardEvent, idx: number) => {
-  if (e.key === "F1") {
-    e.preventDefault();
-    openBahanModalPotong(idx);
-  }
-};
-
-const openBahanModalPotong = (index: number) => {
-  ensureKomponenStruct();
-  activeBahanType.value = "ListPotong";
-  activeBahanIndex.value = index;
-  showBahanModal.value = true;
-};
-
-const addRowPotong = () => {
-  ensureKomponenStruct();
-  props.formData.KomponenSpk.ListPotong.push({ Kode: null, Nama: "" });
-};
-
-const removeRowPotong = (index: number) => {
-  props.formData.KomponenSpk.ListPotong.splice(index, 1);
-  if (props.formData.KomponenSpk.ListPotong.length === 0) {
-    ensureTrailingEmptyRowPotong();
-  }
-};
-
-// ── CETAK + BORDIR (gabungan) ──
-const onKodeCetakBordirEnter = (idx: number) => {
-  ensureKomponenStruct();
-  const row = props.formData.KomponenSpk.ListCetakBordir[idx];
-  const kode = row.Kode?.trim();
-  if (!kode) {
-    row.Nama = "";
-    return;
-  }
-  const found = lookupKodeBahan(kode, true) || lookupKodeBahan(kode, false);
-  if (found) {
-    const isDuplicate = props.formData.KomponenSpk.ListCetakBordir.some(
-      (r: any, i: number) =>
-        r.Kode === found.Kode && r.Proses === row.Proses && i !== idx,
-    );
-    if (isDuplicate) {
-      toast.warning(
-        `Kode ${found.Kode} dengan proses ${row.Proses} sudah ada di baris lain.`,
-      );
-      row.Kode = null;
-      row.Nama = "";
-      return;
-    }
-    row.Kode = found.Kode;
-    row.Nama = found.Nama;
-    ensureTrailingEmptyRowCetakBordir();
-  } else {
-    toast.error("Kode komponen tidak ditemukan.");
-    row.Kode = null;
-    row.Nama = "";
-  }
-};
-
-const onKodeCetakBordirF1 = (e: KeyboardEvent, idx: number) => {
-  if (e.key === "F1") {
-    e.preventDefault();
-    openBahanModalCetakBordir(idx);
-  }
-};
-
-const openBahanModalCetakBordir = (index: number) => {
-  ensureKomponenStruct();
-  activeBahanType.value = "ListCetakBordir";
-  activeBahanIndex.value = index;
-  showBahanModal.value = true;
-};
-
-const addRowCetakBordir = () => {
-  ensureKomponenStruct();
-  props.formData.KomponenSpk.ListCetakBordir.push({
-    Kode: null,
-    Nama: "",
-    Proses: prosesOptions.value[0] || "DTF",
-    Penempatan: "",
-    Ukuran: "",
-  });
-};
-
-const removeRowCetakBordir = (index: number) => {
-  props.formData.KomponenSpk.ListCetakBordir.splice(index, 1);
-  if (props.formData.KomponenSpk.ListCetakBordir.length === 0) {
-    ensureTrailingEmptyRowCetakBordir();
-  }
-};
-
-// ── Handle pilih bahan dari modal ──
-const handleBahanSelected = (bahan: any) => {
-  ensureKomponenStruct();
-  const type = activeBahanType.value;
-  const index = activeBahanIndex.value;
-  const list =
-    type === "ListPotong"
-      ? props.formData.KomponenSpk.ListPotong
-      : props.formData.KomponenSpk.ListCetakBordir;
-
-  if (type === "ListPotong") {
-    const isDuplicate = list.some(
-      (row: any, i: number) => row.Kode === bahan.Kode && i !== index,
-    );
-    if (isDuplicate) {
-      toast.warning(`Kode ${bahan.Kode} sudah ada di baris lain.`);
-      return;
-    }
-  }
-
-  list[index].Kode = bahan.Kode;
-  list[index].Nama = bahan.Nama;
-
-  if (type === "ListPotong") {
-    ensureTrailingEmptyRowPotong();
-  } else {
-    ensureTrailingEmptyRowCetakBordir();
-  }
-};
 </script>
 
 <template>
   <div class="komp-layout">
+    <div class="komp-info-banner">
+      <IconInfoCircle :size="14" class="mr-1" />
+      Kode &amp; Nama Komponen diambil otomatis dari Proof Garmen untuk
+      <b>{{ identifierLabel || "(belum ada referensi)" }}</b
+      >. Untuk Second Process, Proses/Penempatan/Ukuran tetap wajib diisi manual
+      per baris.
+    </div>
+    <div v-if="loadError" class="komp-error-banner">⚠ {{ loadError }}</div>
+
     <div class="komp-tabs">
       <button
         class="komp-tab-btn"
@@ -286,6 +125,9 @@ const handleBahanSelected = (bahan: any) => {
         @click="activeTab = 'potong'"
       >
         <IconScissors :size="14" class="mr-1" /> POTONG
+        <span v-if="listPotong.length" class="tab-badge">{{
+          listPotong.length
+        }}</span>
       </button>
       <button
         class="komp-tab-btn"
@@ -293,176 +135,94 @@ const handleBahanSelected = (bahan: any) => {
         @click="activeTab = 'cetakbordir'"
       >
         <IconPrinter :size="14" class="mr-1" /> SECOND PROCESS
+        <span v-if="listCetakBordir.length" class="tab-badge">{{
+          listCetakBordir.length
+        }}</span>
       </button>
     </div>
 
     <div class="komp-body">
-      <!-- POTONG -->
-      <div v-show="activeTab === 'potong'" class="komp-pane">
-        <div class="komp-pane-header">
-          <span class="komp-pane-title text-blue">
-            <IconScissors :size="14" class="mr-1" /> Komponen Potong
-          </span>
-          <button type="button" class="btn-add" @click="addRowPotong">
-            <IconPlus :size="13" class="mr-1" /> Tambah
-          </button>
-        </div>
-        <table class="komp-table">
-          <thead>
-            <tr>
-              <th style="width: 40px">No</th>
-              <th style="width: 160px">Kode</th>
-              <th>Nama Komponen</th>
-              <th style="width: 50px">Aksi</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="(item, idx) in listPotong" :key="'p' + idx">
-              <td class="text-center">{{ idx + 1 }}</td>
-              <td>
-                <div class="igrp">
-                  <input
-                    v-model="item.Kode"
-                    class="cell-inp"
-                    placeholder="Kode/F1"
-                    @keydown="onKodePotongF1($event, idx)"
-                    @keydown.enter.prevent="onKodePotongEnter(idx)"
-                    @blur="onKodePotongEnter(idx)"
-                  />
-                  <button
-                    type="button"
-                    class="blkp"
-                    title="Cari Komponen (F1)"
-                    @mousedown.prevent="openBahanModalPotong(idx)"
-                  >
-                    <IconSearch :size="12" color="#1565c0" />
-                  </button>
-                </div>
-              </td>
-              <td>{{ item.Nama }}</td>
-              <td class="text-center">
-                <button
-                  type="button"
-                  class="btn-del"
-                  @click="removeRowPotong(idx)"
-                >
-                  <IconTrash :size="13" color="#c62828" />
-                </button>
-              </td>
-            </tr>
-            <tr v-if="listPotong.length === 0">
-              <td colspan="4" class="empty-row">Belum ada data</td>
-            </tr>
-          </tbody>
-        </table>
+      <div v-if="isLoading" class="loading-row">
+        Memuat data dari Proof Garmen...
       </div>
 
-      <!-- CETAK + BORDIR -->
-      <div v-show="activeTab === 'cetakbordir'" class="komp-pane">
-        <div class="komp-pane-header">
-          <span class="komp-pane-title text-orange">
-            <IconPrinter :size="14" class="mr-1" /> Komponen Second Process
-          </span>
-          <button type="button" class="btn-add" @click="addRowCetakBordir">
-            <IconPlus :size="13" class="mr-1" /> Tambah
-          </button>
+      <template v-else>
+        <!-- POTONG — full read-only -->
+        <div v-show="activeTab === 'potong'" class="komp-pane">
+          <table class="komp-table">
+            <thead>
+              <tr>
+                <th style="width: 40px">No</th>
+                <th style="width: 160px">Kode</th>
+                <th>Nama Komponen</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(item, idx) in listPotong" :key="'p' + idx">
+                <td class="text-center">{{ Number(idx) + 1 }}</td>
+                <td class="mono">{{ item.Kode }}</td>
+                <td>{{ item.Nama }}</td>
+              </tr>
+              <tr v-if="listPotong.length === 0">
+                <td colspan="3" class="empty-row">
+                  Belum ada data Proof Garmen untuk lini Potong.
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
 
-        <div class="proses-info">
-          <span class="proses-info-lbl">Proses dari SO:</span>
-          <span
-            v-for="p in prosesOptions"
-            :key="p"
-            class="proses-chip"
-            :class="{ 'proses-chip--auto': p === 'DTF' }"
-          >
-            {{ p }}
-          </span>
-        </div>
-
-        <table class="komp-table">
-          <thead>
-            <tr>
-              <th style="width: 40px">No</th>
-              <th style="width: 160px">Kode</th>
-              <th>Nama Komponen</th>
-              <th style="width: 110px">Proses</th>
-              <th style="width: 140px">Penempatan</th>
-              <th style="width: 110px">Ukuran</th>
-              <th style="width: 50px">Aksi</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="(item, idx) in listCetakBordir" :key="'cb' + idx">
-              <td class="text-center">{{ idx + 1 }}</td>
-              <td>
-                <div class="igrp">
+        <!-- SECOND PROCESS — Kode/Nama readonly, Proses/Penempatan/Ukuran manual -->
+        <div v-show="activeTab === 'cetakbordir'" class="komp-pane">
+          <table class="komp-table">
+            <thead>
+              <tr>
+                <th style="width: 40px">No</th>
+                <th style="width: 130px">Kode</th>
+                <th style="min-width: 160px">Nama Komponen</th>
+                <th style="width: 110px">Proses</th>
+                <th style="width: 160px">Penempatan</th>
+                <th style="width: 130px">Ukuran</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(item, idx) in listCetakBordir" :key="'cb' + idx">
+                <td class="text-center">{{ Number(idx) + 1 }}</td>
+                <td class="mono">{{ item.Kode }}</td>
+                <td>{{ item.Nama }}</td>
+                <td>
+                  <select v-model="item.Proses" class="cell-sel">
+                    <option v-for="p in prosesOptions" :key="p" :value="p">
+                      {{ p }}
+                    </option>
+                  </select>
+                </td>
+                <td>
                   <input
-                    v-model="item.Kode"
+                    v-model="item.Penempatan"
                     class="cell-inp"
-                    placeholder="Kode/F1"
-                    @keydown="onKodeCetakBordirF1($event, idx)"
-                    @keydown.enter.prevent="onKodeCetakBordirEnter(idx)"
-                    @blur="onKodeCetakBordirEnter(idx)"
+                    placeholder="Mis: Kanan Atas"
                   />
-                  <button
-                    type="button"
-                    class="blkp"
-                    title="Cari Komponen (F1)"
-                    @mousedown.prevent="openBahanModalCetakBordir(idx)"
-                  >
-                    <IconSearch :size="12" color="#1565c0" />
-                  </button>
-                </div>
-              </td>
-              <td>{{ item.Nama }}</td>
-              <td>
-                <select v-model="item.Proses" class="cell-sel">
-                  <option v-for="p in prosesOptions" :key="p" :value="p">
-                    {{ p }}
-                  </option>
-                </select>
-              </td>
-              <td>
-                <input
-                  v-model="item.Penempatan"
-                  class="cell-inp"
-                  placeholder="Mis: Kanan Atas"
-                  @input="ensureTrailingEmptyRowCetakBordir"
-                />
-              </td>
-              <td>
-                <input
-                  v-model="item.Ukuran"
-                  class="cell-inp"
-                  placeholder="Mis: 10x10 cm"
-                  @input="ensureTrailingEmptyRowCetakBordir"
-                />
-              </td>
-              <td class="text-center">
-                <button
-                  type="button"
-                  class="btn-del"
-                  @click="removeRowCetakBordir(idx)"
-                >
-                  <IconTrash :size="13" color="#c62828" />
-                </button>
-              </td>
-            </tr>
-            <tr v-if="listCetakBordir.length === 0">
-              <td colspan="7" class="empty-row">Belum ada data</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+                </td>
+                <td>
+                  <input
+                    v-model="item.Ukuran"
+                    class="cell-inp"
+                    placeholder="Mis: 10x10 cm"
+                  />
+                </td>
+              </tr>
+              <tr v-if="listCetakBordir.length === 0">
+                <td colspan="6" class="empty-row">
+                  Belum ada data Proof Garmen untuk lini Cetak/Sublim/Bordir.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </template>
     </div>
   </div>
-
-  <BahanSearchModal
-    v-model="showBahanModal"
-    mode="komponen"
-    @selected="handleBahanSelected"
-  />
 </template>
 
 <style scoped>
@@ -472,6 +232,43 @@ const handleBahanSelected = (bahan: any) => {
   height: 100%;
   font-family: "Segoe UI", system-ui, sans-serif;
   font-size: 11px;
+}
+.komp-info-banner {
+  display: flex;
+  align-items: center;
+  background: #e3f2fd;
+  color: #0d47a1;
+  border: 1px solid #90caf9;
+  border-radius: 4px;
+  padding: 7px 10px;
+  font-size: 11px;
+  margin-bottom: 8px;
+  line-height: 1.4;
+}
+.komp-error-banner {
+  background: #ffebee;
+  color: #c62828;
+  border: 1px solid #ef9a9a;
+  border-radius: 4px;
+  padding: 7px 10px;
+  font-size: 11px;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+.cell-sel,
+.cell-inp {
+  width: 100%;
+  height: 26px;
+  border: 1px solid #bdbdbd;
+  border-radius: 3px;
+  padding: 0 6px;
+  font-size: 11px;
+  outline: none;
+  box-sizing: border-box;
+}
+.cell-sel:focus,
+.cell-inp:focus {
+  border-color: #1565c0;
 }
 .komp-tabs {
   display: flex;
@@ -492,6 +289,7 @@ const handleBahanSelected = (bahan: any) => {
   border-bottom: none;
   border-radius: 4px 4px 0 0;
   cursor: pointer;
+  gap: 4px;
 }
 .komp-tab-btn.active {
   background: white;
@@ -499,76 +297,28 @@ const handleBahanSelected = (bahan: any) => {
   border-bottom: 2px solid white;
   margin-bottom: -1px;
 }
+.tab-badge {
+  background: #1565c0;
+  color: white;
+  border-radius: 8px;
+  padding: 0 5px;
+  font-size: 10px;
+}
+.komp-tab-btn.active .tab-badge {
+  background: #1565c0;
+}
 .komp-body {
   flex: 1;
   overflow-y: auto;
   background: #f5f5f5;
   padding: 10px;
 }
-.komp-pane-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
+.loading-row {
+  text-align: center;
+  padding: 24px;
+  color: #757575;
+  font-style: italic;
 }
-.komp-pane-title {
-  font-size: 12px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-}
-.text-blue {
-  color: #1565c0;
-}
-.text-orange {
-  color: #e65100;
-}
-.btn-add {
-  background: #1565c0;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  padding: 5px 12px;
-  font-size: 11px;
-  font-weight: 600;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-}
-.btn-add:hover {
-  opacity: 0.9;
-}
-
-.proses-info {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: white;
-  border: 1px solid #e0e0e0;
-  border-radius: 4px;
-  padding: 6px 10px;
-  margin-bottom: 8px;
-  flex-wrap: wrap;
-}
-.proses-info-lbl {
-  font-weight: 700;
-  color: #424242;
-}
-.proses-chip {
-  background: #e8f5e9;
-  color: #2e7d32;
-  border: 1px solid #a5d6a7;
-  border-radius: 3px;
-  padding: 2px 8px;
-  font-weight: 700;
-  font-size: 10px;
-}
-.proses-chip--auto {
-  background: #e3f2fd;
-  color: #1565c0;
-  border-color: #90caf9;
-}
-
 .komp-table {
   width: 100%;
   border-collapse: collapse;
@@ -586,70 +336,32 @@ const handleBahanSelected = (bahan: any) => {
   border-bottom: 1px solid #e0e0e0;
 }
 .komp-table tbody td {
-  padding: 5px 8px;
+  padding: 6px 8px;
   border-bottom: 1px solid #eeeeee;
 }
-
-/* Input group (kode + tombol cari) */
-.igrp {
-  display: flex;
-  border: 1px solid #bdbdbd;
-  border-radius: 3px;
-  overflow: hidden;
-  height: 26px;
-  background: white;
+.mono {
+  font-family: monospace;
+  color: #1565c0;
+  font-weight: 600;
 }
-.igrp .cell-inp {
-  border: none;
-  height: 24px;
-}
-.blkp {
-  width: 24px;
-  min-width: 24px;
-  flex-shrink: 0;
-  background: #e3f2fd;
-  border: none;
-  border-left: 1px solid #bdbdbd;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-}
-.blkp:hover {
-  background: #bbdefb;
-}
-
-.cell-sel,
-.cell-inp {
-  width: 100%;
-  height: 26px;
-  border: 1px solid #bdbdbd;
-  border-radius: 3px;
-  padding: 0 6px;
-  font-size: 11px;
-  outline: none;
-  box-sizing: border-box;
-}
-.cell-sel:focus,
-.cell-inp:focus {
-  border-color: #1565c0;
-}
-
 .text-center {
   text-align: center;
 }
-.btn-del {
-  background: #ffebee;
-  border: 1px solid #ef9a9a;
-  border-radius: 3px;
-  padding: 3px 6px;
-  cursor: pointer;
+.proses-chip {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 700;
 }
-.btn-del:hover {
-  background: #ffcdd2;
+.chip-sablon {
+  background: #e8f5e9;
+  color: #2e7d32;
 }
-
+.chip-bordir {
+  background: #fce4ec;
+  color: #ad1457;
+}
 .empty-row {
   text-align: center;
   padding: 16px;

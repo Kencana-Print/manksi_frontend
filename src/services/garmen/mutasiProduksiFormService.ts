@@ -49,7 +49,7 @@ export const mutasiProduksiFormService = {
     kelompok = "",
     tglDibuat = "",
   ) =>
-    api.get("/mutasi-produksi/planning-ppic", {
+    api.get("/garmen/mutasi-produksi-form/planning", {
       params: { nomorSpk, jenisMutasi, kelompok, tglDibuat },
     }),
 
