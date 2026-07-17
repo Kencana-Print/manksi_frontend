@@ -15,10 +15,7 @@ const mainImageUrl = computed(() => {
   const nomor =
     printData.value.header.MSPK_Nomor || printData.value.header.mspk_nomor;
   const cab = printData.value.header.mspk_cab || "HO-";
-  const base =
-    api.defaults.baseURL?.replace(/\/api\/?$/, "") ||
-    import.meta.env.VITE_API_URL ||
-    "";
+  const base = api.defaults.baseURL?.replace(/\/api\/?$/, "") || "";
 
   return `${base}/images/${cab}/map/${encodeURIComponent(nomor)}.jpg`;
 });
@@ -52,10 +49,7 @@ const preloadImageAndPrint = () => {
   const header = printData.value.header;
   const nomor = header.MSPK_Nomor || header.mspk_nomor;
   const cab = header.mspk_cabang || header.mspk_cab || "HO-";
-  const base =
-    api.defaults.baseURL?.replace(/\/api\/?$/, "") ||
-    import.meta.env.VITE_API_URL ||
-    "";
+  const base = api.defaults.baseURL?.replace(/\/api\/?$/, "") || "";
 
   const primaryUrl = `${base}/images/${cab}/map/${encodeURIComponent(nomor)}.jpg`;
   const fallbackUrl = `http://103.94.238.252:8888/file-gambar/${encodeURIComponent(nomor)}.jpg`;
