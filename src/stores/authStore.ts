@@ -109,6 +109,9 @@ export const useAuthStore = defineStore(
     const gudangJadi = computed(
       () => user.value?.gudang.jadi || { kode: "", nama: "" },
     );
+    const gudangBahan = computed(
+      () => user.value?.gudang.bahan || { kode: "", nama: "" },
+    );
     const allowedMenus = computed(() =>
       permissions.value.filter((p) => p.view).map((p) => p.id.toString()),
     );
@@ -204,6 +207,7 @@ export const useAuthStore = defineStore(
       userInitial,
       userCabang,
       gudangJadi,
+      gudangBahan,
       allowedMenus,
       isTokenExpired,
       canLihatHarga,

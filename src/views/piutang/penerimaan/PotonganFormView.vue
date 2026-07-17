@@ -11,6 +11,7 @@ import BaseForm from "@/components/BaseForm.vue";
 import PerusahaanSearchModal from "@/components/lookups/PerusahaanSearchModal.vue";
 import AccountSearchModal from "@/components/lookups/AccountSearchModal.vue";
 import CustomerSearchModal from "@/components/lookups/CustomerSearchModal.vue";
+import NumberInputIDR from "@/components/NumberInputIDR.vue";
 
 import {
   IconScissors,

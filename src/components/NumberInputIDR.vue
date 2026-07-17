@@ -1,57 +1,41 @@
 <script setup lang="ts">
-import { ref, watch, nextTick } from "vue";
+import { computed } from "vue";
 
 const props = defineProps<{
   modelValue: number;
   placeholder?: string;
 }>();
-const emit = defineEmits(["update:modelValue"]);
-
-const inputRef = ref<HTMLInputElement | null>(null);
+const emit = defineEmits<{
+  (e: "update:modelValue", value: number): void;
+}>();
 
 const formatIDR = (val: number) => {
-  if (val === null || val === undefined || isNaN(val)) return "";
+  if (val === null || val === undefined || val === 0) return "";
   return Number(val).toLocaleString("id-ID");
 };
 
-const displayValue = ref(formatIDR(props.modelValue));
-
-// Sinkron dari luar (misal saat fetchApi ngisi formData)
-watch(
-  () => props.modelValue,
-  (newVal) => {
-    const parsedDisplay = Number(displayValue.value.replace(/\D/g, "")) || 0;
-    if (newVal !== parsedDisplay) {
-      displayValue.value = formatIDR(newVal);
-    }
+const displayValue = computed({
+  get() {
+    return formatIDR(props.modelValue);
   },
-);
+  set(val: string) {
+    const digitsOnly = val.replace(/\D/g, "");
+    emit("update:modelValue", digitsOnly ? Number(digitsOnly) : 0);
+  },
+});
 
-const onInput = (e: Event) => {
-  const raw = (e.target as HTMLInputElement).value;
-  // Cuma ambil digit, buang semua titik/koma/huruf
-  const digitsOnly = raw.replace(/\D/g, "");
-  const numVal = digitsOnly ? Number(digitsOnly) : 0;
-
-  displayValue.value = digitsOnly ? formatIDR(numVal) : "";
-  emit("update:modelValue", numVal);
-};
-
-const onFocus = async (e: FocusEvent) => {
-  await nextTick();
+const onFocus = (e: FocusEvent) => {
   (e.target as HTMLInputElement).select();
 };
 </script>
 
 <template>
   <input
-    ref="inputRef"
     type="text"
     inputmode="numeric"
     class="idr-inp"
-    :value="displayValue"
+    v-model="displayValue"
     :placeholder="placeholder"
-    @input="onInput"
     @focus="onFocus"
   />
 </template>

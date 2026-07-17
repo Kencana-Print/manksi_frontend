@@ -80,6 +80,10 @@ import {
   IconTruckOff,
   IconReceiptTax,
   IconRuler2,
+  IconArrowsExchange,
+  IconScale,
+  IconBoxSeam,
+  IconClipboardData,
 } from "@tabler/icons-vue";
 
 interface NavItem {
@@ -774,7 +778,44 @@ const menuItems: NavItem[] = [
             icon: IconFileSpreadsheet,
             menuId: 503,
           },
+          {
+            title: "Mutasi Stok Bahan",
+            to: "/laporan/gudang-garmen/mutasi-stok-bahan",
+            icon: IconArrowsExchange,
+            menuId: 505,
+          },
+          {
+            title: "Stok Accesories vs MKA",
+            to: "/laporan/gudang-garmen/stok-acc-vs-mka",
+            icon: IconScale,
+            menuId: 569,
+          },
           { divider: true },
+          {
+            title: "Stok Barang Jadi",
+            to: "/laporan/gudang-garmen/stok-barang-jadi",
+            icon: IconBoxSeam,
+            menuId: 506,
+          },
+          {
+            title: "Kartu Stok Barang Jadi",
+            to: "/laporan/gudang-garmen/kartu-stok-barangjadi",
+            icon: IconClipboardData,
+            menuId: 507,
+          },
+          {
+            title: "Mutasi Stok Barang Jadi",
+            to: "/laporan/gudang-garmen/mutasi-stok-barang-jadi",
+            icon: IconArrowsExchange,
+            menuId: 508,
+          },
+          { divider: true },
+          {
+            title: "Standart Babaran vs Realisasi",
+            to: "/laporan/gudang-garmen/standart-babaran-vs-realisasi",
+            icon: IconScale,
+            menuId: 509,
+          },
           {
             title: "SPK Belum Ada MKB",
             to: "/laporan/gudang-garmen/spk-belum-mkb",

@@ -2325,6 +2325,78 @@ const router = createRouter({
       },
     },
     {
+      path: "/laporan/gudang-garmen/mutasi-stok-bahan",
+      name: "LapMutasiStokBahan",
+      component: () =>
+        import("@/views/laporan/gudang-garmen/MutasiStokBahanView.vue"),
+      meta: {
+        title: "Mutasi Stok Bahan",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "505",
+      },
+    },
+    {
+      path: "/laporan/gudang-garmen/stok-acc-vs-mka",
+      name: "LapStokAccVsMka",
+      component: () =>
+        import("@/views/laporan/gudang-garmen/StokAccVsMkaView.vue"),
+      meta: {
+        title: "Laporan Stok Accesories vs MKA",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "569",
+      },
+    },
+    {
+      path: "/laporan/gudang-garmen/stok-barang-jadi",
+      name: "LapStokBarangJadi",
+      component: () =>
+        import("@/views/laporan/gudang-garmen/StokBarangJadiView.vue"),
+      meta: {
+        title: "Laporan Stok Barang Jadi",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "506",
+      },
+    },
+    {
+      path: "/laporan/gudang-garmen/kartu-stok-barangjadi",
+      name: "LapKartuStokBarangJadi",
+      component: () =>
+        import("@/views/laporan/gudang-garmen/KartuStokBarangJadiView.vue"),
+      meta: {
+        title: "Kartu Stok Barang Jadi",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "507",
+      },
+    },
+    {
+      path: "/laporan/gudang-garmen/mutasi-stok-barang-jadi",
+      name: "LapMutasiStokBarangJadi",
+      component: () =>
+        import("@/views/laporan/gudang-garmen/MutasiStokBarangJadiView.vue"),
+      meta: {
+        title: "Mutasi Stok Barang Jadi",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "508",
+      },
+    },
+    {
+      path: "/laporan/gudang-garmen/standart-babaran-vs-realisasi",
+      name: "LapStandartBabaranVsRealisasi",
+      component: () =>
+        import("@/views/laporan/gudang-garmen/StandartBabaranVsRealisasiView.vue"),
+      meta: {
+        title: "Standart Babaran vs Realisasi",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "509",
+      },
+    },
+    {
       path: "/laporan/gudang-garmen/kartu-stok-barang",
       name: "LapKartuStokBarang",
       component: () =>

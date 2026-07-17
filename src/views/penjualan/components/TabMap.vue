@@ -733,7 +733,9 @@ const setSetoranPembayaran = (v: any) => {
               style="width: 50px; background: #ddeeff"
               :disabled="isEdit"
               @keydown="onPerushF1"
-              @keydown.enter.prevent="onPerushKodeEnter"
+              @keydown.enter.prevent="
+                ($event.target as HTMLInputElement).blur()
+              "
               @blur="onPerushKodeEnter"
             />
             <input
@@ -863,7 +865,9 @@ const setSetoranPembayaran = (v: any) => {
               class="f-inp"
               style="width: 70px; background: #ddeeff"
               @keydown="onCustF1"
-              @keydown.enter.prevent="onCustKodeEnter"
+              @keydown.enter.prevent="
+                ($event.target as HTMLInputElement).blur()
+              "
               @blur="onCustKodeEnter"
             />
             <input
@@ -897,7 +901,9 @@ const setSetoranPembayaran = (v: any) => {
               class="f-inp"
               style="width: 60px; background: #ddeeff"
               @keydown="onSalesF1"
-              @keydown.enter.prevent="onSalesKodeEnter"
+              @keydown.enter.prevent="
+                ($event.target as HTMLInputElement).blur()
+              "
               @blur="onSalesKodeEnter"
             />
             <input
@@ -931,7 +937,9 @@ const setSetoranPembayaran = (v: any) => {
               class="f-inp"
               style="width: 60px"
               :disabled="isEdit"
-              @keydown.enter.prevent="onJoKodeEnter"
+              @keydown.enter.prevent="
+                ($event.target as HTMLInputElement).blur()
+              "
               @keydown.f1.prevent="!isEdit && (showJoModal = true)"
               @blur="onJoKodeEnter"
             />
@@ -1141,7 +1149,9 @@ const setSetoranPembayaran = (v: any) => {
               class="f-inp"
               style="width: 48px; background: #ddeeff"
               @keydown="onCabMapF1"
-              @keydown.enter.prevent="onCabMapKodeEnter"
+              @keydown.enter.prevent="
+                ($event.target as HTMLInputElement).blur()
+              "
               @blur="onCabMapKodeEnter"
             />
             <input
@@ -1184,7 +1194,9 @@ const setSetoranPembayaran = (v: any) => {
               class="f-inp"
               style="width: 48px; background: #ddeeff"
               @keydown="onCabSpkF1"
-              @keydown.enter.prevent="onCabSpkKodeEnter"
+              @keydown.enter.prevent="
+                ($event.target as HTMLInputElement).blur()
+              "
               @blur="onCabSpkKodeEnter"
             />
             <input
