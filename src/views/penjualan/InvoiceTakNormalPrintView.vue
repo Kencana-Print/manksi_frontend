@@ -255,12 +255,17 @@ const printQZ = async () => {
   try {
     // 1. Konek ke QZ Tray jika belum konek
     if (!qz.websocket.isActive()) {
-      await qz.websocket.connect({
-        host: ["127.0.0.1", "localhost"],
-        usingSecure: false, // Memaksa penggunaan ws:// untuk HTTP
-        keepAlive: 60,
-        retries: 2,
-      });
+      try {
+        // Biarkan QZ mencoba berbagai port bawaannya dengan 5x percobaan
+        await qz.websocket.connect({ retries: 5, delay: 1 });
+      } catch (err: any) {
+        console.error("Detail Error Koneksi QZ:", err);
+        alert(
+          "Gagal terhubung ke aplikasi QZ Tray di komputer ini. Buka Inspect Element -> tab Console untuk melihat detail error.",
+        );
+        isPrinting.value = false;
+        return; // Hentikan proses cetak
+      }
     }
 
     // 2. Buat konfigurasi printer
