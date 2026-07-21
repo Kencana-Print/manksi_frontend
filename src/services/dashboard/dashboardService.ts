@@ -61,4 +61,38 @@ export const dashboardService = {
     api.get("/dashboard/aktivitas-hari-ini", { params: { limit, offset } }),
   getTrendSpk7Hari: () => api.get("/dashboard/trend-spk-7hari"),
   getApprovalPendingCount: () => api.get("/dashboard/approval-pending-count"),
+  getPipelineSpkProduksi: (startDate: string, endDate: string) =>
+    api.get("/dashboard/pipeline-spk-produksi", {
+      params: { startDate, endDate },
+    }),
+  getBahanKurangCount: () => api.get("/dashboard/bahan-kurang-count"),
+  getBahanKurangList: (limit = 20, offset = 0) =>
+    api.get("/dashboard/bahan-kurang-list", { params: { limit, offset } }),
+  getSpkBelumMkbListPaged: (limit = 20, offset = 0) =>
+    api.get("/dashboard/spk-belum-mkb-list-paged", {
+      params: { limit, offset },
+    }),
+  getPoJasaVsBpjSummary: () => api.get("/dashboard/po-jasa-vs-bpj-summary"),
+  getOutstandingPoMitraSummary: () =>
+    api.get("/dashboard/outstanding-po-mitra-summary"),
+  getOutstandingPoMitraList: (limit = 20, offset = 0) =>
+    api.get("/dashboard/outstanding-po-mitra-list", {
+      params: { limit, offset },
+    }),
+  getEfisiensiBabaranSummary: () =>
+    api.get("/dashboard/efisiensi-babaran-summary"),
+  getEfisiensiBabaranList: (limit = 20, offset = 0) =>
+    api.get("/dashboard/efisiensi-babaran-list", { params: { limit, offset } }),
+  getStokAccVsMkaCount: () => api.get("/dashboard/stok-acc-vs-mka-count"),
+  getStokAccVsMkaList: (limit = 20, offset = 0) =>
+    api.get("/dashboard/stok-acc-vs-mka-list", { params: { limit, offset } }),
+  getBarangJadiMetric: () => api.get("/dashboard/barang-jadi-metric"),
+  getStokBarangJadiList: (limit = 20, offset = 0, gudang = "") =>
+    api.get("/dashboard/stok-barang-jadi-list", {
+      params: { limit, offset, gudang },
+    }),
+  getMutasiBarangJadiList: (limit = 20, offset = 0) =>
+    api.get("/dashboard/mutasi-barang-jadi-list", {
+      params: { limit, offset },
+    }),
 };

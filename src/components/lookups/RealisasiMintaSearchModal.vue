@@ -3,8 +3,20 @@ import { ref, watch, computed } from "vue";
 import api from "@/services/api";
 import { IconClipboardSearch, IconSearch } from "@tabler/icons-vue";
 
-const props = defineProps<{ modelValue: boolean }>();
+const props = defineProps<{
+  modelValue: boolean;
+  nomorSpk?: string;
+  excludeNomor?: string;
+}>();
 const emit = defineEmits(["update:modelValue", "selected"]);
+
+const isMaterialMode = computed(() => !!props.nomorSpk);
+
+const num = (v: any, d = 0) =>
+  Number(v || 0).toLocaleString("id-ID", {
+    minimumFractionDigits: d,
+    maximumFractionDigits: d,
+  });
 
 const search = ref("");
 const items = ref<any[]>([]);
@@ -50,6 +62,8 @@ const fetchData = async () => {
         q: search.value,
         page: currentPage.value,
         limit: perPage.value,
+        nomorSpk: props.nomorSpk || undefined,
+        excludeNomor: props.excludeNomor || undefined,
       },
     });
     items.value = res.data.data.items;
@@ -125,7 +139,16 @@ const selectItem = (item: any) => {
         </div>
         <table v-else class="lookup-table">
           <thead>
-            <tr>
+            <tr v-if="isMaterialMode">
+              <th style="width: 130px">NOMOR</th>
+              <th style="width: 90px">TANGGAL</th>
+              <th style="width: 100px">KODE</th>
+              <th>JENIS KAIN</th>
+              <th style="width: 90px" class="tr">JUMLAH</th>
+              <th style="width: 90px" class="tr">SISA</th>
+              <th style="width: 60px">CAB</th>
+            </tr>
+            <tr v-else>
               <th style="width: 160px">NOMOR</th>
               <th style="width: 100px">TANGGAL</th>
               <th style="width: 150px">SPK</th>
@@ -135,16 +158,38 @@ const selectItem = (item: any) => {
           <tbody>
             <tr
               v-for="item in items"
-              :key="item.Nomor"
+              :key="item.Nomor + (item.Kode || '')"
               class="lookup-row"
               @click="selectItem(item)"
             >
-              <td class="td-kode">{{ item.Nomor }}</td>
-              <td>{{ formatDate(item.Tanggal) }}</td>
-              <td>{{ item.SPK }}</td>
-              <td class="text-truncate" style="max-width: 300px">
-                {{ item.NamaSpk }}
-              </td>
+              <template v-if="isMaterialMode">
+                <td class="td-kode">{{ item.Nomor }}</td>
+                <td>{{ item.Tanggal }}</td>
+                <td class="td-kode">{{ item.Kode }}</td>
+                <td class="text-truncate" style="max-width: 220px">
+                  {{ item.JenisKain }}
+                </td>
+                <td class="tr">{{ num(item.Jumlah, 2) }}</td>
+                <td
+                  class="tr"
+                  :style="
+                    Number(item.Sisa) <= 0
+                      ? 'color:#c62828;font-weight:700'
+                      : ''
+                  "
+                >
+                  {{ num(item.Sisa, 2) }}
+                </td>
+                <td>{{ item.Cab }}</td>
+              </template>
+              <template v-else>
+                <td class="td-kode">{{ item.Nomor }}</td>
+                <td>{{ formatDate(item.Tanggal) }}</td>
+                <td>{{ item.SPK }}</td>
+                <td class="text-truncate" style="max-width: 300px">
+                  {{ item.NamaSpk }}
+                </td>
+              </template>
             </tr>
           </tbody>
         </table>

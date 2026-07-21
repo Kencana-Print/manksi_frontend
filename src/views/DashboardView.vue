@@ -26,6 +26,11 @@ import {
   IconAlertTriangle,
   IconTrendingUp,
   IconActivity,
+  IconGauge,
+  IconScale,
+  IconArrowsExchange,
+  IconBoxSeam,
+  IconFileInvoice,
 } from "@tabler/icons-vue";
 
 interface OverdueItem {
@@ -125,6 +130,97 @@ interface RealisasiData {
     HariKonversi: number | null;
   }[];
 }
+interface PipelineData {
+  TotalMasuk: number;
+  AdaMkb: number;
+  AdaRealisasi: number;
+  AdaLhk: number;
+  AdaStbj: number;
+  AdaKirim: number;
+}
+interface BahanKurangBahan {
+  Kode: string;
+  NamaBahan: string;
+  Satuan: string;
+  Kurang: number;
+}
+interface BahanKurangItem {
+  Nomor: string;
+  NamaSpk: string;
+  JmlBahanKurang: number;
+  bahanList: BahanKurangBahan[];
+}
+interface SpkBelumMkbItem {
+  Nomor: string;
+  Nama: string;
+  Tanggal: string;
+  Dateline: string;
+  SisaHari: number;
+}
+interface PoJasaVsBpjData {
+  TotalPO: number;
+  Belum: number;
+  Proses: number;
+  Closed: number;
+}
+interface OutstandingMitraItem {
+  Kode: string;
+  Supplier: string;
+  Jasa: string;
+  Po: number;
+  Terima: number;
+  Kurang: number;
+  Target: number;
+  Otm: number;
+}
+interface EfisiensiBabaranItem {
+  Nomor: string;
+  Nama: string;
+  Customer: string;
+  Minus: number;
+  Status: string;
+}
+interface StokAccVsMkaSpk {
+  Spk: string;
+  NamaSpk: string;
+  Mka: number;
+  Realisasi: number;
+  Sisa: number;
+}
+interface StokAccVsMkaItem {
+  Kode: string;
+  Nama: string;
+  Satuan: string;
+  StokAcc: number;
+  Mka: number;
+  Free: number;
+  spkList: StokAccVsMkaSpk[];
+}
+interface BarangJadiMetric {
+  TotalItem: number;
+  TotalStok: number;
+  ItemBergerak: number;
+  ItemMinus: number;
+}
+interface StokBarangJadiItem {
+  Kode: string;
+  Nama: string;
+  Ukuran: string;
+  Gudang: string;
+  Stok: number;
+  Customer: string;
+}
+interface MutasiBarangJadiItem {
+  Kode: string;
+  Nama: string;
+  Ukuran: string;
+  Stbj: number;
+  MutasiMasuk: number;
+  Koreksi: number;
+  SuratJalan: number;
+  MutasiKeluar: number;
+  StokAkhir: number;
+}
 
 const authStore = useAuthStore();
 const router = useRouter();
@@ -132,13 +228,14 @@ const isSpkDialogVisible = ref(false);
 const activeTab = ref("overview");
 
 watch(activeTab, async (tab) => {
-  await nextTick();
   if (tab === "overview") {
-    // Re-render chart karena container size mungkin berubah
+    await nextTick();
     if (trendData.value.length) renderTrendChart();
     setupAktObserver();
   }
   if (tab === "marketing") {
+    if (!marketingLoaded.value) await loadMarketingData();
+    await nextTick();
     setupPenObserver();
     setupMapObserver();
     setupRpDetailObserver();
@@ -146,16 +243,36 @@ watch(activeTab, async (tab) => {
     setupMapKirimObserver();
   }
   if (tab === "finance") {
+    if (!financeLoaded.value) await loadFinanceData();
+    await nextTick();
     setupOverdueObserver();
   }
   if (tab === "gudang-bahan") {
+    if (!gudangBahanLoaded.value) await loadGudangBahanData();
+    await nextTick();
     setupBufferObserver();
     setupBahanObserver();
+    setupStokAccVsMkaObserver();
+  }
+  if (tab === "gudang") {
+    if (!gudangLoaded.value) await loadGudangData();
+    await setupGudangObservers();
+  }
+  if (tab === "barang-jadi") {
+    if (!barangJadiLoaded.value) await loadBarangJadiData();
+    await nextTick();
+    setupStokBjObserver();
+    setupMutasiBjObserver();
   }
 });
 
 const fmtNum = (val: number) =>
   new Intl.NumberFormat("id-ID").format(Math.ceil(val || 0));
+const fmtDec = (val: number, d = 2) =>
+  Number(val || 0).toLocaleString("id-ID", {
+    minimumFractionDigits: d,
+    maximumFractionDigits: d,
+  });
 
 // ── Role helpers ──
 const bagian = computed(() =>
@@ -180,6 +297,10 @@ const showGudangBahan = computed(
     ["PEMBELIAN", "GUDANG", "PPIC"].includes(bagian.value) ||
     isSuperViewer.value,
 );
+const showBarangJadi = computed(
+  () =>
+    ["ADMIN", "PRODUKSI", "PPIC"].includes(bagian.value) || isSuperViewer.value,
+);
 
 // ── State Dashboard ──
 const mapSummary = ref({
@@ -201,6 +322,11 @@ const spkSummary = ref({
 const realisasiRows = ref<any[]>([]);
 const poBpbSummary = ref({ TotalPO: 0, Open: 0, OnProses: 0, Close: 0 });
 const isLoadingDashboard = ref(false);
+const marketingLoaded = ref(false);
+const financeLoaded = ref(false);
+const gudangLoaded = ref(false);
+const gudangBahanLoaded = ref(false);
+const barangJadiLoaded = ref(false);
 const kunjunganRows = ref<any[]>([]);
 const gudangBahanData = ref<GudangBahanData>({
   metric: { TotalJenis: 0, JmlBawahBuffer: 0, TotalBarcode: 0, JmlMinus: 0 },
@@ -239,6 +365,7 @@ const piutangData = ref<PiutangData>({
 const aktivitasList = ref<any[]>([]);
 const trendData = ref<any[]>([]);
 const trendChartEl = ref<HTMLElement | null>(null);
+const stokAccVsMkaCount = ref(0);
 
 // ── State Penerimaan ──
 const penerimaanSummary = ref({
@@ -260,6 +387,177 @@ const coverageRateColor = computed(() => {
   if (coverageRate.value >= 70) return "#f57f17";
   return "#c62828";
 });
+
+// --- Gudang Garmen ---
+const pipelineData = ref<PipelineData>({
+  TotalMasuk: 0,
+  AdaMkb: 0,
+  AdaRealisasi: 0,
+  AdaLhk: 0,
+  AdaStbj: 0,
+  AdaKirim: 0,
+});
+const bahanKurangSummary = ref({ total: 0 });
+const spkBelumMkbCountVal = ref(0);
+const poJasaVsBpjData = ref<PoJasaVsBpjData>({
+  TotalPO: 0,
+  Belum: 0,
+  Proses: 0,
+  Closed: 0,
+});
+const outstandingPoMitraSummary = ref({ totalMitra: 0, totalKurang: 0 });
+const efisiensiBabaranSummary = ref({
+  totalSpk: 0,
+  jmlDeviasi: 0,
+  pctDeviasi: 0,
+});
+
+// Filter periode pipeline — default bulan berjalan (spk_dateline)
+const pipelineFilter = ref({
+  startDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1)
+    .toISOString()
+    .substring(0, 10),
+  endDate: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0)
+    .toISOString()
+    .substring(0, 10),
+});
+
+const pipelineStages = computed(() => [
+  {
+    label: "SPK Masuk",
+    value: pipelineData.value.TotalMasuk,
+    color: "#1565c0",
+  },
+  { label: "Ada MKB", value: pipelineData.value.AdaMkb, color: "#00695c" },
+  {
+    label: "Realisasi Minta",
+    value: pipelineData.value.AdaRealisasi,
+    color: "#f57f17",
+  },
+  { label: "LHK Cutting", value: pipelineData.value.AdaLhk, color: "#6a1b9a" },
+  { label: "STBJ", value: pipelineData.value.AdaStbj, color: "#0277bd" },
+  { label: "Kirim (SJ)", value: pipelineData.value.AdaKirim, color: "#2e7d32" },
+]);
+
+const pipelinePct = (value: number) => {
+  const total = pipelineData.value.TotalMasuk || 1;
+  return Math.round((value / total) * 100);
+};
+
+const fetchPipelineData = async () => {
+  try {
+    const res = await dashboardService.getPipelineSpkProduksi(
+      pipelineFilter.value.startDate,
+      pipelineFilter.value.endDate,
+    );
+    if (res.data?.data) pipelineData.value = res.data.data;
+  } catch {
+    /* silent */
+  }
+};
+
+// --- Barang Jadi ---
+const barangJadiMetric = ref<BarangJadiMetric>({
+  TotalItem: 0,
+  TotalStok: 0,
+  ItemBergerak: 0,
+  ItemMinus: 0,
+});
+
+const gudangJadiOptions = [
+  { value: "", label: "Semua Gudang" },
+  { value: "GJ002", label: "Gudang Barang Jadi P1" },
+  { value: "GJ001", label: "Gudang Barang Jadi Jeron (P04)" },
+];
+const stokBjGudangFilter = ref("");
+
+// ── Infinite scroll: Stok Barang Jadi ──
+const STOK_BJ_PAGE_SIZE = 20;
+const stokBarangJadiList = ref<StokBarangJadiItem[]>([]);
+const stokBjOffset = ref(0);
+const stokBjHasMore = ref(true);
+const isLoadingMoreStokBj = ref(false);
+const stokBjSentinelEl = ref<HTMLElement | null>(null);
+let stokBjScrollObserver: IntersectionObserver | null = null;
+
+const loadMoreStokBj = async () => {
+  if (!stokBjHasMore.value || isLoadingMoreStokBj.value) return;
+  isLoadingMoreStokBj.value = true;
+  try {
+    const res = await dashboardService.getStokBarangJadiList(
+      STOK_BJ_PAGE_SIZE,
+      stokBjOffset.value,
+      stokBjGudangFilter.value,
+    );
+    const rows: StokBarangJadiItem[] = res.data.data;
+    stokBarangJadiList.value.push(...rows);
+    stokBjOffset.value += rows.length;
+    if (rows.length < STOK_BJ_PAGE_SIZE) stokBjHasMore.value = false;
+  } catch {
+  } finally {
+    isLoadingMoreStokBj.value = false;
+  }
+};
+
+const onChangeStokBjGudang = async () => {
+  stokBarangJadiList.value = [];
+  stokBjOffset.value = 0;
+  stokBjHasMore.value = true;
+  await loadMoreStokBj();
+};
+
+const setupStokBjObserver = () => {
+  if (stokBjScrollObserver) stokBjScrollObserver.disconnect();
+  if (!stokBjSentinelEl.value) return;
+  stokBjScrollObserver = new IntersectionObserver(
+    (entries) => {
+      if (entries[0].isIntersecting) loadMoreStokBj();
+    },
+    { threshold: 0.1 },
+  );
+  stokBjScrollObserver.observe(stokBjSentinelEl.value);
+};
+
+// ── Infinite scroll: Mutasi Barang Jadi ──
+const MUTASI_BJ_PAGE_SIZE = 20;
+const mutasiBarangJadiList = ref<MutasiBarangJadiItem[]>([]);
+const mutasiBjOffset = ref(0);
+const mutasiBjHasMore = ref(true);
+const isLoadingMoreMutasiBj = ref(false);
+const mutasiBjSentinelEl = ref<HTMLElement | null>(null);
+let mutasiBjScrollObserver: IntersectionObserver | null = null;
+
+const loadMoreMutasiBj = async () => {
+  if (!mutasiBjHasMore.value || isLoadingMoreMutasiBj.value) return;
+  isLoadingMoreMutasiBj.value = true;
+  try {
+    const res = await dashboardService.getMutasiBarangJadiList(
+      MUTASI_BJ_PAGE_SIZE,
+      mutasiBjOffset.value,
+    );
+    const rows: MutasiBarangJadiItem[] = res.data.data;
+    mutasiBarangJadiList.value.push(...rows);
+    mutasiBjOffset.value += rows.length;
+    if (rows.length < MUTASI_BJ_PAGE_SIZE) mutasiBjHasMore.value = false;
+  } catch {
+  } finally {
+    isLoadingMoreMutasiBj.value = false;
+  }
+};
+
+const setupMutasiBjObserver = () => {
+  if (mutasiBjScrollObserver) mutasiBjScrollObserver.disconnect();
+  if (!mutasiBjSentinelEl.value) return;
+  mutasiBjScrollObserver = new IntersectionObserver(
+    (entries) => {
+      if (entries[0].isIntersecting) loadMoreMutasiBj();
+    },
+    { threshold: 0.1 },
+  );
+  mutasiBjScrollObserver.observe(mutasiBjSentinelEl.value);
+};
+
+const isLoadingBarangJadi = ref(false);
 
 // ── Infinite scroll: Penawaran Belum SPK ──
 const PEN_PAGE_SIZE = 20;
@@ -663,6 +961,209 @@ const setupMapKirimObserver = () => {
   mapKirimScrollObserver.observe(mapKirimSentinelEl.value);
 };
 
+// ── Infinite scroll: Bahan Kurang ──
+const BAHAN_KURANG_PAGE_SIZE = 20;
+const bahanKurangList = ref<BahanKurangItem[]>([]);
+const bahanKurangOffset = ref(0);
+const bahanKurangHasMore = ref(true);
+const isLoadingMoreBahanKurang = ref(false);
+const bahanKurangSentinelEl = ref<HTMLElement | null>(null);
+let bahanKurangScrollObserver: IntersectionObserver | null = null;
+
+const loadMoreBahanKurang = async () => {
+  if (!bahanKurangHasMore.value || isLoadingMoreBahanKurang.value) return;
+  isLoadingMoreBahanKurang.value = true;
+  try {
+    const res = await dashboardService.getBahanKurangList(
+      BAHAN_KURANG_PAGE_SIZE,
+      bahanKurangOffset.value,
+    );
+    const rows: BahanKurangItem[] = res.data.data;
+    bahanKurangList.value.push(...rows);
+    bahanKurangOffset.value += rows.length;
+    if (rows.length < BAHAN_KURANG_PAGE_SIZE) bahanKurangHasMore.value = false;
+  } catch {
+  } finally {
+    isLoadingMoreBahanKurang.value = false;
+  }
+};
+
+const setupBahanKurangObserver = () => {
+  if (bahanKurangScrollObserver) bahanKurangScrollObserver.disconnect();
+  if (!bahanKurangSentinelEl.value) return;
+  bahanKurangScrollObserver = new IntersectionObserver(
+    (entries) => {
+      if (entries[0].isIntersecting) loadMoreBahanKurang();
+    },
+    { threshold: 0.1 },
+  );
+  bahanKurangScrollObserver.observe(bahanKurangSentinelEl.value);
+};
+
+const setupGudangObservers = async () => {
+  await nextTick();
+  setupBahanKurangObserver();
+  setupSpkBelumMkbObserver();
+  setupOutstandingObserver();
+  setupEfisiensiObserver();
+};
+
+// ── Infinite scroll: Stok Acc vs MKA ──
+const STOK_ACC_MKA_PAGE_SIZE = 20;
+const stokAccVsMkaList = ref<StokAccVsMkaItem[]>([]);
+const stokAccVsMkaOffset = ref(0);
+const stokAccVsMkaHasMore = ref(true);
+const isLoadingMoreStokAccVsMka = ref(false);
+const stokAccVsMkaSentinelEl = ref<HTMLElement | null>(null);
+let stokAccVsMkaScrollObserver: IntersectionObserver | null = null;
+
+const loadMoreStokAccVsMka = async () => {
+  if (!stokAccVsMkaHasMore.value || isLoadingMoreStokAccVsMka.value) return;
+  isLoadingMoreStokAccVsMka.value = true;
+  try {
+    const res = await dashboardService.getStokAccVsMkaList(
+      STOK_ACC_MKA_PAGE_SIZE,
+      stokAccVsMkaOffset.value,
+    );
+    const rows: StokAccVsMkaItem[] = res.data.data;
+    stokAccVsMkaList.value.push(...rows);
+    stokAccVsMkaOffset.value += rows.length;
+    if (rows.length < STOK_ACC_MKA_PAGE_SIZE) stokAccVsMkaHasMore.value = false;
+  } catch {
+  } finally {
+    isLoadingMoreStokAccVsMka.value = false;
+  }
+};
+
+const setupStokAccVsMkaObserver = () => {
+  if (stokAccVsMkaScrollObserver) stokAccVsMkaScrollObserver.disconnect();
+  if (!stokAccVsMkaSentinelEl.value) return;
+  stokAccVsMkaScrollObserver = new IntersectionObserver(
+    (entries) => {
+      if (entries[0].isIntersecting) loadMoreStokAccVsMka();
+    },
+    { threshold: 0.1 },
+  );
+  stokAccVsMkaScrollObserver.observe(stokAccVsMkaSentinelEl.value);
+};
+
+// ── Infinite scroll: SPK Belum MKB ──
+const SPK_BELUM_MKB_PAGE_SIZE = 20;
+const spkBelumMkbList = ref<SpkBelumMkbItem[]>([]);
+const spkBelumMkbOffset = ref(0);
+const spkBelumMkbHasMore = ref(true);
+const isLoadingMoreSpkBelumMkb = ref(false);
+const spkBelumMkbSentinelEl = ref<HTMLElement | null>(null);
+let spkBelumMkbScrollObserver: IntersectionObserver | null = null;
+
+const loadMoreSpkBelumMkb = async () => {
+  if (!spkBelumMkbHasMore.value || isLoadingMoreSpkBelumMkb.value) return;
+  isLoadingMoreSpkBelumMkb.value = true;
+  try {
+    const res = await dashboardService.getSpkBelumMkbListPaged(
+      SPK_BELUM_MKB_PAGE_SIZE,
+      spkBelumMkbOffset.value,
+    );
+    const rows: SpkBelumMkbItem[] = res.data.data;
+    spkBelumMkbList.value.push(...rows);
+    spkBelumMkbOffset.value += rows.length;
+    if (rows.length < SPK_BELUM_MKB_PAGE_SIZE) spkBelumMkbHasMore.value = false;
+  } catch {
+  } finally {
+    isLoadingMoreSpkBelumMkb.value = false;
+  }
+};
+
+const setupSpkBelumMkbObserver = () => {
+  if (spkBelumMkbScrollObserver) spkBelumMkbScrollObserver.disconnect();
+  if (!spkBelumMkbSentinelEl.value) return;
+  spkBelumMkbScrollObserver = new IntersectionObserver(
+    (entries) => {
+      if (entries[0].isIntersecting) loadMoreSpkBelumMkb();
+    },
+    { threshold: 0.1 },
+  );
+  spkBelumMkbScrollObserver.observe(spkBelumMkbSentinelEl.value);
+};
+
+// ── Infinite scroll: Outstanding PO Mitra ──
+const OUTSTANDING_PAGE_SIZE = 20;
+const outstandingPoMitraList = ref<OutstandingMitraItem[]>([]);
+const outstandingOffset = ref(0);
+const outstandingHasMore = ref(true);
+const isLoadingMoreOutstanding = ref(false);
+const outstandingSentinelEl = ref<HTMLElement | null>(null);
+let outstandingScrollObserver: IntersectionObserver | null = null;
+
+const loadMoreOutstanding = async () => {
+  if (!outstandingHasMore.value || isLoadingMoreOutstanding.value) return;
+  isLoadingMoreOutstanding.value = true;
+  try {
+    const res = await dashboardService.getOutstandingPoMitraList(
+      OUTSTANDING_PAGE_SIZE,
+      outstandingOffset.value,
+    );
+    const rows: OutstandingMitraItem[] = res.data.data;
+    outstandingPoMitraList.value.push(...rows);
+    outstandingOffset.value += rows.length;
+    if (rows.length < OUTSTANDING_PAGE_SIZE) outstandingHasMore.value = false;
+  } catch {
+  } finally {
+    isLoadingMoreOutstanding.value = false;
+  }
+};
+
+const setupOutstandingObserver = () => {
+  if (outstandingScrollObserver) outstandingScrollObserver.disconnect();
+  if (!outstandingSentinelEl.value) return;
+  outstandingScrollObserver = new IntersectionObserver(
+    (entries) => {
+      if (entries[0].isIntersecting) loadMoreOutstanding();
+    },
+    { threshold: 0.1 },
+  );
+  outstandingScrollObserver.observe(outstandingSentinelEl.value);
+};
+
+// ── Infinite scroll: Efisiensi Babaran ──
+const EFISIENSI_PAGE_SIZE = 20;
+const efisiensiBabaranList = ref<EfisiensiBabaranItem[]>([]);
+const efisiensiOffset = ref(0);
+const efisiensiHasMore = ref(true);
+const isLoadingMoreEfisiensi = ref(false);
+const efisiensiSentinelEl = ref<HTMLElement | null>(null);
+let efisiensiScrollObserver: IntersectionObserver | null = null;
+
+const loadMoreEfisiensi = async () => {
+  if (!efisiensiHasMore.value || isLoadingMoreEfisiensi.value) return;
+  isLoadingMoreEfisiensi.value = true;
+  try {
+    const res = await dashboardService.getEfisiensiBabaranList(
+      EFISIENSI_PAGE_SIZE,
+      efisiensiOffset.value,
+    );
+    const rows: EfisiensiBabaranItem[] = res.data.data;
+    efisiensiBabaranList.value.push(...rows);
+    efisiensiOffset.value += rows.length;
+    if (rows.length < EFISIENSI_PAGE_SIZE) efisiensiHasMore.value = false;
+  } catch {
+  } finally {
+    isLoadingMoreEfisiensi.value = false;
+  }
+};
+
+const setupEfisiensiObserver = () => {
+  if (efisiensiScrollObserver) efisiensiScrollObserver.disconnect();
+  if (!efisiensiSentinelEl.value) return;
+  efisiensiScrollObserver = new IntersectionObserver(
+    (entries) => {
+      if (entries[0].isIntersecting) loadMoreEfisiensi();
+    },
+    { threshold: 0.1 },
+  );
+  efisiensiScrollObserver.observe(efisiensiSentinelEl.value);
+};
+
 // ── Computed helpers MAP ──
 const mapSpkRate = computed(() => {
   if (!mapSpkMetric.value.TotalMAP) return 0;
@@ -860,16 +1361,9 @@ const stopPolling = () => {
   }
 };
 
-// ── Load Dashboard ──
-const loadDashboard = async () => {
+// ── Overview (selalu di-fetch saat mount, tab ini selalu terlihat) ──
+const loadOverviewData = async () => {
   isLoadingDashboard.value = true;
-  penawaranBelumSpk.value = [];
-  penOffset.value = 0;
-  penHasMore.value = true;
-  penawaranBelumMap.value = [];
-  mapOffset.value = 0;
-  mapHasMore.value = true;
-
   try {
     aktivitasList.value = [];
     aktOffset.value = 0;
@@ -884,150 +1378,359 @@ const loadDashboard = async () => {
     }
 
     await loadMoreAktivitas();
-    if (rTrend.status === "fulfilled") {
-      trendData.value = rTrend.value.data.data || [];
-      renderTrendChart();
-    }
+
     const [spkSumRes] = await Promise.allSettled([
       dashboardService.getSpkSummary(),
     ]);
     if (spkSumRes.status === "fulfilled") {
-      spkSummary.value = spkSumRes.value.data.data; // ← isi dulu
+      spkSummary.value = spkSumRes.value.data.data;
       animatedSpkAktif.value = spkSummary.value.TotalAktif;
       animatedTerlambat.value = spkSummary.value.Terlambat;
       animatedDeadlineHariIni.value = spkSummary.value.DeadlineHariIni;
       animatedSegera.value = spkSummary.value.SegeredDeadline;
     }
     animatedAktivitasCount.value = aktivitasList.value.length;
-
-    if (showPoBpb.value) {
-      const [poBpbRes] = await Promise.allSettled([
-        dashboardService.getPoBahanBpbSummary(),
-      ]);
-      if (poBpbRes.status === "fulfilled")
-        poBpbSummary.value = poBpbRes.value.data.data;
-    }
-
-    if (showPenawaran.value) {
-      rpDetailList.value = [];
-      rpDetailOffset.value = 0;
-      rpDetailHasMore.value = true;
-      mapSpkList.value = [];
-      mapSpkOffset.value = 0;
-      mapSpkHasMore.value = true;
-      mapKirimList.value = [];
-      mapKirimOffset.value = 0;
-      mapKirimHasMore.value = true;
-
-      const [sumRes, realisasiRes, mapSumRes, kunjunganRes, realisasiPenRes] =
-        await Promise.allSettled([
-          dashboardService.getPenawaranSummary(),
-          dashboardService.getRealisasiSummary(),
-          dashboardService.getPenawaranMapSummary(),
-          dashboardService.getKunjunganSalesSummary(),
-          dashboardService.getRealisasiPenawaranDashboard(),
-        ]);
-      if (sumRes.status === "fulfilled")
-        penSummary.value = sumRes.value.data.data;
-      if (realisasiRes.status === "fulfilled")
-        realisasiRows.value = realisasiRes.value.data.data;
-      if (mapSumRes.status === "fulfilled")
-        mapSummary.value = mapSumRes.value.data.data;
-      if (kunjunganRes.status === "fulfilled")
-        kunjunganRows.value = kunjunganRes.value.data.data || [];
-      if (
-        realisasiPenRes.status === "fulfilled" &&
-        realisasiPenRes.value?.data?.data
-      ) {
-        realisasiPenawaranData.value = realisasiPenRes.value.data.data;
-      }
-
-      await Promise.allSettled([
-        loadMorePenawaran(),
-        loadMoreMap(),
-        loadMoreRpDetail(),
-      ]);
-
-      const [mapVsSpkRes, mapVsSjRes] = await Promise.allSettled([
-        dashboardService.getMapVsSpkDashboard(
-          mapFilter.value.startDate,
-          mapFilter.value.endDate,
-        ),
-        dashboardService.getMapVsSjDashboard(
-          mapFilter.value.startDate,
-          mapFilter.value.endDate,
-        ),
-      ]);
-      if (mapVsSpkRes.status === "fulfilled" && mapVsSpkRes.value?.data?.data) {
-        mapSpkMetric.value = mapVsSpkRes.value.data.data.metric;
-        mapDivisi.value = mapVsSpkRes.value.data.data.divisi;
-      }
-      if (mapVsSjRes.status === "fulfilled" && mapVsSjRes.value?.data?.data) {
-        mapSjMetric.value = mapVsSjRes.value.data.data;
-      }
-      await Promise.allSettled([loadMoreMapSpk(), loadMoreMapKirim()]);
-    }
-
-    if (showPiutang.value) {
-      // Reset overdue infinite scroll
-      overdueList.value = [];
-      overdueOffset.value = 0;
-      overdueHasMore.value = true;
-
-      // Load summary + top5 saja (bukan overdue — itu lazy)
-      const [piutangRes, penerimaanRes] = await Promise.allSettled([
-        dashboardService.getPiutangDashboard(),
-        dashboardService.getPenerimaanSummary(),
-      ]);
-      if (piutangRes.status === "fulfilled" && piutangRes.value?.data?.data) {
-        // Ambil summary + top5, overdue load terpisah via infinite scroll
-        piutangData.value.summary = piutangRes.value.data.data.summary;
-        piutangData.value.top5 = piutangRes.value.data.data.top5;
-        piutangData.value.trend = piutangRes.value.data.data.trend;
-        piutangData.value.overdue = []; // kosongkan, ganti pakai overdueList
-      }
-
-      if (
-        penerimaanRes.status === "fulfilled" &&
-        penerimaanRes.value?.data?.data
-      ) {
-        penerimaanSummary.value = penerimaanRes.value.data.data;
-      }
-
-      // Load batch pertama overdue
-      await loadMoreOverdue();
-    }
-
-    if (showGudangBahan.value) {
-      // Reset semua infinite scroll
-      bufferList.value = [];
-      bufferOffset.value = 0;
-      bufferHasMore.value = true;
-      bahanList.value = [];
-      bahanOffset.value = 0;
-      bahanHasMore.value = true;
-
-      isLoadingGudangBahan.value = true;
-      try {
-        // Load metric + topStok saja (buffer & barcode via lazy scroll)
-        const [gbRes] = await Promise.allSettled([
-          dashboardService.getGudangBahanDashboard(),
-        ]);
-        if (gbRes.status === "fulfilled" && gbRes.value?.data?.data) {
-          gudangBahanData.value.metric = gbRes.value.data.data.metric;
-          gudangBahanData.value.topStok = gbRes.value.data.data.topStok;
-          // Kosongkan — diganti pakai lazy list
-          gudangBahanData.value.detailBawahBuffer = [];
-          gudangBahanData.value.bahanBarcode = [];
-        }
-        // Load batch pertama keduanya paralel
-        await Promise.allSettled([loadMoreBuffer(), loadMoreBahan()]);
-      } finally {
-        isLoadingGudangBahan.value = false;
-      }
-    }
   } finally {
     isLoadingDashboard.value = false;
+  }
+};
+
+// ── Shortcut card di Overview — cuma summary ringan (bukan list
+// penuh), biar card gak nunjukin 0 padahal tabnya belum dibuka ──
+const loadOverviewShortcuts = async () => {
+  const calls: Promise<any>[] = [];
+
+  if (showPenawaran.value) {
+    calls.push(
+      dashboardService
+        .getPenawaranSummary()
+        .then((res) => {
+          penSummary.value = res.data.data;
+        })
+        .catch(() => {}),
+    );
+    calls.push(
+      dashboardService
+        .getPenawaranMapSummary()
+        .then((res) => {
+          mapSummary.value = res.data.data;
+        })
+        .catch(() => {}),
+    );
+  }
+  if (showPiutang.value) {
+    calls.push(
+      dashboardService
+        .getPiutangDashboard()
+        .then((res) => {
+          if (res.data?.data?.summary)
+            piutangData.value.summary = res.data.data.summary;
+        })
+        .catch(() => {}),
+    );
+  }
+  if (showPoBpb.value) {
+    calls.push(
+      dashboardService
+        .getPoBahanBpbSummary()
+        .then((res) => {
+          poBpbSummary.value = res.data.data;
+        })
+        .catch(() => {}),
+    );
+  }
+  if (showGudangBahan.value) {
+    calls.push(
+      dashboardService
+        .getGudangBahanDashboard()
+        .then((res) => {
+          if (res.data?.data?.metric)
+            gudangBahanData.value.metric = res.data.data.metric;
+        })
+        .catch(() => {}),
+    );
+  }
+  if (showBarangJadi.value) {
+    calls.push(
+      dashboardService
+        .getBarangJadiMetric()
+        .then((res) => {
+          if (res.data?.data) barangJadiMetric.value = res.data.data;
+        })
+        .catch(() => {}),
+    );
+  }
+
+  await Promise.allSettled(calls);
+};
+
+// ── Marketing ──
+const loadMarketingData = async () => {
+  if (!showPenawaran.value) return;
+  isLoadingDashboard.value = true;
+  try {
+    rpDetailList.value = [];
+    rpDetailOffset.value = 0;
+    rpDetailHasMore.value = true;
+    mapSpkList.value = [];
+    mapSpkOffset.value = 0;
+    mapSpkHasMore.value = true;
+    mapKirimList.value = [];
+    mapKirimOffset.value = 0;
+    mapKirimHasMore.value = true;
+    penawaranBelumSpk.value = [];
+    penOffset.value = 0;
+    penHasMore.value = true;
+    penawaranBelumMap.value = [];
+    mapOffset.value = 0;
+    mapHasMore.value = true;
+
+    const [sumRes, realisasiRes, mapSumRes, kunjunganRes, realisasiPenRes] =
+      await Promise.allSettled([
+        dashboardService.getPenawaranSummary(),
+        dashboardService.getRealisasiSummary(),
+        dashboardService.getPenawaranMapSummary(),
+        dashboardService.getKunjunganSalesSummary(),
+        dashboardService.getRealisasiPenawaranDashboard(),
+      ]);
+    if (sumRes.status === "fulfilled")
+      penSummary.value = sumRes.value.data.data;
+    if (realisasiRes.status === "fulfilled")
+      realisasiRows.value = realisasiRes.value.data.data;
+    if (mapSumRes.status === "fulfilled")
+      mapSummary.value = mapSumRes.value.data.data;
+    if (kunjunganRes.status === "fulfilled")
+      kunjunganRows.value = kunjunganRes.value.data.data || [];
+    if (
+      realisasiPenRes.status === "fulfilled" &&
+      realisasiPenRes.value?.data?.data
+    ) {
+      realisasiPenawaranData.value = realisasiPenRes.value.data.data;
+    }
+
+    await Promise.allSettled([
+      loadMorePenawaran(),
+      loadMoreMap(),
+      loadMoreRpDetail(),
+    ]);
+
+    const [mapVsSpkRes, mapVsSjRes] = await Promise.allSettled([
+      dashboardService.getMapVsSpkDashboard(
+        mapFilter.value.startDate,
+        mapFilter.value.endDate,
+      ),
+      dashboardService.getMapVsSjDashboard(
+        mapFilter.value.startDate,
+        mapFilter.value.endDate,
+      ),
+    ]);
+    if (mapVsSpkRes.status === "fulfilled" && mapVsSpkRes.value?.data?.data) {
+      mapSpkMetric.value = mapVsSpkRes.value.data.data.metric;
+      mapDivisi.value = mapVsSpkRes.value.data.data.divisi;
+    }
+    if (mapVsSjRes.status === "fulfilled" && mapVsSjRes.value?.data?.data) {
+      mapSjMetric.value = mapVsSjRes.value.data.data;
+    }
+    await Promise.allSettled([loadMoreMapSpk(), loadMoreMapKirim()]);
+
+    marketingLoaded.value = true;
+  } finally {
+    isLoadingDashboard.value = false;
+  }
+};
+
+// ── Finance / Piutang ──
+const loadFinanceData = async () => {
+  if (!showPiutang.value) return;
+  isLoadingDashboard.value = true;
+  try {
+    overdueList.value = [];
+    overdueOffset.value = 0;
+    overdueHasMore.value = true;
+
+    const [piutangRes, penerimaanRes] = await Promise.allSettled([
+      dashboardService.getPiutangDashboard(),
+      dashboardService.getPenerimaanSummary(),
+    ]);
+    if (piutangRes.status === "fulfilled" && piutangRes.value?.data?.data) {
+      piutangData.value.summary = piutangRes.value.data.data.summary;
+      piutangData.value.top5 = piutangRes.value.data.data.top5;
+      piutangData.value.trend = piutangRes.value.data.data.trend;
+      piutangData.value.overdue = [];
+    }
+    if (
+      penerimaanRes.status === "fulfilled" &&
+      penerimaanRes.value?.data?.data
+    ) {
+      penerimaanSummary.value = penerimaanRes.value.data.data;
+    }
+
+    await loadMoreOverdue();
+
+    financeLoaded.value = true;
+  } finally {
+    isLoadingDashboard.value = false;
+  }
+};
+
+// ── Gudang Garmen ──
+const loadGudangData = async () => {
+  if (!showPoBpb.value) return;
+  isLoadingDashboard.value = true;
+  try {
+    bahanKurangList.value = [];
+    bahanKurangOffset.value = 0;
+    bahanKurangHasMore.value = true;
+    spkBelumMkbList.value = [];
+    spkBelumMkbOffset.value = 0;
+    spkBelumMkbHasMore.value = true;
+    outstandingPoMitraList.value = [];
+    outstandingOffset.value = 0;
+    outstandingHasMore.value = true;
+    efisiensiBabaranList.value = [];
+    efisiensiOffset.value = 0;
+    efisiensiHasMore.value = true;
+
+    const [
+      poBpbRes,
+      bahanKurangCountRes,
+      spkBelumMkbCountRes,
+      poJasaRes,
+      outstandingSumRes,
+      efisiensiSumRes,
+    ] = await Promise.allSettled([
+      dashboardService.getPoBahanBpbSummary(),
+      dashboardService.getBahanKurangCount(),
+      dashboardService.getSpkBelumMkbCount(),
+      dashboardService.getPoJasaVsBpjSummary(),
+      dashboardService.getOutstandingPoMitraSummary(),
+      dashboardService.getEfisiensiBabaranSummary(),
+    ]);
+    if (poBpbRes.status === "fulfilled")
+      poBpbSummary.value = poBpbRes.value.data.data;
+    if (
+      bahanKurangCountRes.status === "fulfilled" &&
+      bahanKurangCountRes.value?.data?.data
+    )
+      bahanKurangSummary.value = bahanKurangCountRes.value.data.data;
+    if (spkBelumMkbCountRes.status === "fulfilled")
+      spkBelumMkbCountVal.value = spkBelumMkbCountRes.value.data.data ?? 0;
+    if (poJasaRes.status === "fulfilled" && poJasaRes.value?.data?.data)
+      poJasaVsBpjData.value = poJasaRes.value.data.data;
+    if (
+      outstandingSumRes.status === "fulfilled" &&
+      outstandingSumRes.value?.data?.data
+    )
+      outstandingPoMitraSummary.value = outstandingSumRes.value.data.data;
+    if (
+      efisiensiSumRes.status === "fulfilled" &&
+      efisiensiSumRes.value?.data?.data
+    )
+      efisiensiBabaranSummary.value = efisiensiSumRes.value.data.data;
+
+    await Promise.allSettled([
+      loadMoreBahanKurang(),
+      loadMoreSpkBelumMkb(),
+      loadMoreOutstanding(),
+      loadMoreEfisiensi(),
+    ]);
+
+    await fetchPipelineData();
+
+    gudangLoaded.value = true;
+  } finally {
+    isLoadingDashboard.value = false;
+  }
+};
+
+// ── Gudang Bahan ──
+const loadGudangBahanData = async () => {
+  if (!showGudangBahan.value) return;
+  bufferList.value = [];
+  bufferOffset.value = 0;
+  bufferHasMore.value = true;
+  bahanList.value = [];
+  bahanOffset.value = 0;
+  bahanHasMore.value = true;
+  stokAccVsMkaList.value = [];
+  stokAccVsMkaOffset.value = 0;
+  stokAccVsMkaHasMore.value = true;
+
+  isLoadingGudangBahan.value = true;
+  try {
+    const [gbRes, stokAccMkaCountRes] = await Promise.allSettled([
+      dashboardService.getGudangBahanDashboard(),
+      dashboardService.getStokAccVsMkaCount(),
+    ]);
+    if (gbRes.status === "fulfilled" && gbRes.value?.data?.data) {
+      gudangBahanData.value.metric = gbRes.value.data.data.metric;
+      gudangBahanData.value.topStok = gbRes.value.data.data.topStok;
+      gudangBahanData.value.detailBawahBuffer = [];
+      gudangBahanData.value.bahanBarcode = [];
+    }
+    if (
+      stokAccMkaCountRes.status === "fulfilled" &&
+      stokAccMkaCountRes.value?.data?.data
+    )
+      stokAccVsMkaCount.value = stokAccMkaCountRes.value.data.data.total ?? 0;
+
+    await Promise.allSettled([
+      loadMoreBuffer(),
+      loadMoreBahan(),
+      loadMoreStokAccVsMka(),
+    ]);
+
+    gudangBahanLoaded.value = true;
+  } finally {
+    isLoadingGudangBahan.value = false;
+  }
+};
+
+// ── Barang Jadi ──
+const loadBarangJadiData = async () => {
+  if (!showBarangJadi.value) return;
+  stokBarangJadiList.value = [];
+  stokBjOffset.value = 0;
+  stokBjHasMore.value = true;
+  mutasiBarangJadiList.value = [];
+  mutasiBjOffset.value = 0;
+  mutasiBjHasMore.value = true;
+
+  isLoadingBarangJadi.value = true;
+  try {
+    const [metricRes] = await Promise.allSettled([
+      dashboardService.getBarangJadiMetric(),
+    ]);
+    if (metricRes.status === "fulfilled" && metricRes.value?.data?.data)
+      barangJadiMetric.value = metricRes.value.data.data;
+
+    await Promise.allSettled([loadMoreStokBj(), loadMoreMutasiBj()]);
+
+    barangJadiLoaded.value = true;
+  } finally {
+    isLoadingBarangJadi.value = false;
+  }
+};
+
+// ── Refresh: reload tab yang lagi aktif aja ──
+const loadDashboard = async () => {
+  if (activeTab.value === "overview") {
+    await loadOverviewData();
+  } else if (activeTab.value === "marketing") {
+    marketingLoaded.value = false;
+    await loadMarketingData();
+  } else if (activeTab.value === "finance") {
+    financeLoaded.value = false;
+    await loadFinanceData();
+  } else if (activeTab.value === "gudang") {
+    gudangLoaded.value = false;
+    await loadGudangData();
+  } else if (activeTab.value === "gudang-bahan") {
+    gudangBahanLoaded.value = false;
+    await loadGudangBahanData();
+  } else if (activeTab.value === "barang-jadi") {
+    barangJadiLoaded.value = false;
+    await loadBarangJadiData();
   }
 };
 
@@ -1106,7 +1809,19 @@ onMounted(async () => {
     isSpkDialogVisible.value = true;
   }
 
-  await loadDashboard();
+  // Overview SELALU di-fetch (tab-nya selalu terlihat)
+  await loadOverviewData();
+  // Shortcut card butuh summary ringan dari tab lain, tanpa nge-load
+  // list penuhnya (list tetap lazy pas tab beneran dibuka)
+  loadOverviewShortcuts();
+
+  // Kalau default tab BUKAN overview, fetch data tab itu juga
+  if (activeTab.value === "marketing") await loadMarketingData();
+  else if (activeTab.value === "finance") await loadFinanceData();
+  else if (activeTab.value === "gudang") await loadGudangData();
+  else if (activeTab.value === "gudang-bahan") await loadGudangBahanData();
+  else if (activeTab.value === "barang-jadi") await loadBarangJadiData();
+
   startPolling();
 
   // Setup observer untuk tab yang aktif saat ini
@@ -1124,9 +1839,17 @@ onMounted(async () => {
   if (activeTab.value === "gudang-bahan") {
     setupBufferObserver();
     setupBahanObserver();
+    setupStokAccVsMkaObserver();
   }
   if (activeTab.value === "overview") {
     setupAktObserver();
+  }
+  if (activeTab.value === "gudang") {
+    setupGudangObservers();
+  }
+  if (activeTab.value === "barang-jadi") {
+    setupStokBjObserver();
+    setupMutasiBjObserver();
   }
 });
 
@@ -1141,6 +1864,13 @@ onUnmounted(() => {
   rpDetailScrollObserver?.disconnect();
   mapSpkScrollObserver?.disconnect();
   mapKirimScrollObserver?.disconnect();
+  bahanKurangScrollObserver?.disconnect();
+  spkBelumMkbScrollObserver?.disconnect();
+  outstandingScrollObserver?.disconnect();
+  efisiensiScrollObserver?.disconnect();
+  stokAccVsMkaScrollObserver?.disconnect();
+  stokBjScrollObserver?.disconnect();
+  mutasiBjScrollObserver?.disconnect();
 });
 
 const closeSpkDialog = () => {
@@ -1371,6 +2101,14 @@ const sisaClass = (item: any) => {
         <IconPackage :size="14" class="mr-1" :stroke-width="1.7" />
         Gudang Bahan
       </v-tab>
+      <v-tab
+        v-if="showBarangJadi"
+        value="barang-jadi"
+        class="text-caption font-weight-bold"
+      >
+        <IconBoxSeam :size="14" class="mr-1" :stroke-width="1.7" />
+        Barang Jadi
+      </v-tab>
     </v-tabs>
 
     <v-window v-model="activeTab">
@@ -1481,6 +2219,24 @@ const sisaClass = (item: any) => {
                   <span v-else>
                     {{ poBpbSummary.Open }} PO Open ·
                     {{ poBpbSummary.OnProses }} On Proses
+                  </span>
+                </div>
+              </div>
+              <IconChevronRight :size="16" color="#9e9e9e" />
+            </div>
+          </v-col>
+          <v-col v-if="showBarangJadi" cols="12" sm="3">
+            <div class="shortcut-card" @click="activeTab = 'barang-jadi'">
+              <IconBoxSeam :size="20" color="#00695c" :stroke-width="1.5" />
+              <div style="flex: 1; min-width: 0">
+                <div class="shortcut-title">Barang Jadi</div>
+                <div class="shortcut-sub">
+                  <span v-if="isLoadingDashboard || isLoadingBarangJadi"
+                    >Memuat...</span
+                  >
+                  <span v-else>
+                    {{ fmtNum(barangJadiMetric.TotalStok) }} stok ·
+                    {{ barangJadiMetric.ItemMinus }} minus
                   </span>
                 </div>
               </div>
@@ -3658,7 +4414,126 @@ const sisaClass = (item: any) => {
           </v-col>
         </v-row>
 
-        <!-- Panel row 2: Stok bahan barcode -->
+        <!-- ── Panel: Stok Aksesoris vs Kebutuhan MKA ── -->
+        <v-row dense class="mb-2">
+          <v-col cols="12">
+            <div class="manksi-panel content-panel">
+              <div
+                class="panel-header"
+                style="
+                  background: #fff3e0;
+                  color: #e65100;
+                  border-bottom: 1px solid #ffe0b2;
+                "
+              >
+                <IconAlertTriangle
+                  :size="14"
+                  :stroke-width="1.7"
+                  class="mr-1"
+                />
+                Stok Aksesoris vs Kebutuhan MKA
+                <span class="panel-header-sub ml-1"
+                  >(kekurangan, bulan ini)</span
+                >
+                <span
+                  v-if="stokAccVsMkaCount"
+                  class="badge-count ml-auto"
+                  style="background: #e65100"
+                >
+                  {{ stokAccVsMkaCount }} item
+                </span>
+              </div>
+              <div class="panel-body">
+                <v-progress-linear
+                  v-if="isLoadingGudangBahan"
+                  indeterminate
+                  color="warning"
+                  height="2"
+                />
+                <template
+                  v-else-if="
+                    stokAccVsMkaList.length || isLoadingMoreStokAccVsMka
+                  "
+                >
+                  <div class="gb-list">
+                    <div
+                      v-for="item in stokAccVsMkaList"
+                      :key="item.Kode"
+                      class="bk-row"
+                    >
+                      <div
+                        class="gb-row"
+                        style="cursor: pointer"
+                        @click="
+                          router.push('/laporan/gudang-garmen/stok-acc-vs-mka')
+                        "
+                      >
+                        <div
+                          class="gb-nama"
+                          :title="item.Nama"
+                          style="
+                            width: 220px;
+                            white-space: normal;
+                            line-height: 1.3;
+                          "
+                        >
+                          {{ item.Nama }}
+                        </div>
+                        <div class="gb-bar-wrap">
+                          <span class="pen-cus" style="flex: 1">
+                            Stok {{ fmtNum(item.StokAcc) }} / Kebutuhan
+                            {{ fmtNum(item.Mka) }} {{ item.Satuan }}
+                          </span>
+                          <span
+                            style="
+                              font-size: 10px;
+                              font-weight: 700;
+                              color: #e65100;
+                            "
+                          >
+                            Kurang {{ fmtNum(Math.abs(item.Free)) }}
+                          </span>
+                        </div>
+                      </div>
+                      <div class="bk-bahan-list">
+                        <div
+                          v-for="(s, i) in item.spkList"
+                          :key="i"
+                          class="bk-bahan-item"
+                        >
+                          <span class="bk-bahan-nama"
+                            >{{ s.Spk }} — {{ s.NamaSpk }}</span
+                          >
+                          <span class="bk-bahan-kurang">
+                            sisa {{ fmtNum(s.Sisa) }}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <div ref="stokAccVsMkaSentinelEl" class="pen-sentinel">
+                      <span v-if="isLoadingMoreStokAccVsMka" class="pen-loading"
+                        >Memuat...</span
+                      >
+                      <span
+                        v-else-if="
+                          !stokAccVsMkaHasMore && stokAccVsMkaList.length
+                        "
+                        class="pen-end"
+                      >
+                        {{ stokAccVsMkaList.length }} item ditampilkan
+                      </span>
+                    </div>
+                  </div>
+                </template>
+                <div v-else class="text-center text-grey py-3 text-caption">
+                  Semua aksesoris tercukupi untuk kebutuhan MKA bulan ini 🎉
+                </div>
+              </div>
+            </div>
+          </v-col>
+        </v-row>
+
+        <!-- Panel row 3: Stok bahan barcode -->
         <v-row dense>
           <v-col cols="12">
             <div class="manksi-panel content-panel">
@@ -3789,66 +4664,312 @@ const sisaClass = (item: any) => {
            TAB GUDANG GARMEN
       ════════════════════════════════════════ -->
       <v-window-item value="gudang">
-        <v-row dense>
+        <!-- ── Row baru: Pipeline SPK → Produksi ── -->
+        <v-row dense class="mt-2">
           <v-col cols="12">
             <div class="manksi-panel content-panel">
-              <div class="panel-header panel-header--teal">
-                <IconTruckDelivery
+              <div class="panel-header panel-header--blue">
+                <IconTrendingUp :size="14" :stroke-width="1.7" class="mr-1" />
+                Pipeline SPK → Produksi
+                <span class="panel-header-sub ml-1"
+                  >(dateline {{ pipelineFilter.startDate }} s.d
+                  {{ pipelineFilter.endDate }})</span
+                >
+              </div>
+              <div class="panel-body pa-3">
+                <v-progress-linear
+                  v-if="isLoadingDashboard"
+                  indeterminate
+                  color="primary"
+                  height="2"
+                />
+                <template v-else-if="pipelineData.TotalMasuk">
+                  <div class="funnel-wrap">
+                    <div
+                      v-for="(stage, i) in pipelineStages"
+                      :key="stage.label"
+                      class="funnel-row"
+                    >
+                      <span class="funnel-label">{{ stage.label }}</span>
+                      <div class="funnel-bar-track">
+                        <div
+                          class="funnel-bar-fill"
+                          :style="{
+                            width: pipelinePct(stage.value) + '%',
+                            background: stage.color,
+                          }"
+                        />
+                      </div>
+                      <span class="funnel-val" :style="{ color: stage.color }">
+                        {{ stage.value }}
+                      </span>
+                      <span class="funnel-pct"
+                        >{{ pipelinePct(stage.value) }}%</span
+                      >
+                    </div>
+                  </div>
+                </template>
+                <div v-else class="text-center text-grey py-3 text-caption">
+                  Tidak ada SPK dengan dateline pada periode ini.
+                </div>
+              </div>
+            </div>
+          </v-col>
+        </v-row>
+
+        <!-- ── Row: Alert Bahan Kurang ── -->
+        <v-row dense class="mt-2">
+          <v-col cols="12">
+            <div class="manksi-panel content-panel">
+              <div
+                class="panel-header"
+                style="
+                  background: #ffebee;
+                  color: #c62828;
+                  border-bottom: 1px solid #ffcdd2;
+                "
+              >
+                <IconAlertTriangle
                   :size="14"
                   :stroke-width="1.7"
                   class="mr-1"
                 />
-                PO Bahan vs BPB
-                <span class="panel-header-sub ml-1">(bulan ini)</span>
-                <button
-                  class="po-bpb-link ml-auto"
-                  @click="router.push('/laporan/gudang-garmen/po-bahan-vs-bpb')"
+                Bahan Kurang untuk Produksi
+                <span
+                  v-if="bahanKurangSummary.total"
+                  class="badge-count ml-auto"
+                  style="background: #c62828"
                 >
-                  Lihat Detail →
-                </button>
+                  {{ bahanKurangSummary.total }} SPK
+                </span>
               </div>
               <div class="panel-body">
                 <v-progress-linear
                   v-if="isLoadingDashboard"
                   indeterminate
-                  color="teal"
+                  color="red"
                   height="2"
                 />
-                <template v-else>
-                  <div class="po-bpb-summary">
-                    <div class="po-bpb-stat">
-                      <span class="po-bpb-val text-primary">{{
-                        poBpbSummary.TotalPO
-                      }}</span>
-                      <span class="po-bpb-lbl">Total PO</span>
-                    </div>
-                    <div class="po-bpb-divider" />
+                <template
+                  v-else-if="bahanKurangList.length || isLoadingMoreBahanKurang"
+                >
+                  <div class="gb-list" style="max-height: 320px">
                     <div
-                      class="po-bpb-stat clickable"
+                      v-for="item in bahanKurangList"
+                      :key="item.Nomor"
+                      class="bk-row"
+                    >
+                      <div
+                        class="gb-row"
+                        style="cursor: pointer"
+                        @click="
+                          router.push(
+                            '/laporan/gudang-garmen/spk-mkb-vs-po-bpb',
+                          )
+                        "
+                      >
+                        <div
+                          class="gb-nama"
+                          :title="item.NamaSpk"
+                          style="width: 160px"
+                        >
+                          <span class="pen-nomor">{{ item.Nomor }}</span>
+                        </div>
+                        <div class="gb-bar-wrap">
+                          <span class="pen-cus" style="flex: 1">{{
+                            item.NamaSpk
+                          }}</span>
+                          <span
+                            style="
+                              font-size: 10px;
+                              font-weight: 700;
+                              color: #c62828;
+                            "
+                          >
+                            {{ item.JmlBahanKurang }} bahan
+                          </span>
+                        </div>
+                      </div>
+                      <div class="bk-bahan-list">
+                        <div
+                          v-for="(b, i) in item.bahanList"
+                          :key="i"
+                          class="bk-bahan-item"
+                        >
+                          <span class="bk-bahan-nama">{{
+                            b.NamaBahan || b.Kode
+                          }}</span>
+                          <span class="bk-bahan-kurang">
+                            kurang {{ fmtDec(b.Kurang) }} {{ b.Satuan }}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <div ref="bahanKurangSentinelEl" class="pen-sentinel">
+                      <span v-if="isLoadingMoreBahanKurang" class="pen-loading"
+                        >Memuat...</span
+                      >
+                      <span
+                        v-else-if="
+                          !bahanKurangHasMore && bahanKurangList.length
+                        "
+                        class="pen-end"
+                      >
+                        {{ bahanKurangList.length }} SPK ditampilkan
+                      </span>
+                    </div>
+                  </div>
+                </template>
+                <div v-else class="text-center text-grey py-3 text-caption">
+                  Semua kebutuhan bahan produksi tercukupi 🎉
+                </div>
+              </div>
+            </div>
+          </v-col>
+        </v-row>
+
+        <!-- ── Row: SPK Belum MKB | (PO Bahan vs BPB + PO Jasa vs BPB Jasa stacked) ── -->
+        <v-row dense class="mt-2">
+          <v-col cols="12" md="6">
+            <div class="manksi-panel content-panel fill-height">
+              <div class="panel-header panel-header--warning">
+                <IconFileAlert :size="14" :stroke-width="1.7" class="mr-1" />
+                SPK Belum Ada MKB
+                <span v-if="spkBelumMkbCountVal" class="badge-count ml-auto">
+                  {{ spkBelumMkbCountVal }}
+                </span>
+              </div>
+              <div class="panel-body">
+                <v-progress-linear
+                  v-if="isLoadingDashboard"
+                  indeterminate
+                  color="warning"
+                  height="2"
+                />
+                <template
+                  v-else-if="spkBelumMkbList.length || isLoadingMoreSpkBelumMkb"
+                >
+                  <div class="pen-list" style="max-height: 400px">
+                    <div
+                      v-for="s in spkBelumMkbList"
+                      :key="s.Nomor"
+                      class="pen-item"
+                      :class="
+                        s.SisaHari < 0
+                          ? 'umur-danger'
+                          : s.SisaHari <= 3
+                            ? 'umur-warn'
+                            : ''
+                      "
+                      style="cursor: pointer"
                       @click="
-                        router.push('/laporan/gudang-garmen/po-bahan-vs-bpb')
+                        router.push('/laporan/gudang-garmen/spk-belum-mkb')
                       "
                     >
-                      <span class="po-bpb-val" style="color: #c62828">{{
-                        poBpbSummary.Open
-                      }}</span>
-                      <span class="po-bpb-lbl">OPEN</span>
+                      <div class="pen-item-top">
+                        <span class="pen-nomor">{{ s.Nomor }}</span>
+                        <span
+                          class="pen-age"
+                          :class="
+                            s.SisaHari < 0
+                              ? 'umur-danger'
+                              : s.SisaHari <= 3
+                                ? 'umur-warn'
+                                : 'umur-ok'
+                          "
+                        >
+                          {{ s.SisaHari < 0 ? "Lewat" : s.SisaHari + "h" }}
+                        </span>
+                      </div>
+                      <div class="pen-cus">{{ s.Nama }}</div>
+                      <div class="pen-ket">Dateline: {{ s.Dateline }}</div>
                     </div>
-                    <div class="po-bpb-divider" />
-                    <div class="po-bpb-stat">
-                      <span class="po-bpb-val" style="color: #0277bd">{{
-                        poBpbSummary.OnProses
-                      }}</span>
-                      <span class="po-bpb-lbl">ON PROSES</span>
+                    <div ref="spkBelumMkbSentinelEl" class="pen-sentinel">
+                      <span v-if="isLoadingMoreSpkBelumMkb" class="pen-loading"
+                        >Memuat...</span
+                      >
+                      <span
+                        v-else-if="
+                          !spkBelumMkbHasMore && spkBelumMkbList.length
+                        "
+                        class="pen-end"
+                      >
+                        {{ spkBelumMkbList.length }} SPK ditampilkan
+                      </span>
                     </div>
-                    <div class="po-bpb-divider" />
-                    <div class="po-bpb-stat">
-                      <span class="po-bpb-val text-success">{{
-                        poBpbSummary.Close
-                      }}</span>
-                      <span class="po-bpb-lbl">CLOSE</span>
+                  </div>
+                </template>
+                <div v-else class="text-center text-grey py-3 text-caption">
+                  Semua SPK bulan ini sudah ada MKB 🎉
+                </div>
+              </div>
+            </div>
+          </v-col>
+
+          <v-col cols="12" md="6">
+            <div class="d-flex flex-column" style="gap: 8px; height: 100%">
+              <!-- PO Bahan vs BPB -->
+              <div class="manksi-panel content-panel">
+                <div class="panel-header panel-header--teal">
+                  <IconTruckDelivery
+                    :size="14"
+                    :stroke-width="1.7"
+                    class="mr-1"
+                  />
+                  PO Bahan vs BPB
+                  <span class="panel-header-sub ml-1">(bulan ini)</span>
+                  <button
+                    class="po-bpb-link ml-auto"
+                    @click="
+                      router.push('/laporan/gudang-garmen/po-bahan-vs-bpb')
+                    "
+                  >
+                    Lihat Detail →
+                  </button>
+                </div>
+                <div class="panel-body">
+                  <v-progress-linear
+                    v-if="isLoadingDashboard"
+                    indeterminate
+                    color="teal"
+                    height="2"
+                  />
+                  <template v-else>
+                    <div class="po-bpb-summary">
+                      <div class="po-bpb-stat">
+                        <span class="po-bpb-val text-primary">{{
+                          poBpbSummary.TotalPO
+                        }}</span>
+                        <span class="po-bpb-lbl">Total PO</span>
+                      </div>
+                      <div class="po-bpb-divider" />
+                      <div
+                        class="po-bpb-stat clickable"
+                        @click="
+                          router.push('/laporan/gudang-garmen/po-bahan-vs-bpb')
+                        "
+                      >
+                        <span class="po-bpb-val" style="color: #c62828">{{
+                          poBpbSummary.Open
+                        }}</span>
+                        <span class="po-bpb-lbl">OPEN</span>
+                      </div>
+                      <div class="po-bpb-divider" />
+                      <div class="po-bpb-stat">
+                        <span class="po-bpb-val" style="color: #0277bd">{{
+                          poBpbSummary.OnProses
+                        }}</span>
+                        <span class="po-bpb-lbl">ON PROSES</span>
+                      </div>
+                      <div class="po-bpb-divider" />
+                      <div class="po-bpb-stat">
+                        <span class="po-bpb-val text-success">{{
+                          poBpbSummary.Close
+                        }}</span>
+                        <span class="po-bpb-lbl">CLOSE</span>
+                      </div>
                     </div>
-                    <div class="po-bpb-bar-wrap">
+                    <div class="po-bpb-bar-wrap" style="padding: 0 16px 12px">
                       <div class="po-bpb-bar">
                         <div
                           class="po-bpb-seg seg-open"
@@ -3896,8 +5017,530 @@ const sisaClass = (item: any) => {
                         />CLOSE
                       </div>
                     </div>
+                  </template>
+                </div>
+              </div>
+
+              <!-- PO Jasa vs BPB Jasa -->
+              <div class="manksi-panel content-panel">
+                <div class="panel-header panel-header--teal">
+                  <IconFileInvoice
+                    :size="14"
+                    :stroke-width="1.7"
+                    class="mr-1"
+                  />
+                  PO Jasa vs BPB Jasa
+                  <span class="panel-header-sub ml-1">(bulan ini)</span>
+                </div>
+                <div class="panel-body">
+                  <v-progress-linear
+                    v-if="isLoadingDashboard"
+                    indeterminate
+                    color="teal"
+                    height="2"
+                  />
+                  <template v-else>
+                    <div class="po-bpb-summary">
+                      <div class="po-bpb-stat">
+                        <span class="po-bpb-val text-primary">{{
+                          poJasaVsBpjData.TotalPO
+                        }}</span>
+                        <span class="po-bpb-lbl">Total PO</span>
+                      </div>
+                      <div class="po-bpb-divider" />
+                      <div class="po-bpb-stat">
+                        <span class="po-bpb-val" style="color: #c62828">{{
+                          poJasaVsBpjData.Belum
+                        }}</span>
+                        <span class="po-bpb-lbl">BELUM</span>
+                      </div>
+                      <div class="po-bpb-divider" />
+                      <div class="po-bpb-stat">
+                        <span class="po-bpb-val" style="color: #0277bd">{{
+                          poJasaVsBpjData.Proses
+                        }}</span>
+                        <span class="po-bpb-lbl">PROSES</span>
+                      </div>
+                      <div class="po-bpb-divider" />
+                      <div class="po-bpb-stat">
+                        <span class="po-bpb-val text-success">{{
+                          poJasaVsBpjData.Closed
+                        }}</span>
+                        <span class="po-bpb-lbl">CLOSED</span>
+                      </div>
+                    </div>
+                    <div class="po-bpb-bar-wrap" style="padding: 0 16px 12px">
+                      <div class="po-bpb-bar">
+                        <div
+                          class="po-bpb-seg seg-open"
+                          :style="{
+                            width: poJasaVsBpjData.TotalPO
+                              ? (poJasaVsBpjData.Belum /
+                                  poJasaVsBpjData.TotalPO) *
+                                  100 +
+                                '%'
+                              : '0%',
+                          }"
+                        />
+                        <div
+                          class="po-bpb-seg seg-onproses"
+                          :style="{
+                            width: poJasaVsBpjData.TotalPO
+                              ? (poJasaVsBpjData.Proses /
+                                  poJasaVsBpjData.TotalPO) *
+                                  100 +
+                                '%'
+                              : '0%',
+                          }"
+                        />
+                        <div
+                          class="po-bpb-seg seg-close"
+                          :style="{
+                            width: poJasaVsBpjData.TotalPO
+                              ? (poJasaVsBpjData.Closed /
+                                  poJasaVsBpjData.TotalPO) *
+                                  100 +
+                                '%'
+                              : '0%',
+                          }"
+                        />
+                      </div>
+                      <div class="po-bpb-legend">
+                        <span
+                          class="leg-dot"
+                          style="background: #c62828"
+                        />BELUM
+                        <span
+                          class="leg-dot ml-2"
+                          style="background: #0277bd"
+                        />PROSES
+                        <span
+                          class="leg-dot ml-2"
+                          style="background: #43a047"
+                        />CLOSED
+                      </div>
+                    </div>
+                  </template>
+                </div>
+              </div>
+            </div>
+          </v-col>
+        </v-row>
+
+        <!-- ── Row: Outstanding PO Mitra + Efisiensi Babaran ── -->
+        <v-row dense class="mt-2">
+          <v-col cols="12" md="6">
+            <div class="manksi-panel content-panel fill-height">
+              <div
+                class="panel-header"
+                style="
+                  background: #f3e5f5;
+                  color: #6a1b9a;
+                  border-bottom: 1px solid #e1bee7;
+                "
+              >
+                <IconGauge :size="14" :stroke-width="1.7" class="mr-1" />
+                Outstanding PO Mitra
+                <span class="panel-header-sub ml-1">(Jasa Jahit)</span>
+                <span
+                  v-if="outstandingPoMitraSummary.totalMitra"
+                  class="badge-count ml-auto"
+                  style="background: #6a1b9a"
+                >
+                  {{ outstandingPoMitraSummary.totalMitra }} mitra
+                </span>
+              </div>
+              <div class="panel-body">
+                <v-progress-linear
+                  v-if="isLoadingDashboard"
+                  indeterminate
+                  color="purple"
+                  height="2"
+                />
+                <template
+                  v-else-if="
+                    outstandingPoMitraList.length || isLoadingMoreOutstanding
+                  "
+                >
+                  <div
+                    style="
+                      padding: 6px 12px;
+                      border-bottom: 1px solid #f0f0f0;
+                      font-size: 11px;
+                      color: #6a1b9a;
+                      font-weight: 700;
+                    "
+                  >
+                    Total Kurang:
+                    {{ fmtNum(outstandingPoMitraSummary.totalKurang) }}
+                  </div>
+                  <div class="gb-list" style="max-height: 280px">
+                    <div
+                      v-for="m in outstandingPoMitraList"
+                      :key="m.Kode"
+                      class="gb-row"
+                      style="cursor: pointer"
+                      @click="
+                        router.push(
+                          '/laporan/gudang-garmen/outstanding-po-mitra',
+                        )
+                      "
+                    >
+                      <div
+                        class="gb-nama"
+                        :title="m.Supplier"
+                        style="width: 150px"
+                      >
+                        {{ m.Supplier }}
+                      </div>
+                      <div class="gb-bar-wrap">
+                        <span class="pen-cus" style="flex: 1"
+                          >Target: {{ fmtNum(m.Target) }} · OTM
+                          {{ fmtDec(m.Otm) }}</span
+                        >
+                        <span
+                          style="
+                            font-size: 10px;
+                            font-weight: 700;
+                            color: #6a1b9a;
+                          "
+                        >
+                          Kurang {{ fmtNum(m.Kurang) }}
+                        </span>
+                      </div>
+                    </div>
+                    <div ref="outstandingSentinelEl" class="pen-sentinel">
+                      <span v-if="isLoadingMoreOutstanding" class="pen-loading"
+                        >Memuat...</span
+                      >
+                      <span
+                        v-else-if="
+                          !outstandingHasMore && outstandingPoMitraList.length
+                        "
+                        class="pen-end"
+                      >
+                        {{ outstandingPoMitraList.length }} mitra ditampilkan
+                      </span>
+                    </div>
                   </div>
                 </template>
+                <div v-else class="text-center text-grey py-3 text-caption">
+                  Tidak ada outstanding PO mitra jasa jahit bulan ini 🎉
+                </div>
+              </div>
+            </div>
+          </v-col>
+
+          <v-col cols="12" md="6">
+            <div class="manksi-panel content-panel fill-height">
+              <div
+                class="panel-header"
+                style="
+                  background: #fff3e0;
+                  color: #e65100;
+                  border-bottom: 1px solid #ffe0b2;
+                "
+              >
+                <IconScale :size="14" :stroke-width="1.7" class="mr-1" />
+                Efisiensi Babaran
+                <span class="panel-header-sub ml-1">(bulan ini)</span>
+                <span
+                  v-if="efisiensiBabaranSummary.totalSpk"
+                  class="pct-badge ml-auto"
+                  :class="
+                    efisiensiBabaranSummary.pctDeviasi <= 10
+                      ? 'pct-good'
+                      : efisiensiBabaranSummary.pctDeviasi <= 30
+                        ? 'pct-mid'
+                        : 'pct-low'
+                  "
+                >
+                  {{ efisiensiBabaranSummary.pctDeviasi }}% deviasi
+                </span>
+              </div>
+              <div class="panel-body">
+                <v-progress-linear
+                  v-if="isLoadingDashboard"
+                  indeterminate
+                  color="orange"
+                  height="2"
+                />
+                <template v-else-if="efisiensiBabaranSummary.totalSpk">
+                  <div class="pen-summary-bar">
+                    <div class="pen-stat">
+                      <span class="pen-stat-val text-primary">{{
+                        efisiensiBabaranSummary.totalSpk
+                      }}</span>
+                      <span class="pen-stat-lbl">Total SPK</span>
+                    </div>
+                    <div class="pen-stat">
+                      <span class="pen-stat-val" style="color: #e65100">{{
+                        efisiensiBabaranSummary.jmlDeviasi
+                      }}</span>
+                      <span class="pen-stat-lbl">Deviasi Minus</span>
+                    </div>
+                  </div>
+                  <div class="gb-list" style="max-height: 220px">
+                    <div
+                      v-for="s in efisiensiBabaranList"
+                      :key="s.Nomor"
+                      class="gb-row"
+                      style="cursor: pointer"
+                      @click="
+                        router.push(
+                          '/laporan/gudang-garmen/standart-babaran-vs-realisasi',
+                        )
+                      "
+                    >
+                      <div class="gb-nama" :title="s.Nama" style="width: 150px">
+                        <span class="pen-nomor">{{ s.Nomor }}</span>
+                      </div>
+                      <div class="gb-bar-wrap">
+                        <span class="pen-cus" style="flex: 1">{{
+                          s.Nama
+                        }}</span>
+                        <span
+                          style="
+                            font-size: 10px;
+                            font-weight: 700;
+                            color: #c62828;
+                          "
+                        >
+                          {{ fmtDec(s.Minus, 3) }}
+                        </span>
+                      </div>
+                    </div>
+                    <div ref="efisiensiSentinelEl" class="pen-sentinel">
+                      <span v-if="isLoadingMoreEfisiensi" class="pen-loading"
+                        >Memuat...</span
+                      >
+                      <span
+                        v-else-if="
+                          !efisiensiHasMore && efisiensiBabaranList.length
+                        "
+                        class="pen-end"
+                      >
+                        {{ efisiensiBabaranList.length }} SPK ditampilkan
+                      </span>
+                    </div>
+                  </div>
+                </template>
+                <div v-else class="text-center text-grey py-3 text-caption">
+                  Belum ada data babaran bulan ini.
+                </div>
+              </div>
+            </div>
+          </v-col>
+        </v-row>
+      </v-window-item>
+
+      <!-- ════════════════════════════════════════
+           TAB BARANG JADI
+      ════════════════════════════════════════ -->
+      <v-window-item value="barang-jadi">
+        <v-row dense class="mb-3">
+          <v-col cols="6" sm="3">
+            <div class="sum-card">
+              <div class="sum-label">Total Item Barang Jadi</div>
+              <div class="sum-value text-primary">
+                <span v-if="isLoadingBarangJadi">—</span>
+                <span v-else>{{ fmtNum(barangJadiMetric.TotalItem) }}</span>
+              </div>
+            </div>
+          </v-col>
+          <v-col cols="6" sm="3">
+            <div class="sum-card">
+              <div class="sum-label">Total Stok (semua gudang)</div>
+              <div class="sum-value text-success">
+                <span v-if="isLoadingBarangJadi">—</span>
+                <span v-else>{{ fmtNum(barangJadiMetric.TotalStok) }}</span>
+              </div>
+            </div>
+          </v-col>
+          <v-col cols="6" sm="3">
+            <div class="sum-card">
+              <div class="sum-label">Item Bergerak Bulan Ini</div>
+              <div class="sum-value" style="color: #0277bd">
+                <span v-if="isLoadingBarangJadi">—</span>
+                <span v-else>{{ barangJadiMetric.ItemBergerak }}</span>
+              </div>
+            </div>
+          </v-col>
+          <v-col cols="6" sm="3">
+            <div class="sum-card">
+              <div class="sum-label">Item Stok Minus</div>
+              <div class="sum-value text-error">
+                <span v-if="isLoadingBarangJadi">—</span>
+                <span v-else>{{ barangJadiMetric.ItemMinus }}</span>
+              </div>
+            </div>
+          </v-col>
+        </v-row>
+
+        <v-row dense>
+          <v-col cols="12" md="6">
+            <div class="manksi-panel content-panel fill-height">
+              <div class="panel-header panel-header--blue">
+                <IconBoxSeam :size="14" :stroke-width="1.7" class="mr-1" />
+                Stok Barang Jadi (saat ini)
+                <select
+                  v-model="stokBjGudangFilter"
+                  class="gj-filter-sel ml-auto"
+                  @change="onChangeStokBjGudang"
+                >
+                  <option
+                    v-for="g in gudangJadiOptions"
+                    :key="g.value"
+                    :value="g.value"
+                  >
+                    {{ g.label }}
+                  </option>
+                </select>
+              </div>
+              <div class="panel-body">
+                <v-progress-linear
+                  v-if="isLoadingBarangJadi"
+                  indeterminate
+                  color="primary"
+                  height="2"
+                />
+                <template
+                  v-else-if="stokBarangJadiList.length || isLoadingMoreStokBj"
+                >
+                  <div class="gb-list" style="max-height: 400px">
+                    <div
+                      v-for="item in stokBarangJadiList"
+                      :key="item.Kode + item.Gudang"
+                      class="gb-row"
+                    >
+                      <div
+                        class="gb-nama"
+                        :title="item.Nama"
+                        style="width: 160px"
+                      >
+                        {{ item.Nama }}
+                      </div>
+                      <div class="gb-bar-wrap">
+                        <span class="pen-cus" style="flex: 1">
+                          {{ item.Gudang }} · {{ item.Customer || "-" }}
+                        </span>
+                        <span
+                          style="
+                            font-size: 10px;
+                            font-weight: 700;
+                            color: #1565c0;
+                          "
+                        >
+                          {{ fmtNum(item.Stok) }} {{ item.Ukuran }}
+                        </span>
+                      </div>
+                    </div>
+                    <div ref="stokBjSentinelEl" class="pen-sentinel">
+                      <span v-if="isLoadingMoreStokBj" class="pen-loading"
+                        >Memuat...</span
+                      >
+                      <span
+                        v-else-if="!stokBjHasMore && stokBarangJadiList.length"
+                        class="pen-end"
+                      >
+                        {{ stokBarangJadiList.length }} item ditampilkan
+                      </span>
+                    </div>
+                  </div>
+                </template>
+                <div v-else class="text-center text-grey py-3 text-caption">
+                  Belum ada data stok barang jadi.
+                </div>
+              </div>
+            </div>
+          </v-col>
+
+          <v-col cols="12" md="6">
+            <div class="manksi-panel content-panel fill-height">
+              <div class="panel-header panel-header--teal">
+                <IconArrowsExchange
+                  :size="14"
+                  :stroke-width="1.7"
+                  class="mr-1"
+                />
+                Mutasi Barang Jadi
+                <span class="panel-header-sub ml-1">(bulan ini)</span>
+              </div>
+              <div class="panel-body">
+                <v-progress-linear
+                  v-if="isLoadingBarangJadi"
+                  indeterminate
+                  color="teal"
+                  height="2"
+                />
+                <template
+                  v-else-if="
+                    mutasiBarangJadiList.length || isLoadingMoreMutasiBj
+                  "
+                >
+                  <div class="gb-list" style="max-height: 400px">
+                    <div
+                      v-for="item in mutasiBarangJadiList"
+                      :key="item.Kode"
+                      class="gb-row"
+                      :class="{ 'row-minus': Number(item.StokAkhir) < 0 }"
+                    >
+                      <div
+                        class="gb-nama"
+                        :title="item.Nama"
+                        style="width: 160px"
+                      >
+                        {{ item.Nama }}
+                      </div>
+                      <div class="gb-bar-wrap">
+                        <span class="pen-cus" style="flex: 1">
+                          Masuk
+                          {{
+                            fmtNum(
+                              Number(item.Stbj) +
+                                Number(item.MutasiMasuk) +
+                                Number(item.Koreksi),
+                            )
+                          }}
+                          · Keluar
+                          {{
+                            fmtNum(
+                              Number(item.SuratJalan) +
+                                Number(item.MutasiKeluar),
+                            )
+                          }}
+                        </span>
+                        <span
+                          style="font-size: 10px; font-weight: 700"
+                          :style="{
+                            color:
+                              Number(item.StokAkhir) < 0
+                                ? '#c62828'
+                                : '#00695c',
+                          }"
+                        >
+                          Akhir {{ fmtNum(item.StokAkhir) }}
+                        </span>
+                      </div>
+                    </div>
+                    <div ref="mutasiBjSentinelEl" class="pen-sentinel">
+                      <span v-if="isLoadingMoreMutasiBj" class="pen-loading"
+                        >Memuat...</span
+                      >
+                      <span
+                        v-else-if="
+                          !mutasiBjHasMore && mutasiBarangJadiList.length
+                        "
+                        class="pen-end"
+                      >
+                        {{ mutasiBarangJadiList.length }} item ditampilkan
+                      </span>
+                    </div>
+                  </div>
+                </template>
+                <div v-else class="text-center text-grey py-3 text-caption">
+                  Belum ada mutasi barang jadi bulan ini.
+                </div>
               </div>
             </div>
           </v-col>
@@ -4239,6 +5882,7 @@ const sisaClass = (item: any) => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  font-size: 11px;
 }
 .pen-ket {
   font-size: 10px;
@@ -5395,6 +7039,89 @@ const sisaClass = (item: any) => {
 .aktivitas-item--new {
   background: #e8f5e9 !important;
   animation: highlight-fade 3s ease-out forwards;
+}
+
+.funnel-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.funnel-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.funnel-label {
+  width: 120px;
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: #424242;
+}
+.funnel-bar-track {
+  flex: 1;
+  height: 14px;
+  background: #f0f0f0;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.funnel-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.4s ease;
+}
+.funnel-val {
+  width: 36px;
+  text-align: right;
+  font-size: 12px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.funnel-pct {
+  width: 38px;
+  text-align: right;
+  font-size: 10px;
+  color: #9e9e9e;
+  flex-shrink: 0;
+}
+
+.bk-row {
+  border-bottom: 1px solid #f5f5f5;
+}
+.bk-bahan-list {
+  padding: 2px 12px 6px 34px;
+}
+.bk-bahan-item {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: #757575;
+  padding: 1px 0;
+}
+.bk-bahan-nama {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 70%;
+}
+.bk-bahan-kurang {
+  color: #c62828;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.row-minus {
+  background: #fff5f5;
+}
+.gj-filter-sel {
+  font-size: 10px;
+  border: 1px solid #bbdefb;
+  border-radius: 3px;
+  padding: 2px 6px;
+  background: white;
+  color: #1565c0;
+  font-weight: 600;
+  cursor: pointer;
+  outline: none;
 }
 
 @keyframes highlight-fade {

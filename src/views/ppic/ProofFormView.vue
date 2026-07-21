@@ -879,4 +879,22 @@ const validateSave = () => {
 .btn-del:hover {
   background: #ffcdd2;
 }
+
+@media (max-width: 768px) {
+  .fr {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+  }
+  .lbl {
+    width: 100%;
+  }
+  .inp,
+  .igrp {
+    width: 100% !important;
+  }
+  .pf-card {
+    padding: 10px;
+  }
+}
 </style>

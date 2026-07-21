@@ -2349,6 +2349,17 @@ const router = createRouter({
       },
     },
     {
+      path: "/laporan/gudang-garmen/stok-dc",
+      name: "LapStokDc",
+      component: () => import("@/views/laporan/gudang-garmen/StokDcView.vue"),
+      meta: {
+        title: "Laporan Stok Gudang DC",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "570",
+      },
+    },
+    {
       path: "/laporan/gudang-garmen/stok-barang-jadi",
       name: "LapStokBarangJadi",
       component: () =>
@@ -2442,6 +2453,183 @@ const router = createRouter({
         layout: "DefaultLayout",
         requiresAuth: true,
         menuId: "512",
+      },
+    },
+    {
+      path: "/laporan/gudang-garmen/poj-vs-bpj",
+      name: "LapPojVsBpj",
+      component: () => import("@/views/laporan/gudang-garmen/PojVsBpjView.vue"),
+      meta: {
+        title: "Laporan PO Jasa vs BPB Jasa",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "513",
+      },
+    },
+    {
+      path: "/laporan/gudang-garmen/outstanding-po-mitra",
+      name: "LapOutstandingPoMitra",
+      component: () =>
+        import("@/views/laporan/gudang-garmen/OutstandingPoMitraView.vue"),
+      meta: {
+        title: "Laporan Outstanding PO Mitra",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "514",
+      },
+    },
+    {
+      path: "/laporan/gudang-garmen/realisasi-minta-bahan",
+      name: "LapRealisasiMintaBahan",
+      component: () =>
+        import("@/views/laporan/gudang-garmen/RealisasiMintaBahanView.vue"),
+      meta: {
+        title: "Realisasi Minta Bahan (Sisa/Belum Potong)",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "515",
+      },
+    },
+    {
+      path: "/laporan/gudang-garmen/realisasi-minta-vs-lhk-cutt",
+      name: "LapRealisasiMintaVsLhkCutt",
+      component: () =>
+        import("@/views/laporan/gudang-garmen/RealisasiMintaVsLhkCuttView.vue"),
+      meta: {
+        title: "Realisasi Minta Bahan vs LHK Cutting",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "568",
+      },
+    },
+    {
+      path: "/laporan/gudang-garmen/spkv-realisasiv-lhkcutt",
+      name: "LapSpkVsRealisasiVsLhkCutt",
+      component: () =>
+        import("@/views/laporan/gudang-garmen/SpkVsRealisasiVsLhkCuttView.vue"),
+      meta: {
+        title: "SPK vs Realisasi Permintaan vs LHK Cutting",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "517",
+      },
+    },
+    {
+      path: "/laporan/gudang-garmen/spk-vs-stbj-vs-sj",
+      name: "LapSpkVsStbjVsSj",
+      component: () =>
+        import("@/views/laporan/gudang-garmen/SpkVsStbjVsSjView.vue"),
+      meta: {
+        title: "SPK vs STBJ vs SJ",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "518",
+      },
+    },
+    {
+      path: "/laporan/gudang-garmen/spk-mkb-vs-po-bpb",
+      name: "LapSpkMkbVsPoBpb",
+      component: () =>
+        import("@/views/laporan/gudang-garmen/SpkMkbVsPoBpbView.vue"),
+      meta: {
+        title: "SPK MKB vs PO BPB",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "519",
+      },
+    },
+    {
+      path: "/laporan/gudang-garmen/spk-vs-po",
+      name: "LapSpkVsPo",
+      component: () => import("@/views/laporan/gudang-garmen/SpkVsPoView.vue"),
+      meta: {
+        title: "SPK vs PO",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "520",
+      },
+    },
+    {
+      path: "/laporan/gudang-garmen/spk-vs-bpb",
+      name: "LapSpkVsBpb",
+      component: () => import("@/views/laporan/gudang-garmen/SpkVsBpbView.vue"),
+      meta: {
+        title: "SPK vs BPB",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "521",
+      },
+    },
+    {
+      path: "/laporan/gudang-garmen/spk-vs-bpb-non-po",
+      name: "LapSpkVsBpbNonPo",
+      component: () =>
+        import("@/views/laporan/gudang-garmen/SpkVsBpbNonPoView.vue"),
+      meta: {
+        title: "SPK vs BPB Non PO",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "522",
+      },
+    },
+    {
+      path: "/laporan/gudang-garmen/spk-close-stbj",
+      name: "LapSpkCloseStbj",
+      component: () =>
+        import("@/views/laporan/gudang-garmen/SpkCloseStbjView.vue"),
+      meta: {
+        title: "SPK Close STBJ",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "523",
+      },
+    },
+    {
+      path: "/laporan/gudang-garmen/mutasi-prod-detail",
+      name: "LapMutasiProdDetail",
+      component: () =>
+        import("@/views/laporan/gudang-garmen/LaporanMutasiProduksiView.vue"),
+      meta: {
+        title: "Laporan Mutasi Produksi Detail",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "524",
+      },
+    },
+    {
+      path: "/laporan/gudang-garmen/kekurangan-produksi",
+      name: "LapKekuranganProduksi",
+      component: () =>
+        import("@/views/laporan/gudang-garmen/KekuranganProduksiView.vue"),
+      meta: {
+        title: "Laporan Kekurangan Produksi",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "525",
+      },
+    },
+    {
+      path: "/laporan/gudang-garmen/lap-outstanding-spk",
+      name: "LapOutstandingSpk",
+      component: () =>
+        import("@/views/laporan/gudang-garmen/OutstandingSpkView.vue"),
+      meta: {
+        title: "Laporan Outstanding SPK",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "526",
+      },
+    },
+    {
+      path: "/laporan/gudang-garmen/browse-spk",
+      name: "LapBrowseSpk",
+      component: () =>
+        import("@/views/laporan/gudang-garmen/BrowseSpkView.vue"),
+      meta: {
+        title: "Browse SPK",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "527",
       },
     },
 

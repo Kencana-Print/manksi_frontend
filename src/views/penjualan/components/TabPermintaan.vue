@@ -322,7 +322,9 @@ const onFileChange = (e: Event) => {
                 class="tp-inp-field"
                 style="background: #ddeeff; font-weight: 600"
                 placeholder="Kode..."
-                @keydown.enter.prevent="onCustKodeEnter"
+                @keydown.enter.prevent="
+                  ($event.target as HTMLInputElement).blur()
+                "
                 @blur="onCustKodeEnter"
               />
               <button
@@ -353,7 +355,9 @@ const onFileChange = (e: Event) => {
                 class="tp-inp-field"
                 style="background: #ddeeff; font-weight: 600"
                 placeholder="Kode..."
-                @keydown.enter.prevent="onSalesKodeEnter"
+                @keydown.enter.prevent="
+                  ($event.target as HTMLInputElement).blur()
+                "
                 @blur="onSalesKodeEnter"
               />
               <button

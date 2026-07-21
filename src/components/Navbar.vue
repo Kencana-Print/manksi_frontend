@@ -84,6 +84,11 @@ import {
   IconScale,
   IconBoxSeam,
   IconClipboardData,
+  IconGauge,
+  IconListCheck,
+  IconTruckLoading,
+  IconCircleCheck,
+  IconAlertTriangle,
 } from "@tabler/icons-vue";
 
 interface NavItem {
@@ -353,6 +358,13 @@ const menuItems: NavItem[] = [
         icon: IconCalendarStats,
         menuId: 56,
       },
+      { divider: true },
+      {
+        title: "LHK Pola",
+        to: "/garmen/lhk-pola",
+        icon: IconRuler2,
+        menuId: 174,
+      },
     ],
   },
   {
@@ -570,12 +582,6 @@ const menuItems: NavItem[] = [
         menuId: 109,
       },
       { divider: true },
-      {
-        title: "LHK Pola",
-        to: "/garmen/lhk-pola",
-        icon: IconRuler2,
-        menuId: 174,
-      },
     ],
   },
   {
@@ -790,6 +796,12 @@ const menuItems: NavItem[] = [
             icon: IconScale,
             menuId: 569,
           },
+          {
+            title: "Stok Gudang DC",
+            to: "/laporan/gudang-garmen/stok-dc",
+            icon: IconBuildingWarehouse,
+            menuId: 570,
+          },
           { divider: true },
           {
             title: "Stok Barang Jadi",
@@ -833,6 +845,96 @@ const menuItems: NavItem[] = [
             to: "/laporan/gudang-garmen/po-bahan-vs-bpb",
             icon: IconTruckDelivery,
             menuId: 512,
+          },
+          {
+            title: "PO Jasa vs BPB Jasa",
+            to: "/laporan/gudang-garmen/poj-vs-bpj",
+            icon: IconFileInvoice,
+            menuId: 513,
+          },
+          {
+            title: "Outstanding PO Mitra",
+            to: "/laporan/gudang-garmen/outstanding-po-mitra",
+            icon: IconGauge,
+            menuId: 514,
+          },
+          {
+            title: "Realisasi Minta Bahan",
+            to: "/laporan/gudang-garmen/realisasi-minta-bahan",
+            icon: IconClipboardList,
+            menuId: 515,
+          },
+          {
+            title: "Realisasi Minta Bahan vs LHK Cutting",
+            to: "/laporan/gudang-garmen/realisasi-minta-vs-lhk-cutt",
+            icon: IconClipboardCheck,
+            menuId: 568,
+          },
+          {
+            title: "SPK vs Realisasi vs LHK Cutting",
+            to: "/laporan/gudang-garmen/spkv-realisasiv-lhkcutt",
+            icon: IconListCheck,
+            menuId: 517,
+          },
+          {
+            title: "SPK vs STBJ vs SJ",
+            to: "/laporan/gudang-garmen/spk-vs-stbj-vs-sj",
+            icon: IconTruckLoading,
+            menuId: 518,
+          },
+          {
+            title: "SPK MKB vs PO BPB",
+            to: "/laporan/gudang-garmen/spk-mkb-vs-po-bpb",
+            icon: IconFileAnalytics,
+            menuId: 519,
+          },
+          {
+            title: "SPK vs PO",
+            to: "/laporan/gudang-garmen/spk-vs-po",
+            icon: IconFileInvoice,
+            menuId: 520,
+          },
+          {
+            title: "SPK vs BPB",
+            to: "/laporan/gudang-garmen/spk-vs-bpb",
+            icon: IconTruckDelivery,
+            menuId: 521,
+          },
+          {
+            title: "SPK vs BPB Non PO",
+            to: "/laporan/gudang-garmen/spk-vs-bpb-non-po",
+            icon: IconTruckDelivery,
+            menuId: 522,
+          },
+          {
+            title: "SPK Close STBJ",
+            to: "/laporan/gudang-garmen/spk-close-stbj",
+            icon: IconCircleCheck,
+            menuId: 523,
+          },
+          {
+            title: "Mutasi Produksi with Detail",
+            to: "/laporan/gudang-garmen/mutasi-prod-detail",
+            icon: IconLayoutGrid,
+            menuId: 524,
+          },
+          {
+            title: "Laporan Kekurangan Produksi",
+            to: "/laporan/gudang-garmen/kekurangan-produksi",
+            icon: IconAlertTriangle,
+            menuId: 525,
+          },
+          {
+            title: "Outstanding SPK",
+            to: "/laporan/gudang-garmen/lap-outstanding-spk",
+            icon: IconClipboardList,
+            menuId: 526,
+          },
+          {
+            title: "Browse SPK",
+            to: "/laporan/gudang-garmen/browse-spk",
+            icon: IconClipboardList,
+            menuId: 527,
           },
         ],
       },

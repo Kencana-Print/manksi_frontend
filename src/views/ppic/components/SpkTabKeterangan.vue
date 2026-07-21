@@ -279,14 +279,14 @@ const addRow = () => {
 
     <!-- Kolom kanan: Gudang + Produksi -->
     <div class="ket-col ket-col-right">
-      <div class="section-card ket-card">
+      <!-- <div class="section-card ket-card">
         <div class="sec-title mb-2">Keterangan Gudang/Pembelian</div>
         <textarea
           v-model="formData.spk_ketbeli"
           class="ket-textarea"
           placeholder="Keterangan untuk gudang/pembelian..."
         />
-      </div>
+      </div> -->
       <div class="section-card ket-card mt-2">
         <div class="sec-title mb-2">Keterangan Produksi</div>
         <textarea

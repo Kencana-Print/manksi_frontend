@@ -850,6 +850,7 @@ const setSetoranPembayaran = (v: any) => {
             v-model="formData.CustPerfect"
             class="f-inp f-sel"
             style="width: 50px"
+            disabled
           >
             <option v-for="o in perfectOptions" :key="o" :value="o">
               {{ o }}

@@ -26,7 +26,7 @@ const emit = defineEmits([
   "confirm-save",
   "confirm-cancel",
   "confirm-close",
-]); // <--- TAMBAH confirm-close
+]);
 </script>
 
 <template>
@@ -225,9 +225,10 @@ const emit = defineEmits([
   display: flex;
   flex-direction: column;
   min-height: 0;
+  min-width: 0;
   overflow-y: auto;
   overflow-x: hidden;
-  padding-bottom: 12px; /* ← ruang napas di bawah */
+  padding-bottom: 12px;
   scrollbar-width: thin;
   scrollbar-color: #bdbdbd transparent;
 }
@@ -250,13 +251,15 @@ const emit = defineEmits([
   display: flex;
   flex-direction: column;
   min-height: 0;
+  min-width: 0;
   overflow-y: auto;
-  overflow-x: hidden;
+  overflow-x: auto;
 }
 .center-column {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  min-width: 0;
   flex-grow: 1;
 }
 .full-column {

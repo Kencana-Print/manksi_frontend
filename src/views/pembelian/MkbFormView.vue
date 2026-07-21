@@ -276,23 +276,56 @@ const openSpkModal = () => {
   showSpkModal.value = true;
 };
 
+// ── AUTOFILL dtlBahan dari BAST (tkesesuaianmap_komponen) ──
+// Cuma jalan kalau dtlBahan masih kosong (belum ada baris yang user
+// isi manual) — supaya gak pernah menimpa rincian bahan yang sudah
+// diedit user, baik di sesi ini maupun saat mode edit MKB tersimpan.
+const isDtlBahanKosong = () =>
+  formData.value.dtlBahan.every((r: any) => !r.kode && !r.komponen);
+
+const autofillFromBast = (bastKomponen: any[]) => {
+  if (!bastKomponen || !bastKomponen.length) return;
+  if (!isDtlBahanKosong()) return;
+  formData.value.dtlBahan = bastKomponen.map((k: any) => {
+    const row = {
+      komponen: k.komponen || "",
+      ketk: "",
+      babaran: Number(k.babaran) || 0,
+      warna: k.warna || "",
+      jenis: "",
+      kode: k.kode || "",
+      namaBahan: k.nama_bahan || "",
+      satuan: k.satuan || "",
+      gramasi: k.gramasi || "",
+      jumlah: 0,
+      allowance: "",
+      allowanceManual: false,
+      allowanceLocked: false,
+      ready: 0,
+      po: 0,
+      tglbeli: "",
+      keterangan: "",
+    };
+    recalcRowFull(row); // hitung jumlah/allowance dari babaran & jumlahSpk
+    return row;
+  });
+  toast.info(
+    `Rincian bahan otomatis diisi dari BAST MAP (${bastKomponen.length} komponen).`,
+  );
+};
+
 const onSpkSelected = async (spk: any) => {
   try {
     isLoading.value = true;
     const res = await mkbFormService.checkSpk(spk.Nomor, formData.value.nomor);
-    const { info, planning } = res.data.data;
-
-    // Set data produk
+    const { info, planning, bastKomponen } = res.data.data;
     formData.value.nomorSpk = info.Nomor;
     formData.value.namaSpk = info.Nama;
     formData.value.jumlahSpk = info.Jumlah;
     formData.value.jenisOrder = info.JenisOrder;
     formData.value.memoSpk = info.Memo;
-
-    // Rekalkulasi rincian bahan (Babaran)
     formData.value.dtlBahan.forEach(recalcRowFull);
-
-    // Isi Planning (Kecuali MAP)
+    autofillFromBast(bastKomponen);
     if (!isMapMode.value) {
       formData.value.dtlPlan = planning.map((p: any) => ({
         tanggal: formatDateLocal(p.plan_tanggal),
@@ -301,7 +334,7 @@ const onSpkSelected = async (spk: any) => {
     }
   } catch (e: any) {
     toast.error(e.response?.data?.message || "Gagal memvalidasi SPK");
-    formData.value.nomorSpk = ""; // Reset jika error
+    formData.value.nomorSpk = "";
   } finally {
     isLoading.value = false;
   }
@@ -324,31 +357,26 @@ const onSpkEnter = async () => {
   const nomor = (formData.value.nomorSpk || "").trim();
   if (!nomor) return;
   if (isTutupBuku.value && isEdit.value) return;
-
   try {
     isLoading.value = true;
     const res = await mkbFormService.checkSpk(nomor, formData.value.nomor);
-    const { info, planning } = res.data.data;
-
+    const { info, planning, bastKomponen } = res.data.data;
     formData.value.nomorSpk = info.Nomor;
     formData.value.namaSpk = info.Nama;
     formData.value.jumlahSpk = info.Jumlah;
     formData.value.jenisOrder = info.JenisOrder;
     formData.value.memoSpk = info.Memo;
-
     formData.value.dtlBahan.forEach(recalcRowFull);
-
+    autofillFromBast(bastKomponen); // ← tambah
     if (!isMapMode.value) {
       formData.value.dtlPlan = planning.map((p: any) => ({
         tanggal: formatDateLocal(p.plan_tanggal),
         jumlah: p.plan_datang,
       }));
     }
-
     toast.success(`SPK ${info.Nomor} berhasil dimuat.`);
   } catch (e: any) {
     toast.error(e.response?.data?.message || "Nomor SPK tidak ditemukan.");
-    // Reset field SPK jika tidak ditemukan
     formData.value.nomorSpk = "";
     formData.value.namaSpk = "";
     formData.value.jumlahSpk = 0;

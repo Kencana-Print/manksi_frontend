@@ -22,9 +22,15 @@ export const mutasiProduksiFormService = {
     }),
 
   // Search No Material
-  searchNoMaterial: (nomorSpk: string, q = "", page = 1, limit = 30) =>
+  searchNoMaterial: (
+    nomorSpk: string,
+    q = "",
+    excludeNomor = "",
+    page = 1,
+    limit = 30,
+  ) =>
     api.get("/garmen/mutasi-produksi-form/search-material", {
-      params: { nomorSpk, q, page, limit },
+      params: { nomorSpk, q, excludeNomor, page, limit },
     }),
 
   // Detail No Material (setelah pilih)

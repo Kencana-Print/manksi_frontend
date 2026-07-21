@@ -542,7 +542,9 @@ watch(
                 class="f-inp"
                 style="width: 50px; flex: none; background: #ddeeff"
                 @keydown="onPerushF1"
-                @keydown.enter.prevent="onPerushKodeEnter"
+                @keydown.enter.prevent="
+                  ($event.target as HTMLInputElement).blur()
+                "
                 @blur="onPerushKodeEnter"
               />
               <input
@@ -578,7 +580,9 @@ watch(
                   font-weight: 600;
                 "
                 @keydown="onCustF1"
-                @keydown.enter.prevent="onCustKodeEnter"
+                @keydown.enter.prevent="
+                  ($event.target as HTMLInputElement).blur()
+                "
                 @blur="onCustKodeEnter"
               />
               <input
@@ -626,7 +630,9 @@ watch(
                   font-weight: 600;
                 "
                 @keydown="onSalesF1"
-                @keydown.enter.prevent="onSalesKodeEnter"
+                @keydown.enter.prevent="
+                  ($event.target as HTMLInputElement).blur()
+                "
                 @blur="onSalesKodeEnter"
               />
               <input

@@ -176,6 +176,7 @@ const loadPoData = async () => {
       satuan: d.satuan,
       satuanpo: d.satuanpo,
       jumlahyard: 0,
+      jumlahmeter: 0,
       jumlah: 0,
       roll: 0,
       harga: d.harga,
@@ -230,14 +231,36 @@ const setMkbDetail = (item: any) => {
 };
 
 // ── Grid logic ──
+// 1 yard = 0.9144 meter (standar konversi)
+const YARD_TO_METER = 0.9144;
+
+// Yard diisi user → Meter (kolom bantu) & Terima Skrg (jumlah) otomatis terhitung
 const onJumlahYardChange = (idx: number) => {
   const row = formData.value.items[idx];
-  if (row.satuanpo?.toUpperCase() === "YARD")
-    row.jumlah = Number((Number(row.jumlahyard || 0) * 0.9144).toFixed(2));
+  const meter = Number(
+    (Number(row.jumlahyard || 0) * YARD_TO_METER).toFixed(2),
+  );
+  row.jumlahmeter = meter;
+  row.jumlah = meter;
   onJumlahChange(idx);
 };
+
+// Meter (kolom bantu) diisi user → Yard & Terima Skrg (jumlah) otomatis terhitung
+const onJumlahMeterChange = (idx: number) => {
+  const row = formData.value.items[idx];
+  row.jumlahyard = Number(
+    (Number(row.jumlahmeter || 0) / YARD_TO_METER).toFixed(2),
+  );
+  row.jumlah = Number(row.jumlahmeter || 0);
+  onJumlahChange(idx);
+};
+
+// Terima Skrg (jumlah) tetap bisa diisi manual langsung — kalau begitu,
+// kolom bantu Meter ikut disamakan (tanpa memaksa Yard, karena user
+// mungkin memang inputnya bukan dari yard).
 const onJumlahChange = (idx: number) => {
   const row = formData.value.items[idx];
+  row.jumlahmeter = row.jumlah;
   if (isPo.value) {
     const pi = formData.value.poItems.findIndex(
       (p: any) => p.kode === row.kode && p.spk === row.spk,
@@ -315,6 +338,8 @@ const addItem = () => {
     kode: "",
     nama: "",
     satuan: "",
+    jumlahyard: 0,
+    jumlahmeter: 0,
     jumlah: 0,
     roll: 0,
     harga: 0,
@@ -728,7 +753,8 @@ const printBarcodeAll = () => {
                 <th style="width: 72px" class="tr">Qty PO</th>
                 <th style="width: 72px" class="tr">Terima</th>
                 <th style="width: 72px" class="tr text-red">Kurang</th>
-                <th style="width: 80px" class="tr bg-yellow">Jml YARD</th>
+                <th style="width: 75px" class="tr bg-yellow">Jml YARD</th>
+                <th style="width: 75px" class="tr bg-yellow">Jml METER</th>
                 <th style="width: 80px" class="tr bg-yellow">Terima Skrg</th>
                 <th style="width: 55px" class="tr bg-yellow">Roll</th>
                 <th style="width: 80px">Gramasi</th>
@@ -798,8 +824,21 @@ const printBarcodeAll = () => {
                   <input
                     v-model.number="item.jumlahyard"
                     type="number"
+                    step="0.01"
                     class="ci tr fw bg-yellow-light"
+                    title="Isi Yard → Meter & Terima Skrg otomatis terhitung"
                     @blur="onJumlahYardChange(Number(idx))"
+                    v-select-on-focus
+                  />
+                </td>
+                <td class="p0">
+                  <input
+                    v-model.number="item.jumlahmeter"
+                    type="number"
+                    step="0.01"
+                    class="ci tr fw bg-yellow-light"
+                    title="Isi Meter → Yard & Terima Skrg otomatis terhitung"
+                    @blur="onJumlahMeterChange(Number(idx))"
                     v-select-on-focus
                   />
                 </td>

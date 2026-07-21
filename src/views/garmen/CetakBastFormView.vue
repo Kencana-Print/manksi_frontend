@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref, onMounted, watch, nextTick } from "vue";
 import { useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
 import BaseForm from "@/components/BaseForm.vue";
@@ -66,6 +66,9 @@ const savedNomor = ref("");
 const showBahanModal = ref(false);
 const activeBahanIdx = ref(-1);
 const listKomponen = ref<string[]>([]);
+let cachedSizesNomor = "";
+let cachedSizes: any[] | null = null;
+let hasWarnedNoSizes = false;
 
 function normalizeHeader(h: any) {
   return {
@@ -78,7 +81,7 @@ function normalizeHeader(h: any) {
     mspk_finishing: h.mspk_finishing ?? h.Mspk_finishing ?? "",
     mspk_kendala: h.mspk_kendala ?? h.Mspk_kendala ?? "",
     mspk_jumlah_jadi: h.mspk_jumlah_jadi ?? h.Mspk_jumlah ?? 0,
-    mspk_tipe: h.mspk_tipe ?? h.Mspk_tipe ?? "Premium",
+    mspk_tipe: h.mspk_tipe ?? h.Mspk_tipe ?? "",
     mspk_gramasi: h.mspk_gramasi ?? h.Mspk_gramasi ?? "",
     mspk_rencana_size: h.mspk_rencana_size ?? h.Mspk_rencana_size ?? "",
     mspk_keterangan: h.mspk_keterangan ?? h.Mspk_keterangan ?? "",
@@ -196,6 +199,126 @@ const {
   },
 });
 
+// ── SINKRONISASI: Babaran di grid Bahan (komponen) ↔ Keterangan
+// checklist no.8 (Babaran), dan propagasi ke Babaran per Size.
+// Guard flag mencegah watcher saling memicu tak terbatas (infinite loop).
+const isSyncingBabaran = ref(false);
+
+const buildKeteranganFromKomponen = () => {
+  const parts = formData.value.komponen
+    .filter((k: any) => k.komponen && k.komponen.trim())
+    .map((k: any) => `${k.komponen}=${k.babaran ?? 0}`);
+  return parts.length > 0 ? parts.join(", ") : "-";
+};
+
+// Arah 1: Bahan (komponen.babaran) → Keterangan checklist no.8 — LIVE,
+// karena teks yang dihasilkan murni programatik (bukan ketikan user).
+watch(
+  () => formData.value.komponen,
+  () => {
+    if (isSyncingBabaran.value) return;
+    const check8 = formData.value.checklist.find(
+      (c: any) => Number(c.no) === 8,
+    );
+    if (!check8) return;
+    isSyncingBabaran.value = true;
+    check8.keterangan = buildKeteranganFromKomponen();
+    nextTick(() => {
+      isSyncingBabaran.value = false;
+    });
+  },
+  { deep: true },
+);
+
+// Arah 2: Keterangan checklist no.8 → Bahan (komponen.babaran) — dipicu
+// saat blur (bukan tiap ketikan), parse format "KOMPONEN=nilai, ...".
+const onKeterangan8Blur = () => {
+  if (isSyncingBabaran.value) return;
+  const check8 = formData.value.checklist.find((c: any) => Number(c.no) === 8);
+  if (!check8 || !check8.keterangan || check8.keterangan === "-") return;
+
+  const parts = check8.keterangan
+    .split(",")
+    .map((s: string) => s.trim())
+    .filter(Boolean);
+
+  isSyncingBabaran.value = true;
+  parts.forEach((p: string) => {
+    const [komp, val] = p.split("=").map((s: string) => s.trim());
+    if (!komp || val === undefined || isNaN(Number(val))) return;
+    const row = formData.value.komponen.find((k: any) => k.komponen === komp);
+    if (row) {
+      row.babaran = Number(val);
+      syncBabaranToSizeBreakdown(row);
+    }
+  });
+  nextTick(() => {
+    isSyncingBabaran.value = false;
+  });
+};
+
+// Arah 3: Bahan (komponen.babaran) → Babaran per Size — begitu babaran
+// suatu komponen diisi:
+// - Kalau sudah ada baris size untuk komponen itu, update nilainya.
+// - Kalau belum ada sama sekali, auto-generate baris dari daftar size MAP.
+const syncBabaranToSizeBreakdown = async (k: any) => {
+  const komponenStr = (k.komponen || "").trim();
+  if (!komponenStr) return;
+
+  const existingRows = formData.value.sizeBreakdown.filter(
+    (s: any) => s.komponen === komponenStr,
+  );
+
+  if (existingRows.length > 0) {
+    existingRows.forEach((s: any) => {
+      s.babaran = k.babaran;
+    });
+    return;
+  }
+
+  const nomor =
+    formData.value.header.mspk_nomor || formData.value.header.mspk_nomor;
+
+  // Cache: kalau nomor MAP sama dengan cache sebelumnya, pakai hasil
+  // yang sudah diambil, jangan hit API lagi.
+  if (cachedSizesNomor !== nomor) {
+    cachedSizesNomor = nomor;
+    cachedSizes = null;
+    hasWarnedNoSizes = false;
+    try {
+      const res = await api.get(
+        `/garmen/cetak-bast/form/${encodeURIComponent(nomor)}/sizes`,
+      );
+      cachedSizes = res.data.data || [];
+    } catch (error: any) {
+      console.error(
+        "Gagal mengambil daftar size MAP untuk sinkronisasi",
+        error,
+      );
+      toast.error(
+        `Gagal memuat daftar size dari server: ${error.response?.data?.message || error.message}`,
+      );
+      cachedSizes = [];
+    }
+  }
+
+  if (cachedSizes && cachedSizes.length > 0) {
+    cachedSizes.forEach((sz: any) => {
+      formData.value.sizeBreakdown.push({
+        komponen: komponenStr,
+        size: sz.mspks_size,
+        babaran: k.babaran,
+      });
+    });
+  } else if (!hasWarnedNoSizes) {
+    // Toast cuma sekali per pemilihan MAP, bukan per komponen.
+    hasWarnedNoSizes = true;
+    toast.warning(
+      `Tidak ditemukan data ukuran/size untuk MAP ini. Babaran per Size perlu diisi manual.`,
+    );
+  }
+};
+
 const onMapSelected = async (map: any) => {
   isLoading.value = true;
   try {
@@ -203,10 +326,17 @@ const onMapSelected = async (map: any) => {
       `/garmen/cetak-bast/form/${encodeURIComponent(map.Nomor)}`,
     );
     const data = res.data.data;
-
-    // ← Normalisasi header dulu
     data.header = normalizeHeader(data.header);
 
+    if (data.aksesoris && data.aksesoris.length > 0) {
+      data.aksesoris = data.aksesoris.map((acc: any) => ({
+        kode: acc.kode || "",
+        nama: acc.acc_nama || acc.nama || "",
+        satuan: acc.acc_satuan || acc.satuan || "",
+        qty: Number(acc.qty) || 0,
+        note: acc.acc_note || acc.note || "",
+      }));
+    }
     if (data.lock) {
       data.isLocked = true;
       data.isApproved = data.lock.apv === "Y";
@@ -218,6 +348,19 @@ const onMapSelected = async (map: any) => {
     }
     formData.value = data;
     showMapModal.value = false;
+
+    // Reset cache size — MAP baru dipilih, cache lama (kalau ada) sudah
+    // tidak relevan.
+    cachedSizesNomor = "";
+    cachedSizes = null;
+    hasWarnedNoSizes = false;
+
+    await nextTick();
+    for (const k of formData.value.komponen) {
+      if (k.komponen && Number(k.babaran) !== 0) {
+        await syncBabaranToSizeBreakdown(k);
+      }
+    }
   } catch (e: any) {
     toast.error("Gagal memuat data MAP: " + e.message);
   } finally {
@@ -240,51 +383,13 @@ const openBahanModal = (idx: number) => {
 };
 
 const onBabaranChange = async (k: any) => {
-  const rencanaSize =
-    formData.value.header.mspk_rencana_size ||
-    formData.value.header.mspk_rencana_size;
   const komponenStr = (k.komponen || "").trim();
-
   if (!komponenStr) {
     toast.warning("Komponen silahkan di isi dulu ya");
     k.babaran = 0;
     return;
   }
-
-  // Jika Rencana Size = BRAKEDOWN SIZE
-  if (rencanaSize === "BRAKEDOWN SIZE") {
-    // Cek apakah sudah ada breakdown size untuk komponen ini
-    const existing = formData.value.sizeBreakdown.find(
-      (s: any) => s.komponen === komponenStr,
-    );
-
-    if (!existing) {
-      try {
-        // Ambil daftar size dari tmemospk_size
-        const nomor =
-          formData.value.header.mspk_nomor || formData.value.header.mspk_nomor;
-        const res = await api.get(
-          `/garmen/cetak-bast/form/${encodeURIComponent(nomor)}/sizes`,
-        );
-        const sizes = res.data.data;
-
-        if (sizes && sizes.length > 0) {
-          // Otomatis pindah ke tab 2 (Babaran per Size)
-          activeTab.value = 2;
-
-          sizes.forEach((sz: any) => {
-            formData.value.sizeBreakdown.push({
-              komponen: komponenStr,
-              size: sz.mspks_size,
-              babaran: 0,
-            });
-          });
-        }
-      } catch (error) {
-        console.error("Gagal mengambil daftar size SPK", error);
-      }
-    }
-  }
+  await syncBabaranToSizeBreakdown(k);
 };
 
 const addAccRow = () =>
@@ -579,8 +684,9 @@ onMounted(() => {
             class="f-inp f-sel"
             style="max-width: 120px"
           >
-            <option>Premium</option>
-            <option>Medium</option>
+            <option value="">—</option>
+            <option value="Premium">Premium</option>
+            <option value="Medium">Medium</option>
           </select>
         </div>
 
@@ -660,61 +766,8 @@ onMounted(() => {
             overflow-y: auto;
           "
         >
-          <div class="sec-title">Kesesuaian :</div>
-          <div style="overflow-y: auto; flex: 0 0 auto; max-height: 220px">
-            <table class="bt" style="table-layout: fixed">
-              <thead>
-                <tr>
-                  <th style="width: 28px">No</th>
-                  <th style="text-align: left">Kesesuaian</th>
-                  <th class="th-yellow" style="width: 48px">Y/N</th>
-                  <th class="th-yellow" style="width: 180px; text-align: left">
-                    Keterangan
-                  </th>
-                  <th style="width: 55px">Created</th>
-                  <th style="width: 90px">Date Create</th>
-                  <th style="width: 55px">Modified</th>
-                  <th style="width: 90px">Date Modify</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="c in formData.checklist" :key="c.no">
-                  <td class="tc">{{ c.no }}</td>
-                  <td>{{ c.kesesuaian }}</td>
-                  <td class="tc p0">
-                    <select
-                      v-model="c.status"
-                      class="cell-inp tc"
-                      :style="
-                        c.status === 'Y'
-                          ? 'background:#1565c0;color:white;font-weight:700'
-                          : ''
-                      "
-                    >
-                      <option value="Y">Y</option>
-                      <option value="N">N</option>
-                    </select>
-                  </td>
-                  <td class="p0">
-                    <input
-                      v-model="c.keterangan"
-                      class="cell-inp"
-                      @focus="onKeteranganFocus(c)"
-                    />
-                  </td>
-                  <td class="tc muted">{{ c.user_create || "" }}</td>
-                  <td class="muted">{{ fmtDateTime(c.date_create) }}</td>
-                  <td class="tc muted">{{ c.user_modify || "" }}</td>
-                  <td class="muted">{{ fmtDateTime(c.date_modify) }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <div class="f-divider" />
-
           <div class="sec-title">Bahan :</div>
-          <div style="overflow-y: auto; flex: 1; min-height: 0">
+          <div style="overflow: auto; flex: 0 0 auto; max-height: 260px">
             <table class="bt">
               <thead>
                 <tr>
@@ -818,6 +871,62 @@ onMounted(() => {
               + Tambah Baris
             </button>
           </div>
+          <div class="f-divider" />
+          <div class="sec-title">Kesesuaian :</div>
+          <div style="overflow: auto; flex: 1; min-height: 0">
+            <table class="bt" style="table-layout: fixed; min-width: 760px">
+              <thead>
+                <tr>
+                  <th style="width: 28px">No</th>
+                  <th style="text-align: left">Kesesuaian</th>
+                  <th class="th-yellow" style="width: 48px">Y/N</th>
+                  <th class="th-yellow" style="width: 180px; text-align: left">
+                    Keterangan
+                  </th>
+                  <th style="width: 55px">Created</th>
+                  <th style="width: 90px">Date Create</th>
+                  <th style="width: 55px">Modified</th>
+                  <th style="width: 90px">Date Modify</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="c in formData.checklist" :key="c.no">
+                  <td class="tc">{{ c.no }}</td>
+                  <td>{{ c.kesesuaian }}</td>
+                  <td class="tc p0">
+                    <select
+                      v-model="c.status"
+                      class="cell-inp tc"
+                      :style="
+                        c.status === 'Y'
+                          ? 'background:#1565c0;color:white;font-weight:700'
+                          : ''
+                      "
+                    >
+                      <option value="Y">Y</option>
+                      <option value="N">N</option>
+                    </select>
+                  </td>
+                  <td class="p0">
+                    <input
+                      v-model="c.keterangan"
+                      class="cell-inp"
+                      @focus="onKeteranganFocus(c)"
+                      @blur="
+                        Number(c.no) === 8 ? onKeterangan8Blur() : undefined
+                      "
+                    />
+                  </td>
+                  <td class="tc muted">{{ c.user_create || "" }}</td>
+                  <td class="muted">{{ fmtDateTime(c.date_create) }}</td>
+                  <td class="tc muted">{{ c.user_modify || "" }}</td>
+                  <td class="muted">{{ fmtDateTime(c.date_modify) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="f-divider" />
         </div>
 
         <!-- Tab 1: Accesories -->
@@ -1179,9 +1288,10 @@ onMounted(() => {
 /* ── Grid table ── */
 .bt {
   width: 100%;
+  min-width: 640px;
   border-collapse: collapse;
   font-size: 10px;
-  table-layout: fixed; /* ← tambahkan ini */
+  table-layout: fixed;
 }
 .bt thead tr {
   background: #1565c0;

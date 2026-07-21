@@ -787,7 +787,9 @@ watch(
               style="width: 60px; background: #ddeeff"
               :disabled="isEdit"
               @keydown="onPerushF1"
-              @keydown.enter.prevent="onPerushKodeEnter"
+              @keydown.enter.prevent="
+                ($event.target as HTMLInputElement).blur()
+              "
               @blur="onPerushKodeEnter"
             />
             <input
@@ -838,9 +840,12 @@ watch(
               class="inp"
               style="width: 60px; background: #ddeeff"
               @keydown="onCustF1"
-              @keydown.enter.prevent="onCustKodeEnter"
+              @keydown.enter.prevent="
+                ($event.target as HTMLInputElement).blur()
+              "
               @blur="onCustKodeEnter"
             />
+            3. Jenis
             <input
               :value="formData.Customer"
               readonly
@@ -940,7 +945,9 @@ watch(
                   style="width: 50px; background: #ddeeff"
                   :disabled="isEdit"
                   @keydown="onJoF1"
-                  @keydown.enter.prevent="onJoKodeEnter"
+                  @keydown.enter.prevent="
+                    ($event.target as HTMLInputElement).blur()
+                  "
                   @blur="onJoKodeEnter"
                 />
                 <input
@@ -1228,7 +1235,9 @@ watch(
               class="inp"
               style="width: 60px; background: #ddeeff"
               @keydown="onSalesF1"
-              @keydown.enter.prevent="onSalesKodeEnter"
+              @keydown.enter.prevent="
+                ($event.target as HTMLInputElement).blur()
+              "
               @blur="onSalesKodeEnter"
             />
             <input
@@ -1712,7 +1721,9 @@ watch(
               class="inp"
               style="width: 44px; background: #ddeeff"
               @keydown="onWorkshopF1"
-              @keydown.enter.prevent="onWorkshopKodeEnter"
+              @keydown.enter.prevent="
+                ($event.target as HTMLInputElement).blur()
+              "
               @blur="onWorkshopKodeEnter"
             />
             <input

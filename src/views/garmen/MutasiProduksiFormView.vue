@@ -18,7 +18,9 @@ import {
 } from "@tabler/icons-vue";
 
 import SpkSearchModal from "@/components/lookups/SpkSearchModal.vue";
+import RealisasiMintaSearchModal from "@/components/lookups/RealisasiMintaSearchModal.vue";
 import HistoryPakaiMaterialModal from "@/components/lookups/HistoryPakaiMaterialModal.vue";
+import ProsesSebelumnyaModal from "@/components/lookups/ProsesSebelumnyaModal.vue";
 import BahanSearchModal from "@/components/lookups/BahanSearchModal.vue";
 import SpgSearchModal from "@/components/lookups/SpgSearchModal.vue";
 
@@ -154,8 +156,10 @@ const tab = ref<"h" | "d">("h");
 
 // ── Mutasi labels ──────────────────────────────────────────────────────
 const MUTASI = computed(() => {
-  const isP01 = (fd.value.Cab || userCab.value) === "P01";
-  return [
+  const cab = fd.value.Cab || userCab.value;
+  const isP01 = cab === "P01";
+  const isP04 = cab === "P04" || !cab;
+  const base = [
     { val: "1", label: "Potong ke QC Ptg" },
     { val: "2", label: "QC Ptg ke Cetak" },
     { val: "3", label: "Cetak ke QC Cetak" },
@@ -163,6 +167,14 @@ const MUTASI = computed(() => {
     { val: "5", label: "Jahit ke Lipat" },
     { val: "6", label: "Lipat ke Koli" },
   ];
+  // P01 tidak punya gudang DC — dua opsi ini cuma tampil di P04.
+  if (isP04) {
+    base.push(
+      { val: "7", label: "QC Potong ke DC" },
+      { val: "8", label: "QC Cetak ke DC" },
+    );
+  }
+  return base;
 });
 
 // ── Initial data ───────────────────────────────────────────────────────
@@ -758,26 +770,12 @@ const selPlan = (i: number) =>
 
 // ── No Material ────────────────────────────────────────────────────────
 const showMatModal = ref(false);
-const matQ = ref("");
-const matList = ref<any[]>([]);
-const openMaterial = async () => {
+const openMaterial = () => {
   if (!fd.value.NomorSpk) {
     toast.warning("Isi No SPK terlebih dahulu.");
     return;
   }
-  const res = await mutasiProduksiFormService.searchNoMaterial(
-    fd.value.NomorSpk,
-    "",
-  );
-  matList.value = res.data.data || [];
   showMatModal.value = true;
-};
-const filterMat = async () => {
-  const res = await mutasiProduksiFormService.searchNoMaterial(
-    fd.value.NomorSpk,
-    matQ.value,
-  );
-  matList.value = res.data.data || [];
 };
 const selectMat = async (m: any) => {
   showMatModal.value = false;
@@ -978,21 +976,13 @@ const totBsKain = computed(() =>
 );
 
 // ── Proses sebelumnya ──────────────────────────────────────────────────
-const showProsesModal = ref(false);
-const prosesRows = ref<any[]>([]);
 const showHistoryModal = ref(false);
-const openProses = async () => {
+const showProsesModal = ref(false);
+const openProses = () => {
   if (!fd.value.NomorSpk || !fd.value.GdgAsal) {
     toast.warning("SPK dan Lini Asal harus diisi.");
     return;
   }
-  const excl = isEditMode.value ? fd.value.Nomor : "";
-  const res = await mutasiProduksiFormService.getProsesSebelumnya(
-    fd.value.NomorSpk,
-    fd.value.GdgAsal,
-    excl,
-  );
-  prosesRows.value = res.data.data || [];
   showProsesModal.value = true;
 };
 const openHistoryMaterial = () => {
@@ -1124,8 +1114,7 @@ const validateSave = async () => {
     return;
   }
   for (const r of valid) {
-    if (!isDC.value && r.kode === "LL-000400") {
-      // ← tambah !isDC.value
+    if (isLiniPotong.value && r.kode === "LL-000400") {
       const tq =
         (r.jumlah || 0) +
         (r.bslini || 0) +
@@ -1834,8 +1823,12 @@ onMounted(async () => {
                 <th style="width: 75px" class="tr" v-if="!isDC">BS Kain Sbl</th>
                 <th style="width: 65px" class="tr" v-if="!isDC">BS Kain</th>
                 <th style="width: 65px" class="tr" v-if="!isDC">Ganti BS</th>
-                <th style="width: 65px" class="tr" v-if="!isDC">Panjang</th>
-                <th style="width: 65px" class="tr" v-if="!isDC">Lebar</th>
+                <th style="width: 65px" class="tr" v-if="isLiniPotong">
+                  Panjang
+                </th>
+                <th style="width: 65px" class="tr" v-if="isLiniPotong">
+                  Lebar
+                </th>
                 <th v-if="canEdit && !isDC" style="width: 24px"></th>
               </tr>
             </thead>
@@ -1944,6 +1937,8 @@ onMounted(async () => {
                       @focus="sel"
                     />
                   </td>
+                </template>
+                <template v-if="isLiniPotong">
                   <td>
                     <input
                       v-model.number="row.panjang"
@@ -2042,65 +2037,12 @@ onMounted(async () => {
   </v-dialog>
 
   <!-- Material Modal -->
-  <v-dialog v-model="showMatModal" max-width="660px">
-    <v-card class="rounded-lg">
-      <v-card-title
-        class="bg-primary text-white pa-3"
-        style="font-size: 13px; font-weight: 700"
-      >
-        Pilih No Realisasi Minta Kain
-      </v-card-title>
-      <v-card-text class="pa-3">
-        <input
-          v-model="matQ"
-          class="ms"
-          placeholder="Cari jenis kain atau cabang..."
-          @input="filterMat"
-          autofocus
-        />
-        <div class="modal-tw">
-          <table class="mtt">
-            <thead>
-              <tr>
-                <th>Nomor</th>
-                <th>Tgl</th>
-                <th>Kode</th>
-                <th>Jenis Kain</th>
-                <th class="tr">Jml</th>
-                <th>Cab</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr
-                v-for="m in matList"
-                :key="m.Nomor"
-                class="mtr"
-                @click="selectMat(m)"
-              >
-                <td class="mono">{{ m.Nomor }}</td>
-                <td>{{ m.Tanggal }}</td>
-                <td class="mono">{{ m.Kode }}</td>
-                <td>{{ m.JenisKain }}</td>
-                <td class="tr">{{ num(m.Jumlah, 2) }}</td>
-                <td>{{ m.Cab }}</td>
-              </tr>
-              <tr v-if="!matList.length">
-                <td colspan="6" class="me">Tidak ada data</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </v-card-text>
-      <v-card-actions class="pa-2 border-t">
-        <v-spacer /><v-btn
-          variant="text"
-          size="small"
-          @click="showMatModal = false"
-          >Tutup</v-btn
-        >
-      </v-card-actions>
-    </v-card>
-  </v-dialog>
+  <RealisasiMintaSearchModal
+    v-model="showMatModal"
+    :nomor-spk="fd.NomorSpk"
+    :exclude-nomor="isEditMode ? fd.Nomor : ''"
+    @selected="selectMat"
+  />
 
   <!-- Bahan Modal -->
   <BahanSearchModal
@@ -2111,55 +2053,12 @@ onMounted(async () => {
   />
 
   <!-- Proses Sebelumnya Modal -->
-  <v-dialog v-model="showProsesModal" max-width="660px">
-    <v-card class="rounded-lg">
-      <v-card-title
-        class="bg-grey-darken-2 text-white pa-3"
-        style="font-size: 13px; font-weight: 700"
-      >
-        Proses Sebelumnya — {{ fd.NomorSpk }}
-      </v-card-title>
-      <v-card-text class="pa-3">
-        <div class="modal-tw">
-          <table class="mtt">
-            <thead>
-              <tr>
-                <th>Kode</th>
-                <th>Nama</th>
-                <th>Sat</th>
-                <th>Size</th>
-                <th class="tr">Mutasi</th>
-                <th class="tr">Jasa</th>
-                <th class="tr">Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="(r, i) in prosesRows" :key="i">
-                <td class="mono">{{ r.kode }}</td>
-                <td>{{ r.Nama }}</td>
-                <td class="tc">{{ r.Satuan }}</td>
-                <td class="tc">{{ r.Size }}</td>
-                <td class="tr">{{ num(r.Mutasi) }}</td>
-                <td class="tr">{{ num(r.Jasa) }}</td>
-                <td class="tr">{{ num(r.Total) }}</td>
-              </tr>
-              <tr v-if="!prosesRows.length">
-                <td colspan="7" class="me">Belum ada proses sebelumnya</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </v-card-text>
-      <v-card-actions class="pa-2 border-t">
-        <v-spacer /><v-btn
-          variant="text"
-          size="small"
-          @click="showProsesModal = false"
-          >Tutup</v-btn
-        >
-      </v-card-actions>
-    </v-card>
-  </v-dialog>
+  <ProsesSebelumnyaModal
+    v-model="showProsesModal"
+    :nomor-spk="fd.NomorSpk"
+    :gdg-asal="fd.GdgAsal"
+    :exclude-nomor="isEditMode ? fd.Nomor : ''"
+  />
 </template>
 
 <style scoped>
