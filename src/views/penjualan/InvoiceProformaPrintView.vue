@@ -235,7 +235,12 @@ const printQZ = async () => {
   isPrinting.value = true;
   try {
     if (!qz.websocket.isActive()) {
-      await qz.websocket.connect();
+      await qz.websocket.connect({
+        host: ["127.0.0.1", "localhost"],
+        usingSecure: false, // Memaksa penggunaan ws:// untuk HTTP
+        keepAlive: 60,
+        retries: 2,
+      });
     }
 
     const config = qz.configs.create(printerName.value);
