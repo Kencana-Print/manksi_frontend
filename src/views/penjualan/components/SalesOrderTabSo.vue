@@ -845,7 +845,6 @@ watch(
               "
               @blur="onCustKodeEnter"
             />
-            3. Jenis
             <input
               :value="formData.Customer"
               readonly
