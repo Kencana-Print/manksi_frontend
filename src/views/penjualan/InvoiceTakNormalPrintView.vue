@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from "vue";
 import { useRoute } from "vue-router";
 import { invTakNormalFormService as svc } from "@/services/penjualan/invoiceTakNormalFormService";
+import qz from "qz-tray";
 
 import logoKP from "@/assets/kp.jpg";
 import logoJA from "@/assets/ja.jpg";
@@ -16,6 +17,8 @@ const detail = ref<any[]>([]);
 const totals = ref<any>({});
 const isReady = ref(false);
 const isLoading = ref(true);
+const printerName = ref("EPSON LX-310 ESC/P on 192.168.1.41");
+const isPrinting = ref(false);
 
 const doPrint = () => window.print();
 const doClose = () => window.close();
@@ -247,6 +250,39 @@ const generateTxt = () => {
   return pages.map((p) => p.join("\n")).join("\n\f\n");
 };
 
+const printQZ = async () => {
+  isPrinting.value = true;
+  try {
+    // 1. Konek ke QZ Tray jika belum konek
+    if (!qz.websocket.isActive()) {
+      await qz.websocket.connect();
+    }
+
+    // 2. Buat konfigurasi printer
+    const config = qz.configs.create(printerName.value);
+
+    // 3. Siapkan data teks. Tambahkan ESC/POS Init (\x1B\x40) agar settingan printer kereset tiap ngeprint
+    const content = generateTxt();
+    const data = [
+      "\x1B\x40", // ESC @ (Initialize Printer)
+      { type: "raw", format: "plain", data: content },
+      "\x0C", // Form Feed (Eject kertas jika printer mendukung)
+    ];
+
+    // 4. Kirim ke printer
+    await qz.print(config, data);
+    alert("Berhasil dikirim ke printer!");
+  } catch (error: any) {
+    console.error("QZ Error:", error);
+    alert(
+      "Gagal cetak: Pastikan aplikasi QZ Tray berjalan dan nama printer benar. Detail: " +
+        error.message,
+    );
+  } finally {
+    isPrinting.value = false;
+  }
+};
+
 const downloadTxt = () => {
   const content = generateTxt();
   const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
@@ -276,7 +312,8 @@ const fetchData = async () => {
     isReady.value = true;
 
     if (mode === "dotmatrix") {
-      downloadTxt();
+      // HAPUS atau KOMENTARI downloadTxt();
+      // Biarkan user klik tombol cetak QZ nanti
     } else {
       setTimeout(() => window.print(), 600);
     }
@@ -303,21 +340,37 @@ onMounted(() => {
 
     <div v-else-if="isReady" class="dm-card">
       <div class="dm-icon">🖨️</div>
-      <h2>File Dot Matrix Siap</h2>
-      <p>
-        File <b>InvoiceTakNormal_{{ nomor.replace(/\//g, "_") }}.txt</b> telah
-        diunduh.
-      </p>
+      <h2>Cetak Dot Matrix (QZ Tray)</h2>
+      <p>Pastikan aplikasi QZ Tray sudah terbuka di background.</p>
+
       <div class="dm-steps">
-        <b>Cara cetak ke Dot Matrix:</b>
-        <ol>
-          <li>Buka file <b>.txt</b> yang baru saja terunduh</li>
-          <li>Tekan <b>Ctrl+P</b> → pilih printer Dot Matrix</li>
-          <li>Pastikan font <b>Courier New</b> ukuran <b>10pt</b></li>
-          <li>Klik <b>Print</b></li>
-        </ol>
+        <div style="margin-bottom: 8px">
+          <label style="font-weight: bold; display: block; margin-bottom: 4px"
+            >Nama Printer di OS:</label
+          >
+          <input
+            v-model="printerName"
+            type="text"
+            style="
+              width: 100%;
+              padding: 6px;
+              border: 1px solid #ccc;
+              border-radius: 4px;
+            "
+            placeholder="Contoh: EPSON LX-310"
+          />
+        </div>
       </div>
-      <button class="dm-btn" @click="downloadTxt">📥 Unduh Ulang</button>
+
+      <div style="display: flex; gap: 8px">
+        <button class="dm-btn" @click="printQZ" :disabled="isPrinting">
+          {{ isPrinting ? "Mengirim..." : "🚀 Cetak Langsung" }}
+        </button>
+        <!-- Tombol unduh manual tetap disediakan sebagai fallback/cadangan -->
+        <button class="dm-btn" style="background: #757575" @click="downloadTxt">
+          📥 Unduh TXT
+        </button>
+      </div>
     </div>
   </div>
 

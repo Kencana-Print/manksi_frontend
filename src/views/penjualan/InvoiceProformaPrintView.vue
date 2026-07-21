@@ -2,9 +2,12 @@
 import { ref, computed, onMounted } from "vue";
 import { useRoute } from "vue-router";
 import { invoiceProformaFormService } from "@/services/penjualan/invoiceProformaFormService";
+import qz from "qz-tray";
 
 const route = useRoute();
 const nomor = route.params.nomor as string;
+const printerName = ref("192.168.1.41");
+const isPrinting = ref(false);
 
 const header = ref<any>({});
 const details = ref<any[]>([]);
@@ -228,6 +231,32 @@ const generateTxt = () => {
   return pages.map((p) => p.join("\n")).join("\n\f\n");
 };
 
+const printQZ = async () => {
+  isPrinting.value = true;
+  try {
+    if (!qz.websocket.isActive()) {
+      await qz.websocket.connect();
+    }
+
+    const config = qz.configs.create(printerName.value);
+    const content = generateTxt();
+
+    const data = [
+      "\x1B\x40", // ESC @: Inisialisasi printer (reset ukuran font ke normal)
+      { type: "raw", format: "plain", data: content },
+      "\x0C", // Form Feed: Eject halaman
+    ];
+
+    await qz.print(config, data);
+    alert("Berhasil dikirim ke printer!");
+  } catch (error: any) {
+    console.error("QZ Error:", error);
+    alert("Gagal cetak via QZ Tray: " + error.message);
+  } finally {
+    isPrinting.value = false;
+  }
+};
+
 // ── Eksekusi & Download ──
 const downloadTxt = () => {
   const content = generateTxt();
@@ -253,10 +282,7 @@ const fetchData = async () => {
     details.value = res.data.data.details;
     isReady.value = true;
 
-    // Auto download text file
-    setTimeout(() => {
-      downloadTxt();
-    }, 500);
+    // HAPUS setTimeout untuk downloadTxt() di sini
   } catch (error) {
     alert("Gagal memuat data cetak.");
   }
@@ -272,27 +298,40 @@ onMounted(() => {
   <div class="print-instruction" v-if="isReady">
     <div class="card-info">
       <h2 style="color: #1565c0; margin-bottom: 10px">
-        ✅ File Teks Berhasil Disiapkan
+        🖨️ Cetak Invoice Proforma
       </h2>
       <p style="margin-bottom: 15px; color: #555">
-        File invoice telah diunduh dengan nama: <br />
-        <strong>Invoice_Proforma_{{ nomor.replace(/\//g, "_") }}.txt</strong>
+        Pastikan aplikasi QZ Tray berjalan di background komputer.
       </p>
 
-      <div class="instructions">
-        <strong>Cara Cetak ke Dot-Matrix:</strong>
-        <ol style="margin-top: 8px; margin-left: 20px; line-height: 1.6">
-          <li>Buka file <b>.txt</b> yang baru saja terunduh.</li>
-          <li>File akan terbuka di aplikasi <b>Notepad</b>.</li>
-          <li>Tekan <b>Ctrl + P</b> (atau klik File > Print).</li>
-          <li>Pilih printer Dot-Matrix Anda (Epson LX-310 / LQ-2190).</li>
-          <li>Klik <b>Print</b>. Printer akan mencetak dengan cepat.</li>
-        </ol>
+      <div class="instructions" style="margin-bottom: 15px">
+        <label style="font-weight: bold; display: block; margin-bottom: 4px"
+          >Target Printer:</label
+        >
+        <input
+          v-model="printerName"
+          type="text"
+          style="
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+          "
+        />
       </div>
 
-      <button class="btn-download" @click="downloadTxt">
-        📥 Unduh Ulang File .txt
-      </button>
+      <div style="display: flex; gap: 10px; flex-direction: column">
+        <button class="btn-download" @click="printQZ" :disabled="isPrinting">
+          {{ isPrinting ? "Mengirim Data..." : "🚀 Cetak Langsung (QZ Tray)" }}
+        </button>
+        <button
+          class="btn-download"
+          style="background-color: #757575"
+          @click="downloadTxt"
+        >
+          📥 Unduh File .txt (Cadangan)
+        </button>
+      </div>
     </div>
   </div>
   <div

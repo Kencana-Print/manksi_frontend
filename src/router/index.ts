@@ -2491,6 +2491,18 @@ const router = createRouter({
       },
     },
     {
+      path: "/laporan/gudang-garmen/spk-dtf-belum-po",
+      name: "LapSpkDtfBelumPo",
+      component: () =>
+        import("@/views/laporan/gudang-garmen/SpkDtfBelumPoView.vue"),
+      meta: {
+        title: "SPK DTF Belum PO DTF",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "516",
+      },
+    },
+    {
       path: "/laporan/gudang-garmen/realisasi-minta-vs-lhk-cutt",
       name: "LapRealisasiMintaVsLhkCutt",
       component: () =>
@@ -2630,6 +2642,31 @@ const router = createRouter({
         layout: "DefaultLayout",
         requiresAuth: true,
         menuId: "527",
+      },
+    },
+    {
+      path: "/laporan/gudang-garmen/browse-map",
+      name: "LapBrowseMap",
+      component: () =>
+        import("@/views/laporan/gudang-garmen/BrowseMapView.vue"),
+      meta: {
+        title: "Browse MAP",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "528",
+      },
+    },
+
+    {
+      path: "/laporan/produksi-garmen/monitoring-produksi",
+      name: "LapMonitoringProduksi",
+      component: () =>
+        import("@/views/laporan/produksi-garmen/MonitoringProduksiView.vue"),
+      meta: {
+        title: "Laporan Monitoring Produksi",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "554",
       },
     },
 

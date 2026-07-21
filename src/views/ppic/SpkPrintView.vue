@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, nextTick } from "vue";
 import { useRoute } from "vue-router";
 import { spkFormService } from "@/services/ppic/spkFormService";
 import api from "@/services/api";
@@ -191,6 +191,49 @@ const sizeLebarPanjangStr = computed(() => {
     .join("\n");
 });
 
+// ── Auto-fit A4 khusus Page 1 (format baru/non-P01): coba scale-down
+// dulu biar 1 halaman, fallback ke multi-halaman natural kalau
+// kontennya kepanjangan buat diperkecil tanpa jadi susah dibaca.
+const p1PageEl = ref<HTMLElement | null>(null);
+const p1InnerEl = ref<HTMLElement | null>(null);
+const p1Scale = ref(1);
+const p1InnerHeightStyle = ref<string>("auto");
+const p1MultiPage = ref(false);
+
+const MIN_PRINT_SCALE = 0.72;
+
+const fitPageToA4 = async () => {
+  if (!p1PageEl.value || !p1InnerEl.value) return;
+  // Reset ke kondisi "natural" dulu — height:auto, scale:1 — biar
+  // scrollHeight yang diukur adalah tinggi ASLI konten, bukan yang
+  // sudah kepotong batasan tinggi manapun.
+  p1Scale.value = 1;
+  p1MultiPage.value = false;
+  p1InnerHeightStyle.value = "auto";
+  await nextTick();
+
+  const availablePx = p1PageEl.value.clientHeight; // 297mm dikurangi padding
+  const contentPx = p1InnerEl.value.scrollHeight; // tinggi asli konten
+
+  if (contentPx <= availablePx) {
+    // Konten pendek — paksa tinggi penuh 1 halaman biar flex:1 +
+    // margin-top:auto pada .ttd-row tetap berfungsi ngedorong TTD
+    // ke bawah halaman (persis behavior desain aslinya).
+    p1InnerHeightStyle.value = `${availablePx}px`;
+    return;
+  }
+
+  const requiredScale = availablePx / contentPx;
+  if (requiredScale >= MIN_PRINT_SCALE) {
+    p1Scale.value = requiredScale;
+    // height tetap 'auto' (natural) — jangan dipaksa penuh, biar gak
+    // ada ruang kosong ekstra yang bikin proporsi rusak setelah di-scale.
+  } else {
+    p1Scale.value = 1;
+    p1MultiPage.value = true;
+  }
+};
+
 onMounted(async () => {
   try {
     const [resDetail, resLayout] = await Promise.all([
@@ -239,7 +282,11 @@ onMounted(async () => {
     }
 
     isLoaded.value = true;
-    setTimeout(() => window.print(), 1000);
+    if (!isP01.value) {
+      await nextTick();
+      await fitPageToA4();
+    }
+    setTimeout(() => window.print(), 400);
   } catch {
     isError.value = true;
   }
@@ -408,535 +455,559 @@ onMounted(async () => {
       <!-- ══════════════════════════════════════════════
          HALAMAN 1 — Data SPK
     ══════════════════════════════════════════════ -->
-      <div class="print-page page-1">
-        <!-- Header -->
-        <div class="ph">
-          <div class="ph-left">
-            <img src="@/assets/logo.png" class="ph-logo" />
-          </div>
-          <div class="ph-center">
-            <div class="ph-title">Surat Perintah Kerja</div>
-          </div>
-          <div class="ph-right">
-            <div class="ph-nomor">{{ spk.spk_nomor }}</div>
-            <div class="ph-meta">Tgl: {{ tglIndo(spk.spk_tanggal) }}</div>
-            <div class="ph-meta">Workshop: {{ spk.spk_cab }}</div>
-          </div>
-        </div>
-
-        <!-- Body halaman 1 -->
-        <div class="p1-body">
-          <!-- Baris 1: Info SO (kiri) + Gambar (kanan) -->
-          <div class="p1-row-top">
-            <div class="box p1-info">
-              <div class="box-title">Referensi Sales Order</div>
-              <table class="ft">
-                <tr>
-                  <td class="fl">No. SO</td>
-                  <td class="fc">:</td>
-                  <td class="fv">{{ spk.spk_so_ref || "-" }}</td>
-                </tr>
-                <tr>
-                  <td class="fl">Nama pekerjaan</td>
-                  <td class="fc">:</td>
-                  <td class="fv fw">{{ spk.spk_nama }}</td>
-                </tr>
-                <tr>
-                  <td class="fl">Customer</td>
-                  <td class="fc">:</td>
-                  <td class="fv">
-                    <div class="fv-between">
-                      <span>{{ spk.spk_cus_kode }}</span>
-                      <span
-                        v-if="spk.cus_perfect === 'Y'"
-                        class="proses-bg bg-yellow-light"
-                      >
-                        PERFECT
-                      </span>
-                    </div>
-                  </td>
-                </tr>
-                <tr>
-                  <td class="fl">No. MAP</td>
-                  <td class="fc">:</td>
-                  <td class="fv">{{ spk.spk_memo || "-" }}</td>
-                </tr>
-                <tr>
-                  <td class="fl">Jenis order</td>
-                  <td class="fc">:</td>
-                  <td class="fv">{{ spk.jo_nama }}</td>
-                </tr>
-                <tr>
-                  <td class="fl">Kepentingan</td>
-                  <td class="fc">:</td>
-                  <td class="fv">{{ spk.spk_statuskerja }}</td>
-                </tr>
-                <tr>
-                  <td class="fl">Qty order</td>
-                  <td class="fc">:</td>
-                  <td class="fv fw">
-                    {{ Number(spk.spk_jumlah).toLocaleString("id-ID") }} pcs
-                  </td>
-                </tr>
-                <tr>
-                  <td class="fl">Kain</td>
-                  <td class="fc">:</td>
-                  <td class="fv">{{ spk.spk_kain }}</td>
-                </tr>
-                <tr v-if="spk.spk_gramasi">
-                  <td class="fl">Gramasi</td>
-                  <td class="fc">:</td>
-                  <td class="fv">{{ spk.spk_gramasi }}</td>
-                </tr>
-                <tr>
-                  <td class="fl">Finishing</td>
-                  <td class="fc">:</td>
-                  <td class="fv">{{ spk.spk_finishing }}</td>
-                </tr>
-                <tr v-if="spk.spk_warna_badan">
-                  <td class="fl">Warna</td>
-                  <td class="fc">:</td>
-                  <td class="fv">
-                    {{
-                      [
-                        spk.spk_warna_badan,
-                        spk.spk_warna_lengan,
-                        spk.spk_warna_lain,
-                      ]
-                        .filter(Boolean)
-                        .join(" / ")
-                    }}
-                  </td>
-                </tr>
-                <tr>
-                  <td class="fl">No. PO</td>
-                  <td class="fc">:</td>
-                  <td class="fv">{{ spk.spk_nomor_po || "-" }}</td>
-                </tr>
-                <tr>
-                  <td class="fl">Dateline</td>
-                  <td class="fc">:</td>
-                  <td class="fv fw">{{ tglIndo(spk.spk_dateline) }}</td>
-                </tr>
-                <tr>
-                  <td class="fl">Proses</td>
-                  <td class="fc">:</td>
-                  <td class="fv">
-                    <template v-if="prosesChips.length">
-                      <span
-                        v-for="p in prosesChips"
-                        :key="p"
-                        class="proses-bg"
-                        :class="
-                          p === 'DTF' ? 'bg-blue-light' : 'bg-green-light'
-                        "
-                      >
-                        {{ p }}
-                      </span>
-                    </template>
-                    <span v-else class="muted">—</span>
-                  </td>
-                </tr>
-              </table>
+      <div
+        class="print-page page-1"
+        :class="{ 'print-page--multi': p1MultiPage }"
+        ref="p1PageEl"
+      >
+        <div
+          class="page1-scale-inner"
+          ref="p1InnerEl"
+          :style="{
+            height: p1InnerHeightStyle,
+            transform: `scale(${p1Scale})`,
+            transformOrigin: 'top center',
+          }"
+        >
+          <!-- Header -->
+          <div class="ph">
+            <div class="ph-left">
+              <img src="@/assets/logo.png" class="ph-logo" />
             </div>
+            <div class="ph-center">
+              <div class="ph-title">Surat Perintah Kerja</div>
+            </div>
+            <div class="ph-right">
+              <div class="ph-nomor">{{ spk.spk_nomor }}</div>
+              <div class="ph-meta">Tgl: {{ tglIndo(spk.spk_tanggal) }}</div>
+              <div class="ph-meta">Workshop: {{ spk.spk_cab }}</div>
+            </div>
+          </div>
 
-            <div class="p1-img-col">
-              <div class="box img-box-wrap">
-                <div class="box-title">Gambar desain</div>
-                <div class="img-box">
-                  <img
-                    v-if="resolvedImageUrl"
-                    :src="resolvedImageUrl"
-                    class="design-img"
-                  />
-                  <div
-                    v-else-if="!isLoadingImage"
-                    class="muted"
-                    style="font-size: 8pt"
-                  >
-                    (Tidak ada gambar desain)
+          <!-- Body halaman 1 -->
+          <div class="p1-body">
+            <!-- Baris 1: Info SO (kiri) + Gambar (kanan) -->
+            <div class="p1-row-top">
+              <div class="box p1-info">
+                <div class="box-title">Referensi Sales Order</div>
+                <table class="ft">
+                  <tr>
+                    <td class="fl">No. SO</td>
+                    <td class="fc">:</td>
+                    <td class="fv">{{ spk.spk_so_ref || "-" }}</td>
+                  </tr>
+                  <tr>
+                    <td class="fl">Nama pekerjaan</td>
+                    <td class="fc">:</td>
+                    <td class="fv fw">{{ spk.spk_nama }}</td>
+                  </tr>
+                  <tr>
+                    <td class="fl">Customer</td>
+                    <td class="fc">:</td>
+                    <td class="fv">
+                      <div class="fv-between">
+                        <span>{{ spk.spk_cus_kode }}</span>
+                        <span
+                          v-if="spk.cus_perfect === 'Y'"
+                          class="proses-bg bg-yellow-light"
+                        >
+                          PERFECT
+                        </span>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td class="fl">No. MAP</td>
+                    <td class="fc">:</td>
+                    <td class="fv">{{ spk.spk_memo || "-" }}</td>
+                  </tr>
+                  <tr>
+                    <td class="fl">Jenis order</td>
+                    <td class="fc">:</td>
+                    <td class="fv">{{ spk.jo_nama }}</td>
+                  </tr>
+                  <tr>
+                    <td class="fl">Kepentingan</td>
+                    <td class="fc">:</td>
+                    <td class="fv">{{ spk.spk_statuskerja }}</td>
+                  </tr>
+                  <tr>
+                    <td class="fl">Qty order</td>
+                    <td class="fc">:</td>
+                    <td class="fv fw">
+                      {{ Number(spk.spk_jumlah).toLocaleString("id-ID") }} pcs
+                    </td>
+                  </tr>
+                  <tr>
+                    <td class="fl">Kain</td>
+                    <td class="fc">:</td>
+                    <td class="fv">{{ spk.spk_kain }}</td>
+                  </tr>
+                  <tr v-if="spk.spk_gramasi">
+                    <td class="fl">Gramasi</td>
+                    <td class="fc">:</td>
+                    <td class="fv">{{ spk.spk_gramasi }}</td>
+                  </tr>
+                  <tr>
+                    <td class="fl">Finishing</td>
+                    <td class="fc">:</td>
+                    <td class="fv">{{ spk.spk_finishing }}</td>
+                  </tr>
+                  <tr v-if="spk.spk_warna_badan">
+                    <td class="fl">Warna</td>
+                    <td class="fc">:</td>
+                    <td class="fv">
+                      {{
+                        [
+                          spk.spk_warna_badan,
+                          spk.spk_warna_lengan,
+                          spk.spk_warna_lain,
+                        ]
+                          .filter(Boolean)
+                          .join(" / ")
+                      }}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td class="fl">No. PO</td>
+                    <td class="fc">:</td>
+                    <td class="fv">{{ spk.spk_nomor_po || "-" }}</td>
+                  </tr>
+                  <tr>
+                    <td class="fl">Dateline</td>
+                    <td class="fc">:</td>
+                    <td class="fv fw">{{ tglIndo(spk.spk_dateline) }}</td>
+                  </tr>
+                  <tr>
+                    <td class="fl">Proses</td>
+                    <td class="fc">:</td>
+                    <td class="fv">
+                      <template v-if="prosesChips.length">
+                        <span
+                          v-for="p in prosesChips"
+                          :key="p"
+                          class="proses-bg"
+                          :class="
+                            p === 'DTF' ? 'bg-blue-light' : 'bg-green-light'
+                          "
+                        >
+                          {{ p }}
+                        </span>
+                      </template>
+                      <span v-else class="muted">—</span>
+                    </td>
+                  </tr>
+                </table>
+              </div>
+
+              <div class="p1-img-col">
+                <div class="box img-box-wrap">
+                  <div class="box-title">Gambar desain</div>
+                  <div class="img-box">
+                    <img
+                      v-if="resolvedImageUrl"
+                      :src="resolvedImageUrl"
+                      class="design-img"
+                    />
+                    <div
+                      v-else-if="!isLoadingImage"
+                      class="muted"
+                      style="font-size: 8pt"
+                    >
+                      (Tidak ada gambar desain)
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
 
-          <!-- Baris 2: Detail Size -->
-          <div v-if="sizes.length > 0" class="box mb-6">
-            <div class="box-title">Detail size</div>
-            <table class="dt">
-              <thead>
-                <tr>
-                  <th class="tc">Size</th>
-                  <th class="tc">Qty</th>
-                  <th v-if="hasAtasan" class="tc">LD</th>
-                  <th v-if="hasAtasan" class="tc">PB</th>
-                  <th v-if="hasPlPendek" class="tc">PL Pendek</th>
-                  <th v-if="hasPlPanjang" class="tc">PL Panjang</th>
-                  <th v-if="hasAtasan" class="tc">P.Bahu</th>
-                  <th v-if="hasAtasan" class="tc">L.Lengan</th>
-                  <th v-if="hasAtasan" class="tc">L.Manset</th>
-                  <th v-if="hasBawahan" class="tc">L.Pinggang</th>
-                  <th v-if="hasBawahan" class="tc">P.Celana</th>
-                  <th v-if="hasBawahan" class="tc">L.Panggul</th>
-                  <th v-if="hasBawahan" class="tc">L.Paha</th>
-                  <th v-if="hasBawahan" class="tc">Pesak</th>
-                  <th v-if="hasBawahan" class="tc">L.Lutut</th>
-                  <th v-if="hasBawahan" class="tc">L.Bawah</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="sz in sizes" :key="sz.size">
-                  <td class="tc">{{ sz.size }}</td>
-                  <td class="tc">
-                    {{ Number(sz.qty).toLocaleString("id-ID") }}
-                  </td>
-                  <td v-if="hasAtasan" class="tc">{{ sz.ld || 0 }}</td>
-                  <td v-if="hasAtasan" class="tc">{{ sz.pb || 0 }}</td>
-                  <td v-if="hasPlPendek" class="tc">{{ sz.pl_pendek || 0 }}</td>
-                  <td v-if="hasPlPanjang" class="tc">
-                    {{ sz.pl_panjang || 0 }}
-                  </td>
-                  <td v-if="hasAtasan" class="tc">{{ sz.p_bahu || 0 }}</td>
-                  <td v-if="hasAtasan" class="tc">{{ sz.l_lengan || 0 }}</td>
-                  <td v-if="hasAtasan" class="tc">{{ sz.l_manset || 0 }}</td>
-                  <td v-if="hasBawahan" class="tc">{{ sz.l_pinggang || 0 }}</td>
-                  <td v-if="hasBawahan" class="tc">{{ sz.p_celana || 0 }}</td>
-                  <td v-if="hasBawahan" class="tc">{{ sz.l_panggul || 0 }}</td>
-                  <td v-if="hasBawahan" class="tc">{{ sz.l_paha || 0 }}</td>
-                  <td v-if="hasBawahan" class="tc">{{ sz.pesak || 0 }}</td>
-                  <td v-if="hasBawahan" class="tc">{{ sz.l_lutut || 0 }}</td>
-                  <td v-if="hasBawahan" class="tc">{{ sz.l_bawah || 0 }}</td>
-                </tr>
-              </tbody>
-              <tfoot>
-                <tr>
-                  <td class="tc fw">Total</td>
-                  <td class="tc fw">{{ totalQty.toLocaleString("id-ID") }}</td>
-                  <td
-                    :colspan="
-                      (hasAtasan ? 5 : 0) +
-                      (hasPlPendek ? 1 : 0) +
-                      (hasPlPanjang ? 1 : 0) +
-                      (hasBawahan ? 7 : 0)
-                    "
-                  ></td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-
-          <!-- Baris 3: MKB (atas) -->
-          <div class="box mb-6">
-            <div class="box-title">Kebutuhan Bahan (MKB)</div>
-            <table class="dt">
-              <thead>
-                <tr>
-                  <th style="width: 24px">No</th>
-                  <th style="width: 80px">No. MKB</th>
-                  <th style="width: 70px">Kode</th>
-                  <th>Nama Bahan</th>
-                  <th style="width: 50px">Warna</th>
-                  <th style="width: 40px">Babaran</th>
-                  <th style="width: 45px" class="tr">Butuh</th>
-                  <th style="width: 35px">Sat</th>
-                  <th style="width: 100px">Bahan Datang</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="(m, idx) in mkbDetail" :key="idx">
-                  <td class="tc">{{ idx + 1 }}</td>
-                  <td>{{ m.Nomor }}</td>
-                  <td>{{ m.Kode }}</td>
-                  <td>{{ m.NamaBahan }}</td>
-                  <td>{{ m.Warna }}</td>
-                  <td>{{ m.Babaran }}</td>
-                  <td class="tr">
-                    {{ Number(m.Butuh).toLocaleString("id-ID") }}
-                  </td>
-                  <td>{{ m.Satuan }}</td>
-                  <td class="bahan-datang-cell">{{ m.BahanDatang || "—" }}</td>
-                </tr>
-                <tr v-if="mkbDetail.length === 0">
-                  <td colspan="9" class="tc muted">Belum ada MKB</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <!-- Baris 4: MKA (bawah MKB) -->
-          <!-- MKA dari BAST MAP — dipakai kalau SPK berasal dari MAP dan BAST
-     MAP-nya sudah punya accessories/babaran diinput -->
-          <div v-if="hasMkaFromMap" class="box mb-6">
-            <div class="box-title">
-              Kebutuhan Aksesoris &amp; Babaran (dari BAST MAP
-              {{ spk.spk_memo }})
+            <!-- Baris 2: Detail Size -->
+            <div v-if="sizes.length > 0" class="box mb-6">
+              <div class="box-title">Detail size</div>
+              <table class="dt">
+                <thead>
+                  <tr>
+                    <th class="tc">Size</th>
+                    <th class="tc">Qty</th>
+                    <th v-if="hasAtasan" class="tc">LD</th>
+                    <th v-if="hasAtasan" class="tc">PB</th>
+                    <th v-if="hasPlPendek" class="tc">PL Pendek</th>
+                    <th v-if="hasPlPanjang" class="tc">PL Panjang</th>
+                    <th v-if="hasAtasan" class="tc">P.Bahu</th>
+                    <th v-if="hasAtasan" class="tc">L.Lengan</th>
+                    <th v-if="hasAtasan" class="tc">L.Manset</th>
+                    <th v-if="hasBawahan" class="tc">L.Pinggang</th>
+                    <th v-if="hasBawahan" class="tc">P.Celana</th>
+                    <th v-if="hasBawahan" class="tc">L.Panggul</th>
+                    <th v-if="hasBawahan" class="tc">L.Paha</th>
+                    <th v-if="hasBawahan" class="tc">Pesak</th>
+                    <th v-if="hasBawahan" class="tc">L.Lutut</th>
+                    <th v-if="hasBawahan" class="tc">L.Bawah</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="sz in sizes" :key="sz.size">
+                    <td class="tc">{{ sz.size }}</td>
+                    <td class="tc">
+                      {{ Number(sz.qty).toLocaleString("id-ID") }}
+                    </td>
+                    <td v-if="hasAtasan" class="tc">{{ sz.ld || 0 }}</td>
+                    <td v-if="hasAtasan" class="tc">{{ sz.pb || 0 }}</td>
+                    <td v-if="hasPlPendek" class="tc">
+                      {{ sz.pl_pendek || 0 }}
+                    </td>
+                    <td v-if="hasPlPanjang" class="tc">
+                      {{ sz.pl_panjang || 0 }}
+                    </td>
+                    <td v-if="hasAtasan" class="tc">{{ sz.p_bahu || 0 }}</td>
+                    <td v-if="hasAtasan" class="tc">{{ sz.l_lengan || 0 }}</td>
+                    <td v-if="hasAtasan" class="tc">{{ sz.l_manset || 0 }}</td>
+                    <td v-if="hasBawahan" class="tc">
+                      {{ sz.l_pinggang || 0 }}
+                    </td>
+                    <td v-if="hasBawahan" class="tc">{{ sz.p_celana || 0 }}</td>
+                    <td v-if="hasBawahan" class="tc">
+                      {{ sz.l_panggul || 0 }}
+                    </td>
+                    <td v-if="hasBawahan" class="tc">{{ sz.l_paha || 0 }}</td>
+                    <td v-if="hasBawahan" class="tc">{{ sz.pesak || 0 }}</td>
+                    <td v-if="hasBawahan" class="tc">{{ sz.l_lutut || 0 }}</td>
+                    <td v-if="hasBawahan" class="tc">{{ sz.l_bawah || 0 }}</td>
+                  </tr>
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td class="tc fw">Total</td>
+                    <td class="tc fw">
+                      {{ totalQty.toLocaleString("id-ID") }}
+                    </td>
+                    <td
+                      :colspan="
+                        (hasAtasan ? 5 : 0) +
+                        (hasPlPendek ? 1 : 0) +
+                        (hasPlPanjang ? 1 : 0) +
+                        (hasBawahan ? 7 : 0)
+                      "
+                    ></td>
+                  </tr>
+                </tfoot>
+              </table>
             </div>
-            <table v-if="mkaFromMap.komponen.length" class="dt">
-              <thead>
-                <tr>
-                  <th style="width: 100px">Komponen</th>
-                  <th style="width: 80px">Warna</th>
-                  <th style="width: 60px" class="tc">Babaran</th>
-                  <th style="width: 70px" class="tc">Std. Kalkulasi</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="(k, idx) in mkaFromMap.komponen" :key="idx">
-                  <td>{{ k.komponen }}</td>
-                  <td>{{ k.warna || "-" }}</td>
-                  <td class="tc">
-                    {{ Number(k.babaran).toLocaleString("id-ID") }}
-                  </td>
-                  <td class="tc">
-                    {{ Number(k.babarank).toLocaleString("id-ID") }}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-            <!-- ── Babaran per Size — tambahan ── -->
-            <table v-if="mkaFromMap.sizeBreakdown.length" class="dt">
-              <thead>
-                <tr>
-                  <th style="width: 100px">Komponen</th>
-                  <th style="width: 80px">Size</th>
-                  <th style="width: 70px" class="tc">Babaran</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="(s, idx) in mkaFromMap.sizeBreakdown" :key="idx">
-                  <td>{{ s.komponen }}</td>
-                  <td>{{ s.size }}</td>
-                  <td class="tc">
-                    {{ Number(s.babaran).toLocaleString("id-ID") }}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-            <table class="dt">
-              <thead>
-                <tr>
-                  <th style="width: 60px">Kode</th>
-                  <th style="width: 160px">Nama</th>
-                  <th style="width: 50px">Satuan</th>
-                  <th style="width: 50px" class="tr">Qty/Kaos</th>
-                  <th>Note</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="(a, idx) in mkaFromMap.aksesoris" :key="idx">
-                  <td class="fw">{{ a.kode }}</td>
-                  <td>{{ a.nama }}</td>
-                  <td class="tc">{{ a.satuan }}</td>
-                  <td class="tr">{{ a.qty }}</td>
-                  <td>{{ a.note || "—" }}</td>
-                </tr>
-                <tr v-if="mkaFromMap.aksesoris.length === 0">
-                  <td colspan="5" class="tc muted">—</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
 
-          <!-- Fallback: checklist manual MKA (A/B/C...) — dipakai kalau tidak
+            <!-- Baris 3: MKB (atas) -->
+            <div class="box mb-6">
+              <div class="box-title">Kebutuhan Bahan (MKB)</div>
+              <table class="dt">
+                <thead>
+                  <tr>
+                    <th style="width: 24px">No</th>
+                    <th style="width: 80px">No. MKB</th>
+                    <th style="width: 70px">Kode</th>
+                    <th>Nama Bahan</th>
+                    <th style="width: 50px">Warna</th>
+                    <th style="width: 40px">Babaran</th>
+                    <th style="width: 45px" class="tr">Butuh</th>
+                    <th style="width: 35px">Sat</th>
+                    <th style="width: 100px">Bahan Datang</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(m, idx) in mkbDetail" :key="idx">
+                    <td class="tc">{{ idx + 1 }}</td>
+                    <td>{{ m.Nomor }}</td>
+                    <td>{{ m.Kode }}</td>
+                    <td>{{ m.NamaBahan }}</td>
+                    <td>{{ m.Warna }}</td>
+                    <td>{{ m.Babaran }}</td>
+                    <td class="tr">
+                      {{ Number(m.Butuh).toLocaleString("id-ID") }}
+                    </td>
+                    <td>{{ m.Satuan }}</td>
+                    <td class="bahan-datang-cell">
+                      {{ m.BahanDatang || "—" }}
+                    </td>
+                  </tr>
+                  <tr v-if="mkbDetail.length === 0">
+                    <td colspan="9" class="tc muted">Belum ada MKB</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Baris 4: MKA (bawah MKB) -->
+            <!-- MKA dari BAST MAP — dipakai kalau SPK berasal dari MAP dan BAST
+     MAP-nya sudah punya accessories/babaran diinput -->
+            <div v-if="hasMkaFromMap" class="box mb-6">
+              <div class="box-title">
+                Kebutuhan Aksesoris &amp; Babaran (dari BAST MAP
+                {{ spk.spk_memo }})
+              </div>
+              <table v-if="mkaFromMap.komponen.length" class="dt">
+                <thead>
+                  <tr>
+                    <th style="width: 100px">Komponen</th>
+                    <th style="width: 80px">Warna</th>
+                    <th style="width: 60px" class="tc">Babaran</th>
+                    <th style="width: 70px" class="tc">Std. Kalkulasi</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(k, idx) in mkaFromMap.komponen" :key="idx">
+                    <td>{{ k.komponen }}</td>
+                    <td>{{ k.warna || "-" }}</td>
+                    <td class="tc">
+                      {{ Number(k.babaran).toLocaleString("id-ID") }}
+                    </td>
+                    <td class="tc">
+                      {{ Number(k.babarank).toLocaleString("id-ID") }}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+              <!-- ── Babaran per Size — tambahan ── -->
+              <table v-if="mkaFromMap.sizeBreakdown.length" class="dt">
+                <thead>
+                  <tr>
+                    <th style="width: 100px">Komponen</th>
+                    <th style="width: 80px">Size</th>
+                    <th style="width: 70px" class="tc">Babaran</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(s, idx) in mkaFromMap.sizeBreakdown" :key="idx">
+                    <td>{{ s.komponen }}</td>
+                    <td>{{ s.size }}</td>
+                    <td class="tc">
+                      {{ Number(s.babaran).toLocaleString("id-ID") }}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+              <table class="dt">
+                <thead>
+                  <tr>
+                    <th style="width: 60px">Kode</th>
+                    <th style="width: 160px">Nama</th>
+                    <th style="width: 50px">Satuan</th>
+                    <th style="width: 50px" class="tr">Qty/Kaos</th>
+                    <th>Note</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(a, idx) in mkaFromMap.aksesoris" :key="idx">
+                    <td class="fw">{{ a.kode }}</td>
+                    <td>{{ a.nama }}</td>
+                    <td class="tc">{{ a.satuan }}</td>
+                    <td class="tr">{{ a.qty }}</td>
+                    <td>{{ a.note || "—" }}</td>
+                  </tr>
+                  <tr v-if="mkaFromMap.aksesoris.length === 0">
+                    <td colspan="5" class="tc muted">—</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Fallback: checklist manual MKA (A/B/C...) — dipakai kalau tidak
      ada data dari BAST MAP -->
-          <div v-else class="box mb-6">
-            <div class="box-title">Kebutuhan Aksesoris (MKA)</div>
-            <table class="dt">
-              <thead>
-                <tr>
-                  <th style="width: 30px">Kode</th>
-                  <th style="width: 140px">Nama</th>
-                  <th>Keterangan</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="(k, idx) in ketKomponenList" :key="idx">
-                  <td class="tc fw">{{ k.kode }}</td>
-                  <td>{{ k.nama }}</td>
-                  <td>{{ k.ket || "—" }}</td>
-                </tr>
-                <tr v-if="ketKomponenList.length === 0">
-                  <td colspan="3" class="tc muted">—</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+            <div v-else class="box mb-6">
+              <div class="box-title">Kebutuhan Aksesoris (MKA)</div>
+              <table class="dt">
+                <thead>
+                  <tr>
+                    <th style="width: 30px">Kode</th>
+                    <th style="width: 140px">Nama</th>
+                    <th>Keterangan</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(k, idx) in ketKomponenList" :key="idx">
+                    <td class="tc fw">{{ k.kode }}</td>
+                    <td>{{ k.nama }}</td>
+                    <td>{{ k.ket || "—" }}</td>
+                  </tr>
+                  <tr v-if="ketKomponenList.length === 0">
+                    <td colspan="3" class="tc muted">—</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
 
-          <!-- Baris 5: Komponen Potong + Second Process -->
-          <div
-            class="p1-row-komp mb-6"
-            :class="{ 'no-special': keteranganKhusus.length === 0 }"
-          >
-            <!-- Slot kiri-atas: Special Process (kalau ada) ATAU Komponen Potong (kalau Special Process kosong) -->
-            <div v-if="keteranganKhusus.length > 0" class="box">
-              <div class="box-title">Keterangan special process</div>
-              <div class="ket-list ket-small">
-                <div
-                  v-for="(k, idx) in keteranganKhusus"
-                  :key="idx"
-                  class="ket-item"
-                >
-                  {{ idx + 1 }}. {{ k }}
+            <!-- Baris 5: Komponen Potong + Second Process -->
+            <div
+              class="p1-row-komp mb-6"
+              :class="{ 'no-special': keteranganKhusus.length === 0 }"
+            >
+              <!-- Slot kiri-atas: Special Process (kalau ada) ATAU Komponen Potong (kalau Special Process kosong) -->
+              <div v-if="keteranganKhusus.length > 0" class="box">
+                <div class="box-title">Keterangan special process</div>
+                <div class="ket-list ket-small">
+                  <div
+                    v-for="(k, idx) in keteranganKhusus"
+                    :key="idx"
+                    class="ket-item"
+                  >
+                    {{ idx + 1 }}. {{ k }}
+                  </div>
                 </div>
               </div>
+              <div v-else class="box">
+                <div class="box-title">Komponen Potong</div>
+                <table class="dt">
+                  <thead>
+                    <tr>
+                      <th style="width: 24px">No</th>
+                      <th style="width: 80px">Kode</th>
+                      <th>Nama komponen</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="(item, idx) in komponenPotong" :key="idx">
+                      <td class="tc">{{ idx + 1 }}</td>
+                      <td>{{ item.Kode }}</td>
+                      <td>{{ item.Nama }}</td>
+                    </tr>
+                    <tr v-if="komponenPotong.length === 0">
+                      <td colspan="3" class="tc muted">—</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <!-- Slot kanan: Second Process (selalu tampil di sini) -->
+              <div class="box">
+                <div class="box-title">Second Process (Cetak/Bordir)</div>
+                <table class="dt">
+                  <thead>
+                    <tr>
+                      <th style="width: 24px">No</th>
+                      <th style="width: 80px">Kode</th>
+                      <th>Nama</th>
+                      <th style="width: 60px">Proses</th>
+                      <th style="width: 90px">Penempatan</th>
+                      <th style="width: 70px">Ukuran</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="(item, idx) in komponenCetakBordir" :key="idx">
+                      <td class="tc">{{ idx + 1 }}</td>
+                      <td>{{ item.Kode }}</td>
+                      <td>{{ item.Nama }}</td>
+                      <td>
+                        <span
+                          class="proses-bg"
+                          :class="
+                            item.Proses === 'DTF'
+                              ? 'bg-blue-light'
+                              : 'bg-green-light'
+                          "
+                        >
+                          {{ item.Proses }}
+                        </span>
+                      </td>
+                      <td>{{ item.Penempatan }}</td>
+                      <td>{{ item.Ukuran }}</td>
+                    </tr>
+                    <tr v-if="komponenCetakBordir.length === 0">
+                      <td colspan="6" class="tc muted">—</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
             </div>
-            <div v-else class="box">
-              <div class="box-title">Komponen Potong</div>
-              <table class="dt">
+
+            <!-- Baris 6: Komponen Potong (kalau Special Process ADA, tampil di sini penuh) + Produksi -->
+            <div class="p1-row-ket mb-6">
+              <div v-if="keteranganKhusus.length > 0" class="box">
+                <div class="box-title">Komponen Potong</div>
+                <table class="dt">
+                  <thead>
+                    <tr>
+                      <th style="width: 24px">No</th>
+                      <th style="width: 80px">Kode</th>
+                      <th>Nama komponen</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="(item, idx) in komponenPotong" :key="idx">
+                      <td class="tc">{{ idx + 1 }}</td>
+                      <td>{{ item.Kode }}</td>
+                      <td>{{ item.Nama }}</td>
+                    </tr>
+                    <tr v-if="komponenPotong.length === 0">
+                      <td colspan="3" class="tc muted">—</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div
+                class="box"
+                :class="{ 'full-span': keteranganKhusus.length === 0 }"
+              >
+                <div class="box-title">Keterangan produksi</div>
+                <pre class="ket-pre ket-produksi">{{
+                  spk.spk_keterangan || "—"
+                }}</pre>
+              </div>
+            </div>
+
+            <!-- Planning PPIC — breakdown target per proses, diisi manual pakai bolpoin -->
+            <div class="box mb-6">
+              <div class="box-title">
+                Planning PPIC — Target Tiap Proses
+                <span class="box-title-note">(diisi manual)</span>
+              </div>
+              <table class="planning-tbl">
                 <thead>
                   <tr>
-                    <th style="width: 24px">No</th>
-                    <th style="width: 80px">Kode</th>
-                    <th>Nama komponen</th>
+                    <th>Cutting</th>
+                    <th>Sablon / Bordir</th>
+                    <th>Sewing</th>
+                    <th>Packing</th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="(item, idx) in komponenPotong" :key="idx">
-                    <td class="tc">{{ idx + 1 }}</td>
-                    <td>{{ item.Kode }}</td>
-                    <td>{{ item.Nama }}</td>
-                  </tr>
-                  <tr v-if="komponenPotong.length === 0">
-                    <td colspan="3" class="tc muted">—</td>
+                  <tr>
+                    <td class="planning-cell"></td>
+                    <td class="planning-cell"></td>
+                    <td class="planning-cell"></td>
+                    <td class="planning-cell"></td>
                   </tr>
                 </tbody>
               </table>
             </div>
 
-            <!-- Slot kanan: Second Process (selalu tampil di sini) -->
-            <div class="box">
-              <div class="box-title">Second Process (Cetak/Bordir)</div>
-              <table class="dt">
-                <thead>
-                  <tr>
-                    <th style="width: 24px">No</th>
-                    <th style="width: 80px">Kode</th>
-                    <th>Nama</th>
-                    <th style="width: 60px">Proses</th>
-                    <th style="width: 90px">Penempatan</th>
-                    <th style="width: 70px">Ukuran</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="(item, idx) in komponenCetakBordir" :key="idx">
-                    <td class="tc">{{ idx + 1 }}</td>
-                    <td>{{ item.Kode }}</td>
-                    <td>{{ item.Nama }}</td>
-                    <td>
-                      <span
-                        class="proses-bg"
-                        :class="
-                          item.Proses === 'DTF'
-                            ? 'bg-blue-light'
-                            : 'bg-green-light'
-                        "
-                      >
-                        {{ item.Proses }}
-                      </span>
-                    </td>
-                    <td>{{ item.Penempatan }}</td>
-                    <td>{{ item.Ukuran }}</td>
-                  </tr>
-                  <tr v-if="komponenCetakBordir.length === 0">
-                    <td colspan="6" class="tc muted">—</td>
-                  </tr>
-                </tbody>
+            <!-- TTD -->
+            <div class="ttd-row">
+              <table class="ttd-tbl">
+                <tr>
+                  <td class="ttd-hd">Dibuat (PPIC)</td>
+                  <td class="ttd-hd">Manajer Produksi</td>
+                </tr>
+                <tr>
+                  <td class="ttd-space"></td>
+                  <td class="ttd-space"></td>
+                </tr>
+                <tr>
+                  <td class="ttd-name">{{ spk.user_create || "" }}</td>
+                  <td class="ttd-name"></td>
+                </tr>
               </table>
+              <div class="qr-wrap">
+                <qrcode-vue :value="spk.spk_nomor" :size="56" level="L" />
+                <div class="qr-lbl">{{ spk.spk_nomor }}</div>
+              </div>
             </div>
           </div>
 
-          <!-- Baris 6: Komponen Potong (kalau Special Process ADA, tampil di sini penuh) + Produksi -->
-          <div class="p1-row-ket mb-6">
-            <div v-if="keteranganKhusus.length > 0" class="box">
-              <div class="box-title">Komponen Potong</div>
-              <table class="dt">
-                <thead>
-                  <tr>
-                    <th style="width: 24px">No</th>
-                    <th style="width: 80px">Kode</th>
-                    <th>Nama komponen</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="(item, idx) in komponenPotong" :key="idx">
-                    <td class="tc">{{ idx + 1 }}</td>
-                    <td>{{ item.Kode }}</td>
-                    <td>{{ item.Nama }}</td>
-                  </tr>
-                  <tr v-if="komponenPotong.length === 0">
-                    <td colspan="3" class="tc muted">—</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            <div
-              class="box"
-              :class="{ 'full-span': keteranganKhusus.length === 0 }"
+          <!-- Footer halaman 1 -->
+          <div class="pf">
+            <span
+              >Dibuat: {{ spk.user_create }} —
+              {{ formatWaktu(spk.date_create) }}</span
             >
-              <div class="box-title">Keterangan produksi</div>
-              <pre class="ket-pre ket-produksi">{{
-                spk.spk_keterangan || "—"
-              }}</pre>
-            </div>
+            <span>Referensi SO: {{ spk.spk_so_ref || "—" }}</span>
           </div>
-
-          <!-- Planning PPIC — breakdown target per proses, diisi manual pakai bolpoin -->
-          <div class="box mb-6">
-            <div class="box-title">
-              Planning PPIC — Target Tiap Proses
-              <span class="box-title-note">(diisi manual)</span>
-            </div>
-            <table class="planning-tbl">
-              <thead>
-                <tr>
-                  <th>Cutting</th>
-                  <th>Sablon / Bordir</th>
-                  <th>Sewing</th>
-                  <th>Packing</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td class="planning-cell"></td>
-                  <td class="planning-cell"></td>
-                  <td class="planning-cell"></td>
-                  <td class="planning-cell"></td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <!-- TTD -->
-          <div class="ttd-row">
-            <table class="ttd-tbl">
-              <tr>
-                <td class="ttd-hd">Dibuat (PPIC)</td>
-                <td class="ttd-hd">Manajer Produksi</td>
-              </tr>
-              <tr>
-                <td class="ttd-space"></td>
-                <td class="ttd-space"></td>
-              </tr>
-              <tr>
-                <td class="ttd-name">{{ spk.user_create || "" }}</td>
-                <td class="ttd-name"></td>
-              </tr>
-            </table>
-            <div class="qr-wrap">
-              <qrcode-vue :value="spk.spk_nomor" :size="56" level="L" />
-              <div class="qr-lbl">{{ spk.spk_nomor }}</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Footer halaman 1 -->
-        <div class="pf">
-          <span
-            >Dibuat: {{ spk.user_create }} —
-            {{ formatWaktu(spk.date_create) }}</span
-          >
-          <span>Referensi SO: {{ spk.spk_so_ref || "—" }}</span>
         </div>
       </div>
 
@@ -1436,6 +1507,30 @@ onMounted(async () => {
   align-items: center;
   gap: 6px;
   font-size: 6.5pt;
+}
+
+/* ── Auto-fit A4 (Page 1, format baru) ── */
+.print-page.page-1 {
+  height: 297mm;
+  overflow: hidden;
+}
+.print-page.page-1.print-page--multi {
+  height: auto;
+  min-height: 297mm;
+  overflow: visible;
+}
+.page1-scale-inner {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+/* Cegah baris tabel/box kepotong di tengah pas fallback multi-halaman */
+.dt tbody tr {
+  break-inside: avoid;
+}
+.box {
+  break-inside: avoid;
 }
 
 /* ── Page 2 — Layout ── */

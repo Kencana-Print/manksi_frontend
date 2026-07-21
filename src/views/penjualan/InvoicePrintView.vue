@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from "vue";
 import { useRoute } from "vue-router";
 import { invFormService as svc } from "@/services/penjualan/invoiceFormService";
+import qz from "qz-tray";
 
 // Import Logo Perusahaan
 import logoKP from "@/assets/kp.jpg";
@@ -17,6 +18,8 @@ const detail = ref<any[]>([]);
 const totals = ref<any>({});
 const isReady = ref(false);
 const isLoading = ref(true);
+const printerName = ref("192.168.1.41");
+const isPrinting = ref(false);
 
 const doPrint = () => window.print();
 const doClose = () => window.close();
@@ -294,6 +297,46 @@ const generateTxt = (mode: "standart" | "full") => {
   return allPages.map((p) => p.join("\n")).join("\n\f\n");
 };
 
+const printQZ = async (pilihMode: "standart" | "full") => {
+  isPrinting.value = true;
+  try {
+    if (!qz.websocket.isActive()) {
+      await qz.websocket.connect();
+    }
+
+    const config = qz.configs.create(printerName.value);
+    const content = generateTxt(pilihMode);
+
+    const data = [
+      "\x1B\x40", // ESC @: Inisialisasi/Reset printer
+      { type: "raw", format: "plain", data: content },
+      "\x0C", // Form Feed: Eject halaman
+    ];
+
+    await qz.print(config, data);
+    alert(`Berhasil dikirim ke printer (Mode: ${pilihMode})!`);
+  } catch (error: any) {
+    console.error("QZ Error:", error);
+    alert("Gagal cetak via QZ Tray: " + error.message);
+  } finally {
+    isPrinting.value = false;
+  }
+};
+
+// Fungsi unduh diubah agar menerima parameter mode untuk tombol cadangan
+const downloadTxtMode = (pilihMode: "standart" | "full") => {
+  const content = generateTxt(pilihMode);
+  const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `Invoice_${nomor.replace(/\//g, "_")}_${pilihMode}.txt`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+};
+
 const downloadTxt = () => {
   const content = generateTxt(dotMatrixMode.value);
   const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
@@ -358,52 +401,85 @@ onMounted(() => {
       <p>Menyiapkan data cetak...</p>
     </div>
 
-    <div v-else-if="showModeDialog" class="dm-card">
+    <div v-else-if="isReady" class="dm-card">
       <div class="dm-icon">🖨️</div>
-      <h2>Mau dicetak?</h2>
-      <p>
-        Pilih mode cetak untuk Invoice <b>{{ nomor }}</b>
+      <h2>Cetak Invoice Dot Matrix</h2>
+      <p style="margin-bottom: 12px">
+        Pastikan QZ Tray berjalan di background.
       </p>
-      <div class="dm-mode-btns">
+
+      <div class="dm-steps" style="margin-bottom: 16px">
+        <label style="font-weight: bold; display: block; margin-bottom: 4px"
+          >Target Printer (IP / Nama):</label
+        >
+        <input
+          v-model="printerName"
+          type="text"
+          style="
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+          "
+        />
+      </div>
+
+      <div
+        style="
+          text-align: left;
+          margin-bottom: 8px;
+          font-weight: 600;
+          font-size: 13px;
+          color: #1565c0;
+        "
+      >
+        Pilih Mode Cetak Langsung:
+      </div>
+      <div class="dm-mode-btns" style="margin-bottom: 20px">
         <button
           class="dm-mode-btn dm-mode-standart"
-          @click="confirmDotMatrixMode('standart')"
+          @click="printQZ('standart')"
+          :disabled="isPrinting"
         >
-          Standart<br /><span>Maks 31 baris/halaman</span>
+          🚀 Standart<br /><span>Maks 31 baris/halaman</span>
         </button>
         <button
           class="dm-mode-btn dm-mode-full"
-          @click="confirmDotMatrixMode('full')"
+          @click="printQZ('full')"
+          :disabled="isPrinting"
         >
-          Full<br /><span>Semua dalam 1 halaman</span>
+          🚀 Full<br /><span>Semua dalam 1 halaman</span>
         </button>
       </div>
-    </div>
 
-    <div v-else-if="isReady" class="dm-card">
-      <div class="dm-icon">🖨️</div>
-      <h2>File Dot Matrix Siap</h2>
-      <p>
-        File <b>Invoice_{{ nomor.replace(/\//g, "_") }}.txt</b> telah diunduh.
-      </p>
-      <div class="dm-steps">
-        <b>Cara cetak ke Dot Matrix:</b>
-        <ol>
-          <li>Buka file <b>.txt</b> yang baru saja terunduh</li>
-          <li>Tekan <b>Ctrl+P</b> → pilih printer Dot Matrix</li>
-          <li>Pastikan font <b>Courier New</b> ukuran <b>10pt</b></li>
-          <li>Klik <b>Print</b></li>
-        </ol>
-      </div>
-      <div style="display: flex; gap: 8px">
-        <button
-          class="dm-btn"
-          style="background: #546e7a"
-          @click="showModeDialog = true"
+      <div style="border-top: 1px solid #e0e0e0; padding-top: 16px">
+        <div
+          style="
+            font-size: 11px;
+            color: #757575;
+            margin-bottom: 8px;
+            text-align: left;
+          "
         >
-          ↻ Ganti Mode
-        </button>
-        <button class="dm-btn" @click="downloadTxt">📥 Unduh Ulang</button>
+          Cadangan jika printer error (Unduh .txt):
+        </div>
+        <div style="display: flex; gap: 8px">
+          <button
+            class="dm-btn"
+            style="background: #757575"
+            @click="downloadTxtMode('standart')"
+          >
+            📥 TXT Standart
+          </button>
+          <button
+            class="dm-btn"
+            style="background: #757575"
+            @click="downloadTxtMode('full')"
+          >
+            📥 TXT Full
+          </button>
+        </div>
       </div>
     </div>
   </div>

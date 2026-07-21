@@ -89,6 +89,7 @@ import {
   IconTruckLoading,
   IconCircleCheck,
   IconAlertTriangle,
+  IconActivity,
 } from "@tabler/icons-vue";
 
 interface NavItem {
@@ -871,6 +872,12 @@ const menuItems: NavItem[] = [
             menuId: 568,
           },
           {
+            title: "SPK DTF Belum PO DTF",
+            to: "/laporan/gudang-garmen/spk-dtf-belum-po",
+            icon: IconFileAlert,
+            menuId: 516,
+          },
+          {
             title: "SPK vs Realisasi vs LHK Cutting",
             to: "/laporan/gudang-garmen/spkv-realisasiv-lhkcutt",
             icon: IconListCheck,
@@ -935,6 +942,25 @@ const menuItems: NavItem[] = [
             to: "/laporan/gudang-garmen/browse-spk",
             icon: IconClipboardList,
             menuId: 527,
+          },
+          {
+            title: "Browse MAP",
+            to: "/laporan/gudang-garmen/browse-map",
+            icon: IconClipboardList,
+            menuId: 528,
+          },
+        ],
+      },
+      {
+        title: "Laporan Produksi Garmen",
+        icon: IconActivity,
+        menuId: 961,
+        subItems: [
+          {
+            title: "Monitoring Produksi",
+            to: "/laporan/produksi-garmen/monitoring-produksi",
+            icon: IconGauge,
+            menuId: 554,
           },
         ],
       },

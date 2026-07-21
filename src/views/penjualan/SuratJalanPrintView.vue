@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from "vue";
 import { useRoute } from "vue-router";
 import { sjFormService as svc } from "@/services/penjualan/suratJalanFormService";
+import qz from "qz-tray";
 
 // Import Logo Perusahaan
 import logoKP from "@/assets/kp.jpg";
@@ -11,6 +12,8 @@ import logoMD from "@/assets/md.jpg";
 const route = useRoute();
 const nomor = route.query.nomor as string;
 const mode = route.query.mode as string; // "dotmatrix" | "inkjet"
+const printerName = ref("192.168.1.33");
+const isPrinting = ref(false);
 
 const header = ref<any>({});
 const detail = ref<any[]>([]);
@@ -216,6 +219,32 @@ const downloadTxt = () => {
   URL.revokeObjectURL(url);
 };
 
+const printQZ = async () => {
+  isPrinting.value = true;
+  try {
+    if (!qz.websocket.isActive()) {
+      await qz.websocket.connect();
+    }
+
+    const config = qz.configs.create(printerName.value);
+    const content = generateTxt();
+
+    const data = [
+      "\x1B\x40", // ESC @: Inisialisasi/Reset printer
+      { type: "raw", format: "plain", data: content },
+      "\x0C", // Form Feed: Eject halaman
+    ];
+
+    await qz.print(config, data);
+    alert("Berhasil dikirim ke printer Surat Jalan!");
+  } catch (error: any) {
+    console.error("QZ Error:", error);
+    alert("Gagal cetak via QZ Tray: " + error.message);
+  } finally {
+    isPrinting.value = false;
+  }
+};
+
 const fetchData = async () => {
   try {
     const res = await svc.getDataCetak(nomor);
@@ -224,7 +253,7 @@ const fetchData = async () => {
     isReady.value = true;
 
     if (mode === "dotmatrix") {
-      setTimeout(downloadTxt, 400);
+      // Tidak melakukan apa-apa, biarkan user yang klik tombol cetak
     } else {
       setTimeout(() => window.print(), 600);
     }
@@ -249,26 +278,43 @@ onMounted(() => {
     </div>
     <div v-else-if="isReady" class="dm-card">
       <div class="dm-icon">🖨️</div>
-      <h2>File Dot Matrix Siap</h2>
-      <p>
-        File <b>SuratJalan_{{ nomor.replace(/\//g, "_") }}.txt</b> telah
-        diunduh.
-        <br />
-        Cukup 1x cetak — kertas continuous-form sudah karbon rangkap otomatis
-        menghasilkan salinan ke semua lembar.
+      <h2>Cetak Surat Jalan Dot Matrix</h2>
+      <p style="margin-bottom: 12px; line-height: 1.4">
+        Pastikan QZ Tray berjalan di background.<br />
+        <span style="font-size: 11px; color: #d32f2f; font-weight: bold"
+          >Cukup 1x cetak (kertas continuous-form / karbon rangkap).</span
+        >
       </p>
-      <div class="dm-steps">
-        <b>Cara cetak ke Dot Matrix:</b>
-        <ol>
-          <li>Buka file <b>.txt</b> yang baru saja terunduh</li>
-          <li>Tekan <b>Ctrl+P</b> → pilih printer Dot Matrix</li>
-          <li>Pastikan font <b>Courier New</b> ukuran <b>10pt</b></li>
-          <li>Klik <b>Print</b></li>
-        </ol>
+
+      <div class="dm-steps" style="margin-bottom: 16px">
+        <label style="font-weight: bold; display: block; margin-bottom: 4px"
+          >Target Printer (IP / Nama):</label
+        >
+        <input
+          v-model="printerName"
+          type="text"
+          style="
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+          "
+        />
       </div>
-      <button class="dm-btn" @click="downloadTxt">
-        📥 Unduh Ulang File .txt
-      </button>
+
+      <div style="display: flex; gap: 10px; flex-direction: column">
+        <button class="dm-btn" @click="printQZ" :disabled="isPrinting">
+          {{ isPrinting ? "Mengirim Data..." : "🚀 Cetak Langsung" }}
+        </button>
+        <button
+          class="dm-btn"
+          style="background-color: #757575"
+          @click="downloadTxt"
+        >
+          📥 Unduh File .txt (Cadangan)
+        </button>
+      </div>
     </div>
   </div>
 
