@@ -10,16 +10,6 @@ const printData = ref<any>(null);
 const isLoading = ref(true);
 const finalImageUrl = ref("");
 
-const mainImageUrl = computed(() => {
-  if (!printData.value?.header) return "";
-  const nomor =
-    printData.value.header.MSPK_Nomor || printData.value.header.mspk_nomor;
-  const cab = printData.value.header.mspk_cab || "HO-";
-  const base = api.defaults.baseURL?.replace(/\/api\/?$/, "") || "";
-
-  return `${base}/images/${cab}/map/${encodeURIComponent(nomor)}.jpg`;
-});
-
 const handleImgError = (e: Event) => {
   const img = e.target as HTMLImageElement;
   if (img.dataset.tried === "true") {
@@ -50,9 +40,9 @@ const preloadImageAndPrint = () => {
   const nomor = header.MSPK_Nomor || header.mspk_nomor;
   const cab = header.mspk_cabang || header.mspk_cab || "HO-";
   const base = api.defaults.baseURL?.replace(/\/api\/?$/, "") || "";
-
   const primaryUrl = `${base}/images/${cab}/map/${encodeURIComponent(nomor)}.jpg`;
-  const fallbackUrl = `http://103.94.238.252:8888/file-gambar/${encodeURIComponent(nomor)}.jpg`;
+  // ✅ FIX: path relatif, gak hardcode host/port
+  const fallbackUrl = `/file-gambar/${encodeURIComponent(nomor)}.jpg`;
 
   // Preload gambar secara gaib (belakang layar)
   const img = new Image();
