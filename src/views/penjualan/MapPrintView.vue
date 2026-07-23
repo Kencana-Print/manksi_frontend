@@ -90,13 +90,12 @@ const handleImageError = (e: Event) => {
     return;
   }
   img.dataset.tried = "true";
-
   const mhNomor = getVal("mspk_mh_nomor");
   const nomor = getVal("mspk_nomor");
   const fallbackKey = mhNomor || nomor;
-
   if (fallbackKey) {
-    img.src = `http://103.94.238.252:8888/file-gambar/mintaharga/${encodeURIComponent(fallbackKey)}.jpg`;
+    // ✅ FIX: path relatif
+    img.src = `/file-gambar/mintaharga/${encodeURIComponent(fallbackKey)}.jpg`;
   } else {
     img.style.display = "none";
     imageLoaded.value = true;
@@ -112,7 +111,8 @@ const handleImageLoad = () => {
 const getSignatureUrl = (kodeUser: string) => {
   if (!kodeUser) return "";
   const cleanName = kodeUser.trim().toUpperCase();
-  return `http://103.94.238.252:8888/file-gambar/${encodeURIComponent(cleanName)}.jpg`;
+  // ✅ FIX: path relatif
+  return `/file-gambar/${encodeURIComponent(cleanName)}.jpg`;
 };
 
 const tglIndo = (dateStr: string) => {

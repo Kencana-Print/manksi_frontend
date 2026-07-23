@@ -46,7 +46,8 @@ const getLocalUrl = (item: any) => {
 };
 
 const getVpsUrl = (item: any) => {
-  return `http://103.94.238.252:8888/file-gambar/${encodeURIComponent(item.mspk_nomor)}.jpg`;
+  // ✅ FIX: path relatif
+  return `/file-gambar/${encodeURIComponent(item.mspk_nomor)}.jpg`;
 };
 
 // Fungsi fallback saat gambar lokal (web baru) tidak ditemukan (404)

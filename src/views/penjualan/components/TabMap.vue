@@ -174,9 +174,10 @@ const handleFallbackImage = (e: Event) => {
   img.dataset.fallbackTried = "true";
   const mhNomor = props.formData.MintaHarga || props.formData.Nomor;
   if (mhNomor) {
-    const fallbackUrl = `http://103.94.238.252:8888/file-gambar/mintaharga/${encodeURIComponent(mhNomor)}.jpg`;
+    // ✅ FIX: path relatif, gak hardcode host/port
+    const fallbackUrl = `/file-gambar/mintaharga/${encodeURIComponent(mhNomor)}.jpg`;
     img.src = fallbackUrl;
-    resolvedImageUrl.value = fallbackUrl; // ← catat URL yg akhirnya berhasil dipakai
+    resolvedImageUrl.value = fallbackUrl;
   } else {
     img.style.display = "none";
   }
@@ -186,16 +187,15 @@ const handleFallbackImage = (e: Event) => {
 // v-img emit src (string) yang gagal, bukan Event DOM.
 const handlePreviewImageError = (failedSrc: string | undefined) => {
   // Kalau yang gagal itu masih URL utama (belum sempat fallback),
-  // coba fallback ke VPS legacy — sama logic-nya kayak handleFallbackImage,
-  // tapi tanpa akses ke elemen <img> DOM (karena v-img gak kasih itu).
-  if (resolvedImageUrl.value?.includes("8888")) {
+  // coba fallback ke VPS legacy.
+  if (resolvedImageUrl.value?.includes("/file-gambar/")) {
     // Sudah pernah dicoba fallback juga & tetap gagal — nyerah, biarin slot #error nampil
     return;
   }
   const mhNomor = props.formData.MintaHarga || props.formData.Nomor;
   if (mhNomor) {
-    const fallbackUrl = `http://103.94.238.252:8888/file-gambar/mintaharga/${encodeURIComponent(mhNomor)}.jpg`;
-    resolvedImageUrl.value = fallbackUrl;
+    // ✅ FIX: path relatif
+    resolvedImageUrl.value = `/file-gambar/mintaharga/${encodeURIComponent(mhNomor)}.jpg`;
   }
 };
 
