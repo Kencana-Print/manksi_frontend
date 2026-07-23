@@ -34,11 +34,12 @@ const previewImageUrlFallback = ref("");
 const isPreviewLoading = ref(false);
 const isPreviewError = ref(false);
 
-const VPS_BASE = "http://103.94.238.252:8888/file-gambar";
-const getBaseUrl = () =>
-  import.meta.env.VITE_API_BASE_URL?.replace(/\/api\/?$/, "") ||
-  api.defaults.baseURL?.replace(/\/api\/?$/, "") ||
-  `${window.location.protocol}//${window.location.hostname}:3088`;
+// ✅ FIX: sama kayak file print — path relatif, gak hardcode host/port.
+const VPS_BASE = "/file-gambar";
+const getBaseUrl = () => {
+  const rawBase = api.defaults.baseURL || import.meta.env.VITE_API_URL || "";
+  return rawBase.replace(/\/api\/?$/, "");
+};
 
 const previewGambar = (row: any) => {
   const identifier = row.NoPermintaan || row.Gambar;
