@@ -48,35 +48,30 @@ const formatTgl = (val: string) => {
   return `${String(d.getDate()).padStart(2, "0")} ${m[d.getMonth()]} ${d.getFullYear()}`;
 };
 
-const VPS_BASE = "http://103.94.238.252:8888/file-gambar";
-
-const getBaseUrl = () =>
-  import.meta.env.VITE_API_URL?.replace(/\/api\/?$/, "") ||
-  api.defaults.baseURL?.replace(/\/api\/?$/, "") ||
-  `${window.location.protocol}//${window.location.hostname}:3088`;
-
+const VPS_BASE = "/file-gambar";
+const getBaseUrl = () => {
+  const rawBase = api.defaults.baseURL || import.meta.env.VITE_API_URL || "";
+  return rawBase.replace(/\/api\/?$/, "");
+};
 const getDesainUrl = (nomor: string) => {
   if (!nomor) return "";
   return `${getBaseUrl()}/images/mppb/${encodeURIComponent(nomor)}.jpg`;
 };
-
 const getSignatureUrl = (kodeUser: string) => {
   if (!kodeUser) return "";
   return `${getBaseUrl()}/images/ttd/${encodeURIComponent(kodeUser.trim().toUpperCase())}.jpg`;
 };
-
 const onDesainError = (e: Event, nomor: string) => {
   const el = e.target as HTMLImageElement;
-  if (!el.src.includes("8888")) {
+  if (!el.src.includes("/file-gambar/")) {
     el.src = `${VPS_BASE}/${encodeURIComponent(nomor)}.jpg`;
   } else {
     el.style.display = "none";
   }
 };
-
 const onTtdError = (e: Event, kodeUser: string) => {
   const el = e.target as HTMLImageElement;
-  if (!el.src.includes("8888")) {
+  if (!el.src.includes("/file-gambar/")) {
     el.src = `${VPS_BASE}/${encodeURIComponent(kodeUser.trim().toUpperCase())}.jpg`;
   } else {
     el.style.opacity = "0";
