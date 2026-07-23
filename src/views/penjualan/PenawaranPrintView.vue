@@ -54,11 +54,11 @@ const digitalSignImage = computed(() => {
   return signKP;
 });
 
-const getBaseUrl = () =>
-  import.meta.env.VITE_API_BASE_URL?.replace(/\/api\/?$/, "") ||
-  `${window.location.protocol}//${window.location.hostname}:3088`;
-
-const VPS_BASE = "http://103.94.238.252:8888/file-gambar";
+const getBaseUrl = () => {
+  const rawBase = import.meta.env.VITE_API_URL || "";
+  return rawBase.replace(/\/api\/?$/, "");
+};
+const VPS_BASE = "/file-gambar";
 
 const getProductImageUrl = (row: any) => {
   // Ambil identifier dari format key default atau format alias database

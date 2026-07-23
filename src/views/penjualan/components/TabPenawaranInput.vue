@@ -35,7 +35,6 @@ const isPreviewLoading = ref(false);
 const isPreviewError = ref(false);
 
 const VPS_BASE = "http://103.94.238.252:8888/file-gambar";
-
 const getBaseUrl = () =>
   import.meta.env.VITE_API_BASE_URL?.replace(/\/api\/?$/, "") ||
   api.defaults.baseURL?.replace(/\/api\/?$/, "") ||
