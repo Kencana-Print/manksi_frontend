@@ -32,7 +32,6 @@ onMounted(async () => {
 const handleFallbackImage = (e: Event) => {
   const img = e.target as HTMLImageElement;
   if (img.dataset.fallbackTried === "true") return;
-
   const currentSrc = img.src;
   if (currentSrc.includes("/file-gambar/mintaharga/")) {
     img.src = currentSrc.replace("/file-gambar/mintaharga/", "/file-gambar/");
@@ -41,8 +40,9 @@ const handleFallbackImage = (e: Event) => {
     currentSrc.includes("/file-gambar/") &&
     !currentSrc.includes("blob:")
   ) {
+    // ✅ FIX: path relatif, gak hardcode host/port
     const filename = currentSrc.split("/").pop();
-    img.src = `http://103.94.238.252:8888/file-gambar/mintaharga/${filename}`;
+    img.src = `/file-gambar/mintaharga/${filename}`;
     img.dataset.fallbackTried = "true";
   }
 };
@@ -122,7 +122,7 @@ const handleFallbackImage = (e: Event) => {
           </td>
           <td class="text-center p-1" style="vertical-align: middle">
             <img
-              :src="`http://103.94.238.252:8888/file-gambar/${item.Kode}.jpg`"
+              :src="`/file-gambar/${item.Kode}.jpg`"
               class="map-image"
               @error="handleFallbackImage"
             />

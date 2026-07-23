@@ -98,10 +98,10 @@ const onEmailImageError = (e: Event) => {
     return;
   }
   img.dataset.tried = "true";
-
   const nomor = props.formData.Nomor;
   if (nomor) {
-    img.src = `http://103.94.238.252:8888/file-gambar/${encodeURIComponent(nomor)}.jpg`;
+    // ✅ FIX: path relatif, gak hardcode host/port
+    img.src = `/file-gambar/${encodeURIComponent(nomor)}.jpg`;
   } else {
     isEmailImageError.value = true;
   }

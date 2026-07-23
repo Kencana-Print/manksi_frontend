@@ -202,16 +202,18 @@ const lihatGambar = () => {
   const item = selected.value[0];
   const base = api.defaults.baseURL?.replace(/\/api\/?$/, "") || "";
   const cab = item.Cab || "HO-";
+  fallbackTried.value = false; // ✅ reset tiap buka gambar baru
   // Coba dari backend lokal dulu
   gambarUrl.value = `${base}/images/${cab}/map/${encodeURIComponent(item.Nomor)}.jpg`;
   dialogGambar.value = true;
 };
 
+const fallbackTried = ref(false);
+
 const onGambarError = () => {
-  // Fallback ke VPS kalau backend lokal tidak ada
-  if (!gambarUrl.value.includes("8888")) {
-    gambarUrl.value = `http://103.94.238.252:8888/file-gambar/${encodeURIComponent(selected.value[0]?.Nomor)}.jpg`;
-  }
+  if (fallbackTried.value) return;
+  fallbackTried.value = true;
+  gambarUrl.value = `/file-gambar/${encodeURIComponent(selected.value[0]?.Nomor)}.jpg`;
 };
 
 const cetak = () => {
@@ -602,6 +604,7 @@ const confirmToggleClose = async () => {
           max-height="600"
           contain
           class="bg-white rounded border"
+          @error="onGambarError"
         >
           <template v-slot:placeholder>
             <div
@@ -617,14 +620,8 @@ const confirmToggleClose = async () => {
               </div>
             </div>
           </template>
-
           <template v-slot:error>
-            <div v-if="!gambarUrl.includes('8888')" class="fill-height">
-              <!-- Auto retry ke VPS -->
-              {{ onGambarError() }}
-            </div>
             <div
-              v-else
               class="d-flex flex-column align-center justify-center fill-height text-grey"
             >
               <IconPhotoOff :size="48" color="#bdbdbd" />

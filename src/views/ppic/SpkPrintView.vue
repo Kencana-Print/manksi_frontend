@@ -38,10 +38,10 @@ const mkaFromMap = ref<{
 
 const printNomor = String(route.params.nomor);
 
-const getBaseUrl = () =>
-  import.meta.env.VITE_API_BASE_URL?.replace(/\/api\/?$/, "") ||
-  (api.defaults.baseURL || "").replace(/\/api\/?$/, "") ||
-  `${window.location.protocol}//${window.location.hostname}:3088`;
+const getBaseUrl = () => {
+  const rawBase = api.defaults.baseURL || import.meta.env.VITE_API_URL || "";
+  return rawBase.replace(/\/api\/?$/, "");
+};
 
 const resolvedImageUrl = ref("");
 const isLoadingImage = ref(false);
@@ -67,9 +67,7 @@ const resolveDesignImage = () => {
       `${base}/images/${cab}/map/${encodeURIComponent(mapNomor)}.jpg`,
     );
   }
-  candidates.push(
-    `http://103.94.238.252:8888/file-gambar/${encodeURIComponent(mapNomor || soRef)}.jpg`,
-  );
+  candidates.push(`/file-gambar/${encodeURIComponent(mapNomor || soRef)}.jpg`);
 
   isLoadingImage.value = true;
   resolvedImageUrl.value = "";
@@ -171,7 +169,7 @@ const isP01 = computed(
 // ── Signature helper (dipakai format lama, sama pola SalesOrderPrintView) ──
 const getSignatureUrl = (kodeUser: string) => {
   if (!kodeUser) return "";
-  return `http://103.94.238.252:8888/file-gambar/${encodeURIComponent(kodeUser.trim().toUpperCase())}.jpg`;
+  return `/file-gambar/${encodeURIComponent(kodeUser.trim().toUpperCase())}.jpg`;
 };
 const handleSignatureError = (e: Event) => {
   (e.target as HTMLImageElement).style.opacity = "0";

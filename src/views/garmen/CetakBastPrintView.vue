@@ -17,11 +17,13 @@ const handleImgError = (e: Event) => {
     return;
   }
   img.dataset.tried = "true";
-
   const nomor =
     printData.value.header.MSPK_Nomor || printData.value.header.mspk_nomor;
-  // Fallback 1: Ambil langsung dari VPS pusat Manksi berdasarkan Nomor MAP
-  img.src = `http://103.94.238.252:8888/file-gambar/${encodeURIComponent(nomor)}.jpg`;
+  // ✅ FIX: path relatif, gak hardcode host/port. (Fungsi ini gak
+  // dipakai di template sekarang — logic fallback yang beneran jalan
+  // ada di preloadImageAndPrint — tapi dibenerin juga jaga-jaga kalau
+  // nanti ada yang nambahin @error="handleImgError" lagi.)
+  img.src = `/file-gambar/${encodeURIComponent(nomor)}.jpg`;
 };
 
 const fmtDate = (val: string) => {

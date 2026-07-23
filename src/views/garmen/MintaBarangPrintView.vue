@@ -1,21 +1,22 @@
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref, onMounted, computed } from "vue";
 import { useRoute } from "vue-router";
-import { mppbFormService } from "@/services/penjualan/mppbFormService";
+import { mintaBarangFormService } from "@/services/garmen/mintaBarangFormService";
 import logoImg from "@/assets/logo.png";
 
 const route = useRoute();
 const nomor = route.params.nomor as string;
 
 const header = ref<any>(null);
+const details = ref<any[]>([]);
 const isLoading = ref(true);
 const isError = ref(false);
 
 const fetchData = async () => {
   try {
-    const res = await mppbFormService.getDetail(nomor);
-    header.value = res.data.data;
-
+    const res = await mintaBarangFormService.getDetail(nomor);
+    header.value = res.data.data.header;
+    details.value = res.data.data.details || [];
     setTimeout(() => {
       window.print();
     }, 800);
@@ -27,45 +28,40 @@ const fetchData = async () => {
   }
 };
 
-const formatTgl = (val: string) => {
-  if (!val) return "";
+const docTitle = computed(() => `PERMINTAAN ${header.value?.min_jenis || ""}`);
+
+const formatTglLong = (val: string) => {
+  if (!val) return "-";
   const d = new Date(val);
-  const m = [
-    "Januari",
-    "Februari",
-    "Maret",
-    "April",
+  const bln = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
     "Mei",
-    "Juni",
-    "Juli",
-    "Agustus",
-    "September",
-    "Oktober",
-    "November",
-    "Desember",
+    "Jun",
+    "Jul",
+    "Agu",
+    "Sep",
+    "Okt",
+    "Nov",
+    "Des",
   ];
-  return `${String(d.getDate()).padStart(2, "0")} ${m[d.getMonth()]} ${d.getFullYear()}`;
+  return `${String(d.getDate()).padStart(2, "0")} ${bln[d.getMonth()]} ${d.getFullYear()}`;
 };
 
-// Menyembunyikan icon broken image jika TTD tidak ditemukan di VPS
+const num2 = (val: any) =>
+  Number(val || 0).toLocaleString("id-ID", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+
 const hideImg = (e: Event) => {
   (e.target as HTMLImageElement).style.display = "none";
 };
 
-// Ambil TTD berdasarkan nama pembuat (MO) sesuai format DB
-const getSignatureUrl = (kodeUser: string) => {
-  if (!kodeUser) return "";
-  const cleanName = kodeUser.trim();
-  return `http://103.94.238.252:8888/file-gambar/${encodeURIComponent(cleanName)}.jpg`;
-};
-
-const getDesainUrl = (nomorMpb: string) => {
-  if (!nomorMpb) return "";
-  return `http://103.94.238.252:8888/file-gambar/${encodeURIComponent(nomorMpb)}.jpg`;
-};
-
 onMounted(() => {
-  document.title = `Cetak MPPB - ${nomor}`;
+  document.title = `Cetak Permintaan Barang - ${nomor}`;
   fetchData();
 });
 </script>
@@ -73,134 +69,107 @@ onMounted(() => {
 <template>
   <div v-if="isLoading" class="pa-4 text-center">Memuat dokumen cetak...</div>
   <div v-else-if="isError" class="pa-4 text-center text-red">
-    Gagal memuat data cetak. Pastikan nomor MPPB benar.
+    Gagal memuat data cetak. Pastikan nomor permintaan benar.
   </div>
-
   <div v-else class="print-container">
     <div v-for="copy in 2" :key="copy" class="print-block">
-      <div class="kop-box">
-        <div class="kop-logo">
-          <img
-            :src="logoImg"
-            alt="Kencana Print"
-            class="logo-img"
-            @error="hideImg"
-          />
-        </div>
-        <div class="kop-title">
-          BERITA ACARA<br />
-          PERMINTAAN BELI BAHAN<br />
-          {{ header.mpb_nomor }}
-        </div>
-        <div class="kop-right"></div>
+      <div class="head-row">
+        <div class="doc-title">{{ docTitle }}</div>
+        <img
+          :src="logoImg"
+          alt="Kencana Print"
+          class="logo-img"
+          @error="hideImg"
+        />
       </div>
 
-      <div class="content-box">
-        <div class="content-left">
-          <div class="mb-3" style="font-size: 11px">
-            Mohon dibelikan bahan untuk :
-          </div>
-          <table class="rincian-table">
-            <tr>
-              <td class="lbl">Nama Produk</td>
-              <td class="sep">:</td>
-              <td class="val">{{ header.mpb_nama }}</td>
-            </tr>
-            <tr>
-              <td class="lbl">Bahan</td>
-              <td class="sep">:</td>
-              <td class="val">{{ header.mpb_bahan }}</td>
-            </tr>
-            <tr>
-              <td class="lbl">Gramasi</td>
-              <td class="sep">:</td>
-              <td class="val">{{ header.mpb_gramasi }}</td>
-            </tr>
-            <tr>
-              <td class="lbl">Qty</td>
-              <td class="sep">:</td>
-              <td class="val">{{ header.mpb_jmlorder }}</td>
-            </tr>
-            <tr>
-              <td class="lbl">Ukuran</td>
-              <td class="sep">:</td>
-              <td class="val">{{ header.mpb_ukuran }}</td>
-            </tr>
-          </table>
-        </div>
-
-        <div class="content-right">
-          <div class="fw-bold mb-1">DESAIN :</div>
-          <div class="img-wrap">
-            <img
-              :src="getDesainUrl(header.mpb_nomor)"
-              @error="hideImg"
-              class="desain-img"
-            />
-          </div>
-        </div>
-      </div>
-
-      <div class="spacer"></div>
-
-      <div class="date-row">Boyolali, {{ formatTgl(header.mpb_tanggal) }}</div>
-
-      <table class="sig-table">
+      <table class="info-table">
         <tr>
-          <td style="width: 25%; text-align: left">Dibuat oleh,</td>
-          <td style="width: 50%; text-align: center" colspan="2">
-            Mengetahui,
-          </td>
-          <td style="width: 25%; text-align: center">Disetujui oleh,</td>
+          <td class="lbl">No.Permintaan</td>
+          <td class="sep">:</td>
+          <td class="val">{{ header.min_nomor }}</td>
+          <td class="lbl2">Cabang</td>
+          <td class="sep">:</td>
+          <td class="val">{{ header.min_cab }}</td>
         </tr>
         <tr>
-          <td class="sig-space" style="vertical-align: bottom">
-            <img
-              :src="getSignatureUrl(header.user_create)"
-              class="sig-img"
-              @error="hideImg"
-            />
-          </td>
-          <td class="sig-space"></td>
-          <td class="sig-space"></td>
-          <td class="sig-space"></td>
+          <td class="lbl">Tanggal</td>
+          <td class="sep">:</td>
+          <td class="val">{{ formatTglLong(header.min_tanggal) }}</td>
+          <td class="lbl2">SPK</td>
+          <td class="sep">:</td>
+          <td class="val">{{ header.min_spk_nomor || "-" }}</td>
         </tr>
         <tr>
-          <td style="text-align: left; padding-left: 5px">
-            ( <span class="u-name">{{ header.user_create }}</span> )<br />
-            <div style="margin-left: 15px">MO</div>
-          </td>
-          <td style="text-align: center">
-            (
-            <span class="u-name"
-              >&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span
-            >
-            )<br />
-            CMO
-          </td>
-          <td style="text-align: center">
-            (
-            <span class="u-name"
-              >&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span
-            >
-            )<br />
-            Manager marketing
-          </td>
-          <td style="text-align: center">
-            (
-            <span class="u-name"
-              >&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span
-            >
-            )<br />
-            Direktur
-          </td>
+          <td class="lbl">Keterangan</td>
+          <td class="sep">:</td>
+          <td class="val">{{ header.min_ket || "-" }}</td>
+          <td></td>
+          <td></td>
+          <td class="val-sub">{{ header.namaspk }}</td>
         </tr>
       </table>
 
-      <div class="note-section">
-        <div class="note-lbl">Note :</div>
-        <div class="note-val">{{ header.mpb_ket || "-" }}</div>
-      </div>
+      <table class="detail-table">
+        <thead>
+          <tr>
+            <th style="width: 26px">No</th>
+            <th style="width: 90px">Kode</th>
+            <th>Nama</th>
+            <th style="width: 45px">Satuan</th>
+            <th style="width: 65px">Jumlah</th>
+            <th style="width: 140px">Keterangan</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="(d, i) in details" :key="i">
+            <td class="tc">{{ i + 1 }}</td>
+            <td>{{ d.kode }}</td>
+            <td>{{ d.nama }}</td>
+            <td class="tc">{{ d.satuan }}</td>
+            <td class="tr">{{ num2(d.jumlah) }}</td>
+            <td>{{ d.ket }}</td>
+          </tr>
+          <tr v-if="details.length === 0">
+            <td colspan="6" class="empty-td">Tidak ada rincian barang.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="spacer"></div>
+
+      <table class="sig-table">
+        <tr>
+          <td style="width: 33.3%">Pemohon,</td>
+          <td style="width: 33.3%">Menyetujui,</td>
+          <td style="width: 33.3%">Mengetahui,</td>
+        </tr>
+        <tr>
+          <td class="sig-space"></td>
+          <td class="sig-space"></td>
+          <td class="sig-space"></td>
+        </tr>
+        <tr>
+          <td>
+            ( <span class="u-name">{{ header.user_create }}</span> )
+          </td>
+          <td>
+            (
+            <span class="u-name"
+              >&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span
+            >
+            )
+            <div class="atasan-lbl">Atasan</div>
+          </td>
+          <td>
+            (
+            <span class="u-name"
+              >&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span
+            >
+            )
+          </td>
+        </tr>
+      </table>
     </div>
   </div>
 </template>
@@ -216,7 +185,6 @@ onMounted(() => {
     print-color-adjust: exact;
   }
 }
-
 .pa-4 {
   padding: 1rem;
 }
@@ -226,7 +194,6 @@ onMounted(() => {
 .text-red {
   color: red;
 }
-
 .print-container {
   width: 100%;
   max-width: 210mm;
@@ -236,149 +203,101 @@ onMounted(() => {
   color: #000;
   background: white;
 }
-
 .print-block {
-  height: 140mm;
-  padding: 10mm;
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  position: relative;
+  padding: 6mm 0;
 }
-
 .print-block:first-child {
-  border-bottom: 1px dashed #000;
+  border-bottom: 1px dashed #999;
+  padding-bottom: 10mm;
 }
 
-/* KOP */
-.kop-box {
-  border: 1px solid #000;
+.head-row {
   display: flex;
-  align-items: center;
-  padding: 8px 10px;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 6px;
 }
-.kop-logo {
-  width: 130px;
+.doc-title {
+  font-weight: bold;
+  font-size: 14px;
+  text-transform: uppercase;
 }
 .logo-img {
-  max-width: 110px;
-  max-height: 40px;
+  max-width: 90px;
+  max-height: 32px;
   object-fit: contain;
 }
-.kop-title {
-  flex: 1;
-  text-align: center;
-  font-weight: bold;
-  font-size: 13px;
-  line-height: 1.4;
-}
-.kop-right {
-  width: 130px;
-}
 
-/* KONTEN */
-.content-box {
-  border: 1px solid #000;
-  border-top: none;
-  display: flex;
-  padding: 10px;
-}
-.content-left {
-  flex: 1;
-}
-.rincian-table {
+.info-table {
   width: 100%;
   border-collapse: collapse;
-}
-.rincian-table td {
-  padding: 3px 0;
-  vertical-align: top;
+  margin-bottom: 8px;
   font-size: 11px;
 }
-.rincian-table .lbl {
-  width: 90px;
+.info-table td {
+  padding: 1px 4px 1px 0;
+  vertical-align: top;
 }
-.rincian-table .sep {
-  width: 15px;
-  text-align: center;
+.info-table .lbl {
+  width: 85px;
+}
+.info-table .lbl2 {
+  width: 55px;
+}
+.info-table .sep {
+  width: 10px;
+}
+.info-table .val-sub {
+  padding-left: 4px;
 }
 
-/* AREA DESAIN KANAN */
-.content-right {
-  width: 200px;
-  padding-left: 15px;
-  border-left: 1px dashed #eee;
-}
-.img-wrap {
+.detail-table {
   width: 100%;
-  height: 90px;
-  display: flex;
-  align-items: flex-start;
-  justify-content: flex-start;
+  border-collapse: collapse;
+  border: 1px solid #000;
+  font-size: 10.5px;
 }
-.desain-img {
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
-}
-
-.fw-bold {
+.detail-table th {
+  border-bottom: 1px solid #000;
+  padding: 3px 5px;
+  text-align: left;
   font-weight: bold;
 }
-.mb-1 {
-  margin-bottom: 5px;
+.detail-table td {
+  padding: 2px 5px;
 }
-.mb-3 {
-  margin-bottom: 15px;
+.tc {
+  text-align: center;
 }
-.spacer {
-  flex-grow: 1;
+.tr {
+  text-align: right;
+}
+.empty-td {
+  text-align: center;
+  color: #757575;
+  font-style: italic;
+  padding: 10px !important;
 }
 
-/* TANGGAL & TANDA TANGAN */
-.date-row {
-  text-align: right;
-  margin-top: 5px;
-  margin-bottom: 10px;
+.spacer {
+  height: 40px;
 }
+
 .sig-table {
   width: 100%;
   border-collapse: collapse;
-}
-.sig-table td {
-  vertical-align: bottom;
+  text-align: center;
+  font-size: 11px;
 }
 .sig-space {
-  height: 50px;
-}
-
-/* KUNCI PERBAIKAN TTD: z-index positif & margin disesuaikan agar menimpa teks dengan natural */
-.sig-img {
-  max-height: 55px;
-  max-width: 90px;
-  object-fit: contain;
-  display: block;
-  margin-bottom: 2px;
+  height: 40px;
 }
 .u-name {
   display: inline-block;
   min-width: 60px;
-  text-decoration: underline;
-  text-transform: uppercase;
 }
-
-/* NOTE (KETERANGAN MULTILINE) */
-.note-section {
-  display: flex;
-  margin-top: 25px;
-  font-size: 11px;
-}
-.note-lbl {
-  width: 45px;
-}
-.note-val {
-  flex: 1;
-  white-space: pre-wrap;
-  line-height: 1.3;
+.atasan-lbl {
+  font-size: 9.5px;
+  margin-top: -2px;
 }
 </style>

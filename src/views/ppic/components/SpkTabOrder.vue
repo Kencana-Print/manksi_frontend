@@ -29,8 +29,10 @@ const mkbDetail = ref<any[]>([]);
 const isLoadingMkb = ref(false);
 
 const getBaseUrl = () =>
-  (api.defaults.baseURL || "").replace(/\/api\/?$/, "") ||
-  `${window.location.protocol}//${window.location.hostname}:3088`;
+  (api.defaults.baseURL || import.meta.env.VITE_API_URL || "").replace(
+    /\/api\/?$/,
+    "",
+  );
 
 const resolveDesignImage = () => {
   const nomor = props.formData.so_nomor;
@@ -47,9 +49,7 @@ const resolveDesignImage = () => {
   if (map) {
     candidates.push(`${base}/images/${cab}/map/${encodeURIComponent(map)}.jpg`);
   }
-  candidates.push(
-    `http://103.94.238.252:8888/file-gambar/${encodeURIComponent(map || nomor)}.jpg`,
-  );
+  candidates.push(`/file-gambar/${encodeURIComponent(map || nomor)}.jpg`);
 
   isImageError.value = false;
   resolvedImageUrl.value = "";

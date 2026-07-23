@@ -437,7 +437,7 @@ const onGambarError = () => {
     gambarUrl.value = `${base}/images/${cab}/map/${encodeURIComponent(map)}.jpg`;
   } else if (gambarFallbackStep.value <= 1) {
     gambarFallbackStep.value = 2;
-    gambarUrl.value = `http://103.94.238.252:8888/file-gambar/${encodeURIComponent(nomor)}.jpg`;
+    gambarUrl.value = `/file-gambar/${encodeURIComponent(nomor)}.jpg`;
   }
 };
 const onLihatGambar = () => {

@@ -49,16 +49,8 @@ const displayImageUrl = computed(() => {
     props.formData.PathImage.startsWith("http://") ||
     props.formData.PathImage.startsWith("https://")
   ) {
-    // ✅ URL absolut dari backend lama (http://) bakal kena mixed-content
-    // kalau halamannya udah https — paksa jadi https biar konsisten.
     return props.formData.PathImage.replace(/^http:\/\//, "https://");
   }
-  // ✅ FIX: "VITE_API_BASE_URL" gak pernah ada (nama env yang bener
-  // "VITE_API_URL"), jadi dulu selalu jatuh ke fallback hardcode
-  // ":3088" → mixed-content/ERR_SSL begitu diakses via HTTPS.
-  // Sekarang: base dari axios baseURL (biasanya "/api" di produksi),
-  // fallback PATH RELATIF polos kalau kosong — gak pernah hardcode
-  // host/port lagi.
   const rawBase = api.defaults.baseURL || import.meta.env.VITE_API_URL || "";
   const base = rawBase.replace(/\/api\/?$/, "");
   const cleanPath = props.formData.PathImage.startsWith("/")

@@ -256,18 +256,16 @@ const openMapLookup = (idx: number) => {
 const checkImageExists = async (nomorMAP: string) => {
   if (!nomorMAP) return false;
   try {
-    // Kita tembak ke port 8888 yang sudah kita setup sebelumnya
-    const res = await fetch(
-      `http://103.94.238.252:8888/file-gambar/${nomorMAP}.jpg`,
-      { method: "HEAD" },
-    );
+    // ✅ FIX: path relatif, gak hardcode host/port — nginx udah
+    // proxy /file-gambar/ ke port 8888 di belakang layar.
+    const res = await fetch(`/file-gambar/${nomorMAP}.jpg`, {
+      method: "HEAD",
+    });
     if (res.ok) return true;
-
     // Jika tidak ada, coba cek di folder mintaharga
-    const resMh = await fetch(
-      `http://103.94.238.252:8888/file-gambar/mintaharga/${nomorMAP}.jpg`,
-      { method: "HEAD" },
-    );
+    const resMh = await fetch(`/file-gambar/mintaharga/${nomorMAP}.jpg`, {
+      method: "HEAD",
+    });
     return resMh.ok;
   } catch (e) {
     return false;
