@@ -42,12 +42,9 @@ const totalAlokasi = computed(() => {
 
 const mainImageUrl = computed(() => {
   if (!data.value?.spk_nomor) return "";
-
-  const base =
-    import.meta.env.VITE_API_BASE_URL?.replace(/\/api\/?$/, "") ||
-    (api.defaults.baseURL || "").replace(/\/api\/?$/, "") ||
-    `${window.location.protocol}//${window.location.hostname}:3088`;
-
+  // ✅ FIX: path relatif, gak hardcode host/port
+  const rawBase = api.defaults.baseURL || import.meta.env.VITE_API_URL || "";
+  const base = rawBase.replace(/\/api\/?$/, "");
   const cab = data.value.spk_cab || "HO-";
   const memo = data.value.spk_memo;
 
@@ -59,7 +56,7 @@ const mainImageUrl = computed(() => {
 
 const getSignatureUrl = (kodeUser: string) => {
   if (!kodeUser) return "";
-  return `http://103.94.238.252:8888/file-gambar/${encodeURIComponent(kodeUser.trim().toUpperCase())}.jpg`;
+  return `/file-gambar/${encodeURIComponent(kodeUser.trim().toUpperCase())}.jpg`;
 };
 
 const handleSignatureError = (e: Event) => {
@@ -74,14 +71,11 @@ const handleImageError = (e: Event) => {
     return;
   }
   img.dataset.fallbackTried = "true";
-
   const nomor = data.value.spk_memo || data.value.spk_nomor;
   if (nomor) {
-    if (data.value.spk_memo) {
-      img.src = `http://103.94.238.252:8888/file-gambar/map/${encodeURIComponent(nomor)}.jpg`;
-    } else {
-      img.src = `http://103.94.238.252:8888/file-gambar/${encodeURIComponent(nomor)}.jpg`;
-    }
+    img.src = data.value.spk_memo
+      ? `/file-gambar/map/${encodeURIComponent(nomor)}.jpg`
+      : `/file-gambar/${encodeURIComponent(nomor)}.jpg`;
   } else {
     img.style.display = "none";
   }
@@ -139,7 +133,7 @@ const mitraLuarText = computed(() => {
 const formatSizeDetail = computed(() => {
   if (!data.value.sizeDetails?.length) return "";
   return data.value.sizeDetails
-    .map((sz: any) => `${sz.size}=  L: ${sz.ld || 0}   P: ${sz.pb || 0}`) 
+    .map((sz: any) => `${sz.size}=  L: ${sz.ld || 0}   P: ${sz.pb || 0}`)
     .join("\n");
 });
 

@@ -60,13 +60,10 @@ const resolvedImageUrl = ref("");
 
 const displayImageUrl = computed(() => {
   if (props.formData.MainImageBlob) return props.formData.MainImageBlob;
-  if (resolvedImageUrl.value) return resolvedImageUrl.value; // ← pakai fallback jika sudah resolved
-
-  const base =
-    import.meta.env.VITE_API_BASE_URL?.replace(/\/api\/?$/, "") ||
-    api.defaults.baseURL?.replace(/\/api\/?$/, "") ||
-    `${window.location.protocol}//${window.location.hostname}:3088`;
-
+  if (resolvedImageUrl.value) return resolvedImageUrl.value;
+  // ✅ FIX: path relatif, gak hardcode host/port
+  const rawBase = api.defaults.baseURL || import.meta.env.VITE_API_URL || "";
+  const base = rawBase.replace(/\/api\/?$/, "");
   const cab = props.formData.spk_cab || "HO-";
   const nomor = props.formData.spk_memo || props.formData.spk_nomor;
   if (!nomor) return "";
@@ -94,12 +91,7 @@ const onImageError = (e: Event) => {
     return;
   }
 
-  let fallbackUrl = "";
-  if (props.formData.spk_memo) {
-    fallbackUrl = `http://103.94.238.252:8888/file-gambar/${encodeURIComponent(nomor)}.jpg`;
-  } else {
-    fallbackUrl = `http://103.94.238.252:8888/file-gambar/${encodeURIComponent(nomor)}.jpg`;
-  }
+  const fallbackUrl = `/file-gambar/${encodeURIComponent(nomor)}.jpg`;
   img.src = fallbackUrl;
   resolvedImageUrl.value = fallbackUrl; // ← simpan URL yang berhasil
 };

@@ -50,10 +50,8 @@ const getLocalUrl = (item: any) => {
 };
 
 const getVpsUrl = (item: any) => {
-  if (item.memo) {
-    return `http://103.94.238.252:8888/file-gambar/${encodeURIComponent(item.memo)}.jpg`;
-  }
-  return `http://103.94.238.252:8888/file-gambar/${encodeURIComponent(item.nomor)}.jpg`;
+  const name = item.memo || item.nomor;
+  return `/file-gambar/${encodeURIComponent(name)}.jpg`;
 };
 
 const handleFallbackImage = (e: Event, item: any) => {
