@@ -219,21 +219,17 @@ onMounted(async () => {
   }
 });
 
-const VPS_BASE = "http://103.94.238.252:8888/file-gambar";
-
+const VPS_BASE = "/file-gambar";
 const getLocalImgUrl = (nomor: string, tipe: "desain" | "dokumen") => {
-  // Ambil dari VITE env variable
-  const base =
-    import.meta.env.VITE_API_BASE_URL?.replace(/\/api\/?$/, "") ||
-    api.defaults.baseURL?.replace(/\/api\/?$/, "") ||
-    `${window.location.protocol}//${window.location.hostname}:3088`;
+  const rawBase = api.defaults.baseURL || import.meta.env.VITE_API_URL || "";
+  const base = rawBase.replace(/\/api\/?$/, "");
 
-  const url =
+  const path =
     tipe === "desain"
-      ? `${base}/images/mppb/${encodeURIComponent(nomor)}.jpg`
-      : `${base}/images/mppb/${encodeURIComponent(nomor)}-doc.jpg`;
+      ? `/images/mppb/${encodeURIComponent(nomor)}.jpg`
+      : `/images/mppb/${encodeURIComponent(nomor)}-doc.jpg`;
 
-  return url;
+  return base ? `${base}${path}` : path;
 };
 
 const displayImgDesain = computed(() => {
@@ -253,21 +249,20 @@ const displayImgDokumen = computed(() => {
 // Fallback ke VPS kalau lokal gagal
 const onDesainImgError = (e: Event) => {
   const el = e.target as HTMLImageElement;
-  if (!el.src.includes("8888") && formData.value.nomor) {
+  if (!el.src.includes("/file-gambar/") && formData.value.nomor) {
     const vpsUrl = `${VPS_BASE}/${encodeURIComponent(formData.value.nomor)}.jpg`;
     el.src = vpsUrl;
-    activeDesainUrl.value = vpsUrl; // ← update active URL
+    activeDesainUrl.value = vpsUrl;
   } else {
     desainError.value = true;
   }
 };
-
 const onDokumenImgError = (e: Event) => {
   const el = e.target as HTMLImageElement;
-  if (!el.src.includes("8888") && formData.value.nomor) {
+  if (!el.src.includes("/file-gambar/") && formData.value.nomor) {
     const vpsUrl = `${VPS_BASE}/${encodeURIComponent(formData.value.nomor)}-doc.jpg`;
     el.src = vpsUrl;
-    activeDokumenUrl.value = vpsUrl; // ← update active URL
+    activeDokumenUrl.value = vpsUrl;
   } else {
     dokumenError.value = true;
   }

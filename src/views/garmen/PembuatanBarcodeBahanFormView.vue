@@ -3,7 +3,6 @@ import { ref, computed, onMounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
 import BaseForm from "@/components/BaseForm.vue";
-import BahanSearchModal from "@/components/lookups/BahanSearchModal.vue";
 import PembuatanBarcodeBahanStickerDialog from "./PembuatanBarcodeBahanStickerDialog.vue";
 import { pembuatanBarcodeBahanFormService } from "@/services/garmen/pembuatanBarcodeBahanFormService";
 import { useAuthStore } from "@/stores/authStore";
@@ -13,6 +12,10 @@ import {
   IconTrash,
   IconPrinter,
 } from "@tabler/icons-vue";
+
+import BahanSearchModal from "@/components/lookups/BahanSearchModal.vue";
+import BpbSearchModal from "@/components/lookups/BpbSearchModal.vue";
+import ReturBahanSearchModal from "@/components/lookups/ReturBahanSearchModal.vue";
 
 interface Grid1Row {
   kode: string;
@@ -93,6 +96,13 @@ const openBahanModal = (idx: number) => {
   if (bpbNomor.value.trim()) return; // ✅ F1 cuma aktif kalau No.BPB/Retur kosong
   activeGrid1Index.value = idx;
   showBahanModal.value = true;
+};
+
+const onKodeKeydown = (e: KeyboardEvent, idx: number) => {
+  if (e.key === "F1") {
+    e.preventDefault();
+    openBahanModal(idx);
+  }
 };
 
 const applyKodeToGrid1 = (
@@ -197,9 +207,23 @@ const confirmRemoveGrid1Row = () => {
 };
 
 // --- BPB / RETUR LOOKUP ---
-const onBpbRetLostFocus = async () => {
-  const kode = (bpbNomor.value || "").trim();
+const showBpbModal = ref(false);
+const showReturModal = ref(false);
+
+const onBpbRetKeydown = (e: KeyboardEvent) => {
+  if (e.key === "F1") {
+    e.preventDefault();
+    showBpbModal.value = true;
+  } else if (e.key === "F2") {
+    e.preventDefault();
+    showReturModal.value = true;
+  }
+};
+
+const processBpbOrRetur = async (kodeInput: string) => {
+  const kode = (kodeInput || "").trim();
   if (!kode) return;
+  bpbNomor.value = kode;
 
   try {
     isLoading.value = true;
@@ -210,7 +234,6 @@ const onBpbRetLostFocus = async () => {
     const d = res.data.data;
 
     if (d.existingNomor) {
-      // ✅ Udah pernah dibuatkan barcode — redirect ke mode edit
       toast.info(
         `Nomor ini sudah pernah dibuatkan barcode: ${d.existingNomor}`,
       );
@@ -230,6 +253,10 @@ const onBpbRetLostFocus = async () => {
     isLoading.value = false;
   }
 };
+
+const onBpbRetLostFocus = () => processBpbOrRetur(bpbNomor.value);
+const onBpbSelected = (item: any) => processBpbOrRetur(item.Nomor);
+const onReturSelected = (item: any) => processBpbOrRetur(item.Nomor);
 
 // --- LANGSUNG CETAK: incremental save per baris + auto print ---
 const showStickerDialog = ref(false);
@@ -428,6 +455,7 @@ const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
             style="flex: 1; background: #ddeeff"
             :readonly="isEditMode"
             placeholder="F1=BPB, F2=Retur (kosong=manual)"
+            @keydown="onBpbRetKeydown"
             @keydown.enter.prevent="($event.target as HTMLInputElement).blur()"
             @blur="onBpbRetLostFocus"
           />
@@ -497,6 +525,7 @@ const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
                       class="ci"
                       :readonly="!!row.kodex || !!bpbNomor.trim()"
                       placeholder="Kode bahan..."
+                      @keydown="onKodeKeydown($event, idx)"
                       @keydown.enter.prevent="
                         ($event.target as HTMLInputElement).blur()
                       "
@@ -600,6 +629,12 @@ const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
   </BaseForm>
 
   <BahanSearchModal v-model="showBahanModal" @selected="onBahanSelected" />
+  <BpbSearchModal
+    v-model="showBpbModal"
+    endpoint="/lookups/bpb"
+    @selected="onBpbSelected"
+  />
+  <ReturBahanSearchModal v-model="showReturModal" @selected="onReturSelected" />
 
   <PembuatanBarcodeBahanStickerDialog
     v-model="showStickerDialog"

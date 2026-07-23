@@ -1,17 +1,11 @@
 <script setup lang="ts">
 import { ref, watch, computed } from "vue";
 import api from "@/services/api";
-import { IconTruckDelivery, IconSearch } from "@tabler/icons-vue";
+import { IconRotateClockwise2, IconSearch } from "@tabler/icons-vue";
 
-const props = withDefaults(
-  defineProps<{
-    modelValue: boolean;
-    endpoint?: string; // ✅ default: BPB dari PO doang (Retur Pembelian Bahan)
-  }>(),
-  {
-    endpoint: "/lookups/bpb-po",
-  },
-);
+const props = defineProps<{
+  modelValue: boolean;
+}>();
 const emit = defineEmits(["update:modelValue", "selected"]);
 
 const search = ref("");
@@ -36,7 +30,7 @@ let debounce: ReturnType<typeof setTimeout> | null = null;
 const fetchData = async () => {
   isLoading.value = true;
   try {
-    const res = await api.get(props.endpoint, {
+    const res = await api.get("/lookups/produksi-retur", {
       params: {
         q: search.value,
         page: currentPage.value,
@@ -85,17 +79,12 @@ const selectItem = (item: any) => {
   <v-dialog
     :model-value="modelValue"
     @update:model-value="emit('update:modelValue', $event)"
-    max-width="700px"
+    max-width="600px"
   >
     <div class="lookup-card">
       <div class="lookup-header">
-        <IconTruckDelivery :size="15" :stroke-width="1.7" color="white" />
-        <span>{{
-          endpoint === "/lookups/bpb-po"
-            ? "Cari No. BPB (dari PO)"
-            : "Cari No. BPB"
-        }}</span
-        ><v-spacer />
+        <IconRotateClockwise2 :size="15" :stroke-width="1.7" color="white" />
+        <span>Cari No. Retur Produksi</span><v-spacer />
         <button class="lookup-close" @click="emit('update:modelValue', false)">
           ✕
         </button>
@@ -106,7 +95,7 @@ const selectItem = (item: any) => {
           :value="search"
           @input="onSearch(($event.target as HTMLInputElement).value)"
           type="text"
-          placeholder="Cari nomor BPB, supplier, atau keterangan..."
+          placeholder="Cari nomor retur atau keterangan..."
           class="search-input"
           autofocus
         />
@@ -121,7 +110,6 @@ const selectItem = (item: any) => {
             <tr>
               <th style="width: 150px">NOMOR</th>
               <th style="width: 100px">TANGGAL</th>
-              <th>SUPPLIER</th>
               <th>KETERANGAN</th>
             </tr>
           </thead>
@@ -134,7 +122,6 @@ const selectItem = (item: any) => {
             >
               <td class="td-kode">{{ item.Nomor }}</td>
               <td>{{ item.Tanggal }}</td>
-              <td>{{ item.Supplier }}</td>
               <td>{{ item.Keterangan }}</td>
             </tr>
           </tbody>
@@ -179,7 +166,7 @@ const selectItem = (item: any) => {
 .lookup-header {
   display: flex;
   align-items: center;
-  background: #1565c0;
+  background: #00695c;
   color: white;
   padding: 9px 14px;
   font-size: 13px;
@@ -248,12 +235,12 @@ const selectItem = (item: any) => {
   cursor: pointer;
 }
 .lookup-row:hover td {
-  background: #e3f2fd;
+  background: #e0f2f1;
 }
 .td-kode {
   font-family: monospace;
   font-weight: 600;
-  color: #1565c0;
+  color: #00695c;
 }
 .lookup-footer {
   display: flex;
