@@ -12,6 +12,7 @@ import {
   IconPencilOff,
   IconSend,
 } from "@tabler/icons-vue";
+import { formatTanggal } from "@/utils/dateFormat";
 
 const router = useRouter();
 const toast = useToast();
@@ -76,12 +77,6 @@ const headers = [
   { title: "KETERANGAN", key: "Keterangan", minWidth: "250px" },
   { title: "CREATED", key: "Created", width: "120px" },
 ];
-
-const fmtDate = (val: string) => {
-  if (!val) return "";
-  const d = new Date(val);
-  return `${String(d.getDate()).padStart(2, "0")}-${String(d.getMonth() + 1).padStart(2, "0")}-${d.getFullYear()}`;
-};
 
 const fmtNum = (val: any) =>
   new Intl.NumberFormat("id-ID").format(Number(val) || 0);
@@ -287,9 +282,9 @@ const submitPengajuan = async () => {
       </v-btn>
     </template>
 
-    <template #item.Tanggal="{ item }">{{
-      fmtDate((item.raw || item).Tanggal)
-    }}</template>
+    <template #item.Tanggal="{ item }">
+      {{ formatTanggal((item.raw || item).Tanggal) }}
+    </template>
     <template #item.QtyOrder="{ item }">{{
       fmtNum((item.raw || item).QtyOrder)
     }}</template>

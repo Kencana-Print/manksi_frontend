@@ -12,8 +12,30 @@ const isPrinting = ref(false);
 const header = ref<any>({});
 const details = ref<any[]>([]);
 const isReady = ref(false);
+// ── Dialog hasil aksi (pengganti alert()) ──
+const resultDialog = ref<{
+  show: boolean;
+  type: "success" | "error";
+  title: string;
+  message: string;
+}>({
+  show: false,
+  type: "success",
+  title: "",
+  message: "",
+});
+const showResult = (
+  type: "success" | "error",
+  title: string,
+  message: string,
+) => {
+  resultDialog.value = { show: true, type, title, message };
+};
+const closeResult = () => {
+  resultDialog.value.show = false;
+};
 
-// ── Fungsi Terbilang (Sama seperti sebelumnya) ──
+// ── Fungsi Terbilang ──
 const convertTerbilang = (angka: number): string => {
   const bilangan = [
     "",
@@ -73,9 +95,25 @@ const terbilang = (angka: number): string => {
   return convertTerbilang(angka).trim();
 };
 
+// ✅ FIX: sama seperti InvoicePrintView/SuratJalanPrintView —
+// toLocaleString("id-ID") fallback ke koma di server (Node.js tanpa
+// full-ICU). Diganti formatter manual: titik = ribuan, koma = desimal.
 const numFmt = (val: any) => {
-  if (!val) return "0";
-  return Number(val).toLocaleString("id-ID", { maximumFractionDigits: 0 });
+  const n = Number(val || 0);
+  const neg = n < 0;
+  const abs = Math.abs(n);
+  const hasDecimal = Math.round(abs * 100) % 100 !== 0;
+  const fixed = abs.toFixed(hasDecimal ? 2 : 0);
+  const [intPartRaw, decPart] = fixed.split(".");
+  let out = "";
+  let cnt = 0;
+  for (let i = intPartRaw.length - 1; i >= 0; i--) {
+    out = intPartRaw[i] + out;
+    cnt++;
+    if (cnt % 3 === 0 && i !== 0) out = "." + out;
+  }
+  if (decPart) out += "," + decPart;
+  return (neg ? "-" : "") + out;
 };
 
 const dFormat = (val: string) => {
@@ -101,7 +139,7 @@ const nilaiPiutang = computed(
   () => grandTotal.value - (Number(header.value.uang_muka) || 0),
 );
 
-// ── UTILITAS FORMATTING TXT (80 KOLOM) ──
+// ── UTILITAS FORMATTING TXT ──
 const padR = (str: string, len: number) =>
   (str || "").toString().padEnd(len, " ").substring(0, len);
 const padL = (str: string, len: number) =>
@@ -113,117 +151,141 @@ const padC = (str: string, len: number) => {
   return s.padStart(padStart, " ").padEnd(len, " ");
 };
 
-// ── Konstanta kertas dot matrix — 21cm (lebar cetak) x 27,8cm (panjang feed) ──
-// Lebar cetak sudah dikalibrasi 80 kolom (10 CPI standar).
+const wrapText = (text: string, maxWidth: number): string[] => {
+  if (!text) return [""];
+  const words = text.split(" ");
+  const lines: string[] = [];
+  let current = "";
+  for (const word of words) {
+    if ((current + " " + word).trim().length > maxWidth) {
+      if (current) lines.push(current.trim());
+      current = word;
+    } else {
+      current = (current + " " + word).trim();
+    }
+  }
+  if (current) lines.push(current);
+  return lines.length ? lines : [""];
+};
+
+// ── Konstanta kertas dot matrix — disamakan dengan InvoicePrintView ──
+// continuous-form 15" di 10 CPI ≈ 136 kolom.
+const PAGE_WIDTH = 136;
 // Panjang 27,8cm ÷ 2,54 = 10,94" → pada 6 LPI (baris/inch) standar = ~65 baris.
 const PAGE_LINES = 65;
+
+// ✅ Garis solid (bukan putus-putus)
+const LINE = "_".repeat(PAGE_WIDTH);
+
+// Lebar kolom footer (Di bayarkan ke / Dibuat oleh / Mengetahui) —
+// disamakan dengan InvoicePrintView biar TTD gak mepet ke rekening.
+const COL_BAYAR = 58;
+const COL_TTD1 = 39;
+const COL_TTD2 = 39; // 58+39+39 = 136
 
 // ── FUNGSI GENERATE TXT ──
 const generateTxt = () => {
   const h = header.value;
   const d = details.value;
-  const line = "-".repeat(80);
 
   // ── Bangun header (kop + judul + info) sebagai array baris ──
   const buildHeaderLines = (): string[] => {
+    const halfL = 67;
+    const halfR = 68; // halfL + 1(spasi) + halfR = 136
+    const cAlamat = h.inv_cus_alamat || h.cus_alamat || "";
+    const alamatLines = wrapText(cAlamat, halfR - 12);
+
     const lines: string[] = [];
-    lines.push(h.perush_nama || "");
-    lines.push(h.perushd_alamat || h.perush_alamat || "");
-    lines.push(h.perush_kota || "");
-    if (h.perush_telp) lines.push(`Telp: ${h.perush_telp}`);
+    lines.push(padR(h.perush_nama || "", PAGE_WIDTH));
+    lines.push(padR(h.perushd_alamat || h.perush_alamat || "", PAGE_WIDTH));
+    // ✅ Nomor telepon perusahaan di-hide dari cetakan
     lines.push("");
-    lines.push(padC("I N V O I C E   P R O F O R M A", 80));
+    lines.push(padC("I N V O I C E   P R O F O R M A", PAGE_WIDTH));
     lines.push("");
-    const noInv = padR(`Nomor      : ${h.inv_nomor || ""}`, 40);
-    const cusNama = padR(`Customer : ${h.cus_nama || ""}`, 40);
-    lines.push(`${noInv}${cusNama}`);
-    const tglInv = padR(`Tanggal    : ${dFormat(h.inv_tanggal)}`, 40);
-    const cusAlmt = padR(
-      `           ${h.inv_cus_alamat || h.cus_alamat || ""}`,
-      40,
-    );
-    lines.push(`${tglInv}${cusAlmt}`);
-    const ketInv = padR(`Keterangan : ${h.inv_keterangan || ""}`, 40);
-    const cusTelp = padR(
-      `           ${h.cus_telp ? h.cus_telp + " / " : ""}${h.cus_fax || ""}`,
-      40,
-    );
-    lines.push(`${ketInv}${cusTelp}`);
-    lines.push("");
-    lines.push(line);
     lines.push(
-      `${padR("NO", 4)}${padR("SPK", 15)}${padR("NAMA BARANG", 23)}${padR("UKURAN", 8)}${padL("JML", 7)}${padL("HARGA", 11)}${padL("TOTAL", 12)}`,
+      `${padR("Nomor      : " + (h.inv_nomor || ""), halfL)} ${padR("Customer : " + (h.cus_nama || ""), halfR)}`,
     );
-    lines.push(line);
+    lines.push(
+      `${padR("Tanggal    : " + dFormat(h.inv_tanggal), halfL)} ${padR(alamatLines[0] || "", halfR)}`,
+    );
+    lines.push(
+      `${padR("Keterangan : " + (h.inv_keterangan || ""), halfL)} ${padR(alamatLines[1] || "", halfR)}`,
+    );
+    for (let i = 2; i < alamatLines.length; i++) {
+      lines.push(`${padR("", halfL)} ${padR(alamatLines[i], halfR)}`);
+    }
+    // ✅ Nomor telp/fax customer di-hide dari cetakan
+    lines.push(LINE);
+    lines.push(
+      `${padR("No", 3)} ${padR("SPK", 16)} ${padR("Nama", 46)} ${padR("Ukuran", 22)} ${padL("Jumlah", 12)} ${padL("Harga", 16)} ${padL("Total", 16)}`,
+    );
+    lines.push(LINE);
     return lines;
   };
 
   // ── Bangun footer (summary + TTD) sebagai array baris ──
   const buildFooterLines = (): string[] => {
     const lines: string[] = [];
-    lines.push(line);
-    const lblTot =
-      padR("Total", 15) + ":" + padL(numFmt(totalNominal.value), 19);
+    lines.push(LINE);
+    // ✅ Terbilang huruf kapital semua
+    const TERBILANG = (terbilang(grandTotal.value) + " Rupiah").toUpperCase();
+    const tb1 = TERBILANG.substring(0, 48);
+    const tb2 = TERBILANG.length > 48 ? TERBILANG.substring(48, 96) : "";
     lines.push(
-      `${padR("Terbilang : " + terbilang(grandTotal.value) + " Rupiah", 45)}${lblTot}`,
+      `${padR("Terbilang : " + tb1, 95)} ${padR("Total", 14)}: ${padL(numFmt(totalNominal.value), 20)}`,
     );
-    const lblPpn =
-      padR("Total PPN", 15) + ":" + padL(numFmt(totalPpn.value), 19);
-    lines.push(`${padR("", 45)}${lblPpn}`);
-    const lblGTot =
-      padR("Grand Total", 15) + ":" + padL(numFmt(grandTotal.value), 19);
-    lines.push(`${padR("", 45)}${lblGTot}`);
-    const lblDP = padR("Uang Muka", 15) + ":" + padL(numFmt(h.uang_muka), 19);
-    lines.push(`${padR("", 45)}${lblDP}`);
-    const lblSisa =
-      padR("Nilai Piutang", 15) + ":" + padL(numFmt(nilaiPiutang.value), 19);
-    lines.push(`${padR("", 45)}${lblSisa}`);
-    lines.push("");
     lines.push(
-      `Di bayarkan ke:                          Dibuat oleh,         Mengetahui,`,
+      `${padR(tb2, 95)} ${padR("Total PPN", 14)}: ${padL(numFmt(totalPpn.value), 20)}`,
     );
-    lines.push(`REKENING : ${padR(h.inv_rekening || "", 30)}`);
-    lines.push(`ATAS NAMA: ${padR(h.perushd_atasnama || "", 30)}`);
-    lines.push(`BANK     : ${padR(h.perushd_bank || "", 30)}`);
+    lines.push(
+      `${padR("", 95)} ${padR("Grand Total", 14)}: ${padL(numFmt(grandTotal.value), 20)}`,
+    );
+    lines.push(
+      `${padR("", 95)} ${padR("Uang Muka", 14)}: ${padL(numFmt(h.uang_muka), 20)}`,
+    );
+    lines.push(
+      `${padR("", 95)} ${padR("Nilai Piutang", 14)}: ${padL(numFmt(nilaiPiutang.value), 20)}`,
+    );
+    lines.push("");
+    // ✅ Kolom digeser sama seperti Invoice: TTD gak nempel ke rekening
+    lines.push(
+      `${padR("Di bayarkan ke", COL_BAYAR)}${padR("Dibuat oleh,", COL_TTD1)}${padR("Mengetahui,", COL_TTD2)}`,
+    );
+    lines.push(padR("REKENING : " + (h.inv_rekening || ""), COL_BAYAR));
+    lines.push(padR("ATAS NAMA: " + (h.perushd_atasnama || ""), COL_BAYAR));
+    lines.push(padR("BANK     : " + (h.perushd_bank || ""), COL_BAYAR));
     lines.push("");
     lines.push("");
     lines.push(
-      `                                         (          )         (          )`,
+      `${padR("", COL_BAYAR)}${padR("(               )", COL_TTD1)}${padR("(               )", COL_TTD2)}`,
     );
     return lines;
   };
 
-  const dataLineOf = (item: any, idx: number) => {
-    const no = padR(String(idx + 1), 4);
-    const spk = padR(item.kode || "", 15);
-    const nama = padR(item.nama || "", 23);
-    const ukur = padR(item.ukuran || "", 8);
-    const jml = padL(numFmt(item.jumlah), 7);
-    const hrg = padL(numFmt(item.harga), 11);
-    const tot = padL(
-      numFmt((Number(item.jumlah) || 0) * (Number(item.harga) || 0)),
-      12,
-    );
-    return `${no}${spk}${nama}${ukur}${jml}${hrg}${tot}`;
-  };
+  const dataLineOf = (item: any, idx: number) =>
+    `${padR(String(idx + 1), 3)} ${padR(item.kode || "", 16)} ${padR(item.nama || "", 46)} ${padR(item.ukuran || "", 22)} ${padL(numFmt(item.jumlah), 12)} ${padL(numFmt(item.harga), 16)} ${padL(numFmt((Number(item.jumlah) || 0) * (Number(item.harga) || 0)), 16)}`;
 
   const headerLines = buildHeaderLines();
   const footerLines = buildFooterLines();
   const dataLines = d.map((item, idx) => dataLineOf(item, idx));
-  const bodyLines = [...headerLines, ...dataLines, line];
+  const bodyLines = [...headerLines, ...dataLines, LINE];
 
   const pages: string[][] = [];
 
   if (bodyLines.length + footerLines.length <= PAGE_LINES) {
-    // Muat dalam satu halaman — footer langsung menyatu di bawah data.
-    pages.push([...bodyLines, ...footerLines]);
+    // ✅ FIX: blank lines disisipin SEBELUM footer (bukan langsung
+    // nempel), jadi terbilang/total/TTD selalu jatuh persis di baris
+    // terakhir halaman fisik — meski barangnya cuma dikit.
+    const pad = Math.max(0, PAGE_LINES - bodyLines.length - footerLines.length);
+    pages.push([...bodyLines, ...Array(pad).fill(""), ...footerLines]);
   } else {
     // Data terlalu panjang: genapkan halaman ini dengan baris kosong,
-    // lalu footer dimulai bersih di halaman baru (form-feed) — supaya
-    // blok summary+TTD tidak pernah terpotong di tengah.
+    // lalu footer dimulai bersih di halaman baru (form-feed) — tetap
+    // didorong ke bawah halaman itu juga.
     const padToPage = Math.max(0, PAGE_LINES - bodyLines.length);
     pages.push([...bodyLines, ...Array(padToPage).fill("")]);
-    pages.push([...footerLines]);
+    const footerPad = Math.max(0, PAGE_LINES - footerLines.length);
+    pages.push([...Array(footerPad).fill(""), ...footerLines]);
   }
 
   // Pisahkan antar halaman dengan form-feed (\f) agar printer fisik
@@ -236,15 +298,16 @@ const printQZ = async () => {
   try {
     if (!qz.websocket.isActive()) {
       try {
-        // Biarkan QZ mencoba berbagai port bawaannya dengan 5x percobaan
         await qz.websocket.connect({ retries: 5, delay: 1 });
       } catch (err: any) {
         console.error("Detail Error Koneksi QZ:", err);
-        alert(
-          "Gagal terhubung ke aplikasi QZ Tray di komputer ini. Buka Inspect Element -> tab Console untuk melihat detail error.",
+        showResult(
+          "error",
+          "Gagal Terhubung",
+          "Gagal terhubung ke aplikasi QZ Tray di komputer ini. Pastikan QZ Tray sudah berjalan di background.",
         );
         isPrinting.value = false;
-        return; // Hentikan proses cetak
+        return;
       }
     }
 
@@ -252,16 +315,25 @@ const printQZ = async () => {
     const content = generateTxt();
 
     const data = [
-      "\x1B\x40", // ESC @: Inisialisasi printer (reset ukuran font ke normal)
+      "\x1B\x40",
+      "\x1B\x6C\x00",
       { type: "raw", format: "plain", data: content },
-      "\x0C", // Form Feed: Eject halaman
+      "\x0C",
     ];
 
     await qz.print(config, data);
-    alert("Berhasil dikirim ke printer!");
+    showResult(
+      "success",
+      "Berhasil Dikirim",
+      "Data berhasil dikirim ke printer.",
+    );
   } catch (error: any) {
     console.error("QZ Error:", error);
-    alert("Gagal cetak via QZ Tray: " + error.message);
+    showResult(
+      "error",
+      "Gagal Cetak",
+      "Gagal cetak via QZ Tray: " + error.message,
+    );
   } finally {
     isPrinting.value = false;
   }
@@ -275,12 +347,10 @@ const downloadTxt = () => {
 
   const link = document.createElement("a");
   link.href = url;
-  // Nama file akan disesuaikan dengan nomor invoice
   link.download = `Invoice_Proforma_${nomor.replace(/\//g, "_")}.txt`;
   document.body.appendChild(link);
   link.click();
 
-  // Clean up
   document.body.removeChild(link);
   window.URL.revokeObjectURL(url);
 };
@@ -291,10 +361,12 @@ const fetchData = async () => {
     header.value = res.data.data.header;
     details.value = res.data.data.details;
     isReady.value = true;
-
-    // HAPUS setTimeout untuk downloadTxt() di sini
   } catch (error) {
-    alert("Gagal memuat data cetak.");
+    showResult(
+      "error",
+      "Gagal Memuat",
+      "Gagal memuat data cetak. Silakan coba muat ulang halaman.",
+    );
   }
 };
 
@@ -350,6 +422,20 @@ onMounted(() => {
   >
     Menyiapkan data cetak...
   </div>
+
+  <!-- ── Dialog hasil aksi (pengganti alert()) ── -->
+  <Teleport to="body">
+    <div v-if="resultDialog.show" class="rd-backdrop" @click.self="closeResult">
+      <div class="rd-card" :class="`rd-${resultDialog.type}`">
+        <div class="rd-icon">
+          {{ resultDialog.type === "success" ? "✅" : "⚠️" }}
+        </div>
+        <div class="rd-title">{{ resultDialog.title }}</div>
+        <div class="rd-message">{{ resultDialog.message }}</div>
+        <button class="rd-btn" @click="closeResult">OK</button>
+      </div>
+    </div>
+  </Teleport>
 </template>
 
 <style scoped>
@@ -359,7 +445,7 @@ onMounted(() => {
   align-items: center;
   height: 100vh;
   background-color: #f5f5f5;
-  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  font-family: "Consolas", "Courier New", monospace;
 }
 .card-info {
   background: white;
@@ -391,5 +477,82 @@ onMounted(() => {
 }
 .btn-download:hover {
   background: #0d47a1;
+}
+
+/* ── Result Dialog (pengganti alert()) ── */
+.rd-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  animation: rd-fade-in 0.15s ease;
+}
+@keyframes rd-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.rd-card {
+  background: white;
+  border-radius: 10px;
+  padding: 28px 30px;
+  max-width: 360px;
+  width: 90%;
+  text-align: center;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.25);
+  animation: rd-pop-in 0.18s ease;
+}
+@keyframes rd-pop-in {
+  from {
+    transform: scale(0.92);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+.rd-icon {
+  font-size: 40px;
+  margin-bottom: 10px;
+}
+.rd-title {
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 6px;
+  color: #212121;
+}
+.rd-message {
+  font-size: 13px;
+  color: #555;
+  line-height: 1.5;
+  margin-bottom: 20px;
+}
+.rd-btn {
+  padding: 9px 28px;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  color: white;
+}
+.rd-success .rd-btn {
+  background: #2e7d32;
+}
+.rd-success .rd-btn:hover {
+  background: #1b5e20;
+}
+.rd-error .rd-btn {
+  background: #c62828;
+}
+.rd-error .rd-btn:hover {
+  background: #8e0000;
 }
 </style>

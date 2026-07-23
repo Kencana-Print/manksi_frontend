@@ -11,6 +11,7 @@ import {
   IconFileExport,
 } from "@tabler/icons-vue";
 import * as XLSX from "xlsx";
+import { formatTanggal, formatTanggalJam } from "@/utils/dateFormat";
 
 const toast = useToast();
 const authStore = useAuthStore();
@@ -204,7 +205,7 @@ const onExportDetail = () => {
     exportData.push({
       Nomor: master.Nomor,
       Jenis: master.Jenis,
-      Tanggal: formatTgl(master.Tanggal),
+      Tanggal: formatTanggal(master.Tanggal),
       Cabang: master.Cab,
       Tujuan: master.Tujuan,
       Keterangan: master.Keterangan,
@@ -246,23 +247,6 @@ const onExportDetail = () => {
 };
 
 // ── Helpers Formatting ──
-const formatTgl = (val: string) => {
-  if (!val) return "";
-  if (/^\d{4}-\d{2}-\d{2}$/.test(val)) {
-    const [y, m, d] = val.split("-");
-    return `${d}-${m}-${y}`;
-  }
-  const d = new Date(val);
-  return `${String(d.getDate()).padStart(2, "0")}-${String(d.getMonth() + 1).padStart(2, "0")}-${d.getFullYear()}`;
-};
-
-const formatWaktu = (val: string) => {
-  if (!val) return "";
-  const d = new Date(val);
-  if (isNaN(d.getTime())) return val;
-  return `${String(d.getDate()).padStart(2, "0")}-${String(d.getMonth() + 1).padStart(2, "0")}-${d.getFullYear()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-};
-
 const formatQty = (val: any) => {
   return Number(val || 0).toLocaleString("en-US", {
     minimumFractionDigits: 2,
@@ -427,13 +411,15 @@ const confirmTerimaMutasi = async () => {
       </div>
     </template>
 
-    <template #item.Tanggal="{ item }">{{ formatTgl(item.Tanggal) }}</template>
-    <template #item.Created="{ item }">{{
-      formatWaktu(item.Created)
-    }}</template>
-    <template #item.TglTerima="{ item }">{{
-      formatWaktu(item.TglTerima)
-    }}</template>
+    <template #item.Tanggal="{ item }">
+      {{ formatTanggal(item.Tanggal) }}
+    </template>
+    <template #item.Created="{ item }">
+      {{ formatTanggalJam(item.Created) }}
+    </template>
+    <template #item.TglTerima="{ item }">
+      {{ formatTanggalJam(item.TglTerima) }}
+    </template>
 
     <template #detail="{ item }">
       <div class="det-wrap">

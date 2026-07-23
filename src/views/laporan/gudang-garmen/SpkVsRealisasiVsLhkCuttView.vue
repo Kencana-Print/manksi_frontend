@@ -123,7 +123,7 @@ const fmtDate = (v: string) => {
   const s = String(v).substring(0, 10);
   const [y, m, d] = s.split("-");
   if (!y || !m || !d) return v;
-  return `${d}-${m}-${y}`;
+  return `${d}/${m}/${y}`;
 };
 
 // ── Export master ──

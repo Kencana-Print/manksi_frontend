@@ -7,6 +7,7 @@ import { useBrowse } from "@/composables/useBrowse";
 import { mkaService } from "@/services/garmen/mkaService";
 import { exportExcelSingle } from "@/utils/excelExport";
 import { IconNotes, IconFileExport } from "@tabler/icons-vue";
+import { formatTanggal, formatTanggalJam } from "@/utils/dateFormat";
 
 const router = useRouter();
 const toast = useToast();
@@ -229,16 +230,6 @@ const onExportDetail = async () => {
 };
 
 // --- Format ---
-const formatTgl = (v: string) => {
-  if (!v) return "-";
-  const d = new Date(v);
-  return `${String(d.getDate()).padStart(2, "0")}-${String(d.getMonth() + 1).padStart(2, "0")}-${d.getFullYear()}`;
-};
-const formatWaktu = (v: string) => {
-  if (!v) return "-";
-  const d = new Date(v);
-  return `${String(d.getDate()).padStart(2, "0")}-${String(d.getMonth() + 1).padStart(2, "0")}-${d.getFullYear()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-};
 const numFmt = (v: any) =>
   v != null ? Number(v).toLocaleString("id-ID") : "0";
 </script>
@@ -313,10 +304,12 @@ const numFmt = (v: any) =>
     </template>
 
     <!-- Kolom custom -->
-    <template #item.Tanggal="{ item }">{{ formatTgl(item.Tanggal) }}</template>
-    <template #item.Created="{ item }">{{
-      formatWaktu(item.Created)
-    }}</template>
+    <template #item.Tanggal="{ item }">
+      {{ formatTanggal(item.Tanggal) }}
+    </template>
+    <template #item.Created="{ item }">
+      {{ formatTanggalJam(item.Created) }}
+    </template>
     <template #item.JumlahSPK="{ item }">{{ numFmt(item.JumlahSPK) }}</template>
     <template #item.StatusSPK="{ item }">
       <span

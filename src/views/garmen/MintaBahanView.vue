@@ -17,6 +17,7 @@ import {
   IconCheck,
   IconShieldCheck,
 } from "@tabler/icons-vue";
+import { formatTanggal, formatTanggalJam } from "@/utils/dateFormat";
 
 const router = useRouter();
 const toast = useToast();
@@ -113,13 +114,6 @@ const getNomorClass = (item: any) => {
   return "";
 };
 const getApvClass = (val: string) => (val === "N" ? "apv-n" : "");
-
-const fmtDate = (val: string) => {
-  if (!val) return "";
-  const d = new Date(val);
-  if (isNaN(d.getTime())) return val;
-  return `${String(d.getDate()).padStart(2, "0")}-${String(d.getMonth() + 1).padStart(2, "0")}-${d.getFullYear()}`;
-};
 
 // ── Expand detail ──
 const expandedRows = ref<any[]>([]);
@@ -511,7 +505,9 @@ const num = (val: number) => new Intl.NumberFormat("id-ID").format(val || 0);
     </template>
 
     <!-- ── Kolom custom ── -->
-    <template #item.Tanggal="{ item }">{{ fmtDate(item.Tanggal) }}</template>
+    <template #item.Tanggal="{ item }">
+      {{ formatTanggal(item.Tanggal) }}
+    </template>
     <template #item.Nomor="{ item }">
       <span :class="getNomorClass(item)">{{ item.Nomor }}</span>
     </template>
@@ -641,13 +637,13 @@ const num = (val: number) => new Intl.NumberFormat("id-ID").format(val || 0);
                       <td style="font-weight: 700; color: #00796b">
                         {{ rel.NomorRealisasi }}
                       </td>
-                      <td class="tc">{{ rel.TglRealisasi }}</td>
+                      <td class="tc">{{ formatTanggal(rel.TglRealisasi) }}</td>
                       <td class="tc">
                         <span
                           v-if="rel.WaktuApprove"
                           style="font-weight: 600; color: #2e7d32"
                         >
-                          {{ rel.WaktuApprove }}
+                          {{ formatTanggal(rel.WaktuApprove) }}
                         </span>
 
                         <v-btn

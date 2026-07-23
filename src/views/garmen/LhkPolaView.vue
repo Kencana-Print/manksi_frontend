@@ -6,6 +6,7 @@ import BaseBrowse from "@/components/BaseBrowse.vue";
 import { useBrowse } from "@/composables/useBrowse";
 import { lhkPolaService } from "@/services/garmen/lhkPolaService";
 import { IconRuler2, IconChevronRight } from "@tabler/icons-vue";
+import { formatTanggal, formatTanggalJam } from "@/utils/dateFormat";
 
 const router = useRouter();
 const toast = useToast();
@@ -112,17 +113,6 @@ const onDelete = async (item: any) => {
     toast.error(e.response?.data?.message || "Gagal menghapus.");
   }
 };
-
-const formatWaktu = (v: string) => {
-  if (!v) return "-";
-  const d = new Date(v);
-  return `${String(d.getDate()).padStart(2, "0")}-${String(d.getMonth() + 1).padStart(2, "0")}-${d.getFullYear()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-};
-const formatTgl = (v: string) => {
-  if (!v) return "-";
-  const d = new Date(v);
-  return `${String(d.getDate()).padStart(2, "0")}-${String(d.getMonth() + 1).padStart(2, "0")}-${d.getFullYear()}`;
-};
 </script>
 
 <template>
@@ -157,10 +147,12 @@ const formatTgl = (v: string) => {
       </div>
     </template>
 
-    <template #item.Tanggal="{ item }">{{ formatTgl(item.Tanggal) }}</template>
-    <template #item.DateCreate="{ item }">{{
-      formatWaktu(item.DateCreate)
-    }}</template>
+    <template #item.Tanggal="{ item }">
+      {{ formatTanggal(item.Tanggal) }}
+    </template>
+    <template #item.DateCreate="{ item }">
+      {{ formatTanggalJam(item.DateCreate) }}
+    </template>
 
     <!-- ── Expand: dua tabel bersanding, Marker (kiri) & Grading (kanan) ── -->
     <template #detail="{ item }">

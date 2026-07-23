@@ -90,6 +90,7 @@ import {
   IconCircleCheck,
   IconAlertTriangle,
   IconActivity,
+  IconArrowBackUp,
 } from "@tabler/icons-vue";
 
 interface NavItem {
@@ -406,9 +407,9 @@ const menuItems: NavItem[] = [
           },
           {
             title: "Koreksi Stok",
-            to: "/garmen/bahan/koreksi",
+            to: "/garmen/bahan-baku/koreksi-stok",
             icon: IconSettings,
-            menuId: 108,
+            menuId: 115,
           },
           { divider: true },
           {
@@ -418,17 +419,17 @@ const menuItems: NavItem[] = [
             menuId: 101,
           },
           {
-            title: "Retur Pembelian",
-            to: "/garmen/bahan/retur-beli",
-            icon: IconTruck,
-            menuId: 110,
+            title: "Retur Pembelian Bahan",
+            to: "/garmen/bahan-baku/retur-pembelian-bahan",
+            icon: IconArrowBackUp,
+            menuId: 55,
           },
           { divider: true },
           {
-            title: "Barcode Bahan",
-            to: "/garmen/bahan/barcode",
+            title: "Pembuatan Barcode Bahan",
+            to: "/garmen/bahan-baku/pembuatan-barcode-bahan",
             icon: IconBarcode,
-            menuId: 111,
+            menuId: 135,
           },
           {
             title: "Cetak Barcode",
@@ -962,6 +963,53 @@ const menuItems: NavItem[] = [
             icon: IconGauge,
             menuId: 554,
           },
+          {
+            title: "Monitoring Kekurangan Produksi (All Divisi)",
+            to: "/laporan/produksi-garmen/monitoring-kurang-prod",
+            icon: IconAlertTriangle,
+            menuId: 555,
+          },
+          {
+            title: "Monitoring Kekurangan Produksi (Jahit/Line)",
+            to: "/laporan/produksi-garmen/monitoring-kurang-prod-jahit",
+            icon: IconAlertTriangle,
+          },
+          {
+            title: "Monitoring Kekurangan Produksi v2",
+            to: "/laporan/produksi-garmen/monitoring-kurang-prodv2",
+            icon: IconAlertTriangle,
+            menuId: 556,
+          },
+          {
+            title: "Monitoring Kedatangan Bahan",
+            to: "/laporan/produksi-garmen/monitoring-bhn-datang",
+            icon: IconTruckDelivery,
+            menuId: 557,
+          },
+          {
+            title: "Outstanding Bordir",
+            to: "/laporan/produksi-garmen/outstanding-bordir",
+            icon: IconAlertTriangle,
+            menuId: 558,
+          },
+          {
+            title: "Monitoring BS",
+            to: "/laporan/produksi-garmen/monitoring-bs",
+            icon: IconAlertTriangle,
+            menuId: 563,
+          },
+          {
+            title: "Stok Produksi by Line",
+            to: "/laporan/produksi-garmen/stok-by-line",
+            icon: IconLayoutGrid,
+            menuId: 564,
+          },
+          {
+            title: "Pemakaian Obat",
+            to: "/laporan/produksi-garmen/pemakaian-obat",
+            icon: IconFlask,
+            menuId: 565,
+          },
         ],
       },
       {
@@ -989,7 +1037,7 @@ const menuItems: NavItem[] = [
           {
             title: "MAP vs SPK",
             to: "/laporan/penjualan/map-vs-spk",
-            icon: IconClipboardList, // Bisa disesuaikan ikonnya
+            icon: IconClipboardList,
             menuId: 308,
           },
         ],

@@ -18,6 +18,7 @@ import {
   IconSend,
   IconTrash,
 } from "@tabler/icons-vue";
+import { formatTanggal, formatTanggalJam } from "@/utils/dateFormat";
 
 // ── Tipe ──────────────────────────────────────────────────────────────
 interface MutasiRow {
@@ -229,6 +230,7 @@ const headers = [
   { title: "Approval", key: "Approval", width: "80px", align: "center" },
   { title: "Alasan", key: "Alasan", minWidth: "120px" },
   { title: "User", key: "Usr", width: "80px" },
+  { title: "Created", key: "created", width: "150px" },
 ];
 
 // ── Row colors (sesuai Delphi cxGrdMasterCustomDrawCell) ──────────────
@@ -258,13 +260,6 @@ const num = (val: any, dec = 2) =>
         maximumFractionDigits: dec,
       })
     : "0";
-
-const fmtDate = (val: string) => {
-  if (!val) return "";
-  const d = new Date(val);
-  if (isNaN(d.getTime())) return val;
-  return `${String(d.getDate()).padStart(2, "0")}-${String(d.getMonth() + 1).padStart(2, "0")}-${d.getFullYear()}`;
-};
 
 // Badge Ngedit untuk kolom Nomor
 const getNgeditClass = (item: MutasiRow) => {
@@ -802,8 +797,15 @@ onMounted(async () => {
     </template>
 
     <!-- Tanggal format -->
-    <template #item.Tanggal="{ item }">{{ fmtDate(item.Tanggal) }}</template>
-    <template #item.TglSPK="{ item }">{{ fmtDate(item.TglSPK) }}</template>
+    <template #item.Tanggal="{ item }">
+      {{ formatTanggal(item.Tanggal) }}
+    </template>
+    <template #item.TglSPK="{ item }">
+      {{ formatTanggal(item.TglSPK) }}
+    </template>
+    <template #item.created="{ item }">
+      {{ formatTanggalJam(item.created) }}
+    </template>
 
     <!-- Angka desimal -->
     <template #item.Jumlah="{ item }">{{ num(item.Jumlah, 0) }}</template>

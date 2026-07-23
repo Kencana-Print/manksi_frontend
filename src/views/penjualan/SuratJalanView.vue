@@ -15,6 +15,7 @@ import {
   IconDotsVertical,
   IconAlertTriangle,
 } from "@tabler/icons-vue";
+import { formatTanggal, formatTanggalJam } from "@/utils/dateFormat";
 
 const auth = useAuthStore();
 const router = useRouter();
@@ -451,6 +452,9 @@ const onExportDetail = async () => {
         {{ item.Nomor }}
       </span>
     </template>
+    <template #item.Tanggal="{ item }">
+      {{ formatTanggal(item.Tanggal) }}
+    </template>
 
     <template #item.Approved="{ item }">
       <span v-if="item.Approved === 'Sudah'" class="chip chip-green"
@@ -464,6 +468,10 @@ const onExportDetail = async () => {
 
     <template #item.QtyKirim="{ item }">
       {{ Number(item.QtyKirim || 0).toLocaleString("id-ID") }}
+    </template>
+
+    <template #item.Created="{ item }">
+      {{ formatTanggalJam(item.Created) }}
     </template>
 
     <!-- ── Row color via rowPropsFn ── -->

@@ -14,6 +14,28 @@ const nomor = route.query.nomor as string;
 const mode = route.query.mode as string; // "dotmatrix" | "inkjet"
 const printerName = ref("192.168.1.33");
 const isPrinting = ref(false);
+// ── Dialog hasil aksi (pengganti alert()) ──
+const resultDialog = ref<{
+  show: boolean;
+  type: "success" | "error";
+  title: string;
+  message: string;
+}>({
+  show: false,
+  type: "success",
+  title: "",
+  message: "",
+});
+const showResult = (
+  type: "success" | "error",
+  title: string,
+  message: string,
+) => {
+  resultDialog.value = { show: true, type, title, message };
+};
+const closeResult = () => {
+  resultDialog.value.show = false;
+};
 
 const header = ref<any>({});
 const detail = ref<any[]>([]);
@@ -68,7 +90,27 @@ const fmtDate = (v: string) => {
     d.getMonth() + 1,
   ).padStart(2, "0")}/${d.getFullYear()}`;
 };
-const num = (v: any) => Number(v || 0).toLocaleString("id-ID");
+
+// ✅ FIX: sama seperti InvoicePrintView — toLocaleString("id-ID") fallback
+// ke koma di server (Node.js tanpa full-ICU). Diganti formatter manual
+// biar konsisten: titik = ribuan, koma = desimal (kalau ada).
+const num = (v: any) => {
+  const n = Number(v || 0);
+  const neg = n < 0;
+  const abs = Math.abs(n);
+  const hasDecimal = Math.round(abs * 100) % 100 !== 0;
+  const fixed = abs.toFixed(hasDecimal ? 2 : 0);
+  const [intPartRaw, decPart] = fixed.split(".");
+  let out = "";
+  let cnt = 0;
+  for (let i = intPartRaw.length - 1; i >= 0; i--) {
+    out = intPartRaw[i] + out;
+    cnt++;
+    if (cnt % 3 === 0 && i !== 0) out = "." + out;
+  }
+  if (decPart) out += "," + decPart;
+  return (neg ? "-" : "") + out;
+};
 
 // ── Dot matrix helpers ────────────────────────────────────────────────
 const padR = (s: string, n: number) =>
@@ -101,99 +143,113 @@ const wrapText = (text: string, maxWidth: number): string[] => {
   return lines.length ? lines : [""];
 };
 
+const PAGE_WIDTH = 136; // lebar kertas continuous-form (sesuaikan kalau printer beda)
+const NAMA_W = 50;
+const KET_W = 26;
+
+// ✅ Garis solid (bukan putus-putus), sama seperti InvoicePrintView
+const LINE = "_".repeat(PAGE_WIDTH);
+
 const generateTxt = () => {
   const h = header.value;
   const rows = detail.value;
-  const LINE = "-".repeat(120);
+  const halfL = 67;
+  const halfR = 68; // halfL + 1(spasi) + halfR = 136
   let txt = "";
 
-  // Kop perusahaan
-  txt += `${padR(h.perush_nama || "", 120)}\n`;
-  txt += `${padR(h.perush_alamat || "", 120)}\n`;
-  txt += `${padR(h.perush_telp || "", 120)}\n`;
-  txt += "\n";
+  const printHeaderBlock = () => {
+    let s = "";
+    s += `${padR(h.perush_nama || "", PAGE_WIDTH)}\n`;
+    s += `${padR(h.perush_alamat || "", PAGE_WIDTH)}\n`;
+    s += `${padR(h.perush_telp || "", PAGE_WIDTH)}\n`;
+    s += "\n";
+    s += `${padC("S U R A T   J A L A N", PAGE_WIDTH)}\n\n`;
 
-  // Judul
-  txt += `${padC("S U R A T   J A L A N", 120)}\n\n`;
+    const alamatFull = h.sj_alamat_customer || h.cus_alamat || "";
+    const alamatLines = wrapText(alamatFull, halfR);
+    s += `${padR("Nomor      : " + (h.sj_nomor || ""), halfL)} ${padR("Customer : " + (h.cus_nama || ""), halfR)}\n`;
+    s += `${padR("Tanggal    : " + fmtDate(h.sj_tanggal), halfL)} ${padR(alamatLines[0] || "", halfR)}\n`;
+    s += `${padR("Keterangan : " + (h.sj_keterangan || ""), halfL)} ${padR(alamatLines[1] || "", halfR)}\n`;
+    for (let i = 2; i < alamatLines.length; i++) {
+      s += `${padR("", halfL)} ${padR(alamatLines[i], halfR)}\n`;
+    }
+    // ✅ Nomor telp/fax customer di-hide dari cetakan
+    s += `${LINE}\n`;
+    s += `${padR("No", 3)} ${padR("SPK", 12)} ${padR("Nama", NAMA_W)} ${padR(
+      "Ukuran",
+      20,
+    )} ${padL("Jumlah", 10)} ${padL("Koli", 9)} ${padR("Keterangan", KET_W)}\n`;
+    s += `${LINE}\n`;
+    return s;
+  };
 
-  // Header info
-  // Alamat customer bisa panjang — pecah jadi beberapa baris jika > 60 char
-  const alamatFull = h.sj_alamat_customer || h.cus_alamat || "";
-  const alamatLines = wrapText(alamatFull, 60);
-
-  txt += `${padR("Nomor      : " + (h.sj_nomor || ""), 60)} ${padR("Customer : " + (h.cus_nama || ""), 60)}\n`;
-  txt += `${padR("Tanggal    : " + fmtDate(h.sj_tanggal), 60)} ${padR(alamatLines[0] || "", 60)}\n`;
-  txt += `${padR("Keterangan : " + (h.sj_keterangan || ""), 60)} ${padR(alamatLines[1] || "", 60)}\n`;
-
-  // Baris tambahan jika alamat masih ada sisa
-  for (let i = 2; i < alamatLines.length; i++) {
-    txt += `${padR("", 60)} ${padR(alamatLines[i], 60)}\n`;
-  }
-
-  // Telp/fax setelah alamat
-  txt += `${padR("", 60)} ${padR((h.cus_telp || "") + "/" + (h.cus_fax || ""), 60)}\n`;
-
-  txt += `${LINE}\n`;
-  txt += `${padR("No", 3)} ${padR("SPK", 12)} ${padR("Nama", 40)} ${padR(
-    "Ukuran",
-    20,
-  )} ${padL("Jumlah", 10)} ${padL("Koli", 9)} ${padR("Keterangan", 20)}\n`;
-  txt += `${LINE}\n`;
+  txt += printHeaderBlock();
 
   rows.forEach((r: any, i: number) => {
     txt += `${padR(String(i + 1), 3)} `;
     txt += `${padR(r.sjd_spk_nomor || "", 12)} `;
-    txt += `${padR(r.spk_nama || r.spk_nama2 || "", 40)} `;
+    txt += `${padR(r.spk_nama || r.spk_nama2 || "", NAMA_W)} `;
     txt += `${padR(r.sjd_ukuran || "", 20)} `;
     txt += `${padL(num(r.sjd_jumlah), 10)} `;
     txt += `${padL(num(r.sjd_koli), 9)} `;
-    txt += `${padR(r.sjd_keterangan || "", 20)}\n`;
+    txt += `${padR(r.sjd_keterangan || "", KET_W)}\n`;
 
+    // Ulang header tiap 12 baris — cuma kepakai buat daftar panjang
+    // (lebih dari 1 lembar fisik), gak ngaruh ke kasus SPK sedikit.
+    // ✅ "LEMBAR PUTIH KEMBALI SOLO" dihapus sesuai permintaan.
     if ((i + 1) % 12 === 0 && i + 1 < rows.length) {
       txt += `${LINE}\n`;
-      txt += `${padC("LEMBAR PUTIH dan MERAH KEMBALI SOLO", 120)}\n`;
-      txt += "\n".repeat(5);
-      txt += `${padC("S U R A T   J A L A N", 120)}\n`;
-      txt += `${padR("Nomor      : " + (h.sj_nomor || ""), 60)} ${padR(
-        "Customer : " + (h.cus_nama || ""),
-        60,
-      )}\n`;
-      txt += `${padR("Tanggal    : " + fmtDate(h.sj_tanggal), 60)} ${padR(
-        h.sj_alamat_customer || h.cus_alamat || "",
-        60,
-      )}\n`;
-      txt += `${padR("Keterangan : " + (h.sj_keterangan || ""), 60)} ${padR(
-        (h.cus_telp || "") + "/" + (h.cus_fax || ""),
-        60,
-      )}\n`;
-      txt += `${LINE}\n`;
-      txt += `${padR("No", 3)} ${padR("SPK", 12)} ${padR("Nama", 40)} ${padR(
-        "Ukuran",
-        20,
-      )} ${padL("Jumlah", 10)} ${padL("Koli", 9)} ${padR("Keterangan", 20)}\n`;
-      txt += `${LINE}\n`;
+      txt += "\n".repeat(3);
+      txt += printHeaderBlock();
     }
   });
 
-  const sisa = 12 - (rows.length % 12 || 12);
-  txt += "\n".repeat(sisa);
+  // ── Total jumlah dari seluruh baris ──
+  const totalJml = rows.reduce(
+    (s: number, r: any) => s + Number(r.sjd_jumlah || 0),
+    0,
+  );
 
+  // ✅ Nomor fax perusahaan tetap dipakai di kalimat "mohon fax ke...",
+  // walau baris telp terpisah di header udah di-hide.
+  const FAX_NO = h.perush_telp || h.perush_fax || "";
+  const EMAIL = h.perush_email || "";
+
+  // ✅ FIX: gap tetap kecil, bukan digenapin ke kelipatan 12 — biar
+  // panjang halaman ngikutin jumlah baris aktual, gak dorong TTD
+  // sampai lewat panjang fisik 1 lembar continuous-form.
+  txt += "\n".repeat(2);
   txt += `${LINE}\n`;
-  txt += `${padC("LEMBAR PUTIH dan MERAH KEMBALI SOLO", 120)}\n`;
-
-  txt += `${padR("Dibuat Oleh,", 25)} ${padR("Disiapkan Oleh,", 25)} ${padR(
-    "Kepala Gudang,",
-    25,
-  )} ${padR("Pengantar,", 25)}, ${padR("Diterima Oleh,", 25)}\n`;
-  txt += "\n".repeat(3);
-  txt += `${padR("(               )", 25)} ${padR(
-    "(               )",
-    25,
-  )} ${padR("(               )", 25)} ${padR("(               )", 25)} ${padR(
-    "(               )",
-    25,
+  txt += `${padR(
+    "MOHON SURAT JALAN INI DITANDATANGANI, DISTEMPEL, DAN DI FAX KE " + FAX_NO,
+    PAGE_WIDTH,
   )}\n`;
-
+  txt += `${padR("ATAU EMAIL DI " + EMAIL, PAGE_WIDTH - 24)}${padL(
+    "Total Jumlah: " + num(totalJml),
+    24,
+  )}\n`;
+  txt += "\n";
+  txt += `${padR("Dibuat Oleh,", 27)} ${padR("Disiapkan Oleh,", 27)} ${padR(
+    "Kepala Gudang,",
+    27,
+  )} ${padR("Pengantar,", 27)} ${padR("Diterima Oleh,", 27)}\n`;
+  txt += "\n".repeat(3);
+  txt += `${padR("(               )", 27)} ${padR(
+    "(               )",
+    27,
+  )} ${padR("(               )", 27)} ${padR("(               )", 27)} ${padR(
+    "(               )",
+    27,
+  )}\n`;
+  txt += "\n";
+  txt += `${padR(
+    "Note : Pengaduan konsumen maks. 14 hari dari tanggal penerimaan barang.",
+    PAGE_WIDTH,
+  )}\n`;
+  txt += `${padR(
+    "Melebihi batas waktu pengaduan, tidak diterima.",
+    PAGE_WIDTH,
+  )}\n`;
   return txt;
 };
 
@@ -228,11 +284,13 @@ const printQZ = async () => {
         await qz.websocket.connect({ retries: 5, delay: 1 });
       } catch (err: any) {
         console.error("Detail Error Koneksi QZ:", err);
-        alert(
-          "Gagal terhubung ke aplikasi QZ Tray di komputer ini. Buka Inspect Element -> tab Console untuk melihat detail error.",
+        showResult(
+          "error",
+          "Gagal Terhubung",
+          "Gagal terhubung ke aplikasi QZ Tray di komputer ini. Pastikan QZ Tray sudah berjalan di background.",
         );
         isPrinting.value = false;
-        return; // Hentikan proses cetak
+        return;
       }
     }
     const config = qz.configs.create(printerName.value);
@@ -245,10 +303,18 @@ const printQZ = async () => {
     ];
 
     await qz.print(config, data);
-    alert("Berhasil dikirim ke printer Surat Jalan!");
+    showResult(
+      "success",
+      "Berhasil Dikirim",
+      `Data berhasil dikirim ke printer Surat Jalan.`,
+    );
   } catch (error: any) {
     console.error("QZ Error:", error);
-    alert("Gagal cetak via QZ Tray: " + error.message);
+    showResult(
+      "error",
+      "Gagal Cetak",
+      "Gagal cetak via QZ Tray: " + error.message,
+    );
   } finally {
     isPrinting.value = false;
   }
@@ -267,7 +333,11 @@ const fetchData = async () => {
       setTimeout(() => window.print(), 600);
     }
   } catch {
-    alert("Gagal memuat data cetak.");
+    showResult(
+      "error",
+      "Gagal Memuat",
+      "Gagal memuat data cetak. Silakan coba muat ulang halaman.",
+    );
   } finally {
     isLoading.value = false;
   }
@@ -434,9 +504,9 @@ onMounted(() => {
           <div class="page-footer">
             <div class="foot-row">
               <div class="foot-note">
-                Mohon Surat Jalan ini ditanda tangani, distempel, dan di fax
-                ke<br />
-                atau email ke solokencana2@gmail.com
+                Mohon Surat Jalan ini ditanda tangani, distempel, dan di fax ke
+                {{ header.perush_telp }}<br />
+                atau email ke {{ header.perush_email }}
               </div>
 
               <div class="foot-page">
@@ -470,6 +540,20 @@ onMounted(() => {
       </div>
     </template>
   </div>
+
+  <!-- ── Dialog hasil aksi (pengganti alert()) ── -->
+  <Teleport to="body">
+    <div v-if="resultDialog.show" class="rd-backdrop" @click.self="closeResult">
+      <div class="rd-card" :class="`rd-${resultDialog.type}`">
+        <div class="rd-icon">
+          {{ resultDialog.type === "success" ? "✅" : "⚠️" }}
+        </div>
+        <div class="rd-title">{{ resultDialog.title }}</div>
+        <div class="rd-message">{{ resultDialog.message }}</div>
+        <button class="rd-btn" @click="closeResult">OK</button>
+      </div>
+    </div>
+  </Teleport>
 </template>
 
 <style scoped>
@@ -551,6 +635,83 @@ onMounted(() => {
   to {
     transform: rotate(360deg);
   }
+}
+
+/* ── Result Dialog (pengganti alert()) ── */
+.rd-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  animation: rd-fade-in 0.15s ease;
+}
+@keyframes rd-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.rd-card {
+  background: white;
+  border-radius: 10px;
+  padding: 28px 30px;
+  max-width: 360px;
+  width: 90%;
+  text-align: center;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.25);
+  animation: rd-pop-in 0.18s ease;
+}
+@keyframes rd-pop-in {
+  from {
+    transform: scale(0.92);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+.rd-icon {
+  font-size: 40px;
+  margin-bottom: 10px;
+}
+.rd-title {
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 6px;
+  color: #212121;
+}
+.rd-message {
+  font-size: 13px;
+  color: #555;
+  line-height: 1.5;
+  margin-bottom: 20px;
+}
+.rd-btn {
+  padding: 9px 28px;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  color: white;
+}
+.rd-success .rd-btn {
+  background: #2e7d32;
+}
+.rd-success .rd-btn:hover {
+  background: #1b5e20;
+}
+.rd-error .rd-btn {
+  background: #c62828;
+}
+.rd-error .rd-btn:hover {
+  background: #8e0000;
 }
 
 /* ── INKJET PRINT (LANDSCAPE) ── */

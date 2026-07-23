@@ -15,6 +15,7 @@ import {
   IconShieldLock,
   IconSearch,
 } from "@tabler/icons-vue";
+import { formatTanggal, formatTanggalJam } from "@/utils/dateFormat";
 
 const router = useRouter();
 const toast = useToast();
@@ -285,30 +286,6 @@ const submitPin = async () => {
 };
 
 // Formatting helpers
-const formatTgl = (v: string) => {
-  if (!v) return "-";
-
-  // YYYY-MM-DD langsung split
-  if (/^\d{4}-\d{2}-\d{2}$/.test(v)) {
-    const [y, m, d] = v.split("-");
-    return `${d}-${m}-${y}`;
-  }
-
-  const d = new Date(v);
-
-  if (isNaN(d.getTime())) return "-";
-
-  return `${String(d.getDate()).padStart(2, "0")}-${String(d.getMonth() + 1).padStart(2, "0")}-${d.getFullYear()}`;
-};
-const formatWaktu = (v: string) => {
-  if (!v) return "-";
-
-  const d = new Date(v);
-
-  if (isNaN(d.getTime())) return "-";
-
-  return `${String(d.getDate()).padStart(2, "0")}-${String(d.getMonth() + 1).padStart(2, "0")}-${d.getFullYear()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-};
 const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
 </script>
 
@@ -382,15 +359,17 @@ const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
       </div>
     </template>
 
-    <template #item.Tanggal="{ item }">{{ formatTgl(item.Tanggal) }}</template>
+    <template #item.Tanggal="{ item }">{{
+      formatTanggal(item.Tanggal)
+    }}</template>
     <template #item.Comm_Delivery="{ item }">{{
-      formatTgl(item.Comm_Delivery)
+      formatTanggal(item.Comm_Delivery)
     }}</template>
     <template #item.TglClose="{ item }">{{
-      formatTgl(item.TglClose)
+      formatTanggal(item.TglClose)
     }}</template>
     <template #item.Created="{ item }">{{
-      formatWaktu(item.Created)
+      formatTanggalJam(item.Created)
     }}</template>
 
     <template #item.QtyPO="{ item }">{{ numFmt(item.QtyPO) }}</template>

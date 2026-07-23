@@ -10,6 +10,7 @@ import {
   IconLockOpen,
   IconFileExport,
 } from "@tabler/icons-vue";
+import { formatTanggal } from "@/utils/dateFormat";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface BrowseItem {
@@ -386,6 +387,13 @@ fetchData();
         {{ item.Close === "Y" ? "Closed" : "Open" }}
       </v-chip>
     </template>
+    <template #item.TglAwal="{ item }">
+      {{ formatTanggal(item.TglAwal) }}
+    </template>
+
+    <template #item.TglAkhir="{ item }">
+      {{ formatTanggal(item.TglAkhir) }}
+    </template>
     <template #item.JumlahOrder="{ item }">{{
       fmt(item.JumlahOrder)
     }}</template>
@@ -465,7 +473,7 @@ fetchData();
                   >
                     <td class="mono">{{ d.NomorSPK }}</td>
                     <td>{{ d.NamaSPK || "—" }}</td>
-                    <td>{{ d.TglJadwal }}</td>
+                    <td>{{ formatTanggal(d.TglJadwal) }}</td>
                     <td class="tr">{{ fmt(d.Wip) }}</td>
                     <td class="tr">{{ fmt(d.QtyPo) }}</td>
                     <td class="tr fw">{{ fmt(d.QtyJadwal) }}</td>
@@ -498,7 +506,7 @@ fetchData();
                   <tr v-for="(d, i) in detailCache[item.Nomor].sewing" :key="i">
                     <td class="mono">{{ d.NomorSPK }}</td>
                     <td>{{ d.NamaSPK || "—" }}</td>
-                    <td>{{ d.TglJadwal }}</td>
+                    <td>{{ formatTanggal(d.TglJadwal) }}</td>
                     <td class="tr">{{ fmt(d.Wip) }}</td>
                     <td class="tr">{{ fmt(d.QtyPo) }}</td>
                     <td class="tr fw">{{ fmt(d.QtyJadwal) }}</td>
@@ -529,7 +537,7 @@ fetchData();
                   <tr v-for="(d, i) in detailCache[item.Nomor].koli" :key="i">
                     <td class="mono">{{ d.NomorSPK }}</td>
                     <td>{{ d.NamaSPK || "—" }}</td>
-                    <td>{{ d.TglJadwal }}</td>
+                    <td>{{ formatTanggal(d.TglJadwal) }}</td>
                     <td class="tr">{{ fmt(d.Wip) }}</td>
                     <td class="tr">{{ fmt(d.QtyPo) }}</td>
                     <td class="tr fw">{{ fmt(d.QtyJadwal) }}</td>

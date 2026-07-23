@@ -9,6 +9,7 @@ import { stbjService as svc } from "@/services/garmen/stbjService";
 import { exportExcelSingle } from "@/utils/excelExport";
 import { IconClipboardCheck, IconSearch, IconRefresh } from "@tabler/icons-vue";
 import GudangJadiSearchModal from "@/components/lookups/GudangJadiSearchModal.vue";
+import { formatTanggal } from "@/utils/dateFormat";
 
 const MENU_ID = "105";
 const router = useRouter();
@@ -28,11 +29,6 @@ const firstOfMonth = () => {
     new Date().toLocaleString("en-US", { timeZone: "Asia/Jakarta" }),
   );
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
-};
-const fmtDate = (s: string) => {
-  if (!s) return "-";
-  const d = new Date(s);
-  return `${String(d.getDate()).padStart(2, "0")}-${String(d.getMonth() + 1).padStart(2, "0")}-${d.getFullYear()}`;
 };
 const num = (v: any, d = 0) =>
   Number(v || 0).toLocaleString("id-ID", {
@@ -401,11 +397,11 @@ const totalRows = computed(() => items.value?.length ?? 0);
     </template>
 
     <template #item.Tanggal="{ item }">
-      {{ fmtDate(item.Tanggal) }}
+      {{ formatTanggal(item.Tanggal) }}
     </template>
 
     <template #item.TglTerima="{ item }">
-      {{ item.TglTerima ? fmtDate(item.TglTerima) : "-" }}
+      {{ item.TglTerima ? formatTanggal(item.TglTerima) : "-" }}
     </template>
 
     <template #item.NomorTerima="{ item }">

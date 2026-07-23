@@ -20,6 +20,29 @@ const isReady = ref(false);
 const isLoading = ref(true);
 const printerName = ref("192.168.1.41");
 const isPrinting = ref(false);
+const printingMode = ref<"standart" | "full" | null>(null);
+// ── Dialog hasil aksi (pengganti alert()) ──
+const resultDialog = ref<{
+  show: boolean;
+  type: "success" | "error";
+  title: string;
+  message: string;
+}>({
+  show: false,
+  type: "success",
+  title: "",
+  message: "",
+});
+const showResult = (
+  type: "success" | "error",
+  title: string,
+  message: string,
+) => {
+  resultDialog.value = { show: true, type, title, message };
+};
+const closeResult = () => {
+  resultDialog.value.show = false;
+};
 
 const doPrint = () => window.print();
 const doClose = () => window.close();
@@ -50,7 +73,27 @@ const paginatedDetails = computed(() => {
 });
 
 // ── Format helpers ────────────────────────────────────────────────────
-const num = (v: any) => Number(v || 0).toLocaleString("id-ID");
+// ✅ FIX: sebelumnya pakai Number(v).toLocaleString("id-ID"), tapi di server
+// (Node.js tanpa full-ICU) locale "id-ID" fallback ke default en-US
+// (koma jadi pemisah ribuan). Jadi diganti formatter manual biar gak
+// gantung ketersediaan locale — titik = ribuan, koma = desimal (kalau ada).
+const num = (v: any) => {
+  const n = Number(v || 0);
+  const neg = n < 0;
+  const abs = Math.abs(n);
+  const hasDecimal = Math.round(abs * 100) % 100 !== 0;
+  const fixed = abs.toFixed(hasDecimal ? 2 : 0);
+  const [intPartRaw, decPart] = fixed.split(".");
+  let out = "";
+  let cnt = 0;
+  for (let i = intPartRaw.length - 1; i >= 0; i--) {
+    out = intPartRaw[i] + out;
+    cnt++;
+    if (cnt % 3 === 0 && i !== 0) out = "," + out;
+  }
+  if (decPart) out += "." + decPart;
+  return (neg ? "-" : "") + out;
+};
 
 const padR = (s: string, n: number) =>
   (s || "").toString().padEnd(n, " ").substring(0, n);
@@ -61,6 +104,19 @@ const padC = (s: string, n: number) => {
   if (str.length >= n) return str.substring(0, n);
   const p = Math.floor((n - str.length) / 2) + str.length;
   return str.padStart(p, " ").padEnd(n, " ");
+};
+const fmtDateID = (v: string) => {
+  if (!v) return "";
+  const raw = String(v).split("T")[0];
+  const parts = raw.split("-");
+  if (parts.length !== 3) return raw;
+  // ISO (YYYY-MM-DD) — segmen pertama 4 digit
+  if (parts[0].length === 4) {
+    const [y, m, d] = parts;
+    return `${d}/${m}/${y}`;
+  }
+  // Sudah format Indonesia (DD-MM-YYYY) — tinggal ganti separator jadi slash
+  return parts.join("/");
 };
 
 const wrapText = (text: string, maxWidth: number): string[] => {
@@ -133,50 +189,57 @@ const formatPrintedAt = () => {
 };
 
 // ── Generate TXT (Dot Matrix) — sesuai Delphi doslipINV2 ──────────────
-// ── Konstanta kertas dot matrix — 21cm (lebar cetak) x 27,8cm (panjang feed) ──
-// Lebar 21cm ÷ 2,54 = 8,27" → pada pitch NORMAL 10 CPI = ~80 karakter/baris.
-// (Kalau printer di-set condensed/17 CPI, ganti PAGE_WIDTH ke 132 — tapi
-// default di sini asumsikan pitch normal karena itu yang paling umum.)
-const PAGE_WIDTH = 80;
+const PAGE_WIDTH = 136;
 // Panjang 27,8cm ÷ 2,54 = 10,94" → pada 6 LPI (baris/inch) standar = ~65 baris.
 const PAGE_LINES = 65;
+
+// ✅ Garis solid (bukan putus-putus): "-" ada gap antar karakter di dot
+// matrix, underscore ("_") nyambung jadi garis lurus tanpa putus.
+const LINE = "_".repeat(PAGE_WIDTH);
+
+// Lebar kolom footer (Di bayarkan ke / Dibuat oleh / Mengetahui).
+// Sebelumnya 42/47/47 bikin blok TTD kemepetan sama info rekening.
+// Digeser: kolom rekening dipersempit + kolom TTD digeser ke kanan.
+const COL_BAYAR = 58;
+const COL_TTD1 = 39;
+const COL_TTD2 = 39; // 58+39+39 = 136
 
 const generateTxt = (mode: "standart" | "full") => {
   const h = header.value;
   const rows = detail.value;
   const t = totals.value;
-  const LINE = "-".repeat(PAGE_WIDTH);
   const isFull = mode === "full";
 
   // ── Bangun blok header (dipakai ulang tiap halaman utk mode standart) ──
   const buildHeaderLines = (): string[] => {
     const cAlamat = h.inv_cus_alamat || h.cus_alamat || "";
-    const alamatLines = wrapText(cAlamat, 34);
+    const halfL = 67;
+    const halfR = 68; // halfL + 1(spasi) + halfR = 136
+    const alamatLines = wrapText(cAlamat, halfR - 12);
     const lines: string[] = [];
     lines.push(padR(h.perush_nama || "", PAGE_WIDTH));
     lines.push(padR(h.perush_alamat || "", PAGE_WIDTH));
-    lines.push(padR(h.perush_telp || "", PAGE_WIDTH));
+    // ✅ Nomor telepon perusahaan di-hide dari cetakan
     lines.push("");
     lines.push(padC("I N V O I C E", PAGE_WIDTH));
     lines.push("");
     lines.push(
-      `${padR("Nomor      : " + (h.inv_nomor || ""), 40)}${padR("Customer : " + (h.cus_nama || ""), 40)}`,
+      `${padR("Nomor      : " + (h.inv_nomor || ""), halfL)} ${padR("Customer : " + (h.cus_nama || ""), halfR)}`,
     );
     lines.push(
-      `${padR("Tanggal    : " + (h.inv_tanggal_fmt || ""), 40)}${padR(alamatLines[0] || "", 40)}`,
+      `${padR("Tanggal    : " + fmtDateID(h.inv_tanggal_fmt), halfL)} ${padR(alamatLines[0] || "", halfR)}`,
     );
     lines.push(
-      `${padR("Keterangan : " + (h.inv_keterangan || ""), 40)}${padR(alamatLines[1] || "", 40)}`,
+      `${padR("Keterangan : " + (h.inv_keterangan || ""), halfL)} ${padR(alamatLines[1] || "", halfR)}`,
     );
     for (let i = 2; i < alamatLines.length; i++) {
-      lines.push(`${padR("", 40)}${padR(alamatLines[i], 40)}`);
+      lines.push(`${padR("", halfL)} ${padR(alamatLines[i], halfR)}`);
     }
-    lines.push(
-      `${padR("", 40)}${padR((h.cus_telp || "") + "/" + (h.cus_fax || ""), 40)}`,
-    );
+    // ✅ Nomor telp/fax customer di-hide dari cetakan
     lines.push(LINE);
+    lines.push("");
     lines.push(
-      `${padR("No", 3)} ${padR("SPK", 10)} ${padR("Nama", 24)} ${padR("Ukuran", 13)} ${padL("Jumlah", 8)} ${padL("Harga", 10)} ${padL("Total", 10)}`,
+      `${padC("No", 3)} ${padC("SPK", 16)} ${padC("Nama", 46)} ${padC("Ukuran", 22)} ${padC("Jumlah", 12)} ${padC("Harga", 16)} ${padC("Total", 16)}`,
     );
     lines.push(LINE);
     return lines;
@@ -185,39 +248,41 @@ const generateTxt = (mode: "standart" | "full") => {
   const buildFooterLines = (): string[] => {
     const lines: string[] = [];
     lines.push(LINE);
-    const TERBILANG = terbilang(t.grandTotal) + " Rupiah";
-    const tb1 = TERBILANG.substring(0, 28);
-    const tb2 = TERBILANG.length > 28 ? TERBILANG.substring(28, 56) : "";
+    // ✅ Terbilang huruf kapital semua
+    const TERBILANG = (terbilang(t.grandTotal) + " Rupiah").toUpperCase();
+    const tb1 = TERBILANG.substring(0, 48);
+    const tb2 = TERBILANG.length > 48 ? TERBILANG.substring(48, 96) : "";
     lines.push(
-      `${padR("Terbilang : " + tb1, 55)} ${padR("Total", 12)}: ${padL(num(t.totalBarang), 12)}`,
+      `${padR("Terbilang : " + tb1, 95)} ${padR("Total", 14)}: ${padL(num(t.totalBarang), 20)}`,
     );
     const pphLabel = h.inv_pph === "PPh" ? "PPh" : "Disc";
     lines.push(
-      `${padR(tb2, 55)} ${padR(pphLabel, 12)}: ${padL(num(t.disc), 12)}`,
+      `${padR(tb2, 95)} ${padR(pphLabel, 14)}: ${padL(num(t.disc), 20)}`,
     );
     lines.push(
-      `${padR("", 55)} ${padR("Total PPN", 12)}: ${padL(num(t.totalPpn), 12)}`,
+      `${padR("", 95)} ${padR("Total PPN", 14)}: ${padL(num(t.totalPpn), 20)}`,
     );
     lines.push(
-      `${padR("", 55)} ${padR("Grand Total", 12)}: ${padL(num(t.grandTotal), 12)}`,
+      `${padR("", 95)} ${padR("Grand Total", 14)}: ${padL(num(t.grandTotal), 20)}`,
     );
     lines.push(
-      `${padR("", 55)} ${padR("Uang Muka", 12)}: ${padL(num(t.uangMuka), 12)}`,
+      `${padR("", 95)} ${padR("Uang Muka", 14)}: ${padL(num(t.uangMuka), 20)}`,
     );
     lines.push(
-      `${padR("", 55)} ${padR("Nilai Piutang", 12)}: ${padL(num(t.nilaiPiutang), 12)}`,
+      `${padR("", 95)} ${padR("Nilai Piutang", 14)}: ${padL(num(t.nilaiPiutang), 20)}`,
     );
-    lines.push("");
-    lines.push(
-      `${padR("Di bayarkan ke", 25)}${padR("Dibuat oleh,", 28)}${padR("Mengetahui,", 27)}`,
-    );
-    lines.push(padR("REKENING : " + (h.inv_rekening || ""), 50));
-    lines.push(padR("ATAS NAMA: " + (h.perushd_atasnama || ""), 50));
-    lines.push(padR("BANK     : " + (h.perushd_bank || ""), 50));
     lines.push("");
     lines.push("");
     lines.push(
-      `${padR("", 25)}${padR("(               )", 28)}${padR("(               )", 27)}`,
+      `${padR("Di bayarkan ke", COL_BAYAR)}${padR("Dibuat oleh,", COL_TTD1)}${padR("Mengetahui,", COL_TTD2)}`,
+    );
+    lines.push(padR("REKENING : " + (h.inv_rekening || ""), COL_BAYAR));
+    lines.push(padR("ATAS NAMA: " + (h.perushd_atasnama || ""), COL_BAYAR));
+    lines.push(padR("BANK     : " + (h.perushd_bank || ""), COL_BAYAR));
+    lines.push("");
+    lines.push("");
+    lines.push(
+      `${padR("", COL_BAYAR)}${padR("(               )", COL_TTD1)}${padR("(               )", COL_TTD2)}`,
     );
     return lines;
   };
@@ -225,32 +290,33 @@ const generateTxt = (mode: "standart" | "full") => {
   const headerLines = buildHeaderLines();
   const footerLines = buildFooterLines();
   const dataLineOf = (r: any, lineNum: number) =>
-    `${padR(String(lineNum), 3)} ${padR(r.invd_spk_nomor || "", 10)} ${padR(r.nama_barang || "", 24)} ${padR(r.invd_ukuran || "", 13)} ${padL(num(r.invd_jumlah), 8)} ${padL(num(r.invd_harga), 10)} ${padL(num(Number(r.invd_jumlah) * Number(r.invd_harga)), 10)}`;
+    `${padR(String(lineNum), 3)} ${padR(r.invd_spk_nomor || "", 16)} ${padR(r.nama_barang || "", 46)} ${padR(r.invd_ukuran || "", 22)} ${padL(num(r.invd_jumlah), 12)} ${padL(num(r.invd_harga), 16)} ${padL(num(Number(r.invd_jumlah) * Number(r.invd_harga)), 16)}`;
 
   const allPages: string[][] = [];
 
   if (isFull) {
-    // Mode Full: semua baris data dalam 1 "halaman logis", tapi kalau
-    // total (header+data+footer) melebihi kapasitas fisik, sisipkan
-    // page-break SEBELUM footer agar footer tidak terpotong di tengah
-    // (mulai bersih di halaman baru), bukan nyambung asal-asalan.
     const dataLines = rows.map((r: any, i: number) => dataLineOf(r, i + 1));
     const bodyLines = [...headerLines, ...dataLines, LINE];
-
     if (bodyLines.length + footerLines.length <= PAGE_LINES) {
-      allPages.push([...bodyLines, ...footerLines]);
+      // ✅ Footer didorong ke bawah halaman fisik — blank lines disisipin
+      // SEBELUM footer. PAGE_LINES perlu dikalibrasi dari hitungan fisik
+      // biar gap-nya wajar (jangan sampai kegedean kayak sebelumnya).
+      const pad = Math.max(
+        0,
+        PAGE_LINES - bodyLines.length - footerLines.length,
+      );
+      allPages.push([...bodyLines, ...Array(pad).fill(""), ...footerLines]);
     } else {
-      // Body saja tidak cukup ruang utk footer di halaman yang sama —
-      // isi sisa halaman ini dengan baris kosong, lalu footer mulai
-      // bersih di halaman berikutnya.
       const padToPage = Math.max(0, PAGE_LINES - bodyLines.length);
       allPages.push([...bodyLines, ...Array(padToPage).fill("")]);
-      allPages.push([...footerLines]);
+      // Footer di halaman ke-2 juga tetap didorong ke bawah
+      const footerPad = Math.max(0, PAGE_LINES - footerLines.length);
+      allPages.push([...Array(footerPad).fill(""), ...footerLines]);
     }
   } else {
     // Mode Standart: xRecord baris per halaman fisik, tiap halaman
     // SELALU genap tinggi PAGE_LINES (header+data+padding kosong),
-    // footer HANYA di halaman terakhir.
+    // footer HANYA di halaman terakhir & tetap didorong ke bawah.
     const maxDataLinesPerPage = Math.max(
       1,
       PAGE_LINES - headerLines.length - 1, // -1 utk LINE penutup data
@@ -272,18 +338,20 @@ const generateTxt = (mode: "standart" | "full") => {
       const page = [...headerLines, ...dataLines];
 
       if (isLastChunk) {
-        // Genapkan area data ke xRecord baris (blank), baru footer.
         const blankPad = Math.max(0, xRecord - chunk.length);
         page.push(...Array(blankPad).fill(""));
         page.push(LINE);
-        // Kalau footer masih tidak muat di sisa halaman ini, dorong
-        // ke halaman baru yang bersih.
         if (page.length + footerLines.length <= PAGE_LINES) {
-          page.push(...footerLines);
+          const extraPad = Math.max(
+            0,
+            PAGE_LINES - page.length - footerLines.length,
+          );
+          page.push(...Array(extraPad).fill(""), ...footerLines);
           allPages.push(page);
         } else {
           allPages.push(page);
-          allPages.push([...footerLines]);
+          const footerPad = Math.max(0, PAGE_LINES - footerLines.length);
+          allPages.push([...Array(footerPad).fill(""), ...footerLines]);
         }
       } else {
         page.push(LINE);
@@ -299,6 +367,7 @@ const generateTxt = (mode: "standart" | "full") => {
 
 const printQZ = async (pilihMode: "standart" | "full") => {
   isPrinting.value = true;
+  printingMode.value = pilihMode;
   try {
     if (!qz.websocket.isActive()) {
       try {
@@ -306,11 +375,13 @@ const printQZ = async (pilihMode: "standart" | "full") => {
         await qz.websocket.connect({ retries: 5, delay: 1 });
       } catch (err: any) {
         console.error("Detail Error Koneksi QZ:", err);
-        alert(
-          "Gagal terhubung ke aplikasi QZ Tray di komputer ini. Buka Inspect Element -> tab Console untuk melihat detail error.",
+        showResult(
+          "error",
+          "Gagal Terhubung",
+          "Gagal terhubung ke aplikasi QZ Tray di komputer ini. Pastikan QZ Tray sudah berjalan di background.",
         );
         isPrinting.value = false;
-        return; // Hentikan proses cetak
+        return;
       }
     }
 
@@ -319,17 +390,27 @@ const printQZ = async (pilihMode: "standart" | "full") => {
 
     const data = [
       "\x1B\x40", // ESC @: Inisialisasi/Reset printer
+      "\x1B\x6C\x00", // ESC l 0: Set left margin = kolom 0
       { type: "raw", format: "plain", data: content },
       "\x0C", // Form Feed: Eject halaman
     ];
 
     await qz.print(config, data);
-    alert(`Berhasil dikirim ke printer (Mode: ${pilihMode})!`);
+    showResult(
+      "success",
+      "Berhasil Dikirim",
+      `Data berhasil dikirim ke printer (Mode: ${pilihMode}).`,
+    );
   } catch (error: any) {
     console.error("QZ Error:", error);
-    alert("Gagal cetak via QZ Tray: " + error.message);
+    showResult(
+      "error",
+      "Gagal Cetak",
+      "Gagal cetak via QZ Tray: " + error.message,
+    );
   } finally {
     isPrinting.value = false;
+    printingMode.value = null;
   }
 };
 
@@ -391,7 +472,11 @@ const fetchData = async () => {
       setTimeout(() => window.print(), 600);
     }
   } catch {
-    alert("Gagal memuat data cetak.");
+    showResult(
+      "error",
+      "Gagal Memuat",
+      "Gagal memuat data cetak. Silakan coba muat ulang halaman.",
+    );
   } finally {
     isLoading.value = false;
   }
@@ -411,7 +496,13 @@ onMounted(() => {
       <p>Menyiapkan data cetak...</p>
     </div>
 
-    <div v-else-if="isReady" class="dm-card">
+    <div v-else-if="isReady" class="dm-card" style="position: relative">
+      <div v-if="isPrinting" class="dm-loading-overlay">
+        <div class="spinner"></div>
+        <p style="margin: 0; font-weight: 600; color: #1565c0">
+          Mengirim ke printer...
+        </p>
+      </div>
       <div class="dm-icon">🖨️</div>
       <h2>Cetak Invoice Dot Matrix</h2>
       <p style="margin-bottom: 12px">
@@ -452,14 +543,20 @@ onMounted(() => {
           @click="printQZ('standart')"
           :disabled="isPrinting"
         >
-          🚀 Standart<br /><span>Maks 31 baris/halaman</span>
+          <span v-if="printingMode === 'standart'">⏳ Mengirim...</span>
+          <template v-else>
+            🚀 Standart<br /><span>Maks 31 baris/halaman</span>
+          </template>
         </button>
         <button
           class="dm-mode-btn dm-mode-full"
           @click="printQZ('full')"
           :disabled="isPrinting"
         >
-          🚀 Full<br /><span>Semua dalam 1 halaman</span>
+          <span v-if="printingMode === 'full'">⏳ Mengirim...</span>
+          <template v-else>
+            🚀 Full<br /><span>Semua dalam 1 halaman</span>
+          </template>
         </button>
       </div>
 
@@ -646,6 +743,20 @@ onMounted(() => {
       </div>
     </template>
   </div>
+
+  <!-- ── Dialog hasil aksi (pengganti alert()) ── -->
+  <Teleport to="body">
+    <div v-if="resultDialog.show" class="rd-backdrop" @click.self="closeResult">
+      <div class="rd-card" :class="`rd-${resultDialog.type}`">
+        <div class="rd-icon">
+          {{ resultDialog.type === "success" ? "✅" : "⚠️" }}
+        </div>
+        <div class="rd-title">{{ resultDialog.title }}</div>
+        <div class="rd-message">{{ resultDialog.message }}</div>
+        <button class="rd-btn" @click="closeResult">OK</button>
+      </div>
+    </div>
+  </Teleport>
 </template>
 
 <style scoped>
@@ -656,7 +767,7 @@ onMounted(() => {
   align-items: center;
   min-height: 100vh;
   background: #f5f5f5;
-  font-family: "Segoe UI", Arial, sans-serif;
+  font-family: "Consolas", "Courier New", monospace;
   padding: 20px;
   box-sizing: border-box;
 }
@@ -722,6 +833,18 @@ onMounted(() => {
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
   margin: 0 auto 16px;
+}
+.dm-loading-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.92);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  border-radius: 8px;
+  z-index: 10;
 }
 @keyframes spin {
   to {
@@ -974,6 +1097,83 @@ onMounted(() => {
 }
 .ttd-paren {
   font-size: 8pt;
+}
+
+/* ── Result Dialog (pengganti alert()) ── */
+.rd-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  animation: rd-fade-in 0.15s ease;
+}
+@keyframes rd-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.rd-card {
+  background: white;
+  border-radius: 10px;
+  padding: 28px 30px;
+  max-width: 360px;
+  width: 90%;
+  text-align: center;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.25);
+  animation: rd-pop-in 0.18s ease;
+}
+@keyframes rd-pop-in {
+  from {
+    transform: scale(0.92);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+.rd-icon {
+  font-size: 40px;
+  margin-bottom: 10px;
+}
+.rd-title {
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 6px;
+  color: #212121;
+}
+.rd-message {
+  font-size: 13px;
+  color: #555;
+  line-height: 1.5;
+  margin-bottom: 20px;
+}
+.rd-btn {
+  padding: 9px 28px;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  color: white;
+}
+.rd-success .rd-btn {
+  background: #2e7d32;
+}
+.rd-success .rd-btn:hover {
+  background: #1b5e20;
+}
+.rd-error .rd-btn {
+  background: #c62828;
+}
+.rd-error .rd-btn:hover {
+  background: #8e0000;
 }
 
 @media print {

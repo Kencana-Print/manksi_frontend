@@ -8,6 +8,7 @@ import { useBrowse } from "@/composables/useBrowse";
 import { bpbNonBahanService } from "@/services/garmen/bpbNonBahanService";
 import { IconPackage, IconFileExport, IconShieldLock } from "@tabler/icons-vue";
 import * as XLSX from "xlsx";
+import { formatTanggal, formatTanggalJam } from "@/utils/dateFormat";
 
 const router = useRouter();
 const toast = useToast();
@@ -172,7 +173,7 @@ const onExportDetail = () => {
       exportData.push({
         Nomor: master.Nomor,
         Jenis: master.Jenis,
-        Tanggal: formatTgl(master.Tanggal),
+        Tanggal: formatTanggal(master.Tanggal),
         "No. Minta": master.NoMinta,
         "No. PO": master.NoPO,
         Voucher: master.VoucherPembelian,
@@ -192,7 +193,7 @@ const onExportDetail = () => {
         exportData.push({
           Nomor: master.Nomor,
           Jenis: master.Jenis,
-          Tanggal: formatTgl(master.Tanggal),
+          Tanggal: formatTanggal(master.Tanggal),
           "No. Minta": master.NoMinta,
           "No. PO": master.NoPO,
           Voucher: master.VoucherPembelian,
@@ -250,16 +251,6 @@ const getNomorStyle = (ngedit: string) => {
   if (ngedit === "TOLAK") return "background-color: #d32f2f; color: #fff;"; // Merah
   if (ngedit === "ACC") return "background-color: #388e3c; color: #fff;"; // Hijau
   return "";
-};
-
-const formatTgl = (val: string) => {
-  if (!val) return "";
-  if (/^\d{4}-\d{2}-\d{2}$/.test(val)) {
-    const [y, m, d] = val.split("-");
-    return `${d}-${m}-${y}`;
-  }
-  const d = new Date(val);
-  return `${String(d.getDate()).padStart(2, "0")}-${String(d.getMonth() + 1).padStart(2, "0")}-${d.getFullYear()}`;
 };
 
 const formatQty = (val: any) => {
@@ -406,7 +397,13 @@ const formatQty = (val: any) => {
       </div>
     </template>
 
-    <template #item.Tanggal="{ item }">{{ formatTgl(item.Tanggal) }}</template>
+    <template #item.Tanggal="{ item }">
+      {{ formatTanggal(item.Tanggal) }}
+    </template>
+
+    <template #item.Created="{ item }">
+      {{ formatTanggalJam(item.Created) }}
+    </template>
 
     <template #detail="{ item }">
       <div class="det-wrap">

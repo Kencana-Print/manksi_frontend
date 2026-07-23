@@ -13,6 +13,7 @@ import {
   IconShieldLock,
 } from "@tabler/icons-vue";
 import * as XLSX from "xlsx";
+import { formatTanggal } from "@/utils/dateFormat";
 
 const router = useRouter();
 const toast = useToast();
@@ -225,7 +226,7 @@ const onExportDetail = () => {
     exportData.push({
       Nomor: master.Nomor,
       Jenis: master.Jenis,
-      Tanggal: formatTgl(master.Tanggal),
+      Tanggal: formatTanggal(master.Tanggal),
       "No Minta": master.NoMinta,
       Supplier: master.Supplier,
       Keterangan: master.Keterangan,
@@ -307,16 +308,6 @@ const getStatusColor = (status: string) => {
   if (!status) return "text-red font-weight-bold";
   if (status === "PROSES") return "text-blue font-weight-bold";
   return "font-weight-bold"; // CLOSE
-};
-
-const formatTgl = (val: string) => {
-  if (!val) return "";
-  if (/^\d{4}-\d{2}-\d{2}$/.test(val)) {
-    const [y, m, d] = val.split("-");
-    return `${d}-${m}-${y}`;
-  }
-  const d = new Date(val);
-  return `${String(d.getDate()).padStart(2, "0")}-${String(d.getMonth() + 1).padStart(2, "0")}-${d.getFullYear()}`;
 };
 
 const formatQty = (val: any) => {
@@ -503,7 +494,9 @@ const rowPropsFn = (data: any) => {
       </div>
     </template>
 
-    <template #item.Tanggal="{ item }">{{ formatTgl(item.Tanggal) }}</template>
+    <template #item.Tanggal="{ item }">
+      {{ formatTanggal(item.Tanggal) }}
+    </template>
 
     <template #item.Status="{ item }">
       <span :class="getStatusColor(item.Status)">{{ item.Status }}</span>

@@ -14,6 +14,7 @@ import {
   IconShieldLock,
   IconSearch,
 } from "@tabler/icons-vue";
+import { formatTanggal } from "@/utils/dateFormat";
 
 interface ExportDetailRow {
   "No. BPB": string;
@@ -238,7 +239,7 @@ const exportDetail = async () => {
           allDetails.push({
             "No. BPB": item.Nomor,
             "No. PO": item.Nomor_PO || "-",
-            "Tanggal BPB": formatTgl(item.Tanggal),
+            "Tanggal BPB": formatTanggal(item.Tanggal),
             Gudang: item.Gudang,
             Supplier: item.Supplier || "-",
             "Kode Bahan": d.Kode,
@@ -307,11 +308,6 @@ const submitPin = async () => {
 };
 
 // Formatting helpers
-const formatTgl = (v: string) => {
-  if (!v) return "-";
-  const d = new Date(v);
-  return `${String(d.getDate()).padStart(2, "0")}-${String(d.getMonth() + 1).padStart(2, "0")}-${d.getFullYear()}`;
-};
 const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
 </script>
 
@@ -412,10 +408,13 @@ const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
       </div>
     </template>
 
-    <template #item.Tanggal="{ item }">{{ formatTgl(item.Tanggal) }}</template>
-    <template #item.Jatuhtempo="{ item }">{{
-      formatTgl(item.Jatuhtempo)
-    }}</template>
+    <template #item.Tanggal="{ item }">
+      {{ formatTanggal(item.Tanggal) }}
+    </template>
+
+    <template #item.Jatuhtempo="{ item }">
+      {{ formatTanggal(item.Jatuhtempo) }}
+    </template>
 
     <!-- Detail Expand (Lazy Load) -->
     <template #detail="{ item }">

@@ -12,6 +12,7 @@ import {
   IconFileExport,
   IconListDetails,
 } from "@tabler/icons-vue";
+import { formatTanggal, formatTanggalJam } from "@/utils/dateFormat";
 
 const router = useRouter();
 const toast = useToast();
@@ -304,6 +305,12 @@ const onExportDetail = async () => {
     <!-- ── Custom cell rendering ── -->
     <template #item.QtyKirim="{ item }">
       {{ num(item.QtyKirim) }}
+    </template>
+    <template #item.Tanggal="{ item }">
+      {{ formatTanggal(item.Tanggal) }}
+    </template>
+    <template #item.Created="{ item }">
+      {{ formatTanggalJam(item.Created) }}
     </template>
 
     <!-- ── Expanded detail ── -->

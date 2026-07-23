@@ -6,6 +6,7 @@ import { useBrowse } from "@/composables/useBrowse";
 import { useToast } from "vue-toastification";
 import BaseBrowse from "@/components/BaseBrowse.vue";
 import { IconCash, IconPencilOff, IconSend } from "@tabler/icons-vue";
+import { formatTanggal, formatTanggalJam } from "@/utils/dateFormat";
 
 const toast = useToast();
 const router = useRouter();
@@ -128,9 +129,12 @@ const headers = [
   },
   { title: "No. Kalkulasi", key: "NoKalkulasi", width: "130px" },
   { title: "Ket. Kalkulasi", key: "KeteranganKalkulasi", width: "150px" },
+  { title: "Kal. Created", key: "KalCreated", width: "120px" },
+  { title: "Kal. Modified", key: "KalModified", width: "120px" },
   { title: "Status", key: "Status", width: "100px" },
   { title: "Approved", key: "Approved", width: "150px", align: "center" },
   { title: "Di Apv Oleh", key: "diApvOleh", width: "120px" },
+  { title: "Created", key: "Created", width: "150px" },
 ];
 // ── Row coloring ──────────────────────────────────────────────────────
 const rowPropsFn = (data: any) => {
@@ -346,6 +350,18 @@ const submitPengajuan = async () => {
     <template #item.HargaKalkulasi="{ item }">{{
       fmtNum((item.raw || item).HargaKalkulasi)
     }}</template>
+    <template #item.Tanggal="{ item }">
+      {{ formatTanggal((item.raw || item).Tanggal) }}
+    </template>
+    <template #item.TglKalkulasi="{ item }">
+      {{ formatTanggal((item.raw || item).TglKalkulasi) }}
+    </template>
+    <template #item.Approved="{ item }">
+      {{ formatTanggalJam((item.raw || item).Approved) }}
+    </template>
+    <template #item.Created="{ item }">
+      {{ formatTanggalJam((item.raw || item).Created) }}
+    </template>
 
     <!-- Nomor dengan badge Ngedit -->
     <template #item.Nomor="{ item }">

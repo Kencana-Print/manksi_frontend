@@ -12,6 +12,7 @@ import {
   IconListDetails,
   IconTruckDelivery,
 } from "@tabler/icons-vue";
+import { formatTanggal } from "@/utils/dateFormat";
 
 const router = useRouter();
 const toast = useToast();
@@ -24,12 +25,6 @@ const todayLocal = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
 const num = (v: any) => Number(v || 0).toLocaleString("id-ID");
-const fmtDate = (v: string) => {
-  if (!v) return "-";
-  const d = new Date(v);
-  if (isNaN(d.getTime())) return v;
-  return `${String(d.getDate()).padStart(2, "0")}-${String(d.getMonth() + 1).padStart(2, "0")}-${d.getFullYear()}`;
-};
 
 // ── Filter — default hari ini s.d. hari ini ─────────────────
 const tglAwal = ref(todayLocal());
@@ -385,9 +380,11 @@ const onExportDetail = async () => {
     <template #item.QtyKirim="{ item }">
       {{ num(item.QtyKirim) }}
     </template>
-
+    <template #item.Tanggal="{ item }">
+      {{ formatTanggal(item.Tanggal) }}
+    </template>
     <template #item.TglSJ="{ item }">
-      {{ item.TglSJ ? fmtDate(item.TglSJ) : "-" }}
+      {{ formatTanggal(item.TglSJ) }}
     </template>
 
     <!-- ── Expanded detail ── -->
@@ -523,7 +520,7 @@ const onExportDetail = async () => {
               </td>
               <td>{{ item.Divisi }}</td>
               <td class="td-kode">{{ item.Nomor }}</td>
-              <td>{{ fmtDate(item.Tanggal) }}</td>
+              <td>{{ formatTanggal(item.Tanggal) }}</td>
               <td>{{ item.Gudang }}</td>
               <td>{{ item.KdCus }}</td>
               <td>{{ item.Nama }}</td>

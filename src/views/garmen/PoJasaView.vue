@@ -16,6 +16,7 @@ import {
   IconAlertTriangle,
   IconCheck,
 } from "@tabler/icons-vue";
+import { formatTanggal, formatTanggalJam } from "@/utils/dateFormat";
 
 // ── Types ──────────────────────────────────────────────────────────────
 interface PoJasaRow {
@@ -601,6 +602,15 @@ const num = (v: any, d = 0) =>
         :style="item.hapus === 'Y' ? 'color: #9e9e9e' : ''"
         >{{ item.Nomor }}</span
       >
+    </template>
+
+    <!-- Kolom Tanggal -->
+    <template #item.Tanggal="{ item }">
+      {{ formatTanggal(item.Tanggal) }}
+    </template>
+
+    <template #item.Created="{ item }">
+      {{ formatTanggalJam(item.Created) }}
     </template>
 
     <!-- ── Kolom Status ── -->

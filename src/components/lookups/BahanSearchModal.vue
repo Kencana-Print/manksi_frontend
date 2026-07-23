@@ -117,7 +117,7 @@ const selectItem = (item: any) => {
       <v-card-title class="bg-primary text-white d-flex align-center pa-2 px-4">
         <IconPuzzle :size="16" :stroke-width="1.7" color="white" class="mr-2" />
         <span class="text-subtitle-2 font-weight-bold">
-          CARI KOMPONEN {{ isBordir ? "(KHUSUS BORDIR)" : "" }}
+          CARI BAHAN/KOMPONEN {{ isBordir ? "(KHUSUS BORDIR)" : "" }}
         </span>
         <v-spacer></v-spacer>
         <v-btn

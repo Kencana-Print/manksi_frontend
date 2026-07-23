@@ -11,6 +11,7 @@ import {
   IconListDetails,
   IconEdit,
 } from "@tabler/icons-vue";
+import { formatTanggal } from "@/utils/dateFormat";
 
 const toast = useToast();
 
@@ -406,6 +407,34 @@ const saveFormStatus = async () => {
         :class="{ 'status-blue': item.Status === 'Tidak Ada Status' }"
         >{{ item.Status }}</span
       >
+    </template>
+
+    <template #item.Tanggal="{ item }">
+      {{ formatTanggal(item.Tanggal) }}
+    </template>
+
+    <template #item.Tanggal_Kirim="{ item }">
+      {{ formatTanggal(item.Tanggal_Kirim) }}
+    </template>
+
+    <template #item.Tanggal_Terima="{ item }">
+      {{ formatTanggal(item.Tanggal_Terima) }}
+    </template>
+
+    <template #item.Tanggal_Terima_Sj="{ item }">
+      {{ formatTanggal(item.Tanggal_Terima_Sj) }}
+    </template>
+
+    <template #item.Tanggal_Konfirmasi="{ item }">
+      {{ formatTanggal(item.Tanggal_Konfirmasi) }}
+    </template>
+
+    <template #item.Tanggal_Terima_1="{ item }">
+      {{ formatTanggal(item.Tanggal_Terima_1) }}
+    </template>
+
+    <template #item.Tanggal_SerahTerima="{ item }">
+      {{ formatTanggal(item.Tanggal_SerahTerima) }}
     </template>
 
     <!-- ── Expanded detail ── -->

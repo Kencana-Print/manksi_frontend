@@ -16,6 +16,7 @@ import {
   IconCircleCheck,
   IconFileDescription,
 } from "@tabler/icons-vue";
+import { formatTanggal, formatTanggalJam } from "@/utils/dateFormat";
 
 interface ExportDetailItem {
   Nomor: string;
@@ -110,13 +111,6 @@ const headers = [
   { title: "Modified", key: "Modified", width: "140px" },
   { title: "Status", key: "Status", width: "100px", align: "center" },
 ];
-
-const fmtDate = (val: string) => {
-  if (!val) return "";
-  const d = new Date(val);
-  if (isNaN(d.getTime())) return val;
-  return `${String(d.getDate()).padStart(2, "0")}-${String(d.getMonth() + 1).padStart(2, "0")}-${d.getFullYear()}`;
-};
 
 const num = (val: number) => new Intl.NumberFormat("id-ID").format(val || 0);
 
@@ -241,7 +235,7 @@ const onExportDetail = async () => {
         allDetails.push({
           Nomor: item.Nomor,
           Jenis: item.Jenis,
-          Tanggal: fmtDate(item.Tanggal),
+          Tanggal: formatTanggal(item.Tanggal),
           Keterangan: item.Keterangan,
           "Minta Ke": item.MintaKe,
           Priority: item.Priority,
@@ -549,7 +543,13 @@ const submitEstimasi = async () => {
     </template>
 
     <!-- CUSTOM CELLS -->
-    <template #item.Tanggal="{ item }">{{ fmtDate(item.Tanggal) }}</template>
+    <template #item.Tanggal="{ item }">
+      {{ formatTanggal(item.Tanggal) }}
+    </template>
+
+    <template #item.Created="{ item }">
+      {{ formatTanggalJam(item.Created) }}
+    </template>
 
     <template #item.Status="{ item }">
       {{ item.Status === "" || !item.Status ? "OPEN" : item.Status }}

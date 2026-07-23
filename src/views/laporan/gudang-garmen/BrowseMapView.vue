@@ -77,7 +77,7 @@ const formatTgl = (v: string) => {
   const s = String(v).substring(0, 10);
   const [y, m, d] = s.split("-");
   if (!y || !m || !d) return v;
-  return `${d}-${m}-${y}`;
+  return `${d}/${m}/${y}`;
 };
 const formatTglJam = (v: string) => {
   if (!v) return "-";
@@ -86,7 +86,7 @@ const formatTglJam = (v: string) => {
   const [y, m, d] = datePart.split("-");
   if (!y || !m || !d) return v;
   const jam = timePart ? timePart.substring(0, 5) : "";
-  return jam ? `${d}-${m}-${y} ${jam}` : `${d}-${m}-${y}`;
+  return jam ? `${d}-${m}-${y} ${jam}` : `${d}/${m}/${y}`;
 };
 
 // ── Export ──

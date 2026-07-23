@@ -750,6 +750,51 @@ const router = createRouter({
       },
     },
     {
+      path: "/garmen/bahan-baku/koreksi-stok",
+      name: "KoreksiStokBahanBrowse",
+      component: () => import("@/views/garmen/KoreksiStokBahanView.vue"),
+      meta: {
+        title: "Koreksi Stok Bahan",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "115",
+      },
+    },
+    {
+      path: "/garmen/bahan-baku/koreksi-stok/form",
+      name: "KoreksiStokBahanCreate",
+      component: () => import("@/views/garmen/KoreksiStokBahanFormView.vue"),
+      meta: {
+        title: "Tambah Koreksi Stok",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "115",
+        browseRoute: "KoreksiStokBahanBrowse",
+      },
+    },
+    {
+      path: "/garmen/bahan-baku/koreksi-stok/form/:nomor",
+      name: "KoreksiStokBahanEdit",
+      component: () => import("@/views/garmen/KoreksiStokBahanFormView.vue"),
+      meta: {
+        title: "Ubah Koreksi Stok",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "115",
+        browseRoute: "KoreksiStokBahanBrowse",
+      },
+    },
+    {
+      path: "/garmen/bahan-baku/koreksi-stok/print/:nomor",
+      name: "KoreksiStokBahanPrint",
+      component: () => import("@/views/garmen/KoreksiStokBahanPrintView.vue"),
+      meta: {
+        title: "Cetak Koreksi Stok",
+        layout: "BlankLayout",
+        requiresAuth: true,
+      },
+    },
+    {
       path: "/garmen/bahan-baku/bpb-bahan",
       name: "BpbBahanBrowse",
       component: () => import("@/views/garmen/BpbBahanView.vue"),
@@ -792,6 +837,88 @@ const router = createRouter({
         title: "Cetak BPB Bahan",
         layout: "BlankLayout",
         requiresAuth: true,
+      },
+    },
+    {
+      path: "/garmen/bahan-baku/retur-pembelian-bahan",
+      name: "ReturBeliBahanBrowse",
+      component: () => import("@/views/garmen/ReturBeliBahanView.vue"),
+      meta: {
+        title: "Retur Pembelian Bahan",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "55",
+      },
+    },
+    {
+      path: "/garmen/bahan-baku/retur-pembelian-bahan/form",
+      name: "ReturBeliBahanCreate",
+      component: () => import("@/views/garmen/ReturBeliBahanFormView.vue"),
+      meta: {
+        title: "Tambah Retur Pembelian Bahan",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "55",
+        browseRoute: "ReturBeliBahanBrowse",
+      },
+    },
+    {
+      path: "/garmen/bahan-baku/retur-pembelian-bahan/form/:nomor",
+      name: "ReturBeliBahanEdit",
+      component: () => import("@/views/garmen/ReturBeliBahanFormView.vue"),
+      meta: {
+        title: "Ubah Retur Pembelian Bahan",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "55",
+        browseRoute: "ReturBeliBahanBrowse",
+      },
+    },
+    {
+      path: "/garmen/bahan-baku/retur-pembelian-bahan/print/:nomor",
+      name: "ReturBeliBahanPrint",
+      component: () => import("@/views/garmen/ReturBeliBahanPrintView.vue"),
+      meta: {
+        title: "Cetak Retur Pembelian Bahan",
+        layout: "BlankLayout",
+        requiresAuth: true,
+      },
+    },
+    {
+      path: "/garmen/bahan-baku/pembuatan-barcode-bahan",
+      name: "PembuatanBarcodeBahanBrowse",
+      component: () => import("@/views/garmen/PembuatanBarcodeBahanView.vue"),
+      meta: {
+        title: "Pembuatan Barcode Bahan",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "135",
+      },
+    },
+    {
+      path: "/garmen/bahan-baku/pembuatan-barcode-bahan/form",
+      name: "PembuatanBarcodeBahanCreate",
+      component: () =>
+        import("@/views/garmen/PembuatanBarcodeBahanFormView.vue"),
+      meta: {
+        title: "Tambah Pembuatan Barcode Bahan",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "135",
+        browseRoute: "PembuatanBarcodeBahanBrowse",
+      },
+    },
+    {
+      path: "/garmen/bahan-baku/pembuatan-barcode-bahan/form/:nomor",
+      name: "PembuatanBarcodeBahanEdit",
+      component: () =>
+        import("@/views/garmen/PembuatanBarcodeBahanFormView.vue"),
+      meta: {
+        title: "Ubah Pembuatan Barcode Bahan",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "135",
+        browseRoute: "PembuatanBarcodeBahanBrowse",
       },
     },
 
@@ -2667,6 +2794,102 @@ const router = createRouter({
         layout: "DefaultLayout",
         requiresAuth: true,
         menuId: "554",
+      },
+    },
+    {
+      path: "/laporan/produksi-garmen/monitoring-kurang-prod",
+      name: "LapMonitoringKekuranganProduksi",
+      component: () =>
+        import("@/views/laporan/produksi-garmen/MonitoringKekuranganProduksiView.vue"),
+      meta: {
+        title: "Laporan Monitoring Kekurangan Produksi",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "555",
+      },
+    },
+    {
+      path: "/laporan/produksi-garmen/monitoring-kurang-prod-jahit",
+      name: "LapMonitoringKekuranganProduksiJahit",
+      component: () =>
+        import("@/views/laporan/produksi-garmen/MonitoringKekuranganProduksiJahitView.vue"),
+      meta: {
+        title: "Monitoring Kekurangan Produksi (Jahit/Line)",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "961",
+      },
+    },
+    {
+      path: "/laporan/produksi-garmen/monitoring-kurang-prodv2",
+      name: "LapMonitoringKekuranganProduksiV2",
+      component: () =>
+        import("@/views/laporan/produksi-garmen/MonitoringKekuranganProduksiV2View.vue"),
+      meta: {
+        title: "Laporan Monitoring Kekurangan Produksi v2",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "556",
+      },
+    },
+    {
+      path: "/laporan/produksi-garmen/monitoring-bhn-datang",
+      name: "LapMonitoringKedatanganBahan",
+      component: () =>
+        import("@/views/laporan/produksi-garmen/MonitoringKedatanganBahanView.vue"),
+      meta: {
+        title: "Laporan Monitoring Kedatangan Bahan",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "557",
+      },
+    },
+    {
+      path: "/laporan/produksi-garmen/outstanding-bordir",
+      name: "LapOutstandingBordir",
+      component: () =>
+        import("@/views/laporan/produksi-garmen/OutstandingBordirView.vue"),
+      meta: {
+        title: "Outstanding Bordir",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "558",
+      },
+    },
+    {
+      path: "/laporan/produksi-garmen/monitoring-bs",
+      name: "LapMonitoringBs",
+      component: () =>
+        import("@/views/laporan/produksi-garmen/MonitoringBsView.vue"),
+      meta: {
+        title: "Laporan Monitoring BS",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "563",
+      },
+    },
+    {
+      path: "/laporan/produksi-garmen/stok-by-line",
+      name: "LapStokProduksiByLine",
+      component: () =>
+        import("@/views/laporan/produksi-garmen/StokProduksibyLineView.vue"),
+      meta: {
+        title: "Stok Produksi by Line",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "564",
+      },
+    },
+    {
+      path: "/laporan/produksi-garmen/pemakaian-obat",
+      name: "LapPemakaianObat",
+      component: () =>
+        import("@/views/laporan/produksi-garmen/PemakaianObatView.vue"),
+      meta: {
+        title: "Laporan Pemakaian Obat",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "565",
       },
     },
 

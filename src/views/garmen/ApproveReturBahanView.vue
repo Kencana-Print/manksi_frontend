@@ -12,6 +12,7 @@ import {
   IconBarcode,
   IconFileSpreadsheet,
 } from "@tabler/icons-vue";
+import { formatTanggal } from "@/utils/dateFormat";
 
 const router = useRouter();
 const toast = useToast();
@@ -84,13 +85,6 @@ const getRowProps = (data: any) => {
   return {};
 };
 
-const fmtDate = (val: string) => {
-  if (!val) return "";
-  const d = new Date(val);
-  if (isNaN(d.getTime())) return val;
-  return `${String(d.getDate()).padStart(2, "0")}-${String(d.getMonth() + 1).padStart(2, "0")}-${d.getFullYear()}`;
-};
-
 const num = (val: any) =>
   Number(val || 0).toLocaleString("id-ID", { maximumFractionDigits: 2 });
 
@@ -124,9 +118,11 @@ const onExportDetail = () => {
       master.details.forEach((dtl: any) => {
         rows.push({
           "Nomor Approve": master.NoApprov || "",
-          "Tgl. Approve": master.TglApprov ? fmtDate(master.TglApprov) : "",
+          "Tgl. Approve": master.TglApprov
+            ? formatTanggal(master.TglApprov)
+            : "",
           "Nomor Retur Log": master.Nomor,
-          "Tgl. Retur": fmtDate(master.Tanggal),
+          "Tgl. Retur": formatTanggal(master.Tanggal),
           "Gudang Tujuan": master.Tujuan,
           "Gudang Dari": master.Dari,
           "Status Approve": master.NoApprov ? "SUDAH" : "BELUM",
@@ -305,12 +301,13 @@ const onCetakBarcode = (item: any) => {
     </template>
 
     <!-- Kustomisasi Tampilan Kolom Tanggal -->
-    <template #item.Tanggal="{ item }">{{
-      fmtDate(item.raw?.Tanggal || item.Tanggal)
-    }}</template>
-    <template #item.TglApprov="{ item }">{{
-      fmtDate(item.raw?.TglApprov || item.TglApprov)
-    }}</template>
+    <template #item.Tanggal="{ item }">
+      {{ formatTanggal(item.raw?.Tanggal || item.Tanggal) }}
+    </template>
+
+    <template #item.TglApprov="{ item }">
+      {{ formatTanggal(item.raw?.TglApprov || item.TglApprov) }}
+    </template>
 
     <!-- Expandable Details -->
     <template #detail="{ item }">

@@ -6,7 +6,6 @@ import BaseBrowse from "@/components/BaseBrowse.vue";
 import { useBrowse } from "@/composables/useBrowse";
 import { useAuthStore } from "@/stores/authStore";
 import api from "@/services/api";
-// Import service yang baru dibuat
 import { realisasiBarangService } from "@/services/garmen/realisasiBarangService";
 import {
   IconChecks,
@@ -15,6 +14,7 @@ import {
   IconFileSpreadsheet,
   IconPencil,
 } from "@tabler/icons-vue";
+import { formatTanggal, formatTanggalJam } from "@/utils/dateFormat";
 
 const router = useRouter();
 const toast = useToast();
@@ -117,25 +117,6 @@ const headers = [
   { title: "Usr", key: "Usr", width: "80px" },
 ];
 
-const fmtDate = (val: string) => {
-  if (!val) return "";
-  const d = new Date(val);
-  if (isNaN(d.getTime())) return val;
-  return `${String(d.getDate()).padStart(2, "0")}-${String(d.getMonth() + 1).padStart(2, "0")}-${d.getFullYear()}`;
-};
-const fmtDateTime = (val: string) => {
-  if (!val) return "";
-  const d = new Date(val);
-  if (isNaN(d.getTime())) return val;
-  const dd = String(d.getDate()).padStart(2, "0");
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const yyyy = d.getFullYear();
-  const hh = String(d.getHours()).padStart(2, "0");
-  const mi = String(d.getMinutes()).padStart(2, "0");
-  const ss = String(d.getSeconds()).padStart(2, "0");
-  return `${dd}/${mm}/${yyyy} ${hh}:${mi}:${ss}`;
-};
-
 const num = (val: number) => new Intl.NumberFormat("id-ID").format(val || 0);
 
 // Mewarnai baris berdasarkan Status PIN 5 (Sesuai CustomDrawCell Delphi)
@@ -202,7 +183,7 @@ const onExportDetail = () => {
         rows.push({
           "Nomor Realisasi": master.Nomor,
           "No Minta": master.NoMinta,
-          Tanggal: fmtDate(master.Tanggal),
+          Tanggal: formatTanggal(master.Tanggal),
           Jenis: master.Jenis,
           SPK: master.SPK,
           "Nama SPK": master.NamaSpk,
@@ -395,10 +376,12 @@ const submitAjukan = async () => {
       </v-btn>
     </template>
 
-    <template #item.Tanggal="{ item }">{{ fmtDate(item.Tanggal) }}</template>
-    <template #item.Approve="{ item }">{{
-      fmtDateTime(item.Approve)
-    }}</template>
+    <template #item.Tanggal="{ item }">
+      {{ formatTanggal(item.Tanggal) }}
+    </template>
+    <template #item.Approve="{ item }">
+      {{ formatTanggalJam(item.Approve) }}
+    </template>
     <template #item.JmlSPK="{ item }">{{ num(item.JmlSPK) }}</template>
 
     <template #detail="{ item }">

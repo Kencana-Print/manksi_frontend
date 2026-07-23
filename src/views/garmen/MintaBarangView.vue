@@ -15,6 +15,7 @@ import {
   IconFileSpreadsheet,
   IconCheck,
 } from "@tabler/icons-vue";
+import { formatTanggal } from "@/utils/dateFormat";
 
 const router = useRouter();
 const toast = useToast();
@@ -131,13 +132,6 @@ const getNomorClass = (item: any) => {
   return "";
 };
 const getApvClass = (val: string) => (val === "N" ? "apv-n" : "");
-
-const fmtDate = (val: string) => {
-  if (!val) return "";
-  const d = new Date(val);
-  if (isNaN(d.getTime())) return val;
-  return `${String(d.getDate()).padStart(2, "0")}-${String(d.getMonth() + 1).padStart(2, "0")}-${d.getFullYear()}`;
-};
 
 const expandedRows = ref<any[]>([]);
 
@@ -307,7 +301,7 @@ const onExportDetail = () => {
       master.details.forEach((dtl: any) => {
         rows.push({
           "Nomor Permintaan": master.Nomor,
-          Tanggal: fmtDate(master.Tanggal),
+          Tanggal: formatTanggal(master.Tanggal),
           Jenis: master.Jenis,
           Cabang: master.Cab,
           "Gudang Peminta": master.GdgPeminta,
@@ -526,7 +520,9 @@ const num = (val: number) => new Intl.NumberFormat("id-ID").format(val || 0);
     </template>
 
     <!-- ── Kolom custom ── -->
-    <template #item.Tanggal="{ item }">{{ fmtDate(item.Tanggal) }}</template>
+    <template #item.Tanggal="{ item }">
+      {{ formatTanggal(item.Tanggal) }}
+    </template>
     <template #item.Nomor="{ item }">
       <span :class="getNomorClass(item)">{{ item.Nomor }}</span>
     </template>
@@ -627,7 +623,7 @@ const num = (val: number) => new Intl.NumberFormat("id-ID").format(val || 0);
                     <td style="font-weight: 700; color: #00796b">
                       {{ rel.NoRealisasi }}
                     </td>
-                    <td class="tc">{{ fmtDate(rel.TglRealisasi) }}</td>
+                    <td class="tc">{{ formatTanggal(rel.TglRealisasi) }}</td>
 
                     <!-- BAGIAN INI YANG DIUBAH -->
                     <td class="tc">

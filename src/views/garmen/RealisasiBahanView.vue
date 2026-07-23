@@ -12,6 +12,7 @@ import {
   IconPrinter,
   IconFileSpreadsheet,
 } from "@tabler/icons-vue";
+import { formatTanggal } from "@/utils/dateFormat";
 
 const router = useRouter();
 const toast = useToast();
@@ -65,13 +66,6 @@ const headers = [
   { title: "Jml Order", key: "JmlOrder", width: "85px", align: "end" },
   { title: "Usr", key: "Usr", width: "70px" },
 ];
-
-const fmtDate = (val: string) => {
-  if (!val) return "";
-  const d = new Date(val);
-  if (isNaN(d.getTime())) return val;
-  return `${String(d.getDate()).padStart(2, "0")}-${String(d.getMonth() + 1).padStart(2, "0")}-${d.getFullYear()}`;
-};
 
 const num = (val: number) => new Intl.NumberFormat("id-ID").format(val || 0);
 
@@ -311,7 +305,9 @@ const getNomorClass = (item: any) => {
     </template>
 
     <!-- Custom Column Styling -->
-    <template #item.Tanggal="{ item }">{{ fmtDate(item.Tanggal) }}</template>
+    <template #item.Tanggal="{ item }">
+      {{ formatTanggal(item.Tanggal) }}
+    </template>
     <template #item.Nomor="{ item }">
       <span :class="getNomorClass(item)">{{ item.Nomor }}</span>
     </template>

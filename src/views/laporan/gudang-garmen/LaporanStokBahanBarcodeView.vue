@@ -26,6 +26,8 @@ const filterState = ref({
 const expandedRows = ref<any[]>([]);
 const detailsCache = ref<Record<string, any[]>>({});
 const loadingDetails = ref(new Set<string>());
+const mkbDetailCache = ref<Record<string, any[]>>({});
+const loadingMkbDetail = ref(new Set<string>());
 
 // Dialog Update Keterangan
 const dialogKeterangan = ref(false);
@@ -44,6 +46,12 @@ const headers = [
   { title: "IN", key: "Masuk_In", width: "100px", align: "right" },
   { title: "OUT", key: "Keluar_Out", width: "100px", align: "right" },
   { title: "STOK", key: "Stok", width: "100px", align: "right" },
+  {
+    title: "MKB BELUM REALISASI",
+    key: "MkbBelumRealisasi",
+    width: "150px",
+    align: "right",
+  },
 ];
 
 const fetchApi = async () => {
@@ -74,24 +82,26 @@ const onUpdateExpanded = async (newExpanded: any[]) => {
     (item) =>
       !detailsCache.value[item.Kode] && !loadingDetails.value.has(item.Kode),
   );
-
   for (const item of newlyExpanded) {
     const kodeBahan = item.Kode;
     loadingDetails.value.add(kodeBahan);
+    loadingMkbDetail.value.add(kodeBahan);
     try {
-      const res = await laporanStokBahanBarcodeService.getBrowseDetail(
-        kodeBahan,
-        {
+      const [resBarcode, resMkb] = await Promise.all([
+        laporanStokBahanBarcodeService.getBrowseDetail(kodeBahan, {
           endDate: filterState.value.endDate,
           janganTampilkanKosongDetail:
             filterState.value.janganTampilkanKosongDetail,
-        },
-      );
-      detailsCache.value[kodeBahan] = res.data?.data || [];
+        }),
+        laporanStokBahanBarcodeService.getMkbBelumRealisasiDetail(kodeBahan),
+      ]);
+      detailsCache.value[kodeBahan] = resBarcode.data?.data || [];
+      mkbDetailCache.value[kodeBahan] = resMkb.data?.data || [];
     } catch {
-      toast.error(`Gagal memuat rincian barcode untuk kode ${kodeBahan}`);
+      toast.error(`Gagal memuat rincian untuk kode ${kodeBahan}`);
     } finally {
       loadingDetails.value.delete(kodeBahan);
+      loadingMkbDetail.value.delete(kodeBahan);
     }
   }
 };
@@ -193,90 +203,179 @@ const fmtNum = (val: any) =>
       fmtNum(item.Keluar_Out)
     }}</template>
     <template #item.Stok="{ item }">{{ fmtNum(item.Stok) }}</template>
+    <template #item.MkbBelumRealisasi="{ item }">
+      <span
+        :class="{ 'text-mkb-outstanding': Number(item.MkbBelumRealisasi) > 0 }"
+        >{{ fmtNum(item.MkbBelumRealisasi) }}</span
+      >
+    </template>
 
     <template #detail="{ item }">
       <div class="expand-container pa-3 bg-grey-lighten-4">
-        <v-progress-linear
-          v-if="loadingDetails.has(item.Kode)"
-          indeterminate
-          color="primary"
-          height="2"
-          class="mb-2"
-        />
-
-        <div v-else class="border rounded overflow-hidden shadow-sm bg-white">
-          <div
-            class="detail-header px-3 py-1-5 bg-blue-grey-darken-3 text-white font-weight-bold d-flex align-center gap-2"
-          >
-            <IconDatabase :size="14" />
-            Rincian Barcode Bahan: {{ item.Kode }} - {{ item.Nama }}
+        <div class="detail-side-by-side">
+          <!-- ── MKB Belum Realisasi ── -->
+          <div v-if="item.MkbBelumRealisasi > 0" class="detail-col">
+            <v-progress-linear
+              v-if="loadingMkbDetail.has(item.Kode)"
+              indeterminate
+              color="orange"
+              height="2"
+              class="mb-2"
+            />
+            <div
+              v-else
+              class="border rounded overflow-hidden shadow-sm bg-white h-100"
+            >
+              <div
+                class="detail-header px-3 py-1-5 bg-orange-darken-3 text-white font-weight-bold d-flex align-center gap-2"
+              >
+                MKB Belum Realisasi: {{ item.Kode }} - {{ item.Nama }}
+              </div>
+              <div class="overflow-x-auto">
+                <table class="detail-nested-table">
+                  <thead>
+                    <tr>
+                      <th>NO MKB</th>
+                      <th class="text-center">TGL MKB</th>
+                      <th>SPK</th>
+                      <th>NAMA SPK</th>
+                      <th class="text-right">BUTUH</th>
+                      <th class="text-right">READY</th>
+                      <th class="text-right">TERIMA</th>
+                      <th class="text-right">KURANG</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr
+                      v-for="row in mkbDetailCache[item.Kode]"
+                      :key="row.NomorMkb"
+                    >
+                      <td
+                        class="font-monospace text-orange-darken-4 font-weight-medium"
+                      >
+                        {{ row.NomorMkb }}
+                      </td>
+                      <td class="text-center">{{ row.TglMkb }}</td>
+                      <td>{{ row.Spk }}</td>
+                      <td>{{ row.NamaSpk }}</td>
+                      <td class="text-right">{{ fmtNum(row.Butuh) }}</td>
+                      <td class="text-right">{{ fmtNum(row.Ready) }}</td>
+                      <td class="text-right">{{ fmtNum(row.Terima) }}</td>
+                      <td class="text-right font-weight-bold text-error">
+                        {{ fmtNum(row.Kurang) }}
+                      </td>
+                    </tr>
+                    <tr
+                      v-if="
+                        !mkbDetailCache[item.Kode] ||
+                        mkbDetailCache[item.Kode].length === 0
+                      "
+                    >
+                      <td
+                        colspan="8"
+                        class="text-center text-grey pa-3 font-italic"
+                      >
+                        Tidak ada MKB outstanding.
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
 
-          <div class="overflow-x-auto">
-            <table class="detail-nested-table">
-              <thead>
-                <tr>
-                  <th>KODE</th>
-                  <th>BARCODE</th>
-                  <th class="text-center">FIRST IN</th>
-                  <th class="text-right">IN</th>
-                  <th class="text-center">LAST OUT</th>
-                  <th class="text-right">OUT</th>
-                  <th class="text-right">STOK</th>
-                  <th>NOMOR PO / TANGGAL</th>
-                  <th>KETERANGAN</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="row in detailsCache[item.Kode]" :key="row.Barcode">
-                  <td
-                    class="font-monospace text-blue-darken-3 font-weight-medium"
-                  >
-                    {{ row.Kode || item.Kode }}
-                  </td>
-                  <td class="font-monospace">{{ row.Barcode }}</td>
-                  <td class="text-center text-grey-darken-2">
-                    {{ row.Firts_In || "-" }}
-                  </td>
-                  <td class="text-right font-weight-medium text-success">
-                    {{ fmtNum(row.IN) }}
-                  </td>
-                  <td class="text-center text-grey-darken-2">
-                    {{ row.Last_Out || "-" }}
-                  </td>
-                  <td class="text-right font-weight-medium text-error">
-                    {{ fmtNum(row.OUT) }}
-                  </td>
-                  <td
-                    class="text-right font-weight-bold"
-                    :class="row.Stok > 0 ? 'text-blue-darken-4' : 'text-grey'"
-                  >
-                    {{ fmtNum(row.Stok) }}
-                  </td>
-                  <td>{{ row.NomorPO || "-" }}</td>
-                  <td
-                    class="text-truncate text-grey-darken-2"
-                    style="max-width: 250px"
-                    :title="row.Keterangan"
-                  >
-                    {{ row.Keterangan || "-" }}
-                  </td>
-                </tr>
-                <tr
-                  v-if="
-                    !detailsCache[item.Kode] ||
-                    detailsCache[item.Kode].length === 0
-                  "
-                >
-                  <td
-                    colspan="9"
-                    class="text-center text-grey pa-3 font-italic"
-                  >
-                    Tidak ada rincian data barcode untuk spesifikasi filter ini.
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+          <!-- ── Rincian Barcode ── -->
+          <div class="detail-col">
+            <v-progress-linear
+              v-if="loadingDetails.has(item.Kode)"
+              indeterminate
+              color="primary"
+              height="2"
+              class="mb-2"
+            />
+            <div
+              v-else
+              class="border rounded overflow-hidden shadow-sm bg-white h-100"
+            >
+              <div
+                class="detail-header px-3 py-1-5 bg-blue-grey-darken-3 text-white font-weight-bold d-flex align-center gap-2"
+              >
+                <IconDatabase :size="14" />
+                Rincian Barcode: {{ item.Kode }} - {{ item.Nama }}
+              </div>
+              <div class="overflow-x-auto">
+                <table class="detail-nested-table">
+                  <thead>
+                    <tr>
+                      <th>KODE</th>
+                      <th>BARCODE</th>
+                      <th class="text-center">FIRST IN</th>
+                      <th class="text-right">IN</th>
+                      <th class="text-center">LAST OUT</th>
+                      <th class="text-right">OUT</th>
+                      <th class="text-right">STOK</th>
+                      <th>NOMOR PO / TANGGAL</th>
+                      <th>KETERANGAN</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr
+                      v-for="row in detailsCache[item.Kode]"
+                      :key="row.Barcode"
+                    >
+                      <td
+                        class="font-monospace text-blue-darken-3 font-weight-medium"
+                      >
+                        {{ row.Kode || item.Kode }}
+                      </td>
+                      <td class="font-monospace">{{ row.Barcode }}</td>
+                      <td class="text-center text-grey-darken-2">
+                        {{ row.Firts_In || "-" }}
+                      </td>
+                      <td class="text-right font-weight-medium text-success">
+                        {{ fmtNum(row.IN) }}
+                      </td>
+                      <td class="text-center text-grey-darken-2">
+                        {{ row.Last_Out || "-" }}
+                      </td>
+                      <td class="text-right font-weight-medium text-error">
+                        {{ fmtNum(row.OUT) }}
+                      </td>
+                      <td
+                        class="text-right font-weight-bold"
+                        :class="
+                          row.Stok > 0 ? 'text-blue-darken-4' : 'text-grey'
+                        "
+                      >
+                        {{ fmtNum(row.Stok) }}
+                      </td>
+                      <td>{{ row.NomorPO || "-" }}</td>
+                      <td
+                        class="text-truncate text-grey-darken-2"
+                        style="max-width: 250px"
+                        :title="row.Keterangan"
+                      >
+                        {{ row.Keterangan || "-" }}
+                      </td>
+                    </tr>
+                    <tr
+                      v-if="
+                        !detailsCache[item.Kode] ||
+                        detailsCache[item.Kode].length === 0
+                      "
+                    >
+                      <td
+                        colspan="9"
+                        class="text-center text-grey pa-3 font-italic"
+                      >
+                        Tidak ada rincian data barcode untuk spesifikasi filter
+                        ini.
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -434,6 +533,10 @@ const fmtNum = (val: any) =>
 .gap-2 {
   gap: 8px;
 }
+.text-mkb-outstanding {
+  color: #e65100;
+  font-weight: 700;
+}
 
 /* Styling Detail Table Nested */
 .detail-header {
@@ -481,5 +584,19 @@ const fmtNum = (val: any) =>
 .grid-cell-input-text:focus {
   border-color: rgb(var(--v-theme-primary));
   background: #fdfdfd;
+}
+
+.detail-side-by-side {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+.detail-col {
+  flex: 1 1 480px;
+  min-width: 0;
+}
+.h-100 {
+  height: 100%;
 }
 </style>

@@ -21,6 +21,7 @@ import {
   IconX,
   IconLockSquare,
 } from "@tabler/icons-vue";
+import { formatTanggal, formatTanggalJam } from "@/utils/dateFormat";
 
 const authStore = useAuthStore();
 const router = useRouter();
@@ -595,17 +596,7 @@ const submitPin = async () => {
 };
 
 // --- FORMAT ---
-const formatTgl = (v: string) => {
-  if (!v) return "-";
-  const d = new Date(v);
-  return `${String(d.getDate()).padStart(2, "0")}-${String(d.getMonth() + 1).padStart(2, "0")}-${d.getFullYear()}`;
-};
 const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
-const formatWaktu = (v: string) => {
-  if (!v) return "-";
-  const d = new Date(v);
-  return `${String(d.getDate()).padStart(2, "0")}-${String(d.getMonth() + 1).padStart(2, "0")}-${d.getFullYear()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-};
 </script>
 
 <template>
@@ -762,20 +753,29 @@ const formatWaktu = (v: string) => {
       </span>
     </template>
 
-    <template #item.Tanggal="{ item }">{{ formatTgl(item.Tanggal) }}</template>
-    <template #item.Dateline="{ item }">{{
-      formatTgl(item.Dateline)
-    }}</template>
-    <template #item.DatePO="{ item }">{{ formatTgl(item.DatePO) }}</template>
-    <template #item.DatelinePO="{ item }">{{
-      formatTgl(item.DatelinePO)
-    }}</template>
-    <template #item.Design_Tanggal="{ item }">{{
-      formatTgl(item.Design_Tanggal)
-    }}</template>
-    <template #item.Created="{ item }">{{
-      formatWaktu(item.Created)
-    }}</template>
+    <template #item.Tanggal="{ item }">
+      {{ formatTanggal(item.Tanggal) }}
+    </template>
+
+    <template #item.Dateline="{ item }">
+      {{ formatTanggal(item.Dateline) }}
+    </template>
+
+    <template #item.DatePO="{ item }">
+      {{ formatTanggal(item.DatePO) }}
+    </template>
+
+    <template #item.DatelinePO="{ item }">
+      {{ formatTanggal(item.DatelinePO) }}
+    </template>
+
+    <template #item.Design_Tanggal="{ item }">
+      {{ formatTanggal(item.Design_Tanggal) }}
+    </template>
+
+    <template #item.Created="{ item }">
+      {{ formatTanggalJam(item.Created) }}
+    </template>
     <template #item.Harga="{ item }">{{ numFmt(item.Harga) }}</template>
     <template #item.Pesan="{ item }">{{ numFmt(item.Pesan) }}</template>
     <template #item.Kirim="{ item }">{{ numFmt(item.Kirim) }}</template>

@@ -13,6 +13,7 @@ import {
   IconClipboardCheck,
   IconMenu2,
 } from "@tabler/icons-vue";
+import { formatTanggal, formatTanggalJam } from "@/utils/dateFormat";
 
 const authStore = useAuthStore();
 const router = useRouter();
@@ -587,6 +588,14 @@ const fmt = (n: number) => new Intl.NumberFormat("id-ID").format(n);
       </span>
     </template>
 
+    <template #item.Tanggal="{ item }">
+      {{ formatTanggal((item.raw ?? item).Tanggal) }}
+    </template>
+
+    <template #item.Jatuhtempo="{ item }">
+      {{ formatTanggal((item.raw ?? item).Jatuhtempo) }}
+    </template>
+
     <template #item.Jumlah="{ item }">
       {{
         (item.raw ?? item)?.Jumlah != null
@@ -618,6 +627,10 @@ const fmt = (n: number) => new Intl.NumberFormat("id-ID").format(n);
       >
         Pending
       </span>
+    </template>
+
+    <template #item.created="{ item }">
+      {{ formatTanggalJam((item.raw ?? item).created) }}
     </template>
 
     <!-- ── Summary bar ── -->
@@ -687,7 +700,9 @@ const fmt = (n: number) => new Intl.NumberFormat("id-ID").format(n);
         </div>
         <div class="pj-info-row">
           <span class="pj-info-lbl">Tanggal</span>
-          <span class="pj-info-val">{{ selectedItem.Tanggal }}</span>
+          <span class="pj-info-val">{{
+            formatTanggal(selectedItem.Tanggal)
+          }}</span>
         </div>
         <div class="pj-info-row">
           <span class="pj-info-lbl">SPK</span>

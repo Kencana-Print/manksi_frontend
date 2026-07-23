@@ -7,6 +7,7 @@ import { useBrowse } from "@/composables/useBrowse";
 import { bastService } from "@/services/garmen/bastService";
 import * as XLSX from "xlsx";
 import { IconPrinter, IconFileSpreadsheet } from "@tabler/icons-vue";
+import { formatTanggal } from "@/utils/dateFormat";
 
 const router = useRouter();
 const toast = useToast();
@@ -96,12 +97,6 @@ const exportExcel = (isDetail = false) => {
     workbook,
     `cetak_bast_${isDetail ? "detail_" : ""}${new Date().getTime()}.xlsx`,
   );
-};
-
-const fmtDate = (val: string) => {
-  if (!val) return "";
-  const d = new Date(val);
-  return `${String(d.getDate()).padStart(2, "0")}-${String(d.getMonth() + 1).padStart(2, "0")}-${d.getFullYear()}`;
 };
 </script>
 
@@ -195,7 +190,9 @@ const fmtDate = (val: string) => {
       </v-btn>
     </template>
 
-    <template #item.Tanggal="{ item }">{{ fmtDate(item.Tanggal) }}</template>
+    <template #item.Tanggal="{ item }">
+      {{ formatTanggal(item.Tanggal) }}
+    </template>
     <template #item.CetakBAST="{ item }">
       <v-chip
         v-if="item.CetakBAST"

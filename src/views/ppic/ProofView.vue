@@ -7,6 +7,7 @@ import { useBrowse } from "@/composables/useBrowse";
 import { proofService } from "@/services/ppic/proofService";
 import { exportExcelSingle } from "@/utils/excelExport";
 import { IconClipboardCheck } from "@tabler/icons-vue";
+import { formatTanggal } from "@/utils/dateFormat";
 
 const router = useRouter();
 const toast = useToast();
@@ -198,12 +199,6 @@ const onExportDetail = async () => {
   }
 };
 
-const formatTgl = (v: string) => {
-  if (!v) return "-";
-  const d = new Date(v);
-  return `${String(d.getDate()).padStart(2, "0")}-${String(d.getMonth() + 1).padStart(2, "0")}-${d.getFullYear()}`;
-};
-
 onMounted(async () => {
   try {
     const res = await proofService.getMeta();
@@ -270,7 +265,9 @@ onMounted(async () => {
       </v-btn>
     </template>
 
-    <template #item.Tanggal="{ item }">{{ formatTgl(item.Tanggal) }}</template>
+    <template #item.Tanggal="{ item }">
+      {{ formatTanggal(item.Tanggal) }}
+    </template>
 
     <!-- Expand: detail komponen per baris proof -->
     <template #detail="{ item }">

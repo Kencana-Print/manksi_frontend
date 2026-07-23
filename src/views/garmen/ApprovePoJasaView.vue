@@ -6,6 +6,7 @@ import BaseBrowse from "@/components/BaseBrowse.vue";
 import { approvePoJasaService } from "@/services/garmen/approvePoJasaService";
 import { exportExcelSingle } from "@/utils/excelExport";
 import { IconClipboardCheck, IconFileSpreadsheet } from "@tabler/icons-vue";
+import { formatTanggal } from "@/utils/dateFormat";
 
 const toast = useToast();
 
@@ -215,6 +216,11 @@ const num = (v: any) => Number(v || 0).toLocaleString("id-ID");
       <span :class="item.Approve === 'Sudah' ? 'chip-sudah' : 'chip-belum'">
         {{ item.Approve }}
       </span>
+    </template>
+
+    <!-- item.Tanggal -->
+    <template #item.Tanggal="{ item }">
+      {{ formatTanggal(item.Tanggal) }}
     </template>
 
     <!-- item.Total format -->

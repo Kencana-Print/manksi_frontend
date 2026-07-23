@@ -17,6 +17,7 @@ import {
   IconLayoutColumns,
   IconLayoutRows,
 } from "@tabler/icons-vue";
+import { formatTanggal } from "@/utils/dateFormat";
 
 const router = useRouter();
 const toast = useToast();
@@ -110,17 +111,6 @@ const rp = (v: number) =>
     minimumFractionDigits: 0,
   }).format(v || 0);
 const num = (v: number) => new Intl.NumberFormat("id-ID").format(v || 0);
-
-// Format tanggal ISO → "05-04-2026"
-const fmtDate = (val: string) => {
-  if (!val) return "";
-  const d = new Date(val);
-  if (isNaN(d.getTime())) return val;
-  const dd = String(d.getDate()).padStart(2, "0");
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const yyyy = d.getFullYear();
-  return `${dd}-${mm}-${yyyy}`;
-};
 
 const getRowProps = (data: any) => {
   const status = data.item?.raw?.StatusApproval || data.item?.StatusApproval;
@@ -327,7 +317,7 @@ const totalStatusGrid = computed(() => {
 
     <!-- Format kolom Tanggal -->
     <template #item.Tanggal="{ item }">
-      {{ fmtDate(item.Tanggal) }}
+      {{ formatTanggal(item.Tanggal) }}
     </template>
 
     <!-- Format kolom Nominal -->

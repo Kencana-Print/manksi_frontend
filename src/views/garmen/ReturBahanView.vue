@@ -11,6 +11,7 @@ import {
   IconPrinter,
   IconFileDescription,
 } from "@tabler/icons-vue";
+import { formatTanggal } from "@/utils/dateFormat";
 
 const router = useRouter();
 const toast = useToast();
@@ -87,13 +88,6 @@ const getRowProps = (data: any) => {
   if (!item.NoApprov || item.NoApprov.trim() === "")
     return { style: "color:#c62828!important" };
   return {};
-};
-
-const fmtDate = (val: string) => {
-  if (!val) return "";
-  const d = new Date(val);
-  if (isNaN(d.getTime())) return val;
-  return `${String(d.getDate()).padStart(2, "0")}-${String(d.getMonth() + 1).padStart(2, "0")}-${d.getFullYear()}`;
 };
 
 const num = (val: any) =>
@@ -260,12 +254,13 @@ const submitPengajuan = async () => {
     </template>
 
     <!-- Format kolom (diinject langsung ke BaseBrowse) -->
-    <template #item.Tanggal="{ item }">{{
-      fmtDate(item.raw?.Tanggal || item.Tanggal)
-    }}</template>
-    <template #item.TglApprov="{ item }">{{
-      fmtDate(item.raw?.TglApprov || item.TglApprov)
-    }}</template>
+    <template #item.Tanggal="{ item }">
+      {{ formatTanggal(item.raw?.Tanggal || item.Tanggal) }}
+    </template>
+
+    <template #item.TglApprov="{ item }">
+      {{ formatTanggal(item.raw?.TglApprov || item.TglApprov) }}
+    </template>
 
     <!-- Detail expand -->
     <template #detail="{ item }">
