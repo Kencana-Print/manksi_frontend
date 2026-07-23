@@ -46,7 +46,7 @@ const getLocalUrl = (item: any) => {
 };
 
 const getVpsUrl = (item: any) => {
-  return `http://103.94.238.252:8888/file-gambar/mintaharga/${encodeURIComponent(item.mh_nomor)}.jpg`;
+  return `/file-gambar/mintaharga/${encodeURIComponent(item.mh_nomor)}.jpg`;
 };
 
 // Fungsi fallback saat gambar lokal tidak ditemukan

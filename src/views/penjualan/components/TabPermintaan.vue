@@ -42,31 +42,29 @@ const showPreviewDialog = ref(false);
 // ── COMPUTED UNTUK URL GAMBAR (Lokal Backend atau VPS Server) ──
 const displayImageUrl = computed(() => {
   if (imageError.value || !props.formData.PathImage) return "";
-
   if (props.formData.PathImage.startsWith("blob:")) {
     return props.formData.PathImage;
   }
-
   if (
     props.formData.PathImage.startsWith("http://") ||
     props.formData.PathImage.startsWith("https://")
   ) {
-    return props.formData.PathImage;
+    // ✅ URL absolut dari backend lama (http://) bakal kena mixed-content
+    // kalau halamannya udah https — paksa jadi https biar konsisten.
+    return props.formData.PathImage.replace(/^http:\/\//, "https://");
   }
-
-  if (props.formData.PathImage) {
-    // Gunakan VITE_API_BASE_URL, bukan dari api.defaults.baseURL
-    const base =
-      import.meta.env.VITE_API_BASE_URL?.replace(/\/api\/?$/, "") ||
-      api.defaults.baseURL?.replace(/\/api\/?$/, "") ||
-      `${window.location.protocol}//${window.location.hostname}:3088`;
-    const cleanPath = props.formData.PathImage.startsWith("/")
-      ? props.formData.PathImage
-      : `/${props.formData.PathImage}`;
-    return `${base}${cleanPath}`;
-  }
-
-  return "";
+  // ✅ FIX: "VITE_API_BASE_URL" gak pernah ada (nama env yang bener
+  // "VITE_API_URL"), jadi dulu selalu jatuh ke fallback hardcode
+  // ":3088" → mixed-content/ERR_SSL begitu diakses via HTTPS.
+  // Sekarang: base dari axios baseURL (biasanya "/api" di produksi),
+  // fallback PATH RELATIF polos kalau kosong — gak pernah hardcode
+  // host/port lagi.
+  const rawBase = api.defaults.baseURL || import.meta.env.VITE_API_URL || "";
+  const base = rawBase.replace(/\/api\/?$/, "");
+  const cleanPath = props.formData.PathImage.startsWith("/")
+    ? props.formData.PathImage
+    : `/${props.formData.PathImage}`;
+  return `${base}${cleanPath}`;
 });
 
 const divisiOptions = ref<any[]>([]);
