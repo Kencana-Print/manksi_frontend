@@ -95,4 +95,51 @@ export const dashboardService = {
     api.get("/dashboard/mutasi-barang-jadi-list", {
       params: { limit, offset },
     }),
+  getPipelinePenyelesaianSpk: (startDate: string, endDate: string) =>
+    api.get("/dashboard/pipeline-penyelesaian-spk", {
+      params: { startDate, endDate },
+    }),
+
+  getSpkVsStbjSummary: (startDate: string, endDate: string) =>
+    api.get("/dashboard/spk-vs-stbj-summary", {
+      params: { startDate, endDate },
+    }),
+
+  getSpkVsStbjList: (
+    limit: number,
+    offset: number,
+    startDate: string,
+    endDate: string,
+  ) =>
+    api.get("/dashboard/spk-vs-stbj-list", {
+      params: { limit, offset, startDate, endDate },
+    }),
+
+  getSpkVsSjSummary: (startDate: string, endDate: string) =>
+    api.get("/dashboard/spk-vs-sj-summary", { params: { startDate, endDate } }),
+
+  getSpkVsSjList: (
+    limit: number,
+    offset: number,
+    startDate: string,
+    endDate: string,
+  ) =>
+    api.get("/dashboard/spk-vs-sj-list", {
+      params: { limit, offset, startDate, endDate },
+    }),
+
+  getSpkTerkirimBelumTagihSummary: (startDate: string, endDate: string) =>
+    api.get("/dashboard/spk-terkirim-belum-tagih-summary", {
+      params: { startDate, endDate },
+    }),
+
+  getSpkTerkirimBelumTagihList: (
+    limit: number,
+    offset: number,
+    startDate: string,
+    endDate: string,
+  ) =>
+    api.get("/dashboard/spk-terkirim-belum-tagih-list", {
+      params: { limit, offset, startDate, endDate },
+    }),
 };

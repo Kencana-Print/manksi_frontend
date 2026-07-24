@@ -52,15 +52,9 @@ onMounted(async () => {
     await nextTick(); // pastikan <img :src="mainImageUrl"> sudah ada di DOM
     await waitForImage(); // ← tunggu gambar utama beres, baru lanjut print
 
-    if (layoutMode === "horizontal") {
-      const style = document.createElement("style");
-      style.textContent = "@page { size: A4 landscape; margin: 10mm; }";
-      document.head.appendChild(style);
-    } else {
-      const style = document.createElement("style");
-      style.textContent = "@page { size: A4 portrait; margin: 10mm; }";
-      document.head.appendChild(style);
-    }
+    const style = document.createElement("style");
+    style.textContent = "@page { size: A4 landscape; margin: 10mm; }";
+    document.head.appendChild(style);
     window.print();
   } catch (error: any) {
     isError.value = true;
@@ -380,9 +374,7 @@ const tglIndo = (dateStr: string) => {
   box-sizing: border-box;
 }
 
-.print-container.vertikal {
-  max-width: 210mm;
-}
+.print-container.vertikal,
 .print-container.horizontal {
   max-width: 297mm;
 }
@@ -454,7 +446,7 @@ const tglIndo = (dateStr: string) => {
   margin-bottom: 10px;
 }
 .image-area {
-  width: 130px;
+  width: 210px;
   flex-shrink: 0;
 }
 .image-area img {
@@ -490,8 +482,8 @@ const tglIndo = (dateStr: string) => {
   margin-bottom: 10px;
 }
 .img-horizontal-inline {
-  max-width: 140px;
-  max-height: 140px;
+  max-width: 220px;
+  max-height: 220px;
   object-fit: contain;
   flex-shrink: 0;
 }
@@ -571,15 +563,18 @@ pre {
   margin: 0;
   line-height: 1.4;
 }
-
-@media print {
-  body {
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-}
 </style>
 
 <style>
 /* @page dikontrol via JS di onMounted — tidak ada di sini */
+
+/* Wajib di style GLOBAL (non-scoped) — target "body" gak akan match
+   kalau ditaruh di style scoped, karena <body> ada di luar template
+   komponen ini sehingga tidak dapat atribut data-scoped Vue. */
+@media print {
+  body {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}
 </style>

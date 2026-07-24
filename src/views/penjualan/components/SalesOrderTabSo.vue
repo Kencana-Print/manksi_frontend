@@ -861,9 +861,9 @@ watch(
           >
           <select
             v-model="formData.cus_perfect"
-            class="inp sel"
+            class="inp sel ro"
             style="width: 55px"
-            :disabled="isEdit"
+            disabled
           >
             <option value="Y">Y</option>
             <option value="N">N</option>

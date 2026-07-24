@@ -739,6 +739,7 @@ const loadDataMemo = async (nomor: string) => {
       formData.value.NamaPerusahaan = h.perush_nama || "";
       formData.value.spk_cus_kode = h.mspk_cus_kode || "";
       formData.value.Customer = h.cus_nama || "";
+      formData.value.cus_perfect = h.cus_perfect || "N";
       formData.value.spk_jo_kode = h.mspk_jo_kode || "";
       formData.value.JenisOrder = h.jo_nama || "";
       formData.value.spk_sal_kode = h.mspk_sal_kode || "";

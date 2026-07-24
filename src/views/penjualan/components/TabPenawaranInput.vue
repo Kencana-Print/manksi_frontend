@@ -205,6 +205,22 @@ const proceedLoadMintaHarga = async (item: any) => {
     row.Qty = data.qty;
     row.Harga = data.harga;
     hitungTotalBaris(row);
+
+    // ✅ BARU: auto-fill Customer dari Minta Harga kalau belum dipilih
+    if (data.custKode) {
+      if (!props.formData.CustKode) {
+        props.formData.CustKode = data.custKode;
+        props.formData.NamaCustomer = data.custNama || "";
+        toast.info(
+          `Customer otomatis diisi dari Permintaan Harga: ${data.custNama || data.custKode}.`,
+        );
+      } else if (props.formData.CustKode !== data.custKode) {
+        toast.warning(
+          `⚠ No. Permintaan ${item.Nomor} milik customer berbeda (${data.custNama || data.custKode}). Customer yang sudah dipilih TIDAK diubah otomatis.`,
+        );
+      }
+    }
+
     toast.success("Berhasil memuat detail Permintaan Harga.");
   } catch (e: any) {
     toast.error(
@@ -315,10 +331,6 @@ const onSalesKodeEnter = async () => {
 };
 
 const openMintaHargaModal = (index: number) => {
-  if (!props.formData.CustKode) {
-    toast.warning("Pilih Customer terlebih dahulu.");
-    return;
-  }
   activeRowIndex.value = index;
   showMintaHargaModal.value = true;
 };
@@ -356,6 +368,27 @@ const loadDigitalSign = async (kode: string) => {
   } catch {
     // Tidak ada data = biarkan kosong
   }
+};
+const punyaHakCmoUntukDivisi = () => {
+  const divisiStr = String(props.formData.Divisi).charAt(0);
+  return divisiStr === "3"
+    ? authStore.user?.flags.cmo3 === 1
+    : authStore.user?.flags.cmo === 1;
+};
+
+const onDigitalSignChange = (e: Event) => {
+  const select = e.target as HTMLSelectElement;
+  const val = select.value;
+
+  if (val === "Y" && !punyaHakCmoUntukDivisi()) {
+    toast.warning(
+      "Anda tidak memiliki hak CMO untuk mengaktifkan Digital Sign.",
+    );
+    select.value = props.formData.DigitalSign;
+    return;
+  }
+
+  props.formData.DigitalSign = val;
 };
 const handleCustSelected = (item: any) => {
   props.formData.CustKode = item.Kode || item.cus_kode;
@@ -818,9 +851,10 @@ watch(
           <div class="f-row mt-1">
             <label>Digital Sign</label>
             <select
-              v-model="formData.DigitalSign"
+              :value="formData.DigitalSign"
               class="f-inp"
               style="width: 60px"
+              @change="onDigitalSignChange"
             >
               <option value="Y">Y</option>
               <option value="N">N</option>

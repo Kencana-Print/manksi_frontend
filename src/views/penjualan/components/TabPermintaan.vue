@@ -126,6 +126,7 @@ const onCustKodeEnter = async () => {
       }
       props.formData.CustKode = exact.cus_kode || exact.Kode;
       props.formData.CustNama = exact.cus_nama || exact.Nama;
+      props.formData.Perfect = exact.cus_perfect || exact.Perfect || "";
     } else {
       toast.error("Kode customer tidak ditemukan.");
       props.formData.CustKode = "";
@@ -175,6 +176,7 @@ const handleCustSelected = (item: any) => {
   }
   props.formData.CustKode = kode;
   props.formData.CustNama = nama;
+  props.formData.Perfect = item.cus_perfect || item.Perfect || "";
 };
 
 const handleSalesSelected = (item: any) => {
@@ -297,9 +299,11 @@ const onFileChange = (e: Event) => {
               :items="perfectOptions"
               variant="outlined"
               density="compact"
+              readonly
               hide-details
               class="f-inp"
               style="max-width: 80px"
+              bg-color="grey-lighten-4"
             />
           </div>
 

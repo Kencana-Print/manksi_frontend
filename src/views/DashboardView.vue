@@ -221,6 +221,58 @@ interface MutasiBarangJadiItem {
   MutasiKeluar: number;
   StokAkhir: number;
 }
+interface PipelinePenyelesaianSpk {
+  TotalAktif: number;
+  SudahStbj: number;
+  SudahKirim: number;
+  FullInvoice: number;
+}
+interface SpkVsStbjSummary {
+  TotalAktif: number;
+  SudahStbj: number;
+  BelumStbj: number;
+  RataRataHari: number | null;
+}
+interface SpkBelumStbjItem {
+  Nomor: string;
+  Nama: string;
+  Tanggal: string;
+  Dateline: string;
+  SisaHari: number;
+}
+interface SpkVsSjSummary {
+  TotalAktif: number;
+  BelumKirim: number;
+  SebagianKirim: number;
+  LunasKirim: number;
+  TotalQtyOrder: number;
+  TotalQtyKirim: number;
+}
+interface SpkBelumKirimItem {
+  Nomor: string;
+  Nama: string;
+  NamaCustomer: string;
+  Dateline: string;
+  QtyOrder: number;
+  QtyKirim: number;
+}
+interface SpkBelumTagihSummary {
+  TotalTerkirim: number;
+  BelumInvoice: number;
+  SebagianInvoice: number;
+  FullInvoice: number;
+  TotalQtyBelumDitagih: number;
+}
+interface SpkBelumTagihItem {
+  Nomor: string;
+  Nama: string;
+  NamaCustomer: string;
+  QtyKirim: number;
+  QtyInvoice: number;
+  QtyBelumDitagih: number;
+  TglKirimTerakhir: string;
+  UmurHari: number;
+}
 
 const authStore = useAuthStore();
 const router = useRouter();
@@ -246,6 +298,7 @@ watch(activeTab, async (tab) => {
     if (!financeLoaded.value) await loadFinanceData();
     await nextTick();
     setupOverdueObserver();
+    setupSpkTagihObserver();
   }
   if (tab === "gudang-bahan") {
     if (!gudangBahanLoaded.value) await loadGudangBahanData();
@@ -454,6 +507,214 @@ const fetchPipelineData = async () => {
   } catch {
     /* silent */
   }
+};
+
+// ── Pipeline Penyelesaian SPK (SPK -> STBJ -> Kirim -> Invoice) ──
+const pipelinePenyelesaianSpk = ref<PipelinePenyelesaianSpk>({
+  TotalAktif: 0,
+  SudahStbj: 0,
+  SudahKirim: 0,
+  FullInvoice: 0,
+});
+
+const pipelinePenyelesaianStages = computed(() => [
+  {
+    label: "SPK Aktif",
+    value: pipelinePenyelesaianSpk.value.TotalAktif,
+    color: "#1565c0",
+  },
+  {
+    label: "Sudah STBJ",
+    value: pipelinePenyelesaianSpk.value.SudahStbj,
+    color: "#00695c",
+  },
+  {
+    label: "Sudah Kirim",
+    value: pipelinePenyelesaianSpk.value.SudahKirim,
+    color: "#f57f17",
+  },
+  {
+    label: "Full Invoice",
+    value: pipelinePenyelesaianSpk.value.FullInvoice,
+    color: "#2e7d32",
+  },
+]);
+
+const pipelinePenyelesaianPct = (value: number) => {
+  const total = pipelinePenyelesaianSpk.value.TotalAktif || 1;
+  return Math.round((value / total) * 100);
+};
+
+const fetchPipelinePenyelesaianSpk = async () => {
+  try {
+    const res = await dashboardService.getPipelinePenyelesaianSpk(
+      pipelineFilter.value.startDate,
+      pipelineFilter.value.endDate,
+    );
+    if (res.data?.data) pipelinePenyelesaianSpk.value = res.data.data;
+  } catch {
+    /* silent */
+  }
+};
+
+// ── SPK vs STBJ ──
+const spkVsStbjSummary = ref<SpkVsStbjSummary>({
+  TotalAktif: 0,
+  SudahStbj: 0,
+  BelumStbj: 0,
+  RataRataHari: null,
+});
+
+const SPK_STBJ_PAGE_SIZE = 20;
+const spkBelumStbjList = ref<SpkBelumStbjItem[]>([]);
+const spkStbjOffset = ref(0);
+const spkStbjHasMore = ref(true);
+const isLoadingMoreSpkStbj = ref(false);
+const spkStbjSentinelEl = ref<HTMLElement | null>(null);
+let spkStbjScrollObserver: IntersectionObserver | null = null;
+
+const loadMoreSpkStbj = async () => {
+  if (!spkStbjHasMore.value || isLoadingMoreSpkStbj.value) return;
+  isLoadingMoreSpkStbj.value = true;
+  try {
+    const res = await dashboardService.getSpkVsStbjList(
+      SPK_STBJ_PAGE_SIZE,
+      spkStbjOffset.value,
+      pipelineFilter.value.startDate,
+      pipelineFilter.value.endDate,
+    );
+    const rows: SpkBelumStbjItem[] = res.data.data;
+    spkBelumStbjList.value.push(...rows);
+    spkStbjOffset.value += rows.length;
+    if (rows.length < SPK_STBJ_PAGE_SIZE) spkStbjHasMore.value = false;
+  } catch {
+  } finally {
+    isLoadingMoreSpkStbj.value = false;
+  }
+};
+
+const setupSpkStbjObserver = () => {
+  if (spkStbjScrollObserver) spkStbjScrollObserver.disconnect();
+  if (!spkStbjSentinelEl.value) return;
+  spkStbjScrollObserver = new IntersectionObserver(
+    (entries) => {
+      if (entries[0].isIntersecting) loadMoreSpkStbj();
+    },
+    { threshold: 0.1 },
+  );
+  spkStbjScrollObserver.observe(spkStbjSentinelEl.value);
+};
+
+// ── SPK vs SJ ──
+const spkVsSjSummary = ref<SpkVsSjSummary>({
+  TotalAktif: 0,
+  BelumKirim: 0,
+  SebagianKirim: 0,
+  LunasKirim: 0,
+  TotalQtyOrder: 0,
+  TotalQtyKirim: 0,
+});
+const spkKirimRate = computed(() => {
+  if (!spkVsSjSummary.value.TotalQtyOrder) return 0;
+  return Math.round(
+    (spkVsSjSummary.value.TotalQtyKirim / spkVsSjSummary.value.TotalQtyOrder) *
+      100,
+  );
+});
+
+const SPK_SJ_PAGE_SIZE = 20;
+const spkBelumKirimList = ref<SpkBelumKirimItem[]>([]);
+const spkSjOffset = ref(0);
+const spkSjHasMore = ref(true);
+const isLoadingMoreSpkSj = ref(false);
+const spkSjSentinelEl = ref<HTMLElement | null>(null);
+let spkSjScrollObserver: IntersectionObserver | null = null;
+
+const loadMoreSpkSj = async () => {
+  if (!spkSjHasMore.value || isLoadingMoreSpkSj.value) return;
+  isLoadingMoreSpkSj.value = true;
+  try {
+    const res = await dashboardService.getSpkVsSjList(
+      SPK_SJ_PAGE_SIZE,
+      spkSjOffset.value,
+      pipelineFilter.value.startDate,
+      pipelineFilter.value.endDate,
+    );
+    const rows: SpkBelumKirimItem[] = res.data.data;
+    spkBelumKirimList.value.push(...rows);
+    spkSjOffset.value += rows.length;
+    if (rows.length < SPK_SJ_PAGE_SIZE) spkSjHasMore.value = false;
+  } catch {
+  } finally {
+    isLoadingMoreSpkSj.value = false;
+  }
+};
+
+const setupSpkSjObserver = () => {
+  if (spkSjScrollObserver) spkSjScrollObserver.disconnect();
+  if (!spkSjSentinelEl.value) return;
+  spkSjScrollObserver = new IntersectionObserver(
+    (entries) => {
+      if (entries[0].isIntersecting) loadMoreSpkSj();
+    },
+    { threshold: 0.1 },
+  );
+  spkSjScrollObserver.observe(spkSjSentinelEl.value);
+};
+
+// ── SPK Terkirim Belum Ditagih (Finance) ──
+const spkBelumTagihSummary = ref<SpkBelumTagihSummary>({
+  TotalTerkirim: 0,
+  BelumInvoice: 0,
+  SebagianInvoice: 0,
+  FullInvoice: 0,
+  TotalQtyBelumDitagih: 0,
+});
+const spkTagihFilter = ref({
+  startDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1)
+    .toISOString()
+    .substring(0, 10),
+  endDate: new Date().toISOString().substring(0, 10),
+});
+
+const SPK_TAGIH_PAGE_SIZE = 20;
+const spkBelumTagihList = ref<SpkBelumTagihItem[]>([]);
+const spkTagihOffset = ref(0);
+const spkTagihHasMore = ref(true);
+const isLoadingMoreSpkTagih = ref(false);
+const spkTagihSentinelEl = ref<HTMLElement | null>(null);
+let spkTagihScrollObserver: IntersectionObserver | null = null;
+
+const loadMoreSpkTagih = async () => {
+  if (!spkTagihHasMore.value || isLoadingMoreSpkTagih.value) return;
+  isLoadingMoreSpkTagih.value = true;
+  try {
+    const res = await dashboardService.getSpkTerkirimBelumTagihList(
+      SPK_TAGIH_PAGE_SIZE,
+      spkTagihOffset.value,
+      spkTagihFilter.value.startDate,
+      spkTagihFilter.value.endDate,
+    );
+    const rows: SpkBelumTagihItem[] = res.data.data;
+    spkBelumTagihList.value.push(...rows);
+    spkTagihOffset.value += rows.length;
+    if (rows.length < SPK_TAGIH_PAGE_SIZE) spkTagihHasMore.value = false;
+  } catch {
+  } finally {
+    isLoadingMoreSpkTagih.value = false;
+  }
+};
+
+const setupSpkTagihObserver = () => {
+  if (spkTagihScrollObserver) spkTagihScrollObserver.disconnect();
+  if (!spkTagihSentinelEl.value) return;
+  spkTagihScrollObserver = new IntersectionObserver(
+    (entries) => {
+      if (entries[0].isIntersecting) loadMoreSpkTagih();
+    },
+    { threshold: 0.1 },
+  );
+  spkTagihScrollObserver.observe(spkTagihSentinelEl.value);
 };
 
 // --- Barang Jadi ---
@@ -1006,6 +1267,8 @@ const setupGudangObservers = async () => {
   setupSpkBelumMkbObserver();
   setupOutstandingObserver();
   setupEfisiensiObserver();
+  setupSpkStbjObserver();
+  setupSpkSjObserver();
 };
 
 // ── Infinite scroll: Stok Acc vs MKA ──
@@ -1436,9 +1699,23 @@ const loadOverviewShortcuts = async () => {
   if (showPoBpb.value) {
     calls.push(
       dashboardService
-        .getPoBahanBpbSummary()
+        .getSpkVsStbjSummary(
+          pipelineFilter.value.startDate,
+          pipelineFilter.value.endDate,
+        )
         .then((res) => {
-          poBpbSummary.value = res.data.data;
+          if (res.data?.data) spkVsStbjSummary.value = res.data.data;
+        })
+        .catch(() => {}),
+    );
+    calls.push(
+      dashboardService
+        .getSpkVsSjSummary(
+          pipelineFilter.value.startDate,
+          pipelineFilter.value.endDate,
+        )
+        .then((res) => {
+          if (res.data?.data) spkVsSjSummary.value = res.data.data;
         })
         .catch(() => {}),
     );
@@ -1551,11 +1828,19 @@ const loadFinanceData = async () => {
     overdueList.value = [];
     overdueOffset.value = 0;
     overdueHasMore.value = true;
+    spkBelumTagihList.value = [];
+    spkTagihOffset.value = 0;
+    spkTagihHasMore.value = true;
 
-    const [piutangRes, penerimaanRes] = await Promise.allSettled([
-      dashboardService.getPiutangDashboard(),
-      dashboardService.getPenerimaanSummary(),
-    ]);
+    const [piutangRes, penerimaanRes, spkTagihSumRes] =
+      await Promise.allSettled([
+        dashboardService.getPiutangDashboard(),
+        dashboardService.getPenerimaanSummary(),
+        dashboardService.getSpkTerkirimBelumTagihSummary(
+          spkTagihFilter.value.startDate,
+          spkTagihFilter.value.endDate,
+        ),
+      ]);
     if (piutangRes.status === "fulfilled" && piutangRes.value?.data?.data) {
       piutangData.value.summary = piutangRes.value.data.data.summary;
       piutangData.value.top5 = piutangRes.value.data.data.top5;
@@ -1568,8 +1853,13 @@ const loadFinanceData = async () => {
     ) {
       penerimaanSummary.value = penerimaanRes.value.data.data;
     }
+    if (
+      spkTagihSumRes.status === "fulfilled" &&
+      spkTagihSumRes.value?.data?.data
+    )
+      spkBelumTagihSummary.value = spkTagihSumRes.value.data.data;
 
-    await loadMoreOverdue();
+    await Promise.allSettled([loadMoreOverdue(), loadMoreSpkTagih()]);
 
     financeLoaded.value = true;
   } finally {
@@ -1594,6 +1884,12 @@ const loadGudangData = async () => {
     efisiensiBabaranList.value = [];
     efisiensiOffset.value = 0;
     efisiensiHasMore.value = true;
+    spkBelumStbjList.value = [];
+    spkStbjOffset.value = 0;
+    spkStbjHasMore.value = true;
+    spkBelumKirimList.value = [];
+    spkSjOffset.value = 0;
+    spkSjHasMore.value = true;
 
     const [
       poBpbRes,
@@ -1610,6 +1906,20 @@ const loadGudangData = async () => {
       dashboardService.getOutstandingPoMitraSummary(),
       dashboardService.getEfisiensiBabaranSummary(),
     ]);
+    const [spkStbjSumRes, spkSjSumRes] = await Promise.allSettled([
+      dashboardService.getSpkVsStbjSummary(
+        pipelineFilter.value.startDate,
+        pipelineFilter.value.endDate,
+      ),
+      dashboardService.getSpkVsSjSummary(
+        pipelineFilter.value.startDate,
+        pipelineFilter.value.endDate,
+      ),
+    ]);
+    if (spkStbjSumRes.status === "fulfilled" && spkStbjSumRes.value?.data?.data)
+      spkVsStbjSummary.value = spkStbjSumRes.value.data.data;
+    if (spkSjSumRes.status === "fulfilled" && spkSjSumRes.value?.data?.data)
+      spkVsSjSummary.value = spkSjSumRes.value.data.data;
     if (poBpbRes.status === "fulfilled")
       poBpbSummary.value = poBpbRes.value.data.data;
     if (
@@ -1637,9 +1947,12 @@ const loadGudangData = async () => {
       loadMoreSpkBelumMkb(),
       loadMoreOutstanding(),
       loadMoreEfisiensi(),
+      loadMoreSpkStbj(),
+      loadMoreSpkSj(),
     ]);
 
     await fetchPipelineData();
+    await fetchPipelinePenyelesaianSpk();
 
     gudangLoaded.value = true;
   } finally {
@@ -1839,6 +2152,7 @@ onMounted(async () => {
   }
   if (activeTab.value === "finance") {
     setupOverdueObserver();
+    setupSpkTagihObserver();
   }
   if (activeTab.value === "gudang-bahan") {
     setupBufferObserver();
@@ -1875,6 +2189,9 @@ onUnmounted(() => {
   stokAccVsMkaScrollObserver?.disconnect();
   stokBjScrollObserver?.disconnect();
   mutasiBjScrollObserver?.disconnect();
+  spkStbjScrollObserver?.disconnect();
+  spkSjScrollObserver?.disconnect();
+  spkTagihScrollObserver?.disconnect();
 });
 
 const closeSpkDialog = () => {
@@ -2221,8 +2538,11 @@ const sisaClass = (item: any) => {
                 <div class="shortcut-sub">
                   <span v-if="isLoadingDashboard">Memuat...</span>
                   <span v-else>
-                    {{ poBpbSummary.Open }} PO Open ·
-                    {{ poBpbSummary.OnProses }} On Proses
+                    {{ spkVsStbjSummary.BelumStbj }} SPK belum STBJ ·
+                    {{
+                      spkVsSjSummary.BelumKirim + spkVsSjSummary.SebagianKirim
+                    }}
+                    belum lunas kirim
                   </span>
                 </div>
               </div>
@@ -4204,6 +4524,132 @@ const sisaClass = (item: any) => {
             </div>
           </v-col>
         </v-row>
+
+        <v-row dense class="mt-2">
+          <v-col cols="12">
+            <div class="manksi-panel content-panel">
+              <div
+                class="panel-header"
+                style="
+                  background: #fff3e0;
+                  color: #e65100;
+                  border-bottom: 1px solid #ffe0b2;
+                "
+              >
+                <IconAlertTriangle
+                  :size="14"
+                  :stroke-width="1.7"
+                  class="mr-1"
+                />
+                SPK Terkirim Belum Ditagih
+                <span class="panel-header-sub ml-1">(piutang tersembunyi)</span>
+                <span
+                  v-if="
+                    spkBelumTagihSummary.BelumInvoice +
+                    spkBelumTagihSummary.SebagianInvoice
+                  "
+                  class="badge-count ml-auto"
+                  style="background: #e65100"
+                >
+                  {{
+                    spkBelumTagihSummary.BelumInvoice +
+                    spkBelumTagihSummary.SebagianInvoice
+                  }}
+                  SPK
+                </span>
+              </div>
+              <div class="panel-body">
+                <v-progress-linear
+                  v-if="isLoadingDashboard"
+                  indeterminate
+                  color="warning"
+                  height="2"
+                />
+                <template v-else>
+                  <div class="pen-summary-bar">
+                    <div class="pen-stat">
+                      <span class="pen-stat-val text-primary">{{
+                        spkBelumTagihSummary.TotalTerkirim
+                      }}</span>
+                      <span class="pen-stat-lbl">Total Terkirim</span>
+                    </div>
+                    <div class="pen-stat">
+                      <span class="pen-stat-val text-error">{{
+                        spkBelumTagihSummary.BelumInvoice
+                      }}</span>
+                      <span class="pen-stat-lbl">Belum Invoice</span>
+                    </div>
+                    <div class="pen-stat">
+                      <span class="pen-stat-val" style="color: #f57f17">{{
+                        spkBelumTagihSummary.SebagianInvoice
+                      }}</span>
+                      <span class="pen-stat-lbl">Sebagian</span>
+                    </div>
+                    <div class="pen-stat">
+                      <span class="pen-stat-val text-success">{{
+                        spkBelumTagihSummary.FullInvoice
+                      }}</span>
+                      <span class="pen-stat-lbl">Full Invoice</span>
+                    </div>
+                    <div class="pen-stat">
+                      <span class="pen-stat-val" style="color: #e65100">{{
+                        fmtNum(spkBelumTagihSummary.TotalQtyBelumDitagih)
+                      }}</span>
+                      <span class="pen-stat-lbl">Qty Belum Ditagih</span>
+                    </div>
+                  </div>
+
+                  <div
+                    v-if="spkBelumTagihList.length || isLoadingMoreSpkTagih"
+                    class="gb-list"
+                    style="max-height: 320px"
+                  >
+                    <div
+                      v-for="s in spkBelumTagihList"
+                      :key="s.Nomor"
+                      class="gb-row"
+                      :class="s.QtyInvoice === 0 ? 'row-minus' : ''"
+                    >
+                      <div class="gb-nama" :title="s.Nama" style="width: 150px">
+                        <span class="pen-nomor">{{ s.Nomor }}</span>
+                      </div>
+                      <div class="gb-bar-wrap">
+                        <span class="pen-cus" style="flex: 1"
+                          >{{ s.NamaCustomer }} · Kirim
+                          {{ s.TglKirimTerakhir }} ({{ s.UmurHari }}h)</span
+                        >
+                        <span
+                          style="
+                            font-size: 10px;
+                            font-weight: 700;
+                            color: #e65100;
+                          "
+                        >
+                          Belum {{ fmtNum(s.QtyBelumDitagih) }} /
+                          {{ fmtNum(s.QtyKirim) }}
+                        </span>
+                      </div>
+                    </div>
+                    <div ref="spkTagihSentinelEl" class="pen-sentinel">
+                      <span v-if="isLoadingMoreSpkTagih" class="pen-loading"
+                        >Memuat...</span
+                      >
+                      <span
+                        v-else-if="!spkTagihHasMore && spkBelumTagihList.length"
+                        class="pen-end"
+                      >
+                        {{ spkBelumTagihList.length }} SPK ditampilkan
+                      </span>
+                    </div>
+                  </div>
+                  <div v-else class="text-center text-grey py-3 text-caption">
+                    Semua SPK terkirim sudah full invoice 🎉
+                  </div>
+                </template>
+              </div>
+            </div>
+          </v-col>
+        </v-row>
       </v-window-item>
 
       <!-- ════════════════════════════════════════
@@ -4721,6 +5167,57 @@ const sisaClass = (item: any) => {
           </v-col>
         </v-row>
 
+        <v-row dense class="mt-2">
+          <v-col cols="12">
+            <div class="manksi-panel content-panel">
+              <div class="panel-header panel-header--green">
+                <IconTrendingUp :size="14" :stroke-width="1.7" class="mr-1" />
+                Pipeline Penyelesaian SPK
+                <span class="panel-header-sub ml-1"
+                  >(SPK Aktif → STBJ → Kirim → Full Invoice)</span
+                >
+              </div>
+              <div class="panel-body pa-3">
+                <v-progress-linear
+                  v-if="isLoadingDashboard"
+                  indeterminate
+                  color="primary"
+                  height="2"
+                />
+                <template v-else-if="pipelinePenyelesaianSpk.TotalAktif">
+                  <div class="funnel-wrap">
+                    <div
+                      v-for="stage in pipelinePenyelesaianStages"
+                      :key="stage.label"
+                      class="funnel-row"
+                    >
+                      <span class="funnel-label">{{ stage.label }}</span>
+                      <div class="funnel-bar-track">
+                        <div
+                          class="funnel-bar-fill"
+                          :style="{
+                            width: pipelinePenyelesaianPct(stage.value) + '%',
+                            background: stage.color,
+                          }"
+                        />
+                      </div>
+                      <span class="funnel-val" :style="{ color: stage.color }">
+                        {{ stage.value }}
+                      </span>
+                      <span class="funnel-pct"
+                        >{{ pipelinePenyelesaianPct(stage.value) }}%</span
+                      >
+                    </div>
+                  </div>
+                </template>
+                <div v-else class="text-center text-grey py-3 text-caption">
+                  Tidak ada SPK aktif pada periode ini.
+                </div>
+              </div>
+            </div>
+          </v-col>
+        </v-row>
+
         <!-- ── Row: Alert Bahan Kurang ── -->
         <v-row dense class="mt-2">
           <v-col cols="12">
@@ -5131,6 +5628,252 @@ const sisaClass = (item: any) => {
           </v-col>
         </v-row>
 
+        <v-row dense class="mt-2">
+          <!-- SPK Belum STBJ -->
+          <v-col cols="12" md="6">
+            <div class="manksi-panel content-panel fill-height">
+              <div class="panel-header panel-header--warning">
+                <IconFileAlert :size="14" :stroke-width="1.7" class="mr-1" />
+                SPK Belum STBJ
+                <span
+                  v-if="spkVsStbjSummary.RataRataHari"
+                  class="ml-auto pct-badge pct-mid"
+                >
+                  Rata-rata {{ spkVsStbjSummary.RataRataHari }} hari
+                </span>
+              </div>
+              <div class="panel-body">
+                <v-progress-linear
+                  v-if="isLoadingDashboard"
+                  indeterminate
+                  color="warning"
+                  height="2"
+                />
+                <template v-else>
+                  <div class="pen-summary-bar">
+                    <div class="pen-stat">
+                      <span class="pen-stat-val text-primary">{{
+                        spkVsStbjSummary.TotalAktif
+                      }}</span>
+                      <span class="pen-stat-lbl">Total Aktif</span>
+                    </div>
+                    <div class="pen-stat">
+                      <span class="pen-stat-val text-success">{{
+                        spkVsStbjSummary.SudahStbj
+                      }}</span>
+                      <span class="pen-stat-lbl">Sudah STBJ</span>
+                    </div>
+                    <div class="pen-stat">
+                      <span class="pen-stat-val text-error">{{
+                        spkVsStbjSummary.BelumStbj
+                      }}</span>
+                      <span class="pen-stat-lbl">Belum STBJ</span>
+                    </div>
+                  </div>
+                  <div
+                    v-if="spkBelumStbjList.length || isLoadingMoreSpkStbj"
+                    class="pen-list"
+                    style="max-height: 320px"
+                  >
+                    <div
+                      v-for="s in spkBelumStbjList"
+                      :key="s.Nomor"
+                      class="pen-item"
+                      :class="
+                        s.SisaHari < 0
+                          ? 'umur-danger'
+                          : s.SisaHari <= 3
+                            ? 'umur-warn'
+                            : ''
+                      "
+                    >
+                      <div class="pen-item-top">
+                        <span class="pen-nomor">{{ s.Nomor }}</span>
+                        <span
+                          class="pen-age"
+                          :class="
+                            s.SisaHari < 0
+                              ? 'umur-danger'
+                              : s.SisaHari <= 3
+                                ? 'umur-warn'
+                                : 'umur-ok'
+                          "
+                        >
+                          {{ s.SisaHari < 0 ? "Lewat" : s.SisaHari + "h" }}
+                        </span>
+                      </div>
+                      <div class="pen-cus">{{ s.Nama }}</div>
+                      <div class="pen-ket">Dateline: {{ s.Dateline }}</div>
+                    </div>
+                    <div ref="spkStbjSentinelEl" class="pen-sentinel">
+                      <span v-if="isLoadingMoreSpkStbj" class="pen-loading"
+                        >Memuat...</span
+                      >
+                      <span
+                        v-else-if="!spkStbjHasMore && spkBelumStbjList.length"
+                        class="pen-end"
+                      >
+                        {{ spkBelumStbjList.length }} SPK ditampilkan
+                      </span>
+                    </div>
+                  </div>
+                  <div v-else class="text-center text-grey py-3 text-caption">
+                    Semua SPK bulan ini sudah ada STBJ 🎉
+                  </div>
+                </template>
+              </div>
+            </div>
+          </v-col>
+
+          <!-- Status Pengiriman SPK -->
+          <v-col cols="12" md="6">
+            <div class="manksi-panel content-panel fill-height">
+              <div class="panel-header panel-header--teal">
+                <IconTruckDelivery
+                  :size="14"
+                  :stroke-width="1.7"
+                  class="mr-1"
+                />
+                Status Pengiriman SPK
+                <span class="ml-auto" style="font-size: 11px">
+                  {{ spkKirimRate }}% terkirim
+                </span>
+              </div>
+              <div class="panel-body">
+                <v-progress-linear
+                  v-if="isLoadingDashboard"
+                  indeterminate
+                  color="teal"
+                  height="2"
+                />
+                <template v-else>
+                  <div
+                    class="aging-wrap"
+                    style="grid-template-columns: repeat(3, 1fr)"
+                  >
+                    <div
+                      class="aging-chip"
+                      style="background: #ffebee; color: #c62828"
+                    >
+                      <span class="aging-count">{{
+                        spkVsSjSummary.BelumKirim
+                      }}</span>
+                      <span class="aging-label">Belum Kirim</span>
+                    </div>
+                    <div
+                      class="aging-chip"
+                      style="background: #fff8e1; color: #f57f17"
+                    >
+                      <span class="aging-count">{{
+                        spkVsSjSummary.SebagianKirim
+                      }}</span>
+                      <span class="aging-label">Sebagian</span>
+                    </div>
+                    <div
+                      class="aging-chip"
+                      style="background: #e8f5e9; color: #2e7d32"
+                    >
+                      <span class="aging-count">{{
+                        spkVsSjSummary.LunasKirim
+                      }}</span>
+                      <span class="aging-label">Lunas Kirim</span>
+                    </div>
+                  </div>
+
+                  <div
+                    style="padding: 8px 12px; border-bottom: 1px solid #f0f0f0"
+                  >
+                    <div class="d-flex justify-space-between mb-1">
+                      <span style="font-size: 10px; color: #9e9e9e"
+                        >Total qty terkirim</span
+                      >
+                      <span
+                        style="
+                          font-size: 10px;
+                          font-weight: 700;
+                          color: #00695c;
+                        "
+                      >
+                        {{ fmtNum(spkVsSjSummary.TotalQtyKirim) }} /
+                        {{ fmtNum(spkVsSjSummary.TotalQtyOrder) }}
+                      </span>
+                    </div>
+                    <div class="cr-bar">
+                      <div
+                        class="cr-fill"
+                        :style="{
+                          width: spkVsSjSummary.TotalQtyOrder
+                            ? Math.min(
+                                100,
+                                (spkVsSjSummary.TotalQtyKirim /
+                                  spkVsSjSummary.TotalQtyOrder) *
+                                  100,
+                              ) + '%'
+                            : '0%',
+                          background: '#00897b',
+                        }"
+                      />
+                    </div>
+                  </div>
+
+                  <div
+                    style="
+                      border-top: 1px solid #f0f0f0;
+                      padding: 5px 12px 0;
+                      font-size: 10px;
+                      color: #9e9e9e;
+                      font-weight: 600;
+                    "
+                  >
+                    SPK BELUM / SEBAGIAN KIRIM
+                  </div>
+
+                  <div class="pen-list" style="max-height: 240px">
+                    <div
+                      v-for="s in spkBelumKirimList"
+                      :key="s.Nomor"
+                      class="pen-item"
+                      :class="s.QtyKirim === 0 ? 'umur-danger' : 'umur-warn'"
+                    >
+                      <div class="pen-item-top">
+                        <span class="pen-nomor">{{ s.Nomor }}</span>
+                        <span
+                          :style="{
+                            fontSize: '10px',
+                            fontWeight: '700',
+                            color: s.QtyKirim === 0 ? '#c62828' : '#f57f17',
+                          }"
+                        >
+                          {{ fmtNum(s.QtyKirim) }}/{{ fmtNum(s.QtyOrder) }} pcs
+                        </span>
+                      </div>
+                      <div class="pen-cus">{{ s.NamaCustomer }}</div>
+                      <div class="pen-ket">DL: {{ s.Dateline }}</div>
+                    </div>
+                    <div ref="spkSjSentinelEl" class="pen-sentinel">
+                      <span v-if="isLoadingMoreSpkSj" class="pen-loading"
+                        >Memuat...</span
+                      >
+                      <span
+                        v-else-if="!spkSjHasMore && spkBelumKirimList.length"
+                        class="pen-end"
+                      >
+                        {{ spkBelumKirimList.length }} SPK ditampilkan
+                      </span>
+                    </div>
+                  </div>
+                  <div
+                    v-if="!spkBelumKirimList.length && !isLoadingMoreSpkSj"
+                    class="text-center text-grey py-3 text-caption"
+                  >
+                    Semua SPK sudah lunas kirim 🎉
+                  </div>
+                </template>
+              </div>
+            </div>
+          </v-col>
+        </v-row>
+
         <!-- ── Row: Outstanding PO Mitra + Efisiensi Babaran ── -->
         <v-row dense class="mt-2">
           <v-col cols="12" md="6">
@@ -5416,27 +6159,49 @@ const sisaClass = (item: any) => {
                       v-for="item in stokBarangJadiList"
                       :key="item.Kode + item.Gudang"
                       class="gb-row"
+                      style="
+                        flex-direction: column;
+                        align-items: stretch;
+                        gap: 2px;
+                      "
                     >
-                      <div
-                        class="gb-nama"
-                        :title="item.Nama"
-                        style="width: 160px"
-                      >
-                        {{ item.Nama }}
-                      </div>
-                      <div class="gb-bar-wrap">
-                        <span class="pen-cus" style="flex: 1">
-                          {{ item.Gudang }} · {{ item.Customer || "-" }}
-                        </span>
-                        <span
-                          style="
-                            font-size: 10px;
-                            font-weight: 700;
-                            color: #1565c0;
-                          "
+                      <div style="display: flex; align-items: center; gap: 8px">
+                        <div
+                          class="gb-nama"
+                          :title="item.Nama"
+                          style="width: 160px"
                         >
-                          {{ fmtNum(item.Stok) }} {{ item.Ukuran }}
-                        </span>
+                          {{ item.Nama }}
+                        </div>
+                        <div class="gb-bar-wrap">
+                          <span class="pen-cus" style="flex: 1">
+                            {{ item.Gudang }} · {{ item.Customer || "-" }}
+                          </span>
+                          <span
+                            style="
+                              font-size: 13px;
+                              font-weight: 700;
+                              color: #1565c0;
+                              white-space: nowrap;
+                            "
+                          >
+                            {{ fmtNum(item.Stok) }} pcs
+                          </span>
+                        </div>
+                      </div>
+                      <div
+                        v-if="item.Ukuran"
+                        style="
+                          font-size: 9px;
+                          color: #9e9e9e;
+                          padding-left: 168px;
+                          overflow: hidden;
+                          text-overflow: ellipsis;
+                          white-space: nowrap;
+                        "
+                        :title="item.Ukuran"
+                      >
+                        {{ item.Ukuran }}
                       </div>
                     </div>
                     <div ref="stokBjSentinelEl" class="pen-sentinel">
