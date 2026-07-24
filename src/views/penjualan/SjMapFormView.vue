@@ -490,14 +490,24 @@ const skipPrint = () => {
 const loadDivisi = async () => {
   try {
     const res = await api.get("/lookups/divisi");
-    divisiOptions.value = res.data.data
-      .filter((d: any) => d.kode !== 0)
+    // Ekstrak array data, antisipasi jika dibungkus dalam properti 'items'
+    const items = res.data.data.items || res.data.data || [];
+
+    divisiOptions.value = items
+      .map((d: any) => {
+        // Ambil nilai dari field yang mungkin digunakan oleh backend
+        const kode = d.div_kode ?? d.Kode ?? d.kode;
+        const nama = d.div_nama ?? d.Nama ?? d.nama;
+        return { kode, nama };
+      })
+      // Filter out nilai 0, null, atau undefined
+      .filter((d: any) => d.kode != 0 && d.kode != null)
       .map((d: any) => ({
         value: String(d.kode),
         label: `${d.kode} - ${d.nama}`,
       }));
-  } catch {
-    console.error("Gagal memuat divisi");
+  } catch (error) {
+    console.error("Gagal memuat divisi", error);
   }
 };
 
