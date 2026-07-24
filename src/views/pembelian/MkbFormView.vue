@@ -48,6 +48,7 @@ const selectedRowIdx = ref(-1);
 
 // State untuk dropdown komponen
 const listKomponen = ref<string[]>([]);
+const jenisOptions = ["MUDA", "SEDANG", "TUA", "SUPER TUA"];
 
 const formatDateLocal = (value?: string | Date) => {
   if (!value) return "";
@@ -771,7 +772,18 @@ const onPoSelected = (po: any) => {
                   />
                 </td>
                 <td><input type="text" v-model="row.warna" class="gi" /></td>
-                <td><input type="text" v-model="row.jenis" class="gi" /></td>
+                <td style="padding: 0">
+                  <select
+                    v-model="row.jenis"
+                    class="gi"
+                    style="cursor: pointer"
+                  >
+                    <option value="" disabled selected>Pilih...</option>
+                    <option v-for="j in jenisOptions" :key="j" :value="j">
+                      {{ j }}
+                    </option>
+                  </select>
+                </td>
                 <td>
                   <div class="gi-group">
                     <input
