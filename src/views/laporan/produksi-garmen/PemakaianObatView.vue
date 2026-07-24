@@ -7,11 +7,7 @@ import { useBrowse } from "@/composables/useBrowse";
 import { laporanPemakaianObatService } from "@/services/laporan/produksi-garmen/laporanPemakaianObatService";
 import SpkSearchModal from "@/components/lookups/SpkSearchModal.vue";
 import { formatTanggal } from "@/utils/dateFormat";
-import {
-  exportExcel,
-  exportExcelSingle,
-  type ExcelColumn,
-} from "@/utils/excelExport";
+import { exportExcelSingle, type ExcelColumn } from "@/utils/excelExport";
 import { IconFlask, IconFileSpreadsheet, IconSearch } from "@tabler/icons-vue";
 
 const toast = useToast();
@@ -143,7 +139,7 @@ const onExportMaster = async () => {
       "Pemakaian Obat",
       columns,
       list,
-      `Laporan Pemakaian Obat — ${dtAwal.value} s.d ${dtAkhir.value}`,
+      `Laporan Pemakaian Obat  |  Periode: ${formatTanggal(dtAwal.value)} s.d ${formatTanggal(dtAkhir.value)}`,
     );
   } catch {
     toast.error("Gagal export.");
@@ -164,11 +160,48 @@ const onExportDetail = async () => {
       cab.value,
       nomorSpk.value,
     );
-    const rows = res.data.data || [];
-    if (!rows.length) {
+    const allDetail: any[] = res.data.data || [];
+    if (!allDetail.length) {
       toast.warning("Tidak ada data detail.");
       return;
     }
+
+    // ✅ Kelompokkan per Kode obat (jaga urutan kemunculan pertama)
+    const groups: Record<string, any[]> = {};
+    const order: string[] = [];
+    allDetail.forEach((r) => {
+      const key = r.Kode;
+      if (!groups[key]) {
+        groups[key] = [];
+        order.push(key);
+      }
+      groups[key].push(r);
+    });
+
+    const combinedRows: any[] = [];
+
+    order.forEach((key) => {
+      const rowsInGroup = groups[key];
+      const first = rowsInGroup[0];
+      const masterCells = {
+        Kode: first.Kode,
+        JenisObat: first.JenisObat,
+      };
+      const blankMaster = Object.fromEntries(
+        Object.keys(masterCells).map((k) => [k, ""]),
+      );
+
+      rowsInGroup.forEach((r, idx) => {
+        combinedRows.push({
+          ...(idx === 0 ? masterCells : blankMaster),
+          Spk: r.Spk,
+          NamaSPK: r.NamaSPK,
+          JumlahKg: Number(r.JumlahKg) || 0,
+          Harga: Number(r.Harga) || 0,
+        });
+      });
+    });
+
     const columns: ExcelColumn[] = [
       { header: "Kode", key: "Kode", width: 12 },
       { header: "Jenis Obat", key: "JenisObat", width: 26 },
@@ -189,17 +222,16 @@ const onExportDetail = async () => {
         numFmt: "#,##0.00",
       },
     ];
-    await exportExcel(
+
+    await exportExcelSingle(
       `Pemakaian_Obat_Detail_${dtAwal.value}_${dtAkhir.value}.xlsx`,
-      [
-        {
-          sheetName: "Detail per SPK",
-          columns,
-          rows,
-          title: "RINCIAN PEMAKAIAN OBAT PER SPK",
-        },
-      ],
+      "Detail per SPK",
+      columns,
+      combinedRows,
+      `Rincian Pemakaian Obat per SPK  |  Periode: ${formatTanggal(dtAwal.value)} s.d ${formatTanggal(dtAkhir.value)}`,
     );
+
+    toast.success("Berhasil export detail.");
   } catch {
     toast.error("Gagal export detail.");
   } finally {

@@ -639,6 +639,9 @@ const onExport = async () => {
               summary-key="Nilai"
               summary-label="Total Nilai"
             >
+              <template #item.Tanggal="{ item }">
+                {{ item.Tanggal?.replace(/-/g, "/") }}
+              </template>
               <template #item.Status="{ item }">
                 <span
                   class="status-badge"

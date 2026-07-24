@@ -9,11 +9,8 @@ import {
   IconFileSpreadsheet,
   IconSearch,
 } from "@tabler/icons-vue";
-import {
-  exportExcel,
-  exportExcelSingle,
-  type ExcelColumn,
-} from "@/utils/excelExport";
+import { exportExcelSingle, type ExcelColumn } from "@/utils/excelExport";
+import { formatTanggal } from "@/utils/dateFormat";
 
 import BahanSearchModal from "@/components/lookups/BahanSearchModal.vue";
 
@@ -199,11 +196,49 @@ const onExportDetail = async () => {
       filters.value.endDate,
       filters.value.kodeBahan,
     );
-    const rows = res.data.data || [];
-    if (!rows.length) {
+    const allDetail: any[] = res.data.data || [];
+    if (!allDetail.length) {
       toast.warning("Tidak ada data detail pada filter ini.");
       return;
     }
+
+    // ✅ Kelompokkan per Kode bahan (jaga urutan kemunculan pertama)
+    const groups: Record<string, any[]> = {};
+    const order: string[] = [];
+    allDetail.forEach((r) => {
+      const key = r.Kode;
+      if (!groups[key]) {
+        groups[key] = [];
+        order.push(key);
+      }
+      groups[key].push(r);
+    });
+
+    const combinedRows: any[] = [];
+
+    order.forEach((key) => {
+      const rowsInGroup = groups[key];
+      const first = rowsInGroup[0];
+      const masterCells = {
+        Kode: first.Kode,
+        Nama: first.Nama,
+      };
+      const blankMaster = Object.fromEntries(
+        Object.keys(masterCells).map((k) => [k, ""]),
+      );
+
+      rowsInGroup.forEach((r, idx) => {
+        combinedRows.push({
+          ...(idx === 0 ? masterCells : blankMaster),
+          Transaksi: r.Transaksi,
+          Nomor: r.Nomor,
+          Tanggal: formatTanggal(r.Tanggal),
+          StokIn: Number(r.StokIn) || 0,
+          StokOut: Number(r.StokOut) || 0,
+        });
+      });
+    });
+
     const columns: ExcelColumn[] = [
       { header: "Kode", key: "Kode", width: 16 },
       { header: "Nama", key: "Nama", width: 30 },
@@ -225,17 +260,16 @@ const onExportDetail = async () => {
         numFmt: "#,##0.00",
       },
     ];
-    await exportExcel(
+
+    await exportExcelSingle(
       `Kartu_Stok_Bahan_Detail_${filters.value.startDate}_to_${filters.value.endDate}.xlsx`,
-      [
-        {
-          sheetName: "Rincian Transaksi",
-          columns,
-          rows,
-          title: "RINCIAN TRANSAKSI KARTU STOK BAHAN",
-        },
-      ],
+      "Rincian Transaksi",
+      columns,
+      combinedRows,
+      `Rincian Transaksi Kartu Stok Bahan  |  Periode: ${formatTanggal(filters.value.startDate)} s.d ${formatTanggal(filters.value.endDate)}`,
     );
+
+    toast.success("Berhasil export detail.");
   } catch {
     toast.error("Gagal export detail.");
   } finally {
@@ -268,11 +302,26 @@ onMounted(fetchData);
     :items="items ?? []"
     item-value="Kode"
     :is-loading="isLoading"
+    :can-export="canExport"
     show-expand
     :expanded="expandedRows"
     @update:expanded="onUpdateExpanded"
     @refresh="fetchData"
+    @export="onExportMaster"
   >
+    <template #extra-actions>
+      <v-btn
+        v-if="canExport"
+        size="small"
+        color="teal-darken-1"
+        :loading="isExportingDetail"
+        @click="onExportDetail"
+      >
+        <template #prepend><IconFileSpreadsheet :size="15" /></template>Export
+        Detail
+      </v-btn>
+    </template>
+
     <template #filter-left>
       <span class="f-label">Periode</span>
       <input type="date" v-model="filters.startDate" class="f-date" />
@@ -361,7 +410,7 @@ onMounted(fetchData);
                 {{ d.Transaksi }}
               </td>
               <td>{{ d.Nomor || "-" }}</td>
-              <td class="tc">{{ d.Tanggal }}</td>
+              <td class="tc">{{ formatTanggal(d.Tanggal) }}</td>
               <td class="tr">{{ fmtNum(d.StokIn) }}</td>
               <td class="tr">{{ fmtNum(d.StokOut) }}</td>
             </tr>

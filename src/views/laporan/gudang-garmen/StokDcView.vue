@@ -10,6 +10,7 @@ import {
   exportExcelSingle,
   type ExcelColumn,
 } from "@/utils/excelExport";
+import { formatTanggal } from "@/utils/dateFormat";
 
 const toast = useToast();
 const menuId = "570";
@@ -98,12 +99,6 @@ const onUpdateExpanded = async (val: any[]) => {
 
 const fmtNum = (val: any) =>
   new Intl.NumberFormat("id-ID").format(Number(val) || 0);
-const fmtDate = (v: string) => {
-  if (!v) return "-";
-  const d = new Date(v);
-  if (isNaN(d.getTime())) return v;
-  return `${String(d.getDate()).padStart(2, "0")}-${String(d.getMonth() + 1).padStart(2, "0")}-${d.getFullYear()}`;
-};
 
 // ── Export master ──
 const isExporting = ref(false);
@@ -282,9 +277,9 @@ onMounted(fetchData);
       </v-btn>
     </template>
 
-    <template #item.TanggalSpk="{ item }">{{
-      fmtDate(item.TanggalSpk)
-    }}</template>
+    <template #item.TanggalSpk="{ item }">
+      {{ formatTanggal(item.TanggalSpk) }}
+    </template>
     <template #item.StokAwal="{ item }">{{ fmtNum(item.StokAwal) }}</template>
     <template #item.Masuk="{ item }">{{ fmtNum(item.Masuk) }}</template>
     <template #item.Keluar="{ item }">{{ fmtNum(item.Keluar) }}</template>
@@ -320,7 +315,9 @@ onMounted(fetchData);
               <td :class="{ 'font-weight-bold': d.Arah === 'Stok Awal' }">
                 {{ d.Nomor || "-" }}
               </td>
-              <td class="tc">{{ fmtDate(d.Tanggal) }}</td>
+              <td class="tc">
+                {{ formatTanggal(d.Tanggal) }}
+              </td>
               <td>{{ d.GudangAsal || "-" }}</td>
               <td>{{ d.GudangTujuan || "-" }}</td>
               <td class="tc">

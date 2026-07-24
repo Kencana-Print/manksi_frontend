@@ -135,6 +135,9 @@ const getTotal = (key: string, filteredItems: any[]) => {
       </div>
     </template>
 
+    <template #item.Tanggal="{ item }">
+      {{ item.Tanggal?.replace(/-/g, "/") }}
+    </template>
     <template #item.Debet="{ item }">{{ fmtNum(item.Debet) }}</template>
     <template #item.Kredit="{ item }">{{ fmtNum(item.Kredit) }}</template>
     <template #item.Saldo="{ item }">
@@ -210,7 +213,9 @@ const getTotal = (key: string, filteredItems: any[]) => {
               <tbody>
                 <tr v-for="(d, i) in detailData[item.NoPenerimaan]" :key="i">
                   <td>{{ d.NoPelunasan }}</td>
-                  <td class="tc">{{ d.Tanggal }}</td>
+                  <td class="tc">
+                    {{ d.Tanggal?.replace(/-/g, "/") || "-" }}
+                  </td>
                   <td class="font-weight-bold text-primary">{{ d.Invoice }}</td>
                   <td class="tc monospace">{{ d.KodeCus }}</td>
                   <td>{{ d.Customer }}</td>

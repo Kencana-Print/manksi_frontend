@@ -136,6 +136,13 @@ const getTotal = (key: string, filteredItems: any[]) => {
       </div>
     </template>
 
+    <template #item.Tanggal="{ item }">
+      {{ item.Tanggal?.replace(/-/g, "/") }}
+    </template>
+
+    <template #item.TglBayar="{ item }">
+      {{ item.TglBayar ? item.TglBayar.replace(/-/g, "/") : "-" }}
+    </template>
     <template #item.Dpp="{ item }">{{ fmtNum(item.Dpp) }}</template>
     <template #item.PPn="{ item }">{{ fmtNum(item.PPn) }}</template>
     <template #item.Total="{ item }">
@@ -222,7 +229,9 @@ const getTotal = (key: string, filteredItems: any[]) => {
               <tbody>
                 <tr v-for="(d, i) in detailData[item.Nomor]" :key="i">
                   <td class="fw">{{ d.NoBukti }}</td>
-                  <td class="tc">{{ d.Tanggal }}</td>
+                  <td class="tc">
+                    {{ d.Tanggal?.replace(/-/g, "/") || "-" }}
+                  </td>
                   <td>{{ d.CaraBayar }}</td>
                   <td class="tr text-success fw">
                     {{ d.Bayar !== 0 ? fmtNum(d.Bayar) : "-" }}

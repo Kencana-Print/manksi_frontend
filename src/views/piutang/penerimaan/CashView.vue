@@ -6,6 +6,7 @@ import BaseBrowse from "@/components/BaseBrowse.vue";
 import { useBrowse } from "@/composables/useBrowse";
 import { cashService } from "@/services/piutang/penerimaan/cashService";
 import { IconCash, IconFileDescription } from "@tabler/icons-vue";
+import { formatTanggal } from "@/utils/dateFormat";
 
 const router = useRouter();
 const toast = useToast();
@@ -64,13 +65,6 @@ const headers = [
   { title: "Customer", key: "customer", minWidth: "250px" },
   { title: "Notes", key: "Notes", minWidth: "250px" },
 ];
-
-const fmtDate = (val: string) => {
-  if (!val) return "";
-  const d = new Date(val);
-  if (isNaN(d.getTime())) return val;
-  return `${String(d.getDate()).padStart(2, "0")}-${String(d.getMonth() + 1).padStart(2, "0")}-${d.getFullYear()}`;
-};
 
 const fmtNum = (val: number | string | null) => {
   if (!val) return "0";
@@ -231,8 +225,12 @@ const getRowProps = () => ({});
       </div>
     </template>
 
-    <template #item.Tanggal="{ item }">{{ fmtDate(item.Tanggal) }}</template>
-    <template #item.Tempo="{ item }">{{ fmtDate(item.Tempo) }}</template>
+    <template #item.Tanggal="{ item }">
+      {{ formatTanggal(item.Tanggal) }}
+    </template>
+    <template #item.Tempo="{ item }">
+      {{ formatTanggal(item.Tempo) }}
+    </template>
     <template #item.Debet="{ item }">{{ fmtNum(item.Debet) }}</template>
   </BaseBrowse>
 

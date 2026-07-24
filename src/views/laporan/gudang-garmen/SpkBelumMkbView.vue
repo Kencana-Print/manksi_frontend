@@ -5,6 +5,7 @@ import BaseBrowse from "@/components/BaseBrowse.vue";
 import { useBrowse } from "@/composables/useBrowse";
 import { spkBelumMkbService } from "@/services/laporan/gudang-garmen/spkBelumMkbService";
 import { IconFileAlert } from "@tabler/icons-vue";
+import { formatTanggal } from "@/utils/dateFormat";
 
 // Import utility Excel baru Anda
 import { exportExcelSingle, type ExcelColumn } from "@/utils/excelExport";
@@ -130,6 +131,14 @@ const fmtNum = (val: number) =>
         />
       </div>
       <div class="f-divider" />
+    </template>
+
+    <template #item.Tanggal="{ item }">
+      {{ formatTanggal(item.Tanggal) }}
+    </template>
+
+    <template #item.Dateline="{ item }">
+      {{ formatTanggal(item.Dateline) }}
     </template>
 
     <template #item.Jumlah="{ item }">

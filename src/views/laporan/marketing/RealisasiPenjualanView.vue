@@ -371,6 +371,9 @@ const renderChart = async () => {
           summary-key="Nominal_Order"
           summary-label="Total Nominal"
         >
+          <template #item.Tanggal="{ item }">
+            {{ item.Tanggal?.replace(/-/g, "/") }}
+          </template>
           <template #item.Nominal_Order="{ item }">
             <span
               style="font-family: monospace; font-weight: 700; color: #1565c0"

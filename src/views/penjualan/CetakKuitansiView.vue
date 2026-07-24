@@ -5,6 +5,7 @@ import BaseBrowse from "@/components/BaseBrowse.vue";
 import { useBrowse } from "@/composables/useBrowse";
 import { cetakKuitansiService as svc } from "@/services/penjualan/cetakKuitansiService";
 import { IconReceipt2 } from "@tabler/icons-vue";
+import { formatTanggal, formatTanggalJam } from "@/utils/dateFormat";
 
 const router = useRouter();
 
@@ -20,19 +21,6 @@ const todayLocal = () => {
     new Date().toLocaleString("en-US", { timeZone: "Asia/Jakarta" }),
   );
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-};
-const fmtDate = (v: string) => {
-  if (!v) return "-";
-  const d = new Date(v);
-  if (isNaN(d.getTime())) return v;
-  return `${String(d.getDate()).padStart(2, "0")}-${String(d.getMonth() + 1).padStart(2, "0")}-${d.getFullYear()}`;
-};
-const fmtDateTime = (v: string) => {
-  if (!v) return "-";
-  const d = new Date(v);
-  if (isNaN(d.getTime())) return v;
-  const p = (n: number) => String(n).padStart(2, "0");
-  return `${p(d.getDate())}-${p(d.getMonth() + 1)}-${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
 };
 
 // ── Filter — default awal bulan s.d. hari ini ─────────────────
@@ -108,11 +96,11 @@ const goNew = () => {
 
     <!-- ── Custom cell rendering ── -->
     <template #item.Tanggal_Inv="{ item }">
-      {{ fmtDate(item.Tanggal_Inv) }}
+      {{ formatTanggal(item.Tanggal_Inv) }}
     </template>
 
     <template #item.Date_Create="{ item }">
-      {{ fmtDateTime(item.Date_Create) }}
+      {{ formatTanggalJam(item.Date_Create) }}
     </template>
   </BaseBrowse>
 </template>

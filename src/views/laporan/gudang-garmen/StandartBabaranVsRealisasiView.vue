@@ -10,6 +10,7 @@ import {
   exportExcelSingle,
   type ExcelColumn,
 } from "@/utils/excelExport";
+import { formatTanggal } from "@/utils/dateFormat";
 
 const toast = useToast();
 const menuId = "509";
@@ -121,12 +122,6 @@ const fmtNum = (val: any, decimals = 0) =>
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,
   });
-const fmtDate = (v: string) => {
-  if (!v) return "-";
-  const d = new Date(v);
-  if (isNaN(d.getTime())) return v;
-  return `${String(d.getDate()).padStart(2, "0")}-${String(d.getMonth() + 1).padStart(2, "0")}-${d.getFullYear()}`;
-};
 
 // ── Export master ──
 const isExporting = ref(false);
@@ -360,10 +355,12 @@ onMounted(fetchData);
       </v-btn>
     </template>
 
-    <template #item.TanggalSpk="{ item }">{{
-      fmtDate(item.TanggalSpk)
-    }}</template>
-    <template #item.Dateline="{ item }">{{ fmtDate(item.Dateline) }}</template>
+    <template #item.TanggalSpk="{ item }">
+      {{ formatTanggal(item.TanggalSpk) }}
+    </template>
+    <template #item.Dateline="{ item }">
+      {{ formatTanggal(item.Dateline) }}
+    </template>
     <template #item.SpkJumlah="{ item }">{{ fmtNum(item.SpkJumlah) }}</template>
     <template #item.SpkJumlahJadi="{ item }">{{
       fmtNum(item.SpkJumlahJadi)

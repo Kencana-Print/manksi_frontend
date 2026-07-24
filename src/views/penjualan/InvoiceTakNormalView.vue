@@ -13,6 +13,7 @@ import {
   IconListDetails,
   IconAlertTriangle,
 } from "@tabler/icons-vue";
+import { formatTanggal, formatTanggalJam } from "@/utils/dateFormat";
 
 const router = useRouter();
 const toast = useToast();
@@ -31,13 +32,6 @@ const firstOfMonth = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
 };
 const num = (v: any) => Number(v || 0).toLocaleString("id-ID");
-
-const fmtDate = (v: string) => {
-  if (!v) return "-";
-  const d = new Date(v);
-  if (isNaN(d.getTime())) return v;
-  return `${String(d.getDate()).padStart(2, "0")}-${String(d.getMonth() + 1).padStart(2, "0")}-${d.getFullYear()}`;
-};
 
 // ── Filter ─────────────────────────────────────────────────
 // NOTE: default dipakai sama seperti Invoice biasa (awal bulan s.d. hari
@@ -444,12 +438,20 @@ const onExportDetail = async () => {
       {{ num(item.Bayar) }}
     </template>
 
+    <template #item.Tanggal="{ item }">
+      {{ formatTanggal(item.Tanggal) }}
+    </template>
+
     <template #item.Tanggal_Pelunasan="{ item }">
-      {{ item.Tanggal_Pelunasan ? fmtDate(item.Tanggal_Pelunasan) : "-" }}
+      {{ formatTanggal(item.Tanggal_Pelunasan) }}
     </template>
 
     <template #item.Tanggal_Bayar="{ item }">
-      {{ item.Tanggal_Bayar ? fmtDate(item.Tanggal_Bayar) : "-" }}
+      {{ formatTanggal(item.Tanggal_Bayar) }}
+    </template>
+
+    <template #item.Created="{ item }">
+      {{ formatTanggalJam(item.Created) }}
     </template>
 
     <template #item.ACC_Edit="{ item }">
@@ -582,7 +584,7 @@ const onExportDetail = async () => {
                       {{ d.InvoiceNormal }}
                     </td>
                     <td>{{ d.Cabang }}</td>
-                    <td>{{ d.Tanggal ? fmtDate(d.Tanggal) : "-" }}</td>
+                    <td>{{ formatTanggal(d.Tanggal) }}</td>
                     <td>{{ d.KodeCus }}</td>
                     <td>{{ d.NamaCustomer }}</td>
                     <td>{{ d.Alamat }}</td>

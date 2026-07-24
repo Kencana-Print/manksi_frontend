@@ -3001,6 +3001,39 @@ const router = createRouter({
       },
     },
     {
+      path: "/laporan/penjualan/spk-vs-stbj",
+      name: "LaporanSpkVsStbj",
+      component: () => import("@/views/laporan/penjualan/SpkVsStbjView.vue"),
+      meta: {
+        title: "Laporan SPK vs STBJ",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "304",
+      },
+    },
+    {
+      path: "/laporan/penjualan/spk-vs-sj",
+      name: "LaporanSpkVsSj",
+      component: () => import("@/views/laporan/penjualan/SpkVsSjView.vue"),
+      meta: {
+        title: "Laporan SPK vs SJ",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "305",
+      },
+    },
+    {
+      path: "/laporan/penjualan/spk-vs-sj-vs-inv",
+      name: "LaporanSpkVsSjVsInv",
+      component: () => import("@/views/laporan/penjualan/SpkVsSjVsInvView.vue"),
+      meta: {
+        title: "Laporan SPK vs SJ vs Invoice",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "306",
+      },
+    },
+    {
       path: "/laporan/penjualan/map-vs-sj",
       name: "LapMapVsSj",
       component: () => import("@/views/laporan/penjualan/MapVsSjView.vue"),

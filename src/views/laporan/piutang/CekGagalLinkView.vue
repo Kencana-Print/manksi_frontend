@@ -168,6 +168,9 @@ const getTotal = (key: string, filteredItems: any[]) => {
       </v-btn>
     </template>
 
+    <template #item.Tanggal="{ item }">
+      {{ item.Tanggal?.replace(/-/g, "/") }}
+    </template>
     <template #item.Debet="{ item }">{{ fmtNum(item.Debet) }}</template>
     <template #item.Kredit="{ item }">{{ fmtNum(item.Kredit) }}</template>
     <template #item.Bayar="{ item }">
@@ -211,7 +214,9 @@ const getTotal = (key: string, filteredItems: any[]) => {
                 <tr v-for="(d, i) in detailData[item.Nota]" :key="i">
                   <td class="font-weight-bold text-primary">{{ d.Nota }}</td>
                   <td>{{ d.Nomor }}</td>
-                  <td class="tc">{{ d.Tanggal }}</td>
+                  <td class="tc">
+                    {{ d.Tanggal?.replace(/-/g, "/") || "-" }}
+                  </td>
                   <td class="monospace">{{ d.NoBukti }}</td>
                   <td class="tr text-success fw">{{ fmtNum(d.Bayar) }}</td>
                 </tr>

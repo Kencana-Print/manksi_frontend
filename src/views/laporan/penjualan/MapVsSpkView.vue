@@ -6,6 +6,7 @@ import { useBrowse } from "@/composables/useBrowse";
 import { mapVsSpkService } from "@/services/laporan/penjualan/mapVsSpkService";
 import api from "@/services/api";
 import { IconClipboardList } from "@tabler/icons-vue";
+import { formatTanggal } from "@/utils/dateFormat";
 
 // ── UTILITAS EXPORT EXCELJS ──
 import { exportExcelSingle, type ExcelColumn } from "@/utils/excelExport";
@@ -150,6 +151,8 @@ const onExport = async () => {
     // Konversi nilai string ke Number agar format Excel numFmt bisa mendeteksi sebagai angka
     const rowsData = items.value.map((r: any) => ({
       ...r,
+      Tanggal: formatTanggal(r.Tanggal),
+      Dateline: formatTanggal(r.Dateline),
       Jumlah: Number(r.Jumlah) || 0,
       Kirim: Number(r.Kirim) || 0,
       Harga: Number(r.Harga) || 0,
@@ -212,6 +215,12 @@ const fmtNum = (val: number) =>
       </div>
     </template>
 
+    <template #item.Tanggal="{ item }">{{
+      formatTanggal(item.Tanggal)
+    }}</template>
+    <template #item.Dateline="{ item }">{{
+      formatTanggal(item.Dateline)
+    }}</template>
     <template #item.Jumlah="{ item }">{{ fmtNum(item.Jumlah) }}</template>
     <template #item.Kirim="{ item }">
       <span class="text-primary">{{ fmtNum(item.Kirim) }}</span>

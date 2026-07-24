@@ -16,6 +16,7 @@ import {
   exportExcelSingle,
   type ExcelColumn,
 } from "@/utils/excelExport";
+import { formatTanggal } from "@/utils/dateFormat";
 
 import GudangBahanSearchModal from "@/components/lookups/GudangBahanSearchModal.vue";
 
@@ -401,7 +402,9 @@ onMounted(fetchData);
                 {{ d.Transaksi }}
               </td>
               <td>{{ d.Nomor || "-" }}</td>
-              <td class="tc">{{ d.Tanggal }}</td>
+              <td class="tc">
+                {{ formatTanggal(d.Tanggal) }}
+              </td>
               <td class="tr">{{ fmtNum(d.StokIn) }}</td>
               <td class="tr">{{ fmtNum(d.StokOut) }}</td>
             </tr>

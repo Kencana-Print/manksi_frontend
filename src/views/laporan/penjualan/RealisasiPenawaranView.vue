@@ -4,6 +4,9 @@ import { useBrowse } from "@/composables/useBrowse";
 import BaseBrowse from "@/components/BaseBrowse.vue";
 import { realisasiPenawaranService } from "@/services/laporan/penjualan/realisasiPenawaranService";
 import { IconReportAnalytics } from "@tabler/icons-vue";
+import { useToast } from "vue-toastification";
+import { exportExcelSingle, type ExcelColumn } from "@/utils/excelExport";
+import { formatTanggal } from "@/utils/dateFormat";
 
 interface RealisasiPenawaranItem {
   Nominal: number;
@@ -31,7 +34,9 @@ const filters = ref({
   endDate: todayString,
 });
 
-const { items, isLoading, canExport, fetchData, exportToExcel } = useBrowse({
+const toast = useToast();
+
+const { items, isLoading, canExport, fetchData } = useBrowse({
   menuId: "302",
   fetchApi: async () => {
     const res = await realisasiPenawaranService.getBrowse({
@@ -96,6 +101,120 @@ const pctOpen = computed(() =>
     ? ((grandTotal.value.open / grandTotal.value.nominal) * 100).toFixed(2)
     : "0.00",
 );
+
+const onExport = async () => {
+  if (!items.value || items.value.length === 0) {
+    return toast.warning("Tidak ada data untuk diexport.");
+  }
+  try {
+    const columns: ExcelColumn[] = [
+      { header: "Divisi", key: "Divisi", width: 14 },
+      { header: "Customer", key: "Customer", width: 26 },
+      {
+        header: "Jumlah",
+        key: "Jumlah",
+        width: 10,
+        align: "center",
+        numFmt: "#,##0",
+      },
+      { header: "Qty", key: "Qty", width: 12, align: "right", numFmt: "#,##0" },
+      { header: "Satuan", key: "Satuan", width: 10, align: "center" },
+      {
+        header: "Nominal",
+        key: "Nominal",
+        width: 16,
+        align: "right",
+        numFmt: "#,##0",
+      },
+      {
+        header: "Close",
+        key: "Close",
+        width: 16,
+        align: "right",
+        numFmt: "#,##0",
+      },
+      {
+        header: "% Close",
+        key: "PercClose",
+        width: 10,
+        align: "right",
+        numFmt: '0.00"%"',
+      },
+      {
+        header: "Batal",
+        key: "Batal",
+        width: 16,
+        align: "right",
+        numFmt: "#,##0",
+      },
+      {
+        header: "% Batal",
+        key: "PercBatal",
+        width: 10,
+        align: "right",
+        numFmt: '0.00"%"',
+      },
+      {
+        header: "Open",
+        key: "Open",
+        width: 16,
+        align: "right",
+        numFmt: "#,##0",
+      },
+      {
+        header: "% Open",
+        key: "PercOpen",
+        width: 10,
+        align: "right",
+        numFmt: '0.00"%"',
+      },
+    ];
+
+    const rows: any[] = (items.value ?? []).map((it: any) => ({
+      Divisi: it.Divisi,
+      Customer: it.Customer,
+      Jumlah: Number(it.Jumlah) || 0,
+      Qty: Number(it.Qty) || 0,
+      Satuan: it.Satuan,
+      Nominal: Number(it.Nominal) || 0,
+      Close: Number(it.Close) || 0,
+      PercClose: Number(it.PercClose) || 0,
+      Batal: Number(it.Batal) || 0,
+      PercBatal: Number(it.PercBatal) || 0,
+      Open: Number(it.Open) || 0,
+      PercOpen: Number(it.PercOpen) || 0,
+    }));
+
+    // ✅ Baris TOTAL di bawah, nyambung ke angka summary bar yang udah ada di UI
+    rows.push({
+      Divisi: "",
+      Customer: "TOTAL",
+      Jumlah: "",
+      Qty: "",
+      Satuan: "",
+      Nominal: grandTotal.value.nominal,
+      Close: grandTotal.value.close,
+      PercClose: Number(pctClose.value),
+      Batal: grandTotal.value.batal,
+      PercBatal: 0,
+      Open: grandTotal.value.open,
+      PercOpen: Number(pctOpen.value),
+    });
+
+    await exportExcelSingle(
+      `Laporan_Realisasi_Penawaran_${filters.value.startDate}.xlsx`,
+      "Realisasi Penawaran",
+      columns,
+      rows,
+      `Laporan Realisasi Penawaran  |  Periode: ${formatTanggal(filters.value.startDate)} s.d ${formatTanggal(filters.value.endDate)}`,
+    );
+
+    toast.success("Berhasil export data.");
+  } catch (e) {
+    console.error(e);
+    toast.error("Terjadi kesalahan saat export.");
+  }
+};
 </script>
 
 <template>
@@ -113,7 +232,7 @@ const pctOpen = computed(() =>
     item-value="Customer"
     v-model:filter-state="filters"
     @refresh="fetchData"
-    @export="exportToExcel('Laporan_Realisasi_Penawaran')"
+    @export="onExport"
   >
     <!-- ── Filter ── -->
     <template #filter-left>

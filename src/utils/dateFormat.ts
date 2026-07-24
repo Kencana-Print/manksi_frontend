@@ -5,12 +5,32 @@
  */
 export const formatTanggal = (v: string | null | undefined): string => {
   if (!v) return "-";
-  const s = String(v).substring(0, 10);
-  const [y, m, d] = s.split("-");
-  if (!y || !m || !d) return v;
-  return `${d}/${m}/${y}`;
-};
 
+  const s = String(v);
+
+  // sudah dd-MM-yyyy
+  if (/^\d{2}-\d{2}-\d{4}$/.test(s)) {
+    return s.replace(/-/g, "/");
+  }
+
+  // yyyy-MM-dd
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    const [y, m, d] = s.split("-");
+    return `${d}/${m}/${y}`;
+  }
+
+  // ISO
+  if (s.includes("T")) {
+    const d = new Date(s);
+    if (!isNaN(d.getTime())) {
+      return `${String(d.getDate()).padStart(2, "0")}/${String(
+        d.getMonth() + 1,
+      ).padStart(2, "0")}/${d.getFullYear()}`;
+    }
+  }
+
+  return s;
+};
 /**
  * Sama seperti formatTanggal, tapi ikut nampilin jam:menit kalau ada
  * (buat kolom datetime, misal "Tanggal Buat").

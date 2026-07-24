@@ -5,11 +5,8 @@ import BaseBrowse from "@/components/BaseBrowse.vue";
 import { useBrowse } from "@/composables/useBrowse";
 import { laporanOutstandingSpkService } from "@/services/laporan/gudang-garmen/laporanOutstandingSpkService";
 import { IconClipboardList, IconFileSpreadsheet } from "@tabler/icons-vue";
-import {
-  exportExcel,
-  exportExcelSingle,
-  type ExcelColumn,
-} from "@/utils/excelExport";
+import { exportExcelSingle, type ExcelColumn } from "@/utils/excelExport";
+import { formatTanggal } from "@/utils/dateFormat";
 
 const toast = useToast();
 const menuId = "526";
@@ -59,13 +56,6 @@ const fmtNum = (val: any, d = 2) =>
     minimumFractionDigits: d,
     maximumFractionDigits: d,
   });
-const fmtDate = (v: string) => {
-  if (!v) return "-";
-  const s = String(v).substring(0, 10);
-  const [y, m, d] = s.split("-");
-  if (!y || !m || !d) return v;
-  return `${d}/${m}/${y}`;
-};
 
 // ── Export master ──
 const isExporting = ref(false);
@@ -119,15 +109,51 @@ const onExportDetail = async () => {
   isExportingDetail.value = true;
   try {
     const res = await laporanOutstandingSpkService.getAllDetail();
-    const rows = res.data.data || [];
-    if (!rows.length) {
+    const allDetail: any[] = res.data.data || [];
+    if (!allDetail.length) {
       toast.warning("Tidak ada data detail.");
       return;
     }
+
+    // ✅ Kelompokkan per SPK (jaga urutan kemunculan pertama)
+    const groups: Record<string, any[]> = {};
+    const order: string[] = [];
+    allDetail.forEach((r) => {
+      const key = r.spk;
+      if (!groups[key]) {
+        groups[key] = [];
+        order.push(key);
+      }
+      groups[key].push(r);
+    });
+
+    const combinedRows: any[] = [];
+
+    order.forEach((key) => {
+      const rowsInGroup = groups[key];
+      const first = rowsInGroup[0];
+      const masterCells = {
+        Nama: first.Nama,
+        SPK: first.spk,
+      };
+      const blankMaster = Object.fromEntries(
+        Object.keys(masterCells).map((k) => [k, ""]),
+      );
+
+      rowsInGroup.forEach((r, idx) => {
+        combinedRows.push({
+          ...(idx === 0 ? masterCells : blankMaster),
+          Proses: r.proses,
+          Jumlah: Number(r.Jumlah) || 0,
+          Bs: Number(r.Bs) || 0,
+        });
+      });
+    });
+
     const columns: ExcelColumn[] = [
       { header: "Nama SPK", key: "Nama", width: 32 },
-      { header: "SPK", key: "spk", width: 18 },
-      { header: "Proses", key: "proses", width: 16 },
+      { header: "SPK", key: "SPK", width: 18 },
+      { header: "Proses", key: "Proses", width: 16 },
       {
         header: "Jumlah",
         key: "Jumlah",
@@ -143,14 +169,16 @@ const onExportDetail = async () => {
         numFmt: "#,##0.00",
       },
     ];
-    await exportExcel(`Outstanding_SPK_Detail.xlsx`, [
-      {
-        sheetName: "Detail Proses",
-        columns,
-        rows,
-        title: "RINCIAN OUTSTANDING SPK PER PROSES",
-      },
-    ]);
+
+    await exportExcelSingle(
+      "Outstanding_SPK_Detail.xlsx",
+      "Detail Proses",
+      columns,
+      combinedRows,
+      "Rincian Outstanding SPK per Proses",
+    );
+
+    toast.success("Berhasil export detail.");
   } catch {
     toast.error("Gagal export detail.");
   } finally {
@@ -198,7 +226,9 @@ onMounted(fetchData);
       </v-btn>
     </template>
 
-    <template #item.Tanggal="{ item }">{{ fmtDate(item.Tanggal) }}</template>
+    <template #item.Tanggal="{ item }">{{
+      formatTanggal(item.Tanggal)
+    }}</template>
     <template #item.Jumlah="{ item }">{{ fmtNum(item.Jumlah) }}</template>
     <template #item.Kirim="{ item }">{{ fmtNum(item.Kirim) }}</template>
     <template #item.Jadi="{ item }">{{ fmtNum(item.Jadi) }}</template>

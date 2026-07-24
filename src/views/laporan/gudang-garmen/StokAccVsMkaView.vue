@@ -10,6 +10,7 @@ import {
   exportExcelSingle,
   type ExcelColumn,
 } from "@/utils/excelExport";
+import { formatTanggal } from "@/utils/dateFormat";
 
 const toast = useToast();
 const menuId = "569";
@@ -74,12 +75,6 @@ const onUpdateExpanded = async (val: any[]) => {
 
 const fmtNum = (val: any) =>
   new Intl.NumberFormat("id-ID").format(Number(val) || 0);
-const fmtDate = (v: string) => {
-  if (!v) return "-";
-  const d = new Date(v);
-  if (isNaN(d.getTime())) return v;
-  return `${String(d.getDate()).padStart(2, "0")}-${String(d.getMonth() + 1).padStart(2, "0")}-${d.getFullYear()}`;
-};
 
 // ── Export master ──
 const isExporting = ref(false);
@@ -257,7 +252,9 @@ onMounted(fetchData);
           <tbody>
             <tr v-for="(d, i) in detailData[item.Kode]" :key="i">
               <td class="font-weight-bold text-primary">{{ d.NomorMKA }}</td>
-              <td class="tc">{{ fmtDate(d.TglMKA) }}</td>
+              <td class="tc">
+                {{ formatTanggal(d.TglMKA) }}
+              </td>
               <td>{{ d.Spk }}</td>
               <td>{{ d.Nama }}</td>
               <td class="tr">{{ fmtNum(d.Mka) }}</td>

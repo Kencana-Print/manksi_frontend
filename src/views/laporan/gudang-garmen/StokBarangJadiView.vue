@@ -13,6 +13,7 @@ import {
   IconPrinter,
 } from "@tabler/icons-vue";
 import { exportExcelSingle, type ExcelColumn } from "@/utils/excelExport";
+import { formatTanggal } from "@/utils/dateFormat";
 
 const router = useRouter();
 const toast = useToast();
@@ -177,6 +178,10 @@ onMounted(fetchData);
       >
         <template #prepend><IconFileSpreadsheet :size="15" /></template>Export
       </v-btn>
+    </template>
+
+    <template #item.Tanggal="{ item }">
+      {{ formatTanggal(item.Tanggal) }}
     </template>
 
     <template #item.Stok="{ item }">

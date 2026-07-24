@@ -347,6 +347,9 @@ const renderChart = async () => {
               {{ fmtNum(item.Nominal) }}
             </span>
           </template>
+          <template #item.Tanggal="{ item }">
+            {{ item.Tanggal?.replace(/-/g, "/") }}
+          </template>
 
           <!-- Summary row custom -->
           <template #summary-row="{ filteredItems }">

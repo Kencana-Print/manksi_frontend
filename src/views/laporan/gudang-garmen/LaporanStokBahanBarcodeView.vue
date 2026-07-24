@@ -5,6 +5,8 @@ import BaseBrowse from "@/components/BaseBrowse.vue";
 import { useBrowse } from "@/composables/useBrowse";
 import { laporanStokBahanBarcodeService } from "@/services/laporan/gudang-garmen/laporanStokBahanBarcodeService";
 import { IconEdit, IconX, IconDatabase } from "@tabler/icons-vue";
+import { exportExcelSingle, type ExcelColumn } from "@/utils/excelExport";
+import { formatTanggal } from "@/utils/dateFormat";
 
 const toast = useToast();
 
@@ -64,7 +66,7 @@ const fetchApi = async () => {
   return res.data?.data || [];
 };
 
-const { items, isLoading, selected, fetchData, exportToExcel } = useBrowse({
+const { items, isLoading, selected, fetchData } = useBrowse({
   menuId: "501",
   fetchApi,
   immediate: false,
@@ -147,6 +149,88 @@ const saveKeterangan = async () => {
 
 const fmtNum = (val: any) =>
   new Intl.NumberFormat("id-ID").format(Number(val) || 0);
+
+const isExporting = ref(false);
+const onExport = async () => {
+  if (!items.value || items.value.length === 0) {
+    return toast.warning("Tidak ada data untuk diexport.");
+  }
+  isExporting.value = true;
+  try {
+    const columns: ExcelColumn[] = [
+      { header: "Kode", key: "Kode", width: 14 },
+      { header: "Nama Bahan", key: "Nama", width: 32 },
+      { header: "Satuan", key: "Satuan", width: 10, align: "center" },
+      { header: "Warna", key: "Warna", width: 16 },
+      { header: "Gramasi", key: "Gramasi", width: 14 },
+      { header: "Setting", key: "Setting", width: 14 },
+      {
+        header: "Buffer",
+        key: "Buffer",
+        width: 12,
+        align: "right",
+        numFmt: "#,##0",
+      },
+      {
+        header: "In",
+        key: "Masuk_In",
+        width: 12,
+        align: "right",
+        numFmt: "#,##0",
+      },
+      {
+        header: "Out",
+        key: "Keluar_Out",
+        width: 12,
+        align: "right",
+        numFmt: "#,##0",
+      },
+      {
+        header: "Stok",
+        key: "Stok",
+        width: 12,
+        align: "right",
+        numFmt: "#,##0",
+      },
+      {
+        header: "MKB Belum Realisasi",
+        key: "MkbBelumRealisasi",
+        width: 18,
+        align: "right",
+        numFmt: "#,##0",
+      },
+    ];
+
+    const rows = items.value.map((it: any) => ({
+      Kode: it.Kode,
+      Nama: it.Nama,
+      Satuan: it.Satuan,
+      Warna: it.Warna,
+      Gramasi: it.Gramasi,
+      Setting: it.Setting,
+      Buffer: Number(it.Buffer) || 0,
+      Masuk_In: Number(it.Masuk_In) || 0,
+      Keluar_Out: Number(it.Keluar_Out) || 0,
+      Stok: Number(it.Stok) || 0,
+      MkbBelumRealisasi: Number(it.MkbBelumRealisasi) || 0,
+    }));
+
+    await exportExcelSingle(
+      `Laporan_Stok_Bahan_Barcode_${filterState.value.endDate}.xlsx`,
+      "Stok Bahan Barcode",
+      columns,
+      rows,
+      `Laporan Stok Bahan Barcode  |  Per Tanggal: ${formatTanggal(filterState.value.endDate)}`,
+    );
+
+    toast.success("Berhasil export data.");
+  } catch (e) {
+    console.error(e);
+    toast.error("Terjadi kesalahan saat export.");
+  } finally {
+    isExporting.value = false;
+  }
+};
 </script>
 
 <template>
@@ -163,7 +247,7 @@ const fmtNum = (val: any) =>
     :expanded="expandedRows"
     can-export
     @update:expanded="onUpdateExpanded"
-    @export="exportToExcel('Laporan_Stok_Bahan_Barcode')"
+    @export="onExport"
     @refresh="fetchData"
   >
     <template #filter-left>
@@ -255,7 +339,9 @@ const fmtNum = (val: any) =>
                       >
                         {{ row.NomorMkb }}
                       </td>
-                      <td class="text-center">{{ row.TglMkb }}</td>
+                      <td class="text-center">
+                        {{ formatTanggal(row.TglMkb) }}
+                      </td>
                       <td>{{ row.Spk }}</td>
                       <td>{{ row.NamaSpk }}</td>
                       <td class="text-right">{{ fmtNum(row.Butuh) }}</td>
@@ -330,13 +416,13 @@ const fmtNum = (val: any) =>
                       </td>
                       <td class="font-monospace">{{ row.Barcode }}</td>
                       <td class="text-center text-grey-darken-2">
-                        {{ row.Firts_In || "-" }}
+                        {{ row.Firts_In ? formatTanggal(row.Firts_In) : "-" }}
                       </td>
                       <td class="text-right font-weight-medium text-success">
                         {{ fmtNum(row.IN) }}
                       </td>
                       <td class="text-center text-grey-darken-2">
-                        {{ row.Last_Out || "-" }}
+                        {{ row.Last_Out ? formatTanggal(row.Last_Out) : "-" }}
                       </td>
                       <td class="text-right font-weight-medium text-error">
                         {{ fmtNum(row.OUT) }}

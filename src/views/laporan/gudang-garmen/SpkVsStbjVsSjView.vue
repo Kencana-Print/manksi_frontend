@@ -454,6 +454,13 @@ onMounted(() => {
       item.JadiP4 === null ? "-" : fmtNum(item.JadiP4)
     }}</template>
     <template #item.Kirim="{ item }">{{ fmtNum(item.Kirim) }}</template>
+    <template #item.Tanggal="{ item }">
+      {{ item.Tanggal?.replace(/-/g, "/") }}
+    </template>
+
+    <template #item.Dateline="{ item }">
+      {{ item.Dateline?.replace(/-/g, "/") }}
+    </template>
 
     <template #detail="{ item }">
       <div class="detail-wrap">

@@ -45,13 +45,27 @@ export const exportExcel = async (
       dataStartRow = 3;
     }
 
-    // ── Setup kolom ──
+    // ✅ Threshold performa — di atas ini, skip zebra stripe & per-cell
+    // styling manual (row.eachCell bikin object baru utk TIAP cell di
+    // TIAP baris, berat banget buat ribuan baris). Dataset besar pakai
+    // jalur cepat: style di level KOLOM (sekali doang, ExcelJS terapin
+    // ke semua cell kolom itu otomatis) + bulk insert via addRows().
+    const isLargeExport = cfg.rows.length > 500;
+
+    // ── Setup kolom (+ style default per kolom kalau dataset besar) ──
     ws.columns = cfg.columns.map((c) => ({
       key: c.key,
       width: c.width ?? 18,
+      style: isLargeExport
+        ? {
+            font: { size: 10 },
+            alignment: { horizontal: c.align ?? "left", vertical: "middle" },
+            numFmt: c.numFmt,
+          }
+        : undefined,
     }));
 
-    // ── Header row ──
+    // ── Header row (selalu di-style manual — cuma 1 baris, murah) ──
     const headerRow = ws.addRow(cfg.columns.map((c) => c.header));
     headerRow.eachCell((cell, colIdx) => {
       cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 10 };
@@ -69,29 +83,35 @@ export const exportExcel = async (
     });
     headerRow.height = 20;
 
-    // ── Data rows — pakai forEach agar idx tersedia untuk zebra stripe ──
-    cfg.rows.forEach((rowData, idx) => {
-      const row = ws.addRow(cfg.columns.map((c) => rowData[c.key] ?? ""));
-      row.eachCell((cell, colIdx) => {
-        const colCfg = cfg.columns[colIdx - 1];
-        cell.font = { size: 10 };
-        cell.alignment = {
-          horizontal: colCfg?.align ?? "left",
-          vertical: "middle",
-        };
-        if (colCfg?.numFmt) cell.numFmt = colCfg.numFmt;
-
-        // Zebra stripe — idx dari forEach, tidak ada masalah tipe
-        if (idx % 2 === 0) {
-          cell.fill = {
-            type: "pattern",
-            pattern: "solid",
-            fgColor: { argb: "FFF5F5F5" },
+    if (isLargeExport) {
+      // ✅ Jalur cepat — bulk insert, style udah ke-set di level kolom
+      // di atas, jadi ExcelJS gak perlu bikin object gaya per cell.
+      ws.addRows(cfg.rows.map((r) => cfg.columns.map((c) => r[c.key] ?? "")));
+    } else {
+      // Jalur normal — tetep per-cell + zebra stripe (dataset kecil,
+      // biaya perform gak kerasa, tampilannya lebih rapi)
+      cfg.rows.forEach((rowData, idx) => {
+        const row = ws.addRow(cfg.columns.map((c) => rowData[c.key] ?? ""));
+        row.eachCell((cell, colIdx) => {
+          const colCfg = cfg.columns[colIdx - 1];
+          cell.font = { size: 10 };
+          cell.alignment = {
+            horizontal: colCfg?.align ?? "left",
+            vertical: "middle",
           };
-        }
+          if (colCfg?.numFmt) cell.numFmt = colCfg.numFmt;
+
+          if (idx % 2 === 0) {
+            cell.fill = {
+              type: "pattern",
+              pattern: "solid",
+              fgColor: { argb: "FFF5F5F5" },
+            };
+          }
+        });
+        row.height = 16;
       });
-      row.height = 16;
-    });
+    }
 
     // ── Freeze panes ──
     ws.views = [

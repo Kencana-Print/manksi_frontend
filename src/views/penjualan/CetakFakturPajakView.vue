@@ -7,6 +7,7 @@ import FakturPajakDocument from "./components/FakturPajakDocument.vue";
 import InvoiceFakturPajakSearchModal from "@/components/lookups/InvoiceFakturPajakSearchModal.vue";
 import { cetakFakturPajakService as svc } from "@/services/penjualan/cetakFakturPajakService";
 import { IconReceiptTax, IconSearch, IconPrinter } from "@tabler/icons-vue";
+import { formatTanggal } from "@/utils/dateFormat";
 
 const router = useRouter();
 const toast = useToast();
@@ -173,7 +174,7 @@ const doCetak = async () => {
         <template v-if="invoiceInfo">
           <div class="fg mt6">
             <label class="lb w120">Tanggal</label>
-            <span class="val">{{ invoiceInfo.Tanggal }}</span>
+            <span class="val">{{ formatTanggal(invoiceInfo.Tanggal) }}</span>
           </div>
           <div class="fg mt6">
             <label class="lb w120">Customer</label>

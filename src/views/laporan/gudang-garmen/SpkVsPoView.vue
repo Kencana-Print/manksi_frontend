@@ -5,11 +5,8 @@ import BaseBrowse from "@/components/BaseBrowse.vue";
 import { useBrowse } from "@/composables/useBrowse";
 import { spkVsPoService } from "@/services/laporan/gudang-garmen/spkVsPoService";
 import { IconFileInvoice, IconFileSpreadsheet } from "@tabler/icons-vue";
-import {
-  exportExcel,
-  exportExcelSingle,
-  type ExcelColumn,
-} from "@/utils/excelExport";
+import { exportExcelSingle, type ExcelColumn } from "@/utils/excelExport";
+import { formatTanggal } from "@/utils/dateFormat";
 
 const toast = useToast();
 const menuId = "520";
@@ -81,13 +78,6 @@ const fmtNum = (val: any, d = 2) =>
     minimumFractionDigits: d,
     maximumFractionDigits: d,
   });
-const fmtDate = (v: string) => {
-  if (!v) return "-";
-  const s = String(v).substring(0, 10);
-  const [y, m, d] = s.split("-");
-  if (!y || !m || !d) return v;
-  return `${d}/${m}/${y}`;
-};
 
 // ── Export master ──
 const isExporting = ref(false);
@@ -134,11 +124,52 @@ const onExportDetail = async () => {
       filters.value.startDate,
       filters.value.endDate,
     );
-    const rows = res.data.data || [];
-    if (!rows.length) {
+    const allDetail: any[] = res.data.data || [];
+    if (!allDetail.length) {
       toast.warning("Tidak ada data detail pada filter ini.");
       return;
     }
+
+    // ✅ Kelompokkan per SPK Nomor (jaga urutan kemunculan pertama)
+    const groups: Record<string, any[]> = {};
+    const order: string[] = [];
+    allDetail.forEach((r) => {
+      const key = r.SpkNomor;
+      if (!groups[key]) {
+        groups[key] = [];
+        order.push(key);
+      }
+      groups[key].push(r);
+    });
+
+    const combinedRows: any[] = [];
+
+    order.forEach((key) => {
+      const rowsInGroup = groups[key];
+      const first = rowsInGroup[0];
+      const masterCells = {
+        SpkNama: first.SpkNama,
+        Customer: first.Customer,
+        SpkNomor: first.SpkNomor,
+      };
+      const blankMaster = Object.fromEntries(
+        Object.keys(masterCells).map((k) => [k, ""]),
+      );
+
+      rowsInGroup.forEach((r, idx) => {
+        combinedRows.push({
+          ...(idx === 0 ? masterCells : blankMaster),
+          NomorPo: r.NomorPo,
+          Tanggal: formatTanggal(r.Tanggal),
+          Kode: r.Kode,
+          NamaBahan: r.NamaBahan,
+          Satuan: r.Satuan,
+          Jumlah: Number(r.Jumlah) || 0,
+          Terima: Number(r.Terima) || 0,
+        });
+      });
+    });
+
     const columns: ExcelColumn[] = [
       { header: "Spk Nama", key: "SpkNama", width: 28 },
       { header: "Customer", key: "Customer", width: 22 },
@@ -163,17 +194,16 @@ const onExportDetail = async () => {
         numFmt: "#,##0.00",
       },
     ];
-    await exportExcel(
+
+    await exportExcelSingle(
       `SPK_vs_PO_Detail_${filters.value.startDate}_to_${filters.value.endDate}.xlsx`,
-      [
-        {
-          sheetName: "Detail PO",
-          columns,
-          rows,
-          title: "RINCIAN SPK VS PO",
-        },
-      ],
+      "Detail PO",
+      columns,
+      combinedRows,
+      `Rincian SPK vs PO  |  Periode: ${formatTanggal(filters.value.startDate)} s.d ${formatTanggal(filters.value.endDate)}`,
     );
+
+    toast.success("Berhasil export detail.");
   } catch {
     toast.error("Gagal export detail.");
   } finally {
@@ -228,8 +258,12 @@ onMounted(fetchData);
       </v-btn>
     </template>
 
-    <template #item.Tanggal="{ item }">{{ fmtDate(item.Tanggal) }}</template>
-    <template #item.Dateline="{ item }">{{ fmtDate(item.Dateline) }}</template>
+    <template #item.Tanggal="{ item }">{{
+      formatTanggal(item.Tanggal)
+    }}</template>
+    <template #item.Dateline="{ item }">{{
+      formatTanggal(item.Dateline)
+    }}</template>
     <template #item.Jumlah="{ item }">{{ fmtNum(item.Jumlah) }}</template>
 
     <template #detail="{ item }">
@@ -259,7 +293,7 @@ onMounted(fetchData);
               }"
             >
               <td class="font-weight-bold text-primary">{{ d.NomorPo }}</td>
-              <td>{{ fmtDate(d.Tanggal) }}</td>
+              <td>{{ formatTanggal(d.Tanggal) }}</td>
               <td>{{ d.Kode }}</td>
               <td>{{ d.NamaBahan }}</td>
               <td>{{ d.Satuan }}</td>

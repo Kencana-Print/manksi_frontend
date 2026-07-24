@@ -11,6 +11,7 @@ import {
   IconMapPin,
   IconMapPinOff,
 } from "@tabler/icons-vue";
+import { formatTanggal } from "@/utils/dateFormat";
 
 const route = useRoute();
 
@@ -185,12 +186,6 @@ const clearSalesFilter = () => {
   fetchData();
 };
 
-const formatDate = (val: string) => {
-  if (!val || val.startsWith("0000")) return "-";
-  const d = new Date(val);
-  return `${String(d.getDate()).padStart(2, "0")}-${String(d.getMonth() + 1).padStart(2, "0")}-${d.getFullYear()}`;
-};
-
 const getStatusColor = (status: string) => {
   if (status === "done") return "success";
   if (status === "failed") return "error";
@@ -270,11 +265,11 @@ const rowPropsFn = (data: any) => {
     </template>
 
     <template #item.Tanggal_Plan="{ item }">
-      {{ formatDate(item.Tanggal_Plan) }}
+      {{ formatTanggal(item.Tanggal_Plan) }}
     </template>
 
     <template #item.Tgl_Realisasi="{ item }">
-      {{ formatDate(item.Tgl_Realisasi) }}
+      {{ formatTanggal(item.Tgl_Realisasi) }}
     </template>
 
     <template #item.has_plan="{ item }">

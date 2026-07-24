@@ -11,6 +11,7 @@ import {
   IconFileSpreadsheet,
   IconFileDescription,
 } from "@tabler/icons-vue";
+import { formatTanggal, formatTanggalJam } from "@/utils/dateFormat";
 
 const router = useRouter();
 const toast = useToast();
@@ -73,13 +74,6 @@ const headers = [
   { title: "Tgl Bayar", key: "Tanggal_bayar", width: "100px" },
   { title: "Created", key: "Created", width: "140px" },
 ];
-
-const fmtDate = (val: string) => {
-  if (!val) return "";
-  const d = new Date(val);
-  if (isNaN(d.getTime())) return val;
-  return `${String(d.getDate()).padStart(2, "0")}-${String(d.getMonth() + 1).padStart(2, "0")}-${d.getFullYear()}`;
-};
 
 const num = (val: number) => new Intl.NumberFormat("id-ID").format(val || 0);
 
@@ -323,15 +317,20 @@ onMounted(() => {
     </template>
 
     <!-- FORMAT KOLOM UTAMA -->
-    <template #item.Tanggal="{ item }">{{ fmtDate(item.Tanggal) }}</template>
-    <template #item.Tanggal_Pelunasan="{ item }">{{
-      fmtDate(item.Tanggal_Pelunasan)
-    }}</template>
-    <template #item.Tanggal_bayar="{ item }">{{
-      fmtDate(item.Tanggal_bayar)
-    }}</template>
+    <template #item.Tanggal="{ item }">
+      {{ formatTanggal(item.Tanggal) }}
+    </template>
+    <template #item.Tanggal_Pelunasan="{ item }">
+      {{ formatTanggal(item.Tanggal_Pelunasan) }}
+    </template>
+    <template #item.Tanggal_bayar="{ item }">
+      {{ formatTanggal(item.Tanggal_bayar) }}
+    </template>
     <template #item.Total="{ item }">{{ num(item.Total) }}</template>
     <template #item.Bayar="{ item }">{{ num(item.Bayar) }}</template>
+    <template #item.Created="{ item }">
+      {{ formatTanggalJam(item.Created) }}
+    </template>
 
     <!-- GRID DETAIL EXPAND -->
     <template #detail="{ item }">

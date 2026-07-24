@@ -14,6 +14,7 @@ import {
   IconChecks,
   IconAlertTriangle,
 } from "@tabler/icons-vue";
+import { formatTanggal } from "@/utils/dateFormat";
 
 const toast = useToast();
 const auth = useAuthStore();
@@ -509,6 +510,10 @@ const onExportDetail = async () => {
       <span v-else class="chip chip-red">Pending</span>
     </template>
 
+    <template #item.Tanggal="{ item }">
+      {{ formatTanggal(item.Tanggal) }}
+    </template>
+
     <!-- ── Expanded detail ── -->
     <template #detail="{ item }">
       <table class="dtbl">
@@ -727,7 +732,7 @@ const onExportDetail = async () => {
                   <td class="mono" style="color: #1565c0; font-weight: 600">
                     {{ row.Nomor }}
                   </td>
-                  <td>{{ row.Tanggal }}</td>
+                  <td>{{ formatTanggal(row.Tanggal) }}</td>
                   <td>{{ row.Gudang }}</td>
                   <td>{{ row.KdCus }}</td>
                   <td>{{ row.Nama }}</td>

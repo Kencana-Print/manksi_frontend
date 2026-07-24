@@ -501,6 +501,9 @@ const onExport = async () => {
           summary-key="Nominal"
           summary-label="Total Nominal"
         >
+          <template #item.Tanggal="{ item }">
+            {{ item.Tanggal?.replace(/-/g, "/") }}
+          </template>
           <template #item.Qty="{ item }">
             <span style="font-family: monospace">
               {{ Number(item.Qty || 0).toFixed(2) }}
@@ -613,6 +616,9 @@ const onExport = async () => {
               summary-key="Nilai"
               summary-label="Total Nilai"
             >
+              <template #item.Tanggal="{ item }">
+                {{ item.Tanggal?.replace(/-/g, "/") }}
+              </template>
               <template #item.Qty="{ item }">
                 <span style="font-family: monospace">{{
                   fmtNum(item.Qty)

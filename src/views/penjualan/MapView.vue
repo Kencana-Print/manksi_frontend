@@ -22,6 +22,7 @@ import {
   IconLayoutSidebarRight,
   IconLayoutSidebarRightCollapse,
 } from "@tabler/icons-vue";
+import { formatTanggal, formatTanggalJam } from "@/utils/dateFormat";
 
 const router = useRouter();
 const toast = useToast();
@@ -141,20 +142,6 @@ const headers = [
   { title: "Desain Done", key: "Design_Done", width: "100px", align: "center" },
   { title: "Keterangan", key: "Keterangan", minWidth: "300px" },
 ];
-
-const fmtDate = (val: string) => {
-  if (!val) return "";
-  const d = new Date(val);
-  if (isNaN(d.getTime())) return val;
-  return `${String(d.getDate()).padStart(2, "0")}-${String(d.getMonth() + 1).padStart(2, "0")}-${d.getFullYear()}`;
-};
-
-const fmtDateTime = (val: string) => {
-  if (!val) return "";
-  const d = new Date(val);
-  if (isNaN(d.getTime())) return val;
-  return `${String(d.getDate()).padStart(2, "0")}-${String(d.getMonth() + 1).padStart(2, "0")}-${d.getFullYear()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-};
 
 const fmtNum = (val: number | string | null) => {
   if (!val) return "0";
@@ -461,19 +448,25 @@ const confirmToggleClose = async () => {
       </v-menu>
     </template>
 
-    <template #item.Tanggal="{ item }">{{ fmtDate(item.Tanggal) }}</template>
-    <template #item.Dateline="{ item }">{{ fmtDate(item.Dateline) }}</template>
-    <template #item.TglBast="{ item }">{{ fmtDate(item.TglBast) }}</template>
-    <template #item.EstimasiJadi="{ item }">{{
-      fmtDate(item.EstimasiJadi)
-    }}</template>
-    <template #item.Design_Tanggal="{ item }">{{
-      fmtDate(item.Design_Tanggal)
-    }}</template>
+    <template #item.Tanggal="{ item }">
+      {{ formatTanggal(item.Tanggal) }}
+    </template>
+    <template #item.Dateline="{ item }">
+      {{ formatTanggal(item.Dateline) }}
+    </template>
+    <template #item.TglBast="{ item }">
+      {{ formatTanggal(item.TglBast) }}
+    </template>
+    <template #item.EstimasiJadi="{ item }">
+      {{ formatTanggal(item.EstimasiJadi) }}
+    </template>
+    <template #item.Design_Tanggal="{ item }">
+      {{ formatTanggal(item.Design_Tanggal) }}
+    </template>
 
-    <template #item.Created="{ item }">{{
-      fmtDateTime(item.Created)
-    }}</template>
+    <template #item.Created="{ item }">
+      {{ formatTanggalJam(item.Created) }}
+    </template>
 
     <template #item.Panjang="{ item }">{{ fmtNum(item.Panjang) }}</template>
     <template #item.Lebar="{ item }">{{ fmtNum(item.Lebar) }}</template>
@@ -536,7 +529,7 @@ const confirmToggleClose = async () => {
         density="comfortable"
         class="font-weight-bold"
       >
-        ✓ {{ fmtDate(item.AccTanggal) }}
+        ✓ {{ formatTanggal(item.AccTanggal) }}
       </v-chip>
       <v-chip
         v-else

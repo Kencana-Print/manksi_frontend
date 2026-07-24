@@ -1029,6 +1029,24 @@ const menuItems: NavItem[] = [
             icon: IconReportAnalytics,
           },
           {
+            title: "SPK vs STBJ",
+            to: "/laporan/penjualan/spk-vs-stbj",
+            icon: IconClipboardList,
+            menuId: 304,
+          },
+          {
+            title: "SPK vs SJ",
+            to: "/laporan/penjualan/spk-vs-sj",
+            icon: IconTruckDelivery,
+            menuId: 305,
+          },
+          {
+            title: "SPK vs SJ vs Invoice",
+            to: "/laporan/penjualan/spk-vs-sj-vs-inv",
+            icon: IconFileInvoice,
+            menuId: 306,
+          },
+          {
             title: "MAP vs Surat Jalan",
             to: "/laporan/penjualan/map-vs-sj",
             icon: IconTruckDelivery,

@@ -10,6 +10,7 @@ import {
   IconFileDescription,
   IconUpload,
 } from "@tabler/icons-vue";
+import { formatTanggal } from "@/utils/dateFormat";
 
 const router = useRouter();
 const toast = useToast();
@@ -81,13 +82,6 @@ const headers = [
   { title: "Bruto", key: "Bruto", width: "120px", align: "right" },
   { title: "PPh", key: "PPh", width: "120px", align: "right" },
 ];
-
-const fmtDate = (val: string) => {
-  if (!val) return "";
-  const d = new Date(val);
-  if (isNaN(d.getTime())) return val;
-  return `${String(d.getDate()).padStart(2, "0")}-${String(d.getMonth() + 1).padStart(2, "0")}-${d.getFullYear()}`;
-};
 
 const fmtNum = (val: number | string | null) => {
   if (!val) return "0";
@@ -302,9 +296,15 @@ const getRowProps = () => ({});
       </div>
     </template>
 
-    <template #item.Tanggal="{ item }">{{ fmtDate(item.Tanggal) }}</template>
-    <template #item.Tempo="{ item }">{{ fmtDate(item.Tempo) }}</template>
-    <template #item.TglTrs="{ item }">{{ fmtDate(item.TglTrs) }}</template>
+    <template #item.Tanggal="{ item }">
+      {{ formatTanggal(item.Tanggal) }}
+    </template>
+    <template #item.Tempo="{ item }">
+      {{ formatTanggal(item.Tempo) }}
+    </template>
+    <template #item.TglTrs="{ item }">
+      {{ formatTanggal(item.TglTrs) }}
+    </template>
     <template #item.Debet="{ item }">{{ fmtNum(item.Debet) }}</template>
     <template #item.Bruto="{ item }">{{ fmtNum(item.Bruto) }}</template>
     <template #item.PPh="{ item }">{{ fmtNum(item.PPh) }}</template>

@@ -15,6 +15,7 @@ import {
   exportExcelSingle,
   type ExcelColumn,
 } from "@/utils/excelExport";
+import { formatTanggal } from "@/utils/dateFormat";
 
 const toast = useToast();
 const menuId = "517";
@@ -118,13 +119,8 @@ const fmtNum = (val: any, d = 2) =>
     minimumFractionDigits: d,
     maximumFractionDigits: d,
   });
-const fmtDate = (v: string) => {
-  if (!v) return "-";
-  const s = String(v).substring(0, 10);
-  const [y, m, d] = s.split("-");
-  if (!y || !m || !d) return v;
-  return `${d}/${m}/${y}`;
-};
+
+const formatBackendDate = (v?: string) => (v ? v.replace(/-/g, "/") : "-");
 
 // ── Export master ──
 const isExporting = ref(false);
@@ -435,6 +431,9 @@ onMounted(fetchData);
     <template #item.Lhk="{ item }">{{ fmtNum(item.Lhk) }}</template>
     <template #item.Cmt="{ item }">{{ fmtNum(item.Cmt) }}</template>
     <template #item.TotLhk="{ item }">{{ fmtNum(item.TotLhk) }}</template>
+    <template #item.Dateline="{ item }">
+      {{ formatBackendDate(item.Dateline) }}
+    </template>
 
     <template #detail="{ item }">
       <div class="detail-wrap">
@@ -472,7 +471,7 @@ onMounted(fetchData);
           <tbody>
             <tr v-for="(d, i) in detailData[item.Spk]" :key="i">
               <td class="font-weight-bold text-primary">{{ d.NoMinta }}</td>
-              <td>{{ fmtDate(d.TglMinta) }}</td>
+              <td>{{ formatTanggal(d.TglMinta) }}</td>
               <td>{{ d.Gudang }}</td>
               <td>{{ d.Tujuan }}</td>
               <td>{{ d.KodeBahan }}</td>
@@ -483,13 +482,13 @@ onMounted(fetchData);
               <td class="tr">{{ fmtNum(d.JmlRetur) }}</td>
               <td class="tr">{{ fmtNum(d.NetMinta) }}</td>
               <td>{{ d.NoMutasi || "-" }}</td>
-              <td>{{ fmtDate(d.TglMutasi) }}</td>
+              <td>{{ formatTanggal(d.TglMutasi) }}</td>
               <td class="tr">{{ fmtNum(d.Potong) }}</td>
               <td class="tr">{{ fmtNum(d.Berat) }}</td>
               <td class="tr">{{ fmtNum(d.SisaBahan) }}</td>
               <td class="tr">{{ fmtNum(d.Babaran, 4) }}</td>
               <td>{{ d.NoMkb || "-" }}</td>
-              <td>{{ fmtDate(d.TglMkb) }}</td>
+              <td>{{ formatTanggal(d.TglMkb) }}</td>
               <td class="tr">{{ fmtNum(d.QtyMkb) }}</td>
               <td class="tr">{{ fmtNum(d.BabaranMkb) }}</td>
               <td>{{ d.Supplier || "-" }}</td>

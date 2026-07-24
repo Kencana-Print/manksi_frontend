@@ -6,13 +6,10 @@ import { useBrowse } from "@/composables/useBrowse";
 import { mapVsSjService } from "@/services/laporan/penjualan/mapVsSjService";
 import api from "@/services/api";
 import { IconTruckDelivery, IconTableOptions } from "@tabler/icons-vue";
+import { formatTanggal } from "@/utils/dateFormat";
 
 // ── UTILITAS EXPORT EXCELJS ──
-import {
-  exportExcel,
-  exportExcelSingle,
-  type ExcelColumn,
-} from "@/utils/excelExport";
+import { exportExcelSingle, type ExcelColumn } from "@/utils/excelExport";
 
 const toast = useToast();
 const menuId = "307";
@@ -167,7 +164,6 @@ const onExportDetail = async () => {
   try {
     const res = await mapVsSjService.getAllDetail(filters.value);
     const allDetail: any[] = res.data.data;
-
     if (!allDetail.length) {
       toast.warning("Tidak ada data detail pengiriman pada range tanggal ini.");
       return;
@@ -180,19 +176,51 @@ const onExportDetail = async () => {
       return `${d}/${m}/${y}`;
     };
 
-    const rows = allDetail.map((r) => ({
-      ...r,
-      TglMAP: fmtTgl(r.TglMAP),
-      TglSJ: fmtTgl(r.TglSJ),
-      JumlahKirim: Number(r.JumlahKirim) || 0,
-    }));
+    // ✅ Kelompokkan per Nomor MAP (jaga urutan kemunculan pertama)
+    const groups: Record<string, any[]> = {};
+    const order: string[] = [];
+    allDetail.forEach((r) => {
+      const key = r.NomorMAP;
+      if (!groups[key]) {
+        groups[key] = [];
+        order.push(key);
+      }
+      groups[key].push(r);
+    });
 
-    const detailCols: ExcelColumn[] = [
+    const combinedRows: any[] = [];
+
+    order.forEach((key) => {
+      const rowsInGroup = groups[key];
+      const first = rowsInGroup[0];
+      const masterCells = {
+        NomorMAP: first.NomorMAP,
+        TglMAP: fmtTgl(first.TglMAP),
+        Divisi: first.Divisi,
+        NamaCustomer: first.NamaCustomer,
+        NamaMAP: first.NamaMAP,
+      };
+      const blankMaster = Object.fromEntries(
+        Object.keys(masterCells).map((k) => [k, ""]),
+      );
+
+      rowsInGroup.forEach((r, idx) => {
+        combinedRows.push({
+          ...(idx === 0 ? masterCells : blankMaster),
+          NomorSJ: r.NomorSJ,
+          TglSJ: fmtTgl(r.TglSJ),
+          KeteranganSJ: r.KeteranganSJ,
+          JumlahKirim: Number(r.JumlahKirim) || 0,
+        });
+      });
+    });
+
+    const columns: ExcelColumn[] = [
       { header: "Nomor MAP", key: "NomorMAP", width: 22 },
       { header: "Tgl MAP", key: "TglMAP", width: 14, align: "center" },
       { header: "Divisi", key: "Divisi", width: 12, align: "center" },
-      { header: "Customer", key: "NamaCustomer", width: 35 },
-      { header: "Nama MAP", key: "NamaMAP", width: 35 },
+      { header: "Customer", key: "NamaCustomer", width: 30 },
+      { header: "Nama MAP", key: "NamaMAP", width: 30 },
       { header: "Nomor SJ", key: "NomorSJ", width: 20 },
       { header: "Tgl SJ", key: "TglSJ", width: 14, align: "center" },
       { header: "Keterangan", key: "KeteranganSJ", width: 30 },
@@ -205,18 +233,15 @@ const onExportDetail = async () => {
       },
     ];
 
-    await exportExcel(
-      `Laporan_Detail_MAP_vs_SJ_${filters.value.startDate}_sd_${filters.value.endDate}.xlsx`,
-      [
-        {
-          sheetName: "Detail SJ per MAP",
-          columns: detailCols,
-          rows,
-          title: `DETAIL PENGIRIMAN MAP (${filters.value.startDate} s/d ${filters.value.endDate})`,
-          headerColor: "0277bd", // Warna header table beda sedikit
-        },
-      ],
+    await exportExcelSingle(
+      `Export_Detail_MAP_vs_SJ_${filters.value.startDate}.xlsx`,
+      "Detail SJ per MAP",
+      columns,
+      combinedRows,
+      `Detail Pengiriman MAP  |  Periode: ${fmtTgl(filters.value.startDate)} s.d ${fmtTgl(filters.value.endDate)}`,
     );
+
+    toast.success("Berhasil export detail.");
   } catch (e: any) {
     toast.error("Gagal export detail pengiriman.");
   } finally {
@@ -281,6 +306,12 @@ const numFmt = (val: number) => new Intl.NumberFormat("id-ID").format(val || 0);
       </v-btn>
     </template>
 
+    <template #item.Tanggal="{ item }">{{
+      formatTanggal(item.Tanggal)
+    }}</template>
+    <template #item.Dateline="{ item }">{{
+      formatTanggal(item.Dateline)
+    }}</template>
     <template #item.Jumlah="{ item }">{{ numFmt(item.Jumlah) }}</template>
     <template #item.Kirim="{ item }">
       <span class="font-weight-bold text-success">{{
@@ -318,7 +349,7 @@ const numFmt = (val: number) => new Intl.NumberFormat("id-ID").format(val || 0);
             <tbody>
               <tr v-for="(det, idx) in detailData[item.Nomor]" :key="idx">
                 <td class="font-weight-bold">{{ det.NomorSj }}</td>
-                <td class="text-center">{{ det.TanggalSj }}</td>
+                <td class="text-center">{{ formatTanggal(det.TanggalSj) }}</td>
                 <td>{{ det.Keterangan }}</td>
                 <td>{{ det.Alamat }}</td>
                 <td class="text-center">{{ det.Kota }}</td>

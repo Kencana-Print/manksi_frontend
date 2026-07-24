@@ -10,6 +10,7 @@ import {
   IconFileTypeXls,
   IconSearch,
 } from "@tabler/icons-vue";
+import { formatTanggal } from "@/utils/dateFormat";
 
 import CustomerSearchModal from "@/components/lookups/CustomerSearchModal.vue";
 import PerusahaanSearchModal from "@/components/lookups/PerusahaanSearchModal.vue";
@@ -25,12 +26,6 @@ const todayLocal = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
 const num = (v: any) => Number(v || 0).toLocaleString("id-ID");
-const fmtDate = (v: string) => {
-  if (!v) return "-";
-  const d = new Date(v);
-  if (isNaN(d.getTime())) return v;
-  return `${String(d.getDate()).padStart(2, "0")}-${String(d.getMonth() + 1).padStart(2, "0")}-${d.getFullYear()}`;
-};
 
 // ── Filter — default hari ini s.d. hari ini ─────────────────
 const tglAwal = ref(todayLocal());
@@ -337,6 +332,10 @@ const confirmExport = async () => {
         }"
         >{{ item.Status }}</span
       >
+    </template>
+
+    <template #item.Tanggal="{ item }">
+      {{ formatTanggal(item.Tanggal) }}
     </template>
 
     <template #item.Total="{ item }">

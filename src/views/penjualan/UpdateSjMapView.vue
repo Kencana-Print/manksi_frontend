@@ -7,32 +7,20 @@ import { useBrowse } from "@/composables/useBrowse";
 import { updateSjMapService } from "@/services/penjualan/updateSjMapService";
 import UpdateSjMapFormDialog from "@/components/dialogs/UpdateSjMapFormDialog.vue";
 import { IconTruckDelivery, IconEdit } from "@tabler/icons-vue";
+import { formatTanggal } from "@/utils/dateFormat";
 
 const router = useRouter();
 const toast = useToast();
 
 const today = new Date();
 const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
-const formatDateLocal = (value?: string | Date) => {
-  if (!value) return "";
-
-  const d = new Date(value);
-
-  if (isNaN(d.getTime())) return "";
-
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-
-  return `${year}-${month}-${day}`;
-};
-const formatDate = (d: Date) => formatDateLocal(d);
+const toInputDate = (value: Date) => value.toISOString().slice(0, 10);
 const showDialog = ref(false);
 const selectedNomor = ref("");
 
 const filterState = ref({
-  startDate: formatDate(firstDay),
-  endDate: formatDate(today),
+  startDate: toInputDate(firstDay),
+  endDate: toInputDate(today),
 });
 
 const {
@@ -166,36 +154,32 @@ const onUpdateStatus = () => {
     </template>
 
     <template #item.Tanggal="{ item }">
-      {{ formatDateLocal(item.Tanggal) }}
+      {{ formatTanggal(item.Tanggal) }}
     </template>
     <template #item.Tanggal_kirim="{ item }">
-      {{ item.Tanggal_kirim ? formatDateLocal(item.Tanggal_kirim) : "-" }}
+      {{ item.Tanggal_kirim ? formatTanggal(item.Tanggal_kirim) : "-" }}
     </template>
     <template #item.Tanggal_terima="{ item }">
-      {{ item.Tanggal_terima ? formatDateLocal(item.Tanggal_terima) : "-" }}
+      {{ item.Tanggal_terima ? formatTanggal(item.Tanggal_terima) : "-" }}
     </template>
     <template #item.Biaya_Kirim="{ item }">
       {{ formatRupiah(item.Biaya_Kirim) }}
     </template>
 
     <template #item.Tanggal_kembali="{ item }">
-      {{ item.Tanggal_kembali ? formatDateLocal(item.Tanggal_kembali) : "-" }}
+      {{ item.Tanggal_kembali ? formatTanggal(item.Tanggal_kembali) : "-" }}
     </template>
     <template #item.Tanggal_terima_sj="{ item }">
-      {{
-        item.Tanggal_terima_sj ? formatDateLocal(item.Tanggal_terima_sj) : "-"
-      }}
+      {{ item.Tanggal_terima_sj ? formatTanggal(item.Tanggal_terima_sj) : "-" }}
     </template>
     <template #item.Tanggal_konfirmasi="{ item }">
       {{
-        item.Tanggal_konfirmasi ? formatDateLocal(item.Tanggal_konfirmasi) : "-"
+        item.Tanggal_konfirmasi ? formatTanggal(item.Tanggal_konfirmasi) : "-"
       }}
     </template>
     <template #item.Tanggal_serahterima="{ item }">
       {{
-        item.Tanggal_serahterima
-          ? formatDateLocal(item.Tanggal_serahterima)
-          : "-"
+        item.Tanggal_serahterima ? formatTanggal(item.Tanggal_serahterima) : "-"
       }}
     </template>
   </BaseBrowse>

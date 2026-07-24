@@ -2,11 +2,8 @@
 import { ref, watch, onMounted } from "vue";
 import { useBrowse } from "@/composables/useBrowse";
 import BaseBrowse from "@/components/BaseBrowse.vue";
-import {
-  exportExcel,
-  exportExcelSingle,
-  type ExcelColumn,
-} from "@/utils/excelExport";
+import { exportExcelSingle, type ExcelColumn } from "@/utils/excelExport";
+import { useToast } from "vue-toastification";
 import { penawaranVsSpkService } from "@/services/laporan/penjualan/penawaranVsSpkService";
 import api from "@/services/api";
 import { IconReportAnalytics } from "@tabler/icons-vue";
@@ -22,6 +19,7 @@ const filters = ref({
   endDate: todayString,
   divisi: "0",
 });
+const toast = useToast();
 
 const divisiOptions = ref<any[]>([]);
 const loadDivisi = async () => {
@@ -39,7 +37,7 @@ const loadDivisi = async () => {
   }
 };
 
-const { items, isLoading, canExport, fetchData, exportToExcel } = useBrowse({
+const { items, isLoading, canExport, fetchData } = useBrowse({
   menuId: "301",
   fetchApi: async () => {
     const res = await penawaranVsSpkService.getBrowse({
@@ -95,6 +93,50 @@ const onUpdateExpanded = async (val: any[]) => {
   }
 };
 
+const onExport = async () => {
+  if (!items.value || items.value.length === 0) {
+    return toast.warning("Tidak ada data untuk diexport.");
+  }
+  try {
+    const columns: ExcelColumn[] = [
+      { header: "Nomor", key: "Nomor", width: 22 },
+      { header: "Tanggal", key: "Tanggal", width: 14, align: "center" },
+      { header: "Divisi", key: "Divisi", width: 16 },
+      { header: "Customer", key: "NamaCustomer", width: 30 },
+      { header: "Keterangan", key: "Keterangan", width: 30 },
+      {
+        header: "Total SPK",
+        key: "TotalSPK",
+        width: 12,
+        align: "center",
+        numFmt: "#,##0",
+      },
+    ];
+
+    const rows = items.value.map((it: any) => ({
+      Nomor: it.Nomor,
+      Tanggal: formatTgl(it.Tanggal),
+      Divisi: it.Divisi,
+      NamaCustomer: it.NamaCustomer,
+      Keterangan: it.Keterangan,
+      TotalSPK: Number(it.TotalSPK) || 0,
+    }));
+
+    await exportExcelSingle(
+      `Laporan_Penawaran_vs_SPK_${filters.value.startDate}.xlsx`,
+      "Penawaran vs SPK",
+      columns,
+      rows,
+      `Laporan Penawaran vs SPK  |  Periode: ${formatTgl(filters.value.startDate)} s.d ${formatTgl(filters.value.endDate)}`,
+    );
+
+    toast.success("Berhasil export data.");
+  } catch (e) {
+    console.error(e);
+    toast.error("Terjadi kesalahan saat export.");
+  }
+};
+
 const isExportingDetail = ref(false);
 
 const onExportDetail = async () => {
@@ -105,30 +147,52 @@ const onExportDetail = async () => {
       endDate: filters.value.endDate,
       divisi: filters.value.divisi,
     });
-
     const allDetail: any[] = res.data.data;
-
     if (!allDetail.length) {
-      alert("Tidak ada data detail pada range tanggal ini.");
+      toast.warning("Tidak ada data detail pada range tanggal ini.");
       return;
     }
 
-    // Format tanggal untuk Excel
-    const fmt = (v: string) => {
-      if (!v) return "";
-      const s = String(v).substring(0, 10);
-      const [y, m, d] = s.split("-");
-      return `${d}/${m}/${y}`;
-    };
+    // ✅ Kelompokkan per No. Penawaran (jaga urutan kemunculan pertama)
+    const groups: Record<string, any[]> = {};
+    const order: string[] = [];
+    allDetail.forEach((r) => {
+      const key = r.NomorPenawaran;
+      if (!groups[key]) {
+        groups[key] = [];
+        order.push(key);
+      }
+      groups[key].push(r);
+    });
 
-    const rows = allDetail.map((r) => ({
-      ...r,
-      TglPenawaran: fmt(r.TglPenawaran),
-      TglSPK: fmt(r.TglSPK),
-      Jumlah: Number(r.Jumlah) || 0,
-    }));
+    const combinedRows: any[] = [];
 
-    const masterCols: ExcelColumn[] = [
+    order.forEach((key) => {
+      const rowsInGroup = groups[key];
+      const first = rowsInGroup[0];
+      const masterCells = {
+        NomorPenawaran: first.NomorPenawaran,
+        TglPenawaran: formatTgl(first.TglPenawaran),
+        Divisi: first.Divisi,
+        NamaCustomer: first.NamaCustomer,
+        Keterangan: first.Keterangan,
+      };
+      const blankMaster = Object.fromEntries(
+        Object.keys(masterCells).map((k) => [k, ""]),
+      );
+
+      rowsInGroup.forEach((r, idx) => {
+        combinedRows.push({
+          ...(idx === 0 ? masterCells : blankMaster),
+          NomorSPK: r.NomorSPK,
+          TglSPK: formatTgl(r.TglSPK),
+          NamaSPK: r.NamaSPK,
+          Jumlah: Number(r.Jumlah) || 0,
+        });
+      });
+    });
+
+    const columns: ExcelColumn[] = [
       { header: "No. Penawaran", key: "NomorPenawaran", width: 22 },
       {
         header: "Tgl Penawaran",
@@ -136,12 +200,12 @@ const onExportDetail = async () => {
         width: 14,
         align: "center",
       },
-      { header: "Divisi", key: "Divisi", width: 20 },
-      { header: "Customer", key: "NamaCustomer", width: 35 },
+      { header: "Divisi", key: "Divisi", width: 16 },
+      { header: "Customer", key: "NamaCustomer", width: 30 },
       { header: "Keterangan", key: "Keterangan", width: 30 },
       { header: "No. SPK", key: "NomorSPK", width: 20 },
       { header: "Tgl SPK", key: "TglSPK", width: 14, align: "center" },
-      { header: "Nama SPK", key: "NamaSPK", width: 35 },
+      { header: "Nama SPK", key: "NamaSPK", width: 30 },
       {
         header: "Jumlah",
         key: "Jumlah",
@@ -151,20 +215,17 @@ const onExportDetail = async () => {
       },
     ];
 
-    await exportExcel(
-      `Laporan_Penawaran_vs_SPK_${filters.value.startDate}_sd_${filters.value.endDate}.xlsx`,
-      [
-        {
-          sheetName: "Detail Penawaran vs SPK",
-          columns: masterCols,
-          rows,
-          title: `Laporan Penawaran vs SPK — ${filters.value.startDate} s/d ${filters.value.endDate}`,
-          headerColor: "1565C0",
-        },
-      ],
+    await exportExcelSingle(
+      `Export_Detail_Penawaran_vs_SPK_${filters.value.startDate}.xlsx`,
+      "Detail Penawaran vs SPK",
+      columns,
+      combinedRows,
+      `Detail Penawaran vs SPK  |  Periode: ${formatTgl(filters.value.startDate)} s.d ${formatTgl(filters.value.endDate)}`,
     );
+
+    toast.success("Berhasil export detail.");
   } catch (e: any) {
-    alert(e.response?.data?.message || "Gagal export detail.");
+    toast.error(e.response?.data?.message || "Gagal export detail.");
   } finally {
     isExportingDetail.value = false;
   }
@@ -196,7 +257,7 @@ const formatTgl = (v: string) => {
     v-model:expanded="expandedRows"
     v-model:filter-state="filters"
     @refresh="fetchData"
-    @export="exportToExcel('Laporan_Penawaran_vs_SPK')"
+    @export="onExport"
     @update:expanded="onUpdateExpanded"
   >
     <!-- ── Filter kiri ── -->

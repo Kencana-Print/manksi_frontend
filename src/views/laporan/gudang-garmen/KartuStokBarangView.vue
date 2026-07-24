@@ -9,6 +9,7 @@ import {
   IconTableOptions,
   IconSearch,
 } from "@tabler/icons-vue";
+import { formatTanggal } from "@/utils/dateFormat";
 
 import BarangGarmenSearchModal from "@/components/lookups/BarangGarmenSearchModal.vue";
 
@@ -317,7 +318,9 @@ watch(
                 >
                   <td class="fw">{{ d.Transaksi }}</td>
                   <td>{{ d.Nomor }}</td>
-                  <td class="tc">{{ d.Tanggal }}</td>
+                  <td class="tc">
+                    {{ formatTanggal(d.Tanggal) }}
+                  </td>
                   <td class="tr text-success fw">
                     {{ d.StokIn !== 0 ? fmtNum(d.StokIn) : "-" }}
                   </td>

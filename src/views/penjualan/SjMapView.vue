@@ -14,6 +14,7 @@ import {
   IconLockOpen,
   IconSend,
 } from "@tabler/icons-vue";
+import { formatTanggal, formatTanggalJam } from "@/utils/dateFormat";
 
 const router = useRouter();
 const toast = useToast();
@@ -23,15 +24,7 @@ const expanded = ref([]);
 
 const today = new Date();
 const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
-const formatDateLocal = (value: string | Date) => {
-  const d = new Date(value);
-
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-
-  return `${year}-${month}-${day}`;
-};
+const toInputDate = (value: Date) => value.toISOString().slice(0, 10);
 
 // --- STATE PENGAJUAN PIN 5 ---
 const showPinModal = ref(false);
@@ -45,8 +38,8 @@ const pinData = ref({
 });
 
 const filterState = ref({
-  startDate: formatDateLocal(firstDay),
-  endDate: formatDateLocal(today),
+  startDate: toInputDate(firstDay),
+  endDate: toInputDate(today),
 });
 
 const {
@@ -331,7 +324,11 @@ const getNomorClass = (ngedit: string) => {
     </template>
 
     <template #item.Tanggal="{ item }">
-      {{ item.Tanggal ? formatDateLocal(item.Tanggal) : "" }}
+      {{ formatTanggal(item.Tanggal) }}
+    </template>
+
+    <template #item.Created="{ item }">
+      {{ formatTanggalJam(item.Created) }}
     </template>
 
     <template #extra-actions="{ selected }">

@@ -17,6 +17,7 @@ import {
   IconTableExport,
   IconPrinter,
 } from "@tabler/icons-vue";
+import { formatTanggal } from "@/utils/dateFormat";
 
 // ── Tipe data ──────────────────────────────────────────────────────────
 interface JadwalKirimRow {
@@ -542,6 +543,10 @@ watch(
         </template>
         Cetak
       </v-btn>
+    </template>
+
+    <template #item.Tanggal="{ item }">
+      {{ formatTanggal(item.Tanggal) }}
     </template>
 
     <!-- ── Expanded detail ── -->

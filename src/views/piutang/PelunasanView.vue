@@ -15,6 +15,7 @@ import {
   IconLock,
   IconAlertTriangle,
 } from "@tabler/icons-vue";
+import { formatTanggal } from "@/utils/dateFormat";
 
 // Util ExcelJS bawaan proyek Anda
 import {
@@ -28,15 +29,19 @@ const router = useRouter();
 const menuId = "255";
 
 // ── TANGGAL DEFAULT AWAL BULAN S.D HARI INI ──
-const today = new Date();
-const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1)
-  .toISOString()
-  .substring(0, 10);
-const todayString = today.toISOString().substring(0, 10);
+const getStartOfMonth = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
+};
+
+const getLocalDate = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
 
 const filters = ref({
-  startDate: firstDayOfMonth,
-  endDate: todayString,
+  startDate: getStartOfMonth(),
+  endDate: getLocalDate(),
 });
 
 // ── HEADERS MASTER (Sesuai tfull master Delphi) ──
@@ -376,6 +381,10 @@ const getTotalKredit = (arr: any[]) =>
       </v-btn>
     </template>
 
+    <template #item.Tanggal="{ item }">
+      {{ formatTanggal(item.Tanggal) }}
+    </template>
+
     <template #detail="{ item }">
       <div class="detail-wrap">
         <div v-if="detailLoading[item.Nomor]" class="detail-loading">
@@ -406,7 +415,7 @@ const getTotalKredit = (arr: any[]) =>
             <tbody>
               <tr v-for="(d, i) in detailData[item.Nomor]" :key="i">
                 <td class="font-weight-bold text-primary">{{ d.Nota }}</td>
-                <td class="tc">{{ d.TglInvoice }}</td>
+                <td class="tc">{{ formatTanggal(d.TglInvoice) }}</td>
                 <td class="fw text-grey-darken-3">{{ d.Customer }}</td>
                 <td style="white-space: normal">{{ d.Alamat }}</td>
                 <td>
@@ -471,7 +480,7 @@ const getTotalKredit = (arr: any[]) =>
           Nomor Transaksi: <b>{{ selected[0]?.Nomor }}</b>
         </div>
         <div class="text-caption text-grey-darken-2 mb-3">
-          Tanggal: {{ selected[0]?.Tanggal }}
+          Tanggal: {{ formatTanggal(selected[0]?.Tanggal) }}
         </div>
 
         <label class="f-label d-block mb-1"

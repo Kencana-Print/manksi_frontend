@@ -14,6 +14,7 @@ import {
   IconRefreshDot,
   IconAlertTriangle,
 } from "@tabler/icons-vue";
+import { formatTanggal, formatTanggalJam } from "@/utils/dateFormat";
 
 const router = useRouter();
 const toast = useToast();
@@ -32,13 +33,6 @@ const firstOfMonth = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
 };
 const num = (v: any) => Number(v || 0).toLocaleString("id-ID");
-
-const fmtDate = (v: string) => {
-  if (!v) return "-";
-  const d = new Date(v);
-  if (isNaN(d.getTime())) return v;
-  return `${String(d.getDate()).padStart(2, "0")}-${String(d.getMonth() + 1).padStart(2, "0")}-${d.getFullYear()}`;
-};
 
 // ── Filter ─────────────────────────────────────────────────
 const tglAwal = ref(firstOfMonth());
@@ -532,20 +526,28 @@ const onExportDetail = async () => {
       {{ num(item.Bayar) }}
     </template>
 
+    <template #item.Tanggal="{ item }">
+      {{ formatTanggal(item.Tanggal) }}
+    </template>
+
     <template #item.Tanggal_Pelunasan="{ item }">
-      {{ item.Tanggal_Pelunasan ? fmtDate(item.Tanggal_Pelunasan) : "-" }}
+      {{ formatTanggal(item.Tanggal_Pelunasan) }}
     </template>
 
     <template #item.Tanggal_Bayar="{ item }">
-      {{ item.Tanggal_Bayar ? fmtDate(item.Tanggal_Bayar) : "-" }}
+      {{ formatTanggal(item.Tanggal_Bayar) }}
     </template>
 
     <template #item.inv_Tgl_Terima="{ item }">
-      {{ item.inv_Tgl_Terima ? fmtDate(item.inv_Tgl_Terima) : "-" }}
+      {{ formatTanggal(item.inv_Tgl_Terima) }}
     </template>
 
     <template #item.inv_RencanaBayar="{ item }">
-      {{ item.inv_RencanaBayar ? fmtDate(item.inv_RencanaBayar) : "-" }}
+      {{ formatTanggal(item.inv_RencanaBayar) }}
+    </template>
+
+    <template #item.Created="{ item }">
+      {{ formatTanggalJam(item.Created) }}
     </template>
 
     <template #item.ApvNoSJ="{ item }">
