@@ -447,10 +447,13 @@ const tglIndo = (dateStr: string) => {
 }
 .image-area {
   width: 210px;
+  max-height: 170px;
   flex-shrink: 0;
+  overflow: hidden;
 }
 .image-area img {
   width: 100%;
+  height: 100%;
   object-fit: contain;
 }
 .details-area {
