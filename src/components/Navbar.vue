@@ -576,6 +576,19 @@ const menuItems: NavItem[] = [
           },
         ],
       },
+      {
+        title: "PO Internal SPK",
+        icon: IconArrowRight,
+        menuId: 926,
+        subItems: [
+          {
+            title: "PO Internal",
+            to: "/garmen/po-internal-spk/po-internal",
+            icon: IconListDetails,
+            menuId: 124,
+          },
+        ],
+      },
       { divider: true },
       {
         title: "Mutasi Produksi",

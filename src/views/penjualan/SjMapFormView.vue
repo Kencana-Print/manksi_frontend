@@ -542,11 +542,7 @@ onMounted(() => {
 
         <div class="f-row">
           <label class="f-lbl">Divisi</label>
-          <select
-            v-model="formData.header.sj_divisi"
-            class="f-inp f-sel"
-            :disabled="isEditMode || formData.details.length > 0"
-          >
+          <select v-model="formData.header.sj_divisi" class="f-inp f-sel">
             <option v-for="d in divisiOptions" :key="d.value" :value="d.value">
               {{ d.label }}
             </option>

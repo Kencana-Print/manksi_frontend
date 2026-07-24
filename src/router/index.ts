@@ -1499,6 +1499,17 @@ const router = createRouter({
         menuId: "140",
       },
     },
+    {
+      path: "/garmen/po-internal-spk/po-internal",
+      name: "PoInternalSpkBrowse",
+      component: () => import("@/views/garmen/PoInternalSpkView.vue"),
+      meta: {
+        title: "PO Internal",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "124",
+      },
+    },
 
     {
       path: "/garmen/mutasi-produksi",
