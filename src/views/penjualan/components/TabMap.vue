@@ -159,7 +159,8 @@ const displayImageUrl = computed(() => {
   if (props.formData.MintaHarga) {
     const mh = props.formData.MintaHarga;
     const base = getBaseUrl();
-    return `${base}/images/mppb/${encodeURIComponent(mh)}.jpg?v=${imageCacheBust.value}`;
+    // ✅ FIX: sesuai struktur folder backend public/images/HO-/mintaharga/
+    return `${base}/images/HO-/mintaharga/${encodeURIComponent(mh)}.jpg?v=${imageCacheBust.value}`;
   }
 
   return "";
