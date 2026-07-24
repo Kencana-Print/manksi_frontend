@@ -1187,8 +1187,10 @@ let aktScrollObserver: IntersectionObserver | null = null;
 
 // Menu ID per jenis — untuk filter permission
 const JENIS_MENU_ID: Record<string, string> = {
-  SPK: "152", // atau menu SPK yang sesuai
+  SPK: "152",
+  SO: "172", // ⚠️ isi MENU_ID modul SO
   MAP: "162",
+  SJ: "153", // ⚠️ isi MENU_ID modul SJ (kemungkinan "163" berdasarkan menuId di SjMapFormView)
   PENAWARAN: "151",
   INVOICE: "157",
 };
@@ -1273,7 +1275,9 @@ const renderTrendChart = async () => {
 
 const jenisColor: Record<string, string> = {
   SPK: "#1565c0",
+  SO: "#0277bd",
   MAP: "#00695c",
+  SJ: "#00897b",
   PENAWARAN: "#6a1b9a",
   INVOICE: "#2e7d32",
 };
