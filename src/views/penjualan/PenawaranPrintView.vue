@@ -45,6 +45,7 @@ const perushKode = computed(
 const companyLogo = computed(() => {
   if (perushKode.value === "JA") return logoJA;
   if (perushKode.value === "MD") return logoMD;
+  if (perushKode.value === "SM") return ""; // ✅ SM belum punya logo — kosongkan
   return logoKP;
 });
 
@@ -259,9 +260,14 @@ const grandTotal = computed(() => {
       </div>
 
       <div v-else class="print-header-mdkp">
-        <div class="header-top-row">
-          <img :src="companyLogo" alt="Logo" class="company-logo-mdkp" />
-          <div class="our-services">
+        <div v-if="companyLogo || perushKode !== 'SM'" class="header-top-row">
+          <img
+            v-if="companyLogo"
+            :src="companyLogo"
+            alt="Logo"
+            class="company-logo-mdkp"
+          />
+          <div v-if="perushKode !== 'SM'" class="our-services">
             <div class="font-weight-bold">OUR SERVICES :</div>
             <div>- GARMENT (T-SHIRT, POLO SHIRT, KEMEJA, WEARPACK, Etc).</div>
             <div>- MANUAL PRINTING (SPANDUK/UMBUL KAIN).</div>

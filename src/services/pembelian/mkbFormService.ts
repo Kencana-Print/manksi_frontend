@@ -4,6 +4,11 @@ export const mkbFormService = {
   getDetail: (nomor: string) =>
     api.get(`/pembelian/mkb/form/detail`, { params: { nomor } }),
 
+  getBahanFree: (kode: string, mkb: string) =>
+    api.get("/pembelian/mkb/form/bahan-free", {
+      params: { kode, mkb },
+    }),
+
   saveData: (payload: any) => api.post(`/pembelian/mkb/form/save`, payload),
 
   getPrintData: (nomor: string) =>

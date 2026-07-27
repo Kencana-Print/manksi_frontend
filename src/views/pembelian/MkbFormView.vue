@@ -159,6 +159,7 @@ const {
           allowanceManual: true,
           allowanceLocked: allowanceInfo.locked,
           ready: readyVal,
+          free: undefined,
           po: poVal,
           tglbeli: parseDateSafe(val(b, "mkbd_tglbeli")),
           keterangan: val(b, "mkbd_keterangan") || "",
@@ -404,10 +405,25 @@ const addRowBahan = () => {
     allowanceManual: false,
     allowanceLocked: false,
     ready: 0,
+    free: undefined,
     po: 0,
     tglbeli: "",
     keterangan: "",
   });
+};
+
+// Fetch Free untuk 1 baris (lazy, dipanggil dari watcher & onBahanSelected)
+const fetchFreeForRow = async (row: any) => {
+  if (!row.kode) return;
+  try {
+    const res = await mkbFormService.getBahanFree(
+      row.kode,
+      formData.value.nomor || "",
+    );
+    row.free = res.data.data.free;
+  } catch {
+    row.free = null; // gagal load — biarin kosong, jangan blok UI
+  }
 };
 
 // Auto Trailing Row: Memastikan selalu ada baris kosong di paling bawah untuk input baru (Replikasi Grid Delphi)
@@ -427,6 +443,16 @@ watch(
     if (lastRow.komponen || lastRow.kode || lastRow.namaBahan) {
       addRowBahan();
     }
+
+    // 3. Lazy-load Free untuk baris yang sudah punya kode bahan tapi
+    //    belum pernah di-fetch (row.free masih undefined) — dipakai
+    //    baik untuk baris baru yang barusan dipilih maupun data lama
+    //    hasil load edit.
+    newRows.forEach((row: any) => {
+      if (row.kode && row.free === undefined) {
+        fetchFreeForRow(row);
+      }
+    });
   },
   { deep: true, immediate: true },
 );
@@ -445,6 +471,7 @@ const onBahanSelected = (bahan: any) => {
     row.satuan = bahan.Satuan || bahan.Bhn_satuan;
     row.gramasi = bahan.Gramasi || bahan.gramasi || "";
     row.ready = Number(bahan.Stok || 0);
+    row.free = undefined; // ✅ BARU: reset supaya watcher fetch ulang Free bahan baru
 
     row.allowanceManual = false; // ← BARU: bahan baru, default segar lagi
     recalcRowFull(row); // ← DIGANTI dari recalcRowBahan(row)
@@ -733,6 +760,9 @@ const onPoSelected = (po: any) => {
                 </th>
                 <th style="width: 72px" class="tr">Allowance</th>
                 <th style="width: 72px" class="tr">Ready</th>
+                <th style="width: 72px" class="tr bg-green-darken-2 text-white">
+                  Free
+                </th>
                 <th style="width: 72px" class="tr bg-red-darken-2 text-white">
                   Jumlah PO
                 </th>
@@ -848,12 +878,35 @@ const onPoSelected = (po: any) => {
                 <td>
                   <input
                     type="number"
-                    :value="row.ready"
-                    class="gi tr gi-ro"
-                    readonly
-                    tabindex="-1"
+                    v-model="row.ready"
+                    class="gi tr"
+                    title="Bisa diedit manual — otomatis mengurangi Jumlah PO"
+                    @input="recalcRowBahan(row)"
                     v-select-on-focus
                   />
+                </td>
+                <td class="tc" style="padding: 0 6px">
+                  <span
+                    v-if="row.free === undefined"
+                    class="text-grey"
+                    style="font-size: 10px"
+                    >...</span
+                  >
+                  <span
+                    v-else-if="row.free === null"
+                    class="text-grey"
+                    style="font-size: 10px"
+                    >-</span
+                  >
+                  <span
+                    v-else
+                    :style="{
+                      color: row.free < 0 ? '#c62828' : '#2e7d32',
+                      fontWeight: 600,
+                    }"
+                  >
+                    {{ row.free.toLocaleString("id-ID") }}
+                  </span>
                 </td>
                 <td>
                   <input
@@ -878,7 +931,7 @@ const onPoSelected = (po: any) => {
                 </td>
               </tr>
               <tr v-if="formData.dtlBahan.length === 0">
-                <td colspan="15" class="empty-row">
+                <td colspan="16" class="empty-row">
                   Klik Tambah Bahan untuk memulai
                 </td>
               </tr>

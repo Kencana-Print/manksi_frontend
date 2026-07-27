@@ -62,8 +62,8 @@ onMounted(fetchPrintData);
 
       <div v-else class="header-with-logo">
         <img v-if="companyLogo" :src="companyLogo" class="logo-img" />
-        <div class="company-text">
-          <div class="perush-name" :class="{ 'text-ja': perushKode === 'JA' }">
+        <div class="company-text" :class="{ 'text-ja': perushKode === 'JA' }">
+          <div class="perush-name">
             {{ header.perush_nama }}
           </div>
           <div class="perush-addr">{{ header.perush_alamat }}</div>
@@ -142,7 +142,7 @@ onMounted(fetchPrintData);
         atau email
       </div>
 
-      <div v-if="perushKode !== 'JA'" class="footer-inline mt-8">
+      <div class="footer-inline mt-8">
         <div class="feedback-section">
           <p>
             Jika ada hal-hal yang masih belum sesuai mohon ditulis di bawah ini
@@ -184,86 +184,6 @@ onMounted(fetchPrintData);
         </div>
       </div>
     </div>
-
-    <div v-if="perushKode === 'JA'" class="page">
-      <div class="header-with-logo">
-        <img :src="logoJA" class="logo-img" />
-        <div class="company-text">
-          <div class="perush-name text-ja">{{ header.perush_nama }}</div>
-          <div class="perush-addr">{{ header.perush_alamat }}</div>
-        </div>
-      </div>
-
-      <div class="meta-section mt-4 border-none-boxes">
-        <div class="recipient-box border-none">
-          <div>Kepada YTH</div>
-          <div class="fw-bold">{{ header.cus_nama }}</div>
-          <div class="fw-bold">Up. {{ header.sj_up }}</div>
-        </div>
-        <div class="info-box border-none">
-          <table class="meta-table">
-            <tr>
-              <td width="70">Tanggal</td>
-              <td>: {{ header.tgl_indo }}</td>
-            </tr>
-            <tr>
-              <td>No</td>
-              <td>: {{ header.SJ_Nomor }}</td>
-            </tr>
-          </table>
-        </div>
-      </div>
-
-      <div class="feedback-section mt-6">
-        <p>
-          Jika ada hal-hal yang masih belum sesuai mohon ditulis di bawah ini :
-        </p>
-        <div class="feedback-box feedback-large"></div>
-        <p class="mt-4">
-          Demikian Surat Serah Terima Approval Sampel ini kami sampaikan.
-        </p>
-      </div>
-
-      <div class="footer-p2 mt-10">
-        <div class="signature-grid">
-          <div class="sign-box">
-            <div>Yang Menerima,</div>
-            <div class="sign-space"></div>
-            <div>(Nama Terang)</div>
-          </div>
-          <div class="sign-box">
-            <div>Yang Menyerahkan,</div>
-            <div class="sign-space"></div>
-            <div class="fw-bold">Chief Marketing Officer</div>
-          </div>
-        </div>
-
-        <div class="checklist-wrapper">
-          <table class="checklist-table">
-            <thead>
-              <tr>
-                <th>Font</th>
-                <th>Tata letak</th>
-                <th>Warna</th>
-                <th>Model</th>
-                <th>Gambar</th>
-                <th>Finishing</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td></td>
-                <td></td>
-                <td></td>
-                <td></td>
-                <td></td>
-                <td></td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
   </div>
 </template>
 
@@ -294,8 +214,9 @@ onMounted(fetchPrintData);
 /* Header */
 .header-with-logo {
   display: flex;
+  flex-direction: column;
   align-items: flex-start;
-  gap: 15px;
+  gap: 6px;
   margin-bottom: 20px;
   border-bottom: 1px solid #eee;
   padding-bottom: 10px;
@@ -303,14 +224,22 @@ onMounted(fetchPrintData);
 .logo-img {
   max-height: 75px;
   width: auto;
+  flex-shrink: 0;
+}
+.company-text {
+  flex: 1;
+  min-width: 0;
 }
 .perush-name {
   font-size: 18px;
   font-weight: bold;
   color: #cc0000;
 }
-.text-ja {
-  color: #002060 !important;
+.company-text.text-ja {
+  color: #002060;
+}
+.company-text.text-ja .perush-name {
+  color: #002060;
 }
 .header-sm {
   margin-bottom: 20px;

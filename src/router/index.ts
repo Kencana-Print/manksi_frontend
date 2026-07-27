@@ -1510,6 +1510,38 @@ const router = createRouter({
         menuId: "124",
       },
     },
+    {
+      path: "/garmen/po-internal-spk/po-internal/create",
+      name: "PoInternalSpkCreate",
+      component: () => import("@/views/garmen/PoInternalSpkFormView.vue"),
+      meta: {
+        title: "Tambah PO Internal SPK",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "124",
+      },
+    },
+    {
+      path: "/garmen/po-internal-spk/po-internal/edit/:nomor",
+      name: "PoInternalSpkEdit",
+      component: () => import("@/views/garmen/PoInternalSpkFormView.vue"),
+      meta: {
+        title: "Ubah PO Internal SPK",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "124",
+      },
+    },
+    {
+      path: "/garmen/po-internal-spk/po-internal/print/:nomor",
+      name: "PoInternalSpkPrint",
+      component: () => import("@/views/garmen/PoInternalSpkPrintView.vue"),
+      meta: {
+        title: "Cetak PO Internal SPK",
+        layout: "BlankLayout",
+        requiresAuth: true,
+      },
+    },
 
     {
       path: "/garmen/mutasi-produksi",
