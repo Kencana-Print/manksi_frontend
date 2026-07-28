@@ -711,6 +711,7 @@ const validateSave = () => {
   <MapSearchModal
     v-model="showSpkModal"
     :divisi="'3,4,6'"
+    include-closed
     @selected="onSpkSelected"
   />
   <BahanSearchModal

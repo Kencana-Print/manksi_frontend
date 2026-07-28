@@ -15,6 +15,7 @@ const props = defineProps<{
   perushKode?: string; // Tambahkan ini
   divisi?: string;
   source?: string;
+  includeClosed?: boolean;
 }>();
 const emit = defineEmits(["update:modelValue", "selected"]);
 
@@ -36,6 +37,7 @@ const fetchData = async () => {
         perush_kode: props.perushKode, // Kirim filter perusahaan ke backend
         divisi: props.divisi,
         source: props.source,
+        includeClosed: props.includeClosed ? "true" : undefined,
       },
     });
     const allData = res.data.data.items || res.data.data || [];

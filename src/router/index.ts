@@ -1596,6 +1596,28 @@ const router = createRouter({
         menuId: "126",
       },
     },
+    {
+      path: "/garmen/planning-per-spk/input-planning",
+      name: "InputPlanningSpkBrowse",
+      component: () => import("@/views/garmen/InputPlanningSpkView.vue"),
+      meta: {
+        title: "Input Planning per SPK",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "80",
+      },
+    },
+    {
+      path: "/garmen/planning-per-spk/input-planning/form/:nomor",
+      name: "InputPlanningSpkForm",
+      component: () => import("@/views/garmen/InputPlanningSpkFormView.vue"),
+      meta: {
+        title: "Input Planning SPK",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "80",
+      },
+    },
 
     {
       path: "/garmen/mutasi-produksi",

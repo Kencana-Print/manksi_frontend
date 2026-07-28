@@ -91,6 +91,7 @@ import {
   IconAlertTriangle,
   IconActivity,
   IconArrowBackUp,
+  IconFileShredder,
 } from "@tabler/icons-vue";
 
 interface NavItem {
@@ -553,7 +554,7 @@ const menuItems: NavItem[] = [
       { divider: true },
       {
         title: "PO Internal MAP",
-        icon: IconArrowRight,
+        icon: IconFileShredder,
         menuId: 925,
         subItems: [
           {
@@ -578,7 +579,7 @@ const menuItems: NavItem[] = [
       },
       {
         title: "PO Internal SPK",
-        icon: IconArrowRight,
+        icon: IconFileInvoice,
         menuId: 926,
         subItems: [
           {
@@ -598,6 +599,19 @@ const menuItems: NavItem[] = [
             to: "/garmen/po-internal-spk/approve-sj",
             icon: IconCircleCheck,
             menuId: 126,
+          },
+        ],
+      },
+      {
+        title: "Planning per SPK",
+        icon: IconCalendarStats,
+        menuId: 927,
+        subItems: [
+          {
+            title: "Input Planning",
+            to: "/garmen/planning-per-spk/input-planning",
+            icon: IconCalendarStats,
+            menuId: 80,
           },
         ],
       },
