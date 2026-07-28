@@ -71,6 +71,7 @@ const defaultData = {
   pf_petugas: "",
   NamaSpk: "",
   JumlahSpk: 0,
+  Ukuran: "",
   detail: [emptyRow()],
 };
 
@@ -131,6 +132,7 @@ const {
       pf_petugas: h.pf_petugas || "",
       NamaSpk: h.NamaSpk || "",
       JumlahSpk: Number(h.JumlahSpk) || 0,
+      Ukuran: h.Ukuran || "",
       detail:
         d.detail.length > 0
           ? d.detail.map((r: any) => ({ ...emptyRow(), ...r }))
@@ -179,6 +181,53 @@ const removeRow = (idx: number) => {
   if (formData.value.detail.length === 0) ensureTrailingRow();
 };
 
+// Parse format "SIZE=QTY, SIZE=QTY" (mis. "L=50, XL=200") dari
+// field Ukuran MAP — tiap entri jadi 1 baris terpisah, size & qty
+// masing-masing diambil dari pasangannya sendiri (bukan JumlahSpk
+// total). Kalau formatnya cuma size polos tanpa "=" (fallback,
+// misal data lama), qty per baris jatuh ke JumlahSpk sebagai default.
+const parseUkuranSizes = () => {
+  const raw = (formData.value.Ukuran || "")
+    .split(",")
+    .map((s: string) => s.trim())
+    .filter(Boolean);
+
+  if (raw.length === 0)
+    return [{ size: "", qty: formData.value.JumlahSpk || 0 }];
+
+  return raw.map((entry: string) => {
+    const [size, qtyStr] = entry.split("=").map((s: string) => s.trim());
+    const qty =
+      qtyStr !== undefined
+        ? Number(qtyStr) || 0
+        : formData.value.JumlahSpk || 0;
+    return { size: size || entry, qty };
+  });
+};
+
+const applyBahanRows = (idx: number, kode: string, nama: string) => {
+  const targetSizes = parseUkuranSizes();
+
+  targetSizes.forEach((item: { size: string; qty: number }, i: number) => {
+    if (i === 0) {
+      const row = formData.value.detail[idx];
+      row.kode = kode;
+      row.nama = nama;
+      row.size = item.size;
+      row.jumlah = item.qty;
+    } else {
+      formData.value.detail.splice(idx + i, 0, {
+        ...emptyRow(),
+        kode,
+        nama,
+        size: item.size,
+        jumlah: item.qty,
+      });
+    }
+  });
+  ensureTrailingRow();
+};
+
 // ── Auto-calc waktu untuk BORDIR (sttich/15000) ─────────────────────
 const onSttichChange = (row: any) => {
   const sttich = Number(row.sttich) || 0;
@@ -197,9 +246,7 @@ const openBahanModal = (idx: number) => {
 const onBahanSelected = (item: any) => {
   const idx = activeBahanRowIdx.value;
   if (idx > -1 && formData.value.detail[idx]) {
-    formData.value.detail[idx].kode = item.Kode;
-    formData.value.detail[idx].nama = item.Nama;
-    ensureTrailingRow();
+    applyBahanRows(idx, item.Kode, item.Nama);
   }
 };
 
@@ -209,9 +256,7 @@ const onKodeEnter = async (idx: number) => {
   if (!kode) return;
   try {
     const res = await proofFormService.loadBahan(kode, formData.value.pf_lini);
-    row.kode = res.data.data.Kode;
-    row.nama = res.data.data.Nama;
-    ensureTrailingRow();
+    applyBahanRows(idx, res.data.data.Kode, res.data.data.Nama);
   } catch (e: any) {
     toast.error(
       e.response?.data?.message ||
@@ -225,16 +270,23 @@ const onKodeEnter = async (idx: number) => {
 // ── Lookup SPK/MAP ───────────────────────────────────────────────────
 const showSpkModal = ref(false);
 
-const applySpkInfo = (nomor: string, nama: string, jumlah: number) => {
+const applySpkInfo = (
+  nomor: string,
+  nama: string,
+  jumlah: number,
+  ukuran: string,
+) => {
   formData.value.pf_spk_nomor = nomor;
   formData.value.NamaSpk = nama;
   formData.value.JumlahSpk = jumlah;
+  formData.value.Ukuran = ukuran;
 };
 
 const resetSpkInfo = () => {
   formData.value.pf_spk_nomor = "";
   formData.value.NamaSpk = "";
   formData.value.JumlahSpk = 0;
+  formData.value.Ukuran = "";
 };
 
 const checkAndApplySpk = async (nomor: string) => {
@@ -264,7 +316,7 @@ const checkAndApplySpk = async (nomor: string) => {
       resetSpkInfo();
       return;
     }
-    applySpkInfo(nomor, info.nama, info.jumlah);
+    applySpkInfo(nomor, info.nama, info.jumlah, info.ukuran || "");
   } catch {
     toast.error("Gagal memvalidasi SPK/MAP.");
     resetSpkInfo();
@@ -421,6 +473,16 @@ const validateSave = () => {
             readonly
             class="inp ro"
             style="width: 120px"
+          />
+        </div>
+        <div class="fr">
+          <label class="lbl">Ukuran</label>
+          <input
+            :value="formData.Ukuran"
+            readonly
+            class="inp ro"
+            style="flex: 1"
+            title="Baris detail otomatis di-split per size (pisah koma)"
           />
         </div>
       </div>
@@ -669,10 +731,11 @@ const validateSave = () => {
               </td>
               <td>
                 <input
-                  :value="row.waktu"
-                  readonly
-                  class="cell-inp tr ro"
-                  title="Otomatis dihitung (khusus Bordir)"
+                  v-model.number="row.waktu"
+                  type="number"
+                  step="0.0001"
+                  class="cell-inp tr"
+                  title="Otomatis dihitung untuk Bordir (dari Stitch), bisa diedit manual"
                 />
               </td>
               <td class="tc">

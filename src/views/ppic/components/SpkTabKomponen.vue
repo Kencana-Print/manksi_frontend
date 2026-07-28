@@ -1,7 +1,12 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from "vue";
 import api from "@/services/api";
-import { IconScissors, IconPrinter, IconInfoCircle } from "@tabler/icons-vue";
+import {
+  IconScissors,
+  IconPrinter,
+  IconInfoCircle,
+  IconTrash,
+} from "@tabler/icons-vue";
 
 interface CetakBordirRow {
   Kode: string;
@@ -98,6 +103,11 @@ const loadKomponenFromProof = async () => {
   }
 };
 
+const removeCetakBordirRow = (idx: number) => {
+  ensureKomponenStruct();
+  props.formData.KomponenSpk.ListCetakBordir.splice(idx, 1);
+};
+
 onMounted(loadKomponenFromProof);
 watch(identifier, loadKomponenFromProof);
 
@@ -183,6 +193,7 @@ const listCetakBordir = computed(
                 <th style="width: 110px">Proses</th>
                 <th style="width: 160px">Penempatan</th>
                 <th style="width: 130px">Ukuran</th>
+                <th style="width: 36px"></th>
               </tr>
             </thead>
             <tbody>
@@ -210,6 +221,21 @@ const listCetakBordir = computed(
                     class="cell-inp"
                     placeholder="Mis: 10x10 cm"
                   />
+                </td>
+                <td class="text-center">
+                  <button
+                    type="button"
+                    class="btn-del"
+                    title="Hapus baris"
+                    @click="removeCetakBordirRow(Number(idx))"
+                  >
+                    <IconTrash :size="13" color="#c62828" />
+                  </button>
+                </td>
+              </tr>
+              <tr v-if="listCetakBordir.length === 0">
+                <td colspan="7" class="empty-row">
+                  Belum ada data Proof Garmen untuk lini Cetak/Sublim/Bordir.
                 </td>
               </tr>
               <tr v-if="listCetakBordir.length === 0">
@@ -265,6 +291,19 @@ const listCetakBordir = computed(
   font-size: 11px;
   outline: none;
   box-sizing: border-box;
+}
+.btn-del {
+  background: #ffebee;
+  border: 1px solid #ef9a9a;
+  border-radius: 3px;
+  padding: 3px 5px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.btn-del:hover {
+  background: #ffcdd2;
 }
 .cell-sel:focus,
 .cell-inp:focus {

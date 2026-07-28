@@ -86,7 +86,7 @@ const printBarcode = () => {
         page-break-inside: avoid; break-inside: avoid;
         overflow: hidden;
       }
-      .sticker-title { font-size:8pt; font-weight:700; text-align:center; line-height:1.1; margin-bottom:0.3cm; height:24pt; overflow:hidden; text-transform:uppercase; }
+      .sticker-title { font-size:12pt; font-weight:700; text-align:center; line-height:1.1; margin-bottom:0.3cm; height:30pt; overflow:hidden; text-transform:uppercase; }
       .sticker-content { display:flex; align-items:flex-start; flex:1; }
       .qr-wrapper { display:flex; flex-direction:column; align-items:center; margin-right:0.3cm; }
       .barcode-text { font-size:7.5pt; margin-top:2px; font-weight:600; }
@@ -209,12 +209,12 @@ const printBarcode = () => {
 }
 
 .sticker-title {
-  font-size: 8pt;
+  font-size: 12pt;
   font-weight: 700;
   text-align: center;
   line-height: 1.1;
   margin-bottom: 0.3cm;
-  height: 24pt;
+  height: 30pt;
   overflow: hidden;
   text-transform: uppercase;
 }
