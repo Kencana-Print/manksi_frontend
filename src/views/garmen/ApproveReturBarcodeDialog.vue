@@ -83,6 +83,8 @@ const printBarcode = () => {
         display:flex; flex-direction:column;
         font-family:Arial,sans-serif; color:black;
         page-break-after:always; break-after:page;
+        page-break-inside: avoid; break-inside: avoid;
+        overflow: hidden;
       }
       .sticker-title { font-size:8pt; font-weight:700; text-align:center; line-height:1.1; margin-bottom:0.3cm; height:24pt; overflow:hidden; text-transform:uppercase; }
       .sticker-content { display:flex; align-items:flex-start; flex:1; }
@@ -201,6 +203,9 @@ const printBarcode = () => {
   flex-direction: column;
   font-family: Arial, Helvetica, sans-serif;
   color: black;
+  page-break-inside: avoid;
+  break-inside: avoid;
+  overflow: hidden;
 }
 
 .sticker-title {

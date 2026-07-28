@@ -99,6 +99,8 @@ const printBarcode = () => {
         display:flex; flex-direction:column;
         font-family:Arial,sans-serif; color:black;
         page-break-after:always; break-after:page;
+        page-break-inside: avoid; break-inside: avoid;
+        overflow: hidden;
         background: white;
       }
       .sticker-title { 
