@@ -12,28 +12,6 @@ const data = ref<any>(null);
 const isLoading = ref(true);
 const isError = ref(false);
 
-const imagesLoadedCount = ref(0);
-const TOTAL_IMAGES = 2; // 2 copy = 2 <img> instance
-
-const waitForImages = () => {
-  return new Promise<void>((resolve) => {
-    if (imagesLoadedCount.value >= TOTAL_IMAGES) {
-      resolve();
-      return;
-    }
-    const stop = watch(imagesLoadedCount, (val) => {
-      if (val >= TOTAL_IMAGES) {
-        stop();
-        resolve();
-      }
-    });
-    setTimeout(() => {
-      stop();
-      resolve();
-    }, 4000);
-  });
-};
-
 onMounted(async () => {
   try {
     const res = await poInternalSpkFormService.getPrintData(nomor);
@@ -41,7 +19,8 @@ onMounted(async () => {
     isLoading.value = false;
 
     await nextTick();
-    await waitForImages();
+    await resolveDesignImage();
+    await nextTick();
 
     const style = document.createElement("style");
     style.textContent = "@page { size: A4 portrait; margin: 10mm; }";
@@ -55,35 +34,58 @@ onMounted(async () => {
 
 const getBaseUrl = () => api.defaults.baseURL?.replace(/\/api\/?$/, "") || "";
 
-const spkImageUrl = computed(() => {
-  if (!data.value) return "";
-  const nomorSpk = data.value.header.NomorSPK;
-  if (!nomorSpk) return "";
-  const cab = data.value.header.GdgKode || "HO-";
-  return `${getBaseUrl()}/images/${cab}/${encodeURIComponent(nomorSpk)}.jpg`;
-});
+const resolvedImageUrl = ref("");
+const isLoadingImage = ref(false);
 
-const handleImageLoad = () => {
-  imagesLoadedCount.value++;
-};
-
-const handleImageError = (e: Event) => {
-  const img = e.target as HTMLImageElement;
-  if (img.dataset.tried === "true") {
-    img.style.display = "none";
-    imagesLoadedCount.value++;
-    return;
-  }
-  img.dataset.tried = "true";
+// Coba berantai, sama pola dgn SpkPrintView.resolveDesignImage:
+// (1) lokal per-cabang → (2) lokal cabang HO- (fallback kalau file
+// disimpan di folder HO- bukan cabang spesifik) → (3) lokal folder
+// map/ (kalau NomorSPK ternyata nomor MAP) → (4) VPS legacy.
+// Semua kandidat di-preload pakai Image() SEBELUM window.print(),
+// supaya gambar sudah pasti ke-resolve (atau pasti gagal semua)
+// sebelum dialog print terbuka — bukan lagi nunggu <img> di DOM.
+const resolveDesignImage = () => {
   const nomorSpk = data.value?.header?.NomorSPK;
-  if (nomorSpk) {
-    img.src = `/file-gambar/${encodeURIComponent(nomorSpk)}.jpg`;
-  } else {
-    img.style.display = "none";
-    imagesLoadedCount.value++;
+  if (!nomorSpk) {
+    resolvedImageUrl.value = "";
+    return Promise.resolve();
   }
-};
+  const base = getBaseUrl();
+  const cab = data.value.header.GdgKode || "HO-";
 
+  const candidates = [
+    `${base}/images/${cab}/${encodeURIComponent(nomorSpk)}.jpg`,
+  ];
+  if (cab !== "HO-") {
+    candidates.push(`${base}/images/HO-/${encodeURIComponent(nomorSpk)}.jpg`);
+  }
+  candidates.push(
+    `${base}/images/${cab}/map/${encodeURIComponent(nomorSpk)}.jpg`,
+  );
+  candidates.push(`/file-gambar/${encodeURIComponent(nomorSpk)}.jpg`);
+
+  isLoadingImage.value = true;
+  resolvedImageUrl.value = "";
+
+  return new Promise<void>((resolve) => {
+    const tryNext = (idx: number) => {
+      if (idx >= candidates.length) {
+        isLoadingImage.value = false;
+        resolve();
+        return;
+      }
+      const img = new Image();
+      img.onload = () => {
+        resolvedImageUrl.value = candidates[idx];
+        isLoadingImage.value = false;
+        resolve();
+      };
+      img.onerror = () => tryNext(idx + 1);
+      img.src = candidates[idx];
+    };
+    tryNext(0);
+  });
+};
 const num = (val: any) =>
   new Intl.NumberFormat("id-ID").format(Number(val) || 0);
 
@@ -207,12 +209,10 @@ const tglIndo = (dateStr: string) => {
 
             <div class="right-col">
               <div class="img-box">
-                <img
-                  :src="spkImageUrl"
-                  alt=""
-                  @load="handleImageLoad"
-                  @error="handleImageError"
-                />
+                <img v-if="resolvedImageUrl" :src="resolvedImageUrl" alt="" />
+                <span v-else-if="!isLoadingImage" class="img-empty-text"
+                  >Tidak ada gambar</span
+                >
               </div>
               <div class="spk-info">
                 <div class="spk-row">
@@ -405,6 +405,16 @@ const tglIndo = (dateStr: string) => {
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
+}
+.img-box img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+.img-empty-text {
+  font-size: 9px;
+  color: #999;
+  font-style: italic;
 }
 
 .spk-info {
