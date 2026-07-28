@@ -415,8 +415,9 @@ const setBahan = (v: any) => {
     ? `GREIGE ${v.Nama || v.bhn_name}`
     : v.Nama || v.bhn_name;
   formData.value.items[i].satuan = v.Satuan || v.bhn_satuan || "";
-  formData.value.items[i].gramasia = v.Gramasi || ""; // ← auto dari master
-  formData.value.items[i].gramasi = v.Gramasi || ""; // ← sama, readonly
+  // gramasia (Gramasi Awal) SENGAJA tidak di-auto-fill di sini — sesuai
+  // Delphi clkodePropertiesEditValueChanged, field ini manual input user.
+  formData.value.items[i].gramasi = v.Gramasi || ""; // ← auto dari master (readonly)
   formData.value.items[i].setting = v.Setting || "";
   formData.value.items[i].jenis = v.Jenis || "";
   formData.value.items[i].harga = Number(v.Harga || v.bhn_hargabeli) || 0;
@@ -858,7 +859,10 @@ const validateSave = () => {
                 <th style="width: 160px">Nama Bahan</th>
                 <th style="width: 120px">Nama External</th>
                 <th style="width: 50px" class="tc">Sat</th>
-                <th style="width: 80px">Gramasi</th>
+                <th v-if="!isBahan" style="width: 70px">Gramasi Awal</th>
+                <th style="width: 70px">
+                  {{ isBahan ? "Gramasi" : "Gramasi Akhir" }}
+                </th>
                 <th style="width: 50px">Setting</th>
                 <th style="width: 80px">Jenis Bahan</th>
                 <th style="width: 50px" class="tr" v-if="isCelup">Roll</th>
@@ -893,8 +897,15 @@ const validateSave = () => {
                 <td class="p0">
                   <input v-model="row.satuan" class="ci tc ro" readonly />
                 </td>
+                <td class="p0" v-if="!isBahan">
+                  <input
+                    v-model="row.gramasia"
+                    class="ci"
+                    placeholder="Manual"
+                  />
+                </td>
                 <td class="p0">
-                  <input :value="row.gramasia" readonly class="ci ro" />
+                  <input :value="row.gramasi" readonly class="ci ro" />
                 </td>
                 <td class="p0">
                   <input v-model="row.setting" class="ci ro" readonly />
@@ -981,7 +992,10 @@ const validateSave = () => {
                 </td>
               </tr>
               <tr v-if="formData.items.length === 0">
-                <td :colspan="isCelup ? 17 : 16" class="empty-row">
+                <td
+                  :colspan="isCelup ? 18 : isBahan ? 16 : 17"
+                  class="empty-row"
+                >
                   Tidak ada data. Klik "Tambah Baris" untuk memasukkan bahan.
                 </td>
               </tr>

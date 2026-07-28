@@ -587,6 +587,18 @@ const menuItems: NavItem[] = [
             icon: IconListDetails,
             menuId: 124,
           },
+          {
+            title: "Surat Jalan PO Internal",
+            to: "/garmen/po-internal-spk/sj-po-internal",
+            icon: IconTruckDelivery,
+            menuId: 125,
+          },
+          {
+            title: "Approval Surat Jalan PO Internal",
+            to: "/garmen/po-internal-spk/approve-sj",
+            icon: IconCircleCheck,
+            menuId: 126,
+          },
         ],
       },
       { divider: true },

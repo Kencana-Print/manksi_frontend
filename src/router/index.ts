@@ -1504,7 +1504,7 @@ const router = createRouter({
       name: "PoInternalSpkBrowse",
       component: () => import("@/views/garmen/PoInternalSpkView.vue"),
       meta: {
-        title: "PO Internal",
+        title: "PO Internal SPK",
         layout: "DefaultLayout",
         requiresAuth: true,
         menuId: "124",
@@ -1522,7 +1522,7 @@ const router = createRouter({
       },
     },
     {
-      path: "/garmen/po-internal-spk/po-internal/edit/:nomor",
+      path: "/garmen/po-internal-spk/po-internal/form/:nomor",
       name: "PoInternalSpkEdit",
       component: () => import("@/views/garmen/PoInternalSpkFormView.vue"),
       meta: {
@@ -1540,6 +1540,60 @@ const router = createRouter({
         title: "Cetak PO Internal SPK",
         layout: "BlankLayout",
         requiresAuth: true,
+      },
+    },
+    {
+      path: "/garmen/po-internal-spk/sj-po-internal",
+      name: "SjPoInternalSpkBrowse",
+      component: () => import("@/views/garmen/SjPoInternalSpkView.vue"),
+      meta: {
+        title: "Surat Jalan PO Internal",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "125",
+      },
+    },
+    {
+      path: "/garmen/po-internal-spk/sj-po-internal/form",
+      name: "SjPoInternalSpkCreate",
+      component: () => import("@/views/garmen/SjPoInternalSpkFormView.vue"),
+      meta: {
+        title: "Tambah Surat Jalan PO Internal",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "125",
+      },
+    },
+    {
+      path: "/garmen/po-internal-spk/sj-po-internal/form/:nomor",
+      name: "SjPoInternalSpkEdit",
+      component: () => import("@/views/garmen/SjPoInternalSpkFormView.vue"),
+      meta: {
+        title: "Ubah Surat Jalan PO Internal",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "125",
+      },
+    },
+    {
+      path: "/garmen/po-internal-spk/sj-po-internal/print/:nomor",
+      name: "SjPoInternalSpkPrint",
+      component: () => import("@/views/garmen/SjPoInternalSpkPrintView.vue"),
+      meta: {
+        title: "Cetak Surat Jalan PO Internal",
+        layout: "BlankLayout",
+        requiresAuth: true,
+      },
+    },
+    {
+      path: "/garmen/po-internal-spk/approve-sj",
+      name: "ApprovePoInternalSpkBrowse",
+      component: () => import("@/views/garmen/ApprovePoInternalSpkView.vue"),
+      meta: {
+        title: "Approval Surat Jalan PO Internal",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "126",
       },
     },
 

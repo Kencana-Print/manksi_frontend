@@ -24,6 +24,8 @@ const props = defineProps<{
     gramasi: string[];
     finishing: string[];
   };
+  isMapLocked?: boolean;
+  isSjMemoLocked?: boolean;
 }>();
 const emit = defineEmits([
   "upload-main",
@@ -137,7 +139,7 @@ const handleJumlahBlur = () => {
   // Peringatan Beda MPPB
   if (props.formData.spk_mppb && mppb !== 0 && qty !== 0 && qty !== mppb) {
     toast.warning(
-      `Jumlah SPK beda dengan jumlah di MPPB.\nJumlah di MPPB = ${mppb}`,
+      `Jumlah SO beda dengan jumlah di MPPB.\nJumlah di MPPB = ${mppb}`,
       { timeout: 8000 },
     );
   }
@@ -432,13 +434,13 @@ const onPenawaranF1 = (e: KeyboardEvent) => {
 const onSjMemoF1 = (e: KeyboardEvent) => {
   if (e.key === "F1") {
     e.preventDefault();
-    emit("open-lookup", "sjMemo");
+    if (!props.isSjMemoLocked) emit("open-lookup", "sjMemo");
   }
 };
 const onMemoF1 = (e: KeyboardEvent) => {
   if (e.key === "F1") {
     e.preventDefault();
-    emit("open-lookup", "memo");
+    if (!props.isMapLocked) emit("open-lookup", "memo");
   }
 };
 const onMppbF1 = (e: KeyboardEvent) => {
@@ -709,7 +711,7 @@ watch(
 
         <!-- Nomor SPK / Revisi -->
         <div class="fr">
-          <label class="lbl">Nomor SPK</label>
+          <label class="lbl">Nomor SO</label>
           <input
             :value="formData.spk_nomor"
             readonly
@@ -738,7 +740,7 @@ watch(
 
         <!-- Tanggal / Created / Tipe SPK -->
         <div class="fr">
-          <label class="lbl">Tanggal SPK</label>
+          <label class="lbl">Tanggal SO</label>
           <input
             type="date"
             v-model="formData.spk_tanggal"
@@ -753,7 +755,7 @@ watch(
             class="inp ro"
             style="width: 135px"
           />
-          <label class="lbl ml-auto" style="width: 62px">Tipe SPK</label>
+          <label class="lbl ml-auto" style="width: 62px">Tipe SO</label>
           <select
             v-model="formData.spk_tipe"
             class="inp sel"
@@ -804,7 +806,7 @@ watch(
               <IconSearch :size="12" color="#1565c0" />
             </button>
           </div>
-          <label class="lbl ml-2" style="width: 110px">Repeat Dari SPK</label>
+          <label class="lbl ml-2" style="width: 110px">Repeat Dari SO</label>
           <div class="igrp" style="width: 180px">
             <input
               v-model="formData.spk_repeat"
@@ -815,7 +817,7 @@ watch(
             <button
               type="button"
               class="blkp"
-              title="Cari SPK (F1)"
+              title="Cari SO (F1)"
               @mousedown.prevent="$emit('open-lookup', 'repeat')"
             >
               <IconSearch :size="12" color="#1565c0" />
@@ -1033,17 +1035,27 @@ watch(
                   v-model="formData.spk_nomormemo"
                   class="inp"
                   style="flex: 1"
+                  :class="{ ro: isSjMemoLocked }"
+                  :readonly="isSjMemoLocked"
                   @keydown="onSjMemoF1"
                 />
                 <button
                   type="button"
                   class="blkp"
                   title="Cari SJ Memo (F1)"
+                  :disabled="isSjMemoLocked"
                   @mousedown.prevent="$emit('open-lookup', 'sjMemo')"
                 >
                   <IconSearch :size="12" color="#1565c0" />
                 </button>
               </div>
+              <span
+                v-if="isSjMemoLocked"
+                class="ml-1"
+                style="font-size: 12px"
+                title="Otomatis terisi & terkunci dari MAP"
+                >🔒</span
+              >
             </div>
             <div class="fr">
               <label class="lbl">No. MAP</label>
@@ -1052,6 +1064,8 @@ watch(
                   v-model="formData.spk_memo"
                   class="inp"
                   style="flex: 1"
+                  :class="{ ro: isMapLocked }"
+                  :readonly="isMapLocked"
                   @keydown="onMemoF1"
                   @change="$emit('field-blur', 'memo', formData.spk_memo)"
                 />
@@ -1059,11 +1073,19 @@ watch(
                   type="button"
                   class="blkp"
                   title="Cari MAP (F1)"
+                  :disabled="isMapLocked"
                   @mousedown.prevent="$emit('open-lookup', 'memo')"
                 >
                   <IconSearch :size="12" color="#1565c0" />
                 </button>
               </div>
+              <span
+                v-if="isMapLocked"
+                class="ml-1"
+                style="font-size: 12px"
+                title="Otomatis terisi & terkunci dari SJ Memo"
+                >🔒</span
+              >
             </div>
             <div v-if="formData.spk_memo" class="fr" style="margin-top: -2px">
               <span
@@ -1453,8 +1475,8 @@ watch(
               style="width: 90px"
               v-select-on-focus
             />
-            <label class="lbl text-right ml-1" style="width: 48px"
-              >Return</label
+            <label class="lbl text-right ml-1" style="width: 62px"
+              >Harga Fee</label
             >
             <input
               v-model.number="formData.spk_hargafee"
@@ -1674,7 +1696,7 @@ watch(
         </div>
 
         <div class="fr">
-          <label class="lbl" style="width: 72px">Dateline SPK</label>
+          <label class="lbl" style="width: 72px">Dateline SO</label>
           <input
             type="date"
             v-model="formData.spk_dateline"
@@ -1684,7 +1706,7 @@ watch(
         </div>
 
         <div class="fr">
-          <label class="lbl" style="width: 72px">SPK Lama</label>
+          <label class="lbl" style="width: 72px">SO Lama</label>
           <div class="igrp" style="flex: 1">
             <input
               v-model="formData.spk_lama"
@@ -1696,7 +1718,7 @@ watch(
             <button
               type="button"
               class="blkp"
-              title="Cari SPK Lama (F1)"
+              title="Cari SO Lama (F1)"
               @mousedown.prevent="$emit('open-lookup', 'spkLama')"
             >
               <IconSearch :size="12" color="#1565c0" />
@@ -1812,7 +1834,7 @@ watch(
   <v-dialog v-model="showPreviewDialog" max-width="800px">
     <div class="preview-card">
       <div class="preview-header">
-        <span>Preview Design SPK</span>
+        <span>Preview Design SO</span>
         <button class="preview-close" @click="showPreviewDialog = false">
           ✕
         </button>

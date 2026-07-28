@@ -4,14 +4,14 @@ import { useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
 import BaseBrowse from "@/components/BaseBrowse.vue";
 import { useBrowse } from "@/composables/useBrowse";
-import { poInternalSpkService } from "@/services/garmen/poInternalSpkService";
+import { sjPoInternalSpkService } from "@/services/garmen/sjPoInternalSpkService";
 import { exportExcelSingle, type ExcelColumn } from "@/utils/excelExport";
 import { formatTanggal } from "@/utils/dateFormat";
 import api from "@/services/api";
 import BahanSearchModal from "@/components/lookups/BahanSearchModal.vue";
 import SpkSearchModal from "@/components/lookups/SpkSearchModal.vue";
 import {
-  IconListDetails,
+  IconTruckDelivery,
   IconPrinter,
   IconFileExport,
   IconSearch,
@@ -45,9 +45,9 @@ const namaKomponenHint = ref("");
 // --- BROWSE SETUP ---
 const { items, isLoading, selected, canInsert, canEdit, canDelete, fetchData } =
   useBrowse({
-    menuId: "124",
+    menuId: "125",
     fetchApi: async () => {
-      const res = await poInternalSpkService.getBrowse({
+      const res = await sjPoInternalSpkService.getBrowse({
         startDate: filterState.value.dtAwal,
         endDate: filterState.value.dtAkhir,
         cabang: filterState.value.cabang,
@@ -61,31 +61,29 @@ const { items, isLoading, selected, canInsert, canEdit, canDelete, fetchData } =
 
 // --- HEADERS UTAMA ---
 const headers = [
-  { title: "Nomor", key: "Nomor", width: "140px", fixed: true },
+  { title: "Nomor SJ", key: "NomorSJ", width: "140px", fixed: true },
   { title: "Tanggal", key: "Tanggal", width: "95px", align: "center" },
-  { title: "Dateline", key: "Dateline", width: "95px", align: "center" },
+  { title: "Nomor PO", key: "NomorPO", width: "140px" },
   { title: "SPK", key: "SPK", width: "140px" },
-  { title: "Nama SPK", key: "NamaSPK", minWidth: "220px" },
   { title: "Jasa", key: "Jasa", width: "120px" },
   { title: "Cab", key: "Cab", width: "60px", align: "center" },
-  { title: "Tujuan", key: "Tujuan", width: "120px" },
-  { title: "Keterangan", key: "Keterangan", minWidth: "180px" },
-  { title: "Jumlah", key: "Jumlah", width: "90px", align: "right" },
-  { title: "SJ", key: "SJ", width: "80px", align: "right" },
-  { title: "BS", key: "BS", width: "70px", align: "right" },
-  { title: "Selisih", key: "Selisih", width: "90px", align: "right" },
+  { title: "Tujuan", key: "Tujuan", width: "70px", align: "center" },
+  { title: "Keterangan", key: "Keterangan", minWidth: "200px" },
+  { title: "Cmt", key: "Cmt", width: "55px", align: "center" },
+  { title: "Approve", key: "Approve", width: "75px", align: "center" },
+  { title: "No Mutasi", key: "NoMutasi", minWidth: "160px" },
 ];
 
 // --- ROW COLOR (replikasi cxGrdMasterCustomDrawCell) ---
+// Merah = belum di-approve (seluruh baris). Biru khusus kolom
+// NomorSJ (bukan seluruh baris) kalau Cmt='Y', ditangani lewat
+// template #item.NomorSJ di bawah, bukan lewat rowPropsFn.
 const rowPropsFn = (data: any) => {
   const item = data.item?.raw || data.item;
-  if (item.Closed === "N" && Number(item.SJ) === 0) {
-    return { style: "color:#d32f2f!important;font-weight:600" }; // merah
+  if (item.Approve === "N") {
+    return { style: "color:#d32f2f!important;font-weight:600" };
   }
-  if (item.Closed === "N" && Number(item.SJ) !== 0) {
-    return { style: "color:#1565c0!important;font-weight:600" }; // biru
-  }
-  return { style: "color:#212121!important" }; // hitam (Closed='Y')
+  return { style: "color:#212121!important" };
 };
 
 // --- EXPAND LOGIC (DETAIL KOMPONEN) ---
@@ -97,14 +95,14 @@ const onUpdateExpanded = async (newExpanded: any[]) => {
   expandedRows.value = newExpanded;
   const newlyExpanded = newExpanded.filter(
     (item) =>
-      !detailCache.value[item.Nomor] && !expandedLoading.value[item.Nomor],
+      !detailCache.value[item.NomorSJ] && !expandedLoading.value[item.NomorSJ],
   );
 
   for (const item of newlyExpanded) {
-    const nomor = item.Nomor;
+    const nomor = item.NomorSJ;
     expandedLoading.value[nomor] = true;
     try {
-      const res = await poInternalSpkService.getDetail(nomor);
+      const res = await sjPoInternalSpkService.getDetail(nomor);
       detailCache.value[nomor] = res.data.data;
     } catch {
       toast.error(`Gagal memuat detail ${nomor}`);
@@ -209,17 +207,17 @@ watch(
 );
 
 const onAdd = () => {
-  router.push({ name: "PoInternalSpkCreate" });
+  router.push({ name: "SjPoInternalSpkCreate" });
 };
 
 const onEdit = async (item: any) => {
   try {
-    const res = await poInternalSpkService.checkModifiable(item.Nomor);
+    const res = await sjPoInternalSpkService.checkModifiable(item.NomorSJ);
     if (!res.data.data.allowed) {
       return toast.warning(res.data.data.message);
     }
     router.push(
-      `/garmen/po-internal-spk/po-internal/form/${encodeURIComponent(item.Nomor)}`,
+      `/garmen/po-internal-spk/sj-po-internal/form/${encodeURIComponent(item.NomorSJ)}`,
     );
   } catch (e: any) {
     toast.error(e.response?.data?.message || "Gagal memvalidasi data.");
@@ -228,7 +226,7 @@ const onEdit = async (item: any) => {
 
 const onDelete = async (item: any) => {
   try {
-    await poInternalSpkService.delete(item.Nomor);
+    await sjPoInternalSpkService.delete(item.NomorSJ);
     toast.success("Sukses");
     fetchData();
   } catch (e: any) {
@@ -238,7 +236,7 @@ const onDelete = async (item: any) => {
 
 const onPrint = (item: any) => {
   window.open(
-    `/garmen/po-internal-spk/po-internal/print/${encodeURIComponent(item.Nomor)}`,
+    `/garmen/po-internal-spk/sj-po-internal/print/${encodeURIComponent(item.NomorSJ)}`,
     "_blank",
   );
 };
@@ -250,46 +248,30 @@ const onExport = async () => {
   }
   try {
     const columns: ExcelColumn[] = [
-      { header: "Nomor", key: "Nomor", width: 20 },
+      { header: "Nomor SJ", key: "NomorSJ", width: 20 },
       { header: "Tanggal", key: "Tanggal", width: 14, align: "center" },
-      { header: "Dateline", key: "Dateline", width: 14, align: "center" },
+      { header: "Nomor PO", key: "NomorPO", width: 20 },
       { header: "SPK", key: "SPK", width: 20 },
-      { header: "Nama SPK", key: "NamaSPK", width: 30 },
       { header: "Jasa", key: "Jasa", width: 18 },
       { header: "Cab", key: "Cab", width: 10, align: "center" },
-      { header: "Tujuan", key: "Tujuan", width: 18 },
+      { header: "Tujuan", key: "Tujuan", width: 10, align: "center" },
       { header: "Keterangan", key: "Keterangan", width: 26 },
-      {
-        header: "Jumlah",
-        key: "Jumlah",
-        width: 12,
-        align: "right",
-        numFmt: "#,##0",
-      },
-      { header: "SJ", key: "SJ", width: 12, align: "right", numFmt: "#,##0" },
-      { header: "BS", key: "BS", width: 12, align: "right", numFmt: "#,##0" },
-      {
-        header: "Selisih",
-        key: "Selisih",
-        width: 12,
-        align: "right",
-        numFmt: "#,##0",
-      },
-      { header: "Closed", key: "Closed", width: 10, align: "center" },
+      { header: "Cmt", key: "Cmt", width: 8, align: "center" },
+      { header: "Approve", key: "Approve", width: 10, align: "center" },
+      { header: "No Mutasi", key: "NoMutasi", width: 24 },
     ];
 
     const rows = items.value.map((it: any) => ({
       ...it,
       Tanggal: formatTanggal(it.Tanggal),
-      Dateline: formatTanggal(it.Dateline),
     }));
 
     await exportExcelSingle(
-      `PO_Internal_SPK_${today}.xlsx`,
-      "PO Internal",
+      `SJ_PO_Internal_${today}.xlsx`,
+      "SJ PO Internal",
       columns,
       rows,
-      `PO Internal SPK  |  Periode: ${formatTanggal(filterState.value.dtAwal)} s.d ${formatTanggal(filterState.value.dtAkhir)}`,
+      `Surat Jalan PO Internal  |  Periode: ${formatTanggal(filterState.value.dtAwal)} s.d ${formatTanggal(filterState.value.dtAkhir)}`,
     );
 
     toast.success("Berhasil export data.");
@@ -310,18 +292,18 @@ const exportDetail = async () => {
     const combinedRows: any[] = [];
 
     for (const item of items.value) {
-      let detail = detailCache.value[item.Nomor];
+      let detail = detailCache.value[item.NomorSJ];
       if (!detail) {
-        const res = await poInternalSpkService.getDetail(item.Nomor);
+        const res = await sjPoInternalSpkService.getDetail(item.NomorSJ);
         detail = res.data.data;
-        detailCache.value[item.Nomor] = detail;
+        detailCache.value[item.NomorSJ] = detail;
       }
 
       const masterCells = {
-        Nomor: item.Nomor,
+        NomorSJ: item.NomorSJ,
         Tanggal: formatTanggal(item.Tanggal),
+        NomorPO: item.NomorPO,
         SPK: item.SPK,
-        NamaSPK: item.NamaSPK,
         Cab: item.Cab,
       };
       const blankMaster = Object.fromEntries(
@@ -336,9 +318,11 @@ const exportDetail = async () => {
           Satuan: "",
           Size: "",
           JumlahDtl: "",
-          SJDtl: "",
-          BSDtl: "",
-          SelisihDtl: "",
+          BsLiniDtl: "",
+          BsSablonDtl: "",
+          BsKainDtl: "",
+          KoliDtl: "",
+          KeteranganDtl: "",
         });
       } else {
         detail.forEach((dRow: any, idx: number) => {
@@ -349,19 +333,21 @@ const exportDetail = async () => {
             Satuan: dRow.Satuan,
             Size: dRow.Size,
             JumlahDtl: Number(dRow.Jumlah) || 0,
-            SJDtl: Number(dRow.SJ) || 0,
-            BSDtl: Number(dRow.BS) || 0,
-            SelisihDtl: Number(dRow.Selisih) || 0,
+            BsLiniDtl: Number(dRow.BsLini) || 0,
+            BsSablonDtl: Number(dRow.BsSablon) || 0,
+            BsKainDtl: Number(dRow.BsKain) || 0,
+            KoliDtl: Number(dRow.Koli) || 0,
+            KeteranganDtl: dRow.Keterangan || "",
           });
         });
       }
     }
 
     const columns: ExcelColumn[] = [
-      { header: "Nomor PO", key: "Nomor", width: 20 },
+      { header: "Nomor SJ", key: "NomorSJ", width: 20 },
       { header: "Tanggal", key: "Tanggal", width: 14, align: "center" },
+      { header: "Nomor PO", key: "NomorPO", width: 20 },
       { header: "SPK", key: "SPK", width: 20 },
-      { header: "Nama SPK", key: "NamaSPK", width: 30 },
       { header: "Cab", key: "Cab", width: 10, align: "center" },
       { header: "Kode", key: "Kode", width: 14 },
       { header: "Komponen", key: "Komponen", width: 26 },
@@ -375,34 +361,42 @@ const exportDetail = async () => {
         numFmt: "#,##0",
       },
       {
-        header: "SJ",
-        key: "SJDtl",
+        header: "BS Lini",
+        key: "BsLiniDtl",
         width: 12,
         align: "right",
         numFmt: "#,##0",
       },
       {
-        header: "BS",
-        key: "BSDtl",
+        header: "BS Sablon",
+        key: "BsSablonDtl",
         width: 12,
         align: "right",
         numFmt: "#,##0",
       },
       {
-        header: "Selisih",
-        key: "SelisihDtl",
+        header: "BS Kain",
+        key: "BsKainDtl",
         width: 12,
         align: "right",
         numFmt: "#,##0",
       },
+      {
+        header: "Koli",
+        key: "KoliDtl",
+        width: 10,
+        align: "right",
+        numFmt: "#,##0",
+      },
+      { header: "Keterangan", key: "KeteranganDtl", width: 22 },
     ];
 
     await exportExcelSingle(
-      `Export_Detail_PO_Internal_SPK_${today}.xlsx`,
+      `Export_Detail_SJ_PO_Internal_${today}.xlsx`,
       "Detail Komponen",
       columns,
       combinedRows,
-      `Detail Komponen PO Internal SPK  |  Periode: ${formatTanggal(filterState.value.dtAwal)} s.d ${formatTanggal(filterState.value.dtAkhir)}`,
+      `Detail Komponen SJ PO Internal  |  Periode: ${formatTanggal(filterState.value.dtAwal)} s.d ${formatTanggal(filterState.value.dtAkhir)}`,
     );
 
     toast.success("Berhasil export detail.");
@@ -418,9 +412,9 @@ const numFmt = (v: any) =>
 
 <template>
   <BaseBrowse
-    title="PO Internal SPK"
-    menu-id="124"
-    :icon="IconListDetails"
+    title="Surat Jalan PO Internal"
+    menu-id="125"
+    :icon="IconTruckDelivery"
     :headers="headers"
     :items="items ?? []"
     :is-loading="isLoading"
@@ -429,7 +423,7 @@ const numFmt = (v: any) =>
     :can-insert="canInsert"
     :can-edit="canEdit"
     :can-delete="canDelete"
-    item-value="Nomor"
+    item-value="NomorSJ"
     :row-props-fn="rowPropsFn"
     @refresh="fetchData"
     @add="onAdd"
@@ -442,7 +436,7 @@ const numFmt = (v: any) =>
   >
     <template #filter-left>
       <div class="f-group">
-        <span class="f-label">Tanggal</span>
+        <span class="f-label">Periode</span>
         <input type="date" v-model="filterState.dtAwal" class="f-date" />
         <span class="f-sep">s/d</span>
         <input type="date" v-model="filterState.dtAkhir" class="f-date" />
@@ -515,42 +509,44 @@ const numFmt = (v: any) =>
     <template #item.Tanggal="{ item }">{{
       formatTanggal(item.Tanggal)
     }}</template>
-    <template #item.Dateline="{ item }">{{
-      formatTanggal(item.Dateline)
-    }}</template>
-    <template #item.Jumlah="{ item }">{{ numFmt(item.Jumlah) }}</template>
-    <template #item.SJ="{ item }">{{ numFmt(item.SJ) }}</template>
-    <template #item.BS="{ item }">{{ numFmt(item.BS) }}</template>
-    <template #item.Selisih="{ item }">{{ numFmt(item.Selisih) }}</template>
+
+    <!-- Biru khusus teks NomorSJ kalau Cmt='Y' (bukan seluruh baris) -->
+    <template #item.NomorSJ="{ item }">
+      <span :style="item.Cmt === 'Y' ? 'color:#1565c0;font-weight:700' : ''">{{
+        item.NomorSJ
+      }}</span>
+    </template>
 
     <!-- Detail Expand (Lazy Load) -->
     <template #detail="{ item }">
       <div class="expand-wrap">
         <v-progress-linear
-          v-if="expandedLoading[item.Nomor]"
+          v-if="expandedLoading[item.NomorSJ]"
           indeterminate
           color="primary"
           height="2"
         />
         <div v-else>
           <div class="expand-title mb-2">
-            Detail Komponen - {{ item.Nomor }}
+            Detail Komponen - {{ item.NomorSJ }}
           </div>
           <table class="detail-table">
             <thead>
               <tr>
                 <th width="90">Kode</th>
-                <th width="220">Komponen</th>
+                <th width="200">Komponen</th>
                 <th width="70">Satuan</th>
                 <th width="70">Size</th>
-                <th width="90" class="tr">Jumlah</th>
-                <th width="80" class="tr">SJ</th>
-                <th width="70" class="tr">BS</th>
-                <th width="90" class="tr">Selisih</th>
+                <th width="80" class="tr">Jumlah</th>
+                <th width="70" class="tr">BS Lini</th>
+                <th width="80" class="tr">BS Sablon</th>
+                <th width="70" class="tr">BS Kain</th>
+                <th width="60" class="tr">Koli</th>
+                <th width="160">Keterangan</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="(dRow, i) in detailCache[item.Nomor]" :key="i">
+              <tr v-for="(dRow, i) in detailCache[item.NomorSJ]" :key="i">
                 <td class="font-weight-bold text-blue-darken-2">
                   {{ dRow.Kode }}
                 </td>
@@ -558,17 +554,19 @@ const numFmt = (v: any) =>
                 <td class="tc">{{ dRow.Satuan }}</td>
                 <td class="tc">{{ dRow.Size }}</td>
                 <td class="tr">{{ numFmt(dRow.Jumlah) }}</td>
-                <td class="tr">{{ numFmt(dRow.SJ) }}</td>
-                <td class="tr">{{ numFmt(dRow.BS) }}</td>
-                <td class="tr font-weight-bold">{{ numFmt(dRow.Selisih) }}</td>
+                <td class="tr">{{ numFmt(dRow.BsLini) }}</td>
+                <td class="tr">{{ numFmt(dRow.BsSablon) }}</td>
+                <td class="tr">{{ numFmt(dRow.BsKain) }}</td>
+                <td class="tr">{{ numFmt(dRow.Koli) }}</td>
+                <td>{{ dRow.Keterangan }}</td>
               </tr>
               <tr
                 v-if="
-                  !detailCache[item.Nomor] ||
-                  detailCache[item.Nomor].length === 0
+                  !detailCache[item.NomorSJ] ||
+                  detailCache[item.NomorSJ].length === 0
                 "
               >
-                <td colspan="8" class="text-center text-grey py-3 font-italic">
+                <td colspan="10" class="text-center text-grey py-3 font-italic">
                   Tidak ada rincian komponen.
                 </td>
               </tr>

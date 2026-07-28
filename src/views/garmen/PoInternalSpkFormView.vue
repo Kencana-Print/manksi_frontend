@@ -839,7 +839,7 @@ const rp = (val: any) =>
 
   <SpkSearchModal
     v-model="showSpkModal"
-    filter-mode="all"
+    filter-mode="spk-ppic"
     @selected="onSpkSelected"
   />
   <JasaSearchModal v-model="showJasaModal" @selected="onJasaSelected" />

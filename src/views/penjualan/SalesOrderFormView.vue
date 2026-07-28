@@ -71,6 +71,10 @@ const showMemoModal = ref(false);
 const showMppbModal = ref(false);
 const showRepeatModal = ref(false);
 const showSetoranModal = ref(false);
+const isMapLocked = ref(false);
+const isSjMemoLocked = ref(false);
+const showSjMemoMapPickerModal = ref(false);
+const sjMemoMapOptions = ref<any[]>([]);
 
 const isLoadingMemo = ref(false);
 
@@ -715,8 +719,11 @@ const setSoKaosan = (v: any) => {
       formData.value.spk_tgl_po = `${parts[2]}-${parts[1]}-${parts[0]}`;
   }
 };
-const setSjMemo = (v: any) =>
-  (formData.value.spk_nomormemo = v.Nomor || v.sj_nomor);
+const setSjMemo = (v: any) => {
+  const nomor = v.Nomor || v.sj_nomor;
+  formData.value.spk_nomormemo = nomor;
+  loadMapFromSjMemo(nomor);
+};
 // --- FUNGSI AUTO-FILL DARI MAP (Telah Dinormalisasi Casing-nya) ---
 const loadDataMemo = async (nomor: string) => {
   if (!nomor) return;
@@ -825,11 +832,103 @@ const loadDataMemo = async (nomor: string) => {
     isLoadingMemo.value = false; // reset SETELAH nextTick di atas
   }
 };
+// ─────────────────────────────────────────────
+// CROSS-LOCK SJ MEMO <-> MAP
+// ─────────────────────────────────────────────
+
+// Alur 1: SJ Memo dipilih → resolve ke MAP, lalu auto-fill seperti loadDataMemo
+const loadMapFromSjMemo = async (nomorSj: string) => {
+  if (!nomorSj) return;
+  isLoading.value = true;
+  try {
+    const res = await api.get("/penjualan/sales-order/form/sj-memo-map-list", {
+      params: { nomor: nomorSj },
+    });
+    const list: any[] = res.data.data || [];
+    if (list.length === 0) {
+      toast.warning("SJ Memo tersebut tidak memiliki detail MAP.");
+      formData.value.spk_nomormemo = "";
+      return;
+    }
+    if (list.length === 1) {
+      await applyMapFromSj(list[0].kode);
+    } else {
+      // Multi-MAP dalam 1 SJ → user pilih manual lewat modal
+      sjMemoMapOptions.value = list;
+      showSjMemoMapPickerModal.value = true;
+    }
+  } catch (e: any) {
+    toast.error(e.response?.data?.message || "Gagal memuat detail SJ Memo.");
+    formData.value.spk_nomormemo = "";
+  } finally {
+    isLoading.value = false;
+  }
+};
+
+const applyMapFromSj = async (mspkNomor: string) => {
+  formData.value.spk_memo = mspkNomor;
+  await loadDataMemo(mspkNomor); // reuse auto-fill MAP yang sudah ada
+  isMapLocked.value = true; // MAP terkunci, sumbernya dari SJ Memo
+  isSjMemoLocked.value = false; // SJ Memo tetap jadi field driver, tetap bisa diganti
+};
+
+const pickSjMemoMapOption = (row: any) => {
+  showSjMemoMapPickerModal.value = false;
+  applyMapFromSj(row.kode);
+};
+
+// Alur 2: MAP dipilih langsung → cari SJ Memo terkait, lock kalau ketemu tepat 1
+const selectMapDirectly = async (nomorMap: string) => {
+  await loadDataMemo(nomorMap);
+  isMapLocked.value = false; // MAP adalah field driver di alur ini
+
+  try {
+    const res = await api.get("/penjualan/sales-order/form/sj-memo-by-map", {
+      params: { nomor: nomorMap },
+    });
+    const list: any[] = res.data.data || [];
+    if (list.length === 1) {
+      formData.value.spk_nomormemo = list[0].nomor;
+      isSjMemoLocked.value = true;
+    } else {
+      // 0 atau >1 match — ambigu/tidak ada, biarkan SJ Memo tetap bebas diisi manual
+      isSjMemoLocked.value = false;
+    }
+  } catch (e) {
+    console.error("Gagal mencari SJ Memo terkait MAP", e);
+    isSjMemoLocked.value = false;
+  }
+};
+
+// Auto-unlock kalau salah satu field dikosongkan (manual clear)
+watch(
+  () => formData.value.spk_memo,
+  (val) => {
+    if (!val) {
+      isMapLocked.value = false;
+      if (isSjMemoLocked.value) {
+        isSjMemoLocked.value = false;
+        formData.value.spk_nomormemo = "";
+      }
+    }
+  },
+);
+watch(
+  () => formData.value.spk_nomormemo,
+  (val) => {
+    if (!val) {
+      isSjMemoLocked.value = false;
+      if (isMapLocked.value) {
+        isMapLocked.value = false;
+        formData.value.spk_memo = "";
+      }
+    }
+  },
+);
 const setMemo = (v: any) => {
   const nomor = v.Nomor || v.mspk_nomor;
   formData.value.spk_memo = nomor;
-  // Panggil auto-fill
-  loadDataMemo(nomor);
+  selectMapDirectly(nomor);
 };
 const setStokDc = (v: any) => {
   formData.value.spk_invdc = v.Nomor || v.inv_nomor;
@@ -881,7 +980,7 @@ const handleFieldBlur = async (type: string, value: string) => {
 
     // Jika MAP valid, lakukan Auto-fill (Menggantikan logic loaddatamemo di OnExit)
     if (type === "memo") {
-      loadDataMemo(value);
+      selectMapDirectly(value);
     }
     // Auto-fill lainnya
     else if (type === "mppb" && result.data?.jumlah) {
@@ -1299,6 +1398,8 @@ const onPilihKatalog = (item: any) => {
             :formData="formData"
             :isEdit="isEditMode"
             :lookupOptions="lookupOptions"
+            :is-map-locked="isMapLocked"
+            :is-sj-memo-locked="isSjMemoLocked"
             @upload-main="uploadImageMain"
             @open-lookup="(type) => handleLookup(type)"
             @field-blur="handleFieldBlur"
@@ -1423,6 +1524,40 @@ const onPilihKatalog = (item: any) => {
             variant="outlined"
             @click="removeApproveCmo"
             width="100"
+            >Batal</v-btn
+          >
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <v-dialog v-model="showSjMemoMapPickerModal" max-width="480px" persistent>
+      <v-card class="rounded-lg">
+        <v-card-title class="bg-primary text-white pa-3 text-subtitle-1">
+          Pilih MAP dari SJ Memo
+        </v-card-title>
+        <v-card-text class="pa-0">
+          <v-list>
+            <v-list-item
+              v-for="row in sjMemoMapOptions"
+              :key="row.kode"
+              class="py-2"
+              style="cursor: pointer; border-bottom: 1px solid #eee"
+              @click="pickSjMemoMapOption(row)"
+            >
+              <div class="d-flex flex-column">
+                <span class="font-weight-bold"
+                  >{{ row.kode }} — {{ row.nama }}</span
+                >
+                <span style="font-size: 11px; color: #666">
+                  Ukuran: {{ row.ukuran }} &nbsp;|&nbsp; Jumlah:
+                  {{ row.jumlah }}
+                </span>
+              </div>
+            </v-list-item>
+          </v-list>
+        </v-card-text>
+        <v-card-actions class="pa-3 bg-grey-lighten-4 justify-end">
+          <v-btn variant="outlined" @click="showSjMemoMapPickerModal = false"
             >Batal</v-btn
           >
         </v-card-actions>
