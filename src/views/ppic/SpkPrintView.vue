@@ -228,7 +228,7 @@ const fitPageToA4 = async () => {
   // mm↔px antara render browser biasa vs print engine Chrome, supaya
   // konten yang "pas banget" gak kepental ke halaman 2 saat benar-benar
   // dicetak/preview print (walau di layar biasa keliatan muat).
-  const PRINT_SAFETY_BUFFER_PX = 11;
+  const PRINT_SAFETY_BUFFER_PX = 4;
   const availablePx = p1PageEl.value.clientHeight - PRINT_SAFETY_BUFFER_PX;
   const contentPx = p1InnerEl.value.scrollHeight;
 
@@ -1790,7 +1790,7 @@ onMounted(async () => {
 @media print {
   @page {
     size: A4 portrait;
-    margin: 10mm 12mm;
+    margin: 0;
   }
   body {
     margin: 0;
@@ -1803,7 +1803,6 @@ onMounted(async () => {
   }
   .print-page {
     margin: 0;
-    padding: 0;
     box-shadow: none;
     page-break-after: always;
     break-after: page;
