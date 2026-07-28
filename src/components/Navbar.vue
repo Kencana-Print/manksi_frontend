@@ -92,6 +92,8 @@ import {
   IconActivity,
   IconArrowBackUp,
   IconFileShredder,
+  IconCalendarDue,
+  IconClockHour4,
 } from "@tabler/icons-vue";
 
 interface NavItem {
@@ -636,6 +638,18 @@ const menuItems: NavItem[] = [
             icon: IconCalendarStats,
             menuId: 80,
           },
+          {
+            title: "Planning per Tanggal",
+            to: "/garmen/planning-per-spk/planning-per-tgl",
+            icon: IconCalendarDue,
+            menuId: 81,
+          },
+          {
+            title: "Planning SPK vs Realisasi",
+            to: "/garmen/planning-per-spk/plan-vs-realisasi",
+            icon: IconChartBar,
+            menuId: 82,
+          },
         ],
       },
       { divider: true },
@@ -1020,6 +1034,12 @@ const menuItems: NavItem[] = [
         menuId: 961,
         subItems: [
           {
+            title: "Monitoring Proof",
+            to: "/laporan/produksi-garmen/monitoring-proof",
+            icon: IconClipboardCheck,
+            menuId: 553,
+          },
+          {
             title: "Monitoring Produksi",
             to: "/laporan/produksi-garmen/monitoring-produksi",
             icon: IconGauge,
@@ -1053,6 +1073,30 @@ const menuItems: NavItem[] = [
             to: "/laporan/produksi-garmen/outstanding-bordir",
             icon: IconAlertTriangle,
             menuId: 558,
+          },
+          {
+            title: "Standar Babaran Proof",
+            to: "/laporan/produksi-garmen/std-babaran-proof",
+            icon: IconRuler2,
+            menuId: 559,
+          },
+          {
+            title: "Study Time Proses Proof Jahit",
+            to: "/laporan/produksi-garmen/study-time-proof-jahit",
+            icon: IconClockHour4,
+            menuId: 560,
+          },
+          {
+            title: "Study Time Proses Proof Cetak",
+            to: "/laporan/produksi-garmen/study-time-proof-cetak",
+            icon: IconClockHour4,
+            menuId: 561,
+          },
+          {
+            title: "Study Time Proses Proof Bordir",
+            to: "/laporan/produksi-garmen/study-time-proof-bordir",
+            icon: IconClockHour4,
+            menuId: 562,
           },
           {
             title: "Monitoring BS",

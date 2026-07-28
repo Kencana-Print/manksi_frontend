@@ -1618,6 +1618,28 @@ const router = createRouter({
         menuId: "80",
       },
     },
+    {
+      path: "/garmen/planning-per-spk/planning-per-tgl",
+      name: "PlanningPerTanggalBrowse",
+      component: () => import("@/views/garmen/PlanningPerTanggalView.vue"),
+      meta: {
+        title: "Planning per Tanggal",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "81",
+      },
+    },
+    {
+      path: "/garmen/planning-per-spk/plan-vs-realisasi",
+      name: "PlanSpkVsRealisasiBrowse",
+      component: () => import("@/views/garmen/PlanSpkVsRealisasiView.vue"),
+      meta: {
+        title: "Planning SPK vs Realisasi",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "82",
+      },
+    },
 
     {
       path: "/garmen/mutasi-produksi",
@@ -2904,6 +2926,18 @@ const router = createRouter({
     },
 
     {
+      path: "/laporan/produksi-garmen/monitoring-proof",
+      name: "LapMonitoringProof",
+      component: () =>
+        import("@/views/laporan/produksi-garmen/MonitoringProofView.vue"),
+      meta: {
+        title: "Laporan Monitoring Proof",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "553",
+      },
+    },
+    {
       path: "/laporan/produksi-garmen/monitoring-produksi",
       name: "LapMonitoringProduksi",
       component: () =>
@@ -2973,6 +3007,54 @@ const router = createRouter({
         layout: "DefaultLayout",
         requiresAuth: true,
         menuId: "558",
+      },
+    },
+    {
+      path: "/laporan/produksi-garmen/std-babaran-proof",
+      name: "LapStdBabaranProof",
+      component: () =>
+        import("@/views/laporan/produksi-garmen/StdBabaranProofView.vue"),
+      meta: {
+        title: "Laporan Standar Babaran Proof",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "559",
+      },
+    },
+    {
+      path: "/laporan/produksi-garmen/study-time-proof-jahit",
+      name: "LapStudyTimeProofJahit",
+      component: () =>
+        import("@/views/laporan/produksi-garmen/StudyTimeProofJahitView.vue"),
+      meta: {
+        title: "Laporan Study Time Proof Jahit",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "560",
+      },
+    },
+    {
+      path: "/laporan/produksi-garmen/study-time-proof-cetak",
+      name: "LapStudyTimeProofCetak",
+      component: () =>
+        import("@/views/laporan/produksi-garmen/StudyTimeProofCetakView.vue"),
+      meta: {
+        title: "Laporan Study Time Proof Cetak",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "561",
+      },
+    },
+    {
+      path: "/laporan/produksi-garmen/study-time-proof-bordir",
+      name: "LapStudyTimeProofBordir",
+      component: () =>
+        import("@/views/laporan/produksi-garmen/StudyTimeProofBordirView.vue"),
+      meta: {
+        title: "Laporan Study Time Proof Bordir",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "562",
       },
     },
     {
