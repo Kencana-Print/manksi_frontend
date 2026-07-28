@@ -176,7 +176,6 @@ const onDelete = async (item: any) => {
                   <th style="width: 90px">Lebar Kain</th>
                   <th style="width: 90px">Size</th>
                   <th style="width: 80px">For</th>
-                  <th style="width: 80px">Mesin</th>
                   <th style="width: 130px">Keterangan</th>
                 </tr>
               </thead>
@@ -191,18 +190,10 @@ const onDelete = async (item: any) => {
                   <td>{{ r.lebarKain || "-" }}</td>
                   <td>{{ r.size || "-" }}</td>
                   <td>{{ r.tujuanProses || "-" }}</td>
-                  <td>
-                    <span
-                      class="mesin-chip"
-                      :class="'chip-' + (r.mesin || '').toLowerCase()"
-                    >
-                      {{ r.mesin || "-" }}
-                    </span>
-                  </td>
                   <td>{{ r.keterangan || "-" }}</td>
                 </tr>
                 <tr v-if="!detailCache[item.Nomor]?.marker?.length">
-                  <td colspan="8" class="empty-row">Tidak ada data</td>
+                  <td colspan="7" class="empty-row">Tidak ada data</td>
                 </tr>
               </tbody>
             </table>
@@ -325,31 +316,6 @@ const onDelete = async (item: any) => {
   padding: 12px;
   color: #9e9e9e;
   font-style: italic;
-}
-.mesin-chip {
-  display: inline-block;
-  padding: 1px 7px;
-  border-radius: 8px;
-  font-size: 9.5px;
-  font-weight: 700;
-  background: #eceff1;
-  color: #455a64;
-}
-.chip-marker {
-  background: #e3f2fd;
-  color: #1565c0;
-}
-.chip-duplek {
-  background: #fff3e0;
-  color: #e65100;
-}
-.chip-mika {
-  background: #f3e5f5;
-  color: #7b1fa2;
-}
-.chip-cutting {
-  background: #e8f5e9;
-  color: #2e7d32;
 }
 .divisi-chip {
   display: inline-block;
