@@ -1,11 +1,14 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, nextTick } from "vue";
+import { ref, computed, onMounted, onUnmounted, nextTick } from "vue";
+import { useAuthStore } from "@/stores/authStore";
 import { useRoute } from "vue-router";
+import { useToast } from "vue-toastification";
 import { spkFormService } from "@/services/ppic/spkFormService";
 import api from "@/services/api";
 import QrcodeVue from "qrcode.vue";
 
 const route = useRoute();
+const toast = useToast();
 const isLoaded = ref(false);
 const isError = ref(false);
 const spk = ref<any>({});
@@ -45,6 +48,23 @@ const getBaseUrl = () => {
 
 const resolvedImageUrl = ref("");
 const isLoadingImage = ref(false);
+
+const authStore = useAuthStore();
+const isPreview = computed(() => route.query.preview === "1");
+const previewWatermarkText = computed(() => {
+  const user = authStore.userName || authStore.user?.kode || "USER";
+  const now = new Date().toLocaleString("id-ID", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  return `${user} • ${now} • PREVIEW - DILARANG DICETAK`;
+});
+const watermarkTiles = computed(() =>
+  Array(60).fill(previewWatermarkText.value),
+);
 
 // Coba berantai: (1) file milik SO/SPK sendiri di lokal → (2) file MAP
 // di lokal (folder map/) → (3) VPS lama. Sebelumnya cuma nyoba path #1
@@ -251,6 +271,38 @@ const fitPageToA4 = async () => {
   }
 };
 
+// ── Blokir Ctrl+P / Cmd+P / Ctrl+S (lapisan pertama — cegah dialog
+// print/save browser terbuka sama sekali). Ini best-effort: sebagian
+// besar browser modern menghormati preventDefault di keydown untuk
+// shortcut ini, tapi TIDAK ada jaminan 100% di semua browser/OS —
+// makanya lapisan kedua (CSS @media print di bawah) yang jadi jaring
+// pengaman utama, bukan blokir keyboard ini.
+const blockPrintShortcut = (e: KeyboardEvent) => {
+  if (!isPreview.value) return;
+  const key = e.key.toLowerCase();
+  if ((e.ctrlKey || e.metaKey) && (key === "p" || key === "s")) {
+    e.preventDefault();
+    e.stopPropagation();
+    toast.warning("Mode Preview — dokumen ini tidak dapat dicetak/disimpan.");
+  }
+};
+const blockContextMenu = (e: MouseEvent) => {
+  if (isPreview.value) e.preventDefault();
+};
+
+let previewResizeObserver: ResizeObserver | null = null;
+
+onMounted(() => {
+  if (isPreview.value) {
+    window.addEventListener("keydown", blockPrintShortcut, true);
+    document.addEventListener("contextmenu", blockContextMenu);
+  }
+});
+onUnmounted(() => {
+  window.removeEventListener("keydown", blockPrintShortcut, true);
+  document.removeEventListener("contextmenu", blockContextMenu);
+});
+
 onMounted(async () => {
   try {
     const [resDetail, resLayout] = await Promise.all([
@@ -303,7 +355,9 @@ onMounted(async () => {
       await nextTick();
       await fitPageToA4();
     }
-    setTimeout(() => window.print(), 400);
+    if (!isPreview.value) {
+      setTimeout(() => window.print(), 400);
+    }
   } catch {
     isError.value = true;
   }
@@ -316,7 +370,25 @@ onMounted(async () => {
     Mempersiapkan Dokumen Cetak...
   </div>
 
-  <div v-else class="print-root">
+  <div v-else class="print-root" :class="{ 'preview-mode': isPreview }">
+    <!-- Banner mode preview -->
+    <div v-if="isPreview" class="preview-banner">
+      🔒 MODE PREVIEW — Dokumen ini tidak dapat dicetak/disimpan. Aktivitas
+      tercatat: {{ authStore.userName }}.
+    </div>
+
+    <!-- Watermark tile, hanya render di mode preview -->
+    <div v-if="isPreview" class="preview-watermark" aria-hidden="true">
+      <span v-for="(t, i) in watermarkTiles" :key="i" class="wm-tile">{{
+        t
+      }}</span>
+    </div>
+
+    <!-- Pesan yang MUNCUL kalau print tetap ke-trigger (fallback CSS) -->
+    <div class="preview-print-blocked-msg">
+      Dokumen ini tidak dapat dicetak melalui mode Preview.<br />
+      Silakan gunakan tombol "Cetak" resmi di halaman SPK.
+    </div>
     <!-- ══════════════════════════════════════════════
        FORMAT LAMA — khusus Workshop P01
   ══════════════════════════════════════════════ -->
@@ -1810,6 +1882,80 @@ onMounted(async () => {
   .print-page:last-child {
     page-break-after: avoid;
     break-after: avoid;
+  }
+}
+
+/* ── Mode Preview: banner ── */
+.preview-banner {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: #d32f2f;
+  color: white;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 6px 12px;
+  letter-spacing: 0.02em;
+}
+
+/* ── Mode Preview: watermark tile, transparan, non-interaktif ── */
+.preview-watermark {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 40px 24px;
+  padding: 20px;
+  pointer-events: none;
+  overflow: hidden;
+  transform: rotate(-28deg) scale(1.4);
+  transform-origin: center;
+}
+.wm-tile {
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(200, 0, 0, 0.12);
+  white-space: nowrap;
+  user-select: none;
+}
+
+/* ── Mode Preview: cegah select/drag sebagai deterrent tambahan
+   (BUKAN pencegahan screenshot — screenshot tetap tidak bisa dicegah
+   dari sisi web sama sekali) ── */
+.preview-mode {
+  user-select: none;
+}
+.preview-mode img {
+  -webkit-user-drag: none;
+  pointer-events: none;
+}
+
+/* ── Fallback CSS: kalau print TETAP ke-trigger (misal lewat menu
+   browser yang tidak bisa di-preventDefault via JS), swap seluruh
+   konten jadi pesan blokir. Ini lapisan JAMINAN UTAMA, jauh lebih
+   reliable daripada blokir keydown di atas. ── */
+.preview-print-blocked-msg {
+  display: none;
+}
+@media print {
+  .print-root.preview-mode .print-page,
+  .print-root.preview-mode .print-page-old,
+  .print-root.preview-mode .preview-banner,
+  .print-root.preview-mode .preview-watermark {
+    display: none !important;
+  }
+  .print-root.preview-mode .preview-print-blocked-msg {
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    font-size: 16pt;
+    font-weight: 700;
+    text-align: center;
+    color: #000;
   }
 }
 </style>

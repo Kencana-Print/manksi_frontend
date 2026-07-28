@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, watch, computed } from "vue";
+import { ref, onMounted, watch, computed, nextTick } from "vue";
 import { useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
 import { useAuthStore } from "@/stores/authStore";
@@ -20,6 +20,7 @@ import {
   IconCheck,
   IconX,
   IconLockSquare,
+  IconEye,
 } from "@tabler/icons-vue";
 import { formatTanggal, formatTanggalJam } from "@/utils/dateFormat";
 
@@ -495,6 +496,81 @@ const onPrint = async () => {
   }
 };
 
+const showPreviewDialog = ref(false);
+const previewNomor = ref("");
+
+const onPreviewCetak = () => {
+  if (!selectedItem.value) return;
+  previewNomor.value = selectedItem.value.Nomor;
+  showPreviewDialog.value = true;
+};
+
+// Blokir Ctrl+P/Cmd+P/Ctrl+S juga di level PARENT window selama dialog
+// preview terbuka — jaring pengaman tambahan di luar iframe (kalau
+// fokus keyboard kebetulan ada di luar iframe, misal user klik area
+// dialog di luar iframe dulu).
+const blockPrintShortcutParent = (e: KeyboardEvent) => {
+  if (!showPreviewDialog.value) return;
+  const key = e.key.toLowerCase();
+  if ((e.ctrlKey || e.metaKey) && (key === "p" || key === "s")) {
+    e.preventDefault();
+    toast.warning("Mode Preview — dokumen ini tidak dapat dicetak/disimpan.");
+  }
+};
+const previewContainerEl = ref<HTMLElement | null>(null);
+const previewIframeEl = ref<HTMLIFrameElement | null>(null);
+const previewScale = ref(1);
+const previewContentHeight = ref(1123); // fallback awal = 1 halaman A4
+let previewResizeObserver: ResizeObserver | null = null;
+
+const PAGE_WIDTH_PX = 793; // ~210mm @ 96dpi
+
+const recomputePreviewScale = () => {
+  const el = previewContainerEl.value;
+  if (!el) return;
+  const w = el.clientWidth - 24; // padding kiri-kanan
+  if (w < 50) return; // belum ke-layout beneran, skip
+  const scale = Math.min(w / PAGE_WIDTH_PX, 1);
+  previewScale.value = scale > 0 ? scale : 1;
+};
+
+// Begitu iframe selesai load, baca tinggi KONTEN ASLI di dalamnya
+// (bisa 1 atau 2 halaman tergantung SPK punya Layout Proses atau
+// tidak) — lalu samakan tinggi iframe persis segitu. Ini yang bikin
+// cuma ada SATU scrollbar (di container luar), karena iframe sendiri
+// jadi tidak overflow lagi.
+const onPreviewIframeLoad = () => {
+  const iframe = previewIframeEl.value;
+  if (!iframe?.contentDocument) return;
+  const h = iframe.contentDocument.documentElement.scrollHeight;
+  previewContentHeight.value = h > 0 ? h : 1123;
+};
+
+const previewWrapperStyle = computed(() => ({
+  width: `${PAGE_WIDTH_PX}px`,
+  height: `${previewContentHeight.value}px`,
+  transform: `scale(${previewScale.value})`,
+  transformOrigin: "top left",
+}));
+
+watch(showPreviewDialog, async (open) => {
+  if (open) {
+    window.addEventListener("keydown", blockPrintShortcutParent, true);
+    previewContentHeight.value = 1123; // reset ke fallback tiap buka baru
+    await nextTick();
+    if (previewContainerEl.value) {
+      previewResizeObserver = new ResizeObserver(() => recomputePreviewScale());
+      previewResizeObserver.observe(previewContainerEl.value);
+    }
+    recomputePreviewScale();
+  } else {
+    window.removeEventListener("keydown", blockPrintShortcutParent, true);
+    previewResizeObserver?.disconnect();
+    previewResizeObserver = null;
+    previewNomor.value = "";
+  }
+});
+
 const submitPrintApproval = async () => {
   if (!selectedItem.value) return;
   try {
@@ -869,6 +945,15 @@ const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
         <template #prepend><IconPhoto :size="15" /></template>Gambar
       </v-btn>
 
+      <v-btn
+        size="small"
+        color="deep-purple-darken-1"
+        :disabled="selected.length === 0"
+        @click="onPreviewCetak"
+      >
+        <template #prepend><IconEye :size="15" /></template>Preview Cetak
+      </v-btn>
+
       <v-menu v-if="selected.length > 0">
         <template #activator="{ props }">
           <v-btn size="small" color="teal-darken-3" v-bind="props">
@@ -1033,6 +1118,83 @@ const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
           </template>
         </v-img>
       </v-card-text>
+    </v-card>
+  </v-dialog>
+
+  <!-- Dialog Preview Cetak SPK (embed, bukan tab baru) -->
+  <v-dialog
+    v-model="showPreviewDialog"
+    max-width="98vw"
+    scrollable
+    @contextmenu.prevent
+  >
+    <v-card
+      rounded="lg"
+      style="
+        height: 90vh;
+        width: 850px;
+        max-width: 96vw;
+        min-width: 420px;
+        min-height: 320px;
+        display: flex;
+        flex-direction: column;
+        resize: both;
+        overflow: hidden;
+        margin: 0 auto;
+      "
+    >
+      <v-card-title
+        class="bg-primary text-white pa-3 flex-shrink-0"
+        style="cursor: default"
+      >
+        <div class="d-flex align-center justify-space-between">
+          <span class="text-subtitle-2 font-weight-bold"
+            >Preview Cetak SPK: {{ previewNomor }}</span
+          >
+          <v-btn
+            variant="text"
+            size="small"
+            color="white"
+            density="comfortable"
+            @click="showPreviewDialog = false"
+          >
+            <IconX :size="18" />
+          </v-btn>
+        </div>
+        <div class="text-caption" style="opacity: 0.75; line-height: 1.2">
+          ↘ Seret pojok kanan-bawah untuk mengubah ukuran jendela
+        </div>
+      </v-card-title>
+      <div
+        ref="previewContainerEl"
+        style="
+          flex: 1;
+          min-height: 0;
+          background: #616161;
+          overflow-y: auto;
+          overflow-x: hidden;
+          display: flex;
+          justify-content: center;
+          padding: 12px;
+        "
+      >
+        <div :style="previewWrapperStyle" style="flex-shrink: 0">
+          <iframe
+            v-if="showPreviewDialog && previewNomor"
+            ref="previewIframeEl"
+            :key="previewNomor"
+            :src="`/ppic/spk/print/${encodeURIComponent(previewNomor)}?preview=1`"
+            :style="{
+              width: PAGE_WIDTH_PX + 'px',
+              height: previewContentHeight + 'px',
+              border: 'none',
+              display: 'block',
+            }"
+            title="Preview Cetak SPK"
+            @load="onPreviewIframeLoad"
+          />
+        </div>
+      </div>
     </v-card>
   </v-dialog>
 
