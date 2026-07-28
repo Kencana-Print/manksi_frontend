@@ -255,17 +255,28 @@ const onJumlahMeterChange = (idx: number) => {
   onJumlahChange(idx);
 };
 
-// Terima Skrg (jumlah) tetap bisa diisi manual langsung — kalau begitu,
-// kolom bantu Meter ikut disamakan (tanpa memaksa Yard, karena user
-// mungkin memang inputnya bukan dari yard).
 const onJumlahChange = (idx: number) => {
   const row = formData.value.items[idx];
   row.jumlahmeter = row.jumlah;
+
   if (isPo.value) {
-    const pi = formData.value.poItems.findIndex(
-      (p: any) => p.kode === row.kode && p.spk === row.spk,
+    // Grid 1 itu agregat per kode bahan (lintas SPK), sedang Grid 2
+    // per baris SPK — jadi sync ke Grid 2 cuma bisa otomatis kalau
+    // kode itu MEMANG cuma dipecah ke 1 baris SPK di Grid 2. Kalau
+    // ada >1 baris (beberapa SPK pakai kode bahan yang sama), gak
+    // bisa ditebak distribusinya — user isi manual per baris di
+    // Grid 2, biar tetap ketauan jumlahnya harus sama persis pas
+    // validasi save (lihat validateSave poin 6).
+    const matches = formData.value.poItems.filter(
+      (p: any) => p.kode === row.kode,
     );
-    if (pi !== -1) formData.value.poItems[pi].terima = row.jumlah;
+    if (matches.length === 1) {
+      matches[0].terima = row.jumlah;
+    } else if (matches.length > 1) {
+      toast.info(
+        `Kode ${row.kode} punya ${matches.length} baris SPK di Realisasi PO — isi manual per baris di sana.`,
+      );
+    }
   }
 };
 // Sinkron Grid 2 (Realisasi PO per-SPK) → Grid 1 (Rekap per Kode Bahan).
