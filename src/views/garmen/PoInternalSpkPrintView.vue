@@ -52,6 +52,7 @@ const resolveDesignImage = () => {
   }
   const base = getBaseUrl();
   const cab = data.value.header.GdgKode || "HO-";
+  const mapNomor = data.value.header.MapNomor || "";
 
   const candidates = [
     `${base}/images/${cab}/${encodeURIComponent(nomorSpk)}.jpg`,
@@ -59,10 +60,21 @@ const resolveDesignImage = () => {
   if (cab !== "HO-") {
     candidates.push(`${base}/images/HO-/${encodeURIComponent(nomorSpk)}.jpg`);
   }
+  // Folder map/ pakai NOMOR MAP (bisa beda dari NomorSPK kalau SPK
+  // ini originasinya dari MAP — resolve via header.MapNomor).
+  if (mapNomor) {
+    candidates.push(
+      `${base}/images/${cab}/map/${encodeURIComponent(mapNomor)}.jpg`,
+    );
+    if (cab !== "HO-") {
+      candidates.push(
+        `${base}/images/HO-/map/${encodeURIComponent(mapNomor)}.jpg`,
+      );
+    }
+  }
   candidates.push(
-    `${base}/images/${cab}/map/${encodeURIComponent(nomorSpk)}.jpg`,
+    `/file-gambar/${encodeURIComponent(mapNomor || nomorSpk)}.jpg`,
   );
-  candidates.push(`/file-gambar/${encodeURIComponent(nomorSpk)}.jpg`);
 
   isLoadingImage.value = true;
   resolvedImageUrl.value = "";
