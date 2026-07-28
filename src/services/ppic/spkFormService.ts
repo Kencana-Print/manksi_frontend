@@ -27,10 +27,10 @@ export const spkFormService = {
     }),
 
   importLayoutProses: (spkNomor: string, file: File) => {
-    const fd = new FormData();
-    fd.append("spkNomor", spkNomor);
-    fd.append("file", file);
-    return api.post("/ppic/spk/form/layout-proses/import", fd, {
+    const formData = new FormData();
+    formData.append("file", file); // ← field name harus "file", sesuai upload.excel.single("file")
+    formData.append("spkNomor", spkNomor); // ← field name harus persis "spkNomor", sesuai controller
+    return api.post("/ppic/spk/form/layout-proses/import", formData, {
       headers: { "Content-Type": "multipart/form-data" },
     });
   },
