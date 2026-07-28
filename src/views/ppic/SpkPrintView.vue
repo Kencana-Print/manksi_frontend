@@ -224,7 +224,12 @@ const fitPageToA4 = async () => {
   await waitForImages(p1InnerEl.value);
   await nextTick();
 
-  const availablePx = p1PageEl.value.clientHeight;
+  // Buffer aman ~3mm (di 96dpi ≈ 11px) — kompensasi selisih pembulatan
+  // mm↔px antara render browser biasa vs print engine Chrome, supaya
+  // konten yang "pas banget" gak kepental ke halaman 2 saat benar-benar
+  // dicetak/preview print (walau di layar biasa keliatan muat).
+  const PRINT_SAFETY_BUFFER_PX = 11;
+  const availablePx = p1PageEl.value.clientHeight - PRINT_SAFETY_BUFFER_PX;
   const contentPx = p1InnerEl.value.scrollHeight;
 
   if (contentPx <= availablePx) {
@@ -1538,6 +1543,12 @@ onMounted(async () => {
 }
 .box {
   break-inside: avoid;
+}
+
+.ttd-row,
+.pf {
+  break-inside: avoid;
+  page-break-inside: avoid;
 }
 
 /* ── Page 2 — Layout ── */
