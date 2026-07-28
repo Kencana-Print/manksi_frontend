@@ -1016,7 +1016,7 @@ onMounted(async () => {
         <!-- Header -->
         <div class="ph">
           <div class="ph-left">
-            <div class="ph-company">KENCANA PRINT</div>
+            <img src="@/assets/logo.png" class="ph-logo" />
             <div class="ph-sub">Layout Proses Kerja Sewing</div>
           </div>
           <div class="ph-center">
@@ -1197,6 +1197,9 @@ onMounted(async () => {
 }
 .ph-left {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 .ph-center {
   flex: 1;
@@ -1205,11 +1208,6 @@ onMounted(async () => {
 .ph-right {
   flex: 1;
   text-align: right;
-}
-.ph-company {
-  font-size: 13pt;
-  font-weight: bold;
-  color: #1565c0;
 }
 .ph-sub {
   font-size: 7.5pt;

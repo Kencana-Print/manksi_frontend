@@ -155,6 +155,29 @@ const hasAccess = (item: NavItem): boolean => {
   return true;
 };
 
+// Filter item sesuai akses, lalu bersihkan divider yang jadi yatim:
+// di awal/akhir list, atau nempel berturut-turut karena item
+// di antaranya ke-filter habis (gak ada akses).
+const visibleItems = (items: NavItem[] = []): NavItem[] => {
+  const filtered = items.filter((x) => x.divider || hasAccess(x));
+
+  const result: NavItem[] = [];
+  for (const item of filtered) {
+    if (item.divider) {
+      // Skip kalau ini divider pertama, atau item sebelumnya juga divider
+      if (result.length === 0 || result[result.length - 1].divider) continue;
+      result.push(item);
+    } else {
+      result.push(item);
+    }
+  }
+  // Skip kalau divider ada di posisi paling akhir
+  if (result.length > 0 && result[result.length - 1].divider) {
+    result.pop();
+  }
+  return result;
+};
+
 const openMenu = (targetModel: { value: boolean }) => {
   menuItems.forEach((m) => {
     if (m.model && m.model !== targetModel) m.model.value = false;
@@ -1321,12 +1344,7 @@ onUnmounted(() => {
               :opened="openedGroups"
               @update:opened="openedGroups = $event.slice(-1)"
             >
-              <template
-                v-for="(item, i) in (menu.items ?? []).filter((x) =>
-                  hasAccess(x),
-                )"
-                :key="i"
-              >
+              <template v-for="(item, i) in visibleItems(menu.items)" :key="i">
                 <v-divider v-if="item.divider" class="nav-divider" />
 
                 <!-- Folder dengan subItems -->
@@ -1360,9 +1378,7 @@ onUnmounted(() => {
                     </v-list-item>
                   </template>
                   <template
-                    v-for="(sub, si) in (item.subItems ?? []).filter((x) =>
-                      hasAccess(x),
-                    )"
+                    v-for="(sub, si) in visibleItems(item.subItems)"
                     :key="si"
                   >
                     <v-divider v-if="sub.divider" class="my-1 mx-2" />
@@ -1547,10 +1563,7 @@ onUnmounted(() => {
             </v-list-item>
           </template>
 
-          <template
-            v-for="(item, i) in (menu.items ?? []).filter((x) => hasAccess(x))"
-            :key="i"
-          >
+          <template v-for="(item, i) in visibleItems(menu.items)" :key="i">
             <v-divider v-if="item.divider" class="mx-3 my-1" />
             <v-list-group :value="item.title" v-else-if="'subItems' in item">
               <template #activator="{ props, isOpen }">
@@ -1577,9 +1590,7 @@ onUnmounted(() => {
                 </v-list-item>
               </template>
               <template
-                v-for="(sub, si) in (item.subItems ?? []).filter((x) =>
-                  hasAccess(x),
-                )"
+                v-for="(sub, si) in visibleItems(item.subItems)"
                 :key="si"
               >
                 <v-divider v-if="sub.divider" class="mx-3 my-1" />
