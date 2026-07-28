@@ -189,43 +189,57 @@ const sizeLebarPanjangStr = computed(() => {
     .join("\n");
 });
 
-// ── Auto-fit A4 khusus Page 1 (format baru/non-P01): coba scale-down
-// dulu biar 1 halaman, fallback ke multi-halaman natural kalau
-// kontennya kepanjangan buat diperkecil tanpa jadi susah dibaca.
 const p1PageEl = ref<HTMLElement | null>(null);
 const p1InnerEl = ref<HTMLElement | null>(null);
 const p1Scale = ref(1);
-const p1InnerHeightStyle = ref<string>("auto");
+const p1ScaledHeightStyle = ref<string>("auto"); // cuma dipakai saat scale-down
 const p1MultiPage = ref(false);
 
 const MIN_PRINT_SCALE = 0.72;
 
+// Tunggu semua <img> di dalam elemen selesai load sebelum ukur tinggi —
+// kalau diukur lebih awal, gambar yang belum selesai render bikin hasil
+// pengukuran lebih pendek dari kenyataan.
+const waitForImages = (el: HTMLElement) => {
+  const imgs = Array.from(el.querySelectorAll("img"));
+  return Promise.all(
+    imgs.map((img) =>
+      img.complete
+        ? Promise.resolve()
+        : new Promise<void>((resolve) => {
+            img.addEventListener("load", () => resolve(), { once: true });
+            img.addEventListener("error", () => resolve(), { once: true });
+          }),
+    ),
+  );
+};
+
 const fitPageToA4 = async () => {
   if (!p1PageEl.value || !p1InnerEl.value) return;
-  // Reset ke kondisi "natural" dulu — height:auto, scale:1 — biar
-  // scrollHeight yang diukur adalah tinggi ASLI konten, bukan yang
-  // sudah kepotong batasan tinggi manapun.
+
   p1Scale.value = 1;
   p1MultiPage.value = false;
-  p1InnerHeightStyle.value = "auto";
+  p1ScaledHeightStyle.value = "auto";
+  await nextTick();
+  await waitForImages(p1InnerEl.value);
   await nextTick();
 
-  const availablePx = p1PageEl.value.clientHeight; // 297mm dikurangi padding
-  const contentPx = p1InnerEl.value.scrollHeight; // tinggi asli konten
+  const availablePx = p1PageEl.value.clientHeight;
+  const contentPx = p1InnerEl.value.scrollHeight;
 
   if (contentPx <= availablePx) {
-    // Konten pendek — paksa tinggi penuh 1 halaman biar flex:1 +
-    // margin-top:auto pada .ttd-row tetap berfungsi ngedorong TTD
-    // ke bawah halaman (persis behavior desain aslinya).
-    p1InnerHeightStyle.value = `${availablePx}px`;
+    // Konten muat natural — TIDAK perlu dipaksa tinggi persis. CSS
+    // flex (.page1-scale-inner { flex: 1 }) yang dorong blok TTD ke
+    // bawah halaman, otomatis nyesuaiin diri kapan pun (termasuk kalau
+    // ada elemen yang selesai render belakangan, misal QR code) —
+    // sehingga tidak berisiko kepotong seperti sebelumnya.
     return;
   }
 
   const requiredScale = availablePx / contentPx;
   if (requiredScale >= MIN_PRINT_SCALE) {
     p1Scale.value = requiredScale;
-    // height tetap 'auto' (natural) — jangan dipaksa penuh, biar gak
-    // ada ruang kosong ekstra yang bikin proporsi rusak setelah di-scale.
+    p1ScaledHeightStyle.value = `${availablePx}px`;
   } else {
     p1Scale.value = 1;
     p1MultiPage.value = true;
@@ -462,7 +476,8 @@ onMounted(async () => {
           class="page1-scale-inner"
           ref="p1InnerEl"
           :style="{
-            height: p1InnerHeightStyle,
+            height: p1ScaledHeightStyle,
+            overflow: p1Scale < 1 ? 'hidden' : 'visible',
             transform: `scale(${p1Scale})`,
             transformOrigin: 'top center',
           }"
@@ -1502,8 +1517,8 @@ onMounted(async () => {
 
 /* ── Auto-fit A4 (Page 1, format baru) ── */
 .print-page.page-1 {
-  height: 297mm;
-  overflow: hidden;
+  min-height: 297mm;
+  overflow: visible;
 }
 .print-page.page-1.print-page--multi {
   height: auto;
@@ -1514,6 +1529,7 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   width: 100%;
+  flex: 1;
 }
 
 /* Cegah baris tabel/box kepotong di tengah pas fallback multi-halaman */
