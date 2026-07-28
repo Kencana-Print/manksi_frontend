@@ -151,10 +151,20 @@ const {
     };
   },
   submitApi: async (data: any) => {
+    // ⚠️ FIX: filter ulang baris kosong DI SINI, tepat sebelum kirim —
+    // jangan cuma andalkan filter di validateSave(). Watcher auto-
+    // trailing-row (di bawah) bereaksi ASYNC begitu formData.items
+    // di-assign ulang, dan bisa nambah 1 baris kosong baru PERSIS
+    // setelah validateSave() selesai membersihkannya (sebelum user
+    // sempat klik konfirmasi) — race condition yang bikin baris
+    // kosong lolos ke backend.
+    const cleanItems = data.items.filter(
+      (r: any) => r.kode && r.kode.trim() !== "",
+    );
     return await poBahanFormService.saveData({
       isEdit: isEditMode.value,
       header: data.header,
-      items: data.items,
+      items: cleanItems,
       delivery: data.delivery,
       rolls: data.rolls,
       statusNgedit: data.statusNgedit,
