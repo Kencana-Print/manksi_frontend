@@ -1017,7 +1017,6 @@ onMounted(async () => {
         <div class="ph">
           <div class="ph-left">
             <img src="@/assets/logo.png" class="ph-logo" />
-            <div class="ph-sub">Layout Proses Kerja Sewing</div>
           </div>
           <div class="ph-center">
             <div class="ph-title">Layout Proses Sewing</div>
@@ -1199,7 +1198,7 @@ onMounted(async () => {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  align-items: flex-start;
 }
 .ph-center {
   flex: 1;
@@ -1208,10 +1207,6 @@ onMounted(async () => {
 .ph-right {
   flex: 1;
   text-align: right;
-}
-.ph-sub {
-  font-size: 7.5pt;
-  color: #555;
 }
 .ph-title {
   font-size: 14pt;
