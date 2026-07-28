@@ -1074,7 +1074,11 @@ onMounted(() => {
     </template>
   </BaseForm>
 
-  <MapSearchModal v-model="showMapModal" @selected="onMapSelected" />
+  <MapSearchModal
+    v-model="showMapModal"
+    include-closed
+    @selected="onMapSelected"
+  />
   <AccesoriesSearchModal v-model="showAccModal" @selected="onAccSelected" />
   <BahanSearchModal
     v-model="showBahanModal"
