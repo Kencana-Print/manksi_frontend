@@ -6,10 +6,10 @@ import AchievementChart from "@/components/AchievementChart.vue";
 const props = defineProps<{ items: any[]; isLoading?: boolean }>();
 
 const headers = [
-  { title: "Tahun", key: "tahun", width: "60px" },
-  { title: "Bulan", key: "Bulan", width: "80px" },
-  { title: "Kode", key: "SalKode", width: "80px" },
-  { title: "Nama Sales", key: "SalNama", minWidth: "200px" },
+  { title: "Tahun", key: "tahun", width: "45px" },
+  { title: "Bulan", key: "Bulan", width: "65px" },
+  { title: "Kode", key: "SalKode", width: "40px" },
+  { title: "Nama Sales", key: "SalNama", minWidth: "150px" },
   { title: "Target", key: "Target", width: "150px", align: "end" },
   { title: "Realisasi", key: "Realisasi", width: "150px", align: "end" },
   { title: "Ach(%)", key: "Ach", width: "90px", align: "end" },
