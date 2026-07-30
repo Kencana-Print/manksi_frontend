@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, watch } from "vue";
+import { ref, watch, computed } from "vue";
+import { useAuthStore } from "@/stores/authStore";
 import { useToast } from "vue-toastification";
 import { useBrowse } from "@/composables/useBrowse";
 import BaseBrowse from "@/components/BaseBrowse.vue";
@@ -8,6 +9,7 @@ import { exportExcelSingle } from "@/utils/excelExport";
 import { IconClipboardCheck, IconFileSpreadsheet } from "@tabler/icons-vue";
 import { formatTanggal } from "@/utils/dateFormat";
 
+const authStore = useAuthStore();
 const toast = useToast();
 
 interface ApproveRow {
@@ -45,6 +47,12 @@ watch([tglAwal, tglAkhir], () => {
   fetchData();
 });
 
+// ⚠️ Kolom Jumlah/Tarif/Total (master) & HargaBeli (detail) digated
+// flag lihatBeli (user_lihat_beli) — replikasi `if zLihatBeli=1` di
+// ufrmApprovePO. Detail di-gate juga meski source asli tidak — lihat
+// catatan di service.
+const canLihatBeli = computed(() => authStore.user?.flags.lihatBeli === 1);
+
 const { items, isLoading, selected, selectedItem, fetchData } =
   useBrowse<ApproveRow>({
     menuId: "113",
@@ -59,18 +67,26 @@ const { items, isLoading, selected, selectedItem, fetchData } =
   });
 
 // Headers wajib ada untuk BaseBrowse meski kita pakai slot #table
-const headers = [
+const baseHeaders = [
   { title: "Nomor", key: "Nomor", width: "150px" },
   { title: "Tanggal", key: "Tanggal", width: "100px" },
   { title: "Keterangan", key: "Keterangan" },
   { title: "Kode Supplier", key: "KodeSupplier", width: "110px" },
   { title: "Supplier", key: "Supplier" },
   { title: "Jasa", key: "Jasa", width: "120px" },
+];
+const beliHeaders = [
   { title: "Jumlah", key: "Jumlah", width: "80px" },
   { title: "Tarif", key: "Tarif", width: "90px" },
   { title: "Total", key: "Total", width: "100px" },
-  { title: "Approve", key: "Approve", width: "80px" },
 ];
+const tailHeaders = [{ title: "Approve", key: "Approve", width: "80px" }];
+
+const headers = computed(() => [
+  ...baseHeaders,
+  ...(canLihatBeli.value ? beliHeaders : []),
+  ...tailHeaders,
+]);
 
 // Expanded rows
 const expanded = ref<ApproveRow[]>([]);
@@ -132,21 +148,27 @@ const onExport = async () => {
   }
   isExporting.value = true;
   try {
-    await exportExcelSingle(
-      `ApprovePOJasa_${tglAwal.value}_${tglAkhir.value}`,
-      "Approve PO Jasa",
-      [
-        { header: "Nomor", key: "Nomor", width: 20 },
-        { header: "Tanggal", key: "Tanggal", width: 12 },
-        { header: "Keterangan", key: "Keterangan", width: 30 },
-        { header: "Kode Supplier", key: "KodeSupplier", width: 14 },
-        { header: "Supplier", key: "Supplier", width: 28 },
-        { header: "Jasa", key: "Jasa", width: 16 },
+    const columns: any[] = [
+      { header: "Nomor", key: "Nomor", width: 20 },
+      { header: "Tanggal", key: "Tanggal", width: 12 },
+      { header: "Keterangan", key: "Keterangan", width: 30 },
+      { header: "Kode Supplier", key: "KodeSupplier", width: 14 },
+      { header: "Supplier", key: "Supplier", width: 28 },
+      { header: "Jasa", key: "Jasa", width: 16 },
+    ];
+    if (canLihatBeli.value) {
+      columns.push(
         { header: "Jumlah", key: "Jumlah", width: 10, numFmt: "#,##0" },
         { header: "Tarif", key: "Tarif", width: 12, numFmt: "#,##0" },
         { header: "Total", key: "Total", width: 14, numFmt: "#,##0" },
-        { header: "Approve", key: "Approve", width: 10 },
-      ],
+      );
+    }
+    columns.push({ header: "Approve", key: "Approve", width: 10 });
+
+    await exportExcelSingle(
+      `ApprovePOJasa_${tglAwal.value}_${tglAkhir.value}`,
+      "Approve PO Jasa",
+      columns,
       items.value ?? [],
       `APPROVE PO JASA — ${tglAwal.value} s.d. ${tglAkhir.value}`,
     );
@@ -241,7 +263,7 @@ const num = (v: any) => Number(v || 0).toLocaleString("id-ID");
             <th>Nama</th>
             <th class="tr">Jml</th>
             <th class="tr">Terima</th>
-            <th class="tr">Harga Beli</th>
+            <th v-if="canLihatBeli" class="tr">Harga Beli</th>
           </tr>
         </thead>
         <tbody>
@@ -250,7 +272,7 @@ const num = (v: any) => Number(v || 0).toLocaleString("id-ID");
             <td>{{ d.Nama }}</td>
             <td class="tr">{{ num(d.Jml) }}</td>
             <td class="tr">{{ num(d.Terima) }}</td>
-            <td class="tr">{{ num(d.HargaBeli) }}</td>
+            <td v-if="canLihatBeli" class="tr">{{ num(d.HargaBeli) }}</td>
           </tr>
         </tbody>
       </table>

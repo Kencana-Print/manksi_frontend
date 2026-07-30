@@ -94,6 +94,8 @@ import {
   IconFileShredder,
   IconCalendarDue,
   IconClockHour4,
+  IconTarget,
+  IconFileDiff,
 } from "@tabler/icons-vue";
 
 interface NavItem {
@@ -1177,6 +1179,24 @@ const menuItems: NavItem[] = [
             icon: IconReportAnalytics,
           },
           {
+            title: "Target SPK",
+            to: "/laporan/marketing/target-spk",
+            icon: IconTarget,
+            menuId: 312,
+          },
+          {
+            title: "Target vs Realisasi",
+            to: "/laporan/marketing/target-vs-realisasi",
+            icon: IconTarget,
+            menuId: 966,
+          },
+          {
+            title: "Proyeksi vs Realisasi",
+            to: "/laporan/marketing/proyeksi-vs-realisasi",
+            icon: IconTrendingUp,
+            menuId: 1244,
+          },
+          {
             title: "MAP Belum Terealisasi",
             to: "/laporan/marketing/map-belum-realisasi",
             icon: IconFileAlert,
@@ -1203,6 +1223,18 @@ const menuItems: NavItem[] = [
             to: "/laporan/marketing/rekap-penawaran",
             icon: IconReportSearch,
             menuId: 310,
+          },
+          {
+            title: "Revisi Memo SPK",
+            to: "/laporan/marketing/revisi-map",
+            icon: IconFileDiff,
+            menuId: 966,
+          },
+          {
+            title: "Realisasi Pengiriman SPK",
+            to: "/laporan/marketing/realisasi-kirim-spk",
+            icon: IconTruckDelivery,
+            menuId: 302,
           },
           {
             title: "Kunjungan Sales",

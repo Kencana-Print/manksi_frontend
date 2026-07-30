@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, watch, onMounted } from "vue";
+import { ref, watch, onMounted, computed } from "vue";
+import { useAuthStore } from "@/stores/authStore";
 import { useToast } from "vue-toastification";
 import api from "@/services/api";
 import BaseBrowse from "@/components/BaseBrowse.vue";
@@ -16,6 +17,10 @@ import { exportExcel, type ExcelColumn } from "@/utils/excelExport";
 
 const toast = useToast();
 const menuId = "518";
+const authStore = useAuthStore();
+const canLihatCus = computed(
+  () => Number(authStore.user?.flags?.lihatCus) === 1,
+);
 
 const toLocalDateStr = (d: Date) => {
   const y = d.getFullYear();
@@ -73,23 +78,30 @@ const fetchDivisi = async () => {
   }
 };
 
-const masterHeaders = [
-  { title: "Divisi", key: "Divisi", width: "90px" },
-  { title: "Tanggal", key: "Tanggal", width: "95px", align: "center" },
-  { title: "Dateline", key: "Dateline", width: "95px", align: "center" },
-  { title: "Nama", key: "Nama", minWidth: "200px" },
-  { title: "P", key: "Panjang", width: "60px", align: "end" },
-  { title: "L", key: "Lebar", width: "60px", align: "end" },
-  { title: "Nomor", key: "Nomor", width: "140px" },
-  { title: "Customer", key: "Customer", minWidth: "160px" },
-  { title: "Jenis", key: "Jenis", width: "70px" },
-  { title: "Kain", key: "Kain", width: "120px" },
-  { title: "Jml Order", key: "JmlOrder", width: "90px", align: "end" },
-  { title: "Jadi", key: "Jadi", width: "90px", align: "end" },
-  { title: "Jadi P1", key: "JadiP1", width: "85px", align: "end" },
-  { title: "Jadi P4", key: "JadiP4", width: "85px", align: "end" },
-  { title: "Kirim", key: "Kirim", width: "90px", align: "end" },
-];
+const masterHeaders = computed(() => {
+  const h: any[] = [
+    { title: "Divisi", key: "Divisi", width: "90px" },
+    { title: "Tanggal", key: "Tanggal", width: "95px", align: "center" },
+    { title: "Dateline", key: "Dateline", width: "95px", align: "center" },
+    { title: "Nama", key: "Nama", minWidth: "200px" },
+    { title: "P", key: "Panjang", width: "60px", align: "end" },
+    { title: "L", key: "Lebar", width: "60px", align: "end" },
+    { title: "Nomor", key: "Nomor", width: "140px" },
+  ];
+  if (canLihatCus.value) {
+    h.push({ title: "Customer", key: "Customer", minWidth: "160px" });
+  }
+  h.push(
+    { title: "Jenis", key: "Jenis", width: "70px" },
+    { title: "Kain", key: "Kain", width: "120px" },
+    { title: "Jml Order", key: "JmlOrder", width: "90px", align: "end" },
+    { title: "Jadi", key: "Jadi", width: "90px", align: "end" },
+    { title: "Jadi P1", key: "JadiP1", width: "85px", align: "end" },
+    { title: "Jadi P4", key: "JadiP4", width: "85px", align: "end" },
+    { title: "Kirim", key: "Kirim", width: "90px", align: "end" },
+  );
+  return h;
+});
 
 const { items, isLoading, canExport, fetchData } = useBrowse({
   menuId,
@@ -168,7 +180,9 @@ const onExportMaster = async () => {
       { header: "P", key: "Panjang", width: 8 },
       { header: "L", key: "Lebar", width: 8 },
       { header: "Nomor", key: "Nomor", width: 18 },
-      { header: "Customer", key: "Customer", width: 22 },
+      ...(canLihatCus.value
+        ? [{ header: "Customer", key: "Customer", width: 22 }]
+        : []),
       { header: "Jenis", key: "Jenis", width: 10 },
       { header: "Kain", key: "Kain", width: 16 },
       {
@@ -247,7 +261,9 @@ const onExportDetail = async () => {
     const stbjColumns: ExcelColumn[] = [
       { header: "Spk", key: "Spk", width: 18 },
       { header: "Nama", key: "Nama", width: 26 },
-      { header: "Customer", key: "Customer", width: 22 },
+      ...(canLihatCus.value
+        ? [{ header: "Customer", key: "Customer", width: 22 }]
+        : []),
       { header: "Nomor STBJ", key: "NomorStbj", width: 18 },
       { header: "Tgl STBJ", key: "TglStbj", width: 12, align: "center" },
       { header: "Keterangan", key: "Keterangan", width: 26 },
@@ -263,7 +279,9 @@ const onExportDetail = async () => {
     const sjColumns: ExcelColumn[] = [
       { header: "Spk", key: "Spk", width: 18 },
       { header: "Nama", key: "Nama", width: 26 },
-      { header: "Customer", key: "Customer", width: 22 },
+      ...(canLihatCus.value
+        ? [{ header: "Customer", key: "Customer", width: 22 }]
+        : []),
       { header: "Nomor SJ", key: "NomorSj", width: 18 },
       { header: "Tgl SJ", key: "TglSj", width: 12, align: "center" },
       { header: "Gudang", key: "Gudang", width: 16 },

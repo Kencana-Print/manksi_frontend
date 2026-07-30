@@ -3107,6 +3107,41 @@ const router = createRouter({
       },
     },
     {
+      path: "/laporan/marketing/target-spk",
+      name: "LapTargetSpk",
+      component: () => import("@/views/laporan/marketing/TargetSpkView.vue"),
+      meta: {
+        title: "Laporan Target SPK",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "312",
+      },
+    },
+    {
+      path: "/laporan/marketing/target-vs-realisasi",
+      name: "LapTargetVsRealisasi",
+      component: () =>
+        import("@/views/laporan/marketing/TargetVsRealisasiView.vue"),
+      meta: {
+        title: "Target vs Realisasi",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "966",
+      },
+    },
+    {
+      path: "/laporan/marketing/proyeksi-vs-realisasi",
+      name: "LapProyeksiVsRealisasi",
+      component: () =>
+        import("@/views/laporan/marketing/ProyeksiVsRealisasiView.vue"),
+      meta: {
+        title: "Laporan Proyeksi vs Realisasi",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "1244",
+      },
+    },
+    {
       path: "/laporan/marketing/map-belum-realisasi",
       name: "LapMapBelumRealisasi",
       component: () =>
@@ -3163,6 +3198,30 @@ const router = createRouter({
         layout: "DefaultLayout",
         requiresAuth: true,
         menuId: "310",
+      },
+    },
+    {
+      path: "/laporan/marketing/revisi-map",
+      name: "LapRevisiMemoSpk",
+      component: () =>
+        import("@/views/laporan/marketing/RevisiMemoSpkView.vue"),
+      meta: {
+        title: "Laporan Revisi Memo SPK",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "966",
+      },
+    },
+    {
+      path: "/laporan/marketing/realisasi-kirim-spk",
+      name: "LapRealisasiKirimSpk",
+      component: () =>
+        import("@/views/laporan/marketing/RealisasiPengirimanSpkView.vue"),
+      meta: {
+        title: "Realisasi Pengiriman SPK",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "302",
       },
     },
     {

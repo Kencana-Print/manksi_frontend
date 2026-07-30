@@ -52,11 +52,16 @@ const showPrintDialog = ref(false);
 const nomorToPrint = ref("");
 
 // Hak Akses Flags dari Token User
-const canSeeSup = computed(() => {
-  const bagian = authStore.user?.bagian?.toUpperCase() || "";
-  return !!authStore.user?.flags?.lihatSup || bagian === "FINANCE";
-});
-const canSeeBeli = computed(() => !!authStore.user?.flags?.lihatBeli);
+// ⚠️ Sama pola PO Bahan: panel Supplier disembunyikan (bukan
+// dihapus dari formData) kalau user gak punya izin lihatSup —
+// replikasi semangat `if zLihatSup=0` di ufrmBrowsePO (walau form
+// PO Garmen sendiri di Delphi tidak eksplisit nge-toggle gbsup.Visible,
+// diseragamkan dengan pola PO Bahan sesuai keputusan). TIDAK ada
+// bypass tambahan berdasarkan bagian user (mis. "FINANCE") — cukup
+// flag lihatSup murni, konsisten sama semua modul lain yang sudah
+// diaudit.
+const canSeeSup = computed(() => authStore.user?.flags.lihatSup === 1);
+const canSeeBeli = computed(() => authStore.user?.flags.lihatBeli === 1);
 
 // --- HELPER FORMATTING UTK METRIC DAN KATA DI TEMPLATE ---
 const formatDateLocal = (value?: string | Date) => {
@@ -155,7 +160,10 @@ const {
         bpb: item.bpb,
         jumlah: item.jumlah,
         harga: item.harga,
-        total: item.pod_jumlah * item.pod_harga,
+        // ⚠️ FIX: item.pod_jumlah/item.pod_harga tidak pernah ada di
+        // response (field asli namanya jumlah/harga) — sebelumnya selalu
+        // NaN. Ganti pakai field yang benar-benar dikirim backend.
+        total: (Number(item.jumlah) || 0) * (Number(item.harga) || 0),
       })),
     };
   },

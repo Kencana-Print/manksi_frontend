@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, watch, onMounted } from "vue";
+import { ref, watch, onMounted, computed } from "vue";
+import { useAuthStore } from "@/stores/authStore";
 import { useToast } from "vue-toastification";
 import BaseBrowse from "@/components/BaseBrowse.vue";
 import { useBrowse } from "@/composables/useBrowse";
@@ -17,6 +18,7 @@ import {
 } from "@/utils/excelExport";
 import { formatTanggal } from "@/utils/dateFormat";
 
+const authStore = useAuthStore();
 const toast = useToast();
 const menuId = "517";
 
@@ -50,24 +52,35 @@ const clearSpk = () => {
   fetchData();
 };
 
-const masterHeaders = [
-  { title: "Spk", key: "Spk", width: "140px" },
-  { title: "Divisi", key: "Divisi", width: "90px" },
-  { title: "Workshop", key: "Workshop", width: "90px" },
-  { title: "Dateline", key: "Dateline", width: "95px", align: "center" },
-  { title: "Nama", key: "Nama", minWidth: "220px" },
-  { title: "Ukuran", key: "Ukuran", minWidth: "140px" },
-  { title: "Customer", key: "Customer", minWidth: "160px" },
-  { title: "Jenis", key: "Jenis", width: "70px" },
-  { title: "Kain", key: "Kain", width: "120px" },
-  { title: "Jml Order", key: "JmlOrder", width: "90px", align: "end" },
-  { title: "Tot Minta", key: "TotMinta", width: "90px", align: "end" },
-  { title: "Tot Retur", key: "TotRetur", width: "90px", align: "end" },
-  { title: "Net Minta", key: "NetMinta", width: "90px", align: "end" },
-  { title: "Lhk", key: "Lhk", width: "90px", align: "end" },
-  { title: "Cmt", key: "Cmt", width: "90px", align: "end" },
-  { title: "Tot Lhk", key: "TotLhk", width: "90px", align: "end" },
-];
+const canLihatCus = computed(
+  () => Number(authStore.user?.flags?.lihatCus) === 1,
+);
+
+const masterHeaders = computed(() => {
+  const h: any[] = [
+    { title: "Spk", key: "Spk", width: "140px" },
+    { title: "Divisi", key: "Divisi", width: "90px" },
+    { title: "Workshop", key: "Workshop", width: "90px" },
+    { title: "Dateline", key: "Dateline", width: "95px", align: "center" },
+    { title: "Nama", key: "Nama", minWidth: "220px" },
+    { title: "Ukuran", key: "Ukuran", minWidth: "140px" },
+  ];
+  if (canLihatCus.value) {
+    h.push({ title: "Customer", key: "Customer", minWidth: "160px" });
+  }
+  h.push(
+    { title: "Jenis", key: "Jenis", width: "70px" },
+    { title: "Kain", key: "Kain", width: "120px" },
+    { title: "Jml Order", key: "JmlOrder", width: "90px", align: "end" },
+    { title: "Tot Minta", key: "TotMinta", width: "90px", align: "end" },
+    { title: "Tot Retur", key: "TotRetur", width: "90px", align: "end" },
+    { title: "Net Minta", key: "NetMinta", width: "90px", align: "end" },
+    { title: "Lhk", key: "Lhk", width: "90px", align: "end" },
+    { title: "Cmt", key: "Cmt", width: "90px", align: "end" },
+    { title: "Tot Lhk", key: "TotLhk", width: "90px", align: "end" },
+  );
+  return h;
+});
 
 const { items, isLoading, canExport, fetchData } = useBrowse({
   menuId,
@@ -131,7 +144,9 @@ const onExportMaster = async () => {
     const columns: ExcelColumn[] = [
       { header: "Spk", key: "Spk", width: 18 },
       { header: "Nama", key: "Nama", width: 26 },
-      { header: "Customer", key: "Customer", width: 22 },
+      ...(canLihatCus.value
+        ? [{ header: "Customer", key: "Customer", width: 22 }]
+        : []),
       { header: "No Minta", key: "NoMinta", width: 16 },
       { header: "Tgl Minta", key: "TglMinta", width: 12, align: "center" },
       { header: "Gudang", key: "Gudang", width: 14 },
@@ -242,7 +257,9 @@ const onExportDetail = async () => {
     const columns: ExcelColumn[] = [
       { header: "Spk", key: "Spk", width: 18 },
       { header: "Nama", key: "Nama", width: 26 },
-      { header: "Customer", key: "Customer", width: 22 },
+      ...(canLihatCus.value
+        ? [{ header: "Customer", key: "Customer", width: 22 }]
+        : []),
       { header: "No Minta", key: "NoMinta", width: 16 },
       { header: "Tgl Minta", key: "TglMinta", width: 12, align: "center" },
       { header: "Gudang", key: "Gudang", width: 14 },
@@ -301,7 +318,9 @@ const onExportDetail = async () => {
         align: "right",
         numFmt: "#,##0.00",
       },
-      { header: "Supplier", key: "Supplier", width: 20 },
+      ...(canLihatCus.value
+        ? [{ header: "Supplier", key: "Supplier", width: 20 }]
+        : []),
       { header: "No MKB", key: "NoMkb", width: 16 },
       { header: "Tgl MKB", key: "TglMkb", width: 12, align: "center" },
       {
@@ -465,7 +484,7 @@ onMounted(fetchData);
               <th style="width: 90px">Tgl MKB</th>
               <th style="width: 85px" class="tr">Qty MKB</th>
               <th style="width: 90px" class="tr">Babaran MKB</th>
-              <th style="width: 140px">Supplier</th>
+              <th v-if="canLihatCus" style="width: 140px">Supplier</th>
             </tr>
           </thead>
           <tbody>
@@ -491,10 +510,12 @@ onMounted(fetchData);
               <td>{{ formatTanggal(d.TglMkb) }}</td>
               <td class="tr">{{ fmtNum(d.QtyMkb) }}</td>
               <td class="tr">{{ fmtNum(d.BabaranMkb) }}</td>
-              <td>{{ d.Supplier || "-" }}</td>
+              <td v-if="canLihatCus">{{ d.Supplier || "-" }}</td>
             </tr>
             <tr v-if="!detailData[item.Spk]?.length">
-              <td colspan="22" class="empty-row">Tidak ada rincian.</td>
+              <td :colspan="canLihatCus ? 22 : 21" class="empty-row">
+                Tidak ada rincian.
+              </td>
             </tr>
           </tbody>
         </table>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, computed } from "vue";
+import { useAuthStore } from "@/stores/authStore";
 import { useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
 import BaseBrowse from "@/components/BaseBrowse.vue";
@@ -19,6 +20,7 @@ import {
 } from "@tabler/icons-vue";
 import { formatTanggal } from "@/utils/dateFormat";
 
+const authStore = useAuthStore();
 const router = useRouter();
 const toast = useToast();
 const menuId = "151";
@@ -87,22 +89,35 @@ watch(expanded, (newVal) => {
   });
 });
 
-const headers = [
-  { title: "Nomor", key: "Nomor", width: "140px" },
-  { title: "Tanggal", key: "Tanggal", width: "100px" },
-  { title: "Divisi", key: "Divisi", width: "80px", align: "center" },
-  { title: "Tipe", key: "Tipe", width: "90px" },
-  { title: "Perusahaan", key: "Perusahaan", width: "160px" },
-  { title: "Nominal", key: "Nominal", width: "130px", align: "right" },
-  { title: "Nama Customer", key: "NamaCustomer", minWidth: "200px" },
-  { title: "Keterangan", key: "Keterangan", minWidth: "150px" },
-  { title: "Sales", key: "Sales", width: "100px" },
-  { title: "Det", key: "jumlahDetail", width: "55px", align: "center" },
-  { title: "Fu1", key: "Fu1", width: "46px", align: "center" },
-  { title: "Fu2", key: "Fu2", width: "46px", align: "center" },
-  { title: "Fu3", key: "Fu3", width: "46px", align: "center" },
-  { title: "Proyeksi", key: "Proyeksi", width: "90px" },
-];
+const canLihatCus = computed(
+  () => Number(authStore.user?.flags?.lihatCus) === 1,
+);
+
+const headers = computed(() => {
+  const h: any[] = [
+    { title: "Nomor", key: "Nomor", width: "140px" },
+    { title: "Tanggal", key: "Tanggal", width: "100px" },
+    { title: "Divisi", key: "Divisi", width: "80px", align: "center" },
+    { title: "Tipe", key: "Tipe", width: "90px" },
+  ];
+  if (canLihatCus.value) {
+    h.push(
+      { title: "Perusahaan", key: "Perusahaan", width: "160px" },
+      { title: "Nominal", key: "Nominal", width: "130px", align: "right" },
+      { title: "Nama Customer", key: "NamaCustomer", minWidth: "200px" },
+    );
+  }
+  h.push(
+    { title: "Keterangan", key: "Keterangan", minWidth: "150px" },
+    { title: "Sales", key: "Sales", width: "100px" },
+    { title: "Det", key: "jumlahDetail", width: "55px", align: "center" },
+    { title: "Fu1", key: "Fu1", width: "46px", align: "center" },
+    { title: "Fu2", key: "Fu2", width: "46px", align: "center" },
+    { title: "Fu3", key: "Fu3", width: "46px", align: "center" },
+    { title: "Proyeksi", key: "Proyeksi", width: "90px" },
+  );
+  return h;
+});
 
 const rp = (v: number) =>
   new Intl.NumberFormat("id-ID", {
@@ -230,13 +245,13 @@ const totalStatusGrid = computed(() => {
     v-model:expanded="expanded"
     v-model:selected="selected"
     v-model:filterState="filterState"
-    :can-insert="canInsert"
-    :can-edit="canEdit"
-    :can-delete="canDelete"
+    :can-insert="canInsert && canLihatCus"
+    :can-edit="canEdit && canLihatCus"
+    :can-delete="canDelete && canLihatCus"
     can-export
     :row-props-fn="getRowProps"
-    summary-key="Nominal"
-    summary-label="Total Nominal"
+    :summary-key="canLihatCus ? 'Nominal' : undefined"
+    :summary-label="canLihatCus ? 'Total Nominal' : undefined"
     @refresh="fetchData"
     @add="goAdd"
     @edit="goEdit"
@@ -284,6 +299,7 @@ const totalStatusGrid = computed(() => {
     <!-- Extra action buttons -->
     <template #extra-actions="{ selected }">
       <v-btn
+        v-if="canLihatCus"
         size="small"
         variant="flat"
         color="blue-grey"
@@ -295,13 +311,19 @@ const totalStatusGrid = computed(() => {
         /></template>
         Cetak
       </v-btn>
-      <v-btn size="small" variant="flat" color="teal-darken-1">
+      <v-btn
+        v-if="canLihatCus"
+        size="small"
+        variant="flat"
+        color="teal-darken-1"
+      >
         <template #prepend
           ><IconFileSpreadsheet :size="15" :stroke-width="1.7"
         /></template>
         Export Detail
       </v-btn>
       <v-btn
+        v-if="canLihatCus"
         size="small"
         variant="flat"
         color="indigo"
@@ -352,8 +374,12 @@ const totalStatusGrid = computed(() => {
               <th style="width: 80px; text-align: right">Qty Mtr</th>
               <th style="width: 60px; text-align: center">Satuan</th>
               <th style="width: 60px; text-align: right">Qty</th>
-              <th style="width: 100px; text-align: right">Harga</th>
-              <th style="width: 120px; text-align: right">Nominal</th>
+              <th v-if="canLihatCus" style="width: 100px; text-align: right">
+                Harga
+              </th>
+              <th v-if="canLihatCus" style="width: 120px; text-align: right">
+                Nominal
+              </th>
               <th style="width: 70px; text-align: center">Status</th>
             </tr>
           </thead>
@@ -368,8 +394,8 @@ const totalStatusGrid = computed(() => {
               <td class="tr">{{ num(d.QtyMeter) }}</td>
               <td class="tc">{{ d.Satuan }}</td>
               <td class="tr">{{ num(d.Qty) }}</td>
-              <td class="tr">{{ rp(d.Harga) }}</td>
-              <td class="tr fw">{{ rp(d.Nominal) }}</td>
+              <td v-if="canLihatCus" class="tr">{{ rp(d.Harga) }}</td>
+              <td v-if="canLihatCus" class="tr fw">{{ rp(d.Nominal) }}</td>
               <td class="tc">
                 <span
                   class="status-chip"

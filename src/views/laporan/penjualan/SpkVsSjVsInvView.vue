@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, watch, onMounted } from "vue";
+import { ref, watch, onMounted, computed } from "vue";
+import { useAuthStore } from "@/stores/authStore";
 import { useToast } from "vue-toastification";
 import BaseBrowse from "@/components/BaseBrowse.vue";
 import { useBrowse } from "@/composables/useBrowse";
@@ -11,6 +12,7 @@ import CustomerSearchModal from "@/components/lookups/CustomerSearchModal.vue";
 import SalesSearchModal from "@/components/lookups/SalesSearchModal.vue";
 import { IconFileInvoice, IconSearch } from "@tabler/icons-vue";
 
+const authStore = useAuthStore();
 const toast = useToast();
 
 // --- STATE FILTER (default: hari ini s.d. hari ini, divisi ALL) ---
@@ -115,20 +117,31 @@ const { items, isLoading, canExport, fetchData } = useBrowse({
 });
 
 // --- HEADERS UTAMA ---
-const headers = [
-  { title: "Nomor", key: "Nomor", width: "150px", fixed: true },
-  { title: "Tanggal", key: "Tanggal", width: "95px", align: "center" },
-  { title: "Divisi", key: "Divisi", width: "110px" },
-  { title: "Nama Customer", key: "NamaCustomer", minWidth: "200px" },
-  { title: "Nama", key: "Nama", minWidth: "200px" },
-  { title: "Ukuran", key: "Ukuran", width: "160px" },
-  { title: "Jenis", key: "Jenis", width: "70px", align: "center" },
-  { title: "Jumlah", key: "Jumlah", width: "90px", align: "right" },
-  { title: "Prasj", key: "Prasj", width: "80px", align: "right" },
-  { title: "Kirim", key: "Kirim", width: "90px", align: "right" },
-  { title: "Dateline", key: "Dateline", width: "95px", align: "center" },
-  { title: "Nomor PO", key: "NomorPO", width: "130px" },
-];
+const canLihatCus = computed(
+  () => Number(authStore.user?.flags?.lihatCus) === 1,
+);
+
+const headers = computed(() => {
+  const h: any[] = [
+    { title: "Nomor", key: "Nomor", width: "150px", fixed: true },
+    { title: "Tanggal", key: "Tanggal", width: "95px", align: "center" },
+    { title: "Divisi", key: "Divisi", width: "110px" },
+  ];
+  if (canLihatCus.value) {
+    h.push({ title: "Nama Customer", key: "NamaCustomer", minWidth: "200px" });
+  }
+  h.push(
+    { title: "Nama", key: "Nama", minWidth: "200px" },
+    { title: "Ukuran", key: "Ukuran", width: "160px" },
+    { title: "Jenis", key: "Jenis", width: "70px", align: "center" },
+    { title: "Jumlah", key: "Jumlah", width: "90px", align: "right" },
+    { title: "Prasj", key: "Prasj", width: "80px", align: "right" },
+    { title: "Kirim", key: "Kirim", width: "90px", align: "right" },
+    { title: "Dateline", key: "Dateline", width: "95px", align: "center" },
+    { title: "Nomor PO", key: "NomorPO", width: "130px" },
+  );
+  return h;
+});
 
 const numFmt = (v: any) =>
   v || v === 0 ? Number(v).toLocaleString("id-ID") : "0";
@@ -225,7 +238,7 @@ const onExport = async () => {
         Nomor: m.Nomor,
         Tanggal: formatTanggal(m.Tanggal),
         Divisi: m.Divisi,
-        NamaCustomer: m.NamaCustomer,
+        ...(canLihatCus.value ? { NamaCustomer: m.NamaCustomer } : {}),
         Nama: m.Nama,
         Ukuran: m.Ukuran,
         Jenis: m.Jenis,
@@ -288,7 +301,9 @@ const onExport = async () => {
       { header: "Nomor", key: "Nomor", width: 18 },
       { header: "Tanggal", key: "Tanggal", width: 14, align: "center" },
       { header: "Divisi", key: "Divisi", width: 14 },
-      { header: "Nama Customer", key: "NamaCustomer", width: 24 },
+      ...(canLihatCus.value
+        ? [{ header: "Nama Customer", key: "NamaCustomer", width: 24 }]
+        : []),
       { header: "Nama", key: "Nama", width: 30 },
       { header: "Ukuran", key: "Ukuran", width: 18 },
       { header: "Jenis Order", key: "Jenis", width: 10, align: "center" },
@@ -329,12 +344,7 @@ const onExport = async () => {
       { header: "Alamat", key: "Alamat", width: 28 },
       { header: "Kota", key: "Kota", width: 16 },
       { header: "Nomor Inv", key: "NomorInv", width: 18 },
-      {
-        header: "Tanggal Inv",
-        key: "TanggalInv",
-        width: 14,
-        align: "center",
-      },
+      { header: "Tanggal Inv", key: "TanggalInv", width: 14, align: "center" },
       { header: "Keterangan", key: "Keterangan", width: 28 },
       {
         header: "Jumlah",

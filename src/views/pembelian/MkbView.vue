@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, watch, onMounted } from "vue";
+import { ref, watch, onMounted, computed } from "vue";
+import { useAuthStore } from "@/stores/authStore";
 import { useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
 import BaseBrowse from "@/components/BaseBrowse.vue";
@@ -15,6 +16,7 @@ import { formatTanggal, formatTanggalJam } from "@/utils/dateFormat";
 
 const router = useRouter();
 const toast = useToast();
+const authStore = useAuthStore();
 
 const today = new Date();
 const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -55,8 +57,12 @@ watch(
   { deep: true },
 );
 
+// ⚠️ Kolom Customer/Alamat cuma tampil kalau user punya izin lihatCus
+// (user_lihat_cus, integer 0/1) — replikasi `if zcus=1` di Delphi.
+const canLihatCus = computed(() => authStore.canLihatCus);
+
 // --- PENAMBAHAN KOLOM ALAMAT, PLAN, & CREATED ---
-const headers = [
+const baseHeaders = [
   { title: "Nomor", key: "Nomor", width: "130px" },
   { title: "Tanggal", key: "Tanggal", width: "100px", align: "center" },
   { title: "PO", key: "PO", width: "60px", align: "center" },
@@ -67,13 +73,23 @@ const headers = [
   { title: "Jumlah SPK", key: "JumlahSPK", width: "100px", align: "right" },
   { title: "Kain", key: "Kain", width: "160px" },
   { title: "Finishing", key: "Finishing", width: "160px" },
-  { title: "Customer", key: "Customer", width: "200px" },
-  { title: "Alamat", key: "Alamat", width: "250px" }, // Ditambahkan
-  { title: "Keterangan", key: "Keterangan", width: "250px" },
-  { title: "Plan", key: "Plan", width: "70px", align: "center" }, // Ditambahkan
-  { title: "User", key: "usr", width: "100px" },
-  { title: "Created", key: "Created", width: "140px", align: "center" }, // Ditambahkan
 ];
+const custHeaders = [
+  { title: "Customer", key: "Customer", width: "200px" },
+  { title: "Alamat", key: "Alamat", width: "250px" },
+];
+const tailHeaders = [
+  { title: "Keterangan", key: "Keterangan", width: "250px" },
+  { title: "Plan", key: "Plan", width: "70px", align: "center" },
+  { title: "User", key: "usr", width: "100px" },
+  { title: "Created", key: "Created", width: "140px", align: "center" },
+];
+
+const headers = computed(() => [
+  ...baseHeaders,
+  ...(canLihatCus.value ? custHeaders : []),
+  ...tailHeaders,
+]);
 
 const {
   items,

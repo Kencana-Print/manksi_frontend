@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, computed } from "vue";
 import { useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
 import BaseBrowse from "@/components/BaseBrowse.vue";
@@ -86,62 +86,92 @@ const {
   immediate: true,
 });
 
+const canLihatCus = computed(
+  () => Number(authStore.user?.flags?.lihatCus) === 1,
+);
+const canLihatHarga = computed(
+  () => Number(authStore.user?.flags?.lihatHarga) === 1,
+);
+
 // Definisi Kolom berdasarkan query Delphi
-const headers = [
-  { title: "Nomor", key: "Nomor", width: "160px" },
-  { title: "MO", key: "MO", width: "100px" },
-  { title: "CMO", key: "CMO", width: "100px" },
-  { title: "Tanggal", key: "Tanggal", width: "100px" },
-  { title: "Dateline", key: "Dateline", width: "100px" },
-  { title: "Tgl. BAST", key: "TglBast", width: "100px" },
-  {
-    title: "Selisih (BAST-MAP)",
-    key: "SelisihBastMap",
-    width: "130px",
-    align: "right",
-  },
-  { title: "Berita Acara", key: "Berita_Acara", width: "120px" },
-  { title: "Divisi", key: "Divisi", width: "100px" },
-  { title: "Cab", key: "Cab", width: "60px" },
-  { title: "Workshop", key: "Workshop", width: "120px" },
-  { title: "Workshop SPK", key: "WorkshopSPK", width: "130px" },
-  { title: "Aktif", key: "Aktif", width: "60px", align: "center" },
-  {
-    title: "Acc. Customer",
-    key: "AccCustomer",
-    width: "110px",
-    align: "center",
-  },
-  { title: "Nama", key: "Nama", minWidth: "250px" },
-  { title: "Surat Jalan", key: "Surat_Jalan", width: "140px" },
-  { title: "Ukuran", key: "Ukuran", width: "120px" },
-  { title: "Panjang", key: "Panjang", width: "80px", align: "right" },
-  { title: "Lebar", key: "Lebar", width: "80px", align: "right" },
-  { title: "Gramasi", key: "Gramasi", width: "120px" },
-  { title: "Kain", key: "Kain", width: "180px" },
-  { title: "Finishing", key: "Finishing", width: "180px" },
-  { title: "Qty", key: "Jumlah", width: "60px", align: "right" },
-  { title: "Kirim", key: "Kirim", width: "60px", align: "right" },
-  { title: "Rencana", key: "Rencana", width: "80px", align: "right" },
-  { title: "Customer", key: "Customer", minWidth: "200px" },
-  { title: "Salesman", key: "Salesman", width: "120px" },
-  { title: "Tipe", key: "Tipe", width: "100px" },
-  { title: "Harga", key: "Harga", width: "100px", align: "right" },
-  { title: "Harga Riil", key: "HargaRiil", width: "100px", align: "right" },
-  { title: "Created", key: "Created", width: "150px" },
-  { title: "Revisi", key: "Revisi", width: "70px", align: "center" },
-  { title: "No. Referensi", key: "NoReferensi", width: "140px" },
-  { title: "Estimasi Jadi", key: "EstimasiJadi", width: "100px" },
-  { title: "Close", key: "CloseStatus", width: "70px", align: "center" },
-  { title: "SO", key: "SPK", width: "160px" },
-  { title: "Tgl. Desain", key: "Design_Tanggal", width: "100px" },
-  { title: "User Desain", key: "Design_User", width: "100px" },
-  { title: "Note Desain", key: "Design_Note", width: "150px" },
-  { title: "Ngedit", key: "Ngedit", width: "100px" },
-  { title: "Desain Baru", key: "Design_Baru", width: "100px", align: "center" },
-  { title: "Desain Done", key: "Design_Done", width: "100px", align: "center" },
-  { title: "Keterangan", key: "Keterangan", minWidth: "300px" },
-];
+const headers = computed(() => {
+  const h: any[] = [
+    { title: "Nomor", key: "Nomor", width: "160px" },
+    { title: "MO", key: "MO", width: "100px" },
+    { title: "CMO", key: "CMO", width: "100px" },
+    { title: "Tanggal", key: "Tanggal", width: "100px" },
+    { title: "Dateline", key: "Dateline", width: "100px" },
+    { title: "Tgl. BAST", key: "TglBast", width: "100px" },
+    {
+      title: "Selisih (BAST-MAP)",
+      key: "SelisihBastMap",
+      width: "130px",
+      align: "right",
+    },
+    { title: "Berita Acara", key: "Berita_Acara", width: "120px" },
+    { title: "Divisi", key: "Divisi", width: "100px" },
+    { title: "Cab", key: "Cab", width: "60px" },
+    { title: "Workshop", key: "Workshop", width: "120px" },
+    { title: "Workshop SPK", key: "WorkshopSPK", width: "130px" },
+    { title: "Aktif", key: "Aktif", width: "60px", align: "center" },
+    {
+      title: "Acc. Customer",
+      key: "AccCustomer",
+      width: "110px",
+      align: "center",
+    },
+    { title: "Nama", key: "Nama", minWidth: "250px" },
+    { title: "Surat Jalan", key: "Surat_Jalan", width: "140px" },
+    { title: "Ukuran", key: "Ukuran", width: "120px" },
+    { title: "Panjang", key: "Panjang", width: "80px", align: "right" },
+    { title: "Lebar", key: "Lebar", width: "80px", align: "right" },
+    { title: "Gramasi", key: "Gramasi", width: "120px" },
+    { title: "Kain", key: "Kain", width: "180px" },
+    { title: "Finishing", key: "Finishing", width: "180px" },
+    { title: "Qty", key: "Jumlah", width: "60px", align: "right" },
+    { title: "Kirim", key: "Kirim", width: "60px", align: "right" },
+  ];
+  if (canLihatCus.value) {
+    h.push({ title: "Customer", key: "Customer", minWidth: "200px" });
+  }
+  h.push(
+    { title: "Rencana", key: "Rencana", width: "80px", align: "right" },
+    { title: "Salesman", key: "Salesman", width: "120px" },
+    { title: "Tipe", key: "Tipe", width: "100px" },
+  );
+  if (canLihatHarga.value) {
+    h.push(
+      { title: "Harga", key: "Harga", width: "100px", align: "right" },
+      { title: "Harga Riil", key: "HargaRiil", width: "100px", align: "right" },
+    );
+  }
+  h.push(
+    { title: "Created", key: "Created", width: "150px" },
+    { title: "Revisi", key: "Revisi", width: "70px", align: "center" },
+    { title: "No. Referensi", key: "NoReferensi", width: "140px" },
+    { title: "Estimasi Jadi", key: "EstimasiJadi", width: "100px" },
+    { title: "Close", key: "CloseStatus", width: "70px", align: "center" },
+    { title: "SO", key: "SPK", width: "160px" },
+    { title: "Tgl. Desain", key: "Design_Tanggal", width: "100px" },
+    { title: "User Desain", key: "Design_User", width: "100px" },
+    { title: "Note Desain", key: "Design_Note", width: "150px" },
+    { title: "Ngedit", key: "Ngedit", width: "100px" },
+    {
+      title: "Desain Baru",
+      key: "Design_Baru",
+      width: "100px",
+      align: "center",
+    },
+    {
+      title: "Desain Done",
+      key: "Design_Done",
+      width: "100px",
+      align: "center",
+    },
+    { title: "Keterangan", key: "Keterangan", minWidth: "300px" },
+  );
+  return h;
+});
 
 const fmtNum = (val: number | string | null) => {
   if (!val) return "0";

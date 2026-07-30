@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from "vue";
+import { useAuthStore } from "@/stores/authStore";
 import { useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
 import BaseBrowse from "@/components/BaseBrowse.vue";
@@ -32,6 +33,7 @@ interface ExportDetailRow {
   Setting: string;
 }
 
+const authStore = useAuthStore();
 const router = useRouter();
 const toast = useToast();
 
@@ -55,6 +57,11 @@ const filterState = ref({
   gudang: "GB001",
   search: "",
 });
+
+// ⚠️ Kolom Supplier digated flag lihatSup (user_lihat_sup) — replikasi
+// `if zlihatsup<>0` di ufrmBrowseBPB. Tidak ada gating harga di modul
+// ini — Delphi asli tidak pernah query kolom harga di detail BPB.
+const canLihatSup = computed(() => authStore.user?.flags.lihatSup === 1);
 
 // --- STATE DIALOG ---
 const pinDialog = ref(false);
@@ -87,13 +94,15 @@ const {
 });
 
 // --- HEADERS UTAMA ---
-const headers = [
+const baseHeaders = [
   { title: "Nomor", key: "Nomor", width: "140px", fixed: true },
   { title: "Nomor PO", key: "Nomor_PO", width: "140px" },
   { title: "Tanggal", key: "Tanggal", width: "100px", align: "center" },
   { title: "Jatuh Tempo", key: "Jatuhtempo", width: "100px", align: "center" },
   { title: "Barcode", key: "BuatBarcode", width: "90px", align: "center" },
-  { title: "Supplier", key: "Supplier", width: "200px" },
+];
+const supHeaders = [{ title: "Supplier", key: "Supplier", width: "200px" }];
+const tailHeaders = [
   { title: "Ket. PO", key: "Ket_PO", width: "250px" },
   { title: "Keterangan", key: "Keterangan", width: "200px" },
   { title: "Voucher", key: "Voucher_bayar", width: "80px", align: "center" },
@@ -101,6 +110,12 @@ const headers = [
   { title: "Gudang", key: "Gudang", width: "80px", align: "center" },
   { title: "User", key: "Usr", width: "100px" },
 ];
+
+const headers = computed(() => [
+  ...baseHeaders,
+  ...(canLihatSup.value ? supHeaders : []),
+  ...tailHeaders,
+]);
 
 // --- EXPAND LOGIC (DETAIL BPB) ---
 const expandedRows = ref<any[]>([]);
@@ -236,12 +251,14 @@ const exportDetail = async () => {
 
       if (detail && detail.length > 0) {
         detail.forEach((d: any) => {
-          allDetails.push({
+          const row: any = {
             "No. BPB": item.Nomor,
             "No. PO": item.Nomor_PO || "-",
             "Tanggal BPB": formatTanggal(item.Tanggal),
             Gudang: item.Gudang,
-            Supplier: item.Supplier || "-",
+          };
+          if (canLihatSup.value) row.Supplier = item.Supplier || "-";
+          Object.assign(row, {
             "Kode Bahan": d.Kode,
             "Nama Bahan": d.Nama,
             Satuan: d.Satuan,
@@ -251,6 +268,7 @@ const exportDetail = async () => {
             Warna: d.Warna || "",
             Setting: d.Setting || "",
           });
+          allDetails.push(row);
         });
       }
     }

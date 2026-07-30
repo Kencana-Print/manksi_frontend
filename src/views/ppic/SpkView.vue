@@ -82,6 +82,11 @@ const selectedCustomer = computed({
     };
   },
 });
+// ⚠️ Kolom Customer/GroupCustomer digated flag lihatCus, kolom Harga
+// digated flag lihatHarga — replikasi `if zcus=1` / `if zLihatHarga=1`
+// di ufrmBrowseSPK, pola sama persis Sales Order.
+const canLihatCus = computed(() => authStore.user?.flags.lihatCus === 1);
+const canLihatHarga = computed(() => authStore.canLihatHarga);
 
 watch(
   filterState,
@@ -117,7 +122,7 @@ const {
 });
 
 // --- HEADERS ---
-const headers = [
+const baseHeadersFront = [
   { title: "Nomor", key: "Nomor", width: "135px", fixed: true },
   { title: "MO", key: "MO", width: "80px" },
   { title: "CMO", key: "CMO", width: "80px" },
@@ -126,7 +131,9 @@ const headers = [
   { title: "Kepentingan", key: "Kepentingan", width: "100px" },
   { title: "Divisi", key: "Divisi", width: "100px" },
   { title: "Kode Customer", key: "KodeCustomer", width: "100px" },
-  { title: "Customer", key: "Customer", width: "200px" },
+];
+const custHeadersMid = [{ title: "Customer", key: "Customer", width: "200px" }];
+const middleHeaders = [
   { title: "Nama Pesanan", key: "Nama", width: "250px" },
   { title: "Ukuran", key: "Ukuran", width: "100px" },
   { title: "Cab", key: "Cab", width: "60px", align: "center" },
@@ -139,14 +146,22 @@ const headers = [
   { title: "Gramasi", key: "Gramasi", width: "80px" },
   { title: "Kain", key: "Kain", width: "150px" },
   { title: "Finishing", key: "Finishing", width: "150px" },
+];
+const hargaHeader = [
   { title: "Harga", key: "Harga", width: "100px", align: "right" },
+];
+const afterHargaHeaders = [
   { title: "Pesan", key: "Pesan", width: "80px", align: "right" },
   { title: "Pra SJ", key: "Prasj", width: "80px", align: "right" },
   { title: "Kirim", key: "Kirim", width: "80px", align: "right" },
   { title: "Kurang", key: "Kurang", width: "80px", align: "right" },
   { title: "Sales", key: "Sales", width: "120px" },
   { title: "Created", key: "Created", width: "140px", align: "center" },
+];
+const custHeadersGroup = [
   { title: "Group Customer", key: "GroupCustomer", width: "150px" },
+];
+const tailHeadersFront = [
   { title: "PO", key: "PO", width: "120px" },
   { title: "Ket PO", key: "KetPO", width: "150px" },
   { title: "Date PO", key: "DatePO", width: "100px", align: "center" },
@@ -163,7 +178,6 @@ const headers = [
   { title: "MAP", key: "MAP", width: "130px" },
   { title: "Repeat", key: "Repeat", width: "80px" },
   { title: "SO", key: "IsSO", width: "60px", align: "center" },
-  // Produksi
   { title: "Potong", key: "Potong", width: "80px", align: "right" },
   { title: "Qc Potong", key: "QcPotong", width: "80px", align: "right" },
   { title: "Bordir", key: "Bordir", width: "80px", align: "right" },
@@ -195,14 +209,12 @@ const headers = [
   },
   { title: "Kurang Jahit", key: "Kurang_Jahit", width: "90px", align: "right" },
   { title: "Kurang Lipat", key: "Kurang_Lipat", width: "90px", align: "right" },
-  // Status & ACC
   { title: "Aktif", key: "Aktif", width: "60px", align: "center" },
   { title: "Acc", key: "Acc", width: "60px", align: "center" },
   { title: "Acc H0", key: "AccH0", width: "60px", align: "center" },
   { title: "Acc JO", key: "AccJO", width: "80px", align: "center" },
   { title: "Acc Pending", key: "AccPending", width: "90px", align: "center" },
   { title: "MPPB", key: "MPPB", width: "120px" },
-  // Design
   {
     title: "Design Tgl",
     key: "Design_Tanggal",
@@ -216,6 +228,16 @@ const headers = [
   { title: "Keterangan", key: "Keterangan", width: "250px" },
   { title: "Pesanan/Invoice", key: "Pesanan/Invoice", width: "150px" },
 ];
+
+const headers = computed(() => [
+  ...baseHeadersFront,
+  ...(canLihatCus.value ? custHeadersMid : []),
+  ...middleHeaders,
+  ...(canLihatHarga.value ? hargaHeader : []),
+  ...afterHargaHeaders,
+  ...(canLihatCus.value ? custHeadersGroup : []),
+  ...tailHeadersFront,
+]);
 
 // --- EXPAND ---
 const expandedRows = ref<any[]>([]);
@@ -304,114 +326,118 @@ const onExport = async () => {
   if (!items.value?.length)
     return toast.warning("Tidak ada data untuk diekspor.");
 
+  const columns: any[] = [
+    { header: "Nomor", key: "Nomor", width: 20 },
+    { header: "MO", key: "MO", width: 12 },
+    { header: "CMO", key: "CMO", width: 12 },
+    { header: "Tanggal", key: "Tanggal", width: 14, align: "center" },
+    { header: "Dateline", key: "Dateline", width: 14, align: "center" },
+    { header: "Kepentingan", key: "Kepentingan", width: 14 },
+    { header: "Divisi", key: "Divisi", width: 14 },
+    { header: "Kode Customer", key: "KodeCustomer", width: 14 },
+  ];
+  if (canLihatCus.value) {
+    columns.push({ header: "Customer", key: "Customer", width: 28 });
+  }
+  columns.push(
+    { header: "Nama Pesanan", key: "Nama", width: 35 },
+    { header: "Ukuran", key: "Ukuran", width: 16 },
+    { header: "Cab", key: "Cab", width: 10, align: "center" },
+    { header: "Workshop", key: "Workshop", width: 16 },
+    { header: "Tipe", key: "Tipe", width: 12 },
+    { header: "Kain", key: "Kain", width: 20 },
+    { header: "Finishing", key: "Finishing", width: 20 },
+  );
+  if (canLihatHarga.value) {
+    columns.push({
+      header: "Harga",
+      key: "Harga",
+      width: 14,
+      align: "right",
+      numFmt: "#,##0",
+    });
+  }
+  columns.push(
+    {
+      header: "Pesan",
+      key: "Pesan",
+      width: 12,
+      align: "right",
+      numFmt: "#,##0",
+    },
+    {
+      header: "Kirim",
+      key: "Kirim",
+      width: 12,
+      align: "right",
+      numFmt: "#,##0",
+    },
+    {
+      header: "Kurang",
+      key: "Kurang",
+      width: 12,
+      align: "right",
+      numFmt: "#,##0",
+    },
+    { header: "Sales", key: "Sales", width: 18 },
+    { header: "PO", key: "PO", width: 20 },
+    { header: "Ket PO", key: "KetPO", width: 20 },
+    { header: "Status", key: "Status", width: 10, align: "center" },
+    { header: "MAP", key: "MAP", width: 18 },
+    { header: "No Penawaran", key: "NoPenawaran", width: 18 },
+    { header: "MPPB", key: "MPPB", width: 18 },
+    {
+      header: "Potong",
+      key: "Potong",
+      width: 12,
+      align: "right",
+      numFmt: "#,##0",
+    },
+    {
+      header: "Bordir",
+      key: "Bordir",
+      width: 12,
+      align: "right",
+      numFmt: "#,##0",
+    },
+    {
+      header: "Cetak",
+      key: "Cetak",
+      width: 12,
+      align: "right",
+      numFmt: "#,##0",
+    },
+    {
+      header: "Jahit",
+      key: "Jahit",
+      width: 12,
+      align: "right",
+      numFmt: "#,##0",
+    },
+    {
+      header: "Lipat",
+      key: "Lipat",
+      width: 12,
+      align: "right",
+      numFmt: "#,##0",
+    },
+    { header: "Jadi", key: "Jadi", width: 12, align: "right", numFmt: "#,##0" },
+    {
+      header: "Kurang Jadi",
+      key: "Kurang_Jadi",
+      width: 14,
+      align: "right",
+      numFmt: "#,##0",
+    },
+    { header: "Aktif", key: "Aktif", width: 10, align: "center" },
+    { header: "Keterangan", key: "Keterangan", width: 35 },
+    { header: "Created", key: "Created", width: 18, align: "center" },
+  );
+
   await exportExcelSingle(
     `SPK_${dtAwal.value}_${dtAkhir.value}.xlsx`,
     "SPK",
-    [
-      { header: "Nomor", key: "Nomor", width: 20 },
-      { header: "MO", key: "MO", width: 12 },
-      { header: "CMO", key: "CMO", width: 12 },
-      { header: "Tanggal", key: "Tanggal", width: 14, align: "center" },
-      { header: "Dateline", key: "Dateline", width: 14, align: "center" },
-      { header: "Kepentingan", key: "Kepentingan", width: 14 },
-      { header: "Divisi", key: "Divisi", width: 14 },
-      { header: "Kode Customer", key: "KodeCustomer", width: 14 },
-      { header: "Customer", key: "Customer", width: 28 },
-      { header: "Nama Pesanan", key: "Nama", width: 35 },
-      { header: "Ukuran", key: "Ukuran", width: 16 },
-      { header: "Cab", key: "Cab", width: 10, align: "center" },
-      { header: "Workshop", key: "Workshop", width: 16 },
-      { header: "Tipe", key: "Tipe", width: 12 },
-      { header: "Kain", key: "Kain", width: 20 },
-      { header: "Finishing", key: "Finishing", width: 20 },
-      {
-        header: "Harga",
-        key: "Harga",
-        width: 14,
-        align: "right",
-        numFmt: "#,##0",
-      },
-      {
-        header: "Pesan",
-        key: "Pesan",
-        width: 12,
-        align: "right",
-        numFmt: "#,##0",
-      },
-      {
-        header: "Kirim",
-        key: "Kirim",
-        width: 12,
-        align: "right",
-        numFmt: "#,##0",
-      },
-      {
-        header: "Kurang",
-        key: "Kurang",
-        width: 12,
-        align: "right",
-        numFmt: "#,##0",
-      },
-      { header: "Sales", key: "Sales", width: 18 },
-      { header: "PO", key: "PO", width: 20 },
-      { header: "Ket PO", key: "KetPO", width: 20 },
-      { header: "Status", key: "Status", width: 10, align: "center" },
-      { header: "MAP", key: "MAP", width: 18 },
-      { header: "No Penawaran", key: "NoPenawaran", width: 18 },
-      { header: "MPPB", key: "MPPB", width: 18 },
-      {
-        header: "Potong",
-        key: "Potong",
-        width: 12,
-        align: "right",
-        numFmt: "#,##0",
-      },
-      {
-        header: "Bordir",
-        key: "Bordir",
-        width: 12,
-        align: "right",
-        numFmt: "#,##0",
-      },
-      {
-        header: "Cetak",
-        key: "Cetak",
-        width: 12,
-        align: "right",
-        numFmt: "#,##0",
-      },
-      {
-        header: "Jahit",
-        key: "Jahit",
-        width: 12,
-        align: "right",
-        numFmt: "#,##0",
-      },
-      {
-        header: "Lipat",
-        key: "Lipat",
-        width: 12,
-        align: "right",
-        numFmt: "#,##0",
-      },
-      {
-        header: "Jadi",
-        key: "Jadi",
-        width: 12,
-        align: "right",
-        numFmt: "#,##0",
-      },
-      {
-        header: "Kurang Jadi",
-        key: "Kurang_Jadi",
-        width: 14,
-        align: "right",
-        numFmt: "#,##0",
-      },
-      { header: "Aktif", key: "Aktif", width: 10, align: "center" },
-      { header: "Keterangan", key: "Keterangan", width: 35 },
-      { header: "Created", key: "Created", width: 18, align: "center" },
-    ],
+    columns,
     items.value,
     `SPK Periode ${dtAwal.value} s/d ${dtAkhir.value}`,
   );

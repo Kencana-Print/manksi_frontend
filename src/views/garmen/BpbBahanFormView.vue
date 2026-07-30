@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
+import { useAuthStore } from "@/stores/authStore";
 import { useRoute } from "vue-router";
 import { useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
@@ -24,6 +25,7 @@ import MkbDetailSearchModal from "@/components/lookups/MkbDetailSearchModal.vue"
 
 import BpbBahanBarcodeDialog from "./BpbBahanBarcodeDialog.vue";
 
+const authStore = useAuthStore();
 const router = useRouter();
 const route = useRoute();
 const toast = useToast();
@@ -44,6 +46,17 @@ const formatDateLocal = (value?: string | Date) => {
   return `${year}-${month}-${day}`;
 };
 const todayLocal = formatDateLocal(new Date());
+
+// ⚠️ Panel Supplier disembunyikan (bukan dihapus dari formData) kalau
+// user gak punya izin lihatSup — replikasi `if zLihatSup=0 then
+// panelsup.Visible:=False` di ufrmBPB.FormCreate. Data tetap ngalir
+// utuh (header.bpb_sup_kode dst tetap terisi dari backend saat edit),
+// cuma UI-nya yang disembunyikan — sama pola PO Bahan/PO Garmen.
+// ⚠️ Tidak ada gating lihatBeli di form ini — Delphi asli TIDAK pernah
+// men-toggle visibility clharga berdasarkan flag apapun, dan kolom
+// Harga juga memang tidak pernah dirender di tabel manapun di form
+// Vue ini, jadi otomatis aman tanpa perlu tindakan tambahan.
+const canSeeSup = computed(() => authStore.user?.flags.lihatSup === 1);
 
 // ── Modal state ──
 const showSupModal = ref(false);
@@ -646,49 +659,51 @@ const printBarcodeAll = () => {
         <div class="sep" />
 
         <!-- Supplier -->
-        <div class="fr">
-          <label class="lbl">Supplier</label>
-          <div class="igrp" style="width: 75px">
+        <template v-if="canSeeSup">
+          <div class="fr">
+            <label class="lbl">Supplier</label>
+            <div class="igrp" style="width: 75px">
+              <input
+                v-model="formData.header.bpb_sup_kode"
+                class="inp"
+                style="flex: 1; background: #ddeeff"
+                readonly
+              />
+              <button
+                type="button"
+                class="blkp"
+                @click="showSupModal = true"
+                :disabled="isPo"
+              >
+                <IconSearch :size="13" />
+              </button>
+            </div>
             <input
-              v-model="formData.header.bpb_sup_kode"
-              class="inp"
-              style="flex: 1; background: #ddeeff"
+              :value="formData.header.sup_nama"
               readonly
+              class="inp ro ml-1"
+              style="flex: 1"
             />
-            <button
-              type="button"
-              class="blkp"
-              @click="showSupModal = true"
-              :disabled="isPo"
-            >
-              <IconSearch :size="13" />
-            </button>
           </div>
-          <input
-            :value="formData.header.sup_nama"
-            readonly
-            class="inp ro ml-1"
-            style="flex: 1"
-          />
-        </div>
-        <div class="fr">
-          <label class="lbl"></label>
-          <input
-            :value="formData.header.sup_alamat"
-            readonly
-            class="inp ro"
-            style="flex: 1"
-          />
-        </div>
-        <div class="fr">
-          <label class="lbl"></label>
-          <input
-            :value="formData.header.sup_kota"
-            readonly
-            class="inp ro"
-            style="flex: 1"
-          />
-        </div>
+          <div class="fr">
+            <label class="lbl"></label>
+            <input
+              :value="formData.header.sup_alamat"
+              readonly
+              class="inp ro"
+              style="flex: 1"
+            />
+          </div>
+          <div class="fr">
+            <label class="lbl"></label>
+            <input
+              :value="formData.header.sup_kota"
+              readonly
+              class="inp ro"
+              style="flex: 1"
+            />
+          </div>
+        </template>
 
         <div class="sep" />
 

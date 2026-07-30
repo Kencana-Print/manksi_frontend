@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from "vue";
+import { useAuthStore } from "@/stores/authStore";
 import { useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
 import BaseBrowse from "@/components/BaseBrowse.vue";
@@ -17,6 +18,7 @@ import {
 } from "@tabler/icons-vue";
 import { formatTanggal, formatTanggalJam } from "@/utils/dateFormat";
 
+const authStore = useAuthStore();
 const router = useRouter();
 const toast = useToast();
 
@@ -50,6 +52,12 @@ const filterState = ref({
   dtAkhir: today,
   search: "",
 });
+
+// ⚠️ KodeSupplier/Supplier digated flag lihatSup, Harga/Disc (detail)
+// digated flag lihatBeli — replikasi `if zLihatSup<>0` / `if
+// zLihatBeli=1` di ufrmBrowsePO.
+const canLihatSup = computed(() => authStore.user?.flags.lihatSup === 1);
+const canLihatBeli = computed(() => authStore.user?.flags.lihatBeli === 1);
 
 // --- STATE DIALOG ---
 const closeDialog = ref(false);
@@ -87,7 +95,7 @@ const {
 });
 
 // --- HEADERS UTAMA ---
-const headers = [
+const baseHeaders = [
   { title: "Nomor PO", key: "Nomor", width: "140px", fixed: true },
   { title: "Jenis PO", key: "JenisPO", width: "100px" },
   { title: "PO Greige", key: "PoGreige", width: "130px" },
@@ -98,8 +106,12 @@ const headers = [
   { title: "Qty BPB", key: "QtyBPB", width: "100px", align: "right" },
   { title: "Qty Retur", key: "QtyRetur", width: "100px", align: "right" },
   { title: "Keterangan", key: "Keterangan", width: "250px" },
+];
+const supHeaders = [
   { title: "Kode Supplier", key: "KodeSupplier", width: "120px" },
   { title: "Supplier", key: "Supplier", width: "200px" },
+];
+const tailHeaders = [
   { title: "Note", key: "Note", width: "200px" },
   { title: "Status", key: "Status", width: "100px", align: "center" },
   { title: "Alasan Close", key: "AlasanClose", width: "200px" },
@@ -108,6 +120,12 @@ const headers = [
   { title: "User Create", key: "usr", width: "100px" },
   { title: "Created", key: "Created", width: "140px", align: "center" },
 ];
+
+const headers = computed(() => [
+  ...baseHeaders,
+  ...(canLihatSup.value ? supHeaders : []),
+  ...tailHeaders,
+]);
 
 // --- EXPAND LOGIC (DETAIL PO) ---
 const expandedRows = ref<any[]>([]);
@@ -397,8 +415,8 @@ const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
                 <th width="100" class="tr">Qty PO</th>
                 <th width="100" class="tr">Qty BPB</th>
                 <th width="100" class="tr">Qty Retur</th>
-                <th width="100" class="tr">Harga</th>
-                <th width="80" class="tr">Disc</th>
+                <th v-if="canLihatBeli" width="100" class="tr">Harga</th>
+                <th v-if="canLihatBeli" width="80" class="tr">Disc</th>
                 <th width="80" class="text-center">Status</th>
                 <th width="120">No. MKB</th>
                 <th width="120">No. SPK</th>
@@ -415,8 +433,8 @@ const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
                 </td>
                 <td class="tr">{{ numFmt(d.QtyBpb) }}</td>
                 <td class="tr text-error">{{ numFmt(d.QtyRetur) }}</td>
-                <td class="tr">{{ numFmt(d.Harga) }}</td>
-                <td class="tr">{{ numFmt(d.Disc) }}</td>
+                <td v-if="canLihatBeli" class="tr">{{ numFmt(d.Harga) }}</td>
+                <td v-if="canLihatBeli" class="tr">{{ numFmt(d.Disc) }}</td>
                 <td class="text-center">
                   <v-chip
                     size="x-small"
@@ -441,7 +459,7 @@ const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
                   detailCache[item.Nomor].length === 0
                 "
               >
-                <td colspan="9" class="text-center text-grey py-3 font-italic">
+                <td colspan="11" class="text-center text-grey py-3 font-italic">
                   Detail PO tidak ditemukan.
                 </td>
               </tr>

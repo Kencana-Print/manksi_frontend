@@ -49,6 +49,13 @@ const filterState = ref({
 // ── LOGIKA HAK AKSES FILTER (MIGRASI DELPHI FormCreate) ──
 const userBagian = computed(() => authStore.user?.bagian?.toUpperCase() || "");
 const userCabang = computed(() => authStore.userCabang || "");
+// ⚠️ Kolom KdSup/Supplier (master) & Harga/Total (detail) digated
+// flag lihatSup/lihatBeli — backend sudah nge-null-kan datanya
+// (kirim "" / 0), tapi frontend juga perlu nyembunyiin KOLOMNYA biar
+// konsisten sama modul lain, dan supaya gak ada kolom geser (lihat
+// catatan bug header th di bawah).
+const canLihatSup = computed(() => authStore.user?.flags.lihatSup === 1);
+const canLihatBeli = computed(() => authStore.user?.flags.lihatBeli === 1);
 
 const isAllCabangAllowed = computed(() => {
   return ["FINANCE", "AUDIT", "EDP", "DIREKSI", "ADMIN"].includes(
@@ -109,13 +116,17 @@ watch(
 );
 
 // ── Header Master ──
-const headers = [
+const baseHeaders = [
   { title: "Nomor", key: "Nomor", width: "160px", fixed: true },
   { title: "Jenis", key: "Jenis", width: "100px" },
   { title: "Tanggal", key: "Tanggal", width: "90px", align: "center" },
   { title: "No. Minta", key: "NoMinta", width: "140px" },
+];
+const supHeaders = [
   { title: "Kd Sup", key: "KdSup", width: "90px" },
   { title: "Supplier", key: "Supplier", minWidth: "180px" },
+];
+const tailHeaders = [
   { title: "Keterangan", key: "Keterangan", minWidth: "200px" },
   { title: "Status", key: "Status", width: "90px", align: "center" },
   { title: "Cab", key: "Cab", width: "60px", align: "center" },
@@ -123,6 +134,12 @@ const headers = [
   { title: "Usr", key: "Usr", width: "80px" },
   { title: "Modified", key: "Modified", width: "80px" },
 ];
+
+const headers = computed(() => [
+  ...baseHeaders,
+  ...(canLihatSup.value ? supHeaders : []),
+  ...tailHeaders,
+]);
 
 const rawDetails = ref<any[]>([]);
 
@@ -539,14 +556,14 @@ const rowPropsFn = (data: any) => {
                     <th style="width: 80px" class="text-right">Jumlah</th>
                     <th style="width: 80px" class="text-right">Qty BPB</th>
                     <th
-                      v-if="item.Harga !== 0"
+                      v-if="canLihatBeli"
                       style="width: 100px"
                       class="text-right"
                     >
                       Harga
                     </th>
                     <th
-                      v-if="item.Total !== 0"
+                      v-if="canLihatBeli"
                       style="width: 110px"
                       class="text-right"
                     >
@@ -581,11 +598,11 @@ const rowPropsFn = (data: any) => {
                     <td class="text-right font-weight-bold text-success">
                       {{ formatQty(dtl.QtyBpb) }}
                     </td>
-                    <td v-if="dtl.Harga > 0" class="text-right">
+                    <td v-if="canLihatBeli" class="text-right">
                       {{ formatQty(dtl.Harga) }}
                     </td>
                     <td
-                      v-if="dtl.Total > 0"
+                      v-if="canLihatBeli"
                       class="text-right font-weight-bold text-error"
                     >
                       {{ formatQty(dtl.Total) }}

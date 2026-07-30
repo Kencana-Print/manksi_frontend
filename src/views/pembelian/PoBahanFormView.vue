@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick } from "vue";
+import { useAuthStore } from "@/stores/authStore";
 import { useRoute } from "vue-router";
 import { useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
@@ -20,9 +21,23 @@ import BahanSearchModal from "@/components/lookups/BahanSearchModal.vue";
 import SpkSearchModal from "@/components/lookups/SpkSearchModal.vue";
 import MkbSearchModal from "@/components/lookups/MkbSearchModal.vue";
 
+const authStore = useAuthStore();
 const route = useRoute();
 const router = useRouter();
 const toast = useToast();
+
+// ⚠️ Panel Supplier & kolom Harga/Disc/Total disembunyikan (BUKAN
+// dihapus dari formData) kalau user gak punya izin lihatSup/lihatBeli
+// — replikasi `if zLihatSup=0/zLihatBeli=0` di ufrmPO.FormCreate.
+// Data harga/diskon TETAP ada di formData.items (auto-fill dari
+// master bahan tetap jalan, sama seperti Delphi CDS yang tetap
+// ke-set walau kolom invisible) — supaya submit/simpan gak
+// kehilangan data. Backend getDetail/validateField SENGAJA tidak
+// digating (beda dari modul browse-only lain) karena field ini
+// dipakai form yang bisa SAVE — nge-null-kan di response berisiko
+// timpa nilai asli jadi 0 pas user edit & simpan ulang.
+const canLihatSup = computed(() => authStore.user?.flags.lihatSup === 1);
+const canLihatBeli = computed(() => authStore.user?.flags.lihatBeli === 1);
 
 const isEditMode = computed(() => !!route.params.nomor);
 const formatDateLocal = (value?: string | Date) => {
@@ -220,6 +235,15 @@ const ppnValue = computed(() =>
 );
 const grandTotal = computed(() => subTotal.value + ppnValue.value);
 const fmt = (n: number) => n.toLocaleString("id-ID");
+// Hitung colspan dinamis buat baris "Tidak ada data" — base fixed
+// columns + kolom kondisional (Gramasi Awal, Roll, Harga/Disc/Total)
+const colSpanCount = computed(() => {
+  let n = 12; // No, Kode, Nama Bahan, Nama External, Sat, Gramasi, Setting, Jenis, Jumlah, SPK, MKB, Aksi
+  if (!isBahan.value) n += 1; // Gramasi Awal
+  if (isCelup.value) n += 1; // Roll
+  if (canLihatBeli.value) n += 3; // Harga Beli, Disc, Total
+  return n;
+});
 
 // ── Header lookups ──
 const setSup = (v: any) => {
@@ -742,7 +766,7 @@ const validateSave = () => {
 
         <div class="sep mt-1 mb-1" />
 
-        <div class="fr">
+        <div v-if="canLihatSup" class="fr">
           <label class="lbl">Supplier</label>
           <div class="igrp" style="width: 110px">
             <input
@@ -763,7 +787,7 @@ const validateSave = () => {
             </button>
           </div>
         </div>
-        <div class="fr">
+        <div v-if="canLihatSup" class="fr">
           <label class="lbl"></label
           ><input
             :value="formData.header.sup_nama"
@@ -771,7 +795,7 @@ const validateSave = () => {
             class="inp ro flex-grow-1"
           />
         </div>
-        <div class="fr">
+        <div v-if="canLihatSup" class="fr">
           <label class="lbl"></label
           ><input
             :value="formData.header.sup_alamat"
@@ -779,7 +803,7 @@ const validateSave = () => {
             class="inp ro flex-grow-1"
           />
         </div>
-        <div class="fr">
+        <div v-if="canLihatSup" class="fr">
           <label class="lbl"></label
           ><input
             :value="formData.header.sup_kota"
@@ -877,9 +901,23 @@ const validateSave = () => {
                 <th style="width: 80px">Jenis Bahan</th>
                 <th style="width: 50px" class="tr" v-if="isCelup">Roll</th>
                 <th style="width: 75px" class="tr bg-yellow">Jumlah</th>
-                <th style="width: 80px" class="tr bg-yellow">Harga Beli</th>
-                <th style="width: 50px" class="tr bg-yellow">Disc(%)</th>
-                <th style="width: 100px" class="tr bg-blue">Total</th>
+                <th
+                  v-if="canLihatBeli"
+                  style="width: 80px"
+                  class="tr bg-yellow"
+                >
+                  Harga Beli
+                </th>
+                <th
+                  v-if="canLihatBeli"
+                  style="width: 50px"
+                  class="tr bg-yellow"
+                >
+                  Disc(%)
+                </th>
+                <th v-if="canLihatBeli" style="width: 100px" class="tr bg-blue">
+                  Total
+                </th>
                 <th style="width: 90px">SPK</th>
                 <th style="width: 90px">MKB</th>
                 <th style="width: 35px" class="tc">Aksi</th>
@@ -941,7 +979,7 @@ const validateSave = () => {
                     v-select-on-focus
                   />
                 </td>
-                <td class="p0">
+                <td v-if="canLihatBeli" class="p0">
                   <input
                     v-model.number="row.harga"
                     type="number"
@@ -950,7 +988,7 @@ const validateSave = () => {
                     v-select-on-focus
                   />
                 </td>
-                <td class="p0">
+                <td v-if="canLihatBeli" class="p0">
                   <input
                     v-model.number="row.diskon"
                     type="number"
@@ -959,7 +997,7 @@ const validateSave = () => {
                     v-select-on-focus
                   />
                 </td>
-                <td class="p0">
+                <td v-if="canLihatBeli" class="p0">
                   <input
                     :value="fmt(Number(row.total))"
                     readonly
@@ -1002,10 +1040,7 @@ const validateSave = () => {
                 </td>
               </tr>
               <tr v-if="formData.items.length === 0">
-                <td
-                  :colspan="isCelup ? 18 : isBahan ? 16 : 17"
-                  class="empty-row"
-                >
+                <td :colspan="colSpanCount" class="empty-row">
                   Tidak ada data. Klik "Tambah Baris" untuk memasukkan bahan.
                 </td>
               </tr>
@@ -1145,7 +1180,7 @@ const validateSave = () => {
                 style="flex: 1"
               ></textarea>
             </div>
-            <div class="totals-box mt-1">
+            <div v-if="canLihatBeli" class="totals-box mt-1">
               <div class="total-row">
                 <span>Sub Total</span>
                 <input

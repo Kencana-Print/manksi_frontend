@@ -119,6 +119,7 @@ export const useAuthStore = defineStore(
     // Getters Khusus Flags Manksi
     const canLihatHarga = computed(() => user.value?.flags.lihatHarga === 1);
     const canLihatBeli = computed(() => user.value?.flags.lihatBeli === 1);
+    const canLihatCus = computed(() => user.value?.flags.lihatCus === 1);
     const isManager = computed(() => user.value?.flags.isManager === 1);
     const isCmo = computed(() => user.value?.flags.cmo === 1);
     const canSeeApproval = computed(() =>
@@ -212,6 +213,7 @@ export const useAuthStore = defineStore(
       isTokenExpired,
       canLihatHarga,
       canLihatBeli,
+      canLihatCus,
       isManager,
       isCmo,
       canSeeApproval,

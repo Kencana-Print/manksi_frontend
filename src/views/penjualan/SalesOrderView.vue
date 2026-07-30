@@ -36,6 +36,9 @@ const isTimDesain = computed(
   () => authStore.user?.bagian?.toUpperCase() === "DESAIN",
 );
 
+const canLihatCus = computed(() => authStore.user?.flags.lihatCus === 1);
+const canLihatHarga = computed(() => authStore.canLihatHarga);
+
 // --- FILTERS ---
 const listWorkshop = ref<string[]>([]);
 const showCusModal = ref(false);
@@ -144,7 +147,7 @@ const {
 });
 
 // --- HEADERS ---
-const headers = [
+const baseHeadersFront = [
   { title: "Nomor", key: "Nomor", width: "135px", fixed: true },
   { title: "SPK PPIC", key: "SpkPpic", width: "155px" },
   { title: "Tgl SPK PPIC", key: "TglSpkPpic", width: "110px", align: "center" },
@@ -155,7 +158,9 @@ const headers = [
   { title: "Kepentingan", key: "Kepentingan", width: "100px" },
   { title: "Divisi", key: "Divisi", width: "100px" },
   { title: "Kode Customer", key: "KodeCustomer", width: "100px" },
-  { title: "Customer", key: "Customer", width: "200px" },
+];
+const custHeadersMid = [{ title: "Customer", key: "Customer", width: "200px" }];
+const middleHeaders = [
   { title: "Nama Pesanan", key: "Nama", width: "250px" },
   { title: "Ukuran", key: "Ukuran", width: "100px" },
   { title: "Cab", key: "Cab", width: "60px", align: "center" },
@@ -168,11 +173,19 @@ const headers = [
   { title: "Gramasi", key: "Gramasi", width: "80px" },
   { title: "Kain", key: "Kain", width: "150px" },
   { title: "Finishing", key: "Finishing", width: "150px" },
+];
+const hargaHeader = [
   { title: "Harga", key: "Harga", width: "100px", align: "right" },
+];
+const afterHargaHeaders = [
   { title: "Pesan", key: "Pesan", width: "80px", align: "right" },
   { title: "Sales", key: "Sales", width: "120px" },
   { title: "Created", key: "Created", width: "140px", align: "center" },
+];
+const custHeadersGroup = [
   { title: "Group Customer", key: "GroupCustomer", width: "150px" },
+];
+const tailHeadersFront = [
   { title: "PO", key: "PO", width: "120px" },
   { title: "Ket PO", key: "KetPO", width: "150px" },
   { title: "Date PO", key: "DatePO", width: "100px", align: "center" },
@@ -201,6 +214,16 @@ const headers = [
   { title: "Keterangan", key: "Keterangan", width: "250px" },
   { title: "Pesanan/Invoice", key: "Pesanan/Invoice", width: "150px" },
 ];
+
+const headers = computed(() => [
+  ...baseHeadersFront,
+  ...(canLihatCus.value ? custHeadersMid : []),
+  ...middleHeaders,
+  ...(canLihatHarga.value ? hargaHeader : []),
+  ...afterHargaHeaders,
+  ...(canLihatCus.value ? custHeadersGroup : []),
+  ...tailHeadersFront,
+]);
 
 // --- EXPAND LOGIC (Breakdown Size) ---
 const expandedRows = ref<any[]>([]);

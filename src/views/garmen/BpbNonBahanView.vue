@@ -15,7 +15,7 @@ const toast = useToast();
 const authStore = useAuthStore();
 
 // ── Hak Akses Ekstra ──
-const canSeeSup = computed(() => !!authStore.user?.flags?.lihatSup);
+const canSeeSup = computed(() => Number(authStore.user?.flags?.lihatSup) === 1);
 
 // ── Penanganan Tanggal Lokal (Anti Mundur) ──
 const today = new Date();

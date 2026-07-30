@@ -6,7 +6,7 @@ import { useAuthStore } from "@/stores/authStore";
 import BaseBrowse from "@/components/BaseBrowse.vue";
 import { useBrowse } from "@/composables/useBrowse";
 import { suratJalanService as svc } from "@/services/penjualan/suratJalanService";
-import { exportExcelSingle } from "@/utils/excelExport";
+import { exportExcelSingle, type ExcelColumn } from "@/utils/excelExport";
 import {
   IconTruck,
   IconPrinter,
@@ -74,19 +74,30 @@ const onExpandChange = async (newExpanded: any[]) => {
 };
 
 // ── Headers ────────────────────────────────────────────────
-const headers = [
-  { title: "Nomor", key: "Nomor", width: "140px" },
-  { title: "Tanggal", key: "Tanggal", width: "90px" },
-  { title: "Divisi", key: "Divisi", width: "80px" },
-  { title: "Invoice", key: "Invoice", width: "140px" },
-  { title: "Customer", key: "Customer", minWidth: "180px" },
-  { title: "Kota", key: "Kota", width: "120px" },
-  { title: "Keterangan", key: "Keterangan", minWidth: "140px" },
-  { title: "Gudang", key: "Gudang", minWidth: "140px" },
-  { title: "Qty Kirim", key: "QtyKirim", width: "90px", align: "end" },
-  { title: "Approved", key: "Approved", width: "80px", align: "center" },
-  { title: "Created", key: "Created", width: "140px" },
-];
+const canLihatCus = computed(() => Number(auth.user?.flags?.lihatCus) === 1);
+
+const headers = computed(() => {
+  const h: any[] = [
+    { title: "Nomor", key: "Nomor", width: "140px" },
+    { title: "Tanggal", key: "Tanggal", width: "90px" },
+    { title: "Divisi", key: "Divisi", width: "80px" },
+    { title: "Invoice", key: "Invoice", width: "140px" },
+  ];
+  if (canLihatCus.value) {
+    h.push(
+      { title: "Customer", key: "Customer", minWidth: "180px" },
+      { title: "Kota", key: "Kota", width: "120px" },
+    );
+  }
+  h.push(
+    { title: "Keterangan", key: "Keterangan", minWidth: "140px" },
+    { title: "Gudang", key: "Gudang", minWidth: "140px" },
+    { title: "Qty Kirim", key: "QtyKirim", width: "90px", align: "end" },
+    { title: "Approved", key: "Approved", width: "80px", align: "center" },
+    { title: "Created", key: "Created", width: "140px" },
+  );
+  return h;
+});
 
 const detailHeaders = [
   { title: "SPK", key: "SPK", width: "130px" },
@@ -278,24 +289,29 @@ const onExport = async () => {
   try {
     const res = await svc.getExportData(tglAwal.value, tglAkhir.value);
     const data = res.data.data ?? [];
+    const cols: ExcelColumn[] = [
+      { header: "Nomor", key: "Nomor" },
+      { header: "Tanggal", key: "Tanggal" },
+      { header: "Divisi", key: "Divisi" },
+      { header: "Invoice", key: "Invoice" },
+      ...(canLihatCus.value
+        ? [
+            { header: "KdCus", key: "KdCus" },
+            { header: "Customer", key: "Customer" },
+            { header: "Alamat", key: "Alamat" },
+            { header: "Kota", key: "Kota" },
+          ]
+        : []),
+      { header: "Keterangan", key: "Keterangan" },
+      { header: "Gudang", key: "Gudang" },
+      { header: "Qty Kirim", key: "QtyKirim", align: "right" },
+      { header: "Approved", key: "Approved" },
+      { header: "Created", key: "Created" },
+    ];
     await exportExcelSingle(
       `Surat_Jalan_${tglAwal.value}_${tglAkhir.value}`,
       "Surat Jalan",
-      [
-        { header: "Nomor", key: "Nomor" },
-        { header: "Tanggal", key: "Tanggal" },
-        { header: "Divisi", key: "Divisi" },
-        { header: "Invoice", key: "Invoice" },
-        { header: "KdCus", key: "KdCus" },
-        { header: "Customer", key: "Customer" },
-        { header: "Alamat", key: "Alamat" },
-        { header: "Kota", key: "Kota" },
-        { header: "Keterangan", key: "Keterangan" },
-        { header: "Gudang", key: "Gudang" },
-        { header: "Qty Kirim", key: "QtyKirim", align: "right" },
-        { header: "Approved", key: "Approved" },
-        { header: "Created", key: "Created" },
-      ],
+      cols,
       data,
     );
   } catch {
