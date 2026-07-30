@@ -40,16 +40,14 @@ const totalAch = computed(() =>
   totalTarget.value > 0 ? (totalRealisasi.value / totalTarget.value) * 100 : 0,
 );
 
-const chartLabels = computed(() => detailRows.value.map((r) => r.SalNama));
+const chartLabels = computed(() => props.items.map((r) => r.SalNama));
 const chartTarget = computed(() =>
-  detailRows.value.map((r) => Number(r.Target) || 0),
+  props.items.map((r) => Number(r.Target) || 0),
 );
 const chartRealisasi = computed(() =>
-  detailRows.value.map((r) => Number(r.Realisasi) || 0),
+  props.items.map((r) => Number(r.Realisasi) || 0),
 );
-const chartAch = computed(() =>
-  detailRows.value.map((r) => Number(r.Ach) || 0),
-);
+const chartAch = computed(() => props.items.map((r) => Number(r.Ach) || 0));
 </script>
 
 <template>
@@ -103,6 +101,7 @@ const chartAch = computed(() =>
 .tab-chart {
   flex: 1;
   min-width: 320px;
+  overflow-y: auto;
 }
 .sum-lbl {
   font-size: 11px;

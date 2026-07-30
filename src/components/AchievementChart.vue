@@ -102,6 +102,6 @@ onBeforeUnmount(() => {
 .chart-wrap {
   position: relative;
   width: 100%;
-  height: 380px;
+  height: 640px;
 }
 </style>
