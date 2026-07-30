@@ -657,10 +657,10 @@ const onExport = async () => {
   display: flex;
   gap: 12px;
   align-items: flex-start;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
 }
 .detail-col {
-  flex: 1 1 420px;
+  flex: 0 0 auto;
   min-width: 0;
 }
 .detail-header {
@@ -698,5 +698,12 @@ const onExport = async () => {
   color: #9e9e9e;
   padding: 12px;
   font-style: italic;
+}
+
+:deep(.expanded-wrapper) {
+  display: block !important;
+  max-width: 100% !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
 }
 </style>

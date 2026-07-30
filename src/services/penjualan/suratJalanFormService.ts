@@ -24,6 +24,23 @@ export const sjFormService = {
       existingSpkNomors,
     }),
 
+  getSpkDetailFromJadwal: (
+    spkNomor: string,
+    divisi: string,
+    excludeNomor = "",
+    noKirim = "",
+    idKirim = 0,
+    uraian = "",
+  ) =>
+    api.post(`${BASE}/spk-detail-jadwal`, {
+      spkNomor,
+      divisi,
+      excludeNomor,
+      noKirim,
+      idKirim,
+      uraian,
+    }),
+
   getSpkList: (
     cusKode: string,
     perushKode: string,

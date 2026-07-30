@@ -646,21 +646,17 @@ const selectJadwal = async (item: any) => {
 };
 
 const loadSpkDetailWithJadwal = async (item: any) => {
-  const res = await svc.getSpkDetail(
+  const res = await svc.getSpkDetailFromJadwal(
     item.SPK,
-    fd.value.KodeCus,
     divisiStr.value,
     (route.query.nomor as string) || "",
+    item.NoKirim || "",
+    item.NoUrut || 0,
+    item.Uraian || "",
   );
   const rows: any[] = res.data.data || [];
   for (const r of rows) {
-    fd.value.Detail.push({
-      ...r,
-      _key: _key++,
-      NoKirim: item.NoKirim || "",
-      IdKirim: item.NoUrut || 0,
-      Uraian: item.Uraian || "",
-    });
+    fd.value.Detail.push({ ...r, _key: _key++ });
   }
 };
 
