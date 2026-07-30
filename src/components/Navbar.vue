@@ -1237,10 +1237,28 @@ const menuItems: NavItem[] = [
             menuId: 302,
           },
           {
+            title: "Realisasi Pengiriman Memo",
+            to: "/laporan/marketing/realisasi-kirim-memo",
+            icon: IconTruckDelivery,
+            menuId: 303,
+          },
+          {
+            title: "Proyeksi Bulanan",
+            to: "/laporan/marketing/proyeksi-bulanan",
+            icon: IconChartLine,
+            menuId: 1294,
+          },
+          {
             title: "Kunjungan Sales",
             to: "/laporan/marketing/kunjungan-sales",
             icon: IconTruckDelivery,
             menuId: 313,
+          },
+          {
+            title: "Target vs Achievement",
+            to: "/laporan/marketing/target-vs-achievement",
+            icon: IconChartBar,
+            menuId: 314,
           },
         ],
       },

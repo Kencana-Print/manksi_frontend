@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, watch, onMounted } from "vue";
+import { ref, watch, onMounted, computed } from "vue";
+import { useAuthStore } from "@/stores/authStore";
 import { useBrowse } from "@/composables/useBrowse";
 import BaseBrowse from "@/components/BaseBrowse.vue";
 import { exportExcelSingle, type ExcelColumn } from "@/utils/excelExport";
@@ -7,6 +8,8 @@ import { useToast } from "vue-toastification";
 import { penawaranVsSpkService } from "@/services/laporan/penjualan/penawaranVsSpkService";
 import api from "@/services/api";
 import { IconReportAnalytics } from "@tabler/icons-vue";
+
+const authStore = useAuthStore();
 
 const today = new Date();
 const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1)
@@ -63,14 +66,25 @@ watch(
   fetchData,
 );
 
-const masterHeaders = [
-  { title: "Nomor", key: "Nomor", width: "140px", fixed: true },
-  { title: "Tanggal", key: "Tanggal", width: "100px", align: "center" },
-  { title: "Divisi", key: "Divisi", width: "120px" },
-  { title: "Nama Customer", key: "NamaCustomer", minWidth: "200px" },
-  { title: "Keterangan", key: "Keterangan", minWidth: "200px" },
-  { title: "Total SPK", key: "TotalSPK", width: "90px", align: "center" },
-];
+const canLihatCus = computed(
+  () => Number(authStore.user?.flags?.lihatCus) === 1,
+);
+
+const masterHeaders = computed(() => {
+  const h: any[] = [
+    { title: "Nomor", key: "Nomor", width: "140px", fixed: true },
+    { title: "Tanggal", key: "Tanggal", width: "100px", align: "center" },
+    { title: "Divisi", key: "Divisi", width: "120px" },
+  ];
+  if (canLihatCus.value) {
+    h.push({ title: "Nama Customer", key: "NamaCustomer", minWidth: "200px" });
+  }
+  h.push(
+    { title: "Keterangan", key: "Keterangan", minWidth: "200px" },
+    { title: "Total SPK", key: "TotalSPK", width: "90px", align: "center" },
+  );
+  return h;
+});
 
 const expandedRows = ref<string[]>([]);
 const detailData = ref<Record<string, any[]>>({});
@@ -102,7 +116,9 @@ const onExport = async () => {
       { header: "Nomor", key: "Nomor", width: 22 },
       { header: "Tanggal", key: "Tanggal", width: 14, align: "center" },
       { header: "Divisi", key: "Divisi", width: 16 },
-      { header: "Customer", key: "NamaCustomer", width: 30 },
+      ...(canLihatCus.value
+        ? [{ header: "Customer", key: "NamaCustomer", width: 30 }]
+        : []),
       { header: "Keterangan", key: "Keterangan", width: 30 },
       {
         header: "Total SPK",
@@ -117,7 +133,7 @@ const onExport = async () => {
       Nomor: it.Nomor,
       Tanggal: formatTgl(it.Tanggal),
       Divisi: it.Divisi,
-      NamaCustomer: it.NamaCustomer,
+      ...(canLihatCus.value ? { NamaCustomer: it.NamaCustomer } : {}),
       Keterangan: it.Keterangan,
       TotalSPK: Number(it.TotalSPK) || 0,
     }));
@@ -174,7 +190,7 @@ const onExportDetail = async () => {
         NomorPenawaran: first.NomorPenawaran,
         TglPenawaran: formatTgl(first.TglPenawaran),
         Divisi: first.Divisi,
-        NamaCustomer: first.NamaCustomer,
+        ...(canLihatCus.value ? { NamaCustomer: first.NamaCustomer } : {}),
         Keterangan: first.Keterangan,
       };
       const blankMaster = Object.fromEntries(
@@ -201,7 +217,9 @@ const onExportDetail = async () => {
         align: "center",
       },
       { header: "Divisi", key: "Divisi", width: 16 },
-      { header: "Customer", key: "NamaCustomer", width: 30 },
+      ...(canLihatCus.value
+        ? [{ header: "Customer", key: "NamaCustomer", width: 30 }]
+        : []),
       { header: "Keterangan", key: "Keterangan", width: 30 },
       { header: "No. SPK", key: "NomorSPK", width: 20 },
       { header: "Tgl SPK", key: "TglSPK", width: 14, align: "center" },

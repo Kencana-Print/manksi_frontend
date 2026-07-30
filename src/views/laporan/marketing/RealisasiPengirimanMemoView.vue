@@ -5,7 +5,7 @@ import { useToast } from "vue-toastification";
 import BaseBrowse from "@/components/BaseBrowse.vue";
 import { useBrowse } from "@/composables/useBrowse";
 import api from "@/services/api";
-import { realisasiPengirimanSpkService } from "@/services/laporan/marketing/realisasiPengirimanSpkService";
+import { realisasiPengirimanMemoService } from "@/services/laporan/marketing/realisasiPengirimanMemoService";
 import { exportExcelSingle, type ExcelColumn } from "@/utils/excelExport";
 import { formatTanggal } from "@/utils/dateFormat";
 import {
@@ -14,7 +14,7 @@ import {
   IconFileSpreadsheet,
 } from "@tabler/icons-vue";
 
-const MENU_ID = "302";
+const MENU_ID = "303";
 const authStore = useAuthStore();
 const toast = useToast();
 
@@ -30,7 +30,7 @@ const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
 const filterState = ref({
   dtAwal: toLocalDateStr(firstDayOfMonth),
   dtAkhir: toLocalDateStr(today),
-  divisi: "0",
+  divisi: "4", // default 4 - GARMEN, sesuai Delphi cbdivisi.ItemIndex:=3
 });
 
 // ── Dropdown divisi (0 - ALL + daftar dari /lookups/divisi) ──
@@ -58,12 +58,14 @@ loadDivisi();
 // kalau user punya izin ini. Backend JUGA menegakkan ini (kolom
 // dikirim NULL kalau tidak diizinkan) — frontend cuma menyesuaikan
 // header, bukan satu-satunya penjaga akses.
+// Catatan: zLihatHarga/zLihatBeli/zLihatSup TIDAK dicek di source
+// Delphi modul ini — kolom Harga & Nominal selalu tampil.
 const canLihatCus = computed(() => authStore.canLihatCus);
 
 const { items, isLoading, canExport, fetchData } = useBrowse({
   menuId: MENU_ID,
   fetchApi: async () => {
-    const res = await realisasiPengirimanSpkService.getBrowse(
+    const res = await realisasiPengirimanMemoService.getBrowse(
       filterState.value.dtAwal,
       filterState.value.dtAkhir,
       filterState.value.divisi,
@@ -84,18 +86,18 @@ watch(
 const rows = computed(() => items.value ?? []);
 
 const baseHeaders = [
-  { title: "Tanggal", key: "spkTanggal", width: "95px", align: "center" },
+  { title: "Tanggal", key: "Tanggal", width: "95px", align: "center" },
   { title: "Divisi", key: "Divisi", width: "90px" },
-  { title: "SPK Nomor", key: "SpkNomor", width: "140px" },
+  { title: "Nomor", key: "Nomor", width: "140px" },
   { title: "Nama", key: "Nama", minWidth: "220px" },
   { title: "Jml Order", key: "JmlOrder", width: "90px", align: "end" },
   { title: "Harga", key: "Harga", width: "110px", align: "end" },
-  { title: "Nilai", key: "Nilai", width: "130px", align: "end" },
+  { title: "Nominal", key: "Nominal", width: "130px", align: "end" },
   { title: "Dateline", key: "Dateline", width: "95px", align: "center" },
 ];
 const custHeaders = [
-  { title: "Cus Nama", key: "CusNama", minWidth: "200px" },
-  { title: "Cus Alamat", key: "CusAlamat", minWidth: "220px" },
+  { title: "Customer", key: "Customer", minWidth: "200px" },
+  { title: "Alamat", key: "Alamat", minWidth: "220px" },
 ];
 const sjHeaders = [
   { title: "SJ Nomor Awal", key: "SjNomorAwal", width: "130px" },
@@ -114,6 +116,7 @@ const sjHeaders = [
     width: "110px",
     align: "end",
   },
+  { title: "Berita Acara", key: "BeritaAcara", width: "100px" },
   { title: "Tipe", key: "Tipe", width: "80px" },
   { title: "Reason", key: "Reason", minWidth: "140px" },
 ];
@@ -132,7 +135,18 @@ const fmtTgl = (v: any) => (v ? formatTanggal(v) : "");
 const lambatFmt = (v: any) =>
   v === "" || v === null || v === undefined ? "-" : v;
 
+// ── Row styling — merah untuk MAP Pasif (Aktif='N'), sesuai
+// cxGrdMasterStylesGetContentStyle di Delphi ──
+const rowPropsFn = (data: any) => {
+  const item = data.item?.raw || data.item;
+  if (item?.Aktif === "N") return { style: "color:#c62828" };
+  return {};
+};
+
 // ── Dialog Reason ──
+// ⚠️ Daftar opsi ini BELUM terverifikasi ke .dfm Delphi (item combo
+// cbreason disetel di file .dfm, tidak terlihat di .pas). Sesuaikan
+// kalau ada daftar yang benar.
 const showReasonDialog = ref(false);
 const reasonTarget = ref<any>(null);
 const reasonValue = ref("");
@@ -155,8 +169,8 @@ const saveReason = async () => {
   if (!reasonTarget.value) return;
   isSavingReason.value = true;
   try {
-    await realisasiPengirimanSpkService.updateReason(
-      reasonTarget.value.SpkNomor,
+    await realisasiPengirimanMemoService.updateReason(
+      reasonTarget.value.Nomor,
       reasonValue.value,
     );
     reasonTarget.value.Reason = reasonValue.value;
@@ -178,9 +192,9 @@ const onExport = async () => {
   isExporting.value = true;
   try {
     const columns: ExcelColumn[] = [
-      { header: "Tanggal", key: "spkTanggal", width: 12, align: "center" },
+      { header: "Tanggal", key: "Tanggal", width: 12, align: "center" },
       { header: "Divisi", key: "Divisi", width: 12 },
-      { header: "SPK Nomor", key: "SpkNomor", width: 18 },
+      { header: "Nomor", key: "Nomor", width: 18 },
       { header: "Nama", key: "Nama", width: 30 },
       {
         header: "Jml Order",
@@ -197,8 +211,8 @@ const onExport = async () => {
         numFmt: "#,##0.00",
       },
       {
-        header: "Nilai",
-        key: "Nilai",
+        header: "Nominal",
+        key: "Nominal",
         width: 16,
         align: "right",
         numFmt: "#,##0.00",
@@ -206,8 +220,8 @@ const onExport = async () => {
       { header: "Dateline", key: "Dateline", width: 12, align: "center" },
       ...(canLihatCus.value
         ? [
-            { header: "Cus Nama", key: "CusNama", width: 26 },
-            { header: "Cus Alamat", key: "CusAlamat", width: 30 },
+            { header: "Customer", key: "Customer", width: 26 },
+            { header: "Alamat", key: "Alamat", width: 30 },
           ]
         : []),
       { header: "SJ Nomor Awal", key: "SjNomorAwal", width: 18 },
@@ -226,24 +240,25 @@ const onExport = async () => {
         width: 10,
         align: "right",
       },
+      { header: "Berita Acara", key: "BeritaAcara", width: 12 },
       { header: "Tipe", key: "Tipe", width: 10 },
       { header: "Reason", key: "Reason", width: 18 },
     ];
     await exportExcelSingle(
-      `Realisasi_Kirim_SPK_${filterState.value.dtAwal}_${filterState.value.dtAkhir}.xlsx`,
-      "Realisasi Kirim SPK",
+      `Realisasi_Kirim_Memo_${filterState.value.dtAwal}_${filterState.value.dtAkhir}.xlsx`,
+      "Realisasi Kirim Memo",
       columns,
       dataRows.map((r) => ({
-        spkTanggal: fmtTgl(r.spkTanggal),
+        Tanggal: fmtTgl(r.Tanggal),
         Divisi: r.Divisi ?? "",
-        SpkNomor: r.SpkNomor ?? "",
+        Nomor: r.Nomor ?? "",
         Nama: r.Nama ?? "",
         JmlOrder: r.JmlOrder ?? 0,
         Harga: r.Harga ?? 0,
-        Nilai: r.Nilai ?? 0,
+        Nominal: r.Nominal ?? 0,
         Dateline: fmtTgl(r.Dateline),
         ...(canLihatCus.value
-          ? { CusNama: r.CusNama ?? "", CusAlamat: r.CusAlamat ?? "" }
+          ? { Customer: r.Customer ?? "", Alamat: r.Alamat ?? "" }
           : {}),
         SjNomorAwal: r.SjNomorAwal ?? "",
         SjTglAwal: fmtTgl(r.SjTglAwal),
@@ -251,10 +266,11 @@ const onExport = async () => {
         SjTglAkhir: fmtTgl(r.SjTglAkhir),
         LambatKirimAwal: r.LambatKirimAwal ?? "",
         LambatKirimAkhir: r.LambatKirimAkhir ?? "",
+        BeritaAcara: r.BeritaAcara ?? "",
         Tipe: r.Tipe ?? "",
         Reason: r.Reason ?? "",
       })),
-      `Laporan Realisasi Pengiriman SPK — ${filterState.value.dtAwal} s.d ${filterState.value.dtAkhir}`,
+      `Laporan Realisasi Pengiriman Memo — ${filterState.value.dtAwal} s.d ${filterState.value.dtAkhir}`,
     );
   } catch {
     toast.error("Gagal export.");
@@ -266,15 +282,16 @@ const onExport = async () => {
 
 <template>
   <BaseBrowse
-    title="Laporan Realisasi Pengiriman SPK"
+    title="Laporan Realisasi Pengiriman Memo"
     :menu-id="MENU_ID"
     :icon="IconTruckDelivery"
     :headers="headers"
     :items="rows"
     :is-loading="isLoading"
     :can-export="false"
-    item-value="SpkNomor"
-    search-placeholder="Cari nomor SPK / nama..."
+    item-value="Nomor"
+    search-placeholder="Cari nomor MAP / nama..."
+    :row-props-fn="rowPropsFn"
     @refresh="fetchData"
   >
     <template #filter-left>
@@ -293,6 +310,11 @@ const onExport = async () => {
           </option>
         </select>
       </div>
+      <div class="f-divider" />
+      <div class="legend-item">
+        <span class="legend-dot"></span>
+        <span class="legend-lbl">= PASIF</span>
+      </div>
     </template>
 
     <template #extra-actions>
@@ -307,12 +329,10 @@ const onExport = async () => {
       </v-btn>
     </template>
 
-    <template #item.spkTanggal="{ item }">{{
-      fmtTgl(item.spkTanggal)
-    }}</template>
+    <template #item.Tanggal="{ item }">{{ fmtTgl(item.Tanggal) }}</template>
     <template #item.JmlOrder="{ item }">{{ numFmt(item.JmlOrder) }}</template>
     <template #item.Harga="{ item }">{{ numFmt(item.Harga) }}</template>
-    <template #item.Nilai="{ item }">{{ numFmt(item.Nilai) }}</template>
+    <template #item.Nominal="{ item }">{{ numFmt(item.Nominal) }}</template>
     <template #item.Dateline="{ item }">{{ fmtTgl(item.Dateline) }}</template>
     <template #item.SjTglAwal="{ item }">{{ fmtTgl(item.SjTglAwal) }}</template>
     <template #item.SjTglAkhir="{ item }">{{
@@ -351,7 +371,7 @@ const onExport = async () => {
       </v-card-title>
       <v-card-text class="pa-4">
         <div style="font-size: 11px; color: #777; margin-bottom: 8px">
-          SPK: <b>{{ reasonTarget?.SpkNomor }}</b>
+          MAP: <b>{{ reasonTarget?.Nomor }}</b>
         </div>
         <select
           v-model="reasonValue"
@@ -414,6 +434,22 @@ const onExport = async () => {
   height: 20px;
   background: #ddd;
   margin: 0 8px;
+}
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+}
+.legend-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  background: #c62828;
+  display: inline-block;
+}
+.legend-lbl {
+  color: #555;
 }
 .txt-telat {
   color: #c62828;

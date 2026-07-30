@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, computed } from "vue";
+import { useAuthStore } from "@/stores/authStore";
 import { useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
 import BaseBrowse from "@/components/BaseBrowse.vue";
@@ -9,6 +10,7 @@ import UpdateSjMapFormDialog from "@/components/dialogs/UpdateSjMapFormDialog.vu
 import { IconTruckDelivery, IconEdit } from "@tabler/icons-vue";
 import { formatTanggal } from "@/utils/dateFormat";
 
+const authStore = useAuthStore();
 const router = useRouter();
 const toast = useToast();
 
@@ -42,27 +44,40 @@ const {
   },
 });
 
-const headers = [
-  { title: "Nomor", key: "Nomor", width: "160px" },
-  { title: "Tanggal", key: "Tanggal", width: "100px" },
-  { title: "Status", key: "Status", width: "150px" },
-  { title: "Customer", key: "Customer", width: "220px" },
-  { title: "Alamat", key: "Alamat", width: "250px" },
-  { title: "Kota", key: "Kota", width: "120px" },
-  { title: "Divisi", key: "Divisi", width: "100px" },
-  { title: "Ekspedisi", key: "Expedisi", width: "120px" },
-  { title: "Kurir", key: "Kurir", width: "120px" },
-  { title: "No. Resi", key: "Nomor_resi", width: "150px" },
-  { title: "Biaya Kirim", key: "Biaya_Kirim", width: "110px", align: "end" },
-  { title: "Tgl Kirim", key: "Tanggal_kirim", width: "100px" },
-  { title: "Tgl Kembali", key: "Tanggal_kembali", width: "100px" },
-  { title: "Penerima Barang", key: "Penerima_barang", width: "150px" },
-  { title: "Tgl Terima SJ", key: "Tanggal_terima_sj", width: "110px" },
-  { title: "Contact Person", key: "Contact_person", width: "150px" },
-  { title: "Tgl Konf.", key: "Tanggal_konfirmasi", width: "100px" },
-  { title: "Tgl Terima", key: "Tanggal_terima", width: "100px" },
-  { title: "Tgl Serah Terima", key: "Tanggal_serahterima", width: "130px" },
-];
+const canLihatCus = computed(
+  () => Number(authStore.user?.flags?.lihatCus) === 1,
+);
+
+const headers = computed(() => {
+  const h: any[] = [
+    { title: "Nomor", key: "Nomor", width: "160px" },
+    { title: "Tanggal", key: "Tanggal", width: "100px" },
+    { title: "Status", key: "Status", width: "150px" },
+  ];
+  if (canLihatCus.value) {
+    h.push(
+      { title: "Customer", key: "Customer", width: "220px" },
+      { title: "Alamat", key: "Alamat", width: "250px" },
+      { title: "Kota", key: "Kota", width: "120px" },
+    );
+  }
+  h.push(
+    { title: "Divisi", key: "Divisi", width: "100px" },
+    { title: "Ekspedisi", key: "Expedisi", width: "120px" },
+    { title: "Kurir", key: "Kurir", width: "120px" },
+    { title: "No. Resi", key: "Nomor_resi", width: "150px" },
+    { title: "Biaya Kirim", key: "Biaya_Kirim", width: "110px", align: "end" },
+    { title: "Tgl Kirim", key: "Tanggal_kirim", width: "100px" },
+    { title: "Tgl Kembali", key: "Tanggal_kembali", width: "100px" },
+    { title: "Penerima Barang", key: "Penerima_barang", width: "150px" },
+    { title: "Tgl Terima SJ", key: "Tanggal_terima_sj", width: "110px" },
+    { title: "Contact Person", key: "Contact_person", width: "150px" },
+    { title: "Tgl Konf.", key: "Tanggal_konfirmasi", width: "100px" },
+    { title: "Tgl Terima", key: "Tanggal_terima", width: "100px" },
+    { title: "Tgl Serah Terima", key: "Tanggal_serahterima", width: "130px" },
+  );
+  return h;
+});
 
 // Helper untuk format Rupiah
 const formatRupiah = (val: number) =>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref, computed } from "vue";
+import { useAuthStore } from "@/stores/authStore";
 import { useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
 import BaseBrowse from "@/components/BaseBrowse.vue";
@@ -16,6 +17,7 @@ import {
 } from "@tabler/icons-vue";
 import { formatTanggal, formatTanggalJam } from "@/utils/dateFormat";
 
+const authStore = useAuthStore();
 const router = useRouter();
 const toast = useToast();
 
@@ -63,15 +65,26 @@ const {
   },
 });
 
-const headers = [
-  { title: "Nomor", key: "Nomor", width: "160px" },
-  { title: "Tanggal", key: "Tanggal", width: "110px" },
-  { title: "Divisi", key: "Divisi", width: "100px" },
-  { title: "Customer", key: "Customer", width: "200px" },
-  { title: "Keterangan", key: "Keterangan" },
-  { title: "Qty Kirim", key: "QtyKirim", align: "end", width: "100px" },
-  { title: "Created", key: "Created", width: "150px" },
-];
+const canLihatCus = computed(
+  () => Number(authStore.user?.flags?.lihatCus) === 1,
+);
+
+const headers = computed(() => {
+  const h: any[] = [
+    { title: "Nomor", key: "Nomor", width: "160px" },
+    { title: "Tanggal", key: "Tanggal", width: "110px" },
+    { title: "Divisi", key: "Divisi", width: "100px" },
+  ];
+  if (canLihatCus.value) {
+    h.push({ title: "Customer", key: "Customer", width: "200px" });
+  }
+  h.push(
+    { title: "Keterangan", key: "Keterangan" },
+    { title: "Qty Kirim", key: "QtyKirim", align: "end", width: "100px" },
+    { title: "Created", key: "Created", width: "150px" },
+  );
+  return h;
+});
 
 const onAdd = () => router.push("/penjualan/sj-map/create");
 const onEdit = (row: any) => {
@@ -104,14 +117,13 @@ const actExportDetail = () => {
   const exportData: any[] = [];
 
   (items.value ?? []).forEach((h) => {
-    // Jika ada detail (children), buat baris untuk setiap detail
     if (h.children && h.children.length > 0) {
       h.children.forEach((d: any) => {
         exportData.push({
           "No Surat Jalan": h.Nomor,
           Tanggal: h.Tanggal?.substring(0, 10),
           Divisi: h.Divisi,
-          Customer: h.Customer,
+          ...(canLihatCus.value ? { Customer: h.Customer } : {}),
           "Keterangan SJ": h.Keterangan,
           "Nomor Memo": d["Nomor Memo"],
           "Nama Barang": d.Nama,
@@ -121,12 +133,11 @@ const actExportDetail = () => {
         });
       });
     } else {
-      // Jika header tidak punya detail (kasus jarang)
       exportData.push({
         "No Surat Jalan": h.Nomor,
         Tanggal: h.Tanggal?.substring(0, 10),
         Divisi: h.Divisi,
-        Customer: h.Customer,
+        ...(canLihatCus.value ? { Customer: h.Customer } : {}),
         "Keterangan SJ": h.Keterangan,
         "Nomor Memo": "-",
         "Nama Barang": "-",
@@ -134,63 +145,6 @@ const actExportDetail = () => {
       });
     }
   });
-
-  const actPengajuan = async () => {
-    if (selected.value.length === 0)
-      return toast.warning("Pilih data terlebih dahulu.");
-    const row = selected.value[0];
-
-    isPinLoading.value = true;
-    try {
-      // Cek urutan pengajuan terakhir di backend
-      const res = await sjMapService.getPin5Status(row.Nomor);
-      const status = res.data.data;
-
-      pinData.value.nomor = row.Nomor;
-      pinData.value.tanggal = row.Tanggal;
-      pinData.value.customer = row.Customer;
-
-      if (!status) {
-        pinData.value.urut = 1;
-        pinData.value.alasan = "";
-      } else {
-        // Jika sudah pernah diajukan tapi belum dipakai (masih WAIT/ACC/TOLAK)
-        if (!status.pin_dipakai) {
-          pinData.value.urut = status.pin_urut;
-          pinData.value.alasan = status.pin_alasan;
-        } else {
-          // Jika sudah pernah diajukan dan sudah dipakai, tambah urutan baru
-          pinData.value.urut = status.pin_urut + 1;
-          pinData.value.alasan = "";
-        }
-      }
-      showPinModal.value = true;
-    } catch (e: any) {
-      toast.error("Gagal mengecek status pengajuan.");
-    } finally {
-      isPinLoading.value = false;
-    }
-  };
-
-  const submitPengajuan = async () => {
-    if (!pinData.value.alasan.trim())
-      return toast.warning("Alasan harus diisi.");
-
-    isPinLoading.value = true;
-    try {
-      await sjMapService.ajukanPerubahan(pinData.value);
-      toast.success("Berhasil diajukan. Silakan tunggu ACC.");
-      showPinModal.value = false;
-      fetchData(); // Refresh grid agar warna berubah jadi Biru (WAIT)
-    } catch (e: any) {
-      toast.error(
-        "Gagal melakukan pengajuan: " +
-          (e.response?.data?.message || e.message),
-      );
-    } finally {
-      isPinLoading.value = false;
-    }
-  };
 
   const ws = XLSX.utils.json_to_sheet(exportData);
   const wb = XLSX.utils.book_new();
@@ -439,7 +393,9 @@ const getNomorClass = (ngedit: string) => {
         <div class="text-caption mb-1">
           Nomor SJ: <b>{{ pinData.nomor }}</b>
         </div>
-        <div class="text-caption mb-3">Customer: {{ pinData.customer }}</div>
+        <div v-if="canLihatCus" class="text-caption mb-3">
+          Customer: {{ pinData.customer }}
+        </div>
 
         <v-textarea
           v-model="pinData.alasan"

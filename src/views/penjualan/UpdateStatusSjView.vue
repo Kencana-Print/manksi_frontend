@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from "vue";
+import { useAuthStore } from "@/stores/authStore";
 import { useToast } from "vue-toastification";
 import BaseBrowse from "@/components/BaseBrowse.vue";
 import { useBrowse } from "@/composables/useBrowse";
 import { updateStatusSjService as svc } from "@/services/penjualan/updateStatusSjService";
-import { exportExcelSingle } from "@/utils/excelExport";
+import { exportExcelSingle, type ExcelColumn } from "@/utils/excelExport";
 import {
   IconTruckDelivery,
   IconFileExport,
@@ -13,6 +14,7 @@ import {
 } from "@tabler/icons-vue";
 import { formatTanggal } from "@/utils/dateFormat";
 
+const authStore = useAuthStore();
 const toast = useToast();
 
 // ── Helpers ────────────────────────────────────────────────
@@ -74,30 +76,43 @@ const onExpandChange = async (newExpanded: any[]) => {
 };
 
 // ── Headers ────────────────────────────────────────────────
-const headers = [
-  { title: "Nomor", key: "Nomor", width: "140px" },
-  { title: "Tanggal", key: "Tanggal", width: "90px" },
-  { title: "Divisi", key: "Divisi", width: "80px" },
-  { title: "Kd Customer", key: "KodeCustomer", width: "90px" },
-  { title: "Customer", key: "Customer", minWidth: "180px" },
-  { title: "Alamat", key: "Alamat", minWidth: "220px" },
-  { title: "Kota", key: "Kota", width: "120px" },
-  { title: "Status", key: "Status", width: "150px" },
-  { title: "Expedisi", key: "Expedisi", width: "110px" },
-  { title: "Kurir", key: "Kurir", width: "100px" },
-  { title: "No. Resi", key: "Nomor_Resi", width: "120px" },
-  { title: "Tgl Kirim", key: "Tanggal_Kirim", width: "95px" },
-  { title: "Biaya Kirim", key: "Biaya_Kirim", width: "100px", align: "end" },
-  { title: "Total Qty", key: "Total_Qty", width: "90px", align: "end" },
-  { title: "Harga/Qty", key: "Harga", width: "90px", align: "end" },
-  { title: "Tgl Terima", key: "Tanggal_Terima", width: "95px" },
-  { title: "Penerima Barang", key: "Penerima_Barang", width: "140px" },
-  { title: "Tgl Terima SJ", key: "Tanggal_Terima_Sj", width: "95px" },
-  { title: "Contact Person", key: "Contact_Person", width: "140px" },
-  { title: "Tgl Konfirmasi", key: "Tanggal_Konfirmasi", width: "95px" },
-  { title: "Tgl Terima 1", key: "Tanggal_Terima_1", width: "95px" },
-  { title: "Tgl Serah Terima", key: "Tanggal_SerahTerima", width: "95px" },
-];
+const canLihatCus = computed(
+  () => Number(authStore.user?.flags?.lihatCus) === 1,
+);
+
+const headers = computed(() => {
+  const h: any[] = [
+    { title: "Nomor", key: "Nomor", width: "140px" },
+    { title: "Tanggal", key: "Tanggal", width: "90px" },
+    { title: "Divisi", key: "Divisi", width: "80px" },
+  ];
+  if (canLihatCus.value) {
+    h.push(
+      { title: "Kd Customer", key: "KodeCustomer", width: "90px" },
+      { title: "Customer", key: "Customer", minWidth: "180px" },
+      { title: "Alamat", key: "Alamat", minWidth: "220px" },
+      { title: "Kota", key: "Kota", width: "120px" },
+    );
+  }
+  h.push(
+    { title: "Status", key: "Status", width: "150px" },
+    { title: "Expedisi", key: "Expedisi", width: "110px" },
+    { title: "Kurir", key: "Kurir", width: "100px" },
+    { title: "No. Resi", key: "Nomor_Resi", width: "120px" },
+    { title: "Tgl Kirim", key: "Tanggal_Kirim", width: "95px" },
+    { title: "Biaya Kirim", key: "Biaya_Kirim", width: "100px", align: "end" },
+    { title: "Total Qty", key: "Total_Qty", width: "90px", align: "end" },
+    { title: "Harga/Qty", key: "Harga", width: "90px", align: "end" },
+    { title: "Tgl Terima", key: "Tanggal_Terima", width: "95px" },
+    { title: "Penerima Barang", key: "Penerima_Barang", width: "140px" },
+    { title: "Tgl Terima SJ", key: "Tanggal_Terima_Sj", width: "95px" },
+    { title: "Contact Person", key: "Contact_Person", width: "140px" },
+    { title: "Tgl Konfirmasi", key: "Tanggal_Konfirmasi", width: "95px" },
+    { title: "Tgl Terima 1", key: "Tanggal_Terima_1", width: "95px" },
+    { title: "Tgl Serah Terima", key: "Tanggal_SerahTerima", width: "95px" },
+  );
+  return h;
+});
 
 const detailHeaders = [
   { title: "SPK", key: "SpkNomor", width: "130px" },
@@ -129,33 +144,38 @@ const onExport = async () => {
   try {
     const res = await svc.getExportData(tglAwal.value, tglAkhir.value);
     const data = res.data.data ?? [];
+    const cols: ExcelColumn[] = [
+      { header: "Nomor", key: "Nomor" },
+      { header: "Tanggal", key: "Tanggal" },
+      { header: "Divisi", key: "Divisi" },
+      ...(canLihatCus.value
+        ? [
+            { header: "Kd Customer", key: "KodeCustomer" },
+            { header: "Customer", key: "Customer" },
+            { header: "Alamat", key: "Alamat" },
+            { header: "Kota", key: "Kota" },
+          ]
+        : []),
+      { header: "Status", key: "Status" },
+      { header: "Expedisi", key: "Expedisi" },
+      { header: "Kurir", key: "Kurir" },
+      { header: "No. Resi", key: "Nomor_Resi" },
+      { header: "Tgl Kirim", key: "Tanggal_Kirim" },
+      { header: "Biaya Kirim", key: "Biaya_Kirim", align: "right" },
+      { header: "Total Qty", key: "Total_Qty", align: "right" },
+      { header: "Harga/Qty", key: "Harga", align: "right" },
+      { header: "Tgl Terima", key: "Tanggal_Terima" },
+      { header: "Penerima Barang", key: "Penerima_Barang" },
+      { header: "Tgl Terima SJ", key: "Tanggal_Terima_Sj" },
+      { header: "Contact Person", key: "Contact_Person" },
+      { header: "Tgl Konfirmasi", key: "Tanggal_Konfirmasi" },
+      { header: "Tgl Terima 1", key: "Tanggal_Terima_1" },
+      { header: "Tgl Serah Terima", key: "Tanggal_SerahTerima" },
+    ];
     await exportExcelSingle(
       `Update_Status_SJ_${tglAwal.value}_${tglAkhir.value}`,
       "Status SJ",
-      [
-        { header: "Nomor", key: "Nomor" },
-        { header: "Tanggal", key: "Tanggal" },
-        { header: "Divisi", key: "Divisi" },
-        { header: "Kd Customer", key: "KodeCustomer" },
-        { header: "Customer", key: "Customer" },
-        { header: "Alamat", key: "Alamat" },
-        { header: "Kota", key: "Kota" },
-        { header: "Status", key: "Status" },
-        { header: "Expedisi", key: "Expedisi" },
-        { header: "Kurir", key: "Kurir" },
-        { header: "No. Resi", key: "Nomor_Resi" },
-        { header: "Tgl Kirim", key: "Tanggal_Kirim" },
-        { header: "Biaya Kirim", key: "Biaya_Kirim", align: "right" },
-        { header: "Total Qty", key: "Total_Qty", align: "right" },
-        { header: "Harga/Qty", key: "Harga", align: "right" },
-        { header: "Tgl Terima", key: "Tanggal_Terima" },
-        { header: "Penerima Barang", key: "Penerima_Barang" },
-        { header: "Tgl Terima SJ", key: "Tanggal_Terima_Sj" },
-        { header: "Contact Person", key: "Contact_Person" },
-        { header: "Tgl Konfirmasi", key: "Tanggal_Konfirmasi" },
-        { header: "Tgl Terima 1", key: "Tanggal_Terima_1" },
-        { header: "Tgl Serah Terima", key: "Tanggal_SerahTerima" },
-      ],
+      cols,
       data,
     );
   } catch {
@@ -597,7 +617,7 @@ const saveFormStatus = async () => {
                     style="width: 50px"
                   />
                   <input
-                    :value="formHeader.cus_nama"
+                    :value="canLihatCus ? formHeader.cus_nama : ''"
                     readonly
                     class="inp ro"
                     style="flex: 1"
@@ -608,7 +628,9 @@ const saveFormStatus = async () => {
                 <label class="flbl w90">Alamat</label>
                 <input
                   :value="
-                    formHeader.sj_alamat_customer || formHeader.cus_alamat
+                    canLihatCus
+                      ? formHeader.sj_alamat_customer || formHeader.cus_alamat
+                      : ''
                   "
                   readonly
                   class="inp ro"
@@ -618,7 +640,11 @@ const saveFormStatus = async () => {
               <div class="fg mt4">
                 <label class="flbl w90">Kota</label>
                 <input
-                  :value="formHeader.sj_kota_customer || formHeader.cus_kota"
+                  :value="
+                    canLihatCus
+                      ? formHeader.sj_kota_customer || formHeader.cus_kota
+                      : ''
+                  "
                   readonly
                   class="inp ro"
                   style="flex: 1"

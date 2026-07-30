@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from "vue";
+import { useAuthStore } from "@/stores/authStore";
 import { useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
 import BaseBrowse from "@/components/BaseBrowse.vue";
 import { useBrowse } from "@/composables/useBrowse";
 import { invoiceTakNormalService as svc } from "@/services/penjualan/invoiceTakNormalService";
-import { exportExcelSingle } from "@/utils/excelExport";
+import { exportExcelSingle, type ExcelColumn } from "@/utils/excelExport";
 import {
   IconReceipt2,
   IconPrinter,
@@ -15,6 +16,7 @@ import {
 } from "@tabler/icons-vue";
 import { formatTanggal, formatTanggalJam } from "@/utils/dateFormat";
 
+const authStore = useAuthStore();
 const router = useRouter();
 const toast = useToast();
 
@@ -95,25 +97,36 @@ const onExpandChange = async (newExpanded: any[]) => {
 };
 
 // ── Headers ────────────────────────────────────────────────
-const headers = [
-  { title: "Nomor", key: "Nomor", width: "150px" },
-  { title: "Tanggal", key: "Tanggal", width: "90px" },
-  { title: "Divisi", key: "Divisi", width: "90px" },
-  { title: "Customer", key: "NamaCustomer", minWidth: "180px" },
-  { title: "Keterangan", key: "Keterangan", minWidth: "220px" },
-  { title: "Status", key: "Status", width: "100px" },
-  { title: "Otomatis", key: "Otomatis", width: "90px" },
-  { title: "Total", key: "Total", width: "120px", align: "end" },
-  { title: "Faktur Pajak", key: "Faktur_Pajak", width: "150px" },
-  { title: "Status Exp.", key: "Stat_Exp", width: "110px" },
-  { title: "Bayar", key: "Bayar", width: "110px", align: "end" },
-  { title: "Tgl Pelunasan", key: "Tanggal_Pelunasan", width: "100px" },
-  { title: "Tgl Bayar", key: "Tanggal_Bayar", width: "100px" },
-  { title: "ACC Edit", key: "ACC_Edit", width: "100px" },
-  { title: "Alasan", key: "Alasan", minWidth: "180px" },
-  { title: "User", key: "Usr", width: "90px" },
-  { title: "Created", key: "Created", width: "140px" },
-];
+const canLihatCus = computed(
+  () => Number(authStore.user?.flags?.lihatCus) === 1,
+);
+
+const headers = computed(() => {
+  const h: any[] = [
+    { title: "Nomor", key: "Nomor", width: "150px" },
+    { title: "Tanggal", key: "Tanggal", width: "90px" },
+    { title: "Divisi", key: "Divisi", width: "90px" },
+  ];
+  if (canLihatCus.value) {
+    h.push({ title: "Customer", key: "NamaCustomer", minWidth: "180px" });
+  }
+  h.push(
+    { title: "Keterangan", key: "Keterangan", minWidth: "220px" },
+    { title: "Status", key: "Status", width: "100px" },
+    { title: "Otomatis", key: "Otomatis", width: "90px" },
+    { title: "Total", key: "Total", width: "120px", align: "end" },
+    { title: "Faktur Pajak", key: "Faktur_Pajak", width: "150px" },
+    { title: "Status Exp.", key: "Stat_Exp", width: "110px" },
+    { title: "Bayar", key: "Bayar", width: "110px", align: "end" },
+    { title: "Tgl Pelunasan", key: "Tanggal_Pelunasan", width: "100px" },
+    { title: "Tgl Bayar", key: "Tanggal_Bayar", width: "100px" },
+    { title: "ACC Edit", key: "ACC_Edit", width: "100px" },
+    { title: "Alasan", key: "Alasan", minWidth: "180px" },
+    { title: "User", key: "Usr", width: "90px" },
+    { title: "Created", key: "Created", width: "140px" },
+  );
+  return h;
+});
 
 // ── Row color — merah utk Nomor kalau ACC_Edit WAIT/REJECTED (via chip,
 // tidak perlu rowPropsFn khusus seperti Invoice biasa krn tidak ada
@@ -254,28 +267,31 @@ const onExport = async () => {
   try {
     const res = await svc.getExportData(tglAwal.value, tglAkhir.value);
     const data = res.data.data ?? [];
+    const cols: ExcelColumn[] = [
+      { header: "Nomor", key: "Nomor" },
+      { header: "Tanggal", key: "Tanggal" },
+      { header: "Divisi", key: "Divisi" },
+      ...(canLihatCus.value
+        ? [{ header: "Customer", key: "NamaCustomer" }]
+        : []),
+      { header: "Keterangan", key: "Keterangan" },
+      { header: "Status", key: "Status" },
+      { header: "Otomatis", key: "Otomatis" },
+      { header: "Total", key: "Total", align: "right" },
+      { header: "Faktur Pajak", key: "Faktur_Pajak" },
+      { header: "Status Export", key: "Stat_Exp" },
+      { header: "Bayar", key: "Bayar", align: "right" },
+      { header: "Tgl Pelunasan", key: "Tanggal_Pelunasan" },
+      { header: "Tgl Bayar", key: "Tanggal_Bayar" },
+      { header: "ACC Edit", key: "ACC_Edit" },
+      { header: "Alasan", key: "Alasan" },
+      { header: "User", key: "Usr" },
+      { header: "Created", key: "Created" },
+    ];
     await exportExcelSingle(
       `Invoice_Tak_Normal_${tglAwal.value}_${tglAkhir.value}`,
       "Invoice Tak Normal",
-      [
-        { header: "Nomor", key: "Nomor" },
-        { header: "Tanggal", key: "Tanggal" },
-        { header: "Divisi", key: "Divisi" },
-        { header: "Customer", key: "NamaCustomer" },
-        { header: "Keterangan", key: "Keterangan" },
-        { header: "Status", key: "Status" },
-        { header: "Otomatis", key: "Otomatis" },
-        { header: "Total", key: "Total", align: "right" },
-        { header: "Faktur Pajak", key: "Faktur_Pajak" },
-        { header: "Status Export", key: "Stat_Exp" },
-        { header: "Bayar", key: "Bayar", align: "right" },
-        { header: "Tgl Pelunasan", key: "Tanggal_Pelunasan" },
-        { header: "Tgl Bayar", key: "Tanggal_Bayar" },
-        { header: "ACC Edit", key: "ACC_Edit" },
-        { header: "Alasan", key: "Alasan" },
-        { header: "User", key: "Usr" },
-        { header: "Created", key: "Created" },
-      ],
+      cols,
       data,
     );
   } catch {

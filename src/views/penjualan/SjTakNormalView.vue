@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from "vue";
+import { useAuthStore } from "@/stores/authStore";
 import { useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
 import BaseBrowse from "@/components/BaseBrowse.vue";
 import { useBrowse } from "@/composables/useBrowse";
 import { sjTakNormalService as svc } from "@/services/penjualan/sjTakNormalService";
-import { exportExcelSingle } from "@/utils/excelExport";
+import { exportExcelSingle, type ExcelColumn } from "@/utils/excelExport";
 import {
   IconTruckOff,
   IconPrinter,
@@ -14,6 +15,7 @@ import {
 } from "@tabler/icons-vue";
 import { formatTanggal, formatTanggalJam } from "@/utils/dateFormat";
 
+const authStore = useAuthStore();
 const router = useRouter();
 const toast = useToast();
 
@@ -80,19 +82,32 @@ const onExpandChange = async (newExpanded: any[]) => {
 };
 
 // ── Headers ────────────────────────────────────────────────
-const headers = [
-  { title: "Nomor", key: "Nomor", width: "150px" },
-  { title: "Tanggal", key: "Tanggal", width: "90px" },
-  { title: "Divisi", key: "Divisi", width: "90px" },
-  { title: "Kode Cus", key: "KdCus", width: "90px" },
-  { title: "Customer", key: "Customer", minWidth: "180px" },
-  { title: "Alamat", key: "Alamat", minWidth: "200px" },
-  { title: "Kota", key: "Kota", width: "120px" },
-  { title: "Keterangan", key: "Keterangan", minWidth: "140px" },
-  { title: "Gudang", key: "Gudang", minWidth: "140px" },
-  { title: "Qty Kirim", key: "QtyKirim", width: "90px", align: "end" },
-  { title: "Created", key: "Created", width: "140px" },
-];
+const canLihatCus = computed(
+  () => Number(authStore.user?.flags?.lihatCus) === 1,
+);
+
+const headers = computed(() => {
+  const h: any[] = [
+    { title: "Nomor", key: "Nomor", width: "150px" },
+    { title: "Tanggal", key: "Tanggal", width: "90px" },
+    { title: "Divisi", key: "Divisi", width: "90px" },
+  ];
+  if (canLihatCus.value) {
+    h.push(
+      { title: "Kode Cus", key: "KdCus", width: "90px" },
+      { title: "Customer", key: "Customer", minWidth: "180px" },
+      { title: "Alamat", key: "Alamat", minWidth: "200px" },
+      { title: "Kota", key: "Kota", width: "120px" },
+    );
+  }
+  h.push(
+    { title: "Keterangan", key: "Keterangan", minWidth: "140px" },
+    { title: "Gudang", key: "Gudang", minWidth: "140px" },
+    { title: "Qty Kirim", key: "QtyKirim", width: "90px", align: "end" },
+    { title: "Created", key: "Created", width: "140px" },
+  );
+  return h;
+});
 
 // ── Auto refresh ───────────────────────────────────────────
 watch([tglAwal, tglAkhir], fetchData);
@@ -178,22 +193,27 @@ const onExport = async () => {
   try {
     const res = await svc.getExportData(tglAwal.value, tglAkhir.value);
     const data = res.data.data ?? [];
+    const cols: ExcelColumn[] = [
+      { header: "Nomor", key: "Nomor" },
+      { header: "Tanggal", key: "Tanggal" },
+      { header: "Divisi", key: "Divisi" },
+      ...(canLihatCus.value
+        ? [
+            { header: "Kode Cus", key: "KdCus" },
+            { header: "Customer", key: "Customer" },
+            { header: "Alamat", key: "Alamat" },
+            { header: "Kota", key: "Kota" },
+          ]
+        : []),
+      { header: "Keterangan", key: "Keterangan" },
+      { header: "Gudang", key: "Gudang" },
+      { header: "Qty Kirim", key: "QtyKirim", align: "right" },
+      { header: "Created", key: "Created" },
+    ];
     await exportExcelSingle(
       `SJ_Tak_Normal_${tglAwal.value}_${tglAkhir.value}`,
       "SJ Tak Normal",
-      [
-        { header: "Nomor", key: "Nomor" },
-        { header: "Tanggal", key: "Tanggal" },
-        { header: "Divisi", key: "Divisi" },
-        { header: "Kode Cus", key: "KdCus" },
-        { header: "Customer", key: "Customer" },
-        { header: "Alamat", key: "Alamat" },
-        { header: "Kota", key: "Kota" },
-        { header: "Keterangan", key: "Keterangan" },
-        { header: "Gudang", key: "Gudang" },
-        { header: "Qty Kirim", key: "QtyKirim", align: "right" },
-        { header: "Created", key: "Created" },
-      ],
+      cols,
       data,
     );
   } catch {

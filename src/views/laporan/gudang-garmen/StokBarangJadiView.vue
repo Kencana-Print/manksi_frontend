@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, watch, onMounted } from "vue";
+import { ref, watch, onMounted, computed } from "vue";
+import { useAuthStore } from "@/stores/authStore";
 import { useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
 import BaseBrowse from "@/components/BaseBrowse.vue";
@@ -15,6 +16,7 @@ import {
 import { exportExcelSingle, type ExcelColumn } from "@/utils/excelExport";
 import { formatTanggal } from "@/utils/dateFormat";
 
+const authStore = useAuthStore();
 const router = useRouter();
 const toast = useToast();
 const menuId = "506";
@@ -24,19 +26,30 @@ const filters = ref({
   namaGudang: "",
 });
 
-const masterHeaders = [
-  { title: "Kode", key: "Kode", width: "150px" },
-  { title: "Tanggal", key: "Tanggal", width: "100px" },
-  { title: "Nama", key: "Nama", minWidth: "220px" },
-  { title: "Ukuran", key: "Ukuran", width: "90px" },
-  { title: "Kain", key: "Kain", width: "130px" },
-  { title: "Finishing", key: "Finishing", width: "110px" },
-  { title: "Stok", key: "Stok", width: "100px", align: "end" },
-  { title: "Gudang", key: "Gudang", width: "180px" },
-  { title: "Kode Cus", key: "Kodecus", width: "90px" },
-  { title: "Customer", key: "Customer", minWidth: "200px" },
-  { title: "Alamat", key: "Alamat", minWidth: "220px" },
-];
+const canLihatCus = computed(
+  () => Number(authStore.user?.flags?.lihatCus) === 1,
+);
+
+const masterHeaders = computed(() => {
+  const h: any[] = [
+    { title: "Kode", key: "Kode", width: "150px" },
+    { title: "Tanggal", key: "Tanggal", width: "100px" },
+    { title: "Nama", key: "Nama", minWidth: "220px" },
+    { title: "Ukuran", key: "Ukuran", width: "90px" },
+    { title: "Kain", key: "Kain", width: "130px" },
+    { title: "Finishing", key: "Finishing", width: "110px" },
+    { title: "Stok", key: "Stok", width: "100px", align: "end" },
+    { title: "Gudang", key: "Gudang", width: "180px" },
+    { title: "Kode Cus", key: "Kodecus", width: "90px" },
+  ];
+  if (canLihatCus.value) {
+    h.push(
+      { title: "Customer", key: "Customer", minWidth: "200px" },
+      { title: "Alamat", key: "Alamat", minWidth: "220px" },
+    );
+  }
+  return h;
+});
 
 const { items, isLoading, canExport, selected, isSingleSelected, fetchData } =
   useBrowse({
@@ -86,8 +99,12 @@ const onExport = async () => {
         numFmt: "#,##0",
       },
       { header: "Kode Cus", key: "Kodecus", width: 12 },
-      { header: "Customer", key: "Customer", width: 30 },
-      { header: "Alamat", key: "Alamat", width: 40 },
+      ...(canLihatCus.value
+        ? [
+            { header: "Customer", key: "Customer", width: 30 },
+            { header: "Alamat", key: "Alamat", width: 40 },
+          ]
+        : []),
     ];
     await exportExcelSingle(
       `Stok_Barang_Jadi_${filters.value.gudang || "All"}.xlsx`,

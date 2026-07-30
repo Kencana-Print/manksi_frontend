@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, watch, onMounted } from "vue";
+import { ref, watch, onMounted, computed } from "vue";
+import { useAuthStore } from "@/stores/authStore";
 import { useToast } from "vue-toastification";
 import BaseBrowse from "@/components/BaseBrowse.vue";
 import { useBrowse } from "@/composables/useBrowse";
@@ -9,6 +10,7 @@ import { formatTanggal } from "@/utils/dateFormat";
 import api from "@/services/api";
 import { IconTruckDelivery, IconFileExport } from "@tabler/icons-vue";
 
+const authStore = useAuthStore();
 const toast = useToast();
 
 // --- STATE FILTER (default: awal bulan s.d. hari ini, divisi 4) ---
@@ -60,23 +62,36 @@ const { items, isLoading, selected, canExport, fetchData } = useBrowse({
 });
 
 // --- HEADERS UTAMA ---
-const headers = [
-  { title: "Nomor", key: "Nomor", width: "150px", fixed: true },
-  { title: "Tanggal", key: "Tanggal", width: "95px", align: "center" },
-  { title: "Divisi", key: "Divisi", width: "110px" },
-  { title: "Kode Cus", key: "KodeCustomer", width: "90px" },
-  { title: "Nama Customer", key: "NamaCustomer", minWidth: "200px" },
-  { title: "Nama", key: "Nama", minWidth: "200px" },
-  { title: "Ukuran", key: "Ukuran", width: "160px" },
-  { title: "Panjang", key: "Panjang", width: "80px", align: "right" },
-  { title: "Lebar", key: "Lebar", width: "80px", align: "right" },
-  { title: "Jenis", key: "Jenis", width: "70px", align: "center" },
-  { title: "Jumlah", key: "Jumlah", width: "90px", align: "right" },
-  { title: "Prasj", key: "Prasj", width: "80px", align: "right" },
-  { title: "Kirim", key: "Kirim", width: "90px", align: "right" },
-  { title: "Dateline", key: "Dateline", width: "95px", align: "center" },
-  { title: "Status", key: "Stat", width: "130px" },
-];
+const canLihatCus = computed(
+  () => Number(authStore.user?.flags?.lihatCus) === 1,
+);
+
+const headers = computed(() => {
+  const h: any[] = [
+    { title: "Nomor", key: "Nomor", width: "150px", fixed: true },
+    { title: "Tanggal", key: "Tanggal", width: "95px", align: "center" },
+    { title: "Divisi", key: "Divisi", width: "110px" },
+  ];
+  if (canLihatCus.value) {
+    h.push(
+      { title: "Kode Cus", key: "KodeCustomer", width: "90px" },
+      { title: "Nama Customer", key: "NamaCustomer", minWidth: "200px" },
+    );
+  }
+  h.push(
+    { title: "Nama", key: "Nama", minWidth: "200px" },
+    { title: "Ukuran", key: "Ukuran", width: "160px" },
+    { title: "Panjang", key: "Panjang", width: "80px", align: "right" },
+    { title: "Lebar", key: "Lebar", width: "80px", align: "right" },
+    { title: "Jenis", key: "Jenis", width: "70px", align: "center" },
+    { title: "Jumlah", key: "Jumlah", width: "90px", align: "right" },
+    { title: "Prasj", key: "Prasj", width: "80px", align: "right" },
+    { title: "Kirim", key: "Kirim", width: "90px", align: "right" },
+    { title: "Dateline", key: "Dateline", width: "95px", align: "center" },
+    { title: "Status", key: "Stat", width: "130px" },
+  );
+  return h;
+});
 
 // --- EXPAND LOGIC (DETAIL SJ) ---
 const expandedRows = ref<any[]>([]);
@@ -132,8 +147,12 @@ const onExport = async () => {
       { header: "Nomor", key: "Nomor", width: 20 },
       { header: "Tanggal", key: "Tanggal", width: 14, align: "center" },
       { header: "Divisi", key: "Divisi", width: 16 },
-      { header: "Kode Customer", key: "KodeCustomer", width: 14 },
-      { header: "Nama Customer", key: "NamaCustomer", width: 26 },
+      ...(canLihatCus.value
+        ? [
+            { header: "Kode Customer", key: "KodeCustomer", width: 14 },
+            { header: "Nama Customer", key: "NamaCustomer", width: 26 },
+          ]
+        : []),
       { header: "Nama", key: "Nama", width: 30 },
       { header: "Ukuran", key: "Ukuran", width: 20 },
       {
@@ -219,7 +238,7 @@ const exportDetail = async () => {
         Nomor: item.Nomor,
         Tanggal: formatTanggal(item.Tanggal),
         Divisi: item.Divisi,
-        NamaCustomer: item.NamaCustomer,
+        ...(canLihatCus.value ? { NamaCustomer: item.NamaCustomer } : {}),
         Nama: item.Nama,
         Jumlah: Number(item.Jumlah) || 0,
         Kirim: Number(item.Kirim) || 0,
@@ -261,7 +280,9 @@ const exportDetail = async () => {
       { header: "Nomor SPK", key: "Nomor", width: 20 },
       { header: "Tgl SPK", key: "Tanggal", width: 14, align: "center" },
       { header: "Divisi", key: "Divisi", width: 14 },
-      { header: "Customer", key: "NamaCustomer", width: 26 },
+      ...(canLihatCus.value
+        ? [{ header: "Customer", key: "NamaCustomer", width: 26 }]
+        : []),
       { header: "Nama", key: "Nama", width: 28 },
       {
         header: "Jumlah",

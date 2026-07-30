@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, watch, onMounted } from "vue";
+import { ref, watch, onMounted, computed } from "vue";
+import { useAuthStore } from "@/stores/authStore";
 import { useToast } from "vue-toastification";
 import BaseBrowse from "@/components/BaseBrowse.vue";
 import { useBrowse } from "@/composables/useBrowse";
@@ -11,6 +12,7 @@ import { formatTanggal } from "@/utils/dateFormat";
 // ── UTILITAS EXPORT EXCELJS ──
 import { exportExcelSingle, type ExcelColumn } from "@/utils/excelExport";
 
+const authStore = useAuthStore();
 const toast = useToast();
 const menuId = "307";
 
@@ -44,19 +46,30 @@ const loadDivisi = async () => {
 };
 
 // ── BROWSE HOOK ──
-const masterHeaders = [
-  { title: "Nomor MAP", key: "Nomor", width: "160px", fixed: true },
-  { title: "Tanggal", key: "Tanggal", width: "100px", align: "center" },
-  { title: "Divisi", key: "Divisi", width: "90px", align: "center" },
-  { title: "Nama Customer", key: "NamaCustomer", minWidth: "200px" },
-  { title: "Nama Pekerjaan", key: "Nama", minWidth: "220px" },
-  { title: "Ukuran", key: "Ukuran", width: "100px" },
-  { title: "Jenis", key: "Jenis", width: "80px", align: "center" },
-  { title: "Jumlah", key: "Jumlah", width: "90px", align: "right" },
-  { title: "Kirim", key: "Kirim", width: "90px", align: "right" },
-  { title: "Dateline", key: "Dateline", width: "100px", align: "center" },
-  { title: "Sales", key: "Sales", width: "120px" },
-];
+const canLihatCus = computed(
+  () => Number(authStore.user?.flags?.lihatCus) === 1,
+);
+
+const masterHeaders = computed(() => {
+  const h: any[] = [
+    { title: "Nomor MAP", key: "Nomor", width: "160px", fixed: true },
+    { title: "Tanggal", key: "Tanggal", width: "100px", align: "center" },
+    { title: "Divisi", key: "Divisi", width: "90px", align: "center" },
+  ];
+  if (canLihatCus.value) {
+    h.push({ title: "Nama Customer", key: "NamaCustomer", minWidth: "200px" });
+  }
+  h.push(
+    { title: "Nama Pekerjaan", key: "Nama", minWidth: "220px" },
+    { title: "Ukuran", key: "Ukuran", width: "100px" },
+    { title: "Jenis", key: "Jenis", width: "80px", align: "center" },
+    { title: "Jumlah", key: "Jumlah", width: "90px", align: "right" },
+    { title: "Kirim", key: "Kirim", width: "90px", align: "right" },
+    { title: "Dateline", key: "Dateline", width: "100px", align: "center" },
+    { title: "Sales", key: "Sales", width: "120px" },
+  );
+  return h;
+});
 
 const { items, isLoading, canExport, fetchData } = useBrowse({
   menuId,
@@ -115,7 +128,9 @@ const onExportMaster = async () => {
       { header: "Nomor MAP", key: "Nomor", width: 22 },
       { header: "Tanggal", key: "Tanggal", width: 14, align: "center" },
       { header: "Divisi", key: "Divisi", width: 10, align: "center" },
-      { header: "Customer", key: "NamaCustomer", width: 30 },
+      ...(canLihatCus.value
+        ? [{ header: "Customer", key: "NamaCustomer", width: 30 }]
+        : []),
       { header: "Nama Pekerjaan", key: "Nama", width: 40 },
       { header: "Ukuran", key: "Ukuran", width: 15 },
       { header: "Jenis", key: "Jenis", width: 10, align: "center" },
@@ -197,7 +212,7 @@ const onExportDetail = async () => {
         NomorMAP: first.NomorMAP,
         TglMAP: fmtTgl(first.TglMAP),
         Divisi: first.Divisi,
-        NamaCustomer: first.NamaCustomer,
+        ...(canLihatCus.value ? { NamaCustomer: first.NamaCustomer } : {}),
         NamaMAP: first.NamaMAP,
       };
       const blankMaster = Object.fromEntries(
@@ -219,7 +234,9 @@ const onExportDetail = async () => {
       { header: "Nomor MAP", key: "NomorMAP", width: 22 },
       { header: "Tgl MAP", key: "TglMAP", width: 14, align: "center" },
       { header: "Divisi", key: "Divisi", width: 12, align: "center" },
-      { header: "Customer", key: "NamaCustomer", width: 30 },
+      ...(canLihatCus.value
+        ? [{ header: "Customer", key: "NamaCustomer", width: 30 }]
+        : []),
       { header: "Nama MAP", key: "NamaMAP", width: 30 },
       { header: "Nomor SJ", key: "NomorSJ", width: 20 },
       { header: "Tgl SJ", key: "TglSJ", width: 14, align: "center" },

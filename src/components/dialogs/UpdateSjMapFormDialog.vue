@@ -1,12 +1,18 @@
 <script setup lang="ts">
-import { ref, watch } from "vue";
+import { ref, watch, computed } from "vue";
 import { useToast } from "vue-toastification";
+import { useAuthStore } from "@/stores/authStore";
 import { updateSjMapService } from "@/services/penjualan/updateSjMapService";
 import { IconTruckDelivery, IconDeviceFloppy } from "@tabler/icons-vue";
 
 const props = defineProps<{ modelValue: boolean; nomor: string }>();
 const emit = defineEmits(["update:modelValue", "refresh"]);
 const toast = useToast();
+const authStore = useAuthStore();
+
+const canLihatCus = computed(
+  () => Number(authStore.user?.flags?.lihatCus) === 1,
+);
 
 const isLoading = ref(false);
 const isSaving = ref(false);
@@ -128,7 +134,7 @@ watch(
               </div>
             </div>
             <!-- Kanan -->
-            <div>
+            <div v-if="canLihatCus">
               <div class="f-row">
                 <label class="f-lbl">Customer</label>
                 <input

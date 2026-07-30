@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, watch, onMounted } from "vue";
+import { ref, watch, onMounted, computed } from "vue";
+import { useAuthStore } from "@/stores/authStore";
 import { useToast } from "vue-toastification";
 import BaseBrowse from "@/components/BaseBrowse.vue";
 import { useBrowse } from "@/composables/useBrowse";
@@ -9,6 +10,7 @@ import api from "@/services/api";
 import { IconClipboardList, IconFileExport } from "@tabler/icons-vue";
 import { formatTanggal } from "@/utils/dateFormat";
 
+const authStore = useAuthStore();
 const toast = useToast();
 
 // --- STATE FILTER (default: awal bulan s.d. hari ini, divisi 4) ---
@@ -60,20 +62,31 @@ const { items, isLoading, selected, canExport, fetchData } = useBrowse({
 });
 
 // --- HEADERS UTAMA ---
-const headers = [
-  { title: "Divisi", key: "Divisi", width: "130px" },
-  { title: "Nomor", key: "Nomor", width: "150px", fixed: true },
-  { title: "Tanggal", key: "Tanggal", width: "95px", align: "center" },
-  { title: "Hari", key: "Hari", width: "60px", align: "right" },
-  { title: "Tgl Jadi", key: "TanggalJadi", width: "95px", align: "center" },
-  { title: "Dateline", key: "Dateline", width: "95px", align: "center" },
-  { title: "Nama", key: "Nama", minWidth: "220px" },
-  { title: "Jumlah", key: "Jumlah", width: "90px", align: "right" },
-  { title: "Jumlah Jadi", key: "JumlahJadi", width: "90px", align: "right" },
-  { title: "Kode", key: "Kode", width: "90px" },
-  { title: "Customer", key: "Customer", minWidth: "200px" },
-  { title: "Alamat", key: "Alamat", minWidth: "220px" },
-];
+const canLihatCus = computed(
+  () => Number(authStore.user?.flags?.lihatCus) === 1,
+);
+
+const headers = computed(() => {
+  const h: any[] = [
+    { title: "Divisi", key: "Divisi", width: "130px" },
+    { title: "Nomor", key: "Nomor", width: "150px", fixed: true },
+    { title: "Tanggal", key: "Tanggal", width: "95px", align: "center" },
+    { title: "Hari", key: "Hari", width: "60px", align: "right" },
+    { title: "Tgl Jadi", key: "TanggalJadi", width: "95px", align: "center" },
+    { title: "Dateline", key: "Dateline", width: "95px", align: "center" },
+    { title: "Nama", key: "Nama", minWidth: "220px" },
+    { title: "Jumlah", key: "Jumlah", width: "90px", align: "right" },
+    { title: "Jumlah Jadi", key: "JumlahJadi", width: "90px", align: "right" },
+  ];
+  if (canLihatCus.value) {
+    h.push(
+      { title: "Kode", key: "Kode", width: "90px" },
+      { title: "Customer", key: "Customer", minWidth: "200px" },
+      { title: "Alamat", key: "Alamat", minWidth: "220px" },
+    );
+  }
+  return h;
+});
 
 // --- EXPAND LOGIC (DETAIL STBJ) ---
 const expandedRows = ref<any[]>([]);
@@ -138,9 +151,13 @@ const onExport = async () => {
         align: "right",
         numFmt: "#,##0",
       },
-      { header: "Kode Cus", key: "Kode", width: 12 },
-      { header: "Customer", key: "Customer", width: 26 },
-      { header: "Alamat", key: "Alamat", width: 30 },
+      ...(canLihatCus.value
+        ? [
+            { header: "Kode Cus", key: "Kode", width: 12 },
+            { header: "Customer", key: "Customer", width: 26 },
+            { header: "Alamat", key: "Alamat", width: 30 },
+          ]
+        : []),
     ];
     await exportExcelSingle(
       `Laporan_SPK_vs_STBJ_${today}.xlsx`,
@@ -189,9 +206,9 @@ const exportDetail = async () => {
         Nama: item.Nama,
         Jumlah: Number(item.Jumlah) || 0,
         JumlahJadi: Number(item.JumlahJadi) || 0,
-        Kode: item.Kode,
-        Customer: item.Customer,
-        Alamat: item.Alamat,
+        ...(canLihatCus.value
+          ? { Kode: item.Kode, Customer: item.Customer, Alamat: item.Alamat }
+          : {}),
       };
       const blankMaster = Object.fromEntries(
         Object.keys(masterCells).map((k) => [k, ""]),
@@ -241,9 +258,13 @@ const exportDetail = async () => {
         align: "right",
         numFmt: "#,##0",
       },
-      { header: "Kode Cus", key: "Kode", width: 12 },
-      { header: "Customer", key: "Customer", width: 26 },
-      { header: "Alamat", key: "Alamat", width: 30 },
+      ...(canLihatCus.value
+        ? [
+            { header: "Kode Cus", key: "Kode", width: 12 },
+            { header: "Customer", key: "Customer", width: 26 },
+            { header: "Alamat", key: "Alamat", width: 30 },
+          ]
+        : []),
       { header: "No. STBJ", key: "NomorStbj", width: 20 },
       { header: "Tgl STBJ", key: "TglStbj", width: 14, align: "center" },
       {

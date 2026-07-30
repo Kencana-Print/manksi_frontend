@@ -3225,6 +3225,42 @@ const router = createRouter({
       },
     },
     {
+      path: "/laporan/marketing/realisasi-kirim-memo",
+      name: "LapRealisasiKirimMemo",
+      component: () =>
+        import("@/views/laporan/marketing/RealisasiPengirimanMemoView.vue"),
+      meta: {
+        title: "Realisasi Pengiriman Memo",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "303",
+      },
+    },
+    {
+      path: "/laporan/marketing/proyeksi-bulanan",
+      name: "LapProyeksiBulanan",
+      component: () =>
+        import("@/views/laporan/marketing/ProyeksiBulananView.vue"),
+      meta: {
+        title: "Laporan Proyeksi Bulanan",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "1294",
+      },
+    },
+    {
+      path: "/laporan/marketing/target-vs-achievement",
+      name: "LapTargetVsAchievement",
+      component: () =>
+        import("@/views/laporan/marketing/TargetVsAchievementView.vue"),
+      meta: {
+        title: "Monitoring Target vs Achievement",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "314",
+      },
+    },
+    {
       path: "/laporan/marketing/kunjungan-sales",
       name: "LapKunjunganSales",
       component: () =>

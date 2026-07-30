@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, watch, onMounted } from "vue";
+import { ref, watch, onMounted, computed } from "vue";
+import { useAuthStore } from "@/stores/authStore";
 import { useToast } from "vue-toastification";
 import BaseBrowse from "@/components/BaseBrowse.vue";
 import { useBrowse } from "@/composables/useBrowse";
@@ -8,6 +9,7 @@ import { IconTruckDelivery, IconFileSpreadsheet } from "@tabler/icons-vue";
 import { exportExcelSingle, type ExcelColumn } from "@/utils/excelExport";
 import { formatTanggal } from "@/utils/dateFormat";
 
+const authStore = useAuthStore();
 const toast = useToast();
 const menuId = "522";
 
@@ -26,16 +28,27 @@ const filters = ref({
   endDate: toLocalDateStr(today),
 });
 
-const masterHeaders = [
-  { title: "Spk Nomor", key: "SpkNomor", width: "140px" },
-  { title: "Tanggal", key: "Tanggal", width: "95px", align: "center" },
-  { title: "Dateline", key: "Dateline", width: "95px", align: "center" },
-  { title: "Customer", key: "Customer", minWidth: "180px" },
-  { title: "Spk Nama", key: "SpkNama", minWidth: "260px" },
-  { title: "Kain", key: "Kain", width: "160px" },
-  { title: "Finishing", key: "Finishing", minWidth: "200px" },
-  { title: "Jumlah", key: "Jumlah", width: "90px", align: "end" },
-];
+const canLihatCus = computed(
+  () => Number(authStore.user?.flags?.lihatCus) === 1,
+);
+
+const masterHeaders = computed(() => {
+  const h: any[] = [
+    { title: "Spk Nomor", key: "SpkNomor", width: "140px" },
+    { title: "Tanggal", key: "Tanggal", width: "95px", align: "center" },
+    { title: "Dateline", key: "Dateline", width: "95px", align: "center" },
+  ];
+  if (canLihatCus.value) {
+    h.push({ title: "Customer", key: "Customer", minWidth: "180px" });
+  }
+  h.push(
+    { title: "Spk Nama", key: "SpkNama", minWidth: "260px" },
+    { title: "Kain", key: "Kain", width: "160px" },
+    { title: "Finishing", key: "Finishing", minWidth: "200px" },
+    { title: "Jumlah", key: "Jumlah", width: "90px", align: "end" },
+  );
+  return h;
+});
 
 const { items, isLoading, canExport, fetchData } = useBrowse({
   menuId,
@@ -89,7 +102,9 @@ const onExportMaster = async () => {
       { header: "Spk Nomor", key: "SpkNomor", width: 18 },
       { header: "Tanggal", key: "Tanggal", width: 12, align: "center" },
       { header: "Dateline", key: "Dateline", width: 12, align: "center" },
-      { header: "Customer", key: "Customer", width: 24 },
+      ...(canLihatCus.value
+        ? [{ header: "Customer", key: "Customer", width: 24 }]
+        : []),
       { header: "Spk Nama", key: "SpkNama", width: 30 },
       { header: "Kain", key: "Kain", width: 20 },
       { header: "Finishing", key: "Finishing", width: 26 },
@@ -149,7 +164,7 @@ const onExportDetail = async () => {
       const first = rowsInGroup[0];
       const masterCells = {
         SpkNama: first.SpkNama,
-        Customer: first.Customer,
+        ...(canLihatCus.value ? { Customer: first.Customer } : {}),
         SpkNomor: first.SpkNomor,
       };
       const blankMaster = Object.fromEntries(
@@ -171,7 +186,9 @@ const onExportDetail = async () => {
 
     const columns: ExcelColumn[] = [
       { header: "Spk Nama", key: "SpkNama", width: 28 },
-      { header: "Customer", key: "Customer", width: 22 },
+      ...(canLihatCus.value
+        ? [{ header: "Customer", key: "Customer", width: 22 }]
+        : []),
       { header: "Spk Nomor", key: "SpkNomor", width: 16 },
       { header: "Nomor BPB", key: "NomorBpb", width: 16 },
       { header: "Tanggal", key: "Tanggal", width: 12, align: "center" },
