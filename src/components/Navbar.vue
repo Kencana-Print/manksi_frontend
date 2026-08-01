@@ -1303,7 +1303,7 @@ const menuItems: NavItem[] = [
     title: "Tools",
     icon: IconTool,
     model: toolsMenu,
-    adminOnly: true, // Hanya muncul untuk Admin/Developer
+    adminOnly: false, // Hanya muncul untuk Admin/Developer
     items: [
       { title: "Master User", to: "/tools/users", icon: IconUsers },
       { title: "Approval", to: "/tools/approval", icon: IconShieldCheck },
