@@ -3444,6 +3444,17 @@ const router = createRouter({
         // Tidak perlu menuId tunggal di meta sini, karena divalidasi di dalam halamannya
       },
     },
+    {
+      path: "/tools/relationship-map",
+      name: "ToolsRelationshipMap",
+      component: () => import("@/views/tools/RelationshipMapView.vue"),
+      meta: {
+        title: "Relationship Map",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "1321",
+      },
+    },
 
     // ── Error Pages ───────────────────────────────────────────────────
     {

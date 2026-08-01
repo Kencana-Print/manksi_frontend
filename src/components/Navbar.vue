@@ -96,6 +96,7 @@ import {
   IconClockHour4,
   IconTarget,
   IconFileDiff,
+  IconHierarchy3,
 } from "@tabler/icons-vue";
 
 interface NavItem {
@@ -1307,6 +1308,12 @@ const menuItems: NavItem[] = [
       { title: "Master User", to: "/tools/users", icon: IconUsers },
       { title: "Approval", to: "/tools/approval", icon: IconShieldCheck },
       { divider: true },
+      {
+        title: "Relationship Map",
+        to: "/tools/relationship-map",
+        icon: IconHierarchy3,
+        menuId: 1321,
+      },
     ],
   },
 ];
