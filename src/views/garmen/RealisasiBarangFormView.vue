@@ -76,6 +76,7 @@ const {
   executeSave,
   executeCancel,
   executeClose,
+  goBack,
 } = useForm({
   menuId: "62",
   initialData,
@@ -214,6 +215,12 @@ const doCetak = () => {
     `/garmen/barang/realisasi/print/${encodeURIComponent(savedNomor.value)}`,
     "_blank",
   );
+  goBack();
+};
+
+const skipCetak = () => {
+  showPrintDialog.value = false;
+  goBack();
 };
 
 const numFmt = (val: any) =>
@@ -463,9 +470,7 @@ const numFmt = (val: any) =>
         sekarang?
       </v-card-text>
       <v-card-actions class="pa-3 border-t bg-grey-lighten-4">
-        <v-btn variant="text" color="error" @click="showPrintDialog = false">
-          Tidak
-        </v-btn>
+        <v-btn variant="text" color="error" @click="skipCetak"> Tidak </v-btn>
         <v-spacer />
         <v-btn color="primary" variant="elevated" @click="doCetak">
           Ya, Cetak

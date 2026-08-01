@@ -58,9 +58,7 @@ const clearSpk = () => {
 // Sesuai perilaku Delphi: data hanya boleh dimuat kalau ada SPK spesifik
 // dipilih ATAU nama SPK diketik — mencegah query tanpa filter yang berat
 // (query ini narik dari 4 sumber sekaligus, LIKE '%%' bakal scan semua).
-const canFetch = computed(
-  () => !!nomorSpk.value.trim() || !!namaSpk.value.trim(),
-);
+const canFetch = computed(() => !!startDate.value && !!endDate.value);
 
 // ── Tab ──
 const activeTab = ref<"grid" | "pivot" | "chart">("grid");
@@ -75,7 +73,7 @@ const canExport = computed(() => authStore.can(MENU_ID, "view"));
 // auto-fetch saat mount maupun saat filter berubah. ──
 const fetchData = async () => {
   if (!canFetch.value) {
-    toast.warning("Pilih No. SPK atau ketik Nama SPK terlebih dahulu.");
+    toast.warning("Tentukan rentang tanggal terlebih dahulu.");
     return;
   }
   isLoading.value = true;
@@ -425,10 +423,11 @@ const renderChart = async () => {
       <div v-show="activeTab === 'grid'" class="tab-content">
         <div v-if="!hasSearched" class="search-guide">
           <IconSearch :size="40" :stroke-width="1.2" color="#bdbdbd" />
-          <div class="sg-title">Pilih No. SPK atau ketik Nama SPK</div>
+          <div class="sg-title">Tentukan periode, lalu klik Refresh</div>
           <div class="sg-sub">
             Laporan ini menggabungkan data dari 4 sumber transaksi sekaligus —
-            untuk menjaga performa, data hanya dimuat setelah SPK ditentukan.
+            tambahkan filter No./Nama SPK untuk mempersempit hasil dan
+            mempercepat pemuatan, terutama untuk rentang tanggal yang panjang.
           </div>
         </div>
         <BaseTable

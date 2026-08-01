@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from "vue";
+import { ref, onMounted, watch, computed, nextTick } from "vue";
 import { useToast } from "vue-toastification";
 import BaseBrowse from "@/components/BaseBrowse.vue";
 import { useBrowse } from "@/composables/useBrowse";
@@ -8,7 +8,12 @@ import {
   type PrintPermission,
 } from "@/services/laporan/gudang-garmen/browseSpkService";
 import { exportExcelSingle } from "@/utils/excelExport";
-import { IconClipboardList, IconPrinter } from "@tabler/icons-vue";
+import {
+  IconClipboardList,
+  IconPrinter,
+  IconEye,
+  IconX,
+} from "@tabler/icons-vue";
 
 const toast = useToast();
 const menuId = "527";
@@ -155,6 +160,72 @@ const submitPrintApproval = async () => {
   }
 };
 
+// ── Preview Cetak (embed, bukan tab baru) — sama persis alur dengan SpkView.vue ──
+const showPreviewDialog = ref(false);
+const previewNomor = ref("");
+const onPreviewCetak = () => {
+  if (!selectedItem.value) return;
+  previewNomor.value = selectedItem.value.Nomor;
+  showPreviewDialog.value = true;
+};
+
+const blockPrintShortcutParent = (e: KeyboardEvent) => {
+  if (!showPreviewDialog.value) return;
+  const key = e.key.toLowerCase();
+  if ((e.ctrlKey || e.metaKey) && (key === "p" || key === "s")) {
+    e.preventDefault();
+    toast.warning("Mode Preview — dokumen ini tidak dapat dicetak/disimpan.");
+  }
+};
+
+const previewContainerEl = ref<HTMLElement | null>(null);
+const previewIframeEl = ref<HTMLIFrameElement | null>(null);
+const previewScale = ref(1);
+const previewContentHeight = ref(1123);
+let previewResizeObserver: ResizeObserver | null = null;
+const PAGE_WIDTH_PX = 793;
+
+const recomputePreviewScale = () => {
+  const el = previewContainerEl.value;
+  if (!el) return;
+  const w = el.clientWidth - 24;
+  if (w < 50) return;
+  const scale = Math.min(w / PAGE_WIDTH_PX, 1);
+  previewScale.value = scale > 0 ? scale : 1;
+};
+
+const onPreviewIframeLoad = () => {
+  const iframe = previewIframeEl.value;
+  if (!iframe?.contentDocument) return;
+  const h = iframe.contentDocument.documentElement.scrollHeight;
+  previewContentHeight.value = h > 0 ? h : 1123;
+};
+
+const previewWrapperStyle = computed(() => ({
+  width: `${PAGE_WIDTH_PX}px`,
+  height: `${previewContentHeight.value}px`,
+  transform: `scale(${previewScale.value})`,
+  transformOrigin: "top left",
+}));
+
+watch(showPreviewDialog, async (open) => {
+  if (open) {
+    window.addEventListener("keydown", blockPrintShortcutParent, true);
+    previewContentHeight.value = 1123;
+    await nextTick();
+    if (previewContainerEl.value) {
+      previewResizeObserver = new ResizeObserver(() => recomputePreviewScale());
+      previewResizeObserver.observe(previewContainerEl.value);
+    }
+    recomputePreviewScale();
+  } else {
+    window.removeEventListener("keydown", blockPrintShortcutParent, true);
+    previewResizeObserver?.disconnect();
+    previewResizeObserver = null;
+    previewNomor.value = "";
+  }
+});
+
 onMounted(fetchData);
 </script>
 
@@ -197,6 +268,14 @@ onMounted(fetchData);
         <template #prepend><IconPrinter :size="15" /></template>Cetak SPK
         Cutting
       </v-btn>
+      <v-btn
+        size="small"
+        color="deep-purple-darken-1"
+        :disabled="selected.length === 0"
+        @click="onPreviewCetak"
+      >
+        <template #prepend><IconEye :size="15" /></template>Preview Cetak
+      </v-btn>
     </template>
   </BaseBrowse>
 
@@ -230,6 +309,83 @@ onMounted(fetchData);
           Ajukan Approval
         </v-btn>
       </v-card-actions>
+    </v-card>
+  </v-dialog>
+
+  <!-- Dialog Preview Cetak SPK (embed, bukan tab baru) -->
+  <v-dialog
+    v-model="showPreviewDialog"
+    max-width="98vw"
+    scrollable
+    @contextmenu.prevent
+  >
+    <v-card
+      rounded="lg"
+      style="
+        height: 90vh;
+        width: 850px;
+        max-width: 96vw;
+        min-width: 420px;
+        min-height: 320px;
+        display: flex;
+        flex-direction: column;
+        resize: both;
+        overflow: hidden;
+        margin: 0 auto;
+      "
+    >
+      <v-card-title
+        class="bg-primary text-white pa-3 flex-shrink-0"
+        style="cursor: default"
+      >
+        <div class="d-flex align-center justify-space-between">
+          <span class="text-subtitle-2 font-weight-bold"
+            >Preview Cetak SPK: {{ previewNomor }}</span
+          >
+          <v-btn
+            variant="text"
+            size="small"
+            color="white"
+            density="comfortable"
+            @click="showPreviewDialog = false"
+          >
+            <IconX :size="18" />
+          </v-btn>
+        </div>
+        <div class="text-caption" style="opacity: 0.75; line-height: 1.2">
+          ↘ Seret pojok kanan-bawah untuk mengubah ukuran jendela
+        </div>
+      </v-card-title>
+      <div
+        ref="previewContainerEl"
+        style="
+          flex: 1;
+          min-height: 0;
+          background: #616161;
+          overflow-y: auto;
+          overflow-x: hidden;
+          display: flex;
+          justify-content: center;
+          padding: 12px;
+        "
+      >
+        <div :style="previewWrapperStyle" style="flex-shrink: 0">
+          <iframe
+            v-if="showPreviewDialog && previewNomor"
+            ref="previewIframeEl"
+            :key="previewNomor"
+            :src="`/ppic/spk/print/${encodeURIComponent(previewNomor)}?preview=1`"
+            :style="{
+              width: PAGE_WIDTH_PX + 'px',
+              height: previewContentHeight + 'px',
+              border: 'none',
+              display: 'block',
+            }"
+            title="Preview Cetak SPK"
+            @load="onPreviewIframeLoad"
+          />
+        </div>
+      </div>
     </v-card>
   </v-dialog>
 </template>

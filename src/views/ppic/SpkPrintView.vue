@@ -173,7 +173,11 @@ const prosesChips = computed(() => {
   return arr;
 });
 
-const hasLayoutProses = computed(() => !!layoutHeader.value);
+const hasLayoutProses = computed(
+  () =>
+    !!layoutHeader.value &&
+    (layoutProof.value.length > 0 || layoutSewing.value.length > 0),
+);
 const hasMkaFromMap = computed(
   () =>
     mkaFromMap.value.aksesoris.length > 0 ||
@@ -1100,7 +1104,6 @@ onMounted(async () => {
           </div>
         </div>
       </div>
-
       <!-- ══════════════════════════════════════════════
          HALAMAN 2 — Layout Proses Sewing
     ══════════════════════════════════════════════ -->
@@ -1118,7 +1121,6 @@ onMounted(async () => {
             <div class="ph-meta">{{ spk.spk_nama }}</div>
           </div>
         </div>
-
         <!-- Info header layout -->
         <div class="layout-info">
           <div class="li-item">
@@ -1154,83 +1156,130 @@ onMounted(async () => {
             <div class="li-val">{{ layoutHeader?.lh_target_hari || "—" }}</div>
           </div>
         </div>
-
-        <!-- Tabel Proof (atas) -->
+        <!-- Tabel Proof (kiri) & Sewing (kanan) — side by side seperti Excel -->
+        <div class="layout-row">
+          <div class="layout-section layout-section--half">
+            <div class="layout-sec-title proof-title">Proses</div>
+            <table class="lt lt-compact">
+              <colgroup>
+                <col style="width: 14%" />
+                <col style="width: 7%" />
+                <col style="width: 9%" />
+                <col style="width: 9%" />
+                <col style="width: 9%" />
+                <col style="width: 9%" />
+                <col style="width: 10%" />
+                <col style="width: 27%" />
+                <col style="width: 6%" />
+              </colgroup>
+              <thead>
+                <tr>
+                  <th>Operator</th>
+                  <th class="tr">MP</th>
+                  <th class="tr">CT(dt)</th>
+                  <th class="tr">CT(jm)</th>
+                  <th>Sepatu</th>
+                  <th>K.Jrm</th>
+                  <th>M/C</th>
+                  <th>Proses</th>
+                  <th class="tc">No</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(r, i) in [...layoutProof].reverse()" :key="i">
+                  <td class="ellip">{{ r.nama_op }}</td>
+                  <td class="tr">{{ r.mp }}</td>
+                  <td class="tr">{{ r.ct_dt }}</td>
+                  <td class="tr">{{ r.ct_jam }}</td>
+                  <td class="ellip">{{ r.sepatu }}</td>
+                  <td class="ellip">{{ r.kjarum }}</td>
+                  <td class="wrap">{{ r.mc }}</td>
+                  <td class="wrap">{{ r.proses }}</td>
+                  <td class="tc">{{ r.no_urut }}</td>
+                </tr>
+                <tr v-if="layoutProof.length === 0">
+                  <td colspan="9" class="tc muted">Tidak ada data</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="layout-section layout-section--half">
+            <div class="layout-sec-title sewing-title">Proses</div>
+            <table class="lt lt-compact">
+              <colgroup>
+                <col style="width: 6%" />
+                <col style="width: 27%" />
+                <col style="width: 10%" />
+                <col style="width: 9%" />
+                <col style="width: 9%" />
+                <col style="width: 9%" />
+                <col style="width: 9%" />
+                <col style="width: 7%" />
+                <col style="width: 14%" />
+              </colgroup>
+              <thead>
+                <tr>
+                  <th class="tc">No</th>
+                  <th>Proses</th>
+                  <th>M/C</th>
+                  <th>Uk.Jrm</th>
+                  <th>Sepatu</th>
+                  <th class="tr">CT(jm)</th>
+                  <th class="tr">CT(dt)</th>
+                  <th class="tr">MP</th>
+                  <th>Operator</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(r, i) in [...layoutSewing].reverse()" :key="i">
+                  <td class="tc">{{ r.no_urut }}</td>
+                  <td class="wrap">{{ r.proses }}</td>
+                  <td class="wrap">{{ r.mc }}</td>
+                  <td class="ellip">{{ r.ukjarum }}</td>
+                  <td class="ellip">{{ r.sepatu }}</td>
+                  <td class="tr">{{ r.ct_jam }}</td>
+                  <td class="tr">{{ r.ct_dt }}</td>
+                  <td class="tr">{{ r.mp }}</td>
+                  <td class="ellip">{{ r.nama_op }}</td>
+                </tr>
+                <tr v-if="layoutSewing.length === 0">
+                  <td colspan="9" class="tc muted">Tidak ada data</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <!-- Summary & Total -->
         <div class="layout-section">
-          <div class="layout-sec-title proof-title">Line Proof</div>
-          <table class="lt">
-            <thead>
-              <tr>
-                <th style="width: 22px">No</th>
-                <th>Proses</th>
-                <th style="width: 50px">M/C</th>
-                <th style="width: 50px">Uk.Jarum</th>
-                <th style="width: 55px">Sepatu</th>
-                <th style="width: 40px">K.Jarum</th>
-                <th style="width: 44px" class="tr">CT(jam)</th>
-                <th style="width: 40px" class="tr">CT(dt)</th>
-                <th style="width: 28px" class="tr">MP</th>
-                <th style="width: 70px">Operator</th>
-              </tr>
-            </thead>
+          <table class="lt lt-summary">
             <tbody>
-              <tr v-for="(r, i) in layoutProof" :key="i">
-                <td class="tc">{{ r.no_urut }}</td>
-                <td>{{ r.proses }}</td>
-                <td>{{ r.mc }}</td>
-                <td>{{ r.ukjarum }}</td>
-                <td>{{ r.sepatu }}</td>
-                <td>{{ r.kjarum }}</td>
-                <td class="tr">{{ r.ct_jam }}</td>
-                <td class="tr">{{ r.ct_dt }}</td>
-                <td class="tr">{{ r.mp }}</td>
-                <td>{{ r.nama_op }}</td>
+              <tr>
+                <td class="ls-lbl">SUMMARY 1</td>
+                <td class="tr">{{ layoutHeader?.lh_summary1_mp }}</td>
+                <td class="tr">{{ layoutHeader?.lh_summary1_ct_dt }}</td>
+                <td class="tr">{{ layoutHeader?.lh_summary1_ct_jam }}</td>
+                <td class="ls-lbl">SUMMARY 2</td>
+                <td class="tr">{{ layoutHeader?.lh_summary2_ct_jam }}</td>
+                <td class="tr">{{ layoutHeader?.lh_summary2_ct_dt }}</td>
+                <td class="tr">{{ layoutHeader?.lh_summary2_mp }}</td>
               </tr>
-              <tr v-if="layoutProof.length === 0">
-                <td colspan="10" class="tc muted">Tidak ada data</td>
+              <tr>
+                <td class="ls-lbl">TOTAL</td>
+                <td class="tr">{{ layoutHeader?.lh_total_mp }}</td>
+                <td class="tr">{{ layoutHeader?.lh_total_ct_dt }}</td>
+                <td class="tr" colspan="5">
+                  {{ layoutHeader?.lh_total_ct_jam }}
+                </td>
+              </tr>
+              <tr>
+                <td class="ls-lbl">TOTAL DALAM MENIT</td>
+                <td class="tr" colspan="7">
+                  {{ layoutHeader?.lh_total_menit }}
+                </td>
               </tr>
             </tbody>
           </table>
         </div>
-
-        <!-- Tabel Sewing (bawah) -->
-        <div class="layout-section">
-          <div class="layout-sec-title sewing-title">Sewing</div>
-          <table class="lt">
-            <thead>
-              <tr>
-                <th style="width: 22px">No</th>
-                <th>Proses</th>
-                <th style="width: 50px">M/C</th>
-                <th style="width: 50px">Uk.Jarum</th>
-                <th style="width: 55px">Sepatu</th>
-                <th style="width: 40px">K.Jarum</th>
-                <th style="width: 44px" class="tr">CT(jam)</th>
-                <th style="width: 40px" class="tr">CT(dt)</th>
-                <th style="width: 28px" class="tr">MP</th>
-                <th style="width: 70px">Operator</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="(r, i) in layoutSewing" :key="i">
-                <td class="tc">{{ r.no_urut }}</td>
-                <td>{{ r.proses }}</td>
-                <td>{{ r.mc }}</td>
-                <td>{{ r.ukjarum }}</td>
-                <td>{{ r.sepatu }}</td>
-                <td>{{ r.kjarum }}</td>
-                <td class="tr">{{ r.ct_jam }}</td>
-                <td class="tr">{{ r.ct_dt }}</td>
-                <td class="tr">{{ r.mp }}</td>
-                <td>{{ r.nama_op }}</td>
-              </tr>
-              <tr v-if="layoutSewing.length === 0">
-                <td colspan="10" class="tc muted">Tidak ada data</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
         <!-- Footer halaman 2 -->
         <div class="pf">
           <span
@@ -1702,6 +1751,10 @@ onMounted(async () => {
   color: #2e7d32;
 }
 
+.merged-title {
+  background: #1565c0;
+}
+
 /* ══ FORMAT LAMA (P01) ══ */
 .print-page-old {
   width: 210mm;
@@ -1844,6 +1897,49 @@ onMounted(async () => {
   font-size: 8pt;
   margin-top: 6px;
   color: #444;
+}
+
+.layout-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.layout-section--half {
+  flex: 1 1 0;
+  min-width: 0;
+  margin-bottom: 0;
+}
+.lt-compact {
+  font-size: 6.3pt;
+  table-layout: fixed;
+  width: 100%;
+}
+.lt-compact th,
+.lt-compact td {
+  padding: 2px 3px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.lt-compact .ellip {
+  text-overflow: ellipsis;
+}
+.lt-compact .wrap {
+  white-space: normal;
+  word-break: break-word;
+  line-height: 1.15;
+}
+
+.lt-summary {
+  font-size: 7.5pt;
+}
+.lt-summary .ls-lbl {
+  font-weight: bold;
+  background: #f5f5f5;
+  padding: 3px 6px;
+}
+.lt-summary td {
+  border: 0.5px solid #ccc;
+  padding: 3px 6px;
 }
 
 /* ── Screen preview ── */

@@ -961,6 +961,77 @@ const onSpgSelected = async (item: any) => {
   await applySpk(item.Nomor || "");
 };
 
+// ── Fokus antar kolom editable (Tab Detail) ──
+const detailFieldRefs = ref<Record<string, HTMLInputElement>>({});
+
+const setDetailFieldRef = (el: any, idx: number, col: string) => {
+  if (el) detailFieldRefs.value[`${idx}_${col}`] = el as HTMLInputElement;
+};
+
+// Urutan kolom editable dihitung sesuai kondisi row saat ini —
+// kolom yang disembunyikan (v-if) atau readonly tidak masuk daftar.
+const getEditableCols = (): string[] => {
+  const cols: string[] = ["kode"];
+  if (isSpg.value && !isDC.value) cols.push("size");
+  cols.push("jumlah");
+  if (!isDC.value) cols.push("bslini", "bskainsablon", "bskain", "gantibs");
+  if (isLiniPotong.value) cols.push("panjang", "lebar");
+  return cols;
+};
+
+const focusNextDetailField = async (idx: number, col: string) => {
+  if (!canEdit.value) return;
+  const cols = getEditableCols();
+  const colIndex = cols.indexOf(col);
+  const nextCol = cols[colIndex + 1];
+
+  if (nextCol) {
+    await nextTick();
+    const next = detailFieldRefs.value[`${idx}_${nextCol}`];
+    if (next) {
+      next.focus();
+      next.select();
+    }
+    return;
+  }
+
+  // Sudah kolom terakhir untuk baris ini.
+  if (isDC.value) {
+    // Mode DC: baris sudah fixed dari loadKomponenProof, tidak boleh
+    // tambah baris baru. Enter di kolom terakhir (Jumlah) cukup
+    // pindah ke baris berikutnya yang sudah ada, kalau ada.
+    const nextRowIdx = idx + 1;
+    if (nextRowIdx < fd.value.Detail.length) {
+      await nextTick();
+      const next = detailFieldRefs.value[`${nextRowIdx}_${col}`];
+      if (next) {
+        next.focus();
+        next.select();
+      }
+    }
+    return;
+  }
+
+  // Bukan DC: kalau baris ini baris terakhir, otomatis tambah baris
+  // kosong dan pindah fokus ke kolom Kode-nya.
+  const isLastRow = idx === fd.value.Detail.length - 1;
+  if (isLastRow) {
+    addRow();
+    await nextTick();
+    const newIdx = fd.value.Detail.length - 1;
+    const kodeInput = detailFieldRefs.value[`${newIdx}_kode`];
+    if (kodeInput) {
+      kodeInput.focus();
+    }
+  }
+};
+
+// Khusus kode: onKodeBahan sudah async (lookup), lanjut fokus setelah selesai
+const onKodeBahanEnter = async (row: DetailRow, idx: number) => {
+  await onKodeBahan(row);
+  await focusNextDetailField(idx, "kode");
+};
+
 // ── Totals ────────────────────────────────────────────────────────────
 const totJml = computed(() =>
   fd.value.Detail.reduce((s, r) => s + (Number(r.jumlah) || 0), 0),
@@ -1846,7 +1917,8 @@ onMounted(async () => {
                       class="ci"
                       :readonly="!canEdit || isDC"
                       placeholder="Kode..."
-                      @keydown.enter.prevent="onKodeBahan(row)"
+                      :ref="(el) => setDetailFieldRef(el, i, 'kode')"
+                      @keydown.enter.prevent="onKodeBahanEnter(row, i)"
                       @keydown.f1.prevent="openBahan(i)"
                       @blur="onKodeBahan(row)"
                     />
@@ -1866,6 +1938,8 @@ onMounted(async () => {
                     v-model="row.size"
                     class="ci tc"
                     :readonly="!canEdit || !isSpg || isDC"
+                    :ref="(el) => setDetailFieldRef(el, i, 'size')"
+                    @keydown.enter.prevent="focusNextDetailField(i, 'size')"
                   />
                 </td>
                 <td>
@@ -1883,8 +1957,10 @@ onMounted(async () => {
                     type="number"
                     class="ci tr"
                     :readonly="!canEdit"
+                    :ref="(el) => setDetailFieldRef(el, i, 'jumlah')"
                     @focus="sel"
                     @change="onJumlah(row)"
+                    @keydown.enter.prevent="focusNextDetailField(i, 'jumlah')"
                   />
                 </td>
                 <td>
@@ -1907,7 +1983,9 @@ onMounted(async () => {
                       type="number"
                       class="ci tr"
                       :readonly="!canEdit"
+                      :ref="(el) => setDetailFieldRef(el, i, 'bslini')"
                       @focus="sel"
+                      @keydown.enter.prevent="focusNextDetailField(i, 'bslini')"
                     />
                   </td>
                   <td>
@@ -1916,7 +1994,11 @@ onMounted(async () => {
                       type="number"
                       class="ci tr"
                       :readonly="!canEdit"
+                      :ref="(el) => setDetailFieldRef(el, i, 'bskainsablon')"
                       @focus="sel"
+                      @keydown.enter.prevent="
+                        focusNextDetailField(i, 'bskainsablon')
+                      "
                     />
                   </td>
                   <td>
@@ -1925,7 +2007,9 @@ onMounted(async () => {
                       type="number"
                       class="ci tr"
                       :readonly="!canEdit"
+                      :ref="(el) => setDetailFieldRef(el, i, 'bskain')"
                       @focus="sel"
+                      @keydown.enter.prevent="focusNextDetailField(i, 'bskain')"
                     />
                   </td>
                   <td>
@@ -1934,7 +2018,11 @@ onMounted(async () => {
                       type="number"
                       class="ci tr"
                       :readonly="!canEdit"
+                      :ref="(el) => setDetailFieldRef(el, i, 'gantibs')"
                       @focus="sel"
+                      @keydown.enter.prevent="
+                        focusNextDetailField(i, 'gantibs')
+                      "
                     />
                   </td>
                 </template>
@@ -1945,7 +2033,11 @@ onMounted(async () => {
                       type="number"
                       class="ci tr"
                       :readonly="!canEdit"
+                      :ref="(el) => setDetailFieldRef(el, i, 'panjang')"
                       @focus="sel"
+                      @keydown.enter.prevent="
+                        focusNextDetailField(i, 'panjang')
+                      "
                       :style="
                         row.kode === 'LL-000400' && row.panjang <= 0
                           ? 'background:#fff3e0'
@@ -1959,7 +2051,9 @@ onMounted(async () => {
                       type="number"
                       class="ci tr"
                       :readonly="!canEdit"
+                      :ref="(el) => setDetailFieldRef(el, i, 'lebar')"
                       @focus="sel"
+                      @keydown.enter.prevent="focusNextDetailField(i, 'lebar')"
                       :style="
                         row.kode === 'LL-000400' && row.lebar <= 0
                           ? 'background:#fff3e0'

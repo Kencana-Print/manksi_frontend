@@ -102,6 +102,7 @@ const headers = computed(() => {
     { title: "Tanggal", key: "Tanggal", width: "100px" },
     { title: "Dateline", key: "Dateline", width: "100px" },
     { title: "Tgl. BAST", key: "TglBast", width: "100px" },
+    { title: "Nama", key: "Nama", minWidth: "250px" },
     {
       title: "Selisih (BAST-MAP)",
       key: "SelisihBastMap",
@@ -120,7 +121,6 @@ const headers = computed(() => {
       width: "110px",
       align: "center",
     },
-    { title: "Nama", key: "Nama", minWidth: "250px" },
     { title: "Surat Jalan", key: "Surat_Jalan", width: "140px" },
     { title: "Ukuran", key: "Ukuran", width: "120px" },
     { title: "Panjang", key: "Panjang", width: "80px", align: "right" },

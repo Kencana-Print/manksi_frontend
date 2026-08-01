@@ -70,7 +70,9 @@ const TYPE_OPTIONS: { value: NodeType | ""; title: string }[] = [
   { value: "PELUNASAN_PIUTANG", title: "Pelunasan Piutang" },
 ];
 
-type RouteTarget = { name: string; params: { nomor: string } };
+type RouteTarget =
+  | { name: string; params: { nomor: string } }
+  | { name: string; query: { nomor: string } };
 
 // ⚠️ 6 tipe SENGAJA tidak dimasukkan (STBJ, SJ, INVOICE non-proforma,
 // BPJ, VOUCHER, KASBON) karena route edit mereka di router.ts tidak
@@ -96,11 +98,10 @@ const NODE_ROUTE_MAP: Partial<Record<NodeType, (n: DocNode) => RouteTarget>> = {
     name: "BpbNonBahanGarmenFormEdit",
     params: { nomor: n.nomor },
   }),
-  // INVOICE: hanya proforma yang punya route ber-:nomor
   INVOICE: (n) =>
     n.isProforma
       ? { name: "InvoiceProformaEdit", params: { nomor: n.nomor } }
-      : (undefined as unknown as RouteTarget),
+      : { name: "InvoiceFormEdit", query: { nomor: n.nomor } },
   PLANNING_PPIC: (n) => ({
     name: "PpicPlanningSpkEdit",
     params: { nomor: n.nomor },
@@ -177,6 +178,23 @@ const NODE_ROUTE_MAP: Partial<Record<NodeType, (n: DocNode) => RouteTarget>> = {
     name: "PelunasanPiutangEdit",
     params: { nomor: n.nomor },
   }),
+  STBJ: (n) => ({ name: "StbjFormEdit", query: { nomor: n.nomor } }),
+  SJ: (n) => ({ name: "SuratJalanFormEdit", query: { nomor: n.nomor } }),
+
+  BPJ: (n) => ({ name: "BpbJasaFormEdit", query: { nomor: n.nomor } }),
+  SJ_TAK_NORMAL: (n) => ({
+    name: "SjTakNormalFormEdit",
+    query: { nomor: n.nomor },
+  }),
+  INVOICE_TAK_NORMAL: (n) => ({
+    name: "InvoiceTakNormalFormEdit",
+    query: { nomor: n.nomor },
+  }),
+};
+
+const CROSS_APP_TYPES: Partial<Record<NodeType, string>> = {
+  VOUCHER: "Voucher Pembayaran ada di aplikasi Finance ERP, bukan MANKSI.",
+  KASBON: "Uang Muka (Kasbon) ada di aplikasi Finance ERP, bukan MANKSI.",
 };
 
 const getDetailRoute = (node: DocNode): RouteTarget | null => {
@@ -673,6 +691,13 @@ const numFmt = (v: any) =>
         >
           Buka Detail Lengkap ↗
         </router-link>
+        <div
+          v-else-if="CROSS_APP_TYPES[selectedNode.type]"
+          class="detail-panel-unsupported"
+        >
+          {{ CROSS_APP_TYPES[selectedNode.type] }} Buka manual dari aplikasi
+          tersebut.
+        </div>
         <div v-else class="detail-panel-unsupported">
           Modul ini belum mendukung link langsung. Buka manual dari menu
           terkait.

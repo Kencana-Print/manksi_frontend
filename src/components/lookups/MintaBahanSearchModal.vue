@@ -143,6 +143,7 @@ const selectItem = (item: any) => {
               <th style="width: 120px">NOMOR MINTA</th>
               <th style="width: 88px">TANGGAL</th>
               <th style="width: 130px">SPK</th>
+              <th style="width: 160px">NAMA SPK</th>
               <th>KETERANGAN</th>
               <th style="width: 90px">APPROVE</th>
             </tr>
@@ -157,6 +158,7 @@ const selectItem = (item: any) => {
               <td class="td-kode">{{ item.Nomor }}</td>
               <td>{{ formatDate(item.Tanggal) }}</td>
               <td class="td-kode">{{ item.SPK }}</td>
+              <td>{{ item.NamaSpk || "-" }}</td>
               <td>{{ item.Keterangan }}</td>
               <td>
                 <v-chip

@@ -66,9 +66,9 @@ const savedNomor = ref("");
 const showBahanModal = ref(false);
 const activeBahanIdx = ref(-1);
 const listKomponen = ref<string[]>([]);
-let cachedSizesNomor = "";
-let cachedSizes: any[] | null = null;
-let hasWarnedNoSizes = false;
+// let cachedSizesNomor = "";
+// let cachedSizes: any[] | null = null;
+// let hasWarnedNoSizes = false;
 
 function normalizeHeader(h: any) {
   return {
@@ -249,7 +249,7 @@ const onKeterangan8Blur = () => {
     const row = formData.value.komponen.find((k: any) => k.komponen === komp);
     if (row) {
       row.babaran = Number(val);
-      syncBabaranToSizeBreakdown(row);
+      // syncBabaranToSizeBreakdown(row);
     }
   });
   nextTick(() => {
@@ -257,67 +257,67 @@ const onKeterangan8Blur = () => {
   });
 };
 
-// Arah 3: Bahan (komponen.babaran) → Babaran per Size — begitu babaran
-// suatu komponen diisi:
-// - Kalau sudah ada baris size untuk komponen itu, update nilainya.
-// - Kalau belum ada sama sekali, auto-generate baris dari daftar size MAP.
-const syncBabaranToSizeBreakdown = async (k: any) => {
-  const komponenStr = (k.komponen || "").trim();
-  if (!komponenStr) return;
+// // Arah 3: Bahan (komponen.babaran) → Babaran per Size — begitu babaran
+// // suatu komponen diisi:
+// // - Kalau sudah ada baris size untuk komponen itu, update nilainya.
+// // - Kalau belum ada sama sekali, auto-generate baris dari daftar size MAP.
+// const syncBabaranToSizeBreakdown = async (k: any) => {
+//   const komponenStr = (k.komponen || "").trim();
+//   if (!komponenStr) return;
 
-  const existingRows = formData.value.sizeBreakdown.filter(
-    (s: any) => s.komponen === komponenStr,
-  );
+//   const existingRows = formData.value.sizeBreakdown.filter(
+//     (s: any) => s.komponen === komponenStr,
+//   );
 
-  if (existingRows.length > 0) {
-    existingRows.forEach((s: any) => {
-      s.babaran = k.babaran;
-    });
-    return;
-  }
+//   if (existingRows.length > 0) {
+//     existingRows.forEach((s: any) => {
+//       s.babaran = k.babaran;
+//     });
+//     return;
+//   }
 
-  const nomor =
-    formData.value.header.mspk_nomor || formData.value.header.mspk_nomor;
+//   const nomor =
+//     formData.value.header.mspk_nomor || formData.value.header.mspk_nomor;
 
-  // Cache: kalau nomor MAP sama dengan cache sebelumnya, pakai hasil
-  // yang sudah diambil, jangan hit API lagi.
-  if (cachedSizesNomor !== nomor) {
-    cachedSizesNomor = nomor;
-    cachedSizes = null;
-    hasWarnedNoSizes = false;
-    try {
-      const res = await api.get(
-        `/garmen/cetak-bast/form/${encodeURIComponent(nomor)}/sizes`,
-      );
-      cachedSizes = res.data.data || [];
-    } catch (error: any) {
-      console.error(
-        "Gagal mengambil daftar size MAP untuk sinkronisasi",
-        error,
-      );
-      toast.error(
-        `Gagal memuat daftar size dari server: ${error.response?.data?.message || error.message}`,
-      );
-      cachedSizes = [];
-    }
-  }
+//   // Cache: kalau nomor MAP sama dengan cache sebelumnya, pakai hasil
+//   // yang sudah diambil, jangan hit API lagi.
+//   if (cachedSizesNomor !== nomor) {
+//     cachedSizesNomor = nomor;
+//     cachedSizes = null;
+//     hasWarnedNoSizes = false;
+//     try {
+//       const res = await api.get(
+//         `/garmen/cetak-bast/form/${encodeURIComponent(nomor)}/sizes`,
+//       );
+//       cachedSizes = res.data.data || [];
+//     } catch (error: any) {
+//       console.error(
+//         "Gagal mengambil daftar size MAP untuk sinkronisasi",
+//         error,
+//       );
+//       toast.error(
+//         `Gagal memuat daftar size dari server: ${error.response?.data?.message || error.message}`,
+//       );
+//       cachedSizes = [];
+//     }
+//   }
 
-  if (cachedSizes && cachedSizes.length > 0) {
-    cachedSizes.forEach((sz: any) => {
-      formData.value.sizeBreakdown.push({
-        komponen: komponenStr,
-        size: sz.mspks_size,
-        babaran: k.babaran,
-      });
-    });
-  } else if (!hasWarnedNoSizes) {
-    // Toast cuma sekali per pemilihan MAP, bukan per komponen.
-    hasWarnedNoSizes = true;
-    toast.warning(
-      `Tidak ditemukan data ukuran/size untuk MAP ini. Babaran per Size perlu diisi manual.`,
-    );
-  }
-};
+//   if (cachedSizes && cachedSizes.length > 0) {
+//     cachedSizes.forEach((sz: any) => {
+//       formData.value.sizeBreakdown.push({
+//         komponen: komponenStr,
+//         size: sz.mspks_size,
+//         babaran: k.babaran,
+//       });
+//     });
+//   } else if (!hasWarnedNoSizes) {
+//     // Toast cuma sekali per pemilihan MAP, bukan per komponen.
+//     hasWarnedNoSizes = true;
+//     toast.warning(
+//       `Tidak ditemukan data ukuran/size untuk MAP ini. Babaran per Size perlu diisi manual.`,
+//     );
+//   }
+// };
 
 const onMapSelected = async (map: any) => {
   isLoading.value = true;
@@ -346,21 +346,24 @@ const onMapSelected = async (map: any) => {
       data.isApproved = false;
       data.alasanApproval = "";
     }
+    // formData.value = data;
+    // showMapModal.value = false;
+
+    // // Reset cache size — MAP baru dipilih, cache lama (kalau ada) sudah
+    // // tidak relevan.
+    // // cachedSizesNomor = "";
+    // // cachedSizes = null;
+    // // hasWarnedNoSizes = false;
+
+    // await nextTick();
+    // for (const k of formData.value.komponen) {
+    //   if (k.komponen && Number(k.babaran) !== 0) {
+    //     await syncBabaranToSizeBreakdown(k);
+    //   }
+    // }
+    // } catch (e: any) {
     formData.value = data;
     showMapModal.value = false;
-
-    // Reset cache size — MAP baru dipilih, cache lama (kalau ada) sudah
-    // tidak relevan.
-    cachedSizesNomor = "";
-    cachedSizes = null;
-    hasWarnedNoSizes = false;
-
-    await nextTick();
-    for (const k of formData.value.komponen) {
-      if (k.komponen && Number(k.babaran) !== 0) {
-        await syncBabaranToSizeBreakdown(k);
-      }
-    }
   } catch (e: any) {
     toast.error("Gagal memuat data MAP: " + e.message);
   } finally {
@@ -389,7 +392,7 @@ const onBabaranChange = async (k: any) => {
     k.babaran = 0;
     return;
   }
-  await syncBabaranToSizeBreakdown(k);
+  // await syncBabaranToSizeBreakdown(k);
 };
 
 const addAccRow = () =>

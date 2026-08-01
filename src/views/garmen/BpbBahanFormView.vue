@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch } from "vue";
+import { ref, computed, watch, nextTick } from "vue";
 import { useAuthStore } from "@/stores/authStore";
 import { useRoute } from "vue-router";
 import { useRouter } from "vue-router";
@@ -77,6 +77,7 @@ const printMode = ref({
 });
 
 const showPrintConfirm = ref(false);
+const showPrintBarcodeConfirm = ref(false);
 const nomorTerakhir = ref("");
 
 // ── Default data ──
@@ -155,10 +156,13 @@ const {
     });
   },
   onSuccess: (res: any) => {
-    // Tangkap nomor dari backend (sesuai struktur saveData service kita)
     const result = res.data?.data;
     if (result?.nomor) {
       nomorTerakhir.value = result.nomor;
+      formData.value.header.bpb_nomor = result.nomor;
+      if (result?.noBarcodeHdr) {
+        formData.value.header.no_buat_barcode = result.noBarcodeHdr;
+      }
       showPrintConfirm.value = true;
     }
   },
@@ -241,6 +245,55 @@ const setMkbDetail = (item: any) => {
 
   // 3. Reset helper lainnya
   row.harga = 0;
+};
+
+// ── Fokus antar baris Qty/Roll (Tabel 3: Rincian Barcode) ──
+const barcodeQtyRefs = ref<HTMLInputElement[]>([]);
+
+const setBarcodeQtyRef = (el: any, index: number) => {
+  if (el) barcodeQtyRefs.value[index] = el as HTMLInputElement;
+};
+
+const onBarcodeQtyEnter = async (index: number) => {
+  await nextTick();
+  const next = barcodeQtyRefs.value[index + 1];
+  if (next) {
+    next.focus();
+    next.select();
+  }
+};
+
+// ── Fokus antar kolom editable (Tabel 1: Rincian Bahan) ──
+const ITEM_EDITABLE_COLS = [
+  "jumlahyard",
+  "jumlahmeter",
+  "jumlah",
+  "roll",
+  "gramasi",
+  "warna",
+  "setting",
+  "spk",
+] as const;
+
+const itemFieldRefs = ref<Record<string, HTMLInputElement>>({});
+
+const setItemFieldRef = (el: any, idx: number, col: string) => {
+  if (el) itemFieldRefs.value[`${idx}_${col}`] = el as HTMLInputElement;
+};
+
+const onItemFieldEnter = async (
+  idx: number,
+  col: (typeof ITEM_EDITABLE_COLS)[number],
+) => {
+  const colIndex = ITEM_EDITABLE_COLS.indexOf(col);
+  const nextCol = ITEM_EDITABLE_COLS[colIndex + 1];
+  if (!nextCol) return; // sudah kolom terakhir (SPK), diam saja
+  await nextTick();
+  const next = itemFieldRefs.value[`${idx}_${nextCol}`];
+  if (next) {
+    next.focus();
+    next.select();
+  }
 };
 
 // ── Grid logic ──
@@ -534,6 +587,8 @@ const validateSave = () => {
   showSaveDialog.value = true;
 };
 
+const pendingGoBackAfterBarcode = ref(false);
+
 const doPrintDocument = () => {
   showPrintConfirm.value = false;
   const url = router.resolve({
@@ -541,8 +596,35 @@ const doPrintDocument = () => {
     params: { nomor: nomorTerakhir.value },
   }).href;
   window.open(url, "_blank");
-  goBack(); // Kembali ke browse setelah buka tab cetak
+  showPrintBarcodeConfirm.value = true;
 };
+
+const skipPrintDocument = () => {
+  showPrintConfirm.value = false;
+  showPrintBarcodeConfirm.value = true;
+};
+
+const doPrintBarcodeAfterSave = () => {
+  showPrintBarcodeConfirm.value = false;
+  const success = printBarcodeAll();
+  if (success) {
+    // Jangan goBack() sekarang — tunggu dialog barcode ditutup dulu,
+    // supaya user sempat lihat/cetak preview-nya
+    pendingGoBackAfterBarcode.value = true;
+  }
+};
+
+const skipPrintBarcode = () => {
+  showPrintBarcodeConfirm.value = false;
+  goBack();
+};
+
+watch(showBarcodeDialog, (isOpen) => {
+  if (!isOpen && pendingGoBackAfterBarcode.value) {
+    pendingGoBackAfterBarcode.value = false;
+    goBack();
+  }
+});
 
 // ── Print barcode ──
 const printBarcodeSingle = (row: any) => {
@@ -551,14 +633,15 @@ const printBarcodeSingle = (row: any) => {
   printMode.value.barcodeHdr = "";
   showBarcodeDialog.value = true;
 };
-const printBarcodeAll = () => {
-  if (!formData.value.header.no_buat_barcode && !isEditMode.value)
-    return toast.warning(
-      "Simpan data terlebih dahulu untuk generate nomor barcode.",
-    );
+const printBarcodeAll = (): boolean => {
+  if (!formData.value.header.no_buat_barcode && !isEditMode.value) {
+    toast.warning("Simpan data terlebih dahulu untuk generate nomor barcode.");
+    return false;
+  }
   printMode.value.singleBarcode = "";
   printMode.value.barcodeHdr = formData.value.header.no_buat_barcode;
   showBarcodeDialog.value = true;
+  return true;
 };
 </script>
 
@@ -853,7 +936,13 @@ const printBarcodeAll = () => {
                     step="0.01"
                     class="ci tr fw bg-yellow-light"
                     title="Isi Yard → Meter & Terima Skrg otomatis terhitung"
+                    :ref="
+                      (el) => setItemFieldRef(el, Number(idx), 'jumlahyard')
+                    "
                     @blur="onJumlahYardChange(Number(idx))"
+                    @keydown.enter.prevent="
+                      onItemFieldEnter(Number(idx), 'jumlahyard')
+                    "
                     v-select-on-focus
                   />
                 </td>
@@ -864,7 +953,13 @@ const printBarcodeAll = () => {
                     step="0.01"
                     class="ci tr fw bg-yellow-light"
                     title="Isi Meter → Yard & Terima Skrg otomatis terhitung"
+                    :ref="
+                      (el) => setItemFieldRef(el, Number(idx), 'jumlahmeter')
+                    "
                     @blur="onJumlahMeterChange(Number(idx))"
+                    @keydown.enter.prevent="
+                      onItemFieldEnter(Number(idx), 'jumlahmeter')
+                    "
                     v-select-on-focus
                   />
                 </td>
@@ -873,7 +968,11 @@ const printBarcodeAll = () => {
                     v-model.number="item.jumlah"
                     type="number"
                     class="ci tr fw bg-yellow-light"
+                    :ref="(el) => setItemFieldRef(el, Number(idx), 'jumlah')"
                     @blur="onJumlahChange(Number(idx))"
+                    @keydown.enter.prevent="
+                      onItemFieldEnter(Number(idx), 'jumlah')
+                    "
                     v-select-on-focus
                   />
                 </td>
@@ -887,20 +986,55 @@ const printBarcodeAll = () => {
                         ? 'bg-red text-white'
                         : 'bg-yellow-light'
                     "
+                    :ref="(el) => setItemFieldRef(el, Number(idx), 'roll')"
                     @blur="onRollChange(Number(idx))"
+                    @keydown.enter.prevent="
+                      onItemFieldEnter(Number(idx), 'roll')
+                    "
                     v-select-on-focus
                   />
                 </td>
-                <td class="p0"><input v-model="item.gramasi" class="ci" /></td>
-                <td class="p0"><input v-model="item.warna" class="ci" /></td>
-                <td class="p0"><input v-model="item.setting" class="ci" /></td>
+                <td class="p0">
+                  <input
+                    v-model="item.gramasi"
+                    class="ci"
+                    :ref="(el) => setItemFieldRef(el, Number(idx), 'gramasi')"
+                    @keydown.enter.prevent="
+                      onItemFieldEnter(Number(idx), 'gramasi')
+                    "
+                  />
+                </td>
+                <td class="p0">
+                  <input
+                    v-model="item.warna"
+                    class="ci"
+                    :ref="(el) => setItemFieldRef(el, Number(idx), 'warna')"
+                    @keydown.enter.prevent="
+                      onItemFieldEnter(Number(idx), 'warna')
+                    "
+                  />
+                </td>
+                <td class="p0">
+                  <input
+                    v-model="item.setting"
+                    class="ci"
+                    :ref="(el) => setItemFieldRef(el, Number(idx), 'setting')"
+                    @keydown.enter.prevent="
+                      onItemFieldEnter(Number(idx), 'setting')
+                    "
+                  />
+                </td>
                 <td class="p0">
                   <div class="cell-grp">
                     <input
                       v-model="item.spk"
                       class="ci"
                       placeholder="..."
+                      :ref="(el) => setItemFieldRef(el, Number(idx), 'spk')"
                       @change="onSpkChange(Number(idx))"
+                      @keydown.enter.prevent="
+                        onItemFieldEnter(Number(idx), 'spk')
+                      "
                     />
                     <button
                       type="button"
@@ -1041,6 +1175,8 @@ const printBarcodeAll = () => {
                           'bg-blue text-white':
                             b.barcodex && Number(b.jumlahx) !== 0,
                         }"
+                        :ref="(el) => setBarcodeQtyRef(el, Number(i))"
+                        @keydown.enter.prevent="onBarcodeQtyEnter(Number(i))"
                         v-select-on-focus
                       />
                     </td>
@@ -1117,6 +1253,60 @@ const printBarcodeAll = () => {
         <v-spacer />
         <v-btn color="primary" variant="elevated" @click="doPrintDocument">
           <IconPrinter :size="16" class="mr-1" /> Ya, Cetak
+        </v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
+
+  <!-- Dialog Konfirmasi Cetak A4 Setelah Simpan -->
+  <v-dialog v-model="showPrintConfirm" max-width="400" persistent>
+    <v-card class="rounded-lg">
+      <v-card-title class="bg-primary text-white d-flex align-center pa-3">
+        <IconPrinter class="mr-2" :size="20" />
+        <span>Simpan Berhasil</span>
+      </v-card-title>
+      <v-card-text class="pa-4 text-center">
+        <div class="text-body-1 mb-2">
+          Data BPB <b>{{ nomorTerakhir }}</b> telah disimpan.
+        </div>
+        <div class="text-body-2 text-grey-darken-1">
+          Apakah Anda ingin mencetak dokumen BPB ini sekarang?
+        </div>
+      </v-card-text>
+      <v-card-actions class="pa-3 border-t">
+        <v-btn variant="text" @click="skipPrintDocument">Tidak, Tutup</v-btn>
+        <v-spacer />
+        <v-btn color="primary" variant="elevated" @click="doPrintDocument">
+          <IconPrinter :size="16" class="mr-1" /> Ya, Cetak
+        </v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
+
+  <!-- Dialog Konfirmasi Cetak Barcode (Semua) Setelah Simpan -->
+  <v-dialog v-model="showPrintBarcodeConfirm" max-width="400" persistent>
+    <v-card class="rounded-lg">
+      <v-card-title
+        class="bg-teal-darken-2 text-white d-flex align-center pa-3"
+      >
+        <IconPrinter class="mr-2" :size="20" />
+        <span>Cetak Barcode</span>
+      </v-card-title>
+      <v-card-text class="pa-4 text-center">
+        <div class="text-body-2 text-grey-darken-1">
+          Apakah Anda ingin mencetak semua barcode bahan untuk BPB
+          <b>{{ nomorTerakhir }}</b> sekarang?
+        </div>
+      </v-card-text>
+      <v-card-actions class="pa-3 border-t">
+        <v-btn variant="text" @click="skipPrintBarcode">Tidak, Tutup</v-btn>
+        <v-spacer />
+        <v-btn
+          color="teal-darken-2"
+          variant="elevated"
+          @click="doPrintBarcodeAfterSave"
+        >
+          <IconPrinter :size="16" class="mr-1" /> Ya, Cetak Barcode
         </v-btn>
       </v-card-actions>
     </v-card>

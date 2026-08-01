@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, nextTick } from "vue";
 import { useRoute } from "vue-router";
 import { useToast } from "vue-toastification";
 import { useForm } from "@/composables/useForm";
@@ -87,6 +87,7 @@ const {
   executeCancel,
   executeClose,
   fetchData,
+  goBack,
 } = useForm<RealisasiFormData>({
   menuId: "108",
   initialData,
@@ -170,6 +171,86 @@ const {
 });
 
 const showMintaModal = ref(false);
+const barcodeInputRefs = ref<HTMLInputElement[]>([]);
+
+const setBarcodeInputRef = (el: any, index: number) => {
+  if (el) barcodeInputRefs.value[index] = el as HTMLInputElement;
+};
+
+const focusBarcodeInput = (index: number) => {
+  const el = barcodeInputRefs.value[index];
+  if (el) {
+    el.focus();
+    el.select();
+  }
+};
+
+// --- FUNGSI BERSAMA: TARIK DATA PERMINTAAN BERDASARKAN NOMOR ---
+const loadPermintaanData = async (nomor: string) => {
+  const res = await realisasiBahanFormService.getPermintaanInfo(nomor);
+  const data = res.data.data;
+  const h = data.header;
+  formData.value.noMinta = h.nomorMinta;
+  formData.value.spk = h.spk;
+  formData.value.namaSpk = h.namaSpk;
+  formData.value.jumlahSpk = h.jumlahSpk;
+  formData.value.mkb = h.mkb_nomor || h.mkb || "";
+  formData.value.jumlah = 0;
+  formData.value.gudangAsal = h.gudangBahanKode;
+  formData.value.gudangAsalNama = h.gudangBahanNama;
+  formData.value.gudangProduksi = h.gudangProduksiKode;
+  formData.value.gudangProduksiNama = h.gudangProduksiNama;
+  formData.value.barcodes = [];
+  formData.value.details = data.details.map((d: any) => {
+    d.kurang = Number((d.minta - d.sudah).toFixed(2));
+    d.roll = 0;
+    d.netto = 0;
+    d.gross = 0;
+    return d;
+  });
+
+  addBarcodeRow();
+  await nextTick();
+  focusBarcodeInput(0);
+};
+
+// --- 1. KETIKA NO. PERMINTAAN DIPILIH DARI MODAL ---
+const onMintaSelected = async (item: any) => {
+  try {
+    await loadPermintaanData(item.Nomor);
+    toast.success("Data permintaan berhasil dimuat.");
+  } catch (error: any) {
+    console.error("Error Detail:", error);
+    toast.error(
+      error.response?.data?.message || "Gagal mengambil data permintaan.",
+    );
+  }
+};
+
+// --- KEYBOARD HANDLERS: NO. PERMINTAAN ---
+const onMintaKeydown = (e: KeyboardEvent) => {
+  if (e.key === "F1") {
+    e.preventDefault();
+    showMintaModal.value = true;
+  }
+};
+
+const onMintaEnter = async () => {
+  const nomor = (formData.value.noMinta || "").trim().toUpperCase();
+  if (!nomor || isEditMode.value) return;
+  try {
+    isLoading.value = true;
+    await loadPermintaanData(nomor);
+    toast.success("Data permintaan berhasil dimuat.");
+  } catch (error: any) {
+    toast.error(
+      error.response?.data?.message || "No. Permintaan tidak ditemukan.",
+    );
+    formData.value.noMinta = "";
+  } finally {
+    isLoading.value = false;
+  }
+};
 
 // Fungsi Helper untuk Nama Gudang
 const getNamaGudangAsal = (cab: string) => {
@@ -188,46 +269,6 @@ const getNamaGudangProduksi = (kode: string) => {
 // Fungsi Format Angka (agar rapi dan membuang 0.199999)
 const num = (val: number | string) => {
   return Number(val || 0).toLocaleString("id-ID", { maximumFractionDigits: 2 });
-};
-
-// --- 1. KETIKA NO. PERMINTAAN DIPILIH ---
-const onMintaSelected = async (item: any) => {
-  try {
-    const res = await realisasiBahanFormService.getPermintaanInfo(item.Nomor);
-    const data = res.data.data;
-
-    const h = data.header; // <- Ini kuncinya, tampung data header ke variabel h
-
-    formData.value.noMinta = h.nomorMinta;
-    formData.value.spk = h.spk;
-    formData.value.namaSpk = h.namaSpk;
-    formData.value.jumlahSpk = h.jumlahSpk;
-    formData.value.mkb = h.mkb_nomor || h.mkb || "";
-    formData.value.jumlah = 0;
-
-    // PERBAIKAN: Gunakan variabel "h", BUKAN "header" agar tidak crash!
-    formData.value.gudangAsal = h.gudangBahanKode;
-    formData.value.gudangAsalNama = h.gudangBahanNama;
-    formData.value.gudangProduksi = h.gudangProduksiKode;
-    formData.value.gudangProduksiNama = h.gudangProduksiNama;
-
-    formData.value.barcodes = [];
-
-    formData.value.details = data.details.map((d: any) => {
-      d.kurang = Number((d.minta - d.sudah).toFixed(2));
-      d.roll = 0;
-      d.netto = 0; // Pastikan default 0 agar tidak undefined
-      d.gross = 0;
-      return d;
-    });
-
-    toast.success("Data permintaan berhasil dimuat.");
-  } catch (error: any) {
-    console.error("Error Detail:", error);
-    toast.error(
-      error.response?.data?.message || "Gagal mengambil data permintaan.",
-    );
-  }
 };
 
 // --- 2. LOGIKA TABEL 1 (BARCODE) & SINKRONISASI KE TABEL 2 ---
@@ -255,7 +296,6 @@ const onBarcodeEntered = async (item: any, index: number) => {
   try {
     const res = await realisasiBahanFormService.getBarcodeInfo(item.barcode);
     const data = res.data.data;
-
     const isDuplicate = formData.value.barcodes.some(
       (b, i) => b.barcode === data.barcode && i !== index,
     );
@@ -264,15 +304,9 @@ const onBarcodeEntered = async (item: any, index: number) => {
       item.barcode = "";
       return;
     }
-
-    // ← BARU: cek apakah kode bahan hasil scan ada di daftar kebutuhan
-    // (Tabel 2, yang bersumber dari MKB/Minta Bahan). Tidak di-block,
-    // cuma diberi peringatan — bisa saja ini kasus tambahan/pengganti
-    // yang memang sah tapi belum tercatat di MKB.
     const isMatchMkb =
       formData.value.details.length === 0 ||
       formData.value.details.some((d: any) => d.kode === data.kode);
-
     item.kode = data.kode;
     item.nama = data.nama;
     item.satuan = data.satuan;
@@ -281,15 +315,22 @@ const onBarcodeEntered = async (item: any, index: number) => {
     item.kdsup = data.kdsup;
     item.nmsup = data.nmsup;
     item.mismatchMkb = !isMatchMkb;
-
     if (!isMatchMkb) {
       toast.warning(
         `⚠ Bahan "${data.nama}" (${data.kode}) hasil scan TIDAK terdaftar di kebutuhan MKB/Permintaan ini. Pastikan barcode sudah benar.`,
         { timeout: 8000 },
       );
     }
-
     recalculateNetto(item.kode);
+
+    // Otomatis lanjut ke baris berikutnya biar user bisa scan
+    // terus-menerus tanpa klik/pencet apa pun
+    const isLastRow = index === formData.value.barcodes.length - 1;
+    if (isLastRow) {
+      addBarcodeRow();
+    }
+    await nextTick();
+    focusBarcodeInput(index + 1);
   } catch (error: any) {
     toast.error(error.response?.data?.message || "Barcode tidak ditemukan.");
     item.barcode = "";
@@ -412,6 +453,12 @@ const doCetak = () => {
     `/garmen/bahan-baku/realisasi-minta/print/${encodeURIComponent(savedNomor.value)}`,
     "_blank",
   );
+  goBack();
+};
+
+const skipCetak = () => {
+  showPrintDialog.value = false;
+  goBack();
 };
 
 // --- TRIGGER FETCH DATA UNTUK MODE EDIT ---
@@ -463,26 +510,36 @@ onMounted(async () => {
           hide-details
           class="mb-2"
         />
-        <v-text-field
-          v-model="formData.noMinta"
-          label="No. Permintaan"
-          density="compact"
-          variant="outlined"
-          hide-details
-          class="mb-2"
-          readonly
-          @click:append-inner="showMintaModal = true"
-          color="primary"
-        >
-          <template #append-inner>
-            <IconSearch
-              :size="16"
-              :stroke-width="1.7"
-              style="cursor: pointer"
-              @click="showMintaModal = true"
+        <div class="f-row mb-2">
+          <label class="f-lbl">No. Permintaan</label>
+          <div class="inp-grp" style="flex: 1; min-width: 0">
+            <input
+              v-model="formData.noMinta"
+              class="f-inp"
+              style="
+                flex: 1;
+                min-width: 0;
+                background: #ddeeff;
+                font-weight: 600;
+                text-transform: uppercase;
+              "
+              placeholder="F1 / nomor + Enter"
+              :readonly="isEditMode"
+              :class="{ 'f-ro': isEditMode }"
+              @keydown="onMintaKeydown"
+              @keydown.enter.prevent="onMintaEnter"
             />
-          </template>
-        </v-text-field>
+            <button
+              type="button"
+              class="btn-lkp"
+              :disabled="isEditMode"
+              title="Cari Permintaan (F1)"
+              @click="showMintaModal = true"
+            >
+              <IconSearch :size="13" color="#1565c0" />
+            </button>
+          </div>
+        </div>
         <v-textarea
           v-model="formData.keterangan"
           label="Keterangan"
@@ -645,6 +702,7 @@ onMounted(async () => {
                 <td>
                   <input
                     v-model="item.barcode"
+                    :ref="(el) => setBarcodeInputRef(el, index)"
                     class="cell-input fw-bold text-primary"
                     placeholder="Scan di sini..."
                     @change="onBarcodeEntered(item, index)"
@@ -801,9 +859,7 @@ onMounted(async () => {
         sekarang?
       </v-card-text>
       <v-card-actions class="pa-3 border-t bg-grey-lighten-4">
-        <v-btn variant="text" color="error" @click="showPrintDialog = false">
-          Tidak
-        </v-btn>
+        <v-btn variant="text" color="error" @click="skipCetak"> Tidak </v-btn>
         <v-spacer />
         <v-btn color="primary" variant="elevated" @click="doCetak">
           Ya, Cetak
@@ -864,5 +920,77 @@ onMounted(async () => {
   font-weight: 700;
   margin-left: 4px;
   cursor: help;
+}
+
+.f-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 26px;
+}
+.f-lbl {
+  width: 90px;
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: #555;
+  white-space: nowrap;
+}
+.f-inp {
+  height: 26px;
+  border: 1px solid #bdbdbd;
+  border-radius: 3px;
+  padding: 0 5px;
+  font-size: 12px;
+  outline: none;
+  background: white;
+  color: #212121;
+  box-sizing: border-box;
+  font-family: inherit;
+}
+.f-ro {
+  background: #f0f0f0 !important;
+  color: #555 !important;
+}
+.inp-grp {
+  display: flex;
+  border: 1px solid #bdbdbd;
+  border-radius: 4px;
+  overflow: hidden;
+  height: 28px;
+  background: white;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+.inp-grp .f-inp {
+  border: none;
+  border-radius: 0;
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0 6px;
+}
+.btn-lkp {
+  width: 30px;
+  min-width: 30px;
+  height: 100%;
+  background: #e3f2fd;
+  border: none;
+  border-left: 1px solid #bdbdbd;
+  cursor: pointer;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #1565c0;
+}
+.btn-lkp:hover:not(:disabled) {
+  background: #bbdefb;
+}
+.btn-lkp:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  background: #f5f5f5;
 }
 </style>
