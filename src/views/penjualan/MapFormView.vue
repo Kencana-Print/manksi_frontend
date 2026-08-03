@@ -18,7 +18,7 @@ const currentTab = ref(0);
 
 // File holder untuk upload setelah save
 const mainImageFile = ref<File | null>(null);
-const emailImageFile = ref<File | null>(null);
+const poFile = ref<File | null>(null);
 const accBuktiFile = ref<File | null>(null);
 const handleAccBuktiUpload = (file: File) => {
   accBuktiFile.value = file;
@@ -126,8 +126,8 @@ const initialData = {
   isTutupBuku: false,
   MainImageName: "",
   MainImageBlob: "",
-  EmailImageName: "",
-  EmailImageBlob: "",
+  PoFileName: "",
+  PoFileBlob: "",
   Sizes: [] as any[],
   Komponen: [] as any[],
 };
@@ -259,12 +259,12 @@ const {
           "MAIN",
         );
       }
-      if (emailImageFile.value) {
+      if (poFile.value) {
         await mapFormService.uploadGambar(
-          emailImageFile.value,
+          poFile.value,
           savedNomor,
           dataToSave.Cab,
-          "EMAIL",
+          "PO", // ← ganti dari "EMAIL"
         );
       }
       if (accBuktiFile.value) {
@@ -472,8 +472,8 @@ const handleMainUpload = (file: File) => {
   mainImageFile.value = file;
 };
 
-const handleEmailUpload = (file: File) => {
-  emailImageFile.value = file;
+const handlePoUpload = (file: File) => {
+  poFile.value = file;
 };
 
 // ── Logika Navigasi Cetak ──
@@ -555,7 +555,7 @@ const tabs = [
           <TabLainLain
             :form-data="formData"
             :is-edit="isEditMode"
-            @upload-email="handleEmailUpload"
+            @upload-po="handlePoUpload"
             @upload-acc-bukti="handleAccBuktiUpload"
             @acc-bukti-status="(exists) => (isAccImageErrorFromChild = !exists)"
           />

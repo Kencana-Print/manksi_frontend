@@ -16,6 +16,11 @@ const emit = defineEmits(["so-loaded"]);
 const toast = useToast();
 const authStore = useAuthStore();
 
+const isPremiumFlow = computed(() => {
+  const cab = String(props.formData.so_cab || "").toUpperCase();
+  return cab === "P04";
+});
+
 const showSoModal = ref(false);
 const isLoadingSo = ref(false);
 const showPreviewDialog = ref(false);
@@ -152,6 +157,7 @@ const loadSoDetail = async (nomor: string) => {
     props.formData.so_sublim = h.spk_sublim || "N";
     props.formData.so_kepentingan = h.spk_statuskerja || "";
     props.formData.so_dateline = h.spk_dateline?.substring(0, 10) || "";
+    props.formData.spk_keterangan = h.spk_keterangan || "";
 
     // Ambil detail size dari SO (jadi starting point, boleh disesuaikan PPIC nanti)
     props.formData.Sizes = d.dtlSize || [];
@@ -288,9 +294,14 @@ onMounted(async () => {
           >
             Cust PERFECT
           </span>
+
+          <span v-if="formData.so_nomor && !isPremiumFlow" class="badge-legacy">
+            Workshop {{ formData.so_cab }} — Flow Standar
+          </span>
         </div>
 
         <div v-if="formData.so_nomor" class="so-detail-grid mt-2">
+          <!-- Baris 1: Nama + MAP/Customer (selalu) -->
           <div class="fr">
             <label class="lbl">Nama Pekerjaan</label>
             <input
@@ -300,7 +311,6 @@ onMounted(async () => {
               style="flex: 1"
             />
           </div>
-
           <div class="fr">
             <label class="lbl">No. MAP</label>
             <input
@@ -318,32 +328,69 @@ onMounted(async () => {
             />
           </div>
 
-          <div class="fr">
-            <label class="lbl">Ket. Ukuran</label>
-            <input
-              :value="formData.so_ket_ukuran"
-              readonly
-              class="inp ro"
-              style="flex: 1"
-            />
-          </div>
-
-          <div class="fr">
-            <label class="lbl">Kain</label>
-            <input
-              :value="formData.so_kain"
-              readonly
-              class="inp ro"
-              style="flex: 1; max-width: 260px"
-            />
-            <label class="lbl ml-2" style="width: 65px">Gramasi</label>
-            <input
-              :value="formData.so_gramasi"
-              readonly
-              class="inp ro"
-              style="width: 100px"
-            />
-          </div>
+          <!-- Legacy flow: tampilkan Panjang x Lebar x Gramasi ala SalesOrderTabSo -->
+          <template v-if="!isPremiumFlow">
+            <div class="fr">
+              <label class="lbl">Ukuran</label>
+              <input
+                :value="formData.so_panjang"
+                readonly
+                class="inp ro"
+                style="width: 80px"
+              />
+              <span class="mx-1 sep-txt">X</span>
+              <input
+                :value="formData.so_lebar"
+                readonly
+                class="inp ro"
+                style="width: 80px"
+              />
+              <span class="ml-1 sep-txt">Mtr</span>
+              <label class="lbl ml-2" style="width: 80px">Ket. Ukuran</label>
+              <input
+                :value="formData.so_ket_ukuran"
+                readonly
+                class="inp ro"
+                style="flex: 1"
+              />
+            </div>
+            <div class="fr">
+              <label class="lbl">Gramasi</label>
+              <input
+                :value="formData.so_gramasi"
+                readonly
+                class="inp ro"
+                style="width: 260px"
+              />
+            </div>
+          </template>
+          <template v-else>
+            <div class="fr">
+              <label class="lbl">Ket. Ukuran</label>
+              <input
+                :value="formData.so_ket_ukuran"
+                readonly
+                class="inp ro"
+                style="flex: 1"
+              />
+            </div>
+            <div class="fr">
+              <label class="lbl">Kain</label>
+              <input
+                :value="formData.so_kain"
+                readonly
+                class="inp ro"
+                style="flex: 1; max-width: 260px"
+              />
+              <label class="lbl ml-2" style="width: 65px">Gramasi</label>
+              <input
+                :value="formData.so_gramasi"
+                readonly
+                class="inp ro"
+                style="width: 100px"
+              />
+            </div>
+          </template>
 
           <div class="fr">
             <label class="lbl">Finishing</label>
@@ -389,7 +436,8 @@ onMounted(async () => {
             />
           </div>
 
-          <div class="fr">
+          <!-- Warna badan/lengan/lain hanya relevan buat garmen (premium) -->
+          <div v-if="isPremiumFlow" class="fr">
             <label class="lbl">Warna Badan</label>
             <input
               :value="formData.so_warna_badan"
@@ -950,5 +998,20 @@ onMounted(async () => {
   padding: 3px 8px;
   border-radius: 3px;
   white-space: nowrap;
+}
+.badge-legacy {
+  margin-left: 8px;
+  background: #e3f2fd;
+  border: 1px solid #64b5f6;
+  color: #1565c0;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+.sep-txt {
+  color: #555;
+  font-size: 11px;
 }
 </style>

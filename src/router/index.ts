@@ -978,6 +978,27 @@ const router = createRouter({
         requiresAuth: true,
       },
     },
+    {
+      path: "/garmen/bahan-jadi/cetak-bkbj",
+      name: "CetakBkbjBrowse",
+      component: () => import("@/views/garmen/CetakBkbjView.vue"),
+      meta: {
+        title: "Cetak Bukti Keluar Barang Jadi",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "143",
+      },
+    },
+    {
+      path: "/garmen/bahan-jadi/cetak-bkbj/print",
+      name: "CetakBkbjPrint",
+      component: () => import("@/views/garmen/CetakBkbjPrintView.vue"),
+      meta: {
+        title: "Cetak BKBJ",
+        layout: "BlankLayout",
+        requiresAuth: true,
+      },
+    },
 
     {
       path: "/garmen/mka",

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
 import { useForm } from "@/composables/useForm";
@@ -11,6 +11,7 @@ import SpkTabOrder from "./components/SpkTabOrder.vue";
 import SpkTabKomponen from "./components/SpkTabKomponen.vue";
 import SpkTabLayoutProses from "./components/SpkTabLayoutProses.vue";
 import SpkTabKeterangan from "./components/SpkTabKeterangan.vue";
+import SpkTabAlokasi from "./components/SpkTabAlokasi.vue";
 
 const route = useRoute();
 const router = useRouter();
@@ -52,6 +53,9 @@ const defaultData = {
   spk_ketbeli: "",
   spk_keterangan: "",
 
+  spk_cab: "",
+  isPremiumFlow: true,
+
   Sizes: [] as any[],
   KomponenSpk: {
     ListPotong: [] as any[],
@@ -59,6 +63,7 @@ const defaultData = {
   },
   KeteranganKhusus: [] as string[],
   KetKomponenList: [] as any[],
+  Alokasi: [] as any[],
 };
 
 const {
@@ -106,6 +111,7 @@ const {
 
     return {
       ...mapped,
+      isPremiumFlow: d.isPremiumFlow ?? true,
       Sizes: d.dtlSize || [],
       KomponenSpk: d.komponenSpk || { ListPotong: [], ListCetakBordir: [] },
       KeteranganKhusus: d.keteranganKhusus || [],
@@ -113,6 +119,7 @@ const {
         ...k,
         checked: k.checked === 1 || k.checked === true,
       })),
+      Alokasi: d.alokasi || [],
     };
   },
 
@@ -126,6 +133,7 @@ const {
       komponenSpk: data.KomponenSpk,
       keteranganKhusus: data.KeteranganKhusus,
       ketKomponenList: data.KetKomponenList,
+      alokasi: data.Alokasi,
     };
 
     if (isEditMode.value) {
@@ -167,6 +175,7 @@ function mapHeaderToFormData(h: any) {
     so_nomor_po: h.spk_nomor_po || "",
     so_dateline: h.spk_dateline?.substring(0, 10) || "",
     so_tipe: h.spk_tipe || "",
+    spk_cab: h.spk_cab || "",
     so_gramasi: h.spk_gramasi || "",
     so_panjang: Number(h.spk_panjang) || 0,
     so_lebar: Number(h.spk_lebar) || 0,
@@ -182,15 +191,16 @@ function mapHeaderToFormData(h: any) {
 // --- Mode CREATE: SpkTabOrder sudah memuat & mengisi formData sendiri
 // lewat getSoSource saat user pilih SO. Handler ini cuma dengerin event
 // untuk keperluan tab lain (misal reset komponen/keterangan saat ganti SO). ---
-const handleSoLoaded = (_soData: any) => {
-  // formData.so_* & formData.Sizes sudah diisi langsung oleh SpkTabOrder.
-  // Reset state SPK-spesifik karena ini SO baru (relevan saat ganti SO sebelum SPK disimpan).
+const handleSoLoaded = (soData: any) => {
   if (!isEditMode.value) {
     formData.value.spk_nomor = "";
     formData.value.spk_ketbeli = "";
-    formData.value.spk_keterangan = "";
     formData.value.KomponenSpk = { ListPotong: [], ListCetakBordir: [] };
     formData.value.KeteranganKhusus = [];
+
+    formData.value.isPremiumFlow = soData?.isPremiumFlow ?? true;
+    formData.value.spk_cab = soData?.header?.spk_cab || "";
+    formData.value.Alokasi = soData?.soAlokasi || [];
   }
 };
 
@@ -206,12 +216,26 @@ onMounted(async () => {
   if (isEditMode.value) await fetchData();
 });
 
-const tabs = [
-  { title: "Order" },
-  { title: "Komponen SPK" },
-  { title: "Layout Proses" },
-  { title: "Keterangan" },
-];
+const tabs = computed(() => {
+  if (formData.value.isPremiumFlow) {
+    return [
+      { key: "order", title: "Order" },
+      { key: "komponen", title: "Komponen SPK" },
+      { key: "layout", title: "Layout Proses" },
+      { key: "keterangan", title: "Keterangan" },
+    ];
+  }
+  return [
+    { key: "order", title: "Order" },
+    { key: "alokasi", title: "Alokasi" },
+    { key: "keterangan", title: "Keterangan" },
+  ];
+});
+
+// Reset activeTab kalau sedang di tab yang hilang setelah flow berubah
+watch(tabs, (newTabs) => {
+  if (activeTab.value >= newTabs.length) activeTab.value = 0;
+});
 </script>
 
 <template>
@@ -244,21 +268,40 @@ const tabs = [
       </div>
 
       <div class="pf-tab-body">
-        <div v-show="activeTab === 0" class="pf-tab-pane">
+        <div v-show="tabs[activeTab]?.key === 'order'" class="pf-tab-pane">
           <SpkTabOrder
             :form-data="formData"
             :is-edit="isEditMode"
             @so-loaded="handleSoLoaded"
           />
         </div>
-        <div v-show="activeTab === 1" class="pf-tab-pane">
-          <SpkTabKomponen :form-data="formData" :is-edit="isEditMode" />
+
+        <!-- Tab premium only -->
+        <template v-if="formData.isPremiumFlow">
+          <div v-show="tabs[activeTab]?.key === 'komponen'" class="pf-tab-pane">
+            <SpkTabKomponen :form-data="formData" :is-edit="isEditMode" />
+          </div>
+          <div v-show="tabs[activeTab]?.key === 'layout'" class="pf-tab-pane">
+            <SpkTabLayoutProses :form-data="formData" :is-edit="isEditMode" />
+          </div>
+        </template>
+
+        <!-- Tab legacy only -->
+        <div
+          v-if="!formData.isPremiumFlow"
+          v-show="tabs[activeTab]?.key === 'alokasi'"
+          class="pf-tab-pane"
+        >
+          <SpkTabAlokasi :form-data="formData" />
         </div>
-        <div v-show="activeTab === 2" class="pf-tab-pane">
-          <SpkTabLayoutProses :form-data="formData" :is-edit="isEditMode" />
-        </div>
-        <div v-show="activeTab === 3" class="pf-tab-pane">
-          <SpkTabKeterangan :form-data="formData" :is-edit="isEditMode" />
+
+        <!-- Keterangan — tersedia di KEDUA flow -->
+        <div v-show="tabs[activeTab]?.key === 'keterangan'" class="pf-tab-pane">
+          <SpkTabKeterangan
+            :form-data="formData"
+            :is-edit="isEditMode"
+            :is-premium-flow="formData.isPremiumFlow"
+          />
         </div>
       </div>
     </div>

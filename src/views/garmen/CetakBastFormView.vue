@@ -66,9 +66,8 @@ const savedNomor = ref("");
 const showBahanModal = ref(false);
 const activeBahanIdx = ref(-1);
 const listKomponen = ref<string[]>([]);
-// let cachedSizesNomor = "";
-// let cachedSizes: any[] | null = null;
-// let hasWarnedNoSizes = false;
+let cachedSizesNomor = "";
+let cachedSizes: any[] | null = null;
 
 function normalizeHeader(h: any) {
   return {
@@ -257,67 +256,55 @@ const onKeterangan8Blur = () => {
   });
 };
 
-// // Arah 3: Bahan (komponen.babaran) → Babaran per Size — begitu babaran
-// // suatu komponen diisi:
-// // - Kalau sudah ada baris size untuk komponen itu, update nilainya.
-// // - Kalau belum ada sama sekali, auto-generate baris dari daftar size MAP.
-// const syncBabaranToSizeBreakdown = async (k: any) => {
-//   const komponenStr = (k.komponen || "").trim();
-//   if (!komponenStr) return;
+// Generate baris Babaran per Size untuk 1 komponen, HANYA kalau belum
+// ada baris untuk komponen itu — tidak menimpa apapun yang sudah ada,
+// tidak sinkron balik ke Babaran di tab Bahan. babaran selalu mulai
+// dari 0, diisi manual oleh user.
+const ensureSizeRowsForKomponen = async (komponenStr: string) => {
+  if (!komponenStr) return;
 
-//   const existingRows = formData.value.sizeBreakdown.filter(
-//     (s: any) => s.komponen === komponenStr,
-//   );
+  const alreadyExists = formData.value.sizeBreakdown.some(
+    (s: any) => s.komponen === komponenStr,
+  );
+  if (alreadyExists) return;
 
-//   if (existingRows.length > 0) {
-//     existingRows.forEach((s: any) => {
-//       s.babaran = k.babaran;
-//     });
-//     return;
-//   }
+  const nomor = formData.value.header.mspk_nomor;
+  if (!nomor) return;
 
-//   const nomor =
-//     formData.value.header.mspk_nomor || formData.value.header.mspk_nomor;
+  if (cachedSizesNomor !== nomor) {
+    cachedSizesNomor = nomor;
+    cachedSizes = null;
+    try {
+      const res = await api.get(
+        `/garmen/cetak-bast/form/${encodeURIComponent(nomor)}/sizes`,
+      );
+      cachedSizes = res.data.data || [];
+    } catch (error: any) {
+      console.error("Gagal mengambil daftar size MAP", error);
+      cachedSizes = [];
+    }
+  }
 
-//   // Cache: kalau nomor MAP sama dengan cache sebelumnya, pakai hasil
-//   // yang sudah diambil, jangan hit API lagi.
-//   if (cachedSizesNomor !== nomor) {
-//     cachedSizesNomor = nomor;
-//     cachedSizes = null;
-//     hasWarnedNoSizes = false;
-//     try {
-//       const res = await api.get(
-//         `/garmen/cetak-bast/form/${encodeURIComponent(nomor)}/sizes`,
-//       );
-//       cachedSizes = res.data.data || [];
-//     } catch (error: any) {
-//       console.error(
-//         "Gagal mengambil daftar size MAP untuk sinkronisasi",
-//         error,
-//       );
-//       toast.error(
-//         `Gagal memuat daftar size dari server: ${error.response?.data?.message || error.message}`,
-//       );
-//       cachedSizes = [];
-//     }
-//   }
+  if (cachedSizes && cachedSizes.length > 0) {
+    cachedSizes.forEach((sz: any) => {
+      formData.value.sizeBreakdown.push({
+        komponen: komponenStr,
+        size: sz.mspks_size,
+        babaran: 0,
+      });
+    });
+  } else {
+    toast.warning(
+      `Tidak ditemukan data ukuran/size untuk MAP ini. Babaran per Size perlu diisi manual.`,
+    );
+  }
+};
 
-//   if (cachedSizes && cachedSizes.length > 0) {
-//     cachedSizes.forEach((sz: any) => {
-//       formData.value.sizeBreakdown.push({
-//         komponen: komponenStr,
-//         size: sz.mspks_size,
-//         babaran: k.babaran,
-//       });
-//     });
-//   } else if (!hasWarnedNoSizes) {
-//     // Toast cuma sekali per pemilihan MAP, bukan per komponen.
-//     hasWarnedNoSizes = true;
-//     toast.warning(
-//       `Tidak ditemukan data ukuran/size untuk MAP ini. Babaran per Size perlu diisi manual.`,
-//     );
-//   }
-// };
+// Dipanggil saat user pilih/ganti Komponen di grid Bahan
+const onKomponenChange = async (k: any) => {
+  const komponenStr = (k.komponen || "").trim();
+  await ensureSizeRowsForKomponen(komponenStr);
+};
 
 const onMapSelected = async (map: any) => {
   isLoading.value = true;
@@ -346,24 +333,23 @@ const onMapSelected = async (map: any) => {
       data.isApproved = false;
       data.alasanApproval = "";
     }
-    // formData.value = data;
-    // showMapModal.value = false;
 
-    // // Reset cache size — MAP baru dipilih, cache lama (kalau ada) sudah
-    // // tidak relevan.
-    // // cachedSizesNomor = "";
-    // // cachedSizes = null;
-    // // hasWarnedNoSizes = false;
-
-    // await nextTick();
-    // for (const k of formData.value.komponen) {
-    //   if (k.komponen && Number(k.babaran) !== 0) {
-    //     await syncBabaranToSizeBreakdown(k);
-    //   }
-    // }
-    // } catch (e: any) {
     formData.value = data;
     showMapModal.value = false;
+
+    // Reset cache — MAP baru dipilih, cache size lama sudah tidak relevan.
+    cachedSizesNomor = "";
+    cachedSizes = null;
+
+    // Auto-generate baris size untuk komponen yang sudah punya nama
+    // (misal bawaan dari MAP), babaran tetap 0 — diisi manual.
+    await nextTick();
+    for (const k of formData.value.komponen) {
+      const komponenStr = (k.komponen || "").trim();
+      if (komponenStr) {
+        await ensureSizeRowsForKomponen(komponenStr);
+      }
+    }
   } catch (e: any) {
     toast.error("Gagal memuat data MAP: " + e.message);
   } finally {
@@ -385,14 +371,13 @@ const openBahanModal = (idx: number) => {
   showBahanModal.value = true;
 };
 
-const onBabaranChange = async (k: any) => {
+const onBabaranChange = (k: any) => {
   const komponenStr = (k.komponen || "").trim();
   if (!komponenStr) {
     toast.warning("Komponen silahkan di isi dulu ya");
     k.babaran = 0;
-    return;
   }
-  // await syncBabaranToSizeBreakdown(k);
+  // Babaran per Size TIDAK disinkron otomatis dari sini — murni manual.
 };
 
 const addAccRow = () =>
@@ -795,6 +780,7 @@ onMounted(() => {
                       v-model="k.komponen"
                       class="cell-inp font-weight-bold"
                       :style="k.babarank > 0 ? 'color: #1565c0;' : ''"
+                      @change="onKomponenChange(k)"
                     >
                       <option value="" disabled>Pilih...</option>
                       <option

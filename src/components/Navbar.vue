@@ -470,7 +470,7 @@ const menuItems: NavItem[] = [
       },
       {
         title: "Bahan Jadi",
-        icon: IconShirt, // atau IconBox, sesuaikan
+        icon: IconShirt,
         menuId: 921,
         subItems: [
           {
@@ -478,6 +478,12 @@ const menuItems: NavItem[] = [
             to: "/garmen/bahan-jadi/stbj",
             icon: IconClipboardCheck,
             menuId: 105,
+          },
+          {
+            title: "Cetak Bukti Keluar Barang Jadi (BKBJ)",
+            to: "/garmen/bahan-jadi/cetak-bkbj",
+            icon: IconFileInvoice,
+            menuId: 143,
           },
         ],
       },

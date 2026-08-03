@@ -10,11 +10,7 @@ import {
 } from "@tabler/icons-vue";
 
 const props = defineProps<{ formData: any; isEdit: boolean }>();
-const emit = defineEmits([
-  "upload-email",
-  "upload-acc-bukti",
-  "acc-bukti-status",
-]);
+const emit = defineEmits(["upload-po", "upload-acc-bukti", "acc-bukti-status"]);
 const toast = useToast();
 
 const totalQtySize = computed(
@@ -35,10 +31,10 @@ const updateToKetUkuran = () => {
 };
 
 // Email image
-const showEmailDialog = ref(false);
-const isEmailImageError = ref(false); // ← tetap dipakai buat state "beneran kosong"
-
-const emailCacheBust = ref(0);
+const showPoDialog = ref(false);
+const isPoFileError = ref(false);
+const poCacheBust = ref(0);
+const poFileExt = ref<"jpg" | "pdf" | "legacy-email" | "">("");
 
 // ── Persetujuan Customer ──
 const showAccDialog = ref(false);
@@ -49,10 +45,11 @@ const fileAccRef = ref<HTMLInputElement | null>(null);
 watch(
   () => props.formData,
   () => {
-    isEmailImageError.value = false;
-    isAccImageError.value = false; // ← tambahan
-    emailCacheBust.value = Date.now();
-    accCacheBust.value = Date.now(); // ← tambahan
+    isPoFileError.value = false;
+    isAccImageError.value = false;
+    poCacheBust.value = Date.now();
+    accCacheBust.value = Date.now();
+    poFileExt.value = "";
   },
   { flush: "post" },
 );
@@ -60,12 +57,11 @@ watch(
 const accCacheBust = ref(0);
 
 watch(
-  () => props.formData.EmailImageBlob,
+  () => props.formData.PoFileBlob,
   () => {
-    isEmailImageError.value = false;
+    isPoFileError.value = false;
   },
 );
-
 watch(
   () => props.formData.AccBuktiBlob,
   () => {
@@ -73,51 +69,69 @@ watch(
   },
 );
 
-const fileEmailRef = ref<HTMLInputElement | null>(null);
+const filePoRef = ref<HTMLInputElement | null>(null);
 
 const getBaseUrl = () => api.defaults.baseURL?.replace(/\/api\/?$/, "") || "";
 
-const displayEmailUrl = computed(() => {
-  if (isEmailImageError.value) return "";
-  if (props.formData.EmailImageBlob) return props.formData.EmailImageBlob;
+const isPoLocalPdf = computed(
+  () => props.formData.PoFileName?.toLowerCase().endsWith(".pdf") || false,
+);
+
+const displayPoUrl = computed(() => {
+  if (isPoFileError.value) return "";
+  if (props.formData.PoFileBlob) return props.formData.PoFileBlob; // blob lokal (baru dipilih)
   if (!props.isEdit) return "";
   const nomor = props.formData.Nomor;
   if (!nomor) return "";
 
   const base = getBaseUrl();
   const cab = props.formData.Cab || "HO-";
-  return `${base}/images/${cab}/map/${encodeURIComponent(nomor)}-email.jpg?v=${emailCacheBust.value}`;
+  const ext = poFileExt.value || "jpg"; // default coba jpg dulu
+  return `${base}/images/${cab}/map/${encodeURIComponent(nomor)}-po.${ext}?v=${poCacheBust.value}`;
 });
 
-// ← DIGANTI: sekarang fallback ke VPS legacy (data lama sebelum fitur
-// Screenshot Email ada di web — pakai gambar desain utama sebagai best-effort)
-const onEmailImageError = (e: Event) => {
-  const img = e.target as HTMLImageElement;
-  if (img.dataset.tried === "true") {
-    isEmailImageError.value = true; // sudah dicoba VPS juga & tetap gagal → beneran kosong
+const isPoPdf = computed(() =>
+  props.formData.PoFileBlob ? isPoLocalPdf.value : poFileExt.value === "pdf",
+);
+
+// Coba berantai: jpg → pdf → (fallback lama) -email.jpg → gagal
+const onPoFileError = () => {
+  if (poFileExt.value === "") {
+    // baru gagal coba jpg, coba pdf
+    poFileExt.value = "pdf";
     return;
   }
-  img.dataset.tried = "true";
-  const nomor = props.formData.Nomor;
-  if (nomor) {
-    // ✅ FIX: path relatif, gak hardcode host/port
-    img.src = `/file-gambar/${encodeURIComponent(nomor)}.jpg`;
-  } else {
-    isEmailImageError.value = true;
+  if (poFileExt.value === "pdf") {
+    // ⚠️ fallback ke nama file lama (data sebelum rename Email→PO)
+    poFileExt.value = "legacy-email";
+    return;
   }
+  isPoFileError.value = true;
 };
 
-const onEmailChange = (e: Event) => {
+const legacyEmailUrl = computed(() => {
+  const nomor = props.formData.Nomor;
+  if (!nomor) return "";
+  const base = getBaseUrl();
+  const cab = props.formData.Cab || "HO-";
+  return `${base}/images/${cab}/map/${encodeURIComponent(nomor)}-email.jpg?v=${poCacheBust.value}`;
+});
+
+const onPoChange = (e: Event) => {
   const file = (e.target as HTMLInputElement).files?.[0];
   if (!file) return;
-  if (file.size > 500_000) {
-    toast.error("Ukuran gambar Screenshot Email tidak boleh > 500 Kb.");
+  const isPdf = file.type === "application/pdf";
+  const maxSize = isPdf ? 2_000_000 : 500_000; // PDF boleh lebih besar
+  if (file.size > maxSize) {
+    toast.error(
+      `Ukuran ${isPdf ? "PDF" : "gambar"} tidak boleh > ${isPdf ? "2 Mb" : "500 Kb"}.`,
+    );
     return;
   }
-  isEmailImageError.value = false;
-  props.formData.EmailImageName = file.name;
-  props.formData.EmailImageBlob = URL.createObjectURL(file);
-  emit("upload-email", file);
+  isPoFileError.value = false;
+  props.formData.PoFileName = file.name;
+  props.formData.PoFileBlob = URL.createObjectURL(file);
+  emit("upload-po", file);
 };
 
 const displayAccUrl = computed(() => {
@@ -314,7 +328,7 @@ watch(isAccImageError, (val) => {
       </div>
     </div>
 
-    <!-- ── 3. Screenshot Email ── -->
+    <!-- ── 3. Lampiran PO ── -->
     <div
       class="ll-card"
       style="
@@ -324,50 +338,64 @@ watch(isAccImageError, (val) => {
         flex-direction: column;
       "
     >
-      <div class="ll-card-title">Screenshot Email</div>
+      <div class="ll-card-title">Lampiran PO</div>
 
       <div class="ll-upload-name">
-        {{ formData.EmailImageName || "Ukuran Maksimal 500 Kb" }}
+        {{ formData.PoFileName || "Gambar maks 500 Kb / PDF maks 2 Mb" }}
       </div>
 
       <div class="ll-upload-row">
-        <button
-          type="button"
-          class="ll-upload-btn"
-          @click="fileEmailRef?.click()"
-        >
+        <button type="button" class="ll-upload-btn" @click="filePoRef?.click()">
           <IconUpload :size="13" class="mr-1" /> Upload
         </button>
         <button
+          v-if="!isPoPdf"
           type="button"
           class="ll-upload-btn blue"
-          @click="displayEmailUrl && (showEmailDialog = true)"
+          @click="displayPoUrl && (showPoDialog = true)"
         >
           <IconMaximize :size="13" class="mr-1" /> Full Screen
         </button>
+
+        <a
+          v-else
+          class="ll-upload-btn blue"
+          :href="displayPoUrl"
+          target="_blank"
+          rel="noopener"
+          style="text-decoration: none; text-align: center"
+        >
+          Buka PDF
+        </a>
       </div>
 
       <div class="ll-img-box" style="flex: 1">
+        <template v-if="isPoPdf && displayPoUrl">
+          <div class="ll-pdf-badge">
+            <span style="font-size: 28px">📄</span>
+            <div style="font-size: 10px; margin-top: 4px">File PDF</div>
+          </div>
+        </template>
         <img
-          v-if="displayEmailUrl"
-          :src="displayEmailUrl"
+          v-else-if="displayPoUrl"
+          :src="poFileExt === 'legacy-email' ? legacyEmailUrl : displayPoUrl"
           class="ll-img"
-          @click="showEmailDialog = true"
-          @error="onEmailImageError"
+          @click="showPoDialog = true"
+          @error="onPoFileError"
           style="cursor: pointer"
         />
         <div v-else class="ll-img-empty">
           <IconPhoto :size="28" color="#bdbdbd" />
-          <div>No Image available</div>
+          <div>Belum ada lampiran</div>
         </div>
       </div>
 
       <input
-        ref="fileEmailRef"
+        ref="filePoRef"
         type="file"
-        accept="image/*"
+        accept="image/*,application/pdf"
         style="display: none"
-        @change="onEmailChange"
+        @change="onPoChange"
       />
     </div>
 
@@ -481,17 +509,15 @@ watch(isAccImageError, (val) => {
   </div>
 
   <!-- Preview dialog -->
-  <v-dialog v-model="showEmailDialog" max-width="800px">
+  <v-dialog v-model="showPoDialog" max-width="800px">
     <div class="preview-card">
       <div class="preview-header">
-        <span>Preview Screenshot Email</span>
-        <button class="preview-close" @click="showEmailDialog = false">
-          ✕
-        </button>
+        <span>Preview Lampiran PO</span>
+        <button class="preview-close" @click="showPoDialog = false">✕</button>
       </div>
       <div class="preview-body">
         <v-img
-          :src="displayEmailUrl"
+          :src="displayPoUrl"
           max-height="600"
           contain
           class="bg-white rounded"

@@ -6,7 +6,10 @@ import api from "@/services/api";
 const props = defineProps<{
   formData: any;
   isEdit: boolean;
+  isPremiumFlow?: boolean; // ← baru, default true supaya behavior lama tetap aman
 }>();
+
+const isPremium = computed(() => props.isPremiumFlow !== false);
 
 const ensureTrailingEmptyRow = () => {
   if (!props.formData.KeteranganKhusus) props.formData.KeteranganKhusus = [];
@@ -48,8 +51,8 @@ const mkaFromMap = ref<{
     babaran: number;
     babarank: number;
   }[];
-  sizeBreakdown: { komponen: string; size: string; babaran: number }[]; // ← tambahan
-}>({ aksesoris: [], komponen: [], sizeBreakdown: [] }); // ← tambahan default
+  sizeBreakdown: { komponen: string; size: string; babaran: number }[];
+}>({ aksesoris: [], komponen: [], sizeBreakdown: [] });
 const isLoadingMka = ref(false);
 const hasMkaFromMap = computed(
   () =>
@@ -58,6 +61,7 @@ const hasMkaFromMap = computed(
 );
 
 const loadMkaFromMap = async () => {
+  if (!isPremium.value) return; // ⚠️ skip fetch sama sekali untuk legacy flow
   const mapNomor = props.formData.so_map;
   if (!mapNomor) {
     mkaFromMap.value = { aksesoris: [], komponen: [], sizeBreakdown: [] };
@@ -79,6 +83,7 @@ const loadMkaFromMap = async () => {
 // onMounted sebagai jaring pengaman — watcher so_nomor saja bisa terlewat kalau
 // SpkTabOrder mengisi formData.so_nomor setelah komponen ini sudah ter-mount.
 onMounted(() => {
+  if (!isPremium.value) return; // ⚠️ legacy flow tidak butuh Special Process / MKA
   ensureTrailingEmptyRow();
   initKetKomponen();
   loadMkaFromMap();
@@ -86,7 +91,7 @@ onMounted(() => {
 watch(
   () => props.formData.so_nomor,
   (nomor) => {
-    if (nomor) ensureTrailingEmptyRow();
+    if (nomor && isPremium.value) ensureTrailingEmptyRow();
   },
 );
 watch(
@@ -109,8 +114,8 @@ const addRow = () => {
 
 <template>
   <div class="ket-layout">
-    <!-- Kolom kiri: Special Process -->
-    <div class="ket-col">
+    <!-- Kolom kiri: Special Process — PREMIUM ONLY -->
+    <div v-if="isPremium" class="ket-col">
       <div class="section-card full-height">
         <div class="sec-header">
           <span class="sec-title">Keterangan Special Process (Opsional)</span>
@@ -161,12 +166,8 @@ const addRow = () => {
       </div>
     </div>
 
-    <!-- Kolom tengah: Keterangan Komponen MKA -->
-    <div class="ket-col ket-col-wide">
-      <!-- Checklist MKA manual (A/B/C...) — HANYA muncul kalau TIDAK ada
-       data Accessories/Babaran dari BAST MAP. Kalau BAST MAP sudah
-       diisi, itu dianggap sumber kebenaran, checklist manual tidak
-       relevan lagi supaya tidak dobel-input. -->
+    <!-- Kolom tengah: Keterangan Komponen MKA — PREMIUM ONLY -->
+    <div v-if="isPremium" class="ket-col ket-col-wide">
       <div v-if="!hasMkaFromMap" class="section-card full-height">
         <div class="sec-header">
           <span class="sec-title" style="color: #2e7d32"
@@ -214,7 +215,6 @@ const addRow = () => {
         </table>
       </div>
 
-      <!-- Panel BAST MAP — muncul kalau ada data, MENGGANTIKAN checklist -->
       <div v-if="hasMkaFromMap" class="section-card full-height">
         <div class="sec-header">
           <span class="sec-title" style="color: #7b1fa2">
@@ -277,21 +277,19 @@ const addRow = () => {
       </div>
     </div>
 
-    <!-- Kolom kanan: Gudang + Produksi -->
-    <div class="ket-col ket-col-right">
-      <!-- <div class="section-card ket-card">
-        <div class="sec-title mb-2">Keterangan Gudang/Pembelian</div>
-        <textarea
-          v-model="formData.spk_ketbeli"
-          class="ket-textarea"
-          placeholder="Keterangan untuk gudang/pembelian..."
-        />
-      </div> -->
+    <!-- Kolom kanan: Keterangan Produksi — SEMUA FLOW.
+     Fixed 280px saat premium (di samping 2 kolom lain);
+     lebih lebar tapi TIDAK full-height saat legacy (berdiri sendiri). -->
+    <div
+      class="ket-col"
+      :class="isPremium ? 'ket-col-right' : 'ket-col-standalone'"
+    >
       <div class="section-card ket-card mt-2">
         <div class="sec-title mb-2">Keterangan Produksi</div>
         <textarea
           v-model="formData.spk_keterangan"
           class="ket-textarea"
+          :class="{ 'ket-textarea-standalone': !isPremium }"
           placeholder="Keterangan untuk produksi..."
         />
       </div>
@@ -308,7 +306,7 @@ const addRow = () => {
   font-size: 11px;
   height: 100%;
   overflow-y: auto;
-  align-items: stretch;
+  align-items: flex-start;
 }
 .ket-col {
   display: flex;
@@ -321,6 +319,14 @@ const addRow = () => {
 }
 .ket-col-right {
   flex: 0 0 280px;
+}
+.ket-col-standalone {
+  flex: 0 1 700px; /* lebar wajar, tidak full width */
+  align-self: flex-start; /* jangan stretch ikut tinggi parent */
+}
+.ket-textarea-standalone {
+  flex: none; /* jangan ikut aturan flex:1 dari .ket-textarea umum */
+  height: 300px; /* tinggi tetap, mirip kotak di form SO */
 }
 .full-height {
   flex: 1;

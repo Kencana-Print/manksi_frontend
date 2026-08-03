@@ -65,7 +65,6 @@ const handleSignatureError = (e: Event) => {
 const handleImageError = (e: Event) => {
   const img = e.target as HTMLImageElement;
 
-  // Jika sudah fallback ke VPS, sembunyikan
   if (img.dataset.fallbackTried === "true") {
     img.style.display = "none";
     return;
@@ -73,9 +72,8 @@ const handleImageError = (e: Event) => {
   img.dataset.fallbackTried = "true";
   const nomor = data.value.spk_memo || data.value.spk_nomor;
   if (nomor) {
-    img.src = data.value.spk_memo
-      ? `/file-gambar/map/${encodeURIComponent(nomor)}.jpg`
-      : `/file-gambar/${encodeURIComponent(nomor)}.jpg`;
+    // ⚠️ FIX: hapus subfolder "map/" — path sebenarnya langsung di root file-gambar
+    img.src = `/file-gambar/${encodeURIComponent(nomor)}.jpg`;
   } else {
     img.style.display = "none";
   }

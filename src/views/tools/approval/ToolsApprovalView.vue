@@ -19,6 +19,11 @@ const allApprovals = [
   },
   { id: "hapus_data", label: "Approve Hapus Data", menuId: "261" },
   {
+    id: "pembatalan_spk",
+    label: "Approve Pembatalan SPK/SO",
+    menuId: "262",
+  },
+  {
     id: "plafon_manager",
     label: "Approve Plafon Customer (Manager)",
     menuId: "263",
@@ -27,6 +32,11 @@ const allApprovals = [
     id: "plafon_direksi",
     label: "Approve Plafon Customer (Direksi)",
     menuId: "264",
+  },
+  {
+    id: "ganti_qty_kain",
+    label: "Approve SPK Ganti Qty & Jenis Kain",
+    menuId: "265",
   },
   {
     id: "mutasi_noplan",
@@ -76,11 +86,17 @@ const ApprovalInvoiceBlmSjComponent = defineAsyncComponent(
 const ApprovalHapusDataComponent = defineAsyncComponent(
   () => import("./components/ApprovalHapusData.vue"),
 );
+const ApprovalPembatalanSpkComponent = defineAsyncComponent(
+  () => import("./components/ApprovalPembatalanSpk.vue"),
+);
 const ApprovalPlafonManagerComponent = defineAsyncComponent(
   () => import("./components/ApprovalPlafonManager.vue"),
 );
 const ApprovalPlafonDireksiComponent = defineAsyncComponent(
   () => import("./components/ApprovalPlafonDireksi.vue"),
+);
+const ApprovalGantiQtyKainComponent = defineAsyncComponent(
+  () => import("./components/ApprovalGantiQtyKain.vue"),
 );
 const ApprovalMutasiNoPlanComponent = defineAsyncComponent(
   () => import("./components/ApprovalMutasiNoPlan.vue"),
@@ -100,10 +116,14 @@ const currentComponent = computed(() => {
     return ApprovalInvoiceBlmSjComponent;
   if (selectedApproval.value === "hapus_data")
     return ApprovalHapusDataComponent;
+  if (selectedApproval.value === "pembatalan_spk")
+    return ApprovalPembatalanSpkComponent;
   if (selectedApproval.value === "plafon_manager")
     return ApprovalPlafonManagerComponent;
   if (selectedApproval.value === "plafon_direksi")
     return ApprovalPlafonDireksiComponent;
+  if (selectedApproval.value === "ganti_qty_kain")
+    return ApprovalGantiQtyKainComponent;
   if (selectedApproval.value === "mutasi_noplan")
     return ApprovalMutasiNoPlanComponent;
   if (selectedApproval.value === "spk_cetak_ulang")

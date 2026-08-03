@@ -58,7 +58,7 @@ export const mapFormService = {
     file: File,
     mapNomor: string,
     cabang: string,
-    type: "MAIN" | "EMAIL" | "ACC",
+    type: "MAIN" | "PO" | "ACC",
   ) {
     const formData = new FormData();
     formData.append("gambar", file);

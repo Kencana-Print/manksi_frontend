@@ -40,4 +40,7 @@ export const spkFormService = {
 
   getKeteranganKhusus: (spkNomor: string) =>
     api.get("/ppic/spk/form/keterangan-khusus", { params: { spkNomor } }),
+
+  getAlokasi: (nomor: string) =>
+    api.get("/ppic/spk/form/alokasi", { params: { nomor } }),
 };

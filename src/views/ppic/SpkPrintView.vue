@@ -185,10 +185,26 @@ const hasMkaFromMap = computed(
 );
 
 // --- CETAK SPK P01 ---
-// ── Deteksi Workshop P01 → pakai format cetak lama (single page) ──
-const isP01 = computed(
+// ── Deteksi Workshop legacy (P01/P02/P05) → pakai format cetak lama ──
+const isP01Print = computed(
   () => spk.value.spk_cab === "P01" || spk.value.spk_cab2 === "P01",
 );
+const isSpandukMmtPrint = computed(
+  () =>
+    ["P02", "P05"].includes(spk.value.spk_cab) ||
+    ["P02", "P05"].includes(spk.value.spk_cab2),
+);
+const isAnyLegacyPrint = computed(
+  () => isP01Print.value || isSpandukMmtPrint.value,
+);
+
+const spkKetKomponenText = computed(() =>
+  ketKomponenList.value
+    .map((k) => `${k.kode}= ${k.nama}${k.ket ? ": " + k.ket : ""}`)
+    .join("\n"),
+);
+
+const alokasi = ref<any[]>([]);
 
 // ── Signature helper (dipakai format lama, sama pola SalesOrderPrintView) ──
 const getSignatureUrl = (kodeUser: string) => {
@@ -296,6 +312,16 @@ const blockContextMenu = (e: MouseEvent) => {
 
 let previewResizeObserver: ResizeObserver | null = null;
 
+const injectPageStyle = (css: string) => {
+  let el = document.getElementById("dynamic-page-style") as HTMLStyleElement;
+  if (!el) {
+    el = document.createElement("style");
+    el.id = "dynamic-page-style";
+    document.head.appendChild(el);
+  }
+  el.innerHTML = css;
+};
+
 onMounted(() => {
   if (isPreview.value) {
     window.addEventListener("keydown", blockPrintShortcut, true);
@@ -309,9 +335,10 @@ onUnmounted(() => {
 
 onMounted(async () => {
   try {
-    const [resDetail, resLayout] = await Promise.all([
+    const [resDetail, resLayout, resAlokasi] = await Promise.all([
       spkFormService.getDetail(printNomor),
       spkFormService.getLayoutProses(printNomor),
+      spkFormService.getAlokasi(printNomor),
     ]);
 
     const d = resDetail.data.data;
@@ -326,6 +353,7 @@ onMounted(async () => {
     ketKomponenList.value = (d.ketKomponenList || []).filter(
       (k: any) => k.checked,
     );
+    alokasi.value = resAlokasi.data.data || [];
 
     layoutHeader.value = resLayout.data.data?.header || null;
     layoutProof.value = resLayout.data.data?.proof || [];
@@ -355,9 +383,14 @@ onMounted(async () => {
     }
 
     isLoaded.value = true;
-    if (!isP01.value) {
-      await nextTick();
-      await fitPageToA4();
+    if (isSpandukMmtPrint.value) {
+      injectPageStyle("@page { size: A4 landscape; margin: 8mm 10mm; }");
+    } else {
+      injectPageStyle("@page { size: A4 portrait; margin: 0; }");
+      if (!isAnyLegacyPrint.value) {
+        await nextTick();
+        await fitPageToA4();
+      }
     }
     if (!isPreview.value) {
       setTimeout(() => window.print(), 400);
@@ -396,150 +429,384 @@ onMounted(async () => {
     <!-- ══════════════════════════════════════════════
        FORMAT LAMA — khusus Workshop P01
   ══════════════════════════════════════════════ -->
-    <div v-if="isP01" class="print-page-old">
-      <div class="old-border">
-        <div class="old-header-row">
-          <div class="old-title">SURAT PERINTAH KERJA</div>
-          <div class="old-po">PO : {{ spk.spk_nomor_po || "-" }}</div>
-        </div>
-
-        <div class="old-body">
-          <!-- Kolom kiri: info dasar -->
-          <table class="old-info-table">
-            <tbody>
-              <tr>
-                <td class="old-lbl">Nomor SPK</td>
-                <td class="old-colon">:</td>
-                <td>{{ spk.spk_nomor }}</td>
-              </tr>
-              <tr>
-                <td class="old-lbl">Tanggal SPK</td>
-                <td class="old-colon">:</td>
-                <td>{{ tglIndo(spk.spk_tanggal) }}</td>
-              </tr>
-              <tr>
-                <td class="old-lbl">Jenis Order</td>
-                <td class="old-colon">:</td>
-                <td>{{ spk.jo_nama }}</td>
-              </tr>
-              <tr>
-                <td class="old-lbl">Nama Desain</td>
-                <td class="old-colon">:</td>
-                <td>{{ spk.spk_nama }}</td>
-              </tr>
-              <tr>
-                <td class="old-lbl">Jumlah</td>
-                <td class="old-colon">:</td>
-                <td>{{ Number(spk.spk_jumlah).toLocaleString("id-ID") }}</td>
-              </tr>
-              <tr>
-                <td class="old-lbl">Ukuran</td>
-                <td class="old-colon">:</td>
-                <td>{{ sizeUkuranStr }}</td>
-              </tr>
-              <tr>
-                <td class="old-lbl">Kain</td>
-                <td class="old-colon">:</td>
-                <td>{{ spk.spk_kain }}</td>
-              </tr>
-              <tr>
-                <td class="old-lbl">Gramasi</td>
-                <td class="old-colon">:</td>
-                <td>{{ spk.spk_gramasi || "-" }}</td>
-              </tr>
-              <tr>
-                <td class="old-lbl">Finishing</td>
-                <td class="old-colon">:</td>
-                <td>{{ spk.spk_finishing }}</td>
-              </tr>
-              <tr>
-                <td class="old-lbl">Date Line</td>
-                <td class="old-colon">:</td>
-                <td>{{ tglIndo(spk.spk_dateline) }}</td>
-              </tr>
-              <tr>
-                <td class="old-lbl">Workshop</td>
-                <td class="old-colon">:</td>
-                <td>{{ spk.spk_cab }} ({{ spk.spk_workshop }})</td>
-              </tr>
-            </tbody>
-          </table>
-
-          <!-- Tipe SPK — kanan atas info table -->
-          <div class="old-tipe">Tipe SPK : {{ spk.spk_tipe || "-" }}</div>
-
-          <!-- Gambar desain -->
-          <div class="old-img-wrap">
-            <img
-              v-if="resolvedImageUrl"
-              :src="resolvedImageUrl"
-              class="old-img"
-            />
+    <template v-if="isP01Print">
+      <div class="print-page-old">
+        <div class="old-border">
+          <div class="old-header-row">
+            <div class="old-title">SURAT PERINTAH KERJA</div>
+            <div class="old-po">PO : {{ spk.spk_nomor_po || "-" }}</div>
           </div>
 
-          <!-- Keterangan Komponen (checklist manual aksesoris) -->
-          <div class="old-section">
-            <div class="old-section-title">Keterangan Komponen :</div>
-            <div v-if="ketKomponenList.length > 0" class="old-komp-list">
-              <div
-                v-for="(k, idx) in ketKomponenList"
-                :key="idx"
-                class="old-komp-item"
-              >
-                {{ idx + 1 }}. {{ k.nama
-                }}<span v-if="k.ket"> - {{ k.ket }}</span>
+          <div class="old-body">
+            <!-- Kolom kiri: info dasar -->
+            <table class="old-info-table">
+              <tbody>
+                <tr>
+                  <td class="old-lbl">Nomor SPK</td>
+                  <td class="old-colon">:</td>
+                  <td>{{ spk.spk_nomor }}</td>
+                </tr>
+                <tr>
+                  <td class="old-lbl">Tanggal SPK</td>
+                  <td class="old-colon">:</td>
+                  <td>{{ tglIndo(spk.spk_tanggal) }}</td>
+                </tr>
+                <tr>
+                  <td class="old-lbl">Jenis Order</td>
+                  <td class="old-colon">:</td>
+                  <td>{{ spk.jo_nama }}</td>
+                </tr>
+                <tr>
+                  <td class="old-lbl">Nama Desain</td>
+                  <td class="old-colon">:</td>
+                  <td>{{ spk.spk_nama }}</td>
+                </tr>
+                <tr>
+                  <td class="old-lbl">Jumlah</td>
+                  <td class="old-colon">:</td>
+                  <td>{{ Number(spk.spk_jumlah).toLocaleString("id-ID") }}</td>
+                </tr>
+                <tr>
+                  <td class="old-lbl">Ukuran</td>
+                  <td class="old-colon">:</td>
+                  <td>{{ sizeUkuranStr }}</td>
+                </tr>
+                <tr>
+                  <td class="old-lbl">Kain</td>
+                  <td class="old-colon">:</td>
+                  <td>{{ spk.spk_kain }}</td>
+                </tr>
+                <tr>
+                  <td class="old-lbl">Gramasi</td>
+                  <td class="old-colon">:</td>
+                  <td>{{ spk.spk_gramasi || "-" }}</td>
+                </tr>
+                <tr>
+                  <td class="old-lbl">Finishing</td>
+                  <td class="old-colon">:</td>
+                  <td>{{ spk.spk_finishing }}</td>
+                </tr>
+                <tr>
+                  <td class="old-lbl">Date Line</td>
+                  <td class="old-colon">:</td>
+                  <td>{{ tglIndo(spk.spk_dateline) }}</td>
+                </tr>
+                <tr>
+                  <td class="old-lbl">Workshop</td>
+                  <td class="old-colon">:</td>
+                  <td>{{ spk.spk_cab }} ({{ spk.spk_workshop }})</td>
+                </tr>
+              </tbody>
+            </table>
+
+            <!-- Tipe SPK — kanan atas info table -->
+            <div class="old-tipe">Tipe SPK : {{ spk.spk_tipe || "-" }}</div>
+
+            <!-- Gambar desain -->
+            <div class="old-img-wrap">
+              <img
+                v-if="resolvedImageUrl"
+                :src="resolvedImageUrl"
+                class="old-img"
+              />
+            </div>
+
+            <!-- Keterangan Komponen (checklist manual aksesoris) -->
+            <div v-if="ketKomponenList.length > 0" class="old-section">
+              <div class="old-section-title">Keterangan Komponen :</div>
+              <div class="old-komp-list">
+                <div
+                  v-for="(k, idx) in ketKomponenList"
+                  :key="idx"
+                  class="old-komp-item"
+                >
+                  {{ idx + 1 }}. {{ k.nama
+                  }}<span v-if="k.ket"> - {{ k.ket }}</span>
+                </div>
               </div>
             </div>
-          </div>
 
-          <!-- Size : Lebar & Panjang Badan -->
-          <div class="old-section">
-            <div class="old-section-title">
-              Size : Lebar &amp; Panjang Badan
+            <!-- Size : Lebar & Panjang Badan (P01 selalu garmen, tidak perlu cek isSpandukMmt) -->
+            <div v-if="sizes.length > 0" class="old-section">
+              <div class="old-section-title">
+                Size : Lebar &amp; Panjang Badan
+              </div>
+              <pre class="old-size-pre">{{ sizeLebarPanjangStr || "-" }}</pre>
             </div>
-            <pre class="old-size-pre">{{ sizeLebarPanjangStr || "-" }}</pre>
+
+            <!-- Keterangan Produksi -->
+            <div v-if="spk.spk_keterangan" class="old-section old-ket-produksi">
+              <div class="old-section-title">Ket. Produksi :</div>
+              <pre class="old-ket-pre">{{ spk.spk_keterangan }}</pre>
+            </div>
           </div>
 
-          <!-- Keterangan Produksi -->
-          <div v-if="spk.spk_keterangan" class="old-section old-ket-produksi">
-            <div class="old-section-title">Ket. Produksi :</div>
-            <pre class="old-ket-pre">{{ spk.spk_keterangan }}</pre>
+          <!-- TTD MO / CMO -->
+          <div class="old-ttd-wrap">
+            <table class="old-ttd-table">
+              <tr>
+                <td width="50%">MO</td>
+                <td width="50%">CMO</td>
+              </tr>
+              <tr>
+                <td class="old-sign-space">
+                  <img
+                    :src="getSignatureUrl(spk.user_create)"
+                    class="old-ttd-img"
+                    @error="handleSignatureError"
+                  />
+                  <div class="old-sign-name">{{ spk.user_create }}</div>
+                </td>
+                <td class="old-sign-space">
+                  <img
+                    :src="getSignatureUrl(spk.spk_cmo)"
+                    class="old-ttd-img"
+                    @error="handleSignatureError"
+                  />
+                  <div class="old-sign-name">{{ spk.spk_cmo || "-" }}</div>
+                </td>
+              </tr>
+            </table>
           </div>
-        </div>
 
-        <!-- TTD MO / CMO -->
-        <div class="old-ttd-wrap">
-          <table class="old-ttd-table">
-            <tr>
-              <td width="50%">MO</td>
-              <td width="50%">CMO</td>
-            </tr>
-            <tr>
-              <td class="old-sign-space">
-                <img
-                  :src="getSignatureUrl(spk.user_create)"
-                  class="old-ttd-img"
-                  @error="handleSignatureError"
-                />
-                <div class="old-sign-name">{{ spk.user_create }}</div>
-              </td>
-              <td class="old-sign-space">
-                <img
-                  :src="getSignatureUrl(spk.spk_cmo)"
-                  class="old-ttd-img"
-                  @error="handleSignatureError"
-                />
-                <div class="old-sign-name">{{ spk.spk_cmo || "-" }}</div>
-              </td>
-            </tr>
-          </table>
-        </div>
-
-        <div class="old-footer">
-          Dibuat Oleh: {{ spk.user_create }} {{ formatWaktu(spk.date_create) }}
+          <div class="old-footer">
+            Dibuat Oleh: {{ spk.user_create }}
+            {{ formatWaktu(spk.date_create) }}
+          </div>
         </div>
       </div>
-    </div>
+
+      <!-- ══ ALOKASI (P01) — halaman terpisah, format sama dengan old-border ══ -->
+      <div v-if="alokasi.length > 0" class="print-page-old alokasi-page-old">
+        <div class="old-border">
+          <h2 class="alokasi-title-old">ALOKASI PENGIRIMAN :</h2>
+          <table class="alokasi-table-old mt-2">
+            <thead>
+              <tr>
+                <th class="text-left pl-2">Alokasi</th>
+                <th width="80" class="text-center">Jumlah</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(a, idx) in alokasi" :key="idx">
+                <td class="pl-2">{{ a.kota || a.alamat }}</td>
+                <td class="text-center">
+                  {{ Number(a.jumlah).toLocaleString("id-ID") }}
+                </td>
+              </tr>
+            </tbody>
+            <tfoot>
+              <tr>
+                <td class="fw text-left pl-2">Total</td>
+                <td class="fw text-center">
+                  {{
+                    alokasi
+                      .reduce((s, a) => s + (Number(a.jumlah) || 0), 0)
+                      .toLocaleString("id-ID")
+                  }}
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    </template>
+
+    <!-- ══════════════════════════════════════════════
+       SPANDUK/MMT — Workshop P02/P05, gaya SO landscape 2-copy
+  ══════════════════════════════════════════════ -->
+    <template v-else-if="isSpandukMmtPrint">
+      <div class="print-container-so">
+        <div class="print-wrapper-so">
+          <div
+            v-for="copy in 2"
+            :key="'spk-so-' + copy"
+            class="print-half-so"
+            :class="{ 'border-right-so': copy === 1 }"
+          >
+            <div class="header-row-so">
+              <div class="title-main-so">SURAT PERINTAH KERJA</div>
+              <div class="title-po-so">PO : {{ spk.spk_nomor_po || "-" }}</div>
+            </div>
+
+            <table class="info-table-so">
+              <tbody>
+                <tr>
+                  <td class="w-label-so">Nomor SPK</td>
+                  <td class="w-colon-so">:</td>
+                  <td colspan="3">{{ spk.spk_nomor }}</td>
+                </tr>
+                <tr>
+                  <td class="w-label-so">Tanggal SPK</td>
+                  <td class="w-colon-so">:</td>
+                  <td colspan="3">{{ tglIndo(spk.spk_tanggal) }}</td>
+                </tr>
+                <tr>
+                  <td class="w-label-so">Jenis Order</td>
+                  <td class="w-colon-so">:</td>
+                  <td colspan="3">{{ spk.jo_nama }}</td>
+                </tr>
+                <tr>
+                  <td class="w-label-so">Nama Desain</td>
+                  <td class="w-colon-so">:</td>
+                  <td colspan="3">{{ spk.spk_nama }}</td>
+                </tr>
+                <tr>
+                  <td class="w-label-so">Jumlah</td>
+                  <td class="w-colon-so">:</td>
+                  <td colspan="3">
+                    {{ Number(spk.spk_jumlah).toLocaleString("id-ID") }}
+                  </td>
+                </tr>
+                <tr>
+                  <td class="w-label-so">Ukuran</td>
+                  <td class="w-colon-so">:</td>
+                  <td colspan="3">
+                    {{ spk.spk_panjang }} X {{ spk.spk_lebar }} M
+                  </td>
+                </tr>
+                <tr>
+                  <td class="w-label-so">Bahan</td>
+                  <td class="w-colon-so">:</td>
+                  <td colspan="3">{{ spk.spk_kain }}</td>
+                </tr>
+                <tr>
+                  <td class="w-label-so">Gramasi</td>
+                  <td class="w-colon-so">:</td>
+                  <td colspan="3">{{ spk.spk_gramasi || "-" }}</td>
+                </tr>
+                <tr>
+                  <td class="w-label-so">Finishing</td>
+                  <td class="w-colon-so">:</td>
+                  <td colspan="3">{{ spk.spk_finishing }}</td>
+                </tr>
+                <tr>
+                  <td class="w-label-so">Date Line</td>
+                  <td class="w-colon-so">:</td>
+                  <td colspan="3">{{ tglIndo(spk.spk_dateline) }}</td>
+                </tr>
+                <tr>
+                  <td class="w-label-so">Workshop</td>
+                  <td class="w-colon-so">:</td>
+                  <td colspan="3">
+                    {{ spk.spk_cab }} ({{ spk.spk_workshop }}).
+                  </td>
+                </tr>
+                <tr>
+                  <td class="w-label-so">Status Client</td>
+                  <td class="w-colon-so">:</td>
+                  <td colspan="3">
+                    <span
+                      :class="{
+                        'highlight-yellow-so': spk.cus_perfect === 'Y',
+                      }"
+                    >
+                      {{ spk.cus_perfect === "Y" ? "PERFECT" : "REGULER" }}
+                    </span>
+                  </td>
+                </tr>
+                <tr>
+                  <td class="w-label-so">Alokasi</td>
+                  <td class="w-colon-so">:</td>
+                  <td colspan="3">{{ alokasi.length > 0 ? "YA" : "TIDAK" }}</td>
+                </tr>
+                <tr>
+                  <td class="w-label-so align-top-so">Keterangan</td>
+                  <td class="w-colon-so align-top-so">:</td>
+                  <td colspan="3" class="val-desc-so">
+                    <div v-if="spkKetKomponenText" style="margin-bottom: 5px">
+                      <pre class="val-pre-so">
+Keterangan Komponen :
+{{ spkKetKomponenText }}</pre
+                      >
+                    </div>
+                    <pre class="val-pre-so">{{ spk.spk_keterangan }}</pre>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+
+            <div class="layout-box-so">
+              <div class="img-box-so">
+                <div class="ukuran-header-so">
+                  {{ spk.jo_nama }} {{ spk.spk_panjang }} X
+                  {{ spk.spk_lebar }} M
+                </div>
+                <img v-if="resolvedImageUrl" :src="resolvedImageUrl" />
+              </div>
+            </div>
+
+            <div class="bottom-ttd-wrapper-so">
+              <table class="ttd-table-simple-so">
+                <tr>
+                  <td width="50%">MO</td>
+                  <td width="50%">CMO</td>
+                </tr>
+                <tr>
+                  <td class="sign-space-simple-so">
+                    <img
+                      :src="getSignatureUrl(spk.user_create)"
+                      class="ttd-img-simple-so"
+                      @error="handleSignatureError"
+                    />
+                    <div class="sign-name-so">{{ spk.user_create }}</div>
+                  </td>
+                  <td class="sign-space-simple-so">
+                    <img
+                      :src="getSignatureUrl(spk.spk_cmo)"
+                      class="ttd-img-simple-so"
+                      @error="handleSignatureError"
+                    />
+                    <div class="sign-name-so">{{ spk.spk_cmo || "-" }}</div>
+                  </td>
+                </tr>
+              </table>
+              <div class="qr-box-so mt-auto-so">
+                <qrcode-vue :value="spk.spk_nomor" :size="65" level="L" />
+              </div>
+            </div>
+
+            <div class="footer-note-so">
+              Dibuat Oleh: {{ spk.user_create }}
+              {{ formatWaktu(spk.date_create) }}
+            </div>
+          </div>
+
+          <!-- Alokasi — halaman terpisah, sama gaya panel SO -->
+          <div v-if="alokasi.length > 0" class="print-half-so alokasi-panel-so">
+            <h2 class="alokasi-title-so">ALOKASI PENGIRIMAN :</h2>
+            <table class="alokasi-table-so mt-2-so">
+              <thead>
+                <tr>
+                  <th class="text-left-so pl-2-so">Alokasi</th>
+                  <th width="80" class="text-center-so">Jumlah</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(a, idx) in alokasi" :key="idx">
+                  <td class="pl-2-so">{{ a.kota || a.alamat }}</td>
+                  <td class="text-center-so">
+                    {{ Number(a.jumlah).toLocaleString("id-ID") }}
+                  </td>
+                </tr>
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td class="fw-so text-left-so pl-2-so">Total</td>
+                  <td class="fw-so text-center-so">
+                    {{
+                      alokasi
+                        .reduce((s, a) => s + (Number(a.jumlah) || 0), 0)
+                        .toLocaleString("id-ID")
+                    }}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      </div>
+    </template>
 
     <!-- ══════════════════════════════════════════════
        FORMAT BARU — semua workshop selain P01
@@ -828,124 +1095,10 @@ onMounted(async () => {
               </table>
             </div>
 
-            <!-- Baris 4: MKA (bawah MKB) -->
-            <!-- MKA dari BAST MAP — dipakai kalau SPK berasal dari MAP dan BAST
-     MAP-nya sudah punya accessories/babaran diinput -->
-            <div v-if="hasMkaFromMap" class="box mb-6">
-              <div class="box-title">
-                Kebutuhan Aksesoris &amp; Babaran (dari BAST MAP
-                {{ spk.spk_memo }})
-              </div>
-              <table v-if="mkaFromMap.komponen.length" class="dt">
-                <thead>
-                  <tr>
-                    <th style="width: 100px">Komponen</th>
-                    <th style="width: 80px">Warna</th>
-                    <th style="width: 60px" class="tc">Babaran</th>
-                    <th style="width: 70px" class="tc">Std. Kalkulasi</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="(k, idx) in mkaFromMap.komponen" :key="idx">
-                    <td>{{ k.komponen }}</td>
-                    <td>{{ k.warna || "-" }}</td>
-                    <td class="tc">
-                      {{ Number(k.babaran).toLocaleString("id-ID") }}
-                    </td>
-                    <td class="tc">
-                      {{ Number(k.babarank).toLocaleString("id-ID") }}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-              <!-- ── Babaran per Size — tambahan ── -->
-              <table v-if="mkaFromMap.sizeBreakdown.length" class="dt">
-                <thead>
-                  <tr>
-                    <th style="width: 100px">Komponen</th>
-                    <th style="width: 80px">Size</th>
-                    <th style="width: 70px" class="tc">Babaran</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="(s, idx) in mkaFromMap.sizeBreakdown" :key="idx">
-                    <td>{{ s.komponen }}</td>
-                    <td>{{ s.size }}</td>
-                    <td class="tc">
-                      {{ Number(s.babaran).toLocaleString("id-ID") }}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-              <table class="dt">
-                <thead>
-                  <tr>
-                    <th style="width: 60px">Kode</th>
-                    <th style="width: 160px">Nama</th>
-                    <th style="width: 50px">Satuan</th>
-                    <th style="width: 50px" class="tr">Qty/Kaos</th>
-                    <th>Note</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="(a, idx) in mkaFromMap.aksesoris" :key="idx">
-                    <td class="fw">{{ a.kode }}</td>
-                    <td>{{ a.nama }}</td>
-                    <td class="tc">{{ a.satuan }}</td>
-                    <td class="tr">{{ a.qty }}</td>
-                    <td>{{ a.note || "—" }}</td>
-                  </tr>
-                  <tr v-if="mkaFromMap.aksesoris.length === 0">
-                    <td colspan="5" class="tc muted">—</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-
-            <!-- Fallback: checklist manual MKA (A/B/C...) — dipakai kalau tidak
-     ada data dari BAST MAP -->
-            <div v-else class="box mb-6">
-              <div class="box-title">Kebutuhan Aksesoris (MKA)</div>
-              <table class="dt">
-                <thead>
-                  <tr>
-                    <th style="width: 30px">Kode</th>
-                    <th style="width: 140px">Nama</th>
-                    <th>Keterangan</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="(k, idx) in ketKomponenList" :key="idx">
-                    <td class="tc fw">{{ k.kode }}</td>
-                    <td>{{ k.nama }}</td>
-                    <td>{{ k.ket || "—" }}</td>
-                  </tr>
-                  <tr v-if="ketKomponenList.length === 0">
-                    <td colspan="3" class="tc muted">—</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-
-            <!-- Baris 5: Komponen Potong + Second Process -->
-            <div
-              class="p1-row-komp mb-6"
-              :class="{ 'no-special': keteranganKhusus.length === 0 }"
-            >
-              <!-- Slot kiri-atas: Special Process (kalau ada) ATAU Komponen Potong (kalau Special Process kosong) -->
-              <div v-if="keteranganKhusus.length > 0" class="box">
-                <div class="box-title">Keterangan special process</div>
-                <div class="ket-list ket-small">
-                  <div
-                    v-for="(k, idx) in keteranganKhusus"
-                    :key="idx"
-                    class="ket-item"
-                  >
-                    {{ idx + 1 }}. {{ k }}
-                  </div>
-                </div>
-              </div>
-              <div v-else class="box">
+            <!-- Baris 4: Komponen Potong (kiri, lebar) + MKA (kanan, sempit) -->
+            <div class="p1-row-potong-mka mb-6">
+              <!-- Komponen Potong — dapat ruang penuh, bisa panjang -->
+              <div class="box">
                 <div class="box-title">Komponen Potong</div>
                 <table class="dt">
                   <thead>
@@ -968,8 +1121,117 @@ onMounted(async () => {
                 </table>
               </div>
 
-              <!-- Slot kanan: Second Process (selalu tampil di sini) -->
-              <div class="box">
+              <!-- MKA — dipersempit ke kanan -->
+              <div v-if="hasMkaFromMap" class="box mka-narrow">
+                <div class="box-title">
+                  Aksesoris &amp; Babaran (BAST MAP {{ spk.spk_memo }})
+                </div>
+                <table v-if="mkaFromMap.komponen.length" class="dt dt-narrow">
+                  <thead>
+                    <tr>
+                      <th>Komponen</th>
+                      <th>Warna</th>
+                      <th class="tc">Babaran</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="(k, idx) in mkaFromMap.komponen" :key="idx">
+                      <td>{{ k.komponen }}</td>
+                      <td>{{ k.warna || "-" }}</td>
+                      <td class="tc">
+                        {{ Number(k.babaran).toLocaleString("id-ID") }}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+                <table
+                  v-if="mkaFromMap.sizeBreakdown.length"
+                  class="dt dt-narrow"
+                >
+                  <thead>
+                    <tr>
+                      <th>Komponen</th>
+                      <th>Size</th>
+                      <th class="tc">Babaran</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="(s, idx) in mkaFromMap.sizeBreakdown" :key="idx">
+                      <td>{{ s.komponen }}</td>
+                      <td>{{ s.size }}</td>
+                      <td class="tc">
+                        {{ Number(s.babaran).toLocaleString("id-ID") }}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+                <table class="dt dt-narrow">
+                  <thead>
+                    <tr>
+                      <th>Kode</th>
+                      <th>Nama</th>
+                      <th class="tr">Qty</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="(a, idx) in mkaFromMap.aksesoris" :key="idx">
+                      <td class="fw">{{ a.kode }}</td>
+                      <td>{{ a.nama }}</td>
+                      <td class="tr">{{ a.qty }}</td>
+                    </tr>
+                    <tr v-if="mkaFromMap.aksesoris.length === 0">
+                      <td colspan="3" class="tc muted">—</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div v-else class="box mka-narrow">
+                <div class="box-title">Kebutuhan Aksesoris (MKA)</div>
+                <table class="dt dt-narrow">
+                  <thead>
+                    <tr>
+                      <th style="width: 30px">Kode</th>
+                      <th>Nama</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="(k, idx) in ketKomponenList" :key="idx">
+                      <td class="tc fw">{{ k.kode }}</td>
+                      <td>
+                        {{ k.nama }}<span v-if="k.ket"> — {{ k.ket }}</span>
+                      </td>
+                    </tr>
+                    <tr v-if="ketKomponenList.length === 0">
+                      <td colspan="2" class="tc muted">—</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Baris 5: Special Process (kalau ada) + Second Process -->
+            <div
+              class="p1-row-komp mb-6"
+              :class="{ 'no-special': keteranganKhusus.length === 0 }"
+            >
+              <div v-if="keteranganKhusus.length > 0" class="box">
+                <div class="box-title">Keterangan special process</div>
+                <div class="ket-list ket-small">
+                  <div
+                    v-for="(k, idx) in keteranganKhusus"
+                    :key="idx"
+                    class="ket-item"
+                  >
+                    {{ idx + 1 }}. {{ k }}
+                  </div>
+                </div>
+              </div>
+
+              <div
+                class="box"
+                :class="{ 'full-span': keteranganKhusus.length === 0 }"
+              >
                 <div class="box-title">Second Process (Cetak/Bordir)</div>
                 <table class="dt">
                   <thead>
@@ -1010,39 +1272,12 @@ onMounted(async () => {
               </div>
             </div>
 
-            <!-- Baris 6: Komponen Potong (kalau Special Process ADA, tampil di sini penuh) + Produksi -->
-            <div class="p1-row-ket mb-6">
-              <div v-if="keteranganKhusus.length > 0" class="box">
-                <div class="box-title">Komponen Potong</div>
-                <table class="dt">
-                  <thead>
-                    <tr>
-                      <th style="width: 24px">No</th>
-                      <th style="width: 80px">Kode</th>
-                      <th>Nama komponen</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr v-for="(item, idx) in komponenPotong" :key="idx">
-                      <td class="tc">{{ idx + 1 }}</td>
-                      <td>{{ item.Kode }}</td>
-                      <td>{{ item.Nama }}</td>
-                    </tr>
-                    <tr v-if="komponenPotong.length === 0">
-                      <td colspan="3" class="tc muted">—</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-              <div
-                class="box"
-                :class="{ 'full-span': keteranganKhusus.length === 0 }"
-              >
-                <div class="box-title">Keterangan produksi</div>
-                <pre class="ket-pre ket-produksi">{{
-                  spk.spk_keterangan || "—"
-                }}</pre>
-              </div>
+            <!-- Baris 6: Keterangan Produksi — full width sekarang -->
+            <div class="box mb-6">
+              <div class="box-title">Keterangan produksi</div>
+              <pre class="ket-pre ket-produksi">{{
+                spk.spk_keterangan || "—"
+              }}</pre>
             </div>
 
             <!-- Planning PPIC — breakdown target per proses, diisi manual pakai bolpoin -->
@@ -1942,6 +2177,61 @@ onMounted(async () => {
   padding: 3px 6px;
 }
 
+.alokasi-page-old {
+  page-break-before: always;
+  break-before: page;
+}
+.alokasi-title-old {
+  font-size: 15pt;
+  font-weight: bold;
+  text-decoration: underline;
+  margin-bottom: 12px;
+}
+.alokasi-table-old {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 9pt;
+  color: #000;
+}
+.alokasi-table-old th,
+.alokasi-table-old td {
+  border: 1px solid #000;
+  padding: 4px 6px;
+  color: #000 !important;
+}
+.alokasi-table-old th {
+  font-weight: bold;
+}
+.text-left {
+  text-align: left;
+}
+.text-center {
+  text-align: center;
+}
+.pl-2 {
+  padding-left: 8px;
+}
+.mt-2 {
+  margin-top: 8px;
+}
+
+.p1-row-potong-mka {
+  display: grid;
+  grid-template-columns: 1.8fr 1fr;
+  gap: 8px;
+  align-items: start;
+}
+.mka-narrow {
+  font-size: 6.8pt;
+}
+.dt-narrow {
+  font-size: 6.8pt;
+  margin-bottom: 4px;
+}
+.dt-narrow th,
+.dt-narrow td {
+  padding: 2px 4px;
+}
 /* ── Screen preview ── */
 @media screen {
   body {
@@ -2052,6 +2342,220 @@ onMounted(async () => {
     font-weight: 700;
     text-align: center;
     color: #000;
+  }
+}
+
+/* ══ SPANDUK/MMT — gaya SO landscape 2-copy ══ */
+.print-container-so {
+  width: 100%;
+  margin: 0 auto;
+  background: #fff;
+  font-family: "Arial", sans-serif;
+  font-size: 8.5pt;
+  color: #000;
+  box-sizing: border-box;
+}
+.print-wrapper-so {
+  display: flex;
+  flex-wrap: wrap;
+  width: 297mm;
+  min-height: 209mm;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+.print-half-so {
+  flex: 0 0 50%;
+  display: flex;
+  flex-direction: column;
+  padding: 7mm 10mm 7mm 9mm;
+  box-sizing: border-box;
+  min-width: 0;
+  height: 209mm;
+  overflow: hidden;
+}
+.border-right-so {
+  border-right: 1px dotted #999;
+}
+.alokasi-panel-so {
+  flex: 0 0 100%;
+  width: 100%;
+  padding: 7mm 10mm;
+  break-before: page;
+  page-break-before: always;
+}
+.header-row-so {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  align-items: flex-end;
+}
+.title-main-so,
+.title-po-so {
+  font-size: 12pt;
+  font-weight: bold;
+  text-decoration: underline;
+  line-height: 1;
+}
+.info-table-so {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 4px;
+}
+.info-table-so td {
+  padding: 1px 0;
+  vertical-align: top;
+}
+.w-label-so {
+  width: 80px;
+}
+.w-colon-so {
+  width: 12px;
+  text-align: center;
+}
+.align-top-so {
+  vertical-align: top;
+}
+.val-desc-so {
+  padding-top: 2px;
+}
+.val-pre-so {
+  font-family: inherit;
+  font-size: 7.5pt;
+  white-space: pre-wrap;
+  margin: 0;
+  line-height: 1.2;
+}
+.highlight-yellow-so {
+  background: yellow;
+  padding: 1px 4px;
+  font-weight: bold;
+  border: 1px solid #ccc;
+}
+.layout-box-so {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  gap: 15px;
+  margin-top: 8px;
+}
+.img-box-so {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+.img-box-so img {
+  max-width: 100%;
+  max-height: 190px;
+  object-fit: contain;
+}
+.ukuran-header-so {
+  text-align: center;
+  font-weight: bold;
+  font-size: 8pt;
+  letter-spacing: 1px;
+  margin-bottom: 5px;
+}
+.bottom-ttd-wrapper-so {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-top: 12px;
+}
+.ttd-table-simple-so {
+  width: 180px;
+  border-collapse: collapse;
+  text-align: center;
+  font-size: 7.5pt;
+  border: 1px solid #000;
+  color: #000;
+}
+.ttd-table-simple-so td {
+  border: 1px solid #000;
+  padding: 2px;
+  font-weight: bold;
+  color: #000 !important;
+}
+.sign-space-simple-so {
+  position: relative;
+  height: 45px;
+  vertical-align: bottom;
+  padding-bottom: 2px;
+}
+.ttd-img-simple-so {
+  position: absolute;
+  top: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  height: 32px;
+  object-fit: contain;
+  z-index: 1;
+}
+.sign-name-so {
+  position: absolute;
+  bottom: 2px;
+  left: 0;
+  right: 0;
+  z-index: 2;
+}
+.qr-box-so {
+  flex-shrink: 0;
+}
+.mt-auto-so {
+  margin-top: auto;
+}
+.footer-note-so {
+  text-align: right;
+  font-size: 6.5pt;
+  border-top: 1px solid #000;
+  padding-top: 3px;
+  margin-top: 5px;
+}
+.alokasi-title-so {
+  font-size: 15pt;
+  font-weight: bold;
+  text-decoration: underline;
+  margin-bottom: 12px;
+}
+.alokasi-table-so {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 9pt;
+  color: #000;
+}
+.alokasi-table-so th,
+.alokasi-table-so td {
+  border: 1px solid #000;
+  padding: 4px 6px;
+  color: #000 !important;
+}
+.fw-so {
+  font-weight: bold;
+}
+.text-left-so {
+  text-align: left;
+}
+.text-center-so {
+  text-align: center;
+}
+.pl-2-so {
+  padding-left: 8px;
+}
+.mt-2-so {
+  margin-top: 8px;
+}
+
+@media screen {
+  .print-container-so {
+    background: #555;
+    padding: 20px;
+  }
+  .print-wrapper-so {
+    background: white;
+    margin: 0 auto;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
   }
 }
 </style>

@@ -44,4 +44,18 @@ export const salesOrderService = {
 
   updateDesignStatus: (listNomor: string[]) =>
     api.put("/penjualan/sales-order/update-design", { listNomor }),
+
+  getPembatalanDetail: (params: { fbNomor?: string; spkNomor?: string }) =>
+    api.get("/penjualan/sales-order/pembatalan-detail", { params }),
+
+  ajukanPembatalan: (payload: any) =>
+    api.post("/penjualan/sales-order/pembatalan-ajukan", payload),
+
+  getGantiQtyKainStatus: (nomor: string) =>
+    api.get("/penjualan/sales-order/ganti-qty-kain-status", {
+      params: { nomor },
+    }),
+
+  ajukanGantiQtyKain: (nomor: string, alasan: string) =>
+    api.post("/penjualan/sales-order/ganti-qty-kain-ajukan", { nomor, alasan }),
 };

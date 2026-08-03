@@ -94,4 +94,24 @@ export const approvalService = {
     nomor: string;
     status_acc: string;
   }) => api.post("/tools/approval/spk-cetak-ulang/otorisasi", payload),
+
+  // --- APPROVAL PEMBATALAN SPK/SO (MENU_ID: 262) ---
+  getPembatalanSpkList: (params: any) =>
+    api.get("/tools/approval/pembatalan-spk", { params }),
+
+  submitPembatalanSpkOtorisasi: (payload: {
+    nomor: string;
+    status_acc: string;
+  }) => api.post("/tools/approval/pembatalan-spk/otorisasi", payload),
+
+  // --- APPROVAL SPK GANTI QTY & JENIS KAIN (MENU_ID: 265) ---
+  getGantiQtyKainList: (params: any) =>
+    api.get("/tools/approval/ganti-qty-kain", { params }),
+
+  submitGantiQtyKainOtorisasi: (payload: {
+    nomor: string;
+    transaksi: string;
+    urut: number | string;
+    status_acc: string;
+  }) => api.post("/tools/approval/ganti-qty-kain/otorisasi", payload),
 };

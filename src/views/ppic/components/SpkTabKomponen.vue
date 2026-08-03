@@ -6,7 +6,10 @@ import {
   IconPrinter,
   IconInfoCircle,
   IconTrash,
+  IconPlus,
+  IconSearch,
 } from "@tabler/icons-vue";
+import BahanSearchModal from "@/components/lookups/BahanSearchModal.vue";
 
 interface CetakBordirRow {
   Kode: string;
@@ -103,9 +106,126 @@ const loadKomponenFromProof = async () => {
   }
 };
 
+// ── Lookup Bahan (F1/Enter/klik) untuk Kode komponen ──
+const showBahanModal = ref(false);
+const activeTarget = ref<"potong" | "cetakbordir">("potong");
+const activeRowIndex = ref(-1);
+
+const openBahanLookup = (target: "potong" | "cetakbordir", idx: number) => {
+  activeTarget.value = target;
+  activeRowIndex.value = idx;
+  showBahanModal.value = true;
+};
+
+const applyBahanToRow = (item: any) => {
+  const idx = activeRowIndex.value;
+  if (idx < 0) return;
+
+  if (activeTarget.value === "potong") {
+    if (props.formData.KomponenSpk.ListPotong[idx]) {
+      props.formData.KomponenSpk.ListPotong[idx].Kode = item.Kode;
+      props.formData.KomponenSpk.ListPotong[idx].Nama = item.Nama;
+    }
+  } else {
+    if (props.formData.KomponenSpk.ListCetakBordir[idx]) {
+      props.formData.KomponenSpk.ListCetakBordir[idx].Kode = item.Kode;
+      props.formData.KomponenSpk.ListCetakBordir[idx].Nama = item.Nama;
+    }
+  }
+};
+
+// Validasi kalau user ketik langsung lalu tekan Enter (tanpa buka modal)
+const validateKodeOnEnter = async (
+  target: "potong" | "cetakbordir",
+  idx: number,
+) => {
+  const row =
+    target === "potong"
+      ? props.formData.KomponenSpk.ListPotong[idx]
+      : props.formData.KomponenSpk.ListCetakBordir[idx];
+  let input = (row?.Kode || "").trim();
+  if (!input) {
+    if (row) row.Nama = "";
+    return;
+  }
+
+  // ⚠️ BARU: auto-expand suffix angka (mis. "400" → "LL-000400"),
+  // sama pola dengan onKodeBahan di MutasiProduksiFormView.
+  if (/^\d{1,6}$/.test(input)) {
+    const padded = input.padStart(6, "0");
+    try {
+      const res = await api.get("/lookups/bahan", {
+        params: { q: padded, limit: 5, mode: "komponen" },
+      });
+      const items = res.data.data?.items || [];
+      // cocokkan Kode yang 6 digit terakhirnya persis sama dengan suffix
+      const found = items.find((i: any) =>
+        (i.Kode || "").toUpperCase().endsWith(padded),
+      );
+      if (found) {
+        row.Kode = found.Kode;
+        row.Nama = found.Nama;
+        return;
+      }
+    } catch {
+      /* fallback ke pesan gagal di bawah */
+    }
+    row.Nama = "";
+    return;
+  }
+
+  // Kode lengkap — lookup langsung
+  try {
+    const res = await api.get("/lookups/bahan", {
+      params: { q: input, limit: 1, mode: "komponen" },
+    });
+    const found = (res.data.data?.items || [])[0];
+    if (found && found.Kode?.toUpperCase() === input.toUpperCase()) {
+      row.Kode = found.Kode;
+      row.Nama = found.Nama;
+    } else {
+      row.Nama = "";
+    }
+  } catch {
+    row.Nama = "";
+  }
+};
+
+const addPotongRow = () => {
+  ensureKomponenStruct();
+  props.formData.KomponenSpk.ListPotong.push({ Kode: "", Nama: "" });
+};
+
+const removePotongRow = (idx: number) => {
+  ensureKomponenStruct();
+  props.formData.KomponenSpk.ListPotong.splice(idx, 1);
+};
+
 const removeCetakBordirRow = (idx: number) => {
   ensureKomponenStruct();
   props.formData.KomponenSpk.ListCetakBordir.splice(idx, 1);
+};
+
+const addCetakBordirRow = () => {
+  ensureKomponenStruct();
+  props.formData.KomponenSpk.ListCetakBordir.push({
+    Kode: "",
+    Nama: "",
+    Proses: prosesOptions.value[0] || "SABLON",
+    Penempatan: "",
+    Ukuran: "",
+  });
+};
+
+const onKodeF1 = (
+  e: KeyboardEvent,
+  target: "potong" | "cetakbordir",
+  idx: number,
+) => {
+  if (e.key === "F1") {
+    e.preventDefault();
+    openBahanLookup(target, idx);
+  }
 };
 
 onMounted(loadKomponenFromProof);
@@ -129,25 +249,34 @@ const listCetakBordir = computed(
     <div v-if="loadError" class="komp-error-banner">⚠ {{ loadError }}</div>
 
     <div class="komp-tabs">
+      <div class="komp-tabs-left">
+        <button
+          class="komp-tab-btn"
+          :class="{ active: activeTab === 'potong' }"
+          @click="activeTab = 'potong'"
+        >
+          <IconScissors :size="14" class="mr-1" /> POTONG
+          <span v-if="listPotong.length" class="tab-badge">{{
+            listPotong.length
+          }}</span>
+        </button>
+        <button
+          class="komp-tab-btn"
+          :class="{ active: activeTab === 'cetakbordir' }"
+          @click="activeTab = 'cetakbordir'"
+        >
+          <IconPrinter :size="14" class="mr-1" /> SECOND PROCESS
+          <span v-if="listCetakBordir.length" class="tab-badge">{{
+            listCetakBordir.length
+          }}</span>
+        </button>
+      </div>
       <button
-        class="komp-tab-btn"
-        :class="{ active: activeTab === 'potong' }"
-        @click="activeTab = 'potong'"
+        type="button"
+        class="btn-add-row"
+        @click="activeTab === 'potong' ? addPotongRow() : addCetakBordirRow()"
       >
-        <IconScissors :size="14" class="mr-1" /> POTONG
-        <span v-if="listPotong.length" class="tab-badge">{{
-          listPotong.length
-        }}</span>
-      </button>
-      <button
-        class="komp-tab-btn"
-        :class="{ active: activeTab === 'cetakbordir' }"
-        @click="activeTab = 'cetakbordir'"
-      >
-        <IconPrinter :size="14" class="mr-1" /> SECOND PROCESS
-        <span v-if="listCetakBordir.length" class="tab-badge">{{
-          listCetakBordir.length
-        }}</span>
+        <IconPlus :size="13" class="mr-1" /> Tambah Baris
       </button>
     </div>
 
@@ -157,7 +286,7 @@ const listCetakBordir = computed(
       </div>
 
       <template v-else>
-        <!-- POTONG — full read-only -->
+        <!-- POTONG — Kode/Nama otomatis dari Proof, tapi bisa ditambah/hapus manual -->
         <div v-show="activeTab === 'potong'" class="komp-pane">
           <table class="komp-table">
             <thead>
@@ -165,17 +294,57 @@ const listCetakBordir = computed(
                 <th style="width: 40px">No</th>
                 <th style="width: 160px">Kode</th>
                 <th>Nama Komponen</th>
+                <th style="width: 36px"></th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="(item, idx) in listPotong" :key="'p' + idx">
                 <td class="text-center">{{ Number(idx) + 1 }}</td>
-                <td class="mono">{{ item.Kode }}</td>
-                <td>{{ item.Nama }}</td>
+                <td>
+                  <div class="igrp-komp">
+                    <input
+                      v-model="item.Kode"
+                      class="cell-inp mono-inp"
+                      placeholder="Kode"
+                      @keydown="onKodeF1($event, 'potong', Number(idx))"
+                      @keydown.enter.prevent="
+                        validateKodeOnEnter('potong', Number(idx))
+                      "
+                    />
+                    <button
+                      type="button"
+                      class="blkp-komp"
+                      title="Cari Bahan (F1)"
+                      @click="openBahanLookup('potong', Number(idx))"
+                    >
+                      <IconSearch :size="12" color="#1565c0" />
+                    </button>
+                  </div>
+                </td>
+                <td>
+                  <input
+                    :value="item.Nama"
+                    readonly
+                    class="cell-inp cell-ro"
+                    placeholder="Nama otomatis dari Kode"
+                  />
+                </td>
+                <td class="text-center">
+                  <button
+                    type="button"
+                    class="btn-del"
+                    title="Hapus baris"
+                    @click="removePotongRow(Number(idx))"
+                  >
+                    <IconTrash :size="13" color="#c62828" />
+                  </button>
+                </td>
               </tr>
               <tr v-if="listPotong.length === 0">
-                <td colspan="3" class="empty-row">
-                  Belum ada data Proof Garmen untuk lini Potong.
+                <td colspan="4" class="empty-row">
+                  Belum ada data. Klik "Tambah Baris" untuk menambah manual,
+                  atau data akan otomatis terisi kalau Proof Garmen sudah
+                  diinput.
                 </td>
               </tr>
             </tbody>
@@ -199,8 +368,35 @@ const listCetakBordir = computed(
             <tbody>
               <tr v-for="(item, idx) in listCetakBordir" :key="'cb' + idx">
                 <td class="text-center">{{ Number(idx) + 1 }}</td>
-                <td class="mono">{{ item.Kode }}</td>
-                <td>{{ item.Nama }}</td>
+                <td>
+                  <div class="igrp-komp">
+                    <input
+                      v-model="item.Kode"
+                      class="cell-inp mono-inp"
+                      placeholder="Kode"
+                      @keydown="onKodeF1($event, 'cetakbordir', Number(idx))"
+                      @keydown.enter.prevent="
+                        validateKodeOnEnter('cetakbordir', Number(idx))
+                      "
+                    />
+                    <button
+                      type="button"
+                      class="blkp-komp"
+                      title="Cari Bahan (F1)"
+                      @click="openBahanLookup('cetakbordir', Number(idx))"
+                    >
+                      <IconSearch :size="12" color="#1565c0" />
+                    </button>
+                  </div>
+                </td>
+                <td>
+                  <input
+                    :value="item.Nama"
+                    readonly
+                    class="cell-inp cell-ro"
+                    placeholder="Nama otomatis dari Kode"
+                  />
+                </td>
                 <td>
                   <select v-model="item.Proses" class="cell-sel">
                     <option v-for="p in prosesOptions" :key="p" :value="p">
@@ -235,12 +431,9 @@ const listCetakBordir = computed(
               </tr>
               <tr v-if="listCetakBordir.length === 0">
                 <td colspan="7" class="empty-row">
-                  Belum ada data Proof Garmen untuk lini Cetak/Sublim/Bordir.
-                </td>
-              </tr>
-              <tr v-if="listCetakBordir.length === 0">
-                <td colspan="6" class="empty-row">
-                  Belum ada data Proof Garmen untuk lini Cetak/Sublim/Bordir.
+                  Belum ada data. Klik "Tambah Baris" untuk menambah manual,
+                  atau data akan otomatis terisi kalau Proof Garmen sudah
+                  diinput.
                 </td>
               </tr>
             </tbody>
@@ -249,6 +442,12 @@ const listCetakBordir = computed(
       </template>
     </div>
   </div>
+
+  <BahanSearchModal
+    v-model="showBahanModal"
+    mode="komponen"
+    @selected="applyBahanToRow"
+  />
 </template>
 
 <style scoped>
@@ -308,13 +507,6 @@ const listCetakBordir = computed(
 .cell-sel:focus,
 .cell-inp:focus {
   border-color: #1565c0;
-}
-.komp-tabs {
-  display: flex;
-  gap: 4px;
-  padding: 8px 8px 0;
-  background: #eeeeee;
-  border-bottom: 1px solid #bdbdbd;
 }
 .komp-tab-btn {
   display: flex;
@@ -406,5 +598,72 @@ const listCetakBordir = computed(
   padding: 16px;
   color: #bdbdbd;
   font-style: italic;
+}
+.komp-tabs {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  padding: 8px 8px 0;
+  background: #eeeeee;
+  border-bottom: 1px solid #bdbdbd;
+}
+.komp-tabs-left {
+  display: flex;
+  gap: 4px;
+}
+.btn-add-row {
+  display: flex;
+  align-items: center;
+  background: #1565c0;
+  color: white;
+  border: none;
+  border-radius: 4px 4px 0 0;
+  padding: 6px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-bottom: 2px;
+}
+.btn-add-row:hover {
+  opacity: 0.9;
+}
+.mono-inp {
+  font-family: monospace;
+  color: #1565c0;
+  font-weight: 600;
+}
+.igrp-komp {
+  display: flex;
+  border: 1px solid #bdbdbd;
+  border-radius: 3px;
+  overflow: hidden;
+  height: 26px;
+  background: white;
+}
+.igrp-komp .cell-inp {
+  border: none;
+  height: 24px;
+  border-radius: 0;
+}
+.blkp-komp {
+  width: 26px;
+  min-width: 26px;
+  flex-shrink: 0;
+  background: #e3f2fd;
+  border: none;
+  border-left: 1px solid #bdbdbd;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+.blkp-komp:hover {
+  background: #bbdefb;
+}
+.cell-ro {
+  background: #f0f0f0 !important;
+  color: #555 !important;
+  cursor: not-allowed;
 }
 </style>

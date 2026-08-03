@@ -25,6 +25,8 @@ import {
   IconPalette,
   IconLayoutSidebarRight,
   IconLayoutSidebarRightCollapse,
+  IconBan,
+  IconSwitchHorizontal,
 } from "@tabler/icons-vue";
 import { formatTanggal, formatTanggalJam } from "@/utils/dateFormat";
 
@@ -213,6 +215,12 @@ const tailHeadersFront = [
   { title: "Design Done", key: "Design_Done", width: "90px", align: "center" },
   { title: "Keterangan", key: "Keterangan", width: "250px" },
   { title: "Pesanan/Invoice", key: "Pesanan/Invoice", width: "150px" },
+  {
+    title: "Sts Pembatalan",
+    key: "StsPembatalan",
+    width: "130px",
+    align: "center",
+  },
 ];
 
 const headers = computed(() => [
@@ -442,29 +450,37 @@ const confirmBatalClose = async () => {
 const dialogGambar = ref(false);
 const gambarUrl = ref("");
 const gambarFallbackStep = ref(0);
+
 const onGambarError = () => {
   if (!selectedItem.value) return;
   const base = (api.defaults.baseURL || "").replace(/\/api\/?$/, "");
-  const nomor = selectedItem.value.Nomor;
   const cab = selectedItem.value.Cab || "HO-";
-  const map = selectedItem.value.MAP || ""; // kolom MAP dari browse
+  const map = selectedItem.value.MAP || "";
+  const nomor = selectedItem.value.Nomor;
+  const identifier = map || nomor; // ⚠️ FIX: prioritaskan MAP, sama seperti form
 
   if (gambarFallbackStep.value === 0 && map) {
-    // Fallback ke folder /map/
+    // Fallback ke folder /map/ di server images
     gambarFallbackStep.value = 1;
     gambarUrl.value = `${base}/images/${cab}/map/${encodeURIComponent(map)}.jpg`;
   } else if (gambarFallbackStep.value <= 1) {
     gambarFallbackStep.value = 2;
-    gambarUrl.value = `/file-gambar/${encodeURIComponent(nomor)}.jpg`;
+    // ⚠️ FIX: pakai identifier (MAP kalau ada), bukan selalu nomor SO
+    gambarUrl.value = `/file-gambar/${encodeURIComponent(identifier)}.jpg`;
   }
 };
+
 const onLihatGambar = () => {
   if (!selectedItem.value) return;
   gambarFallbackStep.value = 0;
   const base = (api.defaults.baseURL || "").replace(/\/api\/?$/, "");
-  const nomor = selectedItem.value.Nomor;
   const cab = selectedItem.value.Cab || "HO-";
-  gambarUrl.value = `${base}/images/${cab}/${encodeURIComponent(nomor)}.jpg`;
+  const map = selectedItem.value.MAP || "";
+  const nomor = selectedItem.value.Nomor;
+  // ⚠️ FIX: kalau ada MAP, itu yang jadi path utama (sama seperti form),
+  // bukan langsung pakai nomor SO
+  const identifier = map || nomor;
+  gambarUrl.value = `${base}/images/${cab}/${encodeURIComponent(identifier)}.jpg`;
   dialogGambar.value = true;
 };
 
@@ -533,6 +549,53 @@ const submitCloseSpk = async () => {
   }
 };
 
+// --- PENGAJUAN GANTI QTY & JENIS KAIN ---
+const showGantiQtyDialog = ref(false);
+const isGantiQtyLoading = ref(false);
+const isGantiQtySaving = ref(false);
+const gantiQtyAlasan = ref("");
+
+const openGantiQtyDialog = async () => {
+  if (!selectedItem.value) return;
+
+  gantiQtyAlasan.value = "";
+  showGantiQtyDialog.value = true;
+
+  isGantiQtyLoading.value = true;
+  try {
+    const res = await salesOrderService.getGantiQtyKainStatus(
+      selectedItem.value.Nomor,
+    );
+    // prefill alasan kalau ada pengajuan pending sebelumnya
+    gantiQtyAlasan.value = res.data.data?.alasan || "";
+  } catch (e: any) {
+    toast.error(e.response?.data?.message || "Gagal memuat status pengajuan.");
+  } finally {
+    isGantiQtyLoading.value = false;
+  }
+};
+
+const submitGantiQtyKain = async () => {
+  if (!gantiQtyAlasan.value.trim()) {
+    toast.warning("Alasan harus diisi.");
+    return;
+  }
+  isGantiQtySaving.value = true;
+  try {
+    await salesOrderService.ajukanGantiQtyKain(
+      selectedItem.value.Nomor,
+      gantiQtyAlasan.value,
+    );
+    toast.success("Pengajuan berhasil dikirim.\nMenunggu ACC.");
+    showGantiQtyDialog.value = false;
+    fetchData();
+  } catch (e: any) {
+    toast.error(e.response?.data?.message || "Gagal mengirim pengajuan.");
+  } finally {
+    isGantiQtySaving.value = false;
+  }
+};
+
 const onBatalCloseSpk = async () => {
   if (!selectedItem.value) return;
   if (selectedItem.value.Status === "Open")
@@ -560,6 +623,156 @@ const onBatalCloseSpk = async () => {
     } catch (e: any) {
       toast.error(e.response?.data?.message || "Gagal membatalkan close.");
     }
+  }
+};
+
+// --- FORM PEMBATALAN SPK/SO ---
+const showPembatalanDialog = ref(false);
+const isPembatalanLoading = ref(false);
+const isPembatalanSaving = ref(false);
+const pembatalanData = ref<any>({});
+
+const pembatalanForm = ref({
+  abUbah: false,
+  abMap: false,
+  abBahan: false,
+  abQty: false,
+  abLain: false,
+  abLain2: "",
+  abKet: "",
+  spBelum: false,
+  spCuting: false,
+  spSewing: false,
+  spFinishing: false,
+  spSudah: false,
+  sbBeli: false,
+  sbDireksi: false,
+  sbSup: false,
+  sbSudah: false,
+  dampak: "",
+  rtBatal: false,
+  rtAlih: false,
+  rtSisa: false,
+  rtLain: false,
+  rtLain2: "",
+});
+
+const resetPembatalanForm = () => {
+  pembatalanForm.value = {
+    abUbah: false,
+    abMap: false,
+    abBahan: false,
+    abQty: false,
+    abLain: false,
+    abLain2: "",
+    abKet: "",
+    spBelum: false,
+    spCuting: false,
+    spSewing: false,
+    spFinishing: false,
+    spSudah: false,
+    sbBeli: false,
+    sbDireksi: false,
+    sbSup: false,
+    sbSudah: false,
+    dampak: "",
+    rtBatal: false,
+    rtAlih: false,
+    rtSisa: false,
+    rtLain: false,
+    rtLain2: "",
+  };
+};
+
+const openPembatalanDialog = async () => {
+  if (!selectedItem.value) return;
+
+  if (
+    selectedItem.value.Aktif === "N" &&
+    selectedItem.value.Status === "Closed"
+  ) {
+    toast.warning("SO ini sudah closed. Tidak perlu diajukan pembatalan.");
+    return;
+  }
+
+  resetPembatalanForm();
+  pembatalanData.value = {};
+  showPembatalanDialog.value = true;
+
+  isPembatalanLoading.value = true;
+  try {
+    const res = await salesOrderService.getPembatalanDetail({
+      spkNomor: selectedItem.value.Nomor,
+    });
+    pembatalanData.value = res.data.data;
+
+    // kalau ternyata sudah ada pengajuan sebelumnya (belum di-approve), prefill checkbox
+    if (pembatalanData.value.fb_nomor) {
+      const d = pembatalanData.value;
+      pembatalanForm.value = {
+        abUbah: d.fb_abubah === "Y",
+        abMap: d.fb_abmap === "Y",
+        abBahan: d.fb_abbahan === "Y",
+        abQty: d.fb_abqty === "Y",
+        abLain: d.fb_ablain === "Y",
+        abLain2: d.fb_ablain2 || "",
+        abKet: d.fb_abket || "",
+        spBelum: d.fb_spbelum === "Y",
+        spCuting: d.fb_spcuting === "Y",
+        spSewing: d.fb_spsewing === "Y",
+        spFinishing: d.fb_spfinishing === "Y",
+        spSudah: d.fb_spsudah === "Y",
+        sbBeli: d.fb_sbbeli === "Y",
+        sbDireksi: d.fb_sbdireksi === "Y",
+        sbSup: d.fb_sbsup === "Y",
+        sbSudah: d.fb_sbsudah === "Y",
+        dampak: d.fb_dampak || "",
+        rtBatal: d.fb_rtbatal === "Y",
+        rtAlih: d.fb_rtalih === "Y",
+        rtSisa: d.fb_rtsisa === "Y",
+        rtLain: d.fb_rtlain === "Y",
+        rtLain2: d.fb_rtlain2 || "",
+      };
+    }
+  } catch (e: any) {
+    toast.error(e.response?.data?.message || "Gagal memuat data SPK/SO.");
+    showPembatalanDialog.value = false;
+  } finally {
+    isPembatalanLoading.value = false;
+  }
+};
+
+// GANTI submitPembatalan yang lama dengan ini:
+const showConfirmPembatalanDialog = ref(false);
+
+const submitPembatalan = () => {
+  const f = pembatalanForm.value;
+  const adaAlasan = f.abUbah || f.abMap || f.abBahan || f.abQty || f.abLain;
+  if (!adaAlasan) {
+    toast.warning("Pilih minimal satu alasan pembatalan.");
+    return;
+  }
+  showConfirmPembatalanDialog.value = true;
+};
+
+const confirmSubmitPembatalan = async () => {
+  isPembatalanSaving.value = true;
+  try {
+    await salesOrderService.ajukanPembatalan({
+      spkNomor: selectedItem.value?.Nomor,
+      tanggal: new Date().toISOString().substring(0, 10),
+      ...pembatalanForm.value,
+    });
+    toast.success(
+      "Pengajuan pembatalan berhasil disimpan.\nMenunggu approval.",
+    );
+    showConfirmPembatalanDialog.value = false;
+    showPembatalanDialog.value = false;
+    fetchData();
+  } catch (e: any) {
+    toast.error(e.response?.data?.message || "Gagal mengajukan pembatalan.");
+  } finally {
+    isPembatalanSaving.value = false;
   }
 };
 
@@ -805,6 +1018,21 @@ const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
       </div>
     </template>
 
+    <template #item.StsPembatalan="{ item }">
+      <span
+        v-if="item.StsPembatalan"
+        class="sts-batal-badge"
+        :class="{
+          'sts-pengajuan': item.StsPembatalan === 'PENGAJUAN',
+          'sts-approval': item.StsPembatalan === 'APPROVAL',
+          'sts-tolak': item.StsPembatalan === 'TOLAK',
+        }"
+      >
+        {{ item.StsPembatalan }}
+      </span>
+      <span v-else class="text-grey">-</span>
+    </template>
+
     <template #extra-actions="{ selected }">
       <v-btn
         v-if="isTimDesain"
@@ -852,6 +1080,20 @@ const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
               ><IconCheck :size="14" class="mr-2 text-success"
             /></template>
             <v-list-item-title>Approval SO</v-list-item-title>
+          </v-list-item>
+          <v-list-item @click="openGantiQtyDialog">
+            <template #prepend
+              ><IconSwitchHorizontal :size="14" class="mr-2 text-info"
+            /></template>
+            <v-list-item-title
+              >Pengajuan Ganti Qty & Jenis Kain</v-list-item-title
+            >
+          </v-list-item>
+          <v-list-item @click="openPembatalanDialog">
+            <template #prepend
+              ><IconBan :size="14" class="mr-2 text-error"
+            /></template>
+            <v-list-item-title>Form Pembatalan SPK</v-list-item-title>
           </v-list-item>
           <v-divider class="my-1"></v-divider>
           <v-list-item @click="openBatalCloseDialog" :disabled="!canDelete">
@@ -1143,6 +1385,338 @@ const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
       </v-card-actions>
     </v-card>
   </v-dialog>
+
+  <v-dialog
+    v-model="showPembatalanDialog"
+    max-width="820px"
+    persistent
+    scrollable
+  >
+    <v-card class="rounded-lg">
+      <v-card-title class="bg-error text-white d-flex align-center pa-3">
+        <IconBan :size="18" class="mr-2" />
+        <span class="text-subtitle-1 font-weight-bold"
+          >Form Pembatalan SPK</span
+        >
+      </v-card-title>
+
+      <v-card-text class="pa-4" style="max-height: 70vh">
+        <div v-if="isPembatalanLoading" class="text-center py-8 text-grey">
+          Memuat data SPK/SO...
+        </div>
+
+        <div v-else>
+          <!-- Info Umum + Data SPK -->
+          <div class="pb-row">
+            <div class="pb-col">
+              <div class="pb-section-title">Informasi Umum</div>
+              <div class="pb-field">
+                <span class="pb-lbl">No. Form</span>
+                <input
+                  type="text"
+                  :value="pembatalanData.fb_nomor || '(baru saat disimpan)'"
+                  readonly
+                  class="pb-inp flex-1"
+                />
+              </div>
+              <div class="pb-field">
+                <span class="pb-lbl">Tanggal</span>
+                <input
+                  type="text"
+                  :value="
+                    formatTanggal(new Date().toISOString().substring(0, 10))
+                  "
+                  readonly
+                  class="pb-inp flex-1"
+                />
+              </div>
+            </div>
+
+            <div class="pb-col">
+              <div class="pb-section-title">Data SPK/SO</div>
+              <div class="pb-field">
+                <span class="pb-lbl">No. SPK/SO</span>
+                <input
+                  type="text"
+                  :value="pembatalanData.spk_nomor"
+                  readonly
+                  class="pb-inp flex-1 font-weight-bold"
+                />
+              </div>
+              <div class="pb-field">
+                <span class="pb-lbl">Customer</span>
+                <input
+                  type="text"
+                  :value="pembatalanData.cus_nama"
+                  readonly
+                  class="pb-inp flex-1"
+                />
+              </div>
+              <div class="pb-field">
+                <span class="pb-lbl">Produk</span>
+                <input
+                  type="text"
+                  :value="pembatalanData.spk_nama"
+                  readonly
+                  class="pb-inp flex-1"
+                />
+              </div>
+              <div class="pb-field">
+                <span class="pb-lbl">Quantity</span>
+                <input
+                  type="text"
+                  :value="numFmt(pembatalanData.spk_jumlah)"
+                  readonly
+                  class="pb-inp"
+                  style="width: 100px"
+                />
+              </div>
+            </div>
+          </div>
+
+          <v-divider class="my-3" />
+
+          <!-- Alasan Pembatalan -->
+          <div class="pb-section-title">Alasan Pembatalan</div>
+          <div class="pb-check-grid">
+            <label class="pb-check">
+              <input type="checkbox" v-model="pembatalanForm.abUbah" />
+              Perubahan permintaan customer
+            </label>
+            <label class="pb-check">
+              <input type="checkbox" v-model="pembatalanForm.abMap" />
+              MAP tidak disetujui customer
+            </label>
+            <label class="pb-check">
+              <input type="checkbox" v-model="pembatalanForm.abBahan" />
+              Kendala bahan
+            </label>
+            <label class="pb-check">
+              <input type="checkbox" v-model="pembatalanForm.abQty" />
+              Kendala kualitas
+            </label>
+          </div>
+          <label class="pb-check mt-1">
+            <input type="checkbox" v-model="pembatalanForm.abLain" />
+            Lainnya, sebutkan
+          </label>
+          <input
+            type="text"
+            v-model="pembatalanForm.abLain2"
+            :disabled="!pembatalanForm.abLain"
+            class="pb-inp w-100 mt-1"
+            placeholder="Sebutkan alasan lain..."
+          />
+          <div class="pb-field align-start mt-2">
+            <span class="pb-lbl mt-1">Ket. tambahan</span>
+            <textarea
+              v-model="pembatalanForm.abKet"
+              rows="2"
+              class="pb-inp pb-textarea flex-1"
+              placeholder="Keterangan tambahan..."
+            ></textarea>
+          </div>
+
+          <v-divider class="my-3" />
+
+          <!-- Status Proses Produksi -->
+          <div class="pb-section-title">Status Proses Produksi</div>
+          <div class="pb-check-grid">
+            <label class="pb-check">
+              <input type="checkbox" v-model="pembatalanForm.spBelum" />
+              Belum diproses
+            </label>
+            <label class="pb-check">
+              <input type="checkbox" v-model="pembatalanForm.spCuting" />
+              Cutting
+            </label>
+            <label class="pb-check">
+              <input type="checkbox" v-model="pembatalanForm.spSewing" />
+              Sewing
+            </label>
+            <label class="pb-check">
+              <input type="checkbox" v-model="pembatalanForm.spFinishing" />
+              Finishing
+            </label>
+            <label class="pb-check">
+              <input type="checkbox" v-model="pembatalanForm.spSudah" />
+              Sudah selesai produksi
+            </label>
+          </div>
+
+          <v-divider class="my-3" />
+
+          <!-- Status Pembelian dan Penggunaan Bahan -->
+          <div class="pb-section-title">
+            Status Pembelian dan Penggunaan Bahan
+          </div>
+          <div class="pb-check-grid-col">
+            <label class="pb-check">
+              <input type="checkbox" v-model="pembatalanForm.sbBeli" />
+              Belum dilakukan pembelian bahan
+            </label>
+            <label class="pb-check">
+              <input type="checkbox" v-model="pembatalanForm.sbDireksi" />
+              Sudah dilakukan Pengajuan Pembatalan Pembelian Ke Direksi
+            </label>
+            <label class="pb-check">
+              <input type="checkbox" v-model="pembatalanForm.sbSup" />
+              Sudah dilakukan Pengajuan Pembatalan ke Supplier
+            </label>
+            <label class="pb-check">
+              <input type="checkbox" v-model="pembatalanForm.sbSudah" />
+              Bahan sudah digunakan (sebagian / seluruhnya)
+            </label>
+          </div>
+          <div class="pb-field mt-2">
+            <span class="pb-lbl">Estimasi dampak biaya</span>
+            <input
+              type="text"
+              v-model="pembatalanForm.dampak"
+              class="pb-inp flex-1"
+              placeholder="Estimasi dampak biaya..."
+            />
+          </div>
+
+          <v-divider class="my-3" />
+
+          <!-- Rencana Tindak Lanjut -->
+          <div class="pb-section-title">Rencana Tindak Lanjut</div>
+          <div class="pb-check-grid-col">
+            <label class="pb-check">
+              <input type="checkbox" v-model="pembatalanForm.rtBatal" />
+              Pembatalan penuh
+            </label>
+            <label class="pb-check">
+              <input type="checkbox" v-model="pembatalanForm.rtAlih" />
+              Alih order
+            </label>
+            <label class="pb-check">
+              <input type="checkbox" v-model="pembatalanForm.rtSisa" />
+              Penyelesaian sisa bahan
+            </label>
+            <label class="pb-check">
+              <input type="checkbox" v-model="pembatalanForm.rtLain" />
+              Lainnya
+            </label>
+          </div>
+          <input
+            type="text"
+            v-model="pembatalanForm.rtLain2"
+            :disabled="!pembatalanForm.rtLain"
+            class="pb-inp w-100 mt-1"
+            placeholder="Sebutkan rencana lain..."
+          />
+        </div>
+      </v-card-text>
+
+      <v-card-actions class="pa-3 border-t bg-grey-lighten-4">
+        <v-spacer />
+        <v-btn
+          variant="text"
+          color="grey-darken-1"
+          :disabled="isPembatalanSaving"
+          @click="showPembatalanDialog = false"
+        >
+          Batal
+        </v-btn>
+        <v-btn
+          color="error"
+          variant="elevated"
+          :disabled="isPembatalanLoading"
+          @click="submitPembatalan"
+        >
+          Ajukan Pembatalan
+        </v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
+
+  <v-dialog v-model="showConfirmPembatalanDialog" max-width="400px" persistent>
+    <v-card rounded="lg">
+      <v-card-title
+        class="bg-error text-white pa-3 text-subtitle-1 d-flex align-center"
+      >
+        <IconBan :size="16" color="white" class="mr-2" />
+        Konfirmasi Pengajuan Pembatalan
+      </v-card-title>
+      <v-card-text class="pa-4 text-body-2">
+        Yakin ingin mengajukan pembatalan untuk:
+        <div class="font-weight-bold text-error mt-1">
+          {{ selectedItem?.Nomor }}
+        </div>
+        <div class="text-caption text-grey mt-1">{{ selectedItem?.Nama }}</div>
+      </v-card-text>
+      <v-card-actions class="pa-3 border-t bg-grey-lighten-4">
+        <v-spacer />
+        <v-btn
+          variant="text"
+          :disabled="isPembatalanSaving"
+          @click="showConfirmPembatalanDialog = false"
+        >
+          Batal
+        </v-btn>
+        <v-btn
+          color="error"
+          variant="elevated"
+          :loading="isPembatalanSaving"
+          @click="confirmSubmitPembatalan"
+        >
+          Ya, Ajukan
+        </v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
+
+  <v-dialog v-model="showGantiQtyDialog" max-width="420px" persistent>
+    <v-card rounded="lg">
+      <v-card-title
+        class="bg-info text-white pa-3 text-subtitle-1 d-flex align-center"
+      >
+        <IconSwitchHorizontal :size="16" color="white" class="mr-2" />
+        Pengajuan Ganti Qty & Jenis Kain
+      </v-card-title>
+      <v-card-text class="pa-4">
+        <div v-if="isGantiQtyLoading" class="text-center py-4 text-grey">
+          Memuat...
+        </div>
+        <template v-else>
+          <p class="text-caption mb-2">
+            Nomor: <b>{{ selectedItem?.Nomor }}</b>
+          </p>
+          <p class="text-caption mb-2 text-grey-darken-1">
+            {{ selectedItem?.Nama }}
+          </p>
+          <v-textarea
+            v-model="gantiQtyAlasan"
+            label="Alasan Pengajuan"
+            variant="outlined"
+            density="compact"
+            rows="4"
+            hide-details
+            autofocus
+          />
+        </template>
+      </v-card-text>
+      <v-card-actions class="pa-3 border-t">
+        <v-spacer />
+        <v-btn
+          variant="text"
+          :disabled="isGantiQtySaving"
+          @click="showGantiQtyDialog = false"
+          >Batal</v-btn
+        >
+        <v-btn
+          color="info"
+          variant="elevated"
+          :loading="isGantiQtySaving"
+          :disabled="isGantiQtyLoading"
+          @click="submitGantiQtyKain"
+          >Ajukkan</v-btn
+        >
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
 </template>
 
 <style scoped>
@@ -1277,5 +1851,103 @@ const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
 .legend-divider {
   height: 1px;
   background: #eeeeee;
+}
+.pb-row {
+  display: flex;
+  gap: 24px;
+}
+.pb-col {
+  flex: 1;
+  min-width: 0;
+}
+.pb-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: #1565c0;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  margin-bottom: 6px;
+  border-bottom: 1px solid #cfd8dc;
+  padding-bottom: 3px;
+}
+.pb-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.pb-field.align-start {
+  align-items: flex-start;
+}
+.pb-lbl {
+  width: 90px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #37474f;
+  flex-shrink: 0;
+}
+.pb-inp {
+  height: 28px;
+  border: 1px solid #bdbdbd;
+  border-radius: 4px;
+  padding: 0 8px;
+  font-size: 12px;
+  outline: none;
+}
+.pb-inp:focus {
+  border-color: #1565c0;
+}
+.pb-inp:disabled {
+  background: #f5f5f5;
+  color: #9e9e9e;
+}
+.pb-textarea {
+  height: auto;
+  padding: 6px 8px;
+  resize: vertical;
+}
+.w-100 {
+  width: 100%;
+}
+.pb-check-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 20px;
+}
+.pb-check-grid-col {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.pb-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #37474f;
+  cursor: pointer;
+}
+.pb-check input {
+  accent-color: #1565c0;
+  cursor: pointer;
+}
+.sts-batal-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 700;
+}
+.sts-pengajuan {
+  background: #1565c0;
+  color: white;
+}
+.sts-approval {
+  background: #c62828;
+  color: white;
+}
+.sts-tolak {
+  background: #757575;
+  color: white;
 }
 </style>
