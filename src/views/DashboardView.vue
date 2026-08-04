@@ -293,6 +293,8 @@ watch(activeTab, async (tab) => {
     setupRpDetailObserver();
     setupMapSpkObserver();
     setupMapKirimObserver();
+    setupPvrObserver();
+    setupPipelineMenggantungObserver();
   }
   if (tab === "finance") {
     if (!financeLoaded.value) await loadFinanceData();
@@ -1222,6 +1224,265 @@ const setupMapKirimObserver = () => {
   mapKirimScrollObserver.observe(mapKirimSentinelEl.value);
 };
 
+// ── State: Achievement Ringkas ──
+interface AchievementByDivisi {
+  Divisi: string;
+  Target: number;
+  Realisasi: number;
+}
+interface AchievementSales {
+  Sales: string;
+  Target: number;
+  Realisasi: number;
+  Ach: number;
+}
+const achievementData = ref({
+  totalTarget: 0,
+  totalRealisasi: 0,
+  totalAch: 0,
+  byDivisi: [] as AchievementByDivisi[],
+  topSales: [] as AchievementSales[],
+  bottomSales: [] as AchievementSales[],
+});
+
+// ── State: Growth YoY ──
+interface GrowthYoyRow {
+  bulan: number;
+  namaBulan: string;
+  aktual: number;
+  ly: number;
+  yoy: number;
+  runAktual: number;
+  runYoy: number;
+  runGrowthPersen: number;
+  persenProyeksi: number;
+}
+const growthYoyData = ref<GrowthYoyRow[]>([]);
+const growthYoyMonthlyOnly = computed(() =>
+  growthYoyData.value.filter(
+    (r) => Number(r.bulan) >= 1 && Number(r.bulan) <= 12,
+  ),
+);
+
+// ── State: Funnel Penawaran ──
+interface FunnelDivisiRow {
+  Divisi: string;
+  Nominal: number;
+  Realisasi: number;
+  Batal?: number;
+  Confirm?: number;
+  PresentaseRealisasi?: number;
+  PresentaseBatal?: number;
+  PresentaseConfirm?: number;
+  Presentase?: number;
+}
+const penawaranFunnelData = ref({
+  byDivisi: [] as FunnelDivisiRow[],
+  grandTotal: { Nominal: 0, Realisasi: 0, Batal: 0, Confirm: 0 },
+});
+
+// ── State: Funnel MAP ──
+const mapFunnelData = ref<FunnelDivisiRow[]>([]);
+
+// ── Infinite scroll: Proyeksi vs Realisasi (gap customer) ──
+interface GapCustomerItem {
+  CusKode?: string;
+  CusNama?: string;
+  JoKode?: string;
+  JoNama?: string;
+  TotalMemo: number;
+  RealisasiMemo: number | null;
+  gap: number;
+}
+const PVR_PAGE_SIZE = 20;
+const proyeksiVsRealisasiSummary = ref({
+  totalMemo: 0,
+  totalRealisasiMemo: 0,
+  totalRealisasiAll: 0,
+});
+const gapCustomerList = ref<GapCustomerItem[]>([]);
+const pvrPage = ref(1);
+const pvrHasMore = ref(true);
+const isLoadingMorePvr = ref(false);
+const pvrSentinelEl = ref<HTMLElement | null>(null);
+let pvrScrollObserver: IntersectionObserver | null = null;
+const loadMorePvr = async () => {
+  if (!pvrHasMore.value || isLoadingMorePvr.value) return;
+  isLoadingMorePvr.value = true;
+  try {
+    const res = await dashboardService.getProyeksiVsRealisasiSummary(
+      mapFilter.value.startDate,
+      mapFilter.value.endDate,
+      PVR_PAGE_SIZE,
+      pvrPage.value,
+    );
+    const d = res.data.data;
+    proyeksiVsRealisasiSummary.value = {
+      totalMemo: d.totalMemo,
+      totalRealisasiMemo: d.totalRealisasiMemo,
+      totalRealisasiAll: d.totalRealisasiAll,
+    };
+    gapCustomerList.value.push(...(d.gapCustomer || []));
+    pvrPage.value += 1;
+    pvrHasMore.value = !!d.hasMore;
+  } catch {
+  } finally {
+    isLoadingMorePvr.value = false;
+  }
+};
+const setupPvrObserver = () => {
+  if (pvrScrollObserver) pvrScrollObserver.disconnect();
+  if (!pvrSentinelEl.value) return;
+  pvrScrollObserver = new IntersectionObserver(
+    (entries) => {
+      if (entries[0].isIntersecting) loadMorePvr();
+    },
+    { threshold: 0.1 },
+  );
+  pvrScrollObserver.observe(pvrSentinelEl.value);
+};
+
+// ── Infinite scroll: Pipeline Menggantung ──
+interface PipelineItem {
+  Customer: string;
+  NamaSpk: string;
+  Sales: string;
+  Divisi: string;
+  Jumlah: number;
+}
+const PIPELINE_MENGGANTUNG_PAGE_SIZE = 20;
+const pipelineMenggantungSummary = ref({ totalItem: 0, totalNilai: 0 });
+const pipelineMenggantungList = ref<PipelineItem[]>([]);
+const pipelineMenggantungPage = ref(1);
+const pipelineMenggantungHasMore = ref(true);
+const isLoadingMorePipelineMenggantung = ref(false);
+const pipelineMenggantungSentinelEl = ref<HTMLElement | null>(null);
+let pipelineMenggantungScrollObserver: IntersectionObserver | null = null;
+const loadMorePipelineMenggantung = async () => {
+  if (
+    !pipelineMenggantungHasMore.value ||
+    isLoadingMorePipelineMenggantung.value
+  )
+    return;
+  isLoadingMorePipelineMenggantung.value = true;
+  try {
+    const res = await dashboardService.getPipelineMenggantung(
+      mapFilter.value.startDate,
+      mapFilter.value.endDate,
+      PIPELINE_MENGGANTUNG_PAGE_SIZE,
+      pipelineMenggantungPage.value,
+    );
+    const d = res.data.data;
+    pipelineMenggantungSummary.value = {
+      totalItem: d.totalItem,
+      totalNilai: d.totalNilai,
+    };
+    pipelineMenggantungList.value.push(...(d.items || []));
+    pipelineMenggantungPage.value += 1;
+    pipelineMenggantungHasMore.value = !!d.hasMore;
+  } catch {
+  } finally {
+    isLoadingMorePipelineMenggantung.value = false;
+  }
+};
+const setupPipelineMenggantungObserver = () => {
+  if (pipelineMenggantungScrollObserver)
+    pipelineMenggantungScrollObserver.disconnect();
+  if (!pipelineMenggantungSentinelEl.value) return;
+  pipelineMenggantungScrollObserver = new IntersectionObserver(
+    (entries) => {
+      if (entries[0].isIntersecting) loadMorePipelineMenggantung();
+    },
+    { threshold: 0.1 },
+  );
+  pipelineMenggantungScrollObserver.observe(
+    pipelineMenggantungSentinelEl.value,
+  );
+};
+
+// ── Computed helper: Achievement rate color ──
+const achColor = (ach: number) => {
+  if (ach >= 100) return "#2e7d32";
+  if (ach >= 70) return "#f57f17";
+  return "#c62828";
+};
+
+const achChartEl = ref<HTMLElement | null>(null);
+const achTopSalesChartEl = ref<HTMLElement | null>(null);
+
+const renderAchievementChart = async () => {
+  await nextTick();
+  const win = window as any;
+  if (!win.c3) return;
+
+  if (achChartEl.value && achievementData.value.byDivisi.length) {
+    if (achChartEl.value.innerHTML) achChartEl.value.innerHTML = "";
+    const divisi = achievementData.value.byDivisi;
+    win.c3.generate({
+      bindto: achChartEl.value,
+      size: { height: 220 },
+      data: {
+        x: "divisi",
+        columns: [
+          ["divisi", ...divisi.map((d) => d.Divisi)],
+          ["Target", ...divisi.map((d) => d.Target)],
+          ["Realisasi", ...divisi.map((d) => d.Realisasi)],
+        ],
+        type: "bar",
+        colors: { Target: "#bdbdbd", Realisasi: "#1565c0" },
+      },
+      bar: { width: { ratio: 0.5 } },
+      axis: {
+        x: { type: "category" },
+        y: { tick: { format: (v: number) => shortNum(v) } },
+      },
+      legend: { position: "inset" },
+      grid: { y: { show: true } },
+    });
+  }
+
+  if (achTopSalesChartEl.value && achievementData.value.topSales.length) {
+    if (achTopSalesChartEl.value.innerHTML)
+      achTopSalesChartEl.value.innerHTML = "";
+    const top = achievementData.value.topSales;
+    win.c3.generate({
+      bindto: achTopSalesChartEl.value,
+      size: { height: 200 },
+      data: {
+        x: "sales",
+        columns: [
+          ["sales", ...top.map((s) => s.Sales)],
+          ["Ach%", ...top.map((s) => Math.round(s.Ach))],
+        ],
+        type: "bar",
+
+        color: (color: string, d: any) => {
+          if (d.value === undefined) return "#2e7d32"; // warna default legend
+          return achColor(d.value);
+        },
+      },
+      bar: { width: { ratio: 0.6 } },
+      axis: {
+        rotated: true,
+        x: { type: "category" },
+        y: { max: 100, tick: { values: [0, 25, 50, 75, 100] } },
+      },
+      legend: { show: false },
+      grid: { y: { show: true } },
+    });
+  }
+};
+
+watch(
+  () =>
+    [achievementData.value.byDivisi.length, isLoadingDashboard.value] as const,
+  ([len, loading]) => {
+    if (len > 0 && !loading) {
+      renderAchievementChart();
+    }
+  },
+);
+
 // ── Infinite scroll: Bahan Kurang ──
 const BAHAN_KURANG_PAGE_SIZE = 20;
 const bahanKurangList = ref<BahanKurangItem[]>([]);
@@ -1765,6 +2026,26 @@ const loadMarketingData = async () => {
     penawaranBelumMap.value = [];
     mapOffset.value = 0;
     mapHasMore.value = true;
+    achievementData.value = {
+      totalTarget: 0,
+      totalRealisasi: 0,
+      totalAch: 0,
+      byDivisi: [],
+      topSales: [],
+      bottomSales: [],
+    };
+    growthYoyData.value = [];
+    penawaranFunnelData.value = {
+      byDivisi: [],
+      grandTotal: { Nominal: 0, Realisasi: 0, Batal: 0, Confirm: 0 },
+    };
+    mapFunnelData.value = [];
+    gapCustomerList.value = [];
+    pvrPage.value = 1;
+    pvrHasMore.value = true;
+    pipelineMenggantungList.value = [];
+    pipelineMenggantungPage.value = 1;
+    pipelineMenggantungHasMore.value = true;
 
     const [sumRes, realisasiRes, mapSumRes, kunjunganRes, realisasiPenRes] =
       await Promise.allSettled([
@@ -1813,6 +2094,28 @@ const loadMarketingData = async () => {
       mapSjMetric.value = mapVsSjRes.value.data.data;
     }
     await Promise.allSettled([loadMoreMapSpk(), loadMoreMapKirim()]);
+
+    const [achRes, growthRes, penFunnelRes, mapFunnelRes] =
+      await Promise.allSettled([
+        dashboardService.getAchievementSummary(),
+        dashboardService.getGrowthYoy(),
+        dashboardService.getPenawaranFunnel(),
+        dashboardService.getMapFunnel(),
+      ]);
+    if (achRes.status === "fulfilled" && achRes.value?.data?.data)
+      achievementData.value = achRes.value.data.data;
+    if (achRes.status === "fulfilled" && achRes.value?.data?.data) {
+      achievementData.value = achRes.value.data.data;
+      renderAchievementChart();
+    }
+    if (growthRes.status === "fulfilled" && growthRes.value?.data?.data)
+      growthYoyData.value = growthRes.value.data.data;
+    if (penFunnelRes.status === "fulfilled" && penFunnelRes.value?.data?.data)
+      penawaranFunnelData.value = penFunnelRes.value.data.data;
+    if (mapFunnelRes.status === "fulfilled" && mapFunnelRes.value?.data?.data)
+      mapFunnelData.value = mapFunnelRes.value.data.data;
+
+    await Promise.allSettled([loadMorePvr(), loadMorePipelineMenggantung()]);
 
     marketingLoaded.value = true;
   } finally {
@@ -2060,6 +2363,12 @@ const reloadMapPanels = async () => {
   mapKirimList.value = [];
   mapKirimOffset.value = 0;
   mapKirimHasMore.value = true;
+  gapCustomerList.value = [];
+  pvrPage.value = 1;
+  pvrHasMore.value = true;
+  pipelineMenggantungList.value = [];
+  pipelineMenggantungPage.value = 1;
+  pipelineMenggantungHasMore.value = true;
 
   try {
     const [mapVsSpkRes, mapVsSjRes] = await Promise.allSettled([
@@ -2085,6 +2394,9 @@ const reloadMapPanels = async () => {
     await nextTick();
     setupMapSpkObserver();
     setupMapKirimObserver();
+    await Promise.allSettled([loadMorePvr(), loadMorePipelineMenggantung()]);
+    setupPvrObserver();
+    setupPipelineMenggantungObserver();
   }
 };
 
@@ -2149,6 +2461,8 @@ onMounted(async () => {
     setupRpDetailObserver();
     setupMapSpkObserver();
     setupMapKirimObserver();
+    setupPvrObserver();
+    setupPipelineMenggantungObserver();
   }
   if (activeTab.value === "finance") {
     setupOverdueObserver();
@@ -2192,6 +2506,8 @@ onUnmounted(() => {
   spkStbjScrollObserver?.disconnect();
   spkSjScrollObserver?.disconnect();
   spkTagihScrollObserver?.disconnect();
+  pvrScrollObserver?.disconnect();
+  pipelineMenggantungScrollObserver?.disconnect();
 });
 
 const closeSpkDialog = () => {
@@ -2673,6 +2989,127 @@ const sisaClass = (item: any) => {
            TAB MARKETING
       ════════════════════════════════════════ -->
       <v-window-item value="marketing">
+        <!-- ── Row 5: Achievement Ringkas + Growth YoY ── -->
+        <v-row dense class="mt-2">
+          <v-col cols="12" md="6">
+            <div class="manksi-panel content-panel fill-height">
+              <div class="panel-header panel-header--blue">
+                <IconGauge :size="14" :stroke-width="1.7" class="mr-1" />
+                Achievement Ringkas
+                <span class="panel-header-sub ml-1">(bulan ini)</span>
+                <span
+                  v-if="achievementData.totalTarget"
+                  class="ml-auto pct-badge"
+                  :class="
+                    achievementData.totalAch >= 100
+                      ? 'pct-good'
+                      : achievementData.totalAch >= 70
+                        ? 'pct-mid'
+                        : 'pct-low'
+                  "
+                >
+                  {{ Math.round(achievementData.totalAch) }}% ach
+                </span>
+              </div>
+              <div class="panel-body">
+                <v-progress-linear
+                  v-if="isLoadingDashboard"
+                  indeterminate
+                  color="primary"
+                  height="2"
+                />
+                <template v-else-if="achievementData.byDivisi.length">
+                  <div class="pen-summary-bar">
+                    <div class="pen-stat">
+                      <span class="pen-stat-val text-primary">{{
+                        shortNum(achievementData.totalTarget)
+                      }}</span>
+                      <span class="pen-stat-lbl">Target</span>
+                    </div>
+                    <div class="pen-stat">
+                      <span class="pen-stat-val text-success">{{
+                        shortNum(achievementData.totalRealisasi)
+                      }}</span>
+                      <span class="pen-stat-lbl">Realisasi</span>
+                    </div>
+                  </div>
+                  <div style="padding: 8px 12px">
+                    <div ref="achChartEl" style="width: 100%" />
+                  </div>
+                  <div
+                    v-if="achievementData.topSales.length"
+                    style="
+                      border-top: 1px solid #f0f0f0;
+                      padding: 5px 12px 0;
+                      font-size: 10px;
+                      color: #9e9e9e;
+                      font-weight: 600;
+                    "
+                  >
+                    TOP 5 SALES (% ACHIEVEMENT)
+                  </div>
+                  <div
+                    v-if="achievementData.topSales.length"
+                    style="padding: 4px 12px 8px"
+                  >
+                    <div ref="achTopSalesChartEl" style="width: 100%" />
+                  </div>
+                </template>
+                <div v-else class="text-center text-grey py-3 text-caption">
+                  Belum ada data target/achievement bulan ini.
+                </div>
+              </div>
+            </div>
+          </v-col>
+          <v-col cols="12" md="6">
+            <div class="manksi-panel content-panel fill-height">
+              <div class="panel-header panel-header--green">
+                <IconTrendingUp :size="14" :stroke-width="1.7" class="mr-1" />
+                Growth YoY
+                <span class="panel-header-sub ml-1">(12 bulan)</span>
+              </div>
+              <div class="panel-body">
+                <v-progress-linear
+                  v-if="isLoadingDashboard"
+                  indeterminate
+                  color="success"
+                  height="2"
+                />
+                <template v-else-if="growthYoyData.length">
+                  <div class="gb-list" style="max-height: 340px">
+                    <div
+                      v-for="row in growthYoyData"
+                      :key="row.bulan"
+                      class="gb-row"
+                    >
+                      <div class="gb-nama" style="width: 60px">
+                        {{ row.namaBulan }}
+                      </div>
+                      <div class="gb-bar-wrap">
+                        <span class="pen-cus" style="flex: 1">
+                          {{ shortNum(row.aktual) }} vs LY
+                          {{ shortNum(row.ly) }}
+                        </span>
+                        <span
+                          style="font-size: 10px; font-weight: 700"
+                          :style="{
+                            color: row.yoy >= 0 ? '#2e7d32' : '#c62828',
+                          }"
+                        >
+                          {{ row.yoy >= 0 ? "+" : "" }}{{ fmtDec(row.yoy, 1) }}%
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </template>
+                <div v-else class="text-center text-grey py-3 text-caption">
+                  Belum ada data growth YoY.
+                </div>
+              </div>
+            </div>
+          </v-col>
+        </v-row>
+
         <!-- ── Row 1: 3 panel sejajar ── -->
         <v-row dense class="mb-2">
           <!-- Penawaran Belum MAP -->
@@ -3555,12 +3992,273 @@ const sisaClass = (item: any) => {
           </v-col>
         </v-row>
 
-        <!-- ── Row 4: Filter + MAP vs SPK / SJ ── -->
-        <v-row dense class="mt-2 mb-1">
+        <!-- ── Row 6: Funnel Penawaran + Funnel MAP ── -->
+        <v-row dense class="mt-2">
+          <v-col cols="12" md="6">
+            <div class="manksi-panel content-panel fill-height">
+              <div
+                class="panel-header"
+                style="
+                  background: #f3e5f5;
+                  color: #6a1b9a;
+                  border-bottom: 1px solid #e1bee7;
+                "
+              >
+                <IconChartBar :size="14" :stroke-width="1.7" class="mr-1" />
+                Funnel Penawaran
+                <span class="panel-header-sub ml-1"
+                  >(realisasi/batal/confirm)</span
+                >
+              </div>
+              <div class="panel-body">
+                <v-progress-linear
+                  v-if="isLoadingDashboard"
+                  indeterminate
+                  color="purple"
+                  height="2"
+                />
+                <template v-else-if="penawaranFunnelData.byDivisi.length">
+                  <div class="real-list" style="max-height: 320px">
+                    <div
+                      v-for="row in penawaranFunnelData.byDivisi"
+                      :key="row.Divisi"
+                      class="real-row"
+                    >
+                      <div class="real-meta">
+                        <span class="real-divisi">{{ row.Divisi }}</span>
+                        <span class="real-nominal">{{
+                          shortNum(row.Nominal)
+                        }}</span>
+                      </div>
+                      <div class="real-bar-wrap">
+                        <div class="real-bar">
+                          <div
+                            class="real-seg real-seg--close"
+                            :style="{
+                              width: (row.PresentaseRealisasi || 0) + '%',
+                            }"
+                          />
+                          <div
+                            class="real-seg real-seg--batal"
+                            :style="{ width: (row.PresentaseBatal || 0) + '%' }"
+                          />
+                        </div>
+                        <span class="real-pct"
+                          >{{ row.PresentaseRealisasi }}%</span
+                        >
+                      </div>
+                      <div class="real-detail">
+                        <span class="rd-close"
+                          >✓ {{ shortNum(row.Realisasi) }}</span
+                        >
+                        <span v-if="row.Batal" class="rd-batal"
+                          >✕ {{ shortNum(row.Batal) }} ({{
+                            row.PresentaseBatal
+                          }}%)</span
+                        >
+                        <span v-if="row.Confirm" class="rd-open"
+                          >○ {{ shortNum(row.Confirm) }} ({{
+                            row.PresentaseConfirm
+                          }}%)</span
+                        >
+                      </div>
+                    </div>
+                  </div>
+                  <div class="real-legend">
+                    <span class="leg-dot leg-close" />Realisasi
+                    <span class="leg-dot leg-batal" />Batal
+                  </div>
+                </template>
+                <div v-else class="text-center text-grey py-3 text-caption">
+                  Belum ada data penawaran bulan ini.
+                </div>
+              </div>
+            </div>
+          </v-col>
+          <v-col cols="12" md="6">
+            <div class="manksi-panel content-panel fill-height">
+              <div
+                class="panel-header"
+                style="
+                  background: #e0f2f1;
+                  color: #00695c;
+                  border-bottom: 1px solid #b2dfdb;
+                "
+              >
+                <IconChartBar :size="14" :stroke-width="1.7" class="mr-1" />
+                Funnel MAP
+                <span class="panel-header-sub ml-1"
+                  >(realisasi per divisi)</span
+                >
+              </div>
+              <div class="panel-body">
+                <v-progress-linear
+                  v-if="isLoadingDashboard"
+                  indeterminate
+                  color="teal"
+                  height="2"
+                />
+                <template v-else-if="mapFunnelData.length">
+                  <div class="real-list" style="max-height: 320px">
+                    <div
+                      v-for="row in mapFunnelData"
+                      :key="row.Divisi"
+                      class="real-row"
+                    >
+                      <div class="real-meta">
+                        <span class="real-divisi">{{ row.Divisi }}</span>
+                        <span class="real-nominal">{{
+                          shortNum(row.Nominal)
+                        }}</span>
+                      </div>
+                      <div class="real-bar-wrap">
+                        <div class="real-bar">
+                          <div
+                            class="real-seg real-seg--close"
+                            :style="{ width: (row.Presentase || 0) + '%' }"
+                          />
+                        </div>
+                        <span class="real-pct">{{ row.Presentase }}%</span>
+                      </div>
+                      <div class="real-detail">
+                        <span class="rd-close"
+                          >✓ {{ shortNum(row.Realisasi) }}</span
+                        >
+                      </div>
+                    </div>
+                  </div>
+                </template>
+                <div v-else class="text-center text-grey py-3 text-caption">
+                  Belum ada data MAP bulan ini.
+                </div>
+              </div>
+            </div>
+          </v-col>
+        </v-row>
+
+        <!-- ── Row 7: Proyeksi vs Realisasi (Gap Customer) — infinite scroll ── -->
+        <v-row dense class="mt-2">
           <v-col cols="12">
-            <div class="d-flex align-center" style="gap: 8px; padding: 0 2px">
+            <div class="manksi-panel content-panel">
+              <div
+                class="panel-header"
+                style="
+                  background: #fff3e0;
+                  color: #e65100;
+                  border-bottom: 1px solid #ffe0b2;
+                "
+              >
+                <IconAlertTriangle
+                  :size="14"
+                  :stroke-width="1.7"
+                  class="mr-1"
+                />
+                Proyeksi vs Realisasi
+                <span class="panel-header-sub ml-1"
+                  >(gap terbesar per customer)</span
+                >
+              </div>
+              <div class="panel-body">
+                <v-progress-linear
+                  v-if="isLoadingDashboard"
+                  indeterminate
+                  color="warning"
+                  height="2"
+                />
+                <template v-else>
+                  <div class="pen-summary-bar">
+                    <div class="pen-stat">
+                      <span class="pen-stat-val text-primary">{{
+                        shortNum(proyeksiVsRealisasiSummary.totalMemo)
+                      }}</span>
+                      <span class="pen-stat-lbl">Total Memo</span>
+                    </div>
+                    <div class="pen-stat">
+                      <span class="pen-stat-val text-success">{{
+                        shortNum(proyeksiVsRealisasiSummary.totalRealisasiMemo)
+                      }}</span>
+                      <span class="pen-stat-lbl">Realisasi Memo</span>
+                    </div>
+                    <div class="pen-stat">
+                      <span class="pen-stat-val" style="color: #6a1b9a">{{
+                        shortNum(proyeksiVsRealisasiSummary.totalRealisasiAll)
+                      }}</span>
+                      <span class="pen-stat-lbl">Realisasi All</span>
+                    </div>
+                  </div>
+                  <div
+                    v-if="gapCustomerList.length || isLoadingMorePvr"
+                    class="gb-list"
+                    style="max-height: 320px"
+                  >
+                    <div
+                      v-for="(row, i) in gapCustomerList"
+                      :key="i"
+                      class="gb-row"
+                    >
+                      <div
+                        class="gb-nama"
+                        :title="row.CusNama"
+                        style="width: 200px"
+                      >
+                        {{ row.CusNama || row.CusKode || "-" }}
+                      </div>
+                      <div class="gb-bar-wrap">
+                        <span class="pen-cus" style="flex: 1">
+                          {{ row.JoNama || row.JoKode || "" }} · Memo
+                          {{ shortNum(row.TotalMemo) }} · Realisasi
+                          {{
+                            row.RealisasiMemo != null
+                              ? shortNum(row.RealisasiMemo)
+                              : "Belum ada"
+                          }}
+                        </span>
+                        <span
+                          style="
+                            font-size: 10px;
+                            font-weight: 700;
+                            color: #e65100;
+                          "
+                        >
+                          Gap {{ shortNum(row.gap) }}
+                        </span>
+                      </div>
+                    </div>
+                    <div ref="pvrSentinelEl" class="pen-sentinel">
+                      <span v-if="isLoadingMorePvr" class="pen-loading"
+                        >Memuat...</span
+                      >
+                      <span
+                        v-else-if="!pvrHasMore && gapCustomerList.length"
+                        class="pen-end"
+                      >
+                        {{ gapCustomerList.length }} customer ditampilkan
+                      </span>
+                    </div>
+                  </div>
+                  <div v-else class="text-center text-grey py-3 text-caption">
+                    Tidak ada gap proyeksi vs realisasi yang signifikan 🎉
+                  </div>
+                </template>
+              </div>
+            </div>
+          </v-col>
+        </v-row>
+
+        <!-- ── Filter — hanya berlaku untuk panel MAP/Proyeksi di bawah ini ── -->
+        <v-row dense class="mt-3 mb-1">
+          <v-col cols="12">
+            <div
+              class="d-flex align-center flex-wrap"
+              style="
+                gap: 8px;
+                padding: 6px 10px;
+                background: #f5f5f5;
+                border-radius: 4px;
+              "
+            >
               <span class="text-caption text-grey-darken-1 font-weight-bold"
-                >Filter MAP:</span
+                >Filter periode:</span
               >
               <input
                 type="date"
@@ -3576,6 +4274,125 @@ const sisaClass = (item: any) => {
               <button class="map-filter-btn" @click="reloadMapPanels">
                 Terapkan
               </button>
+              <span
+                class="text-caption text-grey-darken-1"
+                style="margin-left: 4px"
+              >
+                Berlaku untuk: Proyeksi vs Realisasi, Pipeline Menggantung,
+                Konversi MAP→SPK, Status Pengiriman MAP, Nilai Pipeline MAP
+              </span>
+            </div>
+          </v-col>
+        </v-row>
+
+        <!-- ── Row 8: Pipeline Menggantung — infinite scroll ── -->
+        <v-row dense class="mt-2 mb-2">
+          <v-col cols="12">
+            <div class="manksi-panel content-panel">
+              <div
+                class="panel-header"
+                style="
+                  background: #ffebee;
+                  color: #c62828;
+                  border-bottom: 1px solid #ffcdd2;
+                "
+              >
+                <IconFileAlert :size="14" :stroke-width="1.7" class="mr-1" />
+                Pipeline Menggantung
+                <span class="panel-header-sub ml-1"
+                  >(Memo belum SPK + Penawaran belum Memo/SPK)</span
+                >
+                <span
+                  v-if="pipelineMenggantungSummary.totalItem"
+                  class="badge-count ml-auto"
+                  style="background: #c62828"
+                >
+                  {{ pipelineMenggantungSummary.totalItem }} item
+                </span>
+              </div>
+              <div class="panel-body">
+                <v-progress-linear
+                  v-if="isLoadingDashboard"
+                  indeterminate
+                  color="red"
+                  height="2"
+                />
+                <template v-else>
+                  <div
+                    style="
+                      padding: 6px 12px;
+                      border-bottom: 1px solid #f0f0f0;
+                      font-size: 11px;
+                      color: #c62828;
+                      font-weight: 700;
+                    "
+                  >
+                    Total Nilai Menggantung:
+                    {{ shortNum(pipelineMenggantungSummary.totalNilai) }}
+                  </div>
+                  <div
+                    v-if="
+                      pipelineMenggantungList.length ||
+                      isLoadingMorePipelineMenggantung
+                    "
+                    class="gb-list"
+                    style="max-height: 320px"
+                  >
+                    <div
+                      v-for="(item, i) in pipelineMenggantungList"
+                      :key="i"
+                      class="gb-row"
+                    >
+                      <div
+                        class="gb-nama"
+                        :title="item.Customer"
+                        style="width: 180px"
+                      >
+                        {{ item.Customer || "-" }}
+                      </div>
+                      <div class="gb-bar-wrap">
+                        <span class="pen-cus" style="flex: 1">
+                          {{ item.NamaSpk || "-" }}
+                          <span v-if="item.Divisi" style="color: #9e9e9e"
+                            >· {{ item.Divisi }}</span
+                          >
+                        </span>
+                        <span
+                          style="
+                            font-size: 10px;
+                            font-weight: 700;
+                            color: #c62828;
+                          "
+                        >
+                          {{ shortNum(item.Jumlah) }}
+                        </span>
+                      </div>
+                    </div>
+                    <div
+                      ref="pipelineMenggantungSentinelEl"
+                      class="pen-sentinel"
+                    >
+                      <span
+                        v-if="isLoadingMorePipelineMenggantung"
+                        class="pen-loading"
+                        >Memuat...</span
+                      >
+                      <span
+                        v-else-if="
+                          !pipelineMenggantungHasMore &&
+                          pipelineMenggantungList.length
+                        "
+                        class="pen-end"
+                      >
+                        {{ pipelineMenggantungList.length }} item ditampilkan
+                      </span>
+                    </div>
+                  </div>
+                  <div v-else class="text-center text-grey py-3 text-caption">
+                    Tidak ada pipeline yang menggantung 🎉
+                  </div>
+                </template>
+              </div>
             </div>
           </v-col>
         </v-row>

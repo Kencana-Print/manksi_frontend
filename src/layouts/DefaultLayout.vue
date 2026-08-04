@@ -22,7 +22,40 @@ import {
   IconCoin,
 } from "@tabler/icons-vue";
 
-import { version as appVersion } from "../../package.json";
+import { useVersionCheck } from "@/composables/useVersionCheck";
+import ChangelogDialog from "@/components/ChangelogDialog.vue";
+
+const {
+  buildVersion,
+  changelog,
+  isLoaded: isChangelogLoaded,
+  updateAvailable,
+  hasUnseenChangelog,
+  markChangelogSeen,
+  dismissUpdate,
+  reloadApp,
+} = useVersionCheck();
+
+const showChangelog = ref(false);
+const hadPendingUpdate = ref(false);
+
+const openUpdateDialog = () => {
+  updateAvailable.value = false;
+  hadPendingUpdate.value = true;
+  showChangelog.value = true;
+};
+
+const openChangelog = () => {
+  hadPendingUpdate.value = false;
+  showChangelog.value = true;
+  markChangelogSeen();
+};
+
+// ⚠️ baru: dipanggil dari tombol "Nanti Saja" di dialog
+const onDismissUpdate = () => {
+  dismissUpdate();
+  showChangelog.value = false;
+};
 
 const theme = useTheme();
 const authStore = useAuthStore();
@@ -356,9 +389,10 @@ const onClickOutside = () => {
         <IconSun v-else :size="16" :stroke-width="1.5" />
       </v-btn>
 
-      <div class="text-medium-emphasis">
-        v{{ appVersion }} &copy; 2026 IT Kencana
-      </div>
+      <button class="version-btn" @click="openChangelog">
+        <span class="version-dot" v-if="hasUnseenChangelog" />
+        v{{ buildVersion }} &copy; 2026 IT Kencana
+      </button>
 
       <span class="mx-2 text-disabled">|</span>
 
@@ -376,6 +410,36 @@ const onClickOutside = () => {
         {{ currentTime }}
       </div>
     </v-footer>
+
+    <ChangelogDialog
+      v-model="showChangelog"
+      :entries="changelog"
+      :is-loaded="isChangelogLoaded"
+      :show-reload-prompt="hadPendingUpdate"
+      @reload="reloadApp"
+      @dismiss="onDismissUpdate"
+    />
+
+    <!-- Snackbar: muncul otomatis kalau backend punya versi lebih baru
+     dari bundle JS yang sedang jalan — deteksi real-time via polling,
+     tidak perlu user refresh duluan untuk tahu. -->
+    <v-snackbar
+      v-model="updateAvailable"
+      :timeout="-1"
+      location="bottom"
+      color="primary"
+      style="margin-bottom: 40px"
+    >
+      <div class="d-flex align-center">
+        <v-icon size="18" class="mr-2">mdi-cloud-download-outline</v-icon>
+        Versi baru MANKSI tersedia.
+      </div>
+      <template #actions>
+        <v-btn variant="text" color="white" @click="openUpdateDialog">
+          Lihat Perubahan
+        </v-btn>
+      </template>
+    </v-snackbar>
   </v-app>
 </template>
 
@@ -595,5 +659,30 @@ const onClickOutside = () => {
   border-radius: 8px;
   min-width: 20px;
   text-align: center;
+}
+
+.version-btn {
+  position: relative;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 11px;
+  color: rgba(var(--v-theme-on-surface), 0.6);
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: background 0.15s;
+}
+.version-btn:hover {
+  background: rgba(var(--v-theme-primary), 0.08);
+  color: rgb(var(--v-theme-primary));
+}
+.version-dot {
+  position: absolute;
+  top: -1px;
+  right: -1px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #e53935;
 }
 </style>

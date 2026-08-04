@@ -142,4 +142,42 @@ export const dashboardService = {
     api.get("/dashboard/spk-terkirim-belum-tagih-list", {
       params: { limit, offset, startDate, endDate },
     }),
+
+  getAchievementSummary: (
+    tahun?: number,
+    bulanAwal?: number,
+    bulanAkhir?: number,
+  ) =>
+    api.get("/dashboard/achievement-summary", {
+      params: { tahun, bulanAwal, bulanAkhir },
+    }),
+
+  getGrowthYoy: (tahun?: number) =>
+    api.get("/dashboard/growth-yoy", { params: { tahun } }),
+
+  getPenawaranFunnel: (bulan?: number, tahun?: number) =>
+    api.get("/dashboard/penawaran-funnel", { params: { bulan, tahun } }),
+
+  getMapFunnel: (bulan?: number, tahun?: number) =>
+    api.get("/dashboard/map-funnel", { params: { bulan, tahun } }),
+
+  getProyeksiVsRealisasiSummary: (
+    startDate: string,
+    endDate: string,
+    limit: number,
+    page: number,
+  ) =>
+    api.get("/dashboard/proyeksi-vs-realisasi-summary", {
+      params: { startDate, endDate, limit, page },
+    }),
+
+  getPipelineMenggantung: (
+    startDate: string,
+    endDate: string,
+    limit: number,
+    page: number,
+  ) =>
+    api.get("/dashboard/pipeline-menggantung", {
+      params: { startDate, endDate, limit, page },
+    }),
 };
