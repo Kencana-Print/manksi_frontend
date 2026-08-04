@@ -56,6 +56,7 @@ interface FormData {
   InvPro: string;
   InvNomor: string;
   Keterangan: string;
+  NomorPO: string;
   StsPpn: number;
   Ppn: number;
   Disc: number;
@@ -119,6 +120,7 @@ const init: FormData = {
   InvPro: "",
   InvNomor: "",
   Keterangan: "",
+  NomorPO: "",
   StsPpn: 0,
   Ppn: 0,
   Disc: 0,
@@ -171,6 +173,7 @@ const {
       InvPro: h.sj_inv_pro || "",
       InvNomor: h.sj_inv_sm || "",
       Keterangan: h.sj_keterangan || "",
+      NomorPO: h.sj_no_po || "",
       StsPpn: h.inv_sts_ppn || 0,
       Ppn: h.inv_ppn || 0,
       Disc: h.inv_disc || 0,
@@ -445,6 +448,20 @@ const ensureEmptyRow = () => {
   }
 };
 
+const appendNomorPo = (ketPo?: string) => {
+  const val = (ketPo || "").trim();
+  if (!val) return;
+  const existing = fd.value.NomorPO
+    ? fd.value.NomorPO.split(",")
+        .map((s) => s.trim())
+        .filter(Boolean)
+    : [];
+  if (!existing.includes(val)) {
+    existing.push(val);
+    fd.value.NomorPO = existing.join(", ");
+  }
+};
+
 // F1 — pilih SPK
 const spkInputValues = ref<Record<number, string>>({});
 
@@ -550,6 +567,11 @@ const loadSpkDetail = async (spkNomor: string) => {
       (x) => x.SpkNomor === r.SpkNomor && x.Ukuran === r.Ukuran,
     );
     if (!dup) fd.value.Detail.push({ ...r, _key: _key++ });
+  }
+  // Auto-fill Nomor PO dari SO yang baru dipilih (overwrite nilai lama —
+  // kalau mau perilakunya "isi cuma kalau masih kosong", beri tahu saya)
+  if (rows.length > 0) {
+    appendNomorPo(rows[0].KetPo);
   }
 };
 
@@ -657,6 +679,9 @@ const loadSpkDetailWithJadwal = async (item: any) => {
   const rows: any[] = res.data.data || [];
   for (const r of rows) {
     fd.value.Detail.push({ ...r, _key: _key++ });
+  }
+  if (rows.length > 0) {
+    appendNomorPo(rows[0].KetPo);
   }
 };
 
@@ -1081,6 +1106,17 @@ onMounted(async () => {
             class="inp"
             style="flex: 1"
             placeholder="Keterangan..."
+          />
+        </div>
+
+        <!-- Nomor PO -->
+        <div class="fg mt4">
+          <label class="lb w90">Nomor PO</label>
+          <input
+            v-model="fd.NomorPO"
+            class="inp"
+            style="flex: 1"
+            placeholder="Otomatis dari SO, bisa diedit manual..."
           />
         </div>
 

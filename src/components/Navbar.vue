@@ -419,7 +419,7 @@ const menuItems: NavItem[] = [
             title: "Retur Bahan",
             to: "/garmen/bahan-baku/retur-bahan",
             icon: IconArrowBack,
-            menuId: 61,
+            menuId: 110,
           },
           { divider: true },
           {
@@ -512,9 +512,9 @@ const menuItems: NavItem[] = [
           },
           {
             title: "Retur Barang",
-            to: "/garmen/barang/retur",
+            to: "/garmen/barang/retur-barang",
             icon: IconArrowBack,
-            menuId: 115,
+            menuId: 61,
           },
           {
             title: "Approve Retur",
@@ -1913,7 +1913,7 @@ onUnmounted(() => {
   font-size: 0.84rem;
   font-weight: 500;
   color: rgb(var(--v-theme-on-surface));
-  max-width: 120px;
+  max-width: clamp(80px, 15vw, 200px);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

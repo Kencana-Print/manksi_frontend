@@ -890,11 +890,9 @@ const onKodeBahan = async (row: DetailRow) => {
   let input = (row.kode || "").trim();
   if (!input || !fd.value.NomorSpk || !fd.value.GdgAsal) return;
 
-  // Auto-expand 3-6 digit angka → cari di backend dengan suffix
-  // Misal: "400" → "LL-000400"
+  // Auto-expand 3-6 digit angka → cari suffix, resolve ke kode penuh dulu
   if (/^\d{1,6}$/.test(input)) {
     const padded = input.padStart(6, "0");
-    // Cari di backend dengan keyword suffix
     try {
       const res = await mutasiProduksiFormService.searchBahanBySuffix(
         padded,
@@ -902,21 +900,22 @@ const onKodeBahan = async (row: DetailRow) => {
       );
       const found = res.data.data?.[0];
       if (found) {
-        row.kode = found.Kode;
-        row.nama = found.Nama;
-        row.satuan = found.Satuan;
+        input = found.Kode; // lanjut ke jalur normal di bawah, bukan langsung isi row
+      } else {
+        toast.error(`Kode suffix ${input} tidak ditemukan.`);
+        row.kode = "";
+        row.nama = "";
         return;
       }
     } catch {
-      /**/
+      toast.error(`Kode suffix ${input} tidak ditemukan.`);
+      row.kode = "";
+      row.nama = "";
+      return;
     }
-    toast.error(`Kode suffix ${input} tidak ditemukan.`);
-    row.kode = "";
-    row.nama = "";
-    return;
   }
 
-  // Normal full kode
+  // Jalur normal (kode lengkap) — sekaligus lanjutan dari resolve suffix
   const excl = isEditMode.value ? fd.value.Nomor : "";
   try {
     const res = await mutasiProduksiFormService.loadKodeBahan(
@@ -927,11 +926,41 @@ const onKodeBahan = async (row: DetailRow) => {
       fd.value.SpkKodek,
     );
     const rows = res.data.data || [];
-    if (rows.length) Object.assign(row, { ...rows[0], _key: row._key });
-    else {
+    if (!rows.length) {
       toast.error("Kode tidak ditemukan.");
       row.kode = "";
       row.nama = "";
+      return;
+    }
+
+    // Baris pertama isi ke row yang sedang diketik user
+    Object.assign(row, { ...rows[0], _key: row._key });
+
+    // ⚠️ FIX: sisanya (kalau SPK punya banyak size — L/XL/2XL dst) disisipkan
+    // sebagai baris baru TEPAT SETELAH baris ini, bukan dibuang. Backend
+    // (loadKodeBahan) sudah expand semua size dari tspk_size — sebelumnya
+    // frontend cuma ambil rows[0] dan buang rows[1..].
+    if (rows.length > 1) {
+      const idx = fd.value.Detail.indexOf(row);
+      const toInsert: DetailRow[] = [];
+      let skipped = 0;
+      for (let i = 1; i < rows.length; i++) {
+        const r = rows[i];
+        const dup = fd.value.Detail.some(
+          (e) => e.kode === r.kode && e.size === r.size && e.nama,
+        );
+        if (dup) {
+          skipped++;
+          continue;
+        }
+        toInsert.push({ _key: _key++, ...r });
+      }
+      if (toInsert.length) {
+        fd.value.Detail.splice(idx + 1, 0, ...toInsert);
+      }
+      if (skipped > 0) {
+        toast.warning(`${skipped} size sudah ada sebelumnya, dilewati.`);
+      }
     }
   } catch (e: any) {
     toast.error(e.response?.data?.message || "Kode tidak ditemukan.");
@@ -996,11 +1025,12 @@ const focusNextDetailField = async (idx: number, col: string) => {
   }
 
   // Sudah kolom terakhir untuk baris ini.
+  const nextRowIdx = idx + 1;
+
   if (isDC.value) {
-    // Mode DC: baris sudah fixed dari loadKomponenProof, tidak boleh
-    // tambah baris baru. Enter di kolom terakhir (Jumlah) cukup
-    // pindah ke baris berikutnya yang sudah ada, kalau ada.
-    const nextRowIdx = idx + 1;
+    // Mode DC: baris fixed dari loadKomponenProof, tidak boleh tambah
+    // baris baru — cuma pindah ke baris berikutnya di KOLOM YANG SAMA
+    // (biasanya Jumlah), kalau baris itu sudah ada.
     if (nextRowIdx < fd.value.Detail.length) {
       await nextTick();
       const next = detailFieldRefs.value[`${nextRowIdx}_${col}`];
@@ -1012,17 +1042,31 @@ const focusNextDetailField = async (idx: number, col: string) => {
     return;
   }
 
-  // Bukan DC: kalau baris ini baris terakhir, otomatis tambah baris
-  // kosong dan pindah fokus ke kolom Kode-nya.
-  const isLastRow = idx === fd.value.Detail.length - 1;
-  if (isLastRow) {
-    addRow();
+  // Bukan DC: kalau baris berikutnya SUDAH ADA (misal user pilih banyak
+  // barang sekaligus lewat search bahan, atau komponen-map otomatis
+  // generate banyak baris sekaligus), lompat ke kolom PERTAMA baris
+  // berikutnya itu — BUKAN cuma jalan kalau baris ini baris terakhir
+  // (ini bug sebelumnya: Enter di baris tengah nggak ngapa-ngapain).
+  if (nextRowIdx < fd.value.Detail.length) {
     await nextTick();
-    const newIdx = fd.value.Detail.length - 1;
-    const kodeInput = detailFieldRefs.value[`${newIdx}_kode`];
-    if (kodeInput) {
-      kodeInput.focus();
+    const nextRow = fd.value.Detail[nextRowIdx];
+    const targetCol = nextRow.nama ? "jumlah" : cols[0];
+    const next = detailFieldRefs.value[`${nextRowIdx}_${targetCol}`];
+    if (next) {
+      next.focus();
+      next.select();
     }
+    return;
+  }
+  
+  // Baris ini memang baris terakhir — tambah baris kosong baru & fokus
+  // ke Kode-nya.
+  addRow();
+  await nextTick();
+  const newIdx = fd.value.Detail.length - 1;
+  const kodeInput = detailFieldRefs.value[`${newIdx}_kode`];
+  if (kodeInput) {
+    kodeInput.focus();
   }
 };
 

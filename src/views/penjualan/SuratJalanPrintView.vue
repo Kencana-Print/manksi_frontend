@@ -169,7 +169,7 @@ const generateTxt = () => {
     const alamatLines = wrapText(alamatFull, halfR);
     s += `${padR("Nomor      : " + (h.sj_nomor || ""), halfL)} ${padR("Customer : " + (h.cus_nama || ""), halfR)}\n`;
     s += `${padR("Tanggal    : " + fmtDate(h.sj_tanggal), halfL)} ${padR(alamatLines[0] || "", halfR)}\n`;
-    s += `${padR("Keterangan : " + (h.sj_keterangan || ""), halfL)} ${padR(alamatLines[1] || "", halfR)}\n`;
+    s += `${padR("Keterangan : " + (h.keterangan_cetak || h.sj_keterangan || ""), halfL)} ${padR(alamatLines[1] || "", halfR)}\n`;
     for (let i = 2; i < alamatLines.length; i++) {
       s += `${padR("", halfL)} ${padR(alamatLines[i], halfR)}\n`;
     }
@@ -446,7 +446,9 @@ onMounted(() => {
                   </tr>
                   <tr>
                     <td class="lbl">Keterangan</td>
-                    <td>: {{ header.sj_keterangan }}</td>
+                    <td>
+                      : {{ header.keterangan_cetak || header.sj_keterangan }}
+                    </td>
                   </tr>
                 </table>
               </div>

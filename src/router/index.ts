@@ -1055,7 +1055,7 @@ const router = createRouter({
     {
       path: "/garmen/barang/permintaan/form",
       name: "GarmenPermintaanBarangCreate",
-      component: () => import("@/views/garmen/MintaBarangFormView.vue"), // File form yang akan dibuat selanjutnya
+      component: () => import("@/views/garmen/MintaBarangFormView.vue"),
       meta: {
         title: "Buat Permintaan Barang Garmen",
         layout: "DefaultLayout",
@@ -1123,6 +1123,51 @@ const router = createRouter({
       component: () => import("@/views/garmen/RealisasiBarangPrintView.vue"),
       meta: {
         title: "Cetak Realisasi Permintaan",
+        layout: "BlankLayout",
+        requiresAuth: true,
+      },
+    },
+    {
+      path: "/garmen/barang/retur-barang",
+      name: "GarmenReturBarang",
+      component: () => import("@/views/garmen/ReturBarangView.vue"),
+      meta: {
+        title: "Retur Barang",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "61",
+      },
+    },
+    {
+      path: "/garmen/barang/retur-barang/form",
+      name: "GarmenReturBarangCreate",
+      component: () => import("@/views/garmen/ReturBarangFormView.vue"),
+      meta: {
+        title: "Tambah Retur Barang",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "61",
+        browseRoute: "GarmenReturBarang",
+      },
+    },
+    {
+      path: "/garmen/barang/retur-barang/form/:nomor",
+      name: "GarmenReturBarangEdit",
+      component: () => import("@/views/garmen/ReturBarangFormView.vue"),
+      meta: {
+        title: "Ubah Retur Barang",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "61",
+        browseRoute: "GarmenReturBarang",
+      },
+    },
+    {
+      path: "/garmen/barang/retur-barang/print/:nomor",
+      name: "GarmenReturBarangPrint",
+      component: () => import("@/views/garmen/ReturBarangPrintView.vue"),
+      meta: {
+        title: "Cetak Retur Barang",
         layout: "BlankLayout",
         requiresAuth: true,
       },
