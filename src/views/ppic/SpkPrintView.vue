@@ -383,7 +383,7 @@ onMounted(async () => {
     }
 
     isLoaded.value = true;
-    if (isSpandukMmtPrint.value) {
+    if (isSpandukMmtPrint.value || isP01Print.value) {
       injectPageStyle("@page { size: A4 landscape; margin: 8mm 10mm; }");
     } else {
       injectPageStyle("@page { size: A4 portrait; margin: 0; }");
@@ -430,175 +430,178 @@ onMounted(async () => {
        FORMAT LAMA — khusus Workshop P01
   ══════════════════════════════════════════════ -->
     <template v-if="isP01Print">
-      <div class="print-page-old">
-        <div class="old-border">
-          <div class="old-header-row">
-            <div class="old-title">SURAT PERINTAH KERJA</div>
-            <div class="old-po">PO : {{ spk.spk_nomor_po || "-" }}</div>
+      <div class="print-container-p01">
+        <div class="print-page-p01">
+          <div class="header-row-p01">
+            <div class="title-main-p01">SURAT PERINTAH KERJA</div>
+            <div class="title-po-p01">PO : {{ spk.spk_nomor_po || "-" }}</div>
           </div>
 
-          <div class="old-body">
-            <!-- Kolom kiri: info dasar -->
-            <table class="old-info-table">
-              <tbody>
-                <tr>
-                  <td class="old-lbl">Nomor SPK</td>
-                  <td class="old-colon">:</td>
-                  <td>{{ spk.spk_nomor }}</td>
-                </tr>
-                <tr>
-                  <td class="old-lbl">Tanggal SPK</td>
-                  <td class="old-colon">:</td>
-                  <td>{{ tglIndo(spk.spk_tanggal) }}</td>
-                </tr>
-                <tr>
-                  <td class="old-lbl">Jenis Order</td>
-                  <td class="old-colon">:</td>
-                  <td>{{ spk.jo_nama }}</td>
-                </tr>
-                <tr>
-                  <td class="old-lbl">Nama Desain</td>
-                  <td class="old-colon">:</td>
-                  <td>{{ spk.spk_nama }}</td>
-                </tr>
-                <tr>
-                  <td class="old-lbl">Jumlah</td>
-                  <td class="old-colon">:</td>
-                  <td>{{ Number(spk.spk_jumlah).toLocaleString("id-ID") }}</td>
-                </tr>
-                <tr>
-                  <td class="old-lbl">Ukuran</td>
-                  <td class="old-colon">:</td>
-                  <td>{{ sizeUkuranStr }}</td>
-                </tr>
-                <tr>
-                  <td class="old-lbl">Kain</td>
-                  <td class="old-colon">:</td>
-                  <td>{{ spk.spk_kain }}</td>
-                </tr>
-                <tr>
-                  <td class="old-lbl">Gramasi</td>
-                  <td class="old-colon">:</td>
-                  <td>{{ spk.spk_gramasi || "-" }}</td>
-                </tr>
-                <tr>
-                  <td class="old-lbl">Finishing</td>
-                  <td class="old-colon">:</td>
-                  <td>{{ spk.spk_finishing }}</td>
-                </tr>
-                <tr>
-                  <td class="old-lbl">Date Line</td>
-                  <td class="old-colon">:</td>
-                  <td>{{ tglIndo(spk.spk_dateline) }}</td>
-                </tr>
-                <tr>
-                  <td class="old-lbl">Workshop</td>
-                  <td class="old-colon">:</td>
-                  <td>{{ spk.spk_cab }} ({{ spk.spk_workshop }})</td>
-                </tr>
-              </tbody>
-            </table>
+          <div class="body-p01">
+            <!-- Kiri -->
+            <div class="kiri-p01">
+              <table class="info-table-p01">
+                <tbody>
+                  <tr>
+                    <td class="w-label-p01">Nomor SPK</td>
+                    <td class="w-colon-p01">:</td>
+                    <td>
+                      <span class="fw-p01">{{ spk.spk_nomor }}</span>
+                      <span v-if="spk.spk_tipe" class="ml-8-p01 text-xs-p01">
+                        Tipe SPK : <strong>{{ spk.spk_tipe }}</strong>
+                      </span>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td class="w-label-p01">Tanggal SPK</td>
+                    <td class="w-colon-p01">:</td>
+                    <td>{{ tglIndo(spk.spk_tanggal) }}</td>
+                  </tr>
+                  <tr>
+                    <td class="w-label-p01">Jenis Order</td>
+                    <td class="w-colon-p01">:</td>
+                    <td>{{ spk.jo_nama }}</td>
+                  </tr>
+                  <tr>
+                    <td class="w-label-p01">Nama Desain</td>
+                    <td class="w-colon-p01">:</td>
+                    <td class="fw-p01">{{ spk.spk_nama }}</td>
+                  </tr>
+                  <tr>
+                    <td class="w-label-p01">Jumlah</td>
+                    <td class="w-colon-p01">:</td>
+                    <td>
+                      {{ Number(spk.spk_jumlah).toLocaleString("id-ID") }}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td class="w-label-p01">Ukuran</td>
+                    <td class="w-colon-p01">:</td>
+                    <td>{{ sizeUkuranStr }}</td>
+                  </tr>
+                  <tr>
+                    <td class="w-label-p01">Kain</td>
+                    <td class="w-colon-p01">:</td>
+                    <td>{{ spk.spk_kain }}</td>
+                  </tr>
+                  <tr>
+                    <td class="w-label-p01">Gramasi</td>
+                    <td class="w-colon-p01">:</td>
+                    <td>{{ spk.spk_gramasi || "-" }}</td>
+                  </tr>
+                  <tr>
+                    <td class="w-label-p01">Finishing</td>
+                    <td class="w-colon-p01">:</td>
+                    <td>{{ spk.spk_finishing }}</td>
+                  </tr>
+                  <tr>
+                    <td class="w-label-p01">Date Line</td>
+                    <td class="w-colon-p01">:</td>
+                    <td class="fw-p01">{{ tglIndo(spk.spk_dateline) }}</td>
+                  </tr>
+                  <tr>
+                    <td class="w-label-p01">Workshop</td>
+                    <td class="w-colon-p01">:</td>
+                    <td>{{ spk.spk_cab }} ({{ spk.spk_workshop }})</td>
+                  </tr>
+                </tbody>
+              </table>
 
-            <!-- Tipe SPK — kanan atas info table -->
-            <div class="old-tipe">Tipe SPK : {{ spk.spk_tipe || "-" }}</div>
+              <div class="fw-p01 text-xs-p01 mt-1-p01">
+                DIKERJAKAN DI {{ spk.spk_cab }} {{ spk.spk_workshop }}
+              </div>
 
-            <!-- Gambar desain -->
-            <div class="old-img-wrap">
-              <img
-                v-if="resolvedImageUrl"
-                :src="resolvedImageUrl"
-                class="old-img"
-              />
-            </div>
+              <div class="img-center-p01">
+                <img
+                  v-if="resolvedImageUrl"
+                  :src="resolvedImageUrl"
+                  class="img-fit-p01"
+                />
+              </div>
 
-            <!-- Keterangan Komponen (checklist manual aksesoris) -->
-            <div v-if="ketKomponenList.length > 0" class="old-section">
-              <div class="old-section-title">Keterangan Komponen :</div>
-              <div class="old-komp-list">
-                <div
-                  v-for="(k, idx) in ketKomponenList"
-                  :key="idx"
-                  class="old-komp-item"
-                >
-                  {{ idx + 1 }}. {{ k.nama
-                  }}<span v-if="k.ket"> - {{ k.ket }}</span>
+              <div
+                v-if="ketKomponenList.length > 0"
+                class="ket-box-p01 mt-2-p01"
+              >
+                <div class="ket-title-p01">Keterangan Komponen :</div>
+                <pre class="ket-pre-p01">{{ spkKetKomponenText }}</pre>
+              </div>
+
+              <div v-if="sizes.length > 0" class="ket-box-p01 mt-2-p01">
+                <div class="ket-title-p01">
+                  Size : Lebar &amp; Panjang Badan
                 </div>
+                <pre class="ket-pre-p01">{{ sizeLebarPanjangStr || "-" }}</pre>
               </div>
             </div>
 
-            <!-- Size : Lebar & Panjang Badan (P01 selalu garmen, tidak perlu cek isSpandukMmt) -->
-            <div v-if="sizes.length > 0" class="old-section">
-              <div class="old-section-title">
-                Size : Lebar &amp; Panjang Badan
+            <!-- Kanan: Ket. Produksi -->
+            <div class="kanan-p01">
+              <div class="ket-box-p01">
+                <div class="ket-title-p01">Ket. Produksi :</div>
+                <pre class="ket-pre-p01">{{ spk.spk_keterangan }}</pre>
               </div>
-              <pre class="old-size-pre">{{ sizeLebarPanjangStr || "-" }}</pre>
-            </div>
-
-            <!-- Keterangan Produksi -->
-            <div v-if="spk.spk_keterangan" class="old-section old-ket-produksi">
-              <div class="old-section-title">Ket. Produksi :</div>
-              <pre class="old-ket-pre">{{ spk.spk_keterangan }}</pre>
             </div>
           </div>
 
-          <!-- TTD MO / CMO -->
-          <div class="old-ttd-wrap">
-            <table class="old-ttd-table">
+          <div class="ttd-wrap-p01">
+            <table class="ttd-table-p01">
               <tr>
                 <td width="50%">MO</td>
                 <td width="50%">CMO</td>
               </tr>
               <tr>
-                <td class="old-sign-space">
+                <td class="sign-space-p01">
                   <img
                     :src="getSignatureUrl(spk.user_create)"
-                    class="old-ttd-img"
+                    class="ttd-img-p01"
                     @error="handleSignatureError"
                   />
-                  <div class="old-sign-name">{{ spk.user_create }}</div>
+                  <div class="sign-name-p01">{{ spk.user_create }}</div>
                 </td>
-                <td class="old-sign-space">
+                <td class="sign-space-p01">
                   <img
                     :src="getSignatureUrl(spk.spk_cmo)"
-                    class="old-ttd-img"
+                    class="ttd-img-p01"
                     @error="handleSignatureError"
                   />
-                  <div class="old-sign-name">{{ spk.spk_cmo || "-" }}</div>
+                  <div class="sign-name-p01">{{ spk.spk_cmo || "-" }}</div>
                 </td>
               </tr>
             </table>
+            <div class="qr-box-p01">
+              <qrcode-vue :value="spk.spk_nomor" :size="60" level="L" />
+            </div>
           </div>
 
-          <div class="old-footer">
+          <div class="footer-note-p01">
             Dibuat Oleh: {{ spk.user_create }}
             {{ formatWaktu(spk.date_create) }}
           </div>
         </div>
-      </div>
 
-      <!-- ══ ALOKASI (P01) — halaman terpisah, format sama dengan old-border ══ -->
-      <div v-if="alokasi.length > 0" class="print-page-old alokasi-page-old">
-        <div class="old-border">
-          <h2 class="alokasi-title-old">ALOKASI PENGIRIMAN :</h2>
-          <table class="alokasi-table-old mt-2">
+        <!-- Alokasi — tetap halaman terpisah kalau ada -->
+        <div v-if="alokasi.length > 0" class="print-page-p01 alokasi-page-p01">
+          <h2 class="alokasi-title-p01">ALOKASI PENGIRIMAN :</h2>
+          <table class="alokasi-table-p01 mt-2-p01">
             <thead>
               <tr>
-                <th class="text-left pl-2">Alokasi</th>
-                <th width="80" class="text-center">Jumlah</th>
+                <th class="text-left-p01 pl-2-p01">Alokasi</th>
+                <th width="80" class="text-center-p01">Jumlah</th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="(a, idx) in alokasi" :key="idx">
-                <td class="pl-2">{{ a.kota || a.alamat }}</td>
-                <td class="text-center">
+                <td class="pl-2-p01">{{ a.kota || a.alamat }}</td>
+                <td class="text-center-p01">
                   {{ Number(a.jumlah).toLocaleString("id-ID") }}
                 </td>
               </tr>
             </tbody>
             <tfoot>
               <tr>
-                <td class="fw text-left pl-2">Total</td>
-                <td class="fw text-center">
+                <td class="fw-p01 text-left-p01 pl-2-p01">Total</td>
+                <td class="fw-p01 text-center-p01">
                   {{
                     alokasi
                       .reduce((s, a) => s + (Number(a.jumlah) || 0), 0)
@@ -2556,6 +2559,219 @@ Keterangan Komponen :
     background: white;
     margin: 0 auto;
     box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+  }
+}
+
+/* ══ SPK P01 — landscape, 2 halaman, kanan = Ket. Produksi ══ */
+.print-container-p01 {
+  width: 100%;
+  font-family: "Arial", sans-serif;
+  font-size: 8.5pt;
+  color: #000;
+}
+.print-page-p01 {
+  width: 277mm;
+  min-height: 190mm;
+  margin: 0 auto;
+  padding: 4mm 6mm;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+}
+.alokasi-page-p01 {
+  page-break-before: always;
+  break-before: page;
+}
+.header-row-p01 {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  align-items: flex-end;
+}
+.title-main-p01,
+.title-po-p01 {
+  font-size: 13pt;
+  font-weight: bold;
+  text-decoration: underline;
+  line-height: 1;
+}
+.body-p01 {
+  display: flex;
+  gap: 12px;
+  flex: 1;
+  min-height: 0;
+  margin-top: 5px;
+}
+.kiri-p01 {
+  flex: 0 0 55%;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.kanan-p01 {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  font-size: 8pt;
+}
+.info-table-p01 {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 4px;
+}
+.info-table-p01 td {
+  padding: 1px 0;
+  vertical-align: top;
+}
+.w-label-p01 {
+  width: 80px;
+}
+.w-colon-p01 {
+  width: 12px;
+  text-align: center;
+}
+.fw-p01 {
+  font-weight: bold;
+}
+.text-xs-p01 {
+  font-size: 7.5pt;
+}
+.ml-8-p01 {
+  margin-left: 8px;
+}
+.mt-1-p01 {
+  margin-top: 4px;
+}
+.mt-2-p01 {
+  margin-top: 8px;
+}
+.img-center-p01 {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  overflow: hidden;
+  padding: 8px 0;
+}
+.img-fit-p01 {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+.ket-box-p01 {
+  display: flex;
+  flex-direction: column;
+}
+.ket-title-p01 {
+  font-weight: bold;
+  font-size: 8.5pt;
+  margin-bottom: 4px;
+  border-bottom: 1px solid #000;
+  padding-bottom: 2px;
+}
+.ket-pre-p01 {
+  font-family: inherit;
+  font-size: 8pt;
+  white-space: pre-wrap;
+  margin: 0;
+  line-height: 1.35;
+}
+.ttd-wrap-p01 {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-top: 12px;
+}
+.ttd-table-p01 {
+  width: 180px;
+  border-collapse: collapse;
+  text-align: center;
+  font-size: 7.5pt;
+  border: 1px solid #000;
+  color: #000;
+}
+.ttd-table-p01 td {
+  border: 1px solid #000;
+  padding: 2px;
+  font-weight: bold;
+  color: #000 !important;
+}
+.sign-space-p01 {
+  position: relative;
+  height: 45px;
+  vertical-align: bottom;
+  padding-bottom: 2px;
+}
+.ttd-img-p01 {
+  position: absolute;
+  top: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  height: 32px;
+  object-fit: contain;
+  z-index: 1;
+}
+.sign-name-p01 {
+  position: absolute;
+  bottom: 2px;
+  left: 0;
+  right: 0;
+  z-index: 2;
+}
+.footer-note-p01 {
+  text-align: right;
+  font-size: 6.5pt;
+  border-top: 1px solid #000;
+  padding-top: 3px;
+  margin-top: 5px;
+}
+.alokasi-title-p01 {
+  font-size: 15pt;
+  font-weight: bold;
+  text-decoration: underline;
+  margin-bottom: 12px;
+}
+.alokasi-table-p01 {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 9pt;
+  color: #000;
+}
+.alokasi-table-p01 th,
+.alokasi-table-p01 td {
+  border: 1px solid #000;
+  padding: 4px 6px;
+  color: #000 !important;
+}
+.text-left-p01 {
+  text-align: left;
+}
+.text-center-p01 {
+  text-align: center;
+}
+.pl-2-p01 {
+  padding-left: 8px;
+}
+
+@media screen {
+  .print-page-p01 {
+    background: white;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+    margin: 20px auto;
+  }
+}
+@media print {
+  .print-page-p01 {
+    margin: 0 auto;
+    box-shadow: none;
+    page-break-after: always;
+    break-after: page;
+  }
+  .print-page-p01:last-child {
+    page-break-after: avoid;
+    break-after: avoid;
   }
 }
 </style>

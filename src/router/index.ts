@@ -999,6 +999,54 @@ const router = createRouter({
         requiresAuth: true,
       },
     },
+    {
+      path: "/garmen/bahan-jadi/koreksi-stok",
+      name: "KoreksiStokBarangJadiBrowse",
+      component: () => import("@/views/garmen/KoreksiStokBarangJadiView.vue"),
+      meta: {
+        title: "Koreksi Stok Barang Jadi",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "114",
+      },
+    },
+    {
+      path: "/garmen/bahan-jadi/koreksi-stok/create",
+      name: "KoreksiStokBarangJadiFormCreate",
+      component: () =>
+        import("@/views/garmen/KoreksiStokBarangJadiFormView.vue"),
+      meta: {
+        title: "Tambah Koreksi Stok Barang Jadi",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "114",
+        browseRoute: "KoreksiStokBarangJadiBrowse",
+      },
+    },
+    {
+      path: "/garmen/bahan-jadi/koreksi-stok/edit/:nomor",
+      name: "KoreksiStokBarangJadiFormEdit",
+      component: () =>
+        import("@/views/garmen/KoreksiStokBarangJadiFormView.vue"),
+      meta: {
+        title: "Ubah Koreksi Stok Barang Jadi",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "114",
+        browseRoute: "KoreksiStokBarangJadiBrowse",
+      },
+    },
+    {
+      path: "/garmen/bahan-jadi/koreksi-stok/print/:nomor",
+      name: "KoreksiStokBarangJadiPrint",
+      component: () =>
+        import("@/views/garmen/KoreksiStokBarangJadiPrintView.vue"),
+      meta: {
+        title: "Cetak Koreksi Stok Barang Jadi",
+        layout: "BlankLayout",
+        requiresAuth: true,
+      },
+    },
 
     {
       path: "/garmen/mka",
@@ -1421,43 +1469,43 @@ const router = createRouter({
         menuId: "68",
       },
     },
-    // {
-    //   path: "/garmen/barang/retur-pembelian/form",
-    //   name: "GarmenReturPembelianBarangCreate",
-    //   component: () =>
-    //     import("@/views/garmen/ReturPembelianBarangFormView.vue"),
-    //   meta: {
-    //     title: "Tambah Retur Pembelian",
-    //     layout: "DefaultLayout",
-    //     requiresAuth: true,
-    //     menuId: "68",
-    //     browseRoute: "GarmenReturPembelianBarang",
-    //   },
-    // },
-    // {
-    //   path: "/garmen/barang/retur-pembelian/form/:nomor",
-    //   name: "GarmenReturPembelianBarangEdit",
-    //   component: () =>
-    //     import("@/views/garmen/ReturPembelianBarangFormView.vue"),
-    //   meta: {
-    //     title: "Ubah Retur Pembelian",
-    //     layout: "DefaultLayout",
-    //     requiresAuth: true,
-    //     menuId: "68",
-    //     browseRoute: "GarmenReturPembelianBarang",
-    //   },
-    // },
-    // {
-    //   path: "/garmen/barang/retur-pembelian/print/:nomor",
-    //   name: "GarmenReturPembelianBarangPrint",
-    //   component: () =>
-    //     import("@/views/garmen/ReturPembelianBarangPrintView.vue"),
-    //   meta: {
-    //     title: "Cetak Retur Pembelian",
-    //     layout: "BlankLayout",
-    //     requiresAuth: true,
-    //   },
-    // },
+    {
+      path: "/garmen/barang/retur-pembelian/form",
+      name: "GarmenReturPembelianBarangCreate",
+      component: () =>
+        import("@/views/garmen/ReturPembelianBarangFormView.vue"),
+      meta: {
+        title: "Tambah Retur Pembelian",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "68",
+        browseRoute: "GarmenReturPembelianBarang",
+      },
+    },
+    {
+      path: "/garmen/barang/retur-pembelian/form/:nomor",
+      name: "GarmenReturPembelianBarangEdit",
+      component: () =>
+        import("@/views/garmen/ReturPembelianBarangFormView.vue"),
+      meta: {
+        title: "Ubah Retur Pembelian",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "68",
+        browseRoute: "GarmenReturPembelianBarang",
+      },
+    },
+    {
+      path: "/garmen/barang/retur-pembelian/print/:nomor",
+      name: "GarmenReturPembelianBarangPrint",
+      component: () =>
+        import("@/views/garmen/ReturPembelianBarangPrintView.vue"),
+      meta: {
+        title: "Cetak Retur Pembelian",
+        layout: "BlankLayout",
+        requiresAuth: true,
+      },
+    },
     {
       path: "/garmen/po-jasa",
       name: "PoJasaBrowse",
@@ -1865,6 +1913,97 @@ const router = createRouter({
         menuId: "174",
       },
     },
+    {
+      path: "/garmen/pemakaian-obat",
+      name: "PemakaianObatBrowse",
+      component: () => import("@/views/garmen/PemakaianObatView.vue"),
+      meta: {
+        title: "Pemakaian Obat",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "120",
+      },
+    },
+    {
+      path: "/garmen/pemakaian-obat/create",
+      name: "PemakaianObatFormCreate",
+      component: () => import("@/views/garmen/PemakaianObatFormView.vue"),
+      meta: {
+        title: "Pemakaian Obat",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "120",
+        browseRoute: "PemakaianObatBrowse",
+      },
+    },
+    {
+      path: "/garmen/pemakaian-obat/edit/:nomor",
+      name: "PemakaianObatFormEdit",
+      component: () => import("@/views/garmen/PemakaianObatFormView.vue"),
+      meta: {
+        title: "Ubah Pemakaian Obat",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "120",
+        browseRoute: "PemakaianObatBrowse",
+      },
+    },
+    {
+      path: "/garmen/pemakaian-obat/print/:nomor",
+      name: "PemakaianObatPrint",
+      component: () => import("@/views/garmen/PemakaianObatPrintView.vue"),
+      meta: {
+        title: "Cetak Pemakaian Obat",
+        layout: "BlankLayout",
+        requiresAuth: true,
+      },
+    },
+    {
+      path: "/garmen/po-paperprint",
+      name: "PoPaperprintBrowse",
+      component: () => import("@/views/garmen/PoPaperprintView.vue"),
+      meta: {
+        title: "PO Paperprint",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "103",
+      },
+    },
+    {
+      path: "/garmen/po-paperprint/create",
+      name: "PoPaperprintFormCreate",
+      component: () => import("@/views/garmen/PoPaperprintFormView.vue"),
+      meta: {
+        title: "PO Paperprint",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "103",
+        browseRoute: "PoPaperprintBrowse",
+      },
+    },
+    {
+      path: "/garmen/po-paperprint/edit/:nomor",
+      name: "PoPaperprintFormEdit",
+      component: () => import("@/views/garmen/PoPaperprintFormView.vue"),
+      meta: {
+        title: "Ubah PO Paperprint",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "103",
+        browseRoute: "PoPaperprintBrowse",
+      },
+    },
+    {
+      path: "/garmen/po-paperprint/print/:nomor",
+      name: "PoPaperprintPrint",
+      component: () => import("@/views/garmen/PoPaperprintPrintView.vue"),
+      meta: {
+        title: "Cetak PO Paperprint",
+        layout: "BlankLayout",
+        requiresAuth: true,
+      },
+    },
+
     {
       path: "/garmen/lhk-pola",
       name: "LhkPolaBrowse",

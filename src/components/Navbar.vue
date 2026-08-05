@@ -485,6 +485,12 @@ const menuItems: NavItem[] = [
             icon: IconFileInvoice,
             menuId: 143,
           },
+          {
+            title: "Koreksi Stok Barang Jadi",
+            to: "/garmen/bahan-jadi/koreksi-stok",
+            icon: IconSettings,
+            menuId: 114,
+          },
         ],
       },
       {
@@ -669,6 +675,18 @@ const menuItems: NavItem[] = [
         menuId: 109,
       },
       { divider: true },
+      {
+        title: "Pemakaian Obat",
+        to: "/garmen/pemakaian-obat",
+        icon: IconFlask,
+        menuId: 120,
+      },
+      {
+        title: "PO Paperprint",
+        to: "/garmen/po-paperprint",
+        icon: IconFileText,
+        menuId: 103,
+      },
     ],
   },
   {

@@ -94,7 +94,7 @@ const grandTotal = (d: any) => total(d) + ppnNominal(d);
 
       <!-- Info 2 kolom -->
       <div class="info-wrap">
-        <!-- Kiri -->
+        <!-- Kiri: Nomor s/d Jasa (TANPA Jumlah/Tarif) -->
         <table class="itbl">
           <tr>
             <td class="lbl">Nomor</td>
@@ -131,23 +131,27 @@ const grandTotal = (d: any) => total(d) + ppnNominal(d);
             <td>:</td>
             <td>{{ data.jasa_nama }}</td>
           </tr>
-          <tr>
-            <td class="lbl">Jumlah</td>
-            <td>:</td>
-            <td>{{ fmt(data.pojh_jumlah) }}</td>
-          </tr>
-          <tr>
-            <td class="lbl">Tarif</td>
-            <td>:</td>
-            <td>{{ fmt(data.pojh_tarif) }}</td>
-          </tr>
         </table>
-        <!-- Kanan: hanya Kepada YTH + supplier -->
+
+        <!-- Kanan: Kepada YTH + supplier, lalu Jumlah/Tarif di bawahnya -->
         <div class="info-right">
-          <div style="font-weight: bold; font-size: 8pt">Kepada YTH</div>
+          <div class="kepada-lbl">Kepada YTH</div>
           <div class="sup-n">{{ data.sup_nama }}</div>
           <div class="sup-a">{{ data.sup_alamat }}</div>
           <div class="sup-a">{{ data.sup_kota }}</div>
+
+          <table class="itbl-right">
+            <tr>
+              <td class="lbl">Jumlah</td>
+              <td>:</td>
+              <td>{{ fmt(data.pojh_jumlah) }}</td>
+            </tr>
+            <tr>
+              <td class="lbl">Tarif</td>
+              <td>:</td>
+              <td>{{ fmt(data.pojh_tarif) }}</td>
+            </tr>
+          </table>
         </div>
       </div>
 
@@ -288,6 +292,7 @@ body {
   grid-template-columns: 1fr 1fr;
   gap: 3mm;
   margin-bottom: 1.5mm;
+  align-items: start;
 }
 .itbl {
   border-collapse: collapse;
@@ -301,23 +306,34 @@ body {
   min-width: 52px;
   white-space: nowrap;
 }
+
 .info-right {
   font-size: 8pt;
-  text-align: right;
 }
-.info-right .itbl td:last-child {
-  text-align: right;
+.kepada-lbl {
+  font-weight: bold;
+  font-size: 8pt;
 }
 .sup-n {
   font-weight: bold;
   font-size: 9pt;
   text-transform: uppercase;
-  text-align: right;
 }
 .sup-a {
   text-transform: uppercase;
   font-size: 7.5pt;
-  text-align: right;
+}
+
+/* Jumlah/Tarif di kolom kanan — label kiri, sejajar dgn tabel kiri,
+   TIDAK rata kanan (ikut pola Delphi) */
+.itbl-right {
+  border-collapse: collapse;
+  font-size: 8pt;
+  margin-top: 2mm;
+}
+.itbl-right td {
+  padding: 0.3mm 1mm;
+  vertical-align: top;
 }
 
 /* Detail table */
@@ -389,10 +405,10 @@ body {
   height: 9mm;
 }
 .note {
-  font-size: 6.8pt;
+  font-size: 8pt;
   color: #333;
-  line-height: 1.4;
-  margin-top: 1mm;
+  line-height: 1.5;
+  margin-top: 1.5mm;
 }
 .ttotal {
   width: 100%;

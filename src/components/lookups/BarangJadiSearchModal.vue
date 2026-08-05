@@ -1,30 +1,21 @@
 <script setup lang="ts">
 import { ref, watch, computed } from "vue";
-import api from "@/services/api";
-import { IconTruckDelivery, IconSearch } from "@tabler/icons-vue";
-import { formatTanggal } from "@/utils/dateFormat";
+import { koreksiStokBarangJadiFormService } from "@/services/garmen/koreksiStokBarangJadiFormService";
+import { IconPackage, IconSearch, IconDatabaseOff } from "@tabler/icons-vue";
 
-const props = withDefaults(
-  defineProps<{
-    modelValue: boolean;
-    endpoint?: string; // ✅ default: BPB dari PO doang (Retur Pembelian Bahan)
-    extraParams?: Record<string, any>;
-    title?: string;
-  }>(),
-  {
-    endpoint: "/lookups/bpb-po",
-    extraParams: () => ({}),
-  },
-);
+const props = defineProps<{
+  modelValue: boolean;
+  gdgKode: string; // wajib — stok dihitung real-time per gudang ini
+}>();
 const emit = defineEmits(["update:modelValue", "selected"]);
 
 const search = ref("");
 const items = ref<any[]>([]);
 const isLoading = ref(false);
+
 const currentPage = ref(1);
 const perPage = ref(50);
 const totalItems = ref(0);
-
 const totalPages = computed(() =>
   Math.max(1, Math.ceil(totalItems.value / perPage.value)),
 );
@@ -34,24 +25,32 @@ const pageStart = computed(() =>
 const pageEnd = computed(() =>
   Math.min(currentPage.value * perPage.value, totalItems.value),
 );
+const visiblePages = computed(() => {
+  const total = totalPages.value,
+    cur = currentPage.value;
+  if (total <= 5) return Array.from({ length: total }, (_, i) => i + 1);
+  let start = Math.max(1, cur - 2);
+  let end = Math.min(total, start + 4);
+  if (end - start < 4) start = Math.max(1, end - 4);
+  return Array.from({ length: end - start + 1 }, (_, i) => start + i);
+});
 
 let debounce: ReturnType<typeof setTimeout> | null = null;
 
 const fetchData = async () => {
   isLoading.value = true;
   try {
-    const res = await api.get(props.endpoint, {
-      params: {
-        q: search.value,
-        page: currentPage.value,
-        limit: perPage.value,
-        ...props.extraParams,
-      },
-    });
+    const res = await koreksiStokBarangJadiFormService.searchBarang(
+      search.value,
+      props.gdgKode,
+      currentPage.value,
+      perPage.value,
+    );
     items.value = res.data.data.items;
     totalItems.value = res.data.data.total;
   } catch (e) {
-    console.error(e);
+    console.error("Gagal memuat barang:", e);
+    items.value = [];
   } finally {
     isLoading.value = false;
   }
@@ -94,58 +93,62 @@ const selectItem = (item: any) => {
   >
     <div class="lookup-card">
       <div class="lookup-header">
-        <IconTruckDelivery :size="15" :stroke-width="1.7" color="white" />
-        <span>{{
-          title ||
-          (endpoint === "/lookups/bpb-po"
-            ? "Cari No. BPB (dari PO)"
-            : "Cari No. BPB")
-        }}</span
-        ><v-spacer />
+        <IconPackage :size="15" :stroke-width="1.7" color="white" />
+        <span>Cari Barang Jadi</span>
+        <v-spacer />
         <button class="lookup-close" @click="emit('update:modelValue', false)">
           ✕
         </button>
       </div>
+
       <div class="lookup-search">
         <IconSearch :size="16" :stroke-width="1.7" color="#9e9e9e" />
         <input
           :value="search"
           @input="onSearch(($event.target as HTMLInputElement).value)"
           type="text"
-          placeholder="Cari nomor BPB, supplier, atau keterangan..."
+          placeholder="Cari kode atau nama barang..."
           class="search-input"
           autofocus
         />
       </div>
+
       <div class="lookup-table-wrap">
-        <div v-if="isLoading" class="lookup-state">Memuat data...</div>
+        <div v-if="isLoading" class="lookup-state">
+          <v-progress-circular indeterminate color="primary" size="24" />
+          <span>Memuat data...</span>
+        </div>
         <div v-else-if="items.length === 0" class="lookup-state">
-          Tidak ada data
+          <IconDatabaseOff :size="32" :stroke-width="1.3" color="#bdbdbd" />
+          <span>Tidak ada data</span>
         </div>
         <table v-else class="lookup-table">
           <thead>
             <tr>
-              <th style="width: 150px">NOMOR</th>
-              <th style="width: 100px">TANGGAL</th>
-              <th>SUPPLIER</th>
-              <th>KETERANGAN</th>
+              <th style="width: 140px">KODE</th>
+              <th>NAMA BARANG</th>
+              <th style="width: 70px">SATUAN</th>
+              <th style="width: 100px; text-align: right">STOK</th>
             </tr>
           </thead>
           <tbody>
             <tr
               v-for="item in items"
-              :key="item.Nomor"
+              :key="item.Kode"
               class="lookup-row"
               @click="selectItem(item)"
             >
-              <td class="td-kode">{{ item.Nomor }}</td>
-              <td>{{ formatTanggal(item.Tanggal) }}</td>
-              <td>{{ item.Supplier }}</td>
-              <td>{{ item.Keterangan }}</td>
+              <td class="td-kode">{{ item.Kode }}</td>
+              <td>{{ item.Nama }}</td>
+              <td>{{ item.Satuan }}</td>
+              <td style="text-align: right; font-weight: 600">
+                {{ Number(item.Stok).toLocaleString("id-ID") }}
+              </td>
             </tr>
           </tbody>
         </table>
       </div>
+
       <div class="lookup-footer">
         <span class="footer-count"
           >{{ pageStart }}–{{ pageEnd }} dari {{ totalItems }} data</span
@@ -157,6 +160,15 @@ const selectItem = (item: any) => {
             @click="goToPage(currentPage - 1)"
           >
             ‹
+          </button>
+          <button
+            v-for="p in visiblePages"
+            :key="p"
+            class="page-btn"
+            :class="{ active: p === currentPage }"
+            @click="goToPage(p)"
+          >
+            {{ p }}
           </button>
           <button
             class="page-btn"
@@ -200,9 +212,6 @@ const selectItem = (item: any) => {
   font-size: 15px;
   cursor: pointer;
 }
-.lookup-close:hover {
-  color: white;
-}
 .lookup-search {
   display: flex;
   align-items: center;
@@ -227,8 +236,11 @@ const selectItem = (item: any) => {
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
+  gap: 8px;
   padding: 40px 16px;
   color: #9e9e9e;
+  font-size: 12px;
 }
 .lookup-table {
   width: 100%;
@@ -237,24 +249,26 @@ const selectItem = (item: any) => {
 .lookup-table thead tr {
   position: sticky;
   top: 0;
-  background: #f5f5f5;
+  background: #1565c0;
 }
 .lookup-table th {
   padding: 7px 10px;
-  text-align: left;
-  border-bottom: 2px solid #e0e0e0;
   font-size: 11px;
-  color: #424242;
+  font-weight: 700;
+  color: white;
+  border: 1px solid #0d47a1;
+  border-bottom: none;
+  text-align: left;
 }
 .lookup-table td {
   padding: 5px 10px;
+  font-size: 12px;
   border-bottom: 1px solid #f0f0f0;
-}
-.lookup-row {
-  cursor: pointer;
 }
 .lookup-row:hover td {
   background: #e3f2fd;
+  color: #1565c0;
+  cursor: pointer;
 }
 .td-kode {
   font-family: monospace;
@@ -263,7 +277,6 @@ const selectItem = (item: any) => {
 }
 .lookup-footer {
   display: flex;
-  align-items: center;
   justify-content: space-between;
   padding: 7px 12px;
   border-top: 1px solid #e0e0e0;
@@ -273,12 +286,17 @@ const selectItem = (item: any) => {
   min-width: 28px;
   height: 26px;
   border: 1px solid #e0e0e0;
+  border-radius: 4px;
   background: white;
   cursor: pointer;
-  border-radius: 4px;
 }
-.page-btn:disabled {
-  opacity: 0.3;
-  cursor: default;
+.page-btn.active {
+  background: #1976d2;
+  color: white;
+  border-color: #1976d2;
+}
+.page-controls {
+  display: flex;
+  gap: 2px;
 }
 </style>
