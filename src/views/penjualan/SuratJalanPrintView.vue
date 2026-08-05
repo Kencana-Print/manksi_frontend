@@ -12,7 +12,7 @@ import logoMD from "@/assets/md.jpg";
 const route = useRoute();
 const nomor = route.query.nomor as string;
 const mode = route.query.mode as string; // "dotmatrix" | "inkjet"
-const printerName = ref("192.168.1.33");
+const printerName = ref("EPSON LX-310 ESC/P");
 const isPrinting = ref(false);
 // ── Dialog hasil aksi (pengganti alert()) ──
 const resultDialog = ref<{
@@ -146,6 +146,17 @@ const wrapText = (text: string, maxWidth: number): string[] => {
 const PAGE_WIDTH = 136; // lebar kertas continuous-form (sesuaikan kalau printer beda)
 const NAMA_W = 50;
 const KET_W = 26;
+// ⬅ Tinggi 1 lembar fisik continuous-form dalam baris (@ 6 LPI standar).
+// Konten di-pad tepat ke angka ini sebelum Form Feed dikirim, supaya
+// lompatan FF selalu presisi ke awal lembar berikutnya — sebelumnya FF
+// cuma dikirim 1x di akhir tanpa hitungan tinggi, jadi jarak lompatannya
+// berubah-ubah tergantung jumlah baris SPK (itu yang kelihatan sbg "blank
+// kosong" tidak konsisten). Sesuaikan angka ini kalau ternyata masih
+// meleset dari perforasi kertas fisik.
+const PAGE_LINES = 33; // 14cm ÷ 2,54 × 6 LPI = 33,07 → 33 baris.
+// (Kertas SJ = 21,5 x 14cm, jauh lebih pendek dari kertas Invoice 21,5 x 27,5cm
+// yang makanya PAGE_LINES-nya juga beda — sebelumnya salah pakai angka 65
+// hasil contek dari Invoice, itu penyebab blank space besar tiap cetak.)
 
 // ✅ Garis solid (bukan putus-putus), sama seperti InvoicePrintView
 const LINE = "_".repeat(PAGE_WIDTH);
@@ -155,102 +166,134 @@ const generateTxt = () => {
   const rows = detail.value;
   const halfL = 67;
   const halfR = 68; // halfL + 1(spasi) + halfR = 136
-  let txt = "";
 
-  const printHeaderBlock = () => {
-    let s = "";
-    s += `${padR(h.perush_nama || "", PAGE_WIDTH)}\n`;
-    s += `${padR(h.perush_alamat || "", PAGE_WIDTH)}\n`;
-    s += `${padR(h.perush_telp || "", PAGE_WIDTH)}\n`;
-    s += "\n";
-    s += `${padC("S U R A T   J A L A N", PAGE_WIDTH)}\n\n`;
+  // ── Header block (dipakai ulang tiap halaman fisik) ──
+  const buildHeaderLines = (): string[] => {
+    const lines: string[] = [];
+    lines.push(padR(h.perush_nama || "", PAGE_WIDTH));
+    lines.push(padR(h.perush_alamat || "", PAGE_WIDTH));
+    lines.push(padR(h.perush_telp || "", PAGE_WIDTH));
+    lines.push("");
+    lines.push(padC("S U R A T   J A L A N", PAGE_WIDTH));
+    lines.push("");
 
     const alamatFull = h.sj_alamat_customer || h.cus_alamat || "";
     const alamatLines = wrapText(alamatFull, halfR);
-    s += `${padR("Nomor      : " + (h.sj_nomor || ""), halfL)} ${padR("Customer : " + (h.cus_nama || ""), halfR)}\n`;
-    s += `${padR("Tanggal    : " + fmtDate(h.sj_tanggal), halfL)} ${padR(alamatLines[0] || "", halfR)}\n`;
-    s += `${padR("Keterangan : " + (h.keterangan_cetak || h.sj_keterangan || ""), halfL)} ${padR(alamatLines[1] || "", halfR)}\n`;
+    lines.push(
+      `${padR("Nomor      : " + (h.sj_nomor || ""), halfL)} ${padR("Customer : " + (h.cus_nama || ""), halfR)}`,
+    );
+    lines.push(
+      `${padR("Tanggal    : " + fmtDate(h.sj_tanggal), halfL)} ${padR(alamatLines[0] || "", halfR)}`,
+    );
+    lines.push(
+      `${padR("Keterangan : " + (h.keterangan_cetak || h.sj_keterangan || ""), halfL)} ${padR(alamatLines[1] || "", halfR)}`,
+    );
     for (let i = 2; i < alamatLines.length; i++) {
-      s += `${padR("", halfL)} ${padR(alamatLines[i], halfR)}\n`;
+      lines.push(`${padR("", halfL)} ${padR(alamatLines[i], halfR)}`);
     }
-    // ✅ Nomor telp/fax customer di-hide dari cetakan
-    s += `${LINE}\n`;
-    s += `${padR("No", 3)} ${padR("SPK", 12)} ${padR("Nama", NAMA_W)} ${padR(
-      "Ukuran",
-      20,
-    )} ${padL("Jumlah", 10)} ${padL("Koli", 9)} ${padR("Keterangan", KET_W)}\n`;
-    s += `${LINE}\n`;
-    return s;
+    lines.push(LINE);
+    lines.push(
+      `${padR("No", 3)} ${padR("SPK", 12)} ${padR("Nama", NAMA_W)} ${padR("Ukuran", 20)} ${padL("Jumlah", 10)} ${padL("Koli", 9)} ${padR("Keterangan", KET_W)}`,
+    );
+    lines.push(LINE);
+    return lines;
   };
 
-  txt += printHeaderBlock();
+  // ── Footer block (hanya di halaman terakhir) ──
+  const buildFooterLines = (): string[] => {
+    const totalJml = rows.reduce(
+      (s: number, r: any) => s + Number(r.sjd_jumlah || 0),
+      0,
+    );
+    const FAX_NO = h.perush_telp || h.perush_fax || "";
+    const EMAIL = h.perush_email || "";
 
-  rows.forEach((r: any, i: number) => {
-    txt += `${padR(String(i + 1), 3)} `;
-    txt += `${padR(r.sjd_spk_nomor || "", 12)} `;
-    txt += `${padR(r.spk_nama || r.spk_nama2 || "", NAMA_W)} `;
-    txt += `${padR(r.sjd_ukuran || "", 20)} `;
-    txt += `${padL(num(r.sjd_jumlah), 10)} `;
-    txt += `${padL(num(r.sjd_koli), 9)} `;
-    txt += `${padR(r.sjd_keterangan || "", KET_W)}\n`;
+    const lines: string[] = [];
+    lines.push(LINE);
+    lines.push(
+      padR(
+        "MOHON SURAT JALAN INI DITANDATANGANI, DISTEMPEL, DAN DI FAX KE " +
+          FAX_NO,
+        PAGE_WIDTH,
+      ),
+    );
+    lines.push(
+      `${padR("ATAU EMAIL DI " + EMAIL, PAGE_WIDTH - 24)}${padL("Total Jumlah: " + num(totalJml), 24)}`,
+    );
+    lines.push("");
+    lines.push(
+      `${padR("Dibuat Oleh,", 27)} ${padR("Disiapkan Oleh,", 27)} ${padR("Kepala Gudang,", 27)} ${padR("Pengantar,", 27)} ${padR("Diterima Oleh,", 27)}`,
+    );
+    lines.push("");
+    lines.push("");
+    lines.push("");
+    lines.push(
+      `${padR("(               )", 27)} ${padR("(               )", 27)} ${padR("(               )", 27)} ${padR("(               )", 27)} ${padR("(               )", 27)}`,
+    );
+    lines.push("");
+    lines.push(
+      padR(
+        "Note : Pengaduan konsumen maks. 14 hari dari tanggal penerimaan barang.",
+        PAGE_WIDTH,
+      ),
+    );
+    lines.push(
+      padR("Melebihi batas waktu pengaduan, tidak diterima.", PAGE_WIDTH),
+    );
+    return lines;
+  };
 
-    // Ulang header tiap 12 baris — cuma kepakai buat daftar panjang
-    // (lebih dari 1 lembar fisik), gak ngaruh ke kasus SPK sedikit.
-    // ✅ "LEMBAR PUTIH KEMBALI SOLO" dihapus sesuai permintaan.
-    if ((i + 1) % 12 === 0 && i + 1 < rows.length) {
-      txt += `${LINE}\n`;
-      txt += "\n".repeat(3);
-      txt += printHeaderBlock();
+  const dataLineOf = (r: any, no: number) =>
+    `${padR(String(no), 3)} ${padR(r.sjd_spk_nomor || "", 12)} ${padR(r.spk_nama || r.spk_nama2 || "", NAMA_W)} ${padR(r.sjd_ukuran || "", 20)} ${padL(num(r.sjd_jumlah), 10)} ${padL(num(r.sjd_koli), 9)} ${padR(r.sjd_keterangan || "", KET_W)}`;
+
+  const headerLines = buildHeaderLines();
+  const footerLines = buildFooterLines();
+
+  // Berapa baris data yang muat di halaman NON-terakhir (tanpa footer)
+  const maxDataPerPage = Math.max(1, PAGE_LINES - headerLines.length);
+
+  const chunks: any[][] = [];
+  for (let i = 0; i < rows.length; i += maxDataPerPage) {
+    chunks.push(rows.slice(i, i + maxDataPerPage));
+  }
+  if (chunks.length === 0) chunks.push([]);
+
+  const allPages: string[][] = [];
+
+  chunks.forEach((chunk, ci) => {
+    const startNo = ci * maxDataPerPage;
+    const dataLines = chunk.map((r: any, i: number) =>
+      dataLineOf(r, startNo + i + 1),
+    );
+    const isLast = ci === chunks.length - 1;
+    const page = [...headerLines, ...dataLines];
+
+    if (isLast) {
+      // Halaman terakhir: pad presisi ke PAGE_LINES lalu tempel footer di
+      // bawah. Kalau data+footer ternyata tidak muat 1 halaman, footer
+      // dilempar ke halaman fisik berikutnya (jarang terjadi, tapi jaga2).
+      if (page.length + footerLines.length <= PAGE_LINES) {
+        const pad = Math.max(0, PAGE_LINES - page.length - footerLines.length);
+        allPages.push([...page, ...Array(pad).fill(""), ...footerLines]);
+      } else {
+        const pad = Math.max(0, PAGE_LINES - page.length);
+        allPages.push([...page, ...Array(pad).fill("")]);
+        const footerPad = Math.max(0, PAGE_LINES - footerLines.length);
+        allPages.push([...Array(footerPad).fill(""), ...footerLines]);
+      }
+    } else {
+      // Halaman tengah: pad presisi ke PAGE_LINES juga (bukan cuma nambah
+      // separator LINE seperti sebelumnya), supaya FF antar halaman selalu
+      // lompat pas ke baris pertama header halaman berikutnya.
+      const pad = Math.max(0, PAGE_LINES - page.length);
+      allPages.push([...page, ...Array(pad).fill("")]);
     }
   });
 
-  // ── Total jumlah dari seluruh baris ──
-  const totalJml = rows.reduce(
-    (s: number, r: any) => s + Number(r.sjd_jumlah || 0),
-    0,
-  );
-
-  // ✅ Nomor fax perusahaan tetap dipakai di kalimat "mohon fax ke...",
-  // walau baris telp terpisah di header udah di-hide.
-  const FAX_NO = h.perush_telp || h.perush_fax || "";
-  const EMAIL = h.perush_email || "";
-
-  // ✅ FIX: gap tetap kecil, bukan digenapin ke kelipatan 12 — biar
-  // panjang halaman ngikutin jumlah baris aktual, gak dorong TTD
-  // sampai lewat panjang fisik 1 lembar continuous-form.
-  txt += "\n".repeat(2);
-  txt += `${LINE}\n`;
-  txt += `${padR(
-    "MOHON SURAT JALAN INI DITANDATANGANI, DISTEMPEL, DAN DI FAX KE " + FAX_NO,
-    PAGE_WIDTH,
-  )}\n`;
-  txt += `${padR("ATAU EMAIL DI " + EMAIL, PAGE_WIDTH - 24)}${padL(
-    "Total Jumlah: " + num(totalJml),
-    24,
-  )}\n`;
-  txt += "\n";
-  txt += `${padR("Dibuat Oleh,", 27)} ${padR("Disiapkan Oleh,", 27)} ${padR(
-    "Kepala Gudang,",
-    27,
-  )} ${padR("Pengantar,", 27)} ${padR("Diterima Oleh,", 27)}\n`;
-  txt += "\n".repeat(3);
-  txt += `${padR("(               )", 27)} ${padR(
-    "(               )",
-    27,
-  )} ${padR("(               )", 27)} ${padR("(               )", 27)} ${padR(
-    "(               )",
-    27,
-  )}\n`;
-  txt += "\n";
-  txt += `${padR(
-    "Note : Pengaduan konsumen maks. 14 hari dari tanggal penerimaan barang.",
-    PAGE_WIDTH,
-  )}\n`;
-  txt += `${padR(
-    "Melebihi batas waktu pengaduan, tidak diterima.",
-    PAGE_WIDTH,
-  )}\n`;
-  return txt;
+  // Form Feed di ANTARA setiap halaman fisik — bukan cuma 1x di paling
+  // akhir. Karena tiap halaman sudah persis PAGE_LINES tinggi, FF di sini
+  // lompatnya selalu presisi, tidak ada lagi jarak blank yang berubah-ubah.
+  return allPages.map((p) => p.join("\n")).join("\n\f\n");
 };
 
 const totalJumlah = computed(() =>
@@ -298,8 +341,12 @@ const printQZ = async () => {
 
     const data = [
       "\x1B\x40", // ESC @: Inisialisasi/Reset printer
-      { type: "raw", format: "plain", data: content },
-      "\x0C", // Form Feed: Eject halaman
+      { type: "raw", format: "plain", data: content }, // ← Form Feed antar
+      // halaman sudah ter-embed di dalam content (karakter \f), jadi tidak
+      // perlu lagi kirim "\x0C" terpisah di sini
+      "\x0C", // FF terakhir — tetap perlu, supaya lembar terakhir yang sudah
+      // di-pad penuh ke PAGE_LINES ikut ke-eject sampai ke perforasi
+      // berikutnya (siap sobek), bukan cuma berhenti di baris terakhir.
     ];
 
     await qz.print(config, data);

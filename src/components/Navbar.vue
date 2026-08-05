@@ -518,15 +518,15 @@ const menuItems: NavItem[] = [
           },
           {
             title: "Approve Retur",
-            to: "/garmen/barang/approve-retur",
+            to: "/garmen/barang/approve-retur-barang",
             icon: IconChecks,
-            menuId: 116,
+            menuId: 63,
           },
           {
             title: "Koreksi Stok",
-            to: "/garmen/barang/koreksi",
+            to: "/garmen/barang/koreksi-stok",
             icon: IconSettings,
-            menuId: 117,
+            menuId: 64,
           },
           {
             title: "Minta Pembelian",

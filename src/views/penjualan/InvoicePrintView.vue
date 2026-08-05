@@ -18,7 +18,7 @@ const detail = ref<any[]>([]);
 const totals = ref<any>({});
 const isReady = ref(false);
 const isLoading = ref(true);
-const printerName = ref("192.168.1.41");
+const printerName = ref("EPSON LX-310 ESC/P");
 const isPrinting = ref(false);
 const printingMode = ref<"standart" | "full" | null>(null);
 // ── Dialog hasil aksi (pengganti alert()) ──
@@ -190,8 +190,13 @@ const formatPrintedAt = () => {
 
 // ── Generate TXT (Dot Matrix) — sesuai Delphi doslipINV2 ──────────────
 const PAGE_WIDTH = 136;
-// Panjang 27,8cm ÷ 2,54 = 10,94" → pada 6 LPI (baris/inch) standar = ~65 baris.
-const PAGE_LINES = 65;
+const PAGE_LINES = 65; // tinggi kertas fisik total — tetap dipakai utk deteksi overflow multi-halaman
+// ⬅ Footer (Terbilang/Total/TTD) di-anchor ke baris ini, BUKAN ke PAGE_LINES.
+// Sebelumnya footer dipaksa mepet ke baris 65 (paling bawah kertas), jadi kalau
+// kertas fisik continuous-form sedikit lebih pendek dari asumsi, baris tanda
+// tangan yang paling bawah kepotong. Turunkan angka ini kalau tanda tangan
+// masih kepotong; naikkan kalau footer sekarang jadi ketinggian.
+const FOOTER_ANCHOR_LINE = 54;
 
 // ✅ Garis solid (bukan putus-putus): "-" ada gap antar karakter di dot
 // matrix, underscore ("_") nyambung jadi garis lurus tanpa putus.
@@ -296,21 +301,17 @@ const generateTxt = (mode: "standart" | "full") => {
 
   if (isFull) {
     const dataLines = rows.map((r: any, i: number) => dataLineOf(r, i + 1));
-    const bodyLines = [...headerLines, ...dataLines, LINE];
-    if (bodyLines.length + footerLines.length <= PAGE_LINES) {
-      // ✅ Footer didorong ke bawah halaman fisik — blank lines disisipin
-      // SEBELUM footer. PAGE_LINES perlu dikalibrasi dari hitungan fisik
-      // biar gap-nya wajar (jangan sampai kegedean kayak sebelumnya).
+    const bodyLines = [...headerLines, ...dataLines]; // ← LINE dihapus dari sini
+    if (bodyLines.length + footerLines.length <= FOOTER_ANCHOR_LINE) {
       const pad = Math.max(
         0,
-        PAGE_LINES - bodyLines.length - footerLines.length,
+        FOOTER_ANCHOR_LINE - bodyLines.length - footerLines.length,
       );
       allPages.push([...bodyLines, ...Array(pad).fill(""), ...footerLines]);
     } else {
       const padToPage = Math.max(0, PAGE_LINES - bodyLines.length);
       allPages.push([...bodyLines, ...Array(padToPage).fill("")]);
-      // Footer di halaman ke-2 juga tetap didorong ke bawah
-      const footerPad = Math.max(0, PAGE_LINES - footerLines.length);
+      const footerPad = Math.max(0, FOOTER_ANCHOR_LINE - footerLines.length);
       allPages.push([...Array(footerPad).fill(""), ...footerLines]);
     }
   } else {
@@ -340,21 +341,26 @@ const generateTxt = (mode: "standart" | "full") => {
       if (isLastChunk) {
         const blankPad = Math.max(0, xRecord - chunk.length);
         page.push(...Array(blankPad).fill(""));
-        page.push(LINE);
-        if (page.length + footerLines.length <= PAGE_LINES) {
+        // ← garis LINE di sini dihapus (bukan bagian dari cetakan Delphi asli)
+        if (page.length + footerLines.length <= FOOTER_ANCHOR_LINE) {
           const extraPad = Math.max(
             0,
-            PAGE_LINES - page.length - footerLines.length,
+            FOOTER_ANCHOR_LINE - page.length - footerLines.length,
           );
           page.push(...Array(extraPad).fill(""), ...footerLines);
           allPages.push(page);
         } else {
           allPages.push(page);
-          const footerPad = Math.max(0, PAGE_LINES - footerLines.length);
+          const footerPad = Math.max(
+            0,
+            FOOTER_ANCHOR_LINE - footerLines.length,
+          );
           allPages.push([...Array(footerPad).fill(""), ...footerLines]);
         }
       } else {
-        page.push(LINE);
+        // ← garis LINE penutup halaman (utk kasus multi-halaman) juga dihapus,
+        // biar konsisten — halaman lanjutan tetap punya garis pemisah kolom
+        // header (di buildHeaderLines), cuma bukan garis ekstra di bawah data.
         allPages.push(page);
       }
     });
@@ -390,8 +396,13 @@ const printQZ = async (pilihMode: "standart" | "full") => {
 
     const data = [
       "\x1B\x40", // ESC @: Inisialisasi/Reset printer
+      "\x0F", // SI: aktifkan condensed print (~17 cpi). Teks kita diformat
+      // 136 kolom mengasumsikan pitch condensed — tanpa command ini printer
+      // cetak di pitch normal (~10 cpi), jadi 136 karakter jatuhnya jauh
+      // lebih lebar dari fisik kertas & nggak muat area scan.
       "\x1B\x6C\x00", // ESC l 0: Set left margin = kolom 0
       { type: "raw", format: "plain", data: content },
+      "\x12", // DC2: batalkan condensed print (balikin ke normal utk job berikutnya)
       "\x0C", // Form Feed: Eject halaman
     ];
 

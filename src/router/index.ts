@@ -1173,6 +1173,62 @@ const router = createRouter({
       },
     },
     {
+      path: "/garmen/barang/approve-retur-barang",
+      name: "GarmenApproveReturBarang",
+      component: () => import("@/views/garmen/ApproveReturBarangView.vue"),
+      meta: {
+        title: "Approve Retur Barang",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "63",
+      },
+    },
+    {
+      path: "/garmen/barang/koreksi-stok",
+      name: "GarmenKoreksiStokBarang",
+      component: () => import("@/views/garmen/KoreksiStokBarangView.vue"),
+      meta: {
+        title: "Koreksi Stok Garmen",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "64",
+      },
+    },
+    {
+      path: "/garmen/barang/koreksi-stok/form",
+      name: "GarmenKoreksiStokBarangCreate",
+      component: () => import("@/views/garmen/KoreksiStokBarangFormView.vue"),
+      meta: {
+        title: "Tambah Koreksi Stok",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "64",
+        browseRoute: "GarmenKoreksiStokBarang",
+      },
+    },
+    {
+      path: "/garmen/barang/koreksi-stok/form/:nomor",
+      name: "GarmenKoreksiStokBarangEdit",
+      component: () => import("@/views/garmen/KoreksiStokBarangFormView.vue"),
+      meta: {
+        title: "Ubah Koreksi Stok",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "64",
+        browseRoute: "GarmenKoreksiStokBarang",
+      },
+    },
+    {
+      path: "/garmen/barang/koreksi-stok/print/:nomor",
+      name: "GarmenKoreksiStokBarangPrint",
+      component: () => import("@/views/garmen/KoreksiStokBarangPrintView.vue"),
+      meta: {
+        title: "Cetak Koreksi Stok",
+        layout: "BlankLayout",
+        requiresAuth: true,
+      },
+    },
+    {
       path: "/garmen/barang/permintaan-pembelian",
       name: "PermintaanPembelianGarmen",
       component: () => import("@/views/garmen/PermintaanPembelianView.vue"),

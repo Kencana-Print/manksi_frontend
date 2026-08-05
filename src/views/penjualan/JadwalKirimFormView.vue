@@ -446,9 +446,6 @@ const totalKoli = computed(() =>
 const totalKirim = computed(() =>
   formData.value.Detail.reduce((s, r) => s + (Number(r.jumlah_kirim) || 0), 0),
 );
-const totalKoliKirim = computed(() =>
-  formData.value.Detail.reduce((s, r) => s + (Number(r.koli_kirim) || 0), 0),
-);
 
 const selectOnFocus = (e: FocusEvent) => {
   const input = e.target as HTMLInputElement;
@@ -927,7 +924,6 @@ onMounted(async () => {
                 <th style="width: 80px">Jam Input</th>
                 <th style="width: 90px">Jam Brg Ready</th>
                 <!-- Kolom realisasi: selalu tampil (HO bisa lihat) -->
-                <th style="width: 75px">Koli Kirim</th>
                 <th style="width: 90px">
                   Jam Kirim
                   <span
@@ -1037,15 +1033,6 @@ onMounted(async () => {
                 </td>
                 <td>
                   <input
-                    v-model.number="row.koli_kirim"
-                    type="number"
-                    class="cell-inp text-right"
-                    :readonly="isDetailDisabled"
-                    @focus="selectOnFocus"
-                  />
-                </td>
-                <td>
-                  <input
                     v-model="row.jam_kirim"
                     type="time"
                     class="cell-inp text-center"
@@ -1093,7 +1080,7 @@ onMounted(async () => {
                 <td class="text-right footer-val">
                   {{ totalKoli.toLocaleString("id-ID") }}
                 </td>
-                <td colspan="3"></td>
+                <td colspan="2"></td>
                 <td class="text-right footer-val">
                   {{ totalKirim.toLocaleString("id-ID") }}
                 </td>
