@@ -17,7 +17,7 @@ const detail = ref<any[]>([]);
 const totals = ref<any>({});
 const isReady = ref(false);
 const isLoading = ref(true);
-const printerName = ref("EPSON LX-310 ESC/P on 192.168.1.41");
+const printerName = ref("EPSON LX-310 ESC/P");
 const isPrinting = ref(false);
 
 const doPrint = () => window.print();
@@ -121,8 +121,12 @@ const terbilang = (n: number): string => {
 // ── Konstanta kertas dot matrix — 21cm (lebar cetak) x 27,8cm (panjang feed) ──
 // Lebar 21cm ÷ 2,54 = 8,27" → pada pitch NORMAL 10 CPI = ~80 karakter/baris.
 const PAGE_WIDTH = 80;
-// Panjang 27,8cm ÷ 2,54 = 10,94" → pada 6 LPI (baris/inch) standar = ~65 baris.
-const PAGE_LINES = 65;
+const PAGE_LINES = 65; // tinggi kertas fisik total — tetap dipakai utk deteksi overflow multi-halaman
+// ⬅ Footer (Terbilang/Total/TTD) di-anchor ke baris ini, BUKAN mepet ke
+// PAGE_LINES (paling bawah kertas) — sama fix seperti InvoicePrintView,
+// supaya baris tanda tangan tidak kepotong kalau kertas fisik sedikit
+// lebih pendek dari asumsi. Tuning naik/turun sesuai hasil cetak fisik.
+const FOOTER_ANCHOR_LINE = 54;
 
 // ── Generate TXT (Dot Matrix) — sesuai Delphi doslipINV2 ──────────────
 // Fixed baris/halaman (tidak ada pilihan Standart/Full seperti Invoice
@@ -208,7 +212,7 @@ const generateTxt = () => {
   const headerLines = buildHeaderLines();
   const footerLines = buildFooterLines();
   const dataLineOf = (r: any, lineNum: number) =>
-    `${padR(String(lineNum), 3)} ${padR(r.invd_spk_nomor || "", 10)} ${padR(r.nama_barang || "", 24)} ${padR(r.invd_ukuran || "", 13)} ${padL(num(r.invd_jumlah), 8)} ${padL(num(r.invd_harga), 10)} ${padL(num(Number(r.invd_jumlah) * Number(r.invd_harga)), 10)}`;
+    `${padR(String(lineNum), 3)} ${padR(r.invd_spk_nomor || "", 10)} ${padR(r.nama_barang || "", 24)} ${padR(r.invd_ukuran || "", 13)} ${padL(num(r.invd_jumlah), 8)} ${padL(num(r.invd_harga), 10)} ${padL(num(Math.round(Number(r.invd_jumlah) * Number(r.invd_harga))), 10)}`;
 
   const maxDataLinesPerPage = Math.max(1, PAGE_LINES - headerLines.length - 1);
   const xRecord = Math.min(30, maxDataLinesPerPage);
@@ -232,16 +236,22 @@ const generateTxt = () => {
     if (isLastChunk) {
       const blankPad = Math.max(0, xRecord - chunk.length);
       page.push(...Array(blankPad).fill(""));
-      page.push(LINE);
-      if (page.length + footerLines.length <= PAGE_LINES) {
-        page.push(...footerLines);
+      // ← garis LINE ekstra di sini dihapus, footerLines sudah diawali LINE
+      // sendiri (lihat buildFooterLines)
+      if (page.length + footerLines.length <= FOOTER_ANCHOR_LINE) {
+        const extraPad = Math.max(
+          0,
+          FOOTER_ANCHOR_LINE - page.length - footerLines.length,
+        );
+        page.push(...Array(extraPad).fill(""), ...footerLines);
         pages.push(page);
       } else {
         pages.push(page);
-        pages.push([...footerLines]);
+        const footerPad = Math.max(0, FOOTER_ANCHOR_LINE - footerLines.length);
+        pages.push([...Array(footerPad).fill(""), ...footerLines]);
       }
     } else {
-      page.push(LINE);
+      // ← garis LINE penutup halaman lanjutan juga dihapus, konsisten
       pages.push(page);
     }
   });
@@ -479,7 +489,11 @@ onMounted(() => {
                 <td style="text-align: right">{{ num(r.invd_jumlah) }}</td>
                 <td style="text-align: right">{{ num(r.invd_harga) }}</td>
                 <td style="text-align: right">
-                  {{ num(Number(r.invd_jumlah) * Number(r.invd_harga)) }}
+                  {{
+                    num(
+                      Math.round(Number(r.invd_jumlah) * Number(r.invd_harga)),
+                    )
+                  }}
                 </td>
               </tr>
             </tbody>

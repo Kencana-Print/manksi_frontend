@@ -560,9 +560,9 @@ const menuItems: NavItem[] = [
           },
           {
             title: "Retur Pembelian",
-            to: "/garmen/barang/retur-beli",
-            icon: IconTruck,
-            menuId: 125,
+            to: "/garmen/barang/retur-pembelian",
+            icon: IconTruckOff,
+            menuId: 68,
           },
         ],
       },

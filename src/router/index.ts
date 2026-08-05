@@ -1411,6 +1411,54 @@ const router = createRouter({
       },
     },
     {
+      path: "/garmen/barang/retur-pembelian",
+      name: "GarmenReturPembelianBarang",
+      component: () => import("@/views/garmen/ReturPembelianBarangView.vue"),
+      meta: {
+        title: "Retur Pembelian Garmen",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "68",
+      },
+    },
+    // {
+    //   path: "/garmen/barang/retur-pembelian/form",
+    //   name: "GarmenReturPembelianBarangCreate",
+    //   component: () =>
+    //     import("@/views/garmen/ReturPembelianBarangFormView.vue"),
+    //   meta: {
+    //     title: "Tambah Retur Pembelian",
+    //     layout: "DefaultLayout",
+    //     requiresAuth: true,
+    //     menuId: "68",
+    //     browseRoute: "GarmenReturPembelianBarang",
+    //   },
+    // },
+    // {
+    //   path: "/garmen/barang/retur-pembelian/form/:nomor",
+    //   name: "GarmenReturPembelianBarangEdit",
+    //   component: () =>
+    //     import("@/views/garmen/ReturPembelianBarangFormView.vue"),
+    //   meta: {
+    //     title: "Ubah Retur Pembelian",
+    //     layout: "DefaultLayout",
+    //     requiresAuth: true,
+    //     menuId: "68",
+    //     browseRoute: "GarmenReturPembelianBarang",
+    //   },
+    // },
+    // {
+    //   path: "/garmen/barang/retur-pembelian/print/:nomor",
+    //   name: "GarmenReturPembelianBarangPrint",
+    //   component: () =>
+    //     import("@/views/garmen/ReturPembelianBarangPrintView.vue"),
+    //   meta: {
+    //     title: "Cetak Retur Pembelian",
+    //     layout: "BlankLayout",
+    //     requiresAuth: true,
+    //   },
+    // },
+    {
       path: "/garmen/po-jasa",
       name: "PoJasaBrowse",
       component: () => import("@/views/garmen/PoJasaView.vue"),

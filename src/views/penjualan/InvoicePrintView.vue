@@ -295,7 +295,7 @@ const generateTxt = (mode: "standart" | "full") => {
   const headerLines = buildHeaderLines();
   const footerLines = buildFooterLines();
   const dataLineOf = (r: any, lineNum: number) =>
-    `${padR(String(lineNum), 3)} ${padR(r.invd_spk_nomor || "", 16)} ${padR(r.nama_barang || "", 46)} ${padR(r.invd_ukuran || "", 22)} ${padL(num(r.invd_jumlah), 12)} ${padL(num(r.invd_harga), 16)} ${padL(num(Number(r.invd_jumlah) * Number(r.invd_harga)), 16)}`;
+    `${padR(String(lineNum), 3)} ${padR(r.invd_spk_nomor || "", 16)} ${padR(r.nama_barang || "", 46)} ${padR(r.invd_ukuran || "", 22)} ${padL(num(r.invd_jumlah), 12)} ${padL(num(r.invd_harga), 16)} ${padL(num(Math.round(Number(r.invd_jumlah) * Number(r.invd_harga))), 16)}`;
 
   const allPages: string[][] = [];
 
@@ -697,7 +697,11 @@ onMounted(() => {
                 <td style="text-align: right">{{ num(r.invd_jumlah) }}</td>
                 <td style="text-align: right">{{ num(r.invd_harga) }}</td>
                 <td style="text-align: right">
-                  {{ num(Number(r.invd_jumlah) * Number(r.invd_harga)) }}
+                  {{
+                    num(
+                      Math.round(Number(r.invd_jumlah) * Number(r.invd_harga)),
+                    )
+                  }}
                 </td>
               </tr>
             </tbody>

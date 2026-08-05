@@ -6,7 +6,7 @@ import qz from "qz-tray";
 
 const route = useRoute();
 const nomor = route.params.nomor as string;
-const printerName = ref("192.168.1.41");
+const printerName = ref("EPSON LX-310 ESC/P");
 const isPrinting = ref(false);
 
 const header = ref<any>({});
@@ -116,6 +116,8 @@ const numFmt = (val: any) => {
   return (neg ? "-" : "") + out;
 };
 
+const roundRp = (v: any) => Math.round(Number(v) || 0);
+
 const dFormat = (val: string) => {
   if (!val) return "";
   const d = new Date(val);
@@ -125,18 +127,18 @@ const dFormat = (val: string) => {
 // ── Kalkulasi Total ──
 const totalNominal = computed(() =>
   details.value.reduce(
-    (sum, d) => sum + (Number(d.jumlah) || 0) * (Number(d.harga) || 0),
+    (sum, d) => sum + roundRp((Number(d.jumlah) || 0) * (Number(d.harga) || 0)),
     0,
   ),
 );
 const totalPpn = computed(() =>
   header.value.inv_sts_ppn === 1
-    ? totalNominal.value * ((Number(header.value.inv_ppn) || 0) / 100)
+    ? roundRp(totalNominal.value * ((Number(header.value.inv_ppn) || 0) / 100))
     : 0,
 );
 const grandTotal = computed(() => totalNominal.value + totalPpn.value);
 const nilaiPiutang = computed(
-  () => grandTotal.value - (Number(header.value.uang_muka) || 0),
+  () => grandTotal.value - roundRp(header.value.uang_muka),
 );
 
 // ── UTILITAS FORMATTING TXT ──
@@ -171,8 +173,12 @@ const wrapText = (text: string, maxWidth: number): string[] => {
 // ── Konstanta kertas dot matrix — disamakan dengan InvoicePrintView ──
 // continuous-form 15" di 10 CPI ≈ 136 kolom.
 const PAGE_WIDTH = 136;
-// Panjang 27,8cm ÷ 2,54 = 10,94" → pada 6 LPI (baris/inch) standar = ~65 baris.
-const PAGE_LINES = 65;
+const PAGE_LINES = 65; // tinggi kertas fisik total — tetap dipakai utk deteksi overflow multi-halaman
+// ⬅ Footer (Terbilang/Total/TTD) di-anchor ke baris ini, BUKAN mepet ke
+// PAGE_LINES (paling bawah kertas) — sama fix seperti InvoicePrintView,
+// supaya baris tanda tangan tidak kepotong. Tuning naik/turun sesuai
+// hasil cetak fisik.
+const FOOTER_ANCHOR_LINE = 54;
 
 // ✅ Garis solid (bukan putus-putus)
 const LINE = "_".repeat(PAGE_WIDTH);
@@ -263,28 +269,26 @@ const generateTxt = () => {
   };
 
   const dataLineOf = (item: any, idx: number) =>
-    `${padR(String(idx + 1), 3)} ${padR(item.kode || "", 16)} ${padR(item.nama || "", 46)} ${padR(item.ukuran || "", 22)} ${padL(numFmt(item.jumlah), 12)} ${padL(numFmt(item.harga), 16)} ${padL(numFmt((Number(item.jumlah) || 0) * (Number(item.harga) || 0)), 16)}`;
+    `${padR(String(idx + 1), 3)} ${padR(item.kode || "", 16)} ${padR(item.nama || "", 46)} ${padR(item.ukuran || "", 22)} ${padL(numFmt(item.jumlah), 12)} ${padL(numFmt(item.harga), 16)} ${padL(numFmt(roundRp((Number(item.jumlah) || 0) * (Number(item.harga) || 0))), 16)}`;
 
   const headerLines = buildHeaderLines();
   const footerLines = buildFooterLines();
   const dataLines = d.map((item, idx) => dataLineOf(item, idx));
-  const bodyLines = [...headerLines, ...dataLines, LINE];
+  const bodyLines = [...headerLines, ...dataLines]; // ← LINE dihapus dari
+  // sini, footerLines sudah diawali LINE-nya sendiri (lihat buildFooterLines)
 
   const pages: string[][] = [];
 
-  if (bodyLines.length + footerLines.length <= PAGE_LINES) {
-    // ✅ FIX: blank lines disisipin SEBELUM footer (bukan langsung
-    // nempel), jadi terbilang/total/TTD selalu jatuh persis di baris
-    // terakhir halaman fisik — meski barangnya cuma dikit.
-    const pad = Math.max(0, PAGE_LINES - bodyLines.length - footerLines.length);
+  if (bodyLines.length + footerLines.length <= FOOTER_ANCHOR_LINE) {
+    const pad = Math.max(
+      0,
+      FOOTER_ANCHOR_LINE - bodyLines.length - footerLines.length,
+    );
     pages.push([...bodyLines, ...Array(pad).fill(""), ...footerLines]);
   } else {
-    // Data terlalu panjang: genapkan halaman ini dengan baris kosong,
-    // lalu footer dimulai bersih di halaman baru (form-feed) — tetap
-    // didorong ke bawah halaman itu juga.
     const padToPage = Math.max(0, PAGE_LINES - bodyLines.length);
     pages.push([...bodyLines, ...Array(padToPage).fill("")]);
-    const footerPad = Math.max(0, PAGE_LINES - footerLines.length);
+    const footerPad = Math.max(0, FOOTER_ANCHOR_LINE - footerLines.length);
     pages.push([...Array(footerPad).fill(""), ...footerLines]);
   }
 

@@ -512,11 +512,7 @@ const checkSpkBaruTanpaSj = (): boolean => {
   if (!fd.value.Apv || fd.value.Apv === "N" || fd.value.Apv === "T")
     return false;
   for (const r of fd.value.Detail) {
-    if (
-      r.NamaSpk &&
-      (!r.SjNomor || r.SjNomor === "" || r.SjNomor === "-") &&
-      !r.IsExisting
-    ) {
+    if (r.NamaSpk && r.SjNomor === "" && !r.IsExisting) {
       return true;
     }
   }
@@ -937,7 +933,10 @@ onMounted(async () => {
                     <input v-else :value="row.Kode" readonly class="ci mono" />
                   </td>
                   <td><input :value="row.NamaSpk" readonly class="ci" /></td>
-                  <td><input :value="row.Ukuran" readonly class="ci" /></td>
+                  <td>
+                    <input v-if="row.Kode" v-model="row.Ukuran" class="ci" />
+                    <input v-else :value="row.Ukuran" readonly class="ci" />
+                  </td>
                   <td>
                     <input
                       v-if="row.Kode"

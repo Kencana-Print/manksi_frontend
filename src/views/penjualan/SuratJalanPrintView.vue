@@ -154,9 +154,9 @@ const KET_W = 26;
 // kosong" tidak konsisten). Sesuaikan angka ini kalau ternyata masih
 // meleset dari perforasi kertas fisik.
 const PAGE_LINES = 33; // 14cm ÷ 2,54 × 6 LPI = 33,07 → 33 baris.
-// (Kertas SJ = 21,5 x 14cm, jauh lebih pendek dari kertas Invoice 21,5 x 27,5cm
-// yang makanya PAGE_LINES-nya juga beda — sebelumnya salah pakai angka 65
-// hasil contek dari Invoice, itu penyebab blank space besar tiap cetak.)
+// ⬅ Footer (note pengaduan dkk) di-anchor 2 baris sebelum ujung fisik
+// kertas — bukan mepet PAGE_LINES persis, kasih sedikit margin aman.
+const FOOTER_ANCHOR_LINE = PAGE_LINES - 2; // 31
 
 // ✅ Garis solid (bukan putus-putus), sama seperti InvoicePrintView
 const LINE = "_".repeat(PAGE_WIDTH);
@@ -269,22 +269,24 @@ const generateTxt = () => {
     const page = [...headerLines, ...dataLines];
 
     if (isLast) {
-      // Halaman terakhir: pad presisi ke PAGE_LINES lalu tempel footer di
-      // bawah. Kalau data+footer ternyata tidak muat 1 halaman, footer
-      // dilempar ke halaman fisik berikutnya (jarang terjadi, tapi jaga2).
-      if (page.length + footerLines.length <= PAGE_LINES) {
-        const pad = Math.max(0, PAGE_LINES - page.length - footerLines.length);
+      if (page.length + footerLines.length <= FOOTER_ANCHOR_LINE) {
+        const pad = Math.max(
+          0,
+          FOOTER_ANCHOR_LINE - page.length - footerLines.length,
+        );
         allPages.push([...page, ...Array(pad).fill(""), ...footerLines]);
       } else {
+        // Data terlalu banyak buat 1 halaman bareng footer — genapkan
+        // halaman ini penuh, footer mulai bersih di halaman fisik baru.
         const pad = Math.max(0, PAGE_LINES - page.length);
         allPages.push([...page, ...Array(pad).fill("")]);
-        const footerPad = Math.max(0, PAGE_LINES - footerLines.length);
+        const footerPad = Math.max(0, FOOTER_ANCHOR_LINE - footerLines.length);
         allPages.push([...Array(footerPad).fill(""), ...footerLines]);
       }
     } else {
-      // Halaman tengah: pad presisi ke PAGE_LINES juga (bukan cuma nambah
-      // separator LINE seperti sebelumnya), supaya FF antar halaman selalu
-      // lompat pas ke baris pertama header halaman berikutnya.
+      // Halaman tengah (kalau data > 1 halaman fisik): pad penuh ke
+      // PAGE_LINES supaya FF antar halaman presisi ke baris pertama
+      // header halaman berikutnya.
       const pad = Math.max(0, PAGE_LINES - page.length);
       allPages.push([...page, ...Array(pad).fill("")]);
     }
