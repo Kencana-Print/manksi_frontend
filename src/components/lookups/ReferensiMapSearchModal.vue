@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, computed } from "vue";
+import { ref, watch } from "vue";
 import api from "@/services/api";
 import { IconFileSearch, IconSearch, IconDatabaseOff } from "@tabler/icons-vue";
 
@@ -8,16 +8,22 @@ const emit = defineEmits(["update:modelValue", "selected"]);
 
 const search = ref("");
 const items = ref<any[]>([]);
+const total = ref(0);
 const isLoading = ref(false);
+let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
-const fetchData = async () => {
+const fetchData = async (keyword = "") => {
   isLoading.value = true;
   try {
-    const res = await api.get("/lookups/spk-produksi");
-    const allData = res.data.data.items || res.data.data || [];
-    items.value = allData;
+    const res = await api.get("/lookups/spk-produksi", {
+      params: { q: keyword, limit: 50 }, // ⚠️ FIX: "q", bukan "keyword" — controller baca req.query.q
+    });
+    const d = res.data.data;
+    items.value = d.items || d || [];
+    total.value = d.total ?? items.value.length;
   } catch (error) {
     console.error("Gagal memuat Referensi MAP/SPK", error);
+    items.value = [];
   } finally {
     isLoading.value = false;
   }
@@ -28,21 +34,14 @@ watch(
   (isOpen) => {
     if (isOpen) {
       search.value = "";
-      if (items.value.length === 0) fetchData();
+      fetchData(""); // selalu fetch ulang setiap dibuka, bukan cache lama
     }
   },
 );
 
-const filteredItems = computed(() => {
-  if (!search.value) return items.value;
-  const q = search.value.toLowerCase();
-  return items.value.filter(
-    (i) =>
-      (i.mspk_nomor?.toLowerCase() || i.Nomor?.toLowerCase() || "").includes(
-        q,
-      ) ||
-      (i.mspk_nama?.toLowerCase() || i.Nama?.toLowerCase() || "").includes(q),
-  );
+watch(search, (val) => {
+  if (debounceTimer) clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(() => fetchData(val), 300);
 });
 
 const selectItem = (item: any) => {
@@ -86,7 +85,7 @@ const selectItem = (item: any) => {
           <v-progress-circular indeterminate color="primary" size="24" />
           <span>Memuat data...</span>
         </div>
-        <div v-else-if="filteredItems.length === 0" class="lookup-state">
+        <div v-else-if="items.length === 0" class="lookup-state">
           <IconDatabaseOff :size="32" :stroke-width="1.3" color="#bdbdbd" />
           <span>{{
             search ? `Tidak ada hasil untuk "${search}"` : "Tidak ada data"
@@ -102,7 +101,7 @@ const selectItem = (item: any) => {
           </thead>
           <tbody>
             <tr
-              v-for="item in filteredItems"
+              v-for="item in items"
               :key="item.mspk_nomor || item.Nomor"
               class="lookup-row"
               @click="selectItem(item)"
@@ -117,7 +116,7 @@ const selectItem = (item: any) => {
 
       <div class="lookup-footer">
         <span class="footer-count"
-          >{{ filteredItems.length }} dari {{ items.length }} data</span
+          >{{ items.length }} dari {{ total }} data</span
         >
         <span class="footer-hint">Klik baris untuk memilih</span>
       </div>
