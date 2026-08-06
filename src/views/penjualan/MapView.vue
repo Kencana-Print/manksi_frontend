@@ -21,6 +21,7 @@ import {
   IconExternalLink,
   IconLayoutSidebarRight,
   IconLayoutSidebarRightCollapse,
+  IconBrush,
 } from "@tabler/icons-vue";
 import { formatTanggal, formatTanggalJam } from "@/utils/dateFormat";
 
@@ -62,6 +63,54 @@ const gambarUrl = ref("");
 const dialogAlasan = ref(false);
 const alasanText = ref("");
 const alasanNomor = ref("");
+
+// --- STATE UNTUK UPDATE STATUS DESIGN ---
+const isBagianDesain = computed(
+  () => authStore.user?.bagian?.toUpperCase() === "DESAIN",
+);
+interface DesignRow {
+  Nomor: string;
+  Nama: string;
+  DesignDone: string;
+}
+const dialogDesign = ref(false);
+const designList = ref<DesignRow[]>([]);
+const isLoadingDesign = ref(false);
+const isSavingDesign = ref(false);
+
+const openDesignDialog = async () => {
+  isLoadingDesign.value = true;
+  try {
+    const res = await mapService.getDesignList(
+      filterState.value.startDate,
+      filterState.value.endDate,
+    );
+    designList.value = (res.data.data || []).map((r: any) => ({
+      Nomor: r.Nomor,
+      Nama: r.Nama,
+      DesignDone: r.DesignDone || "N",
+    }));
+    dialogDesign.value = true;
+  } catch (e: any) {
+    toast.error(e.response?.data?.message || "Gagal memuat data design.");
+  } finally {
+    isLoadingDesign.value = false;
+  }
+};
+
+const submitDesignStatus = async () => {
+  isSavingDesign.value = true;
+  try {
+    await mapService.updateDesignStatus(designList.value);
+    toast.success("Update status design berhasil.");
+    dialogDesign.value = false;
+    fetchData();
+  } catch (e: any) {
+    toast.error(e.response?.data?.message || "Gagal update status design.");
+  } finally {
+    isSavingDesign.value = false;
+  }
+};
 
 const {
   items,
@@ -414,6 +463,19 @@ const confirmToggleClose = async () => {
     </template>
 
     <template #extra-actions="{ selected }">
+      <v-btn
+        v-if="isBagianDesain"
+        size="small"
+        variant="flat"
+        color="deep-purple-darken-1"
+        :loading="isLoadingDesign"
+        @click="openDesignDialog"
+      >
+        <template #prepend
+          ><IconBrush :size="15" :stroke-width="1.7"
+        /></template>
+        Update Status Design
+      </v-btn>
       <v-btn
         size="small"
         variant="flat"
@@ -868,6 +930,73 @@ const confirmToggleClose = async () => {
         </button>
       </div>
     </div>
+  </v-dialog>
+
+  <!-- ── Dialog Update Status Design ── -->
+  <v-dialog v-model="dialogDesign" max-width="600px" persistent>
+    <v-card class="rounded-lg">
+      <v-card-title
+        class="bg-deep-purple-darken-1 text-white d-flex align-center pa-3"
+      >
+        <IconBrush :size="18" :stroke-width="1.7" color="white" class="mr-2" />
+        <span class="text-subtitle-1 font-weight-bold"
+          >Update Status Design</span
+        >
+      </v-card-title>
+      <v-card-text class="pa-0">
+        <div v-if="isLoadingDesign" class="pa-6 text-center text-grey">
+          Memuat data...
+        </div>
+        <div
+          v-else-if="designList.length === 0"
+          class="pa-6 text-center text-grey"
+        >
+          Tidak ada MAP dengan Design Baru yang belum selesai di periode ini.
+        </div>
+        <v-table v-else density="compact" fixed-header height="360px">
+          <thead>
+            <tr>
+              <th style="width: 140px">No. SPK/MAP</th>
+              <th>Nama</th>
+              <th style="width: 100px; text-align: center">Selesai</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="row in designList" :key="row.Nomor">
+              <td class="font-weight-bold text-primary" style="font-size: 12px">
+                {{ row.Nomor }}
+              </td>
+              <td style="font-size: 12px">{{ row.Nama }}</td>
+              <td class="text-center">
+                <input
+                  type="checkbox"
+                  :checked="row.DesignDone === 'Y'"
+                  @change="row.DesignDone = row.DesignDone === 'Y' ? 'N' : 'Y'"
+                />
+              </td>
+            </tr>
+          </tbody>
+        </v-table>
+      </v-card-text>
+      <v-card-actions class="pa-3 bg-grey-lighten-4 border-t">
+        <v-spacer />
+        <v-btn
+          variant="text"
+          color="error"
+          :disabled="isSavingDesign"
+          @click="dialogDesign = false"
+          >Batal</v-btn
+        >
+        <v-btn
+          color="deep-purple-darken-1"
+          variant="elevated"
+          :loading="isSavingDesign"
+          :disabled="designList.length === 0"
+          @click="submitDesignStatus"
+          >Simpan</v-btn
+        >
+      </v-card-actions>
+    </v-card>
   </v-dialog>
 </template>
 

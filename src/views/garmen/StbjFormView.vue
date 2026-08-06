@@ -64,10 +64,10 @@ const toast = useToast();
 const userCab = computed(() => auth.user?.cabang || "");
 const userKode = computed(() => auth.user?.kode || "");
 
-// const gudangFromBrowse = computed(() => ({
-//   kode: (route.query.gudang as string) || "",
-//   nama: (route.query.gudangNama as string) || "",
-// }));
+const gudangFromBrowse = computed(() => ({
+  kode: (route.query.gudang as string) || "",
+  nama: (route.query.gudangNama as string) || "",
+}));
 
 // ── Helpers ────────────────────────────────────────────────────────────
 const todayLocal = () => {
@@ -521,18 +521,15 @@ onMounted(async () => {
     ensureEmptyRow();
   } else {
     fd.value.Tanggal = todayLocal();
-    // ⚠️ FIX BUG: sebelumnya Gudang diambil dari route.query (filter
-    // terakhir di halaman Browse — bisa "ALL"/cabang lain), padahal
-    // harus SELALU gudang jadi resmi milik user sendiri. Pola sama
-    // seperti authStore.gudangJadi di modul Koreksi Stok Barang Jadi.
-    fd.value.GudangKode = auth.gudangJadi?.kode || "";
-    fd.value.GudangNama = auth.gudangJadi?.nama || "";
+    fd.value.GudangKode = gudangFromBrowse.value.kode;
+    fd.value.GudangNama = gudangFromBrowse.value.nama;
     const gp = defaultGdgProduksi();
     fd.value.GudangProduksiKode = gp.kode;
     fd.value.GudangProduksiNama = gp.nama;
     ensureEmptyRow();
   }
 });
+
 // ── Computed summary ──────────────────────────────────────────────────
 const totalJumlah = computed(() =>
   fd.value.Detail.reduce((s, r) => s + Number(r.Jumlah || 0), 0),

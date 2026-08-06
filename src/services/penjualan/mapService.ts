@@ -16,4 +16,10 @@ export const mapService = {
   requestPin5(nomor: string, alasan: string) {
     return api.post(`/penjualan/map/${nomor}/pin5`, { alasan });
   },
+
+  getDesignList: (startDate: string, endDate: string) =>
+    api.get("/penjualan/map/design/list", { params: { startDate, endDate } }),
+
+  updateDesignStatus: (rows: { Nomor: string; DesignDone: string }[]) =>
+    api.put("/penjualan/map/design/status", { rows }),
 };
