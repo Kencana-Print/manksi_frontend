@@ -114,4 +114,14 @@ export const approvalService = {
     urut: number | string;
     status_acc: string;
   }) => api.post("/tools/approval/ganti-qty-kain/otorisasi", payload),
+
+  // --- APPROVAL SO TANPA NOMOR PO (MENU_ID: 268) ---
+  getNoPoList: (params: {
+    startDate: string;
+    endDate: string;
+    belumAccSaja: boolean;
+  }) => api.get("/tools/approval/nopo", { params }),
+
+  submitNoPoOtorisasi: (payload: { nomor: string; status_acc: string }) =>
+    api.post("/tools/approval/nopo/otorisasi", payload),
 };

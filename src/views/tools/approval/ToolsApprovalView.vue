@@ -44,6 +44,11 @@ const allApprovals = [
     menuId: "266",
   },
   { id: "spk_cetak_ulang", label: "Approve Cetak SPK > 1 Kali", menuId: "267" },
+  {
+    id: "nopo",
+    label: "Approve SO Tanpa Nomor PO",
+    menuId: "268",
+  },
 ];
 
 // Tampilkan hanya yang memiliki akses 'view'
@@ -103,6 +108,9 @@ const ApprovalMutasiNoPlanComponent = defineAsyncComponent(
 );
 const ApprovalSpkCetakUlangComponent = defineAsyncComponent(
   () => import("./components/ApprovalSpkCetakUlang.vue"),
+);
+const ApprovalNoPoComponent = defineAsyncComponent(
+  () => import("./components/ApprovalNoPo.vue"),
 );
 
 // Logic Penentuan Komponen Dinamis

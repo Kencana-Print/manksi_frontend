@@ -1237,6 +1237,24 @@ watch(
               />
             </div>
           </div>
+
+          <div v-if="formData.nopo_acc" class="fr mt-1">
+            <span
+              class="acc-badge"
+              :class="{
+                'acc-badge-tolak': formData.nopo_acc === 'TOLAK',
+                'acc-badge-acc': formData.nopo_acc === 'ACC',
+              }"
+            >
+              {{
+                formData.nopo_acc === "MINTA ACC"
+                  ? "⏳ Menunggu ACC (Tanpa PO)"
+                  : formData.nopo_acc === "TOLAK"
+                    ? "❌ Ditolak (Tanpa PO)"
+                    : "✅ ACC (Tanpa PO)"
+              }}
+            </span>
+          </div>
         </div>
 
         <!-- Sales -->
@@ -2138,6 +2156,17 @@ watch(
   flex-shrink: 0;
   align-self: center;
   letter-spacing: 0.03em;
+}
+
+.acc-badge-tolak {
+  background: #ffcdd2 !important;
+  color: #b71c1c !important;
+  border-color: #e57373 !important;
+}
+.acc-badge-acc {
+  background: #c8e6c9 !important;
+  color: #1b5e20 !important;
+  border-color: #81c784 !important;
 }
 
 .preview-card {

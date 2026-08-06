@@ -97,6 +97,8 @@ import {
   IconTarget,
   IconFileDiff,
   IconHierarchy3,
+  IconPhotoScan,
+  IconPhotoSearch,
 } from "@tabler/icons-vue";
 
 interface NavItem {
@@ -682,10 +684,30 @@ const menuItems: NavItem[] = [
         menuId: 120,
       },
       {
+        title: "DTF/DTG",
+        icon: IconPhotoSearch,
+        menuId: 928,
+        subItems: [
+          {
+            title: "SO DTF/DTG",
+            to: "/garmen/dtf/so-dtf",
+            icon: IconPhotoSearch,
+            menuId: 128,
+          },
+          // LHK menyusul
+        ],
+      },
+      {
         title: "PO Paperprint",
         to: "/garmen/po-paperprint",
         icon: IconFileText,
         menuId: 103,
+      },
+      {
+        title: "PO DTF",
+        to: "/garmen/po-dtf",
+        icon: IconPhotoScan,
+        menuId: 141,
       },
     ],
   },

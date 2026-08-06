@@ -109,6 +109,15 @@ const formatWaktu = (isoStr: string) => {
   return `${pad(d.getDate())}-${pad(d.getMonth() + 1)}-${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 };
 
+// "1.00" -> "1", "0.90" -> "0.9", "1.25" -> "1.25"
+const formatUkuran = (v: any) => {
+  const n = Number(v);
+  if (isNaN(n)) return v ?? "";
+  return n.toFixed(2).replace(/\.?0+$/, "");
+};
+
+const isSizeKhusus = computed(() => data.value.spk_sizekhusus === "Y");
+
 const labelText = computed(() => {
   const lbl = Number(data.value.spk_label) || 0;
   if (lbl === 0)
@@ -239,7 +248,11 @@ onMounted(async () => {
                   <tr>
                     <td class="w-label">Ukuran</td>
                     <td class="w-colon">:</td>
-                    <td>{{ data.sizeStr }}</td>
+                    <td>
+                      <span :class="{ 'highlight-yellow': isSizeKhusus }">{{
+                        data.sizeStr
+                      }}</span>
+                    </td>
                   </tr>
                   <tr>
                     <td class="w-label">Bahan</td>
@@ -391,7 +404,8 @@ onMounted(async () => {
                 <td class="w-colon">:</td>
                 <td colspan="3">
                   <template v-if="isSpandukMMT"
-                    >{{ data.spk_panjang }} X {{ data.spk_lebar }} M</template
+                    >{{ formatUkuran(data.spk_panjang) }} X
+                    {{ formatUkuran(data.spk_lebar) }} M</template
                   >
                   <template v-else>{{ data.sizeStr }}</template>
                 </td>
@@ -487,8 +501,8 @@ onMounted(async () => {
           <div class="layout-box" :class="[layoutMode, `divisi-${kodeDivisi}`]">
             <div class="img-box">
               <div class="ukuran-header" v-if="isSpandukMMT">
-                {{ data.jo_nama }} {{ data.spk_panjang }} X
-                {{ data.spk_lebar }} M
+                {{ data.jo_nama }} {{ formatUkuran(data.spk_panjang) }} X
+                {{ formatUkuran(data.spk_lebar) }} M
               </div>
               <img :src="mainImageUrl" @error="handleImageError" />
             </div>
@@ -919,20 +933,24 @@ onMounted(async () => {
 .layout-box {
   display: flex;
   flex: 1;
-  min-height: 0;
+  min-height: 0; /* ← tambahan */
   gap: 15px;
   margin-top: 8px;
 }
 .img-box {
   display: flex;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: center;
   flex-direction: column;
   flex: 1;
   min-width: 0;
+  min-height: 0;
+  max-height: 95mm; /* ← hard cap, cegah gambar dorong konten keluar halaman */
+  overflow: hidden;
 }
 .img-box img {
   max-width: 100%;
+  max-height: 100%; /* ← ganti dari cuma max-width */
   object-fit: contain;
 }
 .ukuran-header {

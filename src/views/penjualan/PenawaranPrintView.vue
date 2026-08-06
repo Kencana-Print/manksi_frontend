@@ -484,8 +484,12 @@ const grandTotal = computed(() => {
 
           <div v-if="perushKode === 'JA'" class="mt-2 text-sm">
             <p>
-              Keterangan lebih lanjut bisa menghubungi marketing kami di nomor
-              atau <b>{{ data.pen_marketing_telp }}</b
+              Keterangan lebih lanjut bisa menghubungi
+              <template v-if="data.pen_marketing"
+                >marketing kami <b>{{ data.pen_marketing }}</b></template
+              ><template v-else>kami</template>
+              di nomor
+              <b>{{ data.pen_marketing_telp || data.perush_telp }}</b
               >.
             </p>
             <p class="mt-3">

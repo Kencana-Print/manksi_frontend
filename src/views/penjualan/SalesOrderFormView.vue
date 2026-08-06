@@ -1053,10 +1053,10 @@ const validateSave = async () => {
   }
 
   if (!fd.spk_nomor_po?.trim()) {
-    toast.warning(
-      "Nomor PO harus diisi.\nJika tidak ada PO tertulis, cari DP Customer dari Penerimaan (tombol 🔍 di sebelah field Nomor PO).",
+    const lanjut = confirm(
+      "Nomor PO belum diisi.\n\nSO tetap bisa disimpan, tapi akan berstatus PASIF sampai disetujui (Approve SO Tanpa Nomor PO).\n\nLanjutkan simpan tanpa Nomor PO?",
     );
-    return;
+    if (!lanjut) return;
   }
 
   // 2. Validasi Tanggal PO

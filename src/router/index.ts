@@ -2003,6 +2003,62 @@ const router = createRouter({
         requiresAuth: true,
       },
     },
+    {
+      path: "/garmen/dtf/so-dtf",
+      name: "SoDtfBrowse",
+      component: () => import("@/views/garmen/SoDtfView.vue"),
+      meta: {
+        title: "SO DTF/DTG",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "128",
+      },
+    },
+    {
+      path: "/garmen/po-dtf",
+      name: "PoDtfBrowse",
+      component: () => import("@/views/garmen/PoDtfView.vue"),
+      meta: {
+        title: "PO DTF",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "141",
+      },
+    },
+    {
+      path: "/garmen/po-dtf/create",
+      name: "PoDtfFormCreate",
+      component: () => import("@/views/garmen/PoDtfFormView.vue"),
+      meta: {
+        title: "PO DTF",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "141",
+        browseRoute: "PoDtfBrowse",
+      },
+    },
+    {
+      path: "/garmen/po-dtf/edit/:nomor",
+      name: "PoDtfFormEdit",
+      component: () => import("@/views/garmen/PoDtfFormView.vue"),
+      meta: {
+        title: "Ubah PO DTF",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "141",
+        browseRoute: "PoDtfBrowse",
+      },
+    },
+    {
+      path: "/garmen/po-dtf/print/:nomor",
+      name: "PoDtfPrint",
+      component: () => import("@/views/garmen/PoDtfPrintView.vue"),
+      meta: {
+        title: "Cetak PO DTF",
+        layout: "BlankLayout",
+        requiresAuth: true,
+      },
+    },
 
     {
       path: "/garmen/lhk-pola",
