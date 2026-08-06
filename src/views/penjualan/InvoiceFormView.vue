@@ -73,7 +73,7 @@ const addDays = (dateStr: string, days: number) => {
 
 let _key = 1;
 const sel = (e: FocusEvent) => (e.target as HTMLInputElement).select();
-const num = (v: any) => Number(v || 0).toLocaleString("id-ID");
+const num = (v: any) => Math.round(Number(v || 0)).toLocaleString("id-ID"); // ← tambahan Math.round
 
 const divisiList = ref<{ kode: number; nama: string }[]>([]);
 
@@ -374,6 +374,8 @@ const ensureEmptyRow = () => {
 
 const isLoadingBarang = ref(false);
 const barangInputValues = ref<Record<number, string>>({});
+const focusedHargaKey = ref<number | null>(null);
+const isDiscFocused = ref(false);
 
 const addBarangByKode = async (kode: string, rowKey?: number) => {
   if (!fd.value.KodePerush) {
@@ -960,11 +962,24 @@ onMounted(async () => {
                   <td>
                     <input
                       v-if="row.Kode"
-                      v-model.number="row.Harga"
                       type="number"
                       class="ci tr hl"
-                      @focus="sel"
-                      @blur="row.Harga = Math.round(row.Harga)"
+                      :value="
+                        focusedHargaKey === row._key
+                          ? row.Harga
+                          : Math.round(row.Harga || 0)
+                      "
+                      @focus="
+                        (e) => {
+                          sel(e);
+                          focusedHargaKey = row._key;
+                        }
+                      "
+                      @input="
+                        row.Harga =
+                          ($event.target as HTMLInputElement).valueAsNumber || 0
+                      "
+                      @blur="focusedHargaKey = null"
                     />
                   </td>
                   <td class="tr" style="padding-right: 6px">
@@ -1022,9 +1037,15 @@ onMounted(async () => {
                   <option value="PPh">PPh</option>
                 </select>
                 <input
-                  v-model.number="fd.Disc"
                   type="number"
                   class="inp tr rk-input"
+                  :value="isDiscFocused ? fd.Disc : Math.round(fd.Disc || 0)"
+                  @focus="isDiscFocused = true"
+                  @input="
+                    fd.Disc =
+                      ($event.target as HTMLInputElement).valueAsNumber || 0
+                  "
+                  @blur="isDiscFocused = false"
                 />
               </div>
               <div class="rk-row">
