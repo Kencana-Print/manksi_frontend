@@ -116,6 +116,11 @@ const grandTotal = (d: any) => total(d) + ppnNominal(d);
             <td>:</td>
             <td>{{ data.pojh_keterangan }}</td>
           </tr>
+          <tr v-if="data.pojh_note">
+            <td class="lbl">Note</td>
+            <td>:</td>
+            <td>{{ data.pojh_note }}</td>
+          </tr>
           <tr>
             <td class="lbl">Product</td>
             <td>:</td>
