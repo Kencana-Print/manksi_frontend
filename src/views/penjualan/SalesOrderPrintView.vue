@@ -40,6 +40,16 @@ const totalAlokasi = computed(() => {
   );
 });
 
+const alokasiChunks = computed(() => {
+  const list = data.value.alokasiList || [];
+  const chunkSize = 24;
+  const chunks = [];
+  for (let i = 0; i < list.length; i += chunkSize) {
+    chunks.push(list.slice(i, i + chunkSize));
+  }
+  return chunks;
+});
+
 const mainImageUrl = computed(() => {
   if (!data.value?.spk_nomor) return "";
   // ✅ FIX: path relatif, gak hardcode host/port
@@ -371,7 +381,7 @@ onMounted(async () => {
           :key="'spk-' + copy"
           class="print-half"
           :class="{
-            'border-right': !withAlokasi && numCopies > 1 && copy === 1,
+            'border-right': copy === 1,
           }"
         >
           <div class="header-row">
@@ -633,34 +643,63 @@ onMounted(async () => {
       </template>
 
       <!-- ══ ALOKASI PANEL ══ -->
+      <!-- ══ ALOKASI PANEL ══ -->
       <div v-if="withAlokasi" class="print-half alokasi-panel">
-        <h2 class="title mb-3" style="text-decoration: underline">
+        <h2
+          class="title mb-2"
+          style="text-decoration: underline; font-size: 13pt; font-weight: bold"
+        >
           ALOKASI PENGIRIMAN :
         </h2>
-        <table class="alokasi-table mt-2" v-if="data.alokasiList?.length > 0">
-          <thead>
-            <tr>
-              <th class="text-left pl-2">Alokasi</th>
-              <th width="80" class="text-center">Jumlah</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="alo in data.alokasiList" :key="alo.urut">
-              <td class="pl-2">{{ alo.kota || alo.alamat }}</td>
-              <td class="text-center">
-                {{ Number(alo.jumlah).toLocaleString("id-ID") }}
-              </td>
-            </tr>
-          </tbody>
-          <tfoot>
-            <tr>
-              <td class="fw text-left pl-2">Total</td>
-              <td class="fw text-center">
-                {{ totalAlokasi.toLocaleString("id-ID") }}
-              </td>
-            </tr>
-          </tfoot>
-        </table>
+
+        <div
+          v-if="data.alokasiList?.length > 0"
+          style="display: flex; gap: 8px; align-items: flex-start; width: 100%"
+        >
+          <table
+            class="alokasi-table mt-2"
+            v-for="(chunk, idx) in alokasiChunks"
+            :key="idx"
+            style="flex: 1; min-width: 0"
+          >
+            <thead>
+              <tr>
+                <th class="text-left pl-2">Alokasi</th>
+                <th width="60" class="text-center">Jumlah</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="alo in chunk" :key="alo.urut">
+                <td class="pl-2" style="padding: 3px 6px; font-size: 8pt">
+                  {{ alo.kota || alo.alamat }}
+                </td>
+                <td
+                  class="text-center"
+                  style="padding: 3px 6px; font-size: 8pt"
+                >
+                  {{ Number(alo.jumlah).toLocaleString("id-ID") }}
+                </td>
+              </tr>
+            </tbody>
+            <tfoot v-if="idx === alokasiChunks.length - 1">
+              <tr>
+                <td
+                  class="fw text-left pl-2"
+                  style="padding: 3px 6px; font-size: 8pt"
+                >
+                  Total
+                </td>
+                <td
+                  class="fw text-center"
+                  style="padding: 3px 6px; font-size: 8pt"
+                >
+                  {{ totalAlokasi.toLocaleString("id-ID") }}
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+
         <div v-else class="text-xs mt-2 italic">
           Tidak ada data alokasi pengiriman.
         </div>
@@ -689,9 +728,18 @@ onMounted(async () => {
 }
 .print-wrapper {
   display: flex;
-  flex-wrap: wrap; /* ← tambah ini */
+  flex-wrap: wrap;
   width: 297mm;
-  min-height: 209mm;
+  height: 190mm;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+.print-wrapper-so {
+  display: flex;
+  flex-wrap: wrap;
+  width: 297mm;
+  height: 190mm;
   margin: 0 auto;
   box-sizing: border-box;
 }
@@ -701,10 +749,10 @@ onMounted(async () => {
   flex: 0 0 50%;
   display: flex;
   flex-direction: column;
-  padding: 7mm 10mm 7mm 9mm;
+  padding: 4mm 8mm;
   box-sizing: border-box;
   min-width: 0;
-  height: 209mm;
+  height: 190mm;
   overflow: hidden;
 }
 .print-half.full-width {
@@ -714,12 +762,10 @@ onMounted(async () => {
 .border-right {
   border-right: 1px dotted #999;
 }
-.alokasi-panel {
-  flex: 0 0 100%;
-  width: 100%;
-  padding: 7mm 10mm;
-  break-before: page;
-  page-break-before: always;
+.img-box-so img {
+  max-width: 100%;
+  max-height: 140px; /* Perkecil maksimal gambar agar TTD tidak kedorong ke bawah */
+  object-fit: contain;
 }
 
 /* ══ GARMEN BODY ══ */
@@ -1147,30 +1193,26 @@ onMounted(async () => {
 @media print {
   @page {
     size: A4 landscape;
-    margin: 8mm 10mm;
+    margin: 5mm;
   }
   body {
-    zoom: 90%;
     margin: 0;
     padding: 0;
     background: white;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
-  .print-wrapper {
-    width: 100%;
-    height: auto; /* ← jangan fixed height */
+
+  /* Tambahkan baris di bawah ini */
+  .print-wrapper,
+  .print-wrapper-so {
+    width: 100% !important;
+    height: 190mm !important;
   }
+
   .alokasi-panel {
     page-break-before: always;
     break-before: page;
-  }
-  body {
-    margin: 0;
-    padding: 0;
-    background: white;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
   }
   .print-container {
     padding: 0;
