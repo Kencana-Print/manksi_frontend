@@ -799,8 +799,14 @@ onMounted(async () => {
                 </td>
                 <td class="tr">{{ num(dtl.sudah) }}</td>
                 <td class="tr text-red-darken-2">{{ num(dtl.kurang) }}</td>
-                <td class="bg-yellow-lighten-5 px-2 tr fw-bold text-primary">
-                  {{ num(dtl.netto) }}
+                <td class="bg-yellow-lighten-5">
+                  <input
+                    type="number"
+                    step="any"
+                    v-model.number="dtl.netto"
+                    class="cell-input tr fw-bold text-primary"
+                    v-select-on-focus
+                  />
                 </td>
                 <td>
                   <input

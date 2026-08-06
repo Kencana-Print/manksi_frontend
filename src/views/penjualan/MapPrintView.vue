@@ -227,13 +227,11 @@ const tglIndo = (dateStr: string) => {
                   {{ getVal("mspk_cab") }} ( {{ getVal("mspk_workshop") }} )
                 </td>
               </tr>
-              <tr>
+              <tr v-if="getVal('cus_perfect') === 'Y'">
                 <td class="lbl">Status client</td>
                 <td class="sep">:</td>
                 <td class="val">
-                  <span class="highlight-yellow">{{
-                    getVal("cus_perfect") === "Y" ? "PERFECT" : "REGULER"
-                  }}</span>
+                  <span class="highlight-yellow">PERFECT</span>
                 </td>
               </tr>
             </table>

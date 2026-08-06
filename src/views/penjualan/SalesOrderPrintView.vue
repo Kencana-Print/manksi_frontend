@@ -218,6 +218,15 @@ onMounted(async () => {
                     <td class="w-colon">:</td>
                     <td>
                       <span class="fw">{{ data.spk_nomor }}</span>
+                      <span
+                        v-if="
+                          data.spk_statuskerja &&
+                          data.spk_statuskerja !== 'Normal'
+                        "
+                        class="status-kerja"
+                        >{{ data.spk_statuskerja }}</span
+                      >
+
                       <span v-if="data.spk_tipe" class="ml-8 text-xs">
                         Tipe SO : <strong>{{ data.spk_tipe }}</strong>
                       </span>
@@ -301,9 +310,11 @@ onMounted(async () => {
 
               <div class="ket-box ket-section mt-2">
                 <div class="ket-title">Size : Lebar &amp; Panjang Badan</div>
-                <pre class="ket-produksi">{{
+                <pre
+                  class="ket-produksi"
+                ><span :class="{ 'highlight-yellow': isSizeKhusus }">{{
                   formatSizeDetail || (data.sizeStr ? data.sizeStr : "-")
-                }}</pre>
+                }}</span></pre>
               </div>
             </div>
 
@@ -373,7 +384,16 @@ onMounted(async () => {
               <tr>
                 <td class="w-label">Nomor SO</td>
                 <td class="w-colon">:</td>
-                <td class="w-val-td">{{ data.spk_nomor }}</td>
+                <td class="w-val-td" style="white-space: nowrap">
+                  <span class="fw">{{ data.spk_nomor }}</span>
+                  <span
+                    v-if="
+                      data.spk_statuskerja && data.spk_statuskerja !== 'Normal'
+                    "
+                    class="status-kerja"
+                    >{{ data.spk_statuskerja }}</span
+                  >
+                </td>
                 <td class="text-right pr-1" v-if="data.spk_tipe">Tipe SO :</td>
                 <td class="fw" v-if="data.spk_tipe">{{ data.spk_tipe }}</td>
               </tr>
@@ -402,12 +422,8 @@ onMounted(async () => {
               <tr>
                 <td class="w-label">Ukuran</td>
                 <td class="w-colon">:</td>
-                <td colspan="3">
-                  <template v-if="isSpandukMMT"
-                    >{{ formatUkuran(data.spk_panjang) }} X
-                    {{ formatUkuran(data.spk_lebar) }} M</template
-                  >
-                  <template v-else>{{ data.sizeStr }}</template>
+                <td>
+                  <span>{{ data.sizeStr }}</span>
                 </td>
               </tr>
               <tr>
@@ -437,16 +453,11 @@ onMounted(async () => {
                   {{ data.spk_cab }} ({{ data.spk_workshop }}).
                 </td>
               </tr>
-              <tr v-if="isSpandukMMT">
+              <tr v-if="isSpandukMMT && data.cus_perfect === 'Y'">
                 <td class="w-label">Status Client</td>
                 <td class="w-colon">:</td>
                 <td colspan="3">
-                  <span
-                    :class="{ 'highlight-yellow': data.cus_perfect === 'Y' }"
-                    >{{
-                      data.cus_perfect === "Y" ? "PERFECT" : "REGULER"
-                    }}</span
-                  >
+                  <span class="highlight-yellow">PERFECT</span>
                 </td>
               </tr>
               <tr v-if="isSpandukMMT">
@@ -1113,6 +1124,13 @@ onMounted(async () => {
   gap: 6px;
   min-width: 0;
   padding-left: 8px;
+}
+
+.status-kerja {
+  color: red;
+  font-weight: bold;
+  margin-left: 10px;
+  text-transform: uppercase;
 }
 
 @media screen {
