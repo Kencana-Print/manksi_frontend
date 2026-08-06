@@ -107,6 +107,7 @@ interface FormData {
   pin5Status: string;
   noPlanStatus: string;
   pin5Urut: number;
+  DcHasProof: boolean;
   Detail: DetailRow[];
 }
 
@@ -232,6 +233,7 @@ const init: FormData = {
   pin5Status: "",
   noPlanStatus: "",
   pin5Urut: 0,
+  DcHasProof: true,
   Detail: [mkRow()],
 };
 
@@ -370,6 +372,7 @@ const {
         pin5Status: d.pin5Status || "",
         noPlanStatus: d.noPlanStatus || "",
         pin5Urut: 0,
+        DcHasProof: d.dcHasProof ?? true,
         Detail: detail,
       };
     } catch (e) {
@@ -402,6 +405,7 @@ const isLiniPotong = computed(
   () => fd.value.GdgAsal === "GP001" || fd.value.GdgAsal === "GP015",
 );
 const isDC = computed(() => fd.value.GdgAsal === "GP032");
+const isDcManualFallback = computed(() => isDC.value && !fd.value.DcHasProof);
 const isSpg = computed(() => fd.value.NomorSpk.startsWith("SPG"));
 const divisiMap = ref<Record<string, string>>({});
 const divisiLabel = computed(() => {
@@ -815,6 +819,16 @@ const loadKomponenProof = async () => {
     fd.value.NomorSpk,
   );
   const { detail, terima, sudahDc } = res.data.data;
+
+  if (!detail || detail.length === 0) {
+    // ⚠️ BARU: Proof Garmen kosong — fallback ke mode manual, baris
+    // kosong yang bisa ditambah/diedit bebas (sama seperti alur non-DC).
+    fd.value.DcHasProof = false;
+    fd.value.Detail = [mkRow()];
+    return;
+  }
+
+  fd.value.DcHasProof = true;
   fd.value.Detail = (detail || []).map((r: any) => {
     const t = terima.find((x: any) => x.kode === r.kode && x.size === r.size);
     const s = sudahDc.find((x: any) => x.kode === r.kode && x.size === r.size);
@@ -1000,7 +1014,8 @@ const setDetailFieldRef = (el: any, idx: number, col: string) => {
 // Urutan kolom editable dihitung sesuai kondisi row saat ini —
 // kolom yang disembunyikan (v-if) atau readonly tidak masuk daftar.
 const getEditableCols = (): string[] => {
-  const cols: string[] = ["kode"];
+  const cols: string[] = [];
+  if (!isDC.value || !fd.value.DcHasProof) cols.push("kode"); // ← diubah
   if (isSpg.value && !isDC.value) cols.push("size");
   cols.push("jumlah");
   if (!isDC.value) cols.push("bslini", "bskainsablon", "bskain", "gantibs");
@@ -1027,10 +1042,9 @@ const focusNextDetailField = async (idx: number, col: string) => {
   // Sudah kolom terakhir untuk baris ini.
   const nextRowIdx = idx + 1;
 
-  if (isDC.value) {
-    // Mode DC: baris fixed dari loadKomponenProof, tidak boleh tambah
-    // baris baru — cuma pindah ke baris berikutnya di KOLOM YANG SAMA
-    // (biasanya Jumlah), kalau baris itu sudah ada.
+  if (isDC.value && fd.value.DcHasProof) {
+    // Proof tersedia: baris fixed dari proof, tidak boleh nambah baris
+    // baru — cuma pindah ke baris berikutnya di KOLOM YANG SAMA.
     if (nextRowIdx < fd.value.Detail.length) {
       await nextTick();
       const next = detailFieldRefs.value[`${nextRowIdx}_${col}`];
@@ -1058,7 +1072,7 @@ const focusNextDetailField = async (idx: number, col: string) => {
     }
     return;
   }
-  
+
   // Baris ini memang baris terakhir — tambah baris kosong baru & fokus
   // ke Kode-nya.
   addRow();
@@ -1908,7 +1922,11 @@ onMounted(async () => {
       <!-- ═══ TAB DETAIL ═══ -->
       <div v-show="tab === 'd'" class="tcon tcon-d">
         <div class="dtbar">
-          <button v-if="canEdit && !isDC" class="btn-g" @click="addRow">
+          <button
+            v-if="canEdit && (!isDC || isDcManualFallback)"
+            class="btn-g"
+            @click="addRow"
+          >
             <IconPlus :size="11" /> Tambah
           </button>
           <button class="btn-s" @click="openProses">Proses Sebelumnya</button>
@@ -1944,7 +1962,10 @@ onMounted(async () => {
                 <th style="width: 65px" class="tr" v-if="isLiniPotong">
                   Lebar
                 </th>
-                <th v-if="canEdit && !isDC" style="width: 24px"></th>
+                <th
+                  v-if="canEdit && (!isDC || isDcManualFallback)"
+                  style="width: 24px"
+                ></th>
               </tr>
             </thead>
             <tbody>
@@ -1959,7 +1980,7 @@ onMounted(async () => {
                     <input
                       v-model="row.kode"
                       class="ci"
-                      :readonly="!canEdit || isDC"
+                      :readonly="!canEdit || (isDC && !isDcManualFallback)"
                       placeholder="Kode..."
                       :ref="(el) => setDetailFieldRef(el, i, 'kode')"
                       @keydown.enter.prevent="onKodeBahanEnter(row, i)"
@@ -1967,7 +1988,7 @@ onMounted(async () => {
                       @blur="onKodeBahan(row)"
                     />
                     <button
-                      v-if="canEdit && !isDC"
+                      v-if="canEdit && (!isDC || isDcManualFallback)"
                       class="csb"
                       @click="openBahan(i)"
                     >
@@ -2106,7 +2127,7 @@ onMounted(async () => {
                     />
                   </td>
                 </template>
-                <td v-if="canEdit && !isDC" class="tc">
+                <td v-if="canEdit && (!isDC || isDcManualFallback)" class="tc">
                   <button class="cdb" @click="delRow(i)">
                     <IconTrash :size="10" />
                   </button>
