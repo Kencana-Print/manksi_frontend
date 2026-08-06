@@ -144,6 +144,8 @@ const uploadAccBukti = (file: File) => {
   accBuktiFile.value = file;
 };
 
+const showNoPoDialog = ref(false);
+
 // Data Kosong Default (Baru)
 const defaultData = {
   spk_nomor: "",
@@ -1021,7 +1023,7 @@ const uploadImageMain = (file: File) => {
   imageToUpload.value = file;
 };
 
-const validateSave = async () => {
+const validateSave = async (skipPoCheck = false) => {
   const fd = formData.value;
   const divisiStr = String(fd.spk_divisi).charAt(0);
   const qtyPesan = Number(fd.spk_jumlah) || 0;
@@ -1053,10 +1055,8 @@ const validateSave = async () => {
   }
 
   if (!fd.spk_nomor_po?.trim()) {
-    const lanjut = confirm(
-      "Nomor PO belum diisi.\n\nSO tetap bisa disimpan, tapi akan berstatus PASIF sampai disetujui (Approve SO Tanpa Nomor PO).\n\nLanjutkan simpan tanpa Nomor PO?",
-    );
-    if (!lanjut) return;
+    showNoPoDialog.value = true;
+    return; // stop di sini — lanjutannya dari tombol OK dialog
   }
 
   // 2. Validasi Tanggal PO
@@ -1222,6 +1222,14 @@ const validateSave = async () => {
   showSaveDialog.value = true;
 };
 
+const confirmSaveWithoutPo = () => {
+  showNoPoDialog.value = false;
+  // Lanjutkan proses validasi & save yang sempat berhenti di atas.
+  // Cara paling aman: panggil ulang validateSave, tapi skip pengecekan
+  // Nomor PO kali ini karena user sudah eksplisit setuju.
+  validateSave(true);
+};
+
 const handleConfirmCmo = () => {
   showConfirmCmoDialog.value = true;
 };
@@ -1344,7 +1352,7 @@ const onPilihKatalog = (item: any) => {
     v-model:show-save-dialog="showSaveDialog"
     v-model:show-cancel-dialog="showCancelDialog"
     v-model:show-close-dialog="showCloseDialog"
-    @validate-save="validateSave"
+    @validate-save="() => validateSave()"
     @confirm-save="executeSave"
     @confirm-cancel="executeCancel"
     @confirm-close="executeClose"
@@ -1563,6 +1571,41 @@ const onPilihKatalog = (item: any) => {
         </v-card-actions>
       </v-card>
     </v-dialog>
+
+    <v-dialog v-model="showNoPoDialog" max-width="420px" persistent>
+      <v-card class="rounded-lg">
+        <v-card-title class="nopo-dialog-head">
+          <IconAlertTriangle :size="16" color="white" class="mr-2" />
+          Nomor PO Belum Diisi
+        </v-card-title>
+        <v-card-text class="pa-4">
+          <p class="mb-2">
+            SO tetap bisa disimpan, tapi akan berstatus
+            <b class="text-warning">PASIF</b> sampai disetujui (<i
+              >Approve SO Tanpa Nomor PO</i
+            >).
+          </p>
+          <p class="mb-0">Lanjutkan simpan tanpa Nomor PO?</p>
+        </v-card-text>
+        <v-card-actions class="pa-3 bg-grey-lighten-4 border-t">
+          <v-spacer />
+          <v-btn
+            variant="text"
+            color="grey-darken-1"
+            @click="showNoPoDialog = false"
+          >
+            Batal
+          </v-btn>
+          <v-btn
+            color="warning"
+            variant="elevated"
+            @click="confirmSaveWithoutPo"
+          >
+            Lanjutkan
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </BaseForm>
 </template>
 
@@ -1628,5 +1671,15 @@ const onPilihKatalog = (item: any) => {
 
 .h-100 {
   height: 100%;
+}
+
+.nopo-dialog-head {
+  background: #e65100;
+  color: white;
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  font-size: 13px;
+  font-weight: 700;
 }
 </style>
