@@ -62,16 +62,16 @@ const getBaseUrl = () => {
 const VPS_BASE = "/file-gambar";
 
 const getProductImageUrl = (row: any) => {
-  const cabang = authStore.user?.cabang || "HO-";
   const gambarManual = row.Gambar || row.pend_gambar;
-
   if (gambarManual) {
-    return `${getBaseUrl()}/images/${cabang}/penawaran/${gambarManual}`;
+    // path lengkap dari root, langsung gabung ke base URL API — bukan folder mintaharga
+    return `${getBaseUrl()}${gambarManual}`;
   }
 
   const identifier = row.NoPermintaan || row.pend_minta;
   if (!identifier) return "";
 
+  const cabang = authStore.user?.cabang || "HO-";
   let cleanName = identifier.replace(/\//g, ".");
   const matchMH = cleanName.match(/(MH\.\d{4}\.\d+)/i);
   if (matchMH) {
@@ -82,15 +82,14 @@ const getProductImageUrl = (row: any) => {
     cleanName = cleanName.replace(/\\/g, "/").split("/").pop() || "";
     cleanName = cleanName.replace(/\.(jpe?g|png)$/i, "");
   }
-
   return `${getBaseUrl()}/images/${cabang}/mintaharga/${cleanName}.jpg`;
 };
 
 const getProductImageUrlVps = (row: any) => {
   const gambarManual = row.Gambar || row.pend_gambar;
-
   if (gambarManual) {
-    return `${VPS_BASE}/penawaran/${gambarManual}`;
+    // upload baru — tidak ada versi lama di VPS /file-gambar/ utk file ini
+    return "";
   }
 
   const identifier = row.NoPermintaan || row.pend_minta;
@@ -106,7 +105,6 @@ const getProductImageUrlVps = (row: any) => {
     cleanName = cleanName.replace(/\\/g, "/").split("/").pop() || "";
     cleanName = cleanName.replace(/\.(jpe?g|png)$/i, "");
   }
-
   return `${VPS_BASE}/mintaharga/${cleanName}.jpg`;
 };
 

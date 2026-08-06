@@ -47,14 +47,13 @@ const previewGambar = (row: any) => {
     return;
   }
 
-  const cabang = authStore.user?.cabang || "HO-";
-
   if (row.Gambar) {
-    // Hasil upload manual — nama file sudah final apa adanya, folder /penawaran/
-    previewImageUrl.value = `${getBaseUrl()}/images/${cabang}/penawaran/${row.Gambar}`;
-    previewImageUrlFallback.value = `${VPS_BASE}/penawaran/${row.Gambar}`;
+    // row.Gambar sudah path lengkap dari root, mis: /images/HO-/penawaran/PEN_DTL_xxx.jpg
+    // Upload baru — TIDAK pakai fallback /file-gambar/ (itu khusus gambar lama)
+    previewImageUrl.value = `${getBaseUrl()}${row.Gambar}`;
+    previewImageUrlFallback.value = "";
   } else {
-    // Dari Minta Harga — folder /mintaharga/, nama perlu dibersihkan dari format MH
+    const cabang = authStore.user?.cabang || "HO-";
     let cleanName = row.NoPermintaan.replace(/\//g, ".");
     const matchMH = cleanName.match(/(MH\.\d{4}\.\d+)/i);
     if (matchMH) {
