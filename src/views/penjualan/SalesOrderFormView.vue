@@ -7,7 +7,7 @@ import BaseForm from "@/components/BaseForm.vue";
 import { useForm } from "@/composables/useForm";
 import { salesOrderFormService } from "@/services/penjualan/salesOrderFormService";
 import { mapFormService } from "@/services/penjualan/mapFormService";
-import { IconShoppingCartCopy } from "@tabler/icons-vue";
+import { IconShoppingCartCopy, IconAlertTriangle } from "@tabler/icons-vue";
 import api from "@/services/api";
 
 // Komponen per Tab (Asumsi kita pisah filenya agar rapi)
