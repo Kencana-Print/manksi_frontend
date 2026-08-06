@@ -516,7 +516,7 @@ const menuItems: NavItem[] = [
             title: "Realisasi Permintaan",
             to: "/garmen/barang/realisasi",
             icon: IconChecks,
-            menuId: 114,
+            menuId: 62,
           },
           {
             title: "Retur Barang",
