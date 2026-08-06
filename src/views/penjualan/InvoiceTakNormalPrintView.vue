@@ -234,10 +234,10 @@ const generateTxt = () => {
     const page = [...headerLines, ...dataLines];
 
     if (isLastChunk) {
-      const blankPad = Math.max(0, xRecord - chunk.length);
-      page.push(...Array(blankPad).fill(""));
-      // ← garis LINE ekstra di sini dihapus, footerLines sudah diawali LINE
-      // sendiri (lihat buildFooterLines)
+      // ⚠️ FIX: jangan paksa padding ke xRecord penuh di chunk terakhir —
+      // itu yang bikin halaman selalu "gemuk" walau cuma 1-2 baris data,
+      // sehingga footer selalu terdorong ke halaman baru padahal ruang
+      // sebenarnya masih cukup. Cek muat dulu pakai baris data ASLI.
       if (page.length + footerLines.length <= FOOTER_ANCHOR_LINE) {
         const extraPad = Math.max(
           0,
@@ -246,12 +246,16 @@ const generateTxt = () => {
         page.push(...Array(extraPad).fill(""), ...footerLines);
         pages.push(page);
       } else {
+        // Baris data terlalu banyak, footer memang butuh halaman baru —
+        // baru di sini padding ke xRecord relevan, biar potongan kertas
+        // fisik tetap rapi per halaman.
+        const blankPad = Math.max(0, xRecord - chunk.length);
+        page.push(...Array(blankPad).fill(""));
         pages.push(page);
         const footerPad = Math.max(0, FOOTER_ANCHOR_LINE - footerLines.length);
         pages.push([...Array(footerPad).fill(""), ...footerLines]);
       }
     } else {
-      // ← garis LINE penutup halaman lanjutan juga dihapus, konsisten
       pages.push(page);
     }
   });

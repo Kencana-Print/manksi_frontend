@@ -339,9 +339,11 @@ const generateTxt = (mode: "standart" | "full") => {
       const page = [...headerLines, ...dataLines];
 
       if (isLastChunk) {
-        const blankPad = Math.max(0, xRecord - chunk.length);
-        page.push(...Array(blankPad).fill(""));
-        // ← garis LINE di sini dihapus (bukan bagian dari cetakan Delphi asli)
+        // ⚠️ FIX: JANGAN paksa padding ke xRecord penuh di chunk terakhir —
+        // itu yang bikin halaman selalu "gemuk" 31 baris data meski cuma
+        // 1-2 baris beneran, sehingga footer selalu kedorong ke halaman
+        // baru walau ruang sebenarnya masih cukup. Biarkan footer nempel
+        // langsung setelah baris data asli, baru cek muat/tidaknya.
         if (page.length + footerLines.length <= FOOTER_ANCHOR_LINE) {
           const extraPad = Math.max(
             0,
@@ -350,6 +352,11 @@ const generateTxt = (mode: "standart" | "full") => {
           page.push(...Array(extraPad).fill(""), ...footerLines);
           allPages.push(page);
         } else {
+          // Baris data terlalu banyak untuk chunk terakhir ini, footer
+          // memang butuh halaman baru — di sini baru relevan padding ke
+          // xRecord, supaya potongan kertas fisik tetap rapi per halaman.
+          const blankPad = Math.max(0, xRecord - chunk.length);
+          page.push(...Array(blankPad).fill(""));
           allPages.push(page);
           const footerPad = Math.max(
             0,
@@ -358,9 +365,6 @@ const generateTxt = (mode: "standart" | "full") => {
           allPages.push([...Array(footerPad).fill(""), ...footerLines]);
         }
       } else {
-        // ← garis LINE penutup halaman (utk kasus multi-halaman) juga dihapus,
-        // biar konsisten — halaman lanjutan tetap punya garis pemisah kolom
-        // header (di buildHeaderLines), cuma bukan garis ekstra di bawah data.
         allPages.push(page);
       }
     });
