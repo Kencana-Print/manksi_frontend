@@ -62,18 +62,18 @@ const getBaseUrl = () => {
 const VPS_BASE = "/file-gambar";
 
 const getProductImageUrl = (row: any) => {
-  // Ambil identifier dari format key default atau format alias database
-  const identifier =
-    row.NoPermintaan || row.Gambar || row.pend_minta || row.pend_gambar;
+  const cabang = authStore.user?.cabang || "HO-";
+  const gambarManual = row.Gambar || row.pend_gambar;
 
+  if (gambarManual) {
+    return `${getBaseUrl()}/images/${cabang}/penawaran/${gambarManual}`;
+  }
+
+  const identifier = row.NoPermintaan || row.pend_minta;
   if (!identifier) return "";
 
-  const cabang = authStore.user?.cabang || "HO-";
-
-  // Ubah MH/2026/2183 menjadi MH.2026.2183 agar sesuai dengan nama file fisik
   let cleanName = identifier.replace(/\//g, ".");
   const matchMH = cleanName.match(/(MH\.\d{4}\.\d+)/i);
-
   if (matchMH) {
     cleanName = matchMH[1];
   } else {
@@ -87,13 +87,17 @@ const getProductImageUrl = (row: any) => {
 };
 
 const getProductImageUrlVps = (row: any) => {
-  const identifier =
-    row.NoPermintaan || row.Gambar || row.pend_minta || row.pend_gambar;
+  const gambarManual = row.Gambar || row.pend_gambar;
+
+  if (gambarManual) {
+    return `${VPS_BASE}/penawaran/${gambarManual}`;
+  }
+
+  const identifier = row.NoPermintaan || row.pend_minta;
   if (!identifier) return "";
 
   let cleanName = identifier.replace(/\//g, ".");
   const matchMH = cleanName.match(/(MH\.\d{4}\.\d+)/i);
-
   if (matchMH) {
     cleanName = matchMH[1];
   } else {

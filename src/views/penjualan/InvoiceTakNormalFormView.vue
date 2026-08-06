@@ -50,6 +50,7 @@ interface FormData {
   Keterangan: string;
   StsPpn: number;
   Ppn: number;
+  Disc: number;
   Xminta5: string;
   Xurut5: number;
   IsTutupBuku: boolean;
@@ -76,6 +77,7 @@ const num = (v: any) => Math.round(Number(v || 0)).toLocaleString("id-ID");
 const divisiList = ref<{ kode: number; nama: string }[]>([]);
 
 const focusedHargaKey = ref<number | null>(null);
+const isDiscFocused = ref(false);
 
 // NOTE: PPN default AKTIF (StsPpn=1, Ppn=11) — beda dari Invoice biasa yg
 // default OFF. Sesuai Delphi refreshdata: cbbPPN.Checked:=True.
@@ -96,6 +98,7 @@ const init: FormData = {
   Keterangan: "",
   StsPpn: 1,
   Ppn: 11,
+  Disc: 0,
   Xminta5: "",
   Xurut5: 0,
   IsTutupBuku: false,
@@ -146,6 +149,7 @@ const {
       Keterangan: h.inv_keterangan || "",
       StsPpn: h.inv_sts_ppn ?? 1,
       Ppn: h.inv_ppn ?? 11,
+      Disc: Number(h.inv_disc) || 0,
       Xminta5: d.xminta5 || "",
       Xurut5: d.xurut5 || 0,
       IsTutupBuku: !!h.isTutupBuku,
@@ -517,15 +521,18 @@ const totalBarang = computed(() =>
   ),
 );
 
+// Dasar PPN = Total - Disc (raw, belum dibulatkan — biar konsisten dgn
+// keputusan simpan Disc mentah di backend)
+const dasarPpn = computed(() => totalBarang.value - Number(fd.value.Disc || 0));
+
 const totalPpn = computed(() => {
   if (!fd.value.StsPpn) return 0;
-  return Math.round(totalBarang.value * (Number(fd.value.Ppn) / 100));
+  return Math.round(dasarPpn.value * (Number(fd.value.Ppn) / 100));
 });
 
 const grandTotal = computed(() => {
-  if (!fd.value.StsPpn) return totalBarang.value;
-  // Ubah perhitungan grandTotal agar menjumlahkan hasil PPN yang sudah dibulatkan
-  return totalBarang.value + totalPpn.value;
+  if (!fd.value.StsPpn) return Math.round(dasarPpn.value);
+  return Math.round(dasarPpn.value) + totalPpn.value;
 });
 
 const nilaiPiutang = computed(
@@ -1149,6 +1156,24 @@ onMounted(async () => {
             <span class="rk-val">{{ num(totalBarang) }}</span>
           </div>
           <div class="rk-row">
+            <span class="rk-lbl">Diskon</span>
+            <input
+              type="number"
+              class="rk-input"
+              :value="isDiscFocused ? fd.Disc : Math.round(fd.Disc || 0)"
+              @focus="
+                (e) => {
+                  sel(e);
+                  isDiscFocused = true;
+                }
+              "
+              @input="
+                fd.Disc = ($event.target as HTMLInputElement).valueAsNumber || 0
+              "
+              @blur="isDiscFocused = false"
+            />
+          </div>
+          <div class="rk-row">
             <span class="rk-lbl">PPN</span>
             <span class="rk-val">{{ num(totalPpn) }}</span>
           </div>
@@ -1679,5 +1704,20 @@ onMounted(async () => {
   font-family: monospace;
   font-weight: 600;
   color: #1565c0;
+}
+.rk-input {
+  width: 90px;
+  height: 22px;
+  border: 1px solid #bdbdbd;
+  border-radius: 3px;
+  padding: 0 4px;
+  font-size: 12px;
+  text-align: right;
+  outline: none;
+  font-family: inherit;
+}
+.rk-input:focus {
+  border-color: #1565c0;
+  background: #fffde7;
 }
 </style>

@@ -156,6 +156,7 @@ const {
         Qty: Number(det.pend_qty) || 0,
         Harga: Number(det.pend_harga) || 0,
         Spk: det.spk_terkait || "",
+        Gambar: det.pend_gambar || "",
       })),
     };
   },

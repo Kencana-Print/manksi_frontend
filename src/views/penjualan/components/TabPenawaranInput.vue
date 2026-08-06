@@ -42,29 +42,32 @@ const getBaseUrl = () => {
 };
 
 const previewGambar = (row: any) => {
-  const identifier = row.NoPermintaan || row.Gambar;
-  if (!identifier) {
+  if (!row.Gambar && !row.NoPermintaan) {
     toast.warning("Tidak ada data Nomor Permintaan atau Gambar.");
     return;
   }
 
   const cabang = authStore.user?.cabang || "HO-";
 
-  // Replace "/" dengan "." untuk jaga-jaga formatnya MH/2026/1521
-  let cleanName = identifier.replace(/\//g, ".");
-  const matchMH = cleanName.match(/(MH\.\d{4}\.\d+)/i);
-
-  if (matchMH) {
-    cleanName = matchMH[1];
+  if (row.Gambar) {
+    // Hasil upload manual — nama file sudah final apa adanya, folder /penawaran/
+    previewImageUrl.value = `${getBaseUrl()}/images/${cabang}/penawaran/${row.Gambar}`;
+    previewImageUrlFallback.value = `${VPS_BASE}/penawaran/${row.Gambar}`;
   } else {
-    cleanName = cleanName.replace(/.*imagemintaharga/i, "");
-    cleanName = cleanName.replace(/.*Downloads/i, "");
-    cleanName = cleanName.replace(/\\/g, "/").split("/").pop() || "";
-    cleanName = cleanName.replace(/\.(jpe?g|png)$/i, "");
+    // Dari Minta Harga — folder /mintaharga/, nama perlu dibersihkan dari format MH
+    let cleanName = row.NoPermintaan.replace(/\//g, ".");
+    const matchMH = cleanName.match(/(MH\.\d{4}\.\d+)/i);
+    if (matchMH) {
+      cleanName = matchMH[1];
+    } else {
+      cleanName = cleanName.replace(/.*imagemintaharga/i, "");
+      cleanName = cleanName.replace(/.*Downloads/i, "");
+      cleanName = cleanName.replace(/\\/g, "/").split("/").pop() || "";
+      cleanName = cleanName.replace(/\.(jpe?g|png)$/i, "");
+    }
+    previewImageUrl.value = `${getBaseUrl()}/images/${cabang}/mintaharga/${cleanName}.jpg`;
+    previewImageUrlFallback.value = `${VPS_BASE}/mintaharga/${cleanName}.jpg`;
   }
-
-  previewImageUrl.value = `${getBaseUrl()}/images/${cabang}/mintaharga/${cleanName}.jpg`;
-  previewImageUrlFallback.value = `${VPS_BASE}/mintaharga/${cleanName}.jpg`;
 
   isPreviewLoading.value = true;
   isPreviewError.value = false;

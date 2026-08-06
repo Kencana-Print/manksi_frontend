@@ -80,6 +80,10 @@ const isLoadingMemo = ref(false);
 
 // --- STATE KONFIRMASI BATAL CMO ---
 const showConfirmCmoDialog = ref(false);
+const showNoPoDialog = ref(false);
+const showMemoWarnDialog = ref(false);
+const memoWarnMessage = ref("");
+const pendingMemoValue = ref("");
 
 const showHistoryAlokasiModal = ref(false);
 
@@ -570,7 +574,15 @@ watch(
 );
 
 // --- Fungsi bersama: load standar ukuran Kencana ---
+const JO_BEBAS_UKURAN = ["CM"];
+const isJoBebasUkuran = computed(() => {
+  const jo = String(formData.value.spk_jo_kode || "").toUpperCase();
+  const nama = String(formData.value.JenisOrder || "").toUpperCase();
+  return JO_BEBAS_UKURAN.includes(jo) || nama.includes("CELEMEK");
+});
+
 const fetchStandarUkuranSizes = async () => {
+  if (isJoBebasUkuran.value) return;
   if (formData.value.spk_standar_ukuran !== "KENCANA") return;
   if (!["3", "4"].includes(String(formData.value.spk_divisi).charAt(0))) return;
   if (!formData.value.spk_jo_kode) return;
@@ -593,6 +605,29 @@ const fetchStandarUkuranSizes = async () => {
     console.error("Gagal load standar ukuran", e);
   }
 };
+
+const ensureFullSizesForBebasUkuran = async () => {
+  try {
+    const res = await api.get("/penjualan/sales-order/form/init-sizes");
+    const fullSizes: any[] = res.data.data || [];
+    const existing = formData.value.Sizes || [];
+    formData.value.Sizes = fullSizes.map((row: any) => {
+      const found = existing.find((e: any) => e.size === row.size);
+      return found
+        ? { ...row, qty: found.qty, lb: found.lb, pb: found.pb }
+        : row;
+    });
+  } catch (e) {
+    console.error("Gagal memuat daftar size penuh", e);
+  }
+};
+
+watch(isJoBebasUkuran, (val) => {
+  if (val) {
+    formData.value.spk_standar_ukuran = "KLIEN";
+    ensureFullSizesForBebasUkuran(); // ← BARU
+  }
+});
 
 // Watch: setiap kali standar/jo_kode/varian/divisi berubah, langsung fetch
 watch(
@@ -962,19 +997,20 @@ const handleFieldBlur = async (type: string, value: string) => {
     });
     const result = res.data;
 
-    // Jika Customer nunggak, backend akan mengirim result.pin = 'Y' dan result.warn
     if (type === "customer" || type === "custKaosan") {
       if (result.pin === "Y") {
-        formData.value.pin_customer = "Y"; // Langsung lock PIN di UI
-        toast.error(`Perhatian: ${result.warn}`, { timeout: 10000 }); // Munculkan notifikasi agak lama
+        formData.value.pin_customer = "Y";
+        toast.error(`Perhatian: ${result.warn}`, { timeout: 10000 });
       } else {
-        formData.value.pin_customer = "N"; // Aman
+        formData.value.pin_customer = "N";
       }
-      return; // Selesai
+      return;
     }
 
-    if (result.warn && !confirm(result.warn)) {
-      if (type === "memo") formData.value.spk_memo = "";
+    if (result.warn && type === "memo") {
+      memoWarnMessage.value = result.warn;
+      pendingMemoValue.value = value;
+      showMemoWarnDialog.value = true;
       return;
     }
 
@@ -1016,12 +1052,21 @@ const handleFieldBlur = async (type: string, value: string) => {
   }
 };
 
+const confirmMemoWarn = () => {
+  showMemoWarnDialog.value = false;
+  selectMapDirectly(pendingMemoValue.value);
+};
+const cancelMemoWarn = () => {
+  showMemoWarnDialog.value = false;
+  formData.value.spk_memo = "";
+};
+
 // Upload Image Logic
 const uploadImageMain = (file: File) => {
   imageToUpload.value = file;
 };
 
-const validateSave = async () => {
+const validateSave = async (skipPoCheck = false) => {
   const fd = formData.value;
   const divisiStr = String(fd.spk_divisi).charAt(0);
   const qtyPesan = Number(fd.spk_jumlah) || 0;
@@ -1052,11 +1097,12 @@ const validateSave = async () => {
     return;
   }
 
-  if (!fd.spk_nomor_po?.trim()) {
-    const lanjut = confirm(
-      "Nomor PO belum diisi.\n\nSO tetap bisa disimpan, tapi akan berstatus PASIF sampai disetujui (Approve SO Tanpa Nomor PO).\n\nLanjutkan simpan tanpa Nomor PO?",
-    );
-    if (!lanjut) return;
+  // ⚠️ FIX: skip dialog kalau approval "SO tanpa PO" sudah ACC
+  // sebelumnya — sama seperti fix MAP, supaya user tidak "ditodong"
+  // ulang tiap edit & simpan padahal approval-nya masih berlaku.
+  if (!fd.spk_nomor_po?.trim() && !skipPoCheck && fd.nopo_acc !== "ACC") {
+    showNoPoDialog.value = true;
+    return;
   }
 
   // 2. Validasi Tanggal PO
@@ -1220,6 +1266,11 @@ const validateSave = async () => {
 
   // Lolos semua validasi, buka konfirmasi simpan
   showSaveDialog.value = true;
+};
+
+const confirmSaveWithoutPo = () => {
+  showNoPoDialog.value = false;
+  validateSave(true);
 };
 
 const handleConfirmCmo = () => {
@@ -1559,6 +1610,65 @@ const onPilihKatalog = (item: any) => {
         <v-card-actions class="pa-3 bg-grey-lighten-4 justify-end">
           <v-btn variant="outlined" @click="showSjMemoMapPickerModal = false"
             >Batal</v-btn
+          >
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <v-dialog v-model="showNoPoDialog" max-width="420px" persistent>
+      <v-card class="rounded-lg">
+        <v-card-title
+          class="pa-3 bg-warning text-white"
+          style="font-size: 13px; font-weight: 700"
+        >
+          Nomor PO Belum Diisi
+        </v-card-title>
+        <v-card-text class="pa-4" style="font-size: 12px">
+          SO tetap bisa disimpan, tapi akan berstatus
+          <b class="text-warning">PASIF</b> sampai disetujui (<i
+            >Approve SO Tanpa Nomor PO</i
+          >).<br /><br />
+          Lanjutkan simpan tanpa Nomor PO?
+        </v-card-text>
+        <v-card-actions class="pa-3 border-t">
+          <v-spacer />
+          <v-btn variant="text" size="small" @click="showNoPoDialog = false"
+            >Batal</v-btn
+          >
+          <v-btn
+            variant="flat"
+            size="small"
+            color="warning"
+            @click="confirmSaveWithoutPo"
+          >
+            Lanjutkan
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <v-dialog v-model="showMemoWarnDialog" max-width="420px" persistent>
+      <v-card class="rounded-lg">
+        <v-card-title
+          class="pa-3 bg-warning text-white"
+          style="font-size: 13px; font-weight: 700"
+        >
+          Konfirmasi MAP
+        </v-card-title>
+        <v-card-text class="pa-4" style="font-size: 12px">{{
+          memoWarnMessage
+        }}</v-card-text>
+        <v-card-actions class="pa-3 border-t">
+          <v-spacer />
+          <v-btn variant="text" size="small" @click="cancelMemoWarn"
+            >Batal</v-btn
+          >
+          <v-btn
+            variant="flat"
+            size="small"
+            color="warning"
+            @click="confirmMemoWarn"
+            >Lanjutkan</v-btn
           >
         </v-card-actions>
       </v-card>

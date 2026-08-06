@@ -52,9 +52,11 @@ const isStandarKlien = computed(
 );
 
 const isLbPbEditable = computed(
-  () => !isDivisiGarmenAtauKaosan.value || isStandarKlien.value,
+  () =>
+    isJoBebasUkuran.value ||
+    !isDivisiGarmenAtauKaosan.value ||
+    isStandarKlien.value,
 );
-
 // Kategori ukuran berdasarkan jenis order
 const kategoriUkuran = computed(() => {
   const jo = String(props.formData.spk_jo_kode || "").toUpperCase();
@@ -69,20 +71,29 @@ const kategoriUkuran = computed(() => {
 
 const showKolomAtasan = computed(
   () =>
-    kategoriUkuran.value === "ATASAN" || kategoriUkuran.value === "WEARPACK",
+    isJoBebasUkuran.value ||
+    kategoriUkuran.value === "ATASAN" ||
+    kategoriUkuran.value === "WEARPACK",
 );
 
 const showKolomBawahan = computed(
   () =>
-    kategoriUkuran.value === "BAWAHAN" || kategoriUkuran.value === "WEARPACK",
+    isJoBebasUkuran.value ||
+    kategoriUkuran.value === "BAWAHAN" ||
+    kategoriUkuran.value === "WEARPACK",
 );
-
 const totalQty = computed(() =>
   (props.formData.Sizes || []).reduce(
     (s: number, r: any) => s + (Number(r.qty) || 0),
     0,
   ),
 );
+
+const isJoBebasUkuran = computed(() => {
+  const jo = String(props.formData.spk_jo_kode || "").toUpperCase();
+  const nama = String(props.formData.JenisOrder || "").toUpperCase();
+  return jo === "CM" || nama.includes("CELEMEK");
+});
 
 const updateKetUkuran = () => {
   const parts: string[] = [];

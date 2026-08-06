@@ -86,6 +86,7 @@ const headers = computed(() => {
   if (canLihatCus.value) {
     h.push(
       { title: "Customer", key: "Customer", minWidth: "180px" },
+      { title: "Alamat", key: "Alamat", minWidth: "200px" },
       { title: "Kota", key: "Kota", width: "120px" },
     );
   }

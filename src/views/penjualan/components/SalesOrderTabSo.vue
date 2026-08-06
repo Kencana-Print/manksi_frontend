@@ -54,6 +54,9 @@ const showPreviewDialog = ref(false);
 const isImageError = ref(false);
 const isAutoSettingDateline = ref(false);
 const isInitialLoad = ref(true);
+const showPinJoDialog = ref(false);
+const showPinJoTolakDialog = ref(false);
+const showAccPendingDialog = ref(false);
 
 const workshopCache = ref<any[]>([]);
 
@@ -127,6 +130,12 @@ const onFileChange = (e: Event) => {
   target.value = ""; // ← RESET INPUT SETELAH SUKSES
 };
 
+const isJoBebasUkuran = computed(() => {
+  const jo = String(props.formData.spk_jo_kode || "").toUpperCase();
+  const nama = String(props.formData.JenisOrder || "").toUpperCase();
+  return jo === "CM" || nama.includes("CELEMEK");
+});
+
 const toggleCmo = () => {
   if (!props.formData.spk_cmo) {
     props.formData.spk_cmo = authStore.user?.kode || "ADMIN";
@@ -155,27 +164,28 @@ const handleJumlahBlur = () => {
     emit("switch-tab", 2); // Pindah ke Tab Kaosan/Detail Size
   }
 };
-
 const handlePinJoClick = () => {
   if (authStore.user?.cabangKaos === "KDC") {
-    const isAcc = confirm(
-      "Akan di ACC Jenis Order ini?\n\nOK = Acc\nBatal = Tolak",
-    );
-    if (isAcc) {
-      props.formData.spk_pinjo = "ACC";
-      toast.success(
-        "ACC Jenis Order berhasil. Lakukan simpan data untuk melanjutkan.",
-      );
-    } else {
-      const isTolak = confirm("Tolak Jenis Order ini?");
-      if (isTolak) {
-        props.formData.spk_pinjo = "TOLAK";
-        toast.info("Tolak Jenis Order. Lakukan simpan data untuk melanjutkan.");
-      }
-    }
+    showPinJoDialog.value = true;
   } else {
     toast.error("Akses Ditolak: Hanya cabang KDC yang berhak ACC Jenis Order.");
   }
+};
+const confirmAccJenisOrder = () => {
+  showPinJoDialog.value = false;
+  props.formData.spk_pinjo = "ACC";
+  toast.success(
+    "ACC Jenis Order berhasil. Lakukan simpan data untuk melanjutkan.",
+  );
+};
+const rejectJenisOrderPrompt = () => {
+  showPinJoDialog.value = false;
+  showPinJoTolakDialog.value = true;
+};
+const confirmTolakJenisOrder = () => {
+  showPinJoTolakDialog.value = false;
+  props.formData.spk_pinjo = "TOLAK";
+  toast.info("Tolak Jenis Order. Lakukan simpan data untuk melanjutkan.");
 };
 
 const pendingAccDisplay = computed(() => {
@@ -191,21 +201,20 @@ const handleAccPendingClick = () => {
       toast.error("Hanya CMO (Marketing) yang boleh ACC Pending.");
       return;
     }
-    const isAcc = confirm(
-      "Akan di ACC status Pending ini?\n\nOK = Acc\nCancel = Tidak Acc",
-    );
-    if (isAcc) {
-      props.formData.spk_accpending = "ACC";
-      toast.success(
-        "ACC Pending berhasil. Lakukan simpan data untuk melanjutkan.",
-      );
-    } else {
-      props.formData.spk_accpending = "N";
-      toast.info(
-        "Status ACC Pending ditolak. Lakukan simpan data untuk melanjutkan.",
-      );
-    }
+    showAccPendingDialog.value = true;
   }
+};
+const confirmAccPending = () => {
+  showAccPendingDialog.value = false;
+  props.formData.spk_accpending = "ACC";
+  toast.success("ACC Pending berhasil. Lakukan simpan data untuk melanjutkan.");
+};
+const rejectAccPending = () => {
+  showAccPendingDialog.value = false;
+  props.formData.spk_accpending = "N";
+  toast.info(
+    "Status ACC Pending ditolak. Lakukan simpan data untuk melanjutkan.",
+  );
 };
 
 // ── Generic lookup by kode ──
@@ -1351,7 +1360,10 @@ watch(
             <label class="lbl">Ket. Ukuran</label>
             <input v-model="formData.spk_ukuran" class="inp" style="flex: 1" />
             <div
-              v-if="['3', '4'].includes(String(formData.spk_divisi).charAt(0))"
+              v-if="
+                ['3', '4'].includes(String(formData.spk_divisi).charAt(0)) &&
+                !isJoBebasUkuran
+              "
               class="standar-radio ml-2"
             >
               <label class="chk-lbl">
@@ -1877,6 +1889,101 @@ watch(
         </v-img>
       </div>
     </div>
+  </v-dialog>
+
+  <v-dialog v-model="showPinJoDialog" max-width="360px" persistent>
+    <v-card class="rounded-lg">
+      <v-card-title
+        class="pa-3 bg-primary text-white"
+        style="font-size: 13px; font-weight: 700"
+      >
+        Konfirmasi Jenis Order
+      </v-card-title>
+      <v-card-text class="pa-4" style="font-size: 12px"
+        >Akan di-ACC Jenis Order ini?</v-card-text
+      >
+      <v-card-actions class="pa-3 border-t">
+        <v-btn
+          variant="outlined"
+          size="small"
+          color="error"
+          @click="rejectJenisOrderPrompt"
+          >Tolak</v-btn
+        >
+        <v-spacer />
+        <v-btn variant="text" size="small" @click="showPinJoDialog = false"
+          >Batal</v-btn
+        >
+        <v-btn
+          variant="flat"
+          size="small"
+          color="primary"
+          @click="confirmAccJenisOrder"
+          >ACC</v-btn
+        >
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
+
+  <v-dialog v-model="showPinJoTolakDialog" max-width="340px" persistent>
+    <v-card class="rounded-lg">
+      <v-card-title
+        class="pa-3 bg-error text-white"
+        style="font-size: 13px; font-weight: 700"
+      >
+        Konfirmasi Tolak
+      </v-card-title>
+      <v-card-text class="pa-4" style="font-size: 12px"
+        >Tolak Jenis Order ini?</v-card-text
+      >
+      <v-card-actions class="pa-3 border-t">
+        <v-spacer />
+        <v-btn variant="text" size="small" @click="showPinJoTolakDialog = false"
+          >Batal</v-btn
+        >
+        <v-btn
+          variant="flat"
+          size="small"
+          color="error"
+          @click="confirmTolakJenisOrder"
+          >Ya, Tolak</v-btn
+        >
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
+
+  <v-dialog v-model="showAccPendingDialog" max-width="360px" persistent>
+    <v-card class="rounded-lg">
+      <v-card-title
+        class="pa-3 bg-primary text-white"
+        style="font-size: 13px; font-weight: 700"
+      >
+        Konfirmasi Status Pending
+      </v-card-title>
+      <v-card-text class="pa-4" style="font-size: 12px"
+        >Akan di-ACC status Pending ini?</v-card-text
+      >
+      <v-card-actions class="pa-3 border-t">
+        <v-btn
+          variant="outlined"
+          size="small"
+          color="error"
+          @click="rejectAccPending"
+          >Tidak ACC</v-btn
+        >
+        <v-spacer />
+        <v-btn variant="text" size="small" @click="showAccPendingDialog = false"
+          >Batal</v-btn
+        >
+        <v-btn
+          variant="flat"
+          size="small"
+          color="primary"
+          @click="confirmAccPending"
+          >ACC</v-btn
+        >
+      </v-card-actions>
+    </v-card>
   </v-dialog>
 </template>
 
