@@ -420,6 +420,8 @@ const isDetailDisabled = computed(
   () => isHoMode.value || !formData.value.NomorSpk?.trim(),
 );
 
+const isRealisasiDisabled = computed(() => !formData.value.NomorSpk?.trim());
+
 const addRow = () => {
   if (!formData.value.NomorSpk?.trim()) {
     toast.warning("Pilih No. SPK terlebih dahulu.");
@@ -927,7 +929,10 @@ onMounted(async () => {
                 <th style="width: 90px">
                   Jam Kirim
                   <span
-                    v-if="!isHoMode && formData.Detail.some((r) => r.jam_kirim)"
+                    v-if="
+                      !isRealisasiDisabled &&
+                      formData.Detail.some((r) => r.jam_kirim)
+                    "
                     class="replace-hint"
                     @click="
                       replaceAllJamKirim(
@@ -942,7 +947,10 @@ onMounted(async () => {
                 <th style="min-width: 120px">
                   Expedisi
                   <span
-                    v-if="!isHoMode && formData.Detail.some((r) => r.expedisi)"
+                    v-if="
+                      !isRealisasiDisabled &&
+                      formData.Detail.some((r) => r.expedisi)
+                    "
                     class="replace-hint"
                     @click="
                       replaceAllExpedisi(
@@ -956,7 +964,10 @@ onMounted(async () => {
                 <th style="width: 90px">
                   Jam Ambil
                   <span
-                    v-if="!isHoMode && formData.Detail.some((r) => r.jam_ambil)"
+                    v-if="
+                      !isRealisasiDisabled &&
+                      formData.Detail.some((r) => r.jam_ambil)
+                    "
                     class="replace-hint"
                     @click="
                       replaceAllJamAmbil(
@@ -1036,7 +1047,7 @@ onMounted(async () => {
                     v-model="row.jam_kirim"
                     type="time"
                     class="cell-inp text-center"
-                    :readonly="isDetailDisabled"
+                    :readonly="isRealisasiDisabled"
                     @change="replaceAllJamKirim(row.jam_kirim)"
                   />
                 </td>
@@ -1044,7 +1055,7 @@ onMounted(async () => {
                   <input
                     v-model="row.expedisi"
                     class="cell-inp"
-                    :readonly="isDetailDisabled"
+                    :readonly="isRealisasiDisabled"
                     @change="replaceAllExpedisi(row.expedisi)"
                   />
                 </td>
@@ -1053,7 +1064,7 @@ onMounted(async () => {
                     v-model="row.jam_ambil"
                     type="time"
                     class="cell-inp text-center"
-                    :readonly="isDetailDisabled"
+                    :readonly="isRealisasiDisabled"
                     @change="replaceAllJamAmbil(row.jam_ambil)"
                   />
                 </td>
