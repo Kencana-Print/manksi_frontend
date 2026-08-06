@@ -1,5 +1,12 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onBeforeUnmount } from "vue";
+import {
+  ref,
+  computed,
+  watch,
+  onMounted,
+  onBeforeUnmount,
+  nextTick,
+} from "vue";
 import { useToast } from "vue-toastification";
 import { useAuthStore } from "@/stores/authStore";
 import { mapFormService } from "@/services/penjualan/mapFormService";
@@ -76,7 +83,14 @@ onMounted(() => {
 watch(
   () => props.formData.Divisi,
   (newDiv) => {
-    if (!props.isEdit && String(newDiv).startsWith("3")) {
+    // ⚠️ FIX: skip default Kaosan DC kalau formData ini hasil copy dari
+    // MAP Referensi (Referensi sudah terisi) — biarkan Perusahaan/
+    // Customer tetap ikut data referensi, jangan ditimpa default.
+    if (
+      !props.isEdit &&
+      !props.formData.Referensi &&
+      String(newDiv).startsWith("3")
+    ) {
       props.formData.PerushKode = "SM";
       props.formData.NamaPerusahaan = "Sukiman Setyo Manunggal";
       props.formData.CustKode = "DC";
@@ -321,16 +335,31 @@ const setRef = async (v: any) => {
     const res = await mapFormService.getById(nomor);
     const d = res.data.data;
     if (d) {
-      // Gunakan mapping yang sama agar field terisi semua (termasuk Workshop, Finishing, dll)
       const mapped = (props as any).mapMapData
         ? (props as any).mapMapData(d)
         : d;
       Object.assign(props.formData, mapped);
 
-      // Kembalikan nomor asli agar tidak menimpa MAP yang sedang dibuat
       props.formData.Nomor = "";
       props.formData.Referensi = nomor;
       props.formData.IsRevisi = "Y";
+
+      await nextTick();
+
+      // ⚠️ FIX: Tanggal MAP baru = tanggal HARI INI (tanggal dibuatnya
+      // revisi ini), BUKAN tanggal MAP referensi — jangan diwarisi.
+      props.formData.Tanggal = new Date().toISOString().substring(0, 10);
+
+      // ⚠️ FIX: CMO approval tidak boleh diwarisi dari referensi — MAP
+      // revisi baru ini belum pernah di-approve CMO sama sekali (makanya
+      // Status: PASIF), jadi checkbox CMO + nama harus kosong, menunggu
+      // approval baru dari user yang login sekarang.
+      props.formData.Cmo = "";
+      props.formData.IsCmo = false;
+
+      // Created tetap kosong — bukan warisan dari referensi (fix sebelumnya)
+      props.formData.Created = "";
+
       toast.success(`Data dari MAP Referensi ${nomor} berhasil dimuat.`);
     }
   } catch {
