@@ -73,25 +73,23 @@ const paginatedDetails = computed(() => {
 });
 
 // ── Format helpers ────────────────────────────────────────────────────
-// ✅ FIX: sebelumnya pakai Number(v).toLocaleString("id-ID"), tapi di server
-// (Node.js tanpa full-ICU) locale "id-ID" fallback ke default en-US
-// (koma jadi pemisah ribuan). Jadi diganti formatter manual biar gak
-// gantung ketersediaan locale — titik = ribuan, koma = desimal (kalau ada).
 const num = (v: any) => {
-  const n = Number(v || 0);
+  // Langsung bulatkan nilai ke bilangan bulat (integer) terdekat
+  const n = Math.round(Number(v || 0));
   const neg = n < 0;
   const abs = Math.abs(n);
-  const hasDecimal = Math.round(abs * 100) % 100 !== 0;
-  const fixed = abs.toFixed(hasDecimal ? 2 : 0);
-  const [intPartRaw, decPart] = fixed.split(".");
+
+  const intPartRaw = String(abs);
   let out = "";
   let cnt = 0;
+
   for (let i = intPartRaw.length - 1; i >= 0; i--) {
     out = intPartRaw[i] + out;
     cnt++;
-    if (cnt % 3 === 0 && i !== 0) out = "," + out;
+    // Gunakan titik sebagai pemisah ribuan
+    if (cnt % 3 === 0 && i !== 0) out = "." + out;
   }
-  if (decPart) out += "." + decPart;
+
   return (neg ? "-" : "") + out;
 };
 
@@ -400,10 +398,8 @@ const printQZ = async (pilihMode: "standart" | "full") => {
 
     const data = [
       "\x1B\x40", // ESC @: Inisialisasi/Reset printer
-      "\x0F", // SI: aktifkan condensed print (~17 cpi). Teks kita diformat
-      // 136 kolom mengasumsikan pitch condensed — tanpa command ini printer
-      // cetak di pitch normal (~10 cpi), jadi 136 karakter jatuhnya jauh
-      // lebih lebar dari fisik kertas & nggak muat area scan.
+      "\x1B\x43" + String.fromCharCode(66), // ESC C 66: PAKSA set panjang kertas fisik jadi 66 baris (11 inci / 27,5 cm)
+      "\x0F", // SI: aktifkan condensed print (~17 cpi)
       "\x1B\x6C\x00", // ESC l 0: Set left margin = kolom 0
       { type: "raw", format: "plain", data: content },
       "\x12", // DC2: batalkan condensed print (balikin ke normal utk job berikutnya)

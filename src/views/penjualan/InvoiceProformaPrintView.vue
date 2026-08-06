@@ -319,10 +319,13 @@ const printQZ = async () => {
     const content = generateTxt();
 
     const data = [
-      "\x1B\x40",
-      "\x1B\x6C\x00",
+      "\x1B\x40", // ESC @: Inisialisasi/Reset printer
+      "\x1B\x43" + String.fromCharCode(66), // ESC C 66: Set panjang kertas 66 baris (11 inci)
+      "\x0F", // SI: aktifkan condensed print (~17 cpi) karena lebar 136 kolom
+      "\x1B\x6C\x00", // ESC l 0: Set margin kiri = 0
       { type: "raw", format: "plain", data: content },
-      "\x0C",
+      "\x12", // DC2: batalkan condensed print
+      "\x0C", // Form Feed: Eject halaman
     ];
 
     await qz.print(config, data);

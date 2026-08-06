@@ -544,23 +544,12 @@ const onFileChange = (e: Event) => {
         </div>
       </div>
 
-      <!-- ── Kolom kanan: Keterangan + Design ── -->
+      <!-- ── Kolom kanan: Design + Keterangan ── -->
       <div class="tp-right">
-        <div class="tp-section" style="flex-shrink: 0">
-          <div class="tp-sec-title">Keterangan</div>
-          <v-textarea
-            v-model="formData.Keterangan"
-            variant="outlined"
-            density="compact"
-            rows="6"
-            hide-details
-            class="f-inp"
-          />
-        </div>
-
+        <!-- Design (Dipindah ke atas, tingginya menyesuaikan isi/gambar) -->
         <div
           class="tp-section"
-          style="flex: 1; display: flex; flex-direction: column"
+          style="flex-shrink: 0; display: flex; flex-direction: column"
         >
           <div class="tp-sec-title">Design</div>
           <div class="tp-img-box">
@@ -612,6 +601,21 @@ const onFileChange = (e: Event) => {
             />
             Status Approval: <strong>{{ formData.StatusEdit }}</strong>
           </div>
+        </div>
+
+        <!-- Keterangan (Dipindah ke bawah, mengisi sisa ruang) -->
+        <div
+          class="tp-section"
+          style="flex: 1; display: flex; flex-direction: column; min-height: 0"
+        >
+          <div class="tp-sec-title">Keterangan</div>
+          <v-textarea
+            v-model="formData.Keterangan"
+            variant="outlined"
+            density="compact"
+            hide-details
+            class="f-inp flex-1 text-area-fill"
+          />
         </div>
       </div>
     </div>
@@ -714,7 +718,7 @@ const onFileChange = (e: Event) => {
   display: flex;
   flex-direction: row;
   gap: 10px;
-  align-items: flex-start;
+  align-items: stretch;
   min-height: 0;
 }
 
@@ -723,7 +727,7 @@ const onFileChange = (e: Event) => {
   min-width: 0;
 }
 .tp-right {
-  width: 320px;
+  width: 380px; /* Lebarkan sesuai kebutuhan, misalnya dari 320px ke 380px atau 400px */
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -781,17 +785,21 @@ const onFileChange = (e: Event) => {
 .f-inp :deep(.v-input__control) {
   min-height: 26px;
 }
-/* textarea override */
-.v-textarea.f-inp :deep(.v-field),
-.v-textarea.f-inp :deep(.v-input__control) {
-  height: auto !important;
-  min-height: 90px !important;
+/* textarea override - agar mengisi seluruh ruang sisa */
+.v-textarea.f-inp.text-area-fill {
+  display: flex;
+  flex-direction: column;
 }
-.v-textarea.f-inp :deep(.v-field__input) {
-  height: auto !important;
-  min-height: 90px !important;
+.v-textarea.f-inp.text-area-fill :deep(.v-input__control),
+.v-textarea.f-inp.text-area-fill :deep(.v-field) {
+  flex: 1;
+  height: 100% !important;
+}
+.v-textarea.f-inp.text-area-fill :deep(.v-field__input) {
+  height: 100% !important;
   padding-top: 8px !important;
   padding-bottom: 8px !important;
+  overflow-y: auto; /* Biarkan bisa di-scroll jika teks sangat panjang */
 }
 
 /* Readonly native input (Created, User) */

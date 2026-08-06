@@ -1025,6 +1025,7 @@ watch(
               </td>
 
               <td class="tc" style="position: relative">
+                <!-- Jika belum ada gambar sama sekali -->
                 <button
                   v-if="!row.Gambar && !row.NoPermintaan"
                   type="button"
@@ -1041,6 +1042,7 @@ watch(
                   <span v-else>📷</span>
                 </button>
 
+                <!-- Jika sudah ada gambar / terhubung dengan No. Permintaan -->
                 <div
                   v-else
                   class="d-flex align-center justify-center w-100 h-100 bg-green-lighten-5 position-relative"
@@ -1061,6 +1063,36 @@ watch(
                     ✓ Gbr
                   </button>
 
+                  <!-- TOMBOL GANTI GAMBAR (KIRI ATAS) -->
+                  <button
+                    v-if="!row.Spk"
+                    type="button"
+                    @click="triggerUpload(Number(idx))"
+                    class="position-absolute"
+                    title="Ganti Gambar Manual"
+                    style="
+                      top: -2px;
+                      left: -2px;
+                      font-size: 10px;
+                      background: white;
+                      border-radius: 50%;
+                      color: #1565c0;
+                      border: 1px solid #1565c0;
+                      width: 14px;
+                      height: 14px;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                      cursor: pointer;
+                    "
+                  >
+                    <span v-if="isUploading && activeUploadIndex === idx"
+                      >⏳</span
+                    >
+                    <span v-else>✎</span>
+                  </button>
+
+                  <!-- TOMBOL HAPUS GAMBAR (KANAN ATAS) -->
                   <button
                     v-if="!row.Spk && !row.NoPermintaan"
                     type="button"

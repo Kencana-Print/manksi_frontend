@@ -318,7 +318,7 @@ const ensureEmptyRowBarang = () => {
       Kode: "",
       NamaSpk: "",
       Ukuran: "",
-      Jumlah: 1,
+      Jumlah: 0,
       Harga: 0,
     });
   }
@@ -947,6 +947,15 @@ onMounted(async () => {
                   <td>
                     <input
                       v-if="row.Kode"
+                      v-model.number="row.Jumlah"
+                      type="number"
+                      class="ci tr hl"
+                      @focus="sel"
+                    />
+                  </td>
+                  <td>
+                    <input
+                      v-if="row.Kode"
                       type="number"
                       class="ci tr hl"
                       :value="
@@ -965,15 +974,6 @@ onMounted(async () => {
                           ($event.target as HTMLInputElement).valueAsNumber || 0
                       "
                       @blur="focusedHargaKey = null"
-                    />
-                  </td>
-                  <td>
-                    <input
-                      v-if="row.Kode"
-                      v-model.number="row.Harga"
-                      type="number"
-                      class="ci tr hl"
-                      @focus="sel"
                     />
                   </td>
                   <td class="tr" style="padding-right: 6px">

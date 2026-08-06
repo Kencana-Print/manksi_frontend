@@ -289,8 +289,9 @@ const printQZ = async () => {
     const content = generateTxt();
     const data = [
       "\x1B\x40", // ESC @ (Initialize Printer)
+      "\x1B\x43" + String.fromCharCode(66), // ESC C 66: Set panjang kertas 66 baris (11 inci)
       { type: "raw", format: "plain", data: content },
-      "\x0C", // Form Feed (Eject kertas jika printer mendukung)
+      "\x0C", // Form Feed
     ];
 
     // 4. Kirim ke printer
