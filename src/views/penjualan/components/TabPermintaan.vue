@@ -51,13 +51,41 @@ const displayImageUrl = computed(() => {
   ) {
     return props.formData.PathImage.replace(/^http:\/\//, "https://");
   }
+
+  // Jika backend mengembalikan PathImage yang sudah berupa URL statis atau path khusus
   const rawBase = api.defaults.baseURL || import.meta.env.VITE_API_URL || "";
   const base = rawBase.replace(/\/api\/?$/, "");
-  const cleanPath = props.formData.PathImage.startsWith("/")
-    ? props.formData.PathImage
-    : `/${props.formData.PathImage}`;
-  return `${base}${cleanPath}`;
+
+  // Jika path diawali dengan /file-gambar atau /images, gabungkan langsung dengan base URL
+  if (
+    props.formData.PathImage.startsWith("/file-gambar/") ||
+    props.formData.PathImage.startsWith("/images/")
+  ) {
+    return `${base}${props.formData.PathImage}`;
+  }
+
+  // Fallback: Jika path hanya berupa nama file atau path relatif biasa, arahkan ke mintaharga sentral
+  const cleanName = props.formData.PathImage.replace(/^\/+/, "");
+  return `${base}/file-gambar/mintaharga/${cleanName}`;
 });
+
+const handleImageError = (e: Event) => {
+  const img = e.target as HTMLImageElement;
+  if (img.dataset.fallbackTried === "true") {
+    imageError.value = true;
+    return;
+  }
+  img.dataset.fallbackTried = "true";
+
+  const nomorMh = props.formData.Nomor;
+  if (!nomorMh) {
+    imageError.value = true;
+    return;
+  }
+
+  // Coba fallback langsung ke folder sentral mintaharga
+  img.src = `/file-gambar/mintaharga/${encodeURIComponent(nomorMh)}.jpg`;
+};
 
 const divisiOptions = ref<any[]>([]);
 const statusOptions = ["BELUM", "MINTA", "WAIT", "CANCEL", "DONE"];
@@ -560,7 +588,7 @@ const onFileChange = (e: Event) => {
               style="cursor: pointer"
               title="Klik untuk melihat ukuran penuh"
               @click="showPreviewDialog = true"
-              @error="imageError = true"
+              @error="handleImageError"
             />
             <div v-else class="tp-img-empty">
               <IconPhotoOff :size="28" color="#bdbdbd" />

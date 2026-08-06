@@ -402,7 +402,7 @@ const {
     const res = await salesOrderFormService.saveData(payload);
 
     // Nomor SPK baru hasil dari DB (jika IsNewMode)
-    const nomorSPK = res.data?.nomor || data.spk_nomor;
+    const nomorSPK = res.data?.data?.nomor || data.spk_nomor;
 
     // 2. Upload Gambar (Jika ada file yang dipilih)
     if (imageToUpload.value && nomorSPK) {

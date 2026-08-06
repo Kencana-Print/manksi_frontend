@@ -104,11 +104,14 @@ watch([() => props.formData.spk_nomor, () => props.formData.spk_memo], () => {
 });
 
 const onFileChange = (e: Event) => {
-  const file = (e.target as HTMLInputElement).files?.[0];
+  const target = e.target as HTMLInputElement;
+  const file = target.files?.[0];
   if (!file) return;
+
   // Di Delphi maksimal 1 MB
   if (file.size > 1_000_000) {
     toast.error("Ukuran gambar tidak boleh > 1 Mb.");
+    target.value = ""; // ← RESET INPUT AGAR BISA PILIH FILE SAMA LAGI
     return;
   }
 
@@ -118,8 +121,10 @@ const onFileChange = (e: Event) => {
   props.formData.MainImageName = file.name;
   props.formData.MainImageBlob = URL.createObjectURL(file);
 
-  // Lepmpar file aslinya ke Komponen Induk (SalesOrderFormView.vue)
+  // Lempar file aslinya ke Komponen Induk
   emit("upload-main", file);
+
+  target.value = ""; // ← RESET INPUT SETELAH SUKSES
 };
 
 const toggleCmo = () => {
@@ -729,10 +734,10 @@ watch(
             class="mr-1"
           />
           <input
-            v-model.number="formData.spk_rev"
-            type="number"
+            v-model="formData.spk_rev"
+            type="text"
             class="inp"
-            style="width: 55px"
+            style="width: 310px"
             :disabled="formData.isRevisi !== 'Y'"
             v-select-on-focus
           />
