@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from "vue";
 import { useToast } from "vue-toastification";
+import api from "@/services/api";
 
 const props = defineProps<{
   formData: any;
@@ -13,6 +14,21 @@ const emit = defineEmits(["upload-acc-bukti"]);
 const accBuktiPreview = ref("");
 const fileAccRef = ref<HTMLInputElement | null>(null);
 
+const accBuktiNotFound = ref(false);
+
+// ⚠️ FIX: file bukti tersimpan di disk sesuai konvensi processImage
+// ({nomor}-acc.jpg), tapi tidak ada kolom DB untuk itu — jadi dibangun
+// dari URL statis (pola sama seperti MapView.lihatGambar), BUKAN dari
+// AccBuktiBlob yang cuma blob URL lokal browser (hilang tiap reload).
+const accBuktiUrl = computed(() => {
+  // Prioritas 1: preview fresh dari file yang baru dipilih user
+  if (props.formData.AccBuktiBlob) return props.formData.AccBuktiBlob;
+  // Prioritas 2: file yang sudah tersimpan di server (mode edit)
+  if (!props.formData.spk_nomor || !props.formData.spk_cab) return "";
+  const base = api.defaults.baseURL?.replace(/\/api\/?$/, "") || "";
+  return `${base}/images/${props.formData.spk_cab}/${encodeURIComponent(props.formData.spk_nomor)}-acc.jpg`;
+});
+
 const onAccChange = (e: Event) => {
   const file = (e.target as HTMLInputElement).files?.[0];
   if (!file) return;
@@ -23,6 +39,7 @@ const onAccChange = (e: Event) => {
   props.formData.AccBuktiName = file.name;
   props.formData.AccBuktiBlob = URL.createObjectURL(file);
   accBuktiPreview.value = props.formData.AccBuktiBlob;
+  accBuktiNotFound.value = false; // ← tambahan
   emit("upload-acc-bukti", file);
 };
 
@@ -479,9 +496,10 @@ const updateKetUkuran = () => {
 
           <div class="uk-img-box">
             <img
-              v-if="formData.AccBuktiBlob"
-              :src="formData.AccBuktiBlob"
+              v-if="accBuktiUrl && !accBuktiNotFound"
+              :src="accBuktiUrl"
               class="uk-img"
+              @error="accBuktiNotFound = true"
             />
             <div v-else class="uk-img-empty">Bukti belum diupload</div>
           </div>
