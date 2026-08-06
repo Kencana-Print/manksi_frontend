@@ -156,10 +156,21 @@ const displayImageUrl = computed(() => {
     return `${base}/images/${cab}/map/${encodeURIComponent(props.formData.Nomor)}.jpg?v=${imageCacheBust.value}`;
   }
 
+  // ⚠️ BARU: mode CREATE dari MAP Referensi (revisi) — Nomor MAP baru
+  // masih kosong sampai disimpan, tapi gambar desain aslinya sudah ada
+  // di VPS pada folder milik MAP REFERENSI itu. Sama pola persis dengan
+  // MapPrintView.vue (images/{cab}/map/{nomor}.jpg) — cab di sini sudah
+  // otomatis kepakai benar karena setRef() meng-copy formData.Cab dari
+  // data MAP referensi lewat mapMapData().
+  if (!props.isEdit && props.formData.Referensi) {
+    const base = getBaseUrl();
+    const cab = props.formData.Cab || "HO-";
+    return `${base}/images/${cab}/map/${encodeURIComponent(props.formData.Referensi)}.jpg?v=${imageCacheBust.value}`;
+  }
+
   if (props.formData.MintaHarga) {
     const mh = props.formData.MintaHarga;
     const base = getBaseUrl();
-    // ✅ FIX: sesuai struktur folder backend public/images/HO-/mintaharga/
     return `${base}/images/HO-/mintaharga/${encodeURIComponent(mh)}.jpg?v=${imageCacheBust.value}`;
   }
 
@@ -173,9 +184,15 @@ const handleFallbackImage = (e: Event) => {
     return;
   }
   img.dataset.fallbackTried = "true";
-  const mhNomor = props.formData.MintaHarga || props.formData.Nomor;
+  // ⚠️ BARU: kalau gambar dari folder map (VPS lokal) gagal — baik
+  // untuk mode edit (pakai Nomor) maupun create-dari-referensi (pakai
+  // Referensi) — coba fallback ke folder legacy mintaharga di VPS lama,
+  // pakai nomor yang sama yang dipakai displayImageUrl di atas.
+  const mhNomor =
+    props.formData.MintaHarga ||
+    props.formData.Referensi ||
+    props.formData.Nomor;
   if (mhNomor) {
-    // ✅ FIX: path relatif, gak hardcode host/port
     const fallbackUrl = `/file-gambar/mintaharga/${encodeURIComponent(mhNomor)}.jpg`;
     img.src = fallbackUrl;
     resolvedImageUrl.value = fallbackUrl;
@@ -187,15 +204,16 @@ const handleFallbackImage = (e: Event) => {
 // Handler khusus buat v-img (Vuetify) — beda tipe event dari native <img>.
 // v-img emit src (string) yang gagal, bukan Event DOM.
 const handlePreviewImageError = (failedSrc: string | undefined) => {
-  // Kalau yang gagal itu masih URL utama (belum sempat fallback),
-  // coba fallback ke VPS legacy.
   if (resolvedImageUrl.value?.includes("/file-gambar/")) {
-    // Sudah pernah dicoba fallback juga & tetap gagal — nyerah, biarin slot #error nampil
     return;
   }
-  const mhNomor = props.formData.MintaHarga || props.formData.Nomor;
+  // ⚠️ BARU: sama seperti handleFallbackImage, ikutkan Referensi dalam
+  // penentuan key fallback saat preview full-screen.
+  const mhNomor =
+    props.formData.MintaHarga ||
+    props.formData.Referensi ||
+    props.formData.Nomor;
   if (mhNomor) {
-    // ✅ FIX: path relatif
     resolvedImageUrl.value = `/file-gambar/mintaharga/${encodeURIComponent(mhNomor)}.jpg`;
   }
 };
