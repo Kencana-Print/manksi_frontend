@@ -407,7 +407,17 @@ const validateSave = async (skipPoCheck = false) => {
   }
 
   // Validasi NomorPO — harus ada sebelum dialog konfirmasi
-  if (!formData.value.NomorPO?.trim() && !skipPoCheck) {
+  // ⚠️ FIX: kalau pengajuan "MAP tanpa PO" sudah di-ACC sebelumnya
+  // (nopo_acc === "ACC"), jangan tampilkan dialog peringatan lagi —
+  // approval itu masih berlaku selama NomorPO tetap kosong seperti
+  // semula (backend syncNoPoApproval juga sudah menjaga supaya tidak
+  // direset). Dialog cuma relevan untuk kasus BELUM pernah diajukan
+  // ("") atau DITOLAK ("TOLAK"), yang memang butuh persetujuan baru.
+  if (
+    !formData.value.NomorPO?.trim() &&
+    !skipPoCheck &&
+    formData.value.nopo_acc !== "ACC"
+  ) {
     showNoPoDialog.value = true;
     return;
   }
