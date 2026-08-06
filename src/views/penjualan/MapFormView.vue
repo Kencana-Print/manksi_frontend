@@ -30,6 +30,7 @@ const wasApprovedOnLoad = ref(false);
 const router = useRouter();
 // const showPrintDialog = ref(false);
 // const savedNomor = ref("");
+const showNoPoDialog = ref(false);
 
 // ── STATE LOOKUPS ──
 const lookupOptions = ref({
@@ -214,6 +215,7 @@ const mapMapData = (rawData: any) => {
     isTutupBuku: d.istutupbuku,
     Sizes: d.sizes,
     Komponen: d.komponen,
+    nopo_acc: d.nopo_acc || "",
   };
 };
 
@@ -342,8 +344,18 @@ const loadSpkInformasi = async (divisiKode: any) => {
   }
 };
 
+const confirmSaveWithoutPo = async () => {
+  showNoPoDialog.value = false;
+  try {
+    await validateSave(true);
+  } catch (e) {
+    console.error(e);
+    toast.error("Terjadi kesalahan saat validasi.");
+  }
+};
+
 // Tambah fungsi validateSave di MapFormView.vue
-const validateSave = async () => {
+const validateSave = async (skipPoCheck = false) => {
   // Cek status edit
   if (isEditMode.value) {
     const status = formData.value.StatusEdit;
@@ -394,10 +406,8 @@ const validateSave = async () => {
   }
 
   // Validasi NomorPO — harus ada sebelum dialog konfirmasi
-  if (!formData.value.NomorPO?.trim()) {
-    toast.warning(
-      "Nomor PO harus diisi.\nJika tidak ada PO tertulis, cari DP Customer dari Penerimaan (tombol 🔍 di sebelah field Nomor PO).",
-    );
+  if (!formData.value.NomorPO?.trim() && !skipPoCheck) {
+    showNoPoDialog.value = true;
     return;
   }
 
@@ -522,7 +532,7 @@ const tabs = [
     v-model:show-save-dialog="showSaveDialog"
     v-model:show-cancel-dialog="showCancelDialog"
     v-model:show-close-dialog="showCloseDialog"
-    @validate-save="validateSave"
+    @validate-save="() => validateSave()"
     @confirm-save="executeSave"
     @confirm-cancel="executeCancel"
     @confirm-close="executeClose"
@@ -617,6 +627,38 @@ const tabs = [
       </v-card-actions>
     </v-card>
   </v-dialog> -->
+
+  <v-dialog v-model="showNoPoDialog" max-width="420px" persistent>
+    <v-card class="rounded-lg">
+      <v-card-title
+        class="pa-3 bg-warning text-white"
+        style="font-size: 13px; font-weight: 700"
+      >
+        Nomor PO Belum Diisi
+      </v-card-title>
+      <v-card-text class="pa-4" style="font-size: 12px">
+        MAP tetap bisa disimpan, tapi akan berstatus
+        <b class="text-warning">PASIF</b> sampai disetujui (<i
+          >Approve MAP Tanpa Nomor PO</i
+        >). <br /><br />
+        Lanjutkan simpan tanpa Nomor PO?
+      </v-card-text>
+      <v-card-actions class="pa-3 border-t">
+        <v-spacer />
+        <v-btn variant="text" size="small" @click="showNoPoDialog = false"
+          >Batal</v-btn
+        >
+        <v-btn
+          variant="flat"
+          size="small"
+          color="warning"
+          @click="confirmSaveWithoutPo"
+        >
+          Lanjutkan
+        </v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
 
   <!-- Dialog Konfirmasi Duplikat Nama -->
   <v-dialog v-model="showDuplikatDialog" max-width="520px" persistent>

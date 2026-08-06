@@ -34,8 +34,9 @@ const authData = ref<any>({});
 const authStatus = ref("Y");
 
 const headers = [
+  { title: "Jenis", key: "Jenis", width: "60px" }, // ← tambahan
   { title: "Nomor", key: "Nomor", width: "160px" },
-  { title: "NamaSO", key: "NamaSO", minWidth: "220px" },
+  { title: "Nama", key: "Nama", minWidth: "220px" }, // ganti dari NamaSO
   { title: "Divisi", key: "Divisi", width: "70px", align: "center" },
   { title: "Jumlah", key: "Jumlah", width: "90px", align: "end" },
   { title: "TglMinta", key: "TglMinta", width: "140px", align: "center" },
@@ -192,6 +193,17 @@ const getRowProps = () => ({});
       >
         {{ item.Acc || "–" }}
       </span>
+    </template>
+
+    <template #item.Jenis="{ item }">
+      <v-chip
+        size="x-small"
+        :color="item.Jenis === 'SO' ? 'blue' : 'purple'"
+        variant="tonal"
+        class="font-weight-bold"
+      >
+        {{ item.Jenis }}
+      </v-chip>
     </template>
 
     <template #item.TglMinta="{ item }">
