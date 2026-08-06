@@ -56,9 +56,7 @@ const loadKomponenFromProof = async () => {
   loadError.value = "";
   ensureKomponenStruct();
   if (!identifier.value) {
-    props.formData.KomponenSpk.ListPotong = [];
-    props.formData.KomponenSpk.ListCetakBordir = [];
-    return;
+    return; // ← jangan wipe kalau identifier belum siap (race dgn fetchData edit mode)
   }
   isLoading.value = true;
   try {
@@ -68,39 +66,47 @@ const loadKomponenFromProof = async () => {
     const proofPotong = res.data.data.ListPotong || [];
     const proofCetakBordir = res.data.data.ListCetakBordir || [];
 
-    // POTONG — full replace, tidak ada field manual di baris ini.
-    props.formData.KomponenSpk.ListPotong = proofPotong.map((p: any) => ({
-      Kode: p.Kode,
-      Nama: p.Nama,
-    }));
+    // POTONG — gabung Proof + baris manual (Kode tidak ada di Proof)
+    // yang sudah ada di formData (dari data tersimpan / diketik user).
+    const proofPotongKodes = new Set(proofPotong.map((p: any) => p.Kode));
+    const manualPotong = (props.formData.KomponenSpk.ListPotong || []).filter(
+      (r: any) => r.Kode && !proofPotongKodes.has(r.Kode),
+    );
+    props.formData.KomponenSpk.ListPotong = [
+      ...proofPotong.map((p: any) => ({ Kode: p.Kode, Nama: p.Nama })),
+      ...manualPotong,
+    ];
 
-    // SECOND PROCESS — Kode/Nama ikut Proof, tapi Proses/Penempatan/Ukuran
-    // yang sudah diisi user sebelumnya (mode edit, atau di sesi ini)
-    // dipertahankan, dicocokkan per Kode.
+    // SECOND PROCESS — sama pola.
     const existingByKode = new Map<string, CetakBordirRow>(
       (props.formData.KomponenSpk.ListCetakBordir || []).map((r: any) => [
         r.Kode,
         r,
       ]),
     );
-    props.formData.KomponenSpk.ListCetakBordir = proofCetakBordir.map(
-      (p: any) => {
-        const existing = existingByKode.get(p.Kode);
-        return {
-          Kode: p.Kode,
-          Nama: p.Nama,
-          Proses: existing?.Proses || p.Proses,
-          Penempatan: existing?.Penempatan || "",
-          Ukuran: existing?.Ukuran || "",
-        };
-      },
-    );
+    const proofCbKodes = new Set(proofCetakBordir.map((p: any) => p.Kode));
+    const fromProof = proofCetakBordir.map((p: any) => {
+      const existing = existingByKode.get(p.Kode);
+      return {
+        Kode: p.Kode,
+        Nama: p.Nama,
+        Proses: existing?.Proses || p.Proses,
+        Penempatan: existing?.Penempatan || "",
+        Ukuran: existing?.Ukuran || "",
+      };
+    });
+    const manualCetakBordir = (
+      props.formData.KomponenSpk.ListCetakBordir || []
+    ).filter((r: any) => r.Kode && !proofCbKodes.has(r.Kode));
+    props.formData.KomponenSpk.ListCetakBordir = [
+      ...fromProof,
+      ...manualCetakBordir,
+    ];
   } catch (e: any) {
     console.error("Gagal load komponen dari Proof:", e);
     loadError.value =
       e.response?.data?.message || e.message || "Gagal memuat data.";
-    props.formData.KomponenSpk.ListPotong = [];
-    props.formData.KomponenSpk.ListCetakBordir = [];
+    // ← FIX: jangan clear data yang sudah ada kalau cuma network error
   } finally {
     isLoading.value = false;
   }
