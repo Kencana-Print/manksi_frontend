@@ -193,9 +193,6 @@ const grandTotal = computed(() => {
 </template>
 
 <style scoped>
-/* Reset dasar untuk memastikan layout print konsisten */
-@import url("https://fonts.googleapis.com/css2?family=Arial:wght@400;700&display=swap");
-
 .print-container {
   width: 100%;
   max-width: 210mm; /* A4 Width */
