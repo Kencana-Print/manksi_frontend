@@ -103,6 +103,7 @@ const totalJumlah = (dtl: any[]) =>
         <thead>
           <tr>
             <th class="c-no">No</th>
+            <th style="width: 60px">No Pack</th>
             <th class="c-kode">Kode</th>
             <th>Nama</th>
             <th style="width: 80px">Ukuran</th>
@@ -114,6 +115,7 @@ const totalJumlah = (dtl: any[]) =>
         <tbody>
           <tr v-for="(r, i) in data.detail" :key="i">
             <td class="tc">{{ Number(i) + 1 }}</td>
+            <td class="tc">{{ r.stbjd_packing || "-" }}</td>
             <td class="mono">{{ r.stbjd_spk_nomor }}</td>
             <td>{{ r.spk_nama }}</td>
             <td>{{ r.stbjd_size }}</td>
@@ -125,7 +127,7 @@ const totalJumlah = (dtl: any[]) =>
         <tfoot>
           <tr>
             <td
-              colspan="4"
+              colspan="5"
               class="tr"
               style="font-weight: 700; padding-right: 4mm"
             >
