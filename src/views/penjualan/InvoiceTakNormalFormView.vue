@@ -510,26 +510,29 @@ const confirmRemoveInvNormalRow = () => {
 // CATATAN: tidak ada konsep Disc/Pph sama sekali di modul ini.
 const totalBarang = computed(() =>
   fd.value.Detail.reduce(
-    (s, r) => s + Number(r.Jumlah || 0) * Number(r.Harga || 0),
+    (s, r) => s + Math.round(Number(r.Jumlah || 0) * Number(r.Harga || 0)),
     0,
   ),
 );
 
 const totalPpn = computed(() => {
   if (!fd.value.StsPpn) return 0;
-  return totalBarang.value * (Number(fd.value.Ppn) / 100);
+  return Math.round(totalBarang.value * (Number(fd.value.Ppn) / 100));
 });
 
 const grandTotal = computed(() => {
   if (!fd.value.StsPpn) return totalBarang.value;
-  return totalBarang.value * ((100 + Number(fd.value.Ppn)) / 100);
+  // Ubah perhitungan grandTotal agar menjumlahkan hasil PPN yang sudah dibulatkan
+  return totalBarang.value + totalPpn.value;
 });
 
-const nilaiPiutang = computed(() => grandTotal.value - uangMuka.value);
+const nilaiPiutang = computed(
+  () => grandTotal.value - Math.round(uangMuka.value),
+);
 
 const totalNominalInvNormal = computed(() =>
   fd.value.InvoiceNormalList.reduce(
-    (s, r) => s + (r.Nomor ? Number(r.Nominal || 0) : 0),
+    (s, r) => s + (r.Nomor ? Math.round(Number(r.Nominal || 0)) : 0),
     0,
   ),
 );
