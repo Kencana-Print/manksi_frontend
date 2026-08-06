@@ -178,11 +178,11 @@ const {
       ...data,
       NomorInv: route.query.nomor || data.NomorInv,
       ApvOverride: confirmedApvReset.value ? "" : undefined,
-      Disc: Math.round(Number(data.Disc) || 0), // ← tambahan
+      Disc: Number(data.Disc) || 0, // ⚠️ FIX: kirim apa adanya, jangan dibulatkan
       Detail: data.Detail.filter((r) => r.Kode && Number(r.Jumlah) !== 0).map(
         ({ _key: _k, IsExisting: _ie, ...r }) => ({
           ...r,
-          Harga: Math.round(Number(r.Harga) || 0), // ← tambahan
+          Harga: Number(r.Harga) || 0, // ⚠️ FIX: kirim apa adanya, jangan dibulatkan
         }),
       ),
     };
