@@ -174,13 +174,16 @@ const {
     if (sjBaruTanpaSj && !confirmedApvReset.value) {
       // handled di validateSave sebelum sampai sini
     }
-
     const payload = {
       ...data,
       NomorInv: route.query.nomor || data.NomorInv,
       ApvOverride: confirmedApvReset.value ? "" : undefined,
+      Disc: Math.round(Number(data.Disc) || 0), // ← tambahan
       Detail: data.Detail.filter((r) => r.Kode && Number(r.Jumlah) !== 0).map(
-        ({ _key: _k, IsExisting: _ie, ...r }) => r,
+        ({ _key: _k, IsExisting: _ie, ...r }) => ({
+          ...r,
+          Harga: Math.round(Number(r.Harga) || 0), // ← tambahan
+        }),
       ),
     };
     return isEditMode.value ? svc.update(payload) : svc.save(payload);
@@ -471,27 +474,34 @@ const totalBarang = computed(() =>
 const totalPpn = computed(() => {
   if (!fd.value.StsPpn) return 0;
   const disc = Number(fd.value.Disc || 0);
+  let raw: number;
   if (fd.value.Pph === "Disc") {
     const baseAfterDisc = totalBarang.value - disc;
-    return baseAfterDisc * (Number(fd.value.Ppn) / 100);
+    raw = baseAfterDisc * (Number(fd.value.Ppn) / 100);
+  } else {
+    raw = totalBarang.value * (Number(fd.value.Ppn) / 100);
   }
-  return totalBarang.value * (Number(fd.value.Ppn) / 100);
+  return Math.round(raw); // ← pembulatan
 });
 
 const grandTotal = computed(() => {
   const disc = Number(fd.value.Disc || 0);
+  let raw: number;
   if (!fd.value.StsPpn) {
-    return totalBarang.value - disc;
-  }
-  if (fd.value.Pph === "Disc") {
+    raw = totalBarang.value - disc;
+  } else if (fd.value.Pph === "Disc") {
     const baseAfterDisc = totalBarang.value - disc;
-    return baseAfterDisc + (baseAfterDisc * Number(fd.value.Ppn)) / 100;
+    raw = baseAfterDisc + (baseAfterDisc * Number(fd.value.Ppn)) / 100;
+  } else {
+    raw = totalBarang.value - disc + totalPpn.value;
   }
-  return totalBarang.value - disc + totalPpn.value;
+  return Math.round(raw); // ← pembulatan
 });
 
 const uangMuka = ref(0); // dari getDebet, hanya tersedia saat edit
-const nilaiPiutang = computed(() => grandTotal.value - uangMuka.value);
+const nilaiPiutang = computed(() =>
+  Math.round(grandTotal.value - uangMuka.value),
+); // ← pembulatan
 
 watch(
   () => fd.value.StsPpn,
@@ -954,6 +964,7 @@ onMounted(async () => {
                       type="number"
                       class="ci tr hl"
                       @focus="sel"
+                      @blur="row.Harga = Math.round(row.Harga)"
                     />
                   </td>
                   <td class="tr" style="padding-right: 6px">

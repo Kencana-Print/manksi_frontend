@@ -136,6 +136,7 @@ const currentComponent = computed(() => {
     return ApprovalMutasiNoPlanComponent;
   if (selectedApproval.value === "spk_cetak_ulang")
     return ApprovalSpkCetakUlangComponent;
+  if (selectedApproval.value === "nopo") return ApprovalNoPoComponent; // ← tambahan
   return null;
 });
 </script>
