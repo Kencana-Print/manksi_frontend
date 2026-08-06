@@ -131,6 +131,7 @@ const initialData = {
   PoFileBlob: "",
   Sizes: [] as any[],
   Komponen: [] as any[],
+  nopo_acc: "", // ← tambahan
 };
 
 // Fungsi Helper Mapping agar Konsisten antara Fetch Edit & Load Referensi

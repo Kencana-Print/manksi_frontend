@@ -71,9 +71,11 @@ const todayLocal = () => {
 
 let _key = 1;
 const sel = (e: FocusEvent) => (e.target as HTMLInputElement).select();
-const num = (v: any) => Number(v || 0).toLocaleString("id-ID");
+const num = (v: any) => Math.round(Number(v || 0)).toLocaleString("id-ID");
 
 const divisiList = ref<{ kode: number; nama: string }[]>([]);
+
+const focusedHargaKey = ref<number | null>(null);
 
 // NOTE: PPN default AKTIF (StsPpn=1, Ppn=11) — beda dari Invoice biasa yg
 // default OFF. Sesuai Delphi refreshdata: cbbPPN.Checked:=True.
@@ -945,10 +947,24 @@ onMounted(async () => {
                   <td>
                     <input
                       v-if="row.Kode"
-                      v-model.number="row.Jumlah"
                       type="number"
                       class="ci tr hl"
-                      @focus="sel"
+                      :value="
+                        focusedHargaKey === row._key
+                          ? row.Harga
+                          : Math.round(row.Harga || 0)
+                      "
+                      @focus="
+                        (e) => {
+                          sel(e);
+                          focusedHargaKey = row._key;
+                        }
+                      "
+                      @input="
+                        row.Harga =
+                          ($event.target as HTMLInputElement).valueAsNumber || 0
+                      "
+                      @blur="focusedHargaKey = null"
                     />
                   </td>
                   <td>
