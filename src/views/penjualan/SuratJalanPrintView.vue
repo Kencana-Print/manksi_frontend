@@ -143,31 +143,20 @@ const wrapText = (text: string, maxWidth: number): string[] => {
   return lines.length ? lines : [""];
 };
 
-const PAGE_WIDTH = 136; // lebar kertas continuous-form (sesuaikan kalau printer beda)
+const PAGE_WIDTH = 136;
 const NAMA_W = 50;
 const KET_W = 26;
-// ⬅ Tinggi 1 lembar fisik continuous-form dalam baris (@ 6 LPI standar).
-// Konten di-pad tepat ke angka ini sebelum Form Feed dikirim, supaya
-// lompatan FF selalu presisi ke awal lembar berikutnya — sebelumnya FF
-// cuma dikirim 1x di akhir tanpa hitungan tinggi, jadi jarak lompatannya
-// berubah-ubah tergantung jumlah baris SPK (itu yang kelihatan sbg "blank
-// kosong" tidak konsisten). Sesuaikan angka ini kalau ternyata masih
-// meleset dari perforasi kertas fisik.
-const PAGE_LINES = 33; // 14cm ÷ 2,54 × 6 LPI = 33,07 → 33 baris.
-// ⬅ Footer (note pengaduan dkk) di-anchor 2 baris sebelum ujung fisik
-// kertas — bukan mepet PAGE_LINES persis, kasih sedikit margin aman.
-const FOOTER_ANCHOR_LINE = PAGE_LINES - 2; // 31
 
-// ✅ Garis solid (bukan putus-putus), sama seperti InvoicePrintView
+const MAX_DATA_ROWS_PER_PAGE = 10;
+
 const LINE = "_".repeat(PAGE_WIDTH);
 
 const generateTxt = () => {
   const h = header.value;
   const rows = detail.value;
   const halfL = 67;
-  const halfR = 68; // halfL + 1(spasi) + halfR = 136
+  const halfR = 68;
 
-  // ── Header block (dipakai ulang tiap halaman fisik) ──
   const buildHeaderLines = (): string[] => {
     const lines: string[] = [];
     lines.push(padR(h.perush_nama || "", PAGE_WIDTH));
@@ -199,7 +188,11 @@ const generateTxt = () => {
     return lines;
   };
 
-  // ── Footer block (hanya di halaman terakhir) ──
+  // ⬅ Footer sekarang dibangun sekali dan dipakai ulang di SETIAP halaman
+  // (dulu cuma di halaman terakhir). ASUMSI: "Total Jumlah" tetap grand
+  // total SELURUH SPK di seluruh dokumen (sama persis di tiap halaman),
+  // bukan subtotal per halaman — kalau maunya subtotal per halaman, kasih
+  // tau, tinggal saya ubah jadi hitung dari `chunk` bukan `rows`.
   const buildFooterLines = (): string[] => {
     const totalJml = rows.reduce(
       (s: number, r: any) => s + Number(r.sjd_jumlah || 0),
@@ -249,52 +242,38 @@ const generateTxt = () => {
   const headerLines = buildHeaderLines();
   const footerLines = buildFooterLines();
 
-  // Berapa baris data yang muat di halaman NON-terakhir (tanpa footer)
-  const maxDataPerPage = Math.max(1, PAGE_LINES - headerLines.length);
-
+  // ⬅ Chunk data SELALU tetap MAX_DATA_ROWS_PER_PAGE baris per halaman —
+  // tidak lagi dihitung dari sisa tinggi kertas (patokan lama terbukti
+  // salah utk kertas fisik yg dipakai).
   const chunks: any[][] = [];
-  for (let i = 0; i < rows.length; i += maxDataPerPage) {
-    chunks.push(rows.slice(i, i + maxDataPerPage));
+  for (let i = 0; i < rows.length; i += MAX_DATA_ROWS_PER_PAGE) {
+    chunks.push(rows.slice(i, i + MAX_DATA_ROWS_PER_PAGE));
   }
   if (chunks.length === 0) chunks.push([]);
 
   const allPages: string[][] = [];
 
   chunks.forEach((chunk, ci) => {
-    const startNo = ci * maxDataPerPage;
+    const startNo = ci * MAX_DATA_ROWS_PER_PAGE;
     const dataLines = chunk.map((r: any, i: number) =>
       dataLineOf(r, startNo + i + 1),
     );
-    const isLast = ci === chunks.length - 1;
-    const page = [...headerLines, ...dataLines];
 
-    if (isLast) {
-      if (page.length + footerLines.length <= FOOTER_ANCHOR_LINE) {
-        const pad = Math.max(
-          0,
-          FOOTER_ANCHOR_LINE - page.length - footerLines.length,
-        );
-        allPages.push([...page, ...Array(pad).fill(""), ...footerLines]);
-      } else {
-        // Data terlalu banyak buat 1 halaman bareng footer — genapkan
-        // halaman ini penuh, footer mulai bersih di halaman fisik baru.
-        const pad = Math.max(0, PAGE_LINES - page.length);
-        allPages.push([...page, ...Array(pad).fill("")]);
-        const footerPad = Math.max(0, FOOTER_ANCHOR_LINE - footerLines.length);
-        allPages.push([...Array(footerPad).fill(""), ...footerLines]);
-      }
-    } else {
-      // Halaman tengah (kalau data > 1 halaman fisik): pad penuh ke
-      // PAGE_LINES supaya FF antar halaman presisi ke baris pertama
-      // header halaman berikutnya.
-      const pad = Math.max(0, PAGE_LINES - page.length);
-      allPages.push([...page, ...Array(pad).fill("")]);
-    }
+    // ⬅ Kalau baris data di halaman ini kurang dari MAX_DATA_ROWS_PER_PAGE
+    // (biasanya halaman terakhir), sisanya di-pad baris kosong — supaya
+    // tinggi tiap halaman fisik SELALU sama, dan Form Feed antar halaman
+    // lompat presisi ke titik yang sama tiap kali (header halaman
+    // berikutnya selalu mulai di baris yang sama).
+    const blankPad = Math.max(0, MAX_DATA_ROWS_PER_PAGE - chunk.length);
+    const paddedData = [...dataLines, ...Array(blankPad).fill("")];
+
+    // ⬅ Header DAN footer SEKARANG SELALU ikut di setiap halaman —
+    // bukan cuma halaman terakhir. Setiap lembar fisik jadi lengkap
+    // berdiri sendiri (ada kop, tabel, sampai tanda tangan).
+    allPages.push([...headerLines, ...paddedData, ...footerLines]);
   });
 
-  // Form Feed di ANTARA setiap halaman fisik — bukan cuma 1x di paling
-  // akhir. Karena tiap halaman sudah persis PAGE_LINES tinggi, FF di sini
-  // lompatnya selalu presisi, tidak ada lagi jarak blank yang berubah-ubah.
+  // Form Feed di antara tiap halaman fisik.
   return allPages.map((p) => p.join("\n")).join("\n\f\n");
 };
 

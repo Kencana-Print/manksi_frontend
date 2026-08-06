@@ -171,23 +171,21 @@ const wrapText = (text: string, maxWidth: number): string[] => {
 };
 
 // ── Konstanta kertas dot matrix — disamakan dengan InvoicePrintView ──
-// continuous-form 15" di 10 CPI ≈ 136 kolom.
-const PAGE_WIDTH = 136;
-const PAGE_LINES = 65; // tinggi kertas fisik total — tetap dipakai utk deteksi overflow multi-halaman
-// ⬅ Footer (Terbilang/Total/TTD) di-anchor ke baris ini, BUKAN mepet ke
-// PAGE_LINES (paling bawah kertas) — sama fix seperti InvoicePrintView,
-// supaya baris tanda tangan tidak kepotong. Tuning naik/turun sesuai
-// hasil cetak fisik.
+const PAGE_WIDTH = 110;
+const BASE_WIDTH = 136; // jangan diubah — acuan kalibrasi original
+const SCALE = PAGE_WIDTH / BASE_WIDTH;
+const col = (n: number) => Math.max(1, Math.round(n * SCALE));
+
+const PAGE_LINES = 65;
 const FOOTER_ANCHOR_LINE = 54;
 
-// ✅ Garis solid (bukan putus-putus)
 const LINE = "_".repeat(PAGE_WIDTH);
 
 // Lebar kolom footer (Di bayarkan ke / Dibuat oleh / Mengetahui) —
-// disamakan dengan InvoicePrintView biar TTD gak mepet ke rekening.
-const COL_BAYAR = 58;
-const COL_TTD1 = 39;
-const COL_TTD2 = 39; // 58+39+39 = 136
+// sekarang proporsional juga.
+const COL_BAYAR = col(58);
+const COL_TTD1 = col(39);
+const COL_TTD2 = col(39);
 
 // ── FUNGSI GENERATE TXT ──
 const generateTxt = () => {
@@ -196,15 +194,14 @@ const generateTxt = () => {
 
   // ── Bangun header (kop + judul + info) sebagai array baris ──
   const buildHeaderLines = (): string[] => {
-    const halfL = 67;
-    const halfR = 68; // halfL + 1(spasi) + halfR = 136
+    const halfL = col(67);
+    const halfR = PAGE_WIDTH - halfL - 1; // sisa lebar, dikurangi 1 spasi pemisah
     const cAlamat = h.inv_cus_alamat || h.cus_alamat || "";
     const alamatLines = wrapText(cAlamat, halfR - 12);
 
     const lines: string[] = [];
     lines.push(padR(h.perush_nama || "", PAGE_WIDTH));
     lines.push(padR(h.perushd_alamat || h.perush_alamat || "", PAGE_WIDTH));
-    // ✅ Nomor telepon perusahaan di-hide dari cetakan
     lines.push("");
     lines.push(padC("I N V O I C E   P R O F O R M A", PAGE_WIDTH));
     lines.push("");
@@ -220,10 +217,9 @@ const generateTxt = () => {
     for (let i = 2; i < alamatLines.length; i++) {
       lines.push(`${padR("", halfL)} ${padR(alamatLines[i], halfR)}`);
     }
-    // ✅ Nomor telp/fax customer di-hide dari cetakan
     lines.push(LINE);
     lines.push(
-      `${padR("No", 3)} ${padR("SPK", 16)} ${padR("Nama", 46)} ${padR("Ukuran", 22)} ${padL("Jumlah", 12)} ${padL("Harga", 16)} ${padL("Total", 16)}`,
+      `${padR("No", col(3))} ${padR("SPK", col(16))} ${padR("Nama", col(46))} ${padR("Ukuran", col(22))} ${padL("Jumlah", col(12))} ${padL("Harga", col(16))} ${padL("Total", col(16))}`,
     );
     lines.push(LINE);
     return lines;
@@ -233,27 +229,29 @@ const generateTxt = () => {
   const buildFooterLines = (): string[] => {
     const lines: string[] = [];
     lines.push(LINE);
-    // ✅ Terbilang huruf kapital semua
+    const wTerbilang = col(95);
+    const wLabel = col(14);
+    const wAngka = col(20);
     const TERBILANG = (terbilang(grandTotal.value) + " Rupiah").toUpperCase();
-    const tb1 = TERBILANG.substring(0, 48);
-    const tb2 = TERBILANG.length > 48 ? TERBILANG.substring(48, 96) : "";
+    const tb1 = TERBILANG.substring(0, col(48));
+    const tb2 =
+      TERBILANG.length > col(48) ? TERBILANG.substring(col(48), col(96)) : "";
     lines.push(
-      `${padR("Terbilang : " + tb1, 95)} ${padR("Total", 14)}: ${padL(numFmt(totalNominal.value), 20)}`,
+      `${padR("Terbilang : " + tb1, wTerbilang)} ${padR("Total", wLabel)}: ${padL(numFmt(totalNominal.value), wAngka)}`,
     );
     lines.push(
-      `${padR(tb2, 95)} ${padR("Total PPN", 14)}: ${padL(numFmt(totalPpn.value), 20)}`,
+      `${padR(tb2, wTerbilang)} ${padR("Total PPN", wLabel)}: ${padL(numFmt(totalPpn.value), wAngka)}`,
     );
     lines.push(
-      `${padR("", 95)} ${padR("Grand Total", 14)}: ${padL(numFmt(grandTotal.value), 20)}`,
+      `${padR("", wTerbilang)} ${padR("Grand Total", wLabel)}: ${padL(numFmt(grandTotal.value), wAngka)}`,
     );
     lines.push(
-      `${padR("", 95)} ${padR("Uang Muka", 14)}: ${padL(numFmt(h.uang_muka), 20)}`,
+      `${padR("", wTerbilang)} ${padR("Uang Muka", wLabel)}: ${padL(numFmt(h.uang_muka), wAngka)}`,
     );
     lines.push(
-      `${padR("", 95)} ${padR("Nilai Piutang", 14)}: ${padL(numFmt(nilaiPiutang.value), 20)}`,
+      `${padR("", wTerbilang)} ${padR("Nilai Piutang", wLabel)}: ${padL(numFmt(nilaiPiutang.value), wAngka)}`,
     );
     lines.push("");
-    // ✅ Kolom digeser sama seperti Invoice: TTD gak nempel ke rekening
     lines.push(
       `${padR("Di bayarkan ke", COL_BAYAR)}${padR("Dibuat oleh,", COL_TTD1)}${padR("Mengetahui,", COL_TTD2)}`,
     );
@@ -269,7 +267,7 @@ const generateTxt = () => {
   };
 
   const dataLineOf = (item: any, idx: number) =>
-    `${padR(String(idx + 1), 3)} ${padR(item.kode || "", 16)} ${padR(item.nama || "", 46)} ${padR(item.ukuran || "", 22)} ${padL(numFmt(item.jumlah), 12)} ${padL(numFmt(item.harga), 16)} ${padL(numFmt(roundRp((Number(item.jumlah) || 0) * (Number(item.harga) || 0))), 16)}`;
+    `${padR(String(idx + 1), col(3))} ${padR(item.kode || "", col(16))} ${padR(item.nama || "", col(46))} ${padR(item.ukuran || "", col(22))} ${padL(numFmt(item.jumlah), col(12))} ${padL(numFmt(item.harga), col(16))} ${padL(numFmt(roundRp((Number(item.jumlah) || 0) * (Number(item.harga) || 0))), col(16))}`;
 
   const headerLines = buildHeaderLines();
   const footerLines = buildFooterLines();

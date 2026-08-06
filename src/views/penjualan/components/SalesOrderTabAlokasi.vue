@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, watch, nextTick } from "vue";
 import {
   IconPlus,
   IconTrash,
@@ -41,9 +41,10 @@ const removeRow = (index: number) => {
 };
 
 // Trigger input file untuk Import Excel
-const triggerExcelUpload = () => {
+const triggerExcelUpload = async () => {
   if (fileInputRef.value) {
-    fileInputRef.value.value = ""; // Reset input
+    fileInputRef.value.value = "";
+    await nextTick();
     fileInputRef.value.click();
   }
 };
@@ -55,15 +56,12 @@ const handleExcelUpload = (e: Event) => {
   if (!file) return;
 
   const reader = new FileReader();
-  reader.onload = (e) => {
+  reader.onload = (ev) => {
     try {
-      const data = new Uint8Array(e.target?.result as ArrayBuffer);
+      const data = new Uint8Array(ev.target?.result as ArrayBuffer);
       const workbook = XLSX.read(data, { type: "array" });
       const firstSheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[firstSheetName];
-
-      // Ubah data sheet jadi array of array
-      // header: 1 berarti outputnya array flat tanpa menjadikan baris 1 sbg keys object
       const jsonData: any[][] = XLSX.utils.sheet_to_json(worksheet, {
         header: 1,
       });
@@ -75,11 +73,9 @@ const handleExcelUpload = (e: Event) => {
 
       if (!props.formData.Alokasi) props.formData.Alokasi = [];
 
-      // Sesuai Delphi: Mulai dari baris ke-2 (index 1)
       let importedCount = 0;
       for (let r = 1; r < jsonData.length; r++) {
         const row = jsonData[r];
-        // Pastikan kolom 1 (Alamat) tidak kosong
         if (row[0] && String(row[0]).trim() !== "") {
           props.formData.Alokasi.push({
             alamat: String(row[0] || "").trim(),
@@ -93,15 +89,41 @@ const handleExcelUpload = (e: Event) => {
       }
 
       toast.success(
-        `${importedCount} baris alokasi berhasil diimport dari Excel.`,
+        `${importedCount} baris alokasi berhasil ditambahkan dari Excel. Total sekarang: ${props.formData.Alokasi.length} baris.`, // ⬅ pesan lebih jelas biar user langsung lihat kalau ini kumulatif, bukan replace
       );
     } catch (error) {
       console.error(error);
       toast.error("Gagal membaca file Excel. Pastikan format sesuai.");
+    } finally {
+      target.value = ""; // ⬅ BARU: reset JUGA di akhir proses (bukan cuma di
+      // triggerExcelUpload), supaya state input benar-benar bersih untuk
+      // import berikutnya, apa pun timing browsernya.
     }
   };
   reader.readAsArrayBuffer(file);
 };
+
+// ── Peringatan live: Total Qty Alokasi vs Jumlah SO ──────────────────
+// Dulu ini blocking check di validateSave() parent (baru muncul pas
+// tombol Simpan diklik). Sekarang jadi toast warning langsung tiap kali
+// datanya berubah — TIDAK memblokir simpan, cuma mengingatkan.
+let alokasiWarnTimer: ReturnType<typeof setTimeout> | null = null;
+
+watch(
+  () => [totalAlokasi.value, Number(props.formData.spk_jumlah) || 0],
+  ([total, jumlah]) => {
+    if (alokasiWarnTimer) clearTimeout(alokasiWarnTimer);
+    // Debounce 600ms — supaya tidak spam toast tiap keystroke saat user
+    // masih mengetik angka jumlah di salah satu baris.
+    alokasiWarnTimer = setTimeout(() => {
+      if (total > 0 && jumlah > 0 && total !== jumlah) {
+        toast.warning(
+          `Total Qty Alokasi (${total.toLocaleString("id-ID")}) belum sama dengan Jumlah SO (${jumlah.toLocaleString("id-ID")}). Silahkan cek kembali.`,
+        );
+      }
+    }, 600);
+  },
+);
 </script>
 
 <template>

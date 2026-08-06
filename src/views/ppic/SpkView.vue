@@ -549,14 +549,22 @@ const previewScale = ref(1);
 const previewContentHeight = ref(1123); // fallback awal = 1 halaman A4
 let previewResizeObserver: ResizeObserver | null = null;
 
-const PAGE_WIDTH_PX = 793; // ~210mm @ 96dpi
+// Cek apakah SPK menggunakan format cetak Landscape (P01 atau Spanduk/MMT P02/P05)
+const isPreviewLandscape = computed(() => {
+  if (!selectedItem.value) return false;
+  const cab = selectedItem.value.Cab;
+  return ["P01", "P02", "P05"].includes(cab);
+});
+
+// A4 Portrait = 793px, A4 Landscape = 1123px
+const PAGE_WIDTH_PX = computed(() => (isPreviewLandscape.value ? 1123 : 793));
 
 const recomputePreviewScale = () => {
   const el = previewContainerEl.value;
   if (!el) return;
   const w = el.clientWidth - 24; // padding kiri-kanan
   if (w < 50) return; // belum ke-layout beneran, skip
-  const scale = Math.min(w / PAGE_WIDTH_PX, 1);
+  const scale = Math.min(w / PAGE_WIDTH_PX.value, 1); // <-- Tambah .value
   previewScale.value = scale > 0 ? scale : 1;
 };
 
@@ -573,7 +581,7 @@ const onPreviewIframeLoad = () => {
 };
 
 const previewWrapperStyle = computed(() => ({
-  width: `${PAGE_WIDTH_PX}px`,
+  width: `${PAGE_WIDTH_PX.value}px`, // <-- Tambah .value
   height: `${previewContentHeight.value}px`,
   transform: `scale(${previewScale.value})`,
   transformOrigin: "top left",
@@ -1156,18 +1164,18 @@ const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
   >
     <v-card
       rounded="lg"
-      style="
-        height: 90vh;
-        width: 850px;
-        max-width: 96vw;
-        min-width: 420px;
-        min-height: 320px;
-        display: flex;
-        flex-direction: column;
-        resize: both;
-        overflow: hidden;
-        margin: 0 auto;
-      "
+      :style="{
+        height: '90vh',
+        width: isPreviewLandscape ? '1180px' : '850px' /* <-- Dibuat Dinamis */,
+        maxWidth: '96vw',
+        minWidth: '420px',
+        minHeight: '320px',
+        display: 'flex',
+        flexDirection: 'column',
+        resize: 'both',
+        overflow: 'hidden',
+        margin: '0 auto',
+      }"
     >
       <v-card-title
         class="bg-primary text-white pa-3 flex-shrink-0"

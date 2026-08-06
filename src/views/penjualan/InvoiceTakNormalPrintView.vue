@@ -119,13 +119,12 @@ const terbilang = (n: number): string => {
 };
 
 // ── Konstanta kertas dot matrix — 21cm (lebar cetak) x 27,8cm (panjang feed) ──
-// Lebar 21cm ÷ 2,54 = 8,27" → pada pitch NORMAL 10 CPI = ~80 karakter/baris.
-const PAGE_WIDTH = 80;
-const PAGE_LINES = 65; // tinggi kertas fisik total — tetap dipakai utk deteksi overflow multi-halaman
-// ⬅ Footer (Terbilang/Total/TTD) di-anchor ke baris ini, BUKAN mepet ke
-// PAGE_LINES (paling bawah kertas) — sama fix seperti InvoicePrintView,
-// supaya baris tanda tangan tidak kepotong kalau kertas fisik sedikit
-// lebih pendek dari asumsi. Tuning naik/turun sesuai hasil cetak fisik.
+const PAGE_WIDTH = 110; // contoh: ~81% dari lebar penuh (136)
+const BASE_WIDTH = 136; // jangan diubah — acuan kalibrasi original
+const SCALE = PAGE_WIDTH / BASE_WIDTH;
+const col = (n: number) => Math.max(1, Math.round(n * SCALE));
+
+const PAGE_LINES = 65;
 const FOOTER_ANCHOR_LINE = 54;
 
 // ── Generate TXT (Dot Matrix) — sesuai Delphi doslipINV2 ──────────────
@@ -140,8 +139,11 @@ const generateTxt = () => {
   const LINE = "-".repeat(PAGE_WIDTH);
 
   const buildHeaderLines = (): string[] => {
+    const halfL = col(67);
+    const halfR = PAGE_WIDTH - halfL - 1; // sisa lebar, dikurangi 1 spasi pemisah
+
     const cAlamat = h.inv_cus_alamat || h.cus_alamat || "";
-    const alamatLines = wrapText(cAlamat, 34);
+    const alamatLines = wrapText(cAlamat, halfR);
     const lines: string[] = [];
     lines.push(padR(h.perush_nama || "", PAGE_WIDTH));
     lines.push(padR(h.perush_alamat || "", PAGE_WIDTH));
@@ -150,23 +152,23 @@ const generateTxt = () => {
     lines.push(padC("I N V O I C E", PAGE_WIDTH));
     lines.push("");
     lines.push(
-      `${padR("Nomor      : " + (h.inv_nomor || ""), 40)}${padR("Customer : " + (h.cus_nama || ""), 40)}`,
+      `${padR("Nomor      : " + (h.inv_nomor || ""), halfL)} ${padR("Customer : " + (h.cus_nama || ""), halfR)}`,
     );
     lines.push(
-      `${padR("Tanggal    : " + (h.inv_tanggal_fmt || ""), 40)}${padR(alamatLines[0] || "", 40)}`,
+      `${padR("Tanggal    : " + (h.inv_tanggal_fmt || ""), halfL)} ${padR(alamatLines[0] || "", halfR)}`,
     );
     lines.push(
-      `${padR("Keterangan : " + (h.inv_keterangan || ""), 40)}${padR(alamatLines[1] || "", 40)}`,
+      `${padR("Keterangan : " + (h.inv_keterangan || ""), halfL)} ${padR(alamatLines[1] || "", halfR)}`,
     );
     for (let i = 2; i < alamatLines.length; i++) {
-      lines.push(`${padR("", 40)}${padR(alamatLines[i], 40)}`);
+      lines.push(`${padR("", halfL)} ${padR(alamatLines[i], halfR)}`);
     }
     lines.push(
-      `${padR("", 40)}${padR((h.cus_telp || "") + "/" + (h.cus_fax || ""), 40)}`,
+      `${padR("", halfL)} ${padR((h.cus_telp || "") + "/" + (h.cus_fax || ""), halfR)}`,
     );
     lines.push(LINE);
     lines.push(
-      `${padR("No", 3)} ${padR("SPK", 10)} ${padR("Nama", 24)} ${padR("Ukuran", 13)} ${padL("Jumlah", 8)} ${padL("Harga", 10)} ${padL("Total", 10)}`,
+      `${padR("No", col(3))} ${padR("SPK", col(12))} ${padR("Nama", col(55))} ${padR("Ukuran", col(20))} ${padL("Jumlah", col(10))} ${padL("Harga", col(12))} ${padL("Total", col(18))}`,
     );
     lines.push(LINE);
     return lines;
@@ -176,35 +178,41 @@ const generateTxt = () => {
   const buildFooterLines = (): string[] => {
     const lines: string[] = [];
     lines.push(LINE);
-    const TERBILANG = terbilang(t.grandTotal) + " Rupiah";
-    const tb1 = TERBILANG.substring(0, 28);
-    const tb2 = TERBILANG.length > 28 ? TERBILANG.substring(28, 56) : "";
+    const wTerbilang = col(95);
+    const wLabel = col(14);
+    const wAngka = col(17);
+    const TERBILANG = (terbilang(t.grandTotal) + " Rupiah").toUpperCase();
+    const tb1 = TERBILANG.substring(0, wTerbilang);
+    const tb2 =
+      TERBILANG.length > wTerbilang
+        ? TERBILANG.substring(wTerbilang, wTerbilang * 2)
+        : "";
     lines.push(
-      `${padR("Terbilang : " + tb1, 55)} ${padR("Total", 12)}: ${padL(num(t.totalBarang), 12)}`,
+      `${padR("Terbilang : " + tb1, wTerbilang)}${padR("Total", wLabel)}: ${padL(num(t.totalBarang), wAngka)}`,
     );
     lines.push(
-      `${padR(tb2, 55)} ${padR("Total PPN", 12)}: ${padL(num(t.totalPpn), 12)}`,
+      `${padR(tb2, wTerbilang)}${padR("Total PPN", wLabel)}: ${padL(num(t.totalPpn), wAngka)}`,
     );
     lines.push(
-      `${padR("", 55)} ${padR("Grand Total", 12)}: ${padL(num(t.grandTotal), 12)}`,
+      `${padR("", wTerbilang)}${padR("Grand Total", wLabel)}: ${padL(num(t.grandTotal), wAngka)}`,
     );
     lines.push(
-      `${padR("", 55)} ${padR("Uang Muka", 12)}: ${padL(num(t.uangMuka), 12)}`,
+      `${padR("", wTerbilang)}${padR("Uang Muka", wLabel)}: ${padL(num(t.uangMuka), wAngka)}`,
     );
     lines.push(
-      `${padR("", 55)} ${padR("Nilai Piutang", 12)}: ${padL(num(t.nilaiPiutang), 12)}`,
+      `${padR("", wTerbilang)}${padR("Nilai Piutang", wLabel)}: ${padL(num(t.nilaiPiutang), wAngka)}`,
     );
     lines.push("");
     lines.push(
-      `${padR("Di bayarkan ke", 25)}${padR("Dibuat oleh,", 28)}${padR("Mengetahui,", 27)}`,
+      `${padR("Di bayarkan ke", col(43))}${padR("Dibuat oleh,", col(48))}${padR("Mengetahui,", col(45))}`,
     );
-    lines.push(padR("REKENING : " + (h.inv_rekening || ""), 50));
-    lines.push(padR("ATAS NAMA: " + (h.perushd_atasnama || ""), 50));
-    lines.push(padR("BANK     : " + (h.perushd_bank || ""), 50));
+    lines.push(padR("REKENING : " + (h.inv_rekening || ""), PAGE_WIDTH));
+    lines.push(padR("ATAS NAMA: " + (h.perushd_atasnama || ""), PAGE_WIDTH));
+    lines.push(padR("BANK     : " + (h.perushd_bank || ""), PAGE_WIDTH));
     lines.push("");
     lines.push("");
     lines.push(
-      `${padR("", 25)}${padR("(               )", 28)}${padR("(               )", 27)}`,
+      `${padR("", col(43))}${padR("(               )", col(48))}${padR("(               )", col(45))}`,
     );
     return lines;
   };
@@ -212,7 +220,7 @@ const generateTxt = () => {
   const headerLines = buildHeaderLines();
   const footerLines = buildFooterLines();
   const dataLineOf = (r: any, lineNum: number) =>
-    `${padR(String(lineNum), 3)} ${padR(r.invd_spk_nomor || "", 10)} ${padR(r.nama_barang || "", 24)} ${padR(r.invd_ukuran || "", 13)} ${padL(num(r.invd_jumlah), 8)} ${padL(num(r.invd_harga), 10)} ${padL(num(Math.round(Number(r.invd_jumlah) * Number(r.invd_harga))), 10)}`;
+    `${padR(String(lineNum), col(3))} ${padR(r.invd_spk_nomor || "", col(12))} ${padR(r.nama_barang || "", col(55))} ${padR(r.invd_ukuran || "", col(20))} ${padL(num(r.invd_jumlah), col(10))} ${padL(num(r.invd_harga), col(12))} ${padL(num(Math.round(Number(r.invd_jumlah) * Number(r.invd_harga))), col(18))}`;
 
   const maxDataLinesPerPage = Math.max(1, PAGE_LINES - headerLines.length - 1);
   const xRecord = Math.min(30, maxDataLinesPerPage);

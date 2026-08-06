@@ -1166,17 +1166,17 @@ const validateSave = async (skipPoCheck = false) => {
     return;
   }
 
-  // 6. Validasi Total Qty Alokasi vs Jumlah Pesanan
-  if (fd.Alokasi && fd.Alokasi.length > 0) {
-    const sumAlokasi = fd.Alokasi.reduce(
-      (acc: number, curr: any) => acc + (Number(curr.jumlah) || 0),
-      0,
-    );
-    if (sumAlokasi > 0 && sumAlokasi !== qtyPesan) {
-      toast.warning("Jumlah SPK vs Total Qty Alokasi beda. Silahkan cek dulu.");
-      return;
-    }
-  }
+  // // 6. Validasi Total Qty Alokasi vs Jumlah Pesanan
+  // if (fd.Alokasi && fd.Alokasi.length > 0) {
+  //   const sumAlokasi = fd.Alokasi.reduce(
+  //     (acc: number, curr: any) => acc + (Number(curr.jumlah) || 0),
+  //     0,
+  //   );
+  //   if (sumAlokasi > 0 && sumAlokasi !== qtyPesan) {
+  //     toast.warning("Jumlah SPK vs Total Qty Alokasi beda. Silahkan cek dulu.");
+  //     return;
+  //   }
+  // }
 
   // 7. Validasi Detail Kaosan (Khusus Divisi 3)
   if (divisiStr === "3") {

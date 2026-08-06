@@ -120,8 +120,24 @@ const onEdit = (item: any) => {
   router.push({ name: "GarmenReturBahanEdit", params: { nomor: item.Nomor } });
 };
 const onDelete = async (item: any) => {
-  // BaseBrowse biasanya menghandle dialog konfirmasi,
-  // tapi kita bisa tambahkan validasi awal di sini atau di deleteApi useBrowse
+  try {
+    // 1. Validasi khusus RETL & Role Gudang (seperti di onEdit)
+    if (
+      item.Nomor.startsWith("RETP") &&
+      authStore.user?.bagian?.toUpperCase() !== "GUDANG"
+    ) {
+      return toast.warning(
+        "Retur tersebut di-input oleh admin gudang. Anda tidak berhak menghapus data ini.",
+      );
+    }
+
+    // 2. Eksekusi Hapus ke Backend (lewat deleteApi useBrowse)
+    await returBahanService.deleteData(item.Nomor);
+    toast.success("Data berhasil dihapus.");
+    fetchData(); // Refresh tabel agar baris yang dihapus segera menghilang
+  } catch (e: any) {
+    toast.error(e.response?.data?.message || "Gagal menghapus data.");
+  }
 };
 const onPrint = (item: any) => {
   // Gunakan encodeURIComponent agar RETL/00118/2026 aman di URL

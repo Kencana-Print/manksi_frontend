@@ -167,13 +167,23 @@ const onEdit = (item: any) => {
   );
 };
 
-const onDelete = (item: any) => {
+const onDelete = async (item: any) => {
+  // 1. Validasi
   const myCab = (authStore.userCabang || "").toUpperCase();
   if (item.Cab !== myCab && myCab !== "ALL" && !myCab.startsWith("HO")) {
     return toast.error("Bukan cabang anda.");
   }
   if (item.Status !== "OPEN") {
     return toast.error(`Sudah ${item.Status}. Tidak bisa dihapus.`);
+  }
+
+  // 2. Eksekusi Hapus ke Backend
+  try {
+    await mintaBarangService.deleteData(item.Nomor);
+    toast.success("Data berhasil dihapus.");
+    fetchData(); // Refresh tabel agar data yang dihapus hilang
+  } catch (e: any) {
+    toast.error(e.response?.data?.message || "Gagal menghapus data.");
   }
 };
 

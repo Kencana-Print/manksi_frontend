@@ -187,25 +187,19 @@ const formatPrintedAt = () => {
 };
 
 // ── Generate TXT (Dot Matrix) — sesuai Delphi doslipINV2 ──────────────
-const PAGE_WIDTH = 136;
-const PAGE_LINES = 65; // tinggi kertas fisik total — tetap dipakai utk deteksi overflow multi-halaman
-// ⬅ Footer (Terbilang/Total/TTD) di-anchor ke baris ini, BUKAN ke PAGE_LINES.
-// Sebelumnya footer dipaksa mepet ke baris 65 (paling bawah kertas), jadi kalau
-// kertas fisik continuous-form sedikit lebih pendek dari asumsi, baris tanda
-// tangan yang paling bawah kepotong. Turunkan angka ini kalau tanda tangan
-// masih kepotong; naikkan kalau footer sekarang jadi ketinggian.
+const PAGE_WIDTH = 110;
+const BASE_WIDTH = 136; // jangan diubah — acuan kalibrasi original
+const SCALE = PAGE_WIDTH / BASE_WIDTH;
+const col = (n: number) => Math.max(1, Math.round(n * SCALE));
+
+const PAGE_LINES = 65;
 const FOOTER_ANCHOR_LINE = 54;
 
-// ✅ Garis solid (bukan putus-putus): "-" ada gap antar karakter di dot
-// matrix, underscore ("_") nyambung jadi garis lurus tanpa putus.
 const LINE = "_".repeat(PAGE_WIDTH);
 
-// Lebar kolom footer (Di bayarkan ke / Dibuat oleh / Mengetahui).
-// Sebelumnya 42/47/47 bikin blok TTD kemepetan sama info rekening.
-// Digeser: kolom rekening dipersempit + kolom TTD digeser ke kanan.
-const COL_BAYAR = 58;
-const COL_TTD1 = 39;
-const COL_TTD2 = 39; // 58+39+39 = 136
+const COL_BAYAR = col(58);
+const COL_TTD1 = col(39);
+const COL_TTD2 = col(39);
 
 const generateTxt = (mode: "standart" | "full") => {
   const h = header.value;
@@ -216,13 +210,12 @@ const generateTxt = (mode: "standart" | "full") => {
   // ── Bangun blok header (dipakai ulang tiap halaman utk mode standart) ──
   const buildHeaderLines = (): string[] => {
     const cAlamat = h.inv_cus_alamat || h.cus_alamat || "";
-    const halfL = 67;
-    const halfR = 68; // halfL + 1(spasi) + halfR = 136
+    const halfL = col(67);
+    const halfR = PAGE_WIDTH - halfL - 1;
     const alamatLines = wrapText(cAlamat, halfR - 12);
     const lines: string[] = [];
     lines.push(padR(h.perush_nama || "", PAGE_WIDTH));
     lines.push(padR(h.perush_alamat || "", PAGE_WIDTH));
-    // ✅ Nomor telepon perusahaan di-hide dari cetakan
     lines.push("");
     lines.push(padC("I N V O I C E", PAGE_WIDTH));
     lines.push("");
@@ -238,11 +231,10 @@ const generateTxt = (mode: "standart" | "full") => {
     for (let i = 2; i < alamatLines.length; i++) {
       lines.push(`${padR("", halfL)} ${padR(alamatLines[i], halfR)}`);
     }
-    // ✅ Nomor telp/fax customer di-hide dari cetakan
     lines.push(LINE);
     lines.push("");
     lines.push(
-      `${padC("No", 3)} ${padC("SPK", 16)} ${padC("Nama", 46)} ${padC("Ukuran", 22)} ${padC("Jumlah", 12)} ${padC("Harga", 16)} ${padC("Total", 16)}`,
+      `${padC("No", col(3))} ${padC("SPK", col(16))} ${padC("Nama", col(46))} ${padC("Ukuran", col(22))} ${padC("Jumlah", col(12))} ${padC("Harga", col(16))} ${padC("Total", col(16))}`,
     );
     lines.push(LINE);
     return lines;
@@ -251,28 +243,31 @@ const generateTxt = (mode: "standart" | "full") => {
   const buildFooterLines = (): string[] => {
     const lines: string[] = [];
     lines.push(LINE);
-    // ✅ Terbilang huruf kapital semua
+    const wTerbilang = col(95);
+    const wLabel = col(14);
+    const wAngka = col(20);
     const TERBILANG = (terbilang(t.grandTotal) + " Rupiah").toUpperCase();
-    const tb1 = TERBILANG.substring(0, 48);
-    const tb2 = TERBILANG.length > 48 ? TERBILANG.substring(48, 96) : "";
+    const tb1 = TERBILANG.substring(0, col(48));
+    const tb2 =
+      TERBILANG.length > col(48) ? TERBILANG.substring(col(48), col(96)) : "";
     lines.push(
-      `${padR("Terbilang : " + tb1, 95)} ${padR("Total", 14)}: ${padL(num(t.totalBarang), 20)}`,
+      `${padR("Terbilang : " + tb1, wTerbilang)} ${padR("Total", wLabel)}: ${padL(num(t.totalBarang), wAngka)}`,
     );
     const pphLabel = h.inv_pph === "PPh" ? "PPh" : "Disc";
     lines.push(
-      `${padR(tb2, 95)} ${padR(pphLabel, 14)}: ${padL(num(t.disc), 20)}`,
+      `${padR(tb2, wTerbilang)} ${padR(pphLabel, wLabel)}: ${padL(num(t.disc), wAngka)}`,
     );
     lines.push(
-      `${padR("", 95)} ${padR("Total PPN", 14)}: ${padL(num(t.totalPpn), 20)}`,
+      `${padR("", wTerbilang)} ${padR("Total PPN", wLabel)}: ${padL(num(t.totalPpn), wAngka)}`,
     );
     lines.push(
-      `${padR("", 95)} ${padR("Grand Total", 14)}: ${padL(num(t.grandTotal), 20)}`,
+      `${padR("", wTerbilang)} ${padR("Grand Total", wLabel)}: ${padL(num(t.grandTotal), wAngka)}`,
     );
     lines.push(
-      `${padR("", 95)} ${padR("Uang Muka", 14)}: ${padL(num(t.uangMuka), 20)}`,
+      `${padR("", wTerbilang)} ${padR("Uang Muka", wLabel)}: ${padL(num(t.uangMuka), wAngka)}`,
     );
     lines.push(
-      `${padR("", 95)} ${padR("Nilai Piutang", 14)}: ${padL(num(t.nilaiPiutang), 20)}`,
+      `${padR("", wTerbilang)} ${padR("Nilai Piutang", wLabel)}: ${padL(num(t.nilaiPiutang), wAngka)}`,
     );
     lines.push("");
     lines.push("");
@@ -293,7 +288,7 @@ const generateTxt = (mode: "standart" | "full") => {
   const headerLines = buildHeaderLines();
   const footerLines = buildFooterLines();
   const dataLineOf = (r: any, lineNum: number) =>
-    `${padR(String(lineNum), 3)} ${padR(r.invd_spk_nomor || "", 16)} ${padR(r.nama_barang || "", 46)} ${padR(r.invd_ukuran || "", 22)} ${padL(num(r.invd_jumlah), 12)} ${padL(num(r.invd_harga), 16)} ${padL(num(Math.round(Number(r.invd_jumlah) * Number(r.invd_harga))), 16)}`;
+    `${padR(String(lineNum), col(3))} ${padR(r.invd_spk_nomor || "", col(16))} ${padR(r.nama_barang || "", col(46))} ${padR(r.invd_ukuran || "", col(22))} ${padL(num(r.invd_jumlah), col(12))} ${padL(num(r.invd_harga), col(16))} ${padL(num(Math.round(Number(r.invd_jumlah) * Number(r.invd_harga))), col(16))}`;
 
   const allPages: string[][] = [];
 

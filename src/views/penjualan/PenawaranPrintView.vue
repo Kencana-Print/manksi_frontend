@@ -111,7 +111,7 @@ const getProductImageUrlVps = (row: any) => {
 const handleImageError = (e: Event, row: any) => {
   const el = e.target as HTMLImageElement;
   const vpsUrl = getProductImageUrlVps(row);
-  if (el.src !== vpsUrl) {
+  if (vpsUrl && el.src !== vpsUrl) {
     el.src = vpsUrl;
   } else {
     el.style.display = "none";
