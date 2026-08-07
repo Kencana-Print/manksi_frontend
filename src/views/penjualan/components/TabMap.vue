@@ -198,37 +198,42 @@ const handleFallbackImage = (e: Event) => {
     return;
   }
   img.dataset.fallbackTried = "true";
-  // ⚠️ BARU: kalau gambar dari folder map (VPS lokal) gagal — baik
-  // untuk mode edit (pakai Nomor) maupun create-dari-referensi (pakai
-  // Referensi) — coba fallback ke folder legacy mintaharga di VPS lama,
-  // pakai nomor yang sama yang dipakai displayImageUrl di atas.
-  const mhNomor =
-    props.formData.MintaHarga ||
-    props.formData.Referensi ||
-    props.formData.Nomor;
-  if (mhNomor) {
-    const fallbackUrl = `/file-gambar/mintaharga/${encodeURIComponent(mhNomor)}.jpg`;
+
+  // ⚠️ PERBAIKAN: Pisahkan path fallback berdasarkan sumber gambarnya.
+  let fallbackUrl = "";
+
+  if (!props.isEdit && props.formData.Referensi) {
+    // Fallback untuk gambar Referensi MAP revisi (di root /mnt/image)
+    fallbackUrl = `/file-gambar/${encodeURIComponent(props.formData.Referensi)}.jpg`;
+  } else if (props.isEdit && props.formData.Nomor) {
+    // Fallback untuk gambar MAP mode edit (di root /mnt/image)
+    fallbackUrl = `/file-gambar/${encodeURIComponent(props.formData.Nomor)}.jpg`;
+  } else if (props.formData.MintaHarga) {
+    // Fallback untuk gambar Permintaan Harga (di dalam folder /mintaharga)
+    fallbackUrl = `/file-gambar/mintaharga/${encodeURIComponent(props.formData.MintaHarga)}.jpg`;
+  }
+
+  if (fallbackUrl) {
     img.src = fallbackUrl;
     resolvedImageUrl.value = fallbackUrl;
   } else {
     img.style.display = "none";
   }
 };
-
 // Handler khusus buat v-img (Vuetify) — beda tipe event dari native <img>.
 // v-img emit src (string) yang gagal, bukan Event DOM.
 const handlePreviewImageError = (failedSrc: string | undefined) => {
   if (resolvedImageUrl.value?.includes("/file-gambar/")) {
     return;
   }
-  // ⚠️ BARU: sama seperti handleFallbackImage, ikutkan Referensi dalam
-  // penentuan key fallback saat preview full-screen.
-  const mhNomor =
-    props.formData.MintaHarga ||
-    props.formData.Referensi ||
-    props.formData.Nomor;
-  if (mhNomor) {
-    resolvedImageUrl.value = `/file-gambar/mintaharga/${encodeURIComponent(mhNomor)}.jpg`;
+
+  // ⚠️ PERBAIKAN: Ikuti logika fallback yang sama persis
+  if (!props.isEdit && props.formData.Referensi) {
+    resolvedImageUrl.value = `/file-gambar/${encodeURIComponent(props.formData.Referensi)}.jpg`;
+  } else if (props.isEdit && props.formData.Nomor) {
+    resolvedImageUrl.value = `/file-gambar/${encodeURIComponent(props.formData.Nomor)}.jpg`;
+  } else if (props.formData.MintaHarga) {
+    resolvedImageUrl.value = `/file-gambar/mintaharga/${encodeURIComponent(props.formData.MintaHarga)}.jpg`;
   }
 };
 
