@@ -91,25 +91,39 @@ onMounted(async () => {
     const res = await poBahanFormService.getDetail(nomorPO);
     const d = res.data.data;
 
+    // ⬅ BARU: baca status & persen PPN dari header, dipakai utk hitung
+    // ulang Harga (setelah PPN) per baris — sebelumnya kolom "Harga"
+    // cuma copy mentah dari "Harga Dpp", tidak pernah dihitung PPN-nya.
+    const ppnPercent = Number(d.header?.po_ppn) || 0;
+    const ppnActive = Number(d.header?.po_status_ppn) === 1;
+
     // Konversi YARD
     const itemsConverted = (d.items || []).map((row: any) => {
       let isMtr = row.pod_bhn_satuan === "MTR";
       let qty = Number(row.pod_Jumlah) || 0;
-      let harga = Number(row.pod_hargabeli) || 0;
+      let hargaDpp = Number(row.pod_hargabeli) || 0; // ⬅ rename dari "harga"
       let sat = row.pod_bhn_satuan;
-
       if (isMtr && satuanPilihan === "YARD") {
         sat = "YARD";
         qty = qty * 1.09361;
-        harga = harga / 1.09361;
+        hargaDpp = hargaDpp / 1.09361;
       }
+
+      // ⬅ BARU: Harga (setelah PPN) = Dpp × (1 + ppn%), kalau PPN aktif.
+      // Total tetap dihitung dari Harga Dpp (BUKAN harga setelah PPN) —
+      // supaya PPN tidak double-hitung, karena PPN sudah ditambahkan
+      // terpisah sebagai baris "Ppn" di footer/grand total.
+      const hargaSetelahPpn = ppnActive
+        ? hargaDpp * (1 + ppnPercent / 100)
+        : hargaDpp;
 
       return {
         ...row,
         satuan_print: sat,
         qty_print: qty,
-        harga_print: harga,
-        total_print: qty * harga * (1 - (Number(row.pod_disc) || 0) / 100),
+        harga_dpp_print: hargaDpp,
+        harga_setelah_ppn_print: hargaSetelahPpn,
+        total_print: qty * hargaDpp * (1 - (Number(row.pod_disc) || 0) / 100),
       };
     });
 
@@ -243,14 +257,14 @@ const grandTotal = computed(() => subTotal.value + ppnValue.value);
           <tr v-for="(item, index) in dataPO.items" :key="index">
             <td class="tc">{{ Number(index) + 1 }}.</td>
             <td class="tc" v-if="isBahan">{{ item.pod_bhn_kode }}</td>
-            <td>{{ item.pod_namaext || item.bhn_name }}</td>
+            <td class="nama-cell">{{ item.pod_namaext || item.bhn_name }}</td>
             <td class="tc">{{ item.satuan_print }}</td>
             <td class="tr">{{ formatNum(item.qty_print, 2) }}</td>
             <td class="tc">{{ item.pod_gramasia || "-" }}</td>
             <td class="tc">{{ item.gramasi || "-" }}</td>
             <td class="tc">{{ item.setting || "-" }}</td>
-            <td class="tr">{{ formatNum(item.harga_print) }}</td>
-            <td class="tr">{{ formatNum(item.harga_print) }}</td>
+            <td class="tr">{{ formatNum(item.harga_dpp_print) }}</td>
+            <td class="tr">{{ formatNum(item.harga_setelah_ppn_print) }}</td>
             <td class="tc">{{ item.pod_disc }}</td>
             <td class="tr">{{ formatNum(item.total_print) }}</td>
           </tr>
@@ -280,7 +294,10 @@ const grandTotal = computed(() => subTotal.value + ppnValue.value);
         <!-- Wrapper Note & Delivery -->
         <div class="notes-wrapper">
           <!-- Background Kuning khusus PO Bahan -->
-          <div class="note-box" :class="{ 'bg-yellow': isBahan }">
+          <div
+            class="note-box"
+            :class="{ 'bg-yellow': isBahan, 'bg-pink': isCelup }"
+          >
             <b>Note : </b>{{ dataPO.header.po_note }}
           </div>
 
@@ -494,6 +511,12 @@ const grandTotal = computed(() => subTotal.value + ppnValue.value);
   -webkit-print-color-adjust: exact !important;
   print-color-adjust: exact !important;
 }
+.bg-pink {
+  background-color: #ffc0cb !important;
+  color: #000 !important;
+  -webkit-print-color-adjust: exact !important;
+  print-color-adjust: exact !important;
+}
 .note-box {
   font-size: 10px;
   white-space: pre-wrap;
@@ -552,5 +575,8 @@ const grandTotal = computed(() => subTotal.value + ppnValue.value);
 .roll-table th {
   text-align: center;
   font-weight: bold;
+}
+.nama-cell {
+  white-space: nowrap;
 }
 </style>
