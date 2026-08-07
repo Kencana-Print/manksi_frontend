@@ -299,10 +299,12 @@ const onItemFieldEnter = async (
 // ── Grid logic ──
 // 1 yard = 0.9144 meter (standar konversi)
 const YARD_TO_METER = 0.9144;
+const isMeterBased = (item: any) => item.satuan === "MTR";
 
 // Yard diisi user → Meter (kolom bantu) & Terima Skrg (jumlah) otomatis terhitung
 const onJumlahYardChange = (idx: number) => {
   const row = formData.value.items[idx];
+  if (!isMeterBased(row)) return; // ⬅ guard: cuma bahan METER
   const meter = Number(
     (Number(row.jumlahyard || 0) * YARD_TO_METER).toFixed(2),
   );
@@ -314,6 +316,7 @@ const onJumlahYardChange = (idx: number) => {
 // Meter (kolom bantu) diisi user → Yard & Terima Skrg (jumlah) otomatis terhitung
 const onJumlahMeterChange = (idx: number) => {
   const row = formData.value.items[idx];
+  if (!isMeterBased(row)) return; // ⬅ guard: cuma bahan METER
   row.jumlahyard = Number(
     (Number(row.jumlahmeter || 0) / YARD_TO_METER).toFixed(2),
   );
@@ -323,16 +326,15 @@ const onJumlahMeterChange = (idx: number) => {
 
 const onJumlahChange = (idx: number) => {
   const row = formData.value.items[idx];
-  row.jumlahmeter = row.jumlah;
-
+  // ⬅ FIX: dulu row.jumlahmeter = row.jumlah SELALU dieksekusi tanpa
+  // cek satuan — utk bahan KG, ini bikin nilai KG yg diketik user
+  // langsung "nyasar" ke kolom Jml METER (kelihatan seperti konversi
+  // padahal cuma salah tempel field). Sekarang cuma sinkron balik ke
+  // Meter kalau memang bahan bersatuan METER.
+  if (isMeterBased(row)) {
+    row.jumlahmeter = row.jumlah;
+  }
   if (isPo.value) {
-    // Grid 1 itu agregat per kode bahan (lintas SPK), sedang Grid 2
-    // per baris SPK — jadi sync ke Grid 2 cuma bisa otomatis kalau
-    // kode itu MEMANG cuma dipecah ke 1 baris SPK di Grid 2. Kalau
-    // ada >1 baris (beberapa SPK pakai kode bahan yang sama), gak
-    // bisa ditebak distribusinya — user isi manual per baris di
-    // Grid 2, biar tetap ketauan jumlahnya harus sama persis pas
-    // validasi save (lihat validateSave poin 6).
     const matches = formData.value.poItems.filter(
       (p: any) => p.kode === row.kode,
     );
@@ -935,7 +937,9 @@ const printBarcodeAll = (): boolean => {
                     type="number"
                     step="0.01"
                     class="ci tr fw bg-yellow-light"
-                    title="Isi Yard → Meter & Terima Skrg otomatis terhitung"
+                    :readonly="item.satuan !== 'MTR'"
+                    :class="{ ro: item.satuan !== 'MTR' }"
+                    title="Isi Yard → Meter & Terima Skrg otomatis terhitung (khusus bahan METER)"
                     :ref="
                       (el) => setItemFieldRef(el, Number(idx), 'jumlahyard')
                     "
@@ -952,7 +956,9 @@ const printBarcodeAll = (): boolean => {
                     type="number"
                     step="0.01"
                     class="ci tr fw bg-yellow-light"
-                    title="Isi Meter → Yard & Terima Skrg otomatis terhitung"
+                    :readonly="item.satuan !== 'MTR'"
+                    :class="{ ro: item.satuan !== 'MTR' }"
+                    title="Isi Meter → Yard & Terima Skrg otomatis terhitung (khusus bahan METER)"
                     :ref="
                       (el) => setItemFieldRef(el, Number(idx), 'jumlahmeter')
                     "
