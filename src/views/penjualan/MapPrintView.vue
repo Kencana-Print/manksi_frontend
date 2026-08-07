@@ -78,21 +78,44 @@ const mainImageUrl = computed(() => {
 // langsung ke fallback legacy mintaharga (program lama)
 const handleImageError = (e: Event) => {
   const img = e.target as HTMLImageElement;
-  if (img.dataset.tried === "true") {
-    img.style.display = "none";
-    imageLoaded.value = true; // sudah exhaust semua opsi, unblock print
-    return;
-  }
-  img.dataset.tried = "true";
-  const mhNomor = getVal("mspk_mh_nomor");
+  const step = parseInt(img.dataset.step || "0", 10);
+
   const nomor = getVal("mspk_nomor");
-  const fallbackKey = mhNomor || nomor;
-  if (fallbackKey) {
-    // ✅ FIX: path relatif
-    img.src = `/file-gambar/mintaharga/${encodeURIComponent(fallbackKey)}.jpg`;
+  const referensi = getVal("mspk_referensi");
+  const mhNomor = getVal("mspk_mh_nomor");
+  const cab = getVal("mspk_cab") || "HO-";
+  const base = getBaseUrl();
+
+  // Daftar urutan URL fallback yang akan dicoba jika gambar utama gagal (404)
+  const fallbacks = [];
+
+  // 1. Jika ini MAP Revisi, coba cari gambar referensinya di folder upload baru
+  if (referensi)
+    fallbacks.push(
+      `${base}/images/${cab}/map/${encodeURIComponent(referensi)}.jpg`,
+    );
+
+  // 2. Coba cari gambar MAP ini di root VPS lama (/mnt/image)
+  if (nomor) fallbacks.push(`/file-gambar/${encodeURIComponent(nomor)}.jpg`);
+
+  // 3. Coba cari gambar MAP Referensi di root VPS lama (/mnt/image)
+  if (referensi)
+    fallbacks.push(`/file-gambar/${encodeURIComponent(referensi)}.jpg`);
+
+  // 4. Coba cari dari Minta Harga di subfolder /mintaharga VPS lama
+  if (mhNomor)
+    fallbacks.push(
+      `/file-gambar/mintaharga/${encodeURIComponent(mhNomor)}.jpg`,
+    );
+
+  // Loop fallback satu per satu sampai ketemu yang tidak error
+  if (step < fallbacks.length) {
+    img.src = fallbacks[step];
+    img.dataset.step = (step + 1).toString();
   } else {
+    // Jika semua daftar fallback di atas dicoba dan gagal semua
     img.style.display = "none";
-    imageLoaded.value = true;
+    imageLoaded.value = true; // Unblock print
   }
 };
 
