@@ -3,13 +3,14 @@ import { ref, computed, watch, onMounted } from "vue";
 import api from "@/services/api";
 import { useToast } from "vue-toastification";
 import JenisKainSearchModal from "@/components/lookups/JenisKainSearchModal.vue";
-import { IconLock } from "@tabler/icons-vue";
+import { IconLock, IconAlertTriangle } from "@tabler/icons-vue";
 
 const toast = useToast();
 const showKainModal = ref(false);
 const cetakOptions = ref<any[]>([]);
 const tambahanOptions = ref<any[]>([]);
 const isMetadataLoading = ref(false);
+const isJenisKainInvalid = ref(false);
 
 const props = defineProps<{ formData: any; isEdit: boolean }>();
 const kal = computed(() => props.formData.Kalkulasi);
@@ -54,13 +55,7 @@ onMounted(loadDropdownOptions);
 
 // ── Logika loadKomponen (Metadata) ─────────────────────────────────────
 const fetchKalkulasiMetadata = async () => {
-  // Hanya jalankan jika field utama terisi dan bukan saat loading data awal (isEdit mode)
-  if (
-    !kal.value.JenisKain ||
-    !props.formData.RencanaOrder ||
-    isMetadataLoading.value
-  )
-    return;
+  if (!kal.value.JenisKain || isMetadataLoading.value) return;
 
   isMetadataLoading.value = true;
   try {
@@ -71,27 +66,36 @@ const fetchKalkulasiMetadata = async () => {
           model: kal.value.Model,
           jenisKain: kal.value.JenisKain,
           warna: kal.value.Warna,
-          qty: props.formData.RencanaOrder,
+          qty: props.formData.RencanaOrder || 0,
         },
       },
     );
 
     const data = res.data.data;
 
+    // ⬅ BARU: Jenis Kain yang tersimpan tidak ketemu di master sama
+    // sekali — tampilkan peringatan, minta user pilih ulang lewat modal.
+    // JANGAN timpa GridKomponen dgn array kosong secara diam-diam.
+    if (data.jenisKainValid === false) {
+      isJenisKainInvalid.value = true;
+      toast.warning(
+        `Jenis Kain "${kal.value.JenisKain}" tidak ditemukan di master harga. Silakan pilih ulang lewat tombol pencarian.`,
+      );
+      return;
+    }
+    isJenisKainInvalid.value = false;
+
     if (!data.komponen || data.komponen.length === 0) {
       console.warn(
         "Backend mengembalikan komponen kosong. Data grid tidak diupdate.",
       );
-      // Opsi: Beri tahu user bahwa kain ini belum terdaftar di master kain
       return;
     }
 
-    // 1. Set Biaya Tetap
     kal.value.RpPotong = data.rpPotong;
     kal.value.RpJahit = data.rpJahit;
     kal.value.PersenAllowance = data.allowancePersen;
 
-    // 2. Set Margin (Laba) Otomatis dari tangga Qty
     if (data.margin.persen === "Y") {
       kal.value.PersenLaba = data.margin.laba;
       kal.value.RpLaba = 0;
@@ -100,7 +104,6 @@ const fetchKalkulasiMetadata = async () => {
       kal.value.PersenLaba = 0;
     }
 
-    // 3. Set Grid Komponen
     kal.value.GridKomponen = data.komponen.map((item: any) => ({
       Komponen: item.komponen,
       Kg: true,
@@ -115,7 +118,6 @@ const fetchKalkulasiMetadata = async () => {
       Bruto: 0,
     }));
 
-    // 4. Hitung ulang baris grid
     kal.value.GridKomponen.forEach(hitungBarisKomponen);
   } catch (e: any) {
     toast.error(
@@ -248,37 +250,39 @@ watch(
   () => kal.value.GridKomponen.forEach(hitungBarisKomponen),
 );
 
-const fetchKomponenKain = async () => {
-  if (!kal.value.JenisKain) return;
-  try {
-    const res = await api.get("/lookups/komponen-kain", {
-      params: {
-        model: kal.value.Model,
-        jenisKain: kal.value.JenisKain,
-        warna: kal.value.Warna,
-      },
-    });
-    kal.value.GridKomponen = res.data.data.map((item: any) => ({
-      Komponen: item.komponen,
-      Kg: true,
-      Pabrik: true,
-      JenisKain: kal.value.JenisKain,
-      Lengan: item.lengan,
-      Warna: kal.value.Warna,
-      Harga: item.harga,
-      Babaran: item.babaran,
-      Kebutuhan: 0,
-      Pcs: 0,
-      Bruto: 0,
-    }));
-    kal.value.GridKomponen.forEach(hitungBarisKomponen);
-  } catch (e) {
-    console.error("Gagal menarik komponen kain", e);
-  }
-};
+// const fetchKomponenKain = async () => {
+//   if (!kal.value.JenisKain) return;
+//   try {
+//     const res = await api.get("/lookups/komponen-kain", {
+//       params: {
+//         model: kal.value.Model,
+//         jenisKain: kal.value.JenisKain,
+//         warna: kal.value.Warna,
+//       },
+//     });
+//     kal.value.GridKomponen = res.data.data.map((item: any) => ({
+//       Komponen: item.komponen,
+//       Kg: true,
+//       Pabrik: true,
+//       JenisKain: kal.value.JenisKain,
+//       Lengan: item.lengan,
+//       Warna: kal.value.Warna,
+//       Harga: item.harga,
+//       Babaran: item.babaran,
+//       Kebutuhan: 0,
+//       Pcs: 0,
+//       Bruto: 0,
+//     }));
+//     kal.value.GridKomponen.forEach(hitungBarisKomponen);
+//   } catch (e) {
+//     console.error("Gagal menarik komponen kain", e);
+//   }
+// };
 watch(
   () => [kal.value.JenisKain, kal.value.Warna, kal.value.Model],
-  fetchKomponenKain,
+  () => {
+    fetchKalkulasiMetadata();
+  },
 );
 
 // ── Grid actions ───────────────────────────────────────────────────────
@@ -295,6 +299,13 @@ const rows8 = Array.from({ length: 8 }, (_, i) => i + 1);
 <template>
   <div class="tk-root">
     <!-- Alert kalkulasi terkunci -->
+    <div v-if="isJenisKainInvalid" class="tk-alert warn">
+      <IconAlertTriangle :size="13" class="mr-1" />
+      Jenis Kain "{{ kal.JenisKain }}" tidak ditemukan di master harga (data
+      lama/sudah berubah). Silakan klik field Jenis Kain untuk memilih ulang,
+      HPP tidak bisa dihitung sampai ini diperbaiki.
+    </div>
+
     <div v-if="formData.isKalkulasiLocked" class="tk-alert error">
       <IconLock :size="13" class="mr-1" />
       Akses Ditolak: Kalkulasi ini terkunci karena terakhir dimodifikasi oleh
@@ -937,5 +948,11 @@ const rows8 = Array.from({ length: 8 }, (_, i) => i + 1);
   margin-top: 5px;
   padding-top: 4px;
   border-top: 1px solid #eeeeee;
+}
+
+.tk-alert.warn {
+  background: #fff8e1;
+  color: #e65100;
+  border: 1px solid #ffcc80;
 }
 </style>
