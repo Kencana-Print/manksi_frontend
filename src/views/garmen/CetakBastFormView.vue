@@ -667,15 +667,12 @@ onMounted(() => {
 
         <div class="f-row">
           <label class="f-lbl">Tipe</label>
-          <select
-            v-model="formData.header.mspk_tipe"
-            class="f-inp f-sel"
-            style="max-width: 120px"
-          >
-            <option value="">—</option>
-            <option value="Premium">Premium</option>
-            <option value="Medium">Medium</option>
-          </select>
+          <input
+            :value="formData.header.mspk_tipe || '-'"
+            readonly
+            class="f-inp f-ro"
+            style="max-width: 120px; font-weight: 600"
+          />
         </div>
 
         <div class="f-row">

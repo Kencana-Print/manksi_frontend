@@ -206,6 +206,15 @@ const spkKetKomponenText = computed(() =>
 
 const alokasi = ref<any[]>([]);
 
+const alokasiChunks = computed(() => {
+  const chunkSize = 24;
+  const chunks: any[][] = [];
+  for (let i = 0; i < alokasi.value.length; i += chunkSize) {
+    chunks.push(alokasi.value.slice(i, i + chunkSize));
+  }
+  return chunks;
+});
+
 // ── Signature helper (dipakai format lama, sama pola SalesOrderPrintView) ──
 const getSignatureUrl = (kodeUser: string) => {
   if (!kodeUser) return "";
@@ -778,34 +787,40 @@ Keterangan Komponen :
           <!-- Alokasi — halaman terpisah, sama gaya panel SO -->
           <div v-if="alokasi.length > 0" class="print-half-so alokasi-panel-so">
             <h2 class="alokasi-title-so">ALOKASI PENGIRIMAN :</h2>
-            <table class="alokasi-table-so mt-2-so">
-              <thead>
-                <tr>
-                  <th class="text-left-so pl-2-so">Alokasi</th>
-                  <th width="80" class="text-center-so">Jumlah</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="(a, idx) in alokasi" :key="idx">
-                  <td class="pl-2-so">{{ a.kota || a.alamat }}</td>
-                  <td class="text-center-so">
-                    {{ Number(a.jumlah).toLocaleString("id-ID") }}
-                  </td>
-                </tr>
-              </tbody>
-              <tfoot>
-                <tr>
-                  <td class="fw-so text-left-so pl-2-so">Total</td>
-                  <td class="fw-so text-center-so">
-                    {{
-                      alokasi
-                        .reduce((s, a) => s + (Number(a.jumlah) || 0), 0)
-                        .toLocaleString("id-ID")
-                    }}
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
+            <div class="alokasi-cols-so mt-2-so">
+              <table
+                class="alokasi-table-so"
+                v-for="(chunk, idx) in alokasiChunks"
+                :key="idx"
+              >
+                <thead>
+                  <tr>
+                    <th class="text-left-so pl-2-so">Alokasi</th>
+                    <th width="60" class="text-center-so">Jumlah</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(a, i2) in chunk" :key="i2">
+                    <td class="pl-2-so">{{ a.kota || a.alamat }}</td>
+                    <td class="text-center-so">
+                      {{ Number(a.jumlah).toLocaleString("id-ID") }}
+                    </td>
+                  </tr>
+                </tbody>
+                <tfoot v-if="idx === alokasiChunks.length - 1">
+                  <tr>
+                    <td class="fw-so text-left-so pl-2-so">Total</td>
+                    <td class="fw-so text-center-so">
+                      {{
+                        alokasi
+                          .reduce((s, a) => s + (Number(a.jumlah) || 0), 0)
+                          .toLocaleString("id-ID")
+                      }}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
           </div>
         </div>
       </div>
@@ -2533,6 +2548,16 @@ Keterangan Komponen :
   border: 1px solid #000;
   padding: 4px 6px;
   color: #000 !important;
+}
+.alokasi-cols-so {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  width: 100%;
+}
+.alokasi-cols-so .alokasi-table-so {
+  flex: 1;
+  min-width: 0;
 }
 .fw-so {
   font-weight: bold;
