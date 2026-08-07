@@ -110,11 +110,15 @@ const loadDivisi = async () => {
   try {
     const res = await api.get("/penjualan/minta-harga/divisi");
     const bagian = (authStore.user?.bagian || "").toUpperCase();
+    const cab = (authStore.user?.cabang || "").toUpperCase(); // <-- Ambil data cabang
     const isMarketing = bagian === "MARKETING";
 
     divisiOptions.value = res.data.data
       .filter((d: any) => {
-        if (isMarketing && (d.Kode === 3 || d.Kode === 6)) return false;
+        // Jika user adalah Marketing dari cabang SELAIN P03, sembunyikan divisi 3 & 6
+        if (isMarketing && cab !== "P03" && (d.Kode === 3 || d.Kode === 6)) {
+          return false;
+        }
         return true;
       })
       .map((d: any) => ({
