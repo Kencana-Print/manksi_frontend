@@ -145,9 +145,14 @@ const fileRef = ref<HTMLInputElement | null>(null);
 const getBaseUrl = () => api.defaults.baseURL?.replace(/\/api\/?$/, "") || "";
 const resolvedImageUrl = ref("");
 watch(
-  () => props.formData.Nomor,
+  () => [
+    props.formData.Nomor,
+    props.formData.Referensi,
+    props.formData.MintaHarga,
+    props.formData.MainImageBlob,
+  ],
   () => {
-    resolvedImageUrl.value = ""; // reset saat ganti record
+    resolvedImageUrl.value = ""; // reset saat ganti record atau saat upload file baru
   },
 );
 
@@ -193,33 +198,34 @@ const displayImageUrl = computed(() => {
 
 const handleFallbackImage = (e: Event) => {
   const img = e.target as HTMLImageElement;
-  if (img.dataset.fallbackTried === "true") {
+
+  // Jika URL yang gagal sudah merupakan URL /file-gambar/ (fallback),
+  // berarti gambar fisik memang benar-benar tidak ada di server. Sembunyikan.
+  if (
+    resolvedImageUrl.value &&
+    resolvedImageUrl.value.includes("/file-gambar/")
+  ) {
     img.style.display = "none";
     return;
   }
-  img.dataset.fallbackTried = "true";
 
-  // ⚠️ PERBAIKAN: Pisahkan path fallback berdasarkan sumber gambarnya.
   let fallbackUrl = "";
 
   if (!props.isEdit && props.formData.Referensi) {
-    // Fallback untuk gambar Referensi MAP revisi (di root /mnt/image)
     fallbackUrl = `/file-gambar/${encodeURIComponent(props.formData.Referensi)}.jpg`;
   } else if (props.isEdit && props.formData.Nomor) {
-    // Fallback untuk gambar MAP mode edit (di root /mnt/image)
     fallbackUrl = `/file-gambar/${encodeURIComponent(props.formData.Nomor)}.jpg`;
   } else if (props.formData.MintaHarga) {
-    // Fallback untuk gambar Permintaan Harga (di dalam folder /mintaharga)
     fallbackUrl = `/file-gambar/mintaharga/${encodeURIComponent(props.formData.MintaHarga)}.jpg`;
   }
 
   if (fallbackUrl) {
-    img.src = fallbackUrl;
     resolvedImageUrl.value = fallbackUrl;
   } else {
     img.style.display = "none";
   }
 };
+
 // Handler khusus buat v-img (Vuetify) — beda tipe event dari native <img>.
 // v-img emit src (string) yang gagal, bukan Event DOM.
 const handlePreviewImageError = (failedSrc: string | undefined) => {
@@ -1466,11 +1472,10 @@ const setSetoranPembayaran = (v: any) => {
         <div class="f-img-box" style="flex: 1">
           <img
             v-if="displayImageUrl"
-            :src="displayImageUrl"
+            :src="resolvedImageUrl || displayImageUrl"
             class="f-img"
             @click="showPreviewDialog = true"
             @error="handleFallbackImage"
-            @load="onMainImageLoad"
             style="cursor: pointer"
           />
           <div v-else class="f-img-empty">
