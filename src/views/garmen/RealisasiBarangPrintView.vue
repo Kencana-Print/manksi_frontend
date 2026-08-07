@@ -43,13 +43,11 @@ onMounted(() => {
 
 <template>
   <div class="print-container" v-if="isReady">
-    <!-- Loop 2 kali untuk rangkap atas dan bawah -->
-    <div class="half-page" v-for="part in 2" :key="part">
+    <div class="full-page">
       <!-- HEADER -->
       <div class="header-box">
         <div class="header-text">
           <div class="title">REALISASI PERMINTAAN {{ header.re_jenis }}</div>
-
           <div class="info-grid">
             <!-- Kolom Kiri -->
             <div class="info-col">
@@ -68,7 +66,6 @@ onMounted(() => {
                 >
               </div>
             </div>
-
             <!-- Kolom Tengah -->
             <div class="info-col">
               <div class="info-row">
@@ -80,7 +77,6 @@ onMounted(() => {
                 <span class="val">{{ header.GdgProduksi }}</span>
               </div>
             </div>
-
             <!-- Kolom Kanan -->
             <div class="info-col">
               <div class="info-row">
@@ -97,7 +93,6 @@ onMounted(() => {
               </div>
             </div>
           </div>
-
           <div class="info-row mt-2">
             <span class="lbl">Keterangan</span><span class="sep">:</span>
             <span class="val">{{ header.re_keterangan }}</span>
@@ -105,8 +100,7 @@ onMounted(() => {
         </div>
         <img :src="logoSrc" class="logo" />
       </div>
-
-      <!-- TABEL BARANG (Hanya memunculkan data yang ada) -->
+      <!-- TABEL BARANG -->
       <table class="items-table">
         <thead>
           <tr>
@@ -119,7 +113,6 @@ onMounted(() => {
           </tr>
         </thead>
         <tbody>
-          <!-- Hapus paddedDetails, gunakan array details asli -->
           <tr v-for="(item, index) in details" :key="index">
             <td class="text-center">{{ index + 1 }}</td>
             <td class="font-mono">{{ item.Kode }}</td>
@@ -132,10 +125,8 @@ onMounted(() => {
           </tr>
         </tbody>
       </table>
-
-      <!-- SPACER: Mengisi ruang kosong agar TTD terdorong ke bawah kertas -->
+      <!-- SPACER -->
       <div class="flex-grow-1"></div>
-
       <!-- TANDA TANGAN -->
       <div class="footer-box">
         <div class="ttd-box">
@@ -155,9 +146,6 @@ onMounted(() => {
           <div class="ttd-space"></div>
         </div>
       </div>
-
-      <!-- Garis Gunting (Hanya tampil di Part 1 pada layar) -->
-      <div class="cut-line" v-if="part === 1"></div>
     </div>
   </div>
 </template>
@@ -189,8 +177,8 @@ onMounted(() => {
   min-height: 297mm; /* Tinggi A4 */
 }
 
-.half-page {
-  height: 50%;
+.full-page {
+  height: 100%;
   padding: 10px 0;
   display: flex;
   flex-direction: column;
@@ -310,15 +298,5 @@ onMounted(() => {
 }
 .ttd-space {
   height: 55px; /* Tinggi Ruang Tanda Tangan */
-}
-
-/* --- PEMBATAS KERTAS --- */
-.cut-line {
-  border-bottom: 1px dashed #ccc;
-  margin: 15px 0;
-  position: absolute;
-  bottom: -15px;
-  left: 0;
-  width: 100%;
 }
 </style>

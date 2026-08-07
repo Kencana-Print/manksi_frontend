@@ -349,15 +349,16 @@ const tabs = [{ title: "Sheet 1 (Input)" }, { title: "Sheet 2 (Keterangan)" }];
   flex-direction: column;
   height: 100%;
   background: #f4f5f7;
+  min-width: 0; /* ⬅ BARU: cegah flex child memaksa lebar minimum bawaan browser */
 }
-
 .pf-tab-nav {
   display: flex;
   background: #e0e0e0;
   border-bottom: 2px solid #bdbdbd;
   padding: 4px 8px 0;
+  overflow-x: auto; /* ⬅ BARU: kalau tab tidak muat, geser horizontal drpd numpuk */
+  flex-shrink: 0;
 }
-
 .pf-tab-btn {
   padding: 6px 16px;
   font-size: 12px;
@@ -369,8 +370,9 @@ const tabs = [{ title: "Sheet 1 (Input)" }, { title: "Sheet 2 (Keterangan)" }];
   border-radius: 4px 4px 0 0;
   cursor: pointer;
   margin-right: 4px;
+  white-space: nowrap; /* ⬅ BARU: judul tab tidak pecah baris */
+  flex-shrink: 0;
 }
-
 .pf-tab-btn.active {
   background: white;
   color: #1565c0;
@@ -378,12 +380,30 @@ const tabs = [{ title: "Sheet 1 (Input)" }, { title: "Sheet 2 (Keterangan)" }];
   border-bottom: 2px solid white;
   margin-bottom: -2px;
 }
-
 .pf-tab-body {
   flex: 1;
-  overflow: hidden; /* Biarkan konten di dalam tab yang scroll */
+  overflow: auto; /* ⬅ diubah dari "hidden" — biar konten tab yang lebih
+                      lebar dari layar (mis. tabel Rincian Barang) bisa
+                      di-scroll horizontal & vertikal di layar kecil */
+  min-height: 0; /* ⬅ BARU */
 }
 .pf-tab-pane {
   padding: 8px;
+  min-width: 0; /* ⬅ BARU */
+  box-sizing: border-box;
+}
+
+/* ⬅ BARU: breakpoint layar kecil (HP/tablet portrait) */
+@media (max-width: 768px) {
+  .pf-tab-nav {
+    padding: 4px 4px 0;
+  }
+  .pf-tab-btn {
+    padding: 6px 10px;
+    font-size: 11px;
+  }
+  .pf-tab-pane {
+    padding: 4px;
+  }
 }
 </style>

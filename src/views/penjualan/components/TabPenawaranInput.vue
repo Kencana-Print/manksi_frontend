@@ -1577,4 +1577,112 @@ watch(
   opacity: 0.45;
   cursor: not-allowed;
 }
+
+/* ── RESPONSIVE: layar kecil (HP/tablet portrait) ── */
+@media (max-width: 900px) {
+  .form-grid-top {
+    grid-template-columns: 1fr; /* 3 kolom → stack 1 kolom */
+    gap: 10px;
+  }
+
+  .header-section {
+    padding: 8px !important;
+  }
+
+  .f-row {
+    flex-wrap: wrap; /* label & input boleh turun baris kalau sempit */
+    margin-bottom: 8px;
+  }
+  .f-row > label:first-child {
+    width: 100%; /* label full-width di atas input, bukan sejajar */
+    margin-bottom: 2px;
+  }
+  .f-row .flex-1 {
+    width: 100%;
+  }
+
+  /* Baris gabungan Tanggal+Tipe, Marketing+Telp, dst — tetap sejajar
+     tapi elemen dalamnya menyusut proporsional, bukan overflow */
+  .f-row.align-start {
+    flex-wrap: nowrap;
+  }
+
+  /* Follow Up checkbox group — biar bisa wrap ke baris berikutnya
+     kalau 4 checkbox tidak muat sejajar */
+  .f-row .d-flex.align-center.gap-2 {
+    flex-wrap: wrap;
+    row-gap: 4px;
+  }
+
+  /* Grid footer (Cetak Grand Total + Total Nominal) — stack di layar
+     sangat sempit supaya tidak kepotong */
+  .grid-footer {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .grid-footer > .d-flex {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
+
+/* ── Tabel Rincian Barang: scroll horizontal yang nyaman di HP ── */
+.table-wrap {
+  -webkit-overflow-scrolling: touch; /* scroll momentum di iOS */
+  touch-action: pan-x pan-y;
+}
+
+@media (max-width: 900px) {
+  /* Target tap minimal ~28-32px biar gampang disentuh jari, dan
+     font sedikit dibesarkan supaya kebaca di layar kecil tanpa perlu
+     zoom manual (yang biasanya bikin layout makin berantakan). */
+  .grid-table th,
+  .grid-table td {
+    padding: 4px 3px;
+  }
+  .cell-inp,
+  .f-inp {
+    min-height: 30px;
+    font-size: 12px;
+  }
+  .btn-lookup {
+    width: 30px;
+    min-width: 30px;
+  }
+  .grid-table .inp-group .btn-lookup {
+    width: 28px;
+    min-width: 28px;
+    height: 28px;
+  }
+
+  /* Kolom "Ket. Batal"/"Ket. Confirm" jarang dipakai bersamaan & makan
+     banyak ruang horizontal — beri lebar minimum lebih kecil khusus
+     mobile supaya kolom-kolom inti (Nama/Qty/Harga/Total) tidak
+     terlalu jauh ke kanan saat pertama buka tabel. */
+  .grid-table th:nth-child(15),
+  .grid-table th:nth-child(16),
+  .grid-table td:nth-child(15),
+  .grid-table td:nth-child(16) {
+    min-width: 90px;
+  }
+}
+
+/* ── Layar sangat sempit (HP kecil, <480px) ── */
+@media (max-width: 480px) {
+  .form-title {
+    font-size: 12px;
+  }
+  .f-row > label:first-child {
+    font-size: 11px;
+  }
+  .total-box {
+    font-size: 13px;
+    min-width: 100px;
+  }
+  /* Tombol "Tambah Baris" & judul section — cegah dempet ke tepi */
+  .d-flex.align-center.justify-space-between.mb-2 {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+}
 </style>
