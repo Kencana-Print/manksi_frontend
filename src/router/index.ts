@@ -2700,6 +2700,33 @@ const router = createRouter({
         menuId: "164",
       },
     },
+    {
+      path: "/penjualan/insentif",
+      name: "InsentifBrowse",
+      component: () => import("@/views/penjualan/InsentifView.vue"),
+      meta: {
+        title: "Insentif",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "167",
+      },
+    },
+    // {
+    //   path: "/penjualan/insentif/form",
+    //   name: "InsentifFormCreate",
+    //   component: () => import("@/views/penjualan/InsentifFormView.vue"),
+    //   meta: { title: "Tambah Insentif", requiresAuth: true, menuId: "167" },
+    // },
+    // {
+    //   path: "/penjualan/insentif/print/:nomor",
+    //   name: "InsentifPrintView",
+    //   component: () => import("@/views/penjualan/InsentifPrintView.vue"),
+    //   meta: {
+    //     title: "Cetak Insentif",
+    //     layout: "BlankLayout",
+    //     requiresAuth: true,
+    //   },
+    // },
 
     {
       path: "/penjualan/jadwal-kirim",

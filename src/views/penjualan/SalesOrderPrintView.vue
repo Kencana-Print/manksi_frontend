@@ -40,6 +40,8 @@ const totalAlokasi = computed(() => {
   );
 });
 
+const hasAlokasi = computed(() => (data.value.alokasiList || []).length > 0);
+
 const alokasiChunks = computed(() => {
   const list = data.value.alokasiList || [];
   const chunkSize = 24;
@@ -474,7 +476,7 @@ onMounted(async () => {
                 <td class="w-label">Alokasi</td>
                 <td class="w-colon">:</td>
                 <td colspan="3">
-                  {{ data.spk_alokasi === "Y" ? "YA" : "TIDAK" }}
+                  {{ hasAlokasi ? "YA" : "TIDAK" }}
                 </td>
               </tr>
               <tr>

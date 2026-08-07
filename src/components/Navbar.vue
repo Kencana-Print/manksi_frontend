@@ -828,6 +828,12 @@ const menuItems: NavItem[] = [
         icon: IconChecks,
         menuId: 164,
       },
+      {
+        title: "Insentif",
+        to: "/penjualan/insentif",
+        icon: IconCoin,
+        menuId: 167,
+      },
       { divider: true },
       {
         title: "Jadwal Kirim",

@@ -259,17 +259,15 @@ const generateTxt = () => {
       dataLineOf(r, startNo + i + 1),
     );
 
-    // ⬅ Kalau baris data di halaman ini kurang dari MAX_DATA_ROWS_PER_PAGE
-    // (biasanya halaman terakhir), sisanya di-pad baris kosong — supaya
-    // tinggi tiap halaman fisik SELALU sama, dan Form Feed antar halaman
-    // lompat presisi ke titik yang sama tiap kali (header halaman
-    // berikutnya selalu mulai di baris yang sama).
-    const blankPad = Math.max(0, MAX_DATA_ROWS_PER_PAGE - chunk.length);
-    const paddedData = [...dataLines, ...Array(blankPad).fill("")];
+    const isLastChunk = ci === chunks.length - 1;
 
-    // ⬅ Header DAN footer SEKARANG SELALU ikut di setiap halaman —
-    // bukan cuma halaman terakhir. Setiap lembar fisik jadi lengkap
-    // berdiri sendiri (ada kop, tabel, sampai tanda tangan).
+    const paddedData = isLastChunk
+      ? dataLines
+      : [
+          ...dataLines,
+          ...Array(Math.max(0, MAX_DATA_ROWS_PER_PAGE - chunk.length)).fill(""),
+        ];
+
     allPages.push([...headerLines, ...paddedData, ...footerLines]);
   });
 

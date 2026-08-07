@@ -19,6 +19,7 @@ import {
   IconLayoutRows,
 } from "@tabler/icons-vue";
 import { formatTanggal } from "@/utils/dateFormat";
+import { exportExcelSingle } from "@/utils/excelExport";
 
 const authStore = useAuthStore();
 const router = useRouter();
@@ -206,6 +207,120 @@ const openStatusModal = async (item: any) => {
   }
 };
 
+const isExportingDetail = ref(false);
+
+const onExportDetail = async () => {
+  if (!items.value?.length) {
+    return toast.warning("Tidak ada data untuk diexport.");
+  }
+
+  isExportingDetail.value = true;
+  try {
+    const rows: any[] = [];
+
+    // Pakai cache kalau baris itu kebetulan sudah pernah di-expand,
+    // sisanya baru fetch — biar tidak query ulang yang sudah ada.
+    for (const master of items.value) {
+      let details = detailsCache.value[master.Nomor];
+      if (!details) {
+        const res = await penawaranService.getBrowseDetail(master.Nomor);
+        details = res.data.data || [];
+        detailsCache.value[master.Nomor] = details;
+      }
+
+      (details || []).forEach((d: any) => {
+        rows.push({
+          Nomor: master.Nomor,
+          Tanggal: formatTanggal(master.Tanggal),
+          Divisi: master.Divisi,
+          Tipe: master.Tipe,
+          Perusahaan: canLihatCus.value ? master.Perusahaan : "",
+          NamaCustomer: canLihatCus.value ? master.NamaCustomer : "",
+          Sales: master.Sales,
+          ID: d.ID,
+          NamaBarang: d.NamaBarang,
+          Bahan: d.Bahan,
+          Ukuran: d.Ukuran,
+          Panjang: Number(d.Panjang) || 0,
+          Lebar: Number(d.Lebar) || 0,
+          QtyMeter: Number(d.QtyMeter) || 0,
+          Satuan: d.Satuan,
+          Qty: Number(d.Qty) || 0,
+          Harga: canLihatCus.value ? Number(d.Harga) || 0 : null,
+          Nominal: canLihatCus.value ? Number(d.Nominal) || 0 : null,
+          Status: d.Status || "OPEN",
+        });
+      });
+    }
+
+    if (rows.length === 0) {
+      return toast.warning("Tidak ada rincian barang untuk diexport.");
+    }
+
+    const columns: any[] = [
+      { header: "Nomor", key: "Nomor", width: 16 },
+      { header: "Tanggal", key: "Tanggal", width: 12 },
+      { header: "Divisi", key: "Divisi", width: 10, align: "center" },
+      { header: "Tipe", key: "Tipe", width: 10 },
+    ];
+    if (canLihatCus.value) {
+      columns.push(
+        { header: "Perusahaan", key: "Perusahaan", width: 18 },
+        { header: "Nama Customer", key: "NamaCustomer", width: 24 },
+      );
+    }
+    columns.push(
+      { header: "Sales", key: "Sales", width: 14 },
+      { header: "ID", key: "ID", width: 8, align: "center" },
+      { header: "Nama Barang", key: "NamaBarang", width: 30 },
+      { header: "Bahan", key: "Bahan", width: 16 },
+      { header: "Ukuran", key: "Ukuran", width: 12 },
+      { header: "Panjang", key: "Panjang", width: 10, align: "right" },
+      { header: "Lebar", key: "Lebar", width: 10, align: "right" },
+      { header: "Qty Mtr", key: "QtyMeter", width: 10, align: "right" },
+      { header: "Satuan", key: "Satuan", width: 8, align: "center" },
+      { header: "Qty", key: "Qty", width: 10, align: "right" },
+    );
+    if (canLihatCus.value) {
+      columns.push(
+        {
+          header: "Harga",
+          key: "Harga",
+          width: 14,
+          align: "right",
+          numFmt: "#,##0",
+        },
+        {
+          header: "Nominal",
+          key: "Nominal",
+          width: 16,
+          align: "right",
+          numFmt: "#,##0",
+        },
+      );
+    }
+    columns.push({
+      header: "Status",
+      key: "Status",
+      width: 10,
+      align: "center",
+    });
+
+    await exportExcelSingle(
+      `Penawaran_Detail_${filterState.value.startDate}_sd_${filterState.value.endDate}.xlsx`,
+      "Detail Penawaran",
+      columns,
+      rows,
+      `Detail Penawaran — Periode ${formatTanggal(filterState.value.startDate)} s/d ${formatTanggal(filterState.value.endDate)}`,
+    );
+    toast.success("Berhasil export detail.");
+  } catch (e: any) {
+    toast.error(e.response?.data?.message || "Gagal export detail.");
+  } finally {
+    isExportingDetail.value = false;
+  }
+};
+
 const saveStatus = async () => {
   isSavingStatus.value = true;
   try {
@@ -316,6 +431,9 @@ const totalStatusGrid = computed(() => {
         size="small"
         variant="flat"
         color="teal-darken-1"
+        :loading="isExportingDetail"
+        :disabled="isExportingDetail"
+        @click="onExportDetail"
       >
         <template #prepend
           ><IconFileSpreadsheet :size="15" :stroke-width="1.7"
