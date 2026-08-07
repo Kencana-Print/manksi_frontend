@@ -263,23 +263,60 @@ const goDelete = async (item: any) => {
 };
 
 // Aksi Ekstra
+const fallbackStep = ref(0);
+
 const lihatGambar = () => {
   if (selected.value.length === 0) return;
   const item = selected.value[0];
   const base = api.defaults.baseURL?.replace(/\/api\/?$/, "") || "";
   const cab = item.Cab || "HO-";
-  fallbackTried.value = false; // ✅ reset tiap buka gambar baru
-  // Coba dari backend lokal dulu
+
+  fallbackStep.value = 0; // ✅ Reset step tiap buka gambar baru
   gambarUrl.value = `${base}/images/${cab}/map/${encodeURIComponent(item.Nomor)}.jpg`;
   dialogGambar.value = true;
 };
 
-const fallbackTried = ref(false);
-
 const onGambarError = () => {
-  if (fallbackTried.value) return;
-  fallbackTried.value = true;
-  gambarUrl.value = `/file-gambar/${encodeURIComponent(selected.value[0]?.Nomor)}.jpg`;
+  if (selected.value.length === 0) return;
+  const item = selected.value[0];
+
+  const nomor = item.Nomor;
+  const referensi = item.NoReferensi || item.MAP || ""; // Field referensi dari row
+  const cab = item.Cab || "HO-";
+  const base = api.defaults.baseURL?.replace(/\/api\/?$/, "") || "";
+
+  // Daftar urutan URL fallback yang akan dicoba berurutan jika gambar sebelumnya 404
+  const fallbacks: string[] = [];
+
+  // 1. Coba MAP ini di root VPS lama (/mnt/image -> /file-gambar)
+  if (nomor) fallbacks.push(`/file-gambar/${encodeURIComponent(nomor)}.jpg`);
+
+  // 2. Jika ini MAP revisi, coba gambar referensinya di folder upload baru
+  if (referensi)
+    fallbacks.push(
+      `${base}/images/${cab}/map/${encodeURIComponent(referensi)}.jpg`,
+    );
+
+  // 3. Coba gambar referensi di root VPS lama
+  if (referensi)
+    fallbacks.push(`/file-gambar/${encodeURIComponent(referensi)}.jpg`);
+
+  // 4. Coba cari di subfolder mintaharga (jaga-jaga sumber awalnya dari sana)
+  if (nomor)
+    fallbacks.push(`/file-gambar/mintaharga/${encodeURIComponent(nomor)}.jpg`);
+  if (referensi)
+    fallbacks.push(
+      `/file-gambar/mintaharga/${encodeURIComponent(referensi)}.jpg`,
+    );
+
+  // Eksekusi fallback secara bertahap
+  if (fallbackStep.value < fallbacks.length) {
+    gambarUrl.value = fallbacks[fallbackStep.value];
+    fallbackStep.value++;
+  } else {
+    // Jika semua opsi habis dan gagal, kosongkan agar <v-img> menampilkan icon #error
+    gambarUrl.value = "";
+  }
 };
 
 const cetak = () => {

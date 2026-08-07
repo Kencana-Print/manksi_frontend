@@ -198,6 +198,32 @@ const isWH003 = computed(() => fd.value.GudangKode === "WH003");
 const showGdgPModal = ref(false);
 const showSpkModal = ref(false);
 const showSpgModal = ref(false);
+const showPackingSearchModal = ref(false);
+const packingSearchQ = ref("");
+const packingSearchResults = ref<any[]>([]);
+const isSearchingPacking = ref(false);
+
+const openPackingSearchModal = () => {
+  packingSearchQ.value = "";
+  packingSearchResults.value = [];
+  showPackingSearchModal.value = true;
+};
+
+let packingSearchDebounce: ReturnType<typeof setTimeout> | null = null;
+const onPackingSearchInput = () => {
+  if (packingSearchDebounce) clearTimeout(packingSearchDebounce);
+  packingSearchDebounce = setTimeout(async () => {
+    isSearchingPacking.value = true;
+    try {
+      const res = await svc.searchPacking(packingSearchQ.value);
+      packingSearchResults.value = res.data.data || [];
+    } catch {
+      packingSearchResults.value = [];
+    } finally {
+      isSearchingPacking.value = false;
+    }
+  }, 300);
+};
 
 // Gudang Produksi Koli
 const gdgPList = ref<any[]>([]);
@@ -363,6 +389,72 @@ const addSpgToGrid = async (spgNomor: string) => {
   } catch (e: any) {
     toast.error(e.response?.data?.message || "SPG tidak ditemukan.");
   }
+};
+
+const addPackingToGrid = async (packNomor: string) => {
+  const alreadyLoaded = fd.value.Detail.some((r) => r.Packing === packNomor);
+  if (alreadyLoaded) {
+    toast.warning(`No. Packing ${packNomor} sudah ada di grid.`);
+    return;
+  }
+  isLoadingPacking.value = true;
+  try {
+    const res = await svc.getPackingDetail(
+      packNomor,
+      (route.query.nomor as string) || "",
+    );
+    const rows = res.data.data || [];
+    if (!rows.length) {
+      toast.warning(`No. Packing ${packNomor} tidak ada data tersedia.`);
+      return;
+    }
+
+    // ⬅ FIX: bersihkan baris kosong placeholder yang sudah ada SEBELUM
+    // nambah data baru — sebelumnya cuma push ke akhir tanpa hapus
+    // placeholder lama, jadi baris kosong "kejepit" di atas data baru
+    // (kosong → data → kosong lagi dari ensureEmptyRow()).
+    fd.value.Detail = fd.value.Detail.filter((r) => r.SpkNomor);
+
+    for (const r of rows) {
+      fd.value.Detail.push({
+        _key: _key++,
+        Packing: r.Packing,
+        SpkNomor: r.SpkNomor,
+        NamaSpk: r.NamaSpk,
+        Ukuran: r.Ukuran,
+        TotalOrder: Number(r.TotalOrder) || 0,
+        Size: r.Size,
+        QtyOrder: Number(r.QtyOrder) || 0,
+        Jumlah: Number(r.Jumlah) || 0,
+        Koli: 0,
+        Jadi: Number(r.Jadi) || 0,
+        Kurang: Number(r.Kurang) || 0,
+        Keterangan: "",
+      });
+      for (const dc of r.dc || []) {
+        fd.value.Detail2.push({
+          _key: _key++,
+          Packing: r.Packing,
+          SpkNomor: r.SpkNomor,
+          KodeKaosan: dc.brg_kode,
+          NamaKaosan: dc.Nama,
+          Size: dc.size,
+          Jumlah: dc.packd_qty,
+        });
+      }
+    }
+    ensureEmptyRow();
+    toast.success(`No. Packing ${packNomor} berhasil ditambahkan.`);
+  } catch (e: any) {
+    toast.error(e.response?.data?.message || "Gagal memuat packing.");
+  } finally {
+    isLoadingPacking.value = false;
+  }
+};
+
+const selectPackingFromSearch = (item: any) => {
+  showPackingSearchModal.value = false;
+  addPackingToGrid(item.Nomor);
 };
 
 // ── Load from Packing (btnPacking) ────────────────────────────────────
@@ -696,6 +788,14 @@ const totalJumlah2 = computed(() =>
                 >Tekan F1 atau Enter di baris kosong untuk pilih SPK</span
               >
               <div style="display: flex; gap: 6px; margin-left: auto">
+                <button
+                  v-if="isWH003"
+                  class="tbtn tbtn-purple"
+                  @click="openPackingSearchModal"
+                >
+                  <IconSearch :size="12" style="margin-right: 3px" />
+                  Cari No. Packing
+                </button>
                 <button
                   v-if="isWH003"
                   class="tbtn tbtn-blue"
@@ -1066,6 +1166,57 @@ const totalJumlah2 = computed(() =>
           size="small"
           variant="text"
           @click="showGdgPModal = false"
+          >Tutup</v-btn
+        >
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
+
+  <!-- ── Modal Cari No. Packing ── -->
+  <v-dialog v-model="showPackingSearchModal" max-width="480px">
+    <v-card class="rounded-lg">
+      <v-card-title
+        class="bg-primary text-white pa-3"
+        style="font-size: 13px; font-weight: 700"
+      >
+        Cari No. Packing
+      </v-card-title>
+      <v-card-text class="pa-3">
+        <input
+          v-model="packingSearchQ"
+          class="ms"
+          placeholder="Ketik nomor packing / SPK / nama..."
+          autofocus
+          @input="onPackingSearchInput"
+        />
+        <div v-if="isSearchingPacking" class="me">Mencari...</div>
+        <div v-else class="ml">
+          <div
+            v-for="item in packingSearchResults"
+            :key="item.Nomor"
+            class="mi"
+            @click="selectPackingFromSearch(item)"
+          >
+            <span class="mk">{{ item.Nomor }}</span>
+            <span style="flex: 1"
+              >{{ item.SpkNomor }} — {{ item.NamaSpk }}</span
+            >
+            <span style="font-size: 10px; color: #999">{{ item.Tanggal }}</span>
+          </div>
+          <div v-if="!packingSearchResults.length && packingSearchQ" class="me">
+            Tidak ada packing ditemukan.
+          </div>
+          <div v-if="!packingSearchQ" class="me">
+            Ketik untuk mencari No. Packing yang belum dipakai STBJ.
+          </div>
+        </div>
+      </v-card-text>
+      <v-card-actions class="pa-2">
+        <v-spacer />
+        <v-btn
+          size="small"
+          variant="text"
+          @click="showPackingSearchModal = false"
           >Tutup</v-btn
         >
       </v-card-actions>
@@ -1628,5 +1779,10 @@ const totalJumlah2 = computed(() =>
   color: #1565c0;
   font-weight: 600;
   border-radius: 3px;
+}
+
+.tbtn-purple {
+  background: #6a1b9a;
+  color: white;
 }
 </style>

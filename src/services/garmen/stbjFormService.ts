@@ -23,6 +23,9 @@ export const stbjFormService = {
   // ── Packing ───────────────────────────────────────────
   getPackingAll: () => api.get(`${BASE}/packing-all`),
 
+  searchPacking: (q: string) =>
+    api.get(`${BASE}/search-packing`, { params: { q } }),
+
   getPackingDetail: (packNomor: string, excludeNomor = "") =>
     api.get(`${BASE}/packing-detail`, { params: { packNomor, excludeNomor } }),
 
