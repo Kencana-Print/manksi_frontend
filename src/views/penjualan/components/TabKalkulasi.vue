@@ -290,6 +290,18 @@ watch(
   },
 );
 
+watch(
+  () => [kal.value.HargaSesuai, kal.value.PersenPpn, kal.value.UpdateOtomatis],
+  () => {
+    if (kal.value.UpdateOtomatis) {
+      const ppn = Number(kal.value.PersenPpn) || 0;
+      kal.value.HargaSesuaiPpn = Math.round(
+        Number(kal.value.HargaSesuai || 0) * (1 + ppn / 100),
+      );
+    }
+  },
+);
+
 // ── Grid actions ───────────────────────────────────────────────────────
 const addCetak = () => kal.value.GridCetak.push({ Keterangan: "", Harga: 0 });
 const delCetak = (i: number) => kal.value.GridCetak.splice(i, 1);
@@ -431,6 +443,49 @@ const rows8 = Array.from({ length: 8 }, (_, i) => i + 1);
               <span class="hpp-label">HPP</span>
               <span class="hpp-value">Rp {{ rp(kal.HargaSesuai) }}</span>
             </div>
+          </div>
+        </div>
+
+        <!-- Panel Harga Penyesuaian + Ppn (sesuai Delphi) -->
+        <div class="tk-section" style="margin-top: 8px">
+          <div class="tk-grid-title" style="margin-bottom: 6px">
+            Harga Penyesuaian + Ppn
+          </div>
+          <div class="tk-row">
+            <label class="tk-lbl">Ppn %</label>
+            <input
+              v-model.number="kal.PersenPpn"
+              type="number"
+              class="tk-inp"
+              style="width: 70px"
+              v-select-on-focus
+            />
+          </div>
+          <div class="tk-row">
+            <label class="tk-lbl">Harga</label>
+            <input
+              v-model.number="kal.HargaSesuaiPpn"
+              type="number"
+              class="tk-inp"
+              style="width: 110px; font-weight: 700"
+              :readonly="kal.UpdateOtomatis"
+              :class="{ ro: kal.UpdateOtomatis }"
+              v-select-on-focus
+            />
+          </div>
+          <label class="chk-label" style="margin-top: 4px">
+            <input
+              type="checkbox"
+              v-model="kal.UpdateOtomatis"
+              style="accent-color: #1565c0"
+            />
+            Update Otomatis (sinkron dari HPP + Laba + Ppn)
+          </label>
+          <div
+            style="font-size: 10px; color: #e65100; margin-top: 3px"
+            v-if="!kal.UpdateOtomatis"
+          >
+            ⚠ Harga ini di-override manual — tidak ikut hitungan otomatis.
           </div>
         </div>
 
@@ -959,5 +1014,11 @@ const rows8 = Array.from({ length: 8 }, (_, i) => i + 1);
   background: #fff8e1;
   color: #e65100;
   border: 1px solid #ffcc80;
+}
+
+.tk-inp.ro,
+.ro {
+  background: #f0f0f0 !important;
+  color: #555 !important;
 }
 </style>

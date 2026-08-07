@@ -125,6 +125,9 @@ const initialData = {
     RpLaba: 0,
     PersenLaba: 0,
     HargaSesuai: 0,
+    PersenPpn: 11,
+    HargaSesuaiPpn: 0,
+    UpdateOtomatis: true,
   },
 };
 
@@ -266,6 +269,9 @@ const {
             RpLaba: Number(d.Kalkulasi.Header.kal_rplaba) || 0,
             PersenLaba: Number(d.Kalkulasi.Header.kal_laba) || 0,
             HargaSesuai: Number(d.Kalkulasi.Header.kal_rpsesuai) || 0,
+            PersenPpn: Number(d.Kalkulasi.Header.kal_ppn) || 11,
+            HargaSesuaiPpn: Number(d.Kalkulasi.Header.kal_rpsesuaippn) || 0,
+            UpdateOtomatis: false,
           }
         : initialData.Kalkulasi,
     };
