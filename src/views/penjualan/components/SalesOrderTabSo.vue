@@ -680,7 +680,10 @@ watch(
 </script>
 
 <template>
-  <div class="so-layout">
+  <div
+    class="so-layout"
+    :style="formData.isLegacy ? 'pointer-events:none;opacity:0.65' : ''"
+  >
     <!-- ══ KOLOM KIRI ══ -->
     <div class="so-left">
       <div class="so-section">

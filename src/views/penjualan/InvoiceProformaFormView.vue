@@ -31,6 +31,7 @@ const showCusModal = ref(false);
 const showRekModal = ref(false);
 const showBarangModal = ref(false);
 const activeRowIndex = ref(-1);
+const focusedHargaIndex = ref<number | null>(null);
 
 const listDivisi = ref<any[]>([]);
 
@@ -435,8 +436,7 @@ const doTidakCetak = () => {
   router.push({ name: "InvoiceProformaBrowse" });
 };
 
-const num = (val: any) =>
-  Number(val || 0).toLocaleString("id-ID", { maximumFractionDigits: 2 });
+const num = (val: any) => Math.round(Number(val) || 0).toLocaleString("id-ID");
 </script>
 
 <template>
@@ -670,11 +670,25 @@ const num = (val: any) =>
                 <td class="bg-yellow-lighten-5">
                   <input
                     type="number"
-                    v-model.number="item.harga"
                     class="cell-input tr fw-bold"
                     step="any"
                     min="0"
-                    v-select-on-focus
+                    :value="
+                      focusedHargaIndex === index
+                        ? item.harga
+                        : Math.round(item.harga || 0)
+                    "
+                    @focus="
+                      (e) => {
+                        (e.target as HTMLInputElement).select();
+                        focusedHargaIndex = Number(index);
+                      }
+                    "
+                    @input="
+                      item.harga =
+                        ($event.target as HTMLInputElement).valueAsNumber || 0
+                    "
+                    @blur="focusedHargaIndex = null"
                   />
                 </td>
                 <td

@@ -127,7 +127,10 @@ watch(
 </script>
 
 <template>
-  <div class="tm-tab-layout">
+  <div
+    class="tm-tab-layout"
+    :style="formData.isLegacy ? 'pointer-events:none;opacity:0.65' : ''"
+  >
     <div class="tm-section d-flex flex-column fill-height">
       <div
         class="tm-sec-title d-flex justify-space-between align-center pb-2"

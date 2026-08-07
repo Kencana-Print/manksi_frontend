@@ -270,6 +270,7 @@ const {
     // Mapping dari API Backend ke bentuk format input form
     return {
       ...d.header,
+      isLegacy: d.header.isLegacy || false,
       spk_accpending: d.header.spk_accpending || "",
       spk_cmo: d.header.spk_cmo || "",
       Customer: d.header.cus_nama,
@@ -1067,6 +1068,12 @@ const uploadImageMain = (file: File) => {
 };
 
 const validateSave = async (skipPoCheck = false) => {
+  if (formData.value.isLegacy) {
+    toast.warning(
+      "Data ini adalah SPK legacy (read-only) — tidak bisa disimpan lewat form ini.",
+    );
+    return;
+  }
   const fd = formData.value;
   const divisiStr = String(fd.spk_divisi).charAt(0);
   const qtyPesan = Number(fd.spk_jumlah) || 0;
@@ -1400,6 +1407,11 @@ const onPilihKatalog = (item: any) => {
     @confirm-cancel="executeCancel"
     @confirm-close="executeClose"
   >
+    <div v-if="formData.isLegacy" class="legacy-banner">
+      ⚠ Ini SPK format lama (data legacy, sebelum migrasi ke Sales Order baru).
+      Ditampilkan sebagai <b>READ-ONLY</b> — tidak bisa diubah/disimpan lewat
+      form ini.
+    </div>
     <div class="pf-container">
       <!-- ── Tab Nav ── -->
       <div class="pf-tab-nav">
@@ -1738,5 +1750,16 @@ const onPilihKatalog = (item: any) => {
 
 .h-100 {
   height: 100%;
+}
+
+.legacy-banner {
+  background: #fff3e0;
+  color: #e65100;
+  border: 1px solid #ffcc80;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 4px;
+  margin: 8px;
 }
 </style>

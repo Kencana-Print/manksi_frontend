@@ -109,7 +109,10 @@ const updateKetUkuran = () => {
 </script>
 
 <template>
-  <div class="uk-layout">
+  <div
+    class="uk-layout"
+    :style="formData.isLegacy ? 'pointer-events:none;opacity:0.65' : ''"
+  >
     <!-- ── 1. Detail Ukuran ── -->
     <div class="uk-card" style="width: 620px; flex-shrink: 0">
       <div class="uk-card-title">Detail Ukuran</div>

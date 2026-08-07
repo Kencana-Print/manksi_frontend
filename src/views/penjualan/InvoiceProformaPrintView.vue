@@ -99,12 +99,10 @@ const terbilang = (angka: number): string => {
 // toLocaleString("id-ID") fallback ke koma di server (Node.js tanpa
 // full-ICU). Diganti formatter manual: titik = ribuan, koma = desimal.
 const numFmt = (val: any) => {
-  const n = Number(val || 0);
+  const n = Math.round(Number(val || 0));
   const neg = n < 0;
   const abs = Math.abs(n);
-  const hasDecimal = Math.round(abs * 100) % 100 !== 0;
-  const fixed = abs.toFixed(hasDecimal ? 2 : 0);
-  const [intPartRaw, decPart] = fixed.split(".");
+  const intPartRaw = String(abs);
   let out = "";
   let cnt = 0;
   for (let i = intPartRaw.length - 1; i >= 0; i--) {
@@ -112,7 +110,6 @@ const numFmt = (val: any) => {
     cnt++;
     if (cnt % 3 === 0 && i !== 0) out = "." + out;
   }
-  if (decPart) out += "," + decPart;
   return (neg ? "-" : "") + out;
 };
 
