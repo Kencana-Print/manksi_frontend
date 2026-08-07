@@ -438,6 +438,16 @@ const removeRow = (idx: number) => {
   formData.value.Detail.splice(idx, 1);
 };
 
+const onRowDeleteKey = (e: KeyboardEvent, idx: number) => {
+  const target = e.target as HTMLElement;
+  const isInsideField = ["INPUT", "SELECT", "TEXTAREA"].includes(
+    target.tagName,
+  );
+  if (isInsideField) return; // biarkan browser proses Delete di dalam field
+  e.preventDefault();
+  if (!isDetailDisabled.value) removeRow(idx);
+};
+
 // Footer summary (sesuai Delphi GetFooterSummary)
 const totalJumlah = computed(() =>
   formData.value.Detail.reduce((s, r) => s + (Number(r.jumlah) || 0), 0),
@@ -986,7 +996,7 @@ onMounted(async () => {
               <tr
                 v-for="(row, idx) in formData.Detail"
                 :key="row._key"
-                @keydown.delete.prevent="!isDetailDisabled && removeRow(idx)"
+                @keydown.delete="onRowDeleteKey($event, idx)"
                 tabindex="0"
               >
                 <td class="text-center text-muted">{{ idx + 1 }}</td>
