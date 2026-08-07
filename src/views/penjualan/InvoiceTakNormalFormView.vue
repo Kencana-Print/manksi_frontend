@@ -950,7 +950,9 @@ onMounted(async () => {
                     <input v-else :value="row.Kode" readonly class="ci mono" />
                   </td>
                   <td><input :value="row.NamaSpk" readonly class="ci" /></td>
-                  <td><input :value="row.Ukuran" readonly class="ci" /></td>
+                  <td>
+                    <input v-if="row.Kode" v-model="row.Ukuran" class="ci" />
+                  </td>
                   <td>
                     <input
                       v-if="row.Kode"
