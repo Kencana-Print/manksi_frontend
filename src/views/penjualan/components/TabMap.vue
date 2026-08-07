@@ -147,11 +147,7 @@ const resolvedImageUrl = ref("");
 watch(
   () => props.formData.Nomor,
   () => {
-    resolvedImageUrl.value = "";
-    // Reset fallback stage juga — <img> tidak ter-remount otomatis
-    // saat ganti record (v-if tetap true), jadi dataset lama bisa nyangkut.
-    const imgEl = document.querySelector(".f-img") as HTMLImageElement | null;
-    if (imgEl) delete imgEl.dataset.fallbackStage;
+    resolvedImageUrl.value = ""; // reset saat ganti record
   },
 );
 
@@ -197,51 +193,42 @@ const displayImageUrl = computed(() => {
 
 const handleFallbackImage = (e: Event) => {
   const img = e.target as HTMLImageElement;
-  const stage = img.dataset.fallbackStage || "0";
-
-  const mapNomor = props.formData.Referensi || props.formData.Nomor;
-
-  // ⬅ FIX: /file-gambar/ (port 8888) itu service TERPISAH dari /images/
-  // (backend kita sendiri, port 3088) — proxy ke server file legacy VPS
-  // yang menyimpan file FLAT tanpa subfolder module (terbukti dari
-  // \\103.94.238.252\image\MAP-xxx.jpg langsung di root share).
-  // Sebelumnya kode nambahin "mintaharga/" di depan nama file — subfolder
-  // itu TIDAK ADA di service ini, makanya selalu 404.
-  if (stage === "0" && mapNomor) {
-    img.dataset.fallbackStage = "1";
-    const flatUrl = `/file-gambar/${encodeURIComponent(mapNomor)}.jpg`;
-    img.src = flatUrl;
-    resolvedImageUrl.value = flatUrl;
+  if (img.dataset.fallbackTried === "true") {
+    img.style.display = "none";
     return;
   }
-
-  img.style.display = "none";
+  img.dataset.fallbackTried = "true";
+  // ⚠️ BARU: kalau gambar dari folder map (VPS lokal) gagal — baik
+  // untuk mode edit (pakai Nomor) maupun create-dari-referensi (pakai
+  // Referensi) — coba fallback ke folder legacy mintaharga di VPS lama,
+  // pakai nomor yang sama yang dipakai displayImageUrl di atas.
+  const mhNomor =
+    props.formData.MintaHarga ||
+    props.formData.Referensi ||
+    props.formData.Nomor;
+  if (mhNomor) {
+    const fallbackUrl = `/file-gambar/mintaharga/${encodeURIComponent(mhNomor)}.jpg`;
+    img.src = fallbackUrl;
+    resolvedImageUrl.value = fallbackUrl;
+  } else {
+    img.style.display = "none";
+  }
 };
 
 // Handler khusus buat v-img (Vuetify) — beda tipe event dari native <img>.
 // v-img emit src (string) yang gagal, bukan Event DOM.
 const handlePreviewImageError = (failedSrc: string | undefined) => {
-  const mapNomor = props.formData.Referensi || props.formData.Nomor;
-  const mhNomor = props.formData.MintaHarga;
-  const base = getBaseUrl();
-
-  // Kalau yang barusan gagal adalah pola lama (/images/{cab}/map/...),
-  // coba pola flat /image/{nomor}.jpg dulu.
-  if (
-    mapNomor &&
-    failedSrc?.includes("/images/") &&
-    !resolvedImageUrl.value?.includes("/image/")
-  ) {
-    resolvedImageUrl.value = `${base}/image/${encodeURIComponent(mapNomor)}.jpg`;
+  if (resolvedImageUrl.value?.includes("/file-gambar/")) {
     return;
   }
-
-  // Kalau pola flat juga gagal, atau tidak ada mapNomor, coba legacy mintaharga
-  if (!resolvedImageUrl.value?.includes("/file-gambar/")) {
-    const mhKey = mhNomor || mapNomor;
-    if (mhKey) {
-      resolvedImageUrl.value = `/file-gambar/mintaharga/${encodeURIComponent(mhKey)}.jpg`;
-    }
+  // ⚠️ BARU: sama seperti handleFallbackImage, ikutkan Referensi dalam
+  // penentuan key fallback saat preview full-screen.
+  const mhNomor =
+    props.formData.MintaHarga ||
+    props.formData.Referensi ||
+    props.formData.Nomor;
+  if (mhNomor) {
+    resolvedImageUrl.value = `/file-gambar/mintaharga/${encodeURIComponent(mhNomor)}.jpg`;
   }
 };
 
