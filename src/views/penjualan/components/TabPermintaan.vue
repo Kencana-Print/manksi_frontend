@@ -65,8 +65,12 @@ const displayImageUrl = computed(() => {
   }
 
   // Fallback: Jika path hanya berupa nama file atau path relatif biasa, arahkan ke mintaharga sentral
-  const cleanName = props.formData.PathImage.replace(/^\/+/, "");
-  return `${base}/file-gambar/mintaharga/${cleanName}`;
+  const cleanName = props.formData.PathImage.replace(/^\/+/, "").replace(
+    /^file-gambar\//,
+    "",
+  );
+  const finalName = cleanName.split("/").pop(); // ambil nama file paling akhir, buang subfolder lama kalau ada
+  return `/file-gambar/${finalName}`;
 });
 
 const handleImageError = (e: Event) => {
@@ -76,15 +80,15 @@ const handleImageError = (e: Event) => {
     return;
   }
   img.dataset.fallbackTried = "true";
-
   const nomorMh = props.formData.Nomor;
   if (!nomorMh) {
     imageError.value = true;
     return;
   }
-
-  // Coba fallback langsung ke folder sentral mintaharga
-  img.src = `/file-gambar/mintaharga/${encodeURIComponent(nomorMh)}.jpg`;
+  // ⬅ FIX: /file-gambar/ service (port 8888) expose file FLAT tanpa
+  // subfolder module — subfolder "mintaharga/" yang lama itu tidak
+  // pernah ada, selalu 404.
+  img.src = `/file-gambar/${encodeURIComponent(nomorMh)}.jpg`;
 };
 
 const divisiOptions = ref<any[]>([]);

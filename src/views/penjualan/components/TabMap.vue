@@ -200,34 +200,21 @@ const handleFallbackImage = (e: Event) => {
   const stage = img.dataset.fallbackStage || "0";
 
   const mapNomor = props.formData.Referensi || props.formData.Nomor;
-  const mhNomor = props.formData.MintaHarga;
-  const base = getBaseUrl();
 
-  // ⬅ BARU: tahap 1 — coba folder FLAT "/image/{nomor}.jpg" (tanpa
-  // subfolder cabang/map). Terbukti dari pengecekan manual di VPS:
-  // file MAP tersimpan flat di \\103.94.238.252\image\, BUKAN di
-  // /images/{cab}/map/ seperti pola modul lain (Penawaran/MintaHarga).
+  // ⬅ FIX: /file-gambar/ (port 8888) itu service TERPISAH dari /images/
+  // (backend kita sendiri, port 3088) — proxy ke server file legacy VPS
+  // yang menyimpan file FLAT tanpa subfolder module (terbukti dari
+  // \\103.94.238.252\image\MAP-xxx.jpg langsung di root share).
+  // Sebelumnya kode nambahin "mintaharga/" di depan nama file — subfolder
+  // itu TIDAK ADA di service ini, makanya selalu 404.
   if (stage === "0" && mapNomor) {
     img.dataset.fallbackStage = "1";
-    const flatUrl = `${base}/image/${encodeURIComponent(mapNomor)}.jpg`;
+    const flatUrl = `/file-gambar/${encodeURIComponent(mapNomor)}.jpg`;
     img.src = flatUrl;
     resolvedImageUrl.value = flatUrl;
     return;
   }
 
-  // Tahap 2 — fallback lama: legacy mintaharga di VPS
-  if (stage === "1") {
-    const mhKey = mhNomor || mapNomor;
-    if (mhKey) {
-      img.dataset.fallbackStage = "2";
-      const fallbackUrl = `/file-gambar/mintaharga/${encodeURIComponent(mhKey)}.jpg`;
-      img.src = fallbackUrl;
-      resolvedImageUrl.value = fallbackUrl;
-      return;
-    }
-  }
-
-  // Semua tahap gagal
   img.style.display = "none";
 };
 
