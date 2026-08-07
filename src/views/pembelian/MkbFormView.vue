@@ -218,7 +218,9 @@ onMounted(() => {
   fetchKomponen();
 });
 
-const recalcRowBahan = (row: any) => {
+// Hitung ulang Jumlah (Butuh) dari babaran & qty SPK — TIDAK menyentuh
+// Allowance/PO, biar bisa dipanggil terpisah sesuai kebutuhan titik trigger.
+const recalcJumlahOnly = (row: any) => {
   if (!row.kode) return;
   const babaran = Number(row.babaran) || 0;
   const qtySpk = Number(formData.value.jumlahSpk) || 0;
@@ -227,9 +229,26 @@ const recalcRowBahan = (row: any) => {
     else if (row.satuan === "MTR" || row.satuan === "YARD")
       row.jumlah = Number((qtySpk * babaran).toFixed(2));
   }
+};
+
+// ⬅ FIX UTAMA: Jumlah PO/akan PO sekarang = (Jumlah + Allowance) - Ready.
+// Sebelumnya Allowance dihitung & ditampilkan sendiri, tapi TIDAK PERNAH
+// ikut nambahin kebutuhan PO — jadi walau Allowance-nya kelihatan di
+// kolom, angka PO tidak berubah sama sekali.
+const recalcPo = (row: any) => {
   const butuh = Number(row.jumlah) || 0;
+  const allowance = Number(row.allowance) || 0;
   const ready = Number(row.ready) || 0;
-  row.po = butuh > ready ? Number((butuh - ready).toFixed(2)) : 0;
+  const totalKebutuhan = butuh + allowance;
+  row.po =
+    totalKebutuhan > ready ? Number((totalKebutuhan - ready).toFixed(2)) : 0;
+};
+
+// Dipanggil saat Ready diedit manual — recalc Jumlah (jaga-jaga kalau
+// Babaran ikut berubah bersamaan) lalu PO. Allowance TIDAK disentuh.
+const recalcRowBahan = (row: any) => {
+  recalcJumlahOnly(row);
+  recalcPo(row);
 };
 
 // ── ALLOWANCE OTOMATIS BERDASARKAN JENIS BAHAN ──
@@ -261,16 +280,17 @@ const applyAllowanceDefault = (row: any) => {
   }
 };
 
-// Gabungan: recalc jumlah (dari babaran/qty SPK) lalu recalc allowance
-// dari jumlah yang baru. Dipakai di semua titik yang tadinya cuma
-// panggil recalcRowBahan saja.
+// Gabungan: recalc Jumlah → recalc Allowance (dari Jumlah baru) →
+// recalc PO (sekarang IKUT MEMPERHITUNGKAN Allowance).
 const recalcRowFull = (row: any) => {
-  recalcRowBahan(row);
+  recalcJumlahOnly(row);
   applyAllowanceDefault(row);
+  recalcPo(row);
 };
 
 const onAllowanceInput = (row: any) => {
   if (!row.allowanceLocked) row.allowanceManual = true;
+  recalcPo(row);
 };
 
 const openSpkModal = () => {
