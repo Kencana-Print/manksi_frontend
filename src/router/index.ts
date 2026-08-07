@@ -2711,12 +2711,12 @@ const router = createRouter({
         menuId: "167",
       },
     },
-    // {
-    //   path: "/penjualan/insentif/form",
-    //   name: "InsentifFormCreate",
-    //   component: () => import("@/views/penjualan/InsentifFormView.vue"),
-    //   meta: { title: "Tambah Insentif", requiresAuth: true, menuId: "167" },
-    // },
+    {
+      path: "/penjualan/insentif/form",
+      name: "InsentifFormCreate",
+      component: () => import("@/views/penjualan/InsentifFormView.vue"),
+      meta: { title: "Tambah Insentif", requiresAuth: true, menuId: "167" },
+    },
     // {
     //   path: "/penjualan/insentif/print/:nomor",
     //   name: "InsentifPrintView",

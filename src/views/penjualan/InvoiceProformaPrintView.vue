@@ -171,7 +171,7 @@ const wrapText = (text: string, maxWidth: number): string[] => {
 };
 
 // ── Konstanta kertas dot matrix — disamakan dengan InvoicePrintView ──
-const PAGE_WIDTH = 110;
+const PAGE_WIDTH = 125;
 const BASE_WIDTH = 136; // jangan diubah — acuan kalibrasi original
 const SCALE = PAGE_WIDTH / BASE_WIDTH;
 const col = (n: number) => Math.max(1, Math.round(n * SCALE));
@@ -233,11 +233,18 @@ const generateTxt = () => {
     const wLabel = col(14);
     const wAngka = col(20);
     const TERBILANG = (terbilang(grandTotal.value) + " Rupiah").toUpperCase();
-    const tb1 = TERBILANG.substring(0, col(48));
+
+    // ⬅ FIX: sama pola dgn InvoicePrintView/InvoiceTakNormalPrintView.
+    const LABEL_TERBILANG = "Terbilang : ";
+    const tb1Width = wTerbilang - LABEL_TERBILANG.length;
+    const tb1 = TERBILANG.substring(0, tb1Width);
     const tb2 =
-      TERBILANG.length > col(48) ? TERBILANG.substring(col(48), col(96)) : "";
+      TERBILANG.length > tb1Width
+        ? TERBILANG.substring(tb1Width, tb1Width + wTerbilang)
+        : "";
+
     lines.push(
-      `${padR("Terbilang : " + tb1, wTerbilang)} ${padR("Total", wLabel)}: ${padL(numFmt(totalNominal.value), wAngka)}`,
+      `${padR(LABEL_TERBILANG + tb1, wTerbilang)} ${padR("Total", wLabel)}: ${padL(numFmt(totalNominal.value), wAngka)}`,
     );
     lines.push(
       `${padR(tb2, wTerbilang)} ${padR("Total PPN", wLabel)}: ${padL(numFmt(totalPpn.value), wAngka)}`,
@@ -266,14 +273,31 @@ const generateTxt = () => {
     return lines;
   };
 
-  const dataLineOf = (item: any, idx: number) =>
-    `${padR(String(idx + 1), col(3))} ${padR(item.kode || "", col(16))} ${padR(item.nama || "", col(46))} ${padR(item.ukuran || "", col(22))} ${padL(numFmt(item.jumlah), col(12))} ${padL(numFmt(item.harga), col(16))} ${padL(numFmt(roundRp((Number(item.jumlah) || 0) * (Number(item.harga) || 0))), col(16))}`;
+  const wrapNamaBarang = (text: string) => wrapText(text || "", col(46));
+
+  const dataLinesOf = (item: any, lineNum: number): string[] => {
+    const namaLines = wrapNamaBarang(item.nama);
+    const first = `${padR(String(lineNum), col(3))} ${padR(item.kode || "", col(16))} ${padR(namaLines[0] || "", col(46))} ${padR(item.ukuran || "", col(22))} ${padL(numFmt(item.jumlah), col(12))} ${padL(numFmt(item.harga), col(16))} ${padL(numFmt(roundRp((Number(item.jumlah) || 0) * (Number(item.harga) || 0))), col(16))}`;
+    const rest = namaLines
+      .slice(1)
+      .map(
+        (ln) =>
+          `${padR("", col(3))} ${padR("", col(16))} ${padR(ln, col(46))} ${padR("", col(22))} ${padR("", col(12))} ${padR("", col(16))} ${padR("", col(16))}`,
+      );
+    return [first, ...rest];
+  };
 
   const headerLines = buildHeaderLines();
   const footerLines = buildFooterLines();
-  const dataLines = d.map((item, idx) => dataLineOf(item, idx));
-  const bodyLines = [...headerLines, ...dataLines]; // ← LINE dihapus dari
-  // sini, footerLines sudah diawali LINE-nya sendiri (lihat buildFooterLines)
+
+  // ⬅ FIX: dataLines sekarang di-flatMap dari dataLinesOf (bisa >1 baris
+  // per item kalau nama panjang), nomor urut hanya nambah per ITEM asli.
+  const dataLines: string[] = [];
+  d.forEach((item, idx) => {
+    dataLines.push(...dataLinesOf(item, idx + 1));
+  });
+
+  const bodyLines = [...headerLines, ...dataLines];
 
   const pages: string[][] = [];
 

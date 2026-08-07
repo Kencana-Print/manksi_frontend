@@ -15,6 +15,7 @@ const isJenisKainInvalid = ref(false);
 const props = defineProps<{ formData: any; isEdit: boolean }>();
 const kal = computed(() => props.formData.Kalkulasi);
 
+const skipNextAutoFetch = ref(props.isEdit);
 const handleKainSelected = (item: any) => {
   kal.value.JenisKain = item.Jeniskain;
   kal.value.KategoriKain = item.Kategori;
@@ -281,6 +282,10 @@ watch(
 watch(
   () => [kal.value.JenisKain, kal.value.Warna, kal.value.Model],
   () => {
+    if (skipNextAutoFetch.value) {
+      skipNextAutoFetch.value = false;
+      return; // ini pemicu dari hydration data lama, bukan aksi user
+    }
     fetchKalkulasiMetadata();
   },
 );

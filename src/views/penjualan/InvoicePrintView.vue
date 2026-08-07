@@ -187,7 +187,7 @@ const formatPrintedAt = () => {
 };
 
 // ── Generate TXT (Dot Matrix) — sesuai Delphi doslipINV2 ──────────────
-const PAGE_WIDTH = 110;
+const PAGE_WIDTH = 125;
 const BASE_WIDTH = 136; // jangan diubah — acuan kalibrasi original
 const SCALE = PAGE_WIDTH / BASE_WIDTH;
 const col = (n: number) => Math.max(1, Math.round(n * SCALE));
@@ -247,11 +247,20 @@ const generateTxt = (mode: "standart" | "full") => {
     const wLabel = col(14);
     const wAngka = col(20);
     const TERBILANG = (terbilang(t.grandTotal) + " Rupiah").toUpperCase();
-    const tb1 = TERBILANG.substring(0, col(48));
+
+    // ⬅ FIX: label "Terbilang : " (12 char) ditambahkan DI DEPAN tb1 —
+    // slice tb1 harus dikurangi panjang label itu dulu, bukan pakai
+    // lebar penuh/angka fix col(48), atau ekornya kepotong saat di-padR.
+    const LABEL_TERBILANG = "Terbilang : ";
+    const tb1Width = wTerbilang - LABEL_TERBILANG.length;
+    const tb1 = TERBILANG.substring(0, tb1Width);
     const tb2 =
-      TERBILANG.length > col(48) ? TERBILANG.substring(col(48), col(96)) : "";
+      TERBILANG.length > tb1Width
+        ? TERBILANG.substring(tb1Width, tb1Width + wTerbilang)
+        : "";
+
     lines.push(
-      `${padR("Terbilang : " + tb1, wTerbilang)} ${padR("Total", wLabel)}: ${padL(num(t.totalBarang), wAngka)}`,
+      `${padR(LABEL_TERBILANG + tb1, wTerbilang)} ${padR("Total", wLabel)}: ${padL(num(t.totalBarang), wAngka)}`,
     );
     const pphLabel = h.inv_pph === "PPh" ? "PPh" : "Disc";
     lines.push(
@@ -287,14 +296,30 @@ const generateTxt = (mode: "standart" | "full") => {
 
   const headerLines = buildHeaderLines();
   const footerLines = buildFooterLines();
-  const dataLineOf = (r: any, lineNum: number) =>
-    `${padR(String(lineNum), col(3))} ${padR(r.invd_spk_nomor || "", col(16))} ${padR(r.nama_barang || "", col(46))} ${padR(r.invd_ukuran || "", col(22))} ${padL(num(r.invd_jumlah), col(12))} ${padL(num(r.invd_harga), col(16))} ${padL(num(Math.round(Number(r.invd_jumlah) * Number(r.invd_harga))), col(16))}`;
+  const wrapNamaBarang = (text: string) => wrapText(text || "", col(46));
+
+  const dataLinesOf = (r: any, lineNum: number): string[] => {
+    const namaLines = wrapNamaBarang(r.nama_barang);
+    const first = `${padR(String(lineNum), col(3))} ${padR(r.invd_spk_nomor || "", col(16))} ${padR(namaLines[0] || "", col(46))} ${padR(r.invd_ukuran || "", col(22))} ${padL(num(r.invd_jumlah), col(12))} ${padL(num(r.invd_harga), col(16))} ${padL(num(Math.round(Number(r.invd_jumlah) * Number(r.invd_harga))), col(16))}`;
+    const rest = namaLines
+      .slice(1)
+      .map(
+        (ln) =>
+          `${padR("", col(3))} ${padR("", col(16))} ${padR(ln, col(46))} ${padR("", col(22))} ${padR("", col(12))} ${padR("", col(16))} ${padR("", col(16))}`,
+      );
+    return [first, ...rest];
+  };
 
   const allPages: string[][] = [];
 
   if (isFull) {
-    const dataLines = rows.map((r: any, i: number) => dataLineOf(r, i + 1));
-    const bodyLines = [...headerLines, ...dataLines]; // ← LINE dihapus dari sini
+    let recordsProcessed = 0;
+    const dataLines: string[] = [];
+    rows.forEach((r: any) => {
+      recordsProcessed++;
+      dataLines.push(...dataLinesOf(r, recordsProcessed));
+    });
+    const bodyLines = [...headerLines, ...dataLines];
     if (bodyLines.length + footerLines.length <= FOOTER_ANCHOR_LINE) {
       const pad = Math.max(
         0,
@@ -308,35 +333,42 @@ const generateTxt = (mode: "standart" | "full") => {
       allPages.push([...Array(footerPad).fill(""), ...footerLines]);
     }
   } else {
-    // Mode Standart: xRecord baris per halaman fisik, tiap halaman
-    // SELALU genap tinggi PAGE_LINES (header+data+padding kosong),
-    // footer HANYA di halaman terakhir & tetap didorong ke bawah.
     const maxDataLinesPerPage = Math.max(
       1,
-      PAGE_LINES - headerLines.length - 1, // -1 utk LINE penutup data
+      PAGE_LINES - headerLines.length - 1,
     );
     const xRecord = Math.min(31, maxDataLinesPerPage);
 
+    // ⬅ FIX: chunking sekarang berdasar TOTAL BARIS CETAK (termasuk baris
+    // lanjutan wrap nama), bukan jumlah record — SPK dgn nama panjang
+    // (>1 baris) dihitung benar saat menentukan muat/tidaknya di halaman.
     const chunks: any[][] = [];
-    for (let i = 0; i < rows.length; i += xRecord) {
-      chunks.push(rows.slice(i, i + xRecord));
+    let current: any[] = [];
+    let currentLineCount = 0;
+    for (const r of rows) {
+      const lineCount = wrapNamaBarang(r.nama_barang).length;
+      if (currentLineCount + lineCount > xRecord && current.length > 0) {
+        chunks.push(current);
+        current = [];
+        currentLineCount = 0;
+      }
+      current.push(r);
+      currentLineCount += lineCount;
     }
+    if (current.length > 0) chunks.push(current);
     if (chunks.length === 0) chunks.push([]);
 
+    let recordsProcessed = 0;
     chunks.forEach((chunk, ci) => {
-      const startNum = ci * xRecord;
-      const dataLines = chunk.map((r: any, i: number) =>
-        dataLineOf(r, startNum + i + 1),
-      );
+      const dataLines: string[] = [];
+      chunk.forEach((r) => {
+        recordsProcessed++;
+        dataLines.push(...dataLinesOf(r, recordsProcessed));
+      });
       const isLastChunk = ci === chunks.length - 1;
       const page = [...headerLines, ...dataLines];
 
       if (isLastChunk) {
-        // ⚠️ FIX: JANGAN paksa padding ke xRecord penuh di chunk terakhir —
-        // itu yang bikin halaman selalu "gemuk" 31 baris data meski cuma
-        // 1-2 baris beneran, sehingga footer selalu kedorong ke halaman
-        // baru walau ruang sebenarnya masih cukup. Biarkan footer nempel
-        // langsung setelah baris data asli, baru cek muat/tidaknya.
         if (page.length + footerLines.length <= FOOTER_ANCHOR_LINE) {
           const extraPad = Math.max(
             0,
@@ -345,10 +377,7 @@ const generateTxt = (mode: "standart" | "full") => {
           page.push(...Array(extraPad).fill(""), ...footerLines);
           allPages.push(page);
         } else {
-          // Baris data terlalu banyak untuk chunk terakhir ini, footer
-          // memang butuh halaman baru — di sini baru relevan padding ke
-          // xRecord, supaya potongan kertas fisik tetap rapi per halaman.
-          const blankPad = Math.max(0, xRecord - chunk.length);
+          const blankPad = Math.max(0, xRecord - dataLines.length);
           page.push(...Array(blankPad).fill(""));
           allPages.push(page);
           const footerPad = Math.max(
@@ -358,6 +387,8 @@ const generateTxt = (mode: "standart" | "full") => {
           allPages.push([...Array(footerPad).fill(""), ...footerLines]);
         }
       } else {
+        const blankPad = Math.max(0, xRecord - dataLines.length);
+        page.push(...Array(blankPad).fill(""));
         allPages.push(page);
       }
     });

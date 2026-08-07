@@ -119,7 +119,7 @@ const terbilang = (n: number): string => {
 };
 
 // ── Konstanta kertas dot matrix — 21cm (lebar cetak) x 27,8cm (panjang feed) ──
-const PAGE_WIDTH = 110; // contoh: ~81% dari lebar penuh (136)
+const PAGE_WIDTH = 125; // contoh: ~81% dari lebar penuh (136)
 const BASE_WIDTH = 136; // jangan diubah — acuan kalibrasi original
 const SCALE = PAGE_WIDTH / BASE_WIDTH;
 const col = (n: number) => Math.max(1, Math.round(n * SCALE));
@@ -182,13 +182,17 @@ const generateTxt = () => {
     const wLabel = col(14);
     const wAngka = col(17);
     const TERBILANG = (terbilang(t.grandTotal) + " Rupiah").toUpperCase();
-    const tb1 = TERBILANG.substring(0, wTerbilang);
+
+    const LABEL_TERBILANG = "Terbilang : ";
+    const tb1Width = wTerbilang - LABEL_TERBILANG.length;
+    const tb1 = TERBILANG.substring(0, tb1Width);
     const tb2 =
-      TERBILANG.length > wTerbilang
-        ? TERBILANG.substring(wTerbilang, wTerbilang * 2)
+      TERBILANG.length > tb1Width
+        ? TERBILANG.substring(tb1Width, tb1Width + wTerbilang)
         : "";
+
     lines.push(
-      `${padR("Terbilang : " + tb1, wTerbilang)}${padR("Total", wLabel)}: ${padL(num(t.totalBarang), wAngka)}`,
+      `${padR(LABEL_TERBILANG + tb1, wTerbilang)}${padR("Total", wLabel)}: ${padL(num(t.totalBarang), wAngka)}`,
     );
     lines.push(
       `${padR(tb2, wTerbilang)}${padR("Total PPN", wLabel)}: ${padL(num(t.totalPpn), wAngka)}`,
@@ -219,33 +223,57 @@ const generateTxt = () => {
 
   const headerLines = buildHeaderLines();
   const footerLines = buildFooterLines();
-  const dataLineOf = (r: any, lineNum: number) =>
-    `${padR(String(lineNum), col(3))} ${padR(r.invd_spk_nomor || "", col(12))} ${padR(r.nama_barang || "", col(55))} ${padR(r.invd_ukuran || "", col(20))} ${padL(num(r.invd_jumlah), col(10))} ${padL(num(r.invd_harga), col(12))} ${padL(num(Math.round(Number(r.invd_jumlah) * Number(r.invd_harga))), col(18))}`;
+  const wrapNamaBarang = (text: string) => wrapText(text || "", col(55));
+
+  const dataLinesOf = (r: any, lineNum: number): string[] => {
+    const namaLines = wrapNamaBarang(r.nama_barang);
+    const first = `${padR(String(lineNum), col(3))} ${padR(r.invd_spk_nomor || "", col(12))} ${padR(namaLines[0] || "", col(55))} ${padR(r.invd_ukuran || "", col(20))} ${padL(num(r.invd_jumlah), col(10))} ${padL(num(r.invd_harga), col(12))} ${padL(num(Math.round(Number(r.invd_jumlah) * Number(r.invd_harga))), col(18))}`;
+    const rest = namaLines
+      .slice(1)
+      .map(
+        (ln) =>
+          `${padR("", col(3))} ${padR("", col(12))} ${padR(ln, col(55))} ${padR("", col(20))} ${padR("", col(10))} ${padR("", col(12))} ${padR("", col(18))}`,
+      );
+    return [first, ...rest];
+  };
 
   const maxDataLinesPerPage = Math.max(1, PAGE_LINES - headerLines.length - 1);
-  const xRecord = Math.min(30, maxDataLinesPerPage);
+  const xRecord = Math.min(30, maxDataLinesPerPage); // sekarang murni budget JUMLAH BARIS, bukan jumlah SPK
 
+  // ⬅ FIX: chunking sekarang berdasarkan TOTAL BARIS CETAK (termasuk
+  // baris lanjutan wrap nama), bukan jumlah record — supaya SPK dengan
+  // nama panjang (>1 baris) tetap dihitung benar saat menentukan muat/
+  // tidaknya di sebuah halaman.
   const chunks: any[][] = [];
-  for (let i = 0; i < rows.length; i += xRecord) {
-    chunks.push(rows.slice(i, i + xRecord));
+  let current: any[] = [];
+  let currentLineCount = 0;
+  for (const r of rows) {
+    const lineCount = wrapNamaBarang(r.nama_barang).length;
+    if (currentLineCount + lineCount > xRecord && current.length > 0) {
+      chunks.push(current);
+      current = [];
+      currentLineCount = 0;
+    }
+    current.push(r);
+    currentLineCount += lineCount;
   }
+  if (current.length > 0) chunks.push(current);
   if (chunks.length === 0) chunks.push([]);
 
   const pages: string[][] = [];
+  let recordsProcessed = 0;
 
   chunks.forEach((chunk, ci) => {
-    const startNum = ci * xRecord;
-    const dataLines = chunk.map((r: any, i: number) =>
-      dataLineOf(r, startNum + i + 1),
-    );
+    const dataLines: string[] = [];
+    chunk.forEach((r) => {
+      recordsProcessed++;
+      dataLines.push(...dataLinesOf(r, recordsProcessed));
+    });
+
     const isLastChunk = ci === chunks.length - 1;
     const page = [...headerLines, ...dataLines];
 
     if (isLastChunk) {
-      // ⚠️ FIX: jangan paksa padding ke xRecord penuh di chunk terakhir —
-      // itu yang bikin halaman selalu "gemuk" walau cuma 1-2 baris data,
-      // sehingga footer selalu terdorong ke halaman baru padahal ruang
-      // sebenarnya masih cukup. Cek muat dulu pakai baris data ASLI.
       if (page.length + footerLines.length <= FOOTER_ANCHOR_LINE) {
         const extraPad = Math.max(
           0,
@@ -254,16 +282,15 @@ const generateTxt = () => {
         page.push(...Array(extraPad).fill(""), ...footerLines);
         pages.push(page);
       } else {
-        // Baris data terlalu banyak, footer memang butuh halaman baru —
-        // baru di sini padding ke xRecord relevan, biar potongan kertas
-        // fisik tetap rapi per halaman.
-        const blankPad = Math.max(0, xRecord - chunk.length);
+        const blankPad = Math.max(0, xRecord - dataLines.length);
         page.push(...Array(blankPad).fill(""));
         pages.push(page);
         const footerPad = Math.max(0, FOOTER_ANCHOR_LINE - footerLines.length);
         pages.push([...Array(footerPad).fill(""), ...footerLines]);
       }
     } else {
+      const blankPad = Math.max(0, xRecord - dataLines.length);
+      page.push(...Array(blankPad).fill(""));
       pages.push(page);
     }
   });
