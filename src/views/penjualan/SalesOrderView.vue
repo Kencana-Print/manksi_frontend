@@ -485,20 +485,21 @@ const onLihatGambar = () => {
   gambarFallbackStep.value = 0;
 
   const base = (api.defaults.baseURL || "").replace(/\/api\/?$/, "");
-  const cab = selectedItem.value.Cab || "HO-";
+  const cab = selectedItem.value.Cab || "HO-"; // Cabang bawaan SO
   const nomor = selectedItem.value.Nomor;
   const map = selectedItem.value.MAP || "";
 
   const divisi = String(selectedItem.value.Divisi || "").toUpperCase();
   const invdc = selectedItem.value["Pesanan/Invoice"] || "";
 
-  // Deteksi fleksibel
   const isKaosan =
     divisi.includes("KAOSAN") || divisi === "3" || divisi.includes("DIVISI 3");
 
   if (isKaosan && invdc) {
-    // 🌟 LOGIKA KHUSUS KAOSAN (Tanpa Timestamp)
-    gambarUrl.value = `https://retail.kaosanofficial.com/images/${cab}/${encodeURIComponent(invdc)}.jpeg`;
+    // 🌟 Ekstrak cabang dari prefix nomor pengajuan (misal: ambil "K06" dari "K06.2026.00071")
+    const cabangKaosan = invdc.split(".")[0] || cab;
+
+    gambarUrl.value = `https://retail.kaosanofficial.com/images/${cabangKaosan}/${encodeURIComponent(invdc)}.jpeg`;
   } else {
     // 🌟 LOGIKA DEFAULT
     const identifier = map || nomor;
