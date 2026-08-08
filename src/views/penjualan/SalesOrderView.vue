@@ -454,11 +454,13 @@ const gambarFallbackStep = ref(0);
 const onGambarError = () => {
   if (!selectedItem.value) return;
 
-  const divisi = String(selectedItem.value.Divisi || "");
-  // Jika ini adalah pesanan Divisi 3 (Kaosan), kita tidak menggunakan fallback legacy Delphi
-  // karena lokasinya sudah pasti di server retail kaosan. Langsung hentikan pencarian.
-  if (divisi.startsWith("3")) {
-    gambarFallbackStep.value = 99; // Paksa masuk ke template error
+  const divisi = String(selectedItem.value.Divisi || "").toUpperCase();
+  const isKaosan =
+    divisi.includes("KAOSAN") || divisi === "3" || divisi.includes("DIVISI 3");
+
+  // Jika ini pesanan Kaosan, jangan lakukan fallback ke file-gambar legacy Delphi
+  if (isKaosan) {
+    gambarFallbackStep.value = 99; // Paksa masuk ke template error (IconPhotoOff)
     return;
   }
 
@@ -468,11 +470,11 @@ const onGambarError = () => {
   const nomor = selectedItem.value.Nomor;
 
   if (gambarFallbackStep.value === 0 && map) {
-    // 1. Fallback pertama: folder /map/ di server images (berdasarkan nomor MAP)
+    // 1. Fallback pertama: folder /map/
     gambarFallbackStep.value = 1;
     gambarUrl.value = `${base}/images/${cab}/map/${encodeURIComponent(map)}.jpg`;
   } else if (gambarFallbackStep.value <= 1) {
-    // 2. Fallback kedua: SPK Format Lama (di server legacy, root `/file-gambar/`)
+    // 2. Fallback kedua: format lawas
     gambarFallbackStep.value = 2;
     gambarUrl.value = `/file-gambar/${encodeURIComponent(nomor)}.jpg`;
   }
@@ -486,16 +488,20 @@ const onLihatGambar = () => {
   const cab = selectedItem.value.Cab || "HO-";
   const nomor = selectedItem.value.Nomor;
   const map = selectedItem.value.MAP || "";
-  const divisi = String(selectedItem.value.Divisi || "");
-  const invdc = selectedItem.value["Pesanan/Invoice"] || ""; // Mengambil spk_invdc
 
-  // LOGIKA KHUSUS DIVISI 3 (KAOSAN)
-  if (divisi.startsWith("3")) {
+  const divisi = String(selectedItem.value.Divisi || "").toUpperCase();
+  const invdc = selectedItem.value["Pesanan/Invoice"] || "";
+
+  // Deteksi fleksibel: Cek apakah divisi mengandung kata "KAOSAN" atau angka "3"
+  const isKaosan =
+    divisi.includes("KAOSAN") || divisi === "3" || divisi.includes("DIVISI 3");
+
+  if (isKaosan && invdc) {
+    // 🌟 LOGIKA KHUSUS KAOSAN
     const timestamp = Date.now();
-    // Menggunakan URL spesifik Kaosan dan data spk_invdc dengan ekstensi .jpeg
     gambarUrl.value = `https://retail.kaosanofficial.com/images/${cab}/${encodeURIComponent(invdc)}.jpeg?t=${timestamp}`;
   } else {
-    // LOGIKA DEFAULT (DIVISI LAIN)
+    // 🌟 LOGIKA DEFAULT (Atau jika Kaosan tapi belum punya nomor pengajuan/invdc)
     const identifier = map || nomor;
     gambarUrl.value = `${base}/images/${cab}/${encodeURIComponent(identifier)}.jpg`;
   }
