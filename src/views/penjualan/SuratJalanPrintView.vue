@@ -147,7 +147,7 @@ const PAGE_WIDTH = 136;
 const NAMA_W = 50;
 const KET_W = 26;
 
-const MAX_DATA_ROWS_PER_PAGE = 8;
+const MAX_DATA_ROWS_PER_PAGE = 7;
 
 const LINE = "_".repeat(PAGE_WIDTH);
 
@@ -162,7 +162,6 @@ const generateTxt = () => {
     lines.push(padR(h.perush_nama || "", PAGE_WIDTH));
     lines.push(padR(h.perush_alamat || "", PAGE_WIDTH));
     lines.push(padR(h.perush_telp || "", PAGE_WIDTH));
-    lines.push("");
     lines.push(padC("S U R A T   J A L A N", PAGE_WIDTH));
     lines.push("");
 
@@ -217,7 +216,6 @@ const generateTxt = () => {
     lines.push(
       `${padR("Dibuat Oleh,", 27)} ${padR("Disiapkan Oleh,", 27)} ${padR("Kepala Gudang,", 27)} ${padR("Pengantar,", 27)} ${padR("Diterima Oleh,", 27)}`,
     );
-    lines.push("");
     lines.push("");
     lines.push("");
     lines.push(
