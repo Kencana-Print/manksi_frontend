@@ -902,7 +902,7 @@ onMounted(async () => {
 .header-row {
   display: flex;
   justify-content: space-between;
-  margin-bottom: 8px;
+  margin-bottom: 4px;
   align-items: flex-end;
 }
 .title-main {
@@ -1083,11 +1083,21 @@ onMounted(async () => {
 }
 .grid-box {
   flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   justify-content: center;
   gap: 5px;
   min-width: 0;
+}
+.layout-box.divisi-3.horizontal .img-box {
+  flex: 0 0 55mm; /* ← jatah tetap, tidak ikut diperas */
+  max-height: 55mm;
+}
+.layout-box.divisi-3.horizontal .grid-box {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 
 /* ── TTD KOMPLEKS ── */
@@ -1114,10 +1124,11 @@ onMounted(async () => {
   color: #000 !important;
 }
 .h-empty {
-  height: 18px;
+  height: 14px;
 }
 .sign-space-complex {
-  height: 28px;
+  position: relative;
+  height: 24px;
 }
 .ttd-img-complex {
   position: absolute;
@@ -1257,7 +1268,7 @@ onMounted(async () => {
   .print-wrapper,
   .print-wrapper-so {
     width: 100% !important;
-    height: 190mm !important;
+    height: 196mm !important;
   }
 
   .alokasi-panel {
