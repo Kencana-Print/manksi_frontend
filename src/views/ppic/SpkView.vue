@@ -454,27 +454,64 @@ const printCheckInfo = ref<{ count: number; approvalStatus: string } | null>(
 );
 
 const onGambarError = () => {
+  // Dikosongkan. Fallback error handling sudah dipindah otomatis ke dalam tryNext() di onLihatGambar
+  gambarUrl.value = "";
+};
+const onLihatGambar = () => {
   if (!selectedItem.value) return;
+
   const base = (api.defaults.baseURL || "").replace(/\/api\/?$/, "");
   const nomor = selectedItem.value.Nomor;
   const cab = selectedItem.value.Cab || "HO-";
   const map = selectedItem.value.MAP || "";
-  if (gambarFallbackStep.value === 0 && map) {
-    gambarFallbackStep.value = 1;
-    gambarUrl.value = `${base}/images/${cab}/map/${encodeURIComponent(map)}.jpg`;
-  } else if (gambarFallbackStep.value <= 1) {
-    gambarFallbackStep.value = 2;
-    gambarUrl.value = `/file-gambar/${encodeURIComponent(nomor)}.jpg`;
+
+  // Karena SPK di-generate dari SO, kita bentuk nama SO-nya
+  const soNomor = nomor.startsWith("SPK-")
+    ? nomor.replace("SPK-", "SO-")
+    : nomor;
+
+  const candidates = [
+    // 1. Coba gambar SPK
+    `${base}/images/${cab}/${encodeURIComponent(nomor)}.jpg`,
+  ];
+
+  // 2. Coba gambar SO (jika ada perbedaan nama)
+  if (soNomor !== nomor) {
+    candidates.push(`${base}/images/${cab}/${encodeURIComponent(soNomor)}.jpg`);
   }
-};
-const onLihatGambar = () => {
-  if (!selectedItem.value) return;
-  gambarFallbackStep.value = 0;
-  const base = (api.defaults.baseURL || "").replace(/\/api\/?$/, "");
-  const nomor = selectedItem.value.Nomor;
-  const cab = selectedItem.value.Cab || "HO-";
-  gambarUrl.value = `${base}/images/${cab}/${encodeURIComponent(nomor)}.jpg`;
+
+  // 3. Coba gambar MAP
+  if (map) {
+    candidates.push(`${base}/images/${cab}/map/${encodeURIComponent(map)}.jpg`);
+  }
+
+  // 4. Fallback ke gambar format lama di root server /file-gambar/
+  candidates.push(`/file-gambar/${encodeURIComponent(nomor)}.jpg`);
+  if (soNomor !== nomor) {
+    candidates.push(`/file-gambar/${encodeURIComponent(soNomor)}.jpg`);
+  }
+  if (map && map !== nomor) {
+    candidates.push(`/file-gambar/${encodeURIComponent(map)}.jpg`);
+  }
+
+  gambarUrl.value = ""; // Reset gambar sebelumnya
   dialogGambar.value = true;
+
+  // Tes URL satu per satu di background
+  const tryNext = (idx: number) => {
+    if (idx >= candidates.length) {
+      gambarUrl.value = ""; // Gagal semua, trigger icon error
+      return;
+    }
+    const img = new Image();
+    img.onload = () => {
+      gambarUrl.value = candidates[idx]; // Gambar ketemu, render ke UI
+    };
+    img.onerror = () => tryNext(idx + 1); // Gagal, coba URL berikutnya
+    img.src = candidates[idx];
+  };
+
+  tryNext(0);
 };
 
 // --- CETAK ---

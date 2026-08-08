@@ -66,11 +66,7 @@ const watermarkTiles = computed(() =>
   Array(60).fill(previewWatermarkText.value),
 );
 
-// Coba berantai: (1) file milik SO/SPK sendiri di lokal → (2) file MAP
-// di lokal (folder map/) → (3) VPS lama. Sebelumnya cuma nyoba path #1
-// via @error, sehingga kalau SPK berasal dari MAP (gambar tersimpan di
-// folder map/ dengan nama spk_memo, bukan spk_so_ref), gambar selalu
-// gagal tanpa pernah mencoba kandidat lain.
+// Coba berantai: (1) SPK di lokal -> (2) SO di lokal -> (3) MAP -> (4) file lama di /file-gambar/
 const resolveDesignImage = () => {
   if (!spk.value.spk_nomor) {
     resolvedImageUrl.value = "";
@@ -79,23 +75,38 @@ const resolveDesignImage = () => {
   const base = getBaseUrl();
   const cab = spk.value.spk_cab || "HO-";
   const nomor = spk.value.spk_nomor;
+
+  // Ambil referensi SO. Jika kosong dan berawalan SPK-, ubah depannya jadi SO-
+  const soRef =
+    spk.value.spk_so_ref ||
+    (nomor.startsWith("SPK-") ? nomor.replace("SPK-", "SO-") : nomor);
   const mapNomor = spk.value.spk_memo || "";
 
   const candidates = [
-    // 1. Gambar SPK Baru (dari backend/images/cabang/spk)
+    // 1. Gambar SPK Baru
     `${base}/images/${cab}/${encodeURIComponent(nomor)}.jpg`,
   ];
 
+  // 2. Gambar SO Baru (Sesuai dengan gambar di terminal yang tersimpan dengan nama SO)
+  if (soRef && soRef !== nomor) {
+    candidates.push(`${base}/images/${cab}/${encodeURIComponent(soRef)}.jpg`);
+  }
+
+  // 3. Gambar MAP
   if (mapNomor) {
-    // 2. Gambar MAP (dari backend/images/cabang/map/map)
     candidates.push(
       `${base}/images/${cab}/map/${encodeURIComponent(mapNomor)}.jpg`,
     );
   }
 
-  // 3. Gambar SPK Lama (dari root /file-gambar/spk)
-  // FIX: Ambil langsung dari "nomor" SPK, bukan mapNomor / soRef
+  // 4. Gambar SPK / SO / MAP Lama (format legacy)
   candidates.push(`/file-gambar/${encodeURIComponent(nomor)}.jpg`);
+  if (soRef && soRef !== nomor) {
+    candidates.push(`/file-gambar/${encodeURIComponent(soRef)}.jpg`);
+  }
+  if (mapNomor && mapNomor !== nomor) {
+    candidates.push(`/file-gambar/${encodeURIComponent(mapNomor)}.jpg`);
+  }
 
   isLoadingImage.value = true;
   resolvedImageUrl.value = "";

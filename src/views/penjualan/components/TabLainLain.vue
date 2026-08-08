@@ -389,12 +389,15 @@ watch(isAccImageError, (val) => {
       </div>
 
       <div class="ll-img-box" style="flex: 1">
-        <template v-if="isPoPdf && displayPoUrl">
-          <div class="ll-pdf-badge">
-            <span style="font-size: 28px">📄</span>
-            <div style="font-size: 10px; margin-top: 4px">File PDF</div>
-          </div>
-        </template>
+        <!-- 1. Tampilkan iframe langsung di halaman jika file adalah PDF -->
+        <iframe
+          v-if="isPoPdf && displayPoUrl"
+          :src="displayPoUrl + '#toolbar=0&navpanes=0&scrollbar=0'"
+          style="width: 100%; height: 100%; border: none; overflow: hidden"
+          title="Preview Lampiran PDF"
+        ></iframe>
+
+        <!-- 2. Tampilkan img jika file adalah gambar (JPG/PNG) -->
         <img
           v-else-if="displayPoUrl"
           :src="poFileExt === 'legacy-email' ? legacyEmailUrl : displayPoUrl"
@@ -403,6 +406,8 @@ watch(isAccImageError, (val) => {
           @error="onPoFileError"
           style="cursor: pointer"
         />
+
+        <!-- 3. Kosong jika tidak ada file sama sekali -->
         <div v-else class="ll-img-empty">
           <IconPhoto :size="28" color="#bdbdbd" />
           <div>Belum ada lampiran</div>
