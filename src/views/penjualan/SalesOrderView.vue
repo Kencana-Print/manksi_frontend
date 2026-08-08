@@ -450,6 +450,14 @@ const confirmBatalClose = async () => {
 const dialogGambar = ref(false);
 const gambarUrl = ref("");
 const gambarFallbackStep = ref(0);
+const kaosanExtIndex = ref(0);
+const KAOSAN_EXTENSIONS = ["jpeg", "png", "jpg"]; // urutan coba: jpeg dulu, lalu png, lalu jpg
+
+const buildKaosanUrl = (cabangKaosan: string, invdc: string, ext: string) => {
+  const base = (api.defaults.baseURL || "").replace(/\/api\/?$/, "");
+  const targetUrl = `https://retail.kaosanofficial.com/images/${cabangKaosan}/${encodeURIComponent(invdc)}.${ext}`;
+  return `${base}/proxy-image?url=${encodeURIComponent(targetUrl)}`;
+};
 
 const onGambarError = () => {
   if (!selectedItem.value) return;
@@ -459,7 +467,20 @@ const onGambarError = () => {
     divisi.includes("KAOSAN") || divisi === "3" || divisi.includes("DIVISI 3");
 
   if (isKaosan) {
-    gambarFallbackStep.value = 99; // Paksa masuk ke template error
+    kaosanExtIndex.value++;
+    if (kaosanExtIndex.value < KAOSAN_EXTENSIONS.length) {
+      // ← BARU: coba ekstensi berikutnya
+      const invdc = selectedItem.value["Pesanan/Invoice"] || "";
+      const cab = selectedItem.value.Cab || "HO-";
+      const cabangKaosan = invdc.includes(".") ? invdc.split(".")[0] : cab;
+      gambarUrl.value = buildKaosanUrl(
+        cabangKaosan,
+        invdc,
+        KAOSAN_EXTENSIONS[kaosanExtIndex.value],
+      );
+    } else {
+      gambarFallbackStep.value = 99; // semua ekstensi gagal → tampilkan error
+    }
     return;
   }
 
@@ -469,12 +490,9 @@ const onGambarError = () => {
   const nomor = selectedItem.value.Nomor;
 
   if (gambarFallbackStep.value === 0 && map) {
-    // 1. Fallback pertama: folder /map/ di struktur web baru
     gambarFallbackStep.value = 1;
     gambarUrl.value = `${base}/images/${cab}/map/${encodeURIComponent(map)}.jpg`;
   } else if (gambarFallbackStep.value <= 1) {
-    // 2. Fallback kedua: format legacy dari aplikasi desktop Delphi
-    // [PERBAIKAN] Gunakan MAP jika ada, jika tidak baru gunakan SO
     gambarFallbackStep.value = 2;
     const identifier = map || nomor;
     gambarUrl.value = `${base}/file-gambar/${encodeURIComponent(identifier)}.jpg`;
@@ -484,6 +502,7 @@ const onGambarError = () => {
 const onLihatGambar = () => {
   if (!selectedItem.value) return;
   gambarFallbackStep.value = 0;
+  kaosanExtIndex.value = 0; // ← BARU: reset ke ekstensi pertama tiap buka dialog
 
   const base = (api.defaults.baseURL || "").replace(/\/api\/?$/, "");
   const cab = selectedItem.value.Cab || "HO-";
@@ -498,10 +517,7 @@ const onLihatGambar = () => {
 
   if (isKaosan && invdc) {
     const cabangKaosan = invdc.includes(".") ? invdc.split(".")[0] : cab;
-    const targetUrl = `https://retail.kaosanofficial.com/images/${cabangKaosan}/${encodeURIComponent(invdc)}.jpeg`;
-
-    // Alirkan melalui proxy backend Manksi
-    gambarUrl.value = `${base}/proxy-image?url=${encodeURIComponent(targetUrl)}`;
+    gambarUrl.value = buildKaosanUrl(cabangKaosan, invdc, KAOSAN_EXTENSIONS[0]); // ← pakai helper
   } else {
     const identifier = map || nomor;
     gambarUrl.value = `${base}/images/${cab}/${encodeURIComponent(identifier)}.jpg`;
