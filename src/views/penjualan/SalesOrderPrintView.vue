@@ -963,10 +963,10 @@ onMounted(async () => {
   margin-top: auto;
 }
 .mb-1 {
-  margin-bottom: 4px;
+  margin-bottom: 2px;
 }
 .mb-2 {
-  margin-bottom: 8px;
+  margin-bottom: 4px;
 }
 .mb-3 {
   margin-bottom: 12px;
@@ -988,7 +988,8 @@ onMounted(async () => {
   margin-bottom: 4px;
 }
 .info-table td {
-  padding: 1px 0;
+  padding: 0.5px 0;
+  line-height: 1.15;
   vertical-align: top;
 }
 .w-label {
@@ -1006,10 +1007,10 @@ onMounted(async () => {
 }
 .val-pre {
   font-family: inherit;
-  font-size: 7.5pt;
+  font-size: 7pt;
   white-space: pre-wrap;
   margin: 0;
-  line-height: 1.2;
+  line-height: 1.05;
 }
 .highlight-yellow {
   background: yellow;
@@ -1084,6 +1085,7 @@ onMounted(async () => {
 .grid-box {
   flex: 1;
   min-height: 0;
+  overflow: visible;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -1145,6 +1147,7 @@ onMounted(async () => {
   gap: 15px;
   margin-top: 3px;
   line-height: 1.3;
+  flex-shrink: 0;
 }
 .col-list {
   display: flex;
