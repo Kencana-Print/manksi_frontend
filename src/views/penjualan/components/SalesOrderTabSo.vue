@@ -67,6 +67,10 @@ const isKaosanForm = computed(() =>
   String(props.formData.spk_divisi).startsWith("3"),
 );
 
+const isNewFormatSO = computed(() =>
+  String(props.formData.spk_nomor || "").startsWith("SO-"),
+);
+
 const kaosanExtIndex = ref(0);
 const KAOSAN_EXTENSIONS = ["png", "jpeg", "jpg"]; // urutan coba
 
@@ -83,8 +87,8 @@ const displayImageUrl = computed(() => {
   const base = rawBase.replace(/\/api\/?$/, "");
   const cab = props.formData.spk_cab || "HO-";
 
-  // ← BARU: Kaosan (divisi 3) ambil dari retail via proxy, bukan folder lokal
-  if (isKaosanForm.value && props.formData.spk_invdc) {
+  // ← UBAH: tambahkan syarat isNewFormatSO
+  if (isKaosanForm.value && isNewFormatSO.value && props.formData.spk_invdc) {
     const invdc = props.formData.spk_invdc;
     const cabangKaosan = invdc.includes(".") ? invdc.split(".")[0] : cab;
     return buildKaosanUrl(cabangKaosan, invdc, KAOSAN_EXTENSIONS[0]);
@@ -106,7 +110,7 @@ const onImageError = (e: Event) => {
   const img = e.target as HTMLImageElement;
 
   // ← BARU: kalau ini form Kaosan, coba ekstensi berikutnya dulu
-  if (isKaosanForm.value && props.formData.spk_invdc) {
+  if (isKaosanForm.value && isNewFormatSO.value && props.formData.spk_invdc) {
     kaosanExtIndex.value++;
     if (kaosanExtIndex.value < KAOSAN_EXTENSIONS.length) {
       const invdc = props.formData.spk_invdc;

@@ -461,7 +461,7 @@ const buildKaosanUrl = (cabangKaosan: string, invdc: string, ext: string) => {
 const onLihatGambar = () => {
   if (!selectedItem.value) return;
   gambarFallbackStep.value = 0;
-  kaosanExtIndex.value = 0; // ← reset tiap buka dialog
+  kaosanExtIndex.value = 0;
 
   const base = (api.defaults.baseURL || "").replace(/\/api\/?$/, "");
   const cab = selectedItem.value.Cab || "HO-";
@@ -473,10 +473,12 @@ const onLihatGambar = () => {
 
   const isKaosan =
     divisi.includes("KAOSAN") || divisi === "3" || divisi.includes("DIVISI 3");
+  const isNewFormatSO = String(nomor || "").startsWith("SO-"); // ← BARU
 
-  if (isKaosan && invdc) {
+  if (isKaosan && isNewFormatSO && invdc) {
+    // ← tambah isNewFormatSO
     const cabangKaosan = invdc.includes(".") ? invdc.split(".")[0] : cab;
-    gambarUrl.value = buildKaosanUrl(cabangKaosan, invdc, KAOSAN_EXTENSIONS[0]); // png
+    gambarUrl.value = buildKaosanUrl(cabangKaosan, invdc, KAOSAN_EXTENSIONS[0]);
   } else {
     const identifier = map || nomor;
     gambarUrl.value = `${base}/images/${cab}/${encodeURIComponent(identifier)}.jpg`;
@@ -488,11 +490,14 @@ const onLihatGambar = () => {
 const onGambarError = () => {
   if (!selectedItem.value) return;
 
+  const nomor = selectedItem.value.Nomor;
   const divisi = String(selectedItem.value.Divisi || "").toUpperCase();
   const isKaosan =
     divisi.includes("KAOSAN") || divisi === "3" || divisi.includes("DIVISI 3");
+  const isNewFormatSO = String(nomor || "").startsWith("SO-"); // ← BARU
 
-  if (isKaosan) {
+  if (isKaosan && isNewFormatSO) {
+    // ← tambah isNewFormatSO
     kaosanExtIndex.value++;
     if (kaosanExtIndex.value < KAOSAN_EXTENSIONS.length) {
       const invdc = selectedItem.value["Pesanan/Invoice"] || "";
@@ -504,7 +509,7 @@ const onGambarError = () => {
         KAOSAN_EXTENSIONS[kaosanExtIndex.value],
       );
     } else {
-      gambarFallbackStep.value = 99; // semua ekstensi gagal → tampilkan pesan error
+      gambarFallbackStep.value = 99;
     }
     return;
   }
@@ -512,7 +517,6 @@ const onGambarError = () => {
   const base = (api.defaults.baseURL || "").replace(/\/api\/?$/, "");
   const cab = selectedItem.value.Cab || "HO-";
   const map = selectedItem.value.MAP || "";
-  const nomor = selectedItem.value.Nomor;
 
   if (gambarFallbackStep.value === 0 && map) {
     gambarFallbackStep.value = 1;
