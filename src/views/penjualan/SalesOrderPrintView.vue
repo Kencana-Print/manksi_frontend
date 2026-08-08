@@ -208,6 +208,24 @@ const renderKeteranganTambahan = computed(() => {
   return arr.join("\n\n");
 });
 
+const isTallImage = ref(false);
+
+const onMainImageLoad = (e: Event) => {
+  const img = e.target as HTMLImageElement;
+  const box = img.closest(".img-box") as HTMLElement | null;
+  if (!box || !img.naturalWidth || !img.naturalHeight) return;
+
+  const boxRect = box.getBoundingClientRect();
+  if (!boxRect.width || !boxRect.height) return;
+
+  const imgAspect = img.naturalWidth / img.naturalHeight; // W/H asli gambar
+  const boxAspect = boxRect.width / boxRect.height; // W/H ruang tersedia
+
+  // Kalau gambar jauh lebih "kurus" dari kontainer → ada ruang kosong di samping
+  // Threshold 0.85 bisa disesuaikan (makin kecil = makin jarang trigger)
+  isTallImage.value = imgAspect < boxAspect * 0.85;
+};
+
 const updateStatusCetak = async (nomor: string) => {
   try {
     await api.post("/penjualan/sales-order/update-cetak", { nomor });
@@ -566,12 +584,19 @@ onMounted(async () => {
           </div>
 
           <div class="layout-box" :class="[layoutMode, `divisi-${kodeDivisi}`]">
-            <div class="img-box">
+            <div
+              class="img-box"
+              :class="{ 'side-label': isSpandukMMT && isTallImage }"
+            >
               <div class="ukuran-header" v-if="isSpandukMMT">
                 {{ data.jo_nama }} {{ formatUkuran(data.spk_panjang) }} X
                 {{ formatUkuran(data.spk_lebar) }} M
               </div>
-              <img :src="mainImageUrl" @error="handleImageError" />
+              <img
+                :src="mainImageUrl"
+                @error="handleImageError"
+                @load="onMainImageLoad"
+              />
             </div>
             <div class="grid-box" v-if="isComplexTtd">
               <table class="ttd-table">
@@ -979,6 +1004,29 @@ onMounted(async () => {
 }
 .pb-1 {
   padding-bottom: 4px;
+}
+
+/* ── Mode label di samping saat gambar terlalu "tinggi" ── */
+.img-box.side-label {
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.img-box.side-label .ukuran-header {
+  writing-mode: vertical-rl; /* teks mengalir menurun, top → bottom */
+  text-orientation: mixed;
+  margin-bottom: 0;
+  letter-spacing: 1px;
+  flex-shrink: 0;
+  max-height: 100%;
+  white-space: nowrap;
+}
+
+.img-box.side-label img {
+  max-height: 100%;
+  max-width: calc(100% - 30px); /* sisakan ruang untuk label vertikal */
 }
 
 /* ── Info Table ── */
