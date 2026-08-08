@@ -373,7 +373,8 @@ const validateSave = async (skipPoCheck = false) => {
     return;
   }
 
-  const wasAlreadyApprovedOnLoad = wasApprovedOnLoad.value; // ← lihat catatan di bawah
+  const wasAlreadyApprovedOnLoad = wasApprovedOnLoad.value;
+  const isDivisi3 = String(formData.value.Divisi || "").charAt(0) === "3";
 
   if (!isEditMode.value) {
     // CREATE — hard block, sesuai semula
