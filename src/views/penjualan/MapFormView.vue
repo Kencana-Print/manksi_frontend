@@ -377,24 +377,27 @@ const validateSave = async (skipPoCheck = false) => {
 
   if (!isEditMode.value) {
     // CREATE — hard block, sesuai semula
-    if (formData.value.AccCustomer !== "Y") {
-      toast.warning(
-        "Customer belum menyetujui pesanan ini. MAP tidak bisa disimpan.",
-      );
-      return;
-    }
-    if (!formData.value.AccTanggal) {
-      toast.warning("Tanggal persetujuan customer wajib diisi.");
-      return;
-    }
-    if (!accBuktiFile.value) {
-      toast.warning("Bukti screenshot persetujuan customer wajib diupload.");
-      return;
+    if (!isDivisi3) {
+      // ← TAMBAHAN: Bypass divisi 3
+      if (formData.value.AccCustomer !== "Y") {
+        toast.warning(
+          "Customer belum menyetujui pesanan ini. MAP tidak bisa disimpan.",
+        );
+        return;
+      }
+      if (!formData.value.AccTanggal) {
+        toast.warning("Tanggal persetujuan customer wajib diisi.");
+        return;
+      }
+      if (!accBuktiFile.value) {
+        toast.warning("Bukti screenshot persetujuan customer wajib diupload.");
+        return;
+      }
     }
   } else if (!wasAlreadyApprovedOnLoad) {
-    // EDIT & sebelumnya belum approved — bebas diedit, TAPI kalau user
-    // sekarang nyentang Y, wajib lengkap dulu.
-    if (formData.value.AccCustomer === "Y") {
+    // EDIT & sebelumnya belum approved
+    if (!isDivisi3 && formData.value.AccCustomer === "Y") {
+      // ← TAMBAHAN: Bypass divisi 3
       if (!formData.value.AccTanggal) {
         toast.warning("Tanggal persetujuan customer wajib diisi.");
         return;
@@ -407,13 +410,8 @@ const validateSave = async (skipPoCheck = false) => {
   }
 
   // Validasi NomorPO — harus ada sebelum dialog konfirmasi
-  // ⚠️ FIX: kalau pengajuan "MAP tanpa PO" sudah di-ACC sebelumnya
-  // (nopo_acc === "ACC"), jangan tampilkan dialog peringatan lagi —
-  // approval itu masih berlaku selama NomorPO tetap kosong seperti
-  // semula (backend syncNoPoApproval juga sudah menjaga supaya tidak
-  // direset). Dialog cuma relevan untuk kasus BELUM pernah diajukan
-  // ("") atau DITOLAK ("TOLAK"), yang memang butuh persetujuan baru.
   if (
+    !isDivisi3 && // ← TAMBAHAN: Bypass divisi 3 untuk validasi Nomor PO
     !formData.value.NomorPO?.trim() &&
     !skipPoCheck &&
     formData.value.nopo_acc !== "ACC"

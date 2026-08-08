@@ -1737,6 +1737,7 @@ onMounted(async () => {
                     <option value="">-- Pilih --</option>
                     <option value="P01">P01</option>
                     <option value="P04">P04</option>
+                    <option value="MITRA">MITRA</option>
                   </select>
                 </div>
                 <div

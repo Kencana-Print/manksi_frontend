@@ -105,6 +105,7 @@ const selectItem = (item: any) => {
               <th style="width: 90px">JASA</th>
               <th style="width: 90px">ASAL</th>
               <th style="width: 90px">TUJUAN</th>
+              <th>KETERANGAN</th>
             </tr>
           </thead>
           <tbody>
@@ -121,6 +122,7 @@ const selectItem = (item: any) => {
               <td>{{ item.Jasa }}</td>
               <td>{{ item.NamaSup }}</td>
               <td>{{ item.NamaCab }}</td>
+              <td>{{ item.Keterangan }}</td>
             </tr>
           </tbody>
         </table>
