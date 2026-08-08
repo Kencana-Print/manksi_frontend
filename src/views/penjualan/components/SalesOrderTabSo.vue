@@ -63,6 +63,18 @@ const workshopCache = ref<any[]>([]);
 const fileRef = ref<HTMLInputElement | null>(null);
 const resolvedImageUrl = ref("");
 
+const isKaosanForm = computed(() =>
+  String(props.formData.spk_divisi).startsWith("3"),
+);
+
+const kaosanExtIndex = ref(0);
+const KAOSAN_EXTENSIONS = ["png", "jpeg", "jpg"]; // urutan coba
+
+const buildKaosanUrl = (cabangKaosan: string, invdc: string, ext: string) => {
+  const targetUrl = `https://retail.kaosanofficial.com/images/${cabangKaosan}/${encodeURIComponent(invdc)}.${ext}`;
+  return `${api.defaults.baseURL}/proxy-image?url=${encodeURIComponent(targetUrl)}`; // pakai baseURL utuh (dgn /api)
+};
+
 const displayImageUrl = computed(() => {
   if (props.formData.MainImageBlob) return props.formData.MainImageBlob;
   if (resolvedImageUrl.value) return resolvedImageUrl.value;
@@ -71,25 +83,51 @@ const displayImageUrl = computed(() => {
   const base = rawBase.replace(/\/api\/?$/, "");
   const cab = props.formData.spk_cab || "HO-";
 
-  // Prioritas utama: nomor SO itu sendiri.
-  // Jika ini form Create dan nomor SO belum dibuat, gunakan MAP (spk_memo) sebagai fallback untuk tampilannya
+  // ← BARU: Kaosan (divisi 3) ambil dari retail via proxy, bukan folder lokal
+  if (isKaosanForm.value && props.formData.spk_invdc) {
+    const invdc = props.formData.spk_invdc;
+    const cabangKaosan = invdc.includes(".") ? invdc.split(".")[0] : cab;
+    return buildKaosanUrl(cabangKaosan, invdc, KAOSAN_EXTENSIONS[0]);
+  }
+
   const nomorSO = props.formData.spk_nomor;
   const mapNomor = props.formData.spk_memo;
 
   if (!nomorSO && !mapNomor) return "";
 
-  // Jika belum disave (masih create) tapi sudah load dari MAP
   if (!nomorSO && mapNomor) {
     return `${base}/images/${cab}/map/${encodeURIComponent(mapNomor)}.jpg`;
   }
 
-  // Jika ada nomor SO
   return `${base}/images/${cab}/${encodeURIComponent(nomorSO)}.jpg`;
 });
 
 const onImageError = (e: Event) => {
   const img = e.target as HTMLImageElement;
 
+  // ← BARU: kalau ini form Kaosan, coba ekstensi berikutnya dulu
+  if (isKaosanForm.value && props.formData.spk_invdc) {
+    kaosanExtIndex.value++;
+    if (kaosanExtIndex.value < KAOSAN_EXTENSIONS.length) {
+      const invdc = props.formData.spk_invdc;
+      const cab = props.formData.spk_cab || "HO-";
+      const cabangKaosan = invdc.includes(".") ? invdc.split(".")[0] : cab;
+      resolvedImageUrl.value = buildKaosanUrl(
+        cabangKaosan,
+        invdc,
+        KAOSAN_EXTENSIONS[kaosanExtIndex.value],
+      );
+      isImageError.value = false;
+      return;
+    } else {
+      isImageError.value = true;
+      img.style.display = "none";
+      resolvedImageUrl.value = "";
+      return;
+    }
+  }
+
+  // ── logic lama untuk non-Kaosan (SO biasa / MAP) tetap sama persis ──
   if (img.dataset.fallbackTried === "true") {
     isImageError.value = true;
     img.style.display = "none";
@@ -110,24 +148,19 @@ const onImageError = (e: Event) => {
     return;
   }
 
-  // Fallback chain (hampir sama persis dengan halaman cetak)
   const candidates: string[] = [];
 
-  // 1. Jika gagal load SO dari Cabang, mungkin dia dari MAP (coba muat MAP-nya)
   if (mapNomor) {
     candidates.push(
       `${base}/images/${cab}/map/${encodeURIComponent(mapNomor)}.jpg`,
     );
   }
-
-  // 2. Fallback ke file gambar lama di root folder
   if (nomorSO) {
     candidates.push(`/file-gambar/${encodeURIComponent(nomorSO)}.jpg`);
   }
   if (mapNomor && mapNomor !== nomorSO) {
     candidates.push(`/file-gambar/${encodeURIComponent(mapNomor)}.jpg`);
   }
-  // Tambahan bila SO memiliki referensi SO lain (saat edit)
   const soRef = props.formData.so_nomor;
   if (soRef && soRef !== nomorSO) {
     candidates.push(`/file-gambar/${encodeURIComponent(soRef)}.jpg`);
@@ -140,8 +173,6 @@ const onImageError = (e: Event) => {
       resolvedImageUrl.value = "";
       return;
     }
-
-    // Test URL sebelum di-apply
     const tempImg = new Image();
     tempImg.onload = () => {
       img.src = candidates[idx];
@@ -730,12 +761,22 @@ watch(
   () => props.formData.spk_nomor,
   () => {
     isImageError.value = false;
+    kaosanExtIndex.value = 0;
   },
 );
 watch(
   () => props.formData.spk_memo,
   () => {
     isImageError.value = false;
+    kaosanExtIndex.value = 0;
+  },
+);
+watch(
+  () => props.formData.spk_invdc,
+  () => {
+    isImageError.value = false;
+    kaosanExtIndex.value = 0;
+    resolvedImageUrl.value = "";
   },
 );
 </script>
