@@ -451,12 +451,38 @@ const dialogGambar = ref(false);
 const gambarUrl = ref("");
 const gambarFallbackStep = ref(0);
 const kaosanExtIndex = ref(0);
-const KAOSAN_EXTENSIONS = ["jpeg", "png", "jpg"]; // urutan coba: jpeg dulu, lalu png, lalu jpg
+const KAOSAN_EXTENSIONS = ["png", "jpeg", "jpg"]; // urutan coba: png dulu, lalu jpeg, lalu jpg
 
 const buildKaosanUrl = (cabangKaosan: string, invdc: string, ext: string) => {
-  const base = (api.defaults.baseURL || "").replace(/\/api\/?$/, "");
   const targetUrl = `https://retail.kaosanofficial.com/images/${cabangKaosan}/${encodeURIComponent(invdc)}.${ext}`;
-  return `${base}/proxy-image?url=${encodeURIComponent(targetUrl)}`;
+  return `${api.defaults.baseURL}/proxy-image?url=${encodeURIComponent(targetUrl)}`; // ← pakai baseURL utuh (dgn /api)
+};
+
+const onLihatGambar = () => {
+  if (!selectedItem.value) return;
+  gambarFallbackStep.value = 0;
+  kaosanExtIndex.value = 0; // ← reset tiap buka dialog
+
+  const base = (api.defaults.baseURL || "").replace(/\/api\/?$/, "");
+  const cab = selectedItem.value.Cab || "HO-";
+  const nomor = selectedItem.value.Nomor;
+  const map = selectedItem.value.MAP || "";
+
+  const divisi = String(selectedItem.value.Divisi || "").toUpperCase();
+  const invdc = selectedItem.value["Pesanan/Invoice"] || "";
+
+  const isKaosan =
+    divisi.includes("KAOSAN") || divisi === "3" || divisi.includes("DIVISI 3");
+
+  if (isKaosan && invdc) {
+    const cabangKaosan = invdc.includes(".") ? invdc.split(".")[0] : cab;
+    gambarUrl.value = buildKaosanUrl(cabangKaosan, invdc, KAOSAN_EXTENSIONS[0]); // png
+  } else {
+    const identifier = map || nomor;
+    gambarUrl.value = `${base}/images/${cab}/${encodeURIComponent(identifier)}.jpg`;
+  }
+
+  dialogGambar.value = true;
 };
 
 const onGambarError = () => {
@@ -469,7 +495,6 @@ const onGambarError = () => {
   if (isKaosan) {
     kaosanExtIndex.value++;
     if (kaosanExtIndex.value < KAOSAN_EXTENSIONS.length) {
-      // ← BARU: coba ekstensi berikutnya
       const invdc = selectedItem.value["Pesanan/Invoice"] || "";
       const cab = selectedItem.value.Cab || "HO-";
       const cabangKaosan = invdc.includes(".") ? invdc.split(".")[0] : cab;
@@ -479,7 +504,7 @@ const onGambarError = () => {
         KAOSAN_EXTENSIONS[kaosanExtIndex.value],
       );
     } else {
-      gambarFallbackStep.value = 99; // semua ekstensi gagal → tampilkan error
+      gambarFallbackStep.value = 99; // semua ekstensi gagal → tampilkan pesan error
     }
     return;
   }
@@ -497,33 +522,6 @@ const onGambarError = () => {
     const identifier = map || nomor;
     gambarUrl.value = `${base}/file-gambar/${encodeURIComponent(identifier)}.jpg`;
   }
-};
-
-const onLihatGambar = () => {
-  if (!selectedItem.value) return;
-  gambarFallbackStep.value = 0;
-  kaosanExtIndex.value = 0; // ← BARU: reset ke ekstensi pertama tiap buka dialog
-
-  const base = (api.defaults.baseURL || "").replace(/\/api\/?$/, "");
-  const cab = selectedItem.value.Cab || "HO-";
-  const nomor = selectedItem.value.Nomor;
-  const map = selectedItem.value.MAP || "";
-
-  const divisi = String(selectedItem.value.Divisi || "").toUpperCase();
-  const invdc = selectedItem.value["Pesanan/Invoice"] || "";
-
-  const isKaosan =
-    divisi.includes("KAOSAN") || divisi === "3" || divisi.includes("DIVISI 3");
-
-  if (isKaosan && invdc) {
-    const cabangKaosan = invdc.includes(".") ? invdc.split(".")[0] : cab;
-    gambarUrl.value = buildKaosanUrl(cabangKaosan, invdc, KAOSAN_EXTENSIONS[0]); // ← pakai helper
-  } else {
-    const identifier = map || nomor;
-    gambarUrl.value = `${base}/images/${cab}/${encodeURIComponent(identifier)}.jpg`;
-  }
-
-  dialogGambar.value = true;
 };
 
 // PIN Dialog
