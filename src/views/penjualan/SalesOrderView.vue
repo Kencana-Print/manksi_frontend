@@ -497,12 +497,12 @@ const onLihatGambar = () => {
     divisi.includes("KAOSAN") || divisi === "3" || divisi.includes("DIVISI 3");
 
   if (isKaosan && invdc) {
-    // 🌟 LOGIKA KHUSUS KAOSAN
-    // [PERBAIKAN] Pastikan ekstrak cabang sukses dari format K06.2026...
     const cabangKaosan = invdc.includes(".") ? invdc.split(".")[0] : cab;
-    gambarUrl.value = `https://retail.kaosanofficial.com/images/${cabangKaosan}/${encodeURIComponent(invdc)}.jpeg`;
+    const targetUrl = `https://retail.kaosanofficial.com/images/${cabangKaosan}/${encodeURIComponent(invdc)}.jpeg`;
+
+    // Alirkan melalui proxy backend Manksi
+    gambarUrl.value = `${base}/proxy-image?url=${encodeURIComponent(targetUrl)}`;
   } else {
-    // 🌟 LOGIKA DEFAULT (Struktur web baru)
     const identifier = map || nomor;
     gambarUrl.value = `${base}/images/${cab}/${encodeURIComponent(identifier)}.jpg`;
   }
