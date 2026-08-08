@@ -458,9 +458,8 @@ const onGambarError = () => {
   const isKaosan =
     divisi.includes("KAOSAN") || divisi === "3" || divisi.includes("DIVISI 3");
 
-  // Jika ini pesanan Kaosan, jangan lakukan fallback ke file-gambar legacy Delphi
   if (isKaosan) {
-    gambarFallbackStep.value = 99; // Paksa masuk ke template error (IconPhotoOff)
+    gambarFallbackStep.value = 99; // Paksa masuk ke template error
     return;
   }
 
@@ -470,13 +469,15 @@ const onGambarError = () => {
   const nomor = selectedItem.value.Nomor;
 
   if (gambarFallbackStep.value === 0 && map) {
-    // 1. Fallback pertama: folder /map/
+    // 1. Fallback pertama: folder /map/ di struktur web baru
     gambarFallbackStep.value = 1;
     gambarUrl.value = `${base}/images/${cab}/map/${encodeURIComponent(map)}.jpg`;
   } else if (gambarFallbackStep.value <= 1) {
-    // 2. Fallback kedua: format lawas
+    // 2. Fallback kedua: format legacy dari aplikasi desktop Delphi
+    // [PERBAIKAN] Gunakan MAP jika ada, jika tidak baru gunakan SO
     gambarFallbackStep.value = 2;
-    gambarUrl.value = `/file-gambar/${encodeURIComponent(nomor)}.jpg`;
+    const identifier = map || nomor;
+    gambarUrl.value = `${base}/file-gambar/${encodeURIComponent(identifier)}.jpg`;
   }
 };
 
@@ -485,7 +486,7 @@ const onLihatGambar = () => {
   gambarFallbackStep.value = 0;
 
   const base = (api.defaults.baseURL || "").replace(/\/api\/?$/, "");
-  const cab = selectedItem.value.Cab || "HO-"; // Cabang bawaan SO
+  const cab = selectedItem.value.Cab || "HO-";
   const nomor = selectedItem.value.Nomor;
   const map = selectedItem.value.MAP || "";
 
@@ -496,12 +497,12 @@ const onLihatGambar = () => {
     divisi.includes("KAOSAN") || divisi === "3" || divisi.includes("DIVISI 3");
 
   if (isKaosan && invdc) {
-    // 🌟 Ekstrak cabang dari prefix nomor pengajuan (misal: ambil "K06" dari "K06.2026.00071")
-    const cabangKaosan = invdc.split(".")[0] || cab;
-
+    // 🌟 LOGIKA KHUSUS KAOSAN
+    // [PERBAIKAN] Pastikan ekstrak cabang sukses dari format K06.2026...
+    const cabangKaosan = invdc.includes(".") ? invdc.split(".")[0] : cab;
     gambarUrl.value = `https://retail.kaosanofficial.com/images/${cabangKaosan}/${encodeURIComponent(invdc)}.jpeg`;
   } else {
-    // 🌟 LOGIKA DEFAULT
+    // 🌟 LOGIKA DEFAULT (Struktur web baru)
     const identifier = map || nomor;
     gambarUrl.value = `${base}/images/${cab}/${encodeURIComponent(identifier)}.jpg`;
   }
