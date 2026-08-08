@@ -40,29 +40,46 @@ const getBaseUrl = () =>
   );
 
 const resolveDesignImage = () => {
-  const nomor = props.formData.so_nomor;
-  if (!nomor) {
+  if (!props.formData.spk_nomor) {
     resolvedImageUrl.value = "";
-    isImageError.value = false;
     return;
   }
   const base = getBaseUrl();
-  const cab = props.formData.so_cab || "HO-";
-  const map = props.formData.so_map || "";
+  const cab = props.formData.spk_cab || "HO-";
 
-  const candidates = [`${base}/images/${cab}/${encodeURIComponent(nomor)}.jpg`];
-  if (map) {
-    candidates.push(`${base}/images/${cab}/map/${encodeURIComponent(map)}.jpg`);
+  // Ambil referensi dari form
+  const nomor = props.formData.spk_nomor;
+  const soRef = props.formData.so_nomor || props.formData.spk_so_ref || nomor;
+  const mapNomor = props.formData.spk_memo || "";
+
+  const candidates = [
+    // 1. Gambar SPK Baru
+    `${base}/images/${cab}/${encodeURIComponent(soRef)}.jpg`,
+  ];
+
+  // 2. Gambar MAP
+  if (mapNomor) {
+    candidates.push(
+      `${base}/images/${cab}/map/${encodeURIComponent(mapNomor)}.jpg`,
+    );
   }
-  candidates.push(`/file-gambar/${encodeURIComponent(map || nomor)}.jpg`);
 
-  isImageError.value = false;
-  resolvedImageUrl.value = "";
+  // 3. Fallback ke gambar format lama di root server /file-gambar/
+  // Prioritaskan mencari dengan format `nomor` asli, baru pakai mapNomor/soRef
+  candidates.push(`/file-gambar/${encodeURIComponent(nomor)}.jpg`);
+
+  if (mapNomor && mapNomor !== nomor) {
+    candidates.push(`/file-gambar/${encodeURIComponent(mapNomor)}.jpg`);
+  }
+  if (soRef && soRef !== nomor) {
+    candidates.push(`/file-gambar/${encodeURIComponent(soRef)}.jpg`);
+  }
+
   isLoadingImage.value = true;
+  resolvedImageUrl.value = "";
 
   const tryNext = (idx: number) => {
     if (idx >= candidates.length) {
-      isImageError.value = true;
       isLoadingImage.value = false;
       return;
     }

@@ -66,17 +66,25 @@ const resolvedImageUrl = ref("");
 const displayImageUrl = computed(() => {
   if (props.formData.MainImageBlob) return props.formData.MainImageBlob;
   if (resolvedImageUrl.value) return resolvedImageUrl.value;
-  // ✅ FIX: path relatif, gak hardcode host/port
+
   const rawBase = api.defaults.baseURL || import.meta.env.VITE_API_URL || "";
   const base = rawBase.replace(/\/api\/?$/, "");
   const cab = props.formData.spk_cab || "HO-";
-  const nomor = props.formData.spk_memo || props.formData.spk_nomor;
-  if (!nomor) return "";
 
-  if (props.formData.spk_memo) {
-    return `${base}/images/${cab}/map/${encodeURIComponent(props.formData.spk_memo)}.jpg`;
+  // Prioritas utama: nomor SO itu sendiri.
+  // Jika ini form Create dan nomor SO belum dibuat, gunakan MAP (spk_memo) sebagai fallback untuk tampilannya
+  const nomorSO = props.formData.spk_nomor;
+  const mapNomor = props.formData.spk_memo;
+
+  if (!nomorSO && !mapNomor) return "";
+
+  // Jika belum disave (masih create) tapi sudah load dari MAP
+  if (!nomorSO && mapNomor) {
+    return `${base}/images/${cab}/map/${encodeURIComponent(mapNomor)}.jpg`;
   }
-  return `${base}/images/${cab}/${encodeURIComponent(nomor)}.jpg`;
+
+  // Jika ada nomor SO
+  return `${base}/images/${cab}/${encodeURIComponent(nomorSO)}.jpg`;
 });
 
 const onImageError = (e: Event) => {
@@ -90,20 +98,73 @@ const onImageError = (e: Event) => {
   }
   img.dataset.fallbackTried = "true";
 
-  const nomor = props.formData.spk_memo || props.formData.spk_nomor;
-  if (!nomor) {
+  const rawBase = api.defaults.baseURL || import.meta.env.VITE_API_URL || "";
+  const base = rawBase.replace(/\/api\/?$/, "");
+  const cab = props.formData.spk_cab || "HO-";
+
+  const nomorSO = props.formData.spk_nomor;
+  const mapNomor = props.formData.spk_memo;
+
+  if (!nomorSO && !mapNomor) {
     isImageError.value = true;
     return;
   }
 
-  const fallbackUrl = `/file-gambar/${encodeURIComponent(nomor)}.jpg`;
-  img.src = fallbackUrl;
-  resolvedImageUrl.value = fallbackUrl; // ← simpan URL yang berhasil
+  // Fallback chain (hampir sama persis dengan halaman cetak)
+  const candidates: string[] = [];
+
+  // 1. Jika gagal load SO dari Cabang, mungkin dia dari MAP (coba muat MAP-nya)
+  if (mapNomor) {
+    candidates.push(
+      `${base}/images/${cab}/map/${encodeURIComponent(mapNomor)}.jpg`,
+    );
+  }
+
+  // 2. Fallback ke file gambar lama di root folder
+  if (nomorSO) {
+    candidates.push(`/file-gambar/${encodeURIComponent(nomorSO)}.jpg`);
+  }
+  if (mapNomor && mapNomor !== nomorSO) {
+    candidates.push(`/file-gambar/${encodeURIComponent(mapNomor)}.jpg`);
+  }
+  // Tambahan bila SO memiliki referensi SO lain (saat edit)
+  const soRef = props.formData.so_nomor;
+  if (soRef && soRef !== nomorSO) {
+    candidates.push(`/file-gambar/${encodeURIComponent(soRef)}.jpg`);
+  }
+
+  const tryNext = (idx: number) => {
+    if (idx >= candidates.length) {
+      isImageError.value = true;
+      img.style.display = "none";
+      resolvedImageUrl.value = "";
+      return;
+    }
+
+    // Test URL sebelum di-apply
+    const tempImg = new Image();
+    tempImg.onload = () => {
+      img.src = candidates[idx];
+      resolvedImageUrl.value = candidates[idx];
+      isImageError.value = false;
+      img.style.display = "block";
+    };
+    tempImg.onerror = () => tryNext(idx + 1);
+    tempImg.src = candidates[idx];
+  };
+
+  tryNext(0);
 };
 
 watch([() => props.formData.spk_nomor, () => props.formData.spk_memo], () => {
   resolvedImageUrl.value = "";
   isImageError.value = false;
+  // Hapus fallback flag agar bisa mencoba chain ulang untuk nomor yang baru
+  if (document.querySelector(".img-preview")) {
+    (
+      document.querySelector(".img-preview") as HTMLImageElement
+    ).dataset.fallbackTried = "false";
+  }
 });
 
 const onFileChange = (e: Event) => {

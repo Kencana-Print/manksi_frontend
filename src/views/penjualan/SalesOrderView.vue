@@ -447,6 +447,7 @@ const confirmBatalClose = async () => {
 };
 
 // State Gambar
+// State Gambar
 const dialogGambar = ref(false);
 const gambarUrl = ref("");
 const gambarFallbackStep = ref(0);
@@ -457,16 +458,16 @@ const onGambarError = () => {
   const cab = selectedItem.value.Cab || "HO-";
   const map = selectedItem.value.MAP || "";
   const nomor = selectedItem.value.Nomor;
-  const identifier = map || nomor; // ⚠️ FIX: prioritaskan MAP, sama seperti form
-
+  
   if (gambarFallbackStep.value === 0 && map) {
-    // Fallback ke folder /map/ di server images
+    // 1. Fallback pertama: folder /map/ di server images (berdasarkan nomor MAP)
     gambarFallbackStep.value = 1;
     gambarUrl.value = `${base}/images/${cab}/map/${encodeURIComponent(map)}.jpg`;
   } else if (gambarFallbackStep.value <= 1) {
+    // 2. Fallback kedua: SPK Format Lama (di server legacy, root `/file-gambar/`)
+    //    Menggunakan nomor SO/SPK asli, bukan MAP (Contoh: "SM-KO-006934")
     gambarFallbackStep.value = 2;
-    // ⚠️ FIX: pakai identifier (MAP kalau ada), bukan selalu nomor SO
-    gambarUrl.value = `/file-gambar/${encodeURIComponent(identifier)}.jpg`;
+    gambarUrl.value = `/file-gambar/${encodeURIComponent(nomor)}.jpg`;
   }
 };
 
@@ -475,10 +476,11 @@ const onLihatGambar = () => {
   gambarFallbackStep.value = 0;
   const base = (api.defaults.baseURL || "").replace(/\/api\/?$/, "");
   const cab = selectedItem.value.Cab || "HO-";
-  const map = selectedItem.value.MAP || "";
   const nomor = selectedItem.value.Nomor;
-  // ⚠️ FIX: kalau ada MAP, itu yang jadi path utama (sama seperti form),
-  // bukan langsung pakai nomor SO
+  const map = selectedItem.value.MAP || "";
+  
+  // 0. Coba muat gambar utama berdasarkan Nomor SO / Ref (di folder Cabang)
+  // FIX: prioritaskan Nomor SO/SPK terlebih dahulu (seperti di form).
   const identifier = map || nomor;
   gambarUrl.value = `${base}/images/${cab}/${encodeURIComponent(identifier)}.jpg`;
   dialogGambar.value = true;
