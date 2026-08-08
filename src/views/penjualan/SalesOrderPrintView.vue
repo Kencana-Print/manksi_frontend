@@ -52,9 +52,29 @@ const alokasiChunks = computed(() => {
   return chunks;
 });
 
+const isNewFormatSO = computed(() =>
+  String(data.value.spk_nomor || "").startsWith("SO-"),
+); // ← BARU: pembeda format baru vs SPK lama
+
+const KAOSAN_EXTENSIONS = ["png", "jpeg", "jpg"];
+
+const buildKaosanUrl = (cabangKaosan: string, invdc: string, ext: string) => {
+  const targetUrl = `https://retail.kaosanofficial.com/images/${cabangKaosan}/${encodeURIComponent(invdc)}.${ext}`;
+  return `${api.defaults.baseURL}/proxy-image?url=${encodeURIComponent(targetUrl)}`;
+};
+
 const mainImageUrl = computed(() => {
   if (!data.value?.spk_nomor) return "";
-  // ✅ FIX: path relatif, gak hardcode host/port
+
+  // ← BARU: Kaosan (divisi 3) & format baru (SO-...) → ambil dari retail via proxy
+  if (isKaosan.value && isNewFormatSO.value && data.value.spk_invdc) {
+    const invdc = data.value.spk_invdc;
+    const cab = data.value.spk_cab || "HO-";
+    const cabangKaosan = invdc.includes(".") ? invdc.split(".")[0] : cab;
+    return buildKaosanUrl(cabangKaosan, invdc, "png"); // percobaan pertama
+  }
+
+  // ── SPK lama (format non-SO-) & non-Kaosan: logic asli, tidak diubah ──
   const rawBase = api.defaults.baseURL || import.meta.env.VITE_API_URL || "";
   const base = rawBase.replace(/\/api\/?$/, "");
   const cab = data.value.spk_cab || "HO-";
@@ -77,6 +97,31 @@ const handleSignatureError = (e: Event) => {
 const handleImageError = (e: Event) => {
   const img = e.target as HTMLImageElement;
 
+  // ← BARU: khusus Kaosan format baru — coba ekstensi lain dulu
+  if (isKaosan.value && isNewFormatSO.value && data.value.spk_invdc) {
+    const currentIdx = Number(img.dataset.kaosanExtIdx || "0");
+    const nextIdx = currentIdx + 1;
+
+    if (nextIdx < KAOSAN_EXTENSIONS.length) {
+      img.dataset.kaosanExtIdx = String(nextIdx);
+      const invdc = data.value.spk_invdc;
+      const cab = data.value.spk_cab || "HO-";
+      const cabangKaosan = invdc.includes(".") ? invdc.split(".")[0] : cab;
+      img.src = buildKaosanUrl(cabangKaosan, invdc, KAOSAN_EXTENSIONS[nextIdx]);
+      return;
+    }
+
+    // Semua ekstensi retail gagal → fallback ke /file-gambar/ pakai nomor SO
+    if (img.dataset.fallbackTried === "true") {
+      img.style.display = "none";
+      return;
+    }
+    img.dataset.fallbackTried = "true";
+    img.src = `/file-gambar/${encodeURIComponent(data.value.spk_nomor)}.jpg`;
+    return;
+  }
+
+  // ── SPK lama / non-Kaosan: logic asli, tidak diubah ──
   if (img.dataset.fallbackTried === "true") {
     img.style.display = "none";
     return;
@@ -84,7 +129,6 @@ const handleImageError = (e: Event) => {
   img.dataset.fallbackTried = "true";
   const nomor = data.value.spk_memo || data.value.spk_nomor;
   if (nomor) {
-    // ⚠️ FIX: hapus subfolder "map/" — path sebenarnya langsung di root file-gambar
     img.src = `/file-gambar/${encodeURIComponent(nomor)}.jpg`;
   } else {
     img.style.display = "none";
@@ -770,6 +814,10 @@ onMounted(async () => {
   object-fit: contain;
 }
 
+.print-half > *:not(.layout-box) {
+  flex-shrink: 0;
+}
+
 /* ══ GARMEN BODY ══ */
 .garmen-body {
   display: flex;
@@ -995,6 +1043,7 @@ onMounted(async () => {
   min-height: 0; /* ← tambahan */
   gap: 15px;
   margin-top: 8px;
+  overflow: hidden;
 }
 .img-box {
   display: flex;
@@ -1036,7 +1085,7 @@ onMounted(async () => {
   flex: 1;
   display: flex;
   flex-direction: column;
-  justify-content: flex-end;
+  justify-content: center;
   gap: 5px;
   min-width: 0;
 }
@@ -1065,11 +1114,10 @@ onMounted(async () => {
   color: #000 !important;
 }
 .h-empty {
-  height: 25px;
+  height: 18px;
 }
 .sign-space-complex {
-  position: relative;
-  height: 35px;
+  height: 28px;
 }
 .ttd-img-complex {
   position: absolute;
