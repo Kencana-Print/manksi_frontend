@@ -95,17 +95,36 @@ const isPoPdf = computed(() =>
 );
 
 // Coba berantai: jpg → pdf → (fallback lama) -email.jpg → gagal
-const onPoFileError = () => {
+const onPoFileError = async () => {
   if (poFileExt.value === "") {
-    // baru gagal coba jpg, coba pdf
-    poFileExt.value = "pdf";
-    return;
-  }
-  if (poFileExt.value === "pdf") {
-    // ⚠️ fallback ke nama file lama (data sebelum rename Email→PO)
+    // 1. Baru gagal coba -po.jpg, kita coba fallback ke -email.jpg (format lama)
+    // Karena ini masih format gambar, UI <img> masih bisa memicu @error jika gagal.
     poFileExt.value = "legacy-email";
     return;
   }
+
+  if (poFileExt.value === "legacy-email") {
+    // 2. Ternyata legacy-email.jpg juga gagal. SEKARANG kita cek PDF.
+    // Karena elemen <img> tidak bisa dipakai untuk mendeteksi file PDF (akan di-unmount),
+    // kita gunakan fetch() untuk mengecek langsung ke server apakah file PDF-nya eksis.
+    const base = getBaseUrl();
+    const cab = props.formData.Cab || "HO-";
+    const nomor = props.formData.Nomor;
+    const pdfUrl = `${base}/images/${cab}/map/${encodeURIComponent(nomor)}-po.pdf?v=${poCacheBust.value}`;
+
+    try {
+      const res = await fetch(pdfUrl, { method: "HEAD" });
+      if (res.ok) {
+        poFileExt.value = "pdf"; // ✅ File PDF benar-benar ada!
+      } else {
+        isPoFileError.value = true; // ❌ File PDF juga tidak ada, tampilkan "Belum ada lampiran"
+      }
+    } catch (e) {
+      isPoFileError.value = true;
+    }
+    return;
+  }
+
   isPoFileError.value = true;
 };
 
