@@ -492,16 +492,15 @@ const onLihatGambar = () => {
   const divisi = String(selectedItem.value.Divisi || "").toUpperCase();
   const invdc = selectedItem.value["Pesanan/Invoice"] || "";
 
-  // Deteksi fleksibel: Cek apakah divisi mengandung kata "KAOSAN" atau angka "3"
+  // Deteksi fleksibel
   const isKaosan =
     divisi.includes("KAOSAN") || divisi === "3" || divisi.includes("DIVISI 3");
 
   if (isKaosan && invdc) {
-    // 🌟 LOGIKA KHUSUS KAOSAN
-    const timestamp = Date.now();
-    gambarUrl.value = `https://retail.kaosanofficial.com/images/${cab}/${encodeURIComponent(invdc)}.jpeg?t=${timestamp}`;
+    // 🌟 LOGIKA KHUSUS KAOSAN (Tanpa Timestamp)
+    gambarUrl.value = `https://retail.kaosanofficial.com/images/${cab}/${encodeURIComponent(invdc)}.jpeg`;
   } else {
-    // 🌟 LOGIKA DEFAULT (Atau jika Kaosan tapi belum punya nomor pengajuan/invdc)
+    // 🌟 LOGIKA DEFAULT
     const identifier = map || nomor;
     gambarUrl.value = `${base}/images/${cab}/${encodeURIComponent(identifier)}.jpg`;
   }
