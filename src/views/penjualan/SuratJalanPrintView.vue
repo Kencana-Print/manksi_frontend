@@ -147,7 +147,7 @@ const PAGE_WIDTH = 136;
 const NAMA_W = 50;
 const KET_W = 26;
 
-const MAX_DATA_ROWS_PER_PAGE = 10;
+const MAX_DATA_ROWS_PER_PAGE = 8;
 
 const LINE = "_".repeat(PAGE_WIDTH);
 
