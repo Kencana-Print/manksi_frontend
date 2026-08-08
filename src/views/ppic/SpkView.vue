@@ -459,55 +459,63 @@ const onGambarError = () => {
 };
 const onLihatGambar = () => {
   if (!selectedItem.value) return;
+  gambarFallbackStep.value = 0;
 
   const base = (api.defaults.baseURL || "").replace(/\/api\/?$/, "");
   const nomor = selectedItem.value.Nomor;
   const cab = selectedItem.value.Cab || "HO-";
   const map = selectedItem.value.MAP || "";
+  const soRef = selectedItem.value.SORef || ""; // ⬅️ Ambil referensi SO dari backend
 
-  // FIX: Bentuk nomor SO. Jika tidak ada awalan SPK- atau SO-, tambahkan SO-
-  const soNomor = nomor.startsWith("SPK-")
+  // Tebakan kasar jika soRef kosong (menambahkan SO-)
+  const fallbackSoNomor = nomor.startsWith("SPK-")
     ? nomor.replace("SPK-", "SO-")
     : nomor.startsWith("SO-")
       ? nomor
       : `SO-${nomor}`;
 
-  const candidates = [
-    // 1. Coba gambar SPK aslinya
-    `${base}/images/${cab}/${encodeURIComponent(nomor)}.jpg`,
-  ];
+  const candidates: string[] = [];
 
-  // 2. Coba gambar SO (Menargetkan SO-SM-MX... dsb)
-  if (soNomor !== nomor) {
-    candidates.push(`${base}/images/${cab}/${encodeURIComponent(soNomor)}.jpg`);
+  // 1. Prioritas Pertama: Gambar SPK Baru
+  candidates.push(`${base}/images/${cab}/${encodeURIComponent(nomor)}.jpg`);
+
+  // 2. Prioritas Kedua: Gambar dari Referensi SO di DB (SO-SM-MX-000006)
+  if (soRef && soRef !== nomor) {
+    candidates.push(`${base}/images/${cab}/${encodeURIComponent(soRef)}.jpg`);
   }
 
-  // 3. Coba gambar MAP
+  // 3. Prioritas Ketiga: Tebakan SO
+  if (fallbackSoNomor !== nomor && fallbackSoNomor !== soRef) {
+    candidates.push(
+      `${base}/images/${cab}/${encodeURIComponent(fallbackSoNomor)}.jpg`,
+    );
+  }
+
+  // 4. Prioritas Keempat: MAP
   if (map) {
     candidates.push(`${base}/images/${cab}/map/${encodeURIComponent(map)}.jpg`);
   }
 
-  // 4. Fallback ke gambar format lama di root server /file-gambar/
+  // 5. Fallback Terakhir: Root file-gambar lama
   candidates.push(`/file-gambar/${encodeURIComponent(nomor)}.jpg`);
-  if (soNomor !== nomor) {
-    candidates.push(`/file-gambar/${encodeURIComponent(soNomor)}.jpg`);
-  }
-  if (map && map !== nomor) {
+  if (soRef && soRef !== nomor)
+    candidates.push(`/file-gambar/${encodeURIComponent(soRef)}.jpg`);
+  if (fallbackSoNomor !== nomor && fallbackSoNomor !== soRef)
+    candidates.push(`/file-gambar/${encodeURIComponent(fallbackSoNomor)}.jpg`);
+  if (map && map !== nomor)
     candidates.push(`/file-gambar/${encodeURIComponent(map)}.jpg`);
-  }
 
   gambarUrl.value = "";
   dialogGambar.value = true;
 
-  // Tes URL satu per satu di background
   const tryNext = (idx: number) => {
     if (idx >= candidates.length) {
-      gambarUrl.value = ""; // Gagal semua, trigger icon error
+      gambarUrl.value = ""; // Gagal semua
       return;
     }
     const img = new Image();
     img.onload = () => {
-      gambarUrl.value = candidates[idx]; // Gambar ketemu, render ke UI
+      gambarUrl.value = candidates[idx];
     };
     img.onerror = () => tryNext(idx + 1);
     img.src = candidates[idx];

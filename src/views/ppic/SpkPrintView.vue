@@ -75,42 +75,47 @@ const resolveDesignImage = () => {
   const base = getBaseUrl();
   const cab = spk.value.spk_cab || "HO-";
   const nomor = spk.value.spk_nomor;
-
-  // FIX: Ambil referensi SO. Jika format lama (tanpa SPK-/SO-), paksakan tambah prefix SO-
-  const baseSoRef = spk.value.spk_so_ref || nomor;
-  const soRef = baseSoRef.startsWith("SPK-")
-    ? baseSoRef.replace("SPK-", "SO-")
-    : baseSoRef.startsWith("SO-")
-      ? baseSoRef
-      : `SO-${baseSoRef}`;
-
+  const soRef = spk.value.spk_so_ref || ""; // ⬅️ Ini sudah disediakan otomatis oleh backend untuk PrintView
   const mapNomor = spk.value.spk_memo || "";
 
-  const candidates = [
-    // 1. Gambar SPK Baru
-    `${base}/images/${cab}/${encodeURIComponent(nomor)}.jpg`,
-  ];
+  const fallbackSoNomor = nomor.startsWith("SPK-")
+    ? nomor.replace("SPK-", "SO-")
+    : nomor.startsWith("SO-")
+      ? nomor
+      : `SO-${nomor}`;
 
-  // 2. Gambar SO Baru
+  const candidates: string[] = [];
+
+  // 1. SPK
+  candidates.push(`${base}/images/${cab}/${encodeURIComponent(nomor)}.jpg`);
+
+  // 2. SO Ref (SO-SM-MX-000006)
   if (soRef && soRef !== nomor) {
     candidates.push(`${base}/images/${cab}/${encodeURIComponent(soRef)}.jpg`);
   }
 
-  // 3. Gambar MAP
+  // 3. Fallback tebakan
+  if (fallbackSoNomor !== nomor && fallbackSoNomor !== soRef) {
+    candidates.push(
+      `${base}/images/${cab}/${encodeURIComponent(fallbackSoNomor)}.jpg`,
+    );
+  }
+
+  // 4. MAP
   if (mapNomor) {
     candidates.push(
       `${base}/images/${cab}/map/${encodeURIComponent(mapNomor)}.jpg`,
     );
   }
 
-  // 4. Gambar SPK / SO / MAP Lama (format legacy)
+  // 5. File Gambar Lama
   candidates.push(`/file-gambar/${encodeURIComponent(nomor)}.jpg`);
-  if (soRef && soRef !== nomor) {
+  if (soRef && soRef !== nomor)
     candidates.push(`/file-gambar/${encodeURIComponent(soRef)}.jpg`);
-  }
-  if (mapNomor && mapNomor !== nomor) {
+  if (fallbackSoNomor !== nomor && fallbackSoNomor !== soRef)
+    candidates.push(`/file-gambar/${encodeURIComponent(fallbackSoNomor)}.jpg`);
+  if (mapNomor && mapNomor !== nomor)
     candidates.push(`/file-gambar/${encodeURIComponent(mapNomor)}.jpg`);
-  }
 
   isLoadingImage.value = true;
   resolvedImageUrl.value = "";
