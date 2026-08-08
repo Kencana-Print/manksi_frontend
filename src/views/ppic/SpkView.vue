@@ -465,17 +465,19 @@ const onLihatGambar = () => {
   const cab = selectedItem.value.Cab || "HO-";
   const map = selectedItem.value.MAP || "";
 
-  // Karena SPK di-generate dari SO, kita bentuk nama SO-nya
+  // FIX: Bentuk nomor SO. Jika tidak ada awalan SPK- atau SO-, tambahkan SO-
   const soNomor = nomor.startsWith("SPK-")
     ? nomor.replace("SPK-", "SO-")
-    : nomor;
+    : nomor.startsWith("SO-")
+      ? nomor
+      : `SO-${nomor}`;
 
   const candidates = [
-    // 1. Coba gambar SPK
+    // 1. Coba gambar SPK aslinya
     `${base}/images/${cab}/${encodeURIComponent(nomor)}.jpg`,
   ];
 
-  // 2. Coba gambar SO (jika ada perbedaan nama)
+  // 2. Coba gambar SO (Menargetkan SO-SM-MX... dsb)
   if (soNomor !== nomor) {
     candidates.push(`${base}/images/${cab}/${encodeURIComponent(soNomor)}.jpg`);
   }
@@ -494,7 +496,7 @@ const onLihatGambar = () => {
     candidates.push(`/file-gambar/${encodeURIComponent(map)}.jpg`);
   }
 
-  gambarUrl.value = ""; // Reset gambar sebelumnya
+  gambarUrl.value = "";
   dialogGambar.value = true;
 
   // Tes URL satu per satu di background
@@ -507,7 +509,7 @@ const onLihatGambar = () => {
     img.onload = () => {
       gambarUrl.value = candidates[idx]; // Gambar ketemu, render ke UI
     };
-    img.onerror = () => tryNext(idx + 1); // Gagal, coba URL berikutnya
+    img.onerror = () => tryNext(idx + 1);
     img.src = candidates[idx];
   };
 

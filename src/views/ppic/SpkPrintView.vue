@@ -76,10 +76,14 @@ const resolveDesignImage = () => {
   const cab = spk.value.spk_cab || "HO-";
   const nomor = spk.value.spk_nomor;
 
-  // Ambil referensi SO. Jika kosong dan berawalan SPK-, ubah depannya jadi SO-
-  const soRef =
-    spk.value.spk_so_ref ||
-    (nomor.startsWith("SPK-") ? nomor.replace("SPK-", "SO-") : nomor);
+  // FIX: Ambil referensi SO. Jika format lama (tanpa SPK-/SO-), paksakan tambah prefix SO-
+  const baseSoRef = spk.value.spk_so_ref || nomor;
+  const soRef = baseSoRef.startsWith("SPK-")
+    ? baseSoRef.replace("SPK-", "SO-")
+    : baseSoRef.startsWith("SO-")
+      ? baseSoRef
+      : `SO-${baseSoRef}`;
+
   const mapNomor = spk.value.spk_memo || "";
 
   const candidates = [
@@ -87,7 +91,7 @@ const resolveDesignImage = () => {
     `${base}/images/${cab}/${encodeURIComponent(nomor)}.jpg`,
   ];
 
-  // 2. Gambar SO Baru (Sesuai dengan gambar di terminal yang tersimpan dengan nama SO)
+  // 2. Gambar SO Baru
   if (soRef && soRef !== nomor) {
     candidates.push(`${base}/images/${cab}/${encodeURIComponent(soRef)}.jpg`);
   }
