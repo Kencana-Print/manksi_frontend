@@ -320,12 +320,12 @@ const printQZ = async () => {
 
     const data = [
       "\x1B\x40", // ESC @: Inisialisasi/Reset printer
-      { type: "raw", format: "plain", data: content }, // ← Form Feed antar
-      // halaman sudah ter-embed di dalam content (karakter \f), jadi tidak
-      // perlu lagi kirim "\x0C" terpisah di sini
-      "\x0C", // FF terakhir — tetap perlu, supaya lembar terakhir yang sudah
-      // di-pad penuh ke PAGE_LINES ikut ke-eject sampai ke perforasi
-      // berikutnya (siap sobek), bukan cuma berhenti di baris terakhir.
+      "\x1B\x4F", // ESC O: Cancel Skip-Over-Perforation
+      //  ⚠️ WAJIB setelah ESC @, karena ESC @ (reset) akan mengembalikan
+      //  printer ke setting default DIP switch — termasuk mengaktifkan
+      //  lagi Skip Over Perforation kalau itu default-nya.
+      { type: "raw", format: "plain", data: content },
+      "\x0C", // FF terakhir
     ];
 
     await qz.print(config, data);

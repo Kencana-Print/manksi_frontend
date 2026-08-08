@@ -16,8 +16,10 @@ import {
   IconCircleX,
   IconCheck,
   IconShieldCheck,
+  IconFileSpreadsheet,
 } from "@tabler/icons-vue";
 import { formatTanggal, formatTanggalJam } from "@/utils/dateFormat";
+import { exportExcelSingle, type ExcelColumn } from "@/utils/excelExport";
 
 const router = useRouter();
 const toast = useToast();
@@ -350,6 +352,137 @@ const onPrint = () => {
   );
 };
 
+// --- Aksi: Export Detail ---
+const isExportingDetail = ref(false);
+
+const onExportDetail = async () => {
+  isExportingDetail.value = true;
+  try {
+    const res = await mintaBahanService.getAllDetail(
+      filterState.value.startDate,
+      filterState.value.endDate,
+      filterState.value.cabang,
+    );
+    const allDetail: any[] = res.data.data || [];
+
+    if (!allDetail.length) {
+      toast.warning("Tidak ada data detail pada filter ini.");
+      return;
+    }
+
+    // ✅ Kelompokkan per Nomor Permintaan
+    const groups: Record<string, any[]> = {};
+    const order: string[] = [];
+    allDetail.forEach((r) => {
+      const key = r.Nomor;
+      if (!groups[key]) {
+        groups[key] = [];
+        order.push(key);
+      }
+      groups[key].push(r);
+    });
+
+    const combinedRows: any[] = [];
+
+    order.forEach((key) => {
+      const rowsInGroup = groups[key];
+      const first = rowsInGroup[0];
+
+      // Data Header/Master yang hanya muncul di baris pertama
+      const masterCells = {
+        Nomor: first.Nomor,
+        Tanggal: formatTanggal(first.Tanggal),
+        Jam: first.Jam,
+        Cab: first.Cab,
+        Divisi: first.Divisi,
+        SPK: first.SPK,
+        NamaSpk: first.NamaSpk,
+        Status: first.Status,
+      };
+
+      // Data kosong untuk baris kedua dan seterusnya
+      const blankMaster = {
+        Nomor: "",
+        Tanggal: "",
+        Jam: "",
+        Cab: "",
+        Divisi: "",
+        SPK: "",
+        NamaSpk: "",
+        Status: "",
+      };
+
+      rowsInGroup.forEach((r, idx) => {
+        combinedRows.push({
+          ...(idx === 0 ? masterCells : blankMaster),
+          KodeBahan: r.KodeBahan,
+          NamaBahan: r.NamaBahan,
+          Satuan: r.Satuan,
+          Babaran: Number(r.Babaran) || 0,
+          Pcs: Number(r.Pcs) || 0,
+          Jumlah: Number(r.Jumlah) || 0,
+          Realisasi: Number(r.Realisasi) || 0,
+          Komponen: r.Komponen || "",
+          Keterangan: r.Keterangan || "",
+        });
+      });
+    });
+
+    const columns: ExcelColumn[] = [
+      { header: "Nomor", key: "Nomor", width: 16 },
+      { header: "Tanggal", key: "Tanggal", width: 12, align: "center" },
+      { header: "Jam", key: "Jam", width: 10, align: "center" },
+      { header: "Cab", key: "Cab", width: 8, align: "center" },
+      { header: "Divisi", key: "Divisi", width: 12 },
+      { header: "SPK", key: "SPK", width: 16 },
+      { header: "Nama SPK", key: "NamaSpk", width: 26 },
+      { header: "Status", key: "Status", width: 12, align: "center" },
+      { header: "Kode Bahan", key: "KodeBahan", width: 14 },
+      { header: "Nama Bahan", key: "NamaBahan", width: 26 },
+      { header: "Sat", key: "Satuan", width: 8, align: "center" },
+      {
+        header: "Babaran",
+        key: "Babaran",
+        width: 10,
+        align: "right",
+        numFmt: "#,##0.00",
+      },
+      { header: "Pcs", key: "Pcs", width: 10, align: "right", numFmt: "#,##0" },
+      {
+        header: "Jumlah",
+        key: "Jumlah",
+        width: 12,
+        align: "right",
+        numFmt: "#,##0.00",
+      },
+      {
+        header: "Realisasi",
+        key: "Realisasi",
+        width: 12,
+        align: "right",
+        numFmt: "#,##0.00",
+      },
+      { header: "Komponen", key: "Komponen", width: 18 },
+      { header: "Keterangan", key: "Keterangan", width: 22 },
+    ];
+
+    await exportExcelSingle(
+      `Detail_Permintaan_Bahan_${filterState.value.startDate}_sd_${filterState.value.endDate}.xlsx`,
+      "Detail Minta Bahan",
+      columns,
+      combinedRows,
+      `Rincian Permintaan Bahan Baku | Periode: ${formatTanggal(filterState.value.startDate)} s.d ${formatTanggal(filterState.value.endDate)}`,
+    );
+
+    toast.success("Berhasil export detail data.");
+  } catch (error) {
+    console.error(error);
+    toast.error("Gagal export Excel.");
+  } finally {
+    isExportingDetail.value = false;
+  }
+};
+
 const num = (val: number) => new Intl.NumberFormat("id-ID").format(val || 0);
 </script>
 
@@ -501,6 +634,20 @@ const num = (val: number) => new Intl.NumberFormat("id-ID").format(val || 0);
           ><IconCircleX :size="15" :stroke-width="1.7"
         /></template>
         Close Transaksi
+      </v-btn>
+      <v-btn
+        v-if="canExport"
+        size="small"
+        color="green-darken-3"
+        variant="outlined"
+        class="ml-2"
+        :loading="isExportingDetail"
+        @click="onExportDetail"
+      >
+        <template #prepend>
+          <IconFileSpreadsheet :size="15" :stroke-width="1.7" />
+        </template>
+        Export Detail
       </v-btn>
     </template>
 

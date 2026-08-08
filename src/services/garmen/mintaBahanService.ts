@@ -9,6 +9,11 @@ export const mintaBahanService = {
   getDetail: (nomor: string) =>
     api.get(`/garmen/bahan-baku/minta-bahan/${encodeURIComponent(nomor)}`),
 
+  getAllDetail: (startDate: string, endDate: string, cabang: string) =>
+    api.get("/garmen/bahan-baku/minta-bahan/all-detail", {
+      params: { startDate, endDate, cabang },
+    }),
+
   checkInsert: () => api.get("/garmen/bahan-baku/minta-bahan/check-insert"),
 
   deleteData: (nomor: string) =>
