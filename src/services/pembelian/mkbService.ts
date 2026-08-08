@@ -25,4 +25,7 @@ export const mkbService = {
       `/pembelian/mkb/${encodeURIComponent(payload.nomor)}/pin`,
       payload,
     ),
+
+  getAllDetailData: (startDate: string, endDate: string) =>
+    api.get(`/pembelian/mkb/all-detail`, { params: { startDate, endDate } }),
 };

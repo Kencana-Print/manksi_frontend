@@ -272,7 +272,7 @@ const generateTxt = () => {
   });
 
   // Form Feed di antara tiap halaman fisik.
-  return allPages.map((p) => p.join("\n")).join("\n\f\n");
+  return allPages.map((p) => p.join("\n")).join("\f");
 };
 
 const totalJumlah = computed(() =>

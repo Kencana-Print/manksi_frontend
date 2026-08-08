@@ -13,6 +13,7 @@ import {
   IconNotes,
 } from "@tabler/icons-vue";
 import { formatTanggal, formatTanggalJam } from "@/utils/dateFormat";
+import { exportExcelSingle, type ExcelColumn } from "@/utils/excelExport";
 
 const router = useRouter();
 const toast = useToast();
@@ -177,8 +178,221 @@ const onPrint = () => {
   window.open(`/pembelian/mkb/print?nomor=${safeNomor}`, "_blank");
 };
 
-const onExportDetail = () =>
-  toast.info("Fitur export detail akan disiapkan...");
+// ── EXPORT HEADER (MASTER) ──
+const isExportingHeader = ref(false);
+const onExportHeader = async () => {
+  if (!items.value?.length)
+    return toast.warning("Tidak ada data untuk diekspor.");
+  isExportingHeader.value = true;
+  try {
+    const columns: ExcelColumn[] = [
+      { header: "Nomor", key: "Nomor", width: 16 },
+      { header: "Tanggal", key: "Tanggal", width: 12, align: "center" },
+      { header: "PO", key: "PO", width: 8, align: "center" },
+      { header: "SPK", key: "SPK", width: 16 },
+      { header: "Tgl SPK", key: "TglSPK", width: 12, align: "center" },
+      { header: "Dateline", key: "Dateline", width: 12, align: "center" },
+      { header: "Nama SPK", key: "NamaSpk", width: 30 },
+      {
+        header: "Jumlah SPK",
+        key: "JumlahSPK",
+        width: 12,
+        align: "right",
+        numFmt: "#,##0",
+      },
+      { header: "Kain", key: "Kain", width: 20 },
+      { header: "Finishing", key: "Finishing", width: 20 },
+      ...(canLihatCus.value
+        ? [
+            { header: "Customer", key: "Customer", width: 22 },
+            { header: "Alamat", key: "Alamat", width: 30 },
+          ]
+        : []),
+      { header: "Keterangan", key: "Keterangan", width: 28 },
+      { header: "Plan", key: "Plan", width: 8, align: "center" },
+      { header: "User", key: "usr", width: 12 },
+      { header: "Created", key: "Created", width: 18, align: "center" },
+    ];
+
+    await exportExcelSingle(
+      `MKB_Header_${dtAwal.value}_to_${dtAkhir.value}.xlsx`,
+      "Data MKB",
+      columns,
+      items.value.map((r) => ({
+        ...r,
+        Tanggal: formatTanggal(r.Tanggal),
+        TglSPK: formatTanggal(r.TglSPK),
+        Dateline: formatTanggal(r.Dateline),
+        Created: formatTanggalJam(r.Created),
+      })),
+      `LAPORAN MKB (HEADER) | Periode: ${formatTanggal(dtAwal.value)} s.d ${formatTanggal(dtAkhir.value)}`,
+    );
+  } catch (error) {
+    toast.error("Gagal export header.");
+  } finally {
+    isExportingHeader.value = false;
+  }
+};
+
+// ── EXPORT DETAIL ──
+const isExportingDetail = ref(false);
+const onExportDetail = async () => {
+  isExportingDetail.value = true;
+  try {
+    const res = await mkbService.getAllDetailData(dtAwal.value, dtAkhir.value);
+    const allDetail: any[] = res.data.data || [];
+
+    if (!allDetail.length) {
+      toast.warning("Tidak ada data detail pada filter ini.");
+      return;
+    }
+
+    // ✅ Kelompokkan per MKB Nomor
+    const groups: Record<string, any[]> = {};
+    const order: string[] = [];
+    allDetail.forEach((r) => {
+      const key = r.Nomor;
+      if (!groups[key]) {
+        groups[key] = [];
+        order.push(key);
+      }
+      groups[key].push(r);
+    });
+
+    const combinedRows: any[] = [];
+
+    order.forEach((key) => {
+      const rowsInGroup = groups[key];
+      const first = rowsInGroup[0];
+
+      // Data Header/Master yang hanya muncul di baris pertama
+      const masterCells = {
+        Nomor: first.Nomor,
+        Tanggal: formatTanggal(first.Tanggal),
+        SPK: first.SPK,
+        TglSPK: formatTanggal(first.TglSPK),
+        Dateline: formatTanggal(first.Dateline),
+        NamaSpk: first.NamaSpk,
+        JumlahSPK: Number(first.JumlahSPK) || 0,
+        ...(canLihatCus.value
+          ? { Customer: first.Customer, Alamat: first.Alamat }
+          : {}),
+      };
+
+      // Data kosong untuk baris kedua dan seterusnya
+      const blankMaster = Object.fromEntries(
+        Object.keys(masterCells).map((k) => [k, ""]),
+      );
+
+      rowsInGroup.forEach((r, idx) => {
+        combinedRows.push({
+          ...(idx === 0 ? masterCells : blankMaster),
+          Komponen: r.Komponen,
+          Warna: r.Warna,
+          Jenis: r.Jenis,
+          Babaran: r.Babaran,
+          Kode: r.Kode,
+          NamaBahan: r.NamaBahan,
+          Satuan: r.Satuan,
+          Gramasi: r.Gramasi,
+          Butuh: Number(r.Butuh) || 0,
+          Ready: Number(r.Ready) || 0,
+          Akan_PO: Number(r.Akan_PO) || 0,
+          SudahPO: Number(r.SudahPO) || 0,
+          Terima: Number(r.Terima) || 0,
+          Kurang: Number(r.Kurang) || 0,
+        });
+      });
+    });
+
+    const columns: ExcelColumn[] = [
+      { header: "Nomor MKB", key: "Nomor", width: 16 },
+      { header: "Tanggal", key: "Tanggal", width: 12, align: "center" },
+      { header: "SPK", key: "SPK", width: 16 },
+      { header: "Tgl SPK", key: "TglSPK", width: 12, align: "center" },
+      { header: "Dateline", key: "Dateline", width: 12, align: "center" },
+      { header: "Nama SPK", key: "NamaSpk", width: 28 },
+      {
+        header: "Jumlah SPK",
+        key: "JumlahSPK",
+        width: 12,
+        align: "right",
+        numFmt: "#,##0",
+      },
+      ...(canLihatCus.value
+        ? [
+            { header: "Customer", key: "Customer", width: 22 },
+            { header: "Alamat", key: "Alamat", width: 30 },
+          ]
+        : []),
+      { header: "Komponen", key: "Komponen", width: 14 },
+      { header: "Warna", key: "Warna", width: 12 },
+      { header: "Jenis", key: "Jenis", width: 12 },
+      { header: "Babaran", key: "Babaran", width: 10 },
+      { header: "Kode", key: "Kode", width: 14 },
+      { header: "Nama Bahan", key: "NamaBahan", width: 24 },
+      { header: "Sat", key: "Satuan", width: 8, align: "center" },
+      { header: "Gramasi", key: "Gramasi", width: 10 },
+      {
+        header: "Butuh",
+        key: "Butuh",
+        width: 10,
+        align: "right",
+        numFmt: "#,##0.00",
+      },
+      {
+        header: "Ready",
+        key: "Ready",
+        width: 10,
+        align: "right",
+        numFmt: "#,##0.00",
+      },
+      {
+        header: "Akan PO",
+        key: "Akan_PO",
+        width: 10,
+        align: "right",
+        numFmt: "#,##0.00",
+      },
+      {
+        header: "Sudah PO",
+        key: "SudahPO",
+        width: 10,
+        align: "right",
+        numFmt: "#,##0.00",
+      },
+      {
+        header: "Terima",
+        key: "Terima",
+        width: 10,
+        align: "right",
+        numFmt: "#,##0.00",
+      },
+      {
+        header: "Kurang",
+        key: "Kurang",
+        width: 10,
+        align: "right",
+        numFmt: "#,##0.00",
+      },
+    ];
+
+    await exportExcelSingle(
+      `MKB_Detail_${dtAwal.value}_to_${dtAkhir.value}.xlsx`,
+      "Detail MKB",
+      columns,
+      combinedRows,
+      `RINCIAN MEMO KEBUTUHAN BAHAN | Periode: ${formatTanggal(dtAwal.value)} s.d ${formatTanggal(dtAkhir.value)}`,
+    );
+
+    toast.success("Berhasil export detail.");
+  } catch (error) {
+    console.error(error);
+    toast.error("Gagal export detail.");
+  } finally {
+    isExportingDetail.value = false;
+  }
+};
 
 // Dialog Pengajuan PIN
 const pinDialog = ref(false);
@@ -261,7 +475,7 @@ const formatQty = (val: any) => {
     @add="onAdd"
     @edit="onEdit"
     @delete="onDelete"
-    @export="exportToExcel('Data_MKB')"
+    @export="onExportHeader"
     @refresh="fetchData"
     item-value="Nomor"
     :row-props-fn="rowPropsFn"
@@ -334,7 +548,13 @@ const formatQty = (val: any) => {
         Cetak
       </v-btn>
 
-      <v-btn size="small" color="teal-darken-2" @click="onExportDetail">
+      <v-btn
+        v-if="canExport"
+        size="small"
+        color="teal-darken-2"
+        :loading="isExportingDetail"
+        @click="onExportDetail"
+      >
         <template #prepend>
           <IconFileExport :size="15" :stroke-width="1.7" />
         </template>
