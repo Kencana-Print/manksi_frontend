@@ -317,13 +317,11 @@ const printQZ = async () => {
     const content = generateTxt();
 
     const data = [
-      "\x1B\x40", // ESC @: Inisialisasi/Reset printer
+      "\x1B\x40", // ESC @: Reset printer
       "\x1B\x4F", // ESC O: Cancel Skip-Over-Perforation
-      //  ⚠️ WAJIB setelah ESC @, karena ESC @ (reset) akan mengembalikan
-      //  printer ke setting default DIP switch — termasuk mengaktifkan
-      //  lagi Skip Over Perforation kalau itu default-nya.
+      "\x1B\x43\x21", // ESC C n: Set Page Length = 33 baris (≈ 5.5" @ 6 LPI)
       { type: "raw", format: "plain", data: content },
-      "\x0C", // FF terakhir
+      "\x0C",
     ];
 
     await qz.print(config, data);
