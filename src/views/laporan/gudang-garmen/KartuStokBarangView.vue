@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from "vue";
 import { useToast } from "vue-toastification";
+import { useAuthStore } from "@/stores/authStore";
 import BaseBrowse from "@/components/BaseBrowse.vue";
 import { useBrowse } from "@/composables/useBrowse";
 import { kartuStokGarmenService } from "@/services/laporan/gudang-garmen/kartuStokGarmenService";
@@ -14,6 +15,7 @@ import { formatTanggal } from "@/utils/dateFormat";
 import BarangGarmenSearchModal from "@/components/lookups/BarangGarmenSearchModal.vue";
 
 const toast = useToast();
+const authStore = useAuthStore();
 const menuId = "503";
 
 const getStartOfLastMonth = () => {
@@ -27,10 +29,12 @@ const getLocalDate = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
 
+const userCab = (authStore.user?.cabang || "HO").replace("-", "");
+
 const filterState = ref({
   startDate: getStartOfLastMonth(),
   endDate: getLocalDate(),
-  cabang: "HO", // Default cabang
+  cabang: userCab,
   jenis: "ACCESORIES",
   barang: "", // Kosong = semua barang
 });

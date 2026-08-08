@@ -93,6 +93,11 @@ const formatTglJam = (v: string) => {
 const onExport = async () => {
   if (!items.value?.length)
     return toast.warning("Tidak ada data untuk diekspor.");
+
+  // Jika ada baris yang di-select, langsung ekspor objek selected tersebut.
+  // Jika tidak, ekspor semua items.
+  const dataToExport = selected.value.length > 0 ? selected.value : items.value;
+
   await exportExcelSingle(
     `Browse_MAP_${dtAwal.value}_${dtAkhir.value}.xlsx`,
     "Browse MAP",
@@ -144,7 +149,7 @@ const onExport = async () => {
       { header: "Rencana", key: "Rencana", width: 14 },
       { header: "Salesman", key: "Salesman", width: 16 },
     ],
-    items.value,
+    dataToExport, // ← Gunakan data yang langsung diambil
     `Browse MAP Periode ${dtAwal.value} s/d ${dtAkhir.value}`,
   );
 };
@@ -172,6 +177,7 @@ onMounted(fetchData);
     v-model:selected="selected"
     :can-export="canExport"
     item-value="Nomor"
+    select-strategy="page"
     @refresh="fetchData"
     @export="onExport"
   >

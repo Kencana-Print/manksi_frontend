@@ -151,7 +151,6 @@ const rowPropsFn = (data: any) => {
   let customClass = "";
 
   if (item.Aktif === "N") customClass = "row-pasif";
-  else if (Number(item.Safety) !== 0) customClass = "row-safety-alert";
 
   return { class: customClass };
 };
@@ -282,6 +281,23 @@ const handleEdit = async (item: any) => {
         </div>
       </div>
     </template>
+
+    <template #item.Stok="{ item }">
+      <div
+        v-if="Number(item.Stok) < Number(item.Safety)"
+        style="
+          background-color: #d32f2f;
+          color: white;
+          padding: 2px 6px;
+          border-radius: 3px;
+          font-weight: bold;
+          display: inline-block;
+        "
+      >
+        {{ item.Stok }}
+      </div>
+      <span v-else>{{ item.Stok }}</span>
+    </template>
   </BaseBrowse>
 
   <GarmenBrgFormDialog
@@ -327,10 +343,8 @@ const handleEdit = async (item: any) => {
 }
 
 /* CUSTOM ROW COLORS */
-:deep(.row-safety-alert td[data-col="Safety"]) {
-  background-color: #f44336 !important;
-  color: white !important;
-  font-weight: bold;
+:deep(.row-pasif) {
+  color: #b71c1c !important;
 }
 :deep(.row-pasif) {
   color: #b71c1c !important;

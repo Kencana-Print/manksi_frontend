@@ -16,6 +16,7 @@ import {
   IconCheck,
 } from "@tabler/icons-vue";
 import { formatTanggal } from "@/utils/dateFormat";
+import { exportExcelSingle, type ExcelColumn } from "@/utils/excelExport";
 
 const router = useRouter();
 const toast = useToast();
@@ -300,74 +301,105 @@ const onApproveRealisasi = async (
 };
 
 // --- Aksi: Export Detail ---
-const onExportDetail = () => {
+const isExportingDetail = ref(false);
+const onExportDetail = async () => {
   if (!items.value || items.value.length === 0) {
     return toast.warning("Tidak ada data untuk diexport.");
   }
 
-  const rows: any[] = [];
-  items.value.forEach((master: any) => {
-    if (master.details && master.details.length > 0) {
-      master.details.forEach((dtl: any) => {
-        rows.push({
-          "Nomor Permintaan": master.Nomor,
+  isExportingDetail.value = true;
+  try {
+    const combinedRows: any[] = [];
+
+    items.value.forEach((master: any) => {
+      if (master.details && master.details.length > 0) {
+        // Data Header/Master yang hanya muncul di baris pertama
+        const masterCells = {
+          Nomor: master.Nomor,
           Tanggal: formatTanggal(master.Tanggal),
           Jenis: master.Jenis,
           Cabang: master.Cab,
-          "Gudang Peminta": master.GdgPeminta,
+          GdgPeminta: master.GdgPeminta,
           SPK: master.SPK,
-          "Nama SPK": master.NamaSpk,
+          NamaSpk: master.NamaSpk,
           Status: master.Status,
-          "Kode Barang": dtl.Kode,
-          "Nama Barang": dtl.Nama,
-          Satuan: dtl.Satuan,
-          "Jml Diminta": dtl.Jumlah,
-          "Jml Direalisasi": dtl.Realisasi,
-          "Keterangan Detail": dtl.Keterangan || "",
+        };
+
+        // Data kosong untuk baris kedua dan seterusnya
+        const blankMaster = {
+          Nomor: "",
+          Tanggal: "",
+          Jenis: "",
+          Cabang: "",
+          GdgPeminta: "",
+          SPK: "",
+          NamaSpk: "",
+          Status: "",
+        };
+
+        master.details.forEach((dtl: any, idx: number) => {
+          combinedRows.push({
+            ...(idx === 0 ? masterCells : blankMaster),
+            Kode: dtl.Kode,
+            Nama: dtl.Nama,
+            Satuan: dtl.Satuan,
+            Minta: Number(dtl.Jumlah) || 0,
+            Realisasi: Number(dtl.Realisasi) || 0,
+            Keterangan: dtl.Keterangan || "",
+          });
         });
-      });
+      }
+    });
+
+    if (combinedRows.length === 0) {
+      toast.warning("Tidak ada rincian barang untuk diexport.");
+      return;
     }
-  });
 
-  if (rows.length === 0) {
-    return toast.warning("Tidak ada rincian barang untuk diexport.");
+    const columns: ExcelColumn[] = [
+      { header: "Nomor Permintaan", key: "Nomor", width: 18 },
+      { header: "Tanggal", key: "Tanggal", width: 12, align: "center" },
+      { header: "Jenis", key: "Jenis", width: 12 },
+      { header: "Cab", key: "Cabang", width: 8, align: "center" },
+      { header: "Gudang Peminta", key: "GdgPeminta", width: 16 },
+      { header: "SPK", key: "SPK", width: 16 },
+      { header: "Nama SPK", key: "NamaSpk", width: 28 },
+      { header: "Status", key: "Status", width: 12, align: "center" },
+      { header: "Kode Barang", key: "Kode", width: 14 },
+      { header: "Nama Barang", key: "Nama", width: 26 },
+      { header: "Satuan", key: "Satuan", width: 10, align: "center" },
+      {
+        header: "Jml Diminta",
+        key: "Minta",
+        width: 12,
+        align: "right",
+        numFmt: "#,##0.00",
+      },
+      {
+        header: "Jml Direalisasi",
+        key: "Realisasi",
+        width: 12,
+        align: "right",
+        numFmt: "#,##0.00",
+      },
+      { header: "Keterangan", key: "Keterangan", width: 20 },
+    ];
+
+    await exportExcelSingle(
+      `Detail_Minta_Barang_${filterState.value.startDate}_sd_${filterState.value.endDate}.xlsx`,
+      "Detail Permintaan",
+      columns,
+      combinedRows,
+      `Rincian Permintaan Barang Garmen | Periode: ${formatTanggal(filterState.value.startDate)} s.d ${formatTanggal(filterState.value.endDate)}`,
+    );
+
+    toast.success("Berhasil export detail data.");
+  } catch (error) {
+    console.error(error);
+    toast.error("Gagal melakukan export Excel.");
+  } finally {
+    isExportingDetail.value = false;
   }
-
-  const headers = Object.keys(rows[0]);
-  const csvContent = [
-    headers.join(","),
-    ...rows.map((row) =>
-      headers
-        .map((fieldName) => {
-          let data =
-            row[fieldName] !== null && row[fieldName] !== undefined
-              ? String(row[fieldName])
-              : "";
-          data = data.replace(/"/g, '""');
-          if (data.includes(",") || data.includes("\n") || data.includes('"')) {
-            data = `"${data}"`;
-          }
-          return data;
-        })
-        .join(","),
-    ),
-  ].join("\n");
-
-  const blob = new Blob(["\uFEFF" + csvContent], {
-    type: "text/csv;charset=utf-8;",
-  });
-  const link = document.createElement("a");
-  const url = URL.createObjectURL(blob);
-  link.setAttribute("href", url);
-  link.setAttribute(
-    "download",
-    `Export_Detail_Minta_Barang_${filterState.value.startDate}_sd_${filterState.value.endDate}.csv`,
-  );
-  link.style.visibility = "hidden";
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  toast.success("Berhasil meng-export detail data.");
 };
 
 const num = (val: number) => new Intl.NumberFormat("id-ID").format(val || 0);
@@ -520,11 +552,12 @@ const num = (val: number) => new Intl.NumberFormat("id-ID").format(val || 0);
         color="green-darken-3"
         variant="outlined"
         class="ml-2"
+        :loading="isExportingDetail"
         @click="onExportDetail"
       >
-        <template #prepend
-          ><IconFileSpreadsheet :size="15" :stroke-width="1.7"
-        /></template>
+        <template #prepend>
+          <IconFileSpreadsheet :size="15" :stroke-width="1.7" />
+        </template>
         Export Detail
       </v-btn>
     </template>

@@ -1,12 +1,18 @@
 <script setup lang="ts">
 import { ref, watch, computed } from "vue";
 import api from "@/services/api";
-import { IconClipboardSearch, IconSearch } from "@tabler/icons-vue";
+import {
+  IconClipboardSearch,
+  IconSearch,
+  IconChevronRight,
+  IconChevronDown,
+} from "@tabler/icons-vue";
 
 const props = defineProps<{
   modelValue: boolean;
   nomorSpk?: string;
   excludeNomor?: string;
+  gudangProduksi?: string;
 }>();
 const emit = defineEmits(["update:modelValue", "selected"]);
 
@@ -93,6 +99,7 @@ watch(
     if (isOpen) {
       search.value = "";
       currentPage.value = 1;
+      expandedRows.value = [];
       fetchData();
     }
   },
@@ -101,6 +108,38 @@ watch(
 const selectItem = (item: any) => {
   emit("selected", item);
   emit("update:modelValue", false);
+};
+
+// ── STATE EXPAND DETAIL ──
+const expandedRows = ref<string[]>([]);
+const detailData = ref<Record<string, any[]>>({});
+const detailLoading = ref<Record<string, boolean>>({});
+
+const toggleExpand = async (item: any) => {
+  const id = item.Nomor;
+  const idx = expandedRows.value.indexOf(id);
+
+  // Jika sudah terbuka, tutup
+  if (idx > -1) {
+    expandedRows.value.splice(idx, 1);
+  } else {
+    // Buka dan fetch data jika belum ada
+    expandedRows.value.push(id);
+    if (!detailData.value[id]) {
+      detailLoading.value[id] = true;
+      try {
+        const res = await api.get("/lookups/realisasi-minta-detail", {
+          params: { nomor: id, gdg: props.gudangProduksi || "" },
+        });
+        detailData.value[id] = res.data.data.items || [];
+      } catch (e) {
+        console.error("Gagal memuat detail:", e);
+        detailData.value[id] = [];
+      } finally {
+        detailLoading.value[id] = false;
+      }
+    }
+  }
 };
 </script>
 
@@ -140,6 +179,8 @@ const selectItem = (item: any) => {
         <table v-else class="lookup-table">
           <thead>
             <tr v-if="isMaterialMode">
+              <th style="width: 40px"></th>
+              <!-- Kolom Expand -->
               <th style="width: 130px">NOMOR</th>
               <th style="width: 90px">TANGGAL</th>
               <th style="width: 100px">KODE</th>
@@ -149,6 +190,8 @@ const selectItem = (item: any) => {
               <th style="width: 60px">CAB</th>
             </tr>
             <tr v-else>
+              <th style="width: 40px"></th>
+              <!-- Kolom Expand -->
               <th style="width: 160px">NOMOR</th>
               <th style="width: 100px">TANGGAL</th>
               <th style="width: 150px">SPK</th>
@@ -156,41 +199,106 @@ const selectItem = (item: any) => {
             </tr>
           </thead>
           <tbody>
-            <tr
+            <template
               v-for="item in items"
               :key="item.Nomor + (item.Kode || '')"
-              class="lookup-row"
-              @click="selectItem(item)"
             >
-              <template v-if="isMaterialMode">
-                <td class="td-kode">{{ item.Nomor }}</td>
-                <td>{{ item.Tanggal }}</td>
-                <td class="td-kode">{{ item.Kode }}</td>
-                <td class="text-truncate" style="max-width: 220px">
-                  {{ item.JenisKain }}
+              <!-- BARIS UTAMA -->
+              <tr class="lookup-row" @click="selectItem(item)">
+                <td style="text-align: center" @click.stop="toggleExpand(item)">
+                  <IconChevronDown
+                    v-if="expandedRows.includes(item.Nomor)"
+                    :size="16"
+                  />
+                  <IconChevronRight v-else :size="16" />
                 </td>
-                <td class="tr">{{ num(item.Jumlah, 2) }}</td>
-                <td
-                  class="tr"
-                  :style="
-                    Number(item.Sisa) <= 0
-                      ? 'color:#c62828;font-weight:700'
-                      : ''
-                  "
-                >
-                  {{ num(item.Sisa, 2) }}
+
+                <template v-if="isMaterialMode">
+                  <td class="td-kode">{{ item.Nomor }}</td>
+                  <td>{{ item.Tanggal }}</td>
+                  <td class="td-kode">{{ item.Kode }}</td>
+                  <td class="text-truncate" style="max-width: 220px">
+                    {{ item.JenisKain }}
+                  </td>
+                  <td class="tr">{{ num(item.Jumlah, 2) }}</td>
+                  <td
+                    class="tr"
+                    :style="
+                      Number(item.Sisa) <= 0
+                        ? 'color:#c62828;font-weight:700'
+                        : ''
+                    "
+                  >
+                    {{ num(item.Sisa, 2) }}
+                  </td>
+                  <td>{{ item.Cab }}</td>
+                </template>
+                <template v-else>
+                  <td class="td-kode">{{ item.Nomor }}</td>
+                  <td>{{ formatDate(item.Tanggal) }}</td>
+                  <td>{{ item.SPK }}</td>
+                  <td class="text-truncate" style="max-width: 300px">
+                    {{ item.NamaSpk }}
+                  </td>
+                </template>
+              </tr>
+
+              <!-- BARIS DETAIL (NESTED TABLE) -->
+              <tr v-if="expandedRows.includes(item.Nomor)" class="expanded-row">
+                <!-- Colspan menyesuaikan dengan mode -->
+                <td :colspan="isMaterialMode ? 8 : 5" class="expanded-cell">
+                  <div
+                    v-if="detailLoading[item.Nomor]"
+                    style="padding: 12px; text-align: center; color: #757575"
+                  >
+                    <v-progress-circular
+                      indeterminate
+                      color="primary"
+                      size="20"
+                      class="mr-2"
+                    />
+                    Memuat detail bahan...
+                  </div>
+
+                  <table v-else class="nested-table">
+                    <thead>
+                      <tr>
+                        <th style="width: 120px">KODE</th>
+                        <th>NAMA BAHAN</th>
+                        <th style="width: 60px">SAT</th>
+                        <th style="width: 80px" class="tr">MINTA</th>
+                        <th style="width: 80px" class="tr">LHK</th>
+                        <th style="width: 80px" class="tr">SISA</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="d in detailData[item.Nomor]" :key="d.Kode">
+                        <td class="td-kode">{{ d.Kode }}</td>
+                        <td>{{ d.Nama }}</td>
+                        <td>{{ d.Satuan }}</td>
+                        <td class="tr">{{ num(d.Minta, 2) }}</td>
+                        <td class="tr">{{ num(d.LHK, 2) }}</td>
+                        <td class="tr font-weight-bold text-primary">
+                          {{ num(d.Sisa, 2) }}
+                        </td>
+                      </tr>
+                      <tr v-if="!detailData[item.Nomor]?.length">
+                        <td
+                          colspan="6"
+                          style="
+                            text-align: center;
+                            color: #9e9e9e;
+                            padding: 10px;
+                          "
+                        >
+                          Tidak ada detail bahan untuk realisasi ini.
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
                 </td>
-                <td>{{ item.Cab }}</td>
-              </template>
-              <template v-else>
-                <td class="td-kode">{{ item.Nomor }}</td>
-                <td>{{ formatDate(item.Tanggal) }}</td>
-                <td>{{ item.SPK }}</td>
-                <td class="text-truncate" style="max-width: 300px">
-                  {{ item.NamaSpk }}
-                </td>
-              </template>
-            </tr>
+              </tr>
+            </template>
           </tbody>
         </table>
       </div>
@@ -409,5 +517,31 @@ const selectItem = (item: any) => {
   background: white;
   cursor: pointer;
   outline: none;
+}
+/* Styling Tabel Expand / Nested Table */
+.expanded-cell {
+  padding: 0 !important;
+  background: #f5f7fb;
+  border-bottom: 2px solid #cfd8dc !important;
+}
+.nested-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+.nested-table th {
+  background: #eceff1;
+  color: #37474f;
+  padding: 5px 10px;
+  font-weight: 700;
+  text-align: left;
+  border-bottom: 1px solid #cfd8dc;
+}
+.nested-table td {
+  padding: 5px 10px;
+  border-bottom: 1px solid #eceff1;
+}
+.tr {
+  text-align: right !important;
 }
 </style>

@@ -479,18 +479,37 @@ const pagedItems = computed(() => {
 });
 
 // ── Row props ──────────────────────────────────────────────────────────
+// ── Row props ──────────────────────────────────────────────────────────
 const handleRowClick = (event: PointerEvent, { item }: { item: any }) => {
   const raw = item?.raw || item;
+
   if (props.selectStrategy === "single") {
+    // Mode Single Select
     if (
       internalSelected.value.length > 0 &&
       internalSelected.value[0][props.itemValue] === raw[props.itemValue]
     ) {
-      internalSelected.value = [];
+      internalSelected.value = []; // Deselect jika diklik lagi
     } else {
-      internalSelected.value = [raw];
+      internalSelected.value = [raw]; // Select baru
+    }
+  } else {
+    // Mode Multi Select (page / all)
+    const index = internalSelected.value.findIndex(
+      (s) => s[props.itemValue] === raw[props.itemValue],
+    );
+
+    if (index !== -1) {
+      // Hapus dari selection jika sudah ada (toggle off)
+      internalSelected.value = internalSelected.value.filter(
+        (s) => s[props.itemValue] !== raw[props.itemValue],
+      );
+    } else {
+      // Tambah ke selection (toggle on)
+      internalSelected.value = [...internalSelected.value, raw];
     }
   }
+
   emit("row-click", raw);
 };
 
@@ -502,7 +521,7 @@ const resolvedRowProps = (data: any) => {
     (s) => s[props.itemValue] === raw[props.itemValue],
   );
   let classes = customProps.class || "";
-  if (isSelected) classes += " row-selected";
+  if (isSelected) classes += " row-selected"; // Ini yang memberikan warna pada baris
   return {
     ...customProps,
     class: classes,
@@ -780,6 +799,7 @@ watch(
             :loading="isLoading"
             :item-value="itemValue"
             :select-strategy="selectStrategy"
+            :show-select="selectStrategy !== 'single'"
             :expanded="expanded"
             @update:expanded="emit('update:expanded', $event)"
             return-object

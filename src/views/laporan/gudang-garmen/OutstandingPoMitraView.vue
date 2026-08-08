@@ -308,6 +308,104 @@ onMounted(fetchData);
     <template #item.Target="{ item }">{{ fmtNum(item.Target) }}</template>
     <template #item.Otm="{ item }">{{ fmtNum(item.Otm, 2) }}</template>
 
+    <template #summary-row="{ filteredItems }">
+      <span
+        style="
+          font-size: 11px;
+          font-weight: 700;
+          color: #90caf9;
+          margin-right: auto;
+        "
+      >
+        GRAND TOTAL
+      </span>
+
+      <span
+        style="
+          font-size: 11px;
+          font-weight: 600;
+          color: rgba(255, 255, 255, 0.8);
+        "
+        >PO:</span
+      >
+      <span
+        style="
+          font-size: 13px;
+          font-weight: 700;
+          color: white;
+          font-family: monospace;
+        "
+      >
+        {{ fmtNum(filteredItems.reduce((s, i) => s + (Number(i.Po) || 0), 0)) }}
+      </span>
+
+      <span
+        style="
+          font-size: 11px;
+          font-weight: 600;
+          color: rgba(255, 255, 255, 0.8);
+          margin-left: 12px;
+        "
+        >Terima:</span
+      >
+      <span
+        style="
+          font-size: 13px;
+          font-weight: 700;
+          color: white;
+          font-family: monospace;
+        "
+      >
+        {{
+          fmtNum(filteredItems.reduce((s, i) => s + (Number(i.Terima) || 0), 0))
+        }}
+      </span>
+
+      <span
+        style="
+          font-size: 11px;
+          font-weight: 600;
+          color: rgba(255, 255, 255, 0.8);
+          margin-left: 12px;
+        "
+        >Kurang:</span
+      >
+      <span
+        style="
+          font-size: 13px;
+          font-weight: 700;
+          color: #ffd54f;
+          font-family: monospace;
+        "
+      >
+        {{
+          fmtNum(filteredItems.reduce((s, i) => s + (Number(i.Kurang) || 0), 0))
+        }}
+      </span>
+
+      <span
+        style="
+          font-size: 11px;
+          font-weight: 600;
+          color: rgba(255, 255, 255, 0.8);
+          margin-left: 12px;
+        "
+        >Target:</span
+      >
+      <span
+        style="
+          font-size: 13px;
+          font-weight: 700;
+          color: white;
+          font-family: monospace;
+        "
+      >
+        {{
+          fmtNum(filteredItems.reduce((s, i) => s + (Number(i.Target) || 0), 0))
+        }}
+      </span>
+    </template>
+
     <template #detail="{ item }">
       <div class="detail-wrap">
         <div v-if="detailLoading[item.Kode]" class="detail-loading">

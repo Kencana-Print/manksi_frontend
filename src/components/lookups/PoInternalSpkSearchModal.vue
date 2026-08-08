@@ -16,17 +16,48 @@ const search = ref("");
 const items = ref<any[]>([]);
 const isLoading = ref(false);
 
-const fetchData = async () => {
+// Tambahan state untuk pagination
+const page = ref(1);
+const total = ref(0);
+
+const fetchData = async (isLoadMore = false) => {
+  if (isLoading.value) return;
   isLoading.value = true;
+
+  if (!isLoadMore) {
+    page.value = 1;
+  }
+
   try {
     const res = await api.get("/lookups/po-internal-spk", {
-      params: { q: search.value, limit: 50 },
+      // Kirim page dan limit
+      params: { q: search.value, page: page.value, limit: 50 },
     });
-    items.value = res.data.data.items || [];
+
+    const fetchedItems = res.data.data.items || [];
+
+    if (isLoadMore) {
+      items.value.push(...fetchedItems);
+    } else {
+      items.value = fetchedItems;
+    }
+
+    total.value = res.data.data.total || 0;
   } catch (error) {
     console.error("Gagal memuat Lookup PO Internal SPK", error);
   } finally {
     isLoading.value = false;
+  }
+};
+
+// Deteksi saat pengguna scroll sampai paling bawah tabel
+const handleScroll = (e: Event) => {
+  const target = e.target as HTMLElement;
+  if (target.scrollTop + target.clientHeight >= target.scrollHeight - 10) {
+    if (!isLoading.value && items.value.length < total.value) {
+      page.value++;
+      fetchData(true); // Panggil mode load more
+    }
   }
 };
 
@@ -43,7 +74,7 @@ watch(
 let debounceTimer: ReturnType<typeof setTimeout>;
 watch(search, () => {
   clearTimeout(debounceTimer);
-  debounceTimer = setTimeout(fetchData, 300);
+  debounceTimer = setTimeout(() => fetchData(false), 300);
 });
 
 const selectItem = (item: any) => {
@@ -82,8 +113,8 @@ const selectItem = (item: any) => {
         </button>
       </div>
 
-      <div class="lookup-table-wrap">
-        <div v-if="isLoading" class="lookup-state">
+      <div class="lookup-table-wrap" @scroll="handleScroll">
+        <div v-if="isLoading && items.length === 0" class="lookup-state">
           <v-progress-circular indeterminate color="primary" size="24" />
           <span>Memuat data...</span>
         </div>
@@ -126,12 +157,20 @@ const selectItem = (item: any) => {
             </tr>
           </tbody>
         </table>
+
+        <div
+          v-if="isLoading && items.length > 0"
+          style="text-align: center; padding: 10px"
+        >
+          <v-progress-circular indeterminate color="primary" size="20" />
+        </div>
       </div>
 
       <div class="lookup-footer">
-        <span class="footer-count"
-          >{{ items.length }} PO terbuka ditemukan</span
-        >
+        <!-- Ubah tampilan total data agar lebih informatif -->
+        <span class="footer-count">
+          Menampilkan {{ items.length }} dari {{ total }} PO terbuka
+        </span>
         <span class="footer-hint">Klik baris untuk memilih</span>
       </div>
     </div>

@@ -75,7 +75,8 @@ const grandTotal = (d: any) => total(d) + ppnNominal(d);
   <div v-if="isLoading" class="state">Memuat data cetak...</div>
   <div v-else-if="error" class="state err">{{ error }}</div>
 
-  <template v-else-if="data">
+  <!-- Bungkus dengan kontainer berukuran pasti A4 -->
+  <div v-else-if="data" class="page-a4">
     <!-- 2 copy dalam 1 halaman A4 -->
     <div v-for="copy in [1, 2]" :key="copy" class="copy">
       <!-- Kop surat -->
@@ -223,10 +224,10 @@ const grandTotal = (d: any) => total(d) + ppnNominal(d);
         </div>
       </div>
 
-      <!-- Pemisah copy (hanya antara copy 1 dan 2) -->
+      <!-- Pemisah copy (hanya antara copy 1 dan 2 diletakkan dengan absolute) -->
       <div v-if="copy === 1" class="cut-line"></div>
     </div>
-  </template>
+  </div>
 </template>
 
 <style>
@@ -257,17 +258,34 @@ body {
   color: #c62828;
 }
 
-/* Setiap copy ~half A4 */
+/* Pembungkus halaman A4 */
+.page-a4 {
+  width: 210mm;
+  height: 297mm;
+  display: flex;
+  flex-direction: column;
+  margin: 0 auto;
+  background: white;
+}
+
+/* Setiap copy KUNCI tepat separuh A4 */
 .copy {
   width: 210mm;
-  padding: 6mm 12mm 3mm;
+  height: 148.5mm; /* Pas separuh 297mm */
+  padding: 8mm 12mm; /* Atur padding yang ideal untuk margin printer */
+  position: relative; /* Untuk cut-line absolute */
+  overflow: hidden; /* Mencegah kalau tabel panjang merusak halaman */
+  display: flex;
+  flex-direction: column;
 }
 
 .cut-line {
-  border-top: 1px dashed #555;
-  margin: 2mm 0;
-  font-size: 0;
-  height: 0;
+  position: absolute;
+  bottom: 0;
+  left: 10mm;
+  right: 10mm;
+  border-bottom: 1px dashed #777;
+  height: 1px;
 }
 
 /* Kop */
@@ -329,8 +347,6 @@ body {
   font-size: 7.5pt;
 }
 
-/* Jumlah/Tarif di kolom kanan — label kiri, sejajar dgn tabel kiri,
-   TIDAK rata kanan (ikut pola Delphi) */
 .itbl-right {
   border-collapse: collapse;
   font-size: 8pt;
@@ -385,11 +401,12 @@ body {
   text-align: right;
 }
 
-/* Footer */
+/* Footer diletakkan di bawah dengan flex-grow */
 .foot {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
+  margin-top: auto; /* Mendorong footer otomatis ke bagian bawah ruang yang tersedia */
 }
 .foot-l {
   flex: 1;
@@ -439,11 +456,12 @@ body {
   body {
     margin: 0;
   }
+  .page-a4 {
+    height: 100%;
+    width: 100%;
+  }
   .copy {
     page-break-inside: avoid;
-  }
-  .cut-line {
-    border-top: none;
   }
 }
 </style>

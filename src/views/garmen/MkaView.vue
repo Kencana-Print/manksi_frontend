@@ -114,17 +114,38 @@ const onUpdateExpanded = async (newExpanded: any[]) => {
   }
 };
 
-// --- Row color: StatusSPK OPEN → merah, sesuai Delphi ---
-const rowPropsFn = (_data: any) => ({});
+// --- Row color: SPK Belum ada MKA → merah ---
+const rowPropsFn = (data: any) => {
+  // Vuetify 3 membungkus data asli di dalam item.raw atau item
+  const rowItem = data.item?.raw || data.item || data;
+
+  if (rowItem.RowType === "SPK") {
+    // Tambahkan !important agar warna tidak tertimpa class default tabel
+    return { style: "color: #d32f2f !important; font-weight: 600;" };
+  }
+  return {};
+};
 
 // --- Handlers ---
 onMounted(() => fetchData());
 
 const onAdd = () => router.push("/garmen/mka/create");
-const onEdit = (item: any) =>
+
+const onEdit = (item: any) => {
+  if (item.RowType === "SPK") {
+    toast.info(
+      "SPK ini belum dibuatkan MKA. Silakan klik tombol Baru untuk memprosesnya.",
+    );
+    return;
+  }
   router.push(`/garmen/mka/edit/${encodeURIComponent(item.Nomor)}`);
+};
 
 const onDelete = async (item: any) => {
+  if (item.RowType === "SPK") {
+    toast.warning("Ini adalah dokumen SPK, tidak bisa dihapus dari menu MKA.");
+    return;
+  }
   try {
     await mkaService.deleteData(item.Nomor);
     toast.success("MKA berhasil dihapus.");
