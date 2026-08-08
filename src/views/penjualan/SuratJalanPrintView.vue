@@ -163,9 +163,15 @@ const generateTxt = () => {
     lines.push(padR(h.perush_alamat || "", PAGE_WIDTH));
     lines.push(padR(h.perush_telp || "", PAGE_WIDTH));
     lines.push(padC("S U R A T   J A L A N", PAGE_WIDTH));
-    lines.push("");
 
-    const alamatFull = h.sj_alamat_customer || h.cus_alamat || "";
+    // AMBIL KOTA CUSTOMER
+    const kotaCustomer = h.sj_kota_customer || h.cus_kota || "";
+    const baseAlamat = h.sj_alamat_customer || h.cus_alamat || "";
+
+    // GABUNGKAN ALAMAT DENGAN KOTA JIKA KOTA TERSEDIA
+    const alamatFull = kotaCustomer
+      ? `${baseAlamat} - ${kotaCustomer}`
+      : baseAlamat;
     const alamatLines = wrapText(alamatFull, halfR);
     lines.push(
       `${padR("Nomor      : " + (h.sj_nomor || ""), halfL)} ${padR("Customer : " + (h.cus_nama || ""), halfR)}`,

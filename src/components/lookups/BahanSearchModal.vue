@@ -6,7 +6,7 @@ import { IconPuzzle, IconX, IconSearch } from "@tabler/icons-vue";
 interface Bahan {
   Kode: string;
   Nama: string;
-  Satuan: string; // Tambahkan Satuan untuk kalkulasi di form
+  Satuan: string;
 }
 
 interface RowClickEvent<T> {
@@ -18,7 +18,7 @@ interface RowClickEvent<T> {
 const props = defineProps<{
   modelValue: boolean;
   isBordir?: boolean;
-  mode?: "komponen" | "all"; // Tambahkan ini
+  mode?: "komponen" | "all";
   mkbFilter?: string;
 }>();
 const emit = defineEmits(["update:modelValue", "selected"]);
@@ -39,7 +39,7 @@ const headers = [
 let searchTimeout: ReturnType<typeof setTimeout> | null = null;
 
 const fetchData = async () => {
-  const mySeq = ++requestSeq; // tandai request ini sbg "yang terbaru"
+  const mySeq = ++requestSeq;
   isLoading.value = true;
   try {
     const res = await api.get("/lookups/bahan", {
@@ -52,10 +52,6 @@ const fetchData = async () => {
         mkb: props.mkbFilter,
       },
     });
-    // Kalau ada request LAIN yang dikirim setelah ini (mySeq bukan lagi
-    // yang terbaru), buang hasilnya — mencegah response request lama
-    // (misal fetch awal tanpa filter) menimpa hasil pencarian yang
-    // sudah lebih baru & relevan.
     if (mySeq !== requestSeq) return;
     items.value = res.data.data.items;
     totalItems.value = res.data.data.total;

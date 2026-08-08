@@ -507,7 +507,7 @@ const onPrint = async () => {
         );
       } else {
         toast.warning(
-          `SPK ini sudah pernah dicetak (${info.count}x). Cetak berikutnya butuh approval manager.`,
+          `Batas cetak gratis (5x) sudah habis. SPK ini sudah dicetak ${info.count}x. Cetak berikutnya butuh approval manager.`,
         );
       }
       printApprovalAlasan.value = "";

@@ -3,15 +3,27 @@ import api from "@/services/api";
 const BASE = "/laporan/gudang-garmen/spkv-realisasiv-lhkcutt";
 
 export const spkVsRealisasiVsLhkCuttService = {
-  getBrowse: (startDate: string, endDate: string, spk = "", isMap = false) =>
+  getBrowse: (
+    startDate: string,
+    endDate: string,
+    spk = "",
+    isMap = false,
+    namaBahan = "", // ← BARU
+  ) =>
     api.get(BASE, {
-      params: { startDate, endDate, spk, map: isMap },
+      params: { startDate, endDate, spk, map: isMap, namaBahan },
     }),
 
   getDetail: (spk: string) => api.get(`${BASE}/${encodeURIComponent(spk)}`),
 
-  getAllDetail: (startDate: string, endDate: string, spk = "", isMap = false) =>
+  getAllDetail: (
+    startDate: string,
+    endDate: string,
+    spk = "",
+    isMap = false,
+    namaBahan = "", // ← BARU
+  ) =>
     api.get(`${BASE}/all-detail`, {
-      params: { startDate, endDate, spk, map: isMap },
+      params: { startDate, endDate, spk, map: isMap, namaBahan },
     }),
 };

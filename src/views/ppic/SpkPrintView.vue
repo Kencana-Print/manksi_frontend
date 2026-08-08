@@ -78,16 +78,24 @@ const resolveDesignImage = () => {
   }
   const base = getBaseUrl();
   const cab = spk.value.spk_cab || "HO-";
-  const soRef = spk.value.spk_so_ref || spk.value.spk_nomor;
+  const nomor = spk.value.spk_nomor;
   const mapNomor = spk.value.spk_memo || "";
 
-  const candidates = [`${base}/images/${cab}/${encodeURIComponent(soRef)}.jpg`];
+  const candidates = [
+    // 1. Gambar SPK Baru (dari backend/images/cabang/spk)
+    `${base}/images/${cab}/${encodeURIComponent(nomor)}.jpg`,
+  ];
+
   if (mapNomor) {
+    // 2. Gambar MAP (dari backend/images/cabang/map/map)
     candidates.push(
       `${base}/images/${cab}/map/${encodeURIComponent(mapNomor)}.jpg`,
     );
   }
-  candidates.push(`/file-gambar/${encodeURIComponent(mapNomor || soRef)}.jpg`);
+
+  // 3. Gambar SPK Lama (dari root /file-gambar/spk)
+  // FIX: Ambil langsung dari "nomor" SPK, bukan mapNomor / soRef
+  candidates.push(`/file-gambar/${encodeURIComponent(nomor)}.jpg`);
 
   isLoadingImage.value = true;
   resolvedImageUrl.value = "";

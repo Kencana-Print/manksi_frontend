@@ -17,6 +17,7 @@ import {
   IconSearch,
 } from "@tabler/icons-vue";
 import { formatTanggal, formatTanggalJam } from "@/utils/dateFormat";
+import { exportExcelSingle, type ExcelColumn } from "@/utils/excelExport";
 
 const authStore = useAuthStore();
 const router = useRouter();
@@ -219,8 +220,147 @@ const processPrint = (satuan: string) => {
   window.open(url, "_blank");
 };
 
-const exportDetail = () => {
-  toast.info("Fitur Export Detail PO sedang dikembangkan.");
+// --- EXPORT DETAIL PO ---
+const isExportingDetail = ref(false);
+
+const onExportDetail = async () => {
+  isExportingDetail.value = true;
+  try {
+    const res = await poBahanService.getAllDetail({
+      startDate: filterState.value.dtAwal,
+      endDate: filterState.value.dtAkhir,
+      search: filterState.value.search,
+    });
+
+    const allDetail: any[] = res.data.data || [];
+
+    if (!allDetail.length) {
+      toast.warning("Tidak ada data detail pada filter ini.");
+      return;
+    }
+
+    // ✅ Kelompokkan per Nomor PO
+    const groups: Record<string, any[]> = {};
+    const order: string[] = [];
+    allDetail.forEach((r) => {
+      const key = r.Nomor;
+      if (!groups[key]) {
+        groups[key] = [];
+        order.push(key);
+      }
+      groups[key].push(r);
+    });
+
+    const combinedRows: any[] = [];
+
+    order.forEach((key) => {
+      const rowsInGroup = groups[key];
+      const first = rowsInGroup[0];
+
+      // Data Header/Master yang hanya muncul di baris pertama
+      const masterCells = {
+        Nomor: first.Nomor,
+        Tanggal: formatTanggal(first.Tanggal),
+        Comm_Delivery: formatTanggal(first.Comm_Delivery),
+        JenisPO: first.JenisPO,
+        ...(canLihatSup.value ? { Supplier: first.Supplier } : {}),
+      };
+
+      // Baris blanko untuk detail kedua dan seterusnya
+      const blankMaster = Object.fromEntries(
+        Object.keys(masterCells).map((k) => [k, ""]),
+      );
+
+      rowsInGroup.forEach((r, idx) => {
+        combinedRows.push({
+          ...(idx === 0 ? masterCells : blankMaster),
+          Kode: r.Kode,
+          Nama: r.Nama,
+          Satuan: r.Satuan,
+          Jumlah: Number(r.Jumlah) || 0,
+          QtyBpb: Number(r.QtyBpb) || 0,
+          QtyRetur: Number(r.QtyRetur) || 0,
+          ...(canLihatBeli.value
+            ? { Harga: Number(r.Harga) || 0, Disc: Number(r.Disc) || 0 }
+            : {}),
+          Status_barang: r.Status_barang,
+          MKB: r.MKB,
+          SPK: r.SPK,
+          Nama_SPK: r.Nama_SPK,
+        });
+      });
+    });
+
+    const columns: ExcelColumn[] = [
+      { header: "Nomor PO", key: "Nomor", width: 16 },
+      { header: "Tanggal", key: "Tanggal", width: 12, align: "center" },
+      { header: "Delivery", key: "Comm_Delivery", width: 12, align: "center" },
+      { header: "Jenis PO", key: "JenisPO", width: 12, align: "center" },
+      ...(canLihatSup.value
+        ? [{ header: "Supplier", key: "Supplier", width: 28 }]
+        : []),
+      { header: "Kode Bahan", key: "Kode", width: 14 },
+      { header: "Nama Bahan", key: "Nama", width: 28 },
+      { header: "Satuan", key: "Satuan", width: 10, align: "center" },
+      {
+        header: "Qty PO",
+        key: "Jumlah",
+        width: 12,
+        align: "right",
+        numFmt: "#,##0.00",
+      },
+      {
+        header: "Qty BPB",
+        key: "QtyBpb",
+        width: 12,
+        align: "right",
+        numFmt: "#,##0.00",
+      },
+      {
+        header: "Qty Retur",
+        key: "QtyRetur",
+        width: 12,
+        align: "right",
+        numFmt: "#,##0.00",
+      },
+      ...(canLihatBeli.value
+        ? [
+            {
+              header: "Harga",
+              key: "Harga",
+              width: 14,
+              align: "right",
+              numFmt: "#,##0.00",
+            },
+            {
+              header: "Disc",
+              key: "Disc",
+              width: 10,
+              align: "right",
+              numFmt: "#,##0.00",
+            },
+          ]
+        : []),
+      { header: "Status", key: "Status_barang", width: 12, align: "center" },
+      { header: "No. MKB", key: "MKB", width: 16 },
+      { header: "No. SPK", key: "SPK", width: 16 },
+      { header: "Nama SPK", key: "Nama_SPK", width: 28 },
+    ];
+
+    await exportExcelSingle(
+      `PO_Bahan_Detail_${filterState.value.dtAwal}_to_${filterState.value.dtAkhir}.xlsx`,
+      "Detail PO Bahan",
+      columns,
+      combinedRows,
+      `Rincian PO Bahan | Periode: ${formatTanggal(filterState.value.dtAwal)} s.d ${formatTanggal(filterState.value.dtAkhir)}`,
+    );
+
+    toast.success("Berhasil export detail PO.");
+  } catch (err) {
+    toast.error("Gagal export detail.");
+  } finally {
+    isExportingDetail.value = false;
+  }
 };
 
 // --- HANDLER CLOSE / BATAL CLOSE ---
@@ -478,8 +618,14 @@ const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
       >
         <template #prepend><IconPrinter :size="15" /></template>Cetak
       </v-btn>
-      <v-btn size="small" color="deep-purple-darken-1" @click="exportDetail">
-        <template #prepend><IconFileExport :size="15" /></template>Export Detail
+      <v-btn
+        size="small"
+        color="deep-purple-darken-1"
+        :loading="isExportingDetail"
+        @click="onExportDetail"
+      >
+        <template #prepend><IconFileExport :size="15" /></template>
+        Export Detail
       </v-btn>
 
       <v-menu v-if="selected.length > 0">

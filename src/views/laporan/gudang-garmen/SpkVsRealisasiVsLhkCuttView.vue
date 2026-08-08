@@ -6,6 +6,7 @@ import BaseBrowse from "@/components/BaseBrowse.vue";
 import { useBrowse } from "@/composables/useBrowse";
 import { spkVsRealisasiVsLhkCuttService } from "@/services/laporan/gudang-garmen/spkVsRealisasiVsLhkCuttService";
 import SpkSearchModal from "@/components/lookups/SpkSearchModal.vue";
+import BahanSearchModal from "@/components/lookups/BahanSearchModal.vue";
 import {
   IconListCheck,
   IconFileSpreadsheet,
@@ -37,9 +38,12 @@ const filters = ref({
   endDate: toLocalDateStr(today),
   spk: "",
   isMap: false,
+  namaBahan: "",
 });
 const namaSpkTerpilih = ref("");
 const showSpkModal = ref(false);
+const showBahanModal = ref(false);
+const namaBahanTerpilih = ref("");
 
 const onSpkSelected = (item: any) => {
   filters.value.spk = item.Nomor;
@@ -49,6 +53,18 @@ const onSpkSelected = (item: any) => {
 const clearSpk = () => {
   filters.value.spk = "";
   namaSpkTerpilih.value = "";
+  fetchData();
+};
+
+const onBahanSelected = (item: any) => {
+  filters.value.namaBahan = item.Kode;
+  namaBahanTerpilih.value = item.Nama || "";
+  fetchData();
+};
+
+const clearBahan = () => {
+  filters.value.namaBahan = "";
+  namaBahanTerpilih.value = "";
   fetchData();
 };
 
@@ -90,6 +106,7 @@ const { items, isLoading, canExport, fetchData } = useBrowse({
       filters.value.endDate,
       filters.value.spk,
       filters.value.isMap,
+      filters.value.namaBahan,
     );
     return res.data.data;
   },
@@ -134,6 +151,29 @@ const fmtNum = (val: any, d = 2) =>
   });
 
 const formatBackendDate = (v?: string) => (v ? v.replace(/-/g, "/") : "-");
+
+const detailSubtotal = (spk: string) => {
+  const rows = detailData.value[spk] || [];
+  const keyword = filters.value.namaBahan.trim().toLowerCase();
+  const matched = keyword
+    ? rows.filter(
+        (d: any) =>
+          (d.NamaBahan || "").toLowerCase().includes(keyword) ||
+          (d.KodeBahan || "").toLowerCase().includes(keyword),
+      )
+    : rows;
+
+  return {
+    netMinta: matched.reduce(
+      (s: number, d: any) => s + Number(d.NetMinta || 0),
+      0,
+    ),
+    totalLhk: matched.reduce(
+      (s: number, d: any) => s + Number(d.BeratLhk || 0),
+      0,
+    ), // ← pakai BeratLhk
+  };
+};
 
 // ── Export master ──
 const isExporting = ref(false);
@@ -381,6 +421,34 @@ onMounted(fetchData);
 
       <div class="f-divider" />
 
+      <span class="f-label">Bahan</span>
+      <div class="spk-picker">
+        <input
+          type="text"
+          :value="namaBahanTerpilih || filters.namaBahan"
+          readonly
+          class="f-inp"
+          style="width: 160px; cursor: pointer"
+          placeholder="Klik untuk pilih..."
+          @click="showBahanModal = true"
+        />
+        <button
+          v-if="filters.namaBahan"
+          type="button"
+          class="btn-clear-spk"
+          @click="clearBahan"
+        >
+          ✕
+        </button>
+        <button
+          type="button"
+          class="btn-search-spk"
+          @click="showBahanModal = true"
+        >
+          <IconSearch :size="13" />
+        </button>
+      </div>
+
       <label class="f-check">
         <input type="checkbox" v-model="filters.isMap" @change="fetchData" />
         <span>MAP</span>
@@ -518,6 +586,25 @@ onMounted(fetchData);
               </td>
             </tr>
           </tbody>
+          <tfoot v-if="detailData[item.Spk]?.length">
+            <tr class="dtl-subtotal">
+              <td colspan="8" class="text-right font-weight-bold">
+                Subtotal{{
+                  filters.namaBahan ? ` ("${filters.namaBahan}")` : ""
+                }}:
+              </td>
+              <td colspan="2"></td>
+              <td class="tr font-weight-bold">
+                {{ fmtNum(detailSubtotal(item.Spk).netMinta) }}
+              </td>
+              <td colspan="4"></td>
+              <td class="tr font-weight-bold">-</td>
+              <td :colspan="canLihatCus ? 3 : 2"></td>
+              <td class="tr font-weight-bold" style="background: #fff3e0">
+                Total LHK: {{ fmtNum(detailSubtotal(item.Spk).totalLhk) }} kg
+              </td>
+            </tr>
+          </tfoot>
         </table>
       </div>
     </template>
@@ -527,6 +614,11 @@ onMounted(fetchData);
     v-model="showSpkModal"
     filter-mode="all"
     @selected="onSpkSelected"
+  />
+  <BahanSearchModal
+    v-model="showBahanModal"
+    mode="all"
+    @selected="onBahanSelected"
   />
 </template>
 
@@ -665,5 +757,11 @@ onMounted(fetchData);
   font-size: 10px;
   color: #9e6b00;
   font-style: italic;
+}
+
+.dtl-subtotal td {
+  background: #eceff1;
+  border-top: 2px solid #90a4ae;
+  padding: 6px 10px;
 }
 </style>

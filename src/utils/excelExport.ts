@@ -6,7 +6,8 @@ export interface ExcelColumn {
   key: string;
   width?: number;
   numFmt?: string;
-  align?: "left" | "center" | "right";
+  // Melonggarkan tipe dengan menambahkan "| string" agar TS tidak rewel
+  align?: "left" | "center" | "right" | string;
 }
 
 export interface ExcelSheetConfig {
@@ -45,11 +46,7 @@ export const exportExcel = async (
       dataStartRow = 3;
     }
 
-    // ✅ Threshold performa — di atas ini, skip zebra stripe & per-cell
-    // styling manual (row.eachCell bikin object baru utk TIAP cell di
-    // TIAP baris, berat banget buat ribuan baris). Dataset besar pakai
-    // jalur cepat: style di level KOLOM (sekali doang, ExcelJS terapin
-    // ke semua cell kolom itu otomatis) + bulk insert via addRows().
+    // ✅ Threshold performa
     const isLargeExport = cfg.rows.length > 500;
 
     // ── Setup kolom (+ style default per kolom kalau dataset besar) ──
@@ -59,13 +56,17 @@ export const exportExcel = async (
       style: isLargeExport
         ? {
             font: { size: 10 },
-            alignment: { horizontal: c.align ?? "left", vertical: "middle" },
+            // Tambahkan "as any" agar ExcelJS tidak protes
+            alignment: {
+              horizontal: (c.align as any) ?? "left",
+              vertical: "middle",
+            },
             numFmt: c.numFmt,
           }
         : undefined,
     }));
 
-    // ── Header row (selalu di-style manual — cuma 1 baris, murah) ──
+    // ── Header row ──
     const headerRow = ws.addRow(cfg.columns.map((c) => c.header));
     headerRow.eachCell((cell, colIdx) => {
       cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 10 };
@@ -75,7 +76,8 @@ export const exportExcel = async (
         fgColor: { argb: "FF" + hdrColor },
       };
       cell.alignment = {
-        horizontal: cfg.columns[colIdx - 1]?.align ?? "left",
+        // Tambahkan "as any"
+        horizontal: (cfg.columns[colIdx - 1]?.align as any) ?? "left",
         vertical: "middle",
         wrapText: false,
       };
@@ -84,19 +86,18 @@ export const exportExcel = async (
     headerRow.height = 20;
 
     if (isLargeExport) {
-      // ✅ Jalur cepat — bulk insert, style udah ke-set di level kolom
-      // di atas, jadi ExcelJS gak perlu bikin object gaya per cell.
+      // Jalur cepat
       ws.addRows(cfg.rows.map((r) => cfg.columns.map((c) => r[c.key] ?? "")));
     } else {
-      // Jalur normal — tetep per-cell + zebra stripe (dataset kecil,
-      // biaya perform gak kerasa, tampilannya lebih rapi)
+      // Jalur normal (Zebra stripe)
       cfg.rows.forEach((rowData, idx) => {
         const row = ws.addRow(cfg.columns.map((c) => rowData[c.key] ?? ""));
         row.eachCell((cell, colIdx) => {
           const colCfg = cfg.columns[colIdx - 1];
           cell.font = { size: 10 };
           cell.alignment = {
-            horizontal: colCfg?.align ?? "left",
+            // Tambahkan "as any"
+            horizontal: (colCfg?.align as any) ?? "left",
             vertical: "middle",
           };
           if (colCfg?.numFmt) cell.numFmt = colCfg.numFmt;

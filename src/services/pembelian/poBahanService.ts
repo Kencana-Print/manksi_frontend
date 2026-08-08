@@ -21,4 +21,10 @@ export const poBahanService = {
 
   requestPinEdit: (payload: { nomor: string; alasan: string }) =>
     api.post("/pembelian/po-bahan/request-pin", payload),
+
+  getAllDetail: (params: {
+    startDate: string;
+    endDate: string;
+    search?: string;
+  }) => api.get("/pembelian/po-bahan/all-detail", { params }),
 };
