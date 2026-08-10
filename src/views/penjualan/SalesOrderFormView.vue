@@ -573,12 +573,19 @@ watch(
         formData.value.Customer = "KAOSAN.OFFICIAL";
         formData.value.cus_perfect = "N";
         formData.value.spk_standar_ukuran = "KENCANA";
-        formData.value.spk_varian_ukuran = "KAOSAN";
+        formData.value.spk_varian_ukuran = "KAOSAN"; // ← reset ke default Kaosan
       } else {
         formData.value.spk_perush_kode = "";
         formData.value.NamaPerusahaan = "";
         formData.value.spk_cus_kode = "";
         formData.value.Customer = "";
+        if (
+          ["KAOSAN", "ANAK", "TUNIK", "POLO"].includes(
+            formData.value.spk_varian_ukuran,
+          )
+        ) {
+          formData.value.spk_varian_ukuran = "LENGAN_PENDEK";
+        }
       }
     }
   },

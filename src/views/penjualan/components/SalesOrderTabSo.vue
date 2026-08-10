@@ -42,6 +42,9 @@ const isOpeningModal = ref(false);
 const isDivisiTiga = computed(() =>
   String(props.formData.spk_divisi).startsWith("3"),
 );
+const labelStdSistem = computed(() =>
+  isDivisiTiga.value ? "Std. Kaosan" : "Std. Kencana",
+);
 const isDivisiSatuAtauLima = computed(() => {
   const d = String(props.formData.spk_divisi).charAt(0);
   return d === "1" || d === "5";
@@ -1482,7 +1485,7 @@ watch(
                   value="KENCANA"
                   style="accent-color: #1565c0"
                 />
-                Std. Kencana
+                {{ labelStdSistem }}
               </label>
               <select
                 v-if="formData.spk_standar_ukuran === 'KENCANA'"
@@ -1490,14 +1493,18 @@ watch(
                 class="inp sel ml-1"
                 style="height: 22px; font-size: 10px; padding: 0 3px"
               >
-                <option value="KAOSAN">Kaos Polos (Kaosan)</option>
-                <option value="ANAK">Kaos Anak</option>
-                <option value="TUNIK">Tunik</option>
-                <option value="POLO">Polo Lacos CVC</option>
-                <option value="LENGAN_PENDEK">Standar (L.Pendek)</option>
-                <option value="LENGAN_PANJANG">Kaos L.Panjang</option>
-                <option value="RAGLAN_LP">Raglan L.Panjang</option>
-                <option value="KEMEJA_WANITA">Kemeja Wanita</option>
+                <template v-if="isDivisiTiga">
+                  <option value="KAOSAN">Kaos Polos (Kaosan)</option>
+                  <option value="ANAK">Kaos Anak</option>
+                  <option value="TUNIK">Tunik</option>
+                  <option value="POLO">Polo Lacos CVC</option>
+                </template>
+                <template v-else>
+                  <option value="LENGAN_PENDEK">Standar (L.Pendek)</option>
+                  <option value="LENGAN_PANJANG">Kaos L.Panjang</option>
+                  <option value="RAGLAN_LP">Raglan L.Panjang</option>
+                  <option value="KEMEJA_WANITA">Kemeja Wanita</option>
+                </template>
               </select>
               <label class="chk-lbl ml-1">
                 <input
