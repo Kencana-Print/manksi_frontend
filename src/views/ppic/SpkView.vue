@@ -465,9 +465,8 @@ const onLihatGambar = () => {
   const nomor = selectedItem.value.Nomor;
   const cab = selectedItem.value.Cab || "HO-";
   const map = selectedItem.value.MAP || "";
-  const soRef = selectedItem.value.SORef || ""; // ⬅️ Ambil referensi SO dari backend
+  const soRef = selectedItem.value.SORef || "";
 
-  // Tebakan kasar jika soRef kosong (menambahkan SO-)
   const fallbackSoNomor = nomor.startsWith("SPK-")
     ? nomor.replace("SPK-", "SO-")
     : nomor.startsWith("SO-")
@@ -476,41 +475,46 @@ const onLihatGambar = () => {
 
   const candidates: string[] = [];
 
-  // 1. Prioritas Pertama: Gambar SPK Baru
+  // ⚠️ MAP diprioritaskan PALING AWAL — ini sumber gambar desain yang
+  // sebenarnya otoritatif (SPK → SO → MAP), path FLAT tanpa subfolder
+  // di VPS legacy (/file-gambar/{map}.jpg, bukan /images/{cab}/map/...).
+  // Kalau tidak diprioritaskan, file lama/salah yang kebetulan ada di
+  // /images/{cab}/{nomor}.jpg bisa ke-load duluan walau isinya bukan
+  // gambar SPK ini sebenarnya (lihat kasus SPK-JA-KO-000005 vs SO
+  // referensinya SO-JA-KO-000010 → MAP-JA-KO-002279).
+  if (map) {
+    candidates.push(`/file-gambar/${encodeURIComponent(map)}.jpg`);
+    candidates.push(`${base}/images/${cab}/${encodeURIComponent(map)}.jpg`);
+  }
+
+  // 2. SPK sendiri
   candidates.push(`${base}/images/${cab}/${encodeURIComponent(nomor)}.jpg`);
 
-  // 2. Prioritas Kedua: Gambar dari Referensi SO di DB (SO-SM-MX-000006)
+  // 3. SO Ref dari backend
   if (soRef && soRef !== nomor) {
     candidates.push(`${base}/images/${cab}/${encodeURIComponent(soRef)}.jpg`);
   }
 
-  // 3. Prioritas Ketiga: Tebakan SO
+  // 4. Tebakan SO
   if (fallbackSoNomor !== nomor && fallbackSoNomor !== soRef) {
     candidates.push(
       `${base}/images/${cab}/${encodeURIComponent(fallbackSoNomor)}.jpg`,
     );
   }
 
-  // 4. Prioritas Keempat: MAP
-  if (map) {
-    candidates.push(`${base}/images/${cab}/map/${encodeURIComponent(map)}.jpg`);
-  }
-
-  // 5. Fallback Terakhir: Root file-gambar lama
+  // 5. Fallback terakhir — file-gambar lama untuk nomor SPK/SO langsung
   candidates.push(`/file-gambar/${encodeURIComponent(nomor)}.jpg`);
   if (soRef && soRef !== nomor)
     candidates.push(`/file-gambar/${encodeURIComponent(soRef)}.jpg`);
   if (fallbackSoNomor !== nomor && fallbackSoNomor !== soRef)
     candidates.push(`/file-gambar/${encodeURIComponent(fallbackSoNomor)}.jpg`);
-  if (map && map !== nomor)
-    candidates.push(`/file-gambar/${encodeURIComponent(map)}.jpg`);
 
   gambarUrl.value = "";
   dialogGambar.value = true;
 
   const tryNext = (idx: number) => {
     if (idx >= candidates.length) {
-      gambarUrl.value = ""; // Gagal semua
+      gambarUrl.value = "";
       return;
     }
     const img = new Image();

@@ -75,7 +75,7 @@ const resolveDesignImage = () => {
   const base = getBaseUrl();
   const cab = spk.value.spk_cab || "HO-";
   const nomor = spk.value.spk_nomor;
-  const soRef = spk.value.spk_so_ref || ""; // ⬅️ Ini sudah disediakan otomatis oleh backend untuk PrintView
+  const soRef = spk.value.spk_so_ref || "";
   const mapNomor = spk.value.spk_memo || "";
 
   const fallbackSoNomor = nomor.startsWith("SPK-")
@@ -86,36 +86,38 @@ const resolveDesignImage = () => {
 
   const candidates: string[] = [];
 
-  // 1. SPK
+  // ⚠️ MAP diprioritaskan PALING AWAL, path FLAT tanpa subfolder —
+  // sama alasan seperti di SpkView.onLihatGambar. Sumber gambar desain
+  // yang otoritatif adalah MAP (SPK → SO → MAP), bukan tebakan
+  // berdasar nomor SPK sendiri yang bisa nyasar ke file lama/salah.
+  if (mapNomor) {
+    candidates.push(`/file-gambar/${encodeURIComponent(mapNomor)}.jpg`);
+    candidates.push(
+      `${base}/images/${cab}/${encodeURIComponent(mapNomor)}.jpg`,
+    );
+  }
+
+  // 2. SPK sendiri
   candidates.push(`${base}/images/${cab}/${encodeURIComponent(nomor)}.jpg`);
 
-  // 2. SO Ref (SO-SM-MX-000006)
+  // 3. SO Ref
   if (soRef && soRef !== nomor) {
     candidates.push(`${base}/images/${cab}/${encodeURIComponent(soRef)}.jpg`);
   }
 
-  // 3. Fallback tebakan
+  // 4. Fallback tebakan SO
   if (fallbackSoNomor !== nomor && fallbackSoNomor !== soRef) {
     candidates.push(
       `${base}/images/${cab}/${encodeURIComponent(fallbackSoNomor)}.jpg`,
     );
   }
 
-  // 4. MAP
-  if (mapNomor) {
-    candidates.push(
-      `${base}/images/${cab}/map/${encodeURIComponent(mapNomor)}.jpg`,
-    );
-  }
-
-  // 5. File Gambar Lama
+  // 5. Fallback terakhir — file-gambar lama untuk nomor SPK/SO langsung
   candidates.push(`/file-gambar/${encodeURIComponent(nomor)}.jpg`);
   if (soRef && soRef !== nomor)
     candidates.push(`/file-gambar/${encodeURIComponent(soRef)}.jpg`);
   if (fallbackSoNomor !== nomor && fallbackSoNomor !== soRef)
     candidates.push(`/file-gambar/${encodeURIComponent(fallbackSoNomor)}.jpg`);
-  if (mapNomor && mapNomor !== nomor)
-    candidates.push(`/file-gambar/${encodeURIComponent(mapNomor)}.jpg`);
 
   isLoadingImage.value = true;
   resolvedImageUrl.value = "";
