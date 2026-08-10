@@ -2015,6 +2015,29 @@ const router = createRouter({
       },
     },
     {
+      path: "/garmen/dtf/lhk-so-dtf",
+      name: "LhkSoDtfBrowse",
+      component: () => import("@/views/garmen/LhkSoDtfView.vue"),
+      meta: {
+        title: "LHK SO DTF/DTG",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "123",
+      },
+    },
+    {
+      path: "/garmen/dtf/lhk-so-dtf/form",
+      name: "LhkSoDtfForm",
+      component: () => import("@/views/garmen/LhkSoDtfFormView.vue"),
+      meta: {
+        title: "Form LHK SO DTF/DTG",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "123",
+        browseRoute: "LhkSoDtfBrowse",
+      },
+    },
+    {
       path: "/garmen/po-dtf",
       name: "PoDtfBrowse",
       component: () => import("@/views/garmen/PoDtfView.vue"),

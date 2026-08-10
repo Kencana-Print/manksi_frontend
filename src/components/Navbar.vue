@@ -694,7 +694,12 @@ const menuItems: NavItem[] = [
             icon: IconPhotoSearch,
             menuId: 128,
           },
-          // LHK menyusul
+          {
+            title: "LHK SO DTF/DTG",
+            to: "/garmen/dtf/lhk-so-dtf",
+            icon: IconClipboardList,
+            menuId: 123,
+          },
         ],
       },
       {
