@@ -252,9 +252,9 @@ onMounted(async () => {
 .print-container {
   width: 100vw;
   height: 100vh;
-  overflow: auto; /* Kunci utamanya di sini */
-  background-color: #525659; /* Warna latar luar kertas */
-  padding: 20px 0; /* Jarak atas bawah layar */
+  overflow: auto;
+  background-color: #525659;
+  padding: 20px 0;
   box-sizing: border-box;
 }
 
@@ -276,13 +276,8 @@ onMounted(async () => {
     padding: 0;
   }
   .print-wrapper {
-    /* PENTING: tinggi TETAP dikunci ke tinggi kertas (bukan auto),
-       supaya konten yang lebih panjang dari biasa (misal Catatan
-       panjang, baris kesesuaian banyak) tidak meluber ke halaman
-       kedua — sebaliknya .image-box di bawah yang otomatis
-       menyusut untuk mengisi sisa ruang yang tepat tersedia. */
     width: 100% !important;
-    height: 200mm !important; /* 210mm kertas - 2x5mm margin @page */
+    height: 195mm !important; /* Disesuaikan agar aman dari margin printer */
     margin: 0 !important;
     padding: 0 !important;
     box-shadow: none !important;
@@ -297,8 +292,8 @@ onMounted(async () => {
 .print-wrapper {
   width: 297mm;
   height: 210mm;
-  margin: 0 auto; /* Tengah secara horizontal di dalam print-container */
-  padding: 10mm;
+  margin: 0 auto;
+  padding: 8mm; /* Padding dikurangi dari 10mm ke 8mm untuk ekstra ruang */
   background: #fff;
   box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
   display: flex;
@@ -310,24 +305,27 @@ onMounted(async () => {
 }
 
 .print-column {
-  width: 48%; /* Akan mengambil 48% dari fixed 297mm */
+  width: 48%;
   display: flex;
   flex-direction: column;
+  height: 100%; /* WAJIB 100% agar flex child di dalamnya tahu batas maksimal */
 }
 
 .header-title {
   border: 1px solid #000;
   padding: 4px;
   font-weight: bold;
-  font-size: 14px;
-  margin-bottom: 8px;
+  font-size: 13px; /* Dikecilkan 1px */
+  margin-bottom: 4px; /* Margin bawah dirapatkan */
+  text-align: center;
 }
 
 .info-table {
-  font-size: 11px;
+  font-size: 10px; /* Dikecilkan 1px */
+  line-height: 1.25; /* Rapatkan spasi antar baris di Catatan */
 }
 .info-table td {
-  padding: 2px 0;
+  padding: 1px 0; /* Rapatkan padding vertikal */
 }
 .align-top {
   vertical-align: top;
@@ -335,27 +333,28 @@ onMounted(async () => {
 
 .detail-table {
   border-collapse: collapse;
-  font-size: 11px;
-  flex-shrink: 0;
+  font-size: 10px; /* Dikecilkan 1px */
+  flex-shrink: 0; /* Tabel tidak boleh ikut menyusut */
 }
 .detail-table th,
 .detail-table td {
   border: 1px solid #000;
-  padding: 4px;
+  padding: 2px 4px; /* Padding dirapatkan */
 }
 .detail-table th {
-  font-weight: normal;
+  font-weight: bold;
 }
 
 .image-box {
   border: 1px solid #000;
-  flex: 1 1 auto; /* mengisi SISA ruang yang tersedia, bukan tinggi tetap */
-  min-height: 60px; /* jaga-jaga supaya tidak hilang total kalau konten atas panjang sekali */
+  flex: 1 1 0; /* KUNCI UTAMA: Flex-basis 0 agar gambar yang mengalah/menyusut, bukan footer yang terdorong */
+  min-height: 0; /* KUNCI UTAMA: Boleh menyusut hingga habis jika teks catatan sangat penuh */
   width: 100%;
   display: flex;
   justify-content: center;
   align-items: center;
   overflow: hidden;
+  margin-top: 6px;
 }
 
 .map-image {
@@ -365,15 +364,16 @@ onMounted(async () => {
 }
 
 .footer-section {
-  font-size: 11px;
-  flex-shrink: 0; /* footer TTD selalu tampil penuh, tidak boleh terpotong */
+  font-size: 10px;
+  flex-shrink: 0; /* KUNCI UTAMA: Area TTD ini kebal, Dilarang keras menyusut atau hilang */
+  margin-top: 8px; /* Jarak atas dirapatkan sedikit */
 }
 .lembar-text {
-  line-height: 1.4;
+  line-height: 1.3;
 }
 
 .ttd-box {
-  width: 220px;
+  width: 210px;
 }
 .ttd-table {
   border-collapse: collapse;
@@ -385,7 +385,7 @@ onMounted(async () => {
   font-weight: normal;
 }
 .ttd-space {
-  height: 60px;
+  height: 45px; /* Ruang tanda tangan sedikit dikurangi dari 60px ke 45px untuk menghemat kertas */
 }
 .w-100 {
   width: 100%;
@@ -397,7 +397,7 @@ onMounted(async () => {
   margin-top: 8px;
 }
 .mt-4 {
-  margin-top: 16px;
+  margin-top: 12px; /* Margin bawaan mt-4 dirapatkan */
 }
 .mb-1 {
   margin-bottom: 4px;
