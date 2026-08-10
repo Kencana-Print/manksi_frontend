@@ -961,7 +961,7 @@ const validateSave = () => {
                   />
                 </td>
                 <td class="p0">
-                  <input v-model="row.setting" class="ci ro" readonly />
+                  <input v-model="row.setting" class="ci" />
                 </td>
                 <td class="p0">
                   <input v-model="row.jenis" class="ci ro" readonly />

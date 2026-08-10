@@ -73,7 +73,6 @@ const formatDate = (dateStr: string) => {
 
 const formatTanggalDDMMYYYY = (dateStr: string) => {
   if (!dateStr) return "";
-  // Ambil 10 karakter pertama (YYYY-MM-DD) untuk menghindari pergeseran timezone
   const ymd = dateStr.substring(0, 10).split("-");
   if (ymd.length === 3) return `${ymd[2]}-${ymd[1]}-${ymd[0]}`;
   return dateStr;
@@ -91,28 +90,21 @@ onMounted(async () => {
     const res = await poBahanFormService.getDetail(nomorPO);
     const d = res.data.data;
 
-    // ⬅ BARU: baca status & persen PPN dari header, dipakai utk hitung
-    // ulang Harga (setelah PPN) per baris — sebelumnya kolom "Harga"
-    // cuma copy mentah dari "Harga Dpp", tidak pernah dihitung PPN-nya.
     const ppnPercent = Number(d.header?.po_ppn) || 0;
     const ppnActive = Number(d.header?.po_status_ppn) === 1;
 
-    // Konversi YARD
-    const itemsConverted = (d.items || []).map((row: any) => {
+    let itemsConverted = (d.items || []).map((row: any) => {
       let isMtr = row.pod_bhn_satuan === "MTR";
       let qty = Number(row.pod_Jumlah) || 0;
-      let hargaDpp = Number(row.pod_hargabeli) || 0; // ⬅ rename dari "harga"
+      let hargaDpp = Number(row.pod_hargabeli) || 0;
       let sat = row.pod_bhn_satuan;
+
       if (isMtr && satuanPilihan === "YARD") {
         sat = "YARD";
         qty = qty * 1.09361;
         hargaDpp = hargaDpp / 1.09361;
       }
 
-      // ⬅ BARU: Harga (setelah PPN) = Dpp × (1 + ppn%), kalau PPN aktif.
-      // Total tetap dihitung dari Harga Dpp (BUKAN harga setelah PPN) —
-      // supaya PPN tidak double-hitung, karena PPN sudah ditambahkan
-      // terpisah sebagai baris "Ppn" di footer/grand total.
       const hargaSetelahPpn = ppnActive
         ? hargaDpp * (1 + ppnPercent / 100)
         : hargaDpp;
@@ -126,6 +118,26 @@ onMounted(async () => {
         total_print: qty * hargaDpp * (1 - (Number(row.pod_disc) || 0) / 100),
       };
     });
+
+    // ⬅ BARU: Grouping khusus PO Greige (jenis === 1)
+    if (d.header?.po_jenis === 1) {
+      const groupedItems: Record<string, any> = {};
+      itemsConverted.forEach((item: any) => {
+        const nama = item.pod_namaext || item.bhn_name || "";
+
+        // Kriteria Grouping: Nama, Satuan, Gramasi Akhir, Setting, Harga DPP, dan Harga
+        const key = `${nama}_${item.satuan_print}_${item.gramasi}_${item.setting}_${item.harga_dpp_print}_${item.harga_setelah_ppn_print}`;
+
+        if (!groupedItems[key]) {
+          groupedItems[key] = { ...item };
+        } else {
+          // Menjumlahkan Qty dan Total dari baris yang digabung
+          groupedItems[key].qty_print += item.qty_print;
+          groupedItems[key].total_print += item.total_print;
+        }
+      });
+      itemsConverted = Object.values(groupedItems);
+    }
 
     const rollsConverted = (d.rolls || []).map((row: any) => ({
       no: Number(row.pod3_no) || 0,
@@ -152,7 +164,8 @@ onMounted(async () => {
   }
 });
 
-// LOGIKA PERBAIKAN: Jika bukan 1(Greige) dan 2(Celup), default-nya adalah Bahan
+// LOGIKA COMPUTED
+const isGreige = computed(() => dataPO.value?.header?.po_jenis === 1);
 const isCelup = computed(() => dataPO.value?.header?.po_jenis === 2);
 const isBahan = computed(
   () =>
@@ -293,10 +306,10 @@ const grandTotal = computed(() => subTotal.value + ppnValue.value);
       <div class="footer-section">
         <!-- Wrapper Note & Delivery -->
         <div class="notes-wrapper">
-          <!-- Background Kuning khusus PO Bahan -->
+          <!-- ⬅ BARU: Background Kuning aktif untuk PO Greige atau Bahan -->
           <div
             class="note-box"
-            :class="{ 'bg-yellow': isBahan, 'bg-pink': isCelup }"
+            :class="{ 'bg-yellow': isBahan || isGreige, 'bg-pink': isCelup }"
           >
             <b>Note : </b>{{ dataPO.header.po_note }}
           </div>
