@@ -200,9 +200,26 @@ const formatSizeDetail = computed(() => {
     .join("\n");
 });
 
+const keteranganProduksiLengkap = computed(() => {
+  const parts = [];
+
+  if (data.value.spk_memo) {
+    parts.push(`Acc seperti memo: ${data.value.spk_memo}`);
+  }
+
+  if (data.value.spk_repeat) {
+    parts.push(`Repeat Order: ${data.value.spk_repeat}`);
+  }
+
+  if (data.value.spk_keterangan) {
+    parts.push(data.value.spk_keterangan);
+  }
+
+  return parts.join("\n");
+});
+
 const renderKeteranganTambahan = computed(() => {
   const arr = [];
-  if (data.value.spk_repeat) arr.push(`Repeat Order: ${data.value.spk_repeat}`);
   if (!isGarmen.value && !isKaosan.value && data.value.ketKomponen)
     arr.push(`Keterangan Komponen :\n${data.value.ketKomponen}`);
   return arr.join("\n\n");
@@ -396,7 +413,7 @@ onMounted(async () => {
             <div class="garmen-kanan">
               <div class="ket-box ket-section">
                 <div class="ket-title">Ket. Produksi :</div>
-                <pre class="ket-produksi">{{ data.spk_keterangan }}</pre>
+                <pre class="ket-produksi">{{ keteranganProduksiLengkap }}</pre>
               </div>
             </div>
           </div>
@@ -551,7 +568,7 @@ onMounted(async () => {
                   >
                     <pre class="val-pre">{{ renderKeteranganTambahan }}</pre>
                   </div>
-                  <pre class="val-pre">{{ data.spk_keterangan }}</pre>
+                  <pre class="val-pre">{{ keteranganProduksiLengkap }}</pre>
                 </td>
               </tr>
               <tr v-if="isKaosan">
