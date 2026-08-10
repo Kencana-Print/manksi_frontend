@@ -40,39 +40,41 @@ const getBaseUrl = () =>
   );
 
 const resolveDesignImage = () => {
-  if (!props.formData.spk_nomor) {
+  const base = getBaseUrl();
+  const cab = props.formData.spk_cab || props.formData.so_cab || "HO-";
+
+  // Ambil referensi dari form (menggunakan struktur yang benar dari SpkFormView)
+  const nomor = props.formData.spk_nomor || "";
+  const soRef = props.formData.so_nomor || "";
+  const mapNomor = props.formData.so_map || ""; // <-- Di form, MAP disimpan di so_map
+
+  // PERBAIKAN: Jangan batalkan pencarian jika nomor SPK kosong (karena SPK baru memang belum ada nomor).
+  // Batalkan HANYA jika semua referensi (SPK, SO, dan MAP) kosong.
+  if (!nomor && !soRef && !mapNomor) {
     resolvedImageUrl.value = "";
     return;
   }
-  const base = getBaseUrl();
-  const cab = props.formData.spk_cab || "HO-";
 
-  // Ambil referensi dari form
-  const nomor = props.formData.spk_nomor;
-  const soRef = props.formData.so_nomor || props.formData.spk_so_ref || nomor;
-  const mapNomor = props.formData.spk_memo || "";
+  const candidates: string[] = [];
 
-  const candidates = [
-    // 1. Gambar SPK Baru
-    `${base}/images/${cab}/${encodeURIComponent(soRef)}.jpg`,
-  ];
-
-  // 2. Gambar MAP
+  // Prioritas 1: Gambar MAP (Paling relevan saat baru tarik SO)
   if (mapNomor) {
     candidates.push(
       `${base}/images/${cab}/map/${encodeURIComponent(mapNomor)}.jpg`,
     );
-  }
-
-  // 3. Fallback ke gambar format lama di root server /file-gambar/
-  // Prioritaskan mencari dengan format `nomor` asli, baru pakai mapNomor/soRef
-  candidates.push(`/file-gambar/${encodeURIComponent(nomor)}.jpg`);
-
-  if (mapNomor && mapNomor !== nomor) {
     candidates.push(`/file-gambar/${encodeURIComponent(mapNomor)}.jpg`);
   }
+
+  // Prioritas 2: Gambar berdasarkan No. SO
   if (soRef && soRef !== nomor) {
+    candidates.push(`${base}/images/${cab}/${encodeURIComponent(soRef)}.jpg`);
     candidates.push(`/file-gambar/${encodeURIComponent(soRef)}.jpg`);
+  }
+
+  // Prioritas 3: Gambar SPK sendiri (Jika ini mode Edit SPK)
+  if (nomor) {
+    candidates.push(`${base}/images/${cab}/${encodeURIComponent(nomor)}.jpg`);
+    candidates.push(`/file-gambar/${encodeURIComponent(nomor)}.jpg`);
   }
 
   isLoadingImage.value = true;
@@ -91,6 +93,7 @@ const resolveDesignImage = () => {
     img.onerror = () => tryNext(idx + 1);
     img.src = candidates[idx];
   };
+
   tryNext(0);
 };
 

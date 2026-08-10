@@ -68,66 +68,53 @@ const watermarkTiles = computed(() =>
 
 // Coba berantai: (1) SPK di lokal -> (2) SO di lokal -> (3) MAP -> (4) file lama di /file-gambar/
 const resolveDesignImage = () => {
-  const base = getBaseUrl();
-  const cab = spk.value.spk_cab || "HO-";
-  const nomor = spk.value.spk_nomor || "";
-  const soRef = spk.value.spk_so_ref || "";
-  const mapNomor = spk.value.spk_memo || "";
-
-  // PERBAIKAN: Jangan dibatalkan hanya karena nomor SPK kosong.
-  // Batalkan HANYA jika ketiga referensi (SPK, SO, MAP) semuanya kosong.
-  if (!nomor && !soRef && !mapNomor) {
+  if (!spk.value.spk_nomor) {
     resolvedImageUrl.value = "";
     return;
   }
+  const base = getBaseUrl();
+  const cab = spk.value.spk_cab || "HO-";
+  const nomor = spk.value.spk_nomor;
+  const soRef = spk.value.spk_so_ref || "";
+  const mapNomor = spk.value.spk_memo || "";
 
-  const isLegacyFormat = nomor && !nomor.startsWith("SPK-");
+  const fallbackSoNomor = nomor.startsWith("SPK-")
+    ? nomor.replace("SPK-", "SO-")
+    : nomor.startsWith("SO-")
+      ? nomor
+      : `SO-${nomor}`;
+
+  // Sama seperti SpkView.onLihatGambar — lihat komentar di sana.
+  const isLegacyFormat = !nomor.startsWith("SPK-");
+
   const candidates: string[] = [];
 
-  // 1. Kandidat gambar dari MAP (Ini yang akan diambil saat Buat SPK Baru)
   const mapCandidates = mapNomor
     ? [
         `/file-gambar/${encodeURIComponent(mapNomor)}.jpg`,
         `${base}/images/${cab}/${encodeURIComponent(mapNomor)}.jpg`,
       ]
     : [];
+  const ownCandidates = [
+    `${base}/images/${cab}/${encodeURIComponent(nomor)}.jpg`,
+    `/file-gambar/${encodeURIComponent(nomor)}.jpg`,
+  ];
 
-  // 2. Kandidat gambar dari SPK sendiri (Jika sudah pernah disimpan)
-  const ownCandidates = nomor
-    ? [
-        `${base}/images/${cab}/${encodeURIComponent(nomor)}.jpg`,
-        `/file-gambar/${encodeURIComponent(nomor)}.jpg`,
-      ]
-    : [];
-
-  // Prioritaskan MAP untuk SPK format baru atau SPK yang baru dibuat
-  if (isLegacyFormat && nomor) {
+  if (isLegacyFormat) {
     candidates.push(...ownCandidates, ...mapCandidates);
   } else {
     candidates.push(...mapCandidates, ...ownCandidates);
   }
 
-  // 3. Tambahkan kandidat dari SO
   if (soRef && soRef !== nomor) {
     candidates.push(`${base}/images/${cab}/${encodeURIComponent(soRef)}.jpg`);
     candidates.push(`/file-gambar/${encodeURIComponent(soRef)}.jpg`);
   }
-
-  if (nomor) {
-    const fallbackSoNomor = nomor.startsWith("SPK-")
-      ? nomor.replace("SPK-", "SO-")
-      : nomor.startsWith("SO-")
-        ? nomor
-        : `SO-${nomor}`;
-
-    if (fallbackSoNomor !== nomor && fallbackSoNomor !== soRef) {
-      candidates.push(
-        `${base}/images/${cab}/${encodeURIComponent(fallbackSoNomor)}.jpg`,
-      );
-      candidates.push(
-        `/file-gambar/${encodeURIComponent(fallbackSoNomor)}.jpg`,
-      );
-    }
+  if (fallbackSoNomor !== nomor && fallbackSoNomor !== soRef) {
+    candidates.push(
+      `${base}/images/${cab}/${encodeURIComponent(fallbackSoNomor)}.jpg`,
+    );
+    candidates.push(`/file-gambar/${encodeURIComponent(fallbackSoNomor)}.jpg`);
   }
 
   isLoadingImage.value = true;
