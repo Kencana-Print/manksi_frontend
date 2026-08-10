@@ -4,7 +4,13 @@ import { useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
 import BaseForm from "@/components/BaseForm.vue";
 import { insentifFormService as svc } from "@/services/penjualan/insentifFormService";
-import { IconCoin, IconSearch, IconTrash } from "@tabler/icons-vue";
+import {
+  IconCoin,
+  IconSearch,
+  IconTrash,
+  IconFileSpreadsheet,
+} from "@tabler/icons-vue";
+import { cetakInsentifExcel } from "@/utils/cetakInsentif";
 
 // ── Types ───────────────────────────────────────────────────────────────
 interface InvoiceRow {
@@ -237,13 +243,18 @@ const skipPrint = () => {
   showPrintDialog.value = false;
   router.push({ name: "InsentifBrowse" });
 };
-const doCetak = () => {
-  window.open(
-    `/penjualan/insentif/print/${encodeURIComponent(savedNomor.value)}`,
-    "_blank",
-  );
-  showPrintDialog.value = false;
-  router.push({ name: "InsentifBrowse" });
+const isCetaking = ref(false);
+const doCetak = async () => {
+  isCetaking.value = true;
+  try {
+    await cetakInsentifExcel(savedNomor.value);
+  } catch (e: any) {
+    toast.error(e.response?.data?.message || "Gagal mencetak.");
+  } finally {
+    isCetaking.value = false;
+    showPrintDialog.value = false;
+    router.push({ name: "InsentifBrowse" });
+  }
 };
 
 // ── Validasi & Simpan ────────────────────────────────────────────────
@@ -706,9 +717,16 @@ const executeClose = () => router.push({ name: "InsentifBrowse" });
       <v-card-actions class="pa-3 border-t" style="gap: 6px">
         <v-btn variant="text" size="small" @click="skipPrint">Tidak</v-btn>
         <v-spacer />
-        <v-btn variant="flat" size="small" color="primary" @click="doCetak"
-          >🖨️ Cetak</v-btn
+        <v-btn
+          variant="flat"
+          size="small"
+          color="primary"
+          :loading="isCetaking"
+          @click="doCetak"
         >
+          <template #prepend><IconFileSpreadsheet :size="14" /></template>
+          Cetak Excel
+        </v-btn>
       </v-card-actions>
     </v-card>
   </v-dialog>

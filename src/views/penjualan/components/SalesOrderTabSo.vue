@@ -1490,6 +1490,10 @@ watch(
                 class="inp sel ml-1"
                 style="height: 22px; font-size: 10px; padding: 0 3px"
               >
+                <option value="KAOSAN">Kaos Polos (Kaosan)</option>
+                <option value="ANAK">Kaos Anak</option>
+                <option value="TUNIK">Tunik</option>
+                <option value="POLO">Polo Lacos CVC</option>
                 <option value="LENGAN_PENDEK">Standar (L.Pendek)</option>
                 <option value="LENGAN_PANJANG">Kaos L.Panjang</option>
                 <option value="RAGLAN_LP">Raglan L.Panjang</option>

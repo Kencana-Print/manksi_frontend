@@ -13,6 +13,7 @@ import {
 } from "@tabler/icons-vue";
 import { formatTanggal, formatTanggalJam } from "@/utils/dateFormat";
 import { exportExcelSingle } from "@/utils/excelExport";
+import { cetakInsentifExcel } from "@/utils/cetakInsentif";
 
 const router = useRouter();
 const toast = useToast();
@@ -94,15 +95,18 @@ const goDelete = async (item: any) => {
   }
 };
 
-// ── Aksi: Cetak ────────────────────────────────────────────────────
-// ⚠️ Belum ada referensi laporan cetak asli (unit uReport Delphi tidak
-// disertakan) — sementara pakai print view generik (placeholder).
-const onCetak = () => {
+// ── Aksi: Cetak (Excel, replikasi persis cetak() Delphi) ──────────
+const isCetaking = ref(false);
+const onCetak = async () => {
   if (!selected.value.length) return;
-  window.open(
-    `/penjualan/insentif/print/${encodeURIComponent(selected.value[0].Nomor)}`,
-    "_blank",
-  );
+  isCetaking.value = true;
+  try {
+    await cetakInsentifExcel(selected.value[0].Nomor);
+  } catch (e: any) {
+    toast.error(e.response?.data?.message || "Gagal mencetak.");
+  } finally {
+    isCetaking.value = false;
+  }
 };
 
 // ── Aksi: Export ───────────────────────────────────────────────────
@@ -308,12 +312,13 @@ const confirmRealisasi = async () => {
         color="blue-grey"
         class="ml-2"
         :disabled="selected.length === 0"
+        :loading="isCetaking"
         @click="onCetak"
       >
         <template #prepend
           ><IconPrinter :size="15" :stroke-width="1.7"
         /></template>
-        Cetak
+        Cetak Excel
       </v-btn>
 
       <v-btn

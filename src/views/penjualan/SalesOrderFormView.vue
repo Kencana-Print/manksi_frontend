@@ -566,13 +566,14 @@ watch(
   () => formData.value.spk_divisi,
   (newDiv) => {
     if (!isEditMode.value && !isLoadingMemo.value) {
-      // ← tambahkan check
       if (String(newDiv).startsWith("3")) {
         formData.value.spk_perush_kode = "SM";
         formData.value.NamaPerusahaan = "Sukiman Setyo Manunggal";
         formData.value.spk_cus_kode = "DC";
         formData.value.Customer = "KAOSAN.OFFICIAL";
         formData.value.cus_perfect = "N";
+        formData.value.spk_standar_ukuran = "KENCANA";
+        formData.value.spk_varian_ukuran = "KAOSAN";
       } else {
         formData.value.spk_perush_kode = "";
         formData.value.NamaPerusahaan = "";
