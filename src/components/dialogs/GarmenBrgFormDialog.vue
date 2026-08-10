@@ -169,6 +169,30 @@ watch(
   },
 );
 
+const checkKodeExist = async () => {
+  // Hanya cek jika mode baru, bukan jenis accesories (karena accesories otomatis dari komponen), dan kode terisi
+  if (
+    !props.isNewMode ||
+    props.jenisGarmen === "ACCESORIES" ||
+    !formData.value.brg_kode
+  )
+    return;
+
+  try {
+    const res = await api.get(
+      `/master/barang-garmen/${formData.value.brg_kode}`,
+    );
+    if (res.data && res.data.data) {
+      toast.error(
+        `Kode barang ${formData.value.brg_kode} sudah pernah digunakan!`,
+      );
+      formData.value.brg_kode = ""; // Langsung tolak dan kosongkan
+    }
+  } catch (e: any) {
+    // Jika 404 Not Found, berarti kode aman digunakan
+  }
+};
+
 const handleSave = async () => {
   const { valid } = await formRef.value!.validate();
   if (!valid) return;
@@ -237,10 +261,20 @@ const handleSave = async () => {
             <div class="f-field" style="max-width: 200px">
               <label class="f-label">Kode</label>
               <input
-                :value="formData.brg_kode"
-                readonly
-                class="f-inp f-readonly"
-                :placeholder="isNewMode ? 'Otomatis' : ''"
+                v-model="formData.brg_kode"
+                :readonly="!isNewMode || jenisGarmen === 'ACCESORIES'"
+                :class="[
+                  'f-inp',
+                  !isNewMode || jenisGarmen === 'ACCESORIES'
+                    ? 'f-readonly'
+                    : '',
+                ]"
+                :placeholder="
+                  isNewMode && jenisGarmen !== 'ACCESORIES'
+                    ? 'Ketik Kode...'
+                    : 'Otomatis'
+                "
+                @blur="checkKodeExist"
               />
             </div>
             <div class="f-field" style="flex: 1">
