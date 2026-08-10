@@ -95,32 +95,37 @@ const {
   },
 });
 
-// Custom Validator: Dijalankan ketika tombol "Simpan" di klik
+const invalidDetailIndexes = ref<Set<number>>(new Set());
+
 const validateSave = () => {
   if (!canSave.value)
     return toast.error("Anda tidak memiliki hak akses untuk menyimpan.");
-
   if (!formData.value.details || formData.value.details.length === 0) {
     return toast.error("Detail kosong.");
   }
 
-  // Validasi Total Barcode vs Jumlah Retur
-  for (const d of formData.value.details) {
+  invalidDetailIndexes.value.clear();
+  let firstInvalidMsg = "";
+
+  formData.value.details.forEach((d: any, idx: number) => {
     const bcs = formData.value.barcodes.filter((b: any) => b.id === d.no);
     const sumBc = bcs.reduce(
       (acc: number, cur: any) => acc + Number(cur.jumlah || 0),
       0,
     );
-
-    // Mengatasi masalah pembulatan desimal JavaScript
     if (Math.abs(sumBc - Number(d.jumlah)) > 0.01) {
-      return toast.error(
-        `Total kuantiti barcode untuk item ${d.nama} (${sumBc}) tidak sama dengan jumlah retur (${d.jumlah}).`,
-      );
+      invalidDetailIndexes.value.add(idx);
+      if (!firstInvalidMsg) {
+        firstInvalidMsg = `Total kuantiti barcode untuk item "${d.nama}" (${sumBc}) tidak sama dengan jumlah retur (${d.jumlah}). Cek bagian "Rincian Barcode / Roll" di bawah.`;
+      }
     }
+  });
+
+  if (invalidDetailIndexes.value.size > 0) {
+    toast.error(firstInvalidMsg, { timeout: 8000 }); // durasi lebih lama
+    return;
   }
 
-  // Jika lolos validasi, buka modal konfirmasi
   showSaveDialog.value = true;
 };
 
@@ -291,7 +296,13 @@ const numFormat = (val: any) =>
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="(item, index) in formData.details" :key="index">
+                <tr
+                  v-for="(item, index) in formData.details"
+                  :key="index"
+                  :class="{
+                    'row-invalid': invalidDetailIndexes.has(Number(index)),
+                  }"
+                >
                   <td class="text-center">{{ Number(index) + 1 }}</td>
                   <td class="bg-grey-lighten-4 px-2">{{ item.nominta }}</td>
                   <td class="bg-grey-lighten-4 px-2">{{ item.kode }}</td>
@@ -379,7 +390,15 @@ const numFormat = (val: any) =>
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="(bc, index) in formData.barcodes" :key="index">
+                <tr
+                  v-for="(bc, index) in formData.barcodes"
+                  :key="index"
+                  :class="{
+                    'row-invalid': invalidDetailIndexes.has(
+                      formData.details.findIndex((d: any) => d.no === bc.id),
+                    ),
+                  }"
+                >
                   <td class="text-center bg-grey-lighten-4">{{ bc.id }}</td>
                   <td class="bg-grey-lighten-4 px-2">{{ bc.kode }}</td>
                   <td
@@ -493,5 +512,12 @@ const numFormat = (val: any) =>
 }
 .fw-bold {
   font-weight: 600;
+}
+
+.row-invalid {
+  background-color: #ffebee !important;
+}
+.row-invalid td {
+  background-color: #ffebee !important;
 }
 </style>
