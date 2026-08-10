@@ -560,7 +560,13 @@ const emptyStateSubtext = computed(() =>
 const clearSelection = () => {
   internalSelected.value = [];
 };
-defineExpose({ clearSelection, search });
+// getFilteredItems() — dipakai parent (mis. saat export) untuk ambil
+// data yang SEDANG tertampil setelah search box + filter kolom aktif,
+// bukan items mentah dari props. Sebelumnya export selalu memakai
+// props.items apa adanya, sehingga hasil search/filter kolom di
+// BaseBrowse tidak terbawa ke file export.
+const getFilteredItems = () => filteredItems.value;
+defineExpose({ clearSelection, search, getFilteredItems });
 
 // ── Column Drag (Pointer-based, bukan HTML5 drag) ────────────────────
 const dragSrcKey = ref<string | null>(null);

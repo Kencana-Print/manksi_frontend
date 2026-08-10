@@ -28,6 +28,16 @@ const getLocalDate = () => {
 };
 
 const activeRealisasi = ref<Record<string, string>>({});
+const baseBrowseRef = ref<InstanceType<typeof BaseBrowse> | null>(null);
+
+// Ambil data yang SEDANG tertampil di grid (setelah search box +
+// filter kolom BaseBrowse aktif), fallback ke items mentah kalau
+// ref belum siap. Dipakai supaya export (baik ringkas maupun detail)
+// konsisten dengan apa yang user lihat setelah difilter, bukan
+// selalu seluruh hasil fetch API.
+const getExportSource = () =>
+  baseBrowseRef.value?.getFilteredItems() ?? items.value ?? [];
+
 const selectRealisasi = (itemNomor: string, relNomor: string) => {
   activeRealisasi.value[itemNomor] = relNomor;
 };
@@ -300,20 +310,55 @@ const onApproveRealisasi = async (
   }
 };
 
+const onExport = async () => {
+  const source = getExportSource();
+  if (!source.length) return toast.warning("Tidak ada data untuk diekspor.");
+
+  const columns: ExcelColumn[] = [
+    { header: "Nomor", key: "Nomor", width: 16 },
+    { header: "Jenis", key: "Jenis", width: 14 },
+    { header: "Tanggal", key: "Tanggal", width: 12, align: "center" },
+    { header: "Jam", key: "Jam", width: 10 },
+    { header: "Cab", key: "Cab", width: 8, align: "center" },
+    { header: "Gdg Peminta", key: "GdgPeminta", width: 16 },
+    { header: "Divisi", key: "Divisi", width: 12 },
+    { header: "SPK", key: "SPK", width: 16 },
+    { header: "Nama SPK", key: "NamaSpk", width: 26 },
+    {
+      header: "Jml SPK",
+      key: "JmlSpk",
+      width: 12,
+      align: "right",
+      numFmt: "#,##0",
+    },
+    { header: "Keterangan", key: "Keterangan", width: 20 },
+    { header: "Status", key: "Status", width: 12, align: "center" },
+    { header: "Alasan Close", key: "AlasanClose", width: 20 },
+    { header: "User", key: "Usr", width: 12 },
+    { header: "Bagian", key: "Bagian", width: 14 },
+  ];
+
+  await exportExcelSingle(
+    `Permintaan_Barang_Garmen_${filterState.value.startDate}_${filterState.value.endDate}.xlsx`,
+    "Permintaan Barang Garmen",
+    columns,
+    source,
+    `Permintaan Barang Garmen Periode ${filterState.value.startDate} s/d ${filterState.value.endDate}`,
+  );
+};
+
 // --- Aksi: Export Detail ---
 const isExportingDetail = ref(false);
 const onExportDetail = async () => {
-  if (!items.value || items.value.length === 0) {
+  const source = getExportSource();
+  if (!source || source.length === 0) {
     return toast.warning("Tidak ada data untuk diexport.");
   }
-
   isExportingDetail.value = true;
   try {
     const combinedRows: any[] = [];
-
-    items.value.forEach((master: any) => {
+    source.forEach((master: any) => {
       if (master.details && master.details.length > 0) {
-        // Data Header/Master yang hanya muncul di baris pertama
         const masterCells = {
           Nomor: master.Nomor,
           Tanggal: formatTanggal(master.Tanggal),
@@ -324,8 +369,6 @@ const onExportDetail = async () => {
           NamaSpk: master.NamaSpk,
           Status: master.Status,
         };
-
-        // Data kosong untuk baris kedua dan seterusnya
         const blankMaster = {
           Nomor: "",
           Tanggal: "",
@@ -336,7 +379,6 @@ const onExportDetail = async () => {
           NamaSpk: "",
           Status: "",
         };
-
         master.details.forEach((dtl: any, idx: number) => {
           combinedRows.push({
             ...(idx === 0 ? masterCells : blankMaster),
@@ -350,12 +392,10 @@ const onExportDetail = async () => {
         });
       }
     });
-
     if (combinedRows.length === 0) {
       toast.warning("Tidak ada rincian barang untuk diexport.");
       return;
     }
-
     const columns: ExcelColumn[] = [
       { header: "Nomor Permintaan", key: "Nomor", width: 18 },
       { header: "Tanggal", key: "Tanggal", width: 12, align: "center" },
@@ -384,7 +424,6 @@ const onExportDetail = async () => {
       },
       { header: "Keterangan", key: "Keterangan", width: 20 },
     ];
-
     await exportExcelSingle(
       `Detail_Minta_Barang_${filterState.value.startDate}_sd_${filterState.value.endDate}.xlsx`,
       "Detail Permintaan",
@@ -392,7 +431,6 @@ const onExportDetail = async () => {
       combinedRows,
       `Rincian Permintaan Barang Garmen | Periode: ${formatTanggal(filterState.value.startDate)} s.d ${formatTanggal(filterState.value.endDate)}`,
     );
-
     toast.success("Berhasil export detail data.");
   } catch (error) {
     console.error(error);
@@ -407,6 +445,7 @@ const num = (val: number) => new Intl.NumberFormat("id-ID").format(val || 0);
 
 <template>
   <BaseBrowse
+    ref="baseBrowseRef"
     title="Permintaan Barang Garmen"
     menu-id="60"
     :icon="IconPackage"
@@ -427,7 +466,7 @@ const num = (val: number) => new Intl.NumberFormat("id-ID").format(val || 0);
     @add="onAdd"
     @edit="onEdit"
     @delete="onDelete"
-    @export="exportToExcel('Permintaan_Barang_Garmen')"
+    @export="onExport"
   >
     <!-- ── Filter bar ── -->
     <template #filter-left>

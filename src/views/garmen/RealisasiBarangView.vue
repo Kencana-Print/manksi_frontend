@@ -15,6 +15,7 @@ import {
   IconPencil,
 } from "@tabler/icons-vue";
 import { formatTanggal, formatTanggalJam } from "@/utils/dateFormat";
+import { exportExcelSingle } from "@/utils/excelExport";
 
 const router = useRouter();
 const toast = useToast();
@@ -35,6 +36,13 @@ const filterState = ref({
 
 const cabangOptions = ref<string[]>(["ALL"]);
 const jenisOptions = ref<string[]>([]);
+
+const baseBrowseRef = ref<InstanceType<typeof BaseBrowse> | null>(null);
+
+// Ambil data yang sedang tertampil (setelah search + filter kolom),
+// fallback ke items mentah kalau ref belum siap.
+const getExportSource = () =>
+  baseBrowseRef.value?.getFilteredItems() ?? items.value ?? [];
 
 onMounted(async () => {
   // Penyesuaian Jenis berdasarkan Bagian/Role User (Sesuai FormCreate Delphi)
@@ -172,12 +180,44 @@ const onPrint = () => {
   );
 };
 
+const onExport = async () => {
+  const source = getExportSource();
+  if (!source.length) return toast.warning("Tidak ada data untuk diekspor.");
+
+  const columns = [
+    { header: "Nomor", key: "Nomor", width: 16 },
+    { header: "Jenis", key: "Jenis", width: 14 },
+    { header: "Tanggal", key: "Tanggal", width: 12, align: "center" },
+    { header: "Jam", key: "Jam", width: 10 },
+    { header: "No Minta", key: "NoMinta", width: 16 },
+    { header: "Keterangan", key: "Keterangan", width: 20 },
+    { header: "SPK", key: "SPK", width: 16 },
+    { header: "Nama SPK", key: "NamaSpk", width: 28 },
+    {
+      header: "Jml SPK",
+      key: "JmlSPK",
+      width: 12,
+      align: "right",
+      numFmt: "#,##0",
+    },
+    { header: "Usr", key: "Usr", width: 12 },
+  ];
+
+  await exportExcelSingle(
+    `Realisasi_Barang_Garmen_${filterState.value.startDate}_${filterState.value.endDate}.xlsx`,
+    "Realisasi Barang Garmen",
+    columns,
+    source,
+    `Realisasi Permintaan Barang Garmen Periode ${filterState.value.startDate} s/d ${filterState.value.endDate}`,
+  );
+};
+
 const onExportDetail = () => {
-  if (!items.value || items.value.length === 0)
-    return toast.warning("Tidak ada data untuk diexport.");
+  const source = getExportSource();
+  if (!source.length) return toast.warning("Tidak ada data untuk diexport.");
 
   const rows: any[] = [];
-  items.value.forEach((master: any) => {
+  source.forEach((master: any) => {
     if (master.details?.length > 0) {
       master.details.forEach((dtl: any) => {
         rows.push({
@@ -258,6 +298,7 @@ const submitAjukan = async () => {
 
 <template>
   <BaseBrowse
+    ref="baseBrowseRef"
     title="Realisasi Permintaan Barang Garmen"
     menu-id="62"
     :icon="IconChecks"
@@ -278,7 +319,7 @@ const submitAjukan = async () => {
     @add="onAdd"
     @edit="onEdit"
     @delete="onDelete"
-    @export="exportToExcel('Realisasi_Barang_Garmen')"
+    @export="onExport"
   >
     <template #filter-left>
       <div class="filter-group">
