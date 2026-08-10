@@ -1676,6 +1676,10 @@ Keterangan Komponen :
   grid-template-columns: 1fr 1.6fr;
   gap: 8px;
 }
+.p1-row-komp.no-special {
+  display: block; /* Menghapus sistem grid agar kotak otomatis 100% */
+  width: 100%;
+}
 .p1-row-ket {
   display: grid;
   grid-template-columns: 1fr 2fr;
