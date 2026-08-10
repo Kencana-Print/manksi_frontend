@@ -153,8 +153,11 @@ const defaultData = {
   spk_nomor: "",
   spk_tanggal: todayLocal,
   spk_dateline: datelineLocal,
+  spk_nomor_po: "",
   spk_tgl_po: todayLocal,
   spk_datelinepo: todayLocal,
+  spk_cus_kaosan: "",
+  CustKaosanNama: "",
   spk_tglaccproof: todayLocal,
   spk_cus_kode: "",
   Customer: "",
@@ -356,6 +359,7 @@ const {
         spk_tgl_po: data.spk_tgl_po || null,
         spk_datelinepo: data.spk_datelinepo || null,
         spk_cus_kode: data.spk_cus_kode,
+        spk_cus_kaosan: data.spk_cus_kaosan,
         spk_sal_kode: data.spk_sal_kode,
         spk_jo_kode: data.spk_jo_kode,
         spk_nama: data.spk_nama,
@@ -739,18 +743,17 @@ const setPenawaranDetail = (v: any) => {
   formData.value.spk_pen_id = v.id || v.ID;
 };
 const setSoKaosan = (v: any) => {
-  // Ambil Nomor SO DTF
-  formData.value.spk_invdc = v.Nomor || v.so_nomor;
-
+  const nomorSo = v.Nomor || v.so_nomor;
+  formData.value.spk_invdc = nomorSo;
+  formData.value.spk_nomor_po = nomorSo;
   // Jika customer Kaosan masih kosong, auto-fill dengan data dari SO
   if (!formData.value.spk_cus_kaosan) {
     formData.value.spk_cus_kaosan = v.KdCus || v.so_cus_kode;
     formData.value.CustKaosanNama = v.Customer || v.cus_nama;
   }
-
   // Di Delphi, SO Kaosan otomatis mengatur tgl po & dateline po
   if (v.Tanggal) {
-    const parts = v.Tanggal.split("-"); // asumsi dd-mm-yyyy dari backend modal
+    const parts = v.Tanggal.split("-");
     if (parts.length === 3)
       formData.value.spk_tgl_po = `${parts[2]}-${parts[1]}-${parts[0]}`;
   }
