@@ -234,6 +234,7 @@ const formTanggalKembali = ref(todayLocal());
 const formContactPerson = ref("");
 const formTanggalKonfirmasi = ref(todayLocal());
 const formTanggalTerima = ref(todayLocal());
+const formTanggalTerimaSj = ref(todayLocal());
 const formTanggalSerahTerima = ref(todayLocal());
 const formPenerimaBarang = ref("");
 
@@ -242,7 +243,6 @@ const showPengiriman = computed(() => formStatusIndex.value === 1);
 const showDokumen = computed(() => formStatusIndex.value === 2);
 const showKonfirmasi = computed(() => formStatusIndex.value === 3);
 const showSerahTerima = computed(() => formStatusIndex.value === 4);
-const formTanggalTerimaSj = computed(() => formTanggalKembali.value);
 
 const resetFormFields = () => {
   formExpedisi.value = "";
@@ -255,6 +255,7 @@ const resetFormFields = () => {
   formTanggalKonfirmasi.value = todayLocal();
   formTanggalTerima.value = todayLocal();
   formTanggalSerahTerima.value = todayLocal();
+  formTanggalTerimaSj.value = todayLocal();
   formPenerimaBarang.value = "";
 };
 
@@ -286,6 +287,7 @@ const onUpdateStatus = async () => {
     formContactPerson.value = d.header.contact_person || "";
     formTanggalKonfirmasi.value = d.header.tanggal_konfirmasi || todayLocal();
     formTanggalTerima.value = d.header.tanggal_terima || todayLocal();
+    formTanggalTerimaSj.value = d.header.tanggal_terima_sj || todayLocal();
     formTanggalSerahTerima.value = d.header.tanggal_serahterima || todayLocal();
     formPenerimaBarang.value = d.header.penerima_barang || "";
   } catch (e: any) {
@@ -779,12 +781,10 @@ const saveFormStatus = async () => {
                 <label class="flbl w110">Tgl Terima SJ</label>
                 <input
                   type="date"
-                  :value="formTanggalTerimaSj"
-                  readonly
-                  class="inp ro"
+                  v-model="formTanggalTerimaSj"
+                  class="inp"
                   style="width: 160px"
                 />
-                <span class="hint-auto">otomatis = Tgl Kembali</span>
               </div>
             </div>
 

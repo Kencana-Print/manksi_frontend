@@ -166,6 +166,14 @@ const onRollChange = (row: any) => {
 
 const numFormat = (val: any) =>
   Number(val || 0).toLocaleString("id-ID", { maximumFractionDigits: 2 });
+
+const getBcSum = (d: any) => {
+  const bcs = formData.value.barcodes.filter((b: any) => b.id === d.no);
+  return bcs.reduce(
+    (acc: number, cur: any) => acc + Number(cur.jumlah || 0),
+    0,
+  );
+};
 </script>
 
 <template>
@@ -287,6 +295,7 @@ const numFormat = (val: any) =>
                   <th width="60">Satuan</th>
                   <th width="70">Minta</th>
                   <th width="90" class="bg-yellow-darken-2">Jumlah</th>
+                  <th width="80" class="text-center">Status BC</th>
                   <th width="60" class="bg-yellow-darken-2">Roll</th>
                   <th width="70">Sudah</th>
                   <th width="150" class="bg-yellow-darken-2">Keterangan</th>
@@ -329,6 +338,24 @@ const numFormat = (val: any) =>
                       readonly
                       v-select-on-focus
                     />
+                  </td>
+                  <td class="text-center">
+                    <span
+                      :style="{
+                        color:
+                          Math.abs(getBcSum(item) - Number(item.jumlah)) > 0.01
+                            ? '#c62828'
+                            : '#2e7d32',
+                        fontWeight: 700,
+                        fontSize: '10px',
+                      }"
+                    >
+                      {{
+                        Math.abs(getBcSum(item) - Number(item.jumlah)) > 0.01
+                          ? "⚠ Belum Pas"
+                          : "✓ OK"
+                      }}
+                    </span>
                   </td>
                   <td class="bg-yellow-lighten-5">
                     <input
