@@ -44,6 +44,13 @@ const emptyRow = (): DtfRow => ({
   Ket: "",
 });
 
+const KETERANGAN_OPTIONS = [
+  "PRES DTF",
+  "CETAK DTF",
+  "CETAK DTG",
+  "CETAK PLASTISOL",
+];
+
 const initialCab = (route.query.cab as string) || "";
 const initialTanggal =
   (route.query.tanggal as string) || new Date().toISOString().substring(0, 10);
@@ -434,7 +441,22 @@ const num = (v: number) => new Intl.NumberFormat("id-ID").format(v || 0);
                   />
                 </td>
                 <td>
-                  <input type="text" v-model="row.Ket" class="cell-input" />
+                  <select v-model="row.Ket" class="cell-input cell-select">
+                    <option value="">-- Pilih --</option>
+                    <option
+                      v-if="row.Ket && !KETERANGAN_OPTIONS.includes(row.Ket)"
+                      :value="row.Ket"
+                    >
+                      {{ row.Ket }}
+                    </option>
+                    <option
+                      v-for="opt in KETERANGAN_OPTIONS"
+                      :key="opt"
+                      :value="opt"
+                    >
+                      {{ opt }}
+                    </option>
+                  </select>
                 </td>
                 <td class="tc">
                   <button
@@ -581,6 +603,21 @@ const num = (v: number) => new Intl.NumberFormat("id-ID").format(v || 0);
   background: transparent;
 }
 .cell-input:focus {
+  border-color: #1976d2;
+  background: white;
+}
+.cell-select {
+  width: 100%;
+  height: 26px;
+  border: 1px solid transparent;
+  padding: 0 2px;
+  font-size: 11px;
+  outline: none;
+  background: transparent;
+  cursor: pointer;
+  appearance: auto;
+}
+.cell-select:focus {
   border-color: #1976d2;
   background: white;
 }

@@ -55,7 +55,10 @@ const {
       filterState.value.endDate,
       filterState.value.cab,
     );
-    return res.data.data.rows;
+    return (res.data.data.rows || []).map((r: any) => ({
+      ...r,
+      _rowKey: `${r.SPK}__${r.Cab}__${r.Tanggal}`,
+    }));
   },
 });
 
@@ -130,7 +133,8 @@ const onEdit = () => {
 // --- HAPUS ---
 const onDelete = async (item: any) => {
   try {
-    await lhkSoDtfService.deleteData(item.SPK, item.Cab, item.Tanggal);
+    const tanggalMurni = String(item.Tanggal).substring(0, 10);
+    await lhkSoDtfService.deleteData(item.SPK, item.Cab, tanggalMurni);
     toast.success("Data LHK berhasil dihapus.");
     fetchData();
   } catch (e: any) {
@@ -293,7 +297,7 @@ const onExportDetail = async () => {
     :can-edit="canEdit"
     :can-delete="canDelete"
     :can-export="canExport"
-    item-value="SPK"
+    item-value="_rowKey"
     @delete="onDelete"
     @refresh="fetchData"
     @export="onExport"
