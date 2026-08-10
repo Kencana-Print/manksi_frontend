@@ -634,8 +634,15 @@ const previewWrapperStyle = computed(() => ({
   transformOrigin: "top left",
 }));
 
+const onPreviewMessage = (e: MessageEvent) => {
+  if (e.data?.type === "spk-print-ready" && typeof e.data.height === "number") {
+    previewContentHeight.value = e.data.height > 0 ? e.data.height : 1123;
+  }
+};
+
 watch(showPreviewDialog, async (open) => {
   if (open) {
+    window.addEventListener("message", onPreviewMessage);
     window.addEventListener("keydown", blockPrintShortcutParent, true);
     previewContentHeight.value = 1123; // reset ke fallback tiap buka baru
     await nextTick();
@@ -1253,7 +1260,7 @@ const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
           min-height: 0;
           background: #616161;
           overflow-y: auto;
-          overflow-x: hidden;
+          overflow-x: auto;
           display: flex;
           justify-content: center;
           padding: 12px;

@@ -328,6 +328,18 @@ const fitPageToA4 = async () => {
   }
 };
 
+const notifyParentReady = () => {
+  if (window.parent !== window) {
+    window.parent.postMessage(
+      {
+        type: "spk-print-ready",
+        height: document.documentElement.scrollHeight,
+      },
+      "*",
+    );
+  }
+};
+
 // ── Blokir Ctrl+P / Cmd+P / Ctrl+S (lapisan pertama — cegah dialog
 // print/save browser terbuka sama sekali). Ini best-effort: sebagian
 // besar browser modern menghormati preventDefault di keydown untuk
@@ -429,6 +441,11 @@ onMounted(async () => {
         await fitPageToA4();
       }
     }
+
+    // Ukuran akhir baru stabil di titik ini — kabari parent (preview dialog)
+    await nextTick();
+    notifyParentReady();
+
     if (!isPreview.value) {
       setTimeout(() => window.print(), 400);
     }
