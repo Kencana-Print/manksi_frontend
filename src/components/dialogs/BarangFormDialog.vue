@@ -86,6 +86,24 @@ const handleFileChange = (event: Event) => {
   }
 };
 
+const checkKodeExist = async () => {
+  // Hanya mengecek jika mode tambah baru dan kode sudah diisi
+  if (!props.isNewMode || !formData.value.Kode) return;
+
+  try {
+    const res = await api.get(`/master/barang/${formData.value.Kode}`);
+
+    // Jika response berhasil (artinya data ditemukan), berarti kode sudah ada
+    if (res.data && res.data.data) {
+      toast.error(`Kode barang ${formData.value.Kode} sudah pernah digunakan!`);
+      formData.value.Kode = ""; // Langsung tolak dan kosongkan kembali inputannya
+    }
+  } catch (error: any) {
+    // Jika error (misal 404 Not Found), berarti kode aman/belum digunakan.
+    // Diamkan saja.
+  }
+};
+
 const handleSave = async () => {
   const { valid } = await formRef.value!.validate();
   if (!valid) return;
@@ -188,6 +206,7 @@ const handleSave = async () => {
                       hide-details="auto"
                       class="brg-input"
                       style="max-width: 180px"
+                      @blur="checkKodeExist"
                     />
                   </div>
                 </div>
