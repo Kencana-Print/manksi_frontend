@@ -5,8 +5,17 @@ import { useToast } from "vue-toastification";
 import BaseBrowse from "@/components/BaseBrowse.vue";
 import { useBrowse } from "@/composables/useBrowse";
 import { lhkPolaService } from "@/services/garmen/lhkPolaService";
-import { IconRuler2, IconChevronRight } from "@tabler/icons-vue";
+import {
+  IconRuler2,
+  IconChevronRight,
+  IconFileSpreadsheet,
+} from "@tabler/icons-vue";
 import { formatTanggal, formatTanggalJam } from "@/utils/dateFormat";
+import {
+  exportExcel,
+  exportExcelSingle,
+  type ExcelColumn,
+} from "@/utils/excelExport";
 
 const router = useRouter();
 const toast = useToast();
@@ -99,6 +108,15 @@ const onUpdateExpanded = async (newExpanded: any[]) => {
   }
 };
 
+const baseBrowseRef = ref<InstanceType<typeof BaseBrowse> | null>(null);
+const isExportingDetail = ref(false);
+
+// Ambil data yang SEDANG tertampil (setelah search box + filter kolom
+// BaseBrowse aktif) — sama pola dengan modul lain, supaya export
+// konsisten dengan apa yang user lihat, bukan seluruh hasil fetch.
+const getExportSource = () =>
+  baseBrowseRef.value?.getFilteredItems() ?? items.value ?? [];
+
 // ── Handlers ─────────────────────────────────────────────────────────
 const onAdd = () => router.push("/garmen/lhk-pola/create");
 const onEdit = (item: any) =>
@@ -113,10 +131,196 @@ const onDelete = async (item: any) => {
     toast.error(e.response?.data?.message || "Gagal menghapus.");
   }
 };
+
+const onExport = async () => {
+  const source = getExportSource();
+  if (!source.length) return toast.warning("Tidak ada data untuk diekspor.");
+
+  const columns: ExcelColumn[] = [
+    { header: "Nomor", key: "Nomor", width: 18 },
+    { header: "Tanggal", key: "Tanggal", width: 12, align: "center" },
+    { header: "Keterangan", key: "Keterangan", width: 30 },
+    {
+      header: "Jml Marker",
+      key: "JmlMarker",
+      width: 12,
+      align: "right",
+      numFmt: "#,##0",
+    },
+    {
+      header: "Jml Grading",
+      key: "JmlGrading",
+      width: 12,
+      align: "right",
+      numFmt: "#,##0",
+    },
+    { header: "User", key: "UserCreate", width: 12 },
+    { header: "Created", key: "DateCreate", width: 16, align: "center" },
+  ];
+
+  const rows = source.map((r: any) => ({
+    ...r,
+    Tanggal: formatTanggal(r.Tanggal),
+    DateCreate: formatTanggalJam(r.DateCreate),
+  }));
+
+  await exportExcelSingle(
+    `LHK_Pola_${filterState.value.dtAwal}_${filterState.value.dtAkhir}.xlsx`,
+    "LHK Pola",
+    columns,
+    rows,
+    `LHK Pola Periode ${filterState.value.dtAwal} s/d ${filterState.value.dtAkhir}`,
+  );
+};
+
+const onExportDetail = async () => {
+  const source = getExportSource();
+  if (!source.length) return toast.warning("Tidak ada data untuk diexport.");
+
+  isExportingDetail.value = true;
+  try {
+    // Pastikan detail sudah ter-load untuk SEMUA baris yang mau
+    // di-export — bukan cuma baris yang kebetulan pernah di-expand
+    // user (detailCache bersifat lazy, tidak otomatis lengkap).
+    const missing = source.filter((r: any) => !detailCache.value[r.Nomor]);
+    if (missing.length > 0) {
+      await Promise.all(
+        missing.map(async (r: any) => {
+          try {
+            const res = await lhkPolaService.getDetail(r.Nomor);
+            detailCache.value[r.Nomor] = {
+              marker: res.data.data.marker || [],
+              grading: res.data.data.grading || [],
+            };
+          } catch {
+            detailCache.value[r.Nomor] = { marker: [], grading: [] };
+          }
+        }),
+      );
+    }
+
+    const markerRows: any[] = [];
+    const gradingRows: any[] = [];
+
+    source.forEach((master: any) => {
+      const det = detailCache.value[master.Nomor] || {
+        marker: [],
+        grading: [],
+      };
+
+      // ⚠️ FIX: semua baris master WAJIB muncul di kedua sheet, meski
+      // tidak punya detail item — sebelumnya baris dengan JmlMarker=0
+      // (atau JmlGrading=0) di-skip total lewat forEach kosong, sehingga
+      // baris LHK itu hilang sama sekali dari sheet Marker meski dia
+      // benar punya data di sheet Grading (dan sebaliknya).
+      if (det.marker.length > 0) {
+        det.marker.forEach((r: any) => {
+          markerRows.push({
+            Nomor: master.Nomor,
+            Tanggal: formatTanggal(master.Tanggal),
+            "No SPK": r.spkNomor,
+            "Nama SPK": r.namaSpk || "",
+            "Lebar Kain": r.lebarKain || "",
+            Size: r.size || "",
+            For: r.tujuanProses || "",
+            Keterangan: r.keterangan || "",
+          });
+        });
+      } else {
+        markerRows.push({
+          Nomor: master.Nomor,
+          Tanggal: formatTanggal(master.Tanggal),
+          "No SPK": "",
+          "Nama SPK": "(Tidak ada data marker)",
+          "Lebar Kain": "",
+          Size: "",
+          For: "",
+          Keterangan: "",
+        });
+      }
+
+      if (det.grading.length > 0) {
+        det.grading.forEach((r: any) => {
+          gradingRows.push({
+            Nomor: master.Nomor,
+            Tanggal: formatTanggal(master.Tanggal),
+            "No SPK": r.spkNomor,
+            "Nama SPK": r.namaSpk || "",
+            Divisi: r.divisi || "",
+            "Grading Size": r.gradingSize || "",
+            Keterangan: r.keterangan || "",
+          });
+        });
+      } else {
+        gradingRows.push({
+          Nomor: master.Nomor,
+          Tanggal: formatTanggal(master.Tanggal),
+          "No SPK": "",
+          "Nama SPK": "(Tidak ada data grading)",
+          Divisi: "",
+          "Grading Size": "",
+          Keterangan: "",
+        });
+      }
+    });
+
+    if (markerRows.length === 0 && gradingRows.length === 0) {
+      return toast.warning("Tidak ada rincian untuk diexport.");
+    }
+
+    const markerColumns: ExcelColumn[] = [
+      { header: "Nomor", key: "Nomor", width: 16 },
+      { header: "Tanggal", key: "Tanggal", width: 12, align: "center" },
+      { header: "No SPK", key: "No SPK", width: 14 },
+      { header: "Nama SPK", key: "Nama SPK", width: 26 },
+      { header: "Lebar Kain", key: "Lebar Kain", width: 12 },
+      { header: "Size", key: "Size", width: 10 },
+      { header: "For", key: "For", width: 12 },
+      { header: "Keterangan", key: "Keterangan", width: 20 },
+    ];
+    const gradingColumns: ExcelColumn[] = [
+      { header: "Nomor", key: "Nomor", width: 16 },
+      { header: "Tanggal", key: "Tanggal", width: 12, align: "center" },
+      { header: "No SPK", key: "No SPK", width: 14 },
+      { header: "Nama SPK", key: "Nama SPK", width: 26 },
+      { header: "Divisi", key: "Divisi", width: 12 },
+      { header: "Grading Size", key: "Grading Size", width: 16 },
+      { header: "Keterangan", key: "Keterangan", width: 20 },
+    ];
+
+    // Dua sheet dalam satu file — Marker & Grading, sesuai struktur
+    // dua tabel bersanding yang sudah ada di expand row.
+    const { exportExcel } = await import("@/utils/excelExport");
+    await exportExcel(
+      `LHK_Pola_Detail_${filterState.value.dtAwal}_${filterState.value.dtAkhir}.xlsx`,
+      [
+        {
+          sheetName: "Marker Mika Duplek",
+          columns: markerColumns,
+          rows: markerRows,
+          title: `Daily Out Marker, Mika & Duplek | Periode ${filterState.value.dtAwal} s/d ${filterState.value.dtAkhir}`,
+        },
+        {
+          sheetName: "Pola Grading",
+          columns: gradingColumns,
+          rows: gradingRows,
+          title: `Daily Out Pola | Periode ${filterState.value.dtAwal} s/d ${filterState.value.dtAkhir}`,
+        },
+      ],
+    );
+    toast.success("Berhasil export detail data.");
+  } catch (e) {
+    console.error(e);
+    toast.error("Gagal melakukan export detail.");
+  } finally {
+    isExportingDetail.value = false;
+  }
+};
 </script>
 
 <template>
   <BaseBrowse
+    ref="baseBrowseRef"
     title="LHK Pola"
     menu-id="174"
     :icon="IconRuler2"
@@ -137,6 +341,7 @@ const onDelete = async (item: any) => {
     @add="onAdd"
     @edit="onEdit"
     @delete="onDelete"
+    @export="onExport"
   >
     <template #filter-left>
       <div class="f-group">
@@ -145,6 +350,21 @@ const onDelete = async (item: any) => {
         <span class="f-sep">s/d</span>
         <input type="date" v-model="filterState.dtAkhir" class="f-date" />
       </div>
+    </template>
+
+    <template #extra-actions>
+      <v-btn
+        size="small"
+        color="green-darken-3"
+        variant="outlined"
+        :loading="isExportingDetail"
+        @click="onExportDetail"
+      >
+        <template #prepend>
+          <IconFileSpreadsheet :size="15" :stroke-width="1.7" />
+        </template>
+        Export Detail
+      </v-btn>
     </template>
 
     <template #item.Tanggal="{ item }">
