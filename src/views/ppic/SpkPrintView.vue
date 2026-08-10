@@ -84,40 +84,38 @@ const resolveDesignImage = () => {
       ? nomor
       : `SO-${nomor}`;
 
+  // Sama seperti SpkView.onLihatGambar — lihat komentar di sana.
+  const isLegacyFormat = !nomor.startsWith("SPK-");
+
   const candidates: string[] = [];
 
-  // ⚠️ MAP diprioritaskan PALING AWAL, path FLAT tanpa subfolder —
-  // sama alasan seperti di SpkView.onLihatGambar. Sumber gambar desain
-  // yang otoritatif adalah MAP (SPK → SO → MAP), bukan tebakan
-  // berdasar nomor SPK sendiri yang bisa nyasar ke file lama/salah.
-  if (mapNomor) {
-    candidates.push(`/file-gambar/${encodeURIComponent(mapNomor)}.jpg`);
-    candidates.push(
-      `${base}/images/${cab}/${encodeURIComponent(mapNomor)}.jpg`,
-    );
+  const mapCandidates = mapNomor
+    ? [
+        `/file-gambar/${encodeURIComponent(mapNomor)}.jpg`,
+        `${base}/images/${cab}/${encodeURIComponent(mapNomor)}.jpg`,
+      ]
+    : [];
+  const ownCandidates = [
+    `${base}/images/${cab}/${encodeURIComponent(nomor)}.jpg`,
+    `/file-gambar/${encodeURIComponent(nomor)}.jpg`,
+  ];
+
+  if (isLegacyFormat) {
+    candidates.push(...ownCandidates, ...mapCandidates);
+  } else {
+    candidates.push(...mapCandidates, ...ownCandidates);
   }
 
-  // 2. SPK sendiri
-  candidates.push(`${base}/images/${cab}/${encodeURIComponent(nomor)}.jpg`);
-
-  // 3. SO Ref
   if (soRef && soRef !== nomor) {
     candidates.push(`${base}/images/${cab}/${encodeURIComponent(soRef)}.jpg`);
+    candidates.push(`/file-gambar/${encodeURIComponent(soRef)}.jpg`);
   }
-
-  // 4. Fallback tebakan SO
   if (fallbackSoNomor !== nomor && fallbackSoNomor !== soRef) {
     candidates.push(
       `${base}/images/${cab}/${encodeURIComponent(fallbackSoNomor)}.jpg`,
     );
-  }
-
-  // 5. Fallback terakhir — file-gambar lama untuk nomor SPK/SO langsung
-  candidates.push(`/file-gambar/${encodeURIComponent(nomor)}.jpg`);
-  if (soRef && soRef !== nomor)
-    candidates.push(`/file-gambar/${encodeURIComponent(soRef)}.jpg`);
-  if (fallbackSoNomor !== nomor && fallbackSoNomor !== soRef)
     candidates.push(`/file-gambar/${encodeURIComponent(fallbackSoNomor)}.jpg`);
+  }
 
   isLoadingImage.value = true;
   resolvedImageUrl.value = "";

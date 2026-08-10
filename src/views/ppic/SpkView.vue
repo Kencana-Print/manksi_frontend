@@ -473,41 +473,48 @@ const onLihatGambar = () => {
       ? nomor
       : `SO-${nomor}`;
 
+  // ⚠️ Format nomor menentukan urutan prioritas kandidat:
+  //  - Format BARU ("SPK-...") → dibuat lewat alur SO→SPK PPIC modern,
+  //    sumber gambar yang benar ada di MAP → MAP didahulukan.
+  //  - Format LEGACY (tanpa prefix "SPK-", mis. "KP-KO-002772") →
+  //    dibuat di sistem lama sebelum SO/MAP dipisah rapi, gambar
+  //    aslinya diupload langsung pakai nama nomor SPK itu sendiri →
+  //    nomor sendiri didahulukan, MAP jadi fallback belakangan (kalau
+  //    MAP didahulukan, berisiko nyasar ke gambar produk lain yang
+  //    kebetulan file-nya ada di path MAP tapi tidak relevan).
+  const isLegacyFormat = !nomor.startsWith("SPK-");
+
   const candidates: string[] = [];
 
-  // ⚠️ MAP diprioritaskan PALING AWAL — ini sumber gambar desain yang
-  // sebenarnya otoritatif (SPK → SO → MAP), path FLAT tanpa subfolder
-  // di VPS legacy (/file-gambar/{map}.jpg, bukan /images/{cab}/map/...).
-  // Kalau tidak diprioritaskan, file lama/salah yang kebetulan ada di
-  // /images/{cab}/{nomor}.jpg bisa ke-load duluan walau isinya bukan
-  // gambar SPK ini sebenarnya (lihat kasus SPK-JA-KO-000005 vs SO
-  // referensinya SO-JA-KO-000010 → MAP-JA-KO-002279).
-  if (map) {
-    candidates.push(`/file-gambar/${encodeURIComponent(map)}.jpg`);
-    candidates.push(`${base}/images/${cab}/${encodeURIComponent(map)}.jpg`);
+  const mapCandidates = map
+    ? [
+        `/file-gambar/${encodeURIComponent(map)}.jpg`,
+        `${base}/images/${cab}/${encodeURIComponent(map)}.jpg`,
+      ]
+    : [];
+  const ownCandidates = [
+    `${base}/images/${cab}/${encodeURIComponent(nomor)}.jpg`,
+    `/file-gambar/${encodeURIComponent(nomor)}.jpg`,
+  ];
+
+  if (isLegacyFormat) {
+    candidates.push(...ownCandidates, ...mapCandidates);
+  } else {
+    candidates.push(...mapCandidates, ...ownCandidates);
   }
 
-  // 2. SPK sendiri
-  candidates.push(`${base}/images/${cab}/${encodeURIComponent(nomor)}.jpg`);
-
-  // 3. SO Ref dari backend
+  // SO Ref & tebakan SO — tetap sebagai fallback tambahan di belakang,
+  // tidak terpengaruh urutan MAP vs nomor di atas
   if (soRef && soRef !== nomor) {
     candidates.push(`${base}/images/${cab}/${encodeURIComponent(soRef)}.jpg`);
+    candidates.push(`/file-gambar/${encodeURIComponent(soRef)}.jpg`);
   }
-
-  // 4. Tebakan SO
   if (fallbackSoNomor !== nomor && fallbackSoNomor !== soRef) {
     candidates.push(
       `${base}/images/${cab}/${encodeURIComponent(fallbackSoNomor)}.jpg`,
     );
-  }
-
-  // 5. Fallback terakhir — file-gambar lama untuk nomor SPK/SO langsung
-  candidates.push(`/file-gambar/${encodeURIComponent(nomor)}.jpg`);
-  if (soRef && soRef !== nomor)
-    candidates.push(`/file-gambar/${encodeURIComponent(soRef)}.jpg`);
-  if (fallbackSoNomor !== nomor && fallbackSoNomor !== soRef)
     candidates.push(`/file-gambar/${encodeURIComponent(fallbackSoNomor)}.jpg`);
+  }
 
   gambarUrl.value = "";
   dialogGambar.value = true;
