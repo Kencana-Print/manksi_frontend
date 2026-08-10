@@ -7,7 +7,7 @@ import BaseForm from "@/components/BaseForm.vue";
 import { useForm } from "@/composables/useForm";
 import { salesOrderFormService } from "@/services/penjualan/salesOrderFormService";
 import { mapFormService } from "@/services/penjualan/mapFormService";
-import { IconShoppingCartCopy } from "@tabler/icons-vue";
+import { IconShoppingCartCopy, IconCheck } from "@tabler/icons-vue";
 import api from "@/services/api";
 
 // Komponen per Tab (Asumsi kita pisah filenya agar rapi)
@@ -460,7 +460,12 @@ const {
   },
   onSuccess: (res: any) => {
     toast.success("Sales Order berhasil disimpan!");
-    router.push({ name: "SalesOrderBrowse" });
+
+    // ⬅️ [PERBAIKAN] Tangkap nomor hasil simpan dan tampilkan dialog cetak
+    savedNomorSO.value = res.data?.data?.nomor || formData.value.spk_nomor;
+    showPostSavePrintDialog.value = true;
+
+    // router.push({ name: "SalesOrderBrowse" }); <-- Baris ini DIHAPUS, dipindah ke fungsi goBackToBrowse
   },
 });
 
@@ -1284,6 +1289,38 @@ const confirmSaveWithoutPo = () => {
   validateSave(true);
 };
 
+// ==========================================
+// STATE DIALOG CETAK POST-SAVE
+// ==========================================
+const showPostSavePrintDialog = ref(false);
+const savedNomorSO = ref("");
+const printWithAlokasi = ref(false);
+
+const hasAlokasi = computed(() => {
+  return formData.value.Alokasi && formData.value.Alokasi.length > 0;
+});
+
+const goBackToBrowse = () => {
+  showPostSavePrintDialog.value = false;
+  router.push({ name: "SalesOrderBrowse" });
+};
+
+const pilihCetakVertikal = () => {
+  window.open(
+    `/penjualan/sales-order/print/${encodeURIComponent(savedNomorSO.value)}?layout=vertical&alokasi=${printWithAlokasi.value}`,
+    "_blank",
+  );
+  goBackToBrowse(); // Kembali ke daftar setelah buka tab cetak
+};
+
+const pilihCetakHorizontal = () => {
+  window.open(
+    `/penjualan/sales-order/print/${encodeURIComponent(savedNomorSO.value)}?layout=horizontal&alokasi=${printWithAlokasi.value}`,
+    "_blank",
+  );
+  goBackToBrowse(); // Kembali ke daftar setelah buka tab cetak
+};
+
 const handleConfirmCmo = () => {
   showConfirmCmoDialog.value = true;
 };
@@ -1686,6 +1723,48 @@ const onPilihKatalog = (item: any) => {
             @click="confirmMemoWarn"
             >Lanjutkan</v-btn
           >
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <!-- Dialog Konfirmasi Cetak Setelah Simpan -->
+    <v-dialog v-model="showPostSavePrintDialog" max-width="450px" persistent>
+      <v-card class="rounded-lg">
+        <v-card-title class="bg-success text-white d-flex align-center pa-3">
+          <IconCheck :size="18" class="mr-2" />
+          <span class="text-subtitle-1 font-weight-bold">Simpan Berhasil</span>
+        </v-card-title>
+        <v-card-text class="pa-4 text-center">
+          <div class="text-body-1 mb-4 text-grey-darken-3">
+            Sales Order <b class="text-primary">{{ savedNomorSO }}</b> berhasil
+            disimpan.<br />Apakah Anda ingin mencetaknya sekarang?
+          </div>
+
+          <div v-if="hasAlokasi" class="d-flex justify-center mb-4">
+            <v-checkbox
+              v-model="printWithAlokasi"
+              label="Cetak Dengan Alokasi Pengiriman?"
+              color="primary"
+              hide-details
+              density="compact"
+            >
+            </v-checkbox>
+          </div>
+
+          <div class="d-flex flex-column gap-2">
+            <v-btn color="primary" variant="flat" @click="pilihCetakVertikal">
+              Cetak Vertikal (Portrait Image)
+            </v-btn>
+            <v-btn color="info" variant="tonal" @click="pilihCetakHorizontal">
+              Cetak Horizontal (Landscape Image)
+            </v-btn>
+          </div>
+        </v-card-text>
+        <v-card-actions class="pa-3 border-t bg-grey-lighten-4">
+          <v-spacer></v-spacer>
+          <v-btn variant="text" color="grey-darken-1" @click="goBackToBrowse">
+            Nanti Saja (Kembali ke Daftar)
+          </v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
