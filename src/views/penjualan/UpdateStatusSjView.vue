@@ -761,7 +761,7 @@ const saveFormStatus = async () => {
             <!-- Status 2: Penyerahan Dokumen Kembali -->
             <div v-if="showDokumen" class="status-fields">
               <div class="fg">
-                <label class="flbl w110">Tanggal Kembali</label>
+                <label class="flbl w110">Tanggal Terima</label>
                 <input
                   type="date"
                   v-model="formTanggalKembali"
