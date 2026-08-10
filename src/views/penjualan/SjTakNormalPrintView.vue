@@ -206,9 +206,9 @@ onMounted(() => {
               <span>( &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; )</span>
             </div>
 
-            <div class="printed-info">
+            <!-- <div class="printed-info">
               Dicetak oleh: {{ printedByDisplay }} — {{ printedAtDisplay }}
-            </div>
+            </div> -->
           </div>
         </div>
       </div>
