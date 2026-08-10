@@ -1681,10 +1681,11 @@ Keterangan Komponen :
   grid-template-columns: 1fr 2fr;
   gap: 8px;
 }
+
+.p1-row-komp .full-span,
 .p1-row-ket .full-span {
   grid-column: 1 / -1;
 }
-
 /* Special process dan gudang lebih compact */
 .ket-small {
   font-size: 7.5pt;
