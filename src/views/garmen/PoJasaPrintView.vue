@@ -261,7 +261,7 @@ body {
 /* Pembungkus halaman A4 */
 .page-a4 {
   width: 210mm;
-  height: 297mm;
+  min-height: 297mm;
   display: flex;
   flex-direction: column;
   margin: 0 auto;
@@ -271,10 +271,10 @@ body {
 /* Setiap copy KUNCI tepat separuh A4 */
 .copy {
   width: 210mm;
-  height: 148.5mm; /* Pas separuh 297mm */
-  padding: 8mm 12mm; /* Atur padding yang ideal untuk margin printer */
-  position: relative; /* Untuk cut-line absolute */
-  overflow: hidden; /* Mencegah kalau tabel panjang merusak halaman */
+  max-height: 144mm;
+  padding: 6mm 12mm;
+  position: relative;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
 }
@@ -451,7 +451,7 @@ body {
 @media print {
   @page {
     size: A4 portrait;
-    margin: 0;
+    margin: 2mm 0;
   }
   body {
     margin: 0;

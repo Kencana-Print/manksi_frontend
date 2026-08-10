@@ -272,7 +272,7 @@ const handleEdit = async (item: any) => {
         <div class="d-flex align-center mr-4">
           <div class="legend-box bg-error mr-2"></div>
           <span class="text-caption font-weight-bold"
-            >Safety<>0 (Perlu Order)</span
+            >Stok &lt; Buffer (Perlu Order)</span
           >
         </div>
         <div class="d-flex align-center">
@@ -284,7 +284,7 @@ const handleEdit = async (item: any) => {
 
     <template #item.Stok="{ item }">
       <div
-        v-if="Number(item.Stok) < Number(item.Safety)"
+        v-if="Number(item.Stok) < Number(item.Buffer)"
         style="
           background-color: #d32f2f;
           color: white;

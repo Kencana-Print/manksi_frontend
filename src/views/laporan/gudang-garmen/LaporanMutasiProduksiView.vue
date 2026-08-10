@@ -2,6 +2,7 @@
 import { ref, computed, watch, nextTick } from "vue";
 import { useAuthStore } from "@/stores/authStore";
 import { useToast } from "vue-toastification";
+import { useRouter } from "vue-router";
 import PageLayout from "@/components/PageLayout.vue";
 import BaseTable from "@/components/BaseTable.vue";
 import SpkSearchModal from "@/components/lookups/SpkSearchModal.vue";
@@ -15,11 +16,13 @@ import {
   IconChartBar,
   IconLayoutGrid,
   IconSearch,
+  IconExternalLink,
 } from "@tabler/icons-vue";
 
 const MENU_ID = "524";
 const authStore = useAuthStore();
 const toast = useToast();
+const router = useRouter();
 
 // ── Filter ──
 // Helper: format Date ke "YYYY-MM-DD" pakai komponen LOKAL
@@ -287,6 +290,60 @@ const renderChart = async () => {
     true,
   );
 };
+
+// ── Navigasi ke Ubah Mutasi Produksi — dibuka TAB BARU supaya
+// laporan yang sedang difilter (gabungan 4 sumber, bisa lama) tidak
+// hilang kalau user cuma mau intip 1 transaksi.
+const openMutasi = (nomorMutasi: string) => {
+  if (!nomorMutasi) return;
+  const url = router.resolve({
+    name: "MutasiProduksiEdit",
+    params: { nomor: nomorMutasi },
+  }).href;
+  window.open(url, "_blank");
+};
+
+// ── Klik kiri baris → langsung buka (replikasi double-click Delphi
+// paling umum), klik kanan → context menu "Lihat Transaksi" ──
+const onRowClick = (item: any) => {
+  openMutasi(item.NomorMutasi);
+};
+
+const showContextMenu = ref(false);
+const contextMenuStyle = ref<Record<string, string>>({});
+const contextMenuTarget = ref("");
+
+const onRowContextMenu = (e: MouseEvent, item: any) => {
+  if (!item.NomorMutasi) return; // baris tanpa mutasi (mis. sumber STBJ) tidak punya menu
+  e.preventDefault();
+  contextMenuTarget.value = item.NomorMutasi;
+  contextMenuStyle.value = {
+    position: "fixed",
+    top: `${e.clientY}px`,
+    left: `${e.clientX}px`,
+    zIndex: "9999",
+  };
+  showContextMenu.value = true;
+};
+
+const closeContextMenu = () => {
+  showContextMenu.value = false;
+};
+
+const onContextMenuAction = () => {
+  openMutasi(contextMenuTarget.value);
+  closeContextMenu();
+};
+
+// rowPropsFn — dikirim ke BaseTable, mengembalikan handler event yang
+// akan diteruskan resolvedRowProps() ke elemen <tr> aslinya.
+const rowPropsFn = (data: any) => {
+  const item = data.item?.raw || data.item;
+  if (!item.NomorMutasi) return {};
+  return {
+    onContextmenu: (e: MouseEvent) => onRowContextMenu(e, item),
+  };
+};
 </script>
 
 <template>
@@ -438,7 +495,20 @@ const renderChart = async () => {
           item-value="NomorMutasi"
           summary-key="Jumlah"
           summary-label="Total Jumlah"
+          :row-props-fn="rowPropsFn"
+          @row-click="onRowClick"
         >
+          <template #item.NomorMutasi="{ item }">
+            <span
+              v-if="item.NomorMutasi"
+              class="mutasi-link"
+              @click="openMutasi(item.NomorMutasi)"
+              @contextmenu="onRowContextMenu($event, item)"
+            >
+              {{ item.NomorMutasi }}
+            </span>
+            <span v-else class="muted">-</span>
+          </template>
           <template #item.TglSpk="{ item }">{{
             fmtDate(item.TglSpk)
           }}</template>
@@ -505,6 +575,22 @@ const renderChart = async () => {
       filter-mode="spk-ppic"
       @selected="onSpkSelected"
     />
+
+    <Teleport to="body">
+      <div
+        v-if="showContextMenu"
+        class="mp-context-backdrop"
+        @click="closeContextMenu"
+        @contextmenu.prevent="closeContextMenu"
+      >
+        <div class="mp-context-menu" :style="contextMenuStyle" @click.stop>
+          <button class="mp-context-item" @click="onContextMenuAction">
+            <IconExternalLink :size="14" />
+            Lihat Transaksi
+          </button>
+        </div>
+      </div>
+    </Teleport>
   </PageLayout>
 </template>
 
@@ -688,5 +774,48 @@ const renderChart = async () => {
   color: #9e9e9e;
   max-width: 380px;
   line-height: 1.5;
+}
+.mutasi-link {
+  color: #1565c0;
+  font-family: monospace;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+}
+.mutasi-link:hover {
+  text-decoration: underline;
+}
+.muted {
+  color: #9e9e9e;
+}
+.mp-context-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+}
+.mp-context-menu {
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+  min-width: 160px;
+  padding: 4px;
+}
+.mp-context-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 10px;
+  border: none;
+  background: none;
+  font-size: 12px;
+  color: #1565c0;
+  cursor: pointer;
+  border-radius: 4px;
+  text-align: left;
+}
+.mp-context-item:hover {
+  background: #e3f2fd;
 }
 </style>

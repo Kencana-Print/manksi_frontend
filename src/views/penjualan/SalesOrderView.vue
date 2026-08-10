@@ -155,6 +155,12 @@ const baseHeadersFront = [
   { title: "Tgl SPK PPIC", key: "TglSpkPpic", width: "110px", align: "center" },
   { title: "MO", key: "MO", width: "80px" },
   { title: "CMO", key: "CMO", width: "80px" },
+  {
+    title: "Tgl Approve CMO",
+    key: "TglApproveCmo",
+    width: "120px",
+    align: "center",
+  },
   { title: "Tanggal", key: "Tanggal", width: "100px", align: "center" },
   { title: "Dateline", key: "Dateline", width: "100px", align: "center" },
   { title: "Kepentingan", key: "Kepentingan", width: "100px" },
@@ -181,6 +187,8 @@ const hargaHeader = [
 ];
 const afterHargaHeaders = [
   { title: "Pesan", key: "Pesan", width: "80px", align: "right" },
+  { title: "Kirim", key: "Kirim", width: "80px", align: "right" },
+  { title: "Kurang", key: "Kurang", width: "80px", align: "right" },
   { title: "Sales", key: "Sales", width: "120px" },
   { title: "Created", key: "Created", width: "140px", align: "center" },
 ];
@@ -193,10 +201,47 @@ const tailHeadersFront = [
   { title: "Date PO", key: "DatePO", width: "100px", align: "center" },
   { title: "Dateline PO", key: "DatelinePO", width: "100px", align: "center" },
   { title: "Status", key: "Status", width: "80px", align: "center" },
+  {
+    title: "Status Cetak",
+    key: "CetakStatusDisplay",
+    width: "120px",
+    align: "center",
+  },
   { title: "Alasan Close", key: "AlasanClose", width: "150px" },
   { title: "No Penawaran", key: "NoPenawaran", width: "130px" },
   { title: "MAP", key: "MAP", width: "130px" },
   { title: "Repeat", key: "Repeat", width: "80px" },
+  { title: "Potong", key: "Potong", width: "80px", align: "right" },
+  { title: "Qc Potong", key: "QcPotong", width: "80px", align: "right" },
+  { title: "Bordir", key: "Bordir", width: "80px", align: "right" },
+  { title: "Cetak", key: "Cetak", width: "80px", align: "right" },
+  { title: "Qc Cetak", key: "QcCetak", width: "80px", align: "right" },
+  { title: "DC", key: "DC", width: "80px", align: "right" },
+  { title: "Jahit", key: "Jahit", width: "80px", align: "right" },
+  { title: "Lipat", key: "Lipat", width: "80px", align: "right" },
+  { title: "Jadi", key: "Jadi", width: "80px", align: "right" },
+  { title: "Kurang Jadi", key: "Kurang_Jadi", width: "90px", align: "right" },
+  {
+    title: "Kurang Potong",
+    key: "Kurang_Potong",
+    width: "90px",
+    align: "right",
+  },
+  {
+    title: "Kurang Bordir",
+    key: "Kurang_Bordir",
+    width: "90px",
+    align: "right",
+  },
+  { title: "Kurang Cetak", key: "Kurang_Cetak", width: "90px", align: "right" },
+  {
+    title: "Kurang Qc Cetak",
+    key: "Kurang_QcCetak",
+    width: "110px",
+    align: "right",
+  },
+  { title: "Kurang Jahit", key: "Kurang_Jahit", width: "90px", align: "right" },
+  { title: "Kurang Lipat", key: "Kurang_Lipat", width: "90px", align: "right" },
   { title: "Aktif", key: "Aktif", width: "60px", align: "center" },
   { title: "Acc", key: "Acc", width: "60px", align: "center" },
   { title: "Acc H0", key: "AccH0", width: "60px", align: "center" },
@@ -265,15 +310,16 @@ const rowPropsFn = (data: any) => {
   const classes: string[] = ["font-weight-bold"];
   let style = "";
 
-  if (item.SpkPpic) {
-    // JIKA SUDAH JADI SPK PPIC: Paksa warna hitam dan abaikan status Open/Pasif
+  if (item.HasSj) {
+    // Paling final — sudah dibuatkan SJ, status Open/Pasif SO tidak relevan lagi
     style = "color: #212121 !important;";
+  } else if (item.SpkPpic) {
+    // Sudah dibuatkan SPK PPIC tapi belum ada SJ
+    style = "color: #00897b !important;";
   } else {
-    // JIKA BELUM ADA SPK PPIC: Jalankan logika warna default
     if (item.Status === "Open") {
       classes.push("text-red-darken-1");
     }
-
     if (item.Aktif === "N") {
       if (item.Acc === "Y" || item.AccH0 === "Y" || item.AccJO === "ACC") {
         classes.push("text-blue-darken-2");
@@ -285,7 +331,6 @@ const rowPropsFn = (data: any) => {
         classes.push("text-green-darken-2");
       }
     }
-
     if (item.Pending !== "NORMAL") {
       if (item.AccPending === "N") classes.push("text-fuchsia-darken-1");
       else if (item.AccPending === "ACC") classes.push("text-orange-darken-3");
@@ -947,6 +992,14 @@ const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
             <div class="legend-dot" style="background: #e65100"></div>
             Pending Acc
           </div>
+          <div class="legend-item">
+            <div class="legend-dot" style="background: #00897b"></div>
+            Sudah SPK PPIC
+          </div>
+          <div class="legend-item">
+            <div class="legend-dot" style="background: #212121"></div>
+            Sudah SJ
+          </div>
         </div>
         <div class="legend-divider" />
         <div class="legend-row">
@@ -1006,8 +1059,67 @@ const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
     <template #item.Harga="{ item }">{{ numFmt(item.Harga) }}</template>
     <template #item.Pesan="{ item }">{{ numFmt(item.Pesan) }}</template>
 
+    <template #item.Kirim="{ item }">{{ numFmt(item.Kirim) }}</template>
+    <template #item.Kurang="{ item }">{{ numFmt(item.Kurang) }}</template>
+
+    <template #item.CetakStatusDisplay="{ item }">
+      <span v-if="Number(item.CetakCount) === 0" class="cetak-badge badge-grey">
+        Belum Dicetak
+      </span>
+      <span
+        v-else-if="item.CetakApprovalStatus === 'WAIT'"
+        class="cetak-badge badge-blue"
+      >
+        Cetak {{ item.CetakCount }}x · Nunggu ACC
+      </span>
+      <span
+        v-else-if="item.CetakApprovalStatus === 'TOLAK'"
+        class="cetak-badge badge-red"
+      >
+        Cetak {{ item.CetakCount }}x · Ditolak
+      </span>
+      <span
+        v-else-if="item.CetakApprovalStatus === 'ACC_READY'"
+        class="cetak-badge badge-green"
+      >
+        Cetak {{ item.CetakCount }}x · Siap Cetak
+      </span>
+      <span v-else class="cetak-badge badge-neutral">
+        Sudah Dicetak {{ item.CetakCount }}x
+      </span>
+    </template>
+
+    <template
+      v-for="col in [
+        'Potong',
+        'QcPotong',
+        'Bordir',
+        'Cetak',
+        'QcCetak',
+        'DC',
+        'Jahit',
+        'Lipat',
+        'Jadi',
+        'Kurang_Jadi',
+        'Kurang_Potong',
+        'Kurang_Bordir',
+        'Kurang_Cetak',
+        'Kurang_QcCetak',
+        'Kurang_Jahit',
+        'Kurang_Lipat',
+      ]"
+      :key="col"
+      v-slot:[`item.${col}`]="{ item }"
+    >
+      {{ numFmt(item[col]) }}
+    </template>
+
     <template #item.TglSpkPpic="{ item }">
       {{ formatTanggal(item.TglSpkPpic) }}
+    </template>
+
+    <template #item.TglApproveCmo="{ item }">
+      {{ item.TglApproveCmo ? formatTanggalJam(item.TglApproveCmo) : "-" }}
     </template>
 
     <template #item.Status="{ item }">
@@ -1993,5 +2105,34 @@ const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
 .sts-tolak {
   background: #757575;
   color: white;
+}
+
+.cetak-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 9.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.badge-grey {
+  background: #f5f5f5;
+  color: #757575;
+}
+.badge-neutral {
+  background: #eceff1;
+  color: #455a64;
+}
+.badge-blue {
+  background: #e3f2fd;
+  color: #1565c0;
+}
+.badge-red {
+  background: #ffebee;
+  color: #c62828;
+}
+.badge-green {
+  background: #e8f5e9;
+  color: #2e7d32;
 }
 </style>

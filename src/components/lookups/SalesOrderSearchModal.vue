@@ -10,45 +10,40 @@ const query = ref("");
 const items = ref<any[]>([]);
 const isLoading = ref(false);
 const page = ref(1);
+const totalItems = ref(0);
 const PAGE_SIZE = 50;
 
-const today = new Date().toISOString().substring(0, 10);
-const threeMonthsAgo = new Date(Date.now() - 90 * 86400000)
-  .toISOString()
-  .substring(0, 10);
+const today = new Date();
+const getLocalDate = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+    d.getDate(),
+  ).padStart(2, "0")}`;
 
-const startDate = ref(threeMonthsAgo);
-const endDate = ref(today);
+const awalBulan = new Date(today.getFullYear(), today.getMonth(), 1);
 
-const fetchData = async () => {
+const startDate = ref(getLocalDate(awalBulan));
+const endDate = ref(getLocalDate(today));
+
+let debounce: ReturnType<typeof setTimeout> | null = null;
+
+// Filter (Aktif='Y', sudah di-approve CMO, belum ada SPK PPIC) sekarang
+// dilakukan di backend (/sales-order/search-for-spk) — modal ini
+// tidak lagi fetch-semua-lalu-filter-client seperti sebelumnya.
+const fetchData = async (append = false) => {
   isLoading.value = true;
   try {
-    const res = await salesOrderService.getBrowse({
+    const res = await salesOrderService.getSearchForSpk({
+      q: query.value,
       startDate: startDate.value,
       endDate: endDate.value,
+      page: page.value,
+      limit: PAGE_SIZE,
     });
-    const all: any[] = res.data.data || [];
-
-    // Filter: hanya SO yang Aktif='Y' DAN sudah di-approve CMO dan belum dibuatkan SPK
-    const validOnly = all.filter(
-      (r) =>
-        r.Aktif === "Y" &&
-        r.CMO &&
-        String(r.CMO).trim() !== "" &&
-        !r.HasSpkPpic,
-    );
-
-    const q = query.value.toLowerCase();
-    items.value = q
-      ? validOnly.filter(
-          (r) =>
-            r.Nomor?.toLowerCase().includes(q) ||
-            r.Nama?.toLowerCase().includes(q) ||
-            r.Customer?.toLowerCase().includes(q),
-        )
-      : validOnly;
+    const data = res.data.data;
+    items.value = append ? [...items.value, ...data.items] : data.items;
+    totalItems.value = data.total;
   } catch {
-    items.value = [];
+    if (!append) items.value = [];
   } finally {
     isLoading.value = false;
   }
@@ -59,17 +54,22 @@ watch(
   (v) => {
     if (v) {
       query.value = "";
+      page.value = 1;
       fetchData();
     }
   },
 );
 
-watch(query, () => {
+const onSearchInput = () => {
   page.value = 1;
-  fetchData();
-});
+  if (debounce) clearTimeout(debounce);
+  debounce = setTimeout(() => fetchData(), 400);
+};
 
-const pagedItems = () => items.value.slice(0, page.value * PAGE_SIZE);
+const loadMore = () => {
+  page.value++;
+  fetchData(true);
+};
 
 const onSelect = (item: any) => {
   emit("selected", item);
@@ -83,12 +83,37 @@ const formatTgl = (v: string) => {
   const d = new Date(v);
   return `${String(d.getDate()).padStart(2, "0")}-${String(d.getMonth() + 1).padStart(2, "0")}-${d.getFullYear()}`;
 };
+
+const statusMapLabel = (status: string) => {
+  switch (status) {
+    case "TANPA_MAP":
+      return "Tanpa MAP";
+    case "MENUNGGU_APV":
+      return "Menunggu ACC";
+    case "SUDAH_APPROVE":
+      return "Sudah ACC";
+    default:
+      return "-";
+  }
+};
+const statusMapClass = (status: string) => {
+  switch (status) {
+    case "TANPA_MAP":
+      return "chip-neutral";
+    case "MENUNGGU_APV":
+      return "chip-wait";
+    case "SUDAH_APPROVE":
+      return "chip-approved";
+    default:
+      return "chip-neutral";
+  }
+};
 </script>
 
 <template>
   <v-dialog
     :model-value="modelValue"
-    max-width="780px"
+    max-width="1100px"
     scrollable
     @update:model-value="close"
   >
@@ -102,7 +127,6 @@ const formatTgl = (v: string) => {
         </v-btn>
       </v-card-title>
 
-      <!-- Filter periode -->
       <div
         class="d-flex align-center gap-2 pa-3 border-b bg-grey-lighten-5"
         style="gap: 8px; flex-wrap: wrap"
@@ -113,7 +137,12 @@ const formatTgl = (v: string) => {
         <input
           type="date"
           v-model="startDate"
-          @change="fetchData"
+          @change="
+            () => {
+              page = 1;
+              fetchData();
+            }
+          "
           style="
             height: 26px;
             border: 1px solid #ccc;
@@ -126,7 +155,12 @@ const formatTgl = (v: string) => {
         <input
           type="date"
           v-model="endDate"
-          @change="fetchData"
+          @change="
+            () => {
+              page = 1;
+              fetchData();
+            }
+          "
           style="
             height: 26px;
             border: 1px solid #ccc;
@@ -138,6 +172,7 @@ const formatTgl = (v: string) => {
         <div style="flex: 1; min-width: 200px; position: relative">
           <input
             v-model="query"
+            @input="onSearchInput"
             placeholder="Cari nomor, nama, customer..."
             style="
               width: 100%;
@@ -167,6 +202,7 @@ const formatTgl = (v: string) => {
             font-size: 10px;
             color: #1565c0;
             border-bottom: 1px solid #bbdefb;
+            width: 100%;
           "
         >
           ℹ️ Hanya menampilkan SO yang sudah Aktif, disetujui CMO, dan belum
@@ -174,7 +210,7 @@ const formatTgl = (v: string) => {
         </div>
       </div>
 
-      <v-card-text class="pa-0" style="max-height: 460px; overflow-y: auto">
+      <v-card-text class="pa-0" style="max-height: 560px; overflow-y: auto">
         <v-progress-linear
           v-if="isLoading"
           indeterminate
@@ -184,31 +220,46 @@ const formatTgl = (v: string) => {
         <table class="so-table">
           <thead>
             <tr>
-              <th width="145">Nomor SO</th>
+              <th width="150">Nomor SO</th>
               <th width="95">Tanggal</th>
-              <th width="160">Customer</th>
-              <th>Nama Pesanan</th>
-              <th width="70" class="tr">Pesan</th>
-              <th width="80">Workshop</th>
+              <th width="180">Customer</th>
+              <th width="260">Nama Pesanan</th>
+              <th width="80" class="tr">Pesan</th>
+              <th width="120">MAP</th>
+              <th width="90">Status MAP</th>
+              <th width="100">Workshop</th>
             </tr>
           </thead>
           <tbody>
             <tr
-              v-for="item in pagedItems()"
+              v-for="item in items"
               :key="item.Nomor"
               @click="onSelect(item)"
               class="so-row"
             >
               <td class="fw-bold text-primary font-mono">{{ item.Nomor }}</td>
               <td>{{ formatTgl(item.Tanggal) }}</td>
-              <td>{{ item.Customer }}</td>
-              <td>{{ item.Nama }}</td>
-              <td class="tr">{{ item.Pesan?.toLocaleString("id-ID") }}</td>
+              <td class="cell-wrap">
+                {{ item.Customer || item.KodeCustomer || "-" }}
+              </td>
+              <td class="cell-wrap cell-clamp">{{ item.Nama }}</td>
+              <td class="tr">
+                {{ Number(item.Pesan).toLocaleString("id-ID") }}
+              </td>
+              <td class="font-mono">{{ item.MAP || "-" }}</td>
+              <td>
+                <span
+                  class="status-chip"
+                  :class="statusMapClass(item.StatusMap)"
+                >
+                  {{ statusMapLabel(item.StatusMap) }}
+                </span>
+              </td>
               <td>{{ item.Workshop }}</td>
             </tr>
             <tr v-if="!isLoading && items.length === 0">
               <td
-                colspan="6"
+                colspan="8"
                 class="text-center text-grey pa-4"
                 style="font-size: 12px"
               >
@@ -217,19 +268,22 @@ const formatTgl = (v: string) => {
             </tr>
           </tbody>
         </table>
-        <!-- Load more -->
-        <div v-if="pagedItems().length < items.length" class="text-center pa-3">
-          <v-btn size="small" variant="tonal" @click="page++">
-            Tampilkan lebih banyak ({{ items.length - pagedItems().length }}
-            lagi)
+        <div v-if="items.length < totalItems" class="text-center pa-3">
+          <v-btn
+            size="small"
+            variant="tonal"
+            :loading="isLoading"
+            @click="loadMore"
+          >
+            Tampilkan lebih banyak ({{ totalItems - items.length }} lagi)
           </v-btn>
         </div>
       </v-card-text>
 
       <v-card-actions class="pa-3 border-t bg-grey-lighten-4">
-        <span class="text-caption text-grey">
-          {{ items.length }} dari total data SO
-        </span>
+        <span class="text-caption text-grey"
+          >{{ items.length }} dari {{ totalItems }} data SO</span
+        >
         <v-spacer />
         <v-btn variant="text" @click="close">Tutup</v-btn>
       </v-card-actions>
@@ -242,6 +296,7 @@ const formatTgl = (v: string) => {
   width: 100%;
   border-collapse: collapse;
   font-size: 11px;
+  table-layout: fixed; /* wajib supaya width kolom dihormati & wrap bekerja */
 }
 .so-table thead th {
   background: #1565c0;
@@ -255,8 +310,23 @@ const formatTgl = (v: string) => {
   white-space: nowrap;
 }
 .so-table tbody td {
-  padding: 4px 8px;
+  padding: 6px 8px;
   border-bottom: 1px solid #eeeeee;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cell-wrap {
+  white-space: normal;
+}
+.cell-clamp {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.35;
 }
 .so-row {
   cursor: pointer;
@@ -275,5 +345,33 @@ const formatTgl = (v: string) => {
 }
 .text-primary {
   color: #1565c0;
+}
+
+.status-chip {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-size: 9.5px;
+  font-weight: 700;
+}
+.status-chip {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-size: 9.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.chip-neutral {
+  background: #f5f5f5;
+  color: #757575;
+}
+.chip-wait {
+  background: #fff3e0;
+  color: #e65100;
+}
+.chip-approved {
+  background: #e8f5e9;
+  color: #2e7d32;
 }
 </style>

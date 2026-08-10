@@ -58,4 +58,12 @@ export const salesOrderService = {
 
   ajukanGantiQtyKain: (nomor: string, alasan: string) =>
     api.post("/penjualan/sales-order/ganti-qty-kain-ajukan", { nomor, alasan }),
+
+  getSearchForSpk: (params: {
+    q?: string;
+    startDate: string;
+    endDate: string;
+    page?: number;
+    limit?: number;
+  }) => api.get("/penjualan/sales-order/search-for-spk", { params }),
 };
