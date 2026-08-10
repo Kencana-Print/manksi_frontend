@@ -206,25 +206,16 @@ const parseUkuranSizes = () => {
 };
 
 const applyBahanRows = (idx: number, kode: string, nama: string) => {
-  const targetSizes = parseUkuranSizes();
+  const row = formData.value.detail[idx];
+  row.kode = kode;
+  row.nama = nama;
 
-  targetSizes.forEach((item: { size: string; qty: number }, i: number) => {
-    if (i === 0) {
-      const row = formData.value.detail[idx];
-      row.kode = kode;
-      row.nama = nama;
-      row.size = item.size;
-      row.jumlah = item.qty;
-    } else {
-      formData.value.detail.splice(idx + i, 0, {
-        ...emptyRow(),
-        kode,
-        nama,
-        size: item.size,
-        jumlah: item.qty,
-      });
-    }
-  });
+  // Masukkan string Ukuran dari header langsung ke kolom size
+  row.size = formData.value.Ukuran || "";
+
+  // Gunakan total JumlahSpk dari header untuk quantity baris tersebut
+  row.jumlah = formData.value.JumlahSpk || 0;
+
   ensureTrailingRow();
 };
 
