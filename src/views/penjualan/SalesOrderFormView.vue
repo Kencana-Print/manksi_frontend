@@ -381,6 +381,7 @@ const {
         spk_keterangan: data.spk_keterangan,
         spk_ketpo: data.spk_ketpo,
         spk_lama: data.spk_lama,
+        spk_repeat: data.spk_repeat,
         spk_label: data.spk_label,
         spk_cmo: data.spk_cmo,
         spk_pinjo: data.spk_pinjo,
