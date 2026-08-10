@@ -235,7 +235,6 @@ const formContactPerson = ref("");
 const formTanggalKonfirmasi = ref(todayLocal());
 const formTanggalTerima = ref(todayLocal());
 const formTanggalSerahTerima = ref(todayLocal());
-const formTanggalTerimaSj = ref(todayLocal());
 const formPenerimaBarang = ref("");
 
 // Visibility field sesuai status — persis Delphi cbbstatusSjChange
@@ -243,6 +242,7 @@ const showPengiriman = computed(() => formStatusIndex.value === 1);
 const showDokumen = computed(() => formStatusIndex.value === 2);
 const showKonfirmasi = computed(() => formStatusIndex.value === 3);
 const showSerahTerima = computed(() => formStatusIndex.value === 4);
+const formTanggalTerimaSj = computed(() => formTanggalKembali.value);
 
 const resetFormFields = () => {
   formExpedisi.value = "";
@@ -255,7 +255,6 @@ const resetFormFields = () => {
   formTanggalKonfirmasi.value = todayLocal();
   formTanggalTerima.value = todayLocal();
   formTanggalSerahTerima.value = todayLocal();
-  formTanggalTerimaSj.value = todayLocal();
   formPenerimaBarang.value = "";
 };
 
@@ -288,7 +287,6 @@ const onUpdateStatus = async () => {
     formTanggalKonfirmasi.value = d.header.tanggal_konfirmasi || todayLocal();
     formTanggalTerima.value = d.header.tanggal_terima || todayLocal();
     formTanggalSerahTerima.value = d.header.tanggal_serahterima || todayLocal();
-    formTanggalTerimaSj.value = d.header.tanggal_terima_sj || todayLocal();
     formPenerimaBarang.value = d.header.penerima_barang || "";
   } catch (e: any) {
     toast.error(e.response?.data?.message || "Gagal memuat data.");
@@ -781,10 +779,12 @@ const saveFormStatus = async () => {
                 <label class="flbl w110">Tgl Terima SJ</label>
                 <input
                   type="date"
-                  v-model="formTanggalTerimaSj"
-                  class="inp"
+                  :value="formTanggalTerimaSj"
+                  readonly
+                  class="inp ro"
                   style="width: 160px"
                 />
+                <span class="hint-auto">otomatis = Tgl Kembali</span>
               </div>
             </div>
 
@@ -1103,5 +1103,11 @@ const saveFormStatus = async () => {
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+.hint-auto {
+  font-size: 10px;
+  color: #9e9e9e;
+  font-style: italic;
+  margin-left: 6px;
 }
 </style>
