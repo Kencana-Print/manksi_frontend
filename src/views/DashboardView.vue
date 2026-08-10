@@ -6985,10 +6985,34 @@ const sisaClass = (item: any) => {
                       <div style="display: flex; align-items: center; gap: 8px">
                         <div
                           class="gb-nama"
-                          :title="item.Nama"
-                          style="width: 160px"
+                          style="
+                            width: 160px;
+                            display: flex;
+                            flex-direction: column;
+                            gap: 1px;
+                          "
                         >
-                          {{ item.Nama }}
+                          <span
+                            style="
+                              font-family: monospace;
+                              font-size: 9px;
+                              font-weight: 700;
+                              color: #1565c0;
+                            "
+                            :title="item.Kode"
+                          >
+                            {{ item.Kode }}
+                          </span>
+                          <span
+                            style="
+                              overflow: hidden;
+                              text-overflow: ellipsis;
+                              white-space: nowrap;
+                            "
+                            :title="item.Nama"
+                          >
+                            {{ item.Nama }}
+                          </span>
                         </div>
                         <div class="gb-bar-wrap">
                           <span class="pen-cus" style="flex: 1">

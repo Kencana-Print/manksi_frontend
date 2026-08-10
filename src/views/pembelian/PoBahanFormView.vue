@@ -953,7 +953,12 @@ const validateSave = () => {
                   />
                 </td>
                 <td class="p0">
-                  <input :value="row.gramasi" readonly class="ci ro" />
+                  <input
+                    v-model="row.gramasi"
+                    class="ci"
+                    :class="{ ro: !isBahan }"
+                    :readonly="!isBahan"
+                  />
                 </td>
                 <td class="p0">
                   <input v-model="row.setting" class="ci ro" readonly />
