@@ -609,11 +609,18 @@ const isJoBebasUkuran = computed(() => {
   return JO_BEBAS_UKURAN.includes(jo) || nama.includes("CELEMEK");
 });
 
+// [BARU] penanda request terbaru — dipakai untuk buang response
+// yang "basi" kalau ada request lebih baru yang sudah jalan duluan
+let standarUkuranReqId = 0;
+
 const fetchStandarUkuranSizes = async () => {
   if (isJoBebasUkuran.value) return;
   if (formData.value.spk_standar_ukuran !== "KENCANA") return;
   if (!["3", "4"].includes(String(formData.value.spk_divisi).charAt(0))) return;
   if (!formData.value.spk_jo_kode) return;
+
+  const existingSizes = [...(formData.value.Sizes || [])];
+  const reqId = ++standarUkuranReqId;
 
   try {
     const res = await api.get("/penjualan/sales-order/form/standar-ukuran", {
@@ -622,10 +629,19 @@ const fetchStandarUkuranSizes = async () => {
         varian: formData.value.spk_varian_ukuran || "STANDAR",
       },
     });
+
+    if (reqId !== standarUkuranReqId) return;
+
     const standarData: any[] = res.data.data || [];
     formData.value.Sizes = standarData.map((s: any) => {
-      const existing = (formData.value.Sizes || []).find(
-        (e: any) => e.size === s.size,
+      const existing = existingSizes.find(
+        (e: any) =>
+          String(e.size || "")
+            .trim()
+            .toUpperCase() ===
+          String(s.size || "")
+            .trim()
+            .toUpperCase(),
       );
       return existing ? { ...s, qty: existing.qty } : s;
     });

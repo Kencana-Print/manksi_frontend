@@ -247,7 +247,7 @@ const onExportDetail = async () => {
           "Nama Barang": d.Nama,
           Satuan: d.Satuan,
           Jumlah: Number(d.Jumlah),
-          Terima: Number(d.Bpb),
+          Terima: Number(d.Terima),
           "Ket Pembelian": d.KetPembelian || "",
           Spesifikasi: d.Spesifikasi || "",
           Kegunaan: d.Kegunaan || "",
@@ -610,7 +610,7 @@ const submitEstimasi = async () => {
                 </td>
                 <!-- Field Bpb dialiaskan sebagai "Terima" di frontend -->
                 <td class="text-right font-weight-bold text-success">
-                  {{ num(dtl.Bpb) }}
+                  {{ num(dtl.Terima) }}
                 </td>
                 <td class="text-caption" style="color: #666">
                   {{ dtl.KetPembelian }}
