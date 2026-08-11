@@ -258,6 +258,20 @@ const onKodeEnter = async (idx: number) => {
   }
 };
 
+// ── Batas wajar tanggal Proof: 1 tahun lalu s/d 1 tahun ke depan ──
+const currentYear = new Date().getFullYear();
+const minTanggal = `${currentYear - 1}-01-01`;
+const maxTanggal = `${currentYear + 1}-12-31`;
+
+const onTanggalChange = () => {
+  const val = formData.value.pf_tanggal;
+  const year = val ? Number(val.substring(0, 4)) : 0;
+  if (!val || year < currentYear - 1 || year > currentYear + 1) {
+    toast.warning("Tanggal tidak valid, dikembalikan ke hari ini.");
+    formData.value.pf_tanggal = todayLocal();
+  }
+};
+
 // ── Lookup SPK/MAP ───────────────────────────────────────────────────
 const showSpkModal = ref(false);
 
@@ -343,6 +357,16 @@ const validateSave = () => {
     toast.warning("Nama MAP belum di isi.");
     return;
   }
+  const tglYear = Number((formData.value.pf_tanggal || "").substring(0, 4));
+  const yearNow = new Date().getFullYear();
+  if (
+    !formData.value.pf_tanggal ||
+    tglYear < yearNow - 1 ||
+    tglYear > yearNow + 1
+  ) {
+    toast.warning("Tanggal Proof tidak valid. Mohon periksa kembali.");
+    return;
+  }
   const valid = formData.value.detail.filter(
     (r: any) => r.nama && r.nama.trim(),
   );
@@ -392,6 +416,18 @@ const validateSave = () => {
             />
             <span v-if="!isEditMode" class="hint-new">← Kosong = Baru</span>
           </div>
+        </div>
+        <div class="fr">
+          <label class="lbl">Tanggal</label>
+          <input
+            type="date"
+            v-model="formData.pf_tanggal"
+            class="inp"
+            style="width: 150px"
+            :min="minTanggal"
+            :max="maxTanggal"
+            @change="onTanggalChange"
+          />
         </div>
         <div class="fr">
           <label class="lbl">Tanggal</label>
