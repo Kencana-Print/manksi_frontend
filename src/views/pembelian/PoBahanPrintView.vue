@@ -85,6 +85,37 @@ const formatNum = (num: number, decimals: number = 0) => {
   });
 };
 
+// Gabungkan baris yang kode, nama, satuan, gramasi awal/akhir, setting,
+// harga DPP, dan harga-nya sama persis — qty & total di-SUM. Kode ikut
+// jadi kunci grouping (relevan buat PO Bahan yang nampilin kolom Kode;
+// untuk Greige kolom Kode memang tidak ditampilkan tapi tetap aman
+// disertakan karena baris yang sama nama pasti sama kode-nya juga).
+const groupIdenticalItems = (items: any[], poJenis: number) => {
+  const groupedItems: Record<string, any> = {};
+  items.forEach((item: any) => {
+    const nama = item.pod_namaext || item.bhn_name || "";
+    const kode = item.pod_bhn_kode || "";
+    const key = [
+      kode,
+      nama,
+      item.satuan_print,
+      item.pod_gramasia || "",
+      item.gramasi || "",
+      item.setting || "",
+      item.harga_dpp_print,
+      item.harga_setelah_ppn_print,
+    ].join("_");
+
+    if (!groupedItems[key]) {
+      groupedItems[key] = { ...item };
+    } else {
+      groupedItems[key].qty_print += item.qty_print;
+      groupedItems[key].total_print += item.total_print;
+    }
+  });
+  return Object.values(groupedItems);
+};
+
 onMounted(async () => {
   try {
     const res = await poBahanFormService.getDetail(nomorPO);
@@ -119,24 +150,12 @@ onMounted(async () => {
       };
     });
 
-    // ⬅ BARU: Grouping khusus PO Greige (jenis === 1)
-    if (d.header?.po_jenis === 1) {
-      const groupedItems: Record<string, any> = {};
-      itemsConverted.forEach((item: any) => {
-        const nama = item.pod_namaext || item.bhn_name || "";
-
-        // Kriteria Grouping: Nama, Satuan, Gramasi Akhir, Setting, Harga DPP, dan Harga
-        const key = `${nama}_${item.satuan_print}_${item.gramasi}_${item.setting}_${item.harga_dpp_print}_${item.harga_setelah_ppn_print}`;
-
-        if (!groupedItems[key]) {
-          groupedItems[key] = { ...item };
-        } else {
-          // Menjumlahkan Qty dan Total dari baris yang digabung
-          groupedItems[key].qty_print += item.qty_print;
-          groupedItems[key].total_print += item.total_print;
-        }
-      });
-      itemsConverted = Object.values(groupedItems);
+    // ⬅ Grouping baris yang identik — jalan untuk PO Greige (jenis=1)
+    // maupun PO Bahan (default). PO Celup (jenis=2) TIDAK di-group,
+    // karena detail roll di halaman 2 butuh baris tetap terpisah
+    // per pod3/roll, jadi header item-nya pun dibiarkan apa adanya.
+    if (d.header?.po_jenis !== 2) {
+      itemsConverted = groupIdenticalItems(itemsConverted, d.header?.po_jenis);
     }
 
     const rollsConverted = (d.rolls || []).map((row: any) => ({

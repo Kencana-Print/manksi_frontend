@@ -249,8 +249,28 @@ const toggleColFilter = (key: string, val: string) => {
   currentPage.value = 1;
 };
 
+// Ketik di search box dropdown → langsung terapkan sebagai filter kolom
+// (bukan cuma menyaring tampilan checkbox). Ini juga otomatis membuat
+// colHasFilter(key) jadi true → ikon filter di header ikut menyala,
+// jadi ada indikator visual bahwa filter sedang aktif.
+const onColSearchInput = (key: string, val: string) => {
+  colFilterSearch.value[key] = val;
+
+  if (val) {
+    const matched = filteredUniqueVals(key); // pakai search text terbaru
+    columnFilters.value[key] = new Set(matched);
+  } else {
+    // Search dikosongkan → tampilkan semua lagi
+    const allVals = uniqueValuesPerCol.value[key] ?? [];
+    columnFilters.value[key] = new Set(allVals);
+  }
+  columnFilters.value = { ...columnFilters.value };
+  currentPage.value = 1;
+};
+
 // Pilih semua = Set berisi semua nilai = tidak ada filter
 const selectAllCol = (key: string) => {
+  colFilterSearch.value[key] = "";
   const allVals = uniqueValuesPerCol.value[key] ?? [];
   columnFilters.value[key] = new Set(allVals);
   columnFilters.value = { ...columnFilters.value };
@@ -1147,14 +1167,22 @@ watch(
       @click.stop
     >
       <!-- Search dalam dropdown -->
-      <div class="cfd-search">
-        <input
-          v-model="colFilterSearch[activeFilterCol]"
-          type="text"
-          placeholder="Cari..."
-          class="cfd-search-input"
-          @click.stop
-        />
+      <input
+        :value="colFilterSearch[activeFilterCol]"
+        @input="
+          onColSearchInput(
+            activeFilterCol,
+            ($event.target as HTMLInputElement).value,
+          )
+        "
+        type="text"
+        placeholder="Cari..."
+        class="cfd-search-input"
+        @click.stop
+      />
+      <div class="cfd-search-hint">
+        {{ filteredUniqueVals(activeFilterCol).length }} dari
+        {{ uniqueValuesPerCol[activeFilterCol]?.length ?? 0 }} nilai ditampilkan
       </div>
 
       <!-- Aksi cepat -->
@@ -1662,6 +1690,11 @@ watch(
 }
 .cfd-search-input:focus {
   border-color: rgb(var(--v-theme-primary));
+}
+.cfd-search-hint {
+  font-size: 10px;
+  color: rgba(var(--v-theme-on-surface), 0.5);
+  padding: 2px 8px 4px;
 }
 
 .cfd-actions {
