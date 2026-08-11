@@ -391,6 +391,13 @@ onMounted(async () => {
                     <td class="w-colon">:</td>
                     <td>{{ data.spk_cab }} ({{ data.spk_workshop }})</td>
                   </tr>
+                  <tr v-if="data.cus_perfect === 'Y'">
+                    <td class="w-label">Status Client</td>
+                    <td class="w-colon">:</td>
+                    <td>
+                      <span class="highlight-yellow">PERFECT</span>
+                    </td>
+                  </tr>
                 </tbody>
               </table>
 
