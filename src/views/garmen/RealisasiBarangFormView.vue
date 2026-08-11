@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { ref, computed } from "vue";
+import type { ComponentPublicInstance } from "vue";
 import { useRoute } from "vue-router";
 import { useToast } from "vue-toastification";
 import { useForm } from "@/composables/useForm";
@@ -181,6 +182,27 @@ const onMintaEnter = async () => {
     formData.value.noMinta = "";
   } finally {
     isLoading.value = false;
+  }
+};
+
+// Simpan referensi elemen input "Jumlah" per baris untuk navigasi Enter
+const jumlahInputs = ref<(HTMLInputElement | null)[]>([]);
+
+const setJumlahRef = (
+  el: Element | ComponentPublicInstance | null,
+  index: number | string,
+) => {
+  jumlahInputs.value[Number(index)] = el as HTMLInputElement | null;
+};
+
+const onJumlahEnter = (index: number | string) => {
+  const i = Number(index);
+  const next = jumlahInputs.value[i + 1];
+  if (next) {
+    next.focus();
+    next.select();
+  } else {
+    jumlahInputs.value[i]?.blur();
   }
 };
 
@@ -431,6 +453,8 @@ const numFmt = (val: any) =>
                     min="0"
                     step="any"
                     v-select-on-focus
+                    :ref="(el) => setJumlahRef(el, index)"
+                    @keydown.enter.prevent="onJumlahEnter(index)"
                   />
                 </td>
                 <td class="bg-yellow-lighten-5">

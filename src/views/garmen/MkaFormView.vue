@@ -276,7 +276,6 @@ const resolveKodeBahan = async (idx: number) => {
 };
 
 const addBahanByKode = async (kode: string, replaceIdx?: number) => {
-  // Cek duplikat — Delphi: "Kode tsb sudah di input, di baris N"
   const dupIdx = formData.value.detail.findIndex(
     (d: MkaDetailRow, i: number) =>
       d.kode === kode && i !== replaceIdx && !!d.nama,
@@ -298,24 +297,43 @@ const addBahanByKode = async (kode: string, replaceIdx?: number) => {
       if (replaceIdx !== undefined) formData.value.detail[replaceIdx].kode = "";
       return;
     }
+
+    // [FIX] Kalau baris ini template size (sudah punya pemakaian/jumlah
+    // terisi dari spksize), pertahankan nilainya -- jangan ketimpa 0
+    // dari getAksesorisByKode. Sama seperti Delphi loadkode():
+    // "if CDS.qty<>0 then pemakaian:=1; jumlah:=qty" -- else baru pakai
+    // hitungan default dari total SPK.
+    const existingRow =
+      replaceIdx !== undefined ? formData.value.detail[replaceIdx] : undefined;
+    const isTemplateRow =
+      existingRow && (existingRow.pemakaian > 0 || existingRow.jumlah > 0);
+
+    const pemakaian = isTemplateRow
+      ? existingRow!.pemakaian
+      : Number(bahan.pemakaian) || 0;
+    const jumlah = isTemplateRow
+      ? existingRow!.jumlah
+      : Number(bahan.jumlah) || 0;
+    const ready = Number(bahan.ready) || 0;
+    const po = ready >= jumlah ? 0 : jumlah - ready;
+
     const newRow: MkaDetailRow = {
       kode: bahan.kode ?? "",
       nama: bahan.nama ?? "",
       satuan: bahan.satuan ?? "",
-      pemakaian: Number(bahan.pemakaian) || 0,
-      jumlah: Number(bahan.jumlah) || 0,
-      ready: Number(bahan.ready) || 0,
+      pemakaian,
+      jumlah,
+      ready,
       free: Number(bahan.free) || 0,
-      po: Number(bahan.po) || 0,
-      keterangan: bahan.keterangan ?? "",
-      _key: newKey(),
+      po,
+      keterangan: existingRow?.keterangan || bahan.keterangan || "",
+      _key: existingRow?._key ?? newKey(),
     };
     if (replaceIdx !== undefined) {
       formData.value.detail[replaceIdx] = newRow;
     } else {
       formData.value.detail.push(newRow);
     }
-    // Auto-tambah baris kosong jika baris terakhir sudah terisi
     const lastRow = formData.value.detail[formData.value.detail.length - 1];
     if (lastRow.nama) {
       addEmptyRow();
