@@ -3,6 +3,7 @@ import { ref, watch, onMounted, computed } from "vue";
 import { useAuthStore } from "@/stores/authStore";
 import { useToast } from "vue-toastification";
 import BaseBrowse from "@/components/BaseBrowse.vue";
+import DetailFilterTable from "@/components/DetailFilterTable.vue";
 import { useBrowse } from "@/composables/useBrowse";
 import { spkVsRealisasiVsLhkCuttService } from "@/services/laporan/gudang-garmen/spkVsRealisasiVsLhkCuttService";
 import SpkSearchModal from "@/components/lookups/SpkSearchModal.vue";
@@ -126,6 +127,7 @@ watch(
 const expandedRows = ref<any[]>([]);
 const detailData = ref<Record<string, any[]>>({});
 const detailLoading = ref<Record<string, boolean>>({});
+const visibleDetailRows = ref<Record<string, any[]>>({});
 
 const onUpdateExpanded = async (val: any[]) => {
   expandedRows.value = val;
@@ -153,7 +155,7 @@ const fmtNum = (val: any, d = 2) =>
 const formatBackendDate = (v?: string) => (v ? v.replace(/-/g, "/") : "-");
 
 const detailSubtotal = (spk: string) => {
-  const rows = detailData.value[spk] || [];
+  const rows = visibleDetailRows.value[spk] ?? detailData.value[spk] ?? [];
   const keyword = filters.value.namaBahan.trim().toLowerCase();
   const matched = keyword
     ? rows.filter(
@@ -171,7 +173,7 @@ const detailSubtotal = (spk: string) => {
     totalLhk: matched.reduce(
       (s: number, d: any) => s + Number(d.BeratLhk || 0),
       0,
-    ), // ← pakai BeratLhk
+    ),
   };
 };
 
@@ -528,84 +530,136 @@ onMounted(fetchData);
           <v-progress-circular indeterminate color="primary" size="20" />
           <span class="ml-2 text-caption text-grey">Memuat detail...</span>
         </div>
-        <table v-else class="dtl-table">
-          <thead>
-            <tr>
-              <th style="width: 120px">No Minta</th>
-              <th style="width: 90px">Tgl Minta</th>
-              <th style="width: 100px">Gudang</th>
-              <th style="width: 100px">Tujuan</th>
-              <th style="width: 100px">Kode Bahan</th>
-              <th style="min-width: 180px">Nama Bahan</th>
-              <th style="width: 100px">Komponen</th>
-              <th style="width: 70px">Satuan</th>
-              <th style="width: 85px" class="tr">Jml Minta</th>
-              <th style="width: 85px" class="tr">Jml Retur</th>
-              <th style="width: 85px" class="tr">Net Minta</th>
-              <th style="width: 140px">No Mutasi</th>
-              <th style="width: 90px">Tgl Mutasi</th>
-              <th style="width: 90px" class="tr">Potong</th>
-              <th style="width: 85px" class="tr">Berat</th>
-              <th style="width: 85px" class="tr">Sisa Bahan</th>
-              <th style="width: 75px" class="tr">Babaran</th>
-              <th style="width: 100px">No MKB</th>
-              <th style="width: 90px">Tgl MKB</th>
-              <th style="width: 85px" class="tr">Qty MKB</th>
-              <th style="width: 90px" class="tr">Babaran MKB</th>
-              <th v-if="canLihatCus" style="width: 140px">Supplier</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="(d, i) in detailData[item.Spk]" :key="i">
-              <td class="font-weight-bold text-primary">{{ d.NoMinta }}</td>
-              <td>{{ formatTanggal(d.TglMinta) }}</td>
-              <td>{{ d.Gudang }}</td>
-              <td>{{ d.Tujuan }}</td>
-              <td>{{ d.KodeBahan }}</td>
-              <td>{{ d.NamaBahan }}</td>
-              <td>{{ d.Komponen || "-" }}</td>
-              <td>{{ d.Satuan }}</td>
-              <td class="tr">{{ fmtNum(d.JmlMinta) }}</td>
-              <td class="tr">{{ fmtNum(d.JmlRetur) }}</td>
-              <td class="tr">{{ fmtNum(d.NetMinta) }}</td>
-              <td>{{ d.NoMutasi || "-" }}</td>
-              <td>{{ formatTanggal(d.TglMutasi) }}</td>
-              <td class="tr">{{ fmtNum(d.Potong) }}</td>
-              <td class="tr">{{ fmtNum(d.Berat) }}</td>
-              <td class="tr">{{ fmtNum(d.SisaBahan) }}</td>
-              <td class="tr">{{ fmtNum(d.Babaran, 4) }}</td>
-              <td>{{ d.NoMkb || "-" }}</td>
-              <td>{{ formatTanggal(d.TglMkb) }}</td>
-              <td class="tr">{{ fmtNum(d.QtyMkb) }}</td>
-              <td class="tr">{{ fmtNum(d.BabaranMkb) }}</td>
-              <td v-if="canLihatCus">{{ d.Supplier || "-" }}</td>
-            </tr>
-            <tr v-if="!detailData[item.Spk]?.length">
-              <td :colspan="canLihatCus ? 22 : 21" class="empty-row">
-                Tidak ada rincian.
-              </td>
-            </tr>
-          </tbody>
-          <tfoot v-if="detailData[item.Spk]?.length">
-            <tr class="dtl-subtotal">
-              <td colspan="8" class="text-right font-weight-bold">
-                Subtotal{{
-                  filters.namaBahan ? ` ("${filters.namaBahan}")` : ""
-                }}:
-              </td>
-              <td colspan="2"></td>
-              <td class="tr font-weight-bold">
-                {{ fmtNum(detailSubtotal(item.Spk).netMinta) }}
-              </td>
-              <td colspan="4"></td>
-              <td class="tr font-weight-bold">-</td>
-              <td :colspan="canLihatCus ? 3 : 2"></td>
-              <td class="tr font-weight-bold" style="background: #fff3e0">
-                Total LHK: {{ fmtNum(detailSubtotal(item.Spk).totalLhk) }} kg
-              </td>
-            </tr>
-          </tfoot>
-        </table>
+        <template v-else>
+          <DetailFilterTable
+            :headers="[
+              { key: 'NoMinta', title: 'No Minta', width: '120px' },
+              { key: 'TglMinta', title: 'Tgl Minta', width: '90px' },
+              { key: 'Gudang', title: 'Gudang', width: '100px' },
+              { key: 'Tujuan', title: 'Tujuan', width: '100px' },
+              { key: 'KodeBahan', title: 'Kode Bahan', width: '100px' },
+              { key: 'NamaBahan', title: 'Nama Bahan', width: '180px' },
+              { key: 'Komponen', title: 'Komponen', width: '100px' },
+              { key: 'Satuan', title: 'Satuan', width: '70px' },
+              {
+                key: 'JmlMinta',
+                title: 'Jml Minta',
+                width: '85px',
+                align: 'right',
+              },
+              {
+                key: 'JmlRetur',
+                title: 'Jml Retur',
+                width: '85px',
+                align: 'right',
+              },
+              {
+                key: 'NetMinta',
+                title: 'Net Minta',
+                width: '85px',
+                align: 'right',
+              },
+              { key: 'NoMutasi', title: 'No Mutasi', width: '140px' },
+              { key: 'TglMutasi', title: 'Tgl Mutasi', width: '90px' },
+              { key: 'Potong', title: 'Potong', width: '90px', align: 'right' },
+              { key: 'Berat', title: 'Berat', width: '85px', align: 'right' },
+              {
+                key: 'SisaBahan',
+                title: 'Sisa Bahan',
+                width: '85px',
+                align: 'right',
+              },
+              {
+                key: 'Babaran',
+                title: 'Babaran',
+                width: '75px',
+                align: 'right',
+              },
+              { key: 'NoMkb', title: 'No MKB', width: '100px' },
+              { key: 'TglMkb', title: 'Tgl MKB', width: '90px' },
+              {
+                key: 'QtyMkb',
+                title: 'Qty MKB',
+                width: '85px',
+                align: 'right',
+              },
+              {
+                key: 'BabaranMkb',
+                title: 'Babaran MKB',
+                width: '90px',
+                align: 'right',
+              },
+              ...(canLihatCus
+                ? [{ key: 'Supplier', title: 'Supplier', width: '140px' }]
+                : []),
+            ]"
+            :items="detailData[item.Spk] || []"
+            @update:filteredItems="(v) => (visibleDetailRows[item.Spk] = v)"
+          >
+            <template #item.NoMinta="{ item: d }">
+              <span class="font-weight-bold text-primary">{{ d.NoMinta }}</span>
+            </template>
+            <template #item.TglMinta="{ item: d }">{{
+              formatTanggal(d.TglMinta)
+            }}</template>
+            <template #item.Komponen="{ item: d }">{{
+              d.Komponen || "-"
+            }}</template>
+            <template #item.JmlMinta="{ item: d }">{{
+              fmtNum(d.JmlMinta)
+            }}</template>
+            <template #item.JmlRetur="{ item: d }">{{
+              fmtNum(d.JmlRetur)
+            }}</template>
+            <template #item.NetMinta="{ item: d }">{{
+              fmtNum(d.NetMinta)
+            }}</template>
+            <template #item.NoMutasi="{ item: d }">{{
+              d.NoMutasi || "-"
+            }}</template>
+            <template #item.TglMutasi="{ item: d }">{{
+              formatTanggal(d.TglMutasi)
+            }}</template>
+            <template #item.Potong="{ item: d }">{{
+              fmtNum(d.Potong)
+            }}</template>
+            <template #item.Berat="{ item: d }">{{ fmtNum(d.Berat) }}</template>
+            <template #item.SisaBahan="{ item: d }">{{
+              fmtNum(d.SisaBahan)
+            }}</template>
+            <template #item.Babaran="{ item: d }">{{
+              fmtNum(d.Babaran, 4)
+            }}</template>
+            <template #item.NoMkb="{ item: d }">{{ d.NoMkb || "-" }}</template>
+            <template #item.TglMkb="{ item: d }">{{
+              formatTanggal(d.TglMkb)
+            }}</template>
+            <template #item.QtyMkb="{ item: d }">{{
+              fmtNum(d.QtyMkb)
+            }}</template>
+            <template #item.BabaranMkb="{ item: d }">{{
+              fmtNum(d.BabaranMkb)
+            }}</template>
+            <template #item.Supplier="{ item: d }">{{
+              d.Supplier || "-"
+            }}</template>
+          </DetailFilterTable>
+
+          <!-- Subtotal — sekarang ikut baris yang tampil setelah filter kolom -->
+          <div v-if="detailData[item.Spk]?.length" class="dtl-subtotal-bar">
+            <span class="font-weight-bold">
+              Subtotal{{
+                filters.namaBahan ? ` ("${filters.namaBahan}")` : ""
+              }}:
+            </span>
+            <span class="font-weight-bold ml-2">
+              Net Minta: {{ fmtNum(detailSubtotal(item.Spk).netMinta) }}
+            </span>
+            <span class="font-weight-bold ml-4" style="color: #e65100">
+              Total LHK: {{ fmtNum(detailSubtotal(item.Spk).totalLhk) }} kg
+            </span>
+          </div>
+        </template>
       </div>
     </template>
   </BaseBrowse>
@@ -763,5 +817,16 @@ onMounted(fetchData);
   background: #eceff1;
   border-top: 2px solid #90a4ae;
   padding: 6px 10px;
+}
+.dtl-subtotal-bar {
+  display: flex;
+  align-items: center;
+  background: #eceff1;
+  border: 1px solid #cfd8dc;
+  border-top: 2px solid #90a4ae;
+  border-radius: 0 0 6px 6px;
+  padding: 6px 12px;
+  font-size: 11px;
+  margin-top: -1px;
 }
 </style>
