@@ -329,6 +329,17 @@ onMounted(async () => {
                         class="status-kerja"
                         >{{ data.spk_statuskerja }}</span
                       >
+                      <span
+                        v-if="data.spk_revisi === 'Y'"
+                        style="
+                          color: red;
+                          font-weight: bold;
+                          margin-left: 8px;
+                          font-size: 8pt;
+                        "
+                      >
+                        (REVISI: {{ data.spk_ketrevisi }})
+                      </span>
 
                       <span v-if="data.spk_tipe" class="ml-8 text-xs">
                         Tipe SO : <strong>{{ data.spk_tipe }}</strong>
