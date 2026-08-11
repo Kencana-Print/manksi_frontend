@@ -476,6 +476,12 @@ const menuItems: NavItem[] = [
         menuId: 921,
         subItems: [
           {
+            title: "Cetak Barcode Kaosan",
+            to: "/garmen/bahan-jadi/cetak-barcode-kaosan",
+            icon: IconBarcode,
+            menuId: 130,
+          },
+          {
             title: "Surat Terima Barang Jadi (STBJ)",
             to: "/garmen/bahan-jadi/stbj",
             icon: IconClipboardCheck,

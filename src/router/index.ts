@@ -923,6 +923,41 @@ const router = createRouter({
     },
 
     {
+      path: "/garmen/bahan-jadi/cetak-barcode-kaosan",
+      name: "CetakBarcodeKaosanBrowse",
+      component: () => import("@/views/garmen/CetakBarcodeKaosanView.vue"),
+      meta: {
+        title: "Cetak Barcode Kaosan",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "130",
+      },
+    },
+    {
+      path: "/garmen/bahan-jadi/cetak-barcode-kaosan/create",
+      name: "CetakBarcodeKaosanFormCreate",
+      component: () => import("@/views/garmen/CetakBarcodeKaosanFormView.vue"),
+      meta: {
+        title: "Tambah Barcode Kaosan",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "130",
+        browseRoute: "CetakBarcodeKaosanBrowse",
+      },
+    },
+    {
+      path: "/garmen/bahan-jadi/cetak-barcode-kaosan/edit",
+      name: "CetakBarcodeKaosanFormEdit",
+      component: () => import("@/views/garmen/CetakBarcodeKaosanFormView.vue"),
+      meta: {
+        title: "Ubah Barcode Kaosan",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "130",
+        browseRoute: "CetakBarcodeKaosanBrowse",
+      },
+    },
+    {
       path: "/garmen/bahan-jadi/stbj",
       name: "StbjBrowse",
       component: () => import("@/views/garmen/StbjView.vue"),

@@ -39,39 +39,77 @@ const getBaseUrl = () =>
     "",
   );
 
+const kaosanExtIndex = ref(0);
+const KAOSAN_EXTENSIONS = ["png", "jpeg", "jpg"];
+
+const buildKaosanUrl = (cabangKaosan: string, invdc: string, ext: string) => {
+  const targetUrl = `https://retail.kaosanofficial.com/images/${cabangKaosan}/${encodeURIComponent(invdc)}.${ext}`;
+  return `${api.defaults.baseURL}/proxy-image?url=${encodeURIComponent(targetUrl)}`;
+};
+
+const tryKaosanExt = (cabangKaosan: string, invdc: string, idx: number) => {
+  if (idx >= KAOSAN_EXTENSIONS.length) {
+    resolvedImageUrl.value = "";
+    isLoadingImage.value = false;
+    return;
+  }
+  const url = buildKaosanUrl(cabangKaosan, invdc, KAOSAN_EXTENSIONS[idx]);
+  const img = new Image();
+  img.onload = () => {
+    resolvedImageUrl.value = url;
+    isLoadingImage.value = false;
+  };
+  img.onerror = () => tryKaosanExt(cabangKaosan, invdc, idx + 1);
+  img.src = url;
+};
+
 const resolveDesignImage = () => {
   const base = getBaseUrl();
   const cab = props.formData.spk_cab || props.formData.so_cab || "HO-";
 
-  // Ambil referensi dari form (menggunakan struktur yang benar dari SpkFormView)
   const nomor = props.formData.spk_nomor || "";
   const soRef = props.formData.so_nomor || "";
-  const mapNomor = props.formData.so_map || ""; // <-- Di form, MAP disimpan di so_map
+  const mapNomor = props.formData.so_map || "";
 
-  // PERBAIKAN: Jangan batalkan pencarian jika nomor SPK kosong (karena SPK baru memang belum ada nomor).
-  // Batalkan HANYA jika semua referensi (SPK, SO, dan MAP) kosong.
   if (!nomor && !soRef && !mapNomor) {
     resolvedImageUrl.value = "";
     return;
   }
 
+  // --- LOGIKA KAOSAN RETAIL ---
+  const divisi = String(
+    props.formData.so_divisi || props.formData.spk_divisi || "",
+  ).toUpperCase();
+  const isKaosan =
+    divisi.includes("KAOSAN") || divisi === "3" || divisi.includes("DIVISI 3");
+  const isNewFormatSO = nomor.startsWith("SPK-") || soRef.startsWith("SO-");
+  const invdc =
+    props.formData.spk_invdc ||
+    props.formData.so_invdc ||
+    props.formData.so_nomor_po ||
+    "";
+
+  if (isKaosan && isNewFormatSO && invdc) {
+    kaosanExtIndex.value = 0;
+    const cabangKaosan = invdc.includes(".") ? invdc.split(".")[0] : cab;
+    isLoadingImage.value = true;
+    tryKaosanExt(cabangKaosan, invdc, 0);
+    return;
+  }
+
+  // --- LOGIC LAMA / STANDAR ---
   const candidates: string[] = [];
 
-  // Prioritas 1: Gambar MAP (Paling relevan saat baru tarik SO)
   if (mapNomor) {
     candidates.push(
       `${base}/images/${cab}/map/${encodeURIComponent(mapNomor)}.jpg`,
     );
     candidates.push(`/file-gambar/${encodeURIComponent(mapNomor)}.jpg`);
   }
-
-  // Prioritas 2: Gambar berdasarkan No. SO
   if (soRef && soRef !== nomor) {
     candidates.push(`${base}/images/${cab}/${encodeURIComponent(soRef)}.jpg`);
     candidates.push(`/file-gambar/${encodeURIComponent(soRef)}.jpg`);
   }
-
-  // Prioritas 3: Gambar SPK sendiri (Jika ini mode Edit SPK)
   if (nomor) {
     candidates.push(`${base}/images/${cab}/${encodeURIComponent(nomor)}.jpg`);
     candidates.push(`/file-gambar/${encodeURIComponent(nomor)}.jpg`);
