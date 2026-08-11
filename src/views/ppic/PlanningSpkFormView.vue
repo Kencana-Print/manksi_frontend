@@ -882,7 +882,7 @@ watch(
                         class="gi"
                         :min="formData.pl_tgl1"
                         :max="formData.pl_tgl2"
-                        @change="clampToPeriode('sewing', idx as number)"
+                        @blur="clampToPeriode('sewing', idx as number)"
                       />
                     </td>
                     <td style="padding: 0">
@@ -1047,6 +1047,9 @@ watch(
                         type="date"
                         v-model="row.plan_tgl_jadwal"
                         class="gi"
+                        :min="formData.pl_tgl1"
+                        :max="formData.pl_tgl2"
+                        @blur="clampToPeriode('koli', idx as number)"
                       />
                     </td>
                     <td style="padding: 0">
@@ -1543,12 +1546,24 @@ watch(
   border-radius: 2px;
 }
 
+/* ── Vuetify Flexbox Chain Fix ── */
 :deep(.v-tabs-window) {
   flex: 1;
   min-height: 0;
-  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+:deep(.v-window__container) {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 :deep(.v-tabs-window-item) {
-  height: 100%;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  height: auto; /* Timpa height 100% bawaan */
 }
 </style>
