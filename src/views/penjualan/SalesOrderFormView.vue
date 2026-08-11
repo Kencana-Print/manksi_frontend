@@ -386,6 +386,13 @@ const {
         spk_cmo: data.spk_cmo,
         spk_pinjo: data.spk_pinjo,
         spk_accpending: data.spk_accpending,
+        spk_pending: data.spk_pending,
+        spk_ketpending: data.spk_ketpending,
+        spk_ppotong: data.spk_ppotong,
+        spk_pcetak: data.spk_pcetak,
+        spk_pbordir: data.spk_pbordir,
+        spk_pjahit: data.spk_pjahit,
+        spk_pfinishing: data.spk_pfinishing,
         spk_nomormemo: data.spk_nomormemo, // ← No SJ Memo
         spk_memo: data.spk_memo, // ← No MAP
         spk_tipe: data.spk_tipe, // ← Tipe SPK
