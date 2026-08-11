@@ -277,9 +277,10 @@ const {
     };
   },
   submitApi: async (dataToSave: MintaHargaForm): Promise<unknown> => {
+    const { Kalkulasi, ...dataPermintaanHarga } = dataToSave;
     return await api.post("/penjualan/minta-harga-form/save", {
       isNewMode: !isEditMode.value,
-      data: dataToSave,
+      data: dataPermintaanHarga,
     });
   },
   onSuccess: async (response: any) => {

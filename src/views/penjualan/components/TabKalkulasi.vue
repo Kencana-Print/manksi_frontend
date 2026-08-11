@@ -148,6 +148,32 @@ const onTambahanChange = (item: any) => {
   }
 };
 
+const isSavingKalkulasi = ref(false);
+const saveKalkulasiOnly = async () => {
+  if (!props.formData.Nomor) {
+    toast.warning(
+      "Simpan data Permintaan Harga (Tab 1) terlebih dahulu sebelum menyimpan Kalkulasi.",
+    );
+    return;
+  }
+  isSavingKalkulasi.value = true;
+  try {
+    const res = await api.post("/penjualan/minta-harga-form/save-kalkulasi", {
+      nomorMh: props.formData.Nomor,
+      kal: kal.value,
+      namaPekerjaan: props.formData.NamaPekerjaan,
+      custKode: props.formData.CustKode,
+      rencanaOrder: props.formData.RencanaOrder,
+    });
+    kal.value.NomorKalkulasi = res.data.data.nomorKal;
+    toast.success("Kalkulasi berhasil disimpan.");
+  } catch (e: any) {
+    toast.error(e.response?.data?.message || "Gagal menyimpan kalkulasi.");
+  } finally {
+    isSavingKalkulasi.value = false;
+  }
+};
+
 // ── Totals ─────────────────────────────────────────────────────────────
 const TotCetak = computed(() =>
   kal.value.GridCetak.reduce(
@@ -198,22 +224,22 @@ watch(
     }
     kal.value.HargaSesuai = Math.round(newHpp + laba);
   },
-  { immediate: true },
+  { immediate: false },
 );
 
 // ── Watchers untuk Trigger loadKomponen ───────────────────────────────
-watch(
-  () => [
-    kal.value.JenisKain,
-    kal.value.Warna,
-    kal.value.Model,
-    props.formData.RencanaOrder,
-  ],
-  () => {
-    // Jalankan metadata loader jika data berubah (kecuali saat awal load data edit)
-    fetchKalkulasiMetadata();
-  },
-);
+// watch(
+//   () => [
+//     kal.value.JenisKain,
+//     kal.value.Warna,
+//     kal.value.Model,
+//     props.formData.RencanaOrder,
+//   ],
+//   () => {
+//     // Jalankan metadata loader jika data berubah (kecuali saat awal load data edit)
+//     fetchKalkulasiMetadata();
+//   },
+// );
 
 // ── Luas Bordir & DTF ──────────────────────────────────────────────────
 const luasBordir = computed(() => {
@@ -327,6 +353,21 @@ const rows8 = Array.from({ length: 8 }, (_, i) => i + 1);
       <IconLock :size="13" class="mr-1" />
       Akses Ditolak: Kalkulasi ini terkunci karena terakhir dimodifikasi oleh
       departemen FINANCE.
+    </div>
+
+    <div class="tk-save-bar">
+      <button
+        type="button"
+        class="tk-save-btn"
+        :disabled="isSavingKalkulasi"
+        @click="saveKalkulasiOnly"
+      >
+        {{ isSavingKalkulasi ? "Menyimpan..." : "💾 Simpan Kalkulasi" }}
+      </button>
+      <span class="tk-save-hint">
+        Perubahan di tab ini TIDAK ikut tersimpan otomatis saat Simpan
+        Permintaan Harga (Tab 1).
+      </span>
     </div>
 
     <!-- 3-kolom layout — pointer-events dinonaktifkan bila terkunci -->
@@ -754,6 +795,37 @@ const rows8 = Array.from({ length: 8 }, (_, i) => i + 1);
 .tk-right {
   width: 220px;
   flex-shrink: 0;
+}
+.tk-save-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  background: #e3f2fd;
+  border: 1px solid #90caf9;
+  border-radius: 4px;
+  margin-bottom: 8px;
+}
+.tk-save-btn {
+  background: #1565c0;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.tk-save-btn:hover {
+  background: #0d47a1;
+}
+.tk-save-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.tk-save-hint {
+  font-size: 10px;
+  color: #1565c0;
 }
 
 /* Section card */

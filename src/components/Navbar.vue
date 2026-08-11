@@ -967,7 +967,7 @@ const menuItems: NavItem[] = [
             menuId: 509,
           },
           {
-            title: "SPK Belum Ada MKB",
+            title: "SO Belum Ada MKB",
             to: "/laporan/gudang-garmen/spk-belum-mkb",
             icon: IconFileAlert,
             menuId: 510,

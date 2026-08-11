@@ -25,7 +25,7 @@ const filterState = ref({
 
 // Kolom tabel di layar (sesuai referensi Delphi)
 const headers = [
-  { title: "No. SPK", key: "SPK", width: "140px", fixed: true },
+  { title: "No. SO", key: "SPK", width: "140px", fixed: true },
   { title: "Tanggal", key: "Tanggal", width: "100px", align: "center" },
   { title: "Dateline", key: "Dateline", width: "100px", align: "center" },
   { title: "Div", key: "Divisi", width: "60px", align: "center" },
@@ -61,7 +61,7 @@ const onExport = async () => {
   try {
     // 1. Definisikan susunan & lebar kolom Excel
     const excelCols: ExcelColumn[] = [
-      { header: "No. SPK", key: "SPK", width: 18 },
+      { header: "No. SO", key: "SPK", width: 18 },
       { header: "Tanggal", key: "Tanggal", width: 14, align: "center" },
       { header: "Dateline", key: "Dateline", width: 14, align: "center" },
       { header: "Divisi", key: "Divisi", width: 10, align: "center" },
@@ -89,11 +89,11 @@ const onExport = async () => {
 
     // 3. Panggil utilitas exportExcelSingle
     await exportExcelSingle(
-      `Laporan_SPK_Belum_MKB_${filterState.value.startDate}.xlsx`,
-      "SPK Belum MKB",
+      `Laporan_SO_Belum_MKB_${filterState.value.startDate}.xlsx`,
+      "SO Belum MKB",
       excelCols,
       rowsData,
-      `DAFTAR SPK BELUM ADA MKB (Mulai Tanggal: ${filterState.value.startDate.split("-").reverse().join("/")})`,
+      `DAFTAR SO BELUM ADA MKB (Mulai Tanggal: ${filterState.value.startDate.split("-").reverse().join("/")})`,
     );
   } catch (error) {
     toast.error("Gagal melakukan export data ke Excel.");
@@ -108,7 +108,7 @@ const fmtNum = (val: number) =>
 
 <template>
   <BaseBrowse
-    title="Laporan SPK Belum Ada MKB"
+    title="Laporan SO Belum Ada MKB"
     :menu-id="menuId"
     :icon="IconFileAlert"
     :headers="headers"
@@ -122,7 +122,7 @@ const fmtNum = (val: number) =>
   >
     <template #filter-left>
       <div class="f-group">
-        <span class="f-label">SPK Mulai Tgl</span>
+        <span class="f-label">SO Mulai Tgl</span>
         <input
           type="date"
           v-model="filterState.startDate"
