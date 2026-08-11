@@ -511,22 +511,23 @@ const onLihatGambar = () => {
   const base = (api.defaults.baseURL || "").replace(/\/api\/?$/, "");
   const cab = selectedItem.value.Cab || "HO-";
   const nomor = selectedItem.value.Nomor;
-  const map = selectedItem.value.MAP || "";
 
   const divisi = String(selectedItem.value.Divisi || "").toUpperCase();
   const invdc = selectedItem.value["Pesanan/Invoice"] || "";
 
   const isKaosan =
     divisi.includes("KAOSAN") || divisi === "3" || divisi.includes("DIVISI 3");
-  const isNewFormatSO = String(nomor || "").startsWith("SO-"); // ← BARU
+  const isNewFormatSO = String(nomor || "").startsWith("SO-");
 
   if (isKaosan && isNewFormatSO && invdc) {
-    // ← tambah isNewFormatSO
     const cabangKaosan = invdc.includes(".") ? invdc.split(".")[0] : cab;
     gambarUrl.value = buildKaosanUrl(cabangKaosan, invdc, KAOSAN_EXTENSIONS[0]);
   } else {
-    const identifier = map || nomor;
-    gambarUrl.value = `${base}/images/${cab}/${encodeURIComponent(identifier)}.jpg`;
+    // [FIX] Prioritaskan gambar upload ulang SENDIRI (by nomor SO),
+    // MAP cuma jadi fallback di onGambarError kalau ini gagal —
+    // sebelumnya MAP dicek duluan (identifier = map || nomor), jadi
+    // gambar upload ulang yang sudah ada tidak pernah kepakai.
+    gambarUrl.value = `${base}/images/${cab}/${encodeURIComponent(nomor)}.jpg`;
   }
 
   dialogGambar.value = true;
@@ -539,10 +540,9 @@ const onGambarError = () => {
   const divisi = String(selectedItem.value.Divisi || "").toUpperCase();
   const isKaosan =
     divisi.includes("KAOSAN") || divisi === "3" || divisi.includes("DIVISI 3");
-  const isNewFormatSO = String(nomor || "").startsWith("SO-"); // ← BARU
+  const isNewFormatSO = String(nomor || "").startsWith("SO-");
 
   if (isKaosan && isNewFormatSO) {
-    // ← tambah isNewFormatSO
     kaosanExtIndex.value++;
     if (kaosanExtIndex.value < KAOSAN_EXTENSIONS.length) {
       const invdc = selectedItem.value["Pesanan/Invoice"] || "";
@@ -563,13 +563,20 @@ const onGambarError = () => {
   const cab = selectedItem.value.Cab || "HO-";
   const map = selectedItem.value.MAP || "";
 
+  // [FIX] Fallback chain baru: nomor sendiri (sudah dicoba di
+  // onLihatGambar, ini yang gagal) -> gambar MAP -> file-gambar/nomor
+  // -> file-gambar/map. Urutan lama nyoba MAP duluan di step ini juga
+  // (setelah gagal di percobaan pertama yang JUGA MAP) — sekarang MAP
+  // baru dicoba di sini, bukan di awal.
   if (gambarFallbackStep.value === 0 && map) {
     gambarFallbackStep.value = 1;
     gambarUrl.value = `${base}/images/${cab}/map/${encodeURIComponent(map)}.jpg`;
   } else if (gambarFallbackStep.value <= 1) {
     gambarFallbackStep.value = 2;
-    const identifier = map || nomor;
-    gambarUrl.value = `${base}/file-gambar/${encodeURIComponent(identifier)}.jpg`;
+    gambarUrl.value = `${base}/file-gambar/${encodeURIComponent(nomor)}.jpg`;
+  } else if (gambarFallbackStep.value === 2 && map && map !== nomor) {
+    gambarFallbackStep.value = 3;
+    gambarUrl.value = `${base}/file-gambar/${encodeURIComponent(map)}.jpg`;
   }
 };
 

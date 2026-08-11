@@ -12,6 +12,9 @@ import SpkTabKomponen from "./components/SpkTabKomponen.vue";
 import SpkTabLayoutProses from "./components/SpkTabLayoutProses.vue";
 import SpkTabKeterangan from "./components/SpkTabKeterangan.vue";
 import SpkTabAlokasi from "./components/SpkTabAlokasi.vue";
+import SpkTabKaosan from "./components/SpkTabKaosan.vue";
+
+import BarangKaosanSearchModal from "@/components/lookups/BarangKaosanSearchModal.vue";
 
 const route = useRoute();
 const router = useRouter();
@@ -64,6 +67,8 @@ const defaultData = {
   KeteranganKhusus: [] as string[],
   KetKomponenList: [] as any[],
   Alokasi: [] as any[],
+
+  Kaosan: [] as any[],
 };
 
 const {
@@ -120,6 +125,7 @@ const {
         checked: k.checked === 1 || k.checked === true,
       })),
       Alokasi: d.alokasi || [],
+      Kaosan: d.dtlKaosan || [],
     };
   },
 
@@ -134,6 +140,7 @@ const {
       keteranganKhusus: data.KeteranganKhusus,
       ketKomponenList: data.KetKomponenList,
       alokasi: data.Alokasi,
+      dtlKaosan: data.Kaosan,
     };
 
     if (isEditMode.value) {
@@ -212,14 +219,60 @@ const validateSave = () => {
   showSaveDialog.value = true;
 };
 
+const isDivisiTiga = computed(() =>
+  String(formData.value.so_divisi).startsWith("3"),
+);
+
+const showBarangKaosanModal = ref(false);
+const activeKaosanIndex = ref(-1);
+
+const handleOpenLookupBarang = (index: number) => {
+  activeKaosanIndex.value = index;
+  showBarangKaosanModal.value = true;
+};
+
+const setBarangKaosan = (selectedItems: any[]) => {
+  if (!selectedItems || selectedItems.length === 0) return;
+  const idx = activeKaosanIndex.value;
+  let isFirstItem = true;
+
+  selectedItems.forEach((v) => {
+    const exists = formData.value.Kaosan.some(
+      (k: any, i: number) =>
+        i !== idx && k.kode === v.Kode && k.ukuran === v.Ukuran,
+    );
+    if (exists) return;
+
+    if (isFirstItem && idx >= 0 && !formData.value.Kaosan[idx].kode) {
+      formData.value.Kaosan[idx].kode = v.Kode;
+      formData.value.Kaosan[idx].nama = v.Nama;
+      formData.value.Kaosan[idx].ukuran = v.Ukuran;
+      formData.value.Kaosan[idx].qtyorder = 1;
+      isFirstItem = false;
+    } else {
+      formData.value.Kaosan.push({
+        kode: v.Kode,
+        nama: v.Nama,
+        ukuran: v.Ukuran,
+        qtyorder: 1,
+      });
+    }
+  });
+  activeKaosanIndex.value = -1;
+};
+
 onMounted(async () => {
   if (isEditMode.value) await fetchData();
 });
 
 const tabs = computed(() => {
+  const kaosanTab = isDivisiTiga.value
+    ? [{ key: "kaosan", title: "Kaosan" }]
+    : [];
   if (formData.value.isPremiumFlow) {
     return [
       { key: "order", title: "Order" },
+      ...kaosanTab,
       { key: "komponen", title: "Komponen SPK" },
       { key: "layout", title: "Layout Proses" },
       { key: "keterangan", title: "Keterangan" },
@@ -227,6 +280,7 @@ const tabs = computed(() => {
   }
   return [
     { key: "order", title: "Order" },
+    ...kaosanTab,
     { key: "alokasi", title: "Alokasi" },
     { key: "keterangan", title: "Keterangan" },
   ];
@@ -284,6 +338,16 @@ watch(tabs, (newTabs) => {
           <div v-show="tabs[activeTab]?.key === 'layout'" class="pf-tab-pane">
             <SpkTabLayoutProses :form-data="formData" :is-edit="isEditMode" />
           </div>
+          <div
+            v-if="isDivisiTiga"
+            v-show="tabs[activeTab]?.key === 'kaosan'"
+            class="pf-tab-pane"
+          >
+            <SpkTabKaosan
+              :form-data="formData"
+              @open-lookup-barang="handleOpenLookupBarang"
+            />
+          </div>
         </template>
 
         <!-- Tab legacy only -->
@@ -306,6 +370,11 @@ watch(tabs, (newTabs) => {
       </div>
     </div>
   </BaseForm>
+
+  <BarangKaosanSearchModal
+    v-model="showBarangKaosanModal"
+    @selected="setBarangKaosan"
+  />
 </template>
 
 <style scoped>

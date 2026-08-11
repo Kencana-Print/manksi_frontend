@@ -66,23 +66,22 @@ const buildKaosanUrl = (cabangKaosan: string, invdc: string, ext: string) => {
 const mainImageUrl = computed(() => {
   if (!data.value?.spk_nomor) return "";
 
-  // ← BARU: Kaosan (divisi 3) & format baru (SO-...) → ambil dari retail via proxy
   if (isKaosan.value && isNewFormatSO.value && data.value.spk_invdc) {
     const invdc = data.value.spk_invdc;
     const cab = data.value.spk_cab || "HO-";
     const cabangKaosan = invdc.includes(".") ? invdc.split(".")[0] : cab;
-    return buildKaosanUrl(cabangKaosan, invdc, "png"); // percobaan pertama
+    return buildKaosanUrl(cabangKaosan, invdc, "png");
   }
 
-  // ── SPK lama (format non-SO-) & non-Kaosan: logic asli, tidak diubah ──
   const rawBase = api.defaults.baseURL || import.meta.env.VITE_API_URL || "";
   const base = rawBase.replace(/\/api\/?$/, "");
   const cab = data.value.spk_cab || "HO-";
-  const memo = data.value.spk_memo;
 
-  if (memo) {
-    return `${base}/images/${cab}/map/${encodeURIComponent(memo)}.jpg`;
-  }
+  // [FIX] Prioritaskan gambar upload ulang SENDIRI (by nomor SO) —
+  // sebelumnya MAP dicek duluan (if memo return map url), jadi gambar
+  // upload ulang yang sudah ada di SO itu sendiri tidak pernah muncul
+  // selama SO-nya punya referensi MAP. MAP sekarang cuma fallback di
+  // handleImageError.
   return `${base}/images/${cab}/${encodeURIComponent(data.value.spk_nomor)}.jpg`;
 });
 
@@ -97,7 +96,6 @@ const handleSignatureError = (e: Event) => {
 const handleImageError = (e: Event) => {
   const img = e.target as HTMLImageElement;
 
-  // ← BARU: khusus Kaosan format baru — coba ekstensi lain dulu
   if (isKaosan.value && isNewFormatSO.value && data.value.spk_invdc) {
     const currentIdx = Number(img.dataset.kaosanExtIdx || "0");
     const nextIdx = currentIdx + 1;
@@ -110,8 +108,6 @@ const handleImageError = (e: Event) => {
       img.src = buildKaosanUrl(cabangKaosan, invdc, KAOSAN_EXTENSIONS[nextIdx]);
       return;
     }
-
-    // Semua ekstensi retail gagal → fallback ke /file-gambar/ pakai nomor SO
     if (img.dataset.fallbackTried === "true") {
       img.style.display = "none";
       return;
@@ -121,18 +117,34 @@ const handleImageError = (e: Event) => {
     return;
   }
 
-  // ── SPK lama / non-Kaosan: logic asli, tidak diubah ──
-  if (img.dataset.fallbackTried === "true") {
-    img.style.display = "none";
+  // [FIX] Fallback chain baru: nomor sendiri (sudah gagal, ini yang
+  // trigger onerror) -> gambar MAP -> file-gambar/nomor -> file-gambar/map
+  const base = (
+    api.defaults.baseURL ||
+    import.meta.env.VITE_API_URL ||
+    ""
+  ).replace(/\/api\/?$/, "");
+  const cab = data.value.spk_cab || "HO-";
+  const memo = data.value.spk_memo;
+  const nomor = data.value.spk_nomor;
+  const step = Number(img.dataset.fbStep || "0");
+
+  if (step === 0 && memo) {
+    img.dataset.fbStep = "1";
+    img.src = `${base}/images/${cab}/map/${encodeURIComponent(memo)}.jpg`;
     return;
   }
-  img.dataset.fallbackTried = "true";
-  const nomor = data.value.spk_memo || data.value.spk_nomor;
-  if (nomor) {
+  if (step <= 1 && nomor) {
+    img.dataset.fbStep = "2";
     img.src = `/file-gambar/${encodeURIComponent(nomor)}.jpg`;
-  } else {
-    img.style.display = "none";
+    return;
   }
+  if (step <= 2 && memo && memo !== nomor) {
+    img.dataset.fbStep = "3";
+    img.src = `/file-gambar/${encodeURIComponent(memo)}.jpg`;
+    return;
+  }
+  img.style.display = "none";
 };
 
 // ── Date helpers (no timezone shift) ──
