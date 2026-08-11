@@ -332,36 +332,32 @@ const waitForImages = (el: HTMLElement) => {
 const fitPageToA4 = async () => {
   if (!p1PageEl.value || !p1InnerEl.value) return;
 
+  // 1. Reset ukuran agar bisa tumbuh maksimal sesuai isinya
   p1Scale.value = 1;
   p1MultiPage.value = false;
-  p1ScaledHeightStyle.value = "auto";
+  p1ScaledHeightStyle.value = "max-content";
   await nextTick();
   await waitForImages(p1InnerEl.value);
   await nextTick();
 
-  // Buffer aman ~3mm (di 96dpi ≈ 11px) — kompensasi selisih pembulatan
-  // mm↔px antara render browser biasa vs print engine Chrome, supaya
-  // konten yang "pas banget" gak kepental ke halaman 2 saat benar-benar
-  // dicetak/preview print (walau di layar biasa keliatan muat).
-  const PRINT_SAFETY_BUFFER_PX = 4;
-  const availablePx = p1PageEl.value.clientHeight - PRINT_SAFETY_BUFFER_PX;
+  // 2. Dapatkan ukuran asli vs ukuran aman kertas A4
+  const availablePx =
+    p1PageEl.value.clientHeight > 0 ? p1PageEl.value.clientHeight - 40 : 1040;
   const contentPx = p1InnerEl.value.scrollHeight;
 
+  // 3. Eksekusi kalkulasi
   if (contentPx <= availablePx) {
-    // Konten muat natural — TIDAK perlu dipaksa tinggi persis. CSS
-    // flex (.page1-scale-inner { flex: 1 }) yang dorong blok TTD ke
-    // bawah halaman, otomatis nyesuaiin diri kapan pun (termasuk kalau
-    // ada elemen yang selesai render belakangan, misal QR code) —
-    // sehingga tidak berisiko kepotong seperti sebelumnya.
+    p1ScaledHeightStyle.value = "auto";
     return;
   }
 
   const requiredScale = availablePx / contentPx;
   if (requiredScale >= MIN_PRINT_SCALE) {
     p1Scale.value = requiredScale;
-    p1ScaledHeightStyle.value = `${availablePx}px`;
+    p1ScaledHeightStyle.value = `${contentPx}px`; // Kunci tingginya
   } else {
     p1Scale.value = 1;
+    p1ScaledHeightStyle.value = "auto";
     p1MultiPage.value = true;
   }
 };
@@ -1984,19 +1980,24 @@ Keterangan Komponen :
 
 /* ── Auto-fit A4 (Page 1, format baru) ── */
 .print-page.page-1 {
-  min-height: 297mm;
-  overflow: visible;
+  width: 210mm;
+  height: 297mm;
+  max-height: 297mm;
+  margin: 0 auto;
+  padding: 10mm 12mm;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
 }
-.print-page.page-1.print-page--multi {
-  height: auto;
-  min-height: 297mm;
-  overflow: visible;
-}
+
 .page1-scale-inner {
   display: flex;
   flex-direction: column;
   width: 100%;
-  flex: 1;
+  flex-shrink: 0 !important; /* <--- KUNCI UTAMA: Mencegah tergencet! */
+  transform-origin: top center;
 }
 
 /* Cegah baris tabel/box kepotong di tengah pas fallback multi-halaman */
