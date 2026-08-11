@@ -192,6 +192,8 @@ function mapHeaderToFormData(h: any) {
     so_sablon: h.spk_sablon || "N",
     so_bordir: h.spk_bordir || "N",
     so_sublim: h.spk_sublim || "N",
+spk_invdc: h.spk_invdc || "", 
+    spk_pen_nomor: h.spk_pen_nomor || "" 
   };
 }
 

@@ -83,15 +83,17 @@ const resolveDesignImage = () => {
   const isKaosan =
     divisi.includes("KAOSAN") || divisi === "3" || divisi.includes("DIVISI 3");
   const isNewFormatSO = nomor.startsWith("SPK-") || soRef.startsWith("SO-");
-  const invdc =
-    props.formData.spk_invdc ||
-    props.formData.so_invdc ||
-    props.formData.so_nomor_po ||
-    "";
 
-  if (isKaosan && isNewFormatSO && invdc) {
+  // Tarik Invdc atau No Penawaran (Hindari spasi agar nama customer tidak masuk)
+  const invdc = props.formData.spk_invdc || props.formData.spk_pen_nomor || "";
+
+  if (isKaosan && isNewFormatSO && invdc && !invdc.includes(" ")) {
     kaosanExtIndex.value = 0;
-    const cabangKaosan = invdc.includes(".") ? invdc.split(".")[0] : cab;
+    // Format "K08.2026.00087" -> "K08"
+    const cabangKaosan = invdc.includes(".")
+      ? invdc.split(".")[0]
+      : invdc.substring(0, 3);
+
     isLoadingImage.value = true;
     tryKaosanExt(cabangKaosan, invdc, 0);
     return;
