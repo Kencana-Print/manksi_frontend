@@ -430,15 +430,6 @@ const validateSave = () => {
           />
         </div>
         <div class="fr">
-          <label class="lbl">Tanggal</label>
-          <input
-            type="date"
-            v-model="formData.pf_tanggal"
-            class="inp"
-            style="width: 150px"
-          />
-        </div>
-        <div class="fr">
           <label class="lbl">Jam</label>
           <input
             type="time"
