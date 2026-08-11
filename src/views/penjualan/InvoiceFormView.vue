@@ -590,6 +590,22 @@ const doCetak = (mode: "dotmatrix" | "inkjet") => {
   showPrintDialog.value = false;
   router.push({ name: "InvoiceBrowse" });
 };
+// ── Print Kunci (Sesuai Delphi F3) ──────────────────────────────────────
+const handlePrintIcon = () => {
+  if (fd.value.Apv === "N") {
+    toast.error(
+      "Belum bisa cetak! Ada SO yang belum dibuatkan Surat Jalan. Menunggu approval.",
+    );
+    return;
+  }
+  if (fd.value.Apv === "T") {
+    toast.error("Tidak di-approve. Invoice ini tidak bisa dicetak.");
+    return;
+  }
+
+  savedNomor.value = fd.value.NomorInv;
+  showPrintDialog.value = true;
+};
 
 // ── Lifecycle ─────────────────────────────────────────────────────────────
 onMounted(async () => {
@@ -614,6 +630,8 @@ onMounted(async () => {
     :is-loading="isLoading"
     :is-saving="isSaving"
     item-name="Invoice"
+    :can-print="isEditMode"
+    @print="handlePrintIcon"
     v-model:show-save-dialog="showSaveDialog"
     v-model:show-cancel-dialog="showCancelDialog"
     v-model:show-close-dialog="showCloseDialog"
@@ -917,6 +935,9 @@ onMounted(async () => {
                   :class="[
                     i % 2 === 1 && row.Kode ? 'rs' : '',
                     !row.Kode ? 'row-empty' : '',
+                    row.Kode && !row.SjNomor && row.SjNomor !== '-'
+                      ? 'row-no-sj'
+                      : '',
                   ]"
                 >
                   <td class="tc muted" style="font-size: 10px">
@@ -1547,5 +1568,16 @@ onMounted(async () => {
   font-size: 11px;
   font-weight: 600;
   margin-bottom: 6px;
+}
+/* ── Baris Merah (Belum ada SJ) ── */
+.row-no-sj td {
+  background: #ffebee !important; /* Latar belakang merah muda */
+}
+.row-no-sj input.ci {
+  color: #c62828 !important; /* Teks input menjadi merah tebal */
+  font-weight: 700;
+}
+.row-no-sj:hover td {
+  background: #ffcdd2 !important;
 }
 </style>
