@@ -206,6 +206,7 @@ const isSearchingPacking = ref(false);
 const openPackingSearchModal = () => {
   packingSearchQ.value = "";
   packingSearchResults.value = [];
+  selectedPacking.value = new Map();
   showPackingSearchModal.value = true;
 };
 
@@ -391,60 +392,65 @@ const addSpgToGrid = async (spgNomor: string) => {
   }
 };
 
-const addPackingToGrid = async (packNomor: string) => {
+// Core: fetch + push ke grid, TANPA toggle loading/toast (dipakai
+// untuk single-add maupun batch-add dari multi-select)
+const fetchAndAddPacking = async (packNomor: string): Promise<boolean> => {
   const alreadyLoaded = fd.value.Detail.some((r) => r.Packing === packNomor);
-  if (alreadyLoaded) {
-    toast.warning(`No. Packing ${packNomor} sudah ada di grid.`);
-    return;
-  }
-  isLoadingPacking.value = true;
-  try {
-    const res = await svc.getPackingDetail(
-      packNomor,
-      (route.query.nomor as string) || "",
-    );
-    const rows = res.data.data || [];
-    if (!rows.length) {
-      toast.warning(`No. Packing ${packNomor} tidak ada data tersedia.`);
-      return;
-    }
+  if (alreadyLoaded) return false;
 
-    // ⬅ FIX: bersihkan baris kosong placeholder yang sudah ada SEBELUM
-    // nambah data baru — sebelumnya cuma push ke akhir tanpa hapus
-    // placeholder lama, jadi baris kosong "kejepit" di atas data baru
-    // (kosong → data → kosong lagi dari ensureEmptyRow()).
-    fd.value.Detail = fd.value.Detail.filter((r) => r.SpkNomor);
+  const res = await svc.getPackingDetail(
+    packNomor,
+    (route.query.nomor as string) || "",
+  );
+  const rows = res.data.data || [];
+  if (!rows.length) return false;
 
-    for (const r of rows) {
-      fd.value.Detail.push({
+  // Bersihkan baris kosong placeholder sebelum nambah data baru
+  fd.value.Detail = fd.value.Detail.filter((r) => r.SpkNomor);
+
+  for (const r of rows) {
+    fd.value.Detail.push({
+      _key: _key++,
+      Packing: r.Packing,
+      SpkNomor: r.SpkNomor,
+      NamaSpk: r.NamaSpk,
+      Ukuran: r.Ukuran,
+      TotalOrder: Number(r.TotalOrder) || 0,
+      Size: r.Size,
+      QtyOrder: Number(r.QtyOrder) || 0,
+      Jumlah: Number(r.Jumlah) || 0,
+      Koli: 0,
+      Jadi: Number(r.Jadi) || 0,
+      Kurang: Number(r.Kurang) || 0,
+      Keterangan: "",
+    });
+    for (const dc of r.dc || []) {
+      fd.value.Detail2.push({
         _key: _key++,
         Packing: r.Packing,
         SpkNomor: r.SpkNomor,
-        NamaSpk: r.NamaSpk,
-        Ukuran: r.Ukuran,
-        TotalOrder: Number(r.TotalOrder) || 0,
-        Size: r.Size,
-        QtyOrder: Number(r.QtyOrder) || 0,
-        Jumlah: Number(r.Jumlah) || 0,
-        Koli: 0,
-        Jadi: Number(r.Jadi) || 0,
-        Kurang: Number(r.Kurang) || 0,
-        Keterangan: "",
+        KodeKaosan: dc.brg_kode,
+        NamaKaosan: dc.Nama,
+        Size: dc.size,
+        Jumlah: dc.packd_qty,
       });
-      for (const dc of r.dc || []) {
-        fd.value.Detail2.push({
-          _key: _key++,
-          Packing: r.Packing,
-          SpkNomor: r.SpkNomor,
-          KodeKaosan: dc.brg_kode,
-          NamaKaosan: dc.Nama,
-          Size: dc.size,
-          Jumlah: dc.packd_qty,
-        });
-      }
     }
-    ensureEmptyRow();
-    toast.success(`No. Packing ${packNomor} berhasil ditambahkan.`);
+  }
+  return true;
+};
+
+// Single-add (dipanggil dari klik langsung baris tanpa checkbox, kalau
+// masih dipakai di tempat lain)
+const addPackingToGrid = async (packNomor: string) => {
+  isLoadingPacking.value = true;
+  try {
+    const ok = await fetchAndAddPacking(packNomor);
+    if (ok) {
+      ensureEmptyRow();
+      toast.success(`No. Packing ${packNomor} berhasil ditambahkan.`);
+    } else {
+      toast.warning(`No. Packing ${packNomor} kosong atau sudah ada di grid.`);
+    }
   } catch (e: any) {
     toast.error(e.response?.data?.message || "Gagal memuat packing.");
   } finally {
@@ -452,10 +458,54 @@ const addPackingToGrid = async (packNomor: string) => {
   }
 };
 
-const selectPackingFromSearch = (item: any) => {
+// Batch-add — dipanggil dari tombol OK setelah checkbox dipilih beberapa
+const confirmSelectedPacking = async () => {
+  const items = selectedPackingList.value;
+  if (!items.length) return;
   showPackingSearchModal.value = false;
-  addPackingToGrid(item.Nomor);
+  isLoadingPacking.value = true;
+  let successCount = 0;
+  try {
+    for (const item of items) {
+      try {
+        const ok = await fetchAndAddPacking(item.Nomor);
+        if (ok) successCount++;
+      } catch {
+        // lanjut ke item berikutnya, jangan hentikan seluruh batch
+      }
+    }
+    ensureEmptyRow();
+    if (successCount > 0) {
+      toast.success(`${successCount} No. Packing berhasil ditambahkan.`);
+    }
+    if (successCount < items.length) {
+      toast.warning(
+        `${items.length - successCount} packing dilewati (kosong/sudah ada).`,
+      );
+    }
+  } finally {
+    isLoadingPacking.value = false;
+    selectedPacking.value = new Map();
+  }
 };
+
+// ── Multi-select state untuk modal Cari No. Packing ──
+const selectedPacking = ref<Map<string, any>>(new Map());
+const selectedPackingList = computed(() =>
+  Array.from(selectedPacking.value.values()),
+);
+
+const togglePackingSelect = (item: any) => {
+  const next = new Map(selectedPacking.value);
+  if (next.has(item.Nomor)) {
+    next.delete(item.Nomor);
+  } else {
+    next.set(item.Nomor, item);
+  }
+  selectedPacking.value = next;
+};
+
+const isPackingSelected = (nomor: string) => selectedPacking.value.has(nomor);
 
 // ── Load from Packing (btnPacking) ────────────────────────────────────
 const showPackingConfirmDialog = ref(false);
@@ -1172,8 +1222,8 @@ const totalJumlah2 = computed(() =>
     </v-card>
   </v-dialog>
 
-  <!-- ── Modal Cari No. Packing ── -->
-  <v-dialog v-model="showPackingSearchModal" max-width="480px">
+  <!-- ── Modal Cari No. Packing (Multi-Select) ── -->
+  <v-dialog v-model="showPackingSearchModal" max-width="560px">
     <v-card class="rounded-lg">
       <v-card-title
         class="bg-primary text-white pa-3"
@@ -1195,8 +1245,15 @@ const totalJumlah2 = computed(() =>
             v-for="item in packingSearchResults"
             :key="item.Nomor"
             class="mi"
-            @click="selectPackingFromSearch(item)"
+            :class="{ 'mi-selected': isPackingSelected(item.Nomor) }"
+            @click="togglePackingSelect(item)"
           >
+            <input
+              type="checkbox"
+              :checked="isPackingSelected(item.Nomor)"
+              @click.stop="togglePackingSelect(item)"
+              style="margin-right: 6px; flex-shrink: 0"
+            />
             <span class="mk">{{ item.Nomor }}</span>
             <span style="flex: 1"
               >{{ item.SpkNomor }} — {{ item.NamaSpk }}</span
@@ -1210,15 +1267,48 @@ const totalJumlah2 = computed(() =>
             Ketik untuk mencari No. Packing yang belum dipakai STBJ.
           </div>
         </div>
+
+        <!-- ── Preview yang sudah dipilih ── -->
+        <div v-if="selectedPackingList.length" class="sp-box">
+          <div class="sp-title">
+            Dipilih ({{ selectedPackingList.length }}):
+          </div>
+          <div class="sp-list">
+            <span
+              v-for="item in selectedPackingList"
+              :key="item.Nomor"
+              class="sp-chip"
+            >
+              {{ item.Nomor }}
+              <button
+                type="button"
+                class="sp-chip-x"
+                @click.stop="togglePackingSelect(item)"
+              >
+                ×
+              </button>
+            </span>
+          </div>
+        </div>
       </v-card-text>
-      <v-card-actions class="pa-2">
-        <v-spacer />
+      <v-card-actions class="pa-3 border-t" style="gap: 8px">
         <v-btn
           size="small"
           variant="text"
           @click="showPackingSearchModal = false"
-          >Tutup</v-btn
         >
+          Tutup
+        </v-btn>
+        <v-spacer />
+        <v-btn
+          size="small"
+          variant="flat"
+          color="primary"
+          :disabled="!selectedPackingList.length"
+          @click="confirmSelectedPacking"
+        >
+          Tambahkan ({{ selectedPackingList.length }})
+        </v-btn>
       </v-card-actions>
     </v-card>
   </v-dialog>
@@ -1784,5 +1874,59 @@ const totalJumlah2 = computed(() =>
 .tbtn-purple {
   background: #6a1b9a;
   color: white;
+}
+
+.mi {
+  display: flex;
+  align-items: center;
+}
+.mi-selected {
+  background: #e3f2fd;
+}
+.sp-box {
+  margin-top: 8px;
+  border-top: 1px solid #eee;
+  padding-top: 8px;
+}
+.sp-title {
+  font-size: 10px;
+  font-weight: 700;
+  color: #555;
+  margin-bottom: 4px;
+}
+.sp-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  max-height: 90px;
+  overflow-y: auto;
+}
+.sp-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #1565c0;
+  color: white;
+  font-size: 10px;
+  font-family: monospace;
+  padding: 2px 4px 2px 8px;
+  border-radius: 10px;
+}
+.sp-chip-x {
+  background: rgba(255, 255, 255, 0.25);
+  border: none;
+  color: white;
+  border-radius: 50%;
+  width: 14px;
+  height: 14px;
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.sp-chip-x:hover {
+  background: rgba(255, 255, 255, 0.4);
 }
 </style>

@@ -228,6 +228,7 @@ const statusMapClass = (status: string) => {
               <th width="120">MAP</th>
               <th width="90">Status MAP</th>
               <th width="100">Workshop</th>
+              <th width="110">MO</th>
             </tr>
           </thead>
           <tbody>
@@ -237,16 +238,25 @@ const statusMapClass = (status: string) => {
               @click="onSelect(item)"
               class="so-row"
             >
-              <td class="fw-bold text-primary font-mono">{{ item.Nomor }}</td>
+              <td class="fw-bold text-primary font-mono" :title="item.Nomor">
+                {{ item.Nomor }}
+              </td>
               <td>{{ formatTgl(item.Tanggal) }}</td>
-              <td class="cell-wrap">
+              <td
+                class="cell-wrap"
+                :title="item.Customer || item.KodeCustomer || ''"
+              >
                 {{ item.Customer || item.KodeCustomer || "-" }}
               </td>
-              <td class="cell-wrap cell-clamp">{{ item.Nama }}</td>
+              <td class="cell-wrap cell-clamp" :title="item.Nama">
+                {{ item.Nama }}
+              </td>
               <td class="tr">
                 {{ Number(item.Pesan).toLocaleString("id-ID") }}
               </td>
-              <td class="font-mono">{{ item.MAP || "-" }}</td>
+              <td class="font-mono" :title="item.MAP || ''">
+                {{ item.MAP || "-" }}
+              </td>
               <td>
                 <span
                   class="status-chip"
@@ -255,11 +265,12 @@ const statusMapClass = (status: string) => {
                   {{ statusMapLabel(item.StatusMap) }}
                 </span>
               </td>
-              <td>{{ item.Workshop }}</td>
+              <td :title="item.Workshop || ''">{{ item.Workshop }}</td>
+              <td :title="item.MO || ''">{{ item.MO || "-" }}</td>
             </tr>
             <tr v-if="!isLoading && items.length === 0">
               <td
-                colspan="8"
+                colspan="9"
                 class="text-center text-grey pa-4"
                 style="font-size: 12px"
               >
