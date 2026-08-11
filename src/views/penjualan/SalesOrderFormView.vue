@@ -553,6 +553,8 @@ onMounted(async () => {
           ? { ...row, qty: found.qty, lb: found.lb, pb: found.pb }
           : row;
       });
+
+      await fetchStandarUkuranSizes();
     }
 
     if (isEditMode.value) {

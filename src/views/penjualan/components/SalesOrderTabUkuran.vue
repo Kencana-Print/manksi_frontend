@@ -51,12 +51,22 @@ const isStandarKlien = computed(
   () => props.formData.spk_standar_ukuran === "KLIEN",
 );
 
-const isLbPbEditable = computed(
-  () =>
-    isJoBebasUkuran.value ||
-    !isDivisiGarmenAtauKaosan.value ||
-    isStandarKlien.value,
-);
+const isRowEditable = (row: any) => {
+  if (isJoBebasUkuran.value) return true;
+  if (!isDivisiGarmenAtauKaosan.value) return true;
+  if (isStandarKlien.value) return true;
+  return row.adaStandar === false;
+};
+
+// Badge kecil biar user tau kenapa baris itu bisa diedit padahal
+// "Standar Kencana" dipilih
+const showManualBadge = (row: any) =>
+  props.formData.spk_standar_ukuran === "KENCANA" &&
+  !isStandarKlien.value &&
+  !isJoBebasUkuran.value &&
+  isDivisiGarmenAtauKaosan.value &&
+  row.adaStandar === false &&
+  Number(row.qty) > 0;
 // Kategori ukuran berdasarkan jenis order
 const kategoriUkuran = computed(() => {
   const jo = String(props.formData.spk_jo_kode || "").toUpperCase();
@@ -175,7 +185,7 @@ const updateKetUkuran = () => {
                     step="0.1"
                     min="0"
                     v-select-on-focus
-                    :disabled="Number(row.qty) === 0 || !isLbPbEditable"
+                    :disabled="Number(row.qty) === 0 || !isRowEditable(row)"
                   />
                 </td>
                 <td class="td-num">
@@ -186,7 +196,7 @@ const updateKetUkuran = () => {
                     step="0.1"
                     min="0"
                     v-select-on-focus
-                    :disabled="Number(row.qty) === 0 || !isLbPbEditable"
+                    :disabled="Number(row.qty) === 0 || !isRowEditable(row)"
                   />
                 </td>
                 <td class="td-num">
@@ -197,7 +207,7 @@ const updateKetUkuran = () => {
                     step="0.1"
                     min="0"
                     v-select-on-focus
-                    :disabled="Number(row.qty) === 0 || !isLbPbEditable"
+                    :disabled="Number(row.qty) === 0 || !isRowEditable(row)"
                   />
                 </td>
                 <td class="td-num">
@@ -208,7 +218,7 @@ const updateKetUkuran = () => {
                     step="0.1"
                     min="0"
                     v-select-on-focus
-                    :disabled="Number(row.qty) === 0 || !isLbPbEditable"
+                    :disabled="Number(row.qty) === 0 || !isRowEditable(row)"
                   />
                 </td>
                 <td class="td-num">
@@ -219,7 +229,7 @@ const updateKetUkuran = () => {
                     step="0.1"
                     min="0"
                     v-select-on-focus
-                    :disabled="Number(row.qty) === 0 || !isLbPbEditable"
+                    :disabled="Number(row.qty) === 0 || !isRowEditable(row)"
                   />
                 </td>
                 <td class="td-num">
@@ -230,7 +240,7 @@ const updateKetUkuran = () => {
                     step="0.1"
                     min="0"
                     v-select-on-focus
-                    :disabled="Number(row.qty) === 0 || !isLbPbEditable"
+                    :disabled="Number(row.qty) === 0 || !isRowEditable(row)"
                   />
                 </td>
                 <td class="td-num">
@@ -241,7 +251,7 @@ const updateKetUkuran = () => {
                     step="0.1"
                     min="0"
                     v-select-on-focus
-                    :disabled="Number(row.qty) === 0 || !isLbPbEditable"
+                    :disabled="Number(row.qty) === 0 || !isRowEditable(row)"
                   />
                 </td>
               </template>
@@ -255,7 +265,7 @@ const updateKetUkuran = () => {
                     step="0.1"
                     min="0"
                     v-select-on-focus
-                    :disabled="Number(row.qty) === 0 || !isLbPbEditable"
+                    :disabled="Number(row.qty) === 0 || !isRowEditable(row)"
                   />
                 </td>
                 <td class="td-num">
@@ -266,7 +276,7 @@ const updateKetUkuran = () => {
                     step="0.1"
                     min="0"
                     v-select-on-focus
-                    :disabled="Number(row.qty) === 0 || !isLbPbEditable"
+                    :disabled="Number(row.qty) === 0 || !isRowEditable(row)"
                   />
                 </td>
                 <td class="td-num">
@@ -277,7 +287,7 @@ const updateKetUkuran = () => {
                     step="0.1"
                     min="0"
                     v-select-on-focus
-                    :disabled="Number(row.qty) === 0 || !isLbPbEditable"
+                    :disabled="Number(row.qty) === 0 || !isRowEditable(row)"
                   />
                 </td>
                 <td class="td-num">
@@ -288,7 +298,7 @@ const updateKetUkuran = () => {
                     step="0.1"
                     min="0"
                     v-select-on-focus
-                    :disabled="Number(row.qty) === 0 || !isLbPbEditable"
+                    :disabled="Number(row.qty) === 0 || !isRowEditable(row)"
                   />
                 </td>
                 <td class="td-num">
@@ -299,7 +309,7 @@ const updateKetUkuran = () => {
                     step="0.1"
                     min="0"
                     v-select-on-focus
-                    :disabled="Number(row.qty) === 0 || !isLbPbEditable"
+                    :disabled="Number(row.qty) === 0 || !isRowEditable(row)"
                   />
                 </td>
                 <td class="td-num">
@@ -310,7 +320,7 @@ const updateKetUkuran = () => {
                     step="0.1"
                     min="0"
                     v-select-on-focus
-                    :disabled="Number(row.qty) === 0 || !isLbPbEditable"
+                    :disabled="Number(row.qty) === 0 || !isRowEditable(row)"
                   />
                 </td>
                 <td class="td-num">
@@ -321,7 +331,7 @@ const updateKetUkuran = () => {
                     step="0.1"
                     min="0"
                     v-select-on-focus
-                    :disabled="Number(row.qty) === 0 || !isLbPbEditable"
+                    :disabled="Number(row.qty) === 0 || !isRowEditable(row)"
                   />
                 </td>
               </template>
@@ -808,5 +818,18 @@ const updateKetUkuran = () => {
 .uk-img-empty {
   font-size: 10px;
   color: #bdbdbd;
+}
+
+.badge-manual {
+  display: inline-block;
+  margin-left: 4px;
+  font-size: 8px;
+  font-weight: 700;
+  color: #e65100;
+  background: #fff3e0;
+  border: 1px solid #ffcc80;
+  border-radius: 8px;
+  padding: 0 4px;
+  vertical-align: middle;
 }
 </style>

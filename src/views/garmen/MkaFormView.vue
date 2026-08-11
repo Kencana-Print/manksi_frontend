@@ -20,6 +20,7 @@ interface MkaDetailRow {
   free: number;
   po: number;
   keterangan: string;
+  size?: string;
   _key: number;
 }
 
@@ -111,6 +112,7 @@ const {
         free: Number(row.free) || 0,
         po: Number(row.po) || 0,
         keterangan: row.keterangan ?? "",
+        size: row.size ?? "",
         _key: newKey(),
       })),
     };
@@ -242,15 +244,18 @@ const doResolveSpk = async (spkNomor: string) => {
 // Pakai AksesorisSearchModal yang sudah ada (emit 'selected' dengan item.Kode)
 const showAksesoriModal = ref(false);
 const aksTargetIdx = ref<number | undefined>(undefined);
+const aksSizeFilter = ref<string>("");
 
 const openAksesoriModal = () => {
   if (!formData.value.mkb_spk_nomor) return;
   aksTargetIdx.value = undefined;
+  aksSizeFilter.value = "";
   showAksesoriModal.value = true;
 };
 
 const openAksesoriModalForRow = (idx: number) => {
   aksTargetIdx.value = idx;
+  aksSizeFilter.value = formData.value.detail[idx]?.size || "";
   showAksesoriModal.value = true;
 };
 
@@ -368,6 +373,7 @@ const addEmptyRow = () => {
     free: 0,
     po: 0,
     keterangan: "",
+    size: "",
     _key: newKey(),
   });
 };
@@ -666,6 +672,7 @@ const validateSave = () => {
 
   <AksesorisSearchModal
     v-model="showAksesoriModal"
+    :size-filter="aksSizeFilter"
     @selected="onAksesoriSelected"
   />
 

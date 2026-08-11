@@ -2,7 +2,7 @@
 import { ref, onMounted } from "vue";
 import { useRoute } from "vue-router";
 import { realisasiBarangFormService } from "@/services/garmen/realisasiBarangFormService";
-import logoSrc from "@/assets/logo.png"; // Sesuaikan path logo Anda
+import logoSrc from "@/assets/logo.png";
 
 const route = useRoute();
 const nomor = route.params.nomor as string;
@@ -18,7 +18,6 @@ const fetchData = async () => {
     details.value = res.data.data.details;
     isReady.value = true;
 
-    // Auto print setelah DOM dirender
     setTimeout(() => {
       window.print();
     }, 800);
@@ -43,13 +42,12 @@ onMounted(() => {
 
 <template>
   <div class="print-container" v-if="isReady">
-    <div class="full-page">
-      <!-- HEADER -->
+    <!-- Copy 1 -->
+    <div class="copy-block">
       <div class="header-box">
         <div class="header-text">
           <div class="title">REALISASI PERMINTAAN {{ header.re_jenis }}</div>
           <div class="info-grid">
-            <!-- Kolom Kiri -->
             <div class="info-col">
               <div class="info-row">
                 <span class="lbl">No. Realisasi</span><span class="sep">:</span>
@@ -66,7 +64,6 @@ onMounted(() => {
                 >
               </div>
             </div>
-            <!-- Kolom Tengah -->
             <div class="info-col">
               <div class="info-row">
                 <span class="lbl">Gudang Asal</span><span class="sep">:</span>
@@ -77,7 +74,6 @@ onMounted(() => {
                 <span class="val">{{ header.GdgProduksi }}</span>
               </div>
             </div>
-            <!-- Kolom Kanan -->
             <div class="info-col">
               <div class="info-row">
                 <span class="lbl">No. Minta</span><span class="sep">:</span>
@@ -100,7 +96,6 @@ onMounted(() => {
         </div>
         <img :src="logoSrc" class="logo" />
       </div>
-      <!-- TABEL BARANG -->
       <table class="items-table">
         <thead>
           <tr>
@@ -125,9 +120,113 @@ onMounted(() => {
           </tr>
         </tbody>
       </table>
-      <!-- SPACER -->
-      <div class="flex-grow-1"></div>
-      <!-- TANDA TANGAN -->
+      <div class="footer-box">
+        <div class="ttd-box">
+          <div class="ttd-title">Diserahkan Oleh</div>
+          <div class="ttd-space"></div>
+        </div>
+        <div class="ttd-box">
+          <div class="ttd-title">Diterima,</div>
+          <div class="ttd-space"></div>
+        </div>
+        <div class="ttd-box">
+          <div class="ttd-title">Checkers,</div>
+          <div class="ttd-space"></div>
+        </div>
+        <div class="ttd-box border-none">
+          <div class="ttd-title">Kepala Gudang,</div>
+          <div class="ttd-space"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Garis potong -->
+    <div class="cut-line">
+      <span class="cut-icon">✂</span>
+      <span class="cut-text"
+        >- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+        - - - - - - - - - - - - - - - - - - - - - - - -</span
+      >
+    </div>
+
+    <!-- Copy 2 -->
+    <div class="copy-block">
+      <div class="header-box">
+        <div class="header-text">
+          <div class="title">REALISASI PERMINTAAN {{ header.re_jenis }}</div>
+          <div class="info-grid">
+            <div class="info-col">
+              <div class="info-row">
+                <span class="lbl">No. Realisasi</span><span class="sep">:</span>
+                <span class="val">{{ header.re_nomor }}</span>
+              </div>
+              <div class="info-row">
+                <span class="lbl">Tanggal</span><span class="sep">:</span>
+                <span class="val">{{ header.tgl_realisasi }}</span>
+              </div>
+              <div class="info-row">
+                <span class="lbl">SPK</span><span class="sep">:</span>
+                <span class="val"
+                  >{{ header.re_spk_nomor }} {{ header.NamaSpk }}</span
+                >
+              </div>
+            </div>
+            <div class="info-col">
+              <div class="info-row">
+                <span class="lbl">Gudang Asal</span><span class="sep">:</span>
+                <span class="val">{{ header.re_cab }}</span>
+              </div>
+              <div class="info-row">
+                <span class="lbl">Gudang Tujuan</span><span class="sep">:</span>
+                <span class="val">{{ header.GdgProduksi }}</span>
+              </div>
+            </div>
+            <div class="info-col">
+              <div class="info-row">
+                <span class="lbl">No. Minta</span><span class="sep">:</span>
+                <span class="val">{{ header.min_nomor }}</span>
+              </div>
+              <div class="info-row">
+                <span class="lbl">Tanggal</span><span class="sep">:</span>
+                <span class="val">{{ header.tgl_minta }}</span>
+              </div>
+              <div class="info-row">
+                <span class="lbl">Peminta</span><span class="sep">:</span>
+                <span class="val">{{ header.peminta }}</span>
+              </div>
+            </div>
+          </div>
+          <div class="info-row mt-2">
+            <span class="lbl">Keterangan</span><span class="sep">:</span>
+            <span class="val">{{ header.re_keterangan }}</span>
+          </div>
+        </div>
+        <img :src="logoSrc" class="logo" />
+      </div>
+      <table class="items-table">
+        <thead>
+          <tr>
+            <th style="width: 30px" class="text-center">No</th>
+            <th style="width: 100px">Kode</th>
+            <th>Nama</th>
+            <th style="width: 60px" class="text-center">Satuan</th>
+            <th style="width: 90px" class="text-right">Jumlah</th>
+            <th style="width: 150px">Keterangan</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="(item, index) in details" :key="index">
+            <td class="text-center">{{ index + 1 }}</td>
+            <td class="font-mono">{{ item.Kode }}</td>
+            <td class="text-truncate" style="max-width: 250px">
+              {{ item.Nama }}
+            </td>
+            <td class="text-center">{{ item.Satuan }}</td>
+            <td class="text-right">{{ numFmt(item.Jumlah) }}</td>
+            <td>{{ item.Keterangan }}</td>
+          </tr>
+        </tbody>
+      </table>
       <div class="footer-box">
         <div class="ttd-box">
           <div class="ttd-title">Diserahkan Oleh</div>
@@ -160,69 +259,83 @@ onMounted(() => {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
-  .cut-line {
-    display: none !important;
-  }
 }
 
 .print-container {
   width: 100%;
-  max-width: 210mm; /* Lebar A4 */
+  max-width: 210mm;
   margin: 0 auto;
   background: white;
   font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
   color: #000;
-  display: flex;
-  flex-direction: column;
-  min-height: 297mm; /* Tinggi A4 */
 }
 
-.full-page {
-  height: 100%;
-  padding: 10px 0;
-  display: flex;
-  flex-direction: column;
-  position: relative;
+.copy-block {
+  height: 132mm;
+  display: block;
+  overflow: hidden;
   page-break-inside: avoid;
 }
 
-/* --- HEADER STRUKTUR --- */
+.cut-line {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 2px 0;
+  color: #555;
+  font-size: 10px;
+}
+.cut-icon {
+  transform: rotate(90deg);
+  font-size: 11px;
+}
+.cut-text {
+  letter-spacing: 1px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+@media print {
+  .cut-line {
+    color: #000;
+  }
+}
+
 .header-box {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 .header-text {
   flex: 1;
 }
 .title {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: bold;
   text-transform: uppercase;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
   letter-spacing: 0.5px;
 }
 .logo {
-  width: 120px;
+  width: 100px;
   object-fit: contain;
   margin-top: -5px;
 }
 
-/* Perbaikan Layout Header */
 .info-grid {
   display: grid;
-  grid-template-columns: 1.4fr 1.2fr 1fr; /* Proporsi disesuaikan */
+  grid-template-columns: 1.4fr 1.2fr 1fr;
   gap: 15px;
-  font-size: 11px; /* Font sedikit dibesarkan agar mudah dibaca */
+  font-size: 10.5px;
 }
 .info-row {
   display: flex;
   align-items: flex-start;
-  margin-bottom: 3px;
+  margin-bottom: 2px;
 }
 .info-row .lbl {
-  width: 90px; /* Lebar diperbesar agar "Gudang Tujuan" tidak terpotong */
+  width: 85px;
   flex-shrink: 0;
   white-space: nowrap;
 }
@@ -236,21 +349,20 @@ onMounted(() => {
   font-weight: normal;
 }
 .mt-2 {
-  margin-top: 6px;
-  font-size: 11px;
+  margin-top: 5px;
+  font-size: 10.5px;
 }
 
-/* --- TABEL --- */
 .items-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 11px;
-  margin-bottom: 5px;
+  font-size: 10.5px;
+  margin-bottom: 4px;
 }
 .items-table th,
 .items-table td {
   border: 1px solid #000;
-  padding: 5px 6px;
+  padding: 3px 6px;
   vertical-align: middle;
 }
 .items-table th {
@@ -258,7 +370,7 @@ onMounted(() => {
   font-weight: bold;
 }
 .items-table td {
-  height: 20px;
+  height: 16px;
 }
 .text-center {
   text-align: center !important;
@@ -268,15 +380,9 @@ onMounted(() => {
 }
 .font-mono {
   font-family: monospace;
-  font-size: 11.5px;
+  font-size: 11px;
 }
 
-/* Flex-grow untuk mengisi ruang kosong antar Tabel & Footer Tanda Tangan */
-.flex-grow-1 {
-  flex-grow: 1;
-}
-
-/* --- TANDA TANGAN --- */
 .footer-box {
   display: flex;
   width: 100%;
@@ -293,10 +399,10 @@ onMounted(() => {
   border-right: none !important;
 }
 .ttd-title {
-  font-size: 11px;
-  margin-top: 4px;
+  font-size: 10px;
+  margin-top: 3px;
 }
 .ttd-space {
-  height: 55px; /* Tinggi Ruang Tanda Tangan */
+  height: 32px;
 }
 </style>
