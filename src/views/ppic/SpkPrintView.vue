@@ -249,6 +249,10 @@ const hasMkaFromMap = computed(
     mkaFromMap.value.aksesoris.length > 0 ||
     mkaFromMap.value.komponen.length > 0,
 );
+const isMoveSpecialProcess = computed(() => {
+  // Pindah ke kanan HANYA JIKA komponen potong > 5 baris
+  return komponenPotong.value.length > 5 && keteranganKhusus.value.length > 0;
+});
 
 // --- CETAK SPK P01 ---
 // ── Deteksi Workshop legacy (P01/P02/P05) → pakai format cetak lama ──
@@ -1192,9 +1196,9 @@ Keterangan Komponen :
               </table>
             </div>
 
-            <!-- Baris 4: Komponen Potong (kiri, lebar) + MKA (kanan, sempit) -->
+            <!-- Baris 4: Komponen Potong (kiri) + MKA (kanan) -->
             <div class="p1-row-potong-mka mb-6">
-              <!-- Komponen Potong — dapat ruang penuh, bisa panjang -->
+              <!-- Kiri: Komponen Potong -->
               <div class="box">
                 <div class="box-title">Komponen Potong</div>
                 <table class="dt">
@@ -1218,101 +1222,137 @@ Keterangan Komponen :
                 </table>
               </div>
 
-              <!-- MKA — dipersempit ke kanan -->
-              <div v-if="hasMkaFromMap" class="box mka-narrow">
-                <div class="box-title">
-                  Aksesoris &amp; Babaran (BAST MAP {{ spk.spk_memo }})
+              <!-- Kanan: MKA + (Special Process JIKA dipindah) -->
+              <div
+                style="
+                  display: flex;
+                  flex-direction: column;
+                  gap: 6px;
+                  min-width: 0;
+                "
+              >
+                <div v-if="hasMkaFromMap" class="box mka-narrow">
+                  <div class="box-title">
+                    Aksesoris &amp; Babaran (BAST MAP {{ spk.spk_memo }})
+                  </div>
+                  <table v-if="mkaFromMap.komponen.length" class="dt dt-narrow">
+                    <thead>
+                      <tr>
+                        <th>Komponen</th>
+                        <th>Warna</th>
+                        <th class="tc">Babaran</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="(k, idx) in mkaFromMap.komponen" :key="idx">
+                        <td>{{ k.komponen }}</td>
+                        <td>{{ k.warna || "-" }}</td>
+                        <td class="tc">
+                          {{ Number(k.babaran).toLocaleString("id-ID") }}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  <table
+                    v-if="mkaFromMap.sizeBreakdown.length"
+                    class="dt dt-narrow"
+                  >
+                    <thead>
+                      <tr>
+                        <th>Komponen</th>
+                        <th>Size</th>
+                        <th class="tc">Babaran</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr
+                        v-for="(s, idx) in mkaFromMap.sizeBreakdown"
+                        :key="idx"
+                      >
+                        <td>{{ s.komponen }}</td>
+                        <td>{{ s.size }}</td>
+                        <td class="tc">
+                          {{ Number(s.babaran).toLocaleString("id-ID") }}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  <table class="dt dt-narrow">
+                    <thead>
+                      <tr>
+                        <th>Kode</th>
+                        <th>Nama</th>
+                        <th class="tr">Qty</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="(a, idx) in mkaFromMap.aksesoris" :key="idx">
+                        <td class="fw">{{ a.kode }}</td>
+                        <td>{{ a.nama }}</td>
+                        <td class="tr">{{ a.qty }}</td>
+                      </tr>
+                      <tr v-if="mkaFromMap.aksesoris.length === 0">
+                        <td colspan="3" class="tc muted">—</td>
+                      </tr>
+                    </tbody>
+                  </table>
                 </div>
-                <table v-if="mkaFromMap.komponen.length" class="dt dt-narrow">
-                  <thead>
-                    <tr>
-                      <th>Komponen</th>
-                      <th>Warna</th>
-                      <th class="tc">Babaran</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr v-for="(k, idx) in mkaFromMap.komponen" :key="idx">
-                      <td>{{ k.komponen }}</td>
-                      <td>{{ k.warna || "-" }}</td>
-                      <td class="tc">
-                        {{ Number(k.babaran).toLocaleString("id-ID") }}
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-                <table
-                  v-if="mkaFromMap.sizeBreakdown.length"
-                  class="dt dt-narrow"
-                >
-                  <thead>
-                    <tr>
-                      <th>Komponen</th>
-                      <th>Size</th>
-                      <th class="tc">Babaran</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr v-for="(s, idx) in mkaFromMap.sizeBreakdown" :key="idx">
-                      <td>{{ s.komponen }}</td>
-                      <td>{{ s.size }}</td>
-                      <td class="tc">
-                        {{ Number(s.babaran).toLocaleString("id-ID") }}
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-                <table class="dt dt-narrow">
-                  <thead>
-                    <tr>
-                      <th>Kode</th>
-                      <th>Nama</th>
-                      <th class="tr">Qty</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr v-for="(a, idx) in mkaFromMap.aksesoris" :key="idx">
-                      <td class="fw">{{ a.kode }}</td>
-                      <td>{{ a.nama }}</td>
-                      <td class="tr">{{ a.qty }}</td>
-                    </tr>
-                    <tr v-if="mkaFromMap.aksesoris.length === 0">
-                      <td colspan="3" class="tc muted">—</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
 
-              <div v-else class="box mka-narrow">
-                <div class="box-title">Kebutuhan Aksesoris (MKA)</div>
-                <table class="dt dt-narrow">
-                  <thead>
-                    <tr>
-                      <th style="width: 30px">Kode</th>
-                      <th>Nama</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr v-for="(k, idx) in ketKomponenList" :key="idx">
-                      <td class="tc fw">{{ k.kode }}</td>
-                      <td>
-                        {{ k.nama }}<span v-if="k.ket"> — {{ k.ket }}</span>
-                      </td>
-                    </tr>
-                    <tr v-if="ketKomponenList.length === 0">
-                      <td colspan="2" class="tc muted">—</td>
-                    </tr>
-                  </tbody>
-                </table>
+                <div v-else class="box mka-narrow">
+                  <div class="box-title">Kebutuhan Aksesoris (MKA)</div>
+                  <table class="dt dt-narrow">
+                    <thead>
+                      <tr>
+                        <th style="width: 30px">Kode</th>
+                        <th>Nama</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="(k, idx) in ketKomponenList" :key="idx">
+                        <td class="tc fw">{{ k.kode }}</td>
+                        <td>
+                          {{ k.nama }}<span v-if="k.ket"> — {{ k.ket }}</span>
+                        </td>
+                      </tr>
+                      <tr v-if="ketKomponenList.length === 0">
+                        <td colspan="2" class="tc muted">—</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <!-- SPECIAL PROCESS (Muncul di sini HANYA JIKA dipindah) -->
+                <div v-if="isMoveSpecialProcess" class="box mka-narrow">
+                  <div class="box-title">Keterangan special process</div>
+                  <div
+                    class="ket-list"
+                    style="font-size: 7.5pt; padding: 4px 6px"
+                  >
+                    <div
+                      v-for="(k, idx) in keteranganKhusus"
+                      :key="idx"
+                      class="ket-item"
+                    >
+                      {{ idx + 1 }}. {{ k }}
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
-            <!-- Baris 5: Special Process (kalau ada) + Second Process -->
+            <!-- Baris 5: Special Process (Normal) + Second Process -->
             <div
               class="p1-row-komp mb-6"
-              :class="{ 'no-special': keteranganKhusus.length === 0 }"
+              :class="{
+                'no-special':
+                  keteranganKhusus.length === 0 || isMoveSpecialProcess,
+              }"
             >
-              <div v-if="keteranganKhusus.length > 0" class="box">
+              <!-- SPECIAL PROCESS (Muncul di posisi asli JIKA TIDAK dipindah) -->
+              <div
+                v-if="keteranganKhusus.length > 0 && !isMoveSpecialProcess"
+                class="box"
+              >
                 <div class="box-title">Keterangan special process</div>
                 <div class="ket-list ket-small">
                   <div
@@ -1325,9 +1365,13 @@ Keterangan Komponen :
                 </div>
               </div>
 
+              <!-- SECOND PROCESS -->
               <div
                 class="box"
-                :class="{ 'full-span': keteranganKhusus.length === 0 }"
+                :class="{
+                  'full-span':
+                    keteranganKhusus.length === 0 || isMoveSpecialProcess,
+                }"
               >
                 <div class="box-title">Second Process (Cetak/Bordir)</div>
                 <table class="dt">
