@@ -849,18 +849,19 @@ watch(
           <label class="lbl ml-auto" style="width: 55px">Revisi</label>
           <input
             type="checkbox"
-            v-model="formData.isRevisi"
+            v-model="formData.spk_revisi"
             true-value="Y"
             false-value="N"
             class="mr-1"
           />
           <input
-            v-model="formData.spk_rev"
+            v-model="formData.spk_ketrevisi"
             type="text"
             class="inp"
             style="width: 310px"
-            :disabled="formData.isRevisi !== 'Y'"
+            :disabled="formData.spk_revisi !== 'Y'"
             v-select-on-focus
+            placeholder="Keterangan revisi..."
           />
         </div>
 

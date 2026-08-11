@@ -199,6 +199,8 @@ const defaultData = {
   spk_accpending: "",
   cus_perfect: "N",
   spk_sizekhusus: "N",
+  spk_revisi: "N",
+  spk_ketrevisi: "",
   spk_varian_ukuran: "LENGAN_PENDEK",
   spk_sablon: "N",
   spk_bordir: "N",
@@ -309,6 +311,10 @@ const {
       // Pastikan mapping nama propertinya tepat
       cus_perfect: d.header.cus_perfect || "N",
       spk_pinjo: d.header.spk_pinjo || "",
+
+      spk_revisi: d.header.spk_revisi || "N",
+      spk_ketrevisi: d.header.spk_ketrevisi || "",
+
       // Data Tambahan dari Join Subquery Backend
       mkb: d.header.mkb || "",
       dtmkb: d.header.dtmkb || "",
@@ -397,6 +403,9 @@ const {
         spk_memo: data.spk_memo, // ← No MAP
         spk_tipe: data.spk_tipe, // ← Tipe SPK
         spk_nama2: data.spk_nama2, // ← Nama Ext
+        spk_revisi:
+          data.spk_revisi === true || data.spk_revisi === "Y" ? "Y" : "N",
+        spk_ketrevisi: data.spk_ketrevisi || "",
         spk_aktif: data.spk_aktif, // ← tambah ini
         kepentingan_acc: data.kepentingan_acc, // ← tambah ini (untuk disimpan ke pin)
         pin_customer: data.pin_customer, // ← tambah ini
