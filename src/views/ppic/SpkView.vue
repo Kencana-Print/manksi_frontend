@@ -8,7 +8,6 @@ import { useBrowse } from "@/composables/useBrowse";
 import { spkService } from "@/services/ppic/spkService";
 import { exportExcelSingle } from "@/utils/excelExport";
 import CustomerSearchModal from "@/components/lookups/CustomerSearchModal.vue";
-import api from "@/services/api";
 import {
   IconClipboardText,
   IconPrinter,
@@ -23,6 +22,7 @@ import {
   IconEye,
 } from "@tabler/icons-vue";
 import { formatTanggal, formatTanggalJam } from "@/utils/dateFormat";
+import api from "@/services/api";
 
 const authStore = useAuthStore();
 const router = useRouter();
@@ -452,40 +452,74 @@ const printApprovalAlasan = ref("");
 const printCheckInfo = ref<{ count: number; approvalStatus: string } | null>(
   null,
 );
+const kaosanExtIndex = ref(0);
+const KAOSAN_EXTENSIONS = ["png", "jpeg", "jpg"];
+const buildKaosanUrl = (cabangKaosan: string, invdc: string, ext: string) => {
+  const targetUrl = `https://retail.kaosanofficial.com/images/${cabangKaosan}/${encodeURIComponent(invdc)}.${ext}`;
+  return `${api.defaults.baseURL}/proxy-image?url=${encodeURIComponent(targetUrl)}`;
+};
 
 const onGambarError = () => {
-  // Dikosongkan. Fallback error handling sudah dipindah otomatis ke dalam tryNext() di onLihatGambar
+  if (!selectedItem.value) return;
+  const nomor = selectedItem.value.Nomor;
+  const divisi = String(selectedItem.value.Divisi || "").toUpperCase();
+  const isKaosan =
+    divisi.includes("KAOSAN") || divisi === "3" || divisi.includes("DIVISI 3");
+  const isNewFormatSO = nomor.startsWith("SPK-");
+
+  if (isKaosan && isNewFormatSO) {
+    kaosanExtIndex.value++;
+    if (kaosanExtIndex.value < KAOSAN_EXTENSIONS.length) {
+      const invdc = selectedItem.value["Pesanan/Invoice"] || "";
+      const cab = selectedItem.value.Cab || "HO-";
+      const cabangKaosan = invdc.includes(".") ? invdc.split(".")[0] : cab;
+      gambarUrl.value = buildKaosanUrl(
+        cabangKaosan,
+        invdc,
+        KAOSAN_EXTENSIONS[kaosanExtIndex.value],
+      );
+    } else {
+      gambarUrl.value = "";
+    }
+    return;
+  }
   gambarUrl.value = "";
 };
 const onLihatGambar = () => {
   if (!selectedItem.value) return;
   gambarFallbackStep.value = 0;
+  kaosanExtIndex.value = 0;
 
   const base = (api.defaults.baseURL || "").replace(/\/api\/?$/, "");
   const nomor = selectedItem.value.Nomor;
   const cab = selectedItem.value.Cab || "HO-";
   const map = selectedItem.value.MAP || "";
   const soRef = selectedItem.value.SORef || "";
+  const divisi = String(selectedItem.value.Divisi || "").toUpperCase();
+  const invdc = selectedItem.value["Pesanan/Invoice"] || "";
 
+  // ⚠️ Sama pola dengan SalesOrderView.onLihatGambar — SPK divisi
+  // Kaosan (khususnya turunan dari SO format baru) gambarnya ada di
+  // server retail Kaosan, bukan di server MANKSI lokal sama sekali.
+  const isKaosan =
+    divisi.includes("KAOSAN") || divisi === "3" || divisi.includes("DIVISI 3");
+  const isNewFormatSO = nomor.startsWith("SPK-"); // SPK PPIC turunan alur baru
+
+  if (isKaosan && isNewFormatSO && invdc) {
+    const cabangKaosan = invdc.includes(".") ? invdc.split(".")[0] : cab;
+    gambarUrl.value = buildKaosanUrl(cabangKaosan, invdc, KAOSAN_EXTENSIONS[0]);
+    dialogGambar.value = true;
+    return;
+  }
+
+  // ── Logic lama (non-Kaosan / legacy) — TIDAK berubah ──
   const fallbackSoNomor = nomor.startsWith("SPK-")
     ? nomor.replace("SPK-", "SO-")
     : nomor.startsWith("SO-")
       ? nomor
       : `SO-${nomor}`;
-
-  // ⚠️ Format nomor menentukan urutan prioritas kandidat:
-  //  - Format BARU ("SPK-...") → dibuat lewat alur SO→SPK PPIC modern,
-  //    sumber gambar yang benar ada di MAP → MAP didahulukan.
-  //  - Format LEGACY (tanpa prefix "SPK-", mis. "KP-KO-002772") →
-  //    dibuat di sistem lama sebelum SO/MAP dipisah rapi, gambar
-  //    aslinya diupload langsung pakai nama nomor SPK itu sendiri →
-  //    nomor sendiri didahulukan, MAP jadi fallback belakangan (kalau
-  //    MAP didahulukan, berisiko nyasar ke gambar produk lain yang
-  //    kebetulan file-nya ada di path MAP tapi tidak relevan).
   const isLegacyFormat = !nomor.startsWith("SPK-");
-
   const candidates: string[] = [];
-
   const mapCandidates = map
     ? [
         `/file-gambar/${encodeURIComponent(map)}.jpg`,
@@ -496,15 +530,11 @@ const onLihatGambar = () => {
     `${base}/images/${cab}/${encodeURIComponent(nomor)}.jpg`,
     `/file-gambar/${encodeURIComponent(nomor)}.jpg`,
   ];
-
   if (isLegacyFormat) {
     candidates.push(...ownCandidates, ...mapCandidates);
   } else {
     candidates.push(...mapCandidates, ...ownCandidates);
   }
-
-  // SO Ref & tebakan SO — tetap sebagai fallback tambahan di belakang,
-  // tidak terpengaruh urutan MAP vs nomor di atas
   if (soRef && soRef !== nomor) {
     candidates.push(`${base}/images/${cab}/${encodeURIComponent(soRef)}.jpg`);
     candidates.push(`/file-gambar/${encodeURIComponent(soRef)}.jpg`);
@@ -515,10 +545,8 @@ const onLihatGambar = () => {
     );
     candidates.push(`/file-gambar/${encodeURIComponent(fallbackSoNomor)}.jpg`);
   }
-
   gambarUrl.value = "";
   dialogGambar.value = true;
-
   const tryNext = (idx: number) => {
     if (idx >= candidates.length) {
       gambarUrl.value = "";
@@ -531,7 +559,6 @@ const onLihatGambar = () => {
     img.onerror = () => tryNext(idx + 1);
     img.src = candidates[idx];
   };
-
   tryNext(0);
 };
 

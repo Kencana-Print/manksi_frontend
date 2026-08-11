@@ -48,6 +48,21 @@ const getBaseUrl = () => {
 
 const resolvedImageUrl = ref("");
 const isLoadingImage = ref(false);
+const kaosanExtIndex = ref(0);
+const KAOSAN_EXTENSIONS = ["png", "jpeg", "jpg"];
+const buildKaosanUrl = (cabangKaosan: string, invdc: string, ext: string) => {
+  const targetUrl = `https://retail.kaosanofficial.com/images/${cabangKaosan}/${encodeURIComponent(invdc)}.${ext}`;
+  return `${api.defaults.baseURL}/proxy-image?url=${encodeURIComponent(targetUrl)}`;
+};
+const isKaosan = computed(() => {
+  const divisi = String(spk.value.spk_divisi || "").toUpperCase();
+  return (
+    divisi.includes("KAOSAN") || divisi === "3" || divisi.includes("DIVISI 3")
+  );
+});
+const isNewFormatSO = computed(() =>
+  String(spk.value.spk_nomor || "").startsWith("SPK-"),
+);
 
 const authStore = useAuthStore();
 const isPreview = computed(() => route.query.preview === "1");
@@ -72,23 +87,33 @@ const resolveDesignImage = () => {
     resolvedImageUrl.value = "";
     return;
   }
+
+  // ⚠️ Sama pola dengan SpkView.onLihatGambar / SalesOrderView —
+  // SPK divisi Kaosan (turunan alur SO baru) gambarnya ada di server
+  // retail Kaosan, bukan lokal MANKSI.
+  if (isKaosan.value && isNewFormatSO.value && spk.value.spk_invdc) {
+    kaosanExtIndex.value = 0;
+    const cab = spk.value.spk_cab || "HO-";
+    const invdc = spk.value.spk_invdc;
+    const cabangKaosan = invdc.includes(".") ? invdc.split(".")[0] : cab;
+    isLoadingImage.value = true;
+    tryKaosanExt(cabangKaosan, invdc, 0);
+    return;
+  }
+
+  // ── Logic lama (non-Kaosan / legacy) — TIDAK berubah ──
   const base = getBaseUrl();
   const cab = spk.value.spk_cab || "HO-";
   const nomor = spk.value.spk_nomor;
   const soRef = spk.value.spk_so_ref || "";
   const mapNomor = spk.value.spk_memo || "";
-
   const fallbackSoNomor = nomor.startsWith("SPK-")
     ? nomor.replace("SPK-", "SO-")
     : nomor.startsWith("SO-")
       ? nomor
       : `SO-${nomor}`;
-
-  // Sama seperti SpkView.onLihatGambar — lihat komentar di sana.
   const isLegacyFormat = !nomor.startsWith("SPK-");
-
   const candidates: string[] = [];
-
   const mapCandidates = mapNomor
     ? [
         `/file-gambar/${encodeURIComponent(mapNomor)}.jpg`,
@@ -99,13 +124,11 @@ const resolveDesignImage = () => {
     `${base}/images/${cab}/${encodeURIComponent(nomor)}.jpg`,
     `/file-gambar/${encodeURIComponent(nomor)}.jpg`,
   ];
-
   if (isLegacyFormat) {
     candidates.push(...ownCandidates, ...mapCandidates);
   } else {
     candidates.push(...mapCandidates, ...ownCandidates);
   }
-
   if (soRef && soRef !== nomor) {
     candidates.push(`${base}/images/${cab}/${encodeURIComponent(soRef)}.jpg`);
     candidates.push(`/file-gambar/${encodeURIComponent(soRef)}.jpg`);
@@ -116,10 +139,8 @@ const resolveDesignImage = () => {
     );
     candidates.push(`/file-gambar/${encodeURIComponent(fallbackSoNomor)}.jpg`);
   }
-
   isLoadingImage.value = true;
   resolvedImageUrl.value = "";
-
   const tryNext = (idx: number) => {
     if (idx >= candidates.length) {
       isLoadingImage.value = false;
@@ -134,6 +155,23 @@ const resolveDesignImage = () => {
     img.src = candidates[idx];
   };
   tryNext(0);
+};
+
+// Coba ekstensi retail Kaosan berurutan (png → jpeg → jpg)
+const tryKaosanExt = (cabangKaosan: string, invdc: string, idx: number) => {
+  if (idx >= KAOSAN_EXTENSIONS.length) {
+    resolvedImageUrl.value = "";
+    isLoadingImage.value = false;
+    return;
+  }
+  const url = buildKaosanUrl(cabangKaosan, invdc, KAOSAN_EXTENSIONS[idx]);
+  const img = new Image();
+  img.onload = () => {
+    resolvedImageUrl.value = url;
+    isLoadingImage.value = false;
+  };
+  img.onerror = () => tryKaosanExt(cabangKaosan, invdc, idx + 1);
+  img.src = url;
 };
 
 const tglIndo = (val: string) => {
