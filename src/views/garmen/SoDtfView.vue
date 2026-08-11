@@ -6,6 +6,7 @@ import { useBrowse } from "@/composables/useBrowse";
 import { soDtfService } from "@/services/garmen/soDtfService";
 import { IconPhotoSearch, IconX } from "@tabler/icons-vue";
 import { formatTanggal } from "@/utils/dateFormat";
+import api from "@/services/api";
 
 const toast = useToast();
 
@@ -22,7 +23,7 @@ const filterState = ref({
 });
 
 // --- KOMPOSISI BROWSE --- (tanpa CRUD — modul ini murni browse + lihat gambar)
-const { items, isLoading, fetchData } = useBrowse({
+const { items, isLoading, selected, selectedItem, fetchData } = useBrowse({
   menuId: "128",
   fetchApi: async () => {
     const res = await soDtfService.getBrowse(
@@ -67,29 +68,54 @@ const rowTextColor = (item: any) => {
   return "";
 };
 
-// --- GAMBAR ---
-const RETAIL_IMAGE_BASE = "https://retail.kaosanofficial.com/images";
+// --- GAMBAR (pola sama persis dengan SO Kaosan — proxy backend +
+// coba beberapa ekstensi berurutan) ---
+const KAOSAN_EXTENSIONS = ["png", "jpeg", "jpg"];
 const imageModalOpen = ref(false);
 const imageModalUrl = ref("");
 const imageNotFound = ref(false);
+const kaosanExtIndex = ref(0);
 
-const buildImageUrl = (nomor: string) => {
-  const cabKode = nomor.substring(0, 3); // "K02.SD.2608.0001" -> "K02"
-  return `${RETAIL_IMAGE_BASE}/${cabKode}/${encodeURIComponent(nomor)}.jpg`;
+const buildKaosanUrl = (cabangKaosan: string, invdc: string, ext: string) => {
+  const targetUrl = `https://retail.kaosanofficial.com/images/${cabangKaosan}/${encodeURIComponent(invdc)}.${ext}`;
+  return `${api.defaults.baseURL}/proxy-image?url=${encodeURIComponent(targetUrl)}`;
 };
 
-const onLihatGambar = (item: any) => {
-  if (!item?.Nomor) {
+const onLihatGambar = () => {
+  if (!selectedItem.value) {
     toast.warning("Pilih data terlebih dahulu.");
     return;
   }
+  const nomor = selectedItem.value.Nomor;
+  // [FIX] cabang diambil dari 3 karakter pertama Nomor SO DTF
+  // (mis. "K02.SD.2608.0001" -> "K02"), sesuai konfirmasi user —
+  // field yang dicocokkan adalah Nomor itu sendiri, bukan field lain
+  const cabKode = nomor.substring(0, 3);
+
   imageNotFound.value = false;
-  imageModalUrl.value = buildImageUrl(item.Nomor);
+  kaosanExtIndex.value = 0;
+  imageModalUrl.value = buildKaosanUrl(cabKode, nomor, KAOSAN_EXTENSIONS[0]);
   imageModalOpen.value = true;
 };
 
 const onImageError = () => {
-  imageNotFound.value = true;
+  if (!selectedItem.value) {
+    imageNotFound.value = true;
+    return;
+  }
+  const nomor = selectedItem.value.Nomor;
+  const cabKode = nomor.substring(0, 3);
+
+  kaosanExtIndex.value++;
+  if (kaosanExtIndex.value < KAOSAN_EXTENSIONS.length) {
+    imageModalUrl.value = buildKaosanUrl(
+      cabKode,
+      nomor,
+      KAOSAN_EXTENSIONS[kaosanExtIndex.value],
+    );
+  } else {
+    imageNotFound.value = true;
+  }
 };
 </script>
 
@@ -104,6 +130,7 @@ const onImageError = () => {
     item-value="Nomor"
     show-expand
     v-model:expanded="expandedRows"
+    v-model:selected="selected"
     v-model:filter-state="filterState"
     :can-insert="false"
     :can-edit="false"
@@ -135,8 +162,13 @@ const onImageError = () => {
       </div>
     </template>
 
-    <template #row-actions="{ item }">
-      <v-btn size="small" color="grey-darken-3" @click="onLihatGambar(item)">
+    <template #extra-actions="{ selected }">
+      <v-btn
+        size="small"
+        color="grey-darken-3"
+        :disabled="selected.length === 0"
+        @click="onLihatGambar"
+      >
         <template #prepend
           ><IconPhotoSearch :size="15" :stroke-width="1.7"
         /></template>
