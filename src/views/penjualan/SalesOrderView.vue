@@ -42,8 +42,15 @@ const canDeleteOrder = computed(() => {
   const flags = authStore.user?.flags;
   const userKode = authStore.user?.kode?.toUpperCase();
 
-  // Hapus hanya jika cmo === 1 atau user kode adalah RIYA
-  return flags?.cmo === 1 || userKode === "RIYA";
+  // Kembalikan pengecekan lengkap untuk CMO dan CMO3
+  const isCmo =
+    flags?.cmo === 1 ||
+    flags?.cmo === "Y" ||
+    flags?.cmo3 === 1 ||
+    flags?.cmo3 === "Y";
+
+  // Hapus jika user adalah CMO atau user kode adalah RIYA
+  return isCmo || userKode === "RIYA";
 });
 
 const canLihatCus = computed(() => authStore.user?.flags.lihatCus === 1);
