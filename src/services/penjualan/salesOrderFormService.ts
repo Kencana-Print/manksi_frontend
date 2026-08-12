@@ -6,6 +6,9 @@ export const salesOrderFormService = {
 
   getKomponenMaster: () => api.get("/penjualan/sales-order/form/komponen-init"),
 
+  getRepeatDetail: (nomor: string) =>
+    api.get("/penjualan/sales-order/form/repeat-detail", { params: { nomor } }),
+
   saveData: (payload: any) =>
     api.post(`/penjualan/sales-order/form/save`, payload),
 };

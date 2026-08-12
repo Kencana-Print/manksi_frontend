@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, computed } from "vue";
+import { useAuthStore } from "@/stores/authStore";
 import { useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
 import BaseBrowse from "@/components/BaseBrowse.vue";
@@ -12,9 +13,22 @@ import {
 } from "@tabler/icons-vue";
 import { formatTanggal } from "@/utils/dateFormat";
 
+interface BrowseHeader {
+  title: string;
+  key: string;
+  width?: string;
+  minWidth?: string;
+  align?: string;
+}
+
+const authStore = useAuthStore();
 const router = useRouter();
 const toast = useToast();
 const menuId = "254";
+
+const canLihatCus = computed(
+  () => Number(authStore.user?.flags?.lihatCus) === 1,
+);
 
 const getStartOfMonth = () => {
   const d = new Date();
@@ -67,21 +81,33 @@ const {
   immediate: true,
 });
 
-const headers = [
-  { title: "Nomor", key: "Nomor", width: "160px" },
-  { title: "Cabang", key: "Cabang", width: "80px", align: "center" },
-  { title: "Bayar", key: "Bayar", width: "120px" },
-  { title: "Tanggal", key: "Tanggal", width: "100px", align: "center" },
-  { title: "Tempo", key: "Tempo", width: "100px", align: "center" },
-  { title: "Account", key: "account", width: "100px" },
-  { title: "Debet", key: "Debet", width: "130px", align: "right" },
-  { title: "Customer", key: "customer", minWidth: "250px" },
-  { title: "Notes", key: "Notes", minWidth: "200px" },
-  { title: "No. Bukti", key: "NoBukti", width: "130px" },
-  { title: "Tgl. Trs", key: "TglTrs", width: "100px", align: "center" },
-  { title: "Bruto", key: "Bruto", width: "120px", align: "right" },
-  { title: "PPh", key: "PPh", width: "120px", align: "right" },
-];
+const headers = computed<BrowseHeader[]>(() => {
+  const base: BrowseHeader[] = [
+    { title: "Nomor", key: "Nomor", width: "160px" },
+    { title: "Cabang", key: "Cabang", width: "80px", align: "center" },
+    { title: "Bayar", key: "Bayar", width: "120px" },
+    { title: "Tanggal", key: "Tanggal", width: "100px", align: "center" },
+    { title: "Tempo", key: "Tempo", width: "100px", align: "center" },
+    { title: "Account", key: "account", width: "100px" },
+    { title: "Debet", key: "Debet", width: "130px", align: "right" },
+    { title: "Customer", key: "customer", minWidth: "150px" },
+  ];
+  if (canLihatCus.value) {
+    base.push({
+      title: "Nama Customer",
+      key: "CustomerNama",
+      minWidth: "250px",
+    });
+  }
+  base.push(
+    { title: "Notes", key: "Notes", minWidth: "200px" },
+    { title: "No. Bukti", key: "NoBukti", width: "130px" },
+    { title: "Tgl. Trs", key: "TglTrs", width: "100px", align: "center" },
+    { title: "Bruto", key: "Bruto", width: "120px", align: "right" },
+    { title: "PPh", key: "PPh", width: "120px", align: "right" },
+  );
+  return base;
+});
 
 const fmtNum = (val: number | string | null) => {
   if (!val) return "0";

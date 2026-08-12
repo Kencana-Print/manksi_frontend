@@ -149,6 +149,12 @@ const {
             NoBukti: x.no_bukti || "",
             Kredit: Number(x.kredit) || 0,
             NotesDetail: x.notesdetail || "",
+            CusNama: x.cus_nama || "",
+            InvTanggal: x.inv_tanggal || todayLocal,
+            InvTempo: x.inv_tanggal_tempo || todayLocal,
+            NilaiPiutang: Number(x.nilai_piutang || 0),
+            Terbayar: Number(x.terbayar || 0),
+            SaldoPiutang: Number(x.saldo_piutang || 0),
           }))
         : defaultData.Detail,
     };
@@ -281,11 +287,20 @@ const loadInfoNota = async (idx: number, notaString: string) => {
     const res = await pelunasanFormService.getInfoInvoice(notaString);
     const info = res.data.data;
 
-    formData.value.Detail[idx].Nota = info.inv_nomor;
-    formData.value.Detail[idx].CusKode = info.inv_cus_kode;
+    const row = formData.value.Detail[idx];
+    row.Nota = info.inv_nomor;
+    row.CusKode = info.inv_cus_kode;
+    row.CusNama = info.cus_nama;
+    row.InvTanggal = info.inv_tanggal.substring(0, 10);
+    row.InvTempo = info.inv_tanggal_tempo.substring(0, 10);
+    row.NilaiPiutang = info.nilai;
+    row.Terbayar = info.terbayar;
+    row.SaldoPiutang = info.saldoPiutang;
+
+    // tetap update footer juga karena baris ini yang baru diisi
     formData.value.NamaCustomer = info.cus_nama;
-    formData.value.TglInvoice = info.inv_tanggal.substring(0, 10);
-    formData.value.TglTempo = info.inv_tanggal_tempo.substring(0, 10);
+    formData.value.TglInvoice = row.InvTanggal;
+    formData.value.TglTempo = row.InvTempo;
     formData.value.Piutang = info.nilai;
     formData.value.Terbayar = info.terbayar;
     formData.value.SaldoPiutang = info.saldoPiutang;
@@ -343,20 +358,15 @@ const loadInfoBuktiBayar = async (idx: number) => {
       }
     }
 
+    // ── BARU: ID Bayar & Jenis Bayar ikut No Bukti Bayar ──
+    formData.value.Detail[idx].Kode = info.kode_bayar || "";
+
     // ── Isi info alokasi kiri ──
     formData.value.NamaCustomer = info.nama_customer;
-    formData.value.NomorPembayaran = info.nomor_bayar; // ← nomor dari terima_bayar
+    formData.value.NomorPembayaran = info.nomor_bayar;
     formData.value.TglPembayaran = info.tanggal.substring(0, 10);
 
-    // ── Auto-fill Keterangan baris jika masih kosong ──
-    if (!formData.value.Detail[idx].NotesDetail && info.keterangan) {
-      formData.value.Detail[idx].NotesDetail = info.keterangan;
-    }
-
     // ── Hitung Sisa Dana ──
-    // total_bayar = debet di terima_bayar_debet
-    // total_kredit = sudah dipakai di piutang_kredit_detail (DB)
-    // terpakaiDiGrid = kredit baris lain di grid yang pakai NoBukti sama
     const terpakaiDiDB = Number(info.total_kredit);
     const terpakaiDiGrid = formData.value.Detail.reduce(
       (sum: number, d: any, i: number) => {
@@ -379,6 +389,18 @@ const loadInfoBuktiBayar = async (idx: number) => {
 
 const kalkulasiTotal = () => {
   // Hanya visual trigger jika diperlukan
+};
+
+const showInfoBarisKeFooter = (idx: number) => {
+  const row = formData.value.Detail[idx];
+  if (!row) return;
+
+  formData.value.NamaCustomer = row.CusNama || formData.value.NamaCustomer;
+  formData.value.TglInvoice = row.InvTanggal || formData.value.TglInvoice;
+  formData.value.TglTempo = row.InvTempo || formData.value.TglTempo;
+  formData.value.Piutang = row.NilaiPiutang ?? formData.value.Piutang;
+  formData.value.Terbayar = row.Terbayar ?? formData.value.Terbayar;
+  formData.value.SaldoPiutang = row.SaldoPiutang ?? formData.value.SaldoPiutang;
 };
 
 const validateSave = () => {
@@ -607,7 +629,14 @@ onMounted(() => {
                 v-for="(item, idx) in formData.Detail"
                 :key="idx"
                 :class="{ 'active-row': activeRowIdx === Number(idx) }"
-                @click="activeRowIdx = Number(idx)"
+                @click="
+                  activeRowIdx = Number(idx);
+                  showInfoBarisKeFooter(Number(idx));
+                "
+                @focusin="
+                  activeRowIdx = Number(idx);
+                  showInfoBarisKeFooter(Number(idx));
+                "
               >
                 <!-- 1. Nomor Urut -->
                 <td class="tc gt-num">{{ Number(idx) + 1 }}</td>
@@ -694,7 +723,11 @@ onMounted(() => {
                     type="text"
                     class="ci tr fw text-success"
                     @change="handleKreditChange($event, Number(idx))"
-                    @focus="($event.target as HTMLInputElement)?.select()"
+                    @focus="
+                      ($event.target as HTMLInputElement)?.select();
+                      activeRowIdx = Number(idx);
+                      showInfoBarisKeFooter(Number(idx));
+                    "
                   />
                 </td>
 

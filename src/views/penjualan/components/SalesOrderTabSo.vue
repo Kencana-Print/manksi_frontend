@@ -961,6 +961,10 @@ watch(
               class="inp"
               style="flex: 1"
               @keydown="onRepeatF1"
+              @keydown.enter.prevent="
+                ($event.target as HTMLInputElement).blur()
+              "
+              @change="$emit('field-blur', 'repeat', formData.spk_repeat)"
             />
             <button
               type="button"

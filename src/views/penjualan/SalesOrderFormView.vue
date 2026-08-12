@@ -1034,8 +1034,11 @@ const setStokDc = (v: any) => {
   formData.value.jmlinvdc = v.Qty || 0; // Set label qty
   formData.value.spk_jumlah = v.Qty || 0; // Auto-isi jumlah SPK
 };
-const setRepeat = (v: any) =>
-  (formData.value.spk_repeat = v.Nomor || v.spk_nomor);
+const setRepeat = (v: any) => {
+  const nomor = v.Nomor || v.spk_nomor;
+  formData.value.spk_repeat = nomor;
+  loadRepeatDetail(nomor);
+};
 const setSpkLama = (v: any) =>
   (formData.value.spk_lama = v.Nomor || v.spk_nomor);
 const setMppb = (v: any) => {
@@ -1052,9 +1055,100 @@ const setSetoranPembayaran = (v: any) => {
   toast.success(`Nomor PO diisi menggunakan nomor setoran: ${v.Nomor}`);
 };
 
+const loadRepeatDetail = async (nomor: string) => {
+  if (!nomor) return;
+  isLoading.value = true;
+  try {
+    const res = await api.get("/penjualan/sales-order/form/repeat-detail", {
+      params: { nomor },
+    });
+    const d = res.data.data;
+    const h = d.header || {};
+
+    // Salin field produk/customer — TIDAK termasuk nomor, tanggal,
+    // approval, gambar. Jumlah/qty SENGAJA dinolkan (lihat di bawah)
+    // sesuai permintaan: user isi ulang qty pesanan baru.
+    formData.value.spk_cus_kode = h.spk_cus_kode || "";
+    formData.value.Customer = h.cus_nama || "";
+    formData.value.cus_perfect = h.cus_perfect || "N";
+    if (String(h.spk_divisi || "").startsWith("3")) {
+      formData.value.spk_cus_kaosan = h.spk_cus_kaosan || "";
+      formData.value.CustKaosanNama = h.cusk || "";
+    }
+    formData.value.spk_sal_kode = h.spk_sal_kode || "";
+    formData.value.Sales = h.sal_nama || "";
+    formData.value.spk_jo_kode = h.spk_jo_kode || "";
+    formData.value.JenisOrder = h.jo_nama || "";
+    formData.value.spk_nama = h.spk_nama || "";
+    formData.value.spk_nama2 = h.spk_nama2 || "";
+    formData.value.spk_ukuran = h.spk_ukuran || "";
+    formData.value.spk_kain = h.spk_kain || "";
+    formData.value.spk_finishing = h.spk_finishing || "";
+    formData.value.spk_panjang = Number(h.spk_panjang) || 0;
+    formData.value.spk_lebar = Number(h.spk_lebar) || 0;
+    formData.value.spk_gramasi = h.spk_gramasi || "";
+    formData.value.spk_harga = Number(h.spk_harga) || 0;
+    formData.value.spk_hargariil = Number(h.spk_hargariil) || 0;
+    formData.value.spk_hargafee = Number(h.spk_hargafee) || 0;
+    formData.value.spk_perush_kode = h.spk_perush_kode || "";
+    formData.value.NamaPerusahaan = h.perush_nama || "";
+    formData.value.spk_cab = h.spk_cab || "";
+    formData.value.spk_workshop = h.workshop || "";
+    formData.value.spk_divisi = String(
+      h.spk_divisi || formData.value.spk_divisi,
+    );
+    formData.value.spk_keterangan = h.spk_keterangan || "";
+    formData.value.spk_warna_badan = h.spk_warna_badan || "";
+    formData.value.spk_warna_lengan = h.spk_warna_lengan || "";
+    formData.value.spk_warna_lain = h.spk_warna_lain || "";
+    formData.value.spk_sablon = h.spk_sablon || "N";
+    formData.value.spk_bordir = h.spk_bordir || "N";
+    formData.value.spk_sublim = h.spk_sublim || "N";
+
+    // ⬅ SENGAJA DINOLKAN — jumlah pesanan baru diisi user sendiri
+    formData.value.spk_jumlah = 0;
+
+    // Detail Kaosan — struktur barang ikut disalin, qtyorder dinolkan
+    if (d.dtlKaosan && d.dtlKaosan.length > 0) {
+      formData.value.Kaosan = d.dtlKaosan.map((k: any) => ({
+        ...k,
+        qtyorder: 0,
+      }));
+    }
+
+    // Detail Size — ukuran badan (ld/pb/dst) tetap ikut (bagian dari
+    // spesifikasi produk), tapi qty pesanan dinolkan
+    if (d.dtlSize && d.dtlSize.length > 0) {
+      formData.value.Sizes = (formData.value.Sizes || []).map((s: any) => {
+        const found = d.dtlSize.find((r: any) => r.size === s.size);
+        return found ? { ...s, ...found, qty: 0 } : s;
+      });
+    }
+
+    if (d.komponen && d.komponen.length > 0) {
+      formData.value.Komponen = d.komponen;
+    }
+
+    toast.success(
+      `Data berhasil disalin dari SO ${nomor}. Qty dikosongkan, silakan isi ulang.`,
+    );
+  } catch (e: any) {
+    toast.error(e.response?.data?.message || "SO Repeat tidak ditemukan.");
+    formData.value.spk_repeat = "";
+  } finally {
+    isLoading.value = false;
+  }
+};
+
 // --- VALIDASI ON BLUR (MIRIP DELPHI ON EXIT) ---
 const handleFieldBlur = async (type: string, value: string) => {
   if (!value) return;
+
+  if (type === "repeat") {
+    loadRepeatDetail(value);
+    return;
+  }
+
   try {
     const res = await api.get("/penjualan/sales-order/form/validate", {
       params: { type, value, extra: formData.value.spk_nomor },
@@ -1681,7 +1775,11 @@ const onPilihKatalog = (item: any) => {
     <SjMemoSearchModal v-model="showSjMemoModal" @selected="setSjMemo" />
     <MapSearchModal v-model="showMemoModal" @selected="setMemo" />
     <MppbSearchModal v-model="showMppbModal" @selected="setMppb" />
-    <SpkSearchModal v-model="showRepeatModal" @selected="setRepeat" />
+    <SpkSearchModal
+      v-model="showRepeatModal"
+      filter-mode="so"
+      @selected="setRepeat"
+    />
     <SpkSearchModal v-model="showSpkLamaModal" @selected="setSpkLama" />
     <InvDcSearchModal v-model="showStokDcModal" @selected="setStokDc" />
     <SoKaosanSearchModal v-model="showSoKaosanModal" @selected="setSoKaosan" />

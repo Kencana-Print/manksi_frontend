@@ -6,7 +6,7 @@ import { IconReceipt, IconSearch, IconDatabaseOff } from "@tabler/icons-vue";
 const props = defineProps<{
   modelValue: boolean;
   cabang: string;
-  kode: string; // kode bayar: BG, BT, CS, PT, RT
+  kode?: string; // kode bayar: BG, BT, CS, PT, RT
 }>();
 
 const emit = defineEmits(["update:modelValue", "selected"]);
@@ -18,11 +18,15 @@ const isLoading = ref(false);
 const isRetur = computed(() => props.kode === "RT");
 
 const fetchData = async () => {
-  if (!props.cabang || !props.kode) return;
+  if (!props.cabang) return;
   isLoading.value = true;
   try {
     const res = await api.get("/lookups/bukti-bayar", {
-      params: { cabang: props.cabang, kode: props.kode, search: search.value },
+      params: {
+        cabang: props.cabang,
+        kode: props.kode || "",
+        search: search.value,
+      },
     });
     items.value = res.data.data || [];
   } catch {
@@ -125,10 +129,10 @@ const selectItem = (item: any) => {
             <tr>
               <th style="width: 180px">NOMOR</th>
               <th style="width: 100px">TANGGAL</th>
-              <th v-if="!isRetur" style="width: 50px">KODE</th>
+              <th style="width: 50px">KODE</th>
               <th>CUSTOMER</th>
               <th style="width: 130px" class="tr">DEBET</th>
-              <th v-if="isRetur" style="width: 160px">KETERANGAN</th>
+              <th style="width: 160px">KETERANGAN</th>
             </tr>
           </thead>
           <tbody>
@@ -140,7 +144,7 @@ const selectItem = (item: any) => {
             >
               <td class="td-kode">{{ item.Nomor }}</td>
               <td>{{ item.Tanggal }}</td>
-              <td v-if="!isRetur" class="tc">{{ item.Kode }}</td>
+              <td class="tc">{{ item.Kode }}</td>
               <td>{{ item.Customer }}</td>
               <td
                 class="tr"
@@ -148,7 +152,7 @@ const selectItem = (item: any) => {
               >
                 {{ fmtNum(item.Debet) }}
               </td>
-              <td v-if="isRetur">{{ item.Keterangan }}</td>
+              <td>{{ item.Keterangan }}</td>
             </tr>
           </tbody>
         </table>
