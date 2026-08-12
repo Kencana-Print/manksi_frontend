@@ -86,13 +86,13 @@ const chartAch = computed(() => props.items.map((r) => Number(r.Ach) || 0));
   overflow-y: auto;
   overflow-x: hidden;
 }
+
 .tab-table {
   flex: 1 1 520px;
   max-width: 720px;
   min-width: 300px;
-  max-height: 100%;
-  overflow: auto;
 }
+
 .tab-chart {
   flex: 1 1 420px;
   min-width: 300px;
@@ -114,6 +114,24 @@ const chartAch = computed(() => props.items.map((r) => Number(r.Ach) || 0));
   .tab-chart {
     height: 400px;
   }
+}
+
+.tab-table :deep(.bt-wrap) {
+  height: auto;
+}
+.tab-table :deep(.bt-table-section) {
+  flex: 0 1 auto;
+}
+.tab-table :deep(.bt-table-wrap) {
+  flex: 0 1 auto;
+  max-height: 420px; /* cap, tetap scroll internal kalau datanya banyak */
+}
+.tab-table :deep(.bt-table) {
+  height: auto;
+}
+.tab-table :deep(.v-table__wrapper) {
+  flex: 0 1 auto !important;
+  max-height: 420px;
 }
 
 .sum-lbl {
