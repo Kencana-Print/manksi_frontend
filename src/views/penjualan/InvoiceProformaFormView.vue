@@ -384,6 +384,10 @@ const onBarangEnter = async (index: number) => {
       formData.value.kodePerush,
       formData.value.cusKode,
     );
+
+    // TAMBAHKAN BARIS INI
+    activeRowIndex.value = index;
+
     onBarangSelected(res.data.data);
   } catch (e: any) {
     toast.error(e.response?.data?.message || "Kode barang tidak ditemukan.");

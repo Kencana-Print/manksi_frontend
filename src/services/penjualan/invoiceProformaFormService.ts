@@ -18,9 +18,12 @@ export const invoiceProformaFormService = {
     ),
 
   getBarangByKode: (kode: string, perushKode: string, cusKode: string) =>
-    api.get(`/penjualan/invoice-proforma/barang/${encodeURIComponent(kode)}`, {
-      params: { perushKode, cusKode },
-    }),
+    api.get(
+      `/penjualan/invoice-proforma/form/barang/${encodeURIComponent(kode)}`,
+      {
+        params: { perushKode, cusKode },
+      },
+    ),
 
   getDetail: (nomor: string) =>
     api.get(`/penjualan/invoice-proforma/form/${encodeURIComponent(nomor)}`),
