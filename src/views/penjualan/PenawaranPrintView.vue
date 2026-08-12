@@ -221,20 +221,12 @@ const parsedSampleList = computed(() => {
 });
 
 const grandTotal = computed(() => {
-  if (!data.value || !data.value.Details) return 0;
-  if (data.value.pen_cetaktotal === 1) {
-    return data.value.Details.reduce(
-      (sum: number, r: any) => sum + Number(r.pend_qty) * Number(r.pend_harga),
-      0,
-    );
-  } else {
-    let min = Infinity;
-    data.value.Details.forEach((r: any) => {
-      const val = Number(r.pend_qty) * Number(r.pend_harga);
-      if (val > 0 && val < min) min = val;
-    });
-    return min === Infinity ? 0 : min;
-  }
+  if (!data.value || !data.value.Details || data.value.pen_cetaktotal !== 1)
+    return 0;
+  return data.value.Details.reduce(
+    (sum: number, r: any) => sum + Number(r.pend_qty) * Number(r.pend_harga),
+    0,
+  );
 });
 
 const dpNominal = computed(() => {
@@ -424,7 +416,7 @@ const dpNominal = computed(() => {
               {{ num(row.pend_qty * row.pend_harga) }}
             </td>
           </tr>
-          <tr class="total-row">
+          <tr v-if="data.pen_cetaktotal === 1" class="total-row">
             <td colspan="7">Grand Total</td>
             <td class="text-right font-weight-bold">{{ num(grandTotal) }}</td>
           </tr>
@@ -472,7 +464,7 @@ const dpNominal = computed(() => {
               />
             </td>
           </tr>
-          <tr class="total-row">
+          <tr v-if="data.pen_cetaktotal === 1" class="total-row">
             <td colspan="5">Grand Total</td>
             <td class="text-right font-weight-bold">{{ num(grandTotal) }}</td>
             <td></td>
