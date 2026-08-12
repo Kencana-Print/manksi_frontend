@@ -72,6 +72,18 @@ const wrapText = (text: string, maxWidth: number): string[] => {
   return lines.length ? lines : [""];
 };
 
+const fmtDateID = (v: string) => {
+  if (!v) return "";
+  const raw = String(v).split("T")[0];
+  const parts = raw.split("-");
+  if (parts.length !== 3) return raw;
+  if (parts[0].length === 4) {
+    const [y, m, d] = parts;
+    return `${d}/${m}/${y}`;
+  }
+  return parts.join("/");
+};
+
 const terbilang = (n: number): string => {
   const satuan = [
     "",
@@ -136,7 +148,7 @@ const generateTxt = () => {
   const h = header.value;
   const rows = detail.value;
   const t = totals.value;
-  const LINE = "-".repeat(PAGE_WIDTH);
+  const LINE = "_".repeat(PAGE_WIDTH);
 
   const buildHeaderLines = (): string[] => {
     const halfL = col(67);
@@ -155,7 +167,7 @@ const generateTxt = () => {
       `${padR("Nomor      : " + (h.inv_nomor || ""), halfL)} ${padR("Customer : " + (h.cus_nama || ""), halfR)}`,
     );
     lines.push(
-      `${padR("Tanggal    : " + (h.inv_tanggal_fmt || ""), halfL)} ${padR(alamatLines[0] || "", halfR)}`,
+      `${padR("Tanggal    : " + fmtDateID(h.inv_tanggal_fmt), halfL)} ${padR(alamatLines[0] || "", halfR)}`,
     );
     lines.push(
       `${padR("Keterangan : " + (h.inv_keterangan || ""), halfL)} ${padR(alamatLines[1] || "", halfR)}`,
@@ -163,9 +175,7 @@ const generateTxt = () => {
     for (let i = 2; i < alamatLines.length; i++) {
       lines.push(`${padR("", halfL)} ${padR(alamatLines[i], halfR)}`);
     }
-    lines.push(
-      `${padR("", halfL)} ${padR((h.cus_telp || "") + "/" + (h.cus_fax || ""), halfR)}`,
-    );
+
     lines.push(LINE);
     lines.push(
       `${padR("No", col(3))} ${padR("SPK", col(12))} ${padR("Nama", col(55))} ${padR("Ukuran", col(20))} ${padL("Jumlah", col(10))} ${padL("Harga", col(12))} ${padL("Total", col(18))}`,
@@ -496,11 +506,6 @@ onMounted(() => {
                   <td></td>
                   <td></td>
                   <td>{{ header.inv_cus_alamat || header.cus_alamat }}</td>
-                </tr>
-                <tr>
-                  <td></td>
-                  <td></td>
-                  <td>{{ header.cus_telp }}</td>
                 </tr>
               </table>
             </div>
