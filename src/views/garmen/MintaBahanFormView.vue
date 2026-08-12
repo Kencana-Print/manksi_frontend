@@ -62,6 +62,7 @@ const initialData = {
   mkbNomor: "",
   mkbTanggal: "",
   status: "OPEN",
+  pin_status: "",
   pin_acc: "",
   pin_dipakai: "",
   details: [] as DetailItem[],
@@ -100,6 +101,7 @@ const {
       mkbNomor: h.mkb_nomor,
       mkbTanggal: formatDateLocal(h.mkb_tanggal),
       status: h.min_close === 0 ? "OPEN" : "CLOSED",
+      pin_status: h.pin_status || "",
       pin_acc: h.pin_acc,
       pin_dipakai: h.pin_dipakai,
       details: res.data.data.details,
@@ -324,6 +326,27 @@ watch(
       <div class="desktop-form-section header-section">
         <div class="text-caption font-weight-bold mb-3 text-primary">
           HEADER
+        </div>
+
+        <div class="d-flex align-center gap-2 mb-2">
+          <v-chip
+            v-if="formData.pin_status === 'WAIT'"
+            color="blue"
+            size="x-small"
+            >WAITING PIN</v-chip
+          >
+          <v-chip
+            v-else-if="formData.pin_status === 'ACC'"
+            color="green"
+            size="x-small"
+            >PIN APPROVED</v-chip
+          >
+          <v-chip
+            v-else-if="formData.pin_status === 'TOLAK'"
+            color="red"
+            size="x-small"
+            >PIN REJECTED</v-chip
+          >
         </div>
 
         <v-text-field
