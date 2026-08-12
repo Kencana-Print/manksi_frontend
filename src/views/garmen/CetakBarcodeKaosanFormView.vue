@@ -1025,7 +1025,7 @@ const closePreview = () => {
                 <span>{{ item.tgl }}</span>
               </div>
               <div class="bck-spk-line">
-                <span>{{ item.spk }} {{ item.tgl }}</span>
+                <span>{{ item.spk }}</span>
                 <span>{{ item.ukuran }} {{ item.nourut }}</span>
               </div>
             </div>
