@@ -236,6 +236,11 @@ const grandTotal = computed(() => {
     return min === Infinity ? 0 : min;
   }
 });
+
+const dpNominal = computed(() => {
+  if (!data.value?.pen_dpper) return 0;
+  return Math.round((grandTotal.value * Number(data.value.pen_dpper)) / 100);
+});
 </script>
 
 <template>
@@ -558,7 +563,7 @@ const grandTotal = computed(() => {
             <table class="payment-table">
               <tr v-if="data.pen_dpper > 0">
                 <td style="width: 70px">DP</td>
-                <td>: {{ data.pen_dpper }}%</td>
+                <td>: {{ data.pen_dpper }}% = {{ fmtRupiah(dpNominal) }}</td>
               </tr>
               <tr v-if="data.pen_rekening">
                 <td>Rekening</td>
