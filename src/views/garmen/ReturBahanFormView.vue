@@ -608,7 +608,7 @@ const numFormat = (val: any) =>
 
   <RealisasiMintaSearchModal
     v-model="showMintaModal"
-    @selected="onMintaSelected"
+    @detail-selected="onDetailSelected"
   />
 
   <RealisasiMintaDetailSearchModal

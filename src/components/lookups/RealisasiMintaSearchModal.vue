@@ -14,7 +14,12 @@ const props = defineProps<{
   excludeNomor?: string;
   gudangProduksi?: string;
 }>();
-const emit = defineEmits(["update:modelValue", "selected"]);
+const emit = defineEmits(["update:modelValue", "selected", "detail-selected"]);
+
+const selectDetailItem = (detail: any) => {
+  emit("detail-selected", detail);
+  emit("update:modelValue", false);
+};
 
 const isMaterialMode = computed(() => !!props.nomorSpk);
 
@@ -180,12 +185,12 @@ const toggleExpand = async (item: any) => {
           <thead>
             <tr v-if="isMaterialMode">
               <th style="width: 40px"></th>
-              <!-- Kolom Expand -->
               <th style="width: 130px">NOMOR</th>
               <th style="width: 90px">TANGGAL</th>
               <th style="width: 100px">KODE</th>
               <th>JENIS KAIN</th>
               <th style="width: 90px" class="tr">JUMLAH</th>
+              <th style="width: 90px" class="tr">TERPAKAI</th>
               <th style="width: 90px" class="tr">SISA</th>
               <th style="width: 60px">CAB</th>
             </tr>
@@ -203,16 +208,15 @@ const toggleExpand = async (item: any) => {
               v-for="item in items"
               :key="item.Nomor + (item.Kode || '')"
             >
-              <!-- BARIS UTAMA -->
-              <tr class="lookup-row" @click="selectItem(item)">
-                <td style="text-align: center" @click.stop="toggleExpand(item)">
+              <!-- BARIS UTAMA — sekarang klik di mana pun cuma toggle expand -->
+              <tr class="lookup-row" @click="toggleExpand(item)">
+                <td style="text-align: center">
                   <IconChevronDown
                     v-if="expandedRows.includes(item.Nomor)"
                     :size="16"
                   />
                   <IconChevronRight v-else :size="16" />
                 </td>
-
                 <template v-if="isMaterialMode">
                   <td class="td-kode">{{ item.Nomor }}</td>
                   <td>{{ item.Tanggal }}</td>
@@ -221,6 +225,9 @@ const toggleExpand = async (item: any) => {
                     {{ item.JenisKain }}
                   </td>
                   <td class="tr">{{ num(item.Jumlah, 2) }}</td>
+                  <td class="tr" style="color: #e65100">
+                    {{ num(item.Terpakai, 2) }}
+                  </td>
                   <td
                     class="tr"
                     :style="
@@ -243,9 +250,8 @@ const toggleExpand = async (item: any) => {
                 </template>
               </tr>
 
-              <!-- BARIS DETAIL (NESTED TABLE) -->
+              <!-- BARIS DETAIL — sekarang tiap baris bahan bisa langsung diklik -->
               <tr v-if="expandedRows.includes(item.Nomor)" class="expanded-row">
-                <!-- Colspan menyesuaikan dengan mode -->
                 <td :colspan="isMaterialMode ? 8 : 5" class="expanded-cell">
                   <div
                     v-if="detailLoading[item.Nomor]"
@@ -259,32 +265,42 @@ const toggleExpand = async (item: any) => {
                     />
                     Memuat detail bahan...
                   </div>
-
                   <table v-else class="nested-table">
                     <thead>
                       <tr>
                         <th style="width: 120px">KODE</th>
                         <th>NAMA BAHAN</th>
-                        <th style="width: 60px">SAT</th>
-                        <th style="width: 80px" class="tr">MINTA</th>
-                        <th style="width: 80px" class="tr">LHK</th>
-                        <th style="width: 80px" class="tr">SISA</th>
+                        <th style="width: 50px">SAT</th>
+                        <th style="width: 75px" class="tr">MINTA</th>
+                        <th style="width: 75px" class="tr">TERPAKAI</th>
+                        <th style="width: 75px" class="tr">SUDAH RETUR</th>
+                        <th style="width: 75px" class="tr">SISA</th>
                       </tr>
                     </thead>
                     <tbody>
-                      <tr v-for="d in detailData[item.Nomor]" :key="d.Kode">
+                      <tr
+                        v-for="d in detailData[item.Nomor]"
+                        :key="d.Kode"
+                        class="nested-row"
+                        @click.stop="selectDetailItem(d)"
+                      >
                         <td class="td-kode">{{ d.Kode }}</td>
                         <td>{{ d.Nama }}</td>
                         <td>{{ d.Satuan }}</td>
                         <td class="tr">{{ num(d.Minta, 2) }}</td>
-                        <td class="tr">{{ num(d.LHK, 2) }}</td>
+                        <td class="tr" style="color: #e65100">
+                          {{ num(d.LHK, 2) }}
+                        </td>
+                        <td class="tr" style="color: #6a1b9a">
+                          {{ num(d.Sudah, 2) }}
+                        </td>
                         <td class="tr font-weight-bold text-primary">
                           {{ num(d.Sisa, 2) }}
                         </td>
                       </tr>
                       <tr v-if="!detailData[item.Nomor]?.length">
                         <td
-                          colspan="6"
+                          colspan="7"
                           style="
                             text-align: center;
                             color: #9e9e9e;
@@ -543,5 +559,14 @@ const toggleExpand = async (item: any) => {
 }
 .tr {
   text-align: right !important;
+}
+
+.nested-row {
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.nested-row:hover td {
+  background: #e3f2fd;
+  color: #1565c0;
 }
 </style>
