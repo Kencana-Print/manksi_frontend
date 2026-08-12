@@ -508,6 +508,7 @@ const buildPrintData = (rows: DetailRow[], nomorDok: string) => {
         nomor: nomorDok,
         tgl: row.tglspk ? row.tglspk.split("-").reverse().join("/") : "",
         kode: row.kodek,
+        spk: row.kode,
         ukuran: row.ukuran,
         barcode: row.barcode,
         nama: row.nama,
@@ -590,6 +591,8 @@ const printStylesXP360B = `
   .bck-ukuran { font-size:4.5pt; font-family:Arial; }
   .bck-barcode-svg { width:27mm !important; height:5.5mm !important; margin:0.1mm 0; }
   .bck-footer { display:flex; justify-content:space-between; width:95%; font-size:4.5pt; font-family:Arial,sans-serif; font-weight:bold; }
+  .bck-footer { display:flex; justify-content:space-between; width:95%; font-size:4.5pt; font-family:Arial,sans-serif; font-weight:bold; }
+  .bck-spk-line { display:flex; justify-content:space-between; width:95%; font-size:4pt; font-family:Arial,sans-serif; color:#333; margin-top:0.3mm; }
 `;
 const printStylesPostek = `
   @page { size: 108mm 17mm landscape; margin: 0 !important; }
@@ -601,6 +604,8 @@ const printStylesPostek = `
   .bck-ukuran { font-size:4.5pt; font-family:Arial; }
   .bck-barcode-svg { width:29mm !important; height:6mm !important; margin:0.1mm 0; }
   .bck-footer { display:flex; justify-content:space-between; width:95%; font-size:4.5pt; font-family:Arial,sans-serif; font-weight:bold; }
+  .bck-footer { display:flex; justify-content:space-between; width:95%; font-size:4.5pt; font-family:Arial,sans-serif; font-weight:bold; }
+  .bck-spk-line { display:flex; justify-content:space-between; width:95%; font-size:4pt; font-family:Arial,sans-serif; color:#333; margin-top:0.3mm; }
 `;
 
 const triggerBrowserPrint = () => {
@@ -1019,6 +1024,10 @@ const closePreview = () => {
                 </div>
                 <span>{{ item.tgl }}</span>
               </div>
+              <div class="bck-spk-line">
+                <span>{{ item.spk }} {{ item.tgl }}</span>
+                <span>{{ item.ukuran }} {{ item.nourut }}</span>
+              </div>
             </div>
           </div>
         </div>
@@ -1389,6 +1398,16 @@ const closePreview = () => {
   font-size: 4.5pt;
   font-family: Arial, sans-serif;
   font-weight: bold;
+}
+.printer-xp360b .bck-spk-line,
+.printer-postek .bck-spk-line {
+  display: flex;
+  justify-content: space-between;
+  width: 95%;
+  font-size: 4pt;
+  font-family: Arial, sans-serif;
+  color: #333;
+  margin-top: 0.3mm;
 }
 
 .printer-postek .bck-row {
