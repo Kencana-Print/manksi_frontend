@@ -1526,6 +1526,7 @@ watch(
                   <option value="LENGAN_PANJANG">Kaos L.Panjang</option>
                   <option value="RAGLAN_LP">Raglan L.Panjang</option>
                   <option value="KEMEJA_WANITA">Kemeja Wanita</option>
+                  <option value="KEMEJA_PRIA">Kemeja Pria</option>
                 </template>
               </select>
               <label class="chk-lbl ml-1">

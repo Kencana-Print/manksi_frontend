@@ -38,6 +38,14 @@ const isTimDesain = computed(
   () => authStore.user?.bagian?.toUpperCase() === "DESAIN",
 );
 
+const canDeleteOrder = computed(() => {
+  const flags = authStore.user?.flags;
+  const userKode = authStore.user?.kode?.toUpperCase();
+
+  // Hapus hanya jika cmo === 1 atau user kode adalah RIYA
+  return flags?.cmo === 1 || userKode === "RIYA";
+});
+
 const canLihatCus = computed(() => authStore.user?.flags.lihatCus === 1);
 const canLihatHarga = computed(() => authStore.canLihatHarga);
 
@@ -924,8 +932,7 @@ const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
     v-model:selected="selected"
     v-model:filter-state="filterState"
     :can-insert="canInsert"
-    :can-edit="canEdit"
-    :can-delete="canDelete"
+    :can-delete="canDelete && canDeleteOrder"
     :can-export="canExport"
     item-value="Nomor"
     :row-props-fn="rowPropsFn"
