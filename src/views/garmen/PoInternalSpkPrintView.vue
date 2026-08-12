@@ -47,11 +47,6 @@ const resolveDesignImage = () => {
   const cab = data.value.header.GdgKode || "HO-";
   const map = data.value.header.MapNomor || "";
 
-  // [FIX] Fallback chain disamakan PERSIS dengan SpkView/SpkPrintView
-  // (final version, termasuk fix subfolder /map/ yang sempat kurang):
-  // - Format baru (SPK-...) -> prioritas MAP dulu, baru nomor sendiri
-  // - Format legacy (bukan SPK-...) -> prioritas nomor sendiri dulu,
-  //   baru MAP
   const isLegacyFormat = !nomorSpk.startsWith("SPK-");
 
   const mapCandidates = map
@@ -71,6 +66,21 @@ const resolveDesignImage = () => {
     candidates.push(...ownCandidates, ...mapCandidates);
   } else {
     candidates.push(...mapCandidates, ...ownCandidates);
+  }
+
+  // [FIX] Fallback ke nomor SO (prefix SPK- diganti SO-), sama pola
+  // fallbackSoNomor di SpkView/SpkPrintView — SPK yang lahir dari
+  // proses SO seringkali gambarnya cuma diupload di bawah nomor SO,
+  // bukan nomor SPK-nya sendiri. Tidak butuh field backend baru
+  // karena cukup string-replace prefix, sama persis pola project ini.
+  if (!isLegacyFormat) {
+    const fallbackSoNomor = nomorSpk.replace("SPK-", "SO-");
+    if (fallbackSoNomor !== nomorSpk) {
+      candidates.push(
+        `${base}/images/${cab}/${encodeURIComponent(fallbackSoNomor)}.jpg`,
+        `/file-gambar/${encodeURIComponent(fallbackSoNomor)}.jpg`,
+      );
+    }
   }
 
   isLoadingImage.value = true;
