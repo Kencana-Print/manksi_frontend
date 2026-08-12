@@ -608,14 +608,9 @@ const numFormat = (val: any) =>
 
   <RealisasiMintaSearchModal
     v-model="showMintaModal"
-    @detail-selected="onDetailSelected"
-  />
-
-  <RealisasiMintaDetailSearchModal
-    v-model="showDetailModal"
-    :nomor-realisasi="formData.details[activeRowIndex]?.nominta"
+    flat
     :gudang-produksi="formData.gudangProduksi"
-    @selected="onDetailSelected"
+    @detail-selected="onDetailSelected"
   />
 
   <v-dialog v-model="showPrintDialog" max-width="400px" persistent>

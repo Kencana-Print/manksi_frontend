@@ -13,15 +13,13 @@ const props = defineProps<{
   nomorSpk?: string;
   excludeNomor?: string;
   gudangProduksi?: string;
+  flat?: boolean;
 }>();
 const emit = defineEmits(["update:modelValue", "selected", "detail-selected"]);
 
-const selectDetailItem = (detail: any) => {
-  emit("detail-selected", detail);
-  emit("update:modelValue", false);
-};
-
-const isMaterialMode = computed(() => !!props.nomorSpk);
+const isMaterialMode = computed(() => !!props.nomorSpk || !!props.flat);
+const showSpkColumn = computed(() => isMaterialMode.value && !props.nomorSpk);
+const dialogWidth = computed(() => (isMaterialMode.value ? "1300px" : "850px"));
 
 const num = (v: any, d = 0) =>
   Number(v || 0).toLocaleString("id-ID", {
@@ -75,6 +73,7 @@ const fetchData = async () => {
         limit: perPage.value,
         nomorSpk: props.nomorSpk || undefined,
         excludeNomor: props.excludeNomor || undefined,
+        flat: props.flat ? "true" : undefined,
       },
     });
     items.value = res.data.data.items;
@@ -84,6 +83,25 @@ const fetchData = async () => {
   } finally {
     isLoading.value = false;
   }
+};
+
+const selectDetailItem = (detail: any) => {
+  emit("detail-selected", detail);
+  emit("update:modelValue", false);
+};
+
+const selectFlatItem = (item: any) => {
+  const normalized = {
+    ...item,
+    NoMinta: item.Nomor,
+    Nama: item.JenisKain,
+    Minta: item.Jumlah,
+    kdsup: item.Kodesup,
+    nmsup: item.NamaSupplier,
+  };
+  emit("selected", normalized);
+  emit("detail-selected", normalized);
+  emit("update:modelValue", false);
 };
 
 const onSearch = (val: string) => {
@@ -152,7 +170,7 @@ const toggleExpand = async (item: any) => {
   <v-dialog
     :model-value="modelValue"
     @update:model-value="emit('update:modelValue', $event)"
-    max-width="850px"
+    :max-width="dialogWidth"
   >
     <div class="lookup-card">
       <div class="lookup-header">
@@ -184,19 +202,22 @@ const toggleExpand = async (item: any) => {
         <table v-else class="lookup-table">
           <thead>
             <tr v-if="isMaterialMode">
-              <th style="width: 40px"></th>
+              <template v-if="showSpkColumn">
+                <th style="width: 120px">SPK</th>
+                <th style="min-width: 180px">NAMA PEKERJAAN</th>
+              </template>
               <th style="width: 130px">NOMOR</th>
               <th style="width: 90px">TANGGAL</th>
               <th style="width: 100px">KODE</th>
               <th>JENIS KAIN</th>
-              <th style="width: 90px" class="tr">JUMLAH</th>
-              <th style="width: 90px" class="tr">TERPAKAI</th>
-              <th style="width: 90px" class="tr">SISA</th>
+              <th style="width: 85px" class="tr">JUMLAH</th>
+              <th style="width: 85px" class="tr">TERPAKAI</th>
+              <th style="width: 85px" class="tr">SUDAH</th>
+              <th style="width: 85px" class="tr">SISA</th>
               <th style="width: 60px">CAB</th>
             </tr>
             <tr v-else>
               <th style="width: 40px"></th>
-              <!-- Kolom Expand -->
               <th style="width: 160px">NOMOR</th>
               <th style="width: 100px">TANGGAL</th>
               <th style="width: 150px">SPK</th>
@@ -208,112 +229,127 @@ const toggleExpand = async (item: any) => {
               v-for="item in items"
               :key="item.Nomor + (item.Kode || '')"
             >
-              <!-- BARIS UTAMA — sekarang klik di mana pun cuma toggle expand -->
-              <tr class="lookup-row" @click="toggleExpand(item)">
-                <td style="text-align: center">
-                  <IconChevronDown
-                    v-if="expandedRows.includes(item.Nomor)"
-                    :size="16"
-                  />
-                  <IconChevronRight v-else :size="16" />
-                </td>
-                <template v-if="isMaterialMode">
-                  <td class="td-kode">{{ item.Nomor }}</td>
-                  <td>{{ item.Tanggal }}</td>
-                  <td class="td-kode">{{ item.Kode }}</td>
+              <tr
+                v-if="isMaterialMode"
+                class="lookup-row"
+                @click="selectFlatItem(item)"
+              >
+                <template v-if="showSpkColumn">
+                  <td class="td-kode">{{ item.SPK }}</td>
                   <td class="text-truncate" style="max-width: 220px">
-                    {{ item.JenisKain }}
+                    {{ item.NamaSpk }}
                   </td>
-                  <td class="tr">{{ num(item.Jumlah, 2) }}</td>
-                  <td class="tr" style="color: #e65100">
-                    {{ num(item.Terpakai, 2) }}
-                  </td>
-                  <td
-                    class="tr"
-                    :style="
-                      Number(item.Sisa) <= 0
-                        ? 'color:#c62828;font-weight:700'
-                        : ''
-                    "
-                  >
-                    {{ num(item.Sisa, 2) }}
-                  </td>
-                  <td>{{ item.Cab }}</td>
                 </template>
-                <template v-else>
+                <td class="td-kode">{{ item.Nomor }}</td>
+                <td>{{ item.Tanggal }}</td>
+                <td class="td-kode">{{ item.Kode }}</td>
+                <td class="text-truncate" style="max-width: 200px">
+                  {{ item.JenisKain }}
+                </td>
+                <td class="tr">{{ num(item.Jumlah, 2) }}</td>
+                <td class="tr" style="color: #e65100">
+                  {{ num(item.Terpakai, 2) }}
+                </td>
+                <td class="tr" style="color: #6a1b9a">
+                  {{ num(item.Sudah, 2) }}
+                </td>
+                <td
+                  class="tr"
+                  :style="
+                    Number(item.Sisa) <= 0
+                      ? 'color:#c62828;font-weight:700'
+                      : ''
+                  "
+                >
+                  {{ num(item.Sisa, 2) }}
+                </td>
+                <td>{{ item.Cab }}</td>
+              </tr>
+
+              <!-- Mode default: header + expand nested bahan (TIDAK BERUBAH) -->
+              <template v-else>
+                <tr class="lookup-row" @click="toggleExpand(item)">
+                  <td style="text-align: center">
+                    <IconChevronDown
+                      v-if="expandedRows.includes(item.Nomor)"
+                      :size="16"
+                    />
+                    <IconChevronRight v-else :size="16" />
+                  </td>
                   <td class="td-kode">{{ item.Nomor }}</td>
                   <td>{{ formatDate(item.Tanggal) }}</td>
                   <td>{{ item.SPK }}</td>
                   <td class="text-truncate" style="max-width: 300px">
                     {{ item.NamaSpk }}
                   </td>
-                </template>
-              </tr>
-
-              <!-- BARIS DETAIL — sekarang tiap baris bahan bisa langsung diklik -->
-              <tr v-if="expandedRows.includes(item.Nomor)" class="expanded-row">
-                <td :colspan="isMaterialMode ? 8 : 5" class="expanded-cell">
-                  <div
-                    v-if="detailLoading[item.Nomor]"
-                    style="padding: 12px; text-align: center; color: #757575"
-                  >
-                    <v-progress-circular
-                      indeterminate
-                      color="primary"
-                      size="20"
-                      class="mr-2"
-                    />
-                    Memuat detail bahan...
-                  </div>
-                  <table v-else class="nested-table">
-                    <thead>
-                      <tr>
-                        <th style="width: 120px">KODE</th>
-                        <th>NAMA BAHAN</th>
-                        <th style="width: 50px">SAT</th>
-                        <th style="width: 75px" class="tr">MINTA</th>
-                        <th style="width: 75px" class="tr">TERPAKAI</th>
-                        <th style="width: 75px" class="tr">SUDAH RETUR</th>
-                        <th style="width: 75px" class="tr">SISA</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr
-                        v-for="d in detailData[item.Nomor]"
-                        :key="d.Kode"
-                        class="nested-row"
-                        @click.stop="selectDetailItem(d)"
-                      >
-                        <td class="td-kode">{{ d.Kode }}</td>
-                        <td>{{ d.Nama }}</td>
-                        <td>{{ d.Satuan }}</td>
-                        <td class="tr">{{ num(d.Minta, 2) }}</td>
-                        <td class="tr" style="color: #e65100">
-                          {{ num(d.LHK, 2) }}
-                        </td>
-                        <td class="tr" style="color: #6a1b9a">
-                          {{ num(d.Sudah, 2) }}
-                        </td>
-                        <td class="tr font-weight-bold text-primary">
-                          {{ num(d.Sisa, 2) }}
-                        </td>
-                      </tr>
-                      <tr v-if="!detailData[item.Nomor]?.length">
-                        <td
-                          colspan="7"
-                          style="
-                            text-align: center;
-                            color: #9e9e9e;
-                            padding: 10px;
-                          "
+                </tr>
+                <tr
+                  v-if="expandedRows.includes(item.Nomor)"
+                  class="expanded-row"
+                >
+                  <td colspan="5" class="expanded-cell">
+                    <div
+                      v-if="detailLoading[item.Nomor]"
+                      style="padding: 12px; text-align: center; color: #757575"
+                    >
+                      <v-progress-circular
+                        indeterminate
+                        color="primary"
+                        size="20"
+                        class="mr-2"
+                      />
+                      Memuat detail bahan...
+                    </div>
+                    <table v-else class="nested-table">
+                      <thead>
+                        <tr>
+                          <th style="width: 120px">KODE</th>
+                          <th>NAMA BAHAN</th>
+                          <th style="width: 50px">SAT</th>
+                          <th style="width: 75px" class="tr">MINTA</th>
+                          <th style="width: 75px" class="tr">TERPAKAI</th>
+                          <th style="width: 75px" class="tr">SUDAH RETUR</th>
+                          <th style="width: 75px" class="tr">SISA</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr
+                          v-for="d in detailData[item.Nomor]"
+                          :key="d.Kode"
+                          class="nested-row"
+                          @click.stop="selectDetailItem(d)"
                         >
-                          Tidak ada detail bahan untuk realisasi ini.
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </td>
-              </tr>
+                          <td class="td-kode">{{ d.Kode }}</td>
+                          <td>{{ d.Nama }}</td>
+                          <td>{{ d.Satuan }}</td>
+                          <td class="tr">{{ num(d.Minta, 2) }}</td>
+                          <td class="tr" style="color: #e65100">
+                            {{ num(d.LHK, 2) }}
+                          </td>
+                          <td class="tr" style="color: #6a1b9a">
+                            {{ num(d.Sudah, 2) }}
+                          </td>
+                          <td class="tr font-weight-bold text-primary">
+                            {{ num(d.Sisa, 2) }}
+                          </td>
+                        </tr>
+                        <tr v-if="!detailData[item.Nomor]?.length">
+                          <td
+                            colspan="7"
+                            style="
+                              text-align: center;
+                              color: #9e9e9e;
+                              padding: 10px;
+                            "
+                          >
+                            Tidak ada detail bahan untuk realisasi ini.
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </td>
+                </tr>
+              </template>
             </template>
           </tbody>
         </table>
@@ -415,6 +451,7 @@ const toggleExpand = async (item: any) => {
 .lookup-table-wrap {
   flex: 1;
   overflow-y: auto;
+  overflow-x: auto;
   min-height: 200px;
 }
 .lookup-state {
