@@ -56,10 +56,22 @@ const chartAch = computed(() => props.items.map((r) => Number(r.Ach) || 0));
         }}</template>
         <template #item.Ach="{ item }">{{ pctFmt(item.Ach) }}</template>
         <template #summary-row>
-          <span class="sum-lbl">Total</span>
-          <span class="sum-val">{{ numFmt(totalTarget) }}</span>
-          <span class="sum-val">{{ numFmt(totalRealisasi) }}</span>
-          <span class="sum-val">{{ totalAch.toFixed(2) }}%</span>
+          <div class="sum-row">
+            <span class="sum-cell" style="width: 60px"></span>
+            <span class="sum-cell" style="width: 80px"></span>
+            <span class="sum-cell sum-label" style="flex: 1; min-width: 140px"
+              >Total</span
+            >
+            <span class="sum-cell tr" style="width: 140px">{{
+              numFmt(totalTarget)
+            }}</span>
+            <span class="sum-cell tr" style="width: 140px">{{
+              numFmt(totalRealisasi)
+            }}</span>
+            <span class="sum-cell tr" style="width: 90px"
+              >{{ totalAch.toFixed(2) }}%</span
+            >
+          </div>
         </template>
       </BaseTable>
     </div>
@@ -134,17 +146,31 @@ const chartAch = computed(() => props.items.map((r) => Number(r.Ach) || 0));
   max-height: 420px;
 }
 
-.sum-lbl {
-  font-size: 11px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.8);
-  margin-right: 8px;
+.sum-row {
+  display: flex;
+  width: 100%;
+  box-sizing: border-box;
 }
-.sum-val {
+.sum-cell {
+  padding: 0 8px;
+  box-sizing: border-box;
+  flex-shrink: 0;
   font-size: 12px;
   font-weight: 700;
   color: white;
   font-family: monospace;
-  margin-right: 16px;
+  white-space: nowrap;
+}
+.sum-label {
+  font-family: inherit;
+  font-weight: 700;
+}
+.sum-cell.tr {
+  text-align: right;
+}
+
+.tab-table :deep(.bt-summary-sticky) {
+  padding: 0 !important;
+  gap: 0 !important;
 }
 </style>

@@ -479,10 +479,13 @@ const skipPrint = () => {
   showPrintDialog.value = false;
   router.push({ name: "SjTakNormalBrowse" });
 };
-const doCetak = () => {
+const doCetak = (mode: "dotmatrix" | "inkjet") => {
   const url = router.resolve({
     name: "SjTakNormalPrint",
-    query: { nomor: savedNomor.value },
+    query: {
+      nomor: savedNomor.value,
+      ...(mode === "dotmatrix" ? { mode: "dotmatrix" } : {}),
+    },
   }).href;
   window.open(url, "_blank");
   showPrintDialog.value = false;
@@ -956,11 +959,28 @@ onMounted(async () => {
       <v-card-text class="pa-4" style="font-size: 12px">
         Data <b>{{ savedNomor }}</b> berhasil disimpan.<br />Ingin mencetak?
       </v-card-text>
-      <v-card-actions class="pa-3 border-t" style="gap: 6px">
-        <v-btn variant="text" size="small" @click="skipPrint">Tidak</v-btn>
-        <v-spacer />
-        <v-btn variant="flat" size="small" color="primary" @click="doCetak">
-          🖨️ Cetak
+      <v-card-actions
+        class="pa-3 border-t"
+        style="gap: 6px; flex-direction: column"
+      >
+        <v-btn
+          block
+          variant="flat"
+          color="primary"
+          @click="doCetak('dotmatrix')"
+        >
+          🖨️ Cetak Dot Matrix
+        </v-btn>
+        <v-btn
+          block
+          variant="outlined"
+          color="primary"
+          @click="doCetak('inkjet')"
+        >
+          📄 Cetak Inkjet (PDF)
+        </v-btn>
+        <v-btn block variant="text" size="small" @click="skipPrint">
+          Tidak, Nanti Saja
         </v-btn>
       </v-card-actions>
     </v-card>

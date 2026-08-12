@@ -165,6 +165,8 @@ const onDelete = async (item: any) => {
 };
 
 // ── Cetak ──────────────────────────────────────────────────
+const showCetakModeDialog = ref(false);
+
 const onCetak = async () => {
   if (!selectedItem.value) return;
   try {
@@ -174,14 +176,22 @@ const onCetak = async () => {
       toast.error(cek.reason);
       return;
     }
-    const url = router.resolve({
-      name: "SjTakNormalPrint",
-      query: { nomor: selectedItem.value.Nomor },
-    }).href;
-    window.open(url, "_blank");
+    showCetakModeDialog.value = true;
   } catch (e: any) {
     toast.error(e.response?.data?.message || "Gagal cek data.");
   }
+};
+
+const openPrint = (mode: "dotmatrix" | "inkjet") => {
+  showCetakModeDialog.value = false;
+  const url = router.resolve({
+    name: "SjTakNormalPrint",
+    query: {
+      nomor: selectedItem.value!.Nomor,
+      ...(mode === "dotmatrix" ? { mode: "dotmatrix" } : {}),
+    },
+  }).href;
+  window.open(url, "_blank");
 };
 
 // ── Export ─────────────────────────────────────────────────
@@ -398,6 +408,50 @@ const onExportDetail = async () => {
       </div>
     </template>
   </BaseBrowse>
+
+  <!-- Dialog Pilih Mode Cetak -->
+  <v-dialog v-model="showCetakModeDialog" max-width="360px" persistent>
+    <v-card class="rounded-lg">
+      <v-card-title
+        class="pa-3 bg-primary text-white"
+        style="font-size: 13px; font-weight: 700"
+      >
+        Pilih Metode Cetak
+      </v-card-title>
+      <v-card-text class="pa-4" style="font-size: 12px">
+        Surat Jalan <b>{{ selectedItem?.Nomor }}</b>
+      </v-card-text>
+      <v-card-actions
+        class="pa-3 border-t"
+        style="gap: 6px; flex-direction: column"
+      >
+        <v-btn
+          block
+          variant="flat"
+          color="primary"
+          @click="openPrint('dotmatrix')"
+        >
+          🖨️ Dot Matrix (Continuous Form)
+        </v-btn>
+        <v-btn
+          block
+          variant="outlined"
+          color="primary"
+          @click="openPrint('inkjet')"
+        >
+          📄 Inkjet (PDF)
+        </v-btn>
+        <v-btn
+          block
+          variant="text"
+          size="small"
+          @click="showCetakModeDialog = false"
+        >
+          Batal
+        </v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
 </template>
 
 <style scoped>
