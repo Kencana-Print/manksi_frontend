@@ -333,11 +333,17 @@ const fmtDec = (val: number, d = 2) =>
 const bagian = computed(() =>
   (authStore.user?.bagian || "").toUpperCase().trim(),
 );
+const cabang = computed(() =>
+  (authStore.user?.cabang || "").toUpperCase().trim(),
+);
 const isSuperViewer = computed(() =>
   ["EDP", "DIREKSI", "OWNER", "IT", "AUDIT"].includes(bagian.value),
 );
 const showPenawaran = computed(
-  () => ["MARKETING", "FINANCE"].includes(bagian.value) || isSuperViewer.value,
+  () =>
+    (["MARKETING", "FINANCE"].includes(bagian.value) &&
+      cabang.value !== "P03") ||
+    isSuperViewer.value,
 );
 const showPoBpb = computed(
   () =>
