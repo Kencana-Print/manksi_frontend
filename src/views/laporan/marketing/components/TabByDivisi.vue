@@ -78,19 +78,44 @@ const chartAch = computed(() => props.items.map((r) => Number(r.Ach) || 0));
 <style scoped>
 .tab-layout {
   display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
   gap: 16px;
   height: 100%;
   min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 .tab-table {
-  flex: 0 0 680px;
-  min-width: 0;
-  height: 100%;
+  flex: 1 1 520px;
+  max-width: 720px;
+  min-width: 300px;
+  max-height: 100%;
+  overflow: auto;
 }
 .tab-chart {
-  flex: 1;
-  min-width: 320px;
+  flex: 1 1 420px;
+  min-width: 300px;
+  max-width: 100%;
+  height: 460px;
 }
+
+@media (max-width: 980px) {
+  .tab-layout {
+    flex-direction: column;
+    flex-wrap: nowrap;
+  }
+  .tab-table,
+  .tab-chart {
+    flex: 1 1 auto;
+    width: 100%;
+    max-width: 100%;
+  }
+  .tab-chart {
+    height: 400px;
+  }
+}
+
 .sum-lbl {
   font-size: 11px;
   font-weight: 600;

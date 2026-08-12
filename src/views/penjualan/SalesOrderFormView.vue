@@ -690,7 +690,10 @@ watch(
     () => formData.value.spk_varian_ukuran,
     () => formData.value.spk_divisi,
   ],
-  fetchStandarUkuranSizes,
+  () => {
+    if (isLoadingMemo.value) return;
+    fetchStandarUkuranSizes();
+  },
 );
 
 // --- HANDLER EVENT MODAL DARI TAB ---
@@ -896,18 +899,19 @@ const loadDataMemo = async (nomor: string) => {
           return {
             size: s.mspks_size || "",
             qty: Number(s.mspks_qty) || 0,
-            lb: Number(s.mspks_a) || 0,
+            ld: Number(s.mspks_a) || 0,
             pb: Number(s.mspks_b) || 0,
           };
         });
       }
 
-      // Set divisi TERAKHIR — watcher akan jalan tapi isLoadingMemo masih true
       formData.value.spk_divisi = String(h.mspk_divisi || 1);
 
-      // Tunggu watcher selesai jalan baru reset flag
       await nextTick();
-      await nextTick(); // double nextTick untuk memastikan semua reaktivitas selesai
+      await nextTick();
+
+      isLoadingMemo.value = false;
+      await fetchStandarUkuranSizes();
 
       toast.success("Data berhasil dimuat dari MAP.");
     }
@@ -916,7 +920,7 @@ const loadDataMemo = async (nomor: string) => {
     formData.value.spk_memo = "";
   } finally {
     isLoading.value = false;
-    isLoadingMemo.value = false; // reset SETELAH nextTick di atas
+    isLoadingMemo.value = false;
   }
 };
 // ─────────────────────────────────────────────
