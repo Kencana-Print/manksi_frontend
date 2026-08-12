@@ -161,7 +161,7 @@ const {
         Ukuran: r.invd_ukuran || "",
         Jumlah: Number(r.invd_jumlah) || 0,
         Harga: Number(r.invd_harga) || 0,
-        SjNomor: r.sjList || "-",
+        SjNomor: r.sjList ?? "-",
         JmlInv: Number(r.jml_inv) || 0,
         Kurang: Number(r.kurang) || 0,
         IsExisting: true,
