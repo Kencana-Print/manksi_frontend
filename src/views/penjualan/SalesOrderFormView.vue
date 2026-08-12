@@ -1335,6 +1335,49 @@ const confirmSaveWithoutPo = () => {
   validateSave(true);
 };
 
+// [BARU] Guard supaya watcher revisi di bawah TIDAK ikut ke-trigger
+// saat data awal di-load (edit SO yang sebelumnya SUDAH revisi=Y) —
+// hanya boleh aktif setelah data awal settle, biar reset CMO cuma
+// terjadi kalau USER sendiri yang baru saja centang Revisi.
+const revisiWatchArmed = ref(false);
+
+onMounted(() => {
+  if (!isEditMode.value) {
+    // Mode create: spk_cmo pasti masih kosong, aman langsung diarm
+    revisiWatchArmed.value = true;
+  }
+});
+
+watch(isLoading, (val, oldVal) => {
+  // Mode edit: baru arm SETELAH fetch data awal selesai (isLoading
+  // true -> false), plus 1 nextTick ekstra biar semua field settle
+  if (isEditMode.value && oldVal === true && val === false) {
+    nextTick(() => {
+      revisiWatchArmed.value = true;
+    });
+  }
+});
+
+// [BARU] Revisi dicentang (dengan CMO sebelumnya sudah approve) ->
+// CMO wajib approve ULANG. Reset spk_cmo + paksa status PASIF sampai
+// CMO klik checkbox lagi — pola sama seperti kepentingan_acc/ketpo_acc
+// yang men-set spk_aktif='N' saat butuh approval baru.
+watch(
+  () => formData.value.spk_revisi,
+  (newVal, oldVal) => {
+    if (!revisiWatchArmed.value) return;
+    if (newVal === "Y" && oldVal !== "Y" && formData.value.spk_cmo) {
+      formData.value.spk_cmo = "";
+      formData.value.isCmoChecked = false;
+      formData.value.spk_aktif = "N";
+      toast.warning(
+        "SO ini direvisi — CMO wajib approve ulang (centang CMO) sebelum SO kembali berstatus AKTIF.",
+        { timeout: 8000 },
+      );
+    }
+  },
+);
+
 // ==========================================
 // STATE DIALOG CETAK POST-SAVE
 // ==========================================

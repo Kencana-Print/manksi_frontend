@@ -128,7 +128,7 @@ const generateTxt = () => {
     lines.push(padR(h.perush_nama || "", PAGE_WIDTH));
     lines.push(padR(h.perush_alamat || "", PAGE_WIDTH));
     lines.push(padR(h.perush_telp || "", PAGE_WIDTH));
-    lines.push(padC("S U R A T   J A L A N   T A K   N O R M A L", PAGE_WIDTH));
+    lines.push(padC("S U R A T   J A L A N", PAGE_WIDTH));
 
     const kotaCustomer = h.sj_kota_customer || h.cus_kota || "";
     const baseAlamat = h.sj_alamat_customer || h.cus_alamat || "";
@@ -141,7 +141,7 @@ const generateTxt = () => {
       `${padR("Nomor      : " + (h.sj_nomor || ""), halfL)} ${padR("Customer : " + (h.cus_nama || ""), halfR)}`,
     );
     lines.push(
-      `${padR("Tanggal    : " + (h.sj_tanggal_fmt || ""), halfL)} ${padR(alamatLines[0] || "", halfR)}`,
+      `${padR("Tanggal    : " + (h.sj_tanggal_fmt || "").replace(/-/g, "/"), halfL)} ${padR(alamatLines[0] || "", halfR)}`,
     );
     lines.push(
       `${padR("Keterangan : " + (h.sj_keterangan || ""), halfL)} ${padR(alamatLines[1] || "", halfR)}`,
@@ -208,13 +208,11 @@ const generateTxt = () => {
     const dataLines = chunk.map((r: any, i: number) =>
       dataLineOf(r, startNo + i + 1),
     );
-    const isLastChunk = ci === chunks.length - 1;
-    const paddedData = isLastChunk
-      ? dataLines
-      : [
-          ...dataLines,
-          ...Array(Math.max(0, MAX_DATA_ROWS_PER_PAGE - chunk.length)).fill(""),
-        ];
+
+    const paddedData = [
+      ...dataLines,
+      ...Array(Math.max(0, MAX_DATA_ROWS_PER_PAGE - chunk.length)).fill(""),
+    ];
     allPages.push([...headerLines, ...paddedData, ...footerLines]);
   });
 

@@ -235,10 +235,31 @@ const isJoBebasUkuran = computed(() => {
   return jo === "CM" || nama.includes("CELEMEK");
 });
 
+// [BARU] Cek apakah SO ini boleh kembali AKTIF (dipanggil setelah CMO
+// approve) — hanya kalau tidak ada approval lain yang masih
+// MINTA ACC/TOLAK/pending, biar tidak override status pending yang
+// lain (kepentingan, ket.po, jenis order, no-PO, piutang customer).
+const canRestoreAktif = () => {
+  const fd = props.formData;
+  return (
+    fd.pin_customer !== "TOLAK" &&
+    !["MINTA ACC", "TOLAK"].includes(fd.ketpo_acc) &&
+    !["MINTA ACC", "TOLAK"].includes(fd.kepentingan_acc) &&
+    !["MINTA ACC", "TOLAK"].includes(fd.spk_pinjo) &&
+    !["MINTA ACC", "TOLAK"].includes(fd.nopo_acc)
+  );
+};
+
 const toggleCmo = () => {
   if (!props.formData.spk_cmo) {
     props.formData.spk_cmo = authStore.user?.kode || "ADMIN";
     props.formData.isCmoChecked = true;
+    // [BARU] CMO baru saja approve — kalau tidak ada approval lain
+    // yang masih pending, restore status jadi AKTIF (menutup siklus
+    // reset yang dipicu waktu Revisi dicentang)
+    if (canRestoreAktif()) {
+      props.formData.spk_aktif = "Y";
+    }
   } else {
     props.formData.isCmoChecked = true;
     emit("confirm-uncheck-cmo");
