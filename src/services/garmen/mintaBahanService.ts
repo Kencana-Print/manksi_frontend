@@ -53,4 +53,10 @@ export const mintaBahanService = {
     api.put(
       `/garmen/bahan-baku/minta-bahan/realisasi/${encodeURIComponent(nomorRealisasi)}/approve`,
     ),
+
+  // ← TAMBAHAN BARU: cek real-time apakah butuh pengajuan PIN5
+  checkCloseStatus: (nomor: string) =>
+    api.get(
+      `/garmen/bahan-baku/minta-bahan/form/${encodeURIComponent(nomor)}/close-status`,
+    ),
 };

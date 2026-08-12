@@ -234,13 +234,19 @@ const onAjukanPerubahan = async () => {
     return toast.warning("Pilih data terlebih dahulu.");
   const item = selected.value[0];
 
-  // (Simulasi cek zClose, di sini kita sederhanakan)
-  if (item.Status !== "OPEN" && item.Ngedit !== "WAIT") {
-    actionType.value = "AJUKAN";
-    actionForm.value = { status: "APPROVE", alasan: "", urut: 1 }; // Default urut = 1
-    actionDialog.value = true;
-  } else {
-    toast.info("Tidak perlu pengajuan perubahan data.");
+  try {
+    const res = await mintaBahanService.checkCloseStatus(item.Nomor);
+    const { needsPin5 } = res.data.data;
+
+    if (needsPin5) {
+      actionType.value = "AJUKAN";
+      actionForm.value = { status: "APPROVE", alasan: "", urut: 1 };
+      actionDialog.value = true;
+    } else {
+      toast.info("Tidak perlu pengajuan perubahan data.");
+    }
+  } catch (e: any) {
+    toast.error(e.response?.data?.message || "Gagal memeriksa status data.");
   }
 };
 
