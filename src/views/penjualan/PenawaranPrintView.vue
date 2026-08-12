@@ -480,7 +480,10 @@ const grandTotal = computed(() => {
           <p v-if="data.pen_status_harga === 0" class="font-italic text-sm">
             * Note : Harga belum termasuk PPN 11%
           </p>
-          <p v-else class="font-italic text-sm">
+          <p
+            v-else-if="data.pen_status_harga === 1"
+            class="font-italic text-sm"
+          >
             * Note : Harga sudah termasuk PPN 11%
           </p>
 
