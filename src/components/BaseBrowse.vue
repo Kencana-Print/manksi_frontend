@@ -95,16 +95,35 @@ const loadState = () => {
     return null;
   }
 };
+
+// Konversi columnFilters tersimpan (plain object berisi array) balik
+// jadi Set — Set tidak bisa di-JSON.stringify langsung (hasilnya {}),
+// jadi harus disimpan sebagai array lalu direkonstruksi di sini.
+const restoreColumnFilters = (
+  saved: Record<string, string[]> | undefined,
+): Record<string, Set<string>> => {
+  if (!saved) return {};
+  const result: Record<string, Set<string>> = {};
+  for (const [key, arr] of Object.entries(saved)) {
+    result[key] = new Set(arr);
+  }
+  return result;
+};
+
 const saveState = () => {
   try {
+    const serializedColumnFilters = Object.fromEntries(
+      Object.entries(columnFilters.value).map(([k, v]) => [k, Array.from(v)]),
+    );
     sessionStorage.setItem(
       storageKey.value,
       JSON.stringify({
         search: search.value,
         currentPage: currentPage.value,
         perPage: perPage.value,
-        // Simpan filterState eksternal bersamaan dalam satu key
         filterState: props.filterState,
+        columnFilters: serializedColumnFilters,
+        colFilterSearch: colFilterSearch.value,
       }),
     );
   } catch {
@@ -119,6 +138,9 @@ const currentPage = ref<number>(saved?.currentPage ?? 1);
 const perPage = ref<number>(saved?.perPage ?? props.itemsPerPage);
 const deleteDialog = ref(false);
 const pendingDeleteItem = ref<any>(null);
+const columnFilters = ref<Record<string, Set<string>>>(
+  restoreColumnFilters(saved?.columnFilters),
+);
 
 // Restore filterState ke parent saat mount jika ada nilai tersimpan
 onMounted(() => {
@@ -129,10 +151,11 @@ onMounted(() => {
 });
 
 // Auto-save: watch internal state + filterState dari parent sekaligus
-watch([search, currentPage, perPage, () => props.filterState], saveState, {
-  flush: "post",
-  deep: true,
-});
+watch(
+  [search, currentPage, perPage, () => props.filterState, columnFilters],
+  saveState,
+  { flush: "post", deep: true },
+);
 
 // ── Selection ──────────────────────────────────────────────────────────
 const internalSelected = computed({
@@ -190,12 +213,12 @@ const finalHeaders = computed(() => {
 
 // ── Column Filter (ala Excel/desktop app) ─────────────────────────────
 // State: { [columnKey]: Set<string> } — nilai yang DI-CENTANG (aktif)
-const columnFilters = ref<Record<string, Set<string>>>({});
 
-// Dropdown state
 const activeFilterCol = ref<string | null>(null);
 const filterDropdownStyle = ref<Record<string, string>>({});
-const colFilterSearch = ref<Record<string, string>>({});
+const colFilterSearch = ref<Record<string, string>>(
+  saved?.colFilterSearch ?? {},
+);
 
 // Semua nilai unik per kolom — dari props.items (bukan filteredItems,
 // agar list tidak berubah saat filter lain aktif)

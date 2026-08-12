@@ -29,6 +29,7 @@ import {
   IconSwitchHorizontal,
 } from "@tabler/icons-vue";
 import { formatTanggal, formatTanggalJam } from "@/utils/dateFormat";
+import { exportExcelSingle, type ExcelColumn } from "@/utils/excelExport";
 
 const authStore = useAuthStore();
 const router = useRouter();
@@ -48,6 +49,7 @@ const canDeleteOrder = computed(() => {
 
 const canLihatCus = computed(() => authStore.user?.flags.lihatCus === 1);
 const canLihatHarga = computed(() => authStore.canLihatHarga);
+const baseBrowseRef = ref<InstanceType<typeof BaseBrowse> | null>(null);
 
 // --- FILTERS ---
 const listWorkshop = ref<string[]>([]);
@@ -141,7 +143,6 @@ const {
   canExport,
   selectedItem,
   fetchData,
-  exportToExcel,
 } = useBrowse({
   menuId: "172",
   fetchApi: async () => {
@@ -919,10 +920,109 @@ const submitDesignStatus = async () => {
 };
 
 const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
+
+// ── Export Excel — baca data SETELAH filter (search box + filter
+// kolom aktif di BaseBrowse), bukan items mentah dari fetch. Kolom
+// dibangun otomatis dari definisi `headers` supaya urutan & label
+// selalu sinkron dengan tabel yang tampil di layar.
+const isExporting = ref(false);
+
+// Kolom numerik yang perlu format ribuan rapi di Excel
+const NUMERIC_KEYS = new Set([
+  "Harga",
+  "Pesan",
+  "Kirim",
+  "Kurang",
+  "Panjang",
+  "Lebar",
+  "Potong",
+  "QcPotong",
+  "Bordir",
+  "Cetak",
+  "QcCetak",
+  "DC",
+  "Jahit",
+  "Lipat",
+  "Jadi",
+  "Kurang_Jadi",
+  "Kurang_Potong",
+  "Kurang_Bordir",
+  "Kurang_Cetak",
+  "Kurang_QcCetak",
+  "Kurang_Jahit",
+  "Kurang_Lipat",
+]);
+
+const onExport = async () => {
+  const dataToExport =
+    baseBrowseRef.value?.getFilteredItems?.() ?? items.value ?? [];
+
+  if (!dataToExport || dataToExport.length === 0) {
+    toast.warning("Tidak ada data untuk diexport.");
+    return;
+  }
+
+  isExporting.value = true;
+  try {
+    const columns: ExcelColumn[] = headers.value
+      .filter((h) => h.key && h.key !== "data-table-expand")
+      .map((h: any) => ({
+        header: h.title,
+        key: h.key,
+        width: h.width ? Math.max(10, Math.round(parseInt(h.width) / 7)) : 16,
+        align: h.align ?? "left",
+        numFmt: NUMERIC_KEYS.has(h.key) ? "#,##0" : undefined,
+      }));
+
+    const rows = dataToExport.map((it: any) => {
+      const row: Record<string, any> = {};
+      columns.forEach((c) => {
+        let val = it[c.key];
+        // Tanggal disimpan sebagai string YYYY-MM-DD/ISO di data mentah —
+        // format sesuai tampilan tabel supaya file Excel enak dibaca
+        if (
+          [
+            "Tanggal",
+            "Dateline",
+            "DatePO",
+            "DatelinePO",
+            "Design_Tanggal",
+            "TglSpkPpic",
+          ].includes(c.key)
+        ) {
+          val = val ? formatTanggal(val) : "";
+        } else if (["Created", "TglApproveCmo"].includes(c.key)) {
+          val = val ? formatTanggalJam(val) : "";
+        } else if (NUMERIC_KEYS.has(c.key)) {
+          val = Number(val) || 0;
+        }
+        row[c.key] = val ?? "";
+      });
+      return row;
+    });
+
+    const periodeLabel = `Periode: ${formatTanggal(dtAwal.value)} s/d ${formatTanggal(dtAkhir.value)}`;
+    await exportExcelSingle(
+      `Sales_Order_${dtAwal.value}_${dtAkhir.value}.xlsx`,
+      "Sales Order",
+      columns,
+      rows,
+      `Laporan Sales Order  |  ${periodeLabel}`,
+    );
+
+    toast.success("Berhasil export data.");
+  } catch (e) {
+    console.error(e);
+    toast.error("Terjadi kesalahan saat export.");
+  } finally {
+    isExporting.value = false;
+  }
+};
 </script>
 
 <template>
   <BaseBrowse
+    ref="baseBrowseRef"
     title="Sales Order"
     menu-id="172"
     :icon="IconShoppingCartCopy"
@@ -941,7 +1041,7 @@ const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
     @edit="onEdit"
     @delete="onDelete"
     @refresh="fetchData"
-    @export="exportToExcel('Sales_Order')"
+    @export="onExport"
     show-expand
     :expanded="expandedRows"
     @update:expanded="onUpdateExpanded"
