@@ -42,15 +42,8 @@ const canDeleteOrder = computed(() => {
   const flags = authStore.user?.flags;
   const userKode = authStore.user?.kode?.toUpperCase();
 
-  // Kembalikan pengecekan lengkap untuk CMO dan CMO3
-  const isCmo =
-    flags?.cmo === 1 ||
-    flags?.cmo === "Y" ||
-    flags?.cmo3 === 1 ||
-    flags?.cmo3 === "Y";
-
-  // Hapus jika user adalah CMO atau user kode adalah RIYA
-  return isCmo || userKode === "RIYA";
+  // Hapus hanya jika cmo === 1 atau user kode adalah RIYA
+  return flags?.cmo === 1 || userKode === "RIYA";
 });
 
 const canLihatCus = computed(() => authStore.user?.flags.lihatCus === 1);
@@ -939,6 +932,7 @@ const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
     v-model:selected="selected"
     v-model:filter-state="filterState"
     :can-insert="canInsert"
+    :can-edit="canEdit"
     :can-delete="canDelete && canDeleteOrder"
     :can-export="canExport"
     item-value="Nomor"
