@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, onMounted, watch } from "vue";
+import { computed, ref, onMounted, watch, nextTick } from "vue";
 import { useRoute } from "vue-router";
 import { useToast } from "vue-toastification";
 import { useForm } from "@/composables/useForm";
@@ -39,6 +39,21 @@ const showGudangModal = ref(false);
 const showSpkModal = ref(false);
 const showBarangModal = ref(false);
 const activeRowIndex = ref(0);
+// ─────────────────────────────────────────────
+// FOKUS ANTAR FIELD DI GRID (Kode -> Jumlah -> Keterangan -> Kode baris berikutnya)
+// ─────────────────────────────────────────────
+const detailFieldRefs = ref<Record<string, HTMLInputElement>>({});
+const setDetailFieldRef = (el: any, index: number, col: string) => {
+  if (el) detailFieldRefs.value[`${index}_${col}`] = el as HTMLInputElement;
+};
+const focusDetailField = async (index: number, col: string) => {
+  await nextTick();
+  const el = detailFieldRefs.value[`${index}_${col}`];
+  if (el) {
+    el.focus();
+    if (el instanceof HTMLInputElement) el.select();
+  }
+};
 
 const formatDateLocal = (value?: string | Date) => {
   if (!value) return "";
@@ -377,18 +392,17 @@ const openBarangModal = (index: number) => {
 // Menangkap item barang yang dipilih
 const onBarangSelected = (item: any) => {
   const i = activeRowIndex.value;
-
-  // Mencegah duplikasi kode barang dalam grid
   const isDuplicate = formData.value.details.some(
     (d: any, idx: number) => idx !== i && d.kode === item.Kode,
   );
   if (isDuplicate) {
     return toast.error(`Kode ${item.Kode} sudah diinput di baris lain.`);
   }
-
   formData.value.details[i].kode = item.Kode;
   formData.value.details[i].nama = item.Nama;
   formData.value.details[i].satuan = item.Satuan;
+  // [BARU] Sama seperti onBarangEnter — pindah fokus ke Jumlah
+  focusDetailField(i, "jumlah");
 };
 
 // ─────────────────────────────────────────────
@@ -420,6 +434,26 @@ const onGudangEnter = async () => {
     formData.value.namaGudangPeminta = "";
   } finally {
     isLoading.value = false;
+  }
+};
+
+const onJumlahEnter = async (index: number) => {
+  const nextIndex = index + 1;
+  // Baris berikutnya biasanya sudah ada (auto-trailing-row nambah baris
+  // kosong begitu Kode baris ini terisi) — tapi jaga-jaga kalau belum
+  // ke-render, tunggu sebentar.
+  await nextTick();
+  if (nextIndex < formData.value.details.length) {
+    focusDetailField(nextIndex, "jumlah");
+  }
+};
+const onKetEnter = async (index: number) => {
+  // Baris terakhir: watcher auto-trailing-row sudah nambah baris kosong
+  // baru di belakangnya — tunggu itu selesai, baru fokus ke Kode baris berikutnya
+  await nextTick();
+  const nextIndex = index + 1;
+  if (nextIndex < formData.value.details.length) {
+    focusDetailField(nextIndex, "kode");
   }
 };
 
@@ -475,7 +509,6 @@ const onBarangEnter = async (index: number) => {
     openBarangModal(index);
     return;
   }
-
   try {
     isLoading.value = true;
     const res = await mintaBarangFormService.getBarangByKode(
@@ -485,8 +518,6 @@ const onBarangEnter = async (index: number) => {
       authStore.user?.bagian || "",
     );
     const item = res.data.data;
-
-    // Cek duplikat
     const isDuplicate = formData.value.details.some(
       (d: any, idx: number) => idx !== index && d.kode === item.Kode,
     );
@@ -495,10 +526,11 @@ const onBarangEnter = async (index: number) => {
       formData.value.details[index].kode = "";
       return;
     }
-
     formData.value.details[index].kode = item.Kode;
     formData.value.details[index].nama = item.Nama;
     formData.value.details[index].satuan = item.Satuan;
+    // [BARU] Kode berhasil ditemukan -> langsung pindah fokus ke Jumlah
+    await focusDetailField(index, "jumlah");
   } catch (e: any) {
     toast.error(e.response?.data?.message || "Kode barang tidak ditemukan.");
     formData.value.details[index].kode = "";
@@ -927,6 +959,10 @@ const numFormat = (val: any) =>
                     min="0"
                     step="any"
                     v-select-on-focus
+                    :ref="
+                      (el) => setDetailFieldRef(el, Number(index), 'jumlah')
+                    "
+                    @keydown.enter.prevent="onJumlahEnter(Number(index))"
                   />
                 </td>
                 <td class="bg-yellow-lighten-5">
@@ -934,6 +970,8 @@ const numFormat = (val: any) =>
                     v-model="item.ket"
                     class="cell-input"
                     placeholder="..."
+                    :ref="(el) => setDetailFieldRef(el, Number(index), 'ket')"
+                    @keydown.enter.prevent="onKetEnter(Number(index))"
                   />
                 </td>
                 <td class="text-center">
