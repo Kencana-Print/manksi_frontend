@@ -523,6 +523,7 @@ const onLihatGambar = () => {
   const mapCandidates = map
     ? [
         `/file-gambar/${encodeURIComponent(map)}.jpg`,
+        `${base}/images/${cab}/map/${encodeURIComponent(map)}.jpg`,
         `${base}/images/${cab}/${encodeURIComponent(map)}.jpg`,
       ]
     : [];

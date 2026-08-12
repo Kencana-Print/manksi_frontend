@@ -117,6 +117,7 @@ const resolveDesignImage = () => {
   const mapCandidates = mapNomor
     ? [
         `/file-gambar/${encodeURIComponent(mapNomor)}.jpg`,
+        `${base}/images/${cab}/map/${encodeURIComponent(mapNomor)}.jpg`,
         `${base}/images/${cab}/${encodeURIComponent(mapNomor)}.jpg`,
       ]
     : [];
