@@ -37,13 +37,6 @@ const getBaseUrl = () => api.defaults.baseURL?.replace(/\/api\/?$/, "") || "";
 const resolvedImageUrl = ref("");
 const isLoadingImage = ref(false);
 
-// Coba berantai, sama pola dgn SpkPrintView.resolveDesignImage:
-// (1) lokal per-cabang → (2) lokal cabang HO- (fallback kalau file
-// disimpan di folder HO- bukan cabang spesifik) → (3) lokal folder
-// map/ (kalau NomorSPK ternyata nomor MAP) → (4) VPS legacy.
-// Semua kandidat di-preload pakai Image() SEBELUM window.print(),
-// supaya gambar sudah pasti ke-resolve (atau pasti gagal semua)
-// sebelum dialog print terbuka — bukan lagi nunggu <img> di DOM.
 const resolveDesignImage = () => {
   const nomorSpk = data.value?.header?.NomorSPK;
   if (!nomorSpk) {
@@ -52,33 +45,36 @@ const resolveDesignImage = () => {
   }
   const base = getBaseUrl();
   const cab = data.value.header.GdgKode || "HO-";
-  const mapNomor = data.value.header.MapNomor || "";
+  const map = data.value.header.MapNomor || "";
 
-  const candidates = [
+  // [FIX] Fallback chain disamakan PERSIS dengan SpkView/SpkPrintView
+  // (final version, termasuk fix subfolder /map/ yang sempat kurang):
+  // - Format baru (SPK-...) -> prioritas MAP dulu, baru nomor sendiri
+  // - Format legacy (bukan SPK-...) -> prioritas nomor sendiri dulu,
+  //   baru MAP
+  const isLegacyFormat = !nomorSpk.startsWith("SPK-");
+
+  const mapCandidates = map
+    ? [
+        `/file-gambar/${encodeURIComponent(map)}.jpg`,
+        `${base}/images/${cab}/map/${encodeURIComponent(map)}.jpg`,
+        `${base}/images/${cab}/${encodeURIComponent(map)}.jpg`,
+      ]
+    : [];
+  const ownCandidates = [
     `${base}/images/${cab}/${encodeURIComponent(nomorSpk)}.jpg`,
+    `/file-gambar/${encodeURIComponent(nomorSpk)}.jpg`,
   ];
-  if (cab !== "HO-") {
-    candidates.push(`${base}/images/HO-/${encodeURIComponent(nomorSpk)}.jpg`);
+
+  const candidates: string[] = [];
+  if (isLegacyFormat) {
+    candidates.push(...ownCandidates, ...mapCandidates);
+  } else {
+    candidates.push(...mapCandidates, ...ownCandidates);
   }
-  // Folder map/ pakai NOMOR MAP (bisa beda dari NomorSPK kalau SPK
-  // ini originasinya dari MAP — resolve via header.MapNomor).
-  if (mapNomor) {
-    candidates.push(
-      `${base}/images/${cab}/map/${encodeURIComponent(mapNomor)}.jpg`,
-    );
-    if (cab !== "HO-") {
-      candidates.push(
-        `${base}/images/HO-/map/${encodeURIComponent(mapNomor)}.jpg`,
-      );
-    }
-  }
-  candidates.push(
-    `/file-gambar/${encodeURIComponent(mapNomor || nomorSpk)}.jpg`,
-  );
 
   isLoadingImage.value = true;
   resolvedImageUrl.value = "";
-
   return new Promise<void>((resolve) => {
     const tryNext = (idx: number) => {
       if (idx >= candidates.length) {
