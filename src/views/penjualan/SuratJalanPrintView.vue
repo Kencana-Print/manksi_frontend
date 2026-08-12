@@ -151,6 +151,7 @@ const MAX_DATA_ROWS_PER_PAGE = 7;
 
 const LINE = "_".repeat(PAGE_WIDTH);
 
+// ── Generate TXT (Dot Matrix) ──────────────
 const generateTxt = () => {
   const h = header.value;
   const rows = detail.value;
@@ -193,11 +194,6 @@ const generateTxt = () => {
     return lines;
   };
 
-  // ⬅ Footer sekarang dibangun sekali dan dipakai ulang di SETIAP halaman
-  // (dulu cuma di halaman terakhir). ASUMSI: "Total Jumlah" tetap grand
-  // total SELURUH SPK di seluruh dokumen (sama persis di tiap halaman),
-  // bukan subtotal per halaman — kalau maunya subtotal per halaman, kasih
-  // tau, tinggal saya ubah jadi hitung dari `chunk` bukan `rows`.
   const buildFooterLines = (): string[] => {
     const totalJml = rows.reduce(
       (s: number, r: any) => s + Number(r.sjd_jumlah || 0),
@@ -225,7 +221,7 @@ const generateTxt = () => {
     lines.push("");
     lines.push("");
     lines.push(
-      `${padR("(               )", 27)} ${padR("(               )", 27)} ${padR("(               )", 27)} ${padR("(               )", 27)} ${padR("(               )", 27)}`,
+      `${padR("(                )", 27)} ${padR("(                )", 27)} ${padR("(                )", 27)} ${padR("(                )", 27)} ${padR("(                )", 27)}`,
     );
     lines.push("");
     lines.push(
@@ -240,42 +236,58 @@ const generateTxt = () => {
     return lines;
   };
 
-  const dataLineOf = (r: any, no: number) =>
-    `${padR(String(no), 3)} ${padR(r.sjd_spk_nomor || "", 12)} ${padR(r.spk_nama || r.spk_nama2 || "", NAMA_W)} ${padR(r.sjd_ukuran || "", 20)} ${padL(num(r.sjd_jumlah), 10)} ${padL(num(r.sjd_koli), 9)} ${padR(r.sjd_keterangan || "", KET_W)}`;
-
   const headerLines = buildHeaderLines();
   const footerLines = buildFooterLines();
 
-  // ⬅ Chunk data SELALU tetap MAX_DATA_ROWS_PER_PAGE baris per halaman —
-  // tidak lagi dihitung dari sisa tinggi kertas (patokan lama terbukti
-  // salah utk kertas fisik yg dipakai).
-  const chunks: any[][] = [];
-  for (let i = 0; i < rows.length; i += MAX_DATA_ROWS_PER_PAGE) {
-    chunks.push(rows.slice(i, i + MAX_DATA_ROWS_PER_PAGE));
+  // 1. URAIKAN DATA MENJADI BARIS FISIK (TERMASUK WRAPPING TEXT NAMA)
+  const allPhysicalRows: string[] = [];
+  let currentRowNo = 1;
+
+  for (const r of rows) {
+    const namaFull = (r.spk_nama || r.spk_nama2 || "").trim();
+    const namaLines = wrapText(namaFull, NAMA_W);
+
+    // Baris Utama (dengan No, SPK, Ukuran, dst)
+    allPhysicalRows.push(
+      `${padR(String(currentRowNo), 3)} ${padR(r.sjd_spk_nomor || "", 12)} ${padR(namaLines[0], NAMA_W)} ${padR(r.sjd_ukuran || "", 20)} ${padL(num(r.sjd_jumlah), 10)} ${padL(num(r.sjd_koli), 9)} ${padR(r.sjd_keterangan || "", KET_W)}`,
+    );
+
+    // Baris Tambahan (jika nama terpotong menjadi multi-baris)
+    for (let i = 1; i < namaLines.length; i++) {
+      allPhysicalRows.push(
+        `${padR("", 3)} ${padR("", 12)} ${padR(namaLines[i], NAMA_W)} ${padR("", 20)} ${padL("", 10)} ${padL("", 9)} ${padR("", KET_W)}`,
+      );
+    }
+
+    currentRowNo++;
+  }
+
+  // 2. CHUNKING BERDASARKAN BARIS FISIK (Bukan jumlah data)
+  // Ini memastikan kapasitas kertas 7 baris selalu akurat.
+  const chunks: string[][] = [];
+  for (let i = 0; i < allPhysicalRows.length; i += MAX_DATA_ROWS_PER_PAGE) {
+    chunks.push(allPhysicalRows.slice(i, i + MAX_DATA_ROWS_PER_PAGE));
   }
   if (chunks.length === 0) chunks.push([]);
 
   const allPages: string[][] = [];
 
-  chunks.forEach((chunk, ci) => {
-    const startNo = ci * MAX_DATA_ROWS_PER_PAGE;
-    const dataLines = chunk.map((r: any, i: number) =>
-      dataLineOf(r, startNo + i + 1),
-    );
-
+  chunks.forEach((chunkLines, ci) => {
     const isLastChunk = ci === chunks.length - 1;
 
+    // Pad space (garis kosong) agar posisi Footer di kertas selalu fix
     const paddedData = isLastChunk
-      ? dataLines
+      ? chunkLines
       : [
-          ...dataLines,
-          ...Array(Math.max(0, MAX_DATA_ROWS_PER_PAGE - chunk.length)).fill(""),
+          ...chunkLines,
+          ...Array(
+            Math.max(0, MAX_DATA_ROWS_PER_PAGE - chunkLines.length),
+          ).fill(""),
         ];
 
     allPages.push([...headerLines, ...paddedData, ...footerLines]);
   });
 
-  // Form Feed di antara tiap halaman fisik.
   return allPages.map((p) => p.join("\n")).join("\n\f");
 };
 
