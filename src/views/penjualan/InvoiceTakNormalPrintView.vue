@@ -43,6 +43,7 @@ const paginatedDetails = computed(() => {
 });
 
 const num = (v: any) => Number(v || 0).toLocaleString("id-ID");
+const numRound = (v: any) => Math.round(Number(v) || 0).toLocaleString("id-ID");
 
 const padR = (s: string, n: number) =>
   (s || "").toString().padEnd(n, " ").substring(0, n);
@@ -237,7 +238,7 @@ const generateTxt = () => {
 
   const dataLinesOf = (r: any, lineNum: number): string[] => {
     const namaLines = wrapNamaBarang(r.nama_barang);
-    const first = `${padR(String(lineNum), col(3))} ${padR(r.invd_spk_nomor || "", col(12))} ${padR(namaLines[0] || "", col(55))} ${padR(r.invd_ukuran || "", col(20))} ${padL(num(r.invd_jumlah), col(10))} ${padL(num(r.invd_harga), col(12))} ${padL(num(Math.round(Number(r.invd_jumlah) * Number(r.invd_harga))), col(18))}`;
+    const first = `${padR(String(lineNum), col(3))} ${padR(r.invd_spk_nomor || "", col(12))} ${padR(namaLines[0] || "", col(55))} ${padR(r.invd_ukuran || "", col(20))} ${padL(num(r.invd_jumlah), col(10))} ${padL(numRound(r.invd_harga), col(12))} ${padL(num(Math.round(Number(r.invd_jumlah) * Number(r.invd_harga))), col(18))}`;
     const rest = namaLines
       .slice(1)
       .map(
@@ -532,7 +533,7 @@ onMounted(() => {
                 <td>{{ r.nama_barang }}</td>
                 <td>{{ r.invd_ukuran }}</td>
                 <td style="text-align: right">{{ num(r.invd_jumlah) }}</td>
-                <td style="text-align: right">{{ num(r.invd_harga) }}</td>
+                <td style="text-align: right">{{ numRound(r.invd_harga) }}</td>
                 <td style="text-align: right">
                   {{
                     num(

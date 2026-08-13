@@ -4,6 +4,16 @@ export const permintaanPembelianFormService = {
   getDetail(nomor: string) {
     return api.get(`/garmen/barang/permintaan-pembelian/form/${nomor}`);
   },
+  uploadGambarItem: (nomor: string, kode: string, formData: FormData) =>
+    api.post(
+      `/garmen/permintaan-pembelian/gambar/${encodeURIComponent(nomor)}/${encodeURIComponent(kode)}`,
+      formData,
+      { headers: { "Content-Type": "multipart/form-data" } },
+    ),
+  deleteGambarItem: (nomor: string, kode: string) =>
+    api.delete(
+      `/garmen/permintaan-pembelian/gambar/${encodeURIComponent(nomor)}/${encodeURIComponent(kode)}`,
+    ),
   getBarangByKode: (
     kode: string,
     jenis: string,

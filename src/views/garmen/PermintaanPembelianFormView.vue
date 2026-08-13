@@ -335,10 +335,124 @@ const onSaveRealisasi = async () => {
     toast.error(e.response?.data?.message || "Gagal simpan realisasi");
   }
 };
+
+// ---- GAMBAR ----
+const activeTab = ref<"transaksi" | "gambar">("transaksi");
+const gambarFileInputRef = ref<HTMLInputElement | null>(null);
+const gambarCacheBust = ref<number>(Date.now());
+const isUploadingGambar = ref<boolean>(false);
+
+// Baris grid yang jadi sumber gambar aktif di tab "Gambar"
+// (activeGridIndex sudah ada, dipakai bareng untuk realisasi)
+
+const activeItem = computed(() => {
+  return formData.value.items[activeGridIndex.value] || null;
+});
+
+const gambarUrl = computed((): string => {
+  const nomor = formData.value.header.mb_nomor;
+  const kode = activeItem.value?.kode;
+  if (!nomor || !kode) return "";
+  return `/images/permintaan-pembelian/${nomor}${kode}.jpg?t=${gambarCacheBust.value}`;
+});
+
+const onGambarError = (e: Event): void => {
+  const img = e.target as HTMLImageElement;
+  img.src = ""; // tidak ada fallback legacy Delphi untuk modul ini (image dulu disimpan di path lokal aplikasi lama, bukan /file-gambar/)
+};
+
+const triggerGambarUpload = (): void => {
+  const nomor = formData.value.header.mb_nomor;
+  if (!nomor) {
+    toast.warning("Simpan data terlebih dahulu sebelum upload gambar.");
+    return;
+  }
+  if (!activeItem.value?.kode) {
+    toast.warning("Pilih baris barang terlebih dahulu.");
+    return;
+  }
+  gambarFileInputRef.value?.click();
+};
+
+const onGambarFileSelected = async (e: Event): Promise<void> => {
+  const file = (e.target as HTMLInputElement).files?.[0];
+  if (!file) return;
+
+  if (file.size > 1000000) {
+    toast.error("Ukuran gambar tidak boleh > 1 Mb.");
+    if (gambarFileInputRef.value) gambarFileInputRef.value.value = "";
+    return;
+  }
+
+  const nomor = formData.value.header.mb_nomor;
+  const kode = activeItem.value?.kode;
+  if (!nomor || !kode) return;
+
+  try {
+    isUploadingGambar.value = true;
+    const form = new FormData();
+    form.append("gambar", file);
+    await permintaanPembelianFormService.uploadGambarItem(nomor, kode, form);
+    if (activeItem.value) activeItem.value.foto = "YA";
+    gambarCacheBust.value = Date.now();
+    toast.success("Gambar berhasil diupload");
+  } catch (err: unknown) {
+    const msg =
+      err && typeof err === "object" && "response" in err
+        ? (err as { response?: { data?: { message?: string } } }).response?.data
+            ?.message
+        : undefined;
+    toast.error(msg || "Gagal upload gambar");
+  } finally {
+    isUploadingGambar.value = false;
+    if (gambarFileInputRef.value) gambarFileInputRef.value.value = "";
+  }
+};
+
+const onHapusGambarItem = async (): Promise<void> => {
+  const nomor = formData.value.header.mb_nomor;
+  const kode = activeItem.value?.kode;
+  if (!nomor || !kode) return;
+  if (!confirm("Hapus gambar?")) return;
+
+  try {
+    await permintaanPembelianFormService.deleteGambarItem(nomor, kode);
+    if (activeItem.value) activeItem.value.foto = "";
+    gambarCacheBust.value = Date.now();
+    toast.success("Gambar berhasil dihapus");
+  } catch (err: unknown) {
+    const msg =
+      err && typeof err === "object" && "response" in err
+        ? (err as { response?: { data?: { message?: string } } }).response?.data
+            ?.message
+        : undefined;
+    toast.error(msg || "Gagal hapus gambar");
+  }
+};
 </script>
 
 <template>
+  <div class="tab-bar">
+    <button
+      type="button"
+      class="tab-btn"
+      :class="{ active: activeTab === 'transaksi' }"
+      @click="activeTab = 'transaksi'"
+    >
+      Transaksi
+    </button>
+    <button
+      type="button"
+      class="tab-btn"
+      :class="{ active: activeTab === 'gambar' }"
+      @click="activeTab = 'gambar'"
+    >
+      Gambar
+    </button>
+  </div>
+
   <BaseForm
+    v-show="activeTab === 'transaksi'"
     :title="
       isEditMode
         ? `Ubah Permintaan Pembelian ${formJenis}`
@@ -654,6 +768,54 @@ const onSaveRealisasi = async () => {
     </template>
   </BaseForm>
 
+  <div v-show="activeTab === 'gambar'" class="gambar-tab-wrap">
+    <div v-if="!activeItem" class="text-center text-grey py-8">
+      Pilih baris barang di tab Transaksi terlebih dahulu.
+    </div>
+    <template v-else>
+      <p class="text-caption mb-2">
+        Gambar untuk:
+        <strong>{{ activeItem.kode }} - {{ activeItem.nama }}</strong>
+      </p>
+      <div class="gambar-preview-box">
+        <img
+          v-if="activeItem.foto === 'YA'"
+          :src="gambarUrl"
+          class="gambar-preview"
+          @error="onGambarError"
+          alt="Preview gambar"
+        />
+        <span v-else class="text-grey">Belum ada gambar</span>
+      </div>
+      <div class="gambar-actions">
+        <input
+          ref="gambarFileInputRef"
+          type="file"
+          accept="image/*"
+          hidden
+          @change="onGambarFileSelected"
+        />
+        <v-btn
+          size="small"
+          color="primary"
+          :loading="isUploadingGambar"
+          @click="triggerGambarUpload"
+        >
+          Upload Gambar
+        </v-btn>
+        <v-btn
+          v-if="activeItem.foto === 'YA'"
+          size="small"
+          color="error"
+          variant="outlined"
+          @click="onHapusGambarItem"
+        >
+          Hapus Gambar
+        </v-btn>
+      </div>
+    </template>
+  </div>
+
   <BarangGarmenSearchModal
     v-model="showBarangModal"
     :jenis="formJenis"
@@ -858,5 +1020,54 @@ const onSaveRealisasi = async () => {
 }
 .btn-del:hover {
   background: #ffebee;
+}
+.tab-bar {
+  display: flex;
+  gap: 4px;
+  padding: 6px 8px 0;
+  background: #f5f5f5;
+}
+.tab-btn {
+  padding: 6px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid #e0e0e0;
+  border-bottom: none;
+  background: #eee;
+  color: #666;
+  border-radius: 4px 4px 0 0;
+  cursor: pointer;
+}
+.tab-btn.active {
+  background: white;
+  color: #1565c0;
+  border-color: #1565c0;
+}
+.gambar-tab-wrap {
+  background: white;
+  border: 1px solid #e0e0e0;
+  padding: 16px;
+  min-height: 400px;
+}
+.gambar-preview-box {
+  width: 100%;
+  max-width: 500px;
+  min-height: 300px;
+  border: 1px solid #ccc;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 12px;
+  background: #fafafa;
+}
+.gambar-preview {
+  max-width: 100%;
+  max-height: 400px;
+  object-fit: contain;
+}
+.gambar-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
 }
 </style>
