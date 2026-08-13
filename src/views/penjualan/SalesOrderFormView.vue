@@ -206,6 +206,7 @@ const defaultData = {
   spk_sablon: "N",
   spk_bordir: "N",
   spk_sublim: "N",
+  spk_tipe: "Medium",
 
   // Array untuk Tabel Detail
   spk_repeat: "",
