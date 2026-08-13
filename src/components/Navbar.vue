@@ -99,6 +99,7 @@ import {
   IconHierarchy3,
   IconPhotoScan,
   IconPhotoSearch,
+  IconMessageExclamation,
 } from "@tabler/icons-vue";
 
 interface NavItem {
@@ -338,6 +339,12 @@ const menuItems: NavItem[] = [
         to: "/daftar/berita-acara",
         icon: IconAlertCircle,
         menuId: 142,
+      },
+      {
+        title: "Complain Customer",
+        to: "/daftar/complain-customer",
+        icon: IconMessageExclamation,
+        menuId: 36,
       },
     ],
   },

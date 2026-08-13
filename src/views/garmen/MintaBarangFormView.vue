@@ -604,14 +604,14 @@ const validateSave = () => {
   }
 
   // Validasi khusus Sparepart
-  if (isSparepart.value) {
-    const bagian = authStore.user?.bagian?.toUpperCase() || "";
-    if (bagian !== "TEKNISI" && bagian !== "IT") {
-      return toast.error(
-        "Hanya bagian Teknisi/IT yg diizinkan untuk menyimpan.",
-      );
-    }
-  }
+  // if (isSparepart.value) {
+  //   const bagian = authStore.user?.bagian?.toUpperCase() || "";
+  //   if (bagian !== "TEKNISI" && bagian !== "IT") {
+  //     return toast.error(
+  //       "Hanya bagian Teknisi/IT yg diizinkan untuk menyimpan.",
+  //     );
+  //   }
+  // }
 
   // Filter baris yang valid (Kode ada)
   const validDetails = formData.value.details.filter(

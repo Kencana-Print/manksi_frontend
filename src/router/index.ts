@@ -347,6 +347,17 @@ const router = createRouter({
         requiresAuth: true,
       },
     },
+    {
+      path: "/daftar/complain-customer",
+      name: "ComplainCustomerBrowse",
+      component: () => import("@/views/daftar/ComplainCustomerView.vue"),
+      meta: {
+        title: "Complain Customer",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "36",
+      },
+    },
 
     // ── Pembelian ─────────────────────────────────────────────────────
     {
