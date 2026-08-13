@@ -91,6 +91,7 @@ const headers = [
   { title: "Jml SPK", key: "JmlSpk", width: "70px", align: "end" },
   { title: "Keterangan", key: "Keterangan", minWidth: "120px" }, // Flexible
   { title: "Status", key: "Status", width: "80px" },
+  { title: "Periode", key: "IsPeriodLocked", width: "80px", align: "center" },
   { title: "Approve", key: "Approve", width: "65px", align: "center" },
   { title: "Apv. Gdg", key: "ApvGudang", width: "80px", align: "center" },
   { title: "Tolak Gdg", key: "AlasanTolak_ApvGudang", minWidth: "100px" }, // Flexible
@@ -157,9 +158,14 @@ const onEdit = (item: any) => {
   const itemCab = (item.Cab || "").toString().trim().toUpperCase();
   const myCab = (authStore.userCabang || "").toString().trim().toUpperCase();
 
-  // PERBAIKAN: Gunakan startsWith("HO")
   if (itemCab !== myCab && myCab !== "ALL" && !myCab.startsWith("HO")) {
     return toast.error(`Bukan cabang anda. (Data: ${itemCab}, Anda: ${myCab})`);
+  }
+
+  if (item.IsPeriodLocked) {
+    return toast.error(
+      "Periode transaksi ini sudah ditutup (tutup buku). Gunakan menu Pengajuan Perubahan untuk mengedit.",
+    );
   }
 
   router.push(
@@ -172,6 +178,12 @@ const onDelete = (item: any) => {
 
   if (itemCab !== myCab && myCab !== "ALL" && !myCab.startsWith("HO")) {
     return toast.error(`Bukan cabang anda. (Data: ${itemCab}, Anda: ${myCab})`);
+  }
+
+  if (item.IsPeriodLocked) {
+    return toast.error(
+      "Periode transaksi ini sudah ditutup (tutup buku). Tidak bisa dihapus.",
+    );
   }
 
   if (item.Status !== "OPEN")
@@ -188,7 +200,12 @@ const onApproveGudang = () => {
     return toast.error("Anda tidak punya hak.");
   }
 
-  // Jika kondisi GANTI BS / GANTI HILANG dan belum di-approve gudang
+  if (item.IsPeriodLocked) {
+    return toast.error(
+      "Periode transaksi ini sudah ditutup (tutup buku). Gunakan menu Pengajuan Perubahan.",
+    );
+  }
+
   if (
     ["GANTI BS", "GANTI HILANG", "TAMBAHAN"].includes(item.Keterangan) &&
     (item.ApvGudang === "N" || item.ApvGudang === "TOLAK")
@@ -213,6 +230,12 @@ const onApproveManager = () => {
 
   if (!authStore.user?.flags?.isManager) {
     return toast.error("Anda tidak punya hak.");
+  }
+
+  if (item.IsPeriodLocked) {
+    return toast.error(
+      "Periode transaksi ini sudah ditutup (tutup buku). Gunakan menu Pengajuan Perubahan.",
+    );
   }
 
   if (item.ApvManager === "N" || item.ApvManager === "TOLAK") {
@@ -311,6 +334,7 @@ const onApproveRealisasi = async (
 
 const closeDialog = ref(false);
 const closeForm = ref({ nomor: "", alasan: "" });
+
 const openCloseDialog = () => {
   if (!selected.value.length)
     return toast.warning("Pilih data terlebih dahulu.");
@@ -319,7 +343,6 @@ const openCloseDialog = () => {
   const itemCab = (item.Cab || "").toString().trim().toUpperCase();
   const myCab = (authStore.userCabang || "").toString().trim().toUpperCase();
 
-  // CEK CABANG & HAK AKSES
   if (itemCab !== myCab && myCab !== "ALL" && !myCab.startsWith("HO")) {
     const bagian = authStore.user?.bagian?.toUpperCase() || "";
     if (!bagian.includes("GUDANG")) {
@@ -327,6 +350,12 @@ const openCloseDialog = () => {
         `Bukan cabang anda. (Data: ${itemCab}, Anda: ${myCab})`,
       );
     }
+  }
+
+  if (item.IsPeriodLocked) {
+    return toast.error(
+      "Periode transaksi ini sudah ditutup (tutup buku). Gunakan menu Pengajuan Perubahan.",
+    );
   }
 
   if (item.Status === "CLOSE" || item.Status === "DICLOSE")
@@ -673,6 +702,18 @@ const num = (val: number) => new Intl.NumberFormat("id-ID").format(val || 0);
     </template>
     <template #item.ApvManager="{ item }">
       <span :class="getApvClass(item.ApvManager)">{{ item.ApvManager }}</span>
+    </template>
+    <template #item.Status="{ item }">
+      {{ item.Status }}
+    </template>
+    <template #item.IsPeriodLocked="{ item }">
+      <span
+        v-if="item.IsPeriodLocked"
+        class="badge-locked"
+        title="Periode akuntansi sudah ditutup, transaksi ini terkunci untuk diedit meski realisasi belum selesai."
+      >
+        🔒 Terkunci
+      </span>
     </template>
 
     <!-- ── Detail expand ── -->
@@ -1274,5 +1315,14 @@ const num = (val: number) => new Intl.NumberFormat("id-ID").format(val || 0);
 }
 .dlg-btn.cancel:hover {
   background: #d0d0d0;
+}
+.badge-locked {
+  background: #757575;
+  color: white;
+  border-radius: 3px;
+  padding: 1px 6px;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
 }
 </style>
