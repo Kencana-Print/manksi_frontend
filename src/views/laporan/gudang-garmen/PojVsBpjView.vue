@@ -119,6 +119,18 @@ const fmtDate = (v: string) => {
   return `${d}/${m}/${y}`;
 };
 
+const summaryColumnKeys = [
+  "JmlPo",
+  "JmlTerima",
+  "Kurang",
+  "Tarif",
+  "TotPo",
+  "TotTerima",
+  "TotKurang",
+  "JumlahBpjList",
+  "TotalBayarBpj",
+];
+
 // ── Export master ──
 const isExporting = ref(false);
 const onExportMaster = async () => {
@@ -291,8 +303,7 @@ onMounted(fetchData);
     :items="items ?? []"
     item-value="Nomor"
     :is-loading="isLoading"
-    summary-key="TotKurang"
-    summary-label="Total Kurang"
+    :summary-columns="summaryColumnKeys"
     @refresh="fetchData"
   >
     <template #filter-left>
@@ -564,5 +575,35 @@ onMounted(fetchData);
 .chip-terima {
   background: #e8f5e9;
   color: #2e7d32;
+}
+
+/* Override wrapper BaseBrowse supaya tabel summary align pas di bawah kolom header */
+:deep(.summary-bar-inner) {
+  padding: 0 !important;
+  gap: 0 !important;
+  justify-content: flex-start !important;
+}
+
+.summary-inline-table {
+  width: max-content;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+.summary-td {
+  padding: 0 8px;
+  height: 30px;
+  box-sizing: border-box;
+  font-size: 12px;
+  font-weight: 700;
+  color: white;
+  font-family: monospace;
+  white-space: nowrap;
+  text-align: left;
+}
+.summary-td.text-center {
+  text-align: center;
+}
+.summary-td.text-end {
+  text-align: right;
 }
 </style>

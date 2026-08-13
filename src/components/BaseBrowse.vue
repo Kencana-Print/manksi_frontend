@@ -52,6 +52,7 @@ const props = withDefaults(
     summaryKey?: string; // key kolom yang akan di-sum, cth: "Nominal"
     summaryLabel?: string; // label di kiri, cth: "Total Nominal"
     beforeDelete?: (item: any) => Promise<boolean> | boolean;
+    summaryColumns?: string[];
   }>(),
   {
     icon: () => IconTable,
@@ -477,6 +478,19 @@ const summaryTotal = computed(() => {
 const summaryFormatted = computed(() =>
   new Intl.NumberFormat("id-ID").format(summaryTotal.value),
 );
+const summaryTotalsMap = computed(() => {
+  const map: Record<string, number> = {};
+  if (!props.summaryColumns) return map;
+  for (const key of props.summaryColumns) {
+    map[key] = filteredItems.value.reduce(
+      (acc, item) => acc + (Number(item[key]) || 0),
+      0,
+    );
+  }
+  return map;
+});
+
+const fmtSummaryVal = (v: number) => new Intl.NumberFormat("id-ID").format(v);
 
 const totalItems = computed(() => filteredItems.value.length);
 const totalPages = computed(() =>
@@ -1004,6 +1018,32 @@ watch(
                 </td>
               </tr>
             </template>
+
+            <template
+              v-if="summaryColumns && summaryColumns.length"
+              #body.append
+            >
+              <tr class="summary-inline-row">
+                <td
+                  v-if="showExpand"
+                  class="summary-td-inline"
+                  style="width: 48px; min-width: 48px"
+                />
+                <td
+                  v-for="col in orderedHeaders"
+                  :key="'sum-' + col.key"
+                  :style="colStyle(col)"
+                  :class="[
+                    'summary-td-inline',
+                    col.align ? `text-${col.align}` : '',
+                  ]"
+                >
+                  <template v-if="summaryColumns.includes(col.key)">
+                    {{ fmtSummaryVal(summaryTotalsMap[col.key] ?? 0) }}
+                  </template>
+                </td>
+              </tr>
+            </template>
           </v-data-table>
         </div>
         <!-- /.table-wrap -->
@@ -1485,6 +1525,25 @@ watch(
   color: white;
   font-family: monospace;
   letter-spacing: 0.02em;
+}
+.summary-inline-row {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+}
+.summary-td-inline {
+  position: sticky;
+  bottom: 0;
+  background: #1565c0 !important;
+  color: white !important;
+  font-weight: 700;
+  font-family: monospace;
+  font-size: 12px;
+  height: 30px !important;
+  box-sizing: border-box;
+  border-top: 2px solid #0d47a1;
+  white-space: nowrap;
+  padding: 0 8px !important;
 }
 
 /* ── Pagination bar ── */
