@@ -232,15 +232,37 @@ const getBaseUrl = () => {
   return raw;
 };
 
-const existingImageUrl = (slot: 1 | 2 | 3) => {
+// ⬅ FIX: gambar lama (dibuat dari aplikasi desktop) fisiknya ada
+// di /mnt/image (diakses via /file-gambar), bukan di public/images/
+// complain (lokasi upload baru dari web). resolvedUrls menyimpan hasil
+// fallback per slot supaya <img @error> tidak loop infinite.
+const resolvedUrls = ref<Record<1 | 2 | 3, string>>({ 1: "", 2: "", 3: "" });
+
+const webImageUrl = (slot: 1 | 2 | 3) => {
   const key = `Image${slot}Name` as "Image1Name" | "Image2Name" | "Image3Name";
   if (!formData.value[key] || !formData.value.Nomor) return "";
   return `${getBaseUrl()}/images/complain/${encodeURIComponent(formData.value.Nomor)}-0${slot}.jpg`;
 };
 
+const legacyImageUrl = (slot: 1 | 2 | 3) => {
+  if (!formData.value.Nomor) return "";
+  return `/file-gambar/${encodeURIComponent(formData.value.Nomor)}-0${slot}.jpg`;
+};
+
 const displayImageUrl = (slot: 1 | 2 | 3) => {
   if (previewUrls.value[slot]) return previewUrls.value[slot];
-  return existingImageUrl(slot);
+  if (resolvedUrls.value[slot]) return resolvedUrls.value[slot];
+  return webImageUrl(slot);
+};
+
+const onImgError = (slot: 1 | 2 | 3, e: Event) => {
+  const img = e.target as HTMLImageElement;
+  if (img.dataset.fallbackTried === "true") {
+    img.style.display = "none";
+    return;
+  }
+  img.dataset.fallbackTried = "true";
+  resolvedUrls.value[slot] = legacyImageUrl(slot);
 };
 
 const triggerFileSelect = (slot: 1 | 2 | 3) => {
@@ -387,18 +409,13 @@ onMounted(async () => {
             <label class="lbl">Tanggal</label>
             <input :value="formData.SpkTanggal" class="inp ro" readonly />
           </div>
-          <div class="fr">
+          <div class="fr fr-divisi">
             <label class="lbl">Divisi</label>
-            <input
-              :value="formData.Divisi"
-              class="inp ro"
-              readonly
-              style="width: 140px; flex: none"
-            />
-            <label class="lbl" style="width: 40px; margin-left: 8px"
-              >Type</label
-            >
-            <input :value="formData.Tipe" class="inp ro" readonly />
+            <div class="divisi-type-group">
+              <input :value="formData.Divisi" class="inp ro" readonly />
+              <label class="lbl-inline">Type</label>
+              <input :value="formData.Tipe" class="inp ro" />
+            </div>
           </div>
           <div class="fr" style="align-items: flex-start">
             <label class="lbl" style="padding-top: 3px">Nama</label>
@@ -550,6 +567,7 @@ onMounted(async () => {
             display: block;
             margin: 0 auto;
           "
+          @error="onImgError(previewSlot, $event)"
         />
       </div>
     </div>
@@ -643,6 +661,13 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   gap: 3px;
+  width: 100%;
+  box-sizing: border-box;
+}
+.fr-col .inp,
+.fr-col .ta {
+  width: 100%;
+  box-sizing: border-box;
 }
 .lbl {
   width: 90px;
@@ -815,5 +840,24 @@ onMounted(async () => {
 .preview-body {
   padding: 16px;
   background: #f5f5f5;
+}
+.divisi-type-group {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+.divisi-type-group .inp {
+  flex: 1;
+  min-width: 80px;
+}
+.lbl-inline {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: #333;
+  white-space: nowrap;
 }
 </style>
