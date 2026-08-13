@@ -26,16 +26,6 @@ const route = useRoute();
 const router = useRouter();
 const toast = useToast();
 
-// ⚠️ Panel Supplier & kolom Harga/Disc/Total disembunyikan (BUKAN
-// dihapus dari formData) kalau user gak punya izin lihatSup/lihatBeli
-// — replikasi `if zLihatSup=0/zLihatBeli=0` di ufrmPO.FormCreate.
-// Data harga/diskon TETAP ada di formData.items (auto-fill dari
-// master bahan tetap jalan, sama seperti Delphi CDS yang tetap
-// ke-set walau kolom invisible) — supaya submit/simpan gak
-// kehilangan data. Backend getDetail/validateField SENGAJA tidak
-// digating (beda dari modul browse-only lain) karena field ini
-// dipakai form yang bisa SAVE — nge-null-kan di response berisiko
-// timpa nilai asli jadi 0 pas user edit & simpan ulang.
 const canLihatSup = computed(() => authStore.user?.flags.lihatSup === 1);
 const canLihatBeli = computed(() => authStore.user?.flags.lihatBeli === 1);
 
@@ -238,8 +228,7 @@ const fmt = (n: number) => n.toLocaleString("id-ID");
 // Hitung colspan dinamis buat baris "Tidak ada data" — base fixed
 // columns + kolom kondisional (Gramasi Awal, Roll, Harga/Disc/Total)
 const colSpanCount = computed(() => {
-  let n = 12; // No, Kode, Nama Bahan, Nama External, Sat, Gramasi, Setting, Jenis, Jumlah, SPK, MKB, Aksi
-  if (!isBahan.value) n += 1; // Gramasi Awal
+  let n = 13; // No, Kode, Nama Bahan, Nama External, Sat, Gramasi Awal, Gramasi, Setting, Jenis, Jumlah, SPK, MKB, Aksi
   if (isCelup.value) n += 1; // Roll
   if (canLihatBeli.value) n += 3; // Harga Beli, Disc, Total
   return n;
@@ -449,9 +438,7 @@ const setBahan = (v: any) => {
     ? `GREIGE ${v.Nama || v.bhn_name}`
     : v.Nama || v.bhn_name;
   formData.value.items[i].satuan = v.Satuan || v.bhn_satuan || "";
-  // gramasia (Gramasi Awal) SENGAJA tidak di-auto-fill di sini — sesuai
-  // Delphi clkodePropertiesEditValueChanged, field ini manual input user.
-  formData.value.items[i].gramasi = v.Gramasi || ""; // ← auto dari master (readonly)
+  formData.value.items[i].gramasi = v.Gramasi || "";
   formData.value.items[i].setting = v.Setting || "";
   formData.value.items[i].jenis = v.Jenis || "";
   formData.value.items[i].harga = Number(v.Harga || v.bhn_hargabeli) || 0;
@@ -893,7 +880,7 @@ const validateSave = () => {
                 <th style="width: 160px">Nama Bahan</th>
                 <th style="width: 120px">Nama External</th>
                 <th style="width: 50px" class="tc">Sat</th>
-                <th v-if="!isBahan" style="width: 70px">Gramasi Awal</th>
+                <th style="width: 70px">Gramasi Awal</th>
                 <th style="width: 70px">
                   {{ isBahan ? "Gramasi" : "Gramasi Akhir" }}
                 </th>
@@ -945,7 +932,7 @@ const validateSave = () => {
                 <td class="p0">
                   <input v-model="row.satuan" class="ci tc ro" readonly />
                 </td>
-                <td class="p0" v-if="!isBahan">
+                <td class="p0">
                   <input
                     v-model="row.gramasia"
                     class="ci"
@@ -956,8 +943,7 @@ const validateSave = () => {
                   <input
                     v-model="row.gramasi"
                     class="ci"
-                    :class="{ ro: !isBahan }"
-                    :readonly="!isBahan"
+                    placeholder="Manual"
                   />
                 </td>
                 <td class="p0">

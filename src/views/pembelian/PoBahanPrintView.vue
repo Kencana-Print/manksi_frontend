@@ -213,6 +213,14 @@ const ppnValue = computed(() =>
     : 0,
 );
 const grandTotal = computed(() => subTotal.value + ppnValue.value);
+
+const totalColumns = computed(() => {
+  let n = 8; // No, Nama, Satuan, Qty, Gramasi(kedua), Setting, Harga Dpp, Harga
+  if (isBahan.value) n += 1; // Kode
+  if (!isBahan.value) n += 1; // Gramasi Awal
+  n += 2; // Disc, Total
+  return n;
+});
 </script>
 
 <template>
@@ -276,8 +284,9 @@ const grandTotal = computed(() => subTotal.value + ppnValue.value);
             <th>Nama</th>
             <th width="45">Satuan</th>
             <th width="65">Qty</th>
-            <th width="60">Gramasi<br />Awal</th>
-            <th width="60">Gramasi<br />Akhir</th>
+            <!-- Gramasi Awal HANYA untuk Greige & Celup, tidak untuk Bahan -->
+            <th width="60" v-if="!isBahan">Gramasi<br />Awal</th>
+            <th width="60">{{ isBahan ? "Gramasi" : "Gramasi Akhir" }}</th>
             <th width="50">Setting</th>
             <th width="80">Harga Dpp</th>
             <th width="80">Harga</th>
@@ -292,7 +301,7 @@ const grandTotal = computed(() => subTotal.value + ppnValue.value);
             <td class="nama-cell">{{ item.pod_namaext || item.bhn_name }}</td>
             <td class="tc">{{ item.satuan_print }}</td>
             <td class="tr">{{ formatNum(item.qty_print, 2) }}</td>
-            <td class="tc">{{ item.pod_gramasia || "-" }}</td>
+            <td class="tc" v-if="!isBahan">{{ item.pod_gramasia || "-" }}</td>
             <td class="tc">{{ item.gramasi || "-" }}</td>
             <td class="tc">{{ item.setting || "-" }}</td>
             <td class="tr">{{ formatNum(item.harga_dpp_print) }}</td>
@@ -302,17 +311,16 @@ const grandTotal = computed(() => subTotal.value + ppnValue.value);
           </tr>
         </tbody>
         <tfoot>
-          <!-- Colspan otomatis menyesuaikan keberadaan kolom "Kode" -->
           <tr>
-            <td :colspan="isBahan ? 11 : 10" class="tr">Total</td>
+            <td :colspan="totalColumns - 1" class="tr">Total</td>
             <td class="tr fw">{{ formatNum(subTotal) }}</td>
           </tr>
           <tr v-if="dataPO.header.po_status_ppn === 1">
-            <td :colspan="isBahan ? 11 : 10" class="tr">Ppn</td>
+            <td :colspan="totalColumns - 1" class="tr">Ppn</td>
             <td class="tr fw">{{ formatNum(ppnValue) }}</td>
           </tr>
           <tr>
-            <td :colspan="isBahan ? 11 : 10" class="tr">Grand Total</td>
+            <td :colspan="totalColumns - 1" class="tr">Grand Total</td>
             <td class="tr fw">{{ formatNum(grandTotal) }}</td>
           </tr>
         </tfoot>
