@@ -663,6 +663,16 @@ const fetchStandarUkuranSizes = async () => {
     if (reqId !== standarUkuranReqId) return;
 
     const standarData: any[] = res.data.data || [];
+
+    // ⚠️ FIX: kombinasi JO+varian yang belum punya master standar ukuran
+    // (JO baru / belum dikonfigurasi) tidak boleh menimpa list jadi
+    // kosong — fallback ke daftar size penuh, qty existing tetap dijaga,
+    // supaya user tetap bisa input manual.
+    if (standarData.length === 0) {
+      await ensureFullSizesForBebasUkuran();
+      return;
+    }
+
     formData.value.Sizes = standarData.map((s: any) => {
       const existing = existingSizes.find(
         (e: any) =>
