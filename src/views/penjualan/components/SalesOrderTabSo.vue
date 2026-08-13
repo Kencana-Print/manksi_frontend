@@ -699,6 +699,8 @@ watch(
   },
 );
 
+const KETPO_TANPA_ACC = ["BARANG PER SET", "BARANG PENDUKUNG", "PRIVE OWNER"];
+
 watch(
   () => props.formData.spk_ketpo,
   (newKet) => {
@@ -706,14 +708,12 @@ watch(
       props.formData.ketpo_acc = "";
       return;
     }
-    const selectedOption = props.lookupOptions.ketPo.find(
-      (opt) => opt.ket === newKet,
-    );
-    if (selectedOption && selectedOption.acc === "Y") {
+    const ketUpper = String(newKet).toUpperCase().trim();
+    if (KETPO_TANPA_ACC.includes(ketUpper)) {
+      props.formData.ketpo_acc = "";
+    } else {
       props.formData.ketpo_acc = "MINTA ACC";
       props.formData.spk_aktif = "N";
-    } else {
-      props.formData.ketpo_acc = "";
     }
   },
 );
@@ -1906,6 +1906,18 @@ watch(
               <IconSearch :size="12" color="#1565c0" />
             </button>
           </div>
+        </div>
+
+        <div class="fr">
+          <label class="lbl" style="width: 72px">Alokasi</label>
+          <select
+            v-model="formData.spk_alokasi"
+            class="inp sel"
+            style="width: 70px"
+          >
+            <option value="N">N</option>
+            <option value="Y">Y</option>
+          </select>
         </div>
 
         <div class="fr">

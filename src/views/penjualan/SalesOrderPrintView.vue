@@ -8,6 +8,8 @@ import QrcodeVue from "qrcode.vue";
 const route = useRoute();
 const isLoaded = ref(false);
 const isError = ref(false);
+const isBlocked = ref(false);
+const blockMessage = ref("");
 const data = ref<any>({});
 
 const printNomor = String(route.params.nomor);
@@ -264,7 +266,17 @@ const updateStatusCetak = async (nomor: string) => {
 onMounted(async () => {
   try {
     const res = await salesOrderFormService.getDetail(printNomor);
-    data.value = res.data.data.header;
+    const header = res.data.data.header;
+
+    if (header.spk_aktif === "N") {
+      isBlocked.value = true;
+      blockMessage.value =
+        "SO ini berstatus PASIF (masih menunggu approval) dan tidak dapat dicetak.";
+      isLoaded.value = true;
+      return;
+    }
+
+    data.value = header;
     data.value.sizeDetails = res.data.data.dtlSize || [];
     data.value.alokasiList = res.data.data.alokasi || [];
     data.value.ketKomponen = res.data.data.ketKomponen || "";
@@ -294,6 +306,21 @@ onMounted(async () => {
 
 <template>
   <div v-if="isError" class="loading-state">Data SO tidak ditemukan.</div>
+  <div v-else-if="isBlocked" class="loading-state blocked-state">
+    <div>
+      <div
+        style="
+          font-size: 14pt;
+          font-weight: bold;
+          color: #c62828;
+          margin-bottom: 8px;
+        "
+      >
+        ⚠ Tidak Dapat Dicetak
+      </div>
+      <div>{{ blockMessage }}</div>
+    </div>
+  </div>
   <div v-else-if="!isLoaded" class="loading-state">
     Mempersiapkan Dokumen Cetak...
   </div>
@@ -844,6 +871,10 @@ onMounted(async () => {
   align-items: center;
   height: 100vh;
   font-family: Arial;
+}
+.blocked-state {
+  text-align: center;
+  color: #333;
 }
 .print-container {
   width: 100%;

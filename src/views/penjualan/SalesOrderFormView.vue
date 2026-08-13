@@ -187,6 +187,7 @@ const defaultData = {
   spk_ketpo: "",
   ketpo_acc: "",
   spk_lama: "",
+  spk_alokasi: "N",
   spk_label: 0,
   spk_cmo: "",
   isCmoChecked: false,
@@ -312,6 +313,8 @@ const {
       cus_perfect: d.header.cus_perfect || "N",
       spk_pinjo: d.header.spk_pinjo || "",
 
+      spk_alokasi: d.header.spk_alokasi || "N",
+
       spk_revisi: d.header.spk_revisi || "N",
       spk_ketrevisi: d.header.spk_ketrevisi || "",
 
@@ -387,6 +390,7 @@ const {
         spk_keterangan: data.spk_keterangan,
         spk_ketpo: data.spk_ketpo,
         spk_lama: data.spk_lama,
+        spk_alokasi: data.spk_alokasi || "N",
         spk_repeat: data.spk_repeat,
         spk_label: data.spk_label,
         spk_cmo: data.spk_cmo,
@@ -484,12 +488,21 @@ const {
   },
   onSuccess: (res: any) => {
     toast.success("Sales Order berhasil disimpan!");
-
-    // ⬅️ [PERBAIKAN] Tangkap nomor hasil simpan dan tampilkan dialog cetak
     savedNomorSO.value = res.data?.data?.nomor || formData.value.spk_nomor;
-    showPostSavePrintDialog.value = true;
 
-    // router.push({ name: "SalesOrderBrowse" }); <-- Baris ini DIHAPUS, dipindah ke fungsi goBackToBrowse
+    // ⬅ FIX: replikasi gate Delphi (lblAktif='AKTIF' baru boleh cetak).
+    // Kalau status PASIF (karena Ket.PO butuh ACC, kepentingan_acc,
+    // pin_customer, nopo_acc, dll), dialog cetak TIDAK dimunculkan.
+    if (formData.value.spk_aktif === "N") {
+      toast.warning(
+        "SO tersimpan dengan status PASIF — menunggu approval sebelum bisa dicetak.",
+        { timeout: 8000 },
+      );
+      router.push({ name: "SalesOrderBrowse" });
+      return;
+    }
+
+    showPostSavePrintDialog.value = true;
   },
 });
 
