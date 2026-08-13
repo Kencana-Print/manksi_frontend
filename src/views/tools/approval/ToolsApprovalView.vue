@@ -8,9 +8,9 @@ const route = useRoute();
 
 // Daftar menu approval beserta MENU_ID aslinya
 const allApprovals = [
-  { id: "piutang_90", label: "Approve SPK Piutang > 90 hari", menuId: "256" },
-  { id: "harga_nol", label: "Approve SPK Harga 0", menuId: "257" },
-  { id: "prioritas", label: "Approve SPK Klien Prioritas", menuId: "258" },
+  { id: "piutang_90", label: "Approve SO Piutang > 90 hari", menuId: "256" },
+  { id: "harga_nol", label: "Approve SO Harga 0", menuId: "257" },
+  { id: "prioritas", label: "Approve SO Klien Prioritas", menuId: "258" },
   { id: "perubahan_data", label: "Approve Perubahan Data", menuId: "259" },
   {
     id: "invoice_blmsj",
@@ -20,7 +20,7 @@ const allApprovals = [
   { id: "hapus_data", label: "Approve Hapus Data", menuId: "261" },
   {
     id: "pembatalan_spk",
-    label: "Approve Pembatalan SPK/SO",
+    label: "Approve Pembatalan SO",
     menuId: "262",
   },
   {
@@ -35,7 +35,7 @@ const allApprovals = [
   },
   {
     id: "ganti_qty_kain",
-    label: "Approve SPK Ganti Qty & Jenis Kain",
+    label: "Approve SO Ganti Qty & Jenis Kain",
     menuId: "265",
   },
   {
@@ -46,7 +46,7 @@ const allApprovals = [
   { id: "spk_cetak_ulang", label: "Approve Cetak SPK > 1 Kali", menuId: "267" },
   {
     id: "nopo",
-    label: "Approve SO Tanpa Nomor PO",
+    label: "Approve SO/MAP Tanpa Nomor PO",
     menuId: "268",
   },
 ];
