@@ -234,14 +234,11 @@ const setBuktiBayar = async (item: any) => {
 
   const row = formData.value.Detail[idx];
 
-  // Validasi customer — cek apakah customer di bukti bayar
-  // match dengan customer di nota
-  // Di Delphi: customer di terima_bayar_debet bisa multi (dipisah ';')
-  const cusKodeBayar: string = item.Customer || "";
+  // ⬅ FIX: pakai KodeCustomer (kode mentah), bukan Customer (nama)
+  const cusKodeBayar: string = item.KodeCustomer || "";
   const cusKodeNota: string = row.CusKode || "";
 
   if (cusKodeBayar && cusKodeNota) {
-    // Customer di bukti bayar bisa format "00028;" atau "00028;00790;"
     const listCus = cusKodeBayar
       .split(";")
       .map((c: string) => c.trim())
@@ -255,11 +252,10 @@ const setBuktiBayar = async (item: any) => {
           `Customer Nota: ${cusKodeNota}\n` +
           `Customer Bayar: ${cusKodeBayar}`,
       );
-      return; // Batalkan — tidak set NoBukti
+      return;
     }
   }
 
-  // Cocok — set dan load info
   formData.value.Detail[idx].NoBukti = item.Nomor;
   await loadInfoBuktiBayar(idx);
 };
