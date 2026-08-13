@@ -43,7 +43,7 @@ const router = createRouter({
       meta: {
         layout: "DefaultLayout",
         requiresAuth: true,
-        menuId: "14",
+        menuId: "25",
         title: "Jenis Bahan",
       },
     },
@@ -353,6 +353,28 @@ const router = createRouter({
       component: () => import("@/views/daftar/ComplainCustomerView.vue"),
       meta: {
         title: "Complain Customer",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "36",
+      },
+    },
+    {
+      path: "/daftar/complain-customer/create",
+      name: "ComplainCustomerCreate",
+      component: () => import("@/views/daftar/ComplainCustomerFormView.vue"),
+      meta: {
+        title: "Tambah Complain Customer",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "36",
+      },
+    },
+    {
+      path: "/daftar/complain-customer/edit/:nomor",
+      name: "ComplainCustomerEdit",
+      component: () => import("@/views/daftar/ComplainCustomerFormView.vue"),
+      meta: {
+        title: "Ubah Complain Customer",
         layout: "DefaultLayout",
         requiresAuth: true,
         menuId: "36",

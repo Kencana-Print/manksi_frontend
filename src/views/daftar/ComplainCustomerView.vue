@@ -7,6 +7,7 @@ import { useBrowse } from "@/composables/useBrowse";
 import { complainCustomerService } from "@/services/master/complainCustomerService";
 import { IconMessageExclamation } from "@tabler/icons-vue";
 import { formatTanggal } from "@/utils/dateFormat";
+import { exportExcelSingle, type ExcelColumn } from "@/utils/excelExport";
 
 const router = useRouter();
 const toast = useToast();
@@ -35,7 +36,6 @@ const {
   canDelete,
   canExport,
   fetchData,
-  exportToExcel,
 } = useBrowse({
   menuId,
   fetchApi: async () => {
@@ -88,6 +88,59 @@ const goDelete = async (item: any) => {
     isLoading.value = false;
   }
 };
+
+// ── Export pakai ExcelJS (excelExport.ts), bukan mekanisme generik ──
+const isExporting = ref(false);
+
+const onExport = async () => {
+  if (!items.value?.length) {
+    toast.warning("Tidak ada data untuk diexport.");
+    return;
+  }
+  isExporting.value = true;
+  try {
+    const columns: ExcelColumn[] = [
+      { header: "Nomor", key: "Nomor", width: 16 },
+      {
+        header: "Tgl Complain",
+        key: "TglComplain",
+        width: 12,
+        align: "center",
+      },
+      { header: "No. SPK/Memo", key: "NoSpkMemo", width: 18 },
+      { header: "Customer", key: "Customer", width: 28 },
+      { header: "Divisi", key: "Divisi", width: 12 },
+      { header: "Tipe", key: "Tipe", width: 12 },
+      { header: "Nama SPK", key: "NamaSpk", width: 28 },
+      { header: "Jenis Complain", key: "JenisComplain", width: 22 },
+      { header: "Uraian", key: "Uraian", width: 28 },
+      { header: "Action/Solution", key: "ActionSolution", width: 28 },
+      { header: "Ket Div1", key: "KetDiv1", width: 24 },
+      { header: "Ket Div2", key: "KetDiv2", width: 24 },
+      { header: "Ket Div3", key: "KetDiv3", width: 24 },
+    ];
+
+    const rows = items.value.map((r: any) => ({
+      ...r,
+      TglComplain: formatTanggal(r.TglComplain),
+    }));
+
+    await exportExcelSingle(
+      `Complain_Customer_${filterState.value.startDate}_sd_${filterState.value.endDate}.xlsx`,
+      "Complain Customer",
+      columns,
+      rows,
+      `Daftar Complain Customer | Periode: ${formatTanggal(filterState.value.startDate)} s.d ${formatTanggal(filterState.value.endDate)}`,
+    );
+
+    toast.success("Berhasil export data.");
+  } catch (error) {
+    console.error(error);
+    toast.error("Gagal export Excel.");
+  } finally {
+    isExporting.value = false;
+  }
+};
 </script>
 
 <template>
@@ -109,7 +162,7 @@ const goDelete = async (item: any) => {
     @add="goAdd"
     @edit="goEdit"
     @delete="goDelete"
-    @export="exportToExcel('Complain_Customer')"
+    @export="onExport"
   >
     <template #filter-left>
       <div class="filter-group">
