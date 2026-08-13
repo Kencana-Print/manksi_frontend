@@ -119,7 +119,13 @@ watch(
       if (props.isNewMode) {
         resetForm();
       } else if (props.bahanData) {
-        formData.value = { ...props.bahanData };
+        formData.value = {
+          ...props.bahanData,
+          Bhn_ket: props.bahanData.Bhn_ket || "",
+          Bhn_hargabeli: Number(props.bahanData.Bhn_hargabeli) || 0,
+          Bhn_buffer: Number(props.bahanData.Bhn_buffer) || 0,
+          Bhn_dead: props.bahanData.Bhn_dead ?? 0,
+        };
       }
       formRef.value?.resetValidation();
     }
