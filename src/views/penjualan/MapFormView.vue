@@ -6,7 +6,12 @@ import { useRouter } from "vue-router";
 import api from "@/services/api"; // Untuk lookup generic seperti divisi
 import { mapFormService } from "@/services/penjualan/mapFormService";
 import BaseForm from "@/components/BaseForm.vue";
-import { IconFileDescription } from "@tabler/icons-vue";
+import {
+  IconFileDescription,
+  IconPrinter,
+  IconLayoutSidebarRight,
+  IconLayoutSidebarRightCollapse,
+} from "@tabler/icons-vue";
 
 // Import Komponen Tab
 import TabMap from "./components/TabMap.vue";
@@ -295,7 +300,10 @@ const {
   },
   onSuccess: (res: any) => {
     toast.success("Data MAP berhasil disimpan.");
-    router.push("/penjualan/map");
+    savedNomor.value =
+      res.data?.data?.nomor || res.data?.nomor || formData.value.Nomor;
+    showPrintDialog.value = true;
+    // router.push dipindah ke closePrintAndExit / pilihGambarVertikal / pilihGambarHorizontal
   },
 });
 
