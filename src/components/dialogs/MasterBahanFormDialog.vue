@@ -94,10 +94,6 @@ const generatedName = computed(() => {
     .toUpperCase();
 });
 
-watch(generatedName, (newVal) => {
-  formData.value.Bhn_name = newVal;
-});
-
 const loadOptions = async () => {
   try {
     const [resProject, resSatuan] = await Promise.all([
@@ -167,6 +163,8 @@ const executeSave = async () => {
       (p) => p.Nama === formData.value.project,
     );
     const ckdProject = selectedProj ? selectedProj.Kode.trim() : "";
+
+    formData.value.Bhn_name = generatedName.value;
 
     if (props.isNewMode) {
       formData.value.Bhn_kode = (
@@ -240,7 +238,7 @@ const executeSave = async () => {
 
             <v-col cols="12">
               <v-text-field
-                v-model="formData.Bhn_name"
+                :model-value="generatedName"
                 label="Nama Bahan (Otomatis)"
                 variant="outlined"
                 density="compact"
