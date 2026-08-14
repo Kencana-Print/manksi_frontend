@@ -1,5 +1,12 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, nextTick } from "vue";
+import {
+  ref,
+  computed,
+  watch,
+  onMounted,
+  nextTick,
+  onBeforeUnmount,
+} from "vue";
 import { useAuthStore } from "@/stores/authStore";
 import { useToast } from "vue-toastification";
 import PageLayout from "@/components/PageLayout.vue";
@@ -60,15 +67,6 @@ onMounted(fetchData);
 
 watch([startDate, endDate], () => {
   fetchData();
-});
-
-watch(activeTab, async (tab) => {
-  await nextTick();
-  if (tab === "chart") renderChart();
-});
-
-watch(items, () => {
-  if (activeTab.value === "chart") renderChart();
 });
 
 // ── Headers ──
@@ -323,32 +321,164 @@ const onExportPivot = async () => {
   toast.success("Export pivot berhasil.");
 };
 
-// ── Chart ──
-const chartEl = ref<HTMLElement | null>(null);
-const renderChart = async () => {
-  await nextTick();
-  if (!chartEl.value || !items.value.length) return;
-  const win = window as any;
-  if (!win.jQuery || !win.jQuery.fn.pivotUI) return;
-  if (!win.$.pivotUtilities?.c3_renderers) return;
-  win.jQuery(chartEl.value).pivotUI(
-    items.value,
-    {
-      rows: ["Divisi"],
-      cols: ["Bulan"],
-      vals: ["Nominal_Order"],
-      aggregatorName: "Sum",
-      rendererName: "Bar Chart",
-      renderers: Object.assign(
-        {},
-        win.$.pivotUtilities.renderers,
-        win.$.pivotUtilities.c3_renderers,
-      ),
-      unusedAttrsVertical: false,
-    },
-    true,
-  );
+const chartCanvasRef = ref<HTMLCanvasElement | null>(null);
+const chartType = ref<"bar" | "line">("bar");
+let chartInstance: any = null;
+let lastPivotTable: any = null;
+
+const buildColumnLabels = (headerRows: any[]): string[] => {
+  const occupied = new Set<string>();
+  const key = (r: number, c: number) => `${r}:${c}`;
+  const colTexts: Record<number, string[]> = {};
+
+  headerRows.forEach((row, rIdx) => {
+    let colCursor = 0;
+    row.forEach((cell: any) => {
+      while (occupied.has(key(rIdx, colCursor))) colCursor++;
+      for (let r = rIdx; r < rIdx + cell.rowSpan; r++) {
+        for (let c = colCursor; c < colCursor + cell.colSpan; c++) {
+          occupied.add(key(r, c));
+          if (cell.text) {
+            if (!colTexts[c]) colTexts[c] = [];
+            if (colTexts[c][colTexts[c].length - 1] !== cell.text) {
+              colTexts[c].push(cell.text);
+            }
+          }
+        }
+      }
+      colCursor += cell.colSpan;
+    });
+  });
+
+  const maxCol = Math.max(0, ...Object.keys(colTexts).map(Number)) + 1;
+  const labels: string[] = [];
+  for (let c = 0; c < maxCol; c++) {
+    labels.push((colTexts[c] || []).join(" / "));
+  }
+  return labels;
 };
+
+const rebuildChart = async (table: any) => {
+  lastPivotTable = table;
+  if (activeTab.value !== "chart") return;
+  await nextTick();
+  if (!chartCanvasRef.value || !table || !table.bodyRows.length) {
+    if (chartInstance) {
+      chartInstance.destroy();
+      chartInstance = null;
+    }
+    return;
+  }
+
+  const rowFieldCount = pivotWithFilterRef.value?.getRowFieldCount?.() ?? 1;
+  const colLabels = buildColumnLabels(table.headerRows).slice(rowFieldCount);
+
+  const parsedRows = table.bodyRows.map((row: any) => {
+    const label = row
+      .slice(0, rowFieldCount)
+      .map((c: any) => c.text)
+      .join(" / ");
+    const values = row.slice(rowFieldCount).map((c: any) => {
+      const n = Number(String(c.text).replace(/\./g, "").replace(/,/g, "."));
+      return isNaN(n) ? 0 : n;
+    });
+    return {
+      label,
+      values,
+      total: values.reduce((s: number, v: number) => s + v, 0),
+    };
+  });
+
+  const top = [...parsedRows].sort((a, b) => b.total - a.total).slice(0, 20);
+
+  const {
+    Chart,
+    BarController,
+    LineController,
+    BarElement,
+    LineElement,
+    PointElement,
+    CategoryScale,
+    LinearScale,
+    Tooltip,
+    Legend,
+  } = await import("chart.js");
+  Chart.register(
+    BarController,
+    LineController,
+    BarElement,
+    LineElement,
+    PointElement,
+    CategoryScale,
+    LinearScale,
+    Tooltip,
+    Legend,
+  );
+
+  if (chartInstance) {
+    chartInstance.destroy();
+    chartInstance = null;
+  }
+
+  const palette = [
+    { bg: "rgba(21,101,192,0.65)", border: "#1565c0" },
+    { bg: "rgba(46,125,50,0.65)", border: "#2e7d32" },
+    { bg: "rgba(239,108,0,0.65)", border: "#ef6c00" },
+    { bg: "rgba(106,27,154,0.65)", border: "#6a1b9a" },
+    { bg: "rgba(198,40,40,0.65)", border: "#c62828" },
+  ];
+
+  chartInstance = new Chart(chartCanvasRef.value, {
+    type: chartType.value,
+    data: {
+      labels: top.map((r) => r.label),
+      datasets: colLabels.map((lbl, idx) => {
+        const color = palette[idx % palette.length];
+        return {
+          label: lbl || `Kolom ${idx + 1}`,
+          data: top.map((r) => r.values[idx] ?? 0),
+          backgroundColor: color.bg,
+          borderColor: color.border,
+          borderWidth: 1,
+          fill: false,
+        };
+      }),
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { position: "top" } },
+      scales: {
+        y: {
+          ticks: {
+            callback: (v: any) =>
+              new Intl.NumberFormat("id-ID", { notation: "compact" }).format(
+                Number(v),
+              ),
+          },
+        },
+        x: { ticks: { maxRotation: 35, font: { size: 10 } } },
+      },
+    },
+  });
+};
+
+const onPivotChanged = (table: any) => {
+  rebuildChart(table);
+};
+
+watch(activeTab, async (tab) => {
+  if (tab === "chart" && lastPivotTable) {
+    await rebuildChart(lastPivotTable);
+  }
+});
+watch(chartType, () => {
+  if (lastPivotTable) rebuildChart(lastPivotTable);
+});
+
+onBeforeUnmount(() => {
+  if (chartInstance) chartInstance.destroy();
+});
 </script>
 
 <template>
@@ -462,8 +592,15 @@ const renderChart = async () => {
           :is-loading="isLoading"
           item-value="Nomor"
           :row-props-fn="rowPropsFn"
-          summary-key="Nominal_Order"
-          summary-label="Total Nom. Order"
+          :summary-columns="[
+            'QtyOrder',
+            'QtyKirim',
+            'QtyJadi',
+            'Nominal_Order',
+            'Nominal_Kirim',
+            'Nominal_Jadi',
+            'Nominal_Selisih',
+          ]"
         >
           <template #item.Tanggal="{ item }">
             {{ item.Tanggal?.replace(/-/g, "/") }}
@@ -515,71 +652,10 @@ const renderChart = async () => {
               {{ fmtNum(item.Nominal_Selisih) }}
             </span>
           </template>
-
-          <template #summary-row="{ filteredItems }">
-            <div class="multi-summary-bar">
-              <span class="ms-item">
-                <span class="ms-lbl">Nom. Order</span>
-                <span class="ms-val">
-                  {{
-                    fmtNum(
-                      filteredItems.reduce(
-                        (s: number, r: any) => s + Number(r.Nominal_Order || 0),
-                        0,
-                      ),
-                    )
-                  }}
-                </span>
-              </span>
-              <span class="ms-sep">|</span>
-              <span class="ms-item">
-                <span class="ms-lbl">Nom. Kirim</span>
-                <span class="ms-val ms-green">
-                  {{
-                    fmtNum(
-                      filteredItems.reduce(
-                        (s: number, r: any) => s + Number(r.Nominal_Kirim || 0),
-                        0,
-                      ),
-                    )
-                  }}
-                </span>
-              </span>
-              <span class="ms-sep">|</span>
-              <span class="ms-item">
-                <span class="ms-lbl">Nom. Jadi</span>
-                <span class="ms-val ms-teal">
-                  {{
-                    fmtNum(
-                      filteredItems.reduce(
-                        (s: number, r: any) => s + Number(r.Nominal_Jadi || 0),
-                        0,
-                      ),
-                    )
-                  }}
-                </span>
-              </span>
-              <span class="ms-sep">|</span>
-              <span class="ms-item">
-                <span class="ms-lbl">Selisih</span>
-                <span class="ms-val ms-red">
-                  {{
-                    fmtNum(
-                      filteredItems.reduce(
-                        (s: number, r: any) =>
-                          s + Number(r.Nominal_Selisih || 0),
-                        0,
-                      ),
-                    )
-                  }}
-                </span>
-              </span>
-            </div>
-          </template>
+          <!-- Hapus seluruh blok #summary-row yang lama -->
         </BaseTable>
       </div>
 
-      <!-- ── Pivot ── -->
       <!-- ── Pivot ── -->
       <div v-show="activeTab === 'pivot'" class="tab-content pivot-wrap">
         <div v-if="!items.length && !isLoading" class="empty-hint">
@@ -609,7 +685,16 @@ const renderChart = async () => {
               'Tanggal',
               'Nomor',
               'Nama',
+              'Bulan',
             ]"
+            :default-rows="['Customer', 'Divisi', 'Nomor']"
+            :default-cols="['Bulan']"
+            :default-vals="[
+              { field: 'Nominal_Order', agg: 'sum' },
+              { field: 'Nominal_Kirim', agg: 'sum' },
+              { field: 'Nominal_Jadi', agg: 'sum' },
+            ]"
+            @pivot-changed="onPivotChanged"
           />
         </template>
       </div>
@@ -619,7 +704,23 @@ const renderChart = async () => {
         <div v-if="!items.length && !isLoading" class="empty-hint">
           Tampilkan data terlebih dahulu.
         </div>
-        <div ref="chartEl" class="chart-container" />
+        <div v-else-if="!lastPivotTable" class="empty-hint">
+          Susun pivot dulu di tab Pivot — grafik akan mengikuti otomatis.
+        </div>
+        <template v-else>
+          <div class="chart-header">
+            <span class="chart-title"
+              >Grafik mengikuti susunan Pivot saat ini</span
+            >
+            <select v-model="chartType" class="chart-type-select">
+              <option value="bar">Bar</option>
+              <option value="line">Line</option>
+            </select>
+          </div>
+          <div class="chart-canvas-wrap">
+            <canvas ref="chartCanvasRef" />
+          </div>
+        </template>
       </div>
     </div>
   </PageLayout>
@@ -726,29 +827,45 @@ const renderChart = async () => {
 .tab-content {
   flex: 1;
   min-height: 0;
-  overflow: auto;
+  overflow: hidden;
 }
 
-.pivot-wrap,
 .chart-wrap {
-  padding: 12px;
-  background: white;
-}
-.chart-container {
-  overflow: auto;
-}
-.chart-container :deep(.pvtUi) {
-  font-size: 12px;
-}
-.pivot-container :deep(.pvtUi),
-.chart-container :deep(.pvtUi) {
-  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 .pivot-export-bar {
   padding: 6px 12px;
   background: #f5f7fa;
   border-bottom: 1px solid #e0e0e0;
   flex-shrink: 0;
+}
+.chart-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  flex-shrink: 0;
+}
+.chart-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #424242;
+}
+.chart-type-select {
+  height: 28px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 0 8px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.chart-canvas-wrap {
+  flex: 1;
+  min-height: 350px;
+  position: relative;
+  padding: 12px;
 }
 
 .empty-hint {

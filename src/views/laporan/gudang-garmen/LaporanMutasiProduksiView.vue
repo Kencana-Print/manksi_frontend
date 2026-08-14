@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { ref, computed, watch, nextTick } from "vue";
+import { ref, computed, watch, nextTick, onBeforeUnmount } from "vue";
+import type ExcelJS from "exceljs";
 import { useAuthStore } from "@/stores/authStore";
 import { useToast } from "vue-toastification";
 import { useRouter } from "vue-router";
 import PageLayout from "@/components/PageLayout.vue";
 import BaseTable from "@/components/BaseTable.vue";
 import SpkSearchModal from "@/components/lookups/SpkSearchModal.vue";
+import PivotWithFilter from "@/components/PivotWithFilter.vue";
 import { laporanMutasiProduksiService } from "@/services/laporan/gudang-garmen/laporanMutasiProduksiService";
 import { exportExcelSingle } from "@/utils/excelExport";
 import {
@@ -50,6 +52,13 @@ const onSpkSelected = (item: any) => {
   namaSpkTerpilih.value = item.Nama || item.Nama2 || "";
   namaSpk.value = ""; // pilih SPK spesifik menggantikan pencarian nama bebas
   fetchData(); // ← auto-fetch begitu SPK dipilih
+};
+const onNomorSpkEnter = () => {
+  // Ketik manual + Enter → pakai nomor apa adanya, kosongkan hint nama
+  // (karena belum tentu valid/ketemu — biar backend yang validasi via query)
+  namaSpkTerpilih.value = "";
+  namaSpk.value = ""; // tetap eksklusif dengan pencarian nama bebas
+  fetchData();
 };
 const clearSpk = () => {
   nomorSpk.value = "";
@@ -97,16 +106,6 @@ const fetchData = async () => {
     isLoading.value = false;
   }
 };
-
-watch(activeTab, async (tab) => {
-  await nextTick();
-  if (tab === "pivot") renderPivot();
-  if (tab === "chart") renderChart();
-});
-watch(items, () => {
-  if (activeTab.value === "pivot") renderPivot();
-  if (activeTab.value === "chart") renderChart();
-});
 
 // ── Headers ──
 const headers = [
@@ -164,6 +163,48 @@ const itemsWithBulan = computed(() =>
     };
   }),
 );
+
+// --- Flatten ----
+const flattenedItems = computed(() => {
+  const result: Record<string, any>[] = [];
+  for (const r of itemsWithBulan.value) {
+    const base = {
+      Nomor: r.Nomor ?? "",
+      NamaSpk: r.NamaSpk ?? "",
+      TglSpk: r.TglSpk ?? "",
+      JoKode: r.JoKode ?? "",
+      DivisiNama: r.DivisiNama ?? "",
+      Tipe: r.Tipe ?? "",
+      NomorMutasi: r.NomorMutasi ?? "",
+      NoPermintaan: r.NoPermintaan ?? "",
+      Kelompok: r.Kelompok ?? "",
+      GudangAsal: r.GudangAsal ?? "",
+      GudangTujuan: r.GudangTujuan ?? "",
+      TanggalMutasi: r.TanggalMutasi ?? "",
+      Kode: r.Kode ?? "",
+      Komponen: r.Komponen ?? "",
+      Satuan: r.Satuan ?? "",
+      Size: r.Size ?? "",
+      Cab: r.Cab ?? "",
+      Bulan: r.Bulan ?? "-",
+    };
+    const measures: [string, any][] = [
+      ["Jumlah", r.Jumlah],
+      ["Terpakai", r.Terpakai],
+      ["Babaran", r.Babaran],
+      ["BS Lini", r.BsLini],
+      ["BS Kain Sablon", r.BsKainSablon],
+      ["BS Kain", r.BsKain],
+    ];
+    for (const [jenis, val] of measures) {
+      const n = Number(val);
+      if (n) {
+        result.push({ ...base, Jenis: jenis, Nilai: n });
+      }
+    }
+  }
+  return result;
+});
 
 // ── Export ──
 const onExport = async () => {
@@ -242,54 +283,284 @@ const onExport = async () => {
   );
 };
 
-// ── Pivot — default sesuai konfigurasi Delphi:
-// cols=[Gudang_Asal], rows=[Spk_nama, Komponen], vals=[Jumlah] ──
-const pivotEl = ref<HTMLElement | null>(null);
-const renderPivot = async () => {
-  await nextTick();
-  if (!pivotEl.value || !itemsWithBulan.value.length) return;
-  const win = window as any;
-  if (!win.jQuery || !win.jQuery.fn.pivotUI) return;
-  win.jQuery(pivotEl.value).pivotUI(
-    itemsWithBulan.value,
-    {
-      rows: ["NamaSpk", "Komponen"],
-      cols: ["GudangAsal"],
-      vals: ["Jumlah"],
-      aggregatorName: "Sum",
-      rendererName: "Table",
-      unusedAttrsVertical: false,
-    },
-    true,
-  );
+const onExportPivot = async () => {
+  const table = await pivotWithFilterRef.value?.exportPivotToExcel?.();
+  if (!table) {
+    toast.warning(
+      "Tidak ada hasil pivot untuk diekspor. Susun pivot dulu di panel kiri.",
+    );
+    return;
+  }
+
+  const ExcelJS = (await import("exceljs")).default;
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet("Pivot");
+  const borderThin = {
+    top: { style: "thin" as const },
+    left: { style: "thin" as const },
+    bottom: { style: "thin" as const },
+    right: { style: "thin" as const },
+  };
+
+  const occupied = new Set<string>();
+  const key = (r: number, c: number) => `${r}:${c}`;
+  const nextFreeCol = (rowIdx: number, fromCol: number): number => {
+    let c = fromCol;
+    while (occupied.has(key(rowIdx, c))) c++;
+    return c;
+  };
+  const markOccupied = (
+    rowIdx: number,
+    colIdx: number,
+    rowSpan: number,
+    colSpan: number,
+  ) => {
+    for (let r = rowIdx; r < rowIdx + rowSpan; r++)
+      for (let c = colIdx; c < colIdx + colSpan; c++) occupied.add(key(r, c));
+  };
+  const writeRows = (
+    rows: { text: string; colSpan: number; rowSpan: number }[][],
+    rowOffset: number,
+    styleFn: (cell: ExcelJS.Cell) => void,
+  ) => {
+    rows.forEach((row, rIdx) => {
+      const absRow = rowOffset + rIdx + 1;
+      const excelRow = sheet.getRow(absRow);
+      let colCursor = 1;
+      row.forEach((cell) => {
+        colCursor = nextFreeCol(absRow, colCursor);
+        const excelCell = excelRow.getCell(colCursor);
+        excelCell.value = cell.text;
+        excelCell.border = borderThin;
+        styleFn(excelCell);
+        markOccupied(absRow, colCursor, cell.rowSpan, cell.colSpan);
+        if (cell.colSpan > 1 || cell.rowSpan > 1) {
+          sheet.mergeCells(
+            absRow,
+            colCursor,
+            absRow + cell.rowSpan - 1,
+            colCursor + cell.colSpan - 1,
+          );
+        }
+        colCursor += cell.colSpan;
+      });
+      excelRow.commit();
+    });
+  };
+
+  writeRows(table.headerRows, 0, (cell) => {
+    cell.font = { bold: true, color: { argb: "FF0D47A1" } };
+    cell.fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FFE3F2FD" },
+    };
+    cell.alignment = { horizontal: "center", vertical: "middle" };
+  });
+  writeRows(table.bodyRows, table.headerRows.length, (cell) => {
+    const text = String(cell.value ?? "");
+    const isNumeric = /^-?[\d.,]+$/.test(text.replace(/\s/g, ""));
+    if (isNumeric) {
+      const n = Number(text.replace(/\./g, "").replace(/,/g, "."));
+      if (!isNaN(n)) {
+        cell.value = n;
+        cell.numFmt = "#,##0";
+      }
+    }
+    cell.alignment = {
+      horizontal: isNumeric ? "right" : "left",
+      vertical: "middle",
+    };
+  });
+
+  sheet.columns.forEach((col) => {
+    col.width = 18;
+  });
+  const buffer = await workbook.xlsx.writeBuffer();
+  const blob = new Blob([buffer], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `Pivot_Mutasi_Produksi_${startDate.value}_${endDate.value}.xlsx`;
+  a.click();
+  URL.revokeObjectURL(url);
+  toast.success("Export pivot berhasil.");
 };
 
-// ── Chart ──
-const chartEl = ref<HTMLElement | null>(null);
-const renderChart = async () => {
-  await nextTick();
-  if (!chartEl.value || !itemsWithBulan.value.length) return;
-  const win = window as any;
-  if (!win.jQuery || !win.jQuery.fn.pivotUI) return;
-  if (!win.$.pivotUtilities?.c3_renderers) return;
-  win.jQuery(chartEl.value).pivotUI(
-    itemsWithBulan.value,
-    {
-      rows: ["GudangAsal"],
-      cols: ["Bulan"],
-      vals: ["Jumlah"],
-      aggregatorName: "Sum",
-      rendererName: "Bar Chart",
-      renderers: Object.assign(
-        {},
-        win.$.pivotUtilities.renderers,
-        win.$.pivotUtilities.c3_renderers,
-      ),
-      unusedAttrsVertical: false,
-    },
-    true,
-  );
+// ── Pivot — default sesuai konfigurasi Delphi:
+const pivotWithFilterRef = ref<InstanceType<typeof PivotWithFilter> | null>(
+  null,
+);
+
+// ── Chart reaktif — dibangun ulang OTOMATIS setiap kali user
+// menyusun ulang pivot (rows/cols/values), lewat event pivot-changed
+// yang di-emit TinyPivotOnly berdasarkan tabel HTML yang baru
+// dirender. Tidak bergantung ke shape internal pivotResult. ──
+const chartCanvasRef = ref<HTMLCanvasElement | null>(null);
+const chartType = ref<"bar" | "line">("bar");
+let chartInstance: any = null;
+let lastPivotTable: any = null;
+
+// ── Bangun label kolom multi-level dari header rows (occupancy-grid,
+// pola sama seperti export) — tiap kolom bisa punya label gabungan
+// dari beberapa baris header kalau ada rowSpan/colSpan. ──
+const buildColumnLabels = (headerRows: any[]): string[] => {
+  const occupied = new Set<string>();
+  const key = (r: number, c: number) => `${r}:${c}`;
+  const colTexts: Record<number, string[]> = {};
+
+  headerRows.forEach((row, rIdx) => {
+    let colCursor = 0;
+    row.forEach((cell: any) => {
+      while (occupied.has(key(rIdx, colCursor))) colCursor++;
+      for (let r = rIdx; r < rIdx + cell.rowSpan; r++) {
+        for (let c = colCursor; c < colCursor + cell.colSpan; c++) {
+          occupied.add(key(r, c));
+          if (cell.text) {
+            if (!colTexts[c]) colTexts[c] = [];
+            if (colTexts[c][colTexts[c].length - 1] !== cell.text) {
+              colTexts[c].push(cell.text);
+            }
+          }
+        }
+      }
+      colCursor += cell.colSpan;
+    });
+  });
+
+  const maxCol = Math.max(0, ...Object.keys(colTexts).map(Number)) + 1;
+  const labels: string[] = [];
+  for (let c = 0; c < maxCol; c++) {
+    labels.push((colTexts[c] || []).join(" / "));
+  }
+  return labels;
 };
+
+const rebuildChart = async (table: any) => {
+  lastPivotTable = table;
+  if (activeTab.value !== "chart") return; // canvas belum ada di DOM kalau tab lain aktif
+  await nextTick();
+  if (!chartCanvasRef.value || !table || !table.bodyRows.length) {
+    if (chartInstance) {
+      chartInstance.destroy();
+      chartInstance = null;
+    }
+    return;
+  }
+
+  const rowFieldCount = pivotWithFilterRef.value?.getRowFieldCount?.() ?? 1;
+  const colLabels = buildColumnLabels(table.headerRows).slice(rowFieldCount);
+
+  const parsedRows = table.bodyRows.map((row: any) => {
+    const label = row
+      .slice(0, rowFieldCount)
+      .map((c: any) => c.text)
+      .join(" / ");
+    const values = row.slice(rowFieldCount).map((c: any) => {
+      const n = Number(String(c.text).replace(/\./g, "").replace(/,/g, "."));
+      return isNaN(n) ? 0 : n;
+    });
+    return {
+      label,
+      values,
+      total: values.reduce((s: number, v: number) => s + v, 0),
+    };
+  });
+
+  const top = [...parsedRows].sort((a, b) => b.total - a.total).slice(0, 20);
+
+  const {
+    Chart,
+    BarController,
+    LineController,
+    BarElement,
+    LineElement,
+    PointElement,
+    CategoryScale,
+    LinearScale,
+    Tooltip,
+    Legend,
+  } = await import("chart.js");
+  Chart.register(
+    BarController,
+    LineController,
+    BarElement,
+    LineElement,
+    PointElement,
+    CategoryScale,
+    LinearScale,
+    Tooltip,
+    Legend,
+  );
+
+  if (chartInstance) {
+    chartInstance.destroy();
+    chartInstance = null;
+  }
+
+  const palette = [
+    { bg: "rgba(21,101,192,0.65)", border: "#1565c0" },
+    { bg: "rgba(46,125,50,0.65)", border: "#2e7d32" },
+    { bg: "rgba(239,108,0,0.65)", border: "#ef6c00" },
+    { bg: "rgba(106,27,154,0.65)", border: "#6a1b9a" },
+    { bg: "rgba(198,40,40,0.65)", border: "#c62828" },
+  ];
+
+  chartInstance = new Chart(chartCanvasRef.value, {
+    type: chartType.value,
+    data: {
+      labels: top.map((r) => r.label),
+      datasets: colLabels.map((lbl, idx) => {
+        const color = palette[idx % palette.length];
+        return {
+          label: lbl || `Kolom ${idx + 1}`,
+          data: top.map((r) => r.values[idx] ?? 0),
+          backgroundColor: color.bg,
+          borderColor: color.border,
+          borderWidth: 1,
+          fill: false,
+        };
+      }),
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { position: "top" } },
+      scales: {
+        y: {
+          ticks: {
+            callback: (v: any) =>
+              new Intl.NumberFormat("id-ID", { notation: "compact" }).format(
+                Number(v),
+              ),
+          },
+        },
+        x: { ticks: { maxRotation: 35, font: { size: 10 } } },
+      },
+    },
+  });
+};
+
+const onPivotChanged = (table: any) => {
+  rebuildChart(table);
+};
+
+// Kalau user pindah ke tab Chart SETELAH pivot sudah pernah disusun
+// (canvas baru muncul di DOM saat itu), render ulang dari data terakhir
+watch(activeTab, async (tab) => {
+  if (tab === "chart" && lastPivotTable) {
+    await rebuildChart(lastPivotTable);
+  }
+});
+watch(chartType, () => {
+  if (lastPivotTable) rebuildChart(lastPivotTable);
+});
+
+onBeforeUnmount(() => {
+  if (chartInstance) chartInstance.destroy();
+});
 
 // ── Navigasi ke Ubah Mutasi Produksi — dibuka TAB BARU supaya
 // laporan yang sedang difilter (gabungan 4 sumber, bisa lama) tidak
@@ -389,12 +660,11 @@ const rowPropsFn = (data: any) => {
         <div class="spk-picker">
           <input
             type="text"
-            :value="nomorSpk"
-            readonly
+            v-model="nomorSpk"
             class="text-inp"
-            style="width: 130px; cursor: pointer"
-            placeholder="Klik untuk pilih..."
-            @click="showSpkModal = true"
+            style="width: 130px"
+            placeholder="Ketik / pilih..."
+            @keydown.enter="onNomorSpkEnter"
           />
           <button
             type="button"
@@ -493,8 +763,15 @@ const rowPropsFn = (data: any) => {
           :items="items"
           :is-loading="isLoading"
           item-value="NomorMutasi"
-          summary-key="Jumlah"
-          summary-label="Total Jumlah"
+          :summary-columns="[
+            'JumlahSpk',
+            'Terpakai',
+            'Babaran',
+            'Jumlah',
+            'BsLini',
+            'BsKainSablon',
+            'BsKain',
+          ]"
           :row-props-fn="rowPropsFn"
           @row-click="onRowClick"
         >
@@ -558,15 +835,68 @@ const rowPropsFn = (data: any) => {
         <div v-if="!items.length && !isLoading" class="empty-hint">
           Tampilkan data terlebih dahulu.
         </div>
-        <div ref="pivotEl" class="pivot-container" />
+        <template v-else>
+          <div class="pivot-export-bar">
+            <span class="pivot-hint-txt">
+              Field "Jenis" berisi Jumlah/Terpakai/Babaran/BS Lini/BS Kain
+              Sablon/BS Kain — susun sebagai baris/kolom untuk bandingkan antar
+              ukuran.
+            </span>
+            <v-btn
+              size="small"
+              color="green"
+              variant="tonal"
+              @click="onExportPivot"
+            >
+              <template #prepend
+                ><IconFileSpreadsheet :size="14" :stroke-width="1.7"
+              /></template>
+              Export Pivot Ini
+            </v-btn>
+          </div>
+          <PivotWithFilter
+            ref="pivotWithFilterRef"
+            :data="itemsWithBulan"
+            :filterable-columns="[
+              'DivisiNama',
+              'Kelompok',
+              'GudangAsal',
+              'GudangTujuan',
+              'Cab',
+              'Bulan',
+              'Komponen',
+              'NamaSpk',
+            ]"
+            :default-rows="['NamaSpk', 'Komponen']"
+            :default-cols="['GudangAsal']"
+            :default-vals="[{ field: 'Jumlah', agg: 'sum' }]"
+            @pivot-changed="onPivotChanged"
+          />
+        </template>
       </div>
 
-      <!-- ── Grafik ── -->
+      <!-- ── Grafik  ── -->
       <div v-show="activeTab === 'chart'" class="tab-content chart-wrap">
         <div v-if="!items.length && !isLoading" class="empty-hint">
           Tampilkan data terlebih dahulu.
         </div>
-        <div ref="chartEl" class="chart-container" />
+        <div v-else-if="!lastPivotTable" class="empty-hint">
+          Susun pivot dulu di tab Pivot — grafik akan mengikuti otomatis.
+        </div>
+        <template v-else>
+          <div class="chart-header">
+            <span class="chart-title"
+              >Grafik mengikuti susunan Pivot saat ini</span
+            >
+            <select v-model="chartType" class="chart-type-select">
+              <option value="bar">Bar</option>
+              <option value="line">Line</option>
+            </select>
+          </div>
+          <div class="chart-canvas-wrap">
+            <canvas ref="chartCanvasRef" />
+          </div>
+        </template>
       </div>
     </div>
 
@@ -692,20 +1022,52 @@ const rowPropsFn = (data: any) => {
 .tab-content {
   flex: 1;
   min-height: 0;
-  overflow: auto;
+  overflow: hidden;
 }
-.pivot-wrap,
 .chart-wrap {
-  padding: 12px;
-  background: white;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
-.pivot-container,
-.chart-container {
-  overflow: auto;
+.pivot-export-bar {
+  padding: 6px 12px;
+  background: #f5f7fa;
+  border-bottom: 1px solid #e0e0e0;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
-.pivot-container :deep(.pvtUi),
-.chart-container :deep(.pvtUi) {
+.pivot-hint-txt {
+  font-size: 10.5px;
+  color: #757575;
+}
+.chart-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  flex-shrink: 0;
+}
+.chart-title {
   font-size: 12px;
+  font-weight: 700;
+  color: #424242;
+}
+.chart-type-select {
+  height: 28px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 0 8px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.chart-canvas-wrap {
+  flex: 1;
+  min-height: 350px;
+  position: relative;
+  padding: 12px;
 }
 .empty-hint {
   padding: 32px;

@@ -5,6 +5,9 @@ import TinyPivotOnly from "@/components/TinyPivotOnly.vue";
 const props = defineProps<{
   data: Record<string, unknown>[];
   filterableColumns: string[]; // kolom mana saja yang dikasih filter, mis. ["Divisi","Sales","Customer","Bulan"]
+  defaultRows?: string[];
+  defaultCols?: string[];
+  defaultVals?: { field: string; agg: string }[];
 }>();
 
 // ── State filter: { [kolom]: Set<value yang DICENTANG> } ──
@@ -90,13 +93,23 @@ const filteredData = computed(() => {
 
 const pivotRef = ref<InstanceType<typeof TinyPivotOnly> | null>(null);
 
+const emit = defineEmits<{
+  (e: "pivot-changed", table: any): void;
+}>();
+
+const onPivotChanged = (table: any) => {
+  emit("pivot-changed", table);
+};
+
 const exportPivotToExcel = async () => {
   const table = pivotRef.value?.getExportTable?.();
   if (!table || !table.bodyRows.length) return null;
-  return table; // dikembalikan ke parent, biar parent yang urus ExcelJS + nama file
+  return table;
 };
 
-defineExpose({ exportPivotToExcel });
+const getRowFieldCount = (): number => pivotRef.value?.rowFields?.length ?? 0;
+
+defineExpose({ exportPivotToExcel, getRowFieldCount });
 </script>
 
 <template>
@@ -160,7 +173,14 @@ defineExpose({ exportPivotToExcel });
 
     <!-- ── Pivot ── -->
     <div class="pivot-body">
-      <TinyPivotOnly ref="pivotRef" :data="filteredData" />
+      <TinyPivotOnly
+        ref="pivotRef"
+        :data="filteredData"
+        :default-rows="defaultRows"
+        :default-cols="defaultCols"
+        :default-vals="defaultVals"
+        @pivot-changed="onPivotChanged"
+      />
     </div>
   </div>
 </template>

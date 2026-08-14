@@ -527,11 +527,13 @@ const addSpkToGrid = async (spkNomor: string) => {
   if (!spkNomor) return;
   isLoadingSpk.value = true;
   try {
-    const piutangRes = await svc.cekPiutang(spkNomor, fd.value.KodeCus);
+    const piutangRes = await svc.cekPiutang(
+      spkNomor,
+      fd.value.KodeCus,
+      fd.value.InvPro,
+    );
     const piutang = piutangRes.data.data;
-
     if (!piutang.lunas && !piutang.korporasi) {
-      // Buka panel otorisasi — sesuai Delphi
       otorisasiSpkPending.value = spkNomor;
       const kodeRes = await svc.getKodeOtorisasi();
       otorisasiKode.value = kodeRes.data.data.kode;
@@ -540,7 +542,6 @@ const addSpkToGrid = async (spkNomor: string) => {
       isLoadingSpk.value = false;
       return;
     }
-
     await loadSpkDetail(spkNomor);
   } catch (e: any) {
     toast.error(e.response?.data?.message || "SO tidak ditemukan.");
@@ -644,7 +645,11 @@ const selectJadwal = async (item: any) => {
   isLoadingSpk.value = true;
   try {
     // Cek piutang dulu — sama seperti jalur F1
-    const piutangRes = await svc.cekPiutang(item.SPK, fd.value.KodeCus);
+    const piutangRes = await svc.cekPiutang(
+      item.SPK,
+      fd.value.KodeCus,
+      fd.value.InvPro,
+    );
     const piutang = piutangRes.data.data;
 
     if (!piutang.lunas && !piutang.korporasi) {

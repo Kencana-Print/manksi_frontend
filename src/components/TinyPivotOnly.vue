@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch } from "vue";
+import { ref, computed, watch, nextTick } from "vue";
 import { PivotSkeleton, usePivotTable } from "@smallwebco/tinypivot-vue";
 import PivotConfig from "./PivotConfig.vue";
 import "@smallwebco/tinypivot-vue/style.css";
@@ -9,8 +9,17 @@ const props = withDefaults(
     data: Record<string, unknown>[];
     theme?: "light" | "dark";
     fontSize?: "xs" | "sm" | "base";
+    defaultRows?: string[];
+    defaultCols?: string[];
+    defaultVals?: { field: string; agg: string }[];
   }>(),
-  { theme: "light", fontSize: "sm" },
+  {
+    theme: "light",
+    fontSize: "sm",
+    defaultRows: () => [],
+    defaultCols: () => [],
+    defaultVals: () => [],
+  },
 );
 
 const enableDrillDown = ref(true);
@@ -45,6 +54,20 @@ const filteredRowCount = computed(() => props.data.length);
 let defaultConfigApplied = false;
 const applyDefaultConfig = () => {
   const names = availableFields.value.map((f) => f.field);
+
+  if (
+    props.defaultRows.length ||
+    props.defaultCols.length ||
+    props.defaultVals.length
+  ) {
+    for (const f of props.defaultRows) if (names.includes(f)) addRowField(f);
+    for (const f of props.defaultCols) if (names.includes(f)) addColumnField(f);
+    for (const v of props.defaultVals)
+      if (names.includes(v.field)) addValueField(v.field, v.agg);
+    return;
+  }
+
+  // Fallback lama (dipakai laporan lain yang belum di-set default-nya)
   if (names.includes("AccountName")) addRowField("AccountName");
   for (const col of ["Tahun", "Bulan", "Jenis"]) {
     if (names.includes(col)) addColumnField(col);
@@ -133,7 +156,25 @@ const getExportTable = (): ExportTable | null => {
   return { headerRows, bodyRows };
 };
 
-defineExpose({ getExportTable });
+const emit = defineEmits<{
+  (e: "pivot-changed", table: ExportTable | null): void;
+}>();
+
+// ── Reaktif: setiap kali konfigurasi pivot berubah (rows/cols/values
+// disusun ulang user), pivotResult (dari library) ikut berubah.
+// Kita TIDAK baca isi pivotResult (shape internal-nya tidak kita
+// ketahui) — cukup pakai sebagai sinyal "sudah waktunya scrape ulang
+// tabel HTML", setelah DOM benar-benar selesai di-render ulang. ──
+watch(
+  pivotResult,
+  async () => {
+    await nextTick();
+    emit("pivot-changed", getExportTable());
+  },
+  { deep: true },
+);
+
+defineExpose({ getExportTable, rowFields, columnFields, valueFields });
 </script>
 
 <template>
@@ -205,7 +246,11 @@ defineExpose({ getExportTable });
 }
 .vpg-pivot-config-panel {
   height: 100%;
+  min-height: 0;
+  overflow: hidden;
   flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
 }
 .vpg-pivot-main {
   flex: 1;

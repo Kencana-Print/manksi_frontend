@@ -31,6 +31,8 @@ const props = withDefaults(
     itemsPerPage?: number;
     summaryKey?: string;
     summaryLabel?: string;
+    summaryColumns?: string[];
+    summaryFormatters?: Record<string, (filteredItems: any[]) => string>;
     // Kalau false, sembunyikan search bar
     showSearch?: boolean;
   }>(),
@@ -244,6 +246,25 @@ const summaryTotal = computed(() => {
 const summaryFormatted = computed(() =>
   new Intl.NumberFormat("id-ID").format(summaryTotal.value),
 );
+
+const summaryTotalsMap = computed(() => {
+  const map: Record<string, number> = {};
+  if (!props.summaryColumns) return map;
+  for (const key of props.summaryColumns) {
+    map[key] = filteredItems.value.reduce(
+      (acc, item) => acc + (Number(item[key]) || 0),
+      0,
+    );
+  }
+  return map;
+});
+
+const finalHeadersForColgroup = computed(() => {
+  if (!props.showExpand) return props.headers;
+  return [{ key: "data-table-expand", width: "48px" }, ...props.headers];
+});
+
+const fmtSummaryVal = (v: number) => new Intl.NumberFormat("id-ID").format(v);
 
 // ── Pagination ──
 const currentPage = ref(1);
@@ -509,6 +530,29 @@ defineExpose({ search, currentPage });
                 <div class="bt-expanded-inner">
                   <slot name="detail" :item="item.raw || item" />
                 </div>
+              </td>
+            </tr>
+          </template>
+
+          <template v-if="summaryColumns && summaryColumns.length" #body.append>
+            <tr class="bt-summary-inline-row">
+              <td
+                v-if="showExpand"
+                class="bt-summary-td-inline"
+                style="width: 48px; min-width: 48px"
+              />
+              <td
+                v-for="col in headers"
+                :key="'sum-' + col.key"
+                :style="colStyle(col)"
+                class="bt-summary-td-inline text-start"
+              >
+                <template v-if="summaryFormatters?.[col.key]">
+                  {{ summaryFormatters[col.key](filteredItems) }}
+                </template>
+                <template v-else-if="summaryColumns.includes(col.key)">
+                  {{ fmtSummaryVal(summaryTotalsMap[col.key] ?? 0) }}
+                </template>
               </td>
             </tr>
           </template>
@@ -897,6 +941,32 @@ defineExpose({ search, currentPage });
   font-weight: 700;
   color: white;
   font-family: monospace;
+}
+
+.bt-summary-inline-row {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+}
+.bt-summary-td-inline {
+  position: sticky;
+  bottom: 0;
+  background: #1565c0 !important;
+  color: white !important;
+  font-weight: 700;
+  font-family: monospace;
+  font-size: 12px;
+  height: 30px !important;
+  box-sizing: border-box !important;
+  border-top: 2px solid #0d47a1;
+  white-space: nowrap;
+  padding: 0 8px !important;
+}
+
+.bt-th,
+.bt-table :deep(tbody td),
+.bt-summary-td-inline {
+  box-sizing: border-box !important;
 }
 
 /* ── Pagination ── */

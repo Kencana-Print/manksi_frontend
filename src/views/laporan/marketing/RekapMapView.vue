@@ -127,10 +127,10 @@ const headersRekap = [
   { title: "Perusahaan", key: "Perush", width: "100px", align: "center" },
   { title: "Jml MAP", key: "JmlMAP", width: "80px", align: "center" },
   { title: "Divisi", key: "Divisi", width: "90px" },
-  { title: "Qty", key: "Qty", width: "110px", align: "right" },
-  { title: "Nominal", key: "Nominal", width: "140px", align: "right" },
-  { title: "Realisasi", key: "Realisasi", width: "140px", align: "right" },
-  { title: "%", key: "Presentase", width: "70px", align: "right" },
+  { title: "Qty", key: "Qty", width: "110px", align: "start" },
+  { title: "Nominal", key: "Nominal", width: "140px", align: "start" },
+  { title: "Realisasi", key: "Realisasi", width: "140px", align: "start" },
+  { title: "%", key: "Presentase", width: "70px", align: "start" },
 ];
 
 const headersDetail = [
@@ -141,13 +141,13 @@ const headersDetail = [
   { title: "Customer", key: "Customer", minWidth: "180px" },
   { title: "Tipe", key: "Tipe", width: "80px" },
   { title: "Nama", key: "Nama", minWidth: "200px" },
-  { title: "Qty", key: "Qty", width: "80px", align: "right" },
-  { title: "Panjang", key: "Panjang", width: "80px", align: "right" },
-  { title: "Lebar", key: "Lebar", width: "80px", align: "right" },
-  { title: "Jml", key: "Jml", width: "100px", align: "right" },
-  { title: "Harga", key: "Harga", width: "110px", align: "right" },
-  { title: "Nilai", key: "Nilai", width: "130px", align: "right" },
-  { title: "Realisasi", key: "Realisasi", width: "130px", align: "right" },
+  { title: "Qty", key: "Qty", width: "80px", align: "start" },
+  { title: "Panjang", key: "Panjang", width: "80px", align: "start" },
+  { title: "Lebar", key: "Lebar", width: "80px", align: "start" },
+  { title: "Jml", key: "Jml", width: "100px", align: "start" },
+  { title: "Harga", key: "Harga", width: "110px", align: "start" },
+  { title: "Nilai", key: "Nilai", width: "130px", align: "start" },
+  { title: "Realisasi", key: "Realisasi", width: "130px", align: "start" },
   { title: "Note", key: "Note", width: "160px" },
 ];
 
@@ -498,8 +498,17 @@ const onExport = async () => {
           :is-loading="isLoading"
           item-value="Sales"
           :row-props-fn="rowPropsRekap"
-          summary-key="Nominal"
-          summary-label="Total Nominal"
+          :summary-columns="['JmlMAP', 'Qty', 'Nominal', 'Realisasi']"
+          :summary-formatters="{
+            Presentase: (rows: any[]) => {
+              const nom = rows.reduce((s, r) => s + Number(r.Nominal || 0), 0);
+              const rel = rows.reduce(
+                (s, r) => s + Number(r.Realisasi || 0),
+                0,
+              );
+              return nom > 0 ? ((rel / nom) * 100).toFixed(2) + '%' : '0.00%';
+            },
+          }"
         >
           <template #item.Tanggal="{ item }">
             {{ item.Tanggal?.replace(/-/g, "/") }}
@@ -538,62 +547,11 @@ const onExport = async () => {
               {{ Number(item.Presentase || 0).toFixed(2) }}%
             </span>
           </template>
-
-          <template #summary-row="{ filteredItems }">
-            <div class="multi-summary-bar">
-              <span class="ms-item">
-                <span class="ms-lbl">Nominal</span>
-                <span class="ms-val">
-                  {{
-                    fmtNum(
-                      filteredItems.reduce(
-                        (s: number, r: any) => s + Number(r.Nominal || 0),
-                        0,
-                      ),
-                    )
-                  }}
-                </span>
-              </span>
-              <span class="ms-sep">|</span>
-              <span class="ms-item">
-                <span class="ms-lbl">Realisasi</span>
-                <span class="ms-val ms-green">
-                  {{
-                    fmtNum(
-                      filteredItems.reduce(
-                        (s: number, r: any) => s + Number(r.Realisasi || 0),
-                        0,
-                      ),
-                    )
-                  }}
-                </span>
-              </span>
-              <span class="ms-sep">|</span>
-              <span class="ms-item">
-                <span class="ms-lbl">% Real.</span>
-                <span class="ms-val ms-orange">
-                  {{
-                    (() => {
-                      const nom = filteredItems.reduce(
-                        (s: number, r: any) => s + Number(r.Nominal || 0),
-                        0,
-                      );
-                      const rel = filteredItems.reduce(
-                        (s: number, r: any) => s + Number(r.Realisasi || 0),
-                        0,
-                      );
-                      return nom > 0
-                        ? ((rel / nom) * 100).toFixed(2) + "%"
-                        : "0%";
-                    })()
-                  }}
-                </span>
-              </span>
-            </div>
-          </template>
+          <!-- Hapus seluruh blok #summary-row -->
         </BaseTable>
       </div>
 
+      <!-- ── Tab Detail (Spanduk / Garmen / MMT) ── -->
       <!-- ── Tab Detail (Spanduk / Garmen / MMT) ── -->
       <template
         v-for="tabKey in ['spanduk', 'garmen', 'mmt'] as const"
@@ -613,8 +571,22 @@ const onExport = async () => {
               :is-loading="isLoading"
               item-value="Nomor"
               :row-props-fn="rowPropsDetail"
-              summary-key="Nilai"
-              summary-label="Total Nilai"
+              :summary-columns="['Qty', 'Jml', 'Nilai', 'Realisasi']"
+              :summary-formatters="{
+                Ach: (rows) => {
+                  const nilai = rows.reduce(
+                    (s, r) => s + Number(r.Nilai || 0),
+                    0,
+                  );
+                  const real = rows.reduce(
+                    (s, r) => s + Number(r.Realisasi || 0),
+                    0,
+                  );
+                  return nilai > 0
+                    ? ((real / nilai) * 100).toFixed(2) + '%'
+                    : '0.00%';
+                },
+              }"
             >
               <template #item.Tanggal="{ item }">
                 {{ item.Tanggal?.replace(/-/g, "/") }}
@@ -658,6 +630,32 @@ const onExport = async () => {
                   {{ item.Realisasi ? fmtNum(item.Realisasi) : "-" }}
                 </span>
               </template>
+              <template #item.Ach="{ item }">
+                <span
+                  v-if="Number(item.Nilai || 0) > 0"
+                  style="font-weight: 700"
+                  :style="{
+                    color:
+                      (Number(item.Realisasi || 0) / Number(item.Nilai)) *
+                        100 >=
+                      100
+                        ? '#2e7d32'
+                        : (Number(item.Realisasi || 0) / Number(item.Nilai)) *
+                              100 >=
+                            50
+                          ? '#f57f17'
+                          : '#c62828',
+                  }"
+                >
+                  {{
+                    (
+                      (Number(item.Realisasi || 0) / Number(item.Nilai)) *
+                      100
+                    ).toFixed(2)
+                  }}%
+                </span>
+                <span v-else class="muted">-</span>
+              </template>
 
               <!-- Note — inline editable -->
               <template #item.Note="{ item }">
@@ -679,52 +677,6 @@ const onExport = async () => {
                   </button>
                 </div>
                 <span v-else class="note-text">{{ item.Note || "-" }}</span>
-              </template>
-
-              <template #summary-row="{ filteredItems }">
-                <div class="multi-summary-bar">
-                  <span class="ms-item">
-                    <span class="ms-lbl">Nilai</span>
-                    <span class="ms-val">
-                      {{
-                        fmtNum(
-                          filteredItems.reduce(
-                            (s: number, r: any) => s + Number(r.Nilai || 0),
-                            0,
-                          ),
-                        )
-                      }}
-                    </span>
-                  </span>
-                  <span class="ms-sep">|</span>
-                  <span class="ms-item">
-                    <span class="ms-lbl">Realisasi</span>
-                    <span class="ms-val ms-green">
-                      {{
-                        fmtNum(
-                          filteredItems.reduce(
-                            (s: number, r: any) => s + Number(r.Realisasi || 0),
-                            0,
-                          ),
-                        )
-                      }}
-                    </span>
-                  </span>
-                  <span class="ms-sep">|</span>
-                  <span class="ms-item">
-                    <span class="ms-lbl">Jml</span>
-                    <span class="ms-val ms-teal">
-                      {{
-                        Number(
-                          filteredItems.reduce(
-                            (s: number, r: any) => s + Number(r.Jml || 0),
-                            0,
-                          ),
-                        ).toFixed(2)
-                      }}
-                    </span>
-                  </span>
-                </div>
               </template>
             </BaseTable>
           </div>

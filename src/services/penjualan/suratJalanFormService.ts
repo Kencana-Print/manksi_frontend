@@ -63,8 +63,8 @@ export const sjFormService = {
       params: { cusKode, perushKode, divisi, invPro, q },
     }),
 
-  cekPiutang: (spkNomor: string, cusKode: string) =>
-    api.get(`${BASE}/cek-piutang`, { params: { spkNomor, cusKode } }),
+  cekPiutang: (spkNomor: string, cusKode: string, invPro = "") =>
+    api.get(`${BASE}/cek-piutang`, { params: { spkNomor, cusKode, invPro } }),
 
   getAlokasiHistory: (cusKode: string) =>
     api.get(`${BASE}/alokasi-history`, { params: { cusKode } }),
