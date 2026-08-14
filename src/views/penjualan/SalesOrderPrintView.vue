@@ -44,6 +44,25 @@ const totalAlokasi = computed(() => {
 
 const hasAlokasi = computed(() => (data.value.alokasiList || []).length > 0);
 
+// --- TAMBAHAN UNTUK ALOKASI INLINE ---
+const MAX_ALOKASI_INLINE = 15; // Batas aman baris agar tidak menabrak TTD di bawah
+
+// Cek apakah alokasi muat ditaruh di bawah Ket. Produksi (Khusus Garmen)
+const isAlokasiInline = computed(() => {
+  if (!isGarmen.value || !withAlokasi.value) return false;
+  const len = data.value.alokasiList?.length || 0;
+  return len > 0 && len <= MAX_ALOKASI_INLINE;
+});
+
+// Cek apakah butuh merender alokasi di halaman ke-2
+const needsAlokasiPage2 = computed(() => {
+  if (!withAlokasi.value || !hasAlokasi.value) return false;
+  // Jika sudah dirender inline di halaman 1, sembunyikan halaman 2
+  if (isAlokasiInline.value) return false;
+  return true;
+});
+// -------------------------------------
+
 const alokasiChunks = computed(() => {
   const list = data.value.alokasiList || [];
   const chunkSize = 24;
@@ -472,6 +491,68 @@ onMounted(async () => {
                 <div class="ket-title">Ket. Produksi :</div>
                 <pre class="ket-produksi">{{ keteranganProduksiLengkap }}</pre>
               </div>
+
+              <!-- ── TAMBAHAN: ALOKASI INLINE (Jika muat) ── -->
+              <div v-if="isAlokasiInline" class="mt-4">
+                <div
+                  class="ket-title"
+                  style="border: none; text-decoration: underline"
+                >
+                  Alokasi Pengiriman :
+                </div>
+                <table class="alokasi-table mt-1">
+                  <thead>
+                    <tr>
+                      <th
+                        class="text-left pl-2"
+                        style="padding: 2px 4px; font-size: 7.5pt"
+                      >
+                        Alokasi
+                      </th>
+                      <th
+                        width="60"
+                        class="text-center"
+                        style="padding: 2px 4px; font-size: 7.5pt"
+                      >
+                        Jumlah
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="alo in data.alokasiList" :key="alo.urut">
+                      <td
+                        class="pl-2"
+                        style="padding: 2px 4px; font-size: 7.5pt"
+                      >
+                        {{ alo.kota || alo.alamat }}
+                      </td>
+                      <td
+                        class="text-center"
+                        style="padding: 2px 4px; font-size: 7.5pt"
+                      >
+                        {{ Number(alo.jumlah).toLocaleString("id-ID") }}
+                      </td>
+                    </tr>
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <td
+                        class="fw text-left pl-2"
+                        style="padding: 2px 4px; font-size: 7.5pt"
+                      >
+                        Total
+                      </td>
+                      <td
+                        class="fw text-center"
+                        style="padding: 2px 4px; font-size: 7.5pt"
+                      >
+                        {{ totalAlokasi.toLocaleString("id-ID") }}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+              <!-- ────────────────────────────────────────── -->
             </div>
           </div>
 
@@ -798,9 +879,8 @@ onMounted(async () => {
         </div>
       </template>
 
-      <!-- ══ ALOKASI PANEL ══ -->
-      <!-- ══ ALOKASI PANEL ══ -->
-      <div v-if="withAlokasi" class="print-half alokasi-panel">
+      <!-- ══ ALOKASI PANEL (Halaman 2 / Overflow) ══ -->
+      <div v-if="needsAlokasiPage2" class="print-half alokasi-panel">
         <h2
           class="title mb-2"
           style="text-decoration: underline; font-size: 13pt; font-weight: bold"

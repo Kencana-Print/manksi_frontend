@@ -97,11 +97,6 @@ const onRowClick = (item: any) => {
 const getRowProps = () => ({});
 
 const fmtNum = (val: number) => new Intl.NumberFormat("id-ID").format(val || 0);
-
-// Hitung total untuk Summary Row
-const getTotal = (key: string, filteredItems: any[]) => {
-  return filteredItems.reduce((sum, item) => sum + (Number(item[key]) || 0), 0);
-};
 </script>
 
 <template>
@@ -119,6 +114,7 @@ const getTotal = (key: string, filteredItems: any[]) => {
     @update:expanded="handleExpanded"
     :can-export="canExport"
     :row-props-fn="getRowProps"
+    :summary-columns="['Dpp', 'PPn', 'Total', 'NominalBayar', 'SisaPiutang']"
     @row-click="onRowClick"
     @refresh="fetchData"
     @export="exportToExcel('Laporan_Detail_Piutang')"
@@ -135,11 +131,9 @@ const getTotal = (key: string, filteredItems: any[]) => {
         <div class="f-divider" />
       </div>
     </template>
-
     <template #item.Tanggal="{ item }">
       {{ item.Tanggal?.replace(/-/g, "/") }}
     </template>
-
     <template #item.TglBayar="{ item }">
       {{ item.TglBayar ? item.TglBayar.replace(/-/g, "/") : "-" }}
     </template>
@@ -159,46 +153,6 @@ const getTotal = (key: string, filteredItems: any[]) => {
       <span class="font-weight-bold text-error">{{
         fmtNum(item.SisaPiutang)
       }}</span>
-    </template>
-
-    <template #summary-row="{ filteredItems }">
-      <div class="d-flex align-center gap-4 w-100 pr-2">
-        <span class="summary-lbl ml-auto">TOTAL KESELURUHAN:</span>
-
-        <div class="d-flex flex-column align-end mx-2">
-          <span class="summary-sublbl">DPP</span>
-          <span class="summary-val">{{
-            fmtNum(getTotal("Dpp", filteredItems))
-          }}</span>
-        </div>
-        <div class="d-flex flex-column align-end mx-2">
-          <span class="summary-sublbl">PPN</span>
-          <span class="summary-val">{{
-            fmtNum(getTotal("PPn", filteredItems))
-          }}</span>
-        </div>
-        <div class="d-flex flex-column align-end mx-2">
-          <span class="summary-sublbl">TOTAL</span>
-          <span class="summary-val text-yellow-accent-2">{{
-            fmtNum(getTotal("Total", filteredItems))
-          }}</span>
-        </div>
-        <div class="d-flex flex-column align-end mx-2">
-          <span class="summary-sublbl">BAYAR</span>
-          <span class="summary-val text-green-accent-2">{{
-            fmtNum(getTotal("NominalBayar", filteredItems))
-          }}</span>
-        </div>
-        <div
-          class="d-flex flex-column align-end pl-2"
-          style="border-left: 1px solid rgba(255, 255, 255, 0.3)"
-        >
-          <span class="summary-sublbl">SISA PIUTANG</span>
-          <span class="summary-val text-red-accent-1" style="font-size: 14px">{{
-            fmtNum(getTotal("SisaPiutang", filteredItems))
-          }}</span>
-        </div>
-      </div>
     </template>
 
     <template #detail="{ item }">
@@ -256,9 +210,6 @@ const getTotal = (key: string, filteredItems: any[]) => {
 .gap-2 {
   gap: 8px;
 }
-.gap-4 {
-  gap: 16px;
-}
 .f-label {
   font-size: 11px;
   font-weight: 700;
@@ -282,25 +233,6 @@ const getTotal = (key: string, filteredItems: any[]) => {
   height: 20px;
   background: #ddd;
   margin: 0 10px;
-}
-
-/* ── Summary Row Styles ── */
-.summary-lbl {
-  font-size: 11px;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.7);
-}
-.summary-sublbl {
-  font-size: 9px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.6);
-  margin-bottom: -2px;
-}
-.summary-val {
-  font-size: 12px;
-  font-weight: 700;
-  color: white;
-  letter-spacing: 0.02em;
 }
 
 /* ── Detail Wrapper ── */

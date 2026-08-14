@@ -98,7 +98,7 @@ const getRowProps = () => ({});
 
 // PEMBULATAN KE ATAS: menggunakan Math.ceil() sebelum di-format
 const fmtNum = (val: number) =>
-  new Intl.NumberFormat("id-ID").format(Math.ceil(val || 0));
+  new Intl.NumberFormat("id-ID").format(Math.round(val || 0));
 
 const getTotal = (key: string, filteredItems: any[]) => {
   return filteredItems.reduce((sum, item) => sum + (Number(item[key]) || 0), 0);
@@ -110,6 +110,17 @@ const numericKeys = computed(() => [
   ...visibleMonths.value,
   "GrandTotal",
 ]);
+
+const summaryFormatters = computed(() => {
+  const result: Record<string, (rows: any[]) => string> = {};
+  for (const key of numericKeys.value) {
+    result[key] = (rows: any[]) => {
+      const total = rows.reduce((s, r) => s + (Number(r[key]) || 0), 0);
+      return fmtNum(total);
+    };
+  }
+  return result;
+});
 </script>
 
 <template>
@@ -124,6 +135,8 @@ const numericKeys = computed(() => [
     v-model:filterState="filterState"
     :can-export="canExport"
     :row-props-fn="getRowProps"
+    :summary-columns="numericKeys"
+    :summary-formatters="summaryFormatters"
     @refresh="fetchData"
     @export="exportToExcel('Laporan_Rekap_Piutang')"
   >
@@ -172,43 +185,6 @@ const numericKeys = computed(() => [
       <span :class="k === 'GrandTotal' ? 'font-weight-bold text-primary' : ''">
         {{ fmtNum(item[k]) }}
       </span>
-    </template>
-
-    <template #summary-row="{ filteredItems }">
-      <div class="d-flex align-center gap-2 w-100 pr-2 summary-container">
-        <span class="summary-lbl ml-auto pr-3">TOTAL:</span>
-
-        <div class="d-flex flex-column align-end mx-1">
-          <span class="summary-sublbl">Tahun Lalu</span>
-          <span class="summary-val">{{
-            fmtNum(getTotal("TahunLalu", filteredItems))
-          }}</span>
-        </div>
-
-        <div
-          v-for="m in visibleMonths"
-          :key="m"
-          class="d-flex flex-column align-end mx-1 pl-2"
-          style="border-left: 1px solid rgba(255, 255, 255, 0.15)"
-        >
-          <span class="summary-sublbl">{{ m.toUpperCase() }}</span>
-          <span class="summary-val">{{
-            fmtNum(getTotal(m, filteredItems))
-          }}</span>
-        </div>
-
-        <div
-          class="d-flex flex-column align-end pl-3 ml-2"
-          style="border-left: 2px solid rgba(255, 255, 255, 0.4)"
-        >
-          <span class="summary-sublbl text-yellow-accent-2">GRAND TOTAL</span>
-          <span
-            class="summary-val text-yellow-accent-2"
-            style="font-size: 14px"
-            >{{ fmtNum(getTotal("GrandTotal", filteredItems)) }}</span
-          >
-        </div>
-      </div>
     </template>
   </BaseBrowse>
 
@@ -267,28 +243,5 @@ const numericKeys = computed(() => [
   align-items: center;
   align-self: center;
   padding-top: 0;
-}
-
-/* ── Summary Row Styles ── */
-.summary-container {
-  overflow-x: auto;
-  padding-bottom: 2px;
-}
-.summary-lbl {
-  font-size: 11px;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.7);
-}
-.summary-sublbl {
-  font-size: 9px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.6);
-  margin-bottom: -2px;
-}
-.summary-val {
-  font-size: 12px;
-  font-weight: 700;
-  color: white;
-  letter-spacing: 0.02em;
 }
 </style>

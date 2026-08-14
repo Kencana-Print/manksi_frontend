@@ -264,7 +264,10 @@ const finalHeadersForColgroup = computed(() => {
   return [{ key: "data-table-expand", width: "48px" }, ...props.headers];
 });
 
-const fmtSummaryVal = (v: number) => new Intl.NumberFormat("id-ID").format(v);
+const fmtSummaryVal = (v: number) =>
+  new Intl.NumberFormat("id-ID", { maximumFractionDigits: 0 }).format(
+    Math.round(v),
+  );
 
 // ── Pagination ──
 const currentPage = ref(1);

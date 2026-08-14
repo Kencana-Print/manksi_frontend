@@ -491,8 +491,10 @@ const summaryTotalsMap = computed(() => {
   return map;
 });
 
-const fmtSummaryVal = (v: number) => new Intl.NumberFormat("id-ID").format(v);
-
+const fmtSummaryVal = (v: number) =>
+  new Intl.NumberFormat("id-ID", { maximumFractionDigits: 0 }).format(
+    Math.round(v),
+  );
 const totalItems = computed(() => filteredItems.value.length);
 const totalPages = computed(() =>
   Math.max(1, Math.ceil(totalItems.value / perPage.value)),

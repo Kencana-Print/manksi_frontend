@@ -103,7 +103,7 @@ const openBayarDialog = async (invoice: any) => {
 
 // ── UTILS ──
 const fmtNum = (val: number) =>
-  new Intl.NumberFormat("id-ID").format(Math.ceil(val || 0));
+  new Intl.NumberFormat("id-ID").format(Math.round(val || 0));
 
 // Delphi: Jika status pasif warnanya merah
 const getRowProps = (data: any) => {
@@ -131,6 +131,7 @@ const getTotal = (key: string, arr: any[]) => {
     v-model:selected="selected"
     :can-export="canExport"
     :row-props-fn="getRowProps"
+    :summary-columns="['Debet', 'Kredit', 'Saldo']"
     @refresh="fetchData"
     @export="exportToExcel('Laporan_Kartu_Piutang')"
   >
@@ -181,36 +182,6 @@ const getTotal = (key: string, arr: any[]) => {
       >
         <IconReceipt2 :size="14" class="mr-1" /> Invoice
       </v-btn>
-    </template>
-
-    <template #summary-row="{ filteredItems }">
-      <div class="d-flex align-center gap-2 w-100 pr-2 summary-container">
-        <span class="summary-lbl ml-auto pr-3">GRAND TOTAL:</span>
-        <div class="d-flex flex-column align-end mx-2">
-          <span class="summary-sublbl">DEBET</span>
-          <span class="summary-val">{{
-            fmtNum(getTotal("Debet", filteredItems))
-          }}</span>
-        </div>
-        <div class="d-flex flex-column align-end mx-2">
-          <span class="summary-sublbl">KREDIT</span>
-          <span class="summary-val">{{
-            fmtNum(getTotal("Kredit", filteredItems))
-          }}</span>
-        </div>
-        <div
-          class="d-flex flex-column align-end pl-3 ml-2"
-          style="border-left: 2px solid rgba(255, 255, 255, 0.4)"
-        >
-          <span class="summary-sublbl text-yellow-accent-2">SALDO PIUTANG</span>
-          <span
-            class="summary-val text-yellow-accent-2"
-            style="font-size: 14px"
-            >{{ fmtNum(getTotal("Saldo", filteredItems)) }}</span
-          >
-        </div>
-        <div style="width: 100px"></div>
-      </div>
     </template>
   </BaseBrowse>
 
@@ -396,29 +367,6 @@ const getTotal = (key: string, arr: any[]) => {
   height: 20px;
   background: #ddd;
   margin: 0 10px;
-}
-
-/* ── Summary Row Styles ── */
-.summary-container {
-  overflow-x: auto;
-  padding-bottom: 2px;
-}
-.summary-lbl {
-  font-size: 11px;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.7);
-}
-.summary-sublbl {
-  font-size: 9px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.6);
-  margin-bottom: -2px;
-}
-.summary-val {
-  font-size: 12px;
-  font-weight: 700;
-  color: white;
-  letter-spacing: 0.02em;
 }
 
 /* ── Modal & Nested Table ── */

@@ -90,7 +90,7 @@ const onRowClick = (item: any) => {
 };
 
 const fmtNum = (val: number) =>
-  new Intl.NumberFormat("id-ID").format(Math.ceil(val || 0));
+  new Intl.NumberFormat("id-ID").format(Math.round(val || 0));
 
 const getTotal = (key: string, filteredItems: any[]) => {
   return filteredItems.reduce((sum, item) => sum + (Number(item[key]) || 0), 0);
@@ -111,6 +111,7 @@ const getTotal = (key: string, filteredItems: any[]) => {
     :expanded="expanded"
     @update:expanded="handleExpanded"
     :can-export="canExport"
+    :summary-columns="['Debet', 'Kredit', 'Saldo']"
     @row-click="onRowClick"
     @refresh="fetchData"
     @export="exportToExcel('Laporan_Daftar_Penerimaan')"
@@ -148,34 +149,6 @@ const getTotal = (key: string, filteredItems: any[]) => {
       >
         {{ fmtNum(item.Saldo) }}
       </span>
-    </template>
-
-    <template #summary-row="{ filteredItems }">
-      <div class="d-flex align-center gap-4 w-100 pr-2">
-        <span class="summary-lbl ml-auto">TOTAL KESELURUHAN:</span>
-        <div class="d-flex flex-column align-end mx-2">
-          <span class="summary-sublbl">DEBET</span>
-          <span class="summary-val">{{
-            fmtNum(getTotal("Debet", filteredItems))
-          }}</span>
-        </div>
-        <div class="d-flex flex-column align-end mx-2">
-          <span class="summary-sublbl">KREDIT</span>
-          <span class="summary-val text-green-accent-2">{{
-            fmtNum(getTotal("Kredit", filteredItems))
-          }}</span>
-        </div>
-        <div
-          class="d-flex flex-column align-end pl-3 ml-2"
-          style="border-left: 1px solid rgba(255, 255, 255, 0.3)"
-        >
-          <span class="summary-sublbl text-yellow-accent-2">SALDO</span>
-          <span class="summary-val text-yellow-accent-2">{{
-            fmtNum(getTotal("Saldo", filteredItems))
-          }}</span>
-        </div>
-        <div style="width: 150px"></div>
-      </div>
     </template>
 
     <template #detail="{ item }">
@@ -260,9 +233,6 @@ const getTotal = (key: string, filteredItems: any[]) => {
 .gap-2 {
   gap: 8px;
 }
-.gap-4 {
-  gap: 16px;
-}
 .f-label {
   font-size: 11px;
   font-weight: 700;
@@ -290,25 +260,6 @@ const getTotal = (key: string, filteredItems: any[]) => {
   height: 20px;
   background: #ddd;
   margin: 0 10px;
-}
-
-/* ── Summary Row Styles ── */
-.summary-lbl {
-  font-size: 11px;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.7);
-}
-.summary-sublbl {
-  font-size: 9px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.6);
-  margin-bottom: -2px;
-}
-.summary-val {
-  font-size: 12px;
-  font-weight: 700;
-  color: white;
-  letter-spacing: 0.02em;
 }
 
 /* ── Detail Wrapper ── */
