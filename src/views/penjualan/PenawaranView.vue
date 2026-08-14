@@ -128,6 +128,22 @@ const rp = (v: number) =>
   }).format(v || 0);
 const num = (v: number) => new Intl.NumberFormat("id-ID").format(v || 0);
 
+// --- SUMMARY FOOTER FORMATTERS ---
+const summaryFormatters = computed<Record<string, any>>(() => {
+  if (!canLihatCus.value) return {};
+
+  return {
+    Perusahaan: () => "TOTAL :",
+    Nominal: (filteredItems: any[]) =>
+      rp(
+        filteredItems.reduce(
+          (sum, item) => sum + (Number(item.Nominal) || 0),
+          0,
+        ),
+      ),
+  };
+});
+
 const getRowProps = (data: any) => {
   const status = data.item?.raw?.StatusApproval || data.item?.StatusApproval;
   if (status === "WAIT")
@@ -365,8 +381,8 @@ const totalStatusGrid = computed(() => {
     :can-delete="canDelete && canLihatCus"
     can-export
     :row-props-fn="getRowProps"
-    :summary-key="canLihatCus ? 'Nominal' : undefined"
-    :summary-label="canLihatCus ? 'Total Nominal' : undefined"
+    :summary-columns="canLihatCus ? ['Nominal'] : []"
+    :summary-formatters="summaryFormatters"
     @refresh="fetchData"
     @add="goAdd"
     @edit="goEdit"

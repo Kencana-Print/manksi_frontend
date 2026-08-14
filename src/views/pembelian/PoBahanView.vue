@@ -445,6 +445,16 @@ const submitPin = async () => {
 
 // Formatting helpers
 const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
+
+// --- SUMMARY FOOTER FORMATTERS ---
+const summaryFormatters = {
+  // Label Total ditaruh di kolom Delivery (tepat sebelum Qty PO)
+  Comm_Delivery: () => "TOTAL :",
+  QtyPO: (items: any[]) =>
+    numFmt(items.reduce((sum, item) => sum + (Number(item.QtyPO) || 0), 0)),
+  QtyBPB: (items: any[]) =>
+    numFmt(items.reduce((sum, item) => sum + (Number(item.QtyBPB) || 0), 0)),
+};
 </script>
 
 <template>
@@ -471,6 +481,8 @@ const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
     show-expand
     :expanded="expandedRows"
     @update:expanded="onUpdateExpanded"
+    :summary-columns="['QtyPO', 'QtyBPB']"
+    :summary-formatters="summaryFormatters"
   >
     <template #filter-left>
       <div class="f-group">

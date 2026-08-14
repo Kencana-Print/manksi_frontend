@@ -419,20 +419,21 @@ const onPengajuanSubmit = async () => {
   }
 };
 
-// ── Summary: total Jumlah dan Total ───────────────────────────────────
-const summaryJumlah = computed(() =>
-  (items.value ?? []).reduce(
-    (s: number, r: any) => s + (Number(r.Jumlah) || 0),
-    0,
-  ),
-);
-const summaryTotal = computed(() =>
-  (items.value ?? []).reduce(
-    (s: number, r: any) => s + (Number(r.Total) || 0),
-    0,
-  ),
-);
+// ── Summary Footer Formatters ─────────────────────────────────────────
 const fmt = (n: number) => new Intl.NumberFormat("id-ID").format(n);
+
+const summaryFormatters = {
+  // Label "TOTAL :" ditaruh di kolom "SPK" (tepat sebelum kolom Jumlah)
+  SPK: () => "TOTAL :",
+  Jumlah: (filteredItems: any[]) =>
+    fmt(
+      filteredItems.reduce((sum, item) => sum + (Number(item.Jumlah) || 0), 0),
+    ),
+  Total: (filteredItems: any[]) =>
+    fmt(
+      filteredItems.reduce((sum, item) => sum + (Number(item.Total) || 0), 0),
+    ),
+};
 </script>
 
 <template>
@@ -459,6 +460,8 @@ const fmt = (n: number) => new Intl.NumberFormat("id-ID").format(n);
     @export="onExport"
     @update:expanded="onUpdateExpanded"
     @update:selected="selected = $event"
+    :summary-columns="['Jumlah', 'Total']"
+    :summary-formatters="summaryFormatters"
   >
     <!-- ── Filter bar ── -->
     <template #filter-left>
@@ -631,14 +634,6 @@ const fmt = (n: number) => new Intl.NumberFormat("id-ID").format(n);
 
     <template #item.created="{ item }">
       {{ formatTanggalJam((item.raw ?? item).created) }}
-    </template>
-
-    <!-- ── Summary bar ── -->
-    <template #summary-row>
-      <span class="summary-lbl">Jumlah:</span>
-      <span class="summary-val">{{ fmt(summaryJumlah) }}</span>
-      <span class="summary-lbl" style="margin-left: 24px">Total:</span>
-      <span class="summary-val">{{ fmt(summaryTotal) }}</span>
     </template>
 
     <!-- ── Expanded detail ── -->

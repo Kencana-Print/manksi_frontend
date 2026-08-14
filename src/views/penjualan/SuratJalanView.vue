@@ -29,6 +29,17 @@ const todayLocal = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
 
+// --- SUMMARY FOOTER FORMATTERS ---
+const summaryFormatters = {
+  // Teks "TOTAL :" ditaruh di sebelah kiri kolom Qty Kirim (misal pada kolom "Keterangan")
+  Keterangan: () => "TOTAL :",
+  // Menjumlahkan total keseluruhan Qty Kirim
+  QtyKirim: (items: any[]) =>
+    new Intl.NumberFormat("id-ID").format(
+      items.reduce((sum, item) => sum + (Number(item.QtyKirim) || 0), 0),
+    ),
+};
+
 // ── Filter ─────────────────────────────────────────────────
 const tglAwal = ref(todayLocal());
 const tglAkhir = ref(todayLocal());
@@ -376,6 +387,8 @@ const onExportDetail = async () => {
     @delete="onDelete"
     @refresh="fetchData"
     :row-props-fn="rowPropsFn"
+    :summary-columns="['QtyKirim']"
+    :summary-formatters="summaryFormatters"
   >
     <template #delete-warning>
       <div style="color: #e65100; font-size: 11px; margin-top: 6px">

@@ -62,34 +62,26 @@ const {
   },
 });
 
-// Summary/footer total — replikasi FooterKind:=skSum di Delphi
-// (Columns[4..10]: Depan, Belakang, Lengan, Variasi, Saku, Panjang(M), Buangan)
-const summary = computed(() => {
-  const rows = items.value ?? [];
-  return rows.reduce(
-    (acc: any, r: any) => {
-      acc.Depan += Number(r.Depan) || 0;
-      acc.Belakang += Number(r.Belakang) || 0;
-      acc.Lengan += Number(r.Lengan) || 0;
-      acc.Variasi += Number(r.Variasi) || 0;
-      acc.Saku += Number(r.Saku) || 0;
-      acc.PanjangM += Number(r.PanjangM) || 0;
-      acc.Buangan += Number(r.Buangan) || 0;
-      return acc;
-    },
-    {
-      Depan: 0,
-      Belakang: 0,
-      Lengan: 0,
-      Variasi: 0,
-      Saku: 0,
-      PanjangM: 0,
-      Buangan: 0,
-    },
-  );
-});
-
 const num = (v: any) => new Intl.NumberFormat("id-ID").format(Number(v) || 0);
+
+const summaryFormatters = {
+  // Label "TOTAL :" ditempatkan pada kolom "NamaOrder" (sebelah kiri kolom Depan)
+  NamaOrder: () => "TOTAL :",
+  Depan: (items: any[]) =>
+    num(items.reduce((sum, item) => sum + (Number(item.Depan) || 0), 0)),
+  Belakang: (items: any[]) =>
+    num(items.reduce((sum, item) => sum + (Number(item.Belakang) || 0), 0)),
+  Lengan: (items: any[]) =>
+    num(items.reduce((sum, item) => sum + (Number(item.Lengan) || 0), 0)),
+  Variasi: (items: any[]) =>
+    num(items.reduce((sum, item) => sum + (Number(item.Variasi) || 0), 0)),
+  Saku: (items: any[]) =>
+    num(items.reduce((sum, item) => sum + (Number(item.Saku) || 0), 0)),
+  PanjangM: (items: any[]) =>
+    num(items.reduce((sum, item) => sum + (Number(item.PanjangM) || 0), 0)),
+  Buangan: (items: any[]) =>
+    num(items.reduce((sum, item) => sum + (Number(item.Buangan) || 0), 0)),
+};
 
 const headers = [
   { title: "Tanggal", key: "Tanggal", width: "95px", align: "center" },
@@ -303,6 +295,16 @@ const onExportDetail = async () => {
     @export="onExport"
     @add="onAdd"
     @edit="onEdit"
+    :summary-columns="[
+      'Depan',
+      'Belakang',
+      'Lengan',
+      'Variasi',
+      'Saku',
+      'PanjangM',
+      'Buangan',
+    ]"
+    :summary-formatters="summaryFormatters"
   >
     <template #filter-left>
       <div class="f-group">
@@ -329,39 +331,6 @@ const onExportDetail = async () => {
             {{ c === "ALL" ? "SEMUA CABANG" : c }}
           </option>
         </select>
-      </div>
-    </template>
-
-    <template #filter-right>
-      <div class="summary-box">
-        <div class="summary-item">
-          <span class="summary-lbl">Depan</span>
-          <span class="summary-val">{{ num(summary.Depan) }}</span>
-        </div>
-        <div class="summary-item">
-          <span class="summary-lbl">Belakang</span>
-          <span class="summary-val">{{ num(summary.Belakang) }}</span>
-        </div>
-        <div class="summary-item">
-          <span class="summary-lbl">Lengan</span>
-          <span class="summary-val">{{ num(summary.Lengan) }}</span>
-        </div>
-        <div class="summary-item">
-          <span class="summary-lbl">Variasi</span>
-          <span class="summary-val">{{ num(summary.Variasi) }}</span>
-        </div>
-        <div class="summary-item">
-          <span class="summary-lbl">Saku</span>
-          <span class="summary-val">{{ num(summary.Saku) }}</span>
-        </div>
-        <div class="summary-item">
-          <span class="summary-lbl">Panjang(M)</span>
-          <span class="summary-val">{{ num(summary.PanjangM) }}</span>
-        </div>
-        <div class="summary-item">
-          <span class="summary-lbl">Buangan</span>
-          <span class="summary-val">{{ num(summary.Buangan) }}</span>
-        </div>
       </div>
     </template>
 
@@ -423,30 +392,5 @@ const onExportDetail = async () => {
 .f-sep {
   font-size: 11px;
   color: #555;
-}
-.summary-box {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  background: white;
-  border: 1px solid #e0e0e0;
-  border-radius: 4px;
-  padding: 4px 10px;
-}
-.summary-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  min-width: 60px;
-}
-.summary-lbl {
-  font-size: 9px;
-  color: #888;
-  text-transform: uppercase;
-}
-.summary-val {
-  font-size: 12px;
-  font-weight: 700;
-  color: #1565c0;
 }
 </style>
