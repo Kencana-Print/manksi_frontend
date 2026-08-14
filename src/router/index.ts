@@ -3938,6 +3938,17 @@ const router = createRouter({
         menuId: "1321",
       },
     },
+    {
+      path: "/tools/sistem-informasi-bahan",
+      name: "SistemInformasiBahan",
+      component: () => import("@/views/tools/SistemInformasiBahanView.vue"),
+      meta: {
+        title: "Sistem Informasi Bahan",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "1322",
+      },
+    },
 
     // ── Error Pages ───────────────────────────────────────────────────
     {

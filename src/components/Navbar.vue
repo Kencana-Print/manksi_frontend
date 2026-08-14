@@ -100,6 +100,7 @@ import {
   IconPhotoScan,
   IconPhotoSearch,
   IconMessageExclamation,
+  IconDatabaseSearch,
 } from "@tabler/icons-vue";
 
 interface NavItem {
@@ -1383,6 +1384,12 @@ const menuItems: NavItem[] = [
         to: "/tools/relationship-map",
         icon: IconHierarchy3,
         menuId: 1321,
+      },
+      {
+        title: "Sistem Informasi Bahan",
+        to: "/tools/sistem-informasi-bahan",
+        icon: IconDatabaseSearch,
+        menuId: 1322,
       },
     ],
   },
