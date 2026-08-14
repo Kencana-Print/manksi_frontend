@@ -231,6 +231,24 @@ const onExport = async () => {
     :can-export="canExport"
     item-value="Customer"
     v-model:filter-state="filters"
+    :summary-columns="['Jumlah', 'Qty', 'Nominal', 'Close', 'Batal', 'Open']"
+    :summary-formatters="{
+      PercClose: (rows) => {
+        const nom = rows.reduce((s, r) => s + Number(r.Nominal || 0), 0);
+        const cls = rows.reduce((s, r) => s + Number(r.Close || 0), 0);
+        return nom > 0 ? ((cls / nom) * 100).toFixed(2) + '%' : '0.00%';
+      },
+      PercBatal: (rows) => {
+        const nom = rows.reduce((s, r) => s + Number(r.Nominal || 0), 0);
+        const bat = rows.reduce((s, r) => s + Number(r.Batal || 0), 0);
+        return nom > 0 ? ((bat / nom) * 100).toFixed(2) + '%' : '0.00%';
+      },
+      PercOpen: (rows) => {
+        const nom = rows.reduce((s, r) => s + Number(r.Nominal || 0), 0);
+        const opn = rows.reduce((s, r) => s + Number(r.Open || 0), 0);
+        return nom > 0 ? ((opn / nom) * 100).toFixed(2) + '%' : '0.00%';
+      },
+    }"
     @refresh="fetchData"
     @export="onExport"
   >
@@ -283,33 +301,6 @@ const onExport = async () => {
       </span>
     </template>
     <template #item.PercOpen="{ item }">{{ pct(item.PercOpen) }}</template>
-
-    <!-- ── Summary row ── -->
-    <template #summary-row>
-      <div class="summary-bar">
-        <div class="s-group">
-          <span class="s-lbl">Total Nominal</span>
-          <span class="s-val s-nominal">{{ num(grandTotal.nominal) }}</span>
-        </div>
-        <div class="s-div" />
-        <div class="s-group">
-          <span class="s-lbl">Close</span>
-          <span class="s-val s-close">{{ num(grandTotal.close) }}</span>
-          <span class="s-pct">({{ pctClose }}%)</span>
-        </div>
-        <div class="s-div" />
-        <div class="s-group">
-          <span class="s-lbl">Batal</span>
-          <span class="s-val s-batal">{{ num(grandTotal.batal) }}</span>
-        </div>
-        <div class="s-div" />
-        <div class="s-group">
-          <span class="s-lbl">Open</span>
-          <span class="s-val s-open">{{ num(grandTotal.open) }}</span>
-          <span class="s-pct">({{ pctOpen }}%)</span>
-        </div>
-      </div>
-    </template>
   </BaseBrowse>
 </template>
 
@@ -341,62 +332,6 @@ const onExport = async () => {
 }
 .f-date:focus {
   border-color: #1565c0;
-}
-
-/* ── Summary bar ── */
-.summary-bar {
-  display: flex;
-  align-items: center;
-  gap: 0;
-  padding: 0 16px;
-  height: 100%;
-  flex-wrap: wrap;
-  row-gap: 4px;
-}
-.s-group {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-  padding: 0 12px;
-}
-.s-div {
-  width: 1px;
-  height: 16px;
-  background: rgba(255, 255, 255, 0.25);
-  flex-shrink: 0;
-}
-.s-lbl {
-  font-size: 10px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.7);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  white-space: nowrap;
-}
-.s-val {
-  font-size: 13px;
-  font-weight: 700;
-  color: white;
-  white-space: nowrap;
-}
-.s-pct {
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.65);
-  white-space: nowrap;
-}
-
-/* warna nilai summary */
-.s-nominal {
-  color: #ffca28;
-}
-.s-close {
-  color: #69f0ae;
-}
-.s-batal {
-  color: #ff8a80;
-}
-.s-open {
-  color: #ffffff;
 }
 
 /* ── Warna kolom tabel ── */

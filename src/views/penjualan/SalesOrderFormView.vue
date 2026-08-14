@@ -573,18 +573,14 @@ onMounted(async () => {
       formData.value.Sizes = fullSizes;
       formData.value.Komponen = resKomponen.data.data || [];
     } else {
-      // fetchData sudah dipanggil otomatis oleh useForm saat isEditMode
-      // tunggu sebentar sampai formData terisi, lalu merge
       await nextTick();
-
       const existingSizes: any[] = formData.value.Sizes || [];
-      formData.value.Sizes = fullSizes.map((row: any) => {
-        const found = existingSizes.find((e: any) => e.size === row.size);
-        return found
-          ? { ...row, qty: found.qty, lb: found.lb, pb: found.pb }
-          : row;
-      });
-
+      formData.value.Sizes = fullSizes.map((row: any) =>
+        mergeSizeRow(
+          row,
+          existingSizes.find((e: any) => e.size === row.size),
+        ),
+      );
       await fetchStandarUkuranSizes();
     }
 
@@ -640,6 +636,42 @@ const isJoBebasUkuran = computed(() => {
   return JO_BEBAS_UKURAN.includes(jo) || nama.includes("CELEMEK");
 });
 
+const DIMENSION_FIELDS = [
+  "ld",
+  "pb",
+  "pl_pendek",
+  "pl_panjang",
+  "p_bahu",
+  "l_lengan",
+  "l_manset",
+  "l_pinggang",
+  "p_celana",
+  "l_panggul",
+  "l_paha",
+  "pesak",
+  "l_lutut",
+  "l_bawah",
+];
+
+// ── Merge 1 baris size: qty selalu dari existing. Untuk field dimensi
+// (LD/PB/dst) — kalau size ini PUNYA standar master (adaStandar=true),
+// field readonly & bersumber dari master. Kalau TIDAK punya standar
+// (adaStandar=false/undefined, mis. 4XL/6XL/JO bebas ukuran), field
+// itu editable manual oleh user — WAJIB dipertahankan dari existing,
+// jangan ditimpa 0 dari master. ──
+const mergeSizeRow = (masterRow: any, existingRow: any | undefined) => {
+  if (!existingRow) return masterRow;
+  const merged = { ...masterRow, qty: existingRow.qty ?? 0 };
+  if (!masterRow.adaStandar) {
+    for (const f of DIMENSION_FIELDS) {
+      if (existingRow[f] !== undefined && existingRow[f] !== null) {
+        merged[f] = existingRow[f];
+      }
+    }
+  }
+  return merged;
+};
+
 // [BARU] penanda request terbaru — dipakai untuk buang response
 // yang "basi" kalau ada request lebih baru yang sudah jalan duluan
 let standarUkuranReqId = 0;
@@ -665,27 +697,25 @@ const fetchStandarUkuranSizes = async () => {
 
     const standarData: any[] = res.data.data || [];
 
-    // ⚠️ FIX: kombinasi JO+varian yang belum punya master standar ukuran
-    // (JO baru / belum dikonfigurasi) tidak boleh menimpa list jadi
-    // kosong — fallback ke daftar size penuh, qty existing tetap dijaga,
-    // supaya user tetap bisa input manual.
     if (standarData.length === 0) {
       await ensureFullSizesForBebasUkuran();
       return;
     }
 
-    formData.value.Sizes = standarData.map((s: any) => {
-      const existing = existingSizes.find(
-        (e: any) =>
-          String(e.size || "")
-            .trim()
-            .toUpperCase() ===
-          String(s.size || "")
-            .trim()
-            .toUpperCase(),
-      );
-      return existing ? { ...s, qty: existing.qty } : s;
-    });
+    formData.value.Sizes = standarData.map((s: any) =>
+      mergeSizeRow(
+        s,
+        existingSizes.find(
+          (e: any) =>
+            String(e.size || "")
+              .trim()
+              .toUpperCase() ===
+            String(s.size || "")
+              .trim()
+              .toUpperCase(),
+        ),
+      ),
+    );
   } catch (e) {
     console.error("Gagal load standar ukuran", e);
   }
@@ -696,12 +726,12 @@ const ensureFullSizesForBebasUkuran = async () => {
     const res = await api.get("/penjualan/sales-order/form/init-sizes");
     const fullSizes: any[] = res.data.data || [];
     const existing = formData.value.Sizes || [];
-    formData.value.Sizes = fullSizes.map((row: any) => {
-      const found = existing.find((e: any) => e.size === row.size);
-      return found
-        ? { ...row, qty: found.qty, lb: found.lb, pb: found.pb }
-        : row;
-    });
+    formData.value.Sizes = fullSizes.map((row: any) =>
+      mergeSizeRow(
+        row,
+        existing.find((e: any) => e.size === row.size),
+      ),
+    );
   } catch (e) {
     console.error("Gagal memuat daftar size penuh", e);
   }

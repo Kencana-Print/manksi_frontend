@@ -147,18 +147,18 @@ const headersRekap = [
   { title: "Perusahaan", key: "Perush", width: "100px", align: "center" },
   { title: "Divisi", key: "Divisi", width: "90px" },
   { title: "Jml Pen.", key: "JmlPenawaran", width: "80px", align: "center" },
-  { title: "Qty", key: "Qty", width: "100px", align: "right" },
-  { title: "Nominal", key: "Nominal", width: "140px", align: "right" },
-  { title: "Realisasi", key: "Realisasi", width: "140px", align: "right" },
-  { title: "%", key: "Presentase", width: "65px", align: "right" },
-  { title: "Batal", key: "Batal", width: "130px", align: "right" },
-  { title: "% Batal", key: "PresentaseBatal", width: "75px", align: "right" },
-  { title: "Confirm", key: "Confirm", width: "130px", align: "right" },
+  { title: "Qty", key: "Qty", width: "100px", align: "start" },
+  { title: "Nominal", key: "Nominal", width: "140px", align: "start" },
+  { title: "Realisasi", key: "Realisasi", width: "140px", align: "start" },
+  { title: "%", key: "Presentase", width: "65px", align: "start" },
+  { title: "Batal", key: "Batal", width: "130px", align: "start" },
+  { title: "% Batal", key: "PresentaseBatal", width: "75px", align: "start" },
+  { title: "Confirm", key: "Confirm", width: "130px", align: "start" },
   {
     title: "% Confirm",
     key: "PresentaseConfirm",
     width: "80px",
-    align: "right",
+    align: "start",
   },
 ];
 
@@ -172,9 +172,9 @@ const headersDetail = [
   { title: "Nama", key: "Nama", minWidth: "200px" },
   { title: "Ukuran", key: "Ukuran", width: "90px" },
   { title: "Bahan", key: "Bahan", width: "120px" },
-  { title: "Harga", key: "Harga", width: "110px", align: "right" },
-  { title: "Qty", key: "Qty", width: "80px", align: "right" },
-  { title: "Nilai", key: "Nilai", width: "130px", align: "right" },
+  { title: "Harga", key: "Harga", width: "110px", align: "start" },
+  { title: "Qty", key: "Qty", width: "80px", align: "start" },
+  { title: "Nilai", key: "Nilai", width: "130px", align: "start" },
   { title: "Ket.", key: "Keterangan", width: "100px", align: "center" },
   { title: "Note", key: "Note", minWidth: "160px" },
 ];
@@ -443,8 +443,34 @@ const onExport = async () => {
           :is-loading="isLoading"
           item-value="Sales"
           :row-props-fn="rowPropsRekap"
-          summary-key="Nominal"
-          summary-label="Total Nominal"
+          :summary-columns="[
+            'JmlPenawaran',
+            'Qty',
+            'Nominal',
+            'Realisasi',
+            'Batal',
+            'Confirm',
+          ]"
+          :summary-formatters="{
+            Presentase: (rows) => {
+              const nom = rows.reduce((s, r) => s + Number(r.Nominal || 0), 0);
+              const rel = rows.reduce(
+                (s, r) => s + Number(r.Realisasi || 0),
+                0,
+              );
+              return nom > 0 ? ((rel / nom) * 100).toFixed(2) + '%' : '0.00%';
+            },
+            PresentaseBatal: (rows) => {
+              const nom = rows.reduce((s, r) => s + Number(r.Nominal || 0), 0);
+              const bat = rows.reduce((s, r) => s + Number(r.Batal || 0), 0);
+              return nom > 0 ? ((bat / nom) * 100).toFixed(2) + '%' : '0.00%';
+            },
+            PresentaseConfirm: (rows) => {
+              const nom = rows.reduce((s, r) => s + Number(r.Nominal || 0), 0);
+              const cnf = rows.reduce((s, r) => s + Number(r.Confirm || 0), 0);
+              return nom > 0 ? ((cnf / nom) * 100).toFixed(2) + '%' : '0.00%';
+            },
+          }"
         >
           <template #item.Qty="{ item }">
             <span style="font-family: monospace">
@@ -512,108 +538,6 @@ const onExport = async () => {
               {{ Number(item.PresentaseConfirm || 0).toFixed(2) }}%
             </span>
           </template>
-
-          <template #summary-row="{ filteredItems }">
-            <div class="multi-summary-bar">
-              <span class="ms-item">
-                <span class="ms-lbl">Nominal</span>
-                <span class="ms-val">
-                  {{
-                    fmtNum(
-                      filteredItems.reduce(
-                        (s: number, r: any) => s + Number(r.Nominal || 0),
-                        0,
-                      ),
-                    )
-                  }}
-                </span>
-              </span>
-              <span class="ms-sep">|</span>
-              <span class="ms-item">
-                <span class="ms-lbl">Realisasi</span>
-                <span class="ms-val ms-green">
-                  {{
-                    fmtNum(
-                      filteredItems.reduce(
-                        (s: number, r: any) => s + Number(r.Realisasi || 0),
-                        0,
-                      ),
-                    )
-                  }}
-                </span>
-              </span>
-              <span class="ms-sep">|</span>
-              <span class="ms-item">
-                <span class="ms-lbl">%</span>
-                <span class="ms-val ms-green">
-                  {{
-                    (() => {
-                      const nom = filteredItems.reduce(
-                        (s: number, r: any) => s + Number(r.Nominal || 0),
-                        0,
-                      );
-                      const rel = filteredItems.reduce(
-                        (s: number, r: any) => s + Number(r.Realisasi || 0),
-                        0,
-                      );
-                      return nom > 0
-                        ? ((rel / nom) * 100).toFixed(2) + "%"
-                        : "0%";
-                    })()
-                  }}
-                </span>
-              </span>
-              <span class="ms-sep">|</span>
-              <span class="ms-item">
-                <span class="ms-lbl">Batal</span>
-                <span class="ms-val ms-red">
-                  {{
-                    fmtNum(
-                      filteredItems.reduce(
-                        (s: number, r: any) => s + Number(r.Batal || 0),
-                        0,
-                      ),
-                    )
-                  }}
-                </span>
-              </span>
-              <span class="ms-sep">|</span>
-              <span class="ms-item">
-                <span class="ms-lbl">% Batal</span>
-                <span class="ms-val ms-red">
-                  {{
-                    (() => {
-                      const nom = filteredItems.reduce(
-                        (s: number, r: any) => s + Number(r.Nominal || 0),
-                        0,
-                      );
-                      const bat = filteredItems.reduce(
-                        (s: number, r: any) => s + Number(r.Batal || 0),
-                        0,
-                      );
-                      return nom > 0
-                        ? ((bat / nom) * 100).toFixed(2) + "%"
-                        : "0%";
-                    })()
-                  }}
-                </span>
-              </span>
-              <span class="ms-sep">|</span>
-              <span class="ms-item">
-                <span class="ms-lbl">Confirm</span>
-                <span class="ms-val ms-purple">
-                  {{
-                    fmtNum(
-                      filteredItems.reduce(
-                        (s: number, r: any) => s + Number(r.Confirm || 0),
-                        0,
-                      ),
-                    )
-                  }}
-                </span>
-              </span>
-            </div>
-          </template>
         </BaseTable>
       </div>
 
@@ -636,8 +560,15 @@ const onExport = async () => {
               :is-loading="isLoading"
               item-value="Nomor"
               :row-props-fn="rowPropsDetail"
-              summary-key="Nilai"
-              summary-label="Total Nilai"
+              :summary-columns="['Qty', 'Nilai']"
+              :summary-formatters="{
+                Status: (rows) => {
+                  const close = rows.filter((r) => r.Status === 'CLOSE').length;
+                  const batal = rows.filter((r) => r.Status === 'BATAL').length;
+                  const open = rows.filter((r) => r.Status === 'OPEN').length;
+                  return `C:${close} B:${batal} O:${open}`;
+                },
+              }"
             >
               <template #item.Tanggal="{ item }">
                 {{ item.Tanggal?.replace(/-/g, "/") }}
@@ -685,68 +616,6 @@ const onExport = async () => {
                 <span class="note-text" :title="item.Note">{{
                   item.Note || "-"
                 }}</span>
-              </template>
-
-              <template #summary-row="{ filteredItems }">
-                <div class="multi-summary-bar">
-                  <span class="ms-item">
-                    <span class="ms-lbl">Total Nilai</span>
-                    <span class="ms-val">
-                      {{
-                        fmtNum(
-                          filteredItems.reduce(
-                            (s: number, r: any) => s + Number(r.Nilai || 0),
-                            0,
-                          ),
-                        )
-                      }}
-                    </span>
-                  </span>
-                  <span class="ms-sep">|</span>
-                  <span class="ms-item">
-                    <span class="ms-lbl">Total Qty</span>
-                    <span class="ms-val ms-teal">
-                      {{
-                        fmtNum(
-                          filteredItems.reduce(
-                            (s: number, r: any) => s + Number(r.Qty || 0),
-                            0,
-                          ),
-                        )
-                      }}
-                    </span>
-                  </span>
-                  <span class="ms-sep">|</span>
-                  <span class="ms-item">
-                    <span class="ms-lbl">Close</span>
-                    <span class="ms-val ms-green">
-                      {{
-                        filteredItems.filter((r: any) => r.Status === "CLOSE")
-                          .length
-                      }}
-                    </span>
-                  </span>
-                  <span class="ms-sep">|</span>
-                  <span class="ms-item">
-                    <span class="ms-lbl">Batal</span>
-                    <span class="ms-val ms-red">
-                      {{
-                        filteredItems.filter((r: any) => r.Status === "BATAL")
-                          .length
-                      }}
-                    </span>
-                  </span>
-                  <span class="ms-sep">|</span>
-                  <span class="ms-item">
-                    <span class="ms-lbl">Open</span>
-                    <span class="ms-val ms-orange">
-                      {{
-                        filteredItems.filter((r: any) => r.Status === "OPEN")
-                          .length
-                      }}
-                    </span>
-                  </span>
-                </div>
               </template>
             </BaseTable>
           </div>
@@ -976,52 +845,5 @@ const onExport = async () => {
   text-overflow: ellipsis;
   white-space: nowrap;
   display: block;
-}
-
-/* ── Multi summary bar ── */
-.multi-summary-bar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 5px 12px;
-  background: #1565c0;
-  min-width: max-content;
-  height: 30px;
-}
-.ms-item {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.ms-lbl {
-  font-size: 10px;
-  color: rgba(255, 255, 255, 0.7);
-  font-weight: 600;
-  text-transform: uppercase;
-}
-.ms-val {
-  font-size: 12px;
-  font-weight: 700;
-  color: white;
-  font-family: monospace;
-}
-.ms-green {
-  color: #a5d6a7;
-}
-.ms-teal {
-  color: #80cbc4;
-}
-.ms-red {
-  color: #ef9a9a;
-}
-.ms-orange {
-  color: #ffcc80;
-}
-.ms-purple {
-  color: #ce93d8;
-}
-.ms-sep {
-  color: rgba(255, 255, 255, 0.3);
-  font-size: 12px;
 }
 </style>

@@ -65,25 +65,6 @@ const formatTgl = (v: string) => {
   return `${d}/${m}/${y}`;
 };
 
-const totals = computed(() => {
-  const cols = [
-    "Potong",
-    "QcPotong",
-    "Cetak",
-    "PresDtf",
-    "QcCetak",
-    "Dc",
-    "Jahit",
-    "Lipat",
-  ];
-  const list = items.value ?? [];
-  const t: Record<string, number> = {};
-  for (const c of cols) {
-    t[c] = list.reduce((s, r) => s + Number(r[c] || 0), 0);
-  }
-  return t;
-});
-
 // ── Export flat (sederhana) ──
 const isExportingSimple = ref(false);
 const onExportSimple = async () => {
@@ -284,6 +265,16 @@ onMounted(fetchData);
     :items="items ?? []"
     :is-loading="isLoading"
     item-value="Tanggal"
+    :summary-columns="[
+      'Potong',
+      'QcPotong',
+      'Cetak',
+      'PresDtf',
+      'QcCetak',
+      'Dc',
+      'Jahit',
+      'Lipat',
+    ]"
     @refresh="fetchData"
   >
     <template #filter-left>
@@ -338,56 +329,6 @@ onMounted(fetchData);
     <template #item.Dc="{ item }">{{ numFmt(item.Dc) }}</template>
     <template #item.Jahit="{ item }">{{ numFmt(item.Jahit) }}</template>
     <template #item.Lipat="{ item }">{{ numFmt(item.Lipat) }}</template>
-
-    <template #summary-row="{ filteredItems }">
-      <span class="summary-lbl">Total:</span>
-      <span class="summary-val">
-        Potong
-        {{
-          numFmt(filteredItems.reduce((s, r) => s + Number(r.Potong || 0), 0))
-        }}
-      </span>
-      <span class="summary-val">
-        QC Potong
-        {{
-          numFmt(filteredItems.reduce((s, r) => s + Number(r.QcPotong || 0), 0))
-        }}
-      </span>
-      <span class="summary-val">
-        Cetak
-        {{
-          numFmt(filteredItems.reduce((s, r) => s + Number(r.Cetak || 0), 0))
-        }}
-      </span>
-      <span class="summary-val">
-        Pres DTF
-        {{
-          numFmt(filteredItems.reduce((s, r) => s + Number(r.PresDtf || 0), 0))
-        }}
-      </span>
-      <span class="summary-val">
-        QC Cetak
-        {{
-          numFmt(filteredItems.reduce((s, r) => s + Number(r.QcCetak || 0), 0))
-        }}
-      </span>
-      <span class="summary-val">
-        DC
-        {{ numFmt(filteredItems.reduce((s, r) => s + Number(r.Dc || 0), 0)) }}
-      </span>
-      <span class="summary-val">
-        Jahit
-        {{
-          numFmt(filteredItems.reduce((s, r) => s + Number(r.Jahit || 0), 0))
-        }}
-      </span>
-      <span class="summary-val">
-        Lipat
-        {{
-          numFmt(filteredItems.reduce((s, r) => s + Number(r.Lipat || 0), 0))
-        }}
-      </span>
-    </template>
   </BaseBrowse>
 </template>
 
@@ -437,16 +378,5 @@ onMounted(fetchData);
 }
 .fw {
   font-weight: 700;
-}
-.summary-lbl {
-  font-size: 11px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.85);
-}
-.summary-val {
-  font-size: 12px;
-  font-weight: 700;
-  color: white;
-  font-family: monospace;
 }
 </style>

@@ -53,6 +53,7 @@ const props = withDefaults(
     summaryLabel?: string; // label di kiri, cth: "Total Nominal"
     beforeDelete?: (item: any) => Promise<boolean> | boolean;
     summaryColumns?: string[];
+    summaryFormatters?: Record<string, (filteredItems: any[]) => string>;
   }>(),
   {
     icon: () => IconTable,
@@ -1038,7 +1039,10 @@ watch(
                     col.align ? `text-${col.align}` : '',
                   ]"
                 >
-                  <template v-if="summaryColumns.includes(col.key)">
+                  <template v-if="summaryFormatters?.[col.key]">
+                    {{ summaryFormatters[col.key](filteredItems) }}
+                  </template>
+                  <template v-else-if="summaryColumns.includes(col.key)">
                     {{ fmtSummaryVal(summaryTotalsMap[col.key] ?? 0) }}
                   </template>
                 </td>

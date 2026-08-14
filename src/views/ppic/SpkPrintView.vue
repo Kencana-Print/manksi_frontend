@@ -2037,6 +2037,12 @@ Keterangan Komponen :
   overflow: hidden;
 }
 
+.print-page.page-1.print-page--multi {
+  height: auto;
+  max-height: none;
+  overflow: visible;
+}
+
 .page1-scale-inner {
   display: flex;
   flex-direction: column;
