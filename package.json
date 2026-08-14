@@ -17,6 +17,7 @@
   "dependencies": {
     "@fontsource/roboto": "^5.2.10",
     "@mdi/font": "7.4.47",
+    "@smallwebco/tinypivot-vue": "^1.2.1",
     "@tabler/icons-vue": "^3.42.0",
     "@vue-flow/background": "^1.3.2",
     "@vue-flow/controls": "^1.1.3",

@@ -122,7 +122,7 @@ const {
         nama: row.bhn_name || "",
         namaext: row.pod_namaext || row.bhn_name || "",
         satuan: row.pod_bhn_satuan || "",
-        gramasia: row.pod_gramasia || "",
+        gramasiAwal: row.gramasiAwal || "",
         gramasi: row.gramasi || "",
         setting: row.setting || "",
         jenis: row.jenis || "",
@@ -286,7 +286,7 @@ const setPoGreige = async (v: any) => {
       nama: it.nama,
       namaext: it.namaext,
       satuan: it.satuan,
-      gramasia: it.gramasia || "",
+      gramasiAwal: it.gramasia || "",
       gramasi: it.gramasi || "",
       setting: it.setting || "",
       jenis: it.jenis || "",
@@ -376,7 +376,7 @@ const addItem = () =>
     nama: "",
     namaext: "",
     satuan: "",
-    gramasia: "",
+    gramasiAwal: "",
     gramasi: "",
     setting: "",
     jenis: "",
@@ -439,6 +439,7 @@ const setBahan = (v: any) => {
     : v.Nama || v.bhn_name;
   formData.value.items[i].satuan = v.Satuan || v.bhn_satuan || "";
   formData.value.items[i].gramasi = v.Gramasi || "";
+  formData.value.items[i].gramasiAwal = isBahan.value ? v.Gramasi || "" : "";
   formData.value.items[i].setting = v.Setting || "";
   formData.value.items[i].jenis = v.Jenis || "";
   formData.value.items[i].harga = Number(v.Harga || v.bhn_hargabeli) || 0;
@@ -494,7 +495,7 @@ const setMkb = async (v: any) => {
       row.nama = item.nama;
       row.namaext = item.namaext;
       row.satuan = item.satuan;
-      row.gramasia = "";
+      row.gramasiAwal = "";
       row.gramasi = item.gramasi;
       row.setting = item.setting;
       row.jenis = item.jenis;
@@ -934,7 +935,7 @@ const validateSave = () => {
                 </td>
                 <td class="p0">
                   <input
-                    v-model="row.gramasia"
+                    v-model="row.gramasiAwal"
                     class="ci"
                     placeholder="Manual"
                   />

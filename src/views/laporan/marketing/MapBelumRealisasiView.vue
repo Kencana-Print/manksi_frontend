@@ -15,6 +15,7 @@ import {
   IconLayoutGrid,
   IconSortDescending,
 } from "@tabler/icons-vue";
+import PivotWithFilter from "@/components/PivotWithFilter.vue";
 
 const MENU_ID = "966";
 const authStore = useAuthStore();
@@ -176,7 +177,7 @@ const renderPivot = async () => {
     {
       rows: ["Customer", "Divisi"],
       cols: ["Bulan"],
-      vals: ["Nominal"],
+      vals: ["Nominal", "QtyOrder"],
       aggregatorName: "Sum",
       rendererName: "Table",
       unusedAttrsVertical: false,
@@ -391,7 +392,19 @@ const renderChart = async () => {
         <div v-if="!items.length && !isLoading" class="empty-hint">
           Tampilkan data terlebih dahulu.
         </div>
-        <div ref="pivotEl" class="pivot-container" />
+        <PivotWithFilter
+          v-else
+          :data="items"
+          :filterable-columns="[
+            'Divisi',
+            'Tipe',
+            'Sales',
+            'Customer',
+            'Tanggal',
+            'Bulan',
+            'Tahun',
+          ]"
+        />
       </div>
 
       <!-- ── Grafik ── -->

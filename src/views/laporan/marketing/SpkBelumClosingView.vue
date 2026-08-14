@@ -4,6 +4,8 @@ import { useAuthStore } from "@/stores/authStore";
 import { useToast } from "vue-toastification";
 import PageLayout from "@/components/PageLayout.vue";
 import BaseTable from "@/components/BaseTable.vue";
+import PivotWithFilter from "@/components/PivotWithFilter.vue";
+import type ExcelJS from "exceljs";
 import { spkBelumClosingService } from "@/services/laporan/marketing/spkBelumClosingService";
 import { exportExcelSingle } from "@/utils/excelExport";
 import {
@@ -62,12 +64,10 @@ watch([startDate, endDate], () => {
 
 watch(activeTab, async (tab) => {
   await nextTick();
-  if (tab === "pivot") renderPivot();
   if (tab === "chart") renderChart();
 });
 
 watch(items, () => {
-  if (activeTab.value === "pivot") renderPivot();
   if (activeTab.value === "chart") renderChart();
 });
 
@@ -193,25 +193,134 @@ const onExport = async () => {
   );
 };
 
-// ── Pivot ──
-const pivotEl = ref<HTMLElement | null>(null);
-const renderPivot = async () => {
-  await nextTick();
-  if (!pivotEl.value || !items.value.length) return;
-  const win = window as any;
-  if (!win.jQuery || !win.jQuery.fn.pivotUI) return;
-  win.jQuery(pivotEl.value).pivotUI(
-    items.value,
-    {
-      rows: ["Customer", "Divisi", "Nomor"],
-      cols: ["Bulan"],
-      vals: ["Nominal_Order"],
-      aggregatorName: "Sum",
-      rendererName: "Table",
-      unusedAttrsVertical: false,
-    },
-    true,
-  );
+const pivotWithFilterRef = ref<InstanceType<typeof PivotWithFilter> | null>(
+  null,
+);
+
+const onExportPivot = async () => {
+  const table = await pivotWithFilterRef.value?.exportPivotToExcel?.();
+  if (!table) {
+    toast.warning(
+      "Tidak ada hasil pivot untuk diekspor. Susun pivot dulu di panel kiri.",
+    );
+    return;
+  }
+
+  const ExcelJS = (await import("exceljs")).default;
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet("Pivot");
+
+  const borderThin = {
+    top: { style: "thin" as const },
+    left: { style: "thin" as const },
+    bottom: { style: "thin" as const },
+    right: { style: "thin" as const },
+  };
+
+  // ── Occupancy tracker: cell [row][col] = true kalau sudah ditempati
+  // (baik ditulis langsung atau kena rowSpan/colSpan dari sel lain) ──
+  const occupied = new Set<string>();
+  const key = (r: number, c: number) => `${r}:${c}`;
+
+  const nextFreeCol = (rowIdx: number, fromCol: number): number => {
+    let c = fromCol;
+    while (occupied.has(key(rowIdx, c))) c++;
+    return c;
+  };
+
+  const markOccupied = (
+    rowIdx: number,
+    colIdx: number,
+    rowSpan: number,
+    colSpan: number,
+  ) => {
+    for (let r = rowIdx; r < rowIdx + rowSpan; r++) {
+      for (let c = colIdx; c < colIdx + colSpan; c++) {
+        occupied.add(key(r, c));
+      }
+    }
+  };
+
+  const writeRows = (
+    rows: { text: string; colSpan: number; rowSpan: number }[][],
+    rowOffset: number,
+    styleFn: (cell: ExcelJS.Cell) => void,
+  ) => {
+    rows.forEach((row, rIdx) => {
+      const absRow = rowOffset + rIdx + 1;
+      const excelRow = sheet.getRow(absRow);
+      let colCursor = 1;
+
+      row.forEach((cell) => {
+        // ⬅ FIX: lompat ke kolom bebas berikutnya, hindari kolom yang
+        // sudah ditempati rowSpan dari baris sebelumnya
+        colCursor = nextFreeCol(absRow, colCursor);
+
+        const excelCell = excelRow.getCell(colCursor);
+        excelCell.value = cell.text;
+        excelCell.border = borderThin;
+        styleFn(excelCell);
+
+        markOccupied(absRow, colCursor, cell.rowSpan, cell.colSpan);
+
+        if (cell.colSpan > 1 || cell.rowSpan > 1) {
+          sheet.mergeCells(
+            absRow,
+            colCursor,
+            absRow + cell.rowSpan - 1,
+            colCursor + cell.colSpan - 1,
+          );
+        }
+        colCursor += cell.colSpan;
+      });
+      excelRow.commit();
+    });
+  };
+
+  // ── Header rows ──
+  writeRows(table.headerRows, 0, (cell) => {
+    cell.font = { bold: true, color: { argb: "FF0D47A1" } };
+    cell.fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FFE3F2FD" },
+    };
+    cell.alignment = { horizontal: "center", vertical: "middle" };
+  });
+
+  // ── Body rows ──
+  const headerRowCount = table.headerRows.length;
+  writeRows(table.bodyRows, headerRowCount, (cell) => {
+    const text = String(cell.value ?? "");
+    const isNumeric = /^-?[\d.,]+$/.test(text.replace(/\s/g, ""));
+    if (isNumeric) {
+      const numericVal = Number(text.replace(/\./g, "").replace(/,/g, "."));
+      if (!isNaN(numericVal)) {
+        cell.value = numericVal;
+        cell.numFmt = "#,##0";
+      }
+    }
+    cell.alignment = {
+      horizontal: isNumeric ? "right" : "left",
+      vertical: "middle",
+    };
+  });
+
+  sheet.columns.forEach((col) => {
+    col.width = 18;
+  });
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  const blob = new Blob([buffer], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `Pivot_SPK_Belum_Closing_${startDate.value}_${endDate.value}.xlsx`;
+  a.click();
+  URL.revokeObjectURL(url);
+  toast.success("Export pivot berhasil.");
 };
 
 // ── Chart ──
@@ -471,11 +580,38 @@ const renderChart = async () => {
       </div>
 
       <!-- ── Pivot ── -->
+      <!-- ── Pivot ── -->
       <div v-show="activeTab === 'pivot'" class="tab-content pivot-wrap">
         <div v-if="!items.length && !isLoading" class="empty-hint">
           Tampilkan data terlebih dahulu.
         </div>
-        <div ref="pivotEl" class="pivot-container" />
+        <template v-else>
+          <div class="pivot-export-bar">
+            <v-btn
+              size="small"
+              color="green"
+              variant="tonal"
+              @click="onExportPivot"
+            >
+              <template #prepend>
+                <IconFileSpreadsheet :size="14" :stroke-width="1.7" />
+              </template>
+              Export Pivot Ini
+            </v-btn>
+          </div>
+          <PivotWithFilter
+            ref="pivotWithFilterRef"
+            :data="items"
+            :filterable-columns="[
+              'Divisi',
+              'Sales',
+              'Customer',
+              'Tanggal',
+              'Nomor',
+              'Nama',
+            ]"
+          />
+        </template>
       </div>
 
       <!-- ── Grafik ── -->
@@ -598,13 +734,21 @@ const renderChart = async () => {
   padding: 12px;
   background: white;
 }
-.pivot-container,
 .chart-container {
   overflow: auto;
+}
+.chart-container :deep(.pvtUi) {
+  font-size: 12px;
 }
 .pivot-container :deep(.pvtUi),
 .chart-container :deep(.pvtUi) {
   font-size: 12px;
+}
+.pivot-export-bar {
+  padding: 6px 12px;
+  background: #f5f7fa;
+  border-bottom: 1px solid #e0e0e0;
+  flex-shrink: 0;
 }
 
 .empty-hint {
