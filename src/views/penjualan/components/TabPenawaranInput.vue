@@ -48,23 +48,27 @@ const previewGambar = (row: any) => {
   }
 
   if (row.Gambar) {
-    // row.Gambar sudah path lengkap dari root, mis: /images/HO-/penawaran/PEN_DTL_xxx.jpg
-    // Upload baru — TIDAK pakai fallback /file-gambar/ (itu khusus gambar lama)
+    // Gambar yang di-upload secara manual (biasanya format /images/...)
     previewImageUrl.value = `${getBaseUrl()}${row.Gambar}`;
     previewImageUrlFallback.value = "";
   } else {
-    const cabang = authStore.user?.cabang || "HO-";
-    let cleanName = row.NoPermintaan.replace(/\//g, ".");
+    // Jika tidak ada gambar upload manual, bentuk nama file dari No. Permintaan
+    let cleanName = row.NoPermintaan;
+
+    // Tangkap format MH.2026.3095 (menghapus path folder yang mungkin tersimpan di database)
     const matchMH = cleanName.match(/(MH\.\d{4}\.\d+)/i);
     if (matchMH) {
       cleanName = matchMH[1];
     } else {
-      cleanName = cleanName.replace(/.*imagemintaharga/i, "");
-      cleanName = cleanName.replace(/.*Downloads/i, "");
+      // Membersihkan jika ada karakter aneh atau path lama
       cleanName = cleanName.replace(/\\/g, "/").split("/").pop() || "";
       cleanName = cleanName.replace(/\.(jpe?g|png)$/i, "");
     }
-    previewImageUrl.value = `${getBaseUrl()}/images/${cabang}/mintaharga/${cleanName}.jpg`;
+
+    // Arahkan ke endpoint gambar yang benar
+    previewImageUrl.value = `${getBaseUrl()}/file-gambar/mintaharga/${cleanName}.jpg`;
+
+    // Fallback jika tidak menggunakan base URL (jaga-jaga routing lokal)
     previewImageUrlFallback.value = `${VPS_BASE}/mintaharga/${cleanName}.jpg`;
   }
 
