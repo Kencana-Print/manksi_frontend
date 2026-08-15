@@ -48,28 +48,26 @@ const previewGambar = (row: any) => {
   }
 
   if (row.Gambar) {
-    // Gambar yang di-upload secara manual (biasanya format /images/...)
-    previewImageUrl.value = `${getBaseUrl()}${row.Gambar}`;
+    // Jika row.Gambar sudah ada, pastikan diawali dengan slash '/'
+    // Browser akan otomatis mengarahkannya ke https://manksi.com/...
+    previewImageUrl.value = row.Gambar.startsWith("/")
+      ? row.Gambar
+      : `/${row.Gambar}`;
     previewImageUrlFallback.value = "";
   } else {
-    // Jika tidak ada gambar upload manual, bentuk nama file dari No. Permintaan
     let cleanName = row.NoPermintaan;
 
-    // Tangkap format MH.2026.3095 (menghapus path folder yang mungkin tersimpan di database)
     const matchMH = cleanName.match(/(MH\.\d{4}\.\d+)/i);
     if (matchMH) {
       cleanName = matchMH[1];
     } else {
-      // Membersihkan jika ada karakter aneh atau path lama
       cleanName = cleanName.replace(/\\/g, "/").split("/").pop() || "";
       cleanName = cleanName.replace(/\.(jpe?g|png)$/i, "");
     }
 
-    // Arahkan ke endpoint gambar yang benar
-    previewImageUrl.value = `${getBaseUrl()}/file-gambar/mintaharga/${cleanName}.jpg`;
-
-    // Fallback jika tidak menggunakan base URL (jaga-jaga routing lokal)
-    previewImageUrlFallback.value = `${VPS_BASE}/mintaharga/${cleanName}.jpg`;
+    // LANGSUNG tembak ke absolute path tanpa getBaseUrl()
+    previewImageUrl.value = `/file-gambar/mintaharga/${cleanName}.jpg`;
+    previewImageUrlFallback.value = `/file-gambar/mintaharga/${cleanName}.jpg`;
   }
 
   isPreviewLoading.value = true;
