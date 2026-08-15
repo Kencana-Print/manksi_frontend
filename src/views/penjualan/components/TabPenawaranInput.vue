@@ -47,16 +47,19 @@ const previewGambar = (row: any) => {
     return;
   }
 
-  if (row.Gambar) {
-    // Jika row.Gambar sudah ada, pastikan diawali dengan slash '/'
-    // Browser akan otomatis mengarahkannya ke https://manksi.com/...
+  // Cek apakah data dari database kotor (terbawa IP hardcode dari bug sebelumnya)
+  const isGambarKotor = row.Gambar && row.Gambar.includes("103.94.238.252");
+
+  if (row.Gambar && !isGambarKotor) {
+    // Jika gambar manual dan namanya normal, pastikan diawali slash
     previewImageUrl.value = row.Gambar.startsWith("/")
       ? row.Gambar
       : `/${row.Gambar}`;
-    previewImageUrlFallback.value = "";
   } else {
+    // Jika row.Gambar kosong ATAU datanya kotor, bentuk ulang dari No. Permintaan
     let cleanName = row.NoPermintaan;
 
+    // Ambil format MH.xxxx.xxxx saja
     const matchMH = cleanName.match(/(MH\.\d{4}\.\d+)/i);
     if (matchMH) {
       cleanName = matchMH[1];
@@ -65,10 +68,12 @@ const previewGambar = (row: any) => {
       cleanName = cleanName.replace(/\.(jpe?g|png)$/i, "");
     }
 
-    // LANGSUNG tembak ke absolute path tanpa getBaseUrl()
+    // Paksa arahkan ke /file-gambar/mintaharga/
     previewImageUrl.value = `/file-gambar/mintaharga/${cleanName}.jpg`;
-    previewImageUrlFallback.value = `/file-gambar/mintaharga/${cleanName}.jpg`;
   }
+
+  // Set fallback ke URL yang sama agar tidak melompat ke path lain saat error
+  previewImageUrlFallback.value = previewImageUrl.value;
 
   isPreviewLoading.value = true;
   isPreviewError.value = false;
