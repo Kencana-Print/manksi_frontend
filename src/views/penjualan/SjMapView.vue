@@ -27,6 +27,25 @@ const expanded = ref([]);
 const today = new Date();
 const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
 const toInputDate = (value: Date) => value.toISOString().slice(0, 10);
+const num = (v: any) => new Intl.NumberFormat("id-ID").format(Number(v) || 0);
+
+// --- SUMMARY FOOTER FORMATTERS ---
+const summaryFormatters = computed<Record<string, any>>(() => {
+  return {
+    // Teks "TOTAL :" ditaruh di sebelah kiri, misal pada kolom "Keterangan"
+    Keterangan: () => "TOTAL :",
+    // Gunakan Math.round() sebelum num() untuk membulatkan angka
+    QtyKirim: (filteredItems: any[]) =>
+      num(
+        Math.round(
+          filteredItems.reduce(
+            (sum, item) => sum + (Number(item.QtyKirim) || 0),
+            0,
+          ),
+        ),
+      ),
+  };
+});
 
 // --- STATE PENGAJUAN PIN 5 ---
 const showPinModal = ref(false);
@@ -251,6 +270,8 @@ const getNomorClass = (ngedit: string) => {
     @edit="onEdit"
     @delete="onDelete"
     @export="exportToExcel('SJ_MAP')"
+    :summary-columns="['QtyKirim']"
+    :summary-formatters="summaryFormatters"
   >
     <template #filter-left>
       <div class="f-group">

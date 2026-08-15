@@ -34,6 +34,27 @@ const firstOfMonth = () => {
 };
 const num = (v: any) => Number(v || 0).toLocaleString("id-ID");
 
+// --- SUMMARY FOOTER FORMATTERS ---
+const summaryFormatters = {
+  // Label "TOTAL :" ditaruh di sebelah kiri, misal pada kolom "Otomatis"
+  Otomatis: () => "TOTAL :",
+
+  // Menerapkan Math.round() pada hasil akumulasi (reduce) sebelum diformat
+  Total: (filteredItems: any[]) =>
+    num(
+      Math.round(
+        filteredItems.reduce((sum, item) => sum + (Number(item.Total) || 0), 0),
+      ),
+    ),
+
+  Bayar: (filteredItems: any[]) =>
+    num(
+      Math.round(
+        filteredItems.reduce((sum, item) => sum + (Number(item.Bayar) || 0), 0),
+      ),
+    ),
+};
+
 // ── Filter ─────────────────────────────────────────────────
 const tglAwal = ref(firstOfMonth());
 const tglAkhir = ref(todayLocal());
@@ -409,6 +430,8 @@ const onExportDetail = async () => {
     @delete="onDelete"
     @refresh="fetchData"
     :row-props-fn="rowPropsFn"
+    :summary-columns="['Total', 'Bayar']"
+    :summary-formatters="summaryFormatters"
   >
     <!-- ── Filter ── -->
     <template #filter-left>

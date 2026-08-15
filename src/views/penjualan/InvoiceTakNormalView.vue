@@ -35,6 +35,33 @@ const firstOfMonth = () => {
 };
 const num = (v: any) => Number(v || 0).toLocaleString("id-ID");
 
+// --- SUMMARY FOOTER FORMATTERS ---
+const summaryFormatters = computed<Record<string, any>>(() => {
+  return {
+    // Label "TOTAL :" ditaruh di sebelah kiri, misal pada kolom "Otomatis"
+    Otomatis: () => "TOTAL :",
+    // Gunakan Math.round() sebelum format untuk pembulatan
+    Total: (filteredItems: any[]) =>
+      num(
+        Math.round(
+          filteredItems.reduce(
+            (sum, item) => sum + (Number(item.Total) || 0),
+            0,
+          ),
+        ),
+      ),
+    Bayar: (filteredItems: any[]) =>
+      num(
+        Math.round(
+          filteredItems.reduce(
+            (sum, item) => sum + (Number(item.Bayar) || 0),
+            0,
+          ),
+        ),
+      ),
+  };
+});
+
 // ── Filter ─────────────────────────────────────────────────
 // NOTE: default dipakai sama seperti Invoice biasa (awal bulan s.d. hari
 // ini). Kalau maunya "hari ini s.d. hari ini", ganti firstOfMonth() jadi
@@ -355,6 +382,8 @@ const onExportDetail = async () => {
     @edit="goEdit"
     @delete="onDelete"
     @refresh="fetchData"
+    :summary-columns="['Total', 'Bayar']"
+    :summary-formatters="summaryFormatters"
   >
     <!-- ── Filter ── -->
     <template #filter-left>

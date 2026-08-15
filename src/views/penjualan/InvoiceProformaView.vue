@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref, onMounted, computed } from "vue";
 import { useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
 import BaseBrowse from "@/components/BaseBrowse.vue";
@@ -76,6 +76,33 @@ const headers = [
 ];
 
 const num = (val: number) => new Intl.NumberFormat("id-ID").format(val || 0);
+
+// --- SUMMARY FOOTER FORMATTERS ---
+const summaryFormatters = computed<Record<string, any>>(() => {
+  return {
+    // Label "TOTAL :" ditaruh di sebelah kiri, pada kolom "Otomatis"
+    Otomatis: () => "TOTAL :",
+    // Menerapkan Math.round() pada hasil akumulasi sebelum diformat
+    Total: (filteredItems: any[]) =>
+      num(
+        Math.round(
+          filteredItems.reduce(
+            (sum, item) => sum + (Number(item.Total) || 0),
+            0,
+          ),
+        ),
+      ),
+    Bayar: (filteredItems: any[]) =>
+      num(
+        Math.round(
+          filteredItems.reduce(
+            (sum, item) => sum + (Number(item.Bayar) || 0),
+            0,
+          ),
+        ),
+      ),
+  };
+});
 
 // Mewarnai baris berdasarkan Status Pengajuan PIN 5 (Sesuai cxGrdMasterCustomDrawCell Delphi)
 const handleRowProps = (data: any) => {
@@ -235,6 +262,8 @@ onMounted(() => {
     @edit="onEdit"
     @delete="onDelete"
     @export="exportToExcel('Daftar_Invoice_Proforma')"
+    :summary-columns="['Total', 'Bayar']"
+    :summary-formatters="summaryFormatters"
   >
     <!-- FILTER -->
     <template #filter-left>

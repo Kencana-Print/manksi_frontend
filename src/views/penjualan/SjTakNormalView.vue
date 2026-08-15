@@ -28,6 +28,13 @@ const todayLocal = () => {
 };
 const num = (v: any) => Number(v || 0).toLocaleString("id-ID");
 
+// --- SUMMARY FOOTER FORMATTERS ---
+const summaryFormatters = {
+  Gudang: () => "TOTAL :", // Teks "TOTAL :" ditaruh di sebelah kiri kolom Qty Kirim
+  QtyKirim: (items: any[]) =>
+    num(items.reduce((sum, item) => sum + (Number(item.QtyKirim) || 0), 0)),
+};
+
 // ── Filter — default hari ini s.d. hari ini ─────────────────
 const tglAwal = ref(todayLocal());
 const tglAkhir = ref(todayLocal());
@@ -287,6 +294,8 @@ const onExportDetail = async () => {
     @edit="goEdit"
     @delete="onDelete"
     @refresh="fetchData"
+    :summary-columns="['QtyKirim']"
+    :summary-formatters="summaryFormatters"
   >
     <!-- ── Filter ── -->
     <template #filter-left>
