@@ -213,6 +213,7 @@ const onExportDetail = async () => {
       { header: "Customer", key: "Customer", width: 26 },
       { header: "Nama", key: "Nama", width: 28 },
       { header: "Komponen", key: "Komponen", width: 16 },
+      { header: "Kain", key: "Kain", width: 25 },
       {
         header: "Babaran Standar",
         key: "BabaranStandar",
