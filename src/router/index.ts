@@ -3806,7 +3806,7 @@ const router = createRouter({
       name: "LaporanSpkVsSjVsInv",
       component: () => import("@/views/laporan/penjualan/SpkVsSjVsInvView.vue"),
       meta: {
-        title: "Laporan SPK vs SJ vs Invoice",
+        title: "Laporan SO vs SJ vs Invoice",
         layout: "DefaultLayout",
         requiresAuth: true,
         menuId: "306",

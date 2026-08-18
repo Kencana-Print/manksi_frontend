@@ -1221,7 +1221,7 @@ const menuItems: NavItem[] = [
             menuId: 305,
           },
           {
-            title: "SPK vs SJ vs Invoice",
+            title: "SO vs SJ vs Invoice",
             to: "/laporan/penjualan/spk-vs-sj-vs-inv",
             icon: IconFileInvoice,
             menuId: 306,
