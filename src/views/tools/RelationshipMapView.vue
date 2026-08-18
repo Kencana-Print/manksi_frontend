@@ -38,6 +38,7 @@ const TYPE_OPTIONS: { value: NodeType | ""; title: string }[] = [
   { value: "SO", title: "SO" },
   { value: "PROOF", title: "Proof Garmen" },
   { value: "SJ_MEMO", title: "SJ Memo" },
+  { value: "MPPB", title: "MPPB" },
   { value: "MKB", title: "MKB" },
   { value: "PO", title: "PO" },
   { value: "BPB", title: "BPB" },

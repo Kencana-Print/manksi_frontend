@@ -6,6 +6,7 @@ export const TYPE_META: Record<string, { label: string; color: string }> = {
   SO: { label: "SO", color: "#1abc9c" },
   PROOF: { label: "Proof Garmen", color: "#f39c12" },
   SJ_MEMO: { label: "SJ Memo", color: "#34495e" },
+  MPPB: { label: "MPPB", color: "#0e6655" },
   MKB: { label: "MKB", color: "#e67e22" },
   PO: { label: "PO", color: "#d35400" },
   BPB: { label: "BPB", color: "#7f8c8d" },

@@ -10,6 +10,7 @@ export type NodeType =
   | "SO"
   | "PROOF"
   | "SJ_MEMO"
+  | "MPPB"
   | "MKB"
   | "PO"
   | "BPB"
