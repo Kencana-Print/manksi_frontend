@@ -374,15 +374,15 @@ const onExport = async () => {
       "All";
 
     const titleLines = [
-      "Laporan SPK vs SJ vs Invoice",
+      "Laporan SO vs SJ vs Invoice",
       `Periode: ${formatTanggal(filterState.value.dtAwal)} s.d ${formatTanggal(filterState.value.dtAkhir)}`,
       `Divisi: ${divisiLabel}  |  Perusahaan: ${perushLabel}  |  Status: ${statusLabel}`,
       `Customer: ${filterState.value.customerNama || "SEMUA"}  |  Sales: ${filterState.value.salesNama || "SEMUA"}`,
     ].join("\n");
 
     await exportExcelSingle(
-      `Laporan_SPK_vs_SJ_vs_Inv_${todayStr}.xlsx`,
-      "SPK vs SJ vs Inv",
+      `Laporan_SO_vs_SJ_vs_Inv_${todayStr}.xlsx`,
+      "SO vs SJ vs Inv",
       columns,
       combinedRows,
       titleLines,
@@ -400,7 +400,7 @@ const onExport = async () => {
 
 <template>
   <BaseBrowse
-    title="Laporan SPK vs SJ vs Invoice"
+    title="Laporan SO vs SJ vs Invoice"
     menu-id="306"
     :icon="IconFileInvoice"
     :headers="headers"
