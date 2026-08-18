@@ -13,6 +13,7 @@ export interface TabItem {
   closable: boolean;
   timestamp: number;
   onClose?: () => void;
+  needsReset?: boolean;
 }
 
 const MAX_TABS = 10;
@@ -35,6 +36,9 @@ export const useTabsStore = defineStore(
       const existing = tabs.value.find((t) => t.id === id);
 
       if (existing) {
+        if (activeTabId.value !== existing.id) {
+          existing.needsReset = true;
+        }
         activeTabId.value = existing.id;
         return;
       }

@@ -130,12 +130,10 @@ export function useForm<
   };
 
   const executeClose = () => {
-    // <--- TAMBAH INI
     showCloseDialog.value = false;
     goBack();
   };
 
-  // --- TAMBAHKAN BLOK INI ---
   onMounted(() => {
     // Jalankan otomatis JIKA:
     // 1. Opsi immediate tidak di-set ke false
@@ -147,9 +145,12 @@ export function useForm<
   });
 
   onActivated(() => {
-    if (!isEditMode.value) {
+    if (isEditMode.value) return;
+    const currentTab = tabsStore.tabs.find((t) => t.id === route.path);
+    if (currentTab?.needsReset) {
       formData.value = JSON.parse(JSON.stringify(options.initialData));
       originalData.value = JSON.parse(JSON.stringify(options.initialData));
+      currentTab.needsReset = false; // konsumsi flag, sekali pakai
     }
   });
 
