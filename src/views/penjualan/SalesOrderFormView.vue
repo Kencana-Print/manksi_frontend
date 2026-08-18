@@ -1278,6 +1278,19 @@ const uploadImageMain = (file: File) => {
   imageToUpload.value = file;
 };
 
+// Divisi 3 dengan Jenis Order murni pengerjaan (SD/SB/TG/PM) — barang
+// fisiknya bukan diambil dari stok DC/Kaosan, jadi Detail Kaosan boleh
+// dikosongkan sepenuhnya. Dicek pakai .includes() (bukan exact match)
+// mengikuti konvensi yang sudah dipakai di backend untuk pola JO serupa.
+const JO_KAOSAN_OPSIONAL = ["SD", "SB", "TG", "PM"];
+const isJoKaosanOpsional = computed(() =>
+  JO_KAOSAN_OPSIONAL.some((sub) =>
+    String(formData.value.spk_jo_kode || "")
+      .toUpperCase()
+      .includes(sub),
+  ),
+);
+
 const validateSave = async (skipPoCheck = false) => {
   if (formData.value.isLegacy) {
     toast.warning(
@@ -1396,8 +1409,9 @@ const validateSave = async (skipPoCheck = false) => {
   //   }
   // }
 
-  // 7. Validasi Detail Kaosan (Khusus Divisi 3)
-  if (divisiStr === "3") {
+  // 7. Validasi Detail Kaosan (Khusus Divisi 3, kecuali JO SD/SB/TG/PM
+  // yang barangnya bukan dari Kaosan/DC — boleh dikosongkan)
+  if (divisiStr === "3" && !isJoKaosanOpsional.value) {
     if (!fd.Kaosan || fd.Kaosan.length === 0) {
       toast.warning("Detail barang kaosan harus diisi.");
       return;
