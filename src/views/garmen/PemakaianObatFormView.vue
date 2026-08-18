@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, nextTick } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import { useRoute } from "vue-router";
 import { useToast } from "vue-toastification";
+import { useForm } from "@/composables/useForm";
 import BaseForm from "@/components/BaseForm.vue";
 import SpkSearchModal from "@/components/lookups/SpkSearchModal.vue";
 import BahanSearchModal from "@/components/lookups/BahanSearchModal.vue";
@@ -22,21 +23,22 @@ interface DetailRow {
   qty: number;
 }
 
+interface PemakaianObatFormData {
+  nomor: string;
+  tanggal: string;
+  cabang: string;
+  spkNomor: string;
+  namaBarang: string;
+  jenisBarang: string;
+  jumlahSpk: number | null;
+  lini: string;
+  keterangan: string;
+  komponenRows: KomponenRow[];
+  detailRows: DetailRow[];
+}
+
 const route = useRoute();
-const router = useRouter();
 const toast = useToast();
-
-const nomorParam = computed(() => route.params.nomor as string | undefined);
-const isEditMode = computed(() => !!nomorParam.value);
-
-const isLoading = ref(true);
-const isSaving = ref(false);
-
-const showSaveDialog = ref(false);
-const showCancelDialog = ref(false);
-const showCloseDialog = ref(false);
-const showPrintDialog = ref(false);
-const savedNomor = ref("");
 
 function getLocalDate(d = new Date()) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
@@ -44,16 +46,112 @@ function getLocalDate(d = new Date()) {
   ).padStart(2, "0")}`;
 }
 
-// --- STATE HEADER ---
-const nomor = ref("");
-const tanggal = ref(getLocalDate());
-const cabang = ref("");
-const spkNomor = ref("");
-const namaBarang = ref(""); // "Product" - readonly, hasil resolve SPK
-const jenisBarang = ref(""); // "Jenis Produk" - readonly
-const jumlahSpk = ref<number | null>(null); // "Jumlah Spk" - readonly, hasil resolve SPK
-const lini = ref("");
-const keterangan = ref("");
+const blankKomponen = (): KomponenRow => ({ kode: "", nama: "", hasil: 0 });
+const blankDetail = (): DetailRow => ({
+  jenis: "",
+  okode: "",
+  satuan: "",
+  jumlah: 0,
+  qty: 0,
+});
+
+const init: PemakaianObatFormData = {
+  nomor: "",
+  tanggal: getLocalDate(),
+  cabang: "",
+  spkNomor: "",
+  namaBarang: "",
+  jenisBarang: "",
+  jumlahSpk: null,
+  lini: "",
+  keterangan: "",
+  komponenRows: [blankKomponen()],
+  detailRows: [blankDetail()],
+};
+
+const showPrintDialog = ref(false);
+const savedNomor = ref("");
+
+const {
+  isEditMode,
+  isLoading,
+  isSaving,
+  showSaveDialog,
+  showCancelDialog,
+  showCloseDialog,
+  formData,
+  fetchData,
+  executeSave,
+  executeClose,
+  goBack,
+} = useForm<PemakaianObatFormData>({
+  menuId: "120",
+  initialData: init,
+  immediate: false, // meta cabang/lini/jenisObat perlu dimuat dulu — manual di onMounted
+  onSuccessRoute: "/garmen/pemakaian-obat",
+
+  fetchApi: async (): Promise<PemakaianObatFormData> => {
+    const nomorParam = route.params.nomor as string;
+    const res = await pemakaianObatFormService.getFormData(nomorParam);
+    const d = res.data.data;
+    return {
+      nomor: d.ob_nomor,
+      tanggal: String(d.ob_tanggal).substring(0, 10),
+      cabang: d.ob_cab,
+      spkNomor: d.ob_spk_nomor,
+      namaBarang: d.namaSpk,
+      jenisBarang: d.jenisOrder,
+      jumlahSpk: d.spkJumlah,
+      lini: d.ob_lini,
+      keterangan: d.ob_keterangan || "",
+      komponenRows: (d.komponen || []).map((k: any) => ({
+        kode: k.kode,
+        nama: k.nama,
+        hasil: Number(k.hasil) || 0,
+      })),
+      detailRows: (d.details || []).map((r: any) => ({
+        jenis: r.jenis,
+        okode: r.okode,
+        satuan: r.satuan,
+        jumlah: Number(r.jumlah) || 0,
+        qty: Number(r.qty) || 0,
+      })),
+    };
+  },
+
+  submitApi: async (data): Promise<any> => {
+    const payload = {
+      tanggal: data.tanggal,
+      spkNomor: data.spkNomor,
+      namaBarang: data.namaBarang,
+      lini: data.lini,
+      keterangan: data.keterangan,
+      cabang: data.cabang,
+      komponen: data.komponenRows
+        .filter((r) => r.kode)
+        .map((r) => ({ kode: r.kode, hasil: r.hasil })),
+      details: data.detailRows
+        .filter((r) => r.jenis)
+        .map((r) => ({ jenis: r.jenis, okode: r.okode, jumlah: r.jumlah })),
+    };
+
+    return isEditMode.value
+      ? pemakaianObatFormService.update(data.nomor, payload)
+      : pemakaianObatFormService.create(payload);
+  },
+
+  onSuccess: (res: any) => {
+    savedNomor.value = res?.data?.data?.nomor || "";
+    showPrintDialog.value = true;
+  },
+});
+
+const fd = formData;
+
+// ⚠️ Field ini di source Delphi (.pas) sebenarnya cbCab/ob_cab —
+// dilabeli "Gudang" di UI Delphi tapi secara data & opsi (P01/P04)
+// persis pola Cabang, bukan gudang beneran. Direplikasi sebagai Cabang.
+const isCabangLocked = computed(() => isEditMode.value);
 
 // --- META ---
 const cabangOptions = ref<string[]>([]);
@@ -62,46 +160,41 @@ const jenisObatOptions = ref<{ kode: string; nama: string; satuan: string }[]>(
   [],
 );
 
-// ⚠️ Field ini di source Delphi (.pas) sebenarnya cbCab/ob_cab —
-// dilabeli "Gudang" di UI Delphi tapi secara data & opsi (P01/P04)
-// persis pola Cabang, bukan gudang beneran. Direplikasi sebagai Cabang.
-const isCabangLocked = computed(() => isEditMode.value);
+const loadMeta = async () => {
+  const res = await pemakaianObatFormService.getMeta();
+  cabangOptions.value = res.data.data.cabangOptions;
+  liniOptions.value = res.data.data.liniOptions;
+  jenisObatOptions.value = res.data.data.jenisObatOptions;
+};
 
 // --- KOMPONEN (grid kecil) ---
-const komponenRows = ref<KomponenRow[]>([]);
-const blankKomponen = (): KomponenRow => ({ kode: "", nama: "", hasil: 0 });
 const ensureTrailingKomponen = () => {
-  const last = komponenRows.value[komponenRows.value.length - 1];
-  if (!last || last.kode) komponenRows.value.push(blankKomponen());
+  const last = fd.value.komponenRows[fd.value.komponenRows.length - 1];
+  if (!last || last.kode) fd.value.komponenRows.push(blankKomponen());
 };
 const totalHasil = computed(() =>
-  komponenRows.value.reduce(
+  fd.value.komponenRows.reduce(
     (s, r) => (r.kode ? s + Number(r.hasil || 0) : s),
     0,
   ),
 );
 
 // --- DETAIL OBAT (grid utama) ---
-const detailRows = ref<DetailRow[]>([]);
-const blankDetail = (): DetailRow => ({
-  jenis: "",
-  okode: "",
-  satuan: "",
-  jumlah: 0,
-  qty: 0,
-});
 const ensureTrailingDetail = () => {
-  const last = detailRows.value[detailRows.value.length - 1];
-  if (!last || last.jenis) detailRows.value.push(blankDetail());
+  const last = fd.value.detailRows[fd.value.detailRows.length - 1];
+  if (!last || last.jenis) fd.value.detailRows.push(blankDetail());
 };
 const totalJumlah = computed(() =>
-  detailRows.value.reduce(
+  fd.value.detailRows.reduce(
     (s, r) => (r.jenis ? s + Number(r.jumlah || 0) : s),
     0,
   ),
 );
 const totalQty = computed(() =>
-  detailRows.value.reduce((s, r) => (r.jenis ? s + Number(r.qty || 0) : s), 0),
+  fd.value.detailRows.reduce(
+    (s, r) => (r.jenis ? s + Number(r.qty || 0) : s),
+    0,
+  ),
 );
 
 const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
@@ -113,64 +206,6 @@ const komponenKodeRefs = ref<Record<number, HTMLInputElement | null>>({});
 const komponenHasilRefs = ref<Record<number, HTMLInputElement | null>>({});
 const detailJumlahRefs = ref<Record<number, HTMLInputElement | null>>({});
 
-// --- LOAD META ---
-const loadMeta = async () => {
-  const res = await pemakaianObatFormService.getMeta();
-  cabangOptions.value = res.data.data.cabangOptions;
-  liniOptions.value = res.data.data.liniOptions;
-  jenisObatOptions.value = res.data.data.jenisObatOptions;
-};
-
-// --- LOAD DATA ---
-const loadData = async () => {
-  isLoading.value = true;
-  try {
-    await loadMeta();
-
-    if (isEditMode.value) {
-      const res = await pemakaianObatFormService.getFormData(nomorParam.value!);
-      const d = res.data.data;
-      nomor.value = d.ob_nomor;
-      tanggal.value = String(d.ob_tanggal).substring(0, 10);
-      cabang.value = d.ob_cab;
-      spkNomor.value = d.ob_spk_nomor;
-      namaBarang.value = d.namaSpk;
-      jenisBarang.value = d.jenisOrder;
-      jumlahSpk.value = d.spkJumlah;
-      lini.value = d.ob_lini;
-      keterangan.value = d.ob_keterangan || "";
-
-      komponenRows.value = (d.komponen || []).map((k: any) => ({
-        kode: k.kode,
-        nama: k.nama,
-        hasil: Number(k.hasil) || 0,
-      }));
-      ensureTrailingKomponen();
-
-      detailRows.value = (d.details || []).map((r: any) => ({
-        jenis: r.jenis,
-        okode: r.okode,
-        satuan: r.satuan,
-        jumlah: Number(r.jumlah) || 0,
-        qty: Number(r.qty) || 0,
-      }));
-      ensureTrailingDetail();
-    } else {
-      cabang.value = cabangOptions.value[0] || "";
-      lini.value = liniOptions.value[0] || "";
-      komponenRows.value = [blankKomponen()];
-      detailRows.value = [blankDetail()];
-    }
-  } catch (e: any) {
-    toast.error(e.response?.data?.message || "Gagal memuat data.");
-    router.push("/garmen/pemakaian-obat");
-  } finally {
-    isLoading.value = false;
-  }
-};
-
-onMounted(loadData);
-
 // --- SPK ---
 const spkModalOpen = ref(false);
 
@@ -178,30 +213,30 @@ const resolveSpkNomor = async (nomorSpk: string) => {
   try {
     const res = await pemakaianObatFormService.resolveSpk(nomorSpk);
     const d = res.data.data;
-    namaBarang.value = d.namaBarang;
-    jenisBarang.value = d.jenisBarang;
-    jumlahSpk.value = d.jumlah;
+    fd.value.namaBarang = d.namaBarang;
+    fd.value.jenisBarang = d.jenisBarang;
+    fd.value.jumlahSpk = d.jumlah;
   } catch (e: any) {
     toast.error(e.response?.data?.message || "Nomor SPK tersebut tidak ada.");
-    namaBarang.value = "";
-    jenisBarang.value = "";
-    jumlahSpk.value = null;
+    fd.value.namaBarang = "";
+    fd.value.jenisBarang = "";
+    fd.value.jumlahSpk = null;
     if (!isEditMode.value) spkNomorRef.value?.focus();
   }
 };
 
 const onSpkBlur = () => {
-  if (!spkNomor.value.trim()) {
-    namaBarang.value = "";
-    jenisBarang.value = "";
-    jumlahSpk.value = null;
+  if (!fd.value.spkNomor.trim()) {
+    fd.value.namaBarang = "";
+    fd.value.jenisBarang = "";
+    fd.value.jumlahSpk = null;
     return;
   }
-  resolveSpkNomor(spkNomor.value.trim());
+  resolveSpkNomor(fd.value.spkNomor.trim());
 };
 
 const onSpkSelected = (item: any) => {
-  spkNomor.value = item.Nomor;
+  fd.value.spkNomor = item.Nomor;
   resolveSpkNomor(item.Nomor);
 };
 
@@ -217,21 +252,21 @@ const komponenModalOpen = ref(false);
 const activeKomponenIdx = ref<number | null>(null);
 
 const openKomponenModal = (idx: number) => {
-  if (komponenRows.value[idx].nama) return;
+  if (fd.value.komponenRows[idx].nama) return;
   activeKomponenIdx.value = idx;
   komponenModalOpen.value = true;
 };
 
 const applyKomponenToRow = (idx: number, kode: string, nama: string) => {
-  const dupIdx = komponenRows.value.findIndex(
+  const dupIdx = fd.value.komponenRows.findIndex(
     (r, i) => i !== idx && r.kode === kode,
   );
   if (dupIdx !== -1) {
     toast.warning(`Komponen ini sudah di input, di baris ${dupIdx + 1}`);
-    komponenRows.value[idx].kode = "";
+    fd.value.komponenRows[idx].kode = "";
     return;
   }
-  komponenRows.value[idx] = { kode, nama, hasil: 0 };
+  fd.value.komponenRows[idx] = { kode, nama, hasil: 0 };
   ensureTrailingKomponen();
   nextTick(() => komponenHasilRefs.value[idx]?.focus());
 };
@@ -250,14 +285,14 @@ const onKomponenKeydown = (e: KeyboardEvent, idx: number) => {
 };
 
 const onKomponenKodeBlur = async (idx: number) => {
-  const kode = (komponenRows.value[idx].kode || "").trim();
-  if (!kode || komponenRows.value[idx].nama) return;
+  const kode = (fd.value.komponenRows[idx].kode || "").trim();
+  if (!kode || fd.value.komponenRows[idx].nama) return;
   try {
     const res = await pemakaianObatFormService.resolveKomponen(kode);
     applyKomponenToRow(idx, res.data.data.kode, res.data.data.nama);
   } catch (e: any) {
     toast.error(e.response?.data?.message || "Komponen ini belum ada.");
-    komponenRows.value[idx].kode = "";
+    fd.value.komponenRows[idx].kode = "";
   }
 };
 
@@ -269,7 +304,7 @@ const requestRemoveKomponen = (idx: number) => {
 };
 const confirmRemoveKomponen = () => {
   if (komponenToDeleteIdx.value === null) return;
-  komponenRows.value.splice(komponenToDeleteIdx.value, 1);
+  fd.value.komponenRows.splice(komponenToDeleteIdx.value, 1);
   ensureTrailingKomponen();
   deleteKomponenDialog.value = false;
   komponenToDeleteIdx.value = null;
@@ -278,7 +313,7 @@ const confirmRemoveKomponen = () => {
 // --- DETAIL OBAT ---
 const onJenisChange = (idx: number, e: Event) => {
   const nama = (e.target as HTMLSelectElement).value;
-  const row = detailRows.value[idx];
+  const row = fd.value.detailRows[idx];
 
   if (!nama) {
     row.jenis = "";
@@ -295,7 +330,7 @@ const onJenisChange = (idx: number, e: Event) => {
     return;
   }
 
-  const dupIdx = detailRows.value.findIndex(
+  const dupIdx = fd.value.detailRows.findIndex(
     (r, i) => i !== idx && r.okode === opt.kode,
   );
   if (dupIdx !== -1) {
@@ -311,8 +346,6 @@ const onJenisChange = (idx: number, e: Event) => {
   nextTick(() => detailJumlahRefs.value[idx]?.focus());
 };
 
-// Sinkron 2-arah Jumlah <-> Qty/Gram, HANYA kalau satuan===KG
-// (replikasi cljumlah/clQty PropertiesEditValueChanged persis)
 const onJumlahInput = (row: DetailRow) => {
   if (row.satuan === "KG") {
     row.qty = Number(row.jumlah || 0) * 1000;
@@ -332,21 +365,21 @@ const requestRemoveDetail = (idx: number) => {
 };
 const confirmRemoveDetail = () => {
   if (detailToDeleteIdx.value === null) return;
-  detailRows.value.splice(detailToDeleteIdx.value, 1);
+  fd.value.detailRows.splice(detailToDeleteIdx.value, 1);
   ensureTrailingDetail();
   deleteDetailDialog.value = false;
   detailToDeleteIdx.value = null;
 };
 
-// --- VALIDASI LOKAL --- (replikasi persis btnSimpanClick)
+// --- VALIDASI LOKAL ---
 const onValidateSave = () => {
-  if (!namaBarang.value) {
+  if (!fd.value.namaBarang) {
     toast.error("Spk belum di isi.");
     spkNomorRef.value?.focus();
     return;
   }
 
-  const filledKomponen = komponenRows.value.filter((r) => r.kode);
+  const filledKomponen = fd.value.komponenRows.filter((r) => r.kode);
   if (filledKomponen.length === 0) {
     return toast.error("Komponen harus diisi.");
   }
@@ -356,7 +389,7 @@ const onValidateSave = () => {
     }
   }
 
-  const filledDetail = detailRows.value.filter((r) => r.jenis);
+  const filledDetail = fd.value.detailRows.filter((r) => r.jenis);
   if (filledDetail.length === 0) {
     return toast.error("Detail harus diisi.");
   }
@@ -372,65 +405,49 @@ const onValidateSave = () => {
   showSaveDialog.value = true;
 };
 
-// --- SUBMIT SIMPAN ---
-const onConfirmSave = async () => {
-  isSaving.value = true;
+// --- LOAD (dipakai saat mount & saat Batal — sama seperti loadData() lama) ---
+const loadInitial = async () => {
+  isLoading.value = true;
   try {
-    const payload = {
-      tanggal: tanggal.value,
-      spkNomor: spkNomor.value,
-      namaBarang: namaBarang.value,
-      lini: lini.value,
-      keterangan: keterangan.value,
-      cabang: cabang.value,
-      komponen: komponenRows.value
-        .filter((r) => r.kode)
-        .map((r) => ({ kode: r.kode, hasil: r.hasil })),
-      details: detailRows.value
-        .filter((r) => r.jenis)
-        .map((r) => ({ jenis: r.jenis, okode: r.okode, jumlah: r.jumlah })),
-    };
-
-    let resultNomor = nomor.value;
+    await loadMeta();
     if (isEditMode.value) {
-      const res = await pemakaianObatFormService.update(nomor.value, payload);
-      resultNomor = res.data.data.nomor;
+      await fetchData();
+      ensureTrailingKomponen();
+      ensureTrailingDetail();
     } else {
-      const res = await pemakaianObatFormService.create(payload);
-      resultNomor = res.data.data.nomor;
+      fd.value = JSON.parse(JSON.stringify(init));
+      fd.value.cabang = cabangOptions.value[0] || "";
+      fd.value.lini = liniOptions.value[0] || "";
     }
-
-    showSaveDialog.value = false;
-    savedNomor.value = resultNomor;
-    showPrintDialog.value = true;
   } catch (e: any) {
-    toast.error(e.response?.data?.message || "Gagal Simpan");
+    toast.error(e.response?.data?.message || "Gagal memuat data.");
+    goBack();
   } finally {
-    isSaving.value = false;
+    isLoading.value = false;
   }
 };
 
-// --- BATAL / TUTUP ---
+// --- BATAL ---
 const onConfirmCancel = () => {
   showCancelDialog.value = false;
-  loadData();
-};
-const onConfirmClose = () => {
-  router.push("/garmen/pemakaian-obat");
+  loadInitial();
 };
 
+// --- CETAK ---
 const doCetak = () => {
   showPrintDialog.value = false;
   window.open(
     `/garmen/pemakaian-obat/print/${encodeURIComponent(savedNomor.value)}`,
     "_blank",
   );
-  router.push("/garmen/pemakaian-obat");
+  goBack();
 };
 const skipCetak = () => {
   showPrintDialog.value = false;
-  router.push("/garmen/pemakaian-obat");
+  goBack();
 };
+
+onMounted(loadInitial);
 </script>
 
 <template>
@@ -444,16 +461,19 @@ const skipCetak = () => {
     v-model:show-cancel-dialog="showCancelDialog"
     v-model:show-close-dialog="showCloseDialog"
     @validate-save="onValidateSave"
-    @confirm-save="onConfirmSave"
+    @confirm-save="executeSave"
     @confirm-cancel="onConfirmCancel"
-    @confirm-close="onConfirmClose"
+    @confirm-close="executeClose"
   >
-    <!-- LEFT COLUMN: Header -->
     <template #left-column>
       <div class="desktop-form-section header-section">
         <div class="mb-3">
           <label class="f-label">Cabang</label>
-          <select v-model="cabang" class="sel-inp" :disabled="isCabangLocked">
+          <select
+            v-model="fd.cabang"
+            class="sel-inp"
+            :disabled="isCabangLocked"
+          >
             <option v-for="c in cabangOptions" :key="c" :value="c">
               {{ c }}
             </option>
@@ -463,7 +483,7 @@ const skipCetak = () => {
         <div class="mb-3">
           <label class="f-label">Nomor</label>
           <v-text-field
-            :model-value="nomor || '<-- Kosong = Baru'"
+            :model-value="fd.nomor || '<-- Kosong = Baru'"
             variant="outlined"
             density="compact"
             readonly
@@ -474,7 +494,7 @@ const skipCetak = () => {
         <div class="mb-3">
           <label class="f-label">Tanggal</label>
           <v-text-field
-            v-model="tanggal"
+            v-model="fd.tanggal"
             type="date"
             variant="outlined"
             density="compact"
@@ -487,7 +507,7 @@ const skipCetak = () => {
           <div class="cell-grp">
             <input
               :ref="(el) => (spkNomorRef = el as any)"
-              v-model="spkNomor"
+              v-model="fd.spkNomor"
               class="ci"
               placeholder="F1 / nomor SPK + Enter"
               autocomplete="off"
@@ -511,7 +531,7 @@ const skipCetak = () => {
         <div class="mb-3">
           <label class="f-label">Product</label>
           <v-text-field
-            :model-value="namaBarang"
+            :model-value="fd.namaBarang"
             variant="outlined"
             density="compact"
             readonly
@@ -522,7 +542,7 @@ const skipCetak = () => {
         <div class="mb-3">
           <label class="f-label">Jenis Produk</label>
           <v-text-field
-            :model-value="jenisBarang"
+            :model-value="fd.jenisBarang"
             variant="outlined"
             density="compact"
             readonly
@@ -533,7 +553,7 @@ const skipCetak = () => {
         <div class="mb-3">
           <label class="f-label">Jumlah Spk</label>
           <v-text-field
-            :model-value="jumlahSpk !== null ? numFmt(jumlahSpk) : ''"
+            :model-value="fd.jumlahSpk !== null ? numFmt(fd.jumlahSpk) : ''"
             variant="outlined"
             density="compact"
             readonly
@@ -543,7 +563,7 @@ const skipCetak = () => {
 
         <div class="mb-3">
           <label class="f-label">Lini</label>
-          <select v-model="lini" class="sel-inp">
+          <select v-model="fd.lini" class="sel-inp">
             <option v-for="l in liniOptions" :key="l" :value="l">
               {{ l }}
             </option>
@@ -554,7 +574,7 @@ const skipCetak = () => {
           <label class="f-label">Keterangan</label>
           <v-text-field
             :ref="(el) => (keteranganRef = el as any)"
-            v-model="keterangan"
+            v-model="fd.keterangan"
             variant="outlined"
             density="compact"
             hide-details
@@ -565,7 +585,6 @@ const skipCetak = () => {
 
     <template #right-column>
       <div class="two-table-wrap">
-        <!-- Tabel Komponen (kecil) -->
         <div class="table-panel komponen-panel">
           <div class="grid-title">Komponen</div>
           <table class="detail-table">
@@ -579,7 +598,7 @@ const skipCetak = () => {
               </tr>
             </thead>
             <tbody>
-              <tr v-for="(row, idx) in komponenRows" :key="idx">
+              <tr v-for="(row, idx) in fd.komponenRows" :key="idx">
                 <td class="text-center">{{ idx + 1 }}</td>
                 <td class="p0">
                   <div class="cell-grp">
@@ -647,7 +666,6 @@ const skipCetak = () => {
           </table>
         </div>
 
-        <!-- Tabel Detail Obat (lebih besar) -->
         <div class="table-panel obat-panel">
           <div class="grid-title">Detail Pemakaian Obat</div>
           <table class="detail-table">
@@ -663,7 +681,7 @@ const skipCetak = () => {
               </tr>
             </thead>
             <tbody>
-              <tr v-for="(row, idx) in detailRows" :key="idx">
+              <tr v-for="(row, idx) in fd.detailRows" :key="idx">
                 <td class="text-center">{{ idx + 1 }}</td>
                 <td class="mono-cell">{{ row.okode }}</td>
                 <td class="p0">

@@ -49,6 +49,11 @@ const allApprovals = [
     label: "Approve SO/MAP Tanpa Nomor PO",
     menuId: "268",
   },
+  {
+    id: "realisasi_beda_bahan",
+    label: "Approve Realisasi Beda Bahan",
+    menuId: "269",
+  },
 ];
 
 // Tampilkan hanya yang memiliki akses 'view'
@@ -112,6 +117,9 @@ const ApprovalSpkCetakUlangComponent = defineAsyncComponent(
 const ApprovalNoPoComponent = defineAsyncComponent(
   () => import("./components/ApprovalNoPo.vue"),
 );
+const ApprovalRealisasiBedaBahanComponent = defineAsyncComponent(
+  () => import("./components/ApprovalRealisasiBedaBahan.vue"),
+);
 
 // Logic Penentuan Komponen Dinamis
 const currentComponent = computed(() => {
@@ -136,7 +144,9 @@ const currentComponent = computed(() => {
     return ApprovalMutasiNoPlanComponent;
   if (selectedApproval.value === "spk_cetak_ulang")
     return ApprovalSpkCetakUlangComponent;
-  if (selectedApproval.value === "nopo") return ApprovalNoPoComponent; // ← tambahan
+  if (selectedApproval.value === "nopo") return ApprovalNoPoComponent;
+  if (selectedApproval.value === "realisasi_beda_bahan")
+    return ApprovalRealisasiBedaBahanComponent;
   return null;
 });
 </script>

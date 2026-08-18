@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, nextTick } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import { ref, computed, nextTick } from "vue";
 import { useToast } from "vue-toastification";
 import BaseForm from "@/components/BaseForm.vue";
+import { useForm } from "@/composables/useForm";
 import BpbSearchModal from "@/components/lookups/BpbSearchModal.vue";
 import { returPembelianFormService } from "@/services/garmen/returPembelianFormService";
 import { IconTruckOff, IconSearch } from "@tabler/icons-vue";
@@ -15,27 +15,28 @@ interface DetailRow {
   jumlah: number;
 }
 
-const route = useRoute();
-const router = useRouter();
+interface SupplierInfo {
+  kode: string;
+  nama: string;
+  alamat: string;
+  kota: string;
+}
+
+interface ReturPembelianFormData {
+  nomor: string;
+  jenis: string;
+  tanggal: string;
+  keterangan: string;
+  bpbNomor: string;
+  bpbTanggal: string;
+  supplier: SupplierInfo;
+  statusPin5: string;
+  rows: DetailRow[];
+}
+
 const toast = useToast();
 
-const nomorParam = computed(() => route.params.nomor as string | undefined);
-const isEditMode = computed(() => !!nomorParam.value);
-
-const isLoading = ref(true);
-const isSaving = ref(false);
-
-const showSaveDialog = ref(false);
-const showCancelDialog = ref(false);
-const showCloseDialog = ref(false);
-
-// --- STATE HEADER ---
-const nomor = ref("");
-const jenis = ref(
-  sessionStorage.getItem("last_jenis_retur_pembelian") || "ACCESORIES",
-);
-const tanggal = ref(getLocalDate());
-const keterangan = ref("");
+const BROWSE_PATH = "/garmen/barang/retur-pembelian";
 
 function getLocalDate(d = new Date()) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
@@ -43,32 +44,109 @@ function getLocalDate(d = new Date()) {
   ).padStart(2, "0")}`;
 }
 
-// --- STATE BPB & SUPPLIER (auto-fill, read-only, immutable setelah create) ---
-const bpbNomor = ref("");
-const bpbTanggal = ref("");
-const supKode = ref("");
-const supNama = ref("");
-const supAlamat = ref("");
-const supKota = ref("");
-
-const isBpbLocked = computed(() => isEditMode.value); // edtbpb.Enabled:=False pasca-load
-
-// --- STATE APPROVAL (PIN5) — pola sama Retur Barang/Koreksi Stok ---
-const statusPin5 = ref("");
 const statusLabel: Record<string, { text: string; color: string }> = {
   MINTA: { text: "Perlu Pengajuan", color: "#c62828" },
   WAIT: { text: "Nunggu ACC", color: "#1976d2" },
   ACC: { text: "Sudah ACC", color: "#2e7d32" },
   TOLAK: { text: "Ditolak", color: "#c62828" },
 };
+
+// ── fetchApi / submitApi ────────────────────────────────────────────────
+const fetchApi = async (): Promise<ReturPembelianFormData> => {
+  const nomorEdit = params.nomor as string;
+  const res = await returPembelianFormService.getFormData(nomorEdit);
+  const d = res.data.data;
+  return {
+    nomor: d.nomor,
+    jenis: d.jenis,
+    tanggal: String(d.tanggal).substring(0, 10),
+    keterangan: d.keterangan,
+    bpbNomor: d.bpbNomor,
+    bpbTanggal: d.bpbTanggal ? String(d.bpbTanggal).substring(0, 10) : "",
+    supplier: {
+      kode: d.supplier.kode || "",
+      nama: d.supplier.nama || "",
+      alamat: d.supplier.alamat || "",
+      kota: d.supplier.kota || "",
+    },
+    statusPin5: d.statusPin5,
+    rows: d.details.map((r: any) => ({
+      kode: r.kode,
+      nama: r.nama,
+      satuan: r.satuan,
+      qtyBpb: Number(r.qtyBpb) || 0,
+      jumlah: Number(r.jumlah) || 0,
+    })),
+  };
+};
+
+const submitApi = async (data: ReturPembelianFormData) => {
+  const payload = {
+    jenis: data.jenis,
+    tanggal: data.tanggal,
+    keterangan: data.keterangan,
+    bpbNomor: data.bpbNomor,
+    supKode: data.supplier.kode,
+    details: data.rows.map((r) => ({ kode: r.kode, jumlah: r.jumlah })),
+  };
+  return isEditMode.value
+    ? returPembelianFormService.update(data.nomor, payload)
+    : returPembelianFormService.create(payload);
+};
+
+// ── useForm ──────────────────────────────────────────────────────────────
+const {
+  isEditMode,
+  isLoading,
+  isSaving,
+  showSaveDialog,
+  showCancelDialog,
+  showCloseDialog,
+  formData,
+  fetchData,
+  executeSave,
+  executeCancel,
+  executeClose,
+  params,
+} = useForm<ReturPembelianFormData>({
+  menuId: "68",
+  initialData: {
+    nomor: "",
+    jenis: sessionStorage.getItem("last_jenis_retur_pembelian") || "ACCESORIES",
+    tanggal: getLocalDate(),
+    keterangan: "",
+    bpbNomor: "",
+    bpbTanggal: "",
+    supplier: { kode: "", nama: "", alamat: "", kota: "" },
+    statusPin5: "",
+    rows: [],
+  },
+  fetchApi,
+  submitApi,
+  onSuccessRoute: BROWSE_PATH,
+  immediate: false,
+  onSuccess: (res: any) => {
+    savedNomor.value = res?.data?.data?.nomor || formData.value.nomor;
+    showPrintDialog.value = true;
+  },
+});
+
+const fd = formData;
 const isSaveBlocked = computed(() =>
-  ["MINTA", "WAIT", "TOLAK"].includes(statusPin5.value),
+  ["MINTA", "WAIT", "TOLAK"].includes(fd.value.statusPin5),
 );
 
-// --- STATE DETAIL (grid 100% dari BPB — TIDAK ada tambah/hapus/cari
-// barang manual, sesuai temuan: cxGrdMainEditKeyDown F1/F2 di-comment-out
-// total di source Delphi. Satu-satunya interaksi user = isi Jumlah) ---
-const rows = ref<DetailRow[]>([]);
+// BPB terkunci begitu sudah edit mode (nomor BPB immutable pasca-create)
+const isBpbLocked = computed(() => isEditMode.value);
+
+const loadData = async () => {
+  await fetchData();
+  if (!isEditMode.value) {
+    await nextTick();
+    bpbInputRef.value?.focus();
+  }
+};
+loadData();
 
 // --- MODAL BPB ---
 const bpbModalOpen = ref(false);
@@ -82,17 +160,19 @@ const openBpbModal = () => {
 const resolveBpb = async (nomorBpb: string) => {
   try {
     const res = await returPembelianFormService.resolveBpb(
-      jenis.value,
+      fd.value.jenis,
       nomorBpb,
     );
     const d = res.data.data;
-    bpbNomor.value = d.bpbNomor;
-    bpbTanggal.value = String(d.bpbTanggal).substring(0, 10);
-    supKode.value = d.supplier.kode || "";
-    supNama.value = d.supplier.nama || "";
-    supAlamat.value = d.supplier.alamat || "";
-    supKota.value = d.supplier.kota || "";
-    rows.value = d.details.map((r: any) => ({
+    fd.value.bpbNomor = d.bpbNomor;
+    fd.value.bpbTanggal = String(d.bpbTanggal).substring(0, 10);
+    fd.value.supplier = {
+      kode: d.supplier.kode || "",
+      nama: d.supplier.nama || "",
+      alamat: d.supplier.alamat || "",
+      kota: d.supplier.kota || "",
+    };
+    fd.value.rows = d.details.map((r: any) => ({
       kode: r.kode,
       nama: r.nama,
       satuan: r.satuan,
@@ -101,8 +181,8 @@ const resolveBpb = async (nomorBpb: string) => {
     }));
   } catch (e: any) {
     toast.error(e.response?.data?.message || "BPB tsb belum ada.");
-    bpbNomor.value = "";
-    rows.value = [];
+    fd.value.bpbNomor = "";
+    fd.value.rows = [];
   }
 };
 
@@ -119,111 +199,39 @@ const onBpbKeydown = (e: KeyboardEvent) => {
 };
 
 const onBpbBlur = () => {
-  const val = (bpbNomor.value || "").trim();
+  const val = (fd.value.bpbNomor || "").trim();
   if (!val || isBpbLocked.value) return;
   resolveBpb(val);
 };
 
-// --- LOAD DATA ---
-const loadData = async () => {
-  isLoading.value = true;
-  try {
-    if (isEditMode.value) {
-      const res = await returPembelianFormService.getFormData(
-        nomorParam.value!,
-      );
-      const d = res.data.data;
-      nomor.value = d.nomor;
-      jenis.value = d.jenis;
-      tanggal.value = String(d.tanggal).substring(0, 10);
-      keterangan.value = d.keterangan;
-      bpbNomor.value = d.bpbNomor;
-      bpbTanggal.value = d.bpbTanggal
-        ? String(d.bpbTanggal).substring(0, 10)
-        : "";
-      supKode.value = d.supplier.kode || "";
-      supNama.value = d.supplier.nama || "";
-      supAlamat.value = d.supplier.alamat || "";
-      supKota.value = d.supplier.kota || "";
-      statusPin5.value = d.statusPin5;
-      rows.value = d.details.map((r: any) => ({
-        kode: r.kode,
-        nama: r.nama,
-        satuan: r.satuan,
-        qtyBpb: Number(r.qtyBpb) || 0,
-        jumlah: Number(r.jumlah) || 0,
-      }));
-    } else {
-      keterangan.value = "";
-      rows.value = [];
-      await nextTick();
-      bpbInputRef.value?.focus();
-    }
-  } catch (e: any) {
-    toast.error(e.response?.data?.message || "Gagal memuat data.");
-    router.push("/garmen/barang/retur-pembelian");
-  } finally {
-    isLoading.value = false;
-  }
-};
-
-onMounted(loadData);
-
 // --- VALIDASI LOKAL ---
-// ⚠️ Tidak ada validasi Keterangan wajib (beda dari Koreksi Stok/Retur
-// Barang) — form Delphi ini memang tidak cek edtKeterangan sama sekali.
+// Tidak ada validasi Keterangan wajib — replikasi form Delphi asli yang
+// memang tidak cek edtKeterangan sama sekali.
 const onValidateSave = () => {
   if (isSaveBlocked.value) {
-    return toast.warning(
+    toast.warning(
       "Transaksi tsb sudah diclose. Silahkan minta approve untuk bisa menyimpan perubahan data.",
     );
+    return;
   }
-  if (!isEditMode.value && !bpbNomor.value) {
-    return toast.error("Nomor BPB belum diisi.");
+  if (!isEditMode.value && !fd.value.bpbNomor) {
+    toast.error("Nomor BPB belum diisi.");
+    return;
   }
-
-  const totalQty = rows.value.reduce((s, r) => s + (Number(r.jumlah) || 0), 0);
+  const totalQty = fd.value.rows.reduce(
+    (s, r) => s + (Number(r.jumlah) || 0),
+    0,
+  );
   if (totalQty === 0) {
-    return toast.error("Qty Retur 0 semua , tidak bisa di simpan.");
+    toast.error("Qty Retur 0 semua , tidak bisa di simpan.");
+    return;
   }
-
   showSaveDialog.value = true;
 };
 
-// --- SUBMIT SIMPAN ---
+// --- PRINT DIALOG ---
 const showPrintDialog = ref(false);
 const savedNomor = ref("");
-
-const onConfirmSave = async () => {
-  isSaving.value = true;
-  try {
-    const payload = {
-      jenis: jenis.value,
-      tanggal: tanggal.value,
-      keterangan: keterangan.value,
-      bpbNomor: bpbNomor.value,
-      supKode: supKode.value,
-      details: rows.value.map((r) => ({ kode: r.kode, jumlah: r.jumlah })),
-    };
-
-    let resultNomor = nomor.value;
-    if (isEditMode.value) {
-      const res = await returPembelianFormService.update(nomor.value, payload);
-      resultNomor = res.data.data.nomor;
-    } else {
-      const res = await returPembelianFormService.create(payload);
-      resultNomor = res.data.data.nomor;
-    }
-
-    showSaveDialog.value = false;
-    savedNomor.value = resultNomor;
-    showPrintDialog.value = true;
-  } catch (e: any) {
-    toast.error(e.response?.data?.message || "Gagal Simpan.");
-  } finally {
-    isSaving.value = false;
-  }
-};
 
 const doCetak = () => {
   showPrintDialog.value = false;
@@ -231,25 +239,17 @@ const doCetak = () => {
     `/garmen/barang/retur-pembelian/print/${encodeURIComponent(savedNomor.value)}`,
     "_blank",
   );
-  router.push("/garmen/barang/retur-pembelian");
-};
-const skipCetak = () => {
-  showPrintDialog.value = false;
-  router.push("/garmen/barang/retur-pembelian");
+  executeClose();
 };
 
-// --- BATAL / TUTUP ---
-const onConfirmCancel = () => {
-  showCancelDialog.value = false;
-  loadData();
-};
-const onConfirmClose = () => {
-  router.push("/garmen/barang/retur-pembelian");
+const skipCetak = () => {
+  showPrintDialog.value = false;
+  executeClose();
 };
 
 const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
 
-// Enter -> pindah antar field (Tanggal -> BPB -> Keterangan -> grid Jumlah)
+// Enter -> pindah antar field
 const tanggalRef = ref<HTMLInputElement | null>(null);
 const keteranganRef = ref<HTMLInputElement | null>(null);
 const jumlahRefs = ref<Record<number, HTMLInputElement | null>>({});
@@ -298,7 +298,9 @@ const onJumlahInput = (row: DetailRow, e: Event) => {
 
 <template>
   <BaseForm
-    :title="isEditMode ? `Ubah Retur Beli ${jenis}` : `Retur Beli ${jenis}`"
+    :title="
+      isEditMode ? `Ubah Retur Beli ${fd.jenis}` : `Retur Beli ${fd.jenis}`
+    "
     menu-id="68"
     :icon="IconTruckOff"
     :is-loading="isLoading"
@@ -307,28 +309,27 @@ const onJumlahInput = (row: DetailRow, e: Event) => {
     v-model:show-cancel-dialog="showCancelDialog"
     v-model:show-close-dialog="showCloseDialog"
     @validate-save="onValidateSave"
-    @confirm-save="onConfirmSave"
-    @confirm-cancel="onConfirmCancel"
-    @confirm-close="onConfirmClose"
+    @confirm-save="executeSave"
+    @confirm-cancel="executeCancel"
+    @confirm-close="executeClose"
   >
-    <!-- LEFT COLUMN: Header -->
     <template #left-column>
       <div class="desktop-form-section header-section">
         <div class="mb-3">
           <label class="f-label">Nomor</label>
           <v-text-field
-            :model-value="nomor || '<-- Kosong = Baru'"
+            :model-value="fd.nomor || '<-- Kosong = Baru'"
             variant="outlined"
             density="compact"
             readonly
             hide-details
           />
-          <div v-if="statusPin5" class="mt-1">
+          <div v-if="fd.statusPin5" class="mt-1">
             <span
               class="status-badge"
-              :style="{ background: statusLabel[statusPin5]?.color }"
+              :style="{ background: statusLabel[fd.statusPin5]?.color }"
             >
-              {{ statusLabel[statusPin5]?.text || statusPin5 }}
+              {{ statusLabel[fd.statusPin5]?.text || fd.statusPin5 }}
             </span>
           </div>
         </div>
@@ -337,7 +338,7 @@ const onJumlahInput = (row: DetailRow, e: Event) => {
           <label class="f-label">Tanggal</label>
           <input
             ref="tanggalRef"
-            v-model="tanggal"
+            v-model="fd.tanggal"
             type="date"
             class="f-inp"
             @keydown.enter.prevent="onTanggalEnter"
@@ -349,7 +350,7 @@ const onJumlahInput = (row: DetailRow, e: Event) => {
           <div class="f-inp-grp">
             <input
               ref="bpbInputRef"
-              v-model="bpbNomor"
+              v-model="fd.bpbNomor"
               class="f-inp"
               style="flex: 1"
               :readonly="isBpbLocked"
@@ -368,14 +369,16 @@ const onJumlahInput = (row: DetailRow, e: Event) => {
               <IconSearch :size="13" color="#1565c0" />
             </button>
           </div>
-          <div v-if="bpbTanggal" class="f-hint">Tgl BPB: {{ bpbTanggal }}</div>
+          <div v-if="fd.bpbTanggal" class="f-hint">
+            Tgl BPB: {{ fd.bpbTanggal }}
+          </div>
         </div>
 
         <div class="mb-3">
           <label class="f-label">Keterangan</label>
           <input
             ref="keteranganRef"
-            v-model="keterangan"
+            v-model="fd.keterangan"
             class="f-inp"
             style="width: 100%"
             @keydown.enter.prevent="onKeteranganEnter"
@@ -386,25 +389,25 @@ const onJumlahInput = (row: DetailRow, e: Event) => {
       <div class="desktop-form-section">
         <div class="f-label mb-2">Supplier</div>
         <input
-          :value="supKode"
+          :value="fd.supplier.kode"
           readonly
           class="f-inp f-ro mb-1"
           style="width: 100%"
         />
         <input
-          :value="supNama"
+          :value="fd.supplier.nama"
           readonly
           class="f-inp f-ro mb-1"
           style="width: 100%"
         />
         <input
-          :value="supAlamat"
+          :value="fd.supplier.alamat"
           readonly
           class="f-inp f-ro mb-1"
           style="width: 100%"
         />
         <input
-          :value="supKota"
+          :value="fd.supplier.kota"
           readonly
           class="f-inp f-ro"
           style="width: 100%"
@@ -412,8 +415,6 @@ const onJumlahInput = (row: DetailRow, e: Event) => {
       </div>
     </template>
 
-    <!-- RIGHT COLUMN: Tabel Detail (semua baris dari BPB, TIDAK ada
-         tambah/hapus/cari barang manual) -->
     <template #right-column>
       <div class="desktop-form-section" style="flex: 1">
         <table class="detail-table">
@@ -428,7 +429,7 @@ const onJumlahInput = (row: DetailRow, e: Event) => {
             </tr>
           </thead>
           <tbody>
-            <tr v-for="(row, idx) in rows" :key="row.kode">
+            <tr v-for="(row, idx) in fd.rows" :key="row.kode">
               <td class="text-center">{{ idx + 1 }}</td>
               <td>{{ row.kode }}</td>
               <td>{{ row.nama }}</td>
@@ -447,7 +448,7 @@ const onJumlahInput = (row: DetailRow, e: Event) => {
                 />
               </td>
             </tr>
-            <tr v-if="!rows.length">
+            <tr v-if="!fd.rows.length">
               <td colspan="6" class="empty-row">
                 Belum ada data — cari No. BPB terlebih dahulu.
               </td>
@@ -461,7 +462,7 @@ const onJumlahInput = (row: DetailRow, e: Event) => {
   <BpbSearchModal
     v-model="bpbModalOpen"
     endpoint="/garmen/barang/retur-pembelian/form/search-bpb"
-    :extra-params="{ jenis: jenis }"
+    :extra-params="{ jenis: fd.jenis }"
     title="Cari No. BPB Garmen"
     @selected="onBpbSelected"
   />

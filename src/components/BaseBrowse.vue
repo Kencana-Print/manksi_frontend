@@ -23,6 +23,8 @@ import {
   IconDatabaseOff,
   IconAlertTriangle,
 } from "@tabler/icons-vue";
+import { useRoute } from "vue-router";
+import { useTabsStore } from "@/stores/tabsStore";
 
 const props = withDefaults(
   defineProps<{
@@ -85,6 +87,13 @@ const emit = defineEmits([
   "update:selected",
   "update:filterState",
 ]);
+
+const route = useRoute();
+const tabsStore = useTabsStore();
+
+const closeCurrentTab = () => {
+  tabsStore.closeTab(route.path);
+};
 
 // ── Session storage key — unik per halaman berdasarkan menuId ──────────
 const storageKey = computed(() => `browse_filter_${props.menuId}`);
@@ -781,7 +790,7 @@ watch(
         Export
       </v-btn>
       <slot name="extra-actions" :selected="internalSelected" />
-      <v-btn size="small" variant="text" @click="$router.back()">
+      <v-btn size="small" variant="text" @click="closeCurrentTab">
         <template #prepend><IconX :size="15" :stroke-width="2" /></template>
         Tutup
       </v-btn>

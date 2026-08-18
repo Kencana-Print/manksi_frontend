@@ -3,6 +3,7 @@ import { jwtDecode } from "jwt-decode";
 import { defineStore } from "pinia";
 import { computed, ref } from "vue";
 import { useRouter } from "vue-router";
+import { useTabsStore } from "@/stores/tabsStore";
 
 // --- INTERFACES SESUAI PAYLOAD MANKSI ---
 interface Gudang {
@@ -164,6 +165,7 @@ export const useAuthStore = defineStore(
       user.value = null;
       permissions.value = [];
       spkUrgent.value = [];
+      useTabsStore().resetTabs();
       router.push("/login");
     }
 
@@ -187,6 +189,7 @@ export const useAuthStore = defineStore(
       permissions.value = [];
       spkUrgent.value = [];
       isSessionExpired.value = true;
+      useTabsStore().resetTabs();
     }
 
     function setApprovalPendingTotal(n: number) {

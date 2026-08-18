@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, nextTick } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import { useRoute } from "vue-router";
 import { useToast } from "vue-toastification";
+import { useForm } from "@/composables/useForm";
 import BaseForm from "@/components/BaseForm.vue";
 import SupplierSearchModal from "@/components/lookups/SupplierSearchModal.vue";
 import SpkSearchModal from "@/components/lookups/SpkSearchModal.vue";
@@ -23,27 +24,25 @@ interface DetailRow {
   jumlah: number;
   harga: number;
   ket: string;
-  idgambar: string; // existing idgambar dari server (kosong kalau belum ada)
-  imageUrl: string | null; // preview existing (dari server) ATAU objectURL file baru
-  newFile: File | null; // file baru yang dipilih user (belum di-upload)
-  removeImage: boolean; // user hapus gambar existing
+  idgambar: string;
+  imageUrl: string | null;
+  removeImage: boolean;
+}
+
+interface PoPaperprintFormData {
+  nomor: string;
+  tanggal: string;
+  dateline: string;
+  cabang: string;
+  supKode: string;
+  supNama: string;
+  supAlamat: string;
+  keterangan: string;
+  rows: DetailRow[];
 }
 
 const route = useRoute();
-const router = useRouter();
 const toast = useToast();
-
-const nomorParam = computed(() => route.params.nomor as string | undefined);
-const isEditMode = computed(() => !!nomorParam.value);
-
-const isLoading = ref(true);
-const isSaving = ref(false);
-
-const showSaveDialog = ref(false);
-const showCancelDialog = ref(false);
-const showCloseDialog = ref(false);
-const showPrintDialog = ref(false);
-const savedNomor = ref("");
 
 function getLocalDate(d = new Date()) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
@@ -51,26 +50,6 @@ function getLocalDate(d = new Date()) {
   ).padStart(2, "0")}`;
 }
 
-// --- STATE HEADER ---
-const nomor = ref("");
-const tanggal = ref(getLocalDate());
-const dateline = ref(getLocalDate());
-const cabang = ref("");
-const supKode = ref("");
-const supNama = ref("");
-const supAlamat = ref("");
-const keterangan = ref("");
-
-// --- META ---
-const cabangOptions = ref<string[]>([]);
-const ukuranOptions = ref<string[]>([]);
-const bahanOptions = ref<string[]>([]);
-
-// ⚠️ Cabang TIDAK dikunci saat edit — dikonfirmasi tidak ada
-// cbcab.Enabled:=False di manapun pada source ini (beda dari modul lain)
-
-// --- GRID DETAIL ---
-const rows = ref<DetailRow[]>([]);
 const blankRow = (): DetailRow => ({
   spk: "",
   nama: "",
@@ -82,52 +61,63 @@ const blankRow = (): DetailRow => ({
   ket: "",
   idgambar: "",
   imageUrl: null,
-  newFile: null,
   removeImage: false,
 });
-const ensureTrailingRow = () => {
-  const last = rows.value[rows.value.length - 1];
-  if (!last || last.spk) rows.value.push(blankRow());
+
+// ⚠️ Default supplier hardcode dimasukkan langsung ke initial state
+// (bukan di-assign setelah mount) supaya snapshot "Batal" konsisten.
+const init: PoPaperprintFormData = {
+  nomor: "",
+  tanggal: getLocalDate(),
+  dateline: getLocalDate(),
+  cabang: "",
+  supKode: "00164",
+  supNama: "MMT KENCANA PRINT",
+  supAlamat: "DEMEN, JERON, NOGOSARI",
+  keterangan: "",
+  rows: [blankRow()],
 };
 
-const totalJumlah = computed(() =>
-  rows.value.reduce((s, r) => (r.spk ? s + Number(r.jumlah || 0) : s), 0),
-);
-const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
+// File gambar per baris TERPISAH dari formData — File object tidak bisa
+// di-JSON.stringify (dipakai useForm buat snapshot Batal), jadi disimpan
+// di sini, keyed by index baris.
+const rowFiles = ref<Record<number, File>>({});
 
-// ══ Refs focus-chain ══
-const spkRefs = ref<Record<number, HTMLInputElement | null>>({});
-const jumlahRefs = ref<Record<number, HTMLInputElement | null>>({});
-const ketRefs = ref<Record<number, HTMLInputElement | null>>({});
-const fileInputRefs = ref<Record<number, HTMLInputElement | null>>({});
+const showPrintDialog = ref(false);
+const savedNomor = ref("");
 
-// --- LOAD META ---
-const loadMeta = async () => {
-  const res = await poPaperprintFormService.getMeta();
-  cabangOptions.value = res.data.data.cabangOptions;
-  ukuranOptions.value = res.data.data.ukuranOptions;
-  bahanOptions.value = res.data.data.bahanOptions;
-};
+const {
+  isEditMode,
+  isLoading,
+  isSaving,
+  showSaveDialog,
+  showCancelDialog,
+  showCloseDialog,
+  formData,
+  fetchData,
+  executeSave,
+  executeClose,
+  goBack,
+} = useForm<PoPaperprintFormData>({
+  menuId: "103",
+  initialData: init,
+  immediate: false, // meta cabang/ukuran/bahan perlu dimuat dulu — manual di onMounted
+  onSuccessRoute: "/garmen/po-paperprint",
 
-// --- LOAD DATA ---
-const loadData = async () => {
-  isLoading.value = true;
-  try {
-    await loadMeta();
-
-    if (isEditMode.value) {
-      const res = await poPaperprintFormService.getFormData(nomorParam.value!);
-      const d = res.data.data;
-      nomor.value = d.pjh_nomor;
-      tanggal.value = String(d.pjh_tanggal).substring(0, 10);
-      dateline.value = String(d.pjh_dateline).substring(0, 10);
-      cabang.value = d.pjh_cab;
-      supKode.value = d.pjh_sup_kode;
-      supNama.value = d.sup_nama;
-      supAlamat.value = d.sup_alamat;
-      keterangan.value = d.pjh_ket || "";
-
-      rows.value = (d.details || []).map((r: any) => ({
+  fetchApi: async (): Promise<PoPaperprintFormData> => {
+    const nomorParam = route.params.nomor as string;
+    const res = await poPaperprintFormService.getFormData(nomorParam);
+    const d = res.data.data;
+    return {
+      nomor: d.pjh_nomor,
+      tanggal: String(d.pjh_tanggal).substring(0, 10),
+      dateline: String(d.pjh_dateline).substring(0, 10),
+      cabang: d.pjh_cab,
+      supKode: d.pjh_sup_kode,
+      supNama: d.sup_nama,
+      supAlamat: d.sup_alamat,
+      keterangan: d.pjh_ket || "",
+      rows: (d.details || []).map((r: any) => ({
         spk: r.spk,
         nama: r.nama,
         ukuran: r.ukuran || "",
@@ -138,48 +128,107 @@ const loadData = async () => {
         ket: r.ket || "",
         idgambar: r.idgambar || "",
         imageUrl: r.hasImage ? r.imageUrl : null,
-        newFile: null,
         removeImage: false,
-      }));
-      ensureTrailingRow();
-    } else {
-      // ⚠️ Default supplier hardcode — replikasi refreshdata() persis
-      cabang.value = cabangOptions.value[0] || "";
-      supKode.value = "00164";
-      supNama.value = "MMT KENCANA PRINT";
-      supAlamat.value = "DEMEN, JERON, NOGOSARI";
-      keterangan.value = "";
-      rows.value = [blankRow()];
-    }
-  } catch (e: any) {
-    toast.error(e.response?.data?.message || "Gagal memuat data.");
-    router.push("/garmen/po-paperprint");
-  } finally {
-    isLoading.value = false;
-  }
+      })),
+    };
+  },
+
+  submitApi: async (data): Promise<any> => {
+    const filled = data.rows.filter((r) => r.spk);
+
+    const payload = new FormData();
+    const detailsPayload = filled.map((r) => {
+      const originalIdx = data.rows.indexOf(r);
+      const file = rowFiles.value[originalIdx];
+      const fieldName = file ? `img_${originalIdx}` : null;
+      if (file) payload.append(fieldName as string, file);
+      return {
+        spk: r.spk,
+        nama: r.nama,
+        ukuran: r.ukuran,
+        bahan: r.bahan,
+        finishing: r.finishing,
+        jumlah: r.jumlah,
+        harga: r.harga,
+        ket: r.ket,
+        idgambar: r.idgambar,
+        newImageField: fieldName,
+        removeImage: r.removeImage,
+      };
+    });
+
+    payload.append(
+      "data",
+      JSON.stringify({
+        tanggal: data.tanggal,
+        dateline: data.dateline,
+        cabang: data.cabang,
+        supKode: data.supKode,
+        keterangan: data.keterangan,
+        details: detailsPayload,
+      }),
+    );
+
+    return isEditMode.value
+      ? poPaperprintFormService.update(data.nomor, payload)
+      : poPaperprintFormService.create(payload);
+  },
+
+  onSuccess: (res: any) => {
+    savedNomor.value = res?.data?.data?.nomor || "";
+    showPrintDialog.value = true;
+  },
+});
+
+const fd = formData;
+
+// --- META ---
+const cabangOptions = ref<string[]>([]);
+const ukuranOptions = ref<string[]>([]);
+const bahanOptions = ref<string[]>([]);
+
+const loadMeta = async () => {
+  const res = await poPaperprintFormService.getMeta();
+  cabangOptions.value = res.data.data.cabangOptions;
+  ukuranOptions.value = res.data.data.ukuranOptions;
+  bahanOptions.value = res.data.data.bahanOptions;
 };
 
-onMounted(loadData);
+const ensureTrailingRow = () => {
+  const last = fd.value.rows[fd.value.rows.length - 1];
+  if (!last || last.spk) fd.value.rows.push(blankRow());
+};
+
+const totalJumlah = computed(() =>
+  fd.value.rows.reduce((s, r) => (r.spk ? s + Number(r.jumlah || 0) : s), 0),
+);
+const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
+
+// ══ Refs focus-chain ══
+const spkRefs = ref<Record<number, HTMLInputElement | null>>({});
+const jumlahRefs = ref<Record<number, HTMLInputElement | null>>({});
+const ketRefs = ref<Record<number, HTMLInputElement | null>>({});
+const fileInputRefs = ref<Record<number, HTMLInputElement | null>>({});
 
 // --- SUPPLIER ---
 const supModalOpen = ref(false);
 const supDirty = ref(false);
 
 const onSupSelected = (item: any) => {
-  supKode.value = item.Kode || item.sup_kode || "";
-  supNama.value = item.Nama || item.sup_nama || "";
-  supAlamat.value = item.Alamat || item.sup_alamat || "";
+  fd.value.supKode = item.Kode || item.sup_kode || "";
+  fd.value.supNama = item.Nama || item.sup_nama || "";
+  fd.value.supAlamat = item.Alamat || item.sup_alamat || "";
 };
 
 const onSupBlur = async () => {
-  if (!supDirty.value || !supKode.value.trim()) return;
+  if (!supDirty.value || !fd.value.supKode.trim()) return;
   supDirty.value = false;
   try {
     const res = await poPaperprintFormService.resolveSupplier(
-      supKode.value.trim(),
+      fd.value.supKode.trim(),
     );
-    supNama.value = res.data.data.nama;
-    supAlamat.value = res.data.data.alamat;
+    fd.value.supNama = res.data.data.nama;
+    fd.value.supAlamat = res.data.data.alamat;
   } catch (e: any) {
     toast.error(
       e.response?.data?.message || "Supplier tsb tidak ada di database.",
@@ -197,7 +246,8 @@ const openSpkModal = (idx: number) => {
 };
 
 // ⚠️ Auto-fill ukuran/bahan/finishing HANYA kalau cabang==='P05',
-// replikasi persis bantuanspk()/loadspk()
+// replikasi persis bantuanspk()/loadspk() — pakai fd.value.cabang
+// (bukan var lokal lagi) karena cabang sekarang bagian dari formData.
 const applySpkToRow = (
   idx: number,
   data: {
@@ -210,11 +260,11 @@ const applySpkToRow = (
     finishing?: string;
   },
 ) => {
-  const row = rows.value[idx];
+  const row = fd.value.rows[idx];
   row.spk = data.Nomor || data.nomor || "";
   row.nama = data.Nama || data.nama || "";
 
-  if (cabang.value === "P05") {
+  if (fd.value.cabang === "P05") {
     row.ukuran = data.ukuran || "";
     row.bahan = data.bahan || "";
     row.finishing = data.finishing || "";
@@ -227,13 +277,11 @@ const applySpkToRow = (
   row.harga = 0;
   row.idgambar = "";
   row.imageUrl = null;
-  row.newFile = null;
   row.removeImage = false;
+  delete rowFiles.value[idx];
 
   ensureTrailingRow();
   nextTick(() => jumlahRefs.value[idx]?.focus());
-  // NOTE: TIDAK ADA cek duplikat SPK — dikonfirmasi source memang
-  // mengizinkan SPK yang sama di baris berbeda.
 };
 
 const onSpkSelected = (item: any) => {
@@ -250,18 +298,18 @@ const onSpkKeydown = (e: KeyboardEvent, idx: number) => {
 };
 
 const onSpkBlur = async (idx: number) => {
-  const kode = (rows.value[idx].spk || "").trim();
-  if (!kode || rows.value[idx].nama) return;
+  const kode = (fd.value.rows[idx].spk || "").trim();
+  if (!kode || fd.value.rows[idx].nama) return;
   try {
     const res = await poPaperprintFormService.resolveSpk(kode);
     applySpkToRow(idx, res.data.data);
   } catch (e: any) {
     toast.error(e.response?.data?.message || "Spk ini belum ada.");
-    rows.value[idx].spk = "";
+    fd.value.rows[idx].spk = "";
   }
 };
 
-// --- HAPUS BARIS --- (selalu boleh, tidak dikunci status apapun)
+// --- HAPUS BARIS ---
 const deleteRowDialog = ref(false);
 const rowToDeleteIdx = ref<number | null>(null);
 const requestRemoveRow = (idx: number) => {
@@ -270,7 +318,8 @@ const requestRemoveRow = (idx: number) => {
 };
 const confirmRemoveRow = () => {
   if (rowToDeleteIdx.value === null) return;
-  rows.value.splice(rowToDeleteIdx.value, 1);
+  fd.value.rows.splice(rowToDeleteIdx.value, 1);
+  delete rowFiles.value[rowToDeleteIdx.value];
   ensureTrailingRow();
   deleteRowDialog.value = false;
   rowToDeleteIdx.value = null;
@@ -285,26 +334,21 @@ const onFileSelected = (idx: number, e: Event) => {
   const file = (e.target as HTMLInputElement).files?.[0];
   if (!file) return;
 
-  // Replikasi validasi ukuran > 1MB (source: n>1000000)
   if (file.size > 1_000_000) {
     toast.error("Ukuran gambar tidak boleh > 1 Mb.");
     (e.target as HTMLInputElement).value = "";
     return;
   }
 
-  const row = rows.value[idx];
-  row.newFile = file;
-  row.imageUrl = URL.createObjectURL(file);
-  row.removeImage = false;
+  rowFiles.value[idx] = file;
+  fd.value.rows[idx].imageUrl = URL.createObjectURL(file);
+  fd.value.rows[idx].removeImage = false;
 };
 
-// Replikasi HapusGambar1Click — clear reference di UI, delete fisik
-// baru terjadi saat Simpan
 const removeRowImage = (idx: number) => {
-  const row = rows.value[idx];
-  if (row.newFile) {
-    // Gambar baru yang belum di-upload — cukup batalkan pilihan lokal
-    row.newFile = null;
+  const row = fd.value.rows[idx];
+  if (rowFiles.value[idx]) {
+    delete rowFiles.value[idx];
     row.imageUrl = null;
     return;
   }
@@ -316,13 +360,13 @@ const removeRowImage = (idx: number) => {
   row.imageUrl = null;
 };
 
-// --- VALIDASI LOKAL --- (replikasi btnSimpanClick)
+// --- VALIDASI LOKAL ---
 const onValidateSave = () => {
-  if (!supKode.value.trim()) {
+  if (!fd.value.supKode.trim()) {
     toast.error("Supplier harus diisi.");
     return;
   }
-  const filled = rows.value.filter((r) => r.spk);
+  const filled = fd.value.rows.filter((r) => r.spk);
   if (filled.length === 0) {
     return toast.error("Detail harus diisi.");
   }
@@ -334,85 +378,48 @@ const onValidateSave = () => {
   showSaveDialog.value = true;
 };
 
-// --- SUBMIT SIMPAN ---
-const onConfirmSave = async () => {
-  isSaving.value = true;
+// --- LOAD (dipakai saat mount & saat Batal — sama seperti loadData() lama) ---
+const loadInitial = async () => {
+  isLoading.value = true;
   try {
-    const filled = rows.value.filter((r) => r.spk);
-
-    const formData = new FormData();
-    const detailsPayload = filled.map((r, i) => {
-      const hasNewFile = !!r.newFile;
-      if (hasNewFile) {
-        formData.append(`img_${i}`, r.newFile as File);
-      }
-      return {
-        spk: r.spk,
-        nama: r.nama,
-        ukuran: r.ukuran,
-        bahan: r.bahan,
-        finishing: r.finishing,
-        jumlah: r.jumlah,
-        harga: r.harga,
-        ket: r.ket,
-        idgambar: r.idgambar,
-        newImageField: hasNewFile ? `img_${i}` : null,
-        removeImage: r.removeImage,
-      };
-    });
-
-    formData.append(
-      "data",
-      JSON.stringify({
-        tanggal: tanggal.value,
-        dateline: dateline.value,
-        cabang: cabang.value,
-        supKode: supKode.value,
-        keterangan: keterangan.value,
-        details: detailsPayload,
-      }),
-    );
-
-    let resultNomor = nomor.value;
+    await loadMeta();
     if (isEditMode.value) {
-      const res = await poPaperprintFormService.update(nomor.value, formData);
-      resultNomor = res.data.data.nomor;
+      await fetchData();
+      ensureTrailingRow();
     } else {
-      const res = await poPaperprintFormService.create(formData);
-      resultNomor = res.data.data.nomor;
+      fd.value = JSON.parse(JSON.stringify(init));
+      fd.value.cabang = cabangOptions.value[0] || "";
     }
-
-    showSaveDialog.value = false;
-    savedNomor.value = resultNomor;
-    showPrintDialog.value = true;
+    rowFiles.value = {};
   } catch (e: any) {
-    toast.error(e.response?.data?.message || "Gagal Simpan");
+    toast.error(e.response?.data?.message || "Gagal memuat data.");
+    goBack();
   } finally {
-    isSaving.value = false;
+    isLoading.value = false;
   }
 };
 
-// --- BATAL / TUTUP ---
+// --- BATAL ---
 const onConfirmCancel = () => {
   showCancelDialog.value = false;
-  loadData();
-};
-const onConfirmClose = () => {
-  router.push("/garmen/po-paperprint");
+  loadInitial();
 };
 
+// --- CETAK ---
 const doCetak = () => {
   showPrintDialog.value = false;
   window.open(
     `/garmen/po-paperprint/print/${encodeURIComponent(savedNomor.value)}`,
     "_blank",
   );
-  router.push("/garmen/po-paperprint");
+  goBack();
 };
 const skipCetak = () => {
   showPrintDialog.value = false;
-  router.push("/garmen/po-paperprint");
+  goBack();
 };
+
+onMounted(loadInitial);
 </script>
 
 <template>
@@ -426,59 +433,54 @@ const skipCetak = () => {
     v-model:show-cancel-dialog="showCancelDialog"
     v-model:show-close-dialog="showCloseDialog"
     @validate-save="onValidateSave"
-    @confirm-save="onConfirmSave"
+    @confirm-save="executeSave"
     @confirm-cancel="onConfirmCancel"
-    @confirm-close="onConfirmClose"
+    @confirm-close="executeClose"
   >
-    <!-- LEFT COLUMN: Header + Supplier -->
     <template #left-column>
       <div class="desktop-form-section header-section">
         <div class="mb-3">
           <label class="f-label">Nomor</label>
           <v-text-field
-            :model-value="nomor || '<-- Kosong = Baru'"
+            :model-value="fd.nomor || '<-- Kosong = Baru'"
             variant="outlined"
             density="compact"
             readonly
             hide-details
           />
         </div>
-
         <div class="mb-3">
           <label class="f-label">Tanggal</label>
           <v-text-field
-            v-model="tanggal"
+            v-model="fd.tanggal"
             type="date"
             variant="outlined"
             density="compact"
             hide-details
           />
         </div>
-
         <div class="mb-3">
           <label class="f-label">Dateline</label>
           <v-text-field
-            v-model="dateline"
+            v-model="fd.dateline"
             type="date"
             variant="outlined"
             density="compact"
             hide-details
           />
         </div>
-
         <div class="mb-3">
           <label class="f-label">Gudang</label>
-          <select v-model="cabang" class="sel-inp">
+          <select v-model="fd.cabang" class="sel-inp">
             <option v-for="c in cabangOptions" :key="c" :value="c">
               {{ c }}
             </option>
           </select>
         </div>
-
         <div class="mb-3">
           <label class="f-label">Keterangan</label>
           <v-text-field
-            v-model="keterangan"
+            v-model="fd.keterangan"
             variant="outlined"
             density="compact"
             hide-details
@@ -492,7 +494,7 @@ const skipCetak = () => {
           <label class="lb w70">Kode</label>
           <div class="ig" style="flex: 1">
             <input
-              v-model="supKode"
+              v-model="fd.supKode"
               class="inp"
               style="width: 70px; flex-shrink: 0"
               placeholder="(F1)"
@@ -502,7 +504,7 @@ const skipCetak = () => {
               @keydown.f1.prevent="supModalOpen = true"
             />
             <input
-              :value="supNama"
+              :value="fd.supNama"
               readonly
               class="inp ro"
               style="flex: 1; min-width: 0"
@@ -516,11 +518,10 @@ const skipCetak = () => {
             </button>
           </div>
         </div>
-        <div v-if="supAlamat" class="note mt2">{{ supAlamat }}</div>
+        <div v-if="fd.supAlamat" class="note mt2">{{ fd.supAlamat }}</div>
       </div>
     </template>
 
-    <!-- RIGHT COLUMN: Grid Detail (full) -->
     <template #right-column>
       <div class="desktop-form-section" style="flex: 1">
         <div class="grid-title">Detail SPK</div>
@@ -541,7 +542,7 @@ const skipCetak = () => {
               </tr>
             </thead>
             <tbody>
-              <tr v-for="(row, idx) in rows" :key="idx">
+              <tr v-for="(row, idx) in fd.rows" :key="idx">
                 <td class="text-center">{{ idx + 1 }}</td>
                 <td class="p0">
                   <div class="cell-grp">

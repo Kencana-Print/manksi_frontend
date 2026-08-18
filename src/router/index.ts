@@ -1,5 +1,7 @@
 import { createRouter, createWebHistory } from "vue-router";
 import { useAuthStore } from "@/stores/authStore";
+import { useTabsStore } from "@/stores/tabsStore";
+import { getMenuIcon } from "@/utils/menuIconMap";
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -8,10 +10,10 @@ const router = createRouter({
     {
       path: "/login",
       name: "Login",
-      component: () => import("@/views/user/LoginView.vue"), // Sesuaikan path komponen login kamu
+      component: () => import("@/views/user/LoginView.vue"),
       meta: {
         title: "Login Aplikasi Manksi",
-        layout: "BlankLayout", // <--- INI KUNCI UTAMANYA
+        layout: "BlankLayout",
         requiresAuth: false,
       },
     },
@@ -2713,6 +2715,7 @@ const router = createRouter({
       component: () => import("@/views/penjualan/MapView.vue"),
       meta: {
         title: "Memo Approval Produk (MAP)",
+        layout: "DefaultLayout",
         requiresAuth: true,
         menuId: "162",
       },
@@ -2721,13 +2724,23 @@ const router = createRouter({
       path: "/penjualan/map/form",
       name: "MapFormCreate",
       component: () => import("@/views/penjualan/MapFormView.vue"),
-      meta: { title: "Tambah MAP", requiresAuth: true, menuId: "162" },
+      meta: {
+        title: "Tambah MAP",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "162",
+      },
     },
     {
       path: "/penjualan/map/form/:nomor",
       name: "MapFormEdit",
       component: () => import("@/views/penjualan/MapFormView.vue"),
-      meta: { title: "Edit MAP", requiresAuth: true, menuId: "162" },
+      meta: {
+        title: "Edit MAP",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "162",
+      },
     },
     {
       path: "/penjualan/map/print/:nomor",
@@ -2806,7 +2819,12 @@ const router = createRouter({
       path: "/penjualan/insentif/form",
       name: "InsentifFormCreate",
       component: () => import("@/views/penjualan/InsentifFormView.vue"),
-      meta: { title: "Tambah Insentif", requiresAuth: true, menuId: "167" },
+      meta: {
+        title: "Tambah Insentif",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "167",
+      },
     },
     // {
     //   path: "/penjualan/insentif/print/:nomor",
@@ -4002,6 +4020,38 @@ router.beforeEach((to, _from) => {
 
   // Jika semua kondisi aman, router otomatis melanjutkan perjalanan tanpa return apa pun
   // (Sama dengan memanggil next() tanpa parameter di versi Vue Router lama)
+});
+
+// ── Sinkronisasi Tabs ────────────────────────────────────────────────
+// Setiap navigasi sukses ke halaman DefaultLayout otomatis dibuka
+// sebagai tab. Ini menangani SEMUA jalur navigasi: klik menu di Navbar,
+// klik link di dalam halaman, router.push() programatik, browser
+// back/forward — bukan cuma klik di TabBar.
+router.afterEach((to) => {
+  // Halaman print/blank/login/error gak perlu jadi tab
+  if (to.meta.layout !== "DefaultLayout") return;
+  if (!to.meta.requiresAuth) return;
+
+  const tabsStore = useTabsStore();
+
+  // Lazy-init: kalau user baru login dan tabsStore belum di-init,
+  // bikin Dashboard tab dulu sebelum buka tab halaman yang dituju.
+  if (!tabsStore.isReady) {
+    tabsStore.initDefaultTabs();
+    // Kalau tujuan navigasi memang Dashboard, cukup init-nya saja
+    if (to.path === "/") return;
+  }
+
+  tabsStore.openTab({
+    title: (to.meta.title as string) || to.name?.toString() || "Halaman",
+    path: to.path,
+    // Laporan dengan filter di query tetap 1 tab (tab id = path saja,
+    // sesuai keputusan yang sudah dibahas), tapi query tetap disimpan
+    // supaya TabView bisa restore filter saat tab di-switch balik.
+    query: Object.keys(to.query).length > 0 ? to.query : undefined,
+    icon: getMenuIcon(to.path),
+    closable: to.path !== "/",
+  });
 });
 
 export default router;

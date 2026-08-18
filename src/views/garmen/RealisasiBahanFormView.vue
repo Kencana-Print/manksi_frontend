@@ -34,6 +34,7 @@ interface RealisasiFormData {
   details: any[];
   pin_acc?: string;
   pin_dipakai?: string;
+  promin_aktif?: string;
 }
 
 const route = useRoute();
@@ -73,6 +74,7 @@ const initialData: RealisasiFormData = {
   isUtama: 1,
   barcodes: [] as any[],
   details: [] as any[],
+  promin_aktif: "Y",
 };
 
 const {
@@ -136,6 +138,10 @@ const {
           relaxtgl: formatDateLocal(d.promind_relaxtgl),
           relaxpic: d.promind_relaxpic,
           ket: d.promind_keterangan,
+          _extra:
+            !d.promind_kodem || d.promind_kodem === d.promind_bhn_kode
+              ? false
+              : true,
         };
       }) || [];
 
@@ -158,6 +164,7 @@ const {
       details: detailsMap,
       pin_acc: h.pin_acc,
       pin_dipakai: h.pin_dipakai,
+      promin_aktif: h.promin_aktif ?? "Y",
     };
   },
   submitApi: async (data: RealisasiFormData): Promise<any> => {
@@ -166,9 +173,25 @@ const {
   },
   onSuccess: (res: any) => {
     savedNomor.value = res.data?.data?.nomor || formData.value.nomor;
+    const perluApproval = res.data?.data?.perluApproval;
+    if (perluApproval) {
+      toast.warning(
+        "Realisasi tersimpan sebagai PASIF — ada bahan di luar permintaan. Bahan belum bisa keluar sampai di-approve (Otorisasi Realisasi Beda Bahan).",
+        { timeout: 8000 },
+      );
+    }
     showPrintDialog.value = true;
   },
 });
+
+const isReadOnlyPasif = computed(
+  () => isEditMode.value && formData.value.promin_aktif === "N",
+);
+
+// Info live (belum simpan) kalau kondisi saat ini akan bikin realisasi PASIF
+const willBePasif = computed(() =>
+  formData.value.details.some((d: any) => d._extra),
+);
 
 const showMintaModal = ref(false);
 const barcodeInputRefs = ref<HTMLInputElement[]>([]);
@@ -286,9 +309,8 @@ const addBarcodeRow = () => {
 };
 
 const removeBarcodeRow = (index: number) => {
-  const deletedKode = formData.value.barcodes[index].kode;
   formData.value.barcodes.splice(index, 1);
-  recalculateNetto(deletedKode);
+  recalculateNetto(); // [DIUBAH] tanpa parameter
 };
 
 const onBarcodeEntered = async (item: any, index: number) => {
@@ -305,8 +327,10 @@ const onBarcodeEntered = async (item: any, index: number) => {
       return;
     }
     const isMatchMkb =
-      formData.value.details.length === 0 ||
-      formData.value.details.some((d: any) => d.kode === data.kode);
+      formData.value.details.filter((d: any) => !d._extra).length === 0 ||
+      formData.value.details.some(
+        (d: any) => !d._extra && d.kode === data.kode,
+      );
     item.kode = data.kode;
     item.nama = data.nama;
     item.satuan = data.satuan;
@@ -321,7 +345,7 @@ const onBarcodeEntered = async (item: any, index: number) => {
         { timeout: 8000 },
       );
     }
-    recalculateNetto(item.kode);
+    recalculateNetto();
 
     // Otomatis lanjut ke baris berikutnya biar user bisa scan
     // terus-menerus tanpa klik/pencet apa pun
@@ -337,25 +361,40 @@ const onBarcodeEntered = async (item: any, index: number) => {
   }
 };
 
-// Inti Keajaiban: Hitung akumulasi qty dari Tabel 1, lempar ke Tabel 2
-const recalculateNetto = (changedKode?: string) => {
+// Inti: hitung akumulasi qty dari Tabel 1 (barcode), lempar ke Tabel 2.
+// Baris "requested" (bawaan Minta Bahan) kode-nya TETAP, cuma netto/gross/roll yg berubah.
+// Barcode yg kode-nya TIDAK match baris requested manapun -> otomatis jadi baris
+// BARU (kodem="") di Tabel 2, mewakili "bahan di luar permintaan" -> ini yg
+// bikin backend deteksi mismatch (kode berbeda dari kodem) dan realisasi jadi PASIF.
+const recalculateNetto = () => {
   if (!formData.value.barcodes || !formData.value.details) return;
 
-  // Kita tambahkan penampung kdsup dan nmsup
   const summary: Record<
     string,
-    { qty: number; count: number; kdsup: string; nmsup: string }
+    {
+      qty: number;
+      count: number;
+      kdsup: string;
+      nmsup: string;
+      nama: string;
+      satuan: string;
+    }
   > = {};
 
   formData.value.barcodes.forEach((b) => {
     if (b && b.kode) {
       if (!summary[b.kode]) {
-        summary[b.kode] = { qty: 0, count: 0, kdsup: "", nmsup: "" };
+        summary[b.kode] = {
+          qty: 0,
+          count: 0,
+          kdsup: "",
+          nmsup: "",
+          nama: b.nama,
+          satuan: b.satuan,
+        };
       }
       summary[b.kode].qty += Number(b.jumlah) || 0;
       summary[b.kode].count += 1;
-
-      // Ambil supplier dari barcode terakhir yang di-scan (sama seperti logic Delphi)
       if (b.kdsup) {
         summary[b.kode].kdsup = b.kdsup;
         summary[b.kode].nmsup = b.nmsup;
@@ -363,35 +402,83 @@ const recalculateNetto = (changedKode?: string) => {
     }
   });
 
-  formData.value.details.forEach((d) => {
-    if (!d) return;
-    if (changedKode && d.kode !== changedKode) return;
-
-    const hasBarcode = formData.value.barcodes.some(
-      (b) => b && b.kode === d.kode,
-    );
-
-    if (hasBarcode && summary[d.kode]) {
-      d.netto = summary[d.kode].qty;
-      d.gross = summary[d.kode].qty;
-      d.roll = summary[d.kode].count;
-
-      // AUTO FILL SUPPLIER! (Replikasi getsupplier Delphi)
-      if (summary[d.kode].kdsup) {
-        d.kdsup = summary[d.kode].kdsup;
-        d.nmsup = summary[d.kode].nmsup; // Jika ada field nmsup di UI
+  // 1. Update baris REQUESTED (kode tidak pernah berubah dari sini)
+  formData.value.details.forEach((d: any) => {
+    if (!d || d._extra) return;
+    const s = summary[d.kode];
+    if (s) {
+      d.netto = s.qty;
+      d.gross = s.qty;
+      d.roll = s.count;
+      if (s.kdsup) {
+        d.kdsup = s.kdsup;
+        d.nmsup = s.nmsup;
       }
-    } else if (changedKode === d.kode) {
+    } else {
       d.netto = 0;
       d.gross = 0;
       d.roll = 0;
-      // Opsional: Hapus kdsup jika barcode dihapus semua
-      // d.kdsup = "";
+    }
+  });
+
+  // 2. Kode yg sudah "diklaim" baris requested -> sisanya kandidat baris EXTRA
+  const claimedKode = new Set(
+    formData.value.details
+      .filter((d: any) => !d._extra)
+      .map((d: any) => d.kode),
+  );
+  const extraKodeList = Object.keys(summary).filter((k) => !claimedKode.has(k));
+
+  // Buang baris extra yg barcodenya sudah dihapus semua
+  formData.value.details = formData.value.details.filter(
+    (d: any) => !d._extra || extraKodeList.includes(d.kode),
+  );
+
+  // Tambah/update baris extra
+  extraKodeList.forEach((kode) => {
+    const s = summary[kode];
+    let row = formData.value.details.find(
+      (d: any) => d._extra && d.kode === kode,
+    );
+    if (!row) {
+      row = {
+        kode,
+        kodem: "", // [PENTING] kosong = di luar permintaan -> backend tandai PASIF
+        nama: s.nama,
+        satuan: s.satuan,
+        stk: 0,
+        minta: 0,
+        sudah: 0,
+        kurang: 0,
+        netto: 0,
+        gross: 0,
+        roll: 0,
+        relaxtgl: "",
+        relaxpic: "",
+        ket: "Bahan di luar Permintaan (substitusi)",
+        kdsup: "",
+        nmsup: "",
+        _extra: true,
+      };
+      formData.value.details.push(row);
+    }
+    row.netto = s.qty;
+    row.gross = s.qty;
+    row.roll = s.count;
+    if (s.kdsup) {
+      row.kdsup = s.kdsup;
+      row.nmsup = s.nmsup;
     }
   });
 };
 
 const validateBeforeSave = () => {
+  if (isReadOnlyPasif.value) {
+    return toast.error(
+      "Realisasi ini PASIF dan menunggu approval. Tidak bisa diubah sampai ada keputusan Otorisasi Realisasi Beda Bahan.",
+    );
+  }
+
   // 1. Validasi Permintaan
   if (!formData.value.noMinta) {
     return toast.warning("No. Permintaan wajib diisi.");
@@ -486,6 +573,28 @@ onMounted(async () => {
     @confirm-close="executeClose"
   >
     <template #left-column>
+      <v-alert
+        v-if="isReadOnlyPasif"
+        type="error"
+        density="compact"
+        variant="tonal"
+        class="mb-3"
+      >
+        <strong>PASIF — Menunggu Approval.</strong> Ada bahan di luar
+        permintaan. Form terkunci sampai ada keputusan di menu Approval
+        Realisasi Beda Bahan.
+      </v-alert>
+      <v-alert
+        v-else-if="willBePasif"
+        type="warning"
+        density="compact"
+        variant="tonal"
+        class="mb-3"
+      >
+        Akan tersimpan sebagai <strong>PASIF</strong> — ada bahan di luar
+        permintaan. Bahan tidak akan keluar sampai di-approve.
+      </v-alert>
+
       <div class="desktop-form-section header-section">
         <div class="text-caption font-weight-bold mb-3 text-primary">
           HEADER REALISASI
@@ -509,6 +618,7 @@ onMounted(async () => {
           variant="outlined"
           hide-details
           class="mb-2"
+          :disabled="isReadOnlyPasif"
         />
         <div class="f-row mb-2">
           <label class="f-lbl">No. Permintaan</label>
@@ -524,15 +634,15 @@ onMounted(async () => {
                 text-transform: uppercase;
               "
               placeholder="F1 / nomor + Enter"
-              :readonly="isEditMode"
-              :class="{ 'f-ro': isEditMode }"
+              :readonly="isEditMode || isReadOnlyPasif"
+              :class="{ 'f-ro': isEditMode || isReadOnlyPasif }"
               @keydown="onMintaKeydown"
               @keydown.enter.prevent="onMintaEnter"
             />
             <button
               type="button"
               class="btn-lkp"
-              :disabled="isEditMode"
+              :disabled="isEditMode || isReadOnlyPasif"
               title="Cari Permintaan (F1)"
               @click="showMintaModal = true"
             >
@@ -548,6 +658,7 @@ onMounted(async () => {
           rows="2"
           hide-details
           class="mb-4"
+          :disabled="isReadOnlyPasif"
         />
 
         <div
@@ -635,6 +746,7 @@ onMounted(async () => {
               inline
               hide-details
               density="compact"
+              :disabled="isReadOnlyPasif"
             >
               <v-radio label="Utama" :value="1" color="primary"></v-radio>
               <v-radio label="Susulan" :value="0" color="primary"></v-radio>
@@ -654,6 +766,7 @@ onMounted(async () => {
               bg-color="yellow-lighten-4"
               class="font-weight-bold"
               v-select-on-focus
+              :disabled="isReadOnlyPasif"
             />
           </div>
         </div>
@@ -705,6 +818,7 @@ onMounted(async () => {
                     :ref="(el) => setBarcodeInputRef(el, index)"
                     class="cell-input fw-bold text-primary"
                     placeholder="Scan di sini..."
+                    :readonly="isReadOnlyPasif"
                     @change="onBarcodeEntered(item, index)"
                   />
                 </td>
@@ -726,7 +840,8 @@ onMounted(async () => {
                     step="any"
                     v-model.number="item.jumlah"
                     class="cell-input tr fw-bold text-primary"
-                    @input="recalculateNetto(item.kode)"
+                    :readonly="isReadOnlyPasif"
+                    @input="recalculateNetto()"
                     v-select-on-focus
                   />
                 </td>
@@ -735,6 +850,7 @@ onMounted(async () => {
                     size="x-small"
                     variant="text"
                     color="error"
+                    :disabled="isReadOnlyPasif"
                     @click="removeBarcodeRow(index)"
                   >
                     <IconTrash :size="14" :stroke-width="1.7" />
@@ -745,7 +861,12 @@ onMounted(async () => {
           </table>
         </div>
         <div class="pa-2 bg-grey-lighten-4 text-right">
-          <v-btn size="x-small" color="primary" @click="addBarcodeRow">
+          <v-btn
+            size="x-small"
+            color="primary"
+            :disabled="isReadOnlyPasif"
+            @click="addBarcodeRow"
+          >
             <template #prepend
               ><IconPlus :size="13" :stroke-width="2"
             /></template>
@@ -786,9 +907,24 @@ onMounted(async () => {
               </tr>
             </thead>
             <tbody>
-              <tr v-for="(dtl, index) in formData.details" :key="index">
+              <tr
+                v-for="(dtl, index) in formData.details"
+                :key="index"
+                :class="{ 'row-mismatch': dtl._extra }"
+              >
                 <td class="text-center">{{ index + 1 }}</td>
-                <td class="fw-bold text-primary">{{ dtl.kode }}</td>
+                <td
+                  class="fw-bold"
+                  :class="dtl._extra ? 'text-error' : 'text-primary'"
+                >
+                  {{ dtl.kode }}
+                  <span
+                    v-if="dtl._extra"
+                    title="Di luar permintaan"
+                    class="mismatch-badge"
+                    >⚠</span
+                  >
+                </td>
                 <td>{{ dtl.nama }}</td>
                 <td class="text-center">{{ dtl.satuan }}</td>
                 <td class="tr">{{ num(dtl.stk) }}</td>
@@ -805,6 +941,7 @@ onMounted(async () => {
                     step="any"
                     v-model.number="dtl.netto"
                     class="cell-input tr fw-bold text-primary"
+                    :readonly="isReadOnlyPasif"
                     v-select-on-focus
                   />
                 </td>
@@ -814,6 +951,7 @@ onMounted(async () => {
                     step="any"
                     v-model.number="dtl.gross"
                     class="cell-input tr fw-bold"
+                    :readonly="isReadOnlyPasif"
                     v-select-on-focus
                   />
                 </td>
@@ -823,14 +961,15 @@ onMounted(async () => {
                     type="date"
                     v-model="dtl.relaxtgl"
                     class="cell-input"
+                    :readonly="isReadOnlyPasif"
                   />
                 </td>
                 <td>
                   <input
-                    type="text"
                     v-model="dtl.relaxpic"
                     class="cell-input"
                     placeholder="PIC..."
+                    :readonly="isReadOnlyPasif"
                   />
                 </td>
                 <td>
@@ -838,6 +977,7 @@ onMounted(async () => {
                     v-model="dtl.ket"
                     class="cell-input"
                     placeholder="Opsional..."
+                    :readonly="isReadOnlyPasif"
                   />
                 </td>
               </tr>

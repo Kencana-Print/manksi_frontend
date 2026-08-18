@@ -1,17 +1,13 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import { useRoute } from "vue-router";
 import { useToast } from "vue-toastification";
 import BaseForm from "@/components/BaseForm.vue";
 import BahanSearchModal from "@/components/lookups/BahanSearchModal.vue";
 import GudangBahanSearchModal from "@/components/lookups/GudangBahanSearchModal.vue";
 import { koreksiStokBahanFormService } from "@/services/garmen/koreksiStokBahanFormService";
-import {
-  IconSettings,
-  IconSearch,
-  IconTrash,
-  IconPlus,
-} from "@tabler/icons-vue";
+import { useForm } from "@/composables/useForm";
+import { IconSettings, IconSearch, IconTrash } from "@tabler/icons-vue";
 
 interface DetailRow {
   kode: string;
@@ -20,55 +16,33 @@ interface DetailRow {
   stok: number;
   jumlah: number;
   selisih: number;
-  hpp: number; // internal, gak ditampilin
-  total: number; // internal, gak ditampilin
+  hpp: number;
+  total: number;
   ket: string;
 }
 
+interface ApprovalState {
+  status: string;
+  urut: number | null;
+}
+
+interface KoreksiStokBahanFormData {
+  nomor: string;
+  tanggal: string;
+  gdgKode: string;
+  gdgNama: string;
+  keterangan: string;
+  approval: ApprovalState;
+  rows: DetailRow[];
+}
+
 const route = useRoute();
-const router = useRouter();
 const toast = useToast();
 
-const nomorParam = computed(() => route.params.nomor as string | undefined);
-const isEditMode = computed(() => !!nomorParam.value);
-
-const isLoading = ref(true);
-const isSaving = ref(false);
-
-const showSaveDialog = ref(false);
-const showCancelDialog = ref(false);
-const showCloseDialog = ref(false);
-
-// --- STATE HEADER ---
-const nomor = ref("");
-const tanggal = ref("");
-const gdgKode = ref("GB001");
-const gdgNama = ref("");
-const keterangan = ref("");
-
-// --- STATE APPROVAL ---
-const approval = ref<{ status: string; urut: number | null }>({
-  status: "",
-  urut: null,
-});
-
-const approvalBadge = computed(() => {
-  const map: Record<string, { text: string; color: string }> = {
-    MINTA: { text: "Perlu Pengajuan Approval", color: "orange" },
-    WAIT: { text: "Menunggu Approval", color: "blue" },
-    ACC: { text: "Disetujui", color: "green" },
-    TOLAK: { text: "Ditolak", color: "red" },
-  };
-  return map[approval.value.status] || null;
-});
-
-// Blok simpan kalau status masih MINTA/WAIT/TOLAK (replikasi FormKeyDown)
-const isSaveBlocked = computed(() =>
-  ["MINTA", "WAIT", "TOLAK"].includes(approval.value.status),
-);
-
-// --- STATE DETAIL (TABEL) ---
-const rows = ref<DetailRow[]>([]);
+// nomor dari URL — dipakai sebagai identifier stabil untuk fetch/submit,
+// gak ikut berubah selama komponen ini hidup (beda sama formData.nomor
+// yang baru terisi setelah fetch sukses)
+const nomorParam = route.params.nomor as string | undefined;
 
 const blankRow = (): DetailRow => ({
   kode: "",
@@ -82,62 +56,166 @@ const blankRow = (): DetailRow => ({
   ket: "",
 });
 
-const ensureTrailingBlankRow = () => {
-  const last = rows.value[rows.value.length - 1];
-  if (!last || last.kode) rows.value.push(blankRow());
+const ensureTrailingBlankRow = (rows: DetailRow[]) => {
+  const last = rows[rows.length - 1];
+  if (!last || last.kode) rows.push(blankRow());
 };
+
+// --- fetchApi: cabang edit vs create di satu tempat ---
+const fetchApi = async (): Promise<KoreksiStokBahanFormData> => {
+  if (nomorParam) {
+    const res = await koreksiStokBahanFormService.getFormData(nomorParam);
+    const d = res.data.data;
+    const rows: DetailRow[] = d.detail.map((r: any) => ({
+      kode: r.kode,
+      nama: r.nama,
+      satuan: r.satuan,
+      stok: Number(r.stok) || 0,
+      jumlah: Number(r.jumlah) || 0,
+      selisih: Number(r.selisih) || 0,
+      hpp: Number(r.hpp) || 0,
+      total: Number(r.total) || 0,
+      ket: r.ket || "",
+    }));
+    ensureTrailingBlankRow(rows);
+    return {
+      nomor: d.header.nomor,
+      tanggal: String(d.header.tanggal).substring(0, 10),
+      gdgKode: d.header.gdgKode,
+      gdgNama: d.header.gdgNama,
+      keterangan: d.header.keterangan,
+      approval: d.approval,
+      rows,
+    };
+  }
+  const res = await koreksiStokBahanFormService.getDefault();
+  const d = res.data.data;
+  return {
+    nomor: "",
+    tanggal: d.tanggal,
+    gdgKode: d.gdgKode,
+    gdgNama: d.gdgNama,
+    keterangan: "",
+    approval: { status: "", urut: null },
+    rows: [blankRow()],
+  };
+};
+
+// --- submitApi: toast sukses ditaruh di sini, bukan di caller —
+// biar executeSave bawaan useForm bisa langsung goBack() setelahnya
+// tanpa perlu onSuccess custom ---
+const submitApi = async (data: KoreksiStokBahanFormData) => {
+  const payload = {
+    tanggal: data.tanggal,
+    gdgKode: data.gdgKode,
+    keterangan: data.keterangan,
+    detail: data.rows
+      .filter((r) => r.kode)
+      .map((r) => ({
+        kode: r.kode,
+        stok: r.stok,
+        jumlah: r.jumlah,
+        selisih: r.selisih,
+        hpp: r.hpp,
+        ket: r.ket,
+      })),
+  };
+  const res = nomorParam
+    ? await koreksiStokBahanFormService.update(nomorParam, payload)
+    : await koreksiStokBahanFormService.create(payload);
+  toast.success("Berhasil Simpan.");
+  return res;
+};
+
+const {
+  isLoading,
+  isSaving,
+  showSaveDialog,
+  showCancelDialog,
+  showCloseDialog,
+  formData,
+  fetchData,
+  executeSave,
+  executeCancel,
+  executeClose,
+} = useForm<KoreksiStokBahanFormData>({
+  menuId: "115",
+  initialData: {
+    nomor: "",
+    tanggal: "",
+    gdgKode: "GB001",
+    gdgNama: "",
+    keterangan: "",
+    approval: { status: "", urut: null },
+    rows: [blankRow()],
+  },
+  fetchApi,
+  submitApi,
+  // immediate: false — kita panggil fetchData() manual di onMounted supaya
+  // jalan di mode create JUGA (bawaan useForm cuma auto-fetch kalau
+  // isEditMode true; di sini fetchApi sendiri yang membedakan cabangnya)
+  immediate: false,
+});
+
+onMounted(fetchData);
+
+const isEditMode = computed(() => !!nomorParam);
+
+const approvalBadge = computed(() => {
+  const map: Record<string, { text: string; color: string }> = {
+    MINTA: { text: "Perlu Pengajuan Approval", color: "orange" },
+    WAIT: { text: "Menunggu Approval", color: "blue" },
+    ACC: { text: "Disetujui", color: "green" },
+    TOLAK: { text: "Ditolak", color: "red" },
+  };
+  return map[formData.value.approval.status] || null;
+});
 
 // --- KONFIRMASI HAPUS BARIS ---
 const deleteRowDialog = ref(false);
 const rowToDeleteIdx = ref<number | null>(null);
-
 const requestRemoveRow = (idx: number) => {
   rowToDeleteIdx.value = idx;
   deleteRowDialog.value = true;
 };
-
 const confirmRemoveRow = () => {
   if (rowToDeleteIdx.value === null) return;
-  rows.value.splice(rowToDeleteIdx.value, 1);
-  ensureTrailingBlankRow();
+  formData.value.rows.splice(rowToDeleteIdx.value, 1);
+  ensureTrailingBlankRow(formData.value.rows);
   deleteRowDialog.value = false;
   rowToDeleteIdx.value = null;
 };
 
 const onJumlahChange = (row: DetailRow) => {
   row.selisih = Number(row.jumlah || 0) - Number(row.stok || 0);
-  row.total = row.selisih * Number(row.hpp || 0); // internal
+  row.total = row.selisih * Number(row.hpp || 0);
 };
 
 // --- MODAL BAHAN ---
 const bahanModalOpen = ref(false);
 const activeRowIndex = ref<number | null>(null);
-
 const openBahanModal = (idx: number) => {
   activeRowIndex.value = idx;
   bahanModalOpen.value = true;
 };
 
-// ✅ Dipakai bareng dari 2 jalur: pilih dari modal ATAU ketik manual+Enter
 const fetchBarangIntoRow = async (idx: number, kodeBaru: string) => {
-  // ✅ Replikasi cek "barang sudah diinput di baris lain" — state lokal
-  const dupIdx = rows.value.findIndex(
+  const dupIdx = formData.value.rows.findIndex(
     (r, i) => i !== idx && r.kode === kodeBaru,
   );
   if (dupIdx !== -1) {
     toast.warning(`Barang ini sudah di input, di baris ${dupIdx + 1}`);
-    rows.value[idx].kode = "";
+    formData.value.rows[idx].kode = "";
     return;
   }
-
   try {
     const res = await koreksiStokBahanFormService.getBarang(kodeBaru, {
-      gdgKode: gdgKode.value,
-      tanggal: tanggal.value,
-      nomorSedangDiedit: nomor.value || "",
+      gdgKode: formData.value.gdgKode,
+      tanggal: formData.value.tanggal,
+      nomorSedangDiedit: nomorParam || "",
     });
     const d = res.data.data;
-    rows.value[idx] = {
+    formData.value.rows[idx] = {
       kode: d.kode,
       nama: d.nama,
       satuan: d.satuan,
@@ -148,10 +226,10 @@ const fetchBarangIntoRow = async (idx: number, kodeBaru: string) => {
       total: 0,
       ket: "",
     };
-    ensureTrailingBlankRow();
+    ensureTrailingBlankRow(formData.value.rows);
   } catch (e: any) {
     toast.error(e.response?.data?.message || "Gagal memuat data barang.");
-    rows.value[idx].kode = "";
+    formData.value.rows[idx].kode = "";
   }
 };
 
@@ -161,9 +239,6 @@ const onBahanSelected = (item: any) => {
   fetchBarangIntoRow(idx, item.Kode);
 };
 
-// ─────────────────────────────────────────────
-// KEYBOARD HANDLERS: KODE BARANG DI TABEL
-// ─────────────────────────────────────────────
 const onKodeKeydown = (e: KeyboardEvent, idx: number) => {
   if (e.key === "F1") {
     e.preventDefault();
@@ -172,138 +247,48 @@ const onKodeKeydown = (e: KeyboardEvent, idx: number) => {
 };
 
 const onKodeBlur = (idx: number) => {
-  const kode = (rows.value[idx].kode || "").trim().toUpperCase();
-  if (!kode) return; // biar blur natural (tab-out row kosong) gak numpuk-nge-modal
+  const kode = (formData.value.rows[idx].kode || "").trim().toUpperCase();
+  if (!kode) return;
   fetchBarangIntoRow(idx, kode);
 };
 
 // --- MODAL GUDANG ---
 const gudangModalOpen = ref(false);
-
 const onGudangSelected = async (item: any) => {
   try {
-    // Validasi ulang ke backend (gdg_bahan=4), jaga-jaga filter modal
-    // belum tentu sepersis backend
     const res = await koreksiStokBahanFormService.getGudang(item.Kode);
-    gdgKode.value = res.data.data.kode;
-    gdgNama.value = res.data.data.nama;
+    formData.value.gdgKode = res.data.data.kode;
+    formData.value.gdgNama = res.data.data.nama;
   } catch (e: any) {
     toast.error(e.response?.data?.message || "Kode gudang tsb tidak ada.");
   }
 };
 
-// --- LOAD DATA ---
-const loadData = async () => {
-  isLoading.value = true;
-  try {
-    if (isEditMode.value) {
-      const res = await koreksiStokBahanFormService.getFormData(
-        nomorParam.value!,
-      );
-      const d = res.data.data;
-      nomor.value = d.header.nomor;
-      tanggal.value = String(d.header.tanggal).substring(0, 10);
-      gdgKode.value = d.header.gdgKode;
-      gdgNama.value = d.header.gdgNama;
-      keterangan.value = d.header.keterangan;
-      approval.value = d.approval;
-      rows.value = d.detail.map((r: any) => ({
-        kode: r.kode,
-        nama: r.nama,
-        satuan: r.satuan,
-        stok: Number(r.stok) || 0,
-        jumlah: Number(r.jumlah) || 0,
-        selisih: Number(r.selisih) || 0,
-        hpp: Number(r.hpp) || 0,
-        total: Number(r.total) || 0,
-        ket: r.ket || "",
-      }));
-      ensureTrailingBlankRow();
-    } else {
-      const res = await koreksiStokBahanFormService.getDefault();
-      const d = res.data.data;
-      tanggal.value = d.tanggal;
-      gdgKode.value = d.gdgKode;
-      gdgNama.value = d.gdgNama;
-      keterangan.value = "";
-      rows.value = [blankRow()];
-    }
-  } catch (e: any) {
-    toast.error(e.response?.data?.message || "Gagal memuat data.");
-    router.push({ name: "KoreksiStokBahanBrowse" });
-  } finally {
-    isLoading.value = false;
-  }
-};
-
-onMounted(loadData);
-
-// --- VALIDASI LOKAL (sebelum buka dialog konfirmasi) ---
+// --- VALIDASI LOKAL (sebelum buka dialog konfirmasi simpan) ---
 const onValidateSave = () => {
-  if (isSaveBlocked.value) {
-    return toast.warning(
+  const data = formData.value;
+  if (["MINTA", "WAIT", "TOLAK"].includes(data.approval.status)) {
+    toast.warning(
       "Transaksi tsb sudah diclose. Silahkan minta approve untuk bisa menyimpan perubahan data.",
     );
+    return;
   }
-  if (!keterangan.value.trim()) {
-    return toast.error("Keterangan harus diisi.");
+  if (!data.keterangan.trim()) {
+    toast.error("Keterangan harus diisi.");
+    return;
   }
-  const filled = rows.value.filter((r) => r.kode);
+  const filled = data.rows.filter((r) => r.kode);
   if (filled.length === 0) {
-    return toast.error("Detail barang harus diisi.");
+    toast.error("Detail barang harus diisi.");
+    return;
   }
   for (const r of filled) {
     if (!r.ket.trim()) {
-      return toast.error("Detail Keterangan harus diisi.");
+      toast.error("Detail Keterangan harus diisi.");
+      return;
     }
   }
   showSaveDialog.value = true;
-};
-
-// --- SUBMIT SIMPAN ---
-const onConfirmSave = async () => {
-  isSaving.value = true;
-  try {
-    const payload = {
-      tanggal: tanggal.value,
-      gdgKode: gdgKode.value,
-      keterangan: keterangan.value,
-      detail: rows.value
-        .filter((r) => r.kode)
-        .map((r) => ({
-          kode: r.kode,
-          stok: r.stok,
-          jumlah: r.jumlah,
-          selisih: r.selisih,
-          hpp: r.hpp,
-          ket: r.ket,
-        })),
-    };
-
-    if (isEditMode.value) {
-      await koreksiStokBahanFormService.update(nomor.value, payload);
-    } else {
-      await koreksiStokBahanFormService.create(payload);
-    }
-
-    toast.success("Berhasil Simpan.");
-    showSaveDialog.value = false;
-    router.push({ name: "KoreksiStokBahanBrowse" });
-  } catch (e: any) {
-    toast.error(e.response?.data?.message || "Gagal menyimpan data.");
-  } finally {
-    isSaving.value = false;
-  }
-};
-
-// --- BATAL / TUTUP ---
-const onConfirmCancel = () => {
-  showCancelDialog.value = false;
-  loadData();
-};
-
-const onConfirmClose = () => {
-  router.push({ name: "KoreksiStokBahanBrowse" });
 };
 
 const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
@@ -311,7 +296,11 @@ const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
 
 <template>
   <BaseForm
-    :title="isEditMode ? `Ubah Koreksi Stok - ${nomor}` : 'Tambah Koreksi Stok'"
+    :title="
+      isEditMode
+        ? `Ubah Koreksi Stok - ${formData.nomor}`
+        : 'Tambah Koreksi Stok'
+    "
     menu-id="115"
     :icon="IconSettings"
     :is-loading="isLoading"
@@ -320,17 +309,16 @@ const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
     v-model:show-cancel-dialog="showCancelDialog"
     v-model:show-close-dialog="showCloseDialog"
     @validate-save="onValidateSave"
-    @confirm-save="onConfirmSave"
-    @confirm-cancel="onConfirmCancel"
-    @confirm-close="onConfirmClose"
+    @confirm-save="executeSave"
+    @confirm-cancel="executeCancel"
+    @confirm-close="executeClose"
   >
-    <!-- LEFT COLUMN: Header -->
     <template #left-column>
       <div class="desktop-form-section header-section">
         <div class="mb-3">
           <label class="f-label">No. Koreksi</label>
           <v-text-field
-            :model-value="nomor || '<-- Kosong = Baru'"
+            :model-value="formData.nomor || '<-- Kosong = Baru'"
             variant="outlined"
             density="compact"
             readonly
@@ -342,23 +330,21 @@ const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
             </v-chip>
           </div>
         </div>
-
         <div class="mb-3">
           <label class="f-label">Tanggal</label>
           <v-text-field
-            v-model="tanggal"
+            v-model="formData.tanggal"
             type="date"
             variant="outlined"
             density="compact"
             hide-details
           />
         </div>
-
         <div class="mb-3">
           <label class="f-label">Gudang</label>
           <div class="d-flex align-center ga-1">
             <v-text-field
-              :model-value="`${gdgKode} - ${gdgNama}`"
+              :model-value="`${formData.gdgKode} - ${formData.gdgNama}`"
               variant="outlined"
               density="compact"
               readonly
@@ -377,18 +363,16 @@ const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
             </v-btn>
           </div>
         </div>
-
         <div class="mb-3">
           <label class="f-label">Keterangan</label>
           <v-textarea
-            v-model="keterangan"
+            v-model="formData.keterangan"
             variant="outlined"
             density="compact"
             rows="3"
             hide-details
           />
         </div>
-
         <v-alert
           type="info"
           variant="tonal"
@@ -402,7 +386,6 @@ const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
       </div>
     </template>
 
-    <!-- RIGHT COLUMN: Tabel Detail -->
     <template #right-column>
       <div class="desktop-form-section" style="flex: 1">
         <table class="detail-table">
@@ -420,7 +403,7 @@ const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
             </tr>
           </thead>
           <tbody>
-            <tr v-for="(row, idx) in rows" :key="idx">
+            <tr v-for="(row, idx) in formData.rows" :key="idx">
               <td class="text-center">{{ idx + 1 }}</td>
               <td class="p0">
                 <div class="cell-grp">
@@ -513,7 +496,9 @@ const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
       </v-card-title>
       <v-card-text class="pa-4 pt-0 text-body-2">
         Baris
-        <b>{{ rowToDeleteIdx !== null ? rows[rowToDeleteIdx]?.nama : "" }}</b>
+        <b>{{
+          rowToDeleteIdx !== null ? formData.rows[rowToDeleteIdx]?.nama : ""
+        }}</b>
         akan dihapus dari daftar koreksi. Lanjutkan?
       </v-card-text>
       <v-card-actions class="pa-3 border-t">

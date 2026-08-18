@@ -124,4 +124,16 @@ export const approvalService = {
 
   submitNoPoOtorisasi: (payload: { nomor: string; status_acc: string }) =>
     api.post("/tools/approval/nopo/otorisasi", payload),
+
+  // --- APPROVAL REALISASI BEDA BAHAN (MENU_ID: 269) ---
+  getRealisasiBedaBahanList: (params: any) =>
+    api.get("/tools/approval/realisasi-beda-bahan", { params }),
+
+  getRealisasiBedaBahanDetail: (nomor: string) =>
+    api.get(`/tools/approval/realisasi-beda-bahan/${nomor}/detail`),
+
+  submitRealisasiBedaBahanOtorisasi: (data: {
+    nomor: string;
+    status_acc: string;
+  }) => api.post("/tools/approval/realisasi-beda-bahan/otorisasi", data),
 };

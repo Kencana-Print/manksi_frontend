@@ -24,6 +24,8 @@ import {
 
 import { useVersionCheck } from "@/composables/useVersionCheck";
 import ChangelogDialog from "@/components/ChangelogDialog.vue";
+import TabBar from "@/components/TabBar.vue";
+import TabView from "@/components/TabView.vue";
 
 const {
   buildVersion,
@@ -285,8 +287,11 @@ const onClickOutside = () => {
   <v-app>
     <Navbar />
 
-    <v-main style="background-color: #f8f9fa">
-      <router-view />
+    <v-main
+      style="background-color: #f8f9fa; display: flex; flex-direction: column"
+    >
+      <TabBar />
+      <TabView />
     </v-main>
 
     <!-- ── Footer — style TIDAK diubah dari versi asli ── -->

@@ -1,15 +1,10 @@
 <script setup lang="ts">
 import { ref, computed } from "vue";
-import { useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
 import BaseForm from "@/components/BaseForm.vue";
+import { useForm } from "@/composables/useForm";
 import { insentifFormService as svc } from "@/services/penjualan/insentifFormService";
-import {
-  IconCoin,
-  IconSearch,
-  IconTrash,
-  IconFileSpreadsheet,
-} from "@tabler/icons-vue";
+import { IconCoin, IconSearch, IconFileSpreadsheet } from "@tabler/icons-vue";
 import { cetakInsentifExcel } from "@/utils/cetakInsentif";
 
 // ── Types ───────────────────────────────────────────────────────────────
@@ -25,9 +20,10 @@ interface InvoiceRow {
   Keterangan: string;
   Invt: string;
 }
+
 interface DetailRow {
   _key: number;
-  Inv: string; // nomor invoice pemilik baris ini
+  Inv: string;
   Kode: string;
   Nama: string;
   Jumlah: number;
@@ -38,7 +34,19 @@ interface DetailRow {
   Xfee: number;
 }
 
-const router = useRouter();
+interface InsentifFormData {
+  Tanggal: string;
+  CusKode: string;
+  CusNama: string;
+  CusAlamat: string;
+  CusKota: string;
+  Bank: string;
+  NoRek: string;
+  AtasNama: string;
+  InvoiceList: InvoiceRow[];
+  DetailSpk: DetailRow[];
+}
+
 const toast = useToast();
 
 const todayLocal = () => {
@@ -48,24 +56,59 @@ const todayLocal = () => {
 
 let _key = 1;
 
-// ── Form state ─────────────────────────────────────────────────────────
-const fd = ref({
-  Tanggal: todayLocal(),
-  CusKode: "",
-  CusNama: "",
-  CusAlamat: "",
-  CusKota: "",
-  Bank: "",
-  NoRek: "",
-  AtasNama: "",
-  InvoiceList: [] as InvoiceRow[],
-  DetailSpk: [] as DetailRow[],
+// ── useForm ──────────────────────────────────────────────────────────────
+// Tidak ada fetchApi — form ini cuma mode create (tidak ada route edit),
+// jadi immediate: false + fetchApi undefined = onMounted useForm tidak
+// akan mencoba fetch apapun.
+const {
+  isSaving,
+  showSaveDialog,
+  showCancelDialog,
+  showCloseDialog,
+  formData,
+  executeSave,
+  executeCancel,
+  executeClose,
+} = useForm<InsentifFormData>({
+  menuId: "167",
+  initialData: {
+    Tanggal: todayLocal(),
+    CusKode: "",
+    CusNama: "",
+    CusAlamat: "",
+    CusKota: "",
+    Bank: "",
+    NoRek: "",
+    AtasNama: "",
+    InvoiceList: [],
+    DetailSpk: [],
+  },
+  submitApi: async (data) => {
+    const payload = {
+      tanggal: data.Tanggal,
+      cusKode: data.CusKode,
+      bank: data.Bank,
+      noRek: data.NoRek,
+      atasNama: data.AtasNama,
+      invoiceList: data.InvoiceList.map((r) => ({
+        Kode: r.Kode,
+        Tanggal: r.Tanggal,
+        Invt: r.Invt,
+      })),
+    };
+    return svc.save(payload);
+  },
+  // Custom onSuccess — TIDAK goBack() otomatis, karena abis save form
+  // ini harus nampilin dialog tanya print dulu, baru navigasi pas user
+  // klik "Tidak" atau "Cetak" (lihat skipPrint/doCetak di bawah).
+  onSuccess: (res: any) => {
+    savedNomor.value = res?.data?.data?.nomor || "";
+    toast.success("Berhasil disimpan.");
+    showPrintDialog.value = true;
+  },
 });
 
-const isLoading = ref(false);
-const isSaving = ref(false);
-const showSaveDialog = ref(false);
-const showCloseDialog = ref(false);
+const fd = formData;
 
 // ── Customer ───────────────────────────────────────────────────────────
 const onCusKodeEnter = async () => {
@@ -89,15 +132,11 @@ const onCusKodeEnter = async () => {
     fd.value.CusNama = "";
     fd.value.CusAlamat = "";
     fd.value.CusKota = "";
-    // Ganti customer → grid invoice/detail yang sudah ada jadi tidak
-    // valid (semua terikat ke customer sebelumnya), reset.
     fd.value.InvoiceList = [];
     fd.value.DetailSpk = [];
   }
 };
 
-// Ganti customer manual (bukan lewat error) juga reset grid — replikasi
-// edtCusKodeChange Delphi (initgrid + initgrid2 tiap CusKode berubah).
 const onCusKodeChange = () => {
   if (fd.value.InvoiceList.length > 0 || fd.value.DetailSpk.length > 0) {
     fd.value.InvoiceList = [];
@@ -123,12 +162,10 @@ const addInvoice = async (nomor: string) => {
     toast.warning("Invoice ini sudah di input.");
     return;
   }
-
   isLoadingInvoice.value = true;
   try {
     const res = await svc.checkInvoice(fd.value.CusKode, nomor);
     const { invoice, detail } = res.data.data;
-
     fd.value.InvoiceList.push({
       _key: _key++,
       Kode: invoice.Kode,
@@ -141,7 +178,6 @@ const addInvoice = async (nomor: string) => {
       Keterangan: invoice.Keterangan,
       Invt: invoice.Invt,
     });
-
     (detail || []).forEach((d: any) => {
       fd.value.DetailSpk.push({
         _key: _key++,
@@ -179,6 +215,7 @@ const openInvoiceModal = async () => {
   showInvoiceModal.value = true;
   await searchInvoiceModal();
 };
+
 const searchInvoiceModal = async () => {
   isLoadingModal.value = true;
   try {
@@ -190,19 +227,20 @@ const searchInvoiceModal = async () => {
     isLoadingModal.value = false;
   }
 };
+
 const selectInvoiceFromModal = async (item: any) => {
   showInvoiceModal.value = false;
   await addInvoice(item.Invoice);
 };
 
-// Hapus baris invoice — ikut hapus semua baris detail SPK miliknya
-// (replikasi cxGrdMain2KeyUp VK_DELETE: cascade delete CDS grid1).
 const showDeleteInvoiceDialog = ref(false);
 const pendingDeleteInvoice = ref<InvoiceRow | null>(null);
+
 const requestRemoveInvoice = (row: InvoiceRow) => {
   pendingDeleteInvoice.value = row;
   showDeleteInvoiceDialog.value = true;
 };
+
 const confirmRemoveInvoice = () => {
   if (pendingDeleteInvoice.value) {
     const kode = pendingDeleteInvoice.value.Kode;
@@ -224,9 +262,6 @@ const totalFeeTransfer = computed(() =>
   ),
 );
 
-// Styling baris detail SPK — replikasi cxGrdMasterCustomDrawCell:
-// fee=0 & xfee=0 → abu (tidak relevan); fee=0 & xfee<>0 → merah (perlu
-// input fee di master SPK dulu).
 const rowClass = (r: DetailRow) => {
   if (Number(r.Fee) === 0 && Number(r.Xfee) === 0) return "row-muted";
   if (Number(r.Fee) === 0 && Number(r.Xfee) !== 0) return "row-danger";
@@ -238,12 +273,16 @@ const num = (v: any) => Number(v || 0).toLocaleString("id-ID");
 // ── Print dialog ───────────────────────────────────────────────────────
 const showPrintDialog = ref(false);
 const savedNomor = ref("");
+const isCetaking = ref(false);
 
+// skipPrint/doCetak dua-duanya jalur "keluar dari form setelah save
+// sukses" — panggil executeClose() (bukan router.push manual) supaya
+// tab ikut ketutup & dialog lain ke-reset, konsisten dengan pola form lain.
 const skipPrint = () => {
   showPrintDialog.value = false;
-  router.push({ name: "InsentifBrowse" });
+  executeClose();
 };
-const isCetaking = ref(false);
+
 const doCetak = async () => {
   isCetaking.value = true;
   try {
@@ -253,11 +292,11 @@ const doCetak = async () => {
   } finally {
     isCetaking.value = false;
     showPrintDialog.value = false;
-    router.push({ name: "InsentifBrowse" });
+    executeClose();
   }
 };
 
-// ── Validasi & Simpan ────────────────────────────────────────────────
+// ── Validasi ───────────────────────────────────────────────────────────
 const validateSave = () => {
   if (!fd.value.CusNama) {
     toast.warning("Customer harus di isi.");
@@ -282,35 +321,6 @@ const validateSave = () => {
   }
   showSaveDialog.value = true;
 };
-
-const executeSave = async () => {
-  showSaveDialog.value = false;
-  isSaving.value = true;
-  try {
-    const payload = {
-      tanggal: fd.value.Tanggal,
-      cusKode: fd.value.CusKode,
-      bank: fd.value.Bank,
-      noRek: fd.value.NoRek,
-      atasNama: fd.value.AtasNama,
-      invoiceList: fd.value.InvoiceList.map((r) => ({
-        Kode: r.Kode,
-        Tanggal: r.Tanggal,
-        Invt: r.Invt,
-      })),
-    };
-    const res = await svc.save(payload);
-    savedNomor.value = res.data?.data?.nomor || "";
-    toast.success("Berhasil disimpan.");
-    showPrintDialog.value = true;
-  } catch (e: any) {
-    toast.error(e.response?.data?.message || "Gagal menyimpan data.");
-  } finally {
-    isSaving.value = false;
-  }
-};
-
-const executeClose = () => router.push({ name: "InsentifBrowse" });
 </script>
 
 <template>
@@ -318,13 +328,14 @@ const executeClose = () => router.push({ name: "InsentifBrowse" });
     title="Tambah Insentif"
     menu-id="167"
     :icon="IconCoin"
-    :is-loading="isLoading"
     :is-saving="isSaving"
     item-name="Insentif"
     v-model:show-save-dialog="showSaveDialog"
+    v-model:show-cancel-dialog="showCancelDialog"
     v-model:show-close-dialog="showCloseDialog"
     @validate-save="validateSave"
     @confirm-save="executeSave"
+    @confirm-cancel="executeCancel"
     @confirm-close="executeClose"
   >
     <template #left-column>

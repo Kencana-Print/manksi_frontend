@@ -3,6 +3,7 @@ import { ref, computed, onMounted, nextTick } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
 import { useAuthStore } from "@/stores/authStore";
+import { useTabsStore } from "@/stores/tabsStore";
 import type { AxiosError } from "axios";
 
 interface UseFormOptions<T> {
@@ -24,6 +25,7 @@ export function useForm<
   const router = useRouter();
   const toast = useToast();
   const authStore = useAuthStore();
+  const tabsStore = useTabsStore();
 
   const isEditMode = computed(
     () =>
@@ -50,13 +52,32 @@ export function useForm<
   });
 
   const goBack = () => {
-    if (options.onSuccessRoute) {
-      router.push(options.onSuccessRoute);
-    } else if (route.meta.browseRoute) {
-      router.push({ name: route.meta.browseRoute as string });
-    } else {
-      window.history.length > 1 ? router.back() : router.push("/");
-    }
+    const currentPath = route.path;
+
+    const target = options.onSuccessRoute
+      ? options.onSuccessRoute
+      : route.meta.browseRoute
+        ? { name: route.meta.browseRoute as string }
+        : window.history.length > 1
+          ? undefined
+          : "/";
+
+    // Selalu kembalikan Promise, meskipun router.back() aslinya void —
+    // supaya .then()/.catch() di bawah bisa dipakai konsisten tanpa
+    // TS mengeluh soal union type void | Promise<...>.
+    const navigate = (): Promise<unknown> => {
+      if (target === undefined) {
+        router.back();
+        return Promise.resolve();
+      }
+      return router.push(target);
+    };
+
+    navigate()
+      .catch(() => {})
+      .then(() => {
+        tabsStore.closeTab(currentPath);
+      });
   };
 
   const originalData = ref<T>(JSON.parse(JSON.stringify(options.initialData)));

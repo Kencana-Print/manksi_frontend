@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import { ref, computed } from "vue";
+import { useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
 import BaseForm from "@/components/BaseForm.vue";
+import { useForm } from "@/composables/useForm";
 import { useAuthStore } from "@/stores/authStore";
 import { returBeliBahanFormService } from "@/services/garmen/returBeliBahanFormService";
 import {
@@ -11,7 +12,6 @@ import {
   IconTrash,
   IconPrinter,
 } from "@tabler/icons-vue";
-
 import BpbSearchModal from "@/components/lookups/BpbSearchModal.vue";
 
 interface Grid1Row {
@@ -34,41 +34,31 @@ interface Grid2Row {
   total: number;
 }
 
-const route = useRoute();
+interface ReturBeliBahanFormData {
+  nomor: string;
+  tanggal: string;
+  keterangan: string;
+  bpbNomor: string;
+  bpbTanggal: string;
+  supKode: string;
+  supNama: string;
+  supAlamat: string;
+  supKota: string;
+  ppnChecked: boolean;
+  ppnValue: number;
+  grid1: Grid1Row[];
+  grid2: Grid2Row[];
+}
+
 const router = useRouter();
 const toast = useToast();
 const authStore = useAuthStore();
 
+const BROWSE_PATH = "/garmen/bahan-baku/retur-pembelian-bahan";
+
 const canLihatBeli = computed(() => authStore.user?.flags?.lihatBeli === 1);
 const canLihatSup = computed(() => authStore.user?.flags?.lihatSup === 1);
 
-const nomorParam = computed(() => route.params.nomor as string | undefined);
-const isEditMode = computed(() => !!nomorParam.value);
-
-const isLoading = ref(true);
-const isSaving = ref(false);
-
-const showSaveDialog = ref(false);
-const showCancelDialog = ref(false);
-const showCloseDialog = ref(false);
-const showPrintConfirm = ref(false);
-const nomorTerakhir = ref("");
-
-// --- STATE HEADER ---
-const nomor = ref("");
-const tanggal = ref("");
-const keterangan = ref("");
-const bpbNomor = ref("");
-const bpbTanggal = ref("");
-const supKode = ref("");
-const supNama = ref("");
-const supAlamat = ref("");
-const supKota = ref("");
-const ppnChecked = ref(false);
-const ppnValue = ref(0);
-
-// --- GRID 1 (scan barcode) ---
-const grid1 = ref<Grid1Row[]>([]);
 const blankGrid1Row = (): Grid1Row => ({
   barcode: "",
   kode: "",
@@ -77,22 +67,146 @@ const blankGrid1Row = (): Grid1Row => ({
   stok: 0,
   jumlah: 0,
 });
-const ensureTrailingGrid1Row = () => {
-  const last = grid1.value[grid1.value.length - 1];
-  if (!last || last.kode) grid1.value.push(blankGrid1Row());
+
+const ensureTrailingGrid1Row = (grid1: Grid1Row[]) => {
+  const last = grid1[grid1.length - 1];
+  if (!last || last.kode) grid1.push(blankGrid1Row());
 };
 
-// --- GRID 2 (agregat bahan, dihitung client-side buat preview) ---
-const grid2 = ref<Grid2Row[]>([]);
+// ── fetchApi / submitApi ────────────────────────────────────────────────
+const fetchApi = async (): Promise<ReturBeliBahanFormData> => {
+  const nomorEdit = params.nomor as string;
+  const res = await returBeliBahanFormService.getFormData(nomorEdit);
+  const d = res.data.data;
 
+  bpbLastFetched.value = d.header.bpbNomor;
+
+  const grid1: Grid1Row[] = d.grid1.map((r: any) => ({
+    barcode: r.barcode,
+    kode: r.kode,
+    nama: r.nama,
+    satuan: r.satuan,
+    stok: Number(r.stok) || 0,
+    jumlah: Number(r.jumlah) || 0,
+  }));
+  ensureTrailingGrid1Row(grid1);
+
+  return {
+    nomor: d.header.nomor,
+    tanggal: String(d.header.tanggal).substring(0, 10),
+    keterangan: d.header.keterangan,
+    bpbNomor: d.header.bpbNomor,
+    bpbTanggal: String(d.header.bpbTanggal || "").substring(0, 10),
+    supKode: d.header.supKode,
+    supNama: d.header.supNama,
+    supAlamat: d.header.supAlamat,
+    supKota: d.header.supKota,
+    ppnChecked: Number(d.header.ppnChecked) !== 0,
+    ppnValue: Number(d.header.ppnValue) || 0,
+    grid1,
+    grid2: d.grid2.map((r: any) => ({
+      kode: r.kode,
+      nama: r.nama,
+      satuan: r.satuan,
+      qtybpb: Number(r.qtybpb) || 0,
+      roll: Number(r.roll) || 0,
+      jumlah: Number(r.jumlah) || 0,
+      harga: Number(r.harga) || 0,
+      total: Number(r.total) || 0,
+    })),
+  };
+};
+
+const submitApi = async (data: ReturBeliBahanFormData) => {
+  const payload = {
+    tanggal: data.tanggal,
+    keterangan: data.keterangan,
+    bpbNomor: data.bpbNomor,
+    supKode: data.supKode,
+    ppnChecked: data.ppnChecked,
+    ppnValue: data.ppnValue,
+    barcodeRows: data.grid1
+      .filter((r) => r.kode)
+      .map((r) => ({
+        barcode: r.barcode,
+        kode: r.kode,
+        jumlah: r.jumlah,
+      })),
+  };
+  return isEditMode.value
+    ? returBeliBahanFormService.update(data.nomor, payload)
+    : returBeliBahanFormService.create(payload);
+};
+
+// ── useForm ──────────────────────────────────────────────────────────────
+const {
+  isEditMode,
+  isLoading,
+  isSaving,
+  showSaveDialog,
+  showCancelDialog,
+  showCloseDialog,
+  formData,
+  fetchData,
+  executeSave,
+  executeCancel,
+  executeClose,
+  params,
+} = useForm<ReturBeliBahanFormData>({
+  menuId: "55",
+  initialData: {
+    nomor: "",
+    tanggal: "",
+    keterangan: "",
+    bpbNomor: "",
+    bpbTanggal: "",
+    supKode: "",
+    supNama: "",
+    supAlamat: "",
+    supKota: "",
+    ppnChecked: false,
+    ppnValue: 0,
+    grid1: [blankGrid1Row()],
+    grid2: [],
+  },
+  fetchApi,
+  submitApi,
+  onSuccessRoute: BROWSE_PATH,
+  immediate: false,
+  onSuccess: (res: any) => {
+    const savedNomor = res?.data?.data?.nomor;
+    toast.success(res?.data?.message || "Berhasil disimpan.");
+    if (savedNomor) {
+      nomorTerakhir.value = savedNomor;
+      showPrintConfirm.value = true;
+    } else {
+      executeClose();
+    }
+  },
+});
+
+const fd = formData;
+
+// Default tanggal mode-create diambil dari endpoint terpisah (getDefault),
+// bukan dari fetchApi (yang cuma jalan pas edit).
+const loadData = async () => {
+  await fetchData();
+  if (!isEditMode.value) {
+    const res = await returBeliBahanFormService.getDefault();
+    fd.value.tanggal = res.data.data.tanggal;
+  }
+};
+loadData();
+
+// --- GRID 2 (agregat, dihitung client-side buat preview) ---
 const recomputeGrid2 = () => {
   const agregat: Record<string, number> = {};
-  grid1.value
+  fd.value.grid1
     .filter((r) => r.kode)
     .forEach((r) => {
       agregat[r.kode] = (agregat[r.kode] || 0) + (Number(r.jumlah) || 0);
     });
-  grid2.value.forEach((row) => {
+  fd.value.grid2.forEach((row) => {
     row.jumlah = agregat[row.kode] || 0;
     row.total = row.jumlah * (row.harga || 0);
   });
@@ -100,32 +214,31 @@ const recomputeGrid2 = () => {
 
 // --- BARCODE SCAN ---
 const onBarcodeBlur = async (idx: number) => {
-  const kodeBarcode = (grid1.value[idx].barcode || "").trim();
+  const kodeBarcode = (fd.value.grid1[idx].barcode || "").trim();
   if (!kodeBarcode) return;
 
-  if (!bpbNomor.value) {
+  if (!fd.value.bpbNomor) {
     toast.warning("No.BPB di isi dulu ya!");
-    grid1.value[idx].barcode = "";
+    fd.value.grid1[idx].barcode = "";
     return;
   }
 
-  // ✅ Replikasi cek "barcode sudah discan di baris lain" — state lokal
-  const dupIdx = grid1.value.findIndex(
+  const dupIdx = fd.value.grid1.findIndex(
     (r, i) => i !== idx && r.barcode === kodeBarcode,
   );
   if (dupIdx !== -1) {
     toast.warning(`Barcode tsb sudah discan, di baris ${dupIdx + 1}`);
-    grid1.value[idx].barcode = "";
+    fd.value.grid1[idx].barcode = "";
     return;
   }
 
   try {
     const res = await returBeliBahanFormService.getBarcode(
       kodeBarcode,
-      bpbNomor.value,
+      fd.value.bpbNomor,
     );
     const d = res.data.data;
-    grid1.value[idx] = {
+    fd.value.grid1[idx] = {
       barcode: d.barcode,
       kode: d.kode,
       nama: d.nama,
@@ -133,11 +246,11 @@ const onBarcodeBlur = async (idx: number) => {
       stok: d.stok,
       jumlah: d.jumlah,
     };
-    ensureTrailingGrid1Row();
+    ensureTrailingGrid1Row(fd.value.grid1);
     recomputeGrid2();
   } catch (e: any) {
     toast.error(e.response?.data?.message || "Gagal memuat data barcode.");
-    grid1.value[idx].barcode = "";
+    fd.value.grid1[idx].barcode = "";
   }
 };
 
@@ -145,7 +258,7 @@ const onJumlahGrid1Change = () => {
   recomputeGrid2();
 };
 
-// --- HAPUS BARIS GRID 1 (konfirmasi dialog) ---
+// --- HAPUS BARIS GRID 1 ---
 const deleteRowDialog = ref(false);
 const rowToDeleteIdx = ref<number | null>(null);
 
@@ -156,20 +269,20 @@ const requestRemoveGrid1Row = (idx: number) => {
 
 const confirmRemoveGrid1Row = () => {
   if (rowToDeleteIdx.value === null) return;
-  grid1.value.splice(rowToDeleteIdx.value, 1);
-  ensureTrailingGrid1Row();
+  fd.value.grid1.splice(rowToDeleteIdx.value, 1);
+  ensureTrailingGrid1Row(fd.value.grid1);
   recomputeGrid2();
   deleteRowDialog.value = false;
   rowToDeleteIdx.value = null;
 };
 
 // --- BPB LOOKUP ---
-const bpbLastFetched = ref(""); // ✅ replikasi xbpb — hindari re-fetch kalau value gak berubah
+const bpbLastFetched = ref("");
 const showBpbModal = ref(false);
 
 const fetchBpbData = async (kodeRaw: string) => {
   const kode = (kodeRaw || "").trim().toUpperCase();
-  bpbNomor.value = kode;
+  fd.value.bpbNomor = kode;
   if (!kode || kode === bpbLastFetched.value) return;
 
   try {
@@ -178,17 +291,16 @@ const fetchBpbData = async (kodeRaw: string) => {
     const d = res.data.data;
     bpbLastFetched.value = kode;
 
-    supKode.value = d.header.supKode;
-    supNama.value = d.header.supNama;
-    supAlamat.value = d.header.supAlamat;
-    supKota.value = d.header.supKota;
-    bpbTanggal.value = String(d.header.bpbTanggal || "").substring(0, 10);
-    ppnChecked.value = Number(d.header.ppnChecked) !== 0;
-    ppnValue.value = Number(d.header.ppnValue) || 0;
+    fd.value.supKode = d.header.supKode;
+    fd.value.supNama = d.header.supNama;
+    fd.value.supAlamat = d.header.supAlamat;
+    fd.value.supKota = d.header.supKota;
+    fd.value.bpbTanggal = String(d.header.bpbTanggal || "").substring(0, 10);
+    fd.value.ppnChecked = Number(d.header.ppnChecked) !== 0;
+    fd.value.ppnValue = Number(d.header.ppnValue) || 0;
 
-    // ✅ Ganti BPB → reset grid 1 (scan ulang dari awal), seed grid 2
-    grid1.value = [blankGrid1Row()];
-    grid2.value = d.grid2.map((r: any) => ({
+    fd.value.grid1 = [blankGrid1Row()];
+    fd.value.grid2 = d.grid2.map((r: any) => ({
       kode: r.kode,
       nama: r.nama,
       satuan: r.satuan,
@@ -200,150 +312,54 @@ const fetchBpbData = async (kodeRaw: string) => {
     }));
   } catch (e: any) {
     toast.error(e.response?.data?.message || "BPB tsb belum ada.");
-    bpbNomor.value = "";
+    fd.value.bpbNomor = "";
     bpbLastFetched.value = "";
   } finally {
     isLoading.value = false;
   }
 };
 
-const onBpbBlur = () => fetchBpbData(bpbNomor.value);
+const onBpbBlur = () => fetchBpbData(fd.value.bpbNomor);
 const onBpbSelected = (item: any) => fetchBpbData(item.Nomor);
 
-// --- TOTAL (footer, cuma dihitung kalau canLihatBeli) ---
+// --- TOTAL ---
 const totalNominal = computed(() =>
-  grid2.value.reduce((s, r) => s + (r.total || 0), 0),
+  fd.value.grid2.reduce((s, r) => s + (r.total || 0), 0),
 );
 const totalPpn = computed(() =>
-  ppnChecked.value ? (totalNominal.value * ppnValue.value) / 100 : 0,
+  fd.value.ppnChecked ? (totalNominal.value * fd.value.ppnValue) / 100 : 0,
 );
 const grandTotal = computed(() => totalNominal.value + totalPpn.value);
 
-// ✅ replikasi cbbPPNClick — centang PPN auto-isi 11%, uncheck jadi 0
 const onPpnCheckedChange = () => {
-  ppnValue.value = ppnChecked.value ? 11 : 0;
+  fd.value.ppnValue = fd.value.ppnChecked ? 11 : 0;
 };
-
-// ✅ replikasi edtPpnExit — sinkron balik: isi manual 0 → auto uncheck,
-// isi manual >0 → auto checked
 const onPpnValueBlur = () => {
-  ppnChecked.value = Number(ppnValue.value) !== 0;
+  fd.value.ppnChecked = Number(fd.value.ppnValue) !== 0;
 };
 
-// --- LOAD DATA ---
-const loadData = async () => {
-  isLoading.value = true;
-  try {
-    if (isEditMode.value) {
-      const res = await returBeliBahanFormService.getFormData(
-        nomorParam.value!,
-      );
-      const d = res.data.data;
-      nomor.value = d.header.nomor;
-      tanggal.value = String(d.header.tanggal).substring(0, 10);
-      keterangan.value = d.header.keterangan;
-      bpbNomor.value = d.header.bpbNomor;
-      bpbLastFetched.value = d.header.bpbNomor;
-      bpbTanggal.value = String(d.header.bpbTanggal || "").substring(0, 10);
-      supKode.value = d.header.supKode;
-      supNama.value = d.header.supNama;
-      supAlamat.value = d.header.supAlamat;
-      supKota.value = d.header.supKota;
-      ppnChecked.value = Number(d.header.ppnChecked) !== 0;
-      ppnValue.value = Number(d.header.ppnValue) || 0;
-
-      grid1.value = d.grid1.map((r: any) => ({
-        barcode: r.barcode,
-        kode: r.kode,
-        nama: r.nama,
-        satuan: r.satuan,
-        stok: Number(r.stok) || 0,
-        jumlah: Number(r.jumlah) || 0,
-      }));
-      ensureTrailingGrid1Row();
-
-      grid2.value = d.grid2.map((r: any) => ({
-        kode: r.kode,
-        nama: r.nama,
-        satuan: r.satuan,
-        qtybpb: Number(r.qtybpb) || 0,
-        roll: Number(r.roll) || 0,
-        jumlah: Number(r.jumlah) || 0,
-        harga: Number(r.harga) || 0,
-        total: Number(r.total) || 0,
-      }));
-    } else {
-      const res = await returBeliBahanFormService.getDefault();
-      tanggal.value = res.data.data.tanggal;
-      grid1.value = [blankGrid1Row()];
-      grid2.value = [];
-    }
-  } catch (e: any) {
-    toast.error(e.response?.data?.message || "Gagal memuat data.");
-    router.push({ name: "ReturBeliBahanBrowse" });
-  } finally {
-    isLoading.value = false;
-  }
-};
-
-onMounted(loadData);
-
-// --- VALIDASI SEBELUM SIMPAN (replikasi F10) ---
+// --- VALIDASI ---
 const onValidateSave = () => {
-  const filled = grid1.value.filter((r) => r.kode);
+  const filled = fd.value.grid1.filter((r) => r.kode);
   if (filled.length === 0) {
-    return toast.error("Tidak ada detail,tidak dapat di simpan");
+    toast.error("Tidak ada detail,tidak dapat di simpan");
+    return;
   }
   const totalQty = filled.reduce((s, r) => s + (Number(r.jumlah) || 0), 0);
   if (totalQty === 0) {
-    return toast.error("Qty Retur 0 semua , tidak bisa di simpan.");
+    toast.error("Qty Retur 0 semua , tidak bisa di simpan.");
+    return;
   }
-  if (!bpbNomor.value) {
-    return toast.error("Nomor BPB harus diisi.");
+  if (!fd.value.bpbNomor) {
+    toast.error("Nomor BPB harus diisi.");
+    return;
   }
   showSaveDialog.value = true;
 };
 
-// --- SUBMIT SIMPAN ---
-const onConfirmSave = async () => {
-  isSaving.value = true;
-  try {
-    const payload = {
-      tanggal: tanggal.value,
-      keterangan: keterangan.value,
-      bpbNomor: bpbNomor.value,
-      supKode: supKode.value,
-      ppnChecked: ppnChecked.value,
-      ppnValue: ppnValue.value,
-      barcodeRows: grid1.value
-        .filter((r) => r.kode)
-        .map((r) => ({
-          barcode: r.barcode,
-          kode: r.kode,
-          jumlah: r.jumlah,
-        })),
-    };
-
-    const res = isEditMode.value
-      ? await returBeliBahanFormService.update(nomor.value, payload)
-      : await returBeliBahanFormService.create(payload);
-
-    const savedNomor = res.data.data?.nomor;
-    toast.success(res.data.message || "Berhasil disimpan.");
-    showSaveDialog.value = false;
-
-    if (savedNomor) {
-      nomorTerakhir.value = savedNomor;
-      showPrintConfirm.value = true;
-    } else {
-      router.push({ name: "ReturBeliBahanBrowse" });
-    }
-  } catch (e: any) {
-    toast.error(e.response?.data?.message || "Gagal menyimpan data.");
-  } finally {
-    isSaving.value = false;
-  }
-};
+// --- PRINT DIALOG ---
+const showPrintConfirm = ref(false);
+const nomorTerakhir = ref("");
 
 const doPrintDocument = () => {
   showPrintConfirm.value = false;
@@ -352,22 +368,12 @@ const doPrintDocument = () => {
     params: { nomor: nomorTerakhir.value },
   }).href;
   window.open(url, "_blank");
-  router.push({ name: "ReturBeliBahanBrowse" });
+  executeClose();
 };
 
 const skipPrint = () => {
   showPrintConfirm.value = false;
-  router.push({ name: "ReturBeliBahanBrowse" });
-};
-
-// --- BATAL / TUTUP ---
-const onConfirmCancel = () => {
-  showCancelDialog.value = false;
-  loadData();
-};
-
-const onConfirmClose = () => {
-  router.push({ name: "ReturBeliBahanBrowse" });
+  executeClose();
 };
 
 const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
@@ -377,7 +383,7 @@ const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
   <BaseForm
     :title="
       isEditMode
-        ? `Ubah Retur Pembelian Bahan - ${nomor}`
+        ? `Ubah Retur Pembelian Bahan - ${fd.nomor}`
         : 'Tambah Retur Pembelian Bahan'
     "
     menu-id="55"
@@ -388,17 +394,16 @@ const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
     v-model:show-cancel-dialog="showCancelDialog"
     v-model:show-close-dialog="showCloseDialog"
     @validate-save="onValidateSave"
-    @confirm-save="onConfirmSave"
-    @confirm-cancel="onConfirmCancel"
-    @confirm-close="onConfirmClose"
+    @confirm-save="executeSave"
+    @confirm-cancel="executeCancel"
+    @confirm-close="executeClose"
   >
-    <!-- LEFT COLUMN: Header + Grand Total -->
     <template #left-column>
       <div class="rbb-left">
         <div class="fr">
           <label class="lbl">Nomor</label>
           <input
-            :value="nomor || '<-- Kosong=Baru'"
+            :value="fd.nomor || '<-- Kosong=Baru'"
             readonly
             class="inp ro"
             style="flex: 1"
@@ -406,7 +411,12 @@ const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
         </div>
         <div class="fr">
           <label class="lbl">Tanggal</label>
-          <input type="date" v-model="tanggal" class="idate" style="flex: 1" />
+          <input
+            type="date"
+            v-model="fd.tanggal"
+            class="idate"
+            style="flex: 1"
+          />
         </div>
 
         <div class="sep" />
@@ -415,7 +425,7 @@ const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
           <label class="lbl">No. BPB</label>
           <div class="igrp" style="flex: 1">
             <input
-              v-model="bpbNomor"
+              v-model="fd.bpbNomor"
               class="inp"
               style="flex: 1; background: #ddeeff"
               :readonly="isEditMode"
@@ -436,16 +446,26 @@ const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
             </button>
           </div>
         </div>
-        <div class="fr" v-if="bpbTanggal">
+        <div class="fr" v-if="fd.bpbTanggal">
           <label class="lbl">Tgl. BPB</label>
-          <input :value="bpbTanggal" readonly class="inp ro" style="flex: 1" />
+          <input
+            :value="fd.bpbTanggal"
+            readonly
+            class="inp ro"
+            style="flex: 1"
+          />
         </div>
 
         <div class="fr">
           <label class="lbl" style="align-self: flex-start; padding-top: 4px"
             >Keterangan</label
           >
-          <textarea v-model="keterangan" class="ta" rows="2" style="flex: 1" />
+          <textarea
+            v-model="fd.keterangan"
+            class="ta"
+            rows="2"
+            style="flex: 1"
+          />
         </div>
 
         <template v-if="canLihatSup">
@@ -454,13 +474,13 @@ const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
             <div class="fieldset-legend">Supplier</div>
             <div class="fr">
               <input
-                :value="supKode"
+                :value="fd.supKode"
                 readonly
                 class="inp ro"
                 style="width: 70px"
               />
               <input
-                :value="supNama"
+                :value="fd.supNama"
                 readonly
                 class="inp ro ml-1"
                 style="flex: 1"
@@ -468,14 +488,19 @@ const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
             </div>
             <div class="fr">
               <input
-                :value="supAlamat"
+                :value="fd.supAlamat"
                 readonly
                 class="inp ro"
                 style="flex: 1"
               />
             </div>
             <div class="fr">
-              <input :value="supKota" readonly class="inp ro" style="flex: 1" />
+              <input
+                :value="fd.supKota"
+                readonly
+                class="inp ro"
+                style="flex: 1"
+              />
             </div>
           </div>
         </template>
@@ -486,17 +511,17 @@ const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
           <label class="chk-lbl">
             <input
               type="checkbox"
-              v-model="ppnChecked"
+              v-model="fd.ppnChecked"
               @change="onPpnCheckedChange"
             />
             PPN %
           </label>
           <input
-            v-model.number="ppnValue"
+            v-model.number="fd.ppnValue"
             type="number"
             class="inp ml-1"
             style="width: 70px"
-            :disabled="!ppnChecked"
+            :disabled="!fd.ppnChecked"
             @blur="onPpnValueBlur"
           />
         </div>
@@ -537,10 +562,8 @@ const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
       </div>
     </template>
 
-    <!-- RIGHT COLUMN: 2 tabel stacked -->
     <template #right-column>
       <div class="rbb-right">
-        <!-- Tabel 1: Scan Barcode -->
         <div class="tbl-header">
           <span class="tbl-title">1. Scan / Input Barcode</span>
         </div>
@@ -559,7 +582,7 @@ const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
               </tr>
             </thead>
             <tbody>
-              <tr v-for="(row, idx) in grid1" :key="idx">
+              <tr v-for="(row, idx) in fd.grid1" :key="idx">
                 <td class="tc gt-lbl">{{ idx + 1 }}</td>
                 <td class="p0">
                   <input
@@ -597,7 +620,7 @@ const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
                   </button>
                 </td>
               </tr>
-              <tr v-if="grid1.length === 0">
+              <tr v-if="fd.grid1.length === 0">
                 <td colspan="8" class="empty-row">
                   Isi No. BPB dulu, lalu scan barcode di sini.
                 </td>
@@ -606,7 +629,6 @@ const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
           </table>
         </div>
 
-        <!-- Tabel 2: Agregat Bahan (read-only) -->
         <div class="tbl-header teal mt-2">
           <span class="tbl-title">2. Rekap Retur per Bahan</span>
         </div>
@@ -630,7 +652,7 @@ const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
               </tr>
             </thead>
             <tbody>
-              <tr v-for="(row, idx) in grid2" :key="idx">
+              <tr v-for="(row, idx) in fd.grid2" :key="idx">
                 <td class="tc gt-lbl">{{ idx + 1 }}</td>
                 <td class="px-1">{{ row.kode }}</td>
                 <td class="px-1" :title="row.nama">{{ row.nama }}</td>
@@ -647,7 +669,7 @@ const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
                   {{ numFmt(row.total) }}
                 </td>
               </tr>
-              <tr v-if="grid2.length === 0">
+              <tr v-if="fd.grid2.length === 0">
                 <td :colspan="canLihatBeli ? 9 : 7" class="empty-row">
                   Belum ada bahan — isi No. BPB dulu.
                 </td>
@@ -659,7 +681,6 @@ const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
     </template>
   </BaseForm>
 
-  <!-- Dialog Konfirmasi Hapus Baris -->
   <v-dialog v-model="deleteRowDialog" max-width="360">
     <v-card rounded="lg">
       <v-card-title class="text-subtitle-1 pa-4 d-flex align-center">
@@ -668,7 +689,9 @@ const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
       </v-card-title>
       <v-card-text class="pa-4 pt-0 text-body-2">
         Baris scan
-        <b>{{ rowToDeleteIdx !== null ? grid1[rowToDeleteIdx]?.nama : "" }}</b>
+        <b>{{
+          rowToDeleteIdx !== null ? fd.grid1[rowToDeleteIdx]?.nama : ""
+        }}</b>
         akan dihapus. Lanjutkan?
       </v-card-text>
       <v-card-actions class="pa-3 border-t">
@@ -681,7 +704,6 @@ const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
     </v-card>
   </v-dialog>
 
-  <!-- Dialog Konfirmasi Cetak Setelah Simpan -->
   <v-dialog v-model="showPrintConfirm" max-width="400" persistent>
     <v-card class="rounded-lg">
       <v-card-title class="bg-primary text-white d-flex align-center pa-3">
