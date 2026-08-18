@@ -1331,7 +1331,15 @@ const validateSave = async (skipPoCheck = false) => {
   // ⚠️ FIX: skip dialog kalau approval "SO tanpa PO" sudah ACC
   // sebelumnya — sama seperti fix MAP, supaya user tidak "ditodong"
   // ulang tiap edit & simpan padahal approval-nya masih berlaku.
-  if (!fd.spk_nomor_po?.trim() && !skipPoCheck && fd.nopo_acc !== "ACC") {
+  // Divisi 3 (Kaosan) DIKECUALIKAN total — Nomor PO di divisi ini
+  // sifatnya opsional (barang bisa jadi stok internal, bukan selalu
+  // pesanan by-PO), jadi kosong tidak perlu approval sama sekali.
+  if (
+    divisiStr !== "3" &&
+    !fd.spk_nomor_po?.trim() &&
+    !skipPoCheck &&
+    fd.nopo_acc !== "ACC"
+  ) {
     showNoPoDialog.value = true;
     return;
   }
@@ -1344,8 +1352,11 @@ const validateSave = async (skipPoCheck = false) => {
     }
   }
 
-  // ← BARU: Gate Persetujuan Customer — HANYA untuk SO tanpa referensi MAP
-  if (!fd.spk_memo) {
+  // ← Gate Persetujuan Customer — HANYA untuk SO tanpa referensi MAP,
+  // dan HANYA di luar Divisi 3. Divisi 3 (Kaosan) tidak memerlukan
+  // bukti persetujuan customer terpisah — alur approval-nya beda dari
+  // divisi lain (biasanya sudah lewat konfirmasi order di sistem retail).
+  if (!fd.spk_memo && divisiStr !== "3") {
     if (!isEditMode.value) {
       if (fd.spk_acc_customer !== "Y") {
         toast.warning(
