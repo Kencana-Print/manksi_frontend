@@ -867,7 +867,7 @@ const rowPropsFn = (data: any) => {
               'Komponen',
               'NamaSpk',
             ]"
-            :default-rows="['NamaSpk', 'Komponen']"
+            :default-rows="['Kelompok', 'Size', 'NamaSpk', 'Komponen']"
             :default-cols="['GudangAsal']"
             :default-vals="[{ field: 'Jumlah', agg: 'sum' }]"
             @pivot-changed="onPivotChanged"
