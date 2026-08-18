@@ -55,6 +55,7 @@ const {
 // Headers persis sesuai Delphi
 const headers = [
   { title: "Nomor", key: "Nomor", width: "130px" },
+  { title: "Status", key: "StatusAktif", width: "90px" },
   { title: "Tanggal", key: "Tanggal", width: "95px" },
   { title: "No. Minta", key: "NoMinta", width: "130px" },
   { title: "Gudang", key: "Gudang", minWidth: "150px" },
@@ -195,8 +196,20 @@ const submitPengajuan = async () => {
   }
 };
 
-// Format warna text Ngedit
+const pasifTooltip = (item: any) => {
+  if (item.StatusBeda === "WAIT") {
+    return "Menunggu approval beda bahan — stok belum terpotong. MKB perlu diubah dulu sebelum di-ACC.";
+  }
+  if (item.StatusBeda === "TOLAK") {
+    return "Pengajuan beda bahan ditolak — perbaiki data lalu ajukan ulang.";
+  }
+  return "Stok belum terpotong (pasif).";
+};
+
+// Format warna teks Ngedit
 const getNomorClass = (item: any) => {
+  if (item.StatusBeda === "WAIT") return "badge-wait";
+  if (item.StatusBeda === "TOLAK") return "badge-tolak";
   if (item.Ngedit === "WAIT") return "badge-wait";
   if (item.Ngedit === "TOLAK") return "badge-tolak";
   if (item.Ngedit === "ACC") return "badge-acc";
@@ -260,6 +273,13 @@ const getNomorClass = (item: any) => {
         <span class="badge-tolak" style="font-size: 10px; padding: 2px 6px"
           >Tolak</span
         >
+        <span class="filter-label ml-2" style="color: #888">|</span>
+        <span class="badge-pasif" style="font-size: 10px; padding: 2px 6px"
+          >Pasif</span
+        >
+        <span class="filter-label" style="color: #888"
+          >= Stok belum terpotong (beda bahan)</span
+        >
       </div>
     </template>
 
@@ -313,6 +333,16 @@ const getNomorClass = (item: any) => {
     </template>
     <template #item.Jumlah="{ item }">{{ num(item.Jumlah) }}</template>
     <template #item.JmlOrder="{ item }">{{ num(item.JmlOrder) }}</template>
+    <template #item.StatusAktif="{ item }">
+      <span
+        v-if="item.Aktif === 'N'"
+        class="badge-pasif"
+        :title="pasifTooltip(item)"
+      >
+        Pasif
+      </span>
+      <span v-else class="badge-aktif-ok"> Aktif </span>
+    </template>
 
     <!-- Expand Detail Row -->
     <template #detail="{ item }">
@@ -455,6 +485,22 @@ const getNomorClass = (item: any) => {
   color: white;
   border-radius: 3px;
   font-weight: 700;
+}
+.badge-pasif {
+  background: #c62828;
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 3px;
+}
+.badge-aktif-ok {
+  background: #e0e0e0;
+  color: #616161;
+  font-size: 10px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 3px;
 }
 
 .det-wrap {

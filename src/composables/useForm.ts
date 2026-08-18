@@ -1,5 +1,5 @@
 // src/composables/useForm.ts
-import { ref, computed, onMounted, nextTick } from "vue";
+import { ref, computed, onMounted, onActivated, nextTick } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
 import { useAuthStore } from "@/stores/authStore";
@@ -143,6 +143,13 @@ export function useForm<
     // 3. Fungsi fetchApi disediakan di komponen
     if (options.immediate !== false && isEditMode.value && options.fetchApi) {
       fetchData();
+    }
+  });
+
+  onActivated(() => {
+    if (!isEditMode.value) {
+      formData.value = JSON.parse(JSON.stringify(options.initialData));
+      originalData.value = JSON.parse(JSON.stringify(options.initialData));
     }
   });
 

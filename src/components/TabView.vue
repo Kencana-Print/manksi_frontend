@@ -26,7 +26,6 @@ watch(
         : tab.path;
     router.push(target).catch(() => {});
   },
-  { immediate: true },
 );
 </script>
 
