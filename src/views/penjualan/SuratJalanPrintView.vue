@@ -188,7 +188,7 @@ const generateTxt = () => {
     }
     lines.push(LINE);
     lines.push(
-      `${padR("No", 3)} ${padR("SPK", 12)} ${padR("Nama", NAMA_W)} ${padR("Ukuran", 20)} ${padL("Jumlah", 10)} ${padL("Koli", 9)} ${padR("Keterangan", KET_W)}`,
+      `${padR("No", 3)} ${padR("SO", 12)} ${padR("Nama", NAMA_W)} ${padR("Ukuran", 20)} ${padL("Jumlah", 10)} ${padL("Koli", 9)} ${padR("Keterangan", KET_W)}`,
     );
     lines.push(LINE);
     return lines;
@@ -246,10 +246,11 @@ const generateTxt = () => {
   for (const r of rows) {
     const namaFull = (r.spk_nama || r.spk_nama2 || "").trim();
     const namaLines = wrapText(namaFull, NAMA_W);
+    const nomorTampil = r.so_ref || r.sjd_spk_nomor || "";
 
     // Baris Utama (dengan No, SPK, Ukuran, dst)
     allPhysicalRows.push(
-      `${padR(String(currentRowNo), 3)} ${padR(r.sjd_spk_nomor || "", 12)} ${padR(namaLines[0], NAMA_W)} ${padR(r.sjd_ukuran || "", 20)} ${padL(num(r.sjd_jumlah), 10)} ${padL(num(r.sjd_koli), 9)} ${padR(r.sjd_keterangan || "", KET_W)}`,
+      `${padR(String(currentRowNo), 3)} ${padR(nomorTampil, 12)} ${padR(namaLines[0], NAMA_W)} ${padR(r.sjd_ukuran || "", 20)} ${padL(num(r.sjd_jumlah), 10)} ${padL(num(r.sjd_koli), 9)} ${padR(r.sjd_keterangan || "", KET_W)}`,
     );
 
     // Baris Tambahan (jika nama terpotong menjadi multi-baris)
@@ -519,7 +520,7 @@ onMounted(() => {
               <thead>
                 <tr>
                   <th style="width: 24px; text-align: center">No</th>
-                  <th style="width: 110px">Spk</th>
+                  <th style="width: 110px">SO</th>
                   <th>Nama</th>
                   <th style="width: 80px">Ukuran</th>
                   <th style="width: 60px; text-align: right">Jumlah</th>
@@ -532,7 +533,7 @@ onMounted(() => {
                   <td style="text-align: center">
                     {{ pi * rowsPerPage + i + 1 }}
                   </td>
-                  <td>{{ r.sjd_spk_nomor }}</td>
+                  <td>{{ r.so_ref || r.sjd_spk_nomor }}</td>
                   <td>{{ r.spk_nama || r.spk_nama2 }}</td>
                   <td>{{ r.sjd_ukuran }}</td>
                   <td style="text-align: right">{{ num(r.sjd_jumlah) }}</td>

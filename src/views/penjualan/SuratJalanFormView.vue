@@ -25,6 +25,7 @@ import {
 interface DetailRow {
   _key: number;
   SpkNomor: string;
+  SoNomor: string;
   NamaSpk: string;
   Ukuran: string;
   Size: string;
@@ -187,6 +188,7 @@ const {
       Detail: (d.detail || []).map((r: any) => ({
         _key: _key++,
         SpkNomor: r.sjd_spk_nomor || "",
+        SoNomor: r.so_ref || r.sjd_spk_nomor || "",
         NamaSpk: r.spk_nama || "",
         Ukuran: r.sjd_ukuran || "",
         Size: r.size || "",
@@ -431,6 +433,7 @@ const ensureEmptyRow = () => {
     fd.value.Detail.push({
       _key: _key++,
       SpkNomor: "",
+      SoNomor: "",
       NamaSpk: "",
       Ukuran: "",
       Size: "",
@@ -1264,7 +1267,7 @@ onMounted(async () => {
                     </template>
                     <input
                       v-else
-                      :value="row.SpkNomor"
+                      :value="row.SoNomor || row.SpkNomor"
                       readonly
                       class="ci mono"
                     />
