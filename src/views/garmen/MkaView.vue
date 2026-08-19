@@ -133,9 +133,11 @@ const onAdd = () => router.push("/garmen/mka/create");
 
 const onEdit = (item: any) => {
   if (item.RowType === "SPK") {
-    toast.info(
-      "SPK ini belum dibuatkan MKA. Silakan klik tombol Baru untuk memprosesnya.",
-    );
+    // SPK belum punya MKA → langsung ke form baru, SPK-nya dibawa lewat query
+    router.push({
+      path: "/garmen/mka/create",
+      query: { spk: item.SPK }, // SPK di data browse = nomor SPK
+    });
     return;
   }
   router.push(`/garmen/mka/edit/${encodeURIComponent(item.Nomor)}`);

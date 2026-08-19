@@ -228,8 +228,28 @@ const mitraLuarText = computed(() => {
 
 const formatSizeDetail = computed(() => {
   if (!data.value.sizeDetails?.length) return "";
-  return data.value.sizeDetails
-    .map((sz: any) => `${sz.size}=  L: ${sz.ld || 0}   P: ${sz.pb || 0}`)
+  // Pasangan "Lebar/Panjang" yang ditampilkan beda-beda tergantung
+  // jenis produk — form input pakai field berbeda per jenis (lihat
+  // DIMENSION_FIELDS di SalesOrderForm.vue):
+  //   - Kaos/atasan umum → ld (Lebar Dada) / pb (Panjang Badan)
+  //   - Celana           → l_pinggang / p_celana
+  // Print sebelumnya hardcode ld/pb saja, jadi celana selalu 0.00.
+  // Sekarang: pilih pasangan pertama yang datanya benar-benar
+  // terisi di salah satu baris, biar generik untuk semua jenis
+  // produk tanpa print perlu tahu jenis order-nya secara eksplisit.
+  const pairs: [string, string][] = [
+    ["ld", "pb"],
+    ["l_pinggang", "p_celana"],
+    ["pl_pendek", "pb"],
+    ["pl_panjang", "pb"],
+  ];
+  const rows = data.value.sizeDetails;
+  const [lKey, pKey] =
+    pairs.find(([lK, pK]) =>
+      rows.some((r: any) => Number(r[lK]) > 0 || Number(r[pK]) > 0),
+    ) || pairs[0];
+  return rows
+    .map((sz: any) => `${sz.size}=  L: ${sz[lKey] || 0}   P: ${sz[pKey] || 0}`)
     .join("\n");
 });
 

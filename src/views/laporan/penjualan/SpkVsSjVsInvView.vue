@@ -42,6 +42,8 @@ const STATUS_OPTIONS = [
   { value: "2", title: "Sudah Terpenuhi" },
 ];
 
+const isLegacyFormat = (item: any) => !/^SO-/.test(item.Nomor || "");
+
 // --- DROPDOWN DIVISI ---
 const divisiOptions = ref<{ value: string; title: string }[]>([]);
 const loadDivisi = async () => {
@@ -123,7 +125,8 @@ const canLihatCus = computed(
 
 const headers = computed(() => {
   const h: any[] = [
-    { title: "Nomor", key: "Nomor", width: "150px", fixed: true },
+    { title: "SO", key: "Nomor", width: "150px", fixed: true },
+    { title: "SPK", key: "Spk", width: "130px" },
     { title: "Tanggal", key: "Tanggal", width: "95px", align: "center" },
     { title: "Divisi", key: "Divisi", width: "110px" },
   ];
@@ -234,8 +237,13 @@ const onExport = async () => {
       // (gak saling terkait), tinggi blok = yang paling banyak barisnya
       const rowCount = Math.max(sjList.length, invList.length, 1);
 
+      // ── swap tampilan: format lama → nomor pindah ke kolom Spk ──
+      const isLegacy = !/^SO-/.test(m.Nomor || "");
+      const displayNomor = isLegacy ? "-" : m.Nomor;
+      const displaySpk = isLegacy ? m.Nomor : m.Spk || "";
+
       const masterCells = {
-        Nomor: m.Nomor,
+        Nomor: displayNomor,
         Tanggal: formatTanggal(m.Tanggal),
         Divisi: m.Divisi,
         ...(canLihatCus.value ? { NamaCustomer: m.NamaCustomer } : {}),
@@ -247,6 +255,7 @@ const onExport = async () => {
         Kirim: Number(m.Kirim) || 0,
         Dateline: formatTanggal(m.Dateline),
         NomorPO: m.NomorPO,
+        Spk: displaySpk,
       };
       const blankMaster = Object.fromEntries(
         Object.keys(masterCells).map((k) => [k, ""]),
@@ -298,7 +307,8 @@ const onExport = async () => {
     });
 
     const columns: ExcelColumn[] = [
-      { header: "Nomor", key: "Nomor", width: 18 },
+      { header: "SO", key: "Nomor", width: 18 },
+      { header: "SPK", key: "Spk", width: 18 },
       { header: "Tanggal", key: "Tanggal", width: 14, align: "center" },
       { header: "Divisi", key: "Divisi", width: 14 },
       ...(canLihatCus.value
@@ -505,6 +515,13 @@ const onExport = async () => {
     <template #item.Jumlah="{ item }">{{ numFmt(item.Jumlah) }}</template>
     <template #item.Prasj="{ item }">{{ numFmt(item.Prasj) }}</template>
     <template #item.Kirim="{ item }">{{ numFmt(item.Kirim) }}</template>
+    <template #item.Nomor="{ item }">
+      <span v-if="isLegacyFormat(item)" class="text-grey">-</span>
+      <span v-else>{{ item.Nomor }}</span>
+    </template>
+    <template #item.Spk="{ item }">
+      {{ isLegacyFormat(item) ? item.Nomor : item.Spk || "-" }}
+    </template>
 
     <template #detail="{ item }">
       <div class="expand-container pa-3 bg-grey-lighten-4">
