@@ -112,6 +112,28 @@ const submitDesignStatus = async () => {
   }
 };
 
+// --- DEBOUNCE & VALIDASI TANGGAL ---
+let dateDebounce: ReturnType<typeof setTimeout> | null = null;
+
+const onFilterDateChange = () => {
+  if (dateDebounce) clearTimeout(dateDebounce);
+
+  dateDebounce = setTimeout(() => {
+    const start = filterState.value.startDate;
+    const end = filterState.value.endDate;
+
+    if (!start || !end) return;
+
+    const startYear = parseInt(start.split("-")[0], 10);
+    const endYear = parseInt(end.split("-")[0], 10);
+
+    // Hanya fetch data jika tahunnya logis (mencegah query tahun 0002)
+    if (startYear > 2000 && endYear > 2000) {
+      fetchData();
+    }
+  }, 600); // Jeda 600ms setelah user berhenti mengetik
+};
+
 const {
   items,
   isLoading,
@@ -464,14 +486,16 @@ const confirmToggleClose = async () => {
           type="date"
           v-model="filterState.startDate"
           class="date-inp"
-          @change="fetchData"
+          @input="onFilterDateChange"
+          @change="onFilterDateChange"
         />
         <span class="filter-sep">s/d</span>
         <input
           type="date"
           v-model="filterState.endDate"
           class="date-inp"
-          @change="fetchData"
+          @input="onFilterDateChange"
+          @change="onFilterDateChange"
         />
       </div>
 
