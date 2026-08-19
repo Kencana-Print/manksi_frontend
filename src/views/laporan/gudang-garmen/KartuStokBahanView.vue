@@ -36,6 +36,7 @@ const masterHeaders = [
   { title: "Gramasi", key: "Gramasi", width: "90px" },
   { title: "Harga Beli", key: "HargaBeli", width: "110px", align: "end" },
   { title: "Stok Awal", key: "StokAwal", width: "100px", align: "end" },
+  { title: "Stok In", key: "StokIn", width: "100px", align: "end" },
   { title: "Koreksi", key: "Koreksi", width: "90px", align: "end" },
   {
     title: "Stok Out",
@@ -117,6 +118,13 @@ const onExportMaster = async () => {
       {
         header: "Stok Awal",
         key: "StokAwal",
+        width: 14,
+        align: "right",
+        numFmt: "#,##0.00",
+      },
+      {
+        header: "Stok In",
+        key: "StokIn",
         width: 14,
         align: "right",
         numFmt: "#,##0.00",
@@ -342,6 +350,7 @@ onMounted(fetchData);
 
     <template #item.HargaBeli="{ item }">{{ fmtNum(item.HargaBeli) }}</template>
     <template #item.StokAwal="{ item }">{{ fmtNum(item.StokAwal) }}</template>
+    <template #item.StokIn="{ item }">{{ fmtNum(item.StokIn) }}</template>
     <template #item.Koreksi="{ item }">{{ fmtNum(item.Koreksi) }}</template>
     <template #item.RealisasiPermintaan="{ item }">{{
       fmtNum(item.RealisasiPermintaan)
