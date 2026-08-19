@@ -608,6 +608,7 @@ const onPrint = async () => {
   }
 };
 
+// --- PREVIEW CETAK ---
 const showPreviewDialog = ref(false);
 const previewNomor = ref("");
 
@@ -631,43 +632,88 @@ const blockPrintShortcutParent = (e: KeyboardEvent) => {
 };
 const previewContainerEl = ref<HTMLElement | null>(null);
 const previewIframeEl = ref<HTMLIFrameElement | null>(null);
-const previewScale = ref(1);
-const previewContentHeight = ref(1123); // fallback awal = 1 halaman A4
+const previewScale = ref(1); // scale AKTIF yang dipakai (auto-fit ATAU manual)
+const previewContentHeight = ref(1123);
 let previewResizeObserver: ResizeObserver | null = null;
 
-// Cek apakah SPK menggunakan format cetak Landscape (P01 atau Spanduk/MMT P02/P05)
+// Zoom manual — null berarti masih mode "auto-fit selayar", begitu
+// user pencet +/-/scroll, nilai numerik (persen/100) mengambil alih
+// dan auto-fit berhenti nge-override sampai user klik Reset.
+const manualZoomFactor = ref<number | null>(null);
+const MIN_ZOOM = 0.25;
+const MAX_ZOOM = 3;
+const ZOOM_STEP = 0.1;
+
+const zoomPercentDisplay = computed(() => Math.round(previewScale.value * 100));
+
 const isPreviewLandscape = computed(() => {
   if (!selectedItem.value) return false;
   const cab = selectedItem.value.Cab;
   return ["P01", "P02", "P05"].includes(cab);
 });
-
-// A4 Portrait = 793px, A4 Landscape = 1123px
 const PAGE_WIDTH_PX = computed(() => (isPreviewLandscape.value ? 1123 : 793));
 
-const recomputePreviewScale = () => {
+// Fit-to-screen: hitung scale berdasarkan LEBAR *dan* TINGGI viewport
+// dialog yang tersedia (bukan cuma lebar seperti sebelumnya) — supaya
+// defaultnya benar-benar "satu halaman penuh kelihatan" sesuai
+// resolusi layar user, bukan cuma lebar penuh tapi tinggi kepotong.
+const computeFitScale = () => {
   const el = previewContainerEl.value;
-  if (!el) return;
-  const w = el.clientWidth - 24; // padding kiri-kanan
-  if (w < 50) return; // belum ke-layout beneran, skip
-  const scale = Math.min(w / PAGE_WIDTH_PX.value, 1); // <-- Tambah .value
-  previewScale.value = scale > 0 ? scale : 1;
+  if (!el) return 1;
+  const availW = el.clientWidth - 24; // padding kiri-kanan
+  const availH = el.clientHeight - 24; // padding atas-bawah
+  if (availW < 50 || availH < 50) return 1;
+  const scaleW = availW / PAGE_WIDTH_PX.value;
+  const scaleH = availH / previewContentHeight.value;
+  const fit = Math.min(scaleW, scaleH, 1); // jangan pernah upscale di atas 100% otomatis
+  return fit > 0 ? fit : 1;
 };
 
-// Begitu iframe selesai load, baca tinggi KONTEN ASLI di dalamnya
-// (bisa 1 atau 2 halaman tergantung SPK punya Layout Proses atau
-// tidak) — lalu samakan tinggi iframe persis segitu. Ini yang bikin
-// cuma ada SATU scrollbar (di container luar), karena iframe sendiri
-// jadi tidak overflow lagi.
+const recomputePreviewScale = () => {
+  // Kalau user sedang zoom manual, JANGAN timpa nilainya — auto-fit
+  // hanya berlaku selama belum ada intervensi zoom manual.
+  if (manualZoomFactor.value !== null) {
+    previewScale.value = manualZoomFactor.value;
+    return;
+  }
+  previewScale.value = computeFitScale();
+};
+
+const zoomIn = () => {
+  const base = manualZoomFactor.value ?? previewScale.value;
+  manualZoomFactor.value = Math.min(MAX_ZOOM, +(base + ZOOM_STEP).toFixed(2));
+  previewScale.value = manualZoomFactor.value;
+};
+const zoomOut = () => {
+  const base = manualZoomFactor.value ?? previewScale.value;
+  manualZoomFactor.value = Math.max(MIN_ZOOM, +(base - ZOOM_STEP).toFixed(2));
+  previewScale.value = manualZoomFactor.value;
+};
+const zoomReset = () => {
+  // Balik ke mode auto-fit selayar (bukan set ke 100% fixed)
+  manualZoomFactor.value = null;
+  recomputePreviewScale();
+};
+const onPreviewWheel = (e: WheelEvent) => {
+  if (!e.ctrlKey && !e.metaKey) return; // scroll biasa tetap scroll konten
+  e.preventDefault();
+  if (e.deltaY < 0) zoomIn();
+  else zoomOut();
+};
+
 const onPreviewIframeLoad = () => {
   const iframe = previewIframeEl.value;
   if (!iframe?.contentDocument) return;
   const h = iframe.contentDocument.documentElement.scrollHeight;
   previewContentHeight.value = h > 0 ? h : 1123;
+  // Tinggi baru diketahui SETELAH load — recompute fit supaya
+  // perhitungan scaleH di atas pakai tinggi konten yang akurat,
+  // bukan fallback 1123 dari awal buka dialog.
+  recomputePreviewScale();
 };
 
 const previewWrapperStyle = computed(() => ({
-  width: `${PAGE_WIDTH_PX.value}px`, // <-- Tambah .value
+  width: `${PAGE_WIDTH_PX.value}px`,
   height: `${previewContentHeight.value}px`,
   transform: `scale(${previewScale.value})`,
   transformOrigin: "top left",
@@ -676,6 +722,7 @@ const previewWrapperStyle = computed(() => ({
 const onPreviewMessage = (e: MessageEvent) => {
   if (e.data?.type === "spk-print-ready" && typeof e.data.height === "number") {
     previewContentHeight.value = e.data.height > 0 ? e.data.height : 1123;
+    recomputePreviewScale();
   }
 };
 
@@ -683,7 +730,8 @@ watch(showPreviewDialog, async (open) => {
   if (open) {
     window.addEventListener("message", onPreviewMessage);
     window.addEventListener("keydown", blockPrintShortcutParent, true);
-    previewContentHeight.value = 1123; // reset ke fallback tiap buka baru
+    previewContentHeight.value = 1123;
+    manualZoomFactor.value = null; // selalu mulai dari auto-fit tiap buka baru
     await nextTick();
     if (previewContainerEl.value) {
       previewResizeObserver = new ResizeObserver(() => recomputePreviewScale());
@@ -695,6 +743,7 @@ watch(showPreviewDialog, async (open) => {
     previewResizeObserver?.disconnect();
     previewResizeObserver = null;
     previewNomor.value = "";
+    manualZoomFactor.value = null;
   }
 });
 
@@ -1259,7 +1308,7 @@ const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
       rounded="lg"
       :style="{
         height: '90vh',
-        width: isPreviewLandscape ? '1180px' : '850px' /* <-- Dibuat Dinamis */,
+        width: isPreviewLandscape ? '1180px' : '850px',
         maxWidth: '96vw',
         minWidth: '420px',
         minHeight: '320px',
@@ -1288,8 +1337,26 @@ const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
             <IconX :size="18" />
           </v-btn>
         </div>
-        <div class="text-caption" style="opacity: 0.75; line-height: 1.2">
-          ↘ Seret pojok kanan-bawah untuk mengubah ukuran jendela
+        <div class="d-flex align-center justify-space-between mt-1">
+          <div class="text-caption" style="opacity: 0.75; line-height: 1.2">
+            ↘ Seret pojok kanan-bawah untuk mengubah ukuran jendela ·
+            Ctrl+Scroll untuk zoom
+          </div>
+          <div class="d-flex align-center zoom-toolbar">
+            <button class="zoom-btn" title="Perkecil" @click="zoomOut">
+              <span style="font-size: 16px; line-height: 1">−</span>
+            </button>
+            <button
+              class="zoom-percent"
+              title="Kembalikan ke ukuran selayar"
+              @click="zoomReset"
+            >
+              {{ zoomPercentDisplay }}%
+            </button>
+            <button class="zoom-btn" title="Perbesar" @click="zoomIn">
+              <span style="font-size: 16px; line-height: 1">+</span>
+            </button>
+          </div>
         </div>
       </v-card-title>
       <div
@@ -1304,6 +1371,7 @@ const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
           justify-content: center;
           padding: 12px;
         "
+        @wheel="onPreviewWheel"
       >
         <div :style="previewWrapperStyle" style="flex-shrink: 0">
           <iframe
@@ -1523,5 +1591,41 @@ const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
 .badge-green {
   background: #e8f5e9;
   color: #2e7d32;
+}
+
+.zoom-toolbar {
+  gap: 2px;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+  padding: 2px;
+}
+.zoom-btn {
+  width: 22px;
+  height: 22px;
+  border: none;
+  background: transparent;
+  color: white;
+  border-radius: 3px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.zoom-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+.zoom-percent {
+  min-width: 44px;
+  height: 22px;
+  border: none;
+  background: transparent;
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  border-radius: 3px;
+}
+.zoom-percent:hover {
+  background: rgba(255, 255, 255, 0.2);
 }
 </style>
