@@ -24,6 +24,7 @@ const props = defineProps<{
     gramasi: string[];
     finishing: string[];
   };
+  kategoriUkuran?: string | null;
   isMapLocked?: boolean;
   isSjMemoLocked?: boolean;
 }>();
@@ -1524,6 +1525,9 @@ watch(
                   <option value="ANAK">Kaos Anak</option>
                   <option value="TUNIK">Tunik</option>
                   <option value="POLO">Polo Lacos CVC</option>
+                </template>
+                <template v-else-if="kategoriUkuran === 'BAWAHAN'">
+                  <option value="STANDAR">Standar Celana</option>
                 </template>
                 <template v-else>
                   <option value="LENGAN_PENDEK">Standar (L.Pendek)</option>

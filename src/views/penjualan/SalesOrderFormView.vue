@@ -684,6 +684,31 @@ const mergeSizeRow = (masterRow: any, existingRow: any | undefined) => {
   return merged;
 };
 
+// --- STANDAR UKURAN ----
+const JO_KATEGORI_ATASAN = ["BB", "BU", "JK", "JS", "KK", "KO", "KS"];
+const JO_KATEGORI_BAWAHAN = ["CL"];
+const JO_KATEGORI_WEARPACK = ["WP"];
+const kategoriUkuran = computed(() => {
+  const jo = String(formData.value.spk_jo_kode || "").toUpperCase();
+  if (JO_KATEGORI_ATASAN.includes(jo)) return "ATASAN";
+  if (JO_KATEGORI_BAWAHAN.includes(jo)) return "BAWAHAN";
+  if (JO_KATEGORI_WEARPACK.includes(jo)) return "WEARPACK";
+  return null;
+});
+
+// Reset varian ke default yang VALID untuk kategori baru — mencegah
+// varian atasan (LENGAN_PENDEK dst) ke-carry-over saat JO diganti ke
+// kategori bawahan (CL), yang menyebabkan query standar ukuran kosong.
+watch(kategoriUkuran, (kat, oldKat) => {
+  if (kat === oldKat) return;
+  if (isDivisiTiga.value) return; // Kaosan pakai default sendiri
+  if (kat === "BAWAHAN") {
+    formData.value.spk_varian_ukuran = "STANDAR"; // sesuaikan dgn ts_varian di DB
+  } else if (kat === "ATASAN" || kat === "WEARPACK") {
+    formData.value.spk_varian_ukuran = "LENGAN_PENDEK";
+  }
+});
+
 // [BARU] penanda request terbaru — dipakai untuk buang response
 // yang "basi" kalau ada request lebih baru yang sudah jalan duluan
 let standarUkuranReqId = 0;
@@ -1784,6 +1809,7 @@ const onPilihKatalog = (item: any) => {
             :formData="formData"
             :isEdit="isEditMode"
             :lookupOptions="lookupOptions"
+            :kategori-ukuran="kategoriUkuran"
             :is-map-locked="isMapLocked"
             :is-sj-memo-locked="isSjMemoLocked"
             @upload-main="uploadImageMain"
