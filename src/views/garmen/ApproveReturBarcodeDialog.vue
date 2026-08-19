@@ -21,6 +21,12 @@ const isOpen = computed({
 const isLoading = ref(false);
 const barcodes = ref<any[]>([]);
 const tanggalRetur = ref("");
+const tanggalCetak = ref("");
+
+const formatTanggalJamCetak = (d: Date) => {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(d.getDate())}-${pad(d.getMonth() + 1)}-${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
 
 const loadData = async () => {
   if (!props.nomor) return;
@@ -29,6 +35,7 @@ const loadData = async () => {
     const res = await approveReturBahanFormService.getDetail(props.nomor);
     barcodes.value = res.data.data.barcodes;
     tanggalRetur.value = res.data.data.header.proret_tanggal;
+    tanggalCetak.value = formatTanggalJamCetak(new Date());
   } catch (error: any) {
     toast.error(error.message || "Gagal memuat data barcode");
     isOpen.value = false;
@@ -74,30 +81,34 @@ const printBarcode = () => {
   if (!printWindow) return;
 
   printWindow.document.write(`
-    <!DOCTYPE html><html><head>
-    <style>
-      * { margin:0; padding:0; box-sizing:border-box; }
-      @page { size: 7.2cm 5cm; margin: 0; }
-      .sticker-page {
-        width:7.2cm; height:5cm; padding:0.2cm 0.4cm;
-        display:flex; flex-direction:column;
-        font-family:Arial,sans-serif; color:black;
-        page-break-after:always; break-after:page;
-        page-break-inside: avoid; break-inside: avoid;
-        overflow: hidden;
-      }
-      .sticker-title { font-size:12pt; font-weight:700; text-align:center; line-height:1.1; margin-bottom:0.3cm; height:30pt; overflow:hidden; text-transform:uppercase; }
-      .sticker-content { display:flex; align-items:flex-start; flex:1; }
-      .qr-wrapper { display:flex; flex-direction:column; align-items:center; margin-right:0.3cm; }
-      .barcode-text { font-size:7.5pt; margin-top:2px; font-weight:600; }
-      .info-wrapper { display:flex; flex-direction:column; padding-top:0.2cm; }
-      .info-qty { font-size:11pt; font-weight:800; margin-bottom:0.1cm; }
-      .info-date { font-size:9pt; font-weight:600; }
-    </style>
-    </head><body>
-      ${clone.innerHTML}
-    </body></html>
-  `);
+  <!DOCTYPE html><html><head>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    @page { size: 7.2cm 5cm; margin: 0; }
+    .sticker-page {
+      width:7.2cm; height:5cm; padding:0.2cm 0.4cm;
+      display:flex; flex-direction:column;
+      font-family:Arial,sans-serif; color:black;
+      page-break-after:always; break-after:page;
+      page-break-inside: avoid; break-inside: avoid;
+      overflow: hidden;
+    }
+    .sticker-title { font-size:12pt; font-weight:700; text-align:center; line-height:1.1; margin-bottom:0.3cm; height:30pt; overflow:hidden; text-transform:uppercase; }
+    .sticker-content { display:flex; align-items:flex-start; flex:1; }
+    .qr-wrapper { display:flex; flex-direction:column; align-items:center; margin-right:0.3cm; }
+    .barcode-text { font-size:7.5pt; margin-top:2px; font-weight:600; }
+    .info-wrapper { display:flex; flex-direction:column; padding-top:0.2cm; }
+    .info-qty { font-size:11pt; font-weight:800; margin-bottom:0.1cm; }
+    .info-date { font-size:9pt; font-weight:600; }
+    .sticker-footer {
+      font-size:5.5pt; color:#666; text-align:right;
+      margin-top:1px; flex-shrink:0;
+    }
+  </style>
+  </head><body>
+    ${clone.innerHTML}
+  </body></html>
+`);
 
   printWindow.document.close();
   printWindow.focus();
@@ -169,6 +180,7 @@ const printBarcode = () => {
                   <div class="info-date">{{ formatDate(tanggalRetur) }}</div>
                 </div>
               </div>
+              <div class="sticker-footer">Dicetak: {{ tanggalCetak }}</div>
             </div>
           </div>
         </div>
@@ -223,6 +235,14 @@ const printBarcode = () => {
   display: flex;
   align-items: flex-start;
   flex: 1;
+}
+
+.sticker-footer {
+  font-size: 5.5pt;
+  color: #666;
+  text-align: right;
+  margin-top: 1px;
+  flex-shrink: 0;
 }
 
 .qr-wrapper {

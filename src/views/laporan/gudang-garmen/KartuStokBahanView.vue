@@ -36,21 +36,13 @@ const masterHeaders = [
   { title: "Gramasi", key: "Gramasi", width: "90px" },
   { title: "Harga Beli", key: "HargaBeli", width: "110px", align: "end" },
   { title: "Stok Awal", key: "StokAwal", width: "100px", align: "end" },
-  { title: "BPB Bahan", key: "BpbBahan", width: "100px", align: "end" },
-  {
-    title: "Retur Material",
-    key: "ReturMaterial",
-    width: "110px",
-    align: "end",
-  },
   { title: "Koreksi", key: "Koreksi", width: "90px", align: "end" },
   {
-    title: "Realisasi Permintaan",
+    title: "Stok Out",
     key: "RealisasiPermintaan",
-    width: "140px",
+    width: "100px",
     align: "end",
   },
-  { title: "Retur Beli", key: "ReturBeli", width: "100px", align: "end" },
   { title: "Stok Akhir", key: "StokAkhir", width: "110px", align: "end" },
 ];
 
@@ -130,20 +122,6 @@ const onExportMaster = async () => {
         numFmt: "#,##0.00",
       },
       {
-        header: "BPB Bahan",
-        key: "BpbBahan",
-        width: 14,
-        align: "right",
-        numFmt: "#,##0.00",
-      },
-      {
-        header: "Retur Material",
-        key: "ReturMaterial",
-        width: 14,
-        align: "right",
-        numFmt: "#,##0.00",
-      },
-      {
         header: "Koreksi",
         key: "Koreksi",
         width: 14,
@@ -151,15 +129,8 @@ const onExportMaster = async () => {
         numFmt: "#,##0.00",
       },
       {
-        header: "Realisasi Permintaan",
+        header: "Stok Out",
         key: "RealisasiPermintaan",
-        width: 16,
-        align: "right",
-        numFmt: "#,##0.00",
-      },
-      {
-        header: "Retur Beli",
-        key: "ReturBeli",
         width: 14,
         align: "right",
         numFmt: "#,##0.00",
@@ -371,15 +342,10 @@ onMounted(fetchData);
 
     <template #item.HargaBeli="{ item }">{{ fmtNum(item.HargaBeli) }}</template>
     <template #item.StokAwal="{ item }">{{ fmtNum(item.StokAwal) }}</template>
-    <template #item.BpbBahan="{ item }">{{ fmtNum(item.BpbBahan) }}</template>
-    <template #item.ReturMaterial="{ item }">{{
-      fmtNum(item.ReturMaterial)
-    }}</template>
     <template #item.Koreksi="{ item }">{{ fmtNum(item.Koreksi) }}</template>
     <template #item.RealisasiPermintaan="{ item }">{{
       fmtNum(item.RealisasiPermintaan)
     }}</template>
-    <template #item.ReturBeli="{ item }">{{ fmtNum(item.ReturBeli) }}</template>
     <template #item.StokAkhir="{ item }">
       <span
         :class="{ 'text-error font-weight-bold': Number(item.StokAkhir) < 0 }"

@@ -24,6 +24,14 @@ const isLoading = ref(false);
 const barcodes = ref<any[]>([]);
 const tanggalBpb = ref("");
 const poNomor = ref(""); // State baru untuk No PO
+// Tanggal cetak — di-generate SEKALI saat data di-load (bukan re-render
+// terus tiap detik), supaya konsisten antara preview dan hasil print
+const tanggalCetak = ref("");
+
+const formatTanggalJamCetak = (d: Date) => {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(d.getDate())}-${pad(d.getMonth() + 1)}-${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
 
 const loadData = async () => {
   if (!props.nomor && !props.barcodeHdr) return;
@@ -45,6 +53,7 @@ const loadData = async () => {
       // Cetak Semua (F5)
       barcodes.value = data.barcodes;
     }
+    tanggalCetak.value = formatTanggalJamCetak(new Date());
   } catch (error: any) {
     toast.error("Gagal memuat data barcode");
     isOpen.value = false;
@@ -90,43 +99,47 @@ const printBarcode = () => {
 
   // Injeksi HTML dan CSS khusus untuk jendela print
   printWindow.document.write(`
-    <!DOCTYPE html><html><head>
-    <style>
-      * { margin:0; padding:0; box-sizing:border-box; }
-      @page { size: 7.2cm 5cm; margin: 0; }
-      .sticker-page {
-        width:7.2cm; height:5cm; padding:0.3cm 0.4cm;
-        display:flex; flex-direction:column;
-        font-family:Arial,sans-serif; color:black;
-        page-break-after:always; break-after:page;
-        page-break-inside: avoid; break-inside: avoid;
-        overflow: hidden;
-        background: white;
-      }
-      .sticker-title { 
-        font-size:12pt; font-weight:700; text-align:center; 
-        line-height:1.1; margin-bottom:0.15cm; height:28pt; 
-        overflow:hidden; text-transform:uppercase; 
-      }
-      .sticker-content { 
-        display:flex; flex-direction:row; align-items:center; justify-content:center; gap:0.25cm; flex:1; 
-      }
-      .qr-col { 
-        display:flex; flex-direction:column; align-items:center; 
-      }
-      .barcode-text { 
-        font-size:7.5pt; margin-top:2px; font-weight:600; 
-      }
-      .info-col { 
-        display:flex; flex-direction:column; justify-content:center; gap:3px;
-      }
-      .info-qty { font-size:11pt; font-weight:800; }
-      .info-date, .info-po { font-size:8pt; font-weight:700; }
-    </style>
-    </head><body>
-      ${clone.innerHTML}
-    </body></html>
-  `);
+  <!DOCTYPE html><html><head>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    @page { size: 7.2cm 5cm; margin: 0; }
+    .sticker-page {
+      width:7.2cm; height:5cm; padding:0.3cm 0.4cm;
+      display:flex; flex-direction:column;
+      font-family:Arial,sans-serif; color:black;
+      page-break-after:always; break-after:page;
+      page-break-inside: avoid; break-inside: avoid;
+      overflow: hidden;
+      background: white;
+    }
+    .sticker-title { 
+      font-size:12pt; font-weight:700; text-align:center; 
+      line-height:1.1; margin-bottom:0.15cm; height:28pt; 
+      overflow:hidden; text-transform:uppercase; 
+    }
+    .sticker-content { 
+      display:flex; flex-direction:row; align-items:center; justify-content:center; gap:0.25cm; flex:1; 
+    }
+    .qr-col { 
+      display:flex; flex-direction:column; align-items:center; 
+    }
+    .barcode-text { 
+      font-size:7.5pt; margin-top:2px; font-weight:600; 
+    }
+    .info-col { 
+      display:flex; flex-direction:column; justify-content:center; gap:3px;
+    }
+    .info-qty { font-size:11pt; font-weight:800; }
+    .info-date, .info-po { font-size:8pt; font-weight:700; }
+    .sticker-footer {
+      font-size:5.5pt; color:#666; text-align:right;
+      margin-top:1px; flex-shrink:0;
+    }
+  </style>
+  </head><body>
+    ${clone.innerHTML}
+  </body></html>
+`);
 
   printWindow.document.close();
   printWindow.focus();
@@ -186,6 +199,7 @@ const printBarcode = () => {
                   <div v-if="poNomor" class="info-po">{{ poNomor }}</div>
                 </div>
               </div>
+              <div class="sticker-footer">Dicetak: {{ tanggalCetak }}</div>
             </div>
           </div>
         </div>
@@ -233,6 +247,13 @@ const printBarcode = () => {
   justify-content: center;
   gap: 0.25cm;
   flex: 1;
+}
+.sticker-footer {
+  font-size: 5.5pt;
+  color: #666;
+  text-align: right;
+  margin-top: 1px;
+  flex-shrink: 0;
 }
 .qr-col {
   display: flex;
