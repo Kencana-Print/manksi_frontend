@@ -704,7 +704,7 @@ onMounted(async () => {
                 <td class="w-label">Alokasi</td>
                 <td class="w-colon">:</td>
                 <td colspan="3">
-                  {{ hasAlokasi ? "YA" : "TIDAK" }}
+                  {{ data.spk_alokasi === "Y" ? "YA" : "TIDAK" }}
                 </td>
               </tr>
               <tr>
