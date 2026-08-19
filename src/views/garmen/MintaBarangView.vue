@@ -50,6 +50,12 @@ const filterState = ref({
 });
 
 const cabangOptions = ref<string[]>(["ALL"]);
+const jenisSlugMap: Record<string, string> = {
+  ACCESORIES: "ACCESORIES",
+  OBAT: "OBAT",
+  SPAREPART: "SPAREPART",
+  "ATK/RTK": "ATK-RTK",
+};
 const jenisOptions = ["ACCESORIES", "OBAT", "SPAREPART", "ATK/RTK"];
 
 onMounted(async () => {
@@ -157,10 +163,9 @@ const onAdd = async () => {
         );
       }
     }
-    // Pass jenis dari filter ke form
-    router.push(
-      `/garmen/barang/permintaan/form?jenis=${filterState.value.jenis}`,
-    );
+    const slug =
+      jenisSlugMap[filterState.value.jenis] || filterState.value.jenis;
+    router.push(`/garmen/barang/permintaan/form/baru/${slug}`);
   } catch (e: any) {
     toast.error(e.response?.data?.message || "Gagal memverifikasi akses.");
   }

@@ -21,8 +21,17 @@ import SpkSearchModal from "@/components/lookups/SpkSearchModal.vue";
 import BarangGarmenSearchModal from "@/components/lookups/BarangGarmenSearchModal.vue";
 
 const route = useRoute();
-const jenisFromQuery =
-  typeof route.query.jenis === "string" ? route.query.jenis : "";
+const jenisSlugReverseMap: Record<string, string> = {
+  ACCESORIES: "ACCESORIES",
+  OBAT: "OBAT",
+  SPAREPART: "SPAREPART",
+  "ATK-RTK": "ATK/RTK",
+};
+const jenisFromParam = computed(() => {
+  const raw = route.params.jenis as string;
+  if (!raw) return "";
+  return jenisSlugReverseMap[raw] || raw;
+});
 const toast = useToast();
 const authStore = useAuthStore();
 
@@ -73,7 +82,7 @@ const formatDateLocal = (value?: string | Date) => {
 const initialData = {
   nomor: "",
   tanggal: formatDateLocal(new Date()),
-  jenis: jenisFromQuery || "ACCESORIES",
+  jenis: jenisFromParam.value || "ACCESORIES",
   cabang: authStore.userCabang === "ALL" ? "" : authStore.userCabang,
   gudangPeminta: "",
   namaGudangPeminta: "",
@@ -181,19 +190,14 @@ const {
 onMounted(() => {
   if (!isEdit.value) {
     const bag = (authStore.user?.bagian || "").toUpperCase();
-
-    // Prioritas 1: dari query param (dikirim browse)
-    if (jenisFromQuery) {
-      formData.value.jenis = jenisFromQuery;
-    }
-    // Prioritas 2: default per bagian (fallback kalau tidak ada query)
-    else if (bag === "GA") {
+    if (jenisFromParam.value) {
+      formData.value.jenis = jenisFromParam.value;
+    } else if (bag === "GA") {
       formData.value.jenis = "ATK/RTK";
     } else if (bag === "TEKNISI" || bag === "IT") {
       formData.value.jenis = "SPAREPART";
       formData.value.bagian = bag;
     }
-    // Else: tetap default ACCESORIES dari initialData
   }
 });
 
