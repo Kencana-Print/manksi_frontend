@@ -128,7 +128,7 @@ const ngeditClass = (row: any) => {
 const goNew = () => {
   router.push({
     name: "StbjFormCreate",
-    query: {
+    params: {
       gudang: filterGudang.value,
       gudangNama: filterGudangNama.value,
     },
@@ -137,11 +137,9 @@ const goNew = () => {
 
 const goEdit = () => {
   if (!selectedItem.value) return;
-  router.push({
-    name: "StbjFormEdit",
-    query: { nomor: selectedItem.value.Nomor },
-    // Gudang saat edit diambil dari data DB, tidak perlu di-pass
-  });
+  router.push(
+    `/garmen/bahan-jadi/stbj/edit/${encodeURIComponent(selectedItem.value.Nomor)}`,
+  );
 };
 
 const onDelete = async () => {

@@ -997,17 +997,6 @@ const router = createRouter({
       name: "StbjBrowse",
       component: () => import("@/views/garmen/StbjView.vue"),
       meta: {
-        title: "Surat Terima Barang Jadi",
-        layout: "DefaultLayout",
-        requiresAuth: true,
-        menuId: "105",
-      },
-    },
-    {
-      path: "/garmen/bahan-jadi/stbj",
-      name: "StbjBrowse",
-      component: () => import("@/views/garmen/StbjView.vue"),
-      meta: {
         title: "Surat Terima Bahan Jadi",
         layout: "DefaultLayout",
         requiresAuth: true,
@@ -1015,7 +1004,7 @@ const router = createRouter({
       },
     },
     {
-      path: "/garmen/bahan-jadi/stbj/create",
+      path: "/garmen/bahan-jadi/stbj/create/:gudang/:gudangNama",
       name: "StbjFormCreate",
       component: () => import("@/views/garmen/StbjFormView.vue"),
       meta: {
@@ -1027,7 +1016,7 @@ const router = createRouter({
       },
     },
     {
-      path: "/garmen/bahan-jadi/stbj/edit",
+      path: "/garmen/bahan-jadi/stbj/edit/:nomor",
       name: "StbjFormEdit",
       component: () => import("@/views/garmen/StbjFormView.vue"),
       meta: {

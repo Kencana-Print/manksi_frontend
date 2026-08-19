@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, nextTick } from "vue";
-import { useRouter, useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
 import { useAuthStore } from "@/stores/authStore";
 import BaseForm from "@/components/BaseForm.vue";
@@ -57,17 +57,12 @@ interface FormData {
 
 // ── Store & Router ─────────────────────────────────────────────────────
 const auth = useAuthStore();
-const router = useRouter();
 const route = useRoute();
+const router = useRouter();
 const toast = useToast();
 
 const userCab = computed(() => auth.user?.cabang || "");
 const userKode = computed(() => auth.user?.kode || "");
-
-const gudangFromBrowse = computed(() => ({
-  kode: (route.query.gudang as string) || "",
-  nama: (route.query.gudangNama as string) || "",
-}));
 
 // ── Helpers ────────────────────────────────────────────────────────────
 const todayLocal = () => {
@@ -99,8 +94,8 @@ const init: FormData = {
   Tanggal: todayLocal(),
   GudangKode: "",
   GudangNama: "",
-  GudangProduksiKode: gdgProd.kode,
-  GudangProduksiNama: gdgProd.nama,
+  GudangProduksiKode: "", // ← kosongkan, diisi belakangan di onMounted
+  GudangProduksiNama: "", // ← kosongkan
   Keterangan: "",
   Detail: [],
   Detail2: [],
@@ -125,13 +120,14 @@ const {
   executeSave,
   executeCancel,
   executeClose,
+  params,
 } = useForm<FormData>({
   menuId: "105",
   initialData: init,
   immediate: false,
 
   fetchApi: async (): Promise<FormData> => {
-    const nomorEdit = route.query.nomor as string;
+    const nomorEdit = route.params.nomor as string;
     const res = await svc.getById(nomorEdit);
     const d = res.data.data;
     const h = d.header;
@@ -173,7 +169,7 @@ const {
   submitApi: async (data): Promise<any> => {
     const payload = {
       ...data,
-      Nomor: route.query.nomor || data.Nomor,
+      NomorSJ: (route.params.nomor as string) || data.Nomor,
       Detail: data.Detail.filter((r) => r.SpkNomor && Number(r.Jumlah) !== 0) // ← filter baris kosong
         .map(({ _key: _k, ...r }) => r),
       Detail2: data.Detail2.filter(
@@ -329,7 +325,7 @@ const addSpkToGrid = async (spkNomor: string) => {
     const res = await svc.getSpkDetail(
       spkNomor,
       fd.value.GudangKode,
-      (route.query.nomor as string) || "",
+      (route.params.nomor as string) || "",
     );
     const { detail, detail2 } = res.data.data;
 
@@ -365,8 +361,9 @@ const addSpgToGrid = async (spgNomor: string) => {
   try {
     const res = await svc.getSpgDetail(
       spgNomor,
-      (route.query.nomor as string) || "",
+      (route.params.nomor as string) || "",
     );
+
     const { detail, detail2 } = res.data.data;
 
     for (const r of detail) {
@@ -400,7 +397,7 @@ const fetchAndAddPacking = async (packNomor: string): Promise<boolean> => {
 
   const res = await svc.getPackingDetail(
     packNomor,
-    (route.query.nomor as string) || "",
+    (route.params.nomor as string) || "",
   );
   const rows = res.data.data || [];
   if (!rows.length) return false;
@@ -657,20 +654,45 @@ const doCetak = (mode: "biasa" | "rangkap3" = "biasa") => {
 };
 
 // ── Lifecycle ─────────────────────────────────────────────────────────
-onMounted(async () => {
-  if (route.query.nomor) {
+// Ekstrak logic inisialisasi jadi fungsi terpisah, dipanggil dari
+// onMounted MAUPUN watch(route.params) — supaya robust terhadap
+// kasus Vue Router reuse komponen yang sama walau path beda (gotcha
+// umum: navigasi ke route dengan `name` sama tapi params beda TIDAK
+// otomatis remount komponen kecuali ada :key eksplisit di level
+// router-view/TabView).
+const initFormForRoute = async () => {
+  if (route.params.nomor) {
     await fetchData();
     ensureEmptyRow();
   } else {
+    fd.value.Nomor = "";
     fd.value.Tanggal = todayLocal();
-    fd.value.GudangKode = gudangFromBrowse.value.kode;
-    fd.value.GudangNama = gudangFromBrowse.value.nama;
+    fd.value.GudangKode = (route.params.gudang as string) || "";
+    fd.value.GudangNama = (route.params.gudangNama as string) || "";
     const gp = defaultGdgProduksi();
     fd.value.GudangProduksiKode = gp.kode;
     fd.value.GudangProduksiNama = gp.nama;
+    fd.value.Keterangan = "";
+    fd.value.Detail = [];
+    fd.value.Detail2 = [];
     ensureEmptyRow();
   }
-});
+};
+
+onMounted(initFormForRoute);
+
+// Kunci fix-nya: kalau instance komponen ini di-reuse (params berubah
+// tanpa remount), watch ini yang jaga supaya form tetap sinkron sama
+// route terbaru.
+watch(
+  () => [route.params.gudang, route.params.gudangNama, route.params.nomor],
+  (newVal, oldVal) => {
+    // Skip di render pertama (sudah ditangani onMounted) — cuma react
+    // ke PERUBAHAN setelah komponen sudah hidup
+    if (JSON.stringify(newVal) === JSON.stringify(oldVal)) return;
+    initFormForRoute();
+  },
+);
 
 // ── Computed summary ──────────────────────────────────────────────────
 const totalJumlah = computed(() =>
