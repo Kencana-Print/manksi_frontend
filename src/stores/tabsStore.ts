@@ -48,7 +48,6 @@ export const useTabsStore = defineStore(
         id,
         timestamp: Date.now(),
         closable: tab.closable ?? true,
-        needsReset: true,
       });
       activeTabId.value = id;
 
