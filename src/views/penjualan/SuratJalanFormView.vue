@@ -148,13 +148,14 @@ const {
   executeSave,
   executeCancel,
   executeClose,
+  params,
 } = useForm<FormData>({
   menuId: "153",
   initialData: init,
   immediate: false,
 
   fetchApi: async (): Promise<FormData> => {
-    const nomorEdit = route.query.nomor as string;
+    const nomorEdit = params.nomor as string;
     const res = await svc.getById(nomorEdit);
     const d = res.data.data;
     const h = d.header;
@@ -209,7 +210,7 @@ const {
   submitApi: async (data): Promise<any> => {
     const payload = {
       ...data,
-      NomorSJ: route.query.nomor || data.NomorSJ,
+      NomorSJ: (params.nomor as string) || data.NomorSJ,
       Detail: data.Detail.filter(
         (r) => r.NamaSpk && Number(r.Jumlah) !== 0,
       ).map(({ _key: _k, ...r }) => r),
@@ -562,7 +563,7 @@ const loadSpkDetail = async (spkNomor: string) => {
     spkNomor,
     fd.value.KodeCus,
     divisiStr.value,
-    (route.query.nomor as string) || "",
+    (params.nomor as string) || "",
     existingSpkNomors,
   );
   const rows: any[] = res.data.data || [];
@@ -679,7 +680,7 @@ const loadSpkDetailWithJadwal = async (item: any) => {
   const res = await svc.getSpkDetailFromJadwal(
     item.SPK,
     divisiStr.value,
-    (route.query.nomor as string) || "",
+    (params.nomor as string) || "",
     item.NoKirim || "",
     item.NoUrut || 0,
     item.Uraian || "",
@@ -908,7 +909,7 @@ onMounted(async () => {
   const divRes = await svc.getDivisiList();
   divisiList.value = divRes.data.data || [];
 
-  if (route.query.nomor) {
+  if (params.nomor) {
     await fetchData();
     ensureEmptyRow();
   } else {

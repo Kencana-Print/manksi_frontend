@@ -2419,7 +2419,7 @@ const router = createRouter({
       },
     },
     {
-      path: "/penjualan/surat-jalan/edit",
+      path: "/penjualan/surat-jalan/edit/:nomor",
       name: "SuratJalanFormEdit",
       component: () => import("@/views/penjualan/SuratJalanFormView.vue"),
       meta: {
@@ -3162,6 +3162,18 @@ const router = createRouter({
         layout: "DefaultLayout",
         requiresAuth: true,
         menuId: "508",
+      },
+    },
+    {
+      path: "/laporan/gudang-garmen/realisasi-keluar-bahan",
+      name: "LapRealisasiKeluarBahan",
+      component: () =>
+        import("@/views/laporan/gudang-garmen/RealisasiKeluarBahanView.vue"),
+      meta: {
+        title: "Laporan Realisasi Keluar Bahan",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "529",
       },
     },
     {

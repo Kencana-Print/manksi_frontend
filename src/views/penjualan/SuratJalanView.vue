@@ -169,10 +169,9 @@ const goEdit = () => {
     return;
   }
 
-  router.push({
-    name: "SuratJalanFormEdit",
-    query: { nomor: selectedItem.value.Nomor },
-  });
+  router.push(
+    `/penjualan/surat-jalan/edit/${encodeURIComponent(selectedItem.value.Nomor)}`,
+  );
 };
 
 // ── Delete ─────────────────────────────────────────────────

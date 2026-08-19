@@ -906,6 +906,12 @@ export const createMenuItems = (): NavItem[] => {
               icon: IconArrowsExchange,
               menuId: 508,
             },
+            {
+              title: "Realisasi Keluar Bahan",
+              to: "/laporan/gudang-garmen/realisasi-keluar-bahan",
+              icon: IconClipboardCheck,
+              menuId: 529,
+            },
             { divider: true },
             {
               title: "Standart Babaran vs Realisasi",
