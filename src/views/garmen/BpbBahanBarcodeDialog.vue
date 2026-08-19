@@ -179,7 +179,9 @@ const printBarcode = () => {
                 </div>
                 <!-- Kolom Kanan: Qty, Tanggal, No PO -->
                 <div class="info-col">
-                  <div class="info-qty">{{ formatQty(bc.jumlah) }} KG</div>
+                  <div class="info-qty">
+                    {{ formatQty(bc.jumlah) }} {{ bc.satuan }}
+                  </div>
                   <div class="info-date">{{ formatDate(tanggalBpb) }}</div>
                   <div v-if="poNomor" class="info-po">{{ poNomor }}</div>
                 </div>
