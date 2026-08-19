@@ -761,10 +761,18 @@ const skipCetakSJ = () => {
 };
 
 onMounted(async () => {
-  // Load jasa list untuk modal (bukan dropdown)
+  // Set Cab dari cabang user login TERLEBIH DAHULU — sebelum fetch apapun
+  // yang butuh scoping cabang (jasa, dsb). Fallback ke P01 (bukan P04)
+  // untuk user tanpa cabang spesifik (mis. HO-) sesuai request.
+  if (!isEditMode.value) {
+    fd.value.Cab =
+      userCab.value && userCab.value !== "HO-" ? userCab.value : "P01";
+  }
+
+  // Load jasa list untuk modal — sekarang fd.value.Cab sudah benar
   try {
     const r = await api.get("/garmen/po-jasa-form/jasa", {
-      params: { cab: fd.value.Cab || userCab.value || "" },
+      params: { cab: fd.value.Cab },
     });
     jasaModalList.value = r.data.data || [];
   } catch {
@@ -774,8 +782,6 @@ onMounted(async () => {
   if (isEditMode.value) {
     await fetchData();
     if (fd.value.SpkNomor && fd.value.JasaKode) await loadPlanning();
-  } else {
-    fd.value.Cab = userCab.value || "P04";
   }
 });
 </script>
