@@ -269,6 +269,18 @@ const {
 } = useForm({
   menuId: "172",
   initialData: defaultData,
+  onFormReset: () => {
+    formData.value.Sizes = [];
+    formData.value.Kaosan = [];
+    formData.value.Alokasi = [];
+    formData.value.Komponen = [];
+    imageToUpload.value = null;
+    accBuktiFile.value = null;
+    isMapLocked.value = false;
+    isSjMemoLocked.value = false;
+    wasApprovedOnLoad.value = false;
+    revisiWatchArmed.value = false;
+  },
   fetchApi: async () => {
     const nomor = String(route.params.nomor);
     const res = await salesOrderFormService.getDetail(nomor);

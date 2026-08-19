@@ -172,22 +172,37 @@ const onEdit = (item: any) => {
     `/garmen/bahan-baku/minta-bahan/form/${encodeURIComponent(item.Nomor)}`,
   );
 };
-const onDelete = (item: any) => {
+const checkBisaHapus = (item: any): boolean => {
   const itemCab = (item.Cab || "").toString().trim().toUpperCase();
   const myCab = (authStore.userCabang || "").toString().trim().toUpperCase();
-
   if (itemCab !== myCab && myCab !== "ALL" && !myCab.startsWith("HO")) {
-    return toast.error(`Bukan cabang anda. (Data: ${itemCab}, Anda: ${myCab})`);
+    toast.error(`Bukan cabang anda. (Data: ${itemCab}, Anda: ${myCab})`);
+    return false;
   }
-
   if (item.IsPeriodLocked) {
-    return toast.error(
+    toast.error(
       "Periode transaksi ini sudah ditutup (tutup buku). Tidak bisa dihapus.",
     );
+    return false;
   }
+  if (item.Status !== "OPEN") {
+    toast.error(`Sudah ${item.Status}. Tidak bisa dihapus.`);
+    return false;
+  }
+  return true;
+};
+const onDelete = async (item: any) => {
+  try {
+    // Panggil service API untuk hapus berdasarkan nomor
+    await mintaBahanService.deleteData(item.Nomor);
+    toast.success("Data berhasil dihapus.");
 
-  if (item.Status !== "OPEN")
-    return toast.error(`Sudah ${item.Status}. Tidak bisa dihapus.`);
+    // Refresh tabel dan hilangkan checklist
+    selected.value = [];
+    fetchData();
+  } catch (error: any) {
+    toast.error(error.response?.data?.message || "Gagal menghapus data.");
+  }
 };
 
 // -- Aksi: Approve Gudang --
@@ -536,9 +551,10 @@ const num = (val: number) => new Intl.NumberFormat("id-ID").format(val || 0);
     v-model:filter-state="filterState"
     :can-insert="canInsert"
     :can-edit="canEdit"
-    :can-delete="canDelete"
     :can-export="canExport"
     :row-props-fn="handleRowProps"
+    :can-delete="canDelete"
+    :before-delete="checkBisaHapus"
     @refresh="fetchData"
     @add="onAdd"
     @edit="onEdit"
