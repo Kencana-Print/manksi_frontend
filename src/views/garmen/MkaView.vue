@@ -129,7 +129,14 @@ const rowPropsFn = (data: any) => {
 // --- Handlers ---
 onMounted(() => fetchData());
 
-const onAdd = () => router.push("/garmen/mka/create");
+const onAdd = () => {
+  const sel = selected.value?.[0];
+  if (sel?.RowType === "SPK") {
+    router.push({ path: "/garmen/mka/create", query: { spk: sel.SPK } });
+    return;
+  }
+  router.push("/garmen/mka/create");
+};
 
 const onEdit = (item: any) => {
   if (item.RowType === "SPK") {

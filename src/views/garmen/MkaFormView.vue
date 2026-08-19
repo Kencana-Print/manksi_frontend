@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
 import { useForm } from "@/composables/useForm";
@@ -241,15 +241,20 @@ const doResolveSpk = async (spkNomor: string) => {
 };
 
 // ─── Auto-fill SPK dari query (misal datang dari klik baris "SPK belum MKA" di browse) ──
-onMounted(() => {
-  if (!isEdit.value) {
-    const spkFromQuery = ((route.query.spk as string) || "").trim();
-    if (spkFromQuery) {
-      formData.value.mkb_spk_nomor = spkFromQuery.toUpperCase();
-      doResolveSpk(spkFromQuery);
-    }
-  }
-});
+// Pakai watch (bukan cuma onMounted) supaya tetap jalan kalau komponen
+// di-reuse Vue Router (hanya query yang berubah, path/route sama —
+// onMounted tidak akan terpanggil ulang dalam kasus itu).
+watch(
+  () => route.query.spk,
+  (spkFromQuery) => {
+    if (isEdit.value) return;
+    const spk = ((spkFromQuery as string) || "").trim();
+    if (!spk) return;
+    formData.value.mkb_spk_nomor = spk.toUpperCase();
+    doResolveSpk(spk);
+  },
+  { immediate: true },
+);
 
 // ─── Aksesoris Modal ──────────────────────────────────────────────────────────
 // Pakai AksesorisSearchModal yang sudah ada (emit 'selected' dengan item.Kode)
