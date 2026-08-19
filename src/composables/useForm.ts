@@ -14,6 +14,7 @@ interface UseFormOptions<T> {
   onSuccessRoute?: string;
   onSuccess?: (response: unknown) => void;
   immediate?: boolean;
+  onFormReset?: () => void;
 }
 
 export function useForm<
@@ -151,6 +152,7 @@ export function useForm<
       formData.value = JSON.parse(JSON.stringify(options.initialData));
       originalData.value = JSON.parse(JSON.stringify(options.initialData));
       currentTab.needsReset = false; // konsumsi flag, sekali pakai
+      options.onFormReset?.();
     }
   });
 

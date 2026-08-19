@@ -152,9 +152,6 @@ const num = (v: any, d = 0) =>
   });
 const sel = (e: FocusEvent) => (e.target as HTMLInputElement).select();
 
-// ── Tab ────────────────────────────────────────────────────────────────
-const tab = ref<"h" | "d">("h");
-
 // ── Mutasi labels ──────────────────────────────────────────────────────
 const MUTASI = computed(() => {
   const cab = fd.value.Cab || userCab.value;
@@ -237,7 +234,32 @@ const init: FormData = {
   Detail: [mkRow()],
 };
 
+// ── Tab ────────────────────────────────────────────────────────────────
+const tab = ref<"h" | "d">("h");
+
+// ── Lookups ────────────────────────────────────────────────────────────
+const komponenOpts = ref<{ komponen: string; babaran: number }[]>([]);
+const kelOpts = ref<string[]>([]);
+const kelTujuanOpts = ref<string[]>([]);
+const planList = ref<PlanningRow[]>([]);
+const spkDirty = ref(false);
+const spkLama = ref("");
+const gdgQ = ref("");
+const gdgList = ref<any[]>([]);
+
 // ── useForm ────────────────────────────────────────────────────────────
+const resetLocalFormState = () => {
+  tab.value = "h";
+  spkLama.value = "";
+  spkDirty.value = false;
+  komponenOpts.value = [];
+  kelOpts.value = [];
+  kelTujuanOpts.value = [];
+  planList.value = [];
+  gdgList.value = [];
+  gdgQ.value = "";
+};
+
 const {
   isEditMode,
   isLoading,
@@ -255,6 +277,7 @@ const {
   menuId: "109",
   initialData: init,
   immediate: false,
+  onFormReset: resetLocalFormState,
   fetchApi: async () => {
     try {
       const res = await mutasiProduksiFormService.getById(
@@ -437,16 +460,8 @@ const showAsalKerjaan = computed(
     fd.value.GdgAsal === "GP022" && (fd.value.Cab === "P01" || !userCab.value),
 );
 
-// ── Lookups ────────────────────────────────────────────────────────────
-const komponenOpts = ref<{ komponen: string; babaran: number }[]>([]);
-const kelOpts = ref<string[]>([]);
-const kelTujuanOpts = ref<string[]>([]);
-const planList = ref<PlanningRow[]>([]);
-
 // ── SPK Modal ──────────────────────────────────────────────────────────
 const showSpkModal = ref(false);
-const spkDirty = ref(false);
-const spkLama = ref("");
 const onSpkSelected = async (item: any) => {
   showSpkModal.value = false;
   spkDirty.value = false;
@@ -598,8 +613,7 @@ const onMutasi = async (val: string) => {
 // ── Gudang modal ───────────────────────────────────────────────────────
 const showGdgModal = ref(false);
 const gdgMode = ref<"asal" | "tujuan">("asal");
-const gdgQ = ref("");
-const gdgList = ref<any[]>([]);
+
 const gdgFiltered = computed(() => {
   const q = gdgQ.value.toLowerCase();
   return gdgList.value.filter(
