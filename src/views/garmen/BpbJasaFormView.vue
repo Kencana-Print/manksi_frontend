@@ -638,8 +638,6 @@ const doCetak = () => {
 
 // ── Lifecycle ─────────────────────────────────────────────────────────
 onMounted(async () => {
-  // useForm sudah auto-fetch via onMounted internal jika isEditMode
-  // tapi untuk BPB Jasa yang pakai query param, pastikan fetchData dipanggil
   if (route.query.nomor) {
     await fetchData();
   } else {
@@ -647,6 +645,27 @@ onMounted(async () => {
     fd.value.Tanggal = todayLocal();
   }
 });
+
+// Tambahan: pantau perubahan query 'nomor' selagi komponen tetap mounted
+watch(
+  () => route.query.nomor,
+  async (newNomor, oldNomor) => {
+    if (newNomor === oldNomor) return;
+
+    // reset dulu ke initial state biar gak "nyangkut" data lama
+    // sebelum response baru datang (termasuk saat fetch gagal/lambat)
+    fd.value = JSON.parse(JSON.stringify(init));
+    komponenList.value = [];
+    kelompokList.value = [];
+
+    if (newNomor) {
+      await fetchData();
+    } else {
+      fd.value.Cab = userCab.value || "";
+      fd.value.Tanggal = todayLocal();
+    }
+  },
+);
 </script>
 
 <template>
