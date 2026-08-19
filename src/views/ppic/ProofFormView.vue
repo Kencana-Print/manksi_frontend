@@ -117,6 +117,12 @@ const {
 } = useForm({
   menuId: "122",
   initialData: defaultData,
+  onFormReset: () => {
+    // Generate ulang waktu & data spesifik agar selalu up-to-date saat form dikosongkan
+    formData.value.pf_tanggal = todayLocal();
+    formData.value.pf_jam = nowTime();
+    formData.value.pf_cab = lockedCab.value;
+  },
   fetchApi: async () => {
     const nomor = String(route.params.nomor);
     const res = await proofFormService.getDetail(nomor);

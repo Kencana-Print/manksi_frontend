@@ -146,13 +146,20 @@ export function useForm<
   });
 
   onActivated(() => {
-    if (isEditMode.value) return;
     const currentTab = tabsStore.tabs.find((t) => t.id === route.path);
+
     if (currentTab?.needsReset) {
-      formData.value = JSON.parse(JSON.stringify(options.initialData));
-      originalData.value = JSON.parse(JSON.stringify(options.initialData));
-      currentTab.needsReset = false; // konsumsi flag, sekali pakai
-      options.onFormReset?.();
+      currentTab.needsReset = false; // Langsung konsumsi flag agar tidak berulang
+
+      if (isEditMode.value && options.fetchApi) {
+        // Jika tab Edit di-close lalu dibuka lagi, ambil ulang dari backend
+        fetchData();
+      } else {
+        // Deep copy ulang untuk mode Create
+        formData.value = JSON.parse(JSON.stringify(options.initialData));
+        originalData.value = JSON.parse(JSON.stringify(options.initialData));
+        options.onFormReset?.();
+      }
     }
   });
 
