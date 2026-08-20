@@ -13,17 +13,18 @@ interface BabaranRow {
 const props = defineProps<{
   formData: {
     Babaran: BabaranRow[];
-    BabaranSource?: "manual" | "mkb";
+    BabaranSource?: "manual" | "mkb" | "proof";
     [key: string]: any;
   };
 }>();
 
-// Baris "asli dari MKB" dikunci per-baris (readonly), tapi form tetap
-// bisa nambah baris baru kalau memang belum ada isinya sama sekali —
-// jadi kuncinya BUKAN source secara global, tapi apakah baris itu
-// punya nourut (artinya berasal dari tmkb_dtl).
-const isMkbRow = (row: BabaranRow) =>
-  props.formData.BabaranSource === "mkb" && row.nourut !== undefined;
+// Baris terkunci kalau sumbernya bukan manual (dari MKB atau Proof
+// Potong) DAN baris itu punya nourut (artinya memang hasil sync,
+// bukan baris trailing kosong yang baru ditambah user).
+const isLockedRow = (row: BabaranRow) =>
+  (props.formData.BabaranSource === "mkb" ||
+    props.formData.BabaranSource === "proof") &&
+  row.nourut !== undefined;
 
 const blankRow = (): BabaranRow => ({
   komponen: "",
@@ -38,7 +39,7 @@ const blankRow = (): BabaranRow => ({
 const ensureTrailing = () => {
   const rows = props.formData.Babaran;
   const last = rows[rows.length - 1];
-  if (!last || (last.komponen && !isMkbRow(last)) || isMkbRow(last)) {
+  if (!last || (last.komponen && !isLockedRow(last)) || isLockedRow(last)) {
     if (!last || last.komponen) rows.push(blankRow());
   }
 };
@@ -73,6 +74,10 @@ const totalBabaran = computed(() =>
       Baris bertanda dari MKB dikunci (edit lewat modul MKB). Baris baru tetap
       bisa ditambah manual.
     </div>
+    <div v-else-if="formData.BabaranSource === 'proof'" class="mkb-banner">
+      Baris bertanda dari Proof Garmen lini Potong dikunci (edit lewat modul
+      Proof Garmen). Baris baru tetap bisa ditambah manual.
+    </div>
     <div class="babaran-title">Babaran per Komponen</div>
     <table class="detail-table">
       <thead>
@@ -89,7 +94,7 @@ const totalBabaran = computed(() =>
         <tr
           v-for="(row, idx) in formData.Babaran"
           :key="idx"
-          :class="{ 'mkb-row': isMkbRow(row) }"
+          :class="{ 'mkb-row': isLockedRow(row) }"
         >
           <td class="text-center">{{ idx + 1 }}</td>
           <td>
@@ -97,7 +102,7 @@ const totalBabaran = computed(() =>
               v-model="row.komponen"
               class="cell-input"
               placeholder="Nama komponen..."
-              :readonly="isMkbRow(row)"
+              :readonly="isLockedRow(row)"
               @input="onKomponenInput(idx)"
             />
           </td>
@@ -106,7 +111,7 @@ const totalBabaran = computed(() =>
               v-model="row.warna"
               class="cell-input"
               :disabled="!row.komponen"
-              :readonly="isMkbRow(row)"
+              :readonly="isLockedRow(row)"
             />
           </td>
           <td>
@@ -114,7 +119,7 @@ const totalBabaran = computed(() =>
               v-model="row.jenis"
               class="cell-input"
               :disabled="!row.komponen"
-              :readonly="isMkbRow(row)"
+              :readonly="isLockedRow(row)"
             />
           </td>
           <td>
@@ -124,12 +129,12 @@ const totalBabaran = computed(() =>
               inputmode="decimal"
               class="cell-input tr"
               :disabled="!row.komponen"
-              :readonly="isMkbRow(row)"
+              :readonly="isLockedRow(row)"
             />
           </td>
           <td class="text-center">
             <button
-              v-if="row.komponen && !isMkbRow(row)"
+              v-if="row.komponen && !isLockedRow(row)"
               type="button"
               class="del-btn"
               @click="removeRow(idx)"
