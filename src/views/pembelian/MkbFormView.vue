@@ -97,6 +97,7 @@ const {
   executeSave,
   executeCancel,
   executeClose,
+  goBack,
 } = useForm({
   menuId: "51",
   initialData: emptyData,
@@ -537,10 +538,23 @@ const validateSave = () => {
   showSaveDialog.value = true;
 };
 
+const resetFormState = () => {
+  formData.value = {
+    ...emptyData,
+    tanggal: formatDateLocal(new Date()),
+    dtlBahan: [],
+    dtlLink: [],
+    dtlPlan: [],
+    dtlMap: [],
+  };
+  savedNomor.value = "";
+  selectedRowIdx.value = -1;
+};
+
 // Fungsi untuk Cetak atau Tutup
 const closePrintAndExit = () => {
   showPrintDialog.value = false;
-  router.back();
+  goBack();
 };
 
 const doCetak = () => {
@@ -550,7 +564,7 @@ const doCetak = () => {
     `/pembelian/mkb/print?nomor=${encodeURIComponent(savedNomor.value)}`,
     "_blank",
   );
-  router.back();
+  goBack();
 };
 
 // --- LOGIKA LINK PO ---

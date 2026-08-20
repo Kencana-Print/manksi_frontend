@@ -197,6 +197,85 @@ const totalQty = computed(() =>
   ),
 );
 
+// --- JENIS OBAT COMBOBOX (ketik + dropdown filter) ---
+const jenisOpenIdx = ref<number | null>(null);
+const jenisSearchText = ref("");
+const jenisHighlight = ref(0);
+const jenisInputRefs = ref<Record<number, HTMLInputElement | null>>({});
+
+const filteredJenisOptions = computed(() => {
+  const q = jenisSearchText.value.trim().toLowerCase();
+  if (!q) return jenisObatOptions.value;
+  return jenisObatOptions.value.filter((o) => o.nama.toLowerCase().includes(q));
+});
+
+const openJenisDropdown = (idx: number) => {
+  jenisOpenIdx.value = idx;
+  jenisSearchText.value = fd.value.detailRows[idx].jenis || "";
+  jenisHighlight.value = 0;
+};
+
+const closeJenisDropdown = () => {
+  jenisOpenIdx.value = null;
+  jenisSearchText.value = "";
+};
+
+const selectJenisOption = (
+  idx: number,
+  opt: { kode: string; nama: string; satuan: string },
+) => {
+  const row = fd.value.detailRows[idx];
+  const dupIdx = fd.value.detailRows.findIndex(
+    (r, i) => i !== idx && r.okode === opt.kode,
+  );
+  if (dupIdx !== -1) {
+    toast.warning(`Jenis Obat ini sudah di input, di baris ${dupIdx + 1}`);
+    closeJenisDropdown();
+    return;
+  }
+  row.jenis = opt.nama;
+  row.okode = opt.kode;
+  row.satuan = opt.satuan;
+  closeJenisDropdown();
+  ensureTrailingDetail();
+  nextTick(() => detailJumlahRefs.value[idx]?.focus());
+};
+
+const onJenisInputChange = (idx: number, e: Event) => {
+  jenisSearchText.value = (e.target as HTMLInputElement).value;
+  jenisHighlight.value = 0;
+  if (jenisOpenIdx.value !== idx) jenisOpenIdx.value = idx;
+};
+
+const onJenisInputBlur = () => {
+  closeJenisDropdown();
+};
+
+const onJenisKeydown = (e: KeyboardEvent, idx: number) => {
+  if (jenisOpenIdx.value !== idx) {
+    if (e.key === "ArrowDown" || e.key === "Enter") {
+      e.preventDefault();
+      openJenisDropdown(idx);
+    }
+    return;
+  }
+  const list = filteredJenisOptions.value;
+  if (e.key === "ArrowDown") {
+    e.preventDefault();
+    jenisHighlight.value = Math.min(jenisHighlight.value + 1, list.length - 1);
+  } else if (e.key === "ArrowUp") {
+    e.preventDefault();
+    jenisHighlight.value = Math.max(jenisHighlight.value - 1, 0);
+  } else if (e.key === "Enter") {
+    e.preventDefault();
+    const opt = list[jenisHighlight.value];
+    if (opt) selectJenisOption(idx, opt);
+  } else if (e.key === "Escape") {
+    e.preventDefault();
+    (e.target as HTMLInputElement).blur();
+  }
+};
+
 const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
 
 // ══ Refs focus-chain ══
@@ -685,20 +764,38 @@ onMounted(loadInitial);
                 <td class="text-center">{{ idx + 1 }}</td>
                 <td class="mono-cell">{{ row.okode }}</td>
                 <td class="p0">
-                  <select
-                    :value="row.jenis"
-                    class="sel-cell"
-                    @change="onJenisChange(idx, $event)"
-                  >
-                    <option value="">-- pilih jenis obat --</option>
-                    <option
-                      v-for="o in jenisObatOptions"
-                      :key="o.kode"
-                      :value="o.nama"
-                    >
-                      {{ o.nama }}
-                    </option>
-                  </select>
+                  <div class="cell-grp jenis-combo">
+                    <input
+                      :ref="(el) => (jenisInputRefs[idx] = el as any)"
+                      :value="
+                        jenisOpenIdx === idx ? jenisSearchText : row.jenis
+                      "
+                      class="ci"
+                      placeholder="Ketik jenis obat..."
+                      autocomplete="off"
+                      @focus="openJenisDropdown(idx)"
+                      @input="onJenisInputChange(idx, $event)"
+                      @keydown="onJenisKeydown($event, idx)"
+                      @blur="onJenisInputBlur"
+                    />
+                    <ul v-if="jenisOpenIdx === idx" class="jenis-dropdown">
+                      <li
+                        v-for="(o, oi) in filteredJenisOptions"
+                        :key="o.kode"
+                        :class="{ active: oi === jenisHighlight }"
+                        @mousedown.prevent="selectJenisOption(idx, o)"
+                        @mouseenter="jenisHighlight = oi"
+                      >
+                        {{ o.nama }}
+                      </li>
+                      <li
+                        v-if="filteredJenisOptions.length === 0"
+                        class="jenis-empty"
+                      >
+                        Tidak ditemukan
+                      </li>
+                    </ul>
+                  </div>
                 </td>
                 <td class="text-center">{{ row.satuan }}</td>
                 <td>
@@ -917,6 +1014,43 @@ onMounted(loadInitial);
 }
 .cell-grp .ci {
   flex: 1;
+}
+.jenis-combo {
+  position: relative;
+}
+.jenis-dropdown {
+  position: absolute;
+  top: 26px;
+  left: 0;
+  right: 0;
+  max-height: 240px;
+  overflow-y: auto;
+  background: white;
+  border: 1px solid #bbb;
+  border-radius: 4px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+  z-index: 50;
+  list-style: none;
+  margin: 0;
+  padding: 2px 0;
+}
+.jenis-dropdown li {
+  padding: 5px 8px;
+  font-size: 11px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.jenis-dropdown li.active,
+.jenis-dropdown li:hover {
+  background: #e3f2fd;
+}
+.jenis-empty {
+  color: #9e9e9e;
+  font-style: italic;
+  cursor: default !important;
+}
+.jenis-empty:hover {
+  background: transparent !important;
 }
 .ci {
   width: 100%;

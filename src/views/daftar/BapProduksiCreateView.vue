@@ -3,7 +3,8 @@ import { ref, onMounted, computed } from "vue";
 import api from "@/services/api";
 import { useToast } from "vue-toastification";
 import { useForm } from "@/composables/useForm";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
+import { useTabsStore } from "@/stores/tabsStore";
 import type { VForm } from "vuetify/components";
 import BaseForm from "@/components/BaseForm.vue";
 import SpkProduksiSearchModal from "@/components/lookups/SpkProduksiSearchModal.vue";
@@ -39,6 +40,8 @@ interface SaveResponse {
   };
 }
 
+const route = useRoute();
+const tabsStore = useTabsStore();
 const toast = useToast();
 const router = useRouter();
 const vFormRef = ref<VForm | null>(null);
@@ -80,6 +83,10 @@ const KATEGORI_OPTIONS = [
   "Lingkungan",
 ];
 
+// ── State dialog konfirmasi cetak (pengganti window.confirm) ──
+const showPrintConfirmDialog = ref(false);
+const savedNomorBap = ref("");
+
 const {
   isEditMode,
   isLoading,
@@ -93,7 +100,7 @@ const {
   showCloseDialog,
   executeCancel,
   executeClose,
-} = useForm({
+} = useForm<BapData>({
   menuId: "142",
   initialData: initialBapData,
   fetchApi: async (): Promise<BapData> => {
@@ -110,27 +117,47 @@ const {
       Approve: !!ed.Approve,
     };
   },
-  submitApi: async (dataToSave) => {
-    await api.post("/master/bap-produksi-form/save", {
+  submitApi: async (dataToSave): Promise<any> => {
+    const res = await api.post("/master/bap-produksi-form/save", {
       isNewMode: !isEditMode.value,
       data: dataToSave,
     });
     toast.success("BAP berhasil disimpan.");
+    return res;
   },
   onSuccess: (response) => {
     const res = response as SaveResponse;
-    const nomorTerupdate = res.data.nomor || formData.value.Nomor;
-    if (confirm("Data berhasil disimpan. Ingin Cetak?")) {
-      const url = router.resolve({
-        name: "BapProduksiPrint",
-        params: { nomor: nomorTerupdate },
-      }).href;
-      window.open(url, "_blank");
-    }
+    savedNomorBap.value = res.data.nomor || formData.value.Nomor;
+    showPrintConfirmDialog.value = true;
   },
-  onSuccessRoute: "/daftar/berita-acara",
 });
 
+const doPrint = () => {
+  showPrintConfirmDialog.value = false;
+  const currentPath = route.path;
+  const url = router.resolve({
+    name: "BapProduksiPrint",
+    params: { nomor: savedNomorBap.value },
+  }).href;
+  window.open(url, "_blank");
+  router
+    .push("/daftar/berita-acara")
+    .catch(() => {})
+    .then(() => {
+      tabsStore.closeTab(currentPath);
+    });
+};
+
+const skipPrint = () => {
+  showPrintConfirmDialog.value = false;
+  const currentPath = route.path;
+  router
+    .push("/daftar/berita-acara")
+    .catch(() => {})
+    .then(() => {
+      tabsStore.closeTab(currentPath);
+    });
+};
 const loadLookup = async () => {
   try {
     const res = await api.get("/lookups/cabang-pabrik");
@@ -503,6 +530,28 @@ const handlePreSave = async () => {
     @selected="handleSpkSelected"
   />
   <KaryawanSearchModal v-model="showKaryawanModal" @selected="addKaryawan" />
+
+  <v-dialog v-model="showPrintConfirmDialog" max-width="380px" persistent>
+    <v-card class="rounded-lg">
+      <v-card-title
+        class="pa-3 bg-success text-white"
+        style="font-size: 13px; font-weight: 700"
+      >
+        Simpan Berhasil
+      </v-card-title>
+      <v-card-text class="pa-4" style="font-size: 12px">
+        Data <b>{{ savedNomorBap }}</b> berhasil disimpan.<br />
+        Ingin mencetak sekarang?
+      </v-card-text>
+      <v-card-actions class="pa-3 border-t">
+        <v-btn variant="text" size="small" @click="skipPrint">Tidak</v-btn>
+        <v-spacer />
+        <v-btn variant="flat" size="small" color="primary" @click="doPrint">
+          Ya, Cetak
+        </v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
 </template>
 
 <style scoped>

@@ -127,6 +127,7 @@ export function useForm<
     } else {
       // Deep copy initialData supaya tidak ada referensi tersisa
       formData.value = JSON.parse(JSON.stringify(options.initialData));
+      options.onFormReset?.();
     }
   };
 
