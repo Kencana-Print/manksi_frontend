@@ -1655,7 +1655,7 @@ const router = createRouter({
       },
     },
     {
-      path: "/garmen/bpb-jasa/edit",
+      path: "/garmen/bpb-jasa/edit/:nomor",
       name: "BpbJasaFormEdit",
       component: () => import("@/views/garmen/BpbJasaFormView.vue"),
       meta: {

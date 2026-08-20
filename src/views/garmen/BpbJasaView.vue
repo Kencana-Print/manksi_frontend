@@ -133,7 +133,7 @@ const goEdit = () => {
   if (!selectedItem.value) return;
   router.push({
     name: "BpbJasaFormEdit",
-    query: { nomor: selectedItem.value.Nomor },
+    params: { nomor: selectedItem.value.Nomor },
   });
 };
 
