@@ -3,6 +3,7 @@ import { ref, computed, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
 import { useAuthStore } from "@/stores/authStore";
+import { useTabsStore } from "@/stores/tabsStore";
 import BaseForm from "@/components/BaseForm.vue";
 import { useForm } from "@/composables/useForm";
 import { bpbNonBahanFormService } from "@/services/garmen/bpbNonBahanFormService";
@@ -18,10 +19,11 @@ const authStore = useAuthStore();
 const route = useRoute();
 const router = useRouter();
 const toast = useToast();
+const tabsStore = useTabsStore();
 
 const isEditMode = computed(() => !!route.params.nomor);
 const formJenis = ref(
-  typeof route.query.jenis === "string" ? route.query.jenis : "ACCESORIES",
+  typeof route.params.jenis === "string" ? route.params.jenis : "ACCESORIES",
 );
 
 // ── Tanggal lokal (hindari UTC shift) ──
@@ -98,14 +100,43 @@ const {
   executeClose,
 } = useForm({
   menuId: "67",
-  initialData: JSON.parse(JSON.stringify(defaultData)), // Hindari referensi reaktif asal
+  initialData: JSON.parse(JSON.stringify(defaultData)),
+  onFormReset: () => {
+    formJenis.value =
+      typeof route.params.jenis === "string"
+        ? route.params.jenis
+        : "ACCESORIES";
+    formData.value.header = {
+      bpb_nomor: "",
+      bpb_jenis: formJenis.value,
+      bpb_tanggal: todayLocal,
+      bpb_mb_nomor: "",
+      bpb_po_nomor: "",
+      bpb_sup_kode: "",
+      sup_nama: "",
+      sup_alamat: "",
+      sup_kota: "",
+      bpb_ket: "",
+      ketpo: "",
+      tglminta: "",
+      tglpo: "",
+      isTutupBuku: false,
+      hasVoucher: false,
+      pin_status: "",
+    };
+    formData.value.detail = [];
+    showMintaModal.value = false;
+    showPoModal.value = false;
+    showSupModal.value = false;
+    activeSpkIndex.value = -1;
+    showSpkModal.value = false;
+  },
   fetchApi: async () => {
     const res = await bpbNonBahanFormService.getDetail(
       route.params.nomor as string,
     );
     const d = res.data.data;
-    formJenis.value = d.header.bpb_jenis; // Sinkronkan jenis dari DB
-
+    formJenis.value = d.header.bpb_jenis;
     return {
       header: {
         ...d.header,
@@ -125,12 +156,18 @@ const {
       bpb_sup_kode: data.header.bpb_sup_kode,
       bpb_ket: data.header.bpb_ket,
       detail: data.detail,
-      user: authStore.user, // Gabungkan user ke dalam payload
+      user: authStore.user,
     });
   },
   onSuccess: (res: any) => {
     toast.success("BPB Berhasil disimpan!");
-    router.push({ name: "BpbNonBahanGarmenBrowse" });
+    const currentPath = route.path; // snapshot SEBELUM push
+    router
+      .push({ name: "BpbNonBahanGarmenBrowse" })
+      .catch(() => {})
+      .then(() => {
+        tabsStore.closeTab(currentPath);
+      });
   },
 });
 

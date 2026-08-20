@@ -1201,7 +1201,7 @@ const router = createRouter({
       },
     },
     {
-      path: "/garmen/barang/realisasi/form",
+      path: "/garmen/barang/realisasi/form/create/:jenis",
       name: "GarmenRealisasiBarangCreate",
       component: () => import("@/views/garmen/RealisasiBarangFormView.vue"),
       meta: {
@@ -1246,7 +1246,7 @@ const router = createRouter({
       },
     },
     {
-      path: "/garmen/barang/retur-barang/form",
+      path: "/garmen/barang/retur-barang/form/create/:jenis",
       name: "GarmenReturBarangCreate",
       component: () => import("@/views/garmen/ReturBarangFormView.vue"),
       meta: {
@@ -1302,7 +1302,7 @@ const router = createRouter({
       },
     },
     {
-      path: "/garmen/barang/koreksi-stok/form",
+      path: "/garmen/barang/koreksi-stok/form/create/:jenis",
       name: "GarmenKoreksiStokBarangCreate",
       component: () => import("@/views/garmen/KoreksiStokBarangFormView.vue"),
       meta: {
@@ -1393,7 +1393,7 @@ const router = createRouter({
       },
     },
     {
-      path: "/garmen/barang/mutasi-out/create",
+      path: "/garmen/barang/mutasi-out/create/:jenis",
       name: "MutasiOutGarmenFormCreate",
       component: () => import("@/views/garmen/MutasiOutBarangFormView.vue"),
       meta: {
@@ -1449,7 +1449,7 @@ const router = createRouter({
       },
     },
     {
-      path: "/garmen/barang/po-nonbahan/create",
+      path: "/garmen/barang/po-nonbahan/create/:jenis",
       name: "PoNonBahanGarmenFormCreate",
       component: () => import("@/views/garmen/PoNonBahanFormView.vue"),
       meta: {
@@ -1494,7 +1494,7 @@ const router = createRouter({
       },
     },
     {
-      path: "/garmen/barang/bpb-nonbahan/create",
+      path: "/garmen/barang/bpb-nonbahan/create/:jenis",
       name: "BpbNonBahanGarmenFormCreate",
       component: () => import("@/views/garmen/BpbNonBahanFormView.vue"),
       meta: {
@@ -1529,7 +1529,7 @@ const router = createRouter({
       },
     },
     {
-      path: "/garmen/barang/retur-pembelian/form",
+      path: "/garmen/barang/retur-pembelian/form/create/:jenis",
       name: "GarmenReturPembelianBarangCreate",
       component: () =>
         import("@/views/garmen/ReturPembelianBarangFormView.vue"),

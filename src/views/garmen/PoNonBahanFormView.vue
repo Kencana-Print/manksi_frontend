@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
 import { useAuthStore } from "@/stores/authStore";
+import { useTabsStore } from "@/stores/tabsStore";
 import BaseForm from "@/components/BaseForm.vue";
 import { useForm } from "@/composables/useForm";
 import { poNonBahanFormService } from "@/services/garmen/poNonBahanFormService";
@@ -16,10 +17,11 @@ const authStore = useAuthStore();
 const route = useRoute();
 const router = useRouter();
 const toast = useToast();
+const tabsStore = useTabsStore();
 
 const isEditMode = computed(() => !!route.params.nomor);
 const formJenis = ref(
-  typeof route.query.jenis === "string" ? route.query.jenis : "ACCESORIES",
+  typeof route.params.jenis === "string" ? route.params.jenis : "ACCESORIES",
 );
 const todayLocal = new Date().toISOString().substring(0, 10);
 
@@ -139,6 +141,34 @@ const {
 } = useForm({
   menuId: "66",
   initialData: defaultData,
+  onFormReset: () => {
+    formJenis.value =
+      typeof route.params.jenis === "string"
+        ? route.params.jenis
+        : "ACCESORIES";
+    formData.value.header = {
+      po_nomor: "",
+      po_jenis: formJenis.value,
+      po_tanggal: todayLocal,
+      po_mb_nomor: "",
+      tglminta: "",
+      mb_cab: "",
+      po_sup_kode: "",
+      sup_nama: "",
+      sup_alamat: "",
+      sup_kota: "",
+      po_ket: "",
+      po_status: "",
+      pin_status: "",
+      isTutupBuku: false,
+      hasBpb: false,
+    };
+    formData.value.items = [];
+    showMintaModal.value = false;
+    showSupModal.value = false;
+    showPrintDialog.value = false;
+    nomorToPrint.value = "";
+  },
   fetchApi: async () => {
     const res = await poNonBahanFormService.getDetail(
       route.params.nomor as string,
@@ -336,17 +366,29 @@ const validateSave = () => {
 };
 
 const onPrintConfirm = () => {
+  const currentPath = route.path;
   window.open(
     `/garmen/barang/po-nonbahan/print/${encodeURIComponent(nomorToPrint.value)}`,
     "_blank",
   );
   showPrintDialog.value = false;
-  router.push({ name: "PoNonBahanGarmenBrowse" });
+  router
+    .push({ name: "PoNonBahanGarmenBrowse" })
+    .catch(() => {})
+    .then(() => {
+      tabsStore.closeTab(currentPath);
+    });
 };
 
 const onPrintCancel = () => {
+  const currentPath = route.path;
   showPrintDialog.value = false;
-  router.push({ name: "PoNonBahanGarmenBrowse" });
+  router
+    .push({ name: "PoNonBahanGarmenBrowse" })
+    .catch(() => {})
+    .then(() => {
+      tabsStore.closeTab(currentPath);
+    });
 };
 </script>
 

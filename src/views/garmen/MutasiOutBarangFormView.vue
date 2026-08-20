@@ -19,7 +19,7 @@ const isEditMode = computed(() => !!route.params.nomor);
 
 // ── Ambil jenis dari query (dikirim dari browse onAdd) ──
 const formJenis = ref(
-  typeof route.query.jenis === "string" ? route.query.jenis : "ACCESORIES",
+  typeof route.params.jenis === "string" ? route.params.jenis : "ACCESORIES",
 );
 
 // ── Tanggal lokal (hindari UTC shift) ──
@@ -71,6 +71,18 @@ const nomorToPrint = ref("");
 const showPermintaanFinanceModal = ref(false);
 const isFinance = computed(() => formData.value.Bagian === "FINANCE");
 
+const emptyDetailRow = () => ({
+  NoPermintaan: "",
+  Kode: "",
+  Nama: "",
+  Satuan: "",
+  Spesifikasi: "",
+  Stok: 0,
+  StokBelumDiterima: 0,
+  StokReal: 0,
+  Jumlah: 0,
+});
+
 const {
   isLoading,
   isSaving,
@@ -84,6 +96,24 @@ const {
 } = useForm({
   menuId: "70",
   initialData: defaultData,
+  onFormReset: () => {
+    formJenis.value =
+      typeof route.params.jenis === "string"
+        ? route.params.jenis
+        : "ACCESORIES";
+    formData.value.Jenis = formJenis.value;
+    formData.value.CabangAsal = authStore.user?.cabang || "P01";
+    formData.value.Bagian = authStore.user?.bagian || "FINANCE";
+    formData.value.Detail = [emptyDetailRow()];
+    showBarangModal.value = false;
+    activeGridIndex.value = -1;
+    customSearchItems.value = undefined;
+    deleteRowDialog.value = false;
+    pendingDeleteIdx.value = null;
+    showPrintDialog.value = false;
+    nomorToPrint.value = "";
+    showPermintaanFinanceModal.value = false;
+  },
   fetchApi: async () => {
     const res = await mutasiOutBarangFormService.getDetail(
       route.params.nomor as string,
