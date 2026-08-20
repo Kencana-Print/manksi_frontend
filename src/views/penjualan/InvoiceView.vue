@@ -423,6 +423,8 @@ const onExportDetail = async () => {
     :show-expand="true"
     :loading-details="loadingDetails"
     :expanded="expandedItems"
+    :filter-state="filterState"
+    @update:filter-state="onFilterStateRestore"
     @update:selected="selected = $event"
     @update:expanded="onExpandChange"
     @add="goNew"
