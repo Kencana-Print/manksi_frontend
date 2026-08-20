@@ -13,6 +13,7 @@ import SpkTabLayoutProses from "./components/SpkTabLayoutProses.vue";
 import SpkTabKeterangan from "./components/SpkTabKeterangan.vue";
 import SpkTabAlokasi from "./components/SpkTabAlokasi.vue";
 import SpkTabKaosan from "./components/SpkTabKaosan.vue";
+import SpkTabBabaran from "./components/SpkTabBabaran.vue";
 
 import BarangKaosanSearchModal from "@/components/lookups/BarangKaosanSearchModal.vue";
 
@@ -67,6 +68,8 @@ const defaultData = {
   KeteranganKhusus: [] as string[],
   KetKomponenList: [] as any[],
   Alokasi: [] as any[],
+  Babaran: [] as any[],
+  BabaranSource: "manual" as "manual" | "mkb",
 
   Kaosan: [] as any[],
 };
@@ -125,6 +128,8 @@ const {
         checked: k.checked === 1 || k.checked === true,
       })),
       Alokasi: d.alokasi || [],
+      Babaran: d.babaran || [],
+      BabaranSource: d.babaranSource || "manual",
       Kaosan: d.dtlKaosan || [],
     };
   },
@@ -140,6 +145,7 @@ const {
       keteranganKhusus: data.KeteranganKhusus,
       ketKomponenList: data.KetKomponenList,
       alokasi: data.Alokasi,
+      babaran: data.Babaran,
       dtlKaosan: data.Kaosan,
     };
 
@@ -192,8 +198,8 @@ function mapHeaderToFormData(h: any) {
     so_sablon: h.spk_sablon || "N",
     so_bordir: h.spk_bordir || "N",
     so_sublim: h.spk_sublim || "N",
-spk_invdc: h.spk_invdc || "", 
-    spk_pen_nomor: h.spk_pen_nomor || "" 
+    spk_invdc: h.spk_invdc || "",
+    spk_pen_nomor: h.spk_pen_nomor || "",
   };
 }
 
@@ -284,6 +290,7 @@ const tabs = computed(() => {
     { key: "order", title: "Order" },
     ...kaosanTab,
     { key: "alokasi", title: "Alokasi" },
+    { key: "babaran", title: "Babaran" },
     { key: "keterangan", title: "Keterangan" },
   ];
 });
@@ -359,6 +366,14 @@ watch(tabs, (newTabs) => {
           class="pf-tab-pane"
         >
           <SpkTabAlokasi :form-data="formData" />
+        </div>
+
+        <div
+          v-if="!formData.isPremiumFlow"
+          v-show="tabs[activeTab]?.key === 'babaran'"
+          class="pf-tab-pane"
+        >
+          <SpkTabBabaran :form-data="formData" />
         </div>
 
         <!-- Keterangan — tersedia di KEDUA flow -->
