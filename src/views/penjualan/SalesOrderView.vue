@@ -375,8 +375,31 @@ onMounted(async () => {
 });
 
 const onAdd = () => router.push("/penjualan/sales-order/create");
-const onEdit = (item: any) =>
+const onEdit = (item: any) => {
+  // Gate baru: SO yang sudah punya SPK PPIC turunan tidak boleh
+  // langsung diedit. PPIC harus close SPK PPIC-nya dulu, baru MO bisa
+  // mengajukan approval (Pengajuan Perubahan Data — mekanisme PIN5
+  // yang sudah ada), dan baru boleh diedit setelah di-ACC.
+  if (item.HasSpkPpic && Number(item.SpkPpicClose) !== 1) {
+    toast.warning(
+      `SO ini sudah memiliki SPK PPIC turunan (${item.SpkPpic}) yang masih Open.\n` +
+        `Minta PPIC untuk meng-close SPK PPIC tersebut terlebih dahulu sebelum SO ini bisa diubah.`,
+    );
+    return;
+  }
+  if (
+    item.HasSpkPpic &&
+    Number(item.SpkPpicClose) === 1 &&
+    item.Ngedit !== "ACC"
+  ) {
+    toast.warning(
+      "SPK PPIC turunan sudah di-close.\n" +
+        'Silakan ajukan "Pengajuan Perubahan Data" (menu Tindakan) dan tunggu ACC sebelum mengubah SO ini.',
+    );
+    return;
+  }
   router.push(`/penjualan/sales-order/edit/${encodeURIComponent(item.Nomor)}`);
+};
 
 const onDelete = async (item: any) => {
   try {
