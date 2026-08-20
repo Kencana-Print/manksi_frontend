@@ -1347,7 +1347,7 @@ const router = createRouter({
       },
     },
     {
-      path: "/garmen/barang/permintaan-pembelian/create",
+      path: "/garmen/barang/permintaan-pembelian/create/:jenis",
       name: "PermintaanPembelianFormCreate",
       component: () => import("@/views/garmen/PermintaanPembelianFormView.vue"),
       meta: {
