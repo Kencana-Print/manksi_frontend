@@ -6158,7 +6158,7 @@ const sisaClass = (item: any) => {
             <div class="manksi-panel content-panel fill-height">
               <div class="panel-header panel-header--warning">
                 <IconFileAlert :size="14" :stroke-width="1.7" class="mr-1" />
-                SPK Belum Ada MKB
+                SO Belum Ada MKB
                 <span v-if="spkBelumMkbCountVal" class="badge-count ml-auto">
                   {{ spkBelumMkbCountVal }}
                 </span>

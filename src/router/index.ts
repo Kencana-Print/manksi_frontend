@@ -3184,7 +3184,7 @@ const router = createRouter({
       component: () =>
         import("@/views/laporan/gudang-garmen/SpkBelumMkbView.vue"),
       meta: {
-        title: "Laporan SPK Belum Ada MKB",
+        title: "Laporan SO Belum Ada MKB",
         layout: "DefaultLayout",
         requiresAuth: true,
         menuId: "510",

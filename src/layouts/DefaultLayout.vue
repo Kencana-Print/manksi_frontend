@@ -164,7 +164,7 @@ const loadNotifications = async () => {
           id: "spk-belum-mkb",
           icon: IconClipboardList,
           color: "#6a1b9a",
-          label: "SPK belum ada MKB",
+          label: "SO belum ada MKB",
           count: mkbCount,
           route: "/laporan/gudang-garmen/spk-belum-mkb",
         });
