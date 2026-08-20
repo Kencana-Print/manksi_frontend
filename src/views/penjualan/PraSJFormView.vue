@@ -2,6 +2,7 @@
 import { ref, computed, watch, onMounted } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { useToast } from "vue-toastification";
+import { useTabsStore } from "@/stores/tabsStore";
 import BaseForm from "@/components/BaseForm.vue";
 import { useForm } from "@/composables/useForm";
 import { praSjFormService as svc } from "@/services/penjualan/praSuratJalanFormService";
@@ -51,6 +52,7 @@ interface FormData {
 const router = useRouter();
 const route = useRoute();
 const toast = useToast();
+const tabsStore = useTabsStore();
 
 const todayLocal = () => {
   const d = new Date(
@@ -109,9 +111,28 @@ const {
   menuId: "168",
   initialData: init,
   immediate: false,
+  onFormReset: () => {
+    showPerushModal.value = false;
+    showGudangModal.value = false;
+    showCusModal.value = false;
+    showCustomerChangeDialog.value = false;
+    pendingCustomerItem.value = null;
+    showAlokasiModal.value = false;
+    alokasiList.value = [];
+
+    isLoadingSo.value = false;
+    soInputValues.value = {};
+    activeRowKey.value = null;
+    showSoModal.value = false;
+
+    showDeleteRowDialog.value = false;
+    pendingDeleteRow.value = null;
+
+    ensureEmptyRow();
+  },
 
   fetchApi: async (): Promise<FormData> => {
-    const praSjEdit = route.query.praSj as string;
+    const praSjEdit = route.params.praSj as string;
     const res = await svc.getById(praSjEdit);
     const d = res.data.data;
     const h = d.header;
@@ -147,7 +168,7 @@ const {
   submitApi: async (data): Promise<any> => {
     const payload = {
       ...data,
-      NomorPra: route.query.praSj || data.NomorPra,
+      NomorPra: (route.params.praSj as string) || data.NomorPra,
       Detail: data.Detail.filter((r) => r.Nama && Number(r.Jumlah) !== 0).map(
         ({ _key: _k, ...r }) => r,
       ),
@@ -158,7 +179,13 @@ const {
   onSuccess: (res: any) => {
     const nomor = res?.data?.data?.nomor || "";
     toast.success(`Data ${nomor} berhasil disimpan.`);
-    router.push({ name: "PraSJBrowse" });
+    const currentPath = route.path; // snapshot SEBELUM push
+    router
+      .push({ name: "PraSJBrowse" })
+      .catch(() => {})
+      .then(() => {
+        tabsStore.closeTab(currentPath);
+      });
   },
 });
 
@@ -483,7 +510,7 @@ onMounted(async () => {
   const divRes = await svc.getDivisiList();
   divisiList.value = divRes.data.data || [];
 
-  if (route.query.praSj) {
+  if (route.params.praSj) {
     await fetchData();
     ensureEmptyRow();
   } else {

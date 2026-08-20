@@ -981,7 +981,7 @@ const router = createRouter({
       },
     },
     {
-      path: "/garmen/bahan-jadi/cetak-barcode-kaosan/edit",
+      path: "/garmen/bahan-jadi/cetak-barcode-kaosan/edit/:nomor",
       name: "CetakBarcodeKaosanFormEdit",
       component: () => import("@/views/garmen/CetakBarcodeKaosanFormView.vue"),
       meta: {
@@ -2373,7 +2373,7 @@ const router = createRouter({
       },
     },
     {
-      path: "/penjualan/pra-sj/edit",
+      path: "/penjualan/pra-sj/edit/:praSj",
       name: "PraSJFormEdit",
       component: () => import("@/views/penjualan/PraSJFormView.vue"),
       meta: {
