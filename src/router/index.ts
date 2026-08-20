@@ -1962,17 +1962,6 @@ const router = createRouter({
       },
     },
     {
-      path: "/garmen/lhk-pola",
-      name: "LhkPolaBrowse",
-      component: () => import("@/views/garmen/LhkPolaView.vue"),
-      meta: {
-        title: "LHK Pola",
-        layout: "DefaultLayout",
-        requiresAuth: true,
-        menuId: "174",
-      },
-    },
-    {
       path: "/garmen/pemakaian-obat",
       name: "PemakaianObatBrowse",
       component: () => import("@/views/garmen/PemakaianObatView.vue"),
