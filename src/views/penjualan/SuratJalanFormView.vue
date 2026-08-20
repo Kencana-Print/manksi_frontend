@@ -3,6 +3,7 @@ import { ref, computed, watch, onMounted } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { useToast } from "vue-toastification";
 import { useAuthStore } from "@/stores/authStore";
+import { useTabsStore } from "@/stores/tabsStore";
 import BaseForm from "@/components/BaseForm.vue";
 import { useForm } from "@/composables/useForm";
 import api from "@/services/api";
@@ -76,6 +77,7 @@ const auth = useAuthStore();
 const router = useRouter();
 const route = useRoute();
 const toast = useToast();
+const tabsStore = useTabsStore();
 
 const todayLocal = () => {
   const d = new Date(
@@ -88,11 +90,112 @@ let _key = 1;
 const sel = (e: FocusEvent) => (e.target as HTMLInputElement).select();
 const num = (v: any) => Number(v || 0).toLocaleString("id-ID");
 
-// ── State ────────────────────────────────────────────────────────────────
+// ── State (dipindah ke atas, sebelum useForm) ───────────────────────────
 const divisiList = ref<any[]>([]);
 const showPrintDialog = ref(false);
 const savedNomor = ref("");
 const isLoadingSpk = ref(false);
+
+const activeRowKey = ref<number | null>(null);
+const spkInputValues = ref<Record<number, string>>({});
+const showSpkModal = ref(false);
+const showJadwalModal = ref(false);
+
+const showCusModal = ref(false);
+const showGudangModal = ref(false);
+const showPerushModal = ref(false);
+const showInvProModal = ref(false);
+
+const showCustomerChangeDialog = ref(false);
+const pendingCustomerItem = ref<any>(null);
+
+const showOtorisasiPanel = ref(false);
+const otorisasiKode = ref("");
+const otorisasiJawaban = ref("");
+const otorisasiSpkPending = ref("");
+const isOtorisasiLoading = ref(false);
+const otorisasiJadwalPending = ref<any>(null);
+
+const showAlokasiHistoryModal = ref(false);
+const alokasiHistoryList = ref<any[]>([]);
+const isLoadingAlokasiHistory = ref(false);
+const alokasiHistoryPage = ref(1);
+const alokasiHistoryTotal = ref(0);
+
+const showAlokasiSpkModal = ref(false);
+const alokasiSpkList = ref<any[]>([]);
+const isLoadingAlokasiSpk = ref(false);
+const alokasiSpkPage = ref(1);
+const alokasiSpkTotal = ref(0);
+const alokasiSpkNomor = ref("");
+const alokasiSpkQ = ref("");
+
+// ── ensureEmptyRow juga perlu dipindah ke atas (dipakai onFormReset) ────
+const ensureEmptyRow = () => {
+  const last = fd.value.Detail[fd.value.Detail.length - 1];
+  if (!last || last.SpkNomor) {
+    fd.value.Detail.push({
+      _key: _key++,
+      SpkNomor: "",
+      SoNomor: "",
+      NamaSpk: "",
+      Ukuran: "",
+      Size: "",
+      Jenis: "",
+      Harga: 0,
+      Jumlah: 0,
+      Koli: 0,
+      Sudah: 0,
+      Kurang: 0,
+      Keterangan: "",
+      Uraian: "",
+      NoKirim: "",
+      IdKirim: 0,
+    });
+  }
+};
+
+// ── Reset semua state lokal di luar formData saat tab-reuse ────────────
+const resetLocalFormState = () => {
+  showPrintDialog.value = false;
+  savedNomor.value = "";
+  isLoadingSpk.value = false;
+
+  activeRowKey.value = null;
+  spkInputValues.value = {};
+  showSpkModal.value = false;
+  showJadwalModal.value = false;
+
+  showCusModal.value = false;
+  showGudangModal.value = false;
+  showPerushModal.value = false;
+  showInvProModal.value = false;
+
+  showCustomerChangeDialog.value = false;
+  pendingCustomerItem.value = null;
+
+  showOtorisasiPanel.value = false;
+  otorisasiKode.value = "";
+  otorisasiJawaban.value = "";
+  otorisasiSpkPending.value = "";
+  otorisasiJadwalPending.value = null;
+
+  showAlokasiHistoryModal.value = false;
+  alokasiHistoryList.value = [];
+  alokasiHistoryPage.value = 1;
+  alokasiHistoryTotal.value = 0;
+
+  showAlokasiSpkModal.value = false;
+  alokasiSpkList.value = [];
+  alokasiSpkPage.value = 1;
+  alokasiSpkTotal.value = 0;
+  alokasiSpkNomor.value = "";
+  alokasiSpkQ.value = "";
+
+  // formData.Detail sudah dikosongkan oleh useForm SEBELUM callback ini
+  // dipanggil — tambahkan baris kosong lagi supaya grid siap diketik.
+  ensureEmptyRow();
+};
 
 // ── Default Gudang per divisi (sesuai Delphi cbDivisiChange) ─────────────
 const defaultGudangByDivisi = (divisiStr: string) => {
@@ -153,6 +256,7 @@ const {
   menuId: "153",
   initialData: init,
   immediate: false,
+  onFormReset: resetLocalFormState,
 
   fetchApi: async (): Promise<FormData> => {
     const nomorEdit = params.nomor as string;
@@ -245,13 +349,7 @@ watch(
 );
 
 // ── Lookup Modals ────────────────────────────────────────────────────────
-const showCusModal = ref(false);
-const showGudangModal = ref(false);
-const showSpkModal = ref(false);
-
 // Perusahaan — inline search
-const showPerushModal = ref(false);
-
 const onPerushEnter = async () => {
   const kode = fd.value.KodePerush.trim();
   if (!kode) return;
@@ -294,8 +392,6 @@ const selectPerush = (item: any) => {
 };
 
 // Invoice Proforma — inline
-const showInvProModal = ref(false);
-
 const onInvProEnter = async () => {
   const nomor = fd.value.InvPro.trim();
   if (!nomor) return;
@@ -323,9 +419,6 @@ const selectInvPro = (item: any) => {
 };
 
 // Customer
-const showCustomerChangeDialog = ref(false);
-const pendingCustomerItem = ref<any>(null);
-
 const onCusEnter = async () => {
   const kode = fd.value.KodeCus.trim();
   if (!kode) return;
@@ -425,33 +518,6 @@ const selectGudang = (item: any) => {
 };
 
 // ── Grid SPK ─────────────────────────────────────────────────────────────
-const activeRowKey = ref<number | null>(null);
-const showJadwalModal = ref(false);
-
-const ensureEmptyRow = () => {
-  const last = fd.value.Detail[fd.value.Detail.length - 1];
-  if (!last || last.SpkNomor) {
-    fd.value.Detail.push({
-      _key: _key++,
-      SpkNomor: "",
-      SoNomor: "",
-      NamaSpk: "",
-      Ukuran: "",
-      Size: "",
-      Jenis: "",
-      Harga: 0,
-      Jumlah: 0,
-      Koli: 0,
-      Sudah: 0,
-      Kurang: 0,
-      Keterangan: "",
-      Uraian: "",
-      NoKirim: "",
-      IdKirim: 0,
-    });
-  }
-};
-
 const appendNomorPo = (ketPo?: string) => {
   const val = (ketPo || "").trim();
   if (!val) return;
@@ -467,8 +533,6 @@ const appendNomorPo = (ketPo?: string) => {
 };
 
 // F1 — pilih SPK
-const spkInputValues = ref<Record<number, string>>({});
-
 const onSpkInputEnter = async (rowKey: number) => {
   const val = (spkInputValues.value[rowKey] || "").trim();
   if (!val) return;
@@ -521,12 +585,6 @@ const selectSpk = async (item: any) => {
 };
 
 // ── Panel Otorisasi ──────────────────────────────────────────────────
-const showOtorisasiPanel = ref(false);
-const otorisasiKode = ref("");
-const otorisasiJawaban = ref("");
-const otorisasiSpkPending = ref("");
-const isOtorisasiLoading = ref(false);
-
 const addSpkToGrid = async (spkNomor: string) => {
   if (!spkNomor) return;
   isLoadingSpk.value = true;
@@ -579,8 +637,6 @@ const loadSpkDetail = async (spkNomor: string) => {
     appendNomorPo(rows[0].KetPo);
   }
 };
-
-const otorisasiJadwalPending = ref<any>(null);
 
 const submitOtorisasi = async () => {
   if (!otorisasiJawaban.value.trim()) {
@@ -699,11 +755,6 @@ const loadSpkDetailWithJadwal = async (item: any) => {
 const isLoadingAlokasi = ref(false);
 
 // ── Alokasi History — ganti ke modal dengan loading ────────────────────
-const showAlokasiHistoryModal = ref(false);
-const alokasiHistoryList = ref<any[]>([]);
-const isLoadingAlokasiHistory = ref(false);
-const alokasiHistoryPage = ref(1);
-const alokasiHistoryTotal = ref(0);
 const alokasiHistoryPerPage = 20;
 
 const alokasiHistoryPages = computed(() =>
@@ -755,13 +806,6 @@ const selectAlokasiHistory = (item: any) => {
 
 // Alokasi SPK
 // ── Alokasi SPK — ganti ke modal dengan loading ─────────────────────────
-const showAlokasiSpkModal = ref(false);
-const alokasiSpkList = ref<any[]>([]);
-const isLoadingAlokasiSpk = ref(false);
-const alokasiSpkPage = ref(1);
-const alokasiSpkTotal = ref(0);
-const alokasiSpkNomor = ref("");
-const alokasiSpkQ = ref("");
 const alokasiSpkPerPage = 20;
 
 const alokasiSpkPages = computed(() =>
@@ -890,17 +934,30 @@ const validateSave = () => {
 
 // ── Print ─────────────────────────────────────────────────────────────────
 const skipPrint = () => {
+  const currentPath = route.path;
   showPrintDialog.value = false;
-  router.push({ name: "SuratJalanBrowse" });
+  router
+    .push({ name: "SuratJalanBrowse" })
+    .catch(() => {})
+    .then(() => {
+      tabsStore.closeTab(currentPath);
+    });
 };
+
 const doCetak = (mode: "dotmatrix" | "inkjet") => {
+  const currentPath = route.path;
   showPrintDialog.value = false;
   const url = router.resolve({
     name: "SuratJalanPrint",
     query: { nomor: savedNomor.value, mode },
   }).href;
   window.open(url, "_blank");
-  router.push({ name: "SuratJalanBrowse" });
+  router
+    .push({ name: "SuratJalanBrowse" })
+    .catch(() => {})
+    .then(() => {
+      tabsStore.closeTab(currentPath);
+    });
 };
 
 // ── Lifecycle ─────────────────────────────────────────────────────────────
