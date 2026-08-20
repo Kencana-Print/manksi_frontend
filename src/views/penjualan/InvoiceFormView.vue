@@ -2,6 +2,7 @@
 import { ref, computed, watch, onMounted } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { useToast } from "vue-toastification";
+import { useTabsStore } from "@/stores/tabsStore";
 import BaseForm from "@/components/BaseForm.vue";
 import { useForm } from "@/composables/useForm";
 import { invFormService as svc } from "@/services/penjualan/invoiceFormService";
@@ -57,6 +58,7 @@ interface FormData {
 const router = useRouter();
 const route = useRoute();
 const toast = useToast();
+const tabsStore = useTabsStore();
 
 const todayLocal = () => {
   const d = new Date(
@@ -121,9 +123,28 @@ const {
   menuId: "156",
   initialData: init,
   immediate: false,
+  onFormReset: () => {
+    // Bersihkan state lokal di luar formData saat tab di-reuse.
+    uangMuka.value = 0;
+    showPrintDialog.value = false;
+    savedNomor.value = "";
+    showPerushModal.value = false;
+    showCusModal.value = false;
+    showInvProModal.value = false;
+    showRekModal.value = false;
+    showBarangModal.value = false;
+    activeRowKey.value = null;
+    isLoadingBarang.value = false;
+    barangInputValues.value = {};
+    focusedHargaKey.value = null;
+    isDiscFocused.value = false;
+    showSpkBaruWarning.value = false;
+    confirmedApvReset.value = false;
+    ensureEmptyRow();
+  },
 
   fetchApi: async (): Promise<FormData> => {
-    const nomorEdit = route.query.nomor as string;
+    const nomorEdit = route.params.nomor as string;
     const res = await svc.getById(nomorEdit);
     const d = res.data.data;
     const h = d.header;
@@ -176,13 +197,13 @@ const {
     }
     const payload = {
       ...data,
-      NomorInv: route.query.nomor || data.NomorInv,
+      NomorInv: (route.params.nomor as string) || data.NomorInv,
       ApvOverride: confirmedApvReset.value ? "" : undefined,
-      Disc: Number(data.Disc) || 0, // ⚠️ FIX: kirim apa adanya, jangan dibulatkan
+      Disc: Number(data.Disc) || 0,
       Detail: data.Detail.filter((r) => r.Kode && Number(r.Jumlah) !== 0).map(
         ({ _key: _k, IsExisting: _ie, ...r }) => ({
           ...r,
-          Harga: Number(r.Harga) || 0, // ⚠️ FIX: kirim apa adanya, jangan dibulatkan
+          Harga: Number(r.Harga) || 0,
         }),
       ),
     };
@@ -196,7 +217,13 @@ const {
       toast.warning(
         `Tersimpan dengan nomor ${nomor}.\nBelum bisa cetak invoice karena ada SO yg belum dibuatkan SJ.`,
       );
-      router.push({ name: "InvoiceBrowse" });
+      const currentPath = route.path; // snapshot SEBELUM push
+      router
+        .push({ name: "InvoiceBrowse" })
+        .catch(() => {})
+        .then(() => {
+          tabsStore.closeTab(currentPath);
+        });
     } else {
       savedNomor.value = nomor;
       fd.value.Detail = [];
@@ -580,17 +607,30 @@ const approvalLabel = computed(() => {
 });
 
 const skipPrint = () => {
+  const currentPath = route.path; // snapshot SEBELUM push
   showPrintDialog.value = false;
-  router.push({ name: "InvoiceBrowse" });
+  router
+    .push({ name: "InvoiceBrowse" })
+    .catch(() => {})
+    .then(() => {
+      tabsStore.closeTab(currentPath);
+    });
 };
+
 const doCetak = (mode: "dotmatrix" | "inkjet") => {
+  const currentPath = route.path; // snapshot SEBELUM push
   const url = router.resolve({
     name: "InvoicePrint",
     query: { nomor: savedNomor.value, mode },
   }).href;
   window.open(url, "_blank");
   showPrintDialog.value = false;
-  router.push({ name: "InvoiceBrowse" });
+  router
+    .push({ name: "InvoiceBrowse" })
+    .catch(() => {})
+    .then(() => {
+      tabsStore.closeTab(currentPath);
+    });
 };
 // ── Print Kunci (Sesuai Delphi F3) ──────────────────────────────────────
 const handlePrintIcon = () => {
@@ -614,7 +654,7 @@ onMounted(async () => {
   const divRes = await svc.getDivisiList();
   divisiList.value = divRes.data.data || [];
 
-  if (route.query.nomor) {
+  if (route.params.nomor) {
     await fetchData();
     ensureEmptyRow();
   } else {

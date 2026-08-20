@@ -2453,7 +2453,7 @@ const router = createRouter({
       },
     },
     {
-      path: "/penjualan/sj-tak-normal/edit",
+      path: "/penjualan/sj-tak-normal/edit/:nomor",
       name: "SjTakNormalFormEdit",
       component: () => import("@/views/penjualan/SjTakNormalFormView.vue"),
       meta: {
@@ -2520,7 +2520,7 @@ const router = createRouter({
       },
     },
     {
-      path: "/penjualan/invoice/edit",
+      path: "/penjualan/invoice/edit/:nomor",
       name: "InvoiceFormEdit",
       component: () => import("@/views/penjualan/InvoiceFormView.vue"),
       meta: {
@@ -2610,7 +2610,7 @@ const router = createRouter({
       },
     },
     {
-      path: "/penjualan/invoice-tak-normal/edit",
+      path: "/penjualan/invoice-tak-normal/edit/:nomor",
       name: "InvoiceTakNormalFormEdit",
       component: () => import("@/views/penjualan/InvoiceTakNormalFormView.vue"),
       meta: {
