@@ -478,6 +478,11 @@ onMounted(async () => {
                       <span class="highlight-yellow">PERFECT</span>
                     </td>
                   </tr>
+                  <tr>
+                    <td class="w-label">Alokasi</td>
+                    <td class="w-colon">:</td>
+                    <td>{{ data.spk_alokasi === "Y" ? "YA" : "TIDAK" }}</td>
+                  </tr>
                 </tbody>
               </table>
 
