@@ -6,7 +6,7 @@ import PageLayout from "@/components/PageLayout.vue";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 import { realisasiKeluarBahanService } from "@/services/laporan/gudang-garmen/realisasiKeluarBahanService";
-import { formatTanggal } from "@/utils/dateFormat";
+import { formatTanggalLocale } from "@/utils/dateFormat";
 import {
   IconClipboardList,
   IconFileSpreadsheet,
@@ -62,7 +62,7 @@ const numFmt = (v: any, d = 2) => {
     maximumFractionDigits: d,
   });
 };
-const fmtTgl = (v: any) => (v ? formatTanggal(v) : "");
+const fmtTgl = (v: any) => formatTanggalLocale(v);
 
 const rowClass = (color: string) => {
   if (color === "black") return "txt-black";
@@ -122,7 +122,7 @@ const onExport = async () => {
     ws.getCell(1, 1).value = "LAPORAN REALISASI KELUAR BAHAN";
     ws.getCell(1, 1).font = { bold: true, size: 12 };
     ws.getCell(2, 1).value =
-      `PERIODE TANGGAL SPK : ${formatTanggal(dtAwal.value)} s/d ${formatTanggal(dtAkhir.value)}`;
+      `PERIODE TANGGAL SPK : ${fmtTgl(dtAwal.value)} s/d ${fmtTgl(dtAkhir.value)}`;
     ws.getCell(2, 1).font = { bold: true };
 
     const headers = [
@@ -141,9 +141,9 @@ const onExport = async () => {
       "NO PERMINTAAN",
       "QTY PERMINTAAN",
       "KETERANGAN",
-      "QTY POTONG",
+      "QTY POTONG (PCS)",
       "WORKSHOP",
-      "SELISIH (KG)",
+      "SELISIH",
     ];
     headers.forEach((h, i) => (ws.getCell(4, i + 1).value = h));
     ws.getRow(4).font = { bold: true };
@@ -300,9 +300,9 @@ onMounted(fetchData);
               <th style="min-width: 110px">No Permintaan</th>
               <th style="width: 90px">Qty Permintaan</th>
               <th style="min-width: 140px">Keterangan</th>
-              <th style="width: 80px">Qty Potong</th>
+              <th style="width: 80px">Qty Potong (Pcs)</th>
               <th style="width: 80px">Workshop</th>
-              <th style="width: 80px">Selisih (KG)</th>
+              <th style="width: 80px">Selisih</th>
             </tr>
           </thead>
           <tbody>
