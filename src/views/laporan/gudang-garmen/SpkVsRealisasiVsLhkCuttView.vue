@@ -260,6 +260,23 @@ const onExportMaster = async () => {
   }
 };
 
+// Kolom "header" yang tidak perlu berulang tiap baris kalau SPK-nya
+// sama dengan baris sebelumnya (baris sudah terurut per Spk dari
+// backend: ORDER BY hdr.Spk, x.NoMinta, x.promind_bhn_kode)
+const collapseRepeatedHeader = (rows: any[], groupCols: string[]) => {
+  let prevSpk: string | null = null;
+  return rows.map((r) => {
+    const isSameGroup = r.Spk === prevSpk;
+    prevSpk = r.Spk;
+    if (!isSameGroup) return r;
+    const clone = { ...r };
+    groupCols.forEach((c) => {
+      clone[c] = "";
+    });
+    return clone;
+  });
+};
+
 // ── Export detail ──
 const isExportingDetail = ref(false);
 const onExportDetail = async () => {
@@ -271,11 +288,17 @@ const onExportDetail = async () => {
       filters.value.spk,
       filters.value.isMap,
     );
-    const rows = res.data.data || [];
-    if (!rows.length) {
+    const rawRows = res.data.data || [];
+    if (!rawRows.length) {
       toast.warning("Tidak ada data detail pada filter ini.");
       return;
     }
+    // Blank-kan Spk/Nama/Customer kalau sama dengan baris sebelumnya
+    // — SPK dengan detail banyak tidak lagi terlihat "berulang".
+    const rows = collapseRepeatedHeader(
+      rawRows,
+      canLihatCus.value ? ["Spk", "Nama", "Customer"] : ["Spk", "Nama"],
+    );
     const columns: ExcelColumn[] = [
       { header: "Spk", key: "Spk", width: 18 },
       { header: "Nama", key: "Nama", width: 26 },
