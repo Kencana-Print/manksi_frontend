@@ -47,6 +47,10 @@ const isDivisiGarmenAtauKaosan = computed(() =>
   ["3", "4"].includes(String(props.formData.spk_divisi).charAt(0)),
 );
 
+const isDivisiKaosanExact = computed(
+  () => String(props.formData.spk_divisi).charAt(0) === "3",
+);
+
 const isStandarKlien = computed(
   () => props.formData.spk_standar_ukuran === "KLIEN",
 );
@@ -128,6 +132,12 @@ const updateKetUkuran = () => {
       <div class="uk-card-title">Detail Ukuran</div>
       <div class="uk-section-hint mb-1">
         Silahkan isi Qty Order berdasarkan size nya.
+        <span
+          v-if="isDivisiKaosanExact"
+          style="color: #e65100; font-weight: 600"
+        >
+          (Divisi Kaosan: Qty otomatis dari tab "Kaosan / Detail Size")
+        </span>
       </div>
 
       <div class="uk-table-wrap">
@@ -168,9 +178,10 @@ const updateKetUkuran = () => {
               <td class="td-num">
                 <input
                   type="number"
-                  v-model.number="row.qty"
+                  :value="row.qty"
                   class="num-inp"
                   min="0"
+                  :disabled="isDivisiKaosanExact"
                   v-select-on-focus
                   @change="if (Number(row.qty) < 0) row.qty = 0;"
                 />

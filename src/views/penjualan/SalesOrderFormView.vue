@@ -609,6 +609,38 @@ const isDivisiTiga = computed(() =>
   String(formData.value.spk_divisi).startsWith("3"),
 );
 
+// --- SINKRONISASI QTY: Detail Barang Kaosan -> Detail Size (Divisi 3) ---
+const syncSizesFromKaosan = () => {
+  if (!isDivisiTiga.value) return;
+  const kaosanList = formData.value.Kaosan || [];
+  const agg: Record<string, number> = {};
+  kaosanList.forEach((k: any) => {
+    const uk = String(k.ukuran || "")
+      .trim()
+      .toUpperCase();
+    if (!uk) return;
+    agg[uk] = (agg[uk] || 0) + (Number(k.qtyorder) || 0);
+  });
+  const sizesList = formData.value.Sizes || [];
+  sizesList.forEach((s: any) => {
+    const uk = String(s.size || "")
+      .trim()
+      .toUpperCase();
+    s.qty = agg[uk] || 0;
+    delete agg[uk];
+  });
+  Object.keys(agg).forEach((uk) => {
+    if (agg[uk] > 0) sizesList.push({ size: uk, qty: agg[uk], lb: 0, pb: 0 });
+  });
+};
+
+// Sync sekali saat data edit selesai dimuat (bukan per keystroke)
+watch(isLoading, (val, oldVal) => {
+  if (isEditMode.value && oldVal === true && val === false) {
+    nextTick(() => syncSizesFromKaosan());
+  }
+});
+
 // --- WATCHER UNTUK AUTO-FILL DIVISI 3 (KAOSAN) ---
 watch(
   () => formData.value.spk_divisi,
@@ -1480,6 +1512,20 @@ const validateSave = async (skipPoCheck = false) => {
     }
   }
 
+  // 7b. Guard tambahan — pastikan breakdown Size juga sinkron total-nya
+  if (divisiStr === "3" && !isJoKaosanOpsional.value) {
+    const sumSize = (fd.Sizes || []).reduce(
+      (acc: number, curr: any) => acc + (Number(curr.qty) || 0),
+      0,
+    );
+    if (sumSize !== qtyPesan) {
+      toast.warning(
+        `Breakdown Detail Size (${sumSize}) tidak sama dengan Jumlah SPK (${qtyPesan}). Silakan cek ulang Detail Barang Kaosan.`,
+      );
+      return;
+    }
+  }
+
   // 8. Validasi Dateline Range (Sesuai btnsimpanClick Delphi)
   if (fd.kepentingan_acc !== "ACC") {
     try {
@@ -1728,6 +1774,7 @@ const setBarangKaosan = (selectedItems: any[]) => {
 
   // Reset index pemanggil
   activeKaosanIndex.value = -1;
+  syncSizesFromKaosan();
 };
 
 const onPilihKatalog = (item: any) => {
@@ -1837,6 +1884,7 @@ const onPilihKatalog = (item: any) => {
           <TabKaosan
             :formData="formData"
             @open-lookup-barang="handleOpenLookupBarang"
+            @sync-sizes="syncSizesFromKaosan"
           />
         </div>
 
