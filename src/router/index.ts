@@ -3155,6 +3155,18 @@ const router = createRouter({
       },
     },
     {
+      path: "/laporan/gudang-garmen/umur-stok-bahan",
+      name: "LapUmurStokBahan",
+      component: () =>
+        import("@/views/laporan/gudang-garmen/UmurStokBahanView.vue"),
+      meta: {
+        title: "Laporan Umur Stok Bahan",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "530",
+      },
+    },
+    {
       path: "/laporan/gudang-garmen/standart-babaran-vs-realisasi",
       name: "LapStandartBabaranVsRealisasi",
       component: () =>

@@ -85,6 +85,7 @@ import {
   IconPhotoSearch,
   IconMessageExclamation,
   IconDatabaseSearch,
+  IconHourglass,
 } from "@tabler/icons-vue";
 
 export interface NavItem {
@@ -911,6 +912,12 @@ export const createMenuItems = (): NavItem[] => {
               to: "/laporan/gudang-garmen/realisasi-keluar-bahan",
               icon: IconClipboardCheck,
               menuId: 529,
+            },
+            {
+              title: "Umur Stok Bahan",
+              to: "/laporan/gudang-garmen/umur-stok-bahan",
+              icon: IconHourglass,
+              menuId: 530,
             },
             { divider: true },
             {
