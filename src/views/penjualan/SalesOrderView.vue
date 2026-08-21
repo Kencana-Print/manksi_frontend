@@ -318,12 +318,16 @@ const rowPropsFn = (data: any) => {
   const item = data.item?.raw || data.item;
   const classes: string[] = ["font-weight-bold"];
   let style = "";
+  const pesanKirimSama = Number(item.Pesan) === Number(item.Kirim);
 
-  if (item.HasSj) {
-    // Paling final — sudah dibuatkan SJ, status Open/Pasif SO tidak relevan lagi
+  if (item.HasSj && pesanKirimSama) {
+    // Paling final — sudah SJ DAN Pesan = Kirim, benar-benar tuntas
     style = "color: #212121 !important;";
+  } else if (item.SpkPpic && !pesanKirimSama) {
+    // Sudah dibuatkan SPK PPIC tapi Pesan != Kirim
+    style = "color: #1a237e !important;"; // navy
   } else if (item.SpkPpic) {
-    // Sudah dibuatkan SPK PPIC tapi belum ada SJ
+    // Sudah dibuatkan SPK PPIC, Pesan = Kirim, belum ada SJ
     style = "color: #00897b !important;";
   } else {
     if (item.Status === "Open") {
@@ -345,7 +349,6 @@ const rowPropsFn = (data: any) => {
       else if (item.AccPending === "ACC") classes.push("text-orange-darken-3");
     }
   }
-
   return { class: classes.join(" "), style };
 };
 
@@ -1133,6 +1136,10 @@ const onExport = async () => {
           <div class="legend-item">
             <div class="legend-dot" style="background: #00897b"></div>
             Sudah SPK PPIC
+          </div>
+          <div class="legend-item">
+            <div class="legend-dot" style="background: #1a237e"></div>
+            SPK PPIC ≠ Kirim
           </div>
           <div class="legend-item">
             <div class="legend-dot" style="background: #212121"></div>
