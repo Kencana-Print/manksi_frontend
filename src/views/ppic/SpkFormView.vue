@@ -277,10 +277,15 @@ const tabs = computed(() => {
   const kaosanTab = isDivisiTiga.value
     ? [{ key: "kaosan", title: "Kaosan" }]
     : [];
+  const alokasiTabPremium =
+    formData.value.Alokasi && formData.value.Alokasi.length > 0
+      ? [{ key: "alokasi", title: "Alokasi" }]
+      : [];
   if (formData.value.isPremiumFlow) {
     return [
       { key: "order", title: "Order" },
       ...kaosanTab,
+      ...alokasiTabPremium,
       { key: "komponen", title: "Komponen SPK" },
       { key: "layout", title: "Layout Proses" },
       { key: "keterangan", title: "Keterangan" },
@@ -361,7 +366,7 @@ watch(tabs, (newTabs) => {
 
         <!-- Tab legacy only -->
         <div
-          v-if="!formData.isPremiumFlow"
+          v-if="tabs.some((t) => t.key === 'alokasi')"
           v-show="tabs[activeTab]?.key === 'alokasi'"
           class="pf-tab-pane"
         >
