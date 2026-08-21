@@ -137,7 +137,9 @@ const rowPropsFn = (data: any) => {
 // ── Export ──
 const onExport = async () => {
   if (!canExport.value) return toast.error("Akses ditolak.");
-  if (!items.value.length) return toast.warning("Tidak ada data.");
+  const dataToExport = baseTableRef.value?.getFilteredItems?.() ?? items.value;
+  if (!dataToExport.length)
+    return toast.warning("Tidak ada data untuk diekspor (cek filter aktif).");
   await exportExcelSingle(
     `Realisasi_Penjualan_${startDate.value}_${endDate.value}`,
     "Realisasi Penjualan",
@@ -185,7 +187,7 @@ const onExport = async () => {
       },
       { header: "Jml SPK", key: "Jumlah_SPK", width: 10, align: "center" },
     ],
-    items.value,
+    dataToExport,
     `Realisasi Penjualan — ${startDate.value} s.d. ${endDate.value}`,
   );
 };
@@ -193,6 +195,8 @@ const onExport = async () => {
 const pivotWithFilterRef = ref<InstanceType<typeof PivotWithFilter> | null>(
   null,
 );
+
+const baseTableRef = ref<InstanceType<typeof BaseTable> | null>(null);
 
 const onExportPivot = async () => {
   const table = await pivotWithFilterRef.value?.exportPivotToExcel?.();
@@ -595,6 +599,7 @@ onBeforeUnmount(() => {
       <!-- ── Grid Data ── -->
       <div v-show="activeTab === 'grid'" class="tab-content">
         <BaseTable
+          ref="baseTableRef"
           :headers="headers"
           :items="items"
           :is-loading="isLoading"
