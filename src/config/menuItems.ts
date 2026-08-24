@@ -281,6 +281,12 @@ export const createMenuItems = (): NavItem[] => {
           icon: IconMessageExclamation,
           menuId: 36,
         },
+        {
+          title: "Kendala",
+          to: "/daftar/kendala",
+          icon: IconAlertTriangle,
+          menuId: 37,
+        },
       ],
     },
     {

@@ -345,7 +345,7 @@ const router = createRouter({
       component: () => import("@/views/daftar/BapProduksiPrintView.vue"),
       meta: {
         title: "Cetak Berita Acara",
-        layout: "BlankLayout", // Gunakan layout kosong tanpa navbar
+        layout: "BlankLayout",
         requiresAuth: true,
       },
     },
@@ -380,6 +380,39 @@ const router = createRouter({
         layout: "DefaultLayout",
         requiresAuth: true,
         menuId: "36",
+      },
+    },
+    {
+      path: "/daftar/kendala",
+      name: "KendalaBrowse",
+      component: () => import("@/views/daftar/KendalaView.vue"),
+      meta: {
+        title: "Kendala",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "37",
+      },
+    },
+    {
+      path: "/daftar/kendala/create",
+      name: "KendalaCreate",
+      component: () => import("@/views/daftar/KendalaFormView.vue"),
+      meta: {
+        title: "Tambah Kendala",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "37",
+      },
+    },
+    {
+      path: "/daftar/kendala/edit/:nomor",
+      name: "KendalaEdit",
+      component: () => import("@/views/daftar/KendalaFormView.vue"),
+      meta: {
+        title: "Ubah Kendala",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "37",
       },
     },
 

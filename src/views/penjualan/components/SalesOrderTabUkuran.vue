@@ -178,7 +178,7 @@ const updateKetUkuran = () => {
               <td class="td-num">
                 <input
                   type="number"
-                  :value="row.qty"
+                  v-model.number="row.qty"
                   class="num-inp"
                   min="0"
                   :disabled="isDivisiKaosanExact"
