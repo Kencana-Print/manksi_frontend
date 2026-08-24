@@ -170,7 +170,7 @@ const {
       NamaPerush: h.perush_nama || "",
       KodeCus: h.inv_cus_kode || "",
       NamaCus: h.cus_nama || "",
-      AlamatCus: h.inv_cus_alamat || h.cus_alamat || "",
+      AlamatCus: h.inv_cus_alamat ?? h.cus_alamat ?? "",
       KotaCus: h.cus_kota || "",
       TanggalTempo: h.inv_tanggal_tempo || todayLocal(),
       RekBank: h.inv_rekening || "",

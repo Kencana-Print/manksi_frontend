@@ -155,7 +155,7 @@ const generateTxt = () => {
     const halfL = col(67);
     const halfR = PAGE_WIDTH - halfL - 1; // sisa lebar, dikurangi 1 spasi pemisah
 
-    const cAlamat = h.inv_cus_alamat || h.cus_alamat || "";
+    const cAlamat = h.inv_cus_alamat ?? h.cus_alamat ?? "";
     const alamatLines = wrapText(cAlamat, halfR);
     const lines: string[] = [];
     lines.push(padR(h.perush_nama || "", PAGE_WIDTH));
@@ -506,7 +506,7 @@ onMounted(() => {
                 <tr>
                   <td></td>
                   <td></td>
-                  <td>{{ header.inv_cus_alamat || header.cus_alamat }}</td>
+                  <td>{{ header.inv_cus_alamat ?? header.cus_alamat }}</td>
                 </tr>
               </table>
             </div>
