@@ -1367,10 +1367,34 @@ const validateSave = async (skipPoCheck = false) => {
     );
     return;
   }
+
   const fd = formData.value;
+
+  // ⬅ PINDAHAN dari onEdit di Browse: gate SPK PPIC turunan,
+  // sekarang dicek saat SIMPAN, bukan saat membuka form edit.
+  if (isEditMode.value && fd.HasSpkPpic && Number(fd.SpkPpicClose) !== 1) {
+    toast.warning(
+      `SO ini sudah memiliki SPK PPIC turunan (${fd.SpkPpic}) yang masih Open.\n` +
+        `Minta PPIC untuk meng-close SPK PPIC tersebut terlebih dahulu sebelum SO ini bisa diubah.`,
+    );
+    return;
+  }
+  if (
+    isEditMode.value &&
+    fd.HasSpkPpic &&
+    Number(fd.SpkPpicClose) === 1 &&
+    fd.Ngedit !== "ACC"
+  ) {
+    toast.warning(
+      "SPK PPIC turunan sudah di-close.\n" +
+        'Silakan ajukan "Pengajuan Perubahan Data" (menu Tindakan) dan tunggu ACC sebelum mengubah SO ini.',
+    );
+    return;
+  }
+
   const divisiStr = String(fd.spk_divisi).charAt(0);
   const qtyPesan = Number(fd.spk_jumlah) || 0;
-
+  
   // 1. Validasi Field Wajib Dasar
   if (!fd.spk_perush_kode) {
     toast.warning("Perusahaan belum dipilih.");

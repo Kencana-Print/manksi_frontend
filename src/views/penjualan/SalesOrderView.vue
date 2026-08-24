@@ -388,28 +388,6 @@ onBeforeUnmount(() => {
 
 const onAdd = () => router.push("/penjualan/sales-order/create");
 const onEdit = (item: any) => {
-  // Gate baru: SO yang sudah punya SPK PPIC turunan tidak boleh
-  // langsung diedit. PPIC harus close SPK PPIC-nya dulu, baru MO bisa
-  // mengajukan approval (Pengajuan Perubahan Data — mekanisme PIN5
-  // yang sudah ada), dan baru boleh diedit setelah di-ACC.
-  if (item.HasSpkPpic && Number(item.SpkPpicClose) !== 1) {
-    toast.warning(
-      `SO ini sudah memiliki SPK PPIC turunan (${item.SpkPpic}) yang masih Open.\n` +
-        `Minta PPIC untuk meng-close SPK PPIC tersebut terlebih dahulu sebelum SO ini bisa diubah.`,
-    );
-    return;
-  }
-  if (
-    item.HasSpkPpic &&
-    Number(item.SpkPpicClose) === 1 &&
-    item.Ngedit !== "ACC"
-  ) {
-    toast.warning(
-      "SPK PPIC turunan sudah di-close.\n" +
-        'Silakan ajukan "Pengajuan Perubahan Data" (menu Tindakan) dan tunggu ACC sebelum mengubah SO ini.',
-    );
-    return;
-  }
   router.push(`/penjualan/sales-order/edit/${encodeURIComponent(item.Nomor)}`);
 };
 
@@ -1403,7 +1381,7 @@ const onExport = async () => {
             <template #prepend
               ><IconBan :size="14" class="mr-2 text-error"
             /></template>
-            <v-list-item-title>Form Pembatalan SPK</v-list-item-title>
+            <v-list-item-title>Form Pembatalan SO</v-list-item-title>
           </v-list-item>
           <v-divider class="my-1"></v-divider>
           <v-list-item @click="openBatalCloseDialog" :disabled="!canDelete">
@@ -1705,9 +1683,7 @@ const onExport = async () => {
     <v-card class="rounded-lg">
       <v-card-title class="bg-error text-white d-flex align-center pa-3">
         <IconBan :size="18" class="mr-2" />
-        <span class="text-subtitle-1 font-weight-bold"
-          >Form Pembatalan SPK</span
-        >
+        <span class="text-subtitle-1 font-weight-bold">Form Pembatalan SO</span>
       </v-card-title>
 
       <v-card-text class="pa-4" style="max-height: 70vh">
