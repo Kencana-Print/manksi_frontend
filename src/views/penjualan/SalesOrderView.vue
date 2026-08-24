@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, watch, computed } from "vue";
+import { ref, onMounted, watch, computed, onBeforeUnmount } from "vue";
 import { useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
 import { useAuthStore } from "@/stores/authStore";
@@ -108,11 +108,16 @@ const selectedCustomer = computed({
 
 // Watch filterState → simpan ke sessionStorage + fetch
 const isInitialized = ref(false);
+let filterDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 watch(
   filterState,
   (val) => {
     sessionStorage.setItem(SESSION_KEY, JSON.stringify(val));
-    if (isInitialized.value) fetchData();
+    if (!isInitialized.value) return;
+    if (filterDebounceTimer) clearTimeout(filterDebounceTimer);
+    filterDebounceTimer = setTimeout(() => {
+      fetchData();
+    }, 800); // tunggu 500ms setelah perubahan terakhir baru fetch
   },
   { deep: true },
 );
@@ -375,6 +380,10 @@ onMounted(async () => {
   }
   isInitialized.value = true;
   fetchData();
+});
+
+onBeforeUnmount(() => {
+  if (filterDebounceTimer) clearTimeout(filterDebounceTimer);
 });
 
 const onAdd = () => router.push("/penjualan/sales-order/create");
