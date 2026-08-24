@@ -86,6 +86,7 @@ import {
   IconMessageExclamation,
   IconDatabaseSearch,
   IconHourglass,
+  IconShoppingBagPlus,
 } from "@tabler/icons-vue";
 
 export interface NavItem {
@@ -306,6 +307,12 @@ export const createMenuItems = (): NavItem[] => {
           to: "/pembelian/po-bahan",
           icon: IconFileText,
           menuId: 52,
+        },
+        {
+          title: "PO External Garmen",
+          to: "/pembelian/po-external-garmen",
+          icon: IconShoppingBagPlus,
+          menuId: 144,
         },
       ],
     },

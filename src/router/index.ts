@@ -505,6 +505,17 @@ const router = createRouter({
         requiresAuth: true,
       },
     },
+    {
+      path: "/pembelian/po-external-garmen",
+      name: "PoExternalGarmenBrowse",
+      component: () => import("@/views/pembelian/PoExternalGarmenView.vue"),
+      meta: {
+        title: "PO External Garmen",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "144",
+      },
+    },
 
     // ── PPIC ──────────────────────────────────────────────────────────
     {
