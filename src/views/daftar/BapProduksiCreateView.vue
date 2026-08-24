@@ -12,6 +12,13 @@ import BagianProduksiSearchModal from "@/components/lookups/BagianProduksiSearch
 import KaryawanSearchModal from "@/components/lookups/KaryawanSearchModal.vue";
 import { IconAlertCircle } from "@tabler/icons-vue";
 
+interface SpkItem {
+  Spk: string;
+  SpkNama: string;
+  Jumlah: number;
+  Harga: number;
+}
+
 interface BapData {
   Nomor: string;
   Tanggal: string;
@@ -23,15 +30,12 @@ interface BapData {
   SumberMasalah: string;
   Solusi: string;
   Pertanggungjawaban: string;
-  SPK: string;
-  SpkNama: string;
-  Jumlah: number;
-  Harga: number;
   Approve: string | boolean;
   StatusEdit: string;
   UrutPin5: number;
   Kategori: string[];
   Karyawan: { nik: string; nama: string }[];
+  SpkList: SpkItem[];
 }
 
 interface SaveResponse {
@@ -63,15 +67,17 @@ const initialBapData = {
   SumberMasalah: "",
   Solusi: "",
   Pertanggungjawaban: "",
-  SPK: "",
-  SpkNama: "",
-  Jumlah: 0,
-  Harga: 0,
   Approve: false,
   StatusEdit: "",
   UrutPin5: 0,
   Kategori: [] as string[],
   Karyawan: [] as { nik: string; nama: string }[],
+  SpkList: [] as {
+    Spk: string;
+    SpkNama: string;
+    Jumlah: number;
+    Harga: number;
+  }[],
 };
 
 const KATEGORI_OPTIONS = [
@@ -107,14 +113,12 @@ const {
     const res = await api.get<{ data: BapData }>(
       `/master/bap-produksi-form/${params.nomor}`,
     );
-
     const ed = res.data.data;
-
     statusPengajuan.value = ed.StatusEdit;
-
     return {
       ...ed,
       Approve: !!ed.Approve,
+      SpkList: ed.SpkList || [],
     };
   },
   submitApi: async (dataToSave): Promise<any> => {
@@ -179,11 +183,6 @@ onMounted(async () => {
   if (isEditMode.value) await fetchData();
 });
 
-const totalHarga = computed(
-  () =>
-    (Number(formData.value.Jumlah) || 0) * (Number(formData.value.Harga) || 0),
-);
-
 const formatCurrency = (val: number) =>
   new Intl.NumberFormat("id-ID").format(val);
 
@@ -200,6 +199,8 @@ const removeKaryawan = (idx: number) => {
   formData.value.Karyawan.splice(idx, 1);
 };
 
+const isBagianManual = ref(false);
+
 const openBagianModal = () => {
   if (!formData.value.Cab) {
     toast.warning("Pilih cabang terlebih dahulu!");
@@ -207,33 +208,70 @@ const openBagianModal = () => {
   }
   showBagianModal.value = true;
 };
-
 const handleBagianSelected = (item: any) => {
   formData.value.BagKode = item.Kode;
   formData.value.BagNama = item.Nama;
+  isBagianManual.value = false;
+};
+const toggleBagianManual = () => {
+  isBagianManual.value = !isBagianManual.value;
+  if (isBagianManual.value) {
+    // Masuk mode manual — kosongkan supaya user isi dari nol
+    formData.value.BagKode = "";
+    formData.value.BagNama = "";
+  }
 };
 
+// [DIUBAH] SPK sekarang multi-baris
+const activeSpkIndex = ref<number | null>(null); // null = tambah baris baru
+const openSpkModal = (idx: number | null = null) => {
+  activeSpkIndex.value = idx;
+  showSpkModal.value = true;
+};
 const handleSpkSelected = async (item: any) => {
   try {
-    // BUG FIX UTAMA: Gunakan item.Nomor, bukan item.Kode!
     const spkNo = item.Nomor;
-
     if (!spkNo) {
       toast.error("Nomor SPK tidak valid.");
       return;
     }
-
+    const exists = formData.value.SpkList.some(
+      (s, i) => s.Spk === spkNo && i !== activeSpkIndex.value,
+    );
+    if (exists) {
+      toast.warning("SPK tersebut sudah ditambahkan.");
+      return;
+    }
     const res = await api.get(`/master/bap-produksi-form/spk/${spkNo}`);
     const data = res.data.data;
-
-    formData.value.SPK = data.Nomor;
-    formData.value.SpkNama = data.Nama;
-    formData.value.Jumlah = Number(data.Jumlah) || 0;
-    formData.value.Harga = Number(data.Harga) || 0;
+    const row: SpkItem = {
+      Spk: data.Nomor,
+      SpkNama: data.Nama,
+      Jumlah: Number(data.Jumlah) || 0,
+      Harga: Number(data.Harga) || 0,
+    };
+    if (activeSpkIndex.value !== null) {
+      formData.value.SpkList[activeSpkIndex.value] = row;
+    } else {
+      formData.value.SpkList.push(row);
+    }
   } catch (e) {
     toast.error("Gagal mengambil detail perhitungan SPK.");
+  } finally {
+    activeSpkIndex.value = null;
   }
 };
+const removeSpk = (idx: number) => {
+  formData.value.SpkList.splice(idx, 1);
+};
+
+// [DIUBAH] Total sekarang dijumlah dari seluruh baris SpkList
+const totalHargaAll = computed(() =>
+  formData.value.SpkList.reduce(
+    (sum, s) => sum + (Number(s.Jumlah) || 0) * (Number(s.Harga) || 0),
+    0,
+  ),
+);
 
 const isFormDisabled = computed(
   () =>
@@ -344,18 +382,17 @@ const handlePreSave = async () => {
                 <div class="f-row">
                   <label class="f-lbl">Bagian</label>
                   <input
-                    :value="formData.BagKode"
-                    readonly
-                    class="f-inp ro cur-ptr"
+                    v-model="formData.BagKode"
+                    class="f-inp cur-ptr"
                     style="width: 110px"
                     @click="openBagianModal"
-                    placeholder="Klik..."
+                    placeholder="Klik/isi..."
                   />
                   <input
-                    :value="formData.BagNama"
-                    readonly
-                    class="f-inp ro ml-1"
+                    v-model="formData.BagNama"
+                    class="f-inp ml-1"
                     style="flex: 1"
+                    placeholder="Nama bagian"
                   />
                 </div>
                 <div class="f-row">
@@ -471,47 +508,79 @@ const handlePreSave = async () => {
 
             <!-- ── FOOTER: SPK + angka ── -->
             <div class="bap-footer-grid">
-              <div class="f-row">
-                <label class="f-lbl">SPK</label>
-                <input
-                  :value="formData.SPK"
-                  readonly
-                  class="f-inp ro cur-ptr"
-                  style="width: 140px"
-                  @click="showSpkModal = true"
-                  placeholder="Klik..."
-                />
-                <input
-                  :value="formData.SpkNama"
-                  readonly
-                  class="f-inp ro ml-1"
-                  style="flex: 1"
-                />
-              </div>
-              <div class="f-row">
-                <label class="f-lbl">Jumlah SPK</label>
-                <input
-                  v-model.number="formData.Jumlah"
-                  type="number"
-                  class="f-inp tr"
-                  style="width: 90px"
-                  v-select-on-focus
-                />
-                <label class="f-lbl ml-2">Harga</label>
-                <input
-                  v-model.number="formData.Harga"
-                  type="number"
-                  class="f-inp tr"
-                  style="width: 130px"
-                  v-select-on-focus
-                />
-                <label class="f-lbl ml-2">Total</label>
-                <input
-                  :value="formatCurrency(totalHarga)"
-                  readonly
-                  class="f-inp ro tr fw"
-                  style="width: 150px"
-                />
+              <div class="spk-panel">
+                <div class="spk-panel-header">
+                  <span class="spk-panel-title">Daftar SPK</span>
+                  <button
+                    type="button"
+                    class="btn-add-kar"
+                    @click="openSpkModal(null)"
+                  >
+                    + Tambah SPK
+                  </button>
+                </div>
+                <div v-if="formData.SpkList.length === 0" class="kar-empty">
+                  Belum ada SPK ditambahkan.
+                </div>
+                <table v-else class="spk-table">
+                  <thead>
+                    <tr>
+                      <th style="width: 130px">No. SPK</th>
+                      <th>Nama SPK</th>
+                      <th style="width: 90px" class="tr">Jumlah</th>
+                      <th style="width: 120px" class="tr">Harga</th>
+                      <th style="width: 130px" class="tr">Total</th>
+                      <th style="width: 32px"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="(s, idx) in formData.SpkList" :key="idx">
+                      <td class="mono cur-ptr" @click="openSpkModal(idx)">
+                        {{ s.Spk }}
+                      </td>
+                      <td>{{ s.SpkNama }}</td>
+                      <td class="tr">
+                        <input
+                          v-model.number="s.Jumlah"
+                          type="number"
+                          class="f-inp tr spk-inp"
+                          v-select-on-focus
+                        />
+                      </td>
+                      <td class="tr">
+                        <input
+                          v-model.number="s.Harga"
+                          type="number"
+                          class="f-inp tr spk-inp"
+                          v-select-on-focus
+                        />
+                      </td>
+                      <td class="tr fw">
+                        {{
+                          formatCurrency(
+                            (Number(s.Jumlah) || 0) * (Number(s.Harga) || 0),
+                          )
+                        }}
+                      </td>
+                      <td class="tc">
+                        <button
+                          type="button"
+                          class="btn-del-kar"
+                          @click="removeSpk(idx)"
+                        >
+                          ✕
+                        </button>
+                      </td>
+                    </tr>
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <td colspan="4" class="tr fw">Total Keseluruhan</td>
+                      <td class="tr fw">{{ formatCurrency(totalHargaAll) }}</td>
+                      <td></td>
+                    </tr>
+                  </tfoot>
+                </table>
               </div>
             </div>
           </div>
@@ -890,5 +959,72 @@ const handlePreSave = async () => {
   display: flex;
   flex-direction: column;
   gap: 5px;
+}
+
+.btn-bag-manual {
+  height: 26px;
+  padding: 0 8px;
+  background: #fff3e0;
+  border: 1px solid #ffcc80;
+  color: #e65100;
+  font-size: 10px;
+  font-weight: 600;
+  border-radius: 2px;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  margin-left: 4px;
+}
+.btn-bag-manual:hover {
+  background: #ffe0b2;
+}
+
+.spk-panel {
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.spk-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #f5f5f5;
+  padding: 4px 8px;
+  border-bottom: 1px solid #e0e0e0;
+}
+.spk-panel-title {
+  font-size: 10px;
+  font-weight: 700;
+  color: #555;
+  text-transform: uppercase;
+}
+.spk-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+.spk-table th {
+  background: #fafafa;
+  padding: 4px 6px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #555;
+  border-bottom: 1px solid #e0e0e0;
+  text-align: left;
+}
+.spk-table td {
+  padding: 3px 6px;
+  border-bottom: 1px solid #f0f0f0;
+}
+.spk-table tfoot td {
+  background: #f5f5f5;
+  padding: 5px 6px;
+}
+.spk-inp {
+  width: 100%;
+  height: 22px;
+}
+.tc {
+  text-align: center;
 }
 </style>

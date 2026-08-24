@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref, onMounted, computed } from "vue";
 import { useRoute } from "vue-router";
 import api from "@/services/api";
 import logoKencana from "@/assets/logo.png";
@@ -33,6 +33,14 @@ const formatCurrency = (val: any) => {
 const handlePrint = () => {
   window.print();
 };
+
+const totalKeseluruhan = computed(() =>
+  (data.value?.SpkList || []).reduce(
+    (sum: number, s: any) =>
+      sum + (Number(s.Jumlah) || 0) * (Number(s.Harga) || 0),
+    0,
+  ),
+);
 
 onMounted(loadPrintData);
 </script>
@@ -73,34 +81,24 @@ onMounted(loadPrintData);
       <tr>
         <td width="15%">Nomor</td>
         <td width="2%">:</td>
-        <td width="33%">{{ data.bap_nomor }}</td>
-        <td width="15%">Nomor Spk</td>
-        <td width="2%">:</td>
-        <td width="33%">{{ data.bap_spk_nomor }}</td>
+        <td width="83%" colspan="4">{{ data.bap_nomor }}</td>
       </tr>
       <tr>
         <td>Tanggal</td>
         <td>:</td>
-        <td>{{ new Date(data.bap_tanggal).toLocaleDateString("id-ID") }}</td>
-        <td>Nama Spk</td>
-        <td>:</td>
-        <td>{{ data.namaspk }}</td>
+        <td colspan="4">
+          {{ new Date(data.bap_tanggal).toLocaleDateString("id-ID") }}
+        </td>
       </tr>
       <tr>
         <td>Cabang</td>
         <td>:</td>
-        <td>{{ data.bap_cab }}</td>
-        <td>Jumlah</td>
-        <td>:</td>
-        <td>{{ formatCurrency(data.bap_jumlah) }}</td>
+        <td colspan="4">{{ data.bap_cab }}</td>
       </tr>
       <tr>
         <td>Bagian</td>
         <td>:</td>
-        <td>{{ data.kb_nama }}</td>
-        <td>Harga</td>
-        <td>:</td>
-        <td>{{ formatCurrency(data.bap_harga) }}</td>
+        <td colspan="4">{{ data.kb_nama || data.bap_bagnama }}</td>
       </tr>
       <tr>
         <td class="align-top">POKOK MASALAH</td>
@@ -110,6 +108,47 @@ onMounted(loadPrintData);
         </td>
       </tr>
     </table>
+
+    <!-- [BARU] Tabel Daftar SPK, menggantikan baris Nomor/Nama/Jumlah/Harga tunggal -->
+    <div v-if="data.SpkList && data.SpkList.length > 0" class="mb-5">
+      <div class="section-label mb-1">DAFTAR SPK</div>
+      <table class="w-100 spk-print-table">
+        <thead>
+          <tr>
+            <th style="width: 5%">No</th>
+            <th style="width: 20%">No. SPK</th>
+            <th>Nama SPK</th>
+            <th style="width: 12%" class="text-right">Jumlah</th>
+            <th style="width: 15%" class="text-right">Harga</th>
+            <th style="width: 15%" class="text-right">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="(s, idx) in data.SpkList as any[]" :key="idx">
+            <td class="text-center">{{ Number(idx) + 1 }}</td>
+            <td>{{ s.Spk }}</td>
+            <td>{{ s.SpkNama }}</td>
+            <td class="text-right">{{ formatCurrency(s.Jumlah) }}</td>
+            <td class="text-right">{{ formatCurrency(s.Harga) }}</td>
+            <td class="text-right">
+              {{
+                formatCurrency((Number(s.Jumlah) || 0) * (Number(s.Harga) || 0))
+              }}
+            </td>
+          </tr>
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="5" class="text-right font-weight-bold">
+              Total Keseluruhan
+            </td>
+            <td class="text-right font-weight-bold">
+              {{ formatCurrency(totalKeseluruhan) }}
+            </td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
 
     <div class="section-container mb-4">
       <div class="section-label">PENYEBAB KESALAHAN</div>
@@ -215,6 +254,23 @@ onMounted(loadPrintData);
   content: ":";
   position: absolute;
   left: 5px;
+}
+
+.spk-print-table {
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+.spk-print-table th,
+.spk-print-table td {
+  border: 1px solid #000;
+  padding: 4px 6px;
+}
+.spk-print-table thead th {
+  font-weight: bold;
+  background: #f0f0f0;
+}
+.spk-print-table tfoot td {
+  border-top: 2px solid #000;
 }
 
 @media print {

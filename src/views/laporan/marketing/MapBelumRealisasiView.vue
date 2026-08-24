@@ -28,6 +28,7 @@ import PivotWithFilter from "@/components/PivotWithFilter.vue";
 const MENU_ID = "966";
 const authStore = useAuthStore();
 const toast = useToast();
+const baseTableRef = ref<InstanceType<typeof BaseTable> | null>(null);
 
 // ── Filter ──
 const today = new Date().toISOString().substring(0, 10);
@@ -148,7 +149,9 @@ const rowPropsFn = (data: any) => {
 // ── Export ──
 const onExport = async () => {
   if (!canExport.value) return toast.error("Akses ditolak.");
-  if (!items.value.length) return toast.warning("Tidak ada data.");
+  const dataToExport = baseTableRef.value?.getFilteredItems?.() ?? items.value;
+  if (!dataToExport.length)
+    return toast.warning("Tidak ada data untuk diekspor (cek filter aktif).");
   await exportExcelSingle(
     `MAP_Belum_Terealisasi_${startDate.value}_${endDate.value}`,
     "MAP Belum Terealisasi",
@@ -191,7 +194,7 @@ const onExport = async () => {
       },
       { header: "Jml MAP", key: "Jumlah_MAP", width: 10, align: "center" },
     ],
-    items.value,
+    dataToExport,
     `MAP Belum Terealisasi — ${startDate.value} s.d. ${endDate.value}`,
   );
 };
@@ -587,6 +590,7 @@ onBeforeUnmount(() => {
       <!-- ── Grid Data ── -->
       <div v-show="activeTab === 'grid'" class="tab-content">
         <BaseTable
+          ref="baseTableRef"
           :headers="headers"
           :items="items"
           :is-loading="isLoading"
