@@ -50,6 +50,17 @@ const selectedRowIdx = ref(-1);
 const listKomponen = ref<string[]>([]);
 const jenisOptions = ["MUDA", "SEDANG", "TUA", "SUPER TUA"];
 
+// pengecualian khusus — SO ini boleh diedit manual Total
+// Jumlahnya di form MKB (kasus khusus per permintaan user, TIDAK
+// mengubah so_jumlah di tsalesorder — hanya dipakai lokal di form
+// ini untuk basis kalkulasi Jumlah Bahan dari Babaran).
+const JUMLAH_SPK_EDITABLE_EXCEPTIONS = ["SO-JA-KO-000018"];
+const isJumlahSpkEditable = computed(() =>
+  JUMLAH_SPK_EDITABLE_EXCEPTIONS.includes(
+    String(formData.value.nomorSpk || "").toUpperCase(),
+  ),
+);
+
 const formatDateLocal = (value?: string | Date) => {
   if (!value) return "";
 
@@ -478,6 +489,18 @@ watch(
   { deep: true, immediate: true },
 );
 
+// ⬅ BARU: saat jumlahSpk diedit manual (hanya untuk SO pengecualian),
+// recalc semua baris rincian bahan supaya Jumlah/Allowance/PO ikut
+// menyesuaikan basis qty yang baru.
+watch(
+  () => formData.value.jumlahSpk,
+  () => {
+    if (isJumlahSpkEditable.value) {
+      formData.value.dtlBahan.forEach(recalcRowFull);
+    }
+  },
+);
+
 const openBahanModal = (index: number) => {
   activeBahanRowIndex.value = index;
   showBahanModal.value = true;
@@ -738,9 +761,13 @@ const onPoSelected = (po: any) => {
           <div class="f-row">
             <label class="f-lbl">Total Jumlah</label>
             <input
-              :value="formData.jumlahSpk"
-              readonly
-              class="f-inp f-ro"
+              v-model.number="formData.jumlahSpk"
+              type="number"
+              :readonly="!isJumlahSpkEditable"
+              :class="['f-inp', isJumlahSpkEditable ? 'f-editable' : 'f-ro']"
+              :title="
+                isJumlahSpkEditable ? 'Bisa diedit manual untuk SO ini' : ''
+              "
               style="width: 80px"
             />
             <template v-if="isMapMode">
@@ -1463,5 +1490,10 @@ const onPoSelected = (po: any) => {
   font-style: italic;
   padding: 12px 8px;
   font-size: 11px;
+}
+
+.f-editable {
+  background: #fff8e1 !important;
+  border-color: #ffb300 !important;
 }
 </style>

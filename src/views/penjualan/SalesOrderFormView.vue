@@ -1383,7 +1383,7 @@ const validateSave = async (skipPoCheck = false) => {
     isEditMode.value &&
     fd.HasSpkPpic &&
     Number(fd.SpkPpicClose) === 1 &&
-    fd.Ngedit !== "ACC"
+    !fd.HasApprovedUbah
   ) {
     toast.warning(
       "SPK PPIC turunan sudah di-close.\n" +
@@ -1394,7 +1394,7 @@ const validateSave = async (skipPoCheck = false) => {
 
   const divisiStr = String(fd.spk_divisi).charAt(0);
   const qtyPesan = Number(fd.spk_jumlah) || 0;
-  
+
   // 1. Validasi Field Wajib Dasar
   if (!fd.spk_perush_kode) {
     toast.warning("Perusahaan belum dipilih.");
