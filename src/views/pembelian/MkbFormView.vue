@@ -49,14 +49,12 @@ const selectedRowIdx = ref(-1);
 // State untuk dropdown komponen
 const listKomponen = ref<string[]>([]);
 const jenisOptions = ["MUDA", "SEDANG", "TUA", "SUPER TUA"];
-
-// pengecualian khusus — SO ini boleh diedit manual Total
-// Jumlahnya di form MKB (kasus khusus per permintaan user, TIDAK
-// mengubah so_jumlah di tsalesorder — hanya dipakai lokal di form
-// ini untuk basis kalkulasi Jumlah Bahan dari Babaran).
-const JUMLAH_SPK_EDITABLE_EXCEPTIONS = ["SO-JA-KO-000018"];
-const isJumlahSpkEditable = computed(() =>
-  JUMLAH_SPK_EDITABLE_EXCEPTIONS.includes(
+// ⬅ Pengecualian khusus — untuk SO ini, kolom "Jumlah" di rincian
+// bahan boleh diedit manual, TIDAK ditimpa otomatis oleh hasil
+// kalkulasi babaran×qtySpk. SO lain tetap terkunci ke rumus.
+const JUMLAH_BAHAN_MANUAL_EXCEPTIONS = ["SO-JA-KO-000018"];
+const isJumlahBahanManual = computed(() =>
+  JUMLAH_BAHAN_MANUAL_EXCEPTIONS.includes(
     String(formData.value.nomorSpk || "").toUpperCase(),
   ),
 );
@@ -234,6 +232,10 @@ onMounted(() => {
 // Allowance/PO, biar bisa dipanggil terpisah sesuai kebutuhan titik trigger.
 const recalcJumlahOnly = (row: any) => {
   if (!row.kode) return;
+  // ⬅ Pengecualian: SO ini biarkan user isi Jumlah manual, jangan
+  // ditimpa hasil hitung babaran×qtySpk.
+  if (isJumlahBahanManual.value) return;
+
   const babaran = Number(row.babaran) || 0;
   const qtySpk = Number(formData.value.jumlahSpk) || 0;
   if (babaran !== 0 && qtySpk !== 0) {
@@ -487,18 +489,6 @@ watch(
     });
   },
   { deep: true, immediate: true },
-);
-
-// ⬅ BARU: saat jumlahSpk diedit manual (hanya untuk SO pengecualian),
-// recalc semua baris rincian bahan supaya Jumlah/Allowance/PO ikut
-// menyesuaikan basis qty yang baru.
-watch(
-  () => formData.value.jumlahSpk,
-  () => {
-    if (isJumlahSpkEditable.value) {
-      formData.value.dtlBahan.forEach(recalcRowFull);
-    }
-  },
 );
 
 const openBahanModal = (index: number) => {
@@ -761,13 +751,9 @@ const onPoSelected = (po: any) => {
           <div class="f-row">
             <label class="f-lbl">Total Jumlah</label>
             <input
-              v-model.number="formData.jumlahSpk"
-              type="number"
-              :readonly="!isJumlahSpkEditable"
-              :class="['f-inp', isJumlahSpkEditable ? 'f-editable' : 'f-ro']"
-              :title="
-                isJumlahSpkEditable ? 'Bisa diedit manual untuk SO ini' : ''
-              "
+              :value="formData.jumlahSpk"
+              readonly
+              class="f-inp f-ro"
               style="width: 80px"
             />
             <template v-if="isMapMode">
@@ -915,6 +901,10 @@ const onPoSelected = (po: any) => {
                     type="number"
                     v-model="row.jumlah"
                     class="gi tr fw bg-blue-lighten-5"
+                    :class="{ 'gi-manual': isJumlahBahanManual }"
+                    :title="
+                      isJumlahBahanManual ? 'Diisi manual — SO khusus' : ''
+                    "
                     @input="recalcRowFull(row)"
                     v-select-on-focus
                   />
@@ -1492,8 +1482,8 @@ const onPoSelected = (po: any) => {
   font-size: 11px;
 }
 
-.f-editable {
+.gi-manual {
   background: #fff8e1 !important;
-  border-color: #ffb300 !important;
+  box-shadow: inset 0 0 0 1.5px #ffb300;
 }
 </style>
