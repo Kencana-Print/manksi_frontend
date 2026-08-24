@@ -112,7 +112,7 @@ const {
       namaPerush: header.perush_nama,
       cusKode: header.inv_cus_kode,
       cusNama: header.cus_nama,
-      alamatCus: header.inv_cus_alamat || header.cus_alamat,
+      alamatCus: header.inv_cus_alamat ?? header.cus_alamat,
       kotaCus: header.inv_cus_kota || header.cus_kota || "",
       rekBank: header.inv_rekening,
       namaBank: header.perushd_bank,

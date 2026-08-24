@@ -193,7 +193,7 @@ const generateTxt = () => {
   const buildHeaderLines = (): string[] => {
     const halfL = col(67);
     const halfR = PAGE_WIDTH - halfL - 1; // sisa lebar, dikurangi 1 spasi pemisah
-    const cAlamat = h.inv_cus_alamat || h.cus_alamat || "";
+    const cAlamat = h.inv_cus_alamat ?? h.cus_alamat ?? "";
     const alamatLines = wrapText(cAlamat, halfR - 12);
 
     const lines: string[] = [];
