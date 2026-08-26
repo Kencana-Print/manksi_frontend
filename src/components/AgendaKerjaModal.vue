@@ -2,6 +2,7 @@
 import { ref, computed, watch } from "vue";
 import { useToast } from "vue-toastification";
 import { useAuthStore } from "@/stores/authStore";
+import { useRouter } from "vue-router";
 import { agendaKerjaService } from "@/services/tools/agendaKerjaService";
 import {
   IconChevronLeft,
@@ -12,6 +13,7 @@ import {
   IconPencil,
   IconBan,
   IconLock,
+  IconExternalLink,
 } from "@tabler/icons-vue";
 
 const props = defineProps<{ modelValue: boolean }>();
@@ -19,6 +21,7 @@ const emit = defineEmits(["update:modelValue", "updated"]);
 
 const authStore = useAuthStore();
 const toast = useToast();
+const router = useRouter();
 
 const currentDate = ref(new Date());
 const items = ref<any[]>([]);
@@ -26,6 +29,7 @@ const isLoading = ref(false);
 const isPic = ref(false); // ← baru
 const confirmDeleteDialog = ref(false);
 const deleteTarget = ref<any>(null);
+const viewMode = ref<"month" | "week">("month");
 
 const selectedDay = ref("");
 const showForm = ref(false);
@@ -58,6 +62,29 @@ const monthEnd = computed(
     ),
 );
 
+// Index hari terpilih (atau hari ini kalau belum pilih) di dalam grid bulan
+const weekDays = computed(() => {
+  const allDays = calendarDays.value;
+  const anchorStr = selectedDay.value || todayStr;
+  let idx = allDays.findIndex((d) => toDateStr(d.date) === anchorStr);
+  if (idx === -1) idx = 0;
+  const weekStartIdx = Math.floor(idx / 7) * 7;
+  return allDays.slice(weekStartIdx, weekStartIdx + 7);
+});
+
+const visibleDays = computed(() =>
+  viewMode.value === "week" ? weekDays.value : calendarDays.value,
+);
+
+const weekLabel = computed(() => {
+  if (viewMode.value !== "week" || weekDays.value.length === 0) return "";
+  const first = weekDays.value[0].date;
+  const last = weekDays.value[6].date;
+  const fmt = (d: Date) =>
+    `${d.getDate()} ${d.toLocaleDateString("id-ID", { month: "short" })}`;
+  return `${fmt(first)} - ${fmt(last)}`;
+});
+
 const dayNames = ["SEN", "SEL", "RAB", "KAM", "JUM", "SAB", "MIN"];
 
 const calendarDays = computed(() => {
@@ -83,6 +110,22 @@ const calendarDays = computed(() => {
     days.push({ date: d, inMonth: false });
   }
   return days;
+});
+
+const sourceColorClass = (sumber: string) => {
+  if (sumber === "MAP") return "src-map";
+  if (sumber === "SO") return "src-so";
+  return ""; // manual tetap pakai class st-open/st-selesai/st-batal yang sudah ada
+};
+
+// Mirror PRIVILEGED_BAGIAN di backend (agendaKerjaService.js) — HANYA
+// dipakai buat nentuin tampilan legend, BUKAN buat security (security
+// tetap sepenuhnya dikontrol backend, ini murni kosmetik biar gak
+// nampilin dot MAP/SO ke bagian yang emang gak akan pernah lihat itemnya).
+const PRIVILEGED_BAGIAN = ["DIREKSI", "OWNER", "AUDIT", "EDP", "IT"];
+const showAutoDerivedLegend = computed(() => {
+  const bagian = (authStore.user?.bagian || "").toUpperCase();
+  return PRIVILEGED_BAGIAN.includes(bagian) || bagian === "MARKETING";
 });
 
 const itemsByDate = computed(() => {
@@ -139,20 +182,36 @@ const goToday = () => {
   fetchMonth();
 };
 const prevMonth = () => {
-  currentDate.value = new Date(
-    currentDate.value.getFullYear(),
-    currentDate.value.getMonth() - 1,
-    1,
-  );
-  fetchMonth();
+  if (viewMode.value === "week") {
+    const newAnchor = new Date(weekDays.value[0].date);
+    newAnchor.setDate(newAnchor.getDate() - 1);
+    currentDate.value = newAnchor;
+    selectedDay.value = toDateStr(newAnchor);
+    fetchMonth();
+  } else {
+    currentDate.value = new Date(
+      currentDate.value.getFullYear(),
+      currentDate.value.getMonth() - 1,
+      1,
+    );
+    fetchMonth();
+  }
 };
 const nextMonth = () => {
-  currentDate.value = new Date(
-    currentDate.value.getFullYear(),
-    currentDate.value.getMonth() + 1,
-    1,
-  );
-  fetchMonth();
+  if (viewMode.value === "week") {
+    const newAnchor = new Date(weekDays.value[6].date);
+    newAnchor.setDate(newAnchor.getDate() + 1);
+    currentDate.value = newAnchor;
+    selectedDay.value = toDateStr(newAnchor);
+    fetchMonth();
+  } else {
+    currentDate.value = new Date(
+      currentDate.value.getFullYear(),
+      currentDate.value.getMonth() + 1,
+      1,
+    );
+    fetchMonth();
+  }
 };
 
 const openDay = (dateStr: string) => {
@@ -212,6 +271,15 @@ const markStatus = async (item: any, status: string) => {
   }
 };
 
+const openSourceDoc = (it: any) => {
+  const routeName = it.Sumber === "MAP" ? "MapFormEdit" : "SalesOrderEdit";
+  const url = router.resolve({
+    name: routeName,
+    params: { nomor: encodeURIComponent(it.Nomor) },
+  }).href;
+  window.open(url, "_blank");
+};
+
 const askDelete = (item: any) => {
   deleteTarget.value = item;
   confirmDeleteDialog.value = true;
@@ -263,10 +331,28 @@ watch(
         <div class="agk-cal">
           <div class="agk-cal-top">
             <div>
-              <div class="agk-month">{{ monthLabel }}</div>
+              <div class="agk-month">
+                {{ viewMode === "week" ? weekLabel : monthLabel }}
+              </div>
               <div class="agk-year">{{ yearLabel }}</div>
             </div>
             <div class="agk-cal-nav">
+              <div class="agk-view-toggle">
+                <button
+                  class="agk-toggle-btn"
+                  :class="{ active: viewMode === 'month' }"
+                  @click="viewMode = 'month'"
+                >
+                  Bulan
+                </button>
+                <button
+                  class="agk-toggle-btn"
+                  :class="{ active: viewMode === 'week' }"
+                  @click="viewMode = 'week'"
+                >
+                  Minggu
+                </button>
+              </div>
               <button class="agk-btn-sm" @click="goToday">Hari ini</button>
               <button class="agk-icon-btn" @click="prevMonth">
                 <IconChevronLeft :size="15" />
@@ -283,40 +369,80 @@ watch(
             <span class="agk-dot dot-batal"></span> BATAL
           </div>
 
-          <div class="agk-grid-head">
-            <div v-for="d in dayNames" :key="d">{{ d }}</div>
-          </div>
-          <div class="agk-grid">
-            <div
-              v-for="(day, idx) in calendarDays"
-              :key="idx"
-              class="agk-cell"
-              :class="{
-                'out-month': !day.inMonth,
-                today: toDateStr(day.date) === todayStr,
-                selected: toDateStr(day.date) === selectedDay,
-              }"
-              @click="openDay(toDateStr(day.date))"
-            >
-              <div class="agk-cell-num">{{ day.date.getDate() }}</div>
+          <template v-if="viewMode === 'month'">
+            <div class="agk-grid-head">
+              <div v-for="d in dayNames" :key="d">{{ d }}</div>
+            </div>
+            <div class="agk-grid">
               <div
-                v-for="(it, i) in (
-                  itemsByDate[toDateStr(day.date)] || []
-                ).slice(0, 2)"
-                :key="i"
-                class="agk-cell-item"
-                :class="`st-${it.Status.toLowerCase()}`"
+                v-for="(day, idx) in calendarDays"
+                :key="idx"
+                class="agk-cell"
+                :class="{
+                  'out-month': !day.inMonth,
+                  today: toDateStr(day.date) === todayStr,
+                  selected: toDateStr(day.date) === selectedDay,
+                }"
+                @click="openDay(toDateStr(day.date))"
               >
-                {{ it.Judul }}
-              </div>
-              <div
-                v-if="(itemsByDate[toDateStr(day.date)] || []).length > 2"
-                class="agk-cell-more"
-              >
-                +{{ (itemsByDate[toDateStr(day.date)] || []).length - 2 }} lagi
+                <div class="agk-cell-num">{{ day.date.getDate() }}</div>
+                <div
+                  v-for="(it, i) in (
+                    itemsByDate[toDateStr(day.date)] || []
+                  ).slice(0, 2)"
+                  :key="i"
+                  class="agk-cell-item"
+                  :class="`st-${it.Status.toLowerCase()}`"
+                  :title="it.Judul"
+                >
+                  {{ it.Judul }}
+                </div>
+                <div
+                  v-if="(itemsByDate[toDateStr(day.date)] || []).length > 2"
+                  class="agk-cell-more"
+                >
+                  +{{ (itemsByDate[toDateStr(day.date)] || []).length - 2 }}
+                  lagi
+                </div>
               </div>
             </div>
-          </div>
+          </template>
+
+          <template v-else>
+            <div class="agk-week-list">
+              <div
+                v-for="(day, idx) in weekDays"
+                :key="idx"
+                class="agk-week-row"
+                :class="{
+                  today: toDateStr(day.date) === todayStr,
+                  selected: toDateStr(day.date) === selectedDay,
+                }"
+                @click="openDay(toDateStr(day.date))"
+              >
+                <div class="agk-week-daylabel">
+                  <div class="agk-week-dayname">{{ dayNames[idx] }}</div>
+                  <div class="agk-week-daynum">{{ day.date.getDate() }}</div>
+                </div>
+                <div class="agk-week-items">
+                  <template
+                    v-if="(itemsByDate[toDateStr(day.date)] || []).length > 0"
+                  >
+                    <span
+                      v-for="(it, i) in itemsByDate[toDateStr(day.date)]"
+                      :key="i"
+                      class="agk-week-chip"
+                      :class="`st-${it.Status.toLowerCase()}`"
+                      :title="it.Judul"
+                    >
+                      {{ it.Judul }}
+                    </span>
+                  </template>
+                  <span v-else class="agk-week-empty">Tidak ada agenda</span>
+                </div>
+              </div>
+            </div>
+          </template>
         </div>
 
         <div class="agk-side">
@@ -370,52 +496,41 @@ watch(
               class="agk-item"
               :class="`st-${it.Status.toLowerCase()}`"
             >
+              <div class="agk-item-top">
+                <span class="agk-item-judul">{{ it.Judul }}</span>
+                <span class="agk-item-status">{{ it.Status }}</span>
+              </div>
+              <div v-if="it.Keterangan" class="agk-item-ket">
+                {{ it.Keterangan }}
+              </div>
               <div
-                v-for="it in selectedDayItems"
-                :key="it.Nomor"
-                class="agk-item"
-                :class="`st-${it.Status.toLowerCase()}`"
+                class="agk-item-actions"
+                v-if="it.UserCreate === authStore.user?.kode"
               >
-                <div class="agk-item-top">
-                  <span class="agk-item-judul">{{ it.Judul }}</span>
-                  <span class="agk-item-status">{{ it.Status }}</span>
-                </div>
-                <div v-if="it.Keterangan" class="agk-item-ket">
-                  {{ it.Keterangan }}
-                </div>
-                <div
-                  class="agk-item-actions"
-                  v-if="it.UserCreate === authStore.user?.kode"
+                <button
+                  class="agk-mini-btn"
+                  title="Selesai"
+                  @click="markStatus(it, 'SELESAI')"
                 >
-                  <button
-                    class="agk-mini-btn"
-                    title="Selesai"
-                    @click="markStatus(it, 'SELESAI')"
-                  >
-                    <IconCheck :size="12" />
-                  </button>
-                  <button
-                    class="agk-mini-btn"
-                    title="Batal"
-                    @click="markStatus(it, 'BATAL')"
-                  >
-                    <IconBan :size="12" />
-                  </button>
-                  <button
-                    class="agk-mini-btn"
-                    title="Edit"
-                    @click="openEdit(it)"
-                  >
-                    <IconPencil :size="12" />
-                  </button>
-                  <button
-                    class="agk-mini-btn danger"
-                    title="Hapus"
-                    @click="askDelete(it)"
-                  >
-                    <IconTrash :size="12" />
-                  </button>
-                </div>
+                  <IconCheck :size="12" />
+                </button>
+                <button
+                  class="agk-mini-btn"
+                  title="Batal"
+                  @click="markStatus(it, 'BATAL')"
+                >
+                  <IconBan :size="12" />
+                </button>
+                <button class="agk-mini-btn" title="Edit" @click="openEdit(it)">
+                  <IconPencil :size="12" />
+                </button>
+                <button
+                  class="agk-mini-btn danger"
+                  title="Hapus"
+                  @click="askDelete(it)"
+                >
+                  <IconTrash :size="12" />
+                </button>
               </div>
             </div>
           </div>
@@ -589,9 +704,10 @@ watch(
   min-height: 100px;
   border-right: 1px solid #eee;
   border-bottom: 1px solid #eee;
-  padding: 3px 4px;
+  padding: 4px 6px;
   cursor: pointer;
-  font-size: 10px;
+  font-size: 10.5px;
+  overflow: hidden;
 }
 .agk-cell:hover {
   background: #f5f9ff;
@@ -833,5 +949,118 @@ watch(
 }
 .dlg-btn.cancel:hover {
   background: #d6d6d6;
+}
+.agk-open-btn:hover {
+  background: #f5f5f5;
+}
+.agk-view-toggle {
+  display: flex;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-right: 4px;
+}
+.agk-toggle-btn {
+  height: 26px;
+  padding: 0 10px;
+  border: none;
+  background: white;
+  font-size: 11px;
+  cursor: pointer;
+  color: #616161;
+}
+.agk-toggle-btn.active {
+  background: #1565c0;
+  color: white;
+}
+.agk-toggle-btn:hover:not(.active) {
+  background: #f0f0f0;
+}
+
+.agk-week-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border: 1px solid #eee;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.agk-week-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 12px;
+  border-bottom: 1px solid #f0f0f0;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.agk-week-row:last-child {
+  border-bottom: none;
+}
+.agk-week-row:hover {
+  background: #fafafa;
+}
+.agk-week-row.selected {
+  background: #e3f2fd;
+}
+.agk-week-row.today .agk-week-daynum {
+  color: #d32f2f;
+  font-weight: 700;
+}
+
+.agk-week-daylabel {
+  flex-shrink: 0;
+  width: 56px;
+  text-align: center;
+}
+.agk-week-dayname {
+  font-size: 10px;
+  font-weight: 700;
+  color: #757575;
+  text-transform: uppercase;
+}
+.agk-week-daynum {
+  font-size: 18px;
+  font-weight: 600;
+  color: #212121;
+  margin-top: 2px;
+}
+
+.agk-week-items {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  align-items: flex-start;
+  padding-top: 2px;
+}
+.agk-week-chip {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: default;
+  background: #e8f0fe;
+  color: #1565c0;
+}
+.agk-week-chip.st-selesai {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+.agk-week-chip.st-batal {
+  background: #f5f5f5;
+  color: #9e9e9e;
+  text-decoration: line-through;
+}
+.agk-week-empty {
+  font-size: 11px;
+  color: #bdbdbd;
+  font-style: italic;
+  padding: 3px 0;
 }
 </style>
