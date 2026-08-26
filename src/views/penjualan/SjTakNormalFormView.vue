@@ -2,6 +2,7 @@
 import { ref, computed, watch, onMounted } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { useToast } from "vue-toastification";
+import { useTabsStore } from "@/stores/tabsStore";
 import BaseForm from "@/components/BaseForm.vue";
 import { useForm } from "@/composables/useForm";
 import { sjTakNormalFormService as svc } from "@/services/penjualan/sjTakNormalFormService";
@@ -45,6 +46,7 @@ interface FormData {
 const router = useRouter();
 const route = useRoute();
 const toast = useToast();
+const tabsStore = useTabsStore();
 
 const todayLocal = () => {
   const d = new Date(
@@ -112,7 +114,26 @@ const {
   menuId: "154",
   initialData: init,
   immediate: false,
-  // fetchApi dihapus — loading data ditangani manual via checkNomor()
+  onFormReset: () => {
+    nomorLocked.value = false;
+    isExistingRecord.value = false;
+    isLoadingCheck.value = false;
+
+    showPrintDialog.value = false;
+    savedNomor.value = "";
+
+    showPerushModal.value = false;
+    showGudangModal.value = false;
+    showCusModal.value = false;
+    showCustomerMismatchDialog.value = false;
+    pendingCustomerKode.value = "";
+    showInvProModal.value = false;
+
+    isLoadingBarang.value = false;
+    barangInputValues.value = {};
+    showBarangModal.value = false;
+    activeRowKey.value = null;
+  },
   submitApi: async (data): Promise<any> => {
     const payload = {
       ...data,
@@ -476,10 +497,18 @@ const validateSave = () => {
 
 // ── Print ─────────────────────────────────────────────────────────────
 const skipPrint = () => {
+  const currentPath = route.path; // snapshot SEBELUM push
   showPrintDialog.value = false;
-  router.push({ name: "SjTakNormalBrowse" });
+  router
+    .push({ name: "SjTakNormalBrowse" })
+    .catch(() => {})
+    .then(() => {
+      tabsStore.closeTab(currentPath);
+    });
 };
+
 const doCetak = (mode: "dotmatrix" | "inkjet") => {
+  const currentPath = route.path; // snapshot SEBELUM push
   const url = router.resolve({
     name: "SjTakNormalPrint",
     query: {
@@ -489,7 +518,12 @@ const doCetak = (mode: "dotmatrix" | "inkjet") => {
   }).href;
   window.open(url, "_blank");
   showPrintDialog.value = false;
-  router.push({ name: "SjTakNormalBrowse" });
+  router
+    .push({ name: "SjTakNormalBrowse" })
+    .catch(() => {})
+    .then(() => {
+      tabsStore.closeTab(currentPath);
+    });
 };
 
 // ── Lifecycle ─────────────────────────────────────────────────────────────
@@ -497,7 +531,7 @@ onMounted(async () => {
   const divRes = await svc.getDivisiList();
   divisiList.value = divRes.data.data || [];
 
-  const nomorEdit = route.query.nomor as string;
+  const nomorEdit = route.params.nomor as string;
   if (nomorEdit) {
     fd.value.NomorSJ = nomorEdit;
     nomorLocked.value = true;

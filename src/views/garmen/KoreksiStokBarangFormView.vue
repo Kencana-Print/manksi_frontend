@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, nextTick } from "vue";
+import { useRoute } from "vue-router";
 import { useToast } from "vue-toastification";
 import { useAuthStore } from "@/stores/authStore";
 import BaseForm from "@/components/BaseForm.vue";
@@ -28,6 +29,7 @@ interface KoreksiStokFormData {
   rows: DetailRow[];
 }
 
+const route = useRoute();
 const toast = useToast();
 const authStore = useAuthStore();
 
@@ -132,14 +134,35 @@ const {
   menuId: "64",
   initialData: {
     nomor: "",
-    // Default jenis dari sessionStorage cuma relevan pas create — kalau
-    // edit, fetchApi bakal timpa ini dengan jenis asli dari data.
-    jenis: sessionStorage.getItem("last_jenis_koreksi_stok") || "ACCESORIES",
+    jenis:
+      typeof route.params.jenis === "string"
+        ? route.params.jenis
+        : "ACCESORIES",
     tanggal: getLocalDate(),
     cabang: "",
     keterangan: "",
     statusPin5: "",
     rows: [blankRow()],
+  },
+  onFormReset: () => {
+    fd.value.jenis =
+      typeof route.params.jenis === "string"
+        ? route.params.jenis
+        : "ACCESORIES";
+    fd.value.cabang = "";
+    fd.value.keterangan = "";
+    fd.value.rows = [blankRow()];
+    barangModalOpen.value = false;
+    activeRowIndex.value = null;
+    deleteRowDialog.value = false;
+    rowToDeleteIdx.value = null;
+    showPrintDialog.value = false;
+    savedNomor.value = "";
+    kodeRefs.value = {};
+    jumlahRefs.value = {};
+    rowKetRefs.value = {};
+    initCreateDefaults();
+    ensureTrailingBlankRow(fd.value.rows);
   },
   fetchApi,
   submitApi,
@@ -166,7 +189,9 @@ const initCreateDefaults = () => {
 };
 
 const loadData = async () => {
-  await fetchData();
+  if (isEditMode.value) {
+    await fetchData();
+  }
   initCreateDefaults();
   ensureTrailingBlankRow(fd.value.rows);
 };

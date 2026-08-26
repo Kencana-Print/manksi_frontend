@@ -1,7 +1,9 @@
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, onActivated } from "vue";
+import { useRoute } from "vue-router";
+import { useTabsStore } from "@/stores/tabsStore";
 import { useAuthStore } from "@/stores/authStore";
 import { useToast } from "vue-toastification";
-import * as XLSX from "xlsx"; // <-- Import library XLSX
+import * as XLSX from "xlsx";
 
 interface UseBrowseOptions<T> {
   menuId: string;
@@ -13,6 +15,8 @@ interface UseBrowseOptions<T> {
 export function useBrowse<T = any>(options: UseBrowseOptions<T>) {
   const authStore = useAuthStore();
   const toast = useToast();
+  const route = useRoute();
+  const tabsStore = useTabsStore();
 
   const items = ref<T[]>([]) as ReturnType<typeof ref<T[]>>;
   const isLoading = ref(false);
@@ -98,6 +102,14 @@ export function useBrowse<T = any>(options: UseBrowseOptions<T>) {
 
   onMounted(() => {
     if (options.immediate !== false) fetchData();
+  });
+
+  onActivated(() => {
+    const currentTab = tabsStore.tabs.find((t) => t.id === route.path);
+    if (currentTab?.needsReset) {
+      currentTab.needsReset = false;
+      fetchData();
+    }
   });
 
   return {

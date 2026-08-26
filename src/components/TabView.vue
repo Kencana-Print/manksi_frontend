@@ -1,12 +1,11 @@
 <script setup lang="ts">
-import { watch } from "vue";
+import { computed, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useTabsStore } from "@/stores/tabsStore";
 
 const tabsStore = useTabsStore();
 const router = useRouter();
 const route = useRoute();
-
 // Saat tab aktif berubah (klik tab di TabBar / tab ditutup), ikuti route-nya.
 // Ini SATU-SATUNYA tempat yang boleh trigger router.push dari perubahan tab —
 // pembukaan tab baru (klik menu, browser back/forward) ditangani router guard
@@ -31,9 +30,17 @@ watch(
 
 <template>
   <div class="tab-view">
-    <router-view v-slot="{ Component, route }">
+    <router-view v-slot="{ Component, route: slotRoute }">
       <KeepAlive :max="10">
-        <component :is="Component" :key="route.path" />
+        <component
+          :is="Component"
+          :key="
+            (tabsStore.tabs.find((t) => t.id === slotRoute.path)?.timestamp ??
+              0) +
+            '::' +
+            slotRoute.path
+          "
+        />
       </KeepAlive>
     </router-view>
   </div>

@@ -27,6 +27,8 @@ const filterState = ref({
   dtAkhir: toLocalDateStr(today),
 });
 
+const baseBrowseRef = ref<InstanceType<typeof BaseBrowse> | null>(null);
+
 const { items, isLoading, canExport, fetchData } = useBrowse({
   menuId: MENU_ID,
   fetchApi: async () => {
@@ -68,29 +70,25 @@ const numFmt = (v: any) =>
       })
     : "";
 
-const totalMemo = computed(() =>
-  rows.value.reduce((s, r) => s + (Number(r.TotalMemo) || 0), 0),
-);
-const totalRealisasiMemo = computed(() =>
-  rows.value.reduce((s, r) => s + (Number(r.RealisasiMemo) || 0), 0),
-);
-const totalRealisasiAll = computed(() =>
-  rows.value.reduce((s, r) => s + (Number(r.RealisasiAll) || 0), 0),
-);
+const sumBy = (list: any[], key: string) =>
+  list.reduce((s, r) => s + (Number(r[key]) || 0), 0);
 
 // ── Export — replikasi layout letterhead Excel Delphi (kop perusahaan,
 // tabel NAMA LAPORAN/PERIODE, header data biru, total, blok ttd). ──
 const isExporting = ref(false);
 const onExport = async () => {
   if (!canExport.value) return toast.error("Akses ditolak.");
-  const dataRows = rows.value ?? [];
-  if (!dataRows.length) return toast.warning("Tidak ada data.");
+  const dataRows =
+    baseBrowseRef.value?.getFilteredItems?.() ?? rows.value ?? [];
+  if (!dataRows.length)
+    return toast.warning("Tidak ada data untuk diekspor (cek filter aktif).");
   isExporting.value = true;
   try {
-    // ⚠️ Laporan ini gak punya filter "perusahaan mana" — ambil entry
-    // pertama dari /lookups/perusahaan sebagai letterhead default.
-    // Kalau company > 1 dan yang benar bukan yang pertama, filter ini
-    // perlu diganti eksplisit.
+    // Hitung total DARI dataRows yang sudah difilter, bukan computed lama
+    const totalMemoVal = sumBy(dataRows, "TotalMemo");
+    const totalRealisasiMemoVal = sumBy(dataRows, "RealisasiMemo");
+    const totalRealisasiAllVal = sumBy(dataRows, "RealisasiAll");
+
     let namaPerush = "";
     let alamatPerush = "";
     try {
@@ -171,13 +169,12 @@ const onExport = async () => {
       jRow++;
     }
     const lastDataRow = jRow - 1;
-
     // ── Total row ──
     ws.getCell(jRow, 1).value = "TOTAL:";
     ws.getCell(jRow, 1).font = { bold: true };
-    ws.getCell(jRow, 5).value = totalMemo.value;
-    ws.getCell(jRow, 6).value = totalRealisasiMemo.value;
-    ws.getCell(jRow, 7).value = totalRealisasiAll.value;
+    ws.getCell(jRow, 5).value = totalMemoVal;
+    ws.getCell(jRow, 6).value = totalRealisasiMemoVal;
+    ws.getCell(jRow, 7).value = totalRealisasiAllVal;
     for (let c = 1; c <= lastCol; c++) {
       const cell = ws.getCell(jRow, c);
       cell.fill = {
@@ -245,6 +242,7 @@ const onExport = async () => {
 
 <template>
   <BaseBrowse
+    ref="baseBrowseRef"
     title="Laporan Proyeksi vs Realisasi"
     :menu-id="MENU_ID"
     :icon="IconTrendingUp"
@@ -254,6 +252,12 @@ const onExport = async () => {
     :can-export="false"
     item-value="CusKode"
     search-placeholder="Cari kode / nama customer..."
+    :summary-columns="['TotalMemo', 'RealisasiMemo', 'RealisasiAll']"
+    :summary-formatters="{
+      TotalMemo: (items) => numFmt(sumBy(items, 'TotalMemo')),
+      RealisasiMemo: (items) => numFmt(sumBy(items, 'RealisasiMemo')),
+      RealisasiAll: (items) => numFmt(sumBy(items, 'RealisasiAll')),
+    }"
     @refresh="fetchData"
   >
     <template #filter-left>
@@ -264,7 +268,6 @@ const onExport = async () => {
         <input type="date" v-model="filterState.dtAkhir" class="f-date" />
       </div>
     </template>
-
     <template #extra-actions>
       <v-btn
         size="small"
@@ -276,7 +279,6 @@ const onExport = async () => {
         <template #prepend><IconFileSpreadsheet :size="15" /></template>Export
       </v-btn>
     </template>
-
     <template #item.TotalMemo="{ item }">{{ numFmt(item.TotalMemo) }}</template>
     <template #item.RealisasiMemo="{ item }">{{
       numFmt(item.RealisasiMemo)
@@ -284,25 +286,7 @@ const onExport = async () => {
     <template #item.RealisasiAll="{ item }">{{
       numFmt(item.RealisasiAll)
     }}</template>
-
-    <template #summary-row>
-      <div class="ms-bar">
-        <span class="ms-item"
-          ><span class="ms-lbl">Total Memo</span
-          ><span class="ms-val">{{ numFmt(totalMemo) }}</span></span
-        >
-        <span class="ms-sep">|</span>
-        <span class="ms-item"
-          ><span class="ms-lbl">Realisasi Memo</span
-          ><span class="ms-val">{{ numFmt(totalRealisasiMemo) }}</span></span
-        >
-        <span class="ms-sep">|</span>
-        <span class="ms-item"
-          ><span class="ms-lbl">Realisasi All</span
-          ><span class="ms-val">{{ numFmt(totalRealisasiAll) }}</span></span
-        >
-      </div>
-    </template>
+    <!-- summary-row dihapus — sekarang pakai summary-columns bawaan BaseBrowse -->
   </BaseBrowse>
 </template>
 

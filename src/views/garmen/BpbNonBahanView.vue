@@ -141,7 +141,7 @@ const onUpdateExpanded = (newExpanded: any[]) => {
 // ── Actions ──
 const onAdd = () =>
   router.push(
-    `/garmen/barang/bpb-nonbahan/create?jenis=${filterState.value.jenis}`,
+    `/garmen/barang/bpb-nonbahan/create/${encodeURIComponent(filterState.value.jenis)}`,
   );
 
 const onEdit = (item: any) => {

@@ -239,6 +239,7 @@ const tab = ref<"h" | "d">("h");
 
 // ── Lookups ────────────────────────────────────────────────────────────
 const komponenOpts = ref<{ komponen: string; babaran: number }[]>([]);
+const terimaSblmMap = ref<Record<string, number>>({}); // key: `${kode}_${size}`
 const kelOpts = ref<string[]>([]);
 const kelTujuanOpts = ref<string[]>([]);
 const planList = ref<PlanningRow[]>([]);
@@ -564,6 +565,27 @@ const applySpk = async (nomor: string) => {
   }
 };
 
+const loadTerimaSebelumnya = async () => {
+  if (!fd.value.NomorSpk || !fd.value.GdgAsal) {
+    terimaSblmMap.value = {};
+    return;
+  }
+  try {
+    const res = await mutasiProduksiFormService.getTerimaSebelumnya(
+      fd.value.NomorSpk,
+      fd.value.GdgAsal,
+      isEditMode.value ? fd.value.Nomor : "",
+    );
+    const map: Record<string, number> = {};
+    for (const r of res.data.data || []) {
+      map[`${r.kode}_${r.size || ""}`] = Number(r.qty) || 0;
+    }
+    terimaSblmMap.value = map;
+  } catch {
+    terimaSblmMap.value = {};
+  }
+};
+
 // ── Mutasi → auto gudang ───────────────────────────────────────────────
 const onMutasi = async (val: string) => {
   if (!canEdit.value) return;
@@ -604,6 +626,7 @@ const onMutasi = async (val: string) => {
     if (rA.data.data?.gdgp_cab) fd.value.Cab = rA.data.data.gdgp_cab;
     await Promise.all([loadKelompok(), loadKelompokTujuan()]);
     await loadPlanning();
+    await loadTerimaSebelumnya();
     if (isDC.value && fd.value.NomorSpk) await loadKomponenProof();
   } catch (e: any) {
     toast.error(e.response?.data?.message || "Gagal memuat gudang.");
@@ -651,6 +674,7 @@ const selectGdg = async (item: any) => {
       fd.value.NamaGdgAsal = item.Nama;
       await loadKelompok();
       await loadPlanning();
+      await loadTerimaSebelumnya();
       if (isDC.value) await loadKomponenProof();
       else fd.value.Detail = [mkRow()];
     } catch (e: any) {
@@ -996,10 +1020,31 @@ const onKodeBahan = async (row: DetailRow) => {
     row.nama = "";
   }
 };
+const checkTerimaWarning = (row: DetailRow) => {
+  const terima = terimaSblmMap.value[`${row.kode}_${row.size || ""}`];
+  if (terima === undefined) return;
+  const totalInput =
+    (Number(row.jumlah) || 0) +
+    (Number(row.bslini) || 0) +
+    (Number(row.bskainsablon) || 0) +
+    (Number(row.bskain) || 0) +
+    (Number(row.gantibs) || 0);
+  const totalSemua = (Number(row.sudah) || 0) + totalInput;
+  if (totalSemua !== terima) {
+    const selisih = totalSemua - terima;
+    toast.warning(
+      `${row.nama || row.kode}${row.size ? " (" + row.size + ")" : ""}: ` +
+        `total (${num(totalSemua)}) ${selisih > 0 ? "lebih" : "kurang"} ` +
+        `dari LHK sebelumnya (${num(terima)}), selisih ${num(Math.abs(selisih))}.`,
+    );
+  }
+};
+
 const onJumlah = (row: DetailRow) => {
   row.lhk = row.jumlah;
   if (row.jumlah > row.kurang && !isSpg.value)
     toast.warning(`Jumlah melebihi kekurangan (${num(row.kurang)}).`);
+  checkTerimaWarning(row);
 };
 const addRow = () => fd.value.Detail.push(mkRow());
 const delRow = (i: number) => {
@@ -1302,6 +1347,7 @@ onMounted(async () => {
       loadKelompok(),
       loadKelompokTujuan(),
       loadPlanning(),
+      loadTerimaSebelumnya(),
     ]);
   } else {
     formData.value.Cab = userCab.value || "P04";
@@ -2065,6 +2111,7 @@ onMounted(async () => {
                       :readonly="!canEdit"
                       :ref="(el) => setDetailFieldRef(el, i, 'bslini')"
                       @focus="sel"
+                      @change="checkTerimaWarning(row)"
                       @keydown.enter.prevent="focusNextDetailField(i, 'bslini')"
                     />
                   </td>
@@ -2076,6 +2123,7 @@ onMounted(async () => {
                       :readonly="!canEdit"
                       :ref="(el) => setDetailFieldRef(el, i, 'bskainsablon')"
                       @focus="sel"
+                      @change="checkTerimaWarning(row)"
                       @keydown.enter.prevent="
                         focusNextDetailField(i, 'bskainsablon')
                       "
@@ -2089,6 +2137,7 @@ onMounted(async () => {
                       :readonly="!canEdit"
                       :ref="(el) => setDetailFieldRef(el, i, 'bskain')"
                       @focus="sel"
+                      @change="checkTerimaWarning(row)"
                       @keydown.enter.prevent="focusNextDetailField(i, 'bskain')"
                     />
                   </td>
@@ -2100,6 +2149,7 @@ onMounted(async () => {
                       :readonly="!canEdit"
                       :ref="(el) => setDetailFieldRef(el, i, 'gantibs')"
                       @focus="sel"
+                      @change="checkTerimaWarning(row)"
                       @keydown.enter.prevent="
                         focusNextDetailField(i, 'gantibs')
                       "

@@ -351,7 +351,8 @@ const resolvedRowProps = (data: any) => {
 };
 
 // ── Expose ──
-defineExpose({ search, currentPage });
+const getFilteredItems = () => filteredItems.value;
+defineExpose({ search, currentPage, getFilteredItems });
 </script>
 
 <template>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, watch, computed } from "vue";
+import { ref, onMounted, watch, computed, onBeforeUnmount } from "vue";
 import { useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
 import { useAuthStore } from "@/stores/authStore";
@@ -108,11 +108,26 @@ const selectedCustomer = computed({
 
 // Watch filterState → simpan ke sessionStorage + fetch
 const isInitialized = ref(false);
+let filterDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+const isValidDate = (s: string) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  const year = Number(s.substring(0, 4));
+  return year >= 2000 && year <= 2100;
+};
+
 watch(
   filterState,
   (val) => {
-    sessionStorage.setItem(SESSION_KEY, JSON.stringify(val));
-    if (isInitialized.value) fetchData();
+    if (isValidDate(val.dtAwal) && isValidDate(val.dtAkhir)) {
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify(val));
+    }
+    if (!isInitialized.value) return;
+    if (filterDebounceTimer) clearTimeout(filterDebounceTimer);
+    filterDebounceTimer = setTimeout(() => {
+      if (isValidDate(dtAwal.value) && isValidDate(dtAkhir.value)) {
+        fetchData();
+      }
+    }, 800);
   },
   { deep: true },
 );
@@ -318,12 +333,16 @@ const rowPropsFn = (data: any) => {
   const item = data.item?.raw || data.item;
   const classes: string[] = ["font-weight-bold"];
   let style = "";
+  const pesanKirimSama = Number(item.Pesan) === Number(item.Kirim);
 
-  if (item.HasSj) {
-    // Paling final — sudah dibuatkan SJ, status Open/Pasif SO tidak relevan lagi
+  if (item.HasSj && pesanKirimSama) {
+    // Paling final — sudah SJ DAN Pesan = Kirim, benar-benar tuntas
     style = "color: #212121 !important;";
+  } else if (item.SpkPpic && !pesanKirimSama) {
+    // Sudah dibuatkan SPK PPIC tapi Pesan != Kirim
+    style = "color: #1a237e !important;"; // navy
   } else if (item.SpkPpic) {
-    // Sudah dibuatkan SPK PPIC tapi belum ada SJ
+    // Sudah dibuatkan SPK PPIC, Pesan = Kirim, belum ada SJ
     style = "color: #00897b !important;";
   } else {
     if (item.Status === "Open") {
@@ -345,7 +364,6 @@ const rowPropsFn = (data: any) => {
       else if (item.AccPending === "ACC") classes.push("text-orange-darken-3");
     }
   }
-
   return { class: classes.join(" "), style };
 };
 
@@ -374,9 +392,14 @@ onMounted(async () => {
   fetchData();
 });
 
+onBeforeUnmount(() => {
+  if (filterDebounceTimer) clearTimeout(filterDebounceTimer);
+});
+
 const onAdd = () => router.push("/penjualan/sales-order/create");
-const onEdit = (item: any) =>
+const onEdit = (item: any) => {
   router.push(`/penjualan/sales-order/edit/${encodeURIComponent(item.Nomor)}`);
+};
 
 const onDelete = async (item: any) => {
   try {
@@ -1049,7 +1072,12 @@ const onExport = async () => {
     <template #filter-left>
       <div class="f-group">
         <span class="f-label">Periode</span>
-        <input type="date" v-model="dtAwal" class="f-date" />
+        <input
+          type="date"
+          v-model="dtAwal"
+          @change="fetchData"
+          class="f-date"
+        />
         <span class="f-sep">s/d</span>
         <input type="date" v-model="dtAkhir" class="f-date" />
       </div>
@@ -1110,6 +1138,10 @@ const onExport = async () => {
           <div class="legend-item">
             <div class="legend-dot" style="background: #00897b"></div>
             Sudah SPK PPIC
+          </div>
+          <div class="legend-item">
+            <div class="legend-dot" style="background: #1a237e"></div>
+            SPK PPIC ≠ Kirim
           </div>
           <div class="legend-item">
             <div class="legend-dot" style="background: #212121"></div>
@@ -1364,7 +1396,7 @@ const onExport = async () => {
             <template #prepend
               ><IconBan :size="14" class="mr-2 text-error"
             /></template>
-            <v-list-item-title>Form Pembatalan SPK</v-list-item-title>
+            <v-list-item-title>Form Pembatalan SO</v-list-item-title>
           </v-list-item>
           <v-divider class="my-1"></v-divider>
           <v-list-item @click="openBatalCloseDialog" :disabled="!canDelete">
@@ -1666,9 +1698,7 @@ const onExport = async () => {
     <v-card class="rounded-lg">
       <v-card-title class="bg-error text-white d-flex align-center pa-3">
         <IconBan :size="18" class="mr-2" />
-        <span class="text-subtitle-1 font-weight-bold"
-          >Form Pembatalan SPK</span
-        >
+        <span class="text-subtitle-1 font-weight-bold">Form Pembatalan SO</span>
       </v-card-title>
 
       <v-card-text class="pa-4" style="max-height: 70vh">

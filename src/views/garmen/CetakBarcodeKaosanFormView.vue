@@ -3,6 +3,7 @@ import { ref, computed, onMounted, nextTick, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
 import { useAuthStore } from "@/stores/authStore";
+import { useTabsStore } from "@/stores/tabsStore";
 import BaseForm from "@/components/BaseForm.vue";
 import { useForm } from "@/composables/useForm";
 import { cetakBarcodeKaosanFormService as svc } from "@/services/garmen/cetakBarcodeKaosanFormService";
@@ -33,9 +34,10 @@ const route = useRoute();
 const router = useRouter();
 const toast = useToast();
 const authStore = useAuthStore();
+const tabsStore = useTabsStore();
 
-const isEdit = computed(() => !!route.query.nomor);
-const nomorParam = computed(() => (route.query.nomor as string) || "");
+const isEdit = computed(() => !!route.params.nomor);
+const nomorParam = computed(() => (route.params.nomor as string) || "");
 
 let _keySeq = 0;
 const newKey = () => ++_keySeq;
@@ -79,6 +81,24 @@ const {
 } = useForm<CetakBarcodeKaosanFormState>({
   menuId: "130",
   initialData: emptyData,
+  onFormReset: () => {
+    showSpkModal.value = false;
+    activeSpkRowKey.value = null;
+    showKaosanModal.value = false;
+    activeKaosanRowKey.value = null;
+    scanBarcodeValue.value = "";
+    showBarcodePickDialog.value = false;
+    barcodePickResults.value = [];
+    selectedPrinter.value = "XP360B";
+    cetakHarga.value = false;
+    isPrintPreviewVisible.value = false;
+    printPreviewData.value = [];
+
+    if (cabFixed.value) {
+      formData.value.cab = authStore.user!.cabang;
+    }
+    addEmptyRow();
+  },
   fetchApi: async () => {
     const res = await svc.getDetail(nomorParam.value);
     const d = res.data.data;
@@ -525,8 +545,14 @@ const triggerPrintFromGrid = () => {
   const validRows = formData.value.detail.filter((d) => d.nama.trim() !== "");
   const data = buildPrintData(validRows, formData.value.nomor);
   if (!data.length) {
-    // Tidak ada yang perlu dicetak (semua cetak=false) -> langsung balik ke browse
-    router.push({ name: "CetakBarcodeKaosanBrowse" });
+    // Tidak ada yang perlu dicetak -> langsung balik ke browse
+    const currentPath = route.path; // snapshot SEBELUM push
+    router
+      .push({ name: "CetakBarcodeKaosanBrowse" })
+      .catch(() => {})
+      .then(() => {
+        tabsStore.closeTab(currentPath);
+      });
     return;
   }
   printPreviewData.value = data;
@@ -664,7 +690,13 @@ const triggerBrowserPrint = () => {
 const closePreview = () => {
   isPrintPreviewVisible.value = false;
   if (formData.value.nomor && formData.value.nomor !== "TES") {
-    router.push({ name: "CetakBarcodeKaosanBrowse" });
+    const currentPath = route.path; // snapshot SEBELUM push
+    router
+      .push({ name: "CetakBarcodeKaosanBrowse" })
+      .catch(() => {})
+      .then(() => {
+        tabsStore.closeTab(currentPath);
+      });
   }
 };
 </script>

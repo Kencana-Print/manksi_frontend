@@ -199,7 +199,7 @@ const getDetailItems = (nomor: string) => {
 // ── Actions ──
 const onAdd = () =>
   router.push(
-    `/garmen/barang/po-nonbahan/create?jenis=${filterState.value.jenis}`,
+    `/garmen/barang/po-nonbahan/create/${encodeURIComponent(filterState.value.jenis)}`,
   );
 
 const onEdit = (item: any) => {

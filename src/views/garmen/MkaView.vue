@@ -8,6 +8,7 @@ import { mkaService } from "@/services/garmen/mkaService";
 import { exportExcelSingle } from "@/utils/excelExport";
 import { IconNotes, IconFileExport } from "@tabler/icons-vue";
 import { formatTanggal, formatTanggalJam } from "@/utils/dateFormat";
+import MkaRealisasiDetailModal from "@/components/garmen/MkaRealisasiDetailModal.vue";
 
 const router = useRouter();
 const toast = useToast();
@@ -35,9 +36,12 @@ const savedFilter = (() => {
 const dtAwal = ref(savedFilter.dtAwal || firstDayOfMonth);
 const dtAkhir = ref(savedFilter.dtAkhir || todayStr);
 const filterKode = ref(savedFilter.filterKode || "");
+const filterByTglSpk = ref(savedFilter.filterByTglSpk ?? false);
+const showRealisasiModal = ref(false);
+const activeRealisasiNomor = ref("");
 
 watch(
-  [dtAwal, dtAkhir, filterKode],
+  [dtAwal, dtAkhir, filterKode, filterByTglSpk],
   () => {
     sessionStorage.setItem(
       SESSION_KEY,
@@ -45,6 +49,7 @@ watch(
         dtAwal: dtAwal.value,
         dtAkhir: dtAkhir.value,
         filterKode: filterKode.value,
+        filterByTglSpk: filterByTglSpk.value,
       }),
     );
     fetchData();
@@ -69,6 +74,7 @@ const {
       startDate: dtAwal.value,
       endDate: dtAkhir.value,
       kodeBarang: filterKode.value,
+      filterByTglSpk: filterByTglSpk.value,
     });
     return res.data.data;
   },
@@ -83,7 +89,8 @@ const headers = [
   { title: "No. SPK", key: "SPK", width: "150px" },
   { title: "Nama SPK", key: "NamaSpk", width: "300px" },
   { title: "Qty SPK", key: "JumlahSPK", width: "80px", align: "right" },
-  { title: "Status SPK", key: "StatusSPK", width: "90px", align: "center" },
+  { title: "Status SPK", key: "StatusSpk", width: "90px", align: "center" },
+  { title: "Status MKA", key: "StatusMka", width: "90px", align: "center" },
   { title: "Keterangan", key: "Keterangan", width: "250px" },
   { title: "User", key: "UserCreate", width: "80px" },
   { title: "Created", key: "Created", width: "140px", align: "center" },
@@ -116,11 +123,12 @@ const onUpdateExpanded = async (newExpanded: any[]) => {
 
 // --- Row color: SPK Belum ada MKA → merah ---
 const rowPropsFn = (data: any) => {
-  // Vuetify 3 membungkus data asli di dalam item.raw atau item
   const rowItem = data.item?.raw || data.item || data;
-
-  if (rowItem.RowType === "SPK") {
-    // Tambahkan !important agar warna tidak tertimpa class default tabel
+  // Merah kalau: (a) SPK belum ada MKA sama sekali (RowType SPK,
+  // fitur tambahan web app), ATAU (b) MKA sudah ada tapi field
+  // user_create-nya kosong (replikasi literal kondisi usr='' Delphi
+  // — biasanya data lama/import tanpa tercatat pembuatnya).
+  if (rowItem.RowType === "SPK" || !rowItem.UserCreate) {
     return { style: "color: #d32f2f !important; font-weight: 600;" };
   }
   return {};
@@ -180,6 +188,7 @@ const onExportHeader = async () => {
       startDate: dtAwal.value,
       endDate: dtAkhir.value,
       kodeBarang: filterKode.value,
+      filterByTglSpk: filterByTglSpk.value,
     });
     await exportExcelSingle(
       `MKA_Header_${dtAwal.value}_${dtAkhir.value}.xlsx`,
@@ -215,6 +224,7 @@ const onExportDetail = async () => {
       startDate: dtAwal.value,
       endDate: dtAkhir.value,
       kodeBarang: filterKode.value,
+      filterByTglSpk: filterByTglSpk.value,
     });
     if (!res.data.data?.length)
       return toast.warning("Tidak ada detail untuk diekspor.");
@@ -259,6 +269,15 @@ const onExportDetail = async () => {
   }
 };
 
+const isRealisasiClickable = (item: any) =>
+  item.StatusSpk === "CLOSE" && item.StatusMka === "OPEN";
+
+const openRealisasiDetail = (item: any) => {
+  if (!isRealisasiClickable(item)) return;
+  activeRealisasiNomor.value = item.Nomor;
+  showRealisasiModal.value = true;
+};
+
 // --- Format ---
 const numFmt = (v: any) =>
   v != null ? Number(v).toLocaleString("id-ID") : "0";
@@ -296,6 +315,11 @@ const numFmt = (v: any) =>
         <span class="f-sep">s/d</span>
         <input type="date" v-model="dtAkhir" class="f-inp" />
       </div>
+      <div class="f-divider" />
+      <label class="f-check">
+        <input type="checkbox" v-model="filterByTglSpk" />
+        Berdasarkan Tgl SPK
+      </label>
       <div class="f-divider" />
       <div class="f-group">
         <span class="f-label">Kode Barang</span>
@@ -341,11 +365,26 @@ const numFmt = (v: any) =>
       {{ formatTanggalJam(item.Created) }}
     </template>
     <template #item.JumlahSPK="{ item }">{{ numFmt(item.JumlahSPK) }}</template>
-    <template #item.StatusSPK="{ item }">
+    <template #item.StatusSpk="{ item }">
       <span
         class="status-chip"
-        :class="item.StatusSPK === 'OPEN' ? 'chip-open' : 'chip-close'"
-        >{{ item.StatusSPK }}</span
+        :class="item.StatusSpk === 'OPEN' ? 'chip-open' : 'chip-close'"
+        >{{ item.StatusSpk }}</span
+      >
+    </template>
+    <template #item.StatusMka="{ item }">
+      <span v-if="!item.StatusMka" class="text-grey" style="font-size: 11px"
+        >-</span
+      >
+      <span
+        v-else
+        class="status-chip"
+        :class="[
+          item.StatusMka === 'CLOSE' ? 'chip-siap' : 'chip-belum',
+          { 'chip-clickable': isRealisasiClickable(item) },
+        ]"
+        @click.stop="openRealisasiDetail(item)"
+        >{{ item.StatusMka }}</span
       >
     </template>
 
@@ -399,6 +438,11 @@ const numFmt = (v: any) =>
       </div>
     </template>
   </BaseBrowse>
+
+  <MkaRealisasiDetailModal
+    v-model="showRealisasiModal"
+    :nomor="activeRealisasiNomor"
+  />
 </template>
 
 <style scoped>
@@ -449,6 +493,16 @@ const numFmt = (v: any) =>
   background: #f5f5f5;
   color: #616161;
   border: 1px solid #e0e0e0;
+}
+.chip-siap {
+  background: #e8f5e9;
+  color: #2e7d32;
+  border: 1px solid #a5d6a7;
+}
+.chip-belum {
+  background: #fff3e0;
+  color: #e65100;
+  border: 1px solid #ffcc80;
 }
 
 .expand-wrap {
@@ -504,5 +558,27 @@ const numFmt = (v: any) =>
 .text-red {
   color: #c62828 !important;
   font-weight: 700;
+}
+.f-check {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #555;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.f-check input {
+  accent-color: #1565c0;
+  cursor: pointer;
+}
+.chip-clickable {
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+}
+.chip-clickable:hover {
+  filter: brightness(0.92);
 }
 </style>

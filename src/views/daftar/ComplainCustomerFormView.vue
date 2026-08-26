@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
+import { useTabsStore } from "@/stores/tabsStore";
 import BaseForm from "@/components/BaseForm.vue";
 import { useForm } from "@/composables/useForm";
 import {
@@ -18,6 +19,7 @@ import SpkSearchModal from "@/components/lookups/SpkSearchModal.vue";
 const route = useRoute();
 const router = useRouter();
 const toast = useToast();
+const tabsStore = useTabsStore();
 
 const isEditMode = computed(() => !!route.params.nomor);
 const nomorUrl = route.params.nomor as string;
@@ -29,6 +31,19 @@ const toLocalDate = (d: Date) => {
   const dd = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${dd}`;
 };
+
+const getLocalDateString = (val: string | null | undefined): string => {
+  if (!val) return "";
+  const s = String(val);
+  if (s.includes("T") && (s.endsWith("Z") || s.includes("+00"))) {
+    const d = new Date(s);
+    if (isNaN(d.getTime())) return "";
+    const wib = new Date(d.getTime() + 7 * 60 * 60 * 1000);
+    return wib.toISOString().substring(0, 10);
+  }
+  return s.substring(0, 10);
+};
+
 const todayLocal = toLocalDate(new Date());
 
 const jenisComplainOptions = ref<string[]>([]);
@@ -80,7 +95,7 @@ const {
     return {
       ...defaultData,
       Nomor: h.tc_nomor,
-      Tanggal: (h.tc_date || todayLocal).substring(0, 10),
+      Tanggal: h.tc_date ? getLocalDateString(h.tc_date) : todayLocal,
       SpkNomor: h.tc_spk_nomor || "",
       SpkNama: spk?.Nama || "",
       SpkTanggal: spk?.Tanggal || "",
@@ -139,7 +154,13 @@ const {
   },
   onSuccess: (res: any) => {
     toast.success("Data Complain berhasil disimpan.");
-    router.push("/daftar/complain-customer");
+    const currentPath = route.path;
+    router
+      .push("/daftar/complain-customer")
+      .catch(() => {})
+      .then(() => {
+        tabsStore.closeTab(currentPath);
+      });
   },
 });
 

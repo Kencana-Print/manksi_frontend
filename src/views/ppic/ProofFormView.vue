@@ -114,6 +114,7 @@ const {
   executeSave,
   executeCancel,
   executeClose,
+  goBack,
 } = useForm({
   menuId: "122",
   initialData: defaultData,
@@ -156,13 +157,14 @@ const {
     }
     return proofFormService.create(payload);
   },
+  onSuccessRoute: "/ppic/proof",
   onSuccess: () => {
     toast.success(
       isEditMode.value
         ? "Proof berhasil diupdate."
         : "Proof berhasil disimpan.",
     );
-    router.push({ name: "ProofBrowse" });
+    goBack();
   },
 });
 

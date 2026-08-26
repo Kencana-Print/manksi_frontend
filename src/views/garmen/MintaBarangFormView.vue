@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, ref, onMounted, watch, nextTick } from "vue";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
+import { useTabsStore } from "@/stores/tabsStore";
 import { useForm } from "@/composables/useForm";
 import { useAuthStore } from "@/stores/authStore";
 import { mintaBarangFormService } from "@/services/garmen/mintaBarangFormService";
@@ -20,7 +21,6 @@ import GudangProduksiSearchModal from "@/components/lookups/GudangProduksiSearch
 import SpkSearchModal from "@/components/lookups/SpkSearchModal.vue";
 import BarangGarmenSearchModal from "@/components/lookups/BarangGarmenSearchModal.vue";
 
-const route = useRoute();
 const jenisSlugReverseMap: Record<string, string> = {
   ACCESORIES: "ACCESORIES",
   OBAT: "OBAT",
@@ -32,6 +32,9 @@ const jenisFromParam = computed(() => {
   if (!raw) return "";
   return jenisSlugReverseMap[raw] || raw;
 });
+const route = useRoute();
+const router = useRouter();
+const tabsStore = useTabsStore();
 const toast = useToast();
 const authStore = useAuthStore();
 
@@ -48,6 +51,8 @@ const showGudangModal = ref(false);
 const showSpkModal = ref(false);
 const showBarangModal = ref(false);
 const activeRowIndex = ref(0);
+const showPrintDialog = ref(false);
+const savedNomor = ref("");
 // ─────────────────────────────────────────────
 // FOKUS ANTAR FIELD DI GRID (Kode -> Jumlah -> Keterangan -> Kode baris berikutnya)
 // ─────────────────────────────────────────────
@@ -133,6 +138,17 @@ const {
 } = useForm({
   menuId: "60",
   initialData,
+  onFormReset: () => {
+    // Bersihkan state lokal di luar formData saat tab di-reuse untuk
+    // transaksi baru (mis. klik "Baru" lagi setelah tutup tab lama).
+    showGudangModal.value = false;
+    showSpkModal.value = false;
+    showBarangModal.value = false;
+    activeRowIndex.value = 0;
+    showPrintDialog.value = false;
+    savedNomor.value = "";
+    detailFieldRefs.value = {};
+  },
   fetchApi: async () => {
     const res = await mintaBarangFormService.getDetail(nomorParam.value);
     const { header, details } = res.data.data;
@@ -182,8 +198,10 @@ const {
   submitApi: async (payload) => {
     return await mintaBarangFormService.saveData(payload);
   },
-  onSuccess: () => {
+  onSuccess: (res: any) => {
     toast.success("Permintaan barang berhasil disimpan.");
+    savedNomor.value = res?.data?.data?.nomor || formData.value.nomor;
+    showPrintDialog.value = true;
   },
 });
 
@@ -589,6 +607,33 @@ const onJenisChange = () => {
   formData.value.mkaTanggal = "";
   formData.value.gudangPeminta = "";
   formData.value.namaGudangPeminta = "";
+};
+
+const skipCetak = () => {
+  const currentPath = route.path;
+  showPrintDialog.value = false;
+  router
+    .push({ name: "GarmenPermintaanBarang" })
+    .catch(() => {})
+    .then(() => {
+      tabsStore.closeTab(currentPath);
+    });
+};
+
+const doCetak = () => {
+  const currentPath = route.path;
+  const url = router.resolve({
+    name: "MintaBarangPrint",
+    params: { nomor: savedNomor.value },
+  }).href;
+  window.open(url, "_blank");
+  showPrintDialog.value = false;
+  router
+    .push({ name: "GarmenPermintaanBarang" })
+    .catch(() => {})
+    .then(() => {
+      tabsStore.closeTab(currentPath);
+    });
 };
 
 // -- VALIDASI SEBELUM SIMPAN --
@@ -1011,6 +1056,25 @@ const numFormat = (val: any) =>
     :cabang="formData.cabang"
     @selected="onBarangSelected"
   />
+
+  <v-dialog v-model="showPrintDialog" max-width="400px" persistent>
+    <v-card class="rounded-lg">
+      <v-card-title class="bg-primary text-white pa-3">
+        Simpan Berhasil
+      </v-card-title>
+      <v-card-text class="pa-4 text-center">
+        Permintaan barang <b>{{ savedNomor }}</b> berhasil disimpan.<br />
+        Ingin mencetak transaksi ini sekarang?
+      </v-card-text>
+      <v-card-actions class="pa-3 border-t bg-grey-lighten-4">
+        <v-btn variant="text" color="error" @click="skipCetak">Tidak</v-btn>
+        <v-spacer />
+        <v-btn color="primary" variant="elevated" @click="doCetak">
+          Ya, Cetak
+        </v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
 </template>
 
 <style scoped>

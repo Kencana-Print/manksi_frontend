@@ -209,7 +209,7 @@ const generateTxt = (mode: "standart" | "full") => {
 
   // ── Bangun blok header (dipakai ulang tiap halaman utk mode standart) ──
   const buildHeaderLines = (): string[] => {
-    const cAlamat = h.inv_cus_alamat || h.cus_alamat || "";
+    const cAlamat = h.inv_cus_alamat ?? h.cus_alamat ?? "";
     const halfL = col(67);
     const halfR = PAGE_WIDTH - halfL - 1;
     const alamatLines = wrapText(cAlamat, halfR - 12);
@@ -689,7 +689,7 @@ onMounted(() => {
                 <tr>
                   <td></td>
                   <td></td>
-                  <td>{{ header.inv_cus_alamat || header.cus_alamat }}</td>
+                  <td>{{ header.inv_cus_alamat ?? header.cus_alamat }}</td>
                 </tr>
                 <tr>
                   <td></td>

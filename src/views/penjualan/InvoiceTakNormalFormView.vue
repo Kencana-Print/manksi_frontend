@@ -2,6 +2,7 @@
 import { ref, computed, watch, onMounted } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { useToast } from "vue-toastification";
+import { useTabsStore } from "@/stores/tabsStore";
 import BaseForm from "@/components/BaseForm.vue";
 import { useForm } from "@/composables/useForm";
 import { invTakNormalFormService as svc } from "@/services/penjualan/invoiceTakNormalFormService";
@@ -62,6 +63,7 @@ interface FormData {
 const router = useRouter();
 const route = useRoute();
 const toast = useToast();
+const tabsStore = useTabsStore();
 
 const todayLocal = () => {
   const d = new Date(
@@ -123,9 +125,37 @@ const {
   menuId: "158",
   initialData: init,
   immediate: false,
+  onFormReset: () => {
+    uangMuka.value = 0;
+    showPrintDialog.value = false;
+    savedNomor.value = "";
+    focusedHargaKey.value = null;
+    isDiscFocused.value = false;
+
+    showPerushModal.value = false;
+    showCusModal.value = false;
+    showRekModal.value = false;
+
+    isLoadingBarang.value = false;
+    barangInputValues.value = {};
+    showBarangModal.value = false;
+    activeBarangRowKey.value = null;
+
+    isLoadingInvNormal.value = false;
+    invNormalInputValues.value = {};
+    showInvNormalModal.value = false;
+    invNormalModalGroup.value = "spanduk";
+    activeInvNormalRowKey.value = null;
+
+    showDeleteInvNormalDialog.value = false;
+    pendingDeleteInvNormalRow.value = null;
+
+    ensureEmptyRowBarang();
+    ensureEmptyRowInvNormal();
+  },
 
   fetchApi: async (): Promise<FormData> => {
-    const nomorEdit = route.query.nomor as string;
+    const nomorEdit = route.params.nomor as string;
     const res = await svc.getById(nomorEdit);
     const d = res.data.data;
     const h = d.header;
@@ -140,7 +170,7 @@ const {
       NamaPerush: h.perush_nama || "",
       KodeCus: h.inv_cus_kode || "",
       NamaCus: h.cus_nama || "",
-      AlamatCus: h.inv_cus_alamat || h.cus_alamat || "",
+      AlamatCus: h.inv_cus_alamat ?? h.cus_alamat ?? "",
       KotaCus: h.cus_kota || "",
       TanggalTempo: h.inv_tanggal_tempo || todayLocal(),
       RekBank: h.inv_rekening || "",
@@ -177,7 +207,7 @@ const {
   submitApi: async (data): Promise<any> => {
     const payload = {
       ...data,
-      NomorInv: route.query.nomor || data.NomorInv,
+      NomorInv: (route.params.nomor as string) || data.NomorInv,
       Detail: data.Detail.filter((r) => r.Kode && Number(r.Jumlah) !== 0).map(
         ({ _key: _k, ...r }) => r,
       ),
@@ -594,17 +624,30 @@ const validateSave = () => {
 
 // ── Print ─────────────────────────────────────────────────────────────────
 const skipPrint = () => {
+  const currentPath = route.path; // snapshot SEBELUM push
   showPrintDialog.value = false;
-  router.push({ name: "InvoiceTakNormalBrowse" });
+  router
+    .push({ name: "InvoiceTakNormalBrowse" })
+    .catch(() => {})
+    .then(() => {
+      tabsStore.closeTab(currentPath);
+    });
 };
+
 const doCetak = () => {
+  const currentPath = route.path; // snapshot SEBELUM push
   const url = router.resolve({
     name: "InvoiceTakNormalPrint",
     query: { nomor: savedNomor.value },
   }).href;
   window.open(url, "_blank");
   showPrintDialog.value = false;
-  router.push({ name: "InvoiceTakNormalBrowse" });
+  router
+    .push({ name: "InvoiceTakNormalBrowse" })
+    .catch(() => {})
+    .then(() => {
+      tabsStore.closeTab(currentPath);
+    });
 };
 
 // ── Lifecycle ─────────────────────────────────────────────────────────────
@@ -612,7 +655,7 @@ onMounted(async () => {
   const divRes = await svc.getDivisiList();
   divisiList.value = divRes.data.data || [];
 
-  if (route.query.nomor) {
+  if (route.params.nomor) {
     await fetchData();
     ensureEmptyRowBarang();
     ensureEmptyRowInvNormal();

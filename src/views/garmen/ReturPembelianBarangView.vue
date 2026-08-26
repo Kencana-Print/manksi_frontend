@@ -145,8 +145,9 @@ const expandedRows = ref<any[]>([]);
 
 // --- FUNGSI AKSI ---
 const onAdd = () => {
-  sessionStorage.setItem("last_jenis_retur_pembelian", filterState.value.jenis);
-  router.push("/garmen/barang/retur-pembelian/form");
+  router.push(
+    `/garmen/barang/retur-pembelian/form/create/${encodeURIComponent(filterState.value.jenis)}`,
+  );
 };
 
 const onEdit = (item: any) => {

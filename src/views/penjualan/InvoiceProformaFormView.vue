@@ -112,7 +112,7 @@ const {
       namaPerush: header.perush_nama,
       cusKode: header.inv_cus_kode,
       cusNama: header.cus_nama,
-      alamatCus: header.inv_cus_alamat || header.cus_alamat,
+      alamatCus: header.inv_cus_alamat ?? header.cus_alamat,
       kotaCus: header.inv_cus_kota || header.cus_kota || "",
       rekBank: header.inv_rekening,
       namaBank: header.perushd_bank,
@@ -558,11 +558,10 @@ const num = (val: any) => Math.round(Number(val) || 0).toLocaleString("id-ID");
         <div class="f-row mb-2">
           <label class="f-lbl"></label>
           <textarea
-            :value="formData.alamatCus"
-            readonly
-            class="f-inp f-ro w-100"
+            v-model="formData.alamatCus"
+            class="f-inp w-100"
             rows="2"
-            style="height: 44px; resize: none"
+            style="height: 44px; resize: vertical"
             placeholder="Alamat Customer..."
           ></textarea>
         </div>

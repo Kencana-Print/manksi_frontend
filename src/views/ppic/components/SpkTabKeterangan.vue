@@ -30,8 +30,8 @@ const initKetKomponen = async () => {
       checked: false,
       ket: "",
     }));
-  } catch {
-    /* biarkan kosong */
+  } catch (e) {
+    console.error("Gagal load master ket komponen:", e);
   }
 };
 

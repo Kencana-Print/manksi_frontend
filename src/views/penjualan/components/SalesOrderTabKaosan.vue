@@ -4,7 +4,7 @@ import { IconPlus, IconTrash, IconCheck } from "@tabler/icons-vue";
 import { useToast } from "vue-toastification";
 
 const props = defineProps<{ formData: any }>();
-const emit = defineEmits(["open-lookup-barang"]);
+const emit = defineEmits(["open-lookup-barang", "sync-sizes"]);
 const toast = useToast();
 
 if (props.formData.spk_label === undefined) props.formData.spk_label = 0;
@@ -21,8 +21,10 @@ const addKaosanRow = () => {
   if (!props.formData.Kaosan) props.formData.Kaosan = [];
   props.formData.Kaosan.push({ kode: "", nama: "", ukuran: "", qtyorder: 0 });
 };
-const removeKaosanRow = (index: number) =>
+const removeKaosanRow = (index: number) => {
   props.formData.Kaosan.splice(index, 1);
+  emit("sync-sizes");
+};
 
 const totalSize = computed(
   () =>
@@ -115,6 +117,7 @@ const updateToKetUkuran = () => {
                     v-model="row.ukuran"
                     class="ci text-uppercase"
                     placeholder="S, M, L..."
+                    @blur="emit('sync-sizes')"
                   />
                 </td>
                 <td class="p0">
@@ -123,6 +126,7 @@ const updateToKetUkuran = () => {
                     v-model.number="row.qtyorder"
                     class="ci tr fw text-blue"
                     v-select-on-focus
+                    @blur="emit('sync-sizes')"
                   />
                 </td>
                 <td class="tc">
@@ -194,7 +198,15 @@ const updateToKetUkuran = () => {
       <!-- Kanan: Size -->
       <div class="k-section" style="flex: 1; min-width: 0">
         <div class="k-header">
-          <span class="k-title">Detail Size / Ukuran Badan</span>
+          <span class="k-title">
+            Detail Size / Ukuran Badan
+            <span
+              class="uk-hint"
+              style="text-transform: none; font-weight: 400"
+            >
+              — otomatis dari Detail Barang Kaosan
+            </span>
+          </span>
           <button type="button" class="btn-add" @click="addSizeRow">
             <IconPlus :size="12" class="mr-1" /> Tambah Size
           </button>
@@ -223,9 +235,10 @@ const updateToKetUkuran = () => {
                 <td class="p0">
                   <input
                     type="number"
-                    v-model.number="row.qty"
+                    :value="row.qty"
                     class="ci tr fw text-blue"
-                    v-select-on-focus
+                    disabled
+                    title="Otomatis dari total Qty Order per ukuran di Detail Barang Kaosan"
                   />
                 </td>
                 <td class="p0">

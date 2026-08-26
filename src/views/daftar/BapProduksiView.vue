@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, onActivated } from "vue";
 import api from "@/services/api";
 import { useBrowse } from "@/composables/useBrowse";
 import { useToast } from "vue-toastification";
@@ -54,6 +54,10 @@ const {
     });
     return res.data.data;
   },
+});
+
+onActivated(() => {
+  fetchData();
 });
 
 const headers = [

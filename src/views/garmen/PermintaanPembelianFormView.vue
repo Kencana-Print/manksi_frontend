@@ -17,9 +17,10 @@ const router = useRouter();
 const toast = useToast();
 
 const isEditMode = computed(() => !!route.params.nomor);
-// Ambil jenis dari Query Params jika Baru, atau akan di-override data DB jika Edit
+// Jenis diambil dari path param (bukan query) — supaya tab id beda
+// per jenis dan tab-reuse tidak nyangkut bawa jenis lama.
 const formJenis = ref(
-  typeof route.query.jenis === "string" ? route.query.jenis : "ACCESORIES",
+  typeof route.params.jenis === "string" ? route.params.jenis : "ACCESORIES",
 );
 
 const todayLocal = new Date().toISOString().substring(0, 10);
@@ -72,6 +73,20 @@ const {
 } = useForm({
   menuId: "65",
   initialData: defaultData,
+  onFormReset: () => {
+    // Route param berubah => KeepAlive-reused component perlu re-sync
+    // formJenis dari path, plus bersihkan semua state lokal di luar
+    // formData (pola sama seperti ProofFormView.vue di handoff).
+    formJenis.value =
+      typeof route.params.jenis === "string"
+        ? route.params.jenis
+        : "ACCESORIES";
+    activeGridIndex.value = -1;
+    showBarangModal.value = false;
+    activeTab.value = "transaksi";
+    showPrintDialog.value = false;
+    nomorToPrint.value = "";
+  },
   fetchApi: async () => {
     const res = await permintaanPembelianFormService.getDetail(
       route.params.nomor as string,
@@ -96,13 +111,11 @@ const {
       items: data.items,
     });
   },
-  // UBAH ONSUCCESS MENJADI SEPERTI INI:
   onSuccess: (res: any) => {
     toast.success("Permintaan berhasil disimpan!");
-    // Ambil nomor dari response backend atau dari form jika edit
     const noTersimpan = res.data?.data?.nomor || formData.value.header.mb_nomor;
     nomorToPrint.value = noTersimpan;
-    showPrintDialog.value = true; // Munculkan dialog Vue
+    showPrintDialog.value = true;
   },
 });
 

@@ -9,7 +9,14 @@ import {
 
 const props = defineProps<{
   modelValue: boolean;
-  filterMode?: "so" | "spk-ppic" | "mutasi" | "sj" | "spk-map" | "all";
+  filterMode?:
+    | "so"
+    | "spk-ppic"
+    | "mutasi"
+    | "sj"
+    | "spk-map"
+    | "po-external"
+    | "all";
   cusKode?: string;
   perushKode?: string;
   divisi?: string | number;
@@ -119,7 +126,9 @@ const selectItem = (item: any) => {
       <div class="lookup-header">
         <IconClipboardSearch :size="15" :stroke-width="1.7" color="white" />
         <span>Cari Data SPK</span>
-        <span class="lookup-header-sub">Divisi 3, 4, 6</span>
+        <span class="lookup-header-sub">{{
+          props.divisi ? `Divisi ${props.divisi}` : "Semua Divisi"
+        }}</span>
         <v-spacer />
         <button class="lookup-close" @click="emit('update:modelValue', false)">
           ✕

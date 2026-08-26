@@ -41,6 +41,10 @@ const waitForImage = () => {
   });
 };
 
+const handlePrint = () => {
+  window.print();
+};
+
 onMounted(async () => {
   try {
     const res = await api.get(
@@ -55,7 +59,6 @@ onMounted(async () => {
     const style = document.createElement("style");
     style.textContent = "@page { size: A4 landscape; margin: 10mm; }";
     document.head.appendChild(style);
-    window.print();
   } catch (error: any) {
     isError.value = true;
     isLoading.value = false;
@@ -152,6 +155,9 @@ const tglIndo = (dateStr: string) => {
   </div>
 
   <div v-else-if="rawData" class="print-container" :class="[layoutMode]">
+    <div class="no-print print-actions">
+      <button @click="handlePrint">🖨️ Cetak MAP</button>
+    </div>
     <table class="outer-table">
       <tbody>
         <tr>
@@ -371,6 +377,26 @@ const tglIndo = (dateStr: string) => {
 </template>
 
 <style scoped>
+.print-actions {
+  text-align: right;
+  padding: 10px 15px;
+  background-color: #f5f5f5;
+  margin-bottom: 10px;
+}
+.print-actions button {
+  padding: 8px 16px;
+  font-size: 10px; /* Mengikuti ukuran font MAP */
+  font-weight: bold;
+  cursor: pointer;
+  background-color: #1976d2;
+  color: white;
+  border: none;
+  border-radius: 4px;
+}
+.print-actions button:hover {
+  background-color: #1565c0;
+}
+
 .loading-state,
 .error-state {
   display: flex;
@@ -599,6 +625,9 @@ pre {
   body {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
+  }
+  .no-print {
+    display: none !important;
   }
 }
 </style>

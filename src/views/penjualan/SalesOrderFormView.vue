@@ -609,6 +609,38 @@ const isDivisiTiga = computed(() =>
   String(formData.value.spk_divisi).startsWith("3"),
 );
 
+// --- SINKRONISASI QTY: Detail Barang Kaosan -> Detail Size (Divisi 3) ---
+const syncSizesFromKaosan = () => {
+  if (!isDivisiTiga.value) return;
+  const kaosanList = formData.value.Kaosan || [];
+  const agg: Record<string, number> = {};
+  kaosanList.forEach((k: any) => {
+    const uk = String(k.ukuran || "")
+      .trim()
+      .toUpperCase();
+    if (!uk) return;
+    agg[uk] = (agg[uk] || 0) + (Number(k.qtyorder) || 0);
+  });
+  const sizesList = formData.value.Sizes || [];
+  sizesList.forEach((s: any) => {
+    const uk = String(s.size || "")
+      .trim()
+      .toUpperCase();
+    s.qty = agg[uk] || 0;
+    delete agg[uk];
+  });
+  Object.keys(agg).forEach((uk) => {
+    if (agg[uk] > 0) sizesList.push({ size: uk, qty: agg[uk], lb: 0, pb: 0 });
+  });
+};
+
+// Sync sekali saat data edit selesai dimuat (bukan per keystroke)
+watch(isLoading, (val, oldVal) => {
+  if (isEditMode.value && oldVal === true && val === false) {
+    nextTick(() => syncSizesFromKaosan());
+  }
+});
+
 // --- WATCHER UNTUK AUTO-FILL DIVISI 3 (KAOSAN) ---
 watch(
   () => formData.value.spk_divisi,
@@ -1335,7 +1367,31 @@ const validateSave = async (skipPoCheck = false) => {
     );
     return;
   }
+
   const fd = formData.value;
+
+  // ⬅ PINDAHAN dari onEdit di Browse: gate SPK PPIC turunan,
+  // sekarang dicek saat SIMPAN, bukan saat membuka form edit.
+  if (isEditMode.value && fd.HasSpkPpic && Number(fd.SpkPpicClose) !== 1) {
+    toast.warning(
+      `SO ini sudah memiliki SPK PPIC turunan (${fd.SpkPpic}) yang masih Open.\n` +
+        `Minta PPIC untuk meng-close SPK PPIC tersebut terlebih dahulu sebelum SO ini bisa diubah.`,
+    );
+    return;
+  }
+  if (
+    isEditMode.value &&
+    fd.HasSpkPpic &&
+    Number(fd.SpkPpicClose) === 1 &&
+    !fd.HasApprovedUbah
+  ) {
+    toast.warning(
+      "SPK PPIC turunan sudah di-close.\n" +
+        'Silakan ajukan "Pengajuan Perubahan Data" (menu Tindakan) dan tunggu ACC sebelum mengubah SO ini.',
+    );
+    return;
+  }
+
   const divisiStr = String(fd.spk_divisi).charAt(0);
   const qtyPesan = Number(fd.spk_jumlah) || 0;
 
@@ -1475,6 +1531,20 @@ const validateSave = async (skipPoCheck = false) => {
     if (sumKaosan !== qtyPesan) {
       toast.warning(
         "Jumlah SPK vs Total Qty Order di Detail Barang Kaosan harus sama.",
+      );
+      return;
+    }
+  }
+
+  // 7b. Guard tambahan — pastikan breakdown Size juga sinkron total-nya
+  if (divisiStr === "3" && !isJoKaosanOpsional.value) {
+    const sumSize = (fd.Sizes || []).reduce(
+      (acc: number, curr: any) => acc + (Number(curr.qty) || 0),
+      0,
+    );
+    if (sumSize !== qtyPesan) {
+      toast.warning(
+        `Breakdown Detail Size (${sumSize}) tidak sama dengan Jumlah SPK (${qtyPesan}). Silakan cek ulang Detail Barang Kaosan.`,
       );
       return;
     }
@@ -1728,6 +1798,7 @@ const setBarangKaosan = (selectedItems: any[]) => {
 
   // Reset index pemanggil
   activeKaosanIndex.value = -1;
+  syncSizesFromKaosan();
 };
 
 const onPilihKatalog = (item: any) => {
@@ -1837,6 +1908,7 @@ const onPilihKatalog = (item: any) => {
           <TabKaosan
             :formData="formData"
             @open-lookup-barang="handleOpenLookupBarang"
+            @sync-sizes="syncSizesFromKaosan"
           />
         </div>
 

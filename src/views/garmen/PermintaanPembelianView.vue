@@ -15,6 +15,7 @@ import {
   IconShieldLock,
   IconCircleCheck,
   IconFileDescription,
+  IconCalendarEvent,
 } from "@tabler/icons-vue";
 import { formatTanggal, formatTanggalJam } from "@/utils/dateFormat";
 
@@ -172,10 +173,9 @@ const getNomorClass = (item: any) => {
 onMounted(() => fetchData());
 
 const onAdd = () => {
-  router.push({
-    name: "PermintaanPembelianFormCreate", // <--- Sesuaikan dengan nama di router
-    query: { jenis: filterState.value.jenis },
-  });
+  router.push(
+    `/garmen/barang/permintaan-pembelian/create/${encodeURIComponent(filterState.value.jenis)}`,
+  );
 };
 
 const onEdit = (item: any) => {

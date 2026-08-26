@@ -99,6 +99,7 @@ const {
   executeSave,
   executeCancel,
   executeClose,
+  goBack,
 } = useForm({
   menuId: "52",
   initialData: defaultData,
@@ -156,13 +157,6 @@ const {
     };
   },
   submitApi: async (data: any) => {
-    // ⚠️ FIX: filter ulang baris kosong DI SINI, tepat sebelum kirim —
-    // jangan cuma andalkan filter di validateSave(). Watcher auto-
-    // trailing-row (di bawah) bereaksi ASYNC begitu formData.items
-    // di-assign ulang, dan bisa nambah 1 baris kosong baru PERSIS
-    // setelah validateSave() selesai membersihkannya (sebelum user
-    // sempat klik konfirmasi) — race condition yang bikin baris
-    // kosong lolos ke backend.
     const cleanItems = data.items.filter(
       (r: any) => r.kode && r.kode.trim() !== "",
     );
@@ -179,7 +173,8 @@ const {
   onSuccess: (res: any) => {
     const nomor = res.data?.data?.nomor || res.data?.nomor || "";
     toast.success(`PO berhasil disimpan dengan nomor: ${nomor}`);
-    router.push("/pembelian/po-bahan");
+    formData.value = JSON.parse(JSON.stringify(defaultData)); // reset eksplisit
+    goBack();
   },
 });
 
