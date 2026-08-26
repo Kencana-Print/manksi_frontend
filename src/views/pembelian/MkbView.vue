@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, onMounted, computed } from "vue";
+import { ref, watch, onActivated, computed } from "vue";
 import { useAuthStore } from "@/stores/authStore";
 import { useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
@@ -113,7 +113,7 @@ const {
   immediate: false,
 });
 
-onMounted(() => fetchData());
+onActivated(() => fetchData());
 
 watch([dtAwal, dtAkhir], () => {
   filterState.value.dtAwal = dtAwal.value;

@@ -45,7 +45,7 @@ export function useForm<
   const showCloseDialog = ref(false);
 
   // Form Data reaktif
-  const formData = ref<T>({ ...options.initialData });
+  const formData = ref<T>(JSON.parse(JSON.stringify(options.initialData)));
 
   const canSave = computed(() => {
     const permission = isEditMode.value ? "edit" : "insert";
@@ -127,6 +127,7 @@ export function useForm<
     } else {
       // Deep copy initialData supaya tidak ada referensi tersisa
       formData.value = JSON.parse(JSON.stringify(options.initialData));
+      options.onFormReset?.();
     }
   };
 

@@ -5,23 +5,24 @@ export const mkaService = {
     startDate: string;
     endDate: string;
     kodeBarang?: string;
+    filterByTglSpk?: boolean;
   }) => api.get("/garmen/mka", { params }),
-
   getDetail: (nomor: string) =>
     api.get("/garmen/mka/detail", { params: { nomor } }),
-
+  getRealisasiDetail: (nomor: string) =>
+    api.get("/garmen/mka/realisasi-detail", { params: { nomor } }),
   deleteData: (nomor: string) =>
     api.delete("/garmen/mka", { params: { nomor } }),
-
   exportHeader: (params: {
     startDate: string;
     endDate: string;
     kodeBarang?: string;
+    filterByTglSpk?: boolean;
   }) => api.get("/garmen/mka/export-header", { params }),
-
   exportDetail: (params: {
     startDate: string;
     endDate: string;
     kodeBarang?: string;
+    filterByTglSpk?: boolean;
   }) => api.get("/garmen/mka/export-detail", { params }),
 };

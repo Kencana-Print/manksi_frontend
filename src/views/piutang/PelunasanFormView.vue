@@ -814,6 +814,7 @@ onMounted(() => {
   gap: 6px;
   min-height: 26px;
   margin-bottom: 4px;
+  flex-wrap: wrap;
 }
 .lbl {
   width: 65px;
@@ -828,7 +829,8 @@ onMounted(() => {
 }
 
 .inp {
-  flex: 1;
+  flex: 1 1 0;
+  min-width: 0;
   height: 24px;
   border: 1px solid #a0a0a0;
   padding: 0 5px;
@@ -837,18 +839,20 @@ onMounted(() => {
   outline: none;
   border-radius: 2px;
 }
+
 .inp:focus {
   border-color: #1565c0;
 }
 
 .idate {
+  flex: 1 1 0;
+  min-width: 0;
   height: 24px;
   border: 1px solid #a0a0a0;
   padding: 0 4px;
   font-size: 11px;
   border-radius: 2px;
   outline: none;
-  flex: 1;
 }
 .idate:focus {
   border-color: #1565c0;
@@ -859,7 +863,8 @@ onMounted(() => {
   color: #444 !important;
 }
 .ta {
-  flex: 1;
+  flex: 1 1 0;
+  min-width: 0;
   border: 1px solid #a0a0a0;
   border-radius: 2px;
   padding: 4px 5px;
@@ -1077,5 +1082,29 @@ onMounted(() => {
 }
 .tf-green {
   color: #a5d6a7;
+}
+
+/* ── Responsif untuk layar kecil ── */
+@media (max-width: 768px) {
+  .fr {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 2px;
+  }
+  .lbl,
+  .lbl.w100 {
+    width: 100%;
+    margin-bottom: 2px;
+  }
+  .inp,
+  .idate,
+  .ta {
+    width: 100%;
+  }
+  /* tombol search tetap sebaris dengan inputnya, bukan ikut wrap ke bawah */
+  .cell-grp,
+  .fr > .inp[style*="flex: none"] + .ci-btn {
+    display: flex;
+  }
 }
 </style>

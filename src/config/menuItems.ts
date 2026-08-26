@@ -85,6 +85,8 @@ import {
   IconPhotoSearch,
   IconMessageExclamation,
   IconDatabaseSearch,
+  IconHourglass,
+  IconShoppingBagPlus,
 } from "@tabler/icons-vue";
 
 export interface NavItem {
@@ -280,6 +282,12 @@ export const createMenuItems = (): NavItem[] => {
           icon: IconMessageExclamation,
           menuId: 36,
         },
+        {
+          title: "Kendala",
+          to: "/daftar/kendala",
+          icon: IconAlertTriangle,
+          menuId: 37,
+        },
       ],
     },
     {
@@ -299,6 +307,12 @@ export const createMenuItems = (): NavItem[] => {
           to: "/pembelian/po-bahan",
           icon: IconFileText,
           menuId: 52,
+        },
+        {
+          title: "PO External Garmen",
+          to: "/pembelian/po-external-garmen",
+          icon: IconShoppingBagPlus,
+          menuId: 144,
         },
       ],
     },
@@ -911,6 +925,12 @@ export const createMenuItems = (): NavItem[] => {
               to: "/laporan/gudang-garmen/realisasi-keluar-bahan",
               icon: IconClipboardCheck,
               menuId: 529,
+            },
+            {
+              title: "Umur Stok Bahan",
+              to: "/laporan/gudang-garmen/umur-stok-bahan",
+              icon: IconHourglass,
+              menuId: 530,
             },
             { divider: true },
             {

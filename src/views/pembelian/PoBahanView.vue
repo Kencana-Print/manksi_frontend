@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from "vue";
+import { ref, computed, watch, onActivated } from "vue";
 import { useAuthStore } from "@/stores/authStore";
 import { useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
@@ -175,7 +175,7 @@ const getNomorStyle = (ngedit: string) => {
 };
 
 // --- HANDLERS ---
-onMounted(() => fetchData());
+onActivated(() => fetchData());
 watch(() => filterState.value.dtAwal, fetchData);
 watch(() => filterState.value.dtAkhir, fetchData);
 // Debounce search agar tidak terlalu sering hit API saat mengetik

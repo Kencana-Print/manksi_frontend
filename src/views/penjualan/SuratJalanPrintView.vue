@@ -145,7 +145,8 @@ const wrapText = (text: string, maxWidth: number): string[] => {
 
 const PAGE_WIDTH = 136;
 const NAMA_W = 50;
-const KET_W = 26;
+const KET_W = 18; // ← dikecilkan dari 26, untuk kasih ruang ke kolom SO
+const SO_W = 20; // ← BARU, sebelumnya hardcode 12 inline
 
 const MAX_DATA_ROWS_PER_PAGE = 7;
 
@@ -188,7 +189,7 @@ const generateTxt = () => {
     }
     lines.push(LINE);
     lines.push(
-      `${padR("No", 3)} ${padR("SO", 12)} ${padR("Nama", NAMA_W)} ${padR("Ukuran", 20)} ${padL("Jumlah", 10)} ${padL("Koli", 9)} ${padR("Keterangan", KET_W)}`,
+      `${padR("No", 3)} ${padR("SO", SO_W)} ${padR("Nama", NAMA_W)} ${padR("Ukuran", 20)} ${padL("Jumlah", 10)} ${padL("Koli", 9)} ${padR("Keterangan", KET_W)}`,
     );
     lines.push(LINE);
     return lines;
@@ -244,22 +245,19 @@ const generateTxt = () => {
   let currentRowNo = 1;
 
   for (const r of rows) {
-    const namaFull = (r.spk_nama || r.spk_nama2 || "").trim();
+    const namaFull = (r.spk_nama2 || r.spk_nama || "").trim();
     const namaLines = wrapText(namaFull, NAMA_W);
     const nomorTampil = r.so_ref || r.sjd_spk_nomor || "";
-
     // Baris Utama (dengan No, SPK, Ukuran, dst)
     allPhysicalRows.push(
-      `${padR(String(currentRowNo), 3)} ${padR(nomorTampil, 12)} ${padR(namaLines[0], NAMA_W)} ${padR(r.sjd_ukuran || "", 20)} ${padL(num(r.sjd_jumlah), 10)} ${padL(num(r.sjd_koli), 9)} ${padR(r.sjd_keterangan || "", KET_W)}`,
+      `${padR(String(currentRowNo), 3)} ${padR(nomorTampil, SO_W)} ${padR(namaLines[0], NAMA_W)} ${padR(r.sjd_ukuran || "", 20)} ${padL(num(r.sjd_jumlah), 10)} ${padL(num(r.sjd_koli), 9)} ${padR(r.sjd_keterangan || "", KET_W)}`,
     );
-
     // Baris Tambahan (jika nama terpotong menjadi multi-baris)
     for (let i = 1; i < namaLines.length; i++) {
       allPhysicalRows.push(
-        `${padR("", 3)} ${padR("", 12)} ${padR(namaLines[i], NAMA_W)} ${padR("", 20)} ${padL("", 10)} ${padL("", 9)} ${padR("", KET_W)}`,
+        `${padR("", 3)} ${padR("", SO_W)} ${padR(namaLines[i], NAMA_W)} ${padR("", 20)} ${padL("", 10)} ${padL("", 9)} ${padR("", KET_W)}`,
       );
     }
-
     currentRowNo++;
   }
 
@@ -520,12 +518,12 @@ onMounted(() => {
               <thead>
                 <tr>
                   <th style="width: 24px; text-align: center">No</th>
-                  <th style="width: 110px">SO</th>
+                  <th style="width: 150px">SO</th>
                   <th>Nama</th>
                   <th style="width: 80px">Ukuran</th>
                   <th style="width: 60px; text-align: right">Jumlah</th>
                   <th style="width: 40px; text-align: right">Koli</th>
-                  <th style="width: 140px">Keterangan</th>
+                  <th style="width: 100px">Keterangan</th>
                 </tr>
               </thead>
               <tbody>
@@ -534,7 +532,7 @@ onMounted(() => {
                     {{ pi * rowsPerPage + i + 1 }}
                   </td>
                   <td>{{ r.so_ref || r.sjd_spk_nomor }}</td>
-                  <td>{{ r.spk_nama || r.spk_nama2 }}</td>
+                  <td>{{ r.spk_nama2 || r.spk_nama }}</td>
                   <td>{{ r.sjd_ukuran }}</td>
                   <td style="text-align: right">{{ num(r.sjd_jumlah) }}</td>
                   <td style="text-align: right">{{ num(r.sjd_koli) }}</td>

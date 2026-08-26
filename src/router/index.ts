@@ -345,7 +345,7 @@ const router = createRouter({
       component: () => import("@/views/daftar/BapProduksiPrintView.vue"),
       meta: {
         title: "Cetak Berita Acara",
-        layout: "BlankLayout", // Gunakan layout kosong tanpa navbar
+        layout: "BlankLayout",
         requiresAuth: true,
       },
     },
@@ -380,6 +380,39 @@ const router = createRouter({
         layout: "DefaultLayout",
         requiresAuth: true,
         menuId: "36",
+      },
+    },
+    {
+      path: "/daftar/kendala",
+      name: "KendalaBrowse",
+      component: () => import("@/views/daftar/KendalaView.vue"),
+      meta: {
+        title: "Kendala",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "37",
+      },
+    },
+    {
+      path: "/daftar/kendala/create",
+      name: "KendalaCreate",
+      component: () => import("@/views/daftar/KendalaFormView.vue"),
+      meta: {
+        title: "Tambah Kendala",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "37",
+      },
+    },
+    {
+      path: "/daftar/kendala/edit/:nomor",
+      name: "KendalaEdit",
+      component: () => import("@/views/daftar/KendalaFormView.vue"),
+      meta: {
+        title: "Ubah Kendala",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "37",
       },
     },
 
@@ -469,6 +502,52 @@ const router = createRouter({
       meta: {
         title: "Cetak PO Bahan",
         layout: "BlankLayout", // Gunakan layout kosong agar sidebar/header aplikasi tidak ikut tercetak
+        requiresAuth: true,
+      },
+    },
+    {
+      path: "/pembelian/po-external-garmen",
+      name: "PoExternalGarmenBrowse",
+      component: () => import("@/views/pembelian/PoExternalGarmenView.vue"),
+      meta: {
+        title: "PO External Garmen",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "144",
+      },
+    },
+    {
+      path: "/pembelian/po-external-garmen/create",
+      name: "PoExternalGarmenCreate",
+      component: () => import("@/views/pembelian/PoExternalGarmenFormView.vue"),
+      meta: {
+        title: "Buat PO External Garmen",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "144",
+        browseRoute: "PoExternalGarmenBrowse",
+      },
+    },
+    {
+      path: "/pembelian/po-external-garmen/edit/:nomor",
+      name: "PoExternalGarmenEdit",
+      component: () => import("@/views/pembelian/PoExternalGarmenFormView.vue"),
+      meta: {
+        title: "Ubah PO External Garmen",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "144",
+        browseRoute: "PoExternalGarmenBrowse",
+      },
+    },
+    {
+      path: "/pembelian/po-external-garmen/print/:nomor",
+      name: "PoExternalGarmenPrint",
+      component: () =>
+        import("@/views/pembelian/PoExternalGarmenPrintView.vue"),
+      meta: {
+        title: "Cetak PO External Garmen",
+        layout: "BlankLayout",
         requiresAuth: true,
       },
     },
@@ -981,7 +1060,7 @@ const router = createRouter({
       },
     },
     {
-      path: "/garmen/bahan-jadi/cetak-barcode-kaosan/edit",
+      path: "/garmen/bahan-jadi/cetak-barcode-kaosan/edit/:nomor",
       name: "CetakBarcodeKaosanFormEdit",
       component: () => import("@/views/garmen/CetakBarcodeKaosanFormView.vue"),
       meta: {
@@ -1246,7 +1325,7 @@ const router = createRouter({
       },
     },
     {
-      path: "/garmen/barang/retur-barang/form",
+      path: "/garmen/barang/retur-barang/form/create/:jenis",
       name: "GarmenReturBarangCreate",
       component: () => import("@/views/garmen/ReturBarangFormView.vue"),
       meta: {
@@ -1302,7 +1381,7 @@ const router = createRouter({
       },
     },
     {
-      path: "/garmen/barang/koreksi-stok/form",
+      path: "/garmen/barang/koreksi-stok/form/create/:jenis",
       name: "GarmenKoreksiStokBarangCreate",
       component: () => import("@/views/garmen/KoreksiStokBarangFormView.vue"),
       meta: {
@@ -1347,7 +1426,7 @@ const router = createRouter({
       },
     },
     {
-      path: "/garmen/barang/permintaan-pembelian/create",
+      path: "/garmen/barang/permintaan-pembelian/create/:jenis",
       name: "PermintaanPembelianFormCreate",
       component: () => import("@/views/garmen/PermintaanPembelianFormView.vue"),
       meta: {
@@ -1393,7 +1472,7 @@ const router = createRouter({
       },
     },
     {
-      path: "/garmen/barang/mutasi-out/create",
+      path: "/garmen/barang/mutasi-out/create/:jenis",
       name: "MutasiOutGarmenFormCreate",
       component: () => import("@/views/garmen/MutasiOutBarangFormView.vue"),
       meta: {
@@ -1449,7 +1528,7 @@ const router = createRouter({
       },
     },
     {
-      path: "/garmen/barang/po-nonbahan/create",
+      path: "/garmen/barang/po-nonbahan/create/:jenis",
       name: "PoNonBahanGarmenFormCreate",
       component: () => import("@/views/garmen/PoNonBahanFormView.vue"),
       meta: {
@@ -1494,7 +1573,7 @@ const router = createRouter({
       },
     },
     {
-      path: "/garmen/barang/bpb-nonbahan/create",
+      path: "/garmen/barang/bpb-nonbahan/create/:jenis",
       name: "BpbNonBahanGarmenFormCreate",
       component: () => import("@/views/garmen/BpbNonBahanFormView.vue"),
       meta: {
@@ -1529,7 +1608,7 @@ const router = createRouter({
       },
     },
     {
-      path: "/garmen/barang/retur-pembelian/form",
+      path: "/garmen/barang/retur-pembelian/form/create/:jenis",
       name: "GarmenReturPembelianBarangCreate",
       component: () =>
         import("@/views/garmen/ReturPembelianBarangFormView.vue"),
@@ -1655,7 +1734,7 @@ const router = createRouter({
       },
     },
     {
-      path: "/garmen/bpb-jasa/edit",
+      path: "/garmen/bpb-jasa/edit/:nomor",
       name: "BpbJasaFormEdit",
       component: () => import("@/views/garmen/BpbJasaFormView.vue"),
       meta: {
@@ -1959,17 +2038,6 @@ const router = createRouter({
         title: "Cetak Mutasi Produksi",
         layout: "BlankLayout",
         requiresAuth: true,
-      },
-    },
-    {
-      path: "/garmen/lhk-pola",
-      name: "LhkPolaBrowse",
-      component: () => import("@/views/garmen/LhkPolaView.vue"),
-      meta: {
-        title: "LHK Pola",
-        layout: "DefaultLayout",
-        requiresAuth: true,
-        menuId: "174",
       },
     },
     {
@@ -2373,7 +2441,7 @@ const router = createRouter({
       },
     },
     {
-      path: "/penjualan/pra-sj/edit",
+      path: "/penjualan/pra-sj/edit/:praSj",
       name: "PraSJFormEdit",
       component: () => import("@/views/penjualan/PraSJFormView.vue"),
       meta: {
@@ -2453,7 +2521,7 @@ const router = createRouter({
       },
     },
     {
-      path: "/penjualan/sj-tak-normal/edit",
+      path: "/penjualan/sj-tak-normal/edit/:nomor",
       name: "SjTakNormalFormEdit",
       component: () => import("@/views/penjualan/SjTakNormalFormView.vue"),
       meta: {
@@ -2520,7 +2588,7 @@ const router = createRouter({
       },
     },
     {
-      path: "/penjualan/invoice/edit",
+      path: "/penjualan/invoice/edit/:nomor",
       name: "InvoiceFormEdit",
       component: () => import("@/views/penjualan/InvoiceFormView.vue"),
       meta: {
@@ -2610,7 +2678,7 @@ const router = createRouter({
       },
     },
     {
-      path: "/penjualan/invoice-tak-normal/edit",
+      path: "/penjualan/invoice-tak-normal/edit/:nomor",
       name: "InvoiceTakNormalFormEdit",
       component: () => import("@/views/penjualan/InvoiceTakNormalFormView.vue"),
       meta: {
@@ -3166,6 +3234,18 @@ const router = createRouter({
       },
     },
     {
+      path: "/laporan/gudang-garmen/umur-stok-bahan",
+      name: "LapUmurStokBahan",
+      component: () =>
+        import("@/views/laporan/gudang-garmen/UmurStokBahanView.vue"),
+      meta: {
+        title: "Laporan Umur Stok Bahan",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "530",
+      },
+    },
+    {
       path: "/laporan/gudang-garmen/standart-babaran-vs-realisasi",
       name: "LapStandartBabaranVsRealisasi",
       component: () =>
@@ -3195,7 +3275,7 @@ const router = createRouter({
       component: () =>
         import("@/views/laporan/gudang-garmen/SpkBelumMkbView.vue"),
       meta: {
-        title: "Laporan SPK Belum Ada MKB",
+        title: "Laporan SO Belum Ada MKB",
         layout: "DefaultLayout",
         requiresAuth: true,
         menuId: "510",

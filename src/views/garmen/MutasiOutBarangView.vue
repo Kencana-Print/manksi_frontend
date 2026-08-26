@@ -141,7 +141,7 @@ const onUpdateExpanded = async (newExpanded: any[]) => {
 // ── Actions ──
 const onAdd = () =>
   router.push(
-    `/garmen/barang/mutasi-out/create?jenis=${filterState.value.jenis}`,
+    `/garmen/barang/mutasi-out/create/${encodeURIComponent(filterState.value.jenis)}`,
   );
 const onEdit = (item: any) => {
   const safeNomor = encodeURIComponent(encodeURIComponent(item.Nomor));

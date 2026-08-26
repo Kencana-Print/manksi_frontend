@@ -27,16 +27,16 @@ onMounted(async () => {
   try {
     const res = await penawaranFormService.getById(nomor);
     data.value = res.data.data;
-
-    setTimeout(() => {
-      window.print();
-    }, 800);
   } catch (error) {
     console.error("Gagal memuat data print", error);
   } finally {
     isLoading.value = false;
   }
 });
+
+const handlePrint = () => {
+  window.print();
+};
 
 const perushKode = computed(
   () => data.value?.pen_perush_kode?.toUpperCase() || "KP",
@@ -239,6 +239,9 @@ const dpNominal = computed(() => {
   <div v-if="isLoading" class="loading-state">Memuat Dokumen...</div>
 
   <div v-else-if="data" class="print-wrapper">
+    <div class="no-print print-actions">
+      <button @click="handlePrint">🖨️ Cetak Penawaran</button>
+    </div>
     <div class="print-container" :style="{ borderColor: pageBorderColor }">
       <div v-if="perushKode === 'JA'" class="print-header-ja">
         <div class="header-left">
@@ -615,6 +618,26 @@ const dpNominal = computed(() => {
 </template>
 
 <style scoped>
+.print-actions {
+  text-align: right;
+  padding: 10px 15px;
+  background-color: #f5f5f5;
+  margin-bottom: 10px;
+}
+.print-actions button {
+  padding: 8px 16px;
+  font-size: 11px; /* Sesuai dengan ukuran font penawaran */
+  font-weight: bold;
+  cursor: pointer;
+  background-color: #1976d2;
+  color: white;
+  border: none;
+  border-radius: 4px;
+}
+.print-actions button:hover {
+  background-color: #1565c0;
+}
+
 /* WAJIB UNTUK BACKGROUND KUNING SAAT CETAK */
 * {
   -webkit-print-color-adjust: exact !important;
@@ -635,6 +658,9 @@ const dpNominal = computed(() => {
   .page-footer-ja {
     position: fixed;
     bottom: 10mm;
+  }
+  .no-print {
+    display: none !important;
   }
 }
 

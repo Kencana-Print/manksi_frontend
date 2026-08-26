@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, nextTick } from "vue";
 import { useToast } from "vue-toastification";
+import { useRoute } from "vue-router";
 import BaseForm from "@/components/BaseForm.vue";
 import { useForm } from "@/composables/useForm";
 import BpbSearchModal from "@/components/lookups/BpbSearchModal.vue";
@@ -34,6 +35,7 @@ interface ReturPembelianFormData {
   rows: DetailRow[];
 }
 
+const route = useRoute();
 const toast = useToast();
 
 const BROWSE_PATH = "/garmen/barang/retur-pembelian";
@@ -112,7 +114,10 @@ const {
   menuId: "68",
   initialData: {
     nomor: "",
-    jenis: sessionStorage.getItem("last_jenis_retur_pembelian") || "ACCESORIES",
+    jenis:
+      typeof route.params.jenis === "string"
+        ? route.params.jenis
+        : "ACCESORIES",
     tanggal: getLocalDate(),
     keterangan: "",
     bpbNomor: "",
@@ -120,6 +125,22 @@ const {
     supplier: { kode: "", nama: "", alamat: "", kota: "" },
     statusPin5: "",
     rows: [],
+  },
+  onFormReset: () => {
+    fd.value.jenis =
+      typeof route.params.jenis === "string"
+        ? route.params.jenis
+        : "ACCESORIES";
+    fd.value.tanggal = getLocalDate();
+    fd.value.keterangan = "";
+    fd.value.bpbNomor = "";
+    fd.value.bpbTanggal = "";
+    fd.value.supplier = { kode: "", nama: "", alamat: "", kota: "" };
+    fd.value.rows = [];
+    bpbModalOpen.value = false;
+    showPrintDialog.value = false;
+    savedNomor.value = "";
+    jumlahRefs.value = {};
   },
   fetchApi,
   submitApi,
@@ -140,7 +161,9 @@ const isSaveBlocked = computed(() =>
 const isBpbLocked = computed(() => isEditMode.value);
 
 const loadData = async () => {
-  await fetchData();
+  if (isEditMode.value) {
+    await fetchData();
+  }
   if (!isEditMode.value) {
     await nextTick();
     bpbInputRef.value?.focus();

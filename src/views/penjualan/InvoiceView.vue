@@ -172,7 +172,7 @@ const goEdit = async () => {
     }
     router.push({
       name: "InvoiceFormEdit",
-      query: { nomor: selectedItem.value.Nomor },
+      params: { nomor: selectedItem.value.Nomor },
     });
   } catch (e: any) {
     toast.error(e.response?.data?.message || "Gagal cek data.");
@@ -423,6 +423,8 @@ const onExportDetail = async () => {
     :show-expand="true"
     :loading-details="loadingDetails"
     :expanded="expandedItems"
+    :filter-state="filterState"
+    @update:filter-state="onFilterStateRestore"
     @update:selected="selected = $event"
     @update:expanded="onExpandChange"
     @add="goNew"

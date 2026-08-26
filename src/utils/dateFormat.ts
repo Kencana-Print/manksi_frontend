@@ -102,3 +102,25 @@ export const formatTanggalLongExport = (
   if (!y || !m || !d) return v;
   return `${d}-${months[Number(m) - 1]}-${y}`;
 };
+
+/**
+ * Format tanggal MENGIKUTI locale/format region yang diset di OS/browser
+ * user (bukan format hardcode). Kalau user Windows-nya diset region
+ * Indonesia -> "21/08/2026", kalau US -> "8/21/2026", dst — otomatis
+ * ikut setting PC masing-masing user.
+ */
+export const formatTanggalLocale = (v: string | null | undefined): string => {
+  if (!v) return "-";
+  const s = String(v);
+  let d: Date;
+  if (s.includes("T")) {
+    d = new Date(s);
+  } else if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
+    const [y, m, day] = s.substring(0, 10).split("-").map(Number);
+    d = new Date(y, m - 1, day);
+  } else {
+    d = new Date(s);
+  }
+  if (isNaN(d.getTime())) return "-";
+  return d.toLocaleDateString();
+};

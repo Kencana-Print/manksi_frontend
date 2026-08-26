@@ -49,6 +49,15 @@ const selectedRowIdx = ref(-1);
 // State untuk dropdown komponen
 const listKomponen = ref<string[]>([]);
 const jenisOptions = ["MUDA", "SEDANG", "TUA", "SUPER TUA"];
+// ⬅ Pengecualian khusus — untuk SO ini, kolom "Jumlah" di rincian
+// bahan boleh diedit manual, TIDAK ditimpa otomatis oleh hasil
+// kalkulasi babaran×qtySpk. SO lain tetap terkunci ke rumus.
+const JUMLAH_BAHAN_MANUAL_EXCEPTIONS = ["SO-JA-KO-000018"];
+const isJumlahBahanManual = computed(() =>
+  JUMLAH_BAHAN_MANUAL_EXCEPTIONS.includes(
+    String(formData.value.nomorSpk || "").toUpperCase(),
+  ),
+);
 
 const formatDateLocal = (value?: string | Date) => {
   if (!value) return "";
@@ -97,6 +106,7 @@ const {
   executeSave,
   executeCancel,
   executeClose,
+  goBack,
 } = useForm({
   menuId: "51",
   initialData: emptyData,
@@ -222,6 +232,10 @@ onMounted(() => {
 // Allowance/PO, biar bisa dipanggil terpisah sesuai kebutuhan titik trigger.
 const recalcJumlahOnly = (row: any) => {
   if (!row.kode) return;
+  // ⬅ Pengecualian: SO ini biarkan user isi Jumlah manual, jangan
+  // ditimpa hasil hitung babaran×qtySpk.
+  if (isJumlahBahanManual.value) return;
+
   const babaran = Number(row.babaran) || 0;
   const qtySpk = Number(formData.value.jumlahSpk) || 0;
   if (babaran !== 0 && qtySpk !== 0) {
@@ -537,10 +551,23 @@ const validateSave = () => {
   showSaveDialog.value = true;
 };
 
+const resetFormState = () => {
+  formData.value = {
+    ...emptyData,
+    tanggal: formatDateLocal(new Date()),
+    dtlBahan: [],
+    dtlLink: [],
+    dtlPlan: [],
+    dtlMap: [],
+  };
+  savedNomor.value = "";
+  selectedRowIdx.value = -1;
+};
+
 // Fungsi untuk Cetak atau Tutup
 const closePrintAndExit = () => {
   showPrintDialog.value = false;
-  router.back();
+  goBack();
 };
 
 const doCetak = () => {
@@ -550,7 +577,7 @@ const doCetak = () => {
     `/pembelian/mkb/print?nomor=${encodeURIComponent(savedNomor.value)}`,
     "_blank",
   );
-  router.back();
+  goBack();
 };
 
 // --- LOGIKA LINK PO ---
@@ -874,6 +901,10 @@ const onPoSelected = (po: any) => {
                     type="number"
                     v-model="row.jumlah"
                     class="gi tr fw bg-blue-lighten-5"
+                    :class="{ 'gi-manual': isJumlahBahanManual }"
+                    :title="
+                      isJumlahBahanManual ? 'Diisi manual — SO khusus' : ''
+                    "
                     @input="recalcRowFull(row)"
                     v-select-on-focus
                   />
@@ -1449,5 +1480,10 @@ const onPoSelected = (po: any) => {
   font-style: italic;
   padding: 12px 8px;
   font-size: 11px;
+}
+
+.gi-manual {
+  background: #fff8e1 !important;
+  box-shadow: inset 0 0 0 1.5px #ffb300;
 }
 </style>

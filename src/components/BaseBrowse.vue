@@ -505,15 +505,17 @@ const fmtSummaryVal = (v: number) =>
     Math.round(v),
   );
 const totalItems = computed(() => filteredItems.value.length);
-const totalPages = computed(() =>
-  Math.max(1, Math.ceil(totalItems.value / perPage.value)),
-);
+const totalPages = computed(() => {
+  if (perPage.value === -1) return 1;
+  return Math.max(1, Math.ceil(totalItems.value / perPage.value));
+});
 const pageStart = computed(() =>
   totalItems.value === 0 ? 0 : (currentPage.value - 1) * perPage.value + 1,
 );
-const pageEnd = computed(() =>
-  Math.min(currentPage.value * perPage.value, totalItems.value),
-);
+const pageEnd = computed(() => {
+  if (perPage.value === -1) return totalItems.value;
+  return Math.min(currentPage.value * perPage.value, totalItems.value);
+});
 
 const visiblePages = computed(() => {
   const total = totalPages.value;
@@ -543,11 +545,11 @@ const onSearch = (val: string) => {
 };
 
 const pagedItems = computed(() => {
+  if (perPage.value === -1) return filteredItems.value;
   const start = (currentPage.value - 1) * perPage.value;
   return filteredItems.value.slice(start, start + perPage.value);
 });
 
-// ── Row props ──────────────────────────────────────────────────────────
 // ── Row props ──────────────────────────────────────────────────────────
 const handleRowClick = (event: PointerEvent, { item }: { item: any }) => {
   const raw = item?.raw || item;
@@ -1158,13 +1160,14 @@ watch(
         <div class="per-page-wrap">
           <span class="page-info">Per halaman</span>
           <select
-            v-model="perPage"
+            v-model.number="perPage"
             class="per-page-select"
             @change="currentPage = 1"
           >
             <option v-for="n in [25, 50, 100, 200]" :key="n" :value="n">
               {{ n }}
             </option>
+            <option :value="-1">Semua</option>
           </select>
         </div>
       </div>

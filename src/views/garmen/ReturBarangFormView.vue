@@ -56,7 +56,8 @@ const formatDateLocal = (value?: string | Date) => {
 const initialData = {
   nomor: "",
   tanggal: formatDateLocal(new Date()),
-  jenis: sessionStorage.getItem("last_jenis_retur_barang") || "ACCESORIES",
+  jenis:
+    typeof route.params.jenis === "string" ? route.params.jenis : "ACCESORIES",
   cabang: authStore.user?.cabang || "",
   gpKode: "",
   gpNama: "",
@@ -80,6 +81,26 @@ const {
 } = useForm({
   menuId: "61",
   initialData,
+  onFormReset: () => {
+    formData.value.jenis =
+      typeof route.params.jenis === "string"
+        ? route.params.jenis
+        : "ACCESORIES";
+    formData.value.cabang = authStore.user?.cabang || "";
+    formData.value.details = [emptyRow()];
+    showGpModal.value = false;
+    showRealisasiModal.value = false;
+    showBarangModal.value = false;
+    barangMultiMode.value = false;
+    activeRowIndex.value = null;
+    presetRealisasiNomor.value = "";
+    showPrintDialog.value = false;
+    savedNomor.value = "";
+    jumlahRefs.value = {};
+    keteranganRefs.value = {};
+    nomintaRefs.value = {};
+    kodeRefs.value = {};
+  },
   fetchApi: async () => {
     const res = await returBarangFormService.getDetail(nomorParam.value);
     const data = res.data.data;

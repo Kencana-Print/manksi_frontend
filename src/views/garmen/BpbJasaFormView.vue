@@ -3,6 +3,7 @@ import { ref, computed, onMounted, watch } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { useToast } from "vue-toastification";
 import { useAuthStore } from "@/stores/authStore";
+import { useTabsStore } from "@/stores/tabsStore";
 import api from "@/services/api";
 import BaseForm from "@/components/BaseForm.vue";
 import { useForm } from "@/composables/useForm";
@@ -96,9 +97,10 @@ interface FormData {
 const authStore = useAuthStore();
 const router = useRouter();
 const route = useRoute();
+const tabsStore = useTabsStore();
 const toast = useToast();
 const userCab = computed(() => authStore.user?.cabang || "");
-const isEditModeManual = computed(() => !!route.query.nomor);
+const isEditModeManual = computed(() => !!route.params.nomor);
 
 // ── Helpers ────────────────────────────────────────────────────────────
 const todayLocal = () => {
@@ -210,7 +212,7 @@ const {
   initialData: init,
   immediate: false,
   fetchApi: async (): Promise<FormData> => {
-    const nomorEdit = (route.query.nomor as string) || (params as any).nomor;
+    const nomorEdit = (route.params.nomor as string) || (params as any).nomor;
     const res = await svc.getFormById(nomorEdit);
     const d = res.data.data;
     const h = d.header;
@@ -290,7 +292,7 @@ const {
     };
   },
   submitApi: async (data): Promise<any> => {
-    const nomorEdit = (route.query.nomor as string) || data.Nomor;
+    const nomorEdit = (route.params.nomor as string) || data.Nomor;
     const payload = {
       ...data,
       Nomor: nomorEdit,
@@ -619,26 +621,46 @@ const validateSave = () => {
 };
 
 const onAfterPrint = () => {
+  const currentPath = route.path;
   showPrintDialog.value = false;
-  router.push({ name: "BpbJasaBrowse" });
+  router
+    .push({ name: "BpbJasaBrowse" })
+    .catch(() => {})
+    .then(() => {
+      tabsStore.closeTab(currentPath);
+    });
 };
+
 const skipPrint = () => {
+  const currentPath = route.path;
   showPrintDialog.value = false;
-  router.push({ name: "BpbJasaBrowse" });
+  router
+    .push({ name: "BpbJasaBrowse" })
+    .catch(() => {})
+    .then(() => {
+      tabsStore.closeTab(currentPath);
+    });
 };
+
 const doCetak = () => {
+  const currentPath = route.path;
   const url = router.resolve({
     name: "BpbJasaPrint",
     query: { nomor: savedNomor.value },
   }).href;
   window.open(url, "_blank");
   showPrintDialog.value = false;
-  router.push({ name: "BpbJasaBrowse" });
+  router
+    .push({ name: "BpbJasaBrowse" })
+    .catch(() => {})
+    .then(() => {
+      tabsStore.closeTab(currentPath);
+    });
 };
 
 // ── Lifecycle ─────────────────────────────────────────────────────────
 onMounted(async () => {
-  if (route.query.nomor) {
+  if (route.params.nomor) {
     await fetchData();
   } else {
     fd.value.Cab = userCab.value || "";
@@ -648,16 +670,12 @@ onMounted(async () => {
 
 // Tambahan: pantau perubahan query 'nomor' selagi komponen tetap mounted
 watch(
-  () => route.query.nomor,
+  () => route.params.nomor,
   async (newNomor, oldNomor) => {
     if (newNomor === oldNomor) return;
-
-    // reset dulu ke initial state biar gak "nyangkut" data lama
-    // sebelum response baru datang (termasuk saat fetch gagal/lambat)
     fd.value = JSON.parse(JSON.stringify(init));
     komponenList.value = [];
     kelompokList.value = [];
-
     if (newNomor) {
       await fetchData();
     } else {

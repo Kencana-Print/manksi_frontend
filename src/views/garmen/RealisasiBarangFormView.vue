@@ -48,8 +48,7 @@ const jenisFromParam = computed(() => {
   return jenisSlugReverseMap[raw] || raw;
 });
 const showMintaModal = ref(false);
-const showBarangModal = ref(false);
-const activeRowIndex = ref(0);
+
 const showPrintDialog = ref(false);
 const savedNomor = ref("");
 // ─────────────────────────────────────────────
@@ -85,7 +84,8 @@ const formatDateLocal = (value?: string | Date) => {
 const initialData = {
   nomor: "",
   tanggal: formatDateLocal(new Date()),
-  jenis: sessionStorage.getItem("last_jenis_realisasi") || "ACCESORIES",
+  jenis:
+    typeof route.params.jenis === "string" ? route.params.jenis : "ACCESORIES",
   noMinta: "",
   cabMinta: "",
   keterangan: "",
@@ -116,6 +116,18 @@ const {
 } = useForm({
   menuId: "62",
   initialData,
+  onFormReset: () => {
+    // sessionStorage bisa berubah antara satu "Tambah" ke "Tambah"
+    // berikutnya (user ganti filter Jenis di browse) — baca ulang di
+    // sini, jangan andalkan initialData yang cuma dibaca sekali saat
+    // komponen pertama kali di-mount.
+    formData.value.jenis =
+      sessionStorage.getItem("last_jenis_realisasi") || "ACCESORIES";
+    showMintaModal.value = false;
+    showPrintDialog.value = false;
+    savedNomor.value = "";
+    jumlahInputs.value = [];
+  },
   fetchApi: async () => {
     const res = await realisasiBarangFormService.getDetail(nomorParam.value);
     const { header, reqHeader, details } = res.data.data;

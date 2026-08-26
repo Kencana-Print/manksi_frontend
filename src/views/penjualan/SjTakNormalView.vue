@@ -138,7 +138,7 @@ const goEdit = async () => {
     }
     router.push({
       name: "SjTakNormalFormEdit",
-      query: { nomor: selectedItem.value.Nomor },
+      params: { nomor: selectedItem.value.Nomor },
     });
   } catch (e: any) {
     toast.error(e.response?.data?.message || "Gagal cek data.");

@@ -126,6 +126,7 @@ const baseHeadersFront = [
   { title: "Nomor", key: "Nomor", width: "135px", fixed: true },
   { title: "MO", key: "MO", width: "80px" },
   { title: "CMO", key: "CMO", width: "80px" },
+  { title: "Pembuat", key: "Pembuat", width: "100px" },
   { title: "Tanggal", key: "Tanggal", width: "100px", align: "center" },
   { title: "Dateline", key: "Dateline", width: "100px", align: "center" },
   { title: "Kepentingan", key: "Kepentingan", width: "100px" },
@@ -330,6 +331,7 @@ const onExport = async () => {
     { header: "Nomor", key: "Nomor", width: 20 },
     { header: "MO", key: "MO", width: 12 },
     { header: "CMO", key: "CMO", width: 12 },
+    { header: "Pembuat", key: "Pembuat", width: 14 },
     { header: "Tanggal", key: "Tanggal", width: 14, align: "center" },
     { header: "Dateline", key: "Dateline", width: 14, align: "center" },
     { header: "Kepentingan", key: "Kepentingan", width: 14 },
@@ -651,7 +653,18 @@ const isPreviewLandscape = computed(() => {
   const cab = selectedItem.value.Cab;
   return ["P01", "P02", "P05"].includes(cab);
 });
-const PAGE_WIDTH_PX = computed(() => (isPreviewLandscape.value ? 1123 : 793));
+
+// ── FIX: lebar asli tiap format print, bukan asumsi A4 landscape generik ──
+// P01 → .print-page-p01 { width: 277mm } ≈ 1047px
+// P02/P05 → .print-wrapper-so { width: 297mm } ≈ 1123px (2 kolom, memang A4 landscape)
+// Portrait (format baru) → .print-page.page-1 { width: 210mm } ≈ 794px
+const PAGE_WIDTH_PX = computed(() => {
+  if (!selectedItem.value) return 793;
+  const cab = selectedItem.value.Cab;
+  if (cab === "P01") return 1047;
+  if (["P02", "P05"].includes(cab)) return 1123;
+  return 793;
+});
 
 // Fit-to-screen: hitung scale berdasarkan LEBAR *dan* TINGGI viewport
 // dialog yang tersedia (bukan cuma lebar seperti sebelumnya) — supaya
@@ -660,12 +673,14 @@ const PAGE_WIDTH_PX = computed(() => (isPreviewLandscape.value ? 1123 : 793));
 const computeFitScale = () => {
   const el = previewContainerEl.value;
   if (!el) return 1;
-  const availW = el.clientWidth - 24; // padding kiri-kanan
-  const availH = el.clientHeight - 24; // padding atas-bawah
+  const availW = el.clientWidth - 24;
+  const availH = el.clientHeight - 24;
   if (availW < 50 || availH < 50) return 1;
   const scaleW = availW / PAGE_WIDTH_PX.value;
   const scaleH = availH / previewContentHeight.value;
-  const fit = Math.min(scaleW, scaleH, 1); // jangan pernah upscale di atas 100% otomatis
+  // ── FIX: hapus cap 1 — biarkan auto-fit upscale sepenuhnya
+  // memenuhi dialog, dibatasi MAX_ZOOM saja supaya tidak ekstrem ──
+  const fit = Math.min(scaleW, scaleH, MAX_ZOOM);
   return fit > 0 ? fit : 1;
 };
 
@@ -691,7 +706,7 @@ const zoomOut = () => {
 };
 const zoomReset = () => {
   // Balik ke mode auto-fit selayar (bukan set ke 100% fixed)
-  manualZoomFactor.value = null;
+  manualZoomFactor.value = 1;
   recomputePreviewScale();
 };
 const onPreviewWheel = (e: WheelEvent) => {
@@ -731,7 +746,7 @@ watch(showPreviewDialog, async (open) => {
     window.addEventListener("message", onPreviewMessage);
     window.addEventListener("keydown", blockPrintShortcutParent, true);
     previewContentHeight.value = 1123;
-    manualZoomFactor.value = null; // selalu mulai dari auto-fit tiap buka baru
+    manualZoomFactor.value = 1; // ← FIX: mulai dari 100% pasti, bukan auto-fit
     await nextTick();
     if (previewContainerEl.value) {
       previewResizeObserver = new ResizeObserver(() => recomputePreviewScale());
@@ -1300,16 +1315,16 @@ const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
   <!-- Dialog Preview Cetak SPK (embed, bukan tab baru) -->
   <v-dialog
     v-model="showPreviewDialog"
-    max-width="98vw"
+    max-width="99vw"
     scrollable
     @contextmenu.prevent
   >
     <v-card
       rounded="lg"
       :style="{
-        height: '90vh',
-        width: isPreviewLandscape ? '1180px' : '850px',
-        maxWidth: '96vw',
+        height: '96vh',
+        width: isPreviewLandscape ? '97vw' : '75vw',
+        maxWidth: '99vw',
         minWidth: '420px',
         minHeight: '320px',
         display: 'flex',
@@ -1348,7 +1363,7 @@ const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
             </button>
             <button
               class="zoom-percent"
-              title="Kembalikan ke ukuran selayar"
+              title="Kembalikan ke 100%"
               @click="zoomReset"
             >
               {{ zoomPercentDisplay }}%
@@ -1369,7 +1384,7 @@ const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
           overflow-x: auto;
           display: flex;
           justify-content: center;
-          padding: 12px;
+          padding: 6px;
         "
         @wheel="onPreviewWheel"
       >

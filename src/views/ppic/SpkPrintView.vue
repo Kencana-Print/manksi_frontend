@@ -646,11 +646,11 @@ onMounted(async () => {
               <tr>
                 <td class="sign-space-p01">
                   <img
-                    :src="getSignatureUrl(spk.user_create)"
+                    :src="getSignatureUrl(spk.spk_mo)"
                     class="ttd-img-p01"
                     @error="handleSignatureError"
                   />
-                  <div class="sign-name-p01">{{ spk.user_create }}</div>
+                  <div class="sign-name-p01">{{ spk.spk_mo || "-" }}</div>
                 </td>
                 <td class="sign-space-p01">
                   <img
@@ -841,11 +841,11 @@ Keterangan Komponen :
                 <tr>
                   <td class="sign-space-simple-so">
                     <img
-                      :src="getSignatureUrl(spk.user_create)"
+                      :src="getSignatureUrl(spk.spk_mo)"
                       class="ttd-img-simple-so"
                       @error="handleSignatureError"
                     />
-                    <div class="sign-name-so">{{ spk.user_create }}</div>
+                    <div class="sign-name-so">{{ spk.spk_mo || "-" }}</div>
                   </td>
                   <td class="sign-space-simple-so">
                     <img

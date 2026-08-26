@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from "vue";
+import { ref, onActivated, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
 import BaseBrowse from "@/components/BaseBrowse.vue";
@@ -199,14 +199,12 @@ const onExportDetail = async () => {
   }
 };
 
-onMounted(async () => {
+onActivated(async () => {
   try {
     const res = await proofService.getMeta();
     const meta = res.data.data;
     cabangOptions.value = meta.cabangOptions || ["ALL", "P01", "P04"];
     userCab.value = meta.userCab || "";
-    // Kalau belum ada filter tersimpan di session, pakai default dari
-    // cabang user (sesuai Delphi: cbCab.Text := frmMenu.CAB)
     if (!savedFilter.cab) {
       filterState.value.cab = meta.defaultCab || "ALL";
     }

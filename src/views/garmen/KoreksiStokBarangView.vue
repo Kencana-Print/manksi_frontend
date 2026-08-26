@@ -62,9 +62,16 @@ onMounted(() => {
   const bagian = (authStore.user?.bagian || "").toUpperCase();
 
   if (
-    ["ADMIN", "PPIC", "GUDANG", "PRODUKSI", "POTONG", "CETAK", "JAHIT", "LIPAT"].includes(
-      bagian,
-    )
+    [
+      "ADMIN",
+      "PPIC",
+      "GUDANG",
+      "PRODUKSI",
+      "POTONG",
+      "CETAK",
+      "JAHIT",
+      "LIPAT",
+    ].includes(bagian)
   ) {
     jenisOptions.value = ["ACCESORIES", "OBAT"];
     filterState.value.jenis = "ACCESORIES";
@@ -91,23 +98,31 @@ onMounted(() => {
 const canBrowse = computed(() => jenisOptions.value.length > 0);
 
 // --- KOMPOSISI BROWSE ---
-const { items, isLoading, selected, fetchData, canInsert, canEdit, canDelete, canExport } =
-  useBrowse({
-    menuId: "64",
-    fetchApi: async () => {
-      if (!canBrowse.value) return [];
-      const res = await koreksiStokBarangService.getBrowse(
-        filterState.value.startDate,
-        filterState.value.endDate,
-        filterState.value.cabang,
-        filterState.value.jenis,
-      );
-      return res.data.data;
-    },
-    deleteApi: async (nomor: string) => {
-      await koreksiStokBarangService.deleteData(nomor);
-    },
-  });
+const {
+  items,
+  isLoading,
+  selected,
+  fetchData,
+  canInsert,
+  canEdit,
+  canDelete,
+  canExport,
+} = useBrowse({
+  menuId: "64",
+  fetchApi: async () => {
+    if (!canBrowse.value) return [];
+    const res = await koreksiStokBarangService.getBrowse(
+      filterState.value.startDate,
+      filterState.value.endDate,
+      filterState.value.cabang,
+      filterState.value.jenis,
+    );
+    return res.data.data;
+  },
+  deleteApi: async (nomor: string) => {
+    await koreksiStokBarangService.deleteData(nomor);
+  },
+});
 
 // --- KONFIGURASI TABEL --- (koreksi stok tidak punya kolom approve/spk,
 // jauh lebih sederhana dari Retur Barang)
@@ -145,8 +160,9 @@ const expandedRows = ref<any[]>([]);
 
 // --- FUNGSI AKSI ---
 const onAdd = () => {
-  sessionStorage.setItem("last_jenis_koreksi_stok", filterState.value.jenis);
-  router.push("/garmen/barang/koreksi-stok/form");
+  router.push(
+    `/garmen/barang/koreksi-stok/form/create/${encodeURIComponent(filterState.value.jenis)}`,
+  );
 };
 
 const onEdit = (item: any) => {
@@ -176,7 +192,8 @@ const onPrint = () => {
 };
 
 const onExport = async () => {
-  if (!items.value?.length) return toast.warning("Tidak ada data untuk diexport.");
+  if (!items.value?.length)
+    return toast.warning("Tidak ada data untuk diexport.");
 
   const columns: ExcelColumn[] = [
     { header: "Nomor", key: "Nomor", width: 18 },
