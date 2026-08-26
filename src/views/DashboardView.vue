@@ -1792,7 +1792,7 @@ const renderTrendChart = async () => {
       type: "line",
       colors: {
         "MAP Baru": "#00695c",
-        "SO Baru": "#0277bd",
+        "SO Baru": "#e65100",
         "SPK Baru": "#1565c0",
       },
     },
