@@ -109,15 +109,25 @@ const selectedCustomer = computed({
 // Watch filterState → simpan ke sessionStorage + fetch
 const isInitialized = ref(false);
 let filterDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+const isValidDate = (s: string) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  const year = Number(s.substring(0, 4));
+  return year >= 2000 && year <= 2100;
+};
+
 watch(
   filterState,
   (val) => {
-    sessionStorage.setItem(SESSION_KEY, JSON.stringify(val));
+    if (isValidDate(val.dtAwal) && isValidDate(val.dtAkhir)) {
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify(val));
+    }
     if (!isInitialized.value) return;
     if (filterDebounceTimer) clearTimeout(filterDebounceTimer);
     filterDebounceTimer = setTimeout(() => {
-      fetchData();
-    }, 800); // tunggu 500ms setelah perubahan terakhir baru fetch
+      if (isValidDate(dtAwal.value) && isValidDate(dtAkhir.value)) {
+        fetchData();
+      }
+    }, 800);
   },
   { deep: true },
 );
@@ -1062,7 +1072,12 @@ const onExport = async () => {
     <template #filter-left>
       <div class="f-group">
         <span class="f-label">Periode</span>
-        <input type="date" v-model="dtAwal" class="f-date" />
+        <input
+          type="date"
+          v-model="dtAwal"
+          @change="fetchData"
+          class="f-date"
+        />
         <span class="f-sep">s/d</span>
         <input type="date" v-model="dtAkhir" class="f-date" />
       </div>

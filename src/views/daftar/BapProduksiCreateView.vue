@@ -1027,4 +1027,29 @@ const handlePreSave = async () => {
 .tc {
   text-align: center;
 }
+
+@media (max-width: 900px) {
+  .bap-top {
+    flex-direction: column;
+  }
+  .bap-right-panel {
+    width: 100%;
+  }
+  .bap-textarea-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .f-row {
+    flex-wrap: wrap;
+  }
+  .f-row .f-inp {
+    width: 100% !important;
+  }
+  .f-lbl {
+    width: 100%;
+    text-align: left;
+  }
+}
 </style>
