@@ -516,6 +516,41 @@ const router = createRouter({
         menuId: "144",
       },
     },
+    {
+      path: "/pembelian/po-external-garmen/create",
+      name: "PoExternalGarmenCreate",
+      component: () => import("@/views/pembelian/PoExternalGarmenFormView.vue"),
+      meta: {
+        title: "Buat PO External Garmen",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "144",
+        browseRoute: "PoExternalGarmenBrowse",
+      },
+    },
+    {
+      path: "/pembelian/po-external-garmen/edit/:nomor",
+      name: "PoExternalGarmenEdit",
+      component: () => import("@/views/pembelian/PoExternalGarmenFormView.vue"),
+      meta: {
+        title: "Ubah PO External Garmen",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "144",
+        browseRoute: "PoExternalGarmenBrowse",
+      },
+    },
+    {
+      path: "/pembelian/po-external-garmen/print/:nomor",
+      name: "PoExternalGarmenPrint",
+      component: () =>
+        import("@/views/pembelian/PoExternalGarmenPrintView.vue"),
+      meta: {
+        title: "Cetak PO External Garmen",
+        layout: "BlankLayout",
+        requiresAuth: true,
+      },
+    },
 
     // ── PPIC ──────────────────────────────────────────────────────────
     {
