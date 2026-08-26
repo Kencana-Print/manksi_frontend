@@ -85,6 +85,7 @@ onMounted(async () => {
     toast.error("Gagal memuat daftar cabang");
     cabangOptions.value = [authStore.userCabang || "HO-"]; // Fallback
   }
+  fetchData();
 });
 
 // --- KONFIGURASI BROWSE ---
@@ -118,7 +119,7 @@ watch(
   () => {
     fetchData();
   },
-  { immediate: true },
+  // { immediate: true },
 );
 
 // --- KONFIGURASI HEADER TABEL ---

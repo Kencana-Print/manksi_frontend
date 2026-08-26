@@ -1201,7 +1201,7 @@ const router = createRouter({
       },
     },
     {
-      path: "/garmen/barang/realisasi/form",
+      path: "/garmen/barang/realisasi/form/baru/:jenis",
       name: "GarmenRealisasiBarangCreate",
       component: () => import("@/views/garmen/RealisasiBarangFormView.vue"),
       meta: {

@@ -33,7 +33,12 @@ const filterState = ref({
   cabang: "ALL",
   jenis: "ACCESORIES",
 });
-
+const jenisSlugMap: Record<string, string> = {
+  ACCESORIES: "ACCESORIES",
+  OBAT: "OBAT",
+  SPAREPART: "SPAREPART",
+  "ATK/RTK": "ATK-RTK",
+};
 const cabangOptions = ref<string[]>(["ALL"]);
 const jenisOptions = ref<string[]>([]);
 
@@ -150,8 +155,12 @@ const expandedRows = ref<any[]>([]);
 
 // --- FUNGSI AKSI ---
 const onAdd = () => {
-  sessionStorage.setItem("last_jenis_realisasi", filterState.value.jenis);
-  router.push("/garmen/barang/realisasi/form");
+  try {
+  const slug = jenisSlugMap[filterState.value.jenis] || filterState.value.jenis;
+  router.push(`/garmen/barang/realisasi/form/baru/${slug}`);
+  } catch (e: any) {
+    toast.error(e.response?.data?.message || "Gagal memverifikasi akses.");
+  }  
 };
 
 const onEdit = (item: any) => {

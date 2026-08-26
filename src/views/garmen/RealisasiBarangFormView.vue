@@ -1,16 +1,18 @@
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { ref, computed, onMounted, nextTick } from "vue";
 import type { ComponentPublicInstance } from "vue";
 import { useRoute } from "vue-router";
 import { useToast } from "vue-toastification";
 import { useForm } from "@/composables/useForm";
+import { useAuthStore } from "@/stores/authStore";
 import BaseForm from "@/components/BaseForm.vue";
 import { realisasiBarangFormService } from "@/services/garmen/realisasiBarangFormService";
 // Import Tabler Icon
-import { IconListCheck, IconSearch } from "@tabler/icons-vue";
+import { IconListCheck, IconSearch,IconTrash, } from "@tabler/icons-vue";
 
-// Modal Pencarian Permintaan
+// Modal Pencarian 
 import PermintaanBarangSearchModal from "@/components/lookups/PermintaanBarangSearchModal.vue";
+import BarangGarmenSearchModal from "@/components/lookups/BarangGarmenSearchModal.vue";
 
 interface DetailItem {
   kode: string;
@@ -26,14 +28,45 @@ interface DetailItem {
 
 const route = useRoute();
 const toast = useToast();
-
+const authStore = useAuthStore();
 const isEdit = computed(() => !!route.params.nomor);
 const nomorParam = computed(() => route.params.nomor as string);
-
+const formTitle = computed(() =>
+  isEdit.value
+    ? `Ubah Realisasi Permintaan ${formData.value.jenis || "Barang"}`
+    : `Realisasi Permintaan ${formData.value.jenis || "Barang"}`,
+);
+const jenisSlugReverseMap: Record<string, string> = {
+  ACCESORIES: "ACCESORIES",
+  OBAT: "OBAT",
+  SPAREPART: "SPAREPART",
+  "ATK-RTK": "ATK/RTK",
+};
+const jenisFromParam = computed(() => {
+  const raw = route.params.jenis as string;
+  if (!raw) return "";
+  return jenisSlugReverseMap[raw] || raw;
+});
 const showMintaModal = ref(false);
-
+const showBarangModal = ref(false);
+const activeRowIndex = ref(0);
 const showPrintDialog = ref(false);
 const savedNomor = ref("");
+// ─────────────────────────────────────────────
+// FOKUS ANTAR FIELD DI GRID (Kode -> Jumlah -> Keterangan -> Kode baris berikutnya)
+// ─────────────────────────────────────────────
+const detailFieldRefs = ref<Record<string, HTMLInputElement>>({});
+const setDetailFieldRef = (el: any, index: number, col: string) => {
+  if (el) detailFieldRefs.value[`${index}_${col}`] = el as HTMLInputElement;
+};
+const focusDetailField = async (index: number, col: string) => {
+  await nextTick();
+  const el = detailFieldRefs.value[`${index}_${col}`];
+  if (el) {
+    el.focus();
+    if (el instanceof HTMLInputElement) el.select();
+  }
+};
 
 const formatDateLocal = (value?: string | Date) => {
   if (!value) return "";
@@ -56,6 +89,8 @@ const initialData = {
   noMinta: "",
   cabMinta: "",
   keterangan: "",
+  bagian: authStore.user?.bagian ,
+  cabang: authStore.userCabang === "ALL" ? "" : authStore.userCabang,
   spk: "",
   namaSpk: "",
   jumlahSpk: 0,
@@ -89,9 +124,11 @@ const {
       nomor: header.re_nomor,
       tanggal: formatDateLocal(header.re_tanggal),
       jenis: header.re_jenis,
+      cabang: header.re_cab,
       noMinta: header.re_minta,
       cabMinta: reqHeader.min_cab,
       keterangan: header.re_keterangan,
+      bagian: header.re_bagian,
       spk: header.re_spk_nomor,
       namaSpk: header.spknama,
       jumlahSpk: header.spkjml || 0,
@@ -111,7 +148,22 @@ const {
   },
 });
 
+onMounted(() => {
+  if (!isEdit.value) {
+    const bag = (authStore.user?.bagian || "").toUpperCase();
+    if (jenisFromParam.value) {
+      formData.value.jenis = jenisFromParam.value;
+    } else if (bag === "GA") {
+      formData.value.jenis = "ATK/RTK";
+    } else if (bag === "TEKNISI" || bag === "IT") {
+      formData.value.jenis = "SPAREPART";
+      formData.value.bagian = bag;
+    }
+  }
+});
+
 const isAccesories = computed(() => formData.value.jenis === "ACCESORIES");
+const isSparepart = computed(() => formData.value.jenis === "SPAREPART");
 
 // --- HANDLER PENCARIAN PERMINTAAN ---
 const openMintaModal = () => {
@@ -215,7 +267,7 @@ const validateSave = () => {
     return toast.error("Realisasi tsb sudah di approve.\nTidak bisa disimpan.");
   }
 
-  if (!formData.value.noMinta) {
+  if (!formData.value.noMinta && !isSparepart.value) {
     return toast.warning("Nomor Permintaan belum dipilih.");
   }
 
@@ -247,11 +299,53 @@ const skipCetak = () => {
 
 const numFmt = (val: any) =>
   Number(val || 0).toLocaleString("id-ID", { maximumFractionDigits: 2 });
+
+// -- FUNGSI MANIPULASI GRID --
+const addRow = () => {
+  formData.value.details.push({
+    kode: "",
+    nama: "",
+    satuan: "",
+    stk: 0,
+    minta: 0,
+    sudah: 0,
+    kurang: 0,
+    jumlah: 0,
+    ket: "",
+  });
+};  
+
+const removeRow = (index: number) => {
+  formData.value.details.splice(index, 1);
+  if (formData.value.details.length === 0) addRow();
+};
+
+const openBarangModal = (index: number) => {
+  activeRowIndex.value = index;
+  showBarangModal.value = true;
+};
+
+// Menangkap item barang yang dipilih
+const onBarangSelected = (item: any) => {
+  const i = activeRowIndex.value;
+  const isDuplicate = formData.value.details.some(
+    (d: any, idx: number) => idx !== i && d.kode === item.Kode,
+  );
+  if (isDuplicate) {
+    return toast.error(`Kode ${item.Kode} sudah diinput di baris lain.`);
+  }
+  formData.value.details[i].kode = item.Kode;
+  formData.value.details[i].nama = item.Nama;
+  formData.value.details[i].satuan = item.Satuan;
+  // [BARU] Sama seperti onBarangEnter — pindah fokus ke Jumlah
+  focusDetailField(i, "jumlah");
+};
+
 </script>
 
 <template>
   <BaseForm
-    :title="`Form Realisasi Permintaan ${formData.jenis}`"
+    :title="formTitle"
     menuId="62"
     :icon="IconListCheck"
     :is-loading="isLoading"
@@ -390,9 +484,18 @@ const numFmt = (val: any) =>
     <template #right-column>
       <v-card border flat class="d-flex flex-column h-100">
         <div
-          class="bg-blue-grey-darken-3 text-white px-3 py-2 font-weight-bold text-caption d-flex align-center"
+          class="bg-blue-grey-darken-3 text-white px-3 py-2 font-weight-bold text-caption d-flex align-center justify-space-between"
         >
-          Detail Barang
+          <div class="d-flex align-center">
+            <IconListDetails :size="14" :stroke-width="1.7" class="mr-2" />
+            Detail Barang
+          </div>
+          <v-btn v-if="isSparepart" size="x-small" color="success" variant="flat" @click="addRow">
+            <template #prepend
+              ><IconPlus :size="13" :stroke-width="2"
+            /></template>
+            Tambah Baris
+          </v-btn>
         </div>
         <div style="overflow: auto; flex-grow: 1; background: #fff">
           <table class="manksi-table">
@@ -408,6 +511,7 @@ const numFmt = (val: any) =>
                 <th width="70" class="tr">Kurang</th>
                 <th width="80" class="bg-yellow-darken-2 tr">Jumlah</th>
                 <th width="160" class="bg-yellow-darken-2">Keterangan</th>
+                <th width="40" class="text-center">Aksi</th>
               </tr>
             </thead>
             <tbody>
@@ -415,13 +519,26 @@ const numFmt = (val: any) =>
                 <td class="text-center bg-grey-lighten-4">
                   {{ Number(index) + 1 }}
                 </td>
-                <td
-                  class="bg-grey-lighten-4 font-weight-bold text-primary px-2"
+                <td class="bg-grey-lighten-4 px-2 text-truncate"
+                  style="max-width: 80px"
                 >
-                  {{ item.kode }}
+                  <div class="field-row-2col" style="display: grid; grid-template-columns: 3fr 1fr; gap: 1rem;">
+                  <div class="field-row">
+                    {{ item.kode }}
+                  </div>  
+                  <div class="field-row">
+                    <button v-if="isSparepart" :disabled="!!formData.noMinta"
+                      type="button"
+                      class="cell-search-btn"
+                      @click="openBarangModal(Number(index))"
+                      title="Cari Barang"
+                    >
+                      <IconSearch :size="12" color="#1565c0" />
+                    </button>                  
+                  </div>
+                  </div>
                 </td>
-                <td
-                  class="bg-grey-lighten-4 px-2 text-truncate"
+                <td class="bg-grey-lighten-4 px-2 text-truncate"
                   style="max-width: 180px"
                 >
                   {{ item.nama }}
@@ -464,6 +581,16 @@ const numFmt = (val: any) =>
                     placeholder="..."
                   />
                 </td>
+                <td class="text-center">
+                  <v-btn v-if="isSparepart" :disabled="!!formData.noMinta"
+                    size="x-small"
+                    variant="text"
+                    color="error"
+                    @click="removeRow(Number(index))"
+                  >
+                    <IconTrash :size="14" :stroke-width="1.7" />
+                  </v-btn>
+                </td>
               </tr>
               <tr v-if="formData.details.length === 0">
                 <td colspan="10" class="text-center py-4 text-grey">
@@ -483,6 +610,13 @@ const numFmt = (val: any) =>
     :jenis="formData.jenis"
     @selected="onMintaSelected"
   />
+
+  <BarangGarmenSearchModal
+    v-model="showBarangModal"
+    :jenis="formData.jenis"
+    :cabang="formData.cabang"
+    @selected="onBarangSelected"
+  />  
 
   <v-dialog v-model="showPrintDialog" max-width="400px" persistent>
     <v-card class="rounded-lg">
