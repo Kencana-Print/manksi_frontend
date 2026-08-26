@@ -101,13 +101,9 @@ const resolveDesignImage = () => {
 
   // --- LOGIC LAMA / STANDAR ---
   const candidates: string[] = [];
-
-  if (mapNomor) {
-    candidates.push(
-      `${base}/images/${cab}/map/${encodeURIComponent(mapNomor)}.jpg`,
-    );
-    candidates.push(`/file-gambar/${encodeURIComponent(mapNomor)}.jpg`);
-  }
+  // Prioritas: gambar SO sendiri (final, diterbitkan Marketing) —
+  // dicoba duluan. MAP cuma fallback kalau SO belum/tidak ada gambar
+  // sendiri (SO lama, atau proses upload gambar SO belum jalan).
   if (soRef && soRef !== nomor) {
     candidates.push(`${base}/images/${cab}/${encodeURIComponent(soRef)}.jpg`);
     candidates.push(`/file-gambar/${encodeURIComponent(soRef)}.jpg`);
@@ -116,10 +112,14 @@ const resolveDesignImage = () => {
     candidates.push(`${base}/images/${cab}/${encodeURIComponent(nomor)}.jpg`);
     candidates.push(`/file-gambar/${encodeURIComponent(nomor)}.jpg`);
   }
-
+  if (mapNomor) {
+    candidates.push(
+      `${base}/images/${cab}/map/${encodeURIComponent(mapNomor)}.jpg`,
+    );
+    candidates.push(`/file-gambar/${encodeURIComponent(mapNomor)}.jpg`);
+  }
   isLoadingImage.value = true;
   resolvedImageUrl.value = "";
-
   const tryNext = (idx: number) => {
     if (idx >= candidates.length) {
       isLoadingImage.value = false;
@@ -133,6 +133,7 @@ const resolveDesignImage = () => {
     img.onerror = () => tryNext(idx + 1);
     img.src = candidates[idx];
   };
+  tryNext(0);
 
   tryNext(0);
 };
