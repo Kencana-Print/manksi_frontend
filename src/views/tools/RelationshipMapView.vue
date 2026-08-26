@@ -348,6 +348,18 @@ const chainPengirimanOrder = (allNodeIds: string[]) => {
   chainNodesByType(allNodeIds, ["STBJ", "JADWAL_KIRIM", "SJ", "INVOICE"]);
 };
 
+// Kasbon (uang muka) & Mutasi Out sama-sama forward children dari
+// Permintaan Pembelian, TAPI TIDAK ada FK langsung satu sama lain —
+// bond2_mso di tkasbonitem2 cuma flag 'Y'/'N' (char(1)), bukan
+// referensi nomor dokumen, dan tgarmenmso_hdr/tgarmenmso_dtl sama
+// sekali tidak punya kolom penunjuk ke Kasbon. Dummy edge di sini
+// MURNI urutan baca alur bisnis (uang muka cair dulu, baru barang
+// di-mutasi out) — sama prinsipnya dengan chainPengirimanOrder,
+// BUKAN relasi struktural di database.
+const chainKasbonMutasiOrder = (allNodeIds: string[]) => {
+  chainNodesByType(allNodeIds, ["KASBON", "MUTASI_OUT"]);
+};
+
 const markExpanded = (id: string) => {
   expandedIds.value.add(id);
   nodes.value = nodes.value.map((n) =>
@@ -383,7 +395,7 @@ const expandNode = async ({
     });
     chainMutasiProduksiOrder(forwardIds);
     chainPengirimanOrder(nodes.value.map((n) => n.id));
-
+    chainKasbonMutasiOrder(nodes.value.map((n) => n.id));
     markExpanded(id);
     runLayout();
     setTimeout(() => fitView({ padding: 0.2, duration: 300 }), 50);
@@ -423,7 +435,7 @@ const startFrom = async (doc: DocNode) => {
     });
     chainMutasiProduksiOrder(forwardIds);
     chainPengirimanOrder(nodes.value.map((n) => n.id));
-
+    chainKasbonMutasiOrder(nodes.value.map((n) => n.id));
     markExpanded(centerId);
     runLayout();
     setTimeout(() => fitView({ padding: 0.2, duration: 300 }), 50);

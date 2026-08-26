@@ -1775,11 +1775,9 @@ const renderTrendChart = async () => {
   const win = window as any;
   if (!win.c3) return;
 
-  // ── Destroy chart lama kalau ada ──
   if (trendChartEl.value.innerHTML) {
     trendChartEl.value.innerHTML = "";
   }
-
   win.c3.generate({
     bindto: trendChartEl.value,
     size: { height: 160 },
@@ -1787,11 +1785,16 @@ const renderTrendChart = async () => {
       x: "label",
       columns: [
         ["label", ...trendData.value.map((r: any) => r.label)],
+        ["MAP Baru", ...trendData.value.map((r: any) => r.map_baru)],
+        ["SO Baru", ...trendData.value.map((r: any) => r.so_baru)],
         ["SPK Baru", ...trendData.value.map((r: any) => r.spk_baru)],
-        ["Penawaran", ...trendData.value.map((r: any) => r.penawaran_baru)],
       ],
       type: "line",
-      colors: { "SPK Baru": "#1565c0", Penawaran: "#f57f17" },
+      colors: {
+        "MAP Baru": "#00695c",
+        "SO Baru": "#0277bd",
+        "SPK Baru": "#1565c0",
+      },
     },
     axis: {
       x: { type: "category", tick: { rotate: 0, multiline: false } },
