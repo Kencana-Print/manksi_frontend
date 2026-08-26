@@ -867,6 +867,9 @@ const rowPropsFn = (data: any) => {
               'Komponen',
               'NamaSpk',
               'NomorMutasi',
+              'TanggalMutasi',
+              'NoPermintaan',
+              'BsKain',
             ]"
             :default-rows="['Kelompok', 'Size', 'NamaSpk', 'Komponen']"
             :default-cols="['GudangAsal']"
