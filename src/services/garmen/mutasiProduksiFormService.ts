@@ -153,4 +153,11 @@ export const mutasiProduksiFormService = {
       ...payload,
       Nomor: nomor,
     }),
+
+  // Terima sebelumnya (LHK proses sebelumnya) — utk notifikasi
+  // non-blocking saat input Jumlah beda dari yg diterima
+  getTerimaSebelumnya: (nomorSpk: string, gdgAsal: string, excludeNomor = "") =>
+    api.get("/garmen/mutasi-produksi-form/terima-sebelumnya", {
+      params: { nomorSpk, gdgAsal, excludeNomor },
+    }),
 };
