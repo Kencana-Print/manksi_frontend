@@ -9,6 +9,8 @@ export const mkaService = {
   }) => api.get("/garmen/mka", { params }),
   getDetail: (nomor: string) =>
     api.get("/garmen/mka/detail", { params: { nomor } }),
+  getRealisasiDetail: (nomor: string) =>
+    api.get("/garmen/mka/realisasi-detail", { params: { nomor } }),
   deleteData: (nomor: string) =>
     api.delete("/garmen/mka", { params: { nomor } }),
   exportHeader: (params: {

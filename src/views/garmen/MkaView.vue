@@ -8,6 +8,7 @@ import { mkaService } from "@/services/garmen/mkaService";
 import { exportExcelSingle } from "@/utils/excelExport";
 import { IconNotes, IconFileExport } from "@tabler/icons-vue";
 import { formatTanggal, formatTanggalJam } from "@/utils/dateFormat";
+import MkaRealisasiDetailModal from "@/components/garmen/MkaRealisasiDetailModal.vue";
 
 const router = useRouter();
 const toast = useToast();
@@ -36,6 +37,8 @@ const dtAwal = ref(savedFilter.dtAwal || firstDayOfMonth);
 const dtAkhir = ref(savedFilter.dtAkhir || todayStr);
 const filterKode = ref(savedFilter.filterKode || "");
 const filterByTglSpk = ref(savedFilter.filterByTglSpk ?? false);
+const showRealisasiModal = ref(false);
+const activeRealisasiNomor = ref("");
 
 watch(
   [dtAwal, dtAkhir, filterKode, filterByTglSpk],
@@ -266,6 +269,15 @@ const onExportDetail = async () => {
   }
 };
 
+const isRealisasiClickable = (item: any) =>
+  item.StatusSpk === "CLOSE" && item.StatusMka === "OPEN";
+
+const openRealisasiDetail = (item: any) => {
+  if (!isRealisasiClickable(item)) return;
+  activeRealisasiNomor.value = item.Nomor;
+  showRealisasiModal.value = true;
+};
+
 // --- Format ---
 const numFmt = (v: any) =>
   v != null ? Number(v).toLocaleString("id-ID") : "0";
@@ -367,7 +379,11 @@ const numFmt = (v: any) =>
       <span
         v-else
         class="status-chip"
-        :class="item.StatusMka === 'CLOSE' ? 'chip-siap' : 'chip-belum'"
+        :class="[
+          item.StatusMka === 'CLOSE' ? 'chip-siap' : 'chip-belum',
+          { 'chip-clickable': isRealisasiClickable(item) },
+        ]"
+        @click.stop="openRealisasiDetail(item)"
         >{{ item.StatusMka }}</span
       >
     </template>
@@ -422,6 +438,11 @@ const numFmt = (v: any) =>
       </div>
     </template>
   </BaseBrowse>
+
+  <MkaRealisasiDetailModal
+    v-model="showRealisasiModal"
+    :nomor="activeRealisasiNomor"
+  />
 </template>
 
 <style scoped>
@@ -551,5 +572,13 @@ const numFmt = (v: any) =>
 .f-check input {
   accent-color: #1565c0;
   cursor: pointer;
+}
+.chip-clickable {
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+}
+.chip-clickable:hover {
+  filter: brightness(0.92);
 }
 </style>
