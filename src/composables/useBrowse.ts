@@ -3,7 +3,7 @@ import { useRoute } from "vue-router";
 import { useTabsStore } from "@/stores/tabsStore";
 import { useAuthStore } from "@/stores/authStore";
 import { useToast } from "vue-toastification";
-import * as XLSX from "xlsx";
+import { exportExcelSingle, type ExcelColumn } from "@/utils/excelExport";
 
 interface UseBrowseOptions<T> {
   menuId: string;
@@ -72,26 +72,45 @@ export function useBrowse<T = any>(options: UseBrowseOptions<T>) {
   };
 
   // --- FUNGSI EXPORT KE EXCEL ---
-  const exportToExcel = (fileName: string = "Export_Data") => {
+  // Backward-compatible: exportToExcel('nama') tetap jalan seperti
+  // sebelumnya (kolom auto dari key object, data = items.value apa
+  // adanya). Opsional: kasih `getData` (misal
+  // baseBrowseRef.value?.getFilteredItems) supaya export ikut filter
+  // grid yang sedang aktif, dan/atau `columns` untuk header rapi +
+  // format angka, konsisten dengan exportExcelSingle di modul lain.
+  const exportToExcel = async (
+    fileName: string = "Export_Data",
+    opts?: {
+      columns?: ExcelColumn[];
+      getData?: () => T[];
+      sheetName?: string;
+      title?: string;
+    },
+  ) => {
     if (!canExport.value) {
       toast.error("Akses ditolak: Anda tidak memiliki izin untuk export.");
       return;
     }
 
-    if (!items.value || items.value.length === 0) {
+    const data = opts?.getData ? opts.getData() : items.value;
+
+    if (!data || data.length === 0) {
       toast.warning("Tidak ada data untuk diexport");
       return;
     }
 
     try {
-      // Buat worksheet dari data JSON (items)
-      const worksheet = XLSX.utils.json_to_sheet(items.value);
-      // Buat workbook kosong
-      const workbook = XLSX.utils.book_new();
-      // Tambahkan worksheet ke dalam workbook
-      XLSX.utils.book_append_sheet(workbook, worksheet, "Data");
-      // Download file Excel
-      XLSX.writeFile(workbook, `${fileName}.xlsx`);
+      const columns: ExcelColumn[] =
+        opts?.columns ??
+        Object.keys(data[0] as object).map((k) => ({ header: k, key: k }));
+
+      await exportExcelSingle(
+        `${fileName}.xlsx`,
+        opts?.sheetName ?? "Data",
+        columns,
+        data,
+        opts?.title,
+      );
 
       toast.success(`Berhasil export ke ${fileName}.xlsx`);
     } catch (error) {
@@ -99,7 +118,6 @@ export function useBrowse<T = any>(options: UseBrowseOptions<T>) {
       console.error(error);
     }
   };
-
   onMounted(() => {
     if (options.immediate !== false) fetchData();
   });

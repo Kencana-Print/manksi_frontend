@@ -80,6 +80,8 @@ const onFilterStateRestore = (val: any) => {
 };
 
 // ── useBrowse ──────────────────────────────────────────────
+const baseBrowseRef = ref<InstanceType<typeof BaseBrowse> | null>(null);
+
 const { items, isLoading, selected, canInsert, canEdit, canDelete, fetchData } =
   useBrowse({
     menuId: "158",
@@ -290,10 +292,24 @@ const isExporting = ref(false);
 const isExportingDetail = ref(false);
 
 const onExport = async () => {
+  const rawData =
+    baseBrowseRef.value?.getFilteredItems?.() ?? items.value ?? [];
+  if (!rawData.length) {
+    toast.warning("Tidak ada data untuk diekspor (cek filter aktif).");
+    return;
+  }
   isExporting.value = true;
   try {
-    const res = await svc.getExportData(tglAwal.value, tglAkhir.value);
-    const data = res.data.data ?? [];
+    // Format tanggal dulu sebelum export — getFilteredItems() balikin
+    // nilai mentah (belum diformat spt di grid via template #item.*)
+    const dataToExport = rawData.map((r: any) => ({
+      ...r,
+      Tanggal: formatTanggal(r.Tanggal),
+      Tanggal_Pelunasan: formatTanggal(r.Tanggal_Pelunasan),
+      Tanggal_Bayar: formatTanggal(r.Tanggal_Bayar),
+      Created: formatTanggalJam(r.Created),
+    }));
+
     const cols: ExcelColumn[] = [
       { header: "Nomor", key: "Nomor" },
       { header: "Tanggal", key: "Tanggal" },
@@ -319,7 +335,7 @@ const onExport = async () => {
       `Invoice_Tak_Normal_${tglAwal.value}_${tglAkhir.value}`,
       "Invoice Tak Normal",
       cols,
-      data,
+      dataToExport,
     );
   } catch {
     toast.error("Gagal export.");
@@ -329,15 +345,100 @@ const onExport = async () => {
 };
 
 const onExportDetail = async () => {
+  const filteredMaster =
+    baseBrowseRef.value?.getFilteredItems?.() ?? items.value ?? [];
+  if (!filteredMaster.length) {
+    toast.warning("Tidak ada data untuk diekspor (cek filter aktif).");
+    return;
+  }
+  const allowedNomors = new Set(filteredMaster.map((r: any) => r.Nomor));
+
   isExportingDetail.value = true;
   try {
     const res = await svc.getExportDetail(tglAwal.value, tglAkhir.value);
-    const data = res.data.data ?? [];
+    const allDetail: any[] = (res.data.data ?? []).filter((r: any) =>
+      allowedNomors.has(r.Nomor),
+    );
+    if (!allDetail.length) {
+      toast.warning("Tidak ada data detail untuk data yang sedang difilter.");
+      return;
+    }
+
+    // Kelompokkan per Nomor Invoice (jaga urutan kemunculan pertama)
+    const groups: Record<string, any[]> = {};
+    const order: string[] = [];
+    allDetail.forEach((r) => {
+      const key = r.Nomor;
+      if (!groups[key]) {
+        groups[key] = [];
+        order.push(key);
+      }
+      groups[key].push(r);
+    });
+
+    const combinedRows: any[] = [];
+    order.forEach((key) => {
+      const rowsInGroup = groups[key];
+      const first = rowsInGroup[0];
+      const masterCells: Record<string, any> = {
+        Nomor: first.Nomor,
+        Tanggal: formatTanggal(first.Tanggal),
+        Divisi: first.Divisi,
+        ...(canLihatCus.value ? { NamaCustomer: first.NamaCustomer } : {}),
+        Keterangan: first.Keterangan,
+        Status: first.Status,
+        Otomatis: first.Otomatis,
+        Total: Math.round(Number(first.Total) || 0),
+        Faktur_Pajak: first.Faktur_Pajak,
+        Stat_Exp: first.Stat_Exp,
+        Bayar: Math.round(Number(first.Bayar) || 0),
+        Tanggal_Pelunasan: formatTanggal(first.Tanggal_Pelunasan),
+        Tanggal_Bayar: formatTanggal(first.Tanggal_Bayar),
+        ACC_Edit: first.ACC_Edit,
+        Alasan: first.Alasan,
+        Usr: first.Usr,
+        Created: first.Created,
+      };
+      const blankMaster = Object.fromEntries(
+        Object.keys(masterCells).map((k) => [k, ""]),
+      );
+      rowsInGroup.forEach((r, idx) => {
+        combinedRows.push({
+          ...(idx === 0 ? masterCells : blankMaster),
+          Kode: r.Kode,
+          Nama: r.Nama,
+          Ukuran: r.Ukuran,
+          Jumlah: Number(r.Jumlah) || 0,
+          Harga: Number(r.Harga) || 0,
+          HargaRiil: Number(r.HargaRiil) || 0,
+          Fee: Number(r.Fee) || 0,
+        });
+      });
+    });
+
     await exportExcelSingle(
       `Invoice_Tak_Normal_Detail_${tglAwal.value}_${tglAkhir.value}`,
       "Detail",
       [
-        { header: "Nomor Inv", key: "Nomor" },
+        { header: "Nomor", key: "Nomor" },
+        { header: "Tanggal", key: "Tanggal" },
+        { header: "Divisi", key: "Divisi" },
+        ...(canLihatCus.value
+          ? [{ header: "Customer", key: "NamaCustomer" }]
+          : []),
+        { header: "Keterangan", key: "Keterangan" },
+        { header: "Status", key: "Status" },
+        { header: "Otomatis", key: "Otomatis" },
+        { header: "Total", key: "Total", align: "right", numFmt: "#,##0" },
+        { header: "Faktur Pajak", key: "Faktur_Pajak" },
+        { header: "Stat Exp", key: "Stat_Exp" },
+        { header: "Bayar", key: "Bayar", align: "right", numFmt: "#,##0" },
+        { header: "Tgl Pelunasan", key: "Tanggal_Pelunasan" },
+        { header: "Tgl Bayar", key: "Tanggal_Bayar" },
+        { header: "ACC Edit", key: "ACC_Edit" },
+        { header: "Alasan", key: "Alasan" },
+        { header: "User", key: "Usr" },
+        { header: "Created", key: "Created" },
         { header: "Kode", key: "Kode" },
         { header: "Nama", key: "Nama" },
         { header: "Ukuran", key: "Ukuran" },
@@ -346,7 +447,7 @@ const onExportDetail = async () => {
         { header: "Harga Riil", key: "HargaRiil", align: "right" },
         { header: "Fee", key: "Fee", align: "right" },
       ],
-      data,
+      combinedRows,
     );
   } catch {
     toast.error("Gagal export detail.");
@@ -358,6 +459,7 @@ const onExportDetail = async () => {
 
 <template>
   <BaseBrowse
+    ref="baseBrowseRef"
     title="Invoice Tak Normal"
     menu-id="158"
     :icon="IconReceipt2"

@@ -1001,8 +1001,6 @@ const onExport = async () => {
       const row: Record<string, any> = {};
       columns.forEach((c) => {
         let val = it[c.key];
-        // Tanggal disimpan sebagai string YYYY-MM-DD/ISO di data mentah —
-        // format sesuai tampilan tabel supaya file Excel enak dibaca
         if (
           [
             "Tanggal",
@@ -1021,6 +1019,28 @@ const onExport = async () => {
         }
         row[c.key] = val ?? "";
       });
+
+      // ── Override kolom yang tampilannya di-compute di template
+      // (beda dari field mentah), biar export konsisten sama yang
+      // dilihat user di grid ──
+      if ("Status" in row) {
+        row.Status = it.SpkPpic ? "Closed (PPIC)" : (it.Status ?? "");
+      }
+      if ("CetakStatusDisplay" in row) {
+        const cetakCount = Number(it.CetakCount) || 0;
+        if (cetakCount === 0) {
+          row.CetakStatusDisplay = "Belum Dicetak";
+        } else if (it.CetakApprovalStatus === "WAIT") {
+          row.CetakStatusDisplay = `Cetak ${cetakCount}x - Nunggu ACC`;
+        } else if (it.CetakApprovalStatus === "TOLAK") {
+          row.CetakStatusDisplay = `Cetak ${cetakCount}x - Ditolak`;
+        } else if (it.CetakApprovalStatus === "ACC_READY") {
+          row.CetakStatusDisplay = `Cetak ${cetakCount}x - Siap Cetak`;
+        } else {
+          row.CetakStatusDisplay = `Sudah Dicetak ${cetakCount}x`;
+        }
+      }
+
       return row;
     });
 

@@ -24,6 +24,7 @@ import {
   IconBrush,
 } from "@tabler/icons-vue";
 import { formatTanggal, formatTanggalJam } from "@/utils/dateFormat";
+import { type ExcelColumn } from "@/utils/excelExport";
 
 const router = useRouter();
 const toast = useToast();
@@ -133,6 +134,8 @@ const onFilterDateChange = () => {
     }
   }, 600); // Jeda 600ms setelah user berhenti mengetik
 };
+
+const baseBrowseRef = ref<InstanceType<typeof BaseBrowse> | null>(null);
 
 const {
   items,
@@ -282,6 +285,92 @@ const goDelete = async (item: any) => {
   } finally {
     isLoading.value = false;
   }
+};
+
+const onExportMap = () => {
+  const columns: ExcelColumn[] = [
+    { header: "Nomor", key: "Nomor" },
+    { header: "Status Edit", key: "Ngedit" },
+    { header: "MO", key: "MO" },
+    { header: "CMO", key: "CMO" },
+    { header: "Tanggal", key: "Tanggal", align: "center" },
+    { header: "Dateline", key: "Dateline", align: "center" },
+    { header: "Tgl. BAST", key: "TglBast", align: "center" },
+    { header: "Nama", key: "Nama", width: 30 },
+    { header: "Selisih (BAST-MAP)", key: "SelisihBastMap", align: "right" },
+    { header: "Berita Acara", key: "Berita_Acara" },
+    { header: "Divisi", key: "Divisi" },
+    { header: "Cab", key: "Cab" },
+    { header: "Workshop", key: "Workshop" },
+    { header: "Workshop SPK", key: "WorkshopSPK" },
+    { header: "Aktif", key: "Aktif", align: "center" },
+    { header: "Acc. Customer", key: "AccCustomerDisplay", align: "center" },
+    { header: "Surat Jalan", key: "Surat_Jalan" },
+    { header: "Ukuran", key: "Ukuran" },
+    { header: "Panjang", key: "Panjang", align: "right", numFmt: "#,##0" },
+    { header: "Lebar", key: "Lebar", align: "right", numFmt: "#,##0" },
+    { header: "Gramasi", key: "Gramasi" },
+    { header: "Kain", key: "Kain" },
+    { header: "Finishing", key: "Finishing" },
+    { header: "Qty", key: "Jumlah", align: "right", numFmt: "#,##0" },
+    { header: "Kirim", key: "Kirim", align: "right", numFmt: "#,##0" },
+    ...(canLihatCus.value
+      ? [{ header: "Customer", key: "Customer", width: 24 }]
+      : []),
+    { header: "Rencana", key: "Rencana", align: "right", numFmt: "#,##0" },
+    { header: "Salesman", key: "Salesman" },
+    { header: "Tipe", key: "Tipe" },
+    ...(canLihatHarga.value
+      ? [
+          { header: "Harga", key: "Harga", align: "right", numFmt: "#,##0" },
+          {
+            header: "Harga Riil",
+            key: "HargaRiil",
+            align: "right",
+            numFmt: "#,##0",
+          },
+        ]
+      : []),
+    { header: "Created", key: "Created" },
+    { header: "Revisi", key: "Revisi", align: "center" },
+    { header: "No. Referensi", key: "NoReferensi" },
+    { header: "Estimasi Jadi", key: "EstimasiJadi", align: "center" },
+    { header: "Close", key: "CloseStatus", align: "center" },
+    { header: "SO", key: "SPK" },
+    { header: "Tgl. Desain", key: "Design_Tanggal", align: "center" },
+    { header: "User Desain", key: "Design_User" },
+    { header: "Note Desain", key: "Design_Note" },
+    { header: "Desain Baru", key: "Design_Baru", align: "center" },
+    { header: "Desain Done", key: "Design_Done", align: "center" },
+    { header: "Keterangan", key: "Keterangan", width: 30 },
+  ];
+
+  exportToExcel(
+    `MAP_${filterState.value.startDate}_sd_${filterState.value.endDate}`,
+    {
+      getData: () => {
+        const rawData =
+          baseBrowseRef.value?.getFilteredItems?.() ?? items.value ?? [];
+        return rawData.map((r: any) => ({
+          ...r,
+          Tanggal: formatTanggal(r.Tanggal),
+          Dateline: formatTanggal(r.Dateline),
+          TglBast: formatTanggal(r.TglBast),
+          EstimasiJadi: formatTanggal(r.EstimasiJadi),
+          Design_Tanggal: formatTanggal(r.Design_Tanggal),
+          Created: formatTanggalJam(r.Created),
+          // Replikasi tampilan chip AccCustomer di grid (✓ tanggal / Belum)
+          AccCustomerDisplay:
+            r.AccCustomer === "Y"
+              ? `Sudah (${formatTanggal(r.AccTanggal)})`
+              : "Belum",
+        }));
+      },
+      columns,
+      sheetName: "MAP",
+      title: `Data MAP — Periode ${filterState.value.startDate} s.d ${filterState.value.endDate}`,
+    },
+  );
 };
 
 // Aksi Ekstra
@@ -459,6 +548,7 @@ const confirmToggleClose = async () => {
 
 <template>
   <BaseBrowse
+    ref="baseBrowseRef"
     title="Memo Approval Produk (MAP)"
     :menu-id="menuId"
     :icon="IconClipboardText"
@@ -477,7 +567,7 @@ const confirmToggleClose = async () => {
     @add="goAdd"
     @edit="goEdit"
     @delete="goDelete"
-    @export="exportToExcel('MAP')"
+    @export="onExportMap"
   >
     <template #filter-left>
       <div class="filter-group">

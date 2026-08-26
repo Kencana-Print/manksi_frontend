@@ -49,6 +49,8 @@ const onFilterStateRestore = (val: any) => {
 };
 
 // ── useBrowse ──────────────────────────────────────────────
+const baseBrowseRef = ref<InstanceType<typeof BaseBrowse> | null>(null);
+
 const { items, isLoading, selected, canInsert, canEdit, canDelete, fetchData } =
   useBrowse({
     menuId: "154",
@@ -206,10 +208,19 @@ const isExporting = ref(false);
 const isExportingDetail = ref(false);
 
 const onExport = async () => {
+  const rawData =
+    baseBrowseRef.value?.getFilteredItems?.() ?? items.value ?? [];
+  if (!rawData.length) {
+    toast.warning("Tidak ada data untuk diekspor (cek filter aktif).");
+    return;
+  }
   isExporting.value = true;
   try {
-    const res = await svc.getExportData(tglAwal.value, tglAkhir.value);
-    const data = res.data.data ?? [];
+    const dataToExport = rawData.map((r: any) => ({
+      ...r,
+      Tanggal: formatTanggal(r.Tanggal),
+    }));
+
     const cols: ExcelColumn[] = [
       { header: "Nomor", key: "Nomor" },
       { header: "Tanggal", key: "Tanggal" },
@@ -231,7 +242,7 @@ const onExport = async () => {
       `SJ_Tak_Normal_${tglAwal.value}_${tglAkhir.value}`,
       "SJ Tak Normal",
       cols,
-      data,
+      dataToExport,
     );
   } catch {
     toast.error("Gagal export.");
@@ -241,24 +252,109 @@ const onExport = async () => {
 };
 
 const onExportDetail = async () => {
+  const filteredMaster =
+    baseBrowseRef.value?.getFilteredItems?.() ?? items.value ?? [];
+  if (!filteredMaster.length) {
+    toast.warning("Tidak ada data untuk diekspor (cek filter aktif).");
+    return;
+  }
+  const allowedNomors = new Set(filteredMaster.map((r: any) => r.Nomor));
+
   isExportingDetail.value = true;
   try {
     const res = await svc.getExportDetail(tglAwal.value, tglAkhir.value);
-    const data = res.data.data ?? [];
+    const allDetail: any[] = (res.data.data ?? []).filter((r: any) =>
+      allowedNomors.has(r.Nomor),
+    );
+    if (!allDetail.length) {
+      toast.warning("Tidak ada data detail untuk data yang sedang difilter.");
+      return;
+    }
+
+    // Kelompokkan per Nomor SJ (jaga urutan kemunculan pertama)
+    const groups: Record<string, any[]> = {};
+    const order: string[] = [];
+    allDetail.forEach((r) => {
+      const key = r.Nomor;
+      if (!groups[key]) {
+        groups[key] = [];
+        order.push(key);
+      }
+      groups[key].push(r);
+    });
+
+    const combinedRows: any[] = [];
+    order.forEach((key) => {
+      const rowsInGroup = groups[key];
+      const first = rowsInGroup[0];
+      const totalQty = rowsInGroup.reduce(
+        (s, r) => s + (Number(r.Jumlah) || 0),
+        0,
+      );
+      const masterCells: Record<string, any> = {
+        Nomor: first.Nomor,
+        Tanggal: formatTanggal(first.Tanggal),
+        Divisi: first.Divisi,
+        ...(canLihatCus.value
+          ? {
+              KdCus: first.KdCus,
+              Customer: first.Customer,
+              Alamat: first.Alamat,
+              Kota: first.Kota,
+            }
+          : {}),
+        Keterangan: first.Keterangan,
+        Gudang: first.Gudang,
+        QtyKirim: totalQty,
+        Created: first.Created,
+      };
+      const blankMaster = Object.fromEntries(
+        Object.keys(masterCells).map((k) => [k, ""]),
+      );
+      rowsInGroup.forEach((r, idx) => {
+        combinedRows.push({
+          ...(idx === 0 ? masterCells : blankMaster),
+          Kode: r.Kode,
+          Nama: r.Nama,
+          Ukuran: r.Ukuran,
+          Panjang: r.Panjang,
+          Lebar: r.Lebar,
+          Jumlah: Number(r.Jumlah) || 0,
+          KetDetail: r.KetDetail,
+        });
+      });
+    });
+
+    const cols: ExcelColumn[] = [
+      { header: "Nomor", key: "Nomor" },
+      { header: "Tanggal", key: "Tanggal" },
+      { header: "Divisi", key: "Divisi" },
+      ...(canLihatCus.value
+        ? [
+            { header: "Kode Cus", key: "KdCus" },
+            { header: "Customer", key: "Customer" },
+            { header: "Alamat", key: "Alamat" },
+            { header: "Kota", key: "Kota" },
+          ]
+        : []),
+      { header: "Keterangan", key: "Keterangan" },
+      { header: "Gudang", key: "Gudang" },
+      { header: "Qty Kirim", key: "QtyKirim", align: "right" },
+      { header: "Created", key: "Created" },
+      { header: "Kode", key: "Kode" },
+      { header: "Nama", key: "Nama" },
+      { header: "Ukuran", key: "Ukuran" },
+      { header: "Panjang", key: "Panjang", align: "right" },
+      { header: "Lebar", key: "Lebar", align: "right" },
+      { header: "Jumlah", key: "Jumlah", align: "right" },
+      { header: "Keterangan Detail", key: "KetDetail" },
+    ];
+
     await exportExcelSingle(
       `SJ_Tak_Normal_Detail_${tglAwal.value}_${tglAkhir.value}`,
       "Detail",
-      [
-        { header: "Nomor SJ", key: "Nomor" },
-        { header: "Kode", key: "Kode" },
-        { header: "Nama", key: "Nama" },
-        { header: "Ukuran", key: "Ukuran" },
-        { header: "Panjang", key: "Panjang", align: "right" },
-        { header: "Lebar", key: "Lebar", align: "right" },
-        { header: "Jumlah", key: "Jumlah", align: "right" },
-        { header: "Keterangan", key: "Keterangan" },
-      ],
-      data,
+      cols,
+      combinedRows,
     );
   } catch {
     toast.error("Gagal export detail.");
@@ -270,6 +366,7 @@ const onExportDetail = async () => {
 
 <template>
   <BaseBrowse
+    ref="baseBrowseRef"
     title="Surat Jalan Tak Normal"
     menu-id="154"
     :icon="IconTruckOff"

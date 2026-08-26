@@ -87,6 +87,7 @@ import {
   IconDatabaseSearch,
   IconHourglass,
   IconShoppingBagPlus,
+  IconCalendarCog,
 } from "@tabler/icons-vue";
 
 export interface NavItem {
@@ -1333,7 +1334,7 @@ export const createMenuItems = (): NavItem[] => {
       title: "Tools",
       icon: IconTool,
       model: toolsMenu,
-      adminOnly: false, // Hanya muncul untuk Admin/Developer
+      adminOnly: false,
       items: [
         { title: "Master User", to: "/tools/users", icon: IconUsers },
         { title: "Approval", to: "/tools/approval", icon: IconShieldCheck },
@@ -1349,6 +1350,12 @@ export const createMenuItems = (): NavItem[] => {
           to: "/tools/sistem-informasi-bahan",
           icon: IconDatabaseSearch,
           menuId: 1322,
+        },
+        {
+          title: "Kelola PIC Agenda",
+          to: "/tools/kelola-pic-agenda",
+          icon: IconCalendarCog,
+          menuId: 124,
         },
       ],
     },

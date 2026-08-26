@@ -7,6 +7,7 @@ import { useToast } from "vue-toastification";
 import BaseBrowse from "@/components/BaseBrowse.vue";
 import { IconCash, IconPencilOff, IconSend } from "@tabler/icons-vue";
 import { formatTanggal, formatTanggalJam } from "@/utils/dateFormat";
+import { type ExcelColumn } from "@/utils/excelExport";
 
 const toast = useToast();
 const router = useRouter();
@@ -65,6 +66,8 @@ const loadDivisi = async () => {
 onMounted(loadDivisi);
 
 // ── Browse ────────────────────────────────────────────────────────────
+const baseBrowseRef = ref<InstanceType<typeof BaseBrowse> | null>(null);
+
 const {
   items,
   isLoading,
@@ -163,6 +166,74 @@ const handleDelete = async (item: any) => {
     toast.error(e.response?.data?.message || "Gagal menghapus data.");
   }
 };
+const onExport = () => {
+  const columns: ExcelColumn[] = [
+    { header: "NOMOR", key: "Nomor" },
+    { header: "DIVISI", key: "Divisi" },
+    { header: "TANGGAL", key: "Tanggal", align: "center" },
+    { header: "CUSTOMER", key: "Customer" },
+    { header: "SALES", key: "Sales" },
+    { header: "NAMA PEKERJAAN", key: "NamaPekerjaan", width: 26 },
+    {
+      header: "Rencana Order",
+      key: "RencanaOrder",
+      align: "right",
+      numFmt: "#,##0",
+    },
+    { header: "Harga Lama", key: "HargaLama", align: "right", numFmt: "#,##0" },
+    {
+      header: "Harga Budget",
+      key: "HargaBudget",
+      align: "right",
+      numFmt: "#,##0",
+    },
+    { header: "Order Terakhir", key: "OrderTerakhir", align: "center" },
+    { header: "Kain", key: "Kain" },
+    { header: "Panjang", key: "Panjang", align: "right" },
+    { header: "Lebar", key: "Lebar", align: "right" },
+    { header: "Ukuran", key: "Ukuran" },
+    { header: "Gramasi", key: "Gramasi" },
+    { header: "Finishing", key: "Finishing" },
+    { header: "Sublim", key: "Sublim" },
+    { header: "Keterangan", key: "Keterangan", width: 24 },
+    { header: "Harga MAP", key: "HargaMAP", align: "right", numFmt: "#,##0" },
+    {
+      header: "Harga Kalkulasi",
+      key: "HargaKalkulasi",
+      align: "right",
+      numFmt: "#,##0",
+    },
+    { header: "Tgl Kalkulasi", key: "TglKalkulasi", align: "center" },
+    { header: "No. Kalkulasi", key: "NoKalkulasi" },
+    { header: "Ket. Kalkulasi", key: "KeteranganKalkulasi", width: 20 },
+    { header: "Kal. Created", key: "KalCreated" },
+    { header: "Kal. Modified", key: "KalModified" },
+    { header: "Status", key: "Status" },
+    { header: "Approved", key: "Approved", align: "center" },
+    { header: "Di Apv Oleh", key: "diApvOleh" },
+    { header: "Created", key: "Created" },
+  ];
+
+  exportToExcel("Data_Permintaan_Harga", {
+    getData: () => {
+      const rawData =
+        baseBrowseRef.value?.getFilteredItems?.() ?? items.value ?? [];
+      // Format semua kolom tanggal/datetime dulu sebelum export —
+      // getFilteredItems() balikin nilai mentah, belum diformat spt di
+      // grid (via template #item.Tanggal, #item.Approved, dst)
+      return rawData.map((r: any) => ({
+        ...r,
+        Tanggal: formatTanggal(r.Tanggal),
+        TglKalkulasi: formatTanggal(r.TglKalkulasi),
+        Approved: formatTanggalJam(r.Approved),
+        Created: formatTanggalJam(r.Created),
+      }));
+    },
+    columns,
+    sheetName: "Permintaan Harga",
+    title: `Data Permintaan Harga — Periode ${startDate.value} s.d ${endDate.value}`,
+  });
+};
 
 // ── Pengajuan perubahan (PIN 5) ───────────────────────────────────────
 const showPinDialog = ref(false);
@@ -217,6 +288,7 @@ const submitPengajuan = async () => {
 
 <template>
   <BaseBrowse
+    ref="baseBrowseRef"
     title="Permintaan Harga"
     menu-id="166"
     :icon="IconCash"
@@ -235,7 +307,7 @@ const submitPengajuan = async () => {
     @add="handleAdd"
     @edit="handleEdit"
     @delete="handleDelete"
-    @export="exportToExcel('Data_Permintaan_Harga')"
+    @export="onExport"
   >
     <!-- ── Filter kiri: Periode + Divisi ── -->
     <template #filter-left>

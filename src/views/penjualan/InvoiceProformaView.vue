@@ -12,6 +12,7 @@ import {
   IconFileDescription,
 } from "@tabler/icons-vue";
 import { formatTanggal, formatTanggalJam } from "@/utils/dateFormat";
+import { exportExcelSingle, type ExcelColumn } from "@/utils/excelExport";
 
 const router = useRouter();
 const toast = useToast();
@@ -33,6 +34,8 @@ const filterState = ref({
 });
 
 // --- KOMPOSISI BROWSE ---
+const baseBrowseRef = ref<InstanceType<typeof BaseBrowse> | null>(null);
+
 const {
   items,
   isLoading,
@@ -156,49 +159,125 @@ const onPrint = () => {
   );
 };
 
+// --- EXPORT HEADER ---
+const onExportMaster = () => {
+  const columns: ExcelColumn[] = [
+    { header: "Nomor", key: "Nomor" },
+    { header: "Tanggal", key: "Tanggal" },
+    { header: "Divisi", key: "Divisi" },
+    { header: "Customer", key: "NamaCustomer" },
+    { header: "Keterangan", key: "Keterangan" },
+    { header: "Status", key: "Status" },
+    { header: "Otomatis", key: "Otomatis" },
+    { header: "Total", key: "Total", align: "right", numFmt: "#,##0" },
+    { header: "Faktur Pajak", key: "Faktur_Pajak" },
+    { header: "Stat Exp", key: "Stat_Exp" },
+    { header: "Bayar", key: "Bayar", align: "right", numFmt: "#,##0" },
+    { header: "Tgl Pelunasan", key: "Tanggal_Pelunasan" },
+    { header: "Tgl Bayar", key: "Tanggal_bayar" },
+    { header: "Created", key: "Created" },
+  ];
+  exportToExcel("Daftar_Invoice_Proforma", {
+    getData: () =>
+      baseBrowseRef.value?.getFilteredItems?.() ?? items.value ?? [],
+    columns,
+    sheetName: "Invoice Proforma",
+    title: `Daftar Invoice Proforma — Periode ${filterState.value.startDate} s.d ${filterState.value.endDate}`,
+  });
+};
+
 // --- EKSPORT DETAIL ---
+const isExportingDetail = ref(false);
 const onExportDetail = async () => {
+  const filteredMaster =
+    baseBrowseRef.value?.getFilteredItems?.() ?? items.value ?? [];
+  if (!filteredMaster.length) {
+    toast.warning("Tidak ada data untuk diekspor (cek filter aktif).");
+    return;
+  }
+
+  isExportingDetail.value = true;
   try {
-    const res = await invoiceProformaService.getExportDetail(
-      filterState.value.startDate,
-      filterState.value.endDate,
-    );
-    const rows = res.data.data;
+    // Detail sudah menempel di tiap baris master (item.details) dari
+    // getBrowseList — pakai itu langsung, otomatis ikut filter yang
+    // sedang aktif di grid tanpa perlu panggil endpoint terpisah.
+    const combinedRows: any[] = [];
+    filteredMaster.forEach((m: any) => {
+      const rowsInGroup = m.details || [];
+      if (!rowsInGroup.length) return; // sama seperti Delphi: baris tanpa detail tidak muncul di export
 
-    if (!rows || rows.length === 0)
-      return toast.warning("Tidak ada detail untuk diexport.");
+      const masterCells = {
+        Nomor: m.Nomor,
+        Tanggal: formatTanggal(m.Tanggal),
+        Divisi: m.Divisi,
+        NamaCustomer: m.NamaCustomer,
+        Keterangan: m.Keterangan,
+        Status: m.Status,
+        Otomatis: m.Otomatis,
+        Total: Math.round(Number(m.Total) || 0),
+        Faktur_Pajak: m.Faktur_Pajak,
+        Stat_Exp: m.Stat_Exp,
+        Bayar: Math.round(Number(m.Bayar) || 0),
+        Tanggal_Pelunasan: formatTanggal(m.Tanggal_Pelunasan),
+        Tanggal_bayar: formatTanggal(m.Tanggal_bayar),
+        Created: m.Created,
+      };
+      const blankMaster = Object.fromEntries(
+        Object.keys(masterCells).map((k) => [k, ""]),
+      );
 
-    const headersStr = Object.keys(rows[0]).join(",");
-    const csvContent = [
-      headersStr,
-      ...rows.map((row: any) =>
-        Object.keys(rows[0])
-          .map((fieldName) => {
-            let data = String(row[fieldName] ?? "");
-            data = data.replace(/"/g, '""');
-            if (
-              data.includes(",") ||
-              data.includes("\n") ||
-              data.includes('"')
-            ) {
-              data = `"${data}"`;
-            }
-            return data;
-          })
-          .join(","),
-      ),
-    ].join("\n");
-
-    const blob = new Blob(["\uFEFF" + csvContent], {
-      type: "text/csv;charset=utf-8;",
+      rowsInGroup.forEach((d: any, idx: number) => {
+        combinedRows.push({
+          ...(idx === 0 ? masterCells : blankMaster),
+          Kode: d.Kode,
+          Nama: d.Nama,
+          Ukuran: d.Ukuran,
+          Jumlah: Number(d.Jumlah) || 0,
+          Harga: Number(d.Harga) || 0,
+          HargaRiil: Number(d.HargaRiil) || 0,
+          Fee: Number(d.Fee) || 0,
+        });
+      });
     });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = `Detail_InvoiceProforma_${filterState.value.startDate}_sd_${filterState.value.endDate}.csv`;
-    link.click();
-    toast.success("Berhasil export detail data.");
-  } catch (error: any) {
+
+    if (!combinedRows.length) {
+      toast.warning("Tidak ada detail untuk diekspor.");
+      return;
+    }
+
+    await exportExcelSingle(
+      `Detail_InvoiceProforma_${filterState.value.startDate}_sd_${filterState.value.endDate}.xlsx`,
+      "Detail",
+      [
+        { header: "Nomor", key: "Nomor" },
+        { header: "Tanggal", key: "Tanggal" },
+        { header: "Divisi", key: "Divisi" },
+        { header: "Customer", key: "NamaCustomer" },
+        { header: "Keterangan", key: "Keterangan" },
+        { header: "Status", key: "Status" },
+        { header: "Otomatis", key: "Otomatis" },
+        { header: "Total", key: "Total", align: "right", numFmt: "#,##0" },
+        { header: "Faktur Pajak", key: "Faktur_Pajak" },
+        { header: "Stat Exp", key: "Stat_Exp" },
+        { header: "Bayar", key: "Bayar", align: "right", numFmt: "#,##0" },
+        { header: "Tgl Pelunasan", key: "Tanggal_Pelunasan" },
+        { header: "Tgl Bayar", key: "Tanggal_bayar" },
+        { header: "Created", key: "Created" },
+        { header: "Kode", key: "Kode" },
+        { header: "Nama", key: "Nama" },
+        { header: "Ukuran", key: "Ukuran" },
+        { header: "Jumlah", key: "Jumlah", align: "right" },
+        { header: "Harga", key: "Harga", align: "right" },
+        { header: "Harga Riil", key: "HargaRiil", align: "right" },
+        { header: "Fee", key: "Fee", align: "right" },
+      ],
+      combinedRows,
+    );
+    toast.success("Berhasil export detail.");
+  } catch {
     toast.error("Gagal export detail data.");
+  } finally {
+    isExportingDetail.value = false;
   }
 };
 
@@ -241,6 +320,7 @@ onMounted(() => {
 
 <template>
   <BaseBrowse
+    ref="baseBrowseRef"
     title="Invoice Proforma"
     menu-id="157"
     :icon="IconFileInvoice"
@@ -261,7 +341,7 @@ onMounted(() => {
     @add="onAdd"
     @edit="onEdit"
     @delete="onDelete"
-    @export="exportToExcel('Daftar_Invoice_Proforma')"
+    @export="onExportMaster"
     :summary-columns="['Total', 'Bayar']"
     :summary-formatters="summaryFormatters"
   >
@@ -334,6 +414,7 @@ onMounted(() => {
         color="green-darken-3"
         variant="outlined"
         class="ml-2"
+        :loading="isExportingDetail"
         @click="onExportDetail"
       >
         <template #prepend>

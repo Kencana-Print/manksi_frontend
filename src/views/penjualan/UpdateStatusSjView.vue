@@ -37,6 +37,8 @@ const tglAwal = ref(firstOfMonth());
 const tglAkhir = ref(todayLocal());
 
 // ── useBrowse ──────────────────────────────────────────────
+const baseBrowseRef = ref<InstanceType<typeof BaseBrowse> | null>(null);
+
 const { items, isLoading, selected, fetchData } = useBrowse({
   menuId: "155",
   fetchApi: async () => {
@@ -140,10 +142,25 @@ const isExporting = ref(false);
 const isExportingDetail = ref(false);
 
 const onExport = async () => {
+  const rawData =
+    baseBrowseRef.value?.getFilteredItems?.() ?? items.value ?? [];
+  if (!rawData.length) {
+    toast.warning("Tidak ada data untuk diekspor (cek filter aktif).");
+    return;
+  }
   isExporting.value = true;
   try {
-    const res = await svc.getExportData(tglAwal.value, tglAkhir.value);
-    const data = res.data.data ?? [];
+    const dataToExport = rawData.map((r: any) => ({
+      ...r,
+      Tanggal: formatTanggal(r.Tanggal),
+      Tanggal_Kirim: formatTanggal(r.Tanggal_Kirim),
+      Tanggal_Terima: formatTanggal(r.Tanggal_Terima),
+      Tanggal_Terima_Sj: formatTanggal(r.Tanggal_Terima_Sj),
+      Tanggal_Konfirmasi: formatTanggal(r.Tanggal_Konfirmasi),
+      Tanggal_Terima_1: formatTanggal(r.Tanggal_Terima_1),
+      Tanggal_SerahTerima: formatTanggal(r.Tanggal_SerahTerima),
+    }));
+
     const cols: ExcelColumn[] = [
       { header: "Nomor", key: "Nomor" },
       { header: "Tanggal", key: "Tanggal" },
@@ -176,7 +193,7 @@ const onExport = async () => {
       `Update_Status_SJ_${tglAwal.value}_${tglAkhir.value}`,
       "Status SJ",
       cols,
-      data,
+      dataToExport,
     );
   } catch {
     toast.error("Gagal export.");
@@ -186,24 +203,127 @@ const onExport = async () => {
 };
 
 const onExportDetail = async () => {
+  const filteredMaster =
+    baseBrowseRef.value?.getFilteredItems?.() ?? items.value ?? [];
+  if (!filteredMaster.length) {
+    toast.warning("Tidak ada data untuk diekspor (cek filter aktif).");
+    return;
+  }
+  const allowedNomors = new Set(filteredMaster.map((r: any) => r.Nomor));
+
   isExportingDetail.value = true;
   try {
     const res = await svc.getExportDetail(tglAwal.value, tglAkhir.value);
-    const data = res.data.data ?? [];
+    const allDetail: any[] = (res.data.data ?? []).filter((r: any) =>
+      allowedNomors.has(r.Nomor),
+    );
+    if (!allDetail.length) {
+      toast.warning("Tidak ada data detail untuk data yang sedang difilter.");
+      return;
+    }
+
+    // Kelompokkan per Nomor SJ (jaga urutan kemunculan pertama)
+    const groups: Record<string, any[]> = {};
+    const order: string[] = [];
+    allDetail.forEach((r) => {
+      const key = r.Nomor;
+      if (!groups[key]) {
+        groups[key] = [];
+        order.push(key);
+      }
+      groups[key].push(r);
+    });
+
+    const combinedRows: any[] = [];
+    order.forEach((key) => {
+      const rowsInGroup = groups[key];
+      const first = rowsInGroup[0];
+      const masterCells: Record<string, any> = {
+        Nomor: first.Nomor,
+        Tanggal: formatTanggal(first.Tanggal),
+        Divisi: first.Divisi,
+        ...(canLihatCus.value
+          ? {
+              KodeCustomer: first.KodeCustomer,
+              Customer: first.Customer,
+              Alamat: first.Alamat,
+              Kota: first.Kota,
+            }
+          : {}),
+        Status: first.Status,
+        Expedisi: first.Expedisi,
+        Kurir: first.Kurir,
+        Nomor_Resi: first.Nomor_Resi,
+        Tanggal_Kirim: formatTanggal(first.Tanggal_Kirim),
+        Biaya_Kirim: Number(first.Biaya_Kirim) || 0,
+        Total_Qty: Number(first.Total_Qty) || 0,
+        Harga: Number(first.Harga) || 0,
+        Tanggal_Terima: formatTanggal(first.Tanggal_Terima),
+        Penerima_Barang: first.Penerima_Barang,
+        Tanggal_Terima_Sj: formatTanggal(first.Tanggal_Terima_Sj),
+        Contact_Person: first.Contact_Person,
+        Tanggal_Konfirmasi: formatTanggal(first.Tanggal_Konfirmasi),
+        Tanggal_Terima_1: formatTanggal(first.Tanggal_Terima_1),
+        Tanggal_SerahTerima: formatTanggal(first.Tanggal_SerahTerima),
+      };
+      const blankMaster = Object.fromEntries(
+        Object.keys(masterCells).map((k) => [k, ""]),
+      );
+      rowsInGroup.forEach((r, idx) => {
+        combinedRows.push({
+          ...(idx === 0 ? masterCells : blankMaster),
+          SpkNomor: r.SpkNomor,
+          NamaBarang: r.NamaBarang,
+          Ukuran: r.Ukuran,
+          Panjang: r.Panjang,
+          Lebar: r.Lebar,
+          Jumlah: Number(r.Jumlah) || 0,
+          KetDetail: r.KetDetail,
+        });
+      });
+    });
+
+    const cols: ExcelColumn[] = [
+      { header: "Nomor", key: "Nomor" },
+      { header: "Tanggal", key: "Tanggal" },
+      { header: "Divisi", key: "Divisi" },
+      ...(canLihatCus.value
+        ? [
+            { header: "Kd Customer", key: "KodeCustomer" },
+            { header: "Customer", key: "Customer" },
+            { header: "Alamat", key: "Alamat" },
+            { header: "Kota", key: "Kota" },
+          ]
+        : []),
+      { header: "Status", key: "Status" },
+      { header: "Expedisi", key: "Expedisi" },
+      { header: "Kurir", key: "Kurir" },
+      { header: "No. Resi", key: "Nomor_Resi" },
+      { header: "Tgl Kirim", key: "Tanggal_Kirim" },
+      { header: "Biaya Kirim", key: "Biaya_Kirim", align: "right" },
+      { header: "Total Qty", key: "Total_Qty", align: "right" },
+      { header: "Harga/Qty", key: "Harga", align: "right" },
+      { header: "Tgl Terima", key: "Tanggal_Terima" },
+      { header: "Penerima Barang", key: "Penerima_Barang" },
+      { header: "Tgl Terima SJ", key: "Tanggal_Terima_Sj" },
+      { header: "Contact Person", key: "Contact_Person" },
+      { header: "Tgl Konfirmasi", key: "Tanggal_Konfirmasi" },
+      { header: "Tgl Terima 1", key: "Tanggal_Terima_1" },
+      { header: "Tgl Serah Terima", key: "Tanggal_SerahTerima" },
+      { header: "SPK", key: "SpkNomor" },
+      { header: "Nama", key: "NamaBarang" },
+      { header: "Ukuran", key: "Ukuran" },
+      { header: "Panjang", key: "Panjang", align: "right" },
+      { header: "Lebar", key: "Lebar", align: "right" },
+      { header: "Jumlah", key: "Jumlah", align: "right" },
+      { header: "Keterangan", key: "KetDetail" },
+    ];
+
     await exportExcelSingle(
       `Update_Status_SJ_Detail_${tglAwal.value}_${tglAkhir.value}`,
       "Detail",
-      [
-        { header: "Nomor SJ", key: "Nomor" },
-        { header: "SPK", key: "SpkNomor" },
-        { header: "Nama", key: "Nama" },
-        { header: "Ukuran", key: "Ukuran" },
-        { header: "Panjang", key: "Panjang", align: "right" },
-        { header: "Lebar", key: "Lebar", align: "right" },
-        { header: "Jumlah", key: "Jumlah", align: "right" },
-        { header: "Keterangan", key: "Keterangan" },
-      ],
-      data,
+      cols,
+      combinedRows,
     );
   } catch {
     toast.error("Gagal export detail.");
@@ -339,6 +459,7 @@ const saveFormStatus = async () => {
 
 <template>
   <BaseBrowse
+    ref="baseBrowseRef"
     title="Update Status Surat Jalan"
     menu-id="155"
     :icon="IconTruckDelivery"

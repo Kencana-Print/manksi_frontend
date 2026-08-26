@@ -13,6 +13,7 @@ import {
   IconSend,
 } from "@tabler/icons-vue";
 import { formatTanggal } from "@/utils/dateFormat";
+import { type ExcelColumn } from "@/utils/excelExport";
 
 const router = useRouter();
 const toast = useToast();
@@ -37,6 +38,8 @@ const filterState = ref({
 const showPinDialog = ref(false);
 const isPinLoading = ref(false);
 const pinData = ref({ nomor: "", alasan: "" });
+
+const baseBrowseRef = ref<InstanceType<typeof BaseBrowse> | null>(null);
 
 const {
   items,
@@ -120,6 +123,41 @@ const cetak = () => {
   );
 };
 
+const onExport = () => {
+  const columns: ExcelColumn[] = [
+    { header: "NOMOR", key: "Nomor" },
+    { header: "NO PO", key: "NO_PO" },
+    { header: "TANGGAL", key: "Tanggal", align: "center" },
+    { header: "DIVISI", key: "Divisi" },
+    { header: "NAMA PRODUK", key: "NamaProduk", width: 30 },
+    { header: "UKURAN", key: "Ukuran" },
+    { header: "BAHAN", key: "Bahan" },
+    { header: "GRAMASI", key: "Gramasi" },
+    { header: "QTY ORDER", key: "QtyOrder", align: "right", numFmt: "#,##0" },
+    { header: "NO DOKUMEN", key: "NoDokumen" },
+    { header: "APPROVE", key: "Approve", align: "center" },
+    { header: "SPK", key: "SPK" },
+    { header: "KETERANGAN", key: "Keterangan", width: 30 },
+    { header: "CREATED", key: "Created" },
+  ];
+
+  exportToExcel("Data_MPPB", {
+    getData: () => {
+      const rawData =
+        baseBrowseRef.value?.getFilteredItems?.() ?? items.value ?? [];
+      // Format tanggal dulu sebelum export — getFilteredItems() balikin
+      // nilai mentah (belum diformat spt di grid via template #item.Tanggal)
+      return rawData.map((r: any) => ({
+        ...r,
+        Tanggal: formatTanggal(r.Tanggal),
+      }));
+    },
+    columns,
+    sheetName: "MPPB",
+    title: `Data MPPB — Periode ${filterState.value.startDate} s.d ${filterState.value.endDate}`,
+  });
+};
+
 // --- ACTION APPROVAL ---
 
 const showApproveDialog = ref(false);
@@ -183,6 +221,7 @@ const submitPengajuan = async () => {
 
 <template>
   <BaseBrowse
+    ref="baseBrowseRef"
     title="Memo Permintaan Pembelian Bahan (MPPB)"
     :menu-id="menuId"
     :icon="IconFileDescription"
@@ -201,7 +240,7 @@ const submitPengajuan = async () => {
     @add="goAdd"
     @edit="goEdit"
     @delete="goDelete"
-    @export="exportToExcel('Data_MPPB')"
+    @export="onExport"
   >
     <template #filter-left>
       <div class="filter-group">

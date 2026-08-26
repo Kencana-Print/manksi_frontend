@@ -45,6 +45,8 @@ const tglAwal = ref(todayLocal());
 const tglAkhir = ref(todayLocal());
 
 // ── useBrowse ──────────────────────────────────────────────
+const baseBrowseRef = ref<InstanceType<typeof BaseBrowse> | null>(null);
+
 const { items, isLoading, selected, canInsert, canEdit, canDelete, fetchData } =
   useBrowse({
     menuId: "153",
@@ -297,10 +299,23 @@ const isExporting = ref(false);
 const isExportingDetail = ref(false);
 
 const onExport = async () => {
+  const rawData =
+    baseBrowseRef.value?.getFilteredItems?.() ?? items.value ?? [];
+  if (!rawData.length) {
+    toast.warning("Tidak ada data untuk diekspor (cek filter aktif).");
+    return;
+  }
   isExporting.value = true;
   try {
-    const res = await svc.getExportData(tglAwal.value, tglAkhir.value);
-    const data = res.data.data ?? [];
+    // Tanggal/Created dari backend sudah string terformat
+    // (DATE_FORMAT), jadi tidak perlu diformat ulang seperti kasus
+    // Invoice — tapi tetap defensif pakai formatTanggal untuk
+    // memastikan tampil rapi apa pun sumbernya.
+    const dataToExport = rawData.map((r: any) => ({
+      ...r,
+      Tanggal: formatTanggal(r.Tanggal),
+    }));
+
     const cols: ExcelColumn[] = [
       { header: "Nomor", key: "Nomor" },
       { header: "Tanggal", key: "Tanggal" },
@@ -324,7 +339,7 @@ const onExport = async () => {
       `Surat_Jalan_${tglAwal.value}_${tglAkhir.value}`,
       "Surat Jalan",
       cols,
-      data,
+      dataToExport,
     );
   } catch {
     toast.error("Gagal export.");
@@ -334,24 +349,126 @@ const onExport = async () => {
 };
 
 const onExportDetail = async () => {
+  const filteredMaster =
+    baseBrowseRef.value?.getFilteredItems?.() ?? items.value ?? [];
+  if (!filteredMaster.length) {
+    toast.warning("Tidak ada data untuk diekspor (cek filter aktif).");
+    return;
+  }
+  const allowedNomors = new Set(filteredMaster.map((r: any) => r.Nomor));
+
   isExportingDetail.value = true;
   try {
     const res = await svc.getExportDetail(tglAwal.value, tglAkhir.value);
-    const data = res.data.data ?? [];
+    const allDetail: any[] = (res.data.data ?? []).filter((r: any) =>
+      allowedNomors.has(r.Nomor),
+    );
+    if (!allDetail.length) {
+      toast.warning("Tidak ada data detail untuk data yang sedang difilter.");
+      return;
+    }
+
+    // Kelompokkan per Nomor SJ (jaga urutan kemunculan pertama)
+    const groups: Record<string, any[]> = {};
+    const order: string[] = [];
+    allDetail.forEach((r) => {
+      const key = r.Nomor;
+      if (!groups[key]) {
+        groups[key] = [];
+        order.push(key);
+      }
+      groups[key].push(r);
+    });
+
+    const combinedRows: any[] = [];
+    order.forEach((key) => {
+      const rowsInGroup = groups[key];
+      const first = rowsInGroup[0];
+      const totalQty = rowsInGroup.reduce(
+        (s, r) => s + (Number(r.Jumlah) || 0),
+        0,
+      );
+      const isPanjangLebar = ["MMT", "SPANDUK"].includes(first.Divisi);
+      const masterCells: Record<string, any> = {
+        Nomor: first.Nomor,
+        Tanggal: formatTanggal(first.Tanggal),
+        Divisi: first.Divisi,
+        Invoice: first.Invoice,
+        ...(canLihatCus.value
+          ? {
+              KdCus: first.KdCus,
+              Customer: first.Customer,
+              Alamat: first.Alamat,
+              Kota: first.Kota,
+            }
+          : {}),
+        Keterangan: first.Keterangan,
+        Gudang: first.Gudang,
+        QtyKirim: totalQty,
+        Approved: first.Approved,
+        Created: first.Created,
+      };
+      const blankMaster = Object.fromEntries(
+        Object.keys(masterCells).map((k) => [k, ""]),
+      );
+      rowsInGroup.forEach((r, idx) => {
+        combinedRows.push({
+          ...(idx === 0 ? masterCells : blankMaster),
+          SPK: r.SPK,
+          Nama: r.Nama,
+          Ukuran: r.Ukuran,
+          ...(isPanjangLebar ? { Panjang: r.Panjang, Lebar: r.Lebar } : {}),
+          Jumlah: Number(r.Jumlah) || 0,
+          Koli: Number(r.Koli) || 0,
+          KetDetail: r.KetDetail,
+          NoKirim: r.NoKirim,
+        });
+      });
+    });
+
+    // Ada Divisi MMT/SPANDUK campur dgn divisi lain di rentang filter?
+    // Kalau ada campuran, kolom Panjang/Lebar tetap disertakan supaya
+    // konsisten satu tabel — biarkan kosong untuk baris non-MMT/SPANDUK.
+    const anyPanjangLebar = combinedRows.some((r) => "Panjang" in r);
+
+    const cols: ExcelColumn[] = [
+      { header: "Nomor", key: "Nomor" },
+      { header: "Tanggal", key: "Tanggal" },
+      { header: "Divisi", key: "Divisi" },
+      { header: "Invoice", key: "Invoice" },
+      ...(canLihatCus.value
+        ? [
+            { header: "KdCus", key: "KdCus" },
+            { header: "Customer", key: "Customer" },
+            { header: "Alamat", key: "Alamat" },
+            { header: "Kota", key: "Kota" },
+          ]
+        : []),
+      { header: "Keterangan", key: "Keterangan" },
+      { header: "Gudang", key: "Gudang" },
+      { header: "Qty Kirim", key: "QtyKirim", align: "right" },
+      { header: "Approved", key: "Approved" },
+      { header: "Created", key: "Created" },
+      { header: "SPK", key: "SPK" },
+      { header: "Nama", key: "Nama" },
+      { header: "Ukuran", key: "Ukuran" },
+      ...(anyPanjangLebar
+        ? [
+            { header: "Panjang", key: "Panjang", align: "right" },
+            { header: "Lebar", key: "Lebar", align: "right" },
+          ]
+        : []),
+      { header: "Jumlah", key: "Jumlah", align: "right" },
+      { header: "Koli", key: "Koli", align: "right" },
+      { header: "Keterangan Detail", key: "KetDetail" },
+      { header: "No. Kirim", key: "NoKirim" },
+    ];
+
     await exportExcelSingle(
       `Surat_Jalan_Detail_${tglAwal.value}_${tglAkhir.value}`,
       "Detail",
-      [
-        { header: "Nomor SJ", key: "Nomor" },
-        { header: "SPK", key: "SPK" },
-        { header: "Nama", key: "Nama" },
-        { header: "Ukuran", key: "Ukuran" },
-        { header: "Jumlah", key: "Jumlah", align: "right" },
-        { header: "Koli", key: "Koli", align: "right" },
-        { header: "Keterangan", key: "Keterangan" },
-        { header: "No. Kirim", key: "NoKirim" },
-      ],
-      data,
+      cols,
+      combinedRows,
     );
   } catch {
     toast.error("Gagal export detail.");
@@ -363,6 +480,7 @@ const onExportDetail = async () => {
 
 <template>
   <BaseBrowse
+    ref="baseBrowseRef"
     title="Surat Jalan"
     menu-id="153"
     :icon="IconTruck"

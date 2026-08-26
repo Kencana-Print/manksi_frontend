@@ -4048,6 +4048,17 @@ const router = createRouter({
         menuId: "1322",
       },
     },
+    {
+      path: "/tools/kelola-pic-agenda",
+      name: "KelolaPicAgenda",
+      component: () => import("@/views/tools/KelolaPicAgendaView.vue"),
+      meta: {
+        title: "Kelola PIC Agenda",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "124",
+      },
+    },
 
     // ── Error Pages ───────────────────────────────────────────────────
     {

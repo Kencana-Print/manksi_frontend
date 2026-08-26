@@ -26,6 +26,9 @@ import { useVersionCheck } from "@/composables/useVersionCheck";
 import ChangelogDialog from "@/components/ChangelogDialog.vue";
 import TabBar from "@/components/TabBar.vue";
 import TabView from "@/components/TabView.vue";
+import AgendaKerjaModal from "@/components/AgendaKerjaModal.vue";
+import { agendaKerjaService } from "@/services/tools/agendaKerjaService";
+import { IconCalendarEvent } from "@tabler/icons-vue";
 
 const {
   buildVersion,
@@ -88,6 +91,7 @@ onMounted(() => {
   const savedTheme = localStorage.getItem("manksi-theme");
   if (savedTheme) theme.global.name.value = savedTheme;
   if (canSeeNotif.value) loadNotifications();
+  loadAgendaBadge();
 });
 
 onUnmounted(() => {
@@ -281,6 +285,18 @@ const onNotifClick = (item: NotifItem) => {
 const onClickOutside = () => {
   showPopover.value = false;
 };
+
+const agendaBadgeCount = ref(0);
+const showAgendaModal = ref(false);
+
+const loadAgendaBadge = async () => {
+  try {
+    const res = await agendaKerjaService.getBadgeCount();
+    agendaBadgeCount.value = res.data.data?.count || 0;
+  } catch {
+    /* silent */
+  }
+};
 </script>
 
 <template>
@@ -315,63 +331,85 @@ const onClickOutside = () => {
 
       <v-spacer />
 
-      <!-- Tengah: lonceng notifikasi -->
-      <div
-        v-if="canSeeNotif"
-        class="notif-wrap"
-        v-click-outside="onClickOutside"
-      >
-        <button
-          class="notif-bell"
-          :class="{ 'has-notif': totalCount > 0 }"
-          @click="showPopover = !showPopover"
-          title="Notifikasi"
-        >
-          <IconBell :size="15" :stroke-width="1.7" />
-          <span v-if="isLoading" class="notif-badge loading">...</span>
-          <span v-else-if="totalCount > 0" class="notif-badge">
-            {{ totalCount > 99 ? "99+" : totalCount }}
-          </span>
-        </button>
-
-        <!-- Popover — muncul ke ATAS karena di footer bawah -->
-        <div v-if="showPopover" class="notif-popover">
-          <div class="notif-header">
-            <span class="notif-title">Pemberitahuan</span>
-            <span v-if="totalCount > 0" class="notif-total-badge">
-              {{ totalCount }} Pending
+      <div class="d-flex align-center" style="gap: 6px">
+        <!-- Agenda Kerja -->
+        <div class="notif-wrap">
+          <button
+            class="notif-bell"
+            :class="{ 'has-notif': agendaBadgeCount > 0 }"
+            @click="showAgendaModal = true"
+            title="Agenda Kerja"
+          >
+            <IconCalendarEvent :size="15" :stroke-width="1.7" />
+            <span v-if="agendaBadgeCount > 0" class="notif-badge">
+              {{ agendaBadgeCount > 99 ? "99+" : agendaBadgeCount }}
             </span>
-          </div>
+          </button>
+        </div>
 
-          <div class="notif-body">
-            <template v-if="notifItems.length">
-              <button
-                v-for="item in notifItems"
-                :key="item.id"
-                class="notif-item"
-                @click="onNotifClick(item)"
-              >
-                <div
-                  class="notif-item-icon"
-                  :style="{ background: item.color + '20', color: item.color }"
+        <!-- Notifikasi (existing) -->
+        <div
+          v-if="canSeeNotif"
+          class="notif-wrap"
+          v-click-outside="onClickOutside"
+        >
+          <button
+            class="notif-bell"
+            :class="{ 'has-notif': totalCount > 0 }"
+            @click="showPopover = !showPopover"
+            title="Notifikasi"
+          >
+            <IconBell :size="15" :stroke-width="1.7" />
+            <span v-if="isLoading" class="notif-badge loading">...</span>
+            <span v-else-if="totalCount > 0" class="notif-badge">
+              {{ totalCount > 99 ? "99+" : totalCount }}
+            </span>
+          </button>
+
+          <!-- Popover — muncul ke ATAS karena di footer bawah -->
+          <div v-if="showPopover" class="notif-popover">
+            <div class="notif-header">
+              <span class="notif-title">Pemberitahuan</span>
+              <span v-if="totalCount > 0" class="notif-total-badge">
+                {{ totalCount }} Pending
+              </span>
+            </div>
+
+            <div class="notif-body">
+              <template v-if="notifItems.length">
+                <button
+                  v-for="item in notifItems"
+                  :key="item.id"
+                  class="notif-item"
+                  @click="onNotifClick(item)"
                 >
-                  <component :is="item.icon" :size="16" :stroke-width="1.6" />
-                </div>
-                <span class="notif-item-label">{{ item.label }}</span>
-                <span
-                  class="notif-item-count"
-                  :style="{ background: item.color }"
-                  >{{ item.count }}</span
-                >
+                  <div
+                    class="notif-item-icon"
+                    :style="{
+                      background: item.color + '20',
+                      color: item.color,
+                    }"
+                  >
+                    <component :is="item.icon" :size="16" :stroke-width="1.6" />
+                  </div>
+                  <span class="notif-item-label">{{ item.label }}</span>
+                  <span
+                    class="notif-item-count"
+                    :style="{ background: item.color }"
+                    >{{ item.count }}</span
+                  >
+                </button>
+              </template>
+              <div v-else class="notif-empty">
+                Tidak ada notifikasi saat ini
+              </div>
+            </div>
+
+            <div class="notif-footer">
+              <button class="notif-refresh" @click="loadNotifications">
+                Perbarui
               </button>
-            </template>
-            <div v-else class="notif-empty">Tidak ada notifikasi saat ini</div>
-          </div>
-
-          <div class="notif-footer">
-            <button class="notif-refresh" @click="loadNotifications">
-              Perbarui
-            </button>
+            </div>
           </div>
         </div>
       </div>
@@ -424,6 +462,8 @@ const onClickOutside = () => {
       @reload="reloadApp"
       @dismiss="onDismissUpdate"
     />
+
+    <AgendaKerjaModal v-model="showAgendaModal" @updated="loadAgendaBadge" />
 
     <!-- Snackbar: muncul otomatis kalau backend punya versi lebih baru
      dari bundle JS yang sedang jalan — deteksi real-time via polling,

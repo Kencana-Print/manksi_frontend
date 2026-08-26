@@ -20,6 +20,7 @@ import {
 } from "@tabler/icons-vue";
 import { formatTanggal } from "@/utils/dateFormat";
 import { exportExcelSingle } from "@/utils/excelExport";
+import { type ExcelColumn } from "@/utils/excelExport";
 
 const authStore = useAuthStore();
 const router = useRouter();
@@ -46,6 +47,8 @@ const isSavingStatus = ref(false);
 const showPrintDialog = ref(false);
 const printStep = ref(1);
 const savedNomor = ref("");
+
+const baseBrowseRef = ref<InstanceType<typeof BaseBrowse> | null>(null);
 
 const {
   items,
@@ -225,34 +228,109 @@ const openStatusModal = async (item: any) => {
 
 const isExportingDetail = ref(false);
 
+const onExportMaster = () => {
+  const columns: ExcelColumn[] = [
+    { header: "Nomor", key: "Nomor" },
+    { header: "Tanggal", key: "Tanggal", align: "center" },
+    { header: "Divisi", key: "Divisi", align: "center" },
+    { header: "Tipe", key: "Tipe" },
+    ...(canLihatCus.value
+      ? [
+          { header: "Perusahaan", key: "Perusahaan", width: 20 },
+          {
+            header: "Nominal",
+            key: "Nominal",
+            align: "right",
+            numFmt: "#,##0",
+          },
+          { header: "Nama Customer", key: "NamaCustomer", width: 24 },
+        ]
+      : []),
+    { header: "Keterangan", key: "Keterangan", width: 24 },
+    { header: "Sales", key: "Sales" },
+    { header: "Det", key: "jumlahDetail", align: "center" },
+    { header: "Fu1", key: "Fu1", align: "center" },
+    { header: "Fu2", key: "Fu2", align: "center" },
+    { header: "Fu3", key: "Fu3", align: "center" },
+    { header: "Proyeksi", key: "Proyeksi" },
+  ];
+
+  exportToExcel("Penawaran", {
+    getData: () => {
+      const rawData =
+        baseBrowseRef.value?.getFilteredItems?.() ?? items.value ?? [];
+      return rawData.map((r: any) => ({
+        ...r,
+        Tanggal: formatTanggal(r.Tanggal),
+      }));
+    },
+    columns,
+    sheetName: "Penawaran",
+    title: `Data Penawaran — Periode ${filterState.value.startDate} s.d ${filterState.value.endDate}`,
+  });
+};
+
 const onExportDetail = async () => {
-  if (!items.value?.length) {
-    return toast.warning("Tidak ada data untuk diexport.");
+  const filteredMaster =
+    baseBrowseRef.value?.getFilteredItems?.() ?? items.value ?? [];
+  if (!filteredMaster.length) {
+    return toast.warning("Tidak ada data untuk diekspor (cek filter aktif).");
   }
 
   isExportingDetail.value = true;
   try {
-    const rows: any[] = [];
-
+    // Kumpulkan detail HANYA untuk master yang lolos filter grid.
     // Pakai cache kalau baris itu kebetulan sudah pernah di-expand,
     // sisanya baru fetch — biar tidak query ulang yang sudah ada.
-    for (const master of items.value) {
+    const allDetail: any[] = [];
+    for (const master of filteredMaster) {
       let details = detailsCache.value[master.Nomor];
       if (!details) {
         const res = await penawaranService.getBrowseDetail(master.Nomor);
         details = res.data.data || [];
         detailsCache.value[master.Nomor] = details;
       }
+      details.forEach((d: any) => {
+        allDetail.push({ ...d, _master: master });
+      });
+    }
 
-      (details || []).forEach((d: any) => {
-        rows.push({
-          Nomor: master.Nomor,
-          Tanggal: formatTanggal(master.Tanggal),
-          Divisi: master.Divisi,
-          Tipe: master.Tipe,
-          Perusahaan: canLihatCus.value ? master.Perusahaan : "",
-          NamaCustomer: canLihatCus.value ? master.NamaCustomer : "",
-          Sales: master.Sales,
+    if (!allDetail.length) {
+      return toast.warning("Tidak ada rincian barang untuk diekspor.");
+    }
+
+    // Kelompokkan per Nomor Penawaran (jaga urutan kemunculan pertama)
+    const groups: Record<string, any[]> = {};
+    const order: string[] = [];
+    allDetail.forEach((r) => {
+      const key = r._master.Nomor;
+      if (!groups[key]) {
+        groups[key] = [];
+        order.push(key);
+      }
+      groups[key].push(r);
+    });
+
+    const combinedRows: any[] = [];
+    order.forEach((key) => {
+      const rowsInGroup = groups[key];
+      const master = rowsInGroup[0]._master;
+      const masterCells: Record<string, any> = {
+        Nomor: master.Nomor,
+        Tanggal: formatTanggal(master.Tanggal),
+        Divisi: master.Divisi,
+        Tipe: master.Tipe,
+        ...(canLihatCus.value
+          ? { Perusahaan: master.Perusahaan, NamaCustomer: master.NamaCustomer }
+          : {}),
+        Sales: master.Sales,
+      };
+      const blankMaster = Object.fromEntries(
+        Object.keys(masterCells).map((k) => [k, ""]),
+      );
+      rowsInGroup.forEach((d, idx) => {
+        combinedRows.push({
+          ...(idx === 0 ? masterCells : blankMaster),
           ID: d.ID,
           NamaBarang: d.NamaBarang,
           Bahan: d.Bahan,
@@ -262,30 +340,28 @@ const onExportDetail = async () => {
           QtyMeter: Number(d.QtyMeter) || 0,
           Satuan: d.Satuan,
           Qty: Number(d.Qty) || 0,
-          Harga: canLihatCus.value ? Number(d.Harga) || 0 : null,
-          Nominal: canLihatCus.value ? Number(d.Nominal) || 0 : null,
+          ...(canLihatCus.value
+            ? {
+                Harga: Number(d.Harga) || 0,
+                Nominal: Number(d.Nominal) || 0,
+              }
+            : {}),
           Status: d.Status || "OPEN",
         });
       });
-    }
-
-    if (rows.length === 0) {
-      return toast.warning("Tidak ada rincian barang untuk diexport.");
-    }
+    });
 
     const columns: any[] = [
       { header: "Nomor", key: "Nomor", width: 16 },
       { header: "Tanggal", key: "Tanggal", width: 12 },
       { header: "Divisi", key: "Divisi", width: 10, align: "center" },
       { header: "Tipe", key: "Tipe", width: 10 },
-    ];
-    if (canLihatCus.value) {
-      columns.push(
-        { header: "Perusahaan", key: "Perusahaan", width: 18 },
-        { header: "Nama Customer", key: "NamaCustomer", width: 24 },
-      );
-    }
-    columns.push(
+      ...(canLihatCus.value
+        ? [
+            { header: "Perusahaan", key: "Perusahaan", width: 18 },
+            { header: "Nama Customer", key: "NamaCustomer", width: 24 },
+          ]
+        : []),
       { header: "Sales", key: "Sales", width: 14 },
       { header: "ID", key: "ID", width: 8, align: "center" },
       { header: "Nama Barang", key: "NamaBarang", width: 30 },
@@ -296,37 +372,32 @@ const onExportDetail = async () => {
       { header: "Qty Mtr", key: "QtyMeter", width: 10, align: "right" },
       { header: "Satuan", key: "Satuan", width: 8, align: "center" },
       { header: "Qty", key: "Qty", width: 10, align: "right" },
-    );
-    if (canLihatCus.value) {
-      columns.push(
-        {
-          header: "Harga",
-          key: "Harga",
-          width: 14,
-          align: "right",
-          numFmt: "#,##0",
-        },
-        {
-          header: "Nominal",
-          key: "Nominal",
-          width: 16,
-          align: "right",
-          numFmt: "#,##0",
-        },
-      );
-    }
-    columns.push({
-      header: "Status",
-      key: "Status",
-      width: 10,
-      align: "center",
-    });
+      ...(canLihatCus.value
+        ? [
+            {
+              header: "Harga",
+              key: "Harga",
+              width: 14,
+              align: "right",
+              numFmt: "#,##0",
+            },
+            {
+              header: "Nominal",
+              key: "Nominal",
+              width: 16,
+              align: "right",
+              numFmt: "#,##0",
+            },
+          ]
+        : []),
+      { header: "Status", key: "Status", width: 10, align: "center" },
+    ];
 
     await exportExcelSingle(
       `Penawaran_Detail_${filterState.value.startDate}_sd_${filterState.value.endDate}.xlsx`,
       "Detail Penawaran",
       columns,
-      rows,
+      combinedRows,
       `Detail Penawaran — Periode ${formatTanggal(filterState.value.startDate)} s/d ${formatTanggal(filterState.value.endDate)}`,
     );
     toast.success("Berhasil export detail.");
@@ -365,6 +436,7 @@ const totalStatusGrid = computed(() => {
 
 <template>
   <BaseBrowse
+    ref="baseBrowseRef"
     title="Penawaran"
     :menu-id="menuId"
     :icon="IconFileText"
@@ -387,7 +459,7 @@ const totalStatusGrid = computed(() => {
     @add="goAdd"
     @edit="goEdit"
     @delete="goDelete"
-    @export="exportToExcel('Penawaran')"
+    @export="onExportMaster"
   >
     <!-- Filter bar -->
     <template #filter-left>
