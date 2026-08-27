@@ -6,6 +6,7 @@ export const dashboardService = {
   getPenawaranBelumSpk: (limit = 20, offset = 0) =>
     api.get("/dashboard/penawaran-belum-spk", { params: { limit, offset } }),
   getSpkSummary: () => api.get("/dashboard/spk-summary"),
+  getSoSummary: () => api.get("/dashboard/so-summary"),
   getRealisasiSummary: () =>
     api.get("/laporan/penjualan/realisasi-penawaran/dashboard-summary"),
   getPoBahanSisa: () => api.get("/dashboard/po-bahan-sisa"),

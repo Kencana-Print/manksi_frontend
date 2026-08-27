@@ -380,6 +380,12 @@ const spkSummary = ref({
   SegeredDeadline: 0,
   Selesai: 0,
 });
+const soSummary = ref({
+  TotalAktif: 0,
+  BelumSpk: 0,
+  BelumKirim: 0,
+  BelumJadi: 0,
+});
 const realisasiRows = ref<any[]>([]);
 const poBpbSummary = ref({ TotalPO: 0, Open: 0, OnProses: 0, Close: 0 });
 const isLoadingDashboard = ref(false);
@@ -1087,17 +1093,17 @@ const mapFilter = ref({
 // ── State MAP vs SPK ──
 interface MapVsSpkMetric {
   TotalMAP: number;
-  SudahSPK: number;
-  BelumSPK: number;
+  SudahSO: number;
+  BelumSO: number;
   TotalNilai: number;
-  NilaiSudahSPK: number;
-  NilaiBelumSPK: number;
+  NilaiSudahSO: number;
+  NilaiBelumSO: number;
 }
 interface MapDivisiItem {
   Divisi: string;
   TotalMAP: number;
-  SudahSPK: number;
-  NilaiSPK: number;
+  SudahSO: number;
+  NilaiSO: number;
   NilaiPotensi: number;
 }
 interface MapBelumSpkItem {
@@ -1112,11 +1118,11 @@ interface MapBelumSpkItem {
 }
 const mapSpkMetric = ref<MapVsSpkMetric>({
   TotalMAP: 0,
-  SudahSPK: 0,
-  BelumSPK: 0,
+  SudahSO: 0,
+  BelumSO: 0,
   TotalNilai: 0,
-  NilaiSudahSPK: 0,
-  NilaiBelumSPK: 0,
+  NilaiSudahSO: 0,
+  NilaiBelumSO: 0,
 });
 const mapDivisi = ref<MapDivisiItem[]>([]);
 
@@ -1698,7 +1704,7 @@ const setupEfisiensiObserver = () => {
 const mapSpkRate = computed(() => {
   if (!mapSpkMetric.value.TotalMAP) return 0;
   return Math.round(
-    (mapSpkMetric.value.SudahSPK / mapSpkMetric.value.TotalMAP) * 100,
+    (mapSpkMetric.value.SudahSO / mapSpkMetric.value.TotalMAP) * 100,
   );
 });
 const mapKirimRate = computed(() => {
@@ -1916,8 +1922,9 @@ const loadOverviewData = async () => {
 
     await loadMoreAktivitas();
 
-    const [spkSumRes] = await Promise.allSettled([
+    const [spkSumRes, soSumRes] = await Promise.allSettled([
       dashboardService.getSpkSummary(),
+      dashboardService.getSoSummary(),
     ]);
     if (spkSumRes.status === "fulfilled") {
       spkSummary.value = spkSumRes.value.data.data;
@@ -1925,6 +1932,9 @@ const loadOverviewData = async () => {
       animatedTerlambat.value = spkSummary.value.Terlambat;
       animatedDeadlineHariIni.value = spkSummary.value.DeadlineHariIni;
       animatedSegera.value = spkSummary.value.SegeredDeadline;
+    }
+    if (soSumRes.status === "fulfilled") {
+      soSummary.value = soSumRes.value.data.data;
     }
     animatedAktivitasCount.value = aktivitasList.value.length;
   } finally {
@@ -2793,6 +2803,42 @@ const sisaClass = (item: any) => {
               <div class="sum-label">Segera Deadline (≤3hr)</div>
               <div class="sum-value" style="color: #e65100">
                 {{ isLoadingDashboard ? "—" : animatedSegera }}
+              </div>
+            </div>
+          </v-col>
+        </v-row>
+
+        <!-- SO Summary Cards -->
+        <v-row dense class="mb-3">
+          <v-col cols="6" sm="3">
+            <div class="sum-card">
+              <div class="sum-label">SO Aktif</div>
+              <div class="sum-value text-primary">
+                {{ isLoadingDashboard ? "—" : soSummary.TotalAktif }}
+              </div>
+            </div>
+          </v-col>
+          <v-col cols="6" sm="3">
+            <div class="sum-card">
+              <div class="sum-label">Belum Dibuatkan SPK</div>
+              <div class="sum-value text-error">
+                {{ isLoadingDashboard ? "—" : soSummary.BelumSpk }}
+              </div>
+            </div>
+          </v-col>
+          <v-col cols="6" sm="3">
+            <div class="sum-card">
+              <div class="sum-label">Belum Kirim</div>
+              <div class="sum-value text-warning">
+                {{ isLoadingDashboard ? "—" : soSummary.BelumKirim }}
+              </div>
+            </div>
+          </v-col>
+          <v-col cols="6" sm="3">
+            <div class="sum-card">
+              <div class="sum-label">Belum Jadi</div>
+              <div class="sum-value" style="color: #e65100">
+                {{ isLoadingDashboard ? "—" : soSummary.BelumJadi }}
               </div>
             </div>
           </v-col>
@@ -4444,15 +4490,15 @@ const sisaClass = (item: any) => {
                     </div>
                     <div class="pen-stat">
                       <span class="pen-stat-val text-success">{{
-                        mapSpkMetric.SudahSPK
+                        mapSpkMetric.SudahSO
                       }}</span>
-                      <span class="pen-stat-lbl">Sudah SPK</span>
+                      <span class="pen-stat-lbl">Sudah SO</span>
                     </div>
                     <div class="pen-stat">
                       <span class="pen-stat-val text-error">{{
-                        mapSpkMetric.BelumSPK
+                        mapSpkMetric.BelumSO
                       }}</span>
-                      <span class="pen-stat-lbl">Belum SPK</span>
+                      <span class="pen-stat-lbl">Belum SO</span>
                     </div>
                   </div>
 
@@ -4466,7 +4512,7 @@ const sisaClass = (item: any) => {
                       <div class="real-meta">
                         <span class="real-divisi">{{ row.Divisi }}</span>
                         <span class="real-nominal">
-                          SPK {{ shortNum(row.NilaiSPK) }} | Pot
+                          SO {{ shortNum(row.NilaiSO) }} | Pot
                           {{ shortNum(row.NilaiPotensi) }}
                         </span>
                       </div>
@@ -4476,9 +4522,9 @@ const sisaClass = (item: any) => {
                             class="real-seg real-seg--close"
                             :style="{
                               width:
-                                row.NilaiSPK + row.NilaiPotensi
-                                  ? (row.NilaiSPK /
-                                      (row.NilaiSPK + row.NilaiPotensi)) *
+                                row.NilaiSO + row.NilaiPotensi
+                                  ? (row.NilaiSO /
+                                      (row.NilaiSO + row.NilaiPotensi)) *
                                       100 +
                                     '%'
                                   : '0%',
@@ -4488,9 +4534,9 @@ const sisaClass = (item: any) => {
                             class="real-seg real-seg--open"
                             :style="{
                               width:
-                                row.NilaiSPK + row.NilaiPotensi
+                                row.NilaiSO + row.NilaiPotensi
                                   ? (row.NilaiPotensi /
-                                      (row.NilaiSPK + row.NilaiPotensi)) *
+                                      (row.NilaiSO + row.NilaiPotensi)) *
                                       100 +
                                     '%'
                                   : '0%',
@@ -4499,10 +4545,10 @@ const sisaClass = (item: any) => {
                         </div>
                         <span class="real-pct">
                           {{
-                            row.NilaiSPK + row.NilaiPotensi
+                            row.NilaiSO + row.NilaiPotensi
                               ? Math.round(
-                                  (row.NilaiSPK /
-                                    (row.NilaiSPK + row.NilaiPotensi)) *
+                                  (row.NilaiSO /
+                                    (row.NilaiSO + row.NilaiPotensi)) *
                                     100,
                                 )
                               : 0
@@ -4793,16 +4839,16 @@ const sisaClass = (item: any) => {
                         class="pen-stat-val text-success"
                         style="font-size: 14px"
                       >
-                        {{ shortNum(mapSpkMetric.NilaiSudahSPK) }}
+                        {{ shortNum(mapSpkMetric.NilaiSudahSO) }}
                       </span>
-                      <span class="pen-stat-lbl">Confirmed (SPK)</span>
+                      <span class="pen-stat-lbl">Confirmed (SO)</span>
                     </div>
                     <div class="pen-stat">
                       <span
                         class="pen-stat-val text-warning"
                         style="font-size: 14px"
                       >
-                        {{ shortNum(mapSpkMetric.NilaiBelumSPK) }}
+                        {{ shortNum(mapSpkMetric.NilaiBelumSO) }}
                       </span>
                       <span class="pen-stat-lbl">Potensi</span>
                     </div>
@@ -4823,7 +4869,7 @@ const sisaClass = (item: any) => {
                           class="knj-pct"
                           style="color: #6a1b9a; font-weight: 700"
                         >
-                          {{ shortNum(row.NilaiSPK + row.NilaiPotensi) }}
+                          {{ shortNum(row.NilaiSO + row.NilaiPotensi) }}
                         </span>
                       </div>
                       <div class="knj-bar-wrap">
@@ -4834,7 +4880,7 @@ const sisaClass = (item: any) => {
                             style="background: #7b1fa2"
                             :style="{
                               width: mapSpkMetric.TotalNilai
-                                ? (row.NilaiSPK / mapSpkMetric.TotalNilai) *
+                                ? (row.NilaiSO / mapSpkMetric.TotalNilai) *
                                     100 +
                                   '%'
                                 : '0%',
@@ -4856,13 +4902,13 @@ const sisaClass = (item: any) => {
                       </div>
                       <div class="real-detail mt-1">
                         <span style="color: #7b1fa2"
-                          >✓ {{ shortNum(row.NilaiSPK) }}</span
+                          >✓ {{ shortNum(row.NilaiSO) }}</span
                         >
                         <span style="color: #9c27b0"
                           >○ {{ shortNum(row.NilaiPotensi) }}</span
                         >
                         <span style="color: #9e9e9e"
-                          >{{ row.SudahSPK }}/{{ row.TotalMAP }} MAP</span
+                          >{{ row.SudahSO }}/{{ row.TotalMAP }} MAP</span
                         >
                       </div>
                     </div>
@@ -4877,7 +4923,7 @@ const sisaClass = (item: any) => {
                     <span
                       class="leg-dot"
                       style="background: #7b1fa2"
-                    />Confirmed (SPK)
+                    />Confirmed (SO)
                     <span class="leg-dot" style="background: #ce93d8" />Potensi
                   </div>
                 </template>
