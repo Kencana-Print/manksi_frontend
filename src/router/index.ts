@@ -1655,6 +1655,40 @@ const router = createRouter({
       },
     },
     {
+      path: "/garmen/spk-gudang/create",
+      name: "GarmenSpkGudangCreate",
+      component: () => import("@/views/garmen/SpkGudangFormView.vue"),
+      meta: {
+        title: "Buat SPK Gudang",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "79",
+        browseRoute: "GarmenSpkGudangBrowse",
+      },
+    },
+    {
+      path: "/garmen/spk-gudang/edit/:nomor",
+      name: "GarmenSpkGudangEdit",
+      component: () => import("@/views/garmen/SpkGudangFormView.vue"),
+      meta: {
+        title: "Ubah SPK Gudang",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "79",
+        browseRoute: "GarmenSpkGudangBrowse",
+      },
+    },
+    {
+      path: "/garmen/spk-gudang/print/:nomor",
+      name: "GarmenSpkGudangPrint",
+      component: () => import("@/views/garmen/SpkGudangPrintView.vue"),
+      meta: {
+        title: "Cetak SPK Gudang",
+        layout: "BlankLayout",
+        requiresAuth: true,
+      },
+    },
+    {
       path: "/garmen/po-jasa",
       name: "PoJasaBrowse",
       component: () => import("@/views/garmen/PoJasaView.vue"),
