@@ -9,6 +9,9 @@ export const mppbFormService = {
     return api.post("/penjualan/mppb/form", payload);
   },
 
+  getMintaHargaDetail: (nomor: string) =>
+    api.get(`/penjualan/mppb/form/minta-harga/${encodeURIComponent(nomor)}`),
+
   // Tambahan Fungsi Upload Gambar (Multipart/form-data)
   uploadGambar: (nomor: string, tipe: "desain" | "dokumen", file: File) => {
     const formData = new FormData();

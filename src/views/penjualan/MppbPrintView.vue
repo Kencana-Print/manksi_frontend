@@ -103,6 +103,11 @@ onMounted(() => {
         <div class="content-left">
           <div class="mb-3">Mohon dibelikan bahan untuk :</div>
           <table class="rincian-table">
+            <tr v-if="header.mpb_pen_nomor">
+              <td class="lbl">No. Penawaran</td>
+              <td class="sep">:</td>
+              <td class="val">{{ header.mpb_pen_nomor }}</td>
+            </tr>
             <tr>
               <td class="lbl">Nama Produk</td>
               <td class="sep">:</td>

@@ -66,6 +66,7 @@ const {
 // Definisi Kolom (Sesuai query ufrmBrowseMPPB Delphi)
 const headers = [
   { title: "NOMOR", key: "Nomor", width: "160px" },
+  { title: "NO PENAWARAN", key: "NoPenawaran", width: "150px" },
   { title: "NO PO", key: "NO_PO", width: "140px" },
   { title: "TANGGAL", key: "Tanggal", width: "100px", align: "center" },
   { title: "DIVISI", key: "Divisi", width: "120px" },
@@ -126,6 +127,7 @@ const cetak = () => {
 const onExport = () => {
   const columns: ExcelColumn[] = [
     { header: "NOMOR", key: "Nomor" },
+    { header: "NO PENAWARAN", key: "NoPenawaran" },
     { header: "NO PO", key: "NO_PO" },
     { header: "TANGGAL", key: "Tanggal", align: "center" },
     { header: "DIVISI", key: "Divisi" },

@@ -17,6 +17,9 @@ import {
 } from "@tabler/icons-vue";
 import type { AxiosResponse } from "axios";
 
+import PenawaranSearchModal from "@/components/lookups/PenawaranSearchModal.vue";
+import PenawaranDetailSearchModal from "@/components/lookups/PenawaranDetailSearchModal.vue";
+
 const route = useRoute();
 const router = useRouter();
 const toast = useToast();
@@ -69,6 +72,10 @@ const uploadDocName = ref("");
 const showPreviewDialog = ref(false);
 const previewUrlActive = ref("");
 
+const showPenawaranModal = ref(false);
+const showPenawaranDetailModal = ref(false);
+const activePenawaranNomor = ref("");
+
 const formatDateLocal = (value: string | Date) => {
   const d = new Date(value);
 
@@ -96,6 +103,8 @@ const emptyData = {
   isTutupBuku: false,
   imgDesainLokal: "",
   imgDokumenLokal: "",
+  penNomor: "",
+  penId: "",
 };
 
 const {
@@ -133,6 +142,8 @@ const {
       isTutupBuku: h.isTutupBuku || false,
       imgDesainLokal: "",
       imgDokumenLokal: "",
+      penNomor: h.mpb_pen_nomor || "",
+      penId: h.mpb_pen_id || "",
     };
   },
   submitApi: async (payload) => {
@@ -274,9 +285,55 @@ const openPreview = (url: string) => {
   showPreviewDialog.value = true;
 };
 
+const openPenawaranModal = () => {
+  showPenawaranModal.value = true;
+};
+
+const selectPenawaran = (item: any) => {
+  showPenawaranModal.value = false;
+  activePenawaranNomor.value = item.Nomor;
+  showPenawaranDetailModal.value = true;
+};
+
+const selectPenawaranDetail = async (item: any) => {
+  showPenawaranDetailModal.value = false;
+  formData.value.penNomor = activePenawaranNomor.value;
+  formData.value.penId = item.id;
+
+  if (!item.Minta) {
+    toast.warning(
+      "Baris detail ini tidak punya referensi Permintaan Harga — isi field manual.",
+    );
+    return;
+  }
+
+  try {
+    const res = await mppbFormService.getMintaHargaDetail(item.Minta);
+    const mh = res.data.data;
+    formData.value.divisi = String(mh.mh_divisi);
+    formData.value.namaProduk = mh.mh_nama || "";
+    formData.value.ukuran = mh.mh_ukuran || "";
+    formData.value.bahan = mh.mh_kain || "";
+    formData.value.gramasi = mh.mh_gramasi || "";
+    formData.value.jumlahOrder = Number(mh.mh_jmlorder) || 0;
+  } catch (e: any) {
+    toast.error(
+      e.response?.data?.message || "Gagal memuat data Permintaan Harga.",
+    );
+  }
+};
+
+const clearPenawaran = () => {
+  formData.value.penNomor = "";
+  formData.value.penId = "";
+};
+
 // ── VALIDASI SIMPAN ──
 const validateSave = () => {
   if (!canSave.value) return toast.error("Hak akses simpan ditolak.");
+  if (!formData.value.penNomor || !formData.value.penId) {
+    return toast.warning("No. Penawaran wajib dipilih.");
+  }
   if (isTutupBuku.value) {
     return toast.error(
       "Transaksi tsb sudah diclose.\nSilahkan minta approve (PIN 5) untuk menyimpan.",
@@ -384,6 +441,36 @@ const formatWaktu = (dt: string) => {
               style="flex: 1"
               placeholder="-"
             />
+          </div>
+
+          <v-divider class="my-3" />
+
+          <div class="tp-row">
+            <label class="tp-lbl">No. Penawaran</label>
+            <v-text-field
+              :model-value="formData.penNomor"
+              variant="outlined"
+              density="compact"
+              readonly
+              bg-color="grey-lighten-4"
+              hide-details
+              class="f-inp pen-field"
+              placeholder="Klik untuk cari..."
+              @click="openPenawaranModal"
+            >
+              <template #append-inner>
+                <IconSearch :size="14" color="#1565c0" />
+              </template>
+            </v-text-field>
+            <button
+              v-if="formData.penNomor"
+              type="button"
+              class="pen-clear-btn"
+              title="Hapus link"
+              @click.stop="clearPenawaran"
+            >
+              <IconX :size="12" />
+            </button>
           </div>
 
           <v-divider class="my-3" />
@@ -640,6 +727,16 @@ const formatWaktu = (dt: string) => {
       </v-card-actions>
     </v-card>
   </v-dialog>
+
+  <PenawaranSearchModal
+    v-model="showPenawaranModal"
+    @selected="selectPenawaran"
+  />
+  <PenawaranDetailSearchModal
+    v-model="showPenawaranDetailModal"
+    :penawaran-nomor="activePenawaranNomor"
+    @selected="selectPenawaranDetail"
+  />
 </template>
 
 <style scoped>
@@ -843,5 +940,43 @@ const formatWaktu = (dt: string) => {
   font-weight: 500;
   font-style: italic;
   text-align: right;
+}
+.pen-field :deep(.v-field) {
+  cursor: pointer;
+}
+.pen-clear-btn {
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  border: 1px solid #ffcdd2;
+  border-radius: 4px;
+  background: #ffebee;
+  color: #c62828;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.pen-clear-btn:hover {
+  background: #ffcdd2;
+}
+.pen-detail-box {
+  flex: 1;
+  background: #e3f2fd;
+  border: 1px solid #90caf9;
+  border-radius: 4px;
+  padding: 8px 10px;
+  font-size: 11px;
+}
+.pen-detail-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 0;
+}
+.pen-detail-lbl {
+  color: #1565c0;
+  font-weight: 600;
+  flex-shrink: 0;
 }
 </style>
