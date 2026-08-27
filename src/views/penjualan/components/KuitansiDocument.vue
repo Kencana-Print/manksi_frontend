@@ -18,10 +18,12 @@ const companyLogo = computed(() => {
 
 const isKp = computed(() => props.header.variant === "kp");
 
-// "Boyolali,[Date]" — Date di FastReport = tanggal SAAT DICETAK,
-// BUKAN tanggal transaksi invoice.
+// "Boyolali,[Date]" — tanggal transaksi invoice (inv_tanggal), bukan
+// tanggal saat kuitansi dicetak.
 const printedDate = computed(() => {
-  const d = new Date();
+  const raw = props.header?.inv_tanggal;
+  if (!raw) return "-";
+  const d = new Date(raw);
   const p = (n: number) => String(n).padStart(2, "0");
   return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()}`;
 });

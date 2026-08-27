@@ -509,6 +509,31 @@ const onExportDetail = async () => {
     isExportingDetail.value = false;
   }
 };
+
+// ── Cell "editable" ala Delphi grid — klik utk lihat nilai mentah
+// (dgn desimal), blur utk balik ke tampilan dibulatkan. Murni visual,
+// TIDAK menyimpan perubahan apa pun.
+const editingCell = ref<string | null>(null);
+const cellKey = (item: any, field: string) => `${item.Nomor}_${field}`;
+
+const numRaw = (v: any) =>
+  Number(v || 0).toLocaleString("id-ID", { maximumFractionDigits: 10 });
+
+const openCellEdit = (item: any, field: string, event: MouseEvent) => {
+  editingCell.value = cellKey(item, field);
+  // Fokus otomatis ke input yg baru muncul
+  requestAnimationFrame(() => {
+    const target = event.target as HTMLElement;
+    const cell = target.closest("td");
+    const input = cell?.querySelector("input");
+    input?.focus();
+    (input as HTMLInputElement)?.select();
+  });
+};
+
+const closeCellEdit = () => {
+  editingCell.value = null;
+};
 </script>
 
 <template>
@@ -651,11 +676,37 @@ const onExportDetail = async () => {
     </template>
 
     <template #item.Total="{ item }">
-      {{ num(item.Total) }}
+      <input
+        v-if="editingCell === cellKey(item, 'Total')"
+        :value="numRaw(item.Total)"
+        readonly
+        class="cell-edit-inp"
+        @blur="closeCellEdit"
+        @keydown.escape="closeCellEdit"
+      />
+      <span
+        v-else
+        class="cell-display"
+        @click="openCellEdit(item, 'Total', $event)"
+        >{{ num(Math.round(Number(item.Total) || 0)) }}</span
+      >
     </template>
 
     <template #item.Bayar="{ item }">
-      {{ num(item.Bayar) }}
+      <input
+        v-if="editingCell === cellKey(item, 'Bayar')"
+        :value="numRaw(item.Bayar)"
+        readonly
+        class="cell-edit-inp"
+        @blur="closeCellEdit"
+        @keydown.escape="closeCellEdit"
+      />
+      <span
+        v-else
+        class="cell-display"
+        @click="openCellEdit(item, 'Bayar', $event)"
+        >{{ num(Math.round(Number(item.Bayar) || 0)) }}</span
+      >
     </template>
 
     <template #item.Tanggal="{ item }">
@@ -1092,5 +1143,27 @@ const onExportDetail = async () => {
 }
 .mt8 {
   margin-top: 8px;
+}
+.cell-display {
+  cursor: cell;
+  display: inline-block;
+  width: 100%;
+  text-align: right;
+}
+.cell-display:hover {
+  background: #fffde7;
+}
+.cell-edit-inp {
+  width: 100%;
+  height: 22px;
+  border: 1px solid #1565c0;
+  border-radius: 2px;
+  padding: 0 4px;
+  font-size: 11px;
+  text-align: right;
+  outline: none;
+  background: #fffde7;
+  font-family: inherit;
+  box-sizing: border-box;
 }
 </style>

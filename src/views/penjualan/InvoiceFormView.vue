@@ -497,7 +497,7 @@ const removeRow = (row: DetailRow) => {
 // ── Hitung total — sesuai Delphi hitung() ────────────────────────────────
 const totalBarang = computed(() =>
   fd.value.Detail.reduce(
-    (s, r) => s + Number(r.Jumlah || 0) * Number(r.Harga || 0),
+    (s, r) => s + Math.round(Number(r.Jumlah || 0) * Number(r.Harga || 0)),
     0,
   ),
 );
@@ -1041,7 +1041,9 @@ onMounted(async () => {
                     />
                   </td>
                   <td class="tr" style="padding-right: 6px">
-                    {{ row.Kode ? num(row.Jumlah * row.Harga) : "" }}
+                    {{
+                      row.Kode ? num(Math.round(row.Jumlah * row.Harga)) : ""
+                    }}
                   </td>
                   <td>
                     <input
