@@ -101,7 +101,9 @@ const resolveDesignImage = () => {
     return;
   }
 
-  // ── Logic lama (non-Kaosan / legacy) — TIDAK berubah ──
+  // ── Logic lama (non-Kaosan / legacy) — urutan prioritas diperbaiki:
+  // SO ref DULU (sumber paling relevan), baru nomor SPK sendiri, baru
+  // fallback SO turunan, MAP TERAKHIR — sama pola dgn fix SpkTabOrder.
   const base = getBaseUrl();
   const cab = spk.value.spk_cab || "HO-";
   const nomor = spk.value.spk_nomor;
@@ -112,34 +114,38 @@ const resolveDesignImage = () => {
     : nomor.startsWith("SO-")
       ? nomor
       : `SO-${nomor}`;
-  const isLegacyFormat = !nomor.startsWith("SPK-");
+
   const candidates: string[] = [];
-  const mapCandidates = mapNomor
-    ? [
-        `/file-gambar/${encodeURIComponent(mapNomor)}.jpg`,
-        `${base}/images/${cab}/map/${encodeURIComponent(mapNomor)}.jpg`,
-        `${base}/images/${cab}/${encodeURIComponent(mapNomor)}.jpg`,
-      ]
-    : [];
-  const ownCandidates = [
-    `${base}/images/${cab}/${encodeURIComponent(nomor)}.jpg`,
-    `/file-gambar/${encodeURIComponent(nomor)}.jpg`,
-  ];
-  if (isLegacyFormat) {
-    candidates.push(...ownCandidates, ...mapCandidates);
-  } else {
-    candidates.push(...mapCandidates, ...ownCandidates);
-  }
-  if (soRef && soRef !== nomor) {
+
+  // 1. SO ref — prioritas utama
+  if (soRef) {
     candidates.push(`${base}/images/${cab}/${encodeURIComponent(soRef)}.jpg`);
     candidates.push(`/file-gambar/${encodeURIComponent(soRef)}.jpg`);
   }
+
+  // 2. Nomor SPK sendiri
+  candidates.push(`${base}/images/${cab}/${encodeURIComponent(nomor)}.jpg`);
+  candidates.push(`/file-gambar/${encodeURIComponent(nomor)}.jpg`);
+
+  // 3. Fallback SO turunan (kalau soRef kosong tapi bisa ditebak dari nomor)
   if (fallbackSoNomor !== nomor && fallbackSoNomor !== soRef) {
     candidates.push(
       `${base}/images/${cab}/${encodeURIComponent(fallbackSoNomor)}.jpg`,
     );
     candidates.push(`/file-gambar/${encodeURIComponent(fallbackSoNomor)}.jpg`);
   }
+
+  // 4. MAP — paling akhir, cuma dipakai kalau semua sumber SO gagal
+  if (mapNomor) {
+    candidates.push(`/file-gambar/${encodeURIComponent(mapNomor)}.jpg`);
+    candidates.push(
+      `${base}/images/${cab}/map/${encodeURIComponent(mapNomor)}.jpg`,
+    );
+    candidates.push(
+      `${base}/images/${cab}/${encodeURIComponent(mapNomor)}.jpg`,
+    );
+  }
+
   isLoadingImage.value = true;
   resolvedImageUrl.value = "";
   const tryNext = (idx: number) => {
