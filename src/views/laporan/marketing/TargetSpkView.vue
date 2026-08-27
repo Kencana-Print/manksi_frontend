@@ -304,6 +304,7 @@ const saveKodeSales = async (row: any) => {
     :is-loading="isLoading"
     :item-value="itemValue"
     :can-export="canExport"
+    :summary-columns="['Spk3', 'Spk2', 'Spk1', 'Average', 'Target', 'Actual']"
     search-placeholder="Cari kode / nama customer..."
     @refresh="fetchData"
   >

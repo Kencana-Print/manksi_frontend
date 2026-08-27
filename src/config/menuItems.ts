@@ -1240,7 +1240,7 @@ export const createMenuItems = (): NavItem[] => {
               icon: IconFileAlert,
             },
             {
-              title: "SPK Belum Closing",
+              title: "SO Belum Closing",
               to: "/laporan/marketing/spk-belum-closing",
               icon: IconClipboardX,
             },

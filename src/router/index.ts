@@ -3785,7 +3785,7 @@ const router = createRouter({
       component: () =>
         import("@/views/laporan/marketing/SpkBelumClosingView.vue"),
       meta: {
-        title: "SPK Belum Closing",
+        title: "SO Belum Closing",
         layout: "DefaultLayout",
         requiresAuth: true,
         menuId: "966",

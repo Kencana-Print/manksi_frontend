@@ -3462,7 +3462,7 @@ const sisaClass = (item: any) => {
             <div class="manksi-panel content-panel">
               <div class="panel-header panel-header--blue">
                 <IconChartBar :size="14" :stroke-width="1.7" class="mr-1" />
-                Waktu realisasi penawaran → SPK
+                Waktu realisasi penawaran → SO
                 <span class="panel-header-sub ml-1">(90 hari terakhir)</span>
                 <span
                   v-if="realisasiPenawaranData.metric.RataRataHari"
@@ -3759,11 +3759,11 @@ const sisaClass = (item: any) => {
                           </th>
                           <th style="min-width: 160px">Customer</th>
                           <th style="width: 70px; text-align: center">
-                            Total SPK
+                            Total SO
                           </th>
-                          <th style="width: 150px">SPK pertama</th>
+                          <th style="width: 150px">SO pertama</th>
                           <th style="width: 95px; text-align: center">
-                            Tgl SPK
+                            Tgl SO
                           </th>
                           <th style="width: 70px; text-align: right">Hari</th>
                           <th style="width: 90px; text-align: center">
@@ -4412,7 +4412,7 @@ const sisaClass = (item: any) => {
             <div class="manksi-panel content-panel fill-height">
               <div class="panel-header panel-header--blue">
                 <IconChartBar :size="14" :stroke-width="1.7" class="mr-1" />
-                Konversi MAP → SPK
+                Konversi MAP → SO
                 <span
                   class="ml-auto pct-badge"
                   :class="
@@ -4526,7 +4526,7 @@ const sisaClass = (item: any) => {
                       font-weight: 600;
                     "
                   >
-                    MAP BELUM SPK
+                    MAP BELUM SO
                   </div>
 
                   <!-- Infinite scroll list -->

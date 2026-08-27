@@ -206,6 +206,9 @@ const formatUkuran = (v: any) => {
 };
 
 const isSizeKhusus = computed(() => data.value.spk_sizekhusus === "Y");
+const isStandarKlien = computed(
+  () => data.value.spk_standar_ukuran === "KLIEN",
+);
 
 const labelText = computed(() => {
   const lbl = Number(data.value.spk_label) || 0;
@@ -471,11 +474,13 @@ onMounted(async () => {
                     <td class="w-colon">:</td>
                     <td>{{ data.spk_cab }} ({{ data.spk_workshop }})</td>
                   </tr>
-                  <tr v-if="data.cus_perfect === 'Y'">
+                  <tr>
                     <td class="w-label">Status Client</td>
                     <td class="w-colon">:</td>
                     <td>
-                      <span class="highlight-yellow">PERFECT</span>
+                      <span class="highlight-yellow">{{
+                        data.cus_perfect === "Y" ? "PERFECT" : ""
+                      }}</span>
                     </td>
                   </tr>
                   <tr>
@@ -507,7 +512,7 @@ onMounted(async () => {
                 <div class="ket-title">Size : Lebar &amp; Panjang Badan</div>
                 <pre
                   class="ket-produksi"
-                ><span :class="{ 'highlight-yellow': isSizeKhusus }">{{
+                ><span :class="{ 'highlight-yellow': isSizeKhusus || isStandarKlien }">{{
                   formatSizeDetail || (data.sizeStr ? data.sizeStr : "-")
                 }}</span></pre>
               </div>
@@ -721,11 +726,13 @@ onMounted(async () => {
                   {{ data.spk_cab }} ({{ data.spk_workshop }}).
                 </td>
               </tr>
-              <tr v-if="isSpandukMMT && data.cus_perfect === 'Y'">
+              <tr v-if="isSpandukMMT">
                 <td class="w-label">Status Client</td>
                 <td class="w-colon">:</td>
                 <td colspan="3">
-                  <span class="highlight-yellow">PERFECT</span>
+                  <span class="highlight-yellow">{{
+                    data.cus_perfect === "Y" ? "PERFECT" : ""
+                  }}</span>
                 </td>
               </tr>
               <tr v-if="isSpandukMMT">
@@ -1279,10 +1286,12 @@ onMounted(async () => {
   line-height: 1.05;
 }
 .highlight-yellow {
-  background: yellow;
+  background: yellow !important;
   padding: 1px 4px;
   font-weight: bold;
   border: 1px solid #ccc;
+  -webkit-print-color-adjust: exact !important;
+  print-color-adjust: exact !important;
 }
 .row-flex {
   display: flex;

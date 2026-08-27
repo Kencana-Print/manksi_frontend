@@ -71,7 +71,7 @@ watch([startDate, endDate], () => {
 
 // ── Headers ──
 const headers = [
-  { title: "Nomor SPK", key: "Nomor", width: "160px" },
+  { title: "Nomor SO/SPK", key: "Nomor", width: "160px" },
   { title: "Nama", key: "Nama", minWidth: "200px" },
   { title: "Tanggal", key: "Tanggal", width: "100px", align: "center" },
   { title: "Divisi", key: "Divisi", width: "90px" },
@@ -126,10 +126,10 @@ const onExport = async () => {
   if (!canExport.value) return toast.error("Akses ditolak.");
   if (!items.value.length) return toast.warning("Tidak ada data.");
   await exportExcelSingle(
-    `SPK_Belum_Closing_${startDate.value}_${endDate.value}`,
-    "SPK Belum Closing",
+    `SO_Belum_Closing_${startDate.value}_${endDate.value}`,
+    "SO Belum Closing",
     [
-      { header: "Nomor SPK", key: "Nomor", width: 18 },
+      { header: "Nomor SO/SPK", key: "Nomor", width: 18 },
       { header: "Nama", key: "Nama", width: 32 },
       { header: "Tanggal", key: "Tanggal", width: 12, align: "center" },
       { header: "Divisi", key: "Divisi", width: 12 },
@@ -187,7 +187,7 @@ const onExport = async () => {
       { header: "Jml SPK", key: "Jumlah_SPK", width: 10, align: "center" },
     ],
     items.value,
-    `SPK Belum Closing — ${startDate.value} s.d. ${endDate.value}`,
+    `SO Belum Closing — ${startDate.value} s.d. ${endDate.value}`,
   );
 };
 
@@ -315,7 +315,7 @@ const onExportPivot = async () => {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `Pivot_SPK_Belum_Closing_${startDate.value}_${endDate.value}.xlsx`;
+  a.download = `Pivot_SO_Belum_Closing_${startDate.value}_${endDate.value}.xlsx`;
   a.click();
   URL.revokeObjectURL(url);
   toast.success("Export pivot berhasil.");
@@ -483,7 +483,7 @@ onBeforeUnmount(() => {
 
 <template>
   <PageLayout
-    title="SPK Belum Closing"
+    title="SO Belum Closing"
     :menu-id="MENU_ID"
     :icon="IconClipboardX"
   >
