@@ -1185,7 +1185,6 @@ const router = createRouter({
         requiresAuth: true,
       },
     },
-
     {
       path: "/garmen/mka",
       name: "GarmenMkaBrowse",
@@ -1642,6 +1641,17 @@ const router = createRouter({
         title: "Cetak Retur Pembelian",
         layout: "BlankLayout",
         requiresAuth: true,
+      },
+    },
+    {
+      path: "/garmen/spk-gudang",
+      name: "GarmenSpkGudangBrowse",
+      component: () => import("@/views/garmen/SpkGudangView.vue"),
+      meta: {
+        title: "SPK Gudang",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "79",
       },
     },
     {

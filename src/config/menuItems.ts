@@ -536,6 +536,12 @@ export const createMenuItems = (): NavItem[] => {
             },
           ],
         },
+        {
+          title: "SPK Gudang",
+          to: "/garmen/spk-gudang",
+          icon: IconClipboardList,
+          menuId: 79,
+        },
         { divider: true },
         {
           title: "PO Jasa",
