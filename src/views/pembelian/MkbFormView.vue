@@ -214,6 +214,16 @@ const isTutupBuku = computed(() =>
   ["WAIT", "TOLAK"].includes(formData.value.pin_status),
 );
 
+const totalJumlahPlan = computed(() =>
+  formData.value.dtlPlan.reduce(
+    (s: number, p: any) => s + (Number(p.jumlah) || 0),
+    0,
+  ),
+);
+const canAddPlanRow = computed(
+  () => totalJumlahPlan.value < (Number(formData.value.jumlahSpk) || 0),
+);
+
 // Fetch master list komponen dari backend
 const fetchKomponen = async () => {
   try {
@@ -520,8 +530,15 @@ const removeRowBahan = (index: number) => {
     selectedRowIdx.value = formData.value.dtlBahan.length - 1;
   }
 };
-const addRowPlan = () =>
+const addRowPlan = () => {
+  if (!canAddPlanRow.value) {
+    toast.warning(
+      "Jumlah Datang sudah sama dengan Jumlah Butuh. Ubah tanggal/jumlah baris yang sudah ada kalau perlu revisi.",
+    );
+    return;
+  }
   formData.value.dtlPlan.push({ tanggal: "", jumlah: 0 });
+};
 const removeRowPlan = (index: number) =>
   formData.value.dtlPlan.splice(index, 1);
 
@@ -1078,7 +1095,12 @@ const onPoSelected = (po: any) => {
               color="orange-darken-3"
               variant="outlined"
               @click="addRowPlan"
-              :disabled="isMapMode"
+              :disabled="isMapMode || !canAddPlanRow"
+              :title="
+                !canAddPlanRow && !isMapMode
+                  ? 'Jumlah Datang sudah sama dengan Jumlah Butuh'
+                  : ''
+              "
             >
               <template #prepend><IconPlus :size="11" /></template>
               Add
@@ -1090,6 +1112,16 @@ const onPoSelected = (po: any) => {
             style="padding: 0 8px"
           >
             MAP tidak perlu input planning SPK.
+          </div>
+          <div
+            v-if="!isMapMode && !canAddPlanRow && formData.dtlPlan.length > 0"
+            class="text-caption font-italic mb-1 mt-1"
+            style="padding: 0 8px; color: #2e7d32"
+          >
+            ✓ Jumlah Datang ({{ totalJumlahPlan.toLocaleString("id-ID") }})
+            sudah mencapai Total Jumlah SPK ({{
+              Number(formData.jumlahSpk).toLocaleString("id-ID")
+            }}).
           </div>
           <div class="grid-scroll" style="flex: 1">
             <table class="grid-table">
