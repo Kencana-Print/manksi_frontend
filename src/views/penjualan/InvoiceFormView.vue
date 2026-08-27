@@ -76,6 +76,25 @@ const addDays = (dateStr: string, days: number) => {
 let _key = 1;
 const sel = (e: FocusEvent) => (e.target as HTMLInputElement).select();
 const num = (v: any) => Math.round(Number(v || 0)).toLocaleString("id-ID"); // ← tambahan Math.round
+// Format Harga saat mode edit: ribuan pakai titik, desimal pakai koma,
+// sampai 9 digit di belakang koma (sesuai kebutuhan presisi kalkulasi
+// babaran/harga satuan yang gak selalu bulat).
+const fmtHargaEdit = (v: number) =>
+  Number(v || 0).toLocaleString("id-ID", { maximumFractionDigits: 9 });
+
+// Parse balik dari string berformat id-ID ke number murni
+const parseHargaInput = (raw: string): number => {
+  // Buang titik ribuan, ganti koma desimal jadi titik
+  const cleaned = raw.replace(/\./g, "").replace(",", ".");
+  const n = parseFloat(cleaned);
+  return isNaN(n) ? 0 : n;
+};
+
+const focusCursorToEnd = (e: FocusEvent) => {
+  const el = e.target as HTMLInputElement;
+  const len = el.value.length;
+  setTimeout(() => el.setSelectionRange(len, len), 0);
+};
 
 const divisiList = ref<{ kode: number; nama: string }[]>([]);
 
@@ -1017,25 +1036,28 @@ onMounted(async () => {
                       @change="onJumlahChange(row)"
                     />
                   </td>
+                  <td></td>
                   <td>
                     <input
                       v-if="row.Kode"
-                      type="number"
+                      type="text"
+                      inputmode="decimal"
                       class="ci tr hl"
                       :value="
                         focusedHargaKey === row._key
-                          ? row.Harga
-                          : Math.round(row.Harga || 0)
+                          ? fmtHargaEdit(row.Harga)
+                          : num(row.Harga)
                       "
                       @focus="
                         (e) => {
-                          sel(e);
                           focusedHargaKey = row._key;
+                          focusCursorToEnd(e);
                         }
                       "
                       @input="
-                        row.Harga =
-                          ($event.target as HTMLInputElement).valueAsNumber || 0
+                        row.Harga = parseHargaInput(
+                          ($event.target as HTMLInputElement).value,
+                        )
                       "
                       @blur="focusedHargaKey = null"
                     />
