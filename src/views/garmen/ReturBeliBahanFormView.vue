@@ -190,8 +190,9 @@ const fd = formData;
 // Default tanggal mode-create diambil dari endpoint terpisah (getDefault),
 // bukan dari fetchApi (yang cuma jalan pas edit).
 const loadData = async () => {
-  await fetchData();
-  if (!isEditMode.value) {
+  if (isEditMode.value) {
+    await fetchData();
+  } else {
     const res = await returBeliBahanFormService.getDefault();
     fd.value.tanggal = res.data.data.tanggal;
   }
