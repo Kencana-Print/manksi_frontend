@@ -956,8 +956,6 @@ const NUMERIC_KEYS = new Set([
   "Pesan",
   "Kirim",
   "Kurang",
-  "Panjang",
-  "Lebar",
   "Potong",
   "QcPotong",
   "Bordir",
@@ -975,6 +973,10 @@ const NUMERIC_KEYS = new Set([
   "Kurang_Jahit",
   "Kurang_Lipat",
 ]);
+// Kolom ukuran fisik (bisa berupa pecahan seperti 0,9) — format
+// beda dari NUMERIC_KEYS di atas supaya angka desimalnya tidak
+// dibulatkan saat ditampilkan di Excel
+const DECIMAL_KEYS = new Set(["Panjang", "Lebar"]);
 
 const onExport = async () => {
   const dataToExport =
@@ -994,7 +996,11 @@ const onExport = async () => {
         key: h.key,
         width: h.width ? Math.max(10, Math.round(parseInt(h.width) / 7)) : 16,
         align: h.align ?? "left",
-        numFmt: NUMERIC_KEYS.has(h.key) ? "#,##0" : undefined,
+        numFmt: NUMERIC_KEYS.has(h.key)
+          ? "#,##0"
+          : DECIMAL_KEYS.has(h.key)
+            ? "#,##0.##"
+            : undefined,
       }));
 
     const rows = dataToExport.map((it: any) => {
@@ -1014,7 +1020,7 @@ const onExport = async () => {
           val = val ? formatTanggal(val) : "";
         } else if (["Created", "TglApproveCmo"].includes(c.key)) {
           val = val ? formatTanggalJam(val) : "";
-        } else if (NUMERIC_KEYS.has(c.key)) {
+        } else if (NUMERIC_KEYS.has(c.key) || DECIMAL_KEYS.has(c.key)) {
           val = Number(val) || 0;
         }
         row[c.key] = val ?? "";
