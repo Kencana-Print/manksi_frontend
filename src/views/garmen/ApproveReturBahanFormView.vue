@@ -157,7 +157,7 @@ const onRollChange = (row: any) => {
       id: row.no,
       kode: row.kode,
       nama: row.nama,
-      barcode: `${row.kode}-${yy}xxxx`,
+      barcode: `${row.kode}-${yy}${String(startSeq).padStart(4, "0")}`,
       jumlah: currentRoll === 1 ? row.jumlah : 0,
     });
     startSeq++;
