@@ -673,7 +673,7 @@ watch(
 );
 
 // --- Fungsi bersama: load standar ukuran Kencana ---
-const JO_BEBAS_UKURAN = ["CM"];
+const JO_BEBAS_UKURAN = ["CM", "LL"];
 const isJoBebasUkuran = computed(() => {
   const jo = String(formData.value.spk_jo_kode || "").toUpperCase();
   const nama = String(formData.value.JenisOrder || "").toUpperCase();
@@ -722,10 +722,9 @@ const JO_KATEGORI_BAWAHAN = ["CL"];
 const JO_KATEGORI_WEARPACK = ["WP"];
 const kategoriUkuran = computed(() => {
   const jo = String(formData.value.spk_jo_kode || "").toUpperCase();
-  if (JO_KATEGORI_ATASAN.includes(jo)) return "ATASAN";
   if (JO_KATEGORI_BAWAHAN.includes(jo)) return "BAWAHAN";
   if (JO_KATEGORI_WEARPACK.includes(jo)) return "WEARPACK";
-  return null;
+  return "ATASAN";
 });
 
 // Reset varian ke default yang VALID untuk kategori baru — mencegah

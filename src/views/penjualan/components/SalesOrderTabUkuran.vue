@@ -74,13 +74,11 @@ const showManualBadge = (row: any) =>
 // Kategori ukuran berdasarkan jenis order
 const kategoriUkuran = computed(() => {
   const jo = String(props.formData.spk_jo_kode || "").toUpperCase();
-  const atasan = ["BB", "BU", "JK", "JS", "KK", "KO", "KS"];
   const bawahan = ["CL"];
   const wearpack = ["WP"];
-  if (atasan.includes(jo)) return "ATASAN";
   if (bawahan.includes(jo)) return "BAWAHAN";
   if (wearpack.includes(jo)) return "WEARPACK";
-  return null;
+  return "ATASAN"; // default untuk JO yang tidak terdaftar eksplisit (mis. "LL")
 });
 
 const showKolomAtasan = computed(
@@ -103,11 +101,15 @@ const totalQty = computed(() =>
   ),
 );
 
-const isJoBebasUkuran = computed(() => {
-  const jo = String(props.formData.spk_jo_kode || "").toUpperCase();
-  const nama = String(props.formData.JenisOrder || "").toUpperCase();
-  return jo === "CM" || nama.includes("CELEMEK");
-});
+const isJoBebasUkuran = computed(
+  () =>
+    ["CM", "LL"].includes(
+      String(props.formData.spk_jo_kode || "").toUpperCase(),
+    ) ||
+    String(props.formData.JenisOrder || "")
+      .toUpperCase()
+      .includes("CELEMEK"),
+);
 
 const updateKetUkuran = () => {
   const parts: string[] = [];
