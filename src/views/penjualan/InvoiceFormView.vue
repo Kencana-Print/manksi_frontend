@@ -1036,7 +1036,6 @@ onMounted(async () => {
                       @change="onJumlahChange(row)"
                     />
                   </td>
-                  <td></td>
                   <td>
                     <input
                       v-if="row.Kode"
