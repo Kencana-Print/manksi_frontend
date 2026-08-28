@@ -152,12 +152,13 @@ const onRollChange = (row: any) => {
   let startSeq = row.last + 1;
 
   for (let i = 0; i < currentRoll; i++) {
+    const seqStr = String(10000 + startSeq).slice(-4);
     formData.value.barcodes.push({
       no: startSeq,
       id: row.no,
       kode: row.kode,
       nama: row.nama,
-      barcode: `${row.kode}-${yy}${String(startSeq).padStart(4, "0")}`,
+      barcode: `${row.kode}-${yy}${seqStr}`,
       jumlah: currentRoll === 1 ? row.jumlah : 0,
     });
     startSeq++;
