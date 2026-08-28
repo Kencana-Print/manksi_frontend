@@ -240,8 +240,14 @@ const prosesChips = computed(() => {
   if (spk.value.spk_bordir === "Y") arr.push("BORDIR");
   if (spk.value.spk_sublim === "Y") arr.push("SUBLIM");
 
-  // DTF hanya kalau tidak ada proses apapun dari SO
-  if (arr.length === 0) arr.push("DTF");
+  // DTF HANYA ditampilkan kalau memang disebut eksplisit di finishing —
+  // BUKAN default fallback ketika semua checkbox kosong. Banyak SPK
+  // (misal celana, seperti kasus ini) finishing-nya sama sekali tidak
+  // menyinggung proses cetak apa pun; menulis "DTF" di situ menyesatkan
+  // produksi seolah-olah harus di-DTF padahal tidak relevan sama sekali.
+  if (arr.length === 0 && finishing.includes("dtf")) {
+    arr.push("DTF");
+  }
 
   return arr;
 });
