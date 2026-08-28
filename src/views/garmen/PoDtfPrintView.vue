@@ -172,7 +172,8 @@ const doPrint = () => window.print();
               <th style="width: 70px">Ukuran</th>
               <th style="width: 70px">Bahan</th>
               <th style="width: 110px; text-align: center">Desain</th>
-              <th style="width: 60px">Jml</th>
+              <th style="width: 55px">Jml Cetak</th>
+              <th style="width: 55px">Jml Layout</th>
               <th style="width: 80px">Ket</th>
             </tr>
           </thead>
@@ -189,12 +190,8 @@ const doPrint = () => window.print();
                   @error="handleRowImgError($event, d, data.pjh_cab)"
                 />
               </td>
-              <td class="tr">
-                {{ num(d.jumlah) }}
-                <div v-if="d.jmlLayout" class="jml-layout">
-                  {{ d.jmlLayout }}
-                </div>
-              </td>
+              <td class="tr">{{ num(d.jumlah) }}</td>
+              <td class="tr">{{ d.jmlLayout ? num(d.jmlLayout) : "-" }}</td>
               <td>{{ d.ket }}</td>
             </tr>
           </tbody>
@@ -322,11 +319,6 @@ const doPrint = () => window.print();
 }
 .tr {
   text-align: right;
-}
-.jml-layout {
-  font-size: 10px;
-  color: #555;
-  font-weight: 400;
 }
 .img-cell {
   padding: 4px !important;
