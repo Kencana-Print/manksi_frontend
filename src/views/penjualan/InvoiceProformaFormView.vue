@@ -659,7 +659,13 @@ const num = (val: any) => Math.round(Number(val) || 0).toLocaleString("id-ID");
                 >
                   {{ item.nama }}
                 </td>
-                <td class="bg-grey-lighten-4 px-2">{{ item.ukuran }}</td>
+                <td>
+                  <input
+                    v-model="item.ukuran"
+                    class="cell-input"
+                    placeholder="Ukuran"
+                  />
+                </td>
                 <td class="bg-yellow-lighten-5">
                   <input
                     type="number"

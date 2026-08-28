@@ -1024,7 +1024,10 @@ const onExport = async () => {
       // (beda dari field mentah), biar export konsisten sama yang
       // dilihat user di grid ──
       if ("Status" in row) {
-        row.Status = it.SpkPpic ? "Closed (PPIC)" : (it.Status ?? "");
+        row.Status =
+          it.SpkPpic && it.Status === "Closed"
+            ? "Closed (PPIC)"
+            : (it.Status ?? "");
       }
       if ("CetakStatusDisplay" in row) {
         const cetakCount = Number(it.CetakCount) || 0;
@@ -1287,13 +1290,6 @@ const onExport = async () => {
 
     <template #item.TglApproveCmo="{ item }">
       {{ item.TglApproveCmo ? formatTanggalJam(item.TglApproveCmo) : "-" }}
-    </template>
-
-    <template #item.Status="{ item }">
-      <span v-if="item.SpkPpic" class="text-black font-weight-bold"
-        >Closed (PPIC)</span
-      >
-      <span v-else>{{ item.Status }}</span>
     </template>
 
     <template #detail="{ item }">
