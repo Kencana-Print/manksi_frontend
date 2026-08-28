@@ -7,6 +7,7 @@ export const dashboardService = {
     api.get("/dashboard/penawaran-belum-spk", { params: { limit, offset } }),
   getSpkSummary: () => api.get("/dashboard/spk-summary"),
   getSoSummary: () => api.get("/dashboard/so-summary"),
+  getSoAktifTrend: () => api.get("/dashboard/so-aktif-trend"),
   getRealisasiSummary: () =>
     api.get("/laporan/penjualan/realisasi-penawaran/dashboard-summary"),
   getPoBahanSisa: () => api.get("/dashboard/po-bahan-sisa"),
@@ -181,4 +182,6 @@ export const dashboardService = {
     api.get("/dashboard/pipeline-menggantung", {
       params: { startDate, endDate, limit, page },
     }),
+
+  getCompanyPulseSummary: () => api.get("/dashboard/company-pulse"),
 };

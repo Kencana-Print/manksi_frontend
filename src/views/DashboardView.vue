@@ -386,6 +386,15 @@ const soSummary = ref({
   BelumKirim: 0,
   BelumJadi: 0,
 });
+const soAktifTrend = ref<{ delta: number | null }>({ delta: null });
+const companyPulse = ref({
+  revenueMtd: 0,
+  outstandingAr: 0,
+  approvalPendingTotal: 0,
+});
+const showCompanyPulse = computed(
+  () => isSuperViewer.value || bagian.value === "FINANCE",
+);
 const realisasiRows = ref<any[]>([]);
 const poBpbSummary = ref({ TotalPO: 0, Open: 0, OnProses: 0, Close: 0 });
 const isLoadingDashboard = ref(false);
@@ -1922,9 +1931,10 @@ const loadOverviewData = async () => {
 
     await loadMoreAktivitas();
 
-    const [spkSumRes, soSumRes] = await Promise.allSettled([
+    const [spkSumRes, soSumRes, soTrendRes] = await Promise.allSettled([
       dashboardService.getSpkSummary(),
       dashboardService.getSoSummary(),
+      dashboardService.getSoAktifTrend(),
     ]);
     if (spkSumRes.status === "fulfilled") {
       spkSummary.value = spkSumRes.value.data.data;
@@ -1935,6 +1945,9 @@ const loadOverviewData = async () => {
     }
     if (soSumRes.status === "fulfilled") {
       soSummary.value = soSumRes.value.data.data;
+    }
+    if (soTrendRes.status === "fulfilled") {
+      soAktifTrend.value = soTrendRes.value.data.data;
     }
     animatedAktivitasCount.value = aktivitasList.value.length;
   } finally {
@@ -1972,6 +1985,16 @@ const loadOverviewShortcuts = async () => {
         .then((res) => {
           if (res.data?.data?.summary)
             piutangData.value.summary = res.data.data.summary;
+        })
+        .catch(() => {}),
+    );
+  }
+  if (showCompanyPulse.value) {
+    calls.push(
+      dashboardService
+        .getCompanyPulseSummary()
+        .then((res) => {
+          if (res.data?.data) companyPulse.value = res.data.data;
         })
         .catch(() => {}),
     );
@@ -2772,6 +2795,46 @@ const sisaClass = (item: any) => {
            TAB OVERVIEW
       ════════════════════════════════════════ -->
       <v-window-item value="overview">
+        <v-row v-if="showCompanyPulse" dense class="mb-3">
+          <v-col cols="12">
+            <div
+              class="manksi-panel d-flex flex-wrap align-center"
+              style="padding: 10px 16px; gap: 0; border-left: 4px solid #6a1b9a"
+            >
+              <div class="pen-stat" style="padding: 0 20px">
+                <span class="pen-stat-val text-primary" style="font-size: 18px">
+                  {{
+                    isLoadingDashboard ? "—" : shortNum(companyPulse.revenueMtd)
+                  }}
+                </span>
+                <span class="pen-stat-lbl">Revenue MTD</span>
+              </div>
+              <div class="po-bpb-divider" />
+              <div class="pen-stat" style="padding: 0 20px">
+                <span class="pen-stat-val text-error" style="font-size: 18px">
+                  {{
+                    isLoadingDashboard
+                      ? "—"
+                      : shortNum(companyPulse.outstandingAr)
+                  }}
+                </span>
+                <span class="pen-stat-lbl">Outstanding AR</span>
+              </div>
+              <div class="po-bpb-divider" />
+              <div class="pen-stat" style="padding: 0 20px">
+                <span
+                  class="pen-stat-val"
+                  style="font-size: 18px; color: #e65100"
+                >
+                  {{
+                    isLoadingDashboard ? "—" : companyPulse.approvalPendingTotal
+                  }}
+                </span>
+                <span class="pen-stat-lbl">Approval Pending</span>
+              </div>
+            </div>
+          </v-col>
+        </v-row>
         <!-- SPK Summary Cards -->
         <v-row dense class="mb-3">
           <v-col cols="6" sm="3">
@@ -2815,6 +2878,17 @@ const sisaClass = (item: any) => {
               <div class="sum-label">SO Aktif</div>
               <div class="sum-value text-primary">
                 {{ isLoadingDashboard ? "—" : soSummary.TotalAktif }}
+              </div>
+              <div
+                v-if="!isLoadingDashboard && soAktifTrend.delta !== null"
+                class="sum-sub"
+                :style="{
+                  color: soAktifTrend.delta >= 0 ? '#2e7d32' : '#c62828',
+                  fontWeight: 600,
+                }"
+              >
+                {{ soAktifTrend.delta >= 0 ? "▲" : "▼" }}
+                {{ Math.abs(soAktifTrend.delta) }}% vs minggu lalu
               </div>
             </div>
           </v-col>

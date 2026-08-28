@@ -14,4 +14,7 @@ export const cetakFakturPajakService = {
 
   searchInvoice: (q = "", page = 1, limit = 50) =>
     api.get(`${BASE}/search`, { params: { q, page, limit } }),
+
+  hapusNomorPajak: (nomor: string) =>
+    api.post(`${BASE}/hapus-nomor-pajak`, { nomor }),
 };

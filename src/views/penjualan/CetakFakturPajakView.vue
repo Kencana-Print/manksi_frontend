@@ -132,6 +132,33 @@ const doCetak = async () => {
     isCetak.value = false;
   }
 };
+
+const showHapusDialog = ref(false);
+const isHapus = ref(false);
+
+const onHapusClick = () => {
+  if (!invoiceInfo.value?.SudahAdaFaktur) return;
+  showHapusDialog.value = true;
+};
+
+const doHapus = async () => {
+  if (!invoiceInfo.value) return;
+
+  isHapus.value = true;
+  try {
+    await svc.hapusNomorPajak(nomor.value);
+    toast.success("Nomor Pajak berhasil dihapus.");
+    noSeri.value = "";
+    invoiceInfo.value.SudahAdaFaktur = false;
+    invoiceInfo.value.NoFpExisting = "";
+    await fetchPreview();
+  } catch (e: any) {
+    toast.error(e.response?.data?.message || "Gagal menghapus Nomor Pajak.");
+  } finally {
+    isHapus.value = false;
+    showHapusDialog.value = false;
+  }
+};
 </script>
 
 <template>
@@ -215,6 +242,16 @@ const doCetak = async () => {
             >
               Reset
             </v-btn>
+            <v-btn
+              v-if="invoiceInfo.SudahAdaFaktur"
+              color="error"
+              variant="text"
+              size="small"
+              style="margin-left: 8px"
+              @click="onHapusClick"
+            >
+              Hapus Nomor Pajak
+            </v-btn>
           </div>
         </template>
       </div>
@@ -274,6 +311,37 @@ const doCetak = async () => {
             :loading="isCetak"
             @click="doCetak"
             >Ya, Ganti & Cetak</v-btn
+          >
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <v-dialog v-model="showHapusDialog" max-width="380px" persistent>
+      <v-card class="rounded-lg">
+        <v-card-title
+          class="pa-3 bg-error text-white"
+          style="font-size: 13px; font-weight: 700"
+        >
+          Konfirmasi Hapus Nomor Pajak
+        </v-card-title>
+        <v-card-text class="pa-4" style="font-size: 12px">
+          Nomor Pajak <b>{{ invoiceInfo?.NoFpExisting }}</b> akan dihapus dari
+          invoice ini.<br /><br />
+          Invoice ini juga akan hilang dari kolom "Faktur Pajak" di Browse
+          Invoice. Yakin?
+        </v-card-text>
+        <v-card-actions class="pa-3 border-t">
+          <v-btn variant="text" size="small" @click="showHapusDialog = false"
+            >Batal</v-btn
+          >
+          <v-spacer />
+          <v-btn
+            variant="flat"
+            size="small"
+            color="error"
+            :loading="isHapus"
+            @click="doHapus"
+            >Ya, Hapus</v-btn
           >
         </v-card-actions>
       </v-card>
