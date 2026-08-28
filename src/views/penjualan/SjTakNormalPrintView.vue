@@ -188,31 +188,50 @@ const generateTxt = () => {
     return lines;
   };
 
-  // ⚠️ Field beda dari SJ normal: pakai r.nama_barang (sudah di-JOIN
-  // di backend), bukan spk_nama/spk_nama2
-  const dataLineOf = (r: any, no: number) =>
-    `${padR(String(no), 3)} ${padR(r.sjd_spk_nomor || "", 12)} ${padR(r.nama_barang || "", NAMA_W)} ${padR(r.sjd_ukuran || "", 20)} ${padL(num(r.sjd_jumlah), 10)} ${padL(num(r.sjd_koli), 9)} ${padR(r.sjd_keterangan || "", KET_W)}`;
+  // GANTI dataLineOf yang lama, dan bagian chunking di bawahnya:
 
   const headerLines = buildHeaderLines();
   const footerLines = buildFooterLines();
 
-  const chunks: any[][] = [];
-  for (let i = 0; i < rows.length; i += MAX_DATA_ROWS_PER_PAGE) {
-    chunks.push(rows.slice(i, i + MAX_DATA_ROWS_PER_PAGE));
+  // 1. Uraikan data jadi baris fisik, termasuk wrapping nama yang panjang
+  //    (persis pola SJ Normal — nama kepanjangan dipecah jadi baris tambahan)
+  const allPhysicalRows: string[] = [];
+  let currentRowNo = 1;
+
+  for (const r of rows) {
+    const namaFull = (r.nama_barang || "").trim();
+    const namaLines = wrapText(namaFull, NAMA_W);
+
+    allPhysicalRows.push(
+      `${padR(String(currentRowNo), 3)} ${padR(r.sjd_spk_nomor || "", 12)} ${padR(namaLines[0], NAMA_W)} ${padR(r.sjd_ukuran || "", 20)} ${padL(num(r.sjd_jumlah), 10)} ${padL(num(r.sjd_koli), 9)} ${padR(r.sjd_keterangan || "", KET_W)}`,
+    );
+    for (let i = 1; i < namaLines.length; i++) {
+      allPhysicalRows.push(
+        `${padR("", 3)} ${padR("", 12)} ${padR(namaLines[i], NAMA_W)} ${padR("", 20)} ${padL("", 10)} ${padL("", 9)} ${padR("", KET_W)}`,
+      );
+    }
+    currentRowNo++;
+  }
+
+  // 2. Chunking berdasarkan baris fisik (bukan jumlah baris data mentah),
+  //    biar kapasitas 7 baris per halaman tetap akurat walau ada wrapping
+  const chunks: string[][] = [];
+  for (let i = 0; i < allPhysicalRows.length; i += MAX_DATA_ROWS_PER_PAGE) {
+    chunks.push(allPhysicalRows.slice(i, i + MAX_DATA_ROWS_PER_PAGE));
   }
   if (chunks.length === 0) chunks.push([]);
 
   const allPages: string[][] = [];
-  chunks.forEach((chunk, ci) => {
-    const startNo = ci * MAX_DATA_ROWS_PER_PAGE;
-    const dataLines = chunk.map((r: any, i: number) =>
-      dataLineOf(r, startNo + i + 1),
-    );
-
-    const paddedData = [
-      ...dataLines,
-      ...Array(Math.max(0, MAX_DATA_ROWS_PER_PAGE - chunk.length)).fill(""),
-    ];
+  chunks.forEach((chunkLines, ci) => {
+    const isLastChunk = ci === chunks.length - 1;
+    const paddedData = isLastChunk
+      ? chunkLines
+      : [
+          ...chunkLines,
+          ...Array(
+            Math.max(0, MAX_DATA_ROWS_PER_PAGE - chunkLines.length),
+          ).fill(""),
+        ];
     allPages.push([...headerLines, ...paddedData, ...footerLines]);
   });
 
