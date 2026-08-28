@@ -183,15 +183,69 @@ const previewIframeEl = ref<HTMLIFrameElement | null>(null);
 const previewScale = ref(1);
 const previewContentHeight = ref(1123);
 let previewResizeObserver: ResizeObserver | null = null;
-const PAGE_WIDTH_PX = 793;
+
+// Zoom manual — null = masih auto-fit, begitu user pencet +/-/scroll ambil alih
+const manualZoomFactor = ref<number | null>(null);
+const MIN_ZOOM = 0.25;
+const MAX_ZOOM = 3;
+const ZOOM_STEP = 0.1;
+
+const zoomPercentDisplay = computed(() => Math.round(previewScale.value * 100));
+
+// Kalau Browse SPK ini juga bisa nampilin SPK Cutting P01/P02/P05 (landscape),
+// samain logicnya dengan SpkView — kalau memang selalu portrait, boleh skip bagian ini
+const isPreviewLandscape = computed(() => {
+  if (!selectedItem.value) return false;
+  return ["P01", "P02", "P05"].includes(selectedItem.value.Cab);
+});
+
+const PAGE_WIDTH_PX = computed(() => {
+  if (!selectedItem.value) return 793;
+  const cab = selectedItem.value.Cab;
+  if (cab === "P01") return 1047;
+  if (["P02", "P05"].includes(cab)) return 1123;
+  return 793;
+});
+
+const computeFitScale = () => {
+  const el = previewContainerEl.value;
+  if (!el) return 1;
+  const availW = el.clientWidth - 24;
+  const availH = el.clientHeight - 24;
+  if (availW < 50 || availH < 50) return 1;
+  const scaleW = availW / PAGE_WIDTH_PX.value;
+  const scaleH = availH / previewContentHeight.value;
+  const fit = Math.min(scaleW, scaleH, MAX_ZOOM);
+  return fit > 0 ? fit : 1;
+};
 
 const recomputePreviewScale = () => {
-  const el = previewContainerEl.value;
-  if (!el) return;
-  const w = el.clientWidth - 24;
-  if (w < 50) return;
-  const scale = Math.min(w / PAGE_WIDTH_PX, 1);
-  previewScale.value = scale > 0 ? scale : 1;
+  if (manualZoomFactor.value !== null) {
+    previewScale.value = manualZoomFactor.value;
+    return;
+  }
+  previewScale.value = computeFitScale();
+};
+
+const zoomIn = () => {
+  const base = manualZoomFactor.value ?? previewScale.value;
+  manualZoomFactor.value = Math.min(MAX_ZOOM, +(base + ZOOM_STEP).toFixed(2));
+  previewScale.value = manualZoomFactor.value;
+};
+const zoomOut = () => {
+  const base = manualZoomFactor.value ?? previewScale.value;
+  manualZoomFactor.value = Math.max(MIN_ZOOM, +(base - ZOOM_STEP).toFixed(2));
+  previewScale.value = manualZoomFactor.value;
+};
+const zoomReset = () => {
+  manualZoomFactor.value = 1;
+  recomputePreviewScale();
+};
+const onPreviewWheel = (e: WheelEvent) => {
+  if (!e.ctrlKey && !e.metaKey) return;
+  e.preventDefault();
+  if (e.deltaY < 0) zoomIn();
+  else zoomOut();
 };
 
 const onPreviewIframeLoad = () => {
@@ -199,10 +253,11 @@ const onPreviewIframeLoad = () => {
   if (!iframe?.contentDocument) return;
   const h = iframe.contentDocument.documentElement.scrollHeight;
   previewContentHeight.value = h > 0 ? h : 1123;
+  recomputePreviewScale();
 };
 
 const previewWrapperStyle = computed(() => ({
-  width: `${PAGE_WIDTH_PX}px`,
+  width: `${PAGE_WIDTH_PX.value}px`,
   height: `${previewContentHeight.value}px`,
   transform: `scale(${previewScale.value})`,
   transformOrigin: "top left",
@@ -212,6 +267,7 @@ watch(showPreviewDialog, async (open) => {
   if (open) {
     window.addEventListener("keydown", blockPrintShortcutParent, true);
     previewContentHeight.value = 1123;
+    manualZoomFactor.value = 1;
     await nextTick();
     if (previewContainerEl.value) {
       previewResizeObserver = new ResizeObserver(() => recomputePreviewScale());
@@ -223,6 +279,7 @@ watch(showPreviewDialog, async (open) => {
     previewResizeObserver?.disconnect();
     previewResizeObserver = null;
     previewNomor.value = "";
+    manualZoomFactor.value = null;
   }
 });
 
@@ -315,24 +372,24 @@ onMounted(fetchData);
   <!-- Dialog Preview Cetak SPK (embed, bukan tab baru) -->
   <v-dialog
     v-model="showPreviewDialog"
-    max-width="98vw"
+    max-width="99vw"
     scrollable
     @contextmenu.prevent
   >
     <v-card
       rounded="lg"
-      style="
-        height: 90vh;
-        width: 850px;
-        max-width: 96vw;
-        min-width: 420px;
-        min-height: 320px;
-        display: flex;
-        flex-direction: column;
-        resize: both;
-        overflow: hidden;
-        margin: 0 auto;
-      "
+      :style="{
+        height: '96vh',
+        width: isPreviewLandscape ? '97vw' : '75vw',
+        maxWidth: '99vw',
+        minWidth: '420px',
+        minHeight: '320px',
+        display: 'flex',
+        flexDirection: 'column',
+        resize: 'both',
+        overflow: 'hidden',
+        margin: '0 auto',
+      }"
     >
       <v-card-title
         class="bg-primary text-white pa-3 flex-shrink-0"
@@ -352,8 +409,24 @@ onMounted(fetchData);
             <IconX :size="18" />
           </v-btn>
         </div>
-        <div class="text-caption" style="opacity: 0.75; line-height: 1.2">
-          ↘ Seret pojok kanan-bawah untuk mengubah ukuran jendela
+        <div class="d-flex align-center justify-space-between mt-1">
+          <div class="text-caption" style="opacity: 0.75; line-height: 1.2">
+            ↘ Seret pojok kanan-bawah untuk mengubah ukuran jendela ·
+            Ctrl+Scroll untuk zoom
+          </div>
+          <div class="d-flex align-center zoom-toolbar">
+            <button class="zoom-btn" title="Perkecil" @click="zoomOut">
+              −
+            </button>
+            <button
+              class="zoom-percent"
+              title="Kembalikan ke 100%"
+              @click="zoomReset"
+            >
+              {{ zoomPercentDisplay }}%
+            </button>
+            <button class="zoom-btn" title="Perbesar" @click="zoomIn">+</button>
+          </div>
         </div>
       </v-card-title>
       <div
@@ -363,11 +436,12 @@ onMounted(fetchData);
           min-height: 0;
           background: #616161;
           overflow-y: auto;
-          overflow-x: hidden;
+          overflow-x: auto;
           display: flex;
           justify-content: center;
-          padding: 12px;
+          padding: 6px;
         "
+        @wheel="onPreviewWheel"
       >
         <div :style="previewWrapperStyle" style="flex-shrink: 0">
           <iframe
@@ -376,8 +450,9 @@ onMounted(fetchData);
             :key="previewNomor"
             :src="`/ppic/spk/print/${encodeURIComponent(previewNomor)}?preview=1`"
             :style="{
-              width: PAGE_WIDTH_PX + 'px',
-              height: previewContentHeight + 'px',
+              height: '96vh',
+              width: isPreviewLandscape ? '97vw' : '75vw',
+              maxWidth: '99vw',
               border: 'none',
               display: 'block',
             }"
@@ -414,5 +489,40 @@ onMounted(fetchData);
 .f-sep {
   font-size: 11px;
   color: #555;
+}
+.zoom-toolbar {
+  gap: 2px;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+  padding: 2px;
+}
+.zoom-btn {
+  width: 22px;
+  height: 22px;
+  border: none;
+  background: transparent;
+  color: white;
+  border-radius: 3px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.zoom-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+.zoom-percent {
+  min-width: 44px;
+  height: 22px;
+  border: none;
+  background: transparent;
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  border-radius: 3px;
+}
+.zoom-percent:hover {
+  background: rgba(255, 255, 255, 0.2);
 }
 </style>
