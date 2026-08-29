@@ -2056,10 +2056,13 @@ Keterangan Komponen :
 }
 
 .page1-scale-inner {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
   display: flex;
   flex-direction: column;
-  width: 100%;
-  flex-shrink: 0 !important; /* <--- KUNCI UTAMA: Mencegah tergencet! */
+  flex-shrink: 0 !important;
   transform-origin: top center;
 }
 
