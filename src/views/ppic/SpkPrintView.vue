@@ -323,8 +323,7 @@ const sizeLebarPanjangStr = computed(() => {
 
 const p1PageEl = ref<HTMLElement | null>(null);
 const p1InnerEl = ref<HTMLElement | null>(null);
-const p1Scale = ref(1);
-const p1ScaledHeightStyle = ref<string>("auto"); // cuma dipakai saat scale-down
+const p1Scale = ref(1); // cuma dipakai saat scale-down
 const p1MultiPage = ref(false);
 
 const MIN_PRINT_SCALE = 0.72;
@@ -349,10 +348,9 @@ const waitForImages = (el: HTMLElement) => {
 const fitPageToA4 = async () => {
   if (!p1PageEl.value || !p1InnerEl.value) return;
 
-  // 1. Reset ukuran agar bisa tumbuh maksimal sesuai isinya
+  // 1. Reset agar bisa tumbuh maksimal sesuai isinya
   p1Scale.value = 1;
   p1MultiPage.value = false;
-  p1ScaledHeightStyle.value = "max-content";
   await nextTick();
   await waitForImages(p1InnerEl.value);
   await nextTick();
@@ -364,17 +362,17 @@ const fitPageToA4 = async () => {
 
   // 3. Eksekusi kalkulasi
   if (contentPx <= availablePx) {
-    p1ScaledHeightStyle.value = "auto";
-    return;
+    return; // p1Scale tetap 1, tidak perlu zoom out
   }
 
   const requiredScale = availablePx / contentPx;
   if (requiredScale >= MIN_PRINT_SCALE) {
     p1Scale.value = requiredScale;
-    p1ScaledHeightStyle.value = `${contentPx}px`; // Kunci tingginya
+    // Tidak perlu lagi mengunci tinggi manual — dengan CSS zoom,
+    // tinggi box akan otomatis mengecil sesuai faktor skala,
+    // pas dengan availablePx.
   } else {
     p1Scale.value = 1;
-    p1ScaledHeightStyle.value = "auto";
     p1MultiPage.value = true;
   }
 };
@@ -938,10 +936,7 @@ Keterangan Komponen :
           class="page1-scale-inner"
           ref="p1InnerEl"
           :style="{
-            height: p1ScaledHeightStyle,
-            overflow: p1Scale < 1 ? 'hidden' : 'visible',
-            transform: `scale(${p1Scale})`,
-            transformOrigin: 'top center',
+            zoom: p1Scale,
           }"
         >
           <!-- Header -->
@@ -2056,14 +2051,10 @@ Keterangan Komponen :
 }
 
 .page1-scale-inner {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
   display: flex;
   flex-direction: column;
+  width: 100%;
   flex-shrink: 0 !important;
-  transform-origin: top center;
 }
 
 /* Cegah baris tabel/box kepotong di tengah pas fallback multi-halaman */
