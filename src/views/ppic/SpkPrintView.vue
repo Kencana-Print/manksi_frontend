@@ -1692,8 +1692,7 @@ Keterangan Komponen :
   margin: 0 auto;
   padding: 10mm 12mm 10mm 12mm;
   box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
+  /* display: flex; flex-direction: column; ← DIHAPUS */
 }
 
 /* ── Print header ── */
@@ -1739,11 +1738,11 @@ Keterangan Komponen :
 }
 
 /* ── Page 1 layout ── */
-.p1-body {
+/* .p1-body {
   flex: 1;
   display: flex;
   flex-direction: column;
-}
+} */
 .p1-row-top {
   display: flex;
   gap: 8px;
@@ -1959,12 +1958,15 @@ Keterangan Komponen :
 
 /* ── TTD ── */
 .ttd-row {
-  display: flex;
+  display: flex; /* boleh tetap flex — ini elemen kecil/tidak lintas halaman, aman */
   justify-content: space-between;
   align-items: flex-end;
-  margin-top: auto;
+  /* margin-top: auto; ← DIHAPUS, sudah tidak relevan */
   padding-top: 6px;
   border-top: 0.5px solid #ccc;
+  margin-top: 16px; /* ganti dengan margin tetap secukupnya sebagai jarak dari konten sebelumnya */
+  break-inside: avoid;
+  page-break-inside: avoid;
 }
 .ttd-tbl {
   border-collapse: collapse;
@@ -2023,8 +2025,7 @@ Keterangan Komponen :
   margin: 0 auto;
   padding: 10mm 12mm;
   box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
+  /* display: flex; flex-direction: column; ← DIHAPUS */
 }
 
 .print-page.page-1.print-page--multi {
@@ -2034,9 +2035,8 @@ Keterangan Komponen :
 }
 
 .page1-scale-inner {
-  display: flex;
-  flex-direction: column;
   width: 100%;
+  /* display: flex; flex-direction: column; ← DIHAPUS */
 }
 
 /* Cegah baris tabel/box kepotong di tengah pas fallback multi-halaman */
