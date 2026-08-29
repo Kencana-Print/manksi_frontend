@@ -485,13 +485,9 @@ onMounted(async () => {
       injectPageStyle("@page { size: A4 landscape; margin: 8mm 10mm; }");
     } else {
       injectPageStyle("@page { size: A4 portrait; margin: 0; }");
-      if (!isAnyLegacyPrint.value) {
-        await nextTick();
-        await fitPageToA4();
-      }
+      // fitPageToA4 dihapus — biarkan konten flow natural
     }
 
-    // Ukuran akhir baru stabil di titik ini — kabari parent (preview dialog)
     await nextTick();
     notifyParentReady();
 
@@ -927,18 +923,8 @@ Keterangan Komponen :
       <!-- ══════════════════════════════════════════════
          HALAMAN 1 — Data SPK
     ══════════════════════════════════════════════ -->
-      <div
-        class="print-page page-1"
-        :class="{ 'print-page--multi': p1MultiPage }"
-        ref="p1PageEl"
-      >
-        <div
-          class="page1-scale-inner"
-          ref="p1InnerEl"
-          :style="{
-            zoom: p1Scale,
-          }"
-        >
+      <div class="print-page page-1" ref="p1PageEl">
+        <div class="page1-scale-inner" ref="p1InnerEl">
           <!-- Header -->
           <div class="ph">
             <div class="ph-left">
@@ -2033,15 +2019,12 @@ Keterangan Komponen :
 /* ── Auto-fit A4 (Page 1, format baru) ── */
 .print-page.page-1 {
   width: 210mm;
-  height: 297mm;
-  max-height: 297mm;
+  min-height: 297mm;
   margin: 0 auto;
   padding: 10mm 12mm;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  position: relative;
-  overflow: hidden;
 }
 
 .print-page.page-1.print-page--multi {
@@ -2054,7 +2037,6 @@ Keterangan Komponen :
   display: flex;
   flex-direction: column;
   width: 100%;
-  flex-shrink: 0 !important;
 }
 
 /* Cegah baris tabel/box kepotong di tengah pas fallback multi-halaman */
