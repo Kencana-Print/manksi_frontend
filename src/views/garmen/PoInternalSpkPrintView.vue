@@ -37,12 +37,68 @@ const getBaseUrl = () => api.defaults.baseURL?.replace(/\/api\/?$/, "") || "";
 const resolvedImageUrl = ref("");
 const isLoadingImage = ref(false);
 
+const isKaosan = computed(() => {
+  const divisi = String(data.value?.header?.Divisi || "").toUpperCase();
+  return (
+    divisi.includes("KAOSAN") || divisi === "3" || divisi.includes("DIVISI 3")
+  );
+});
+const isNewFormatSO = computed(() =>
+  String(data.value?.header?.NomorSPK || "").startsWith("SPK-"),
+);
+
+const KAOSAN_EXTENSIONS = ["png", "jpeg", "jpg"];
+const buildKaosanUrl = (cabangKaosan: string, invdc: string, ext: string) => {
+  const targetUrl = `https://retail.kaosanofficial.com/images/${cabangKaosan}/${encodeURIComponent(invdc)}.${ext}`;
+  return `${api.defaults.baseURL}/proxy-image?url=${encodeURIComponent(targetUrl)}`;
+};
+
+// Coba ekstensi retail Kaosan berurutan (png → jpeg → jpg)
+const tryKaosanExt = (
+  cabangKaosan: string,
+  invdc: string,
+  idx: number,
+  resolve: () => void,
+) => {
+  if (idx >= KAOSAN_EXTENSIONS.length) {
+    resolvedImageUrl.value = "";
+    isLoadingImage.value = false;
+    resolve();
+    return;
+  }
+  const url = buildKaosanUrl(cabangKaosan, invdc, KAOSAN_EXTENSIONS[idx]);
+  const img = new Image();
+  img.onload = () => {
+    resolvedImageUrl.value = url;
+    isLoadingImage.value = false;
+    resolve();
+  };
+  img.onerror = () => tryKaosanExt(cabangKaosan, invdc, idx + 1, resolve);
+  img.src = url;
+};
+
 const resolveDesignImage = () => {
   const nomorSpk = data.value?.header?.NomorSPK;
   if (!nomorSpk) {
     resolvedImageUrl.value = "";
     return Promise.resolve();
   }
+
+  // ⚠️ Sama pola dengan SpkPrintView.resolveDesignImage — SPK divisi
+  // Kaosan (turunan alur SO baru) gambarnya ada di server retail
+  // Kaosan, bukan lokal MANKSI.
+  const invdc = data.value.header.Invdc || "";
+  if (isKaosan.value && isNewFormatSO.value && invdc) {
+    const cab = data.value.header.GdgKode || "HO-";
+    const cabangKaosan = invdc.includes(".") ? invdc.split(".")[0] : cab;
+    isLoadingImage.value = true;
+    resolvedImageUrl.value = "";
+    return new Promise<void>((resolve) => {
+      tryKaosanExt(cabangKaosan, invdc, 0, resolve);
+    });
+  }
+
+  // ── Logic lama (non-Kaosan / legacy) ──
   const base = getBaseUrl();
   const cab = data.value.header.GdgKode || "HO-";
   const map = data.value.header.MapNomor || "";
@@ -68,11 +124,6 @@ const resolveDesignImage = () => {
     candidates.push(...mapCandidates, ...ownCandidates);
   }
 
-  // [FIX] Fallback ke nomor SO (prefix SPK- diganti SO-), sama pola
-  // fallbackSoNomor di SpkView/SpkPrintView — SPK yang lahir dari
-  // proses SO seringkali gambarnya cuma diupload di bawah nomor SO,
-  // bukan nomor SPK-nya sendiri. Tidak butuh field backend baru
-  // karena cukup string-replace prefix, sama persis pola project ini.
   if (!isLegacyFormat) {
     const fallbackSoNomor = nomorSpk.replace("SPK-", "SO-");
     if (fallbackSoNomor !== nomorSpk) {
