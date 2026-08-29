@@ -48,7 +48,20 @@ const prosesOptions = computed(() => {
   if (props.formData.so_sablon === "Y") opsi.push("SABLON");
   if (props.formData.so_bordir === "Y") opsi.push("BORDIR");
   if (props.formData.so_sublim === "Y") opsi.push("SUBLIM");
+
+  // DTF ditambahkan kalau memang disebut eksplisit di teks finishing —
+  // independen dari checkbox sablon/bordir/sublim, karena DTF bisa
+  // berdampingan dengan proses lain (mis. "DTF, SABLON, SUBLIM...").
+  const finishing = (props.formData.so_finishing || "").toLowerCase();
+  if (finishing.includes("dtf") && !opsi.includes("DTF")) {
+    opsi.push("DTF");
+  }
+
+  // Fallback terakhir: kalau semua kondisi di atas kosong (tidak ada
+  // sablon/bordir/sublim/dtf eksplisit), tetap sediakan DTF sebagai
+  // default pilihan dropdown supaya user tidak buntu.
   if (opsi.length === 0) opsi.push("DTF");
+
   return opsi;
 });
 
