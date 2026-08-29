@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, nextTick } from "vue";
+import { ref, computed, onMounted, nextTick, watch } from "vue";
 import type { ComponentPublicInstance } from "vue";
 import { useRoute } from "vue-router";
 import { useToast } from "vue-toastification";
@@ -8,9 +8,9 @@ import { useAuthStore } from "@/stores/authStore";
 import BaseForm from "@/components/BaseForm.vue";
 import { realisasiBarangFormService } from "@/services/garmen/realisasiBarangFormService";
 // Import Tabler Icon
-import { IconListCheck, IconSearch,IconTrash, } from "@tabler/icons-vue";
+import { IconListCheck, IconSearch, IconTrash } from "@tabler/icons-vue";
 
-// Modal Pencarian 
+// Modal Pencarian
 import PermintaanBarangSearchModal from "@/components/lookups/PermintaanBarangSearchModal.vue";
 import BarangGarmenSearchModal from "@/components/lookups/BarangGarmenSearchModal.vue";
 
@@ -89,7 +89,7 @@ const initialData = {
   noMinta: "",
   cabMinta: "",
   keterangan: "",
-  bagian: authStore.user?.bagian ,
+  bagian: authStore.user?.bagian,
   cabang: authStore.userCabang === "ALL" ? "" : authStore.userCabang,
   spk: "",
   namaSpk: "",
@@ -178,16 +178,8 @@ const onMintaSelected = async (item: any) => {
     );
     const { header, details } = res.data.data;
 
-    formData.value.noMinta = header.min_nomor;
-    formData.value.cabMinta = header.min_cab;
-    formData.value.peminta = header.user_create;
-    formData.value.spk = header.min_spk_nomor;
-    formData.value.namaSpk = header.namaspk;
-    formData.value.jumlahSpk = header.jumlahspk || 0;
-    formData.value.mka = header.mkb_nomor;
-    formData.value.mkaTanggal = formatDateLocal(header.mkb_tanggal);
+    if (!applyPermintaanDetail(header, details)) return;
 
-    formData.value.details = details;
     toast.success("Detail rincian barang berhasil ditarik.");
   } catch (error: any) {
     toast.error(
@@ -207,6 +199,27 @@ const onMintaKeydown = (e: KeyboardEvent) => {
   }
 };
 
+// ─── Validasi jenis permintaan harus sama dengan jenis form ──────────────
+const applyPermintaanDetail = (header: any, details: any[]): boolean => {
+  if (header.min_jenis && header.min_jenis !== formData.value.jenis) {
+    toast.error(
+      `Nomor tsb adalah permintaan ${header.min_jenis}, bukan ${formData.value.jenis}.`,
+    );
+    return false;
+  }
+
+  formData.value.noMinta = header.min_nomor;
+  formData.value.cabMinta = header.min_cab;
+  formData.value.peminta = header.user_create;
+  formData.value.spk = header.min_spk_nomor;
+  formData.value.namaSpk = header.namaspk;
+  formData.value.jumlahSpk = header.jumlahspk || 0;
+  formData.value.mka = header.mkb_nomor;
+  formData.value.mkaTanggal = formatDateLocal(header.mkb_tanggal);
+  formData.value.details = details;
+  return true;
+};
+
 const onMintaEnter = async () => {
   const nomor = (formData.value.noMinta || "").trim().toUpperCase();
   if (!nomor || isEdit.value) return;
@@ -216,15 +229,10 @@ const onMintaEnter = async () => {
     const res = await realisasiBarangFormService.getPermintaanDetail(nomor);
     const { header, details } = res.data.data;
 
-    formData.value.noMinta = header.min_nomor;
-    formData.value.cabMinta = header.min_cab;
-    formData.value.peminta = header.user_create;
-    formData.value.spk = header.min_spk_nomor;
-    formData.value.namaSpk = header.namaspk;
-    formData.value.jumlahSpk = header.jumlahspk || 0;
-    formData.value.mka = header.mkb_nomor;
-    formData.value.mkaTanggal = formatDateLocal(header.mkb_tanggal);
-    formData.value.details = details;
+    if (!applyPermintaanDetail(header, details)) {
+      formData.value.noMinta = "";
+      return;
+    }
 
     toast.success("Detail rincian barang berhasil ditarik.");
   } catch (error: any) {
@@ -236,6 +244,19 @@ const onMintaEnter = async () => {
     isLoading.value = false;
   }
 };
+
+// ─── Auto-fill No. Permintaan dari query (klik baris "Belum Direalisasi" merah di browse, lalu klik Baru) ──
+watch(
+  () => route.query.minta,
+  (val) => {
+    if (isEdit.value) return;
+    const nomor = ((val as string) || "").trim().toUpperCase();
+    if (!nomor) return;
+    formData.value.noMinta = nomor;
+    onMintaEnter();
+  },
+  { immediate: true },
+);
 
 // Simpan referensi elemen input "Jumlah" per baris untuk navigasi Enter
 const jumlahInputs = ref<(HTMLInputElement | null)[]>([]);
@@ -313,7 +334,7 @@ const addRow = () => {
     jumlah: 0,
     ket: "",
   });
-};  
+};
 
 const removeRow = (index: number) => {
   formData.value.details.splice(index, 1);
@@ -340,7 +361,6 @@ const onBarangSelected = (item: any) => {
   // [BARU] Sama seperti onBarangEnter — pindah fokus ke Jumlah
   focusDetailField(i, "jumlah");
 };
-
 </script>
 
 <template>
@@ -490,7 +510,13 @@ const onBarangSelected = (item: any) => {
             <IconListDetails :size="14" :stroke-width="1.7" class="mr-2" />
             Detail Barang
           </div>
-          <v-btn v-if="isSparepart" size="x-small" color="success" variant="flat" @click="addRow">
+          <v-btn
+            v-if="isSparepart"
+            size="x-small"
+            color="success"
+            variant="flat"
+            @click="addRow"
+          >
             <template #prepend
               ><IconPlus :size="13" :stroke-width="2"
             /></template>
@@ -519,26 +545,37 @@ const onBarangSelected = (item: any) => {
                 <td class="text-center bg-grey-lighten-4">
                   {{ Number(index) + 1 }}
                 </td>
-                <td class="bg-grey-lighten-4 px-2 text-truncate"
+                <td
+                  class="bg-grey-lighten-4 px-2 text-truncate"
                   style="max-width: 80px"
                 >
-                  <div class="field-row-2col" style="display: grid; grid-template-columns: 3fr 1fr; gap: 1rem;">
-                  <div class="field-row">
-                    {{ item.kode }}
-                  </div>  
-                  <div class="field-row">
-                    <button v-if="isSparepart" :disabled="!!formData.noMinta"
-                      type="button"
-                      class="cell-search-btn"
-                      @click="openBarangModal(Number(index))"
-                      title="Cari Barang"
-                    >
-                      <IconSearch :size="12" color="#1565c0" />
-                    </button>                  
-                  </div>
+                  <div
+                    class="field-row-2col"
+                    style="
+                      display: grid;
+                      grid-template-columns: 3fr 1fr;
+                      gap: 1rem;
+                    "
+                  >
+                    <div class="field-row">
+                      {{ item.kode }}
+                    </div>
+                    <div class="field-row">
+                      <button
+                        v-if="isSparepart"
+                        :disabled="!!formData.noMinta"
+                        type="button"
+                        class="cell-search-btn"
+                        @click="openBarangModal(Number(index))"
+                        title="Cari Barang"
+                      >
+                        <IconSearch :size="12" color="#1565c0" />
+                      </button>
+                    </div>
                   </div>
                 </td>
-                <td class="bg-grey-lighten-4 px-2 text-truncate"
+                <td
+                  class="bg-grey-lighten-4 px-2 text-truncate"
                   style="max-width: 180px"
                 >
                   {{ item.nama }}
@@ -582,7 +619,9 @@ const onBarangSelected = (item: any) => {
                   />
                 </td>
                 <td class="text-center">
-                  <v-btn v-if="isSparepart" :disabled="!!formData.noMinta"
+                  <v-btn
+                    v-if="isSparepart"
+                    :disabled="!!formData.noMinta"
                     size="x-small"
                     variant="text"
                     color="error"
@@ -616,7 +655,7 @@ const onBarangSelected = (item: any) => {
     :jenis="formData.jenis"
     :cabang="formData.cabang"
     @selected="onBarangSelected"
-  />  
+  />
 
   <v-dialog v-model="showPrintDialog" max-width="400px" persistent>
     <v-card class="rounded-lg">

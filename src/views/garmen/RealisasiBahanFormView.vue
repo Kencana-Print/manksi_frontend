@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, nextTick } from "vue";
+import { ref, computed, onMounted, nextTick, watch } from "vue";
 import { useRoute } from "vue-router";
 import { useToast } from "vue-toastification";
 import { useForm } from "@/composables/useForm";
@@ -274,6 +274,19 @@ const onMintaEnter = async () => {
     isLoading.value = false;
   }
 };
+
+// ─── Auto-fill No. Permintaan dari query (klik baris "Belum Direalisasi" merah di browse, lalu klik Baru) ──
+watch(
+  () => route.query.minta,
+  (val) => {
+    if (isEditMode.value) return;
+    const nomor = ((val as string) || "").trim().toUpperCase();
+    if (!nomor) return;
+    formData.value.noMinta = nomor;
+    onMintaEnter();
+  },
+  { immediate: true },
+);
 
 // Fungsi Helper untuk Nama Gudang
 const getNamaGudangAsal = (cab: string) => {

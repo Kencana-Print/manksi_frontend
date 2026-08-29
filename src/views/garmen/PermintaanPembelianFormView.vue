@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { ref, computed, nextTick } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
 import { useAuthStore } from "@/stores/authStore";
@@ -205,7 +205,6 @@ const onKodeEnter = async (idx: number) => {
     );
     const item = res.data.data;
 
-    // Cek duplikat
     const isDuplicate = formData.value.items.some(
       (d: any, i: number) => i !== idx && d.kode === item.Kode,
     );
@@ -221,10 +220,15 @@ const onKodeEnter = async (idx: number) => {
     formData.value.items[idx].harga = 0;
     recalcTotal(idx);
 
-    // Auto tambah baris jika ini baris terakhir
     if (idx === formData.value.items.length - 1) {
       addItem();
     }
+
+    // Enter di Kode manual -> lanjut ke Jumlah baris yang sama
+    await nextTick();
+    const jumlahInput = jumlahFieldRefs.value[idx];
+    jumlahInput?.focus();
+    jumlahInput?.select();
   } catch (e: any) {
     toast.error(e.response?.data?.message || "Kode barang tidak ditemukan.");
     formData.value.items[idx].kode = "";
@@ -247,6 +251,24 @@ const activeItemRealisasi = computed(() => {
   if (!activeKode) return [];
   return formData.value.realisasi.filter((r: any) => r.kode === activeKode);
 });
+
+// ─── Enter di Jumlah -> loncat ke Jumlah baris berikutnya ────────────────
+const jumlahFieldRefs = ref<Record<number, HTMLInputElement>>({});
+const setJumlahFieldRef = (el: any, idx: number) => {
+  if (el) jumlahFieldRefs.value[idx] = el as HTMLInputElement;
+};
+
+const focusNextJumlah = async (idx: number) => {
+  const nextIdx = idx + 1;
+  if (nextIdx < formData.value.items.length) {
+    await nextTick();
+    const next = jumlahFieldRefs.value[nextIdx];
+    next?.focus();
+    next?.select();
+  }
+  // Kalau sudah baris terakhir: diam saja — baris baru cuma ditambah
+  // lewat pemilihan Kode (F1/modal), bukan dari Jumlah.
+};
 
 // --- VALIDATION ---
 const validateSave = () => {
@@ -661,7 +683,9 @@ const onHapusGambarItem = async (): Promise<void> => {
                       v-model.number="item.jumlah"
                       type="number"
                       class="ci text-right font-weight-bold"
+                      :ref="(el) => setJumlahFieldRef(el, Number(idx))"
                       @input="recalcTotal(Number(idx))"
+                      @keydown.enter.prevent="focusNextJumlah(Number(idx))"
                       v-select-on-focus
                     />
                   </td>
@@ -673,13 +697,6 @@ const onHapusGambarItem = async (): Promise<void> => {
                       class="ci text-right"
                       @input="recalcTotal(Number(idx))"
                       v-select-on-focus
-                    />
-                  </td>
-                  <td v-if="isDetailRinci" class="p0">
-                    <input
-                      :value="item.total"
-                      class="ci ro text-right"
-                      readonly
                     />
                   </td>
                   <td v-if="isDetailRinci" class="p0">

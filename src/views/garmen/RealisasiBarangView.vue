@@ -42,6 +42,24 @@ const jenisSlugMap: Record<string, string> = {
 const cabangOptions = ref<string[]>(["ALL"]);
 const jenisOptions = ref<string[]>([]);
 
+const openMintaList = ref<any[]>([]);
+const pendingNomorMinta = ref("");
+
+const fetchOpenMinta = async () => {
+  try {
+    const res = await api.get("/lookups/permintaan-barang-garmen", {
+      params: {
+        jenis: filterState.value.jenis,
+        bagian: authStore.user?.bagian || "",
+        limit: 0, // 0 = tanpa LIMIT, ambil semua
+      },
+    });
+    openMintaList.value = res.data.data.items;
+  } catch {
+    openMintaList.value = [];
+  }
+};
+
 const baseBrowseRef = ref<InstanceType<typeof BaseBrowse> | null>(null);
 
 // Ambil data yang sedang tertampil (setelah search + filter kolom),
@@ -135,18 +153,21 @@ const num = (val: number) => new Intl.NumberFormat("id-ID").format(val || 0);
 // Mewarnai baris berdasarkan Status PIN 5 (Sesuai CustomDrawCell Delphi)
 const handleRowProps = (data: any) => {
   const item = data.item?.raw || data.item;
+  if (item.RowType === "MINTA") {
+    return { style: "color: #d32f2f !important; font-weight: 600;" };
+  }
   if (item.Ngedit === "WAIT") {
     return {
       style: "color: white !important; background-color: #1976d2 !important;",
-    }; // Blue
+    };
   } else if (item.Ngedit === "ACC") {
     return {
       style: "color: white !important; background-color: #2e7d32 !important;",
-    }; // Green
+    };
   } else if (item.Ngedit === "TOLAK") {
     return {
       style: "color: white !important; background-color: #c62828 !important;",
-    }; // Red
+    };
   }
   return {};
 };
@@ -156,20 +177,46 @@ const expandedRows = ref<any[]>([]);
 // --- FUNGSI AKSI ---
 const onAdd = () => {
   try {
-  const slug = jenisSlugMap[filterState.value.jenis] || filterState.value.jenis;
-  router.push(`/garmen/barang/realisasi/form/baru/${slug}`);
+    const sel = selected.value?.[0];
+    const slug =
+      jenisSlugMap[filterState.value.jenis] || filterState.value.jenis;
+
+    if (sel?.RowType === "MINTA") {
+      router.push({
+        path: `/garmen/barang/realisasi/form/baru/${slug}`,
+        query: { minta: sel.Nomor },
+      });
+      return;
+    }
+
+    router.push(`/garmen/barang/realisasi/form/baru/${slug}`);
   } catch (e: any) {
     toast.error(e.response?.data?.message || "Gagal memverifikasi akses.");
-  }  
+  }
 };
 
 const onEdit = (item: any) => {
+  if (item.RowType === "MINTA") {
+    const slug =
+      jenisSlugMap[filterState.value.jenis] || filterState.value.jenis;
+    router.push({
+      path: `/garmen/barang/realisasi/form/baru/${slug}`,
+      query: { minta: item.Nomor },
+    });
+    return;
+  }
   router.push(
     `/garmen/barang/realisasi/form/${encodeURIComponent(item.Nomor)}`,
   );
 };
 
 const onDelete = async (item: any) => {
+  if (item.RowType === "MINTA") {
+    toast.warning(
+      "Ini adalah data Permintaan, belum ada Realisasi untuk dihapus.",
+    );
+    return;
+  }
   try {
     await realisasiBarangService.deleteData(item.Nomor);
     toast.success("Berhasil dihapus.");
@@ -465,7 +512,11 @@ const submitAjukan = async () => {
                 </tr>
                 <tr v-if="!item.details?.length">
                   <td colspan="6" class="empty-td">
-                    Tidak ada rincian barang.
+                    {{
+                      item.RowType === "MINTA"
+                        ? "Belum ada Realisasi untuk permintaan ini — klik baris ini lalu klik Baru."
+                        : "Tidak ada rincian barang."
+                    }}
                   </td>
                 </tr>
               </tbody>

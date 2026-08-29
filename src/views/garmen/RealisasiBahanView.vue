@@ -77,9 +77,10 @@ const loadingDetails = ref<Set<string>>(new Set());
 
 watch(expandedRows, async (newVal) => {
   if (newVal.length === 0) return;
-  const nomor = newVal[newVal.length - 1]?.Nomor;
-  if (!nomor || detailsData.value[nomor] || loadingDetails.value.has(nomor))
-    return;
+  const row = newVal[newVal.length - 1];
+  const nomor = row?.Nomor;
+  if (!nomor || row.RowType === "MINTA") return;
+  if (detailsData.value[nomor] || loadingDetails.value.has(nomor)) return;
 
   loadingDetails.value.add(nomor);
   try {
@@ -94,16 +95,37 @@ watch(expandedRows, async (newVal) => {
 
 // --- AKSI STANDAR ---
 const onAdd = () => {
+  const sel = selected.value?.[0];
+  if (sel?.RowType === "MINTA") {
+    router.push({
+      path: "/garmen/bahan-baku/realisasi-minta/form",
+      query: { minta: sel.Nomor },
+    });
+    return;
+  }
   router.push("/garmen/bahan-baku/realisasi-minta/form");
 };
 
 const onEdit = (item: any) => {
+  if (item.RowType === "MINTA") {
+    router.push({
+      path: "/garmen/bahan-baku/realisasi-minta/form",
+      query: { minta: item.Nomor },
+    });
+    return;
+  }
   router.push(
     `/garmen/bahan-baku/realisasi-minta/form/${encodeURIComponent(item.Nomor)}`,
   );
 };
 
 const onDelete = async (item: any) => {
+  if (item.RowType === "MINTA") {
+    toast.warning(
+      "Ini adalah data Permintaan, belum ada Realisasi untuk dihapus.",
+    );
+    return;
+  }
   try {
     await realisasiBahanService.deleteData(item.Nomor);
     toast.success("Berhasil dihapus. Status Minta Bahan dikalkulasi ulang.");
@@ -215,6 +237,14 @@ const getNomorClass = (item: any) => {
   if (item.Ngedit === "ACC") return "badge-acc";
   return "";
 };
+
+const handleRowProps = (data: any) => {
+  const item = data.item?.raw || data.item;
+  if (item.RowType === "MINTA") {
+    return { style: "color: #d32f2f !important; font-weight: 600;" };
+  }
+  return {};
+};
 </script>
 
 <template>
@@ -227,6 +257,7 @@ const getNomorClass = (item: any) => {
     :is-loading="isLoading"
     item-value="Nomor"
     show-expand
+    :row-props-fn="handleRowProps"
     v-model:expanded="expandedRows"
     v-model:selected="selected"
     v-model:filter-state="filterState"

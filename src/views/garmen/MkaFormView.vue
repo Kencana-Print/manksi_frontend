@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from "vue";
+import { ref, computed, onMounted, watch, nextTick } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
 import { useForm } from "@/composables/useForm";
@@ -396,6 +396,47 @@ const addEmptyRow = () => {
 
 const removeRow = (idx: number) => formData.value.detail.splice(idx, 1);
 
+// ─── Fokus antar kolom editable (Enter pindah field) ─────────────────────
+const EDITABLE_COLS = ["kode", "pemakaian", "jumlah", "keterangan"] as const;
+const detailFieldRefs = ref<Record<string, HTMLInputElement>>({});
+const setDetailFieldRef = (el: any, idx: number, col: string) => {
+  if (el) detailFieldRefs.value[`${idx}_${col}`] = el as HTMLInputElement;
+};
+
+const focusNextDetailField = async (idx: number, col: string) => {
+  const colIdx = EDITABLE_COLS.indexOf(col as any);
+  const nextCol = EDITABLE_COLS[colIdx + 1];
+
+  if (nextCol) {
+    await nextTick();
+    const next = detailFieldRefs.value[`${idx}_${nextCol}`];
+    next?.focus();
+    next?.select();
+    return;
+  }
+
+  // Kolom terakhir (Keterangan) -> baris berikutnya
+  const nextIdx = idx + 1;
+  if (nextIdx < formData.value.detail.length) {
+    await nextTick();
+    const next = detailFieldRefs.value[`${nextIdx}_kode`];
+    next?.focus();
+    next?.select();
+    return;
+  }
+
+  // Baris terakhir -> tambah baris kosong baru & fokus Kode-nya
+  addEmptyRow();
+  await nextTick();
+  detailFieldRefs.value[`${nextIdx}_kode`]?.focus();
+};
+
+// Kode: resolve dulu (async lookup), baru lanjut pindah fokus
+const onKodeEnter = async (idx: number) => {
+  await resolveKodeBahan(idx);
+  await focusNextDetailField(idx, "kode");
+};
+
 // ─── Validasi (Delphi: VK_F10 handler) ───────────────────────────────────────
 const validateSave = () => {
   if (!formData.value.mkb_spk_nomor?.trim()) {
@@ -574,8 +615,11 @@ const validateSave = () => {
                         :class="{ ro: !!row.nama }"
                         :readonly="!!row.nama"
                         placeholder="F1/kode"
+                        :ref="
+                          (el) => setDetailFieldRef(el, idx as number, 'kode')
+                        "
                         @keydown="onKodeKeydown($event, idx as number)"
-                        @keydown.enter.prevent="resolveKodeBahan(idx as number)"
+                        @keydown.enter.prevent="onKodeEnter(idx as number)"
                         @blur="resolveKodeBahan(idx as number)"
                       />
                       <button
@@ -606,7 +650,14 @@ const validateSave = () => {
                       type="number"
                       min="0"
                       class="ci text-right"
+                      :ref="
+                        (el) =>
+                          setDetailFieldRef(el, idx as number, 'pemakaian')
+                      "
                       @input="recalcRow(idx as number)"
+                      @keydown.enter.prevent="
+                        focusNextDetailField(idx as number, 'pemakaian')
+                      "
                       v-select-on-focus
                     />
                   </td>
@@ -618,7 +669,13 @@ const validateSave = () => {
                       min="0"
                       class="ci text-right font-weight-bold"
                       style="background: #fffde7"
+                      :ref="
+                        (el) => setDetailFieldRef(el, idx as number, 'jumlah')
+                      "
                       @input="recalcPo(idx as number)"
+                      @keydown.enter.prevent="
+                        focusNextDetailField(idx as number, 'jumlah')
+                      "
                       v-select-on-focus
                     />
                   </td>
@@ -653,6 +710,13 @@ const validateSave = () => {
                       v-model="row.keterangan"
                       class="ci"
                       maxlength="100"
+                      :ref="
+                        (el) =>
+                          setDetailFieldRef(el, idx as number, 'keterangan')
+                      "
+                      @keydown.enter.prevent="
+                        focusNextDetailField(idx as number, 'keterangan')
+                      "
                     />
                   </td>
 

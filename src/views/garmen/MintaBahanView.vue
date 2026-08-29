@@ -79,6 +79,13 @@ const {
   },
 });
 
+const baseBrowseRef = ref<InstanceType<typeof BaseBrowse> | null>(null);
+
+// Ambil data yang sedang tertampil (setelah search/filter kolom di
+// BaseBrowse), fallback ke items mentah kalau ref belum siap.
+const getExportSource = () =>
+  baseBrowseRef.value?.getFilteredItems() ?? items.value ?? [];
+
 const headers = [
   { title: "Nomor", key: "Nomor", width: "115px" },
   { title: "Tanggal", key: "Tanggal", width: "85px" },
@@ -402,6 +409,43 @@ const onPrint = () => {
   );
 };
 
+const onExportHeader = async () => {
+  const source = getExportSource();
+  if (!source.length) return toast.warning("Tidak ada data untuk diekspor.");
+
+  const columns: ExcelColumn[] = [
+    { header: "Nomor", key: "Nomor", width: 16 },
+    { header: "Tanggal", key: "Tanggal", width: 12, align: "center" },
+    { header: "Jam", key: "Jam", width: 10 },
+    { header: "Cab", key: "Cab", width: 8, align: "center" },
+    { header: "Divisi", key: "Divisi", width: 12 },
+    { header: "Div. SPK", key: "DivisiSpk", width: 12 },
+    { header: "SPK", key: "SPK", width: 16 },
+    { header: "Nama SPK", key: "NamaSpk", width: 28 },
+    {
+      header: "Jml SPK",
+      key: "JmlSpk",
+      width: 10,
+      align: "right",
+      numFmt: "#,##0",
+    },
+    { header: "Keterangan", key: "Keterangan", width: 22 },
+    { header: "Status", key: "Status", width: 12, align: "center" },
+    { header: "Approve", key: "Approve", width: 10, align: "center" },
+    { header: "Apv. Gudang", key: "ApvGudang", width: 12, align: "center" },
+    { header: "Apv. Manager", key: "ApvManager", width: 12, align: "center" },
+    { header: "User", key: "Usr", width: 12 },
+  ];
+
+  await exportExcelSingle(
+    `Permintaan_Bahan_Baku_${filterState.value.startDate}_${filterState.value.endDate}.xlsx`,
+    "Permintaan Bahan Baku",
+    columns,
+    source,
+    `Permintaan Bahan Baku Periode ${filterState.value.startDate} s/d ${filterState.value.endDate}`,
+  );
+};
+
 // --- Aksi: Export Detail ---
 const isExportingDetail = ref(false);
 
@@ -413,7 +457,11 @@ const onExportDetail = async () => {
       filterState.value.endDate,
       filterState.value.cabang,
     );
-    const allDetail: any[] = res.data.data || [];
+    let allDetail: any[] = res.data.data || [];
+
+    // Batasi ke Nomor yang sedang tertampil (sesuai search/filter kolom BaseBrowse)
+    const visibleNomors = new Set(getExportSource().map((r: any) => r.Nomor));
+    allDetail = allDetail.filter((r) => visibleNomors.has(r.Nomor));
 
     if (!allDetail.length) {
       toast.warning("Tidak ada data detail pada filter ini.");
@@ -538,6 +586,7 @@ const num = (val: number) => new Intl.NumberFormat("id-ID").format(val || 0);
 
 <template>
   <BaseBrowse
+    ref="baseBrowseRef"
     title="Permintaan Bahan Baku"
     menu-id="127"
     :icon="IconBox"
@@ -559,7 +608,7 @@ const num = (val: number) => new Intl.NumberFormat("id-ID").format(val || 0);
     @add="onAdd"
     @edit="onEdit"
     @delete="onDelete"
-    @export="exportToExcel('Permintaan_Bahan_Baku')"
+    @export="onExportHeader"
   >
     <!-- ── Filter bar ── -->
     <template #filter-left>
