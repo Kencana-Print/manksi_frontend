@@ -160,6 +160,18 @@ const {
 } = useForm<typeof initialData, RouteParams>({
   menuId: "117",
   initialData,
+  onFormReset: () => {
+    activeTab.value = 0;
+    showMapModal.value = false;
+    showAccModal.value = false;
+    activeAccIdx.value = -1;
+    showPrintDialog.value = false;
+    savedNomor.value = "";
+    showBahanModal.value = false;
+    activeBahanIdx.value = -1;
+    cachedSizesNomor = "";
+    cachedSizes = null;
+  },
   fetchApi: async (): Promise<typeof initialData> => {
     const res = await api.get<{ data: typeof initialData }>(
       `/garmen/cetak-bast/form/${encodeURIComponent(params.nomor ?? "")}`,
@@ -518,10 +530,16 @@ const fetchListKomponen = async () => {
 };
 
 const handlePrint = () => {
+  showPrintDialog.value = false;
   window.open(
     `/garmen/cetak-bast/print/${encodeURIComponent(savedNomor.value)}`,
     "_blank",
   );
+  router.push("/garmen/cetak-bast");
+};
+
+const skipPrint = () => {
+  showPrintDialog.value = false;
   router.push("/garmen/cetak-bast");
 };
 
@@ -1082,12 +1100,7 @@ onMounted(() => {
         Anda ingin mencetak BAST sekarang?
       </v-card-text>
       <v-card-actions class="pa-3 border-t bg-grey-lighten-4">
-        <v-btn
-          variant="text"
-          color="error"
-          @click="router.push('/garmen/cetak-bast')"
-          >Tidak</v-btn
-        >
+        <v-btn variant="text" color="error" @click="skipPrint">Tidak</v-btn>
         <v-spacer></v-spacer>
         <v-btn color="primary" variant="elevated" @click="handlePrint">
           <template #prepend
