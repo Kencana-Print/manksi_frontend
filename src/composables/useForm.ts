@@ -1,5 +1,5 @@
 // src/composables/useForm.ts
-import { ref, computed, onMounted, onActivated, nextTick } from "vue";
+import { ref, computed, onMounted, onActivated, nextTick, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
 import { useAuthStore } from "@/stores/authStore";
@@ -43,9 +43,20 @@ export function useForm<
   const showSaveDialog = ref(false);
   const showCancelDialog = ref(false);
   const showCloseDialog = ref(false);
+  const isDirty = ref(false);
 
   // Form Data reaktif
   const formData = ref<T>(JSON.parse(JSON.stringify(options.initialData)));
+
+  watch(
+    formData,
+    () => {
+      if (!isLoading.value) {
+        isDirty.value = true;
+      }
+    },
+    { deep: true },
+  );
 
   const canSave = computed(() => {
     const permission = isEditMode.value ? "edit" : "insert";
@@ -89,6 +100,7 @@ export function useForm<
     try {
       const data = await options.fetchApi();
       formData.value = data;
+      isDirty.value = false;
       originalData.value = JSON.parse(JSON.stringify(data)); // snapshot setelah fetch
     } catch (e) {
       console.error("Error pada useForm fetchData:", e);
@@ -104,6 +116,7 @@ export function useForm<
     isSaving.value = true;
     try {
       const response = await options.submitApi(formData.value as T);
+      isDirty.value = false;
       showSaveDialog.value = false;
 
       if (options.onSuccess) {
@@ -148,18 +161,16 @@ export function useForm<
 
   onActivated(() => {
     const currentTab = tabsStore.tabs.find((t) => t.id === route.path);
-
     if (currentTab?.needsReset) {
-      currentTab.needsReset = false; // Langsung konsumsi flag agar tidak berulang
+      currentTab.needsReset = false;
+
+      // Jangan timpa perubahan yang belum disimpan
+      if (isDirty.value) {
+        return;
+      }
 
       if (isEditMode.value && options.fetchApi) {
-        // Jika tab Edit di-close lalu dibuka lagi, ambil ulang dari backend
         fetchData();
-      } else {
-        // Deep copy ulang untuk mode Create
-        formData.value = JSON.parse(JSON.stringify(options.initialData));
-        originalData.value = JSON.parse(JSON.stringify(options.initialData));
-        options.onFormReset?.();
       }
     }
   });
@@ -180,5 +191,6 @@ export function useForm<
     executeClose,
     params,
     originalData,
+    isDirty,
   };
 }

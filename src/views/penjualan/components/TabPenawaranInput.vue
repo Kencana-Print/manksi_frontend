@@ -104,6 +104,41 @@ const statusHargaOptions = [
   { value: 1, label: "Sudah PPN" },
   { value: 2, label: "Disembunyikan" },
 ];
+const ketBatalOptions = [
+  "ALT QTY",
+  "ALT UKURAN",
+  "DIBAGI DENGAN VENDOR LAIN",
+  "HANYA ALTERNATIF BAHAN",
+  "HANYA TANYA-TANYA",
+  "KALAH HARGA",
+  "KALAH TENDER",
+  "LAIN-LAIN",
+  "SAMPLE KALAH KUALITAS",
+  "TIDAK JADI PRODUKSI DULU",
+  "TUTUP BUKU",
+  "UPDATE PENAWARAN",
+  "WAKTU PENGERJAAN LAMA",
+];
+
+const ketConfirmOptions = [
+  "MENUNGGU HASIL TENDER",
+  "MENUNGGU INFO",
+  "NUNGGU DATA UKURAN",
+  "NUNGGU FILE DESAIN",
+  "NUNGGU MATCHING KAIN",
+  "NUNGGU PO",
+  "PROJECT DIHOLD",
+  "SAMPEL BELUM JADI",
+  "TANYA ALTERNATIF BAHAN",
+];
+
+const onStatusChange = (row: any) => {
+  if (row.Status === "" || row.Status === "OPEN") {
+    row.Batal = "";
+  } else {
+    row.Confirm = "";
+  }
+};
 
 const loadDivisi = async () => {
   try {
@@ -1132,6 +1167,7 @@ watch(
                   v-model="row.Status"
                   class="cell-inp"
                   :disabled="!!row.Spk"
+                  @change="onStatusChange(row)"
                 >
                   <option value="">OPEN</option>
                   <option value="BATAL">BATAL</option>
@@ -1139,20 +1175,43 @@ watch(
                 </select>
               </td>
               <td>
-                <input
-                  type="text"
+                <select
                   v-model="row.Batal"
                   class="cell-inp"
-                  :disabled="!!row.Spk"
-                />
+                  :disabled="
+                    !!row.Spk ||
+                    (row.Status !== 'BATAL' && row.Status !== 'CLOSE')
+                  "
+                >
+                  <option value=""></option>
+                  <option
+                    v-for="opt in ketBatalOptions"
+                    :key="opt"
+                    :value="opt"
+                  >
+                    {{ opt }}
+                  </option>
+                </select>
               </td>
               <td>
-                <input
-                  type="text"
+                <select
                   v-model="row.Confirm"
                   class="cell-inp"
-                  :disabled="!!row.Spk"
-                />
+                  :disabled="
+                    !!row.Spk ||
+                    row.Status === 'BATAL' ||
+                    row.Status === 'CLOSE'
+                  "
+                >
+                  <option value=""></option>
+                  <option
+                    v-for="opt in ketConfirmOptions"
+                    :key="opt"
+                    :value="opt"
+                  >
+                    {{ opt }}
+                  </option>
+                </select>
               </td>
               <td>
                 <input

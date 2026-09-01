@@ -74,7 +74,6 @@ const initialData = {
   isTutupBuku: false,
   SampleText: "",
   Details: [
-    // Inisialisasi minimal 1 baris kosong
     {
       ID: "",
       NoPermintaan: "",
@@ -87,6 +86,9 @@ const initialData = {
       Qty: 0,
       Harga: 0,
       Spk: "",
+      Status: "",
+      Batal: "",
+      Confirm: "",
     },
   ],
 };
@@ -155,8 +157,11 @@ const {
         Satuan: det.pend_satuan,
         Qty: Number(det.pend_qty) || 0,
         Harga: Number(det.pend_harga) || 0,
-        Spk: det.spk_terkait || "",
+        Spk: det.spk || "", // ← catatan: aliasnya "spk" (huruf kecil), bukan "spk_terkait"
         Gambar: det.pend_gambar || "",
+        Status: det.pend_status || "", // ← FIX: kolom mentah, bukan "Status"
+        Batal: det.pend_batal || "", // ← FIX: kolom mentah, bukan "KetBatal"
+        Confirm: det.pend_confirm || "", // ← FIX: kolom mentah, bukan "KetConfirm"
       })),
     };
   },
