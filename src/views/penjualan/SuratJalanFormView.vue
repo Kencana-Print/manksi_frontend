@@ -536,7 +536,6 @@ const appendNomorPo = (ketPo?: string) => {
 const onSpkInputEnter = async (rowKey: number) => {
   const val = (spkInputValues.value[rowKey] || "").trim();
   if (!val) return;
-
   if (!fd.value.KodePerush) {
     toast.warning("Perusahaan diisi dulu.");
     return;
@@ -546,7 +545,9 @@ const onSpkInputEnter = async (rowKey: number) => {
     return;
   }
 
-  // Hapus baris kosong ini
+  // Hapus baris kosong yang sedang diketik ini SAJA (bukan filter semua) —
+  // di jalur ini activeRowKey memang tepat sasaran karena inputnya
+  // per-baris, jadi tidak perlu diubah.
   const idx = fd.value.Detail.findIndex(
     (r) => r._key === rowKey && !r.SpkNomor,
   );
@@ -572,18 +573,16 @@ const openSpkModal = (rowKey?: number) => {
 
 const selectSpk = async (item: any) => {
   showSpkModal.value = false;
-  // Hapus baris kosong placeholder
-  if (activeRowKey.value !== null) {
-    const idx = fd.value.Detail.findIndex(
-      (r) => r._key === activeRowKey.value && !r.SpkNomor,
-    );
-    if (idx !== -1) fd.value.Detail.splice(idx, 1);
-    activeRowKey.value = null;
-  }
+  // Hapus SEMUA baris kosong (bukan cuma yang activeRowKey), supaya
+  // data baru selalu ditambahkan di posisi paling akhir grid — baik
+  // dipicu dari tombol toolbar (activeRowKey=null) maupun dari baris
+  // tertentu (activeRowKey terisi).
+  fd.value.Detail = fd.value.Detail.filter((r) => r.SpkNomor);
+  activeRowKey.value = null;
+
   await addSpkToGrid(item.Nomor);
   ensureEmptyRow();
 };
-
 // ── Panel Otorisasi ──────────────────────────────────────────────────
 const addSpkToGrid = async (spkNomor: string) => {
   if (!spkNomor) return;
@@ -694,17 +693,11 @@ const openJadwalModal = (rowKey?: number) => {
 
 const selectJadwal = async (item: any) => {
   showJadwalModal.value = false;
-  if (activeRowKey.value !== null) {
-    const idx = fd.value.Detail.findIndex(
-      (r) => r._key === activeRowKey.value && !r.SpkNomor,
-    );
-    if (idx !== -1) fd.value.Detail.splice(idx, 1);
-    activeRowKey.value = null;
-  }
+  fd.value.Detail = fd.value.Detail.filter((r) => r.SpkNomor);
+  activeRowKey.value = null;
 
   isLoadingSpk.value = true;
   try {
-    // Cek piutang dulu — sama seperti jalur F1
     const piutangRes = await svc.cekPiutang(
       item.SPK,
       fd.value.KodeCus,
@@ -714,7 +707,7 @@ const selectJadwal = async (item: any) => {
 
     if (!piutang.lunas && !piutang.korporasi) {
       otorisasiSpkPending.value = item.SPK;
-      otorisasiJadwalPending.value = item; // simpan info no kirim untuk dipakai setelah otorisasi sukses
+      otorisasiJadwalPending.value = item;
       const kodeRes = await svc.getKodeOtorisasi();
       otorisasiKode.value = kodeRes.data.data.kode;
       otorisasiJawaban.value = "";
