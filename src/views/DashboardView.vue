@@ -4953,11 +4953,13 @@ const sisaClass = (item: any) => {
                             class="knj-seg"
                             style="background: #7b1fa2"
                             :style="{
-                              width: mapSpkMetric.TotalNilai
-                                ? (row.NilaiSO / mapSpkMetric.TotalNilai) *
-                                    100 +
-                                  '%'
-                                : '0%',
+                              width:
+                                row.NilaiSO + row.NilaiPotensi
+                                  ? (row.NilaiSO /
+                                      (row.NilaiSO + row.NilaiPotensi)) *
+                                      100 +
+                                    '%'
+                                  : '0%',
                             }"
                           />
                           <!-- Potensi -->
@@ -4965,11 +4967,13 @@ const sisaClass = (item: any) => {
                             class="knj-seg"
                             style="background: #ce93d8"
                             :style="{
-                              width: mapSpkMetric.TotalNilai
-                                ? (row.NilaiPotensi / mapSpkMetric.TotalNilai) *
-                                    100 +
-                                  '%'
-                                : '0%',
+                              width:
+                                row.NilaiSO + row.NilaiPotensi
+                                  ? (row.NilaiPotensi /
+                                      (row.NilaiSO + row.NilaiPotensi)) *
+                                      100 +
+                                    '%'
+                                  : '0%',
                             }"
                           />
                         </div>
