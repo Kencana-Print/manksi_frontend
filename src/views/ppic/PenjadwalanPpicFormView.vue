@@ -22,6 +22,7 @@ import {
   IconDownload,
   IconTrash,
   IconSearch,
+  IconX,
 } from "@tabler/icons-vue";
 import { formatTanggal } from "@/utils/dateFormat";
 
@@ -79,7 +80,6 @@ const executeClose = () => {
 
 // ── State lokal — pengganti formData dari useForm ──────────────────
 const isLoading = ref(false);
-const isInitialLoad = ref(true);
 const isEditMode = ref(false);
 
 const header = reactive({
@@ -297,32 +297,41 @@ const loadExisting = async (nomor: string) => {
   }
 };
 
+const isCreating = ref(false);
+
 const createNew = async () => {
-  isLoading.value = true;
+  if (!header.pjw_tgl1 || !header.pjw_tgl2) {
+    toast.warning("Isi periode terlebih dahulu.");
+    return;
+  }
+  isCreating.value = true;
   try {
     const res = await penjadwalanPpicService.createHeader({
       pjw_tgl1: header.pjw_tgl1,
       pjw_tgl2: header.pjw_tgl2,
-      pjw_cab: "",
-      pjw_divisi: "",
-      pjw_keterangan: "",
+      pjw_cab: header.pjw_cab,
+      pjw_divisi: header.pjw_divisi,
+      pjw_keterangan: header.pjw_keterangan,
     });
     header.pjw_nomor = res.data.data.nomor;
     isEditMode.value = true;
+    await nextTick();
+    isInitialLoad.value = false;
     router.replace(
       `/ppic/penjadwalan/edit/${encodeURIComponent(header.pjw_nomor)}`,
     );
+    joinRoom(header.pjw_nomor);
+    toast.success(`Komitmen Kirim ${header.pjw_nomor} berhasil dibuat.`);
   } catch (e: any) {
     toast.error(
       e.response?.data?.message || "Gagal membuat Komitmen Kirim baru.",
     );
-    router.push("/ppic/penjadwalan");
   } finally {
-    isLoading.value = false;
-    await nextTick();
-    isInitialLoad.value = false;
+    isCreating.value = false;
   }
 };
+
+const isInitialLoad = ref(false); // ⬅ default false, bukan true
 
 onMounted(async () => {
   await Promise.all([loadCabang(), loadDivisi()]);
@@ -330,13 +339,11 @@ onMounted(async () => {
   const nomorParam = route.params.nomor as string | undefined;
   if (nomorParam) {
     isEditMode.value = true;
+    isInitialLoad.value = true; // ⬅ guard baru diaktifkan HANYA saat load existing
     await loadExisting(decodeURIComponent(nomorParam));
-  } else {
-    await createNew();
-  }
-
-  if (header.pjw_nomor) {
-    joinRoom(header.pjw_nomor);
+    if (header.pjw_nomor) {
+      joinRoom(header.pjw_nomor);
+    }
   }
 });
 
@@ -750,6 +757,19 @@ const rowClass = (d: DetailRow) => {
     v-model:show-close-dialog="showCloseDialog"
     @confirm-close="executeClose"
   >
+    <template #header-actions>
+      <v-btn
+        size="small"
+        variant="tonal"
+        color="error"
+        @click="showCloseDialog = true"
+      >
+        <template #prepend>
+          <IconX :size="15" :stroke-width="2" />
+        </template>
+        Tutup
+      </v-btn>
+    </template>
     <div class="pjw-form">
       <!-- Presence bar -->
       <div class="pjw-presence-bar">
@@ -772,7 +792,7 @@ const rowClass = (d: DetailRow) => {
         <div class="pjw-hdr-row">
           <label class="pjw-lbl">Nomor</label>
           <input
-            :value="header.pjw_nomor || '...'"
+            :value="header.pjw_nomor || '(Belum dibuat)'"
             readonly
             class="pjw-inp-ro"
             style="width: 200px"
@@ -805,6 +825,17 @@ const rowClass = (d: DetailRow) => {
               {{ c.title }}
             </option>
           </select>
+
+          <button
+            v-if="!header.pjw_nomor && canEditMarketing"
+            type="button"
+            class="pjw-tarik-btn"
+            style="margin-left: 16px"
+            :disabled="isCreating"
+            @click="createNew"
+          >
+            {{ isCreating ? "Membuat..." : "Buat Komitmen Kirim" }}
+          </button>
         </div>
         <div class="pjw-hdr-row">
           <label class="pjw-lbl">Keterangan</label>
