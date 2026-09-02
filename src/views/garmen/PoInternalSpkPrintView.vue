@@ -19,7 +19,10 @@ onMounted(async () => {
     isLoading.value = false;
 
     await nextTick();
-    await resolveDesignImage();
+    if (!isDariGudang.value) {
+      // ⬅ skip kalau dari Gudang
+      await resolveDesignImage();
+    }
     await nextTick();
 
     const style = document.createElement("style");
@@ -45,6 +48,9 @@ const isKaosan = computed(() => {
 });
 const isNewFormatSO = computed(() =>
   String(data.value?.header?.NomorSPK || "").startsWith("SPK-"),
+);
+const isDariGudang = computed(
+  () => (data.value?.header?.UserBagian || "").toUpperCase() === "GUDANG",
 );
 
 const KAOSAN_EXTENSIONS = ["png", "jpeg", "jpg"];
@@ -89,7 +95,7 @@ const resolveDesignImage = () => {
   // Kaosan, bukan lokal MANKSI.
   const invdc = data.value.header.Invdc || "";
   if (isKaosan.value && isNewFormatSO.value && invdc) {
-    const cab = data.value.header.GdgKode || "HO-";
+    const cab = data.value.header.SpkCab || data.value.header.GdgKode || "HO-";
     const cabangKaosan = invdc.includes(".") ? invdc.split(".")[0] : cab;
     isLoadingImage.value = true;
     resolvedImageUrl.value = "";
@@ -193,7 +199,7 @@ const tglIndo = (dateStr: string) => {
 
           <!-- ── Body: info kiri, gambar+SPK kanan ── -->
           <div class="body-row">
-            <div class="left-col">
+            <div class="left-col" :class="{ 'left-col-full': isDariGudang }">
               <table class="info-table">
                 <tr>
                   <td class="lbl">Nomor</td>
@@ -276,7 +282,7 @@ const tglIndo = (dateStr: string) => {
               </div>
             </div>
 
-            <div class="right-col">
+            <div v-if="!isDariGudang" class="right-col">
               <div class="img-box">
                 <img v-if="resolvedImageUrl" :src="resolvedImageUrl" alt="" />
                 <span v-else-if="!isLoadingImage" class="img-empty-text"
@@ -506,6 +512,9 @@ const tglIndo = (dateStr: string) => {
 }
 .font-weight-bold {
   font-weight: bold;
+}
+.left-col-full {
+  flex: 1 1 100%;
 }
 
 @media print {
