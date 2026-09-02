@@ -23,6 +23,15 @@ export const poInternalSpkFormService = {
     existingRows?: { kode: string; size: string }[];
   }) => api.post(`${BASE}/load-bahan`, payload),
 
+  loadAccesories: (payload: {
+    kode: string;
+    nomorSpk: string;
+    jasa: string;
+    gdgAsal: string;
+    poiNomor?: string;
+    existingRows?: { kode: string; size: string }[];
+  }) => api.post(`${BASE}/load-accesories`, payload),
+
   getById: (nomor: string) => api.get(`${BASE}/${encodeURIComponent(nomor)}`),
 
   save: (payload: any) => api.post(`${BASE}/save`, payload),

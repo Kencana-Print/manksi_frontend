@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from "vue";
+import { useAuthStore } from "@/stores/authStore";
 import { useRoute, useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
 import { useForm } from "@/composables/useForm";
@@ -19,7 +20,9 @@ import SpkSearchModal from "@/components/lookups/SpkSearchModal.vue";
 import PabrikSearchModal from "@/components/lookups/PabrikSearchModal.vue";
 import BahanSearchModal from "@/components/lookups/BahanSearchModal.vue";
 import JasaSearchModal from "@/components/lookups/JasaSearchModal.vue";
+import BarangGarmenSearchModal from "@/components/lookups/BarangGarmenSearchModal.vue";
 
+const authStore = useAuthStore();
 const route = useRoute();
 const router = useRouter();
 const toast = useToast();
@@ -28,11 +31,15 @@ const isEdit = computed(() => !!route.params.nomor);
 const nomorParam = computed(() =>
   route.params.nomor ? decodeURIComponent(route.params.nomor as string) : "",
 );
+const isGudang = computed(
+  () => authStore.user?.bagian?.toUpperCase() === "GUDANG",
+);
 
 const showSpkModal = ref(false);
 const showGdgAsalModal = ref(false);
 const showSupModal = ref(false);
 const showBahanModal = ref(false);
+const showAccesoriesModal = ref(false);
 const showJasaModal = ref(false);
 const activeRowIndex = ref(-1);
 
@@ -414,21 +421,28 @@ const onKodeKeydown = (e: KeyboardEvent, idx: number) => {
     e.preventDefault();
     if (!headerLengkapUntukBahan()) return;
     activeRowIndex.value = idx;
-    showBahanModal.value = true;
+    if (isGudang.value) {
+      showAccesoriesModal.value = true;
+    } else {
+      showBahanModal.value = true;
+    }
   }
-};
-
-const onKodeEnter = async (idx: number) => {
-  const kode = formData.value.detail[idx].kode?.trim();
-  if (!kode) return;
-  if (!headerLengkapUntukBahan()) return;
-  await resolveKode(kode, idx);
 };
 
 const openBahanModal = () => {
   if (!headerLengkapUntukBahan()) return;
   activeRowIndex.value = formData.value.detail.length - 1;
-  showBahanModal.value = true;
+  if (isGudang.value) {
+    showAccesoriesModal.value = true;
+  } else {
+    showBahanModal.value = true;
+  }
+};
+const onKodeEnter = async (idx: number) => {
+  const kode = formData.value.detail[idx].kode?.trim();
+  if (!kode) return;
+  if (!headerLengkapUntukBahan()) return;
+  await resolveKode(kode, idx);
 };
 
 const onBahanSelected = async (item: any) => {
@@ -438,6 +452,38 @@ const onBahanSelected = async (item: any) => {
       ? activeRowIndex.value
       : formData.value.detail.length - 1;
   await resolveKode(kode, idx);
+};
+
+const resolveKodeAccesories = async (kode: string, idx: number) => {
+  try {
+    isLoading.value = true;
+    const res = await poInternalSpkFormService.loadAccesories({
+      kode,
+      nomorSpk: formData.value.nomorSpk,
+      jasa: formData.value.jasa,
+      gdgAsal: formData.value.gdgAsal,
+      poiNomor: formData.value.nomor || "",
+      existingRows: formData.value.detail
+        .filter((_: any, i: number) => i !== idx)
+        .map((d: any) => ({ kode: d.kode, size: d.size })),
+    });
+    const { rows } = res.data.data;
+    formData.value.detail.splice(idx, 1, ...rows);
+  } catch (e: any) {
+    toast.error(e.response?.data?.message || "Gagal menambah Accesories.");
+    formData.value.detail[idx].kode = "";
+  } finally {
+    isLoading.value = false;
+  }
+};
+
+const onAccesoriesSelected = async (item: any) => {
+  const kode = item.Kode;
+  const idx =
+    activeRowIndex.value >= 0
+      ? activeRowIndex.value
+      : formData.value.detail.length - 1;
+  await resolveKodeAccesories(kode, idx);
 };
 
 const removeDetail = (idx: number) => {
@@ -849,6 +895,12 @@ const rp = (val: any) =>
     v-model="showBahanModal"
     mode="komponen"
     @selected="onBahanSelected"
+  />
+  <BarangGarmenSearchModal
+    v-model="showAccesoriesModal"
+    jenis="ACCESORIES"
+    :cabang="formData.gdgAsal"
+    @selected="onAccesoriesSelected"
   />
 
   <v-dialog v-model="showPrintDialog" max-width="400px" persistent>
