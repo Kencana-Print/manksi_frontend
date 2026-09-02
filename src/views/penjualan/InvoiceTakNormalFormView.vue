@@ -558,26 +558,31 @@ const confirmRemoveInvNormalRow = () => {
 
 // ── Hitung total — sesuai Delphi hitung() ─────────────────────────────────
 // CATATAN: tidak ada konsep Disc/Pph sama sekali di modul ini.
-const totalBarang = computed(() =>
+// Urutan pembulatan HARUS sama persis dengan backend getDataCetak():
+// jumlah dulu raw (belum dibulatkan per baris), baru dibulatkan sekali;
+// Disc dibulatkan SEBELUM dipakai sebagai dasar PPN.
+const totalBarangRaw = computed(() =>
   fd.value.Detail.reduce(
-    (s, r) => s + Math.round(Number(r.Jumlah || 0) * Number(r.Harga || 0)),
+    (s, r) => s + Number(r.Jumlah || 0) * Number(r.Harga || 0),
     0,
   ),
 );
+const totalBarang = computed(() => Math.round(totalBarangRaw.value));
 
-// Dasar PPN = Total - Disc (raw, belum dibulatkan — biar konsisten dgn
-// keputusan simpan Disc mentah di backend)
-const dasarPpn = computed(() => totalBarang.value - Number(fd.value.Disc || 0));
+const discRounded = computed(() => Math.round(Number(fd.value.Disc || 0)));
+
+// Dasar PPN dari RAW (belum dibulatkan) dikurangi Disc yang sudah
+// dibulatkan — persis pola dasarPpnRaw di backend.
+const dasarPpnRaw = computed(() => totalBarangRaw.value - discRounded.value);
 
 const totalPpn = computed(() => {
   if (!fd.value.StsPpn) return 0;
-  return Math.round(dasarPpn.value * (Number(fd.value.Ppn) / 100));
+  return Math.round(dasarPpnRaw.value * (Number(fd.value.Ppn) / 100));
 });
 
-const grandTotal = computed(() => {
-  if (!fd.value.StsPpn) return Math.round(dasarPpn.value);
-  return Math.round(dasarPpn.value) + totalPpn.value;
-});
+const grandTotal = computed(
+  () => totalBarang.value - discRounded.value + totalPpn.value,
+);
 
 const nilaiPiutang = computed(
   () => grandTotal.value - Math.round(uangMuka.value),

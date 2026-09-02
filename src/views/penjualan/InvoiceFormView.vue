@@ -513,40 +513,36 @@ const removeRow = (row: DetailRow) => {
   ensureEmptyRow();
 };
 
-// ── Hitung total — sesuai Delphi hitung() ────────────────────────────────
-const totalBarang = computed(() =>
+// ── Hitung total — HARUS sama persis dengan formula Browse getBrowse():
+// (SUM(harga*jumlah) - Disc) + PPN%, dihitung dari RAW, dibulatkan
+// HANYA SEKALI di akhir untuk Grand Total (bukan per komponen).
+const totalBarangRaw = computed(() =>
   fd.value.Detail.reduce(
-    (s, r) => s + Math.round(Number(r.Jumlah || 0) * Number(r.Harga || 0)),
+    (s, r) => s + Number(r.Jumlah || 0) * Number(r.Harga || 0),
     0,
   ),
 );
+const totalBarang = computed(() => Math.round(totalBarangRaw.value)); // display only
 
-const totalPpn = computed(() => {
-  if (!fd.value.StsPpn) return 0;
+const grandTotalRaw = computed(() => {
   const disc = Number(fd.value.Disc || 0);
-  let raw: number;
+  if (!fd.value.StsPpn) return totalBarangRaw.value - disc;
   if (fd.value.Pph === "Disc") {
-    const baseAfterDisc = totalBarang.value - disc;
-    raw = baseAfterDisc * (Number(fd.value.Ppn) / 100);
-  } else {
-    raw = totalBarang.value * (Number(fd.value.Ppn) / 100);
+    const baseAfterDisc = totalBarangRaw.value - disc;
+    return baseAfterDisc + (baseAfterDisc * Number(fd.value.Ppn)) / 100;
   }
-  return Math.round(raw); // ← pembulatan
+  // Pph="PPh": basis PPN dari totalBarangRaw (BUKAN dikurangi disc)
+  return (
+    totalBarangRaw.value -
+    disc +
+    (totalBarangRaw.value * Number(fd.value.Ppn)) / 100
+  );
 });
+const grandTotal = computed(() => Math.round(grandTotalRaw.value)); // ⬅ satu-satunya pembulatan final, sama seperti Browse
 
-const grandTotal = computed(() => {
-  const disc = Number(fd.value.Disc || 0);
-  let raw: number;
-  if (!fd.value.StsPpn) {
-    raw = totalBarang.value - disc;
-  } else if (fd.value.Pph === "Disc") {
-    const baseAfterDisc = totalBarang.value - disc;
-    raw = baseAfterDisc + (baseAfterDisc * Number(fd.value.Ppn)) / 100;
-  } else {
-    raw = totalBarang.value - disc + totalPpn.value;
-  }
-  return Math.round(raw); // ← pembulatan
-});
+const totalPpn = computed(
+  () => grandTotal.value - totalBarang.value + Number(fd.value.Disc || 0),
+);
 
 const uangMuka = ref(0); // dari getDebet, hanya tersedia saat edit
 const nilaiPiutang = computed(() =>
