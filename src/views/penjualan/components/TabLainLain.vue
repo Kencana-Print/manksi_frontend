@@ -79,15 +79,25 @@ const isPoLocalPdf = computed(
 
 const displayPoUrl = computed(() => {
   if (isPoFileError.value) return "";
-  if (props.formData.PoFileBlob) return props.formData.PoFileBlob; // blob lokal (baru dipilih)
-  if (!props.isEdit) return "";
-  const nomor = props.formData.Nomor;
-  if (!nomor) return "";
+  if (props.formData.PoFileBlob) return props.formData.PoFileBlob;
 
-  const base = getBaseUrl();
-  const cab = props.formData.Cab || "HO-";
-  const ext = poFileExt.value || "jpg"; // default coba jpg dulu
-  return `${base}/images/${cab}/map/${encodeURIComponent(nomor)}-po.${ext}?v=${poCacheBust.value}`;
+  if (props.isEdit && props.formData.Nomor) {
+    const base = getBaseUrl();
+    const cab = props.formData.Cab || "HO-";
+    const ext = poFileExt.value || "jpg";
+    return `${base}/images/${cab}/map/${encodeURIComponent(props.formData.Nomor)}-po.${ext}?v=${poCacheBust.value}`;
+  }
+
+  // ⬅ BARU: mode Tambah dari MAP Referensi — lampiran PO lama masih
+  // relevan sebagai acuan, sama pola dengan gambar Design utama.
+  if (!props.isEdit && props.formData.Referensi) {
+    const base = getBaseUrl();
+    const cab = props.formData.Cab || "HO-";
+    const ext = poFileExt.value || "jpg";
+    return `${base}/images/${cab}/map/${encodeURIComponent(props.formData.Referensi)}-po.${ext}?v=${poCacheBust.value}`;
+  }
+
+  return "";
 });
 
 const isPoPdf = computed(() =>
@@ -109,7 +119,8 @@ const onPoFileError = async () => {
     // kita gunakan fetch() untuk mengecek langsung ke server apakah file PDF-nya eksis.
     const base = getBaseUrl();
     const cab = props.formData.Cab || "HO-";
-    const nomor = props.formData.Nomor;
+    const nomor =
+      props.formData.Nomor || (!props.isEdit ? props.formData.Referensi : "");
     const pdfUrl = `${base}/images/${cab}/map/${encodeURIComponent(nomor)}-po.pdf?v=${poCacheBust.value}`;
 
     try {
@@ -157,14 +168,21 @@ const displayAccUrl = computed(() => {
   if (isAccImageError.value) return "";
   if (props.formData.AccBuktiBlob) return props.formData.AccBuktiBlob;
   if (props.formData.AccCustomer !== "Y") return "";
-  if (!props.isEdit) return "";
-  const nomor = props.formData.Nomor;
-  if (!nomor) return "";
 
-  const base = getBaseUrl();
-  const cab = props.formData.Cab || "HO-";
-  // Data baru, tidak ada legacy VPS — tidak perlu fallback
-  return `${base}/images/${cab}/map/${encodeURIComponent(nomor)}-acc.jpg?v=${accCacheBust.value}`;
+  if (props.isEdit && props.formData.Nomor) {
+    const base = getBaseUrl();
+    const cab = props.formData.Cab || "HO-";
+    return `${base}/images/${cab}/map/${encodeURIComponent(props.formData.Nomor)}-acc.jpg?v=${accCacheBust.value}`;
+  }
+
+  // ⬅ BARU: mode Tambah dari MAP Referensi
+  if (!props.isEdit && props.formData.Referensi) {
+    const base = getBaseUrl();
+    const cab = props.formData.Cab || "HO-";
+    return `${base}/images/${cab}/map/${encodeURIComponent(props.formData.Referensi)}-acc.jpg?v=${accCacheBust.value}`;
+  }
+
+  return "";
 });
 
 const onAccImageError = () => {
