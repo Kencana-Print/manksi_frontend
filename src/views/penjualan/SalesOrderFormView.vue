@@ -263,12 +263,14 @@ const {
   showCancelDialog,
   showCloseDialog,
   formData,
+  fetchData,
   executeSave,
   executeCancel,
   executeClose,
 } = useForm({
   menuId: "172",
   initialData: defaultData,
+  immediate: false,
   onFormReset: () => {
     formData.value.Sizes = [];
     formData.value.Kaosan = [];
@@ -578,13 +580,13 @@ onMounted(async () => {
     lookupOptions.value.kepentingan = resKepentingan.data.data;
     lookupOptions.value.ketPo = resKetPo.data.data;
 
-    // ← definisikan fullSizes dari response
     const fullSizes: any[] = resSizes.data.data || [];
 
     if (!isEditMode.value) {
       formData.value.Sizes = fullSizes;
       formData.value.Komponen = resKomponen.data.data || [];
     } else {
+      await fetchData();
       await nextTick();
       const existingSizes: any[] = formData.value.Sizes || [];
       formData.value.Sizes = fullSizes.map((row: any) =>
