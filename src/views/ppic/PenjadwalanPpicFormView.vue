@@ -1009,8 +1009,12 @@ const rowClass = (d: DetailRow) => {
                   class="pjw-cell-date"
                   :disabled="!canEditMarketing"
                   @focus="onFieldFocus(d, 'pjwd_tgl_permintaan_kirim')"
-                  @blur="onFieldBlur(d, 'pjwd_tgl_permintaan_kirim')"
-                  @change="onPermintaanKirimChange(d)"
+                  @blur="
+                    () => {
+                      onFieldBlur(d, 'pjwd_tgl_permintaan_kirim');
+                      onPermintaanKirimChange(d);
+                    }
+                  "
                 />
               </td>
               <td class="tc" style="position: relative">
@@ -1057,8 +1061,12 @@ const rowClass = (d: DetailRow) => {
                     class="pjw-cell-date"
                     :disabled="!canEditKesepakatan"
                     @focus="onFieldFocus(d, 'pjwd_tgl_kesepakatan')"
-                    @blur="onFieldBlur(d, 'pjwd_tgl_kesepakatan')"
-                    @change="onKesepakatanChange(d)"
+                    @blur="
+                      () => {
+                        onFieldBlur(d, 'pjwd_tgl_kesepakatan');
+                        onKesepakatanChange(d);
+                      }
+                    "
                   />
                   <input
                     type="text"
