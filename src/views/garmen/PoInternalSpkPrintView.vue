@@ -282,8 +282,8 @@ const tglIndo = (dateStr: string) => {
               </div>
             </div>
 
-            <div class="right-col">
-              <div v-if="!isDariGudang" class="img-box">
+            <div v-if="!isDariGudang" class="right-col">
+              <div class="img-box">
                 <img v-if="resolvedImageUrl" :src="resolvedImageUrl" alt="" />
                 <span v-else-if="!isLoadingImage" class="img-empty-text"
                   >Tidak ada gambar</span
@@ -301,26 +301,21 @@ const tglIndo = (dateStr: string) => {
                   <span class="spk-sep">:</span>
                   <span class="spk-val">{{ data.header.NamaSpk }}</span>
                 </div>
-
-                <template v-if="!isDariGudang">
-                  <div class="spk-row mt-1">
-                    <span class="spk-lbl">Jumlah</span>
-                    <span class="spk-sep">:</span>
-                    <span class="spk-val">{{
-                      num(data.header.JumlahSpk)
-                    }}</span>
-                  </div>
-                  <div class="spk-row">
-                    <span class="spk-lbl">Bahan</span>
-                    <span class="spk-sep">:</span>
-                    <span class="spk-val">{{ data.header.Bahan }}</span>
-                  </div>
-                  <div class="spk-row">
-                    <span class="spk-lbl">Ukuran</span>
-                    <span class="spk-sep">:</span>
-                    <span class="spk-val">{{ data.header.Ukuran }}</span>
-                  </div>
-                </template>
+                <div class="spk-row mt-1">
+                  <span class="spk-lbl">Jumlah</span>
+                  <span class="spk-sep">:</span>
+                  <span class="spk-val">{{ num(data.header.JumlahSpk) }}</span>
+                </div>
+                <div class="spk-row">
+                  <span class="spk-lbl">Bahan</span>
+                  <span class="spk-sep">:</span>
+                  <span class="spk-val">{{ data.header.Bahan }}</span>
+                </div>
+                <div class="spk-row">
+                  <span class="spk-lbl">Ukuran</span>
+                  <span class="spk-sep">:</span>
+                  <span class="spk-val">{{ data.header.Ukuran }}</span>
+                </div>
               </div>
             </div>
           </div>
