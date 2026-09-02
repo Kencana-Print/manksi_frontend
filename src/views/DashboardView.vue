@@ -104,6 +104,7 @@ interface RealisasiMetric {
   KonversiLambat: number;
   KonversiSangatLambat: number;
   BelumKonversi: number;
+  Batal: number;
   RataRataHari: number;
 }
 interface RealisasiTren {
@@ -419,6 +420,7 @@ const realisasiPenawaranData = ref<RealisasiData>({
     KonversiLambat: 0,
     KonversiSangatLambat: 0,
     BelumKonversi: 0,
+    Batal: 0,
     RataRataHari: 0,
   },
   tren: [],
@@ -1050,6 +1052,7 @@ interface RealisasiDetailItem {
   SpkPertama: string | null;
   TglSpkPertama: string | null;
   HariKonversi: number | null;
+  IsBatal: number;
 }
 
 const RP_DETAIL_PAGE_SIZE = 20;
@@ -2617,6 +2620,7 @@ const realisasiPct = computed(() => {
     normal: Math.round((m.KonversiNormal / total) * 100),
     lambat: Math.round((m.KonversiLambat / total) * 100),
     sangatLambat: Math.round((m.KonversiSangatLambat / total) * 100),
+    batal: Math.round((m.Batal / total) * 100),
     belum: Math.round((m.BelumKonversi / total) * 100),
   };
 });
@@ -2928,7 +2932,7 @@ const sisaClass = (item: any) => {
                 <div class="shortcut-sub">
                   <span v-if="isLoadingDashboard">Memuat...</span>
                   <span v-else>
-                    {{ penSummary.BelumSpk }} penawaran belum SPK ·
+                    {{ penSummary.BelumSpk }} penawaran belum SO ·
                     {{ mapSummary.BelumMAP }} belum MAP
                   </span>
                 </div>
@@ -3352,7 +3356,7 @@ const sisaClass = (item: any) => {
             <div class="manksi-panel content-panel fill-height">
               <div class="panel-header panel-header--warning">
                 <IconFileAlert :size="14" :stroke-width="1.7" class="mr-1" />
-                Belum SPK
+                Belum SO
                 <span v-if="penSummary.BelumSpk" class="badge-count ml-auto">
                   {{ penSummary.BelumSpk }}
                 </span>
@@ -3687,7 +3691,17 @@ const sisaClass = (item: any) => {
                               >({{ realisasiPct.belum }}%)</span
                             >
                           </span>
-                          <span class="rp-lbl">Belum SPK</span>
+                          <span class="rp-lbl">Belum SO</span>
+                        </div>
+                        <div class="rp-divider" />
+                        <div class="rp-stat" style="padding: 2px 10px">
+                          <span class="rp-val" style="color: #757575"
+                            >{{ realisasiPenawaranData.metric.Batal }}
+                            <span class="rp-pct"
+                              >({{ realisasiPct.batal }}%)</span
+                            >
+                          </span>
+                          <span class="rp-lbl">Batal</span>
                         </div>
                       </div>
 
@@ -3741,6 +3755,17 @@ const sisaClass = (item: any) => {
                           <div
                             class="rp-seg"
                             :style="{
+                              width: realisasiPct.batal + '%',
+                              background: '#616161',
+                            }"
+                          >
+                            <span v-if="realisasiPct.batal >= 8"
+                              >{{ realisasiPct.batal }}%</span
+                            >
+                          </div>
+                          <div
+                            class="rp-seg"
+                            :style="{
                               width: realisasiPct.belum + '%',
                               background: '#bdbdbd',
                             }"
@@ -3778,8 +3803,14 @@ const sisaClass = (item: any) => {
                           <span
                             ><span
                               class="leg-dot"
+                              style="background: #616161"
+                            />Batal</span
+                          >
+                          <span
+                            ><span
+                              class="leg-dot"
                               style="background: #bdbdbd"
-                            />Belum SPK</span
+                            />Belum SO</span
                           >
                         </div>
                       </div>
@@ -3949,6 +3980,12 @@ const sisaClass = (item: any) => {
                             }}
                           </td>
                           <td style="text-align: center">
+                            <span
+                              v-if="row.IsBatal"
+                              class="rp-badge"
+                              style="background: #eeeeee; color: #616161"
+                              >Batal</span
+                            >
                             <span
                               v-if="row.HariKonversi === null"
                               class="rp-badge rp-badge--none"
@@ -4429,7 +4466,7 @@ const sisaClass = (item: any) => {
                 <IconFileAlert :size="14" :stroke-width="1.7" class="mr-1" />
                 Pipeline Menggantung
                 <span class="panel-header-sub ml-1"
-                  >(Memo belum SPK + Penawaran belum Memo/SPK)</span
+                  >(Memo belum SO + Penawaran belum Memo/SPK)</span
                 >
                 <span
                   v-if="pipelineMenggantungSummary.totalItem"

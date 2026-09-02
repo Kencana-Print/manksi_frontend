@@ -6,8 +6,13 @@ export interface ExcelColumn {
   key: string;
   width?: number;
   numFmt?: string;
-  // Melonggarkan tipe dengan menambahkan "| string" agar TS tidak rewel
   align?: "left" | "center" | "right" | string;
+}
+
+export interface RowStyleResult {
+  fillColor?: string; // hex tanpa '#', mis. "B71C1C"
+  fontColor?: string; // hex tanpa '#', mis. "FFFFFF"
+  bold?: boolean;
 }
 
 export interface ExcelSheetConfig {
@@ -17,6 +22,7 @@ export interface ExcelSheetConfig {
   title?: string;
   headerColor?: string;
   freezeRow?: number;
+  rowStyleFn?: (row: any) => RowStyleResult | null; // ⬅ baru
 }
 
 export const exportExcel = async (
@@ -47,7 +53,7 @@ export const exportExcel = async (
     }
 
     // ✅ Threshold performa
-    const isLargeExport = cfg.rows.length > 500;
+    const isLargeExport = cfg.rows.length > 500 && !cfg.rowStyleFn;
 
     // ── Setup kolom (+ style default per kolom kalau dataset besar) ──
     ws.columns = cfg.columns.map((c) => ({
@@ -89,20 +95,32 @@ export const exportExcel = async (
       // Jalur cepat
       ws.addRows(cfg.rows.map((r) => cfg.columns.map((c) => r[c.key] ?? "")));
     } else {
-      // Jalur normal (Zebra stripe)
       cfg.rows.forEach((rowData, idx) => {
         const row = ws.addRow(cfg.columns.map((c) => rowData[c.key] ?? ""));
+        const customStyle = cfg.rowStyleFn?.(rowData) ?? null;
+
         row.eachCell((cell, colIdx) => {
           const colCfg = cfg.columns[colIdx - 1];
-          cell.font = { size: 10 };
+          cell.font = {
+            size: 10,
+            bold: customStyle?.bold ?? false,
+            color: customStyle?.fontColor
+              ? { argb: "FF" + customStyle.fontColor }
+              : undefined,
+          };
           cell.alignment = {
-            // Tambahkan "as any"
             horizontal: (colCfg?.align as any) ?? "left",
             vertical: "middle",
           };
           if (colCfg?.numFmt) cell.numFmt = colCfg.numFmt;
 
-          if (idx % 2 === 0) {
+          if (customStyle?.fillColor) {
+            cell.fill = {
+              type: "pattern",
+              pattern: "solid",
+              fgColor: { argb: "FF" + customStyle.fillColor },
+            };
+          } else if (idx % 2 === 0) {
             cell.fill = {
               type: "pattern",
               pattern: "solid",

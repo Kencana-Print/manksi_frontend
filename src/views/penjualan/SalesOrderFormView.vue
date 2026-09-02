@@ -1359,6 +1359,11 @@ const isJoKaosanOpsional = computed(() =>
   ),
 );
 
+const JO_WAJIB_MAP = ["BU", "WP", "JS", "JK"];
+const isJoWajibMap = computed(() =>
+  JO_WAJIB_MAP.includes(String(formData.value.spk_jo_kode || "").toUpperCase()),
+);
+
 const validateSave = async (skipPoCheck = false) => {
   if (formData.value.isLegacy) {
     toast.warning(
@@ -1418,6 +1423,21 @@ const validateSave = async (skipPoCheck = false) => {
   if (!fd.spk_cab) {
     toast.warning("Workshop (Cabang) belum dipilih.");
     return;
+  }
+  // Tipe SO wajib untuk divisi Garmen (4)
+  if (divisiStr === "4" && !fd.spk_tipe) {
+    toast.warning("Tipe SO wajib dipilih untuk Divisi Garmen.");
+    return;
+  }
+
+  // Nomor PO + No. MAP/SJ Memo wajib untuk JO BU/WP/JS/JK
+  if (isJoWajibMap.value) {
+    if (!fd.spk_memo?.trim() && !fd.spk_nomormemo?.trim()) {
+      toast.warning(
+        `No. MAP atau No. SJ Memo wajib diisi untuk Jenis Order ${fd.spk_jo_kode}.`,
+      );
+      return;
+    }
   }
 
   // ⚠️ FIX: skip dialog kalau approval "SO tanpa PO" sudah ACC

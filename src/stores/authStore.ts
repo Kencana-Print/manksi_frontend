@@ -123,6 +123,11 @@ export const useAuthStore = defineStore(
     const canLihatCus = computed(() => user.value?.flags.lihatCus === 1);
     const isManager = computed(() => user.value?.flags.isManager === 1);
     const isCmo = computed(() => user.value?.flags.cmo === 1);
+    const isPpic = computed(
+      () =>
+        user.value?.bagian?.toUpperCase() === "PPIC" ||
+        user.value?.kode?.toUpperCase() === "ADMIN",
+    );
     const canSeeApproval = computed(() =>
       [256, 257, 258, 259, 260, 261, 262, 263].some((id) =>
         permissions.value.filter((p) => p.id === id).some((p) => p.view),
@@ -219,6 +224,7 @@ export const useAuthStore = defineStore(
       canLihatCus,
       isManager,
       isCmo,
+      isPpic,
       canSeeApproval,
       // Actions
       setLoginData,

@@ -88,6 +88,8 @@ import {
   IconHourglass,
   IconShoppingBagPlus,
   IconCalendarCog,
+  IconNotebook,
+  IconCalendarWeek,
 } from "@tabler/icons-vue";
 
 export interface NavItem {
@@ -346,6 +348,12 @@ export const createMenuItems = (): NavItem[] => {
           to: "/ppic/planning-spk",
           icon: IconCalendarStats,
           menuId: 56,
+        },
+        {
+          title: "Komitmen Kirim",
+          to: "/ppic/penjadwalan",
+          icon: IconCalendarWeek,
+          menuId: 176,
         },
         { divider: true },
         {
@@ -695,6 +703,12 @@ export const createMenuItems = (): NavItem[] => {
           to: "/penjualan/mppb",
           icon: IconFileDescription,
           menuId: 150,
+        },
+        {
+          title: "Pra Order",
+          to: "/penjualan/pra-order",
+          icon: IconNotebook,
+          menuId: 175,
         },
         {
           title: "Permintaan Harga",

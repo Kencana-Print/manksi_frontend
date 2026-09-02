@@ -75,6 +75,35 @@ const isNewFormatSO = computed(() =>
   String(props.formData.spk_nomor || "").startsWith("SO-"),
 );
 
+// ── Indikator visual field wajib (border merah saat kosong) ──
+const isEmpty = (val: any) => !val || String(val).trim() === "";
+
+const isDivisiGarmen = computed(
+  () => String(props.formData.spk_divisi).charAt(0) === "4",
+);
+
+const reqPerush = computed(() => isEmpty(props.formData.spk_perush_kode));
+const reqCust = computed(() => isEmpty(props.formData.spk_cus_kode));
+const reqJo = computed(() => isEmpty(props.formData.spk_jo_kode));
+const reqSales = computed(() => isEmpty(props.formData.spk_sal_kode));
+const reqNama = computed(() => isEmpty(props.formData.spk_nama));
+const reqWorkshop = computed(() => isEmpty(props.formData.spk_cab));
+const reqTipe = computed(
+  () => isDivisiGarmen.value && isEmpty(props.formData.spk_tipe),
+);
+
+const JO_WAJIB_MAP = ["BU", "WP", "JS", "JK"];
+const isJoWajibMap = computed(() =>
+  JO_WAJIB_MAP.includes(String(props.formData.spk_jo_kode || "").toUpperCase()),
+);
+
+const reqMapOrSjMemo = computed(
+  () =>
+    isJoWajibMap.value &&
+    isEmpty(props.formData.spk_memo) &&
+    isEmpty(props.formData.spk_nomormemo),
+);
+
 const kaosanExtIndex = ref(0);
 const KAOSAN_EXTENSIONS = ["png", "jpeg", "jpg"]; // urutan coba
 
@@ -904,11 +933,17 @@ watch(
             class="inp ro"
             style="width: 135px"
           />
-          <label class="lbl ml-auto" style="width: 62px">Tipe SO</label>
+          <label class="lbl ml-auto" style="width: 62px">
+            Tipe SO
+            <span v-if="reqTipe" style="color: #e53935; font-weight: 700"
+              >*</span
+            >
+          </label>
           <select
             v-model="formData.spk_tipe"
             class="inp sel"
             style="width: 110px"
+            :class="{ 'req-empty': reqTipe }"
           >
             <option v-for="o in tipeSpkOptions" :key="o" :value="o">
               {{ o }}
@@ -922,7 +957,7 @@ watch(
           <div
             class="igrp"
             style="width: 335px"
-            :class="{ 'bg-grey-lighten-3': isEdit }"
+            :class="{ 'bg-grey-lighten-3': isEdit, 'req-empty': reqPerush }"
           >
             <input
               v-model="formData.spk_perush_kode"
@@ -981,7 +1016,11 @@ watch(
         <!-- Customer / Cust PERFECT -->
         <div class="fr">
           <label class="lbl">Customer</label>
-          <div class="igrp" style="width: 335px">
+          <div
+            class="igrp"
+            style="width: 335px"
+            :class="{ 'req-empty': reqCust }"
+          >
             <input
               v-model="formData.spk_cus_kode"
               class="inp"
@@ -1083,7 +1122,7 @@ watch(
               <div
                 class="igrp"
                 style="width: 255px"
-                :class="{ 'bg-grey-lighten-3': isEdit }"
+                :class="{ 'bg-grey-lighten-3': isEdit, 'req-empty': reqJo }"
               >
                 <input
                   v-model="formData.spk_jo_kode"
@@ -1182,8 +1221,19 @@ watch(
               />
             </div>
             <div class="fr">
-              <label class="lbl">No. SJ Memo</label>
-              <div class="igrp" style="width: 210px">
+              <label class="lbl">
+                No. SJ Memo
+                <span
+                  v-if="isJoWajibMap"
+                  style="color: #e53935; font-weight: 700"
+                  >*</span
+                >
+              </label>
+              <div
+                class="igrp"
+                style="width: 210px"
+                :class="{ ro: isSjMemoLocked, 'req-empty': reqMapOrSjMemo }"
+              >
                 <input
                   v-model="formData.spk_nomormemo"
                   class="inp"
@@ -1211,8 +1261,19 @@ watch(
               >
             </div>
             <div class="fr">
-              <label class="lbl">No. MAP</label>
-              <div class="igrp" style="width: 210px">
+              <label class="lbl">
+                No. MAP
+                <span
+                  v-if="isJoWajibMap"
+                  style="color: #e53935; font-weight: 700"
+                  >*</span
+                >
+              </label>
+              <div
+                class="igrp"
+                style="width: 210px"
+                :class="{ ro: isMapLocked, 'req-empty': reqMapOrSjMemo }"
+              >
                 <input
                   v-model="formData.spk_memo"
                   class="inp"
@@ -1413,7 +1474,11 @@ watch(
         <!-- Sales -->
         <div class="fr mt-1">
           <label class="lbl">Sales</label>
-          <div class="igrp" style="width: 310px">
+          <div
+            class="igrp"
+            style="width: 310px"
+            :class="{ 'req-empty': reqSales }"
+          >
             <input
               v-model="formData.spk_sal_kode"
               class="inp"
@@ -1448,7 +1513,12 @@ watch(
         <!-- Nama / Nama Ext / Jumlah -->
         <div class="fr">
           <label class="lbl">Nama</label>
-          <input v-model="formData.spk_nama" class="inp" style="flex: 1" />
+          <input
+            v-model="formData.spk_nama"
+            class="inp"
+            style="flex: 1"
+            :class="{ 'req-empty': reqNama }"
+          />
         </div>
         <div class="fr">
           <label class="lbl">Nama Ext</label>
@@ -1926,7 +1996,11 @@ watch(
 
         <div class="fr">
           <label class="lbl" style="width: 72px">Workshop</label>
-          <div class="igrp" style="flex: 1">
+          <div
+            class="igrp"
+            style="flex: 1"
+            :class="{ 'req-empty': reqWorkshop }"
+          >
             <input
               v-model="formData.spk_cab"
               class="inp"
@@ -2543,5 +2617,12 @@ watch(
 }
 .text-center {
   text-align: center;
+}
+.req-empty {
+  border-color: #e53935 !important;
+  background: #fff5f5 !important;
+}
+.req-empty.igrp {
+  box-shadow: 0 0 0 1px #e53935;
 }
 </style>

@@ -709,6 +709,40 @@ const router = createRouter({
         browseRoute: "PpicPlanningSpk",
       },
     },
+    // router/index.ts
+    {
+      path: "/ppic/penjadwalan",
+      name: "PenjadwalanPpic",
+      component: () => import("@/views/ppic/PenjadwalanPpicView.vue"),
+      meta: {
+        title: "Komitmen Kirim",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "176",
+      },
+    },
+    {
+      path: "/ppic/penjadwalan/create",
+      name: "PenjadwalanPpicCreate",
+      component: () => import("@/views/ppic/PenjadwalanPpicFormView.vue"),
+      meta: {
+        title: "Tambah Komitmen Kirim",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "176",
+      },
+    },
+    {
+      path: "/ppic/penjadwalan/edit/:nomor",
+      name: "PenjadwalanPpicEdit",
+      component: () => import("@/views/ppic/PenjadwalanPpicFormView.vue"),
+      meta: {
+        title: "Ubah Komitmen Kirim",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "176",
+      },
+    },
 
     // ── Garmen ──────────────────────────────────────────────────────────
     {
@@ -2337,7 +2371,39 @@ const router = createRouter({
         menuId: "150",
       },
     },
-
+    {
+      path: "/penjualan/pra-order",
+      name: "PraOrder",
+      component: () => import("@/views/penjualan/PraOrderView.vue"),
+      meta: {
+        title: "Pra Order",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "175",
+      },
+    },
+    {
+      path: "/penjualan/pra-order/create",
+      name: "PraOrderCreate",
+      component: () => import("@/views/penjualan/PraOrderFormView.vue"),
+      meta: {
+        title: "Tambah Pra Order",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "175",
+      },
+    },
+    {
+      path: "/penjualan/pra-order/edit/:nomor",
+      name: "PraOrderEdit",
+      component: () => import("@/views/penjualan/PraOrderFormView.vue"),
+      meta: {
+        title: "Ubah Pra Order",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "175",
+      },
+    },
     {
       path: "/penjualan/minta-harga",
       name: "PermintaanHarga",

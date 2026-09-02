@@ -258,10 +258,8 @@ const fmtNum = (val: number | string | null) => {
 const getRowProps = (data: any) => {
   const row = data.item?.raw || data.item;
   if (row.Aktif === "N") return { class: "row-passive text-grey" };
-  // Sesuai Delphi: Aktif = Y, CloseStatus = N --> Merah
   if (row.Aktif === "Y" && row.CloseStatus === "N")
     return { class: "row-active-open text-red-darken-2 font-weight-medium" };
-  // Sisa (Aktif = Y, CloseStatus = Y) --> Hitam (bawaan)
   return {};
 };
 
@@ -1286,5 +1284,12 @@ const confirmToggleClose = async () => {
   background: #e0e0e0;
   color: #424242;
   margin-left: auto;
+}
+:deep(.row-passive td) {
+  color: #9e9e9e !important;
+}
+:deep(.row-active-open td) {
+  color: #d32f2f !important;
+  font-weight: 600 !important;
 }
 </style>
