@@ -554,14 +554,18 @@ const dpNominal = computed(() => {
             </div>
           </div>
 
-          <div v-if="perushKode !== 'JA'" class="mt-4 text-sm">
+          <div class="mt-4 text-sm">
             <table class="payment-table">
-              <tr v-if="data.pen_dpper > 0">
+              <tr v-if="perushKode === 'JA' && data.pen_dpper > 0">
+                <td style="width: 160px">Mohon Untuk DP Sebesar</td>
+                <td>Rp. {{ fmtRupiah(dpNominal).replace("Rp. ", "") }}</td>
+              </tr>
+              <tr v-else-if="data.pen_dpper > 0">
                 <td style="width: 70px">DP</td>
                 <td>: {{ data.pen_dpper }}% = {{ fmtRupiah(dpNominal) }}</td>
               </tr>
               <tr v-if="data.pen_rekening">
-                <td>Rekening</td>
+                <td style="width: 70px">Rekening</td>
                 <td>: {{ data.pen_rekening }}</td>
               </tr>
               <tr v-if="data.perushd_bank">
