@@ -542,6 +542,22 @@ const addRowPlan = () => {
 const removeRowPlan = (index: number) =>
   formData.value.dtlPlan.splice(index, 1);
 
+const onPlanJumlahInput = (idx: number, e: Event) => {
+  const val = Number((e.target as HTMLInputElement).value) || 0;
+  const totalLain = formData.value.dtlPlan.reduce(
+    (s: number, p: any, i: number) =>
+      i === idx ? s : s + (Number(p.jumlah) || 0),
+    0,
+  );
+  const sisaKuota = (Number(formData.value.jumlahSpk) || 0) - totalLain;
+  if (val > sisaKuota) {
+    formData.value.dtlPlan[idx].jumlah = Math.max(0, sisaKuota);
+    toast.warning(
+      `Jumlah Datang tidak boleh melebihi sisa kuota (${sisaKuota.toLocaleString("id-ID")}).`,
+    );
+  }
+};
+
 const validateSave = () => {
   if (!canSave.value) return toast.error("Hak akses simpan ditolak.");
   if (isTutupBuku.value)
@@ -564,6 +580,10 @@ const validateSave = () => {
     );
     if (totalPlan === 0)
       return toast.warning("Qty Kedatangan (Planning) bahan harus diisi.");
+    if (totalPlan > (Number(formData.value.jumlahSpk) || 0))
+      return toast.warning(
+        `Total Jumlah Datang (${totalPlan.toLocaleString("id-ID")}) melebihi Total Jumlah SPK (${Number(formData.value.jumlahSpk).toLocaleString("id-ID")}).`,
+      );
   }
   showSaveDialog.value = true;
 };
@@ -1153,6 +1173,7 @@ const onPoSelected = (po: any) => {
                       class="gi tr fw"
                       style="background: #fff8e1; color: #212121"
                       v-select-on-focus
+                      @input="onPlanJumlahInput(Number(idx), $event)"
                     />
                   </td>
                   <td class="tc">
