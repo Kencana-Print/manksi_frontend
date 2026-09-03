@@ -335,7 +335,11 @@ const rowPropsFn = (data: any) => {
   let style = "";
   const pesanKirimSama = Number(item.Pesan) === Number(item.Kirim);
 
-  if (item.HasSj && pesanKirimSama) {
+  // ⬅ Pending selalu menang, apapun status SpkPpic/HasSj-nya
+  if (item.Pending !== "NORMAL") {
+    if (item.AccPending === "N") style = "color: #e1bee7 !important;";
+    else if (item.AccPending === "ACC") style = "color: #e65100 !important;";
+  } else if (item.HasSj && pesanKirimSama) {
     style = "color: #212121 !important;";
   } else if (item.SpkPpic && !pesanKirimSama) {
     style = "color: #1a237e !important;";
@@ -354,15 +358,7 @@ const rowPropsFn = (data: any) => {
       }
     }
 
-    // ⬅ FIX: pakai style inline + !important, bukan class — supaya
-    // dijamin menang melawan warna default sel tabel Vuetify, sama
-    // seperti tiga branch di atas. Sebelumnya pakai class biasa
-    // (text-purple-lighten-1) yang kalah specificity dan jatuh ke
-    // warna hitam default v-data-table.
-    if (item.Pending !== "NORMAL") {
-      if (item.AccPending === "N") style = "color: #e1bee7 !important;";
-      else if (item.AccPending === "ACC") style = "color: #e65100 !important;";
-    } else if (item.Status === "Open") {
+    if (item.Status === "Open") {
       style = "color: #e53935 !important;";
     }
   }
