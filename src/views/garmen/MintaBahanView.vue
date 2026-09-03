@@ -175,6 +175,16 @@ const onEdit = (item: any) => {
     );
   }
 
+  // sudah direalisasi (penuh maupun sebagian) — kunci total,
+  // tidak ada jalur pengajuan seperti tutup buku, karena mengubah
+  // permintaan yang barangnya sudah keluar dari gudang berisiko
+  // membuat data realisasi vs permintaan jadi tidak konsisten.
+  if (item.SudahRealisasi) {
+    return toast.error(
+      "Permintaan ini sudah direalisasi oleh Gudang (sebagian/seluruhnya). Tidak bisa diubah lagi.",
+    );
+  }
+
   router.push(
     `/garmen/bahan-baku/minta-bahan/form/${encodeURIComponent(item.Nomor)}`,
   );
@@ -189,6 +199,12 @@ const checkBisaHapus = (item: any): boolean => {
   if (item.IsPeriodLocked) {
     toast.error(
       "Periode transaksi ini sudah ditutup (tutup buku). Tidak bisa dihapus.",
+    );
+    return false;
+  }
+  if (item.SudahRealisasi) {
+    toast.error(
+      "Permintaan ini sudah direalisasi oleh Gudang. Tidak bisa dihapus.",
     );
     return false;
   }

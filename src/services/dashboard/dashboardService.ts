@@ -184,4 +184,29 @@ export const dashboardService = {
     }),
 
   getCompanyPulseSummary: () => api.get("/dashboard/company-pulse"),
+
+  getMapSpkBelumPermintaanSummary: () =>
+    api.get("/dashboard/map-spk-belum-permintaan-summary"),
+  getMapSpkBelumPermintaanList: (limit = 20, offset = 0) =>
+    api.get("/dashboard/map-spk-belum-permintaan-list", {
+      params: { limit, offset },
+    }),
+  getPermintaanBelumRealisasiSummary: () =>
+    api.get("/dashboard/permintaan-belum-realisasi-summary"),
+  getPermintaanBelumRealisasiList: (limit = 20, offset = 0) =>
+    api.get("/dashboard/permintaan-belum-realisasi-list", {
+      params: { limit, offset },
+    }),
+  getPoBahanBelumDatangSummary: () =>
+    api.get("/dashboard/po-bahan-belum-datang-summary"),
+  getPoBahanBelumDatangList: (limit = 20, offset = 0) =>
+    api.get("/dashboard/po-bahan-belum-datang-list", {
+      params: { limit, offset },
+    }),
+  getStokBebasSummary: () => api.get("/dashboard/stok-bebas-summary"),
+  getStokBebasList: (limit = 20, offset = 0) =>
+    api.get("/dashboard/stok-bebas-list", { params: { limit, offset } }),
+  getBufferKaosanSummary: () => api.get("/dashboard/buffer-kaosan-summary"),
+  getBufferKaosanList: (limit = 20, offset = 0) =>
+    api.get("/dashboard/buffer-kaosan-list", { params: { limit, offset } }),
 };

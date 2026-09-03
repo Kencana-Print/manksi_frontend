@@ -399,8 +399,11 @@ const onExport = async () => {
                       <th class="text-right">IN</th>
                       <th class="text-center">LAST OUT</th>
                       <th class="text-right">OUT</th>
-                      <th class="text-right">STOK</th>
+                      <th>STOK</th>
+                      <th>KATEGORI</th>
+                      <th>NAMA BAHAN BARCODE</th>
                       <th>NOMOR PO / TANGGAL</th>
+                      <th>NO. SPK PEMAKAI</th>
                       <th>KETERANGAN</th>
                     </tr>
                   </thead>
@@ -435,7 +438,24 @@ const onExport = async () => {
                       >
                         {{ fmtNum(row.Stok) }}
                       </td>
+                      <td class="text-center">
+                        <span
+                          class="kategori-badge"
+                          :class="
+                            row.Kategori === 'ECER'
+                              ? 'badge-ecer'
+                              : 'badge-reguler'
+                          "
+                        >
+                          {{ row.Kategori === "ECER" ? "Ecer" : "Reguler" }}
+                        </span>
+                      </td>
+                      <td>
+                        {{ item.Nama
+                        }}{{ row.Kategori === "ECER" ? " -R" : "" }}
+                      </td>
                       <td>{{ row.NomorPO || "-" }}</td>
+                      <td>{{ row.NomorSpk || "-" }}</td>
                       <td
                         class="text-truncate text-grey-darken-2"
                         style="max-width: 250px"
@@ -451,7 +471,7 @@ const onExport = async () => {
                       "
                     >
                       <td
-                        colspan="9"
+                        colspan="11"
                         class="text-center text-grey pa-3 font-italic"
                       >
                         Tidak ada rincian data barcode untuk spesifikasi filter
@@ -684,5 +704,21 @@ const onExport = async () => {
 }
 .h-100 {
   height: 100%;
+}
+.kategori-badge {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.badge-reguler {
+  background: #e3f2fd;
+  color: #1565c0;
+}
+.badge-ecer {
+  background: #fff3e0;
+  color: #e65100;
 }
 </style>

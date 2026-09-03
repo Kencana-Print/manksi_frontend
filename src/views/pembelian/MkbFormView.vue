@@ -433,6 +433,18 @@ const onSpkEnter = async () => {
   }
 };
 
+watch(
+  () => route.query.spk,
+  (val) => {
+    if (isEdit.value) return;
+    const nomor = ((val as string) || "").trim().toUpperCase();
+    if (!nomor) return;
+    formData.value.nomorSpk = nomor;
+    onSpkEnter();
+  },
+  { immediate: true },
+);
+
 const addRowBahan = () => {
   formData.value.dtlBahan.push({
     komponen: "",

@@ -34,6 +34,7 @@ const masterHeaders = [
   { title: "Nama", key: "Nama", minWidth: "220px" },
   { title: "Satuan", key: "Satuan", width: "80px", align: "center" },
   { title: "Gramasi", key: "Gramasi", width: "90px" },
+  { title: "Buffer", key: "Buffer", width: "90px", align: "end" },
   { title: "Harga Beli", key: "HargaBeli", width: "110px", align: "end" },
   { title: "Stok Awal", key: "StokAwal", width: "100px", align: "end" },
   { title: "Stok In", key: "StokIn", width: "100px", align: "end" },
@@ -269,6 +270,25 @@ const clearBahanFilter = () => {
   namaBahanTerpilih.value = "";
 };
 
+const BUFFER_ALERT_PROJECTS = ["KAOSAN", "RESZO"];
+
+const isBufferAlert = (item: any) => {
+  const project = String(item.Project || "").toUpperCase();
+  if (!BUFFER_ALERT_PROJECTS.includes(project)) return false;
+  return Number(item.StokAkhir) < Number(item.Buffer);
+};
+
+const rowPropsFn = (data: any) => {
+  const item = data.item?.raw || data.item;
+  if (isBufferAlert(item)) {
+    return {
+      class: "font-weight-bold",
+      style: "color: #c62828 !important;",
+    };
+  }
+  return {};
+};
+
 onMounted(fetchData);
 </script>
 
@@ -287,6 +307,7 @@ onMounted(fetchData);
     @update:expanded="onUpdateExpanded"
     @refresh="fetchData"
     @export="onExportMaster"
+    :row-props-fn="rowPropsFn"
   >
     <template #extra-actions>
       <v-btn
@@ -348,6 +369,17 @@ onMounted(fetchData);
       </div>
     </template>
 
+    <template #filter-right>
+      <div class="legend-note">
+        <span
+          class="legend-dot"
+          style="background: #ffebee; border: 1px solid #ef9a9a"
+        ></span>
+        Stok Akhir &lt; Buffer (khusus KAOSAN &amp; RESZO)
+      </div>
+    </template>
+
+    <template #item.Buffer="{ item }">{{ fmtNum(item.Buffer) }}</template>
     <template #item.HargaBeli="{ item }">{{ fmtNum(item.HargaBeli) }}</template>
     <template #item.StokAwal="{ item }">{{ fmtNum(item.StokAwal) }}</template>
     <template #item.StokIn="{ item }">{{ fmtNum(item.StokIn) }}</template>
@@ -540,5 +572,18 @@ onMounted(fetchData);
 }
 .btn-clear:hover {
   background: #ffcdd2;
+}
+.legend-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: #555;
+}
+.legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  flex-shrink: 0;
 }
 </style>

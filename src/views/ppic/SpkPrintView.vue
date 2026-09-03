@@ -1305,7 +1305,10 @@ Keterangan Komponen :
                       <tr v-for="(k, idx) in ketKomponenList" :key="idx">
                         <td class="tc fw">{{ k.kode }}</td>
                         <td>
-                          {{ k.nama }}<span v-if="k.ket"> — {{ k.ket }}</span>
+                          <div class="ket-komponen-nama">{{ k.nama }}</div>
+                          <div v-if="k.ket" class="ket-komponen-detail">
+                            {{ k.ket }}
+                          </div>
                         </td>
                       </tr>
                       <tr v-if="ketKomponenList.length === 0">
@@ -1791,6 +1794,16 @@ Keterangan Komponen :
   min-height: 54px;
   line-height: 1.6;
   padding: 6px 8px;
+}
+.ket-komponen-nama {
+  font-weight: bold;
+}
+.ket-komponen-detail {
+  white-space: pre-line;
+  font-size: 6.5pt;
+  color: #333;
+  margin-top: 1px;
+  line-height: 1.3;
 }
 .mb-6 {
   margin-bottom: 6px;

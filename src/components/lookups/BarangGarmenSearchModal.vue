@@ -7,6 +7,7 @@ const props = defineProps<{
   modelValue: boolean;
   jenis: string;
   cabang: string;
+  initialKeyword?: string;
 }>();
 const emit = defineEmits(["update:modelValue", "selected"]);
 
@@ -79,7 +80,7 @@ watch(
   () => props.modelValue,
   (isOpen) => {
     if (isOpen) {
-      search.value = "";
+      search.value = props.initialKeyword || "";
       currentPage.value = 1;
       fetchData();
     }
