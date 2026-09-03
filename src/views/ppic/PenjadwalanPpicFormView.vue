@@ -32,6 +32,13 @@ const tabsStore = useTabsStore();
 const route = useRoute();
 const router = useRouter();
 
+const showQtyWarning = (warning: any) => {
+  if (!warning) return;
+  toast.info(
+    `Total Qty periode ini sudah ${Number(warning.totalSetelah).toLocaleString("id-ID")}, melebihi batas ${Number(warning.batas).toLocaleString("id-ID")}.`,
+  );
+};
+
 const pad = (n: number) => String(n).padStart(2, "0");
 const toLocalDate = (d: Date) =>
   `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -439,6 +446,7 @@ const tarikSo = async () => {
         rowInput,
       );
       pushRowFromServer(saveRes.data.data.pjwd_id, rowInput);
+      showQtyWarning(saveRes.data.data.warning);
       ditambah++;
     }
     toast.success(`${ditambah} SO baru ditambahkan ke daftar.`);
@@ -488,6 +496,7 @@ const tarikPraOrder = async () => {
         rowInput,
       );
       pushRowFromServer(saveRes.data.data.pjwd_id, rowInput);
+      showQtyWarning(saveRes.data.data.warning);
       ditambah++;
     }
     toast.success(`${ditambah} rencana Pra Order ditambahkan ke daftar.`);
@@ -536,6 +545,7 @@ const tarikMap = async () => {
         rowInput,
       );
       pushRowFromServer(saveRes.data.data.pjwd_id, rowInput);
+      showQtyWarning(saveRes.data.data.warning);
       ditambah++;
     }
     toast.success(`${ditambah} MAP baru ditambahkan ke daftar.`);
@@ -604,6 +614,7 @@ const tambahManual = async () => {
       rowInput,
     );
     pushRowFromServer(saveRes.data.data.pjwd_id, rowInput);
+    showQtyWarning(saveRes.data.data.warning);
     manualSoNomor.value = "";
     toast.success(
       `${isMapNomor ? "MAP" : "SO"} ${rowInput.SoNomor || rowInput.MapNomor} ditambahkan.`,
@@ -627,20 +638,21 @@ const onDetailFieldChange = (
   dbField: string,
 ) => {
   if (!row.PjwdId) return;
-  const previousValue = (row as any)[field]; // ⬅ snapshot sebelum debounce jalan
+  const previousValue = (row as any)[field];
   debounce(
     `row:${row.PjwdId}:${dbField}`,
     async () => {
       try {
-        await penjadwalanPpicService.updateDetailField(
+        const res = await penjadwalanPpicService.updateDetailField(
           header.pjw_nomor,
           row.PjwdId!,
           dbField,
           (row as any)[field],
         );
+        showQtyWarning(res.data?.data?.warning);
       } catch (e: any) {
         toast.error(e.response?.data?.message || "Gagal menyimpan perubahan.");
-        (row as any)[field] = previousValue; // ⬅ revert kalau ditolak server
+        (row as any)[field] = previousValue;
       }
     },
     700,
