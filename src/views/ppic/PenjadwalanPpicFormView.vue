@@ -139,6 +139,9 @@ const onManualBlur = () => {
   emitFieldBlur(header.pjw_nomor, 0, "manual-add");
 };
 
+const isManualRow = (d: DetailRow) =>
+  !d.SoNomor && !d.NomorPraOrder && !d.MapNomor && d.Sumber === "MANUAL";
+
 // ── Role permissions ────────────────────────────────────────────
 const isAdmin = computed(() => authStore.user?.kode?.toUpperCase() === "ADMIN");
 const canEditMarketing = computed(
@@ -629,6 +632,50 @@ const tambahManual = async () => {
   }
 };
 
+const isManualAddLoading = ref(false);
+const tambahBarisManual = async () => {
+  if (!header.pjw_cab) return toast.warning("Pilih Cabang terlebih dahulu.");
+  isManualAddLoading.value = true;
+  try {
+    const rowInput = {
+      SoNomor: "",
+      NomorPraOrder: "",
+      MapNomor: "",
+      Sumber: "MANUAL",
+      Nama: "Baris Baru",
+      Tanggal: "",
+      Pesan: 0,
+      Kirim: 0,
+      Kurang: 0,
+      Rencana: 0,
+      PermintaanKirim: "",
+      NamaManual: "Baris Baru",
+      PesanManual: 0,
+      KirimManual: 0,
+      RealisasiManual: 0,
+    };
+    const saveRes = await penjadwalanPpicService.addDetailRow(
+      header.pjw_nomor,
+      rowInput,
+    );
+    pushRowFromServer(saveRes.data.data.pjwd_id, rowInput);
+    toast.success("Baris manual ditambahkan — silakan isi datanya.");
+  } catch (e: any) {
+    toast.error(e.response?.data?.message || "Gagal menambah baris manual.");
+  } finally {
+    isManualAddLoading.value = false;
+  }
+};
+
+const onManualNamaChange = (row: DetailRow) =>
+  onDetailFieldChange(row, "Nama", "pjwd_nama_manual");
+const onManualPesanChange = (row: DetailRow) =>
+  onDetailFieldChange(row, "Pesan", "pjwd_pesan_manual");
+const onManualKirimChange = (row: DetailRow) =>
+  onDetailFieldChange(row, "Kirim", "pjwd_kirim_manual");
+const onManualRealisasiChange = (row: DetailRow) =>
+  onDetailFieldChange(row, "Realisasi", "pjwd_realisasi_manual");
+
 // ═══════════════════════════════════════════════════════════════
 // UPDATE FIELD PER-BARIS — debounced auto-save
 // ═══════════════════════════════════════════════════════════════
@@ -659,7 +706,15 @@ const onDetailFieldChange = (
   );
 };
 
-const onRencanaInput = (row: DetailRow, raw: string) => {
+const moveCursorToEnd = (e: Event) => {
+  const input = e.target as HTMLInputElement;
+  nextTick(() => {
+    const len = input.value.length;
+    input.setSelectionRange(len, len);
+  });
+};
+
+const onRencanaInput = (row: DetailRow, raw: string, e: Event) => {
   const val = raw.replace(/[^0-9]/g, "");
   row.Rencana = val ? Number(val) : 0;
   if (row.StatusPermintaan !== "NECESSARY") {
@@ -667,6 +722,23 @@ const onRencanaInput = (row: DetailRow, raw: string) => {
     onDetailFieldChange(row, "StatusPermintaan", "pjwd_status_permintaan");
   }
   onDetailFieldChange(row, "Rencana", "pjwd_rencana");
+  moveCursorToEnd(e);
+};
+
+const onManualPesanInput = (row: DetailRow, raw: string, e: Event) => {
+  const val = raw.replace(/[^0-9]/g, "");
+  row.Pesan = val ? Number(val) : 0;
+  row.Kurang = Math.max(row.Pesan - row.Kirim, 0);
+  onManualPesanChange(row);
+  moveCursorToEnd(e);
+};
+
+const onManualKirimInput = (row: DetailRow, raw: string, e: Event) => {
+  const val = raw.replace(/[^0-9]/g, "");
+  row.Kirim = val ? Number(val) : 0;
+  row.Kurang = Math.max(row.Pesan - row.Kirim, 0);
+  onManualKirimChange(row);
+  moveCursorToEnd(e);
 };
 
 const onPermintaanKirimChange = (row: DetailRow) =>
@@ -900,6 +972,16 @@ const rowClass = (d: DetailRow) => {
             isTarikMapLoading ? "Menarik..." : "Tarik dari MAP"
           }}
         </button>
+        <button
+          type="button"
+          class="pjw-tarik-btn manual"
+          :disabled="isManualAddLoading || !canEditMarketing"
+          @click="tambahBarisManual"
+        >
+          <IconDownload :size="14" class="mr-1" />{{
+            isManualAddLoading ? "Menambah..." : "Tambah Baris Manual"
+          }}
+        </button>
         <div class="pjw-manual-wrap">
           <span v-if="fieldFocusMap[MANUAL_ADD_KEY]" class="field-focus-badge">
             {{ fieldFocusMap[MANUAL_ADD_KEY].nama }} sedang mengetik...
@@ -955,22 +1037,72 @@ const rowClass = (d: DetailRow) => {
             >
               <td>{{ formatTanggal(d.Tanggal) }}</td>
               <td>
-                <div class="mono">
+                <div class="mono" v-if="!isManualRow(d)">
                   {{ d.SoNomor || d.MapNomor || d.NomorPraOrder }}
                 </div>
-                <div>{{ d.Nama }}</div>
+                <input
+                  v-if="isManualRow(d)"
+                  type="text"
+                  v-model="d.Nama"
+                  class="pjw-cell-text"
+                  placeholder="Nama..."
+                  :disabled="!canEditMarketing"
+                  @focus="onFieldFocus(d, 'pjwd_nama_manual')"
+                  @blur="
+                    () => {
+                      onFieldBlur(d, 'pjwd_nama_manual');
+                      onManualNamaChange(d);
+                    }
+                  "
+                />
+                <div v-else>{{ d.Nama }}</div>
                 <span
                   class="sumber-badge"
                   :class="{
                     'is-pra': d.Sumber === 'PRA ORDER',
                     'is-map': d.Sumber === 'MAP',
                     'is-so': d.Sumber === 'SO',
+                    'is-manual': d.Sumber === 'MANUAL',
                   }"
                   >{{ d.Sumber }}</span
                 >
               </td>
-              <td class="tr">{{ fmt(d.Pesan) }}</td>
-              <td class="tr">{{ fmt(d.Kirim) }}</td>
+              <td class="tr">
+                <input
+                  v-if="isManualRow(d)"
+                  type="text"
+                  inputmode="numeric"
+                  class="pjw-cell-num"
+                  :value="d.Pesan"
+                  :disabled="!canEditMarketing"
+                  @input="
+                    onManualPesanInput(
+                      d,
+                      ($event.target as HTMLInputElement).value,
+                      $event,
+                    )
+                  "
+                />
+                <template v-else>{{ fmt(d.Pesan) }}</template>
+              </td>
+              <td class="tr">
+                <input
+                  v-if="isManualRow(d)"
+                  type="text"
+                  inputmode="numeric"
+                  class="pjw-cell-num"
+                  :value="d.Kirim"
+                  :disabled="!canEditMarketing"
+                  @input="
+                    onManualKirimInput(
+                      d,
+                      ($event.target as HTMLInputElement).value,
+                      $event,
+                    )
+                  "
+                />
+                <template v-else>{{ fmt(d.Kirim) }}</template>
+              </td>
               <td class="tr" :class="{ 'text-red fw': d.Kurang > 0 }">
                 {{ fmt(d.Kurang) }}
               </td>
@@ -995,11 +1127,26 @@ const rowClass = (d: DetailRow) => {
                   "
                   @blur="onFieldBlur(d, 'pjwd_rencana')"
                   @input="
-                    onRencanaInput(d, ($event.target as HTMLInputElement).value)
+                    onRencanaInput(
+                      d,
+                      ($event.target as HTMLInputElement).value,
+                      $event,
+                    )
                   "
                 />
               </td>
-              <td class="tr">{{ fmt(d.Realisasi) }}</td>
+              <td class="tr">
+                <input
+                  v-if="isManualRow(d)"
+                  type="text"
+                  inputmode="numeric"
+                  class="pjw-cell-num"
+                  v-model.number="d.Realisasi"
+                  :disabled="!canEditMarketing"
+                  @blur="onManualRealisasiChange(d)"
+                />
+                <template v-else>{{ fmt(d.Realisasi) }}</template>
+              </td>
               <td class="tc" style="position: relative">
                 <span
                   v-if="
@@ -1228,6 +1375,15 @@ const rowClass = (d: DetailRow) => {
 .pjw-tarik-btn:disabled {
   opacity: 0.6;
   cursor: default;
+}
+.pjw-tarik-btn.manual {
+  background: #455a64;
+}
+.pjw-tarik-btn.manual:hover:not(:disabled) {
+  background: #263238;
+}
+.sumber-badge.is-manual {
+  background: #455a64;
 }
 
 .pjw-manual-add {
