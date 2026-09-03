@@ -336,18 +336,12 @@ const rowPropsFn = (data: any) => {
   const pesanKirimSama = Number(item.Pesan) === Number(item.Kirim);
 
   if (item.HasSj && pesanKirimSama) {
-    // Paling final — sudah SJ DAN Pesan = Kirim, benar-benar tuntas
     style = "color: #212121 !important;";
   } else if (item.SpkPpic && !pesanKirimSama) {
-    // Sudah dibuatkan SPK PPIC tapi Pesan != Kirim
-    style = "color: #1a237e !important;"; // navy
+    style = "color: #1a237e !important;";
   } else if (item.SpkPpic) {
-    // Sudah dibuatkan SPK PPIC, Pesan = Kirim, belum ada SJ
     style = "color: #00897b !important;";
   } else {
-    if (item.Status === "Open") {
-      classes.push("text-red-darken-1");
-    }
     if (item.Aktif === "N") {
       if (item.Acc === "Y" || item.AccH0 === "Y" || item.AccJO === "ACC") {
         classes.push("text-blue-darken-2");
@@ -359,11 +353,20 @@ const rowPropsFn = (data: any) => {
         classes.push("text-green-darken-2");
       }
     }
+
+    // ⬅ FIX: pakai style inline + !important, bukan class — supaya
+    // dijamin menang melawan warna default sel tabel Vuetify, sama
+    // seperti tiga branch di atas. Sebelumnya pakai class biasa
+    // (text-purple-lighten-1) yang kalah specificity dan jatuh ke
+    // warna hitam default v-data-table.
     if (item.Pending !== "NORMAL") {
-      if (item.AccPending === "N") classes.push("text-fuchsia-darken-1");
-      else if (item.AccPending === "ACC") classes.push("text-orange-darken-3");
+      if (item.AccPending === "N") style = "color: #d400f7 !important;";
+      else if (item.AccPending === "ACC") style = "color: #e65100 !important;";
+    } else if (item.Status === "Open") {
+      style = "color: #e53935 !important;";
     }
   }
+
   return { class: classes.join(" "), style };
 };
 
@@ -1157,7 +1160,7 @@ const onExport = async () => {
             Tolak
           </div>
           <div class="legend-item">
-            <div class="legend-dot" style="background: #ab47bc"></div>
+            <div class="legend-dot" style="background: #ce93d8"></div>
             Pending
           </div>
           <div class="legend-item">
