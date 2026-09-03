@@ -360,7 +360,7 @@ const rowPropsFn = (data: any) => {
     // (text-purple-lighten-1) yang kalah specificity dan jatuh ke
     // warna hitam default v-data-table.
     if (item.Pending !== "NORMAL") {
-      if (item.AccPending === "N") style = "color: #ce93d8 !important;";
+      if (item.AccPending === "N") style = "color: #e1bee7 !important;";
       else if (item.AccPending === "ACC") style = "color: #e65100 !important;";
     } else if (item.Status === "Open") {
       style = "color: #e53935 !important;";
@@ -1160,7 +1160,7 @@ const onExport = async () => {
             Tolak
           </div>
           <div class="legend-item">
-            <div class="legend-dot" style="background: #ce93d8"></div>
+            <div class="legend-dot" style="background: #e1bee7"></div>
             Pending
           </div>
           <div class="legend-item">
