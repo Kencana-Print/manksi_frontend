@@ -51,7 +51,7 @@ onMounted(() => {
       "LIPAT",
     ].includes(bagian)
   ) {
-    jenisOptions.value = ["ACCESORIES", "OBAT"];
+    jenisOptions.value = ["ACCESORIES", "OBAT", "SPAREPART", "ATK/RTK"];
     filterState.value.jenis = "ACCESORIES";
   } else if (bagian === "GA") {
     jenisOptions.value = ["ATK/RTK"];
