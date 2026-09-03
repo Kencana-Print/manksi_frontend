@@ -337,8 +337,10 @@ const rowPropsFn = (data: any) => {
 
   // ⬅ Pending selalu menang, apapun status SpkPpic/HasSj-nya
   if (item.Pending !== "NORMAL") {
-    if (item.AccPending === "N") style = "color: #e1bee7 !important;";
-    else if (item.AccPending === "ACC") style = "color: #e65100 !important;";
+    style =
+      item.AccPending === "ACC"
+        ? "color: #e65100 !important;"
+        : "color: #ce93d8 !important;";
   } else if (item.HasSj && pesanKirimSama) {
     style = "color: #212121 !important;";
   } else if (item.SpkPpic && !pesanKirimSama) {
@@ -1156,7 +1158,7 @@ const onExport = async () => {
             Tolak
           </div>
           <div class="legend-item">
-            <div class="legend-dot" style="background: #e1bee7"></div>
+            <div class="legend-dot" style="background: #ce93d8"></div>
             Pending
           </div>
           <div class="legend-item">
