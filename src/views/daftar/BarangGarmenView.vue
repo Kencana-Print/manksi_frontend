@@ -62,12 +62,12 @@ const showFilterObat = computed(() => {
 
 const showFilterSparepart = computed(() => {
   const b = authStore.user?.bagian || "";
-  return ["TEKNISI", "IT", "FINANCE", "AUDIT", "DIREKSI", "EDP"].includes(b);
+  return ["TEKNISI", "IT", "FINANCE", "AUDIT", "DIREKSI", "EDP","ADMIN"].includes(b);
 });
 
 const showFilterAtk = computed(() => {
   const b = authStore.user?.bagian || "";
-  return ["GA", "FINANCE", "AUDIT", "DIREKSI", "EDP"].includes(b);
+  return ["GA", "FINANCE", "AUDIT", "DIREKSI", "EDP","ADMIN"].includes(b);
 });
 
 // Menentukan Default Check (Migrasi rbacc.Checked:=True dll)
