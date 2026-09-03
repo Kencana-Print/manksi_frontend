@@ -360,7 +360,7 @@ const rowPropsFn = (data: any) => {
     // (text-purple-lighten-1) yang kalah specificity dan jatuh ke
     // warna hitam default v-data-table.
     if (item.Pending !== "NORMAL") {
-      if (item.AccPending === "N") style = "color: #d400f7 !important;";
+      if (item.AccPending === "N") style = "color: #ce93d8 !important;";
       else if (item.AccPending === "ACC") style = "color: #e65100 !important;";
     } else if (item.Status === "Open") {
       style = "color: #e53935 !important;";

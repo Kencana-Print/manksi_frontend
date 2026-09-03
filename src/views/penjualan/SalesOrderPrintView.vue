@@ -27,6 +27,10 @@ const isSpandukMMT = computed(
   () => kodeDivisi.value === "1" || kodeDivisi.value === "5",
 );
 const isComplexTtd = computed(() => isKaosan.value);
+const isPending = computed(() => {
+  const ket = String(data.value.spk_keterangan || "").toLowerCase();
+  return ket.includes("pending");
+});
 
 const numCopies = computed(() => {
   if (withAlokasi.value) return 1;
@@ -412,6 +416,17 @@ onMounted(async () => {
                       >
                         (REVISI: {{ data.spk_ketrevisi }})
                       </span>
+                      <span
+                        v-if="isPending"
+                        style="
+                          color: red;
+                          font-weight: bold;
+                          margin-left: 8px;
+                          font-size: 9pt;
+                        "
+                      >
+                        PENDING!
+                      </span>
 
                       <span v-if="data.spk_tipe" class="ml-8 text-xs">
                         Tipe SO : <strong>{{ data.spk_tipe }}</strong>
@@ -665,6 +680,17 @@ onMounted(async () => {
                     "
                   >
                     (REVISI: {{ data.spk_ketrevisi }})
+                  </span>
+                  <span
+                    v-if="isPending"
+                    style="
+                      color: red;
+                      font-weight: bold;
+                      margin-left: 8px;
+                      font-size: 9pt;
+                    "
+                  >
+                    PENDING!
                   </span>
                 </td>
                 <td class="text-right pr-1" v-if="data.spk_tipe">Tipe SO :</td>
