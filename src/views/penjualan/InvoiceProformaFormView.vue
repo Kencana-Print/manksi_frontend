@@ -535,20 +535,27 @@ const num = (val: any) => Math.round(Number(val) || 0).toLocaleString("id-ID");
           <label class="f-lbl">Customer</label>
           <div class="inp-grp" style="flex: 1">
             <input
-              :value="formData.cusNama || formData.cusKode"
+              v-model="formData.cusKode"
+              class="f-inp"
+              style="width: 70px; flex-shrink: 0; text-transform: uppercase"
+              placeholder="Kode"
+              @keydown.enter.prevent="onCusEnter"
+              @keydown.f1.prevent="showCusModal = true"
+              @blur="onCusEnter"
+            />
+            <input
+              :value="formData.cusNama"
               readonly
               class="f-inp f-ro"
-              style="flex: 1; cursor: pointer"
-              placeholder="Klik / F1 cari..."
-              @click="showCusModal = true"
+              style="flex: 1"
+              placeholder="Nama customer..."
+              tabindex="-1"
             />
             <button
               type="button"
               class="btn-lkp"
               title="Cari Customer (F1)"
               @click="showCusModal = true"
-              @keydown.f1.prevent="showCusModal = true"
-              tabindex="0"
             >
               <IconSearch :size="14" color="#1565c0" />
             </button>
