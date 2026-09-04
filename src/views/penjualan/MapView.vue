@@ -257,9 +257,11 @@ const fmtNum = (val: number | string | null) => {
 // - Aktif='N' -> Abu-abu
 const getRowProps = (data: any) => {
   const row = data.item?.raw || data.item;
-  if (row.Aktif === "N") return { class: "row-passive text-grey" };
+  if (row.Aktif === "N") return { class: "map-row-passive text-grey" };
   if (row.Aktif === "Y" && row.CloseStatus === "N")
-    return { class: "row-active-open text-red-darken-2 font-weight-medium" };
+    return {
+      class: "map-row-active-open text-red-darken-2 font-weight-medium",
+    };
   return {};
 };
 
@@ -1289,6 +1291,16 @@ const confirmToggleClose = async () => {
   color: #9e9e9e !important;
 }
 :deep(.row-active-open td) {
+  color: #d32f2f !important;
+  font-weight: 600 !important;
+}
+</style>
+
+<style>
+:deep(.map-row-passive td) {
+  color: #9e9e9e !important;
+}
+:deep(.map-row-active-open td) {
   color: #d32f2f !important;
   font-weight: 600 !important;
 }

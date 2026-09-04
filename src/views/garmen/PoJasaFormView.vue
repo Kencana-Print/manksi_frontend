@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch, nextTick } from "vue";
+import { ref, computed, onMounted, onActivated, watch, nextTick } from "vue";
 import { useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
 import { useAuthStore } from "@/stores/authStore";
@@ -119,6 +119,21 @@ const mkB = (): BahanRow => ({
   total: 0,
   gdg_kode: "",
 });
+const resetFormNew = () => {
+  fd.value = JSON.parse(JSON.stringify(init));
+  fd.value.Tanggal = todayWIB();
+  fd.value.Dateline = todayWIB();
+  fd.value.Cab =
+    userCab.value && userCab.value !== "HO-" ? userCab.value : "P01";
+  fd.value.KomponenRows = [mkK()];
+  fd.value.BahanRows = [mkB()];
+  planList.value = [];
+  activeTab.value = "komponen";
+  savedNomor.value = "";
+  spkDirty.value = false;
+  supDirty.value = false;
+  jasaDirty.value = false;
+};
 const num = (v: any, d = 0) =>
   Number(v || 0).toLocaleString("id-ID", {
     minimumFractionDigits: d,
@@ -761,12 +776,8 @@ const skipCetakSJ = () => {
 };
 
 onMounted(async () => {
-  // Set Cab dari cabang user login TERLEBIH DAHULU — sebelum fetch apapun
-  // yang butuh scoping cabang (jasa, dsb). Fallback ke P01 (bukan P04)
-  // untuk user tanpa cabang spesifik (mis. HO-) sesuai request.
   if (!isEditMode.value) {
-    fd.value.Cab =
-      userCab.value && userCab.value !== "HO-" ? userCab.value : "P01";
+    resetFormNew();
   }
 
   // Load jasa list untuk modal — sekarang fd.value.Cab sudah benar
@@ -782,6 +793,14 @@ onMounted(async () => {
   if (isEditMode.value) {
     await fetchData();
     if (fd.value.SpkNomor && fd.value.JasaKode) await loadPlanning();
+  }
+});
+
+onActivated(() => {
+  // Kalau instance ini di-reuse via KeepAlive untuk buka "Tambah" baru lagi
+  // (bukan remount dari nol), onMounted tidak terpanggil ulang — reset di sini.
+  if (!isEditMode.value) {
+    resetFormNew();
   }
 });
 </script>
