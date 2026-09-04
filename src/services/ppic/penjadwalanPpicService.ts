@@ -1,7 +1,7 @@
 import api from "@/services/api";
 
 export const penjadwalanPpicService = {
-  getBrowse(params: { startDate: string; endDate: string }) {
+  getBrowse(params: { startDate: string; endDate: string; cabang?: string }) {
     return api.get("/ppic/penjadwalan/browse", { params });
   },
   getDetail(nomor: string) {
@@ -94,6 +94,18 @@ export const penjadwalanPpicService = {
   deleteDetailRow(pjwNomor: string, pjwdId: number) {
     return api.delete(`/ppic/penjadwalan-form/row/${pjwdId}`, {
       data: { pjwNomor },
+    });
+  },
+  checkTargetPeriod(pjwdId: number, tanggalBaru: string) {
+    return api.get(`/ppic/penjadwalan-form/row/${pjwdId}/check-target`, {
+      params: { tanggalBaru },
+    });
+  },
+
+  moveDetailRow(pjwNomor: string, pjwdId: number, tanggalBaru: string) {
+    return api.post(`/ppic/penjadwalan-form/row/${pjwdId}/move`, {
+      pjwNomor,
+      tanggalBaru,
     });
   },
 };

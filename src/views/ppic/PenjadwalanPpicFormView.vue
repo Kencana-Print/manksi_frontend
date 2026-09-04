@@ -749,6 +749,90 @@ const onKesepakatanChange = (row: DetailRow) =>
   onDetailFieldChange(row, "Kesepakatan", "pjwd_tgl_kesepakatan");
 const onKetKesepakatanChange = (row: DetailRow) =>
   onDetailFieldChange(row, "KetKesepakatan", "pjwd_ket_kesepakatan");
+const showMoveDialog = ref(false);
+const moveTargetInfo = ref<any>(null);
+const moveRowRef = ref<DetailRow | null>(null);
+const movePendingTanggal = ref("");
+const previousKesepakatan = reactive<Record<number, string>>({});
+const isMoving = ref(false);
+
+const onKesepakatanFocus = (row: DetailRow) => {
+  if (row.PjwdId) previousKesepakatan[row.PjwdId] = row.Kesepakatan;
+  onFieldFocus(row, "pjwd_tgl_kesepakatan");
+};
+
+const onKesepakatanBlur = async (row: DetailRow) => {
+  onFieldBlur(row, "pjwd_tgl_kesepakatan");
+  if (!row.PjwdId || !row.Kesepakatan) return;
+
+  const prev = previousKesepakatan[row.PjwdId];
+  if (prev === row.Kesepakatan) return; // tidak berubah, tidak perlu apa-apa
+
+  // Masih dalam rentang periode saat ini → simpan seperti biasa
+  if (
+    row.Kesepakatan >= header.pjw_tgl1 &&
+    row.Kesepakatan <= header.pjw_tgl2
+  ) {
+    onKesepakatanChange(row);
+    return;
+  }
+
+  // Di luar periode saat ini → cek dulu ke mana harus pindah
+  try {
+    const res = await penjadwalanPpicService.checkTargetPeriod(
+      row.PjwdId,
+      row.Kesepakatan,
+    );
+    const info = res.data.data;
+    if (!info.needMove) {
+      onKesepakatanChange(row);
+      return;
+    }
+    moveTargetInfo.value = info;
+    moveRowRef.value = row;
+    movePendingTanggal.value = row.Kesepakatan;
+    showMoveDialog.value = true;
+  } catch (e: any) {
+    toast.error(e.response?.data?.message || "Gagal mengecek periode tujuan.");
+    row.Kesepakatan = prev;
+  }
+};
+
+const cancelMove = () => {
+  if (moveRowRef.value?.PjwdId) {
+    moveRowRef.value.Kesepakatan =
+      previousKesepakatan[moveRowRef.value.PjwdId] || "";
+  }
+  showMoveDialog.value = false;
+  moveRowRef.value = null;
+  moveTargetInfo.value = null;
+};
+
+const confirmMove = async () => {
+  const row = moveRowRef.value;
+  if (!row || !row.PjwdId) return;
+  isMoving.value = true;
+  try {
+    const res = await penjadwalanPpicService.moveDetailRow(
+      header.pjw_nomor,
+      row.PjwdId,
+      movePendingTanggal.value,
+    );
+    if (res.data.data.moved) {
+      const idx = detail.value.findIndex((d) => d.PjwdId === row.PjwdId);
+      if (idx !== -1) detail.value.splice(idx, 1);
+      toast.success(`Dipindahkan ke periode ${res.data.data.nomor}.`);
+    }
+  } catch (e: any) {
+    toast.error(e.response?.data?.message || "Gagal memindahkan baris.");
+    row.Kesepakatan = previousKesepakatan[row.PjwdId] || "";
+  } finally {
+    isMoving.value = false;
+    showMoveDialog.value = false;
+    moveRowRef.value = null;
+    moveTargetInfo.value = null;
+  }
+};
 
 // ═══════════════════════════════════════════════════════════════
 // HAPUS BARIS
@@ -776,6 +860,11 @@ onMounted(() => {
     // (server broadcast ke SEMUA anggota room termasuk pengirim)
     if (detail.value.some((d) => d.PjwdId === payload.pjwd_id)) return;
     pushRowFromServer(payload.pjwd_id, payload.row);
+  });
+
+  on("pjw:row-moved-in", (payload: any) => {
+    if (detail.value.some((d) => d.PjwdId === payload.PjwdId)) return;
+    detail.value.push(mapDetailRow(payload));
   });
 
   on("pjw:field-updated", (payload: any) => {
@@ -1219,13 +1308,8 @@ const rowClass = (d: DetailRow) => {
                     v-model="d.Kesepakatan"
                     class="pjw-cell-date"
                     :disabled="!canEditKesepakatan"
-                    @focus="onFieldFocus(d, 'pjwd_tgl_kesepakatan')"
-                    @blur="
-                      () => {
-                        onFieldBlur(d, 'pjwd_tgl_kesepakatan');
-                        onKesepakatanChange(d);
-                      }
-                    "
+                    @focus="onKesepakatanFocus(d)"
+                    @blur="onKesepakatanBlur(d)"
                   />
                   <input
                     type="text"
@@ -1267,6 +1351,62 @@ const rowClass = (d: DetailRow) => {
       </div>
     </div>
   </BaseForm>
+
+  <v-dialog v-model="showMoveDialog" max-width="420" persistent>
+    <v-card class="rounded-lg">
+      <v-card-title class="bg-orange-darken-2 text-white pa-3 text-subtitle-1">
+        Konfirmasi Pindah Periode
+      </v-card-title>
+      <v-card-text class="pa-4" style="font-size: 13px">
+        <p>
+          Tanggal Kesepakatan baru (<b>{{
+            formatTanggal(movePendingTanggal)
+          }}</b
+          >) berada di luar periode <b>{{ header.pjw_nomor }}</b
+          >.
+        </p>
+        <p class="mt-2">
+          Baris
+          <b>{{
+            moveRowRef?.SoNomor ||
+            moveRowRef?.MapNomor ||
+            moveRowRef?.NomorPraOrder ||
+            moveRowRef?.Nama
+          }}</b>
+          akan dipindahkan ke:
+        </p>
+        <p class="mt-2">
+          <template v-if="moveTargetInfo?.willCreateNew">
+            Periode baru
+            <b
+              >({{ formatTanggal(moveTargetInfo.targetTgl1) }} s/d
+              {{ formatTanggal(moveTargetInfo.targetTgl2) }})</b
+            >
+            — nomor akan dibuat otomatis.
+          </template>
+          <template v-else>
+            Periode <b>{{ moveTargetInfo?.targetNomor }}</b> ({{
+              formatTanggal(moveTargetInfo?.targetTgl1)
+            }}
+            s/d {{ formatTanggal(moveTargetInfo?.targetTgl2) }})
+          </template>
+        </p>
+      </v-card-text>
+      <v-card-actions class="pa-3 border-t bg-grey-lighten-4">
+        <v-btn variant="text" :disabled="isMoving" @click="cancelMove"
+          >Batal</v-btn
+        >
+        <v-spacer />
+        <v-btn
+          color="orange-darken-2"
+          variant="elevated"
+          :loading="isMoving"
+          @click="confirmMove"
+          >Ya, Pindahkan</v-btn
+        >
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
 </template>
 
 <style scoped>
