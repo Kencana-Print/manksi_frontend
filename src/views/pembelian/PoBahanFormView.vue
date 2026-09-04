@@ -60,6 +60,19 @@ const showMkbModal = ref(false);
 const activeGridIndex = ref(-1);
 // delivery bahan modal needs separate index
 const activeDeliveryIdx = ref(-1);
+const rollInputRefs = ref<(HTMLInputElement | null)[]>([]);
+
+const setRollInputRef = (el: any, idx: number) => {
+  rollInputRefs.value[idx] = el as HTMLInputElement | null;
+};
+
+const focusNextRollJumlah = (idx: number) => {
+  const next = rollInputRefs.value[idx + 1];
+  if (next) {
+    next.focus();
+    next.select();
+  }
+};
 
 // ── Default data ──
 const defaultData = {
@@ -1047,7 +1060,7 @@ const validateSave = () => {
                 + Tambah
               </button>
             </div>
-            <div class="tbl-wrap" style="height: 145px">
+            <div class="tbl-wrap" style="height: 145px" ref="rollTableRef">
               <table class="gt">
                 <thead>
                   <tr>
@@ -1145,6 +1158,10 @@ const validateSave = () => {
                         v-model.number="r.jumlah"
                         type="number"
                         class="ci tr fw w-100"
+                        :ref="(el) => setRollInputRef(el, Number(idx))"
+                        @keydown.enter.prevent="
+                          focusNextRollJumlah(Number(idx))
+                        "
                         v-select-on-focus
                       />
                     </td>
