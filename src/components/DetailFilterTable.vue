@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { toRef } from "vue";
+import { toRef, computed } from "vue";
 import { watch } from "vue";
 import {
   useColumnFilter,
@@ -15,6 +15,9 @@ const props = defineProps<{
   headers: DetailHeader[];
   items: Record<string, any>[];
   itemKey?: string;
+  showTotal?: boolean;
+  totalLabel?: string;
+  maxHeight?: string;
 }>();
 
 const emit = defineEmits<{
@@ -48,6 +51,25 @@ const onWrapClick = (e: MouseEvent) => {
   }
 };
 
+const columnTotals = computed(() => {
+  const totals: Record<string, number> = {};
+  props.headers
+    .filter((h) => h.align === "right")
+    .forEach((h) => {
+      totals[h.key] = filteredItems.value.reduce(
+        (sum, item) => sum + (Number(item[h.key]) || 0),
+        0,
+      );
+    });
+  return totals;
+});
+
+const formatDefault = (v: number) =>
+  Number(v || 0).toLocaleString("id-ID", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+
 watch(filteredItems, (val) => emit("update:filteredItems", val), {
   immediate: true,
 });
@@ -60,51 +82,75 @@ watch(filteredItems, (val) => emit("update:filteredItems", val), {
         <IconFilterOff :size="11" /> Reset Filter ({{ activeFilterCount }})
       </button>
     </div>
-    <table class="dft-table">
-      <thead>
-        <tr>
-          <th
-            v-for="h in headers"
-            :key="h.key"
-            :style="{ width: h.width }"
-            :class="h.align ? `text-${h.align}` : ''"
+    <div class="dft-scroll" :style="maxHeight ? { maxHeight } : {}">
+      <table class="dft-table">
+        <thead>
+          <tr>
+            <th
+              v-for="h in headers"
+              :key="h.key"
+              :style="{ width: h.width }"
+              :class="h.align ? `text-${h.align}` : ''"
+            >
+              <div class="dft-th-inner">
+                <span class="dft-th-title">{{ h.title }}</span>
+                <button
+                  class="dft-filter-btn"
+                  :class="{ active: colHasFilter(h.key) }"
+                  @click.stop="openColFilter(h.key, $event)"
+                >
+                  <IconFilter
+                    v-if="colHasFilter(h.key)"
+                    :size="9"
+                    :stroke-width="2"
+                  />
+                  <IconAdjustmentsHorizontal
+                    v-else
+                    :size="9"
+                    :stroke-width="2"
+                  />
+                </button>
+              </div>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr
+            v-for="(item, idx) in filteredItems"
+            :key="itemKey ? item[itemKey] : idx"
           >
-            <div class="dft-th-inner">
-              <span class="dft-th-title">{{ h.title }}</span>
-              <button
-                class="dft-filter-btn"
-                :class="{ active: colHasFilter(h.key) }"
-                @click.stop="openColFilter(h.key, $event)"
-              >
-                <IconFilter
-                  v-if="colHasFilter(h.key)"
-                  :size="9"
-                  :stroke-width="2"
-                />
-                <IconAdjustmentsHorizontal v-else :size="9" :stroke-width="2" />
-              </button>
-            </div>
-          </th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr
-          v-for="(item, idx) in filteredItems"
-          :key="itemKey ? item[itemKey] : idx"
-        >
-          <td
-            v-for="h in headers"
-            :key="h.key"
-            :class="h.align ? `text-${h.align}` : ''"
-          >
-            <slot :name="`item.${h.key}`" :item="item">{{ item[h.key] }}</slot>
-          </td>
-        </tr>
-        <tr v-if="filteredItems.length === 0">
-          <td :colspan="headers.length" class="dft-empty">Tidak ada data.</td>
-        </tr>
-      </tbody>
-    </table>
+            <td
+              v-for="h in headers"
+              :key="h.key"
+              :class="h.align ? `text-${h.align}` : ''"
+            >
+              <slot :name="`item.${h.key}`" :item="item">{{
+                item[h.key]
+              }}</slot>
+            </td>
+          </tr>
+          <tr v-if="filteredItems.length === 0">
+            <td :colspan="headers.length" class="dft-empty">Tidak ada data.</td>
+          </tr>
+        </tbody>
+        <tfoot v-if="showTotal && filteredItems.length">
+          <tr>
+            <td
+              v-for="(h, idx) in headers"
+              :key="'total-' + h.key"
+              :class="h.align ? `text-${h.align}` : ''"
+            >
+              <template v-if="idx === 0">{{ totalLabel || "Total" }}</template>
+              <template v-else-if="h.align === 'right'">
+                <slot :name="`total.${h.key}`" :value="columnTotals[h.key]">
+                  {{ formatDefault(columnTotals[h.key]) }}
+                </slot>
+              </template>
+            </td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
   </div>
 
   <Teleport to="body">
@@ -349,5 +395,23 @@ watch(filteredItems, (val) => emit("update:filteredItems", val), {
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
+}
+.dft-scroll {
+  overflow: auto;
+  position: relative;
+}
+.dft-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+}
+.dft-table tfoot td {
+  position: sticky;
+  bottom: 0;
+  background: #eceff1;
+  font-weight: 700;
+  border-top: 2px solid #90a4ae;
+  z-index: 2;
+  padding: 5px 7px;
 }
 </style>

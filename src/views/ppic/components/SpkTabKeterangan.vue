@@ -1,13 +1,20 @@
 <script setup lang="ts">
 import { ref, onMounted, watch, computed } from "vue";
-import { IconPlus, IconTrash } from "@tabler/icons-vue";
+import { IconSearch, IconPlus, IconTrash } from "@tabler/icons-vue";
 import api from "@/services/api";
+import BarangGarmenSearchModal from "@/components/lookups/BarangGarmenSearchModal.vue";
 
 const props = defineProps<{
   formData: any;
   isEdit: boolean;
   isPremiumFlow?: boolean; // ← baru, default true supaya behavior lama tetap aman
 }>();
+
+const showAccModal = ref(false);
+const activeItemIdx = ref(-1);
+const activeLineIdx = ref(-1);
+const activeKeyword = ref("");
+const activeKetKeyword = ref("");
 
 const isPremium = computed(() => props.isPremiumFlow !== false);
 
@@ -33,6 +40,77 @@ const initKetKomponen = async () => {
   } catch (e) {
     console.error("Gagal load master ket komponen:", e);
   }
+};
+
+// ── Setiap item punya _ketLines (array baris) yang disinkronkan ke
+// item.ket (string, dipisah "\n") — supaya backend tidak perlu diubah
+// sama sekali, cuma UI yang menampilkan banyak baris sebagai list.
+const ensureKetLines = (item: any) => {
+  if (!item._ketLines) {
+    item._ketLines = item.ket
+      ? item.ket.split("\n").filter((s: string) => s)
+      : [""];
+    if (item._ketLines.length === 0) item._ketLines = [""];
+  }
+  return item._ketLines;
+};
+
+const syncKet = (item: any) => {
+  item.ket = (item._ketLines || []).filter((s: string) => s.trim()).join("\n");
+};
+
+const onCheckChange = (idx: number) => {
+  const item = props.formData.KetKomponenList[idx];
+  if (item.checked) {
+    ensureKetLines(item);
+  } else {
+    item._ketLines = [""];
+    item.ket = "";
+  }
+};
+
+const addLine = (item: any) => {
+  ensureKetLines(item).push("");
+};
+
+const removeLine = (item: any, lineIdx: number) => {
+  const lines = ensureKetLines(item);
+  lines.splice(lineIdx, 1);
+  if (lines.length === 0) lines.push("");
+  syncKet(item);
+};
+
+// Trigger pencarian — dipanggil dari F1, Enter, dan tombol search.
+// Keyword = teks yang sudah diketik user di baris itu (kalau ada),
+// fallback ke nama komponen (kecuali LAIN-LAIN, selalu tanpa filter).
+const triggerSearch = (itemIdx: number, lineIdx: number) => {
+  const item = props.formData.KetKomponenList[itemIdx];
+  const lines = ensureKetLines(item);
+  const typed = (lines[lineIdx] || "").trim();
+  activeItemIdx.value = itemIdx;
+  activeLineIdx.value = lineIdx;
+  activeKeyword.value = item.nama === "LAIN-LAIN" ? typed : typed || item.nama;
+  showAccModal.value = true;
+};
+
+const onLineKeydown = (e: KeyboardEvent, itemIdx: number, lineIdx: number) => {
+  if (e.key === "F1" || e.key === "Enter") {
+    e.preventDefault();
+    triggerSearch(itemIdx, lineIdx);
+  }
+};
+
+const onAccesoriesSelectedForKet = (v: any) => {
+  const itemIdx = activeItemIdx.value;
+  const lineIdx = activeLineIdx.value;
+  if (itemIdx < 0 || lineIdx < 0) return;
+  const item = props.formData.KetKomponenList[itemIdx];
+  const lines = ensureKetLines(item);
+  lines[lineIdx] = `${v.Kode} - ${v.Nama}`;
+  syncKet(item);
+  showAccModal.value = false;
+  activeItemIdx.value = -1;
+  activeLineIdx.value = -1;
 };
 
 // ─── MKA dari BAST MAP (accessories + babaran) — read-only referensi ───
@@ -187,7 +265,10 @@ const addRow = () => {
             </tr>
           </thead>
           <tbody>
-            <tr v-for="item in formData.KetKomponenList" :key="item.kode">
+            <tr
+              v-for="(item, idx) in formData.KetKomponenList"
+              :key="item.kode"
+            >
               <td class="text-center" style="font-weight: 700">
                 {{ item.kode }}
               </td>
@@ -197,14 +278,57 @@ const addRow = () => {
                   type="checkbox"
                   v-model="item.checked"
                   style="width: 16px; height: 16px; cursor: pointer"
+                  @change="onCheckChange(Number(idx))"
                 />
               </td>
               <td>
+                <div v-if="item.checked" class="ket-lines-wrap">
+                  <div
+                    v-for="(line, lineIdx) in ensureKetLines(item)"
+                    :key="lineIdx"
+                    class="ket-line-row"
+                  >
+                    <input
+                      v-model="ensureKetLines(item)[lineIdx]"
+                      class="cell-inp"
+                      placeholder="Ketik untuk cari, atau F1/Enter..."
+                      @keydown="
+                        onLineKeydown($event, Number(idx), Number(lineIdx))
+                      "
+                      @change="syncKet(item)"
+                    />
+                    <button
+                      type="button"
+                      class="btn-search-sm"
+                      title="Cari Accessories (F1)"
+                      @click="triggerSearch(Number(idx), Number(lineIdx))"
+                    >
+                      <IconSearch :size="12" />
+                    </button>
+                    <button
+                      v-if="ensureKetLines(item).length > 1"
+                      type="button"
+                      class="btn-del-sm"
+                      title="Hapus baris"
+                      @click="removeLine(item, Number(lineIdx))"
+                    >
+                      <IconTrash :size="12" color="#c62828" />
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    class="btn-add-line"
+                    @click="addLine(item)"
+                  >
+                    <IconPlus :size="11" class="mr-1" /> Tambah Baris
+                  </button>
+                </div>
                 <input
-                  v-model="item.ket"
+                  v-else
+                  :value="item.ket"
                   class="cell-inp"
                   placeholder="Keterangan (opsional)"
-                  :disabled="!item.checked"
+                  disabled
                 />
               </td>
             </tr>
@@ -295,6 +419,14 @@ const addRow = () => {
       </div>
     </div>
   </div>
+
+  <BarangGarmenSearchModal
+    v-model="showAccModal"
+    jenis="ACCESORIES"
+    :cabang="formData.so_cab || formData.spk_cab"
+    :initial-keyword="activeKeyword"
+    @selected="onAccesoriesSelectedForKet"
+  />
 </template>
 
 <style scoped>
@@ -452,5 +584,58 @@ const addRow = () => {
 }
 .ket-textarea:focus {
   border-color: #1565c0;
+}
+.ket-lines-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.ket-line-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.ket-line-row .cell-inp {
+  flex: 1;
+}
+.btn-search-sm,
+.btn-del-sm {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  border-radius: 3px;
+  border: 1px solid #bdbdbd;
+  background: #f5f5f5;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.btn-search-sm:hover {
+  background: #e3f2fd;
+  border-color: #1565c0;
+}
+.btn-del-sm {
+  background: #ffebee;
+  border-color: #ef9a9a;
+}
+.btn-del-sm:hover {
+  background: #ffcdd2;
+}
+.btn-add-line {
+  align-self: flex-start;
+  background: transparent;
+  border: 1px dashed #90caf9;
+  color: #1565c0;
+  border-radius: 3px;
+  padding: 3px 8px;
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+}
+.btn-add-line:hover {
+  background: #e3f2fd;
 }
 </style>

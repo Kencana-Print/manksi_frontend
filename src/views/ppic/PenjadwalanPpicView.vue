@@ -12,6 +12,8 @@ import {
   IconTrash,
   IconFileExport,
   IconListDetails,
+  IconEye,
+  IconX,
 } from "@tabler/icons-vue";
 import { exportExcelSingle, exportExcel } from "@/utils/excelExport";
 import { formatTanggal } from "@/utils/dateFormat";
@@ -28,6 +30,8 @@ interface BrowseItem {
 interface DetailRow {
   PjwdId: number;
   Nomor: string;
+  Sumber: string;
+  NomorMap: string;
   Nama: string;
   Tanggal: string;
   Pesan: number;
@@ -56,22 +60,19 @@ const toLocalDate = (d: Date) =>
   `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 
 const HARI = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
-const getMondayOfWeek = (d: Date) => {
-  const day = d.getDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  const mon = new Date(d);
-  mon.setDate(d.getDate() + diff);
-  return mon;
+const getMonthRange = (d: Date) => {
+  const first = new Date(d.getFullYear(), d.getMonth(), 1);
+  const last = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+  return { first, last };
 };
 
 const today = new Date();
-const monday = getMondayOfWeek(today);
-const saturday = new Date(monday);
-saturday.setDate(monday.getDate() + 5);
+const { first: monthStart, last: monthEnd } = getMonthRange(today);
 
 const filterState = ref({
-  start: toLocalDate(monday),
-  end: toLocalDate(saturday),
+  start: toLocalDate(monthStart),
+  end: toLocalDate(monthEnd),
+  cabang: "",
 });
 
 const filterStart = computed({
@@ -87,6 +88,13 @@ const filterEnd = computed({
   },
 });
 
+const filterCabang = computed({
+  get: () => filterState.value.cabang,
+  set: (v) => {
+    filterState.value = { ...filterState.value, cabang: v };
+  },
+});
+
 const hariStart = computed(() =>
   filterStart.value
     ? HARI[new Date(filterStart.value + "T00:00:00").getDay()]
@@ -99,20 +107,13 @@ const hariEnd = computed(() =>
 const onFilterStateRestored = (state: Record<string, any>) => {
   if (state.start) filterState.value.start = state.start;
   if (state.end) filterState.value.end = state.end;
+  if (state.cabang !== undefined) filterState.value.cabang = state.cabang;
 };
-
-watch(filterStart, (val) => {
-  if (!val) return;
-  const d = new Date(val + "T00:00:00");
-  if (d.getDay() === 1) {
-    const sat = new Date(d);
-    sat.setDate(d.getDate() + 5);
-    filterEnd.value = toLocalDate(sat);
-  }
-});
 
 const items = ref<BrowseItem[]>([]);
 const isLoading = ref(false);
+const cabangOptions = ref<{ value: string; title: string }[]>([]);
+
 const selected = ref<BrowseItem[]>([]);
 const expandedRows = ref<BrowseItem[]>([]);
 const detailCache = ref<Record<string, DetailRow[]>>({});
@@ -123,6 +124,49 @@ const showOpenDialog = ref(false);
 const showDeleteDialog = ref(false);
 const isActioning = ref(false);
 const selectedItem = ref<BrowseItem | null>(null);
+
+const showPreviewDialog = ref(false);
+const previewNomor = ref("");
+const previewDetail = ref<DetailRow[]>([]);
+const previewLoading = ref(false);
+
+const loadCabang = async () => {
+  try {
+    const res = await penjadwalanPpicService.getCabang();
+    cabangOptions.value = res.data.data.map((c: any) => ({
+      value: c.Kode,
+      title: `${c.Kode} - ${c.Nama}`,
+    }));
+  } catch {
+    console.error("Gagal load cabang");
+  }
+};
+
+const openPreview = async () => {
+  if (!selected.value.length) return;
+  const item = selected.value[0];
+  previewNomor.value = item.Nomor;
+  showPreviewDialog.value = true;
+
+  if (detailCache.value[item.Nomor]) {
+    previewDetail.value = detailCache.value[item.Nomor];
+    return;
+  }
+
+  previewLoading.value = true;
+  try {
+    const res = await penjadwalanPpicService.getDetail(item.Nomor);
+    previewDetail.value = res.data.data ?? [];
+    detailCache.value = {
+      ...detailCache.value,
+      [item.Nomor]: previewDetail.value,
+    };
+  } catch {
+    toast.error(`Gagal memuat detail ${item.Nomor}`);
+  } finally {
+    previewLoading.value = false;
+  }
+};
 
 const baseBrowseRef = ref<InstanceType<typeof BaseBrowse> | null>(null);
 const isExporting = ref(false);
@@ -159,6 +203,7 @@ const fetchData = async () => {
     const res = await penjadwalanPpicService.getBrowse({
       startDate: filterStart.value,
       endDate: filterEnd.value,
+      cabang: filterState.value.cabang,
     });
     items.value = res.data.data ?? [];
   } catch (e: any) {
@@ -445,6 +490,7 @@ const onExportDetail = async () => {
 
 const fmt = (n: number | null | undefined) => (n ?? 0).toLocaleString("id-ID");
 
+loadCabang();
 fetchData();
 </script>
 
@@ -475,7 +521,7 @@ fetchData();
   >
     <template #filter-left>
       <div class="date-filter">
-        <span class="f-label">Periode Minggu</span>
+        <span class="f-label" style="margin-left: 10px">Periode</span>
         <div class="date-with-day">
           <input type="date" v-model="filterStart" class="f-date" />
           <span class="f-day">{{ hariStart }}</span>
@@ -485,6 +531,13 @@ fetchData();
           <input type="date" v-model="filterEnd" class="f-date" />
           <span class="f-day">{{ hariEnd }}</span>
         </div>
+        <span class="f-label">Cabang</span>
+        <select v-model="filterCabang" class="f-select">
+          <option value="">Semua Cabang</option>
+          <option v-for="c in cabangOptions" :key="c.value" :value="c.value">
+            {{ c.title }}
+          </option>
+        </select>
         <v-btn
           color="primary"
           variant="tonal"
@@ -506,6 +559,16 @@ fetchData();
       >
         <template #prepend><IconTrash :size="15" /></template>
         Hapus
+      </v-btn>
+      <v-btn
+        size="small"
+        variant="outlined"
+        color="primary"
+        :disabled="selected.length !== 1"
+        @click="openPreview"
+      >
+        <template #prepend><IconEye :size="14" /></template>
+        Preview
       </v-btn>
       <v-btn
         size="small"
@@ -581,7 +644,7 @@ fetchData();
               <th class="tr">Rencana</th>
               <th class="tr">Realisasi</th>
               <th class="tc">Permintaan Kirim</th>
-              <th class="tc">Status</th>
+              <th class="tc">Permintaan</th>
               <th>Kesepakatan</th>
             </tr>
           </thead>
@@ -708,6 +771,97 @@ fetchData();
       </v-card-actions>
     </v-card>
   </v-dialog>
+
+  <v-dialog v-model="showPreviewDialog" max-width="1150">
+    <v-card class="rounded-lg">
+      <v-card-title
+        class="bg-primary text-white pa-3 text-subtitle-1 d-flex align-center justify-space-between"
+      >
+        <span>Preview Komitmen Kirim — {{ previewNomor }}</span>
+        <v-btn
+          icon
+          size="small"
+          variant="text"
+          color="white"
+          @click="showPreviewDialog = false"
+        >
+          <IconX :size="18" />
+        </v-btn>
+      </v-card-title>
+      <v-card-text class="pa-0">
+        <div v-if="previewLoading" class="expand-loading pa-4">
+          <v-progress-circular indeterminate color="primary" size="20" />
+          <span>Memuat detail...</span>
+        </div>
+        <table v-else class="dt" style="width: 100%">
+          <thead>
+            <tr>
+              <th>Tanggal</th>
+              <th>Sumber</th>
+              <th>Nomor / Nama</th>
+              <th class="tr">Pesan</th>
+              <th class="tr">Kirim</th>
+              <th class="tr">Kurang</th>
+              <th class="tr">Rencana</th>
+              <th class="tr">Realisasi</th>
+              <th class="tc">Permintaan Kirim</th>
+              <th class="tc">Permintaan</th>
+              <th>Kesepakatan</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="d in previewDetail"
+              :key="d.PjwdId"
+              :class="detailRowClass(d)"
+            >
+              <td>{{ formatTanggal(d.Tanggal) }}</td>
+              <td>
+                <v-chip size="x-small" variant="tonal">{{ d.Sumber }}</v-chip>
+              </td>
+              <td>
+                <div class="mono">
+                  {{ d.Nomor || d.NomorPraOrder || d.NomorMap || "-" }}
+                </div>
+                <div>{{ d.Nama }}</div>
+              </td>
+              <td class="tr">{{ fmt(d.Pesan) }}</td>
+              <td class="tr">{{ fmt(d.Kirim) }}</td>
+              <td class="tr" :class="{ 'text-red fw': Number(d.Kurang) > 0 }">
+                {{ fmt(d.Kurang) }}
+              </td>
+              <td class="tr">{{ fmt(d.Rencana) }}</td>
+              <td class="tr">{{ fmt(d.Realisasi) }}</td>
+              <td class="tc">{{ formatTanggal(d.PermintaanKirim) }}</td>
+              <td class="tc">
+                <v-chip
+                  size="x-small"
+                  :color="d.StatusPermintaan === 'CLOSE' ? 'success' : 'grey'"
+                  variant="flat"
+                >
+                  {{ d.StatusPermintaan }}
+                </v-chip>
+              </td>
+              <td>
+                <span v-if="d.Kesepakatan" class="kesepakatan-tgl">{{
+                  formatTanggal(d.Kesepakatan)
+                }}</span>
+                <span v-if="d.KetKesepakatan" class="kesepakatan-ket">
+                  — {{ d.KetKesepakatan }}</span
+                >
+                <span v-if="!d.Kesepakatan" class="text-grey">-</span>
+              </td>
+            </tr>
+            <tr v-if="!previewDetail.length">
+              <td colspan="11" class="empty-row">
+                Belum ada SO/MAP/Pra Order/Manual di periode ini.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </v-card-text>
+    </v-card>
+  </v-dialog>
 </template>
 
 <style scoped>
@@ -736,6 +890,18 @@ fetchData();
   background: white;
 }
 .f-date:focus {
+  border-color: #1976d2;
+}
+.f-select {
+  height: 26px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  padding: 0 4px;
+  font-size: 11px;
+  outline: none;
+  background: white;
+}
+.f-select:focus {
   border-color: #1976d2;
 }
 .f-sep {

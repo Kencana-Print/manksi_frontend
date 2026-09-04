@@ -182,6 +182,7 @@ interface EfisiensiBabaranItem {
   Status: string;
 }
 interface StokAccVsMkaSpk {
+  NomorMka: string;
   Spk: string;
   NamaSpk: string;
   Mka: number;
@@ -274,6 +275,22 @@ interface SpkBelumTagihItem {
   TglKirimTerakhir: string;
   UmurHari: number;
 }
+interface StokBebasItem {
+  Kode: string;
+  Nama: string;
+  Satuan: string;
+  Stok: number;
+  MkbBelumRealisasi: number;
+  Free: number;
+}
+interface BufferKaosanItem {
+  Kode: string;
+  Nama: string;
+  Satuan: string;
+  Buffer: number;
+  StokAkhir: number;
+  Tipe: "BAHAN" | "AKSESORIS";
+}
 
 const authStore = useAuthStore();
 const router = useRouter();
@@ -306,9 +323,16 @@ watch(activeTab, async (tab) => {
   if (tab === "gudang-bahan") {
     if (!gudangBahanLoaded.value) await loadGudangBahanData();
     await nextTick();
+    setupMspObserver();
+    setupPbrObserver();
+    setupPbdObserver();
+    setupGbMkbObserver();
+    setupGbMkaObserver();
     setupBufferObserver();
     setupBahanObserver();
     setupStokAccVsMkaObserver();
+    setupSbObserver();
+    setupBkObserver();
   }
   if (tab === "gudang") {
     if (!gudangLoaded.value) await loadGudangData();
@@ -444,6 +468,22 @@ const aktivitasList = ref<any[]>([]);
 const trendData = ref<any[]>([]);
 const trendChartEl = ref<HTMLElement | null>(null);
 const stokAccVsMkaCount = ref(0);
+const stokBebasSummary = ref({ total: 0 });
+const SB_PAGE_SIZE = 20;
+const stokBebasList = ref<StokBebasItem[]>([]);
+const sbOffset = ref(0);
+const sbHasMore = ref(true);
+const isLoadingMoreSb = ref(false);
+const sbSentinelEl = ref<HTMLElement | null>(null);
+let sbScrollObserver: IntersectionObserver | null = null;
+const bufferKaosanSummary = ref({ total: 0 });
+const BK_PAGE_SIZE = 20;
+const bufferKaosanList = ref<BufferKaosanItem[]>([]);
+const bkOffset = ref(0);
+const bkHasMore = ref(true);
+const isLoadingMoreBk = ref(false);
+const bkSentinelEl = ref<HTMLElement | null>(null);
+let bkScrollObserver: IntersectionObserver | null = null;
 
 // ── State Penerimaan ──
 const penerimaanSummary = ref({
@@ -1712,6 +1752,261 @@ const setupEfisiensiObserver = () => {
   efisiensiScrollObserver.observe(efisiensiSentinelEl.value);
 };
 
+// ── a. MAP/SPK belum permintaan & realisasi ──
+const mapSpkBelumPermintaanSummary = ref({ total: 0 });
+const MSP_PAGE_SIZE = 20;
+const mapSpkBelumPermintaanList = ref<any[]>([]);
+const mspOffset = ref(0);
+const mspHasMore = ref(true);
+const isLoadingMoreMsp = ref(false);
+const mspSentinelEl = ref<HTMLElement | null>(null);
+let mspScrollObserver: IntersectionObserver | null = null;
+
+const loadMoreMsp = async () => {
+  if (!mspHasMore.value || isLoadingMoreMsp.value) return;
+  isLoadingMoreMsp.value = true;
+  try {
+    const res = await dashboardService.getMapSpkBelumPermintaanList(
+      MSP_PAGE_SIZE,
+      mspOffset.value,
+    );
+    const rows: any[] = res.data.data;
+    mapSpkBelumPermintaanList.value.push(...rows);
+    mspOffset.value += rows.length;
+    if (rows.length < MSP_PAGE_SIZE) mspHasMore.value = false;
+  } catch {
+  } finally {
+    isLoadingMoreMsp.value = false;
+  }
+};
+const setupMspObserver = () => {
+  if (mspScrollObserver) mspScrollObserver.disconnect();
+  if (!mspSentinelEl.value) return;
+  mspScrollObserver = new IntersectionObserver(
+    (entries) => {
+      if (entries[0].isIntersecting) loadMoreMsp();
+    },
+    { threshold: 0.1 },
+  );
+  mspScrollObserver.observe(mspSentinelEl.value);
+};
+
+// ── b. Permintaan Bahan belum direalisasi ──
+const permintaanBelumRealisasiSummary = ref({
+  Total: 0,
+  BelumSamaSekali: 0,
+  Sebagian: 0,
+});
+const PBR_PAGE_SIZE = 20;
+const permintaanBelumRealisasiList = ref<any[]>([]);
+const pbrOffset = ref(0);
+const pbrHasMore = ref(true);
+const isLoadingMorePbr = ref(false);
+const pbrSentinelEl = ref<HTMLElement | null>(null);
+let pbrScrollObserver: IntersectionObserver | null = null;
+
+const loadMorePbr = async () => {
+  if (!pbrHasMore.value || isLoadingMorePbr.value) return;
+  isLoadingMorePbr.value = true;
+  try {
+    const res = await dashboardService.getPermintaanBelumRealisasiList(
+      PBR_PAGE_SIZE,
+      pbrOffset.value,
+    );
+    const rows: any[] = res.data.data;
+    permintaanBelumRealisasiList.value.push(...rows);
+    pbrOffset.value += rows.length;
+    if (rows.length < PBR_PAGE_SIZE) pbrHasMore.value = false;
+  } catch {
+  } finally {
+    isLoadingMorePbr.value = false;
+  }
+};
+const setupPbrObserver = () => {
+  if (pbrScrollObserver) pbrScrollObserver.disconnect();
+  if (!pbrSentinelEl.value) return;
+  pbrScrollObserver = new IntersectionObserver(
+    (entries) => {
+      if (entries[0].isIntersecting) loadMorePbr();
+    },
+    { threshold: 0.1 },
+  );
+  pbrScrollObserver.observe(pbrSentinelEl.value);
+};
+
+// ── c. PO Bahan belum datang ──
+const poBahanBelumDatangSummary = ref({ total: 0 });
+const PBD_PAGE_SIZE = 20;
+const poBahanBelumDatangList = ref<any[]>([]);
+const pbdOffset = ref(0);
+const pbdHasMore = ref(true);
+const isLoadingMorePbd = ref(false);
+const pbdSentinelEl = ref<HTMLElement | null>(null);
+let pbdScrollObserver: IntersectionObserver | null = null;
+
+const loadMorePbd = async () => {
+  if (!pbdHasMore.value || isLoadingMorePbd.value) return;
+  isLoadingMorePbd.value = true;
+  try {
+    const res = await dashboardService.getPoBahanBelumDatangList(
+      PBD_PAGE_SIZE,
+      pbdOffset.value,
+    );
+    const rows: any[] = res.data.data;
+    poBahanBelumDatangList.value.push(...rows);
+    pbdOffset.value += rows.length;
+    if (rows.length < PBD_PAGE_SIZE) pbdHasMore.value = false;
+  } catch {
+  } finally {
+    isLoadingMorePbd.value = false;
+  }
+};
+const setupPbdObserver = () => {
+  if (pbdScrollObserver) pbdScrollObserver.disconnect();
+  if (!pbdSentinelEl.value) return;
+  pbdScrollObserver = new IntersectionObserver(
+    (entries) => {
+      if (entries[0].isIntersecting) loadMorePbd();
+    },
+    { threshold: 0.1 },
+  );
+  pbdScrollObserver.observe(pbdSentinelEl.value);
+};
+
+// ── d. SO belum MKB (state terpisah, khusus tab gudang-bahan) ──
+const gbSpkBelumMkbCount = ref(0);
+const GB_MKB_PAGE_SIZE = 20;
+const gbSpkBelumMkbList = ref<any[]>([]);
+const gbMkbOffset = ref(0);
+const gbMkbHasMore = ref(true);
+const isLoadingMoreGbMkb = ref(false);
+const gbMkbSentinelEl = ref<HTMLElement | null>(null);
+let gbMkbScrollObserver: IntersectionObserver | null = null;
+
+const loadMoreGbMkb = async () => {
+  if (!gbMkbHasMore.value || isLoadingMoreGbMkb.value) return;
+  isLoadingMoreGbMkb.value = true;
+  try {
+    const res = await dashboardService.getSpkBelumMkbListPaged(
+      GB_MKB_PAGE_SIZE,
+      gbMkbOffset.value,
+    );
+    const rows: any[] = res.data.data;
+    gbSpkBelumMkbList.value.push(...rows);
+    gbMkbOffset.value += rows.length;
+    if (rows.length < GB_MKB_PAGE_SIZE) gbMkbHasMore.value = false;
+  } catch {
+  } finally {
+    isLoadingMoreGbMkb.value = false;
+  }
+};
+const setupGbMkbObserver = () => {
+  if (gbMkbScrollObserver) gbMkbScrollObserver.disconnect();
+  if (!gbMkbSentinelEl.value) return;
+  gbMkbScrollObserver = new IntersectionObserver(
+    (entries) => {
+      if (entries[0].isIntersecting) loadMoreGbMkb();
+    },
+    { threshold: 0.1 },
+  );
+  gbMkbScrollObserver.observe(gbMkbSentinelEl.value);
+};
+
+// ── e. MKA belum direalisasi (state terpisah, khusus tab gudang-bahan) ──
+const gbStokAccVsMkaCount = ref(0);
+const GB_MKA_PAGE_SIZE = 20;
+const gbStokAccVsMkaList = ref<any[]>([]);
+const gbMkaOffset = ref(0);
+const gbMkaHasMore = ref(true);
+const isLoadingMoreGbMka = ref(false);
+const gbMkaSentinelEl = ref<HTMLElement | null>(null);
+let gbMkaScrollObserver: IntersectionObserver | null = null;
+
+const loadMoreGbMka = async () => {
+  if (!gbMkaHasMore.value || isLoadingMoreGbMka.value) return;
+  isLoadingMoreGbMka.value = true;
+  try {
+    const res = await dashboardService.getStokAccVsMkaList(
+      GB_MKA_PAGE_SIZE,
+      gbMkaOffset.value,
+    );
+    const rows: any[] = res.data.data;
+    gbStokAccVsMkaList.value.push(...rows);
+    gbMkaOffset.value += rows.length;
+    if (rows.length < GB_MKA_PAGE_SIZE) gbMkaHasMore.value = false;
+  } catch {
+  } finally {
+    isLoadingMoreGbMka.value = false;
+  }
+};
+const setupGbMkaObserver = () => {
+  if (gbMkaScrollObserver) gbMkaScrollObserver.disconnect();
+  if (!gbMkaSentinelEl.value) return;
+  gbMkaScrollObserver = new IntersectionObserver(
+    (entries) => {
+      if (entries[0].isIntersecting) loadMoreGbMka();
+    },
+    { threshold: 0.1 },
+  );
+  gbMkaScrollObserver.observe(gbMkaSentinelEl.value);
+};
+const loadMoreSb = async () => {
+  if (!sbHasMore.value || isLoadingMoreSb.value) return;
+  isLoadingMoreSb.value = true;
+  try {
+    const res = await dashboardService.getStokBebasList(
+      SB_PAGE_SIZE,
+      sbOffset.value,
+    );
+    const rows: StokBebasItem[] = res.data.data;
+    stokBebasList.value.push(...rows);
+    sbOffset.value += rows.length;
+    if (rows.length < SB_PAGE_SIZE) sbHasMore.value = false;
+  } catch {
+  } finally {
+    isLoadingMoreSb.value = false;
+  }
+};
+const setupSbObserver = () => {
+  if (sbScrollObserver) sbScrollObserver.disconnect();
+  if (!sbSentinelEl.value) return;
+  sbScrollObserver = new IntersectionObserver(
+    (entries) => {
+      if (entries[0].isIntersecting) loadMoreSb();
+    },
+    { threshold: 0.1 },
+  );
+  sbScrollObserver.observe(sbSentinelEl.value);
+};
+const loadMoreBk = async () => {
+  if (!bkHasMore.value || isLoadingMoreBk.value) return;
+  isLoadingMoreBk.value = true;
+  try {
+    const res = await dashboardService.getBufferKaosanList(
+      BK_PAGE_SIZE,
+      bkOffset.value,
+    );
+    const rows: BufferKaosanItem[] = res.data.data;
+    bufferKaosanList.value.push(...rows);
+    bkOffset.value += rows.length;
+    if (rows.length < BK_PAGE_SIZE) bkHasMore.value = false;
+  } catch {
+  } finally {
+    isLoadingMoreBk.value = false;
+  }
+};
+const setupBkObserver = () => {
+  if (bkScrollObserver) bkScrollObserver.disconnect();
+  if (!bkSentinelEl.value) return;
+  bkScrollObserver = new IntersectionObserver(
+    (entries) => {
+      if (entries[0].isIntersecting) loadMoreBk();
+    },
+    { threshold: 0.1 },
+  );
+  bkScrollObserver.observe(bkSentinelEl.value);
+};
+
 // ── Computed helpers MAP ──
 const mapSpkRate = computed(() => {
   if (!mapSpkMetric.value.TotalMAP) return 0;
@@ -2321,11 +2616,49 @@ const loadGudangBahanData = async () => {
   stokAccVsMkaOffset.value = 0;
   stokAccVsMkaHasMore.value = true;
 
+  // ⬅ reset panel actionable baru
+  mapSpkBelumPermintaanList.value = [];
+  mspOffset.value = 0;
+  mspHasMore.value = true;
+  permintaanBelumRealisasiList.value = [];
+  pbrOffset.value = 0;
+  pbrHasMore.value = true;
+  poBahanBelumDatangList.value = [];
+  pbdOffset.value = 0;
+  pbdHasMore.value = true;
+  gbSpkBelumMkbList.value = [];
+  gbMkbOffset.value = 0;
+  gbMkbHasMore.value = true;
+  gbStokAccVsMkaList.value = [];
+  gbMkaOffset.value = 0;
+  gbMkaHasMore.value = true;
+  stokBebasList.value = [];
+  sbOffset.value = 0;
+  sbHasMore.value = true;
+  bufferKaosanList.value = [];
+  bkOffset.value = 0;
+  bkHasMore.value = true;
+
   isLoadingGudangBahan.value = true;
   try {
-    const [gbRes, stokAccMkaCountRes] = await Promise.allSettled([
+    const [
+      gbRes,
+      stokAccMkaCountRes,
+      mspSumRes,
+      pbrSumRes,
+      pbdSumRes,
+      gbMkbCountRes,
+      sbSumRes,
+      bkSumRes,
+    ] = await Promise.allSettled([
       dashboardService.getGudangBahanDashboard(),
       dashboardService.getStokAccVsMkaCount(),
+      dashboardService.getMapSpkBelumPermintaanSummary(),
+      dashboardService.getPermintaanBelumRealisasiSummary(),
+      dashboardService.getPoBahanBelumDatangSummary(),
+      dashboardService.getSpkBelumMkbCount(),
+      dashboardService.getStokBebasSummary(),
+      dashboardService.getBufferKaosanSummary(),
     ]);
     if (gbRes.status === "fulfilled" && gbRes.value?.data?.data) {
       gudangBahanData.value.metric = gbRes.value.data.data.metric;
@@ -2338,11 +2671,31 @@ const loadGudangBahanData = async () => {
       stokAccMkaCountRes.value?.data?.data
     )
       stokAccVsMkaCount.value = stokAccMkaCountRes.value.data.data.total ?? 0;
+    if (mspSumRes.status === "fulfilled" && mspSumRes.value?.data?.data)
+      mapSpkBelumPermintaanSummary.value = mspSumRes.value.data.data;
+    if (pbrSumRes.status === "fulfilled" && pbrSumRes.value?.data?.data)
+      permintaanBelumRealisasiSummary.value = pbrSumRes.value.data.data;
+    if (pbdSumRes.status === "fulfilled" && pbdSumRes.value?.data?.data)
+      poBahanBelumDatangSummary.value = pbdSumRes.value.data.data;
+    if (gbMkbCountRes.status === "fulfilled")
+      gbSpkBelumMkbCount.value = gbMkbCountRes.value.data.data ?? 0;
+    gbStokAccVsMkaCount.value = stokAccVsMkaCount.value;
+    if (sbSumRes.status === "fulfilled" && sbSumRes.value?.data?.data)
+      stokBebasSummary.value = sbSumRes.value.data.data;
+    if (bkSumRes.status === "fulfilled" && bkSumRes.value?.data?.data)
+      bufferKaosanSummary.value = bkSumRes.value.data.data;
 
     await Promise.allSettled([
       loadMoreBuffer(),
       loadMoreBahan(),
       loadMoreStokAccVsMka(),
+      loadMoreMsp(),
+      loadMorePbr(),
+      loadMorePbd(),
+      loadMoreGbMkb(),
+      loadMoreGbMka(),
+      loadMoreSb(),
+      loadMoreBk(),
     ]);
 
     gudangBahanLoaded.value = true;
@@ -2514,9 +2867,16 @@ onMounted(async () => {
     setupSpkTagihObserver();
   }
   if (activeTab.value === "gudang-bahan") {
+    setupMspObserver();
+    setupPbrObserver();
+    setupPbdObserver();
+    setupGbMkbObserver();
+    setupGbMkaObserver();
     setupBufferObserver();
     setupBahanObserver();
     setupStokAccVsMkaObserver();
+    setupSbObserver();
+    setupBkObserver();
   }
   if (activeTab.value === "overview") {
     setupAktObserver();
@@ -2553,6 +2913,13 @@ onUnmounted(() => {
   spkTagihScrollObserver?.disconnect();
   pvrScrollObserver?.disconnect();
   pipelineMenggantungScrollObserver?.disconnect();
+  mspScrollObserver?.disconnect();
+  pbrScrollObserver?.disconnect();
+  pbdScrollObserver?.disconnect();
+  gbMkbScrollObserver?.disconnect();
+  gbMkaScrollObserver?.disconnect();
+  sbScrollObserver?.disconnect();
+  bkScrollObserver?.disconnect();
 });
 
 const closeSpkDialog = () => {
@@ -5691,6 +6058,462 @@ const sisaClass = (item: any) => {
           </v-col>
         </v-row>
 
+        <!-- ══ ACTIONABLE — di atas monitoring buffer ══ -->
+        <v-row dense class="mb-2">
+          <!-- a. MAP/SPK belum ada Permintaan & Realisasi Bahan -->
+          <v-col cols="12" md="6">
+            <div class="manksi-panel content-panel fill-height">
+              <div
+                class="panel-header"
+                style="
+                  background: #ffebee;
+                  color: #c62828;
+                  border-bottom: 1px solid #ffcdd2;
+                "
+              >
+                <IconAlertTriangle
+                  :size="14"
+                  :stroke-width="1.7"
+                  class="mr-1"
+                />
+                MAP/SPK Belum Ada Permintaan &amp; Realisasi Bahan
+                <span
+                  v-if="mapSpkBelumPermintaanSummary.total"
+                  class="badge-count ml-auto"
+                  style="background: #c62828"
+                >
+                  {{ mapSpkBelumPermintaanSummary.total }}
+                </span>
+              </div>
+              <div class="panel-body">
+                <v-progress-linear
+                  v-if="isLoadingGudangBahan"
+                  indeterminate
+                  color="red"
+                  height="2"
+                />
+                <template
+                  v-else-if="
+                    mapSpkBelumPermintaanList.length || isLoadingMoreMsp
+                  "
+                >
+                  <div class="pen-list" style="max-height: 320px">
+                    <div
+                      v-for="item in mapSpkBelumPermintaanList"
+                      :key="item.Nomor"
+                      class="pen-item"
+                      :class="
+                        item.SisaHari < 0
+                          ? 'umur-danger'
+                          : item.SisaHari <= 3
+                            ? 'umur-warn'
+                            : ''
+                      "
+                    >
+                      <div class="pen-item-top">
+                        <span class="pen-nomor">{{ item.Nomor }}</span>
+                        <div class="d-flex align-center" style="gap: 5px">
+                          <span class="pen-divisi">{{ item.Sumber }}</span>
+                          <span
+                            class="pen-age"
+                            :class="
+                              item.SisaHari < 0
+                                ? 'umur-danger'
+                                : item.SisaHari <= 3
+                                  ? 'umur-warn'
+                                  : 'umur-ok'
+                            "
+                          >
+                            {{
+                              item.SisaHari < 0 ? "Lewat" : item.SisaHari + "h"
+                            }}
+                          </span>
+                        </div>
+                      </div>
+                      <div class="pen-cus">{{ item.Nama }}</div>
+                      <div class="pen-ket">Dateline: {{ item.Dateline }}</div>
+                    </div>
+                    <div ref="mspSentinelEl" class="pen-sentinel">
+                      <span v-if="isLoadingMoreMsp" class="pen-loading"
+                        >Memuat...</span
+                      >
+                      <span
+                        v-else-if="
+                          !mspHasMore && mapSpkBelumPermintaanList.length
+                        "
+                        class="pen-end"
+                      >
+                        {{ mapSpkBelumPermintaanList.length }} item ditampilkan
+                      </span>
+                    </div>
+                  </div>
+                </template>
+                <div v-else class="text-center text-grey py-3 text-caption">
+                  Semua MAP/SPK sudah ada permintaan atau realisasi bahan 🎉
+                </div>
+              </div>
+            </div>
+          </v-col>
+
+          <!-- b. Permintaan Bahan belum direalisasi -->
+          <v-col cols="12" md="6">
+            <div class="manksi-panel content-panel fill-height">
+              <div class="panel-header panel-header--warning">
+                <IconFileAlert :size="14" :stroke-width="1.7" class="mr-1" />
+                Permintaan Bahan Belum Direalisasi
+                <span
+                  v-if="permintaanBelumRealisasiSummary.Total"
+                  class="badge-count ml-auto"
+                >
+                  {{ permintaanBelumRealisasiSummary.Total }}
+                </span>
+              </div>
+              <div class="panel-body">
+                <v-progress-linear
+                  v-if="isLoadingGudangBahan"
+                  indeterminate
+                  color="warning"
+                  height="2"
+                />
+                <template
+                  v-else-if="
+                    permintaanBelumRealisasiList.length || isLoadingMorePbr
+                  "
+                >
+                  <div class="pen-summary-bar">
+                    <div class="pen-stat">
+                      <span class="pen-stat-val text-error">{{
+                        permintaanBelumRealisasiSummary.BelumSamaSekali
+                      }}</span>
+                      <span class="pen-stat-lbl">Belum Sama Sekali</span>
+                    </div>
+                    <div class="pen-stat">
+                      <span class="pen-stat-val" style="color: #f57f17">{{
+                        permintaanBelumRealisasiSummary.Sebagian
+                      }}</span>
+                      <span class="pen-stat-lbl">Sebagian</span>
+                    </div>
+                  </div>
+                  <div class="pen-list" style="max-height: 260px">
+                    <div
+                      v-for="item in permintaanBelumRealisasiList"
+                      :key="item.Nomor"
+                      class="pen-item"
+                      :class="
+                        item.Status === 'Belum' ? 'umur-danger' : 'umur-warn'
+                      "
+                      style="cursor: pointer"
+                      @click="
+                        router.push({
+                          path: '/garmen/bahan-baku/realisasi-minta/form',
+                          query: { minta: item.Nomor },
+                        })
+                      "
+                    >
+                      <div class="pen-item-top">
+                        <span class="pen-nomor">{{ item.Nomor }}</span>
+                        <span
+                          class="pen-age"
+                          :class="
+                            item.Status === 'Belum'
+                              ? 'umur-danger'
+                              : 'umur-warn'
+                          "
+                        >
+                          {{ item.Status }}
+                        </span>
+                      </div>
+                      <div class="pen-cus">{{ item.NamaSpk || item.Spk }}</div>
+                      <div class="pen-ket">
+                        {{ item.Cab }} · {{ item.Tanggal }} ·
+                        {{ item.UmurHari }}h
+                      </div>
+                    </div>
+                    <div ref="pbrSentinelEl" class="pen-sentinel">
+                      <span v-if="isLoadingMorePbr" class="pen-loading"
+                        >Memuat...</span
+                      >
+                      <span
+                        v-else-if="
+                          !pbrHasMore && permintaanBelumRealisasiList.length
+                        "
+                        class="pen-end"
+                      >
+                        {{ permintaanBelumRealisasiList.length }} permintaan
+                        ditampilkan
+                      </span>
+                    </div>
+                  </div>
+                </template>
+                <div v-else class="text-center text-grey py-3 text-caption">
+                  Semua permintaan bahan sudah direalisasi 🎉
+                </div>
+              </div>
+            </div>
+          </v-col>
+        </v-row>
+
+        <v-row dense class="mb-2">
+          <!-- d. SO Belum Ada MKB -->
+          <v-col cols="12" md="4">
+            <div class="manksi-panel content-panel fill-height">
+              <div class="panel-header panel-header--warning">
+                <IconFileAlert :size="14" :stroke-width="1.7" class="mr-1" />
+                SO Belum Ada MKB
+                <span v-if="gbSpkBelumMkbCount" class="badge-count ml-auto">{{
+                  gbSpkBelumMkbCount
+                }}</span>
+              </div>
+              <div class="panel-body">
+                <v-progress-linear
+                  v-if="isLoadingGudangBahan"
+                  indeterminate
+                  color="warning"
+                  height="2"
+                />
+                <template
+                  v-else-if="gbSpkBelumMkbList.length || isLoadingMoreGbMkb"
+                >
+                  <div class="pen-list" style="max-height: 320px">
+                    <div
+                      v-for="s in gbSpkBelumMkbList"
+                      :key="s.Nomor"
+                      class="pen-item"
+                      :class="
+                        s.SisaHari < 0
+                          ? 'umur-danger'
+                          : s.SisaHari <= 3
+                            ? 'umur-warn'
+                            : ''
+                      "
+                      style="cursor: pointer"
+                      @click="
+                        router.push('/laporan/gudang-garmen/spk-belum-mkb')
+                      "
+                    >
+                      <div class="pen-item-top">
+                        <span class="pen-nomor">{{ s.Nomor }}</span>
+                        <span
+                          class="pen-age"
+                          :class="
+                            s.SisaHari < 0
+                              ? 'umur-danger'
+                              : s.SisaHari <= 3
+                                ? 'umur-warn'
+                                : 'umur-ok'
+                          "
+                        >
+                          {{ s.SisaHari < 0 ? "Lewat" : s.SisaHari + "h" }}
+                        </span>
+                      </div>
+                      <div class="pen-cus">{{ s.Nama }}</div>
+                      <div class="pen-ket">Dateline: {{ s.Dateline }}</div>
+                    </div>
+                    <div ref="gbMkbSentinelEl" class="pen-sentinel">
+                      <span v-if="isLoadingMoreGbMkb" class="pen-loading"
+                        >Memuat...</span
+                      >
+                      <span
+                        v-else-if="!gbMkbHasMore && gbSpkBelumMkbList.length"
+                        class="pen-end"
+                      >
+                        {{ gbSpkBelumMkbList.length }} SO ditampilkan
+                      </span>
+                    </div>
+                  </div>
+                </template>
+                <div v-else class="text-center text-grey py-3 text-caption">
+                  Semua SO bulan ini sudah ada MKB 🎉
+                </div>
+              </div>
+            </div>
+          </v-col>
+
+          <!-- e. MKA Belum Direalisasi -->
+          <v-col cols="12" md="4">
+            <div class="manksi-panel content-panel fill-height">
+              <div
+                class="panel-header"
+                style="
+                  background: #fff3e0;
+                  color: #e65100;
+                  border-bottom: 1px solid #ffe0b2;
+                "
+              >
+                <IconAlertTriangle
+                  :size="14"
+                  :stroke-width="1.7"
+                  class="mr-1"
+                />
+                MKA Belum Direalisasi
+                <span
+                  v-if="gbStokAccVsMkaCount"
+                  class="badge-count ml-auto"
+                  style="background: #e65100"
+                >
+                  {{ gbStokAccVsMkaCount }}
+                </span>
+              </div>
+              <div class="panel-body">
+                <v-progress-linear
+                  v-if="isLoadingGudangBahan"
+                  indeterminate
+                  color="warning"
+                  height="2"
+                />
+                <template
+                  v-else-if="gbStokAccVsMkaList.length || isLoadingMoreGbMka"
+                >
+                  <div class="gb-list" style="max-height: 320px">
+                    <div
+                      v-for="item in gbStokAccVsMkaList"
+                      :key="item.Kode"
+                      class="bk-row"
+                    >
+                      <div
+                        class="gb-row"
+                        style="cursor: pointer"
+                        @click="
+                          router.push('/laporan/gudang-garmen/stok-acc-vs-mka')
+                        "
+                      >
+                        <div
+                          class="gb-nama"
+                          :title="item.Nama"
+                          style="
+                            width: 150px;
+                            white-space: normal;
+                            line-height: 1.3;
+                          "
+                        >
+                          {{ item.Nama }}
+                        </div>
+                        <div class="gb-bar-wrap">
+                          <span class="pen-cus" style="flex: 1">
+                            Stok {{ fmtNum(item.StokAcc) }} / Kebutuhan
+                            {{ fmtNum(item.Mka) }} {{ item.Satuan }}
+                          </span>
+                          <span
+                            style="
+                              font-size: 10px;
+                              font-weight: 700;
+                              color: #e65100;
+                            "
+                          >
+                            Kurang {{ fmtNum(Math.abs(item.Free)) }}
+                          </span>
+                        </div>
+                      </div>
+                      <div class="bk-bahan-list">
+                        <div
+                          v-for="(s, i) in item.spkList"
+                          :key="i"
+                          class="bk-bahan-item"
+                        >
+                          <span class="bk-bahan-nama"
+                            >{{ s.NomorMka }} · {{ s.Spk }} —
+                            {{ s.NamaSpk }}</span
+                          >
+                          <span class="bk-bahan-kurang"
+                            >sisa {{ fmtNum(s.Sisa) }}</span
+                          >
+                        </div>
+                      </div>
+                    </div>
+                    <div ref="gbMkaSentinelEl" class="pen-sentinel">
+                      <span v-if="isLoadingMoreGbMka" class="pen-loading"
+                        >Memuat...</span
+                      >
+                      <span
+                        v-else-if="!gbMkaHasMore && gbStokAccVsMkaList.length"
+                        class="pen-end"
+                      >
+                        {{ gbStokAccVsMkaList.length }} item ditampilkan
+                      </span>
+                    </div>
+                  </div>
+                </template>
+                <div v-else class="text-center text-grey py-3 text-caption">
+                  Semua aksesoris tercukupi untuk kebutuhan MKA 🎉
+                </div>
+              </div>
+            </div>
+          </v-col>
+
+          <!-- c. PO Bahan Belum Datang -->
+          <v-col cols="12" md="4">
+            <div class="manksi-panel content-panel fill-height">
+              <div class="panel-header panel-header--teal">
+                <IconTruckDelivery
+                  :size="14"
+                  :stroke-width="1.7"
+                  class="mr-1"
+                />
+                PO Bahan Belum Datang
+                <span
+                  v-if="poBahanBelumDatangSummary.total"
+                  class="badge-count ml-auto"
+                  style="background: #00695c"
+                >
+                  {{ poBahanBelumDatangSummary.total }}
+                </span>
+              </div>
+              <div class="panel-body">
+                <v-progress-linear
+                  v-if="isLoadingGudangBahan"
+                  indeterminate
+                  color="teal"
+                  height="2"
+                />
+                <template
+                  v-else-if="poBahanBelumDatangList.length || isLoadingMorePbd"
+                >
+                  <div class="pen-list" style="max-height: 320px">
+                    <div
+                      v-for="po in poBahanBelumDatangList"
+                      :key="po.Nomor"
+                      class="pen-item"
+                      :class="
+                        po.Status === 'OPEN' ? 'umur-danger' : 'umur-warn'
+                      "
+                    >
+                      <div class="pen-item-top">
+                        <span class="pen-nomor">{{ po.Nomor }}</span>
+                        <span
+                          class="pen-age"
+                          :class="
+                            po.Status === 'OPEN' ? 'umur-danger' : 'umur-warn'
+                          "
+                        >
+                          {{ po.Status }}
+                        </span>
+                      </div>
+                      <div class="pen-cus">{{ po.Supplier || "-" }}</div>
+                      <div class="pen-ket">
+                        {{ po.Tanggal }} · {{ po.UmurHari }}h
+                      </div>
+                    </div>
+                    <div ref="pbdSentinelEl" class="pen-sentinel">
+                      <span v-if="isLoadingMorePbd" class="pen-loading"
+                        >Memuat...</span
+                      >
+                      <span
+                        v-else-if="!pbdHasMore && poBahanBelumDatangList.length"
+                        class="pen-end"
+                      >
+                        {{ poBahanBelumDatangList.length }} PO ditampilkan
+                      </span>
+                    </div>
+                  </div>
+                </template>
+                <div v-else class="text-center text-grey py-3 text-caption">
+                  Semua PO bahan sudah selesai diterima 🎉
+                </div>
+              </div>
+            </div>
+          </v-col>
+        </v-row>
+
         <!-- Panel row 1: Buffer alert + Top stok -->
         <v-row dense class="mb-2">
           <!-- Stok di bawah buffer -->
@@ -5851,6 +6674,133 @@ const sisaClass = (item: any) => {
           </v-col>
         </v-row>
 
+        <!-- ── Panel: Monitoring Buffer Bahan & Aksesoris KAOSAN ── -->
+        <v-row dense class="mb-2">
+          <v-col cols="12">
+            <div class="manksi-panel content-panel">
+              <div
+                class="panel-header"
+                style="
+                  background: #fff8e1;
+                  color: #854f0b;
+                  border-bottom: 1px solid #ffe0b2;
+                "
+              >
+                <IconAlertTriangle
+                  :size="14"
+                  :stroke-width="1.7"
+                  class="mr-1"
+                />
+                Buffer Bahan &amp; Aksesoris KAOSAN
+                <span class="panel-header-sub ml-1">(di bawah buffer)</span>
+                <span
+                  v-if="bufferKaosanSummary.total"
+                  class="badge-count ml-auto"
+                  style="background: #854f0b"
+                >
+                  {{ bufferKaosanSummary.total }} item
+                </span>
+              </div>
+              <div class="panel-body">
+                <v-progress-linear
+                  v-if="isLoadingGudangBahan"
+                  indeterminate
+                  color="warning"
+                  height="2"
+                />
+                <template
+                  v-else-if="bufferKaosanList.length || isLoadingMoreBk"
+                >
+                  <div class="gb-list" style="max-height: 320px">
+                    <div
+                      v-for="item in bufferKaosanList"
+                      :key="item.Tipe + item.Kode"
+                      class="gb-row"
+                    >
+                      <div
+                        class="gb-nama"
+                        :title="item.Nama"
+                        style="width: 200px"
+                      >
+                        <span
+                          style="
+                            font-size: 9px;
+                            font-weight: 700;
+                            padding: 0 4px;
+                            border-radius: 2px;
+                            margin-right: 4px;
+                          "
+                          :style="{
+                            background:
+                              item.Tipe === 'BAHAN' ? '#e3f2fd' : '#f3e5f5',
+                            color:
+                              item.Tipe === 'BAHAN' ? '#1565c0' : '#6a1b9a',
+                          }"
+                        >
+                          {{ item.Tipe === "BAHAN" ? "BHN" : "ACC" }}
+                        </span>
+                        {{ item.Nama }}
+                      </div>
+                      <div class="gb-bar-wrap">
+                        <div class="gb-bar-track">
+                          <div
+                            class="gb-bar-fill"
+                            :style="{
+                              width:
+                                bufferPct(item.StokAkhir, item.Buffer) + '%',
+                              background: bufferColor(
+                                bufferPct(item.StokAkhir, item.Buffer),
+                              ),
+                            }"
+                          />
+                        </div>
+                        <span
+                          class="gb-bar-val"
+                          :style="{
+                            color: bufferColor(
+                              bufferPct(item.StokAkhir, item.Buffer),
+                            ),
+                          }"
+                        >
+                          {{ fmtNum(item.StokAkhir) }} /
+                          {{ fmtNum(item.Buffer) }} {{ item.Satuan }}
+                        </span>
+                      </div>
+                      <span
+                        class="gb-pct"
+                        :style="{
+                          color: bufferColor(
+                            bufferPct(item.StokAkhir, item.Buffer),
+                          ),
+                        }"
+                      >
+                        {{ bufferPct(item.StokAkhir, item.Buffer) }}%
+                      </span>
+                    </div>
+                    <div
+                      ref="bkSentinelEl"
+                      style="padding: 6px; text-align: center"
+                    >
+                      <span v-if="isLoadingMoreBk" class="pen-loading"
+                        >Memuat...</span
+                      >
+                      <span
+                        v-else-if="!bkHasMore && bufferKaosanList.length"
+                        class="pen-end"
+                      >
+                        {{ bufferKaosanList.length }} item ditampilkan
+                      </span>
+                    </div>
+                  </div>
+                </template>
+                <div v-else class="text-center text-grey py-3 text-caption">
+                  Semua bahan &amp; aksesoris KAOSAN di atas buffer 🎉
+                </div>
+              </div>
+            </div>
+          </v-col>
+        </v-row>
+
         <!-- ── Panel: Stok Aksesoris vs Kebutuhan MKA ── -->
         <v-row dense class="mb-2">
           <v-col cols="12">
@@ -5964,6 +6914,109 @@ const sisaClass = (item: any) => {
                 </template>
                 <div v-else class="text-center text-grey py-3 text-caption">
                   Semua aksesoris tercukupi untuk kebutuhan MKA bulan ini 🎉
+                </div>
+              </div>
+            </div>
+          </v-col>
+        </v-row>
+
+        <!-- ── Panel: Stok Bebas (Free Stock) ── -->
+        <v-row dense class="mb-2">
+          <v-col cols="12">
+            <div class="manksi-panel content-panel">
+              <div
+                class="panel-header"
+                style="
+                  background: #ffebee;
+                  color: #c62828;
+                  border-bottom: 1px solid #ffcdd2;
+                "
+              >
+                <IconAlertTriangle
+                  :size="14"
+                  :stroke-width="1.7"
+                  class="mr-1"
+                />
+                Stok Bebas (Free Stock)
+                <span class="panel-header-sub ml-1"
+                  >(Stok − kebutuhan MKB belum realisasi)</span
+                >
+                <span
+                  v-if="stokBebasSummary.total"
+                  class="badge-count ml-auto"
+                  style="background: #c62828"
+                >
+                  {{ stokBebasSummary.total }} kekurangan
+                </span>
+              </div>
+              <div class="panel-body">
+                <v-progress-linear
+                  v-if="isLoadingGudangBahan"
+                  indeterminate
+                  color="red"
+                  height="2"
+                />
+                <template v-else-if="stokBebasList.length || isLoadingMoreSb">
+                  <div
+                    style="
+                      overflow-x: auto;
+                      max-height: 320px;
+                      overflow-y: auto;
+                    "
+                  >
+                    <table class="gb-tbl">
+                      <thead>
+                        <tr>
+                          <th>Nama bahan</th>
+                          <th class="tr">Stok</th>
+                          <th class="tr">Kebutuhan MKB</th>
+                          <th class="tr">Free</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr v-for="item in stokBebasList" :key="item.Kode">
+                          <td
+                            :title="item.Nama"
+                            style="
+                              max-width: 220px;
+                              overflow: hidden;
+                              text-overflow: ellipsis;
+                              white-space: nowrap;
+                            "
+                          >
+                            {{ item.Nama || item.Kode }}
+                          </td>
+                          <td class="tr">{{ fmtNum(item.Stok) }}</td>
+                          <td class="tr" style="color: #e65100">
+                            {{ fmtNum(item.MkbBelumRealisasi) }}
+                          </td>
+                          <td
+                            class="tr"
+                            style="font-weight: 700; color: #c62828"
+                          >
+                            {{ fmtNum(item.Free) }}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                    <div
+                      ref="sbSentinelEl"
+                      style="padding: 6px; text-align: center"
+                    >
+                      <span v-if="isLoadingMoreSb" class="pen-loading"
+                        >Memuat...</span
+                      >
+                      <span
+                        v-else-if="!sbHasMore && stokBebasList.length"
+                        class="pen-end"
+                      >
+                        {{ stokBebasList.length }} bahan ditampilkan
+                      </span>
+                    </div>
+                  </div>
+                </template>
+                <div v-else class="text-center text-grey py-3 text-caption">
+                  Tidak ada bahan dengan stok bebas negatif 🎉
                 </div>
               </div>
             </div>

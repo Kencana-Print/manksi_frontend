@@ -99,6 +99,10 @@ const masterHeaders = computed(() => {
   return h;
 });
 
+const baseBrowseRef = ref<InstanceType<typeof BaseBrowse> | null>(null);
+const getExportSource = () =>
+  baseBrowseRef.value?.getFilteredItems?.() ?? items.value ?? [];
+
 const { items, isLoading, canExport, fetchData } = useBrowse({
   menuId,
   fetchApi: async () => {
@@ -127,7 +131,6 @@ watch(
 const expandedRows = ref<any[]>([]);
 const detailData = ref<Record<string, any[]>>({});
 const detailLoading = ref<Record<string, boolean>>({});
-const visibleDetailRows = ref<Record<string, any[]>>({});
 
 const onUpdateExpanded = async (val: any[]) => {
   expandedRows.value = val;
@@ -153,29 +156,6 @@ const fmtNum = (val: any, d = 2) =>
   });
 
 const formatBackendDate = (v?: string) => (v ? v.replace(/-/g, "/") : "-");
-
-const detailSubtotal = (spk: string) => {
-  const rows = visibleDetailRows.value[spk] ?? detailData.value[spk] ?? [];
-  const keyword = filters.value.namaBahan.trim().toLowerCase();
-  const matched = keyword
-    ? rows.filter(
-        (d: any) =>
-          (d.NamaBahan || "").toLowerCase().includes(keyword) ||
-          (d.KodeBahan || "").toLowerCase().includes(keyword),
-      )
-    : rows;
-
-  return {
-    netMinta: matched.reduce(
-      (s: number, d: any) => s + Number(d.NetMinta || 0),
-      0,
-    ),
-    totalLhk: matched.reduce(
-      (s: number, d: any) => s + Number(d.BeratLhk || 0),
-      0,
-    ),
-  };
-};
 
 // ── Export master ──
 const isExporting = ref(false);
@@ -288,7 +268,12 @@ const onExportDetail = async () => {
       filters.value.spk,
       filters.value.isMap,
     );
-    const rawRows = res.data.data || [];
+    let rawRows = res.data.data || [];
+
+    // Batasi ke Spk yang sedang tertampil (sesuai search/filter kolom BaseBrowse)
+    const visibleSpks = new Set(getExportSource().map((r: any) => r.Spk));
+    rawRows = rawRows.filter((r: any) => visibleSpks.has(r.Spk));
+
     if (!rawRows.length) {
       toast.warning("Tidak ada data detail pada filter ini.");
       return;
@@ -406,6 +391,7 @@ onMounted(fetchData);
 
 <template>
   <BaseBrowse
+    ref="baseBrowseRef"
     title="SPK vs Realisasi Permintaan vs LHK Cutting"
     :menu-id="menuId"
     :icon="IconListCheck"
@@ -597,7 +583,8 @@ onMounted(fetchData);
                 : []),
             ]"
             :items="detailData[item.Spk] || []"
-            @update:filteredItems="(v) => (visibleDetailRows[item.Spk] = v)"
+            show-total
+            total-label="Total"
           >
             <template #item.NoMinta="{ item: d }">
               <span class="font-weight-bold text-primary">{{ d.NoMinta }}</span>
@@ -646,22 +633,10 @@ onMounted(fetchData);
             <template #item.Supplier="{ item: d }">{{
               d.Supplier || "-"
             }}</template>
+            <template #total.Babaran="{ value }">{{
+              fmtNum(value, 4)
+            }}</template>
           </DetailFilterTable>
-
-          <!-- Subtotal — sekarang ikut baris yang tampil setelah filter kolom -->
-          <div v-if="detailData[item.Spk]?.length" class="dtl-subtotal-bar">
-            <span class="font-weight-bold">
-              Subtotal{{
-                filters.namaBahan ? ` ("${filters.namaBahan}")` : ""
-              }}:
-            </span>
-            <span class="font-weight-bold ml-2">
-              Net Minta: {{ fmtNum(detailSubtotal(item.Spk).netMinta) }}
-            </span>
-            <span class="font-weight-bold ml-4" style="color: #e65100">
-              Total LHK: {{ fmtNum(detailSubtotal(item.Spk).totalLhk) }} kg
-            </span>
-          </div>
         </template>
       </div>
     </template>
@@ -814,22 +789,5 @@ onMounted(fetchData);
   font-size: 10px;
   color: #9e6b00;
   font-style: italic;
-}
-
-.dtl-subtotal td {
-  background: #eceff1;
-  border-top: 2px solid #90a4ae;
-  padding: 6px 10px;
-}
-.dtl-subtotal-bar {
-  display: flex;
-  align-items: center;
-  background: #eceff1;
-  border: 1px solid #cfd8dc;
-  border-top: 2px solid #90a4ae;
-  border-radius: 0 0 6px 6px;
-  padding: 6px 12px;
-  font-size: 11px;
-  margin-top: -1px;
 }
 </style>

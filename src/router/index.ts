@@ -3273,6 +3273,52 @@ const router = createRouter({
         menuId: "255",
       },
     },
+    {
+      path: "/piutang/pengajuan-dana",
+      name: "PengajuanDanaBrowse",
+      component: () => import("@/views/piutang/PengajuanDanaView.vue"),
+      meta: {
+        title: "Pengajuan Dana",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "177",
+      },
+    },
+    // {
+    //   path: "/piutang/pengajuan-dana/create",
+    //   name: "PengajuanDanaCreate",
+    //   component: () => import("@/views/piutang/PengajuanDanaFormView.vue"),
+    //   meta: {
+    //     title: "Tambah Pengajuan Dana",
+    //     layout: "DefaultLayout",
+    //     requiresAuth: true,
+    //     menuId: "177",
+    //     browseRoute: "PengajuanDanaBrowse",
+    //   },
+    // },
+    // {
+    //   path: "/piutang/pengajuan-dana/edit/:nomor",
+    //   name: "PengajuanDanaEdit",
+    //   component: () => import("@/views/piutang/PengajuanDanaFormView.vue"),
+    //   meta: {
+    //     title: "Ubah Pengajuan Dana",
+    //     layout: "DefaultLayout",
+    //     requiresAuth: true,
+    //     menuId: "177",
+    //     browseRoute: "PengajuanDanaBrowse",
+    //   },
+    // },
+    // {
+    //   path: "/piutang/pengajuan-dana/print/:nomor",
+    //   name: "PengajuanDanaPrint",
+    //   component: () => import("@/views/piutang/PengajuanDanaPrintView.vue"),
+    //   meta: {
+    //     title: "Cetak Pengajuan Dana",
+    //     layout: "BlankLayout",
+    //     requiresAuth: true,
+    //     menuId: "177",
+    //   },
+    // },
 
     // ── Laporan ───────────────────────────────────────────────────
     {

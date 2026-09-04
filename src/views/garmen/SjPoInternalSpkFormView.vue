@@ -289,11 +289,10 @@ const showKelompokTujuan = computed(
 const loadKelompokOptions = async () => {
   try {
     const res = await sjPoInternalSpkFormService.getKelompokOptions(
-      formData.value.jasaNama,
+      formData.value.liniAsalNama,
       formData.value.gdgAsalKode,
     );
     kelompokOptions.value = res.data.data || [];
-    // replikasi cbKelompok.ItemIndex:=0 — auto-pilih opsi pertama
     if (kelompokOptions.value.length > 0 && !formData.value.kelompok) {
       formData.value.kelompok = kelompokOptions.value[0];
     }
@@ -397,6 +396,7 @@ const onLiniAsalBlur = async () => {
     );
     formData.value.liniAsal = res.data.data.kode;
     formData.value.liniAsalNama = res.data.data.nama;
+    await loadKelompokOptions(); // ⬅ baru
   } catch (e: any) {
     toast.error(e.response?.data?.message || "Kode Lini tidak ditemukan.");
     formData.value.liniAsal = "";
@@ -413,7 +413,7 @@ const onLiniTujuanBlur = async () => {
   try {
     const res = await sjPoInternalSpkFormService.checkGudangProduksi(
       kode,
-      formData.value.gdgAsalKode,
+      formData.value.gdgTujuanKode,
     );
     formData.value.liniTujuan = res.data.data.kode;
     formData.value.liniTujuanNama = res.data.data.nama;
@@ -425,9 +425,10 @@ const onLiniTujuanBlur = async () => {
     await loadKelompokTujuanOptions();
   }
 };
-const onLiniAsalSelected = (item: any) => {
+const onLiniAsalSelected = async (item: any) => {
   formData.value.liniAsal = item.Kode || item.gdgp_kode;
   formData.value.liniAsalNama = item.Nama || item.gdgp_nama;
+  await loadKelompokOptions(); // ⬅ baru
 };
 const onLiniTujuanSelected = async (item: any) => {
   formData.value.liniTujuan = item.Kode || item.gdgp_kode;
@@ -1331,7 +1332,7 @@ const rp = (val: any) =>
   />
   <GudangProduksiSearchModal
     v-model="showLiniTujuanModal"
-    :cabang="formData.gdgAsalKode"
+    :cabang="formData.gdgTujuanKode"
     @selected="onLiniTujuanSelected"
   />
   <SupplierSearchModal

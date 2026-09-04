@@ -151,14 +151,31 @@ const onUpdateExpanded = async (newExpanded: any[]) => {
   }
 };
 
-const onAdd = () => router.push("/pembelian/mkb/create");
+const onAdd = () => {
+  const sel = selected.value?.[0];
+  if (sel?.RowType === "SO_PENDING") {
+    router.push({
+      path: "/pembelian/mkb/create",
+      query: { spk: sel.Nomor },
+    });
+    return;
+  }
+  router.push("/pembelian/mkb/create");
+};
 const onEdit = (item: any) => {
-  // DOUBLE ENCODE: "MKB/1356/2026" -> "MKB%252F1356%252F2026"
-  // Vue router akan membacanya sebagai SATU parameter utuh
+  if (item.Nomor && item.RowType === "SO_PENDING") {
+    router.push({ path: "/pembelian/mkb/create", query: { spk: item.Nomor } });
+    return;
+  }
   const safeNomor = encodeURIComponent(encodeURIComponent(item.Nomor));
   router.push(`/pembelian/mkb/edit/${safeNomor}`);
 };
+
 const onDelete = async (item: any) => {
+  if (item.RowType === "SO_PENDING") {
+    toast.warning("Ini SO yang belum ada MKB — belum ada data untuk dihapus.");
+    return;
+  }
   try {
     await mkbService.deleteData(item.Nomor, item.Tanggal);
     toast.success("MKB berhasil dihapus.");
@@ -423,6 +440,14 @@ const submitPin = async () => {
 
 const rowPropsFn = (data: any) => {
   const item = data.item?.raw || data.item;
+
+  if (item.RowType === "SO_PENDING") {
+    return {
+      style:
+        "color: #c62828 !important; font-weight: 700; background: #ffebee;",
+    };
+  }
+
   const ket = item.Keterangan || "";
   const classes: string[] = ["font-weight-bold"];
 

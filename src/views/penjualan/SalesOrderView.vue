@@ -235,37 +235,37 @@ const tailHeadersFront = [
   { title: "No Penawaran", key: "NoPenawaran", width: "130px" },
   { title: "MAP", key: "MAP", width: "130px" },
   { title: "Repeat", key: "Repeat", width: "80px" },
-  { title: "Potong", key: "Potong", width: "80px", align: "right" },
-  { title: "Qc Potong", key: "QcPotong", width: "80px", align: "right" },
-  { title: "Bordir", key: "Bordir", width: "80px", align: "right" },
-  { title: "Cetak", key: "Cetak", width: "80px", align: "right" },
-  { title: "Qc Cetak", key: "QcCetak", width: "80px", align: "right" },
-  { title: "DC", key: "DC", width: "80px", align: "right" },
-  { title: "Jahit", key: "Jahit", width: "80px", align: "right" },
-  { title: "Lipat", key: "Lipat", width: "80px", align: "right" },
-  { title: "Jadi", key: "Jadi", width: "80px", align: "right" },
-  { title: "Kurang Jadi", key: "Kurang_Jadi", width: "90px", align: "right" },
-  {
-    title: "Kurang Potong",
-    key: "Kurang_Potong",
-    width: "90px",
-    align: "right",
-  },
-  {
-    title: "Kurang Bordir",
-    key: "Kurang_Bordir",
-    width: "90px",
-    align: "right",
-  },
-  { title: "Kurang Cetak", key: "Kurang_Cetak", width: "90px", align: "right" },
-  {
-    title: "Kurang Qc Cetak",
-    key: "Kurang_QcCetak",
-    width: "110px",
-    align: "right",
-  },
-  { title: "Kurang Jahit", key: "Kurang_Jahit", width: "90px", align: "right" },
-  { title: "Kurang Lipat", key: "Kurang_Lipat", width: "90px", align: "right" },
+  // { title: "Potong", key: "Potong", width: "80px", align: "right" },
+  // { title: "Qc Potong", key: "QcPotong", width: "80px", align: "right" },
+  // { title: "Bordir", key: "Bordir", width: "80px", align: "right" },
+  // { title: "Cetak", key: "Cetak", width: "80px", align: "right" },
+  // { title: "Qc Cetak", key: "QcCetak", width: "80px", align: "right" },
+  // { title: "DC", key: "DC", width: "80px", align: "right" },
+  // { title: "Jahit", key: "Jahit", width: "80px", align: "right" },
+  // { title: "Lipat", key: "Lipat", width: "80px", align: "right" },
+  // { title: "Jadi", key: "Jadi", width: "80px", align: "right" },
+  // { title: "Kurang Jadi", key: "Kurang_Jadi", width: "90px", align: "right" },
+  // {
+  //   title: "Kurang Potong",
+  //   key: "Kurang_Potong",
+  //   width: "90px",
+  //   align: "right",
+  // },
+  // {
+  //   title: "Kurang Bordir",
+  //   key: "Kurang_Bordir",
+  //   width: "90px",
+  //   align: "right",
+  // },
+  // { title: "Kurang Cetak", key: "Kurang_Cetak", width: "90px", align: "right" },
+  // {
+  //   title: "Kurang Qc Cetak",
+  //   key: "Kurang_QcCetak",
+  //   width: "110px",
+  //   align: "right",
+  // },
+  // { title: "Kurang Jahit", key: "Kurang_Jahit", width: "90px", align: "right" },
+  // { title: "Kurang Lipat", key: "Kurang_Lipat", width: "90px", align: "right" },
   { title: "Aktif", key: "Aktif", width: "60px", align: "center" },
   { title: "Acc", key: "Acc", width: "60px", align: "center" },
   { title: "Acc H0", key: "AccH0", width: "60px", align: "center" },
@@ -335,7 +335,13 @@ const rowPropsFn = (data: any) => {
   let style = "";
   const pesanKirimSama = Number(item.Pesan) === Number(item.Kirim);
 
-  if (item.HasSj && pesanKirimSama) {
+  // ⬅ Pending selalu menang, apapun status SpkPpic/HasSj-nya
+  if (item.Pending !== "NORMAL") {
+    style =
+      item.AccPending === "ACC"
+        ? "color: #e65100 !important;"
+        : "color: #ce93d8 !important;";
+  } else if (item.HasSj && pesanKirimSama) {
     style = "color: #212121 !important;";
   } else if (item.SpkPpic && !pesanKirimSama) {
     style = "color: #1a237e !important;";
@@ -354,15 +360,7 @@ const rowPropsFn = (data: any) => {
       }
     }
 
-    // ⬅ FIX: pakai style inline + !important, bukan class — supaya
-    // dijamin menang melawan warna default sel tabel Vuetify, sama
-    // seperti tiga branch di atas. Sebelumnya pakai class biasa
-    // (text-purple-lighten-1) yang kalah specificity dan jatuh ke
-    // warna hitam default v-data-table.
-    if (item.Pending !== "NORMAL") {
-      if (item.AccPending === "N") style = "color: #d400f7 !important;";
-      else if (item.AccPending === "ACC") style = "color: #e65100 !important;";
-    } else if (item.Status === "Open") {
+    if (item.Status === "Open") {
       style = "color: #e53935 !important;";
     }
   }
@@ -953,29 +951,6 @@ const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
 // selalu sinkron dengan tabel yang tampil di layar.
 const isExporting = ref(false);
 
-// Kolom numerik yang perlu format ribuan rapi di Excel
-const NUMERIC_KEYS = new Set([
-  "Harga",
-  "Pesan",
-  "Kirim",
-  "Kurang",
-  "Potong",
-  "QcPotong",
-  "Bordir",
-  "Cetak",
-  "QcCetak",
-  "DC",
-  "Jahit",
-  "Lipat",
-  "Jadi",
-  "Kurang_Jadi",
-  "Kurang_Potong",
-  "Kurang_Bordir",
-  "Kurang_Cetak",
-  "Kurang_QcCetak",
-  "Kurang_Jahit",
-  "Kurang_Lipat",
-]);
 // Kolom ukuran fisik (bisa berupa pecahan seperti 0,9) — format
 // beda dari NUMERIC_KEYS di atas supaya angka desimalnya tidak
 // dibulatkan saat ditampilkan di Excel
@@ -999,11 +974,7 @@ const onExport = async () => {
         key: h.key,
         width: h.width ? Math.max(10, Math.round(parseInt(h.width) / 7)) : 16,
         align: h.align ?? "left",
-        numFmt: NUMERIC_KEYS.has(h.key)
-          ? "#,##0"
-          : DECIMAL_KEYS.has(h.key)
-            ? "#,##0.##"
-            : undefined,
+        numFmt: DECIMAL_KEYS.has(h.key) ? "#,##0.##" : undefined,
       }));
 
     const rows = dataToExport.map((it: any) => {
@@ -1023,7 +994,7 @@ const onExport = async () => {
           val = val ? formatTanggal(val) : "";
         } else if (["Created", "TglApproveCmo"].includes(c.key)) {
           val = val ? formatTanggalJam(val) : "";
-        } else if (NUMERIC_KEYS.has(c.key) || DECIMAL_KEYS.has(c.key)) {
+        } else if (DECIMAL_KEYS.has(c.key)) {
           val = Number(val) || 0;
         }
         row[c.key] = val ?? "";
@@ -1266,31 +1237,6 @@ const onExport = async () => {
       <span v-else class="cetak-badge badge-neutral">
         Sudah Dicetak {{ item.CetakCount }}x
       </span>
-    </template>
-
-    <template
-      v-for="col in [
-        'Potong',
-        'QcPotong',
-        'Bordir',
-        'Cetak',
-        'QcCetak',
-        'DC',
-        'Jahit',
-        'Lipat',
-        'Jadi',
-        'Kurang_Jadi',
-        'Kurang_Potong',
-        'Kurang_Bordir',
-        'Kurang_Cetak',
-        'Kurang_QcCetak',
-        'Kurang_Jahit',
-        'Kurang_Lipat',
-      ]"
-      :key="col"
-      v-slot:[`item.${col}`]="{ item }"
-    >
-      {{ numFmt(item[col]) }}
     </template>
 
     <template #item.TglSpkPpic="{ item }">

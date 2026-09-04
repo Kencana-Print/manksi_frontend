@@ -3,18 +3,18 @@ import api from "@/services/api";
 export const invoiceProformaFormService = {
   getPerusahaanByKode: (kode: string) =>
     api.get(
-      `/penjualan/invoice-proforma/perusahaan/${encodeURIComponent(kode)}`,
+      `/penjualan/invoice-proforma/form/perusahaan/${encodeURIComponent(kode)}`,
     ),
 
   getCustomerByKode: (kode: string) =>
-    api.get(`/penjualan/invoice-proforma/customer/${encodeURIComponent(kode)}`),
+    api.get(
+      `/penjualan/invoice-proforma/form/customer/${encodeURIComponent(kode)}`,
+    ),
 
   getRekeningByNomor: (rekening: string, perushKode: string) =>
     api.get(
-      `/penjualan/invoice-proforma/rekening/${encodeURIComponent(rekening)}`,
-      {
-        params: { perushKode },
-      },
+      `/penjualan/invoice-proforma/form/rekening/${encodeURIComponent(rekening)}`,
+      { params: { perushKode } },
     ),
 
   getBarangByKode: (kode: string, perushKode: string, cusKode: string) =>

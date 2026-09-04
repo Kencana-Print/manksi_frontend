@@ -32,6 +32,13 @@ const tabsStore = useTabsStore();
 const route = useRoute();
 const router = useRouter();
 
+const showQtyWarning = (warning: any) => {
+  if (!warning) return;
+  toast.info(
+    `Total Qty periode ini sudah ${Number(warning.totalSetelah).toLocaleString("id-ID")}, melebihi batas ${Number(warning.batas).toLocaleString("id-ID")}.`,
+  );
+};
+
 const pad = (n: number) => String(n).padStart(2, "0");
 const toLocalDate = (d: Date) =>
   `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -131,6 +138,9 @@ const onManualBlur = () => {
   if (!header.pjw_nomor) return;
   emitFieldBlur(header.pjw_nomor, 0, "manual-add");
 };
+
+const isManualRow = (d: DetailRow) =>
+  !d.SoNomor && !d.NomorPraOrder && !d.MapNomor && d.Sumber === "MANUAL";
 
 // ── Role permissions ────────────────────────────────────────────
 const isAdmin = computed(() => authStore.user?.kode?.toUpperCase() === "ADMIN");
@@ -439,6 +449,7 @@ const tarikSo = async () => {
         rowInput,
       );
       pushRowFromServer(saveRes.data.data.pjwd_id, rowInput);
+      showQtyWarning(saveRes.data.data.warning);
       ditambah++;
     }
     toast.success(`${ditambah} SO baru ditambahkan ke daftar.`);
@@ -488,6 +499,7 @@ const tarikPraOrder = async () => {
         rowInput,
       );
       pushRowFromServer(saveRes.data.data.pjwd_id, rowInput);
+      showQtyWarning(saveRes.data.data.warning);
       ditambah++;
     }
     toast.success(`${ditambah} rencana Pra Order ditambahkan ke daftar.`);
@@ -536,6 +548,7 @@ const tarikMap = async () => {
         rowInput,
       );
       pushRowFromServer(saveRes.data.data.pjwd_id, rowInput);
+      showQtyWarning(saveRes.data.data.warning);
       ditambah++;
     }
     toast.success(`${ditambah} MAP baru ditambahkan ke daftar.`);
@@ -604,6 +617,7 @@ const tambahManual = async () => {
       rowInput,
     );
     pushRowFromServer(saveRes.data.data.pjwd_id, rowInput);
+    showQtyWarning(saveRes.data.data.warning);
     manualSoNomor.value = "";
     toast.success(
       `${isMapNomor ? "MAP" : "SO"} ${rowInput.SoNomor || rowInput.MapNomor} ditambahkan.`,
@@ -618,6 +632,50 @@ const tambahManual = async () => {
   }
 };
 
+const isManualAddLoading = ref(false);
+const tambahBarisManual = async () => {
+  if (!header.pjw_cab) return toast.warning("Pilih Cabang terlebih dahulu.");
+  isManualAddLoading.value = true;
+  try {
+    const rowInput = {
+      SoNomor: "",
+      NomorPraOrder: "",
+      MapNomor: "",
+      Sumber: "MANUAL",
+      Nama: "Baris Baru",
+      Tanggal: "",
+      Pesan: 0,
+      Kirim: 0,
+      Kurang: 0,
+      Rencana: 0,
+      PermintaanKirim: "",
+      NamaManual: "Baris Baru",
+      PesanManual: 0,
+      KirimManual: 0,
+      RealisasiManual: 0,
+    };
+    const saveRes = await penjadwalanPpicService.addDetailRow(
+      header.pjw_nomor,
+      rowInput,
+    );
+    pushRowFromServer(saveRes.data.data.pjwd_id, rowInput);
+    toast.success("Baris manual ditambahkan — silakan isi datanya.");
+  } catch (e: any) {
+    toast.error(e.response?.data?.message || "Gagal menambah baris manual.");
+  } finally {
+    isManualAddLoading.value = false;
+  }
+};
+
+const onManualNamaChange = (row: DetailRow) =>
+  onDetailFieldChange(row, "Nama", "pjwd_nama_manual");
+const onManualPesanChange = (row: DetailRow) =>
+  onDetailFieldChange(row, "Pesan", "pjwd_pesan_manual");
+const onManualKirimChange = (row: DetailRow) =>
+  onDetailFieldChange(row, "Kirim", "pjwd_kirim_manual");
+const onManualRealisasiChange = (row: DetailRow) =>
+  onDetailFieldChange(row, "Realisasi", "pjwd_realisasi_manual");
+
 // ═══════════════════════════════════════════════════════════════
 // UPDATE FIELD PER-BARIS — debounced auto-save
 // ═══════════════════════════════════════════════════════════════
@@ -627,27 +685,36 @@ const onDetailFieldChange = (
   dbField: string,
 ) => {
   if (!row.PjwdId) return;
-  const previousValue = (row as any)[field]; // ⬅ snapshot sebelum debounce jalan
+  const previousValue = (row as any)[field];
   debounce(
     `row:${row.PjwdId}:${dbField}`,
     async () => {
       try {
-        await penjadwalanPpicService.updateDetailField(
+        const res = await penjadwalanPpicService.updateDetailField(
           header.pjw_nomor,
           row.PjwdId!,
           dbField,
           (row as any)[field],
         );
+        showQtyWarning(res.data?.data?.warning);
       } catch (e: any) {
         toast.error(e.response?.data?.message || "Gagal menyimpan perubahan.");
-        (row as any)[field] = previousValue; // ⬅ revert kalau ditolak server
+        (row as any)[field] = previousValue;
       }
     },
     700,
   );
 };
 
-const onRencanaInput = (row: DetailRow, raw: string) => {
+const moveCursorToEnd = (e: Event) => {
+  const input = e.target as HTMLInputElement;
+  nextTick(() => {
+    const len = input.value.length;
+    input.setSelectionRange(len, len);
+  });
+};
+
+const onRencanaInput = (row: DetailRow, raw: string, e: Event) => {
   const val = raw.replace(/[^0-9]/g, "");
   row.Rencana = val ? Number(val) : 0;
   if (row.StatusPermintaan !== "NECESSARY") {
@@ -655,6 +722,23 @@ const onRencanaInput = (row: DetailRow, raw: string) => {
     onDetailFieldChange(row, "StatusPermintaan", "pjwd_status_permintaan");
   }
   onDetailFieldChange(row, "Rencana", "pjwd_rencana");
+  moveCursorToEnd(e);
+};
+
+const onManualPesanInput = (row: DetailRow, raw: string, e: Event) => {
+  const val = raw.replace(/[^0-9]/g, "");
+  row.Pesan = val ? Number(val) : 0;
+  row.Kurang = Math.max(row.Pesan - row.Kirim, 0);
+  onManualPesanChange(row);
+  moveCursorToEnd(e);
+};
+
+const onManualKirimInput = (row: DetailRow, raw: string, e: Event) => {
+  const val = raw.replace(/[^0-9]/g, "");
+  row.Kirim = val ? Number(val) : 0;
+  row.Kurang = Math.max(row.Pesan - row.Kirim, 0);
+  onManualKirimChange(row);
+  moveCursorToEnd(e);
 };
 
 const onPermintaanKirimChange = (row: DetailRow) =>
@@ -665,6 +749,90 @@ const onKesepakatanChange = (row: DetailRow) =>
   onDetailFieldChange(row, "Kesepakatan", "pjwd_tgl_kesepakatan");
 const onKetKesepakatanChange = (row: DetailRow) =>
   onDetailFieldChange(row, "KetKesepakatan", "pjwd_ket_kesepakatan");
+const showMoveDialog = ref(false);
+const moveTargetInfo = ref<any>(null);
+const moveRowRef = ref<DetailRow | null>(null);
+const movePendingTanggal = ref("");
+const previousKesepakatan = reactive<Record<number, string>>({});
+const isMoving = ref(false);
+
+const onKesepakatanFocus = (row: DetailRow) => {
+  if (row.PjwdId) previousKesepakatan[row.PjwdId] = row.Kesepakatan;
+  onFieldFocus(row, "pjwd_tgl_kesepakatan");
+};
+
+const onKesepakatanBlur = async (row: DetailRow) => {
+  onFieldBlur(row, "pjwd_tgl_kesepakatan");
+  if (!row.PjwdId || !row.Kesepakatan) return;
+
+  const prev = previousKesepakatan[row.PjwdId];
+  if (prev === row.Kesepakatan) return; // tidak berubah, tidak perlu apa-apa
+
+  // Masih dalam rentang periode saat ini → simpan seperti biasa
+  if (
+    row.Kesepakatan >= header.pjw_tgl1 &&
+    row.Kesepakatan <= header.pjw_tgl2
+  ) {
+    onKesepakatanChange(row);
+    return;
+  }
+
+  // Di luar periode saat ini → cek dulu ke mana harus pindah
+  try {
+    const res = await penjadwalanPpicService.checkTargetPeriod(
+      row.PjwdId,
+      row.Kesepakatan,
+    );
+    const info = res.data.data;
+    if (!info.needMove) {
+      onKesepakatanChange(row);
+      return;
+    }
+    moveTargetInfo.value = info;
+    moveRowRef.value = row;
+    movePendingTanggal.value = row.Kesepakatan;
+    showMoveDialog.value = true;
+  } catch (e: any) {
+    toast.error(e.response?.data?.message || "Gagal mengecek periode tujuan.");
+    row.Kesepakatan = prev;
+  }
+};
+
+const cancelMove = () => {
+  if (moveRowRef.value?.PjwdId) {
+    moveRowRef.value.Kesepakatan =
+      previousKesepakatan[moveRowRef.value.PjwdId] || "";
+  }
+  showMoveDialog.value = false;
+  moveRowRef.value = null;
+  moveTargetInfo.value = null;
+};
+
+const confirmMove = async () => {
+  const row = moveRowRef.value;
+  if (!row || !row.PjwdId) return;
+  isMoving.value = true;
+  try {
+    const res = await penjadwalanPpicService.moveDetailRow(
+      header.pjw_nomor,
+      row.PjwdId,
+      movePendingTanggal.value,
+    );
+    if (res.data.data.moved) {
+      const idx = detail.value.findIndex((d) => d.PjwdId === row.PjwdId);
+      if (idx !== -1) detail.value.splice(idx, 1);
+      toast.success(`Dipindahkan ke periode ${res.data.data.nomor}.`);
+    }
+  } catch (e: any) {
+    toast.error(e.response?.data?.message || "Gagal memindahkan baris.");
+    row.Kesepakatan = previousKesepakatan[row.PjwdId] || "";
+  } finally {
+    isMoving.value = false;
+    showMoveDialog.value = false;
+    moveRowRef.value = null;
+    moveTargetInfo.value = null;
+  }
+};
 
 // ═══════════════════════════════════════════════════════════════
 // HAPUS BARIS
@@ -692,6 +860,11 @@ onMounted(() => {
     // (server broadcast ke SEMUA anggota room termasuk pengirim)
     if (detail.value.some((d) => d.PjwdId === payload.pjwd_id)) return;
     pushRowFromServer(payload.pjwd_id, payload.row);
+  });
+
+  on("pjw:row-moved-in", (payload: any) => {
+    if (detail.value.some((d) => d.PjwdId === payload.PjwdId)) return;
+    detail.value.push(mapDetailRow(payload));
   });
 
   on("pjw:field-updated", (payload: any) => {
@@ -888,6 +1061,16 @@ const rowClass = (d: DetailRow) => {
             isTarikMapLoading ? "Menarik..." : "Tarik dari MAP"
           }}
         </button>
+        <button
+          type="button"
+          class="pjw-tarik-btn manual"
+          :disabled="isManualAddLoading || !canEditMarketing"
+          @click="tambahBarisManual"
+        >
+          <IconDownload :size="14" class="mr-1" />{{
+            isManualAddLoading ? "Menambah..." : "Tambah Baris Manual"
+          }}
+        </button>
         <div class="pjw-manual-wrap">
           <span v-if="fieldFocusMap[MANUAL_ADD_KEY]" class="field-focus-badge">
             {{ fieldFocusMap[MANUAL_ADD_KEY].nama }} sedang mengetik...
@@ -943,22 +1126,72 @@ const rowClass = (d: DetailRow) => {
             >
               <td>{{ formatTanggal(d.Tanggal) }}</td>
               <td>
-                <div class="mono">
+                <div class="mono" v-if="!isManualRow(d)">
                   {{ d.SoNomor || d.MapNomor || d.NomorPraOrder }}
                 </div>
-                <div>{{ d.Nama }}</div>
+                <input
+                  v-if="isManualRow(d)"
+                  type="text"
+                  v-model="d.Nama"
+                  class="pjw-cell-text"
+                  placeholder="Nama..."
+                  :disabled="!canEditMarketing"
+                  @focus="onFieldFocus(d, 'pjwd_nama_manual')"
+                  @blur="
+                    () => {
+                      onFieldBlur(d, 'pjwd_nama_manual');
+                      onManualNamaChange(d);
+                    }
+                  "
+                />
+                <div v-else>{{ d.Nama }}</div>
                 <span
                   class="sumber-badge"
                   :class="{
                     'is-pra': d.Sumber === 'PRA ORDER',
                     'is-map': d.Sumber === 'MAP',
                     'is-so': d.Sumber === 'SO',
+                    'is-manual': d.Sumber === 'MANUAL',
                   }"
                   >{{ d.Sumber }}</span
                 >
               </td>
-              <td class="tr">{{ fmt(d.Pesan) }}</td>
-              <td class="tr">{{ fmt(d.Kirim) }}</td>
+              <td class="tr">
+                <input
+                  v-if="isManualRow(d)"
+                  type="text"
+                  inputmode="numeric"
+                  class="pjw-cell-num"
+                  :value="d.Pesan"
+                  :disabled="!canEditMarketing"
+                  @input="
+                    onManualPesanInput(
+                      d,
+                      ($event.target as HTMLInputElement).value,
+                      $event,
+                    )
+                  "
+                />
+                <template v-else>{{ fmt(d.Pesan) }}</template>
+              </td>
+              <td class="tr">
+                <input
+                  v-if="isManualRow(d)"
+                  type="text"
+                  inputmode="numeric"
+                  class="pjw-cell-num"
+                  :value="d.Kirim"
+                  :disabled="!canEditMarketing"
+                  @input="
+                    onManualKirimInput(
+                      d,
+                      ($event.target as HTMLInputElement).value,
+                      $event,
+                    )
+                  "
+                />
+                <template v-else>{{ fmt(d.Kirim) }}</template>
+              </td>
               <td class="tr" :class="{ 'text-red fw': d.Kurang > 0 }">
                 {{ fmt(d.Kurang) }}
               </td>
@@ -983,11 +1216,26 @@ const rowClass = (d: DetailRow) => {
                   "
                   @blur="onFieldBlur(d, 'pjwd_rencana')"
                   @input="
-                    onRencanaInput(d, ($event.target as HTMLInputElement).value)
+                    onRencanaInput(
+                      d,
+                      ($event.target as HTMLInputElement).value,
+                      $event,
+                    )
                   "
                 />
               </td>
-              <td class="tr">{{ fmt(d.Realisasi) }}</td>
+              <td class="tr">
+                <input
+                  v-if="isManualRow(d)"
+                  type="text"
+                  inputmode="numeric"
+                  class="pjw-cell-num"
+                  v-model.number="d.Realisasi"
+                  :disabled="!canEditMarketing"
+                  @blur="onManualRealisasiChange(d)"
+                />
+                <template v-else>{{ fmt(d.Realisasi) }}</template>
+              </td>
               <td class="tc" style="position: relative">
                 <span
                   v-if="
@@ -1060,13 +1308,8 @@ const rowClass = (d: DetailRow) => {
                     v-model="d.Kesepakatan"
                     class="pjw-cell-date"
                     :disabled="!canEditKesepakatan"
-                    @focus="onFieldFocus(d, 'pjwd_tgl_kesepakatan')"
-                    @blur="
-                      () => {
-                        onFieldBlur(d, 'pjwd_tgl_kesepakatan');
-                        onKesepakatanChange(d);
-                      }
-                    "
+                    @focus="onKesepakatanFocus(d)"
+                    @blur="onKesepakatanBlur(d)"
                   />
                   <input
                     type="text"
@@ -1108,6 +1351,62 @@ const rowClass = (d: DetailRow) => {
       </div>
     </div>
   </BaseForm>
+
+  <v-dialog v-model="showMoveDialog" max-width="420" persistent>
+    <v-card class="rounded-lg">
+      <v-card-title class="bg-orange-darken-2 text-white pa-3 text-subtitle-1">
+        Konfirmasi Pindah Periode
+      </v-card-title>
+      <v-card-text class="pa-4" style="font-size: 13px">
+        <p>
+          Tanggal Kesepakatan baru (<b>{{
+            formatTanggal(movePendingTanggal)
+          }}</b
+          >) berada di luar periode <b>{{ header.pjw_nomor }}</b
+          >.
+        </p>
+        <p class="mt-2">
+          Baris
+          <b>{{
+            moveRowRef?.SoNomor ||
+            moveRowRef?.MapNomor ||
+            moveRowRef?.NomorPraOrder ||
+            moveRowRef?.Nama
+          }}</b>
+          akan dipindahkan ke:
+        </p>
+        <p class="mt-2">
+          <template v-if="moveTargetInfo?.willCreateNew">
+            Periode baru
+            <b
+              >({{ formatTanggal(moveTargetInfo.targetTgl1) }} s/d
+              {{ formatTanggal(moveTargetInfo.targetTgl2) }})</b
+            >
+            — nomor akan dibuat otomatis.
+          </template>
+          <template v-else>
+            Periode <b>{{ moveTargetInfo?.targetNomor }}</b> ({{
+              formatTanggal(moveTargetInfo?.targetTgl1)
+            }}
+            s/d {{ formatTanggal(moveTargetInfo?.targetTgl2) }})
+          </template>
+        </p>
+      </v-card-text>
+      <v-card-actions class="pa-3 border-t bg-grey-lighten-4">
+        <v-btn variant="text" :disabled="isMoving" @click="cancelMove"
+          >Batal</v-btn
+        >
+        <v-spacer />
+        <v-btn
+          color="orange-darken-2"
+          variant="elevated"
+          :loading="isMoving"
+          @click="confirmMove"
+          >Ya, Pindahkan</v-btn
+        >
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
 </template>
 
 <style scoped>
@@ -1216,6 +1515,15 @@ const rowClass = (d: DetailRow) => {
 .pjw-tarik-btn:disabled {
   opacity: 0.6;
   cursor: default;
+}
+.pjw-tarik-btn.manual {
+  background: #455a64;
+}
+.pjw-tarik-btn.manual:hover:not(:disabled) {
+  background: #263238;
+}
+.sumber-badge.is-manual {
+  background: #455a64;
 }
 
 .pjw-manual-add {

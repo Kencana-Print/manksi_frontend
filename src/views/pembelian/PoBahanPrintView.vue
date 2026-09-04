@@ -301,7 +301,7 @@ const totalColumns = computed(() => {
             <td class="nama-cell">{{ item.pod_namaext || item.bhn_name }}</td>
             <td class="tc">{{ item.satuan_print }}</td>
             <td class="tr">{{ formatNum(item.qty_print, 2) }}</td>
-            <td class="tc" v-if="!isBahan">{{ item.pod_gramasia || "-" }}</td>
+            <td class="tc" v-if="!isBahan">{{ item.gramasiAwal || "-" }}</td>
             <td class="tc">{{ item.gramasi || "-" }}</td>
             <td class="tc">{{ item.setting || "-" }}</td>
             <td class="tr">{{ formatNum(item.harga_dpp_print) }}</td>

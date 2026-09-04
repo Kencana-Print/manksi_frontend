@@ -4,9 +4,10 @@ import { useToast } from "vue-toastification";
 import BaseBrowse from "@/components/BaseBrowse.vue";
 import { useBrowse } from "@/composables/useBrowse";
 import { umurStokBahanService as svc } from "@/services/laporan/gudang-garmen/umurStokBahanService";
-import { exportExcelSingle, type ExcelColumn } from "@/utils/excelExport";
 import BahanSearchModal from "@/components/lookups/BahanSearchModal.vue";
 import { IconHourglass, IconFileExport, IconSearch } from "@tabler/icons-vue";
+import ExcelJS from "exceljs";
+import { saveAs } from "file-saver";
 
 const MENU_ID = "530";
 const toast = useToast();
@@ -76,14 +77,12 @@ const headers = [
 
 const rowPropsFn = (data: any) => {
   const item = data.item?.raw || data.item;
+  if (item?.Status === "Dead Stock")
+    return { style: "color: #c62828 !important; font-weight: 700;" };
   if (item?.Status === "Slowmoving")
-    return {
-      style: "color: white !important; background-color: #c62828 !important;",
-    };
+    return { style: "color: #e65100 !important; font-weight: 700;" };
   if (item?.Status === "Perhatian")
-    return {
-      style: "color: white !important; background-color: #e65100 !important;",
-    };
+    return { style: "color: #f9a825 !important; font-weight: 700;" };
   return {};
 };
 
@@ -94,31 +93,90 @@ const formatTanggal = (val: string) => {
 };
 
 const isExporting = ref(false);
+const STATUS_COLOR: Record<string, string> = {
+  "Dead Stock": "FFC62828",
+  Slowmoving: "FFE65100",
+  Perhatian: "FFF9A825",
+};
+
 const onExport = async () => {
   if (!items.value?.length)
     return toast.warning("Tidak ada data untuk diekspor.");
   isExporting.value = true;
   try {
-    const cols: ExcelColumn[] = [
-      { header: "Kode", key: "Kode", width: 14 },
-      { header: "Nama", key: "Nama", width: 30 },
-      { header: "Satuan", key: "Satuan", width: 10 },
-      { header: "Barcode", key: "Barcode", width: 20 },
-      { header: "Stok", key: "Stok", width: 12, align: "right" },
-      { header: "Tgl Cetak", key: "TanggalCetak", width: 14 },
-      { header: "Umur (hari)", key: "Umur", width: 14, align: "right" },
-      { header: "Status", key: "Status", width: 14 },
+    const wb = new ExcelJS.Workbook();
+    wb.creator = "MANKSI ERP";
+    wb.created = new Date();
+    const ws = wb.addWorksheet("Umur Stok Bahan");
+
+    ws.getCell(1, 1).value = "LAPORAN UMUR STOK BAHAN";
+    ws.getCell(1, 1).font = { bold: true, size: 12 };
+    ws.getCell(2, 1).value = `Per Tanggal: ${formatTanggal(tanggal.value)}`;
+    ws.getCell(2, 1).font = { bold: true };
+
+    const headerRow = [
+      "Kode",
+      "Nama",
+      "Satuan",
+      "Barcode",
+      "Stok",
+      "Tgl Cetak",
+      "Umur (hari)",
+      "Status",
     ];
-    const rows = items.value.map((r: any) => ({
-      ...r,
-      TanggalCetak: formatTanggal(r.TanggalCetak),
-    }));
-    await exportExcelSingle(
-      `Umur_Stok_Bahan_${tanggal.value}`,
-      "Umur Stok Bahan",
-      cols,
-      rows,
-      `Umur Stok Bahan per ${formatTanggal(tanggal.value)}`,
+    headerRow.forEach((h, i) => (ws.getCell(4, i + 1).value = h));
+    ws.getRow(4).font = { bold: true };
+    ws.getRow(4).eachCell((cell) => {
+      cell.fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FF87CEEB" },
+      };
+      cell.alignment = { horizontal: "center", vertical: "middle" };
+    });
+
+    let jRow = 5;
+    for (const r of items.value) {
+      ws.getCell(jRow, 1).value = r.Kode ?? "";
+      ws.getCell(jRow, 2).value = r.Nama ?? "";
+      ws.getCell(jRow, 3).value = r.Satuan ?? "";
+      ws.getCell(jRow, 4).value = r.Barcode ?? "";
+      ws.getCell(jRow, 5).value = Number(r.Stok) || 0;
+      ws.getCell(jRow, 6).value = formatTanggal(r.TanggalCetak);
+      ws.getCell(jRow, 7).value = r.Umur !== null ? Number(r.Umur) : "";
+      ws.getCell(jRow, 8).value = r.Status ?? "";
+
+      const color = STATUS_COLOR[r.Status];
+      if (color) {
+        ws.getRow(jRow).eachCell((cell) => {
+          cell.font = { color: { argb: color }, bold: true };
+        });
+      }
+
+      jRow++;
+    }
+
+    const lastRow = jRow - 1;
+    for (let row = 4; row <= lastRow; row++) {
+      for (let col = 1; col <= headerRow.length; col++) {
+        ws.getCell(row, col).border = {
+          top: { style: "thin" },
+          left: { style: "thin" },
+          bottom: { style: "thin" },
+          right: { style: "thin" },
+        };
+      }
+    }
+
+    ws.columns.forEach((col) => (col.width = 16));
+    ws.getColumn(2).width = 30;
+
+    const buf = await wb.xlsx.writeBuffer();
+    saveAs(
+      new Blob([buf], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      }),
+      `Umur_Stok_Bahan_${tanggal.value}.xlsx`,
     );
     toast.success("Berhasil export data.");
   } catch {
@@ -138,8 +196,8 @@ const onExport = async () => {
     :items="items ?? []"
     :is-loading="isLoading"
     item-value="Barcode"
-    :can-export="canExport"
     :filter-state="filterState"
+    :row-props-fn="rowPropsFn"
     @update:filter-state="onFilterStateRestore"
     @refresh="fetchData"
   >
@@ -177,10 +235,12 @@ const onExport = async () => {
     </template>
     <template #filter-right>
       <div class="legend-row">
-        <span class="legend-dot dot-orange"></span>
-        <span class="legend-lbl">Perhatian (60–90 hari)</span>
+        <span class="legend-dot dot-yellow"></span>
+        <span class="legend-lbl">Perhatian (6–12 bulan)</span>
+        <span class="legend-dot dot-orange" style="margin-left: 10px"></span>
+        <span class="legend-lbl">Slow Moving (12–24 bulan)</span>
         <span class="legend-dot dot-red" style="margin-left: 10px"></span>
-        <span class="legend-lbl">Slowmoving (&gt; 90 hari)</span>
+        <span class="legend-lbl">Dead Stock (&gt; 24 bulan)</span>
       </div>
     </template>
     <template #extra-actions>
@@ -240,6 +300,9 @@ const onExport = async () => {
   height: 12px;
   border-radius: 2px;
   flex-shrink: 0;
+}
+.dot-yellow {
+  background: #fdd835;
 }
 .dot-orange {
   background: #e65100;

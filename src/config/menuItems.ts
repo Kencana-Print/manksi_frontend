@@ -901,6 +901,12 @@ export const createMenuItems = (): NavItem[] => {
           icon: IconCoin,
           menuId: 255,
         },
+        {
+          title: "Pengajuan Dana",
+          to: "/piutang/pengajuan-dana",
+          icon: IconCash,
+          menuId: 177,
+        },
       ],
     },
     {

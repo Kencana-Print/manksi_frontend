@@ -27,6 +27,10 @@ const isSpandukMMT = computed(
   () => kodeDivisi.value === "1" || kodeDivisi.value === "5",
 );
 const isComplexTtd = computed(() => isKaosan.value);
+const isPending = computed(() => {
+  const ket = String(data.value.spk_keterangan || "").toLowerCase();
+  return ket.includes("pending");
+});
 
 const numCopies = computed(() => {
   if (withAlokasi.value) return 1;
@@ -412,7 +416,6 @@ onMounted(async () => {
                       >
                         (REVISI: {{ data.spk_ketrevisi }})
                       </span>
-
                       <span v-if="data.spk_tipe" class="ml-8 text-xs">
                         Tipe SO : <strong>{{ data.spk_tipe }}</strong>
                       </span>
@@ -421,7 +424,12 @@ onMounted(async () => {
                   <tr>
                     <td class="w-label">Tanggal SO</td>
                     <td class="w-colon">:</td>
-                    <td>{{ tglIndo(data.spk_tanggal) }}</td>
+                    <td>
+                      {{ tglIndo(data.spk_tanggal) }}
+                      <span v-if="isPending" class="pending-badge-row"
+                        >PENDING!</span
+                      >
+                    </td>
                   </tr>
                   <tr>
                     <td class="w-label">Jenis Order</td>
@@ -673,7 +681,12 @@ onMounted(async () => {
               <tr>
                 <td class="w-label">Tanggal SO</td>
                 <td class="w-colon">:</td>
-                <td colspan="3">{{ tglIndo(data.spk_tanggal) }}</td>
+                <td colspan="3">
+                  {{ tglIndo(data.spk_tanggal) }}
+                  <span v-if="isPending" class="pending-badge-row"
+                    >PENDING!</span
+                  >
+                </td>
               </tr>
               <tr>
                 <td class="w-label">Jenis Order</td>
@@ -1516,6 +1529,13 @@ onMounted(async () => {
   font-weight: bold;
   margin-left: 10px;
   text-transform: uppercase;
+}
+
+.pending-badge-row {
+  color: red;
+  font-weight: bold;
+  font-size: 9pt;
+  margin-left: 10px;
 }
 
 @media screen {

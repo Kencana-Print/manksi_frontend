@@ -72,6 +72,14 @@ const rowClass = (color: string) => {
   return "";
 };
 
+const chipClass = (color: string) => {
+  if (color === "black") return "chip-black";
+  if (color === "yellow") return "chip-yellow";
+  if (color === "green") return "chip-green";
+  if (color === "red") return "chip-red";
+  return "chip-blue";
+};
+
 const statusClass = (status: string) => {
   if (status === "Closed") return "st-closed";
   if (status === "Open") return "st-open";
@@ -135,6 +143,7 @@ const onExport = async () => {
       "SATUAN",
       "STD MAP",
       "STD MKB",
+      "STD ACTUAL",
       "NO REALISASI",
       "REALISASI KELUAR",
       "STATUS",
@@ -142,8 +151,10 @@ const onExport = async () => {
       "QTY PERMINTAAN",
       "KETERANGAN",
       "QTY POTONG (PCS)",
+      "BERAT POTONG (KG)",
+      "SELISIH BERAT (KG)",
       "WORKSHOP",
-      "SELISIH",
+      "SELISIH BABARAN",
     ];
     headers.forEach((h, i) => (ws.getCell(4, i + 1).value = h));
     ws.getRow(4).font = { bold: true };
@@ -167,17 +178,18 @@ const onExport = async () => {
       ws.getCell(jRow, 7).value = r.Satuan ?? "";
       ws.getCell(jRow, 8).value = r.StdMap ?? 0;
       ws.getCell(jRow, 9).value = r.StdMkb ?? 0;
-      ws.getCell(jRow, 10).value = r.NoRealisasi ?? "";
-      ws.getCell(jRow, 11).value = r.RealisasiKeluar ?? 0;
-      ws.getCell(jRow, 12).value = r.Status ?? "";
-      ws.getCell(jRow, 13).value = r.NoPermintaan ?? "";
-      ws.getCell(jRow, 14).value = r.QtyPermintaan ?? 0;
-      ws.getCell(jRow, 15).value = r.Keterangan ?? "";
-      ws.getCell(jRow, 16).value = r.QtyPotong ?? 0;
-      ws.getCell(jRow, 17).value = r.Workshop ?? "";
-      ws.getCell(jRow, 18).value = r.SelisihKg ?? 0;
-
-      applyRowColor(ws.getRow(jRow), r.RowColor || "");
+      ws.getCell(jRow, 10).value = r.StdActual ?? 0;
+      ws.getCell(jRow, 11).value = r.NoRealisasi ?? "";
+      ws.getCell(jRow, 12).value = r.RealisasiKeluar ?? 0;
+      ws.getCell(jRow, 13).value = r.StatusChip?.label ?? r.Status ?? "";
+      ws.getCell(jRow, 14).value = r.NoPermintaan ?? "";
+      ws.getCell(jRow, 15).value = r.QtyPermintaan ?? 0;
+      ws.getCell(jRow, 16).value = r.Keterangan ?? "";
+      ws.getCell(jRow, 17).value = r.QtyPotong ?? 0;
+      ws.getCell(jRow, 18).value = r.BeratPotongKg ?? 0;
+      ws.getCell(jRow, 19).value = r.SelisihBeratKg ?? 0;
+      ws.getCell(jRow, 20).value = r.Workshop ?? "";
+      ws.getCell(jRow, 21).value = r.SelisihBabaran ?? 0;
 
       jRow++;
     }
@@ -194,9 +206,9 @@ const onExport = async () => {
       }
     }
     ws.columns.forEach((col) => (col.width = 16));
-    ws.getColumn(3).width = 30;
-    ws.getColumn(6).width = 24;
-    ws.getColumn(15).width = 20;
+    ws.getColumn(3).width = 30; // Nama SPK
+    ws.getColumn(6).width = 24; // Nama Bahan
+    ws.getColumn(16).width = 20; // Keterangan (geser dari 15 ke 16)
 
     const buf = await wb.xlsx.writeBuffer();
     saveAs(
@@ -266,18 +278,19 @@ onMounted(fetchData);
 
       <div class="legend-bar">
         <span class="lg-item"
-          ><span class="txt-sample txt-black">Aa</span> Closed penuh (potong ≥
-          order)</span
-        >
-        <span class="lg-item"
-          ><span class="dot dot-yellow" /> Closed tapi potong &lt; order</span
-        >
-        <span class="lg-item"
-          ><span class="dot dot-green" /> Masih open, potong sudah ≥ order</span
-        >
-        <span class="lg-item"
-          ><span class="txt-sample txt-red">Aa</span> Masih open, potong &lt;
+          ><span class="chip-sample chip-black">Closed</span> Potong ≥
           order</span
+        >
+        <span class="lg-item"
+          ><span class="chip-sample chip-yellow"
+            >Closed · Potong Kurang</span
+          ></span
+        >
+        <span class="lg-item"
+          ><span class="chip-sample chip-green">Open · Potong Cukup</span></span
+        >
+        <span class="lg-item"
+          ><span class="chip-sample chip-red">Open · Potong Kurang</span></span
         >
       </div>
 
@@ -294,6 +307,7 @@ onMounted(fetchData);
               <th style="width: 60px">Satuan</th>
               <th style="width: 70px">Std MAP</th>
               <th style="width: 70px">Std MKB</th>
+              <th style="width: 70px">Std Actual</th>
               <th style="min-width: 110px">No Realisasi</th>
               <th style="width: 90px">Realisasi Keluar</th>
               <th style="width: 80px">Status</th>
@@ -301,8 +315,10 @@ onMounted(fetchData);
               <th style="width: 90px">Qty Permintaan</th>
               <th style="min-width: 140px">Keterangan</th>
               <th style="width: 80px">Qty Potong (Pcs)</th>
+              <th style="width: 90px">Berat Potong (Kg)</th>
+              <th style="width: 90px">Selisih Berat (Kg)</th>
               <th style="width: 80px">Workshop</th>
-              <th style="width: 80px">Selisih</th>
+              <th style="width: 80px">Selisih Babaran</th>
             </tr>
           </thead>
           <tbody>
@@ -312,7 +328,7 @@ onMounted(fetchData);
             <tr v-else-if="!rows.length">
               <td colspan="18" class="tc py-4 text-grey">Tidak ada data.</td>
             </tr>
-            <tr v-for="(r, i) in rows" :key="i" :class="rowClass(r.RowColor)">
+            <tr v-for="(r, i) in rows" :key="i">
               <td>{{ r.Spk }}</td>
               <td class="tc">{{ fmtTgl(r.TanggalSpk) }}</td>
               <td>{{ r.NamaSpk }}</td>
@@ -322,23 +338,37 @@ onMounted(fetchData);
               <td class="tc">{{ r.Satuan }}</td>
               <td class="tr">{{ numFmt(r.StdMap) }}</td>
               <td class="tr">{{ numFmt(r.StdMkb) }}</td>
+              <td class="tr">{{ numFmt(r.StdActual) }}</td>
               <td class="mono">{{ r.NoRealisasi }}</td>
               <td class="tr">{{ numFmt(r.RealisasiKeluar) }}</td>
               <td class="tc">
-                <span class="st-badge" :class="statusClass(r.Status)">{{
-                  r.Status
+                <span class="st-chip" :class="chipClass(r.StatusChip?.color)">{{
+                  r.StatusChip?.label
                 }}</span>
               </td>
               <td class="mono">{{ r.NoPermintaan }}</td>
               <td class="tr">{{ numFmt(r.QtyPermintaan) }}</td>
               <td>{{ r.Keterangan }}</td>
               <td class="tr">{{ numFmt(r.QtyPotong, 0) }}</td>
+              <td class="tr">{{ numFmt(r.BeratPotongKg) }}</td>
+              <td
+                class="tr"
+                :style="
+                  Math.abs(r.SelisihBeratKg) > 0.1
+                    ? 'color:#c62828;font-weight:700'
+                    : ''
+                "
+              >
+                {{ numFmt(r.SelisihBeratKg) }}
+              </td>
               <td>{{ r.Workshop }}</td>
               <td
                 class="tr"
-                :style="r.SelisihKg < 0 ? 'color:#c62828;font-weight:700' : ''"
+                :style="
+                  r.SelisihBabaran < 0 ? 'color:#c62828;font-weight:700' : ''
+                "
               >
-                {{ numFmt(r.SelisihKg) }}
+                {{ numFmt(r.SelisihBabaran) }}
               </td>
             </tr>
           </tbody>
@@ -438,19 +468,41 @@ onMounted(fetchData);
 }
 
 /* ── Warna baris ── */
-.txt-black td {
-  color: #000 !important;
+.st-chip {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.chip-black {
+  background: #212121;
+  color: #fff;
+}
+.chip-yellow {
+  background: #fff9c4;
+  color: #7a6a00;
+}
+.chip-green {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+.chip-red {
+  background: #ffebee;
+  color: #c62828;
+}
+.chip-blue {
+  background: #e3f2fd;
+  color: #1565c0;
+}
+.chip-sample {
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-size: 9px;
   font-weight: 700;
 }
-.txt-red td {
-  color: #c62828 !important;
-}
-.bg-yellow td {
-  background: #fff9c4 !important;
-}
-.bg-green td {
-  background: #c8e6c9 !important;
-}
+
 .table-scroll {
   flex: 1;
   overflow: auto;
@@ -485,42 +537,5 @@ onMounted(fetchData);
 .mono {
   font-family: monospace;
   font-size: 10px;
-}
-
-/* ── Warna baris sesuai spesifikasi ── */
-.row-black td {
-  background: #212121 !important;
-  color: #fff !important;
-}
-.row-yellow td {
-  background: #fff9c4 !important;
-}
-.row-green td {
-  background: #e8f5e9 !important;
-}
-
-.st-badge {
-  display: inline-block;
-  padding: 1px 8px;
-  border-radius: 8px;
-  font-size: 10px;
-  font-weight: 700;
-}
-.st-closed {
-  background: #e8f5e9;
-  color: #2e7d32;
-}
-.st-open {
-  background: #ffebee;
-  color: #c62828;
-}
-.st-process {
-  background: #e3f2fd;
-  color: #1565c0;
-}
-/* Badge status tetap kebaca kontras walau baris hitam */
-.row-black .st-badge {
-  background: rgba(255, 255, 255, 0.15) !important;
-  color: #fff !important;
 }
 </style>
