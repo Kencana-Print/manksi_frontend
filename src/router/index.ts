@@ -551,7 +551,46 @@ const router = createRouter({
         requiresAuth: true,
       },
     },
-
+    {
+      path: "/pembelian/setting-harga-bahan",
+      redirect: "/pembelian/setting-harga-bahan/garmen",
+    },
+    {
+      path: "/pembelian/setting-harga-bahan/garmen",
+      name: "SettingHargaGarmen",
+      component: () =>
+        import("@/views/pembelian/setting-harga-bahan/SettingHargaGarmenView.vue"),
+      meta: {
+        title: "Setting Harga Bahan Garmen",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "210",
+      },
+    },
+    {
+      path: "/pembelian/setting-harga-bahan/mmt",
+      name: "SettingHargaMmt",
+      component: () =>
+        import("@/views/pembelian/setting-harga-bahan/SettingHargaMmtView.vue"),
+      meta: {
+        title: "Setting Harga Bahan MMT",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "211",
+      },
+    },
+    {
+      path: "/pembelian/setting-harga-bahan/spanduk",
+      name: "SettingHargaSpanduk",
+      component: () =>
+        import("@/views/pembelian/setting-harga-bahan/SettingHargaSpandukView.vue"),
+      meta: {
+        title: "Setting Harga Bahan Spanduk",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "212",
+      },
+    },
     // ── PPIC ──────────────────────────────────────────────────────────
     {
       path: "/ppic/proof",

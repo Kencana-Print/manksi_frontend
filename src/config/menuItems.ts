@@ -90,6 +90,9 @@ import {
   IconCalendarCog,
   IconNotebook,
   IconCalendarWeek,
+  IconTags,
+  IconPhoto,
+  IconFlag,
 } from "@tabler/icons-vue";
 
 export interface NavItem {
@@ -316,6 +319,31 @@ export const createMenuItems = (): NavItem[] => {
           to: "/pembelian/po-external-garmen",
           icon: IconShoppingBagPlus,
           menuId: 144,
+        },
+        { divider: true },
+        {
+          title: "Setting Harga Bahan",
+          icon: IconTags,
+          subItems: [
+            {
+              title: "Garmen",
+              to: "/pembelian/setting-harga-bahan/garmen",
+              icon: IconShirt,
+              menuId: 210,
+            },
+            {
+              title: "MMT",
+              to: "/pembelian/setting-harga-bahan/mmt",
+              icon: IconPhoto,
+              menuId: 211,
+            },
+            {
+              title: "Spanduk",
+              to: "/pembelian/setting-harga-bahan/spanduk",
+              icon: IconFlag,
+              menuId: 212,
+            },
+          ],
         },
       ],
     },
