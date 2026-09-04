@@ -13,10 +13,8 @@ export const invoiceProformaFormService = {
 
   getRekeningByNomor: (rekening: string, perushKode: string) =>
     api.get(
-      `/penjualan/invoice-proforma/rekening/${encodeURIComponent(rekening)}`,
-      {
-        params: { perushKode },
-      },
+      `/penjualan/invoice-proforma/form/rekening/${encodeURIComponent(rekening)}`,
+      { params: { perushKode } },
     ),
 
   getBarangByKode: (kode: string, perushKode: string, cusKode: string) =>
