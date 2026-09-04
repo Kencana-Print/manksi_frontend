@@ -48,6 +48,11 @@ const loadDivisi = async () => {
 };
 
 // --- BROWSE SETUP ---
+const baseBrowseRef = ref<InstanceType<typeof BaseBrowse> | null>(null);
+
+const getExportItems = () =>
+  (baseBrowseRef.value?.getFilteredItems?.() as any[]) ?? items.value;
+
 const { items, isLoading, selected, canExport, fetchData } = useBrowse({
   menuId: "305",
   fetchApi: async () => {
@@ -139,7 +144,8 @@ const getStatClass = (stat: string) => {
 
 // --- EXPORT (header) ---
 const onExport = async () => {
-  if (!items.value || items.value.length === 0) {
+  const exportItems = getExportItems();
+  if (!exportItems || exportItems.length === 0) {
     return toast.warning("Tidak ada data untuk diexport.");
   }
   try {
@@ -195,7 +201,7 @@ const onExport = async () => {
       { header: "Status", key: "Stat", width: 18 },
     ];
 
-    const rows = items.value.map((it: any) => ({
+    const rows = exportItems.map((it: any) => ({
       ...it,
       Tanggal: formatTanggal(it.Tanggal),
       Dateline: formatTanggal(it.Dateline),
@@ -218,7 +224,8 @@ const onExport = async () => {
 
 // --- EXPORT DETAIL ---
 const exportDetail = async () => {
-  if (!items.value || items.value.length === 0) {
+  const exportItems = getExportItems();
+  if (!exportItems || exportItems.length === 0) {
     return toast.warning("Tidak ada data untuk diexport.");
   }
   toast.info("Menyiapkan data detail untuk diexport... Mohon tunggu.");
@@ -226,7 +233,7 @@ const exportDetail = async () => {
   try {
     const combinedRows: any[] = [];
 
-    for (const item of items.value) {
+    for (const item of exportItems) {
       let detail = detailCache.value[item.Nomor];
       if (!detail) {
         const res = await spkVsSjService.getDetail(item.Nomor);
@@ -333,6 +340,7 @@ const exportDetail = async () => {
 
 <template>
   <BaseBrowse
+    ref="baseBrowseRef"
     title="Laporan SPK vs SJ"
     menu-id="305"
     :icon="IconTruckDelivery"

@@ -15,11 +15,20 @@ const toast = useToast();
 const menuId = "308";
 
 // ── SETUP FILTER ──
+const baseBrowseRef = ref<InstanceType<typeof BaseBrowse> | null>(null);
+
+const toLocalDateStr = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
 const today = new Date();
-const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1)
-  .toISOString()
-  .substring(0, 10);
-const todayString = today.toISOString().substring(0, 10);
+const firstDayOfMonth = toLocalDateStr(
+  new Date(today.getFullYear(), today.getMonth(), 1),
+);
+const todayString = toLocalDateStr(today);
 
 const filters = ref({
   startDate: firstDayOfMonth,
@@ -58,6 +67,8 @@ const headers = [
   { title: "Dateline", key: "Dateline", width: "100px", align: "center" },
   { title: "Sales", key: "Sales", width: "110px" },
   { title: "No. Penawaran", key: "No_Penawaran", width: "160px" },
+  { title: "Nomor SO", key: "NomorSO", width: "160px" },
+  { title: "Nama SO", key: "NamaSO", minWidth: "220px" },
   { title: "No. SPK", key: "SPK", width: "160px" },
   { title: "Nama SPK", key: "Nama_SPK", minWidth: "220px" },
   { title: "Harga", key: "Harga", width: "110px", align: "right" },
@@ -91,7 +102,10 @@ watch(
 // ── EXPORT EXCEL ──
 const isExporting = ref(false);
 const onExport = async () => {
-  if (!items.value || items.value.length === 0) {
+  const exportItems =
+    (baseBrowseRef.value?.getFilteredItems?.() as any[]) ?? items.value;
+
+  if (!exportItems || exportItems.length === 0) {
     toast.warning("Tidak ada data untuk diexport.");
     return;
   }
@@ -123,6 +137,8 @@ const onExport = async () => {
       { header: "Dateline", key: "Dateline", width: 14, align: "center" },
       { header: "Sales", key: "Sales", width: 20 },
       { header: "No. Penawaran", key: "No_Penawaran", width: 22 },
+      { header: "Nomor SO", key: "NomorSO", width: 22 },
+      { header: "Nama SO", key: "NamaSO", width: 35 },
       { header: "No. SPK", key: "SPK", width: 22 },
       { header: "Nama SPK", key: "Nama_SPK", width: 35 },
       {
@@ -148,8 +164,7 @@ const onExport = async () => {
       },
     ];
 
-    // Konversi nilai string ke Number agar format Excel numFmt bisa mendeteksi sebagai angka
-    const rowsData = items.value.map((r: any) => ({
+    const rowsData = exportItems.map((r: any) => ({
       ...r,
       Tanggal: formatTanggal(r.Tanggal),
       Dateline: formatTanggal(r.Dateline),
@@ -180,6 +195,7 @@ const fmtNum = (val: number) =>
 
 <template>
   <BaseBrowse
+    ref="baseBrowseRef"
     title="Laporan MAP vs SPK"
     :menu-id="menuId"
     :icon="IconClipboardList"
@@ -234,6 +250,8 @@ const fmtNum = (val: number) =>
         fmtNum(item.Nilai)
       }}</span>
     </template>
+    <template #item.NomorSO="{ item }">{{ item.NomorSO || "-" }}</template>
+    <template #item.SPK="{ item }">{{ item.SPK || "-" }}</template>
   </BaseBrowse>
 </template>
 

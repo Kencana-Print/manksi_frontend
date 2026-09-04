@@ -17,11 +17,18 @@ const toast = useToast();
 const menuId = "307";
 
 // ── SETUP FILTER ──
+const toLocalDateStr = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
 const today = new Date();
-const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1)
-  .toISOString()
-  .substring(0, 10);
-const todayString = today.toISOString().substring(0, 10);
+const firstDayOfMonth = toLocalDateStr(
+  new Date(today.getFullYear(), today.getMonth(), 1),
+);
+const todayString = toLocalDateStr(today);
 
 const filters = ref({
   startDate: firstDayOfMonth,
@@ -71,6 +78,8 @@ const masterHeaders = computed(() => {
   return h;
 });
 
+const baseBrowseRef = ref<InstanceType<typeof BaseBrowse> | null>(null);
+
 const { items, isLoading, canExport, fetchData } = useBrowse({
   menuId,
   fetchApi: async () => {
@@ -118,7 +127,10 @@ const onUpdateExpanded = async (val: any[]) => {
 // ── EXPORT EXCEL MASTER ──
 const isExportingMaster = ref(false);
 const onExportMaster = async () => {
-  if (!items.value || items.value.length === 0) {
+  const exportItems =
+    (baseBrowseRef.value?.getFilteredItems?.() as any[]) ?? items.value;
+
+  if (!exportItems || exportItems.length === 0) {
     toast.warning("Tidak ada data untuk diexport.");
     return;
   }
@@ -152,7 +164,7 @@ const onExportMaster = async () => {
       { header: "Sales", key: "Sales", width: 20 },
     ];
 
-    const rowsData = items.value.map((r: any) => ({
+    const rowsData = exportItems.map((r: any) => ({
       ...r,
       Jumlah: Number(r.Jumlah) || 0,
       Kirim: Number(r.Kirim) || 0,
@@ -178,7 +190,20 @@ const onExportDetail = async () => {
   isExportingDetail.value = true;
   try {
     const res = await mapVsSjService.getAllDetail(filters.value);
-    const allDetail: any[] = res.data.data;
+    let allDetail: any[] = res.data.data;
+
+    // ✅ Batasi ke MAP yang masih lolos search box / filter kolom di
+    // grid (BaseBrowse). getAllDetail query terpisah ke server hanya
+    // berdasar tanggal & divisi, jadi filter lokal grid tidak otomatis
+    // ke-apply — harus disaring manual pakai NomorMAP yang tampil.
+    const filteredGridItems = baseBrowseRef.value?.getFilteredItems?.();
+    if (filteredGridItems) {
+      const visibleNomor = new Set(
+        filteredGridItems.map((it: any) => it.Nomor),
+      );
+      allDetail = allDetail.filter((r: any) => visibleNomor.has(r.NomorMAP));
+    }
+
     if (!allDetail.length) {
       toast.warning("Tidak ada data detail pengiriman pada range tanggal ini.");
       return;
@@ -271,6 +296,7 @@ const numFmt = (val: number) => new Intl.NumberFormat("id-ID").format(val || 0);
 
 <template>
   <BaseBrowse
+    ref="baseBrowseRef"
     title="Laporan MAP vs Surat Jalan"
     :menu-id="menuId"
     :icon="IconTruckDelivery"

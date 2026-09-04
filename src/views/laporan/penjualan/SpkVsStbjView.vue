@@ -48,6 +48,8 @@ const loadDivisi = async () => {
 };
 
 // --- BROWSE SETUP ---
+const baseBrowseRef = ref<InstanceType<typeof BaseBrowse> | null>(null);
+
 const { items, isLoading, selected, canExport, fetchData } = useBrowse({
   menuId: "304",
   fetchApi: async () => {
@@ -124,8 +126,12 @@ watch(() => filterState.value.dtAkhir, fetchData);
 watch(() => filterState.value.divisi, fetchData);
 
 // --- EXPORT (header) ---
+const getExportItems = () =>
+  (baseBrowseRef.value?.getFilteredItems?.() as any[]) ?? items.value;
+
 const onExport = async () => {
-  if (!items.value || items.value.length === 0) {
+  const exportItems = getExportItems();
+  if (!exportItems || exportItems.length === 0) {
     return toast.warning("Tidak ada data untuk diexport.");
   }
   try {
@@ -163,7 +169,7 @@ const onExport = async () => {
       `Laporan_SPK_vs_STBJ_${today}.xlsx`,
       "SPK vs STBJ",
       columns,
-      items.value.map((it: any) => ({
+      exportItems.map((it: any) => ({
         ...it,
         Tanggal: formatTanggal(it.Tanggal),
         TanggalJadi: formatTanggal(it.TanggalJadi),
@@ -180,7 +186,8 @@ const onExport = async () => {
 
 // --- EXPORT DETAIL ---
 const exportDetail = async () => {
-  if (!items.value || items.value.length === 0) {
+  const exportItems = getExportItems();
+  if (!exportItems || exportItems.length === 0) {
     return toast.warning("Tidak ada data untuk diexport.");
   }
   toast.info("Menyiapkan data detail untuk diexport... Mohon tunggu.");
@@ -188,7 +195,7 @@ const exportDetail = async () => {
   try {
     const combinedRows: any[] = [];
 
-    for (const item of items.value) {
+    for (const item of exportItems) {
       let detail = detailCache.value[item.Nomor];
       if (!detail) {
         const res = await spkVsStbjService.getDetail(item.Nomor);
@@ -215,7 +222,6 @@ const exportDetail = async () => {
       );
 
       if (!detail || detail.length === 0) {
-        // ✅ SPK tanpa STBJ tetap muncul 1 baris, kolom detail kosong
         combinedRows.push({
           ...masterCells,
           NomorStbj: "",
@@ -225,8 +231,6 @@ const exportDetail = async () => {
       } else {
         detail.forEach((dRow: any, idx: number) => {
           combinedRows.push({
-            // ✅ Kolom master cuma keisi di baris pertama grup ini,
-            // baris berikutnya dikosongin (gak diulang tiap baris)
             ...(idx === 0 ? masterCells : blankMaster),
             NomorStbj: dRow.NomorStbj,
             TglStbj: formatTanggal(dRow.Tanggal),
@@ -297,6 +301,7 @@ const numFmt = (v: any) =>
 
 <template>
   <BaseBrowse
+    ref="baseBrowseRef"
     title="Laporan SPK vs STBJ"
     menu-id="304"
     :icon="IconClipboardList"

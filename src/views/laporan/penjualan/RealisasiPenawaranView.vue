@@ -36,6 +36,8 @@ const filters = ref({
 
 const toast = useToast();
 
+const baseBrowseRef = ref<InstanceType<typeof BaseBrowse> | null>(null);
+
 const { items, isLoading, canExport, fetchData } = useBrowse({
   menuId: "302",
   fetchApi: async () => {
@@ -103,9 +105,14 @@ const pctOpen = computed(() =>
 );
 
 const onExport = async () => {
-  if (!items.value || items.value.length === 0) {
+  const exportItems: RealisasiPenawaranItem[] =
+    (baseBrowseRef.value?.getFilteredItems?.() as RealisasiPenawaranItem[]) ??
+    items.value;
+
+  if (!exportItems || exportItems.length === 0) {
     return toast.warning("Tidak ada data untuk diexport.");
   }
+
   try {
     const columns: ExcelColumn[] = [
       { header: "Divisi", key: "Divisi", width: 14 },
@@ -170,7 +177,7 @@ const onExport = async () => {
       },
     ];
 
-    const rows: any[] = (items.value ?? []).map((it: any) => ({
+    const rows: any[] = exportItems.map((it: any) => ({
       Divisi: it.Divisi,
       Customer: it.Customer,
       Jumlah: Number(it.Jumlah) || 0,
@@ -185,20 +192,41 @@ const onExport = async () => {
       PercOpen: Number(it.PercOpen) || 0,
     }));
 
-    // ✅ Baris TOTAL di bawah, nyambung ke angka summary bar yang udah ada di UI
+    // ✅ Total dihitung dari exportItems (data ter-filter), bukan grandTotal global
+    const totalNominal = exportItems.reduce(
+      (s, r) => s + (Number(r.Nominal) || 0),
+      0,
+    );
+    const totalClose = exportItems.reduce(
+      (s, r) => s + (Number(r.Close) || 0),
+      0,
+    );
+    const totalBatal = exportItems.reduce(
+      (s, r) => s + (Number(r.Batal) || 0),
+      0,
+    );
+    const totalOpen = exportItems.reduce(
+      (s, r) => s + (Number(r.Open) || 0),
+      0,
+    );
+
+    const totalPctClose = totalNominal ? (totalClose / totalNominal) * 100 : 0;
+    const totalPctBatal = totalNominal ? (totalBatal / totalNominal) * 100 : 0;
+    const totalPctOpen = totalNominal ? (totalOpen / totalNominal) * 100 : 0;
+
     rows.push({
       Divisi: "",
       Customer: "TOTAL",
       Jumlah: "",
       Qty: "",
       Satuan: "",
-      Nominal: grandTotal.value.nominal,
-      Close: grandTotal.value.close,
-      PercClose: Number(pctClose.value),
-      Batal: grandTotal.value.batal,
-      PercBatal: 0,
-      Open: grandTotal.value.open,
-      PercOpen: Number(pctOpen.value),
+      Nominal: totalNominal,
+      Close: totalClose,
+      PercClose: Number(totalPctClose.toFixed(2)),
+      Batal: totalBatal,
+      PercBatal: Number(totalPctBatal.toFixed(2)),
+      Open: totalOpen,
+      PercOpen: Number(totalPctOpen.toFixed(2)),
     });
 
     await exportExcelSingle(
@@ -219,6 +247,7 @@ const onExport = async () => {
 
 <template>
   <BaseBrowse
+    ref="baseBrowseRef"
     title="Realisasi Penawaran"
     menu-id="302"
     :icon="IconReportAnalytics"
