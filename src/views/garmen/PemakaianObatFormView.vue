@@ -284,6 +284,7 @@ const keteranganRef = ref<HTMLInputElement | null>(null);
 const komponenKodeRefs = ref<Record<number, HTMLInputElement | null>>({});
 const komponenHasilRefs = ref<Record<number, HTMLInputElement | null>>({});
 const detailJumlahRefs = ref<Record<number, HTMLInputElement | null>>({});
+const detailQtyRefs = ref<Record<number, HTMLInputElement | null>>({});
 
 // --- SPK ---
 const spkModalOpen = ref(false);
@@ -434,6 +435,20 @@ const onQtyInput = (row: DetailRow) => {
   if (row.satuan === "KG") {
     row.jumlah = Number(row.qty || 0) / 1000;
   }
+};
+
+// Enter di Jumlah → pindah ke Qty/Gram baris yang SAMA
+const onJumlahKeydown = (e: KeyboardEvent, idx: number) => {
+  if (e.key !== "Enter") return;
+  e.preventDefault();
+  nextTick(() => detailQtyRefs.value[idx]?.focus());
+};
+
+// Enter di Qty/Gram → pindah ke Jumlah baris BERIKUTNYA
+const onQtyKeydown = (e: KeyboardEvent, idx: number) => {
+  if (e.key !== "Enter") return;
+  e.preventDefault();
+  nextTick(() => detailJumlahRefs.value[idx + 1]?.focus());
 };
 
 const deleteDetailDialog = ref(false);
@@ -807,16 +822,19 @@ onMounted(loadInitial);
                     class="cell-input tr"
                     :disabled="!row.jenis"
                     @input="onJumlahInput(row)"
+                    @keydown="onJumlahKeydown($event, idx)"
                   />
                 </td>
                 <td>
                   <input
+                    :ref="(el) => (detailQtyRefs[idx] = el as any)"
                     v-model.number="row.qty"
                     type="text"
                     inputmode="decimal"
                     class="cell-input tr"
                     :disabled="!row.jenis"
                     @input="onQtyInput(row)"
+                    @keydown="onQtyKeydown($event, idx)"
                   />
                 </td>
                 <td class="text-center">
