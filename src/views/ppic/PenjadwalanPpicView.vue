@@ -38,6 +38,7 @@ interface DetailRow {
   Kirim: number;
   Kurang: number;
   Rencana: number;
+  KetRencana: string;
   Realisasi: number;
   PermintaanKirim: string;
   StatusPermintaan: string;
@@ -391,41 +392,109 @@ const onExportDetail = async () => {
       results.forEach((r) => (detailPerNomor[r.nomor] = r.data));
     }
 
-    const combinedRows: any[] = [];
+    const columns = [
+      { header: "Cabang", key: "Cabang", align: "center" },
+      { header: "Tanggal", key: "Tanggal" },
+      { header: "Nomor", key: "NomorSo" },
+      { header: "Nama", key: "Nama" },
+      { header: "Pesan", key: "Pesan", align: "right", numFmt: "#,##0" },
+      { header: "Kirim", key: "Kirim", align: "right", numFmt: "#,##0" },
+      { header: "Kurang", key: "Kurang", align: "right", numFmt: "#,##0" },
+      { header: "Rencana", key: "Rencana", align: "right", numFmt: "#,##0" },
+      { header: "Ket. Rencana", key: "KetRencana" },
+      {
+        header: "Realisasi",
+        key: "Realisasi",
+        align: "right",
+        numFmt: "#,##0",
+      },
+      {
+        header: "Permintaan Kirim",
+        key: "PermintaanKirim",
+        align: "center",
+      },
+      { header: "Permintaan", key: "StatusPermintaan", align: "center" },
+      { header: "Kesepakatan", key: "Kesepakatan", align: "center" },
+      { header: "Ket Kesepakatan", key: "KetKesepakatan" },
+    ];
+
+    // Nama sheet Excel: max 31 char, tidak boleh \ / ? * [ ] : , dan harus unik.
+    const usedNames = new Set<string>();
+    const sanitizeSheetName = (raw: string) => {
+      let name = raw.replace(/[\\/?*[\]:]/g, "-").trim();
+      if (!name) name = "Periode";
+      name = name.slice(0, 31);
+      let final = name;
+      let i = 2;
+      while (usedNames.has(final)) {
+        const suffix = `(${i})`;
+        final = name.slice(0, 31 - suffix.length) + suffix;
+        i++;
+      }
+      usedNames.add(final);
+      return final;
+    };
+
+    const sheets: any[] = [];
     for (const periode of rawData as BrowseItem[]) {
       const detailRows = detailPerNomor[periode.Nomor] || [];
       if (!detailRows.length) continue;
 
-      const masterCells = {
-        NomorPeriode: periode.Nomor,
-        TglAwal: formatTanggal(periode.TglAwal),
-        TglAkhir: formatTanggal(periode.TglAkhir),
+      const rows = detailRows.map((d) => ({
         Cabang: periode.Cabang,
-      };
-      const blankMaster = Object.fromEntries(
-        Object.keys(masterCells).map((k) => [k, ""]),
-      );
+        Tanggal: formatTanggal(d.Tanggal),
+        NomorSo: d.Nomor || d.NomorPraOrder || d.NomorMap || "-",
+        Nama: d.Nama,
+        Pesan: Number(d.Pesan) || 0,
+        Kirim: Number(d.Kirim) || 0,
+        Kurang: Number(d.Kurang) || 0,
+        Rencana: Number(d.Rencana) || 0,
+        KetRencana: d.KetRencana || "",
+        Realisasi: Number(d.Realisasi) || 0,
+        PermintaanKirim: formatTanggal(d.PermintaanKirim),
+        StatusPermintaan: d.StatusPermintaan,
+        Kesepakatan: formatTanggal(d.Kesepakatan),
+        KetKesepakatan: d.KetKesepakatan || "",
+      }));
 
-      detailRows.forEach((d, idx) => {
-        combinedRows.push({
-          ...(idx === 0 ? masterCells : blankMaster),
-          Tanggal: formatTanggal(d.Tanggal),
-          NomorSo: d.Nomor || d.NomorPraOrder,
-          Nama: d.Nama,
-          Pesan: Number(d.Pesan) || 0,
-          Kirim: Number(d.Kirim) || 0,
-          Kurang: Number(d.Kurang) || 0,
-          Rencana: Number(d.Rencana) || 0,
-          Realisasi: Number(d.Realisasi) || 0,
-          PermintaanKirim: formatTanggal(d.PermintaanKirim),
-          StatusPermintaan: d.StatusPermintaan,
-          Kesepakatan: formatTanggal(d.Kesepakatan),
-          KetKesepakatan: d.KetKesepakatan || "",
-        });
+      // Baris total Rencana per periode, ditampilkan di akhir sheet.
+      const totalRencana = detailRows.reduce(
+        (sum, d) => sum + (Number(d.Rencana) || 0),
+        0,
+      );
+      rows.push({
+        Cabang: "",
+        Tanggal: "",
+        NomorSo: "",
+        Nama: "TOTAL RENCANA",
+        Pesan: "" as any,
+        Kirim: "" as any,
+        Kurang: "" as any,
+        Rencana: totalRencana,
+        KetRencana: "",
+        Realisasi: "" as any,
+        PermintaanKirim: "",
+        StatusPermintaan: "",
+        Kesepakatan: "",
+        KetKesepakatan: "",
+        _isSummary: true,
+      } as any);
+
+      sheets.push({
+        sheetName: sanitizeSheetName(
+          `${periode.Nomor} ${formatTanggal(periode.TglAwal)}-${formatTanggal(periode.TglAkhir)}`,
+        ),
+        headerColor: "FFEB3B",
+        columns,
+        rows,
+        rowStyleFn: (row: any) =>
+          row._isSummary
+            ? { fillColor: "FFD54F", fontColor: "212121", bold: true }
+            : rowStyleForStatus(row.StatusPermintaan),
       });
     }
 
-    if (!combinedRows.length) {
+    if (!sheets.length) {
       toast.warning(
         "Tidak ada detail SO/Pra Order/MAP untuk periode yang ditampilkan.",
       );
@@ -434,51 +503,7 @@ const onExportDetail = async () => {
 
     await exportExcel(
       `Komitmen_Kirim_Detail_${filterStart.value}_${filterEnd.value}.xlsx`,
-      [
-        {
-          sheetName: "Detail",
-          headerColor: "FFEB3B", // kuning, sesuai gaya tracker Excel referensi
-          columns: [
-            { header: "Periode", key: "NomorPeriode" },
-            { header: "Tgl Awal", key: "TglAwal" },
-            { header: "Tgl Akhir", key: "TglAkhir" },
-            { header: "Cabang", key: "Cabang" },
-            { header: "Tanggal", key: "Tanggal" },
-            { header: "Nomor", key: "NomorSo" },
-            { header: "Nama", key: "Nama" },
-            { header: "Pesan", key: "Pesan", align: "right", numFmt: "#,##0" },
-            { header: "Kirim", key: "Kirim", align: "right", numFmt: "#,##0" },
-            {
-              header: "Kurang",
-              key: "Kurang",
-              align: "right",
-              numFmt: "#,##0",
-            },
-            {
-              header: "Rencana",
-              key: "Rencana",
-              align: "right",
-              numFmt: "#,##0",
-            },
-            {
-              header: "Realisasi",
-              key: "Realisasi",
-              align: "right",
-              numFmt: "#,##0",
-            },
-            {
-              header: "Permintaan Kirim",
-              key: "PermintaanKirim",
-              align: "center",
-            },
-            { header: "Permintaan", key: "StatusPermintaan", align: "center" },
-            { header: "Kesepakatan", key: "Kesepakatan", align: "center" },
-            { header: "Ket Kesepakatan", key: "KetKesepakatan" },
-          ],
-          rows: combinedRows,
-          rowStyleFn: (row) => rowStyleForStatus(row.StatusPermintaan),
-        },
-      ],
+      sheets,
     );
   } catch (e) {
     console.error(e);
@@ -660,6 +685,9 @@ fetchData();
                 <div>{{ d.Nama }}</div>
                 <div v-if="d.NomorPraOrder" class="praorder-badge">
                   dari {{ d.NomorPraOrder }}
+                </div>
+                <div v-if="d.KetRencana" class="ket-rencana-note">
+                  📝 {{ d.KetRencana }}
                 </div>
               </td>
               <td class="tr">{{ fmt(d.Pesan) }}</td>
@@ -1007,6 +1035,12 @@ fetchData();
   color: white;
   padding: 1px 6px;
   border-radius: 8px;
+}
+.ket-rencana-note {
+  margin-top: 2px;
+  font-size: 9.5px;
+  font-style: italic;
+  color: #e65100;
 }
 .kesepakatan-tgl {
   font-weight: 700;

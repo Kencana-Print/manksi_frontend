@@ -229,6 +229,7 @@ const onExportDetail = async () => {
       rowsInGroup.forEach((d: any, idx: number) => {
         combinedRows.push({
           ...(idx === 0 ? masterCells : blankMaster),
+          NomorUlang: m.Nomor,
           Kode: d.Kode,
           Nama: d.Nama,
           Ukuran: d.Ukuran,
@@ -263,6 +264,7 @@ const onExportDetail = async () => {
         { header: "Tgl Pelunasan", key: "Tanggal_Pelunasan" },
         { header: "Tgl Bayar", key: "Tanggal_bayar" },
         { header: "Created", key: "Created" },
+        { header: "Nomor", key: "NomorUlang" },
         { header: "Kode", key: "Kode" },
         { header: "Nama", key: "Nama" },
         { header: "Ukuran", key: "Ukuran" },
