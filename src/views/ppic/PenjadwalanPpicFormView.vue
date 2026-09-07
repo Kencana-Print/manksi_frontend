@@ -149,7 +149,9 @@ const canEditMarketing = computed(
   () => isAdmin.value || authStore.user?.bagian?.toUpperCase() === "MARKETING",
 );
 const canEditKesepakatan = computed(
-  () => isAdmin.value || authStore.user?.bagian?.toUpperCase() === "PPIC",
+  () =>
+    isAdmin.value ||
+    authStore.user?.bagian?.toUpperCase() !== "MARKETING",
 );
 
 // ── Cabang → Divisi mapping tetap ───────────────────────────────
