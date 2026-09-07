@@ -4,9 +4,8 @@ import { useRoute, useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
 import BaseForm from "@/components/BaseForm.vue";
 import { useForm } from "@/composables/useForm";
-import { lhkPolaFormService } from "@/services/garmen/lhkPolaFormService";
+import { lhkMarkerFormService } from "@/services/ppic/lhkMarkerFormService";
 import SpkPolaSearchModal from "@/components/lookups/SpkPolaSearchModal.vue";
-import SpkSearchModal from "@/components/lookups/SpkSearchModal.vue";
 import { IconRuler2, IconSearch, IconTrash } from "@tabler/icons-vue";
 import api from "@/services/api";
 
@@ -15,13 +14,14 @@ const router = useRouter();
 const toast = useToast();
 const isEditMode = computed(() => !!route.params.nomor);
 
-const gradingImageFiles = ref<Record<string, File>>({});
+const markerImageFiles = ref<Record<string, File>>({});
 
-const emptyGradingRow = () => ({
+const emptyMarkerRow = () => ({
   spkNomor: "",
   namaSpk: "",
-  divisi: "",
-  gradingSize: "",
+  lebarKain: "",
+  size: "",
+  tujuanProses: "",
   keterangan: "",
   gambar: "",
 });
@@ -30,8 +30,8 @@ const defaultData = {
   nomor: "",
   tanggal: new Date().toISOString().substring(0, 10),
   keterangan: "",
-  pembuatPola: "",
-  grading: [emptyGradingRow()],
+  pembuatMarker: "",
+  marker: [emptyMarkerRow()],
 };
 
 const {
@@ -45,49 +45,45 @@ const {
   executeCancel,
   executeClose,
 } = useForm({
-  menuId: "174",
+  menuId: "179",
   initialData: defaultData,
   fetchApi: async () => {
     const nomor = String(route.params.nomor);
-    const res = await lhkPolaFormService.getDetail(nomor);
+    const res = await lhkMarkerFormService.getDetail(nomor);
     const d = res.data.data;
     return {
       nomor: d.header.lhkp_nomor,
       tanggal: String(d.header.lhkp_tanggal).substring(0, 10),
       keterangan: d.header.lhkp_keterangan || "",
-      pembuatPola: d.header.pembuatPola || "",
-      grading:
-        d.grading.length > 0
-          ? d.grading.map((r: any) => ({
+      pembuatMarker: d.header.pembuatMarker || "",
+      marker:
+        d.marker.length > 0
+          ? d.marker.map((r: any) => ({
               spkNomor: r.spkNomor,
               namaSpk: r.namaSpk || "",
-              divisi: r.divisi || "",
-              gradingSize: r.gradingSize || "",
+              lebarKain: r.lebarKain || "",
+              size: r.size || "",
+              tujuanProses: r.tujuanProses || "",
               keterangan: r.keterangan || "",
               gambar: r.gambar || "",
             }))
-          : [emptyGradingRow()],
+          : [emptyMarkerRow()],
     };
   },
   submitApi: async (data: any) => {
     const payload = {
       tanggal: data.tanggal,
       keterangan: data.keterangan,
-      pembuatPola: data.pembuatPola,
-      grading: data.grading,
+      pembuatMarker: data.pembuatMarker,
+      marker: data.marker,
     };
     const res = isEditMode.value
-      ? await lhkPolaFormService.update(String(route.params.nomor), payload)
-      : await lhkPolaFormService.create(payload);
+      ? await lhkMarkerFormService.update(String(route.params.nomor), payload)
+      : await lhkMarkerFormService.create(payload);
     const savedNomor = res.data.data.nomor;
     try {
-      for (const [spkNomor, file] of Object.entries(gradingImageFiles.value)) {
-        await lhkPolaFormService.uploadGambar(
-          file,
-          savedNomor,
-          "grading",
-          spkNomor,
-        );
+      for (const [spkNomor, file] of Object.entries(markerImageFiles.value)) {
+        await lhkMarkerFormService.uploadGambar(file, savedNomor, spkNomor);
       }
     } catch (imgError: any) {
       toast.warning(
@@ -99,19 +95,17 @@ const {
   onSuccess: () => {
     toast.success(
       isEditMode.value
-        ? "LHK Pola berhasil diupdate."
-        : "LHK Pola berhasil disimpan.",
+        ? "LHK Marker berhasil diupdate."
+        : "LHK Marker berhasil disimpan.",
     );
-    router.push({ name: "LhkPolaBrowse" });
+    router.push({ name: "PpicLhkMarker" });
   },
 });
 
-// Auto-generate Keterangan dari gabungan Nama SPK yang terisi,
-// supaya browse langsung menampilkan konteks tanpa user ketik manual.
 watch(
-  () => formData.value.grading.map((r: any) => r.namaSpk).join("|"),
+  () => formData.value.marker.map((r: any) => r.namaSpk).join("|"),
   () => {
-    const namaList = formData.value.grading
+    const namaList = formData.value.marker
       .map((r: any) => r.namaSpk)
       .filter((n: string) => n && n.trim());
     const unique = [...new Set(namaList)];
@@ -121,16 +115,16 @@ watch(
   },
 );
 
-const ensureTrailingGradingRow = () => {
-  const list = formData.value.grading;
+const ensureTrailingMarkerRow = () => {
+  const list = formData.value.marker;
   const last = list[list.length - 1];
   if (list.length === 0 || (last && last.spkNomor.trim())) {
-    list.push(emptyGradingRow());
+    list.push(emptyMarkerRow());
   }
 };
-const removeGradingRow = (idx: number) => {
-  formData.value.grading.splice(idx, 1);
-  if (formData.value.grading.length === 0) ensureTrailingGradingRow();
+const removeMarkerRow = (idx: number) => {
+  formData.value.marker.splice(idx, 1);
+  if (formData.value.marker.length === 0) ensureTrailingMarkerRow();
 };
 
 const showSpkModal = ref(false);
@@ -140,7 +134,7 @@ const openSpkModal = (idx: number) => {
   showSpkModal.value = true;
 };
 const checkDuplicateSpk = (nomor: string, excludeIdx: number) =>
-  formData.value.grading.some(
+  formData.value.marker.some(
     (r: any, i: number) => i !== excludeIdx && r.spkNomor === nomor,
   );
 const onSpkSelected = (item: any) => {
@@ -150,51 +144,38 @@ const onSpkSelected = (item: any) => {
     toast.warning(`SPK ${item.Nomor} sudah ada di baris lain.`);
     return;
   }
-  formData.value.grading[idx].spkNomor = item.Nomor;
-  formData.value.grading[idx].namaSpk = item.Nama;
-  lookupDivisiForRow(idx);
-  ensureTrailingGradingRow();
+  formData.value.marker[idx].spkNomor = item.Nomor;
+  formData.value.marker[idx].namaSpk = item.Nama;
+  ensureTrailingMarkerRow();
 };
-const lookupDivisiForRow = async (idx: number) => {
-  const row = formData.value.grading[idx];
-  if (!row.spkNomor) return;
-  try {
-    const res = await lhkPolaFormService.getSpkByNomor(row.spkNomor);
-    formData.value.grading[idx].divisi = res.data.data.DivisiNama || "";
-  } catch {
-    formData.value.grading[idx].divisi = "";
-  }
-};
-const onGradingSpkEnter = async (idx: number) => {
-  const nomor = formData.value.grading[idx].spkNomor.trim();
+const onMarkerSpkEnter = async (idx: number) => {
+  const nomor = formData.value.marker[idx].spkNomor.trim();
   if (!nomor) return;
   if (checkDuplicateSpk(nomor, idx)) {
     toast.warning(`SPK ${nomor} sudah ada di baris lain.`);
-    formData.value.grading[idx].spkNomor = "";
+    formData.value.marker[idx].spkNomor = "";
     return;
   }
   try {
-    const res = await lhkPolaFormService.getSpkByNomor(nomor);
-    formData.value.grading[idx].namaSpk = res.data.data.Nama;
-    formData.value.grading[idx].divisi = res.data.data.DivisiNama || "";
-    ensureTrailingGradingRow();
+    const res = await lhkMarkerFormService.getSpkByNomor(nomor);
+    formData.value.marker[idx].namaSpk = res.data.data.Nama;
+    ensureTrailingMarkerRow();
   } catch {
     toast.error(`SPK/MAP "${nomor}" tidak ditemukan.`);
-    formData.value.grading[idx].spkNomor = "";
-    formData.value.grading[idx].namaSpk = "";
-    formData.value.grading[idx].divisi = "";
+    formData.value.marker[idx].spkNomor = "";
+    formData.value.marker[idx].namaSpk = "";
   }
 };
 
-const onGradingImageChange = (e: Event, idx: number) => {
+const onMarkerImageChange = (e: Event, idx: number) => {
   const file = (e.target as HTMLInputElement).files?.[0];
-  const row = formData.value.grading[idx];
+  const row = formData.value.marker[idx];
   if (!file || !row.spkNomor) return;
   if (file.size > 1_000_000) {
     toast.error("Ukuran gambar tidak boleh > 1 Mb.");
     return;
   }
-  gradingImageFiles.value[row.spkNomor] = file;
+  markerImageFiles.value[row.spkNomor] = file;
   row.gambar = URL.createObjectURL(file);
 };
 const getGambarUrl = (row: any) => {
@@ -218,11 +199,11 @@ const validateSave = () => {
     toast.warning("Tanggal wajib diisi.");
     return;
   }
-  const gradingFilled = formData.value.grading.filter((r: any) =>
+  const markerFilled = formData.value.marker.filter((r: any) =>
     r.spkNomor.trim(),
   );
-  if (gradingFilled.length === 0) {
-    toast.warning("Minimal harus ada 1 baris SPK terisi di Pola/Grading.");
+  if (markerFilled.length === 0) {
+    toast.warning("Minimal harus ada 1 baris SPK terisi.");
     return;
   }
   showSaveDialog.value = true;
@@ -231,8 +212,8 @@ const validateSave = () => {
 
 <template>
   <BaseForm
-    :title="isEditMode ? 'Ubah LHK Pola' : 'Buat LHK Pola'"
-    menu-id="174"
+    :title="isEditMode ? 'Ubah LHK Marker' : 'Buat LHK Marker'"
+    menu-id="179"
     :icon="IconRuler2"
     :is-loading="isLoading"
     :is-saving="isSaving"
@@ -247,7 +228,7 @@ const validateSave = () => {
     <div class="lp-container">
       <div class="lp-header-card">
         <div class="fr">
-          <label class="lbl">No. LHK Pola</label>
+          <label class="lbl">No. LHK Marker</label>
           <input
             :value="formData.nomor || '(Otomatis)'"
             readonly
@@ -269,10 +250,10 @@ const validateSave = () => {
         <div class="fr">
           <label class="lbl">Pembuat</label>
           <input
-            v-model="formData.pembuatPola"
+            v-model="formData.pembuatMarker"
             class="inp"
             style="flex: 1"
-            placeholder="Nama pembuat pola..."
+            placeholder="Nama pembuat marker..."
           />
         </div>
       </div>
@@ -284,15 +265,16 @@ const validateSave = () => {
               <th style="width: 32px">No</th>
               <th style="width: 150px">No. SPK</th>
               <th>Nama SPK</th>
-              <th style="width: 110px">Divisi</th>
-              <th style="width: 160px">Grading Size</th>
-              <th style="width: 180px">Keterangan</th>
+              <th style="width: 100px">Lebar Kain</th>
+              <th style="width: 110px">Size</th>
+              <th style="width: 100px">For</th>
+              <th style="width: 160px">Keterangan</th>
               <th style="width: 90px">Gambar</th>
               <th style="width: 36px"></th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="(row, idx) in formData.grading" :key="idx">
+            <tr v-for="(row, idx) in formData.marker" :key="idx">
               <td class="tc">{{ Number(idx) + 1 }}</td>
               <td>
                 <div class="igrp">
@@ -300,7 +282,7 @@ const validateSave = () => {
                     v-model="row.spkNomor"
                     class="cell-inp"
                     placeholder="F1/Enter cari..."
-                    @keydown.enter.prevent="onGradingSpkEnter(Number(idx))"
+                    @keydown.enter.prevent="onMarkerSpkEnter(Number(idx))"
                     @keydown.f1.prevent="openSpkModal(Number(idx))"
                   />
                   <button
@@ -316,13 +298,24 @@ const validateSave = () => {
                 <input :value="row.namaSpk" readonly class="cell-inp ro" />
               </td>
               <td>
-                <input :value="row.divisi" readonly class="cell-inp ro" />
+                <input
+                  v-model="row.lebarKain"
+                  class="cell-inp"
+                  placeholder="147CM"
+                />
               </td>
               <td>
                 <input
-                  v-model="row.gradingSize"
+                  v-model="row.size"
                   class="cell-inp"
-                  placeholder="S,M,L,XL"
+                  placeholder="M,L,XL"
+                />
+              </td>
+              <td>
+                <input
+                  v-model="row.tujuanProses"
+                  class="cell-inp"
+                  placeholder="CUTTING"
                 />
               </td>
               <td>
@@ -346,16 +339,16 @@ const validateSave = () => {
                     accept="image/*"
                     class="cell-file-inp"
                     :disabled="!row.spkNomor"
-                    @change="onGradingImageChange($event, Number(idx))"
+                    @change="onMarkerImageChange($event, Number(idx))"
                   />
                 </div>
               </td>
               <td class="tc">
                 <button
-                  v-if="formData.grading.length > 1"
+                  v-if="formData.marker.length > 1"
                   type="button"
                   class="btn-del"
-                  @click="removeGradingRow(Number(idx))"
+                  @click="removeMarkerRow(Number(idx))"
                 >
                   <IconTrash :size="13" color="#c62828" />
                 </button>
@@ -366,11 +359,7 @@ const validateSave = () => {
       </div>
     </div>
 
-    <SpkSearchModal
-      v-model="showSpkModal"
-      filter-mode="spk-map"
-      @selected="onSpkSelected"
-    />
+    <SpkPolaSearchModal v-model="showSpkModal" @selected="onSpkSelected" />
 
     <v-dialog v-model="showImagePreview" max-width="800px">
       <div class="preview-card">

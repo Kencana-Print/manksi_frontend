@@ -390,6 +390,12 @@ export const createMenuItems = (): NavItem[] => {
           icon: IconRuler2,
           menuId: 174,
         },
+        {
+          title: "LHK Marker",
+          to: "/ppic/lhk-marker",
+          icon: IconRuler2,
+          menuId: 179,
+        },
       ],
     },
     {

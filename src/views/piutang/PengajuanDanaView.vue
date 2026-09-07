@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from "vue";
+import { useAuthStore } from "@/stores/authStore";
 import { useToast } from "vue-toastification";
 import { useRouter } from "vue-router";
 import BaseBrowse from "@/components/BaseBrowse.vue";
@@ -20,6 +21,7 @@ import {
   type ExcelColumn,
 } from "@/utils/excelExport";
 
+const authStore = useAuthStore();
 const toast = useToast();
 const router = useRouter();
 const menuId = "177";
@@ -42,10 +44,17 @@ const filters = ref({
 // ── Headers master (sesuai kolom Delphi btnRefreshClick) ──
 const masterHeaders = [
   { title: "Status", key: "_status", width: "130px", align: "center" },
+  {
+    title: "Status Finance",
+    key: "_statusFinance",
+    width: "150px",
+    align: "center",
+  },
   { title: "Nomor", key: "Nomor", width: "150px" },
   { title: "Tanggal", key: "Tanggal", width: "95px", align: "center" },
   { title: "Nik", key: "Nik", width: "70px" },
   { title: "Nama", key: "Nama", width: "150px" },
+  { title: "Cost Center", key: "_costCenter", width: "260px" },
   { title: "Lokasi", key: "Lokasi", width: "70px" },
   { title: "Bagian", key: "Bagian", width: "90px" },
   { title: "Pjh Ke", key: "PjhKe", width: "70px" },
@@ -110,21 +119,39 @@ const getStatusInfo = (
   row: any,
 ): { label: string; color: string; bg: string } => {
   if (row.Closed === "Sudah")
-    return { label: "Selesai", color: "#616161", bg: "#F5F5F5" };
+    return { label: "Selesai", color: "#212121", bg: "#F5F5F5" };
   if (row.Verified === "Belum")
     return { label: "Belum Verifikasi", color: "#1565C0", bg: "#E3F2FD" };
   if (row.Approval === "Belum")
     return { label: "Belum Cair", color: "#C62828", bg: "#FFEBEE" };
   if (row.Beli === "Belum")
     return { label: "Belum Beli", color: "#2E7D32", bg: "#E8F5E9" };
-  return { label: "", color: "", bg: "" };
+  // Semua (Verified/Approval/Beli) sudah "Sudah" tapi Closed masih "Belum"
+  // — proses selesai, tinggal menunggu di-Close.
+  return { label: "Menunggu Close", color: "#00838F", bg: "#E0F7FA" };
 };
+
+const STATUS_FINANCE_LABEL: Record<
+  string,
+  { label: string; color: string; bg: string }
+> = {
+  PENDING: { label: "Pending", color: "#e65100", bg: "#fff3e0" },
+  MENUNGGU_PEMBELIAN: {
+    label: "Menunggu Pembelian",
+    color: "#1565c0",
+    bg: "#e3f2fd",
+  },
+  BULAN_DEPAN: { label: "Bulan Depan", color: "#7b1fa2", bg: "#f3e5f5" },
+  OTORISASI: { label: "Otorisasi", color: "#c2185b", bg: "#fce4ec" },
+};
+const getStatusFinanceInfo = (row: any) =>
+  STATUS_FINANCE_LABEL[row.StatusFinance] || null;
 
 const getRowProps = (data: any) => {
   const row = data.item?.raw || data.item;
   const status = getStatusInfo(row);
   return {
-    style: status.bg ? `background-color: ${status.bg};` : "",
+    style: status.color ? `color: ${status.color}; font-weight: 600;` : "",
   };
 };
 
@@ -133,9 +160,22 @@ const onBaru = () => router.push("/piutang/pengajuan-dana/create");
 
 const onUbah = () => {
   if (!isSingleSelected.value) return;
-  router.push(
-    `/piutang/pengajuan-dana/edit/${encodeURIComponent(selected.value[0].Nomor)}`,
-  );
+  const item = selected.value[0];
+
+  if (item.Closed === "Sudah") {
+    toast.warning("Pengajuan sudah Close.");
+    return;
+  }
+  if (item.Verified === "Sudah") {
+    toast.warning("Sudah di Verifikasi oleh GA.");
+    return;
+  }
+  if (item.UserKode !== authStore.user?.kode) {
+    toast.warning("Pengajuan ini bukan milik Anda.");
+    return;
+  }
+
+  router.push(`/piutang/pengajuan-dana/edit/${encodeURIComponent(item.Nomor)}`);
 };
 
 const onHapus = async () => {
@@ -152,10 +192,27 @@ const onHapus = async () => {
   }
 };
 
+const showPrintChoiceDialog = ref(false);
+const printTargetNomor = ref("");
+
 const onCetak = () => {
   if (!isSingleSelected.value) return;
+  const item = selected.value[0];
+  printTargetNomor.value = item.Nomor;
+  if (item.PjhKe === "P04") {
+    showPrintChoiceDialog.value = true;
+  } else {
+    openPrint("half"); // default non-P04 selalu HALF, sesuai Delphi
+  }
+};
+
+const openPrint = (layout: "full" | "half") => {
+  showPrintChoiceDialog.value = false;
+  const routeName =
+    layout === "full" ? "PengajuanDanaPrint" : "PengajuanDanaPrintHalf";
   const printUrl = router.resolve({
-    path: `/piutang/pengajuan-dana/print/${encodeURIComponent(selected.value[0].Nomor)}`,
+    name: routeName,
+    params: { nomor: printTargetNomor.value },
   }).href;
   window.open(printUrl, "_blank");
 };
@@ -376,6 +433,10 @@ const fmtNum = (val: number) =>
           <span class="legend-dot" style="background: #616161"></span>
           <span>Selesai</span>
         </div>
+        <div class="legend-item">
+          <span class="legend-dot" style="background: #00838f"></span>
+          <span>Menunggu Close</span>
+        </div>
       </div>
     </template>
 
@@ -455,8 +516,33 @@ const fmtNum = (val: number) =>
       <span v-else class="text-grey text-caption">-</span>
     </template>
 
+    <template #item._statusFinance="{ item }">
+      <v-chip
+        v-if="getStatusFinanceInfo(item)"
+        size="x-small"
+        :style="{
+          backgroundColor: getStatusFinanceInfo(item)!.bg,
+          color: getStatusFinanceInfo(item)!.color,
+        }"
+        class="font-weight-bold"
+      >
+        {{ getStatusFinanceInfo(item)!.label }}
+      </v-chip>
+      <span v-else class="text-grey text-caption">-</span>
+    </template>
+
     <template #item.Tanggal="{ item }">
       {{ formatTanggal(item.Tanggal) }}
+    </template>
+
+    <template #item._costCenter="{ item }">
+      <span v-if="item.CcNama">
+        {{ item.CcNama
+        }}<span v-if="item.CcDcNama" class="text-grey">
+          — {{ item.CcDcNama }}</span
+        >
+      </span>
+      <span v-else class="text-grey text-caption">-</span>
     </template>
 
     <template #detail="{ item }">
@@ -521,6 +607,29 @@ const fmtNum = (val: number) =>
       </div>
     </template>
   </BaseBrowse>
+
+  <v-dialog v-model="showPrintChoiceDialog" max-width="380px" persistent>
+    <v-card class="rounded-lg">
+      <v-card-title
+        class="bg-primary text-white pa-3"
+        style="font-size: 13px; font-weight: 700"
+      >
+        Pilih Ukuran Cetak
+      </v-card-title>
+      <v-card-text class="pa-4 text-center">
+        [Yes] Cetak Full A4 &nbsp;&nbsp; [No] Cetak 1/2 A4
+      </v-card-text>
+      <v-card-actions class="pa-3 border-t bg-grey-lighten-4">
+        <v-btn variant="outlined" color="primary" @click="openPrint('half')"
+          >No — 1/2 A4</v-btn
+        >
+        <v-spacer />
+        <v-btn variant="elevated" color="primary" @click="openPrint('full')"
+          >Yes — Full A4</v-btn
+        >
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
 </template>
 
 <style scoped>

@@ -782,6 +782,41 @@ const router = createRouter({
         menuId: "176",
       },
     },
+    {
+      path: "/ppic/lhk-marker",
+      name: "PpicLhkMarker",
+      component: () => import("@/views/ppic/LhkMarkerView.vue"),
+      meta: {
+        title: "LHK Marker",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "179",
+      },
+    },
+    {
+      path: "/ppic/lhk-marker/create",
+      name: "PpicLhkMarkerCreate",
+      component: () => import("@/views/ppic/LhkMarkerFormView.vue"),
+      meta: {
+        title: "Buat LHK Marker",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "179",
+        browseRoute: "PpicLhkMarker",
+      },
+    },
+    {
+      path: "/ppic/lhk-marker/edit/:nomor",
+      name: "PpicLhkMarkerEdit",
+      component: () => import("@/views/ppic/LhkMarkerFormView.vue"),
+      meta: {
+        title: "Ubah LHK Marker",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "179",
+        browseRoute: "PpicLhkMarker",
+      },
+    },
 
     // ── Garmen ──────────────────────────────────────────────────────────
     {
@@ -3284,41 +3319,52 @@ const router = createRouter({
         menuId: "177",
       },
     },
-    // {
-    //   path: "/piutang/pengajuan-dana/create",
-    //   name: "PengajuanDanaCreate",
-    //   component: () => import("@/views/piutang/PengajuanDanaFormView.vue"),
-    //   meta: {
-    //     title: "Tambah Pengajuan Dana",
-    //     layout: "DefaultLayout",
-    //     requiresAuth: true,
-    //     menuId: "177",
-    //     browseRoute: "PengajuanDanaBrowse",
-    //   },
-    // },
-    // {
-    //   path: "/piutang/pengajuan-dana/edit/:nomor",
-    //   name: "PengajuanDanaEdit",
-    //   component: () => import("@/views/piutang/PengajuanDanaFormView.vue"),
-    //   meta: {
-    //     title: "Ubah Pengajuan Dana",
-    //     layout: "DefaultLayout",
-    //     requiresAuth: true,
-    //     menuId: "177",
-    //     browseRoute: "PengajuanDanaBrowse",
-    //   },
-    // },
-    // {
-    //   path: "/piutang/pengajuan-dana/print/:nomor",
-    //   name: "PengajuanDanaPrint",
-    //   component: () => import("@/views/piutang/PengajuanDanaPrintView.vue"),
-    //   meta: {
-    //     title: "Cetak Pengajuan Dana",
-    //     layout: "BlankLayout",
-    //     requiresAuth: true,
-    //     menuId: "177",
-    //   },
-    // },
+    {
+      path: "/piutang/pengajuan-dana/create",
+      name: "PengajuanDanaCreate",
+      component: () => import("@/views/piutang/PengajuanDanaFormView.vue"),
+      meta: {
+        title: "Tambah Pengajuan Dana",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "177",
+        browseRoute: "PengajuanDanaBrowse",
+      },
+    },
+    {
+      path: "/piutang/pengajuan-dana/edit/:nomor",
+      name: "PengajuanDanaEdit",
+      component: () => import("@/views/piutang/PengajuanDanaFormView.vue"),
+      meta: {
+        title: "Ubah Pengajuan Dana",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "177",
+        browseRoute: "PengajuanDanaBrowse",
+      },
+    },
+    {
+      path: "/piutang/pengajuan-dana/print/:nomor",
+      name: "PengajuanDanaPrint",
+      component: () => import("@/views/piutang/PengajuanDanaPrintView.vue"),
+      meta: {
+        title: "Cetak Pengajuan Dana",
+        layout: "BlankLayout",
+        requiresAuth: true,
+        menuId: "177",
+      },
+    },
+    {
+      path: "/piutang/pengajuan-dana/print-half/:nomor",
+      name: "PengajuanDanaPrintHalf",
+      component: () => import("@/views/piutang/PengajuanDanaPrintHalfView.vue"),
+      meta: {
+        title: "Cetak Pengajuan Dana (1/2 A4)",
+        layout: "BlankLayout",
+        requiresAuth: true,
+        menuId: "177",
+      },
+    },
 
     // ── Laporan ───────────────────────────────────────────────────
     {

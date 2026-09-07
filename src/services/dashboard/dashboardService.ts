@@ -15,6 +15,9 @@ export const dashboardService = {
   getPenawaranBelumMap: (limit = 20, offset = 0) =>
     api.get("/dashboard/penawaran-belum-map", { params: { limit, offset } }),
   getPenawaranMapSummary: () => api.get("/dashboard/penawaran-map-summary"),
+  getPenawaranBatalSummary: () => api.get("/dashboard/penawaran-batal-summary"),
+  getPenawaranBatalList: (limit = 20, offset = 0) =>
+    api.get("/dashboard/penawaran-batal-list", { params: { limit, offset } }),
   getKunjunganSalesSummary: () => api.get("/dashboard/kunjungan-sales-summary"),
   getPiutangDashboard: () => api.get("/dashboard/piutang-dashboard"),
   getPiutangOverdue: (limit = 20, offset = 0) =>
@@ -156,6 +159,9 @@ export const dashboardService = {
 
   getGrowthYoy: (tahun?: number) =>
     api.get("/dashboard/growth-yoy", { params: { tahun } }),
+
+  getAchievementMonthly: (tahun?: number) =>
+    api.get("/dashboard/achievement-monthly", { params: { tahun } }),
 
   getPenawaranFunnel: (bulan?: number, tahun?: number) =>
     api.get("/dashboard/penawaran-funnel", { params: { bulan, tahun } }),
