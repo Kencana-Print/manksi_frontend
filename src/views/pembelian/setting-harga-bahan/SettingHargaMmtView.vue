@@ -45,7 +45,7 @@ const displayedMmtItems = computed(() => {
 });
 
 const mmtHeaders = [
-    { title: "ID", key: "id", width: "70px", align: "center" as const },
+    { title: "NO", key: "no", width: "70px", align: "center" as const },
     { title: "KATEGORI", key: "kategori", width: "130px" },
     { title: "KODE", key: "bahan_kode", width: "110px" },
     { title: "NAMA BAHAN", key: "nama_bahan", minWidth: "220px" },
@@ -62,7 +62,7 @@ const mmtHeaders = [
         align: "end" as const,
     },
     {
-        title: "TARIF / M² (RP)",
+        title: "TARIF / M²",
         key: "harga",
         width: "150px",
         align: "end" as const,
@@ -94,13 +94,13 @@ const {
 });
 
 const toppingHeaders = [
-    { title: "KODE", key: "kode", width: "140px" },
+    { title: "NO", key: "no", width: "70px", align: "center" as const },
     { title: "NAMA TOPPING / AKSESORIS", key: "nama", minWidth: "240px" },
     { title: "KATEGORI", key: "kategori", width: "150px" },
     { title: "UKURAN", key: "ukuran", width: "120px" },
     { title: "MATERIAL", key: "material", width: "120px" },
     {
-        title: "HARGA (RP)",
+        title: "HARGA",
         key: "harga",
         width: "140px",
         align: "end" as const,
@@ -249,11 +249,17 @@ const handleRefresh = () => {
 
 const handleExport = () => {
     if (activeSub.value === "bahan") {
+        const exportData = (displayedMmtItems.value ?? []).map(
+            (item: any, idx: number) => ({
+                ...item,
+                no: idx + 1,
+            }),
+        );
         exportExcelSingle(
             "Setting_Harga_MMT.xlsx",
             "Bahan MMT",
             [
-                { key: "id", header: "ID", width: 8 },
+                { key: "no", header: "NO", width: 8, align: "center" },
                 { key: "kategori", header: "KATEGORI", width: 15 },
                 { key: "bahan_kode", header: "KODE", width: 15 },
                 { key: "nama_bahan", header: "NAMA BAHAN", width: 30 },
@@ -271,32 +277,38 @@ const handleExport = () => {
                 },
                 {
                     key: "harga",
-                    header: "TARIF / M2 (RP)",
+                    header: "TARIF / M2",
                     width: 18,
                     numFmt: "Rp #,##0",
                 },
             ],
-            mmtItems.value ?? [],
+            exportData,
             "Master Bahan MMT",
         );
     } else {
+        const exportData = (toppingItems.value ?? []).map(
+            (item: any, idx: number) => ({
+                ...item,
+                no: idx + 1,
+            }),
+        );
         exportExcelSingle(
             "Topping_Aksesoris_MMT.xlsx",
             "Topping MMT",
             [
-                { key: "kode", header: "KODE", width: 15 },
+                { key: "no", header: "NO", width: 8, align: "center" },
                 { key: "nama", header: "NAMA TOPPING", width: 30 },
                 { key: "kategori", header: "KATEGORI", width: 20 },
                 { key: "ukuran", header: "UKURAN", width: 15 },
                 { key: "material", header: "MATERIAL", width: 15 },
                 {
                     key: "harga",
-                    header: "HARGA (RP)",
+                    header: "HARGA",
                     width: 18,
                     numFmt: "Rp #,##0",
                 },
             ],
-            toppingItems.value ?? [],
+            exportData,
             "Master Topping & Aksesoris MMT",
         );
     }
@@ -401,14 +413,14 @@ const executeSaveTopping = async () => {
                             size="small"
                             class="text-none font-weight-bold px-3"
                         >
-                            1. Master Bahan
+                            Master Bahan
                         </v-btn>
                         <v-btn
                             value="topping"
                             size="small"
                             class="text-none font-weight-bold px-3"
                         >
-                            2. Topping & Aksesoris
+                            Topping & Aksesoris
                         </v-btn>
                     </v-btn-toggle>
                 </div>
@@ -442,6 +454,14 @@ const executeSaveTopping = async () => {
                         }})
                     </span>
                 </div>
+            </template>
+
+            <template #item.no="{ index }">
+                <span
+                    class="text-caption text-medium-emphasis font-weight-medium"
+                >
+                    {{ index + 1 }}
+                </span>
             </template>
 
             <template #item.kategori="{ value }">
@@ -510,17 +530,25 @@ const executeSaveTopping = async () => {
                             size="small"
                             class="text-none font-weight-bold px-3"
                         >
-                            1. Master Bahan
+                            Master Bahan
                         </v-btn>
                         <v-btn
                             value="topping"
                             size="small"
                             class="text-none font-weight-bold px-3"
                         >
-                            2. Topping & Aksesoris
+                            Topping & Aksesoris
                         </v-btn>
                     </v-btn-toggle>
                 </div>
+            </template>
+
+            <template #item.no="{ index }">
+                <span
+                    class="text-caption text-medium-emphasis font-weight-medium"
+                >
+                    {{ index + 1 }}
+                </span>
             </template>
 
             <template #item.harga="{ value }">
@@ -609,7 +637,7 @@ const executeSaveTopping = async () => {
                     <v-col cols="12">
                         <v-text-field
                             v-model.number="mmtForm.harga"
-                            label="Tarif per m² (Rp) *"
+                            label="Tarif per m²*"
                             type="number"
                             variant="outlined"
                             density="compact"

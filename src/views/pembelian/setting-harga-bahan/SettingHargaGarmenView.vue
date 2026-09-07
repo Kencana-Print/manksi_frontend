@@ -75,20 +75,82 @@ const getGramasi = (jenisKain: string): string => {
     return "-";
 };
 
-// Custom settings override untuk Biaya Jahit dan Margin Tier per item kain
+// Global Margin Tier (%)
+const globalMarginTier = reactive({
+    t1: 20,
+    t2: 15,
+    t3: 10,
+    t4: 7.5,
+    t5: 2,
+});
+const marginTierDialog = ref(false);
+
+// Custom settings override untuk Harga, Allowance, Biaya Jahit dan Margin Tier per item kain
 const customKainSettings = ref<
     Record<
         string,
         {
+            hargaBahan?: number;
+            allowancePersen?: number;
             biayaJahit?: number;
+            t1_margin?: number;
+            t2_margin?: number;
+            t3_margin?: number;
+            t4_margin?: number;
+            t5_margin?: number;
             t1?: number;
             t2?: number;
             t3?: number;
             t4?: number;
             t5?: number;
+            isDirty?: boolean;
         }
     >
 >({});
+
+// Helper untuk inline table edit angka/nominal Rupiah dengan pemisah ribuan (.)
+const onInlineNumberChange = (
+    row: any,
+    field: "hargaBahan" | "biayaJahit",
+    event: Event,
+) => {
+    const input = event.target as HTMLInputElement;
+    const rawVal = input.value.replace(/\D/g, "");
+    const num = rawVal ? parseInt(rawVal, 10) : 0;
+
+    // Tampilkan formatted angka dengan pemisah ribuan titik
+    input.value =
+        num > 0 ? num.toLocaleString("id-ID") : rawVal === "0" ? "0" : "";
+
+    const rowId = row.rowId;
+    if (!customKainSettings.value[rowId]) {
+        customKainSettings.value[rowId] = {};
+    }
+    customKainSettings.value[rowId][field] = num;
+    customKainSettings.value[rowId].isDirty = true;
+    customKainSettings.value = { ...customKainSettings.value };
+};
+
+// Helper untuk inline edit persentase (Allowance & Margin Tier)
+const onInlinePercentChange = (
+    row: any,
+    field: "allowancePersen" | "t1" | "t2" | "t3" | "t4" | "t5",
+    event: Event,
+) => {
+    const input = event.target as HTMLInputElement;
+    const val = parseFloat(input.value) || 0;
+    const rowId = row.rowId;
+    if (!customKainSettings.value[rowId]) {
+        customKainSettings.value[rowId] = {};
+    }
+    customKainSettings.value[rowId][field] = val;
+    customKainSettings.value[rowId].isDirty = true;
+    customKainSettings.value = { ...customKainSettings.value };
+};
+
+const isRowDirty = (rowId: string) => {
+    return !!customKainSettings.value[rowId]?.isDirty;
+};
 
 // Parser data spreadsheet lengkap untuk model garmen
 const parseKainData = (kodeModel: "KH-0001" | "KH-0002") => {
@@ -137,8 +199,17 @@ const parseKainData = (kodeModel: "KH-0001" | "KH-0002") => {
         };
 
         const isSport = ktg === "PE" || ktg === "HYGIT" || ktg === "DRYFIT";
-        const allowancePersen = Number(item.mhk_allow) || (isSport ? 5 : 17);
-        const hargaBahan = Number(item.mhk_harga) || 0;
+        const itemRowId = `${item.mhk_kode}_${jk}_${item.mhk_warna}_${item.mhk_komponen}`;
+        const customSet = customKainSettings.value[itemRowId] || {};
+
+        const allowancePersen =
+            customSet.allowancePersen !== undefined
+                ? customSet.allowancePersen
+                : Number(item.mhk_allow) || (isSport ? 5 : 17);
+        const hargaBahan =
+            customSet.hargaBahan !== undefined
+                ? customSet.hargaBahan
+                : Number(item.mhk_harga) || 0;
 
         const hargaBody = b.body > 0 ? hargaBahan / b.body / 1.11 : 0;
         const hargaLengan =
@@ -150,9 +221,6 @@ const parseKainData = (kodeModel: "KH-0001" | "KH-0002") => {
         const totalHargaBahan = hargaBody + hargaLengan + hargaRib;
         const allowanceRp = totalHargaBahan * (allowancePersen / 100);
         const totalBahan = totalHargaBahan + allowanceRp;
-
-        const itemRowId = `${item.mhk_kode}_${jk}_${item.mhk_warna}_${item.mhk_komponen}`;
-        const customSet = customKainSettings.value[itemRowId] || {};
 
         // Biaya Konveksi / Jahit (Default: 5610 / 2800, dapat di-override)
         const biayaKonveksi =
@@ -168,14 +236,25 @@ const parseKainData = (kodeModel: "KH-0001" | "KH-0002") => {
             const margin = hpp * (persen / 100);
             const jual = hpp + margin;
             const up = Math.ceil(jual / 1000) * 1000;
-            return { margin, jual, up };
+            return { margin, jual, up, pct: persen };
         };
 
-        const t1 = calcTier(customSet.t1 ?? 20);
-        const t2 = calcTier(customSet.t2 ?? 15);
-        const t3 = calcTier(customSet.t3 ?? 10);
-        const t4 = calcTier(customSet.t4 ?? 7.5);
-        const t5 = calcTier(customSet.t5 ?? 2);
+        const t1_pct =
+            customSet.t1 !== undefined ? customSet.t1 : globalMarginTier.t1;
+        const t2_pct =
+            customSet.t2 !== undefined ? customSet.t2 : globalMarginTier.t2;
+        const t3_pct =
+            customSet.t3 !== undefined ? customSet.t3 : globalMarginTier.t3;
+        const t4_pct =
+            customSet.t4 !== undefined ? customSet.t4 : globalMarginTier.t4;
+        const t5_pct =
+            customSet.t5 !== undefined ? customSet.t5 : globalMarginTier.t5;
+
+        const t1 = calcTier(t1_pct);
+        const t2 = calcTier(t2_pct);
+        const t3 = calcTier(t3_pct);
+        const t4 = calcTier(t4_pct);
+        const t5 = calcTier(t5_pct);
 
         return {
             rowId: `${item.mhk_kode}_${jk}_${item.mhk_warna}_${item.mhk_komponen}`,
@@ -199,18 +278,23 @@ const parseKainData = (kodeModel: "KH-0001" | "KH-0002") => {
             totalBahan,
             biayaKonveksi,
             hpp,
+            tier1_pct: t1.pct,
             tier1_margin: t1.margin,
             tier1_jual: t1.jual,
             tier1_up: t1.up,
+            tier2_pct: t2.pct,
             tier2_margin: t2.margin,
             tier2_jual: t2.jual,
             tier2_up: t2.up,
+            tier3_pct: t3.pct,
             tier3_margin: t3.margin,
             tier3_jual: t3.jual,
             tier3_up: t3.up,
+            tier4_pct: t4.pct,
             tier4_margin: t4.margin,
             tier4_jual: t4.jual,
             tier4_up: t4.up,
+            tier5_pct: t5.pct,
             tier5_margin: t5.margin,
             tier5_jual: t5.jual,
             tier5_up: t5.up,
@@ -490,10 +574,10 @@ interface GarmenColDef {
     subHeaders?: { key: string; title: string; subClass?: string }[];
 }
 
-const defaultColsKh0001: GarmenColDef[] = [
+const defaultColsKh0001 = computed<GarmenColDef[]>(() => [
     { key: "lengan", title: "LENGAN", width: "80px", align: "center" },
     { key: "gramasi", title: "GRAMASI", width: "90px", align: "center" },
-    { key: "babaran", title: "BABARAN", width: "95px", align: "end" },
+    { key: "babaran", title: "BABARAN", width: "100px", align: "end" },
     { key: "warna", title: "WARNA", width: "80px", align: "center" },
     { key: "hargaBahan", title: "HARGA / KG", width: "115px", align: "end" },
     { key: "hargaBody", title: "HRG BODY", width: "100px", align: "end" },
@@ -505,66 +589,66 @@ const defaultColsKh0001: GarmenColDef[] = [
         align: "end",
     },
     { key: "allowance", title: "ALLOW (%)", width: "85px", align: "center" },
-    { key: "biayaKonveksi", title: "JAHIT", width: "95px", align: "end" },
+    { key: "biayaKonveksi", title: "KONVEKSI", width: "95px", align: "end" },
     { key: "hpp", title: "HPP", width: "105px", align: "end" },
     {
         key: "tier1",
-        title: "100 - 249 PCS (20%)",
+        title: `100 - 249 PCS (${globalMarginTier.t1}%)`,
         isGroup: true,
         colSpan: 3,
         subHeaders: [
-            { key: "tier1_margin", title: "MARGIN" },
+            { key: "tier1_margin", title: "MARGIN (%)" },
             { key: "tier1_jual", title: "HRG JUAL" },
             { key: "tier1_up", title: "HARGA UP", subClass: "th-up" },
         ],
     },
     {
         key: "tier2",
-        title: "250 - 499 PCS (15%)",
+        title: `250 - 499 PCS (${globalMarginTier.t2}%)`,
         isGroup: true,
         colSpan: 3,
         subHeaders: [
-            { key: "tier2_margin", title: "MARGIN" },
+            { key: "tier2_margin", title: "MARGIN (%)" },
             { key: "tier2_jual", title: "HRG JUAL" },
             { key: "tier2_up", title: "HARGA UP", subClass: "th-up" },
         ],
     },
     {
         key: "tier3",
-        title: "500 - 749 PCS (10%)",
+        title: `500 - 749 PCS (${globalMarginTier.t3}%)`,
         isGroup: true,
         colSpan: 3,
         subHeaders: [
-            { key: "tier3_margin", title: "MARGIN" },
+            { key: "tier3_margin", title: "MARGIN (%)" },
             { key: "tier3_jual", title: "HRG JUAL" },
             { key: "tier3_up", title: "HARGA UP", subClass: "th-up" },
         ],
     },
     {
         key: "tier4",
-        title: "750 - 999 PCS (7.5%)",
+        title: `750 - 999 PCS (${globalMarginTier.t4}%)`,
         isGroup: true,
         colSpan: 3,
         subHeaders: [
-            { key: "tier4_margin", title: "MARGIN" },
+            { key: "tier4_margin", title: "MARGIN (%)" },
             { key: "tier4_jual", title: "HRG JUAL" },
             { key: "tier4_up", title: "HARGA UP", subClass: "th-up" },
         ],
     },
     {
         key: "tier5",
-        title: "≥ 1000 PCS (2%)",
+        title: `≥ 1000 PCS (${globalMarginTier.t5}%)`,
         isGroup: true,
         colSpan: 3,
         subHeaders: [
-            { key: "tier5_margin", title: "MARGIN" },
+            { key: "tier5_margin", title: "MARGIN (%)" },
             { key: "tier5_jual", title: "HRG JUAL" },
             { key: "tier5_up", title: "HARGA UP", subClass: "th-up" },
         ],
     },
-];
+]);
 
-const defaultColsKh0002: GarmenColDef[] = [
+const defaultColsKh0002 = computed<GarmenColDef[]>(() => [
     { key: "lengan", title: "LENGAN", width: "80px", align: "center" },
     { key: "gramasi", title: "GRAMASI", width: "90px", align: "center" },
     { key: "babaranBody", title: "BABARAN BODY", width: "115px", align: "end" },
@@ -590,60 +674,60 @@ const defaultColsKh0002: GarmenColDef[] = [
     { key: "hpp", title: "HPP", width: "105px", align: "end" },
     {
         key: "tier1",
-        title: "100 - 249 PCS (20%)",
+        title: `100 - 249 PCS (${globalMarginTier.t1}%)`,
         isGroup: true,
         colSpan: 3,
         subHeaders: [
-            { key: "tier1_margin", title: "MARGIN" },
+            { key: "tier1_margin", title: "MARGIN (%)" },
             { key: "tier1_jual", title: "HRG JUAL" },
             { key: "tier1_up", title: "HARGA UP", subClass: "th-up" },
         ],
     },
     {
         key: "tier2",
-        title: "250 - 499 PCS (15%)",
+        title: `250 - 499 PCS (${globalMarginTier.t2}%)`,
         isGroup: true,
         colSpan: 3,
         subHeaders: [
-            { key: "tier2_margin", title: "MARGIN" },
+            { key: "tier2_margin", title: "MARGIN (%)" },
             { key: "tier2_jual", title: "HRG JUAL" },
             { key: "tier2_up", title: "HARGA UP", subClass: "th-up" },
         ],
     },
     {
         key: "tier3",
-        title: "500 - 749 PCS (10%)",
+        title: `500 - 749 PCS (${globalMarginTier.t3}%)`,
         isGroup: true,
         colSpan: 3,
         subHeaders: [
-            { key: "tier3_margin", title: "MARGIN" },
+            { key: "tier3_margin", title: "MARGIN (%)" },
             { key: "tier3_jual", title: "HRG JUAL" },
             { key: "tier3_up", title: "HARGA UP", subClass: "th-up" },
         ],
     },
     {
         key: "tier4",
-        title: "750 - 999 PCS (7.5%)",
+        title: `750 - 999 PCS (${globalMarginTier.t4}%)`,
         isGroup: true,
         colSpan: 3,
         subHeaders: [
-            { key: "tier4_margin", title: "MARGIN" },
+            { key: "tier4_margin", title: "MARGIN (%)" },
             { key: "tier4_jual", title: "HRG JUAL" },
             { key: "tier4_up", title: "HARGA UP", subClass: "th-up" },
         ],
     },
     {
         key: "tier5",
-        title: "≥ 1000 PCS (2%)",
+        title: `≥ 1000 PCS (${globalMarginTier.t5}%)`,
         isGroup: true,
         colSpan: 3,
         subHeaders: [
-            { key: "tier5_margin", title: "MARGIN" },
+            { key: "tier5_margin", title: "MARGIN (%)" },
             { key: "tier5_jual", title: "HRG JUAL" },
             { key: "tier5_up", title: "HARGA UP", subClass: "th-up" },
         ],
     },
-];
+]);
 
 const colOrderKeyKh0001 = "garmen_colorder_kh0001";
 const colOrderKeyKh0002 = "garmen_colorder_kh0002";
@@ -668,7 +752,9 @@ const colOrderKh0002 = ref<string[]>(loadColOrder(colOrderKeyKh0002));
 
 const currentCols = computed(() => {
     const isKh0001 = activeSub.value === "kh0001";
-    const defaults = isKh0001 ? defaultColsKh0001 : defaultColsKh0002;
+    const defaults = isKh0001
+        ? defaultColsKh0001.value
+        : defaultColsKh0002.value;
     const orders = isKh0001 ? colOrderKh0001.value : colOrderKh0002.value;
 
     if (orders.length === 0) return defaults;
@@ -684,6 +770,79 @@ const currentCols = computed(() => {
     }
     return result;
 });
+
+// Inline Editing Dirty Rows & Save Handler
+const dirtyRows = computed(() => {
+    const dirtyList: any[] = [];
+    const allRows =
+        activeSub.value === "kh0001"
+            ? itemsKh0001All.value
+            : itemsKh0002All.value;
+    for (const r of allRows) {
+        if (isRowDirty(r.rowId)) {
+            dirtyList.push(r);
+        }
+    }
+    return dirtyList;
+});
+
+const isSavingInline = ref(false);
+const confirmInlineSaveDialog = ref(false);
+
+const promptSaveInline = () => {
+    if (dirtyRows.value.length === 0) return;
+    confirmInlineSaveDialog.value = true;
+};
+
+const getOldValue = (row: any, field: "harga" | "allow" | "konveksi") => {
+    const raw = row.rawItem || {};
+    const isSport =
+        row.ktg === "PE" || row.ktg === "HYGIT" || row.ktg === "DRYFIT";
+    if (field === "harga") return Number(raw.mhk_harga) || 0;
+    if (field === "allow") return Number(raw.mhk_allow) || (isSport ? 5 : 17);
+    if (field === "konveksi") return isSport ? 2800 : 5610;
+    return 0;
+};
+
+const executeSaveAllInlineChanges = async () => {
+    if (dirtyRows.value.length === 0) return;
+    isSavingInline.value = true;
+    try {
+        for (const row of dirtyRows.value) {
+            const raw = row.rawItem || row;
+            const payload = {
+                ...raw,
+                mhk_harga: row.hargaBahan,
+                mhk_allow: row.allowancePersen,
+                old_jeniskain: raw.mhk_jeniskain || row.jenisKain,
+                old_warna: raw.mhk_warna || row.warna,
+                old_komponen: raw.mhk_komponen || "BODY",
+                old_lengan: raw.mhk_lengan || row.lengan || "PENDEK",
+            };
+            await settingHargaBahanService.updateKainGarmen("update", payload);
+            if (customKainSettings.value[row.rowId]) {
+                customKainSettings.value[row.rowId].isDirty = false;
+            }
+        }
+        customKainSettings.value = { ...customKainSettings.value };
+        confirmInlineSaveDialog.value = false;
+        toast.success(
+            "Semua perubahan harga bahan, allowance & konveksi berhasil disimpan",
+        );
+        fetchKain();
+    } catch (err: any) {
+        toast.error(
+            err.response?.data?.message || "Gagal menyimpan perubahan tabel",
+        );
+    } finally {
+        isSavingInline.value = false;
+    }
+};
+
+const cancelAllInlineChanges = () => {
+    customKainSettings.value = {};
+    toast.info("Perubahan edit tabel dibatalkan");
+};
 
 const isColOrderChanged = computed(() => {
     return activeSub.value === "kh0001"
@@ -941,13 +1100,19 @@ const handleEdit = (item?: any) => {
 
         Object.assign(kainForm, {
             ...raw,
-            mhk_kode: raw.mhk_kode || target.kode || (activeSub.value === "kh0001" ? "KH-0001" : "KH-0002"),
+            mhk_kode:
+                raw.mhk_kode ||
+                target.kode ||
+                (activeSub.value === "kh0001" ? "KH-0001" : "KH-0002"),
             mhk_ktg: raw.mhk_ktg || target.ktg || "COTTON",
             mhk_jeniskain: raw.mhk_jeniskain || target.jenisKain,
             mhk_lengan: raw.mhk_lengan || target.lengan || "PENDEK",
             mhk_komponen: raw.mhk_komponen || "BODY",
             mhk_warna: raw.mhk_warna || target.warna,
-            mhk_babaran: Number(raw.mhk_babaran || target.babaranBody || target.babaran) || 0,
+            mhk_babaran:
+                Number(
+                    raw.mhk_babaran || target.babaranBody || target.babaran,
+                ) || 0,
             mhk_harga: Number(raw.mhk_harga || target.hargaBahan) || 0,
             mhk_allow: Number(raw.mhk_allow || target.allowancePersen) || 17,
             biayaJahit: savedCustom.biayaJahit ?? (isSport ? 2800 : 5610),
@@ -965,43 +1130,56 @@ const handleEdit = (item?: any) => {
     }
 };
 
-const handleDelete = async (item?: any) => {
+const confirmKainDelete = ref(false);
+const kainToDelete = ref<any>(null);
+const confirmTambahanDelete = ref(false);
+const tambahanToDelete = ref<any>(null);
+
+const handleDelete = (item?: any) => {
     if (activeSub.value === "tambahan") {
         const target = item || tambahanSelected.value?.[0];
         if (!target) return;
-        try {
-            await settingHargaBahanService.deleteTambahanGarmen(target.mht_ket);
-            toast.success(
-                `Biaya tambahan "${target.mht_ket}" berhasil dihapus`,
-            );
-            fetchTambahan();
-        } catch (err: any) {
-            toast.error(
-                err.response?.data?.message || "Gagal menghapus biaya tambahan",
-            );
-        }
+        tambahanToDelete.value = target;
+        confirmTambahanDelete.value = true;
     } else {
         const target = item || selectedRow.value;
         if (!target) return;
         const raw = target.rawItem || target;
-        if (
-            confirm(
-                `Yakin ingin menghapus harga kain ${raw.mhk_jeniskain} (${raw.mhk_warna})?`,
-            )
-        ) {
-            try {
-                await settingHargaBahanService.deleteKainGarmen(raw);
-                toast.success(
-                    `Harga kain ${raw.mhk_jeniskain} (${raw.mhk_warna}) berhasil dihapus`,
-                );
-                selectedRow.value = null;
-                fetchKain();
-            } catch (err: any) {
-                toast.error(
-                    err.response?.data?.message || "Gagal menghapus kain",
-                );
-            }
-        }
+        kainToDelete.value = raw;
+        confirmKainDelete.value = true;
+    }
+};
+
+const executeDeleteKain = async () => {
+    if (!kainToDelete.value) return;
+    try {
+        await settingHargaBahanService.deleteKainGarmen(kainToDelete.value);
+        toast.success(
+            `Harga kain ${kainToDelete.value.mhk_jeniskain} (${kainToDelete.value.mhk_warna}) berhasil dihapus`,
+        );
+        selectedRow.value = null;
+        confirmKainDelete.value = false;
+        fetchKain();
+    } catch (err: any) {
+        toast.error(err.response?.data?.message || "Gagal menghapus kain");
+    }
+};
+
+const executeDeleteTambahan = async () => {
+    if (!tambahanToDelete.value) return;
+    try {
+        await settingHargaBahanService.deleteTambahanGarmen(
+            tambahanToDelete.value.mht_ket,
+        );
+        toast.success(
+            `Biaya tambahan "${tambahanToDelete.value.mht_ket}" berhasil dihapus`,
+        );
+        confirmTambahanDelete.value = false;
+        fetchTambahan();
+    } catch (err: any) {
+        toast.error(
+            err.response?.data?.message || "Gagal menghapus biaya tambahan",
+        );
     }
 };
 
@@ -1671,6 +1849,30 @@ const executeSaveTambahan = async () => {
             :loading="kainLoading"
         >
             <template #header-actions>
+                <!-- Tombol Simpan Cepat jika ada baris tabel yang di-edit -->
+                <v-btn
+                    v-if="dirtyRows.length > 0"
+                    size="small"
+                    color="success"
+                    variant="elevated"
+                    :loading="isSavingInline"
+                    @click="promptSaveInline"
+                    class="font-weight-bold elevation-1 mr-1"
+                >
+                    Simpan Perubahan ({{ dirtyRows.length }})
+                </v-btn>
+                <v-btn
+                    v-if="dirtyRows.length > 0"
+                    size="small"
+                    color="grey-darken-1"
+                    variant="outlined"
+                    :disabled="isSavingInline"
+                    @click="cancelAllInlineChanges"
+                    class="mr-1"
+                >
+                    Batal
+                </v-btn>
+
                 <v-btn
                     v-if="canInsert"
                     size="small"
@@ -1790,6 +1992,20 @@ const executeSaveTambahan = async () => {
                         title="Segarkan data"
                     >
                         <IconRefresh :size="18" :stroke-width="1.7" />
+                    </v-btn>
+
+                    <!-- Setting Persentase Margin Tier -->
+                    <v-btn
+                        size="small"
+                        color="primary"
+                        variant="tonal"
+                        @click="marginTierDialog = true"
+                        title="Sesuaikan persentase margin tier penjualan"
+                    >
+                        <template #prepend>
+                            <IconSparkles :size="15" :stroke-width="1.7" />
+                        </template>
+                        Margin Tier (%)
                     </v-btn>
 
                     <!-- Reset Filter -->
@@ -2073,7 +2289,6 @@ const executeSaveTambahan = async () => {
                                         },
                                     ]"
                                     @click="selectRow(row)"
-                                    @dblclick="handleEdit(row)"
                                 >
                                     <!-- No -->
                                     <td
@@ -2171,12 +2386,36 @@ const executeSaveTambahan = async () => {
                                             </v-chip>
                                         </td>
 
-                                        <!-- Harga Bahan / Kg -->
+                                        <!-- Harga Bahan / Kg (Inline Editable) -->
                                         <td
                                             v-else-if="col.key === 'hargaBahan'"
-                                            class="text-end font-weight-bold num-cell"
+                                            class="text-end num-cell inline-edit-cell"
+                                            :class="{
+                                                'cell-dirty': isRowDirty(
+                                                    row.rowId,
+                                                ),
+                                            }"
+                                            @click.stop
                                         >
-                                            Rp {{ formatRp(row.hargaBahan) }}
+                                            <div class="inline-input-wrapper">
+                                                <span class="inline-prefix"
+                                                    >Rp</span
+                                                >
+                                                <input
+                                                    type="text"
+                                                    class="inline-table-input"
+                                                    :value="
+                                                        formatRp(row.hargaBahan)
+                                                    "
+                                                    @input="
+                                                        onInlineNumberChange(
+                                                            row,
+                                                            'hargaBahan',
+                                                            $event,
+                                                        )
+                                                    "
+                                                />
+                                            </div>
                                         </td>
 
                                         <!-- Komponen Biaya -->
@@ -2209,22 +2448,75 @@ const executeSaveTambahan = async () => {
                                             Rp
                                             {{ formatRp(row.totalHargaBahan) }}
                                         </td>
+
+                                        <!-- Allowance (%) (Inline Editable) -->
                                         <td
                                             v-else-if="col.key === 'allowance'"
-                                            class="text-center text-caption"
+                                            class="text-center inline-edit-cell"
+                                            :class="{
+                                                'cell-dirty': isRowDirty(
+                                                    row.rowId,
+                                                ),
+                                            }"
+                                            @click.stop
                                         >
-                                            {{ row.allowancePersen }}%
+                                            <div
+                                                class="inline-input-wrapper justify-center"
+                                            >
+                                                <input
+                                                    type="number"
+                                                    step="0.5"
+                                                    class="inline-table-input text-center"
+                                                    style="width: 52px"
+                                                    :value="row.allowancePersen"
+                                                    @input="
+                                                        onInlinePercentChange(
+                                                            row,
+                                                            'allowancePersen',
+                                                            $event,
+                                                        )
+                                                    "
+                                                />
+                                                <span class="inline-suffix"
+                                                    >%</span
+                                                >
+                                            </div>
                                         </td>
 
-                                        <!-- Biaya Konveksi & HPP -->
+                                        <!-- Biaya Konveksi / Jahit (Inline Editable) & HPP -->
                                         <td
                                             v-else-if="
                                                 col.key === 'biayaKonveksi'
                                             "
-                                            class="text-end num-cell text-medium-emphasis"
+                                            class="text-end num-cell inline-edit-cell"
+                                            :class="{
+                                                'cell-dirty': isRowDirty(
+                                                    row.rowId,
+                                                ),
+                                            }"
+                                            @click.stop
                                         >
-                                            Rp
-                                            {{ formatRp(row.biayaKonveksi) }}
+                                            <div class="inline-input-wrapper">
+                                                <span class="inline-prefix"
+                                                    >Rp</span
+                                                >
+                                                <input
+                                                    type="text"
+                                                    class="inline-table-input"
+                                                    :value="
+                                                        formatRp(
+                                                            row.biayaKonveksi,
+                                                        )
+                                                    "
+                                                    @input="
+                                                        onInlineNumberChange(
+                                                            row,
+                                                            'biayaJahit',
+                                                            $event,
+                                                        )
+                                                    "
+                                                />
+                                            </div>
                                         </td>
                                         <td
                                             v-else-if="col.key === 'hpp'"
@@ -2233,15 +2525,40 @@ const executeSaveTambahan = async () => {
                                             Rp {{ formatRp(row.hpp) }}
                                         </td>
 
-                                        <!-- Tier 1: 100 - 249 PCS (20%) -->
+                                        <!-- Tier 1: 100 - 249 PCS -->
                                         <template
                                             v-else-if="col.key === 'tier1'"
                                         >
                                             <td
-                                                class="text-end num-cell text-medium-emphasis"
+                                                class="text-center inline-edit-cell"
+                                                :class="{
+                                                    'cell-dirty': isRowDirty(
+                                                        row.rowId,
+                                                    ),
+                                                }"
+                                                @click.stop
                                             >
-                                                Rp
-                                                {{ formatRp(row.tier1_margin) }}
+                                                <div
+                                                    class="inline-input-wrapper justify-center"
+                                                >
+                                                    <input
+                                                        type="number"
+                                                        step="0.5"
+                                                        class="inline-table-input text-center"
+                                                        style="width: 48px"
+                                                        :value="row.tier1_pct"
+                                                        @input="
+                                                            onInlinePercentChange(
+                                                                row,
+                                                                't1',
+                                                                $event,
+                                                            )
+                                                        "
+                                                    />
+                                                    <span class="inline-suffix"
+                                                        >%</span
+                                                    >
+                                                </div>
                                             </td>
                                             <td
                                                 class="text-end num-cell text-medium-emphasis"
@@ -2256,15 +2573,40 @@ const executeSaveTambahan = async () => {
                                             </td>
                                         </template>
 
-                                        <!-- Tier 2: 250 - 499 PCS (15%) -->
+                                        <!-- Tier 2: 250 - 499 PCS -->
                                         <template
                                             v-else-if="col.key === 'tier2'"
                                         >
                                             <td
-                                                class="text-end num-cell text-medium-emphasis"
+                                                class="text-center inline-edit-cell"
+                                                :class="{
+                                                    'cell-dirty': isRowDirty(
+                                                        row.rowId,
+                                                    ),
+                                                }"
+                                                @click.stop
                                             >
-                                                Rp
-                                                {{ formatRp(row.tier2_margin) }}
+                                                <div
+                                                    class="inline-input-wrapper justify-center"
+                                                >
+                                                    <input
+                                                        type="number"
+                                                        step="0.5"
+                                                        class="inline-table-input text-center"
+                                                        style="width: 48px"
+                                                        :value="row.tier2_pct"
+                                                        @input="
+                                                            onInlinePercentChange(
+                                                                row,
+                                                                't2',
+                                                                $event,
+                                                            )
+                                                        "
+                                                    />
+                                                    <span class="inline-suffix"
+                                                        >%</span
+                                                    >
+                                                </div>
                                             </td>
                                             <td
                                                 class="text-end num-cell text-medium-emphasis"
@@ -2279,15 +2621,40 @@ const executeSaveTambahan = async () => {
                                             </td>
                                         </template>
 
-                                        <!-- Tier 3: 500 - 749 PCS (10%) -->
+                                        <!-- Tier 3: 500 - 749 PCS -->
                                         <template
                                             v-else-if="col.key === 'tier3'"
                                         >
                                             <td
-                                                class="text-end num-cell text-medium-emphasis"
+                                                class="text-center inline-edit-cell"
+                                                :class="{
+                                                    'cell-dirty': isRowDirty(
+                                                        row.rowId,
+                                                    ),
+                                                }"
+                                                @click.stop
                                             >
-                                                Rp
-                                                {{ formatRp(row.tier3_margin) }}
+                                                <div
+                                                    class="inline-input-wrapper justify-center"
+                                                >
+                                                    <input
+                                                        type="number"
+                                                        step="0.5"
+                                                        class="inline-table-input text-center"
+                                                        style="width: 48px"
+                                                        :value="row.tier3_pct"
+                                                        @input="
+                                                            onInlinePercentChange(
+                                                                row,
+                                                                't3',
+                                                                $event,
+                                                            )
+                                                        "
+                                                    />
+                                                    <span class="inline-suffix"
+                                                        >%</span
+                                                    >
+                                                </div>
                                             </td>
                                             <td
                                                 class="text-end num-cell text-medium-emphasis"
@@ -2302,15 +2669,40 @@ const executeSaveTambahan = async () => {
                                             </td>
                                         </template>
 
-                                        <!-- Tier 4: 750 - 999 PCS (7.5%) -->
+                                        <!-- Tier 4: 750 - 999 PCS -->
                                         <template
                                             v-else-if="col.key === 'tier4'"
                                         >
                                             <td
-                                                class="text-end num-cell text-medium-emphasis"
+                                                class="text-center inline-edit-cell"
+                                                :class="{
+                                                    'cell-dirty': isRowDirty(
+                                                        row.rowId,
+                                                    ),
+                                                }"
+                                                @click.stop
                                             >
-                                                Rp
-                                                {{ formatRp(row.tier4_margin) }}
+                                                <div
+                                                    class="inline-input-wrapper justify-center"
+                                                >
+                                                    <input
+                                                        type="number"
+                                                        step="0.5"
+                                                        class="inline-table-input text-center"
+                                                        style="width: 48px"
+                                                        :value="row.tier4_pct"
+                                                        @input="
+                                                            onInlinePercentChange(
+                                                                row,
+                                                                't4',
+                                                                $event,
+                                                            )
+                                                        "
+                                                    />
+                                                    <span class="inline-suffix"
+                                                        >%</span
+                                                    >
+                                                </div>
                                             </td>
                                             <td
                                                 class="text-end num-cell text-medium-emphasis"
@@ -2325,15 +2717,40 @@ const executeSaveTambahan = async () => {
                                             </td>
                                         </template>
 
-                                        <!-- Tier 5: ≥ 1000 PCS (2%) -->
+                                        <!-- Tier 5: ≥ 1000 PCS -->
                                         <template
                                             v-else-if="col.key === 'tier5'"
                                         >
                                             <td
-                                                class="text-end num-cell text-medium-emphasis"
+                                                class="text-center inline-edit-cell"
+                                                :class="{
+                                                    'cell-dirty': isRowDirty(
+                                                        row.rowId,
+                                                    ),
+                                                }"
+                                                @click.stop
                                             >
-                                                Rp
-                                                {{ formatRp(row.tier5_margin) }}
+                                                <div
+                                                    class="inline-input-wrapper justify-center"
+                                                >
+                                                    <input
+                                                        type="number"
+                                                        step="0.5"
+                                                        class="inline-table-input text-center"
+                                                        style="width: 48px"
+                                                        :value="row.tier5_pct"
+                                                        @input="
+                                                            onInlinePercentChange(
+                                                                row,
+                                                                't5',
+                                                                $event,
+                                                            )
+                                                        "
+                                                    />
+                                                    <span class="inline-suffix"
+                                                        >%</span
+                                                    >
+                                                </div>
                                             </td>
                                             <td
                                                 class="text-end num-cell text-medium-emphasis"
@@ -2406,10 +2823,6 @@ const executeSaveTambahan = async () => {
                                     selectedRow.warna
                                 }})
                             </span>
-                        </div>
-                        <v-spacer />
-                        <div class="text-caption text-medium-emphasis">
-                            Klik baris untuk memilih • Klik 2x untuk ubah
                         </div>
                     </div>
                 </div>
@@ -2508,9 +2921,7 @@ const executeSaveTambahan = async () => {
                 <!-- ── MODE UBAH: DIBATASI HANYA HARGA BAHAN, ALLOWANCE, JAHIT, DAN MARGIN ── -->
                 <div v-if="isEditKain">
                     <!-- Read-Only Master Info Card -->
-                    <div
-                        class="pa-3 mb-3 rounded-lg border bg-grey-lighten-5"
-                    >
+                    <div class="pa-3 mb-3 rounded-lg border bg-grey-lighten-5">
                         <div
                             class="d-flex justify-space-between align-center mb-1"
                         >
@@ -2531,15 +2942,30 @@ const executeSaveTambahan = async () => {
                         <div
                             class="d-flex flex-wrap ga-x-3 ga-y-1 text-caption text-medium-emphasis"
                         >
-                            <span><strong>Model:</strong> {{
-                                kainForm.mhk_kode === "KH-0001"
-                                    ? "Kaos 1 Warna"
-                                    : "Kaos 2 Warna"
-                            }}</span>
-                            <span><strong>Kategori:</strong> {{ kainForm.mhk_ktg }}</span>
-                            <span><strong>Lengan:</strong> {{ kainForm.mhk_lengan || "-" }}</span>
-                            <span v-if="kainForm.mhk_komponen"><strong>Komponen:</strong> {{ kainForm.mhk_komponen }}</span>
-                            <span><strong>Babaran:</strong> {{ kainForm.mhk_babaran }} kg</span>
+                            <span
+                                ><strong>Model:</strong>
+                                {{
+                                    kainForm.mhk_kode === "KH-0001"
+                                        ? "Kaos 1 Warna"
+                                        : "Kaos 2 Warna"
+                                }}
+                            </span>
+                            <span
+                                ><strong>Kategori:</strong>
+                                {{ kainForm.mhk_ktg }}</span
+                            >
+                            <span
+                                ><strong>Lengan:</strong>
+                                {{ kainForm.mhk_lengan || "-" }}</span
+                            >
+                            <span v-if="kainForm.mhk_komponen"
+                                ><strong>Komponen:</strong>
+                                {{ kainForm.mhk_komponen }}</span
+                            >
+                            <span
+                                ><strong>Babaran:</strong>
+                                {{ kainForm.mhk_babaran }} kg</span
+                            >
                         </div>
                     </div>
 
@@ -2547,14 +2973,14 @@ const executeSaveTambahan = async () => {
                     <div
                         class="text-caption font-weight-bold text-uppercase text-medium-emphasis mb-2"
                     >
-                        Parameter Biaya & Margin
+                        Parameter Harga / Kg, Allowance, Konveksi & Margin
                     </div>
                     <v-row dense>
-                        <!-- 1. HARGA BAHAN -->
+                        <!-- 1. HARGA / KG -->
                         <v-col cols="12" sm="6">
                             <v-text-field
                                 v-model.number="kainForm.mhk_harga"
-                                label="Harga Bahan / Kg (Rp) *"
+                                label="Harga / Kg (Rp) *"
                                 type="number"
                                 prefix="Rp"
                                 variant="outlined"
@@ -2563,11 +2989,11 @@ const executeSaveTambahan = async () => {
                             />
                         </v-col>
 
-                        <!-- 2. ALLOWANCE -->
+                        <!-- 2. PRESENTASE ALLOWANCE -->
                         <v-col cols="12" sm="6">
                             <v-text-field
                                 v-model.number="kainForm.mhk_allow"
-                                label="Allowance (%) *"
+                                label="Presentase Allowance (%) *"
                                 type="number"
                                 suffix="%"
                                 variant="outlined"
@@ -2576,11 +3002,11 @@ const executeSaveTambahan = async () => {
                             />
                         </v-col>
 
-                        <!-- 3. JAHIT (BIAYA KONVEKSI) -->
+                        <!-- 3. KONVEKSI -->
                         <v-col cols="12">
                             <v-text-field
                                 v-model.number="kainForm.biayaJahit"
-                                label="Biaya Jahit / Konveksi (Rp) *"
+                                label="Konveksi (Rp) *"
                                 type="number"
                                 prefix="Rp"
                                 variant="outlined"
@@ -2792,6 +3218,309 @@ const executeSaveTambahan = async () => {
         </v-card>
     </v-dialog>
 
+    <!-- MODAL SETTING PERSENTASE MARGIN TIER (%) -->
+    <v-dialog v-model="marginTierDialog" max-width="440px">
+        <v-card class="rounded-lg">
+            <v-card-title
+                class="dialog-header pa-3 d-flex align-center justify-space-between bg-grey-lighten-4 border-b"
+            >
+                <div
+                    class="d-flex align-center font-weight-bold"
+                    style="font-size: 13px"
+                >
+                    <IconSparkles :size="16" class="mr-2 text-primary" />
+                    Pengaturan Persentase Margin Tier (%)
+                </div>
+            </v-card-title>
+            <v-card-text class="pa-4">
+                <p class="text-caption text-medium-emphasis mb-3">
+                    Nilai margin ini akan diterapkan secara global untuk
+                    menghitung harga jual dan harga UP setiap tier kuantiti:
+                </p>
+                <v-row dense>
+                    <v-col cols="6">
+                        <v-text-field
+                            v-model.number="globalMarginTier.t1"
+                            label="Tier 1 (100 - 249 PCS)"
+                            type="number"
+                            suffix="%"
+                            variant="outlined"
+                            density="compact"
+                            hide-details="auto"
+                        />
+                    </v-col>
+                    <v-col cols="6">
+                        <v-text-field
+                            v-model.number="globalMarginTier.t2"
+                            label="Tier 2 (250 - 499 PCS)"
+                            type="number"
+                            suffix="%"
+                            variant="outlined"
+                            density="compact"
+                            hide-details="auto"
+                        />
+                    </v-col>
+                    <v-col cols="6">
+                        <v-text-field
+                            v-model.number="globalMarginTier.t3"
+                            label="Tier 3 (500 - 749 PCS)"
+                            type="number"
+                            suffix="%"
+                            variant="outlined"
+                            density="compact"
+                            hide-details="auto"
+                        />
+                    </v-col>
+                    <v-col cols="6">
+                        <v-text-field
+                            v-model.number="globalMarginTier.t4"
+                            label="Tier 4 (750 - 999 PCS)"
+                            type="number"
+                            suffix="%"
+                            variant="outlined"
+                            density="compact"
+                            hide-details="auto"
+                        />
+                    </v-col>
+                    <v-col cols="12">
+                        <v-text-field
+                            v-model.number="globalMarginTier.t5"
+                            label="Tier 5 (≥ 1000 PCS)"
+                            type="number"
+                            suffix="%"
+                            variant="outlined"
+                            density="compact"
+                            hide-details="auto"
+                        />
+                    </v-col>
+                </v-row>
+            </v-card-text>
+            <v-card-actions class="pa-3 border-t justify-end ga-2">
+                <v-btn
+                    color="primary"
+                    variant="elevated"
+                    size="small"
+                    @click="marginTierDialog = false"
+                >
+                    Tutup
+                </v-btn>
+            </v-card-actions>
+        </v-card>
+    </v-dialog>
+
+    <!-- MODAL REVIEW & KONFIRMASI SIMPAN PERUBAHAN TABEL (SUMMARY & PREVIEW TABLE) -->
+    <v-dialog v-model="confirmInlineSaveDialog" max-width="920px" persistent>
+        <v-card class="rounded-lg">
+            <v-card-title
+                class="dialog-header pa-3 d-flex align-center justify-space-between bg-primary text-white"
+            >
+                <div
+                    class="d-flex align-center font-weight-bold"
+                    style="font-size: 14px"
+                >
+                    <IconSparkles :size="18" class="mr-2" />
+                    Review & Konfirmasi Perubahan Harga ({{ dirtyRows.length }}
+                    Item)
+                </div>
+                <v-btn
+                    icon
+                    variant="text"
+                    size="x-small"
+                    color="white"
+                    @click="confirmInlineSaveDialog = false"
+                >
+                    <IconX :size="16" />
+                </v-btn>
+            </v-card-title>
+
+            <v-card-text class="pa-4">
+                <!-- Summary Info Alert -->
+                <v-alert
+                    type="info"
+                    variant="tonal"
+                    density="compact"
+                    class="mb-3 text-caption"
+                >
+                    Berikut adalah daftar data harga yang telah Anda ubah pada
+                    tabel. Periksa perbandingan nilai sebelum dan sesudah
+                    perubahan sebelum menyimpannya ke database.
+                </v-alert>
+
+                <!-- Comparison Table -->
+                <div
+                    class="border rounded overflow-hidden"
+                    style="max-height: 380px; overflow-y: auto"
+                >
+                    <v-table density="compact" hover class="review-table">
+                        <thead class="bg-grey-lighten-4">
+                            <tr>
+                                <th class="text-center" style="width: 45px">
+                                    NO
+                                </th>
+                                <th style="width: 180px">JENIS KAIN & WARNA</th>
+                                <th class="text-end" style="width: 140px">
+                                    HARGA / KG
+                                </th>
+                                <th class="text-center" style="width: 110px">
+                                    ALLOWANCE
+                                </th>
+                                <th class="text-end" style="width: 130px">
+                                    KONVEKSI
+                                </th>
+                                <th class="text-end" style="width: 120px">
+                                    HPP BARU
+                                </th>
+                                <th class="text-end" style="width: 130px">
+                                    HRG UP TIER 1
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr
+                                v-for="(row, idx) in dirtyRows"
+                                :key="row.rowId"
+                            >
+                                <td
+                                    class="text-center text-caption text-medium-emphasis"
+                                >
+                                    {{ idx + 1 }}
+                                </td>
+                                <td>
+                                    <div
+                                        class="font-weight-bold text-caption text-primary"
+                                    >
+                                        {{ row.jenisKain }}
+                                    </div>
+                                    <v-chip
+                                        size="x-small"
+                                        variant="tonal"
+                                        :color="getWarnaChipColor(row.warna)"
+                                        class="font-weight-medium"
+                                    >
+                                        {{ row.warna }}
+                                    </v-chip>
+                                </td>
+                                <td class="text-end text-caption">
+                                    <div
+                                        class="text-decoration-line-through text-medium-emphasis"
+                                        style="font-size: 10px"
+                                        v-if="
+                                            getOldValue(row, 'harga') !==
+                                            row.hargaBahan
+                                        "
+                                    >
+                                        Rp
+                                        {{
+                                            formatRp(getOldValue(row, "harga"))
+                                        }}
+                                    </div>
+                                    <div
+                                        class="font-weight-bold"
+                                        :class="
+                                            getOldValue(row, 'harga') !==
+                                            row.hargaBahan
+                                                ? 'text-success'
+                                                : ''
+                                        "
+                                    >
+                                        Rp {{ formatRp(row.hargaBahan) }}
+                                    </div>
+                                </td>
+                                <td class="text-center text-caption">
+                                    <div
+                                        class="text-decoration-line-through text-medium-emphasis"
+                                        style="font-size: 10px"
+                                        v-if="
+                                            getOldValue(row, 'allow') !==
+                                            row.allowancePersen
+                                        "
+                                    >
+                                        {{ getOldValue(row, "allow") }}%
+                                    </div>
+                                    <div
+                                        class="font-weight-bold"
+                                        :class="
+                                            getOldValue(row, 'allow') !==
+                                            row.allowancePersen
+                                                ? 'text-success'
+                                                : ''
+                                        "
+                                    >
+                                        {{ row.allowancePersen }}%
+                                    </div>
+                                </td>
+                                <td class="text-end text-caption">
+                                    <div
+                                        class="text-decoration-line-through text-medium-emphasis"
+                                        style="font-size: 10px"
+                                        v-if="
+                                            getOldValue(row, 'konveksi') !==
+                                            row.biayaKonveksi
+                                        "
+                                    >
+                                        Rp
+                                        {{
+                                            formatRp(
+                                                getOldValue(row, "konveksi"),
+                                            )
+                                        }}
+                                    </div>
+                                    <div
+                                        class="font-weight-bold"
+                                        :class="
+                                            getOldValue(row, 'konveksi') !==
+                                            row.biayaKonveksi
+                                                ? 'text-success'
+                                                : ''
+                                        "
+                                    >
+                                        Rp {{ formatRp(row.biayaKonveksi) }}
+                                    </div>
+                                </td>
+                                <td
+                                    class="text-end text-caption font-weight-bold text-grey-darken-3 bg-grey-lighten-5"
+                                >
+                                    Rp {{ formatRp(row.hpp) }}
+                                </td>
+                                <td
+                                    class="text-end text-caption font-weight-bold text-primary bg-blue-lighten-5"
+                                >
+                                    Rp {{ formatRp(row.tier1_up) }}
+                                </td>
+                            </tr>
+                        </tbody>
+                    </v-table>
+                </div>
+            </v-card-text>
+
+            <v-card-actions
+                class="pa-3 border-t bg-grey-lighten-4 justify-end ga-2"
+            >
+                <v-btn
+                    variant="outlined"
+                    size="small"
+                    color="secondary"
+                    :disabled="isSavingInline"
+                    @click="confirmInlineSaveDialog = false"
+                >
+                    Batal / Lanjut Edit
+                </v-btn>
+                <v-btn
+                    color="primary"
+                    variant="elevated"
+                    size="small"
+                    :loading="isSavingInline"
+                    @click="executeSaveAllInlineChanges"
+                >
+                    <template #prepend>
+                        <IconSparkles :size="15" />
+                    </template>
+                    Konfirmasi & Simpan ke Database
+                </v-btn>
+            </v-card-actions>
+        </v-card>
+    </v-dialog>
+
     <!-- FORM DIALOG TAMBAHAN -->
     <v-dialog v-model="tambahanDialog" max-width="480px" persistent>
         <v-card class="dialog-card rounded-lg">
@@ -2933,6 +3662,76 @@ const executeSaveTambahan = async () => {
                     @click="executeSaveTambahan"
                 >
                     Ya, Simpan
+                </v-btn>
+            </v-card-actions>
+        </v-card>
+    </v-dialog>
+
+    <!-- CONFIRM DELETE DIALOG KAIN -->
+    <v-dialog v-model="confirmKainDelete" max-width="360px">
+        <v-card class="rounded-lg">
+            <v-card-title
+                class="text-subtitle-1 font-weight-bold pa-4 d-flex align-center"
+            >
+                <IconHelpCircle :size="18" color="#c62828" class="mr-2" />
+                Konfirmasi Hapus
+            </v-card-title>
+            <v-card-text class="pa-4 pt-0 text-body-2">
+                Yakin ingin menghapus harga kain
+                <strong
+                    >{{ kainToDelete?.mhk_jeniskain }} ({{
+                        kainToDelete?.mhk_warna
+                    }})</strong
+                >?
+            </v-card-text>
+            <v-card-actions class="pa-3 border-t justify-end ga-2">
+                <v-btn
+                    variant="text"
+                    size="small"
+                    @click="confirmKainDelete = false"
+                >
+                    Batal
+                </v-btn>
+                <v-btn
+                    color="error"
+                    variant="elevated"
+                    size="small"
+                    @click="executeDeleteKain"
+                >
+                    Ya, Hapus
+                </v-btn>
+            </v-card-actions>
+        </v-card>
+    </v-dialog>
+
+    <!-- CONFIRM DELETE DIALOG TAMBAHAN -->
+    <v-dialog v-model="confirmTambahanDelete" max-width="360px">
+        <v-card class="rounded-lg">
+            <v-card-title
+                class="text-subtitle-1 font-weight-bold pa-4 d-flex align-center"
+            >
+                <IconHelpCircle :size="18" color="#c62828" class="mr-2" />
+                Konfirmasi Hapus
+            </v-card-title>
+            <v-card-text class="pa-4 pt-0 text-body-2">
+                Yakin ingin menghapus biaya tambahan
+                <strong>"{{ tambahanToDelete?.mht_ket }}"</strong>?
+            </v-card-text>
+            <v-card-actions class="pa-3 border-t justify-end ga-2">
+                <v-btn
+                    variant="text"
+                    size="small"
+                    @click="confirmTambahanDelete = false"
+                >
+                    Batal
+                </v-btn>
+                <v-btn
+                    color="error"
+                    variant="elevated"
+                    size="small"
+                    @click="executeDeleteTambahan"
+                >
+                    Ya, Hapus
                 </v-btn>
             </v-card-actions>
         </v-card>
@@ -3449,6 +4248,79 @@ thead .col-jeniskain {
 
 .spreadsheet-table tbody tr.row-selected:hover .sticky-col {
     background-color: #bfdbfe !important;
+}
+
+/* ── Inline Table Editing Styles ── */
+.inline-edit-cell {
+    padding: 2px 4px !important;
+    position: relative;
+}
+
+.inline-input-wrapper {
+    display: flex;
+    align-items: center;
+    position: relative;
+    width: 100%;
+}
+
+.inline-prefix {
+    font-size: 10px;
+    color: rgba(var(--v-theme-on-surface, 0, 0, 0), 0.5);
+    margin-right: 2px;
+    font-weight: 600;
+    user-select: none;
+}
+
+.inline-suffix {
+    font-size: 10px;
+    color: rgba(var(--v-theme-on-surface, 0, 0, 0), 0.5);
+    margin-left: 2px;
+    font-weight: 600;
+    user-select: none;
+}
+
+.inline-table-input {
+    width: 100%;
+    height: 24px;
+    padding: 1px 4px;
+    font-size: 11.5px;
+    font-weight: 600;
+    text-align: right;
+    border: 1px solid transparent;
+    border-radius: 3px;
+    background: transparent;
+    color: inherit;
+    font-family: inherit;
+    transition: all 0.15s ease-in-out;
+}
+
+.inline-table-input:hover {
+    border-color: #90caf9;
+    background: #ffffff;
+}
+
+.inline-table-input:focus {
+    border-color: #1976d2;
+    background: #ffffff;
+    box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.2);
+    outline: none;
+}
+
+.cell-dirty {
+    background-color: #e8f5e9 !important;
+    position: relative;
+}
+
+.cell-dirty::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 0;
+    height: 0;
+    border-style: solid;
+    border-width: 0 6px 6px 0;
+    border-color: transparent #2e7d32 transparent transparent;
 }
 
 /* ── Empty state (Identik BaseBrowse) ── */
