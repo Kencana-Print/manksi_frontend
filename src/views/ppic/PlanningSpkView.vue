@@ -10,6 +10,7 @@ import {
   IconLockOpen,
   IconFileExport,
 } from "@tabler/icons-vue";
+import { exportExcelSingle } from "@/utils/excelExport";
 import { formatTanggal } from "@/utils/dateFormat";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -270,21 +271,106 @@ const confirmDelete = async () => {
 };
 
 // ─── Export ───────────────────────────────────────────────────────────────────
-const doExport = async (type: "master" | "detail") => {
+const isExportingDetail = ref(false);
+
+const doExportMaster = async () => {
   try {
     const params = { startDate: filterStart.value, endDate: filterEnd.value };
-    const res =
-      type === "master"
-        ? await planningSpkService.exportMaster(params)
-        : await planningSpkService.exportDetail(params);
+    const res = await planningSpkService.exportMaster(params);
     const url = URL.createObjectURL(new Blob([res.data]));
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${type === "master" ? "PlanningSpk" : "DetailPlanningSpk"}_${filterStart.value}_${filterEnd.value}.xlsx`;
+    a.download = `PlanningSpk_${filterStart.value}_${filterEnd.value}.xlsx`;
     a.click();
     URL.revokeObjectURL(url);
   } catch {
     toast.error("Gagal export.");
+  }
+};
+
+const doExportDetail = async () => {
+  isExportingDetail.value = true;
+  try {
+    const res = await planningSpkService.exportDetail({
+      startDate: filterStart.value,
+      endDate: filterEnd.value,
+    });
+    const allDetail: any[] = res.data.data ?? [];
+    if (!allDetail.length) {
+      toast.warning("Tidak ada data untuk diekspor.");
+      return;
+    }
+
+    // Kelompokkan per Nomor Plan (jaga urutan kemunculan pertama)
+    const groups: Record<string, any[]> = {};
+    const order: string[] = [];
+    allDetail.forEach((r) => {
+      const key = r.NomorPlan;
+      if (!groups[key]) {
+        groups[key] = [];
+        order.push(key);
+      }
+      groups[key].push(r);
+    });
+
+    const combinedRows: any[] = [];
+    order.forEach((key) => {
+      const rowsInGroup = groups[key];
+      const first = rowsInGroup[0];
+      const masterCells = {
+        NomorPlan: first.NomorPlan,
+        TglAwal: formatTanggal(first.TglAwal),
+        TglAkhir: formatTanggal(first.TglAkhir),
+        Cabang: first.Cabang,
+      };
+      const blankMaster = Object.fromEntries(
+        Object.keys(masterCells).map((k) => [k, ""]),
+      );
+      rowsInGroup.forEach((r, idx) => {
+        combinedRows.push({
+          ...(idx === 0 ? masterCells : blankMaster),
+          NomorSPK: r.NomorSPK || "-",
+          NamaOrder: r.NamaOrder || "-",
+          QtySPK: Number(r.QtySPK) || 0,
+          Divisi: r.Divisi,
+          TglJadwal: formatTanggal(r.TglJadwal),
+          Wip: Number(r.Wip) || 0,
+          QtyPO: Number(r.QtyPO) || 0,
+          QtyJadwal: Number(r.QtyJadwal) || 0,
+          LineKelompok: r.LineKelompok || "-",
+        });
+      });
+    });
+
+    await exportExcelSingle(
+      `Detail_PlanningSpk_${filterStart.value}_${filterEnd.value}.xlsx`,
+      "Detail",
+      [
+        { header: "Nomor Plan", key: "NomorPlan" },
+        { header: "Tgl Awal", key: "TglAwal" },
+        { header: "Tgl Akhir", key: "TglAkhir" },
+        { header: "Cabang", key: "Cabang" },
+        { header: "Nomor SPK", key: "NomorSPK" },
+        { header: "Nama Order", key: "NamaOrder" },
+        { header: "Qty SPK", key: "QtySPK", align: "right", numFmt: "#,##0" },
+        { header: "Divisi", key: "Divisi" },
+        { header: "Tgl Jadwal", key: "TglJadwal" },
+        { header: "WIP", key: "Wip", align: "right", numFmt: "#,##0" },
+        { header: "Qty PO", key: "QtyPO", align: "right", numFmt: "#,##0" },
+        {
+          header: "Qty Jadwal",
+          key: "QtyJadwal",
+          align: "right",
+          numFmt: "#,##0",
+        },
+        { header: "Line/Kelompok", key: "LineKelompok" },
+      ],
+      combinedRows,
+    );
+  } catch {
+    toast.error("Gagal export detail.");
+  } finally {
+    isExportingDetail.value = false;
   }
 };
 
@@ -317,7 +403,7 @@ fetchData();
     @refresh="fetchData"
     @add="handleAdd"
     @edit="handleEdit"
-    @export="doExport('master')"
+    @export="doExportMaster"
   >
     <!-- ─── Filter ─── -->
     <template #filter-left>
@@ -371,7 +457,12 @@ fetchData();
       >
         <template #prepend><IconLockOpen :size="14" /></template>Open
       </v-btn>
-      <v-btn size="small" color="green-darken-2" @click="doExport('detail')">
+      <v-btn
+        size="small"
+        color="green-darken-2"
+        :loading="isExportingDetail"
+        @click="doExportDetail"
+      >
         <template #prepend><IconFileExport :size="14" /></template>Export Detail
       </v-btn>
     </template>

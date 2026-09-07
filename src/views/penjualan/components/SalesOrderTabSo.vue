@@ -753,11 +753,13 @@ watch(
   () => props.formData.spk_statuskerja,
   async (newStatus, oldStatus) => {
     const isDiv3 = String(props.formData.spk_divisi).startsWith("3");
+    // Cabang P03 (Kaosan) dikecualikan dari wajib-isi-customer —
+    // dicek dari cabang USER yang login, bukan spk_cab (workshop SPK).
+    const isP03Kaosan = isDiv3 && authStore.user?.cabang === "P03";
     const custKode = isDiv3
       ? props.formData.spk_cus_kaosan
       : props.formData.spk_cus_kode;
-
-    if (!custKode && newStatus !== "STANDART") {
+    if (!isP03Kaosan && !custKode && newStatus !== "STANDART") {
       toast.warning(
         "Customer silahkan di isi dulu sebelum mengubah tingkat kepentingan.",
       );

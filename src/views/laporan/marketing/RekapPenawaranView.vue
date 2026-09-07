@@ -47,6 +47,13 @@ const spandukRows = ref<any[]>([]);
 const garmenRows = ref<any[]>([]);
 const mmtRows = ref<any[]>([]);
 const isLoading = ref(false);
+const rekapTableRef = ref<InstanceType<typeof BaseTable> | null>(null);
+const detailTableRefs = ref<
+  Record<string, InstanceType<typeof BaseTable> | null>
+>({});
+const setDetailTableRef = (key: string, el: any) => {
+  if (el) detailTableRefs.value[key] = el;
+};
 
 const canExport = computed(() => authStore.can(MENU_ID, "view"));
 
@@ -205,6 +212,12 @@ const onExport = async () => {
   const label = BULAN_NAMES[bulan.value - 1] + "_" + tahun.value;
 
   if (tab === "rekap") {
+    const filteredRekap =
+      rekapTableRef.value?.getFilteredItems?.() ?? rekapRows.value;
+    if (!filteredRekap.length) {
+      toast.warning("Tidak ada data untuk diekspor (cek filter aktif).");
+      return;
+    }
     await exportExcelSingle(
       `RekapPenawaran_${label}`,
       "Rekap Penawaran",
@@ -270,16 +283,22 @@ const onExport = async () => {
           numFmt: "0.00",
         },
       ],
-      rekapRows.value,
+      filteredRekap,
       `Rekap Penawaran — ${BULAN_NAMES[bulan.value - 1]} ${tahun.value}`,
     );
   } else {
-    const rows =
+    const rawRows =
       tab === "spanduk"
         ? spandukRows.value
         : tab === "garmen"
           ? garmenRows.value
           : mmtRows.value;
+    const filteredRows =
+      detailTableRefs.value[tab]?.getFilteredItems?.() ?? rawRows;
+    if (!filteredRows.length) {
+      toast.warning("Tidak ada data untuk diekspor (cek filter aktif).");
+      return;
+    }
     const tabLabel = tab.charAt(0).toUpperCase() + tab.slice(1);
     await exportExcelSingle(
       `RekapPenawaran_${tabLabel}_${label}`,
@@ -318,7 +337,7 @@ const onExport = async () => {
         { header: "Ket.", key: "Keterangan", width: 14, align: "center" },
         { header: "Note", key: "Note", width: 24 },
       ],
-      rows,
+      filteredRows,
       `Detail Penawaran ${tabLabel} — ${BULAN_NAMES[bulan.value - 1]} ${tahun.value}`,
     );
   }
@@ -438,6 +457,7 @@ const onExport = async () => {
       <!-- ── Tab Rekap ── -->
       <div v-show="activeTab === 'rekap'" class="tab-content">
         <BaseTable
+          ref="rekapTableRef"
           :headers="headersRekap"
           :items="rekapRows"
           :is-loading="isLoading"
@@ -549,6 +569,7 @@ const onExport = async () => {
         <div v-show="activeTab === tabKey" class="tab-content">
           <div class="detail-table-wrap">
             <BaseTable
+              :ref="(el: any) => setDetailTableRef(tabKey, el)"
               :headers="headersDetail"
               :items="
                 tabKey === 'spanduk'

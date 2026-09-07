@@ -42,6 +42,15 @@ const TAHUN_LIST = Array.from({ length: 6 }, (_, i) => now.getFullYear() - i);
 // ── Tab ──
 const activeTab = ref<"rekap" | "spanduk" | "garmen" | "mmt">("rekap");
 
+const rekapTableRef = ref<InstanceType<typeof BaseTable> | null>(null);
+const detailTableRefs = ref<
+  Record<string, InstanceType<typeof BaseTable> | null>
+>({});
+
+const setDetailTableRef = (tabKey: string, el: any) => {
+  detailTableRefs.value[tabKey] = el;
+};
+
 // ── Data ──
 const rekapRows = ref<any[]>([]);
 const spandukRows = ref<any[]>([]);
@@ -247,6 +256,13 @@ const onExport = async () => {
   const label = BULAN_NAMES[bulan.value - 1] + "_" + tahun.value;
 
   if (tab === "rekap") {
+    const exportRows =
+      rekapTableRef.value?.getFilteredItems?.() ?? rekapRows.value;
+
+    if (!exportRows.length) {
+      return toast.warning("Tidak ada data untuk diexport.");
+    }
+
     await exportExcelSingle(
       `RekapMAP_${label}`,
       "Rekap MAP",
@@ -284,16 +300,23 @@ const onExport = async () => {
           numFmt: "0.00",
         },
       ],
-      rekapRows.value,
+      exportRows,
       `Rekap MAP — ${BULAN_NAMES[bulan.value - 1]} ${tahun.value}`,
     );
   } else {
-    const rows =
+    const rawRows =
       tab === "spanduk"
         ? spandukRows.value
         : tab === "garmen"
           ? garmenRows.value
           : mmtRows.value;
+    const exportRows =
+      detailTableRefs.value[tab]?.getFilteredItems?.() ?? rawRows;
+
+    if (!exportRows.length) {
+      return toast.warning("Tidak ada data untuk diexport.");
+    }
+
     const tabLabel = tab.charAt(0).toUpperCase() + tab.slice(1);
     await exportExcelSingle(
       `RekapMAP_${tabLabel}_${label}`,
@@ -357,7 +380,7 @@ const onExport = async () => {
         },
         { header: "Note", key: "Note", width: 20 },
       ],
-      rows,
+      exportRows,
       `Detail MAP ${tabLabel} — ${BULAN_NAMES[bulan.value - 1]} ${tahun.value}`,
     );
   }
@@ -493,6 +516,7 @@ const onExport = async () => {
       <!-- ── Tab Rekap MAP ── -->
       <div v-show="activeTab === 'rekap'" class="tab-content">
         <BaseTable
+          ref="rekapTableRef"
           :headers="headersRekap"
           :items="rekapRows"
           :is-loading="isLoading"
@@ -560,6 +584,7 @@ const onExport = async () => {
         <div v-show="activeTab === tabKey" class="tab-content">
           <div class="detail-table-wrap">
             <BaseTable
+              :ref="(el) => setDetailTableRef(tabKey, el)"
               :headers="headersDetail"
               :items="
                 tabKey === 'spanduk'

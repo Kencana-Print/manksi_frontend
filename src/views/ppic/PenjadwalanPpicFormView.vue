@@ -66,6 +66,7 @@ interface DetailRow {
   Kirim: number;
   Kurang: number;
   Rencana: number;
+  KetRencana: string;
   Realisasi: number;
   PermintaanKirim: string;
   StatusPermintaan: string;
@@ -148,7 +149,9 @@ const canEditMarketing = computed(
   () => isAdmin.value || authStore.user?.bagian?.toUpperCase() === "MARKETING",
 );
 const canEditKesepakatan = computed(
-  () => isAdmin.value || authStore.user?.bagian?.toUpperCase() === "PPIC",
+  () =>
+    isAdmin.value ||
+    authStore.user?.bagian?.toUpperCase() !== "MARKETING",
 );
 
 // ── Cabang → Divisi mapping tetap ───────────────────────────────
@@ -277,6 +280,7 @@ const mapDetailRow = (r: any): DetailRow => ({
   Kirim: Number(r.Kirim) || 0,
   Kurang: Number(r.Kurang) || 0,
   Rencana: Number(r.Rencana) || 0,
+  KetRencana: r.KetRencana || "",
   Realisasi: Number(r.Realisasi) || 0,
   PermintaanKirim: r.PermintaanKirim || "",
   StatusPermintaan: r.StatusPermintaan || "CLOSE",
@@ -394,6 +398,7 @@ const pushRowFromServer = (pjwdId: number, rowInput: any) => {
     Kirim: Number(rowInput.Kirim) || 0,
     Kurang: Number(rowInput.Kurang) || 0,
     Rencana: Number(rowInput.Rencana) || 0,
+    KetRencana: "",
     Realisasi: 0,
     PermintaanKirim: rowInput.PermintaanKirim || "",
     StatusPermintaan: "CLOSE",
@@ -745,6 +750,8 @@ const onPermintaanKirimChange = (row: DetailRow) =>
   onDetailFieldChange(row, "PermintaanKirim", "pjwd_tgl_permintaan_kirim");
 const onStatusPermintaanChange = (row: DetailRow) =>
   onDetailFieldChange(row, "StatusPermintaan", "pjwd_status_permintaan");
+const onKetRencanaChange = (row: DetailRow) =>
+  onDetailFieldChange(row, "KetRencana", "pjwd_ket_rencana");
 const onKesepakatanChange = (row: DetailRow) =>
   onDetailFieldChange(row, "Kesepakatan", "pjwd_tgl_kesepakatan");
 const onKetKesepakatanChange = (row: DetailRow) =>
@@ -872,6 +879,7 @@ onMounted(() => {
     if (!row) return;
     const fieldMap: Record<string, keyof DetailRow> = {
       pjwd_rencana: "Rencana",
+      pjwd_ket_rencana: "KetRencana",
       pjwd_tgl_permintaan_kirim: "PermintaanKirim",
       pjwd_status_permintaan: "StatusPermintaan",
       pjwd_tgl_kesepakatan: "Kesepakatan",
@@ -1221,6 +1229,21 @@ const rowClass = (d: DetailRow) => {
                       ($event.target as HTMLInputElement).value,
                       $event,
                     )
+                  "
+                />
+                <input
+                  v-if="d.Rencana < d.Kurang"
+                  type="text"
+                  v-model="d.KetRencana"
+                  class="pjw-cell-text pjw-ket-rencana"
+                  placeholder="Catatan, mis. tanpa size S"
+                  :disabled="!canEditMarketing"
+                  @focus="onFieldFocus(d, 'pjwd_ket_rencana')"
+                  @blur="
+                    () => {
+                      onFieldBlur(d, 'pjwd_ket_rencana');
+                      onKetRencanaChange(d);
+                    }
                   "
                 />
               </td>
@@ -1644,6 +1667,13 @@ const rowClass = (d: DetailRow) => {
   display: flex;
   flex-direction: column;
   gap: 3px;
+}
+.pjw-ket-rencana {
+  margin-top: 3px;
+  text-align: left !important;
+  font-style: italic;
+  font-size: 10px;
+  border-color: #ffb74d;
 }
 .pjw-cell-text {
   width: 100%;

@@ -101,6 +101,8 @@ const clearSales = () => {
 };
 
 // --- BROWSE SETUP ---
+const baseBrowseRef = ref<InstanceType<typeof BaseBrowse> | null>(null);
+
 const { items, isLoading, canExport, fetchData } = useBrowse({
   menuId: "306",
   fetchApi: async () => {
@@ -216,6 +218,24 @@ const onExport = async () => {
       return toast.warning("Tidak ada data untuk diexport.");
     }
 
+    // ✅ Batasi export ke baris yang masih lolos search box / filter
+    // kolom di grid (BaseBrowse). Master di sini datang dari query
+    // server terpisah (getExportData), jadi tidak otomatis ikut
+    // filter lokal grid — harus disaring manual pakai Nomor yang
+    // sedang tampil.
+    const filteredGridItems = baseBrowseRef.value?.getFilteredItems?.();
+    let exportMaster = master;
+    if (filteredGridItems) {
+      const visibleNomor = new Set(
+        filteredGridItems.map((it: any) => it.Nomor),
+      );
+      exportMaster = master.filter((m: any) => visibleNomor.has(m.Nomor));
+    }
+
+    if (exportMaster.length === 0) {
+      return toast.warning("Tidak ada data untuk diexport.");
+    }
+
     // ✅ Kelompokkan SJ & Invoice per Nomor SPK (2 list independen)
     const sjByNomor: Record<string, any[]> = {};
     sjDetails.forEach((r: any) => {
@@ -230,7 +250,7 @@ const onExport = async () => {
 
     const combinedRows: any[] = [];
 
-    master.forEach((m: any) => {
+    exportMaster.forEach((m: any) => {
       const sjList = sjByNomor[m.Nomor] || [];
       const invList = invByNomor[m.Nomor] || [];
       // ✅ replikasi persis: SJ & Invoice punya baris sendiri-sendiri
@@ -410,6 +430,7 @@ const onExport = async () => {
 
 <template>
   <BaseBrowse
+    ref="baseBrowseRef"
     title="Laporan SO vs SJ vs Invoice"
     menu-id="306"
     :icon="IconFileInvoice"

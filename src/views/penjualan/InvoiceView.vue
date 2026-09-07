@@ -457,6 +457,7 @@ const onExportDetail = async () => {
       rowsInGroup.forEach((r, idx) => {
         combinedRows.push({
           ...(idx === 0 ? masterCells : blankMaster),
+          NomorUlang: first.Nomor, // ⬅ baru — terisi di SETIAP baris, bukan cuma baris pertama
           Kode: r.Kode,
           Nama: r.Nama,
           Ukuran: r.Ukuran,
@@ -493,6 +494,7 @@ const onExportDetail = async () => {
         { header: "Created", key: "Created" },
         { header: "ACC Edit", key: "ACC_Edit" },
         { header: "Alasan", key: "Alasan" },
+        { header: "Nomor", key: "NomorUlang" },
         { header: "Kode", key: "Kode" },
         { header: "Nama", key: "Nama" },
         { header: "Ukuran", key: "Ukuran" },
