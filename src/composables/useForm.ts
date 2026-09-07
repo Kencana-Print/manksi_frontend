@@ -164,13 +164,23 @@ export function useForm<
     if (currentTab?.needsReset) {
       currentTab.needsReset = false;
 
-      // Jangan timpa perubahan yang belum disimpan
       if (isDirty.value) {
         return;
       }
 
       if (isEditMode.value && options.fetchApi) {
         fetchData();
+      } else if (!isEditMode.value) {
+        // Mode tambah baru — reset bersih, dengan guard isLoading supaya
+        // watcher deep di atas tidak membalikkan isDirty jadi true lagi.
+        isLoading.value = true;
+        formData.value = JSON.parse(JSON.stringify(options.initialData));
+        originalData.value = JSON.parse(JSON.stringify(options.initialData));
+        options.onFormReset?.();
+        nextTick(() => {
+          isDirty.value = false;
+          isLoading.value = false;
+        });
       }
     }
   });
