@@ -171,18 +171,18 @@ onMounted(async () => {
         >
           <td class="tc td-nowrap">{{ idx + 1 }}</td>
           <td class="td-spk td-nowrap">{{ row.No_SPK }}</td>
-          <td class="td-wrap">{{ row.Nama_Spk }}</td>
-          <td class="td-wrap">{{ row.Ukuran }}</td>
-          <td class="td-wrap">{{ row.Kain }}</td>
+          <td class="td-nowrap">{{ row.Nama_Spk }}</td>
+          <td class="td-nowrap">{{ row.Ukuran }}</td>
+          <td class="td-nowrap">{{ row.Kain }}</td>
           <td class="tc td-nowrap td-sm">{{ fmtDateShort(row.Tanggal) }}</td>
-          <td class="td-wrap">{{ row.Uraian }}</td>
+          <td class="td-nowrap">{{ row.Uraian }}</td>
           <td class="tc td-nowrap td-sm">{{ row.Cus_Kode }}</td>
           <td class="tr td-nowrap">{{ num(row.Jumlah) }}</td>
           <td class="tr td-nowrap">{{ num(row.Koli) }}</td>
           <td class="tc td-nowrap">{{ row.Jam }}</td>
           <td class="td-sj td-nowrap">{{ row.Nomor_SJ }}</td>
           <td class="tr td-nowrap">{{ row.Kirim ? num(row.Kirim) : "0" }}</td>
-          <td class="td-wrap">{{ row.Expedisi }}</td>
+          <td class="td-nowrap">{{ row.Expedisi }}</td>
         </tr>
 
         <tr v-if="!rows.length">
@@ -322,7 +322,7 @@ body {
 .main-table thead tr.th-sub th {
   background: white;
   color: #000;
-  font-size: 6.5pt;
+  font-size: 7.5pt; /* ⬅ diseragamkan, sebelumnya 6.5pt */
   font-weight: 700;
   padding: 3px 3px;
   border: 0.5px solid #000;
@@ -344,12 +344,6 @@ body {
   vertical-align: top;
 }
 
-/* Wrap — boleh multi-baris */
-.td-wrap {
-  white-space: normal;
-  word-break: break-word;
-}
-
 /* Nowrap — satu baris */
 .td-nowrap {
   white-space: nowrap;
@@ -368,18 +362,11 @@ body {
 .tr {
   text-align: right;
 }
-.td-sm {
-  font-size: 7pt;
-}
 
 .td-spk {
-  font-size: 7pt;
   font-weight: 600;
-  color: #0d47a1;
-  font-family: monospace;
 }
 .td-sj {
-  font-size: 7pt;
   color: #2e7d32;
   font-weight: 600;
 }
@@ -432,10 +419,15 @@ body {
   /* Pastikan hitam putih */
   .main-table thead tr.th-top th,
   .main-table thead tr.th-sub th {
-    background: white !important;
-    color: black !important;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
+    background: white;
+    color: #000;
+    font-size: 7.5pt; /* ⬅ diseragamkan, sebelumnya 6.5pt */
+    font-weight: 700;
+    padding: 3px 3px;
+    border: 0.5px solid #000;
+    text-align: left;
+    vertical-align: middle;
+    white-space: nowrap;
   }
   .row-stripe td {
     background: white !important;
