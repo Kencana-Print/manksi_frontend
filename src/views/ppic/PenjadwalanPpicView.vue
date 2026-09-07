@@ -482,8 +482,9 @@ const onExportDetail = async () => {
 
       sheets.push({
         sheetName: sanitizeSheetName(
-          `${periode.Nomor} ${formatTanggal(periode.TglAwal)}-${formatTanggal(periode.TglAkhir)}`,
+          `${periode.Cabang} ${formatTanggal(periode.TglAwal)}-${formatTanggal(periode.TglAkhir)}`,
         ),
+        title: `${periode.Cabang} - ${formatTanggal(periode.TglAwal)} s/d ${formatTanggal(periode.TglAkhir)}`,
         headerColor: "FFEB3B",
         columns,
         rows,
