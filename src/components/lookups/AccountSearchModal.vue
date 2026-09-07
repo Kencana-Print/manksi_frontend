@@ -9,7 +9,10 @@ interface Account {
   Rekening: string;
 }
 
-const props = defineProps<{ modelValue: boolean }>();
+const props = defineProps<{
+  modelValue: boolean;
+  filterMode?: "potongan";
+}>();
 const emit = defineEmits(["update:modelValue", "selected"]);
 
 const search = ref("");
@@ -33,7 +36,12 @@ const fetchData = async () => {
   isLoading.value = true;
   try {
     const res = await api.get("/lookups/account", {
-      params: { q: search.value, page: page.value, limit: itemsPerPage.value },
+      params: {
+        q: search.value,
+        page: page.value,
+        limit: itemsPerPage.value,
+        filterMode: props.filterMode ?? "",
+      },
     });
     items.value = res.data.data.items;
     totalItems.value = res.data.data.total;
@@ -101,6 +109,13 @@ const selectItem = (item: Account) => {
         />
         <span class="text-subtitle-2 font-weight-bold">
           CARI DATA ACCOUNT
+        </span>
+        <span
+          v-if="filterMode === 'potongan'"
+          class="text-caption ml-2"
+          style="opacity: 0.8"
+        >
+          (Khusus Potongan)
         </span>
         <v-spacer></v-spacer>
         <v-btn

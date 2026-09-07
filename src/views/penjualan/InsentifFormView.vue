@@ -6,6 +6,7 @@ import { useForm } from "@/composables/useForm";
 import { insentifFormService as svc } from "@/services/penjualan/insentifFormService";
 import { IconCoin, IconSearch, IconFileSpreadsheet } from "@tabler/icons-vue";
 import { cetakInsentifExcel } from "@/utils/cetakInsentif";
+import CustomerSearchModal from "@/components/lookups/CustomerSearchModal.vue";
 
 // ── Types ───────────────────────────────────────────────────────────────
 interface InvoiceRow {
@@ -109,6 +110,7 @@ const {
 });
 
 const fd = formData;
+const showCustModal = ref(false);
 
 // ── Customer ───────────────────────────────────────────────────────────
 const onCusKodeEnter = async () => {
@@ -135,6 +137,17 @@ const onCusKodeEnter = async () => {
     fd.value.InvoiceList = [];
     fd.value.DetailSpk = [];
   }
+};
+
+const onCustSelected = (item: any) => {
+  fd.value.CusKode = item.Kode;
+  fd.value.CusNama = item.Nama;
+  fd.value.CusAlamat = item.Alamat || "";
+  fd.value.CusKota = item.Kota || "";
+  // Reset invoice/detail SPK — sama seperti saat ganti kode manual,
+  // karena customer berbeda = invoice yang relevan berbeda.
+  fd.value.InvoiceList = [];
+  fd.value.DetailSpk = [];
 };
 
 const onCusKodeChange = () => {
@@ -361,6 +374,7 @@ const validateSave = () => {
               "
               placeholder="Kode"
               @keydown.enter.prevent="onCusKodeEnter"
+              @keydown.f1.prevent="showCustModal = true"
               @blur="onCusKodeEnter"
               @input="onCusKodeChange"
             />
@@ -372,6 +386,14 @@ const validateSave = () => {
               placeholder="Nama customer..."
               tabindex="-1"
             />
+            <button
+              type="button"
+              class="ig-search-btn"
+              title="Cari Customer (F1)"
+              @click="showCustModal = true"
+            >
+              <IconSearch :size="13" color="#1565c0" />
+            </button>
           </div>
         </div>
 
@@ -680,6 +702,8 @@ const validateSave = () => {
       </v-card-actions>
     </v-card>
   </v-dialog>
+
+  <CustomerSearchModal v-model="showCustModal" @selected="onCustSelected" />
 
   <!-- ── Dialog Konfirmasi Hapus Baris Invoice ── -->
   <v-dialog v-model="showDeleteInvoiceDialog" max-width="360px" persistent>
@@ -1035,5 +1059,22 @@ const validateSave = () => {
   padding: 12px;
   color: #9e9e9e;
   font-style: italic;
+}
+.ig-search-btn {
+  width: 24px;
+  min-width: 24px;
+  height: 100%;
+  background: #e3f2fd;
+  border: none;
+  border-left: 1px solid #bdbdbd;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  flex-shrink: 0;
+}
+.ig-search-btn:hover {
+  background: #bbdefb;
 }
 </style>

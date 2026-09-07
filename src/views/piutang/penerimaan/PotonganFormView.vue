@@ -576,6 +576,7 @@ const validateBeforeSave = () => {
   />
   <AccountSearchModal
     v-model="showRekeningModal"
+    filter-mode="potongan"
     @selected="handleRekeningSelected"
   />
   <CustomerSearchModal v-model="showCustModal" @selected="handleCustSelected" />

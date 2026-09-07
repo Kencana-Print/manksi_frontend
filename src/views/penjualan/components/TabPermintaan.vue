@@ -28,11 +28,13 @@ const uploadName = ref("");
 const isOpeningModal = ref(false);
 
 const imageError = ref(false);
+const imgCacheBuster = ref(Date.now());
 
 watch(
   () => props.formData.PathImage,
   () => {
     imageError.value = false;
+    imgCacheBuster.value = Date.now();
   },
 );
 
@@ -45,28 +47,25 @@ const displayImageUrl = computed(() => {
   if (props.formData.PathImage.startsWith("blob:")) {
     return props.formData.PathImage;
   }
+  const cacheBust = `v=${imgCacheBuster.value}`;
   if (
     props.formData.PathImage.startsWith("http://") ||
     props.formData.PathImage.startsWith("https://")
   ) {
-    return props.formData.PathImage.replace(/^http:\/\//, "https://");
+    const secured = props.formData.PathImage.replace(/^http:\/\//, "https://");
+    const sep = secured.includes("?") ? "&" : "?";
+    return `${secured}${sep}${cacheBust}`;
   }
-
-  // Jika backend mengembalikan PathImage yang sudah berupa URL statis atau path khusus
   const rawBase = api.defaults.baseURL || import.meta.env.VITE_API_URL || "";
   const base = rawBase.replace(/\/api\/?$/, "");
-
-  // Jika path diawali dengan /file-gambar atau /images, gabungkan langsung dengan base URL
   if (
     props.formData.PathImage.startsWith("/file-gambar/") ||
     props.formData.PathImage.startsWith("/images/")
   ) {
-    return `${base}${props.formData.PathImage}`;
+    return `${base}${props.formData.PathImage}?${cacheBust}`;
   }
-
-  // Fallback: Jika path hanya berupa nama file atau path relatif biasa, arahkan ke mintaharga sentral
   const cleanName = props.formData.PathImage.replace(/^\/+/, "");
-  return `${base}/file-gambar/mintaharga/${cleanName}`;
+  return `${base}/file-gambar/mintaharga/${cleanName}?${cacheBust}`;
 });
 
 const handleImageError = (e: Event) => {
@@ -76,15 +75,12 @@ const handleImageError = (e: Event) => {
     return;
   }
   img.dataset.fallbackTried = "true";
-
   const nomorMh = props.formData.Nomor;
   if (!nomorMh) {
     imageError.value = true;
     return;
   }
-
-  // Coba fallback langsung ke folder sentral mintaharga
-  img.src = `/file-gambar/mintaharga/${encodeURIComponent(nomorMh)}.jpg`;
+  img.src = `/file-gambar/mintaharga/${encodeURIComponent(nomorMh)}.jpg?v=${Date.now()}`;
 };
 
 const divisiOptions = ref<any[]>([]);
