@@ -382,7 +382,8 @@ const showPiutang = computed(() =>
 const showGudangBahan = computed(
   () =>
     ["PEMBELIAN", "GUDANG", "PPIC"].includes(bagian.value) ||
-    isSuperViewer.value,
+    isSuperViewer.value ||
+    authStore.user?.kode?.toUpperCase() === "NANDA",
 );
 const showBarangJadi = computed(
   () =>
@@ -3978,7 +3979,8 @@ const sisaClass = (item: any) => {
             <div class="manksi-panel content-panel fill-height">
               <div class="panel-header panel-header--warning">
                 <IconFileAlert :size="14" :stroke-width="1.7" class="mr-1" />
-                Belum SO
+                Penawaran Belum SO
+                <span class="panel-header-sub ml-1">(1 tahun terakhir)</span>
                 <span v-if="penSummary.BelumSpk" class="badge-count ml-auto">
                   {{ penSummary.BelumSpk }}
                 </span>
@@ -4002,7 +4004,7 @@ const sisaClass = (item: any) => {
                       <span class="pen-stat-val text-success">{{
                         penSummary.SudahSpk
                       }}</span>
-                      <span class="pen-stat-lbl">Ada SPK</span>
+                      <span class="pen-stat-lbl">Ada SPK/SO</span>
                     </div>
                     <div class="pen-stat">
                       <span class="pen-stat-val text-error">{{
@@ -4035,6 +4037,12 @@ const sisaClass = (item: any) => {
                       :key="p.Nomor"
                       class="pen-item"
                       :class="umurClass(p.UmurHari)"
+                      style="cursor: pointer"
+                      @click="
+                        router.push(
+                          `/penjualan/penawaran/edit/${encodeURIComponent(p.Nomor)}`,
+                        )
+                      "
                     >
                       <div class="pen-item-top">
                         <span class="pen-nomor">{{ p.Nomor }}</span>
