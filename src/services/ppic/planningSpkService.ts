@@ -71,8 +71,5 @@ export const planningSpkService = {
     }),
 
   exportDetail: (params: { startDate: string; endDate: string }) =>
-    api.get("/ppic/planning-spk/export-detail", {
-      params,
-      responseType: "blob",
-    }),
+    api.get("/ppic/planning-spk/export-detail", { params }),
 };
