@@ -38,19 +38,6 @@ const pendingLabel = computed(() => {
   return ket ? `${status} — ${ket}` : status;
 });
 
-const pendingProsesText = computed(() => {
-  if (!isPending.value) return "";
-  const map: [string, boolean][] = [
-    ["Potong", data.value.spk_ppotong === "Y"],
-    ["Cetak", data.value.spk_pcetak === "Y"],
-    ["Bordir", data.value.spk_pbordir === "Y"],
-    ["Jahit", data.value.spk_pjahit === "Y"],
-    ["Finishing", data.value.spk_pfinishing === "Y"],
-  ];
-  const ditahan = map.filter(([, y]) => y).map(([nama]) => nama);
-  return ditahan.length ? `Ditahan: ${ditahan.join(", ")}` : "";
-});
-
 const numCopies = computed(() => {
   if (withAlokasi.value) return 1;
   if (isGarmen.value) return 1; // Garmen: 1 lembar, tidak digandakan
@@ -448,9 +435,6 @@ onMounted(async () => {
                       <span v-if="isPending" class="pending-badge-row">{{
                         pendingLabel
                       }}</span>
-                      <div v-if="pendingProsesText" class="pending-proses-text">
-                        {{ pendingProsesText }}
-                      </div>
                     </td>
                   </tr>
                   <tr>
@@ -705,12 +689,9 @@ onMounted(async () => {
                 <td class="w-colon">:</td>
                 <td colspan="3">
                   {{ tglIndo(data.spk_tanggal) }}
-                  <span v-if="isPending" class="pending-badge-row">{{
-                    pendingLabel
-                  }}</span>
-                  <div v-if="pendingProsesText" class="pending-proses-text">
-                    {{ pendingProsesText }}
-                  </div>
+                  <span v-if="isPending" class="pending-badge-row"
+                    >PENDING!</span
+                  >
                 </td>
               </tr>
               <tr>
@@ -1561,13 +1542,6 @@ onMounted(async () => {
   font-weight: bold;
   font-size: 9pt;
   margin-left: 10px;
-}
-
-.pending-proses-text {
-  color: #d32f2f;
-  font-size: 7pt;
-  font-style: italic;
-  margin-top: 2px;
 }
 
 @media screen {
