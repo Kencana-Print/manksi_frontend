@@ -1005,6 +1005,10 @@ fetchData();
   color: white;
   font-weight: 700;
 }
+.row-necessary .kesepakatan-tgl,
+.row-necessary .kesepakatan-ket {
+  color: #ffffff !important;
+}
 .dt tbody tr.row-partial td {
   background: #fff3e0;
 }
