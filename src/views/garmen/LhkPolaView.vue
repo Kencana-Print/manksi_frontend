@@ -190,8 +190,7 @@ const onExportDetail = async () => {
       );
     }
 
-    const markerRows: any[] = [];
-    const gradingRows: any[] = [];
+    const rows: any[] = [];
 
     source.forEach((master: any) => {
       const det = detailCache.value[master.Nomor] || {
@@ -207,52 +206,66 @@ const onExportDetail = async () => {
         Object.keys(masterCells).map((k) => [k, ""]),
       );
 
-      // Baris master WAJIB muncul di kedua sheet, meski tidak punya
-      // detail item (tetap dipertahankan dari fix sebelumnya).
+      let isFirstRowInGroup = true;
+      const pushRow = (data: Record<string, any>) => {
+        rows.push({
+          ...(isFirstRowInGroup ? masterCells : blankMaster),
+          NomorUlang: master.Nomor,
+          ...data,
+        });
+        isFirstRowInGroup = false;
+      };
+
       if (det.marker.length > 0) {
-        det.marker.forEach((r: any, idx: number) => {
-          markerRows.push({
-            ...(idx === 0 ? masterCells : blankMaster),
-            NomorUlang: master.Nomor,
+        det.marker.forEach((r: any) => {
+          pushRow({
+            Jenis: "MARKER",
             "No SPK": r.spkNomor,
             "Nama SPK": r.namaSpk || "",
             "Lebar Kain": r.lebarKain || "",
             Size: r.size || "",
             For: r.tujuanProses || "",
+            Divisi: "",
+            "Grading Size": "",
             Keterangan: r.keterangan || "",
           });
         });
       } else {
-        markerRows.push({
-          ...masterCells,
-          NomorUlang: master.Nomor,
+        pushRow({
+          Jenis: "MARKER",
           "No SPK": "",
           "Nama SPK": "(Tidak ada data marker)",
           "Lebar Kain": "",
           Size: "",
           For: "",
+          Divisi: "",
+          "Grading Size": "",
           Keterangan: "",
         });
       }
 
       if (det.grading.length > 0) {
-        det.grading.forEach((r: any, idx: number) => {
-          gradingRows.push({
-            ...(idx === 0 ? masterCells : blankMaster),
-            NomorUlang: master.Nomor,
+        det.grading.forEach((r: any) => {
+          pushRow({
+            Jenis: "GRADING",
             "No SPK": r.spkNomor,
             "Nama SPK": r.namaSpk || "",
+            "Lebar Kain": "",
+            Size: "",
+            For: "",
             Divisi: r.divisi || "",
             "Grading Size": r.gradingSize || "",
             Keterangan: r.keterangan || "",
           });
         });
       } else {
-        gradingRows.push({
-          ...masterCells,
-          NomorUlang: master.Nomor,
+        pushRow({
+          Jenis: "GRADING",
           "No SPK": "",
           "Nama SPK": "(Tidak ada data grading)",
+          "Lebar Kain": "",
+          Size: "",
+          For: "",
           Divisi: "",
           "Grading Size": "",
           Keterangan: "",
@@ -260,51 +273,30 @@ const onExportDetail = async () => {
       }
     });
 
-    if (markerRows.length === 0 && gradingRows.length === 0) {
-      return toast.warning("Tidak ada rincian untuk diexport.");
-    }
+    if (!rows.length) return toast.warning("Tidak ada rincian untuk diexport.");
 
-    const markerColumns: ExcelColumn[] = [
+    const columns: ExcelColumn[] = [
       { header: "Nomor", key: "Nomor", width: 16 },
       { header: "Tanggal", key: "Tanggal", width: 12, align: "center" },
       { header: "Pembuat", key: "Pembuat", width: 20 },
       { header: "Nomor", key: "NomorUlang", width: 16 },
+      { header: "Jenis", key: "Jenis", width: 10, align: "center" },
       { header: "No SPK", key: "No SPK", width: 14 },
       { header: "Nama SPK", key: "Nama SPK", width: 26 },
       { header: "Lebar Kain", key: "Lebar Kain", width: 12 },
       { header: "Size", key: "Size", width: 10 },
       { header: "For", key: "For", width: 12 },
-      { header: "Keterangan", key: "Keterangan", width: 20 },
-    ];
-    const gradingColumns: ExcelColumn[] = [
-      { header: "Nomor", key: "Nomor", width: 16 },
-      { header: "Tanggal", key: "Tanggal", width: 12, align: "center" },
-      { header: "Pembuat", key: "Pembuat", width: 20 },
-      { header: "Nomor", key: "NomorUlang", width: 16 },
-      { header: "No SPK", key: "No SPK", width: 14 },
-      { header: "Nama SPK", key: "Nama SPK", width: 26 },
       { header: "Divisi", key: "Divisi", width: 12 },
       { header: "Grading Size", key: "Grading Size", width: 16 },
       { header: "Keterangan", key: "Keterangan", width: 20 },
     ];
 
-    const { exportExcel } = await import("@/utils/excelExport");
-    await exportExcel(
+    await exportExcelSingle(
       `LHK_Pola_Detail_${filterState.value.dtAwal}_${filterState.value.dtAkhir}.xlsx`,
-      [
-        {
-          sheetName: "Marker Mika Duplek",
-          columns: markerColumns,
-          rows: markerRows,
-          title: `Daily Out Marker, Mika & Duplek | Periode ${filterState.value.dtAwal} s/d ${filterState.value.dtAkhir}`,
-        },
-        {
-          sheetName: "Pola Grading",
-          columns: gradingColumns,
-          rows: gradingRows,
-          title: `Daily Out Pola | Periode ${filterState.value.dtAwal} s/d ${filterState.value.dtAkhir}`,
-        },
-      ],
+      "Detail",
+      columns,
+      rows,
+      `Daily Out Marker & Pola | Periode ${filterState.value.dtAwal} s/d ${filterState.value.dtAkhir}`,
     );
     toast.success("Berhasil export detail data.");
   } catch (e) {
