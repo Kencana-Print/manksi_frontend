@@ -6,7 +6,7 @@ export const permintaanPembelianFormService = {
   },
   uploadGambarItem: (nomor: string, kode: string, formData: FormData) =>
     api.post(
-      `/garmen/permintaan-pembelian/gambar/${encodeURIComponent(nomor)}/${encodeURIComponent(kode)}`,
+      `/garmen/permintaan-pembelian/form/gambar/${encodeURIComponent(nomor)}/${encodeURIComponent(kode)}`,
       formData,
       { headers: { "Content-Type": "multipart/form-data" } },
     ),
