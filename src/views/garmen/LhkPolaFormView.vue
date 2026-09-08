@@ -352,13 +352,6 @@ const validateSave = () => {
               </td>
               <td>
                 <input
-                  v-model.number="row.gradingSize"
-                  class="cell-inp"
-                  placeholder="S,M,L,XL"
-                />
-              </td>
-              <td>
-                <input
                   v-model.number="row.panjang"
                   type="number"
                   step="0.01"

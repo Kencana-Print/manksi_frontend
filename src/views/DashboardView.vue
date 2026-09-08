@@ -3258,6 +3258,7 @@ const KATEGORI_LABEL: Record<string, string> = {
   SANGAT_LAMBAT: ">30hr",
   BELUM: "Belum",
   BATAL: "Batal",
+  CLOSE: "Close",
 };
 const KATEGORI_COLOR: Record<string, string> = {
   CEPAT: "#2e7d32",
@@ -3266,6 +3267,7 @@ const KATEGORI_COLOR: Record<string, string> = {
   SANGAT_LAMBAT: "#c62828",
   BELUM: "#bdbdbd",
   BATAL: "#616161",
+   CLOSE: "#00897b", 
 };
 const BULAN_LABEL = [
   "Jan",
