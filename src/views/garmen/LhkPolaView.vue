@@ -74,6 +74,7 @@ const headers = [
   { title: "Tanggal", key: "Tanggal", width: "100px", align: "center" },
   { title: "Keterangan", key: "Keterangan", minWidth: "220px" },
   { title: "SPK", key: "SpkNomor", minWidth: "160px" },
+  { title: "Divisi", key: "Divisi", width: "130px" },
   { title: "Pembuat", key: "Pembuat", width: "140px" },
   { title: "Jml Grading", key: "JmlGrading", width: "100px", align: "right" },
   { title: "User", key: "UserCreate", width: "90px" },
