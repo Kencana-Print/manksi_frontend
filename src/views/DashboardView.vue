@@ -3267,7 +3267,7 @@ const KATEGORI_COLOR: Record<string, string> = {
   SANGAT_LAMBAT: "#c62828",
   BELUM: "#bdbdbd",
   BATAL: "#616161",
-   CLOSE: "#00897b", 
+  CLOSE: "#00897b",
 };
 const BULAN_LABEL = [
   "Jan",
@@ -4284,8 +4284,20 @@ const sisaClass = (item: any) => {
               md="6"
               lg="4"
             >
-              <div class="manksi-panel content-panel fill-height">
-                <div class="panel-header panel-header--blue">
+              <div
+                class="manksi-panel content-panel fill-height"
+                :class="{
+                  'rp-total-card': grp.divisi === 'TOTAL SEMUA DIVISI',
+                }"
+              >
+                <div
+                  class="panel-header"
+                  :class="
+                    grp.divisi === 'TOTAL SEMUA DIVISI'
+                      ? 'panel-header--green'
+                      : 'panel-header--blue'
+                  "
+                >
                   <IconChartBar :size="14" :stroke-width="1.7" class="mr-1" />
                   Realisasi Penawaran — {{ grp.divisi }}
                   <span class="panel-header-sub ml-1">(12 bulan)</span>
@@ -10342,6 +10354,12 @@ const sisaClass = (item: any) => {
 .rp-total-row td {
   background: #fafafa;
   border-top: 2px solid #e0e0e0;
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+}
+.rp-total-card {
+  border: 2px solid #2e7d32;
 }
 .rp-bulanan-seg:hover .rp-tooltip {
   display: block;
