@@ -6,13 +6,13 @@ export const permintaanPembelianFormService = {
   },
   uploadGambarItem: (nomor: string, kode: string, formData: FormData) =>
     api.post(
-      `/garmen/permintaan-pembelian/form/gambar/${encodeURIComponent(nomor)}/${encodeURIComponent(kode)}`,
+      `/garmen/barang/permintaan-pembelian/form/gambar/${encodeURIComponent(nomor)}/${encodeURIComponent(kode)}`,
       formData,
       { headers: { "Content-Type": "multipart/form-data" } },
     ),
   deleteGambarItem: (nomor: string, kode: string) =>
     api.delete(
-      `/garmen/permintaan-pembelian/gambar/${encodeURIComponent(nomor)}/${encodeURIComponent(kode)}`,
+      `/garmen/barang/permintaan-pembelian/form/gambar/${encodeURIComponent(nomor)}/${encodeURIComponent(kode)}`,
     ),
   getBarangByKode: (
     kode: string,
