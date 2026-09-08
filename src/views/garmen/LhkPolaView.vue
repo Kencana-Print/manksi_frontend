@@ -373,76 +373,38 @@ const onExportDetail = async () => {
           color="primary"
           height="2"
         />
-        <div v-else class="expand-cols">
-          <!-- Marker / Mika / Duplek -->
-          <div class="expand-col">
-            <div class="expand-title">Daily Out Marker, Mika &amp; Duplek</div>
-            <table class="det-table">
-              <thead>
-                <tr>
-                  <th style="width: 26px">No</th>
-                  <th style="width: 100px">No SPK</th>
-                  <th>Nama SPK</th>
-                  <th style="width: 90px">Lebar Kain</th>
-                  <th style="width: 90px">Size</th>
-                  <th style="width: 80px">For</th>
-                  <th style="width: 130px">Keterangan</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr
-                  v-for="(r, i) in detailCache[item.Nomor]?.marker"
-                  :key="r.id"
-                >
-                  <td class="tc">{{ i + 1 }}</td>
-                  <td class="mono">{{ r.spkNomor }}</td>
-                  <td>{{ r.namaSpk || "-" }}</td>
-                  <td>{{ r.lebarKain || "-" }}</td>
-                  <td>{{ r.size || "-" }}</td>
-                  <td>{{ r.tujuanProses || "-" }}</td>
-                  <td>{{ r.keterangan || "-" }}</td>
-                </tr>
-                <tr v-if="!detailCache[item.Nomor]?.marker?.length">
-                  <td colspan="7" class="empty-row">Tidak ada data</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <!-- Pola / Grading -->
-          <div class="expand-col">
-            <div class="expand-title">Daily Out Pola</div>
-            <table class="det-table">
-              <thead>
-                <tr>
-                  <th style="width: 26px">No</th>
-                  <th style="width: 100px">No SPK</th>
-                  <th>Nama SPK</th>
-                  <th style="width: 90px">Divisi</th>
-                  <th style="width: 130px">Grading Size</th>
-                  <th style="width: 130px">Keterangan</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr
-                  v-for="(r, i) in detailCache[item.Nomor]?.grading"
-                  :key="r.id"
-                >
-                  <td class="tc">{{ i + 1 }}</td>
-                  <td class="mono">{{ r.spkNomor }}</td>
-                  <td>{{ r.namaSpk || "-" }}</td>
-                  <td>
-                    <span class="divisi-chip">{{ r.divisi || "-" }}</span>
-                  </td>
-                  <td>{{ r.gradingSize || "-" }}</td>
-                  <td>{{ r.keterangan || "-" }}</td>
-                </tr>
-                <tr v-if="!detailCache[item.Nomor]?.grading?.length">
-                  <td colspan="6" class="empty-row">Tidak ada data</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+        <div v-else class="expand-col">
+          <div class="expand-title">Daily Out Pola</div>
+          <table class="det-table">
+            <thead>
+              <tr>
+                <th style="width: 26px">No</th>
+                <th style="width: 100px">No SPK</th>
+                <th>Nama SPK</th>
+                <th style="width: 90px">Divisi</th>
+                <th style="width: 130px">Grading Size</th>
+                <th style="width: 130px">Keterangan</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="(r, i) in detailCache[item.Nomor]?.grading"
+                :key="r.id"
+              >
+                <td class="tc">{{ i + 1 }}</td>
+                <td class="mono">{{ r.spkNomor }}</td>
+                <td>{{ r.namaSpk || "-" }}</td>
+                <td>
+                  <span class="divisi-chip">{{ r.divisi || "-" }}</span>
+                </td>
+                <td>{{ r.gradingSize || "-" }}</td>
+                <td>{{ r.keterangan || "-" }}</td>
+              </tr>
+              <tr v-if="!detailCache[item.Nomor]?.grading?.length">
+                <td colspan="6" class="empty-row">Tidak ada data</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
     </template>
@@ -478,9 +440,8 @@ const onExportDetail = async () => {
   padding: 10px 10px 10px 40px;
   background: #eceff1;
 }
-.expand-cols {
-  display: flex;
-  gap: 10px;
+.expand-col {
+  width: 100%;
 }
 .expand-col {
   flex: 1;
