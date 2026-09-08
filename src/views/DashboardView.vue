@@ -1511,26 +1511,6 @@ const growthYoyWithAch = computed<GrowthYoyRowWithAch[]>(() =>
   })),
 );
 
-// ── State: Funnel Penawaran ──
-interface FunnelDivisiRow {
-  Divisi: string;
-  Nominal: number;
-  Realisasi: number;
-  Batal?: number;
-  Confirm?: number;
-  PresentaseRealisasi?: number;
-  PresentaseBatal?: number;
-  PresentaseConfirm?: number;
-  Presentase?: number;
-}
-const penawaranFunnelData = ref({
-  byDivisi: [] as FunnelDivisiRow[],
-  grandTotal: { Nominal: 0, Realisasi: 0, Batal: 0, Confirm: 0 },
-});
-
-// ── State: Funnel MAP ──
-const mapFunnelData = ref<FunnelDivisiRow[]>([]);
-
 // ── Infinite scroll: Proyeksi vs Realisasi (gap customer) ──
 interface GapCustomerItem {
   CusKode?: string;
@@ -2654,11 +2634,6 @@ const loadMarketingData = async () => {
     };
     growthYoyData.value = [];
     achievementMonthly.value = [];
-    penawaranFunnelData.value = {
-      byDivisi: [],
-      grandTotal: { Nominal: 0, Realisasi: 0, Batal: 0, Confirm: 0 },
-    };
-    mapFunnelData.value = [];
     gapCustomerList.value = [];
     pvrPage.value = 1;
     pvrHasMore.value = true;
@@ -2742,14 +2717,11 @@ const loadMarketingData = async () => {
     }
     await Promise.allSettled([loadMoreMapSpk(), loadMoreMapKirim()]);
 
-    const [achRes, achMonthlyRes, growthRes, penFunnelRes, mapFunnelRes] =
-      await Promise.allSettled([
-        dashboardService.getAchievementSummary(),
-        dashboardService.getAchievementMonthly(),
-        dashboardService.getGrowthYoy(),
-        dashboardService.getPenawaranFunnel(),
-        dashboardService.getMapFunnel(),
-      ]);
+    const [achRes, achMonthlyRes, growthRes] = await Promise.allSettled([
+      dashboardService.getAchievementSummary(),
+      dashboardService.getAchievementMonthly(),
+      dashboardService.getGrowthYoy(),
+    ]);
     if (achRes.status === "fulfilled" && achRes.value?.data?.data) {
       achievementData.value = achRes.value.data.data;
       renderAchievementChart();
@@ -2758,10 +2730,6 @@ const loadMarketingData = async () => {
       achievementMonthly.value = achMonthlyRes.value.data.data;
     if (growthRes.status === "fulfilled" && growthRes.value?.data?.data)
       growthYoyData.value = growthRes.value.data.data;
-    if (penFunnelRes.status === "fulfilled" && penFunnelRes.value?.data?.data)
-      penawaranFunnelData.value = penFunnelRes.value.data.data;
-    if (mapFunnelRes.status === "fulfilled" && mapFunnelRes.value?.data?.data)
-      mapFunnelData.value = mapFunnelRes.value.data.data;
 
     await Promise.allSettled([loadMorePvr(), loadMorePipelineMenggantung()]);
 
@@ -4832,150 +4800,6 @@ const sisaClass = (item: any) => {
                 </template>
                 <div v-else class="text-center text-grey py-3 text-caption">
                   Belum ada data kunjungan bulan ini.
-                </div>
-              </div>
-            </div>
-          </v-col>
-        </v-row>
-
-        <!-- ── Row 6: Funnel Penawaran + Funnel MAP ── -->
-        <v-row dense class="mt-2">
-          <v-col cols="12" md="6">
-            <div class="manksi-panel content-panel fill-height">
-              <div
-                class="panel-header"
-                style="
-                  background: #f3e5f5;
-                  color: #6a1b9a;
-                  border-bottom: 1px solid #e1bee7;
-                "
-              >
-                <IconChartBar :size="14" :stroke-width="1.7" class="mr-1" />
-                Funnel Penawaran
-                <span class="panel-header-sub ml-1"
-                  >(realisasi/batal/confirm)</span
-                >
-              </div>
-              <div class="panel-body">
-                <v-progress-linear
-                  v-if="isLoadingDashboard"
-                  indeterminate
-                  color="purple"
-                  height="2"
-                />
-                <template v-else-if="penawaranFunnelData.byDivisi.length">
-                  <div class="real-list" style="max-height: 320px">
-                    <div
-                      v-for="row in penawaranFunnelData.byDivisi"
-                      :key="row.Divisi"
-                      class="real-row"
-                    >
-                      <div class="real-meta">
-                        <span class="real-divisi">{{ row.Divisi }}</span>
-                        <span class="real-nominal">{{
-                          shortNum(row.Nominal)
-                        }}</span>
-                      </div>
-                      <div class="real-bar-wrap">
-                        <div class="real-bar">
-                          <div
-                            class="real-seg real-seg--close"
-                            :style="{
-                              width: (row.PresentaseRealisasi || 0) + '%',
-                            }"
-                          />
-                          <div
-                            class="real-seg real-seg--batal"
-                            :style="{ width: (row.PresentaseBatal || 0) + '%' }"
-                          />
-                        </div>
-                        <span class="real-pct"
-                          >{{ row.PresentaseRealisasi }}%</span
-                        >
-                      </div>
-                      <div class="real-detail">
-                        <span class="rd-close"
-                          >✓ {{ shortNum(row.Realisasi) }}</span
-                        >
-                        <span v-if="row.Batal" class="rd-batal"
-                          >✕ {{ shortNum(row.Batal) }} ({{
-                            row.PresentaseBatal
-                          }}%)</span
-                        >
-                        <span v-if="row.Confirm" class="rd-open"
-                          >○ {{ shortNum(row.Confirm) }} ({{
-                            row.PresentaseConfirm
-                          }}%)</span
-                        >
-                      </div>
-                    </div>
-                  </div>
-                  <div class="real-legend">
-                    <span class="leg-dot leg-close" />Realisasi
-                    <span class="leg-dot leg-batal" />Batal
-                  </div>
-                </template>
-                <div v-else class="text-center text-grey py-3 text-caption">
-                  Belum ada data penawaran bulan ini.
-                </div>
-              </div>
-            </div>
-          </v-col>
-          <v-col cols="12" md="6">
-            <div class="manksi-panel content-panel fill-height">
-              <div
-                class="panel-header"
-                style="
-                  background: #e0f2f1;
-                  color: #00695c;
-                  border-bottom: 1px solid #b2dfdb;
-                "
-              >
-                <IconChartBar :size="14" :stroke-width="1.7" class="mr-1" />
-                Funnel MAP
-                <span class="panel-header-sub ml-1"
-                  >(realisasi per divisi)</span
-                >
-              </div>
-              <div class="panel-body">
-                <v-progress-linear
-                  v-if="isLoadingDashboard"
-                  indeterminate
-                  color="teal"
-                  height="2"
-                />
-                <template v-else-if="mapFunnelData.length">
-                  <div class="real-list" style="max-height: 320px">
-                    <div
-                      v-for="row in mapFunnelData"
-                      :key="row.Divisi"
-                      class="real-row"
-                    >
-                      <div class="real-meta">
-                        <span class="real-divisi">{{ row.Divisi }}</span>
-                        <span class="real-nominal">{{
-                          shortNum(row.Nominal)
-                        }}</span>
-                      </div>
-                      <div class="real-bar-wrap">
-                        <div class="real-bar">
-                          <div
-                            class="real-seg real-seg--close"
-                            :style="{ width: (row.Presentase || 0) + '%' }"
-                          />
-                        </div>
-                        <span class="real-pct">{{ row.Presentase }}%</span>
-                      </div>
-                      <div class="real-detail">
-                        <span class="rd-close"
-                          >✓ {{ shortNum(row.Realisasi) }}</span
-                        >
-                      </div>
-                    </div>
-                  </div>
-                </template>
-                <div v-else class="text-center text-grey py-3 text-caption">
-                  Belum ada data MAP bulan ini.
                 </div>
               </div>
             </div>
@@ -8953,6 +8777,9 @@ const sisaClass = (item: any) => {
                     style="background: #f5f5f5; color: #9e9e9e"
                     >Belum</span
                   >
+                </td>
+                <td style="text-align: right">
+                  {{ row.NilaiSo > 0 ? shortNum(row.NilaiSo) : "-" }}
                 </td>
               </tr>
               <tr v-if="!effectiveCallingList.length">

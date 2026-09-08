@@ -208,66 +208,24 @@ const onExportDetail = async () => {
         Object.keys(masterCells).map((k) => [k, ""]),
       );
 
-      let isFirstRowInGroup = true;
-      const pushRow = (data: Record<string, any>) => {
-        rows.push({
-          ...(isFirstRowInGroup ? masterCells : blankMaster),
-          NomorUlang: master.Nomor,
-          ...data,
-        });
-        isFirstRowInGroup = false;
-      };
-
-      if (det.marker.length > 0) {
-        det.marker.forEach((r: any) => {
-          pushRow({
-            Jenis: "MARKER",
-            "No SPK": r.spkNomor,
-            "Nama SPK": r.namaSpk || "",
-            "Lebar Kain": r.lebarKain || "",
-            Size: r.size || "",
-            For: r.tujuanProses || "",
-            Divisi: "",
-            "Grading Size": "",
-            Keterangan: r.keterangan || "",
-          });
-        });
-      } else {
-        pushRow({
-          Jenis: "MARKER",
-          "No SPK": "",
-          "Nama SPK": "(Tidak ada data marker)",
-          "Lebar Kain": "",
-          Size: "",
-          For: "",
-          Divisi: "",
-          "Grading Size": "",
-          Keterangan: "",
-        });
-      }
-
       if (det.grading.length > 0) {
-        det.grading.forEach((r: any) => {
-          pushRow({
-            Jenis: "GRADING",
+        det.grading.forEach((r: any, idx: number) => {
+          rows.push({
+            ...(idx === 0 ? masterCells : blankMaster),
+            NomorUlang: master.Nomor,
             "No SPK": r.spkNomor,
             "Nama SPK": r.namaSpk || "",
-            "Lebar Kain": "",
-            Size: "",
-            For: "",
             Divisi: r.divisi || "",
             "Grading Size": r.gradingSize || "",
             Keterangan: r.keterangan || "",
           });
         });
       } else {
-        pushRow({
-          Jenis: "GRADING",
+        rows.push({
+          ...masterCells,
+          NomorUlang: master.Nomor,
           "No SPK": "",
           "Nama SPK": "(Tidak ada data grading)",
-          "Lebar Kain": "",
-          Size: "",
-          For: "",
           Divisi: "",
           "Grading Size": "",
           Keterangan: "",
@@ -282,12 +240,8 @@ const onExportDetail = async () => {
       { header: "Tanggal", key: "Tanggal", width: 12, align: "center" },
       { header: "Pembuat", key: "Pembuat", width: 20 },
       { header: "Nomor", key: "NomorUlang", width: 16 },
-      { header: "Jenis", key: "Jenis", width: 10, align: "center" },
       { header: "No SPK", key: "No SPK", width: 14 },
       { header: "Nama SPK", key: "Nama SPK", width: 26 },
-      { header: "Lebar Kain", key: "Lebar Kain", width: 12 },
-      { header: "Size", key: "Size", width: 10 },
-      { header: "For", key: "For", width: 12 },
       { header: "Divisi", key: "Divisi", width: 12 },
       { header: "Grading Size", key: "Grading Size", width: 16 },
       { header: "Keterangan", key: "Keterangan", width: 20 },
@@ -298,7 +252,7 @@ const onExportDetail = async () => {
       "Detail",
       columns,
       rows,
-      `Daily Out Marker & Pola | Periode ${filterState.value.dtAwal} s/d ${filterState.value.dtAkhir}`,
+      `Daily Out Pola | Periode ${filterState.value.dtAwal} s/d ${filterState.value.dtAkhir}`,
     );
     toast.success("Berhasil export detail data.");
   } catch (e) {
