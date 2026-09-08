@@ -28,8 +28,14 @@ const isSpandukMMT = computed(
 );
 const isComplexTtd = computed(() => isKaosan.value);
 const isPending = computed(() => {
-  const ket = String(data.value.spk_keterangan || "").toLowerCase();
-  return ket.includes("pending");
+  return !!String(data.value.spk_pending || "").trim();
+});
+
+const pendingLabel = computed(() => {
+  const status = String(data.value.spk_pending || "").trim();
+  const ket = String(data.value.spk_ketpending || "").trim();
+  if (!status) return "";
+  return ket ? `${status} — ${ket}` : status;
 });
 
 const numCopies = computed(() => {
@@ -426,9 +432,9 @@ onMounted(async () => {
                     <td class="w-colon">:</td>
                     <td>
                       {{ tglIndo(data.spk_tanggal) }}
-                      <span v-if="isPending" class="pending-badge-row"
-                        >PENDING!</span
-                      >
+                      <span v-if="isPending" class="pending-badge-row">{{
+                        pendingLabel
+                      }}</span>
                     </td>
                   </tr>
                   <tr>
