@@ -451,6 +451,37 @@ const gudangLoaded = ref(false);
 const gudangBahanLoaded = ref(false);
 const barangJadiLoaded = ref(false);
 const kunjunganRows = ref<any[]>([]);
+interface EffectiveCallingRow {
+  NamaCustomer: string;
+  NomorPenawaran: string;
+  QtyPenawaran: number;
+  NilaiPenawaran: number;
+  JmlMap: number;
+  NilaiMap: number;
+  MapNomorList: string | null;
+  JmlSo: number;
+  NilaiSo: number;
+  SoNomorList: string | null;
+}
+const showEffectiveCallingDialog = ref(false);
+const effectiveCallingNama = ref("");
+const isLoadingEffectiveCalling = ref(false);
+const effectiveCallingList = ref<EffectiveCallingRow[]>([]);
+
+const openEffectiveCalling = async (namaSales: string) => {
+  effectiveCallingNama.value = namaSales;
+  showEffectiveCallingDialog.value = true;
+  isLoadingEffectiveCalling.value = true;
+  effectiveCallingList.value = [];
+  try {
+    const res = await dashboardService.getEffectiveCallingDetail(namaSales);
+    effectiveCallingList.value = res.data.data || [];
+  } catch {
+    /* silent */
+  } finally {
+    isLoadingEffectiveCalling.value = false;
+  }
+};
 const gudangBahanData = ref<GudangBahanData>({
   metric: { TotalJenis: 0, JmlBawahBuffer: 0, TotalBarcode: 0, JmlMinus: 0 },
   detailBawahBuffer: [],
@@ -4683,7 +4714,7 @@ const sisaClass = (item: any) => {
               <div class="panel-header panel-header--green">
                 <IconWalk :size="14" :stroke-width="1.7" class="mr-1" />
                 Kunjungan Sales
-                <span class="panel-header-sub ml-1">(bulan ini)</span>
+                <span class="panel-header-sub ml-1">(90 hari terakhir)</span>
                 <button
                   class="po-bpb-link ml-auto"
                   @click="goToKunjunganDetail()"
@@ -4706,7 +4737,16 @@ const sisaClass = (item: any) => {
                       class="knj-row"
                     >
                       <div class="knj-meta">
-                        <span class="knj-sales">{{ row.Nama_Sales }}</span>
+                        <span
+                          class="knj-sales"
+                          style="
+                            cursor: pointer;
+                            text-decoration: underline dotted;
+                          "
+                          title="Lihat Effective Calling"
+                          @click="openEffectiveCalling(row.Nama_Sales)"
+                          >{{ row.Nama_Sales }}</span
+                        >
                         <div class="knj-stats">
                           <span class="knj-badge done">✓ {{ row.Done }}</span>
                           <span class="knj-badge failed"
@@ -8762,6 +8802,166 @@ const sisaClass = (item: any) => {
           >
             Mengerti, Tutup
           </v-btn>
+        </div>
+      </v-card>
+    </v-dialog>
+
+    <v-dialog v-model="showEffectiveCallingDialog" max-width="1100px">
+      <v-card class="rounded-lg">
+        <div
+          class="pa-3 d-flex align-center justify-space-between"
+          style="background: #1867c0; color: white"
+        >
+          <span style="font-size: 13px; font-weight: 700">
+            Effective Calling — {{ effectiveCallingNama }}
+          </span>
+          <v-btn
+            icon
+            variant="text"
+            size="small"
+            color="white"
+            @click="showEffectiveCallingDialog = false"
+          >
+            <IconX :size="16" :stroke-width="2" />
+          </v-btn>
+        </div>
+        <div style="max-height: 70vh; overflow-y: auto">
+          <v-progress-linear
+            v-if="isLoadingEffectiveCalling"
+            indeterminate
+            color="primary"
+            height="2"
+          />
+          <table v-else class="rp-tbl" style="min-width: 900px">
+            <thead>
+              <tr>
+                <th style="width: 140px">Customer</th>
+                <th style="width: 130px">No. Penawaran</th>
+                <th style="width: 70px; text-align: right">Qty</th>
+                <th style="width: 100px; text-align: right">Nilai Penawaran</th>
+                <th style="width: 80px; text-align: center">Status MAP</th>
+                <th style="width: 100px; text-align: right">Nilai MAP</th>
+                <th style="width: 80px; text-align: center">Status SO</th>
+                <th style="width: 100px; text-align: right">Nilai SO</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(row, idx) in effectiveCallingList" :key="idx">
+                <td
+                  style="
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    white-space: nowrap;
+                    max-width: 140px;
+                  "
+                  :title="row.NamaCustomer"
+                >
+                  {{ row.NamaCustomer }}
+                </td>
+                <td
+                  style="
+                    font-family: monospace;
+                    color: #1565c0;
+                    font-weight: 600;
+                  "
+                >
+                  {{ row.NomorPenawaran }}
+                </td>
+                <td style="text-align: right">
+                  {{ fmtNum(row.QtyPenawaran) }}
+                </td>
+                <td style="text-align: right">
+                  {{ shortNum(row.NilaiPenawaran) }}
+                </td>
+                <td style="text-align: center">
+                  <v-tooltip v-if="row.JmlMap > 0" location="top">
+                    <template #activator="{ props }">
+                      <span
+                        v-bind="props"
+                        class="rp-badge"
+                        style="
+                          background: #e8f5e9;
+                          color: #2e7d32;
+                          cursor: help;
+                        "
+                        >Sudah ({{ row.JmlMap }})</span
+                      >
+                    </template>
+                    <div
+                      style="
+                        max-width: 260px;
+                        max-height: 200px;
+                        overflow-y: auto;
+                      "
+                    >
+                      <div
+                        v-for="(nomor, i) in (row.MapNomorList || '').split(
+                          ', ',
+                        )"
+                        :key="i"
+                        style="white-space: nowrap"
+                      >
+                        {{ nomor }}
+                      </div>
+                    </div>
+                  </v-tooltip>
+                  <span
+                    v-else
+                    class="rp-badge"
+                    style="background: #f5f5f5; color: #9e9e9e"
+                    >Belum</span
+                  >
+                </td>
+                <td style="text-align: right">
+                  {{ row.NilaiMap > 0 ? shortNum(row.NilaiMap) : "-" }}
+                </td>
+                <td style="text-align: center">
+                  <v-tooltip v-if="row.JmlSo > 0" location="top">
+                    <template #activator="{ props }">
+                      <span
+                        v-bind="props"
+                        class="rp-badge"
+                        style="
+                          background: #e8f5e9;
+                          color: #2e7d32;
+                          cursor: help;
+                        "
+                        >Sudah ({{ row.JmlSo }})</span
+                      >
+                    </template>
+                    <div
+                      style="
+                        max-width: 260px;
+                        max-height: 200px;
+                        overflow-y: auto;
+                      "
+                    >
+                      <div
+                        v-for="(nomor, i) in (row.SoNomorList || '').split(
+                          ', ',
+                        )"
+                        :key="i"
+                        style="white-space: nowrap"
+                      >
+                        {{ nomor }}
+                      </div>
+                    </div>
+                  </v-tooltip>
+                  <span
+                    v-else
+                    class="rp-badge"
+                    style="background: #f5f5f5; color: #9e9e9e"
+                    >Belum</span
+                  >
+                </td>
+              </tr>
+              <tr v-if="!effectiveCallingList.length">
+                <td colspan="8" class="text-center text-grey py-3 text-caption">
+                  Tidak ada data penawaran 90 hari terakhir untuk sales ini.
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </v-card>
     </v-dialog>

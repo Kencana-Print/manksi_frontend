@@ -19,6 +19,8 @@ export const dashboardService = {
   getPenawaranBatalList: (limit = 20, offset = 0) =>
     api.get("/dashboard/penawaran-batal-list", { params: { limit, offset } }),
   getKunjunganSalesSummary: () => api.get("/dashboard/kunjungan-sales-summary"),
+  getEffectiveCallingDetail: (namaSales: string) =>
+    api.get("/dashboard/effective-calling-detail", { params: { namaSales } }),
   getPiutangDashboard: () => api.get("/dashboard/piutang-dashboard"),
   getPiutangOverdue: (limit = 20, offset = 0) =>
     api.get("/dashboard/piutang-overdue", { params: { limit, offset } }),
