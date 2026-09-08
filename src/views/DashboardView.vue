@@ -314,6 +314,8 @@ watch(activeTab, async (tab) => {
     setupMapKirimObserver();
     setupPvrObserver();
     setupPipelineMenggantungObserver();
+    setupPtmDetailObserver();
+    setupMtsDetailObserver();
   }
   if (tab === "finance") {
     if (!financeLoaded.value) await loadFinanceData();
@@ -424,7 +426,23 @@ const companyPulse = ref({
 const showCompanyPulse = computed(
   () => isSuperViewer.value || bagian.value === "FINANCE",
 );
-const realisasiRows = ref<any[]>([]);
+// const realisasiRows = ref<any[]>([]);
+interface RealisasiBulananStatus {
+  JmlItem: number;
+  Nilai: number;
+}
+interface RealisasiBulananMonth {
+  Bulan: string;
+  statuses: Record<string, RealisasiBulananStatus>;
+  totalItem: number;
+  totalNilai: number;
+}
+interface RealisasiBulananDivisi {
+  divisi: string;
+  bulanan: RealisasiBulananMonth[];
+}
+const realisasiBulananData = ref<RealisasiBulananDivisi[]>([]);
+
 const poBpbSummary = ref({ TotalPO: 0, Open: 0, OnProses: 0, Close: 0 });
 const isLoadingDashboard = ref(false);
 const marketingLoaded = ref(false);
@@ -454,6 +472,30 @@ const realisasiPenawaranData = ref<RealisasiData>({
   tren: [],
   distribusi: [],
   tabelDetail: [],
+});
+interface KategoriKonversi {
+  kode: string;
+  JmlItem: number;
+  Nilai: number;
+  Pct: number;
+}
+interface KategoriKonversiData {
+  totalItem: number;
+  totalNilai: number;
+  totalQty: number;
+  kategori: KategoriKonversi[];
+}
+const realisasiPenToMap = ref<KategoriKonversiData>({
+  totalItem: 0,
+  totalNilai: 0,
+  totalQty: 0,
+  kategori: [],
+});
+const realisasiMapToSo = ref<KategoriKonversiData>({
+  totalItem: 0,
+  totalNilai: 0,
+  totalQty: 0,
+  kategori: [],
 });
 const piutangData = ref<PiutangData>({
   summary: {
@@ -2120,6 +2162,97 @@ const setupBkObserver = () => {
   );
   bkScrollObserver.observe(bkSentinelEl.value);
 };
+interface RealisasiKonversiDetailItem {
+  Nomor: string;
+  Tanggal: string;
+  Customer: string;
+  Divisi: string;
+  Nilai: number;
+  JmlItem?: number; // widget A
+  Qty?: number; // widget B
+  TotalMap?: number;
+  MapPertama?: string | null;
+  TglMapPertama?: string | null;
+  TotalSo?: number;
+  SoPertama?: string | null;
+  TglSoPertama?: string | null;
+  HariKonversi: number | null;
+  Status: string;
+}
+
+const PTM_DETAIL_PAGE_SIZE = 20;
+const ptmDetailList = ref<RealisasiKonversiDetailItem[]>([]);
+const ptmDetailOffset = ref(0);
+const ptmDetailHasMore = ref(true);
+const isLoadingMorePtmDetail = ref(false);
+const ptmDetailSentinelEl = ref<HTMLElement | null>(null);
+let ptmDetailScrollObserver: IntersectionObserver | null = null;
+
+const loadMorePtmDetail = async () => {
+  if (!ptmDetailHasMore.value || isLoadingMorePtmDetail.value) return;
+  isLoadingMorePtmDetail.value = true;
+  try {
+    const res = await dashboardService.getRealisasiPenawaranToMapDetail(
+      PTM_DETAIL_PAGE_SIZE,
+      ptmDetailOffset.value,
+    );
+    const rows: RealisasiKonversiDetailItem[] = res.data.data;
+    ptmDetailList.value.push(...rows);
+    ptmDetailOffset.value += rows.length;
+    if (rows.length < PTM_DETAIL_PAGE_SIZE) ptmDetailHasMore.value = false;
+  } catch {
+  } finally {
+    isLoadingMorePtmDetail.value = false;
+  }
+};
+const setupPtmDetailObserver = () => {
+  if (ptmDetailScrollObserver) ptmDetailScrollObserver.disconnect();
+  if (!ptmDetailSentinelEl.value) return;
+  ptmDetailScrollObserver = new IntersectionObserver(
+    (entries) => {
+      if (entries[0].isIntersecting) loadMorePtmDetail();
+    },
+    { threshold: 0.1 },
+  );
+  ptmDetailScrollObserver.observe(ptmDetailSentinelEl.value);
+};
+
+const MTS_DETAIL_PAGE_SIZE = 20;
+const mtsDetailList = ref<RealisasiKonversiDetailItem[]>([]);
+const mtsDetailOffset = ref(0);
+const mtsDetailHasMore = ref(true);
+const isLoadingMoreMtsDetail = ref(false);
+const mtsDetailSentinelEl = ref<HTMLElement | null>(null);
+let mtsDetailScrollObserver: IntersectionObserver | null = null;
+
+const loadMoreMtsDetail = async () => {
+  if (!mtsDetailHasMore.value || isLoadingMoreMtsDetail.value) return;
+  isLoadingMoreMtsDetail.value = true;
+  try {
+    const res = await dashboardService.getRealisasiMapToSoDetail(
+      MTS_DETAIL_PAGE_SIZE,
+      mtsDetailOffset.value,
+    );
+    const rows: RealisasiKonversiDetailItem[] = res.data.data;
+    mtsDetailList.value.push(...rows);
+    mtsDetailOffset.value += rows.length;
+    if (rows.length < MTS_DETAIL_PAGE_SIZE) mtsDetailHasMore.value = false;
+  } catch {
+  } finally {
+    isLoadingMoreMtsDetail.value = false;
+  }
+};
+const setupMtsDetailObserver = () => {
+  if (mtsDetailScrollObserver) mtsDetailScrollObserver.disconnect();
+  if (!mtsDetailSentinelEl.value) return;
+  mtsDetailScrollObserver = new IntersectionObserver(
+    (entries) => {
+      if (entries[0].isIntersecting) loadMoreMtsDetail();
+    },
+    { threshold: 0.1 },
+  );
+  mtsDetailScrollObserver.observe(mtsDetailSentinelEl.value);
+};
 
 // ── Computed helpers MAP ──
 const mapSpkRate = computed(() => {
@@ -2501,28 +2634,46 @@ const loadMarketingData = async () => {
     pipelineMenggantungList.value = [];
     pipelineMenggantungPage.value = 1;
     pipelineMenggantungHasMore.value = true;
+    ptmDetailList.value = [];
+    ptmDetailOffset.value = 0;
+    ptmDetailHasMore.value = true;
+    mtsDetailList.value = [];
+    mtsDetailOffset.value = 0;
+    mtsDetailHasMore.value = true;
 
     const [
       sumRes,
-      realisasiRes,
       mapSumRes,
       batalSumRes,
       kunjunganRes,
       realisasiPenRes,
+      realisasiBulananRes,
+      penToMapRes,
+      mapToSoRes,
     ] = await Promise.allSettled([
       dashboardService.getPenawaranSummary(),
-      dashboardService.getRealisasiSummary(),
       dashboardService.getPenawaranMapSummary(),
       dashboardService.getPenawaranBatalSummary(),
       dashboardService.getKunjunganSalesSummary(),
       dashboardService.getRealisasiPenawaranDashboard(),
+      dashboardService.getRealisasiPenawaranBulanan(),
+      dashboardService.getRealisasiPenawaranToMap(),
+      dashboardService.getRealisasiMapToSo(),
     ]);
+    if (penToMapRes.status === "fulfilled" && penToMapRes.value?.data?.data)
+      realisasiPenToMap.value = penToMapRes.value.data.data;
+    if (mapToSoRes.status === "fulfilled" && mapToSoRes.value?.data?.data)
+      realisasiMapToSo.value = mapToSoRes.value.data.data;
+    if (
+      realisasiBulananRes.status === "fulfilled" &&
+      realisasiBulananRes.value?.data?.data
+    ) {
+      realisasiBulananData.value = realisasiBulananRes.value.data.data;
+    }
     if (batalSumRes.status === "fulfilled")
       penawaranBatalSummary.value = batalSumRes.value.data.data;
     if (sumRes.status === "fulfilled")
       penSummary.value = sumRes.value.data.data;
-    if (realisasiRes.status === "fulfilled")
-      realisasiRows.value = realisasiRes.value.data.data;
     if (mapSumRes.status === "fulfilled")
       mapSummary.value = mapSumRes.value.data.data;
     if (kunjunganRes.status === "fulfilled")
@@ -2582,6 +2733,9 @@ const loadMarketingData = async () => {
       mapFunnelData.value = mapFunnelRes.value.data.data;
 
     await Promise.allSettled([loadMorePvr(), loadMorePipelineMenggantung()]);
+
+    // ⬇ tambahkan di sini
+    await Promise.allSettled([loadMorePtmDetail(), loadMoreMtsDetail()]);
 
     marketingLoaded.value = true;
   } finally {
@@ -2988,6 +3142,8 @@ onMounted(async () => {
     setupMapKirimObserver();
     setupPvrObserver();
     setupPipelineMenggantungObserver();
+    setupPtmDetailObserver();
+    setupMtsDetailObserver();
   }
   if (activeTab.value === "finance") {
     setupOverdueObserver();
@@ -3073,27 +3229,66 @@ const umurClass = (hari: number) => {
   if (hari >= 7) return "umur-warn";
   return "umur-ok";
 };
-const totalNominal = computed(() =>
-  realisasiRows.value.reduce((s, r) => s + Number(r.Nominal || 0), 0),
-);
-const totalClose = computed(() =>
-  realisasiRows.value.reduce((s, r) => s + Number(r.Close || 0), 0),
-);
-const pctGlobal = computed(() =>
-  totalNominal.value
-    ? Math.round((totalClose.value / totalNominal.value) * 100)
-    : 0,
-);
-const barPct = (nominal: number, close: number, batal: number) => ({
-  close: nominal ? Math.round((close / nominal) * 100) : 0,
-  batal: nominal ? Math.round((batal / nominal) * 100) : 0,
-  open: nominal ? Math.round(((nominal - close - batal) / nominal) * 100) : 0,
-});
+// const totalNominal = computed(() =>
+//   realisasiRows.value.reduce((s, r) => s + Number(r.Nominal || 0), 0),
+// );
+// const totalClose = computed(() =>
+//   realisasiRows.value.reduce((s, r) => s + Number(r.Close || 0), 0),
+// );
+// const pctGlobal = computed(() =>
+//   totalNominal.value
+//     ? Math.round((totalClose.value / totalNominal.value) * 100)
+//     : 0,
+// );
+// const barPct = (nominal: number, close: number, batal: number) => ({
+//   close: nominal ? Math.round((close / nominal) * 100) : 0,
+//   batal: nominal ? Math.round((batal / nominal) * 100) : 0,
+//   open: nominal ? Math.round(((nominal - close - batal) / nominal) * 100) : 0,
+// });
 const shortNum = (n: number) => {
   if (n >= 1_000_000_000) return (n / 1_000_000_000).toFixed(1) + "M";
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + "jt";
   if (n >= 1_000) return (n / 1_000).toFixed(0) + "rb";
   return String(n);
+};
+const KATEGORI_LABEL: Record<string, string> = {
+  CEPAT: "Cepat ≤7hr",
+  NORMAL: "Normal 8-14hr",
+  LAMBAT: "Lambat 15-30hr",
+  SANGAT_LAMBAT: ">30hr",
+  BELUM: "Belum",
+  BATAL: "Batal",
+};
+const KATEGORI_COLOR: Record<string, string> = {
+  CEPAT: "#2e7d32",
+  NORMAL: "#185FA5",
+  LAMBAT: "#f57f17",
+  SANGAT_LAMBAT: "#c62828",
+  BELUM: "#bdbdbd",
+  BATAL: "#616161",
+};
+const BULAN_LABEL = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "Mei",
+  "Jun",
+  "Jul",
+  "Agu",
+  "Sep",
+  "Okt",
+  "Nov",
+  "Des",
+];
+const formatBulanLabel = (bulan: string) => {
+  const [y, m] = bulan.split("-").map(Number);
+  return `${BULAN_LABEL[m - 1]} '${String(y).slice(2)}`;
+};
+const rpSegPct = (m: RealisasiBulananMonth, status: string) => {
+  if (!m.totalNilai) return 0;
+  const v = m.statuses[status]?.Nilai || 0;
+  return Math.round((v / m.totalNilai) * 100);
 };
 const shortNumID = (n: number) => shortNum(n).replace(".", ",");
 const calcYoyPct = (aktual: number, ly: number): number => {
@@ -4078,160 +4273,94 @@ const sisaClass = (item: any) => {
             </div>
           </v-col>
 
-          <!-- Realisasi per Divisi -->
-          <v-col cols="12" md="4">
+          <!-- ── Row baru: Realisasi Penawaran — histori bulanan per divisi ── -->
+          <v-row dense class="mb-2">
+            <v-col
+              v-for="grp in realisasiBulananData"
+              :key="grp.divisi"
+              cols="12"
+              md="6"
+              lg="4"
+            >
+              <div class="manksi-panel content-panel fill-height">
+                <div class="panel-header panel-header--blue">
+                  <IconChartBar :size="14" :stroke-width="1.7" class="mr-1" />
+                  Realisasi Penawaran — {{ grp.divisi }}
+                  <span class="panel-header-sub ml-1">(12 bulan)</span>
+                </div>
+                <div class="panel-body">
+                  <v-progress-linear
+                    v-if="isLoadingDashboard"
+                    indeterminate
+                    color="primary"
+                    height="2"
+                  />
+                  <template v-else>
+                    <div class="rp-bulanan-list">
+                      <div
+                        v-for="(m, idx) in grp.bulanan"
+                        :key="m.Bulan"
+                        class="rp-bulanan-row"
+                      >
+                        <div class="rp-bulanan-bulan">
+                          {{ formatBulanLabel(m.Bulan) }}
+                        </div>
+                        <div class="rp-bulanan-bar-wrap">
+                          <div class="rp-bulanan-bar">
+                            <div
+                              v-for="st in ['OPEN', 'CLOSE', 'BATAL']"
+                              :key="st"
+                              v-show="rpSegPct(m, st) > 0"
+                              class="rp-bulanan-seg"
+                              :class="'rp-seg--' + st.toLowerCase()"
+                              :style="{ width: rpSegPct(m, st) + '%' }"
+                            >
+                              <div
+                                class="rp-tooltip"
+                                :class="{ 'rp-tooltip--below': idx < 2 }"
+                              >
+                                <div class="rp-tooltip-title">{{ st }}</div>
+                                <div>
+                                  {{ m.statuses[st]?.JmlItem || 0 }} item
+                                </div>
+                                <div>
+                                  {{ shortNum(m.statuses[st]?.Nilai || 0) }}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        <div class="rp-bulanan-total">
+                          {{ shortNum(m.totalNilai) }}
+                        </div>
+                      </div>
+                    </div>
+                    <div class="real-legend">
+                      <span class="leg-dot" style="background: #43a047" />Close
+                      <span
+                        class="leg-dot ml-2"
+                        style="background: #e53935"
+                      />Batal
+                      <span
+                        class="leg-dot ml-2"
+                        style="background: #90caf9"
+                      />Open
+                    </div>
+                  </template>
+                </div>
+              </div>
+            </v-col>
+          </v-row>
+        </v-row>
+
+        <!-- ── Row: Widget A & B — Kecepatan Konversi ── -->
+        <v-row dense class="mb-2">
+          <v-col cols="12" md="6">
             <div class="manksi-panel content-panel fill-height">
               <div class="panel-header panel-header--blue">
                 <IconChartBar :size="14" :stroke-width="1.7" class="mr-1" />
-                Realisasi Penawaran
-                <span class="panel-header-sub ml-1">(bulan ini)</span>
-                <span
-                  v-if="totalNominal"
-                  class="ml-auto pct-badge"
-                  :class="
-                    pctGlobal >= 80
-                      ? 'pct-good'
-                      : pctGlobal >= 50
-                        ? 'pct-mid'
-                        : 'pct-low'
-                  "
-                >
-                  {{ pctGlobal }}% close
-                </span>
-              </div>
-              <div class="panel-body">
-                <v-progress-linear
-                  v-if="isLoadingDashboard"
-                  indeterminate
-                  color="primary"
-                  height="2"
-                />
-                <template v-else-if="realisasiRows.length">
-                  <div class="real-total-row">
-                    <span class="real-total-lbl">Total Nominal</span>
-                    <span class="real-total-val">{{
-                      shortNum(totalNominal)
-                    }}</span>
-                    <span class="real-total-close"
-                      >Close {{ shortNum(totalClose) }}</span
-                    >
-                  </div>
-                  <div class="real-list">
-                    <div
-                      v-for="row in realisasiRows"
-                      :key="row.Divisi"
-                      class="real-row"
-                    >
-                      <div class="real-meta">
-                        <span class="real-divisi">{{
-                          row.Divisi || "LAINNYA"
-                        }}</span>
-                        <span class="real-nominal">{{
-                          shortNum(Number(row.Nominal))
-                        }}</span>
-                      </div>
-                      <div class="real-bar-wrap">
-                        <div class="real-bar">
-                          <div
-                            class="real-seg real-seg--close"
-                            :style="{
-                              width:
-                                barPct(
-                                  Number(row.Nominal),
-                                  Number(row.Close),
-                                  Number(row.Batal),
-                                ).close + '%',
-                            }"
-                          />
-                          <div
-                            class="real-seg real-seg--batal"
-                            :style="{
-                              width:
-                                barPct(
-                                  Number(row.Nominal),
-                                  Number(row.Close),
-                                  Number(row.Batal),
-                                ).batal + '%',
-                            }"
-                          />
-                          <div
-                            class="real-seg real-seg--open"
-                            :style="{
-                              width:
-                                barPct(
-                                  Number(row.Nominal),
-                                  Number(row.Close),
-                                  Number(row.Batal),
-                                ).open + '%',
-                            }"
-                          />
-                        </div>
-                        <span class="real-pct">
-                          {{
-                            barPct(
-                              Number(row.Nominal),
-                              Number(row.Close),
-                              Number(row.Batal),
-                            ).close
-                          }}%
-                        </span>
-                      </div>
-                      <div class="real-detail">
-                        <span class="rd-close"
-                          >✓ {{ shortNum(Number(row.Close)) }}</span
-                        >
-                        <span v-if="Number(row.Batal) > 0" class="rd-batal"
-                          >✕ {{ shortNum(Number(row.Batal)) }}</span
-                        >
-                        <span class="rd-open"
-                          >○
-                          {{
-                            shortNum(
-                              Number(row.Nominal) -
-                                Number(row.Close) -
-                                Number(row.Batal),
-                            )
-                          }}</span
-                        >
-                      </div>
-                    </div>
-                  </div>
-                  <div class="real-legend">
-                    <span class="leg-dot leg-close" />Close
-                    <span class="leg-dot leg-batal" />Batal
-                    <span class="leg-dot leg-open" />Open
-                  </div>
-                </template>
-                <div v-else class="text-center text-grey py-3 text-caption">
-                  Belum ada data penawaran bulan ini.
-                </div>
-              </div>
-            </div>
-          </v-col>
-        </v-row>
-
-        <!-- ── Row 2: Waktu Realisasi + Tabel Detail ── -->
-        <v-row dense class="mb-2">
-          <v-col cols="12">
-            <div class="manksi-panel content-panel">
-              <div class="panel-header panel-header--blue">
-                <IconChartBar :size="14" :stroke-width="1.7" class="mr-1" />
-                Waktu realisasi penawaran → SO
+                Penawaran → MAP
                 <span class="panel-header-sub ml-1">(90 hari terakhir)</span>
-                <span
-                  v-if="realisasiPenawaranData.metric.RataRataHari"
-                  class="ml-auto pct-badge"
-                  :class="
-                    realisasiPenawaranData.metric.RataRataHari <= 14
-                      ? 'pct-good'
-                      : realisasiPenawaranData.metric.RataRataHari <= 30
-                        ? 'pct-mid'
-                        : 'pct-low'
-                  "
-                >
-                  Rata-rata
-                  {{ realisasiPenawaranData.metric.RataRataHari }} hari
-                </span>
               </div>
               <div class="panel-body">
                 <v-progress-linear
@@ -4240,320 +4369,64 @@ const sisaClass = (item: any) => {
                   color="primary"
                   height="2"
                 />
-                <template v-else>
-                  <!-- Metric mini + stacked bar + tren — layout 2 kolom -->
-                  <div
-                    style="
-                      display: flex;
-                      gap: 0;
-                      border-bottom: 1px solid #f0f0f0;
-                    "
-                  >
-                    <!-- Kiri: metric + stacked bar -->
+                <template v-else-if="realisasiPenToMap.totalItem">
+                  <div class="kk-stack">
                     <div
-                      style="
-                        flex: 1;
-                        padding: 10px 12px;
-                        border-right: 1px solid #f0f0f0;
-                      "
+                      v-for="k in realisasiPenToMap.kategori"
+                      :key="k.kode"
+                      v-show="k.Pct > 0"
+                      class="kk-seg"
+                      :style="{
+                        width: k.Pct + '%',
+                        background: KATEGORI_COLOR[k.kode],
+                      }"
                     >
-                      <div
-                        class="rp-summary"
-                        style="
-                          padding: 0 0 8px;
-                          border-bottom: 1px solid #f5f5f5;
-                          margin-bottom: 8px;
-                        "
-                      >
-                        <div class="rp-stat" style="padding: 2px 10px">
-                          <span class="rp-val" style="color: #212121">{{
-                            realisasiPenawaranData.metric.TotalPenawaran
-                          }}</span>
-                          <span class="rp-lbl">Total</span>
-                        </div>
-                        <div class="rp-divider" />
-                        <div class="rp-stat" style="padding: 2px 10px">
-                          <span class="rp-val" style="color: #2e7d32"
-                            >{{ realisasiPenawaranData.metric.KonversiCepat }}
-                            <span class="rp-pct"
-                              >({{ realisasiPct.cepat }}%)</span
-                            >
-                          </span>
-                          <span class="rp-lbl">Cepat ≤7hr</span>
-                        </div>
-                        <div class="rp-divider" />
-                        <div class="rp-stat" style="padding: 2px 10px">
-                          <span class="rp-val" style="color: #185fa5"
-                            >{{ realisasiPenawaranData.metric.KonversiNormal }}
-                            <span class="rp-pct"
-                              >({{ realisasiPct.normal }}%)</span
-                            >
-                          </span>
-                          <span class="rp-lbl">Normal 8–30hr</span>
-                        </div>
-                        <div class="rp-divider" />
-                        <div class="rp-stat" style="padding: 2px 10px">
-                          <span class="rp-val" style="color: #854f0b"
-                            >{{ realisasiPenawaranData.metric.KonversiLambat }}
-                            <span class="rp-pct"
-                              >({{ realisasiPct.lambat }}%)</span
-                            >
-                          </span>
-                          <span class="rp-lbl">Lambat 31–90hr</span>
-                        </div>
-                        <div class="rp-divider" />
-                        <div class="rp-stat" style="padding: 2px 10px">
-                          <span class="rp-val" style="color: #c62828"
-                            >{{
-                              realisasiPenawaranData.metric.KonversiSangatLambat
-                            }}
-                            <span class="rp-pct"
-                              >({{ realisasiPct.sangatLambat }}%)</span
-                            >
-                          </span>
-                          <span class="rp-lbl">&gt;90hr</span>
-                        </div>
-                        <div class="rp-divider" />
-                        <div class="rp-stat" style="padding: 2px 10px">
-                          <span class="rp-val" style="color: #616161"
-                            >{{ realisasiPenawaranData.metric.BelumKonversi }}
-                            <span class="rp-pct"
-                              >({{ realisasiPct.belum }}%)</span
-                            >
-                          </span>
-                          <span class="rp-lbl">Belum SO</span>
-                        </div>
-                        <div class="rp-divider" />
-                        <div class="rp-stat" style="padding: 2px 10px">
-                          <span class="rp-val" style="color: #757575"
-                            >{{ realisasiPenawaranData.metric.Batal }}
-                            <span class="rp-pct"
-                              >({{ realisasiPct.batal }}%)</span
-                            >
-                          </span>
-                          <span class="rp-lbl">Batal</span>
-                        </div>
-                      </div>
-
-                      <!-- Stacked bar -->
-                      <div v-if="realisasiPenawaranData.metric.TotalPenawaran">
-                        <div class="rp-stack">
-                          <div
-                            class="rp-seg"
-                            :style="{
-                              width: realisasiPct.cepat + '%',
-                              background: '#2e7d32',
-                            }"
-                          >
-                            <span v-if="realisasiPct.cepat >= 8"
-                              >{{ realisasiPct.cepat }}%</span
-                            >
-                          </div>
-                          <div
-                            class="rp-seg"
-                            :style="{
-                              width: realisasiPct.normal + '%',
-                              background: '#185FA5',
-                            }"
-                          >
-                            <span v-if="realisasiPct.normal >= 8"
-                              >{{ realisasiPct.normal }}%</span
-                            >
-                          </div>
-                          <div
-                            class="rp-seg"
-                            :style="{
-                              width: realisasiPct.lambat + '%',
-                              background: '#f57f17',
-                            }"
-                          >
-                            <span v-if="realisasiPct.lambat >= 8"
-                              >{{ realisasiPct.lambat }}%</span
-                            >
-                          </div>
-                          <div
-                            class="rp-seg"
-                            :style="{
-                              width: realisasiPct.sangatLambat + '%',
-                              background: '#c62828',
-                            }"
-                          >
-                            <span v-if="realisasiPct.sangatLambat >= 8"
-                              >{{ realisasiPct.sangatLambat }}%</span
-                            >
-                          </div>
-                          <div
-                            class="rp-seg"
-                            :style="{
-                              width: realisasiPct.batal + '%',
-                              background: '#616161',
-                            }"
-                          >
-                            <span v-if="realisasiPct.batal >= 8"
-                              >{{ realisasiPct.batal }}%</span
-                            >
-                          </div>
-                          <div
-                            class="rp-seg"
-                            :style="{
-                              width: realisasiPct.belum + '%',
-                              background: '#bdbdbd',
-                            }"
-                          >
-                            <span v-if="realisasiPct.belum >= 8"
-                              >{{ realisasiPct.belum }}%</span
-                            >
-                          </div>
-                        </div>
-                        <div class="rp-legend">
-                          <span
-                            ><span
-                              class="leg-dot"
-                              style="background: #2e7d32"
-                            />Cepat ≤7hr</span
-                          >
-                          <span
-                            ><span
-                              class="leg-dot"
-                              style="background: #185fa5"
-                            />Normal 8–30hr</span
-                          >
-                          <span
-                            ><span
-                              class="leg-dot"
-                              style="background: #f57f17"
-                            />Lambat 31–90hr</span
-                          >
-                          <span
-                            ><span
-                              class="leg-dot"
-                              style="background: #c62828"
-                            />&gt;90hr</span
-                          >
-                          <span
-                            ><span
-                              class="leg-dot"
-                              style="background: #616161"
-                            />Batal</span
-                          >
-                          <span
-                            ><span
-                              class="leg-dot"
-                              style="background: #bdbdbd"
-                            />Belum SO</span
-                          >
-                        </div>
-                      </div>
-                    </div>
-
-                    <!-- Kanan: tren per bulan -->
-                    <div
-                      v-if="realisasiPenawaranData.tren.length"
-                      style="width: 280px; flex-shrink: 0; padding: 10px 12px"
-                    >
-                      <div class="rp-tren-title">
-                        Tren rata-rata hari / bulan
-                      </div>
-                      <div class="rp-tren-list">
-                        <div
-                          v-for="t in realisasiPenawaranData.tren"
-                          :key="t.Bulan"
-                          class="rp-tren-row"
-                        >
-                          <span class="rp-tren-bulan">{{ t.Bulan }}</span>
-                          <div class="rp-tren-bar-wrap">
-                            <div class="rp-tren-track">
-                              <div
-                                class="rp-tren-fill"
-                                :style="{
-                                  width:
-                                    Math.min(100, (t.RataRataHari / 60) * 100) +
-                                    '%',
-                                  background:
-                                    t.RataRataHari <= 14
-                                      ? '#2e7d32'
-                                      : t.RataRataHari <= 30
-                                        ? '#185FA5'
-                                        : '#c62828',
-                                }"
-                              />
-                              <div
-                                class="rp-target-line"
-                                style="left: calc(14 / 60 * 100%)"
-                              />
-                            </div>
-                          </div>
-                          <span
-                            class="rp-tren-val"
-                            :style="{
-                              color:
-                                t.RataRataHari <= 14
-                                  ? '#2e7d32'
-                                  : t.RataRataHari <= 30
-                                    ? '#185FA5'
-                                    : '#c62828',
-                            }"
-                          >
-                            {{
-                              t.RataRataHari !== null
-                                ? t.RataRataHari + " hr"
-                                : "—"
-                            }}
-                          </span>
-                          <span class="rp-tren-konversi"
-                            >{{ t.Konversi }}/{{ t.TotalPenawaran }}</span
-                          >
-                        </div>
-                      </div>
-                      <div class="rp-legend" style="margin-top: 6px">
-                        <span
-                          style="display: flex; align-items: center; gap: 4px"
-                        >
-                          <span
-                            style="
-                              width: 12px;
-                              height: 2px;
-                              border-top: 2px dashed #9e9e9e;
-                              display: inline-block;
-                            "
-                          ></span>
-                          Target 14 hari
-                        </span>
-                      </div>
+                      <span v-if="k.Pct >= 8">{{ k.Pct }}%</span>
                     </div>
                   </div>
-
-                  <!-- Tabel detail — infinite scroll -->
+                  <div class="kk-list">
+                    <div
+                      v-for="k in realisasiPenToMap.kategori"
+                      :key="k.kode"
+                      class="kk-row"
+                    >
+                      <span
+                        class="kk-dot"
+                        :style="{ background: KATEGORI_COLOR[k.kode] }"
+                      />
+                      <span class="kk-label">{{ KATEGORI_LABEL[k.kode] }}</span>
+                      <span class="kk-item"
+                        >{{ k.JmlItem }} item ({{ k.Pct }}%)</span
+                      >
+                      <span class="kk-nilai">{{ shortNum(k.Nilai) }}</span>
+                    </div>
+                  </div>
                   <div
                     style="
                       overflow-x: auto;
                       max-height: 320px;
                       overflow-y: auto;
+                      border-top: 1px solid #f0f0f0;
                     "
                   >
                     <table class="rp-tbl">
                       <thead>
                         <tr>
-                          <th style="width: 160px">No. penawaran</th>
-                          <th style="width: 95px; text-align: center">
-                            Tgl penawaran
+                          <th style="width: 140px">No. Penawaran</th>
+                          <th style="width: 90px; text-align: center">
+                            Tanggal
                           </th>
-                          <th style="min-width: 160px">Customer</th>
-                          <th style="width: 70px; text-align: center">
-                            Total SO
-                          </th>
-                          <th style="width: 150px">SO pertama</th>
-                          <th style="width: 95px; text-align: center">
-                            Tgl SO
-                          </th>
-                          <th style="width: 70px; text-align: right">Hari</th>
+                          <th style="min-width: 140px">Customer</th>
+                          <th style="width: 110px">Divisi</th>
+                          <th style="width: 90px; text-align: right">Nilai</th>
+                          <th style="width: 60px; text-align: right">Item</th>
                           <th style="width: 90px; text-align: center">
                             Status
                           </th>
                         </tr>
                       </thead>
                       <tbody>
-                        <tr v-for="(row, idx) in rpDetailList" :key="idx">
+                        <tr v-for="(row, idx) in ptmDetailList" :key="idx">
                           <td
                             style="
                               font-family: monospace;
@@ -4561,106 +4434,229 @@ const sisaClass = (item: any) => {
                               font-weight: 600;
                             "
                           >
-                            {{ row.NomorPenawaran }}
+                            {{ row.Nomor }}
                           </td>
-                          <td style="text-align: center">
-                            {{ row.TglPenawaran }}
-                          </td>
+                          <td style="text-align: center">{{ row.Tanggal }}</td>
                           <td
                             style="
                               overflow: hidden;
                               text-overflow: ellipsis;
                               white-space: nowrap;
-                              max-width: 160px;
+                              max-width: 140px;
                             "
                             :title="row.Customer"
                           >
                             {{ row.Customer }}
                           </td>
-                          <td style="text-align: center; font-weight: 600">
-                            {{ row.TotalSPK || "—" }}
+                          <td>{{ row.Divisi }}</td>
+                          <td style="text-align: right">
+                            {{ shortNum(row.Nilai) }}
                           </td>
-                          <td
-                            style="
-                              font-family: monospace;
-                              font-size: 10px;
-                              color: #424242;
-                            "
-                          >
-                            {{ row.SpkPertama || "—" }}
-                          </td>
-                          <td style="text-align: center">
-                            {{ row.TglSpkPertama || "—" }}
-                          </td>
-                          <td
-                            style="text-align: right; font-weight: 600"
-                            :style="{
-                              color:
-                                row.HariKonversi === null
-                                  ? '#9e9e9e'
-                                  : row.HariKonversi <= 7
-                                    ? '#2e7d32'
-                                    : row.HariKonversi <= 30
-                                      ? '#185FA5'
-                                      : '#c62828',
-                            }"
-                          >
-                            {{
-                              row.HariKonversi !== null ? row.HariKonversi : "—"
-                            }}
-                          </td>
+                          <td style="text-align: right">{{ row.JmlItem }}</td>
                           <td style="text-align: center">
                             <span
-                              v-if="row.IsBatal"
                               class="rp-badge"
-                              style="background: #eeeeee; color: #616161"
-                              >Batal</span
+                              :style="{
+                                background: KATEGORI_COLOR[row.Status] + '22',
+                                color: KATEGORI_COLOR[row.Status],
+                              }"
                             >
-                            <span
-                              v-if="row.HariKonversi === null"
-                              class="rp-badge rp-badge--none"
-                              >Belum</span
-                            >
-                            <span
-                              v-else-if="row.HariKonversi <= 7"
-                              class="rp-badge rp-badge--fast"
-                              >Cepat</span
-                            >
-                            <span
-                              v-else-if="row.HariKonversi <= 30"
-                              class="rp-badge rp-badge--mid"
-                              >Normal</span
-                            >
-                            <span
-                              v-else-if="row.HariKonversi <= 90"
-                              class="rp-badge rp-badge--slow"
-                              >Lambat</span
-                            >
-                            <span v-else class="rp-badge rp-badge--vslow"
-                              >&gt;90hr</span
-                            >
+                              {{ KATEGORI_LABEL[row.Status] }}
+                            </span>
                           </td>
                         </tr>
                       </tbody>
+                      <tfoot>
+                        <tr class="rp-total-row">
+                          <td
+                            colspan="4"
+                            style="font-weight: 700; text-align: right"
+                          >
+                            TOTAL:
+                          </td>
+                          <td style="text-align: right; font-weight: 700">
+                            {{ shortNum(realisasiPenToMap.totalNilai) }}
+                          </td>
+                          <td style="text-align: right; font-weight: 700">
+                            {{ fmtNum(realisasiPenToMap.totalQty) }}
+                          </td>
+                          <td></td>
+                        </tr>
+                      </tfoot>
                     </table>
-
-                    <!-- Sentinel -->
                     <div
-                      ref="rpDetailSentinelEl"
+                      ref="ptmDetailSentinelEl"
                       style="padding: 6px; text-align: center"
                     >
-                      <span v-if="isLoadingMoreRpDetail" class="pen-loading"
+                      <span v-if="isLoadingMorePtmDetail" class="pen-loading"
                         >Memuat...</span
                       >
                       <span
-                        v-else-if="!rpDetailHasMore && rpDetailList.length"
+                        v-else-if="!ptmDetailHasMore && ptmDetailList.length"
                         class="pen-end"
                       >
-                        {{ rpDetailList.length }} penawaran ditampilkan
+                        {{ ptmDetailList.length }} penawaran ditampilkan
                       </span>
                     </div>
                   </div>
                 </template>
+                <div v-else class="text-center text-grey py-3 text-caption">
+                  Belum ada data penawaran 90 hari terakhir.
+                </div>
+              </div>
+            </div>
+          </v-col>
+
+          <v-col cols="12" md="6">
+            <div class="manksi-panel content-panel fill-height">
+              <div class="panel-header panel-header--teal">
+                <IconChartBar :size="14" :stroke-width="1.7" class="mr-1" />
+                MAP → SO
+                <span class="panel-header-sub ml-1">(90 hari terakhir)</span>
+              </div>
+              <div class="panel-body">
+                <v-progress-linear
+                  v-if="isLoadingDashboard"
+                  indeterminate
+                  color="teal"
+                  height="2"
+                />
+                <template v-else-if="realisasiMapToSo.totalItem">
+                  <div class="kk-stack">
+                    <div
+                      v-for="k in realisasiMapToSo.kategori"
+                      :key="k.kode"
+                      v-show="k.Pct > 0"
+                      class="kk-seg"
+                      :style="{
+                        width: k.Pct + '%',
+                        background: KATEGORI_COLOR[k.kode],
+                      }"
+                    >
+                      <span v-if="k.Pct >= 8">{{ k.Pct }}%</span>
+                    </div>
+                  </div>
+                  <div class="kk-list">
+                    <div
+                      v-for="k in realisasiMapToSo.kategori"
+                      :key="k.kode"
+                      class="kk-row"
+                    >
+                      <span
+                        class="kk-dot"
+                        :style="{ background: KATEGORI_COLOR[k.kode] }"
+                      />
+                      <span class="kk-label">{{ KATEGORI_LABEL[k.kode] }}</span>
+                      <span class="kk-item"
+                        >{{ k.JmlItem }} item ({{ k.Pct }}%)</span
+                      >
+                      <span class="kk-nilai">{{ shortNum(k.Nilai) }}</span>
+                    </div>
+                  </div>
+                  <div
+                    style="
+                      overflow-x: auto;
+                      max-height: 320px;
+                      overflow-y: auto;
+                      border-top: 1px solid #f0f0f0;
+                    "
+                  >
+                    <table class="rp-tbl">
+                      <thead>
+                        <tr>
+                          <th style="width: 140px">No. MAP</th>
+                          <th style="width: 90px; text-align: center">
+                            Tanggal
+                          </th>
+                          <th style="min-width: 140px">Customer</th>
+                          <th style="width: 110px">Divisi</th>
+                          <th style="width: 90px; text-align: right">Nilai</th>
+                          <th style="width: 70px; text-align: right">Qty</th>
+                          <th style="width: 90px; text-align: center">
+                            Status
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr v-for="(row, idx) in mtsDetailList" :key="idx">
+                          <td
+                            style="
+                              font-family: monospace;
+                              color: #1565c0;
+                              font-weight: 600;
+                            "
+                          >
+                            {{ row.Nomor }}
+                          </td>
+                          <td style="text-align: center">{{ row.Tanggal }}</td>
+                          <td
+                            style="
+                              overflow: hidden;
+                              text-overflow: ellipsis;
+                              white-space: nowrap;
+                              max-width: 140px;
+                            "
+                            :title="row.Customer"
+                          >
+                            {{ row.Customer }}
+                          </td>
+                          <td>{{ row.Divisi }}</td>
+                          <td style="text-align: right">
+                            {{ shortNum(row.Nilai) }}
+                          </td>
+                          <td style="text-align: right">
+                            {{ fmtNum(row.Qty || 0) }}
+                          </td>
+                          <td style="text-align: center">
+                            <span
+                              class="rp-badge"
+                              :style="{
+                                background: KATEGORI_COLOR[row.Status] + '22',
+                                color: KATEGORI_COLOR[row.Status],
+                              }"
+                            >
+                              {{ KATEGORI_LABEL[row.Status] }}
+                            </span>
+                          </td>
+                        </tr>
+                      </tbody>
+                      <tfoot>
+                        <tr class="rp-total-row">
+                          <td
+                            colspan="4"
+                            style="font-weight: 700; text-align: right"
+                          >
+                            TOTAL:
+                          </td>
+                          <td style="text-align: right; font-weight: 700">
+                            {{ shortNum(realisasiMapToSo.totalNilai) }}
+                          </td>
+                          <td style="text-align: right; font-weight: 700">
+                            {{ fmtNum(realisasiMapToSo.totalQty) }}
+                          </td>
+                          <td></td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                    <div
+                      ref="mtsDetailSentinelEl"
+                      style="padding: 6px; text-align: center"
+                    >
+                      <span v-if="isLoadingMoreMtsDetail" class="pen-loading"
+                        >Memuat...</span
+                      >
+                      <span
+                        v-else-if="!mtsDetailHasMore && mtsDetailList.length"
+                        class="pen-end"
+                      >
+                        {{ mtsDetailList.length }} MAP ditampilkan
+                      </span>
+                    </div>
+                  </div>
+                </template>
+                <div v-else class="text-center text-grey py-3 text-caption">
+                  Belum ada data MAP 90 hari terakhir.
+                </div>
               </div>
             </div>
           </v-col>
@@ -9004,32 +9000,6 @@ const sisaClass = (item: any) => {
   color: #bdbdbd;
 }
 
-/* ── Realisasi ── */
-.real-total-row {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  padding: 6px 12px;
-  border-bottom: 1px solid #f0f0f0;
-  background: #fafafa;
-}
-.real-total-lbl {
-  font-size: 10px;
-  color: #9e9e9e;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-.real-total-val {
-  font-size: 14px;
-  font-weight: 700;
-  color: #1565c0;
-}
-.real-total-close {
-  font-size: 11px;
-  color: #2e7d32;
-  font-weight: 600;
-  margin-left: auto;
-}
 .real-list {
   max-height: 280px;
   overflow-y: auto;
@@ -10297,6 +10267,137 @@ const sisaClass = (item: any) => {
   font-weight: 600;
   cursor: pointer;
   outline: none;
+}
+
+.rp-bulanan-list {
+  max-height: 400px;
+  overflow-y: auto;
+}
+.rp-bulanan-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px;
+  border-bottom: 1px solid #f5f5f5;
+}
+.rp-bulanan-row:last-child {
+  border-bottom: none;
+}
+.rp-bulanan-bulan {
+  width: 48px;
+  flex-shrink: 0;
+  font-size: 10px;
+  color: #616161;
+  font-weight: 600;
+}
+.rp-bulanan-bar-wrap {
+  flex: 1;
+  min-width: 0;
+}
+.rp-bulanan-bar {
+  display: flex;
+  height: 14px;
+  border-radius: 3px;
+  overflow: visible;
+  background: #f0f0f0;
+}
+.rp-bulanan-seg {
+  position: relative;
+  height: 100%;
+  transition: width 0.3s;
+}
+.rp-seg--open {
+  background: #90caf9;
+}
+.rp-seg--close {
+  background: #43a047;
+}
+.rp-seg--batal {
+  background: #e53935;
+}
+.rp-tooltip {
+  display: none;
+  position: absolute;
+  bottom: 120%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #212121;
+  color: #fff;
+  font-size: 10px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+  z-index: 10;
+}
+.rp-tooltip--below {
+  bottom: auto;
+  top: 120%;
+}
+.rp-tooltip-title {
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+.rp-total-row td {
+  background: #fafafa;
+  border-top: 2px solid #e0e0e0;
+}
+.rp-bulanan-seg:hover .rp-tooltip {
+  display: block;
+}
+.rp-bulanan-total {
+  width: 55px;
+  flex-shrink: 0;
+  text-align: right;
+  font-size: 10px;
+  font-weight: 700;
+  color: #424242;
+}
+.kk-stack {
+  display: flex;
+  height: 22px;
+  margin: 10px 12px 8px;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.kk-seg {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  color: white;
+  transition: width 0.4s;
+}
+.kk-list {
+  padding: 0 12px 10px;
+}
+.kk-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 0;
+  font-size: 11px;
+}
+.kk-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.kk-label {
+  width: 100px;
+  flex-shrink: 0;
+  color: #424242;
+}
+.kk-item {
+  flex: 1;
+  color: #616161;
+}
+.kk-nilai {
+  font-weight: 700;
+  color: #212121;
+  white-space: nowrap;
 }
 
 @keyframes highlight-fade {

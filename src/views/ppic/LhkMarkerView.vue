@@ -79,6 +79,7 @@ const headers = [
   { title: "Nomor", key: "Nomor", width: "150px" },
   { title: "Tanggal", key: "Tanggal", width: "100px", align: "center" },
   { title: "Keterangan", key: "Keterangan", minWidth: "200px" },
+  { title: "SPK", key: "SpkNomor", minWidth: "160px" },
   { title: "Pembuat", key: "Pembuat", width: "140px" },
   { title: "Jml Marker", key: "JmlMarker", width: "100px", align: "right" },
   { title: "User", key: "UserCreate", width: "90px" },

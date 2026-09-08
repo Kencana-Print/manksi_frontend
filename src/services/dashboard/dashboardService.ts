@@ -30,6 +30,17 @@ export const dashboardService = {
     api.get("/dashboard/gudang-bahan-barcode", { params: { limit, offset } }),
   getRealisasiPenawaranDashboard: () =>
     api.get("/dashboard/realisasi-penawaran"),
+  getRealisasiPenawaranToMap: () =>
+    api.get("/dashboard/realisasi-penawaran-to-map"),
+  getRealisasiMapToSo: () => api.get("/dashboard/realisasi-map-to-so"),
+  getRealisasiPenawaranToMapDetail: (limit: number, offset: number) =>
+    api.get("/dashboard/realisasi-penawaran-to-map-detail", {
+      params: { limit, offset },
+    }),
+  getRealisasiMapToSoDetail: (limit: number, offset: number) =>
+    api.get("/dashboard/realisasi-map-to-so-detail", {
+      params: { limit, offset },
+    }),
   getRealisasiPenawaranDetail: (limit = 20, offset = 0) =>
     api.get("/dashboard/realisasi-penawaran-detail", {
       params: { limit, offset },
@@ -165,6 +176,9 @@ export const dashboardService = {
 
   getPenawaranFunnel: (bulan?: number, tahun?: number) =>
     api.get("/dashboard/penawaran-funnel", { params: { bulan, tahun } }),
+
+  getRealisasiPenawaranBulanan: () =>
+    api.get("/dashboard/realisasi-penawaran-bulanan"),
 
   getMapFunnel: (bulan?: number, tahun?: number) =>
     api.get("/dashboard/map-funnel", { params: { bulan, tahun } }),

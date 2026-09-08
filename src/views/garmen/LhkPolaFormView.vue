@@ -22,6 +22,8 @@ const emptyGradingRow = () => ({
   namaSpk: "",
   divisi: "",
   gradingSize: "",
+  panjang: null as number | null,
+  lebar: null as number | null,
   keterangan: "",
   gambar: "",
 });
@@ -63,6 +65,14 @@ const {
               namaSpk: r.namaSpk || "",
               divisi: r.divisi || "",
               gradingSize: r.gradingSize || "",
+              panjang:
+                r.panjang !== null && r.panjang !== undefined
+                  ? Number(r.panjang)
+                  : null,
+              lebar:
+                r.lebar !== null && r.lebar !== undefined
+                  ? Number(r.lebar)
+                  : null,
               keterangan: r.keterangan || "",
               gambar: r.gambar || "",
             }))
@@ -225,6 +235,19 @@ const validateSave = () => {
     toast.warning("Minimal harus ada 1 baris SPK terisi di Pola/Grading.");
     return;
   }
+  const invalidRow = gradingFilled.find(
+    (r: any) =>
+      r.panjang === null ||
+      r.panjang === "" ||
+      r.lebar === null ||
+      r.lebar === "",
+  );
+  if (invalidRow) {
+    toast.warning(
+      `Panjang dan Lebar wajib diisi untuk SPK ${invalidRow.spkNomor}.`,
+    );
+    return;
+  }
   showSaveDialog.value = true;
 };
 </script>
@@ -285,7 +308,9 @@ const validateSave = () => {
               <th style="width: 150px">No. SPK</th>
               <th>Nama SPK</th>
               <th style="width: 110px">Divisi</th>
-              <th style="width: 160px">Grading Size</th>
+              <th style="width: 140px">Grading Size</th>
+              <th style="width: 90px">Panjang (cm)</th>
+              <th style="width: 90px">Lebar (cm)</th>
               <th style="width: 180px">Keterangan</th>
               <th style="width: 90px">Gambar</th>
               <th style="width: 36px"></th>
@@ -323,6 +348,40 @@ const validateSave = () => {
                   v-model="row.gradingSize"
                   class="cell-inp"
                   placeholder="S,M,L,XL"
+                />
+              </td>
+              <td>
+                <input
+                  v-model.number="row.gradingSize"
+                  class="cell-inp"
+                  placeholder="S,M,L,XL"
+                />
+              </td>
+              <td>
+                <input
+                  v-model.number="row.panjang"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  class="cell-inp"
+                  :class="{
+                    'cell-inp--required':
+                      row.spkNomor &&
+                      (row.panjang === null || row.panjang === ''),
+                  }"
+                />
+              </td>
+              <td>
+                <input
+                  v-model.number="row.lebar"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  class="cell-inp"
+                  :class="{
+                    'cell-inp--required':
+                      row.spkNomor && (row.lebar === null || row.lebar === ''),
+                  }"
                 />
               </td>
               <td>
@@ -582,5 +641,9 @@ const validateSave = () => {
 .preview-body {
   padding: 16px;
   background: #f5f5f5;
+}
+.cell-inp--required {
+  border-color: #ef5350;
+  background: #fff5f5;
 }
 </style>
