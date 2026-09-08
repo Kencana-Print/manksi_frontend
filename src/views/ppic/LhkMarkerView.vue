@@ -176,12 +176,20 @@ const onExportDetail = async () => {
     const rows: any[] = [];
     source.forEach((master: any) => {
       const det = detailCache.value[master.Nomor] || [];
+      const masterCells = {
+        Nomor: master.Nomor,
+        Tanggal: formatTanggal(master.Tanggal),
+        Pembuat: master.Pembuat || "",
+      };
+      const blankMaster = Object.fromEntries(
+        Object.keys(masterCells).map((k) => [k, ""]),
+      );
+
       if (det.length > 0) {
-        det.forEach((r: any) => {
+        det.forEach((r: any, idx: number) => {
           rows.push({
-            Nomor: master.Nomor,
-            Tanggal: formatTanggal(master.Tanggal),
-            Pembuat: master.Pembuat || "",
+            ...(idx === 0 ? masterCells : blankMaster),
+            NomorUlang: master.Nomor, // ⬅ tetap terisi tiap baris, buat filter/sort
             "No SPK": r.spkNomor,
             "Nama SPK": r.namaSpk || "",
             "Lebar Kain": r.lebarKain || "",
@@ -192,9 +200,8 @@ const onExportDetail = async () => {
         });
       } else {
         rows.push({
-          Nomor: master.Nomor,
-          Tanggal: formatTanggal(master.Tanggal),
-          Pembuat: master.Pembuat || "",
+          ...masterCells,
+          NomorUlang: master.Nomor,
           "No SPK": "",
           "Nama SPK": "(Tidak ada data marker)",
           "Lebar Kain": "",
@@ -211,6 +218,7 @@ const onExportDetail = async () => {
       { header: "Nomor", key: "Nomor", width: 16 },
       { header: "Tanggal", key: "Tanggal", width: 12, align: "center" },
       { header: "Pembuat", key: "Pembuat", width: 20 },
+      { header: "Nomor", key: "NomorUlang", width: 16 },
       { header: "No SPK", key: "No SPK", width: 14 },
       { header: "Nama SPK", key: "Nama SPK", width: 26 },
       { header: "Lebar Kain", key: "Lebar Kain", width: 12 },

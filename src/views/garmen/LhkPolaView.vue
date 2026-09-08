@@ -173,9 +173,6 @@ const onExportDetail = async () => {
 
   isExportingDetail.value = true;
   try {
-    // Pastikan detail sudah ter-load untuk SEMUA baris yang mau
-    // di-export — bukan cuma baris yang kebetulan pernah di-expand
-    // user (detailCache bersifat lazy, tidak otomatis lengkap).
     const missing = source.filter((r: any) => !detailCache.value[r.Nomor]);
     if (missing.length > 0) {
       await Promise.all(
@@ -201,17 +198,22 @@ const onExportDetail = async () => {
         marker: [],
         grading: [],
       };
+      const masterCells = {
+        Nomor: master.Nomor,
+        Tanggal: formatTanggal(master.Tanggal),
+        Pembuat: master.Pembuat || "",
+      };
+      const blankMaster = Object.fromEntries(
+        Object.keys(masterCells).map((k) => [k, ""]),
+      );
 
-      // ⚠️ FIX: semua baris master WAJIB muncul di kedua sheet, meski
-      // tidak punya detail item — sebelumnya baris dengan JmlMarker=0
-      // (atau JmlGrading=0) di-skip total lewat forEach kosong, sehingga
-      // baris LHK itu hilang sama sekali dari sheet Marker meski dia
-      // benar punya data di sheet Grading (dan sebaliknya).
+      // Baris master WAJIB muncul di kedua sheet, meski tidak punya
+      // detail item (tetap dipertahankan dari fix sebelumnya).
       if (det.marker.length > 0) {
-        det.marker.forEach((r: any) => {
+        det.marker.forEach((r: any, idx: number) => {
           markerRows.push({
-            Nomor: master.Nomor,
-            Tanggal: formatTanggal(master.Tanggal),
+            ...(idx === 0 ? masterCells : blankMaster),
+            NomorUlang: master.Nomor,
             "No SPK": r.spkNomor,
             "Nama SPK": r.namaSpk || "",
             "Lebar Kain": r.lebarKain || "",
@@ -222,8 +224,8 @@ const onExportDetail = async () => {
         });
       } else {
         markerRows.push({
-          Nomor: master.Nomor,
-          Tanggal: formatTanggal(master.Tanggal),
+          ...masterCells,
+          NomorUlang: master.Nomor,
           "No SPK": "",
           "Nama SPK": "(Tidak ada data marker)",
           "Lebar Kain": "",
@@ -234,10 +236,10 @@ const onExportDetail = async () => {
       }
 
       if (det.grading.length > 0) {
-        det.grading.forEach((r: any) => {
+        det.grading.forEach((r: any, idx: number) => {
           gradingRows.push({
-            Nomor: master.Nomor,
-            Tanggal: formatTanggal(master.Tanggal),
+            ...(idx === 0 ? masterCells : blankMaster),
+            NomorUlang: master.Nomor,
             "No SPK": r.spkNomor,
             "Nama SPK": r.namaSpk || "",
             Divisi: r.divisi || "",
@@ -247,8 +249,8 @@ const onExportDetail = async () => {
         });
       } else {
         gradingRows.push({
-          Nomor: master.Nomor,
-          Tanggal: formatTanggal(master.Tanggal),
+          ...masterCells,
+          NomorUlang: master.Nomor,
           "No SPK": "",
           "Nama SPK": "(Tidak ada data grading)",
           Divisi: "",
@@ -265,6 +267,8 @@ const onExportDetail = async () => {
     const markerColumns: ExcelColumn[] = [
       { header: "Nomor", key: "Nomor", width: 16 },
       { header: "Tanggal", key: "Tanggal", width: 12, align: "center" },
+      { header: "Pembuat", key: "Pembuat", width: 20 },
+      { header: "Nomor", key: "NomorUlang", width: 16 },
       { header: "No SPK", key: "No SPK", width: 14 },
       { header: "Nama SPK", key: "Nama SPK", width: 26 },
       { header: "Lebar Kain", key: "Lebar Kain", width: 12 },
@@ -275,6 +279,8 @@ const onExportDetail = async () => {
     const gradingColumns: ExcelColumn[] = [
       { header: "Nomor", key: "Nomor", width: 16 },
       { header: "Tanggal", key: "Tanggal", width: 12, align: "center" },
+      { header: "Pembuat", key: "Pembuat", width: 20 },
+      { header: "Nomor", key: "NomorUlang", width: 16 },
       { header: "No SPK", key: "No SPK", width: 14 },
       { header: "Nama SPK", key: "Nama SPK", width: 26 },
       { header: "Divisi", key: "Divisi", width: 12 },
@@ -282,8 +288,6 @@ const onExportDetail = async () => {
       { header: "Keterangan", key: "Keterangan", width: 20 },
     ];
 
-    // Dua sheet dalam satu file — Marker & Grading, sesuai struktur
-    // dua tabel bersanding yang sudah ada di expand row.
     const { exportExcel } = await import("@/utils/excelExport");
     await exportExcel(
       `LHK_Pola_Detail_${filterState.value.dtAwal}_${filterState.value.dtAkhir}.xlsx`,
