@@ -170,7 +170,12 @@ const onExport = () => {
   const columns: ExcelColumn[] = [
     { header: "NOMOR", key: "Nomor" },
     { header: "DIVISI", key: "Divisi" },
-    { header: "TANGGAL", key: "Tanggal", align: "center" },
+    {
+      header: "TANGGAL",
+      key: "Tanggal",
+      align: "center",
+      numFmt: "dd/mm/yyyy",
+    },
     { header: "CUSTOMER", key: "Customer" },
     { header: "SALES", key: "Sales" },
     { header: "NAMA PEKERJAAN", key: "NamaPekerjaan", width: 26 },
@@ -203,13 +208,23 @@ const onExport = () => {
       align: "right",
       numFmt: "#,##0",
     },
-    { header: "Tgl Kalkulasi", key: "TglKalkulasi", align: "center" },
+    {
+      header: "Tgl Kalkulasi",
+      key: "TglKalkulasi",
+      align: "center",
+      numFmt: "dd/mm/yyyy",
+    },
     { header: "No. Kalkulasi", key: "NoKalkulasi" },
     { header: "Ket. Kalkulasi", key: "KeteranganKalkulasi", width: 20 },
     { header: "Kal. Created", key: "KalCreated" },
     { header: "Kal. Modified", key: "KalModified" },
     { header: "Status", key: "Status" },
-    { header: "Approved", key: "Approved", align: "center" },
+    {
+      header: "Approved",
+      key: "Approved",
+      align: "center",
+      numFmt: "dd/mm/yyyy hh:mm:ss",
+    },
     { header: "Di Apv Oleh", key: "diApvOleh" },
     { header: "Created", key: "Created" },
   ];
@@ -218,15 +233,14 @@ const onExport = () => {
     getData: () => {
       const rawData =
         baseBrowseRef.value?.getFilteredItems?.() ?? items.value ?? [];
-      // Format semua kolom tanggal/datetime dulu sebelum export —
-      // getFilteredItems() balikin nilai mentah, belum diformat spt di
-      // grid (via template #item.Tanggal, #item.Approved, dst)
+      // Kirim Date object asli, JANGAN diformat ke string di sini.
+      // Biar Excel simpan sebagai serial date, tampilan diatur numFmt.
       return rawData.map((r: any) => ({
         ...r,
-        Tanggal: formatTanggal(r.Tanggal),
-        TglKalkulasi: formatTanggal(r.TglKalkulasi),
-        Approved: formatTanggalJam(r.Approved),
-        Created: formatTanggalJam(r.Created),
+        Tanggal: r.Tanggal ? new Date(r.Tanggal) : null,
+        TglKalkulasi: r.TglKalkulasi ? new Date(r.TglKalkulasi) : null,
+        Approved: r.Approved ? new Date(r.Approved) : null,
+        Created: r.Created ? new Date(r.Created) : null,
       }));
     },
     columns,
