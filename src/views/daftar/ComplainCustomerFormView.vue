@@ -71,6 +71,9 @@ const defaultData = {
   Image1Name: "",
   Image2Name: "",
   Image3Name: "",
+  Image1Url: "",
+  Image2Url: "",
+  Image3Url: "",
 };
 
 const {
@@ -116,6 +119,9 @@ const {
       Image1Name: h.tc_image1 || "",
       Image2Name: h.tc_image2 || "",
       Image3Name: h.tc_image3 || "",
+      Image1Url: d.images?.[1]?.url || "",
+      Image2Url: d.images?.[2]?.url || "",
+      Image3Url: d.images?.[3]?.url || "",
     };
   },
   submitApi: async (data: any) => {
@@ -257,33 +263,13 @@ const getBaseUrl = () => {
 // di /mnt/image (diakses via /file-gambar), bukan di public/images/
 // complain (lokasi upload baru dari web). resolvedUrls menyimpan hasil
 // fallback per slot supaya <img @error> tidak loop infinite.
-const resolvedUrls = ref<Record<1 | 2 | 3, string>>({ 1: "", 2: "", 3: "" });
-
-const webImageUrl = (slot: 1 | 2 | 3) => {
-  const key = `Image${slot}Name` as "Image1Name" | "Image2Name" | "Image3Name";
-  if (!formData.value[key] || !formData.value.Nomor) return "";
-  return `${getBaseUrl()}/images/complain/${encodeURIComponent(formData.value.Nomor)}-0${slot}.jpg`;
-};
-
-const legacyImageUrl = (slot: 1 | 2 | 3) => {
-  if (!formData.value.Nomor) return "";
-  return `/file-gambar/${encodeURIComponent(formData.value.Nomor)}-0${slot}.jpg`;
-};
 
 const displayImageUrl = (slot: 1 | 2 | 3) => {
   if (previewUrls.value[slot]) return previewUrls.value[slot];
-  if (resolvedUrls.value[slot]) return resolvedUrls.value[slot];
-  return webImageUrl(slot);
-};
-
-const onImgError = (slot: 1 | 2 | 3, e: Event) => {
-  const img = e.target as HTMLImageElement;
-  if (img.dataset.fallbackTried === "true") {
-    img.style.display = "none";
-    return;
-  }
-  img.dataset.fallbackTried = "true";
-  resolvedUrls.value[slot] = legacyImageUrl(slot);
+  const key = `Image${slot}Url` as "Image1Url" | "Image2Url" | "Image3Url";
+  const relPath = formData.value[key];
+  if (!relPath) return "";
+  return `${getBaseUrl()}${relPath}`;
 };
 
 const triggerFileSelect = (slot: 1 | 2 | 3) => {
@@ -316,7 +302,6 @@ const openPreview = (slot: 1 | 2 | 3) => {
 const showResetDialog = ref(false);
 const confirmResetImages = async () => {
   if (!formData.value.Nomor) {
-    // Belum tersimpan — cukup bersihkan state lokal
     pendingFiles.value = { 1: null, 2: null, 3: null };
     previewUrls.value = { 1: "", 2: "", 3: "" };
     showResetDialog.value = false;
@@ -324,9 +309,9 @@ const confirmResetImages = async () => {
   }
   try {
     await complainCustomerFormService.resetImages(formData.value.Nomor);
-    formData.value.Image1Name = "";
-    formData.value.Image2Name = "";
-    formData.value.Image3Name = "";
+    formData.value.Image1Url = "";
+    formData.value.Image2Url = "";
+    formData.value.Image3Url = "";
     pendingFiles.value = { 1: null, 2: null, 3: null };
     previewUrls.value = { 1: "", 2: "", 3: "" };
     toast.success("Reset gambar berhasil.");
@@ -588,7 +573,6 @@ onMounted(async () => {
             display: block;
             margin: 0 auto;
           "
-          @error="onImgError(previewSlot, $event)"
         />
       </div>
     </div>
