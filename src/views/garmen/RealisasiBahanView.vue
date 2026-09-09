@@ -61,6 +61,7 @@ const headers = [
   { title: "Gudang", key: "Gudang", minWidth: "150px" },
   { title: "Gdg Produksi", key: "GdgProduksi", width: "100px" },
   { title: "Keterangan", key: "Keterangan", minWidth: "150px" },
+  { title: "Substitusi", key: "AlasanBeda", width: "110px" },
   { title: "SPK", key: "SPK", width: "130px" },
   { title: "Nama SPK", key: "NamaSPK", minWidth: "220px" },
   { title: "Jumlah", key: "Jumlah", width: "80px", align: "end" },
@@ -309,7 +310,15 @@ const handleRowProps = (data: any) => {
           >Pasif</span
         >
         <span class="filter-label" style="color: #888"
-          >= Stok belum terpotong (beda bahan)</span
+          >= Stok belum terpotong (data lama, sebelum bahan beda otomatis
+          langsung aktif)</span
+        >
+        <span class="filter-label ml-2" style="color: #888">|</span>
+        <span class="badge-substitusi" style="font-size: 10px; padding: 2px 6px"
+          >Ada Substitusi</span
+        >
+        <span class="filter-label" style="color: #888"
+          >= bahan diganti otomatis, hover untuk lihat alasan</span
         >
       </div>
     </template>
@@ -373,6 +382,16 @@ const handleRowProps = (data: any) => {
         Pasif
       </span>
       <span v-else class="badge-aktif-ok"> Aktif </span>
+    </template>
+    <template #item.AlasanBeda="{ item }">
+      <span
+        v-if="item.AlasanBeda"
+        class="badge-substitusi"
+        :title="item.AlasanBeda"
+      >
+        Ada Substitusi
+      </span>
+      <span v-else class="text-grey" style="font-size: 10px">-</span>
     </template>
 
     <!-- Expand Detail Row -->
@@ -524,6 +543,16 @@ const handleRowProps = (data: any) => {
   font-weight: 700;
   padding: 2px 8px;
   border-radius: 3px;
+}
+.badge-substitusi {
+  background: #fff3e0;
+  color: #e65100;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 3px;
+  cursor: help;
+  border: 1px solid #ffcc80;
 }
 .badge-aktif-ok {
   background: #e0e0e0;

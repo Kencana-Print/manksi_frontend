@@ -35,6 +35,7 @@ interface RealisasiFormData {
   pin_acc?: string;
   pin_dipakai?: string;
   promin_aktif?: string;
+  alasanBedaBahan: string;
 }
 
 const route = useRoute();
@@ -75,6 +76,7 @@ const initialData: RealisasiFormData = {
   barcodes: [] as any[],
   details: [] as any[],
   promin_aktif: "Y",
+  alasanBedaBahan: "",
 };
 
 const {
@@ -165,6 +167,7 @@ const {
       pin_acc: h.pin_acc,
       pin_dipakai: h.pin_dipakai,
       promin_aktif: h.promin_aktif ?? "Y",
+      alasanBedaBahan: h.promin_alasan_beda || "",
     };
   },
   submitApi: async (data: RealisasiFormData): Promise<any> => {
@@ -173,23 +176,19 @@ const {
   },
   onSuccess: (res: any) => {
     savedNomor.value = res.data?.data?.nomor || formData.value.nomor;
-    const perluApproval = res.data?.data?.perluApproval;
-    if (perluApproval) {
-      toast.warning(
-        "Realisasi tersimpan sebagai PASIF — ada bahan di luar permintaan. Bahan belum bisa keluar sampai di-approve (Otorisasi Realisasi Beda Bahan).",
-        { timeout: 8000 },
+    const adaBedaBahan = res.data?.data?.adaBedaBahan;
+    if (adaBedaBahan) {
+      toast.success(
+        "Realisasi tersimpan. Permintaan Bahan otomatis ditambahkan bahan pengganti & di-close.",
+        { timeout: 6000 },
       );
     }
     showPrintDialog.value = true;
   },
 });
 
-const isReadOnlyPasif = computed(
-  () => isEditMode.value && formData.value.promin_aktif === "N",
-);
-
 // Info live (belum simpan) kalau kondisi saat ini akan bikin realisasi PASIF
-const willBePasif = computed(() =>
+const adaSubstitusi = computed(() =>
   formData.value.details.some((d: any) => d._extra),
 );
 
@@ -486,45 +485,28 @@ const recalculateNetto = () => {
 };
 
 const validateBeforeSave = () => {
-  if (isReadOnlyPasif.value) {
-    return toast.error(
-      "Realisasi ini PASIF dan menunggu approval. Tidak bisa diubah sampai ada keputusan Otorisasi Realisasi Beda Bahan.",
-    );
-  }
+  // (hapus blok isReadOnlyPasif)
 
-  // 1. Validasi Permintaan
   if (!formData.value.noMinta) {
     return toast.warning("No. Permintaan wajib diisi.");
   }
-
-  // 2. Validasi SPK
   if (!formData.value.spk) {
     return toast.warning("Nomor SPK harus di isi.");
   }
-
-  // 3. Validasi Gudang Asal
   if (!formData.value.gudangAsal) {
     return toast.warning("Gudang asal tidak boleh kosong.");
   }
-
-  // 4. Validasi Gudang Produksi
   if (!formData.value.gudangProduksi) {
     return toast.warning("Gudang Produksi tidak boleh kosong.");
   }
-
-  // 5. Validasi Gudang Sama (Delphi: if edtGudang.Text = edtGudang2.Text)
   if (formData.value.gudangAsal === formData.value.gudangProduksi) {
     return toast.warning(
       "Gudang Produksi tidak boleh sama dengan gudang asal.",
     );
   }
-
-  // 6. Validasi Tabel Kosong
   if (!formData.value.details || formData.value.details.length === 0) {
     return toast.warning("Detail harus diisi.");
   }
-
-  // 7. Validasi Netto 0 (Delphi: if tq=0 then showMessage('Netto masih kosong semua'))
   const totalNetto = formData.value.details.reduce(
     (sum, d) => sum + (Number(d.netto) || 0),
     0,
@@ -535,6 +517,11 @@ const validateBeforeSave = () => {
     );
   }
 
+  // ⬅ BARU: alasan wajib kalau ada substitusi
+  if (adaSubstitusi.value && !formData.value.alasanBedaBahan?.trim()) {
+    return toast.warning("Alasan bahan berbeda wajib diisi.");
+  }
+
   const hasMismatch = formData.value.barcodes.some((b: any) => b.mismatchMkb);
   if (hasMismatch) {
     toast.warning(
@@ -543,7 +530,6 @@ const validateBeforeSave = () => {
     );
   }
 
-  // Jika semua lolos, tampilkan dialog konfirmasi bawaan (Yakin ingin simpan?)
   showSaveDialog.value = true;
 };
 
@@ -587,26 +573,27 @@ onMounted(async () => {
   >
     <template #left-column>
       <v-alert
-        v-if="isReadOnlyPasif"
-        type="error"
-        density="compact"
-        variant="tonal"
-        class="mb-3"
-      >
-        <strong>PASIF — Menunggu Approval.</strong> Ada bahan di luar
-        permintaan. Form terkunci sampai ada keputusan di menu Approval
-        Realisasi Beda Bahan.
-      </v-alert>
-      <v-alert
-        v-else-if="willBePasif"
+        v-if="adaSubstitusi"
         type="warning"
         density="compact"
         variant="tonal"
         class="mb-3"
       >
-        Akan tersimpan sebagai <strong>PASIF</strong> — ada bahan di luar
-        permintaan. Bahan tidak akan keluar sampai di-approve.
+        Ada bahan hasil scan yang berbeda dari permintaan — akan otomatis
+        ditambahkan ke Permintaan Bahan & MKB terkait, dan Permintaan Bahan ini
+        akan di-CLOSE. Isi alasan di bawah.
       </v-alert>
+      <v-textarea
+        v-if="adaSubstitusi"
+        v-model="formData.alasanBedaBahan"
+        label="Alasan Bahan Berbeda"
+        density="compact"
+        variant="outlined"
+        rows="2"
+        hide-details
+        class="mb-3"
+        bg-color="yellow-lighten-4"
+      />
 
       <div class="desktop-form-section header-section">
         <div class="text-caption font-weight-bold mb-3 text-primary">
@@ -631,7 +618,6 @@ onMounted(async () => {
           variant="outlined"
           hide-details
           class="mb-2"
-          :disabled="isReadOnlyPasif"
         />
         <div class="f-row mb-2">
           <label class="f-lbl">No. Permintaan</label>
@@ -647,15 +633,15 @@ onMounted(async () => {
                 text-transform: uppercase;
               "
               placeholder="F1 / nomor + Enter"
-              :readonly="isEditMode || isReadOnlyPasif"
-              :class="{ 'f-ro': isEditMode || isReadOnlyPasif }"
+              :readonly="isEditMode"
+              :class="{ 'f-ro': isEditMode }"
               @keydown="onMintaKeydown"
               @keydown.enter.prevent="onMintaEnter"
             />
             <button
               type="button"
               class="btn-lkp"
-              :disabled="isEditMode || isReadOnlyPasif"
+              :disabled="isEditMode"
               title="Cari Permintaan (F1)"
               @click="showMintaModal = true"
             >
@@ -671,7 +657,6 @@ onMounted(async () => {
           rows="2"
           hide-details
           class="mb-4"
-          :disabled="isReadOnlyPasif"
         />
 
         <div
@@ -759,7 +744,6 @@ onMounted(async () => {
               inline
               hide-details
               density="compact"
-              :disabled="isReadOnlyPasif"
             >
               <v-radio label="Utama" :value="1" color="primary"></v-radio>
               <v-radio label="Susulan" :value="0" color="primary"></v-radio>
@@ -779,7 +763,6 @@ onMounted(async () => {
               bg-color="yellow-lighten-4"
               class="font-weight-bold"
               v-select-on-focus
-              :disabled="isReadOnlyPasif"
             />
           </div>
         </div>
@@ -831,7 +814,6 @@ onMounted(async () => {
                     :ref="(el) => setBarcodeInputRef(el, index)"
                     class="cell-input fw-bold text-primary"
                     placeholder="Scan di sini..."
-                    :readonly="isReadOnlyPasif"
                     @change="onBarcodeEntered(item, index)"
                   />
                 </td>
@@ -853,7 +835,6 @@ onMounted(async () => {
                     step="any"
                     v-model.number="item.jumlah"
                     class="cell-input tr fw-bold text-primary"
-                    :readonly="isReadOnlyPasif"
                     @input="recalculateNetto()"
                     v-select-on-focus
                   />
@@ -863,7 +844,6 @@ onMounted(async () => {
                     size="x-small"
                     variant="text"
                     color="error"
-                    :disabled="isReadOnlyPasif"
                     @click="removeBarcodeRow(index)"
                   >
                     <IconTrash :size="14" :stroke-width="1.7" />
@@ -874,12 +854,7 @@ onMounted(async () => {
           </table>
         </div>
         <div class="pa-2 bg-grey-lighten-4 text-right">
-          <v-btn
-            size="x-small"
-            color="primary"
-            :disabled="isReadOnlyPasif"
-            @click="addBarcodeRow"
-          >
+          <v-btn size="x-small" color="primary" @click="addBarcodeRow">
             <template #prepend
               ><IconPlus :size="13" :stroke-width="2"
             /></template>
@@ -954,7 +929,6 @@ onMounted(async () => {
                     step="any"
                     v-model.number="dtl.netto"
                     class="cell-input tr fw-bold text-primary"
-                    :readonly="isReadOnlyPasif"
                     v-select-on-focus
                   />
                 </td>
@@ -964,7 +938,6 @@ onMounted(async () => {
                     step="any"
                     v-model.number="dtl.gross"
                     class="cell-input tr fw-bold"
-                    :readonly="isReadOnlyPasif"
                     v-select-on-focus
                   />
                 </td>
@@ -974,7 +947,6 @@ onMounted(async () => {
                     type="date"
                     v-model="dtl.relaxtgl"
                     class="cell-input"
-                    :readonly="isReadOnlyPasif"
                   />
                 </td>
                 <td>
@@ -982,7 +954,6 @@ onMounted(async () => {
                     v-model="dtl.relaxpic"
                     class="cell-input"
                     placeholder="PIC..."
-                    :readonly="isReadOnlyPasif"
                   />
                 </td>
                 <td>
@@ -990,7 +961,6 @@ onMounted(async () => {
                     v-model="dtl.ket"
                     class="cell-input"
                     placeholder="Opsional..."
-                    :readonly="isReadOnlyPasif"
                   />
                 </td>
               </tr>
