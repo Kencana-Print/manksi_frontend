@@ -6,4 +6,10 @@ export const complainCustomerService = {
 
   deleteComplain: (nomor: string) =>
     api.delete(`/master/complain-customer/${encodeURIComponent(nomor)}`),
+
+  exportExcel: (params: { startDate: string; endDate: string }) =>
+    api.get("/master/complain-customer/export", {
+      params,
+      responseType: "blob",
+    }),
 };

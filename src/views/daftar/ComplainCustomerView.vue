@@ -93,46 +93,20 @@ const goDelete = async (item: any) => {
 const isExporting = ref(false);
 
 const onExport = async () => {
-  if (!items.value?.length) {
-    toast.warning("Tidak ada data untuk diexport.");
-    return;
-  }
   isExporting.value = true;
   try {
-    const columns: ExcelColumn[] = [
-      { header: "Nomor", key: "Nomor", width: 16 },
-      {
-        header: "Tgl Complain",
-        key: "TglComplain",
-        width: 12,
-        align: "center",
-      },
-      { header: "No. SPK/Memo", key: "NoSpkMemo", width: 18 },
-      { header: "Customer", key: "Customer", width: 28 },
-      { header: "Divisi", key: "Divisi", width: 12 },
-      { header: "Tipe", key: "Tipe", width: 12 },
-      { header: "Nama SPK", key: "NamaSpk", width: 28 },
-      { header: "Jenis Complain", key: "JenisComplain", width: 22 },
-      { header: "Uraian", key: "Uraian", width: 28 },
-      { header: "Action/Solution", key: "ActionSolution", width: 28 },
-      { header: "Ket Div1", key: "KetDiv1", width: 24 },
-      { header: "Ket Div2", key: "KetDiv2", width: 24 },
-      { header: "Ket Div3", key: "KetDiv3", width: 24 },
-    ];
-
-    const rows = items.value.map((r: any) => ({
-      ...r,
-      TglComplain: formatTanggal(r.TglComplain),
-    }));
-
-    await exportExcelSingle(
-      `Complain_Customer_${filterState.value.startDate}_sd_${filterState.value.endDate}.xlsx`,
-      "Complain Customer",
-      columns,
-      rows,
-      `Daftar Complain Customer | Periode: ${formatTanggal(filterState.value.startDate)} s.d ${formatTanggal(filterState.value.endDate)}`,
-    );
-
+    const res = await complainCustomerService.exportExcel(filterState.value);
+    const blob = new Blob([res.data], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `Complain_Customer_${filterState.value.startDate}_sd_${filterState.value.endDate}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
     toast.success("Berhasil export data.");
   } catch (error) {
     console.error(error);
