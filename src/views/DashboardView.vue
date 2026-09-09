@@ -32,6 +32,7 @@ import {
   IconBoxSeam,
   IconFileInvoice,
 } from "@tabler/icons-vue";
+import AiChatWidget from "@/components/AiChatWidget.vue";
 
 interface OverdueItem {
   Invoice: string;
@@ -293,6 +294,7 @@ interface BufferKaosanItem {
 }
 
 const authStore = useAuthStore();
+const canAccessAiChat = computed(() => authStore.user?.cabang === "HO-");
 const router = useRouter();
 const isSpkDialogVisible = ref(false);
 const activeTab = ref("overview");
@@ -8793,6 +8795,8 @@ const sisaClass = (item: any) => {
       </v-card>
     </v-dialog>
   </v-container>
+
+  <AiChatWidget v-if="canAccessAiChat" />
 </template>
 
 <style scoped>
