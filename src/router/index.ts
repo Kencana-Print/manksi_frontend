@@ -3918,6 +3918,18 @@ const router = createRouter({
     },
 
     {
+      path: "/laporan/marketing/so-belum-komitmen",
+      name: "LapSoBelumKomitmen",
+      component: () =>
+        import("@/views/laporan/marketing/SoBelumKomitmenView.vue"),
+      meta: {
+        title: "SO Belum Komitmen Kirim",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "571",
+      },
+    },
+    {
       path: "/laporan/marketing/penawaran-vs-map",
       name: "LapPenawaranVsMap",
       component: () =>

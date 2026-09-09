@@ -59,6 +59,9 @@ interface DetailRow {
   SoNomor: string;
   NomorPraOrder: string;
   MapNomor: string;
+  MhNomor: string;
+  PenNomor: string;
+  PenId: string;
   Sumber: string;
   Nama: string;
   Tanggal: string;
@@ -141,7 +144,12 @@ const onManualBlur = () => {
 };
 
 const isManualRow = (d: DetailRow) =>
-  !d.SoNomor && !d.NomorPraOrder && !d.MapNomor && d.Sumber === "MANUAL";
+  !d.SoNomor &&
+  !d.NomorPraOrder &&
+  !d.MapNomor &&
+  !d.MhNomor &&
+  !d.PenNomor &&
+  d.Sumber === "MANUAL";
 
 // ── Role permissions ────────────────────────────────────────────
 const isAdmin = computed(() => authStore.user?.kode?.toUpperCase() === "ADMIN");
@@ -149,9 +157,7 @@ const canEditMarketing = computed(
   () => isAdmin.value || authStore.user?.bagian?.toUpperCase() === "MARKETING",
 );
 const canEditKesepakatan = computed(
-  () =>
-    isAdmin.value ||
-    authStore.user?.bagian?.toUpperCase() !== "MARKETING",
+  () => isAdmin.value || authStore.user?.bagian?.toUpperCase() !== "MARKETING",
 );
 
 // ── Cabang → Divisi mapping tetap ───────────────────────────────
@@ -273,6 +279,9 @@ const mapDetailRow = (r: any): DetailRow => ({
   SoNomor: r.Nomor || "",
   NomorPraOrder: r.NomorPraOrder || "",
   MapNomor: r.NomorMap || "",
+  MhNomor: r.NomorMh || "",
+  PenNomor: r.NomorPen || "",
+  PenId: r.PenId || "",
   Sumber: r.Sumber || (r.Nomor ? "SO" : r.NomorMap ? "MAP" : "PRA ORDER"),
   Nama: r.Nama,
   Tanggal: r.Tanggal,
@@ -383,14 +392,22 @@ const isTarikPraOrderLoading = ref(false);
 const isTarikMapLoading = ref(false);
 const isManualLoading = ref(false);
 const manualSoNomor = ref("");
+const showPenawaranPicker = ref(false);
+const penawaranPickerNomor = ref("");
+const penawaranPickerItems = ref<any[]>([]);
+const penawaranPickerDivisi = ref("");
+const isPenawaranPickerLoading = ref(false);
 
 const pushRowFromServer = (pjwdId: number, rowInput: any) => {
-  if (detail.value.some((d) => d.PjwdId === pjwdId)) return; // ⬅ guard — cegah duplikat siapa pun pemanggilnya
+  if (detail.value.some((d) => d.PjwdId === pjwdId)) return;
   detail.value.push({
     PjwdId: pjwdId,
     SoNomor: rowInput.SoNomor || "",
     NomorPraOrder: rowInput.NomorPraOrder || "",
     MapNomor: rowInput.MapNomor || "",
+    MhNomor: rowInput.MhNomor || "",
+    PenNomor: rowInput.PenNomor || "",
+    PenId: rowInput.PenId || "",
     Sumber: rowInput.Sumber,
     Nama: rowInput.Nama,
     Tanggal: rowInput.Tanggal,
@@ -407,9 +424,13 @@ const pushRowFromServer = (pjwdId: number, rowInput: any) => {
   });
 };
 
-const isDuplicate = (sumber: string, nomor: string) => {
+const isDuplicate = (sumber: string, nomor: string, penId?: string) => {
   if (sumber === "SO") return detail.value.some((d) => d.SoNomor === nomor);
   if (sumber === "MAP") return detail.value.some((d) => d.MapNomor === nomor);
+  if (sumber === "PERMINTAAN HARGA")
+    return detail.value.some((d) => d.MhNomor === nomor);
+  if (sumber === "PENAWARAN")
+    return detail.value.some((d) => d.PenNomor === nomor && d.PenId === penId);
   return detail.value.some((d) => d.NomorPraOrder === nomor);
 };
 
@@ -564,30 +585,94 @@ const tarikMap = async () => {
   }
 };
 
+const detectSumberFromNomor = (
+  nomor: string,
+): "MH" | "MAP" | "PENAWARAN" | "SO" => {
+  const upper = nomor.toUpperCase();
+  if (upper.startsWith("MH.")) return "MH";
+  if (upper.startsWith("MAP-") || upper.startsWith("MAP/")) return "MAP";
+  // Format Penawaran: NNNNN/KODE/TAHUN, misal 00023/KP/2026 — ada 2 slash
+  if ((nomor.match(/\//g) || []).length >= 2) return "PENAWARAN";
+  return "SO";
+};
+
 const tambahManual = async () => {
   const nomor = manualSoNomor.value.trim();
   if (!nomor) return;
   if (!header.pjw_cab) return toast.warning("Pilih Cabang terlebih dahulu.");
 
-  const isMapNomor = nomor.toUpperCase().startsWith("MAP-");
-  if (isDuplicate(isMapNomor ? "MAP" : "SO", nomor)) {
-    toast.warning(`${isMapNomor ? "MAP" : "SO"} ini sudah ada di daftar.`);
+  const jenis = detectSumberFromNomor(nomor);
+
+  // ── Penawaran: buka picker baris detail dulu, bukan langsung add ──
+  if (jenis === "PENAWARAN") {
+    isManualLoading.value = true;
+    try {
+      const res = await penjadwalanPpicService.getPenawaranDetailList(nomor);
+      const d = res.data.data;
+      if (!d || !d.items?.length) {
+        toast.warning(
+          "Penawaran ini tidak punya baris detail yang bisa dipilih.",
+        );
+        return;
+      }
+      penawaranPickerNomor.value = nomor;
+      penawaranPickerDivisi.value = String(d.divisi || "");
+      penawaranPickerItems.value = d.items;
+      showPenawaranPicker.value = true;
+    } catch (e: any) {
+      toast.error(e.response?.data?.message || "Penawaran tidak ditemukan.");
+    } finally {
+      isManualLoading.value = false;
+    }
+    return;
+  }
+
+  if (isDuplicate(jenis === "MH" ? "PERMINTAAN HARGA" : jenis, nomor)) {
+    toast.warning(`${jenis} ini sudah ada di daftar.`);
     return;
   }
 
   isManualLoading.value = true;
   try {
     let rowInput: any;
-    if (isMapNomor) {
+
+    if (jenis === "MH") {
+      const res = await penjadwalanPpicService.getMhInfo(
+        nomor,
+        header.pjw_divisi,
+        header.pjw_nomor,
+      );
+      const k = res.data.data;
+      rowInput = {
+        SoNomor: "",
+        NomorPraOrder: "",
+        MapNomor: "",
+        MhNomor: k.Nomor,
+        PenNomor: "",
+        PenId: "",
+        Sumber: "PERMINTAAN HARGA",
+        Nama: k.Nama,
+        Tanggal: k.Tanggal,
+        Pesan: k.Pesan,
+        Kirim: k.Kirim,
+        Kurang: k.Kurang,
+        Rencana: Number(k.Kurang) || 0,
+        PermintaanKirim: "",
+      };
+    } else if (jenis === "MAP") {
       const res = await penjadwalanPpicService.getMapInfo(
         nomor,
         header.pjw_divisi,
+        header.pjw_nomor,
       );
       const k = res.data.data;
       rowInput = {
         SoNomor: "",
         NomorPraOrder: "",
         MapNomor: k.Nomor,
+        MhNomor: "",
+        PenNomor: "",
+        PenId: "",
         Sumber: "MAP",
         Nama: k.Nama,
         Tanggal: k.Tanggal,
@@ -601,12 +686,16 @@ const tambahManual = async () => {
       const res = await penjadwalanPpicService.getSoInfo(
         nomor,
         header.pjw_divisi,
+        header.pjw_nomor,
       );
       const k = res.data.data;
       rowInput = {
         SoNomor: k.Nomor,
         NomorPraOrder: "",
         MapNomor: "",
+        MhNomor: "",
+        PenNomor: "",
+        PenId: "",
         Sumber: "SO",
         Nama: k.Nama,
         Tanggal: k.Tanggal,
@@ -617,6 +706,7 @@ const tambahManual = async () => {
         PermintaanKirim: k.DatelineAsli || "",
       };
     }
+
     const saveRes = await penjadwalanPpicService.addDetailRow(
       header.pjw_nomor,
       rowInput,
@@ -624,13 +714,69 @@ const tambahManual = async () => {
     pushRowFromServer(saveRes.data.data.pjwd_id, rowInput);
     showQtyWarning(saveRes.data.data.warning);
     manualSoNomor.value = "";
-    toast.success(
-      `${isMapNomor ? "MAP" : "SO"} ${rowInput.SoNomor || rowInput.MapNomor} ditambahkan.`,
+    toast.success(`${jenis} ${nomor} ditambahkan.`);
+  } catch (e: any) {
+    toast.error(e.response?.data?.message || `${jenis} tidak ditemukan.`);
+  } finally {
+    isManualLoading.value = false;
+  }
+};
+
+const pilihBarisPenawaran = async (item: any) => {
+  if (item.Status === "BATAL") {
+    toast.warning("Baris ini sudah BATAL, tidak bisa ditambahkan.");
+    return;
+  }
+  if (item.SudahJadiSo) {
+    toast.warning(
+      `Baris ini sudah jadi SO (${item.SudahJadiSo}) — tambahkan lewat "Tarik SO Periode Ini" saja.`,
     );
+    return;
+  }
+  if (
+    isDuplicate("PENAWARAN", penawaranPickerNomor.value, String(item.PendId))
+  ) {
+    toast.warning("Baris ini sudah ada di daftar.");
+    return;
+  }
+
+  isManualLoading.value = true;
+  try {
+    const res = await penjadwalanPpicService.getPenawaranItemInfo(
+      penawaranPickerNomor.value,
+      item.PendId,
+      header.pjw_divisi,
+      header.pjw_nomor,
+    );
+    const k = res.data.data;
+    const rowInput = {
+      SoNomor: "",
+      NomorPraOrder: "",
+      MapNomor: "",
+      MhNomor: "",
+      PenNomor: k.PenNomor,
+      PenId: String(k.PendId),
+      Sumber: "PENAWARAN",
+      Nama: k.Nama,
+      Tanggal: k.Tanggal,
+      Pesan: k.Pesan,
+      Kirim: k.Kirim,
+      Kurang: k.Kurang,
+      Rencana: Number(k.Kurang) || 0,
+      PermintaanKirim: "",
+    };
+    const saveRes = await penjadwalanPpicService.addDetailRow(
+      header.pjw_nomor,
+      rowInput,
+    );
+    pushRowFromServer(saveRes.data.data.pjwd_id, rowInput);
+    showQtyWarning(saveRes.data.data.warning);
+    toast.success(`Penawaran ${k.PenNomor} (baris ${k.PendId}) ditambahkan.`);
+    showPenawaranPicker.value = false;
+    manualSoNomor.value = "";
   } catch (e: any) {
     toast.error(
-      e.response?.data?.message ||
-        `${isMapNomor ? "MAP" : "SO"} tidak ditemukan.`,
+      e.response?.data?.message || "Gagal menambahkan baris Penawaran.",
     );
   } finally {
     isManualLoading.value = false;
@@ -1160,6 +1306,8 @@ const rowClass = (d: DetailRow) => {
                     'is-map': d.Sumber === 'MAP',
                     'is-so': d.Sumber === 'SO',
                     'is-manual': d.Sumber === 'MANUAL',
+                    'is-mh': d.Sumber === 'PERMINTAAN HARGA',
+                    'is-pen': d.Sumber === 'PENAWARAN',
                   }"
                   >{{ d.Sumber }}</span
                 >
@@ -1427,6 +1575,71 @@ const rowClass = (d: DetailRow) => {
           @click="confirmMove"
           >Ya, Pindahkan</v-btn
         >
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
+
+  <v-dialog v-model="showPenawaranPicker" max-width="640" scrollable>
+    <v-card class="rounded-lg">
+      <v-card-title class="bg-purple-darken-2 text-white pa-3 text-subtitle-1">
+        Pilih Baris — Penawaran {{ penawaranPickerNomor }}
+      </v-card-title>
+      <v-card-text class="pa-0" style="max-height: 420px">
+        <table class="pen-picker-table">
+          <thead>
+            <tr>
+              <th>Nama Barang</th>
+              <th class="tc">Ukuran</th>
+              <th class="tr">Qty</th>
+              <th class="tc">Status</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="item in penawaranPickerItems"
+              :key="item.PendId"
+              :class="{
+                'row-disabled': item.Status === 'BATAL' || item.SudahJadiSo,
+              }"
+            >
+              <td>{{ item.Nama }}</td>
+              <td class="tc">{{ item.Ukuran }}</td>
+              <td class="tr">{{ fmt(item.Qty) }}</td>
+              <td class="tc">
+                <span v-if="item.SudahJadiSo" class="pen-status-badge done">
+                  Sudah SO: {{ item.SudahJadiSo }}
+                </span>
+                <span
+                  v-else-if="item.Status === 'BATAL'"
+                  class="pen-status-badge batal"
+                >
+                  Batal
+                </span>
+                <span v-else class="pen-status-badge open">Open</span>
+              </td>
+              <td>
+                <v-btn
+                  size="x-small"
+                  color="purple-darken-2"
+                  variant="flat"
+                  :disabled="
+                    item.Status === 'BATAL' ||
+                    !!item.SudahJadiSo ||
+                    isManualLoading
+                  "
+                  @click="pilihBarisPenawaran(item)"
+                >
+                  Pilih
+                </v-btn>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </v-card-text>
+      <v-card-actions class="pa-3 border-t bg-grey-lighten-4">
+        <v-spacer />
+        <v-btn variant="text" @click="showPenawaranPicker = false">Batal</v-btn>
       </v-card-actions>
     </v-card>
   </v-dialog>
@@ -1837,5 +2050,51 @@ const rowClass = (d: DetailRow) => {
 }
 .pjw-manual-wrap {
   position: relative;
+}
+.sumber-badge.is-mh {
+  background: #00838f;
+}
+.sumber-badge.is-pen {
+  background: #ad1457;
+}
+
+.pen-picker-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+.pen-picker-table thead th {
+  background: #f5f5f5;
+  padding: 6px 8px;
+  text-align: left;
+  border-bottom: 1px solid #e0e0e0;
+  position: sticky;
+  top: 0;
+}
+.pen-picker-table tbody td {
+  padding: 6px 8px;
+  border-bottom: 1px solid #eee;
+}
+.pen-picker-table .row-disabled {
+  opacity: 0.55;
+}
+.pen-status-badge {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 8px;
+  white-space: nowrap;
+}
+.pen-status-badge.open {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+.pen-status-badge.done {
+  background: #e3f2fd;
+  color: #1565c0;
+}
+.pen-status-badge.batal {
+  background: #ffebee;
+  color: #c62828;
 }
 </style>

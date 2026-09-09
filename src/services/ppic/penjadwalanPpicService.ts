@@ -51,15 +51,36 @@ export const penjadwalanPpicService = {
       params: { startDate, endDate, divisi, excludeNomor },
     });
   },
-  getSoInfo(soNomor: string, divisi = "") {
+  getSoInfo(soNomor: string, divisi = "", excludeNomor = "") {
     return api.get(`/ppic/penjadwalan-form/so-info/${soNomor}`, {
-      params: { divisi },
+      params: { divisi, excludeNomor },
     });
   },
-  getMapInfo(mapNomor: string, divisi = "") {
+  getMapInfo(mapNomor: string, divisi = "", excludeNomor = "") {
     return api.get(`/ppic/penjadwalan-form/map-info/${mapNomor}`, {
-      params: { divisi },
+      params: { divisi, excludeNomor },
     });
+  },
+  getMhInfo(mhNomor: string, divisi = "", excludeNomor = "") {
+    return api.get(`/ppic/penjadwalan-form/mh-info/${mhNomor}`, {
+      params: { divisi, excludeNomor },
+    });
+  },
+  getPenawaranDetailList(penNomor: string) {
+    return api.get(
+      `/ppic/penjadwalan-form/penawaran-detail/${encodeURIComponent(penNomor)}`,
+    );
+  },
+  getPenawaranItemInfo(
+    penNomor: string,
+    pendId: string,
+    divisi = "",
+    excludeNomor = "",
+  ) {
+    return api.get(
+      `/ppic/penjadwalan-form/penawaran-item/${encodeURIComponent(penNomor)}/${encodeURIComponent(pendId)}`,
+      { params: { divisi, excludeNomor } },
+    );
   },
   getFormDetail(nomor: string) {
     return api.get(`/ppic/penjadwalan-form/${nomor}`);

@@ -1266,6 +1266,12 @@ export const createMenuItems = (): NavItem[] => {
           menuId: 966,
           subItems: [
             {
+              title: "SO Belum Komitmen Kirim",
+              to: "/laporan/marketing/so-belum-komitmen",
+              icon: IconClipboardX,
+              menuId: 571,
+            },
+            {
               title: "Penawaran vs MAP",
               to: "/laporan/marketing/penawaran-vs-map",
               icon: IconReportAnalytics,
