@@ -315,7 +315,6 @@ watch(activeTab, async (tab) => {
     setupMapSpkObserver();
     setupMapKirimObserver();
     setupPvrObserver();
-    setupPipelineMenggantungObserver();
     setupPtmDetailObserver();
     setupMtsDetailObserver();
   }
@@ -444,6 +443,51 @@ interface RealisasiBulananDivisi {
   bulanan: RealisasiBulananMonth[];
 }
 const realisasiBulananData = ref<RealisasiBulananDivisi[]>([]);
+interface StatusKirimMapBucket {
+  Bulan: string;
+  JumlahMAP: number;
+  real: number[]; // [0-7, 8-14, 15-30, >30]
+  belum: number[];
+}
+interface StatusKirimMapDivisi {
+  divisi: string;
+  bulanan: StatusKirimMapBucket[];
+}
+const statusKirimMapData = ref<StatusKirimMapDivisi[]>([]);
+interface SlowDeadStockItem {
+  Kode: string;
+  Nama: string;
+  Satuan: string;
+  Stok: number;
+  UmurHari: number;
+  Status: string;
+}
+interface SlowDeadStockJenis {
+  jenisKode: string;
+  jenisNama: string;
+  totalStokList: { satuan: string; stok: number }[];
+  jmlSlowmoving: number;
+  jmlDeadStock: number;
+  items: SlowDeadStockItem[];
+}
+const slowDeadStockData = ref<SlowDeadStockJenis[]>([]);
+const SLOW_DEAD_PAGE_SIZE = 15;
+const slowDeadStockPage = ref(1);
+const slowDeadStockTotalPages = computed(() =>
+  Math.max(1, Math.ceil(slowDeadStockData.value.length / SLOW_DEAD_PAGE_SIZE)),
+);
+const slowDeadStockPaged = computed(() => {
+  const start = (slowDeadStockPage.value - 1) * SLOW_DEAD_PAGE_SIZE;
+  return slowDeadStockData.value.slice(start, start + SLOW_DEAD_PAGE_SIZE);
+});
+interface KonversiBabaranItem {
+  kategori: string;
+  label: string;
+  totalPcs: number;
+  totalKg: number;
+  pcsPerKg: number;
+}
+const konversiBabaranData = ref<KonversiBabaranItem[]>([]);
 
 const poBpbSummary = ref({ TotalPO: 0, Open: 0, OnProses: 0, Close: 0 });
 const isLoadingDashboard = ref(false);
@@ -1262,13 +1306,11 @@ const setupRpDetailObserver = () => {
   rpDetailScrollObserver.observe(rpDetailSentinelEl.value);
 };
 
-// ── Filter global MAP ──
-const mapFilter = ref({
-  startDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1)
-    .toISOString()
-    .substring(0, 10),
-  endDate: new Date().toISOString().substring(0, 10),
-});
+// ── Range tetap 90 hari untuk panel MAP/Proyeksi (filter periode dihapus) ──
+const mapRangeEnd = new Date().toISOString().substring(0, 10);
+const mapRangeStart = new Date(Date.now() - 89 * 86400000)
+  .toISOString()
+  .substring(0, 10);
 
 // ── State MAP vs SPK ──
 interface MapVsSpkMetric {
@@ -1350,8 +1392,8 @@ const loadMoreMapSpk = async () => {
     const res = await dashboardService.getMapBelumSpk(
       MAP_SPK_PAGE_SIZE,
       mapSpkOffset.value,
-      mapFilter.value.startDate,
-      mapFilter.value.endDate,
+      mapRangeStart,
+      mapRangeEnd,
     );
     const rows: MapBelumSpkItem[] = res.data.data;
     mapSpkList.value.push(...rows);
@@ -1391,8 +1433,8 @@ const loadMoreMapKirim = async () => {
     const res = await dashboardService.getMapBelumKirim(
       MAP_KIRIM_PAGE_SIZE,
       mapKirimOffset.value,
-      mapFilter.value.startDate,
-      mapFilter.value.endDate,
+      mapRangeStart,
+      mapRangeEnd,
     );
     const rows: MapBelumKirimItem[] = res.data.data;
     mapKirimList.value.push(...rows);
@@ -1540,8 +1582,8 @@ const loadMorePvr = async () => {
   isLoadingMorePvr.value = true;
   try {
     const res = await dashboardService.getProyeksiVsRealisasiSummary(
-      mapFilter.value.startDate,
-      mapFilter.value.endDate,
+      mapRangeStart,
+      mapRangeEnd,
       PVR_PAGE_SIZE,
       pvrPage.value,
     );
@@ -1569,64 +1611,6 @@ const setupPvrObserver = () => {
     { threshold: 0.1 },
   );
   pvrScrollObserver.observe(pvrSentinelEl.value);
-};
-
-// ── Infinite scroll: Pipeline Menggantung ──
-interface PipelineItem {
-  Customer: string;
-  NamaSpk: string;
-  Sales: string;
-  Divisi: string;
-  Jumlah: number;
-}
-const PIPELINE_MENGGANTUNG_PAGE_SIZE = 20;
-const pipelineMenggantungSummary = ref({ totalItem: 0, totalNilai: 0 });
-const pipelineMenggantungList = ref<PipelineItem[]>([]);
-const pipelineMenggantungPage = ref(1);
-const pipelineMenggantungHasMore = ref(true);
-const isLoadingMorePipelineMenggantung = ref(false);
-const pipelineMenggantungSentinelEl = ref<HTMLElement | null>(null);
-let pipelineMenggantungScrollObserver: IntersectionObserver | null = null;
-const loadMorePipelineMenggantung = async () => {
-  if (
-    !pipelineMenggantungHasMore.value ||
-    isLoadingMorePipelineMenggantung.value
-  )
-    return;
-  isLoadingMorePipelineMenggantung.value = true;
-  try {
-    const res = await dashboardService.getPipelineMenggantung(
-      mapFilter.value.startDate,
-      mapFilter.value.endDate,
-      PIPELINE_MENGGANTUNG_PAGE_SIZE,
-      pipelineMenggantungPage.value,
-    );
-    const d = res.data.data;
-    pipelineMenggantungSummary.value = {
-      totalItem: d.totalItem,
-      totalNilai: d.totalNilai,
-    };
-    pipelineMenggantungList.value.push(...(d.items || []));
-    pipelineMenggantungPage.value += 1;
-    pipelineMenggantungHasMore.value = !!d.hasMore;
-  } catch {
-  } finally {
-    isLoadingMorePipelineMenggantung.value = false;
-  }
-};
-const setupPipelineMenggantungObserver = () => {
-  if (pipelineMenggantungScrollObserver)
-    pipelineMenggantungScrollObserver.disconnect();
-  if (!pipelineMenggantungSentinelEl.value) return;
-  pipelineMenggantungScrollObserver = new IntersectionObserver(
-    (entries) => {
-      if (entries[0].isIntersecting) loadMorePipelineMenggantung();
-    },
-    { threshold: 0.1 },
-  );
-  pipelineMenggantungScrollObserver.observe(
-    pipelineMenggantungSentinelEl.value,
-  );
 };
 
 // ── Computed helper: Achievement rate color ──
@@ -2639,15 +2623,16 @@ const loadMarketingData = async () => {
     gapCustomerList.value = [];
     pvrPage.value = 1;
     pvrHasMore.value = true;
-    pipelineMenggantungList.value = [];
-    pipelineMenggantungPage.value = 1;
-    pipelineMenggantungHasMore.value = true;
     ptmDetailList.value = [];
     ptmDetailOffset.value = 0;
     ptmDetailHasMore.value = true;
     mtsDetailList.value = [];
     mtsDetailOffset.value = 0;
     mtsDetailHasMore.value = true;
+    statusKirimMapData.value = [];
+    slowDeadStockData.value = [];
+    slowDeadStockPage.value = 1;
+    konversiBabaranData.value = [];
 
     const [
       sumRes,
@@ -2658,6 +2643,9 @@ const loadMarketingData = async () => {
       realisasiBulananRes,
       penToMapRes,
       mapToSoRes,
+      statusKirimMapRes,
+      slowDeadMktRes,
+      konversiBabaranRes,
     ] = await Promise.allSettled([
       dashboardService.getPenawaranSummary(),
       dashboardService.getPenawaranMapSummary(),
@@ -2667,7 +2655,28 @@ const loadMarketingData = async () => {
       dashboardService.getRealisasiPenawaranBulanan(),
       dashboardService.getRealisasiPenawaranToMap(),
       dashboardService.getRealisasiMapToSo(),
+      dashboardService.getStatusPengirimanMapBulanan(),
+      dashboardService.getStokSlowDeadStockBahan(),
+      dashboardService.getKonversiBabaranAktual(),
     ]);
+    if (
+      konversiBabaranRes.status === "fulfilled" &&
+      konversiBabaranRes.value?.data?.data
+    ) {
+      konversiBabaranData.value = konversiBabaranRes.value.data.data;
+    }
+    if (
+      slowDeadMktRes.status === "fulfilled" &&
+      slowDeadMktRes.value?.data?.data
+    ) {
+      slowDeadStockData.value = slowDeadMktRes.value.data.data;
+    }
+    if (
+      statusKirimMapRes.status === "fulfilled" &&
+      statusKirimMapRes.value?.data?.data
+    ) {
+      statusKirimMapData.value = statusKirimMapRes.value.data.data;
+    }
     if (penToMapRes.status === "fulfilled" && penToMapRes.value?.data?.data)
       realisasiPenToMap.value = penToMapRes.value.data.data;
     if (mapToSoRes.status === "fulfilled" && mapToSoRes.value?.data?.data)
@@ -2701,14 +2710,8 @@ const loadMarketingData = async () => {
     ]);
 
     const [mapVsSpkRes, mapVsSjRes] = await Promise.allSettled([
-      dashboardService.getMapVsSpkDashboard(
-        mapFilter.value.startDate,
-        mapFilter.value.endDate,
-      ),
-      dashboardService.getMapVsSjDashboard(
-        mapFilter.value.startDate,
-        mapFilter.value.endDate,
-      ),
+      dashboardService.getMapVsSpkDashboard(mapRangeStart, mapRangeEnd),
+      dashboardService.getMapVsSjDashboard(mapRangeStart, mapRangeEnd),
     ]);
     if (mapVsSpkRes.status === "fulfilled" && mapVsSpkRes.value?.data?.data) {
       mapSpkMetric.value = mapVsSpkRes.value.data.data.metric;
@@ -2733,7 +2736,7 @@ const loadMarketingData = async () => {
     if (growthRes.status === "fulfilled" && growthRes.value?.data?.data)
       growthYoyData.value = growthRes.value.data.data;
 
-    await Promise.allSettled([loadMorePvr(), loadMorePipelineMenggantung()]);
+    await loadMorePvr();
 
     // ⬇ tambahkan di sini
     await Promise.allSettled([loadMorePtmDetail(), loadMoreMtsDetail()]);
@@ -2919,6 +2922,9 @@ const loadGudangBahanData = async () => {
   bufferKaosanList.value = [];
   bkOffset.value = 0;
   bkHasMore.value = true;
+  slowDeadStockData.value = [];
+  slowDeadStockPage.value = 1;
+  konversiBabaranData.value = [];
 
   isLoadingGudangBahan.value = true;
   try {
@@ -2931,6 +2937,8 @@ const loadGudangBahanData = async () => {
       gbMkbCountRes,
       sbSumRes,
       bkSumRes,
+      slowDeadRes,
+      konversiBabaranRes,
     ] = await Promise.allSettled([
       dashboardService.getGudangBahanDashboard(),
       dashboardService.getStokAccVsMkaCount(),
@@ -2940,7 +2948,18 @@ const loadGudangBahanData = async () => {
       dashboardService.getSpkBelumMkbCount(),
       dashboardService.getStokBebasSummary(),
       dashboardService.getBufferKaosanSummary(),
+      dashboardService.getStokSlowDeadStockBahan(),
+      dashboardService.getKonversiBabaranAktual(),
     ]);
+    if (
+      konversiBabaranRes.status === "fulfilled" &&
+      konversiBabaranRes.value?.data?.data
+    ) {
+      konversiBabaranData.value = konversiBabaranRes.value.data.data;
+    }
+    if (slowDeadRes.status === "fulfilled" && slowDeadRes.value?.data?.data) {
+      slowDeadStockData.value = slowDeadRes.value.data.data;
+    }
     if (gbRes.status === "fulfilled" && gbRes.value?.data?.data) {
       gudangBahanData.value.metric = gbRes.value.data.data.metric;
       gudangBahanData.value.topStok = gbRes.value.data.data.topStok;
@@ -3045,20 +3064,11 @@ const reloadMapPanels = async () => {
   gapCustomerList.value = [];
   pvrPage.value = 1;
   pvrHasMore.value = true;
-  pipelineMenggantungList.value = [];
-  pipelineMenggantungPage.value = 1;
-  pipelineMenggantungHasMore.value = true;
 
   try {
     const [mapVsSpkRes, mapVsSjRes] = await Promise.allSettled([
-      dashboardService.getMapVsSpkDashboard(
-        mapFilter.value.startDate,
-        mapFilter.value.endDate,
-      ),
-      dashboardService.getMapVsSjDashboard(
-        mapFilter.value.startDate,
-        mapFilter.value.endDate,
-      ),
+      dashboardService.getMapVsSpkDashboard(mapRangeStart, mapRangeEnd),
+      dashboardService.getMapVsSjDashboard(mapRangeStart, mapRangeEnd),
     ]);
     if (mapVsSpkRes.status === "fulfilled" && mapVsSpkRes.value?.data?.data) {
       mapSpkMetric.value = mapVsSpkRes.value.data.data.metric;
@@ -3073,9 +3083,8 @@ const reloadMapPanels = async () => {
     await nextTick();
     setupMapSpkObserver();
     setupMapKirimObserver();
-    await Promise.allSettled([loadMorePvr(), loadMorePipelineMenggantung()]);
+    await loadMorePvr();
     setupPvrObserver();
-    setupPipelineMenggantungObserver();
   }
 };
 
@@ -3142,7 +3151,6 @@ onMounted(async () => {
     setupMapSpkObserver();
     setupMapKirimObserver();
     setupPvrObserver();
-    setupPipelineMenggantungObserver();
     setupPtmDetailObserver();
     setupMtsDetailObserver();
   }
@@ -3196,7 +3204,6 @@ onUnmounted(() => {
   spkSjScrollObserver?.disconnect();
   spkTagihScrollObserver?.disconnect();
   pvrScrollObserver?.disconnect();
-  pipelineMenggantungScrollObserver?.disconnect();
   mspScrollObserver?.disconnect();
   pbrScrollObserver?.disconnect();
   pbdScrollObserver?.disconnect();
@@ -4808,6 +4815,189 @@ const sisaClass = (item: any) => {
           </v-col>
         </v-row>
 
+        <v-row dense class="mb-2">
+          <v-col cols="12">
+            <div class="manksi-panel content-panel">
+              <div
+                class="panel-header"
+                style="
+                  background: #eceff1;
+                  color: #37474f;
+                  border-bottom: 1px solid #cfd8dc;
+                "
+              >
+                <IconAlertTriangle
+                  :size="14"
+                  :stroke-width="1.7"
+                  class="mr-1"
+                />
+                Stok Slow Moving & Dead Stock serta Konversi per kg Kain
+                <span class="panel-header-sub ml-1">(per jenis bahan)</span>
+              </div>
+              <div class="panel-body">
+                <v-progress-linear
+                  v-if="isLoadingDashboard"
+                  indeterminate
+                  color="grey"
+                  height="2"
+                />
+                <template v-else-if="slowDeadStockData.length">
+                  <div
+                    v-if="konversiBabaranData.length"
+                    class="d-flex flex-wrap"
+                    style="
+                      gap: 0;
+                      border-bottom: 1px solid #f0f0f0;
+                      background: #fafafa;
+                    "
+                  >
+                    <div
+                      v-for="k in konversiBabaranData"
+                      :key="k.kategori"
+                      class="pen-stat"
+                      style="padding: 8px 4px"
+                    >
+                      <span
+                        class="pen-stat-val text-primary"
+                        style="font-size: 15px"
+                      >
+                        {{ fmtDec(k.pcsPerKg, 1) }} pcs/kg
+                      </span>
+                      <span class="pen-stat-lbl">{{ k.label }}</span>
+                    </div>
+                  </div>
+                  <v-expansion-panels variant="accordion" multiple>
+                    <v-expansion-panel
+                      v-for="grp in slowDeadStockPaged"
+                      :key="grp.jenisNama"
+                    >
+                      <v-expansion-panel-title
+                        style="min-height: 40px; padding: 8px 12px"
+                      >
+                        <div
+                          style="
+                            display: flex;
+                            align-items: center;
+                            gap: 10px;
+                            font-size: 11px;
+                            flex-wrap: wrap;
+                          "
+                        >
+                          <span style="font-weight: 700; color: #37474f">{{
+                            grp.jenisNama
+                          }}</span>
+                          <span
+                            v-if="grp.jmlSlowmoving"
+                            class="badge-count"
+                            style="background: #f57f17"
+                          >
+                            Slowmoving {{ grp.jmlSlowmoving }}
+                          </span>
+                          <span
+                            v-if="grp.jmlDeadStock"
+                            class="badge-count"
+                            style="background: #c62828"
+                          >
+                            Dead Stock {{ grp.jmlDeadStock }}
+                          </span>
+                          <span style="color: #9e9e9e">
+                            Total stok:
+                            <template
+                              v-for="(t, i) in grp.totalStokList"
+                              :key="t.satuan"
+                            >
+                              {{ i > 0 ? ", " : "" }}{{ fmtNum(t.stok) }}
+                              {{ t.satuan }}
+                            </template>
+                          </span>
+                        </div>
+                      </v-expansion-panel-title>
+                      <v-expansion-panel-text style="padding: 0">
+                        <div style="overflow-x: auto">
+                          <table class="gb-tbl">
+                            <thead>
+                              <tr>
+                                <th>Nama Bahan</th>
+                                <th class="tr">Stok</th>
+                                <th class="tr">Umur (hr)</th>
+                                <th class="tc">Status</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <tr v-for="item in grp.items" :key="item.Kode">
+                                <td>{{ item.Nama || item.Kode }}</td>
+                                <td class="tr">
+                                  {{ fmtNum(item.Stok) }} {{ item.Satuan }}
+                                </td>
+                                <td class="tr">{{ item.UmurHari }}</td>
+                                <td class="tc">
+                                  <span
+                                    class="gb-badge"
+                                    :class="
+                                      item.Status === 'Dead Stock'
+                                        ? 'gb-badge--danger'
+                                        : 'gb-badge--warn'
+                                    "
+                                  >
+                                    {{ item.Status }}
+                                  </span>
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                      </v-expansion-panel-text>
+                    </v-expansion-panel>
+                    <div
+                      v-if="slowDeadStockTotalPages > 1"
+                      class="d-flex align-center justify-center"
+                      style="
+                        gap: 10px;
+                        padding: 8px 12px;
+                        border-top: 1px solid #f0f0f0;
+                      "
+                    >
+                      <button
+                        class="knj-detail-btn"
+                        :disabled="slowDeadStockPage === 1"
+                        :style="{ opacity: slowDeadStockPage === 1 ? 0.4 : 1 }"
+                        @click="slowDeadStockPage--"
+                      >
+                        ← Sebelumnya
+                      </button>
+                      <span style="font-size: 11px; color: #757575">
+                        Halaman {{ slowDeadStockPage }} dari
+                        {{ slowDeadStockTotalPages }} ({{
+                          slowDeadStockData.length
+                        }}
+                        jenis bahan)
+                      </span>
+                      <button
+                        class="knj-detail-btn"
+                        :disabled="
+                          slowDeadStockPage === slowDeadStockTotalPages
+                        "
+                        :style="{
+                          opacity:
+                            slowDeadStockPage === slowDeadStockTotalPages
+                              ? 0.4
+                              : 1,
+                        }"
+                        @click="slowDeadStockPage++"
+                      >
+                        Berikutnya →
+                      </button>
+                    </div>
+                  </v-expansion-panels>
+                </template>
+                <div v-else class="text-center text-grey py-3 text-caption">
+                  Tidak ada bahan slow moving atau dead stock 🎉
+                </div>
+              </div>
+            </div>
+          </v-col>
+        </v-row>
+
         <!-- ── Row 7: Proyeksi vs Realisasi (Gap Customer) — infinite scroll ── -->
         <v-row dense class="mt-2">
           <v-col cols="12">
@@ -4910,158 +5100,6 @@ const sisaClass = (item: any) => {
                   </div>
                   <div v-else class="text-center text-grey py-3 text-caption">
                     Tidak ada gap proyeksi vs realisasi yang signifikan 🎉
-                  </div>
-                </template>
-              </div>
-            </div>
-          </v-col>
-        </v-row>
-
-        <!-- ── Filter — hanya berlaku untuk panel MAP/Proyeksi di bawah ini ── -->
-        <v-row dense class="mt-3 mb-1">
-          <v-col cols="12">
-            <div
-              class="d-flex align-center flex-wrap"
-              style="
-                gap: 8px;
-                padding: 6px 10px;
-                background: #f5f5f5;
-                border-radius: 4px;
-              "
-            >
-              <span class="text-caption text-grey-darken-1 font-weight-bold"
-                >Filter periode:</span
-              >
-              <input
-                type="date"
-                v-model="mapFilter.startDate"
-                class="map-date-inp"
-              />
-              <span class="text-caption text-grey">s.d</span>
-              <input
-                type="date"
-                v-model="mapFilter.endDate"
-                class="map-date-inp"
-              />
-              <button class="map-filter-btn" @click="reloadMapPanels">
-                Terapkan
-              </button>
-              <span
-                class="text-caption text-grey-darken-1"
-                style="margin-left: 4px"
-              >
-                Berlaku untuk: Proyeksi vs Realisasi, Pipeline Menggantung,
-                Konversi MAP→SPK, Status Pengiriman MAP, Nilai Pipeline MAP
-              </span>
-            </div>
-          </v-col>
-        </v-row>
-
-        <!-- ── Row 8: Pipeline Menggantung — infinite scroll ── -->
-        <v-row dense class="mt-2 mb-2">
-          <v-col cols="12">
-            <div class="manksi-panel content-panel">
-              <div
-                class="panel-header"
-                style="
-                  background: #ffebee;
-                  color: #c62828;
-                  border-bottom: 1px solid #ffcdd2;
-                "
-              >
-                <IconFileAlert :size="14" :stroke-width="1.7" class="mr-1" />
-                Pipeline Menggantung
-                <span class="panel-header-sub ml-1"
-                  >(Memo belum SO + Penawaran belum Memo/SPK)</span
-                >
-                <span
-                  v-if="pipelineMenggantungSummary.totalItem"
-                  class="badge-count ml-auto"
-                  style="background: #c62828"
-                >
-                  {{ pipelineMenggantungSummary.totalItem }} item
-                </span>
-              </div>
-              <div class="panel-body">
-                <v-progress-linear
-                  v-if="isLoadingDashboard"
-                  indeterminate
-                  color="red"
-                  height="2"
-                />
-                <template v-else>
-                  <div
-                    style="
-                      padding: 6px 12px;
-                      border-bottom: 1px solid #f0f0f0;
-                      font-size: 11px;
-                      color: #c62828;
-                      font-weight: 700;
-                    "
-                  >
-                    Total Nilai Menggantung:
-                    {{ shortNum(pipelineMenggantungSummary.totalNilai) }}
-                  </div>
-                  <div
-                    v-if="
-                      pipelineMenggantungList.length ||
-                      isLoadingMorePipelineMenggantung
-                    "
-                    class="gb-list"
-                    style="max-height: 320px"
-                  >
-                    <div
-                      v-for="(item, i) in pipelineMenggantungList"
-                      :key="i"
-                      class="gb-row"
-                    >
-                      <div
-                        class="gb-nama"
-                        :title="item.Customer"
-                        style="width: 180px"
-                      >
-                        {{ item.Customer || "-" }}
-                      </div>
-                      <div class="gb-bar-wrap">
-                        <span class="pen-cus" style="flex: 1">
-                          {{ item.NamaSpk || "-" }}
-                          <span v-if="item.Divisi" style="color: #9e9e9e"
-                            >· {{ item.Divisi }}</span
-                          >
-                        </span>
-                        <span
-                          style="
-                            font-size: 10px;
-                            font-weight: 700;
-                            color: #c62828;
-                          "
-                        >
-                          {{ shortNum(item.Jumlah) }}
-                        </span>
-                      </div>
-                    </div>
-                    <div
-                      ref="pipelineMenggantungSentinelEl"
-                      class="pen-sentinel"
-                    >
-                      <span
-                        v-if="isLoadingMorePipelineMenggantung"
-                        class="pen-loading"
-                        >Memuat...</span
-                      >
-                      <span
-                        v-else-if="
-                          !pipelineMenggantungHasMore &&
-                          pipelineMenggantungList.length
-                        "
-                        class="pen-end"
-                      >
-                        {{ pipelineMenggantungList.length }} item ditampilkan
-                      </span>
-                    </div>
-                  </div>
-                  <div v-else class="text-center text-grey py-3 text-caption">
-                    Tidak ada pipeline yang menggantung 🎉
                   </div>
                 </template>
               </div>
@@ -5205,6 +5243,12 @@ const sisaClass = (item: any) => {
                             ? 'umur-warn'
                             : ''
                       "
+                      style="cursor: pointer"
+                      @click="
+                        router.push(
+                          `/penjualan/map/form/${encodeURIComponent(m.Nomor)}`,
+                        )
+                      "
                     >
                       <div class="pen-item-top">
                         <span class="pen-nomor">{{ m.Nomor }}</span>
@@ -5252,161 +5296,6 @@ const sisaClass = (item: any) => {
             </div>
           </v-col>
 
-          <!-- Panel 2: Status Pengiriman MAP -->
-          <v-col cols="12" md="4">
-            <div class="manksi-panel content-panel fill-height">
-              <div class="panel-header panel-header--teal">
-                <IconTruckDelivery
-                  :size="14"
-                  :stroke-width="1.7"
-                  class="mr-1"
-                />
-                Status Pengiriman MAP
-                <span class="ml-auto" style="font-size: 11px">
-                  {{ mapKirimRate }}% terkirim
-                </span>
-              </div>
-              <div class="panel-body">
-                <v-progress-linear
-                  v-if="isLoadingDashboard"
-                  indeterminate
-                  color="teal"
-                  height="2"
-                />
-                <template v-else>
-                  <!-- 3 bucket card -->
-                  <div
-                    class="aging-wrap"
-                    style="grid-template-columns: repeat(3, 1fr)"
-                  >
-                    <div
-                      class="aging-chip"
-                      style="background: #ffebee; color: #c62828"
-                    >
-                      <span class="aging-count">{{
-                        mapSjMetric.BelumKirim
-                      }}</span>
-                      <span class="aging-label">Belum Kirim</span>
-                    </div>
-                    <div
-                      class="aging-chip"
-                      style="background: #fff8e1; color: #f57f17"
-                    >
-                      <span class="aging-count">{{
-                        mapSjMetric.SebagianKirim
-                      }}</span>
-                      <span class="aging-label">Sebagian</span>
-                    </div>
-                    <div
-                      class="aging-chip"
-                      style="background: #e8f5e9; color: #2e7d32"
-                    >
-                      <span class="aging-count">{{
-                        mapSjMetric.LunasKirim
-                      }}</span>
-                      <span class="aging-label">Lunas Kirim</span>
-                    </div>
-                  </div>
-
-                  <!-- Progress bar qty -->
-                  <div
-                    style="padding: 8px 12px; border-bottom: 1px solid #f0f0f0"
-                  >
-                    <div class="d-flex justify-space-between mb-1">
-                      <span style="font-size: 10px; color: #9e9e9e"
-                        >Total qty terkirim</span
-                      >
-                      <span
-                        style="
-                          font-size: 10px;
-                          font-weight: 700;
-                          color: #00695c;
-                        "
-                      >
-                        {{ fmtNum(mapSjMetric.TotalQtyKirim) }} /
-                        {{ fmtNum(mapSjMetric.TotalQtyOrder) }}
-                      </span>
-                    </div>
-                    <div class="cr-bar">
-                      <div
-                        class="cr-fill"
-                        :style="{
-                          width: mapSjMetric.TotalQtyOrder
-                            ? Math.min(
-                                100,
-                                (mapSjMetric.TotalQtyKirim /
-                                  mapSjMetric.TotalQtyOrder) *
-                                  100,
-                              ) + '%'
-                            : '0%',
-                          background: '#00897b',
-                        }"
-                      />
-                    </div>
-                  </div>
-
-                  <!-- Divider label -->
-                  <div
-                    style="
-                      border-top: 1px solid #f0f0f0;
-                      padding: 5px 12px 0;
-                      font-size: 10px;
-                      color: #9e9e9e;
-                      font-weight: 600;
-                    "
-                  >
-                    MAP BELUM / SEBAGIAN KIRIM
-                  </div>
-
-                  <!-- Infinite scroll -->
-                  <div class="pen-list" style="max-height: 280px">
-                    <div
-                      v-for="m in mapKirimList"
-                      :key="m.Nomor"
-                      class="pen-item"
-                      :class="m.QtyKirim === 0 ? 'umur-danger' : 'umur-warn'"
-                    >
-                      <div class="pen-item-top">
-                        <span class="pen-nomor">{{ m.Nomor }}</span>
-                        <span class="pen-divisi">{{ m.Divisi }}</span>
-                      </div>
-                      <div class="pen-cus">{{ m.NamaCustomer }}</div>
-                      <div class="d-flex justify-space-between mt-1">
-                        <span class="pen-ket">DL: {{ m.Dateline }}</span>
-                        <span
-                          :style="{
-                            fontSize: '10px',
-                            fontWeight: '700',
-                            color: m.QtyKirim === 0 ? '#c62828' : '#f57f17',
-                          }"
-                        >
-                          {{ fmtNum(m.QtyKirim) }}/{{ fmtNum(m.QtyOrder) }} pcs
-                        </span>
-                      </div>
-                    </div>
-                    <div ref="mapKirimSentinelEl" class="pen-sentinel">
-                      <span v-if="isLoadingMoreMapKirim" class="pen-loading"
-                        >Memuat...</span
-                      >
-                      <span
-                        v-else-if="!mapKirimHasMore && mapKirimList.length"
-                        class="pen-end"
-                      >
-                        {{ mapKirimList.length }} MAP ditampilkan
-                      </span>
-                    </div>
-                  </div>
-                  <div
-                    v-if="!mapKirimList.length && !isLoadingMoreMapKirim"
-                    class="text-center text-grey py-3 text-caption"
-                  >
-                    Semua MAP sudah lunas kirim 🎉
-                  </div>
-                </template>
-              </div>
-            </div>
-          </v-col>
-
           <!-- Panel 3: Nilai Pipeline MAP -->
           <v-col cols="12" md="4">
             <div class="manksi-panel content-panel fill-height">
@@ -5420,9 +5309,7 @@ const sisaClass = (item: any) => {
               >
                 <IconCoin :size="14" :stroke-width="1.7" class="mr-1" />
                 Nilai Pipeline MAP
-                <span class="panel-header-sub ml-1"
-                  >({{ mapFilter.startDate }} s.d {{ mapFilter.endDate }})</span
-                >
+                <span class="panel-header-sub ml-1">(90 hari terakhir)</span>
               </div>
               <div class="panel-body">
                 <v-progress-linear
@@ -5548,6 +5435,102 @@ const sisaClass = (item: any) => {
                     <span class="leg-dot" style="background: #ce93d8" />Potensi
                   </div>
                 </template>
+              </div>
+            </div>
+          </v-col>
+        </v-row>
+
+        <v-row dense class="mb-2">
+          <v-col
+            cols="12"
+            md="6"
+            v-for="grp in statusKirimMapData.filter(
+              (g) => g.divisi !== 'KAOSAN',
+            )"
+            :key="grp.divisi"
+          >
+            <div class="manksi-panel content-panel mb-2">
+              <div class="panel-header panel-header--teal">
+                <IconTruckDelivery
+                  :size="14"
+                  :stroke-width="1.7"
+                  class="mr-1"
+                />
+                Status Pengiriman MAP — {{ grp.divisi }}
+                <span class="panel-header-sub ml-1">(tahun berjalan)</span>
+              </div>
+              <div class="panel-body" style="overflow-x: auto">
+                <v-progress-linear
+                  v-if="isLoadingDashboard"
+                  indeterminate
+                  color="teal"
+                  height="2"
+                />
+                <table v-else class="gb-tbl" style="min-width: 780px">
+                  <thead>
+                    <tr>
+                      <th rowspan="2" style="vertical-align: middle">Bulan</th>
+                      <th
+                        rowspan="2"
+                        style="vertical-align: middle; text-align: right"
+                      >
+                        Jumlah MAP
+                      </th>
+                      <th colspan="4" style="text-align: center">Realisasi</th>
+                      <th colspan="4" style="text-align: center">
+                        Belum Realisasi
+                      </th>
+                    </tr>
+                    <tr>
+                      <th class="tr">0-7 hr</th>
+                      <th class="tr">8-14 hr</th>
+                      <th class="tr">15-30 hr</th>
+                      <th class="tr">&gt;30 hr</th>
+                      <th class="tr">0-7 hr</th>
+                      <th class="tr">8-14 hr</th>
+                      <th class="tr">15-30 hr</th>
+                      <th class="tr">&gt;30 hr</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="m in grp.bulanan" :key="m.Bulan">
+                      <td>{{ formatBulanLabel(m.Bulan) }}</td>
+                      <td class="tr" style="font-weight: 700">
+                        {{ m.JumlahMAP }}
+                      </td>
+                      <td class="tr" style="color: #2e7d32">
+                        {{ m.real[0] || "-" }}
+                      </td>
+                      <td class="tr" style="color: #2e7d32">
+                        {{ m.real[1] || "-" }}
+                      </td>
+                      <td class="tr" style="color: #f57f17">
+                        {{ m.real[2] || "-" }}
+                      </td>
+                      <td class="tr" style="color: #c62828">
+                        {{ m.real[3] || "-" }}
+                      </td>
+                      <td class="tr" style="color: #757575">
+                        {{ m.belum[0] || "-" }}
+                      </td>
+                      <td class="tr" style="color: #f57f17">
+                        {{ m.belum[1] || "-" }}
+                      </td>
+                      <td class="tr" style="color: #e65100">
+                        {{ m.belum[2] || "-" }}
+                      </td>
+                      <td class="tr" style="color: #c62828">
+                        {{ m.belum[3] || "-" }}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+                <div
+                  v-if="!grp.bulanan.some((m) => m.JumlahMAP > 0)"
+                  class="text-center text-grey py-3 text-caption"
+                >
+                  Belum ada data MAP tahun ini untuk divisi ini.
+                </div>
               </div>
             </div>
           </v-col>
@@ -7056,6 +7039,189 @@ const sisaClass = (item: any) => {
                 </template>
                 <div v-else class="text-center text-grey py-3 text-caption">
                   Semua aksesoris tercukupi untuk kebutuhan MKA bulan ini 🎉
+                </div>
+              </div>
+            </div>
+          </v-col>
+        </v-row>
+
+        <v-row dense class="mb-2">
+          <v-col cols="12">
+            <div class="manksi-panel content-panel">
+              <div
+                class="panel-header"
+                style="
+                  background: #eceff1;
+                  color: #37474f;
+                  border-bottom: 1px solid #cfd8dc;
+                "
+              >
+                <IconAlertTriangle
+                  :size="14"
+                  :stroke-width="1.7"
+                  class="mr-1"
+                />
+                Stok Slow Moving & Dead Stock
+                <span class="panel-header-sub ml-1">(per jenis bahan)</span>
+              </div>
+              <div class="panel-body">
+                <v-progress-linear
+                  v-if="isLoadingGudangBahan"
+                  indeterminate
+                  color="grey"
+                  height="2"
+                />
+                <template v-else-if="slowDeadStockData.length">
+                  <div
+                    v-if="konversiBabaranData.length"
+                    class="d-flex flex-wrap"
+                    style="
+                      gap: 0;
+                      border-bottom: 1px solid #f0f0f0;
+                      background: #fafafa;
+                    "
+                  >
+                    <div
+                      v-for="k in konversiBabaranData"
+                      :key="k.kategori"
+                      class="pen-stat"
+                      style="padding: 8px 4px"
+                    >
+                      <span
+                        class="pen-stat-val text-primary"
+                        style="font-size: 15px"
+                      >
+                        {{ fmtDec(k.pcsPerKg, 1) }} pcs/kg
+                      </span>
+                      <span class="pen-stat-lbl">{{ k.label }}</span>
+                    </div>
+                  </div>
+                  <v-expansion-panels variant="accordion" multiple>
+                    <v-expansion-panel
+                      v-for="grp in slowDeadStockPaged"
+                      :key="grp.jenisNama"
+                    >
+                      <v-expansion-panel-title
+                        style="min-height: 40px; padding: 8px 12px"
+                      >
+                        <div
+                          style="
+                            display: flex;
+                            align-items: center;
+                            gap: 10px;
+                            font-size: 11px;
+                            flex-wrap: wrap;
+                          "
+                        >
+                          <span style="font-weight: 700; color: #37474f">{{
+                            grp.jenisNama
+                          }}</span>
+                          <span
+                            v-if="grp.jmlSlowmoving"
+                            class="badge-count"
+                            style="background: #f57f17"
+                          >
+                            Slowmoving {{ grp.jmlSlowmoving }}
+                          </span>
+                          <span
+                            v-if="grp.jmlDeadStock"
+                            class="badge-count"
+                            style="background: #c62828"
+                          >
+                            Dead Stock {{ grp.jmlDeadStock }}
+                          </span>
+                          <span style="color: #9e9e9e">
+                            Total stok:
+                            <template
+                              v-for="(t, i) in grp.totalStokList"
+                              :key="t.satuan"
+                            >
+                              {{ i > 0 ? ", " : "" }}{{ fmtNum(t.stok) }}
+                              {{ t.satuan }}
+                            </template>
+                          </span>
+                        </div>
+                      </v-expansion-panel-title>
+                      <v-expansion-panel-text style="padding: 0">
+                        <div style="overflow-x: auto">
+                          <table class="gb-tbl">
+                            <thead>
+                              <tr>
+                                <th>Nama Bahan</th>
+                                <th class="tr">Stok</th>
+                                <th class="tr">Umur (hr)</th>
+                                <th class="tc">Status</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <tr v-for="item in grp.items" :key="item.Kode">
+                                <td>{{ item.Nama || item.Kode }}</td>
+                                <td class="tr">
+                                  {{ fmtNum(item.Stok) }} {{ item.Satuan }}
+                                </td>
+                                <td class="tr">{{ item.UmurHari }}</td>
+                                <td class="tc">
+                                  <span
+                                    class="gb-badge"
+                                    :class="
+                                      item.Status === 'Dead Stock'
+                                        ? 'gb-badge--danger'
+                                        : 'gb-badge--warn'
+                                    "
+                                  >
+                                    {{ item.Status }}
+                                  </span>
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                      </v-expansion-panel-text>
+                    </v-expansion-panel>
+                    <div
+                      v-if="slowDeadStockTotalPages > 1"
+                      class="d-flex align-center justify-center"
+                      style="
+                        gap: 10px;
+                        padding: 8px 12px;
+                        border-top: 1px solid #f0f0f0;
+                      "
+                    >
+                      <button
+                        class="knj-detail-btn"
+                        :disabled="slowDeadStockPage === 1"
+                        :style="{ opacity: slowDeadStockPage === 1 ? 0.4 : 1 }"
+                        @click="slowDeadStockPage--"
+                      >
+                        ← Sebelumnya
+                      </button>
+                      <span style="font-size: 11px; color: #757575">
+                        Halaman {{ slowDeadStockPage }} dari
+                        {{ slowDeadStockTotalPages }} ({{
+                          slowDeadStockData.length
+                        }}
+                        jenis bahan)
+                      </span>
+                      <button
+                        class="knj-detail-btn"
+                        :disabled="
+                          slowDeadStockPage === slowDeadStockTotalPages
+                        "
+                        :style="{
+                          opacity:
+                            slowDeadStockPage === slowDeadStockTotalPages
+                              ? 0.4
+                              : 1,
+                        }"
+                        @click="slowDeadStockPage++"
+                      >
+                        Berikutnya →
+                      </button>
+                    </div>
+                  </v-expansion-panels>
+                </template>
+                <div v-else class="text-center text-grey py-3 text-caption">
+                  Tidak ada bahan slow moving atau dead stock 🎉
                 </div>
               </div>
             </div>

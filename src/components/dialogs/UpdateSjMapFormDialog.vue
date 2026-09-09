@@ -19,9 +19,10 @@ const isSaving = ref(false);
 
 const statusOptions = [
   { value: 0, label: "Tidak Ada Status" },
-  { value: 1, label: "Pengiriman" },
-  { value: 2, label: "Konfirmasi Ke Client" },
-  { value: 3, label: "ACC Client" },
+  { value: 1, label: "Pengirman" },
+  { value: 2, label: "Penyerahan Dokumen Kembali" },
+  { value: 3, label: "Konfirmasi Client" },
+  { value: 4, label: "Serah Terima ke Bag. Piutang" },
 ];
 
 const form = ref<any>({ header: {}, details: [] });

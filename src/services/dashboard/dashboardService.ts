@@ -73,6 +73,11 @@ export const dashboardService = {
     api.get("/dashboard/map-belum-kirim", {
       params: { limit, offset, startDate, endDate },
     }),
+  getStatusPengirimanMapBulanan: (tahun?: number) =>
+    api.get("/dashboard/status-pengiriman-map-bulanan", { params: { tahun } }),
+  getStokSlowDeadStockBahan: () =>
+    api.get("/dashboard/stok-slow-dead-stock-bahan"),
+  getKonversiBabaranAktual: () => api.get("/dashboard/konversi-babaran-aktual"),
   getSpkBelumMkbCount: () => api.get("/dashboard/spk-belum-mkb-count"),
   getSpkDeadlineKritis: () => api.get("/dashboard/spk-deadline-kritis"),
   getAktivitasHariIni: (limit = 20, offset = 0) =>
