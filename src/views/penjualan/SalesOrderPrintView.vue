@@ -28,7 +28,10 @@ const isSpandukMMT = computed(
 );
 const isComplexTtd = computed(() => isKaosan.value);
 const isPending = computed(() => {
-  return !!String(data.value.spk_pending || "").trim();
+  const status = String(data.value.spk_pending || "")
+    .trim()
+    .toUpperCase();
+  return !!status && status !== "NORMAL";
 });
 
 const pendingLabel = computed(() => {
