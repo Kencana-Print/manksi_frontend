@@ -11,7 +11,21 @@ const tglAwal = route.query.tglAwal as string;
 const tglAkhir = route.query.tglAkhir as string;
 const gudang = (route.query.gudang as string) || "";
 
+// Parse manual "DD-MM-YYYY" — jangan andalkan new Date(string) untuk
+// format ini, browser membacanya ambigu (kadang MM-DD-YYYY).
+const parseDDMMYYYY = (val: string): Date | null => {
+  if (!val) return null;
+  const parts = val.split("-");
+  if (parts.length !== 3) return null;
+  const [dd, mm, yyyy] = parts.map(Number);
+  if (!dd || !mm || !yyyy) return null;
+  const d = new Date(yyyy, mm - 1, dd);
+  return isNaN(d.getTime()) ? null : d;
+};
+
 const fmtDate = (val: string) => {
+  // tglAwal/tglAkhir dari route.query masih format ISO (YYYY-MM-DD,
+  // dari <input type="date">) — new Date() aman untuk format ini.
   if (!val) return "";
   const d = new Date(val);
   if (isNaN(d.getTime())) return val;
@@ -19,9 +33,9 @@ const fmtDate = (val: string) => {
 };
 
 const fmtDateShort = (val: string) => {
-  if (!val) return "";
-  const d = new Date(val);
-  if (isNaN(d.getTime())) return val;
+  // row.Tanggal dari backend format DD-MM-YYYY — WAJIB parse manual.
+  const d = parseDDMMYYYY(val);
+  if (!d) return val || "";
   const months = [
     "Jan",
     "Feb",
@@ -92,6 +106,23 @@ onMounted(async () => {
       - tfoot → repeat di tiap halaman (footer)
     -->
     <table class="main-table">
+      <colgroup>
+        <col style="width: 18px" />
+        <col style="width: 95px" />
+        <col style="width: 212px" />
+        <col style="width: 80px" />
+        <col style="width: 60px" />
+        <col style="width: 40px" />
+        <col style="width: 140px" />
+        <col style="width: 30px" />
+        <col style="width: 38px" />
+        <col style="width: 32px" />
+        <col style="width: 44px" />
+        <col style="width: 92px" />
+        <col style="width: 36px" />
+        <col style="width: 72px" />
+      </colgroup>
+
       <!-- ══ THEAD: repeat tiap halaman ══ -->
       <thead>
         <!-- Baris 1: Header perusahaan -->
@@ -127,26 +158,26 @@ onMounted(async () => {
 
         <!-- Baris 2: Header kolom tabel — baris 1 (rowspan) -->
         <tr class="th-top">
-          <th rowspan="2" style="width: 24px">NO.</th>
-          <th rowspan="2" style="width: 95px">NO SPK</th>
-          <th rowspan="2" style="width: 130px">NAMA SPK</th>
-          <th rowspan="2" style="width: 80px">UKURAN</th>
-          <th rowspan="2" style="width: 80px">JENIS KAIN</th>
-          <th rowspan="2" style="width: 52px">TANGGAL</th>
-          <th rowspan="2" style="width: 140px">URAIAN</th>
-          <th rowspan="2" style="width: 38px">CUST</th>
-          <th colspan="3" class="tc th-group">JADWAL</th>
-          <th colspan="2" class="tc th-group">REALISASI</th>
-          <th rowspan="2" style="width: 72px">EXPEDISI</th>
+          <th rowspan="2">NO.</th>
+          <th rowspan="2">NO SPK</th>
+          <th rowspan="2">NAMA SPK</th>
+          <th rowspan="2">UKURAN</th>
+          <th rowspan="2">JENIS KAIN</th>
+          <th rowspan="2">TANGGAL</th>
+          <th rowspan="2">URAIAN</th>
+          <th rowspan="2">CUST</th>
+          <th colspan="3">JADWAL</th>
+          <th colspan="2">REALISASI</th>
+          <th rowspan="2">EXPEDISI</th>
         </tr>
 
         <!-- Baris 3: Sub-header kolom -->
         <tr class="th-sub">
-          <th style="width: 48px" class="tc">JML PCS</th>
-          <th style="width: 40px" class="tc">JML KOLI</th>
-          <th style="width: 52px" class="tc">JAM BRG READY</th>
+          <th style="width: 38px" class="tc">JML PCS</th>
+          <th style="width: 32px" class="tc">JML KOLI</th>
+          <th style="width: 44px" class="tc">JAM BRG READY</th>
           <th style="width: 92px" class="tc">NOMOR SJ</th>
-          <th style="width: 46px" class="tc">JML KIRIM</th>
+          <th style="width: 36px" class="tc">JML KIRIM</th>
         </tr>
       </thead>
 
@@ -322,13 +353,16 @@ body {
 .main-table thead tr.th-sub th {
   background: white;
   color: #000;
-  font-size: 7.5pt; /* ⬅ diseragamkan, sebelumnya 6.5pt */
+  font-size: 7pt;
   font-weight: 700;
-  padding: 3px 3px;
+  padding: 3px 2px;
   border: 0.5px solid #000;
   text-align: left;
   vertical-align: middle;
-  white-space: nowrap;
+  white-space: normal;
+  word-break: break-word;
+  line-height: 1.15;
+  overflow: hidden;
 }
 
 .th-group {
@@ -421,13 +455,16 @@ body {
   .main-table thead tr.th-sub th {
     background: white;
     color: #000;
-    font-size: 7.5pt; /* ⬅ diseragamkan, sebelumnya 6.5pt */
+    font-size: 7pt;
     font-weight: 700;
-    padding: 3px 3px;
+    padding: 3px 2px;
     border: 0.5px solid #000;
     text-align: left;
     vertical-align: middle;
-    white-space: nowrap;
+    white-space: normal;
+    word-break: break-word;
+    line-height: 1.15;
+    overflow: hidden;
   }
   .row-stripe td {
     background: white !important;
