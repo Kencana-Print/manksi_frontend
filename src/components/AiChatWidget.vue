@@ -1,31 +1,68 @@
 <script setup lang="ts">
 import { ref, nextTick, computed } from "vue";
-import { aiChatService } from "@/services/aiChat/aiChatService";
+import {
+  aiChatService,
+  type ConversationSummary,
+} from "@/services/aiChat/aiChatService";
 import {
   IconMessageChatbot,
   IconX,
   IconSend,
   IconRobot,
   IconTrash,
+  IconPlus,
+  IconMessageCircle,
+  IconTrendingUp,
+  IconCash,
+  IconPackage,
+  IconTarget,
+  IconSparkles,
 } from "@tabler/icons-vue";
+import { useAuthStore } from "@/stores/authStore";
+const authStore = useAuthStore();
+const userName = computed(
+  () => authStore.user?.nama || authStore.user?.kode || "Anda",
+);
 
 const isOpen = ref(false);
 const isSending = ref(false);
 const inputText = ref("");
 const messagesEl = ref<HTMLElement | null>(null);
 
-// Riwayat mentah (format Anthropic) — dikirim balik ke backend tiap
-// request supaya Claude tetap ingat konteks percakapan sebelumnya.
-const conversationHistory = ref<any[]>([]);
-
-// Riwayat yang ditampilkan ke user — cuma teks, bukan tool_use blocks.
 interface DisplayMsg {
   role: "user" | "assistant";
   text: string;
 }
 const displayMessages = ref<DisplayMsg[]>([]);
+const activeConversationId = ref<number | null>(null);
+
+const conversations = ref<ConversationSummary[]>([]);
+const isLoadingConversations = ref(false);
+const isLoadingConversation = ref(false);
+
+const deleteTargetId = ref<number | null>(null);
+const showDeleteConfirm = ref(false);
 
 const hasMessages = computed(() => displayMessages.value.length > 0);
+
+const greeting = computed(() => {
+  const h = new Date().getHours();
+  if (h < 10) return "Selamat pagi";
+  if (h < 15) return "Selamat siang";
+  if (h < 18) return "Selamat sore";
+  return "Selamat malam";
+});
+
+const suggestedQuestions = [
+  { text: "Ada SPK yang deadline-nya udah lewat nggak?", icon: IconTrendingUp },
+  { text: "Berapa total piutang overdue sekarang?", icon: IconCash },
+  { text: "Ringkasan SO aktif bulan ini gimana?", icon: IconMessageCircle },
+  {
+    text: "SPK mana aja yang kekurangan bahan buat produksi?",
+    icon: IconPackage,
+  },
+  { text: "Berapa banyak SPK yang belum dibuatkan MKB?", icon: IconTarget },
+];
 
 const scrollToBottom = async () => {
   await nextTick();
@@ -34,22 +71,73 @@ const scrollToBottom = async () => {
   }
 };
 
+const loadConversations = async () => {
+  isLoadingConversations.value = true;
+  try {
+    const res = await aiChatService.listConversations();
+    conversations.value = res.data.data || [];
+  } catch {
+    /* silent */
+  } finally {
+    isLoadingConversations.value = false;
+  }
+};
+
 const toggleOpen = () => {
   isOpen.value = !isOpen.value;
-  if (isOpen.value) scrollToBottom();
+  if (isOpen.value) {
+    loadConversations();
+    scrollToBottom();
+  }
 };
 
-const extractText = (content: any): string => {
-  if (typeof content === "string") return content;
-  if (!Array.isArray(content)) return "";
-  return content
-    .filter((b: any) => b.type === "text")
-    .map((b: any) => b.text)
-    .join("\n");
+const startNewChat = () => {
+  activeConversationId.value = null;
+  displayMessages.value = [];
 };
 
-const sendMessage = async () => {
-  const text = inputText.value.trim();
+const openConversation = async (id: number) => {
+  if (id === activeConversationId.value) return;
+  isLoadingConversation.value = true;
+  try {
+    const res = await aiChatService.getConversation(id);
+    const conv = res.data.data;
+    activeConversationId.value = conv.id;
+    displayMessages.value = conv.displayMessages || [];
+    scrollToBottom();
+  } catch {
+    /* silent */
+  } finally {
+    isLoadingConversation.value = false;
+  }
+};
+
+const askDeleteConfirm = (id: number, e: Event) => {
+  e.stopPropagation();
+  deleteTargetId.value = id;
+  showDeleteConfirm.value = true;
+};
+
+const confirmDelete = async () => {
+  if (!deleteTargetId.value) return;
+  try {
+    await aiChatService.deleteConversation(deleteTargetId.value);
+    conversations.value = conversations.value.filter(
+      (c) => c.id !== deleteTargetId.value,
+    );
+    if (activeConversationId.value === deleteTargetId.value) {
+      startNewChat();
+    }
+  } catch {
+    /* silent */
+  } finally {
+    showDeleteConfirm.value = false;
+    deleteTargetId.value = null;
+  }
+};
+
+const sendMessage = async (overrideText?: string) => {
+  const text = (overrideText ?? inputText.value).trim();
   if (!text || isSending.value) return;
 
   displayMessages.value.push({ role: "user", text });
@@ -60,10 +148,26 @@ const sendMessage = async () => {
   try {
     const res = await aiChatService.sendMessage(
       text,
-      conversationHistory.value,
+      activeConversationId.value,
     );
-    const { reply, messages } = res.data.data;
-    conversationHistory.value = messages;
+    const { reply, conversationId, title } = res.data.data;
+
+    if (!activeConversationId.value) {
+      activeConversationId.value = conversationId;
+      conversations.value.unshift({
+        id: conversationId,
+        title: title || "Percakapan Baru",
+        updatedAt: new Date().toISOString(),
+      });
+    } else {
+      const idx = conversations.value.findIndex((c) => c.id === conversationId);
+      if (idx > 0) {
+        const [item] = conversations.value.splice(idx, 1);
+        item.updatedAt = new Date().toISOString();
+        conversations.value.unshift(item);
+      }
+    }
+
     displayMessages.value.push({
       role: "assistant",
       text: reply || "(Tidak ada jawaban)",
@@ -81,33 +185,30 @@ const sendMessage = async () => {
   }
 };
 
-const clearChat = () => {
-  displayMessages.value = [];
-  conversationHistory.value = [];
-};
-
 const onEnter = (e: KeyboardEvent) => {
-  if (e.shiftKey) return; // shift+enter = baris baru
+  if (e.shiftKey) return;
   e.preventDefault();
   sendMessage();
 };
 
-const suggestedQuestions = [
-  "Ada SPK yang deadline-nya udah lewat nggak?",
-  "Berapa total piutang overdue sekarang?",
-  "Ringkasan SO aktif bulan ini gimana?",
-  "SPK mana aja yang kekurangan bahan buat produksi?",
-  "Berapa banyak SPK yang belum dibuatkan MKB?",
-];
-
-const askSuggested = (q: string) => {
-  inputText.value = q;
-  sendMessage();
+const formatRelativeDate = (iso: string) => {
+  const d = new Date(iso);
+  const today = new Date();
+  const isToday = d.toDateString() === today.toDateString();
+  if (isToday) {
+    return d.toLocaleTimeString("id-ID", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
+  return d.toLocaleDateString("id-ID", { day: "2-digit", month: "short" });
 };
+
+const truncate = (s: string, n: number) =>
+  s.length > n ? s.slice(0, n) + "..." : s;
 </script>
 
 <template>
-  <!-- ── Floating Button ── -->
   <button
     v-if="!isOpen"
     class="ai-fab"
@@ -117,86 +218,157 @@ const askSuggested = (q: string) => {
     <IconMessageChatbot :size="24" :stroke-width="1.7" />
   </button>
 
-  <!-- ── Chat Panel ── -->
   <div v-else class="ai-panel">
-    <div class="ai-panel-header">
-      <div class="ai-panel-title">
-        <IconRobot :size="16" :stroke-width="1.8" class="mr-1" />
-        Asisten AI
-      </div>
-      <div class="ai-panel-actions">
-        <button
-          v-if="hasMessages"
-          class="ai-icon-btn"
-          title="Bersihkan chat"
-          @click="clearChat"
+    <!-- ── Sidebar permanen ── -->
+    <div class="ai-sidebar">
+      <button class="ai-newchat-btn" @click="startNewChat">
+        <IconPlus :size="14" class="mr-1" /> Percakapan Baru
+      </button>
+      <div class="ai-sidebar-list">
+        <div v-if="isLoadingConversations" class="ai-sidebar-loading">
+          Memuat...
+        </div>
+        <div v-else-if="!conversations.length" class="ai-sidebar-empty">
+          Belum ada riwayat.
+        </div>
+        <div
+          v-for="conv in conversations"
+          :key="conv.id"
+          class="ai-conv-item"
+          :class="{ 'ai-conv-item--active': conv.id === activeConversationId }"
+          @click="openConversation(conv.id)"
         >
-          <IconTrash :size="14" />
-        </button>
+          <IconMessageCircle :size="13" class="ai-conv-icon" />
+          <div class="ai-conv-item-text">
+            <div class="ai-conv-title">{{ truncate(conv.title, 26) }}</div>
+            <div class="ai-conv-date">
+              {{ formatRelativeDate(conv.updatedAt) }}
+            </div>
+          </div>
+          <button
+            class="ai-conv-delete"
+            title="Hapus"
+            @click="askDeleteConfirm(conv.id, $event)"
+          >
+            <IconTrash :size="12" />
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Chat area ── -->
+    <div class="ai-main">
+      <div class="ai-panel-header">
+        <div class="ai-panel-header-avatar">
+          <IconRobot :size="18" :stroke-width="1.8" />
+        </div>
+        <div class="ai-panel-header-text">
+          <div class="ai-panel-title">Asisten AI</div>
+          <div class="ai-panel-subtitle">
+            Siap bantu jawab pertanyaan seputar Penjualan, Piutang, Produksi
+          </div>
+        </div>
         <button class="ai-icon-btn" title="Tutup" @click="toggleOpen">
           <IconX :size="16" />
         </button>
       </div>
-    </div>
 
-    <div ref="messagesEl" class="ai-panel-body">
-      <div v-if="!hasMessages" class="ai-empty-hint">
-        <div class="ai-hint-title">
-          👋 Halo! Saya bisa bantu jawab pertanyaan seputar Penjualan, Piutang,
-          dan Produksi.
+      <div ref="messagesEl" class="ai-panel-body">
+        <div v-if="isLoadingConversation" class="ai-loading-center">
+          Memuat percakapan...
         </div>
-        <div class="ai-hint-sub">Coba tanya, misalnya:</div>
+
+        <div v-else-if="!hasMessages" class="ai-greeting">
+          <div class="ai-greeting-avatar">
+            <IconSparkles :size="30" :stroke-width="1.6" />
+          </div>
+          <div class="ai-greeting-title">{{ greeting }}, {{ userName }}!</div>
+          <div class="ai-greeting-sub">Ada yang bisa saya bantu?</div>
+
+          <div class="ai-suggest-grid">
+            <button
+              v-for="(q, i) in suggestedQuestions"
+              :key="i"
+              class="ai-suggest-card"
+              @click="sendMessage(q.text)"
+            >
+              <component
+                :is="q.icon"
+                :size="15"
+                :stroke-width="1.7"
+                class="mr-1"
+              />
+              <span>{{ q.text }}</span>
+            </button>
+          </div>
+        </div>
+
+        <template v-else>
+          <div
+            v-for="(msg, i) in displayMessages"
+            :key="i"
+            class="ai-msg-row"
+            :class="msg.role === 'user' ? 'ai-msg-row--user' : ''"
+          >
+            <div
+              class="ai-msg-bubble"
+              :class="
+                msg.role === 'user'
+                  ? 'ai-msg-bubble--user'
+                  : 'ai-msg-bubble--bot'
+              "
+            >
+              {{ msg.text }}
+            </div>
+          </div>
+
+          <div v-if="isSending" class="ai-msg-row">
+            <div class="ai-msg-bubble ai-msg-bubble--bot ai-typing">
+              <span class="ai-dot" />
+              <span class="ai-dot" />
+              <span class="ai-dot" />
+            </div>
+          </div>
+        </template>
+      </div>
+
+      <div class="ai-panel-input">
+        <textarea
+          v-model="inputText"
+          rows="1"
+          placeholder="Tanyakan SPK, piutang, produksi, dll..."
+          :disabled="isSending"
+          @keydown.enter="onEnter"
+        />
         <button
-          v-for="(q, i) in suggestedQuestions"
-          :key="i"
-          class="ai-suggest-chip"
-          @click="askSuggested(q)"
+          class="ai-send-btn"
+          :disabled="isSending || !inputText.trim()"
+          @click="sendMessage()"
         >
-          {{ q }}
+          <IconSend :size="16" />
         </button>
       </div>
-
-      <div
-        v-for="(msg, i) in displayMessages"
-        :key="i"
-        class="ai-msg-row"
-        :class="msg.role === 'user' ? 'ai-msg-row--user' : ''"
-      >
-        <div
-          class="ai-msg-bubble"
-          :class="
-            msg.role === 'user' ? 'ai-msg-bubble--user' : 'ai-msg-bubble--bot'
-          "
-        >
-          {{ msg.text }}
-        </div>
-      </div>
-
-      <div v-if="isSending" class="ai-msg-row">
-        <div class="ai-msg-bubble ai-msg-bubble--bot ai-typing">
-          <span class="ai-dot" />
-          <span class="ai-dot" />
-          <span class="ai-dot" />
-        </div>
-      </div>
     </div>
 
-    <div class="ai-panel-input">
-      <textarea
-        v-model="inputText"
-        rows="1"
-        placeholder="Tulis pertanyaan..."
-        :disabled="isSending"
-        @keydown.enter="onEnter"
-      />
-      <button
-        class="ai-send-btn"
-        :disabled="isSending || !inputText.trim()"
-        @click="sendMessage"
-      >
-        <IconSend :size="16" />
-      </button>
-    </div>
+    <!-- ── Konfirmasi hapus ── -->
+    <v-dialog v-model="showDeleteConfirm" max-width="360px">
+      <v-card class="pa-4 rounded-lg">
+        <div style="font-size: 13px; font-weight: 700; margin-bottom: 8px">
+          Hapus percakapan ini?
+        </div>
+        <div style="font-size: 12px; color: #616161; margin-bottom: 16px">
+          Riwayat chat ini akan dihapus permanen dan tidak bisa dikembalikan.
+        </div>
+        <div class="d-flex justify-end" style="gap: 8px">
+          <v-btn size="small" variant="text" @click="showDeleteConfirm = false">
+            Batal
+          </v-btn>
+          <v-btn size="small" color="error" @click="confirmDelete">
+            Hapus
+          </v-btn>
+        </div>
+      </v-card>
+    </v-dialog>
   </div>
 </template>
 
@@ -228,50 +400,169 @@ const askSuggested = (q: string) => {
   position: fixed;
   bottom: 24px;
   right: 24px;
-  width: 480px;
+  width: 760px;
   height: 680px;
   max-height: 85vh;
   background: white;
-  border-radius: 10px;
+  border-radius: 12px;
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.3);
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   overflow: hidden;
   z-index: 999;
   font-family: "Segoe UI", system-ui, sans-serif;
 }
 
+/* ── Sidebar ── */
+.ai-sidebar {
+  width: 220px;
+  flex-shrink: 0;
+  background: #f7f2f2;
+  border-right: 1px solid #eee;
+  display: flex;
+  flex-direction: column;
+  padding: 10px;
+}
+.ai-newchat-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: white;
+  border: 1px dashed #1867c0;
+  color: #1867c0;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 9px;
+  border-radius: 8px;
+  cursor: pointer;
+  margin-bottom: 10px;
+  flex-shrink: 0;
+}
+.ai-newchat-btn:hover {
+  background: #e3f2fd;
+}
+.ai-sidebar-list {
+  flex: 1;
+  overflow-y: auto;
+}
+.ai-sidebar-loading,
+.ai-sidebar-empty {
+  text-align: center;
+  font-size: 11px;
+  color: #9e9e9e;
+  padding: 20px 0;
+}
+.ai-conv-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  background: transparent;
+  border-radius: 8px;
+  padding: 8px 8px;
+  margin-bottom: 2px;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.ai-conv-item:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+.ai-conv-item--active {
+  background: rgba(24, 103, 192, 0.1);
+}
+.ai-conv-icon {
+  color: #9e9e9e;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+.ai-conv-item-text {
+  min-width: 0;
+  flex: 1;
+}
+.ai-conv-title {
+  font-size: 11.5px;
+  color: #424242;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ai-conv-date {
+  font-size: 9.5px;
+  color: #bdbdbd;
+  margin-top: 1px;
+}
+.ai-conv-delete {
+  background: transparent;
+  border: none;
+  color: #cccccc;
+  cursor: pointer;
+  padding: 3px;
+  flex-shrink: 0;
+  border-radius: 4px;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.ai-conv-item:hover .ai-conv-delete {
+  opacity: 1;
+}
+.ai-conv-delete:hover {
+  background: #ffebee;
+  color: #e53935;
+}
+
+/* ── Main chat area ── */
+.ai-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 .ai-panel-header {
   background: #1867c0;
   color: white;
-  padding: 10px 12px;
+  padding: 12px 14px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 10px;
   flex-shrink: 0;
 }
-.ai-panel-title {
+.ai-panel-header-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.18);
   display: flex;
   align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.ai-panel-header-text {
+  flex: 1;
+  min-width: 0;
+}
+.ai-panel-title {
   font-size: 13px;
   font-weight: 700;
 }
-.ai-panel-actions {
-  display: flex;
-  align-items: center;
-  gap: 4px;
+.ai-panel-subtitle {
+  font-size: 10.5px;
+  color: rgba(255, 255, 255, 0.85);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .ai-icon-btn {
   background: rgba(255, 255, 255, 0.15);
   border: none;
   color: white;
-  width: 24px;
-  height: 24px;
-  border-radius: 4px;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
+  flex-shrink: 0;
 }
 .ai-icon-btn:hover {
   background: rgba(255, 255, 255, 0.28);
@@ -280,17 +571,76 @@ const askSuggested = (q: string) => {
 .ai-panel-body {
   flex: 1;
   overflow-y: auto;
-  padding: 12px;
-  background: #f5f7fa;
+  padding: 16px;
+  background: #fafbfc;
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
-.ai-empty-hint {
-  font-size: 11.5px;
-  color: #616161;
-  line-height: 1.5;
-  padding: 8px 4px;
+.ai-loading-center {
+  text-align: center;
+  font-size: 12px;
+  color: #9e9e9e;
+  margin: auto;
+}
+
+/* ── Greeting screen ── */
+.ai-greeting {
+  margin: auto;
+  text-align: center;
+  padding: 20px 10px;
+  max-width: 480px;
+}
+.ai-greeting-avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: #e3f2fd;
+  color: #1867c0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 14px;
+}
+.ai-greeting-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: #1867c0;
+}
+.ai-greeting-sub {
+  font-size: 12px;
+  color: #757575;
+  margin-top: 4px;
+  margin-bottom: 20px;
+}
+.ai-suggest-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  text-align: left;
+}
+.ai-suggest-card {
+  display: flex;
+  align-items: center;
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 10px;
+  padding: 10px 11px;
+  font-size: 11px;
+  color: #37474f;
+  cursor: pointer;
+  transition: all 0.12s;
+  text-align: left;
+  line-height: 1.35;
+}
+.ai-suggest-card:hover {
+  border-color: #1867c0;
+  background: #e3f2fd;
+  color: #1867c0;
+}
+.ai-suggest-card svg {
+  flex-shrink: 0;
+  color: #1867c0;
 }
 
 .ai-msg-row {
@@ -300,8 +650,8 @@ const askSuggested = (q: string) => {
   justify-content: flex-end;
 }
 .ai-msg-bubble {
-  max-width: 82%;
-  padding: 8px 11px;
+  max-width: 78%;
+  padding: 9px 12px;
   border-radius: 10px;
   font-size: 12px;
   line-height: 1.45;
@@ -318,39 +668,6 @@ const askSuggested = (q: string) => {
   background: #1867c0;
   color: white;
   border-top-right-radius: 2px;
-}
-
-.ai-hint-title {
-  font-size: 11.5px;
-  color: #616161;
-  line-height: 1.5;
-  padding: 4px 4px 8px;
-}
-.ai-hint-sub {
-  font-size: 10.5px;
-  font-weight: 700;
-  color: #757575;
-  padding: 0 4px 6px;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-}
-.ai-suggest-chip {
-  display: block;
-  width: 100%;
-  text-align: left;
-  background: white;
-  border: 1px solid #d0d7de;
-  border-radius: 8px;
-  padding: 8px 10px;
-  font-size: 11.5px;
-  color: #1867c0;
-  margin-bottom: 6px;
-  cursor: pointer;
-  transition: background 0.12s;
-}
-.ai-suggest-chip:hover {
-  background: #e3f2fd;
-  border-color: #1867c0;
 }
 
 .ai-typing {
@@ -389,8 +706,8 @@ const askSuggested = (q: string) => {
   flex-shrink: 0;
   display: flex;
   align-items: flex-end;
-  gap: 6px;
-  padding: 8px;
+  gap: 8px;
+  padding: 10px 12px;
   border-top: 1px solid #e0e0e0;
   background: white;
 }
@@ -398,8 +715,8 @@ const askSuggested = (q: string) => {
   flex: 1;
   resize: none;
   border: 1px solid #ccc;
-  border-radius: 6px;
-  padding: 7px 9px;
+  border-radius: 8px;
+  padding: 8px 10px;
   font-size: 12px;
   font-family: inherit;
   outline: none;
@@ -412,9 +729,9 @@ const askSuggested = (q: string) => {
   background: #1867c0;
   color: white;
   border: none;
-  width: 32px;
-  height: 32px;
-  border-radius: 6px;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
