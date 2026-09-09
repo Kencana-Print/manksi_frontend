@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, watch, computed } from "vue";
+import { ref, reactive, watch, computed, onMounted } from "vue";
 import { useRoute } from "vue-router";
 import { useToast } from "vue-toastification";
 import {
@@ -75,15 +75,180 @@ const getGramasi = (jenisKain: string): string => {
     return "-";
 };
 
-// Global Margin Tier (%)
-const globalMarginTier = reactive({
-    t1: 20,
-    t2: 15,
-    t3: 10,
-    t4: 7.5,
-    t5: 2,
+// ==========================================
+// 1.0 DATA MASTER MARGIN GARMEN (tmintaharga_margin)
+// ==========================================
+interface MarginTierItem {
+    model: string;
+    qmin: number;
+    qmax: number;
+    margin: number;
+    persen?: string;
+}
+
+const rawMarginItems = ref<MarginTierItem[]>([]);
+const isMarginLoading = ref(false);
+
+const fetchMarginGarmen = async () => {
+    try {
+        isMarginLoading.value = true;
+        const res = await settingHargaBahanService.getMarginGarmen();
+        if (res.data?.success && Array.isArray(res.data.data)) {
+            rawMarginItems.value = res.data.data.map((item: any) => ({
+                model: item.model,
+                qmin: Number(item.qmin) || 0,
+                qmax: Number(item.qmax) || 0,
+                margin: Number(item.margin) || 0,
+                persen: item.persen || "Y",
+            }));
+        }
+    } catch (err: any) {
+        toast.error(
+            "Gagal memuat master margin garmen: " +
+                (err.message || "Unknown error"),
+        );
+    } finally {
+        isMarginLoading.value = false;
+    }
+};
+
+const marginTiersKh0001 = computed<MarginTierItem[]>(() => {
+    const list = rawMarginItems.value.filter((m) => m.model === "KH-0001");
+    if (list.length > 0) return list;
+    return [
+        { model: "KH-0001", qmin: 100, qmax: 249, margin: 20 },
+        { model: "KH-0001", qmin: 250, qmax: 499, margin: 15 },
+        { model: "KH-0001", qmin: 500, qmax: 749, margin: 12.5 },
+        { model: "KH-0001", qmin: 750, qmax: 999, margin: 10 },
+        { model: "KH-0001", qmin: 1000, qmax: 999999999, margin: 7 },
+    ];
 });
+
+const marginTiersKh0002 = computed<MarginTierItem[]>(() => {
+    const list = rawMarginItems.value.filter((m) => m.model === "KH-0002");
+    if (list.length > 0) return list;
+    return [
+        { model: "KH-0002", qmin: 100, qmax: 299, margin: 20 },
+        { model: "KH-0002", qmin: 300, qmax: 499, margin: 15 },
+        { model: "KH-0002", qmin: 500, qmax: 749, margin: 12.5 },
+        { model: "KH-0002", qmin: 750, qmax: 999, margin: 10 },
+        { model: "KH-0002", qmin: 1000, qmax: 999999999, margin: 7 },
+    ];
+});
+
+// Modal Dialog & Edit State Margin Tier
 const marginTierDialog = ref(false);
+const editMarginModel = ref<"KH-0001" | "KH-0002">("KH-0001");
+const isSavingMargin = ref(false);
+interface MarginEditItem {
+    model: string;
+    qmin: number;
+    qmax: number;
+    margin: number;
+    label: string;
+}
+const editMarginList = ref<MarginEditItem[]>([]);
+
+const loadEditMarginList = () => {
+    const list = rawMarginItems.value.filter(
+        (m) => m.model === editMarginModel.value,
+    );
+    if (list.length > 0) {
+        editMarginList.value = list.map((item, idx) => ({
+            model: item.model,
+            qmin: item.qmin,
+            qmax: item.qmax,
+            margin: item.margin,
+            label:
+                item.qmax >= 999999
+                    ? `Tier ${idx + 1} (≥ ${item.qmin} PCS)`
+                    : `Tier ${idx + 1} (${item.qmin} - ${item.qmax} PCS)`,
+        }));
+    } else {
+        const isKh02 = editMarginModel.value === "KH-0002";
+        editMarginList.value = [
+            {
+                model: editMarginModel.value,
+                qmin: 100,
+                qmax: isKh02 ? 299 : 249,
+                margin: 20,
+                label: `Tier 1 (100 - ${isKh02 ? 299 : 249} PCS)`,
+            },
+            {
+                model: editMarginModel.value,
+                qmin: isKh02 ? 300 : 250,
+                qmax: 499,
+                margin: 15,
+                label: `Tier 2 (${isKh02 ? 300 : 250} - 499 PCS)`,
+            },
+            {
+                model: editMarginModel.value,
+                qmin: 500,
+                qmax: 749,
+                margin: 12.5,
+                label: "Tier 3 (500 - 749 PCS)",
+            },
+            {
+                model: editMarginModel.value,
+                qmin: 750,
+                qmax: 999,
+                margin: 10,
+                label: "Tier 4 (750 - 999 PCS)",
+            },
+            {
+                model: editMarginModel.value,
+                qmin: 1000,
+                qmax: 999999999,
+                margin: 7,
+                label: "Tier 5 (≥ 1000 PCS)",
+            },
+        ];
+    }
+};
+
+const openMarginTierDialog = () => {
+    editMarginModel.value =
+        activeSub.value === "kh0002" ? "KH-0002" : "KH-0001";
+    loadEditMarginList();
+    marginTierDialog.value = true;
+};
+
+watch(editMarginModel, () => {
+    loadEditMarginList();
+});
+
+const saveMarginTier = async () => {
+    try {
+        isSavingMargin.value = true;
+        const payload = editMarginList.value.map((item) => ({
+            model: item.model,
+            qmin: item.qmin,
+            qmax: item.qmax,
+            margin: Number(item.margin) || 0,
+        }));
+        const res = await settingHargaBahanService.updateMarginGarmen(payload);
+        if (res.data?.success) {
+            toast.success(
+                `Pengaturan margin tier ${editMarginModel.value} berhasil disimpan ke database`,
+            );
+            await fetchMarginGarmen();
+            marginTierDialog.value = false;
+        } else {
+            toast.error(res.data?.message || "Gagal menyimpan margin");
+        }
+    } catch (err: any) {
+        toast.error(
+            "Gagal menyimpan margin ke database: " +
+                (err.message || "Unknown error"),
+        );
+    } finally {
+        isSavingMargin.value = false;
+    }
+};
+
+onMounted(() => {
+    fetchMarginGarmen();
+});
 
 // Custom settings override untuk Harga, Allowance, Biaya Jahit dan Margin Tier per item kain
 const customKainSettings = ref<
@@ -239,16 +404,31 @@ const parseKainData = (kodeModel: "KH-0001" | "KH-0002") => {
             return { margin, jual, up, pct: persen };
         };
 
+        const activeTiers =
+            kodeModel === "KH-0001"
+                ? marginTiersKh0001.value
+                : marginTiersKh0002.value;
+
         const t1_pct =
-            customSet.t1 !== undefined ? customSet.t1 : globalMarginTier.t1;
+            customSet.t1 !== undefined
+                ? customSet.t1
+                : (activeTiers[0]?.margin ?? 20);
         const t2_pct =
-            customSet.t2 !== undefined ? customSet.t2 : globalMarginTier.t2;
+            customSet.t2 !== undefined
+                ? customSet.t2
+                : (activeTiers[1]?.margin ?? 15);
         const t3_pct =
-            customSet.t3 !== undefined ? customSet.t3 : globalMarginTier.t3;
+            customSet.t3 !== undefined
+                ? customSet.t3
+                : (activeTiers[2]?.margin ?? 12.5);
         const t4_pct =
-            customSet.t4 !== undefined ? customSet.t4 : globalMarginTier.t4;
+            customSet.t4 !== undefined
+                ? customSet.t4
+                : (activeTiers[3]?.margin ?? 10);
         const t5_pct =
-            customSet.t5 !== undefined ? customSet.t5 : globalMarginTier.t5;
+            customSet.t5 !== undefined
+                ? customSet.t5
+                : (activeTiers[4]?.margin ?? 7);
 
         const t1 = calcTier(t1_pct);
         const t2 = calcTier(t2_pct);
@@ -593,7 +773,7 @@ const defaultColsKh0001 = computed<GarmenColDef[]>(() => [
     { key: "hpp", title: "HPP", width: "105px", align: "end" },
     {
         key: "tier1",
-        title: `100 - 249 PCS (${globalMarginTier.t1}%)`,
+        title: `${marginTiersKh0001.value[0]?.qmin ?? 100} - ${marginTiersKh0001.value[0]?.qmax ?? 249} PCS (${marginTiersKh0001.value[0]?.margin ?? 20}%)`,
         isGroup: true,
         colSpan: 3,
         subHeaders: [
@@ -604,7 +784,7 @@ const defaultColsKh0001 = computed<GarmenColDef[]>(() => [
     },
     {
         key: "tier2",
-        title: `250 - 499 PCS (${globalMarginTier.t2}%)`,
+        title: `${marginTiersKh0001.value[1]?.qmin ?? 250} - ${marginTiersKh0001.value[1]?.qmax ?? 499} PCS (${marginTiersKh0001.value[1]?.margin ?? 15}%)`,
         isGroup: true,
         colSpan: 3,
         subHeaders: [
@@ -615,7 +795,7 @@ const defaultColsKh0001 = computed<GarmenColDef[]>(() => [
     },
     {
         key: "tier3",
-        title: `500 - 749 PCS (${globalMarginTier.t3}%)`,
+        title: `${marginTiersKh0001.value[2]?.qmin ?? 500} - ${marginTiersKh0001.value[2]?.qmax ?? 749} PCS (${marginTiersKh0001.value[2]?.margin ?? 12.5}%)`,
         isGroup: true,
         colSpan: 3,
         subHeaders: [
@@ -626,7 +806,7 @@ const defaultColsKh0001 = computed<GarmenColDef[]>(() => [
     },
     {
         key: "tier4",
-        title: `750 - 999 PCS (${globalMarginTier.t4}%)`,
+        title: `${marginTiersKh0001.value[3]?.qmin ?? 750} - ${marginTiersKh0001.value[3]?.qmax ?? 999} PCS (${marginTiersKh0001.value[3]?.margin ?? 10}%)`,
         isGroup: true,
         colSpan: 3,
         subHeaders: [
@@ -637,7 +817,7 @@ const defaultColsKh0001 = computed<GarmenColDef[]>(() => [
     },
     {
         key: "tier5",
-        title: `≥ 1000 PCS (${globalMarginTier.t5}%)`,
+        title: `≥ ${marginTiersKh0001.value[4]?.qmin ?? 1000} PCS (${marginTiersKh0001.value[4]?.margin ?? 7}%)`,
         isGroup: true,
         colSpan: 3,
         subHeaders: [
@@ -674,7 +854,7 @@ const defaultColsKh0002 = computed<GarmenColDef[]>(() => [
     { key: "hpp", title: "HPP", width: "105px", align: "end" },
     {
         key: "tier1",
-        title: `100 - 249 PCS (${globalMarginTier.t1}%)`,
+        title: `${marginTiersKh0002.value[0]?.qmin ?? 100} - ${marginTiersKh0002.value[0]?.qmax ?? 299} PCS (${marginTiersKh0002.value[0]?.margin ?? 20}%)`,
         isGroup: true,
         colSpan: 3,
         subHeaders: [
@@ -685,7 +865,7 @@ const defaultColsKh0002 = computed<GarmenColDef[]>(() => [
     },
     {
         key: "tier2",
-        title: `250 - 499 PCS (${globalMarginTier.t2}%)`,
+        title: `${marginTiersKh0002.value[1]?.qmin ?? 300} - ${marginTiersKh0002.value[1]?.qmax ?? 499} PCS (${marginTiersKh0002.value[1]?.margin ?? 15}%)`,
         isGroup: true,
         colSpan: 3,
         subHeaders: [
@@ -696,7 +876,7 @@ const defaultColsKh0002 = computed<GarmenColDef[]>(() => [
     },
     {
         key: "tier3",
-        title: `500 - 749 PCS (${globalMarginTier.t3}%)`,
+        title: `${marginTiersKh0002.value[2]?.qmin ?? 500} - ${marginTiersKh0002.value[2]?.qmax ?? 749} PCS (${marginTiersKh0002.value[2]?.margin ?? 12.5}%)`,
         isGroup: true,
         colSpan: 3,
         subHeaders: [
@@ -707,7 +887,7 @@ const defaultColsKh0002 = computed<GarmenColDef[]>(() => [
     },
     {
         key: "tier4",
-        title: `750 - 999 PCS (${globalMarginTier.t4}%)`,
+        title: `${marginTiersKh0002.value[3]?.qmin ?? 750} - ${marginTiersKh0002.value[3]?.qmax ?? 999} PCS (${marginTiersKh0002.value[3]?.margin ?? 10}%)`,
         isGroup: true,
         colSpan: 3,
         subHeaders: [
@@ -718,7 +898,7 @@ const defaultColsKh0002 = computed<GarmenColDef[]>(() => [
     },
     {
         key: "tier5",
-        title: `≥ 1000 PCS (${globalMarginTier.t5}%)`,
+        title: `≥ ${marginTiersKh0002.value[4]?.qmin ?? 1000} PCS (${marginTiersKh0002.value[4]?.margin ?? 7}%)`,
         isGroup: true,
         colSpan: 3,
         subHeaders: [
@@ -1185,8 +1365,12 @@ const executeDeleteTambahan = async () => {
 
 const handleRefresh = () => {
     selectedRow.value = null;
-    if (activeSub.value === "tambahan") fetchTambahan();
-    else fetchKain();
+    if (activeSub.value === "tambahan") {
+        fetchTambahan();
+    } else {
+        fetchKain();
+        fetchMarginGarmen();
+    }
 };
 
 const handleExport = async () => {
@@ -1999,12 +2183,9 @@ const executeSaveTambahan = async () => {
                         size="small"
                         color="primary"
                         variant="tonal"
-                        @click="marginTierDialog = true"
+                        @click="openMarginTierDialog"
                         title="Sesuaikan persentase margin tier penjualan"
                     >
-                        <template #prepend>
-                            <IconSparkles :size="15" :stroke-width="1.7" />
-                        </template>
                         Margin Tier (%)
                     </v-btn>
 
@@ -3219,7 +3400,7 @@ const executeSaveTambahan = async () => {
     </v-dialog>
 
     <!-- MODAL SETTING PERSENTASE MARGIN TIER (%) -->
-    <v-dialog v-model="marginTierDialog" max-width="440px">
+    <v-dialog v-model="marginTierDialog" max-width="500px">
         <v-card class="rounded-lg">
             <v-card-title
                 class="dialog-header pa-3 d-flex align-center justify-space-between bg-grey-lighten-4 border-b"
@@ -3231,78 +3412,77 @@ const executeSaveTambahan = async () => {
                     <IconSparkles :size="16" class="mr-2 text-primary" />
                     Pengaturan Persentase Margin Tier (%)
                 </div>
+                <v-btn
+                    icon
+                    variant="text"
+                    size="x-small"
+                    @click="marginTierDialog = false"
+                >
+                    <IconX :size="16" />
+                </v-btn>
             </v-card-title>
             <v-card-text class="pa-4">
                 <p class="text-caption text-medium-emphasis mb-3">
-                    Nilai margin ini akan diterapkan secara global untuk
-                    menghitung harga jual dan harga UP setiap tier kuantiti:
+                    Nilai persentase margin ini tersimpan langsung di database
+                    master (<code>tmintaharga_margin</code>) dan digunakan
+                    otomatis oleh kalkulasi penawaran:
                 </p>
+
+                <!-- Pilihan Model -->
+                <div class="d-flex align-center mb-4 ga-2">
+                    <span class="text-caption font-weight-medium">Model:</span>
+                    <v-btn-toggle
+                        v-model="editMarginModel"
+                        mandatory
+                        density="compact"
+                        color="primary"
+                        variant="outlined"
+                    >
+                        <v-btn value="KH-0001" size="small">
+                            KH-0001 (1 Warna)
+                        </v-btn>
+                        <v-btn value="KH-0002" size="small">
+                            KH-0002 (2 Warna)
+                        </v-btn>
+                    </v-btn-toggle>
+                </div>
+
                 <v-row dense>
-                    <v-col cols="6">
+                    <v-col
+                        v-for="item in editMarginList"
+                        :key="item.qmin"
+                        :cols="item.qmax >= 999999 ? 12 : 6"
+                    >
                         <v-text-field
-                            v-model.number="globalMarginTier.t1"
-                            label="Tier 1 (100 - 249 PCS)"
+                            v-model.number="item.margin"
+                            :label="item.label"
                             type="number"
                             suffix="%"
                             variant="outlined"
                             density="compact"
                             hide-details="auto"
-                        />
-                    </v-col>
-                    <v-col cols="6">
-                        <v-text-field
-                            v-model.number="globalMarginTier.t2"
-                            label="Tier 2 (250 - 499 PCS)"
-                            type="number"
-                            suffix="%"
-                            variant="outlined"
-                            density="compact"
-                            hide-details="auto"
-                        />
-                    </v-col>
-                    <v-col cols="6">
-                        <v-text-field
-                            v-model.number="globalMarginTier.t3"
-                            label="Tier 3 (500 - 749 PCS)"
-                            type="number"
-                            suffix="%"
-                            variant="outlined"
-                            density="compact"
-                            hide-details="auto"
-                        />
-                    </v-col>
-                    <v-col cols="6">
-                        <v-text-field
-                            v-model.number="globalMarginTier.t4"
-                            label="Tier 4 (750 - 999 PCS)"
-                            type="number"
-                            suffix="%"
-                            variant="outlined"
-                            density="compact"
-                            hide-details="auto"
-                        />
-                    </v-col>
-                    <v-col cols="12">
-                        <v-text-field
-                            v-model.number="globalMarginTier.t5"
-                            label="Tier 5 (≥ 1000 PCS)"
-                            type="number"
-                            suffix="%"
-                            variant="outlined"
-                            density="compact"
-                            hide-details="auto"
+                            min="0"
+                            step="0.5"
                         />
                     </v-col>
                 </v-row>
             </v-card-text>
             <v-card-actions class="pa-3 border-t justify-end ga-2">
                 <v-btn
-                    color="primary"
-                    variant="elevated"
+                    variant="text"
                     size="small"
                     @click="marginTierDialog = false"
                 >
-                    Tutup
+                    Batal
+                </v-btn>
+                <v-btn
+                    color="primary"
+                    variant="elevated"
+                    size="small"
+                    :loading="isSavingMargin"
+                    @click="saveMarginTier"
+                >
+                    Simpan ke Database
                 </v-btn>
             </v-card-actions>
         </v-card>

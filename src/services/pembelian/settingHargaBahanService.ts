@@ -25,6 +25,14 @@ export const settingHargaBahanService = {
       `/pembelian/setting-harga-bahan/garmen-tambahan/${encodeURIComponent(ket)}`
     ),
 
+  // --- GARMEN MARGIN TIER ---
+  getMarginGarmen: (model?: string) =>
+    api.get("/pembelian/setting-harga-bahan/garmen-margin", {
+      params: model ? { model } : undefined,
+    }),
+  updateMarginGarmen: (payload: any) =>
+    api.put("/pembelian/setting-harga-bahan/garmen-margin", payload),
+
   // --- SPANDUK ---
   getSpanduk: () => api.get("/pembelian/setting-harga-bahan/spanduk"),
   createSpanduk: (payload: any) =>
