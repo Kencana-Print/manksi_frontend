@@ -233,20 +233,24 @@ const onExport = () => {
     getData: () => {
       const rawData =
         baseBrowseRef.value?.getFilteredItems?.() ?? items.value ?? [];
-      // Kirim Date object asli, JANGAN diformat ke string di sini.
-      // Biar Excel simpan sebagai serial date, tampilan diatur numFmt.
       return rawData.map((r: any) => ({
         ...r,
-        Tanggal: r.Tanggal ? new Date(r.Tanggal) : null,
-        TglKalkulasi: r.TglKalkulasi ? new Date(r.TglKalkulasi) : null,
-        Approved: r.Approved ? new Date(r.Approved) : null,
-        Created: r.Created ? new Date(r.Created) : null,
+        Tanggal: toDateOnly(r.Tanggal),
+        TglKalkulasi: toDateOnly(r.TglKalkulasi),
+        Created: toDateOnly(r.Created), // ← jam dibuang di sini
+        Approved: r.Approved ? new Date(r.Approved) : null, // tetap simpan jam kalau memang perlu jam-nya di kolom Approved sendiri
       }));
     },
     columns,
     sheetName: "Permintaan Harga",
     title: `Data Permintaan Harga — Periode ${startDate.value} s.d ${endDate.value}`,
   });
+};
+
+const toDateOnly = (val: any) => {
+  if (!val) return null;
+  const d = new Date(val);
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate()); // jam dibuang
 };
 
 // ── Pengajuan perubahan (PIN 5) ───────────────────────────────────────
