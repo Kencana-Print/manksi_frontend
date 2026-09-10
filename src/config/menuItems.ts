@@ -315,6 +315,12 @@ export const createMenuItems = (): NavItem[] => {
           menuId: 52,
         },
         {
+          title: "PO Non Bahan",
+          to: "/garmen/barang/po-nonbahan",
+          icon: IconFileInvoice,
+          menuId: 66,
+        },
+        {
           title: "PO External Garmen",
           to: "/pembelian/po-external-garmen",
           icon: IconShoppingBagPlus,
@@ -557,12 +563,6 @@ export const createMenuItems = (): NavItem[] => {
               to: "/garmen/barang/mutasi-out",
               icon: IconTruckDelivery,
               menuId: 70,
-            },
-            {
-              title: "PO Non Bahan",
-              to: "/garmen/barang/po-nonbahan",
-              icon: IconFileInvoice,
-              menuId: 66,
             },
             {
               title: "BPB Non Bahan",
