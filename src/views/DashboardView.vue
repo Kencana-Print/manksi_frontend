@@ -297,6 +297,7 @@ const authStore = useAuthStore();
 const canAccessAiChat = computed(() => authStore.user?.cabang === "HO-");
 const router = useRouter();
 const isSpkDialogVisible = ref(false);
+const isBapAuditDialogVisible = ref(false);
 const activeTab = ref("overview");
 
 watch(activeTab, async (tab) => {
@@ -3119,11 +3120,20 @@ onMounted(async () => {
     activeTab.value = "gudang-bahan";
   }
 
+  // BAP Audit dan SPK Urgent ditampilkan berurutan, bukan bersamaan —
+  // kalau SPK Urgent perlu tampil, BAP Audit menyusul setelah SPK
+  // ditutup (lihat closeSpkDialog). Kalau SPK Urgent TIDAK perlu
+  // tampil, BAP Audit langsung tampil di sini.
   if (
     authStore.spkUrgent?.length > 0 &&
     !sessionStorage.getItem("hasSeenSpk")
   ) {
     isSpkDialogVisible.value = true;
+  } else if (
+    authStore.bapBaruAudit?.length > 0 &&
+    !sessionStorage.getItem("hasSeenBapAudit")
+  ) {
+    isBapAuditDialogVisible.value = true;
   }
 
   // Overview SELALU di-fetch (tab-nya selalu terlihat)
@@ -3217,6 +3227,22 @@ onUnmounted(() => {
 const closeSpkDialog = () => {
   isSpkDialogVisible.value = false;
   sessionStorage.setItem("hasSeenSpk", "true");
+  // Tampilkan dialog BAP Audit SETELAH dialog SPK ditutup, bukan bersamaan
+  if (
+    authStore.bapBaruAudit?.length > 0 &&
+    !sessionStorage.getItem("hasSeenBapAudit")
+  ) {
+    isBapAuditDialogVisible.value = true;
+  }
+};
+
+const closeBapAuditDialog = () => {
+  isBapAuditDialogVisible.value = false;
+  sessionStorage.setItem("hasSeenBapAudit", "true");
+};
+const goToBapDetail = (nomor: string) => {
+  closeBapAuditDialog();
+  router.push(`/daftar/berita-acara/edit/${encodeURIComponent(nomor)}`);
 };
 
 const goToKunjunganDetail = (namaSales?: string) => {
@@ -8957,6 +8983,84 @@ const sisaClass = (item: any) => {
               </tr>
             </tbody>
           </table>
+        </div>
+      </v-card>
+    </v-dialog>
+
+    <v-dialog v-model="isBapAuditDialogVisible" persistent max-width="900px">
+      <v-card class="spk-dialog-card" rounded="lg">
+        <div
+          class="spk-header"
+          style="background: linear-gradient(135deg, #6a1b9a 0%, #8e24aa 100%)"
+        >
+          <div class="spk-header-left">
+            <div class="spk-header-icon">
+              <IconClipboardList :size="18" :stroke-width="1.6" color="white" />
+            </div>
+            <div>
+              <div class="spk-header-title">
+                Berita Acara / Komplain Produksi Baru
+              </div>
+              <div class="spk-header-sub">
+                {{ authStore.bapBaruAudit?.length }} BAP belum direview
+              </div>
+            </div>
+          </div>
+          <v-btn
+            icon
+            variant="text"
+            size="small"
+            color="white"
+            @click="closeBapAuditDialog"
+          >
+            <IconX :size="18" :stroke-width="2" />
+          </v-btn>
+        </div>
+
+        <div class="spk-table-wrap">
+          <table class="spk-table">
+            <thead>
+              <tr>
+                <th class="col-spk">Nomor</th>
+                <th class="col-tgl">Tanggal</th>
+                <th style="width: 130px">Tipe</th>
+                <th style="width: 120px">Bagian</th>
+                <th class="col-nama">Permasalahan</th>
+                <th class="col-cab">Cab</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="(item, index) in authStore.bapBaruAudit"
+                :key="index"
+                style="cursor: pointer"
+                @click="goToBapDetail(item.Nomor)"
+              >
+                <td class="col-spk">
+                  <span class="spk-badge">{{ item.Nomor }}</span>
+                </td>
+                <td class="col-tgl">{{ item.Tanggal }}</td>
+                <td>{{ item.Tipe }}</td>
+                <td>{{ item.BagNama }}</td>
+                <td class="col-nama">{{ item.Masalah }}</td>
+                <td class="col-cab">{{ item.Cab || "—" }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="spk-footer">
+          <span class="text-caption text-grey"
+            >Klik baris untuk membuka & review</span
+          >
+          <v-btn
+            color="primary"
+            variant="flat"
+            size="small"
+            @click="closeBapAuditDialog"
+          >
+            Tutup
+          </v-btn>
         </div>
       </v-card>
     </v-dialog>

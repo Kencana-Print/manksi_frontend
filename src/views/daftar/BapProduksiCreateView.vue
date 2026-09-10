@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from "vue";
 import api from "@/services/api";
+import { useAuthStore } from "@/stores/authStore";
 import { useToast } from "vue-toastification";
 import { useForm } from "@/composables/useForm";
 import { useRoute, useRouter } from "vue-router";
@@ -31,6 +32,9 @@ interface BapData {
   Solusi: string;
   Pertanggungjawaban: string;
   Approve: string | boolean;
+  ReviewAudit: string;
+  ReviewAuditBy: string;
+  ReviewAuditTgl: string | null;
   StatusEdit: string;
   UrutPin5: number;
   Kategori: string[];
@@ -44,6 +48,7 @@ interface SaveResponse {
   };
 }
 
+const authStore = useAuthStore();
 const route = useRoute();
 const tabsStore = useTabsStore();
 const toast = useToast();
@@ -68,6 +73,9 @@ const initialBapData = {
   Solusi: "",
   Pertanggungjawaban: "",
   Approve: false,
+  ReviewAudit: "N",
+  ReviewAuditBy: "",
+  ReviewAuditTgl: null,
   StatusEdit: "",
   UrutPin5: 0,
   Kategori: [] as string[],
@@ -279,9 +287,35 @@ const isFormDisabled = computed(
     ["WAIT", "TOLAK", "MINTA"].includes(statusPengajuan.value),
 );
 
+const isAudit = computed(
+  () => (authStore.user?.bagian || "").toUpperCase() === "AUDIT",
+);
+const isMarkingReview = ref(false);
+
+const markReview = async () => {
+  if (!formData.value.Nomor) return;
+  isMarkingReview.value = true;
+  try {
+    await api.post(
+      `/master/bap-produksi-form/${encodeURIComponent(formData.value.Nomor)}/review-audit`,
+    );
+    formData.value.ReviewAudit = "Y";
+    formData.value.ReviewAuditBy = authStore.user?.kode || "";
+    toast.success("BAP ditandai sudah direview.");
+  } catch (e) {
+    toast.error("Gagal menandai review.");
+  } finally {
+    isMarkingReview.value = false;
+  }
+};
+
 const handlePreSave = async () => {
   const { valid } = await vFormRef.value!.validate();
   if (!valid) return;
+  if (formData.value.Kategori.length === 0) {
+    toast.error("Kategori wajib dipilih minimal 1 sebelum menyimpan.");
+    return;
+  }
   if (isFormDisabled.value) {
     toast.warning("Belum bisa menyimpan. Status: " + statusPengajuan.value);
     return;
@@ -396,8 +430,13 @@ const handlePreSave = async () => {
                   />
                 </div>
                 <div class="f-row">
-                  <label class="f-lbl">Kategori</label>
-                  <div class="f-multi-check">
+                  <label class="f-lbl"
+                    >Kategori <span class="req">*</span></label
+                  >
+                  <div
+                    class="f-multi-check"
+                    :class="{ 'kat-error': formData.Kategori.length === 0 }"
+                  >
                     <label
                       v-for="kat in KATEGORI_OPTIONS"
                       :key="kat"
@@ -430,6 +469,31 @@ const handlePreSave = async () => {
                   />
                   <span>APPROVE</span>
                 </label>
+
+                <button
+                  v-if="isAudit && isEditMode"
+                  type="button"
+                  class="btn-add-kar"
+                  :disabled="formData.ReviewAudit === 'Y' || isMarkingReview"
+                  style="width: 100%; height: 32px; font-size: 11px"
+                  :style="
+                    formData.ReviewAudit === 'Y'
+                      ? {
+                          background: '#e8f5e9',
+                          color: '#2e7d32',
+                          borderColor: '#a5d6a7',
+                          cursor: 'default',
+                        }
+                      : {}
+                  "
+                  @click="markReview"
+                >
+                  {{
+                    formData.ReviewAudit === "Y"
+                      ? `✔ Direview oleh ${formData.ReviewAuditBy}`
+                      : "Tandai Sudah Direview"
+                  }}
+                </button>
 
                 <!-- Karyawan Terlibat -->
                 <div class="kar-panel">
@@ -952,6 +1016,11 @@ const handlePreSave = async () => {
 }
 .ta-error {
   border-color: #e53935 !important;
+}
+.kat-error {
+  padding: 4px;
+  border: 1px solid #e53935;
+  border-radius: 4px;
 }
 
 /* ── Footer ── */

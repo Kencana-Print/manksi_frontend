@@ -67,9 +67,19 @@ interface LoginResponse {
   user: User;
   permissions: Permission[];
   spkUrgent: SpkUrgentItem[];
+  bapBaruAudit: BapBaruItem[];
   isDefaultPassword?: boolean;
   specialMessage?: string | null;
   message: string;
+}
+
+interface BapBaruItem {
+  Nomor: string;
+  Tanggal: string;
+  Tipe: string;
+  BagNama: string;
+  Masalah: string;
+  Cab: string;
 }
 
 export const useAuthStore = defineStore(
@@ -82,6 +92,7 @@ export const useAuthStore = defineStore(
     const user = ref<User | null>(null);
     const permissions = ref<Permission[]>([]);
     const spkUrgent = ref<SpkUrgentItem[]>([]);
+    const bapBaruAudit = ref<BapBaruItem[]>([]);
     const isSessionExpired = ref(false);
     const isOnline = ref(navigator.onLine);
     const approvalPendingTotal = ref(0);
@@ -160,6 +171,7 @@ export const useAuthStore = defineStore(
       user.value = loginResponse.user;
       permissions.value = loginResponse.permissions || [];
       spkUrgent.value = loginResponse.spkUrgent || [];
+      bapBaruAudit.value = loginResponse.bapBaruAudit || [];
 
       // Router push akan ditangani di komponen Login.vue agar bisa show modal SPK dulu
     }
@@ -170,6 +182,9 @@ export const useAuthStore = defineStore(
       user.value = null;
       permissions.value = [];
       spkUrgent.value = [];
+      bapBaruAudit.value = [];
+      sessionStorage.removeItem("hasSeenSpk");
+      sessionStorage.removeItem("hasSeenBapAudit");
       useTabsStore().resetTabs();
       router.push("/login");
     }
@@ -193,6 +208,7 @@ export const useAuthStore = defineStore(
       user.value = null;
       permissions.value = [];
       spkUrgent.value = [];
+      bapBaruAudit.value = [];
       isSessionExpired.value = true;
       useTabsStore().resetTabs();
     }
@@ -207,6 +223,7 @@ export const useAuthStore = defineStore(
       user,
       permissions,
       spkUrgent,
+      bapBaruAudit,
       isSessionExpired,
       isOnline,
       approvalPendingTotal,
