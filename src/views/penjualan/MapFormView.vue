@@ -443,6 +443,14 @@ const validateSave = async (skipPoCheck = false) => {
     toast.warning("Jenis Order wajib diisi.");
     return;
   }
+  const divisiChar = String(formData.value.Divisi || "").charAt(0);
+  if (
+    ["3", "4"].includes(divisiChar) &&
+    (!formData.value.TipeSpk || !formData.value.TipeSpk.trim())
+  ) {
+    toast.warning("Tipe Memo (Premium/Medium) wajib diisi untuk divisi ini.");
+    return;
+  }
 
   try {
     const divisi = String(formData.value.Divisi || "").charAt(0);

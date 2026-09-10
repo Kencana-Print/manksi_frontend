@@ -963,6 +963,19 @@ const loadDataMemo = async (nomor: string) => {
         return acc;
       }, {});
 
+      // ⚠️ BARU: MAP divisi Garmen (4) wajib sudah dibuatkan Cetak BAST
+      // (menu Berita Acara/Kesesuaian MAP) sebelum bisa dipakai di SO —
+      // dicek dari flag mspk_bastnew yang di-set saat BAST MAP disimpan.
+      const divisiMap = String(h.mspk_divisi || "").charAt(0);
+      if (divisiMap === "4" && Number(h.mspk_bastnew) !== 1) {
+        toast.error(
+          "MAP ini belum dibuatkan Cetak BAST. Silakan buat BAST MAP terlebih dahulu sebelum bisa dipakai di SO.",
+          { timeout: 8000 },
+        );
+        formData.value.spk_memo = "";
+        return;
+      }
+
       // Assign semua field KECUALI divisi dulu
       formData.value.spk_perush_kode = h.mspk_perush_kode || "";
       formData.value.NamaPerusahaan = h.perush_nama || "";
@@ -1091,6 +1104,11 @@ const loadMapFromSjMemo = async (nomorSj: string) => {
 const applyMapFromSj = async (mspkNomor: string) => {
   formData.value.spk_memo = mspkNomor;
   await loadDataMemo(mspkNomor); // reuse auto-fill MAP yang sudah ada
+  if (!formData.value.spk_memo) {
+    // Validasi BAST gagal — batalkan juga SJ Memo-nya, karena satu paket
+    formData.value.spk_nomormemo = "";
+    return;
+  }
   isMapLocked.value = true; // MAP terkunci, sumbernya dari SJ Memo
   isSjMemoLocked.value = false; // SJ Memo tetap jadi field driver, tetap bisa diganti
 };
@@ -1103,6 +1121,7 @@ const pickSjMemoMapOption = (row: any) => {
 // Alur 2: MAP dipilih langsung → cari SJ Memo terkait, lock kalau ketemu tepat 1
 const selectMapDirectly = async (nomorMap: string) => {
   await loadDataMemo(nomorMap);
+  if (!formData.value.spk_memo) return; // validasi BAST gagal, MAP dibatalkan
   isMapLocked.value = false; // MAP adalah field driver di alur ini
 
   try {
