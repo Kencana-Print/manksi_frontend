@@ -17,6 +17,8 @@ import {
   IconPackage,
   IconTarget,
   IconSparkles,
+  IconMicrophone,
+  IconMicrophoneOff,
 } from "@tabler/icons-vue";
 import { useAuthStore } from "@/stores/authStore";
 const authStore = useAuthStore();
@@ -28,6 +30,51 @@ const isOpen = ref(false);
 const isSending = ref(false);
 const inputText = ref("");
 const messagesEl = ref<HTMLElement | null>(null);
+
+// ── Voice input (Web Speech API bawaan browser, gratis) ──
+const isListening = ref(false);
+const isSpeechSupported =
+  typeof window !== "undefined" &&
+  ("SpeechRecognition" in window || "webkitSpeechRecognition" in window);
+let recognition: any = null;
+
+if (isSpeechSupported) {
+  const SpeechRecognitionCtor =
+    (window as any).SpeechRecognition ||
+    (window as any).webkitSpeechRecognition;
+  recognition = new SpeechRecognitionCtor();
+  recognition.lang = "id-ID";
+  recognition.continuous = false;
+  recognition.interimResults = true;
+
+  recognition.onresult = (event: any) => {
+    let transcript = "";
+    for (let i = 0; i < event.results.length; i++) {
+      transcript += event.results[i][0].transcript;
+    }
+    inputText.value = transcript;
+  };
+
+  recognition.onend = () => {
+    isListening.value = false;
+  };
+
+  recognition.onerror = () => {
+    isListening.value = false;
+  };
+}
+
+const toggleListening = () => {
+  if (!isSpeechSupported || !recognition) return;
+  if (isListening.value) {
+    recognition.stop();
+    isListening.value = false;
+  } else {
+    inputText.value = "";
+    recognition.start();
+    isListening.value = true;
+  }
+};
 
 interface DisplayMsg {
   role: "user" | "assistant";
@@ -336,10 +383,25 @@ const truncate = (s: string, n: number) =>
         <textarea
           v-model="inputText"
           rows="1"
-          placeholder="Tanyakan SPK, piutang, produksi, dll..."
+          :placeholder="
+            isListening
+              ? 'Mendengarkan...'
+              : 'Tanyakan SPK, piutang, produksi, dll...'
+          "
           :disabled="isSending"
           @keydown.enter="onEnter"
         />
+        <button
+          v-if="isSpeechSupported"
+          class="ai-mic-btn"
+          :class="{ 'ai-mic-btn--active': isListening }"
+          :disabled="isSending"
+          :title="isListening ? 'Berhenti merekam' : 'Bicara'"
+          @click="toggleListening"
+        >
+          <IconMicrophoneOff v-if="isListening" :size="16" />
+          <IconMicrophone v-else :size="16" />
+        </button>
         <button
           class="ai-send-btn"
           :disabled="isSending || !inputText.trim()"
@@ -744,5 +806,40 @@ const truncate = (s: string, n: number) =>
 }
 .ai-send-btn:not(:disabled):hover {
   background: #1565c0;
+}
+.ai-mic-btn {
+  background: #f0f0f0;
+  color: #616161;
+  border: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+.ai-mic-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.ai-mic-btn:not(:disabled):hover {
+  background: #e0e0e0;
+}
+.ai-mic-btn--active {
+  background: #e53935;
+  color: white;
+  animation: ai-mic-pulse 1.4s infinite;
+}
+@keyframes ai-mic-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(229, 57, 53, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(229, 57, 53, 0);
+  }
 }
 </style>
