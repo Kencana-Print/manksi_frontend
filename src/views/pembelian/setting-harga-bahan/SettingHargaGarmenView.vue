@@ -246,8 +246,44 @@ const saveMarginTier = async () => {
     }
 };
 
+// Master Biaya Jahit dari tmintaharga_biaya (mhb_jenis = 'JAHIT')
+const biayaJahitList = ref<
+    { mhb_jenis: string; mhb_ket: string; mhb_biaya: number }[]
+>([]);
+
+const fetchBiayaJahit = async () => {
+    try {
+        const res = await settingHargaBahanService.getBiayaJahitGarmen();
+        biayaJahitList.value = res.data.data || [];
+    } catch (err: any) {
+        console.error("Gagal mengambil master biaya jahit:", err);
+    }
+};
+
+const getBiayaKonveksiByKtg = (ktg: string): number => {
+    const cleanKtg = (ktg || "").trim().toUpperCase();
+    if (biayaJahitList.value.length > 0) {
+        const match = biayaJahitList.value.find(
+            (b) => (b.mhb_ket || "").trim().toUpperCase() === cleanKtg,
+        );
+        if (match && match.mhb_biaya !== undefined) {
+            return Number(match.mhb_biaya) || 0;
+        }
+        const fallback = biayaJahitList.value.find(
+            (b) => (b.mhb_ket || "").trim() === "-",
+        );
+        if (fallback && fallback.mhb_biaya !== undefined) {
+            return Number(fallback.mhb_biaya) || 0;
+        }
+    }
+    const isSport =
+        cleanKtg === "PE" || cleanKtg === "HYGIT" || cleanKtg === "DRYFIT";
+    return isSport ? 2000 : 5000;
+};
+
 onMounted(() => {
     fetchMarginGarmen();
+    fetchBiayaJahit();
 });
 
 // Custom settings override untuk Harga, Allowance, Biaya Jahit dan Margin Tier per item kain
@@ -347,7 +383,7 @@ const parseKainData = (kodeModel: "KH-0001" | "KH-0002") => {
 
         if (komp === "BODY" && val > 0) b.body = val;
         else if (komp === "LENGAN" && val > 0) b.lengan = val;
-        else if (komp === "RIB" && val > 0) b.rib = val;
+        else if (komp === "RIB" && val >= 50) b.rib = val;
         else if (val > 0 && b.body === 0) b.body = val;
 
         if (item.mhk_lengan) b.lenganText = item.mhk_lengan;
@@ -381,19 +417,22 @@ const parseKainData = (kodeModel: "KH-0001" | "KH-0002") => {
             kodeModel === "KH-0002" && b.lengan > 0
                 ? hargaBahan / b.lengan / 1.11
                 : 0;
-        const hargaRib = b.rib > 0 ? hargaBahan / b.rib / 1.11 : 0;
+        const hargaRib =
+            customSet.hargaBahan !== undefined
+                ? Math.round((hargaBahan / 1.11 + 1500) / 70)
+                : item.mhk_harga_rib !== undefined && item.mhk_harga_rib !== null
+                  ? Number(item.mhk_harga_rib)
+                  : Math.round((hargaBahan / 1.11 + 1500) / 70);
 
         const totalHargaBahan = hargaBody + hargaLengan + hargaRib;
         const allowanceRp = totalHargaBahan * (allowancePersen / 100);
         const totalBahan = totalHargaBahan + allowanceRp;
 
-        // Biaya Konveksi / Jahit (Default: 5610 / 2800, dapat di-override)
+        // Biaya Konveksi / Jahit dari tmintaharga_biaya (mhb_jenis = 'JAHIT')
         const biayaKonveksi =
             customSet.biayaJahit !== undefined
                 ? customSet.biayaJahit
-                : isSport
-                  ? 2800
-                  : 5610;
+                : getBiayaKonveksiByKtg(ktg);
         const hpp = totalBahan + biayaKonveksi;
 
         // Tangga Margin Qty
@@ -980,7 +1019,7 @@ const getOldValue = (row: any, field: "harga" | "allow" | "konveksi") => {
         row.ktg === "PE" || row.ktg === "HYGIT" || row.ktg === "DRYFIT";
     if (field === "harga") return Number(raw.mhk_harga) || 0;
     if (field === "allow") return Number(raw.mhk_allow) || (isSport ? 5 : 17);
-    if (field === "konveksi") return isSport ? 2800 : 5610;
+    if (field === "konveksi") return getBiayaKonveksiByKtg(row.ktg);
     return 0;
 };
 
@@ -992,16 +1031,39 @@ const executeSaveAllInlineChanges = async () => {
             const raw = row.rawItem || row;
             const payload = {
                 ...raw,
+                mhk_kode:
+                    raw.mhk_kode ||
+                    row.kode ||
+                    (activeSub.value === "kh0001" ? "KH-0001" : "KH-0002"),
+                mhk_ktg: raw.mhk_ktg || row.ktg || "",
+                mhk_jeniskain: raw.mhk_jeniskain || row.jenisKain || "",
+                mhk_warna: raw.mhk_warna || row.warna || "",
+                mhk_komponen:
+                    raw.mhk_komponen !== undefined
+                        ? raw.mhk_komponen
+                        : row.komponen || "",
+                mhk_lengan:
+                    raw.mhk_lengan !== undefined
+                        ? raw.mhk_lengan
+                        : row.lengan || "",
+                mhk_babaran:
+                    raw.mhk_babaran !== undefined
+                        ? raw.mhk_babaran
+                        : row.babaranBody || 0,
                 mhk_harga: row.hargaBahan,
                 mhk_allow: row.allowancePersen,
+                old_kode:
+                    raw.mhk_kode ||
+                    row.kode ||
+                    (activeSub.value === "kh0001" ? "KH-0001" : "KH-0002"),
                 old_jeniskain: raw.mhk_jeniskain || row.jenisKain,
                 old_warna: raw.mhk_warna || row.warna,
-                old_komponen: raw.mhk_komponen || "BODY",
-                old_lengan: raw.mhk_lengan || row.lengan || "PENDEK",
             };
             await settingHargaBahanService.updateKainGarmen("update", payload);
             if (customKainSettings.value[row.rowId]) {
-                customKainSettings.value[row.rowId].isDirty = false;
+                delete customKainSettings.value[row.rowId].isDirty;
+                delete customKainSettings.value[row.rowId].hargaBahan;
+                delete customKainSettings.value[row.rowId].allowancePersen;
             }
         }
         customKainSettings.value = { ...customKainSettings.value };
@@ -1190,7 +1252,7 @@ const kainForm = reactive({
     mhk_warna: "MUDA",
     mhk_harga: 0,
     mhk_allow: 17,
-    biayaJahit: 5610,
+    biayaJahit: 5000,
     tier1_margin_pct: 20,
     tier2_margin_pct: 15,
     tier3_margin_pct: 10,
@@ -1237,7 +1299,7 @@ const handleAdd = () => {
             mhk_warna: "MUDA",
             mhk_harga: 0,
             mhk_allow: 17,
-            biayaJahit: 5610,
+            biayaJahit: getBiayaKonveksiByKtg("COTTON"),
             tier1_margin_pct: 20,
             tier2_margin_pct: 15,
             tier3_margin_pct: 10,
@@ -1275,7 +1337,9 @@ const handleEdit = (item?: any) => {
             (raw.mhk_ktg || target.ktg || "").toUpperCase() === "PE" ||
             (raw.mhk_ktg || target.ktg || "").toUpperCase() === "HYGIT" ||
             (raw.mhk_ktg || target.ktg || "").toUpperCase() === "DRYFIT";
-        const rowId = `${raw.mhk_kode || target.kode}_${raw.mhk_jeniskain || target.jenisKain}_${raw.mhk_warna || target.warna}_${raw.mhk_komponen || "BODY"}`;
+        const rowId =
+            target.rowId ||
+            `${raw.mhk_kode || target.kode}_${raw.mhk_jeniskain || target.jenisKain}_${raw.mhk_warna || target.warna}_${raw.mhk_komponen || ""}`;
         const savedCustom = customKainSettings.value[rowId] || {};
 
         Object.assign(kainForm, {
@@ -1286,25 +1350,47 @@ const handleEdit = (item?: any) => {
                 (activeSub.value === "kh0001" ? "KH-0001" : "KH-0002"),
             mhk_ktg: raw.mhk_ktg || target.ktg || "COTTON",
             mhk_jeniskain: raw.mhk_jeniskain || target.jenisKain,
-            mhk_lengan: raw.mhk_lengan || target.lengan || "PENDEK",
-            mhk_komponen: raw.mhk_komponen || "BODY",
+            mhk_lengan:
+                raw.mhk_lengan !== undefined
+                    ? raw.mhk_lengan
+                    : target.lengan || "",
+            mhk_komponen:
+                raw.mhk_komponen !== undefined
+                    ? raw.mhk_komponen
+                    : target.komponen || "",
             mhk_warna: raw.mhk_warna || target.warna,
             mhk_babaran:
                 Number(
-                    raw.mhk_babaran || target.babaranBody || target.babaran,
+                    raw.mhk_babaran !== undefined
+                        ? raw.mhk_babaran
+                        : target.babaranBody || target.babaran,
                 ) || 0,
-            mhk_harga: Number(raw.mhk_harga || target.hargaBahan) || 0,
-            mhk_allow: Number(raw.mhk_allow || target.allowancePersen) || 17,
-            biayaJahit: savedCustom.biayaJahit ?? (isSport ? 2800 : 5610),
+            mhk_harga:
+                Number(
+                    target.hargaBahan !== undefined
+                        ? target.hargaBahan
+                        : raw.mhk_harga,
+                ) || 0,
+            mhk_allow:
+                Number(
+                    target.allowancePersen !== undefined
+                        ? target.allowancePersen
+                        : raw.mhk_allow,
+                ) || 17,
+            biayaJahit:
+                savedCustom.biayaJahit ??
+                getBiayaKonveksiByKtg(raw.mhk_ktg || target.ktg),
             tier1_margin_pct: savedCustom.t1 ?? 20,
             tier2_margin_pct: savedCustom.t2 ?? 15,
             tier3_margin_pct: savedCustom.t3 ?? 10,
             tier4_margin_pct: savedCustom.t4 ?? 7.5,
             tier5_margin_pct: savedCustom.t5 ?? 2,
+            old_kode:
+                raw.mhk_kode ||
+                target.kode ||
+                (activeSub.value === "kh0001" ? "KH-0001" : "KH-0002"),
             old_jeniskain: raw.mhk_jeniskain || target.jenisKain,
             old_warna: raw.mhk_warna || target.warna,
-            old_komponen: raw.mhk_komponen || "BODY",
-            old_lengan: raw.mhk_lengan || target.lengan || "PENDEK",
         });
         kainDialog.value = true;
     }
@@ -1325,7 +1411,15 @@ const handleDelete = (item?: any) => {
         const target = item || selectedRow.value;
         if (!target) return;
         const raw = target.rawItem || target;
-        kainToDelete.value = raw;
+        kainToDelete.value = {
+            ...raw,
+            mhk_kode:
+                raw.mhk_kode ||
+                target.kode ||
+                (activeSub.value === "kh0001" ? "KH-0001" : "KH-0002"),
+            mhk_jeniskain: raw.mhk_jeniskain || target.jenisKain,
+            mhk_warna: raw.mhk_warna || target.warna,
+        };
         confirmKainDelete.value = true;
     }
 };
@@ -1369,6 +1463,7 @@ const handleRefresh = () => {
         fetchTambahan();
     } else {
         fetchKain();
+        fetchBiayaJahit();
         fetchMarginGarmen();
     }
 };
@@ -1690,7 +1785,7 @@ const handleExport = async () => {
                 } else if (key === "hargaRib") {
                     if (hrgBahanCol) {
                         values.push({
-                            formula: `=${hrgBahanCol}${r}/70/1.11`,
+                            formula: `=(${hrgBahanCol}${r}/1.11+1500)/70`,
                             result: row.hargaRib,
                         });
                     } else {
@@ -1965,8 +2060,12 @@ const executeSaveKain = async () => {
             await settingHargaBahanService.updateKainGarmen("update", kainForm);
 
             // Simpan override setting jahit & margin tier
-            const rowId = `${kainForm.mhk_kode}_${kainForm.mhk_jeniskain}_${kainForm.mhk_warna}_${kainForm.mhk_komponen || "BODY"}`;
+            const rowId = `${kainForm.mhk_kode}_${kainForm.mhk_jeniskain}_${kainForm.mhk_warna}_${kainForm.mhk_komponen || ""}`;
+            if (!customKainSettings.value[rowId]) {
+                customKainSettings.value[rowId] = {};
+            }
             customKainSettings.value[rowId] = {
+                ...customKainSettings.value[rowId],
                 biayaJahit: kainForm.biayaJahit,
                 t1: kainForm.tier1_margin_pct,
                 t2: kainForm.tier2_margin_pct,
@@ -1974,6 +2073,9 @@ const executeSaveKain = async () => {
                 t4: kainForm.tier4_margin_pct,
                 t5: kainForm.tier5_margin_pct,
             };
+            delete customKainSettings.value[rowId].hargaBahan;
+            delete customKainSettings.value[rowId].allowancePersen;
+            delete customKainSettings.value[rowId].isDirty;
 
             toast.success(
                 "Harga bahan, allowance, jahit, dan margin berhasil diperbarui",
@@ -3692,9 +3794,6 @@ const executeSaveTambahan = async () => {
                     :loading="isSavingInline"
                     @click="executeSaveAllInlineChanges"
                 >
-                    <template #prepend>
-                        <IconSparkles :size="15" />
-                    </template>
                     Konfirmasi & Simpan ke Database
                 </v-btn>
             </v-card-actions>
