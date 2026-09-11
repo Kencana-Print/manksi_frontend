@@ -28,6 +28,7 @@ interface TabRow {
   plan_qty_po: number;
   plan_qty_jadwal: number;
   plan_line_kelompok: string; // tidak dipakai di koli
+  plan_keterangan: string;
   supplierKode: string;
   supplierNama: string;
   _key: number;
@@ -136,6 +137,7 @@ const emptyRow = (defaultTgl: string): TabRow => ({
   plan_qty_po: 0,
   plan_qty_jadwal: 0,
   plan_line_kelompok: "",
+  plan_keterangan: "",
   supplierKode: "",
   supplierNama: "",
   _spkDetail: "",
@@ -153,6 +155,7 @@ const mapRow = (r: any, defaultTgl: string): TabRow => ({
   plan_qty_po: Number(r.plan_qty_po) || 0,
   plan_qty_jadwal: Number(r.plan_qty_jadwal) || 0,
   plan_line_kelompok: r.plan_line_kelompok ?? "",
+  plan_keterangan: r.plan_keterangan ?? "",
   supplierKode: r.supplierKode ?? "",
   supplierNama: r.supplierNama ?? "",
   _spkDetail: r.NamaSPK ? `${r.NomorSPK} | ${r.NamaSPK} | ${r.QtySPK} pcs` : "",
@@ -710,7 +713,7 @@ watch(
                     <th style="width: 80px" class="tr">Qty PO</th>
                     <th style="width: 85px" class="tr bg-yellow">Qty Jadwal</th>
                     <th style="width: 150px">Line/Kelompok</th>
-
+                    <th style="width: 150px">Keterangan</th>
                     <th style="width: 32px"></th>
                   </tr>
                 </thead>
@@ -792,6 +795,15 @@ watch(
                         placeholder="Bebas..."
                       />
                     </td>
+                    <td style="padding: 0">
+                      <input
+                        type="text"
+                        v-model="row.plan_keterangan"
+                        class="gi"
+                        maxlength="200"
+                        placeholder="Keterangan..."
+                      />
+                    </td>
                     <td class="tc" style="padding: 0">
                       <button
                         type="button"
@@ -803,7 +815,7 @@ watch(
                     </td>
                   </tr>
                   <tr v-if="!formData.detail.cutting.length">
-                    <td colspan="10" class="empty-row">Klik + Tambah Baris</td>
+                    <td colspan="11" class="empty-row">Klik + Tambah Baris</td>
                   </tr>
                 </tbody>
               </table>
@@ -837,6 +849,7 @@ watch(
                     <th style="width: 150px">Line/Kelompok</th>
                     <th style="width: 130px">Supplier</th>
                     <th style="width: 160px">Nama Supplier</th>
+                    <th style="width: 150px">Keterangan</th>
                     <th style="width: 32px"></th>
                   </tr>
                 </thead>
@@ -962,6 +975,15 @@ watch(
                     <td class="ro-cell" :title="row.supplierNama">
                       {{ isExternalLine(row) ? row.supplierNama || "—" : "—" }}
                     </td>
+                    <td style="padding: 0">
+                      <input
+                        type="text"
+                        v-model="row.plan_keterangan"
+                        class="gi"
+                        maxlength="200"
+                        placeholder="Keterangan..."
+                      />
+                    </td>
                     <td class="tc" style="padding: 0">
                       <button
                         type="button"
@@ -973,7 +995,7 @@ watch(
                     </td>
                   </tr>
                   <tr v-if="!formData.detail.sewing.length">
-                    <td colspan="12" class="empty-row">Klik + Tambah Baris</td>
+                    <td colspan="13" class="empty-row">Klik + Tambah Baris</td>
                   </tr>
                 </tbody>
               </table>
@@ -1004,6 +1026,7 @@ watch(
                     <th style="width: 80px" class="tr">WIP</th>
                     <th style="width: 80px" class="tr">Qty PO</th>
                     <th style="width: 85px" class="tr bg-yellow">Qty Jadwal</th>
+                    <th style="width: 150px">Keterangan</th>
                     <th style="width: 32px"></th>
                   </tr>
                 </thead>
@@ -1079,6 +1102,15 @@ watch(
                         v-select-on-focus
                       />
                     </td>
+                    <td style="padding: 0">
+                      <input
+                        type="text"
+                        v-model="row.plan_keterangan"
+                        class="gi"
+                        maxlength="200"
+                        placeholder="Keterangan..."
+                      />
+                    </td>
                     <td class="tc" style="padding: 0">
                       <button
                         type="button"
@@ -1090,7 +1122,7 @@ watch(
                     </td>
                   </tr>
                   <tr v-if="!formData.detail.koli.length">
-                    <td colspan="9" class="empty-row">Klik + Tambah Baris</td>
+                    <td colspan="10" class="empty-row">Klik + Tambah Baris</td>
                   </tr>
                 </tbody>
               </table>

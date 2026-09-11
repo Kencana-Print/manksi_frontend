@@ -30,6 +30,7 @@ interface DetailRow {
   QtyPo: number;
   QtyJadwal: number;
   LineKelompok: string;
+  Keterangan: string;
 }
 interface DetailCache {
   cutting: DetailRow[];
@@ -338,6 +339,7 @@ const doExportDetail = async () => {
           QtyPO: Number(r.QtyPO) || 0,
           QtyJadwal: Number(r.QtyJadwal) || 0,
           LineKelompok: r.LineKelompok || "-",
+          Keterangan: r.Keterangan || "-",
         });
       });
     });
@@ -364,6 +366,7 @@ const doExportDetail = async () => {
           numFmt: "#,##0",
         },
         { header: "Line/Kelompok", key: "LineKelompok" },
+        { header: "Keterangan", key: "Keterangan" },
       ],
       combinedRows,
     );
@@ -555,6 +558,7 @@ fetchData();
                     <th class="tr">Qty PO</th>
                     <th class="tr">Qty Jadwal</th>
                     <th>Line/Kelompok</th>
+                    <th>Keterangan</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -569,9 +573,10 @@ fetchData();
                     <td class="tr">{{ fmt(d.QtyPo) }}</td>
                     <td class="tr fw">{{ fmt(d.QtyJadwal) }}</td>
                     <td>{{ d.LineKelompok || "—" }}</td>
+                    <td>{{ d.Keterangan || "—" }}</td>
                   </tr>
                   <tr v-if="!detailCache[item.Nomor].cutting.length">
-                    <td colspan="5" class="empty-row">
+                    <td colspan="8" class="empty-row">
                       Tidak ada data cutting
                     </td>
                   </tr>
@@ -591,6 +596,7 @@ fetchData();
                     <th class="tr">Qty PO</th>
                     <th class="tr">Qty Jadwal</th>
                     <th>Line/Kelompok</th>
+                    <th>Keterangan</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -602,9 +608,10 @@ fetchData();
                     <td class="tr">{{ fmt(d.QtyPo) }}</td>
                     <td class="tr fw">{{ fmt(d.QtyJadwal) }}</td>
                     <td>{{ d.LineKelompok || "—" }}</td>
+                    <td>{{ d.Keterangan || "—" }}</td>
                   </tr>
                   <tr v-if="!detailCache[item.Nomor].sewing.length">
-                    <td colspan="5" class="empty-row">Tidak ada data sewing</td>
+                    <td colspan="8" class="empty-row">Tidak ada data sewing</td>
                   </tr>
                 </tbody>
               </table>
@@ -622,6 +629,7 @@ fetchData();
                     <th class="tr">Qty PO</th>
                     <th class="tr">Qty Jadwal</th>
                     <th>Line/Kelompok</th>
+                    <th>Keterangan</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -633,9 +641,10 @@ fetchData();
                     <td class="tr">{{ fmt(d.QtyPo) }}</td>
                     <td class="tr fw">{{ fmt(d.QtyJadwal) }}</td>
                     <td>{{ d.LineKelompok || "—" }}</td>
+                    <td>{{ d.Keterangan || "—" }}</td>
                   </tr>
                   <tr v-if="!detailCache[item.Nomor].koli.length">
-                    <td colspan="5" class="empty-row">Tidak ada data koli</td>
+                    <td colspan="8" class="empty-row">Tidak ada data koli</td>
                   </tr>
                 </tbody>
               </table>
