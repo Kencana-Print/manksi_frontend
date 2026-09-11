@@ -361,10 +361,17 @@ const parseKainData = (kodeModel: "KH-0001" | "KH-0002") => {
         (item: any) => (item.mhk_kode || "").toUpperCase() === kodeModel,
     );
 
-    // Kumpulkan master babaran per jenis kain
+    // Kumpulkan master babaran per jenis kain & harga lengan
     const babaranMap = new Map<
         string,
-        { body: number; lengan: number; rib: number; lenganText: string }
+        {
+            body: number;
+            lengan: number;
+            rib: number;
+            lenganText: string;
+            hargaLengan: number;
+            hargaTua: number;
+        }
     >();
 
     itemsForModel.forEach((item: any) => {
@@ -375,16 +382,26 @@ const parseKainData = (kodeModel: "KH-0001" | "KH-0002") => {
                 lengan: 0,
                 rib: 70,
                 lenganText: "PENDEK",
+                hargaLengan: 0,
+                hargaTua: 0,
             });
         }
         const b = babaranMap.get(jk)!;
         const komp = (item.mhk_komponen || "").toUpperCase();
+        const warna = (item.mhk_warna || "").toUpperCase();
         const val = Number(item.mhk_babaran) || 0;
+        const hrg = Number(item.mhk_harga) || 0;
 
         if (komp === "BODY" && val > 0) b.body = val;
-        else if (komp === "LENGAN" && val > 0) b.lengan = val;
+        else if (komp === "LENGAN" && val > 0) {
+            b.lengan = val;
+        }
         else if (komp === "RIB" && val >= 50) b.rib = val;
         else if (val > 0 && b.body === 0) b.body = val;
+
+        if (warna === "TUA" && hrg > 0) {
+            b.hargaTua = hrg;
+        }
 
         if (item.mhk_lengan) b.lenganText = item.mhk_lengan;
     });
@@ -397,43 +414,64 @@ const parseKainData = (kodeModel: "KH-0001" | "KH-0002") => {
             lengan: 0,
             rib: 70,
             lenganText: "PENDEK",
+            hargaLengan: 0,
+            hargaTua: 0,
         };
 
-        const isSport = ktg === "PE" || ktg === "HYGIT" || ktg === "DRYFIT";
         const itemRowId = `${item.mhk_kode}_${jk}_${item.mhk_warna}_${item.mhk_komponen}`;
         const customSet = customKainSettings.value[itemRowId] || {};
+        const hasCustom = Object.keys(customSet).length > 0;
 
-        const allowancePersen =
-            customSet.allowancePersen !== undefined
-                ? customSet.allowancePersen
-                : Number(item.mhk_allow) || (isSport ? 5 : 17);
+        // Jika tidak ada inline edit oleh user, konsumsi LANGSUNG data kalkulasi dari BE:
         const hargaBahan =
             customSet.hargaBahan !== undefined
                 ? customSet.hargaBahan
                 : Number(item.mhk_harga) || 0;
 
-        const hargaBody = b.body > 0 ? hargaBahan / b.body / 1.11 : 0;
-        const hargaLengan =
-            kodeModel === "KH-0002" && b.lengan > 0
-                ? hargaBahan / b.lengan / 1.11
-                : 0;
-        const hargaRib =
-            customSet.hargaBahan !== undefined
-                ? Math.round((hargaBahan / 1.11 + 1500) / 70)
-                : item.mhk_harga_rib !== undefined && item.mhk_harga_rib !== null
-                  ? Number(item.mhk_harga_rib)
-                  : Math.round((hargaBahan / 1.11 + 1500) / 70);
+        const allowancePersen =
+            customSet.allowancePersen !== undefined
+                ? customSet.allowancePersen
+                : Number(item.mhk_allow) || 0;
 
-        const totalHargaBahan = hargaBody + hargaLengan + hargaRib;
-        const allowanceRp = totalHargaBahan * (allowancePersen / 100);
-        const totalBahan = totalHargaBahan + allowanceRp;
-
-        // Biaya Konveksi / Jahit dari tmintaharga_biaya (mhb_jenis = 'JAHIT')
         const biayaKonveksi =
             customSet.biayaJahit !== undefined
                 ? customSet.biayaJahit
-                : getBiayaKonveksiByKtg(ktg);
-        const hpp = totalBahan + biayaKonveksi;
+                : Number(item.biayaKonveksi ?? item.mhk_biaya_konveksi ?? 0);
+
+        let hargaBody: number;
+        let hargaLengan: number;
+        let hargaRib: number;
+        let totalHargaBahan: number;
+        let allowanceRp: number;
+        let totalBahan: number;
+        let hpp: number;
+
+        if (!hasCustom) {
+            // MURNI KONSUMSI HASIL KALKULASI DARI BACKEND
+            hargaBody = Number(item.hargaBody ?? item.mhk_harga_body ?? 0);
+            hargaLengan = Number(item.hargaLengan ?? item.mhk_harga_lengan ?? 0);
+            hargaRib = Number(item.hargaRib ?? item.mhk_harga_rib ?? 0);
+            totalHargaBahan = Number(item.totalHargaBahan ?? item.mhk_total_harga_bahan ?? 0);
+            allowanceRp = Number(item.allowanceRp ?? item.mhk_allowance_rp ?? 0);
+            totalBahan = Number(item.totalBahan ?? item.mhk_total_bahan ?? 0);
+            hpp = Number(item.hpp ?? item.mhk_hpp ?? 0);
+        } else {
+            // RE-CALCULATE HANYA KETIKA USER SEDANG INLINE-EDIT DI TABEL
+            const bBody = Number(item.babaranBody ?? item.babaran_body ?? b.body) || 0;
+            const bLengan = Number(item.babaranLengan ?? item.babaran_lengan ?? b.lengan) || 0;
+            hargaBody = bBody > 0 ? Math.round(hargaBahan / bBody / 1.11) : 0;
+            hargaLengan =
+                kodeModel === "KH-0002"
+                    ? (item.mhk_harga_lengan !== undefined && item.mhk_harga_lengan !== null
+                        ? Number(item.mhk_harga_lengan)
+                        : (bLengan > 0 ? Math.round(((b.hargaTua || hargaBahan) / 1.11) / bLengan) : 0))
+                    : 0;
+            hargaRib = Math.round((hargaBahan / 1.11 + 1500) / 70);
+            totalHargaBahan = hargaBody + hargaLengan + hargaRib;
+            allowanceRp = Math.round(totalHargaBahan * (allowancePersen / 100));
+            totalBahan = totalHargaBahan + allowanceRp;
+            hpp = totalBahan + biayaKonveksi;
+        }
 
         // Tangga Margin Qty
         const calcTier = (persen: number) => {
@@ -483,9 +521,9 @@ const parseKainData = (kodeModel: "KH-0001" | "KH-0002") => {
             jenisKain: jk,
             lengan: item.mhk_lengan || b.lenganText,
             gramasi: getGramasi(jk),
-            babaranBody: b.body,
-            babaranLengan: b.lengan,
-            babaranRib: b.rib,
+            babaranBody: item.babaranBody ?? item.babaran_body ?? b.body,
+            babaranLengan: item.babaranLengan ?? item.babaran_lengan ?? b.lengan,
+            babaranRib: item.babaranRib ?? item.babaran_rib ?? b.rib,
             warna: item.mhk_warna || "-",
             hargaBahan,
             hargaBody,
@@ -1015,11 +1053,9 @@ const promptSaveInline = () => {
 
 const getOldValue = (row: any, field: "harga" | "allow" | "konveksi") => {
     const raw = row.rawItem || {};
-    const isSport =
-        row.ktg === "PE" || row.ktg === "HYGIT" || row.ktg === "DRYFIT";
     if (field === "harga") return Number(raw.mhk_harga) || 0;
-    if (field === "allow") return Number(raw.mhk_allow) || (isSport ? 5 : 17);
-    if (field === "konveksi") return getBiayaKonveksiByKtg(row.ktg);
+    if (field === "allow") return Number(raw.mhk_allow) || 0;
+    if (field === "konveksi") return Number(raw.biayaKonveksi ?? raw.mhk_biaya_konveksi) || 0;
     return 0;
 };
 
@@ -1314,6 +1350,25 @@ const handleAdd = () => {
     }
 };
 
+watch(
+    () => kainForm.mhk_ktg,
+    (newKtg) => {
+        if (!isEditKain.value) {
+            const clean = (newKtg || "").toUpperCase();
+            if (clean === "PE" || clean === "HYGIT" || clean === "DRYFIT") {
+                kainForm.mhk_allow = 5;
+                kainForm.biayaJahit = getBiayaKonveksiByKtg("PE");
+            } else if (clean === "LACOST") {
+                kainForm.mhk_allow = 20;
+                kainForm.biayaJahit = getBiayaKonveksiByKtg("LACOST");
+            } else {
+                kainForm.mhk_allow = 17;
+                kainForm.biayaJahit = getBiayaKonveksiByKtg("COTTON");
+            }
+        }
+    },
+);
+
 const handleEdit = (item?: any) => {
     if (activeSub.value === "tambahan") {
         const target = item || tambahanSelected.value?.[0];
@@ -1457,15 +1512,17 @@ const executeDeleteTambahan = async () => {
     }
 };
 
-const handleRefresh = () => {
+const handleRefresh = async () => {
     selectedRow.value = null;
+    customKainSettings.value = {};
     if (activeSub.value === "tambahan") {
-        fetchTambahan();
+        await fetchTambahan();
     } else {
-        fetchKain();
-        fetchBiayaJahit();
-        fetchMarginGarmen();
+        await fetchKain();
+        await fetchBiayaJahit();
+        await fetchMarginGarmen();
     }
+    toast.success("Data berhasil disegarkan dari server");
 };
 
 const handleExport = async () => {
@@ -1774,14 +1831,7 @@ const handleExport = async () => {
                         values.push(row.hargaBody ?? 0);
                     }
                 } else if (key === "hargaLengan") {
-                    if (hrgBahanCol && babaranLenganCol) {
-                        values.push({
-                            formula: `=${hrgBahanCol}${r}/${babaranLenganCol}${r}/1.11`,
-                            result: row.hargaLengan,
-                        });
-                    } else {
-                        values.push(row.hargaLengan ?? 0);
-                    }
+                    values.push(row.hargaLengan ?? 0);
                 } else if (key === "hargaRib") {
                     if (hrgBahanCol) {
                         values.push({
