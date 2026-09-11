@@ -165,6 +165,21 @@ onMounted(loadPrintData);
       <div class="section-content pre-wrap">{{ data.bap_jawab }}</div>
     </div>
 
+    <div v-if="data.bap_review_audit === 'Y'" class="audit-box mb-10">
+      <div class="audit-box-title">CATATAN REVIEW AUDIT</div>
+      <div class="audit-box-content pre-wrap">
+        {{ data.bap_review_audit_catatan || "-" }}
+      </div>
+      <div class="audit-box-meta">
+        Direview oleh {{ data.bap_review_audit_by }} pada
+        {{
+          data.bap_review_audit_tgl
+            ? new Date(data.bap_review_audit_tgl).toLocaleDateString("id-ID")
+            : "-"
+        }}
+      </div>
+    </div>
+
     <div class="d-flex justify-space-between text-center mt-15">
       <div style="width: 25%">
         <div>Dibuat Oleh,</div>
@@ -271,6 +286,25 @@ onMounted(loadPrintData);
 }
 .spk-print-table tfoot td {
   border-top: 2px solid #000;
+}
+
+.audit-box {
+  border: 1px solid #000;
+  padding: 8px 10px;
+  font-size: 0.9rem;
+}
+.audit-box-title {
+  font-weight: bold;
+  margin-bottom: 4px;
+}
+.audit-box-content {
+  margin-bottom: 4px;
+}
+.audit-box-meta {
+  font-size: 0.75rem;
+  color: #555;
+  font-style: italic;
+  text-align: right;
 }
 
 @media print {

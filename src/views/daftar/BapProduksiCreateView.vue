@@ -35,6 +35,7 @@ interface BapData {
   ReviewAudit: string;
   ReviewAuditBy: string;
   ReviewAuditTgl: string | null;
+  ReviewAuditCatatan: string;
   StatusEdit: string;
   UrutPin5: number;
   Kategori: string[];
@@ -76,6 +77,7 @@ const initialBapData = {
   ReviewAudit: "N",
   ReviewAuditBy: "",
   ReviewAuditTgl: null,
+  ReviewAuditCatatan: "",
   StatusEdit: "",
   UrutPin5: 0,
   Kategori: [] as string[],
@@ -294,10 +296,15 @@ const isMarkingReview = ref(false);
 
 const markReview = async () => {
   if (!formData.value.Nomor) return;
+  if (!formData.value.ReviewAuditCatatan?.trim()) {
+    toast.warning("Catatan Audit wajib diisi sebelum menandai review.");
+    return;
+  }
   isMarkingReview.value = true;
   try {
     await api.post(
       `/master/bap-produksi-form/${encodeURIComponent(formData.value.Nomor)}/review-audit`,
+      { catatan: formData.value.ReviewAuditCatatan },
     );
     formData.value.ReviewAudit = "Y";
     formData.value.ReviewAuditBy = authStore.user?.kode || "";
@@ -470,30 +477,44 @@ const handlePreSave = async () => {
                   <span>APPROVE</span>
                 </label>
 
-                <button
-                  v-if="isAudit && isEditMode"
-                  type="button"
-                  class="btn-add-kar"
-                  :disabled="formData.ReviewAudit === 'Y' || isMarkingReview"
-                  style="width: 100%; height: 32px; font-size: 11px"
-                  :style="
-                    formData.ReviewAudit === 'Y'
-                      ? {
-                          background: '#e8f5e9',
-                          color: '#2e7d32',
-                          borderColor: '#a5d6a7',
-                          cursor: 'default',
-                        }
-                      : {}
-                  "
-                  @click="markReview"
-                >
-                  {{
-                    formData.ReviewAudit === "Y"
-                      ? `✔ Direview oleh ${formData.ReviewAuditBy}`
-                      : "Tandai Sudah Direview"
-                  }}
-                </button>
+                <template v-if="isAudit && isEditMode">
+                  <textarea
+                    v-model="formData.ReviewAuditCatatan"
+                    class="f-inp"
+                    style="
+                      width: 100%;
+                      height: 60px;
+                      padding: 4px;
+                      resize: none;
+                      margin-bottom: 4px;
+                    "
+                    :disabled="formData.ReviewAudit === 'Y'"
+                    placeholder="Catatan Audit (wajib diisi sebelum menandai review)..."
+                  ></textarea>
+                  <button
+                    type="button"
+                    class="btn-add-kar"
+                    :disabled="formData.ReviewAudit === 'Y' || isMarkingReview"
+                    style="width: 100%; height: 32px; font-size: 11px"
+                    :style="
+                      formData.ReviewAudit === 'Y'
+                        ? {
+                            background: '#e8f5e9',
+                            color: '#2e7d32',
+                            borderColor: '#a5d6a7',
+                            cursor: 'default',
+                          }
+                        : {}
+                    "
+                    @click="markReview"
+                  >
+                    {{
+                      formData.ReviewAudit === "Y"
+                        ? `✔ Direview oleh ${formData.ReviewAuditBy}`
+                        : "Tandai Sudah Direview"
+                    }}
+                  </button>
+                </template>
 
                 <!-- Karyawan Terlibat -->
                 <div class="kar-panel">

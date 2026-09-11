@@ -68,6 +68,7 @@ interface LoginResponse {
   permissions: Permission[];
   spkUrgent: SpkUrgentItem[];
   bapBaruAudit: BapBaruItem[];
+  bapReviewedNotif: BapReviewedItem[];
   isDefaultPassword?: boolean;
   specialMessage?: string | null;
   message: string;
@@ -82,6 +83,17 @@ interface BapBaruItem {
   Cab: string;
 }
 
+interface BapReviewedItem {
+  Nomor: string;
+  Tanggal: string;
+  Tipe: string;
+  BagNama: string;
+  Masalah: string;
+  Catatan: string;
+  ReviewedBy: string;
+  ReviewedTgl: string;
+}
+
 export const useAuthStore = defineStore(
   "auth",
   () => {
@@ -93,6 +105,7 @@ export const useAuthStore = defineStore(
     const permissions = ref<Permission[]>([]);
     const spkUrgent = ref<SpkUrgentItem[]>([]);
     const bapBaruAudit = ref<BapBaruItem[]>([]);
+    const bapReviewedNotif = ref<BapReviewedItem[]>([]);
     const isSessionExpired = ref(false);
     const isOnline = ref(navigator.onLine);
     const approvalPendingTotal = ref(0);
@@ -172,6 +185,7 @@ export const useAuthStore = defineStore(
       permissions.value = loginResponse.permissions || [];
       spkUrgent.value = loginResponse.spkUrgent || [];
       bapBaruAudit.value = loginResponse.bapBaruAudit || [];
+      bapReviewedNotif.value = loginResponse.bapReviewedNotif || [];
 
       // Router push akan ditangani di komponen Login.vue agar bisa show modal SPK dulu
     }
@@ -185,6 +199,8 @@ export const useAuthStore = defineStore(
       bapBaruAudit.value = [];
       sessionStorage.removeItem("hasSeenSpk");
       sessionStorage.removeItem("hasSeenBapAudit");
+      bapReviewedNotif.value = [];
+      sessionStorage.removeItem("hasSeenBapReviewed");
       useTabsStore().resetTabs();
       router.push("/login");
     }
@@ -209,6 +225,7 @@ export const useAuthStore = defineStore(
       permissions.value = [];
       spkUrgent.value = [];
       bapBaruAudit.value = [];
+      bapReviewedNotif.value = [];
       isSessionExpired.value = true;
       useTabsStore().resetTabs();
     }
@@ -224,6 +241,7 @@ export const useAuthStore = defineStore(
       permissions,
       spkUrgent,
       bapBaruAudit,
+      bapReviewedNotif,
       isSessionExpired,
       isOnline,
       approvalPendingTotal,

@@ -66,8 +66,15 @@ const headers = [
   { title: "CAB", key: "Cab", width: "60px", align: "center" },
   { title: "TIPE", key: "Tipe", width: "120px" },
   { title: "BAGIAN", key: "Bagian", width: "120px" },
-  { title: "KATEGORI", key: "Kategori", width: "200px" }, // ← baru
-  { title: "KARYAWAN TERLIBAT", key: "Karyawan", width: "220px" }, // ← baru
+  { title: "KATEGORI", key: "Kategori", width: "200px" },
+  { title: "KARYAWAN TERLIBAT", key: "Karyawan", width: "220px" },
+  {
+    title: "REVIEW AUDIT",
+    key: "ReviewAudit",
+    width: "130px",
+    align: "center",
+  },
+  { title: "CATATAN AUDIT", key: "ReviewAuditCatatan", minWidth: "200px" },
   { title: "MASALAH", key: "Masalah", minWidth: "200px" },
   { title: "SUMBER MASALAH", key: "SumberMasalah", minWidth: "200px" },
   { title: "SOLUSI", key: "Solusi", minWidth: "200px" },
@@ -277,6 +284,16 @@ const handlePrint = () => {
       </div>
       <span v-else class="text-grey text-caption">-</span>
     </template>
+    <template #item.ReviewAudit="{ item }">
+      <span
+        v-if="item.ReviewAudit === 'Y'"
+        class="review-badge review-badge--done"
+        :title="`${item.ReviewAuditBy || ''} · ${item.ReviewAuditTgl || ''}`"
+      >
+        ✔ Direview
+      </span>
+      <span v-else class="review-badge review-badge--pending"> Belum </span>
+    </template>
   </BaseBrowse>
 
   <BapAjukanEditDialog
@@ -382,5 +399,23 @@ const handlePrint = () => {
   font-size: 10px;
   color: #212121;
   white-space: nowrap;
+}
+.review-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.review-badge--done {
+  background: #e8f5e9;
+  color: #2e7d32;
+  border: 1px solid #a5d6a7;
+}
+.review-badge--pending {
+  background: #fff3e0;
+  color: #e65100;
+  border: 1px solid #ffcc80;
 }
 </style>

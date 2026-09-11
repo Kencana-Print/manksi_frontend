@@ -33,6 +33,7 @@ import {
   IconFileInvoice,
 } from "@tabler/icons-vue";
 import AiChatWidget from "@/components/AiChatWidget.vue";
+import api from "@/services/api";
 
 interface OverdueItem {
   Invoice: string;
@@ -298,6 +299,8 @@ const canAccessAiChat = computed(() => authStore.user?.cabang === "HO-");
 const router = useRouter();
 const isSpkDialogVisible = ref(false);
 const isBapAuditDialogVisible = ref(false);
+const isBapReviewedDialogVisible = ref(false);
+const hasReadBapReviewed = ref(false);
 const activeTab = ref("overview");
 
 watch(activeTab, async (tab) => {
@@ -3134,6 +3137,8 @@ onMounted(async () => {
     !sessionStorage.getItem("hasSeenBapAudit")
   ) {
     isBapAuditDialogVisible.value = true;
+  } else {
+    showBapReviewedIfNeeded();
   }
 
   // Overview SELALU di-fetch (tab-nya selalu terlihat)
@@ -3227,21 +3232,49 @@ onUnmounted(() => {
 const closeSpkDialog = () => {
   isSpkDialogVisible.value = false;
   sessionStorage.setItem("hasSeenSpk", "true");
-  // Tampilkan dialog BAP Audit SETELAH dialog SPK ditutup, bukan bersamaan
   if (
     authStore.bapBaruAudit?.length > 0 &&
     !sessionStorage.getItem("hasSeenBapAudit")
   ) {
     isBapAuditDialogVisible.value = true;
+  } else {
+    showBapReviewedIfNeeded();
   }
 };
 
 const closeBapAuditDialog = () => {
   isBapAuditDialogVisible.value = false;
   sessionStorage.setItem("hasSeenBapAudit", "true");
+  showBapReviewedIfNeeded();
 };
 const goToBapDetail = (nomor: string) => {
   closeBapAuditDialog();
+  router.push(`/daftar/berita-acara/edit/${encodeURIComponent(nomor)}`);
+};
+
+const showBapReviewedIfNeeded = () => {
+  if (
+    authStore.bapReviewedNotif?.length > 0 &&
+    !sessionStorage.getItem("hasSeenBapReviewed")
+  ) {
+    hasReadBapReviewed.value = false;
+    isBapReviewedDialogVisible.value = true;
+  }
+};
+
+const closeBapReviewedDialog = async () => {
+  if (!hasReadBapReviewed.value) return; // guard tambahan, tombol juga disabled
+  try {
+    const nomorList = authStore.bapReviewedNotif.map((b) => b.Nomor);
+    await api.post("/master/bap-produksi-form/reviewed/dibaca", { nomorList });
+  } catch {
+    /* silent — tetap tutup dialog walau gagal tandai, supaya user tidak macet */
+  }
+  isBapReviewedDialogVisible.value = false;
+  sessionStorage.setItem("hasSeenBapReviewed", "true");
+};
+
+const goToBapDetailFromReviewed = (nomor: string) => {
   router.push(`/daftar/berita-acara/edit/${encodeURIComponent(nomor)}`);
 };
 
@@ -9058,6 +9091,106 @@ const sisaClass = (item: any) => {
             variant="flat"
             size="small"
             @click="closeBapAuditDialog"
+          >
+            Tutup
+          </v-btn>
+        </div>
+      </v-card>
+    </v-dialog>
+
+    <v-dialog v-model="isBapReviewedDialogVisible" persistent max-width="750px">
+      <v-card class="spk-dialog-card" rounded="lg">
+        <div
+          class="spk-header"
+          style="background: linear-gradient(135deg, #2e7d32 0%, #43a047 100%)"
+        >
+          <div class="spk-header-left">
+            <div class="spk-header-icon">
+              <IconClipboardList :size="18" :stroke-width="1.6" color="white" />
+            </div>
+            <div>
+              <div class="spk-header-title">
+                Catatan Review Audit — BAP Anda
+              </div>
+              <div class="spk-header-sub">
+                {{ authStore.bapReviewedNotif?.length }} BAP sudah direview
+                AUDIT
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="spk-table-wrap" style="max-height: 50vh">
+          <div
+            v-for="item in authStore.bapReviewedNotif"
+            :key="item.Nomor"
+            style="
+              padding: 12px 16px;
+              border-bottom: 1px solid #eee;
+              cursor: pointer;
+            "
+            @click="goToBapDetailFromReviewed(item.Nomor)"
+          >
+            <div
+              style="
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+              "
+            >
+              <span class="spk-badge">{{ item.Nomor }}</span>
+              <span style="font-size: 10px; color: #757575">{{
+                item.Tanggal
+              }}</span>
+            </div>
+            <div style="font-size: 11px; color: #424242; margin-top: 2px">
+              {{ item.Masalah }}
+            </div>
+            <div
+              style="
+                margin-top: 6px;
+                padding: 8px 10px;
+                background: #f1f8e9;
+                border-left: 3px solid #43a047;
+                border-radius: 3px;
+                font-size: 11px;
+                color: #212121;
+                white-space: pre-wrap;
+              "
+            >
+              {{ item.Catatan || "-" }}
+            </div>
+            <div
+              style="
+                font-size: 10px;
+                color: #9e9e9e;
+                margin-top: 3px;
+                text-align: right;
+              "
+            >
+              Direview oleh {{ item.ReviewedBy }} pada {{ item.ReviewedTgl }}
+            </div>
+          </div>
+        </div>
+
+        <div class="spk-footer">
+          <label
+            class="d-flex align-center"
+            style="gap: 6px; cursor: pointer; font-size: 12px"
+          >
+            <input
+              type="checkbox"
+              v-model="hasReadBapReviewed"
+              style="accent-color: #2e7d32"
+            />
+            Saya sudah membaca semua catatan review di atas
+          </label>
+          <v-btn
+            color="primary"
+            variant="flat"
+            size="small"
+            :disabled="!hasReadBapReviewed"
+            @click="closeBapReviewedDialog"
           >
             Tutup
           </v-btn>
