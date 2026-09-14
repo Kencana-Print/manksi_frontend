@@ -909,6 +909,34 @@ const movePendingTanggal = ref("");
 const previousKesepakatan = reactive<Record<number, string>>({});
 const isMoving = ref(false);
 
+const doMove = async (row: DetailRow, tanggalBaru: string) => {
+  if (!row.PjwdId) return;
+  isMoving.value = true;
+  try {
+    const res = await penjadwalanPpicService.moveDetailRow(
+      header.pjw_nomor,
+      row.PjwdId,
+      tanggalBaru,
+    );
+    if (res.data.data.moved) {
+      const idx = detail.value.findIndex((d) => d.PjwdId === row.PjwdId);
+      if (idx !== -1) detail.value.splice(idx, 1);
+      if (res.data.data.arah === "MAJU") {
+        toast.success(
+          `Dimajukan ke periode ${res.data.data.nomor} — dicatat sebagai Tambahan Pencapaian.`,
+        );
+      } else {
+        toast.success(`Dipindahkan ke periode ${res.data.data.nomor}.`);
+      }
+    }
+  } catch (e: any) {
+    toast.error(e.response?.data?.message || "Gagal memindahkan baris.");
+    row.Kesepakatan = previousKesepakatan[row.PjwdId] || "";
+  } finally {
+    isMoving.value = false;
+  }
+};
+
 const onKesepakatanFocus = (row: DetailRow) => {
   if (row.PjwdId) previousKesepakatan[row.PjwdId] = row.Kesepakatan;
   onFieldFocus(row, "pjwd_tgl_kesepakatan");
@@ -919,9 +947,8 @@ const onKesepakatanBlur = async (row: DetailRow) => {
   if (!row.PjwdId || !row.Kesepakatan) return;
 
   const prev = previousKesepakatan[row.PjwdId];
-  if (prev === row.Kesepakatan) return; // tidak berubah, tidak perlu apa-apa
+  if (prev === row.Kesepakatan) return;
 
-  // Masih dalam rentang periode saat ini → simpan seperti biasa
   if (
     row.Kesepakatan >= header.pjw_tgl1 &&
     row.Kesepakatan <= header.pjw_tgl2
@@ -930,7 +957,6 @@ const onKesepakatanBlur = async (row: DetailRow) => {
     return;
   }
 
-  // Di luar periode saat ini → cek dulu ke mana harus pindah
   try {
     const res = await penjadwalanPpicService.checkTargetPeriod(
       row.PjwdId,
@@ -941,6 +967,14 @@ const onKesepakatanBlur = async (row: DetailRow) => {
       onKesepakatanChange(row);
       return;
     }
+
+    if (info.arah === "MAJU") {
+      // Maju: langsung eksekusi, tanpa dialog konfirmasi
+      await doMove(row, row.Kesepakatan);
+      return;
+    }
+
+    // Mundur: tetap lewat dialog konfirmasi seperti sebelumnya
     moveTargetInfo.value = info;
     moveRowRef.value = row;
     movePendingTanggal.value = row.Kesepakatan;
@@ -963,28 +997,11 @@ const cancelMove = () => {
 
 const confirmMove = async () => {
   const row = moveRowRef.value;
-  if (!row || !row.PjwdId) return;
-  isMoving.value = true;
-  try {
-    const res = await penjadwalanPpicService.moveDetailRow(
-      header.pjw_nomor,
-      row.PjwdId,
-      movePendingTanggal.value,
-    );
-    if (res.data.data.moved) {
-      const idx = detail.value.findIndex((d) => d.PjwdId === row.PjwdId);
-      if (idx !== -1) detail.value.splice(idx, 1);
-      toast.success(`Dipindahkan ke periode ${res.data.data.nomor}.`);
-    }
-  } catch (e: any) {
-    toast.error(e.response?.data?.message || "Gagal memindahkan baris.");
-    row.Kesepakatan = previousKesepakatan[row.PjwdId] || "";
-  } finally {
-    isMoving.value = false;
-    showMoveDialog.value = false;
-    moveRowRef.value = null;
-    moveTargetInfo.value = null;
-  }
+  if (!row) return;
+  await doMove(row, movePendingTanggal.value);
+  showMoveDialog.value = false;
+  moveRowRef.value = null;
+  moveTargetInfo.value = null;
 };
 
 // ═══════════════════════════════════════════════════════════════
