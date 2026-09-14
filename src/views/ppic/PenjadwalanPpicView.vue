@@ -4,7 +4,10 @@ import { useAuthStore } from "@/stores/authStore";
 import { useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
 import BaseBrowse from "@/components/BaseBrowse.vue";
-import { penjadwalanPpicService } from "@/services/ppic/penjadwalanPpicService";
+import {
+  penjadwalanPpicService,
+  type PencapaianRow,
+} from "@/services/ppic/penjadwalanPpicService";
 import {
   IconCalendarWeek,
   IconLock,
@@ -14,6 +17,7 @@ import {
   IconListDetails,
   IconEye,
   IconX,
+  IconReportAnalytics,
 } from "@tabler/icons-vue";
 import { exportExcelSingle, exportExcel } from "@/utils/excelExport";
 import { formatTanggal } from "@/utils/dateFormat";
@@ -328,6 +332,97 @@ const confirmDelete = async () => {
   }
 };
 
+const KATEGORI_SUGGESTIONS = [
+  "Cust",
+  "Bahan",
+  "Preparation",
+  "Sewing/Produksi",
+  "Ekspedisi",
+];
+
+const showPencapaianDialog = ref(false);
+const pencapaianLoading = ref(false);
+const pencapaianSaving = ref(false);
+const pencapaianNomor = ref("");
+const pencapaianRencana = ref(0);
+const pencapaianRealisasi = ref(0);
+const tidakTercapaiRows = ref<PencapaianRow[]>([]);
+const tambahanRows = ref<PencapaianRow[]>([]);
+
+const pencapaianPersen = computed(() =>
+  pencapaianRencana.value > 0
+    ? (pencapaianRealisasi.value / pencapaianRencana.value) * 100
+    : 0,
+);
+const tambahanPersenTotal = computed(() =>
+  pencapaianRencana.value > 0
+    ? (tambahanRows.value.reduce((s, r) => s + (Number(r.pcs) || 0), 0) /
+        pencapaianRencana.value) *
+      100
+    : 0,
+);
+const totalPencapaian = computed(
+  () => pencapaianPersen.value + tambahanPersenTotal.value,
+);
+const rowPersen = (pcs: number) =>
+  pencapaianRencana.value > 0
+    ? ((Number(pcs) || 0) / pencapaianRencana.value) * 100
+    : 0;
+
+const openPencapaian = async () => {
+  if (!selected.value.length) return;
+  const item = selected.value[0];
+  pencapaianNomor.value = item.Nomor;
+  showPencapaianDialog.value = true;
+  pencapaianLoading.value = true;
+  try {
+    const res = await penjadwalanPpicService.getPencapaian(item.Nomor);
+    const d = res.data.data;
+    pencapaianRencana.value = d.Rencana;
+    pencapaianRealisasi.value = d.Realisasi;
+    tidakTercapaiRows.value = d.TidakTercapai.map((r: any) => ({
+      Id: r.Id,
+      kategori: r.Kategori,
+      keterangan: r.Keterangan,
+      pcs: r.Pcs,
+    }));
+    tambahanRows.value = d.Tambahan.map((r: any) => ({
+      Id: r.Id,
+      kategori: r.Kategori,
+      keterangan: r.Keterangan,
+      pcs: r.Pcs,
+    }));
+  } catch {
+    toast.error(`Gagal memuat pencapaian ${item.Nomor}`);
+  } finally {
+    pencapaianLoading.value = false;
+  }
+};
+
+const addTidakTercapaiRow = () =>
+  tidakTercapaiRows.value.push({ kategori: "", keterangan: "", pcs: 0 });
+const removeTidakTercapaiRow = (i: number) =>
+  tidakTercapaiRows.value.splice(i, 1);
+const addTambahanRow = () =>
+  tambahanRows.value.push({ kategori: "", keterangan: "", pcs: 0 });
+const removeTambahanRow = (i: number) => tambahanRows.value.splice(i, 1);
+
+const savePencapaian = async () => {
+  pencapaianSaving.value = true;
+  try {
+    await penjadwalanPpicService.savePencapaian(pencapaianNomor.value, {
+      tidakTercapai: tidakTercapaiRows.value,
+      tambahan: tambahanRows.value,
+    });
+    toast.success("Pencapaian berhasil disimpan.");
+    showPencapaianDialog.value = false;
+  } catch (e: any) {
+    toast.error(e.response?.data?.message || "Gagal menyimpan pencapaian.");
+  } finally {
+    pencapaianSaving.value = false;
+  }
+};
+
 const onExport = async () => {
   const rawData =
     baseBrowseRef.value?.getFilteredItems?.() ?? items.value ?? [];
@@ -595,6 +690,16 @@ fetchData();
       >
         <template #prepend><IconEye :size="14" /></template>
         Preview
+      </v-btn>
+      <v-btn
+        size="small"
+        variant="outlined"
+        color="deep-purple"
+        :disabled="selected.length !== 1"
+        @click="openPencapaian"
+      >
+        <template #prepend><IconReportAnalytics :size="14" /></template>
+        Pencapaian
       </v-btn>
       <v-btn
         size="small"
@@ -891,6 +996,199 @@ fetchData();
       </v-card-text>
     </v-card>
   </v-dialog>
+
+  <v-dialog v-model="showPencapaianDialog" max-width="650" persistent>
+    <v-card class="rounded-lg">
+      <v-card-title
+        class="bg-deep-purple text-white pa-3 text-subtitle-1 d-flex align-center justify-space-between"
+      >
+        <span>Laporan Pencapaian — {{ pencapaianNomor }}</span>
+        <v-btn
+          icon
+          size="small"
+          variant="text"
+          color="white"
+          @click="showPencapaianDialog = false"
+        >
+          <IconX :size="18" />
+        </v-btn>
+      </v-card-title>
+      <v-card-text class="pa-4">
+        <div v-if="pencapaianLoading" class="expand-loading">
+          <v-progress-circular indeterminate color="primary" size="20" />
+          <span>Memuat...</span>
+        </div>
+        <template v-else>
+          <table class="dt dt-summary">
+            <tbody>
+              <tr>
+                <td>Rencana</td>
+                <td class="tr">{{ fmt(pencapaianRencana) }}</td>
+              </tr>
+              <tr>
+                <td>Realisasi</td>
+                <td class="tr">{{ fmt(pencapaianRealisasi) }}</td>
+              </tr>
+              <tr class="fw">
+                <td>Pencapaian</td>
+                <td class="tr">{{ pencapaianPersen.toFixed(1) }}%</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="section-header mt-4 mb-1">
+            <span class="section-title">Yang tidak tercapai</span>
+            <v-btn
+              size="x-small"
+              variant="text"
+              color="primary"
+              @click="addTidakTercapaiRow"
+              >+ Baris</v-btn
+            >
+          </div>
+          <table class="dt dt-pencapaian">
+            <thead>
+              <tr>
+                <th>Kategori</th>
+                <th>Keterangan</th>
+                <th class="tr">Pcs</th>
+                <th class="tr">%</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(r, i) in tidakTercapaiRows" :key="i">
+                <td>
+                  <v-combobox
+                    v-model="r.kategori"
+                    :items="KATEGORI_SUGGESTIONS"
+                    density="compact"
+                    hide-details
+                    variant="underlined"
+                  />
+                </td>
+                <td>
+                  <v-text-field
+                    v-model="r.keterangan"
+                    density="compact"
+                    hide-details
+                    variant="underlined"
+                  />
+                </td>
+                <td class="tr">
+                  <v-text-field
+                    v-model.number="r.pcs"
+                    type="number"
+                    density="compact"
+                    hide-details
+                    variant="underlined"
+                    style="width: 90px"
+                  />
+                </td>
+                <td class="tr">{{ rowPersen(r.pcs).toFixed(1) }}%</td>
+                <td>
+                  <v-btn
+                    icon
+                    size="x-small"
+                    variant="text"
+                    color="error"
+                    @click="removeTidakTercapaiRow(i)"
+                    ><IconX :size="14"
+                  /></v-btn>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="section-header mt-4 mb-1">
+            <span class="section-title">Tambahan</span>
+            <v-btn
+              size="x-small"
+              variant="text"
+              color="primary"
+              @click="addTambahanRow"
+              >+ Baris</v-btn
+            >
+          </div>
+          <table class="dt dt-pencapaian">
+            <thead>
+              <tr>
+                <th>Kategori</th>
+                <th>Keterangan</th>
+                <th class="tr">Pcs</th>
+                <th class="tr">%</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(r, i) in tambahanRows" :key="i">
+                <td>
+                  <v-combobox
+                    v-model="r.kategori"
+                    :items="KATEGORI_SUGGESTIONS"
+                    density="compact"
+                    hide-details
+                    variant="underlined"
+                  />
+                </td>
+                <td>
+                  <v-text-field
+                    v-model="r.keterangan"
+                    density="compact"
+                    hide-details
+                    variant="underlined"
+                  />
+                </td>
+                <td class="tr">
+                  <v-text-field
+                    v-model.number="r.pcs"
+                    type="number"
+                    density="compact"
+                    hide-details
+                    variant="underlined"
+                    style="width: 90px"
+                  />
+                </td>
+                <td class="tr">{{ rowPersen(r.pcs).toFixed(1) }}%</td>
+                <td>
+                  <v-btn
+                    icon
+                    size="x-small"
+                    variant="text"
+                    color="error"
+                    @click="removeTambahanRow(i)"
+                    ><IconX :size="14"
+                  /></v-btn>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          <table class="dt dt-total mt-3">
+            <tbody>
+              <tr class="fw">
+                <td>Total Pencapaian</td>
+                <td class="tr">{{ totalPencapaian.toFixed(1) }}%</td>
+              </tr>
+            </tbody>
+          </table>
+        </template>
+      </v-card-text>
+      <v-card-actions class="pa-3 border-t bg-grey-lighten-4">
+        <v-btn variant="text" @click="showPencapaianDialog = false"
+          >Batal</v-btn
+        >
+        <v-spacer />
+        <v-btn
+          color="deep-purple"
+          variant="elevated"
+          :loading="pencapaianSaving"
+          @click="savePencapaian"
+          >Simpan</v-btn
+        >
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
 </template>
 
 <style scoped>
@@ -1011,6 +1309,51 @@ fetchData();
 }
 .dt tbody tr.row-partial td {
   background: #fff3e0;
+}
+.dt-pencapaian tbody td {
+  vertical-align: middle;
+  padding-top: 2px;
+  padding-bottom: 2px;
+}
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.section-title {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #424242;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.dt-summary {
+  font-size: 13px;
+}
+.dt-summary td {
+  padding: 5px 8px;
+}
+.dt-summary tr.fw td {
+  font-size: 14px;
+  color: #6a1b9a;
+}
+
+.dt-pencapaian tbody td {
+  vertical-align: middle;
+  padding-top: 2px;
+  padding-bottom: 2px;
+}
+
+.dt-total {
+  font-size: 14px;
+}
+.dt-total td {
+  padding: 8px;
+  border-top: 2px solid #6a1b9a;
+}
+.dt-total tr.fw td {
+  color: #6a1b9a;
 }
 
 .tr {

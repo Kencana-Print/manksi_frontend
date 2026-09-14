@@ -1,5 +1,12 @@
 import api from "@/services/api";
 
+export interface PencapaianRow {
+  Id?: number;
+  kategori: string;
+  keterangan: string;
+  pcs: number;
+}
+
 export const penjadwalanPpicService = {
   getBrowse(params: { startDate: string; endDate: string; cabang?: string }) {
     return api.get("/ppic/penjadwalan/browse", { params });
@@ -13,6 +20,17 @@ export const penjadwalanPpicService = {
   deleteData(nomor: string) {
     return api.delete(`/ppic/penjadwalan/${nomor}`);
   },
+  getPencapaian: (nomor: string) =>
+    api.get(`/ppic/penjadwalan/${encodeURIComponent(nomor)}/pencapaian`),
+
+  savePencapaian: (
+    nomor: string,
+    payload: { tidakTercapai: PencapaianRow[]; tambahan: PencapaianRow[] },
+  ) =>
+    api.put(
+      `/ppic/penjadwalan/${encodeURIComponent(nomor)}/pencapaian`,
+      payload,
+    ),
 
   // ── Form ──
   getCabang() {
