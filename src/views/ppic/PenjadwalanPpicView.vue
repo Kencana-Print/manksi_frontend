@@ -775,80 +775,82 @@ fetchData();
           <span>Memuat detail...</span>
         </div>
 
-        <table v-else-if="detailCache[item.Nomor]" class="dt">
-          <thead>
-            <tr>
-              <th>Tanggal</th>
-              <th>Nomor / Nama SO</th>
-              <th v-if="showPanjangLebar(item.Cabang)" class="tr">Panjang</th>
-              <th v-if="showPanjangLebar(item.Cabang)" class="tr">Lebar</th>
-              <th class="tr">Pesan</th>
-              <th class="tr">Kirim</th>
-              <th class="tr">Kurang</th>
-              <th class="tr">Rencana</th>
-              <th class="tr">Realisasi</th>
-              <th class="tc">Permintaan Kirim</th>
-              <th class="tc">Permintaan</th>
-              <th>Kesepakatan</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr
-              v-for="d in detailCache[item.Nomor]"
-              :key="d.PjwdId"
-              :class="detailRowClass(d)"
-            >
-              <td>{{ formatTanggal(d.Tanggal) }}</td>
-              <td>
-                <div class="mono">{{ d.Nomor }}</div>
-                <div>{{ d.Nama }}</div>
-                <div v-if="d.NomorPraOrder" class="praorder-badge">
-                  dari {{ d.NomorPraOrder }}
-                </div>
-                <div v-if="d.KetRencana" class="ket-rencana-note">
-                  📝 {{ d.KetRencana }}
-                </div>
-              </td>
-              <td v-if="showPanjangLebar(item.Cabang)" class="tr">
-                {{ fmt(d.Panjang) }}
-              </td>
-              <td v-if="showPanjangLebar(item.Cabang)" class="tr">
-                {{ fmt(d.Lebar) }}
-              </td>
-              <td class="tr">{{ fmt(d.Pesan) }}</td>
-              <td class="tr">{{ fmt(d.Kirim) }}</td>
-              <td class="tr" :class="{ 'text-red fw': Number(d.Kurang) > 0 }">
-                {{ fmt(d.Kurang) }}
-              </td>
-              <td class="tr">{{ fmt(d.Rencana) }}</td>
-              <td class="tr">{{ fmt(d.Realisasi) }}</td>
-              <td class="tc">{{ formatTanggal(d.PermintaanKirim) }}</td>
-              <td class="tc">
-                <v-chip
-                  size="x-small"
-                  :color="d.StatusPermintaan === 'CLOSE' ? 'success' : 'grey'"
-                  variant="flat"
-                >
-                  {{ d.StatusPermintaan }}
-                </v-chip>
-              </td>
-              <td>
-                <span v-if="d.Kesepakatan" class="kesepakatan-tgl">{{
-                  formatTanggal(d.Kesepakatan)
-                }}</span>
-                <span v-if="d.KetKesepakatan" class="kesepakatan-ket">
-                  — {{ d.KetKesepakatan }}</span
-                >
-                <span v-if="!d.Kesepakatan" class="text-grey">-</span>
-              </td>
-            </tr>
-            <tr v-if="!detailCache[item.Nomor].length">
-              <td colspan="10" class="empty-row">
-                Belum ada SO ditambahkan di periode ini.
-              </td>
-            </tr>
-          </tbody>
-        </table>
+        <div v-else-if="detailCache[item.Nomor]" class="dt-scroll">
+          <table class="dt">
+            <thead>
+              <tr>
+                <th>Tanggal</th>
+                <th>Nomor / Nama SO</th>
+                <th v-if="showPanjangLebar(item.Cabang)" class="tr">Panjang</th>
+                <th v-if="showPanjangLebar(item.Cabang)" class="tr">Lebar</th>
+                <th class="tr">Pesan</th>
+                <th class="tr">Kirim</th>
+                <th class="tr">Kurang</th>
+                <th class="tr">Rencana</th>
+                <th class="tr">Realisasi</th>
+                <th class="tc">Permintaan Kirim</th>
+                <th class="tc">Permintaan</th>
+                <th>Kesepakatan</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="d in detailCache[item.Nomor]"
+                :key="d.PjwdId"
+                :class="detailRowClass(d)"
+              >
+                <td>{{ formatTanggal(d.Tanggal) }}</td>
+                <td>
+                  <div class="mono">{{ d.Nomor }}</div>
+                  <div>{{ d.Nama }}</div>
+                  <div v-if="d.NomorPraOrder" class="praorder-badge">
+                    dari {{ d.NomorPraOrder }}
+                  </div>
+                  <div v-if="d.KetRencana" class="ket-rencana-note">
+                    📝 {{ d.KetRencana }}
+                  </div>
+                </td>
+                <td v-if="showPanjangLebar(item.Cabang)" class="tr">
+                  {{ fmt(d.Panjang) }}
+                </td>
+                <td v-if="showPanjangLebar(item.Cabang)" class="tr">
+                  {{ fmt(d.Lebar) }}
+                </td>
+                <td class="tr">{{ fmt(d.Pesan) }}</td>
+                <td class="tr">{{ fmt(d.Kirim) }}</td>
+                <td class="tr" :class="{ 'text-red fw': Number(d.Kurang) > 0 }">
+                  {{ fmt(d.Kurang) }}
+                </td>
+                <td class="tr">{{ fmt(d.Rencana) }}</td>
+                <td class="tr">{{ fmt(d.Realisasi) }}</td>
+                <td class="tc">{{ formatTanggal(d.PermintaanKirim) }}</td>
+                <td class="tc">
+                  <v-chip
+                    size="x-small"
+                    :color="d.StatusPermintaan === 'CLOSE' ? 'success' : 'grey'"
+                    variant="flat"
+                  >
+                    {{ d.StatusPermintaan }}
+                  </v-chip>
+                </td>
+                <td>
+                  <span v-if="d.Kesepakatan" class="kesepakatan-tgl">{{
+                    formatTanggal(d.Kesepakatan)
+                  }}</span>
+                  <span v-if="d.KetKesepakatan" class="kesepakatan-ket">
+                    — {{ d.KetKesepakatan }}</span
+                  >
+                  <span v-if="!d.Kesepakatan" class="text-grey">-</span>
+                </td>
+              </tr>
+              <tr v-if="!detailCache[item.Nomor].length">
+                <td colspan="10" class="empty-row">
+                  Belum ada SO ditambahkan di periode ini.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
 
         <div v-else class="expand-empty">Tidak ada data detail.</div>
       </div>
@@ -1329,6 +1331,16 @@ fetchData();
   background: #b71c1c !important;
   color: white;
   font-weight: 700;
+}
+.dt-scroll {
+  max-height: 340px;
+  overflow-y: auto;
+  overflow-x: auto;
+}
+.dt thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
 }
 .row-necessary .kesepakatan-tgl,
 .row-necessary .kesepakatan-ket {
