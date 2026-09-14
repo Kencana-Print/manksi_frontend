@@ -49,6 +49,8 @@ interface DetailRow {
   Kesepakatan: string;
   KetKesepakatan: string;
   NomorPraOrder: string;
+  Panjang: number;
+  Lebar: number;
 }
 
 const router = useRouter();
@@ -134,6 +136,7 @@ const showPreviewDialog = ref(false);
 const previewNomor = ref("");
 const previewDetail = ref<DetailRow[]>([]);
 const previewLoading = ref(false);
+const previewCabang = ref("");
 
 const loadCabang = async () => {
   try {
@@ -151,6 +154,7 @@ const openPreview = async () => {
   if (!selected.value.length) return;
   const item = selected.value[0];
   previewNomor.value = item.Nomor;
+  previewCabang.value = item.Cabang;
   showPreviewDialog.value = true;
 
   if (detailCache.value[item.Nomor]) {
@@ -458,6 +462,34 @@ const onExport = async () => {
   }
 };
 
+const buildDetailColumns = (cabang: string) => {
+  const cols: any[] = [
+    { header: "Cabang", key: "Cabang", align: "center" },
+    { header: "Tanggal", key: "Tanggal" },
+    { header: "Nomor", key: "NomorSo" },
+    { header: "Nama", key: "Nama" },
+  ];
+  if (showPanjangLebar(cabang)) {
+    cols.push(
+      { header: "Panjang", key: "Panjang", align: "right", numFmt: "#,##0.00" },
+      { header: "Lebar", key: "Lebar", align: "right", numFmt: "#,##0.00" },
+    );
+  }
+  cols.push(
+    { header: "Pesan", key: "Pesan", align: "right", numFmt: "#,##0" },
+    { header: "Kirim", key: "Kirim", align: "right", numFmt: "#,##0" },
+    { header: "Kurang", key: "Kurang", align: "right", numFmt: "#,##0" },
+    { header: "Rencana", key: "Rencana", align: "right", numFmt: "#,##0" },
+    { header: "Ket. Rencana", key: "KetRencana" },
+    { header: "Realisasi", key: "Realisasi", align: "right", numFmt: "#,##0" },
+    { header: "Permintaan Kirim", key: "PermintaanKirim", align: "center" },
+    { header: "Permintaan", key: "StatusPermintaan", align: "center" },
+    { header: "Kesepakatan", key: "Kesepakatan", align: "center" },
+    { header: "Ket Kesepakatan", key: "KetKesepakatan" },
+  );
+  return cols;
+};
+
 const onExportDetail = async () => {
   const rawData =
     baseBrowseRef.value?.getFilteredItems?.() ?? items.value ?? [];
@@ -487,32 +519,6 @@ const onExportDetail = async () => {
       results.forEach((r) => (detailPerNomor[r.nomor] = r.data));
     }
 
-    const columns = [
-      { header: "Cabang", key: "Cabang", align: "center" },
-      { header: "Tanggal", key: "Tanggal" },
-      { header: "Nomor", key: "NomorSo" },
-      { header: "Nama", key: "Nama" },
-      { header: "Pesan", key: "Pesan", align: "right", numFmt: "#,##0" },
-      { header: "Kirim", key: "Kirim", align: "right", numFmt: "#,##0" },
-      { header: "Kurang", key: "Kurang", align: "right", numFmt: "#,##0" },
-      { header: "Rencana", key: "Rencana", align: "right", numFmt: "#,##0" },
-      { header: "Ket. Rencana", key: "KetRencana" },
-      {
-        header: "Realisasi",
-        key: "Realisasi",
-        align: "right",
-        numFmt: "#,##0",
-      },
-      {
-        header: "Permintaan Kirim",
-        key: "PermintaanKirim",
-        align: "center",
-      },
-      { header: "Permintaan", key: "StatusPermintaan", align: "center" },
-      { header: "Kesepakatan", key: "Kesepakatan", align: "center" },
-      { header: "Ket Kesepakatan", key: "KetKesepakatan" },
-    ];
-
     // Nama sheet Excel: max 31 char, tidak boleh \ / ? * [ ] : , dan harus unik.
     const usedNames = new Set<string>();
     const sanitizeSheetName = (raw: string) => {
@@ -535,11 +541,15 @@ const onExportDetail = async () => {
       const detailRows = detailPerNomor[periode.Nomor] || [];
       if (!detailRows.length) continue;
 
+      const columns = buildDetailColumns(periode.Cabang); // ⬅ BARU, per periode
+
       const rows = detailRows.map((d) => ({
         Cabang: periode.Cabang,
         Tanggal: formatTanggal(d.Tanggal),
         NomorSo: d.Nomor || d.NomorPraOrder || d.NomorMap || "-",
         Nama: d.Nama,
+        Panjang: Number(d.Panjang) || 0, // ⬅ BARU — aman walau kolomnya tidak dipakai
+        Lebar: Number(d.Lebar) || 0, // ⬅ BARU
         Pesan: Number(d.Pesan) || 0,
         Kirim: Number(d.Kirim) || 0,
         Kurang: Number(d.Kurang) || 0,
@@ -610,6 +620,7 @@ const onExportDetail = async () => {
 };
 
 const fmt = (n: number | null | undefined) => (n ?? 0).toLocaleString("id-ID");
+const showPanjangLebar = (cabang: string) => ["P02", "P05"].includes(cabang);
 
 loadCabang();
 fetchData();
@@ -769,6 +780,8 @@ fetchData();
             <tr>
               <th>Tanggal</th>
               <th>Nomor / Nama SO</th>
+              <th v-if="showPanjangLebar(item.Cabang)" class="tr">Panjang</th>
+              <th v-if="showPanjangLebar(item.Cabang)" class="tr">Lebar</th>
               <th class="tr">Pesan</th>
               <th class="tr">Kirim</th>
               <th class="tr">Kurang</th>
@@ -795,6 +808,12 @@ fetchData();
                 <div v-if="d.KetRencana" class="ket-rencana-note">
                   📝 {{ d.KetRencana }}
                 </div>
+              </td>
+              <td v-if="showPanjangLebar(item.Cabang)" class="tr">
+                {{ fmt(d.Panjang) }}
+              </td>
+              <td v-if="showPanjangLebar(item.Cabang)" class="tr">
+                {{ fmt(d.Lebar) }}
               </td>
               <td class="tr">{{ fmt(d.Pesan) }}</td>
               <td class="tr">{{ fmt(d.Kirim) }}</td>
@@ -933,6 +952,8 @@ fetchData();
               <th>Tanggal</th>
               <th>Sumber</th>
               <th>Nomor / Nama</th>
+              <th v-if="showPanjangLebar(previewCabang)" class="tr">Panjang</th>
+              <th v-if="showPanjangLebar(previewCabang)" class="tr">Lebar</th>
               <th class="tr">Pesan</th>
               <th class="tr">Kirim</th>
               <th class="tr">Kurang</th>
@@ -963,6 +984,12 @@ fetchData();
               <td class="tr">{{ fmt(d.Kirim) }}</td>
               <td class="tr" :class="{ 'text-red fw': Number(d.Kurang) > 0 }">
                 {{ fmt(d.Kurang) }}
+              </td>
+              <td v-if="showPanjangLebar(previewCabang)" class="tr">
+                {{ fmt(d.Panjang) }}
+              </td>
+              <td v-if="showPanjangLebar(previewCabang)" class="tr">
+                {{ fmt(d.Lebar) }}
               </td>
               <td class="tr">{{ fmt(d.Rencana) }}</td>
               <td class="tr">{{ fmt(d.Realisasi) }}</td>
