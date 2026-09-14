@@ -295,7 +295,18 @@ interface BufferKaosanItem {
 }
 
 const authStore = useAuthStore();
-const canAccessAiChat = computed(() => authStore.user?.cabang === "HO-");
+const AI_CHAT_ALLOWED_KODE = [
+  "DARUL",
+  "DIR",
+  "ADMIN",
+  "RIO",
+  "EDI",
+  "WIDI",
+  "HARIS",
+];
+const canAccessAiChat = computed(() =>
+  AI_CHAT_ALLOWED_KODE.includes((authStore.user?.kode || "").toUpperCase()),
+);
 const router = useRouter();
 const isSpkDialogVisible = ref(false);
 const isBapAuditDialogVisible = ref(false);
