@@ -36,8 +36,13 @@ interface DetailRow {
   Nomor: string;
   Sumber: string;
   NomorMap: string;
+  NomorMh: string;
+  NomorPen: string;
+  PenId: string;
   Nama: string;
   Tanggal: string;
+  Panjang: number;
+  Lebar: number;
   Pesan: number;
   Kirim: number;
   Kurang: number;
@@ -49,8 +54,6 @@ interface DetailRow {
   Kesepakatan: string;
   KetKesepakatan: string;
   NomorPraOrder: string;
-  Panjang: number;
-  Lebar: number;
 }
 
 const router = useRouter();
@@ -546,7 +549,7 @@ const onExportDetail = async () => {
       const rows = detailRows.map((d) => ({
         Cabang: periode.Cabang,
         Tanggal: formatTanggal(d.Tanggal),
-        NomorSo: d.Nomor || d.NomorPraOrder || d.NomorMap || "-",
+        NomorSo: nomorTampil(d),
         Nama: d.Nama,
         Panjang: Number(d.Panjang) || 0, // ⬅ BARU — aman walau kolomnya tidak dipakai
         Lebar: Number(d.Lebar) || 0, // ⬅ BARU
@@ -621,6 +624,8 @@ const onExportDetail = async () => {
 
 const fmt = (n: number | null | undefined) => (n ?? 0).toLocaleString("id-ID");
 const showPanjangLebar = (cabang: string) => ["P02", "P05"].includes(cabang);
+const nomorTampil = (d: DetailRow) =>
+  d.Nomor || d.NomorMap || d.NomorMh || d.NomorPen || d.NomorPraOrder || "-";
 
 loadCabang();
 fetchData();
@@ -801,9 +806,9 @@ fetchData();
               >
                 <td>{{ formatTanggal(d.Tanggal) }}</td>
                 <td>
-                  <div class="mono">{{ d.Nomor }}</div>
+                  <div class="mono">{{ nomorTampil(d) }}</div>
                   <div>{{ d.Nama }}</div>
-                  <div v-if="d.NomorPraOrder" class="praorder-badge">
+                  <div v-if="d.NomorPraOrder && d.Nomor" class="praorder-badge">
                     dari {{ d.NomorPraOrder }}
                   </div>
                   <div v-if="d.KetRencana" class="ket-rencana-note">
@@ -977,9 +982,7 @@ fetchData();
                 <v-chip size="x-small" variant="tonal">{{ d.Sumber }}</v-chip>
               </td>
               <td>
-                <div class="mono">
-                  {{ d.Nomor || d.NomorPraOrder || d.NomorMap || "-" }}
-                </div>
+                <div class="mono">{{ nomorTampil(d) }}</div>
                 <div>{{ d.Nama }}</div>
               </td>
               <td class="tr">{{ fmt(d.Pesan) }}</td>
