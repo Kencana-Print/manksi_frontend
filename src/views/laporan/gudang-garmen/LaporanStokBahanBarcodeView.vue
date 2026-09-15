@@ -54,6 +54,18 @@ const headers = [
     width: "150px",
     align: "right",
   },
+  {
+    title: "PO BELUM BPB (OPEN)",
+    key: "PoBelumBpb",
+    width: "150px",
+    align: "right",
+  },
+  {
+    title: "BAHAN BELUM PO",
+    key: "BahanBelumPo",
+    width: "140px",
+    align: "right",
+  },
 ];
 
 const fetchApi = async () => {
@@ -199,6 +211,20 @@ const onExport = async () => {
         align: "right",
         numFmt: "#,##0",
       },
+      {
+        header: "PO Belum BPB (Open)",
+        key: "PoBelumBpb",
+        width: 18,
+        align: "right",
+        numFmt: "#,##0",
+      },
+      {
+        header: "Bahan Belum PO",
+        key: "BahanBelumPo",
+        width: 16,
+        align: "right",
+        numFmt: "#,##0",
+      },
     ];
 
     const rows = items.value.map((it: any) => ({
@@ -213,8 +239,9 @@ const onExport = async () => {
       Keluar_Out: Number(it.Keluar_Out) || 0,
       Stok: Number(it.Stok) || 0,
       MkbBelumRealisasi: Number(it.MkbBelumRealisasi) || 0,
+      PoBelumBpb: Number(it.PoBelumBpb) || 0,
+      BahanBelumPo: Number(it.BahanBelumPo) || 0,
     }));
-
     await exportExcelSingle(
       `Laporan_Stok_Bahan_Barcode_${filterState.value.endDate}.xlsx`,
       "Stok Bahan Barcode",
@@ -291,6 +318,17 @@ const onExport = async () => {
       <span
         :class="{ 'text-mkb-outstanding': Number(item.MkbBelumRealisasi) > 0 }"
         >{{ fmtNum(item.MkbBelumRealisasi) }}</span
+      >
+    </template>
+    <template #item.PoBelumBpb="{ item }">
+      <span :class="{ 'text-po-outstanding': Number(item.PoBelumBpb) > 0 }">{{
+        fmtNum(item.PoBelumBpb)
+      }}</span>
+    </template>
+    <template #item.BahanBelumPo="{ item }">
+      <span
+        :class="{ 'text-belumpo-outstanding': Number(item.BahanBelumPo) > 0 }"
+        >{{ fmtNum(item.BahanBelumPo) }}</span
       >
     </template>
 
@@ -641,6 +679,14 @@ const onExport = async () => {
 }
 .text-mkb-outstanding {
   color: #e65100;
+  font-weight: 700;
+}
+.text-po-outstanding {
+  color: #1565c0;
+  font-weight: 700;
+}
+.text-belumpo-outstanding {
+  color: #c62828;
   font-weight: 700;
 }
 
