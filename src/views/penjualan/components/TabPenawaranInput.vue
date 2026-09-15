@@ -7,7 +7,6 @@ import api from "@/services/api";
 import {
   IconSearch,
   IconPlus,
-  IconAlertTriangle,
   IconX,
   IconPhotoOff,
   IconExternalLink,
@@ -228,8 +227,6 @@ const removeDetail = (index: number) => {
 
 // ── Logika Minta Harga (Dengan Dialog Konfirmasi) ──
 const isMintaHargaLoading = ref(false);
-const confirmDialog = ref(false);
-const pendingMintaHargaItem = ref<any>(null);
 
 const proceedLoadMintaHarga = async (item: any) => {
   if (activeRowIndex.value === null) return;
@@ -273,28 +270,12 @@ const proceedLoadMintaHarga = async (item: any) => {
     row.NoPermintaan = "";
   } finally {
     isMintaHargaLoading.value = false;
-    confirmDialog.value = false;
-    pendingMintaHargaItem.value = null;
   }
 };
 
 const handleMintaHargaSelected = async (item: any) => {
   if (activeRowIndex.value === null) return;
-  if (Number(item.Harga) === 0) {
-    pendingMintaHargaItem.value = item;
-    confirmDialog.value = true;
-    return;
-  }
   await proceedLoadMintaHarga(item);
-};
-
-const onConfirmYes = () => {
-  if (pendingMintaHargaItem.value)
-    proceedLoadMintaHarga(pendingMintaHargaItem.value);
-};
-const onConfirmNo = () => {
-  confirmDialog.value = false;
-  pendingMintaHargaItem.value = null;
 };
 
 // ── Logika Lookups ──
@@ -1017,6 +998,7 @@ watch(
                   type="number"
                   v-model="row.Panjang"
                   class="cell-inp tr"
+                  min="0"
                   :disabled="!!row.Spk"
                   v-select-on-focus
                 />
@@ -1026,6 +1008,7 @@ watch(
                   type="number"
                   v-model="row.Lebar"
                   class="cell-inp tr"
+                  min="0"
                   :disabled="!!row.Spk"
                   v-select-on-focus
                 />
@@ -1275,31 +1258,6 @@ watch(
     :kode-perusahaan="formData.PerushKode"
     @selected="handleRekeningSelected"
   />
-
-  <v-dialog v-model="confirmDialog" max-width="400px" persistent>
-    <v-card class="rounded-lg">
-      <v-card-title class="text-h6 pa-4 d-flex align-center">
-        <IconAlertTriangle
-          color="orange"
-          class="mr-2"
-          :size="20"
-          :stroke-width="1.7"
-        />
-        Peringatan
-      </v-card-title>
-      <v-card-text class="pa-4 pt-0 text-body-2 text-grey-darken-3">
-        Belum ada kalkulasi harga untuk No. Permintaan ini. <br />
-        Apakah Anda tetap ingin melanjutkannya?
-      </v-card-text>
-      <v-card-actions class="pa-4 pt-2 border-t">
-        <v-spacer></v-spacer>
-        <v-btn variant="text" @click="onConfirmNo">Batal</v-btn>
-        <v-btn color="primary" variant="elevated" @click="onConfirmYes"
-          >Ya, Lanjutkan</v-btn
-        >
-      </v-card-actions>
-    </v-card>
-  </v-dialog>
 
   <v-dialog v-model="showPreviewDialog" max-width="800px">
     <v-card class="rounded-lg">

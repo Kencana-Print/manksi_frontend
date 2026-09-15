@@ -178,6 +178,15 @@ const {
     if (validDetails.length === 0) {
       throw new Error("Minimal harus ada 1 detail barang.");
     }
+    // BARU: qty per baris wajib > 0
+    const zeroQtyRow = validDetails.find(
+      (d) => !d.Spk && Number(d.Qty || 0) <= 0,
+    );
+    if (zeroQtyRow) {
+      throw new Error(
+        `Qty untuk "${zeroQtyRow.NamaBarang}" harus lebih dari 0.`,
+      );
+    }
 
     dataToSave.Details = validDetails;
     return await penawaranFormService.save(dataToSave, !isEditMode.value);
