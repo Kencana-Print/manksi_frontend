@@ -144,9 +144,9 @@ const wrapText = (text: string, maxWidth: number): string[] => {
 };
 
 const PAGE_WIDTH = 136;
-const NAMA_W = 50;
-const KET_W = 18; // ← dikecilkan dari 26, untuk kasih ruang ke kolom SO
-const SO_W = 20; // ← BARU, sebelumnya hardcode 12 inline
+const NAMA_W = 45; // dari 50 → 45 (nama masih cukup, contoh "KAOS OBLONG DUNLOP KUNING" = 25 char)
+const KET_W = 40; // dari 18 → 40
+const SO_W = 15;
 
 const MAX_DATA_ROWS_PER_PAGE = 7;
 
@@ -189,7 +189,7 @@ const generateTxt = () => {
     }
     lines.push(LINE);
     lines.push(
-      `${padR("No", 3)} ${padR("SO", SO_W)} ${padR("Nama", NAMA_W)} ${padR("Ukuran", 20)} ${padL("Jumlah", 10)} ${padL("Koli", 9)} ${padR("Keterangan", KET_W)}`,
+      `${padR("No", 3)} ${padR("SO", SO_W)} ${padR("Nama", NAMA_W)} ${padR("Ukuran", 13)} ${padL("Jumlah", 10)} ${padL("Koli", 9)} ${padR("Keterangan", KET_W)}`,
     );
     lines.push(LINE);
     return lines;
@@ -240,22 +240,29 @@ const generateTxt = () => {
   const headerLines = buildHeaderLines();
   const footerLines = buildFooterLines();
 
-  // 1. URAIKAN DATA MENJADI BARIS FISIK (TERMASUK WRAPPING TEXT NAMA)
+  // 1. URAIKAN DATA MENJADI BARIS FISIK (TERMASUK WRAPPING TEXT NAMA & KETERANGAN)
   const allPhysicalRows: string[] = [];
   let currentRowNo = 1;
 
   for (const r of rows) {
     const namaFull = (r.spk_nama2 || r.spk_nama || "").trim();
     const namaLines = wrapText(namaFull, NAMA_W);
+
+    const ketFull = (r.sjd_keterangan || "").trim();
+    const ketLines = wrapText(ketFull, KET_W);
+
+    const maxLines = Math.max(namaLines.length, ketLines.length);
     const nomorTampil = r.so_ref || r.sjd_spk_nomor || "";
-    // Baris Utama (dengan No, SPK, Ukuran, dst)
+
+    // Baris Utama (No, SO, Ukuran, Jumlah, Koli tetap di baris pertama saja)
     allPhysicalRows.push(
-      `${padR(String(currentRowNo), 3)} ${padR(nomorTampil, SO_W)} ${padR(namaLines[0], NAMA_W)} ${padR(r.sjd_ukuran || "", 20)} ${padL(num(r.sjd_jumlah), 10)} ${padL(num(r.sjd_koli), 9)} ${padR(r.sjd_keterangan || "", KET_W)}`,
+      `${padR(String(currentRowNo), 3)} ${padR(nomorTampil, SO_W)} ${padR(namaLines[0], NAMA_W)} ${padR(r.sjd_ukuran || "", 13)} ${padL(num(r.sjd_jumlah), 10)} ${padL(num(r.sjd_koli), 9)} ${padR(r.sjd_keterangan || "", KET_W)}`,
     );
-    // Baris Tambahan (jika nama terpotong menjadi multi-baris)
-    for (let i = 1; i < namaLines.length; i++) {
+
+    // Baris Tambahan (jika Nama ATAU Keterangan sama-sama butuh wrap)
+    for (let i = 1; i < maxLines; i++) {
       allPhysicalRows.push(
-        `${padR("", 3)} ${padR("", SO_W)} ${padR(namaLines[i], NAMA_W)} ${padR("", 20)} ${padL("", 10)} ${padL("", 9)} ${padR("", KET_W)}`,
+        `${padR("", 3)} ${padR("", SO_W)} ${padR(namaLines[i], NAMA_W)} ${padR("", 13)} ${padL("", 10)} ${padL("", 9)} ${padR("", KET_W)}`,
       );
     }
     currentRowNo++;

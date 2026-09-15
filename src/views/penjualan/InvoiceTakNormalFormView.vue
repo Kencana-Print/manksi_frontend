@@ -653,11 +653,11 @@ const skipPrint = () => {
     });
 };
 
-const doCetak = () => {
+const doCetak = (mode: "dotmatrix" | "inkjet") => {
   const currentPath = route.path; // snapshot SEBELUM push
   const url = router.resolve({
     name: "InvoiceTakNormalPrint",
-    query: { nomor: savedNomor.value },
+    query: { nomor: savedNomor.value, mode },
   }).href;
   window.open(url, "_blank");
   showPrintDialog.value = false;
@@ -1331,8 +1331,21 @@ onMounted(async () => {
       <v-card-actions class="pa-3 border-t" style="gap: 6px">
         <v-btn variant="text" size="small" @click="skipPrint">Tidak</v-btn>
         <v-spacer />
-        <v-btn variant="flat" size="small" color="primary" @click="doCetak">
-          🖨️ Cetak
+        <v-btn
+          variant="outlined"
+          size="small"
+          color="blue-grey"
+          @click="doCetak('dotmatrix')"
+        >
+          🖨️ Dot Matrix
+        </v-btn>
+        <v-btn
+          variant="flat"
+          size="small"
+          color="primary"
+          @click="doCetak('inkjet')"
+        >
+          🖨️ InkJet (A4)
         </v-btn>
       </v-card-actions>
     </v-card>
