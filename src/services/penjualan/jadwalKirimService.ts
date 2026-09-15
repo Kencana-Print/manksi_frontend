@@ -22,6 +22,11 @@ export const jadwalKirimService = {
       params: divisi ? { divisi } : undefined,
     }),
 
+  tundaData: (nomor: string, alasan: string) =>
+    api.post(`/penjualan/jadwal-kirim/${encodeURIComponent(nomor)}/tunda`, {
+      alasan,
+    }),
+
   deleteData: (nomor: string) =>
     api.delete(`/penjualan/jadwal-kirim/${encodeURIComponent(nomor)}`),
 };

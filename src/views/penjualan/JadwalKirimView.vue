@@ -16,6 +16,7 @@ import {
   IconSearch,
   IconTableExport,
   IconPrinter,
+  IconClockPause,
 } from "@tabler/icons-vue";
 import { formatTanggal } from "@/utils/dateFormat";
 
@@ -36,6 +37,10 @@ interface JadwalKirimRow {
   Selisih_Jumlah: number;
   Selisih_Koli: number;
   usr_create: string;
+  jk_status?: string;
+  jk_alasan_tunda?: string;
+  jk_tunda_dari_nomor?: string;
+  jk_tunda_ke_nomor?: string;
 }
 
 interface DetailRow {
@@ -181,6 +186,7 @@ const headers = [
   { title: "Koli Real.", key: "Koli_Realisasi", width: "90px", align: "end" },
   { title: "Selisih Jml", key: "Selisih_Jumlah", width: "95px", align: "end" },
   { title: "Selisih Koli", key: "Selisih_Koli", width: "95px", align: "end" },
+  { title: "Status", key: "jk_status", width: "90px" },
   { title: "User", key: "usr_create", width: "90px" },
 ];
 
@@ -396,6 +402,53 @@ const clearGudang = () => {
   filterState.value.gudangNama = "";
 };
 
+const showTundaDialog = ref(false);
+const tundaAlasan = ref("");
+const isTundaSaving = ref(false);
+
+// ⚠️ KONFIRMASI: field role yang benar dari authStore.user — asumsi
+// "bagian", sesuaikan kalau nama field aslinya beda (mis. "jabatan")
+const canTunda = computed(
+  () => (authStore.user?.bagian || "").toUpperCase() === "KIRIM",
+);
+
+const openTundaDialog = () => {
+  if (selected.value.length !== 1) {
+    toast.warning("Pilih tepat 1 jadwal kirim untuk ditunda.");
+    return;
+  }
+  const item = selected.value[0] as unknown as JadwalKirimRow;
+  if (item.jk_status && item.jk_status !== "OPEN") {
+    toast.error(`Data ini sudah berstatus '${item.jk_status}'.`);
+    return;
+  }
+  tundaAlasan.value = "";
+  showTundaDialog.value = true;
+};
+
+const confirmTunda = async () => {
+  if (!tundaAlasan.value.trim()) {
+    toast.warning("Alasan tunda wajib diisi.");
+    return;
+  }
+  const item = selected.value[0] as unknown as JadwalKirimRow;
+  isTundaSaving.value = true;
+  try {
+    const res = await jadwalKirimService.tundaData(
+      item.Nomor,
+      tundaAlasan.value.trim(),
+    );
+    toast.success(res.data.message || "Jadwal berhasil ditunda.");
+    showTundaDialog.value = false;
+    clearSelection();
+    await fetchData();
+  } catch (err: any) {
+    toast.error(err.response?.data?.message || "Gagal menunda jadwal.");
+  } finally {
+    isTundaSaving.value = false;
+  }
+};
+
 // ── Filter state restore dari BaseBrowse sessionStorage ───────────────
 const onFilterStateRestored = (saved: Record<string, any>) => {
   if (saved.tglAwal) filterState.value.tglAwal = saved.tglAwal;
@@ -526,6 +579,18 @@ watch(
     <!-- ── Extra actions: Export Detail ── -->
     <template #extra-actions>
       <v-btn
+        v-if="canTunda"
+        size="small"
+        color="orange-darken-2"
+        @click="openTundaDialog"
+      >
+        <template #prepend>
+          <IconClockPause :size="15" :stroke-width="1.7" />
+        </template>
+        Tunda Pengiriman
+      </v-btn>
+
+      <v-btn
         size="small"
         color="teal"
         :loading="isExportingDetail"
@@ -543,6 +608,18 @@ watch(
         </template>
         Cetak
       </v-btn>
+    </template>
+
+    <template #item.jk_status="{ item }">
+      <v-chip
+        v-if="item.jk_status === 'TUNDA'"
+        size="x-small"
+        color="orange"
+        variant="flat"
+      >
+        TUNDA
+      </v-chip>
+      <span v-else style="font-size: 11px; color: #999">—</span>
     </template>
 
     <template #item.Tanggal="{ item }">
@@ -659,6 +736,47 @@ watch(
       <v-card-actions class="pa-3 border-t">
         <v-spacer />
         <v-btn variant="text" @click="showGudangModal = false">Tutup</v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
+
+  <!-- ── Dialog Tunda Pengiriman ── -->
+  <v-dialog v-model="showTundaDialog" max-width="450px" persistent>
+    <v-card class="rounded-lg">
+      <v-card-title
+        class="bg-orange-darken-2 text-white pa-3 d-flex align-center"
+      >
+        <IconClockPause :size="16" class="mr-2" />
+        <span style="font-size: 13px; font-weight: 700">Tunda Pengiriman</span>
+      </v-card-title>
+      <v-card-text class="pa-4">
+        <p class="mb-3" style="font-size: 12px; color: #555">
+          Jadwal ini akan ditandai TUNDA, dan sistem otomatis membuat jadwal
+          baru untuk keesokan harinya dengan data yang sama.
+        </p>
+        <label style="font-size: 11px; font-weight: 600; color: #424242">
+          Alasan Tunda <span style="color: #d32f2f">*</span>
+        </label>
+        <v-textarea
+          v-model="tundaAlasan"
+          rows="3"
+          variant="outlined"
+          density="compact"
+          hide-details
+          placeholder="Jelaskan alasan penundaan..."
+          class="mt-1"
+        />
+      </v-card-text>
+      <v-card-actions class="pa-3 border-t">
+        <v-spacer />
+        <v-btn variant="text" @click="showTundaDialog = false">Batal</v-btn>
+        <v-btn
+          color="orange-darken-2"
+          :loading="isTundaSaving"
+          @click="confirmTunda"
+        >
+          Ya, Tunda
+        </v-btn>
       </v-card-actions>
     </v-card>
   </v-dialog>
