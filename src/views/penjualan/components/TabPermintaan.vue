@@ -84,7 +84,7 @@ const handleImageError = (e: Event) => {
 };
 
 const divisiOptions = ref<any[]>([]);
-const statusOptions = ["BELUM", "MINTA", "WAIT", "CANCEL", "DONE"];
+const statusOptions = ["BELUM", "MINTA","NEGO", "WAIT", "CANCEL", "DONE"];
 const perfectOptions = ["Y", "N", ""];
 
 watch(

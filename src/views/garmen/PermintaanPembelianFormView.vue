@@ -239,6 +239,8 @@ const onKodeEnter = async (idx: number) => {
   }
 };
 
+const fmt = (v: number) => new Intl.NumberFormat("id-ID").format(v || 0);
+
 const recalcTotal = (i: number) => {
   const row = formData.value.items[i];
   row.total = (Number(row.jumlah) || 0) * (Number(row.harga) || 0);
@@ -586,12 +588,12 @@ const onHapusGambarItem = async (): Promise<void> => {
                   <th style="width: 40px" class="text-center">No</th>
                   <th style="width: 110px">Kode</th>
                   <th style="min-width: 180px">Nama Barang</th>
-                  <th v-if="isDetailRinci" style="min-width: 150px">
+                  <th v-if="isDetailRinci" style="min-width: 150px; background: #ffeb3b">
                     Spesifikasi
                   </th>
                   <th style="width: 60px" class="text-center">Sat</th>
                   <th
-                    style="width: 90px; background: #2e7d32"
+                    style="width: 90px"
                     class="text-right text-white"
                   >
                     Est.Realisasi
@@ -699,6 +701,11 @@ const onHapusGambarItem = async (): Promise<void> => {
                       v-select-on-focus
                     />
                   </td>
+
+                 <!-- Total -->
+                 <td class="ci text-right" :class="{ 'ci text-right': item.total === 0 }">
+                 {{ fmt(item.total) }}</td>
+
                   <td v-if="isDetailRinci" class="p0">
                     <input
                       v-model="item.kegunaan"
@@ -778,7 +785,7 @@ const onHapusGambarItem = async (): Promise<void> => {
                       @click="removeRealisasiRow(Number(idx))"
                       class="text-error"
                     >
-                      ✕
+                      <IconTrash :size="12" :stroke-width="1.8" />
                     </button>
                   </td>
                 </tr>
