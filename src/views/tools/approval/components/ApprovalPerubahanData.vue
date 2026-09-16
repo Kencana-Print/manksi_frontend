@@ -38,6 +38,7 @@ const authStatus = ref("Y");
 const headers = [
   { title: "Program", key: "Program", width: "100px" },
   { title: "Transaksi", key: "Transaksi", width: "140px" },
+  { title: "Jenis", key: "Jenis", width: "110px" }, // ⬅ BARU
   { title: "Nomor", key: "Nomor", width: "150px" },
   { title: "Tanggal", key: "Tanggal", width: "90px", align: "center" },
   { title: "Keterangan", key: "Keterangan", minWidth: "300px" },
@@ -92,6 +93,7 @@ const submitOtorisasi = async () => {
       nomor: authData.value.Nomor,
       transaksi: authData.value.Transaksi,
       urut: authData.value.AjuanKe,
+      jenis: authData.value.Jenis, // ⬅ BARU
       status_acc: authStatus.value,
     });
 
@@ -101,13 +103,13 @@ const submitOtorisasi = async () => {
     );
     showAuthDialog.value = false;
 
-    // MUTASI LOKAL: Update array data table di layar
-    // Karena bisa ada duplikasi Nomor, kita cocokkan Nomor, Transaksi, dan Urut
+    // Karena bisa ada duplikasi Nomor, cocokkan Nomor+Transaksi+Urut+Jenis
     const targetRow = items.value?.find(
       (i: any) =>
         i.Nomor === authData.value.Nomor &&
         i.Transaksi === authData.value.Transaksi &&
-        i.AjuanKe === authData.value.AjuanKe,
+        i.AjuanKe === authData.value.AjuanKe &&
+        i.Jenis === authData.value.Jenis, // ⬅ BARU
     );
 
     if (targetRow) {
@@ -213,6 +215,16 @@ const getRowProps = (data: any) => {
     <template #item.TglAcc="{ item }">
       {{ formatDateTime(item.TglAcc) }}
     </template>
+
+    <template #item.Jenis="{ item }">
+      <v-chip
+        size="x-small"
+        :color="item.Jenis === 'TUTUPBUKU' ? 'deep-orange' : 'blue-grey'"
+        variant="flat"
+      >
+        {{ item.Jenis === "TUTUPBUKU" ? "Tutup Buku" : "SPK PPIC" }}
+      </v-chip>
+    </template>
   </BaseBrowse>
 
   <v-dialog v-model="showAuthDialog" max-width="500px" persistent>
@@ -263,6 +275,22 @@ const getRowProps = (data: any) => {
                   style="width: 40px"
                 />
               </div>
+            </div>
+
+            <div class="d-row">
+              <span class="d-lbl">Jenis</span>
+              <input
+                type="text"
+                :value="
+                  authData.Jenis === 'TUTUPBUKU'
+                    ? 'Tutup Buku'
+                    : authData.Jenis === 'UBAH'
+                      ? 'SPK PPIC Closed'
+                      : authData.Jenis
+                "
+                readonly
+                class="d-inp flex-1 font-weight-bold"
+              />
             </div>
 
             <div class="d-row align-start mt-2">

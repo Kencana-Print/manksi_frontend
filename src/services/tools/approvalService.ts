@@ -52,6 +52,7 @@ export const approvalService = {
     nomor: string;
     transaksi: string;
     urut: number;
+    jenis: string;
     status_acc: string;
   }) => api.post("/tools/approval/perubahan-data/otorisasi", payload),
 
