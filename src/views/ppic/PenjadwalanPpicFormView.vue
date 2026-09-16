@@ -425,13 +425,23 @@ const pushRowFromServer = (pjwdId: number, rowInput: any) => {
 };
 
 const isDuplicate = (sumber: string, nomor: string, penId?: string) => {
-  if (sumber === "SO") return detail.value.some((d) => d.SoNomor === nomor);
-  if (sumber === "MAP") return detail.value.some((d) => d.MapNomor === nomor);
-  if (sumber === "PERMINTAAN HARGA")
-    return detail.value.some((d) => d.MhNomor === nomor);
-  if (sumber === "PENAWARAN")
-    return detail.value.some((d) => d.PenNomor === nomor && d.PenId === penId);
-  return detail.value.some((d) => d.NomorPraOrder === nomor);
+  const matches = (d: DetailRow) => {
+    if (sumber === "SO") return d.SoNomor === nomor;
+    if (sumber === "MAP") return d.MapNomor === nomor;
+    if (sumber === "PERMINTAAN HARGA") return d.MhNomor === nomor;
+    if (sumber === "PENAWARAN")
+      return d.PenNomor === nomor && d.PenId === penId;
+    return d.NomorPraOrder === nomor;
+  };
+  const rows = detail.value.filter(matches);
+  if (rows.length === 0) return false;
+  // Boleh nambah baris lagi HANYA kalau semua baris existing untuk
+  // nomor ini sudah PARTIAL dan sudah punya Tanggal Kesepakatan —
+  // batch sebelumnya sudah "dikunci", baris baru jadi batch berikutnya.
+  const semuaSiapDipecah = rows.every(
+    (d) => d.StatusPermintaan === "PARTIAL" && !!d.Kesepakatan,
+  );
+  return !semuaSiapDipecah;
 };
 
 const tarikSo = async () => {
@@ -628,7 +638,10 @@ const tambahManual = async () => {
   }
 
   if (isDuplicate(jenis === "MH" ? "PERMINTAAN HARGA" : jenis, nomor)) {
-    toast.warning(`${jenis} ini sudah ada di daftar.`);
+    toast.warning(
+      `${jenis} ${nomor} sudah ada di daftar. Isi Rencana sebagian (PARTIAL) dan ` +
+        `Tanggal Kesepakatan pada baris yang ada dulu sebelum menambahkan batch/tanggal kirim lain.`,
+    );
     return;
   }
 
