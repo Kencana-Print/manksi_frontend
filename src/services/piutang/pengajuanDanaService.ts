@@ -9,4 +9,10 @@ export const pengajuanDanaService = {
 
   deletePengajuan: (nomor: string) =>
     api.delete(`/piutang/pengajuan-dana/${encodeURIComponent(nomor)}`),
+
+  closeManual: (nomor: string, alasan: string) =>
+    api.post(
+      `/piutang/pengajuan-dana/${encodeURIComponent(nomor)}/close-manual`,
+      { alasan },
+    ),
 };

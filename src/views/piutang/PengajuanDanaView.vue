@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from "vue";
+import { ref, watch, computed } from "vue";
 import { useAuthStore } from "@/stores/authStore";
 import { useToast } from "vue-toastification";
 import { useRouter } from "vue-router";
@@ -13,6 +13,7 @@ import {
   IconTrash,
   IconPrinter,
   IconFileSpreadsheet,
+  IconCircleCheck,
 } from "@tabler/icons-vue";
 import { formatTanggal } from "@/utils/dateFormat";
 import {
@@ -215,6 +216,52 @@ const openPrint = (layout: "full" | "half") => {
     params: { nomor: printTargetNomor.value },
   }).href;
   window.open(printUrl, "_blank");
+};
+
+const showCloseManualDialog = ref(false);
+const closeManualAlasan = ref("");
+const isClosingManual = ref(false);
+
+const canCloseManual = computed(() => {
+  if (!isSingleSelected.value) return false;
+  const item = selected.value[0];
+  return (
+    item.Approval === "Sudah" &&
+    item.Beli === "Belum" &&
+    item.Closed === "Belum" &&
+    item.UserKode === authStore.user?.kode
+  );
+});
+
+const onOpenCloseManual = () => {
+  if (!isSingleSelected.value) return;
+  closeManualAlasan.value = "";
+  showCloseManualDialog.value = true;
+};
+
+const onConfirmCloseManual = async () => {
+  if (!closeManualAlasan.value.trim()) {
+    toast.error("Alasan penutupan manual wajib diisi.");
+    return;
+  }
+  const target = selected.value[0];
+  isClosingManual.value = true;
+  try {
+    await pengajuanDanaService.closeManual(
+      target.Nomor,
+      closeManualAlasan.value.trim(),
+    );
+    toast.success("Pengajuan berhasil di-close manual.");
+    showCloseManualDialog.value = false;
+    clearSelection();
+    fetchData();
+  } catch (error: any) {
+    toast.error(
+      error.response?.data?.message || "Gagal melakukan close manual.",
+    );
+  } finally {
+    isClosingManual.value = false;
+  }
 };
 
 // ── Export Master ──
@@ -480,6 +527,15 @@ const fmtNum = (val: number) =>
         <template #prepend><IconPrinter :size="15" /></template>Cetak
       </v-btn>
       <v-btn
+        v-if="canCloseManual"
+        size="small"
+        color="teal"
+        class="mr-1"
+        @click="onOpenCloseManual"
+      >
+        <template #prepend><IconCircleCheck :size="15" /></template>Close Manual
+      </v-btn>
+      <v-btn
         v-if="canExport"
         size="small"
         color="success"
@@ -627,6 +683,52 @@ const fmtNum = (val: number) =>
         <v-btn variant="elevated" color="primary" @click="openPrint('full')"
           >Yes — Full A4</v-btn
         >
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
+
+  <v-dialog v-model="showCloseManualDialog" max-width="420px" persistent>
+    <v-card class="rounded-lg">
+      <v-card-title
+        class="bg-teal text-white pa-3"
+        style="font-size: 13px; font-weight: 700"
+      >
+        Close Manual Pengajuan
+      </v-card-title>
+      <v-card-text class="pa-4">
+        <div class="text-caption text-grey-darken-1 mb-3">
+          Qty yang dibelikan belum sama dengan qty pengajuan, tapi Anda sudah
+          merasa cukup. Isi alasan penutupan manual di bawah ini.
+        </div>
+        <v-textarea
+          v-model="closeManualAlasan"
+          label="Alasan"
+          variant="outlined"
+          density="compact"
+          rows="3"
+          maxlength="255"
+          counter
+          hide-details="auto"
+          autofocus
+        />
+      </v-card-text>
+      <v-card-actions class="pa-3 border-t bg-grey-lighten-4">
+        <v-spacer />
+        <v-btn
+          variant="text"
+          @click="showCloseManualDialog = false"
+          :disabled="isClosingManual"
+        >
+          Batal
+        </v-btn>
+        <v-btn
+          variant="elevated"
+          color="teal"
+          :loading="isClosingManual"
+          @click="onConfirmCloseManual"
+        >
+          Ya, Close Manual
+        </v-btn>
       </v-card-actions>
     </v-card>
   </v-dialog>
