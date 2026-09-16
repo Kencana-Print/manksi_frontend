@@ -85,6 +85,14 @@ const grandTotal = computed(
         <td>{{ dataPO.header.Lokasi }}</td>
       </tr>
       <tr>
+        <td>Cost Center</td>
+        <td>:</td>
+        <td>{{ dataPO.header.CcKode }}</td>
+        <td>Detail CC</td>
+        <td>:</td>
+        <td>{{ dataPO.header.CcDcNama }}</td>
+      </tr>
+      <tr>
         <td>Keterangan</td>
         <td>:</td>
         <td colspan="4">{{ dataPO.header.Keterangan }}</td>
