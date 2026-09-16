@@ -134,6 +134,7 @@ const headers = [
   { title: "Ket. Kalkulasi", key: "KeteranganKalkulasi", width: "150px" },
   { title: "Kal. Created", key: "KalCreated", width: "120px" },
   { title: "Kal. Modified", key: "KalModified", width: "120px" },
+  { title: "No. Kalkulasi Sales", key: "NoKals", width: "130px" },
   { title: "Status", key: "Status", width: "100px" },
   { title: "Approved", key: "Approved", width: "150px", align: "center" },
   { title: "Di Apv Oleh", key: "diApvOleh", width: "120px" },
@@ -147,6 +148,7 @@ const rowPropsFn = (data: any) => {
   if (s === "WAIT") return { class: "text-green font-weight-medium" };
   if (s === "CANCEL") return { class: "text-blue font-weight-medium" };
   if (s === "BELUM") return { class: "text-grey-darken-1 font-weight-medium" };
+  if (s === "NEGO") return { class: "text-purple font-weight-medium" };
   return {};
 };
 
@@ -218,6 +220,7 @@ const onExport = () => {
     { header: "Ket. Kalkulasi", key: "KeteranganKalkulasi", width: 20 },
     { header: "Kal. Created", key: "KalCreated" },
     { header: "Kal. Modified", key: "KalModified" },
+    { header: "No. Kalkulasi Sales", key: "NoKals" },
     { header: "Status", key: "Status" },
     {
       header: "Approved",
@@ -392,9 +395,18 @@ const submitPengajuan = async () => {
             <div class="legend-dot" style="background: #757575"></div>
             <span>BELUM</span>
           </div>
+
           <div class="legend-item">
             <div class="legend-dot" style="background: #e53935"></div>
             <span>MINTA</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-dot" style="background: #BF2DBF"></div>
+            <span>NEGO</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-dot" style="background: #2e7d32"></div>
+            <span>WAIT</span>
           </div>
           <div class="legend-item">
             <div class="legend-dot" style="background: #1565c0"></div>
@@ -639,6 +651,7 @@ const submitPengajuan = async () => {
   background: #e53935;
   color: white;
 }
+
 
 /* ── Dialog Pengajuan ── */
 .pin-card {
