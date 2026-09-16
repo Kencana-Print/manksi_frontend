@@ -210,6 +210,10 @@ const detailHeaders = [
 // ── Row color: selisih negatif → merah muda ────────────────────────────
 const rowPropsFn = (data: any) => {
   const item = data.item?.raw || data.item;
+
+  if (item?.jk_status === "TUNDA") {
+    return { style: "background-color: #f5f5f5 !important; color: #757575;" };
+  }
   if (Number(item?.Selisih_Jumlah) < 0 || Number(item?.Selisih_Koli) < 0) {
     return { style: "background-color: #fff8f8 !important; color: #c62828;" };
   }
