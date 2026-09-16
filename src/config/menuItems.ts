@@ -579,6 +579,12 @@ export const createMenuItems = (): NavItem[] => {
           ],
         },
         {
+          title: "Pengajuan Dana",
+          to: "/piutang/pengajuan-dana",
+          icon: IconCash,
+          menuId: 177,
+        },
+        {
           title: "SPK Gudang",
           to: "/garmen/spk-gudang",
           icon: IconClipboardList,
@@ -906,12 +912,6 @@ export const createMenuItems = (): NavItem[] => {
           to: "/piutang/pelunasan",
           icon: IconCoin,
           menuId: 255,
-        },
-        {
-          title: "Pengajuan Dana",
-          to: "/piutang/pengajuan-dana",
-          icon: IconCash,
-          menuId: 177,
         },
       ],
     },
