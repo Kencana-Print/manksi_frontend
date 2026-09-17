@@ -247,7 +247,6 @@ const proceedLoadMintaHarga = async (item: any) => {
     row.Harga = data.harga;
     hitungTotalBaris(row);
 
-    // ✅ BARU: auto-fill Customer dari Minta Harga kalau belum dipilih
     if (data.custKode) {
       if (!props.formData.CustKode) {
         props.formData.CustKode = data.custKode;
@@ -262,7 +261,15 @@ const proceedLoadMintaHarga = async (item: any) => {
       }
     }
 
-    toast.success("Berhasil memuat detail Permintaan Harga.");
+    // ⬅ BARU: belum ada kalkulasi -> warning saja, baris tetap terisi
+    // (Harga = 0, user bisa isi manual), TIDAK di-reset seperti error.
+    if (data.belumKalkulasi) {
+      toast.warning(
+        `⚠ No. Permintaan ${item.Nomor} belum ada kalkulasi harga. Harga diisi 0 — silakan isi manual.`,
+      );
+    } else {
+      toast.success("Berhasil memuat detail Permintaan Harga.");
+    }
   } catch (e: any) {
     toast.error(
       e.response?.data?.message || e.message || "Gagal memuat Permintaan Harga",
