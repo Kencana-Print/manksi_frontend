@@ -383,12 +383,6 @@ export const createMenuItems = (): NavItem[] => {
           icon: IconCalendarStats,
           menuId: 56,
         },
-        {
-          title: "Komitmen Kirim",
-          to: "/ppic/penjadwalan",
-          icon: IconCalendarWeek,
-          menuId: 176,
-        },
         { divider: true },
         {
           title: "LHK Pola",
@@ -867,6 +861,12 @@ export const createMenuItems = (): NavItem[] => {
           to: "/penjualan/jadwal-kirim",
           icon: IconTruckDelivery,
           menuId: 119,
+        },
+        {
+          title: "Komitmen Kirim",
+          to: "/ppic/penjadwalan",
+          icon: IconCalendarWeek,
+          menuId: 176,
         },
       ],
     },
