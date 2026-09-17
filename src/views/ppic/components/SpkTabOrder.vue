@@ -87,15 +87,21 @@ const resolveDesignImage = () => {
   // Tarik Invdc atau No Penawaran (Hindari spasi agar nama customer tidak masuk)
   const invdc = props.formData.spk_invdc || props.formData.spk_pen_nomor || "";
 
-  if (isKaosan && isNewFormatSO && invdc && !invdc.includes(" ")) {
-    kaosanExtIndex.value = 0;
-    // Format "K08.2026.00087" -> "K08"
-    const cabangKaosan = invdc.includes(".")
-      ? invdc.split(".")[0]
-      : invdc.substring(0, 3);
-
-    isLoadingImage.value = true;
-    tryKaosanExt(cabangKaosan, invdc, 0);
+  if (isKaosan && isNewFormatSO) {
+    if (invdc && !invdc.includes(" ")) {
+      kaosanExtIndex.value = 0;
+      const cabangKaosan = invdc.includes(".")
+        ? invdc.split(".")[0]
+        : invdc.substring(0, 3);
+      isLoadingImage.value = true;
+      tryKaosanExt(cabangKaosan, invdc, 0);
+    } else {
+      // BARU: Kaosan tapi belum ada invdc/pen_nomor — jangan fallback
+      // ke LOGIC LAMA, biar nggak nampilin gambar dari sumber yang
+      // salah (mis. placeholder template generik).
+      resolvedImageUrl.value = "";
+      isLoadingImage.value = false;
+    }
     return;
   }
 
@@ -219,6 +225,8 @@ const loadSoDetail = async (nomor: string) => {
     props.formData.so_kepentingan = h.spk_statuskerja || "";
     props.formData.so_dateline = h.spk_dateline?.substring(0, 10) || "";
     props.formData.spk_keterangan = h.spk_keterangan || "";
+    props.formData.spk_invdc = h.spk_invdc || "";
+    props.formData.spk_pen_nomor = h.spk_pen_nomor || "";
 
     // Ambil detail size dari SO (jadi starting point, boleh disesuaikan PPIC nanti)
     props.formData.Sizes = d.dtlSize || [];
