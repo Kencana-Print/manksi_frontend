@@ -48,7 +48,20 @@ const terbilang = (angka: number): string => {
       " Juta " +
       terbilang(angka % 1000000)
     );
-  return "";
+  // ⬅ BARU: cabang Milyar — sebelumnya angka >= 1 Milyar jatuh ke
+  // `return ""` di akhir fungsi, makanya Grand Total besar tampil kosong.
+  if (angka < 1000000000000)
+    return (
+      terbilang(Math.floor(angka / 1000000000)) +
+      " Milyar " +
+      terbilang(angka % 1000000000)
+    );
+  // ⬅ BARU: cabang Triliun, jaga-jaga kalau nilainya bisa sebesar itu.
+  return (
+    terbilang(Math.floor(angka / 1000000000000)) +
+    " Triliun " +
+    terbilang(angka % 1000000000000)
+  );
 };
 
 const formatDate = (dateStr: string) => {
@@ -327,7 +340,13 @@ const totalColumns = computed(() => {
       </table>
 
       <p class="terbilang">
-        {{ terbilang(Math.round(grandTotal)).toUpperCase() }} RUPIAH
+        {{
+          terbilang(Math.round(grandTotal))
+            .replace(/\s+/g, " ")
+            .trim()
+            .toUpperCase()
+        }}
+        RUPIAH
       </p>
 
       <div class="footer-section">
