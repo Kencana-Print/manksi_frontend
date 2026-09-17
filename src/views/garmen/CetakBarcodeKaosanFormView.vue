@@ -9,8 +9,13 @@ import { useForm } from "@/composables/useForm";
 import { cetakBarcodeKaosanFormService as svc } from "@/services/garmen/cetakBarcodeKaosanFormService";
 import SpkSearchModal from "@/components/lookups/SpkSearchModal.vue";
 import BarangKaosanSearchModal from "@/components/lookups/BarangKaosanSearchModal.vue";
-import { IconBarcode, IconSearch, IconPrinter } from "@tabler/icons-vue";
-import JsBarcode from "jsbarcode";
+import {
+  IconBarcode,
+  IconSearch,
+  IconPrinter,
+  IconEye,
+} from "@tabler/icons-vue";
+import QRCode from "qrcode";
 
 // ─── Types ────────────────────────────────────────────────
 interface DetailRow {
@@ -18,7 +23,7 @@ interface DetailRow {
   kode: string; // SPK nomor (atau kode dasar kalau input dari kaosan langsung)
   kodek: string; // Kode item kaosan
   tglspk: string;
-  barcode: string;
+  barcode: string; // barcode SKU-level lama (brgd_barcode), dipakai buat lookup, BUKAN yang di-encode ke QR
   nama: string;
   ukuran: string;
   order: number;
@@ -28,6 +33,28 @@ interface DetailRow {
   jumlah: number;
   cetak: boolean;
   packing: string;
+  sudahCetak?: number;
+}
+
+// ⚠️ ASUMSI: bentuk 1 unit fisik yang dikembalikan backend di
+// res.data.data.units setelah save — sesuai cetakBarcodeKaosanFormService.saveData()
+interface PrintUnit {
+  bcdNourut: number;
+  kode: string; // SPK nomor
+  kodek: string; // kode barang kaosan
+  ukuran: string;
+  nama: string;
+  harga: number;
+  tglspk: string;
+  unit_serial: string; // konten yang di-encode ke QR
+  posisi: number; // "No Urut" dalam range awal..akhir baris itu
+}
+
+interface QtyMismatchItem {
+  nama: string;
+  ukuran: string;
+  order: number;
+  jumlah: number;
 }
 
 const route = useRoute();
@@ -93,6 +120,7 @@ const {
     cetakHarga.value = false;
     isPrintPreviewVisible.value = false;
     printPreviewData.value = [];
+    isPreviewMode.value = false;
 
     if (cabFixed.value) {
       formData.value.cab = authStore.user!.cabang;
@@ -126,7 +154,10 @@ const {
     const nomorHasil = res.data?.data?.nomor || formData.value.nomor;
     formData.value.nomor = nomorHasil;
     toast.success(`Berhasil disimpan dengan nomor: ${nomorHasil}`);
-    triggerPrintFromGrid();
+    // BARU: sumber data print sekarang unit fisik dari backend
+    // (berisi unit_serial hasil generate), bukan dihitung ulang dari
+    // grid frontend
+    triggerPrintFromGrid(res.data?.data?.units || []);
   },
 });
 
@@ -204,7 +235,7 @@ const addSpkToGrid = async (spkNomor: string, replaceKey?: number | null) => {
         ukuran: it.ukuran,
         order: it.order,
         harga: it.harga,
-        awal: 0,
+        awal: it.nextAwal || 0,
         akhir: 0,
         jumlah: 0,
         cetak: it.cetak,
@@ -248,9 +279,26 @@ const openKaosanModal = (rowKey?: number) => {
   showKaosanModal.value = true;
 };
 
-const onKaosanItemsSelected = (selectedItems: any[]) => {
+const onKaosanItemsSelected = async (selectedItems: any[]) => {
   if (!selectedItems?.length) return;
   const replaceKey = activeKaosanRowKey.value;
+
+  // BARU: ambil nextAwal per kode unik yang dipilih
+  const uniqueKodes = [...new Set(selectedItems.map((it) => it.Kode))];
+  const nextAwalMap = new Map<string, Map<string, number>>();
+  await Promise.all(
+    uniqueKodes.map(async (kd) => {
+      try {
+        const res = await svc.lookupKodeKaosan(kd);
+        const items = res.data.data.items || [];
+        const m = new Map<string, number>();
+        items.forEach((it: any) => m.set(it.ukuran, it.nextAwal || 1));
+        nextAwalMap.set(kd, m);
+      } catch {
+        // gagal ambil nextAwal — bukan blocker, tetap lanjut dengan 0
+      }
+    }),
+  );
 
   const isDup = (
     kode: string,
@@ -268,9 +316,9 @@ const onKaosanItemsSelected = (selectedItems: any[]) => {
 
   let firstUsed = false;
   for (const it of selectedItems) {
-    // ⚠️ Kode dasar (brg_kode) jadi kode & kodek sekaligus, replika
-    // loadkaos() Delphi: CDS.kode:=anomor; CDS.kodex:=anomor; CDS.kodek:=anomor
     if (isDup(it.Kode, it.Kode, it.Ukuran, replaceKey)) continue;
+
+    const suggestedAwal = nextAwalMap.get(it.Kode)?.get(it.Ukuran) || 0;
 
     const row: DetailRow = {
       _key: newKey(),
@@ -282,7 +330,7 @@ const onKaosanItemsSelected = (selectedItems: any[]) => {
       ukuran: it.Ukuran,
       order: 0,
       harga: Number(it.Harga) || 0,
-      awal: 0,
+      awal: suggestedAwal, // BARU
       akhir: 0,
       jumlah: 0,
       cetak: !!it.Barcode,
@@ -356,7 +404,7 @@ const addKodeKaosanToGrid = async (
         ukuran: it.ukuran,
         order: it.order,
         harga: it.harga,
-        awal: 0,
+        awal: it.nextAwal || 0,
         akhir: 0,
         jumlah: 0,
         cetak: it.cetak,
@@ -394,6 +442,8 @@ const addKodeKaosanToGrid = async (
 const scanBarcodeValue = ref("");
 const showBarcodePickDialog = ref(false);
 const barcodePickResults = ref<any[]>([]);
+const showQtyMismatchDialog = ref(false);
+const qtyMismatchDetails = ref<QtyMismatchItem[]>([]);
 
 const onScanBarcodeEnter = async () => {
   const val = scanBarcodeValue.value.trim();
@@ -459,6 +509,20 @@ const removeRow = (key: number) => {
 // clawalPropertiesEditValueChanged Delphi)
 const onAwalAkhirChange = (row: DetailRow) => {
   if (!row.nama) return;
+
+  // BARU: baris sudah punya unit tercetak — Akhir tidak boleh
+  // dikurangi di bawah jumlah yang sudah ada (Awal terkunci lewat
+  // readonly di template)
+  if (row.sudahCetak && row.sudahCetak > 0) {
+    const minAkhir = row.awal + row.sudahCetak - 1;
+    if ((row.akhir || 0) < minAkhir) {
+      toast.warning(
+        `Baris "${row.nama}" sudah punya ${row.sudahCetak} unit tercetak — Akhir minimal ${minAkhir}.`,
+      );
+      row.akhir = minAkhir;
+    }
+  }
+
   row.jumlah = Math.max(0, (row.akhir || 0) - (row.awal || 0) + 1);
   if (row.cetak) {
     row.packing = `${row.awal}-${row.akhir}`;
@@ -491,17 +555,50 @@ const validateSave = () => {
         toast.warning("Awal tidak boleh > Akhir.");
         return;
       }
+      if (d.sudahCetak && d.sudahCetak > 0 && d.jumlah < d.sudahCetak) {
+        toast.warning(
+          `Baris "${d.nama}" sudah punya ${d.sudahCetak} unit tercetak — Akhir tidak boleh dikurangi.`,
+        );
+        return;
+      }
     }
   }
+
+  // BARU: cek mismatch jumlah vs qty pesanan SPK — warning + konfirmasi
+  const mismatches = validRows
+    .filter((d) => d.cetak && d.order > 0 && d.jumlah !== d.order)
+    .map((d) => ({
+      nama: d.nama,
+      ukuran: d.ukuran,
+      order: d.order,
+      jumlah: d.jumlah,
+    }));
+
+  if (mismatches.length > 0) {
+    qtyMismatchDetails.value = mismatches;
+    showQtyMismatchDialog.value = true;
+    return;
+  }
+
   showSaveDialog.value = true;
 };
 
-// ─── Printer & Print Preview (client-side, replika cetak() Delphi) ──
+// BARU: lanjut ke dialog save utama setelah user konfirmasi mismatch
+const confirmQtyMismatchAndSave = () => {
+  showQtyMismatchDialog.value = false;
+  showSaveDialog.value = true;
+};
+
+// ─── Printer & Print Preview (client-side) ──────────────────
 type PrinterType = "XP360B" | "POSTEK";
 const selectedPrinter = ref<PrinterType>("XP360B");
 const cetakHarga = ref(false);
 const isPrintPreviewVisible = ref(false);
 const printPreviewData = ref<any[]>([]);
+// BARU: true kalau dialog sedang menampilkan preview (belum simpan),
+// dipakai supaya closePreview tidak pindah tab/browse seperti pas
+// print sungguhan setelah save
+const isPreviewMode = ref(false);
 
 const fr = (v: number) =>
   Number(v || 0).toLocaleString("id-ID", { maximumFractionDigits: 0 });
@@ -515,35 +612,33 @@ const chunkedPreviewData = computed(() => {
   return result;
 });
 
-const buildPrintData = (rows: DetailRow[], nomorDok: string) => {
-  const output: any[] = [];
-  let urut = 0;
-  for (const row of rows) {
-    if (!row.barcode || !row.cetak || (row.jumlah || 0) <= 0) continue;
-    for (let i = row.awal; i <= row.akhir; i++) {
-      urut++;
-      const hargaFormatted =
-        cetakHarga.value && Number(row.harga) > 0 ? `Rp ${fr(row.harga)}` : "";
-      output.push({
-        nomor: nomorDok,
-        tgl: row.tglspk ? row.tglspk.split("-").reverse().join("/") : "",
-        kode: row.kodek,
-        spk: row.kode,
-        ukuran: row.ukuran,
-        barcode: row.barcode,
-        nama: row.nama,
-        harga: row.harga,
-        charga: hargaFormatted,
-        nourut: urut,
-      });
-    }
-  }
-  return output;
+// BARU: sumber data print sekarang array unit fisik (unit_serial per
+// pcs) dari backend, bukan lagi dihitung ulang dari awal..akhir di
+// frontend. qrValue = konten yang di-encode ke QR (unit_serial),
+// nourut = posisi dalam range (tampilan "No Urut" di label).
+const buildPrintData = (units: PrintUnit[], nomorDok: string) => {
+  return units.map((u: any) => {
+    const hargaFormatted =
+      cetakHarga.value && Number(u.harga) > 0 ? `Rp ${fr(u.harga)}` : "";
+    return {
+      nomor: nomorDok,
+      tgl: u.tglspk ? u.tglspk.split("-").reverse().join("/") : "",
+      kode: u.kodek,
+      spk: u.kode,
+      ukuran: u.ukuran,
+      qrValue: u.unit_serial,
+      nama: u.nama,
+      harga: u.harga,
+      charga: hargaFormatted,
+      nourut: u.posisi,
+      isConflict: !!u.isConflict,
+    };
+  });
 };
 
-const triggerPrintFromGrid = () => {
-  const validRows = formData.value.detail.filter((d) => d.nama.trim() !== "");
-  const data = buildPrintData(validRows, formData.value.nomor);
+const triggerPrintFromGrid = (units: PrintUnit[] = []) => {
+  isPreviewMode.value = false;
+  const data = buildPrintData(units, formData.value.nomor);
   if (!data.length) {
     // Tidak ada yang perlu dicetak -> langsung balik ke browse
     const currentPath = route.path; // snapshot SEBELUM push
@@ -559,16 +654,69 @@ const triggerPrintFromGrid = () => {
   isPrintPreviewVisible.value = true;
 };
 
+// BARU: Preview Cetak — panggil endpoint read-only (tidak insert
+// apapun), bisa dipakai kapan saja termasuk saat sedang edit, tanpa
+// perlu simpan dulu
+const previewPrintClick = async () => {
+  const validRows = formData.value.detail.filter(
+    (d) => d.nama.trim() !== "" && d.cetak,
+  );
+  if (!validRows.length) {
+    toast.warning("Tidak ada baris dengan Cetak aktif untuk dipreview.");
+    return;
+  }
+  for (const d of validRows) {
+    if (!d.awal || !d.akhir) {
+      toast.warning("Awal atau Akhir harus diisi untuk preview.");
+      return;
+    }
+    if (d.awal > d.akhir) {
+      toast.warning("Awal tidak boleh > Akhir.");
+      return;
+    }
+  }
+
+  try {
+    const payload = {
+      nomor: formData.value.nomor || "",
+      detail: formData.value.detail.map(({ _key, ...rest }) => rest),
+    };
+    const res = await svc.previewPrint(payload);
+    const units = res.data.data || [];
+    if (!units.length) {
+      toast.warning("Tidak ada unit yang bisa dipreview.");
+      return;
+    }
+    const hasConflict = units.some((u: any) => u.isConflict);
+    if (hasConflict) {
+      toast.warning(
+        "Beberapa nomor urut sudah pernah dicetak sebelumnya — cek ulang sebelum simpan.",
+      );
+    }
+    isPreviewMode.value = true;
+    printPreviewData.value = buildPrintData(
+      units,
+      formData.value.nomor || "PREVIEW",
+    );
+    isPrintPreviewVisible.value = true;
+  } catch (e: any) {
+    toast.error(e.response?.data?.message || "Gagal memuat preview cetak.");
+  }
+};
+
+// BARU: dummy QR untuk tes printer (dulu dummy CODE128)
 const testPrinter = () => {
+  isPreviewMode.value = false;
   const jumlahTes = selectedPrinter.value === "POSTEK" ? 3 : 2;
   const dummy: any[] = [];
   for (let i = 1; i <= jumlahTes; i++) {
     dummy.push({
       nomor: "TES",
       tgl: todayLocal().split("-").reverse().join("/"),
-      kode: "12345678",
+      kode: "TESKODE",
+      spk: "TES.SPK",
       ukuran: "TES",
-      barcode: "12345678",
+      qrValue: `TES.SPK.TES.${i}`,
       nama: "TES PRINTER",
       harga: 0,
       charga: "",
@@ -579,32 +727,30 @@ const testPrinter = () => {
   isPrintPreviewVisible.value = true;
 };
 
-const generateBarcodesInPreview = async () => {
+// BARU: generate QR di preview layar (ganti generateBarcodesInPreview)
+const generateQrInPreview = async () => {
   await nextTick();
   const area = document.getElementById("bck-print-area");
   if (!area) return;
-  const svgs = area.querySelectorAll<SVGElement>(".bck-barcode-svg");
-  svgs.forEach((svg) => {
-    const val = svg.getAttribute("data-barcode-value");
-    if (!val) return;
+  const canvases = area.querySelectorAll<HTMLCanvasElement>(".bck-qr-canvas");
+  for (const canvas of Array.from(canvases)) {
+    const val = canvas.getAttribute("data-qr-value");
+    if (!val) continue;
     try {
-      JsBarcode(svg, val, {
-        format: "CODE128",
-        lineColor: "#000",
-        width: 1.2,
-        height: 25,
-        displayValue: false,
-        margin: 1,
+      await QRCode.toCanvas(canvas, val, {
+        margin: 0,
+        width: 90,
+        errorCorrectionLevel: "M",
       });
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
     }
-  });
+  }
 };
 
 watch([printPreviewData, isPrintPreviewVisible], () => {
   if (isPrintPreviewVisible.value && printPreviewData.value.length) {
-    setTimeout(() => generateBarcodesInPreview(), 100);
+    setTimeout(() => generateQrInPreview(), 100);
   }
 });
 
@@ -612,28 +758,49 @@ const printStylesXP360B = `
   @page { size: 68mm 15mm landscape; margin: 0 !important; }
   html, body { margin:0; padding:0; width:68mm; background:#fff; -webkit-print-color-adjust: exact; }
   .bck-row { display:flex; width:68mm; height:15mm; align-items:center; gap:3mm; padding:0 1mm; box-sizing:border-box; page-break-after: always !important; }
-  .bck-label { width:31mm; height:14mm; display:flex; flex-direction:column; padding:0.5mm 0 0 2mm; box-sizing:border-box; overflow:hidden; }
-  .bck-nama { font-size:5pt; font-weight:bold; font-family:'Arial Narrow',Arial,sans-serif; line-height:1; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
-  .bck-ukuran { font-size:4.5pt; font-family:Arial; }
-  .bck-barcode-svg { width:27mm !important; height:5.5mm !important; margin:0.1mm 0; }
-  .bck-footer { display:flex; justify-content:space-between; width:95%; font-size:4.5pt; font-family:Arial,sans-serif; font-weight:bold; }
-  .bck-footer { display:flex; justify-content:space-between; width:95%; font-size:4.5pt; font-family:Arial,sans-serif; font-weight:bold; }
-  .bck-spk-line { display:flex; justify-content:space-between; width:95%; font-size:4pt; font-family:Arial,sans-serif; color:#333; margin-top:0.3mm; }
+  .bck-label { width:31mm; height:14mm; box-sizing:border-box; overflow:hidden;
+    display:grid;
+    grid-template-columns: 8mm 16mm 7mm;
+    grid-template-rows: 6mm 4mm 4mm;
+    grid-template-areas:
+      "nama nama nourut"
+      "qr   spk  ukuran"
+      "qr   tgl  ukuran";
+  }
+  .bck-cell { display:flex; align-items:center; justify-content:center; overflow:hidden; padding:0.15mm; box-sizing:border-box; text-align:center; line-height:1; }
+  .bck-c-nama { grid-area:nama; justify-content:flex-start; text-align:left; align-items:flex-start; padding-top:0.4mm; font-size:5.5pt; font-weight:bold; font-family:'Arial Narrow',Arial,sans-serif; line-height:1.05; word-break:break-word; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+  .bck-c-ukuran { grid-area:ukuran; font-size:8pt; font-weight:bold; font-family:Arial,sans-serif; }
+  .bck-c-qr { grid-area:qr; }
+  .bck-qr-canvas { width:7mm !important; height:7mm !important; }
+  .bck-c-spk { grid-area:spk; font-size:3.8pt; font-weight:bold; font-family:Arial,sans-serif; padding:0; }
+  .bck-c-tgl { grid-area:tgl; font-size:3.5pt; font-family:Arial,sans-serif; color:#333; padding:0; }
+  .bck-c-nourut { grid-area:nourut; font-size:4.5pt; font-weight:bold; font-family:Arial,sans-serif; }
 `;
 const printStylesPostek = `
   @page { size: 108mm 17mm landscape; margin: 0 !important; }
   html, body { margin:0; padding:0; width:108mm; background:#fff; -webkit-print-color-adjust: exact; }
   .bck-row { display:flex; width:108mm; height:17mm; align-items:center; gap:2mm; padding:0 1mm; box-sizing:border-box; }
   .bck-row:not(:last-child) { page-break-after: always !important; }
-  .bck-label { width:34mm; height:16mm; display:flex; flex-direction:column; padding:0.5mm 0 0 2mm; box-sizing:border-box; overflow:hidden; }
-  .bck-nama { font-size:5pt; font-weight:bold; font-family:'Arial Narrow',Arial,sans-serif; line-height:1; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
-  .bck-ukuran { font-size:4.5pt; font-family:Arial; }
-  .bck-barcode-svg { width:29mm !important; height:6mm !important; margin:0.1mm 0; }
-  .bck-footer { display:flex; justify-content:space-between; width:95%; font-size:4.5pt; font-family:Arial,sans-serif; font-weight:bold; }
-  .bck-footer { display:flex; justify-content:space-between; width:95%; font-size:4.5pt; font-family:Arial,sans-serif; font-weight:bold; }
-  .bck-spk-line { display:flex; justify-content:space-between; width:95%; font-size:4pt; font-family:Arial,sans-serif; color:#333; margin-top:0.3mm; }
+  .bck-label { width:34mm; height:16mm; box-sizing:border-box; overflow:hidden;
+    display:grid;
+    grid-template-columns: 9mm 17mm 8mm;
+    grid-template-rows: 6.5mm 4.75mm 4.75mm;
+    grid-template-areas:
+      "nama nama nourut"
+      "qr   spk  ukuran"
+      "qr   tgl  ukuran";
+  }
+  .bck-cell { display:flex; align-items:center; justify-content:center; overflow:hidden; padding:0.15mm; box-sizing:border-box; text-align:center; line-height:1; }
+  .bck-c-nama { grid-area:nama; justify-content:flex-start; text-align:left; align-items:flex-start; padding-top:0.4mm; font-size:6pt; font-weight:bold; font-family:'Arial Narrow',Arial,sans-serif; line-height:1.05; word-break:break-word; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+  .bck-c-ukuran { grid-area:ukuran; font-size:9pt; font-weight:bold; font-family:Arial,sans-serif; }
+  .bck-c-qr { grid-area:qr; }
+  .bck-qr-canvas { width:8mm !important; height:8mm !important; }
+  .bck-c-spk { grid-area:spk; font-size:4pt; font-weight:bold; font-family:Arial,sans-serif; padding:0; }
+  .bck-c-tgl { grid-area:tgl; font-size:3.7pt; font-family:Arial,sans-serif; color:#333; padding:0; }
+  .bck-c-nourut { grid-area:nourut; font-size:4.8pt; font-weight:bold; font-family:Arial,sans-serif; }
 `;
 
+// BARU: regenerate QR di iframe cetak (ganti regenerate JsBarcode)
 const triggerBrowserPrint = () => {
   const content = document.getElementById("bck-print-area");
   if (!content) return;
@@ -659,36 +826,37 @@ const triggerBrowserPrint = () => {
     doc.write("</body></html>");
     doc.close();
 
-    const svgs = doc.querySelectorAll(".bck-barcode-svg");
-    svgs.forEach((svg) => {
-      const val = svg.getAttribute("data-barcode-value");
+    const canvases = doc.querySelectorAll<HTMLCanvasElement>(".bck-qr-canvas");
+    const renderPromises: Promise<void>[] = [];
+    canvases.forEach((canvas) => {
+      const val = canvas.getAttribute("data-qr-value");
       if (val) {
-        try {
-          JsBarcode(svg as SVGElement, val, {
-            format: "CODE128",
-            lineColor: "#000",
-            width: 1,
-            height: 20,
-            displayValue: false,
+        renderPromises.push(
+          QRCode.toCanvas(canvas, val, {
             margin: 0,
-          });
-        } catch (e) {
-          console.error(e);
-        }
+            width: 90,
+            errorCorrectionLevel: "M",
+          }).catch((e: any) => console.error(e)),
+        );
       }
     });
 
-    setTimeout(() => {
-      frame.contentWindow?.focus();
-      frame.contentWindow?.print();
-      setTimeout(() => document.body.removeChild(frame), 1500);
-    }, 400);
+    Promise.all(renderPromises).then(() => {
+      setTimeout(() => {
+        frame.contentWindow?.focus();
+        frame.contentWindow?.print();
+        setTimeout(() => document.body.removeChild(frame), 1500);
+      }, 200);
+    });
   }
   closePreview();
 };
 
 const closePreview = () => {
   isPrintPreviewVisible.value = false;
+  const wasPreview = isPreviewMode.value;
+  isPreviewMode.value = false;
+  if (wasPreview) return; // preview murni: tetap di form, tidak pindah tab
   if (formData.value.nomor && formData.value.nomor !== "TES") {
     const currentPath = route.path; // snapshot SEBELUM push
     router
@@ -769,6 +937,14 @@ const closePreview = () => {
 
         <button type="button" class="btn-tes-printer" @click="testPrinter">
           <IconPrinter :size="14" class="mr-1" /> Tes Printer
+        </button>
+
+        <button
+          type="button"
+          class="btn-preview-cetak mt-1"
+          @click="previewPrintClick"
+        >
+          <IconEye :size="14" class="mr-1" /> Preview Cetak
         </button>
 
         <div class="sep mt-2 mb-2" />
@@ -910,7 +1086,9 @@ const closePreview = () => {
                       type="number"
                       min="0"
                       class="ci text-right"
+                      :class="{ ro: (row.sudahCetak || 0) > 0 }"
                       style="background: #fffde7"
+                      :readonly="(row.sudahCetak || 0) > 0"
                       @input="onAwalAkhirChange(row)"
                       v-select-on-focus
                     />
@@ -1018,6 +1196,10 @@ const closePreview = () => {
         <v-spacer />
         <v-btn icon="mdi-close" size="small" @click="closePreview" />
       </v-toolbar>
+      <div v-if="isPreviewMode" class="preview-banner">
+        Mode Preview — data belum disimpan, nomor/serial final baru terkunci
+        saat disimpan.
+      </div>
       <v-card-text class="pa-4" style="background: #525659">
         <div
           id="bck-print-area"
@@ -1034,32 +1216,22 @@ const closePreview = () => {
               v-for="item in chunk"
               :key="item.nourut"
               class="bck-label bck-preview-label"
+              :class="{ 'bck-conflict': item.isConflict }"
             >
-              <div class="bck-nama">{{ item.nama }}</div>
-              <div class="bck-ukuran">{{ item.ukuran }}</div>
-              <svg
-                class="bck-barcode-svg"
-                :data-barcode-value="item.barcode"
-              ></svg>
-              <div class="bck-footer">
-                <div
-                  style="
-                    display: flex;
-                    flex-direction: column;
-                    line-height: 1.1;
-                  "
-                >
-                  <span>{{ item.barcode }}</span>
-                  <span v-if="item.charga" style="font-weight: normal">{{
-                    item.charga
-                  }}</span>
-                </div>
-                <span>{{ item.tgl }}</span>
+              <div class="bck-cell bck-c-nama">{{ item.nama }}</div>
+              <div class="bck-cell bck-c-ukuran">{{ item.ukuran }}</div>
+              <div class="bck-cell bck-c-qr">
+                <canvas
+                  class="bck-qr-canvas"
+                  :data-qr-value="item.qrValue"
+                ></canvas>
               </div>
-              <div class="bck-spk-line">
-                <span>{{ item.spk }}</span>
-                <span>{{ item.ukuran }} {{ item.nourut }}</span>
+              <div class="bck-cell bck-c-spk">{{ item.spk }}</div>
+              <div class="bck-cell bck-c-tgl">
+                {{ item.tgl
+                }}<span v-if="item.charga"> · {{ item.charga }}</span>
               </div>
+              <div class="bck-cell bck-c-nourut">{{ item.nourut }}</div>
             </div>
           </div>
         </div>
@@ -1070,6 +1242,38 @@ const closePreview = () => {
         <v-btn color="primary" @click="triggerBrowserPrint">
           <template #prepend><IconPrinter :size="15" /></template>Cetak
         </v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
+
+  <!-- Konfirmasi mismatch jumlah cetak vs qty pesanan SPK -->
+  <v-dialog v-model="showQtyMismatchDialog" max-width="500px" persistent>
+    <v-card rounded="lg">
+      <v-card-title class="bg-orange-darken-2 text-white pa-3 text-subtitle-1">
+        ⚠️ Jumlah Tidak Sesuai Qty Pesanan
+      </v-card-title>
+      <v-card-text class="pa-4">
+        <p class="mb-2" style="font-size: 12px">
+          Jumlah yang akan dicetak berbeda dari qty pesanan SPK untuk baris
+          berikut:
+        </p>
+        <div v-for="(m, i) in qtyMismatchDetails" :key="i" class="mismatch-row">
+          <strong>{{ m.nama }}</strong> ({{ m.ukuran }}) — Qty Pesanan:
+          <b>{{ m.order }}</b
+          >, Akan Dicetak: <b>{{ m.jumlah }}</b>
+        </div>
+        <p class="mt-3" style="font-size: 12px; color: #616161">
+          Lanjutkan simpan dengan jumlah seperti ini?
+        </p>
+      </v-card-text>
+      <v-card-actions class="pa-3">
+        <v-spacer />
+        <v-btn variant="text" @click="showQtyMismatchDialog = false"
+          >Batal</v-btn
+        >
+        <v-btn color="orange-darken-2" @click="confirmQtyMismatchAndSave"
+          >Ya, Lanjutkan</v-btn
+        >
       </v-card-actions>
     </v-card>
   </v-dialog>
@@ -1152,6 +1356,24 @@ const closePreview = () => {
 }
 .btn-tes-printer:hover {
   background: #bbdefb;
+}
+
+.btn-preview-cetak {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  width: 100%;
+  border: 1px solid #6a1b9a;
+  background: #f3e5f5;
+  color: #6a1b9a;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn-preview-cetak:hover {
+  background: #e1bee7;
 }
 
 .fieldset-box {
@@ -1352,6 +1574,11 @@ const closePreview = () => {
   color: #9e9e9e;
   font-style: italic;
 }
+.mismatch-row {
+  font-size: 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
 </style>
 
 <style>
@@ -1369,22 +1596,25 @@ const closePreview = () => {
 .bck-preview-label {
   border: 1px dashed #ccc;
 }
-.bck-barcode-svg {
+.bck-preview-label.bck-conflict {
+  border: 1px solid #d32f2f;
+  box-shadow: 0 0 0 1px #d32f2f;
+}
+.preview-banner {
+  background: #fff3e0;
+  color: #e65100;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 8px 16px;
+  border-bottom: 1px solid #ffcc80;
+  text-align: center;
+}
+.bck-qr-canvas {
   display: block;
-}
-.bck-barcode-svg rect {
-  fill: #fff !important;
-}
-.bck-barcode-svg g,
-.bck-barcode-svg path,
-.bck-barcode-svg line {
-  stroke: #000 !important;
-  fill: #000 !important;
+  image-rendering: pixelated;
 }
 
-/* ── Layout preview di layar — TERPISAH dari printStylesXP360B/Postek
-   yang cuma dipakai di iframe cetak. Ukuran disamakan biar preview =
-   hasil cetak fisik. ── */
+/* ── XP-360B ── */
 .printer-xp360b .bck-row {
   display: flex;
   width: 68mm;
@@ -1397,51 +1627,77 @@ const closePreview = () => {
 .printer-xp360b .bck-label {
   width: 31mm;
   height: 14mm;
-  display: flex;
-  flex-direction: column;
-  padding: 0.5mm 0 0 2mm;
   box-sizing: border-box;
   overflow: hidden;
+  display: grid;
+  grid-template-columns: 8mm 16mm 7mm;
+  grid-template-rows: 6mm 4mm 4mm;
+  grid-template-areas:
+    "nama nama nourut"
+    "qr   spk  ukuran"
+    "qr   tgl  ukuran";
 }
-.printer-xp360b .bck-nama {
-  font-size: 5pt;
+.printer-xp360b .bck-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: 0.15mm;
+  box-sizing: border-box;
+  text-align: center;
+  line-height: 1;
+}
+.printer-xp360b .bck-c-nama {
+  grid-area: nama;
+  justify-content: flex-start;
+  text-align: left;
+  align-items: flex-start;
+  padding-top: 0.4mm;
+  font-size: 5.5pt;
   font-weight: bold;
   font-family: "Arial Narrow", Arial, sans-serif;
-  line-height: 1;
+  line-height: 1.05;
+  word-break: break-word;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   line-clamp: 2;
   -webkit-box-orient: vertical;
-  overflow: hidden;
 }
-.printer-xp360b .bck-ukuran {
-  font-size: 4.5pt;
-  font-family: Arial;
-}
-.printer-xp360b .bck-barcode-svg {
-  width: 27mm !important;
-  height: 5.5mm !important;
-  margin: 0.1mm 0;
-}
-.printer-xp360b .bck-footer {
-  display: flex;
-  justify-content: space-between;
-  width: 95%;
-  font-size: 4.5pt;
-  font-family: Arial, sans-serif;
+.printer-xp360b .bck-c-ukuran {
+  grid-area: ukuran;
+  font-size: 8pt;
   font-weight: bold;
+  font-family: Arial, sans-serif;
 }
-.printer-xp360b .bck-spk-line,
-.printer-postek .bck-spk-line {
-  display: flex;
-  justify-content: space-between;
-  width: 95%;
-  font-size: 4pt;
+.printer-xp360b .bck-c-qr {
+  grid-area: qr;
+}
+.printer-xp360b .bck-qr-canvas {
+  width: 7mm !important;
+  height: 7mm !important;
+}
+.printer-xp360b .bck-c-spk {
+  grid-area: spk;
+  font-size: 3.8pt;
+  font-weight: bold;
+  font-family: Arial, sans-serif;
+  padding: 0;
+}
+.printer-xp360b .bck-c-tgl {
+  grid-area: tgl;
+  font-size: 3.5pt;
   font-family: Arial, sans-serif;
   color: #333;
-  margin-top: 0.3mm;
+  padding: 0;
+}
+.printer-xp360b .bck-c-nourut {
+  grid-area: nourut;
+  font-size: 4.5pt;
+  font-weight: bold;
+  font-family: Arial, sans-serif;
 }
 
+/* ── Postek ── */
 .printer-postek .bck-row {
   display: flex;
   width: 108mm;
@@ -1454,49 +1710,73 @@ const closePreview = () => {
 .printer-postek .bck-label {
   width: 34mm;
   height: 16mm;
-  display: flex;
-  flex-direction: column;
-  padding: 0.5mm 0 0 2mm;
   box-sizing: border-box;
   overflow: hidden;
+  display: grid;
+  grid-template-columns: 9mm 17mm 8mm;
+  grid-template-rows: 6.5mm 4.75mm 4.75mm;
+  grid-template-areas:
+    "nama nama nourut"
+    "qr   spk  ukuran"
+    "qr   tgl  ukuran";
 }
-.printer-postek .bck-nama {
-  font-size: 5pt;
+.printer-postek .bck-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: 0.15mm;
+  box-sizing: border-box;
+  text-align: center;
+  line-height: 1;
+}
+.printer-postek .bck-c-nama {
+  grid-area: nama;
+  justify-content: flex-start;
+  text-align: left;
+  align-items: flex-start;
+  padding-top: 0.4mm;
+  font-size: 6pt;
   font-weight: bold;
   font-family: "Arial Narrow", Arial, sans-serif;
-  line-height: 1;
+  line-height: 1.05;
+  word-break: break-word;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   line-clamp: 2;
   -webkit-box-orient: vertical;
-  overflow: hidden;
 }
-.printer-postek .bck-ukuran {
-  font-size: 4.5pt;
-  font-family: Arial;
-}
-.printer-postek .bck-barcode-svg {
-  width: 29mm !important;
-  height: 6mm !important;
-  margin: 0.1mm 0;
-}
-.printer-postek .bck-footer {
-  display: flex;
-  justify-content: space-between;
-  width: 95%;
-  font-size: 4.5pt;
-  font-family: Arial, sans-serif;
+.printer-postek .bck-c-ukuran {
+  grid-area: ukuran;
+  font-size: 9pt;
   font-weight: bold;
+  font-family: Arial, sans-serif;
 }
-
-#bck-print-area {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
+.printer-postek .bck-c-qr {
+  grid-area: qr;
 }
-.bck-preview.bck-row {
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
-  background: white;
+.printer-postek .bck-qr-canvas {
+  width: 8mm !important;
+  height: 8mm !important;
+}
+.printer-postek .bck-c-spk {
+  grid-area: spk;
+  font-size: 4pt;
+  font-weight: bold;
+  font-family: Arial, sans-serif;
+  padding: 0;
+}
+.printer-postek .bck-c-tgl {
+  grid-area: tgl;
+  font-size: 3.7pt;
+  font-family: Arial, sans-serif;
+  color: #333;
+  padding: 0;
+}
+.printer-postek .bck-c-nourut {
+  grid-area: nourut;
+  font-size: 4.8pt;
+  font-weight: bold;
+  font-family: Arial, sans-serif;
 }
 </style>
