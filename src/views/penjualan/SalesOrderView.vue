@@ -334,20 +334,26 @@ const rowPropsFn = (data: any) => {
   const classes: string[] = ["font-weight-bold"];
   let style = "";
   const pesanKirimSama = Number(item.Pesan) === Number(item.Kirim);
+  // ⬅ BARU: murni berdasarkan Kirim, lepas dari SpkPpic — SO tetap
+  // merah selama belum ada pengiriman sama sekali, walaupun SPK PPIC
+  // sudah dibuat.
+  const belumAdaKirim = Number(item.Kirim) === 0;
 
-  // ⬅ Pending selalu menang, apapun status SpkPpic/HasSj-nya
   if (item.Pending !== "NORMAL") {
     style =
       item.AccPending === "ACC"
         ? "color: #e65100 !important;"
         : "color: #ce93d8 !important;";
-  } else if (item.HasSj && pesanKirimSama) {
+  } else if (pesanKirimSama) {
+    // Sudah selesai (Pesan = Kirim) → hitam, menang atas status apa pun
     style = "color: #212121 !important;";
-  } else if (item.SpkPpic && !pesanKirimSama) {
-    style = "color: #1a237e !important;";
-  } else if (item.SpkPpic) {
-    style = "color: #00897b !important;";
+  } else if (belumAdaKirim) {
+    // Belum ada pengiriman sama sekali → merah, walaupun SPK PPIC
+    // sudah dibuat
+    style = "color: #e53935 !important;";
   } else {
+    // Sudah ada kirim sebagian, tapi belum penuh — fallback ke skema
+    // Aktif/Acc default
     if (item.Aktif === "N") {
       if (item.Acc === "Y" || item.AccH0 === "Y" || item.AccJO === "ACC") {
         classes.push("text-blue-darken-2");
@@ -358,10 +364,6 @@ const rowPropsFn = (data: any) => {
       if (item.Acc === "N" || item.AccH0 === "N" || item.AccJO === "TOLAK") {
         classes.push("text-green-darken-2");
       }
-    }
-
-    if (item.Status === "Open") {
-      style = "color: #e53935 !important;";
     }
   }
 
@@ -1116,7 +1118,7 @@ const onExport = async () => {
           <span class="legend-title">Font:</span>
           <div class="legend-item">
             <div class="legend-dot" style="background: #e53935"></div>
-            Aktif/Open
+            Belum Ada Proses
           </div>
           <div class="legend-item">
             <div class="legend-dot" style="background: #757575"></div>
@@ -1139,16 +1141,8 @@ const onExport = async () => {
             Pending Acc
           </div>
           <div class="legend-item">
-            <div class="legend-dot" style="background: #00897b"></div>
-            Sudah SPK PPIC
-          </div>
-          <div class="legend-item">
-            <div class="legend-dot" style="background: #1a237e"></div>
-            SPK PPIC ≠ Kirim
-          </div>
-          <div class="legend-item">
             <div class="legend-dot" style="background: #212121"></div>
-            Sudah SJ
+            Pesan = Kirim
           </div>
         </div>
         <div class="legend-divider" />
