@@ -48,6 +48,13 @@ const formatTgl = (val: string) => {
   return `${String(d.getDate()).padStart(2, "0")} ${m[d.getMonth()]} ${d.getFullYear()}`;
 };
 
+const formatRibuan = (val: number | string) => {
+  if (val === null || val === undefined || val === "") return "";
+  const num = typeof val === "string" ? parseFloat(val) : val;
+  if (isNaN(num)) return val;
+  return num.toLocaleString("id-ID");
+};
+
 const VPS_BASE = "/file-gambar";
 const getBaseUrl = () => {
   const rawBase = api.defaults.baseURL || import.meta.env.VITE_API_URL || "";
@@ -126,7 +133,7 @@ onMounted(() => {
             <tr>
               <td class="lbl">Qty</td>
               <td class="sep">:</td>
-              <td class="val">{{ header.mpb_jmlorder }}</td>
+              <td class="val">{{ formatRibuan(header.mpb_jmlorder) }}</td>
             </tr>
             <tr>
               <td class="lbl">Ukuran</td>
