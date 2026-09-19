@@ -325,12 +325,9 @@ const onExportDetail = async () => {
           : {}),
         Sales: master.Sales,
       };
-      const blankMaster = Object.fromEntries(
-        Object.keys(masterCells).map((k) => [k, ""]),
-      );
-      rowsInGroup.forEach((d, idx) => {
+      rowsInGroup.forEach((d) => {
         combinedRows.push({
-          ...(idx === 0 ? masterCells : blankMaster),
+          ...masterCells,
           ID: d.ID,
           NamaBarang: d.NamaBarang,
           Bahan: d.Bahan,
