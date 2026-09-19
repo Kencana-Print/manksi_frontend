@@ -1,30 +1,7 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from "vue";
-import { praOrderService } from "@/services/penjualan/praOrderService";
+import { ref, computed, nextTick } from "vue";
 
 const props = defineProps<{ formData: any; isEdit: boolean }>();
-
-const ukuranMaster = ref<{ kode: string; ukuran: string }[]>([]);
-
-onMounted(async () => {
-  try {
-    const res = await praOrderService.getInitGrids();
-    ukuranMaster.value = res.data.data.ukuran || [];
-
-    // Sinkron: pastikan semua ukuran master tersedia sebagai baris,
-    // isi qty dari data tersimpan (jika edit) atau 0.
-    const existing = new Map(
-      props.formData.Ukuran.map((u: any) => [u.Kode, u.Qty]),
-    );
-    props.formData.Ukuran = ukuranMaster.value.map((m) => ({
-      Kode: m.kode,
-      Ukuran: m.ukuran,
-      Qty: Number(existing.get(m.kode)) || 0,
-    }));
-  } catch {
-    console.error("Gagal load master ukuran");
-  }
-});
 
 const totalQty = computed(() =>
   props.formData.Ukuran.reduce(
@@ -32,6 +9,19 @@ const totalQty = computed(() =>
     0,
   ),
 );
+
+// ── Enter pindah ke qty baris berikutnya ──
+const qtyInputRefs = ref<(HTMLInputElement | null)[]>([]);
+const setQtyRef = (el: any, idx: number) => {
+  qtyInputRefs.value[idx] = el;
+};
+const focusNextQty = (idx: number) => {
+  const next = qtyInputRefs.value[idx + 1];
+  if (next) {
+    next.focus();
+    nextTick(() => next.select());
+  }
+};
 </script>
 
 <template>
@@ -48,16 +38,18 @@ const totalQty = computed(() =>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="u in formData.Ukuran" :key="u.Kode">
+            <tr v-for="(u, idx) in formData.Ukuran" :key="u.Kode">
               <td class="tc">{{ u.Kode }}</td>
               <td>{{ u.Ukuran }}</td>
               <td>
                 <input
+                  :ref="(el) => setQtyRef(el, Number(idx))"
                   v-model.number="u.Qty"
                   type="number"
                   min="0"
                   class="tu-qty-inp"
                   v-select-on-focus
+                  @keydown.enter.prevent="focusNextQty(Number(idx))"
                 />
               </td>
             </tr>

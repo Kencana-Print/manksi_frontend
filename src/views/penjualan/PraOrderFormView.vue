@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref, onMounted, nextTick } from "vue";
 import { useRouter } from "vue-router";
 import { useForm } from "@/composables/useForm";
 import { praOrderService } from "@/services/penjualan/praOrderService";
@@ -9,6 +9,7 @@ import PraOrderTabRencana from "./components/PraOrderTabRencana.vue";
 import PraOrderTabUkuran from "./components/PraOrderTabUkuran.vue";
 import PraOrderTabKatalog from "./components/PraOrderTabKatalog.vue";
 import { IconNotebook, IconRuler2, IconPhoto } from "@tabler/icons-vue";
+import { formatTanggal, formatTanggalJam } from "@/utils/dateFormat";
 
 type PraOrderForm = typeof initialData;
 type RouteParams = { nomor?: string };
@@ -60,6 +61,14 @@ const initialData = {
   Gambar: [] as { Id?: number; Path: string; Keterangan: string }[],
 };
 
+const ukuranMasterList = ref<{ kode: string; ukuran: string }[]>([]);
+
+const mergeUkuranRow = (masterRow: any, existingRow: any | undefined) => ({
+  Kode: String(masterRow.kode),
+  Ukuran: masterRow.ukuran,
+  Qty: existingRow ? Number(existingRow.Qty) || 0 : 0,
+});
+
 const {
   isEditMode,
   isLoading,
@@ -101,7 +110,7 @@ const {
       Status: d.pro_status,
       StatusEdit: d.StatusEdit,
       isTutupBuku: d.isTutupBuku,
-      Created: d.date_create || "",
+      Created: d.date_create ? formatTanggalJam(d.date_create) : "",
       User: d.user_create || "",
       Bahan: (d.bahan || []).map((b: any) => ({
         ProbId: b.prob_id,
@@ -162,8 +171,30 @@ const {
   },
 });
 
-onMounted(() => {
-  if (isEditMode.value) fetchData();
+onMounted(async () => {
+  try {
+    const res = await praOrderService.getInitGrids();
+    ukuranMasterList.value = res.data.data.ukuran || [];
+  } catch {
+    console.error("Gagal load master ukuran");
+  }
+
+  if (!isEditMode.value) {
+    formData.value.Ukuran = ukuranMasterList.value.map((m) =>
+      mergeUkuranRow(m, undefined),
+    );
+    return;
+  }
+
+  await fetchData();
+  await nextTick();
+  const existingUkuran = formData.value.Ukuran || [];
+  formData.value.Ukuran = ukuranMasterList.value.map((m) =>
+    mergeUkuranRow(
+      m,
+      existingUkuran.find((e: any) => String(e.Kode) === String(m.kode)),
+    ),
+  );
 });
 
 const currentTab = ref(0);

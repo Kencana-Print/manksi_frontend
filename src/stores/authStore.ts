@@ -46,6 +46,7 @@ interface Permission {
   insert: boolean;
   edit: boolean;
   delete: boolean;
+  save: boolean;
 }
 
 interface SpkUrgentItem {
@@ -207,7 +208,7 @@ export const useAuthStore = defineStore(
 
     function can(
       menuId: string,
-      action: "view" | "insert" | "edit" | "delete",
+      action: "view" | "insert" | "edit" | "delete" | "save",
     ): boolean {
       const idAsNumber = Number.parseInt(menuId, 10);
       return permissions.value

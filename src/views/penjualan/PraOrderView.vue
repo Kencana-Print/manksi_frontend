@@ -104,6 +104,7 @@ const headers = [
   { title: "CUSTOMER", key: "Customer", width: "180px" },
   { title: "SALES", key: "Sales", width: "130px" },
   { title: "NAMA PEKERJAAN", key: "NamaPekerjaan", width: "220px" },
+  { title: "BAHAN", key: "Bahan", width: "180px" },
   { title: "Qty Rencana", key: "QtyRencana", width: "110px", align: "end" },
   { title: "Tgl Kirim", key: "TglKirim", width: "110px", align: "center" },
   {
@@ -122,11 +123,12 @@ const headers = [
 const rowPropsFn = (data: any) => {
   const item = data.item?.raw || data.item;
   if (item.Status === "CLOSE")
-    return { class: "text-grey-darken-1 font-weight-medium" };
+    return { class: "font-weight-medium", style: "color: #212121" };
   if (item.StatusPpic === "TIDAK SANGGUP")
     return { class: "text-red font-weight-medium" };
   if (item.StatusPpic === "SANGGUP")
     return { class: "text-green font-weight-medium" };
+  if (item.StatusPpic === "PENDING") return { class: "text-grey-darken-1" };
   return {};
 };
 
@@ -155,6 +157,7 @@ const onExport = () => {
     { header: "CUSTOMER", key: "Customer" },
     { header: "SALES", key: "Sales" },
     { header: "NAMA PEKERJAAN", key: "NamaPekerjaan", width: 26 },
+    { header: "BAHAN", key: "Bahan", width: 24 },
     {
       header: "Qty Rencana",
       key: "QtyRencana",
@@ -247,7 +250,9 @@ const handleConvert = async () => {
   try {
     const res = await praOrderService.convertToMintaHarga(item.Nomor);
     toast.success(res.data.message);
-    fetchData();
+    router.push(
+      `/penjualan/minta-harga/edit/${encodeURIComponent(res.data.mhNomor)}`,
+    );
   } catch (e: any) {
     toast.error(
       e.response?.data?.message || "Gagal konversi ke Permintaan Harga.",

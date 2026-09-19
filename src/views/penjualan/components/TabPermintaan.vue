@@ -3,6 +3,7 @@ import { ref, watch, onMounted, computed } from "vue";
 import api from "@/services/api";
 import { useToast } from "vue-toastification";
 import { useAuthStore } from "@/stores/authStore";
+import PraOrderSearchModal from "@/components/lookups/PraOrderSearchModal.vue";
 import CustomerSearchModal from "@/components/lookups/CustomerSearchModal.vue";
 import SalesSearchModal from "@/components/lookups/SalesSearchModal.vue";
 import {
@@ -23,6 +24,9 @@ const emit = defineEmits(["image-selected"]);
 
 const showCustModal = ref(false);
 const showSalesModal = ref(false);
+const showProOrderModal = ref(false);
+const isLoadingProOrder = ref(false);
+const proOrderWarning = ref("");
 const fileRef = ref<HTMLInputElement | null>(null);
 const uploadName = ref("");
 const isOpeningModal = ref(false);
@@ -84,7 +88,7 @@ const handleImageError = (e: Event) => {
 };
 
 const divisiOptions = ref<any[]>([]);
-const statusOptions = ["BELUM", "MINTA","NEGO", "WAIT", "CANCEL", "DONE"];
+const statusOptions = ["BELUM", "MINTA", "NEGO", "WAIT", "CANCEL", "DONE"];
 const perfectOptions = ["Y", "N", ""];
 
 watch(
@@ -126,6 +130,51 @@ const loadDivisi = async () => {
   }
 };
 onMounted(loadDivisi);
+
+const fillFromProOrder = async (kode: string) => {
+  proOrderWarning.value = "";
+  if (!kode) return;
+  isLoadingProOrder.value = true;
+  try {
+    const res = await api.get(
+      `/penjualan/pra-order-form/lookup/${encodeURIComponent(kode)}`,
+    );
+    const d = res.data.data;
+    props.formData.ProNomor = d.nomor;
+    props.formData.CustKode = d.cusKode;
+    props.formData.CustNama = d.cusNama;
+    props.formData.SalesKode = d.salKode;
+    props.formData.SalesNama = d.salNama;
+    props.formData.NamaPekerjaan = d.namaPekerjaan;
+    props.formData.Divisi = d.divisi;
+    props.formData.Finishing = d.finishing;
+    props.formData.RencanaOrder = d.rencanaOrder;
+    props.formData.Kain = d.kain;
+    props.formData.Ukuran = d.ukuran;
+    if (d.sudahDipakaiOleh) {
+      proOrderWarning.value = `Pra Order ini sudah pernah dipakai untuk Minta Harga ${d.sudahDipakaiOleh}.`;
+      toast.warning(proOrderWarning.value);
+    } else {
+      toast.success("Data berhasil diisi otomatis dari Pra Order.");
+    }
+  } catch (e: any) {
+    toast.error(
+      e.response?.data?.message || "Nomor Pra Order tidak ditemukan.",
+    );
+    props.formData.ProNomor = "";
+  } finally {
+    isLoadingProOrder.value = false;
+  }
+};
+
+const onProNomorEnter = () => {
+  if (isOpeningModal.value) return;
+  fillFromProOrder(props.formData.ProNomor?.trim());
+};
+
+const handleProOrderSelected = (item: any) => {
+  fillFromProOrder(item.Nomor);
+};
 
 const onCustKodeEnter = async () => {
   if (isOpeningModal.value) return;
@@ -287,6 +336,48 @@ const onFileChange = (e: Event) => {
                 >
               </template>
             </v-text-field>
+          </div>
+
+          <!-- Nomor Pra Order (opsional) -->
+          <div class="tp-row">
+            <label class="tp-lbl">No. Pra Order</label>
+            <div class="tp-inp-grp" style="width: 160px">
+              <input
+                v-model="formData.ProNomor"
+                class="tp-inp-field"
+                placeholder="Opsional..."
+                :readonly="isEdit && !!formData.ProNomor"
+                @keydown.enter.prevent="onProNomorEnter"
+                @keydown.f1.prevent="
+                  isOpeningModal = true;
+                  showProOrderModal = true;
+                "
+                @blur="onProNomorEnter"
+              />
+              <button
+                type="button"
+                class="tp-lkp-btn"
+                @mousedown.prevent="
+                  isOpeningModal = true;
+                  showProOrderModal = true;
+                "
+                @click="isOpeningModal = false"
+              >
+                <IconSearch :size="13" />
+              </button>
+            </div>
+            <span
+              v-if="isLoadingProOrder"
+              style="font-size: 10px; color: #757575"
+            >
+              Memuat...
+            </span>
+          </div>
+          <div v-if="proOrderWarning" class="tp-row" style="margin-top: -2px">
+            <label class="tp-lbl"></label>
+            <span style="font-size: 10px; color: #f57f17">{{
+              proOrderWarning
+            }}</span>
           </div>
 
           <!-- Tanggal + Created sejajar -->
@@ -649,6 +740,10 @@ const onFileChange = (e: Event) => {
     </div>
   </div>
 
+  <PraOrderSearchModal
+    v-model="showProOrderModal"
+    @selected="handleProOrderSelected"
+  />
   <CustomerSearchModal v-model="showCustModal" @selected="handleCustSelected" />
   <SalesSearchModal v-model="showSalesModal" @selected="handleSalesSelected" />
 

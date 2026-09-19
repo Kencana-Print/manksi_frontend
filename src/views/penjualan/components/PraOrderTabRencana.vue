@@ -183,7 +183,7 @@ const handleSalesSelected = (item: any) => {
 const bahanOptions = computed(() =>
   bahanMaster.value.map((b: any) => ({
     value: b.Kode,
-    title: `${b.Kode} — ${b.Nama} (${b.Warna || "-"}/${b.Gramasi || "-"})`,
+    title: b.Nama,
     raw: b,
   })),
 );
@@ -424,7 +424,7 @@ const openPreview = (url: string) => {
             />
           </div>
 
-          <div class="tp-row" style="align-items: flex-start">
+          <div class="tp-row tp-row-area" style="align-items: flex-start">
             <label class="tp-lbl" style="padding-top: 6px">Spesifikasi</label>
             <v-textarea
               v-model="formData.Spesifikasi"
@@ -432,7 +432,7 @@ const openPreview = (url: string) => {
               density="compact"
               hide-details
               rows="2"
-              class="f-inp"
+              class="f-inp tp-textarea-2row"
               placeholder="mis. Leher pakai rip jadi, tanpa manset lengan"
             />
           </div>
@@ -463,7 +463,7 @@ const openPreview = (url: string) => {
             />
           </div>
 
-          <div class="tp-row" style="align-items: flex-start">
+          <div class="tp-row tp-row-area" style="align-items: flex-start">
             <label class="tp-lbl" style="padding-top: 6px"
               >Catatan Deadline</label
             >
@@ -473,7 +473,7 @@ const openPreview = (url: string) => {
               density="compact"
               hide-details
               rows="2"
-              class="f-inp"
+              class="f-inp tp-textarea-2row"
               placeholder="mis. Harus sampai Gresik tgl 13 Juli"
             />
           </div>
@@ -494,8 +494,8 @@ const openPreview = (url: string) => {
                   density="compact"
                   hide-details
                   clearable
-                  placeholder="Ketik kode atau nama bahan..."
-                  no-data-text="Bahan tidak ditemukan"
+                  placeholder="Ketik kode atau nama jenis bahan..."
+                  no-data-text="Jenis bahan tidak ditemukan"
                   class="f-inp"
                   @update:model-value="onBahanPicked"
                 />
@@ -510,7 +510,7 @@ const openPreview = (url: string) => {
                     class="bahan-chip-badge"
                     :class="readyBadgeClass(b.StatusReady)"
                   ></span>
-                  <span>{{ b.Kode }} - {{ b.Nama }}</span>
+                  <span>{{ b.Nama }}</span>
                   <button
                     type="button"
                     class="bahan-chip-del"
@@ -638,7 +638,7 @@ const openPreview = (url: string) => {
               :key="b.Kode"
               class="ppic-bahan-row"
             >
-              <span class="ppic-bahan-nama">{{ b.Kode }} - {{ b.Nama }}</span>
+              <span class="ppic-bahan-nama">{{ b.Nama }}</span>
               <div class="ppic-bahan-actions">
                 <button
                   type="button"
@@ -674,7 +674,7 @@ const openPreview = (url: string) => {
             density="compact"
             hide-details
             rows="2"
-            class="f-inp"
+            class="f-inp tp-textarea-2row"
             placeholder="Catatan (wajib jika Tidak Sanggup)..."
           />
           <div class="ppic-decision-row">
@@ -818,6 +818,21 @@ const openPreview = (url: string) => {
   font-weight: 500;
   color: #333;
   white-space: nowrap;
+}
+.tp-row-area {
+  margin-bottom: 10px;
+}
+.f-inp.tp-textarea-2row :deep(.v-input__control),
+.f-inp.tp-textarea-2row :deep(.v-field) {
+  height: auto !important;
+  min-height: 56px !important;
+}
+.f-inp.tp-textarea-2row :deep(.v-field__input) {
+  height: auto !important;
+  min-height: 56px !important;
+  padding-top: 8px !important;
+  padding-bottom: 8px !important;
+  align-items: flex-start;
 }
 .f-inp {
   flex: 1;
