@@ -181,17 +181,26 @@ const openAjukanDialog = async () => {
       ),
     );
     ajukanItems.value = results.flatMap(({ header, items }) =>
-      items.map((it: any) => ({
-        Sumber: header.Sumber,
-        NomorHeader: header.Nomor,
-        ItemNourut: it.ItemNourut,
-        Nama: it.Nama,
-        Satuan: it.Satuan,
-        Qty: it.Qty,
-        Keterangan: header.Keterangan,
-        NominalAsli: Number(it.Nominal) || 0,
-        Nominal: Number(it.Nominal) || 0,
-      })),
+      items.map((it: any) => {
+        // Field nominal beda nama tergantung sumber: PENGAJUAN_DANA pakai
+        // RpPengajuan (dari ga2.viewpengajuan), PERMINTAAN_PEMBELIAN pakai
+        // Nominal langsung (dari tgarmenmintabeli_dtl).
+        const nominalSumber =
+          header.Sumber === "PENGAJUAN_DANA"
+            ? Number(it.RpPengajuan) || 0
+            : Number(it.Nominal) || 0;
+        return {
+          Sumber: header.Sumber,
+          NomorHeader: header.Nomor,
+          ItemNourut: it.ItemNourut,
+          Nama: it.Nama,
+          Satuan: it.Satuan,
+          Qty: it.Qty,
+          Keterangan: header.Keterangan,
+          NominalSumber: nominalSumber, // readonly, dari sumber — audit trail
+          NominalAjuan: nominalSumber, // editable manual oleh Purchasing
+        };
+      }),
     );
   } catch (e: any) {
     toast.error(e.response?.data?.message || "Gagal memuat rincian item.");
@@ -202,7 +211,7 @@ const openAjukanDialog = async () => {
 };
 
 const ajukanTotal = computed(() =>
-  ajukanItems.value.reduce((s, r) => s + Number(r.Nominal || 0), 0),
+  ajukanItems.value.reduce((s, r) => s + Number(r.NominalAjuan || 0), 0),
 );
 
 const submitAjukan = async () => {
@@ -216,8 +225,8 @@ const submitAjukan = async () => {
       satuan: r.Satuan,
       qty: r.Qty,
       keterangan: r.Keterangan,
-      nominal: r.Nominal,
-      nominalAsli: r.NominalAsli,
+      nominal: r.NominalAjuan,
+      nominalAsli: r.NominalSumber,
     }));
     const res = await pengajuanUangMukaService.create({
       tanggal: ajukanTanggal.value,
@@ -816,7 +825,8 @@ const goRealisasi = (item: any) => {
                 <th style="width: 40px">No</th>
                 <th style="width: 130px">Nomor</th>
                 <th>Item</th>
-                <th style="width: 160px" class="tr">Nominal</th>
+                <th style="width: 150px" class="tr">Nominal Sumber</th>
+                <th style="width: 160px" class="tr">Nominal Ajuan</th>
               </tr>
             </thead>
             <tbody>
@@ -827,14 +837,25 @@ const goRealisasi = (item: any) => {
                 <td class="tc">{{ i + 1 }}</td>
                 <td class="mono">{{ r.NomorHeader }}</td>
                 <td class="wrap-cell">{{ r.Nama }}</td>
+                <td class="tr">{{ numFmt(r.NominalSumber) }}</td>
                 <td class="tr">
-                  <NumberInputIDR v-model="r.Nominal" cursor-to-end />
+                  <NumberInputIDR v-model="r.NominalAjuan" cursor-to-end />
                 </td>
               </tr>
             </tbody>
             <tfoot>
               <tr>
                 <td colspan="3" class="tr fw">Total</td>
+                <td class="tr fw">
+                  {{
+                    numFmt(
+                      ajukanItems.reduce(
+                        (s, r) => s + Number(r.NominalSumber || 0),
+                        0,
+                      ),
+                    )
+                  }}
+                </td>
                 <td class="tr fw">{{ numFmt(ajukanTotal) }}</td>
               </tr>
             </tfoot>

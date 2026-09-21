@@ -377,7 +377,7 @@ const submitTerima = async () => {
     </template>
 
     <template #extra-actions>
-      <v-btn
+      <!-- <v-btn
         size="small"
         color="primary"
         :disabled="!selectedItem || !canBuatSjKeluar(selectedItem)"
@@ -385,7 +385,7 @@ const submitTerima = async () => {
       >
         <template #prepend><IconTruckDelivery :size="15" /></template>
         Buat SJ Keluar
-      </v-btn>
+      </v-btn> -->
       <v-btn
         size="small"
         color="grey-darken-3"
@@ -393,7 +393,7 @@ const submitTerima = async () => {
         @click="openPrintTab"
       >
         <template #prepend><IconPrinter :size="15" /></template>
-        Cetak Referensi Produksi
+        Cetak
       </v-btn>
       <v-btn
         size="small"
