@@ -843,7 +843,7 @@ const goRealisasi = (item: any) => {
                 </td>
               </tr>
             </tbody>
-            <tfoot>
+            <tfoot class="sticky-foot">
               <tr>
                 <td colspan="3" class="tr fw">Total</td>
                 <td class="tr fw">
@@ -1016,5 +1016,14 @@ const goRealisasi = (item: any) => {
 .nominal-inp:focus {
   border-color: #1565c0;
   outline: none;
+}
+.sticky-foot {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+}
+.sticky-foot td {
+  background: white;
+  box-shadow: 0 -1px 0 #b0bec5;
 }
 </style>

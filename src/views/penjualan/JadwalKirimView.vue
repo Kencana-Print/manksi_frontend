@@ -756,7 +756,8 @@ watch(
       <v-card-text class="pa-4">
         <p class="mb-3" style="font-size: 12px; color: #555">
           Jadwal ini akan ditandai TUNDA, dan sistem otomatis membuat jadwal
-          baru untuk keesokan harinya dengan data yang sama.
+          baru untuk keesokan harinya (Senin jika jadwal jatuh pada hari Sabtu)
+          dengan data yang sama.
         </p>
         <label style="font-size: 11px; font-weight: 600; color: #424242">
           Alasan Tunda <span style="color: #d32f2f">*</span>
