@@ -30,9 +30,11 @@ interface BrowseItem {
   Close: string;
   Keterangan: string;
   JumlahSO: number;
+  JumlahMap: number;
 }
 interface DetailRow {
   PjwdId: number;
+  PjwdTipe: string;
   Nomor: string;
   Sumber: string;
   NomorMap: string;
@@ -158,6 +160,7 @@ const openPreview = async () => {
   const item = selected.value[0];
   previewNomor.value = item.Nomor;
   previewCabang.value = item.Cabang;
+  activePreviewTab.value = "SO";
   showPreviewDialog.value = true;
 
   if (detailCache.value[item.Nomor]) {
@@ -190,9 +193,24 @@ const headers = [
   { title: "TGL AKHIR", key: "TglAkhir", width: "100px", align: "center" },
   { title: "CABANG", key: "Cabang", width: "70px", align: "center" },
   { title: "STATUS", key: "Close", width: "80px", align: "center" },
-  { title: "JML SO", key: "JumlahSO", width: "80px", align: "center" },
+  { title: "JML SO", key: "JumlahSO", width: "70px", align: "center" },
+  { title: "JML MAP", key: "JumlahMap", width: "70px", align: "center" },
   { title: "KETERANGAN", key: "Keterangan", width: "300px" },
 ];
+
+const activeExpandTab = ref<Record<string, "SO" | "MAP">>({});
+
+const getExpandTab = (nomor: string) => activeExpandTab.value[nomor] || "SO";
+const setExpandTab = (nomor: string, tab: "SO" | "MAP") => {
+  activeExpandTab.value = { ...activeExpandTab.value, [nomor]: tab };
+};
+
+const filterByTipe = (rows: DetailRow[], tipe: "SO" | "MAP") =>
+  rows.filter((d) =>
+    tipe === "MAP" ? d.PjwdTipe === "MAP" : d.PjwdTipe !== "MAP",
+  );
+
+const activePreviewTab = ref<"SO" | "MAP">("SO");
 
 let filterTimer: ReturnType<typeof setTimeout> | null = null;
 watch(
@@ -355,6 +373,9 @@ const pencapaianRencana = ref(0);
 const pencapaianRealisasi = ref(0);
 const tidakTercapaiRows = ref<PencapaianRow[]>([]);
 const tambahanRows = ref<PencapaianRow[]>([]);
+const activePencapaianTab = ref<"SO" | "MAP">("SO");
+const pencapaianDataSo = ref<any>(null);
+const pencapaianDataMap = ref<any>(null);
 
 const pencapaianPersen = computed(() =>
   pencapaianRencana.value > 0
@@ -380,30 +401,43 @@ const openPencapaian = async () => {
   if (!selected.value.length) return;
   const item = selected.value[0];
   pencapaianNomor.value = item.Nomor;
+  activePencapaianTab.value = "SO";
   showPencapaianDialog.value = true;
   pencapaianLoading.value = true;
   try {
     const res = await penjadwalanPpicService.getPencapaian(item.Nomor);
-    const d = res.data.data;
-    pencapaianRencana.value = d.Rencana;
-    pencapaianRealisasi.value = d.Realisasi;
-    tidakTercapaiRows.value = d.TidakTercapai.map((r: any) => ({
-      Id: r.Id,
-      kategori: r.Kategori,
-      keterangan: r.Keterangan,
-      pcs: r.Pcs,
-    }));
-    tambahanRows.value = d.Tambahan.map((r: any) => ({
-      Id: r.Id,
-      kategori: r.Kategori,
-      keterangan: r.Keterangan,
-      pcs: r.Pcs,
-    }));
+    pencapaianDataSo.value = res.data.data.So;
+    pencapaianDataMap.value = res.data.data.Map;
+    loadPencapaianTab("SO");
   } catch {
     toast.error(`Gagal memuat pencapaian ${item.Nomor}`);
   } finally {
     pencapaianLoading.value = false;
   }
+};
+
+const loadPencapaianTab = (tab: "SO" | "MAP") => {
+  const d = tab === "MAP" ? pencapaianDataMap.value : pencapaianDataSo.value;
+  if (!d) return;
+  pencapaianRencana.value = d.Rencana;
+  pencapaianRealisasi.value = d.Realisasi;
+  tidakTercapaiRows.value = d.TidakTercapai.map((r: any) => ({
+    Id: r.Id,
+    kategori: r.Kategori,
+    keterangan: r.Keterangan,
+    pcs: r.Pcs,
+  }));
+  tambahanRows.value = d.Tambahan.map((r: any) => ({
+    Id: r.Id,
+    kategori: r.Kategori,
+    keterangan: r.Keterangan,
+    pcs: r.Pcs,
+  }));
+};
+
+const switchPencapaianTab = (tab: "SO" | "MAP") => {
+  activePencapaianTab.value = tab;
+  loadPencapaianTab(tab);
 };
 
 const addTidakTercapaiRow = () =>
@@ -420,9 +454,46 @@ const savePencapaian = async () => {
     await penjadwalanPpicService.savePencapaian(pencapaianNomor.value, {
       tidakTercapai: tidakTercapaiRows.value,
       tambahan: tambahanRows.value,
+      group: activePencapaianTab.value === "MAP" ? "MAP" : undefined,
     });
     toast.success("Pencapaian berhasil disimpan.");
-    showPencapaianDialog.value = false;
+    // Perbarui cache lokal supaya kalau user pindah tab tanpa reload,
+    // datanya tetap sinkron dengan yang baru disimpan.
+    const target =
+      activePencapaianTab.value === "MAP"
+        ? "pencapaianDataMap"
+        : "pencapaianDataSo";
+    if (activePencapaianTab.value === "MAP" && pencapaianDataMap.value) {
+      pencapaianDataMap.value.TidakTercapai = tidakTercapaiRows.value.map(
+        (r) => ({
+          Id: r.Id,
+          Kategori: r.kategori,
+          Keterangan: r.keterangan,
+          Pcs: r.pcs,
+        }),
+      );
+      pencapaianDataMap.value.Tambahan = tambahanRows.value.map((r) => ({
+        Id: r.Id,
+        Kategori: r.kategori,
+        Keterangan: r.keterangan,
+        Pcs: r.pcs,
+      }));
+    } else if (pencapaianDataSo.value) {
+      pencapaianDataSo.value.TidakTercapai = tidakTercapaiRows.value.map(
+        (r) => ({
+          Id: r.Id,
+          Kategori: r.kategori,
+          Keterangan: r.keterangan,
+          Pcs: r.pcs,
+        }),
+      );
+      pencapaianDataSo.value.Tambahan = tambahanRows.value.map((r) => ({
+        Id: r.Id,
+        Kategori: r.kategori,
+        Keterangan: r.keterangan,
+        Pcs: r.pcs,
+      }));
+    }
   } catch (e: any) {
     toast.error(e.response?.data?.message || "Gagal menyimpan pencapaian.");
   } finally {
@@ -467,6 +538,7 @@ const onExport = async () => {
 
 const buildDetailColumns = (cabang: string) => {
   const cols: any[] = [
+    { header: "Tipe", key: "Tipe", align: "center" },
     { header: "Cabang", key: "Cabang", align: "center" },
     { header: "Tanggal", key: "Tanggal" },
     { header: "Nomor", key: "NomorSo" },
@@ -547,12 +619,13 @@ const onExportDetail = async () => {
       const columns = buildDetailColumns(periode.Cabang); // ⬅ BARU, per periode
 
       const rows = detailRows.map((d) => ({
+        Tipe: d.PjwdTipe === "MAP" ? "MAP" : "SO",
         Cabang: periode.Cabang,
         Tanggal: formatTanggal(d.Tanggal),
         NomorSo: nomorTampil(d),
         Nama: d.Nama,
-        Panjang: Number(d.Panjang) || 0, // ⬅ BARU — aman walau kolomnya tidak dipakai
-        Lebar: Number(d.Lebar) || 0, // ⬅ BARU
+        Panjang: Number(d.Panjang) || 0,
+        Lebar: Number(d.Lebar) || 0,
         Pesan: Number(d.Pesan) || 0,
         Kirim: Number(d.Kirim) || 0,
         Kurang: Number(d.Kurang) || 0,
@@ -565,20 +638,42 @@ const onExportDetail = async () => {
         KetKesepakatan: d.KetKesepakatan || "",
       }));
 
-      // Baris total Rencana per periode, ditampilkan di akhir sheet.
-      const totalRencana = detailRows.reduce(
-        (sum, d) => sum + (Number(d.Rencana) || 0),
-        0,
-      );
+      // Baris total Rencana — dipisah SO vs MAP, ditampilkan di akhir sheet.
+      const totalRencanaSo = detailRows
+        .filter((d) => d.PjwdTipe !== "MAP")
+        .reduce((sum, d) => sum + (Number(d.Rencana) || 0), 0);
+      const totalRencanaMap = detailRows
+        .filter((d) => d.PjwdTipe === "MAP")
+        .reduce((sum, d) => sum + (Number(d.Rencana) || 0), 0);
+
       rows.push({
+        Tipe: "SO",
         Cabang: "",
         Tanggal: "",
         NomorSo: "",
-        Nama: "TOTAL RENCANA",
+        Nama: "TOTAL RENCANA SO",
         Pesan: "" as any,
         Kirim: "" as any,
         Kurang: "" as any,
-        Rencana: totalRencana,
+        Rencana: totalRencanaSo,
+        KetRencana: "",
+        Realisasi: "" as any,
+        PermintaanKirim: "",
+        StatusPermintaan: "",
+        Kesepakatan: "",
+        KetKesepakatan: "",
+        _isSummary: true,
+      } as any);
+      rows.push({
+        Tipe: "MAP",
+        Cabang: "",
+        Tanggal: "",
+        NomorSo: "",
+        Nama: "TOTAL RENCANA MAP (SAMPEL)",
+        Pesan: "" as any,
+        Kirim: "" as any,
+        Kurang: "" as any,
+        Rencana: totalRencanaMap,
         KetRencana: "",
         Realisasi: "" as any,
         PermintaanKirim: "",
@@ -780,81 +875,124 @@ fetchData();
           <span>Memuat detail...</span>
         </div>
 
-        <div v-else-if="detailCache[item.Nomor]" class="dt-scroll">
-          <table class="dt">
-            <thead>
-              <tr>
-                <th>Tanggal</th>
-                <th>Nomor / Nama SO</th>
-                <th v-if="showPanjangLebar(item.Cabang)" class="tr">Panjang</th>
-                <th v-if="showPanjangLebar(item.Cabang)" class="tr">Lebar</th>
-                <th class="tr">Pesan</th>
-                <th class="tr">Kirim</th>
-                <th class="tr">Kurang</th>
-                <th class="tr">Rencana</th>
-                <th class="tr">Realisasi</th>
-                <th class="tc">Permintaan Kirim</th>
-                <th class="tc">Permintaan</th>
-                <th>Kesepakatan</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr
-                v-for="d in detailCache[item.Nomor]"
-                :key="d.PjwdId"
-                :class="detailRowClass(d)"
-              >
-                <td>{{ formatTanggal(d.Tanggal) }}</td>
-                <td>
-                  <div class="mono">{{ nomorTampil(d) }}</div>
-                  <div>{{ d.Nama }}</div>
-                  <div v-if="d.NomorPraOrder && d.Nomor" class="praorder-badge">
-                    dari {{ d.NomorPraOrder }}
-                  </div>
-                  <div v-if="d.KetRencana" class="ket-rencana-note">
-                    📝 {{ d.KetRencana }}
-                  </div>
-                </td>
-                <td v-if="showPanjangLebar(item.Cabang)" class="tr">
-                  {{ fmt(d.Panjang) }}
-                </td>
-                <td v-if="showPanjangLebar(item.Cabang)" class="tr">
-                  {{ fmt(d.Lebar) }}
-                </td>
-                <td class="tr">{{ fmt(d.Pesan) }}</td>
-                <td class="tr">{{ fmt(d.Kirim) }}</td>
-                <td class="tr" :class="{ 'text-red fw': Number(d.Kurang) > 0 }">
-                  {{ fmt(d.Kurang) }}
-                </td>
-                <td class="tr">{{ fmt(d.Rencana) }}</td>
-                <td class="tr">{{ fmt(d.Realisasi) }}</td>
-                <td class="tc">{{ formatTanggal(d.PermintaanKirim) }}</td>
-                <td class="tc">
-                  <v-chip
-                    size="x-small"
-                    :color="d.StatusPermintaan === 'CLOSE' ? 'success' : 'grey'"
-                    variant="flat"
+        <div v-else-if="detailCache[item.Nomor]">
+          <div class="mini-tab-switch">
+            <button
+              type="button"
+              :class="{ active: getExpandTab(item.Nomor) === 'SO' }"
+              @click="setExpandTab(item.Nomor, 'SO')"
+            >
+              SO ({{ item.JumlahSO }})
+            </button>
+            <button
+              type="button"
+              :class="{ active: getExpandTab(item.Nomor) === 'MAP' }"
+              @click="setExpandTab(item.Nomor, 'MAP')"
+            >
+              MAP — Sampel ({{ item.JumlahMap }})
+            </button>
+          </div>
+
+          <div class="dt-scroll">
+            <table class="dt">
+              <thead>
+                <tr>
+                  <th>Tanggal</th>
+                  <th>Nomor / Nama SO</th>
+                  <th v-if="showPanjangLebar(item.Cabang)" class="tr">
+                    Panjang
+                  </th>
+                  <th v-if="showPanjangLebar(item.Cabang)" class="tr">Lebar</th>
+                  <th class="tr">Pesan</th>
+                  <th class="tr">Kirim</th>
+                  <th class="tr">Kurang</th>
+                  <th class="tr">Rencana</th>
+                  <th class="tr">Realisasi</th>
+                  <th class="tc">Permintaan Kirim</th>
+                  <th class="tc">Permintaan</th>
+                  <th>Kesepakatan</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="d in filterByTipe(
+                    detailCache[item.Nomor],
+                    getExpandTab(item.Nomor),
+                  )"
+                  :key="d.PjwdId"
+                  :class="detailRowClass(d)"
+                >
+                  <td>{{ formatTanggal(d.Tanggal) }}</td>
+                  <td>
+                    <div class="mono">{{ nomorTampil(d) }}</div>
+                    <div>{{ d.Nama }}</div>
+                    <div
+                      v-if="d.NomorPraOrder && d.Nomor"
+                      class="praorder-badge"
+                    >
+                      dari {{ d.NomorPraOrder }}
+                    </div>
+                    <div v-if="d.KetRencana" class="ket-rencana-note">
+                      📝 {{ d.KetRencana }}
+                    </div>
+                  </td>
+                  <td v-if="showPanjangLebar(item.Cabang)" class="tr">
+                    {{ fmt(d.Panjang) }}
+                  </td>
+                  <td v-if="showPanjangLebar(item.Cabang)" class="tr">
+                    {{ fmt(d.Lebar) }}
+                  </td>
+                  <td class="tr">{{ fmt(d.Pesan) }}</td>
+                  <td class="tr">{{ fmt(d.Kirim) }}</td>
+                  <td
+                    class="tr"
+                    :class="{ 'text-red fw': Number(d.Kurang) > 0 }"
                   >
-                    {{ d.StatusPermintaan }}
-                  </v-chip>
-                </td>
-                <td>
-                  <span v-if="d.Kesepakatan" class="kesepakatan-tgl">{{
-                    formatTanggal(d.Kesepakatan)
-                  }}</span>
-                  <span v-if="d.KetKesepakatan" class="kesepakatan-ket">
-                    — {{ d.KetKesepakatan }}</span
-                  >
-                  <span v-if="!d.Kesepakatan" class="text-grey">-</span>
-                </td>
-              </tr>
-              <tr v-if="!detailCache[item.Nomor].length">
-                <td colspan="10" class="empty-row">
-                  Belum ada SO ditambahkan di periode ini.
-                </td>
-              </tr>
-            </tbody>
-          </table>
+                    {{ fmt(d.Kurang) }}
+                  </td>
+                  <td class="tr">{{ fmt(d.Rencana) }}</td>
+                  <td class="tr">{{ fmt(d.Realisasi) }}</td>
+                  <td class="tc">{{ formatTanggal(d.PermintaanKirim) }}</td>
+                  <td class="tc">
+                    <v-chip
+                      size="x-small"
+                      :color="
+                        d.StatusPermintaan === 'CLOSE' ? 'success' : 'grey'
+                      "
+                      variant="flat"
+                    >
+                      {{ d.StatusPermintaan }}
+                    </v-chip>
+                  </td>
+                  <td>
+                    <span v-if="d.Kesepakatan" class="kesepakatan-tgl">{{
+                      formatTanggal(d.Kesepakatan)
+                    }}</span>
+                    <span v-if="d.KetKesepakatan" class="kesepakatan-ket">
+                      — {{ d.KetKesepakatan }}</span
+                    >
+                    <span v-if="!d.Kesepakatan" class="text-grey">-</span>
+                  </td>
+                </tr>
+                <tr
+                  v-if="
+                    !filterByTipe(
+                      detailCache[item.Nomor],
+                      getExpandTab(item.Nomor),
+                    ).length
+                  "
+                >
+                  <td colspan="10" class="empty-row">
+                    Belum ada
+                    {{
+                      getExpandTab(item.Nomor) === "MAP" ? "MAP/sampel" : "SO"
+                    }}
+                    ditambahkan di periode ini.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
 
         <div v-else class="expand-empty">Tidak ada data detail.</div>
@@ -953,78 +1091,100 @@ fetchData();
           <v-progress-circular indeterminate color="primary" size="20" />
           <span>Memuat detail...</span>
         </div>
-        <table v-else class="dt" style="width: 100%">
-          <thead>
-            <tr>
-              <th>Tanggal</th>
-              <th>Sumber</th>
-              <th>Nomor / Nama</th>
-              <th v-if="showPanjangLebar(previewCabang)" class="tr">Panjang</th>
-              <th v-if="showPanjangLebar(previewCabang)" class="tr">Lebar</th>
-              <th class="tr">Pesan</th>
-              <th class="tr">Kirim</th>
-              <th class="tr">Kurang</th>
-              <th class="tr">Rencana</th>
-              <th class="tr">Realisasi</th>
-              <th class="tc">Permintaan Kirim</th>
-              <th class="tc">Permintaan</th>
-              <th>Kesepakatan</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr
-              v-for="d in previewDetail"
-              :key="d.PjwdId"
-              :class="detailRowClass(d)"
+        <template v-else>
+          <div class="mini-tab-switch pa-2">
+            <button
+              type="button"
+              :class="{ active: activePreviewTab === 'SO' }"
+              @click="activePreviewTab = 'SO'"
             >
-              <td>{{ formatTanggal(d.Tanggal) }}</td>
-              <td>
-                <v-chip size="x-small" variant="tonal">{{ d.Sumber }}</v-chip>
-              </td>
-              <td>
-                <div class="mono">{{ nomorTampil(d) }}</div>
-                <div>{{ d.Nama }}</div>
-              </td>
-              <td class="tr">{{ fmt(d.Pesan) }}</td>
-              <td class="tr">{{ fmt(d.Kirim) }}</td>
-              <td class="tr" :class="{ 'text-red fw': Number(d.Kurang) > 0 }">
-                {{ fmt(d.Kurang) }}
-              </td>
-              <td v-if="showPanjangLebar(previewCabang)" class="tr">
-                {{ fmt(d.Panjang) }}
-              </td>
-              <td v-if="showPanjangLebar(previewCabang)" class="tr">
-                {{ fmt(d.Lebar) }}
-              </td>
-              <td class="tr">{{ fmt(d.Rencana) }}</td>
-              <td class="tr">{{ fmt(d.Realisasi) }}</td>
-              <td class="tc">{{ formatTanggal(d.PermintaanKirim) }}</td>
-              <td class="tc">
-                <v-chip
-                  size="x-small"
-                  :color="d.StatusPermintaan === 'CLOSE' ? 'success' : 'grey'"
-                  variant="flat"
-                >
-                  {{ d.StatusPermintaan }}
-                </v-chip>
-              </td>
-              <td>
-                <span v-if="d.Kesepakatan" class="kesepakatan-tgl">{{
-                  formatTanggal(d.Kesepakatan)
-                }}</span>
-                <span v-if="d.KetKesepakatan" class="kesepakatan-ket">
-                  — {{ d.KetKesepakatan }}</span
-                >
-                <span v-if="!d.Kesepakatan" class="text-grey">-</span>
-              </td>
-            </tr>
-            <tr v-if="!previewDetail.length">
-              <td colspan="11" class="empty-row">
-                Belum ada SO/MAP/Pra Order/Manual di periode ini.
-              </td>
-            </tr>
-          </tbody>
-        </table>
+              SO
+            </button>
+            <button
+              type="button"
+              :class="{ active: activePreviewTab === 'MAP' }"
+              @click="activePreviewTab = 'MAP'"
+            >
+              MAP — Sampel
+            </button>
+          </div>
+          <table class="dt" style="width: 100%">
+            <thead>
+              <tr>
+                <th>Tanggal</th>
+                <th>Sumber</th>
+                <th>Nomor / Nama</th>
+                <th v-if="showPanjangLebar(previewCabang)" class="tr">
+                  Panjang
+                </th>
+                <th v-if="showPanjangLebar(previewCabang)" class="tr">Lebar</th>
+                <th class="tr">Pesan</th>
+                <th class="tr">Kirim</th>
+                <th class="tr">Kurang</th>
+                <th class="tr">Rencana</th>
+                <th class="tr">Realisasi</th>
+                <th class="tc">Permintaan Kirim</th>
+                <th class="tc">Permintaan</th>
+                <th>Kesepakatan</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="d in filterByTipe(previewDetail, activePreviewTab)"
+                :key="d.PjwdId"
+                :class="detailRowClass(d)"
+              >
+                <td>{{ formatTanggal(d.Tanggal) }}</td>
+                <td>
+                  <v-chip size="x-small" variant="tonal">{{ d.Sumber }}</v-chip>
+                </td>
+                <td>
+                  <div class="mono">{{ nomorTampil(d) }}</div>
+                  <div>{{ d.Nama }}</div>
+                </td>
+                <td class="tr">{{ fmt(d.Pesan) }}</td>
+                <td class="tr">{{ fmt(d.Kirim) }}</td>
+                <td class="tr" :class="{ 'text-red fw': Number(d.Kurang) > 0 }">
+                  {{ fmt(d.Kurang) }}
+                </td>
+                <td v-if="showPanjangLebar(previewCabang)" class="tr">
+                  {{ fmt(d.Panjang) }}
+                </td>
+                <td v-if="showPanjangLebar(previewCabang)" class="tr">
+                  {{ fmt(d.Lebar) }}
+                </td>
+                <td class="tr">{{ fmt(d.Rencana) }}</td>
+                <td class="tr">{{ fmt(d.Realisasi) }}</td>
+                <td class="tc">{{ formatTanggal(d.PermintaanKirim) }}</td>
+                <td class="tc">
+                  <v-chip
+                    size="x-small"
+                    :color="d.StatusPermintaan === 'CLOSE' ? 'success' : 'grey'"
+                    variant="flat"
+                  >
+                    {{ d.StatusPermintaan }}
+                  </v-chip>
+                </td>
+                <td>
+                  <span v-if="d.Kesepakatan" class="kesepakatan-tgl">{{
+                    formatTanggal(d.Kesepakatan)
+                  }}</span>
+                  <span v-if="d.KetKesepakatan" class="kesepakatan-ket">
+                    — {{ d.KetKesepakatan }}</span
+                  >
+                  <span v-if="!d.Kesepakatan" class="text-grey">-</span>
+                </td>
+              </tr>
+              <tr v-if="!filterByTipe(previewDetail, activePreviewTab).length">
+                <td colspan="11" class="empty-row">
+                  Belum ada
+                  {{ activePreviewTab === "MAP" ? "MAP/sampel" : "SO" }} di
+                  periode ini.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </template>
       </v-card-text>
     </v-card>
   </v-dialog>
@@ -1051,6 +1211,23 @@ fetchData();
           <span>Memuat...</span>
         </div>
         <template v-else>
+          <div class="mini-tab-switch mb-3">
+            <button
+              type="button"
+              :class="{ active: activePencapaianTab === 'SO' }"
+              @click="switchPencapaianTab('SO')"
+            >
+              Komitmen Kirim SO
+            </button>
+            <button
+              type="button"
+              :class="{ active: activePencapaianTab === 'MAP' }"
+              @click="switchPencapaianTab('MAP')"
+            >
+              Komitmen Kirim MAP — Sampel
+            </button>
+          </div>
+
           <table class="dt dt-summary">
             <tbody>
               <tr>
@@ -1438,5 +1615,26 @@ fetchData();
 }
 .kesepakatan-ket {
   color: #757575;
+}
+.mini-tab-switch {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 6px;
+  padding-left: 2px;
+}
+.mini-tab-switch button {
+  padding: 3px 10px;
+  border: 1px solid #bdbdbd;
+  border-radius: 3px;
+  background: white;
+  font-size: 10.5px;
+  font-weight: 600;
+  cursor: pointer;
+  color: #555;
+}
+.mini-tab-switch button.active {
+  background: #1565c0;
+  color: white;
+  border-color: #1565c0;
 }
 </style>

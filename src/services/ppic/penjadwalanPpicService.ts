@@ -25,7 +25,11 @@ export const penjadwalanPpicService = {
 
   savePencapaian: (
     nomor: string,
-    payload: { tidakTercapai: PencapaianRow[]; tambahan: PencapaianRow[] },
+    payload: {
+      tidakTercapai: PencapaianRow[];
+      tambahan: PencapaianRow[];
+      group?: string;
+    },
   ) =>
     api.put(
       `/ppic/penjadwalan/${encodeURIComponent(nomor)}/pencapaian`,
@@ -74,9 +78,15 @@ export const penjadwalanPpicService = {
       params: { divisi, excludeNomor },
     });
   },
-  getMapInfo(mapNomor: string, divisi = "", excludeNomor = "") {
+  getMapInfo(
+    mapNomor: string,
+    divisi = "",
+    excludeNomor = "",
+    tgl1 = "",
+    tgl2 = "",
+  ) {
     return api.get(`/ppic/penjadwalan-form/map-info/${mapNomor}`, {
-      params: { divisi, excludeNomor },
+      params: { divisi, excludeNomor, tgl1, tgl2 },
     });
   },
   getMhInfo(mhNomor: string, divisi = "", excludeNomor = "") {

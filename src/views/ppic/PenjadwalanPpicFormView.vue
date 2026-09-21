@@ -56,6 +56,7 @@ todaySaturday.setDate(todayMonday.getDate() + 5);
 
 interface DetailRow {
   PjwdId: number | null;
+  Tipe: "SO" | "MAP";
   SoNomor: string;
   NomorPraOrder: string;
   MapNomor: string;
@@ -199,8 +200,14 @@ const loadDivisi = async () => {
   }
 };
 
-const totalRencana = computed(() =>
-  detail.value.reduce((s, d) => s + (Number(d.Rencana) || 0), 0),
+const totalRencanaSo = computed(() =>
+  detailSo.value.reduce((s, d) => s + (Number(d.Rencana) || 0), 0),
+);
+const totalRencanaMap = computed(() =>
+  detailMap.value.reduce((s, d) => s + (Number(d.Rencana) || 0), 0),
+);
+const totalRencanaVisible = computed(() =>
+  activeFormTab.value === "MAP" ? totalRencanaMap.value : totalRencanaSo.value,
 );
 
 // ═══════════════════════════════════════════════════════════════
@@ -271,11 +278,20 @@ watch(
 
 const divisiTarik = computed(() => header.pjw_divisi || "0");
 
+const activeFormTab = ref<"SO" | "MAP">("SO");
+
+const detailSo = computed(() => detail.value.filter((d) => d.Tipe !== "MAP"));
+const detailMap = computed(() => detail.value.filter((d) => d.Tipe === "MAP"));
+const visibleDetail = computed(() =>
+  activeFormTab.value === "MAP" ? detailMap.value : detailSo.value,
+);
+
 // ═══════════════════════════════════════════════════════════════
 // LOAD DATA — mode edit (fetch existing) atau mode baru (create langsung)
 // ═══════════════════════════════════════════════════════════════
 const mapDetailRow = (r: any): DetailRow => ({
   PjwdId: r.PjwdId ?? null,
+  Tipe: r.PjwdTipe === "MAP" ? "MAP" : "SO",
   SoNomor: r.Nomor || "",
   NomorPraOrder: r.NomorPraOrder || "",
   MapNomor: r.NomorMap || "",
@@ -402,13 +418,16 @@ const pushRowFromServer = (pjwdId: number, rowInput: any) => {
   if (detail.value.some((d) => d.PjwdId === pjwdId)) return;
   detail.value.push({
     PjwdId: pjwdId,
+    Tipe: rowInput.Tipe === "MAP" ? "MAP" : "SO",
     SoNomor: rowInput.SoNomor || "",
     NomorPraOrder: rowInput.NomorPraOrder || "",
     MapNomor: rowInput.MapNomor || "",
     MhNomor: rowInput.MhNomor || "",
     PenNomor: rowInput.PenNomor || "",
     PenId: rowInput.PenId || "",
-    Sumber: rowInput.Sumber,
+    Sumber:
+      rowInput.Sumber ||
+      (rowInput.SoNomor ? "SO" : rowInput.MapNomor ? "MAP" : "PRA ORDER"),
     Nama: rowInput.Nama,
     Tanggal: rowInput.Tanggal,
     Pesan: Number(rowInput.Pesan) || 0,
@@ -416,7 +435,7 @@ const pushRowFromServer = (pjwdId: number, rowInput: any) => {
     Kurang: Number(rowInput.Kurang) || 0,
     Rencana: Number(rowInput.Rencana) || 0,
     KetRencana: "",
-    Realisasi: 0,
+    Realisasi: Number(rowInput.Realisasi) || 0,
     PermintaanKirim: rowInput.PermintaanKirim || "",
     StatusPermintaan: "CLOSE",
     Kesepakatan: "",
@@ -517,17 +536,19 @@ const tarikPraOrder = async () => {
     let ditambah = 0;
     for (const k of kandidat) {
       if (isDuplicate("PRA ORDER", k.Nomor)) continue;
+      const isMapTab = activeFormTab.value === "MAP";
       const rowInput = {
+        Tipe: activeFormTab.value,
         SoNomor: "",
         NomorPraOrder: k.Nomor,
         MapNomor: "",
         Sumber: "PRA ORDER",
         Nama: k.Nama,
         Tanggal: k.Tanggal,
-        Pesan: k.QtyRencana,
+        Pesan: isMapTab ? 0 : k.QtyRencana,
         Kirim: 0,
-        Kurang: k.QtyRencana,
-        Rencana: Number(k.QtyRencana) || 0,
+        Kurang: isMapTab ? 0 : k.QtyRencana,
+        Rencana: isMapTab ? 0 : Number(k.QtyRencana) || 0,
         PermintaanKirim: k.TglKirim || "",
       };
       const saveRes = await penjadwalanPpicService.addDetailRow(
@@ -656,7 +677,9 @@ const tambahManual = async () => {
         header.pjw_nomor,
       );
       const k = res.data.data;
+      const isMapTab = activeFormTab.value === "MAP";
       rowInput = {
+        Tipe: activeFormTab.value,
         SoNomor: "",
         NomorPraOrder: "",
         MapNomor: "",
@@ -666,10 +689,10 @@ const tambahManual = async () => {
         Sumber: "PERMINTAAN HARGA",
         Nama: k.Nama,
         Tanggal: k.Tanggal,
-        Pesan: k.Pesan,
-        Kirim: k.Kirim,
-        Kurang: k.Kurang,
-        Rencana: Number(k.Kurang) || 0,
+        Pesan: isMapTab ? 0 : k.Pesan,
+        Kirim: isMapTab ? 0 : k.Kirim,
+        Kurang: isMapTab ? 0 : k.Kurang,
+        Rencana: isMapTab ? 0 : Number(k.Kurang) || 0,
         PermintaanKirim: "",
       };
     } else if (jenis === "MAP") {
@@ -677,9 +700,12 @@ const tambahManual = async () => {
         nomor,
         header.pjw_divisi,
         header.pjw_nomor,
+        header.pjw_tgl1,
+        header.pjw_tgl2,
       );
       const k = res.data.data;
       rowInput = {
+        Tipe: activeFormTab.value,
         SoNomor: "",
         NomorPraOrder: "",
         MapNomor: k.Nomor,
@@ -692,7 +718,8 @@ const tambahManual = async () => {
         Pesan: k.Pesan,
         Kirim: k.Kirim,
         Kurang: k.Kurang,
-        Rencana: Number(k.Kurang) || 0,
+        Rencana: activeFormTab.value === "MAP" ? 0 : Number(k.Kurang) || 0,
+        Realisasi: activeFormTab.value === "MAP" ? k.Realisasi : 0,
         PermintaanKirim: k.DatelineAsli || "",
       };
     } else {
@@ -703,6 +730,7 @@ const tambahManual = async () => {
       );
       const k = res.data.data;
       rowInput = {
+        Tipe: "SO",
         SoNomor: k.Nomor,
         NomorPraOrder: "",
         MapNomor: "",
@@ -762,7 +790,9 @@ const pilihBarisPenawaran = async (item: any) => {
       header.pjw_nomor,
     );
     const k = res.data.data;
+    const isMapTab = activeFormTab.value === "MAP";
     const rowInput = {
+      Tipe: activeFormTab.value,
       SoNomor: "",
       NomorPraOrder: "",
       MapNomor: "",
@@ -772,10 +802,10 @@ const pilihBarisPenawaran = async (item: any) => {
       Sumber: "PENAWARAN",
       Nama: k.Nama,
       Tanggal: k.Tanggal,
-      Pesan: k.Pesan,
-      Kirim: k.Kirim,
-      Kurang: k.Kurang,
-      Rencana: Number(k.Kurang) || 0,
+      Pesan: isMapTab ? 0 : k.Pesan,
+      Kirim: isMapTab ? 0 : k.Kirim,
+      Kurang: isMapTab ? 0 : k.Kurang,
+      Rencana: isMapTab ? 0 : Number(k.Kurang) || 0,
       PermintaanKirim: "",
     };
     const saveRes = await penjadwalanPpicService.addDetailRow(
@@ -802,6 +832,7 @@ const tambahBarisManual = async () => {
   isManualAddLoading.value = true;
   try {
     const rowInput = {
+      Tipe: activeFormTab.value,
       SoNomor: "",
       NomorPraOrder: "",
       MapNomor: "",
@@ -1020,15 +1051,16 @@ const confirmMove = async () => {
 // ═══════════════════════════════════════════════════════════════
 // HAPUS BARIS
 // ═══════════════════════════════════════════════════════════════
-const removeDetail = async (idx: number) => {
-  const row = detail.value[idx];
+const removeDetail = async (row: DetailRow) => {
   if (!row.PjwdId) {
-    detail.value.splice(idx, 1);
+    const idx = detail.value.indexOf(row);
+    if (idx !== -1) detail.value.splice(idx, 1);
     return;
   }
   try {
     await penjadwalanPpicService.deleteDetailRow(header.pjw_nomor, row.PjwdId);
-    detail.value.splice(idx, 1);
+    const idx = detail.value.findIndex((d) => d.PjwdId === row.PjwdId);
+    if (idx !== -1) detail.value.splice(idx, 1);
   } catch (e: any) {
     toast.error(e.response?.data?.message || "Gagal menghapus baris.");
   }
@@ -1145,6 +1177,23 @@ const rowClass = (d: DetailRow) => {
         </div>
       </div>
 
+      <div class="pjw-tab-switch">
+        <button
+          type="button"
+          :class="{ active: activeFormTab === 'SO' }"
+          @click="activeFormTab = 'SO'"
+        >
+          Komitmen Kirim SO ({{ detailSo.length }})
+        </button>
+        <button
+          type="button"
+          :class="{ active: activeFormTab === 'MAP' }"
+          @click="activeFormTab = 'MAP'"
+        >
+          Komitmen Kirim MAP — Sampel ({{ detailMap.length }})
+        </button>
+      </div>
+
       <div class="pjw-hdr-section">
         <div class="pjw-hdr-row">
           <label class="pjw-lbl">Nomor</label>
@@ -1216,6 +1265,7 @@ const rowClass = (d: DetailRow) => {
           style="width: 170px"
         />
         <button
+          v-if="activeFormTab === 'SO'"
           type="button"
           class="pjw-tarik-btn"
           :disabled="isTarikLoading || !canEditMarketing"
@@ -1236,6 +1286,7 @@ const rowClass = (d: DetailRow) => {
           }}
         </button>
         <button
+          v-if="activeFormTab === 'SO'"
           type="button"
           class="pjw-tarik-btn map"
           :disabled="isTarikMapLoading || !canEditMarketing"
@@ -1304,7 +1355,7 @@ const rowClass = (d: DetailRow) => {
           </thead>
           <tbody>
             <tr
-              v-for="(d, idx) in detail"
+              v-for="(d, idx) in visibleDetail"
               :key="d.PjwdId ?? idx"
               :class="rowClass(d)"
             >
@@ -1528,7 +1579,7 @@ const rowClass = (d: DetailRow) => {
                   v-if="canEditMarketing"
                   type="button"
                   class="pjw-row-del"
-                  @click="removeDetail(idx)"
+                  @click="removeDetail(d)"
                 >
                   <IconTrash :size="13" />
                 </button>
@@ -1543,8 +1594,10 @@ const rowClass = (d: DetailRow) => {
           </tbody>
           <tfoot>
             <tr class="pjw-footer-row">
-              <td colspan="5" class="pjw-footer-label">Total Rencana</td>
-              <td class="tr pjw-footer-val">{{ fmt(totalRencana) }}</td>
+              <td colspan="5" class="pjw-footer-label">
+                Total Rencana{{ activeFormTab === "MAP" ? " (Sampel)" : "" }}
+              </td>
+              <td class="tr pjw-footer-val">{{ fmt(totalRencanaVisible) }}</td>
               <td colspan="5"></td>
             </tr>
           </tfoot>
@@ -1682,6 +1735,31 @@ const rowClass = (d: DetailRow) => {
   height: 100%;
   font-family: "Segoe UI", system-ui, sans-serif;
   font-size: 12px;
+}
+
+.pjw-tab-switch {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+.pjw-tab-switch button {
+  padding: 6px 14px;
+  border: 1px solid #bdbdbd;
+  border-radius: 4px;
+  background: white;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  color: #555;
+}
+.pjw-tab-switch button.active {
+  background: #1565c0;
+  color: white;
+  border-color: #1565c0;
+}
+.pjw-tab-switch button:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 .pjw-hdr-section {
