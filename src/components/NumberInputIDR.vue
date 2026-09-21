@@ -4,6 +4,8 @@ import { computed } from "vue";
 const props = defineProps<{
   modelValue: number;
   placeholder?: string;
+  disabled?: boolean;
+  cursorToEnd?: boolean;
 }>();
 const emit = defineEmits<{
   (e: "update:modelValue", value: number): void;
@@ -25,7 +27,20 @@ const displayValue = computed({
 });
 
 const onFocus = (e: FocusEvent) => {
-  (e.target as HTMLInputElement).select();
+  const el = e.target as HTMLInputElement;
+  if (props.cursorToEnd) {
+    const len = el.value.length;
+    el.setSelectionRange(len, len);
+  } else {
+    el.select();
+  }
+};
+
+const onInput = (e: Event) => {
+  if (!props.cursorToEnd) return;
+  const el = e.target as HTMLInputElement;
+  const len = el.value.length;
+  requestAnimationFrame(() => el.setSelectionRange(len, len));
 };
 </script>
 
@@ -36,7 +51,9 @@ const onFocus = (e: FocusEvent) => {
     class="idr-inp"
     v-model="displayValue"
     :placeholder="placeholder"
+    :disabled="disabled"
     @focus="onFocus"
+    @input="onInput"
   />
 </template>
 
@@ -52,5 +69,8 @@ const onFocus = (e: FocusEvent) => {
   text-align: right;
   padding: 0 6px;
   box-sizing: border-box;
+}
+.idr-inp:disabled {
+  color: #999;
 }
 </style>

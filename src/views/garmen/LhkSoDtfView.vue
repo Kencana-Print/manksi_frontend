@@ -86,6 +86,7 @@ const summaryFormatters = {
 const headers = [
   { title: "Tanggal", key: "Tanggal", width: "95px", align: "center" },
   { title: "Cab", key: "Cab", width: "60px", align: "center" },
+  { title: "Tipe", key: "Tipe", width: "70px", align: "center" },
   { title: "SPK", key: "SPK", width: "160px" },
   { title: "Nama Order", key: "NamaOrder", minWidth: "220px" },
   { title: "Depan", key: "Depan", width: "80px", align: "right" },
@@ -126,7 +127,12 @@ const onEdit = () => {
 const onDelete = async (item: any) => {
   try {
     const tanggalMurni = String(item.Tanggal).substring(0, 10);
-    await lhkSoDtfService.deleteData(item.SPK, item.Cab, tanggalMurni);
+    await lhkSoDtfService.deleteData(
+      item.SPK,
+      item.Cab,
+      tanggalMurni,
+      item.Tipe,
+    );
     toast.success("Data LHK berhasil dihapus.");
     fetchData();
   } catch (e: any) {
@@ -344,6 +350,15 @@ const onExportDetail = async () => {
     <template #item.Saku="{ item }">{{ num(item.Saku) }}</template>
     <template #item.PanjangM="{ item }">{{ num(item.PanjangM) }}</template>
     <template #item.Buangan="{ item }">{{ num(item.Buangan) }}</template>
+    <template #item.Tipe="{ item }">
+      <v-chip
+        size="x-small"
+        :color="item.Tipe === 'MAKLON' ? 'orange' : 'blue-grey'"
+        variant="flat"
+      >
+        {{ item.Tipe }}
+      </v-chip>
+    </template>
 
     <template #extra-actions="{ selected: sel }">
       <v-btn

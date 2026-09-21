@@ -12,6 +12,7 @@ interface Account {
 const props = defineProps<{
   modelValue: boolean;
   filterMode?: "potongan";
+  jenis?: "KAS" | "BANK";
 }>();
 const emit = defineEmits(["update:modelValue", "selected"]);
 
@@ -41,6 +42,7 @@ const fetchData = async () => {
         page: page.value,
         limit: itemsPerPage.value,
         filterMode: props.filterMode ?? "",
+        jenis: props.jenis ?? "",
       },
     });
     items.value = res.data.data.items;

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, nextTick } from "vue";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
 import BaseForm from "@/components/BaseForm.vue";
 import { useForm } from "@/composables/useForm";
@@ -9,10 +9,13 @@ import { IconSearch, IconTrash, IconClipboardList } from "@tabler/icons-vue";
 
 import SpkSearchModal from "@/components/lookups/SpkSearchModal.vue";
 import SoDtfSearchModal from "@/components/lookups/SoDtfSearchModal.vue";
+import MaklonSearchModal from "@/components/lookups/MaklonSearchModal.vue";
+import BarangGarmenSearchModal from "@/components/lookups/BarangGarmenSearchModal.vue";
 
 interface DtfRow {
   Kode: string;
   Nama: string;
+  Tipe: "" | "SPK" | "SODTF" | "MAKLON";
   Depan: number;
   Belakang: number;
   Lengan: number;
@@ -21,6 +24,15 @@ interface DtfRow {
   Panjang: number;
   Buangan: number;
   Ket: string;
+  // Khusus Maklon — dipakai/ditampilkan menggantikan kolom di atas
+  KodePolos: string;
+  Satuan: string;
+  KodeHasil: string;
+  NamaHasil: string;
+  QtyHasil: number;
+  BsAfval: number;
+  CabTujuan: string;
+  TargetJadiOptions?: any[];
 }
 interface DtfFormData {
   cab: string;
@@ -29,11 +41,13 @@ interface DtfFormData {
 }
 
 const route = useRoute();
+const router = useRouter();
 const toast = useToast();
 
 const emptyRow = (): DtfRow => ({
   Kode: "",
   Nama: "",
+  Tipe: "",
   Depan: 0,
   Belakang: 0,
   Lengan: 0,
@@ -42,6 +56,13 @@ const emptyRow = (): DtfRow => ({
   Panjang: 0,
   Buangan: 0,
   Ket: "",
+  KodePolos: "",
+  Satuan: "",
+  KodeHasil: "",
+  NamaHasil: "",
+  QtyHasil: 0,
+  BsAfval: 0,
+  CabTujuan: "",
 });
 
 const KETERANGAN_OPTIONS = [
@@ -54,6 +75,11 @@ const KETERANGAN_OPTIONS = [
 const initialCab = (route.query.cab as string) || "";
 const initialTanggal =
   (route.query.tanggal as string) || new Date().toISOString().substring(0, 10);
+const hasMaklonRow = computed(() =>
+  formData.value.rows.some((r) => r.Tipe === "MAKLON"),
+);
+const showCetakSjDialog = ref(false);
+const generatedSjList = ref<{ mklNomor: string; sjmNomor: string }[]>([]);
 
 const {
   isSaving,
@@ -74,13 +100,35 @@ const {
     lhkSoDtfFormService.save({
       cab: data.cab,
       tanggal: data.tanggal,
-      rows: data.rows.filter((r) => r.Kode.trim() !== ""),
+      rows: data.rows
+        .filter((r) => r.Kode.trim() !== "")
+        .map((r) =>
+          r.Tipe === "MAKLON"
+            ? {
+                Kode: r.Kode,
+                Tipe: r.Tipe,
+                Ket: r.Ket,
+                KodePolos: r.KodePolos,
+                QtyMasuk: r.Depan, // Depan dipinjam sebagai Qty Masuk
+                Satuan: r.Satuan,
+                KodeHasil: r.KodeHasil,
+                QtyHasil: r.QtyHasil,
+                BsAfval: r.BsAfval,
+              }
+            : { ...r },
+        ),
     }),
   // Replikasi F10 Delphi: setelah simpan sukses TIDAK keluar dari form,
   // cuma reload data (refreshdata()) dan tampilkan pesan sukses.
-  onSuccess: async () => {
-    toast.success("Berhasil Simpan");
-    await reloadRows();
+  onSuccess: (res: any) => {
+    toast.success("LHK berhasil disimpan.");
+    const sjList = res?.data?.data?.sjHasilMaklon || [];
+    if (sjList.length) {
+      generatedSjList.value = sjList;
+      showCetakSjDialog.value = true;
+    } else {
+      goBack();
+    }
   },
   immediate: false,
 });
@@ -95,18 +143,50 @@ const reloadRows = async () => {
       formData.value.cab,
       formData.value.tanggal,
     );
-    const rows: DtfRow[] = (res.data.data || []).map((r: any) => ({
-      Kode: r.Kode || "",
-      Nama: r.Nama || "",
-      Depan: Number(r.Depan) || 0,
-      Belakang: Number(r.Belakang) || 0,
-      Lengan: Number(r.Lengan) || 0,
-      Variasi: Number(r.Variasi) || 0,
-      Saku: Number(r.Saku) || 0,
-      Panjang: Number(r.Panjang) || 0,
-      Buangan: Number(r.Buangan) || 0,
-      Ket: r.Ket || "",
-    }));
+    const rows: DtfRow[] = (res.data.data || []).map((r: any) => {
+      if (r.Tipe === "MAKLON") {
+        return {
+          Kode: r.Kode || "",
+          Nama: r.Nama || "",
+          Tipe: "MAKLON",
+          Depan: Number(r.QtyMasuk) || 0,
+          Belakang: 0,
+          Lengan: 0,
+          Variasi: Number(r.QtyHasil) || 0,
+          Saku: Number(r.BsAfval) || 0,
+          Panjang: 0,
+          Buangan: 0,
+          Ket: r.Ket || "",
+          KodePolos: r.KodePolos || "", // ⬅ FIX: sebelumnya selalu ""
+          Satuan: r.Satuan || "",
+          KodeHasil: r.KodeHasil || "",
+          NamaHasil: r.NamaHasil || "",
+          QtyHasil: Number(r.QtyHasil) || 0,
+          BsAfval: Number(r.BsAfval) || 0,
+          CabTujuan: "",
+        };
+      }
+      return {
+        Kode: r.Kode || "",
+        Nama: r.Nama || "",
+        Tipe: r.Tipe || "SPK",
+        Depan: Number(r.Depan) || 0,
+        Belakang: Number(r.Belakang) || 0,
+        Lengan: Number(r.Lengan) || 0,
+        Variasi: Number(r.Variasi) || 0,
+        Saku: Number(r.Saku) || 0,
+        Panjang: Number(r.Panjang) || 0,
+        Buangan: Number(r.Buangan) || 0,
+        Ket: r.Ket || "",
+        KodePolos: "",
+        Satuan: "",
+        KodeHasil: "",
+        NamaHasil: "",
+        QtyHasil: 0,
+        BsAfval: 0,
+        CabTujuan: "",
+      };
+    });
     formData.value.rows = rows;
     ensureTrailingEmptyRow();
   } catch (e: any) {
@@ -169,42 +249,115 @@ const doDeleteRow = () => {
 // TIDAK termasuk tmemospk. Kalau nomor MAP, harus dipilih via F1.
 const onKodeBlur = async (row: DtfRow) => {
   const kode = row.Kode.trim();
-  if (!kode || row.Nama) return; // sudah ada Nama = sudah tervalidasi (dari F1/F2)
+  if (!kode || row.Nama) return;
   try {
     const res = await lhkSoDtfFormService.validateKode(kode);
     row.Kode = res.data.data.Nomor;
     row.Nama = res.data.data.Nama;
+    row.Tipe = res.data.data.Tipe;
+    if (row.Tipe === "MAKLON") {
+      await applyMaklonAutofill(row);
+    }
     ensureTrailingEmptyRow();
   } catch (e: any) {
-    toast.warning(e.response?.data?.message || "Spk/SO DTF tsb belum ada.");
+    toast.warning(
+      e.response?.data?.message || "Spk/SO DTF/Maklon tsb belum ada.",
+    );
+  }
+};
+
+const applyMaklonAutofill = async (row: DtfRow) => {
+  try {
+    const res = await lhkSoDtfFormService.getMaklonAutofill(row.Kode);
+    const d = res.data.data;
+    row.KodePolos = d.kodePolos;
+    row.Satuan = d.satuan;
+    row.Depan = Number(d.qtyMasuk) || 0;
+    row.CabTujuan = d.cabTujuan;
+
+    if (d.targetJadiOptions.length === 1) {
+      // Cuma 1 rencana — langsung isi otomatis
+      row.KodeHasil = d.targetJadiOptions[0].Kode;
+      row.NamaHasil = d.targetJadiOptions[0].Nama;
+    } else if (d.targetJadiOptions.length > 1) {
+      // Lebih dari 1 — belum dipilih, munculkan pilihan ke user
+      row.KodeHasil = "";
+      row.NamaHasil = "";
+      row.TargetJadiOptions = d.targetJadiOptions;
+      toast.info(
+        `${row.Kode} punya ${d.targetJadiOptions.length} rencana Barang Jadi — pilih salah satu.`,
+      );
+    } else {
+      row.KodeHasil = "";
+      row.NamaHasil = "";
+    }
+
+    if (d.multiItem) {
+      toast.warning(
+        `${row.Kode} punya lebih dari 1 item barang polos — Qty Masuk digabung, silakan cek manual.`,
+      );
+    }
+  } catch (e: any) {
+    toast.error(e.response?.data?.message || "Gagal memuat data Maklon.");
   }
 };
 
 // ── F1 (SPK/MAP) & F2 (SO DTF Kaosan) — sekarang pakai SearchModal reusable ──
 const showSpkMapLookup = ref(false);
 const showSoDtfLookup = ref(false);
+const showMaklonLookup = ref(false);
 const lookupTargetIndex = ref<number | null>(null);
 
 const openSpkMapLookup = (idx: number) => {
-  if (formData.value.rows[idx].Nama) return; // sudah terisi — replikasi guard Delphi
+  if (formData.value.rows[idx].Nama) return;
   lookupTargetIndex.value = idx;
   showSpkMapLookup.value = true;
 };
 const openSoDtfLookup = (idx: number) => {
-  if (formData.value.rows[idx].Nama) return; // sudah terisi — replikasi guard Delphi
+  if (formData.value.rows[idx].Nama) return;
   lookupTargetIndex.value = idx;
   showSoDtfLookup.value = true;
+};
+const openMaklonLookup = (idx: number) => {
+  if (formData.value.rows[idx].Nama) return;
+  lookupTargetIndex.value = idx;
+  showMaklonLookup.value = true;
 };
 
 // Selection langsung assign Kode+Nama tanpa validasi tambahan —
 // replikasi persis cxGrdMainEditKeyDown (assign langsung dari hasil
 // frmbantuan, tidak lewat loadspk()).
-const selectLookupResult = (item: any) => {
+const selectLookupResult = async (item: any) => {
   if (lookupTargetIndex.value === null) return;
   const row = formData.value.rows[lookupTargetIndex.value];
   row.Kode = item.Nomor;
   row.Nama = item.Nama;
+  row.Tipe = item.Tipe || "SPK";
+  if (row.Tipe === "MAKLON") {
+    await applyMaklonAutofill(row);
+  }
   ensureTrailingEmptyRow();
+};
+
+const showItemHasilModal = ref(false);
+const itemHasilTargetIndex = ref<number | null>(null);
+
+const openItemHasilModal = (idx: number) => {
+  const row = formData.value.rows[idx];
+  if (!row.CabTujuan) {
+    toast.warning("Pilih No. Maklon terlebih dahulu.");
+    return;
+  }
+  itemHasilTargetIndex.value = idx;
+  showItemHasilModal.value = true;
+};
+
+const selectItemHasil = (item: any) => {
+  const idx = itemHasilTargetIndex.value;
+  if (idx === null) return;
+  formData.value.rows[idx].KodeHasil = item.Kode;
+  formData.value.rows[idx].NamaHasil = item.Nama;
+  showItemHasilModal.value = false;
 };
 
 // ── Enter = pindah field berikutnya ──
@@ -247,23 +400,29 @@ const onCariSpk = () => {
 // ── Validasi sebelum Simpan (replikasi urutan & pesan F10 persis) ──
 const onValidateSave = () => {
   const filled = formData.value.rows.filter((r) => r.Kode.trim() !== "");
+  if (filled.length === 0) return toast.error("Detail harus diisi.");
 
-  if (filled.length === 0) {
-    toast.error("Detail harus diisi.");
-    return;
-  }
   for (const r of filled) {
-    if (!r.Ket.trim()) {
-      toast.error("Keterangan harus diisi.");
-      return;
-    }
-    const qtySum = r.Depan + r.Belakang + r.Lengan + r.Variasi + r.Saku;
-    if (qtySum === 0) {
-      toast.error("Qty harus di isi");
-      return;
+    if (!r.Ket.trim()) return toast.error("Keterangan harus diisi.");
+    if (r.Tipe === "MAKLON") {
+      if (!r.KodeHasil)
+        return toast.error(`${r.Kode}: Item Hasil wajib diisi.`);
+      if (!r.QtyHasil && !r.BsAfval)
+        return toast.error(`${r.Kode}: Qty Hasil atau BS/Afval harus diisi.`);
+    } else {
+      const qtySum = r.Depan + r.Belakang + r.Lengan + r.Variasi + r.Saku;
+      if (qtySum === 0) return toast.error("Qty harus di isi");
     }
   }
   showSaveDialog.value = true;
+};
+
+const openPrintSj = (sjmNomor: string) => {
+  const url = router.resolve({
+    name: "SjHasilMakloonPrint",
+    params: { nomor: sjmNomor },
+  }).href;
+  window.open(url, "_blank");
 };
 
 const num = (v: number) => new Intl.NumberFormat("id-ID").format(v || 0);
@@ -318,7 +477,8 @@ const num = (v: number) => new Intl.NumberFormat("id-ID").format(v || 0);
         <div class="section-title">
           Detail LHK
           <span class="section-hint"
-            >F1: Help SPK/MAP · F2: Help SO DTF Kaosan</span
+            >F1: Help SPK/MAP · F2: Help SO DTF Kaosan · F3: Help No.
+            Maklon</span
           >
         </div>
         <div class="table-scroll">
@@ -326,13 +486,23 @@ const num = (v: number) => new Intl.NumberFormat("id-ID").format(v || 0);
             <thead>
               <tr>
                 <th style="width: 30px">No</th>
-                <th style="width: 220px">SPK/MAP</th>
-                <th style="min-width: 220px">Nama</th>
-                <th style="width: 75px">Depan</th>
-                <th style="width: 75px">Belakang</th>
-                <th style="width: 75px">Lengan</th>
-                <th style="width: 75px">Variasi</th>
-                <th style="width: 65px">Saku</th>
+                <th style="width: 220px">SPK/MAP/Maklon</th>
+                <th style="min-width: 200px">Nama</th>
+                <th style="width: 90px">
+                  {{ hasMaklonRow ? "Qty Masuk" : "Depan" }}
+                </th>
+                <th style="width: 90px">
+                  {{ hasMaklonRow ? "Satuan" : "Belakang" }}
+                </th>
+                <th style="width: 170px">
+                  {{ hasMaklonRow ? "Item Hasil" : "Lengan" }}
+                </th>
+                <th style="width: 85px">
+                  {{ hasMaklonRow ? "Qty Hasil" : "Variasi" }}
+                </th>
+                <th style="width: 80px">
+                  {{ hasMaklonRow ? "BS/Afval" : "Saku" }}
+                </th>
                 <th style="width: 80px">Panjang(M)</th>
                 <th style="width: 80px">Buangan(M)</th>
                 <th style="min-width: 160px">Keterangan</th>
@@ -348,7 +518,10 @@ const num = (v: number) => new Intl.NumberFormat("id-ID").format(v || 0);
                     if (el) rowRefs[idx] = el as HTMLElement;
                   }
                 "
-                :class="{ 'row-highlight': highlightedRowIndex === idx }"
+                :class="{
+                  'row-highlight': highlightedRowIndex === idx,
+                  'row-maklon': row.Tipe === 'MAKLON',
+                }"
               >
                 <td class="tc">{{ idx + 1 }}</td>
                 <td>
@@ -360,6 +533,7 @@ const num = (v: number) => new Intl.NumberFormat("id-ID").format(v || 0);
                       @blur="onKodeBlur(row)"
                       @keydown.f1.prevent="openSpkMapLookup(idx)"
                       @keydown.f2.prevent="openSoDtfLookup(idx)"
+                      @keydown.f3.prevent="openMaklonLookup(idx)"
                     />
                     <button
                       class="lk-btn"
@@ -379,6 +553,15 @@ const num = (v: number) => new Intl.NumberFormat("id-ID").format(v || 0);
                     >
                       F2
                     </button>
+                    <button
+                      class="lk-btn"
+                      tabindex="-1"
+                      :disabled="!!row.Nama"
+                      title="F3 Help No. Maklon"
+                      @click="openMaklonLookup(idx)"
+                    >
+                      F3
+                    </button>
                   </div>
                 </td>
                 <td>
@@ -388,48 +571,108 @@ const num = (v: number) => new Intl.NumberFormat("id-ID").format(v || 0);
                     class="cell-input"
                     readonly
                   />
+                  <span v-if="row.Tipe === 'MAKLON'" class="tipe-badge"
+                    >MAKLON</span
+                  >
                 </td>
+
+                <!-- Depan / Qty Masuk -->
                 <td>
                   <input
+                    v-if="row.Tipe === 'MAKLON'"
+                    type="number"
+                    v-model.number="row.Depan"
+                    class="cell-input tr"
+                    readonly
+                  />
+                  <input
+                    v-else
                     type="number"
                     v-model.number="row.Depan"
                     class="cell-input tr"
                   />
                 </td>
+
+                <!-- Belakang / Satuan -->
                 <td>
                   <input
+                    v-if="row.Tipe === 'MAKLON'"
+                    type="text"
+                    v-model="row.Satuan"
+                    class="cell-input"
+                    readonly
+                  />
+                  <input
+                    v-else
                     type="number"
                     v-model.number="row.Belakang"
                     class="cell-input tr"
                   />
                 </td>
+
+                <!-- Lengan / Item Hasil -->
                 <td>
+                  <div v-if="row.Tipe === 'MAKLON'" class="kode-cell">
+                    <span class="cell-text mono">{{
+                      row.KodeHasil || "—"
+                    }}</span>
+                    <button
+                      class="lk-btn"
+                      tabindex="-1"
+                      title="Ganti Item Hasil"
+                      @click="openItemHasilModal(idx)"
+                    >
+                      <IconSearch :size="10" />
+                    </button>
+                  </div>
                   <input
+                    v-else
                     type="number"
                     v-model.number="row.Lengan"
                     class="cell-input tr"
                   />
                 </td>
+
+                <!-- Variasi / Qty Hasil -->
                 <td>
                   <input
+                    v-if="row.Tipe === 'MAKLON'"
+                    type="number"
+                    v-model.number="row.QtyHasil"
+                    class="cell-input tr"
+                  />
+                  <input
+                    v-else
                     type="number"
                     v-model.number="row.Variasi"
                     class="cell-input tr"
                   />
                 </td>
+
+                <!-- Saku / BS-Afval -->
                 <td>
                   <input
+                    v-if="row.Tipe === 'MAKLON'"
+                    type="number"
+                    v-model.number="row.BsAfval"
+                    class="cell-input tr"
+                  />
+                  <input
+                    v-else
                     type="number"
                     v-model.number="row.Saku"
                     class="cell-input tr"
                   />
                 </td>
+
+                <!-- Panjang, Buangan: tidak relevan buat Maklon, disable -->
                 <td>
                   <input
                     type="number"
                     step="0.1"
                     v-model.number="row.Panjang"
                     class="cell-input tr"
+                    :disabled="row.Tipe === 'MAKLON'"
                   />
                 </td>
                 <td>
@@ -438,8 +681,10 @@ const num = (v: number) => new Intl.NumberFormat("id-ID").format(v || 0);
                     step="0.1"
                     v-model.number="row.Buangan"
                     class="cell-input tr"
+                    :disabled="row.Tipe === 'MAKLON'"
                   />
                 </td>
+
                 <td>
                   <select v-model="row.Ket" class="cell-input cell-select">
                     <option value="">-- Pilih --</option>
@@ -483,6 +728,16 @@ const num = (v: number) => new Intl.NumberFormat("id-ID").format(v || 0);
     @selected="selectLookupResult"
   />
   <SoDtfSearchModal v-model="showSoDtfLookup" @selected="selectLookupResult" />
+  <BarangGarmenSearchModal
+    v-model="showItemHasilModal"
+    jenis="ACCESORIES"
+    :cabang="formData.rows[itemHasilTargetIndex ?? 0]?.CabTujuan || ''"
+    @selected="selectItemHasil"
+  />
+  <MaklonSearchModal
+    v-model="showMaklonLookup"
+    @selected="selectLookupResult"
+  />
 
   <!-- Dialog Konfirmasi Hapus Baris -->
   <v-dialog v-model="showDeleteRowDialog" max-width="360px">
@@ -498,6 +753,43 @@ const num = (v: number) => new Intl.NumberFormat("id-ID").format(v || 0);
         <v-btn variant="text" @click="showDeleteRowDialog = false">Tidak</v-btn>
         <v-btn color="error" variant="elevated" @click="doDeleteRow"
           >Ya, Hapus</v-btn
+        >
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
+
+  <v-dialog v-model="showCetakSjDialog" max-width="420px" persistent>
+    <v-card class="rounded-lg">
+      <v-card-title
+        class="bg-primary text-white pa-3"
+        style="font-size: 13px; font-weight: 700"
+      >
+        SJ Hasil Maklon Terbit
+      </v-card-title>
+      <v-card-text class="pa-4">
+        <div class="mb-2" style="font-size: 12px">
+          Berikut SJ Hasil Maklon yang otomatis dibuat:
+        </div>
+        <div
+          v-for="s in generatedSjList"
+          :key="s.sjmNomor"
+          class="d-flex justify-space-between align-center mb-1"
+        >
+          <span class="mono">{{ s.sjmNomor }}</span>
+          <v-btn size="x-small" color="primary" @click="openPrintSj(s.sjmNomor)"
+            >Cetak</v-btn
+          >
+        </div>
+      </v-card-text>
+      <v-card-actions class="pa-3 border-t bg-grey-lighten-4">
+        <v-spacer />
+        <v-btn
+          variant="text"
+          @click="
+            showCetakSjDialog = false;
+            goBack();
+          "
+          >Selesai</v-btn
         >
       </v-card-actions>
     </v-card>
@@ -667,5 +959,22 @@ const num = (v: number) => new Intl.NumberFormat("id-ID").format(v || 0);
 }
 .lookup-row:hover {
   background: #e3f2fd;
+}
+.row-maklon td {
+  background: #fff8e1 !important;
+}
+.cell-text {
+  flex: 1;
+  font-size: 10px;
+  padding: 0 2px;
+}
+.tipe-badge {
+  font-size: 8px;
+  font-weight: 700;
+  color: #f57c00;
+  background: #fff3e0;
+  padding: 1px 4px;
+  border-radius: 3px;
+  margin-left: 4px;
 }
 </style>

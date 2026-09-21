@@ -93,6 +93,9 @@ import {
   IconTags,
   IconPhoto,
   IconFlag,
+  IconRecycle,
+  IconCashBanknote,
+  IconMapPin,
 } from "@tabler/icons-vue";
 
 export interface NavItem {
@@ -325,6 +328,12 @@ export const createMenuItems = (): NavItem[] => {
           to: "/pembelian/po-external-garmen",
           icon: IconShoppingBagPlus,
           menuId: 144,
+        },
+        {
+          title: "Uang Muka",
+          icon: IconCashBanknote,
+          to: "/pembelian/uang-muka",
+          menuId: 315,
         },
         { divider: true },
         {
@@ -584,6 +593,25 @@ export const createMenuItems = (): NavItem[] => {
           icon: IconClipboardList,
           menuId: 79,
         },
+        {
+          title: "Maklon Barang",
+          icon: IconArrowsExchange,
+          menuId: 181,
+          subItems: [
+            {
+              title: "Makloon Barang",
+              to: "/garmen/maklon/makloon-barang",
+              icon: IconArrowsExchange,
+              menuId: 180,
+            },
+            {
+              title: "SJ Hasil Maklon",
+              to: "/garmen/makloon/sj-hasil-makloon",
+              icon: IconTruckDelivery,
+              menuId: 182,
+            },
+          ],
+        },
         { divider: true },
         {
           title: "PO Jasa",
@@ -761,6 +789,12 @@ export const createMenuItems = (): NavItem[] => {
           to: "/penjualan/sales-order",
           icon: IconShoppingCartCopy,
           menuId: 172,
+        },
+        {
+          title: "Alokasi SO",
+          to: "/penjualan/alokasi-so",
+          icon: IconMapPin,
+          menuId: 183,
         },
         { divider: true },
         {
@@ -955,6 +989,12 @@ export const createMenuItems = (): NavItem[] => {
               to: "/laporan/gudang-garmen/stok-acc-vs-mka",
               icon: IconScale,
               menuId: 569,
+            },
+            {
+              title: "Monitoring Status & Stock Transaksi Maklon",
+              to: "/laporan/gudang-garmen/monitoring-makloon",
+              icon: IconArrowsExchange,
+              menuId: 572,
             },
             {
               title: "Stok Gudang DC",

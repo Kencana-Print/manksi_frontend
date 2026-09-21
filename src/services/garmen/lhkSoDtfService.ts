@@ -10,10 +10,9 @@ export const lhkSoDtfService = {
       },
     }),
 
-  deleteData: (spkNomor: string, cab: string, tanggal: string) =>
+  deleteData: (spkNomor: string, cab: string, tanggal: string, tipe: string) =>
     api.delete(
-      `/garmen/dtf/lhk-so-dtf/${encodeURIComponent(spkNomor)}/${encodeURIComponent(
-        cab,
-      )}/${encodeURIComponent(tanggal)}`,
+      `/garmen/dtf/lhk-so-dtf/${encodeURIComponent(spkNomor)}/${encodeURIComponent(cab)}/${encodeURIComponent(tanggal)}`,
+      { params: { tipe } },
     ),
 };

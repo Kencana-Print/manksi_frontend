@@ -21,6 +21,42 @@ export const dashboardService = {
   getKunjunganSalesSummary: () => api.get("/dashboard/kunjungan-sales-summary"),
   getEffectiveCallingDetail: (namaSales: string) =>
     api.get("/dashboard/effective-calling-detail", { params: { namaSales } }),
+  getTargetCollectionSales(bulan?: number, tahun?: number) {
+    return api.get("/dashboard/target-collection-sales", {
+      params: { bulan, tahun },
+    });
+  },
+  getPotensiSourceOptions: (
+    namaCustomer = "",
+    sumber?: "PENAWARAN" | "MAP",
+    limit = 20,
+    offset = 0,
+  ) =>
+    api.get("/dashboard/potensi-source-options", {
+      params: { namaCustomer, sumber, limit, offset },
+    }),
+  setPotensi: (payload: {
+    sumber: "PENAWARAN" | "MAP";
+    nomorSumber: string;
+    namaItem: string;
+    harga: number;
+  }) => api.post("/dashboard/potensi", payload),
+  setPotensiBulk: (
+    items: {
+      sumber: "PENAWARAN" | "MAP";
+      nomorSumber: string;
+      namaItem: string;
+      harga: number;
+    }[],
+  ) => api.post("/dashboard/potensi-bulk", { items }),
+  batalPotensi: (nomor: string, alasan: string) =>
+    api.patch(`/dashboard/potensi/${encodeURIComponent(nomor)}/batal`, {
+      alasan,
+    }),
+  getPotensiSummary: (startDate?: string, endDate?: string) =>
+    api.get("/dashboard/potensi-summary", { params: { startDate, endDate } }),
+  getPotensiList: (limit = 20, offset = 0) =>
+    api.get("/dashboard/potensi-list", { params: { limit, offset } }),
   getPiutangDashboard: () => api.get("/dashboard/piutang-dashboard"),
   getPiutangOverdue: (limit = 20, offset = 0) =>
     api.get("/dashboard/piutang-overdue", { params: { limit, offset } }),

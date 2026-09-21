@@ -552,6 +552,30 @@ const router = createRouter({
       },
     },
     {
+      path: "/pembelian/uang-muka",
+      name: "UangMuka",
+      component: () => import("@/views/pembelian/UangMukaView.vue"),
+      meta: {
+        title: "Uang Muka",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "315",
+      },
+    },
+    {
+      path: "/pembelian/uang-muka/realisasi/:nomor",
+      name: "UangMukaRealisasiForm",
+      component: () =>
+        import("@/views/pembelian/UangMukaRealisasiFormView.vue"),
+      meta: {
+        title: "Realisasi Uang Muka",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "315",
+        browseRoute: "UangMuka",
+      },
+    },
+    {
       path: "/pembelian/setting-harga-bahan",
       redirect: "/pembelian/setting-harga-bahan/garmen",
     },
@@ -1797,6 +1821,103 @@ const router = createRouter({
       },
     },
     {
+      path: "/garmen/maklon/makloon-barang",
+      name: "MaklonBarangBrowse",
+      component: () => import("@/views/garmen/MaklonBarangView.vue"),
+      meta: {
+        title: "Maklon Barang",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "180",
+      },
+    },
+    {
+      path: "/garmen/maklon/makloon-barang/create",
+      name: "MaklonBarangCreate",
+      component: () => import("@/views/garmen/MaklonBarangFormView.vue"),
+      meta: {
+        title: "Buat Maklon Barang",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "180",
+        browseRoute: "MaklonBarangBrowse",
+      },
+    },
+    {
+      path: "/garmen/maklon/makloon-barang/edit/:nomor",
+      name: "MaklonBarangEdit",
+      component: () => import("@/views/garmen/MaklonBarangFormView.vue"),
+      meta: {
+        title: "Ubah Maklon Barang",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "180",
+        browseRoute: "MaklonBarangBrowse",
+      },
+    },
+    {
+      path: "/garmen/maklon/makloon-barang/print-gabungan/:nomor/:sjkNomor",
+      name: "MaklonGabunganPrint",
+      component: () => import("@/views/garmen/MaklonGabunganPrintView.vue"),
+      meta: {
+        title: "Cetak Maklon Barang",
+        layout: "BlankLayout",
+        requiresAuth: true,
+      },
+    },
+    {
+      path: "/garmen/maklon/makloon-barang/print/:nomor",
+      name: "MaklonBarangPrint",
+      component: () => import("@/views/garmen/MaklonBarangPrintView.vue"),
+      meta: {
+        title: "Cetak Maklon Barang",
+        layout: "BlankLayout",
+        requiresAuth: true,
+      },
+    },
+    {
+      path: "/garmen/maklon/sj-keluar/print/:sjkNomor",
+      name: "MaklonSjKeluarPrint",
+      component: () => import("@/views/garmen/MaklonSjKeluarPrintView.vue"),
+      meta: {
+        title: "Cetak SJ Maklon",
+        layout: "BlankLayout",
+        requiresAuth: true,
+      },
+    },
+    {
+      path: "/garmen/makloon/sj-hasil-makloon",
+      name: "SjHasilMakloonBrowse",
+      component: () => import("@/views/garmen/SjHasilMakloonView.vue"),
+      meta: {
+        title: "SJ Hasil Maklon",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "182",
+      },
+    },
+    {
+      path: "/garmen/makloon/sj-hasil-makloon/create",
+      name: "SjHasilMakloonCreate",
+      component: () => import("@/views/garmen/SjHasilMakloonFormView.vue"),
+      meta: {
+        title: "Buat SJ Hasil Maklon",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "182",
+      },
+    },
+    {
+      path: "/garmen/makloon/sj-hasil-makloon/print/:nomor",
+      name: "SjHasilMakloonPrint",
+      component: () => import("@/views/garmen/SjHasilMakloonPrintView.vue"),
+      meta: {
+        title: "Cetak SJ Hasil Maklon",
+        layout: "BlankLayout",
+        requiresAuth: true,
+      },
+    },
+    {
       path: "/garmen/po-jasa",
       name: "PoJasaBrowse",
       component: () => import("@/views/garmen/PoJasaView.vue"),
@@ -2613,6 +2734,17 @@ const router = createRouter({
       },
     },
     {
+      path: "/penjualan/alokasi-so",
+      name: "AlokasiSoBrowse",
+      component: () => import("@/views/penjualan/AlokasiSoView.vue"),
+      meta: {
+        title: "Alokasi SO",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "183",
+      },
+    },
+    {
       path: "/penjualan/pra-sj/create",
       name: "PraSJFormCreate",
       component: () => import("@/views/penjualan/PraSJFormView.vue"),
@@ -3413,6 +3545,18 @@ const router = createRouter({
         layout: "DefaultLayout",
         requiresAuth: true,
         menuId: "569",
+      },
+    },
+    {
+      path: "/laporan/gudang-garmen/monitoring-makloon",
+      name: "LapMonitoringMakloon",
+      component: () =>
+        import("@/views/laporan/gudang-garmen/MonitoringMakloonView.vue"),
+      meta: {
+        title: "Monitoring Status & Stock Transaksi Maklon",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "572",
       },
     },
     {

@@ -24,6 +24,8 @@ const emptyGradingRow = () => ({
   gradingSize: "",
   panjang: null as number | null,
   lebar: null as number | null,
+  panjangMentah: null as number | null,
+  lebarMentah: null as number | null,
   keterangan: "",
   gambar: "",
 });
@@ -73,6 +75,14 @@ const {
                 r.lebar !== null && r.lebar !== undefined
                   ? Number(r.lebar)
                   : null,
+              panjangMentah:
+                r.panjangMentah !== null && r.panjangMentah !== undefined
+                  ? Number(r.panjangMentah)
+                  : null,
+              lebarMentah:
+                r.lebarMentah !== null && r.lebarMentah !== undefined
+                  ? Number(r.lebarMentah)
+                  : null,
               keterangan: r.keterangan || "",
               gambar: r.gambar || "",
             }))
@@ -91,12 +101,14 @@ const {
       : await lhkPolaFormService.create(payload);
     const savedNomor = res.data.data.nomor;
     try {
-      for (const [spkNomor, file] of Object.entries(gradingImageFiles.value)) {
+      for (const [key, file] of Object.entries(gradingImageFiles.value)) {
+        const [spkNomor, size] = key.split("|");
         await lhkPolaFormService.uploadGambar(
           file,
           savedNomor,
           "grading",
           spkNomor,
+          size,
         );
       }
     } catch (imgError: any) {
@@ -149,45 +161,82 @@ const openSpkModal = (idx: number) => {
   spkModalIdx.value = idx;
   showSpkModal.value = true;
 };
-const checkDuplicateSpk = (nomor: string, excludeIdx: number) =>
+const checkDuplicateRow = (
+  spkNomor: string,
+  size: string,
+  excludeIdx: number,
+) =>
   formData.value.grading.some(
-    (r: any, i: number) => i !== excludeIdx && r.spkNomor === nomor,
+    (r: any, i: number) =>
+      i !== excludeIdx && r.spkNomor === spkNomor && r.gradingSize === size,
   );
-const onSpkSelected = (item: any) => {
-  const idx = spkModalIdx.value;
-  if (idx < 0) return;
-  if (checkDuplicateSpk(item.Nomor, idx)) {
-    toast.warning(`SPK ${item.Nomor} sudah ada di baris lain.`);
+
+const breakdownSpkToRows = async (
+  spkNomor: string,
+  namaSpk: string,
+  divisi: string,
+  idx: number,
+) => {
+  const sizeRes = await lhkPolaFormService.getSizesBySpk(spkNomor);
+  const sizes = sizeRes.data.data as {
+    size: string;
+    panjang: number;
+    lebar: number;
+  }[];
+
+  if (!sizes.length) {
+    toast.warning(`SPK ${spkNomor} tidak punya data size di tspk_size.`);
     return;
   }
-  formData.value.grading[idx].spkNomor = item.Nomor;
-  formData.value.grading[idx].namaSpk = item.Nama;
-  lookupDivisiForRow(idx);
+
+  const newRows = sizes
+    .filter((s) => !checkDuplicateRow(spkNomor, s.size, -1))
+    .map((s) => ({
+      spkNomor,
+      namaSpk,
+      divisi,
+      gradingSize: s.size,
+      panjang: Number(s.panjang),
+      lebar: Number(s.lebar),
+      panjangMentah: null,
+      lebarMentah: null,
+      keterangan: "",
+      gambar: "",
+    }));
+
+  if (!newRows.length) {
+    toast.warning(`Semua size dari SPK ${spkNomor} sudah ada di baris lain.`);
+    return;
+  }
+
+  // Ganti baris kosong (idx) dengan baris pertama hasil breakdown,
+  // sisanya disisipkan setelahnya.
+  formData.value.grading.splice(idx, 1, ...newRows);
   ensureTrailingGradingRow();
 };
-const lookupDivisiForRow = async (idx: number) => {
+const onSpkSelected = async (item: any) => {
+  const idx = spkModalIdx.value;
+  if (idx < 0) return;
   const row = formData.value.grading[idx];
-  if (!row.spkNomor) return;
+  row.spkNomor = item.Nomor;
+  row.namaSpk = item.Nama;
+  let divisiNama = "";
   try {
-    const res = await lhkPolaFormService.getSpkByNomor(row.spkNomor);
-    formData.value.grading[idx].divisi = res.data.data.DivisiNama || "";
+    const res = await lhkPolaFormService.getSpkByNomor(item.Nomor);
+    divisiNama = res.data.data.DivisiNama || "";
   } catch {
-    formData.value.grading[idx].divisi = "";
+    divisiNama = "";
   }
+  await breakdownSpkToRows(item.Nomor, item.Nama, divisiNama, idx);
 };
 const onGradingSpkEnter = async (idx: number) => {
   const nomor = formData.value.grading[idx].spkNomor.trim();
   if (!nomor) return;
-  if (checkDuplicateSpk(nomor, idx)) {
-    toast.warning(`SPK ${nomor} sudah ada di baris lain.`);
-    formData.value.grading[idx].spkNomor = "";
-    return;
-  }
   try {
     const res = await lhkPolaFormService.getSpkByNomor(nomor);
-    formData.value.grading[idx].namaSpk = res.data.data.Nama;
-    formData.value.grading[idx].divisi = res.data.data.DivisiNama || "";
-    ensureTrailingGradingRow();
+    const namaSpk = res.data.data.Nama;
+    const divisiNama = res.data.data.DivisiNama || "";
+    await breakdownSpkToRows(nomor, namaSpk, divisiNama, idx);
   } catch {
     toast.error(`SPK/MAP "${nomor}" tidak ditemukan.`);
     formData.value.grading[idx].spkNomor = "";
@@ -199,12 +248,12 @@ const onGradingSpkEnter = async (idx: number) => {
 const onGradingImageChange = (e: Event, idx: number) => {
   const file = (e.target as HTMLInputElement).files?.[0];
   const row = formData.value.grading[idx];
-  if (!file || !row.spkNomor) return;
+  if (!file || !row.spkNomor || !row.gradingSize) return;
   if (file.size > 1_000_000) {
     toast.error("Ukuran gambar tidak boleh > 1 Mb.");
     return;
   }
-  gradingImageFiles.value[row.spkNomor] = file;
+  gradingImageFiles.value[`${row.spkNomor}|${row.gradingSize}`] = file;
   row.gambar = URL.createObjectURL(file);
 };
 const getGambarUrl = (row: any) => {
@@ -244,7 +293,7 @@ const validateSave = () => {
   );
   if (invalidRow) {
     toast.warning(
-      `Panjang dan Lebar wajib diisi untuk SPK ${invalidRow.spkNomor}.`,
+      `Panjang dan Lebar wajib diisi untuk SPK ${invalidRow.spkNomor} size ${invalidRow.gradingSize}.`,
     );
     return;
   }
@@ -307,11 +356,13 @@ const validateSave = () => {
               <th style="width: 32px">No</th>
               <th style="width: 150px">No. SPK</th>
               <th>Nama SPK</th>
-              <th style="width: 110px">Divisi</th>
-              <th style="width: 140px">Grading Size</th>
-              <th style="width: 90px">Panjang (cm)</th>
-              <th style="width: 90px">Lebar (cm)</th>
-              <th style="width: 180px">Keterangan</th>
+              <th style="width: 100px">Divisi</th>
+              <th style="width: 80px">Size</th>
+              <th style="width: 80px">Panjang</th>
+              <th style="width: 80px">Lebar</th>
+              <th style="width: 90px">Pj. Mentah</th>
+              <th style="width: 90px">Lb. Mentah</th>
+              <th style="width: 150px">Keterangan</th>
               <th style="width: 90px">Gambar</th>
               <th style="width: 36px"></th>
             </tr>
@@ -344,37 +395,30 @@ const validateSave = () => {
                 <input :value="row.divisi" readonly class="cell-inp ro" />
               </td>
               <td>
-                <input
-                  v-model="row.gradingSize"
-                  class="cell-inp"
-                  placeholder="S,M,L,XL"
-                />
+                <input :value="row.gradingSize" readonly class="cell-inp ro" />
+              </td>
+              <td>
+                <input :value="row.panjang" readonly class="cell-inp ro" />
+              </td>
+              <td>
+                <input :value="row.lebar" readonly class="cell-inp ro" />
               </td>
               <td>
                 <input
-                  v-model.number="row.panjang"
+                  v-model.number="row.panjangMentah"
                   type="number"
                   step="0.01"
                   min="0"
                   class="cell-inp"
-                  :class="{
-                    'cell-inp--required':
-                      row.spkNomor &&
-                      (row.panjang === null || row.panjang === ''),
-                  }"
                 />
               </td>
               <td>
                 <input
-                  v-model.number="row.lebar"
+                  v-model.number="row.lebarMentah"
                   type="number"
                   step="0.01"
                   min="0"
                   class="cell-inp"
-                  :class="{
-                    'cell-inp--required':
-                      row.spkNomor && (row.lebar === null || row.lebar === ''),
-                  }"
                 />
               </td>
               <td>

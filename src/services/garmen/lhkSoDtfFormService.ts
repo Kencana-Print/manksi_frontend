@@ -15,6 +15,18 @@ export const lhkSoDtfFormService = {
     api.get("/garmen/dtf/lhk-so-dtf-form/lookup-so-dtf", {
       params: { keyword },
     }),
+  lookupMaklon: (keyword: string, page = 1, limit = 50) =>
+    api.get("/garmen/dtf/lhk-so-dtf-form/lookup-maklon", {
+      params: { keyword, page, limit },
+    }),
+  validateMaklonKode: (kode: string) =>
+    api.get(
+      `/garmen/dtf/lhk-so-dtf-form/validate-maklon/${encodeURIComponent(kode)}`,
+    ),
+  getMaklonAutofill: (mklNomor: string) =>
+    api.get(
+      `/garmen/dtf/lhk-so-dtf-form/maklon-autofill/${encodeURIComponent(mklNomor)}`,
+    ),
   validateKode: (kode: string) =>
     api.get(
       `/garmen/dtf/lhk-so-dtf-form/validate-kode/${encodeURIComponent(kode)}`,

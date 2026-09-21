@@ -64,6 +64,31 @@ interface PiutangData {
   overdue: OverdueItem[];
   trend: TrendItem[];
 }
+interface TargetCollectionItem {
+  salKode: string;
+  namaSales: string;
+  targetBulanIni: number;
+  piutangSaatIni: number;
+  collectionMtd: number;
+  collectionYtd: number;
+  pctCollectionMtd: number | null;
+  pctCollectionYtd: number | null;
+}
+interface TargetCollectionGrandTotal {
+  targetBulanIni: number;
+  piutangSaatIni: number;
+  collectionMtd: number;
+  collectionYtd: number;
+  pctCollectionMtd: number | null;
+  pctCollectionYtd: number | null;
+}
+interface TargetCollectionData {
+  bulan: number;
+  tahun: number;
+  targetBulanLabel: string;
+  items: TargetCollectionItem[];
+  grandTotal: TargetCollectionGrandTotal;
+}
 interface GudangBahanMetric {
   TotalJenis: number;
   JmlBawahBuffer: number;
@@ -332,6 +357,7 @@ watch(activeTab, async (tab) => {
     setupPvrObserver();
     setupPtmDetailObserver();
     setupMtsDetailObserver();
+    setupPotensiListObserver();
   }
   if (tab === "finance") {
     if (!financeLoaded.value) await loadFinanceData();
@@ -372,6 +398,14 @@ const fmtDec = (val: number, d = 2) =>
     minimumFractionDigits: d,
     maximumFractionDigits: d,
   });
+const fmtPct = (val: number | null) =>
+  val === null ? "—" : `${val >= 100 ? Math.round(val) : fmtDec(val, 1)}%`;
+const pctColor = (val: number | null) => {
+  if (val === null) return "#9e9e9e";
+  if (val >= 80) return "#2e7d32";
+  if (val >= 50) return "#f57f17";
+  return "#c62828";
+};
 
 // ── Role helpers ──
 const bagian = computed(() =>
@@ -602,6 +636,57 @@ const piutangData = ref<PiutangData>({
   overdue: [],
   trend: [],
 });
+const targetCollectionData = ref<TargetCollectionData | null>(null);
+const isLoadingTargetCollection = ref(false);
+const targetCollectionCache = new Map<string, TargetCollectionData>();
+const targetCollectionMonthChips = computed(() => {
+  const arr: { bulan: number; tahun: number; label: string; key: string }[] =
+    [];
+  const now = new Date();
+  const tahun = now.getFullYear();
+  const bulanSekarang = now.getMonth() + 1;
+  for (let m = 1; m <= bulanSekarang; m++) {
+    arr.push({
+      bulan: m,
+      tahun,
+      label: `${BULAN_LABEL[m - 1]} '${String(tahun).slice(2)}`,
+      key: `${tahun}-${m}`,
+    });
+  }
+  return arr;
+});
+
+const selectedTargetCollectionKey = computed(() =>
+  targetCollectionData.value
+    ? `${targetCollectionData.value.tahun}-${targetCollectionData.value.bulan}`
+    : "",
+);
+
+const fetchTargetCollection = async (bulan: number, tahun: number) => {
+  const key = `${tahun}-${bulan}`;
+  const cached = targetCollectionCache.get(key);
+  if (cached) {
+    targetCollectionData.value = cached;
+    return;
+  }
+  isLoadingTargetCollection.value = true;
+  try {
+    const res = await dashboardService.getTargetCollectionSales(bulan, tahun);
+    const data: TargetCollectionData = res.data.data;
+    targetCollectionCache.set(key, data);
+    targetCollectionData.value = data;
+  } catch {
+    /* silent */
+  } finally {
+    isLoadingTargetCollection.value = false;
+  }
+};
+
+const ensureTargetCollectionLoaded = async () => {
+  if (targetCollectionData.value) return;
+  const now = new Date();
+  await fetchTargetCollection(now.getMonth() + 1, now.getFullYear());
+};
 const aktivitasList = ref<any[]>([]);
 const trendData = ref<any[]>([]);
 const trendChartEl = ref<HTMLElement | null>(null);
@@ -1628,6 +1713,294 @@ const setupPvrObserver = () => {
   pvrScrollObserver.observe(pvrSentinelEl.value);
 };
 
+// ── Proyeksi Potensial (pengganti Proyeksi vs Realisasi) ──
+interface PotensiSummary {
+  jmlItem: number;
+  totalPotensi: number;
+  totalRealisasi: number;
+  totalBatal: number;
+}
+interface PotensiItem {
+  pot_nomor: string;
+  pot_nama_item: string;
+  pot_harga: number;
+  pot_status: string;
+  pot_alasan_batal: string | null;
+  date_create: string;
+  user_create: string;
+  sal_nama: string | null;
+  cus_nama: string | null;
+  NomorSumber: string;
+  Sumber: "PENAWARAN" | "MAP";
+  IsRealisasi: number;
+}
+interface PotensiSourceOption {
+  Sumber: "PENAWARAN" | "MAP";
+  Nomor: string;
+  Tanggal: string;
+  sal_nama: string | null;
+  cus_nama: string;
+  NamaItem: string;
+  Nominal: number;
+}
+
+const potensiSummary = ref<PotensiSummary>({
+  jmlItem: 0,
+  totalPotensi: 0,
+  totalRealisasi: 0,
+  totalBatal: 0,
+});
+
+const POTENSI_PAGE_SIZE = 20;
+const potensiList = ref<PotensiItem[]>([]);
+const potensiOffset = ref(0);
+const potensiHasMore = ref(true);
+const isLoadingMorePotensi = ref(false);
+const potensiSentinelEl = ref<HTMLElement | null>(null);
+let potensiScrollObserver: IntersectionObserver | null = null;
+
+const loadMorePotensiList = async () => {
+  if (!potensiHasMore.value || isLoadingMorePotensi.value) return;
+  isLoadingMorePotensi.value = true;
+  try {
+    const res = await dashboardService.getPotensiList(
+      POTENSI_PAGE_SIZE,
+      potensiOffset.value,
+    );
+    const rows: PotensiItem[] = res.data.data.items ?? [];
+    potensiList.value.push(...rows);
+    potensiOffset.value += rows.length;
+    if (rows.length < POTENSI_PAGE_SIZE) potensiHasMore.value = false;
+  } catch {
+  } finally {
+    isLoadingMorePotensi.value = false;
+  }
+};
+
+const setupPotensiListObserver = () => {
+  if (potensiScrollObserver) potensiScrollObserver.disconnect();
+  if (!potensiSentinelEl.value) return;
+  potensiScrollObserver = new IntersectionObserver(
+    (entries) => {
+      if (entries[0].isIntersecting) loadMorePotensiList();
+    },
+    { threshold: 0.1 },
+  );
+  potensiScrollObserver.observe(potensiSentinelEl.value);
+};
+
+const fetchPotensiSummary = async () => {
+  try {
+    const res = await dashboardService.getPotensiSummary();
+    if (res.data?.data) potensiSummary.value = res.data.data;
+  } catch {
+    /* silent */
+  }
+};
+
+// ── Dialog: Set Potensial (multi-select, 2 tab) ──
+const showSetPotensiDialog = ref(false);
+const potensiDialogTab = ref<"PENAWARAN" | "MAP">("PENAWARAN");
+const potensiSourceCustFilter = ref("");
+
+const PSRC_PAGE_SIZE = 20;
+
+const penSourceList = ref<PotensiSourceOption[]>([]);
+const penSourceOffset = ref(0);
+const penSourceHasMore = ref(true);
+const isLoadingMorePenSource = ref(false);
+const penSourceSentinelEl = ref<HTMLElement | null>(null);
+let penSourceScrollObserver: IntersectionObserver | null = null;
+
+const mapSourceList = ref<PotensiSourceOption[]>([]);
+const mapSourceOffset = ref(0);
+const mapSourceHasMore = ref(true);
+const isLoadingMoreMapSource = ref(false);
+const mapSourceSentinelEl = ref<HTMLElement | null>(null);
+let mapSourceScrollObserver: IntersectionObserver | null = null;
+
+const selectedPotensiMap = ref(new Map<string, PotensiSourceOption>());
+const selectedPotensiCount = computed(() => selectedPotensiMap.value.size);
+const potensiKey = (opt: PotensiSourceOption) => `${opt.Sumber}:${opt.Nomor}`;
+const isPotensiSelected = (opt: PotensiSourceOption) =>
+  selectedPotensiMap.value.has(potensiKey(opt));
+const togglePotensiSelect = (opt: PotensiSourceOption) => {
+  const key = potensiKey(opt);
+  const next = new Map(selectedPotensiMap.value);
+  if (next.has(key)) next.delete(key);
+  else next.set(key, opt);
+  selectedPotensiMap.value = next;
+};
+
+const loadMorePenSource = async () => {
+  if (!penSourceHasMore.value || isLoadingMorePenSource.value) return;
+  isLoadingMorePenSource.value = true;
+  try {
+    const res = await dashboardService.getPotensiSourceOptions(
+      potensiSourceCustFilter.value,
+      "PENAWARAN",
+      PSRC_PAGE_SIZE,
+      penSourceOffset.value,
+    );
+    const rows: PotensiSourceOption[] = res.data.data.items ?? [];
+    penSourceList.value.push(...rows);
+    penSourceOffset.value += rows.length;
+    if (rows.length < PSRC_PAGE_SIZE) penSourceHasMore.value = false;
+  } catch {
+  } finally {
+    isLoadingMorePenSource.value = false;
+  }
+};
+
+const loadMoreMapSource = async () => {
+  if (!mapSourceHasMore.value || isLoadingMoreMapSource.value) return;
+  isLoadingMoreMapSource.value = true;
+  try {
+    const res = await dashboardService.getPotensiSourceOptions(
+      potensiSourceCustFilter.value,
+      "MAP",
+      PSRC_PAGE_SIZE,
+      mapSourceOffset.value,
+    );
+    const rows: PotensiSourceOption[] = res.data.data.items ?? [];
+    mapSourceList.value.push(...rows);
+    mapSourceOffset.value += rows.length;
+    if (rows.length < PSRC_PAGE_SIZE) mapSourceHasMore.value = false;
+  } catch {
+  } finally {
+    isLoadingMoreMapSource.value = false;
+  }
+};
+
+const setupPenSourceObserver = () => {
+  if (penSourceScrollObserver) penSourceScrollObserver.disconnect();
+  if (!penSourceSentinelEl.value) return;
+  penSourceScrollObserver = new IntersectionObserver(
+    (entries) => {
+      if (entries[0].isIntersecting) loadMorePenSource();
+    },
+    { threshold: 0.1 },
+  );
+  penSourceScrollObserver.observe(penSourceSentinelEl.value);
+};
+const setupMapSourceObserver = () => {
+  if (mapSourceScrollObserver) mapSourceScrollObserver.disconnect();
+  if (!mapSourceSentinelEl.value) return;
+  mapSourceScrollObserver = new IntersectionObserver(
+    (entries) => {
+      if (entries[0].isIntersecting) loadMoreMapSource();
+    },
+    { threshold: 0.1 },
+  );
+  mapSourceScrollObserver.observe(mapSourceSentinelEl.value);
+};
+
+watch(potensiDialogTab, async (tab) => {
+  if (tab === "MAP" && !mapSourceList.value.length && mapSourceHasMore.value) {
+    await loadMoreMapSource();
+  }
+  await nextTick();
+  if (tab === "PENAWARAN") setupPenSourceObserver();
+  else setupMapSourceObserver();
+});
+
+watch(showSetPotensiDialog, (v) => {
+  if (!v) {
+    penSourceScrollObserver?.disconnect();
+    mapSourceScrollObserver?.disconnect();
+  }
+});
+
+const openSetPotensiDialog = async () => {
+  showSetPotensiDialog.value = true;
+  potensiDialogTab.value = "PENAWARAN";
+  potensiSourceCustFilter.value = "";
+  selectedPotensiMap.value = new Map();
+  penSourceList.value = [];
+  penSourceOffset.value = 0;
+  penSourceHasMore.value = true;
+  mapSourceList.value = [];
+  mapSourceOffset.value = 0;
+  mapSourceHasMore.value = true;
+  await loadMorePenSource();
+  await nextTick();
+  setupPenSourceObserver();
+};
+
+const searchPotensiSource = async () => {
+  penSourceList.value = [];
+  penSourceOffset.value = 0;
+  penSourceHasMore.value = true;
+  mapSourceList.value = [];
+  mapSourceOffset.value = 0;
+  mapSourceHasMore.value = true;
+  if (potensiDialogTab.value === "PENAWARAN") {
+    await loadMorePenSource();
+    await nextTick();
+    setupPenSourceObserver();
+  } else {
+    await loadMoreMapSource();
+    await nextTick();
+    setupMapSourceObserver();
+  }
+};
+
+const isSubmittingPotensi = ref(false);
+const submitSetPotensi = async () => {
+  if (selectedPotensiMap.value.size === 0) return;
+  isSubmittingPotensi.value = true;
+  try {
+    const items = Array.from(selectedPotensiMap.value.values()).map((opt) => ({
+      sumber: opt.Sumber,
+      nomorSumber: opt.Nomor,
+      namaItem: opt.NamaItem,
+      harga: Number(opt.Nominal) || 0,
+    }));
+    await dashboardService.setPotensiBulk(items);
+    showSetPotensiDialog.value = false;
+    potensiList.value = [];
+    potensiOffset.value = 0;
+    potensiHasMore.value = true;
+    await Promise.allSettled([fetchPotensiSummary(), loadMorePotensiList()]);
+  } catch (e: any) {
+    alert(e?.response?.data?.message || "Gagal menyimpan potensi.");
+  } finally {
+    isSubmittingPotensi.value = false;
+  }
+};
+
+// ── Dialog: Batal Potensi ──
+const showBatalPotensiDialog = ref(false);
+const potensiToBatal = ref<PotensiItem | null>(null);
+const batalPotensiAlasan = ref("");
+const isSubmittingBatalPotensi = ref(false);
+
+const openBatalPotensiDialog = (item: PotensiItem) => {
+  potensiToBatal.value = item;
+  batalPotensiAlasan.value = "";
+  showBatalPotensiDialog.value = true;
+};
+
+const submitBatalPotensi = async () => {
+  if (!potensiToBatal.value || !batalPotensiAlasan.value.trim()) return;
+  isSubmittingBatalPotensi.value = true;
+  try {
+    await dashboardService.batalPotensi(
+      potensiToBatal.value.pot_nomor,
+      batalPotensiAlasan.value.trim(),
+    );
+    showBatalPotensiDialog.value = false;
+    potensiList.value = [];
+    potensiOffset.value = 0;
+    potensiHasMore.value = true;
+    await Promise.allSettled([fetchPotensiSummary(), loadMorePotensiList()]);
+  } catch (e: any) {
+    alert(e?.response?.data?.message || "Gagal membatalkan potensi.");
+  } finally {
+    isSubmittingBatalPotensi.value = false;
+  }
+};
+
 // ── Computed helper: Achievement rate color ──
 const achColor = (ach: number) => {
   if (ach >= 100) return "#2e7d32";
@@ -2638,6 +3011,9 @@ const loadMarketingData = async () => {
     gapCustomerList.value = [];
     pvrPage.value = 1;
     pvrHasMore.value = true;
+    potensiList.value = [];
+    potensiOffset.value = 0;
+    potensiHasMore.value = true;
     ptmDetailList.value = [];
     ptmDetailOffset.value = 0;
     ptmDetailHasMore.value = true;
@@ -2674,6 +3050,7 @@ const loadMarketingData = async () => {
       dashboardService.getStokSlowDeadStockBahan(),
       dashboardService.getKonversiBabaranAktual(),
     ]);
+    ensureTargetCollectionLoaded();
     if (
       konversiBabaranRes.status === "fulfilled" &&
       konversiBabaranRes.value?.data?.data
@@ -2753,8 +3130,9 @@ const loadMarketingData = async () => {
 
     await loadMorePvr();
 
-    // ⬇ tambahkan di sini
     await Promise.allSettled([loadMorePtmDetail(), loadMoreMtsDetail()]);
+
+    await Promise.allSettled([fetchPotensiSummary(), loadMorePotensiList()]);
 
     marketingLoaded.value = true;
   } finally {
@@ -2783,6 +3161,7 @@ const loadFinanceData = async () => {
           spkTagihFilter.value.endDate,
         ),
       ]);
+    ensureTargetCollectionLoaded();
     if (piutangRes.status === "fulfilled" && piutangRes.value?.data?.data) {
       piutangData.value.summary = piutangRes.value.data.data.summary;
       piutangData.value.top5 = piutangRes.value.data.data.top5;
@@ -3179,6 +3558,7 @@ onMounted(async () => {
     setupPvrObserver();
     setupPtmDetailObserver();
     setupMtsDetailObserver();
+    setupPotensiListObserver();
   }
   if (activeTab.value === "finance") {
     setupOverdueObserver();
@@ -3238,6 +3618,7 @@ onUnmounted(() => {
   sbScrollObserver?.disconnect();
   bkScrollObserver?.disconnect();
   pbBatalScrollObserver?.disconnect();
+  potensiScrollObserver?.disconnect();
 });
 
 const closeSpkDialog = () => {
@@ -4047,6 +4428,151 @@ const sisaClass = (item: any) => {
                 </template>
                 <div v-else class="text-center text-grey py-3 text-caption">
                   Belum ada data growth YoY.
+                </div>
+              </div>
+            </div>
+          </v-col>
+        </v-row>
+
+        <v-row dense class="mt-2">
+          <v-col cols="12">
+            <div class="manksi-panel content-panel">
+              <div class="panel-header panel-header--green">
+                <IconCoin :size="14" :stroke-width="1.7" class="mr-1" />
+                Target Collection
+                <span v-if="targetCollectionData" class="panel-header-sub ml-1">
+                  (target dari omzet
+                  {{ targetCollectionData.targetBulanLabel }})
+                </span>
+              </div>
+              <div class="panel-body">
+                <v-progress-linear
+                  v-if="isLoadingTargetCollection"
+                  indeterminate
+                  color="success"
+                  height="2"
+                />
+                <template v-else-if="targetCollectionData">
+                  <div style="overflow-x: auto">
+                    <table class="gb-tbl" style="min-width: 720px">
+                      <thead>
+                        <tr>
+                          <th>Sales</th>
+                          <th class="tr">Target Bulan Ini</th>
+                          <th class="tr">Piutang Saat Ini</th>
+                          <th class="tr">Collection Bulan Ini</th>
+                          <th class="tc">% MTD</th>
+                          <th class="tc">% YTD</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr
+                          v-for="row in targetCollectionData.items"
+                          :key="row.salKode"
+                        >
+                          <td>{{ row.namaSales }}</td>
+                          <td class="tr">{{ fmtNum(row.targetBulanIni) }}</td>
+                          <td class="tr" style="color: #c62828">
+                            {{ fmtNum(row.piutangSaatIni) }}
+                          </td>
+                          <td class="tr" style="color: #2e7d32">
+                            {{ fmtNum(row.collectionMtd) }}
+                          </td>
+                          <td class="tc">
+                            <span
+                              class="gb-badge"
+                              :style="{
+                                background:
+                                  pctColor(row.pctCollectionMtd) + '18',
+                                color: pctColor(row.pctCollectionMtd),
+                              }"
+                            >
+                              {{ fmtPct(row.pctCollectionMtd) }}
+                            </span>
+                          </td>
+                          <td class="tc">
+                            <span
+                              class="gb-badge"
+                              :style="{
+                                background:
+                                  pctColor(row.pctCollectionYtd) + '18',
+                                color: pctColor(row.pctCollectionYtd),
+                              }"
+                            >
+                              {{ fmtPct(row.pctCollectionYtd) }}
+                            </span>
+                          </td>
+                        </tr>
+                      </tbody>
+                      <tfoot>
+                        <tr class="rp-total-row">
+                          <td style="font-weight: 700">GRAND TOTAL</td>
+                          <td class="tr" style="font-weight: 700">
+                            {{
+                              fmtNum(
+                                targetCollectionData.grandTotal.targetBulanIni,
+                              )
+                            }}
+                          </td>
+                          <td
+                            class="tr"
+                            style="font-weight: 700; color: #c62828"
+                          >
+                            {{
+                              fmtNum(
+                                targetCollectionData.grandTotal.piutangSaatIni,
+                              )
+                            }}
+                          </td>
+                          <td
+                            class="tr"
+                            style="font-weight: 700; color: #2e7d32"
+                          >
+                            {{
+                              fmtNum(
+                                targetCollectionData.grandTotal.collectionMtd,
+                              )
+                            }}
+                          </td>
+                          <td class="tc" style="font-weight: 700">
+                            {{
+                              fmtPct(
+                                targetCollectionData.grandTotal
+                                  .pctCollectionMtd,
+                              )
+                            }}
+                          </td>
+                          <td class="tc" style="font-weight: 700">
+                            {{
+                              fmtPct(
+                                targetCollectionData.grandTotal
+                                  .pctCollectionYtd,
+                              )
+                            }}
+                          </td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+
+                  <!-- ── Strip chip bulan ── -->
+                  <div class="tc-month-strip">
+                    <button
+                      v-for="m in targetCollectionMonthChips"
+                      :key="m.key"
+                      class="tc-month-chip"
+                      :class="{
+                        'tc-month-chip--active':
+                          m.key === selectedTargetCollectionKey,
+                      }"
+                      @click="fetchTargetCollection(m.bulan, m.tahun)"
+                    >
+                      {{ m.label }}
+                    </button>
+                  </div>
+                </template>
+                <div v-else class="text-center text-grey py-3 text-caption">
+                  Belum ada data target collection.
                 </div>
               </div>
             </div>
@@ -5068,7 +5594,7 @@ const sisaClass = (item: any) => {
           </v-col>
         </v-row>
 
-        <!-- ── Row 7: Proyeksi vs Realisasi (Gap Customer) — infinite scroll ── -->
+        <!-- ── Row 7: Proyeksi Potensial ── -->
         <v-row dense class="mt-2">
           <v-col cols="12">
             <div class="manksi-panel content-panel">
@@ -5080,98 +5606,141 @@ const sisaClass = (item: any) => {
                   border-bottom: 1px solid #ffe0b2;
                 "
               >
-                <IconAlertTriangle
-                  :size="14"
-                  :stroke-width="1.7"
-                  class="mr-1"
-                />
-                Proyeksi vs Realisasi
+                <IconCoin :size="14" :stroke-width="1.7" class="mr-1" />
+                Proyeksi Potensial
                 <span class="panel-header-sub ml-1"
-                  >(gap terbesar per customer)</span
+                  >(ditandai manual Sales/MO)</span
                 >
+                <button
+                  class="knj-detail-btn ml-auto"
+                  style="border-color: #ffcc80; color: #e65100"
+                  @click="openSetPotensiDialog"
+                >
+                  + Set Potensial
+                </button>
               </div>
               <div class="panel-body">
-                <v-progress-linear
-                  v-if="isLoadingDashboard"
-                  indeterminate
-                  color="warning"
-                  height="2"
-                />
-                <template v-else>
-                  <div class="pen-summary-bar">
-                    <div class="pen-stat">
-                      <span class="pen-stat-val text-primary">{{
-                        shortNum(proyeksiVsRealisasiSummary.totalMemo)
-                      }}</span>
-                      <span class="pen-stat-lbl">Total Memo</span>
-                    </div>
-                    <div class="pen-stat">
-                      <span class="pen-stat-val text-success">{{
-                        shortNum(proyeksiVsRealisasiSummary.totalRealisasiMemo)
-                      }}</span>
-                      <span class="pen-stat-lbl">Realisasi Memo</span>
-                    </div>
-                    <div class="pen-stat">
-                      <span class="pen-stat-val" style="color: #6a1b9a">{{
-                        shortNum(proyeksiVsRealisasiSummary.totalRealisasiAll)
-                      }}</span>
-                      <span class="pen-stat-lbl">Realisasi All</span>
-                    </div>
+                <div class="pen-summary-bar">
+                  <div class="pen-stat">
+                    <span class="pen-stat-val text-primary">{{
+                      potensiSummary.jmlItem
+                    }}</span>
+                    <span class="pen-stat-lbl">Jml Item</span>
                   </div>
+                  <div class="pen-stat">
+                    <span class="pen-stat-val" style="color: #6a1b9a">{{
+                      shortNum(potensiSummary.totalPotensi)
+                    }}</span>
+                    <span class="pen-stat-lbl">Total Potensi</span>
+                  </div>
+                  <div class="pen-stat">
+                    <span class="pen-stat-val text-success">{{
+                      shortNum(potensiSummary.totalRealisasi)
+                    }}</span>
+                    <span class="pen-stat-lbl">Realisasi</span>
+                  </div>
+                  <div class="pen-stat">
+                    <span class="pen-stat-val text-grey">{{
+                      shortNum(potensiSummary.totalBatal)
+                    }}</span>
+                    <span class="pen-stat-lbl">Batal</span>
+                  </div>
+                </div>
+
+                <div
+                  v-if="potensiList.length || isLoadingMorePotensi"
+                  class="gb-list"
+                  style="max-height: 340px"
+                >
                   <div
-                    v-if="gapCustomerList.length || isLoadingMorePvr"
-                    class="gb-list"
-                    style="max-height: 320px"
+                    v-for="item in potensiList"
+                    :key="item.pot_nomor"
+                    class="gb-row"
+                    :class="item.pot_status === 'BATAL' ? 'row-minus' : ''"
+                    style="align-items: flex-start"
                   >
-                    <div
-                      v-for="(row, i) in gapCustomerList"
-                      :key="i"
-                      class="gb-row"
-                    >
-                      <div
-                        class="gb-nama"
-                        :title="row.CusNama"
-                        style="width: 200px"
-                      >
-                        {{ row.CusNama || row.CusKode || "-" }}
+                    <div class="gb-nama" style="width: 190px">
+                      <span class="pen-nomor" style="font-size: 10px">{{
+                        item.pot_nomor
+                      }}</span>
+                      <div style="font-size: 10px; color: #9e9e9e">
+                        {{ item.Sumber }} {{ item.NomorSumber }}
                       </div>
-                      <div class="gb-bar-wrap">
-                        <span class="pen-cus" style="flex: 1">
-                          {{ row.JoNama || row.JoKode || "" }} · Memo
-                          {{ shortNum(row.TotalMemo) }} · Realisasi
-                          {{
-                            row.RealisasiMemo != null
-                              ? shortNum(row.RealisasiMemo)
-                              : "Belum ada"
-                          }}
-                        </span>
+                    </div>
+                    <div
+                      class="gb-bar-wrap"
+                      style="flex-direction: column; align-items: stretch"
+                    >
+                      <div class="d-flex justify-space-between">
+                        <span class="pen-cus">{{ item.pot_nama_item }}</span>
                         <span
                           style="
-                            font-size: 10px;
+                            font-size: 11px;
                             font-weight: 700;
-                            color: #e65100;
+                            color: #6a1b9a;
                           "
                         >
-                          Gap {{ shortNum(row.gap) }}
+                          {{ shortNum(item.pot_harga) }}
                         </span>
                       </div>
-                    </div>
-                    <div ref="pvrSentinelEl" class="pen-sentinel">
-                      <span v-if="isLoadingMorePvr" class="pen-loading"
-                        >Memuat...</span
+                      <div
+                        class="d-flex justify-space-between align-center mt-1"
                       >
-                      <span
-                        v-else-if="!pvrHasMore && gapCustomerList.length"
-                        class="pen-end"
+                        <span style="font-size: 10px; color: #757575">
+                          {{ item.cus_nama || "-" }} ·
+                          {{ item.sal_nama || "-" }} · oleh
+                          {{ item.user_create }}
+                        </span>
+                        <span
+                          v-if="item.pot_status === 'BATAL'"
+                          class="rp-badge"
+                          style="background: #f5f5f5; color: #9e9e9e"
+                        >
+                          Batal
+                        </span>
+                        <span
+                          v-else-if="item.IsRealisasi"
+                          class="rp-badge"
+                          style="background: #e8f5e9; color: #2e7d32"
+                        >
+                          Realisasi
+                        </span>
+                        <button
+                          v-else
+                          class="knj-detail-btn"
+                          style="border-color: #ffcdd2; color: #c62828"
+                          @click="openBatalPotensiDialog(item)"
+                        >
+                          Batal
+                        </button>
+                      </div>
+                      <div
+                        v-if="item.pot_alasan_batal"
+                        style="
+                          font-size: 10px;
+                          font-style: italic;
+                          color: #c62828;
+                        "
                       >
-                        {{ gapCustomerList.length }} customer ditampilkan
-                      </span>
+                        {{ item.pot_alasan_batal }}
+                      </div>
                     </div>
                   </div>
-                  <div v-else class="text-center text-grey py-3 text-caption">
-                    Tidak ada gap proyeksi vs realisasi yang signifikan 🎉
+                  <div ref="potensiSentinelEl" class="pen-sentinel">
+                    <span v-if="isLoadingMorePotensi" class="pen-loading"
+                      >Memuat...</span
+                    >
+                    <span
+                      v-else-if="!potensiHasMore && potensiList.length"
+                      class="pen-end"
+                    >
+                      {{ potensiList.length }} potensi ditampilkan
+                    </span>
                   </div>
-                </template>
+                </div>
+                <div v-else class="text-center text-grey py-3 text-caption">
+                  Belum ada penawaran/MAP yang ditandai potensial.
+                </div>
               </div>
             </div>
           </v-col>
@@ -5736,6 +6305,151 @@ const sisaClass = (item: any) => {
                 }}</span>
               </div>
               <div class="sum-sub">diaplikasikan ke invoice</div>
+            </div>
+          </v-col>
+        </v-row>
+
+        <v-row dense class="mt-2">
+          <v-col cols="12">
+            <div class="manksi-panel content-panel">
+              <div class="panel-header panel-header--green">
+                <IconCoin :size="14" :stroke-width="1.7" class="mr-1" />
+                Target Collection
+                <span v-if="targetCollectionData" class="panel-header-sub ml-1">
+                  (target dari omzet
+                  {{ targetCollectionData.targetBulanLabel }})
+                </span>
+              </div>
+              <div class="panel-body">
+                <v-progress-linear
+                  v-if="isLoadingTargetCollection"
+                  indeterminate
+                  color="success"
+                  height="2"
+                />
+                <template v-else-if="targetCollectionData">
+                  <div style="overflow-x: auto">
+                    <table class="gb-tbl" style="min-width: 720px">
+                      <thead>
+                        <tr>
+                          <th>Sales</th>
+                          <th class="tr">Target Bulan Ini</th>
+                          <th class="tr">Piutang Saat Ini</th>
+                          <th class="tr">Collection Bulan Ini</th>
+                          <th class="tc">% MTD</th>
+                          <th class="tc">% YTD</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr
+                          v-for="row in targetCollectionData.items"
+                          :key="row.salKode"
+                        >
+                          <td>{{ row.namaSales }}</td>
+                          <td class="tr">{{ fmtNum(row.targetBulanIni) }}</td>
+                          <td class="tr" style="color: #c62828">
+                            {{ fmtNum(row.piutangSaatIni) }}
+                          </td>
+                          <td class="tr" style="color: #2e7d32">
+                            {{ fmtNum(row.collectionMtd) }}
+                          </td>
+                          <td class="tc">
+                            <span
+                              class="gb-badge"
+                              :style="{
+                                background:
+                                  pctColor(row.pctCollectionMtd) + '18',
+                                color: pctColor(row.pctCollectionMtd),
+                              }"
+                            >
+                              {{ fmtPct(row.pctCollectionMtd) }}
+                            </span>
+                          </td>
+                          <td class="tc">
+                            <span
+                              class="gb-badge"
+                              :style="{
+                                background:
+                                  pctColor(row.pctCollectionYtd) + '18',
+                                color: pctColor(row.pctCollectionYtd),
+                              }"
+                            >
+                              {{ fmtPct(row.pctCollectionYtd) }}
+                            </span>
+                          </td>
+                        </tr>
+                      </tbody>
+                      <tfoot>
+                        <tr class="rp-total-row">
+                          <td style="font-weight: 700">GRAND TOTAL</td>
+                          <td class="tr" style="font-weight: 700">
+                            {{
+                              fmtNum(
+                                targetCollectionData.grandTotal.targetBulanIni,
+                              )
+                            }}
+                          </td>
+                          <td
+                            class="tr"
+                            style="font-weight: 700; color: #c62828"
+                          >
+                            {{
+                              fmtNum(
+                                targetCollectionData.grandTotal.piutangSaatIni,
+                              )
+                            }}
+                          </td>
+                          <td
+                            class="tr"
+                            style="font-weight: 700; color: #2e7d32"
+                          >
+                            {{
+                              fmtNum(
+                                targetCollectionData.grandTotal.collectionMtd,
+                              )
+                            }}
+                          </td>
+                          <td class="tc" style="font-weight: 700">
+                            {{
+                              fmtPct(
+                                targetCollectionData.grandTotal
+                                  .pctCollectionMtd,
+                              )
+                            }}
+                          </td>
+                          <td class="tc" style="font-weight: 700">
+                            {{
+                              fmtPct(
+                                targetCollectionData.grandTotal
+                                  .pctCollectionYtd,
+                              )
+                            }}
+                          </td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+
+                  <!-- ── Strip chip bulan ── -->
+                  <div class="tc-month-strip">
+                    <button
+                      v-for="m in targetCollectionMonthChips"
+                      :key="m.key"
+                      class="tc-month-chip"
+                      :class="{
+                        'tc-month-chip--active':
+                          m.key === selectedTargetCollectionKey,
+                      }"
+                      @click="fetchTargetCollection(m.bulan, m.tahun)"
+                    >
+                      {{ m.label }}
+                    </button>
+                  </div>
+                </template>
+                <div v-else class="text-center text-grey py-3 text-caption">
+                  Belum ada data target collection.
+                </div>
+              </div>
             </div>
           </v-col>
         </v-row>
@@ -9208,6 +9922,260 @@ const sisaClass = (item: any) => {
         </div>
       </v-card>
     </v-dialog>
+
+    <!-- Dialog: Set Potensial -->
+    <v-dialog v-model="showSetPotensiDialog" max-width="1000px" scrollable>
+      <v-card
+        class="rounded-lg"
+        style="height: 80vh; display: flex; flex-direction: column"
+      >
+        <div
+          class="pa-3 d-flex align-center justify-space-between"
+          style="background: #e65100; color: white; flex-shrink: 0"
+        >
+          <span style="font-size: 14px; font-weight: 700">Set Potensial</span>
+          <v-btn
+            icon
+            variant="text"
+            size="small"
+            color="white"
+            @click="showSetPotensiDialog = false"
+          >
+            <IconX :size="18" :stroke-width="2" />
+          </v-btn>
+        </div>
+
+        <div class="pa-3" style="flex-shrink: 0; border-bottom: 1px solid #eee">
+          <div class="d-flex mb-2" style="gap: 8px">
+            <input
+              v-model="potensiSourceCustFilter"
+              placeholder="Cari customer..."
+              class="map-date-inp"
+              style="flex: 1"
+              @keyup.enter="searchPotensiSource"
+            />
+            <button class="map-filter-btn" @click="searchPotensiSource">
+              Cari
+            </button>
+          </div>
+          <v-tabs
+            v-model="potensiDialogTab"
+            density="compact"
+            color="orange-darken-2"
+          >
+            <v-tab value="PENAWARAN" class="text-caption font-weight-bold"
+              >Penawaran Open</v-tab
+            >
+            <v-tab value="MAP" class="text-caption font-weight-bold"
+              >MAP Open</v-tab
+            >
+          </v-tabs>
+        </div>
+
+        <div style="flex: 1; overflow-y: auto; min-height: 0">
+          <v-window v-model="potensiDialogTab" style="height: 100%">
+            <v-window-item value="PENAWARAN" style="height: 100%">
+              <div
+                v-if="!penSourceList.length && isLoadingMorePenSource"
+                class="text-center py-6 text-caption"
+              >
+                Memuat...
+              </div>
+              <div
+                v-for="opt in penSourceList"
+                :key="'PENAWARAN:' + opt.Nomor"
+                class="pen-item potensi-src-row"
+                :class="{ 'potensi-src-row--selected': isPotensiSelected(opt) }"
+                style="cursor: pointer"
+                @click="togglePotensiSelect(opt)"
+              >
+                <div class="d-flex align-center" style="gap: 10px">
+                  <input
+                    type="checkbox"
+                    :checked="isPotensiSelected(opt)"
+                    @click.stop="togglePotensiSelect(opt)"
+                  />
+                  <div style="flex: 1; min-width: 0">
+                    <div class="pen-item-top">
+                      <span class="pen-nomor">{{ opt.Nomor }}</span>
+                      <div class="d-flex align-center" style="gap: 14px">
+                        <span
+                          style="
+                            font-size: 10px;
+                            color: #757575;
+                            white-space: nowrap;
+                          "
+                        >
+                          {{ opt.sal_nama || "-" }}
+                        </span>
+                        <span
+                          style="
+                            font-size: 11px;
+                            color: #6a1b9a;
+                            font-weight: 700;
+                            white-space: nowrap;
+                          "
+                        >
+                          {{ shortNum(opt.Nominal) }}
+                        </span>
+                      </div>
+                    </div>
+                    <div class="pen-cus">{{ opt.cus_nama }}</div>
+                    <div class="pen-ket">{{ opt.NamaItem }}</div>
+                  </div>
+                </div>
+              </div>
+              <div ref="penSourceSentinelEl" class="pen-sentinel">
+                <span
+                  v-if="isLoadingMorePenSource && penSourceList.length"
+                  class="pen-loading"
+                  >Memuat...</span
+                >
+                <span
+                  v-else-if="!penSourceHasMore && penSourceList.length"
+                  class="pen-end"
+                >
+                  {{ penSourceList.length }} penawaran ditampilkan
+                </span>
+              </div>
+              <div
+                v-if="!isLoadingMorePenSource && !penSourceList.length"
+                class="text-center py-6 text-caption text-grey"
+              >
+                Tidak ada Penawaran Open yang bisa ditandai.
+              </div>
+            </v-window-item>
+
+            <v-window-item value="MAP" style="height: 100%">
+              <div
+                v-if="!mapSourceList.length && isLoadingMoreMapSource"
+                class="text-center py-6 text-caption"
+              >
+                Memuat...
+              </div>
+              <div
+                v-for="opt in mapSourceList"
+                :key="'MAP:' + opt.Nomor"
+                class="pen-item potensi-src-row"
+                :class="{ 'potensi-src-row--selected': isPotensiSelected(opt) }"
+                style="cursor: pointer"
+                @click="togglePotensiSelect(opt)"
+              >
+                <div class="d-flex align-center" style="gap: 10px">
+                  <input
+                    type="checkbox"
+                    :checked="isPotensiSelected(opt)"
+                    @click.stop="togglePotensiSelect(opt)"
+                  />
+                  <div style="flex: 1; min-width: 0">
+                    <div class="pen-item-top">
+                      <span class="pen-nomor">{{ opt.Nomor }}</span>
+                      <div class="d-flex align-center" style="gap: 14px">
+                        <span
+                          style="
+                            font-size: 10px;
+                            color: #757575;
+                            white-space: nowrap;
+                          "
+                        >
+                          {{ opt.sal_nama || "-" }}
+                        </span>
+                        <span
+                          style="
+                            font-size: 11px;
+                            color: #6a1b9a;
+                            font-weight: 700;
+                            white-space: nowrap;
+                          "
+                        >
+                          {{ shortNum(opt.Nominal) }}
+                        </span>
+                      </div>
+                    </div>
+                    <div class="pen-cus">{{ opt.cus_nama }}</div>
+                    <div class="pen-ket">{{ opt.NamaItem }}</div>
+                  </div>
+                </div>
+              </div>
+              <div ref="mapSourceSentinelEl" class="pen-sentinel">
+                <span
+                  v-if="isLoadingMoreMapSource && mapSourceList.length"
+                  class="pen-loading"
+                  >Memuat...</span
+                >
+                <span
+                  v-else-if="!mapSourceHasMore && mapSourceList.length"
+                  class="pen-end"
+                >
+                  {{ mapSourceList.length }} MAP ditampilkan
+                </span>
+              </div>
+              <div
+                v-if="!isLoadingMoreMapSource && !mapSourceList.length"
+                class="text-center py-6 text-caption text-grey"
+              >
+                Tidak ada MAP Open yang bisa ditandai.
+              </div>
+            </v-window-item>
+          </v-window>
+        </div>
+
+        <div class="spk-footer" style="flex-shrink: 0">
+          <span style="font-size: 12px; color: #757575"
+            >{{ selectedPotensiCount }} item dipilih</span
+          >
+          <v-btn
+            color="primary"
+            variant="flat"
+            size="small"
+            :loading="isSubmittingPotensi"
+            :disabled="selectedPotensiCount === 0"
+            @click="submitSetPotensi"
+          >
+            Simpan ({{ selectedPotensiCount }})
+          </v-btn>
+        </div>
+      </v-card>
+    </v-dialog>
+
+    <!-- Dialog: Batal Potensi -->
+    <v-dialog v-model="showBatalPotensiDialog" max-width="450px">
+      <v-card class="rounded-lg pa-3">
+        <div style="font-size: 13px; font-weight: 700; margin-bottom: 8px">
+          Batalkan Potensi {{ potensiToBatal?.pot_nomor }}
+        </div>
+        <textarea
+          v-model="batalPotensiAlasan"
+          placeholder="Alasan batal (wajib)..."
+          rows="3"
+          style="
+            width: 100%;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            padding: 6px;
+            font-size: 12px;
+          "
+        />
+        <div class="d-flex justify-end mt-3" style="gap: 8px">
+          <v-btn
+            variant="text"
+            size="small"
+            @click="showBatalPotensiDialog = false"
+            >Batal</v-btn
+          >
+          <v-btn
+            color="error"
+            variant="flat"
+            size="small"
+            :loading="isSubmittingBatalPotensi"
+            :disabled="!batalPotensiAlasan.trim()"
+            @click="submitBatalPotensi"
+          >
+            Konfirmasi Batal
+          </v-btn>
+        </div>
+      </v-card>
+    </v-dialog>
   </v-container>
 
   <AiChatWidget v-if="canAccessAiChat" />
@@ -10863,6 +11831,40 @@ const sisaClass = (item: any) => {
   font-weight: 700;
   color: #212121;
   white-space: nowrap;
+}
+
+.tc-month-strip {
+  display: flex;
+  gap: 6px;
+  padding: 8px 12px;
+  border-top: 1px solid #f0f0f0;
+  overflow-x: auto;
+  background: #fafafa;
+}
+.tc-month-chip {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 12px;
+  border: 1px solid #e0e0e0;
+  background: white;
+  color: #616161;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.tc-month-chip:hover {
+  border-color: #2e7d32;
+  color: #2e7d32;
+}
+.tc-month-chip--active {
+  background: #2e7d32;
+  border-color: #2e7d32;
+  color: white;
+}
+
+.potensi-src-row--selected {
+  background: #fff3e0;
 }
 
 @keyframes highlight-fade {
