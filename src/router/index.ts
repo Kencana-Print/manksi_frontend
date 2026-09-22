@@ -563,6 +563,17 @@ const router = createRouter({
       },
     },
     {
+      path: "/pembelian/uang-muka/print-pengajuan/:nomor",
+      name: "PengajuanUangMukaPrint",
+      component: () =>
+        import("@/views/pembelian/PengajuanUangMukaPrintView.vue"),
+      meta: {
+        title: "Cetak Bukti Pengajuan Uang Muka",
+        layout: "BlankLayout",
+        requiresAuth: true,
+      },
+    },
+    {
       path: "/pembelian/uang-muka/realisasi/:nomor",
       name: "UangMukaRealisasiForm",
       component: () =>
@@ -573,6 +584,40 @@ const router = createRouter({
         requiresAuth: true,
         menuId: "315",
         browseRoute: "UangMuka",
+      },
+    },
+    {
+      path: "/pembelian/uang-muka/print/:nomor",
+      name: "UangMukaPrint",
+      component: () => import("@/views/pembelian/UangMukaPrintView.vue"),
+      meta: {
+        title: "Cetak Bukti Kasbon",
+        layout: "BlankLayout",
+        requiresAuth: true,
+      },
+    },
+    {
+      path: "/pembelian/uang-muka/penyelesaian/:nomor",
+      name: "UangMukaPenyelesaianForm",
+      component: () =>
+        import("@/views/pembelian/UangMukaPenyelesaianFormView.vue"),
+      meta: {
+        title: "Penyelesaian Uang Muka",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "315",
+        browseRoute: "UangMuka",
+      },
+    },
+    {
+      path: "/pembelian/uang-muka/print-penyelesaian/:nomor",
+      name: "UangMukaPenyelesaianPrint",
+      component: () =>
+        import("@/views/pembelian/UangMukaPenyelesaianPrintView.vue"),
+      meta: {
+        title: "Cetak Penyelesaian Uang Muka",
+        layout: "BlankLayout",
+        requiresAuth: true,
       },
     },
     {
