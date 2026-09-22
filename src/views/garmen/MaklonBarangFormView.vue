@@ -1147,6 +1147,13 @@ const numFmt = (v: any) =>
 .target-tbl-scroll {
   max-height: 280px;
   overflow-y: auto;
+  overscroll-behavior: contain; /* stop parent .polos-list from stealing the wheel scroll */
+}
+.target-tbl thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #eeeeee; /* keep header visible while scrolling, and signals "there's more" */
 }
 
 .mode-toggle {
