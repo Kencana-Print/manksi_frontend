@@ -104,7 +104,7 @@ const grandTotal = computed(
         <tr>
           <th width="20">No</th>
           <th>Nama (Kegunaan)</th>
-          <th width="45">Deadline</th>
+          <th width="52">Deadline</th>
           <th width="32">Qty</th>
           <th width="60">Nominal</th>
           <th width="60">Total</th>
@@ -119,7 +119,7 @@ const grandTotal = computed(
               }}<span v-if="item.kegunaan"> ({{ item.kegunaan }})</span>
             </template>
           </td>
-          <td class="tc">
+          <td class="tc deadline-cell">
             {{ item.deadline ? formatTanggalPendek(item.deadline) : "" }}
           </td>
           <td class="tr">{{ item.qty ? formatNum(item.qty) : "" }}</td>
@@ -230,6 +230,9 @@ const grandTotal = computed(
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.deadline-cell {
+  white-space: nowrap;
 }
 
 .sig-table {

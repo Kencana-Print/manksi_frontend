@@ -158,11 +158,13 @@ const grandTotal = computed(
           <td class="sig-cell">Disetujui Oleh,</td>
         </tr>
         <tr>
-          <td class="sig-space"></td>
+          <td class="sig-space nama-pengaju">{{ dataPO.header.Nama }}</td>
           <td class="sig-space"></td>
         </tr>
         <tr>
-          <td class="sig-cell">( Yang Mengajukan )</td>
+          <td class="sig-cell">
+            ( {{ dataPO.header.Nama || "Yang Mengajukan" }} )
+          </td>
           <td class="sig-cell">( Atasan )</td>
         </tr>
       </table>
@@ -273,5 +275,11 @@ const grandTotal = computed(
   border-top: none;
   border-bottom: none;
   height: 60px;
+}
+.nama-pengaju {
+  text-align: center;
+  vertical-align: bottom;
+  font-weight: bold;
+  padding-bottom: 6px;
 }
 </style>
