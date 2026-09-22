@@ -155,7 +155,10 @@ const isManualRow = (d: DetailRow) =>
 // ── Role permissions ────────────────────────────────────────────
 const isAdmin = computed(() => authStore.user?.kode?.toUpperCase() === "ADMIN");
 const canEditMarketing = computed(
-  () => isAdmin.value || authStore.user?.bagian?.toUpperCase() === "MARKETING",
+  () =>
+    isAdmin.value ||
+    authStore.user?.bagian?.toUpperCase() === "MARKETING" ||
+    authStore.user?.bagian?.toUpperCase() === "AUDIT",
 );
 const canEditKesepakatan = computed(
   () => isAdmin.value || authStore.user?.bagian?.toUpperCase() !== "MARKETING",

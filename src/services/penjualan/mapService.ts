@@ -13,6 +13,9 @@ export const mapService = {
   approveCmo(nomor: string) {
     return api.put(`/penjualan/map/${nomor}/approve`);
   },
+  batalApproveCmo(nomor: string) {
+    return api.put(`/penjualan/map/${encodeURIComponent(nomor)}/batal-approve`);
+  },
   requestPin5(nomor: string, alasan: string) {
     return api.post(`/penjualan/map/${nomor}/pin5`, { alasan });
   },
