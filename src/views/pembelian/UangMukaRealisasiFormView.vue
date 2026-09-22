@@ -6,22 +6,29 @@ import { useForm } from "@/composables/useForm";
 import { uangMukaRealisasiService } from "@/services/pembelian/uangMukaRealisasiService";
 import NumberInputIDR from "@/components/NumberInputIDR.vue";
 import AccountSearchModal from "@/components/lookups/AccountSearchModal.vue";
-import SupplierSearchModal from "@/components/lookups/SupplierSearchModal.vue";
-import { IconCash, IconSearch } from "@tabler/icons-vue";
+// import SupplierSearchModal from "@/components/lookups/SupplierSearchModal.vue";
+import {
+  IconCash,
+  IconSearch,
+  IconChevronDown,
+  IconChevronRight,
+} from "@tabler/icons-vue";
 
 interface RealisasiDetail {
-  pumd_id: number;
+  pumd_id: number | null;
   sumber: string;
   nomor_header: string;
-  item_nourut: number;
+  item_nourut: number | null;
   pmt_nomor: string | null;
   keterangan: string;
   nama: string;
   satuan: string;
   qty: number;
+  nominal_sumber: number;
   nominal_ajuan: number;
   nominal_acc: number;
   status_acc: "ACC" | "TOLAK";
+  locked: boolean;
   kdsup: string;
   supplier: string;
   bank: string;
@@ -76,14 +83,37 @@ const {
   fetchApi: async () => {
     const res = await uangMukaRealisasiService.getDetail(params.nomor);
     const d = res.data;
+
+    // Cabang HO- disamakan dengan P01 untuk keperluan default rekening/kas
+    const effectiveCabang = d.pum_cabang === "HO-" ? "P01" : d.pum_cabang;
+    let defaultRekKode = "";
+    let defaultRekNama = "";
+    try {
+      const accRes = await uangMukaRealisasiService.getAccountOptions(
+        "KAS",
+        effectiveCabang,
+      );
+      // Toleran terhadap dua kemungkinan bentuk response: array mentah
+      // (res.json(rows)) atau dibungkus { success, data } — tergantung
+      // pola controller yang dipakai.
+      const body = accRes.data;
+      const accounts = Array.isArray(body) ? body : (body?.data ?? []);
+      if (accounts.length > 0) {
+        defaultRekKode = accounts[0].kode;
+        defaultRekNama = accounts[0].nama;
+      }
+    } catch (e) {
+      console.error("Gagal memuat default rekening/kas:", e);
+    }
+
     return {
       pum_nomor: d.pum_nomor,
       pum_cabang: d.pum_cabang,
       jenis: "KAS",
-      rek_kode: "",
-      rek_nama: "",
+      rek_kode: defaultRekKode,
+      rek_nama: defaultRekNama,
       tanggal: todayStr,
-      nota: "",
+      nota: d.pum_nota || "",
       penerima: d.pum_user_create || "",
       keterangan: d.pum_keterangan || "",
       detail: d.detail.map((r: any) => ({
@@ -105,15 +135,21 @@ const {
     }),
   onSuccess: (response: any) => {
     toast.success(`Realisasi berhasil. No. Bon: ${response?.bonNomor ?? "-"}`);
+    window.open(
+      `/pembelian/uang-muka/print/${encodeURIComponent(formData.value.pum_nomor)}`,
+      "_blank",
+    );
     goBack();
   },
 });
 
 const numFmt = (v: any) =>
   v != null ? Number(v).toLocaleString("id-ID") : "0";
-const sumberLabel = (v: string) =>
-  v === "PENGAJUAN_DANA" ? "Pengajuan Dana" : "Permintaan Pembelian";
-
+const sumberLabel = (v: string) => {
+  if (v === "PENGAJUAN_DANA") return "Pengajuan Dana";
+  if (v === "KASBON") return "Kasbon";
+  return "Permintaan Pembelian";
+};
 const totalAcc = computed(() =>
   formData.value.detail
     .filter((d) => d.status_acc === "ACC")
@@ -121,10 +157,20 @@ const totalAcc = computed(() =>
 );
 
 const toggleAcc = (row: RealisasiDetail, val: "ACC" | "TOLAK") => {
+  if (row.locked) return;
   row.status_acc = val;
   if (val === "TOLAK") row.nominal_acc = 0;
   else if (!row.nominal_acc) row.nominal_acc = row.nominal_ajuan;
 };
+
+const showItemDetail = ref(false);
+
+const kasbonRow = computed(() =>
+  formData.value.detail.find((d) => d.sumber === "KASBON"),
+);
+const itemRows = computed(() =>
+  formData.value.detail.filter((d) => d.sumber !== "KASBON"),
+);
 
 // ── Account lookup (Rekening/Kas) ──
 const showAccountModal = ref(false);
@@ -133,24 +179,24 @@ const onAccountSelected = (item: any) => {
   formData.value.rek_nama = item.Nama;
 };
 
-// ── Supplier lookup per baris ──
-const showSupplierModal = ref(false);
-const activeSupplierRowIndex = ref<number | null>(null);
+// // ── Supplier lookup per baris ──
+// const showSupplierModal = ref(false);
+// const activeSupplierRowIndex = ref<number | null>(null);
 
-const openSupplierModal = (index: number) => {
-  activeSupplierRowIndex.value = index;
-  showSupplierModal.value = true;
-};
+// const openSupplierModal = (index: number) => {
+//   activeSupplierRowIndex.value = index;
+//   showSupplierModal.value = true;
+// };
 
-const onSupplierSelected = (item: any) => {
-  if (activeSupplierRowIndex.value === null) return;
-  const row = formData.value.detail[activeSupplierRowIndex.value];
-  row.kdsup = item.Kode;
-  row.supplier = item.Nama;
-  row.bank = item.Bank || "";
-  row.rekening = item.Rekening || "";
-  row.atasnama = item.AtasNama || "";
-};
+// const onSupplierSelected = (item: any) => {
+//   if (activeSupplierRowIndex.value === null) return;
+//   const row = formData.value.detail[activeSupplierRowIndex.value];
+//   row.kdsup = item.Kode;
+//   row.supplier = item.Nama;
+//   row.bank = item.Bank || "";
+//   row.rekening = item.Rekening || "";
+//   row.atasnama = item.AtasNama || "";
+// };
 
 const onValidateSave = () => {
   if (!formData.value.rek_kode) {
@@ -231,14 +277,15 @@ const onValidateSave = () => {
           class="mb-3"
           hide-details
         />
-        <v-text-field
-          v-model="formData.nota"
+        <!-- <v-text-field
+          :model-value="formData.nota || '-'"
           label="No. Nota"
           variant="outlined"
           density="compact"
           class="mb-3"
           hide-details
-        />
+          readonly
+        /> -->
         <v-text-field
           v-model="formData.penerima"
           label="Penerima"
@@ -264,75 +311,75 @@ const onValidateSave = () => {
         <table class="rl-table">
           <thead>
             <tr>
-              <th>No</th>
+              <th style="width: 30px"></th>
               <th>Sumber</th>
               <th>Nomor</th>
               <th>Item</th>
-              <th class="tr">Nominal Ajuan</th>
+              <th class="tr">Nominal Sumber</th>
               <th class="tc">ACC</th>
               <th class="tc">Tolak</th>
               <th class="tr">Nominal ACC</th>
-              <th>Kd.Sup</th>
-              <th>Supplier</th>
-              <th>Bank</th>
-              <th>Rekening</th>
-              <th>Atas Nama</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="(d, i) in formData.detail" :key="d.pumd_id">
-              <td class="tc">{{ i + 1 }}</td>
-              <td>{{ sumberLabel(d.sumber) }}</td>
-              <td class="mono">{{ d.nomor_header }}</td>
-              <td>{{ d.nama }}</td>
-              <td class="tr">{{ numFmt(d.nominal_ajuan) }}</td>
+            <tr v-if="kasbonRow" class="row-kasbon">
+              <td class="tc">
+                <button
+                  type="button"
+                  class="expand-btn"
+                  @click="showItemDetail = !showItemDetail"
+                >
+                  <IconChevronDown v-if="showItemDetail" :size="14" />
+                  <IconChevronRight v-else :size="14" />
+                </button>
+              </td>
+              <td>{{ sumberLabel(kasbonRow.sumber) }}</td>
+              <td class="mono">{{ kasbonRow.nomor_header }}</td>
+              <td>{{ kasbonRow.nama }}</td>
+              <td class="tr">{{ numFmt(kasbonRow.nominal_ajuan) }}</td>
               <td class="tc">
                 <input
                   type="checkbox"
-                  :checked="d.status_acc === 'ACC'"
-                  @change="toggleAcc(d, 'ACC')"
+                  :checked="kasbonRow.status_acc === 'ACC'"
+                  @change="toggleAcc(kasbonRow, 'ACC')"
                 />
               </td>
               <td class="tc">
                 <input
                   type="checkbox"
-                  :checked="d.status_acc === 'TOLAK'"
-                  @change="toggleAcc(d, 'TOLAK')"
+                  :checked="kasbonRow.status_acc === 'TOLAK'"
+                  @change="toggleAcc(kasbonRow, 'TOLAK')"
                 />
               </td>
               <td>
                 <NumberInputIDR
-                  v-model="d.nominal_acc"
-                  :disabled="d.status_acc === 'TOLAK'"
+                  v-model="kasbonRow.nominal_acc"
+                  :disabled="kasbonRow.status_acc === 'TOLAK'"
                   cursor-to-end
                 />
               </td>
-              <template v-if="d.sumber === 'PERMINTAAN_PEMBELIAN'">
-                <td>
-                  <div
-                    class="rl-lookup-cell"
-                    :class="{ disabled: d.status_acc === 'TOLAK' }"
-                    @click="d.status_acc !== 'TOLAK' && openSupplierModal(i)"
-                  >
-                    <span>{{ d.kdsup || "-" }}</span>
-                    <IconSearch :size="12" :stroke-width="1.7" />
-                  </div>
-                </td>
-                <td>{{ d.supplier || "-" }}</td>
-                <td>{{ d.bank || "-" }}</td>
-                <td>{{ d.rekening || "-" }}</td>
-                <td>{{ d.atasnama || "-" }}</td>
-              </template>
-              <template v-else>
-                <td colspan="5"></td>
-              </template>
             </tr>
+            <template v-if="showItemDetail">
+              <tr
+                v-for="(d, i) in itemRows"
+                :key="d.pumd_id ?? i"
+                class="row-locked row-detail"
+              >
+                <td class="tc"></td>
+                <td>{{ sumberLabel(d.sumber) }}</td>
+                <td class="mono">{{ d.nomor_header }}</td>
+                <td>{{ d.nama }}</td>
+                <td class="tr">{{ numFmt(d.nominal_sumber) }}</td>
+                <td class="tc"><input type="checkbox" checked disabled /></td>
+                <td class="tc"><input type="checkbox" disabled /></td>
+                <td class="tr">-</td>
+              </tr>
+            </template>
           </tbody>
           <tfoot>
             <tr>
-              <td colspan="6" class="tr fw">Total Nominal Realisasi</td>
+              <td colspan="7" class="tr fw">Total Nominal Realisasi</td>
               <td class="fw">{{ numFmt(totalAcc) }}</td>
-              <td colspan="5"></td>
             </tr>
           </tfoot>
         </table>
@@ -344,10 +391,6 @@ const onValidateSave = () => {
     v-model="showAccountModal"
     :jenis="formData.jenis"
     @selected="onAccountSelected"
-  />
-  <SupplierSearchModal
-    v-model="showSupplierModal"
-    @selected="onSupplierSelected"
   />
 </template>
 
@@ -422,6 +465,12 @@ const onValidateSave = () => {
   font-weight: 700;
   white-space: nowrap;
 }
+.rl-table thead th.tr {
+  text-align: right;
+}
+.rl-table thead th.tc {
+  text-align: center;
+}
 .rl-table tbody td {
   padding: 4px 8px;
   border-bottom: 1px solid #eee;
@@ -438,5 +487,33 @@ const onValidateSave = () => {
 }
 .fw {
   font-weight: 700;
+}
+.row-locked {
+  background: #fafafa;
+  color: #9e9e9e;
+}
+.row-locked input[type="checkbox"] {
+  cursor: not-allowed;
+}
+.row-kasbon {
+  background: #e3f2fd;
+  font-weight: 700;
+}
+.expand-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #1565c0;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.expand-btn:hover {
+  color: #0d47a1;
+}
+.row-detail td {
+  padding-left: 20px;
+  font-size: 11px;
 }
 </style>

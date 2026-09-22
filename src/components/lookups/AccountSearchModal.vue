@@ -12,7 +12,7 @@ interface Account {
 const props = defineProps<{
   modelValue: boolean;
   filterMode?: "potongan";
-  jenis?: "KAS" | "BANK";
+  jenis?: "KAS" | "BANK" | "ALL";
 }>();
 const emit = defineEmits(["update:modelValue", "selected"]);
 

@@ -4,6 +4,8 @@ export const pengajuanUangMukaService = {
   create(payload: {
     tanggal: string;
     keterangan?: string;
+    nota?: string;
+    nominalDiajukan: number;
     items: {
       sumber: string;
       nomorHeader: string;
@@ -12,7 +14,6 @@ export const pengajuanUangMukaService = {
       satuan?: string;
       qty?: number;
       keterangan?: string;
-      nominal: number;
       nominalAsli?: number;
     }[];
   }) {
@@ -31,6 +32,11 @@ export const pengajuanUangMukaService = {
   getDetail(nomor: string) {
     return api.get(
       `/pembelian/pengajuan-uang-muka/${encodeURIComponent(nomor)}`,
+    );
+  },
+  getPrintData(nomor: string) {
+    return api.get(
+      `/pembelian/pengajuan-uang-muka/print/${encodeURIComponent(nomor)}`,
     );
   },
 };

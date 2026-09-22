@@ -16,6 +16,10 @@ export const uangMukaRealisasiService = {
       `/pembelian/uang-muka-realisasi/${encodeURIComponent(nomor)}`,
     );
   },
+  getPrintData: (nomor: string) =>
+    api.get(
+      `/pembelian/uang-muka-realisasi/print/${encodeURIComponent(nomor)}`,
+    ),
   saveRealisasi(nomor: string, payload: any) {
     return api.post(
       `/pembelian/uang-muka-realisasi/${encodeURIComponent(nomor)}/realisasi`,
