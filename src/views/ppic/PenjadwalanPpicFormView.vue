@@ -721,7 +721,7 @@ const tambahManual = async () => {
         Pesan: k.Pesan,
         Kirim: k.Kirim,
         Kurang: k.Kurang,
-        Rencana: activeFormTab.value === "MAP" ? 0 : Number(k.Kurang) || 0,
+        Rencana: Number(k.Pesan) || 0,
         Realisasi: activeFormTab.value === "MAP" ? k.Realisasi : 0,
         PermintaanKirim: k.DatelineAsli || "",
       };
