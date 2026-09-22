@@ -3,14 +3,13 @@ import Vue from "@vitejs/plugin-vue";
 import Fonts from "unplugin-fonts/vite";
 import { defineConfig } from "vite";
 import Vuetify, { transformAssetUrls } from "vite-plugin-vuetify";
+import { VitePWA } from "vite-plugin-pwa";
 
-// https://vitejs.dev/config/
 export default defineConfig({
   plugins: [
     Vue({
       template: { transformAssetUrls },
     }),
-    // https://github.com/vuetifyjs/vuetify-loader/tree/master/packages/vite-plugin#readme
     Vuetify({
       autoImport: true,
     }),
@@ -23,6 +22,69 @@ export default defineConfig({
             styles: ["normal", "italic"],
           },
         ],
+      },
+    }),
+    VitePWA({
+      registerType: "prompt", // munculkan tombol "update tersedia" daripada auto-reload paksa
+      includeAssets: ["favicon.ico", "pwa/*.png"],
+      manifest: {
+        name: "Manksi Web",
+        short_name: "Manksi",
+        description: "Manksi Web Application",
+        theme_color: "#1e2327",
+        background_color: "#ffffff",
+        display: "standalone", // bikin tampil seperti app desktop/Android, tanpa address bar
+        display_override: ["window-controls-overlay", "standalone"],
+        start_url: "/",
+        scope: "/",
+        orientation: "any",
+        icons: [
+          {
+            src: "/pwa/pwa-192x192.png",
+            sizes: "192x192",
+            type: "image/png",
+          },
+          {
+            src: "/pwa/pwa-512x512.png",
+            sizes: "512x512",
+            type: "image/png",
+          },
+          {
+            src: "/pwa/maskable-icon-512x512.png",
+            sizes: "512x512",
+            type: "image/png",
+            purpose: "maskable",
+          },
+        ],
+      },
+      workbox: {
+        // cache asset build (js/css/font) + cache CDN scripts yang dipakai di index.html
+        globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
+        runtimeCaching: [
+          {
+            urlPattern: /^https:\/\/cdnjs\.cloudflare\.com\/.*/i,
+            handler: "CacheFirst",
+            options: {
+              cacheName: "cdn-libs-cache",
+              expiration: { maxEntries: 30, maxAgeSeconds: 60 * 60 * 24 * 30 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+          {
+            // sesuaikan pola ini dengan base URL API kamu
+            urlPattern: /\/api\/.*/i,
+            handler: "NetworkFirst",
+            options: {
+              cacheName: "api-cache",
+              networkTimeoutSeconds: 10,
+              expiration: { maxEntries: 100, maxAgeSeconds: 60 * 5 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+        ],
+      },
+      devOptions: {
+        enabled: false, // set true kalau mau test service worker saat `npm run dev`
       },
     }),
   ],
