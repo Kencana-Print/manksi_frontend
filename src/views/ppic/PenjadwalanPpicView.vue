@@ -224,6 +224,43 @@ watch(
   { deep: true },
 );
 
+const showNotifDialog = ref(false);
+const notifPeriodeList = ref<any[]>([]);
+
+const checkUnnotifiedMap = async () => {
+  const bagian = authStore.user?.bagian?.toUpperCase();
+  if (bagian === "MARKETING") return; // notifikasi ini buat non-Marketing (yg isi Kesepakatan)
+  try {
+    const res = await penjadwalanPpicService.getUnnotifiedMap();
+    const list = res.data.data || [];
+    if (list.length > 0) {
+      notifPeriodeList.value = list;
+      showNotifDialog.value = true;
+    }
+  } catch {
+    // Silent — notifikasi bukan fitur kritikal, jangan ganggu load halaman
+  }
+};
+
+const closeNotifDialog = async () => {
+  const allIds = notifPeriodeList.value.flatMap((p) =>
+    p.items.map((i: any) => i.pjwdId),
+  );
+  showNotifDialog.value = false;
+  if (allIds.length > 0) {
+    try {
+      await penjadwalanPpicService.markMapNotified(allIds);
+    } catch {
+      // Best-effort — kalau gagal, akan muncul lagi next load, tidak fatal
+    }
+  }
+};
+
+const openFromNotif = (pjwNomor: string) => {
+  closeNotifDialog();
+  router.push(`/ppic/penjadwalan/edit/${encodeURIComponent(pjwNomor)}`);
+};
+
 const fetchData = async () => {
   isLoading.value = true;
   selected.value = [];
@@ -724,6 +761,7 @@ const nomorTampil = (d: DetailRow) =>
 
 loadCabang();
 fetchData();
+checkUnnotifiedMap();
 </script>
 
 <template>
@@ -1394,6 +1432,61 @@ fetchData();
           :loading="pencapaianSaving"
           @click="savePencapaian"
           >Simpan</v-btn
+        >
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
+
+  <v-dialog v-model="showNotifDialog" max-width="900" persistent>
+    <v-card
+      class="rounded-lg"
+      style="max-height: 90vh; display: flex; flex-direction: column"
+    >
+      <v-card-title
+        class="bg-orange-darken-2 text-white pa-3 d-flex align-center flex-shrink-0"
+        style="font-size: 15px; font-weight: 700"
+      >
+        <IconCalendarWeek :size="18" class="mr-2" />
+        Komitmen Kirim Sampel Baru
+      </v-card-title>
+      <v-card-text class="pa-4" style="flex: 1; overflow-y: auto">
+        <div v-for="p in notifPeriodeList" :key="p.pjwNomor" class="mb-4">
+          <div
+            class="d-flex align-center justify-space-between mb-2"
+            style="cursor: pointer"
+            @click="openFromNotif(p.pjwNomor)"
+          >
+            <div>
+              <span
+                class="font-weight-bold text-primary"
+                style="font-size: 13px"
+                >{{ p.pjwNomor }}</span
+              >
+              <span class="text-grey ml-2" style="font-size: 13px">
+                ({{ formatTanggal(p.tgl1) }} s/d {{ formatTanggal(p.tgl2) }},
+                {{ p.cab }})
+              </span>
+            </div>
+            <v-icon size="18" color="primary">mdi-arrow-right</v-icon>
+          </div>
+          <ul
+            style="
+              font-size: 13px;
+              padding-left: 20px;
+              margin: 0;
+              line-height: 1.7;
+            "
+          >
+            <li v-for="it in p.items" :key="it.pjwdId">
+              <span class="mono">{{ it.mapNomor }}</span> — {{ it.nama }}
+            </li>
+          </ul>
+        </div>
+      </v-card-text>
+      <v-card-actions class="pa-3 border-t bg-grey-lighten-4 flex-shrink-0">
+        <v-spacer />
+        <v-btn variant="text" style="font-size: 13px" @click="closeNotifDialog"
+          >Tutup</v-btn
         >
       </v-card-actions>
     </v-card>

@@ -1290,13 +1290,6 @@ const setSetoranPembayaran = (v: any) => {
             class="f-date"
             style="width: 120px"
           />
-          <label class="f-lbl ml-2" style="width: 80px">Estimasi Jadi</label>
-          <input
-            type="date"
-            v-model="formData.EstimasiJadi"
-            class="f-date"
-            style="width: 120px"
-          />
         </div>
 
         <div class="f-row">

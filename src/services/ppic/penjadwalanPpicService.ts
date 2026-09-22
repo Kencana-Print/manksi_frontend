@@ -22,6 +22,9 @@ export const penjadwalanPpicService = {
   },
   getPencapaian: (nomor: string) =>
     api.get(`/ppic/penjadwalan/${encodeURIComponent(nomor)}/pencapaian`),
+  getUnnotifiedMap: () => api.get("/ppic/penjadwalan/notif-map"),
+  markMapNotified: (pjwdIds: number[]) =>
+    api.post("/ppic/penjadwalan/notif-map/mark-read", { pjwdIds }),
 
   savePencapaian: (
     nomor: string,
