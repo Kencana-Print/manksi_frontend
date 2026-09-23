@@ -185,9 +185,6 @@ const onPrint = () => {
 };
 
 const onExportHeader = async () => {
-  // ⬅ DIUBAH: ambil dari getFilteredItems() dulu — ini yang mengikutkan
-  // search box & column filter aktif di BaseBrowse. items.value cuma
-  // fallback kalau ref belum ke-mount.
   const rows = baseBrowseRef.value?.getFilteredItems?.() ?? items.value ?? [];
   if (!rows.length) return toast.warning("Tidak ada data untuk diekspor.");
   try {
@@ -196,7 +193,15 @@ const onExportHeader = async () => {
       "MKA Header",
       [
         { header: "Nomor", key: "Nomor", width: 18 },
-        { header: "Tanggal", key: "Tanggal", width: 12, align: "center" },
+        // ⬅ BARU: numFmt eksplisit — Excel nampilin sesuai ini, bukan
+        // menebak ulang dari string saat file dibuka
+        {
+          header: "Tanggal",
+          key: "Tanggal",
+          width: 12,
+          align: "center",
+          numFmt: "dd/mm/yyyy",
+        },
         { header: "Divisi", key: "Divisi", width: 12 },
         { header: "No. SPK", key: "SPK", width: 18 },
         { header: "Nama SPK", key: "NamaSpk", width: 40 },
@@ -214,7 +219,11 @@ const onExportHeader = async () => {
       ],
       rows.map((r: any) => ({
         ...r,
-        Tanggal: formatTanggalLocale(r.Tanggal),
+        // ⬅ DIUBAH: kirim Date object mentah, bukan string dari
+        // formatTanggalLocale — biar Excel simpan sebagai tipe Date
+        // beneran, tampilannya dikontrol numFmt di atas, bukan
+        // ditebak ulang oleh Excel pas file dibuka.
+        Tanggal: r.Tanggal ? new Date(r.Tanggal) : null,
         StatusMka: r.StatusMka || "-",
       })),
       `MKA Periode ${dtAwal.value} s/d ${dtAkhir.value}`,
@@ -241,24 +250,20 @@ const onExportDetail = async () => {
     });
     const allDetail = res.data.data || [];
 
-    // ⬅ BARU: kelompokkan detail per Nomor MKA
     const detailByNomor: Record<string, any[]> = {};
     for (const d of allDetail) {
       if (!detailByNomor[d.Nomor]) detailByNomor[d.Nomor] = [];
       detailByNomor[d.Nomor].push(d);
     }
 
-    // ⬅ BARU: pola master-detail merge — sama seperti exportDetail di
-    // SpkVsStbjView.vue. Kolom header (Nomor, Tanggal, Status, dst)
-    // cuma diisi di baris PERTAMA tiap grup MKA, baris berikutnya
-    // dikosongkan supaya tidak berulang di Excel.
     const combinedRows: any[] = [];
     for (const item of headerRows) {
       const detail = detailByNomor[item.Nomor] || [];
 
       const masterCells = {
         Nomor: item.Nomor,
-        Tanggal: formatTanggalLocale(item.Tanggal),
+        // ⬅ DIUBAH: Date object, bukan formatTanggalLocale
+        Tanggal: item.Tanggal ? new Date(item.Tanggal) : null,
         Divisi: item.Divisi,
         SPK: item.SPK,
         NamaSpk: item.NamaSpk,
@@ -299,7 +304,13 @@ const onExportDetail = async () => {
       "MKA Detail",
       [
         { header: "Nomor MKA", key: "Nomor", width: 18 },
-        { header: "Tanggal", key: "Tanggal", width: 12, align: "center" },
+        {
+          header: "Tanggal",
+          key: "Tanggal",
+          width: 12,
+          align: "center",
+          numFmt: "dd/mm/yyyy",
+        }, // ⬅ BARU
         { header: "Divisi", key: "Divisi", width: 12 },
         { header: "No. SPK", key: "SPK", width: 18 },
         { header: "Nama SPK", key: "NamaSpk", width: 30 },
