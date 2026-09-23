@@ -144,6 +144,8 @@ const STATUS_FINANCE_LABEL: Record<
     color: "#1565c0",
     bg: "#e3f2fd",
   },
+  SUDAH_DIPENUHI: { label: "Sudah Dipenuhi", color: "#2e7d32", bg: "#e8f5e9" },
+  BELUM_DIPENUHI: { label: "Belum Dipenuhi", color: "#c62828", bg: "#ffebee" },
   BULAN_DEPAN: { label: "Bulan Depan", color: "#7b1fa2", bg: "#f3e5f5" },
   OTORISASI: { label: "Otorisasi", color: "#c2185b", bg: "#fce4ec" },
 };
