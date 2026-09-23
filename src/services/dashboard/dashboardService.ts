@@ -26,6 +26,11 @@ export const dashboardService = {
       params: { bulan, tahun },
     });
   },
+  getTargetCollectionDetail: (params: {
+    salKode?: string | null;
+    bulan?: number;
+    tahun?: number;
+  }) => api.get("/dashboard/target-collection/detail", { params }),
   getPotensiSourceOptions: (
     namaCustomer = "",
     sumber?: "PENAWARAN" | "MAP",

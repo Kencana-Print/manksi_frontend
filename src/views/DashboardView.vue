@@ -400,6 +400,13 @@ const fmtDec = (val: number, d = 2) =>
     minimumFractionDigits: d,
     maximumFractionDigits: d,
   });
+// ⬅ BARU: tampilkan surplus (target sudah terlampaui) dengan tanda "+",
+// bukan angka negatif yang membingungkan — nilai aslinya tetap sama,
+// cuma cara render-nya yang beda.
+const fmtSisaCollection = (val: number) => {
+  if (val < 0) return `+${fmtNum(Math.abs(val))}`;
+  return fmtNum(val);
+};
 const fmtPct = (val: number | null) =>
   val === null ? "—" : `${val >= 100 ? Math.round(val) : fmtDec(val, 1)}%`;
 const pctColor = (val: number | null) => {
@@ -1800,6 +1807,52 @@ const fetchPotensiSummary = async () => {
     /* silent */
   }
 };
+
+// ── Drill-down Target Collection ──
+interface TargetDetailItem {
+  nota: string;
+  tanggal: string;
+  cusKode: string;
+  cusNama: string;
+  debet: number;
+  sisa: number;
+}
+
+const showTargetDetailDialog = ref(false);
+const isTargetDetailLoading = ref(false);
+const targetDetailSalNama = ref("");
+const targetDetailItems = ref<TargetDetailItem[]>([]);
+const targetDetailLabel = ref("");
+
+const openTargetDetail = async (row: {
+  salKode: string;
+  namaSales: string;
+}) => {
+  targetDetailSalNama.value = row.namaSales;
+  showTargetDetailDialog.value = true;
+  isTargetDetailLoading.value = true;
+  targetDetailItems.value = [];
+  try {
+    const res = await dashboardService.getTargetCollectionDetail({
+      salKode: row.salKode,
+      bulan: targetCollectionData.value?.bulan,
+      tahun: targetCollectionData.value?.tahun,
+    });
+    targetDetailLabel.value = res.data.data?.targetBulanLabel || "";
+    targetDetailItems.value = res.data.data?.items || [];
+  } catch (e: any) {
+    alert(e?.response?.data?.message || "Gagal memuat detail invoice.");
+  } finally {
+    isTargetDetailLoading.value = false;
+  }
+};
+
+const targetDetailTotal = computed(() =>
+  targetDetailItems.value.reduce((sum, it) => sum + it.debet, 0),
+);
+const targetDetailSisaTotal = computed(() =>
+  targetDetailItems.value.reduce((sum, it) => sum + it.sisa, 0),
+);
 
 // ── Dialog: Set Potensial (multi-select, 2 tab) ──
 const showSetPotensiDialog = ref(false);
@@ -4475,7 +4528,14 @@ const sisaClass = (item: any) => {
                           v-for="row in targetCollectionData.items"
                           :key="row.salKode"
                         >
-                          <td>{{ row.namaSales }}</td>
+                          <td>
+                            <span
+                              class="td-sales-link"
+                              @click="openTargetDetail(row)"
+                            >
+                              {{ row.namaSales }}
+                            </span>
+                          </td>
                           <td class="tr">{{ fmtNum(row.targetBulanIni) }}</td>
                           <td class="tr" style="color: #c62828">
                             {{ fmtNum(row.piutangSaatIni) }}
@@ -4489,7 +4549,7 @@ const sisaClass = (item: any) => {
                                   : '#2e7d32',
                             }"
                           >
-                            {{ fmtNum(row.sisaCollectionMtd) }}
+                            {{ fmtSisaCollection(row.sisaCollectionMtd) }}
                           </td>
                           <td class="tc">
                             <span
@@ -4549,7 +4609,7 @@ const sisaClass = (item: any) => {
                             }"
                           >
                             {{
-                              fmtNum(
+                              fmtSisaCollection(
                                 targetCollectionData.grandTotal
                                   .sisaCollectionMtd,
                               )
@@ -6366,7 +6426,14 @@ const sisaClass = (item: any) => {
                           v-for="row in targetCollectionData.items"
                           :key="row.salKode"
                         >
-                          <td>{{ row.namaSales }}</td>
+                          <td>
+                            <span
+                              class="td-sales-link"
+                              @click="openTargetDetail(row)"
+                            >
+                              {{ row.namaSales }}
+                            </span>
+                          </td>
                           <td class="tr">{{ fmtNum(row.targetBulanIni) }}</td>
                           <td class="tr" style="color: #c62828">
                             {{ fmtNum(row.piutangSaatIni) }}
@@ -6380,7 +6447,7 @@ const sisaClass = (item: any) => {
                                   : '#2e7d32',
                             }"
                           >
-                            {{ fmtNum(row.sisaCollectionMtd) }}
+                            {{ fmtSisaCollection(row.sisaCollectionMtd) }}
                           </td>
                           <td class="tc">
                             <span
@@ -6440,7 +6507,7 @@ const sisaClass = (item: any) => {
                             }"
                           >
                             {{
-                              fmtNum(
+                              fmtSisaCollection(
                                 targetCollectionData.grandTotal
                                   .sisaCollectionMtd,
                               )
@@ -9782,6 +9849,76 @@ const sisaClass = (item: any) => {
       </v-card>
     </v-dialog>
 
+    <v-dialog v-model="showTargetDetailDialog" max-width="960px" scrollable>
+      <v-card class="rounded-lg">
+        <v-card-title class="bg-primary text-white d-flex align-center pa-3">
+          <span class="text-subtitle-1 font-weight-bold">
+            Detail Invoice Target Collection — {{ targetDetailSalNama }}
+          </span>
+        </v-card-title>
+        <v-card-text class="pa-3" style="max-height: 60vh">
+          <div v-if="isTargetDetailLoading" class="text-center py-6 text-grey">
+            Memuat data...
+          </div>
+          <template v-else>
+            <div class="text-caption text-grey mb-2">
+              Invoice terbit bulan {{ targetDetailLabel }}
+            </div>
+            <table class="td-detail-table" style="min-width: 780px">
+              <thead>
+                <tr>
+                  <th style="width: 160px">No. Invoice</th>
+                  <th style="width: 100px">Tanggal</th>
+                  <th style="width: 220px">Customer</th>
+                  <th class="tr">Nilai Invoice</th>
+                  <th class="tr">Sisa Hari Ini</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="it in targetDetailItems" :key="it.nota">
+                  <td class="fw">{{ it.nota }}</td>
+                  <td>{{ it.tanggal }}</td>
+                  <td>{{ it.cusNama || it.cusKode }}</td>
+                  <td class="tr">{{ it.debet.toLocaleString("id-ID") }}</td>
+                  <td
+                    class="tr"
+                    :style="{ color: it.sisa > 0 ? '#c62828' : '#2e7d32' }"
+                  >
+                    {{ it.sisa.toLocaleString("id-ID") }}
+                  </td>
+                </tr>
+                <tr v-if="!targetDetailItems.length">
+                  <td
+                    colspan="5"
+                    class="text-center text-grey py-4 font-italic"
+                  >
+                    Tidak ada invoice.
+                  </td>
+                </tr>
+              </tbody>
+              <tfoot v-if="targetDetailItems.length">
+                <tr>
+                  <td colspan="3" class="tr fw">TOTAL</td>
+                  <td class="tr fw">
+                    {{ targetDetailTotal.toLocaleString("id-ID") }}
+                  </td>
+                  <td class="tr fw">
+                    {{ targetDetailSisaTotal.toLocaleString("id-ID") }}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </template>
+        </v-card-text>
+        <v-card-actions class="pa-3 border-t bg-grey-lighten-4">
+          <v-spacer />
+          <v-btn variant="text" @click="showTargetDetailDialog = false"
+            >Tutup</v-btn
+          >
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
     <v-dialog v-model="isBapAuditDialogVisible" persistent max-width="900px">
       <v-card class="spk-dialog-card" rounded="lg">
         <div
@@ -11902,6 +12039,41 @@ const sisaClass = (item: any) => {
 
 .potensi-src-row--selected {
   background: #fff3e0;
+}
+
+.td-sales-link {
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  color: inherit;
+}
+.td-sales-link:hover {
+  color: #1565c0;
+}
+.td-detail-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.td-detail-table th {
+  background: #eceff1;
+  padding: 6px 8px;
+  text-align: left;
+  border-bottom: 2px solid #b0bec5;
+}
+.td-detail-table td {
+  padding: 5px 8px;
+  border-bottom: 1px solid #f0f0f0;
+}
+.td-detail-table .tr {
+  text-align: right;
+}
+.td-detail-table .fw {
+  font-weight: 700;
+}
+.td-detail-table th,
+.td-detail-table td {
+  white-space: nowrap;
 }
 
 @keyframes highlight-fade {
