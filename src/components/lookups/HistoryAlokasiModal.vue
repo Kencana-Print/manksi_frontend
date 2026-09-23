@@ -49,6 +49,9 @@ watch([items, search], () => {
       String(i.Alamat ?? "")
         .toLowerCase()
         .includes(q) ||
+      String(i.Toko ?? "")
+        .toLowerCase()
+        .includes(q) ||
       String(i.Kota ?? "")
         .toLowerCase()
         .includes(q),
@@ -89,7 +92,7 @@ const submitSelection = () => {
         <input
           v-model="search"
           type="text"
-          placeholder="Cari alamat atau kota..."
+          placeholder="Cari alamat, toko, atau kota..."
           class="search-input"
           autofocus
         />
@@ -124,7 +127,8 @@ const submitSelection = () => {
                 />
               </th>
               <th>ALAMAT</th>
-              <th style="width: 160px">KOTA</th>
+              <th style="width: 150px">TOKO</th>
+              <th style="width: 130px">KOTA</th>
             </tr>
           </thead>
           <tbody>
@@ -157,6 +161,7 @@ const submitSelection = () => {
                 />
               </td>
               <td class="td-alamat">{{ item.Alamat }}</td>
+              <td>{{ item.Toko || "-" }}</td>
               <td>{{ item.Kota }}</td>
             </tr>
           </tbody>

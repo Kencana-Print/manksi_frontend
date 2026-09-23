@@ -143,6 +143,7 @@ const appendHistoryAlokasi = (selectedRows: any[]) => {
     if (!exists) {
       dialogData.value.alokasi.push({
         alamat: row.Alamat,
+        toko: row.Toko || "",
         kota: row.Kota,
         person: "",
         hp: "",
@@ -154,6 +155,7 @@ const appendHistoryAlokasi = (selectedRows: any[]) => {
 const addRow = () => {
   dialogData.value.alokasi.push({
     alamat: "",
+    toko: "",
     kota: "",
     person: "",
     hp: "",
@@ -186,10 +188,11 @@ const handleExcelUpload = (e: Event) => {
         if (row[0] && String(row[0]).trim() !== "") {
           dialogData.value.alokasi.push({
             alamat: String(row[0] || "").trim(),
-            kota: String(row[1] || "").trim(),
-            person: String(row[2] || "").trim(),
-            hp: String(row[3] || "").trim(),
-            jumlah: Number(row[4]) || 0,
+            toko: String(row[1] || "").trim(), // ⬅ BARU, kolom baru di posisi 1
+            kota: String(row[2] || "").trim(), // ⬅ digeser dari 1 → 2
+            person: String(row[3] || "").trim(), // ⬅ digeser dari 2 → 3
+            hp: String(row[4] || "").trim(), // ⬅ digeser dari 3 → 4
+            jumlah: Number(row[5]) || 0, // ⬅ digeser dari 4 → 5
           });
           count++;
         }
@@ -423,6 +426,7 @@ const onExport = async () => {
                 <tr>
                   <th style="width: 40px" class="text-center">No</th>
                   <th style="text-align: left; min-width: 320px">Alamat</th>
+                  <th style="text-align: left; min-width: 160px">Nama Toko</th>
                   <th style="text-align: left; width: 160px">Kota</th>
                   <th style="text-align: left; width: 150px">Kontak Person</th>
                   <th style="text-align: left; width: 140px">No. HP</th>
@@ -444,6 +448,14 @@ const onExport = async () => {
                   <td class="ll-td-inp">
                     <input
                       type="text"
+                      v-model="row.toko"
+                      class="ll-cell"
+                      placeholder="Nama toko..."
+                    />
+                  </td>
+                  <td class="ll-td-inp">
+                    <input
+                      type="text"
                       v-model="row.kota"
                       class="ll-cell"
                       placeholder="Kota"
@@ -454,7 +466,7 @@ const onExport = async () => {
                       type="text"
                       v-model="row.person"
                       class="ll-cell"
-                      placeholder="Nama kontak"
+                      placeholder="Nama / MD Region"
                     />
                   </td>
                   <td class="ll-td-inp">
@@ -486,13 +498,36 @@ const onExport = async () => {
                   v-if="!dialogData.alokasi || dialogData.alokasi.length === 0"
                 >
                   <td
-                    colspan="7"
+                    colspan="8"
                     class="text-center text-grey py-4 font-italic"
                   >
                     Belum ada data alokasi.
                   </td>
                 </tr>
               </tbody>
+              <tfoot v-if="dialogData.alokasi && dialogData.alokasi.length > 0">
+                <tr>
+                  <td
+                    colspan="6"
+                    class="text-right font-weight-bold py-1 px-2"
+                    style="background: #f5f5f5"
+                  >
+                    TOTAL QTY ALOKASI :
+                  </td>
+                  <td
+                    class="text-right font-weight-bold py-1 px-2"
+                    :class="
+                      totalAlokasi() === dialogData.qtyOrder
+                        ? 'text-success'
+                        : 'text-warning'
+                    "
+                    style="background: #e3f2fd"
+                  >
+                    {{ fmtNum(totalAlokasi()) }}
+                  </td>
+                  <td style="background: #f5f5f5"></td>
+                </tr>
+              </tfoot>
               <tfoot v-if="dialogData.alokasi && dialogData.alokasi.length > 0">
                 <tr>
                   <td
