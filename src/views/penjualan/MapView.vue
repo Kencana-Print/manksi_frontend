@@ -60,6 +60,7 @@ const filterState = ref({
 // --- STATE UNTUK MODAL GAMBAR & ALASAN ---
 const dialogGambar = ref(false);
 const gambarUrl = ref("");
+const gambarLoaded = ref(false);
 
 const dialogAlasan = ref(false);
 const alasanText = ref("");
@@ -437,37 +438,34 @@ const lihatGambar = () => {
   const base = api.defaults.baseURL?.replace(/\/api\/?$/, "") || "";
   const cab = item.Cab || "HO-";
 
-  fallbackStep.value = 0; // ✅ Reset step tiap buka gambar baru
+  fallbackStep.value = 0;
+  gambarLoaded.value = false; // ⬅ reset tiap buka gambar baru
   gambarUrl.value = `${base}/images/${cab}/map/${encodeURIComponent(item.Nomor)}.jpg`;
   dialogGambar.value = true;
 };
 
+const onGambarLoad = () => {
+  gambarLoaded.value = true; // ⬅ BARU: dipanggil dari @load di <v-img>
+};
+
 const onGambarError = () => {
+  gambarLoaded.value = false; // ⬅ tetap false selama masih dalam proses fallback
   if (selected.value.length === 0) return;
   const item = selected.value[0];
 
   const nomor = item.Nomor;
-  const referensi = item.NoReferensi || item.MAP || ""; // Field referensi dari row
+  const referensi = item.NoReferensi || item.MAP || "";
   const cab = item.Cab || "HO-";
   const base = api.defaults.baseURL?.replace(/\/api\/?$/, "") || "";
 
-  // Daftar urutan URL fallback yang akan dicoba berurutan jika gambar sebelumnya 404
   const fallbacks: string[] = [];
-
-  // 1. Coba MAP ini di root VPS lama (/mnt/image -> /file-gambar)
   if (nomor) fallbacks.push(`/file-gambar/${encodeURIComponent(nomor)}.jpg`);
-
-  // 2. Jika ini MAP revisi, coba gambar referensinya di folder upload baru
   if (referensi)
     fallbacks.push(
       `${base}/images/${cab}/map/${encodeURIComponent(referensi)}.jpg`,
     );
-
-  // 3. Coba gambar referensi di root VPS lama
   if (referensi)
     fallbacks.push(`/file-gambar/${encodeURIComponent(referensi)}.jpg`);
-
-  // 4. Coba cari di subfolder mintaharga (jaga-jaga sumber awalnya dari sana)
   if (nomor)
     fallbacks.push(`/file-gambar/mintaharga/${encodeURIComponent(nomor)}.jpg`);
   if (referensi)
@@ -475,12 +473,10 @@ const onGambarError = () => {
       `/file-gambar/mintaharga/${encodeURIComponent(referensi)}.jpg`,
     );
 
-  // Eksekusi fallback secara bertahap
   if (fallbackStep.value < fallbacks.length) {
     gambarUrl.value = fallbacks[fallbackStep.value];
     fallbackStep.value++;
   } else {
-    // Jika semua opsi habis dan gagal, kosongkan agar <v-img> menampilkan icon #error
     gambarUrl.value = "";
   }
 };
@@ -928,6 +924,7 @@ const confirmToggleClose = async () => {
           contain
           class="bg-white rounded border"
           @error="onGambarError"
+          @load="onGambarLoad"
         >
           <template v-slot:placeholder>
             <div
@@ -956,7 +953,13 @@ const confirmToggleClose = async () => {
 
       <v-card-actions class="bg-white pa-2 border-t">
         <v-spacer></v-spacer>
-        <v-btn color="primary" variant="text" :href="gambarUrl" target="_blank">
+        <v-btn
+          color="primary"
+          variant="text"
+          :href="gambarUrl"
+          target="_blank"
+          :disabled="!gambarLoaded"
+        >
           <template #prepend
             ><IconExternalLink :size="15" :stroke-width="1.7"
           /></template>
