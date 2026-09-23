@@ -19,8 +19,10 @@ import {
 import BarangGarmenSearchModal from "@/components/lookups/BarangGarmenSearchModal.vue";
 
 interface GambarRow {
-  file_path: string;
+  file_path: string; // server URL (existing) ATAU blob: URL (baru dipilih, belum tersimpan)
   keterangan: string;
+  file?: File; // ⬅ BARU: File mentah, cuma ada kalau gambar ini belum ke-upload
+  pendingKey?: string; // ⬅ BARU: id unik, dipakai backend buat matching file
 }
 interface TargetJadiRow {
   kode_jadi: string;
@@ -139,31 +141,61 @@ const {
     };
   },
   submitApi: async (data: MaklonFormData) => {
-    return await maklonBarangFormService.save({
-      header: {
+    const detailsPayload = data.Details.map((r) => ({
+      kode_polos: r.is_freetext ? r.nama_polos_manual : r.kode_polos,
+      is_freetext: r.is_freetext,
+      nama_polos_manual: r.nama_polos_manual,
+      qty_kirim: Number(r.qty_kirim) || 0,
+      satuan_kirim: r.satuan_kirim,
+      keterangan: r.keterangan,
+      target_jadi: r.target_jadi
+        .filter((t) => t.kode_jadi)
+        .map((t) => ({
+          kode_jadi: t.kode_jadi,
+          estimasi_qty: Number(t.estimasi_qty) || 0,
+          // ⬅ DIUBAH: gambar yang punya `file` (belum ke-upload) dikirim
+          // sebagai { pendingKey, keterangan } saja — bukan file_path blob
+          // yang tidak berarti apa-apa buat backend. Gambar lama (edit
+          // mode, sudah ada di server) tetap kirim file_path aslinya.
+          gambar: t.gambar.map((g) =>
+            g.file
+              ? { pendingKey: g.pendingKey, keterangan: g.keterangan }
+              : { file_path: g.file_path, keterangan: g.keterangan },
+          ),
+        })),
+    }));
+
+    const fd = new FormData();
+    fd.append(
+      "header",
+      JSON.stringify({
         mkl_nomor: isEditMode.value ? data.Nomor : undefined,
         mkl_tanggal: data.Tanggal,
         mkl_cab_asal: data.CabAsal,
         mkl_cab_tujuan: data.CabTujuan,
         mkl_deadline: data.Deadline,
         mkl_keterangan: data.Keterangan,
-      },
-      details: data.Details.map((r) => ({
-        kode_polos: r.is_freetext ? r.nama_polos_manual : r.kode_polos,
-        is_freetext: r.is_freetext,
-        nama_polos_manual: r.nama_polos_manual,
-        qty_kirim: Number(r.qty_kirim) || 0,
-        satuan_kirim: r.satuan_kirim,
-        keterangan: r.keterangan,
-        target_jadi: r.target_jadi
-          .filter((t) => t.kode_jadi)
-          .map((t) => ({
-            kode_jadi: t.kode_jadi,
-            estimasi_qty: Number(t.estimasi_qty) || 0,
-            gambar: t.gambar,
-          })),
-      })),
-    });
+      }),
+    );
+    fd.append("details", JSON.stringify(detailsPayload));
+
+    // ⬅ BARU: kumpulkan file mentah + pendingKeys, urutan HARUS sejajar
+    // — file di-append ke FormData urut sama persis dengan pendingKeys,
+    // karena backend zip dua array ini by index.
+    const pendingKeys: string[] = [];
+    for (const row of data.Details) {
+      for (const t of row.target_jadi) {
+        for (const g of t.gambar) {
+          if (g.file) {
+            fd.append("images", g.file);
+            pendingKeys.push(g.pendingKey!);
+          }
+        }
+      }
+    }
+    fd.append("pendingKeys", JSON.stringify(pendingKeys));
+
+    return await maklonBarangFormService.save(fd);
   },
   onSuccess: (res: any) => {
     const nomor = res?.data?.data?.nomor || "";
@@ -293,30 +325,34 @@ const triggerFileInput = (rowIdx: number, targetIdx: number) => {
   fileInputRefs.value[fileInputKey(rowIdx, targetIdx)]?.click();
 };
 
-const onFilesSelected = async (e: Event, rowIdx: number, targetIdx: number) => {
+const onFilesSelected = (e: Event, rowIdx: number, targetIdx: number) => {
   const input = e.target as HTMLInputElement;
   if (!input.files || !input.files.length) return;
-  const key = fileInputKey(rowIdx, targetIdx);
-  uploadingKey.value = key;
-  try {
-    const files = Array.from(input.files);
-    const res = await maklonBarangFormService.uploadGambar(files);
-    for (const item of res.data.data) {
-      formData.value.Details[rowIdx].target_jadi[targetIdx].gambar.push({
-        file_path: item.file_path,
-        keterangan: "",
-      });
+
+  const files = Array.from(input.files);
+  const target = formData.value.Details[rowIdx].target_jadi[targetIdx];
+
+  files.forEach((file, i) => {
+    if (!file.type.startsWith("image/")) {
+      toast.error(`${file.name} bukan file gambar, dilewati.`);
+      return;
     }
-    toast.success(`${files.length} gambar berhasil diunggah.`);
-  } catch (e: any) {
-    toast.error(e.response?.data?.message || "Gagal mengunggah gambar.");
-  } finally {
-    uploadingKey.value = null;
-    input.value = "";
-  }
+    target.gambar.push({
+      file_path: URL.createObjectURL(file),
+      keterangan: "",
+      file,
+      pendingKey: `${rowIdx}-${targetIdx}-${Date.now()}-${i}`,
+    });
+  });
+
+  input.value = "";
 };
 
 const removeGambar = (rowIdx: number, targetIdx: number, gIdx: number) => {
+  const g = formData.value.Details[rowIdx].target_jadi[targetIdx].gambar[gIdx];
+  if (g.file && g.file_path.startsWith("blob:")) {
+    URL.revokeObjectURL(g.file_path);
+  }
   formData.value.Details[rowIdx].target_jadi[targetIdx].gambar.splice(gIdx, 1);
 };
 

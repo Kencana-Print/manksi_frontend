@@ -4,7 +4,15 @@ const BASE = "/garmen/maklon/makloon-barang";
 
 export const maklonBarangFormService = {
   getById: (nomor: string) => api.get(`${BASE}/form/${nomor}`),
-  save: (payload: any) => api.post(`${BASE}/form/save`, payload),
+  // ⬅ DIUBAH: save sekarang selalu kirim FormData (header + details JSON,
+  // plus file gambar mentah yang belum ke-upload). uploadGambar terpisah
+  // (di bawah) TIDAK lagi dipakai dari form ini — dibiarkan ada untuk
+  // backward-compat kalau ada pemakai lain, tapi alur baru upload gambar
+  // menyatu dengan save.
+  save: (formData: FormData) =>
+    api.post(`${BASE}/form/save`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    }),
   uploadGambar: (files: File[]) => {
     const formData = new FormData();
     files.forEach((f) => formData.append("images", f));
