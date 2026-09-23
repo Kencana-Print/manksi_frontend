@@ -15,6 +15,7 @@
     "mcp:revert": "ruler revert"
   },
   "dependencies": {
+    "@fontsource/plus-jakarta-sans": "^5.3.0",
     "@fontsource/roboto": "^5.2.10",
     "@mdi/font": "7.4.47",
     "@smallwebco/tinypivot-vue": "^1.2.1",

@@ -335,6 +335,12 @@ export const createMenuItems = (): NavItem[] => {
           to: "/pembelian/uang-muka",
           menuId: 315,
         },
+        {
+          title: "Mutasi Out Garmen",
+          to: "/garmen/barang/mutasi-out",
+          icon: IconTruckDelivery,
+          menuId: 70,
+        },
         { divider: true },
         {
           title: "Setting Harga Bahan",
@@ -561,12 +567,7 @@ export const createMenuItems = (): NavItem[] => {
               icon: IconTruckDelivery,
               menuId: 69,
             },
-            {
-              title: "Mutasi Out",
-              to: "/garmen/barang/mutasi-out",
-              icon: IconTruckDelivery,
-              menuId: 70,
-            },
+
             {
               title: "BPB Non Bahan",
               to: "/garmen/barang/bpb-nonbahan",

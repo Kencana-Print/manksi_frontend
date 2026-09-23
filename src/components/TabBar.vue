@@ -261,7 +261,7 @@ onUnmounted(() => {
               :stroke-width="1.8"
               class="tab-icon"
             />
-            <span class="tab-title">{{ tab.title }}</span>
+            <span class="tab-title" :title="tab.title">{{ tab.title }}</span>
             <button
               v-if="tab.closable"
               class="tab-close"

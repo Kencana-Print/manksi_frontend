@@ -14,7 +14,7 @@ import App from "./App.vue";
 // Styles
 import "unfonts.css";
 import "./styles/main.css";
-import "vue-toastification/dist/index.css"; // <-- [TAMBAHKAN BARIS INI]
+import "vue-toastification/dist/index.css";
 
 const app = createApp(App);
 

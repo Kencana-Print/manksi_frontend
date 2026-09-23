@@ -17,8 +17,8 @@ export default defineConfig({
       fontsource: {
         families: [
           {
-            name: "Roboto",
-            weights: [100, 300, 400, 500, 700, 900],
+            name: "Plus Jakarta Sans",
+            weights: [200, 300, 400, 500, 600, 700, 800],
             styles: ["normal", "italic"],
           },
         ],
@@ -60,11 +60,6 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
-        // ⬅ BARU: path-path ini disajikan langsung oleh Nginx/backend
-        // (foto MAP, file gambar lama), bukan bagian dari SPA — jangan
-        // pernah dibalas index.html oleh navigation fallback Workbox,
-        // atau buka URL-nya langsung/tab baru akan selalu jatuh ke
-        // halaman 404 custom app (Vue Router nggak match path itu).
         navigateFallbackDenylist: [/^\/images\//, /^\/file-gambar\//],
         runtimeCaching: [
           {
@@ -86,9 +81,6 @@ export default defineConfig({
               cacheableResponse: { statuses: [0, 200] },
             },
           },
-          // ⬅ BARU: opsional tapi disarankan — biar foto MAP juga ikut
-          // di-cache Workbox untuk akses cepat/offline, TANPA jadi bagian
-          // dari navigation fallback (beda mekanisme dari denylist di atas)
           {
             urlPattern: /^\/images\/.*\.(jpg|jpeg|png|webp)$/i,
             handler: "CacheFirst",
