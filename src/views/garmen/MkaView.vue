@@ -7,7 +7,7 @@ import { useBrowse } from "@/composables/useBrowse";
 import { mkaService } from "@/services/garmen/mkaService";
 import { exportExcelSingle } from "@/utils/excelExport";
 import { IconNotes, IconFileExport } from "@tabler/icons-vue";
-import { formatTanggal, formatTanggalJam } from "@/utils/dateFormat";
+import { formatTanggalLocale, formatTanggalJam } from "@/utils/dateFormat";
 import MkaRealisasiDetailModal from "@/components/garmen/MkaRealisasiDetailModal.vue";
 
 const router = useRouter();
@@ -56,6 +56,10 @@ watch(
   },
   { deep: true },
 );
+
+// ⬅ BARU: ref ke BaseBrowse, dipakai buat ambil data yang SEDANG tampil
+// (sudah kena search box + column filter), bukan items mentah
+const baseBrowseRef = ref<InstanceType<typeof BaseBrowse> | null>(null);
 
 const {
   items,
@@ -181,15 +185,12 @@ const onPrint = () => {
 };
 
 const onExportHeader = async () => {
-  if (!items.value?.length)
-    return toast.warning("Tidak ada data untuk diekspor.");
+  // ⬅ DIUBAH: ambil dari getFilteredItems() dulu — ini yang mengikutkan
+  // search box & column filter aktif di BaseBrowse. items.value cuma
+  // fallback kalau ref belum ke-mount.
+  const rows = baseBrowseRef.value?.getFilteredItems?.() ?? items.value ?? [];
+  if (!rows.length) return toast.warning("Tidak ada data untuk diekspor.");
   try {
-    const res = await mkaService.exportHeader({
-      startDate: dtAwal.value,
-      endDate: dtAkhir.value,
-      kodeBarang: filterKode.value,
-      filterByTglSpk: filterByTglSpk.value,
-    });
     await exportExcelSingle(
       `MKA_Header_${dtAwal.value}_${dtAkhir.value}.xlsx`,
       "MKA Header",
@@ -206,11 +207,16 @@ const onExportHeader = async () => {
           align: "right",
           numFmt: "#,##0",
         },
-        { header: "Status SPK", key: "StatusSPK", width: 12, align: "center" },
+        { header: "Status SPK", key: "StatusSpk", width: 12, align: "center" },
+        { header: "Status MKA", key: "StatusMka", width: 12, align: "center" },
         { header: "Keterangan", key: "Keterangan", width: 35 },
         { header: "User", key: "UserCreate", width: 12 },
       ],
-      res.data.data,
+      rows.map((r: any) => ({
+        ...r,
+        Tanggal: formatTanggalLocale(r.Tanggal),
+        StatusMka: r.StatusMka || "-",
+      })),
       `MKA Periode ${dtAwal.value} s/d ${dtAkhir.value}`,
     );
   } catch (e: any) {
@@ -219,6 +225,16 @@ const onExportHeader = async () => {
 };
 
 const onExportDetail = async () => {
+  // ⬅ BARU: scope export detail ke Nomor yang SEDANG tampil (hasil
+  // filter), bukan seluruh periode. Baris RowType 'SPK' dilewati
+  // (belum ada MKA, memang tidak punya detail aksesoris).
+  const rows = baseBrowseRef.value?.getFilteredItems?.() ?? items.value ?? [];
+  const nomorSet = new Set(
+    rows.filter((r: any) => r.RowType !== "SPK").map((r: any) => r.Nomor),
+  );
+  if (!nomorSet.size)
+    return toast.warning("Tidak ada data MKA untuk diekspor.");
+
   try {
     const res = await mkaService.exportDetail({
       startDate: dtAwal.value,
@@ -226,7 +242,12 @@ const onExportDetail = async () => {
       kodeBarang: filterKode.value,
       filterByTglSpk: filterByTglSpk.value,
     });
-    if (!res.data.data?.length)
+    // ⬅ BARU: filter hasil API supaya konsisten dengan apa yang lagi
+    // tampil di grid (search/column filter tidak dikenal backend)
+    const filteredDetail = (res.data.data || []).filter((d: any) =>
+      nomorSet.has(d.Nomor),
+    );
+    if (!filteredDetail.length)
       return toast.warning("Tidak ada detail untuk diekspor.");
     await exportExcelSingle(
       `MKA_Detail_${dtAwal.value}_${dtAkhir.value}.xlsx`,
@@ -261,7 +282,10 @@ const onExportDetail = async () => {
           numFmt: "#,##0",
         },
       ],
-      res.data.data,
+      filteredDetail.map((r: any) => ({
+        ...r,
+        Tanggal: formatTanggalLocale(r.Tanggal),
+      })),
       `MKA Detail Periode ${dtAwal.value} s/d ${dtAkhir.value}`,
     );
   } catch (e: any) {
@@ -285,6 +309,7 @@ const numFmt = (v: any) =>
 
 <template>
   <BaseBrowse
+    ref="baseBrowseRef"
     title="MKA (Memo Kebutuhan Aksesoris)"
     menu-id="57"
     :icon="IconNotes"
@@ -359,7 +384,7 @@ const numFmt = (v: any) =>
 
     <!-- Kolom custom -->
     <template #item.Tanggal="{ item }">
-      {{ formatTanggal(item.Tanggal) }}
+      {{ formatTanggalLocale(item.Tanggal) }}
     </template>
     <template #item.Created="{ item }">
       {{ formatTanggalJam(item.Created) }}
