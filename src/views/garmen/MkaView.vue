@@ -225,15 +225,12 @@ const onExportHeader = async () => {
 };
 
 const onExportDetail = async () => {
-  // ⬅ BARU: scope export detail ke Nomor yang SEDANG tampil (hasil
-  // filter), bukan seluruh periode. Baris RowType 'SPK' dilewati
-  // (belum ada MKA, memang tidak punya detail aksesoris).
   const rows = baseBrowseRef.value?.getFilteredItems?.() ?? items.value ?? [];
-  const nomorSet = new Set(
-    rows.filter((r: any) => r.RowType !== "SPK").map((r: any) => r.Nomor),
-  );
-  if (!nomorSet.size)
+  const headerRows = rows.filter((r: any) => r.RowType !== "SPK");
+  if (!headerRows.length)
     return toast.warning("Tidak ada data MKA untuk diekspor.");
+
+  toast.info("Menyiapkan data detail untuk diexport... Mohon tunggu.");
 
   try {
     const res = await mkaService.exportDetail({
@@ -242,21 +239,72 @@ const onExportDetail = async () => {
       kodeBarang: filterKode.value,
       filterByTglSpk: filterByTglSpk.value,
     });
-    // ⬅ BARU: filter hasil API supaya konsisten dengan apa yang lagi
-    // tampil di grid (search/column filter tidak dikenal backend)
-    const filteredDetail = (res.data.data || []).filter((d: any) =>
-      nomorSet.has(d.Nomor),
-    );
-    if (!filteredDetail.length)
-      return toast.warning("Tidak ada detail untuk diekspor.");
+    const allDetail = res.data.data || [];
+
+    // ⬅ BARU: kelompokkan detail per Nomor MKA
+    const detailByNomor: Record<string, any[]> = {};
+    for (const d of allDetail) {
+      if (!detailByNomor[d.Nomor]) detailByNomor[d.Nomor] = [];
+      detailByNomor[d.Nomor].push(d);
+    }
+
+    // ⬅ BARU: pola master-detail merge — sama seperti exportDetail di
+    // SpkVsStbjView.vue. Kolom header (Nomor, Tanggal, Status, dst)
+    // cuma diisi di baris PERTAMA tiap grup MKA, baris berikutnya
+    // dikosongkan supaya tidak berulang di Excel.
+    const combinedRows: any[] = [];
+    for (const item of headerRows) {
+      const detail = detailByNomor[item.Nomor] || [];
+
+      const masterCells = {
+        Nomor: item.Nomor,
+        Tanggal: formatTanggalLocale(item.Tanggal),
+        Divisi: item.Divisi,
+        SPK: item.SPK,
+        NamaSpk: item.NamaSpk,
+        StatusSpk: item.StatusSpk || "-",
+        StatusMka: item.StatusMka || "-",
+      };
+      const blankMaster = Object.fromEntries(
+        Object.keys(masterCells).map((k) => [k, ""]),
+      );
+
+      if (!detail.length) {
+        combinedRows.push({
+          ...masterCells,
+          Kode: "",
+          NamaAksesoris: "",
+          Satuan: "",
+          Ready: "",
+          Free: "",
+          Jumlah: "",
+        });
+      } else {
+        detail.forEach((d: any, idx: number) => {
+          combinedRows.push({
+            ...(idx === 0 ? masterCells : blankMaster),
+            Kode: d.Kode,
+            NamaAksesoris: d.NamaAksesoris,
+            Satuan: d.Satuan,
+            Ready: Number(d.Ready) || 0,
+            Free: Number(d.Free) || 0,
+            Jumlah: Number(d.Jumlah) || 0,
+          });
+        });
+      }
+    }
+
     await exportExcelSingle(
       `MKA_Detail_${dtAwal.value}_${dtAkhir.value}.xlsx`,
       "MKA Detail",
       [
         { header: "Nomor MKA", key: "Nomor", width: 18 },
         { header: "Tanggal", key: "Tanggal", width: 12, align: "center" },
+        { header: "Divisi", key: "Divisi", width: 12 },
         { header: "No. SPK", key: "SPK", width: 18 },
-        { header: "Nama SPK", key: "NamaSpk", width: 40 },
+        { header: "Nama SPK", key: "NamaSpk", width: 30 },
+        { header: "Status SPK", key: "StatusSpk", width: 12, align: "center" },
+        { header: "Status MKA", key: "StatusMka", width: 12, align: "center" },
         { header: "Kode", key: "Kode", width: 14 },
         { header: "Nama Aksesoris", key: "NamaAksesoris", width: 40 },
         { header: "Satuan", key: "Satuan", width: 10 },
@@ -282,12 +330,11 @@ const onExportDetail = async () => {
           numFmt: "#,##0",
         },
       ],
-      filteredDetail.map((r: any) => ({
-        ...r,
-        Tanggal: formatTanggalLocale(r.Tanggal),
-      })),
+      combinedRows,
       `MKA Detail Periode ${dtAwal.value} s/d ${dtAkhir.value}`,
     );
+
+    toast.success("Berhasil export detail.");
   } catch (e: any) {
     toast.error("Gagal export detail.");
   }
