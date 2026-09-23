@@ -60,7 +60,16 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
-        navigateFallbackDenylist: [/^\/images\//, /^\/file-gambar\//],
+        // ⬅ /uploads/ ditambahkan — path ini disajikan backend Express
+        // (gambar upload Maklon Barang, dll), sama seperti /images/ dan
+        // /file-gambar/ — semuanya harus dikecualikan dari navigation
+        // fallback, atau klik "buka gambar" akan selalu jatuh ke 404
+        // custom app-nya, walau file-nya beneran ada di server.
+        navigateFallbackDenylist: [
+          /^\/images\//,
+          /^\/file-gambar\//,
+          /^\/uploads\//,
+        ],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/cdnjs\.cloudflare\.com\/.*/i,
@@ -86,6 +95,17 @@ export default defineConfig({
             handler: "CacheFirst",
             options: {
               cacheName: "map-images-cache",
+              expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 * 7 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+          // ⬅ BARU: cache juga gambar upload maklon, pola sama seperti
+          // map-images-cache di atas
+          {
+            urlPattern: /^\/uploads\/.*\.(jpg|jpeg|png|webp)$/i,
+            handler: "CacheFirst",
+            options: {
+              cacheName: "uploads-images-cache",
               expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 * 7 },
               cacheableResponse: { statuses: [0, 200] },
             },
