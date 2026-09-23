@@ -19,7 +19,8 @@ import {
 } from "@tabler/icons-vue";
 
 interface DtlLinkItem {
-  no: number;
+  no?: number;
+  bahanUid: number;
   nomor: string;
   tanggal: string;
   kode: string;
@@ -45,6 +46,12 @@ const savedNomor = ref("");
 
 const showPoModal = ref(false);
 const selectedRowIdx = ref(-1);
+
+// ⬅ BARU: id internal per baris bahan, TIDAK dikirim ke server — dipakai
+// supaya link PO tetap "nempel" ke baris yang benar walau posisi baris
+// bergeser (baris lain ditambah/dihapus) sebelum Simpan ditekan.
+let uidCounter = 0;
+const nextUid = () => ++uidCounter;
 
 // State untuk dropdown komponen
 const listKomponen = ref<string[]>([]);
@@ -115,15 +122,70 @@ const {
     const d = res.data.data;
     const h = d.header;
 
-    // HELPER 1: Mengatasi huruf besar/kecil dari MySQL
     const val = (obj: any, key: string) => obj[key] ?? obj[key.toUpperCase()];
 
-    // HELPER 2: Parsing tanggal aman
     const parseDateSafe = (v: any) => {
       if (!v || v === "0000-00-00" || v === "0000-00-00 00:00:00") return "";
-
       return formatDateLocal(v);
     };
+
+    const dtlBahanMapped = (d.dtlBahan || []).map((b: any) => {
+      const jumlahVal = Number(val(b, "mkbd_jumlah")) || 0;
+      const allowanceVal =
+        val(b, "mkbd_allowance") !== null
+          ? Number(val(b, "mkbd_allowance"))
+          : "";
+      const readyVal = Number(
+        b.mkbd_jumlah_rs ?? b.mkbd_jumlah_RS ?? b.MKBD_JUMLAH_RS ?? 0,
+      );
+      const poVal = Number(
+        b.mkbd_jumlah_po ?? b.mkbd_jumlah_PO ?? b.MKBD_JUMLAH_PO ?? 0,
+      );
+      const namaBahanVal = val(b, "bhn_name");
+      const allowanceInfo = getAllowanceInfo(namaBahanVal);
+
+      return {
+        _uid: nextUid(), // ⬅ BARU
+        no: val(b, "mkbd_nourut"), // nilai asli dari server, dipakai buat matching dtlLink di bawah
+        komponen: val(b, "mkbd_komponen"),
+        ketk: val(b, "mkbd_ketk"),
+        babaran: Number(val(b, "mkbd_babaran")) || 0,
+        warna: val(b, "mkbd_warna"),
+        jenis: val(b, "mkbd_jenis"),
+        kode: val(b, "mkbd_bhn_kode"),
+        namaBahan: namaBahanVal,
+        satuan: val(b, "mkbd_bhn_satuan"),
+        gramasi: val(b, "gramasi"),
+        jumlah: jumlahVal,
+        allowance: allowanceVal,
+        allowanceManual: true,
+        allowanceLocked: allowanceInfo.locked,
+        ready: readyVal,
+        free: undefined,
+        po: poVal,
+        tglbeli: parseDateSafe(val(b, "mkbd_tglbeli")),
+        keterangan: val(b, "mkbd_keterangan") || "",
+      };
+    });
+
+    // ⬅ BARU: cocokkan tiap link PO ke baris bahan yang benar via nilai
+    // `no` (mkbd2_nourut / mkbd_nourut) asli dari server, simpan sebagai
+    // bahanUid — bukan lagi mengandalkan `no` mentah yang gampang basi
+    // begitu urutan baris berubah.
+    const dtlLinkMapped = (d.dtlLink || []).map((l: any) => {
+      const originalNo = val(l, "mkbd2_nourut");
+      const matchedRow = dtlBahanMapped.find(
+        (row: any) => row.no === originalNo,
+      );
+      return {
+        bahanUid: matchedRow?._uid,
+        nomor: val(l, "mkbd2_po_nomor"),
+        tanggal: val(l, "tgl"),
+        kode: val(l, "mkbd_bhn_kode"),
+        qtylink: Number(val(l, "mkbd2_qty")) || 0,
+        link: val(l, "mkbd2_pourut"),
+      };
+    });
 
     return {
       nomor: val(h, "mkb_nomor"),
@@ -137,59 +199,12 @@ const {
       jumlahSpk: Number(val(h, "jumlahspk")) || 0,
       memoSpk: val(h, "spk_memo") || "",
       pin_status: h.pin_status,
-
-      dtlBahan: (d.dtlBahan || []).map((b: any) => {
-        const jumlahVal = Number(val(b, "mkbd_jumlah")) || 0;
-        const allowanceVal =
-          val(b, "mkbd_allowance") !== null
-            ? Number(val(b, "mkbd_allowance"))
-            : "";
-        const readyVal = Number(
-          b.mkbd_jumlah_rs ?? b.mkbd_jumlah_RS ?? b.MKBD_JUMLAH_RS ?? 0,
-        );
-        const poVal = Number(
-          b.mkbd_jumlah_po ?? b.mkbd_jumlah_PO ?? b.MKBD_JUMLAH_PO ?? 0,
-        );
-        const namaBahanVal = val(b, "bhn_name");
-        const allowanceInfo = getAllowanceInfo(namaBahanVal);
-
-        return {
-          no: val(b, "mkbd_nourut"),
-          komponen: val(b, "mkbd_komponen"),
-          ketk: val(b, "mkbd_ketk"),
-          babaran: Number(val(b, "mkbd_babaran")) || 0,
-          warna: val(b, "mkbd_warna"),
-          jenis: val(b, "mkbd_jenis"),
-          kode: val(b, "mkbd_bhn_kode"),
-          namaBahan: namaBahanVal,
-          satuan: val(b, "mkbd_bhn_satuan"),
-          gramasi: val(b, "gramasi"),
-          jumlah: jumlahVal,
-          allowance: allowanceVal,
-          allowanceManual: true,
-          allowanceLocked: allowanceInfo.locked,
-          ready: readyVal,
-          free: undefined,
-          po: poVal,
-          tglbeli: parseDateSafe(val(b, "mkbd_tglbeli")),
-          keterangan: val(b, "mkbd_keterangan") || "",
-        };
-      }),
-
-      dtlLink: (d.dtlLink || []).map((l: any) => ({
-        no: val(l, "mkbd2_nourut"),
-        nomor: val(l, "mkbd2_po_nomor"),
-        tanggal: val(l, "tgl"),
-        kode: val(l, "mkbd_bhn_kode"),
-        qtylink: Number(val(l, "mkbd2_qty")) || 0,
-        link: val(l, "mkbd2_pourut"),
-      })),
-
+      dtlBahan: dtlBahanMapped,
+      dtlLink: dtlLinkMapped,
       dtlPlan: (d.dtlPlan || []).map((p: any) => ({
         tanggal: parseDateSafe(val(p, "plan_tanggal")),
         jumlah: Number(val(p, "plan_datang")) || 0,
       })),
-
       dtlMap: (d.dtlMap || []).map((m: any) => ({
         komponen: val(m, "ks_komponen"),
         size: val(m, "ks_size"),
@@ -197,13 +212,28 @@ const {
       })),
     };
   },
-  submitApi: async (payload) => mkbFormService.saveData(payload),
-  onSuccessRoute: "", // KOSONGKAN agar tidak auto-back
-  onSuccess: (res: any) => {
-    toast.success("MKB berhasil disimpan.");
-    // Tangkap nomor yang baru di-save (atau nomor lama jika mode edit)
-    savedNomor.value = res.data?.data?.nomor || formData.value.nomor;
-    showPrintDialog.value = true;
+  submitApi: async (payload) => {
+    // ⬅ BARU: assign nourut final berdasarkan posisi baris SAAT INI
+    // (index+1, konsisten dengan fallback `d.no || i+1` yang dipakai
+    // backend untuk tmkb_dtl), lalu resolve dtlLink ke nourut itu via
+    // _uid — supaya link PO selalu nempel ke baris bahan yang benar
+    // apa pun urutan add/hapus baris yang terjadi di form.
+    const dtlBahanFinal = payload.dtlBahan.map((row: any, i: number) => ({
+      ...row,
+      no: i + 1,
+    }));
+    const uidToNo = new Map(
+      dtlBahanFinal.map((row: any) => [row._uid, row.no]),
+    );
+    const dtlLinkFinal = payload.dtlLink
+      .filter((l: any) => uidToNo.has(l.bahanUid))
+      .map((l: any) => ({ ...l, no: uidToNo.get(l.bahanUid) }));
+
+    return mkbFormService.saveData({
+      ...payload,
+      dtlBahan: dtlBahanFinal,
+      dtlLink: dtlLinkFinal,
+    });
   },
 });
 
@@ -334,6 +364,7 @@ const autofillFromBast = (bastKomponen: any[]) => {
   if (!isDtlBahanKosong()) return;
   formData.value.dtlBahan = bastKomponen.map((k: any) => {
     const row = {
+      _uid: nextUid(),
       komponen: k.komponen || "",
       ketk: "",
       babaran: Number(k.babaran) || 0,
@@ -447,6 +478,7 @@ watch(
 
 const addRowBahan = () => {
   formData.value.dtlBahan.push({
+    _uid: nextUid(),
     komponen: "",
     ketk: "",
     babaran: 0,
@@ -535,9 +567,13 @@ const onBahanSelected = (bahan: any) => {
 };
 
 const removeRowBahan = (index: number) => {
+  const removed = formData.value.dtlBahan[index];
   formData.value.dtlBahan.splice(index, 1);
-  // Reset selectedRowIdx kalau index yang dihapus adalah yang aktif
-  // atau index aktif sekarang melebihi panjang array
+  if (removed?._uid !== undefined) {
+    formData.value.dtlLink = formData.value.dtlLink.filter(
+      (l: DtlLinkItem) => l.bahanUid !== removed._uid,
+    );
+  }
   if (selectedRowIdx.value >= formData.value.dtlBahan.length) {
     selectedRowIdx.value = formData.value.dtlBahan.length - 1;
   }
@@ -648,31 +684,26 @@ const openPoLinkModal = () => {
 const onPoSelected = (po: any) => {
   const rowBahan = formData.value.dtlBahan[selectedRowIdx.value];
 
-  // Validasi 1: Sisa PO mencukupi?
   if (rowBahan.po > po.Sisa) {
     return toast.error("Sisa PO tidak mencukupi kebutuhan MKB ini.");
   }
-
-  // Validasi 2: Sudah ada BPB? (Backend sudah cek, tapi kita cek lagi)
   if (po.BPB > 0) {
     return toast.error(
       "PO tersebut sudah ada penerimaan BPB. Tidak bisa di-link.",
     );
   }
 
-  // Hapus link lama untuk baris nomor (nourut) ini (Fungsi hapuslink di Delphi)
   formData.value.dtlLink = formData.value.dtlLink.filter(
-    (l: DtlLinkItem) => l.no !== rowBahan.no,
+    (l: DtlLinkItem) => l.bahanUid !== rowBahan._uid,
   );
 
-  // Tambah link baru
   formData.value.dtlLink.push({
-    no: rowBahan.no, // nourut rincian bahan
+    bahanUid: rowBahan._uid,
     nomor: po.NOPO,
     tanggal: po.TglPO,
     kode: po.Kode,
     qtylink: rowBahan.po,
-    link: po.NoUrut, // pourut (pod_nourut)
+    link: po.NoUrut,
   });
 
   toast.success(`Berhasil link ke PO: ${po.NOPO}`);
