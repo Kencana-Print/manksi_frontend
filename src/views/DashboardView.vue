@@ -1739,6 +1739,7 @@ interface PotensiItem {
 interface PotensiSourceOption {
   Sumber: "PENAWARAN" | "MAP";
   Nomor: string;
+  PendId?: number | null; // ⬅ BARU — cuma terisi untuk PENAWARAN
   Tanggal: string;
   sal_nama: string | null;
   cus_nama: string;
@@ -1823,7 +1824,8 @@ let mapSourceScrollObserver: IntersectionObserver | null = null;
 
 const selectedPotensiMap = ref(new Map<string, PotensiSourceOption>());
 const selectedPotensiCount = computed(() => selectedPotensiMap.value.size);
-const potensiKey = (opt: PotensiSourceOption) => `${opt.Sumber}:${opt.Nomor}`;
+const potensiKey = (opt: PotensiSourceOption) =>
+  `${opt.Sumber}:${opt.Nomor}:${opt.PendId ?? ""}`;
 const isPotensiSelected = (opt: PotensiSourceOption) =>
   selectedPotensiMap.value.has(potensiKey(opt));
 const togglePotensiSelect = (opt: PotensiSourceOption) => {
@@ -1955,6 +1957,7 @@ const submitSetPotensi = async () => {
     const items = Array.from(selectedPotensiMap.value.values()).map((opt) => ({
       sumber: opt.Sumber,
       nomorSumber: opt.Nomor,
+      pendId: opt.PendId ?? undefined, // ⬅ BARU
       namaItem: opt.NamaItem,
       harga: Number(opt.Nominal) || 0,
     }));
