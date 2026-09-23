@@ -340,7 +340,7 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-/* ===== TAB BAR — hijau tema ===== */
+/* ===== TAB BAR — tema Manksi (biru) ===== */
 .finance-tabbar {
   display: flex;
   align-items: stretch;
@@ -350,7 +350,7 @@ onUnmounted(() => {
   background: rgba(255, 255, 255, 0.85);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  border-bottom: 1px solid #c8e6c9;
+  border-bottom: 1px solid #bbdefb;
   position: relative;
   z-index: 20;
   min-width: 0;
@@ -430,8 +430,8 @@ onUnmounted(() => {
   color: #6b7280;
 }
 .tab-close:hover {
-  background: rgba(46, 125, 50, 0.1);
-  color: #1b5e20;
+  background: rgba(21, 101, 192, 0.1);
+  color: #0d47a1;
 }
 
 .tab-indicator {
@@ -440,30 +440,30 @@ onUnmounted(() => {
   left: 12px;
   right: 12px;
   height: 2.5px;
-  background: #2e7d32;
+  background: #1565c0;
   border-radius: 2px 2px 0 0;
   animation: indicatorSlide 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
 
 .tab-item:hover {
-  background: rgba(46, 125, 50, 0.06);
+  background: rgba(21, 101, 192, 0.06);
 }
 .tab-item:hover .tab-icon,
 .tab-item:hover .tab-title {
-  color: #1b5e20;
+  color: #0d47a1;
 }
 .tab-item:hover .tab-close {
   opacity: 0.8;
 }
 
 .tab-item.active {
-  background: #e8f5e9;
+  background: #e3f2fd;
 }
 .tab-item.active .tab-icon {
-  color: #2e7d32;
+  color: #1565c0;
 }
 .tab-item.active .tab-title {
-  color: #1b5e20;
+  color: #0d47a1;
   font-weight: 600;
 }
 .tab-item.active .tab-close {
@@ -509,8 +509,8 @@ onUnmounted(() => {
   transition: all 0.15s ease;
 }
 .tab-action:hover {
-  background: rgba(46, 125, 50, 0.08);
-  color: #2e7d32;
+  background: rgba(21, 101, 192, 0.08);
+  color: #1565c0;
 }
 
 .tab-menu-title {
@@ -541,8 +541,8 @@ onUnmounted(() => {
   transition: all 0.12s ease;
 }
 .ctx-item:hover {
-  background: rgba(46, 125, 50, 0.08);
-  color: #1b5e20;
+  background: rgba(21, 101, 192, 0.08);
+  color: #0d47a1;
 }
 .ctx-sep {
   height: 1px;
@@ -563,11 +563,11 @@ onUnmounted(() => {
   z-index: 5;
 }
 .scroll-nav-btn:hover {
-  background: rgba(46, 125, 50, 0.08);
-  color: #1b5e20;
+  background: rgba(21, 101, 192, 0.08);
+  color: #0d47a1;
 }
 .tab-item:focus-visible {
-  outline: 2px solid #2e7d32;
+  outline: 2px solid #1565c0;
   outline-offset: -2px;
   border-radius: 4px;
 }
