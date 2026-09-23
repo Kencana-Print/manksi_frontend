@@ -210,6 +210,7 @@ const addDetail = () => {
     Status: "",
     Batal: "",
     Confirm: "",
+    Optional: false,
   });
 };
 
@@ -247,6 +248,13 @@ const proceedLoadMintaHarga = async (item: any) => {
     row.Harga = data.harga;
     hitungTotalBaris(row);
 
+    // ⬅ BARU: autofill Status Harga dari mh_ket_kalkulasi, kalau
+    // terdeteksi (0 atau 1). Kalau null (teks nggak match pola INC/EXC
+    // PPN), pilihan Status Harga yang sudah ada di form TIDAK diubah.
+    if (data.statusHarga === 0 || data.statusHarga === 1) {
+      props.formData.StatusHarga = data.statusHarga;
+    }
+
     if (data.custKode) {
       if (!props.formData.CustKode) {
         props.formData.CustKode = data.custKode;
@@ -261,8 +269,6 @@ const proceedLoadMintaHarga = async (item: any) => {
       }
     }
 
-    // ⬅ BARU: belum ada kalkulasi -> warning saja, baris tetap terisi
-    // (Harga = 0, user bisa isi manual), TIDAK di-reset seperti error.
     if (data.belumKalkulasi) {
       toast.warning(
         `⚠ No. Permintaan ${item.Nomor} belum ada kalkulasi harga. Harga diisi 0 — silakan isi manual.`,
@@ -937,6 +943,7 @@ watch(
               <th style="width: 100px">SPK/MAP</th>
               <th style="width: 50px" class="tc">Gbr</th>
               <th style="width: 90px">Status</th>
+              <th style="width: 60px" class="tc">Optional</th>
               <th style="min-width: 130px">Ket. Batal</th>
               <th style="min-width: 130px">Ket. Confirm</th>
               <th style="width: 40px" class="tc">ID</th>
@@ -1163,6 +1170,14 @@ watch(
                   <option value="BATAL">BATAL</option>
                   <option value="CLOSE">CLOSE</option>
                 </select>
+              </td>
+              <td class="tc">
+                <input
+                  type="checkbox"
+                  v-model="row.Optional"
+                  :disabled="!!row.Spk"
+                  title="Kalau dicentang, baris ini tidak akan terhitung ke pelaporan omset penawaran open"
+                />
               </td>
               <td>
                 <select

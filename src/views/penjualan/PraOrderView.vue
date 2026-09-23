@@ -58,13 +58,21 @@ watch(
 const loadDivisi = async () => {
   try {
     const res = await praOrderService.getDivisi();
-    divisiOptions.value = [
-      { Kode: "0", Nama: "ALL" },
-      ...res.data.data.map((d: any) => ({
+    // ⬅ DIUBAH: buang opsi sintetis "0 - ALL" (dulu ditambah manual di
+    // frontend) dan kode "6" (FIT U) dari daftar backend
+    divisiOptions.value = res.data.data
+      .filter((d: any) => String(d.Kode) !== "6")
+      .map((d: any) => ({
         Kode: d.Kode,
         Nama: `${d.Kode} - ${d.Nama}`,
-      })),
-    ];
+      }));
+    // ⬅ BARU: karena "0 - ALL" sudah tidak ada di daftar, default filter
+    // sekarang jatuh ke divisi pertama yang tersisa (bukan lagi "semua
+    // divisi" seperti sebelumnya) — supaya dropdown selalu punya nilai
+    // terpilih yang valid, bukan kosong.
+    if (!filterState.value.divisiKode && divisiOptions.value.length) {
+      divisiKode.value = divisiOptions.value[0].Kode;
+    }
   } catch {
     console.error("Gagal load divisi");
   }
@@ -242,7 +250,12 @@ const isConverting = ref(false);
 const handleConvert = async () => {
   if (!selected.value.length) return;
   const item = selected.value[0];
-  if (item.StatusPpic !== "SANGGUP") {
+  // ⬅ BARU: samakan logika dengan backend — divisi Spanduk/MMT lolos
+  // tanpa syarat StatusPpic SANGGUP
+  const isDivisiTanpaCekPpic = ["SPANDUK", "MMT"].includes(
+    (item.Divisi || "").toUpperCase(),
+  );
+  if (!isDivisiTanpaCekPpic && item.StatusPpic !== "SANGGUP") {
     toast.warning("PPIC belum menyatakan sanggup untuk order ini.");
     return;
   }

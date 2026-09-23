@@ -89,6 +89,7 @@ const initialData = {
       Status: "",
       Batal: "",
       Confirm: "",
+      Optional: false,
     },
   ],
 };
@@ -162,6 +163,7 @@ const {
         Status: det.pend_status || "", // ← FIX: kolom mentah, bukan "Status"
         Batal: det.pend_batal || "", // ← FIX: kolom mentah, bukan "KetBatal"
         Confirm: det.pend_confirm || "", // ← FIX: kolom mentah, bukan "KetConfirm"
+        Optional: Number(det.pend_optional) === 1,
       })),
     };
   },

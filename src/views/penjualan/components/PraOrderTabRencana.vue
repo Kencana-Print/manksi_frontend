@@ -41,14 +41,34 @@ const previewUrl = ref("");
 const loadDivisi = async () => {
   try {
     const res = await api.get("/penjualan/pra-order/divisi");
-    divisiOptions.value = res.data.data.map((d: any) => ({
-      value: String(d.Kode),
-      title: `${d.Kode} - ${d.Nama}`,
-    }));
+    // ⬅ DIUBAH: buang kode "6" (FIT U) — "0" (ALL) memang tidak pernah
+    // muncul di endpoint ini (beda dari browse yang nambah "0-ALL" secara
+    // manual), jadi cukup filter kode 6 saja di sini.
+    divisiOptions.value = res.data.data
+      .filter((d: any) => String(d.Kode) !== "6")
+      .map((d: any) => ({
+        value: String(d.Kode),
+        title: `${d.Kode} - ${d.Nama}`,
+      }));
   } catch {
     console.error("Gagal load divisi");
   }
 };
+
+// ⬅ BARU: Bahan Alternatif cuma relevan untuk Divisi Garmen (kode "4")
+const isDivisiGarmen = computed(() => String(props.formData.Divisi) === "4");
+
+// ⬅ BARU: kalau user ganti Divisi keluar dari Garmen, kosongkan Bahan
+// supaya data bahan yang sudah dipilih tidak nyangkut kepakai/kesave
+// buat divisi yang bahan alternatifnya nggak relevan.
+watch(
+  () => props.formData.Divisi,
+  (newVal, oldVal) => {
+    if (String(newVal) !== "4" && props.formData.Bahan?.length) {
+      props.formData.Bahan = [];
+    }
+  },
+);
 
 const loadInitGrids = async () => {
   try {
@@ -479,7 +499,11 @@ const openPreview = (url: string) => {
           </div>
 
           <!-- Bahan Alternatif -->
-          <div class="tp-row" style="align-items: flex-start; margin-top: 8px">
+          <div
+            v-if="isDivisiGarmen"
+            class="tp-row"
+            style="align-items: flex-start; margin-top: 8px"
+          >
             <label class="tp-lbl" style="padding-top: 6px"
               >Bahan Alternatif</label
             >
@@ -631,8 +655,10 @@ const openPreview = (url: string) => {
         >
           <div class="tp-sec-title">Aksi PPIC</div>
 
-          <div class="ppic-sub-title">Cek Ketersediaan Bahan</div>
-          <div class="ppic-bahan-list">
+          <div class="ppic-sub-title" v-if="isDivisiGarmen">
+            Cek Ketersediaan Bahan
+          </div>
+          <div class="ppic-bahan-list" v-if="isDivisiGarmen">
             <div
               v-for="b in formData.Bahan"
               :key="b.Kode"
