@@ -610,6 +610,25 @@ const fmtNum = (val: number) =>
           </div>
           <div class="dtl-scroll">
             <table class="dtl-table">
+              <thead>
+                <tr>
+                  <th style="width: 150px">Nama</th>
+                  <th style="width: 170px">Spesifikasi</th>
+                  <th style="width: 60px" class="tc">Satuan</th>
+                  <th style="width: 80px" class="tr">Qty Ajukan</th>
+                  <th style="width: 80px" class="tr">Qty Verif</th>
+                  <th style="width: 70px" class="tr">Qty Beli</th>
+                  <th style="width: 80px" class="tr">Qty Realisasi</th>
+                  <th style="width: 100px" class="tr">Rp Ajukan</th>
+                  <th style="width: 100px" class="tr">Rp Approved</th>
+                  <th style="width: 130px">Deadline</th>
+                  <th style="width: 130px">Verified Oleh</th>
+                  <th style="width: 130px">Approved Oleh</th>
+                  <th style="width: 180px">Cost Center</th>
+                  <th style="min-width: 180px">Kegunaan</th>
+                  <th style="min-width: 180px">Keterangan</th>
+                </tr>
+              </thead>
               <tbody>
                 <tr v-for="(d, i) in detailData[item.Nomor]" :key="i">
                   <td class="fw text-grey-darken-3">{{ d.Nama }}</td>
