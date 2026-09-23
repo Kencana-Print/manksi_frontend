@@ -25,7 +25,7 @@ export default defineConfig({
       },
     }),
     VitePWA({
-      registerType: "prompt", // munculkan tombol "update tersedia" daripada auto-reload paksa
+      registerType: "prompt",
       includeAssets: ["favicon.ico", "pwa/*.png"],
       manifest: {
         name: "Manksi Web",
@@ -59,8 +59,13 @@ export default defineConfig({
         ],
       },
       workbox: {
-        // cache asset build (js/css/font) + cache CDN scripts yang dipakai di index.html
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
+        // ⬅ BARU: path-path ini disajikan langsung oleh Nginx/backend
+        // (foto MAP, file gambar lama), bukan bagian dari SPA — jangan
+        // pernah dibalas index.html oleh navigation fallback Workbox,
+        // atau buka URL-nya langsung/tab baru akan selalu jatuh ke
+        // halaman 404 custom app (Vue Router nggak match path itu).
+        navigateFallbackDenylist: [/^\/images\//, /^\/file-gambar\//],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/cdnjs\.cloudflare\.com\/.*/i,
@@ -72,7 +77,6 @@ export default defineConfig({
             },
           },
           {
-            // sesuaikan pola ini dengan base URL API kamu
             urlPattern: /\/api\/.*/i,
             handler: "NetworkFirst",
             options: {
@@ -82,10 +86,22 @@ export default defineConfig({
               cacheableResponse: { statuses: [0, 200] },
             },
           },
+          // ⬅ BARU: opsional tapi disarankan — biar foto MAP juga ikut
+          // di-cache Workbox untuk akses cepat/offline, TANPA jadi bagian
+          // dari navigation fallback (beda mekanisme dari denylist di atas)
+          {
+            urlPattern: /^\/images\/.*\.(jpg|jpeg|png|webp)$/i,
+            handler: "CacheFirst",
+            options: {
+              cacheName: "map-images-cache",
+              expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 * 7 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
         ],
       },
       devOptions: {
-        enabled: false, // set true kalau mau test service worker saat `npm run dev`
+        enabled: false,
       },
     }),
   ],
