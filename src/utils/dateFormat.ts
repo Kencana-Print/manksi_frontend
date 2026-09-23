@@ -124,3 +124,19 @@ export const formatTanggalLocale = (v: string | null | undefined): string => {
   if (isNaN(d.getTime())) return "-";
   return d.toLocaleDateString();
 };
+
+/**
+ * Konversi ke Date object yang AMAN dikirim ke ExcelJS (atau proses lain
+ * yang mengonversi Date pakai basis waktu berbeda). Ambil tanggal kalender
+ * yang benar via formatTanggal() (sudah teruji aman dari pergeseran
+ * timezone), lalu bikin ulang Date di JAM 12 SIANG lokal — bukan tengah
+ * malam — supaya konversi timezone apa pun di proses selanjutnya (ExcelJS,
+ * dll) tidak pernah menggeser ke tanggal sebelum/sesudahnya.
+ */
+export const toExcelDate = (v: string | null | undefined): Date | null => {
+  const formatted = formatTanggal(v); // "dd/mm/yyyy", sudah aman dari shift
+  if (!formatted || formatted === "-") return null;
+  const [dd, mm, yyyy] = formatted.split("/").map(Number);
+  if (!dd || !mm || !yyyy) return null;
+  return new Date(yyyy, mm - 1, dd, 12, 0, 0);
+};

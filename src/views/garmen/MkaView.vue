@@ -7,7 +7,11 @@ import { useBrowse } from "@/composables/useBrowse";
 import { mkaService } from "@/services/garmen/mkaService";
 import { exportExcelSingle } from "@/utils/excelExport";
 import { IconNotes, IconFileExport } from "@tabler/icons-vue";
-import { formatTanggalLocale, formatTanggalJam } from "@/utils/dateFormat";
+import {
+  formatTanggalLocale,
+  formatTanggalJam,
+  toExcelDate,
+} from "@/utils/dateFormat";
 import MkaRealisasiDetailModal from "@/components/garmen/MkaRealisasiDetailModal.vue";
 
 const router = useRouter();
@@ -219,11 +223,7 @@ const onExportHeader = async () => {
       ],
       rows.map((r: any) => ({
         ...r,
-        // ⬅ DIUBAH: kirim Date object mentah, bukan string dari
-        // formatTanggalLocale — biar Excel simpan sebagai tipe Date
-        // beneran, tampilannya dikontrol numFmt di atas, bukan
-        // ditebak ulang oleh Excel pas file dibuka.
-        Tanggal: r.Tanggal ? new Date(r.Tanggal) : null,
+        Tanggal: toExcelDate(r.Tanggal), // ⬅ DIUBAH dari new Date(r.Tanggal)
         StatusMka: r.StatusMka || "-",
       })),
       `MKA Periode ${dtAwal.value} s/d ${dtAkhir.value}`,
@@ -262,8 +262,7 @@ const onExportDetail = async () => {
 
       const masterCells = {
         Nomor: item.Nomor,
-        // ⬅ DIUBAH: Date object, bukan formatTanggalLocale
-        Tanggal: item.Tanggal ? new Date(item.Tanggal) : null,
+        Tanggal: toExcelDate(item.Tanggal), // ⬅ DIUBAH dari new Date(item.Tanggal)
         Divisi: item.Divisi,
         SPK: item.SPK,
         NamaSpk: item.NamaSpk,
