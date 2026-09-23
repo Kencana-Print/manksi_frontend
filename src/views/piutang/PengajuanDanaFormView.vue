@@ -32,8 +32,10 @@ interface ItemRow {
   Nilai: number;
   Satuan: string;
   Deadline: string;
-  Nomor: string; // pjd_jobkp — ref job butuh, kalau ada
-  Kode: string; // pjd_kode — ref job butuh, kalau ada
+  Nomor: string;
+  Kode: string;
+  CcKode: string;
+  CcDcNama: string;
 }
 
 interface PengajuanDanaFormData {
@@ -45,8 +47,6 @@ interface PengajuanDanaFormData {
   Lokasi: string;
   Keterangan: string;
   items: ItemRow[];
-  CcKode: string;
-  CcDcNama: string;
 }
 
 const mkItem = (): ItemRow => ({
@@ -59,6 +59,8 @@ const mkItem = (): ItemRow => ({
   Deadline: "",
   Nomor: "",
   Kode: "",
+  CcKode: "", // ⬅ BARU
+  CcDcNama: "", // ⬅ BARU
 });
 
 const todayLocal = () => {
@@ -76,8 +78,6 @@ const defaultData = {
   Bagian: "",
   Lokasi: "",
   Keterangan: "",
-  CcKode: "",
-  CcDcNama: "",
   items: [mkItem()] as ItemRow[],
 };
 
@@ -113,8 +113,6 @@ const {
       Bagian: h.Bagian || "",
       Lokasi: h.Lokasi || "",
       Keterangan: h.Keterangan || "",
-      CcKode: h.CcKode || "",
-      CcDcNama: h.CcDcNama || "",
       items: (d.items || []).map(
         (r: any): ItemRow => ({
           Nama: r.Nama || "",
@@ -126,6 +124,8 @@ const {
           Deadline: r.Deadline || "",
           Nomor: r.Nomor || "",
           Kode: r.Kode || "",
+          CcKode: r.CcKode || "", // ⬅ BARU
+          CcDcNama: r.CcNama || r.CcDcNama || "", // ⬅ BARU — tampilkan nama CC yang di-resolve dari join
         }),
       ),
     };
@@ -136,8 +136,7 @@ const {
       Tanggal: data.Tanggal,
       Nik: data.Nik,
       Keterangan: data.Keterangan,
-      CcKode: data.CcKode,
-      CcDcNama: data.CcDcNama,
+      // ⬅ DIHAPUS: CcKode, CcDcNama — backend sekarang derive dari validItems[0]
     };
     return isEditMode.value
       ? pengajuanDanaFormService.update(data.Nomor, header, validItems)
@@ -179,10 +178,21 @@ const onNikBlur = () => {
   applyNik(fd.value.Nik.trim());
 };
 
+// ⬅ DIUBAH: modal Cost Center sekarang dibuka per baris, bukan header
 const showCcModal = ref(false);
+const activeCcRowIndex = ref<number>(-1);
+
+const openCcModal = (idx: number) => {
+  activeCcRowIndex.value = idx;
+  showCcModal.value = true;
+};
 const selectCc = (item: any) => {
-  fd.value.CcKode = item.cc_kode;
-  fd.value.CcDcNama = item.dc_nama;
+  const idx = activeCcRowIndex.value;
+  if (idx > -1 && fd.value.items[idx]) {
+    fd.value.items[idx].CcKode = item.cc_kode;
+    fd.value.items[idx].CcDcNama = item.dc_nama;
+  }
+  activeCcRowIndex.value = -1;
 };
 
 // ── Items grid ──
@@ -227,8 +237,6 @@ const onPermintaanSelected = async (p: any) => {
       toast.info("Tidak ada item yang bisa diimport dari Permintaan ini.");
       return;
     }
-    // Buang baris kosong terakhir sebelum diisi, replikasi pola Delphi
-    // "kalau Nama sudah terisi, Append baru; kalau belum, isi baris ini"
     fd.value.items = fd.value.items.filter((r: ItemRow) => r.Nama.trim());
     rows.forEach((r: any) => {
       fd.value.items.push({
@@ -241,6 +249,8 @@ const onPermintaanSelected = async (p: any) => {
         Deadline: r.Deadline || "",
         Nomor: "",
         Kode: "",
+        CcKode: "", // ⬅ BARU
+        CcDcNama: "", // ⬅ BARU
       });
     });
     fd.value.items.push(mkItem());
@@ -260,7 +270,6 @@ const onJobButuhSelected = (payload: { job: any; items: any[] }) => {
   }
   fd.value.items = fd.value.items.filter((r: ItemRow) => r.Nama.trim());
 
-  // Cegah duplikat: sama nomor(jbd_nomor) + kode(jbd_kode) skip
   const existing = new Set(
     fd.value.items.map((r: ItemRow) => `${r.Nomor}::${r.Kode}`),
   );
@@ -278,6 +287,8 @@ const onJobButuhSelected = (payload: { job: any; items: any[] }) => {
       Deadline: todayLocal(),
       Nomor: r.Nomor || "",
       Kode: r.Kode || "",
+      CcKode: "", // ⬅ BARU
+      CcDcNama: "", // ⬅ BARU
     });
     existing.add(key);
     ditambah++;
@@ -306,10 +317,8 @@ const validateSave = () => {
     toast.warning("Nik harus diisi.");
     return;
   }
-  if (!fd.value.CcKode) {
-    toast.warning("Cost Center harus diisi.");
-    return;
-  }
+  // ⬅ DIHAPUS: cek CcKode di level header
+
   const validItems = fd.value.items.filter((r: ItemRow) => r.Nama.trim());
   if (!validItems.length) {
     toast.warning("Minimal satu item harus diisi.");
@@ -323,6 +332,11 @@ const validateSave = () => {
     }
     if (r.Deadline < today) {
       toast.warning(`Baris ${idx + 1}: Isi Deadline yang benar.`);
+      return;
+    }
+    // ⬅ BARU: Cost Center wajib per baris
+    if (!r.CcKode) {
+      toast.warning(`Baris ${idx + 1}: Cost Center harus diisi.`);
       return;
     }
   }
@@ -416,24 +430,6 @@ onMounted(async () => {
           <input :value="fd.Lokasi" readonly class="inp ro" style="flex: 1" />
         </div>
         <div class="fg mt4">
-          <label class="lb w80"
-            >Cost Center <span style="color: #c62828">*</span></label
-          >
-          <div class="ig" style="flex: 1">
-            <input
-              :value="fd.CcDcNama ? `${fd.CcDcNama}` : ''"
-              readonly
-              class="inp ro"
-              style="flex: 1; cursor: pointer"
-              placeholder="Klik untuk pilih..."
-              @click="showCcModal = true"
-            />
-            <button type="button" class="ibtn" @click="showCcModal = true">
-              <IconSearch :size="11" color="#1565c0" />
-            </button>
-          </div>
-        </div>
-        <div class="fg mt4">
           <label class="lb w80">Keterangan</label>
           <input v-model="fd.Keterangan" class="inp" style="flex: 1" />
         </div>
@@ -509,12 +505,14 @@ onMounted(async () => {
                 <th style="width: 26px">#</th>
                 <th style="min-width: 180px">Nama</th>
                 <th style="min-width: 160px">Kegunaan</th>
+                <th style="width: 70px">Satuan</th>
                 <th style="width: 70px" class="tr">Qty</th>
                 <th style="width: 100px" class="tr">Nominal</th>
                 <th style="width: 120px" class="tr">Total Pengajuan</th>
                 <th style="width: 110px">Deadline</th>
                 <th style="width: 110px">Nomor</th>
                 <th style="width: 70px">Kode</th>
+                <th style="width: 150px">Cost Center</th>
                 <th style="width: 24px"></th>
               </tr>
             </thead>
@@ -529,6 +527,13 @@ onMounted(async () => {
                   />
                 </td>
                 <td><input v-model="row.Kegunaan" class="ci" /></td>
+                <td>
+                  <input
+                    v-model="row.Satuan"
+                    class="ci"
+                    style="font-size: 10px"
+                  />
+                </td>
                 <td>
                   <input
                     v-model.number="row.Qty"
@@ -571,6 +576,32 @@ onMounted(async () => {
                     style="font-size: 10px"
                   />
                 </td>
+                <td>
+                  <div class="ig" style="height: 22px">
+                    <input
+                      :value="row.CcDcNama"
+                      readonly
+                      class="inp"
+                      style="
+                        flex: 1;
+                        min-width: 0;
+                        height: 20px;
+                        font-size: 10px;
+                        cursor: pointer;
+                      "
+                      placeholder="Pilih CC..."
+                      @click="openCcModal(i)"
+                    />
+                    <button
+                      type="button"
+                      class="ibtn"
+                      style="width: 20px; min-width: 20px"
+                      @click="openCcModal(i)"
+                    >
+                      <IconSearch :size="10" color="#1565c0" />
+                    </button>
+                  </div>
+                </td>
                 <td class="tc">
                   <button type="button" class="cdb" @click="removeItem(i)">
                     <IconTrash :size="9" />
@@ -580,9 +611,9 @@ onMounted(async () => {
             </tbody>
             <tfoot>
               <tr class="footer-row">
-                <td colspan="4" class="tr">Grand Total</td>
+                <td colspan="6" class="tr">Grand Total</td>
                 <td class="tr fw">{{ grandTotal.toLocaleString("id-ID") }}</td>
-                <td colspan="4"></td>
+                <td colspan="5"></td>
               </tr>
             </tfoot>
           </table>

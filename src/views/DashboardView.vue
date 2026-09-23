@@ -71,6 +71,7 @@ interface TargetCollectionItem {
   piutangSaatIni: number;
   collectionMtd: number;
   collectionYtd: number;
+  sisaCollectionMtd: number;
   pctCollectionMtd: number | null;
   pctCollectionYtd: number | null;
 }
@@ -79,6 +80,7 @@ interface TargetCollectionGrandTotal {
   piutangSaatIni: number;
   collectionMtd: number;
   collectionYtd: number;
+  sisaCollectionMtd: number;
   pctCollectionMtd: number | null;
   pctCollectionYtd: number | null;
 }
@@ -4475,8 +4477,16 @@ const sisaClass = (item: any) => {
                           <td class="tr" style="color: #c62828">
                             {{ fmtNum(row.piutangSaatIni) }}
                           </td>
-                          <td class="tr" style="color: #2e7d32">
-                            {{ fmtNum(row.collectionMtd) }}
+                          <td
+                            class="tr"
+                            :style="{
+                              color:
+                                row.sisaCollectionMtd > 0
+                                  ? '#c62828'
+                                  : '#2e7d32',
+                            }"
+                          >
+                            {{ fmtNum(row.sisaCollectionMtd) }}
                           </td>
                           <td class="tc">
                             <span
@@ -4526,11 +4536,19 @@ const sisaClass = (item: any) => {
                           </td>
                           <td
                             class="tr"
-                            style="font-weight: 700; color: #2e7d32"
+                            :style="{
+                              fontWeight: 700,
+                              color:
+                                targetCollectionData.grandTotal
+                                  .sisaCollectionMtd > 0
+                                  ? '#c62828'
+                                  : '#2e7d32',
+                            }"
                           >
                             {{
                               fmtNum(
-                                targetCollectionData.grandTotal.collectionMtd,
+                                targetCollectionData.grandTotal
+                                  .sisaCollectionMtd,
                               )
                             }}
                           </td>
@@ -6350,8 +6368,16 @@ const sisaClass = (item: any) => {
                           <td class="tr" style="color: #c62828">
                             {{ fmtNum(row.piutangSaatIni) }}
                           </td>
-                          <td class="tr" style="color: #2e7d32">
-                            {{ fmtNum(row.collectionMtd) }}
+                          <td
+                            class="tr"
+                            :style="{
+                              color:
+                                row.sisaCollectionMtd > 0
+                                  ? '#c62828'
+                                  : '#2e7d32',
+                            }"
+                          >
+                            {{ fmtNum(row.sisaCollectionMtd) }}
                           </td>
                           <td class="tc">
                             <span
@@ -6401,11 +6427,19 @@ const sisaClass = (item: any) => {
                           </td>
                           <td
                             class="tr"
-                            style="font-weight: 700; color: #2e7d32"
+                            :style="{
+                              fontWeight: 700,
+                              color:
+                                targetCollectionData.grandTotal
+                                  .sisaCollectionMtd > 0
+                                  ? '#c62828'
+                                  : '#2e7d32',
+                            }"
                           >
                             {{
                               fmtNum(
-                                targetCollectionData.grandTotal.collectionMtd,
+                                targetCollectionData.grandTotal
+                                  .sisaCollectionMtd,
                               )
                             }}
                           </td>

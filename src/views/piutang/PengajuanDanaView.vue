@@ -60,7 +60,9 @@ const masterHeaders = [
   { title: "Pjh Ke", key: "PjhKe", width: "70px" },
   { title: "Keterangan", key: "Keterangan", minWidth: "220px" },
   { title: "Jenis", key: "Jenis", width: "150px" },
-  { title: "Cost Center", key: "_costCenter", width: "260px" },
+  // ⬅ DIHAPUS: kolom "_costCenter" — CC sekarang per item, dilihat di
+  // tabel detail (expand row), bukan lagi representatif kalau
+  // ditampilkan 1 nilai per header (bisa beda-beda per item).
   { title: "Priority", key: "Priority", width: "80px" },
   { title: "Verified", key: "Verified", width: "80px", align: "center" },
   { title: "Approval", key: "Approval", width: "80px", align: "center" },
@@ -345,6 +347,9 @@ const onExportDetail = async () => {
           QtyRealisasi: Number(d.QtyRealisasi) || 0,
           RpPengajuan: Number(d.RpPengajuan) || 0,
           RpApproved: Number(d.RpApproved) || 0,
+          CostCenter: d.CcNama
+            ? `${d.CcNama}${d.CcDcNama ? " — " + d.CcDcNama : ""}`
+            : "", // ⬅ BARU
           Kegunaan: d.Kegunaan,
           Keterangan: d.Keterangan,
         });
@@ -417,6 +422,7 @@ const onExportDetail = async () => {
               align: "right",
               numFmt: "#,##0",
             },
+            { header: "Cost Center", key: "CostCenter", width: 22 },
             { header: "Kegunaan", key: "Kegunaan", width: 25 },
             { header: "Keterangan", key: "Keterangan", width: 25 },
           ],
@@ -591,16 +597,6 @@ const fmtNum = (val: number) =>
       {{ formatTanggal(item.Tanggal) }}
     </template>
 
-    <template #item._costCenter="{ item }">
-      <span v-if="item.CcNama">
-        {{ item.CcNama
-        }}<span v-if="item.CcDcNama" class="text-grey">
-          — {{ item.CcDcNama }}</span
-        >
-      </span>
-      <span v-else class="text-grey text-caption">-</span>
-    </template>
-
     <template #detail="{ item }">
       <div class="detail-wrap">
         <div v-if="detailLoading[item.Nomor]" class="detail-loading">
@@ -614,24 +610,6 @@ const fmtNum = (val: number) =>
           </div>
           <div class="dtl-scroll">
             <table class="dtl-table">
-              <thead>
-                <tr>
-                  <th style="width: 150px">Nama</th>
-                  <th style="width: 170px">Spesifikasi</th>
-                  <th style="width: 60px" class="tc">Satuan</th>
-                  <th style="width: 80px" class="tr">Qty Ajukan</th>
-                  <th style="width: 80px" class="tr">Qty Verif</th>
-                  <th style="width: 70px" class="tr">Qty Beli</th>
-                  <th style="width: 80px" class="tr">Qty Realisasi</th>
-                  <th style="width: 100px" class="tr">Rp Ajukan</th>
-                  <th style="width: 100px" class="tr">Rp Approved</th>
-                  <th style="width: 130px">Deadline</th>
-                  <th style="width: 130px">Verified Oleh</th>
-                  <th style="width: 130px">Approved Oleh</th>
-                  <th style="min-width: 180px">Kegunaan</th>
-                  <th style="min-width: 180px">Keterangan</th>
-                </tr>
-              </thead>
               <tbody>
                 <tr v-for="(d, i) in detailData[item.Nomor]" :key="i">
                   <td class="fw text-grey-darken-3">{{ d.Nama }}</td>
@@ -648,11 +626,22 @@ const fmtNum = (val: number) =>
                   <td>{{ d.Deadline ? formatTanggal(d.Deadline) : "-" }}</td>
                   <td>{{ d.NameVerified || "-" }}</td>
                   <td>{{ d.NameApproved || "-" }}</td>
+                  <!-- ⬅ BARU: kolom Cost Center per item -->
+                  <td style="white-space: normal">
+                    <span v-if="d.CcNama">
+                      {{ d.CcNama
+                      }}<span v-if="d.CcDcNama" class="text-grey">
+                        — {{ d.CcDcNama }}</span
+                      >
+                    </span>
+                    <span v-else class="text-grey text-caption">-</span>
+                  </td>
                   <td style="white-space: normal">{{ d.Kegunaan }}</td>
                   <td style="white-space: normal">{{ d.Keterangan }}</td>
                 </tr>
                 <tr v-if="!detailData[item.Nomor]?.length">
-                  <td colspan="14" class="empty-row">
+                  <td colspan="15" class="empty-row">
+                    <!-- ⬅ DIUBAH: 14 → 15 (nambah 1 kolom) -->
                     Tidak ada rincian item untuk pengajuan ini.
                   </td>
                 </tr>
