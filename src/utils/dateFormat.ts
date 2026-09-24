@@ -140,3 +140,57 @@ export const toExcelDate = (v: string | null | undefined): Date | null => {
   if (!dd || !mm || !yyyy) return null;
   return new Date(yyyy, mm - 1, dd, 12, 0, 0);
 };
+
+/**
+ * Format tanggal ringkas ala "12 Sept 26" — TANPA jam/detik/timezone.
+ * Dipakai khusus buat export yang butuh format singkat manusiawi
+ * (bukan dd/mm/yyyy, bukan ISO). Sama pola input-parsing dengan
+ * formatTanggal (aman dari bug timezone — ambil komponen tanggal
+ * LOKAL dari string, tidak lewat new Date().toISOString() lagi).
+ */
+const BULAN_SINGKAT = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "Mei",
+  "Jun",
+  "Jul",
+  "Agu",
+  "Sep",
+  "Okt",
+  "Nov",
+  "Des",
+];
+export const formatTanggalSingkat = (v: string | null | undefined): string => {
+  if (!v) return "-";
+
+  const s = String(v);
+  let y: number, m: number, d: number;
+
+  if (s.includes("T")) {
+    // ISO string — ambil komponen tanggal via Date object (lokal)
+    const dt = new Date(s);
+    if (isNaN(dt.getTime())) return "-";
+    y = dt.getFullYear();
+    m = dt.getMonth() + 1;
+    d = dt.getDate();
+  } else if (/^\d{2}-\d{2}-\d{4}$/.test(s)) {
+    // dd-MM-yyyy
+    const [dd, mm, yyyy] = s.split("-").map(Number);
+    d = dd;
+    m = mm;
+    y = yyyy;
+  } else if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
+    // yyyy-MM-dd (dengan atau tanpa waktu setelahnya)
+    const [yyyy, mm, dd] = s.substring(0, 10).split("-").map(Number);
+    y = yyyy;
+    m = mm;
+    d = dd;
+  } else {
+    return s;
+  }
+
+  if (!y || !m || !d) return "-";
+  return `${d} ${BULAN_SINGKAT[m - 1]} ${String(y).slice(2)}`;
+};

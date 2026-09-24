@@ -21,7 +21,11 @@ import {
   IconLockSquare,
   IconEye,
 } from "@tabler/icons-vue";
-import { formatTanggal, formatTanggalJam } from "@/utils/dateFormat";
+import {
+  formatTanggal,
+  formatTanggalJam,
+  formatTanggalSingkat,
+} from "@/utils/dateFormat";
 import api from "@/services/api";
 
 const authStore = useAuthStore();
@@ -440,7 +444,11 @@ const onExport = async () => {
     `SPK_${dtAwal.value}_${dtAkhir.value}.xlsx`,
     "SPK",
     columns,
-    items.value,
+    items.value.map((it: any) => ({
+      ...it,
+      Tanggal: formatTanggalSingkat(it.Tanggal),
+      Dateline: formatTanggalSingkat(it.Dateline),
+    })),
     `SPK Periode ${dtAwal.value} s/d ${dtAkhir.value}`,
   );
 };
