@@ -1816,6 +1816,7 @@ interface TargetDetailItem {
   cusNama: string;
   debet: number;
   sisa: number;
+  terbayar: number;
 }
 
 const showTargetDetailDialog = ref(false);
@@ -1838,7 +1839,6 @@ const openTargetDetail = async (row: {
       bulan: targetCollectionData.value?.bulan,
       tahun: targetCollectionData.value?.tahun,
     });
-    targetDetailLabel.value = res.data.data?.targetBulanLabel || "";
     targetDetailItems.value = res.data.data?.items || [];
   } catch (e: any) {
     alert(e?.response?.data?.message || "Gagal memuat detail invoice.");
@@ -9849,7 +9849,7 @@ const sisaClass = (item: any) => {
       </v-card>
     </v-dialog>
 
-    <v-dialog v-model="showTargetDetailDialog" max-width="960px" scrollable>
+    <v-dialog v-model="showTargetDetailDialog" max-width="1200px" scrollable>
       <v-card class="rounded-lg">
         <v-card-title class="bg-primary text-white d-flex align-center pa-3">
           <span class="text-subtitle-1 font-weight-bold">
@@ -9867,11 +9867,12 @@ const sisaClass = (item: any) => {
             <table class="td-detail-table" style="min-width: 780px">
               <thead>
                 <tr>
-                  <th style="width: 160px">No. Invoice</th>
+                  <th style="width: 150px">No. Invoice</th>
                   <th style="width: 100px">Tanggal</th>
-                  <th style="width: 220px">Customer</th>
-                  <th class="tr">Nilai Invoice</th>
-                  <th class="tr">Sisa Hari Ini</th>
+                  <th>Customer</th>
+                  <th class="tr" style="width: 130px">Nilai Invoice</th>
+                  <th class="tr" style="width: 130px">Dibayar</th>
+                  <th class="tr" style="width: 130px">Sisa</th>
                 </tr>
               </thead>
               <tbody>
@@ -9880,6 +9881,9 @@ const sisaClass = (item: any) => {
                   <td>{{ it.tanggal }}</td>
                   <td>{{ it.cusNama || it.cusKode }}</td>
                   <td class="tr">{{ it.debet.toLocaleString("id-ID") }}</td>
+                  <td class="tr" style="color: #2e7d32">
+                    {{ it.terbayar.toLocaleString("id-ID") }}
+                  </td>
                   <td
                     class="tr"
                     :style="{ color: it.sisa > 0 ? '#c62828' : '#2e7d32' }"
@@ -9889,7 +9893,7 @@ const sisaClass = (item: any) => {
                 </tr>
                 <tr v-if="!targetDetailItems.length">
                   <td
-                    colspan="5"
+                    colspan="6"
                     class="text-center text-grey py-4 font-italic"
                   >
                     Tidak ada invoice.
@@ -9901,6 +9905,13 @@ const sisaClass = (item: any) => {
                   <td colspan="3" class="tr fw">TOTAL</td>
                   <td class="tr fw">
                     {{ targetDetailTotal.toLocaleString("id-ID") }}
+                  </td>
+                  <td class="tr fw" style="color: #2e7d32">
+                    {{
+                      targetDetailItems
+                        .reduce((s, it) => s + it.terbayar, 0)
+                        .toLocaleString("id-ID")
+                    }}
                   </td>
                   <td class="tr fw">
                     {{ targetDetailSisaTotal.toLocaleString("id-ID") }}
@@ -12074,6 +12085,17 @@ const sisaClass = (item: any) => {
 .td-detail-table th,
 .td-detail-table td {
   white-space: nowrap;
+}
+.td-badge-old {
+  display: inline-block;
+  background: #e65100;
+  color: white;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 3px;
+  margin-left: 4px;
+  vertical-align: middle;
 }
 
 @keyframes highlight-fade {
