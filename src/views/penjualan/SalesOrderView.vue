@@ -27,9 +27,11 @@ import {
   IconLayoutSidebarRightCollapse,
   IconBan,
   IconSwitchHorizontal,
+  IconEdit,
 } from "@tabler/icons-vue";
 import { formatTanggal, formatTanggalJam } from "@/utils/dateFormat";
 import { exportExcelSingle, type ExcelColumn } from "@/utils/excelExport";
+import NumberInputIDR from "@/components/NumberInputIDR.vue";
 
 const authStore = useAuthStore();
 const router = useRouter();
@@ -105,6 +107,15 @@ const selectedCustomer = computed({
     };
   },
 });
+// ⬅ BARU: handler hasil pilihan CustomerSearchModal — sebelumnya modal
+// ini tidak pernah mengisi selectedCustomer sama sekali (listen ke
+// @click, bukan @selected), jadi filter Customer tidak pernah aktif.
+const handleCustSelected = (item: any) => {
+  selectedCustomer.value = {
+    kode: item.cus_kode || item.Kode || item.kode,
+    nama: item.cus_nama || item.Nama || item.nama,
+  };
+};
 
 // Watch filterState → simpan ke sessionStorage + fetch
 const isInitialized = ref(false);
@@ -383,10 +394,11 @@ onMounted(async () => {
   try {
     const res = await salesOrderService.getWorkshops();
     const data = res.data.data;
+    const ALLOWED_WORKSHOPS = ["MT1", "P01", "P02", "P04", "P05"];
     if (Array.isArray(data)) {
-      listWorkshop.value = data.map((w) =>
-        typeof w === "object" ? w.kode : w,
-      );
+      listWorkshop.value = data
+        .map((w) => (typeof w === "object" ? w.kode : w))
+        .filter((kode) => ALLOWED_WORKSHOPS.includes(kode));
     }
   } catch (e) {
     console.error("Gagal load workshop:", e);
@@ -1046,6 +1058,95 @@ const onExport = async () => {
     isExporting.value = false;
   }
 };
+
+// ── Revisi SO ──
+const showRevisiDialog = ref(false);
+const isRevisiLoading = ref(false);
+const isRevisiSaving = ref(false);
+const revisiData = ref<any>({
+  nomorPo: "",
+  tglPo: "",
+  datelinePo: "",
+  hargaJual: 0,
+  hargaRiil: 0,
+  hargaFee: 0,
+  isTutupBuku: false,
+  canSaveNow: true,
+});
+const showRevisiPinDialog = ref(false);
+const revisiPinAlasan = ref("");
+const isRevisiPinSubmitting = ref(false);
+
+const openRevisiDialog = async () => {
+  if (!selectedItem.value) return;
+  showRevisiDialog.value = true;
+  isRevisiLoading.value = true;
+  try {
+    const res = await salesOrderService.getRevisiDetail(
+      selectedItem.value.Nomor,
+    );
+    revisiData.value = res.data.data;
+  } catch (e: any) {
+    toast.error(e.response?.data?.message || "Gagal memuat data revisi.");
+    showRevisiDialog.value = false;
+  } finally {
+    isRevisiLoading.value = false;
+  }
+};
+
+const submitRevisi = async () => {
+  if (!selectedItem.value) return;
+  isRevisiSaving.value = true;
+  try {
+    await salesOrderService.saveRevisi(selectedItem.value.Nomor, {
+      nomorPo: revisiData.value.nomorPo,
+      tglPo: revisiData.value.tglPo,
+      datelinePo: revisiData.value.datelinePo,
+      hargaJual: revisiData.value.hargaJual,
+      hargaRiil: revisiData.value.hargaRiil,
+      hargaFee: revisiData.value.hargaFee,
+    });
+    toast.success("Revisi SO berhasil disimpan.");
+    showRevisiDialog.value = false;
+    fetchData();
+  } catch (e: any) {
+    toast.error(e.response?.data?.message || "Gagal menyimpan revisi.");
+  } finally {
+    isRevisiSaving.value = false;
+  }
+};
+
+const openRevisiPinDialog = () => {
+  revisiPinAlasan.value = "";
+  showRevisiPinDialog.value = true;
+};
+
+const submitRevisiPin = async () => {
+  if (!selectedItem.value) return;
+  if (!revisiPinAlasan.value.trim()) {
+    toast.warning("Alasan wajib diisi.");
+    return;
+  }
+  isRevisiPinSubmitting.value = true;
+  try {
+    const res = await salesOrderService.requestRevisiPin(
+      selectedItem.value.Nomor,
+      revisiPinAlasan.value,
+    );
+    toast.success(res.data.message);
+    showRevisiPinDialog.value = false;
+    // muat ulang status — kalau kebetulan sudah ada approval lama
+    // yang belum dipakai, canSaveNow bisa langsung jadi true
+    const refreshed = await salesOrderService.getRevisiDetail(
+      selectedItem.value.Nomor,
+    );
+    revisiData.value = { ...revisiData.value, ...refreshed.data.data };
+  } catch (e: any) {
+    toast.error(e.response?.data?.message || "Gagal mengirim pengajuan.");
+  } finally {
+    isRevisiPinSubmitting.value = false;
+  }
+};
 </script>
 
 <template>
@@ -1329,6 +1430,16 @@ const onExport = async () => {
         Gambar
       </v-btn>
 
+      <v-btn
+        v-if="selected.length === 1 && selected[0].HasSpkPpic"
+        size="small"
+        color="deep-purple"
+        @click="openRevisiDialog"
+      >
+        <template #prepend><IconEdit :size="15" /></template>
+        Revisi SO
+      </v-btn>
+
       <v-menu v-if="selected.length > 0">
         <template #activator="{ props }">
           <v-btn size="small" color="teal-darken-3" v-bind="props">
@@ -1381,10 +1492,7 @@ const onExport = async () => {
     </template>
   </BaseBrowse>
 
-  <CustomerSearchModal
-    v-model="showCusModal"
-    @click="selectedCustomer = null"
-  />
+  <CustomerSearchModal v-model="showCusModal" @selected="handleCustSelected" />
 
   <v-dialog v-model="pinDialog" max-width="400">
     <v-card rounded="lg">
@@ -1983,6 +2091,147 @@ const onExport = async () => {
       </v-card-actions>
     </v-card>
   </v-dialog>
+
+  <v-dialog v-model="showRevisiDialog" max-width="460px" persistent>
+    <v-card rounded="lg">
+      <v-card-title
+        class="bg-deep-purple text-white pa-3 text-subtitle-1 d-flex align-center"
+      >
+        <IconEdit :size="16" color="white" class="mr-2" />
+        Revisi SO — {{ selectedItem?.Nomor }}
+      </v-card-title>
+      <v-card-text class="pa-4">
+        <div v-if="isRevisiLoading" class="text-center py-6 text-grey">
+          Memuat data...
+        </div>
+        <template v-else>
+          <div
+            v-if="revisiData.isTutupBuku && !revisiData.canSaveNow"
+            class="revisi-alert mb-3"
+          >
+            Periode SO ini sudah ditutup buku. Ajukan Pengajuan Perubahan Data
+            dulu dan tunggu ACC sebelum bisa menyimpan revisi.
+            <div class="mt-2">
+              <v-btn
+                size="x-small"
+                color="warning"
+                variant="elevated"
+                @click="openRevisiPinDialog"
+              >
+                Ajukan Perubahan Data
+              </v-btn>
+            </div>
+          </div>
+          <div
+            v-else-if="revisiData.isTutupBuku && revisiData.canSaveNow"
+            class="revisi-alert-ok mb-3"
+          >
+            ✓ Pengajuan perubahan data sudah di-ACC. Anda bisa menyimpan revisi
+            ini.
+          </div>
+
+          <div class="revisi-field">
+            <label>Nomor PO</label>
+            <input
+              type="text"
+              v-model="revisiData.nomorPo"
+              class="revisi-inp"
+            />
+          </div>
+          <div class="revisi-field">
+            <label>Tgl PO</label>
+            <input type="date" v-model="revisiData.tglPo" class="revisi-inp" />
+          </div>
+          <div class="revisi-field">
+            <label>Dateline PO</label>
+            <input
+              type="date"
+              v-model="revisiData.datelinePo"
+              class="revisi-inp"
+            />
+          </div>
+          <v-divider class="my-3" />
+          <div class="revisi-field">
+            <label>Harga Jual</label>
+            <div class="revisi-inp-wrap">
+              <NumberInputIDR v-model="revisiData.hargaJual" cursor-to-end />
+            </div>
+          </div>
+          <div class="revisi-field">
+            <label>Harga Riil</label>
+            <div class="revisi-inp-wrap">
+              <NumberInputIDR v-model="revisiData.hargaRiil" cursor-to-end />
+            </div>
+          </div>
+          <div class="revisi-field">
+            <label>Harga Fee</label>
+            <div class="revisi-inp-wrap">
+              <NumberInputIDR v-model="revisiData.hargaFee" cursor-to-end />
+            </div>
+          </div>
+        </template>
+      </v-card-text>
+      <v-card-actions class="pa-3 border-t bg-grey-lighten-4">
+        <v-spacer />
+        <v-btn
+          variant="text"
+          :disabled="isRevisiSaving"
+          @click="showRevisiDialog = false"
+        >
+          Batal
+        </v-btn>
+        <v-btn
+          color="deep-purple"
+          variant="elevated"
+          :loading="isRevisiSaving"
+          :disabled="isRevisiLoading || !revisiData.canSaveNow"
+          @click="submitRevisi"
+        >
+          Simpan Revisi
+        </v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
+
+  <v-dialog v-model="showRevisiPinDialog" max-width="400px">
+    <v-card rounded="lg">
+      <v-card-title class="bg-warning text-white pa-3 text-subtitle-1">
+        Pengajuan Perubahan Data — Revisi SO
+      </v-card-title>
+      <v-card-text class="pa-4">
+        <p class="text-caption mb-2">
+          Nomor: <b>{{ selectedItem?.Nomor }}</b>
+        </p>
+        <v-textarea
+          v-model="revisiPinAlasan"
+          label="Alasan Perubahan"
+          variant="outlined"
+          density="compact"
+          rows="3"
+          hide-details
+          autofocus
+        />
+      </v-card-text>
+      <v-card-actions class="pa-3 border-t">
+        <v-spacer />
+        <v-btn
+          variant="text"
+          :disabled="isRevisiPinSubmitting"
+          @click="showRevisiPinDialog = false"
+        >
+          Batal
+        </v-btn>
+        <v-btn
+          color="warning"
+          variant="elevated"
+          :loading="isRevisiPinSubmitting"
+          @click="submitRevisiPin"
+        >
+          Kirim Pengajuan
+        </v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
 </template>
 
 <style scoped>
@@ -2244,5 +2493,61 @@ const onExport = async () => {
 .badge-green {
   background: #e8f5e9;
   color: #2e7d32;
+}
+.revisi-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.revisi-field label {
+  width: 100px;
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: #424242;
+}
+.revisi-inp {
+  flex: 1;
+  height: 30px;
+  border: 1px solid #bdbdbd;
+  border-radius: 4px;
+  padding: 0 8px;
+  font-size: 12px;
+  outline: none;
+}
+.revisi-inp:focus {
+  border-color: #1565c0;
+}
+.revisi-inp.tr {
+  text-align: right;
+}
+.revisi-alert {
+  background: #fff8e1;
+  color: #f57f17;
+  border: 1px solid #ffe082;
+  border-radius: 4px;
+  padding: 8px 10px;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.revisi-alert-ok {
+  background: #e8f5e9;
+  color: #2e7d32;
+  border: 1px solid #a5d6a7;
+  border-radius: 4px;
+  padding: 8px 10px;
+  font-size: 11px;
+}
+.revisi-inp-wrap {
+  flex: 1;
+  height: 30px;
+  border: 1px solid #bdbdbd;
+  border-radius: 4px;
+  overflow: hidden;
+  transition: border-color 0.15s;
+}
+.revisi-inp-wrap:focus-within {
+  border-color: #1565c0;
 }
 </style>

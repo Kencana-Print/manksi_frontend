@@ -66,4 +66,21 @@ export const salesOrderService = {
     page?: number;
     limit?: number;
   }) => api.get("/penjualan/sales-order/search-for-spk", { params }),
+
+  getRevisiDetail: (nomor: string) =>
+    api.get(
+      `/penjualan/sales-order/${encodeURIComponent(nomor)}/revisi-detail`,
+    ),
+
+  saveRevisi: (nomor: string, payload: any) =>
+    api.put(
+      `/penjualan/sales-order/${encodeURIComponent(nomor)}/revisi`,
+      payload,
+    ),
+
+  requestRevisiPin: (nomor: string, alasan: string) =>
+    api.post(
+      `/penjualan/sales-order/${encodeURIComponent(nomor)}/request-revisi-pin`,
+      { alasan },
+    ),
 };

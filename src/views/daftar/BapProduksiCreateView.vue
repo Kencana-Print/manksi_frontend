@@ -323,6 +323,26 @@ const handlePreSave = async () => {
     toast.error("Kategori wajib dipilih minimal 1 sebelum menyimpan.");
     return;
   }
+  // ⬅ BARU: Permasalahan sudah punya tanda visual wajib (ta-error) tapi
+  // sebelumnya tidak pernah benar-benar dicek di sini — user bisa
+  // submit dengan field ini kosong tanpa ke-block.
+  if (!formData.value.Masalah?.trim()) {
+    toast.error("Permasalahan wajib diisi sebelum menyimpan.");
+    return;
+  }
+  // ⬅ BARU: Solusi, Sumber Masalah, Pertanggungjawaban sekarang wajib juga
+  if (!formData.value.Solusi?.trim()) {
+    toast.error("Solusi wajib diisi sebelum menyimpan.");
+    return;
+  }
+  if (!formData.value.SumberMasalah?.trim()) {
+    toast.error("Sumber Masalah wajib diisi sebelum menyimpan.");
+    return;
+  }
+  if (!formData.value.Pertanggungjawaban?.trim()) {
+    toast.error("Pertanggungjawaban wajib diisi sebelum menyimpan.");
+    return;
+  }
   if (isFormDisabled.value) {
     toast.warning("Belum bisa menyimpan. Status: " + statusPengajuan.value);
     return;
@@ -402,7 +422,7 @@ const handlePreSave = async () => {
                   </select>
                 </div>
                 <div class="f-row">
-                  <label class="f-lbl">Tipe</label>
+                  <label class="f-lbl">Tipe <span class="req">*</span></label>
                   <label class="radio-label">
                     <input
                       type="radio"
@@ -564,27 +584,40 @@ const handlePreSave = async () => {
                   v-model="formData.Masalah"
                   class="bap-ta"
                   rows="5"
-                  :class="{ 'ta-error': !formData.Masalah }"
+                  :class="{ 'ta-error': !formData.Masalah?.trim() }"
                 />
               </div>
               <div class="bap-ta-item">
-                <label class="bap-ta-label">Solusi</label>
-                <textarea v-model="formData.Solusi" class="bap-ta" rows="5" />
+                <label class="bap-ta-label"
+                  >Solusi <span class="req">*</span></label
+                >
+                <textarea
+                  v-model="formData.Solusi"
+                  class="bap-ta"
+                  rows="5"
+                  :class="{ 'ta-error': !formData.Solusi?.trim() }"
+                />
               </div>
               <div class="bap-ta-item">
-                <label class="bap-ta-label">Sumber Masalah</label>
+                <label class="bap-ta-label"
+                  >Sumber Masalah <span class="req">*</span></label
+                >
                 <textarea
                   v-model="formData.SumberMasalah"
                   class="bap-ta"
                   rows="5"
+                  :class="{ 'ta-error': !formData.SumberMasalah?.trim() }"
                 />
               </div>
               <div class="bap-ta-item">
-                <label class="bap-ta-label">Pertanggungjawaban</label>
+                <label class="bap-ta-label"
+                  >Pertanggungjawaban <span class="req">*</span></label
+                >
                 <textarea
                   v-model="formData.Pertanggungjawaban"
                   class="bap-ta"
                   rows="5"
+                  :class="{ 'ta-error': !formData.Pertanggungjawaban?.trim() }"
                 />
               </div>
             </div>

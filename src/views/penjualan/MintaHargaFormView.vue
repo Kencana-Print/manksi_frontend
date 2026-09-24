@@ -8,7 +8,13 @@ import BaseForm from "@/components/BaseForm.vue";
 import TabPermintaan from "./components/TabPermintaan.vue";
 import TabKalkulasi from "./components/TabKalkulasi.vue";
 import TabKatalogMintaHarga from "./components/TabKatalogMintaHarga.vue";
-import { IconCash, IconCalculator, IconPhoto } from "@tabler/icons-vue";
+import MintaHargaTabKatalogSo from "./components/MintaHargaTabKatalogSo.vue";
+import {
+  IconCash,
+  IconCalculator,
+  IconPhoto,
+  IconShoppingCartCopy,
+} from "@tabler/icons-vue";
 
 type MintaHargaForm = typeof initialData;
 
@@ -319,10 +325,24 @@ const tabs = [
   { text: "1. Price Request", icon: IconCash },
   { text: "2. Get Price (Kalkulasi)", icon: IconCalculator },
   { text: "3. Katalog Desain", icon: IconPhoto },
+  { text: "4. Katalog Pesanan", icon: IconShoppingCartCopy },
 ];
 
 const handleImageSelected = (file: File) => {
   selectedImageFile.value = file;
+};
+
+// ⬅ BARU: autofill dari SO yang dipilih di tab Katalog Pesanan
+const handlePilihSo = (item: any) => {
+  formData.value.NamaPekerjaan = item.nama || formData.value.NamaPekerjaan;
+  formData.value.Kain = item.kain || formData.value.Kain;
+  formData.value.Ukuran = item.ukuran || formData.value.Ukuran;
+  formData.value.Finishing = item.finishing || formData.value.Finishing;
+  formData.value.RencanaOrder =
+    Number(item.jumlah) || formData.value.RencanaOrder;
+  formData.value.HargaLama = Number(item.harga) || formData.value.HargaLama;
+  toast.success(`Data referensi diambil dari SO ${item.nomor}.`);
+  currentTab.value = 0; // balik ke tab Price Request supaya hasilnya kelihatan
 };
 </script>
 
@@ -374,6 +394,17 @@ const handleImageSelected = (file: File) => {
           <TabKatalogMintaHarga
             :cust-kode="formData.CustKode"
             :cust-nama="formData.CustNama"
+          />
+        </div>
+        <div
+          v-show="currentTab === 3"
+          class="mh-tab-pane"
+          style="padding: 0; overflow: hidden; height: 100%"
+        >
+          <MintaHargaTabKatalogSo
+            :cust-kode="formData.CustKode"
+            :cust-nama="formData.CustNama"
+            @pilih="handlePilihSo"
           />
         </div>
       </div>
