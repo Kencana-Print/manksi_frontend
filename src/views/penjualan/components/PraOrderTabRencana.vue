@@ -3,7 +3,6 @@ import { ref, watch, computed, onMounted } from "vue";
 import api from "@/services/api";
 import { praOrderService } from "@/services/penjualan/praOrderService";
 import { useToast } from "vue-toastification";
-import { useAuthStore } from "@/stores/authStore";
 import CustomerSearchModal from "@/components/lookups/CustomerSearchModal.vue";
 import SalesSearchModal from "@/components/lookups/SalesSearchModal.vue";
 import {
@@ -19,17 +18,12 @@ import {
 
 const props = defineProps<{ formData: any; isEdit: boolean }>();
 const toast = useToast();
-const authStore = useAuthStore();
 const emit = defineEmits(["files-selected"]);
 
 const showCustModal = ref(false);
 const showSalesModal = ref(false);
 const isOpeningModal = ref(false);
 const fileRef = ref<HTMLInputElement | null>(null);
-
-const isSavingBahanStatus = ref<Record<number, boolean>>({});
-const isSavingPpicStatus = ref(false);
-const catatanPpicDraft = ref(props.formData.CatatanPpic || "");
 
 const divisiOptions = ref<any[]>([]);
 const bahanMaster = ref<any[]>([]);
@@ -76,51 +70,6 @@ const loadInitGrids = async () => {
     bahanMaster.value = res.data.data.bahan || [];
   } catch {
     console.error("Gagal load master bahan");
-  }
-};
-
-const setBahanReady = async (bahan: any, status: string) => {
-  if (!bahan.ProbId) {
-    toast.warning(
-      "Simpan data terlebih dahulu sebelum cek ketersediaan bahan.",
-    );
-    return;
-  }
-  isSavingBahanStatus.value[bahan.ProbId] = true;
-  try {
-    await praOrderService.setStatusBahan(bahan.ProbId, status);
-    bahan.StatusReady = status;
-    toast.success(`Status bahan "${bahan.Nama}" diperbarui.`);
-  } catch (e: any) {
-    toast.error(e.response?.data?.message || "Gagal memperbarui status bahan.");
-  } finally {
-    isSavingBahanStatus.value[bahan.ProbId] = false;
-  }
-};
-
-const setPpicDecision = async (status: string) => {
-  if (!props.formData.Nomor) {
-    toast.warning("Data belum tersimpan.");
-    return;
-  }
-  if (status === "TIDAK SANGGUP" && !catatanPpicDraft.value.trim()) {
-    toast.warning("Catatan alasan wajib diisi untuk status Tidak Sanggup.");
-    return;
-  }
-  isSavingPpicStatus.value = true;
-  try {
-    await praOrderService.setStatusPpic(
-      props.formData.Nomor,
-      status,
-      catatanPpicDraft.value,
-    );
-    props.formData.StatusPpic = status;
-    props.formData.CatatanPpic = catatanPpicDraft.value;
-    toast.success("Keputusan PPIC berhasil disimpan.");
-  } catch (e: any) {
-    toast.error(e.response?.data?.message || "Gagal menyimpan keputusan PPIC.");
-  } finally {
-    isSavingPpicStatus.value = false;
   }
 };
 
@@ -647,98 +596,6 @@ const openPreview = (url: string) => {
             Status Approval: <strong>{{ formData.StatusEdit }}</strong>
           </div>
         </div>
-
-        <!-- Panel Aksi PPIC — hanya tampil untuk user bagian PPIC (atau ADMIN), dan hanya saat edit (data sudah tersimpan) -->
-        <div
-          v-if="isEdit && authStore.isPpic && formData.Status !== 'CLOSE'"
-          class="tp-section tp-ppic-panel"
-        >
-          <div class="tp-sec-title">Aksi PPIC</div>
-
-          <div class="ppic-sub-title" v-if="isDivisiGarmen">
-            Cek Ketersediaan Bahan
-          </div>
-          <div class="ppic-bahan-list" v-if="isDivisiGarmen">
-            <div
-              v-for="b in formData.Bahan"
-              :key="b.Kode"
-              class="ppic-bahan-row"
-            >
-              <span class="ppic-bahan-nama">{{ b.Nama }}</span>
-              <div class="ppic-bahan-actions">
-                <button
-                  type="button"
-                  class="ppic-btn-mini ready"
-                  :class="{ active: b.StatusReady === 'READY' }"
-                  :disabled="isSavingBahanStatus[b.ProbId]"
-                  @click="setBahanReady(b, 'READY')"
-                >
-                  Ready
-                </button>
-                <button
-                  type="button"
-                  class="ppic-btn-mini not-ready"
-                  :class="{ active: b.StatusReady === 'TIDAK READY' }"
-                  :disabled="isSavingBahanStatus[b.ProbId]"
-                  @click="setBahanReady(b, 'TIDAK READY')"
-                >
-                  Tidak Ready
-                </button>
-              </div>
-            </div>
-            <div v-if="!formData.Bahan.length" class="bahan-empty">
-              Belum ada bahan alternatif.
-            </div>
-          </div>
-
-          <div class="ppic-sub-title" style="margin-top: 10px">
-            Keputusan Kesanggupan
-          </div>
-          <v-textarea
-            v-model="catatanPpicDraft"
-            variant="outlined"
-            density="compact"
-            hide-details
-            rows="2"
-            class="f-inp tp-textarea-2row"
-            placeholder="Catatan (wajib jika Tidak Sanggup)..."
-          />
-          <div class="ppic-decision-row">
-            <button
-              type="button"
-              class="ppic-btn-decision sanggup"
-              :disabled="isSavingPpicStatus"
-              @click="setPpicDecision('SANGGUP')"
-            >
-              ✓ Sanggup
-            </button>
-            <button
-              type="button"
-              class="ppic-btn-decision tidak"
-              :disabled="isSavingPpicStatus"
-              @click="setPpicDecision('TIDAK SANGGUP')"
-            >
-              ✕ Tidak Sanggup
-            </button>
-          </div>
-        </div>
-
-        <div
-          class="tp-section"
-          style="
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            min-height: 0;
-            margin-top: 8px;
-          "
-        >
-          <div class="tp-sec-title">Info</div>
-          <div class="tp-note">
-            Detail ukuran, qty, dan keterangan tambahan diisi di tab
-            <strong>"Ukuran & Keterangan"</strong>.
-          </div>
-        </div>
       </div>
     </div>
   </div>
@@ -1161,96 +1018,5 @@ const openPreview = (url: string) => {
   background: #fff8e1;
   color: #f57f17;
   border: 1px solid #ffe082;
-}
-.tp-ppic-panel {
-  border-color: #90caf9;
-  background: #f7fbff;
-}
-.ppic-sub-title {
-  font-size: 10px;
-  font-weight: 700;
-  color: #1565c0;
-  margin-bottom: 5px;
-}
-.ppic-bahan-list {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.ppic-bahan-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-  background: white;
-  border: 1px solid #e0e0e0;
-  border-radius: 4px;
-  padding: 4px 8px;
-}
-.ppic-bahan-nama {
-  font-size: 11px;
-  color: #333;
-  flex: 1;
-  min-width: 0;
-}
-.ppic-bahan-actions {
-  display: flex;
-  gap: 4px;
-  flex-shrink: 0;
-}
-.ppic-btn-mini {
-  font-size: 10px;
-  padding: 3px 8px;
-  border-radius: 3px;
-  border: 1px solid #ccc;
-  background: white;
-  color: #555;
-  cursor: pointer;
-  font-weight: 600;
-}
-.ppic-btn-mini:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-.ppic-btn-mini.ready.active {
-  background: #2e7d32;
-  border-color: #2e7d32;
-  color: white;
-}
-.ppic-btn-mini.not-ready.active {
-  background: #e53935;
-  border-color: #e53935;
-  color: white;
-}
-.ppic-decision-row {
-  display: flex;
-  gap: 6px;
-  margin-top: 6px;
-}
-.ppic-btn-decision {
-  flex: 1;
-  padding: 6px;
-  border: none;
-  border-radius: 4px;
-  font-size: 11px;
-  font-weight: 700;
-  cursor: pointer;
-  color: white;
-}
-.ppic-btn-decision:disabled {
-  opacity: 0.6;
-  cursor: default;
-}
-.ppic-btn-decision.sanggup {
-  background: #2e7d32;
-}
-.ppic-btn-decision.sanggup:hover:not(:disabled) {
-  background: #1b5e20;
-}
-.ppic-btn-decision.tidak {
-  background: #e53935;
-}
-.ppic-btn-decision.tidak:hover:not(:disabled) {
-  background: #c62828;
 }
 </style>

@@ -4,6 +4,7 @@ import { konfirmasiPraOrderService } from "@/services/ppic/konfirmasiPraOrderSer
 import { useBrowse } from "@/composables/useBrowse";
 import { useToast } from "vue-toastification";
 import BaseBrowse from "@/components/BaseBrowse.vue";
+import { useAuthStore } from "@/stores/authStore";
 import {
   IconClipboardCheck,
   IconEye,
@@ -13,6 +14,7 @@ import {
 import { formatTanggal, formatTanggalJam } from "@/utils/dateFormat";
 
 const toast = useToast();
+const authStore = useAuthStore();
 
 // ── Filter state ──────────────────────────────────────────────────────
 const getToday = () => new Date().toISOString().substr(0, 10);
@@ -303,6 +305,13 @@ const canConfirm = computed(
         (item.raw || item).Nomor
       }}</span>
     </template>
+    <template #item.Customer="{ item }">
+      {{
+        authStore.canLihatCus
+          ? (item.raw || item).Customer || "—"
+          : (item.raw || item).CusKode || "—"
+      }}
+    </template>
     <template #item.StatusPpic="{ item }">
       <v-chip
         size="x-small"
@@ -354,8 +363,11 @@ const canConfirm = computed(
                 <tr>
                   <td class="lbl">Customer</td>
                   <td class="val">
-                    {{ detailData.pro_cus_kode }} —
-                    {{ detailData.pro_cus_nama }}
+                    {{
+                      authStore.canLihatCus
+                        ? `${detailData.pro_cus_kode} — ${detailData.pro_cus_nama}`
+                        : detailData.pro_cus_kode
+                    }}
                   </td>
                 </tr>
                 <tr>
