@@ -11,6 +11,7 @@ import {
   IconPencilOff,
   IconSend,
   IconArrowBigRightLine,
+  IconPrinter,
 } from "@tabler/icons-vue";
 import { formatTanggal, formatTanggalJam } from "@/utils/dateFormat";
 import { type ExcelColumn } from "@/utils/excelExport";
@@ -155,6 +156,15 @@ const handleDelete = async (item: any) => {
   } catch (e: any) {
     toast.error(e.response?.data?.message || "Gagal menghapus data.");
   }
+};
+const handlePrint = () => {
+  if (!selected.value.length) return;
+  const item = selected.value[0];
+  const url = router.resolve({
+    name: "PraOrderPrint",
+    params: { nomor: item.Nomor },
+  }).href;
+  window.open(url, "_blank");
 };
 
 const onExport = () => {
@@ -365,6 +375,15 @@ const handleConvert = async () => {
           ><IconPencilOff :size="15" :stroke-width="1.7"
         /></template>
         Pengajuan Perubahan Data
+      </v-btn>
+      <v-btn
+        size="small"
+        color="grey-darken-3"
+        :disabled="selected.length === 0"
+        @click="handlePrint"
+      >
+        <template #prepend><IconPrinter :size="15" /></template>
+        Cetak
       </v-btn>
     </template>
 

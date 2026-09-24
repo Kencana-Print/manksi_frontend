@@ -17,6 +17,8 @@ type RouteParams = { nomor?: string };
 const toast = useToast();
 const router = useRouter();
 const pendingFiles = ref<File[]>([]);
+const showPrintDialog = ref(false);
+const savedNomor = ref("");
 
 const formatDateLocal = (value?: string | Date) => {
   if (!value) return "";
@@ -167,9 +169,27 @@ const {
     } else {
       toast.success("Data berhasil disimpan!");
     }
-    router.push("/penjualan/pra-order");
+    // ⬅ DIUBAH: jangan langsung navigasi ke browse — tampilkan dialog
+    // konfirmasi cetak dulu, sama pola BpbJasaFormView
+    savedNomor.value = nomor;
+    showPrintDialog.value = true;
   },
 });
+
+const doCetak = () => {
+  const url = router.resolve({
+    name: "PraOrderPrint",
+    params: { nomor: savedNomor.value },
+  }).href;
+  window.open(url, "_blank");
+  showPrintDialog.value = false;
+  router.push("/penjualan/pra-order");
+};
+
+const skipPrint = () => {
+  showPrintDialog.value = false;
+  router.push("/penjualan/pra-order");
+};
 
 onMounted(async () => {
   try {
@@ -262,6 +282,28 @@ const handleFilesSelected = (files: File[]) => {
       </div>
     </div>
   </BaseForm>
+
+  <v-dialog v-model="showPrintDialog" max-width="360px" persistent>
+    <v-card class="rounded-lg">
+      <v-card-title
+        class="pa-3 bg-primary text-white"
+        style="font-size: 13px; font-weight: 700"
+      >
+        Simpan Berhasil
+      </v-card-title>
+      <v-card-text class="pa-4" style="font-size: 12px">
+        Data <b>{{ savedNomor }}</b> berhasil disimpan.<br />
+        Ingin mencetak Pra Order?
+      </v-card-text>
+      <v-card-actions class="pa-3 border-t">
+        <v-btn variant="text" size="small" @click="skipPrint">Tidak</v-btn>
+        <v-spacer />
+        <v-btn variant="flat" size="small" color="primary" @click="doCetak"
+          >Ya, Cetak</v-btn
+        >
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
 </template>
 
 <style scoped>

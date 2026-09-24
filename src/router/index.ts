@@ -2645,6 +2645,16 @@ const router = createRouter({
       },
     },
     {
+      path: "/penjualan/pra-order/print/:nomor",
+      name: "PraOrderPrint",
+      component: () => import("@/views/penjualan/PraOrderPrintView.vue"),
+      meta: {
+        title: "Cetak Pra Order",
+        layout: "BlankLayout", // WAJIB BlankLayout
+        requiresAuth: true,
+      },
+    },
+    {
       path: "/penjualan/minta-harga",
       name: "PermintaanHarga",
       component: () => import("@/views/penjualan/MintaHargaView.vue"),
