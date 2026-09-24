@@ -70,6 +70,7 @@ interface LoginResponse {
   spkUrgent: SpkUrgentItem[];
   bapBaruAudit: BapBaruItem[];
   bapReviewedNotif: BapReviewedItem[];
+  praOrderPendingPpic: PraOrderPendingItem[];
   isDefaultPassword?: boolean;
   specialMessage?: string | null;
   message: string;
@@ -95,6 +96,16 @@ interface BapReviewedItem {
   ReviewedTgl: string;
 }
 
+interface PraOrderPendingItem {
+  Nomor: string;
+  NamaPekerjaan: string;
+  CusKode: string;
+  Customer: string;
+  Tanggal: string;
+  TglKirim: string;
+  Divisi: string;
+}
+
 export const useAuthStore = defineStore(
   "auth",
   () => {
@@ -107,6 +118,7 @@ export const useAuthStore = defineStore(
     const spkUrgent = ref<SpkUrgentItem[]>([]);
     const bapBaruAudit = ref<BapBaruItem[]>([]);
     const bapReviewedNotif = ref<BapReviewedItem[]>([]);
+    const praOrderPendingPpic = ref<PraOrderPendingItem[]>([]);
     const isSessionExpired = ref(false);
     const isOnline = ref(navigator.onLine);
     const approvalPendingTotal = ref(0);
@@ -187,6 +199,7 @@ export const useAuthStore = defineStore(
       spkUrgent.value = loginResponse.spkUrgent || [];
       bapBaruAudit.value = loginResponse.bapBaruAudit || [];
       bapReviewedNotif.value = loginResponse.bapReviewedNotif || [];
+      praOrderPendingPpic.value = loginResponse.praOrderPendingPpic || [];
 
       // Router push akan ditangani di komponen Login.vue agar bisa show modal SPK dulu
     }
@@ -202,6 +215,8 @@ export const useAuthStore = defineStore(
       sessionStorage.removeItem("hasSeenBapAudit");
       bapReviewedNotif.value = [];
       sessionStorage.removeItem("hasSeenBapReviewed");
+      praOrderPendingPpic.value = [];
+      sessionStorage.removeItem("hasSeenPraOrderPpic");
       useTabsStore().resetTabs();
       router.push("/login");
     }
@@ -227,6 +242,7 @@ export const useAuthStore = defineStore(
       spkUrgent.value = [];
       bapBaruAudit.value = [];
       bapReviewedNotif.value = [];
+      praOrderPendingPpic.value = [];
       isSessionExpired.value = true;
       useTabsStore().resetTabs();
     }
@@ -243,6 +259,7 @@ export const useAuthStore = defineStore(
       spkUrgent,
       bapBaruAudit,
       bapReviewedNotif,
+      praOrderPendingPpic,
       isSessionExpired,
       isOnline,
       approvalPendingTotal,

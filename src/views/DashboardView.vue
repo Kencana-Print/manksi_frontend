@@ -337,6 +337,7 @@ const canAccessAiChat = computed(() =>
 const router = useRouter();
 const isSpkDialogVisible = ref(false);
 const isBapAuditDialogVisible = ref(false);
+const isPraOrderPpicDialogVisible = ref(false);
 const isBapReviewedDialogVisible = ref(false);
 const hasReadBapReviewed = ref(false);
 const activeTab = ref("overview");
@@ -3571,10 +3572,11 @@ onMounted(async () => {
     activeTab.value = "gudang-bahan";
   }
 
-  // BAP Audit dan SPK Urgent ditampilkan berurutan, bukan bersamaan —
-  // kalau SPK Urgent perlu tampil, BAP Audit menyusul setelah SPK
-  // ditutup (lihat closeSpkDialog). Kalau SPK Urgent TIDAK perlu
-  // tampil, BAP Audit langsung tampil di sini.
+  // SPK Urgent, BAP Audit, Pra Order PPIC, dan BAP Reviewed ditampilkan
+  // BERURUTAN, bukan bersamaan — masing-masing menyusul setelah dialog
+  // sebelumnya ditutup (lihat closeSpkDialog / closeBapAuditDialog /
+  // closePraOrderPpicDialog). Urutan: SPK -> BAP Audit -> Pra Order PPIC
+  // -> BAP Reviewed.
   if (
     authStore.spkUrgent?.length > 0 &&
     !sessionStorage.getItem("hasSeenSpk")
@@ -3586,7 +3588,7 @@ onMounted(async () => {
   ) {
     isBapAuditDialogVisible.value = true;
   } else {
-    showBapReviewedIfNeeded();
+    showPraOrderPpicIfNeeded(); // ⬅ DIUBAH: dulu langsung showBapReviewedIfNeeded()
   }
 
   // Overview SELALU di-fetch (tab-nya selalu terlihat)
@@ -3688,18 +3690,43 @@ const closeSpkDialog = () => {
   ) {
     isBapAuditDialogVisible.value = true;
   } else {
-    showBapReviewedIfNeeded();
+    showPraOrderPpicIfNeeded();
   }
 };
 
 const closeBapAuditDialog = () => {
   isBapAuditDialogVisible.value = false;
   sessionStorage.setItem("hasSeenBapAudit", "true");
-  showBapReviewedIfNeeded();
+  showPraOrderPpicIfNeeded(); // ⬅ DIUBAH
 };
 const goToBapDetail = (nomor: string) => {
   closeBapAuditDialog();
   router.push(`/daftar/berita-acara/edit/${encodeURIComponent(nomor)}`);
+};
+
+// ⬅ BARU: dialog Pra Order PENDING konfirmasi PPIC — cuma untuk bagian
+// PPIC (authStore.praOrderPendingPpic kosong buat bagian lain, sudah
+// difilter di authService.js)
+const showPraOrderPpicIfNeeded = () => {
+  if (
+    authStore.praOrderPendingPpic?.length > 0 &&
+    !sessionStorage.getItem("hasSeenPraOrderPpic")
+  ) {
+    isPraOrderPpicDialogVisible.value = true;
+  } else {
+    showBapReviewedIfNeeded();
+  }
+};
+
+const closePraOrderPpicDialog = () => {
+  isPraOrderPpicDialogVisible.value = false;
+  sessionStorage.setItem("hasSeenPraOrderPpic", "true");
+  showBapReviewedIfNeeded();
+};
+
+const goToPraOrderPpicDetail = () => {
+  closePraOrderPpicDialog();
+  router.push("/ppic/konfirmasi-pra-order");
 };
 
 const showBapReviewedIfNeeded = () => {
@@ -10008,6 +10035,98 @@ const sisaClass = (item: any) => {
       </v-card>
     </v-dialog>
 
+    <!-- ════════════════════════════════════════
+         DIALOG PRA ORDER — PENDING KONFIRMASI PPIC
+    ════════════════════════════════════════ -->
+    <v-dialog
+      v-model="isPraOrderPpicDialogVisible"
+      persistent
+      max-width="900px"
+    >
+      <v-card class="spk-dialog-card" rounded="lg">
+        <div
+          class="spk-header"
+          style="background: linear-gradient(135deg, #ef6c00 0%, #f57c00 100%)"
+        >
+          <div class="spk-header-left">
+            <div class="spk-header-icon">
+              <IconClipboardList :size="18" :stroke-width="1.6" color="white" />
+            </div>
+            <div>
+              <div class="spk-header-title">
+                Pra Order Belum Ditindaklanjuti
+              </div>
+              <div class="spk-header-sub">
+                {{ authStore.praOrderPendingPpic?.length }} Pra Order menunggu
+                konfirmasi kesanggupan
+              </div>
+            </div>
+          </div>
+          <v-btn
+            icon
+            variant="text"
+            size="small"
+            color="white"
+            @click="closePraOrderPpicDialog"
+          >
+            <IconX :size="18" :stroke-width="2" />
+          </v-btn>
+        </div>
+
+        <div class="spk-table-wrap">
+          <table class="spk-table praorder-ppic-table">
+            <thead>
+              <tr>
+                <th class="col-spk">Nomor</th>
+                <th class="col-tgl">Tanggal</th>
+                <th class="col-nama">Nama Pekerjaan</th>
+                <th class="col-customer">Customer</th>
+                <th style="width: 100px">Divisi</th>
+                <th class="col-tgl">Tgl Kirim</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="(item, index) in authStore.praOrderPendingPpic"
+                :key="index"
+                style="cursor: pointer"
+                @click="goToPraOrderPpicDetail"
+              >
+                <td class="col-spk">
+                  <span class="spk-badge">{{ item.Nomor }}</span>
+                </td>
+                <td class="col-tgl">{{ item.Tanggal }}</td>
+                <td class="col-nama">{{ item.NamaPekerjaan }}</td>
+                <td class="col-customer">
+                  {{
+                    authStore.canLihatCus
+                      ? item.Customer || "—"
+                      : item.CusKode || "—"
+                  }}
+                </td>
+                <td>{{ item.Divisi || "—" }}</td>
+                <td class="col-tgl">{{ item.TglKirim }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="spk-footer">
+          <span class="text-caption text-grey"
+            >Klik baris untuk membuka menu Konfirmasi Pra Order</span
+          >
+          <v-btn
+            color="primary"
+            variant="flat"
+            size="small"
+            @click="closePraOrderPpicDialog"
+          >
+            Tutup
+          </v-btn>
+        </div>
+      </v-card>
+    </v-dialog>
+
     <v-dialog v-model="isBapReviewedDialogVisible" persistent max-width="750px">
       <v-card class="spk-dialog-card" rounded="lg">
         <div
@@ -11075,6 +11194,9 @@ const sisaClass = (item: any) => {
 }
 .col-ws {
   width: 110px;
+}
+.praorder-ppic-table .col-tgl {
+  width: 130px;
 }
 .row-overdue td {
   background: #fff5f5;

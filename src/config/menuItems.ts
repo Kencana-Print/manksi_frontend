@@ -398,6 +398,12 @@ export const createMenuItems = (): NavItem[] => {
           icon: IconCalendarStats,
           menuId: 56,
         },
+        {
+          title: "Konfirmasi Pra Order",
+          to: "/ppic/konfirmasi-pra-order",
+          icon: IconClipboardCheck,
+          menuId: 1325,
+        },
         { divider: true },
         {
           title: "LHK Pola",

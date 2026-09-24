@@ -886,6 +886,17 @@ const router = createRouter({
         browseRoute: "PpicLhkMarker",
       },
     },
+    {
+      path: "/ppic/konfirmasi-pra-order",
+      name: "KonfirmasiPraOrder",
+      component: () => import("@/views/ppic/KonfirmasiPraOrderView.vue"),
+      meta: {
+        title: "Konfirmasi Pra Order",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "1325",
+      },
+    },
 
     // ── Garmen ──────────────────────────────────────────────────────────
     {
