@@ -31,9 +31,9 @@ export const settingHargaBahanService = {
         ),
 
     // --- GARMEN MARGIN TIER ---
-    getMarginGarmen: (model?: string) =>
+    getMarginGarmen: (model?: string, ktg?: string) =>
         api.get("/pembelian/setting-harga-bahan/garmen-margin", {
-            params: model ? { model } : undefined,
+            params: model || ktg ? { model, ktg } : undefined,
         }),
     updateMarginGarmen: (payload: any) =>
         api.put("/pembelian/setting-harga-bahan/garmen-margin", payload),
