@@ -72,4 +72,9 @@ export const mapFormService = {
       },
     });
   },
+
+  clearPenawaran: (nomor: string) =>
+    api.patch(
+      `/penjualan/map-form/${encodeURIComponent(nomor)}/clear-penawaran`,
+    ),
 };

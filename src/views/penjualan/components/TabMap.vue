@@ -16,6 +16,7 @@ import {
   IconMaximize,
   IconPhoto,
   IconSearch,
+  IconTrash,
 } from "@tabler/icons-vue";
 
 import PerusahaanSearchModal from "@/components/lookups/PerusahaanSearchModal.vue";
@@ -39,6 +40,15 @@ const props = defineProps<{
 const emit = defineEmits(["update-revisi-note", "upload-main"]);
 const toast = useToast();
 const isOpeningModal = ref(false);
+const isClearingPenawaran = ref(false);
+const showRemovePenawaranDialog = ref(false);
+
+const canRemovePenawaran = computed(() => {
+  const bagian = (authStore.user?.bagian || "").toUpperCase();
+  return (
+    bagian === "MARKETING" || authStore.user?.kode?.toUpperCase() === "ADMIN"
+  );
+});
 
 // ── Modal states ──
 const showPerushModal = ref(false);
@@ -387,6 +397,28 @@ const setPenawaran = (v: any) => {
 const setPenawaranDetail = (v: any) => {
   // Hanya simpan ID detail — tidak mengisi field lain
   props.formData.PenawaranId = v.id || v.ID;
+};
+const openRemovePenawaranDialog = () => {
+  if (!props.formData.Nomor) {
+    toast.warning("Data belum tersimpan.");
+    return;
+  }
+  showRemovePenawaranDialog.value = true;
+};
+
+const confirmRemovePenawaran = async () => {
+  isClearingPenawaran.value = true;
+  try {
+    await mapFormService.clearPenawaran(props.formData.Nomor);
+    props.formData.Penawaran = "";
+    props.formData.PenawaranId = "";
+    toast.success("Link Penawaran berhasil dihapus.");
+    showRemovePenawaranDialog.value = false;
+  } catch (e: any) {
+    toast.error(e.response?.data?.message || "Gagal menghapus link Penawaran.");
+  } finally {
+    isClearingPenawaran.value = false;
+  }
 };
 
 // ── Generic lookup ──
@@ -891,6 +923,16 @@ const setSetoranPembayaran = (v: any) => {
             placeholder="ID"
             title="ID Detail Penawaran"
           />
+          <button
+            v-if="isEdit && formData.Penawaran && canRemovePenawaran"
+            type="button"
+            class="btn-remove-pen"
+            :disabled="isClearingPenawaran"
+            title="Hapus link Penawaran (kembalikan ke OPEN)"
+            @click="openRemovePenawaranDialog"
+          >
+            <IconTrash :size="13" />
+          </button>
           <label class="f-lbl ml-2" style="width: 115px"
             >No. Permintaan Harga</label
           >
@@ -1554,6 +1596,41 @@ const setSetoranPembayaran = (v: any) => {
       </div>
     </div>
   </v-dialog>
+
+  <v-dialog v-model="showRemovePenawaranDialog" max-width="420px" persistent>
+    <v-card class="rounded-lg">
+      <v-card-title
+        class="pa-3 bg-error text-white"
+        style="font-size: 13px; font-weight: 700"
+      >
+        Hapus Link Penawaran
+      </v-card-title>
+      <v-card-text class="pa-4" style="font-size: 12px">
+        Yakin ingin melepas link Penawaran
+        <b>{{ formData.Penawaran }}</b> dari MAP ini?<br />
+        Status Penawaran akan dikembalikan ke <b>OPEN</b>.
+      </v-card-text>
+      <v-card-actions class="pa-3 border-t">
+        <v-btn
+          variant="text"
+          size="small"
+          :disabled="isClearingPenawaran"
+          @click="showRemovePenawaranDialog = false"
+          >Batal</v-btn
+        >
+        <v-spacer />
+        <v-btn
+          variant="flat"
+          size="small"
+          color="error"
+          :loading="isClearingPenawaran"
+          @click="confirmRemovePenawaran"
+        >
+          Ya, Hapus Link
+        </v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
 </template>
 
 <style scoped>
@@ -1720,6 +1797,26 @@ const setSetoranPembayaran = (v: any) => {
   background: #eeeeee;
   cursor: not-allowed;
   opacity: 0.5;
+}
+.btn-remove-pen {
+  width: 26px;
+  height: 26px;
+  background: #ffebee;
+  border: 1px solid #ef9a9a;
+  border-radius: 3px;
+  color: #c62828;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.btn-remove-pen:hover:not(:disabled) {
+  background: #ffcdd2;
+}
+.btn-remove-pen:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 .inp-grp {
