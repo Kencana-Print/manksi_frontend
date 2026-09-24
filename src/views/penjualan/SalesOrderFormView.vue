@@ -1714,7 +1714,10 @@ const savedNomorSO = ref("");
 const printWithAlokasi = ref(false);
 
 const hasAlokasi = computed(() => {
-  return formData.value.Alokasi && formData.value.Alokasi.length > 0;
+  return (
+    formData.value.Alokasi?.length > 0 &&
+    formData.value.Alokasi.some((a: any) => a.kota || a.alamat)
+  );
 });
 
 const goBackToBrowse = () => {
@@ -1774,6 +1777,7 @@ const appendHistoryAlokasi = (selectedRows: any[]) => {
     if (!exists) {
       formData.value.Alokasi.push({
         alamat: row.Alamat,
+        toko: row.Toko || "", // ⬅ BARU
         kota: row.Kota,
         person: "",
         hp: "",

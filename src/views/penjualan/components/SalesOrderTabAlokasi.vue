@@ -29,6 +29,7 @@ const addRow = () => {
   if (!props.formData.Alokasi) props.formData.Alokasi = [];
   props.formData.Alokasi.push({
     alamat: "",
+    toko: "",
     kota: "",
     person: "",
     hp: "",
@@ -79,10 +80,11 @@ const handleExcelUpload = (e: Event) => {
         if (row[0] && String(row[0]).trim() !== "") {
           props.formData.Alokasi.push({
             alamat: String(row[0] || "").trim(),
-            kota: String(row[1] || "").trim(),
-            person: String(row[2] || "").trim(),
-            hp: String(row[3] || "").trim(),
-            jumlah: Number(row[4]) || 0,
+            toko: String(row[1] || "").trim(), // ⬅ BARU, kolom baru di posisi 1
+            kota: String(row[2] || "").trim(), // ⬅ digeser dari 1 → 2
+            person: String(row[3] || "").trim(), // ⬅ digeser dari 2 → 3
+            hp: String(row[4] || "").trim(), // ⬅ digeser dari 3 → 4
+            jumlah: Number(row[5]) || 0, // ⬅ digeser dari 4 → 5
           });
           importedCount++;
         }
@@ -177,7 +179,8 @@ watch(
             <tr>
               <th style="width: 40px" class="text-center">No</th>
               <th style="text-align: left">Alamat</th>
-              <th style="text-align: left; width: 200px">Kota</th>
+              <th style="text-align: left; width: 160px">Nama Toko</th>
+              <th style="text-align: left; width: 160px">Kota</th>
               <th style="text-align: left; width: 150px">Kontak Person</th>
               <th style="text-align: left; width: 150px">No. HP</th>
               <th style="width: 100px; text-align: right">Jumlah</th>
@@ -193,6 +196,14 @@ watch(
                   v-model="row.alamat"
                   class="ll-cell"
                   placeholder="Detail alamat..."
+                />
+              </td>
+              <td class="ll-td-inp">
+                <input
+                  type="text"
+                  v-model="row.toko"
+                  class="ll-cell"
+                  placeholder="Nama toko..."
                 />
               </td>
               <td class="ll-td-inp">
@@ -239,7 +250,7 @@ watch(
               </td>
             </tr>
             <tr v-if="!formData.Alokasi || formData.Alokasi.length === 0">
-              <td colspan="7" class="text-center text-grey py-4 font-italic">
+              <td colspan="8" class="text-center text-grey py-4 font-italic">
                 Belum ada data alokasi. Klik tombol di atas untuk menginput
                 data.
               </td>
@@ -248,7 +259,7 @@ watch(
           <tfoot v-if="formData.Alokasi && formData.Alokasi.length > 0">
             <tr>
               <td
-                colspan="5"
+                colspan="6"
                 class="text-right font-weight-bold py-1 px-2"
                 style="background: #f5f5f5"
               >

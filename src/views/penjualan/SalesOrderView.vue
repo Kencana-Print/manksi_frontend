@@ -8,6 +8,9 @@ import { useBrowse } from "@/composables/useBrowse";
 import { salesOrderService } from "@/services/penjualan/salesOrderService";
 import { salesOrderFormService } from "@/services/penjualan/salesOrderFormService";
 import CustomerSearchModal from "@/components/lookups/CustomerSearchModal.vue";
+import SalesSearchModal from "@/components/lookups/SalesSearchModal.vue";
+import PenawaranSearchModal from "@/components/lookups/PenawaranSearchModal.vue";
+import InvDcSearchModal from "@/components/lookups/InvDcSearchModal.vue";
 import api from "@/services/api";
 import {
   IconShoppingCartCopy,
@@ -1070,12 +1073,44 @@ const revisiData = ref<any>({
   hargaJual: 0,
   hargaRiil: 0,
   hargaFee: 0,
+  cusKode: "",
+  cusNama: "",
+  salKode: "",
+  salNama: "",
+  penawaranNomor: "",
+  invoiceDc: "",
+  namaExternal: "",
   isTutupBuku: false,
   canSaveNow: true,
 });
 const showRevisiPinDialog = ref(false);
 const revisiPinAlasan = ref("");
 const isRevisiPinSubmitting = ref(false);
+
+// ⬅ BARU: lookup modal khusus dialog Revisi SO
+const showRevisiCusModal = ref(false);
+const showRevisiSalesModal = ref(false);
+const showRevisiPenawaranModal = ref(false);
+
+const handleRevisiCusSelected = (item: any) => {
+  revisiData.value.cusKode = item.cus_kode || item.Kode || item.kode;
+  revisiData.value.cusNama = item.cus_nama || item.Nama || item.nama;
+  showRevisiCusModal.value = false;
+};
+const handleRevisiSalesSelected = (item: any) => {
+  revisiData.value.salKode = item.sal_kode || item.Kode || item.kode;
+  revisiData.value.salNama = item.sal_nama || item.Nama || item.nama;
+  showRevisiSalesModal.value = false;
+};
+const handleRevisiPenawaranSelected = (item: any) => {
+  revisiData.value.penawaranNomor = item.Nomor || item.pen_nomor;
+  showRevisiPenawaranModal.value = false;
+};
+const showRevisiInvDcModal = ref(false);
+const handleRevisiInvDcSelected = (item: any) => {
+  revisiData.value.invoiceDc = item.Nomor || item.inv_nomor;
+  showRevisiInvDcModal.value = false;
+};
 
 const openRevisiDialog = async () => {
   if (!selectedItem.value) return;
@@ -1105,6 +1140,12 @@ const submitRevisi = async () => {
       hargaJual: revisiData.value.hargaJual,
       hargaRiil: revisiData.value.hargaRiil,
       hargaFee: revisiData.value.hargaFee,
+      cusKode: revisiData.value.cusKode,
+      cusNama: revisiData.value.cusNama,
+      salKode: revisiData.value.salKode,
+      penawaranNomor: revisiData.value.penawaranNomor,
+      invoiceDc: revisiData.value.invoiceDc,
+      namaExternal: revisiData.value.namaExternal,
     });
     toast.success("Revisi SO berhasil disimpan.");
     showRevisiDialog.value = false;
@@ -1493,6 +1534,23 @@ const submitRevisiPin = async () => {
   </BaseBrowse>
 
   <CustomerSearchModal v-model="showCusModal" @selected="handleCustSelected" />
+  <CustomerSearchModal
+    v-model="showRevisiCusModal"
+    @selected="handleRevisiCusSelected"
+  />
+  <SalesSearchModal
+    v-model="showRevisiSalesModal"
+    @selected="handleRevisiSalesSelected"
+  />
+  <PenawaranSearchModal
+    v-model="showRevisiPenawaranModal"
+    @selected="handleRevisiPenawaranSelected"
+    :cust-kode="revisiData.cusKode"
+  />
+  <InvDcSearchModal
+    v-model="showRevisiInvDcModal"
+    @selected="handleRevisiInvDcSelected"
+  />
 
   <v-dialog v-model="pinDialog" max-width="400">
     <v-card rounded="lg">
@@ -2169,6 +2227,101 @@ const submitRevisiPin = async () => {
               <NumberInputIDR v-model="revisiData.hargaFee" cursor-to-end />
             </div>
           </div>
+          <v-divider class="my-3" />
+          <div class="revisi-field">
+            <label>Customer</label>
+            <div class="revisi-lkp-grp">
+              <input
+                type="text"
+                :value="
+                  revisiData.cusKode
+                    ? `${revisiData.cusKode} — ${revisiData.cusNama}`
+                    : ''
+                "
+                readonly
+                class="revisi-inp revisi-inp-lkp"
+                placeholder="Klik untuk cari..."
+                @click="showRevisiCusModal = true"
+              />
+              <button
+                type="button"
+                class="revisi-lkp-btn"
+                @click="showRevisiCusModal = true"
+              >
+                <IconSearch :size="13" />
+              </button>
+            </div>
+          </div>
+          <div class="revisi-field">
+            <label>Sales</label>
+            <div class="revisi-lkp-grp">
+              <input
+                type="text"
+                :value="
+                  revisiData.salKode
+                    ? `${revisiData.salKode} — ${revisiData.salNama}`
+                    : ''
+                "
+                readonly
+                class="revisi-inp revisi-inp-lkp"
+                placeholder="Klik untuk cari..."
+                @click="showRevisiSalesModal = true"
+              />
+              <button
+                type="button"
+                class="revisi-lkp-btn"
+                @click="showRevisiSalesModal = true"
+              >
+                <IconSearch :size="13" />
+              </button>
+            </div>
+          </div>
+          <div class="revisi-field">
+            <label>No. Penawaran</label>
+            <div class="revisi-lkp-grp">
+              <input
+                type="text"
+                v-model="revisiData.penawaranNomor"
+                readonly
+                class="revisi-inp revisi-inp-lkp"
+                placeholder="Klik untuk cari..."
+                @click="showRevisiPenawaranModal = true"
+              />
+              <button
+                type="button"
+                class="revisi-lkp-btn"
+                @click="showRevisiPenawaranModal = true"
+              >
+                <IconSearch :size="13" />
+              </button>
+            </div>
+          </div>
+          <div class="revisi-field">
+            <label>Nama External SO</label>
+            <input
+              type="text"
+              v-model="revisiData.namaExternal"
+              class="revisi-inp"
+            />
+          </div>
+          <div class="revisi-field">
+            <label>No. Invoice DC</label>
+            <div class="revisi-lkp-grp">
+              <input
+                type="text"
+                v-model="revisiData.invoiceDc"
+                class="revisi-inp revisi-inp-lkp"
+                style="cursor: text; background: white"
+              />
+              <button
+                type="button"
+                class="revisi-lkp-btn"
+                @click="showRevisiInvDcModal = true"
+              >
+                <IconSearch :size="13" />
+              </button>
+            </div>
+          </div>
         </template>
       </v-card-text>
       <v-card-actions class="pa-3 border-t bg-grey-lighten-4">
@@ -2549,5 +2702,38 @@ const submitRevisiPin = async () => {
 }
 .revisi-inp-wrap:focus-within {
   border-color: #1565c0;
+}
+.revisi-lkp-grp {
+  flex: 1;
+  display: flex;
+  height: 30px;
+  border: 1px solid #bdbdbd;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.revisi-inp-lkp {
+  flex: 1;
+  border: none;
+  border-radius: 0;
+  cursor: pointer;
+  background: #f9f9f9;
+}
+.revisi-inp-lkp:focus {
+  border: none;
+}
+.revisi-lkp-btn {
+  width: 30px;
+  flex-shrink: 0;
+  background: #e3f2fd;
+  border: none;
+  border-left: 1px solid #bdbdbd;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #1565c0;
+}
+.revisi-lkp-btn:hover {
+  background: #bbdefb;
 }
 </style>
