@@ -178,13 +178,6 @@ const terbilang = (n: number): string => {
             (<span style="display: inline-block; width: 60px"></span>)
           </div>
         </div>
-        <div class="ttd-col">
-          <div class="ttd-title">Disetujui</div>
-          <div class="ttd-space"></div>
-          <div class="ttd-name">
-            (<span style="display: inline-block; width: 60px"></span>)
-          </div>
-        </div>
       </div>
     </div>
   </div>

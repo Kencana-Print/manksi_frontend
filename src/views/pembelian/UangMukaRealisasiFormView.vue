@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { ref, computed, watch } from "vue";
 import { useToast } from "vue-toastification";
 import BaseForm from "@/components/BaseForm.vue";
 import { useForm } from "@/composables/useForm";
@@ -170,6 +170,23 @@ const kasbonRow = computed(() =>
 );
 const itemRows = computed(() =>
   formData.value.detail.filter((d) => d.sumber !== "KASBON"),
+);
+
+// item rows terkunci (locked) — nggak bisa di-toggle manual
+// satu-satu, jadi status_acc-nya harus mengikuti status KASBON. Kalau
+// KASBON di-Tolak, semua item ikut Tolak (uang muka batal, jadi tidak
+// ada satu pun item yang jadi dibelikan); kalau KASBON ACC lagi, item
+// balik ke ACC dengan nominal_acc default = nominal_ajuan-nya.
+watch(
+  () => kasbonRow.value?.status_acc,
+  (newStatus) => {
+    if (!newStatus) return;
+    itemRows.value.forEach((row) => {
+      row.status_acc = newStatus;
+      row.nominal_acc =
+        newStatus === "TOLAK" ? 0 : row.nominal_acc || row.nominal_ajuan;
+    });
+  },
 );
 
 // ── Account lookup (Rekening/Kas) ──
@@ -370,8 +387,20 @@ const onValidateSave = () => {
                 <td class="mono">{{ d.nomor_header }}</td>
                 <td>{{ d.nama }}</td>
                 <td class="tr">{{ numFmt(d.nominal_sumber) }}</td>
-                <td class="tc"><input type="checkbox" checked disabled /></td>
-                <td class="tc"><input type="checkbox" disabled /></td>
+                <td class="tc">
+                  <input
+                    type="checkbox"
+                    :checked="d.status_acc === 'ACC'"
+                    disabled
+                  />
+                </td>
+                <td class="tc">
+                  <input
+                    type="checkbox"
+                    :checked="d.status_acc === 'TOLAK'"
+                    disabled
+                  />
+                </td>
                 <td class="tr">-</td>
               </tr>
             </template>

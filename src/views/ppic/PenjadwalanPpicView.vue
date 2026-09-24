@@ -186,6 +186,7 @@ const openPreview = async () => {
 const baseBrowseRef = ref<InstanceType<typeof BaseBrowse> | null>(null);
 const isExporting = ref(false);
 const isExportingDetail = ref(false);
+const showExportDetailChoice = ref(false);
 
 const headers = [
   { title: "NOMOR", key: "Nomor", width: "200px" },
@@ -602,7 +603,8 @@ const buildDetailColumns = (cabang: string) => {
   return cols;
 };
 
-const onExportDetail = async () => {
+const onExportDetail = async (tipe: "SO" | "MAP") => {
+  showExportDetailChoice.value = false; // ⬅ BARU: tutup dialog pilihan
   const rawData =
     baseBrowseRef.value?.getFilteredItems?.() ?? items.value ?? [];
   if (!rawData.length) {
@@ -611,8 +613,6 @@ const onExportDetail = async () => {
   }
   isExportingDetail.value = true;
   try {
-    // Pastikan detail semua periode yang tampil sudah ter-fetch —
-    // pakai cache kalau ada, fetch baru kalau belum pernah di-expand.
     const detailPerNomor: Record<string, DetailRow[]> = {
       ...detailCache.value,
     };
@@ -631,7 +631,6 @@ const onExportDetail = async () => {
       results.forEach((r) => (detailPerNomor[r.nomor] = r.data));
     }
 
-    // Nama sheet Excel: max 31 char, tidak boleh \ / ? * [ ] : , dan harus unik.
     const usedNames = new Set<string>();
     const sanitizeSheetName = (raw: string) => {
       let name = raw.replace(/[\\/?*[\]:]/g, "-").trim();
@@ -650,10 +649,14 @@ const onExportDetail = async () => {
 
     const sheets: any[] = [];
     for (const periode of rawData as BrowseItem[]) {
-      const detailRows = detailPerNomor[periode.Nomor] || [];
+      // ⬅ BARU: filter dulu sesuai tipe yang dipilih, sebelum dipakai
+      const detailRows = filterByTipe(
+        detailPerNomor[periode.Nomor] || [],
+        tipe,
+      );
       if (!detailRows.length) continue;
 
-      const columns = buildDetailColumns(periode.Cabang); // ⬅ BARU, per periode
+      const columns = buildDetailColumns(periode.Cabang);
 
       const rows = detailRows.map((d) => ({
         Tipe: d.PjwdTipe === "MAP" ? "MAP" : "SO",
@@ -675,42 +678,24 @@ const onExportDetail = async () => {
         KetKesepakatan: d.KetKesepakatan || "",
       }));
 
-      // Baris total Rencana — dipisah SO vs MAP, ditampilkan di akhir sheet.
-      const totalRencanaSo = detailRows
-        .filter((d) => d.PjwdTipe !== "MAP")
-        .reduce((sum, d) => sum + (Number(d.Rencana) || 0), 0);
-      const totalRencanaMap = detailRows
-        .filter((d) => d.PjwdTipe === "MAP")
-        .reduce((sum, d) => sum + (Number(d.Rencana) || 0), 0);
-
+      // ⬅ DIUBAH: cuma satu baris total, sesuai tipe yang dipilih
+      // (sebelumnya selalu dua baris — Total SO dan Total MAP — karena
+      // export lama mencampur keduanya dalam satu sheet)
+      const totalRencana = detailRows.reduce(
+        (sum, d) => sum + (Number(d.Rencana) || 0),
+        0,
+      );
       rows.push({
-        Tipe: "SO",
+        Tipe: tipe,
         Cabang: "",
         Tanggal: "",
         NomorSo: "",
-        Nama: "TOTAL RENCANA SO",
+        Nama:
+          tipe === "MAP" ? "TOTAL RENCANA MAP (SAMPEL)" : "TOTAL RENCANA SO",
         Pesan: "" as any,
         Kirim: "" as any,
         Kurang: "" as any,
-        Rencana: totalRencanaSo,
-        KetRencana: "",
-        Realisasi: "" as any,
-        PermintaanKirim: "",
-        StatusPermintaan: "",
-        Kesepakatan: "",
-        KetKesepakatan: "",
-        _isSummary: true,
-      } as any);
-      rows.push({
-        Tipe: "MAP",
-        Cabang: "",
-        Tanggal: "",
-        NomorSo: "",
-        Nama: "TOTAL RENCANA MAP (SAMPEL)",
-        Pesan: "" as any,
-        Kirim: "" as any,
-        Kurang: "" as any,
-        Rencana: totalRencanaMap,
+        Rencana: totalRencana,
         KetRencana: "",
         Realisasi: "" as any,
         PermintaanKirim: "",
@@ -737,13 +722,14 @@ const onExportDetail = async () => {
 
     if (!sheets.length) {
       toast.warning(
-        "Tidak ada detail SO/Pra Order/MAP untuk periode yang ditampilkan.",
+        `Tidak ada detail ${tipe === "MAP" ? "MAP/Sampel" : "SO"} untuk periode yang ditampilkan.`,
       );
       return;
     }
 
+    // ⬅ BARU: nama file ikut menyebut tipe yang diekspor
     await exportExcel(
-      `Komitmen_Kirim_Detail_${filterStart.value}_${filterEnd.value}.xlsx`,
+      `Komitmen_Kirim_Detail_${tipe}_${filterStart.value}_${filterEnd.value}.xlsx`,
       sheets,
     );
   } catch (e) {
@@ -881,7 +867,7 @@ checkUnnotifiedMap();
         variant="outlined"
         color="success"
         :loading="isExportingDetail"
-        @click="onExportDetail"
+        @click="showExportDetailChoice = true"
       >
         <IconListDetails :size="14" style="margin-right: 4px" />
         Export Detail
@@ -1488,6 +1474,43 @@ checkUnnotifiedMap();
         <v-btn variant="text" style="font-size: 13px" @click="closeNotifDialog"
           >Tutup</v-btn
         >
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
+
+  <v-dialog v-model="showExportDetailChoice" max-width="380" persistent>
+    <v-card class="rounded-lg">
+      <v-card-title
+        class="bg-success text-white pa-3 text-subtitle-1"
+        style="font-size: 13px; font-weight: 700"
+      >
+        Export Detail — Pilih Tipe
+      </v-card-title>
+      <v-card-text class="pa-4" style="font-size: 12px">
+        Export akan mencakup periode yang sedang ditampilkan di grid, hanya
+        untuk tipe yang dipilih.
+      </v-card-text>
+      <v-card-actions class="pa-3 border-t bg-grey-lighten-4">
+        <v-btn variant="text" @click="showExportDetailChoice = false"
+          >Batal</v-btn
+        >
+        <v-spacer />
+        <v-btn
+          variant="outlined"
+          color="primary"
+          :loading="isExportingDetail"
+          @click="onExportDetail('SO')"
+        >
+          Komitmen SO
+        </v-btn>
+        <v-btn
+          variant="elevated"
+          color="success"
+          :loading="isExportingDetail"
+          @click="onExportDetail('MAP')"
+        >
+          Komitmen MAP
+        </v-btn>
       </v-card-actions>
     </v-card>
   </v-dialog>

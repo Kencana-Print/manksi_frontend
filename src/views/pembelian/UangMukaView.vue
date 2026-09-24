@@ -185,7 +185,6 @@ const showAjukanPrintDialog = ref(false);
 const savedPumNomor = ref("");
 const ajukanTanggal = ref(todayStr);
 const ajukanKeterangan = ref("");
-const ajukanNota = ref("");
 const isSubmittingAjukan = ref(false);
 const ajukanItems = ref<any[]>([]);
 const ajukanNominalDiajukan = ref(0);
@@ -195,7 +194,6 @@ const openAjukanDialog = async () => {
   if (!canAjukan.value) return;
   ajukanTanggal.value = todayStr;
   ajukanKeterangan.value = "";
-  ajukanNota.value = "";
   showAjukanDialog.value = true;
   isLoadingAjukanDetail.value = true;
   try {
@@ -265,7 +263,6 @@ const submitAjukan = async () => {
     const res = await pengajuanUangMukaService.create({
       tanggal: ajukanTanggal.value,
       keterangan: ajukanKeterangan.value,
-      nota: ajukanNota.value,
       nominalDiajukan: ajukanNominalDiajukan.value,
       items,
     });
@@ -1166,14 +1163,6 @@ const goPenyelesaian = () => {
           density="compact"
           rows="2"
           hide-details="auto"
-          class="mb-3"
-        />
-        <v-text-field
-          v-model="ajukanNota"
-          label="No. Nota"
-          variant="outlined"
-          density="compact"
-          hide-details
           class="mb-3"
         />
 

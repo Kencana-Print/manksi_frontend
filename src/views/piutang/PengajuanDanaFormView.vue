@@ -188,6 +188,13 @@ const openCcModal = (idx: number) => {
 };
 const selectCc = (item: any) => {
   const idx = activeCcRowIndex.value;
+  if (idx === -2) {
+    replaceCcKode.value = item.cc_kode;
+    replaceCcNama.value = item.dc_nama;
+    activeCcRowIndex.value = -1;
+    showReplaceCcBar.value = true; // ⬅ munculkan bar "Terapkan ke Semua Baris"
+    return;
+  }
   if (idx > -1 && fd.value.items[idx]) {
     fd.value.items[idx].CcKode = item.cc_kode;
     fd.value.items[idx].CcDcNama = item.dc_nama;
@@ -309,6 +316,29 @@ const applyReplaceDeadline = () => {
     if (r.Nama.trim()) r.Deadline = replaceDeadlineVal.value;
   });
   showReplaceDeadline.value = false;
+};
+
+// ── Replace Cost Center (bulk-set semua baris) ──
+const showReplaceCcBar = ref(false);
+const replaceCcKode = ref("");
+const replaceCcNama = ref("");
+
+const openReplaceCcModal = () => {
+  activeCcRowIndex.value = -2; // penanda: hasil pilihan modal diarahkan ke Replace CC, bukan baris tertentu
+  showCcModal.value = true;
+};
+const applyReplaceCc = () => {
+  if (!replaceCcKode.value) {
+    toast.warning("Pilih Cost Center terlebih dahulu.");
+    return;
+  }
+  fd.value.items.forEach((r) => {
+    if (r.Nama.trim()) {
+      r.CcKode = replaceCcKode.value;
+      r.CcDcNama = replaceCcNama.value;
+    }
+  });
+  showReplaceCcBar.value = false;
 };
 
 // ── Validasi sebelum simpan (replikasi cxButton2Click) ──
@@ -465,6 +495,13 @@ onMounted(async () => {
             >
               <IconCalendar :size="12" /> Replace Deadline
             </button>
+            <button
+              type="button"
+              class="btn-import replace"
+              @click="openReplaceCcModal"
+            >
+              Replace Cost Center
+            </button>
             <button type="button" class="btn-add" @click="addItem">
               <IconPlus :size="10" /> Tambah
             </button>
@@ -498,6 +535,30 @@ onMounted(async () => {
           </button>
         </div>
 
+        <div v-if="showReplaceCcBar" class="replace-box">
+          <label class="lb" style="width: auto; margin-right: 6px"
+            >Cost Center baru:</label
+          >
+          <span style="font-size: 12px; font-weight: 600; margin-right: 6px">
+            {{ replaceCcNama || "-" }}
+          </span>
+          <button
+            type="button"
+            class="btn-import"
+            style="margin-left: 8px"
+            @click="applyReplaceCc"
+          >
+            Terapkan ke Semua Baris
+          </button>
+          <button
+            type="button"
+            class="btn-cancel-small"
+            @click="showReplaceCcBar = false"
+          >
+            Batal
+          </button>
+        </div>
+
         <div class="gwrap">
           <table class="gtbl">
             <thead>
@@ -509,10 +570,10 @@ onMounted(async () => {
                 <th style="width: 70px" class="tr">Qty</th>
                 <th style="width: 100px" class="tr">Nominal</th>
                 <th style="width: 120px" class="tr">Total Pengajuan</th>
+                <th style="width: 150px">Cost Center</th>
                 <th style="width: 110px">Deadline</th>
                 <th style="width: 110px">Nomor</th>
                 <th style="width: 70px">Kode</th>
-                <th style="width: 150px">Cost Center</th>
                 <th style="width: 24px"></th>
               </tr>
             </thead>
@@ -558,25 +619,6 @@ onMounted(async () => {
                   />
                 </td>
                 <td>
-                  <input type="date" v-model="row.Deadline" class="ci" />
-                </td>
-                <td>
-                  <input
-                    :value="row.Nomor"
-                    readonly
-                    class="ci ro"
-                    style="font-size: 10px"
-                  />
-                </td>
-                <td>
-                  <input
-                    :value="row.Kode"
-                    readonly
-                    class="ci ro"
-                    style="font-size: 10px"
-                  />
-                </td>
-                <td>
                   <div class="ig" style="height: 22px">
                     <input
                       :value="row.CcDcNama"
@@ -601,6 +643,25 @@ onMounted(async () => {
                       <IconSearch :size="10" color="#1565c0" />
                     </button>
                   </div>
+                </td>
+                <td>
+                  <input type="date" v-model="row.Deadline" class="ci" />
+                </td>
+                <td>
+                  <input
+                    :value="row.Nomor"
+                    readonly
+                    class="ci ro"
+                    style="font-size: 10px"
+                  />
+                </td>
+                <td>
+                  <input
+                    :value="row.Kode"
+                    readonly
+                    class="ci ro"
+                    style="font-size: 10px"
+                  />
                 </td>
                 <td class="tc">
                   <button type="button" class="cdb" @click="removeItem(i)">
