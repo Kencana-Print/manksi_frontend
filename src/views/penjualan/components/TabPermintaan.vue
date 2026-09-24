@@ -151,6 +151,9 @@ const fillFromProOrder = async (kode: string) => {
     props.formData.RencanaOrder = d.rencanaOrder;
     props.formData.Kain = d.kain;
     props.formData.Ukuran = d.ukuran;
+    // ⬅ BARU: Keterangan & gambar referensi dari Pra Order
+    if (d.keterangan) props.formData.Keterangan = d.keterangan;
+    if (d.imageUrl) props.formData.PathImage = d.imageUrl;
     if (d.sudahDipakaiOleh) {
       proOrderWarning.value = `Pra Order ini sudah pernah dipakai untuk Minta Harga ${d.sudahDipakaiOleh}.`;
       toast.warning(proOrderWarning.value);

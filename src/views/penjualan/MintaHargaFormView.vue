@@ -308,6 +308,23 @@ const {
       } catch {
         toast.error("Data tersimpan, tapi gagal mengunggah gambar.");
       }
+    } else if (
+      // ⬅ BARU: user TIDAK upload manual, tapi form ini ditarik dari Pra
+      // Order (PathImage masih nunjuk ke referensi file Pra Order, belum
+      // pernah beneran ter-copy secara fisik ke folder mintaharga) —
+      // trigger copy fisik supaya gambar tidak hilang saat form di-reload.
+      nomor &&
+      formData.value.ProNomor &&
+      formData.value.PathImage?.includes("/praorder/")
+    ) {
+      try {
+        await api.post(
+          `/penjualan/pra-order-form/copy-image/${encodeURIComponent(formData.value.ProNomor)}/${encodeURIComponent(nomor)}`,
+        );
+      } catch (e) {
+        console.error("Gagal menyalin gambar dari Pra Order:", e);
+      }
+      toast.success("Data berhasil disimpan!");
     } else {
       toast.success("Data berhasil disimpan!");
     }
