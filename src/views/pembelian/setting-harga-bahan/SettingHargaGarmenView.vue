@@ -75,11 +75,44 @@ const getGramasi = (jenisKain: string): string => {
     return "-";
 };
 
+// Helper untuk mengecek apakah jenis kain termasuk PE, HYGIT atau DRYFIT (pembulatan ratusan 00)
+const isPeOrHygitKain = (ktg: string, jenisKain: string): boolean => {
+    const cleanKtg = (ktg || "").toUpperCase().trim();
+    const cleanJk = (jenisKain || "").toUpperCase().trim();
+
+    if (cleanJk.includes("LACOST") || cleanKtg === "LACOST") return false;
+
+    // DRYFIT — sekarang ratusan (00) seperti PE/HYGIT
+    if (cleanJk.includes("DRYFIT") || cleanKtg === "DRYFIT") return true;
+
+    // HYGIT / HYGET
+    if (
+        cleanKtg.includes("HYGIT") ||
+        cleanKtg.includes("HYGET") ||
+        cleanJk.includes("HYGIT") ||
+        cleanJk.includes("HYGET")
+    ) {
+        return true;
+    }
+
+    // PE
+    if (
+        cleanKtg === "PE" ||
+        cleanJk.startsWith("PE") ||
+        cleanJk.includes(" PE")
+    ) {
+        return true;
+    }
+
+    return false;
+};
+
 // ==========================================
 // 1.0 DATA MASTER MARGIN GARMEN (tmintaharga_margin)
 // ==========================================
 interface MarginTierItem {
     model: string;
+    ktg?: string;
     qmin: number;
     qmax: number;
     margin: number;
@@ -96,6 +129,7 @@ const fetchMarginGarmen = async () => {
         if (res.data?.success && Array.isArray(res.data.data)) {
             rawMarginItems.value = res.data.data.map((item: any) => ({
                 model: item.model,
+                ktg: item.ktg ? String(item.ktg).toUpperCase() : undefined,
                 qmin: Number(item.qmin) || 0,
                 qmax: Number(item.qmax) || 0,
                 margin: Number(item.margin) || 0,
@@ -112,29 +146,56 @@ const fetchMarginGarmen = async () => {
     }
 };
 
-const marginTiersKh0001 = computed<MarginTierItem[]>(() => {
-    const list = rawMarginItems.value.filter((m) => m.model === "KH-0001");
-    if (list.length > 0) return list;
+const getMarginTiers = (model: string, ktg: string): MarginTierItem[] => {
+    const cleanKtg = (ktg || "").toUpperCase();
+    // Cari margin per model+ktg, fallback ke per model tanpa ktg, lalu default
+    let list = rawMarginItems.value.filter(
+        (m) => m.model === model && (m as any).ktg === cleanKtg,
+    );
+    if (list.length === 0) {
+        list = rawMarginItems.value.filter(
+            (m) => m.model === model && !(m as any).ktg,
+        );
+        if (list.length === 0)
+            list = rawMarginItems.value.filter((m) => m.model === model);
+    }
+    if (list.length > 0) return list as MarginTierItem[];
+    const isKh0002 = model === "KH-0002";
+    const isPe = cleanKtg === "PE";
     return [
-        { model: "KH-0001", qmin: 100, qmax: 249, margin: 20 },
-        { model: "KH-0001", qmin: 250, qmax: 499, margin: 15 },
-        { model: "KH-0001", qmin: 500, qmax: 749, margin: 12.5 },
-        { model: "KH-0001", qmin: 750, qmax: 999, margin: 10 },
-        { model: "KH-0001", qmin: 1000, qmax: 999999999, margin: 7 },
+        {
+            model,
+            qmin: isKh0002 ? 100 : 100,
+            qmax: isKh0002 ? 299 : 249,
+            margin: 20,
+        } as MarginTierItem,
+        {
+            model,
+            qmin: isKh0002 ? 300 : 250,
+            qmax: 499,
+            margin: 15,
+        } as MarginTierItem,
+        {
+            model,
+            qmin: 500,
+            qmax: 749,
+            margin: isPe ? 10 : 12.5,
+        } as MarginTierItem,
+        { model, qmin: 750, qmax: 999, margin: 10 } as MarginTierItem,
+        {
+            model,
+            qmin: 1000,
+            qmax: 999999999,
+            margin: isPe ? 5 : 10,
+        } as MarginTierItem,
     ];
-});
-
-const marginTiersKh0002 = computed<MarginTierItem[]>(() => {
-    const list = rawMarginItems.value.filter((m) => m.model === "KH-0002");
-    if (list.length > 0) return list;
-    return [
-        { model: "KH-0002", qmin: 100, qmax: 299, margin: 20 },
-        { model: "KH-0002", qmin: 300, qmax: 499, margin: 15 },
-        { model: "KH-0002", qmin: 500, qmax: 749, margin: 12.5 },
-        { model: "KH-0002", qmin: 750, qmax: 999, margin: 10 },
-        { model: "KH-0002", qmin: 1000, qmax: 999999999, margin: 7 },
-    ];
-});
+};
+const marginTiersKh0001 = computed<MarginTierItem[]>(() =>
+    getMarginTiers("KH-0001", "COTTON"),
+);
+const marginTiersKh0002 = computed<MarginTierItem[]>(() =>
+    getMarginTiers("KH-0002", "COTTON"),
+);
 
 // Modal Dialog & Edit State Margin Tier
 const marginTierDialog = ref(false);
@@ -287,13 +348,18 @@ onMounted(() => {
 });
 
 // Custom settings override untuk Harga, Allowance, Biaya Jahit dan Margin Tier per item kain
+// hargaBahanPartaiBesar = mhk_harga_partaibesar (≥1000), fallback ke hargaBahan jika null
+// allowancePersenPartaiBesar = mhk_allow_partaibesar (≥1000), fallback ke allowancePersen
 const customKainSettings = ref<
     Record<
         string,
         {
             hargaBahan?: number;
+            hargaBahanPartaiBesar?: number;
             allowancePersen?: number;
+            allowancePersenPartaiBesar?: number;
             biayaJahit?: number;
+            biayaJahitPartaiBesar?: number;
             t1_margin?: number;
             t2_margin?: number;
             t3_margin?: number;
@@ -312,7 +378,11 @@ const customKainSettings = ref<
 // Helper untuk inline table edit angka/nominal Rupiah dengan pemisah ribuan (.)
 const onInlineNumberChange = (
     row: any,
-    field: "hargaBahan" | "biayaJahit",
+    field:
+        | "hargaBahan"
+        | "hargaBahanPartaiBesar"
+        | "biayaJahit"
+        | "biayaJahitPartaiBesar",
     event: Event,
 ) => {
     const input = event.target as HTMLInputElement;
@@ -335,7 +405,14 @@ const onInlineNumberChange = (
 // Helper untuk inline edit persentase (Allowance & Margin Tier)
 const onInlinePercentChange = (
     row: any,
-    field: "allowancePersen" | "t1" | "t2" | "t3" | "t4" | "t5",
+    field:
+        | "allowancePersen"
+        | "allowancePersenPartaiBesar"
+        | "t1"
+        | "t2"
+        | "t3"
+        | "t4"
+        | "t5",
     event: Event,
 ) => {
     const input = event.target as HTMLInputElement;
@@ -362,6 +439,7 @@ const parseKainData = (kodeModel: "KH-0001" | "KH-0002") => {
     );
 
     // Kumpulkan master babaran per jenis kain & harga lengan
+    // FIX: hargaTuaBesar ikut custom edit TUA (≥1000) agar kolom HRG LENGAN (≥1000) tidak stuck
     const babaranMap = new Map<
         string,
         {
@@ -371,6 +449,7 @@ const parseKainData = (kodeModel: "KH-0001" | "KH-0002") => {
             lenganText: string;
             hargaLengan: number;
             hargaTua: number;
+            hargaTuaBesar: number;
         }
     >();
 
@@ -384,23 +463,40 @@ const parseKainData = (kodeModel: "KH-0001" | "KH-0002") => {
                 lenganText: "PENDEK",
                 hargaLengan: 0,
                 hargaTua: 0,
+                hargaTuaBesar: 0,
             });
         }
         const b = babaranMap.get(jk)!;
         const komp = (item.mhk_komponen || "").toUpperCase();
         const warna = (item.mhk_warna || "").toUpperCase();
         const val = Number(item.mhk_babaran) || 0;
-        const hrg = Number(item.mhk_harga) || 0;
+        // Efektif harga dengan override inline-edit (agar preview HRG LENGAN ikut berubah saat TUA diedit)
+        const rowIdTmp = `${item.mhk_kode}_${(item.mhk_jeniskain || "").trim()}_${item.mhk_warna}_${item.mhk_komponen}`;
+        const csTmp = customKainSettings.value[rowIdTmp] || {};
+        const hrgEff =
+            csTmp.hargaBahan !== undefined
+                ? Number(csTmp.hargaBahan) || 0
+                : Number(item.mhk_harga) || 0;
+        const hrgBesarEff =
+            csTmp.hargaBahanPartaiBesar !== undefined
+                ? Number(csTmp.hargaBahanPartaiBesar) || 0
+                : item.mhk_harga_partaibesar !== null &&
+                    item.mhk_harga_partaibesar !== undefined &&
+                    Number(item.mhk_harga_partaibesar) !== 0
+                  ? Number(item.mhk_harga_partaibesar)
+                  : hrgEff;
 
         if (komp === "BODY" && val > 0) b.body = val;
         else if (komp === "LENGAN" && val > 0) {
             b.lengan = val;
-        }
-        else if (komp === "RIB" && val >= 50) b.rib = val;
+        } else if (komp === "RIB" && val >= 50) b.rib = val;
         else if (val > 0 && b.body === 0) b.body = val;
 
-        if (warna === "TUA" && hrg > 0) {
-            b.hargaTua = hrg;
+        if (warna === "TUA" && hrgEff > 0) {
+            b.hargaTua = hrgEff;
+        }
+        if (warna === "TUA" && hrgBesarEff > 0) {
+            b.hargaTuaBesar = hrgBesarEff;
         }
 
         if (item.mhk_lengan) b.lenganText = item.mhk_lengan;
@@ -416,6 +512,7 @@ const parseKainData = (kodeModel: "KH-0001" | "KH-0002") => {
             lenganText: "PENDEK",
             hargaLengan: 0,
             hargaTua: 0,
+            hargaTuaBesar: 0,
         };
 
         const itemRowId = `${item.mhk_kode}_${jk}_${item.mhk_warna}_${item.mhk_komponen}`;
@@ -427,16 +524,41 @@ const parseKainData = (kodeModel: "KH-0001" | "KH-0002") => {
             customSet.hargaBahan !== undefined
                 ? customSet.hargaBahan
                 : Number(item.mhk_harga) || 0;
+        const hargaBahanPartaiBesar =
+            customSet.hargaBahanPartaiBesar !== undefined
+                ? customSet.hargaBahanPartaiBesar
+                : item.mhk_harga_partaibesar !== null &&
+                    item.mhk_harga_partaibesar !== undefined &&
+                    Number(item.mhk_harga_partaibesar) !== 0
+                  ? Number(item.mhk_harga_partaibesar)
+                  : hargaBahan;
 
         const allowancePersen =
             customSet.allowancePersen !== undefined
                 ? customSet.allowancePersen
                 : Number(item.mhk_allow) || 0;
+        const allowancePersenBesar =
+            customSet.allowancePersenPartaiBesar !== undefined
+                ? customSet.allowancePersenPartaiBesar
+                : item.mhk_allow_partaibesar !== null &&
+                    item.mhk_allow_partaibesar !== undefined &&
+                    String(item.mhk_allow_partaibesar) !== ""
+                  ? Number(item.mhk_allow_partaibesar)
+                  : allowancePersen;
 
         const biayaKonveksi =
             customSet.biayaJahit !== undefined
                 ? customSet.biayaJahit
                 : Number(item.biayaKonveksi ?? item.mhk_biaya_konveksi ?? 0);
+        const biayaKonveksiBesar =
+            customSet.biayaJahitPartaiBesar !== undefined
+                ? customSet.biayaJahitPartaiBesar
+                : Number(
+                      item.biayaKonveksiBesar ??
+                          item.mhk_biaya_konveksi_partaibesar ??
+                          item.biayaKonveksiPartaiBesar ??
+                          0,
+                  ) || biayaKonveksi;
 
         let hargaBody: number;
         let hargaLengan: number;
@@ -445,46 +567,137 @@ const parseKainData = (kodeModel: "KH-0001" | "KH-0002") => {
         let allowanceRp: number;
         let totalBahan: number;
         let hpp: number;
+        let hargaBodyBesar: number;
+        let hargaLenganBesar: number;
+        let hargaRibBesar: number;
+        let totalHargaBahanBesar: number;
+        let allowanceRpBesar: number;
+        let totalBahanBesar: number;
+        let hppBesar: number;
 
         if (!hasCustom) {
             // MURNI KONSUMSI HASIL KALKULASI DARI BACKEND
             hargaBody = Number(item.hargaBody ?? item.mhk_harga_body ?? 0);
-            hargaLengan = Number(item.hargaLengan ?? item.mhk_harga_lengan ?? 0);
+            hargaLengan = Number(
+                item.hargaLengan ?? item.mhk_harga_lengan ?? 0,
+            );
             hargaRib = Number(item.hargaRib ?? item.mhk_harga_rib ?? 0);
-            totalHargaBahan = Number(item.totalHargaBahan ?? item.mhk_total_harga_bahan ?? 0);
-            allowanceRp = Number(item.allowanceRp ?? item.mhk_allowance_rp ?? 0);
+            totalHargaBahan = Number(
+                item.totalHargaBahan ?? item.mhk_total_harga_bahan ?? 0,
+            );
+            allowanceRp = Number(
+                item.allowanceRp ?? item.mhk_allowance_rp ?? 0,
+            );
             totalBahan = Number(item.totalBahan ?? item.mhk_total_bahan ?? 0);
             hpp = Number(item.hpp ?? item.mhk_hpp ?? 0);
+            hargaBodyBesar =
+                Number(
+                    item.hargaBody_partaibesar ??
+                        item.mhk_harga_body_partaibesar ??
+                        0,
+                ) || hargaBody;
+            hargaLenganBesar =
+                Number(
+                    item.hargaLengan_partaibesar ??
+                        item.mhk_harga_lengan_partaibesar ??
+                        0,
+                ) || hargaLengan;
+            hargaRibBesar =
+                Number(
+                    item.hargaRib_partaibesar ??
+                        item.mhk_harga_rib_partaibesar ??
+                        0,
+                ) || hargaRib;
+            totalHargaBahanBesar =
+                Number(
+                    item.totalHargaBahan_partaibesar ??
+                        item.mhk_total_harga_bahan_partaibesar ??
+                        0,
+                ) || totalHargaBahan;
+            allowanceRpBesar =
+                Number(
+                    item.allowanceRp_partaibesar ??
+                        item.mhk_allowance_rp_partaibesar ??
+                        0,
+                ) || allowanceRp;
+            totalBahanBesar =
+                Number(
+                    item.totalBahan_partaibesar ??
+                        item.mhk_total_bahan_partaibesar ??
+                        0,
+                ) || totalBahan;
+            hppBesar =
+                Number(
+                    item.hpp_partaibesar ??
+                        item.mhk_hpp_partaibesar ??
+                        item.hppPartaiBesar ??
+                        0,
+                ) || hpp;
+            // BE adalah single source of truth — tidak ada fallback hitung manual di FE untuk kolom ≥1000 (hrg body/rib/bahan ≥1000).
+            // Jika BE belum mengirim partai besar, nilai akan fallback ke harga normal di atas (|| hargaBody dll).
         } else {
             // RE-CALCULATE HANYA KETIKA USER SEDANG INLINE-EDIT DI TABEL
-            const bBody = Number(item.babaranBody ?? item.babaran_body ?? b.body) || 0;
-            const bLengan = Number(item.babaranLengan ?? item.babaran_lengan ?? b.lengan) || 0;
+            const bBody =
+                Number(item.babaranBody ?? item.babaran_body ?? b.body) || 0;
+            const bLengan =
+                Number(item.babaranLengan ?? item.babaran_lengan ?? b.lengan) ||
+                0;
             hargaBody = bBody > 0 ? Math.round(hargaBahan / bBody / 1.11) : 0;
             hargaLengan =
                 kodeModel === "KH-0002"
-                    ? (item.mhk_harga_lengan !== undefined && item.mhk_harga_lengan !== null
+                    ? item.mhk_harga_lengan !== undefined &&
+                      item.mhk_harga_lengan !== null
                         ? Number(item.mhk_harga_lengan)
-                        : (bLengan > 0 ? Math.round(((b.hargaTua || hargaBahan) / 1.11) / bLengan) : 0))
+                        : bLengan > 0
+                          ? Math.round(
+                                (b.hargaTua || hargaBahan) / 1.11 / bLengan,
+                            )
+                          : 0
                     : 0;
             hargaRib = Math.round((hargaBahan / 1.11 + 1500) / 70);
             totalHargaBahan = hargaBody + hargaLengan + hargaRib;
             allowanceRp = Math.round(totalHargaBahan * (allowancePersen / 100));
             totalBahan = totalHargaBahan + allowanceRp;
             hpp = totalBahan + biayaKonveksi;
+            hargaBodyBesar =
+                bBody > 0
+                    ? Math.round(hargaBahanPartaiBesar / bBody / 1.11)
+                    : 0;
+            hargaLenganBesar =
+                kodeModel === "KH-0002"
+                    ? bLengan > 0
+                        ? Math.round(
+                              (b.hargaTuaBesar || hargaBahanPartaiBesar) /
+                                  1.11 /
+                                  bLengan,
+                          )
+                        : 0
+                    : 0;
+            hargaRibBesar = Math.round(
+                (hargaBahanPartaiBesar / 1.11 + 1500) / 70,
+            );
+            totalHargaBahanBesar =
+                hargaBodyBesar + hargaLenganBesar + hargaRibBesar;
+            allowanceRpBesar = Math.round(
+                totalHargaBahanBesar * (allowancePersenBesar / 100),
+            );
+            totalBahanBesar = totalHargaBahanBesar + allowanceRpBesar;
+            hppBesar = totalBahanBesar + biayaKonveksiBesar;
         }
 
         // Tangga Margin Qty
-        const calcTier = (persen: number) => {
-            const margin = hpp * (persen / 100);
-            const jual = hpp + margin;
-            const up = Math.ceil(jual / 1000) * 1000;
+        // Khusus jenis kain PE dan Hygit dibulatkan ke ratusan terdekat (ke atas), lainnya ke ribuan
+        // Tier 5 (>=1000) pakai HPP partai besar
+        const roundUnit = isPeOrHygitKain(ktg, jk) ? 100 : 1000;
+
+        const calcTier = (persen: number, baseHpp: number = hpp) => {
+            const margin = baseHpp * (persen / 100);
+            const jual = baseHpp + margin;
+            const up = Math.ceil(jual / roundUnit) * roundUnit;
             return { margin, jual, up, pct: persen };
         };
 
-        const activeTiers =
-            kodeModel === "KH-0001"
-                ? marginTiersKh0001.value
-                : marginTiersKh0002.value;
+        const activeTiers = getMarginTiers(kodeModel, ktg);
 
         const t1_pct =
             customSet.t1 !== undefined
@@ -507,11 +720,11 @@ const parseKainData = (kodeModel: "KH-0001" | "KH-0002") => {
                 ? customSet.t5
                 : (activeTiers[4]?.margin ?? 7);
 
-        const t1 = calcTier(t1_pct);
-        const t2 = calcTier(t2_pct);
-        const t3 = calcTier(t3_pct);
-        const t4 = calcTier(t4_pct);
-        const t5 = calcTier(t5_pct);
+        const t1 = calcTier(t1_pct, hpp);
+        const t2 = calcTier(t2_pct, hpp);
+        const t3 = calcTier(t3_pct, hpp);
+        const t4 = calcTier(t4_pct, hpp);
+        const t5 = calcTier(t5_pct, hppBesar);
 
         return {
             rowId: `${item.mhk_kode}_${jk}_${item.mhk_warna}_${item.mhk_komponen}`,
@@ -522,19 +735,32 @@ const parseKainData = (kodeModel: "KH-0001" | "KH-0002") => {
             lengan: item.mhk_lengan || b.lenganText,
             gramasi: getGramasi(jk),
             babaranBody: item.babaranBody ?? item.babaran_body ?? b.body,
-            babaranLengan: item.babaranLengan ?? item.babaran_lengan ?? b.lengan,
+            babaranLengan:
+                item.babaranLengan ?? item.babaran_lengan ?? b.lengan,
             babaranRib: item.babaranRib ?? item.babaran_rib ?? b.rib,
             warna: item.mhk_warna || "-",
             hargaBahan,
+            hargaBahanPartaiBesar,
             hargaBody,
+            hargaBodyBesar,
             hargaLengan,
+            hargaLenganBesar,
             hargaRib,
+            hargaRibBesar,
             totalHargaBahan,
+            totalHargaBahanBesar,
             allowancePersen,
+            allowancePersenBesar,
             allowanceRp,
+            allowanceRpBesar,
             totalBahan,
+            totalBahanBesar,
             biayaKonveksi,
+            biayaKonveksiBesar,
+            biayaKonveksiPartaiBesar: biayaKonveksiBesar,
             hpp,
+            hppBesar,
+            hppPartaiBesar: hppBesar,
             tier1_pct: t1.pct,
             tier1_margin: t1.margin,
             tier1_jual: t1.jual,
@@ -614,22 +840,38 @@ const getColValue = (row: any, key: string): string => {
             return row.warna || "-";
         case "hargaBahan":
             return `Rp ${formatRp(row.hargaBahan)}`;
+        case "hargaBahanPartaiBesar":
+            return `Rp ${formatRp(row.hargaBahanPartaiBesar)}`;
         case "hargaBody":
             return `Rp ${formatRp(row.hargaBody)}`;
+        case "hargaBodyBesar":
+            return `Rp ${formatRp(row.hargaBodyBesar)}`;
         case "hargaLengan":
             return `Rp ${formatRp(row.hargaLengan)}`;
+        case "hargaLenganBesar":
+            return `Rp ${formatRp(row.hargaLenganBesar)}`;
         case "hargaRib":
             return `Rp ${formatRp(row.hargaRib)}`;
+        case "hargaRibBesar":
+            return `Rp ${formatRp(row.hargaRibBesar)}`;
         case "totalHargaBahan":
             return `Rp ${formatRp(row.totalHargaBahan)}`;
+        case "totalHargaBahanBesar":
+            return `Rp ${formatRp(row.totalHargaBahanBesar)}`;
         case "allowance":
             return `${row.allowancePersen}%`;
+        case "allowancePartaiBesar":
+            return `${row.allowancePersenBesar ?? row.allowancePersen}%`;
         case "totalBahan":
             return `Rp ${formatRp(row.totalBahan)}`;
         case "biayaKonveksi":
             return `Rp ${formatRp(row.biayaKonveksi)}`;
+        case "biayaKonveksiPartaiBesar":
+            return `Rp ${formatRp(row.biayaKonveksiPartaiBesar ?? row.biayaKonveksiBesar ?? row.biayaKonveksi)}`;
         case "hpp":
             return `Rp ${formatRp(row.hpp)}`;
+        case "hppPartaiBesar":
+            return `Rp ${formatRp(row.hppPartaiBesar)}`;
         case "tier1":
             return `Rp ${formatRp(row.tier1_up)}`;
         case "tier2":
@@ -818,12 +1060,54 @@ const filteredKh0002 = computed(() => {
     return itemsKh0002All.value.filter((r) => filterRow(r, q));
 });
 
+// Helper: header tier tampil range jika margin berbeda per baris (mis. 5% dan 10%)
+const getTierMarginLabel = (
+    model: "KH-0001" | "KH-0002",
+    tier: 1 | 2 | 3 | 4 | 5,
+): string => {
+    const tiers =
+        model === "KH-0001" ? marginTiersKh0001.value : marginTiersKh0002.value;
+    const fallback = tiers[tier - 1]?.margin;
+    const items =
+        model === "KH-0001" ? itemsKh0001All.value : itemsKh0002All.value;
+    if (!items || items.length === 0) {
+        return fallback !== undefined ? `${fallback}%` : "";
+    }
+    const vals: number[] = items.map((r: any) => {
+        switch (tier) {
+            case 1:
+                return Number(r.tier1_pct) || 0;
+            case 2:
+                return Number(r.tier2_pct) || 0;
+            case 3:
+                return Number(r.tier3_pct) || 0;
+            case 4:
+                return Number(r.tier4_pct) || 0;
+            case 5:
+                return Number(r.tier5_pct) || 0;
+            default:
+                return 0;
+        }
+    });
+    const uniq = [...new Set(vals.map((v) => Number(v.toFixed(2))))];
+    if (uniq.length <= 1) {
+        const v = uniq[0] ?? fallback ?? 0;
+        return `${Number(v.toString())}%`;
+    }
+    const min = Math.min(...vals);
+    const max = Math.max(...vals);
+    const fmt = (n: number) =>
+        Number.isInteger(n) ? `${n}` : `${Number(n.toFixed(2))}`;
+    return `${fmt(min)}% dan ${fmt(max)}%`;
+};
+
 // ==========================================
 // 1.1 FITUR PINDAH KOLOM (DRAG & DROP ala BaseBrowse)
 // ==========================================
 interface GarmenColDef {
     key: string;
     title: string;
+    subTitle?: string;
     width?: string;
     align?: "start" | "center" | "end";
     isGroup?: boolean;
@@ -836,21 +1120,70 @@ const defaultColsKh0001 = computed<GarmenColDef[]>(() => [
     { key: "gramasi", title: "GRAMASI", width: "90px", align: "center" },
     { key: "babaran", title: "BABARAN", width: "100px", align: "end" },
     { key: "warna", title: "WARNA", width: "80px", align: "center" },
-    { key: "hargaBahan", title: "HARGA / KG", width: "115px", align: "end" },
+    {
+        key: "hargaBahan",
+        title: "HARGA / KG",
+        subTitle: "Non PPN",
+        width: "135px",
+        align: "end",
+    },
+    {
+        key: "hargaBahanPartaiBesar",
+        title: "HARGA / KG (≥1000)",
+        subTitle: "Non PPN",
+        width: "165px",
+        align: "end",
+    },
     { key: "hargaBody", title: "HRG BODY", width: "100px", align: "end" },
+    {
+        key: "hargaBodyBesar",
+        title: "HRG BODY (≥1000)",
+        width: "125px",
+        align: "end",
+    },
     { key: "hargaRib", title: "HRG RIB", width: "95px", align: "end" },
+    {
+        key: "hargaRibBesar",
+        title: "HRG RIB (≥1000)",
+        width: "115px",
+        align: "end",
+    },
     {
         key: "totalHargaBahan",
         title: "Hrg Bahan",
         width: "105px",
         align: "end",
     },
-    { key: "allowance", title: "ALLOW (%)", width: "85px", align: "center" },
+    {
+        key: "totalHargaBahanBesar",
+        title: "HRG BAHAN (≥1000)",
+        width: "135px",
+        align: "end",
+    },
+    { key: "allowance", title: "ALLOW", width: "85px", align: "center" },
+    {
+        key: "allowancePartaiBesar",
+        title: "ALLOW (≥1000)",
+        width: "110px",
+        align: "center",
+    },
     { key: "biayaKonveksi", title: "KONVEKSI", width: "95px", align: "end" },
+    {
+        key: "biayaKonveksiPartaiBesar",
+        title: "KONVEKSI (≥1000)",
+        width: "125px",
+        align: "end",
+    },
     { key: "hpp", title: "HPP", width: "105px", align: "end" },
     {
+        key: "hppPartaiBesar",
+        title: "HPP (≥1000)",
+        width: "125px",
+        align: "end",
+    },
+    {
         key: "tier1",
-        title: `${marginTiersKh0001.value[0]?.qmin ?? 100} - ${marginTiersKh0001.value[0]?.qmax ?? 249} PCS (${marginTiersKh0001.value[0]?.margin ?? 20}%)`,
+        title: `${marginTiersKh0001.value[0]?.qmin ?? 100} - ${marginTiersKh0001.value[0]?.qmax ?? 249} PCS (${getTierMarginLabel("KH-0001", 1)})`,
         isGroup: true,
         colSpan: 3,
         subHeaders: [
@@ -861,7 +1194,7 @@ const defaultColsKh0001 = computed<GarmenColDef[]>(() => [
     },
     {
         key: "tier2",
-        title: `${marginTiersKh0001.value[1]?.qmin ?? 250} - ${marginTiersKh0001.value[1]?.qmax ?? 499} PCS (${marginTiersKh0001.value[1]?.margin ?? 15}%)`,
+        title: `${marginTiersKh0001.value[1]?.qmin ?? 250} - ${marginTiersKh0001.value[1]?.qmax ?? 499} PCS (${getTierMarginLabel("KH-0001", 2)})`,
         isGroup: true,
         colSpan: 3,
         subHeaders: [
@@ -872,7 +1205,7 @@ const defaultColsKh0001 = computed<GarmenColDef[]>(() => [
     },
     {
         key: "tier3",
-        title: `${marginTiersKh0001.value[2]?.qmin ?? 500} - ${marginTiersKh0001.value[2]?.qmax ?? 749} PCS (${marginTiersKh0001.value[2]?.margin ?? 12.5}%)`,
+        title: `${marginTiersKh0001.value[2]?.qmin ?? 500} - ${marginTiersKh0001.value[2]?.qmax ?? 749} PCS (${getTierMarginLabel("KH-0001", 3)})`,
         isGroup: true,
         colSpan: 3,
         subHeaders: [
@@ -883,7 +1216,7 @@ const defaultColsKh0001 = computed<GarmenColDef[]>(() => [
     },
     {
         key: "tier4",
-        title: `${marginTiersKh0001.value[3]?.qmin ?? 750} - ${marginTiersKh0001.value[3]?.qmax ?? 999} PCS (${marginTiersKh0001.value[3]?.margin ?? 10}%)`,
+        title: `${marginTiersKh0001.value[3]?.qmin ?? 750} - ${marginTiersKh0001.value[3]?.qmax ?? 999} PCS (${getTierMarginLabel("KH-0001", 4)})`,
         isGroup: true,
         colSpan: 3,
         subHeaders: [
@@ -894,7 +1227,7 @@ const defaultColsKh0001 = computed<GarmenColDef[]>(() => [
     },
     {
         key: "tier5",
-        title: `≥ ${marginTiersKh0001.value[4]?.qmin ?? 1000} PCS (${marginTiersKh0001.value[4]?.margin ?? 7}%)`,
+        title: `≥ ${marginTiersKh0001.value[4]?.qmin ?? 1000} PCS (${getTierMarginLabel("KH-0001", 5)})`,
         isGroup: true,
         colSpan: 3,
         subHeaders: [
@@ -916,22 +1249,75 @@ const defaultColsKh0002 = computed<GarmenColDef[]>(() => [
         align: "end",
     },
     { key: "warna", title: "WARNA", width: "80px", align: "center" },
-    { key: "hargaBahan", title: "HARGA / KG", width: "115px", align: "end" },
+    {
+        key: "hargaBahan",
+        title: "HARGA / KG",
+        subTitle: "Non PPN",
+        width: "135px",
+        align: "end",
+    },
+    {
+        key: "hargaBahanPartaiBesar",
+        title: "HARGA / KG (≥1000)",
+        subTitle: "Non PPN",
+        width: "165px",
+        align: "end",
+    },
     { key: "hargaBody", title: "HRG BODY", width: "100px", align: "end" },
+    {
+        key: "hargaBodyBesar",
+        title: "HRG BODY (≥1000)",
+        subTitle: "Non PPN",
+        width: "125px",
+        align: "end",
+    },
     { key: "hargaLengan", title: "HRG LENGAN", width: "105px", align: "end" },
+    {
+        key: "hargaLenganBesar",
+        title: "HRG LENGAN (≥1000)",
+        subTitle: "Non PPN",
+        width: "135px",
+        align: "end",
+    },
     { key: "hargaRib", title: "HRG RIB", width: "95px", align: "end" },
+    {
+        key: "hargaRibBesar",
+        title: "HRG RIB (≥1000)",
+        subTitle: "Non PPN",
+        width: "115px",
+        align: "end",
+    },
     {
         key: "totalHargaBahan",
         title: "Hrg Bahan",
         width: "105px",
         align: "end",
     },
+    {
+        key: "totalHargaBahanBesar",
+        title: "HRG BAHAN (≥1000)",
+        subTitle: "Non PPN",
+        width: "135px",
+        align: "end",
+    },
     { key: "allowance", title: "ALLOW (%)", width: "85px", align: "center" },
     { key: "biayaKonveksi", title: "KONVEKSI", width: "95px", align: "end" },
+    {
+        key: "biayaKonveksiPartaiBesar",
+        title: "KONVEKSI (≥1000)",
+        width: "125px",
+        align: "end",
+    },
     { key: "hpp", title: "HPP", width: "105px", align: "end" },
     {
+        key: "hppPartaiBesar",
+        title: "HPP (≥1000)",
+        width: "125px",
+        align: "end",
+    },
+    {
         key: "tier1",
-        title: `${marginTiersKh0002.value[0]?.qmin ?? 100} - ${marginTiersKh0002.value[0]?.qmax ?? 299} PCS (${marginTiersKh0002.value[0]?.margin ?? 20}%)`,
+        title: `${marginTiersKh0002.value[0]?.qmin ?? 100} - ${marginTiersKh0002.value[0]?.qmax ?? 299} PCS (${getTierMarginLabel("KH-0002", 1)})`,
         isGroup: true,
         colSpan: 3,
         subHeaders: [
@@ -942,7 +1328,7 @@ const defaultColsKh0002 = computed<GarmenColDef[]>(() => [
     },
     {
         key: "tier2",
-        title: `${marginTiersKh0002.value[1]?.qmin ?? 300} - ${marginTiersKh0002.value[1]?.qmax ?? 499} PCS (${marginTiersKh0002.value[1]?.margin ?? 15}%)`,
+        title: `${marginTiersKh0002.value[1]?.qmin ?? 300} - ${marginTiersKh0002.value[1]?.qmax ?? 499} PCS (${getTierMarginLabel("KH-0002", 2)})`,
         isGroup: true,
         colSpan: 3,
         subHeaders: [
@@ -953,7 +1339,7 @@ const defaultColsKh0002 = computed<GarmenColDef[]>(() => [
     },
     {
         key: "tier3",
-        title: `${marginTiersKh0002.value[2]?.qmin ?? 500} - ${marginTiersKh0002.value[2]?.qmax ?? 749} PCS (${marginTiersKh0002.value[2]?.margin ?? 12.5}%)`,
+        title: `${marginTiersKh0002.value[2]?.qmin ?? 500} - ${marginTiersKh0002.value[2]?.qmax ?? 749} PCS (${getTierMarginLabel("KH-0002", 3)})`,
         isGroup: true,
         colSpan: 3,
         subHeaders: [
@@ -964,7 +1350,7 @@ const defaultColsKh0002 = computed<GarmenColDef[]>(() => [
     },
     {
         key: "tier4",
-        title: `${marginTiersKh0002.value[3]?.qmin ?? 750} - ${marginTiersKh0002.value[3]?.qmax ?? 999} PCS (${marginTiersKh0002.value[3]?.margin ?? 10}%)`,
+        title: `${marginTiersKh0002.value[3]?.qmin ?? 750} - ${marginTiersKh0002.value[3]?.qmax ?? 999} PCS (${getTierMarginLabel("KH-0002", 4)})`,
         isGroup: true,
         colSpan: 3,
         subHeaders: [
@@ -975,7 +1361,7 @@ const defaultColsKh0002 = computed<GarmenColDef[]>(() => [
     },
     {
         key: "tier5",
-        title: `≥ ${marginTiersKh0002.value[4]?.qmin ?? 1000} PCS (${marginTiersKh0002.value[4]?.margin ?? 7}%)`,
+        title: `≥ ${marginTiersKh0002.value[4]?.qmin ?? 1000} PCS (${getTierMarginLabel("KH-0002", 5)})`,
         isGroup: true,
         colSpan: 3,
         subHeaders: [
@@ -1055,7 +1441,8 @@ const getOldValue = (row: any, field: "harga" | "allow" | "konveksi") => {
     const raw = row.rawItem || {};
     if (field === "harga") return Number(raw.mhk_harga) || 0;
     if (field === "allow") return Number(raw.mhk_allow) || 0;
-    if (field === "konveksi") return Number(raw.biayaKonveksi ?? raw.mhk_biaya_konveksi) || 0;
+    if (field === "konveksi")
+        return Number(raw.biayaKonveksi ?? raw.mhk_biaya_konveksi) || 0;
     return 0;
 };
 
@@ -1087,7 +1474,11 @@ const executeSaveAllInlineChanges = async () => {
                         ? raw.mhk_babaran
                         : row.babaranBody || 0,
                 mhk_harga: row.hargaBahan,
+                mhk_harga_partaibesar:
+                    row.hargaBahanPartaiBesar ?? row.hargaBahan,
                 mhk_allow: row.allowancePersen,
+                mhk_allow_partaibesar:
+                    row.allowancePersenBesar ?? row.allowancePersen,
                 old_kode:
                     raw.mhk_kode ||
                     row.kode ||
@@ -1099,7 +1490,11 @@ const executeSaveAllInlineChanges = async () => {
             if (customKainSettings.value[row.rowId]) {
                 delete customKainSettings.value[row.rowId].isDirty;
                 delete customKainSettings.value[row.rowId].hargaBahan;
+                delete customKainSettings.value[row.rowId]
+                    .hargaBahanPartaiBesar;
                 delete customKainSettings.value[row.rowId].allowancePersen;
+                delete customKainSettings.value[row.rowId]
+                    .allowancePersenPartaiBesar;
             }
         }
         customKainSettings.value = { ...customKainSettings.value };
@@ -1251,18 +1646,29 @@ const {
 const tambahanHeaders = [
     { title: "KETERANGAN ITEM CUSTOM", key: "mht_ket", minWidth: "250px" },
     {
-        title: "LACOST (RP)",
+        title: "LACOST",
         key: "mht_lacost",
         width: "160px",
         align: "end" as const,
     },
     {
-        title: "COTTON (RP)",
+        title: "COTTON",
         key: "mht_cotton",
         width: "160px",
         align: "end" as const,
     },
-    { title: "PE (RP)", key: "mht_pe", width: "160px", align: "end" as const },
+    {
+        title: "PE (<1000)",
+        key: "mht_pe",
+        width: "160px",
+        align: "end" as const,
+    },
+    {
+        title: "PE (≥1000)",
+        key: "mht_pe_partaibesar",
+        width: "160px",
+        align: "end" as const,
+    },
 ];
 
 watch(activeSub, (newVal) => {
@@ -1287,7 +1693,9 @@ const kainForm = reactive({
     mhk_babaran: 0,
     mhk_warna: "MUDA",
     mhk_harga: 0,
+    mhk_harga_partaibesar: 0,
     mhk_allow: 17,
+    mhk_allow_partaibesar: 10,
     biayaJahit: 5000,
     tier1_margin_pct: 20,
     tier2_margin_pct: 15,
@@ -1310,6 +1718,7 @@ const tambahanForm = reactive({
     mht_lacost: 0,
     mht_cotton: 0,
     mht_pe: 0,
+    mht_pe_partaibesar: 0,
 });
 
 const handleAdd = () => {
@@ -1321,6 +1730,7 @@ const handleAdd = () => {
             mht_lacost: 0,
             mht_cotton: 0,
             mht_pe: 0,
+            mht_pe_partaibesar: 0,
         });
         tambahanDialog.value = true;
     } else {
@@ -1334,7 +1744,9 @@ const handleAdd = () => {
             mhk_babaran: 0,
             mhk_warna: "MUDA",
             mhk_harga: 0,
+            mhk_harga_partaibesar: 0,
             mhk_allow: 17,
+            mhk_allow_partaibesar: 10,
             biayaJahit: getBiayaKonveksiByKtg("COTTON"),
             tier1_margin_pct: 20,
             tier2_margin_pct: 15,
@@ -1380,6 +1792,7 @@ const handleEdit = (item?: any) => {
             mht_lacost: Number(target.mht_lacost) || 0,
             mht_cotton: Number(target.mht_cotton) || 0,
             mht_pe: Number(target.mht_pe) || 0,
+            mht_pe_partaibesar: Number(target.mht_pe_partaibesar) || 0,
         });
         tambahanDialog.value = true;
     } else {
@@ -1426,12 +1839,24 @@ const handleEdit = (item?: any) => {
                         ? target.hargaBahan
                         : raw.mhk_harga,
                 ) || 0,
+            mhk_harga_partaibesar:
+                Number(
+                    target.hargaBahanPartaiBesar !== undefined
+                        ? target.hargaBahanPartaiBesar
+                        : (raw.mhk_harga_partaibesar ?? raw.mhk_harga),
+                ) || 0,
             mhk_allow:
                 Number(
                     target.allowancePersen !== undefined
                         ? target.allowancePersen
                         : raw.mhk_allow,
                 ) || 17,
+            mhk_allow_partaibesar:
+                Number(
+                    target.allowancePersenBesar !== undefined
+                        ? target.allowancePersenBesar
+                        : (raw.mhk_allow_partaibesar ?? raw.mhk_allow),
+                ) || 10,
             biayaJahit:
                 savedCustom.biayaJahit ??
                 getBiayaKonveksiByKtg(raw.mhk_ktg || target.ktg),
@@ -1553,6 +1978,13 @@ const handleExport = async () => {
                     numFmt: "Rp #,##0",
                     align: "right",
                 },
+                {
+                    key: "mht_pe_partaibesar",
+                    header: "PE (≥1000) (RP)",
+                    width: 18,
+                    numFmt: "Rp #,##0",
+                    align: "right",
+                },
             ],
             tambahanItems.value ?? [],
             "Biaya Custom Tambahan Garmen",
@@ -1564,9 +1996,9 @@ const handleExport = async () => {
             ? "Setting_Harga_Kaos_1_Warna_KH0001.xlsx"
             : "Setting_Harga_Kaos_2_Warna_KH0002.xlsx";
         const titleSheet = isModel1
-            ? "SETTING HARGA BAHAN KAOS1 WARNA"
-            : "SETTING HARGA BAHAN KAOS 2 WARNA";
-        const sheetName = isModel1 ? "Kaos 1 Warna" : "Kaos 2 Warna";
+            ? "SETTING HARGA BAHAN 1 WARNA"
+            : "SETTING HARGA BAHAN 2 WARNA";
+        const sheetName = isModel1 ? "1 Warna" : "2 Warna";
 
         const wb = new ExcelJS.Workbook();
         wb.creator = "MANKSI ERP";
@@ -1651,15 +2083,19 @@ const handleExport = async () => {
                     currentColIdx++;
                 }
             } else {
-                mergeRanges.push({
-                    sRow: 3,
-                    sCol: currentColIdx,
-                    eRow: 4,
-                    eCol: currentColIdx,
-                });
-
-                headerRow1Texts.push(col.title);
-                headerRow2Texts.push("");
+                if ((col as any).subTitle) {
+                    headerRow1Texts.push(col.title);
+                    headerRow2Texts.push((col as any).subTitle);
+                } else {
+                    mergeRanges.push({
+                        sRow: 3,
+                        sCol: currentColIdx,
+                        eRow: 4,
+                        eCol: currentColIdx,
+                    });
+                    headerRow1Texts.push(col.title);
+                    headerRow2Texts.push("");
+                }
 
                 let width = 14;
                 let align: "left" | "center" | "right" = "right";
@@ -1803,6 +2239,12 @@ const handleExport = async () => {
         dataRows.forEach((row, idx) => {
             const r = idx + 5; // Baris data Excel dimulai dari baris ke-5
             const values: any[] = [];
+            const rowRoundUnit = isPeOrHygitKain(
+                (row as any).ktg,
+                (row as any).jenisKain,
+            )
+                ? 100
+                : 1000;
 
             const hrgBahanCol = colLetterMap["hargaBahan"];
             const babaranBodyCol =
@@ -1890,7 +2332,7 @@ const handleExport = async () => {
                     values.push(
                         jCol
                             ? {
-                                  formula: `=ROUNDUP(${jCol}${r}/1000,0)*1000`,
+                                  formula: `=ROUNDUP(${jCol}${r}/${rowRoundUnit},0)*${rowRoundUnit}`,
                                   result: row.tier1_up,
                               }
                             : (row.tier1_up ?? 0),
@@ -1919,7 +2361,7 @@ const handleExport = async () => {
                     values.push(
                         jCol
                             ? {
-                                  formula: `=ROUNDUP(${jCol}${r}/1000,0)*1000`,
+                                  formula: `=ROUNDUP(${jCol}${r}/${rowRoundUnit},0)*${rowRoundUnit}`,
                                   result: row.tier2_up,
                               }
                             : (row.tier2_up ?? 0),
@@ -1948,7 +2390,7 @@ const handleExport = async () => {
                     values.push(
                         jCol
                             ? {
-                                  formula: `=ROUNDUP(${jCol}${r}/1000,0)*1000`,
+                                  formula: `=ROUNDUP(${jCol}${r}/${rowRoundUnit},0)*${rowRoundUnit}`,
                                   result: row.tier3_up,
                               }
                             : (row.tier3_up ?? 0),
@@ -1977,7 +2419,7 @@ const handleExport = async () => {
                     values.push(
                         jCol
                             ? {
-                                  formula: `=ROUNDUP(${jCol}${r}/1000,0)*1000`,
+                                  formula: `=ROUNDUP(${jCol}${r}/${rowRoundUnit},0)*${rowRoundUnit}`,
                                   result: row.tier4_up,
                               }
                             : (row.tier4_up ?? 0),
@@ -2006,7 +2448,7 @@ const handleExport = async () => {
                     values.push(
                         jCol
                             ? {
-                                  formula: `=ROUNDUP(${jCol}${r}/1000,0)*1000`,
+                                  formula: `=ROUNDUP(${jCol}${r}/${rowRoundUnit},0)*${rowRoundUnit}`,
                                   result: row.tier5_up,
                               }
                             : (row.tier5_up ?? 0),
@@ -2280,14 +2722,14 @@ const executeSaveTambahan = async () => {
                                 size="small"
                                 class="text-none font-weight-bold px-3"
                             >
-                                Kaos 1 Warna
+                                1 Warna
                             </v-btn>
                             <v-btn
                                 value="kh0002"
                                 size="small"
                                 class="text-none font-weight-bold px-3"
                             >
-                                Kaos 2 Warna
+                                2 Warna
                             </v-btn>
                             <v-btn
                                 value="tambahan"
@@ -2538,45 +2980,58 @@ const executeSaveTambahan = async () => {
                                             @pointerup="onColPointerUp"
                                             @pointercancel="onColPointerUp"
                                         >
-                                            <div class="th-inner">
-                                                <span
-                                                    class="col-drag-handle"
-                                                    title="Drag untuk pindah kolom"
-                                                    >⠿</span
-                                                >
-                                                <span class="th-title">{{
-                                                    col.title
-                                                }}</span>
-                                                <button
-                                                    class="col-filter-btn"
-                                                    :class="{
-                                                        active: colHasFilter(
-                                                            col.key,
-                                                        ),
-                                                    }"
-                                                    @click.stop="
-                                                        openColFilter(
-                                                            col.key,
-                                                            $event,
-                                                        )
-                                                    "
-                                                    title="Filter kolom"
-                                                >
-                                                    <IconFilter
-                                                        v-if="
-                                                            colHasFilter(
+                                            <div
+                                                class="th-inner"
+                                                :class="{
+                                                    'th-has-subtitle':
+                                                        !!col.subTitle,
+                                                }"
+                                            >
+                                                <div class="th-title-row">
+                                                    <span
+                                                        class="col-drag-handle"
+                                                        title="Drag untuk pindah kolom"
+                                                        >⠿</span
+                                                    >
+                                                    <span class="th-title">{{
+                                                        col.title
+                                                    }}</span>
+                                                    <button
+                                                        class="col-filter-btn"
+                                                        :class="{
+                                                            active: colHasFilter(
                                                                 col.key,
+                                                            ),
+                                                        }"
+                                                        @click.stop="
+                                                            openColFilter(
+                                                                col.key,
+                                                                $event,
                                                             )
                                                         "
-                                                        :size="10"
-                                                        :stroke-width="2"
-                                                    />
-                                                    <IconAdjustmentsHorizontal
-                                                        v-else
-                                                        :size="10"
-                                                        :stroke-width="2"
-                                                    />
-                                                </button>
+                                                        title="Filter kolom"
+                                                    >
+                                                        <IconFilter
+                                                            v-if="
+                                                                colHasFilter(
+                                                                    col.key,
+                                                                )
+                                                            "
+                                                            :size="10"
+                                                            :stroke-width="2"
+                                                        />
+                                                        <IconAdjustmentsHorizontal
+                                                            v-else
+                                                            :size="10"
+                                                            :stroke-width="2"
+                                                        />
+                                                    </button>
+                                                </div>
+                                                <span
+                                                    v-if="col.subTitle"
+                                                    class="th-subtitle"
+                                                    >{{ col.subTitle }}</span
+                                                >
                                             </div>
                                         </th>
                                     </template>
@@ -2751,12 +3206,59 @@ const executeSaveTambahan = async () => {
                                             </div>
                                         </td>
 
-                                        <!-- Komponen Biaya -->
+                                        <!-- Harga (≥1000) Inline Editable -->
+                                        <td
+                                            v-else-if="
+                                                col.key ===
+                                                'hargaBahanPartaiBesar'
+                                            "
+                                            class="text-end num-cell inline-edit-cell"
+                                            :class="{
+                                                'cell-dirty': isRowDirty(
+                                                    row.rowId,
+                                                ),
+                                            }"
+                                            @click.stop
+                                        >
+                                            <div class="inline-input-wrapper">
+                                                <span class="inline-prefix"
+                                                    >Rp</span
+                                                >
+                                                <input
+                                                    type="text"
+                                                    class="inline-table-input"
+                                                    :value="
+                                                        formatRp(
+                                                            row.hargaBahanPartaiBesar,
+                                                        )
+                                                    "
+                                                    @input="
+                                                        onInlineNumberChange(
+                                                            row,
+                                                            'hargaBahanPartaiBesar',
+                                                            $event,
+                                                        )
+                                                    "
+                                                />
+                                            </div>
+                                        </td>
+
+                                        <!-- Komponen Biaya (BE-only) -->
                                         <td
                                             v-else-if="col.key === 'hargaBody'"
                                             class="text-end num-cell text-medium-emphasis"
                                         >
                                             Rp {{ formatRp(row.hargaBody) }}
+                                        </td>
+                                        <td
+                                            v-else-if="
+                                                col.key === 'hargaBodyBesar'
+                                            "
+                                            class="text-end num-cell text-medium-emphasis"
+                                            style="background: #f3e5f5"
+                                        >
+                                            Rp
+                                            {{ formatRp(row.hargaBodyBesar) }}
                                         </td>
                                         <td
                                             v-else-if="
@@ -2767,10 +3269,30 @@ const executeSaveTambahan = async () => {
                                             Rp {{ formatRp(row.hargaLengan) }}
                                         </td>
                                         <td
+                                            v-else-if="
+                                                col.key === 'hargaLenganBesar'
+                                            "
+                                            class="text-end num-cell text-medium-emphasis"
+                                            style="background: #f3e5f5"
+                                        >
+                                            Rp
+                                            {{ formatRp(row.hargaLenganBesar) }}
+                                        </td>
+                                        <td
                                             v-else-if="col.key === 'hargaRib'"
                                             class="text-end num-cell text-medium-emphasis"
                                         >
                                             Rp {{ formatRp(row.hargaRib) }}
+                                        </td>
+                                        <td
+                                            v-else-if="
+                                                col.key === 'hargaRibBesar'
+                                            "
+                                            class="text-end num-cell text-medium-emphasis"
+                                            style="background: #f3e5f5"
+                                        >
+                                            Rp
+                                            {{ formatRp(row.hargaRibBesar) }}
                                         </td>
                                         <td
                                             v-else-if="
@@ -2780,6 +3302,21 @@ const executeSaveTambahan = async () => {
                                         >
                                             Rp
                                             {{ formatRp(row.totalHargaBahan) }}
+                                        </td>
+                                        <td
+                                            v-else-if="
+                                                col.key ===
+                                                'totalHargaBahanBesar'
+                                            "
+                                            class="text-end num-cell font-weight-medium"
+                                            style="background: #f3e5f5"
+                                        >
+                                            Rp
+                                            {{
+                                                formatRp(
+                                                    row.totalHargaBahanBesar,
+                                                )
+                                            }}
                                         </td>
 
                                         <!-- Allowance (%) (Inline Editable) -->
@@ -2806,6 +3343,45 @@ const executeSaveTambahan = async () => {
                                                         onInlinePercentChange(
                                                             row,
                                                             'allowancePersen',
+                                                            $event,
+                                                        )
+                                                    "
+                                                />
+                                                <span class="inline-suffix"
+                                                    >%</span
+                                                >
+                                            </div>
+                                        </td>
+
+                                        <!-- Allowance (≥1000) Inline Editable -->
+                                        <td
+                                            v-else-if="
+                                                col.key ===
+                                                'allowancePartaiBesar'
+                                            "
+                                            class="text-center inline-edit-cell"
+                                            :class="{
+                                                'cell-dirty': isRowDirty(
+                                                    row.rowId,
+                                                ),
+                                            }"
+                                            @click.stop
+                                        >
+                                            <div
+                                                class="inline-input-wrapper justify-center"
+                                            >
+                                                <input
+                                                    type="number"
+                                                    step="0.5"
+                                                    class="inline-table-input text-center"
+                                                    style="width: 52px"
+                                                    :value="
+                                                        row.allowancePersenBesar
+                                                    "
+                                                    @input="
+                                                        onInlinePercentChange(
+                                                            row,
+                                                            'allowancePersenPartaiBesar',
                                                             $event,
                                                         )
                                                     "
@@ -2852,10 +3428,56 @@ const executeSaveTambahan = async () => {
                                             </div>
                                         </td>
                                         <td
+                                            v-else-if="
+                                                col.key ===
+                                                'biayaKonveksiPartaiBesar'
+                                            "
+                                            class="text-end num-cell inline-edit-cell"
+                                            :class="{
+                                                'cell-dirty': isRowDirty(
+                                                    row.rowId,
+                                                ),
+                                            }"
+                                            @click.stop
+                                        >
+                                            <div class="inline-input-wrapper">
+                                                <span class="inline-prefix"
+                                                    >Rp</span
+                                                >
+                                                <input
+                                                    type="text"
+                                                    class="inline-table-input"
+                                                    :value="
+                                                        formatRp(
+                                                            row.biayaKonveksiPartaiBesar ??
+                                                                row.biayaKonveksiBesar,
+                                                        )
+                                                    "
+                                                    @input="
+                                                        onInlineNumberChange(
+                                                            row,
+                                                            'biayaJahitPartaiBesar',
+                                                            $event,
+                                                        )
+                                                    "
+                                                />
+                                            </div>
+                                        </td>
+                                        <td
                                             v-else-if="col.key === 'hpp'"
                                             class="text-end font-weight-bold num-cell cell-hpp"
                                         >
                                             Rp {{ formatRp(row.hpp) }}
+                                        </td>
+                                        <td
+                                            v-else-if="
+                                                col.key === 'hppPartaiBesar'
+                                            "
+                                            class="text-end font-weight-bold num-cell cell-hpp"
+                                            style="background: #fff8e1"
+                                        >
+                                            Rp
+                                            {{ formatRp(row.hppPartaiBesar) }}
                                         </td>
 
                                         <!-- Tier 1: 100 - 249 PCS -->
@@ -3199,14 +3821,14 @@ const executeSaveTambahan = async () => {
                             size="small"
                             class="text-none font-weight-bold px-3"
                         >
-                            Kaos 1 Warna
+                            1 Warna
                         </v-btn>
                         <v-btn
                             value="kh0002"
                             size="small"
                             class="text-none font-weight-bold px-3"
                         >
-                            Kaos 2 Warna
+                            2 Warna
                         </v-btn>
                         <v-btn
                             value="tambahan"
@@ -3226,6 +3848,9 @@ const executeSaveTambahan = async () => {
                 <span>Rp {{ Number(value || 0).toLocaleString("id-ID") }}</span>
             </template>
             <template #item.mht_pe="{ value }">
+                <span>Rp {{ Number(value || 0).toLocaleString("id-ID") }}</span>
+            </template>
+            <template #item.mht_pe_partaibesar="{ value }">
                 <span>Rp {{ Number(value || 0).toLocaleString("id-ID") }}</span>
             </template>
         </BaseBrowse>
@@ -3279,8 +3904,8 @@ const executeSaveTambahan = async () => {
                                 ><strong>Model:</strong>
                                 {{
                                     kainForm.mhk_kode === "KH-0001"
-                                        ? "Kaos 1 Warna"
-                                        : "Kaos 2 Warna"
+                                        ? "1 Warna"
+                                        : "2 Warna"
                                 }}
                             </span>
                             <span
@@ -3306,19 +3931,35 @@ const executeSaveTambahan = async () => {
                     <div
                         class="text-caption font-weight-bold text-uppercase text-medium-emphasis mb-2"
                     >
-                        Parameter Harga / Kg, Allowance, Konveksi & Margin
+                        Parameter Harga / Kg Non PPN, Allowance, Konveksi &
+                        Margin
                     </div>
                     <v-row dense>
                         <!-- 1. HARGA / KG -->
                         <v-col cols="12" sm="6">
                             <v-text-field
                                 v-model.number="kainForm.mhk_harga"
-                                label="Harga / Kg (Rp) *"
+                                label="Harga / Kg Non PPN (Rp) *"
                                 type="number"
                                 prefix="Rp"
                                 variant="outlined"
                                 density="compact"
                                 hide-details="auto"
+                            />
+                        </v-col>
+
+                        <!-- 1b. HARGA (≥1000) -->
+                        <v-col cols="12" sm="6">
+                            <v-text-field
+                                v-model.number="kainForm.mhk_harga_partaibesar"
+                                label="Harga / Kg (≥1000) Non PPN (Rp)"
+                                type="number"
+                                prefix="Rp"
+                                variant="outlined"
+                                density="compact"
+                                hide-details="auto"
+                                hint="Kosong = pakai Harga / Kg"
+                                persistent-hint
                             />
                         </v-col>
 
@@ -3332,6 +3973,21 @@ const executeSaveTambahan = async () => {
                                 variant="outlined"
                                 density="compact"
                                 hide-details="auto"
+                            />
+                        </v-col>
+
+                        <!-- 2b. ALLOWANCE (≥1000) -->
+                        <v-col cols="12" sm="6">
+                            <v-text-field
+                                v-model.number="kainForm.mhk_allow_partaibesar"
+                                label="Allowance (≥1000) (%)"
+                                type="number"
+                                suffix="%"
+                                variant="outlined"
+                                density="compact"
+                                hide-details="auto"
+                                hint="Untuk HPP ≥1000"
+                                persistent-hint
                             />
                         </v-col>
 
@@ -3506,12 +4162,25 @@ const executeSaveTambahan = async () => {
                     <v-col cols="12" sm="6">
                         <v-text-field
                             v-model.number="kainForm.mhk_harga"
-                            label="Harga / Kg (Rp) *"
+                            label="Harga / Kg Non PPN (Rp) *"
                             type="number"
                             prefix="Rp"
                             variant="outlined"
                             density="compact"
                             hide-details="auto"
+                        />
+                    </v-col>
+                    <v-col cols="12" sm="6">
+                        <v-text-field
+                            v-model.number="kainForm.mhk_harga_partaibesar"
+                            label="Harga / Kg (≥1000) Non PPN (Rp)"
+                            type="number"
+                            prefix="Rp"
+                            variant="outlined"
+                            density="compact"
+                            hide-details="auto"
+                            hint="Kosong = pakai Harga / Kg"
+                            persistent-hint
                         />
                     </v-col>
                     <v-col cols="12" sm="6">
@@ -3523,6 +4192,19 @@ const executeSaveTambahan = async () => {
                             variant="outlined"
                             density="compact"
                             hide-details="auto"
+                        />
+                    </v-col>
+                    <v-col cols="12" sm="6">
+                        <v-text-field
+                            v-model.number="kainForm.mhk_allow_partaibesar"
+                            label="Allowance (≥1000) (%)"
+                            type="number"
+                            suffix="%"
+                            variant="outlined"
+                            density="compact"
+                            hide-details="auto"
+                            hint="Untuk HPP ≥1000"
+                            persistent-hint
                         />
                     </v-col>
                 </v-row>
@@ -3691,7 +4373,25 @@ const executeSaveTambahan = async () => {
                                 </th>
                                 <th style="width: 180px">JENIS KAIN & WARNA</th>
                                 <th class="text-end" style="width: 140px">
-                                    HARGA / KG
+                                    <div
+                                        style="
+                                            display: flex;
+                                            flex-direction: column;
+                                            align-items: flex-end;
+                                            line-height: 1.1;
+                                        "
+                                    >
+                                        <span>HARGA / KG</span>
+                                        <span
+                                            style="
+                                                font-size: 9px;
+                                                font-weight: 700;
+                                                opacity: 0.65;
+                                                letter-spacing: 0.04em;
+                                            "
+                                            >Non PPN</span
+                                        >
+                                    </div>
                                 </th>
                                 <th class="text-center" style="width: 110px">
                                     ALLOWANCE
@@ -3903,6 +4603,16 @@ const executeSaveTambahan = async () => {
                         <v-text-field
                             v-model.number="tambahanForm.mht_pe"
                             label="Biaya PE (Rp)"
+                            type="number"
+                            variant="outlined"
+                            density="compact"
+                            hide-details="auto"
+                        />
+                    </v-col>
+                    <v-col cols="12">
+                        <v-text-field
+                            v-model.number="tambahanForm.mht_pe_partaibesar"
+                            label="Biaya PE (≥1000) (Rp)"
                             type="number"
                             variant="outlined"
                             density="compact"
@@ -4317,12 +5027,37 @@ const executeSaveTambahan = async () => {
     width: 100%;
 }
 
+.th-inner.th-has-subtitle {
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+    justify-content: center;
+}
+
+.th-title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 4px;
+    width: 100%;
+}
+
 .th-title {
     flex: 1;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     text-align: center;
+}
+
+.th-subtitle {
+    font-size: 8.5px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    color: rgba(255, 255, 255, 0.9);
+    line-height: 1;
+    text-transform: uppercase;
+    opacity: 0.95;
 }
 
 .col-drag-handle {

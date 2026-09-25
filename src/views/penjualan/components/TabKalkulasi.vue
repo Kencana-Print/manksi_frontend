@@ -3,7 +3,7 @@ import { ref, computed, watch, onMounted } from "vue";
 import api from "@/services/api";
 import { useToast } from "vue-toastification";
 import JenisKainSearchModal from "@/components/lookups/JenisKainSearchModal.vue";
-import { IconLock, IconAlertTriangle } from "@tabler/icons-vue";
+import { IconLock, IconAlertTriangle, IconSparkles } from "@tabler/icons-vue";
 
 const toast = useToast();
 const showKainModal = ref(false);
@@ -139,12 +139,15 @@ const onTambahanChange = (item: any) => {
   const opt = tambahanOptions.value.find((o) => o.mht_ket === item.Keterangan);
   if (opt) {
     const ktg = kal.value.KategoriKain;
+    const isPartaiBesar = Number(kal.value.QtyOrder || 0) >= 1000;
     item.Harga =
       ktg === "LACOST"
         ? Number(opt.mht_lacost)
         : ktg === "COTTON"
           ? Number(opt.mht_cotton)
-          : Number(opt.mht_pe);
+          : isPartaiBesar && Number(opt.mht_pe_partaibesar) > 0
+            ? Number(opt.mht_pe_partaibesar)
+            : Number(opt.mht_pe);
   }
 };
 
@@ -272,9 +275,24 @@ watch(luasBordir, hitungRpBordir);
 watch(luasDtf, hitungRpDtf);
 watch(() => kal.value.Bordir.Cm, hitungRpBordir);
 watch(() => kal.value.Dtf.Cm, hitungRpDtf);
+const isPartaiBesar = computed(() => Number(props.formData.RencanaOrder) >= 1000);
 watch(
   () => props.formData.RencanaOrder,
-  () => kal.value.GridKomponen.forEach(hitungBarisKomponen),
+  (newVal: number, oldVal: number) => {
+    kal.value.GridKomponen.forEach(hitungBarisKomponen);
+    // Jika melewati threshold partai besar (1000), harga bahan berubah — refetch metadata
+    const wasBesar = Number(oldVal || 0) >= 1000;
+    const isBesar = Number(newVal || 0) >= 1000;
+    if (wasBesar !== isBesar && kal.value.JenisKain && kal.value.Warna && kal.value.Model) {
+      if (skipNextAutoFetch.value) return;
+      fetchKalkulasiMetadata();
+      toast.info(
+        isBesar
+          ? "Qty ≥1000 — harga partai besar aktif (mhk_harga_partaibesar)"
+          : "Qty <1000 — kembali ke harga normal",
+      );
+    }
+  },
 );
 
 // const fetchKomponenKain = async () => {
@@ -353,6 +371,12 @@ const rows8 = Array.from({ length: 8 }, (_, i) => i + 1);
       <IconLock :size="13" class="mr-1" />
       Akses Ditolak: Kalkulasi ini terkunci karena terakhir dimodifikasi oleh
       departemen FINANCE.
+    </div>
+
+    <div v-if="isPartaiBesar" class="tk-alert partai">
+      <IconSparkles :size="13" class="mr-1" />
+      Partai Besar aktif (qty ≥ 1000) — harga bahan otomatis memakai
+      <code>mhk_harga_partaibesar</code> jika terisi, fallback ke harga normal.
     </div>
 
     <div class="tk-save-bar">
@@ -1086,6 +1110,11 @@ const rows8 = Array.from({ length: 8 }, (_, i) => i + 1);
   background: #fff8e1;
   color: #e65100;
   border: 1px solid #ffcc80;
+}
+.tk-alert.partai {
+  background: #e8f5e9;
+  color: #1b5e20;
+  border: 1px solid #a5d6a7;
 }
 
 .tk-inp.ro,
