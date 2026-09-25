@@ -257,6 +257,7 @@ const hasLayoutProses = computed(
     !!layoutHeader.value &&
     (layoutProof.value.length > 0 || layoutSewing.value.length > 0),
 );
+const hasAlokasi = computed(() => alokasi.value.length > 0);
 const hasMkaFromMap = computed(
   () =>
     mkaFromMap.value.aksesoris.length > 0 ||
@@ -1477,8 +1478,79 @@ Keterangan Komponen :
           </div>
         </div>
       </div>
+
       <!-- ══════════════════════════════════════════════
-         HALAMAN 2 — Layout Proses Sewing
+         HALAMAN ALOKASI — Alokasi Pengiriman (SPK & Sales Order)
+         Muncul hanya jika ada data alokasi. Kalau ada, halaman Layout
+         Proses Sewing di bawah otomatis jadi halaman ke-3.
+    ══════════════════════════════════════════════ -->
+      <div v-if="hasAlokasi" class="print-page page-alokasi">
+        <div class="ph">
+          <div class="ph-left">
+            <img src="@/assets/logo.png" class="ph-logo" />
+          </div>
+          <div class="ph-center">
+            <div class="ph-title">Alokasi Pengiriman</div>
+          </div>
+          <div class="ph-right">
+            <div class="ph-nomor">{{ spk.spk_nomor }}</div>
+            <div class="ph-meta">No. SO: {{ spk.spk_so_ref || "—" }}</div>
+          </div>
+        </div>
+
+        <div class="box">
+          <div class="box-title">Daftar Alokasi</div>
+          <table class="dt">
+            <thead>
+              <tr>
+                <th style="width: 30px" class="tc">No</th>
+                <th>Alamat</th>
+                <th style="width: 130px">Toko</th>
+                <th style="width: 100px">Kota</th>
+                <th style="width: 120px">Kontak Person</th>
+                <th style="width: 100px">No. HP</th>
+                <th style="width: 70px" class="tr">Jumlah</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(a, idx) in alokasi" :key="idx">
+                <td class="tc">{{ idx + 1 }}</td>
+                <td>{{ a.alamat || "-" }}</td>
+                <td>{{ a.toko || "-" }}</td>
+                <td>{{ a.kota || "-" }}</td>
+                <td>{{ a.person || "-" }}</td>
+                <td>{{ a.hp || "-" }}</td>
+                <td class="tr">
+                  {{ Number(a.jumlah || 0).toLocaleString("id-ID") }}
+                </td>
+              </tr>
+            </tbody>
+            <tfoot>
+              <tr>
+                <td colspan="6" class="tc fw">Total</td>
+                <td class="tr fw">
+                  {{
+                    alokasi
+                      .reduce((s, a) => s + (Number(a.jumlah) || 0), 0)
+                      .toLocaleString("id-ID")
+                  }}
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+
+        <div class="pf">
+          <span
+            >Dibuat: {{ spk.user_create }} —
+            {{ formatWaktu(spk.date_create) }}</span
+          >
+          <span>Referensi SO: {{ spk.spk_so_ref || "—" }}</span>
+        </div>
+      </div>
+
+      <!-- ══════════════════════════════════════════════
+         HALAMAN 2/3 — Layout Proses Sewing
     ══════════════════════════════════════════════ -->
       <div v-if="hasLayoutProses" class="print-page page-2">
         <!-- Header -->
