@@ -123,6 +123,8 @@ const headers = [
     align: "center",
   },
   { title: "Status PPIC", key: "StatusPpic", width: "130px", align: "center" },
+  { title: "Est. SO", key: "TglSoEstimasi", width: "100px", align: "center" },
+  { title: "Est. MAP", key: "TglMap", width: "100px", align: "center" },
   { title: "No. MH", key: "NomorMH", width: "140px" },
   { title: "Status", key: "Status", width: "90px", align: "center" },
   { title: "Created", key: "Created", width: "150px" },
@@ -185,6 +187,8 @@ const onExport = () => {
     { header: "Tgl Kirim", key: "TglKirim", align: "center" },
     { header: "Status Bahan", key: "StatusBahan", align: "center" },
     { header: "Status PPIC", key: "StatusPpic", align: "center" },
+    { header: "Est. SO", key: "TglSoEstimasi", align: "center" },
+    { header: "Est. MAP", key: "TglMap", align: "center" },
     { header: "No. MH", key: "NomorMH" },
     { header: "Status", key: "Status", align: "center" },
     { header: "Created", key: "Created" },
@@ -198,6 +202,8 @@ const onExport = () => {
         ...r,
         Tanggal: formatTanggal(r.Tanggal),
         TglKirim: formatTanggal(r.TglKirim),
+        TglSoEstimasi: formatTanggal(r.TglSoEstimasi),
+        TglMap: formatTanggal(r.TglMap),
         Created: formatTanggalJam(r.Created),
       }));
     },
@@ -431,6 +437,12 @@ const handleConvert = async () => {
     }}</template>
     <template #item.TglKirim="{ item }">{{
       formatTanggal((item.raw || item).TglKirim)
+    }}</template>
+    <template #item.TglSoEstimasi="{ item }">{{
+      formatTanggal((item.raw || item).TglSoEstimasi)
+    }}</template>
+    <template #item.TglMap="{ item }">{{
+      formatTanggal((item.raw || item).TglMap)
     }}</template>
     <template #item.Created="{ item }">{{
       formatTanggalJam((item.raw || item).Created)

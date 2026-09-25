@@ -13,10 +13,15 @@ export const konfirmasiPraOrderService = {
   getDetail: (nomor: string) =>
     api.get(`/ppic/konfirmasi-pra-order/${encodeURIComponent(nomor)}`),
 
-  confirmKesanggupan: (nomor: string, status: string, catatan: string) =>
+  confirmKesanggupan: (
+    nomor: string,
+    status: string,
+    catatan: string,
+    extra?: { tglMap?: string; tglSoEstimasi?: string },
+  ) =>
     api.patch(
       `/ppic/konfirmasi-pra-order/${encodeURIComponent(nomor)}/konfirmasi`,
-      { status, catatan },
+      { status, catatan, ...extra },
     ),
 
   confirmStatusBahan: (probId: number, status: string) =>

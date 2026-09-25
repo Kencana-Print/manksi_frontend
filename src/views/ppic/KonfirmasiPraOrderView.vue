@@ -121,12 +121,18 @@ const detailData = ref<any>(null);
 const isConfirming = ref(false);
 const catatanTolak = ref("");
 const showTolakInput = ref(false);
+const estTglSo = ref("");
+const estTglMap = ref("");
+const showSanggupInput = ref(false);
 
 const openDetail = async (item: any) => {
   showDetailDialog.value = true;
   isDetailLoading.value = true;
   showTolakInput.value = false;
   catatanTolak.value = "";
+  showSanggupInput.value = false;
+  estTglSo.value = "";
+  estTglMap.value = "";
   try {
     const res = await konfirmasiPraOrderService.getDetail(item.Nomor);
     detailData.value = res.data.data;
@@ -143,7 +149,15 @@ const gambarUrl = computed(() => {
   return g ? g.prog_file_path : "";
 });
 
+const openSanggupInput = () => {
+  showSanggupInput.value = true;
+};
+
 const confirmSanggup = async () => {
+  if (!estTglSo.value || !estTglMap.value) {
+    toast.warning("Tanggal Estimasi SO dan Estimasi MAP wajib diisi.");
+    return;
+  }
   if (!detailData.value) return;
   isConfirming.value = true;
   try {
@@ -151,6 +165,7 @@ const confirmSanggup = async () => {
       detailData.value.pro_nomor,
       "SANGGUP",
       "",
+      { tglSoEstimasi: estTglSo.value, tglMap: estTglMap.value },
     );
     toast.success("Pra Order dikonfirmasi SANGGUP.");
     showDetailDialog.value = false;
@@ -503,6 +518,43 @@ const canConfirm = computed(
               >
             </div>
           </div>
+          <div v-else-if="showSanggupInput" class="sanggup-input-wrap">
+            <div class="d-flex" style="gap: 8px">
+              <v-text-field
+                v-model="estTglSo"
+                type="date"
+                label="Estimasi Tanggal SO"
+                variant="outlined"
+                density="compact"
+                hide-details
+              />
+              <v-text-field
+                v-model="estTglMap"
+                type="date"
+                label="Estimasi Tanggal MAP"
+                variant="outlined"
+                density="compact"
+                hide-details
+              />
+            </div>
+            <div class="d-flex justify-end mt-2" style="gap: 8px">
+              <v-btn
+                size="small"
+                variant="text"
+                @click="showSanggupInput = false"
+                >Batal</v-btn
+              >
+              <v-btn
+                size="small"
+                color="success"
+                variant="elevated"
+                :loading="isConfirming"
+                @click="confirmSanggup"
+                >Konfirmasi Sanggup</v-btn
+              >
+            </div>
+          </div>
+
           <template v-else>
             <v-spacer />
             <v-btn
@@ -519,8 +571,8 @@ const canConfirm = computed(
               size="small"
               color="success"
               variant="elevated"
-              :loading="isConfirming"
-              @click="confirmSanggup"
+              :disabled="isConfirming"
+              @click="openSanggupInput"
             >
               <template #prepend><IconCheck :size="14" /></template>
               Sanggup
@@ -740,6 +792,9 @@ const canConfirm = computed(
 }
 
 .tolak-input-wrap {
+  width: 100%;
+}
+.sanggup-input-wrap {
   width: 100%;
 }
 </style>
