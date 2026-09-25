@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { ref, computed, watch } from "vue";
 import QrcodeVue from "qrcode.vue";
 import { IconX, IconPrinter } from "@tabler/icons-vue";
 
@@ -29,6 +29,20 @@ const formatDate = (val?: string) => {
 
 const formatQty = (val: any) =>
   Number(val || 0).toLocaleString("id-ID", { maximumFractionDigits: 2 });
+
+const tanggalCetak = ref("");
+
+const formatTanggalJamCetak = (d: Date) => {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(d.getDate())}-${pad(d.getMonth() + 1)}-${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
+
+watch(
+  () => props.modelValue,
+  (newVal) => {
+    if (newVal) tanggalCetak.value = formatTanggalJamCetak(new Date());
+  },
+);
 
 const printBarcode = () => {
   const printArea = document.getElementById("barcode-print-area");
@@ -83,6 +97,13 @@ const printBarcode = () => {
       }
       .info-qty { font-size:11pt; font-weight:800; }
       .info-date, .info-po { font-size:8pt; font-weight:700; }
+      .sticker-footer {
+        font-size: 5.5pt;
+        color: #666;
+        text-align: right;
+        margin-top: 1px;
+        flex-shrink: 0;
+      }
     </style>
     </head><body>
       ${clone.innerHTML}
@@ -190,6 +211,13 @@ const printBarcode = () => {
   justify-content: center;
   gap: 0.25cm;
   flex: 1;
+}
+.sticker-footer {
+  font-size: 5.5pt;
+  color: #666;
+  text-align: right;
+  margin-top: 1px;
+  flex-shrink: 0;
 }
 .qr-col {
   display: flex;
