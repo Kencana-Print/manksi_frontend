@@ -65,7 +65,7 @@ const printBarcode = () => {
         background: white;
       }
       .sticker-title {
-        font-size: 11pt; font-weight:700; text-align:center;
+        font-size: 12pt; font-weight:700; text-align:center;
         line-height:1.1; margin-bottom:0.15cm; height: 30pt;
         overflow:hidden; text-transform:uppercase;
       }
@@ -174,7 +174,7 @@ const printBarcode = () => {
   color: black;
 }
 .sticker-title {
-  font-size: 11pt;
+  font-size: 12pt;
   font-weight: 700;
   text-align: center;
   line-height: 1.1;
