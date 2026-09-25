@@ -528,29 +528,6 @@ const onExport = async () => {
                   <td style="background: #f5f5f5"></td>
                 </tr>
               </tfoot>
-              <tfoot v-if="dialogData.alokasi && dialogData.alokasi.length > 0">
-                <tr>
-                  <td
-                    colspan="5"
-                    class="text-right font-weight-bold py-1 px-2"
-                    style="background: #f5f5f5"
-                  >
-                    TOTAL QTY ALOKASI :
-                  </td>
-                  <td
-                    class="text-right font-weight-bold py-1 px-2"
-                    :class="
-                      totalAlokasi() === dialogData.qtyOrder
-                        ? 'text-success'
-                        : 'text-warning'
-                    "
-                    style="background: #e3f2fd"
-                  >
-                    {{ fmtNum(totalAlokasi()) }}
-                  </td>
-                  <td style="background: #f5f5f5"></td>
-                </tr>
-              </tfoot>
             </table>
           </div>
         </template>
