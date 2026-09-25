@@ -103,6 +103,7 @@ const headers = [
   { title: "Rencana Order", key: "RencanaOrder", width: "130px", align: "end" },
   { title: "Harga Lama", key: "HargaLama", width: "120px", align: "end" },
   { title: "Harga Budget", key: "HargaBudget", width: "120px", align: "end" },
+  { title: "Pra Order", key: "PraOrder", width: "130px" },
   {
     title: "Order Terakhir",
     key: "OrderTerakhir",
@@ -194,6 +195,7 @@ const onExport = () => {
       align: "right",
       numFmt: "#,##0",
     },
+    { header: "Pra Order", key: "PraOrder" },
     { header: "Order Terakhir", key: "OrderTerakhir", align: "center" },
     { header: "Kain", key: "Kain" },
     { header: "Panjang", key: "Panjang", align: "right" },
@@ -401,7 +403,7 @@ const submitPengajuan = async () => {
             <span>MINTA</span>
           </div>
           <div class="legend-item">
-            <div class="legend-dot" style="background: #BF2DBF"></div>
+            <div class="legend-dot" style="background: #bf2dbf"></div>
             <span>NEGO</span>
           </div>
           <div class="legend-item">
@@ -651,7 +653,6 @@ const submitPengajuan = async () => {
   background: #e53935;
   color: white;
 }
-
 
 /* ── Dialog Pengajuan ── */
 .pin-card {
