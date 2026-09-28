@@ -918,11 +918,11 @@ checkUnnotifiedMap();
           </div>
 
           <div class="dt-scroll">
-            <table class="dt">
+            <table class="dt dt-detail">
               <thead>
                 <tr>
                   <th>Tanggal</th>
-                  <th>Nomor / Nama SO</th>
+                  <th class="nomor-nama-header">Nomor / Nama SO</th>
                   <th v-if="showPanjangLebar(item.Cabang)" class="tr">
                     Panjang
                   </th>
@@ -947,7 +947,7 @@ checkUnnotifiedMap();
                   :class="detailRowClass(d)"
                 >
                   <td>{{ formatTanggal(d.Tanggal) }}</td>
-                  <td>
+                  <td class="nomor-nama-cell">
                     <div class="mono">{{ nomorTampil(d) }}</div>
                     <div>{{ d.Nama }}</div>
                     <div
@@ -1132,12 +1132,12 @@ checkUnnotifiedMap();
               MAP — Sampel
             </button>
           </div>
-          <table class="dt" style="width: 100%">
+          <table class="dt dt-detail" style="width: 100%">
             <thead>
               <tr>
                 <th>Tanggal</th>
                 <th>Sumber</th>
-                <th>Nomor / Nama</th>
+                <th class="nomor-nama-header">Nomor / Nama</th>
                 <th v-if="showPanjangLebar(previewCabang)" class="tr">
                   Panjang
                 </th>
@@ -1162,7 +1162,7 @@ checkUnnotifiedMap();
                 <td>
                   <v-chip size="x-small" variant="tonal">{{ d.Sumber }}</v-chip>
                 </td>
-                <td>
+                <td class="nomor-nama-cell">
                   <div class="mono">{{ nomorTampil(d) }}</div>
                   <div>{{ d.Nama }}</div>
                 </td>
@@ -1613,6 +1613,21 @@ checkUnnotifiedMap();
   padding: 4px 8px;
   border-bottom: 1px solid #eee;
   vertical-align: top;
+}
+.dt.dt-detail {
+  table-layout: fixed !important;
+  width: 100% !important;
+}
+.dt.dt-detail th.nomor-nama-header,
+.dt.dt-detail td.nomor-nama-cell {
+  width: 260px !important;
+  max-width: 260px !important;
+}
+.dt.dt-detail td.nomor-nama-cell,
+.dt.dt-detail td.nomor-nama-cell * {
+  white-space: normal !important;
+  word-break: break-word !important;
+  overflow-wrap: anywhere !important;
 }
 .dt tbody tr:nth-of-type(even) td {
   background: #fafafa;

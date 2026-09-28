@@ -2040,6 +2040,14 @@ const openBatalPotensiDialog = (item: PotensiItem) => {
   showBatalPotensiDialog.value = true;
 };
 
+const goToPotensiSource = (item: PotensiItem) => {
+  const path =
+    item.Sumber === "MAP"
+      ? `/penjualan/map/form/${encodeURIComponent(item.NomorSumber)}`
+      : `/penjualan/penawaran/edit/${encodeURIComponent(item.NomorSumber)}`;
+  router.push(path);
+};
+
 const submitBatalPotensi = async () => {
   if (!potensiToBatal.value || !batalPotensiAlasan.value.trim()) return;
   isSubmittingBatalPotensi.value = true;
@@ -5771,7 +5779,16 @@ const sisaClass = (item: any) => {
                       <span class="pen-nomor" style="font-size: 10px">{{
                         item.pot_nomor
                       }}</span>
-                      <div style="font-size: 10px; color: #9e9e9e">
+                      <div
+                        style="
+                          font-size: 10px;
+                          color: #9e9e9e;
+                          cursor: pointer;
+                          text-decoration: underline dotted;
+                        "
+                        title="Buka untuk edit"
+                        @click="goToPotensiSource(item)"
+                      >
                         {{ item.Sumber }} {{ item.NomorSumber }}
                       </div>
                     </div>
