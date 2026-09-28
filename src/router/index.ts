@@ -307,6 +307,28 @@ const router = createRouter({
       },
     },
     {
+      path: "/daftar/cost-center",
+      name: "CostCenter",
+      component: () => import("@/views/daftar/CostCenterView.vue"),
+      meta: {
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "39",
+        title: "Cost Center",
+      },
+    },
+    {
+      path: "/daftar/account",
+      name: "Account",
+      component: () => import("@/views/daftar/AccountView.vue"),
+      meta: {
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "40",
+        title: "Account",
+      },
+    },
+    {
       path: "/daftar/berita-acara",
       name: "BapProduksiBrowse",
       component: () => import("@/views/daftar/BapProduksiView.vue"),

@@ -283,6 +283,19 @@ export const createMenuItems = (): NavItem[] => {
         },
         { divider: true },
         {
+          title: "Cost Center",
+          to: "/daftar/cost-center",
+          icon: IconBuildingBank,
+          menuId: 39,
+        },
+        {
+          title: "Account",
+          to: "/daftar/account",
+          icon: IconBuildingBank,
+          menuId: 40,
+        },
+        { divider: true },
+        {
           title: "BAP & Komplain",
           to: "/daftar/berita-acara",
           icon: IconAlertCircle,

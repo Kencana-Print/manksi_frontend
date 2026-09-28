@@ -46,6 +46,7 @@ interface PengajuanDanaFormData {
   Bagian: string;
   Lokasi: string;
   Keterangan: string;
+  PjhKe: string;
   items: ItemRow[];
 }
 
@@ -78,6 +79,7 @@ const defaultData = {
   Bagian: "",
   Lokasi: "",
   Keterangan: "",
+  PjhKe: "P01",
   items: [mkItem()] as ItemRow[],
 };
 
@@ -113,6 +115,7 @@ const {
       Bagian: h.Bagian || "",
       Lokasi: h.Lokasi || "",
       Keterangan: h.Keterangan || "",
+      PjhKe: h.PjhKe || "P01",
       items: (d.items || []).map(
         (r: any): ItemRow => ({
           Nama: r.Nama || "",
@@ -136,6 +139,7 @@ const {
       Tanggal: data.Tanggal,
       Nik: data.Nik,
       Keterangan: data.Keterangan,
+      PjhKe: data.PjhKe, // ⬅ BARU
       // ⬅ DIHAPUS: CcKode, CcDcNama — backend sekarang derive dari validItems[0]
     };
     return isEditMode.value
@@ -425,6 +429,13 @@ onMounted(async () => {
             class="inp ro"
             style="flex: 1"
           />
+        </div>
+        <div class="fg mt4">
+          <label class="lb w80">Pengajuan Ke</label>
+          <select v-model="fd.PjhKe" class="inp" style="width: 160px">
+            <option value="P01">P01</option>
+            <option value="P04">P04</option>
+          </select>
         </div>
 
         <div class="sep mt-1 mb-1" />

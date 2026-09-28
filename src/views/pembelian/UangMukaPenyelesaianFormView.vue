@@ -997,6 +997,9 @@ const onStatusFinanceChange = async (d: PenyelesaianDetail, idx: number) => {
       >
         <div class="d-flex align-center justify-space-between mb-2">
           <div class="section-title" style="margin-bottom: 0">Rincian Item</div>
+          <v-btn size="small" variant="text" @click="addRow">
+            <IconPlus :size="14" class="mr-1" /> Tambah Baris
+          </v-btn>
         </div>
 
         <div class="rl-table-wrap flex-grow-1">

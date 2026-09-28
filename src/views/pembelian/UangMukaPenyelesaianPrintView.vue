@@ -8,6 +8,7 @@ const route = useRoute();
 const data = ref<any>(null);
 const isLoading = ref(true);
 const error = ref("");
+const yangBersangkutan = ref("");
 
 onMounted(async () => {
   try {
@@ -15,7 +16,13 @@ onMounted(async () => {
       decodeURIComponent(route.params.nomor as string),
     );
     data.value = res;
-    setTimeout(() => window.print(), 600);
+    isLoading.value = false;
+    // Minta nama "Yang Bersangkutan" sebelum cetak — tidak ada di data
+    // tersimpan, diisi manual oleh yang mencetak.
+    yangBersangkutan.value =
+      window.prompt("Nama Yang Bersangkutan (penerima):", "") || "";
+    setTimeout(() => window.print(), 300);
+    return;
   } catch (e: any) {
     error.value = e.response?.data?.message ?? "Gagal memuat data cetak.";
   } finally {
@@ -206,17 +213,15 @@ const terbilang = (n: number): string => {
           </div>
         </div>
         <div class="ttd-col">
-          <div class="ttd-title">Kasir</div>
+          <div class="ttd-title">Yang Bersangkutan</div>
+          <div class="ttd-space"></div>
+          <div class="ttd-name">({{ yangBersangkutan || "           " }})</div>
+        </div>
+        <div class="ttd-col">
+          <div class="ttd-title">Mengetahui,</div>
           <div class="ttd-space"></div>
           <div class="ttd-name">
             ({{ data.pum_user_realisasi || "           " }})
-          </div>
-        </div>
-        <div class="ttd-col">
-          <div class="ttd-title">Manager</div>
-          <div class="ttd-space"></div>
-          <div class="ttd-name">
-            (<span style="display: inline-block; width: 60px"></span>)
           </div>
         </div>
       </div>
@@ -367,6 +372,8 @@ body {
   text-align: center;
 }
 .ttd-title {
+  min-height: 26px;
+  line-height: 13px;
   margin-bottom: 40px;
 }
 .ttd-name {

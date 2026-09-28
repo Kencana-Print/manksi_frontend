@@ -206,17 +206,48 @@ const openBkkModal = (idx: number) => {
   activeTrsIdx.value = idx;
   showBkkModal.value = true;
 };
-const selectBkk = (b: any) => {
-  const exists = form.value.detail.some(
-    (d, i) => i !== activeTrsIdx.value && d.trs === b.nomor,
+const selectBkk = (items: any[]) => {
+  if (!items || !items.length) return;
+
+  const usedNomors = new Set(
+    form.value.detail
+      .filter((_, i) => i !== activeTrsIdx.value)
+      .map((d) => d.trs)
+      .filter(Boolean),
   );
-  if (exists) {
-    toast.warning("Nomor BKK tsb sudah di input.");
+
+  const duplicates: string[] = [];
+  const toApply = items.filter((b) => {
+    if (usedNomors.has(b.nomor)) {
+      duplicates.push(b.nomor);
+      return false;
+    }
+    usedNomors.add(b.nomor);
+    return true;
+  });
+
+  if (duplicates.length) {
+    toast.warning(`Nomor BKK sudah di-input: ${duplicates.join(", ")}`);
+  }
+  if (!toApply.length) {
+    showBkkModal.value = false;
     return;
   }
-  const d = form.value.detail[activeTrsIdx.value];
-  d.trs = b.nomor;
-  d.nominal = Number(b.nominal) || 0;
+
+  // Item pertama isi baris yang sedang aktif (row tempat F1/tombol dipencet)
+  const first = toApply[0];
+  const d0 = form.value.detail[activeTrsIdx.value];
+  d0.trs = first.nomor;
+  d0.nominal = Number(first.nominal) || 0;
+
+  // Item selebihnya masing-masing jadi baris baru
+  for (let i = 1; i < toApply.length; i++) {
+    addRow();
+    const newIdx = form.value.detail.length - 1;
+    form.value.detail[newIdx].trs = toApply[i].nomor;
+    form.value.detail[newIdx].nominal = Number(toApply[i].nominal) || 0;
+  }
+
   showBkkModal.value = false;
 };
 

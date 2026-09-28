@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from "vue";
+import { ref, watch, computed } from "vue";
 import { pengajuanTransferFormService } from "@/services/pembelian/pengajuanTransferFormService";
 import { IconReceipt2, IconSearch, IconDatabaseOff } from "@tabler/icons-vue";
 
@@ -10,6 +10,8 @@ const search = ref("");
 const items = ref<any[]>([]);
 const isLoading = ref(false);
 let debounce: ReturnType<typeof setTimeout> | null = null;
+
+const selectedKeys = ref<Set<string>>(new Set());
 
 const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
 
@@ -36,13 +38,35 @@ watch(
   (isOpen) => {
     if (isOpen) {
       search.value = "";
+      selectedKeys.value = new Set();
       fetchData();
     }
   },
 );
 
-const selectItem = (item: any) => {
-  emit("selected", item);
+const toggleRow = (item: any) => {
+  const s = new Set(selectedKeys.value);
+  if (s.has(item.nomor)) s.delete(item.nomor);
+  else s.add(item.nomor);
+  selectedKeys.value = s;
+};
+
+const selectedItems = computed(() =>
+  items.value.filter((i) => selectedKeys.value.has(i.nomor)),
+);
+const selectedTotal = computed(() =>
+  selectedItems.value.reduce((s, i) => s + (Number(i.nominal) || 0), 0),
+);
+
+// Klik satu baris tanpa checklist apa pun = pilih cepat 1 item langsung
+const quickSelect = (item: any) => {
+  emit("selected", [item]);
+  emit("update:modelValue", false);
+};
+
+const confirmMultiSelect = () => {
+  if (!selectedItems.value.length) return;
+  emit("selected", selectedItems.value);
   emit("update:modelValue", false);
 };
 </script>
@@ -51,12 +75,12 @@ const selectItem = (item: any) => {
   <v-dialog
     :model-value="modelValue"
     @update:model-value="emit('update:modelValue', $event)"
-    max-width="680px"
+    max-width="720px"
   >
     <div class="lookup-card">
       <div class="lookup-header">
         <IconReceipt2 :size="15" :stroke-width="1.7" color="white" />
-        <span>F1 — Cari Nomor BKK</span>
+        <span>F1 — Cari Nomor BKK (bisa pilih lebih dari satu)</span>
         <v-spacer />
         <button class="lookup-close" @click="emit('update:modelValue', false)">
           ✕
@@ -92,6 +116,7 @@ const selectItem = (item: any) => {
         <table v-else class="lookup-table">
           <thead>
             <tr>
+              <th style="width: 30px"></th>
               <th style="width: 150px">Nomor</th>
               <th style="width: 100px">Tanggal</th>
               <th>Penerima</th>
@@ -104,8 +129,16 @@ const selectItem = (item: any) => {
               v-for="item in items"
               :key="item.nomor"
               class="lookup-row"
-              @click="selectItem(item)"
+              :class="{ 'row-checked': selectedKeys.has(item.nomor) }"
+              @click="quickSelect(item)"
             >
+              <td class="td-chk" @click.stop="toggleRow(item)">
+                <input
+                  type="checkbox"
+                  :checked="selectedKeys.has(item.nomor)"
+                  @click.stop="toggleRow(item)"
+                />
+              </td>
               <td class="td-kode">{{ item.nomor }}</td>
               <td>{{ item.tanggal }}</td>
               <td>{{ item.penerima || "-" }}</td>
@@ -117,13 +150,24 @@ const selectItem = (item: any) => {
       </div>
 
       <div class="lookup-footer">
-        <span class="footer-count">{{ items.length }} data</span>
-        <button
-          class="btn-batal ml-auto"
-          @click="emit('update:modelValue', false)"
-        >
-          Batal
-        </button>
+        <span class="footer-count">
+          {{ items.length }} data
+          <template v-if="selectedItems.length">
+            — {{ selectedItems.length }} dipilih ({{ numFmt(selectedTotal) }})
+          </template>
+        </span>
+        <div class="ml-auto d-flex" style="gap: 8px">
+          <button class="btn-batal" @click="emit('update:modelValue', false)">
+            Batal
+          </button>
+          <button
+            class="btn-pilih"
+            :disabled="!selectedItems.length"
+            @click="confirmMultiSelect"
+          >
+            Pilih ({{ selectedItems.length }})
+          </button>
+        </div>
       </div>
     </div>
   </v-dialog>
@@ -238,12 +282,18 @@ const selectItem = (item: any) => {
   color: #212121;
   white-space: nowrap;
 }
+.td-chk {
+  text-align: center;
+}
 .lookup-row {
   cursor: pointer;
   transition: background 0.1s;
 }
 .lookup-row:hover td {
   background: #eceff1;
+}
+.row-checked td {
+  background: #e0f2f1;
 }
 .td-kode {
   font-family: monospace;
@@ -279,5 +329,22 @@ const selectItem = (item: any) => {
 }
 .btn-batal:hover {
   background: #f0f0f0;
+}
+.btn-pilih {
+  background: #00695c;
+  border: none;
+  border-radius: 4px;
+  padding: 4px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  color: white;
+}
+.btn-pilih:hover:not(:disabled) {
+  background: #004d40;
+}
+.btn-pilih:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 </style>
