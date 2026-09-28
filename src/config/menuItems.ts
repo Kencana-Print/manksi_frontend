@@ -96,6 +96,9 @@ import {
   IconRecycle,
   IconCashBanknote,
   IconMapPin,
+  IconBook,
+  IconTransfer,
+  IconList,
 } from "@tabler/icons-vue";
 
 export interface NavItem {
@@ -340,6 +343,12 @@ export const createMenuItems = (): NavItem[] => {
           to: "/garmen/barang/mutasi-out",
           icon: IconTruckDelivery,
           menuId: 70,
+        },
+        {
+          title: "Pengajuan Transfer",
+          to: "/pembelian/pengajuan-transfer",
+          icon: IconTransfer,
+          menuId: 958,
         },
         { divider: true },
         {
@@ -912,7 +921,7 @@ export const createMenuItems = (): NavItem[] => {
       ],
     },
     {
-      title: "Piutang",
+      title: "Finance",
       icon: IconCreditCard,
       model: piutangMenu,
       menuId: 8,
@@ -953,6 +962,55 @@ export const createMenuItems = (): NavItem[] => {
           to: "/piutang/pelunasan",
           icon: IconCoin,
           menuId: 255,
+        },
+        { divider: true },
+        {
+          title: "Bukti Kas Masuk (BKM)",
+          to: "/piutang/bkm",
+          icon: IconReceipt,
+          menuId: 952,
+        },
+        {
+          title: "Bukti Kas Keluar (BKK)",
+          to: "/piutang/bkk",
+          icon: IconReceipt2,
+          menuId: 953,
+        },
+        {
+          title: "Bukti Bank Masuk (BBM)",
+          to: "/piutang/bbm",
+          icon: IconBuildingBank,
+          menuId: 954,
+        },
+        {
+          title: "Bukti Bank Keluar (BBK)",
+          to: "/piutang/bbk",
+          icon: IconBuildingBank,
+          menuId: 955,
+        },
+        {
+          title: "Jurnal Umum",
+          to: "/piutang/jurnal-umum",
+          icon: IconBook,
+          menuId: 956,
+        },
+        {
+          title: "Rekonsiliasi Bank",
+          to: "/piutang/rekonsiliasi-bank",
+          icon: IconArrowsExchange,
+          menuId: 957,
+        },
+        {
+          title: "Terima Setoran Kasir",
+          to: "/piutang/terima-setoran",
+          icon: IconReceipt,
+          menuId: 959,
+        },
+        {
+          title: "Voucher Pembayaran",
+          to: "/piutang/voucher-pembayaran",
+          icon: IconFileInvoice,
+          menuId: 201,
         },
       ],
     },
@@ -1438,6 +1496,48 @@ export const createMenuItems = (): NavItem[] => {
               title: "Cek Gagal Link",
               to: "/laporan/piutang/cek-gagal-link",
               icon: IconLinkOff,
+            },
+          ],
+        },
+        {
+          title: "Laporan Finance",
+          icon: IconBuildingBank,
+          menuId: 969,
+          subItems: [
+            {
+              title: "List Jurnal",
+              to: "/laporan/finance/list-jurnal",
+              icon: IconList,
+            },
+            {
+              title: "Buku Besar",
+              to: "/laporan/finance/buku-besar",
+              icon: IconBook,
+            },
+            {
+              title: "Kasbon Belum Selesai",
+              to: "/laporan/finance/kasbon-belum-selesai",
+              icon: IconReceipt2,
+            },
+            {
+              title: "Rekonsiliasi Bank",
+              to: "/laporan/finance/rekonsiliasi-bank",
+              icon: IconBuildingBank,
+            },
+            {
+              title: "Stok Finance",
+              to: "/laporan/finance/stok-finance",
+              icon: IconList,
+            },
+            {
+              title: "Daftar Hutang",
+              to: "/laporan/finance/daftar-hutang",
+              icon: IconFileInvoice,
+            },
+            {
+              title: "Biaya per Divisi",
+              to: "/laporan/finance/biaya-per-divisi",
+              icon: IconFileText,
             },
           ],
         },
