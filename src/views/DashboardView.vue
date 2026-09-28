@@ -483,8 +483,16 @@ const companyPulse = ref({
   outstandingAr: 0,
   approvalPendingTotal: 0,
 });
+const saldoKas = ref({
+  Cabang: null as string | null,
+  Saldo: 0,
+  JumlahRekening: 0,
+});
 const showCompanyPulse = computed(
   () => isSuperViewer.value || bagian.value === "FINANCE",
+);
+const showSaldoKas = computed(
+  () => ["FINANCE", "PEMBELIAN"].includes(bagian.value) || isSuperViewer.value,
 );
 // const realisasiRows = ref<any[]>([]);
 interface RealisasiBulananStatus {
@@ -2996,6 +3004,16 @@ const loadOverviewShortcuts = async () => {
         .catch(() => {}),
     );
   }
+  if (showSaldoKas.value) {
+    calls.push(
+      dashboardService
+        .getSaldoKas()
+        .then((res) => {
+          if (res.data?.data) saldoKas.value = res.data.data;
+        })
+        .catch(() => {}),
+    );
+  }
   if (showPoBpb.value) {
     calls.push(
       dashboardService
@@ -4088,6 +4106,39 @@ const sisaClass = (item: any) => {
             </div>
           </v-col>
         </v-row>
+
+        <v-row v-if="showSaldoKas" dense class="mb-3">
+          <v-col cols="12">
+            <div
+              class="saldo-kas-card"
+              :class="
+                saldoKas.Saldo < 0
+                  ? 'saldo-kas-card--neg'
+                  : 'saldo-kas-card--pos'
+              "
+            >
+              <div class="saldo-kas-icon-wrap">
+                <IconCoin :size="22" :stroke-width="1.7" />
+              </div>
+              <div class="saldo-kas-main">
+                <div class="saldo-kas-val">
+                  {{ isLoadingDashboard ? "—" : fmtNum(saldoKas.Saldo) }}
+                </div>
+                <div class="saldo-kas-lbl">
+                  Saldo Kas ({{ saldoKas.Cabang || cabang }})
+                </div>
+              </div>
+              <div class="saldo-kas-divider" />
+              <div class="saldo-kas-sub">
+                <div class="saldo-kas-sub-val">
+                  {{ isLoadingDashboard ? "—" : saldoKas.JumlahRekening }}
+                </div>
+                <div class="saldo-kas-sub-lbl">Jml Rekening Kas</div>
+              </div>
+            </div>
+          </v-col>
+        </v-row>
+
         <!-- SPK Summary Cards -->
         <v-row dense class="mb-3">
           <v-col cols="6" sm="3">
@@ -12243,6 +12294,120 @@ const sisaClass = (item: any) => {
   }
   100% {
     background: transparent;
+  }
+}
+
+.saldo-kas-card {
+  position: relative;
+  background: #fff;
+  border-radius: 8px;
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  border-left: 4px solid #2e7d32;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+.saldo-kas-card--pos {
+  border-left-color: #2e7d32;
+  animation: saldoGlowGreen 2.2s ease-in-out infinite;
+}
+.saldo-kas-card--neg {
+  border-left-color: #c62828;
+  animation: saldoGlowRed 2.2s ease-in-out infinite;
+}
+.saldo-kas-icon-wrap {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.saldo-kas-card--pos .saldo-kas-icon-wrap {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+.saldo-kas-card--neg .saldo-kas-icon-wrap {
+  background: #ffebee;
+  color: #c62828;
+}
+.saldo-kas-main {
+  flex: 1;
+  min-width: 0;
+}
+.saldo-kas-val {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.saldo-kas-card--pos .saldo-kas-val {
+  color: #2e7d32;
+}
+.saldo-kas-card--neg .saldo-kas-val {
+  color: #c62828;
+}
+.saldo-kas-lbl {
+  font-size: 10px;
+  color: #9e9e9e;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-top: 2px;
+}
+.saldo-kas-divider {
+  width: 1px;
+  height: 36px;
+  background: #e0e0e0;
+  flex-shrink: 0;
+}
+.saldo-kas-sub {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 12px;
+  flex-shrink: 0;
+}
+.saldo-kas-sub-val {
+  font-size: 18px;
+  font-weight: 700;
+  color: #616161;
+}
+.saldo-kas-sub-lbl {
+  font-size: 9px;
+  color: #9e9e9e;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+@keyframes saldoGlowGreen {
+  0%,
+  100% {
+    box-shadow:
+      0 1px 2px rgba(0, 0, 0, 0.05),
+      0 0 0 0 rgba(46, 125, 50, 0);
+  }
+  50% {
+    box-shadow:
+      0 1px 2px rgba(0, 0, 0, 0.05),
+      0 0 14px 2px rgba(46, 125, 50, 0.35);
+  }
+}
+@keyframes saldoGlowRed {
+  0%,
+  100% {
+    box-shadow:
+      0 1px 2px rgba(0, 0, 0, 0.05),
+      0 0 0 0 rgba(198, 40, 40, 0);
+  }
+  50% {
+    box-shadow:
+      0 1px 2px rgba(0, 0, 0, 0.05),
+      0 0 14px 2px rgba(198, 40, 40, 0.35);
   }
 }
 </style>
