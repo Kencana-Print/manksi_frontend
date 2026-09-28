@@ -85,7 +85,10 @@ const fetchPumOutstanding = async () => {
         filters.value.cabFilter === "ALL" ? undefined : filters.value.cabFilter,
       status: "OUTSTANDING",
     });
-    pumOutstandingItems.value = res.data;
+    pumOutstandingItems.value = res.data.map((r: any) => ({
+      ...r,
+      RowKey: r.Nomor,
+    }));
   } catch (e: any) {
     toast.error(
       e.response?.data?.message || "Gagal memuat Pengajuan Uang Muka.",
@@ -105,7 +108,10 @@ const fetchPumHistory = async () => {
         filters.value.cabFilter === "ALL" ? undefined : filters.value.cabFilter,
       status: "HISTORY",
     });
-    pumHistoryItems.value = res.data;
+    pumHistoryItems.value = res.data.map((r: any) => ({
+      ...r,
+      RowKey: r.Nomor || `LEGACY-${r.BonNomor}`,
+    }));
   } catch (e: any) {
     toast.error(
       e.response?.data?.message || "Gagal memuat riwayat Pengajuan Uang Muka.",
@@ -378,24 +384,27 @@ const onUpdateExpandedPum = async (newExpanded: any[]) => {
   expandedPum.value = newExpanded;
   const newlyExpanded = newExpanded.filter(
     (item) =>
-      !pumDetailCache.value[item.Nomor] && !pumDetailLoading.value[item.Nomor],
+      !pumDetailCache.value[item.RowKey] &&
+      !pumDetailLoading.value[item.RowKey],
   );
   for (const item of newlyExpanded) {
-    const nomor = item.Nomor;
-    pumDetailLoading.value[nomor] = true;
+    const key = item.RowKey;
+    if (!item.Nomor) {
+      // Kasbon lama — tidak ada Pengajuan Uang Muka, gak perlu fetch.
+      pumDetailCache.value[key] = [];
+      continue;
+    }
+    pumDetailLoading.value[key] = true;
     try {
-      const res = await pengajuanUangMukaService.getDetail(nomor);
-      pumDetailCache.value[nomor] = res.data;
+      const res = await pengajuanUangMukaService.getDetail(item.Nomor);
+      pumDetailCache.value[key] = res.data;
     } catch {
-      toast.error(`Gagal memuat detail ${nomor}`);
+      toast.error(`Gagal memuat detail ${item.Nomor}`);
     } finally {
-      pumDetailLoading.value[nomor] = false;
+      pumDetailLoading.value[key] = false;
     }
   }
 
-  // Khusus tab History: item yang sudah direalisasi (punya BonNomor)
-  // sekalian ambil detail Penyelesaian, supaya bisa ditampilkan sebagai
-  // section kedua terpisah dari detail Pengajuan.
   if (activeTab.value === "history") {
     const newlyExpandedBon = newExpanded.filter(
       (item) =>
@@ -408,9 +417,6 @@ const onUpdateExpandedPum = async (newExpanded: any[]) => {
       penyelesaianDetailLoading.value[bonNomor] = true;
       try {
         const res = await uangMukaPenyelesaianFormService.getFormData(bonNomor);
-        // getFormData mengembalikan payload langsung (lihat pemakaian
-        // di UangMukaPenyelesaianPrintView.vue: data.value = res), bukan
-        // dibungkus res.data.data.
         penyelesaianDetailCache.value[bonNomor] = res;
       } catch (e) {
         console.error(`Gagal memuat detail penyelesaian ${bonNomor}:`, e);
@@ -863,7 +869,7 @@ const goPenyelesaian = () => {
       :can-edit="false"
       :can-delete="false"
       :can-export="false"
-      item-value="Nomor"
+      item-value="RowKey"
       show-expand
       :expanded="expandedPum"
       @update:expanded="onUpdateExpandedPum"
@@ -893,7 +899,8 @@ const goPenyelesaian = () => {
           color="indigo"
           :disabled="
             !selectedPumHistory[0] ||
-            selectedPumHistory[0].Status !== 'REALISASI'
+            selectedPumHistory[0].Status !== 'REALISASI' ||
+            !selectedPumHistory[0].Nomor
           "
           @click="openPrintHistory"
         >
@@ -926,9 +933,9 @@ const goPenyelesaian = () => {
         </v-btn>
       </template>
 
-      <template #item.Nomor="{ item }"
-        ><span class="mono">{{ item.Nomor }}</span></template
-      >
+      <template #item.Nomor="{ item }">
+        <span class="mono">{{ item.Nomor || "-" }}</span>
+      </template>
       <template #item.Tanggal="{ item }">{{ tglFmt(item.Tanggal) }}</template>
       <template #item.TotalNominal="{ item }">{{
         numFmt(item.TotalNominal)
@@ -1003,65 +1010,84 @@ const goPenyelesaian = () => {
         <div class="detail-wrap">
           <div class="detail-side-by-side">
             <div class="detail-col">
-              <v-progress-linear
-                v-if="pumDetailLoading[item.Nomor]"
-                indeterminate
-                color="primary"
-                height="2"
-              />
-              <div v-else-if="pumDetailCache[item.Nomor]" class="detail-panel">
-                <div class="panel-head">
-                  Detail Pengajuan Uang Muka —
-                  <span class="text-warning ml-1">{{ item.Nomor }}</span>
-                </div>
-                <div class="dtl-scroll">
-                  <table class="dtl-table">
-                    <thead>
-                      <tr>
-                        <th>Sumber</th>
-                        <th>Nomor</th>
-                        <th>Keterangan</th>
-                        <th class="tr">Nominal Sumber</th>
-                        <th class="tr">Nominal Ajuan</th>
-                        <th class="tc">Status ACC</th>
-                        <th class="tr">Nominal ACC</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr v-for="(d, i) in pumDetailCache[item.Nomor]" :key="i">
-                        <td>
-                          <v-chip
-                            size="x-small"
-                            :color="
-                              d.Sumber === 'PENGAJUAN_DANA' ? 'blue' : 'orange'
-                            "
-                            variant="flat"
-                          >
-                            {{ sumberLabel(d.Sumber) }}
-                          </v-chip>
-                        </td>
-                        <td class="mono">{{ d.NomorSumber }}</td>
-                        <td>{{ d.Keterangan }}</td>
-                        <td
-                          class="tr"
-                          :class="{
-                            'text-warning fw':
-                              Number(d.NominalSumber) !==
-                              Number(d.NominalAjuan),
-                          }"
+              <template v-if="item.Nomor">
+                <v-progress-linear
+                  v-if="pumDetailLoading[item.RowKey]"
+                  indeterminate
+                  color="primary"
+                  height="2"
+                />
+                <div
+                  v-else-if="pumDetailCache[item.RowKey]"
+                  class="detail-panel"
+                >
+                  <div class="panel-head">
+                    Detail Pengajuan Uang Muka —
+                    <span class="text-warning ml-1">{{ item.Nomor }}</span>
+                  </div>
+                  <div class="dtl-scroll">
+                    <table class="dtl-table">
+                      <thead>
+                        <tr>
+                          <th>Sumber</th>
+                          <th>Nomor</th>
+                          <th>Keterangan</th>
+                          <th class="tr">Nominal Sumber</th>
+                          <th class="tr">Nominal Ajuan</th>
+                          <th class="tc">Status ACC</th>
+                          <th class="tr">Nominal ACC</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr
+                          v-for="(d, i) in pumDetailCache[item.RowKey]"
+                          :key="i"
                         >
-                          {{ numFmt(d.NominalSumber) }}
-                        </td>
-                        <td class="tr">{{ numFmt(d.NominalAjuan) }}</td>
-                        <td class="tc">{{ d.StatusAcc || "-" }}</td>
-                        <td class="tr fw">
-                          {{
-                            d.NominalAcc != null ? numFmt(d.NominalAcc) : "-"
-                          }}
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
+                          <td>
+                            <v-chip
+                              v-if="d.Sumber !== 'KASBON'"
+                              size="x-small"
+                              :color="
+                                d.Sumber === 'PENGAJUAN_DANA'
+                                  ? 'blue'
+                                  : 'orange'
+                              "
+                              variant="flat"
+                            >
+                              {{ sumberLabel(d.Sumber) }}
+                            </v-chip>
+                            <span v-else class="font-weight-bold">KASBON</span>
+                          </td>
+                          <td class="mono">{{ d.NomorSumber }}</td>
+                          <td>{{ d.Keterangan }}</td>
+                          <td
+                            class="tr"
+                            :class="{
+                              'text-warning fw':
+                                Number(d.NominalSumber) !==
+                                Number(d.NominalAjuan),
+                            }"
+                          >
+                            {{ numFmt(d.NominalSumber) }}
+                          </td>
+                          <td class="tr">{{ numFmt(d.NominalAjuan) }}</td>
+                          <td class="tc">{{ d.StatusAcc || "-" }}</td>
+                          <td class="tr fw">
+                            {{
+                              d.NominalAcc != null ? numFmt(d.NominalAcc) : "-"
+                            }}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </template>
+              <div v-else class="detail-panel">
+                <div class="panel-head">Kasbon Lama</div>
+                <div class="pa-3 text-medium-emphasis">
+                  Kasbon lama — dibuat langsung tanpa Pengajuan Uang Muka, tidak
+                  ada detail sumber pengajuan.
                 </div>
               </div>
             </div>
