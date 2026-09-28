@@ -169,6 +169,29 @@ const hitungTotalBaris = (row: any) => {
   row.Nominal = qty * harga;
 };
 
+const focusedHargaIndex = ref<number | null>(null);
+
+const displayHarga = (row: any, idx: number) => {
+  if (focusedHargaIndex.value === idx) {
+    return row.Harga ? String(row.Harga) : "";
+  }
+  return row.Harga ? Number(row.Harga).toLocaleString("id-ID") : "";
+};
+
+const onHargaFocus = (idx: number) => {
+  focusedHargaIndex.value = idx;
+};
+
+const onHargaInput = (e: Event, row: any) => {
+  const raw = (e.target as HTMLInputElement).value.replace(/[^\d]/g, "");
+  row.Harga = raw ? Number(raw) : 0;
+  hitungTotalBaris(row);
+};
+
+const onHargaBlur = () => {
+  focusedHargaIndex.value = null;
+};
+
 const grandTotal = computed(() => {
   if (!props.formData.Details || props.formData.Details.length === 0) return 0;
   if (props.formData.CetakTotal) {
@@ -1047,10 +1070,13 @@ watch(
               </td>
               <td>
                 <input
-                  type="number"
-                  v-model="row.Harga"
+                  type="text"
+                  inputmode="numeric"
+                  :value="displayHarga(row, Number(idx))"
                   class="cell-inp tr"
-                  @input="hitungTotalBaris(row)"
+                  @focus="onHargaFocus(Number(idx))"
+                  @input="onHargaInput($event, row)"
+                  @blur="onHargaBlur"
                   v-select-on-focus
                 />
               </td>
