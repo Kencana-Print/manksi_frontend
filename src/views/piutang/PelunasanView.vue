@@ -95,19 +95,12 @@ const onUpdateExpanded = async (val: any[]) => {
   }
 };
 
-// ── ATURAN PEWARNAAN BARIS (getRowTextColor) ──
-const getRowTextColor = (item: any): string => {
-  if (item.Ngedit === "WAIT") return "#1565C0"; // Blue
-  if (item.Ngedit === "ACC") return "#2E7D32"; // Green
-  if (item.Ngedit === "TOLAK") return "#C62828"; // Red
+// ── ATURAN PEWARNAAN BARIS: Back (No) — Pengajuan Perubahan Data ──
+const getNomorStyle = (ngedit: string) => {
+  if (ngedit === "WAIT") return "background-color: #1976d2; color: #fff;"; // Biru
+  if (ngedit === "TOLAK") return "background-color: #d32f2f; color: #fff;"; // Merah
+  if (ngedit === "ACC") return "background-color: #388e3c; color: #fff;"; // Hijau
   return "";
-};
-
-const getRowProps = (item: any) => {
-  const textColor = getRowTextColor(item);
-  return {
-    style: textColor ? { color: textColor, fontWeight: "600" } : {},
-  };
 };
 
 // ── AKSI OPERASIONAL BUTTON ──
@@ -284,7 +277,6 @@ const getTotalKredit = (arr: any[]) =>
     show-expand
     :expanded="expandedRows"
     @update:expanded="onUpdateExpanded"
-    :row-props-fn="getRowProps"
     @refresh="fetchData"
   >
     <template #filter-left>
@@ -381,8 +373,34 @@ const getTotalKredit = (arr: any[]) =>
       </v-btn>
     </template>
 
+    <template #filter-right>
+      <div class="legend-box">
+        <div class="legend-row">
+          <span class="legend-title">Back (No):</span>
+          <div class="legend-item">
+            <div class="legend-dot" style="background: #1565c0"></div>
+            Nunggu
+          </div>
+          <div class="legend-item">
+            <div class="legend-dot" style="background: #2e7d32"></div>
+            Acc
+          </div>
+          <div class="legend-item">
+            <div class="legend-dot" style="background: #c62828"></div>
+            Tolak
+          </div>
+        </div>
+      </div>
+    </template>
+
     <template #item.Tanggal="{ item }">
       {{ formatTanggal(item.Tanggal) }}
+    </template>
+
+    <template #item.Nomor="{ item }">
+      <div class="nomor-cell" :style="getNomorStyle(item.Ngedit)">
+        {{ item.Nomor }}
+      </div>
     </template>
 
     <template #detail="{ item }">
@@ -655,5 +673,48 @@ const getTotalKredit = (arr: any[]) =>
 .f-textarea:focus {
   border-color: #7b1fa2;
   box-shadow: 0 0 4px rgba(123, 31, 162, 0.2);
+}
+.nomor-cell {
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-family: monospace;
+  display: inline-block;
+  min-width: 100%;
+}
+.legend-box {
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  padding: 4px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.legend-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+}
+.legend-title {
+  font-size: 10px;
+  font-weight: 700;
+  color: #555;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  color: #424242;
+  white-space: nowrap;
+}
+.legend-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  flex-shrink: 0;
 }
 </style>
