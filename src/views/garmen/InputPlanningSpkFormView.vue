@@ -180,6 +180,19 @@ const sumField = (field: string) =>
     .filter((r: any) => r.tanggal)
     .reduce((acc: number, r: any) => acc + (Number(r[field]) || 0), 0);
 
+const footerTotals = computed(() => ({
+  datang: sumField("datang"),
+  cutting: sumField("cutting"),
+  cetak: sumField("cetak"),
+  sublim: sumField("sublim"),
+  bordir: sumField("bordir"),
+  jahit: sumField("jahit"),
+  finishing: sumField("finishing"),
+  kirim: sumField("kirim"),
+}));
+
+const fmtTotal = (n: number) => (n ? fmt(n) : "");
+
 const validateSave = () => {
   const validRows = formData.value.rows.filter((r: any) => r.tanggal);
   if (validRows.length === 0) {
@@ -528,6 +541,38 @@ const fmt = (n: number) =>
                   </td>
                 </tr>
               </tbody>
+              <tfoot>
+                <tr>
+                  <td class="tc footer-cell"></td>
+                  <td class="footer-cell footer-label">TOTAL :</td>
+                  <td class="tr footer-cell">
+                    {{ fmtTotal(footerTotals.datang) }}
+                  </td>
+                  <td class="tr footer-cell">
+                    {{ fmtTotal(footerTotals.cutting) }}
+                  </td>
+                  <td class="tr footer-cell">
+                    {{ fmtTotal(footerTotals.cetak) }}
+                  </td>
+                  <td class="tr footer-cell">
+                    {{ fmtTotal(footerTotals.sublim) }}
+                  </td>
+                  <td class="tr footer-cell">
+                    {{ fmtTotal(footerTotals.bordir) }}
+                  </td>
+                  <td class="tr footer-cell">
+                    {{ fmtTotal(footerTotals.jahit) }}
+                  </td>
+                  <td class="tr footer-cell">
+                    {{ fmtTotal(footerTotals.finishing) }}
+                  </td>
+                  <td class="tr footer-cell">
+                    {{ fmtTotal(footerTotals.kirim) }}
+                  </td>
+                  <td colspan="7" class="footer-cell"></td>
+                  <td class="footer-cell"></td>
+                </tr>
+              </tfoot>
             </table>
           </div>
         </div>
@@ -628,17 +673,13 @@ const fmt = (n: number) =>
   border-radius: 8px;
   padding: 10px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
 }
 
 .tbl-wrap {
   overflow: auto;
   border: 1px solid #bdbdbd;
   border-radius: 4px;
-  flex: 1;
+  max-height: 55vh;
 }
 
 .gt {
@@ -677,6 +718,22 @@ const fmt = (n: number) =>
 }
 .gt tbody tr:hover td {
   background: #e3f2fd !important;
+}
+.gt tfoot td {
+  position: sticky;
+  bottom: 0;
+  background: #f5f5f5;
+  border: 1px solid #bdbdbd;
+  font-weight: 700;
+  font-size: 11px;
+  padding: 5px 6px;
+  z-index: 1;
+  color: #1565c0;
+  height: 28px;
+}
+.gt tfoot td.footer-label {
+  text-align: right;
+  color: #424242;
 }
 
 .p0 {
