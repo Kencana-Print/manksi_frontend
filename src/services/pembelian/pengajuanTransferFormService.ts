@@ -44,6 +44,10 @@ export const pengajuanTransferFormService = {
       params: { search },
     });
   },
+  getBkkOptions: (search = "") =>
+    api.get("/pembelian/pengajuan-transfer-form/bkk-options", {
+      params: { search },
+    }),
   getDetailForm(nomor: string) {
     return api.get("/pembelian/pengajuan-transfer-form/detail", {
       params: { nomor },

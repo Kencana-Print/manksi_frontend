@@ -6,6 +6,7 @@ import { useTabsStore } from "@/stores/tabsStore";
 import { pengajuanTransferFormService } from "@/services/pembelian/pengajuanTransferFormService";
 import BaseForm from "@/components/BaseForm.vue";
 import SupplierSearchModal from "@/components/lookups/SupplierSearchModal.vue";
+import BkkSearchModal from "@/components/lookups/BkkSearchModal.vue";
 import {
   IconTransfer,
   IconSearch,
@@ -197,6 +198,26 @@ const onKodeSupEnter = async (d: any) => {
     d.kode = "";
     d.nama = "";
   }
+};
+
+// ── BKK (F1) ──
+const showBkkModal = ref(false);
+const openBkkModal = (idx: number) => {
+  activeTrsIdx.value = idx;
+  showBkkModal.value = true;
+};
+const selectBkk = (b: any) => {
+  const exists = form.value.detail.some(
+    (d, i) => i !== activeTrsIdx.value && d.trs === b.nomor,
+  );
+  if (exists) {
+    toast.warning("Nomor BKK tsb sudah di input.");
+    return;
+  }
+  const d = form.value.detail[activeTrsIdx.value];
+  d.trs = b.nomor;
+  d.nominal = Number(b.nominal) || 0;
+  showBkkModal.value = false;
 };
 
 // ── Voucher (F2) / PO External (F3) / Petty Cash (F4) — trs search ──
@@ -749,6 +770,7 @@ const skipCetak = () => {
 
         <div class="hint-box">
           <div class="hint-title">Pintasan di kolom No. Transaksi:</div>
+          <div class="hint-row"><span class="hint-key">F1</span> No. BKK</div>
           <div class="hint-row">
             <span class="hint-key">F2</span> Voucher Pembayaran
           </div>
@@ -860,6 +882,9 @@ const skipCetak = () => {
                       v-model="d.trs"
                       class="cell"
                       :readonly="!!d.jurnal || isRealisasi"
+                      @keydown.f1.prevent="
+                        !d.jurnal && !isRealisasi && openBkkModal(idx)
+                      "
                       @keydown.f2.prevent="
                         !d.jurnal && !isRealisasi && openVoucherModal(idx)
                       "
@@ -871,6 +896,14 @@ const skipCetak = () => {
                       "
                     />
                     <div v-if="!d.jurnal && !isRealisasi" class="trs-btn-group">
+                      <button
+                        type="button"
+                        class="trs-btn"
+                        title="F1: BKK"
+                        @click="openBkkModal(idx)"
+                      >
+                        K
+                      </button>
                       <button
                         type="button"
                         class="trs-btn"
@@ -1090,6 +1123,8 @@ const skipCetak = () => {
 
   <!-- Modal Supplier — reuse shared component -->
   <SupplierSearchModal v-model="showSupplierModal" @selected="selectSupplier" />
+
+  <BkkSearchModal v-model="showBkkModal" @selected="selectBkk" />
 
   <!-- Modal Supplier Detail Rekening -->
   <v-dialog v-model="showSupDetModal" max-width="500px">

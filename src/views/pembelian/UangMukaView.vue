@@ -285,6 +285,14 @@ const cetakBuktiPengajuan = () => {
   );
   showAjukanPrintDialog.value = false;
 };
+const openPrintPumAjuan = () => {
+  const item = selectedPumOutstanding.value[0];
+  if (!item) return;
+  window.open(
+    `/pembelian/uang-muka/print-pengajuan/${encodeURIComponent(item.Nomor)}`,
+    "_blank",
+  );
+};
 const outstandingHeaders = [
   { title: "Sumber", key: "Sumber", width: "150px" },
   { title: "Nomor", key: "Nomor", width: "150px" },
@@ -725,6 +733,15 @@ const goPenyelesaian = () => {
       </template>
 
       <template #extra-actions>
+        <v-btn
+          size="small"
+          color="indigo"
+          :disabled="!selectedPumOutstanding[0]"
+          @click="openPrintPumAjuan"
+        >
+          <template #prepend><IconPrinter :size="15" /></template>
+          Cetak
+        </v-btn>
         <v-btn
           v-if="canRealisasi"
           size="small"

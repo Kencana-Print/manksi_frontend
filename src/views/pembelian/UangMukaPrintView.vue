@@ -188,11 +188,11 @@ body {
   color: #666;
 }
 .print-page {
-  width: 190mm;
+  width: 138mm;
   margin: 0 auto;
-  padding: 10mm 12mm;
+  padding: 5mm 6mm;
   font-family: Arial, sans-serif;
-  font-size: 10pt;
+  font-size: 9pt;
   color: #000;
 }
 .header-row {
@@ -202,26 +202,26 @@ body {
   margin-bottom: 6px;
 }
 .doc-title {
-  font-size: 14pt;
+  font-size: 11pt;
   font-weight: 700;
   letter-spacing: 0.05em;
-  margin-top: 8px;
+  margin-top: 4px;
 }
 .logo {
-  height: 45px;
+  height: 30px;
   object-fit: contain;
 }
 .info-table {
   width: 100%;
   border-collapse: collapse;
-  margin-bottom: 8px;
-  font-size: 9.5pt;
+  margin-bottom: 6px;
+  font-size: 8.5pt;
 }
 .info-lbl {
   font-weight: 600;
   white-space: nowrap;
   padding: 1px 4px 1px 0;
-  width: 90px;
+  width: 75px;
 }
 .info-sep {
   padding: 1px 4px;
@@ -234,20 +234,20 @@ body {
   width: 100%;
   border-collapse: collapse;
   margin-bottom: 0;
-  font-size: 9.5pt;
+  font-size: 8.5pt;
 }
 .detail-table thead tr {
   background: #f0f0f0;
 }
 .detail-table th {
   border: 1px solid #000;
-  padding: 4px 6px;
+  padding: 3px 5px;
   font-weight: 700;
   text-align: left;
 }
 .detail-table td {
   border: 1px solid #000;
-  padding: 3px 6px;
+  padding: 2px 5px;
 }
 .tc {
   text-align: center;
@@ -258,50 +258,50 @@ body {
 .total-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 9.5pt;
+  font-size: 8.5pt;
   border: 1px solid #000;
   border-top: none;
 }
 .terbilang-cell {
-  padding: 4px 6px;
+  padding: 3px 5px;
   font-style: italic;
   border-right: 1px solid #000;
 }
 .kasbon-label {
-  padding: 4px 6px;
+  padding: 3px 5px;
   font-weight: 700;
   white-space: nowrap;
   text-align: right;
   border-right: 1px solid #000;
-  width: 70px;
+  width: 60px;
 }
 .kasbon-val {
-  padding: 4px 6px;
+  padding: 3px 5px;
   text-align: right;
-  width: 110px;
+  width: 90px;
 }
 .ttd-row {
   display: flex;
-  margin-top: 20px;
+  margin-top: 14px;
   gap: 0;
 }
 .ttd-col {
   flex: 1;
   text-align: center;
-  font-size: 9.5pt;
+  font-size: 8.5pt;
 }
 .ttd-title {
   font-weight: 600;
   margin-bottom: 2px;
 }
 .ttd-space {
-  height: 40px;
+  height: 26px;
 }
 .ttd-name {
   border-top: 1px solid #000;
   padding-top: 2px;
   display: inline-block;
-  min-width: 120px;
+  min-width: 100px;
 }
 .row-kasbon td {
   font-weight: bold;
@@ -309,8 +309,8 @@ body {
 }
 @media print {
   @page {
-    size: A4;
-    margin: 10mm 12mm;
+    size: A5;
+    margin: 5mm;
   }
   .print-page {
     width: 100%;

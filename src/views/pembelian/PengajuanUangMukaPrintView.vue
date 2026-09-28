@@ -199,35 +199,36 @@ body {
   color: #666;
 }
 .print-page {
-  width: 190mm;
+  width: 138mm;
   margin: 0 auto;
-  padding: 10mm 10mm;
+  padding: 5mm 6mm;
   font-family: Arial, sans-serif;
-  font-size: 9.5pt;
+  font-size: 9pt;
   color: #000;
 }
 .header-row {
-  display: flex;
   position: relative;
-  margin-bottom: 15px;
+  height: 34px;
+  margin-bottom: 10px;
 }
 .doc-title-wrapper {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  text-align: center;
 }
 .doc-title {
-  font-size: 13pt;
+  font-size: 11pt;
   font-weight: bold;
   text-decoration: underline;
-  margin-left: 100px;
 }
 .logo {
   position: absolute;
   right: 0;
   top: 0;
-  height: 40px;
+  height: 28px;
   object-fit: contain;
 }
 .info-grid {
@@ -317,8 +318,8 @@ body {
 }
 @media print {
   @page {
-    size: A4;
-    margin: 10mm;
+    size: A5;
+    margin: 5mm;
   }
   .print-page {
     width: 100%;
