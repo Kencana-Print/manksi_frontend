@@ -329,6 +329,28 @@ const router = createRouter({
       },
     },
     {
+      path: "/daftar/kelompok",
+      name: "Kelompok",
+      component: () => import("@/views/daftar/KelompokView.vue"),
+      meta: {
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "41",
+        title: "Kelompok",
+      },
+    },
+    {
+      path: "/daftar/jenis-pembayaran",
+      name: "JenisPembayaran",
+      component: () => import("@/views/daftar/JenisPembayaranView.vue"),
+      meta: {
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "42",
+        title: "Jenis Pembayaran",
+      },
+    },
+    {
       path: "/daftar/berita-acara",
       name: "BapProduksiBrowse",
       component: () => import("@/views/daftar/BapProduksiView.vue"),

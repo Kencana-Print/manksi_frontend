@@ -291,9 +291,22 @@ export const createMenuItems = (): NavItem[] => {
         {
           title: "Account",
           to: "/daftar/account",
-          icon: IconBuildingBank,
+          icon: IconCreditCard,
           menuId: 40,
         },
+        {
+          title: "Kelompok",
+          to: "/daftar/kelompok",
+          icon: IconLayoutGrid,
+          menuId: 41,
+        },
+        {
+          title: "Jenis Pembayaran",
+          to: "/daftar/jenis-pembayaran",
+          icon: IconCash,
+          menuId: 42,
+        },
+
         { divider: true },
         {
           title: "BAP & Komplain",
