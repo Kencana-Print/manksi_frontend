@@ -161,6 +161,7 @@ const openPreview = async () => {
   previewNomor.value = item.Nomor;
   previewCabang.value = item.Cabang;
   activePreviewTab.value = "SO";
+  previewSearch.value = "";
   showPreviewDialog.value = true;
 
   if (detailCache.value[item.Nomor]) {
@@ -210,6 +211,31 @@ const filterByTipe = (rows: DetailRow[], tipe: "SO" | "MAP") =>
   rows.filter((d) =>
     tipe === "MAP" ? d.PjwdTipe === "MAP" : d.PjwdTipe !== "MAP",
   );
+
+// ── Search di detail ──
+const detailSearch = ref<Record<string, string>>({});
+const getDetailSearch = (nomor: string) => detailSearch.value[nomor] || "";
+const setDetailSearch = (nomor: string, v: string) => {
+  detailSearch.value = { ...detailSearch.value, [nomor]: v };
+};
+const previewSearch = ref("");
+
+const matchSearch = (d: DetailRow, q: string) => {
+  const s = q.trim().toLowerCase();
+  if (!s) return true;
+  return [
+    nomorTampil(d),
+    d.Nama,
+    d.NomorPraOrder,
+    d.Sumber,
+    d.KetRencana,
+    d.KetKesepakatan,
+    d.StatusPermintaan,
+  ].some((v) => (v ?? "").toString().toLowerCase().includes(s));
+};
+
+const filterDetail = (rows: DetailRow[], tipe: "SO" | "MAP", q = "") =>
+  filterByTipe(rows, tipe).filter((d) => matchSearch(d, q));
 
 const activePreviewTab = ref<"SO" | "MAP">("SO");
 
@@ -900,21 +926,37 @@ checkUnnotifiedMap();
         </div>
 
         <div v-else-if="detailCache[item.Nomor]">
-          <div class="mini-tab-switch">
-            <button
-              type="button"
-              :class="{ active: getExpandTab(item.Nomor) === 'SO' }"
-              @click="setExpandTab(item.Nomor, 'SO')"
-            >
-              SO ({{ item.JumlahSO }})
-            </button>
-            <button
-              type="button"
-              :class="{ active: getExpandTab(item.Nomor) === 'MAP' }"
-              @click="setExpandTab(item.Nomor, 'MAP')"
-            >
-              MAP — Sampel ({{ item.JumlahMap }})
-            </button>
+          <div class="detail-toolbar">
+            <div class="mini-tab-switch">
+              <button
+                type="button"
+                :class="{ active: getExpandTab(item.Nomor) === 'SO' }"
+                @click="setExpandTab(item.Nomor, 'SO')"
+              >
+                SO ({{ item.JumlahSO }})
+              </button>
+              <button
+                type="button"
+                :class="{ active: getExpandTab(item.Nomor) === 'MAP' }"
+                @click="setExpandTab(item.Nomor, 'MAP')"
+              >
+                MAP — Sampel ({{ item.JumlahMap }})
+              </button>
+            </div>
+            <input
+              type="text"
+              class="f-search"
+              placeholder="Cari nomor / nama / keterangan..."
+              :value="getDetailSearch(item.Nomor)"
+              @input="
+                setDetailSearch(
+                  item.Nomor,
+                  ($event.target as HTMLInputElement).value,
+                )
+              "
+              @click.stop
+              @keydown.stop
+            />
           </div>
 
           <div class="dt-scroll">
@@ -939,9 +981,10 @@ checkUnnotifiedMap();
               </thead>
               <tbody>
                 <tr
-                  v-for="d in filterByTipe(
+                  v-for="d in filterDetail(
                     detailCache[item.Nomor],
                     getExpandTab(item.Nomor),
+                    getDetailSearch(item.Nomor),
                   )"
                   :key="d.PjwdId"
                   :class="detailRowClass(d)"
@@ -960,10 +1003,10 @@ checkUnnotifiedMap();
                       📝 {{ d.KetRencana }}
                     </div>
                   </td>
-                  <td v-if="showPanjangLebar(item.Cabang)" class="tr">
+                  <td v-if="showPanjangLebar(previewCabang)" class="tr">
                     {{ fmt(d.Panjang) }}
                   </td>
-                  <td v-if="showPanjangLebar(item.Cabang)" class="tr">
+                  <td v-if="showPanjangLebar(previewCabang)" class="tr">
                     {{ fmt(d.Lebar) }}
                   </td>
                   <td class="tr">{{ fmt(d.Pesan) }}</td>
@@ -1000,18 +1043,27 @@ checkUnnotifiedMap();
                 </tr>
                 <tr
                   v-if="
-                    !filterByTipe(
+                    !filterDetail(
                       detailCache[item.Nomor],
                       getExpandTab(item.Nomor),
+                      getDetailSearch(item.Nomor),
                     ).length
                   "
                 >
-                  <td colspan="10" class="empty-row">
-                    Belum ada
-                    {{
-                      getExpandTab(item.Nomor) === "MAP" ? "MAP/sampel" : "SO"
-                    }}
-                    ditambahkan di periode ini.
+                  <td
+                    :colspan="showPanjangLebar(item.Cabang) ? 12 : 10"
+                    class="empty-row"
+                  >
+                    <template v-if="getDetailSearch(item.Nomor)">
+                      Tidak ada hasil untuk "{{ getDetailSearch(item.Nomor) }}".
+                    </template>
+                    <template v-else>
+                      Belum ada
+                      {{
+                        getExpandTab(item.Nomor) === "MAP" ? "MAP/sampel" : "SO"
+                      }}
+                      ditambahkan di periode ini.
+                    </template>
                   </td>
                 </tr>
               </tbody>
@@ -1116,21 +1168,29 @@ checkUnnotifiedMap();
           <span>Memuat detail...</span>
         </div>
         <template v-else>
-          <div class="mini-tab-switch pa-2">
-            <button
-              type="button"
-              :class="{ active: activePreviewTab === 'SO' }"
-              @click="activePreviewTab = 'SO'"
-            >
-              SO
-            </button>
-            <button
-              type="button"
-              :class="{ active: activePreviewTab === 'MAP' }"
-              @click="activePreviewTab = 'MAP'"
-            >
-              MAP — Sampel
-            </button>
+          <div class="detail-toolbar pa-2">
+            <div class="mini-tab-switch">
+              <button
+                type="button"
+                :class="{ active: activePreviewTab === 'SO' }"
+                @click="activePreviewTab = 'SO'"
+              >
+                SO
+              </button>
+              <button
+                type="button"
+                :class="{ active: activePreviewTab === 'MAP' }"
+                @click="activePreviewTab = 'MAP'"
+              >
+                MAP — Sampel
+              </button>
+            </div>
+            <input
+              v-model="previewSearch"
+              type="text"
+              class="f-search"
+              placeholder="Cari nomor / nama / keterangan..."
+            />
           </div>
           <table class="dt dt-detail" style="width: 100%">
             <thead>
@@ -1154,7 +1214,11 @@ checkUnnotifiedMap();
             </thead>
             <tbody>
               <tr
-                v-for="d in filterByTipe(previewDetail, activePreviewTab)"
+                v-for="d in filterDetail(
+                  previewDetail,
+                  activePreviewTab,
+                  previewSearch,
+                )"
                 :key="d.PjwdId"
                 :class="detailRowClass(d)"
               >
@@ -1199,7 +1263,12 @@ checkUnnotifiedMap();
                   <span v-if="!d.Kesepakatan" class="text-grey">-</span>
                 </td>
               </tr>
-              <tr v-if="!filterByTipe(previewDetail, activePreviewTab).length">
+              <tr
+                v-if="
+                  !filterDetail(previewDetail, activePreviewTab, previewSearch)
+                    .length
+                "
+              >
                 <td colspan="11" class="empty-row">
                   Belum ada
                   {{ activePreviewTab === "MAP" ? "MAP/sampel" : "SO" }} di
@@ -1767,5 +1836,28 @@ checkUnnotifiedMap();
   background: #1565c0;
   color: white;
   border-color: #1565c0;
+}
+.detail-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.detail-toolbar .mini-tab-switch {
+  margin-bottom: 0;
+}
+.f-search {
+  height: 26px;
+  width: 260px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  padding: 0 8px;
+  font-size: 11px;
+  outline: none;
+  background: white;
+}
+.f-search:focus {
+  border-color: #1976d2;
 }
 </style>
