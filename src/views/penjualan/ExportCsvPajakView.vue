@@ -85,6 +85,8 @@ const onFilterStateRestore = (val: any) => {
 };
 
 // ── useBrowse ──────────────────────────────────────────────
+const baseBrowseRef = ref<InstanceType<typeof BaseBrowse> | null>(null);
+
 const { items, isLoading, selected, fetchData } = useBrowse({
   menuId: "160",
   fetchApi: async () => {
@@ -164,7 +166,9 @@ const downloadBlob = (blob: Blob, filename: string) => {
 };
 
 const askExport = (mode: "csv" | "xlsx") => {
-  if (!items.value?.length) {
+  const filtered =
+    baseBrowseRef.value?.getFilteredItems?.() ?? items.value ?? [];
+  if (!filtered.length) {
     toast.warning("Tidak ada data untuk diexport.");
     return;
   }
@@ -177,12 +181,17 @@ const confirmExport = async () => {
   showExportConfirm.value = false;
   if (!mode) return;
 
+  const filtered =
+    baseBrowseRef.value?.getFilteredItems?.() ?? items.value ?? [];
+  const nomorList = filtered.map((i: any) => i.Nomor);
+
   const payload = {
     tglAwal: tglAwal.value,
     tglAkhir: tglAkhir.value,
     cusKode: cusKode.value,
     perushKode: perushKode.value,
     nomor: nomor.value,
+    nomorList, // ⬅ batasi export cuma ke baris yang sedang tampil di BaseBrowse (search/column filter aktif)
   };
 
   if (mode === "csv") {
@@ -224,6 +233,7 @@ const confirmExport = async () => {
 
 <template>
   <BaseBrowse
+    ref="baseBrowseRef"
     title="Export CSV ke Faktur Pajak"
     menu-id="160"
     :icon="IconFileSpreadsheet"
@@ -414,8 +424,9 @@ const confirmExport = async () => {
         Konfirmasi Export
       </v-card-title>
       <v-card-text class="pa-4" style="font-size: 12px">
-        Export {{ items?.length ?? 0 }} invoice ke
-        <b>{{ pendingExportMode === "csv" ? "CSV" : "XLSX" }}</b
+        Export
+        {{ (baseBrowseRef?.getFilteredItems?.() ?? items ?? []).length }}
+        invoice ke <b>{{ pendingExportMode === "csv" ? "CSV" : "XLSX" }}</b
         >?<br /><br />
         Invoice yang diexport akan ditandai sebagai
         <b>"Sudah Export"</b> dan tidak akan muncul lagi di daftar ini.
