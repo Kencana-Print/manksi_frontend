@@ -55,6 +55,9 @@ const totalAlokasi = computed(() => {
   );
 });
 
+const namaToko = (a: any) =>
+  a.toko || a.nama_toko || a.namaToko || a.nama || "-";
+
 const hasAlokasi = computed(() => (data.value.alokasiList || []).length > 0);
 
 // --- TAMBAHAN UNTUK ALOKASI INLINE ---
@@ -557,10 +560,16 @@ onMounted(async () => {
                         class="text-left pl-2"
                         style="padding: 2px 4px; font-size: 7.5pt"
                       >
+                        Nama Toko
+                      </th>
+                      <th
+                        class="text-left pl-2"
+                        style="padding: 2px 4px; font-size: 7.5pt"
+                      >
                         Alokasi
                       </th>
                       <th
-                        width="60"
+                        width="45"
                         class="text-center"
                         style="padding: 2px 4px; font-size: 7.5pt"
                       >
@@ -570,6 +579,12 @@ onMounted(async () => {
                   </thead>
                   <tbody>
                     <tr v-for="alo in data.alokasiList" :key="alo.urut">
+                      <td
+                        class="pl-2"
+                        style="padding: 2px 4px; font-size: 7.5pt"
+                      >
+                        {{ namaToko(alo) }}
+                      </td>
                       <td
                         class="pl-2"
                         style="padding: 2px 4px; font-size: 7.5pt"
@@ -587,6 +602,7 @@ onMounted(async () => {
                   <tfoot>
                     <tr>
                       <td
+                        colspan="2"
                         class="fw text-left pl-2"
                         style="padding: 2px 4px; font-size: 7.5pt"
                       >
@@ -957,12 +973,16 @@ onMounted(async () => {
           >
             <thead>
               <tr>
+                <th class="text-left pl-2">Nama Toko</th>
                 <th class="text-left pl-2">Alokasi</th>
-                <th width="60" class="text-center">Jumlah</th>
+                <th width="50" class="text-center">Jumlah</th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="alo in chunk" :key="alo.urut">
+                <td class="pl-2" style="padding: 3px 6px; font-size: 8pt">
+                  {{ alo.toko || "-" }}
+                </td>
                 <td class="pl-2" style="padding: 3px 6px; font-size: 8pt">
                   {{ alo.kota || alo.alamat }}
                 </td>
@@ -977,6 +997,7 @@ onMounted(async () => {
             <tfoot v-if="idx === alokasiChunks.length - 1">
               <tr>
                 <td
+                  colspan="2"
                   class="fw text-left pl-2"
                   style="padding: 3px 6px; font-size: 8pt"
                 >
