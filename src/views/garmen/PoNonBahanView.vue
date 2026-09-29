@@ -64,6 +64,8 @@ const isAllCabangAllowed = computed(() => {
 });
 
 const cabangOptions = ref<string[]>([]);
+const BAGIAN_PEMBELIAN = ["PEMBELIAN", "PURCHASING"]; // sesuaikan dengan nilai asli
+
 const showFilterAcc = computed(() =>
   [
     "ADMIN",
@@ -78,18 +80,38 @@ const showFilterAcc = computed(() =>
     "AUDIT",
     "DIREKSI",
     "EDP",
+    ...BAGIAN_PEMBELIAN,
   ].includes(userBagian.value),
 );
 const showFilterObat = computed(() => showFilterAcc.value);
 const showFilterSparepart = computed(() =>
-  ["TEKNISI", "IT", "FINANCE", "AUDIT", "DIREKSI", "EDP", "ADMIN"].includes(
-    userBagian.value,
-  ),
+  [
+    "TEKNISI",
+    "IT",
+    "FINANCE",
+    "AUDIT",
+    "DIREKSI",
+    "EDP",
+    "ADMIN",
+    ...BAGIAN_PEMBELIAN,
+  ].includes(userBagian.value),
 );
 const showFilterAtk = computed(() =>
-  ["GA", "FINANCE", "AUDIT", "DIREKSI", "EDP", "ADMIN"].includes(
-    userBagian.value,
-  ),
+  [
+    "GA",
+    "FINANCE",
+    "AUDIT",
+    "DIREKSI",
+    "EDP",
+    "ADMIN",
+    ...BAGIAN_PEMBELIAN,
+  ].includes(userBagian.value),
+);
+
+// Fallback: kalau bagian tidak cocok dengan daftar mana pun, tampilkan semua
+const noJenisMatched = computed(
+  () =>
+    !showFilterAcc.value && !showFilterSparepart.value && !showFilterAtk.value,
 );
 
 const initFilters = () => {
@@ -101,7 +123,8 @@ const initFilters = () => {
     filterState.value.cabang = "ALL";
   }
 
-  if (showFilterAcc.value) filterState.value.jenis = "ACCESORIES";
+  if (showFilterAcc.value || noJenisMatched.value)
+    filterState.value.jenis = "ACCESORIES";
   else if (showFilterAtk.value) filterState.value.jenis = "ATK/RTK";
   else if (showFilterSparepart.value) filterState.value.jenis = "SPAREPART";
 };
@@ -395,7 +418,7 @@ const rowPropsFn = (data: any) => {
       <div class="filter-group">
         <span class="filter-label">Jenis</span>
         <div class="radio-wrap">
-          <label class="radio-label" v-if="showFilterAcc">
+          <label class="radio-label" v-if="showFilterAcc || noJenisMatched">
             <input
               type="radio"
               v-model="filterState.jenis"
@@ -404,7 +427,7 @@ const rowPropsFn = (data: any) => {
             />
             ACC
           </label>
-          <label class="radio-label" v-if="showFilterObat">
+          <label class="radio-label" v-if="showFilterObat || noJenisMatched">
             <input
               type="radio"
               v-model="filterState.jenis"
@@ -413,7 +436,10 @@ const rowPropsFn = (data: any) => {
             />
             OBAT
           </label>
-          <label class="radio-label" v-if="showFilterSparepart">
+          <label
+            class="radio-label"
+            v-if="showFilterSparepart || noJenisMatched"
+          >
             <input
               type="radio"
               v-model="filterState.jenis"
@@ -422,7 +448,7 @@ const rowPropsFn = (data: any) => {
             />
             SPAREPART
           </label>
-          <label class="radio-label" v-if="showFilterAtk">
+          <label class="radio-label" v-if="showFilterAtk || noJenisMatched">
             <input
               type="radio"
               v-model="filterState.jenis"
