@@ -212,13 +212,65 @@ const filterByTipe = (rows: DetailRow[], tipe: "SO" | "MAP") =>
     tipe === "MAP" ? d.PjwdTipe === "MAP" : d.PjwdTipe !== "MAP",
   );
 
-// ── Search di detail ──
-const detailSearch = ref<Record<string, string>>({});
-const getDetailSearch = (nomor: string) => detailSearch.value[nomor] || "";
-const setDetailSearch = (nomor: string, v: string) => {
-  detailSearch.value = { ...detailSearch.value, [nomor]: v };
-};
+// ── Search global di detail ──
+const globalSearch = ref("");
+const isSearching = ref(false);
+let searchTimer: ReturnType<typeof setTimeout> | null = null;
 const previewSearch = ref("");
+
+const loadAllDetails = async () => {
+  const belumAda = items.value.filter((r) => !detailCache.value[r.Nomor]);
+  if (!belumAda.length) return;
+  const results = await Promise.all(
+    belumAda.map((r) =>
+      penjadwalanPpicService
+        .getDetail(r.Nomor)
+        .then((res) => ({ nomor: r.Nomor, data: res.data.data ?? [] })),
+    ),
+  );
+  const next = { ...detailCache.value };
+  results.forEach((r) => (next[r.nomor] = r.data));
+  detailCache.value = next;
+};
+
+const displayItems = computed(() => {
+  const q = globalSearch.value.trim();
+  if (!q || isSearching.value) return items.value;
+  return items.value.filter((i) =>
+    (detailCache.value[i.Nomor] || []).some((d) => matchSearch(d, q)),
+  );
+});
+
+watch(globalSearch, (q) => {
+  if (searchTimer) clearTimeout(searchTimer);
+  if (!q.trim()) {
+    expandedRows.value = [];
+    return;
+  }
+  searchTimer = setTimeout(async () => {
+    isSearching.value = true;
+    try {
+      await loadAllDetails();
+      // buka tab yang ada hasilnya (SO dulu, kalau kosong pindah ke MAP)
+      for (const i of items.value) {
+        const rows = detailCache.value[i.Nomor] || [];
+        if (
+          !filterDetail(rows, "SO", q).length &&
+          filterDetail(rows, "MAP", q).length
+        ) {
+          setExpandTab(i.Nomor, "MAP");
+        } else {
+          setExpandTab(i.Nomor, "SO");
+        }
+      }
+      expandedRows.value = [...displayItems.value];
+    } catch {
+      toast.error("Gagal memuat detail untuk pencarian.");
+    } finally {
+      isSearching.value = false;
+    }
+  }, 400);
+});
 
 const matchSearch = (d: DetailRow, q: string) => {
   const s = q.trim().toLowerCase();
@@ -293,6 +345,7 @@ const fetchData = async () => {
   selected.value = [];
   expandedRows.value = [];
   detailCache.value = {};
+  globalSearch.value = "";
   try {
     const res = await penjadwalanPpicService.getBrowse({
       startDate: filterStart.value,
@@ -783,7 +836,7 @@ checkUnnotifiedMap();
     menu-id="176"
     :icon="IconCalendarWeek"
     :headers="headers"
-    :items="items"
+    :items="displayItems"
     :is-loading="isLoading"
     v-model:selected="selected"
     :expanded="expandedRows"
@@ -829,6 +882,19 @@ checkUnnotifiedMap();
           @click="fetchData"
           >Filter</v-btn
         >
+        <input
+          v-model="globalSearch"
+          type="text"
+          class="f-search"
+          placeholder="Cari di detail (nomor / nama / ket)..."
+        />
+        <v-progress-circular
+          v-if="isSearching"
+          indeterminate
+          size="16"
+          width="2"
+          color="primary"
+        />
       </div>
     </template>
 
@@ -926,37 +992,21 @@ checkUnnotifiedMap();
         </div>
 
         <div v-else-if="detailCache[item.Nomor]">
-          <div class="detail-toolbar">
-            <div class="mini-tab-switch">
-              <button
-                type="button"
-                :class="{ active: getExpandTab(item.Nomor) === 'SO' }"
-                @click="setExpandTab(item.Nomor, 'SO')"
-              >
-                SO ({{ item.JumlahSO }})
-              </button>
-              <button
-                type="button"
-                :class="{ active: getExpandTab(item.Nomor) === 'MAP' }"
-                @click="setExpandTab(item.Nomor, 'MAP')"
-              >
-                MAP — Sampel ({{ item.JumlahMap }})
-              </button>
-            </div>
-            <input
-              type="text"
-              class="f-search"
-              placeholder="Cari nomor / nama / keterangan..."
-              :value="getDetailSearch(item.Nomor)"
-              @input="
-                setDetailSearch(
-                  item.Nomor,
-                  ($event.target as HTMLInputElement).value,
-                )
-              "
-              @click.stop
-              @keydown.stop
-            />
+          <div class="mini-tab-switch">
+            <button
+              type="button"
+              :class="{ active: getExpandTab(item.Nomor) === 'SO' }"
+              @click="setExpandTab(item.Nomor, 'SO')"
+            >
+              SO ({{ item.JumlahSO }})
+            </button>
+            <button
+              type="button"
+              :class="{ active: getExpandTab(item.Nomor) === 'MAP' }"
+              @click="setExpandTab(item.Nomor, 'MAP')"
+            >
+              MAP — Sampel ({{ item.JumlahMap }})
+            </button>
           </div>
 
           <div class="dt-scroll">
@@ -982,26 +1032,22 @@ checkUnnotifiedMap();
               <tbody>
                 <tr
                   v-for="d in filterDetail(
-                    detailCache[item.Nomor],
-                    getExpandTab(item.Nomor),
-                    getDetailSearch(item.Nomor),
+                    previewDetail,
+                    activePreviewTab,
+                    previewSearch,
                   )"
                   :key="d.PjwdId"
                   :class="detailRowClass(d)"
                 >
                   <td>{{ formatTanggal(d.Tanggal) }}</td>
+                  <td>
+                    <v-chip size="x-small" variant="tonal">{{
+                      d.Sumber
+                    }}</v-chip>
+                  </td>
                   <td class="nomor-nama-cell">
                     <div class="mono">{{ nomorTampil(d) }}</div>
                     <div>{{ d.Nama }}</div>
-                    <div
-                      v-if="d.NomorPraOrder && d.Nomor"
-                      class="praorder-badge"
-                    >
-                      dari {{ d.NomorPraOrder }}
-                    </div>
-                    <div v-if="d.KetRencana" class="ket-rencana-note">
-                      📝 {{ d.KetRencana }}
-                    </div>
                   </td>
                   <td v-if="showPanjangLebar(previewCabang)" class="tr">
                     {{ fmt(d.Panjang) }}
@@ -1044,25 +1090,23 @@ checkUnnotifiedMap();
                 <tr
                   v-if="
                     !filterDetail(
-                      detailCache[item.Nomor],
-                      getExpandTab(item.Nomor),
-                      getDetailSearch(item.Nomor),
+                      previewDetail,
+                      activePreviewTab,
+                      previewSearch,
                     ).length
                   "
                 >
                   <td
-                    :colspan="showPanjangLebar(item.Cabang) ? 12 : 10"
+                    :colspan="showPanjangLebar(previewCabang) ? 13 : 11"
                     class="empty-row"
                   >
-                    <template v-if="getDetailSearch(item.Nomor)">
-                      Tidak ada hasil untuk "{{ getDetailSearch(item.Nomor) }}".
+                    <template v-if="previewSearch">
+                      Tidak ada hasil untuk "{{ previewSearch }}".
                     </template>
                     <template v-else>
                       Belum ada
-                      {{
-                        getExpandTab(item.Nomor) === "MAP" ? "MAP/sampel" : "SO"
-                      }}
-                      ditambahkan di periode ini.
+                      {{ activePreviewTab === "MAP" ? "MAP/sampel" : "SO" }} di
+                      periode ini.
                     </template>
                   </td>
                 </tr>
