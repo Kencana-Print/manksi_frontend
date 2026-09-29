@@ -904,6 +904,19 @@ checkUnnotifiedMap();
           @click="fetchData"
           >Filter</v-btn
         >
+        <input
+          v-model="globalSearch"
+          type="text"
+          class="f-search"
+          placeholder="Cari di detail (nomor / nama / ket)..."
+        />
+        <v-progress-circular
+          v-if="isSearching"
+          indeterminate
+          size="16"
+          width="2"
+          color="primary"
+        />
       </div>
     </template>
 
@@ -1001,37 +1014,21 @@ checkUnnotifiedMap();
         </div>
 
         <div v-else-if="detailCache[item.Nomor]">
-          <div class="detail-toolbar">
-            <div class="mini-tab-switch">
-              <button
-                type="button"
-                :class="{ active: getExpandTab(item.Nomor) === 'SO' }"
-                @click="setExpandTab(item.Nomor, 'SO')"
-              >
-                SO ({{ item.JumlahSO }})
-              </button>
-              <button
-                type="button"
-                :class="{ active: getExpandTab(item.Nomor) === 'MAP' }"
-                @click="setExpandTab(item.Nomor, 'MAP')"
-              >
-                MAP — Sampel ({{ item.JumlahMap }})
-              </button>
-            </div>
-            <input
-              type="text"
-              class="f-search"
-              placeholder="Cari nomor / nama / keterangan..."
-              :value="getDetailSearch(item.Nomor)"
-              @input="
-                setDetailSearch(
-                  item.Nomor,
-                  ($event.target as HTMLInputElement).value,
-                )
-              "
-              @click.stop
-              @keydown.stop
-            />
+          <div class="mini-tab-switch">
+            <button
+              type="button"
+              :class="{ active: getExpandTab(item.Nomor) === 'SO' }"
+              @click="setExpandTab(item.Nomor, 'SO')"
+            >
+              SO ({{ item.JumlahSO }})
+            </button>
+            <button
+              type="button"
+              :class="{ active: getExpandTab(item.Nomor) === 'MAP' }"
+              @click="setExpandTab(item.Nomor, 'MAP')"
+            >
+              MAP — Sampel ({{ item.JumlahMap }})
+            </button>
           </div>
 
           <div class="dt-scroll">
@@ -1059,7 +1056,7 @@ checkUnnotifiedMap();
                   v-for="d in filterDetail(
                     detailCache[item.Nomor],
                     getExpandTab(item.Nomor),
-                    getDetailSearch(item.Nomor),
+                    globalSearch,
                   )"
                   :key="d.PjwdId"
                   :class="detailRowClass(d)"
@@ -1078,10 +1075,10 @@ checkUnnotifiedMap();
                       📝 {{ d.KetRencana }}
                     </div>
                   </td>
-                  <td v-if="showPanjangLebar(previewCabang)" class="tr">
+                  <td v-if="showPanjangLebar(item.Cabang)" class="tr">
                     {{ fmt(d.Panjang) }}
                   </td>
-                  <td v-if="showPanjangLebar(previewCabang)" class="tr">
+                  <td v-if="showPanjangLebar(item.Cabang)" class="tr">
                     {{ fmt(d.Lebar) }}
                   </td>
                   <td class="tr">{{ fmt(d.Pesan) }}</td>
@@ -1121,7 +1118,7 @@ checkUnnotifiedMap();
                     !filterDetail(
                       detailCache[item.Nomor],
                       getExpandTab(item.Nomor),
-                      getDetailSearch(item.Nomor),
+                      globalSearch,
                     ).length
                   "
                 >
@@ -1129,8 +1126,8 @@ checkUnnotifiedMap();
                     :colspan="showPanjangLebar(item.Cabang) ? 12 : 10"
                     class="empty-row"
                   >
-                    <template v-if="getDetailSearch(item.Nomor)">
-                      Tidak ada hasil untuk "{{ getDetailSearch(item.Nomor) }}".
+                    <template v-if="globalSearch">
+                      Tidak ada hasil untuk "{{ globalSearch }}".
                     </template>
                     <template v-else>
                       Belum ada
@@ -1305,16 +1302,16 @@ checkUnnotifiedMap();
                   <div class="mono">{{ nomorTampil(d) }}</div>
                   <div>{{ d.Nama }}</div>
                 </td>
-                <td class="tr">{{ fmt(d.Pesan) }}</td>
-                <td class="tr">{{ fmt(d.Kirim) }}</td>
-                <td class="tr" :class="{ 'text-red fw': Number(d.Kurang) > 0 }">
-                  {{ fmt(d.Kurang) }}
-                </td>
                 <td v-if="showPanjangLebar(previewCabang)" class="tr">
                   {{ fmt(d.Panjang) }}
                 </td>
                 <td v-if="showPanjangLebar(previewCabang)" class="tr">
                   {{ fmt(d.Lebar) }}
+                </td>
+                <td class="tr">{{ fmt(d.Pesan) }}</td>
+                <td class="tr">{{ fmt(d.Kirim) }}</td>
+                <td class="tr" :class="{ 'text-red fw': Number(d.Kurang) > 0 }">
+                  {{ fmt(d.Kurang) }}
                 </td>
                 <td class="tr">{{ fmt(d.Rencana) }}</td>
                 <td class="tr">{{ fmt(d.Realisasi) }}</td>
@@ -1344,10 +1341,18 @@ checkUnnotifiedMap();
                     .length
                 "
               >
-                <td colspan="11" class="empty-row">
-                  Belum ada
-                  {{ activePreviewTab === "MAP" ? "MAP/sampel" : "SO" }} di
-                  periode ini.
+                <td
+                  :colspan="showPanjangLebar(previewCabang) ? 13 : 11"
+                  class="empty-row"
+                >
+                  <template v-if="previewSearch">
+                    Tidak ada hasil untuk "{{ previewSearch }}".
+                  </template>
+                  <template v-else>
+                    Belum ada
+                    {{ activePreviewTab === "MAP" ? "MAP/sampel" : "SO" }} di
+                    periode ini.
+                  </template>
                 </td>
               </tr>
             </tbody>
