@@ -7,7 +7,15 @@ import BaseBrowse from "@/components/BaseBrowse.vue";
 import { uangMukaService } from "@/services/pembelian/uangMukaService";
 import { pengajuanUangMukaService } from "@/services/pembelian/pengajuanUangMukaService";
 import { uangMukaPenyelesaianFormService } from "@/services/pembelian/uangMukaPenyelesaianFormService";
-import { IconCash, IconSend, IconPrinter, IconCheck } from "@tabler/icons-vue";
+import { exportExcelSingle } from "@/utils/excelExport";
+import {
+  IconCash,
+  IconSend,
+  IconPrinter,
+  IconCheck,
+  IconFileExport,
+  IconListDetails,
+} from "@tabler/icons-vue";
 import NumberInputIDR from "@/components/NumberInputIDR.vue";
 
 const authStore = useAuthStore();
@@ -56,6 +64,15 @@ const pumHistoryItems = ref<any[]>([]);
 const selectedPumOutstanding = ref<any[]>([]);
 const selectedPumHistory = ref<any[]>([]);
 
+const baseBrowseRef = ref<InstanceType<typeof BaseBrowse> | null>(null);
+
+const isExportingOutstanding = ref(false);
+const isExportingOutstandingDetail = ref(false);
+const isExportingPum = ref(false);
+const isExportingPumDetail = ref(false);
+const isExportingHistory = ref(false);
+const isExportingHistoryDetail = ref(false);
+
 const fetchOutstanding = async () => {
   isLoading.value = true;
   try {
@@ -72,6 +89,156 @@ const fetchOutstanding = async () => {
     toast.error(e.response?.data?.message || "Gagal memuat data outstanding.");
   } finally {
     isLoading.value = false;
+  }
+};
+
+const onExportOutstanding = async () => {
+  const data =
+    baseBrowseRef.value?.getFilteredItems?.() ?? outstandingItems.value ?? [];
+  if (!data.length) {
+    toast.warning("Tidak ada data untuk diexport.");
+    return;
+  }
+  isExportingOutstanding.value = true;
+  try {
+    const rows = data.map((r: any) => ({
+      Sumber: sumberLabel(r.Sumber),
+      Nomor: r.Nomor,
+      Tanggal: tglFmt(r.Tanggal),
+      Keterangan: r.Keterangan,
+      Pemohon: r.Pemohon,
+      Bagian: r.Bagian,
+      Cabang: r.Cabang,
+      Nominal: Math.round(Number(r.Nominal) || 0),
+    }));
+    await exportExcelSingle(
+      `UangMuka_Outstanding_${filters.value.dtAwal}_${filters.value.dtAkhir}`,
+      "Outstanding",
+      [
+        { header: "Sumber", key: "Sumber" },
+        { header: "Nomor", key: "Nomor" },
+        { header: "Tanggal", key: "Tanggal" },
+        { header: "Keterangan", key: "Keterangan" },
+        { header: "Pemohon", key: "Pemohon" },
+        { header: "Bagian", key: "Bagian" },
+        { header: "Cabang", key: "Cabang" },
+        { header: "Nominal", key: "Nominal", align: "right", numFmt: "#,##0" },
+      ],
+      rows,
+    );
+  } catch {
+    toast.error("Gagal export.");
+  } finally {
+    isExportingOutstanding.value = false;
+  }
+};
+
+const onExportOutstandingDetail = async () => {
+  const masters =
+    baseBrowseRef.value?.getFilteredItems?.() ?? outstandingItems.value ?? [];
+  if (!masters.length) {
+    toast.warning("Tidak ada data untuk diexport.");
+    return;
+  }
+  isExportingOutstandingDetail.value = true;
+  try {
+    const results = await Promise.all(
+      masters.map((h: any) =>
+        uangMukaService
+          .getOutstandingDetail(h.Sumber, h.Nomor)
+          .then((res) => ({ header: h, items: res.data ?? [] }))
+          .catch(() => ({ header: h, items: [] })),
+      ),
+    );
+
+    const combinedRows: any[] = [];
+    results.forEach(({ header, items: dtl }) => {
+      const masterCells = {
+        Sumber: sumberLabel(header.Sumber),
+        Nomor: header.Nomor,
+        Tanggal: tglFmt(header.Tanggal),
+        Keterangan: header.Keterangan,
+        Pemohon: header.Pemohon,
+        Bagian: header.Bagian,
+        Cabang: header.Cabang,
+        Nominal: Math.round(Number(header.Nominal) || 0),
+      };
+      const blankMaster = Object.fromEntries(
+        Object.keys(masterCells).map((k) => [k, ""]),
+      );
+
+      if (!dtl.length) {
+        combinedRows.push({
+          ...masterCells,
+          ItemNama: "",
+          ItemKode: "",
+          ItemSatuan: "",
+          ItemQty: "",
+          ItemNominal: "",
+          ItemQtyRealisasi: "",
+          ItemNominalRealisasi: "",
+          ItemKeterangan: "",
+        });
+        return;
+      }
+
+      dtl.forEach((d: any, idx: number) => {
+        const isDana = header.Sumber === "PENGAJUAN_DANA";
+        combinedRows.push({
+          ...(idx === 0 ? masterCells : blankMaster),
+          ItemNama: d.Nama,
+          ItemKode: isDana ? "" : d.Kode,
+          ItemSatuan: d.Satuan,
+          ItemQty: isDana ? Number(d.QtyPengajuan) || 0 : Number(d.Qty) || 0,
+          ItemNominal: Math.round(
+            Number(isDana ? d.RpPengajuan : d.Nominal) || 0,
+          ),
+          ItemQtyRealisasi: Number(d.QtyRealisasi) || 0,
+          ItemNominalRealisasi: Math.round(
+            Number(isDana ? d.RpApproved : d.NominalRealisasi) || 0,
+          ),
+          ItemKeterangan: isDana ? d.Keterangan : "",
+        });
+      });
+    });
+
+    await exportExcelSingle(
+      `UangMuka_Outstanding_Detail_${filters.value.dtAwal}_${filters.value.dtAkhir}`,
+      "Detail",
+      [
+        { header: "Sumber", key: "Sumber" },
+        { header: "Nomor", key: "Nomor" },
+        { header: "Tanggal", key: "Tanggal" },
+        { header: "Keterangan", key: "Keterangan" },
+        { header: "Pemohon", key: "Pemohon" },
+        { header: "Bagian", key: "Bagian" },
+        { header: "Cabang", key: "Cabang" },
+        { header: "Nominal", key: "Nominal", align: "right", numFmt: "#,##0" },
+        { header: "Item", key: "ItemNama" },
+        { header: "Kode", key: "ItemKode" },
+        { header: "Satuan", key: "ItemSatuan" },
+        { header: "Qty", key: "ItemQty", align: "right" },
+        {
+          header: "Nominal Item",
+          key: "ItemNominal",
+          align: "right",
+          numFmt: "#,##0",
+        },
+        { header: "Qty Realisasi", key: "ItemQtyRealisasi", align: "right" },
+        {
+          header: "Nominal Realisasi",
+          key: "ItemNominalRealisasi",
+          align: "right",
+          numFmt: "#,##0",
+        },
+        { header: "Keterangan Item", key: "ItemKeterangan" },
+      ],
+      combinedRows,
+    );
+  } catch {
+    toast.error("Gagal export detail.");
+  } finally {
+    isExportingOutstandingDetail.value = false;
   }
 };
 
@@ -98,6 +265,156 @@ const fetchPumOutstanding = async () => {
   }
 };
 
+const onExportPum = async () => {
+  const data =
+    baseBrowseRef.value?.getFilteredItems?.() ??
+    pumOutstandingItems.value ??
+    [];
+  if (!data.length) {
+    toast.warning("Tidak ada data untuk diexport.");
+    return;
+  }
+  isExportingPum.value = true;
+  try {
+    const rows = data.map((r: any) => ({
+      Nomor: r.Nomor,
+      Tanggal: tglFmt(r.Tanggal),
+      Status: STATUS_LABEL[r.Status]?.label || r.Status,
+      Keterangan: r.Keterangan,
+      Cabang: r.Cabang,
+      TotalNominal: Math.round(Number(r.TotalNominal) || 0),
+      BonNomor: r.BonNomor || "-",
+      UserCreate: r.UserCreate,
+    }));
+    await exportExcelSingle(
+      `PUM_Outstanding_${filters.value.dtAwal}_${filters.value.dtAkhir}`,
+      "PUM Outstanding",
+      [
+        { header: "Nomor", key: "Nomor" },
+        { header: "Tanggal", key: "Tanggal" },
+        { header: "Status", key: "Status" },
+        { header: "Keterangan", key: "Keterangan" },
+        { header: "Cabang", key: "Cabang" },
+        {
+          header: "Total Nominal",
+          key: "TotalNominal",
+          align: "right",
+          numFmt: "#,##0",
+        },
+        { header: "No. Bon", key: "BonNomor" },
+        { header: "User", key: "UserCreate" },
+      ],
+      rows,
+    );
+  } catch {
+    toast.error("Gagal export.");
+  } finally {
+    isExportingPum.value = false;
+  }
+};
+
+const onExportPumDetail = async () => {
+  const masters =
+    baseBrowseRef.value?.getFilteredItems?.() ??
+    pumOutstandingItems.value ??
+    [];
+  if (!masters.length) {
+    toast.warning("Tidak ada data untuk diexport.");
+    return;
+  }
+  isExportingPumDetail.value = true;
+  try {
+    const results = await Promise.all(
+      masters.map((h: any) =>
+        pengajuanUangMukaService
+          .getDetail(h.Nomor)
+          .then((res) => ({ header: h, items: res.data ?? [] }))
+          .catch(() => ({ header: h, items: [] })),
+      ),
+    );
+
+    const combinedRows: any[] = [];
+    results.forEach(({ header, items: dtl }) => {
+      const masterCells = {
+        Nomor: header.Nomor,
+        Tanggal: tglFmt(header.Tanggal),
+        Status: STATUS_LABEL[header.Status]?.label || header.Status,
+        Keterangan: header.Keterangan,
+        Cabang: header.Cabang,
+        TotalNominal: Math.round(Number(header.TotalNominal) || 0),
+      };
+      const blankMaster = Object.fromEntries(
+        Object.keys(masterCells).map((k) => [k, ""]),
+      );
+
+      dtl.forEach((d: any, idx: number) => {
+        combinedRows.push({
+          ...(idx === 0 ? masterCells : blankMaster),
+          ItemSumber: d.Sumber === "KASBON" ? "KASBON" : sumberLabel(d.Sumber),
+          ItemNomorSumber: d.NomorSumber,
+          ItemNama: d.Nama,
+          ItemSatuan: d.Satuan,
+          ItemQty: d.Qty != null ? Number(d.Qty) || 0 : "",
+          ItemKeterangan: d.Keterangan,
+          ItemNominalSumber: Math.round(Number(d.NominalSumber) || 0),
+          ItemNominalAjuan: Math.round(Number(d.NominalAjuan) || 0),
+          ItemStatusAcc: d.StatusAcc || "-",
+          ItemNominalAcc:
+            d.NominalAcc != null ? Math.round(Number(d.NominalAcc)) : "",
+        });
+      });
+    });
+
+    await exportExcelSingle(
+      `PUM_Outstanding_Detail_${filters.value.dtAwal}_${filters.value.dtAkhir}`,
+      "Detail",
+      [
+        { header: "Nomor PUM", key: "Nomor" },
+        { header: "Tanggal", key: "Tanggal" },
+        { header: "Status", key: "Status" },
+        { header: "Keterangan", key: "Keterangan" },
+        { header: "Cabang", key: "Cabang" },
+        {
+          header: "Total Nominal",
+          key: "TotalNominal",
+          align: "right",
+          numFmt: "#,##0",
+        },
+        { header: "Sumber", key: "ItemSumber" },
+        { header: "Nomor Sumber", key: "ItemNomorSumber" },
+        { header: "Item", key: "ItemNama" },
+        { header: "Satuan", key: "ItemSatuan" },
+        { header: "Qty", key: "ItemQty", align: "right" },
+        { header: "Keterangan Item", key: "ItemKeterangan" },
+        {
+          header: "Nominal Sumber",
+          key: "ItemNominalSumber",
+          align: "right",
+          numFmt: "#,##0",
+        },
+        {
+          header: "Nominal Ajuan",
+          key: "ItemNominalAjuan",
+          align: "right",
+          numFmt: "#,##0",
+        },
+        { header: "Status ACC", key: "ItemStatusAcc" },
+        {
+          header: "Nominal ACC",
+          key: "ItemNominalAcc",
+          align: "right",
+          numFmt: "#,##0",
+        },
+      ],
+      combinedRows,
+    );
+  } catch {
+    toast.error("Gagal export detail.");
+  } finally {
+    isExportingPumDetail.value = false;
+  }
+};
+
 const fetchPumHistory = async () => {
   isLoading.value = true;
   try {
@@ -118,6 +435,189 @@ const fetchPumHistory = async () => {
     );
   } finally {
     isLoading.value = false;
+  }
+};
+
+const onExportHistory = async () => {
+  const data =
+    baseBrowseRef.value?.getFilteredItems?.() ?? pumHistoryItems.value ?? [];
+  if (!data.length) {
+    toast.warning("Tidak ada data untuk diexport.");
+    return;
+  }
+  isExportingHistory.value = true;
+  try {
+    const rows = data.map((r: any) => ({
+      Nomor: r.Nomor || "-",
+      Tanggal: tglFmt(r.Tanggal),
+      Jenis: r.Jenis || "-",
+      Account: r.Account || "-",
+      Pjh: r.Pjh || "-",
+      Nota: r.Nota || "-",
+      Penerima: r.Penerima || "-",
+      TotalNominal: Math.round(Number(r.TotalNominal) || 0),
+      Terpakai: Math.round(Number(r.Terpakai) || 0),
+      Sisa: Math.round(Number(r.Sisa) || 0),
+      Keterangan: r.Keterangan,
+      NoBukti: r.NoBukti || "-",
+      Selesai: selesaiLabel(r.BonSelesai),
+      Closed: closedLabel(r.Closed),
+      DibuatOleh: r.DibuatOleh || "-",
+      TglDibuat: r.TglDibuat || "-",
+      Status: STATUS_LABEL[r.Status]?.label || r.Status,
+    }));
+    await exportExcelSingle(
+      `PUM_Realisasi_${filters.value.dtAwal}_${filters.value.dtAkhir}`,
+      "Realisasi",
+      [
+        { header: "Nomor", key: "Nomor" },
+        { header: "Tanggal", key: "Tanggal" },
+        { header: "Jenis", key: "Jenis" },
+        { header: "Account", key: "Account" },
+        { header: "PJH", key: "Pjh" },
+        { header: "Nota", key: "Nota" },
+        { header: "Penerima", key: "Penerima" },
+        {
+          header: "Total Nominal",
+          key: "TotalNominal",
+          align: "right",
+          numFmt: "#,##0",
+        },
+        {
+          header: "Terpakai",
+          key: "Terpakai",
+          align: "right",
+          numFmt: "#,##0",
+        },
+        { header: "Sisa", key: "Sisa", align: "right", numFmt: "#,##0" },
+        { header: "Keterangan", key: "Keterangan" },
+        { header: "No Bukti", key: "NoBukti" },
+        { header: "Selesai", key: "Selesai" },
+        { header: "Closed", key: "Closed" },
+        { header: "Dibuat Oleh", key: "DibuatOleh" },
+        { header: "Tgl Dibuat", key: "TglDibuat" },
+        { header: "Status", key: "Status" },
+      ],
+      rows,
+    );
+  } catch {
+    toast.error("Gagal export.");
+  } finally {
+    isExportingHistory.value = false;
+  }
+};
+
+const onExportHistoryDetail = async () => {
+  const masters =
+    baseBrowseRef.value?.getFilteredItems?.() ?? pumHistoryItems.value ?? [];
+  if (!masters.length) {
+    toast.warning("Tidak ada data untuk diexport.");
+    return;
+  }
+  isExportingHistoryDetail.value = true;
+  try {
+    const results = await Promise.all(
+      masters.map((h: any) =>
+        h.Nomor
+          ? pengajuanUangMukaService
+              .getDetail(h.Nomor)
+              .then((res) => ({ header: h, items: res.data ?? [] }))
+              .catch(() => ({ header: h, items: [] }))
+          : Promise.resolve({ header: h, items: [] }),
+      ),
+    );
+
+    const combinedRows: any[] = [];
+    results.forEach(({ header, items: dtl }) => {
+      const masterCells = {
+        Nomor: header.Nomor || "-",
+        Tanggal: tglFmt(header.Tanggal),
+        Jenis: header.Jenis || "-",
+        Account: header.Account || "-",
+        BonNomor: header.BonNomor || "-",
+        Penerima: header.Penerima || "-",
+        TotalNominal: Math.round(Number(header.TotalNominal) || 0),
+        Status: STATUS_LABEL[header.Status]?.label || header.Status,
+      };
+      const blankMaster = Object.fromEntries(
+        Object.keys(masterCells).map((k) => [k, ""]),
+      );
+
+      if (!dtl.length) {
+        combinedRows.push({
+          ...masterCells,
+          ItemSumber: "",
+          ItemNomorSumber: "",
+          ItemNama: "",
+          ItemNominalSumber: "",
+          ItemNominalAjuan: "",
+          ItemStatusAcc: "",
+          ItemNominalAcc: "",
+        });
+        return;
+      }
+
+      dtl.forEach((d: any, idx: number) => {
+        combinedRows.push({
+          ...(idx === 0 ? masterCells : blankMaster),
+          ItemSumber: d.Sumber === "KASBON" ? "KASBON" : sumberLabel(d.Sumber),
+          ItemNomorSumber: d.NomorSumber,
+          ItemNama: d.Nama,
+          ItemNominalSumber: Math.round(Number(d.NominalSumber) || 0),
+          ItemNominalAjuan: Math.round(Number(d.NominalAjuan) || 0),
+          ItemStatusAcc: d.StatusAcc || "-",
+          ItemNominalAcc:
+            d.NominalAcc != null ? Math.round(Number(d.NominalAcc)) : "",
+        });
+      });
+    });
+
+    await exportExcelSingle(
+      `PUM_Realisasi_Detail_${filters.value.dtAwal}_${filters.value.dtAkhir}`,
+      "Detail",
+      [
+        { header: "Nomor PUM", key: "Nomor" },
+        { header: "Tanggal", key: "Tanggal" },
+        { header: "Jenis", key: "Jenis" },
+        { header: "Account", key: "Account" },
+        { header: "No. Bon", key: "BonNomor" },
+        { header: "Penerima", key: "Penerima" },
+        {
+          header: "Total Nominal",
+          key: "TotalNominal",
+          align: "right",
+          numFmt: "#,##0",
+        },
+        { header: "Status", key: "Status" },
+        { header: "Sumber", key: "ItemSumber" },
+        { header: "Nomor Sumber", key: "ItemNomorSumber" },
+        { header: "Item", key: "ItemNama" },
+        {
+          header: "Nominal Sumber",
+          key: "ItemNominalSumber",
+          align: "right",
+          numFmt: "#,##0",
+        },
+        {
+          header: "Nominal Ajuan",
+          key: "ItemNominalAjuan",
+          align: "right",
+          numFmt: "#,##0",
+        },
+        { header: "Status ACC", key: "ItemStatusAcc" },
+        {
+          header: "Nominal ACC",
+          key: "ItemNominalAcc",
+          align: "right",
+          numFmt: "#,##0",
+        },
+      ],
+      combinedRows,
+    );
+  } catch {
+    toast.error("Gagal export detail.");
+  } finally {
+    isExportingHistoryDetail.value = false;
   }
 };
 
@@ -500,6 +1000,7 @@ const goPenyelesaian = () => {
 
     <!-- TAB OUTSTANDING -->
     <BaseBrowse
+      ref="baseBrowseRef"
       v-if="activeTab === 'outstanding'"
       title="Uang Muka — Outstanding"
       menu-id="315"
@@ -538,6 +1039,26 @@ const goPenyelesaian = () => {
         >
           <template #prepend><IconSend :size="15" /></template>
           Ajukan ({{ selectedOutstanding.length }})
+        </v-btn>
+        <v-btn
+          size="small"
+          variant="outlined"
+          color="success"
+          :loading="isExportingOutstanding"
+          @click="onExportOutstanding"
+        >
+          <template #prepend><IconFileExport :size="15" /></template>
+          Export
+        </v-btn>
+        <v-btn
+          size="small"
+          variant="outlined"
+          color="success"
+          :loading="isExportingOutstandingDetail"
+          @click="onExportOutstandingDetail"
+        >
+          <template #prepend><IconListDetails :size="15" /></template>
+          Export Detail
         </v-btn>
       </template>
 
@@ -702,6 +1223,7 @@ const goPenyelesaian = () => {
 
     <!-- TAB OUTSTANDING PUM -->
     <BaseBrowse
+      ref="baseBrowseRef"
       v-else-if="activeTab === 'pum-outstanding'"
       title="Pengajuan Uang Muka — Outstanding"
       menu-id="315"
@@ -756,6 +1278,26 @@ const goPenyelesaian = () => {
           @click="goRealisasi(selectedPumOutstanding[0])"
         >
           Realisasi
+        </v-btn>
+        <v-btn
+          size="small"
+          variant="outlined"
+          color="success"
+          :loading="isExportingPum"
+          @click="onExportPum"
+        >
+          <template #prepend><IconFileExport :size="15" /></template>
+          Export
+        </v-btn>
+        <v-btn
+          size="small"
+          variant="outlined"
+          color="success"
+          :loading="isExportingPumDetail"
+          @click="onExportPumDetail"
+        >
+          <template #prepend><IconListDetails :size="15" /></template>
+          Export Detail
         </v-btn>
       </template>
 
@@ -856,6 +1398,7 @@ const goPenyelesaian = () => {
 
     <!-- TAB HISTORY -->
     <BaseBrowse
+      ref="baseBrowseRef"
       v-else
       title="Pengajuan Uang Muka — History"
       menu-id="315"
@@ -930,6 +1473,26 @@ const goPenyelesaian = () => {
         >
           <template #prepend><IconPrinter :size="15" /></template>
           Cetak Penyelesaian
+        </v-btn>
+        <v-btn
+          size="small"
+          variant="outlined"
+          color="success"
+          :loading="isExportingHistory"
+          @click="onExportHistory"
+        >
+          <template #prepend><IconFileExport :size="15" /></template>
+          Export
+        </v-btn>
+        <v-btn
+          size="small"
+          variant="outlined"
+          color="success"
+          :loading="isExportingHistoryDetail"
+          @click="onExportHistoryDetail"
+        >
+          <template #prepend><IconListDetails :size="15" /></template>
+          Export Detail
         </v-btn>
       </template>
 

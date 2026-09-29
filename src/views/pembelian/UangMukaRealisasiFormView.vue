@@ -134,11 +134,17 @@ const {
       detail: data.detail,
     }),
   onSuccess: (response: any) => {
-    toast.success(`Realisasi berhasil. No. Bon: ${response?.bonNomor ?? "-"}`);
-    window.open(
-      `/pembelian/uang-muka/print/${encodeURIComponent(formData.value.pum_nomor)}`,
-      "_blank",
-    );
+    if (response?.status === "DITOLAK") {
+      toast.success("Pengajuan Uang Muka ditolak.");
+    } else {
+      toast.success(
+        `Realisasi berhasil. No. Bon: ${response?.bonNomor ?? "-"}`,
+      );
+      window.open(
+        `/pembelian/uang-muka/print/${encodeURIComponent(formData.value.pum_nomor)}`,
+        "_blank",
+      );
+    }
     goBack();
   },
 });
@@ -216,14 +222,20 @@ const onAccountSelected = (item: any) => {
 // };
 
 const onValidateSave = () => {
-  if (!formData.value.rek_kode) {
+  if (!formData.value.detail.length) {
+    toast.error("Tidak ada rincian untuk diproses.");
+    return;
+  }
+
+  const adaAcc = formData.value.detail.some((d) => d.status_acc === "ACC");
+
+  // Rekening/Kas hanya wajib kalau ada baris yang benar-benar direalisasi (ACC).
+  // Kalau semua baris ditolak, ini murni penolakan PUM — tidak perlu rekening/kas.
+  if (adaAcc && !formData.value.rek_kode) {
     toast.error("Pilih rekening/kas terlebih dahulu.");
     return;
   }
-  if (!formData.value.detail.some((d) => d.status_acc === "ACC")) {
-    toast.error("Minimal 1 baris harus ACC.");
-    return;
-  }
+
   showSaveDialog.value = true;
 };
 </script>
