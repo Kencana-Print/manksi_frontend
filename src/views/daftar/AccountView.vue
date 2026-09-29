@@ -41,9 +41,11 @@ const rows = computed(() =>
 const headers = [
   { title: "KODE", key: "kode", width: "100px" },
   { title: "NAMA", key: "nama", minWidth: "220px" },
-  { title: "NO. REKENING", key: "no_rekening", width: "150px" },
+  { title: "NO. REK BANK", key: "no_rekening", width: "150px" },
   { title: "KELOMPOK", key: "kelompok", width: "160px" },
   { title: "CABANG", key: "cabang", width: "90px" },
+  { title: "STORE", key: "store", width: "120px" },
+  { title: "KETERANGAN", key: "keterangan", minWidth: "180px" },
   { title: "STATUS", key: "status", width: "90px" },
   {
     title: "SALDO AKHIR",
