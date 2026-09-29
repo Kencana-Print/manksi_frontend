@@ -2015,7 +2015,11 @@ const onPilihKatalog = (item: any) => {
     />
     <SpkSearchModal v-model="showSpkLamaModal" @selected="setSpkLama" />
     <InvDcSearchModal v-model="showStokDcModal" @selected="setStokDc" />
-    <SoKaosanSearchModal v-model="showSoKaosanModal" @selected="setSoKaosan" />
+    <SoKaosanSearchModal
+      v-model="showSoKaosanModal"
+      :jo-kode="formData.spk_jo_kode"
+      @selected="setSoKaosan"
+    />
     <SetoranSearchModal
       v-model="showSetoranModal"
       :cust-kode="formData.spk_cus_kode"

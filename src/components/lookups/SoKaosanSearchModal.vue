@@ -3,7 +3,7 @@ import { ref, watch } from "vue";
 import api from "@/services/api";
 import { IconShoppingCart, IconX, IconSearch } from "@tabler/icons-vue";
 
-const props = defineProps<{ modelValue: boolean }>();
+const props = defineProps<{ modelValue: boolean; joKode?: string }>();
 const emit = defineEmits(["update:modelValue", "selected"]);
 
 const search = ref("");
@@ -26,7 +26,12 @@ const fetchData = async () => {
   isLoading.value = true;
   try {
     const res = await api.get("/lookups/so-kaosan", {
-      params: { q: search.value, page: page.value, limit: itemsPerPage.value },
+      params: {
+        q: search.value,
+        page: page.value,
+        limit: itemsPerPage.value,
+        joKode: props.joKode || "",
+      },
     });
     items.value = res.data.data.items;
     totalItems.value = res.data.data.total;
