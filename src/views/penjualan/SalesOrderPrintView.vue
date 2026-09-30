@@ -60,14 +60,29 @@ const namaToko = (a: any) =>
 
 const hasAlokasi = computed(() => (data.value.alokasiList || []).length > 0);
 
-// --- TAMBAHAN UNTUK ALOKASI INLINE ---
-const MAX_ALOKASI_INLINE = 15; // Batas aman baris agar tidak menabrak TTD di bawah
+// Garmen + cetak dengan alokasi: selalu inline di bawah Ket. Produksi
+const isAlokasiInline = computed(
+  () => isGarmen.value && withAlokasi.value && hasAlokasi.value,
+);
 
-// Cek apakah alokasi muat ditaruh di bawah Ket. Produksi (Khusus Garmen)
-const isAlokasiInline = computed(() => {
-  if (!isGarmen.value || !withAlokasi.value) return false;
-  const len = data.value.alokasiList?.length || 0;
-  return len > 0 && len <= MAX_ALOKASI_INLINE;
+// Alokasi banyak (> 20 baris) dipecah jadi 2 kolom supaya muat 1 halaman
+const alokasiInlineChunks = computed(() => {
+  const list = data.value.alokasiList || [];
+  const cols = list.length > 20 ? 2 : 1;
+  const size = Math.ceil(list.length / cols) || 1;
+  const chunks: any[][] = [];
+  for (let i = 0; i < list.length; i += size) {
+    chunks.push(list.slice(i, i + size));
+  }
+  return chunks;
+});
+
+// Ukuran font mengecil otomatis sesuai jumlah baris
+const alokasiInlineSize = computed(() => {
+  const n = data.value.alokasiList?.length || 0;
+  if (n <= 14) return "md";
+  if (n <= 20) return "sm";
+  return "xs";
 });
 
 // Cek apakah butuh merender alokasi di halaman ke-2
@@ -545,78 +560,42 @@ onMounted(async () => {
                 <pre class="ket-produksi">{{ keteranganProduksiLengkap }}</pre>
               </div>
 
-              <!-- ── TAMBAHAN: ALOKASI INLINE (Jika muat) ── -->
-              <div v-if="isAlokasiInline" class="mt-4">
-                <div
-                  class="ket-title"
-                  style="border: none; text-decoration: underline"
-                >
-                  Alokasi Pengiriman :
+              <!-- ALOKASI INLINE: di bawah Ket. Produksi -->
+              <div v-if="isAlokasiInline" class="alokasi-inline mt-2">
+                <div class="ket-title">Alokasi Pengiriman :</div>
+                <div class="alokasi-inline-cols">
+                  <table
+                    v-for="(chunk, cidx) in alokasiInlineChunks"
+                    :key="cidx"
+                    class="alokasi-table alokasi-inline-table"
+                    :class="`sz-${alokasiInlineSize}`"
+                  >
+                    <thead>
+                      <tr>
+                        <th class="text-left">Nama Toko</th>
+                        <th class="text-left">Alokasi</th>
+                        <th class="text-center">Jml</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="alo in chunk" :key="alo.urut">
+                        <td>{{ namaToko(alo) }}</td>
+                        <td>{{ alo.kota || alo.alamat }}</td>
+                        <td class="text-center">
+                          {{ Number(alo.jumlah).toLocaleString("id-ID") }}
+                        </td>
+                      </tr>
+                    </tbody>
+                    <tfoot v-if="cidx === alokasiInlineChunks.length - 1">
+                      <tr>
+                        <td colspan="2" class="fw text-left">Total</td>
+                        <td class="fw text-center">
+                          {{ totalAlokasi.toLocaleString("id-ID") }}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
                 </div>
-                <table class="alokasi-table mt-1">
-                  <thead>
-                    <tr>
-                      <th
-                        class="text-left pl-2"
-                        style="padding: 2px 4px; font-size: 7.5pt"
-                      >
-                        Nama Toko
-                      </th>
-                      <th
-                        class="text-left pl-2"
-                        style="padding: 2px 4px; font-size: 7.5pt"
-                      >
-                        Alokasi
-                      </th>
-                      <th
-                        width="45"
-                        class="text-center"
-                        style="padding: 2px 4px; font-size: 7.5pt"
-                      >
-                        Jumlah
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr v-for="alo in data.alokasiList" :key="alo.urut">
-                      <td
-                        class="pl-2"
-                        style="padding: 2px 4px; font-size: 7.5pt"
-                      >
-                        {{ namaToko(alo) }}
-                      </td>
-                      <td
-                        class="pl-2"
-                        style="padding: 2px 4px; font-size: 7.5pt"
-                      >
-                        {{ alo.kota || alo.alamat }}
-                      </td>
-                      <td
-                        class="text-center"
-                        style="padding: 2px 4px; font-size: 7.5pt"
-                      >
-                        {{ Number(alo.jumlah).toLocaleString("id-ID") }}
-                      </td>
-                    </tr>
-                  </tbody>
-                  <tfoot>
-                    <tr>
-                      <td
-                        colspan="2"
-                        class="fw text-left pl-2"
-                        style="padding: 2px 4px; font-size: 7.5pt"
-                      >
-                        Total
-                      </td>
-                      <td
-                        class="fw text-center"
-                        style="padding: 2px 4px; font-size: 7.5pt"
-                      >
-                        {{ totalAlokasi.toLocaleString("id-ID") }}
-                      </td>
-                    </tr>
-                  </tfoot>
-                </table>
               </div>
               <!-- ────────────────────────────────────────── -->
             </div>
@@ -1531,6 +1510,48 @@ onMounted(async () => {
 }
 .alokasi-table th {
   font-weight: bold;
+}
+
+.garmen-kanan {
+  min-height: 0;
+}
+.alokasi-inline {
+  min-height: 0;
+}
+.alokasi-inline-cols {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+}
+.alokasi-inline-table {
+  flex: 1;
+  min-width: 0;
+  table-layout: fixed;
+}
+.alokasi-inline-table th,
+.alokasi-inline-table td {
+  padding: 1.5px 3px;
+  line-height: 1.15;
+  word-break: break-word;
+}
+.alokasi-inline-table th:nth-child(2) {
+  width: 22%;
+}
+.alokasi-inline-table th:nth-child(3) {
+  width: 32px;
+}
+.alokasi-inline-table.sz-md th,
+.alokasi-inline-table.sz-md td {
+  font-size: 7.5pt;
+}
+.alokasi-inline-table.sz-sm th,
+.alokasi-inline-table.sz-sm td {
+  font-size: 6.5pt;
+}
+.alokasi-inline-table.sz-xs th,
+.alokasi-inline-table.sz-xs td {
+  font-size: 5.5pt;
+  padding: 1px 2px;
 }
 
 /* ── Footer ── */
