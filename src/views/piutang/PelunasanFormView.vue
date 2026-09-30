@@ -416,11 +416,17 @@ const validateSave = () => {
 
   for (let i = 0; i < validDetails.length; i++) {
     const r = validDetails[i];
+    const kredit = Number(r.Kredit) || 0;
+
+    if (kredit < 0)
+      return toast.warning(`Nilai Bayar baris ${i + 1} tidak boleh minus.`);
+
+    // Baris bernilai 0 tidak butuh bukti bayar (tidak ada dana yang dipakai)
+    if (kredit === 0) continue;
+
     if (!r.Kode) return toast.warning(`Tipe bayar baris ${i + 1} harus diisi.`);
     if (r.Kode !== "RT" && !r.NoBukti)
       return toast.warning(`No Bukti bayar baris ${i + 1} harus diisi.`);
-    if (Number(r.Kredit) <= 0)
-      return toast.warning(`Nilai Bayar baris ${i + 1} tidak boleh nol.`);
   }
 
   formData.value.Detail = validDetails;
