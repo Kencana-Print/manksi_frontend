@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from "vue";
+import { ref, watch, computed } from "vue";
 import api from "@/services/api";
 import {
   IconPaperclip,
@@ -10,9 +10,12 @@ import {
 
 const props = defineProps<{
   modelValue: boolean;
-  sizeFilter?: string; // size baris pemanggil (kalau ada, auto-filter LABEL)
+  sizeFilter?: string;
+  multiple?: boolean; // mode pilih banyak (checkbox + tombol Pilih)
 }>();
-const emit = defineEmits(["update:modelValue", "selected"]);
+const emit = defineEmits(["update:modelValue", "selected", "selected-many"]);
+
+const selectedItems = ref<any[]>([]);
 
 const search = ref("");
 const items = ref<any[]>([]);
@@ -49,6 +52,7 @@ watch(
     if (isOpen) {
       search.value = "";
       showAllOverride.value = false;
+      selectedItems.value = [];
       fetchData();
     }
   },
@@ -66,6 +70,48 @@ const toggleShowAll = () => {
 
 const selectItem = (item: any) => {
   emit("selected", item);
+  emit("update:modelValue", false);
+};
+
+// Baris tanpa Kode tidak bisa dipilih
+const isSelectable = (item: any) => !!item.Kode;
+const isSelected = (item: any) =>
+  selectedItems.value.some((s) => s.Kode === item.Kode);
+
+const toggleItem = (item: any) => {
+  if (!isSelectable(item)) return;
+  if (isSelected(item)) {
+    selectedItems.value = selectedItems.value.filter(
+      (s) => s.Kode !== item.Kode,
+    );
+  } else {
+    selectedItems.value.push(item);
+  }
+};
+
+const onRowClick = (item: any) =>
+  props.multiple ? toggleItem(item) : selectItem(item);
+
+const selectableItems = computed(() => items.value.filter(isSelectable));
+const allSelected = computed(
+  () =>
+    selectableItems.value.length > 0 &&
+    selectableItems.value.every((i) => isSelected(i)),
+);
+const toggleAll = () => {
+  if (allSelected.value) {
+    const kodes = new Set(selectableItems.value.map((i) => i.Kode));
+    selectedItems.value = selectedItems.value.filter((s) => !kodes.has(s.Kode));
+  } else {
+    for (const i of selectableItems.value) {
+      if (!isSelected(i)) selectedItems.value.push(i);
+    }
+  }
+};
+
+const confirmMulti = () => {
+  if (!selectedItems.value.length) return;
+  emit("selected-many", [...selectedItems.value]);
   emit("update:modelValue", false);
 };
 
@@ -145,6 +191,14 @@ const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
         <table v-else class="lookup-table">
           <thead>
             <tr>
+              <th v-if="multiple" style="width: 34px" class="text-center">
+                <input
+                  type="checkbox"
+                  :checked="allSelected"
+                  :disabled="!selectableItems.length"
+                  @change="toggleAll"
+                />
+              </th>
               <th style="width: 130px">KODE</th>
               <th>NAMA AKSESORIS</th>
               <th style="width: 130px">NOTE</th>
@@ -154,11 +208,24 @@ const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
           </thead>
           <tbody>
             <tr
-              v-for="item in items"
-              :key="item.Kode"
+              v-for="(item, i) in items"
+              :key="item.Kode || `row-${i}`"
               class="lookup-row"
-              @click="selectItem(item)"
+              :class="{
+                'row-picked': multiple && isSelected(item),
+                'row-disabled': multiple && !isSelectable(item),
+              }"
+              @click="onRowClick(item)"
             >
+              <td v-if="multiple" class="text-center">
+                <input
+                  type="checkbox"
+                  :checked="isSelected(item)"
+                  :disabled="!isSelectable(item)"
+                  @click.stop
+                  @change="toggleItem(item)"
+                />
+              </td>
               <td class="td-kode">{{ item.Kode }}</td>
               <td class="font-weight-bold">{{ item.Nama }}</td>
               <td>{{ item.Note }}</td>
@@ -175,7 +242,23 @@ const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
       </div>
 
       <div class="lookup-footer">
-        <span class="footer-count">{{ items.length }} hasil</span>
+        <span class="footer-count">
+          {{ items.length }} hasil<template v-if="multiple">
+            · {{ selectedItems.length }} dipilih</template
+          >
+        </span>
+        <div v-if="multiple" style="display: flex; gap: 8px">
+          <button class="foot-btn" @click="emit('update:modelValue', false)">
+            Batal
+          </button>
+          <button
+            class="foot-btn foot-btn--primary"
+            :disabled="!selectedItems.length"
+            @click="confirmMulti"
+          >
+            Pilih ({{ selectedItems.length }})
+          </button>
+        </div>
       </div>
     </div>
   </v-dialog>
@@ -372,5 +455,35 @@ const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
 .text-red {
   color: #c62828;
   font-weight: 700;
+}
+.row-picked td {
+  background: #e3f2fd;
+}
+.row-disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+.lookup-table input[type="checkbox"] {
+  accent-color: #1565c0;
+  cursor: pointer;
+}
+.foot-btn {
+  background: white;
+  border: 1px solid #bdbdbd;
+  border-radius: 4px;
+  padding: 4px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  color: #424242;
+}
+.foot-btn--primary {
+  background: #1565c0;
+  border-color: #1565c0;
+  color: white;
+}
+.foot-btn--primary:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 </style>

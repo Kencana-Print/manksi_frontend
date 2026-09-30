@@ -282,6 +282,66 @@ const onAksesoriSelected = async (item: any) => {
   await addBahanByKode(kode, aksTargetIdx.value);
 };
 
+// Multi-select: item pertama ke baris aktif, sisanya ke baris kosong
+// di bawahnya atau baris baru yang disisipkan
+const onAksesoriSelectedMany = async (items: any[]) => {
+  const detail = formData.value.detail;
+
+  // Buang kode kosong & yang sudah ada di grid
+  const existing = new Set(
+    detail.filter((d: MkaDetailRow) => d.nama).map((d: MkaDetailRow) => d.kode),
+  );
+  const kodes: string[] = [];
+  let skipped = 0;
+  for (const it of items) {
+    const kode = (it?.Kode ?? "").trim();
+    if (!kode) continue;
+    if (existing.has(kode)) {
+      skipped++;
+      continue;
+    }
+    existing.add(kode);
+    kodes.push(kode);
+  }
+  if (skipped)
+    toast.warning(`${skipped} aksesoris sudah ada di grid, dilewati.`);
+  if (!kodes.length) return;
+
+  // Titik awal: baris yang diklik, atau baris kosong pertama
+  let cursor = aksTargetIdx.value;
+  if (cursor === undefined) {
+    cursor = detail.findIndex((d: MkaDetailRow) => !d.nama && !d.kode);
+    if (cursor === -1) {
+      addEmptyRow();
+      cursor = formData.value.detail.length - 1;
+    }
+  }
+
+  // Proses berurutan supaya index baris tidak bergeser
+  for (let i = 0; i < kodes.length; i++) {
+    if (i > 0) {
+      cursor++;
+      const next = formData.value.detail[cursor];
+      if (!next || next.nama || next.kode) {
+        formData.value.detail.splice(cursor, 0, {
+          kode: "",
+          nama: "",
+          satuan: "",
+          pemakaian: 0,
+          jumlah: 0,
+          ready: 0,
+          free: 0,
+          po: 0,
+          keterangan: "",
+          size: "",
+          _key: newKey(),
+        });
+      }
+    }
+    await addBahanByKode(kodes[i], cursor);
+  }
+};
+
 // ─── Resolve kode diketik langsung (Delphi: loadkode) ────────────────────────
 const onKodeKeydown = (e: KeyboardEvent, idx: number) => {
   if (e.key === "F1") {
@@ -753,7 +813,9 @@ const validateSave = () => {
   <AksesorisSearchModal
     v-model="showAksesoriModal"
     :size-filter="aksSizeFilter"
+    multiple
     @selected="onAksesoriSelected"
+    @selected-many="onAksesoriSelectedMany"
   />
 
   <!-- Dialog cetak setelah simpan -->
