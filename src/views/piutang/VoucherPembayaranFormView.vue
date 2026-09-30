@@ -112,21 +112,23 @@ const parseNum = (v: string) =>
   Number(String(v).replace(/\./g, "").replace(",", ".")) || 0;
 
 // ── Detail row ops ──
-const addDetailRow = () =>
-  detail.value.push({
-    tipe: "",
-    searchType: "BPB",
-    nomor: "",
-    tanggal: "",
-    keterangan: "",
-    jenis: "",
-    nilai: 0,
-    nilaiMax: 0,
-    bs: 0,
-    tarif: 0,
-    potongan: 0,
-    total: 0,
-  });
+const createDetailRow = (searchType = "BPB"): DetailRow => ({
+  tipe: "",
+  searchType,
+  nomor: "",
+  tanggal: "",
+  keterangan: "",
+  jenis: "",
+  nilai: 0,
+  nilaiMax: 0,
+  bs: 0,
+  tarif: 0,
+  potongan: 0,
+  total: 0,
+});
+
+const addDetailRow = () => detail.value.push(createDetailRow());
+
 const removeDetailRow = (idx: number) => detail.value.splice(idx, 1);
 
 const recalcDetail = (d: DetailRow) => {
@@ -279,6 +281,7 @@ const activeNotaIdx = ref(-1);
 const notaOptions = ref<any[]>([]);
 const notaLoading = ref(false);
 const notaSearch = ref("");
+const selectedNotas = ref<any[]>([]);
 
 const notaTypeConfig = computed(() => {
   const map: Record<string, { title: string; color: string }> = {
@@ -303,6 +306,7 @@ const openNotaModal = async (type: string, idx: number) => {
   activeNotaIdx.value = idx;
   notaSearch.value = "";
   notaOptions.value = [];
+  selectedNotas.value = [];
   showNotaModal.value = true;
   notaLoading.value = true;
   try {
@@ -329,22 +333,83 @@ const doSearchNota = async () => {
     notaLoading.value = false;
   }
 };
-const selectNota = async (item: any) => {
-  const exists = detail.value.some(
-    (d, i) => i !== activeNotaIdx.value && d.nomor === item.Nomor,
-  );
-  if (exists) {
-    toast.warning("Nota ini sudah diinputkan.");
+// Nota yang sudah dipakai di baris lain (baris aktif tidak dihitung,
+// karena baris aktif akan ditimpa)
+const isNotaUsed = (n: any) =>
+  detail.value.some((d, i) => i !== activeNotaIdx.value && d.nomor === n.Nomor);
+
+const isNotaSelected = (n: any) =>
+  selectedNotas.value.some((s) => s.Nomor === n.Nomor);
+
+const toggleNota = (n: any) => {
+  if (isNotaUsed(n)) return;
+  if (isNotaSelected(n)) {
+    selectedNotas.value = selectedNotas.value.filter(
+      (s) => s.Nomor !== n.Nomor,
+    );
+  } else {
+    selectedNotas.value.push(n);
+  }
+};
+
+const selectableNotas = computed(() =>
+  notaOptions.value.filter((n) => !isNotaUsed(n)),
+);
+const allNotaSelected = computed(
+  () =>
+    selectableNotas.value.length > 0 &&
+    selectableNotas.value.every((n) => isNotaSelected(n)),
+);
+const toggleAllNota = () => {
+  if (allNotaSelected.value) {
+    const ids = new Set(selectableNotas.value.map((n) => n.Nomor));
+    selectedNotas.value = selectedNotas.value.filter((s) => !ids.has(s.Nomor));
+  } else {
+    for (const n of selectableNotas.value) {
+      if (!isNotaSelected(n)) selectedNotas.value.push(n);
+    }
+  }
+};
+
+const confirmNotaSelection = async () => {
+  if (!selectedNotas.value.length) {
+    toast.warning("Pilih minimal satu nota.");
     return;
   }
-  const d = detail.value[activeNotaIdx.value];
-  d.nomor = item.Nomor;
-  d.nilaiMax = 0;
+
+  const type = notaModalType.value;
+  const startIdx = activeNotaIdx.value;
+  const picked = [...selectedNotas.value];
   showNotaModal.value = false;
-  await loadNotaDetail(activeNotaIdx.value, item.Nomor, notaModalType.value);
-  if (notaModalType.value === "BPG" && item.SupKode && !form.value.supKode) {
-    await applySupplier(item.SupKode);
+
+  // Siapkan baris: pertama di baris aktif, sisanya reuse baris kosong
+  // di bawahnya atau sisipkan baris baru
+  const targetIdx: number[] = [];
+  let cursor = startIdx;
+  picked.forEach((n, i) => {
+    if (i > 0) {
+      cursor++;
+      const next = detail.value[cursor];
+      if (!next || next.nomor) {
+        detail.value.splice(cursor, 0, createDetailRow(type));
+      }
+    }
+    const row = detail.value[cursor];
+    row.nomor = n.Nomor;
+    row.searchType = type;
+    row.nilaiMax = 0;
+    targetIdx.push(cursor);
+  });
+
+  await Promise.all(
+    picked.map((n, i) => loadNotaDetail(targetIdx[i], n.Nomor, type)),
+  );
+
+  // BPG: supplier diambil dari nota pertama kalau belum ada
+  if (type === "BPG" && picked[0]?.SupKode && !form.value.supKode) {
+    await applySupplier(picked[0].SupKode);
   }
+  selectedNotas.value = [];
 };
 
 // ── PPN & Disc ──
@@ -1012,6 +1077,14 @@ const executeClose = () => {
           <table v-else class="mini-table">
             <thead>
               <tr>
+                <th style="width: 32px" class="text-center">
+                  <input
+                    type="checkbox"
+                    :checked="allNotaSelected"
+                    :disabled="!selectableNotas.length"
+                    @change="toggleAllNota"
+                  />
+                </th>
                 <th style="width: 140px">Nomor</th>
                 <th style="width: 100px">Tanggal</th>
                 <th v-if="notaModalType === 'BPG'" style="width: 90px">
@@ -1030,8 +1103,21 @@ const executeClose = () => {
                 v-for="n in notaOptions"
                 :key="n.Nomor"
                 class="mini-row"
-                @click="selectNota(n)"
+                :class="{
+                  'mini-row--selected': isNotaSelected(n),
+                  'mini-row--used': isNotaUsed(n),
+                }"
+                @click="toggleNota(n)"
               >
+                <td class="text-center">
+                  <input
+                    type="checkbox"
+                    :checked="isNotaSelected(n)"
+                    :disabled="isNotaUsed(n)"
+                    @click.stop
+                    @change="toggleNota(n)"
+                  />
+                </td>
                 <td>{{ n.Nomor }}</td>
                 <td>{{ n.Tanggal }}</td>
                 <td v-if="notaModalType === 'BPG'">{{ n.Jenis }}</td>
@@ -1045,7 +1131,7 @@ const executeClose = () => {
                 <td>{{ n.Supplier }}</td>
               </tr>
               <tr v-if="!notaOptions.length">
-                <td colspan="5" class="text-center text-grey py-3">
+                <td colspan="6" class="text-center text-grey py-3">
                   Tidak ada data
                 </td>
               </tr>
@@ -1053,6 +1139,27 @@ const executeClose = () => {
           </table>
         </div>
       </v-card-text>
+      <v-card-actions class="pa-3 border-t bg-grey-lighten-4">
+        <span class="text-caption text-grey-darken-1">
+          {{ selectedNotas.length }} nota dipilih
+        </span>
+        <v-spacer />
+        <v-btn
+          variant="text"
+          color="grey-darken-1"
+          @click="showNotaModal = false"
+        >
+          Batal
+        </v-btn>
+        <v-btn
+          variant="flat"
+          :style="{ background: notaTypeConfig.color, color: 'white' }"
+          :disabled="!selectedNotas.length"
+          @click="confirmNotaSelection"
+        >
+          Pilih ({{ selectedNotas.length }})
+        </v-btn>
+      </v-card-actions>
     </v-card>
   </v-dialog>
 
@@ -1510,5 +1617,19 @@ const executeClose = () => {
 }
 .mini-row:hover td {
   background: #e3f2fd;
+}
+.mini-row--selected td {
+  background: #e3f2fd;
+}
+.mini-row--used {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+.mini-row--used:hover td {
+  background: transparent;
+}
+.mini-table input[type="checkbox"] {
+  accent-color: #1565c0;
+  cursor: pointer;
 }
 </style>
