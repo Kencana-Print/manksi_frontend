@@ -31,6 +31,7 @@ onMounted(async () => {
       kegunaan: r.Kegunaan,
       deadline: r.Deadline,
       qty: Number(r.Qty) || 0,
+      satuan: r.Satuan || "",
       nominal: Number(r.Nilai) || 0,
       total: Number(r.Total) || 0,
     }));
@@ -41,6 +42,7 @@ onMounted(async () => {
         kegunaan: "",
         deadline: "",
         qty: 0,
+        satuan: "",
         nominal: 0,
         total: 0,
       });
@@ -106,6 +108,7 @@ const grandTotal = computed(
           <th>Nama (Kegunaan)</th>
           <th width="52">Deadline</th>
           <th width="32">Qty</th>
+          <th width="34">Satuan</th>
           <th width="60">Nominal</th>
           <th width="60">Total</th>
         </tr>
@@ -123,13 +126,14 @@ const grandTotal = computed(
             {{ item.deadline ? formatTanggalPendek(item.deadline) : "" }}
           </td>
           <td class="tr">{{ item.qty ? formatNum(item.qty) : "" }}</td>
+          <td class="tc">{{ item.satuan }}</td>
           <td class="tr">{{ item.nominal ? formatNum(item.nominal) : "0" }}</td>
           <td class="tr">{{ formatNum(item.total) }}</td>
         </tr>
       </tbody>
       <tfoot>
         <tr>
-          <td colspan="5" class="tr fw">Total</td>
+          <td colspan="6" class="tr fw">Total</td>
           <td class="tr fw">{{ formatNum(grandTotal) }}</td>
         </tr>
       </tfoot>

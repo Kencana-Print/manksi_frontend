@@ -49,14 +49,20 @@ onMounted(async () => {
       nama: r.Nama,
       kegunaan: r.Kegunaan,
       qty: Number(r.Qty) || 0,
+      satuan: r.Satuan || "",
       nominal: Number(r.Nilai) || 0,
       total: Number(r.Total) || 0,
     }));
 
-    // Padding baris kosong sampai TOTAL_ROWS, replikasi pola tampilan
-    // 15 baris tetap seperti form fisik Delphi (insertketampungan).
     while (rows.length < TOTAL_ROWS) {
-      rows.push({ nama: "", kegunaan: "", qty: 0, nominal: 0, total: 0 });
+      rows.push({
+        nama: "",
+        kegunaan: "",
+        qty: 0,
+        satuan: "",
+        nominal: 0,
+        total: 0,
+      });
     }
 
     dataPO.value = { header: d.header, items: rows };
@@ -124,6 +130,7 @@ const grandTotal = computed(
             <th width="30">No</th>
             <th>Nama (Kegunaan)</th>
             <th width="60">Qty</th>
+            <th width="60">Satuan</th>
             <th width="90">Nominal</th>
             <th width="90">Total</th>
           </tr>
@@ -138,6 +145,7 @@ const grandTotal = computed(
               </template>
             </td>
             <td class="tr">{{ item.qty ? formatNum(item.qty) : "" }}</td>
+            <td class="tc">{{ item.satuan }}</td>
             <td class="tr">
               {{ item.nominal ? formatNum(item.nominal) : "0" }}
             </td>
@@ -146,7 +154,7 @@ const grandTotal = computed(
         </tbody>
         <tfoot>
           <tr>
-            <td colspan="4" class="tr fw">Total</td>
+            <td colspan="5" class="tr fw">Total</td>
             <td class="tr fw">{{ formatNum(grandTotal) }}</td>
           </tr>
         </tfoot>

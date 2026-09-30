@@ -2277,4 +2277,11 @@ const onPilihKatalog = (item: any) => {
   border-radius: 4px;
   margin: 8px;
 }
+
+.igrp .inp {
+  min-width: 0;
+}
+.igrp {
+  min-width: 0;
+}
 </style>
