@@ -23,22 +23,9 @@ const pctFmt = (v: any) => (v || v === 0 ? `${Number(v).toFixed(2)}%` : "");
 const rowPropsFn = (data: any) => {
   const item = data.item?.raw || data.item;
   if (item?.SalNama === "GRAND TOTAL") return { class: "row-grand-total" };
-  if (item?.SalNama === "SUB TOTAL") return { class: "row-sub-total" };
+  if (item?.SalNama?.startsWith("SUB TOTAL")) return { class: "row-sub-total" };
   return {};
 };
-
-// Footer & chart cuma pakai baris per-sales (Urut=1), biar gak
-// double-count subtotal/grand total
-const detailRows = computed(() => props.items.filter((r) => r.Urut === 1));
-const totalTarget = computed(() =>
-  detailRows.value.reduce((s, r) => s + (Number(r.Target) || 0), 0),
-);
-const totalRealisasi = computed(() =>
-  detailRows.value.reduce((s, r) => s + (Number(r.Realisasi) || 0), 0),
-);
-const totalAch = computed(() =>
-  totalTarget.value > 0 ? (totalRealisasi.value / totalTarget.value) * 100 : 0,
-);
 
 const chartLabels = computed(() => props.items.map((r) => r.SalNama));
 const chartTarget = computed(() =>
@@ -66,12 +53,6 @@ const chartAch = computed(() => props.items.map((r) => Number(r.Ach) || 0));
           numFmt(item.Realisasi)
         }}</template>
         <template #item.Ach="{ item }">{{ pctFmt(item.Ach) }}</template>
-        <template #summary-row>
-          <span class="sum-lbl">Total</span>
-          <span class="sum-val">{{ numFmt(totalTarget) }}</span>
-          <span class="sum-val">{{ numFmt(totalRealisasi) }}</span>
-          <span class="sum-val">{{ totalAch.toFixed(2) }}%</span>
-        </template>
       </BaseTable>
     </div>
     <div class="tab-chart">
