@@ -145,6 +145,14 @@ const getTotal = (key: string, filteredItems: any[]) => {
   return filteredItems.reduce((sum, item) => sum + (Number(item[key]) || 0), 0);
 };
 
+const exportData = computed(() => {
+  const totalRow: Record<string, any> = { Kode: "", Customer: "GRAND TOTAL" };
+  for (const key of numericKeys.value) {
+    totalRow[key] = getTotal(key, items.value ?? []);
+  }
+  return [...(items.value ?? []), totalRow];
+});
+
 // Array kunci angka untuk loop format sel
 const numericKeys = computed(() => [
   "TahunLalu",
@@ -179,7 +187,9 @@ const summaryFormatters = computed(() => {
     :summary-columns="numericKeys"
     :summary-formatters="summaryFormatters"
     @refresh="fetchData"
-    @export="exportToExcel('Laporan_Rekap_Piutang')"
+    @export="
+      exportToExcel('Laporan_Rekap_Piutang', { getData: () => exportData })
+    "
   >
     <template #filter-left>
       <div class="d-flex align-center gap-2">
