@@ -4635,7 +4635,7 @@ const sisaClass = (item: any) => {
                                   : '#2e7d32',
                             }"
                           >
-                            {{ fmtSisaCollection(row.sisaCollectionMtd) }}
+                            {{ fmtNum(row.collectionMtd) }}
                           </td>
                           <td class="tc">
                             <span
@@ -4695,9 +4695,8 @@ const sisaClass = (item: any) => {
                             }"
                           >
                             {{
-                              fmtSisaCollection(
-                                targetCollectionData.grandTotal
-                                  .sisaCollectionMtd,
+                              fmtNum(
+                                targetCollectionData.grandTotal.collectionMtd,
                               )
                             }}
                           </td>
@@ -6542,7 +6541,7 @@ const sisaClass = (item: any) => {
                                   : '#2e7d32',
                             }"
                           >
-                            {{ fmtSisaCollection(row.sisaCollectionMtd) }}
+                            {{ fmtNum(row.collectionMtd) }}
                           </td>
                           <td class="tc">
                             <span
@@ -6602,9 +6601,8 @@ const sisaClass = (item: any) => {
                             }"
                           >
                             {{
-                              fmtSisaCollection(
-                                targetCollectionData.grandTotal
-                                  .sisaCollectionMtd,
+                              fmtNum(
+                                targetCollectionData.grandTotal.collectionMtd,
                               )
                             }}
                           </td>
