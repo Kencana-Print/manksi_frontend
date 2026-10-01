@@ -24,6 +24,47 @@ const filterState = ref({
 const showPerusahaanModal = ref(false);
 const selectedPerusahaanNama = ref("");
 
+// State untuk Dialog Detail Piutang per Customer
+const showDetailDialog = ref(false);
+const detailLoading = ref(false);
+const detailItems = ref<any[]>([]);
+const detailCustomerNama = ref("");
+
+const detailHeaders = [
+  { title: "Nota", key: "Nota" },
+  { title: "Tanggal", key: "Tanggal" },
+  { title: "Debet", key: "Debet", align: "end" },
+  { title: "Bayar", key: "Bayar", align: "end" },
+  { title: "Sisa", key: "Sisa", align: "end" },
+] as const;
+
+const fmtDate = (val: string) => {
+  if (!val) return "";
+  const d = new Date(val);
+  return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
+};
+
+const openDetailDialog = async (item: any) => {
+  detailCustomerNama.value = `[${item.Kode}] ${item.Customer}`;
+  showDetailDialog.value = true;
+  detailLoading.value = true;
+  detailItems.value = [];
+  try {
+    const res = await rekapPiutangService.getDetail({
+      customer: item.Kode,
+      endDate: filterState.value.endDate,
+      perusahaan: filterState.value.perusahaan,
+    });
+    detailItems.value = res.data.data || [];
+  } finally {
+    detailLoading.value = false;
+  }
+};
+
+const detailTotalSisa = computed(() =>
+  detailItems.value.reduce((sum, r) => sum + (Number(r.Sisa) || 0), 0),
+);
+
 // Daftar singkatan bulan statis
 const allMonths = [
   "Jan",
@@ -181,12 +222,82 @@ const summaryFormatters = computed(() => {
       </div>
     </template>
 
+    <template #item.Customer="{ item }">
+      <span class="customer-link" @click="openDetailDialog(item)">
+        {{ item.Customer }}
+      </span>
+    </template>
+
     <template v-for="k in numericKeys" :key="k" #[`item.${k}`]="{ item }">
       <span :class="k === 'GrandTotal' ? 'font-weight-bold text-primary' : ''">
         {{ fmtNum(item[k]) }}
       </span>
     </template>
   </BaseBrowse>
+
+  <v-dialog v-model="showDetailDialog" max-width="900">
+    <v-card rounded="lg" class="detail-card">
+      <v-card-title
+        class="detail-header d-flex align-center justify-space-between"
+      >
+        <div class="d-flex align-center gap-2">
+          <v-icon icon="mdi-receipt-text-outline" size="22" color="white" />
+          <div>
+            <div class="detail-title">Detail Piutang Outstanding</div>
+            <div class="detail-subtitle">{{ detailCustomerNama }}</div>
+          </div>
+        </div>
+        <v-btn
+          icon="mdi-close"
+          variant="text"
+          color="white"
+          density="comfortable"
+          @click="showDetailDialog = false"
+        />
+      </v-card-title>
+
+      <v-card-text class="pa-0">
+        <v-data-table-virtual
+          :headers="detailHeaders"
+          :items="detailItems"
+          :loading="detailLoading"
+          height="420"
+          fixed-header
+          density="comfortable"
+          no-data-text="Tidak ada piutang outstanding"
+          class="detail-table"
+        >
+          <template #item.Tanggal="{ item }">{{
+            fmtDate(item.Tanggal)
+          }}</template>
+          <template #item.Debet="{ item }">{{ fmtNum(item.Debet) }}</template>
+          <template #item.Bayar="{ item }">{{ fmtNum(item.Bayar) }}</template>
+          <template #item.Sisa="{ item }">
+            <span
+              class="sisa-val"
+              :class="item.Sisa < 0 ? 'text-error' : 'text-primary'"
+            >
+              {{ fmtNum(item.Sisa) }}
+            </span>
+          </template>
+        </v-data-table-virtual>
+      </v-card-text>
+
+      <v-divider />
+
+      <v-card-actions
+        class="detail-footer d-flex justify-space-between align-center px-4 py-3"
+      >
+        <span class="text-caption text-medium-emphasis">
+          {{ detailItems.length }} invoice outstanding
+        </span>
+        <div class="d-flex align-center gap-2">
+          <span class="text-body-2 font-weight-medium">Total Sisa Piutang</span>
+          <span class="total-sisa">{{ fmtNum(detailTotalSisa) }}</span>
+        </div>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
 
   <PerusahaanSearchModal
     v-model="showPerusahaanModal"
@@ -243,5 +354,55 @@ const summaryFormatters = computed(() => {
   align-items: center;
   align-self: center;
   padding-top: 0;
+}
+
+.customer-link {
+  color: #1565c0;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  transition: text-decoration-color 0.15s;
+}
+.customer-link:hover {
+  text-decoration-color: #1565c0;
+}
+
+.detail-card {
+  overflow: hidden;
+}
+.detail-header {
+  background: linear-gradient(135deg, #1565c0, #1976d2);
+  padding: 16px 20px;
+}
+.detail-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: white;
+  line-height: 1.2;
+}
+.detail-subtitle {
+  font-size: 12.5px;
+  color: #e3f2fd;
+}
+.detail-table :deep(thead th) {
+  background: #f5f7fa !important;
+  font-weight: 700 !important;
+  font-size: 11.5px !important;
+  text-transform: uppercase;
+  color: #555 !important;
+}
+.detail-table :deep(tbody tr:hover) {
+  background: #f0f7ff !important;
+}
+.sisa-val {
+  font-weight: 700;
+}
+.detail-footer {
+  background: #fafafa;
+}
+.total-sisa {
+  font-size: 16px;
+  font-weight: 800;
+  color: #1565c0;
 }
 </style>
