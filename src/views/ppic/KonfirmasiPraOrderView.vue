@@ -438,6 +438,10 @@ const belumSemuaBahanDipilih = computed(() =>
                     {{ formatTanggal(detailData.pro_tgl_kirim) }}
                   </td>
                 </tr>
+                <tr v-if="detailData.pro_ukuran_bebas">
+                  <td class="lbl">Ukuran (Free Text)</td>
+                  <td class="val">{{ detailData.pro_ukuran_bebas }}</td>
+                </tr>
                 <tr v-if="detailData.pro_catatan_deadline">
                   <td class="lbl">Ket. Deadline</td>
                   <td class="val">{{ detailData.pro_catatan_deadline }}</td>
