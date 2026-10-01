@@ -1,11 +1,10 @@
 import api from "@/services/api";
 
 export const mintaBarangFormService = {
-  getDetail(nomor: string) {
-    return api.get(
-      `/garmen/barang/permintaan/form/${encodeURIComponent(nomor)}`,
-    );
-  },
+  getDetail: (nomor: string, opts?: { print?: boolean }) =>
+    api.get(`/garmen/minta-barang/${encodeURIComponent(nomor)}`, {
+      params: opts?.print ? { print: 1 } : undefined,
+    }),
 
   getGudangByKode: (kode: string, cabang: string) =>
     api.get(

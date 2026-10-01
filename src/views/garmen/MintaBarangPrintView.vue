@@ -14,7 +14,7 @@ const isError = ref(false);
 
 const fetchData = async () => {
   try {
-    const res = await mintaBarangFormService.getDetail(nomor);
+    const res = await mintaBarangFormService.getDetail(nomor, { print: true });
     header.value = res.data.data.header;
     details.value = res.data.data.details || [];
     setTimeout(() => {
