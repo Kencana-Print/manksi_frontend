@@ -218,7 +218,7 @@ const tglIndo = (dateStr: string) => {
                   {{ getVal("mspk_ukuran") || getVal("mspk_rencana_size") }}
                 </td>
               </tr>
-              <tr v-if="getVal('mspk_gramasi')">
+              <tr>
                 <td class="lbl">Gramasi</td>
                 <td class="sep">:</td>
                 <td class="val">{{ getVal("mspk_gramasi") }}</td>
