@@ -94,6 +94,18 @@ const headers = [
   { title: "Qty Rencana", key: "QtyRencana", width: "110px", align: "end" },
   { title: "Tgl Kirim", key: "TglKirim", width: "110px", align: "center" },
   {
+    title: "Tgl Est. SO",
+    key: "TglEstimasiSO",
+    width: "110px",
+    align: "center",
+  },
+  {
+    title: "Tgl Est. MAP",
+    key: "TglEstimasiMAP",
+    width: "110px",
+    align: "center",
+  },
+  {
     title: "Status PPIC",
     key: "StatusPpic",
     width: "140px",
@@ -124,6 +136,7 @@ const showTolakInput = ref(false);
 const estTglSo = ref("");
 const estTglMap = ref("");
 const showSanggupInput = ref(false);
+const catatanSanggup = ref("");
 
 const openDetail = async (item: any) => {
   showDetailDialog.value = true;
@@ -133,6 +146,7 @@ const openDetail = async (item: any) => {
   showSanggupInput.value = false;
   estTglSo.value = "";
   estTglMap.value = "";
+  catatanSanggup.value = "";
   try {
     const res = await konfirmasiPraOrderService.getDetail(item.Nomor);
     detailData.value = res.data.data;
@@ -158,13 +172,19 @@ const confirmSanggup = async () => {
     toast.warning("Tanggal Estimasi SO dan Estimasi MAP wajib diisi.");
     return;
   }
+  if (belumSemuaBahanDipilih.value) {
+    toast.warning(
+      "Status Ready/Tidak Ready untuk semua alternatif bahan wajib dipilih dulu.",
+    );
+    return;
+  }
   if (!detailData.value) return;
   isConfirming.value = true;
   try {
     await konfirmasiPraOrderService.confirmKesanggupan(
       detailData.value.pro_nomor,
       "SANGGUP",
-      "",
+      catatanSanggup.value,
       { tglSoEstimasi: estTglSo.value, tglMap: estTglMap.value },
     );
     toast.success("Pra Order dikonfirmasi SANGGUP.");
@@ -223,6 +243,9 @@ const setBahanStatus = async (bahan: any, status: string) => {
 
 const canConfirm = computed(
   () => detailData.value?.pro_status_ppic === "PENDING",
+);
+const belumSemuaBahanDipilih = computed(() =>
+  (detailData.value?.bahan || []).some((b: any) => !b.prob_status_ready),
 );
 </script>
 
@@ -311,6 +334,12 @@ const canConfirm = computed(
     }}</template>
     <template #item.TglKirim="{ item }">{{
       formatTanggal((item.raw || item).TglKirim)
+    }}</template>
+    <template #item.TglEstimasiSO="{ item }">{{
+      formatTanggal((item.raw || item).TglEstimasiSO)
+    }}</template>
+    <template #item.TglEstimasiMAP="{ item }">{{
+      formatTanggal((item.raw || item).TglEstimasiMAP)
     }}</template>
     <template #item.Created="{ item }">{{
       formatTanggalJam((item.raw || item).Created)
@@ -537,6 +566,15 @@ const canConfirm = computed(
                 hide-details
               />
             </div>
+            <v-textarea
+              v-model="catatanSanggup"
+              label="Keterangan (opsional)"
+              variant="outlined"
+              density="compact"
+              rows="2"
+              hide-details
+              class="mt-2"
+            />
             <div class="d-flex justify-end mt-2" style="gap: 8px">
               <v-btn
                 size="small"
@@ -571,7 +609,12 @@ const canConfirm = computed(
               size="small"
               color="success"
               variant="elevated"
-              :disabled="isConfirming"
+              :disabled="isConfirming || belumSemuaBahanDipilih"
+              :title="
+                belumSemuaBahanDipilih
+                  ? 'Pilih status Ready/Tidak Ready untuk semua alternatif bahan dulu'
+                  : ''
+              "
               @click="openSanggupInput"
             >
               <template #prepend><IconCheck :size="14" /></template>
