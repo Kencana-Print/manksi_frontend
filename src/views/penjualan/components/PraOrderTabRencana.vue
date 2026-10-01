@@ -447,6 +447,27 @@ const openPreview = (url: string) => {
             />
           </div>
 
+          <div class="tp-row tp-row-area" style="align-items: flex-start">
+            <label class="tp-lbl" style="padding-top: 6px"
+              >Ukuran (Free Text)</label
+            >
+            <div class="flex-1">
+              <v-textarea
+                v-model="formData.UkuranBebas"
+                variant="outlined"
+                density="compact"
+                hide-details
+                rows="2"
+                class="f-inp tp-textarea-2row"
+                placeholder="Isi jika detail size per ukuran belum tersedia, mis. S-10, M-20, L-15..."
+              />
+              <div class="tp-img-hint">
+                Kosongkan kalau detail size sudah diisi di tab "Ukuran &
+                Keterangan".
+              </div>
+            </div>
+          </div>
+
           <!-- Bahan Alternatif -->
           <div
             v-if="isDivisiGarmen"
