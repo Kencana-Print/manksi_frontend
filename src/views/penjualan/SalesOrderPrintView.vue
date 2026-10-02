@@ -61,8 +61,14 @@ const namaToko = (a: any) =>
 const hasAlokasi = computed(() => (data.value.alokasiList || []).length > 0);
 
 // Garmen + cetak dengan alokasi: selalu inline di bawah Ket. Produksi
+const ALOKASI_INLINE_MAX = 16; // di atas ini, wrap ke halaman berikutnya
+
 const isAlokasiInline = computed(
-  () => isGarmen.value && withAlokasi.value && hasAlokasi.value,
+  () =>
+    isGarmen.value &&
+    withAlokasi.value &&
+    hasAlokasi.value &&
+    (data.value.alokasiList?.length || 0) <= ALOKASI_INLINE_MAX,
 );
 
 // Alokasi banyak (> 20 baris) dipecah jadi 2 kolom supaya muat 1 halaman
