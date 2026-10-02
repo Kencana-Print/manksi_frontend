@@ -12,6 +12,13 @@ import SoDtfSearchModal from "@/components/lookups/SoDtfSearchModal.vue";
 import MaklonSearchModal from "@/components/lookups/MaklonSearchModal.vue";
 import BarangGarmenSearchModal from "@/components/lookups/BarangGarmenSearchModal.vue";
 
+interface HasilRow {
+  Id: number | null;
+  KodeHasil: string;
+  NamaHasil: string;
+  QtyHasil: number;
+  BsAfval: number;
+}
 interface DtfRow {
   Kode: string;
   Nama: string;
@@ -27,12 +34,9 @@ interface DtfRow {
   // Khusus Maklon — dipakai/ditampilkan menggantikan kolom di atas
   KodePolos: string;
   Satuan: string;
-  KodeHasil: string;
-  NamaHasil: string;
-  QtyHasil: number;
-  BsAfval: number;
   CabTujuan: string;
   TargetJadiOptions?: any[];
+  HasilRows: HasilRow[];
 }
 interface DtfFormData {
   cab: string;
@@ -43,6 +47,14 @@ interface DtfFormData {
 const route = useRoute();
 const router = useRouter();
 const toast = useToast();
+
+const emptyHasil = (): HasilRow => ({
+  Id: null,
+  KodeHasil: "",
+  NamaHasil: "",
+  QtyHasil: 0,
+  BsAfval: 0,
+});
 
 const emptyRow = (): DtfRow => ({
   Kode: "",
@@ -58,11 +70,8 @@ const emptyRow = (): DtfRow => ({
   Ket: "",
   KodePolos: "",
   Satuan: "",
-  KodeHasil: "",
-  NamaHasil: "",
-  QtyHasil: 0,
-  BsAfval: 0,
   CabTujuan: "",
+  HasilRows: [],
 });
 
 const KETERANGAN_OPTIONS = [
@@ -111,9 +120,16 @@ const {
                 KodePolos: r.KodePolos,
                 QtyMasuk: r.Depan, // Depan dipinjam sebagai Qty Masuk
                 Satuan: r.Satuan,
-                KodeHasil: r.KodeHasil,
-                QtyHasil: r.QtyHasil,
-                BsAfval: r.BsAfval,
+                HasilRows: r.HasilRows.filter(
+                  (h) =>
+                    h.KodeHasil &&
+                    (Number(h.QtyHasil) > 0 || Number(h.BsAfval) > 0),
+                ).map((h) => ({
+                  Id: h.Id,
+                  KodeHasil: h.KodeHasil,
+                  QtyHasil: h.QtyHasil,
+                  BsAfval: h.BsAfval,
+                })),
               }
             : { ...r },
         ),
@@ -143,50 +159,66 @@ const reloadRows = async () => {
       formData.value.cab,
       formData.value.tanggal,
     );
-    const rows: DtfRow[] = (res.data.data || []).map((r: any) => {
+    const rows: DtfRow[] = [];
+    const maklonGroups = new Map<number, DtfRow>();
+    for (const r of res.data.data || []) {
       if (r.Tipe === "MAKLON") {
-        return {
+        let row = maklonGroups.get(r.DtfMaklonId);
+        if (!row) {
+          row = {
+            Kode: r.Kode || "",
+            Nama: r.Nama || "",
+            Tipe: "MAKLON",
+            Depan: Number(r.QtyMasuk) || 0,
+            Belakang: 0,
+            Lengan: 0,
+            Variasi: 0,
+            Saku: 0,
+            Panjang: 0,
+            Buangan: 0,
+            Ket: r.Ket || "",
+            KodePolos: r.KodePolos || "",
+            Satuan: r.Satuan || "",
+            CabTujuan: "",
+            HasilRows: [],
+          };
+          maklonGroups.set(r.DtfMaklonId, row);
+          rows.push(row);
+        }
+        if (r.HasilId) {
+          row.HasilRows.push({
+            Id: r.HasilId,
+            KodeHasil: r.KodeHasil || "",
+            NamaHasil: r.NamaHasil || "",
+            QtyHasil: Number(r.QtyHasil) || 0,
+            BsAfval: Number(r.BsAfval) || 0,
+          });
+        }
+      } else {
+        rows.push({
           Kode: r.Kode || "",
           Nama: r.Nama || "",
-          Tipe: "MAKLON",
-          Depan: Number(r.QtyMasuk) || 0,
-          Belakang: 0,
-          Lengan: 0,
-          Variasi: Number(r.QtyHasil) || 0,
-          Saku: Number(r.BsAfval) || 0,
-          Panjang: 0,
-          Buangan: 0,
+          Tipe: r.Tipe || "SPK",
+          Depan: Number(r.Depan) || 0,
+          Belakang: Number(r.Belakang) || 0,
+          Lengan: Number(r.Lengan) || 0,
+          Variasi: Number(r.Variasi) || 0,
+          Saku: Number(r.Saku) || 0,
+          Panjang: Number(r.Panjang) || 0,
+          Buangan: Number(r.Buangan) || 0,
           Ket: r.Ket || "",
-          KodePolos: r.KodePolos || "", // ⬅ FIX: sebelumnya selalu ""
-          Satuan: r.Satuan || "",
-          KodeHasil: r.KodeHasil || "",
-          NamaHasil: r.NamaHasil || "",
-          QtyHasil: Number(r.QtyHasil) || 0,
-          BsAfval: Number(r.BsAfval) || 0,
+          KodePolos: "",
+          Satuan: "",
           CabTujuan: "",
-        };
+          HasilRows: [],
+        });
       }
-      return {
-        Kode: r.Kode || "",
-        Nama: r.Nama || "",
-        Tipe: r.Tipe || "SPK",
-        Depan: Number(r.Depan) || 0,
-        Belakang: Number(r.Belakang) || 0,
-        Lengan: Number(r.Lengan) || 0,
-        Variasi: Number(r.Variasi) || 0,
-        Saku: Number(r.Saku) || 0,
-        Panjang: Number(r.Panjang) || 0,
-        Buangan: Number(r.Buangan) || 0,
-        Ket: r.Ket || "",
-        KodePolos: "",
-        Satuan: "",
-        KodeHasil: "",
-        NamaHasil: "",
-        QtyHasil: 0,
-        BsAfval: 0,
-        CabTujuan: "",
-      };
-    });
+    }
+    for (const row of rows) {
+      if (row.Tipe === "MAKLON" && row.HasilRows.length === 0) {
+        row.HasilRows.push(emptyHasil());
+      }
+    }
     formData.value.rows = rows;
     ensureTrailingEmptyRow();
   } catch (e: any) {
@@ -275,21 +307,20 @@ const applyMaklonAutofill = async (row: DtfRow) => {
     row.Depan = Number(d.qtyMasuk) || 0;
     row.CabTujuan = d.cabTujuan;
 
-    if (d.targetJadiOptions.length === 1) {
-      // Cuma 1 rencana — langsung isi otomatis
-      row.KodeHasil = d.targetJadiOptions[0].Kode;
-      row.NamaHasil = d.targetJadiOptions[0].Nama;
-    } else if (d.targetJadiOptions.length > 1) {
-      // Lebih dari 1 — belum dipilih, munculkan pilihan ke user
-      row.KodeHasil = "";
-      row.NamaHasil = "";
+    if (d.targetJadiOptions.length >= 1) {
+      // Langsung tampilkan SEMUA target Barang Jadi sebagai baris Item
+      // Hasil (Qty 0 default) — user tinggal isi qty yang relevan,
+      // baris yang dibiarkan 0 otomatis diabaikan saat simpan.
+      row.HasilRows = d.targetJadiOptions.map((opt: any) => ({
+        Id: null,
+        KodeHasil: opt.Kode,
+        NamaHasil: opt.Nama,
+        QtyHasil: 0,
+        BsAfval: 0,
+      }));
       row.TargetJadiOptions = d.targetJadiOptions;
-      toast.info(
-        `${row.Kode} punya ${d.targetJadiOptions.length} rencana Barang Jadi — pilih salah satu.`,
-      );
     } else {
-      row.KodeHasil = "";
-      row.NamaHasil = "";
+      row.HasilRows = [emptyHasil()];
     }
 
     if (d.multiItem) {
@@ -341,24 +372,85 @@ const selectLookupResult = async (item: any) => {
 
 const showItemHasilModal = ref(false);
 const itemHasilTargetIndex = ref<number | null>(null);
+const itemHasilHasilIndex = ref<number | null>(null);
 
-const openItemHasilModal = (idx: number) => {
+const openItemHasilModal = (idx: number, hasilIdx: number | null) => {
   const row = formData.value.rows[idx];
   if (!row.CabTujuan) {
     toast.warning("Pilih No. Maklon terlebih dahulu.");
     return;
   }
   itemHasilTargetIndex.value = idx;
+  itemHasilHasilIndex.value = hasilIdx;
   showItemHasilModal.value = true;
+};
+
+const addHasilRow = (idx: number) => {
+  openItemHasilModal(idx, null);
+};
+
+const removeHasilRow = (idx: number, hasilIdx: number) => {
+  const row = formData.value.rows[idx];
+  if (row.HasilRows.length > 1) {
+    row.HasilRows.splice(hasilIdx, 1);
+  } else {
+    row.HasilRows[0] = emptyHasil();
+  }
 };
 
 const selectItemHasil = (item: any) => {
   const idx = itemHasilTargetIndex.value;
   if (idx === null) return;
-  formData.value.rows[idx].KodeHasil = item.Kode;
-  formData.value.rows[idx].NamaHasil = item.Nama;
+  const row = formData.value.rows[idx];
+  if (itemHasilHasilIndex.value === null) {
+    row.HasilRows.push({
+      Id: null,
+      KodeHasil: item.Kode,
+      NamaHasil: item.Nama,
+      QtyHasil: 0,
+      BsAfval: 0,
+    });
+  } else {
+    const h = row.HasilRows[itemHasilHasilIndex.value];
+    h.KodeHasil = item.Kode;
+    h.NamaHasil = item.Nama;
+  }
   showItemHasilModal.value = false;
 };
+
+interface RenderRow {
+  rowIdx: number;
+  hasilIdx: number;
+  isFirst: boolean;
+  hasilCount: number;
+  key: string;
+}
+const renderRows = computed<RenderRow[]>(() => {
+  const out: RenderRow[] = [];
+  formData.value.rows.forEach((row, rowIdx) => {
+    if (row.Tipe === "MAKLON") {
+      const count = row.HasilRows.length || 1;
+      for (let h = 0; h < count; h++) {
+        out.push({
+          rowIdx,
+          hasilIdx: h,
+          isFirst: h === 0,
+          hasilCount: count,
+          key: `${rowIdx}-${h}`,
+        });
+      }
+    } else {
+      out.push({
+        rowIdx,
+        hasilIdx: 0,
+        isFirst: true,
+        hasilCount: 1,
+        key: `${rowIdx}-0`,
+      });
+    }
+  });
+  return out;
+});
 
 // ── Enter = pindah field berikutnya ──
 // Replikasi FormKeyPress Delphi: `if Key=#13 then SelectNext(ActiveControl,True,True)`
@@ -405,10 +497,15 @@ const onValidateSave = () => {
   for (const r of filled) {
     if (!r.Ket.trim()) return toast.error("Keterangan harus diisi.");
     if (r.Tipe === "MAKLON") {
-      if (!r.KodeHasil)
+      const filledHasil = r.HasilRows.filter((h) => h.KodeHasil);
+      if (!filledHasil.length)
         return toast.error(`${r.Kode}: Item Hasil wajib diisi.`);
-      if (!r.QtyHasil && !r.BsAfval)
-        return toast.error(`${r.Kode}: Qty Hasil atau BS/Afval harus diisi.`);
+      for (const h of filledHasil) {
+        if (!h.QtyHasil && !h.BsAfval)
+          return toast.error(
+            `${r.Kode} (${h.KodeHasil}): Qty Hasil atau BS/Afval harus diisi.`,
+          );
+      }
     } else {
       const qtySum = r.Depan + r.Belakang + r.Lengan + r.Variasi + r.Saku;
       if (qtySum === 0) return toast.error("Qty harus di isi");
@@ -511,124 +608,149 @@ const num = (v: number) => new Intl.NumberFormat("id-ID").format(v || 0);
             </thead>
             <tbody>
               <tr
-                v-for="(row, idx) in formData.rows"
-                :key="idx"
+                v-for="rr in renderRows"
+                :key="rr.key"
                 :ref="
                   (el) => {
-                    if (el) rowRefs[idx] = el as HTMLElement;
+                    if (rr.isFirst && el)
+                      rowRefs[rr.rowIdx] = el as HTMLElement;
                   }
                 "
                 :class="{
-                  'row-highlight': highlightedRowIndex === idx,
-                  'row-maklon': row.Tipe === 'MAKLON',
+                  'row-highlight': highlightedRowIndex === rr.rowIdx,
+                  'row-maklon': formData.rows[rr.rowIdx].Tipe === 'MAKLON',
                 }"
               >
-                <td class="tc">{{ idx + 1 }}</td>
-                <td>
-                  <div class="kode-cell">
+                <template v-if="rr.isFirst">
+                  <td class="tc" :rowspan="rr.hasilCount">
+                    {{ rr.rowIdx + 1 }}
+                  </td>
+                  <td :rowspan="rr.hasilCount">
+                    <div class="kode-cell">
+                      <input
+                        type="text"
+                        v-model="formData.rows[rr.rowIdx].Kode"
+                        class="cell-input nav-field"
+                        @blur="onKodeBlur(formData.rows[rr.rowIdx])"
+                        @keydown.f1.prevent="openSpkMapLookup(rr.rowIdx)"
+                        @keydown.f2.prevent="openSoDtfLookup(rr.rowIdx)"
+                        @keydown.f3.prevent="openMaklonLookup(rr.rowIdx)"
+                      />
+                      <button
+                        class="lk-btn"
+                        tabindex="-1"
+                        :disabled="!!formData.rows[rr.rowIdx].Nama"
+                        title="F1 Help SPK/MAP"
+                        @click="openSpkMapLookup(rr.rowIdx)"
+                      >
+                        F1
+                      </button>
+                      <button
+                        class="lk-btn"
+                        tabindex="-1"
+                        :disabled="!!formData.rows[rr.rowIdx].Nama"
+                        title="F2 Help SO DTF Kaosan"
+                        @click="openSoDtfLookup(rr.rowIdx)"
+                      >
+                        F2
+                      </button>
+                      <button
+                        class="lk-btn"
+                        tabindex="-1"
+                        :disabled="!!formData.rows[rr.rowIdx].Nama"
+                        title="F3 Help No. Maklon"
+                        @click="openMaklonLookup(rr.rowIdx)"
+                      >
+                        F3
+                      </button>
+                    </div>
+                  </td>
+                  <td :rowspan="rr.hasilCount">
                     <input
                       type="text"
-                      v-model="row.Kode"
-                      class="cell-input nav-field"
-                      @blur="onKodeBlur(row)"
-                      @keydown.f1.prevent="openSpkMapLookup(idx)"
-                      @keydown.f2.prevent="openSoDtfLookup(idx)"
-                      @keydown.f3.prevent="openMaklonLookup(idx)"
+                      v-model="formData.rows[rr.rowIdx].Nama"
+                      class="cell-input"
+                      readonly
                     />
-                    <button
-                      class="lk-btn"
-                      tabindex="-1"
-                      :disabled="!!row.Nama"
-                      title="F1 Help SPK/MAP"
-                      @click="openSpkMapLookup(idx)"
+                    <span
+                      v-if="formData.rows[rr.rowIdx].Tipe === 'MAKLON'"
+                      class="tipe-badge"
+                      >MAKLON</span
                     >
-                      F1
-                    </button>
-                    <button
-                      class="lk-btn"
-                      tabindex="-1"
-                      :disabled="!!row.Nama"
-                      title="F2 Help SO DTF Kaosan"
-                      @click="openSoDtfLookup(idx)"
-                    >
-                      F2
-                    </button>
-                    <button
-                      class="lk-btn"
-                      tabindex="-1"
-                      :disabled="!!row.Nama"
-                      title="F3 Help No. Maklon"
-                      @click="openMaklonLookup(idx)"
-                    >
-                      F3
-                    </button>
-                  </div>
-                </td>
-                <td>
-                  <input
-                    type="text"
-                    v-model="row.Nama"
-                    class="cell-input"
-                    readonly
-                  />
-                  <span v-if="row.Tipe === 'MAKLON'" class="tipe-badge"
-                    >MAKLON</span
-                  >
-                </td>
-
-                <!-- Depan / Qty Masuk -->
-                <td>
-                  <input
-                    v-if="row.Tipe === 'MAKLON'"
-                    type="number"
-                    v-model.number="row.Depan"
-                    class="cell-input tr"
-                    readonly
-                  />
-                  <input
-                    v-else
-                    type="number"
-                    v-model.number="row.Depan"
-                    class="cell-input tr"
-                  />
-                </td>
-
-                <!-- Belakang / Satuan -->
-                <td>
-                  <input
-                    v-if="row.Tipe === 'MAKLON'"
-                    type="text"
-                    v-model="row.Satuan"
-                    class="cell-input"
-                    readonly
-                  />
-                  <input
-                    v-else
-                    type="number"
-                    v-model.number="row.Belakang"
-                    class="cell-input tr"
-                  />
-                </td>
+                  </td>
+                  <td :rowspan="rr.hasilCount">
+                    <input
+                      v-if="formData.rows[rr.rowIdx].Tipe === 'MAKLON'"
+                      type="number"
+                      v-model.number="formData.rows[rr.rowIdx].Depan"
+                      class="cell-input tr"
+                      readonly
+                    />
+                    <input
+                      v-else
+                      type="number"
+                      v-model.number="formData.rows[rr.rowIdx].Depan"
+                      class="cell-input tr"
+                    />
+                  </td>
+                  <td :rowspan="rr.hasilCount">
+                    <input
+                      v-if="formData.rows[rr.rowIdx].Tipe === 'MAKLON'"
+                      type="text"
+                      v-model="formData.rows[rr.rowIdx].Satuan"
+                      class="cell-input"
+                      readonly
+                    />
+                    <input
+                      v-else
+                      type="number"
+                      v-model.number="formData.rows[rr.rowIdx].Belakang"
+                      class="cell-input tr"
+                    />
+                  </td>
+                </template>
 
                 <!-- Lengan / Item Hasil -->
                 <td>
-                  <div v-if="row.Tipe === 'MAKLON'" class="kode-cell">
+                  <div
+                    v-if="formData.rows[rr.rowIdx].Tipe === 'MAKLON'"
+                    class="kode-cell"
+                  >
                     <span class="cell-text mono">{{
-                      row.KodeHasil || "—"
+                      formData.rows[rr.rowIdx].HasilRows[rr.hasilIdx]
+                        ?.KodeHasil || "—"
                     }}</span>
                     <button
                       class="lk-btn"
                       tabindex="-1"
-                      title="Ganti Item Hasil"
-                      @click="openItemHasilModal(idx)"
+                      title="Pilih Item Hasil"
+                      @click="openItemHasilModal(rr.rowIdx, rr.hasilIdx)"
                     >
                       <IconSearch :size="10" />
+                    </button>
+                    <button
+                      v-if="rr.isFirst"
+                      class="lk-btn"
+                      tabindex="-1"
+                      title="Tambah Item Hasil"
+                      @click="addHasilRow(rr.rowIdx)"
+                    >
+                      +
+                    </button>
+                    <button
+                      v-if="rr.hasilCount > 1"
+                      class="lk-btn"
+                      tabindex="-1"
+                      title="Hapus Item Hasil ini"
+                      @click="removeHasilRow(rr.rowIdx, rr.hasilIdx)"
+                    >
+                      <IconTrash :size="10" />
                     </button>
                   </div>
                   <input
                     v-else
                     type="number"
-                    v-model.number="row.Lengan"
+                    v-model.number="formData.rows[rr.rowIdx].Lengan"
                     class="cell-input tr"
                   />
                 </td>
@@ -636,15 +758,17 @@ const num = (v: number) => new Intl.NumberFormat("id-ID").format(v || 0);
                 <!-- Variasi / Qty Hasil -->
                 <td>
                   <input
-                    v-if="row.Tipe === 'MAKLON'"
+                    v-if="formData.rows[rr.rowIdx].Tipe === 'MAKLON'"
                     type="number"
-                    v-model.number="row.QtyHasil"
+                    v-model.number="
+                      formData.rows[rr.rowIdx].HasilRows[rr.hasilIdx].QtyHasil
+                    "
                     class="cell-input tr"
                   />
                   <input
                     v-else
                     type="number"
-                    v-model.number="row.Variasi"
+                    v-model.number="formData.rows[rr.rowIdx].Variasi"
                     class="cell-input tr"
                   />
                 </td>
@@ -652,67 +776,77 @@ const num = (v: number) => new Intl.NumberFormat("id-ID").format(v || 0);
                 <!-- Saku / BS-Afval -->
                 <td>
                   <input
-                    v-if="row.Tipe === 'MAKLON'"
+                    v-if="formData.rows[rr.rowIdx].Tipe === 'MAKLON'"
                     type="number"
-                    v-model.number="row.BsAfval"
+                    v-model.number="
+                      formData.rows[rr.rowIdx].HasilRows[rr.hasilIdx].BsAfval
+                    "
                     class="cell-input tr"
                   />
                   <input
                     v-else
                     type="number"
-                    v-model.number="row.Saku"
+                    v-model.number="formData.rows[rr.rowIdx].Saku"
                     class="cell-input tr"
                   />
                 </td>
 
-                <!-- Panjang, Buangan: tidak relevan buat Maklon, disable -->
-                <td>
-                  <input
-                    type="number"
-                    step="0.1"
-                    v-model.number="row.Panjang"
-                    class="cell-input tr"
-                    :disabled="row.Tipe === 'MAKLON'"
-                  />
-                </td>
-                <td>
-                  <input
-                    type="number"
-                    step="0.1"
-                    v-model.number="row.Buangan"
-                    class="cell-input tr"
-                    :disabled="row.Tipe === 'MAKLON'"
-                  />
-                </td>
-
-                <td>
-                  <select v-model="row.Ket" class="cell-input cell-select">
-                    <option value="">-- Pilih --</option>
-                    <option
-                      v-if="row.Ket && !KETERANGAN_OPTIONS.includes(row.Ket)"
-                      :value="row.Ket"
+                <template v-if="rr.isFirst">
+                  <td :rowspan="rr.hasilCount">
+                    <input
+                      type="number"
+                      step="0.1"
+                      v-model.number="formData.rows[rr.rowIdx].Panjang"
+                      class="cell-input tr"
+                      :disabled="formData.rows[rr.rowIdx].Tipe === 'MAKLON'"
+                    />
+                  </td>
+                  <td :rowspan="rr.hasilCount">
+                    <input
+                      type="number"
+                      step="0.1"
+                      v-model.number="formData.rows[rr.rowIdx].Buangan"
+                      class="cell-input tr"
+                      :disabled="formData.rows[rr.rowIdx].Tipe === 'MAKLON'"
+                    />
+                  </td>
+                  <td :rowspan="rr.hasilCount">
+                    <select
+                      v-model="formData.rows[rr.rowIdx].Ket"
+                      class="cell-input cell-select"
                     >
-                      {{ row.Ket }}
-                    </option>
-                    <option
-                      v-for="opt in KETERANGAN_OPTIONS"
-                      :key="opt"
-                      :value="opt"
+                      <option value="">-- Pilih --</option>
+                      <option
+                        v-if="
+                          formData.rows[rr.rowIdx].Ket &&
+                          !KETERANGAN_OPTIONS.includes(
+                            formData.rows[rr.rowIdx].Ket,
+                          )
+                        "
+                        :value="formData.rows[rr.rowIdx].Ket"
+                      >
+                        {{ formData.rows[rr.rowIdx].Ket }}
+                      </option>
+                      <option
+                        v-for="opt in KETERANGAN_OPTIONS"
+                        :key="opt"
+                        :value="opt"
+                      >
+                        {{ opt }}
+                      </option>
+                    </select>
+                  </td>
+                  <td class="tc" :rowspan="rr.hasilCount">
+                    <button
+                      class="del-btn"
+                      tabindex="-1"
+                      title="Hapus baris"
+                      @click="confirmDeleteRow(rr.rowIdx)"
                     >
-                      {{ opt }}
-                    </option>
-                  </select>
-                </td>
-                <td class="tc">
-                  <button
-                    class="del-btn"
-                    tabindex="-1"
-                    title="Hapus baris"
-                    @click="confirmDeleteRow(idx)"
-                  >
-                    <IconTrash :size="14" />
-                  </button>
-                </td>
+                      <IconTrash :size="14" />
+                    </button>
+                  </td>
+                </template>
               </tr>
             </tbody>
           </table>
