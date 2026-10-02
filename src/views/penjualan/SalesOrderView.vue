@@ -10,6 +10,7 @@ import { salesOrderFormService } from "@/services/penjualan/salesOrderFormServic
 import CustomerSearchModal from "@/components/lookups/CustomerSearchModal.vue";
 import SalesSearchModal from "@/components/lookups/SalesSearchModal.vue";
 import PenawaranSearchModal from "@/components/lookups/PenawaranSearchModal.vue";
+import PenawaranDetailSearchModal from "@/components/lookups/PenawaranDetailSearchModal.vue";
 import InvDcSearchModal from "@/components/lookups/InvDcSearchModal.vue";
 import api from "@/services/api";
 import {
@@ -286,6 +287,7 @@ const tailHeadersFront = [
   { title: "Acc JO", key: "AccJO", width: "80px", align: "center" },
   { title: "Acc Pending", key: "AccPending", width: "90px", align: "center" },
   { title: "MPPB", key: "MPPB", width: "120px" },
+  { title: "No. LHK Desain", key: "LhkNomor", width: "130px" },
   {
     title: "Design Tgl",
     key: "Design_Tanggal",
@@ -1078,6 +1080,7 @@ const revisiData = ref<any>({
   salKode: "",
   salNama: "",
   penawaranNomor: "",
+  penawaranPendId: "",
   invoiceDc: "",
   namaExternal: "",
   isTutupBuku: false,
@@ -1091,6 +1094,8 @@ const isRevisiPinSubmitting = ref(false);
 const showRevisiCusModal = ref(false);
 const showRevisiSalesModal = ref(false);
 const showRevisiPenawaranModal = ref(false);
+const showRevisiPenawaranDetailModal = ref(false);
+const selectedRevisiPenawaranNomor = ref("");
 
 const handleRevisiCusSelected = (item: any) => {
   revisiData.value.cusKode = item.cus_kode || item.Kode || item.kode;
@@ -1103,8 +1108,16 @@ const handleRevisiSalesSelected = (item: any) => {
   showRevisiSalesModal.value = false;
 };
 const handleRevisiPenawaranSelected = (item: any) => {
-  revisiData.value.penawaranNomor = item.Nomor || item.pen_nomor;
+  const nomor = item.Nomor || item.pen_nomor;
+  revisiData.value.penawaranNomor = nomor;
+  revisiData.value.penawaranPendId = ""; // reset tiap kali pilih header baru
+  selectedRevisiPenawaranNomor.value = nomor;
   showRevisiPenawaranModal.value = false;
+  showRevisiPenawaranDetailModal.value = true; // lanjut pilih detail item
+};
+const handleRevisiPenawaranDetailSelected = (item: any) => {
+  revisiData.value.penawaranPendId = item.id || item.ID;
+  showRevisiPenawaranDetailModal.value = false;
 };
 const showRevisiInvDcModal = ref(false);
 const handleRevisiInvDcSelected = (item: any) => {
@@ -1144,6 +1157,7 @@ const submitRevisi = async () => {
       cusNama: revisiData.value.cusNama,
       salKode: revisiData.value.salKode,
       penawaranNomor: revisiData.value.penawaranNomor,
+      penawaranPendId: revisiData.value.penawaranPendId,
       invoiceDc: revisiData.value.invoiceDc,
       namaExternal: revisiData.value.namaExternal,
     });
@@ -1546,6 +1560,11 @@ const submitRevisiPin = async () => {
     v-model="showRevisiPenawaranModal"
     @selected="handleRevisiPenawaranSelected"
     :cust-kode="revisiData.cusKode"
+  />
+  <PenawaranDetailSearchModal
+    v-model="showRevisiPenawaranDetailModal"
+    @selected="handleRevisiPenawaranDetailSelected"
+    :penawaran-nomor="selectedRevisiPenawaranNomor"
   />
   <InvDcSearchModal
     v-model="showRevisiInvDcModal"
