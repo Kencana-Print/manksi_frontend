@@ -54,6 +54,7 @@ interface DetailRow {
   PermintaanKirim: string;
   StatusPermintaan: string;
   Kesepakatan: string;
+  QtyKesepakatan: number;
   KetKesepakatan: string;
   NomorPraOrder: string;
 }
@@ -698,6 +699,12 @@ const buildDetailColumns = (cabang: string) => {
     { header: "Realisasi", key: "Realisasi", align: "right", numFmt: "#,##0" },
     { header: "Permintaan Kirim", key: "PermintaanKirim", align: "center" },
     { header: "Permintaan", key: "StatusPermintaan", align: "center" },
+    {
+      header: "Qty Kesepakatan",
+      key: "QtyKesepakatan",
+      align: "right",
+      numFmt: "#,##0",
+    },
     { header: "Kesepakatan", key: "Kesepakatan", align: "center" },
     { header: "Ket Kesepakatan", key: "KetKesepakatan" },
   );
@@ -775,6 +782,7 @@ const onExportDetail = async (tipe: "SO" | "MAP") => {
         Realisasi: Number(d.Realisasi) || 0,
         PermintaanKirim: formatTanggal(d.PermintaanKirim),
         StatusPermintaan: d.StatusPermintaan,
+        QtyKesepakatan: Number(d.QtyKesepakatan) || 0,
         Kesepakatan: formatTanggal(d.Kesepakatan),
         KetKesepakatan: d.KetKesepakatan || "",
       }));
@@ -1048,6 +1056,7 @@ checkUnnotifiedMap();
                   <th class="tr">Realisasi</th>
                   <th class="tc">Permintaan Kirim</th>
                   <th class="tc">Permintaan</th>
+                  <th class="tr">Qty Kesepakatan</th>
                   <th>Kesepakatan</th>
                 </tr>
               </thead>
@@ -1103,6 +1112,9 @@ checkUnnotifiedMap();
                       {{ d.StatusPermintaan }}
                     </v-chip>
                   </td>
+                  <td class="tr">
+                    {{ d.QtyKesepakatan ? fmt(d.QtyKesepakatan) : "-" }}
+                  </td>
                   <td>
                     <span v-if="d.Kesepakatan" class="kesepakatan-tgl">{{
                       formatTanggal(d.Kesepakatan)
@@ -1123,7 +1135,7 @@ checkUnnotifiedMap();
                   "
                 >
                   <td
-                    :colspan="showPanjangLebar(item.Cabang) ? 12 : 10"
+                    :colspan="showPanjangLebar(item.Cabang) ? 13 : 11"
                     class="empty-row"
                   >
                     <template v-if="globalSearch">
@@ -1281,6 +1293,7 @@ checkUnnotifiedMap();
                 <th class="tr">Realisasi</th>
                 <th class="tc">Permintaan Kirim</th>
                 <th class="tc">Permintaan</th>
+                <th class="tr">Qty Kesepakatan</th>
                 <th>Kesepakatan</th>
               </tr>
             </thead>
@@ -1325,6 +1338,9 @@ checkUnnotifiedMap();
                     {{ d.StatusPermintaan }}
                   </v-chip>
                 </td>
+                <td class="tr">
+                  {{ d.QtyKesepakatan ? fmt(d.QtyKesepakatan) : "-" }}
+                </td>
                 <td>
                   <span v-if="d.Kesepakatan" class="kesepakatan-tgl">{{
                     formatTanggal(d.Kesepakatan)
@@ -1342,7 +1358,7 @@ checkUnnotifiedMap();
                 "
               >
                 <td
-                  :colspan="showPanjangLebar(previewCabang) ? 13 : 11"
+                  :colspan="showPanjangLebar(previewCabang) ? 14 : 12"
                   class="empty-row"
                 >
                   <template v-if="previewSearch">
