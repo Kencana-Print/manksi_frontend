@@ -1530,7 +1530,7 @@ const submitRevisiPin = async () => {
             <v-list-item-title>Form Pembatalan SO</v-list-item-title>
           </v-list-item>
           <v-divider class="my-1"></v-divider>
-          <v-list-item @click="openBatalCloseDialog" :disabled="!canDelete">
+          <v-list-item @click="openCloseSpk" :disabled="!canDelete">
             <template #prepend
               ><IconLockSquare :size="14" class="mr-2 text-warning"
             /></template>
