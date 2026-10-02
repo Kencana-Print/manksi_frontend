@@ -102,7 +102,7 @@ const needsAlokasiPage2 = computed(() => {
 
 const alokasiChunks = computed(() => {
   const list = data.value.alokasiList || [];
-  const chunkSize = 20;
+  const chunkSize = 24;
   const chunks = [];
   for (let i = 0; i < list.length; i += chunkSize) {
     chunks.push(list.slice(i, i + chunkSize));
@@ -1505,19 +1505,34 @@ onMounted(async () => {
 .alokasi-table {
   width: 100%;
   border-collapse: collapse;
+  table-layout: fixed;
   font-size: 9pt;
   color: #000;
 }
 .alokasi-table th,
 .alokasi-table td {
   border: 1px solid #000;
-  padding: 4px 6px;
+  padding: 3px 5px;
   color: #000 !important;
+  vertical-align: top;
+  line-height: 1.15;
+  word-break: break-word;
 }
 .alokasi-table th {
   font-weight: bold;
 }
-
+.alokasi-table th:nth-child(1),
+.alokasi-table td:nth-child(1) {
+  width: 58%;
+}
+.alokasi-table th:nth-child(2),
+.alokasi-table td:nth-child(2) {
+  width: 22%;
+}
+.alokasi-table th:nth-child(3),
+.alokasi-table td:nth-child(3) {
+  width: 20%;
+}
 .garmen-kanan {
   min-height: 0;
 }
