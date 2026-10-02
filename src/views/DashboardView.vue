@@ -31,9 +31,12 @@ import {
   IconArrowsExchange,
   IconBoxSeam,
   IconFileInvoice,
+  IconFileSpreadsheet,
 } from "@tabler/icons-vue";
 import AiChatWidget from "@/components/AiChatWidget.vue";
 import api from "@/services/api";
+import { exportExcelSingle } from "@/utils/excelExport";
+import { formatTanggalJam } from "@/utils/dateFormat";
 
 interface OverdueItem {
   Invoice: string;
@@ -1814,6 +1817,72 @@ const fetchPotensiSummary = async () => {
     if (res.data?.data) potensiSummary.value = res.data.data;
   } catch {
     /* silent */
+  }
+};
+
+const isExportingPotensi = ref(false);
+const exportPotensiExcel = async () => {
+  isExportingPotensi.value = true;
+  try {
+    const all: PotensiItem[] = [];
+    let offset = 0;
+    const pageSize = 200;
+    while (true) {
+      const res = await dashboardService.getPotensiList(pageSize, offset);
+      const rows: PotensiItem[] = res.data.data.items ?? [];
+      all.push(...rows);
+      offset += rows.length;
+      if (rows.length < pageSize) break;
+    }
+
+    if (!all.length) {
+      alert("Tidak ada data Proyeksi Potensial untuk diexport.");
+      return;
+    }
+
+    const rows = all.map((item) => ({
+      nomor: item.pot_nomor,
+      tanggal: formatTanggalJam(item.date_create),
+      sumber: item.Sumber,
+      noSumber: item.NomorSumber,
+      namaItem: item.pot_nama_item,
+      customer: item.cus_nama || "-",
+      sales: item.sal_nama || "-",
+      userCreate: item.user_create,
+      harga: Number(item.pot_harga) || 0,
+      status: item.pot_status,
+      alasanBatal: item.pot_alasan_batal || "",
+    }));
+
+    await exportExcelSingle(
+      `Proyeksi_Potensial_${new Date().toISOString().substring(0, 10)}.xlsx`,
+      "Proyeksi Potensial",
+      [
+        { header: "Nomor", key: "nomor", width: 16 },
+        { header: "Tanggal", key: "tanggal", width: 14 },
+        { header: "Sumber", key: "sumber", width: 12 },
+        { header: "No. Sumber", key: "noSumber", width: 16 },
+        { header: "Nama Item", key: "namaItem", width: 28 },
+        { header: "Customer", key: "customer", width: 22 },
+        { header: "Sales", key: "sales", width: 18 },
+        { header: "User Create", key: "userCreate", width: 14 },
+        {
+          header: "Harga",
+          key: "harga",
+          width: 16,
+          numFmt: '"Rp"#,##0',
+          align: "right",
+        },
+        { header: "Status", key: "status", width: 14 },
+        { header: "Alasan Batal", key: "alasanBatal", width: 24 },
+      ],
+      rows,
+    );
+  } catch (e: any) {
+    console.error(e);
+    alert("Gagal export Proyeksi Potensial: " + (e?.message ?? String(e)));
+  } finally {
+    isExportingPotensi.value = false;
   }
 };
 
@@ -5779,6 +5848,18 @@ const sisaClass = (item: any) => {
                 >
                 <button
                   class="knj-detail-btn ml-auto"
+                  style="border-color: #ffcc80; color: #e65100"
+                  :disabled="isExportingPotensi"
+                  @click="exportPotensiExcel"
+                >
+                  <IconFileSpreadsheet
+                    :size="12"
+                    style="vertical-align: middle; margin-right: 2px"
+                  />
+                  {{ isExportingPotensi ? "Mengexport..." : "Export" }}
+                </button>
+                <button
+                  class="knj-detail-btn"
                   style="border-color: #ffcc80; color: #e65100"
                   @click="openSetPotensiDialog"
                 >
