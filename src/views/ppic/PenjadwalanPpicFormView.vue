@@ -75,6 +75,7 @@ interface DetailRow {
   PermintaanKirim: string;
   StatusPermintaan: string;
   Kesepakatan: string;
+  QtyKesepakatan: number;
   KetKesepakatan: string;
 }
 
@@ -313,6 +314,7 @@ const mapDetailRow = (r: any): DetailRow => ({
   PermintaanKirim: r.PermintaanKirim || "",
   StatusPermintaan: r.StatusPermintaan || "CLOSE",
   Kesepakatan: r.Kesepakatan || "",
+  QtyKesepakatan: Number(r.QtyKesepakatan) || 0,
   KetKesepakatan: r.KetKesepakatan || "",
 });
 
@@ -442,6 +444,7 @@ const pushRowFromServer = (pjwdId: number, rowInput: any) => {
     PermintaanKirim: rowInput.PermintaanKirim || "",
     StatusPermintaan: "CLOSE",
     Kesepakatan: "",
+    QtyKesepakatan: 0,
     KetKesepakatan: "",
   });
 };
@@ -923,6 +926,13 @@ const onRencanaInput = (row: DetailRow, raw: string, e: Event) => {
   moveCursorToEnd(e);
 };
 
+const onQtyKesepakatanInput = (row: DetailRow, raw: string, e: Event) => {
+  const val = raw.replace(/[^0-9]/g, "");
+  row.QtyKesepakatan = val ? Number(val) : 0;
+  onQtyKesepakatanChange(row);
+  moveCursorToEnd(e);
+};
+
 const onManualPesanInput = (row: DetailRow, raw: string, e: Event) => {
   const val = raw.replace(/[^0-9]/g, "");
   row.Pesan = val ? Number(val) : 0;
@@ -947,6 +957,8 @@ const onKetRencanaChange = (row: DetailRow) =>
   onDetailFieldChange(row, "KetRencana", "pjwd_ket_rencana");
 const onKesepakatanChange = (row: DetailRow) =>
   onDetailFieldChange(row, "Kesepakatan", "pjwd_tgl_kesepakatan");
+const onQtyKesepakatanChange = (row: DetailRow) =>
+  onDetailFieldChange(row, "QtyKesepakatan", "pjwd_qty_kesepakatan");
 const onKetKesepakatanChange = (row: DetailRow) =>
   onDetailFieldChange(row, "KetKesepakatan", "pjwd_ket_kesepakatan");
 const showMoveDialog = ref(false);
@@ -1094,6 +1106,7 @@ onMounted(() => {
       pjwd_tgl_permintaan_kirim: "PermintaanKirim",
       pjwd_status_permintaan: "StatusPermintaan",
       pjwd_tgl_kesepakatan: "Kesepakatan",
+      pjwd_qty_kesepakatan: "QtyKesepakatan",
       pjwd_ket_kesepakatan: "KetKesepakatan",
     };
     const localField = fieldMap[payload.field];
@@ -1352,7 +1365,7 @@ const rowClass = (d: DetailRow) => {
               <th style="width: 80px" class="tr">Realisasi</th>
               <th style="width: 130px" class="tc">Permintaan Kirim</th>
               <th style="width: 100px" class="tc">Permintaan</th>
-              <th style="width: 200px">Kesepakatan</th>
+              <th style="width: 230px">Kesepakatan</th>
               <th style="width: 36px"></th>
             </tr>
           </thead>
@@ -1557,15 +1570,50 @@ const rowClass = (d: DetailRow) => {
                       .nama
                   }}
                 </span>
+                <span
+                  v-if="
+                    fieldFocusMap[focusKey(d.PjwdId, 'pjwd_qty_kesepakatan')]
+                  "
+                  class="field-focus-badge"
+                >
+                  {{
+                    fieldFocusMap[focusKey(d.PjwdId, "pjwd_qty_kesepakatan")]
+                      .nama
+                  }}
+                </span>
                 <div class="pjw-kesepakatan-cell">
-                  <input
-                    type="date"
-                    v-model="d.Kesepakatan"
-                    class="pjw-cell-date"
-                    :disabled="!canEditKesepakatan"
-                    @focus="onKesepakatanFocus(d)"
-                    @blur="onKesepakatanBlur(d)"
-                  />
+                  <div class="pjw-kesepakatan-top">
+                    <input
+                      type="text"
+                      inputmode="numeric"
+                      class="pjw-cell-num pjw-cell-qty"
+                      placeholder="Qty"
+                      :value="d.QtyKesepakatan"
+                      :disabled="!canEditKesepakatan"
+                      @focus="
+                        (e) => {
+                          sel(e);
+                          onFieldFocus(d, 'pjwd_qty_kesepakatan');
+                        }
+                      "
+                      @blur="onFieldBlur(d, 'pjwd_qty_kesepakatan')"
+                      @input="
+                        onQtyKesepakatanInput(
+                          d,
+                          ($event.target as HTMLInputElement).value,
+                          $event,
+                        )
+                      "
+                    />
+                    <input
+                      type="date"
+                      v-model="d.Kesepakatan"
+                      class="pjw-cell-date"
+                      :disabled="!canEditKesepakatan"
+                      @focus="onKesepakatanFocus(d)"
+                      @blur="onKesepakatanBlur(d)"
+                    />
+                  </div>
                   <input
                     type="text"
                     v-model="d.KetKesepakatan"
@@ -1991,6 +2039,21 @@ const rowClass = (d: DetailRow) => {
   display: flex;
   flex-direction: column;
   gap: 3px;
+}
+.pjw-kesepakatan-top {
+  display: flex;
+  gap: 3px;
+}
+.pjw-kesepakatan-top .pjw-cell-qty {
+  width: 56px;
+  min-width: 56px;
+  max-width: 56px;
+  flex: 0 0 56px;
+  text-align: right;
+}
+.pjw-kesepakatan-top .pjw-cell-date {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 .pjw-ket-rencana {
   margin-top: 3px;
