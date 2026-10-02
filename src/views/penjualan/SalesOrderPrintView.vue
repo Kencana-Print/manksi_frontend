@@ -102,7 +102,7 @@ const needsAlokasiPage2 = computed(() => {
 
 const alokasiChunks = computed(() => {
   const list = data.value.alokasiList || [];
-  const chunkSize = 24;
+  const chunkSize = 20;
   const chunks = [];
   for (let i = 0; i < list.length; i += chunkSize) {
     chunks.push(list.slice(i, i + chunkSize));
