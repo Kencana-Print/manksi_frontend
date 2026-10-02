@@ -665,19 +665,31 @@ const num = (v: number) => new Intl.NumberFormat("id-ID").format(v || 0);
                       </button>
                     </div>
                   </td>
-                  <td :rowspan="rr.hasilCount">
-                    <input
-                      type="text"
-                      v-model="formData.rows[rr.rowIdx].Nama"
-                      class="cell-input"
-                      readonly
-                    />
-                    <span
-                      v-if="formData.rows[rr.rowIdx].Tipe === 'MAKLON'"
-                      class="tipe-badge"
-                      >MAKLON</span
-                    >
-                  </td>
+                </template>
+
+                <!-- Nama: per baris Item Hasil untuk MAKLON (bukan gabungan) -->
+                <td>
+                  <input
+                    type="text"
+                    :value="
+                      formData.rows[rr.rowIdx].Tipe === 'MAKLON'
+                        ? formData.rows[rr.rowIdx].HasilRows[rr.hasilIdx]
+                            ?.NamaHasil || ''
+                        : formData.rows[rr.rowIdx].Nama
+                    "
+                    class="cell-input"
+                    readonly
+                  />
+                  <span
+                    v-if="
+                      rr.isFirst && formData.rows[rr.rowIdx].Tipe === 'MAKLON'
+                    "
+                    class="tipe-badge"
+                    >MAKLON</span
+                  >
+                </td>
+
+                <template v-if="rr.isFirst">
                   <td :rowspan="rr.hasilCount">
                     <input
                       v-if="formData.rows[rr.rowIdx].Tipe === 'MAKLON'"
