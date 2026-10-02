@@ -938,7 +938,7 @@ onMounted(async () => {
       </template>
 
       <!-- ══ ALOKASI PANEL (Halaman 2 / Overflow) ══ -->
-      <div v-if="needsAlokasiPage2" class="print-half alokasi-panel">
+      <div v-if="needsAlokasiPage2" class="print-half full-width alokasi-panel">
         <h2
           class="title mb-2"
           style="text-decoration: underline; font-size: 13pt; font-weight: bold"
