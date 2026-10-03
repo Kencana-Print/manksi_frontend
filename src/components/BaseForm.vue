@@ -1,10 +1,13 @@
 <script setup lang="ts">
+import { ref } from "vue";
 import PageLayout from "@/components/PageLayout.vue";
 import {
   IconDeviceFloppy,
   IconX,
   IconAlertTriangle,
   IconCircleX,
+  IconChevronLeft,
+  IconChevronRight,
 } from "@tabler/icons-vue";
 
 const props = defineProps<{
@@ -27,6 +30,10 @@ const emit = defineEmits([
   "confirm-cancel",
   "confirm-close",
 ]);
+
+// Collapse panel kiri (header/info form) supaya tabel detail bisa fokus
+// pakai lebar penuh. State lokal per halaman, reset tiap halaman dibuka.
+const isLeftCollapsed = ref(false);
 </script>
 
 <template>
@@ -94,12 +101,36 @@ const emit = defineEmits([
             : !$slots['left-column'] && $slots['right-column']
               ? 'single-column'
               : 'custom-layout',
+        isLeftCollapsed ? 'collapsed-left' : '',
       ]"
       v-if="!isLoading"
     >
       <template v-if="$slots['left-column'] || $slots['right-column']">
-        <aside class="left-column" v-if="$slots['left-column']">
-          <slot name="left-column"></slot>
+        <aside
+          class="left-column"
+          :class="{ collapsed: isLeftCollapsed }"
+          v-if="$slots['left-column']"
+        >
+          <button
+            type="button"
+            class="left-collapse-btn"
+            :title="
+              isLeftCollapsed
+                ? 'Tampilkan panel (header)'
+                : 'Sembunyikan panel (fokus ke tabel)'
+            "
+            @click="isLeftCollapsed = !isLeftCollapsed"
+          >
+            <IconChevronLeft
+              v-if="!isLeftCollapsed"
+              :size="14"
+              :stroke-width="2"
+            />
+            <IconChevronRight v-else :size="14" :stroke-width="2" />
+          </button>
+          <div class="left-column-content" v-show="!isLeftCollapsed">
+            <slot name="left-column"></slot>
+          </div>
         </aside>
         <main class="center-column" v-if="$slots['center-column']">
           <slot name="center-column"></slot>
@@ -201,7 +232,7 @@ const emit = defineEmits([
   padding: 12px;
   height: calc(100vh - 180px);
   display: grid;
-  grid-template-columns: 320px 1fr;
+  grid-template-columns: var(--left-col-width, 320px) 1fr;
   gap: 16px;
   overflow: hidden;
 }
@@ -209,10 +240,10 @@ const emit = defineEmits([
   grid-template-columns: 1fr;
 }
 .form-grid-container.two-column {
-  grid-template-columns: 320px 1fr;
+  grid-template-columns: var(--left-col-width, 320px) 1fr;
 }
 .form-grid-container.three-column {
-  grid-template-columns: 280px 1fr 200px;
+  grid-template-columns: var(--left-col-width, 280px) 1fr 200px;
 }
 .form-grid-container.custom-layout {
   display: block;
@@ -221,9 +252,17 @@ const emit = defineEmits([
   overflow: hidden;
 }
 
+/* Collapse panel kiri — satu aturan ini otomatis berlaku di semua
+   breakpoint di bawah karena semuanya baca var(--left-col-width) yang sama */
+.form-grid-container.collapsed-left {
+  --left-col-width: 32px;
+  gap: 8px;
+}
+
 .left-column {
   display: flex;
   flex-direction: column;
+  position: relative;
   min-height: 0;
   min-width: 0;
   overflow-y: auto;
@@ -231,6 +270,32 @@ const emit = defineEmits([
   padding-bottom: 12px;
   scrollbar-width: thin;
   scrollbar-color: #bdbdbd transparent;
+}
+.left-column.collapsed {
+  overflow: visible;
+  padding-bottom: 0;
+}
+
+.left-collapse-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: 1px solid #e0e0e0;
+  border-radius: 50%;
+  background: white;
+  color: rgba(0, 0, 0, 0.55);
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+.left-collapse-btn:hover {
+  background: #f5f5f5;
+  color: rgba(0, 0, 0, 0.87);
 }
 
 .left-column::-webkit-scrollbar {
@@ -286,20 +351,22 @@ const emit = defineEmits([
 /* 1600px ke bawah — kolom kiri sedikit lebih kecil */
 @media (max-width: 1600px) {
   .form-grid-container.two-column {
-    grid-template-columns: 290px 1fr;
+    --left-col-width: 290px;
   }
   .form-grid-container.three-column {
-    grid-template-columns: 260px 1fr 180px;
+    --left-col-width: 260px;
+    grid-template-columns: var(--left-col-width) 1fr 180px;
   }
 }
 
 /* 1400px ke bawah */
 @media (max-width: 1400px) {
   .form-grid-container.two-column {
-    grid-template-columns: 260px 1fr;
+    --left-col-width: 260px;
   }
   .form-grid-container.three-column {
-    grid-template-columns: 240px 1fr 160px;
+    --left-col-width: 240px;
+    grid-template-columns: var(--left-col-width) 1fr 160px;
   }
   .form-grid-container {
     gap: 12px;
@@ -310,10 +377,11 @@ const emit = defineEmits([
 /* 1280px ke bawah — layout mulai kolaps ke single column */
 @media (max-width: 1280px) {
   .form-grid-container.two-column {
-    grid-template-columns: 240px 1fr;
+    --left-col-width: 240px;
   }
   .form-grid-container.three-column {
-    grid-template-columns: 220px 1fr;
+    --left-col-width: 220px;
+    grid-template-columns: var(--left-col-width) 1fr;
     /* kolom ketiga wrap ke bawah */
     grid-template-rows: auto auto;
   }

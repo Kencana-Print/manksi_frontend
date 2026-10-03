@@ -157,7 +157,7 @@ const bahanNames = computed(() =>
                 <td class="lbl">Customer</td>
                 <td class="sep">:</td>
                 <td class="val">
-                  {{ getVal("pro_cus_kode") }} — {{ getVal("pro_cus_nama") }}
+                  {{ getVal("pro_cus_kode") }}
                 </td>
               </tr>
               <tr>

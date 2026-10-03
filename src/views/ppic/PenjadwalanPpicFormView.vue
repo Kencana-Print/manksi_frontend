@@ -624,11 +624,11 @@ const tarikMap = async () => {
 
 const detectSumberFromNomor = (
   nomor: string,
-): "MH" | "MAP" | "PENAWARAN" | "SO" => {
+): "MH" | "MAP" | "PENAWARAN" | "SO" | "PRA" => {
   const upper = nomor.toUpperCase();
+  if (upper.startsWith("PRA.")) return "PRA";
   if (upper.startsWith("MH.")) return "MH";
   if (upper.startsWith("MAP-") || upper.startsWith("MAP/")) return "MAP";
-  // Format Penawaran: NNNNN/KODE/TAHUN, misal 00023/KP/2026 — ada 2 slash
   if ((nomor.match(/\//g) || []).length >= 2) return "PENAWARAN";
   return "SO";
 };
@@ -664,7 +664,16 @@ const tambahManual = async () => {
     return;
   }
 
-  if (isDuplicate(jenis === "MH" ? "PERMINTAAN HARGA" : jenis, nomor)) {
+  if (
+    isDuplicate(
+      jenis === "MH"
+        ? "PERMINTAAN HARGA"
+        : jenis === "PRA"
+          ? "PRA ORDER"
+          : jenis,
+      nomor,
+    )
+  ) {
     toast.warning(
       `${jenis} ${nomor} sudah ada di daftar. Isi Rencana sebagian (PARTIAL) dan ` +
         `Tanggal Kesepakatan pada baris yang ada dulu sebelum menambahkan batch/tanggal kirim lain.`,
@@ -726,6 +735,30 @@ const tambahManual = async () => {
         Kurang: k.Kurang,
         Rencana: Number(k.Pesan) || 0,
         Realisasi: activeFormTab.value === "MAP" ? k.Realisasi : 0,
+        PermintaanKirim: k.DatelineAsli || "",
+      };
+    } else if (jenis === "PRA") {
+      const res = await penjadwalanPpicService.getPraOrderInfo(
+        nomor,
+        header.pjw_divisi,
+      );
+      const k = res.data.data;
+      const isMapTab = activeFormTab.value === "MAP";
+      rowInput = {
+        Tipe: activeFormTab.value,
+        SoNomor: "",
+        NomorPraOrder: k.Nomor,
+        MapNomor: "",
+        MhNomor: "",
+        PenNomor: "",
+        PenId: "",
+        Sumber: "PRA ORDER",
+        Nama: k.Nama,
+        Tanggal: k.Tanggal,
+        Pesan: isMapTab ? 0 : k.Pesan,
+        Kirim: 0,
+        Kurang: isMapTab ? 0 : k.Kurang,
+        Rencana: isMapTab ? 0 : k.Pesan,
         PermintaanKirim: k.DatelineAsli || "",
       };
     } else {
@@ -1331,7 +1364,7 @@ const rowClass = (d: DetailRow) => {
               v-model="manualSoNomor"
               type="text"
               class="pjw-manual-inp"
-              placeholder="Ketik nomor SO atau MAP..."
+              placeholder="Ketik nomor SO, MAP, Pra Order, MH, atau Penawaran..."
               :disabled="!canEditMarketing"
               @focus="onManualFocus"
               @blur="onManualBlur"

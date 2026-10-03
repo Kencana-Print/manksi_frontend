@@ -92,6 +92,11 @@ export const penjadwalanPpicService = {
       params: { divisi, excludeNomor, tgl1, tgl2 },
     });
   },
+  getPraOrderInfo(proNomor: string, divisi = "") {
+    return api.get(`/ppic/penjadwalan-form/pra-order-info/${proNomor}`, {
+      params: { divisi },
+    });
+  },
   getMhInfo(mhNomor: string, divisi = "", excludeNomor = "") {
     return api.get(`/ppic/penjadwalan-form/mh-info/${mhNomor}`, {
       params: { divisi, excludeNomor },
