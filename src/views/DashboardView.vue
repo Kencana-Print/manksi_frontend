@@ -364,6 +364,7 @@ watch(activeTab, async (tab) => {
     setupPtmDetailObserver();
     setupMtsDetailObserver();
     setupPotensiListObserver();
+    setupPotensiBatalListObserver();
   }
   if (tab === "finance") {
     if (!financeLoaded.value) await loadFinanceData();
@@ -1755,6 +1756,20 @@ interface PotensiItem {
   Sumber: "PENAWARAN" | "MAP";
   IsRealisasi: number;
 }
+interface PotensiBatalItem {
+  pot_nomor: string;
+  pot_nama_item: string;
+  pot_harga: number;
+  pot_alasan_batal: string | null;
+  date_create: string;
+  TanggalBatal: string;
+  user_create: string;
+  user_modified: string;
+  sal_nama: string | null;
+  cus_nama: string | null;
+  NomorSumber: string;
+  Sumber: "PENAWARAN" | "MAP";
+}
 interface PotensiSourceOption {
   Sumber: "PENAWARAN" | "MAP";
   Nomor: string;
@@ -1884,6 +1899,44 @@ const exportPotensiExcel = async () => {
   } finally {
     isExportingPotensi.value = false;
   }
+};
+
+const PB2_PAGE_SIZE = 20;
+const potensiBatalList = ref<PotensiBatalItem[]>([]);
+const potensiBatalOffset = ref(0);
+const potensiBatalHasMore = ref(true);
+const isLoadingMorePotensiBatal = ref(false);
+const potensiBatalSentinelEl = ref<HTMLElement | null>(null);
+let potensiBatalScrollObserver: IntersectionObserver | null = null;
+
+const loadMorePotensiBatalList = async () => {
+  if (!potensiBatalHasMore.value || isLoadingMorePotensiBatal.value) return;
+  isLoadingMorePotensiBatal.value = true;
+  try {
+    const res = await dashboardService.getPotensiBatalList(
+      PB2_PAGE_SIZE,
+      potensiBatalOffset.value,
+    );
+    const rows: PotensiBatalItem[] = res.data.data.items ?? [];
+    potensiBatalList.value.push(...rows);
+    potensiBatalOffset.value += rows.length;
+    if (rows.length < PB2_PAGE_SIZE) potensiBatalHasMore.value = false;
+  } catch {
+  } finally {
+    isLoadingMorePotensiBatal.value = false;
+  }
+};
+
+const setupPotensiBatalListObserver = () => {
+  if (potensiBatalScrollObserver) potensiBatalScrollObserver.disconnect();
+  if (!potensiBatalSentinelEl.value) return;
+  potensiBatalScrollObserver = new IntersectionObserver(
+    (entries) => {
+      if (entries[0].isIntersecting) loadMorePotensiBatalList();
+    },
+    { threshold: 0.1 },
+  );
+  potensiBatalScrollObserver.observe(potensiBatalSentinelEl.value);
 };
 
 // ── Drill-down Target Collection ──
@@ -2097,7 +2150,14 @@ const submitSetPotensi = async () => {
     potensiList.value = [];
     potensiOffset.value = 0;
     potensiHasMore.value = true;
-    await Promise.allSettled([fetchPotensiSummary(), loadMorePotensiList()]);
+    potensiBatalList.value = [];
+    potensiBatalOffset.value = 0;
+    potensiBatalHasMore.value = true;
+    await Promise.allSettled([
+      fetchPotensiSummary(),
+      loadMorePotensiList(),
+      loadMorePotensiBatalList(),
+    ]);
   } catch (e: any) {
     alert(e?.response?.data?.message || "Gagal menyimpan potensi.");
   } finally {
@@ -2137,7 +2197,11 @@ const submitBatalPotensi = async () => {
     potensiList.value = [];
     potensiOffset.value = 0;
     potensiHasMore.value = true;
-    await Promise.allSettled([fetchPotensiSummary(), loadMorePotensiList()]);
+    await Promise.allSettled([
+      fetchPotensiSummary(),
+      loadMorePotensiList(),
+      loadMorePotensiBatalList(),
+    ]);
   } catch (e: any) {
     alert(e?.response?.data?.message || "Gagal membatalkan potensi.");
   } finally {
@@ -3286,7 +3350,11 @@ const loadMarketingData = async () => {
 
     await Promise.allSettled([loadMorePtmDetail(), loadMoreMtsDetail()]);
 
-    await Promise.allSettled([fetchPotensiSummary(), loadMorePotensiList()]);
+    await Promise.allSettled([
+      fetchPotensiSummary(),
+      loadMorePotensiList(),
+      loadMorePotensiBatalList(),
+    ]);
 
     marketingLoaded.value = true;
   } finally {
@@ -3714,6 +3782,7 @@ onMounted(async () => {
     setupPtmDetailObserver();
     setupMtsDetailObserver();
     setupPotensiListObserver();
+    setupPotensiBatalListObserver();
   }
   if (activeTab.value === "finance") {
     setupOverdueObserver();
@@ -3774,6 +3843,7 @@ onUnmounted(() => {
   bkScrollObserver?.disconnect();
   pbBatalScrollObserver?.disconnect();
   potensiScrollObserver?.disconnect();
+  potensiBatalScrollObserver?.disconnect();
 });
 
 const closeSpkDialog = () => {
@@ -5831,7 +5901,7 @@ const sisaClass = (item: any) => {
 
         <!-- ── Row 7: Proyeksi Potensial ── -->
         <v-row dense class="mt-2">
-          <v-col cols="12">
+          <v-col cols="12" md="8">
             <div class="manksi-panel content-panel">
               <div
                 class="panel-header"
@@ -5885,12 +5955,6 @@ const sisaClass = (item: any) => {
                       shortNum(potensiSummary.totalRealisasi)
                     }}</span>
                     <span class="pen-stat-lbl">Realisasi</span>
-                  </div>
-                  <div class="pen-stat">
-                    <span class="pen-stat-val text-grey">{{
-                      shortNum(potensiSummary.totalBatal)
-                    }}</span>
-                    <span class="pen-stat-lbl">Batal</span>
                   </div>
                 </div>
 
@@ -5996,6 +6060,106 @@ const sisaClass = (item: any) => {
                 </div>
                 <div v-else class="text-center text-grey py-3 text-caption">
                   Belum ada penawaran/MAP yang ditandai potensial.
+                </div>
+              </div>
+            </div>
+          </v-col>
+
+          <!-- Card baru: Proyeksi Potensial - Batal -->
+          <v-col cols="12" md="4">
+            <div class="manksi-panel content-panel fill-height">
+              <div
+                class="panel-header"
+                style="
+                  background: #eceff1;
+                  color: #37474f;
+                  border-bottom: 1px solid #cfd8dc;
+                "
+              >
+                <IconAlertTriangle
+                  :size="14"
+                  :stroke-width="1.7"
+                  class="mr-1"
+                />
+                Proyeksi Potensial — Batal
+                <span
+                  v-if="potensiSummary.totalBatal"
+                  class="badge-count ml-auto"
+                  style="background: #757575"
+                >
+                  {{ shortNum(potensiSummary.totalBatal) }}
+                </span>
+              </div>
+              <div class="panel-body">
+                <div
+                  v-if="potensiBatalList.length || isLoadingMorePotensiBatal"
+                  class="gb-list"
+                  style="max-height: 340px"
+                >
+                  <div
+                    v-for="item in potensiBatalList"
+                    :key="item.pot_nomor"
+                    class="gb-row row-minus"
+                    style="align-items: flex-start"
+                  >
+                    <div class="gb-nama" style="width: 150px">
+                      <span class="pen-nomor" style="font-size: 10px">{{
+                        item.pot_nomor
+                      }}</span>
+                      <div style="font-size: 10px; color: #9e9e9e">
+                        {{ item.Sumber }} {{ item.NomorSumber }}
+                      </div>
+                    </div>
+                    <div
+                      class="gb-bar-wrap"
+                      style="flex-direction: column; align-items: stretch"
+                    >
+                      <div class="d-flex justify-space-between">
+                        <span class="pen-cus">{{ item.pot_nama_item }}</span>
+                        <span
+                          style="
+                            font-size: 11px;
+                            font-weight: 700;
+                            color: #757575;
+                          "
+                        >
+                          {{ shortNum(item.pot_harga) }}
+                        </span>
+                      </div>
+                      <div style="font-size: 10px; color: #9e9e9e">
+                        {{ item.cus_nama || "-" }} ·
+                        {{ item.sal_nama || "-" }} · dibatalkan
+                        {{ formatTanggalJam(item.TanggalBatal) }}
+                      </div>
+                      <div
+                        v-if="item.pot_alasan_batal"
+                        style="
+                          font-size: 10px;
+                          font-style: italic;
+                          color: #c62828;
+                          margin-top: 2px;
+                        "
+                      >
+                        Alasan: {{ item.pot_alasan_batal }}
+                      </div>
+                    </div>
+                  </div>
+                  <div ref="potensiBatalSentinelEl" class="pen-sentinel">
+                    <span v-if="isLoadingMorePotensiBatal" class="pen-loading"
+                      >Memuat...</span
+                    >
+                    <span
+                      v-else-if="
+                        !potensiBatalHasMore && potensiBatalList.length
+                      "
+                      class="pen-end"
+                    >
+                      {{ potensiBatalList.length }} potensi batal ditampilkan
+                    </span>
+                  </div>
+                </div>
+                <div v-else class="text-center text-grey py-3 text-caption">
+                  Belum ada potensi yang dibatalkan.
                 </div>
               </div>
             </div>

@@ -63,6 +63,8 @@ export const dashboardService = {
     api.get("/dashboard/potensi-summary", { params: { startDate, endDate } }),
   getPotensiList: (limit = 20, offset = 0) =>
     api.get("/dashboard/potensi-list", { params: { limit, offset } }),
+  getPotensiBatalList: (limit = 20, offset = 0) =>
+    api.get("/dashboard/potensi-batal-list", { params: { limit, offset } }),
   getPiutangDashboard: () => api.get("/dashboard/piutang-dashboard"),
   getPiutangOverdue: (limit = 20, offset = 0) =>
     api.get("/dashboard/piutang-overdue", { params: { limit, offset } }),
