@@ -7,6 +7,7 @@ import { useTabsStore } from "@/stores/tabsStore";
 import { useForm } from "@/composables/useForm";
 import { bkkFormService } from "@/services/piutang/bkkFormService";
 import BaseForm from "@/components/BaseForm.vue";
+import CollapsiblePanel from "@/components/CollapsiblePanel.vue";
 import AccountSearchModal from "@/components/lookups/AccountSearchModal.vue";
 import CostCenterSearchModal from "@/components/lookups/CostCenterSearchModal.vue";
 import SupplierSearchModal from "@/components/lookups/SupplierSearchModal.vue";
@@ -544,87 +545,89 @@ const pilihCetak = () => {
   >
     <div class="bkk-layout">
       <!-- ══ KOLOM KIRI: Informasi BKK ══ -->
-      <div class="bkk-left">
-        <div class="bkk-section">
-          <div class="bkk-sec-title">Informasi BKK</div>
+      <CollapsiblePanel width="300px">
+        <div class="bkk-left">
+          <div class="bkk-section">
+            <div class="bkk-sec-title">Informasi BKK</div>
 
-          <div class="f-field">
-            <label class="f-lbl">Nomor BKK</label>
-            <input
-              :value="formData.Nomor || 'Otomatis'"
-              readonly
-              class="f-inp f-ro"
-            />
-          </div>
-
-          <div class="f-field">
-            <label class="f-lbl">Tanggal</label>
-            <input type="date" v-model="formData.Tanggal" class="f-inp" />
-          </div>
-
-          <div class="f-field">
-            <label class="f-lbl">Account <span class="req">*</span></label>
-            <div class="igrp">
+            <div class="f-field">
+              <label class="f-lbl">Nomor BKK</label>
               <input
-                :value="formData.RekKode"
+                :value="formData.Nomor || 'Otomatis'"
                 readonly
-                class="f-inp-in"
-                style="width: 90px"
+                class="f-inp f-ro"
               />
+            </div>
+
+            <div class="f-field">
+              <label class="f-lbl">Tanggal</label>
+              <input type="date" v-model="formData.Tanggal" class="f-inp" />
+            </div>
+
+            <div class="f-field">
+              <label class="f-lbl">Account <span class="req">*</span></label>
+              <div class="igrp">
+                <input
+                  :value="formData.RekKode"
+                  readonly
+                  class="f-inp-in"
+                  style="width: 90px"
+                />
+                <input
+                  :value="formData.RekNama"
+                  readonly
+                  class="f-inp-in f-ro"
+                  style="flex: 1"
+                />
+                <button type="button" class="blkp" @click="openHeaderAccModal">
+                  <IconSearch :size="13" color="#1565c0" />
+                </button>
+              </div>
+            </div>
+
+            <div class="f-field">
+              <label class="f-lbl">Dibayarkan Kepada</label>
               <input
-                :value="formData.RekNama"
-                readonly
-                class="f-inp-in f-ro"
-                style="flex: 1"
+                v-model="formData.Penerima"
+                class="f-inp"
+                placeholder="Nama penerima"
               />
-              <button type="button" class="blkp" @click="openHeaderAccModal">
-                <IconSearch :size="13" color="#1565c0" />
-              </button>
+            </div>
+
+            <div class="f-field">
+              <label class="f-lbl">No. Nota</label>
+              <input
+                v-model="formData.Nota"
+                class="f-inp"
+                placeholder="No. nota"
+              />
+            </div>
+
+            <div class="f-field">
+              <label class="f-lbl">Keterangan</label>
+              <input
+                v-model="formData.Keterangan"
+                class="f-inp"
+                placeholder="Keterangan pembayaran"
+              />
+            </div>
+
+            <div class="f-field">
+              <label class="f-lbl">Cabang</label>
+              <input
+                :value="formData.Cabang || '(otomatis dari Account)'"
+                readonly
+                class="f-inp f-ro"
+              />
             </div>
           </div>
 
-          <div class="f-field">
-            <label class="f-lbl">Dibayarkan Kepada</label>
-            <input
-              v-model="formData.Penerima"
-              class="f-inp"
-              placeholder="Nama penerima"
-            />
-          </div>
-
-          <div class="f-field">
-            <label class="f-lbl">No. Nota</label>
-            <input
-              v-model="formData.Nota"
-              class="f-inp"
-              placeholder="No. nota"
-            />
-          </div>
-
-          <div class="f-field">
-            <label class="f-lbl">Keterangan</label>
-            <input
-              v-model="formData.Keterangan"
-              class="f-inp"
-              placeholder="Keterangan pembayaran"
-            />
-          </div>
-
-          <div class="f-field">
-            <label class="f-lbl">Cabang</label>
-            <input
-              :value="formData.Cabang || '(otomatis dari Account)'"
-              readonly
-              class="f-inp f-ro"
-            />
+          <div class="total-box">
+            <span>Total BKK</span>
+            <span>{{ numFmt(totalNominal) }}</span>
           </div>
         </div>
-
-        <div class="total-box">
-          <span>Total BKK</span>
-          <span>{{ numFmt(totalNominal) }}</span>
-        </div>
-      </div>
+      </CollapsiblePanel>
 
       <!-- ══ KOLOM KANAN: Detail Pengeluaran ══ -->
       <div class="bkk-right">
@@ -1115,7 +1118,6 @@ const pilihCetak = () => {
   font-size: 12px;
 }
 .bkk-left {
-  width: 300px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;

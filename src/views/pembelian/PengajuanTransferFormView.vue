@@ -5,6 +5,7 @@ import { useToast } from "vue-toastification";
 import { useTabsStore } from "@/stores/tabsStore";
 import { pengajuanTransferFormService } from "@/services/pembelian/pengajuanTransferFormService";
 import BaseForm from "@/components/BaseForm.vue";
+import CollapsiblePanel from "@/components/CollapsiblePanel.vue";
 import SupplierSearchModal from "@/components/lookups/SupplierSearchModal.vue";
 import BkkSearchModal from "@/components/lookups/BkkSearchModal.vue";
 import {
@@ -734,85 +735,87 @@ const skipCetak = () => {
   >
     <div class="pt-layout">
       <!-- ══ KOLOM KIRI ══ -->
-      <div class="pt-left">
-        <div class="pt-section">
-          <div class="pt-sec-title">Informasi Pengajuan</div>
+      <CollapsiblePanel width="280px">
+        <div class="pt-left">
+          <div class="pt-section">
+            <div class="pt-sec-title">Informasi Pengajuan</div>
 
-          <div class="f-field">
-            <label class="f-lbl">Nomor</label>
-            <input
-              :value="form.nomor || 'Otomatis'"
-              readonly
-              class="f-inp f-ro"
-            />
-          </div>
-
-          <div class="f-field">
-            <label class="f-lbl">Tanggal</label>
-            <input
-              type="date"
-              v-model="form.tanggal"
-              class="f-inp"
-              :readonly="isRealisasi"
-            />
-          </div>
-
-          <div class="f-field">
-            <label class="f-lbl"
-              >Rekening Asal <span class="req">*</span></label
-            >
-            <div class="igrp">
+            <div class="f-field">
+              <label class="f-lbl">Nomor</label>
               <input
-                :value="form.rek_kode"
+                :value="form.nomor || 'Otomatis'"
                 readonly
-                class="f-inp-in"
-                style="width: 90px; flex-shrink: 0"
+                class="f-inp f-ro"
               />
+            </div>
+
+            <div class="f-field">
+              <label class="f-lbl">Tanggal</label>
               <input
-                :value="form.rek_nama"
-                readonly
-                class="f-inp-in f-ro"
-                style="flex: 1"
+                type="date"
+                v-model="form.tanggal"
+                class="f-inp"
+                :readonly="isRealisasi"
               />
-              <button
-                v-if="!isRealisasi"
-                type="button"
-                class="blkp"
-                @click="showAccountModal = true"
+            </div>
+
+            <div class="f-field">
+              <label class="f-lbl"
+                >Rekening Asal <span class="req">*</span></label
               >
-                <IconSearch :size="13" color="#1565c0" />
-              </button>
+              <div class="igrp">
+                <input
+                  :value="form.rek_kode"
+                  readonly
+                  class="f-inp-in"
+                  style="width: 90px; flex-shrink: 0"
+                />
+                <input
+                  :value="form.rek_nama"
+                  readonly
+                  class="f-inp-in f-ro"
+                  style="flex: 1"
+                />
+                <button
+                  v-if="!isRealisasi"
+                  type="button"
+                  class="blkp"
+                  @click="showAccountModal = true"
+                >
+                  <IconSearch :size="13" color="#1565c0" />
+                </button>
+              </div>
+              <div v-if="form.rek_rekening" class="f-hint">
+                Rekening: {{ form.rek_rekening }}
+              </div>
             </div>
-            <div v-if="form.rek_rekening" class="f-hint">
-              Rekening: {{ form.rek_rekening }}
+
+            <div v-if="form.byrvoucher" class="f-field">
+              <label class="f-lbl">No. Bayar Voucher</label>
+              <input :value="form.byrvoucher" readonly class="f-inp f-ro" />
             </div>
           </div>
 
-          <div v-if="form.byrvoucher" class="f-field">
-            <label class="f-lbl">No. Bayar Voucher</label>
-            <input :value="form.byrvoucher" readonly class="f-inp f-ro" />
+          <div class="total-box">
+            <span>Total Nominal</span>
+            <span>{{ numFmt(totalNominal) }}</span>
           </div>
-        </div>
 
-        <div class="total-box">
-          <span>Total Nominal</span>
-          <span>{{ numFmt(totalNominal) }}</span>
-        </div>
-
-        <div class="hint-box">
-          <div class="hint-title">Pintasan di kolom No. Transaksi:</div>
-          <div class="hint-row"><span class="hint-key">F1</span> No. BKK</div>
-          <div class="hint-row">
-            <span class="hint-key">F2</span> Voucher Pembayaran
-          </div>
-          <div class="hint-row">
-            <span class="hint-key">F3</span> PO External
-          </div>
-          <div class="hint-row">
-            <span class="hint-key">F4</span> Petty Cash
+          <div class="hint-box">
+            <div class="hint-title">Pintasan di kolom No. Transaksi:</div>
+            <div class="hint-row"><span class="hint-key">F1</span> No. BKK</div>
+            <div class="hint-row">
+              <span class="hint-key">F2</span> Voucher Pembayaran
+            </div>
+            <div class="hint-row">
+              <span class="hint-key">F3</span> PO External
+            </div>
+            <div class="hint-row">
+              <span class="hint-key">F4</span> Petty Cash
+            </div>
           </div>
         </div>
-      </div>
+      </CollapsiblePanel>
 
       <!-- ══ KOLOM KANAN ══ -->
       <div class="pt-right">
@@ -1589,7 +1592,6 @@ const skipCetak = () => {
   font-size: 12px;
 }
 .pt-left {
-  width: 280px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
