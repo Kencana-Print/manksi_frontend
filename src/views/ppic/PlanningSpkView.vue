@@ -9,6 +9,7 @@ import {
   IconLock,
   IconLockOpen,
   IconFileExport,
+  IconTrash,
 } from "@tabler/icons-vue";
 import { exportExcelSingle } from "@/utils/excelExport";
 import { formatTanggal } from "@/utils/dateFormat";
@@ -31,6 +32,18 @@ interface DetailRow {
   QtyJadwal: number;
   LineKelompok: string;
   Keterangan: string;
+  // Khusus Sewing format baru (Format === "BARU"); selain itu kosong
+  Format?: "BARU" | "LAMA";
+  Mp?: number;
+  Smv?: number;
+  SmvSumber?: string;
+  Hari?: number;
+  Jam?: number;
+  Target?: number;
+  ActualOutput?: number;
+  ActualJam?: number | null;
+  WaktuProduksi?: number;
+  Resume?: number | null;
 }
 interface DetailCache {
   cutting: DetailRow[];
@@ -340,6 +353,12 @@ const doExportDetail = async () => {
           QtyJadwal: Number(r.QtyJadwal) || 0,
           LineKelompok: r.LineKelompok || "-",
           Keterangan: r.Keterangan || "-",
+          Mp: r.Mp == null ? "" : Number(r.Mp),
+          Smv: r.Smv == null ? "" : Number(r.Smv),
+          Hari: r.Hari == null ? "" : Number(r.Hari),
+          Jam: r.Jam == null ? "" : Number(r.Jam),
+          WaktuProduksi: r.WaktuProduksi == null ? "" : Number(r.WaktuProduksi),
+          Resume: r.Resume == null ? "" : Number(r.Resume),
         });
       });
     });
@@ -367,6 +386,27 @@ const doExportDetail = async () => {
         },
         { header: "Line/Kelompok", key: "LineKelompok" },
         { header: "Keterangan", key: "Keterangan" },
+        { header: "MP", key: "Mp", align: "right", numFmt: "#,##0" },
+        {
+          header: "SMV (mnt)",
+          key: "Smv",
+          align: "right",
+          numFmt: "#,##0.000",
+        },
+        { header: "Hari", key: "Hari", align: "right", numFmt: "#,##0.0" },
+        { header: "Jam", key: "Jam", align: "right", numFmt: "#,##0.0" },
+        {
+          header: "Waktu Prod (mnt)",
+          key: "WaktuProduksi",
+          align: "right",
+          numFmt: "#,##0",
+        },
+        {
+          header: "Resume (mnt)",
+          key: "Resume",
+          align: "right",
+          numFmt: "#,##0.0",
+        },
       ],
       combinedRows,
     );
@@ -378,6 +418,46 @@ const doExportDetail = async () => {
 };
 
 const fmt = (n: number | null | undefined) => (n ?? 0).toLocaleString("id-ID");
+
+const fmtDec = (n: number | null | undefined, d = 2) =>
+  n == null
+    ? "—"
+    : Number(n).toLocaleString("id-ID", { maximumFractionDigits: d });
+
+// Format !== "BARU" (termasuk kalau backend belum mengirim Format) = tampilan lama
+const sewingBaru = (nomor: string) =>
+  detailCache.value[nomor]?.sewing.filter((r) => r.Format === "BARU") ?? [];
+const sewingLama = (nomor: string) =>
+  detailCache.value[nomor]?.sewing.filter((r) => r.Format !== "BARU") ?? [];
+
+const sewingGroups = (nomor: string) => {
+  const map = new Map<
+    string,
+    {
+      line: string;
+      items: DetailRow[];
+      totalTarget: number;
+      totalActual: number;
+    }
+  >();
+  for (const r of sewingBaru(nomor)) {
+    const k = r.LineKelompok || "";
+    if (!map.has(k))
+      map.set(k, { line: k, items: [], totalTarget: 0, totalActual: 0 });
+    const g = map.get(k)!;
+    g.items.push(r);
+    g.totalTarget += Number(r.Target) || 0;
+    g.totalActual += Number(r.ActualOutput) || 0;
+  }
+  const rank = (l: string) =>
+    !l ? "0" : l === "LINE EXTERNAL" ? "2" : "1" + l;
+  return [...map.values()].sort((a, b) =>
+    rank(a.line).localeCompare(rank(b.line)),
+  );
+};
+
+const isOver = (d: DetailRow) =>
+  d.Resume != null && d.WaktuProduksi != null && d.Resume > d.WaktuProduksi;
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 fetchData();
@@ -586,7 +666,90 @@ fetchData();
 
             <!-- Sewing -->
             <v-tabs-window-item value="sewing">
-              <table class="dt">
+              <!-- Format baru: per Line, SPK di dalamnya -->
+              <table v-if="sewingBaru(item.Nomor).length" class="dt">
+                <thead>
+                  <tr class="thead-sewing">
+                    <th style="width: 28px">No</th>
+                    <th>Nomor SPK</th>
+                    <th>Nama SPK</th>
+                    <th class="tr">WIP</th>
+                    <th class="tr">Qty PO</th>
+                    <th class="tr">SMV (mnt)</th>
+                    <th class="tr">Hari</th>
+                    <th class="tr">Jam</th>
+                    <th class="tr">Target</th>
+                    <th class="tr">Act. Output</th>
+                    <th class="tr">Waktu Prod (mnt)</th>
+                    <th class="tr">Resume (mnt)</th>
+                    <th>Keterangan</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <template
+                    v-for="g in sewingGroups(item.Nomor)"
+                    :key="g.line || '_blank'"
+                  >
+                    <tr class="grp-row">
+                      <td colspan="13">
+                        <div class="grp-bar">
+                          <span class="grp-title">{{
+                            g.line || "(Tanpa line)"
+                          }}</span>
+                          <span class="grp-chip"
+                            >MP <b>{{ fmtDec(g.items[0].Mp, 0) }}</b></span
+                          >
+                          <span class="grp-chip"
+                            >Act. Jam
+                            <b>{{ fmtDec(g.items[0].ActualJam) }}</b></span
+                          >
+                          <span class="grp-chip"
+                            >Σ Target <b>{{ fmt(g.totalTarget) }}</b></span
+                          >
+                          <span class="grp-chip"
+                            >Σ Act. Output <b>{{ fmt(g.totalActual) }}</b></span
+                          >
+                        </div>
+                      </td>
+                    </tr>
+                    <tr v-for="(d, n) in g.items" :key="n">
+                      <td class="tc">{{ n + 1 }}</td>
+                      <td class="mono">{{ d.NomorSPK }}</td>
+                      <td>{{ d.NamaSPK || "—" }}</td>
+                      <td class="tr">{{ fmt(d.Wip) }}</td>
+                      <td class="tr">{{ fmt(d.QtyPo) }}</td>
+                      <td
+                        class="tr"
+                        :class="{ 'smv-manual': d.SmvSumber === 'MANUAL' }"
+                        :title="
+                          d.SmvSumber === 'PROOF'
+                            ? 'Dari Proof Garmen lini Jahit'
+                            : 'Input manual'
+                        "
+                      >
+                        <IconLock
+                          v-if="d.SmvSumber === 'PROOF'"
+                          :size="10"
+                          class="smv-lock"
+                        />
+                        {{ fmtDec(d.Smv, 3) }}
+                      </td>
+                      <td class="tr">{{ fmtDec(d.Hari, 1) }}</td>
+                      <td class="tr">{{ fmtDec(d.Jam, 1) }}</td>
+                      <td class="tr fw">{{ fmt(d.Target) }}</td>
+                      <td class="tr">{{ fmt(d.ActualOutput) }}</td>
+                      <td class="tr">{{ fmtDec(d.WaktuProduksi, 0) }}</td>
+                      <td class="tr" :class="{ over: isOver(d) }">
+                        {{ fmtDec(d.Resume, 1) }}
+                      </td>
+                      <td>{{ d.Keterangan || "—" }}</td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+
+              <!-- Format lama (planning sebelum rombak tab Sewing) -->
+              <table v-if="sewingLama(item.Nomor).length" class="dt">
                 <thead>
                   <tr class="thead-sewing">
                     <th>Nomor SPK</th>
@@ -600,7 +763,7 @@ fetchData();
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="(d, i) in detailCache[item.Nomor].sewing" :key="i">
+                  <tr v-for="(d, i) in sewingLama(item.Nomor)" :key="i">
                     <td class="mono">{{ d.NomorSPK }}</td>
                     <td>{{ d.NamaSPK || "—" }}</td>
                     <td>{{ formatTanggal(d.TglJadwal) }}</td>
@@ -610,11 +773,15 @@ fetchData();
                     <td>{{ d.LineKelompok || "—" }}</td>
                     <td>{{ d.Keterangan || "—" }}</td>
                   </tr>
-                  <tr v-if="!detailCache[item.Nomor].sewing.length">
-                    <td colspan="8" class="empty-row">Tidak ada data sewing</td>
-                  </tr>
                 </tbody>
               </table>
+
+              <div
+                v-if="!detailCache[item.Nomor].sewing.length"
+                class="empty-row"
+              >
+                Tidak ada data sewing
+              </div>
             </v-tabs-window-item>
 
             <!-- Koli -->
@@ -865,6 +1032,51 @@ fetchData();
   font-style: italic;
   padding: 10px;
   font-size: 11px;
+}
+
+/* Blok Line di tab Sewing (format baru) */
+.dt tbody tr.grp-row td,
+.dt tbody tr.grp-row:hover td {
+  background: #c8e6c9 !important;
+  padding: 0;
+  border-bottom: 1px solid #81c784;
+}
+.grp-bar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  height: 26px;
+  padding: 0 8px;
+  font-size: 11px;
+}
+.grp-title {
+  font-size: 12px;
+  font-weight: 800;
+  color: #1b5e20;
+  min-width: 70px;
+}
+.grp-chip {
+  color: #2e7d32;
+}
+.grp-chip b {
+  color: #1b5e20;
+  margin-left: 2px;
+}
+.smv-lock {
+  color: #2e7d32;
+  vertical-align: -1px;
+  margin-right: 2px;
+}
+.smv-manual {
+  background: #fff3e0 !important;
+}
+.dt td.over {
+  color: #c62828;
+  font-weight: 700;
+  background: #ffebee !important;
+}
+.tc {
+  text-align: center;
 }
 
 /* Override Vuetify tabs di dalam expand */

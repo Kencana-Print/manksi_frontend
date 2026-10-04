@@ -16,4 +16,14 @@ export const planningSpkFormService = {
     api.post("/ppic/planning-spk-form/riwayat", { spkList, excludeNomor }),
 
   saveData: (payload: any) => api.post("/ppic/planning-spk-form", payload),
+
+  getSewingReferensi: (payload: {
+    tgl1: string;
+    tgl2: string;
+    lines: string[];
+    spkList: string[];
+  }) => api.post("/ppic/planning-spk-form/sewing-referensi", payload),
+
+  getKelompok: (lini: "POTONG" | "JAHIT" = "POTONG", cab = "P04") =>
+    api.get("/ppic/planning-spk-form/kelompok", { params: { lini, cab } }),
 };
