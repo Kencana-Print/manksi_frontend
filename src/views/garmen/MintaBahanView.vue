@@ -86,6 +86,15 @@ const baseBrowseRef = ref<InstanceType<typeof BaseBrowse> | null>(null);
 const getExportSource = () =>
   baseBrowseRef.value?.getFilteredItems() ?? items.value ?? [];
 
+// Ubah nilai tanggal (ISO/Date) jadi Date UTC-midnight supaya Excel
+// menampilkan tanggal yang sama dengan di browse (tanpa geser zona waktu).
+const toExcelDate = (val: any): Date | "" => {
+  if (!val) return "";
+  const d = new Date(val);
+  if (isNaN(d.getTime())) return "";
+  return new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+};
+
 const headers = [
   { title: "Nomor", key: "Nomor", width: "115px" },
   { title: "Tanggal", key: "Tanggal", width: "85px" },
@@ -431,7 +440,13 @@ const onExportHeader = async () => {
 
   const columns: ExcelColumn[] = [
     { header: "Nomor", key: "Nomor", width: 16 },
-    { header: "Tanggal", key: "Tanggal", width: 12, align: "center" },
+    {
+      header: "Tanggal",
+      key: "Tanggal",
+      width: 12,
+      align: "center",
+      numFmt: "dd mmm yy",
+    },
     { header: "Jam", key: "Jam", width: 10 },
     { header: "Cab", key: "Cab", width: 8, align: "center" },
     { header: "Divisi", key: "Divisi", width: 12 },
@@ -456,7 +471,7 @@ const onExportHeader = async () => {
   // Samakan dengan tampilan browse: tanggal ISO → dd/mm/yyyy (zona waktu lokal)
   const rows = source.map((r: any) => ({
     ...r,
-    Tanggal: formatTanggal(r.Tanggal),
+    Tanggal: toExcelDate(r.Tanggal),
   }));
 
   await exportExcelSingle(
@@ -511,7 +526,7 @@ const onExportDetail = async () => {
       // Data Header/Master yang hanya muncul di baris pertama
       const masterCells = {
         Nomor: first.Nomor,
-        Tanggal: formatTanggal(first.Tanggal),
+        Tanggal: toExcelDate(first.Tanggal),
         Jam: first.Jam,
         Cab: first.Cab,
         Divisi: first.Divisi,
@@ -550,7 +565,13 @@ const onExportDetail = async () => {
 
     const columns: ExcelColumn[] = [
       { header: "Nomor", key: "Nomor", width: 16 },
-      { header: "Tanggal", key: "Tanggal", width: 12, align: "center" },
+      {
+        header: "Tanggal",
+        key: "Tanggal",
+        width: 12,
+        align: "center",
+        numFmt: "dd mmm yy",
+      },
       { header: "Jam", key: "Jam", width: 10, align: "center" },
       { header: "Cab", key: "Cab", width: 8, align: "center" },
       { header: "Divisi", key: "Divisi", width: 12 },
