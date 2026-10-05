@@ -348,8 +348,8 @@ const doExportDetail = async () => {
           QtySPK: Number(r.QtySPK) || 0,
           Divisi: r.Divisi,
           TglJadwal: formatTanggal(r.TglJadwal),
-          Wip: Number(r.Wip) || 0,
-          QtyPO: Number(r.QtyPO) || 0,
+          Wip: r.Wip == null ? "" : Number(r.Wip),
+          QtyPO: r.QtyPO == null ? "" : Number(r.QtyPO),
           QtyJadwal: Number(r.QtyJadwal) || 0,
           LineKelompok: r.LineKelompok || "-",
           Keterangan: r.Keterangan || "-",
@@ -673,8 +673,6 @@ fetchData();
                     <th style="width: 28px">No</th>
                     <th>Nomor SPK</th>
                     <th>Nama SPK</th>
-                    <th class="tr">WIP</th>
-                    <th class="tr">Qty PO</th>
                     <th class="tr">SMV (mnt)</th>
                     <th class="tr">Hari</th>
                     <th class="tr">Jam</th>
@@ -691,7 +689,7 @@ fetchData();
                     :key="g.line || '_blank'"
                   >
                     <tr class="grp-row">
-                      <td colspan="13">
+                      <td colspan="11">
                         <div class="grp-bar">
                           <span class="grp-title">{{
                             g.line || "(Tanpa line)"
