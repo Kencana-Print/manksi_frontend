@@ -62,6 +62,12 @@ const headers = [
   { title: "Koreksi", key: "Koreksi", width: "90px", align: "right" },
   { title: "Mutasi In", key: "MSI", width: "100px", align: "right" },
   {
+    title: "Terima Maklon",
+    key: "TerimaMaklon",
+    width: "110px",
+    align: "right",
+  },
+  {
     title: "Realisasi",
     key: "RealisasiPermintaan",
     width: "100px",
@@ -269,6 +275,9 @@ watch(
     <template #item.Retur="{ item }">{{ fmtNum(item.Retur) }}</template>
     <template #item.Koreksi="{ item }">{{ fmtNum(item.Koreksi) }}</template>
     <template #item.MSI="{ item }">{{ fmtNum(item.MSI) }}</template>
+    <template #item.TerimaMaklon="{ item }">{{
+      fmtNum(item.TerimaMaklon)
+    }}</template>
     <template #item.RealisasiPermintaan="{ item }">{{
       fmtNum(item.RealisasiPermintaan)
     }}</template>
