@@ -259,6 +259,8 @@ const doExportDetail = async () => {
           Debet: debet,
           Bayar: bayar,
           Sisa: sisa,
+          NoPO: r.NoPO || "-",
+          FakturPajak: r.FakturPajak || "-",
         });
         sDebet += debet;
         sBayar += bayar;
@@ -307,6 +309,8 @@ const doExportDetail = async () => {
         { header: "Debet", key: "Debet", align: "right", numFmt: "#,##0" },
         { header: "Bayar", key: "Bayar", align: "right", numFmt: "#,##0" },
         { header: "Sisa", key: "Sisa", align: "right", numFmt: "#,##0" },
+        { header: "No. PO", key: "NoPO" },
+        { header: "Faktur Pajak", key: "FakturPajak" },
       ],
       rows,
     );
