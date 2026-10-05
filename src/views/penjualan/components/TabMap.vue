@@ -29,6 +29,7 @@ import PenawaranDetailSearchModal from "@/components/lookups/PenawaranDetailSear
 import PabrikSearchModal from "@/components/lookups/PabrikSearchModal.vue";
 import ReferensiMapSearchModal from "@/components/lookups/ReferensiMapSearchModal.vue";
 import SetoranSearchModal from "@/components/lookups/SetoranSearchModal.vue";
+import LhkDesainSearchModal from "@/components/lookups/LhkDesainSearchModal.vue";
 
 const authStore = useAuthStore();
 const props = defineProps<{
@@ -61,6 +62,7 @@ const showCabMapModal = ref(false);
 const showCabSpkModal = ref(false);
 const showRefModal = ref(false);
 const showSetoranModal = ref(false);
+const showLhkModal = ref(false);
 
 const showPreviewDialog = ref(false);
 const showPenawaranDetailModal = ref(false);
@@ -386,6 +388,9 @@ const setRef = async (v: any) => {
   } catch {
     toast.error("Gagal memuat data dari referensi MAP.");
   }
+};
+const setLhk = (v: any) => {
+  props.formData.LhkNomor = v.Nomor || v.lhk_nomor;
 };
 const setPenawaran = (v: any) => {
   const nomor = v.Nomor || v.pen_nomor;
@@ -944,6 +949,26 @@ const setSetoranPembayaran = (v: any) => {
             placeholder="Klik untuk cari..."
             @mousedown.prevent="openMintaModal"
           />
+          <div class="f-row">
+            <label class="f-lbl">No. LHK Desain</label>
+            <input
+              v-model="formData.LhkNomor"
+              class="f-inp f-lkp-inp"
+              style="width: 160px; cursor: pointer; background: #f9f9f9"
+              readonly
+              placeholder="Klik untuk cari... (opsional)"
+              @mousedown.prevent="showLhkModal = true"
+            />
+            <button
+              v-if="formData.LhkNomor"
+              type="button"
+              class="btn-remove-pen"
+              title="Hapus referensi LHK Desain"
+              @click="formData.LhkNomor = ''"
+            >
+              <IconTrash :size="13" />
+            </button>
+          </div>
           <label class="f-lbl ml-2 cust-perfect-lbl" style="width: 80px"
             >Cust PERFECT</label
           >
@@ -1562,6 +1587,7 @@ const setSetoranPembayaran = (v: any) => {
     :cust-kode="formData.CustKode"
     @selected="setSetoranPembayaran"
   />
+  <LhkDesainSearchModal v-model="showLhkModal" @selected="setLhk" />
 
   <!-- Preview dialog -->
   <v-dialog v-model="showPreviewDialog" max-width="800px">

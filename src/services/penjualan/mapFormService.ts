@@ -44,6 +44,9 @@ export const mapFormService = {
     });
   },
 
+  searchLhkDesain: (q: string = "") =>
+    api.get("/penjualan/map-form/search-lhk-desain", { params: { q } }),
+
   getById(nomor: string) {
     const safeNomor = encodeURIComponent(nomor);
     return api.get(`/penjualan/map-form/${safeNomor}`);

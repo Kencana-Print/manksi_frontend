@@ -34,6 +34,7 @@ import MppbSearchModal from "@/components/lookups/MppbSearchModal.vue";
 import HistoryAlokasiModal from "@/components/lookups/HistoryAlokasiModal.vue";
 import BarangKaosanSearchModal from "@/components/lookups/BarangKaosanSearchModal.vue";
 import SetoranSearchModal from "@/components/lookups/SetoranSearchModal.vue";
+import LhkDesainSearchModal from "@/components/lookups/LhkDesainSearchModal.vue";
 
 const route = useRoute();
 const router = useRouter();
@@ -66,6 +67,7 @@ const showWorkshopModal = ref(false);
 const showStokDcModal = ref(false);
 const showSoKaosanModal = ref(false);
 const showSpkLamaModal = ref(false);
+const showLhkModal = ref(false);
 const showSjMemoModal = ref(false);
 const showMemoModal = ref(false);
 const showMppbModal = ref(false);
@@ -221,6 +223,7 @@ const defaultData = {
 
   spk_desain: "",
   spk_newdesign: "N",
+  spk_lhk_nomor: "",
 
   spk_warna_badan: "",
   spk_warna_lengan: "",
@@ -337,6 +340,7 @@ const {
       mkb: d.header.mkb || "",
       dtmkb: d.header.dtmkb || "",
       jmlmppb: d.header.jmlmppb || 0,
+      spk_lhk_nomor: d.header.spk_lhk_nomor || "",
       jmlinvdc: d.header.jmlinvdc || 0,
 
       // Fallback Checkbox (jika di DB null)
@@ -439,6 +443,7 @@ const {
         spk_acc_tanggal: data.spk_acc_tanggal || null,
         spk_desain: data.spk_desain || "",
         spk_newdesign: data.spk_newdesign || "N",
+        spk_lhk_nomor: data.spk_lhk_nomor || "",
         spk_tglaccproof: data.spk_tglaccproof || null,
         spk_mpotong: data.spk_mpotong || "N",
         spk_mcetak: data.spk_mcetak || "N",
@@ -880,6 +885,9 @@ const handleLookup = (type: string) => {
       }
       showSetoranModal.value = true;
       break;
+    case "lhkDesain":
+      showLhkModal.value = true;
+      break;
   }
 };
 
@@ -1184,6 +1192,9 @@ const setRepeat = (v: any) => {
 };
 const setSpkLama = (v: any) =>
   (formData.value.spk_lama = v.Nomor || v.spk_nomor);
+const setLhk = (v: any) => {
+  formData.value.spk_lhk_nomor = v.Nomor || v.lhk_nomor;
+};
 const setMppb = (v: any) => {
   formData.value.spk_mppb = v.Nomor || v.mpb_nomor;
   formData.value.jmlmppb = v.Jumlah || v.mpb_jmlorder || 0;
@@ -2014,6 +2025,7 @@ const onPilihKatalog = (item: any) => {
       @selected="setRepeat"
     />
     <SpkSearchModal v-model="showSpkLamaModal" @selected="setSpkLama" />
+    <LhkDesainSearchModal v-model="showLhkModal" @selected="setLhk" />
     <InvDcSearchModal v-model="showStokDcModal" @selected="setStokDc" />
     <SoKaosanSearchModal
       v-model="showSoKaosanModal"

@@ -99,6 +99,8 @@ import {
   IconBook,
   IconTransfer,
   IconList,
+  IconPalette,
+  IconChecklist,
 } from "@tabler/icons-vue";
 
 export interface NavItem {
@@ -826,6 +828,20 @@ export const createMenuItems = (): NavItem[] => {
           icon: IconFileText,
           menuId: 151,
         },
+        { divider: true },
+        {
+          title: "Permintaan Desain",
+          to: "/penjualan/permintaan-desain",
+          icon: IconPalette,
+          menuId: 184,
+        },
+        {
+          title: "LHK Desain",
+          to: "/penjualan/lhk-desain",
+          icon: IconChecklist,
+          menuId: 185,
+        },
+        { divider: true },
         {
           title: "Sales Order",
           to: "/penjualan/sales-order",
@@ -1397,6 +1413,12 @@ export const createMenuItems = (): NavItem[] => {
           menuId: 966,
           subItems: [
             {
+              title: "Laporan Desain Marketing",
+              to: "/laporan/marketing/laporan-desain",
+              icon: IconPalette,
+              menuId: 316,
+            },
+            {
               title: "SO Belum Komitmen Kirim",
               to: "/laporan/marketing/so-belum-komitmen",
               icon: IconClipboardX,
@@ -1511,6 +1533,11 @@ export const createMenuItems = (): NavItem[] => {
               title: "Kartu Piutang",
               to: "/laporan/piutang/kartu-piutang",
               icon: IconFileDescription,
+            },
+            {
+              title: "SPK Terkirim Belum Invoice",
+              to: "/laporan/piutang/spk-terkirim-belum-invoice",
+              icon: IconTruckDelivery,
             },
             { divider: true },
             {

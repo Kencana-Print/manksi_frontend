@@ -2851,6 +2851,51 @@ const router = createRouter({
       },
     },
     {
+      path: "/penjualan/permintaan-desain",
+      name: "PermintaanDesainBrowse",
+      component: () => import("@/views/penjualan/PermintaanDesainView.vue"),
+      meta: {
+        title: "Permintaan Desain",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "184",
+      },
+    },
+    {
+      path: "/penjualan/permintaan-desain/create",
+      name: "PermintaanDesainCreate",
+      component: () => import("@/views/penjualan/PermintaanDesainFormView.vue"),
+      meta: {
+        title: "Tambah Permintaan Desain",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "184",
+        browseRoute: "PermintaanDesainBrowse",
+      },
+    },
+    {
+      path: "/penjualan/permintaan-desain/print/:nomor",
+      name: "PermintaanDesainPrint",
+      component: () =>
+        import("@/views/penjualan/PermintaanDesainPrintView.vue"),
+      meta: {
+        title: "Cetak Permintaan Desain",
+        layout: "BlankLayout",
+        requiresAuth: true,
+      },
+    },
+    {
+      path: "/penjualan/lhk-desain",
+      name: "LhkDesainBrowse",
+      component: () => import("@/views/penjualan/LhkDesainView.vue"),
+      meta: {
+        title: "LHK Desain",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "185",
+      },
+    },
+    {
       path: "/penjualan/sales-order",
       name: "SalesOrderBrowse",
       component: () => import("@/views/penjualan/SalesOrderView.vue"),
@@ -4534,6 +4579,18 @@ const router = createRouter({
     },
 
     {
+      path: "/laporan/marketing/laporan-desain",
+      name: "LapDesainMarketing",
+      component: () =>
+        import("@/views/laporan/marketing/LaporanDesainMarketingView.vue"),
+      meta: {
+        title: "Laporan Desain Marketing",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "316",
+      },
+    },
+    {
       path: "/laporan/marketing/so-belum-komitmen",
       name: "LapSoBelumKomitmen",
       component: () =>
@@ -4834,6 +4891,18 @@ const router = createRouter({
         layout: "DefaultLayout",
         requiresAuth: true,
         menuId: "968", // Parent Menu ID Laporan Piutang
+      },
+    },
+    {
+      path: "/laporan/piutang/spk-terkirim-belum-invoice",
+      name: "LapSpkTerkirimBelumInvoice",
+      component: () =>
+        import("@/views/laporan/piutang/SpkTerkirimBelumInvoiceView.vue"),
+      meta: {
+        title: "SPK Terkirim Belum Invoice",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "968", // Mengikuti hak akses parent Laporan Piutang
       },
     },
     {

@@ -631,6 +631,12 @@ const onSpkLamaF1 = (e: KeyboardEvent) => {
     emit("open-lookup", "spkLama");
   }
 };
+const onLhkF1 = (e: KeyboardEvent) => {
+  if (e.key === "F1") {
+    e.preventDefault();
+    emit("open-lookup", "lhkDesain");
+  }
+};
 const onNomorPoF1 = (e: KeyboardEvent) => {
   if (e.key === "F1") {
     e.preventDefault();
@@ -1961,6 +1967,27 @@ watch(
             class="idate"
             style="flex: 1"
           />
+        </div>
+
+        <div class="fr">
+          <label class="lbl" style="width: 72px">LHK Desain</label>
+          <div class="igrp" style="flex: 1">
+            <input
+              v-model="formData.spk_lhk_nomor"
+              readonly
+              class="inp ro"
+              style="flex: 1"
+              @keydown="onLhkF1"
+            />
+            <button
+              type="button"
+              class="blkp"
+              title="Cari LHK Desain (F1)"
+              @mousedown.prevent="$emit('open-lookup', 'lhkDesain')"
+            >
+              <IconSearch :size="12" color="#1565c0" />
+            </button>
+          </div>
         </div>
 
         <div class="fr">
