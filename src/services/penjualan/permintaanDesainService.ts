@@ -29,6 +29,23 @@ export const permintaanDesainService = {
     items: { desain: string; jml: number }[];
   }) => api.post("/penjualan/permintaan-desain", payload),
 
+  updateHeader: (
+    nomor: string,
+    payload: {
+      namaProject: string;
+      customer?: string;
+      customerNama?: string;
+      jenisPekerjaan: string;
+      dateline?: string;
+      keterangan?: string;
+      items: { id: number | null; desain: string; jml: number }[];
+    },
+  ) =>
+    api.put(
+      `/penjualan/permintaan-desain/${encodeURIComponent(nomor)}`,
+      payload,
+    ),
+
   updateProgress: (nomor: string, jmlJadi: number) =>
     api.put(
       `/penjualan/permintaan-desain/${encodeURIComponent(nomor)}/progress`,

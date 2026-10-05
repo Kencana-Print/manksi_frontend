@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
+import { useRoute } from "vue-router";
 import { useToast } from "vue-toastification";
 import BaseForm from "@/components/BaseForm.vue";
 import { useForm } from "@/composables/useForm";
@@ -14,6 +15,7 @@ import {
 } from "@tabler/icons-vue";
 
 interface ItemRow {
+  id?: number | null;
   desain: string;
   jml: number;
 }
@@ -33,7 +35,18 @@ interface PDFormData {
 }
 
 const toast = useToast();
-const todayStr = new Date().toISOString().slice(0, 10);
+const route = useRoute();
+const editNomor = computed(() => String(route.params.nomor || ""));
+const isEdit = computed(() => !!editNomor.value);
+const editJmlJadi = ref(0);
+
+const toInputDate = (v: any) => {
+  if (!v) return "";
+  const d = new Date(v);
+  if (isNaN(d.getTime())) return "";
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+const todayStr = toInputDate(new Date());
 
 const initialData: PDFormData = {
   tanggal: todayStr,
@@ -62,8 +75,28 @@ const {
 } = useForm<PDFormData>({
   menuId: "184",
   initialData,
-  submitApi: (data) =>
-    svc.createPD({
+  submitApi: (data) => {
+    const items = data.items
+      .filter((i) => i.desain.trim() && Number(i.jml) > 0)
+      .map((i) => ({
+        id: i.id ?? null,
+        desain: i.desain.trim(),
+        jml: Number(i.jml),
+      }));
+
+    if (isEdit.value) {
+      return svc.updateHeader(editNomor.value, {
+        namaProject: data.namaProject.trim(),
+        customer: data.customerKode || undefined,
+        customerNama: data.customerNama || undefined,
+        jenisPekerjaan: data.jenisPekerjaan,
+        dateline: data.dateline || undefined,
+        keterangan: data.keterangan,
+        items,
+      });
+    }
+
+    return svc.createPD({
       tanggal: data.tanggal,
       namaProject: data.namaProject,
       customer: data.customerKode || undefined,
@@ -73,13 +106,14 @@ const {
       prioritas: data.prioritas,
       desainer: data.desainer || undefined,
       referensi: data.jenisPekerjaan === "REVISI" ? data.referensi : undefined,
-      items: data.items
-        .filter((i) => i.desain.trim() && Number(i.jml) > 0)
-        .map((i) => ({ desain: i.desain.trim(), jml: Number(i.jml) })),
-    }),
+      items: items.map(({ desain, jml }) => ({ desain, jml })),
+    });
+  },
   onSuccess: (response: any) => {
     toast.success(
-      `Permintaan Desain ${response?.nomor ?? ""} berhasil dibuat.`,
+      isEdit.value
+        ? `Permintaan Desain ${editNomor.value} berhasil diupdate.`
+        : `Permintaan Desain ${response?.nomor ?? ""} berhasil dibuat.`,
     );
     goBack();
   },
@@ -111,6 +145,43 @@ onMounted(async () => {
     desainerOptions.value = res.data.data ?? [];
   } catch {
     // opsional, biarin kosong kalau gagal — nggak blocking form
+  }
+});
+
+onMounted(async () => {
+  if (!isEdit.value) return;
+  try {
+    const res = await svc.getDetail(editNomor.value);
+    const d = res.data.data;
+    if (!d) throw new Error("not found");
+    if (["CLOSE", "PENDING", "CANCEL", "CANCEL_ALT"].includes(d.pd_status)) {
+      toast.error(
+        `PD berstatus ${d.pd_status} tidak dapat diedit. Aktifkan kembali dulu jika perlu.`,
+      );
+      goBack();
+      return;
+    }
+    editJmlJadi.value = Number(d.pd_jmljadi) || 0;
+    formData.value = {
+      tanggal: toInputDate(d.pd_tanggal),
+      namaProject: d.pd_nama_project ?? "",
+      customerKode: d.pd_customer ?? "",
+      customerNama: d.pd_customer_nama ?? "",
+      jenisPekerjaan: d.pd_jenis_pekerjaan ?? "BARU",
+      dateline: toInputDate(d.pd_dateline),
+      prioritas: d.pd_prioritas ?? "NORMAL",
+      referensi: d.pd_referensi ?? "",
+      keterangan: d.pd_keterangan ?? "",
+      desainer: d.pd_desainer ?? "",
+      items: (d.detail ?? []).map((x: any) => ({
+        id: x.pd2_id,
+        desain: x.pd2_pd_desain ?? "",
+        jml: Number(x.pd2_pd_jml) || 1,
+      })),
+    };
+  } catch {
+    toast.error("Gagal memuat Permintaan Desain.");
+    goBack();
   }
 });
 
@@ -156,6 +227,12 @@ const onValidateSave = () => {
     toast.error("Minimal 1 baris detail desain dengan jumlah > 0.");
     return;
   }
+  if (isEdit.value && totalJml.value < editJmlJadi.value) {
+    toast.error(
+      `Total jumlah tidak boleh kurang dari yang sudah jadi (${editJmlJadi.value}).`,
+    );
+    return;
+  }
   showSaveDialog.value = true;
 };
 </script>
@@ -166,7 +243,7 @@ const onValidateSave = () => {
     menu-id="184"
     :icon="IconPalette"
     :is-saving="isSaving"
-    item-name="Permintaan Desain Baru"
+    :item-name="isEdit ? `Perubahan ${editNomor}` : 'Permintaan Desain Baru'"
     v-model:show-save-dialog="showSaveDialog"
     v-model:show-cancel-dialog="showCancelDialog"
     v-model:show-close-dialog="showCloseDialog"
@@ -187,6 +264,7 @@ const onValidateSave = () => {
           density="compact"
           class="mb-3"
           hide-details
+          :disabled="isEdit"
         />
 
         <v-text-field
@@ -220,6 +298,7 @@ const onValidateSave = () => {
           density="compact"
           class="mb-3"
           hide-details
+          :disabled="isEdit"
         />
 
         <div
@@ -227,7 +306,10 @@ const onValidateSave = () => {
           class="lookup-field mb-3"
         >
           <label class="lookup-label">No. PD Asal (referensi)</label>
-          <div class="lookup-input-wrap" @click="showReferensiModal = true">
+          <div
+            class="lookup-input-wrap"
+            @click="!isEdit && (showReferensiModal = true)"
+          >
             <span :class="{ 'text-grey': !formData.referensi }">
               {{ formData.referensi || "Pilih Permintaan Desain asal..." }}
             </span>
@@ -253,6 +335,7 @@ const onValidateSave = () => {
           density="compact"
           class="mb-3"
           hide-details
+          :disabled="isEdit"
         />
 
         <v-select
@@ -265,6 +348,7 @@ const onValidateSave = () => {
           density="compact"
           class="mb-3"
           clearable
+          :disabled="isEdit"
           hide-details
         />
 

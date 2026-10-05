@@ -291,7 +291,10 @@ const onExportDetail = async () => {
       masters.map((h: any) =>
         svc
           .getDetail(h.Nomor)
-          .then((res: any) => ({ header: h, items: res.data?.items ?? [] }))
+          .then((res: any) => ({
+            header: h,
+            items: res.data?.data?.detail ?? [],
+          }))
           .catch(() => ({ header: h, items: [] })),
       ),
     );
@@ -446,6 +449,27 @@ const resumeSelected = async () => {
     isResumingStatus.value = false;
   }
 };
+
+// ── Edit PD (non-Desain) ──
+const canEditPD = computed(() => {
+  const it = selectedItem.value;
+  if (!it) return false;
+  const bagian = (authStore.user?.bagian || "").toUpperCase();
+  if (["EDP", "IT"].includes(bagian)) return true;
+  if (bagian === "DESAIN") return false;
+  const kode = authStore.user?.kode;
+  return it.Marketing === kode || it.UserCreate === kode;
+});
+
+const isSelectedClosed = computed(() => selectedItem.value?.Status === "CLOSE");
+
+const openEdit = () => {
+  if (!selectedItem.value) return;
+  router.push({
+    name: "PermintaanDesainEdit",
+    params: { nomor: selectedItem.value.Nomor },
+  });
+};
 </script>
 
 <template>
@@ -498,6 +522,16 @@ const resumeSelected = async () => {
     </template>
 
     <template #extra-actions>
+      <v-btn
+        v-if="canEditPD"
+        size="small"
+        color="orange-darken-2"
+        :disabled="!selectedItem || isSelectedManual || isSelectedClosed"
+        @click="openEdit"
+      >
+        <template #prepend><IconEdit :size="15" /></template>
+        Edit
+      </v-btn>
       <v-btn
         v-if="isDesain"
         size="small"
@@ -840,6 +874,7 @@ const resumeSelected = async () => {
 .mt8 {
   margin-top: 8px;
 }
+
 .pd-detail-wrap {
   padding: 8px 16px 12px;
   background: #f5f7fb;
