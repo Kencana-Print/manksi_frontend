@@ -453,11 +453,17 @@ const onExportHeader = async () => {
     { header: "User", key: "Usr", width: 12 },
   ];
 
+  // Samakan dengan tampilan browse: tanggal ISO → dd/mm/yyyy (zona waktu lokal)
+  const rows = source.map((r: any) => ({
+    ...r,
+    Tanggal: formatTanggal(r.Tanggal),
+  }));
+
   await exportExcelSingle(
     `Permintaan_Bahan_Baku_${filterState.value.startDate}_${filterState.value.endDate}.xlsx`,
     "Permintaan Bahan Baku",
     columns,
-    source,
+    rows,
     `Permintaan Bahan Baku Periode ${filterState.value.startDate} s/d ${filterState.value.endDate}`,
   );
 };
