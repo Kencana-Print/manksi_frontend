@@ -266,17 +266,11 @@ const mitraLuarText = computed(() => {
   return parts.length > 0 ? "Mitra Luar: " + parts.join(", ") : "";
 });
 
-const formatSizeDetail = computed(() => {
-  if (!data.value.sizeDetails?.length) return "";
-  // Pasangan "Lebar/Panjang" yang ditampilkan beda-beda tergantung
-  // jenis produk — form input pakai field berbeda per jenis (lihat
-  // DIMENSION_FIELDS di SalesOrderForm.vue):
-  //   - Kaos/atasan umum → ld (Lebar Dada) / pb (Panjang Badan)
-  //   - Celana           → l_pinggang / p_celana
-  // Print sebelumnya hardcode ld/pb saja, jadi celana selalu 0.00.
-  // Sekarang: pilih pasangan pertama yang datanya benar-benar
-  // terisi di salah satu baris, biar generik untuk semua jenis
-  // produk tanpa print perlu tahu jenis order-nya secara eksplisit.
+// Daftar ukuran per baris: "28= L: 76 P: 97"
+const sizeDetailList = computed<string[]>(() => {
+  if (!data.value.sizeDetails?.length) return [];
+  // Pasangan Lebar/Panjang beda per jenis produk (kaos: ld/pb, celana: l_pinggang/p_celana, dst).
+  // Pilih pasangan pertama yang datanya terisi di salah satu baris.
   const pairs: [string, string][] = [
     ["ld", "pb"],
     ["l_pinggang", "p_celana"],
@@ -288,10 +282,23 @@ const formatSizeDetail = computed(() => {
     pairs.find(([lK, pK]) =>
       rows.some((r: any) => Number(r[lK]) > 0 || Number(r[pK]) > 0),
     ) || pairs[0];
-  return rows
-    .map((sz: any) => `${sz.size}=  L: ${sz[lKey] || 0}   P: ${sz[pKey] || 0}`)
-    .join("\n");
+  return rows.map(
+    (sz: any) => `${sz.size}= L: ${sz[lKey] || 0} P: ${sz[pKey] || 0}`,
+  );
 });
+
+// Maks 6 ukuran per kolom; kalau banyak, lanjut ke kolom di sampingnya.
+// Kalau total > 24 (lebih dari 4 kolom), baris per kolom ditambah supaya tetap 4 kolom.
+const SIZE_PER_COL = 6;
+const SIZE_MAX_COL = 4;
+const sizeRows = computed(() => {
+  const n = sizeDetailList.value.length;
+  if (n <= SIZE_PER_COL) return Math.max(n, 1);
+  return Math.max(SIZE_PER_COL, Math.ceil(n / SIZE_MAX_COL));
+});
+const sizeGridStyle = computed(() => ({
+  gridTemplateRows: `repeat(${sizeRows.value}, auto)`,
+}));
 
 const keteranganProduksiLengkap = computed(() => {
   const parts = [];
@@ -551,11 +558,23 @@ onMounted(async () => {
 
               <div class="ket-box ket-section mt-2">
                 <div class="ket-title">Size : Lebar &amp; Panjang Badan</div>
-                <pre
-                  class="ket-produksi"
-                ><span :class="{ 'highlight-yellow': isSizeKhusus || isStandarKlien }">{{
-                  formatSizeDetail || (data.sizeStr ? data.sizeStr : "-")
-                }}</span></pre>
+                <div
+                  v-if="sizeDetailList.length"
+                  class="size-grid"
+                  :style="sizeGridStyle"
+                >
+                  <div
+                    v-for="(s, i) in sizeDetailList"
+                    :key="i"
+                    class="size-item"
+                    :class="{
+                      'highlight-yellow': isSizeKhusus || isStandarKlien,
+                    }"
+                  >
+                    {{ s }}
+                  </div>
+                </div>
+                <pre v-else class="ket-produksi">{{ data.sizeStr || "-" }}</pre>
               </div>
             </div>
 
@@ -1148,16 +1167,31 @@ onMounted(async () => {
   line-height: 1.35;
   /* Tidak uppercase — biarkan as-is sesuai input user */
 }
+.size-grid {
+  display: grid;
+  grid-auto-flow: column; /* isi ke bawah dulu, lalu pindah ke kolom sebelah */
+  grid-auto-columns: max-content;
+  column-gap: 14px;
+  row-gap: 1px;
+  font-size: 8pt;
+  line-height: 1.35;
+}
+.size-item {
+  white-space: nowrap;
+}
 
 /* Gambar + Size + Komponen dalam satu baris */
 .garmen-img-center {
-  flex: 1; /* isi sisa ruang antara info table dan TTD */
+  flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 0;
+  min-height: 45mm; /* jangan sampai terjepit blok lain */
   overflow: hidden;
   padding: 8px 0;
+}
+.garmen-kiri > *:not(.garmen-img-center) {
+  flex-shrink: 0; /* info, komponen, size tidak ikut diperas */
 }
 
 .garmen-img-fit {
