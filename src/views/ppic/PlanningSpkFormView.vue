@@ -5,10 +5,8 @@ import { useToast } from "vue-toastification";
 import { useForm } from "@/composables/useForm";
 import { planningSpkFormService } from "@/services/ppic/planningSpkFormService";
 import BaseForm from "@/components/BaseForm.vue";
-import api from "@/services/api";
 
 import SpkSearchModal from "@/components/lookups/SpkSearchModal.vue";
-import SupplierSearchModal from "@/components/lookups/SupplierSearchModal.vue";
 
 import {
   IconCalendarStats,
@@ -316,16 +314,13 @@ const {
           .map((r) => ({
             NomorSPK: r.NomorSPK,
             plan_tgl_jadwal: payload.pl_tgl1, // sewing mingguan: tanggal = awal periode
-            plan_wip: r.plan_wip,
-            plan_qty_po: r.plan_qty_po,
             plan_line_kelompok: r.plan_line_kelompok,
             plan_keterangan: r.plan_keterangan,
-            supplierKode: r.supplierKode,
-            supplierNama: r.supplierNama,
             plan_hari: r.plan_hari,
             plan_jam: r.plan_jam,
             plan_target_output: r.plan_target_output,
             plan_smv: r.plan_smv,
+            plan_mp: r.mp,
           })),
         koli: (payload.detail.koli as TabRow[])
           .filter((r) => r.NomorSPK && r.plan_tgl_jadwal)
@@ -486,8 +481,6 @@ const resolveSpk = async (tab: TabKey, idx: number, nomor: string) => {
       }`,
     ].join("\n");
 
-    // Auto-fill qty_po per tab
-    if (tab === "sewing") row.plan_qty_po = po.sewing;
     if (tab === "koli") row.plan_qty_po = po.koli;
     // cutting: qty_po tetap 0, tidak ada PO Jasa
 
@@ -533,65 +526,8 @@ const resolveSpk = async (tab: TabKey, idx: number, nomor: string) => {
   }
 };
 
-// ─── Handler Supplier ──────────────────────────────────────────────────────────────
 const isExternalLine = (row: TabRow) =>
   row.plan_line_kelompok === "LINE EXTERNAL";
-
-const showSupplierModal = ref(false);
-const activeSupplierRowIdx = ref(-1);
-
-const openSupplierModal = (idx: number) => {
-  activeSupplierRowIdx.value = idx;
-  showSupplierModal.value = true;
-};
-
-const onSupplierKeydown = (e: KeyboardEvent, idx: number) => {
-  if (e.key === "F1") {
-    e.preventDefault();
-    openSupplierModal(idx);
-  }
-};
-
-const onSupplierEnter = async (idx: number) => {
-  const row = formData.value.detail.sewing[idx];
-  const kode = row.supplierKode?.trim();
-  if (!kode) {
-    row.supplierNama = "";
-    return;
-  }
-  row._supplierLoading = true;
-  try {
-    const res = await api.get("/lookups/supplier", {
-      params: { q: kode, limit: 1 },
-    });
-    const items = res.data.data?.items || res.data.data || [];
-    const item = items.find(
-      (i: any) =>
-        (i.Kode || i.sup_kode || "").toUpperCase() === kode.toUpperCase(),
-    );
-    if (item) {
-      row.supplierKode = item.Kode || item.sup_kode;
-      row.supplierNama = item.Nama || item.sup_nama;
-    } else {
-      toast.error("Kode supplier tidak ditemukan.");
-      row.supplierKode = "";
-      row.supplierNama = "";
-    }
-  } catch {
-    toast.error("Gagal memvalidasi supplier.");
-  } finally {
-    row._supplierLoading = false;
-  }
-};
-
-const onSupplierSelected = (item: any) => {
-  const idx = activeSupplierRowIdx.value;
-  if (idx < 0) return;
-  const row = formData.value.detail.sewing[idx];
-  row.supplierKode = item.Kode || item.sup_kode;
-  row.supplierNama = item.Nama || item.sup_nama;
-  showSupplierModal.value = false;
-};
 
 // ─── Sewing: referensi MP / SMV / actual ──────────────────────────────────────
 interface SewingRef {
@@ -835,6 +771,28 @@ const addSewingSpk = (line: string) => {
   formData.value.detail.sewing.push(newSewingRow(line));
 };
 
+// MP per line: default dari DB, boleh diedit. Berlaku ke semua SPK di line itu.
+const setLineMp = (line: string, val: string) => {
+  const mp = Math.max(0, Math.floor(Number(val) || 0));
+  formData.value.detail.sewing.forEach((r) => {
+    if (r.plan_line_kelompok === line) {
+      r.mp = mp;
+      r._mpLocked = true; // jangan ditimpa refresh dari DB
+    }
+  });
+};
+
+const mpDiffersFromDb = (line: string, mp: number) =>
+  mp !== (sewingRef.value.mpByLine[line] ?? 0);
+
+const resetLineMp = async (line: string) => {
+  const rows = formData.value.detail.sewing.filter(
+    (r) => r.plan_line_kelompok === line,
+  );
+  rows.forEach((r) => (r._mpLocked = false));
+  if (await refreshSewingRef()) rows.forEach(applyMpSmv);
+};
+
 // Hanya boleh kalau semua baris di line itu masih kosong (tombolnya disabled
 // selama masih ada SPK) supaya tidak ada SPK yang hilang tanpa sengaja.
 const removeSewingLine = (line: string) => {
@@ -903,16 +861,6 @@ const validateSave = () => {
   if (!hasData)
     return toast.warning("Minimal isi satu baris SPK di salah satu tab.");
 
-  // ← BARU
-  const missingSupplier = formData.value.detail.sewing.some(
-    (r) => r.NomorSPK && isExternalLine(r) && !r.supplierKode,
-  );
-  if (missingSupplier) {
-    return toast.warning(
-      "Isi Supplier untuk baris Sewing dengan Line Eksternal.",
-    );
-  }
-
   // ── Validasi khusus Sewing ──
   const sw = formData.value.detail.sewing.filter((r) => r.NomorSPK);
   if (sw.some((r) => !r.plan_line_kelompok))
@@ -921,6 +869,10 @@ const validateSave = () => {
     return toast.warning("Jumlah hari dan jam Sewing harus lebih dari 0.");
   if (sw.some((r) => !(r.plan_target_output > 0)))
     return toast.warning("Target output Sewing wajib diisi (lebih dari 0).");
+  if (sw.some((r) => !isExternalLine(r) && !(r.mp > 0)))
+    return toast.warning(
+      "MP wajib diisi (lebih dari 0) untuk setiap Line Sewing.",
+    );
   const swKeys = new Set<string>();
   for (const r of sw) {
     const k = `${r.NomorSPK}|${r.plan_line_kelompok}`;
@@ -1265,10 +1217,8 @@ watch(
                   <tr>
                     <th style="width: 28px">No</th>
                     <th style="width: 130px">Nomor SPK</th>
-                    <th style="width: 200px">Nama SPK</th>
+                    <th style="width: 220px">Nama SPK</th>
                     <th style="width: 70px" class="tr">Qty SPK</th>
-                    <th style="width: 70px" class="tr">WIP</th>
-                    <th style="width: 70px" class="tr">Qty PO</th>
                     <th style="width: 80px" class="tr">SMV (mnt)</th>
                     <th style="width: 55px" class="tr">Hari</th>
                     <th style="width: 55px" class="tr">Jam</th>
@@ -1276,9 +1226,7 @@ watch(
                     <th style="width: 80px" class="tr">Act. Output</th>
                     <th style="width: 85px" class="tr">Waktu Prod (mnt)</th>
                     <th style="width: 85px" class="tr">Resume (mnt)</th>
-                    <th style="width: 130px">Supplier</th>
-                    <th style="width: 150px">Nama Supplier</th>
-                    <th style="width: 150px">Keterangan</th>
+                    <th style="width: 200px">Keterangan</th>
                     <th style="width: 32px"></th>
                   </tr>
                 </thead>
@@ -1286,7 +1234,7 @@ watch(
                   <template v-for="g in sewingGroups" :key="g.line || '_blank'">
                     <!-- Header blok Line: Line, MP, Actual Jam sekali saja -->
                     <tr class="grp-row">
-                      <td colspan="17">
+                      <td colspan="13">
                         <div class="grp-bar">
                           <span v-if="g.line" class="grp-title">{{
                             g.line
@@ -1311,10 +1259,39 @@ watch(
                           </select>
                           <span class="grp-chip"
                             >MP
-                            <b>{{
-                              g.line ? fmtDec(g.items[0].row.mp, 0) : "—"
-                            }}</b></span
-                          >
+                            <input
+                              type="number"
+                              class="grp-mp"
+                              min="0"
+                              step="1"
+                              :disabled="!g.line"
+                              :value="g.line ? g.items[0].row.mp : ''"
+                              :title="
+                                g.line
+                                  ? `Dari database: ${fmtDec(sewingRef.mpByLine[g.line] ?? 0, 0)}`
+                                  : ''
+                              "
+                              v-select-on-focus
+                              @change="
+                                setLineMp(
+                                  g.line,
+                                  ($event.target as HTMLInputElement).value,
+                                )
+                              "
+                            />
+                            <button
+                              v-if="
+                                g.line &&
+                                mpDiffersFromDb(g.line, g.items[0].row.mp)
+                              "
+                              type="button"
+                              class="btn-mp-reset"
+                              title="Kembalikan ke jumlah dari database"
+                              @click="resetLineMp(g.line)"
+                            >
+                              reset
+                            </button>
+                          </span>
                           <span class="grp-chip"
                             >Act. Jam
                             <b>{{ fmtDec(g.items[0].row.actual_jam) }}</b></span
@@ -1368,24 +1345,6 @@ watch(
                       </td>
                       <td class="ro-cell tr">
                         {{ row.QtySPK ? fmt(row.QtySPK) : "—" }}
-                      </td>
-                      <td style="padding: 0">
-                        <input
-                          type="number"
-                          v-model.number="row.plan_wip"
-                          min="0"
-                          class="gi tr"
-                          v-select-on-focus
-                        />
-                      </td>
-                      <td style="padding: 0">
-                        <input
-                          type="number"
-                          v-model.number="row.plan_qty_po"
-                          min="0"
-                          class="gi tr"
-                          v-select-on-focus
-                        />
                       </td>
 
                       <!-- SMV: PROOF = terkunci, MANUAL = input -->
@@ -1460,35 +1419,6 @@ watch(
                       </td>
 
                       <td style="padding: 0">
-                        <template v-if="isExternalLine(row)">
-                          <div class="gi-group">
-                            <input
-                              v-model="row.supplierKode"
-                              class="gi"
-                              style="text-transform: uppercase"
-                              placeholder="F1/Enter"
-                              @keydown="(e) => onSupplierKeydown(e, idx)"
-                              @keydown.enter.prevent="onSupplierEnter(idx)"
-                            />
-                            <button
-                              class="btn-gi-lkp"
-                              :class="{ loading: row._supplierLoading }"
-                              @click="openSupplierModal(idx)"
-                            >
-                              <IconSearch :size="11" />
-                            </button>
-                          </div>
-                        </template>
-                        <template v-else>
-                          <span class="ro-cell dash">—</span>
-                        </template>
-                      </td>
-                      <td class="ro-cell" :title="row.supplierNama">
-                        {{
-                          isExternalLine(row) ? row.supplierNama || "—" : "—"
-                        }}
-                      </td>
-                      <td style="padding: 0">
                         <input
                           type="text"
                           v-model="row.plan_keterangan"
@@ -1509,7 +1439,7 @@ watch(
                     </tr>
                   </template>
                   <tr v-if="!formData.detail.sewing.length">
-                    <td colspan="17" class="empty-row">
+                    <td colspan="13" class="empty-row">
                       Pilih "+ Tambah Line..." untuk mulai
                     </td>
                   </tr>
@@ -1654,12 +1584,6 @@ watch(
     v-model="showSpkModal"
     filter-mode="spk-ppic"
     @selected="onSpkSelected"
-  />
-
-  <!-- Supplier Modal -->
-  <SupplierSearchModal
-    v-model="showSupplierModal"
-    @selected="onSupplierSelected"
   />
 
   <!-- Dialog konfirmasi SMV manual (SPK tanpa Proof Garmen) -->
@@ -2193,6 +2117,37 @@ input[type="number"]::-webkit-inner-spin-button {
 .grp-chip b {
   color: #1b5e20;
   margin-left: 2px;
+}
+.grp-mp {
+  width: 46px;
+  height: 20px;
+  margin-left: 2px;
+  padding: 0 4px;
+  text-align: right;
+  font-size: 11px;
+  font-weight: 700;
+  color: #1b5e20;
+  background: white;
+  border: 1px solid #66bb6a;
+  border-radius: 3px;
+  outline: none;
+}
+.grp-mp:focus {
+  box-shadow: 0 0 0 1.5px #1976d2;
+}
+.grp-mp:disabled {
+  background: #eee;
+}
+.btn-mp-reset {
+  margin-left: 4px;
+  height: 20px;
+  padding: 0 6px;
+  font-size: 10px;
+  color: #1b5e20;
+  background: transparent;
+  border: 1px dashed #66bb6a;
+  border-radius: 3px;
+  cursor: pointer;
 }
 .grp-spacer {
   flex: 1;
