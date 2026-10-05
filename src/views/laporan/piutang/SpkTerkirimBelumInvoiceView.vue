@@ -52,6 +52,7 @@ const clearPerusahaan = () => {
 // ── Tabel ──
 const headers = [
   { title: "Nomor", key: "Nomor", width: "160px" },
+  { title: "No. SPK", key: "NoSPK", minWidth: "200px" },
   { title: "Jenis", key: "Jenis", width: "70px", align: "center" },
   { title: "Nama", key: "Nama", minWidth: "220px" },
   { title: "Customer", key: "Customer", minWidth: "220px" },
