@@ -79,6 +79,7 @@ const KETERANGAN_OPTIONS = [
   "CETAK DTF",
   "CETAK DTG",
   "CETAK PLASTISOL",
+  "CETAK MANUAL",
 ];
 
 const initialCab = (route.query.cab as string) || "";
