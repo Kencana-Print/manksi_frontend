@@ -359,12 +359,13 @@ const tglIndo = (dateStr: string) => {
             <div class="catatan-wrap">
               <div class="lbl">Catatan :</div>
               <div class="val">
-                <span
-                  v-if="getVal('mspk_revisi') === 'Y'"
-                  class="font-weight-bold"
-                >
-                  Memo {{ getVal("mspk_nomor") }} = PERMAK SAJA tidak usah buat
-                  BARU !!<br /><br />
+                <span v-if="getVal('mspk_referensi')" class="font-weight-bold">
+                  Memo {{ getVal("mspk_referensi") }} = PERMAK SAJA tidak usah
+                  buat BARU !!<br />
+                  <template v-if="getVal('mspk_revisi_note')">
+                    {{ getVal("mspk_revisi_note") }}<br />
+                  </template>
+                  <br />
                 </span>
                 <pre class="catatan-text">{{ getVal("mspk_keterangan") }}</pre>
               </div>
