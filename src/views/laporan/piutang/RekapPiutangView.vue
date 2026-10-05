@@ -3,12 +3,20 @@ import { ref, computed } from "vue";
 import BaseBrowse from "@/components/BaseBrowse.vue";
 import { useBrowse } from "@/composables/useBrowse";
 import { rekapPiutangService } from "@/services/laporan/piutang/rekapPiutangService";
-import { IconFileAnalytics, IconSearch } from "@tabler/icons-vue";
+import { useToast } from "vue-toastification";
+import { exportExcelSingle } from "@/utils/excelExport";
+import {
+  IconFileAnalytics,
+  IconSearch,
+  IconFileExport,
+} from "@tabler/icons-vue";
 
 // Import Modal Perusahaan
 import PerusahaanSearchModal from "@/components/lookups/PerusahaanSearchModal.vue";
 
 const menuId = "968"; // Akses ikut parent Laporan Piutang
+
+const toast = useToast();
 
 const getLocalDate = () => {
   const d = new Date();
@@ -145,13 +153,175 @@ const getTotal = (key: string, filteredItems: any[]) => {
   return filteredItems.reduce((sum, item) => sum + (Number(item[key]) || 0), 0);
 };
 
-const exportData = computed(() => {
+// ── Export: ikut search + filter kolom di BaseBrowse ───────────────────────
+const browseRef = ref<InstanceType<typeof BaseBrowse> | null>(null);
+
+// Baris yang sedang tampil (setelah search + filter kolom), semua halaman
+const getFilteredCustomers = (): any[] => {
+  const all = items.value ?? [];
+  const filtered = browseRef.value?.getFilteredItems?.() ?? all;
+  if (filtered.length !== all.length) {
+    toast.info(
+      `Export ${filtered.length} dari ${all.length} customer sesuai filter.`,
+    );
+  }
+  return filtered;
+};
+
+// Export rekap: dipanggil saat tombol Export diklik, bukan computed,
+// supaya selalu membaca kondisi filter terbaru.
+const buildExportData = () => {
+  const rows = getFilteredCustomers();
   const totalRow: Record<string, any> = { Kode: "", Customer: "GRAND TOTAL" };
   for (const key of numericKeys.value) {
-    totalRow[key] = getTotal(key, items.value ?? []);
+    totalRow[key] = getTotal(key, rows);
   }
-  return [...(items.value ?? []), totalRow];
-});
+  return [...rows, totalRow];
+};
+
+// ── Export Detail: invoice outstanding per customer ────────────────────────
+const isExportingDetail = ref(false);
+const exportDone = ref(0);
+const exportTotal = ref(0);
+
+// Ambil detail semua customer dengan paralel terbatas (4 request sekaligus)
+const fetchAllDetails = async (
+  customers: any[],
+  endDate: string,
+  perusahaan: string,
+  concurrency = 4,
+) => {
+  const map = new Map<string, any[]>();
+  let cursor = 0;
+  let failure: unknown = null;
+
+  const worker = async () => {
+    while (!failure && cursor < customers.length) {
+      const c = customers[cursor++];
+      try {
+        const res = await rekapPiutangService.getDetail({
+          customer: c.Kode,
+          endDate,
+          perusahaan,
+        });
+        map.set(c.Kode, res.data.data || []);
+        exportDone.value++;
+      } catch (e) {
+        failure = e; // hentikan worker lain
+      }
+    }
+  };
+
+  await Promise.all(
+    Array.from({ length: Math.min(concurrency, customers.length) }, worker),
+  );
+  if (failure) throw failure;
+  return map;
+};
+
+const doExportDetail = async () => {
+  const customers = getFilteredCustomers();
+  if (!customers.length) {
+    toast.warning("Tidak ada data untuk diekspor.");
+    return;
+  }
+
+  // Snapshot filter supaya tidak berubah kalau user mengubahnya saat proses berjalan
+  const { endDate, perusahaan } = filterState.value;
+
+  isExportingDetail.value = true;
+  exportDone.value = 0;
+  exportTotal.value = customers.length;
+  try {
+    const detailMap = await fetchAllDetails(customers, endDate, perusahaan);
+
+    const rows: any[] = [];
+    let gDebet = 0;
+    let gBayar = 0;
+    let gSisa = 0;
+    const mismatch: string[] = [];
+
+    for (const c of customers) {
+      const inv = detailMap.get(c.Kode) ?? [];
+      let sDebet = 0;
+      let sBayar = 0;
+      let sSisa = 0;
+
+      for (const r of inv) {
+        const debet = Number(r.Debet) || 0;
+        const bayar = Number(r.Bayar) || 0;
+        const sisa = Number(r.Sisa) || 0;
+        rows.push({
+          Kode: c.Kode,
+          Customer: c.Customer,
+          Nota: r.Nota,
+          Tanggal: fmtDate(r.Tanggal),
+          Debet: debet,
+          Bayar: bayar,
+          Sisa: sisa,
+        });
+        sDebet += debet;
+        sBayar += bayar;
+        sSisa += sisa;
+      }
+
+      if (inv.length) {
+        rows.push({
+          Kode: c.Kode,
+          Customer: c.Customer,
+          Nota: "SUBTOTAL",
+          Tanggal: "",
+          Debet: sDebet,
+          Bayar: sBayar,
+          Sisa: sSisa,
+        });
+      }
+      gDebet += sDebet;
+      gBayar += sBayar;
+      gSisa += sSisa;
+
+      // Detail harus sama dengan Grand Total di rekap (toleransi Rp 1)
+      if (Math.abs(sSisa - (Number(c.GrandTotal) || 0)) > 1) {
+        mismatch.push(c.Kode);
+      }
+    }
+
+    rows.push({
+      Kode: "",
+      Customer: "GRAND TOTAL",
+      Nota: "",
+      Tanggal: "",
+      Debet: gDebet,
+      Bayar: gBayar,
+      Sisa: gSisa,
+    });
+
+    await exportExcelSingle(
+      `Detail_Rekap_Piutang_${endDate}${perusahaan ? "_" + perusahaan : ""}.xlsx`,
+      "Detail Piutang",
+      [
+        { header: "Kode", key: "Kode" },
+        { header: "Customer", key: "Customer" },
+        { header: "Nota", key: "Nota" },
+        { header: "Tanggal", key: "Tanggal" },
+        { header: "Debet", key: "Debet", align: "right", numFmt: "#,##0" },
+        { header: "Bayar", key: "Bayar", align: "right", numFmt: "#,##0" },
+        { header: "Sisa", key: "Sisa", align: "right", numFmt: "#,##0" },
+      ],
+      rows,
+    );
+
+    if (mismatch.length) {
+      toast.warning(
+        `${mismatch.length} customer selisih antara rekap dan detail (mis. ${mismatch.slice(0, 3).join(", ")}).`,
+      );
+    }
+  } catch (e: any) {
+    toast.error(e?.response?.data?.message || "Gagal export detail.");
+  } finally {
+    isExportingDetail.value = false;
+  }
+};
 
 // Array kunci angka untuk loop format sel
 const numericKeys = computed(() => [
@@ -174,6 +344,7 @@ const summaryFormatters = computed(() => {
 
 <template>
   <BaseBrowse
+    ref="browseRef"
     title="Laporan Rekap Piutang"
     :menu-id="menuId"
     :icon="IconFileAnalytics"
@@ -188,7 +359,7 @@ const summaryFormatters = computed(() => {
     :summary-formatters="summaryFormatters"
     @refresh="fetchData"
     @export="
-      exportToExcel('Laporan_Rekap_Piutang', { getData: () => exportData })
+      exportToExcel('Laporan_Rekap_Piutang', { getData: buildExportData })
     "
   >
     <template #filter-left>
@@ -230,6 +401,23 @@ const summaryFormatters = computed(() => {
           </template>
         </v-text-field>
       </div>
+    </template>
+
+    <template #extra-actions>
+      <v-btn
+        v-if="canExport"
+        size="small"
+        color="green-darken-2"
+        :disabled="isLoading || isExportingDetail || !(items ?? []).length"
+        @click="doExportDetail"
+      >
+        <template #prepend><IconFileExport :size="14" /></template>
+        {{
+          isExportingDetail
+            ? `Mengambil detail ${exportDone}/${exportTotal}...`
+            : "Export Detail"
+        }}
+      </v-btn>
     </template>
 
     <template #item.Customer="{ item }">
