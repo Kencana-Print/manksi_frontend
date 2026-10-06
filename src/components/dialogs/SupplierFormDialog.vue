@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, computed } from "vue";
+import { ref, watch, computed, onBeforeUnmount } from "vue";
 import type { VForm } from "vuetify/components";
 import api from "@/services/api";
 import { useToast } from "vue-toastification";
@@ -52,6 +52,68 @@ const emptyForm = () => ({
 
 const formData = ref(emptyForm());
 
+// ── Deteksi nama kembar / mirip ──
+const namaKembar = ref<any[]>([]);
+const namaMirip = ref<any[]>([]);
+const namaAwal = ref("");
+let cekTimer: ReturnType<typeof setTimeout> | null = null;
+let cekSeq = 0;
+
+const resetCekNama = () => {
+  if (cekTimer) clearTimeout(cekTimer);
+  cekTimer = null;
+  cekSeq++;
+  namaKembar.value = [];
+  namaMirip.value = [];
+};
+
+const pesanKembar = computed(() => {
+  const s = namaKembar.value[0];
+  if (!s) return "";
+  return `Sudah terdaftar: ${s.Kode} - ${s.Nama}${s.Kota ? " (" + s.Kota + ")" : ""}${s.Aktif === "N" ? " [pasif]" : ""}`;
+});
+
+// Array stabil: hanya dibuat ulang saat isinya benar-benar berubah
+const errorNama = computed(() =>
+  namaKembar.value.length ? [pesanKembar.value] : [],
+);
+
+const cekNama = async () => {
+  const nama = (formData.value.Nama || "").trim();
+  const seq = ++cekSeq;
+
+  // Edit & nama belum diubah: tidak perlu cek
+  if (nama.length < 3 || (!props.isNewMode && nama === namaAwal.value)) {
+    namaKembar.value = [];
+    namaMirip.value = [];
+    return;
+  }
+
+  try {
+    const res = await api.get("/master/supplier/check-nama", {
+      params: { nama, exclude: formData.value.Kode || "" },
+    });
+    if (seq !== cekSeq) return; // respons basi, abaikan
+    const list: any[] = res.data.data || [];
+    namaKembar.value = list.filter((x) => Number(x.Sama) === 1);
+    namaMirip.value = list.filter((x) => Number(x.Sama) !== 1);
+  } catch (e) {
+    if (seq !== cekSeq) return;
+    console.warn("[Supplier] cek nama gagal", e); // backend tetap memblokir saat simpan
+    namaKembar.value = [];
+    namaMirip.value = [];
+  }
+};
+
+const onNamaInput = () => {
+  if (cekTimer) clearTimeout(cekTimer);
+  cekTimer = setTimeout(cekNama, 400);
+};
+
+onBeforeUnmount(() => {
+  if (cekTimer) clearTimeout(cekTimer);
+});
+
 watch(
   () => props.modelValue,
   (isOpen) => {
@@ -89,6 +151,10 @@ watch(
         RekeningList: ed.RekeningList ? [...ed.RekeningList] : [],
       };
     }
+    namaAwal.value = props.isNewMode
+      ? ""
+      : String(formData.value.Nama || "").trim();
+    resetCekNama();
     formRef.value?.resetValidation();
   },
 );
@@ -105,6 +171,14 @@ const handleSave = async () => {
   if (!valid) return;
   if (!Object.values(formData.value.Jenis).some(Boolean)) {
     toast.warning("Minimal pilih satu Jenis Supplier!");
+    return;
+  }
+
+  formData.value.Nama = (formData.value.Nama || "").trim();
+  if (cekTimer) clearTimeout(cekTimer);
+  await cekNama();
+  if (namaKembar.value.length) {
+    toast.error(pesanKembar.value);
     return;
   }
   isSaving.value = true;
@@ -176,9 +250,11 @@ const jenisItems = [
                   variant="outlined"
                   density="compact"
                   :rules="[(v) => !!v || 'Wajib diisi']"
+                  :error-messages="errorNama"
                   hide-details="auto"
                   autofocus
                   class="sup-input"
+                  @update:model-value="onNamaInput"
                 />
               </div>
               <div class="sup-field" style="width: 130px; flex-shrink: 0">
@@ -193,6 +269,16 @@ const jenisItems = [
                     Pasif
                   </label>
                 </div>
+              </div>
+            </div>
+
+            <!-- Saran nama mirip (tidak memblokir) -->
+            <div v-if="namaMirip.length" class="nama-mirip">
+              <div class="nama-mirip-title">Nama mirip sudah ada:</div>
+              <div v-for="m in namaMirip" :key="m.Kode" class="nama-mirip-item">
+                <b>{{ m.Kode }}</b> - {{ m.Nama }}
+                <span v-if="m.Kota"> ({{ m.Kota }})</span>
+                <span v-if="m.Aktif === 'N'" class="text-error"> [pasif]</span>
               </div>
             </div>
 
@@ -477,10 +563,10 @@ const jenisItems = [
           type="button"
           class="sup-btn-save"
           @click="handleSave"
-          :disabled="isSaving"
+          :disabled="isSaving || namaKembar.length > 0"
         >
           <span v-if="isSaving">Menyimpan...</span>
-          <span v-else>Simpan (F10)</span>
+          <span v-else>Simpan</span>
         </button>
       </div>
     </v-card>
@@ -765,5 +851,23 @@ const jenisItems = [
 
 .sup-input :deep(textarea) {
   resize: none;
+}
+
+/* ── Saran nama mirip ── */
+.nama-mirip {
+  margin: -2px 0 6px 118px; /* sejajar field Nama: lebar Kode 110 + gap 8 */
+  padding: 5px 10px;
+  background: #fff8e1;
+  border-left: 3px solid #f9a825;
+  border-radius: 2px;
+  font-size: 11px;
+  color: #5d4037;
+}
+.nama-mirip-title {
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+.nama-mirip-item {
+  line-height: 1.5;
 }
 </style>

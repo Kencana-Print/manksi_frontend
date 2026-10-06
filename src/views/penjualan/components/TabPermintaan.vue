@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref, watch, onMounted, computed } from "vue";
+import { ref, watch, onMounted, computed, nextTick } from "vue";
 import api from "@/services/api";
 import { useToast } from "vue-toastification";
 import { useAuthStore } from "@/stores/authStore";
+import MintaHargaSearchModal from "@/components/lookups/MintaHargaSearchModal.vue";
 import PraOrderSearchModal from "@/components/lookups/PraOrderSearchModal.vue";
 import CustomerSearchModal from "@/components/lookups/CustomerSearchModal.vue";
 import SalesSearchModal from "@/components/lookups/SalesSearchModal.vue";
@@ -140,6 +141,8 @@ const fillFromProOrder = async (kode: string) => {
       `/penjualan/pra-order-form/lookup/${encodeURIComponent(kode)}`,
     );
     const d = res.data.data;
+    if (d.divisi != null) props.formData.Divisi = String(d.divisi);
+    await nextTick();
     props.formData.ProNomor = d.nomor;
     props.formData.CustKode = d.cusKode;
     props.formData.CustNama = d.cusNama;
@@ -264,6 +267,70 @@ const handleSalesSelected = (item: any) => {
   props.formData.SalesNama = item.sal_nama || item.Nama || item.nama;
 };
 
+const showMhModal = ref(false);
+const isLoadingMhRef = ref(false);
+const refMhNomor = ref("");
+
+const handleMhSelected = async (item: any) => {
+  if (props.isEdit) return;
+  isLoadingMhRef.value = true;
+  try {
+    const res = await api.get(
+      `/penjualan/minta-harga-form/${encodeURIComponent(item.Nomor)}`,
+    );
+    const d = res.data.data;
+    const f = props.formData;
+
+    // 1) Divisi dulu. Watcher Divisi mengosongkan Customer di mode baru,
+    //    jadi tunggu selesai sebelum Customer diisi.
+    const divisiOk = divisiOptions.value.some(
+      (o) => o.value === String(d.mh_divisi),
+    );
+    if (divisiOk) {
+      f.Divisi = String(d.mh_divisi);
+      await nextTick();
+    } else {
+      toast.warning(
+        `Divisi ${d.mh_divisi} tidak tersedia untuk akun Anda, divisi tidak diubah.`,
+      );
+    }
+
+    // 2) Customer lewat validator supaya status aktif dan Perfect ikut terisi.
+    f.CustKode = d.mh_cus_kode || "";
+    f.CustNama = d.mh_cus_nama || "";
+    await onCustKodeEnter();
+
+    // 3) Sisa data spesifikasi. Nomor, Tanggal, Status, Kalkulasi, Gambar
+    //    sengaja tidak disalin.
+    f.SalesKode = d.mh_sal_kode || "";
+    f.SalesNama = d.SalesNama || "";
+    f.NamaPekerjaan = d.mh_nama || "";
+    f.RencanaOrder = Number(d.mh_jmlorder) || 0;
+    f.HargaLama = Number(d.mh_harga) || 0;
+    f.HargaBudget = Number(d.mh_budget) || 0;
+    f.Kain = d.mh_kain || "";
+    f.Ukuran = d.mh_ukuran || "";
+    f.Panjang = Number(d.mh_panjang) || 0;
+    f.Lebar = Number(d.mh_lebar) || 0;
+    f.Gramasi = d.mh_gramasi || "";
+    f.Finishing = d.mh_finishing || "";
+    f.Sublim = d.mh_sublim || "";
+    f.CabKaos = d.mh_cabkaos || "";
+
+    // Opsional: jejak referensi tersimpan lewat Keterangan. Hapus bila tidak mau.
+    if (!f.Keterangan) f.Keterangan = `Ref. ${d.mh_nomor}`;
+
+    refMhNomor.value = d.mh_nomor;
+    toast.success(`Data referensi diambil dari ${d.mh_nomor}.`);
+  } catch (e: any) {
+    toast.error(
+      e.response?.data?.message || "Gagal memuat Permintaan Harga referensi.",
+    );
+  } finally {
+    isLoadingMhRef.value = false;
+  }
+};
+
 const onFileChange = (e: Event) => {
   const file = (e.target as HTMLInputElement).files?.[0];
   if (!file) return;
@@ -332,6 +399,7 @@ const onFileChange = (e: Event) => {
               hide-details
               class="f-inp"
               style="max-width: 180px"
+              @keydown.f1.prevent="!isEdit && (showMhModal = true)"
             >
               <template #append-inner>
                 <span v-if="!isEdit" class="hint-new"
@@ -339,6 +407,24 @@ const onFileChange = (e: Event) => {
                 >
               </template>
             </v-text-field>
+            <button
+              v-if="!isEdit"
+              type="button"
+              class="tp-lkp-solo"
+              title="Cari Permintaan Harga lama sebagai referensi (F1)"
+              @click="showMhModal = true"
+            >
+              <IconSearch :size="13" />
+            </button>
+            <span v-if="isLoadingMhRef" style="font-size: 10px; color: #757575">
+              Memuat...
+            </span>
+          </div>
+          <div v-if="refMhNomor" class="tp-row" style="margin-top: -2px">
+            <label class="tp-lbl"></label>
+            <span style="font-size: 10px; color: #1565c0">
+              Referensi dari {{ refMhNomor }}. Data disalin, nomor tetap baru.
+            </span>
           </div>
 
           <!-- Nomor Pra Order (opsional) -->
@@ -749,6 +835,11 @@ const onFileChange = (e: Event) => {
   />
   <CustomerSearchModal v-model="showCustModal" @selected="handleCustSelected" />
   <SalesSearchModal v-model="showSalesModal" @selected="handleSalesSelected" />
+  <MintaHargaSearchModal
+    v-model="showMhModal"
+    :cust-kode="formData.CustKode || undefined"
+    @selected="handleMhSelected"
+  />
 
   <v-dialog v-model="showPreviewDialog" max-width="800px">
     <v-card class="rounded-lg">
@@ -1109,6 +1200,22 @@ const onFileChange = (e: Event) => {
   flex-shrink: 0;
 }
 .tp-lkp-btn:hover {
+  background: #e3f2fd;
+}
+.tp-lkp-solo {
+  width: 26px;
+  height: 26px;
+  border: 1px solid #bdbdbd;
+  border-radius: 4px;
+  background: #f0f0f0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #1565c0;
+  flex-shrink: 0;
+}
+.tp-lkp-solo:hover {
   background: #e3f2fd;
 }
 .flex-1 {

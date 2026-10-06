@@ -1957,6 +1957,7 @@ const setupPotensiBatalListObserver = () => {
 
 // ── Drill-down Target Collection ──
 interface TargetDetailItem {
+  jenis: "BARU" | "LAMA";
   nota: string;
   tanggal: string;
   cusKode: string;
@@ -1987,6 +1988,7 @@ const openTargetDetail = async (row: {
       tahun: targetCollectionData.value?.tahun,
     });
     targetDetailItems.value = res.data.data?.items || [];
+    targetDetailLabel.value = res.data.data?.targetBulanLabel || "";
   } catch (e: any) {
     alert(e?.response?.data?.message || "Gagal memuat detail invoice.");
   } finally {
@@ -5136,17 +5138,17 @@ const sisaClass = (item: any) => {
                           <th class="tr">Target Omzet</th>
                           <th
                             class="tr"
+                            title="Sisa piutang invoice bulan target saat ini"
+                          >
+                            Piutang Saat Ini
+                          </th>
+                          <th
+                            class="tr"
                             title="Sisa piutang invoice sebelum bulan target, per akhir bulan lalu"
                           >
                             Target Piutang Lama
                           </th>
                           <th class="tr">Total Target</th>
-                          <th
-                            class="tr"
-                            title="Sisa piutang invoice bulan target saat ini"
-                          >
-                            Piutang Saat Ini
-                          </th>
                           <th class="tr">Collection Bulan Ini</th>
                           <th class="tr">% MTD</th>
                           <th class="tr">% YTD</th>
@@ -5172,13 +5174,13 @@ const sisaClass = (item: any) => {
                             </span>
                           </td>
                           <td class="tr">{{ fmtNum(row.targetBulanIni) }}</td>
+                          <td class="tr">{{ fmtNum(row.piutangSaatIni) }}</td>
                           <td class="tr">
                             {{ fmtNum(row.targetPiutangLama) }}
                           </td>
                           <td class="tr" style="font-weight: 600">
                             {{ fmtNum(row.targetTotal) }}
                           </td>
-                          <td class="tr">{{ fmtNum(row.piutangSaatIni) }}</td>
                           <td
                             class="tr"
                             :style="{
@@ -5217,6 +5219,13 @@ const sisaClass = (item: any) => {
                           <td class="tr">
                             {{
                               fmtNum(
+                                targetCollectionData.grandTotal.piutangSaatIni,
+                              )
+                            }}
+                          </td>
+                          <td class="tr">
+                            {{
+                              fmtNum(
                                 targetCollectionData.grandTotal
                                   .targetPiutangLama,
                               )
@@ -5226,13 +5235,6 @@ const sisaClass = (item: any) => {
                             {{
                               fmtNum(
                                 targetCollectionData.grandTotal.targetTotal,
-                              )
-                            }}
-                          </td>
-                          <td class="tr">
-                            {{
-                              fmtNum(
-                                targetCollectionData.grandTotal.piutangSaatIni,
                               )
                             }}
                           </td>
@@ -7371,17 +7373,17 @@ const sisaClass = (item: any) => {
                           <th class="tr">Target Omzet</th>
                           <th
                             class="tr"
+                            title="Sisa piutang invoice bulan target saat ini"
+                          >
+                            Piutang Saat Ini
+                          </th>
+                          <th
+                            class="tr"
                             title="Sisa piutang invoice sebelum bulan target, per akhir bulan lalu"
                           >
                             Target Piutang Lama
                           </th>
                           <th class="tr">Total Target</th>
-                          <th
-                            class="tr"
-                            title="Sisa piutang invoice bulan target saat ini"
-                          >
-                            Piutang Saat Ini
-                          </th>
                           <th class="tr">Collection Bulan Ini</th>
                           <th class="tr">% MTD</th>
                           <th class="tr">% YTD</th>
@@ -7407,13 +7409,13 @@ const sisaClass = (item: any) => {
                             </span>
                           </td>
                           <td class="tr">{{ fmtNum(row.targetBulanIni) }}</td>
+                          <td class="tr">{{ fmtNum(row.piutangSaatIni) }}</td>
                           <td class="tr">
                             {{ fmtNum(row.targetPiutangLama) }}
                           </td>
                           <td class="tr" style="font-weight: 600">
                             {{ fmtNum(row.targetTotal) }}
                           </td>
-                          <td class="tr">{{ fmtNum(row.piutangSaatIni) }}</td>
                           <td
                             class="tr"
                             :style="{
@@ -7452,6 +7454,13 @@ const sisaClass = (item: any) => {
                           <td class="tr">
                             {{
                               fmtNum(
+                                targetCollectionData.grandTotal.piutangSaatIni,
+                              )
+                            }}
+                          </td>
+                          <td class="tr">
+                            {{
+                              fmtNum(
                                 targetCollectionData.grandTotal
                                   .targetPiutangLama,
                               )
@@ -7461,13 +7470,6 @@ const sisaClass = (item: any) => {
                             {{
                               fmtNum(
                                 targetCollectionData.grandTotal.targetTotal,
-                              )
-                            }}
-                          </td>
-                          <td class="tr">
-                            {{
-                              fmtNum(
-                                targetCollectionData.grandTotal.piutangSaatIni,
                               )
                             }}
                           </td>
@@ -10921,6 +10923,8 @@ const sisaClass = (item: any) => {
           <template v-else>
             <div class="text-caption text-grey mb-2">
               Invoice terbit bulan {{ targetDetailLabel }}
+              <span class="td-badge-old">LAMA</span> = invoice sebelum bulan
+              tersebut (sisa per akhir bulan lalu)
             </div>
             <table class="td-detail-table" style="min-width: 780px">
               <thead>
@@ -10935,7 +10939,12 @@ const sisaClass = (item: any) => {
               </thead>
               <tbody>
                 <tr v-for="it in targetDetailItems" :key="it.nota">
-                  <td class="fw">{{ it.nota }}</td>
+                  <td class="fw">
+                    {{ it.nota }}
+                    <span v-if="it.jenis === 'LAMA'" class="td-badge-old"
+                      >LAMA</span
+                    >
+                  </td>
                   <td>{{ it.tanggal }}</td>
                   <td>{{ it.cusNama || it.cusKode }}</td>
                   <td class="tr">{{ it.debet.toLocaleString("id-ID") }}</td>

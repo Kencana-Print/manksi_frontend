@@ -12,6 +12,7 @@ const emit = defineEmits(["update:modelValue", "selected"]);
 const search = ref("");
 const items = ref<any[]>([]);
 const isLoading = ref(false);
+const showRiwayat = ref(false);
 
 const currentPage = ref(1);
 const perPage = ref(50);
@@ -40,16 +41,21 @@ let debounce: ReturnType<typeof setTimeout> | null = null;
 const fetchData = async () => {
   isLoading.value = true;
   try {
+    const q = search.value.trim();
+    const pakaiRiwayat = q !== "";
+
     const res = await api.get("/lookups/supplier", {
       params: {
-        q: search.value,
+        q,
         jenis: props.jenis,
         page: currentPage.value,
         limit: perPage.value,
+        riwayat: pakaiRiwayat ? 1 : 0,
       },
     });
     items.value = res.data.data.items;
     totalItems.value = res.data.data.total;
+    showRiwayat.value = pakaiRiwayat;
   } catch (e) {
     console.error("Gagal memuat Supplier:", e);
   } finally {
@@ -90,7 +96,7 @@ const selectItem = (item: any) => {
   <v-dialog
     :model-value="modelValue"
     @update:model-value="emit('update:modelValue', $event)"
-    max-width="820px"
+    max-width="900px"
   >
     <div class="lookup-card">
       <div class="lookup-header">
@@ -134,13 +140,17 @@ const selectItem = (item: any) => {
               <th style="width: 100px">KODE</th>
               <th>NAMA SUPPLIER</th>
               <th>ALAMAT</th>
-              <th style="width: 150px">KOTA</th>
+              <th style="width: 120px">KOTA</th>
+              <template v-if="showRiwayat">
+                <th style="width: 100px">TRX TERAKHIR</th>
+                <th style="width: 120px" class="text-right">NOMINAL</th>
+              </template>
             </tr>
           </thead>
           <tbody>
             <tr
-              v-for="item in items"
-              :key="item.Kode"
+              v-for="(item, idx) in items"
+              :key="item.Kode + '|' + (item.Rekening || idx)"
               class="lookup-row"
               @click="selectItem(item)"
             >
@@ -148,6 +158,18 @@ const selectItem = (item: any) => {
               <td class="font-weight-bold">{{ item.Nama }}</td>
               <td>{{ item.Alamat || "-" }}</td>
               <td>{{ item.Kota || "-" }}</td>
+              <template v-if="showRiwayat">
+                <td>{{ item.TglTrx || "-" }}</td>
+                <td class="text-right">
+                  {{
+                    item.Nominal == null
+                      ? "-"
+                      : new Intl.NumberFormat("id-ID", {
+                          maximumFractionDigits: 0,
+                        }).format(Number(item.Nominal))
+                  }}
+                </td>
+              </template>
             </tr>
           </tbody>
         </table>

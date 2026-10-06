@@ -341,8 +341,8 @@ const currentTab = ref(0);
 const tabs = [
   { text: "1. Price Request", icon: IconCash },
   { text: "2. Get Price (Kalkulasi)", icon: IconCalculator },
-  { text: "3. Katalog Desain", icon: IconPhoto },
-  { text: "4. Katalog Pesanan", icon: IconShoppingCartCopy },
+  { text: "3. Katalog Permintaan Harga", icon: IconPhoto },
+  { text: "4. Katalog SO", icon: IconShoppingCartCopy },
 ];
 
 const handleImageSelected = (file: File) => {

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, computed, onMounted } from "vue";
+import { ref, watch, computed, onMounted, onBeforeUnmount } from "vue";
 import type { VForm } from "vuetify/components";
 import api from "@/services/api";
 import { useToast } from "vue-toastification";
@@ -87,6 +87,7 @@ onMounted(() => {
 watch(
   () => props.modelValue,
   (isOpen) => {
+    if (namaTimer) clearTimeout(namaTimer);
     if (!isOpen) return;
 
     if (props.isNewMode) {
@@ -97,6 +98,8 @@ watch(
         ...props.editData,
       };
     }
+    namaKembar.value = [];
+    namaAwal.value = props.isNewMode ? "" : (formData.value.Nama || "").trim();
     formRef.value?.resetValidation();
   },
 );
@@ -108,9 +111,65 @@ const handleCustomerSelected = (cus: any) => {
   formData.value.KotaInduk = cus.Kota; // Asumsi Modal lookup mengirim ini
 };
 
+const namaKembar = ref<any[]>([]);
+const namaMirip = ref<any[]>([]);
+const namaAwal = ref("");
+
+const pesanKembar = computed(() => {
+  const k = namaKembar.value[0];
+  return k
+    ? `Nama sudah terdaftar: ${k.Kode} - ${k.Nama} (${k.Kota || "-"}, ${k.Status})`
+    : "";
+});
+
+const cekNama = async () => {
+  const nama = (formData.value.Nama || "").trim();
+  if (
+    !nama ||
+    nama.length < 3 ||
+    (!props.isNewMode && nama === namaAwal.value)
+  ) {
+    namaKembar.value = [];
+    namaMirip.value = [];
+    return;
+  }
+  try {
+    const res = await api.get("/master/customer/check-nama", {
+      params: { nama, exclude: formData.value.Kode || "" },
+    });
+    // Abaikan respons basi bila user sudah mengubah nama lagi.
+    if ((formData.value.Nama || "").trim() === nama) {
+      const hasil = res.data.data || [];
+      namaKembar.value = hasil.filter((r: any) => r.Sama);
+      namaMirip.value = hasil.filter((r: any) => !r.Sama);
+    }
+  } catch {
+    // Gagal cek tidak memblokir; backend tetap menolak saat simpan.
+  }
+};
+
+let namaTimer: ReturnType<typeof setTimeout> | null = null;
+
+const onNamaInput = () => {
+  namaKembar.value = [];
+  namaMirip.value = [];
+  if (namaTimer) clearTimeout(namaTimer);
+  namaTimer = setTimeout(cekNama, 400);
+};
+
+onBeforeUnmount(() => {
+  if (namaTimer) clearTimeout(namaTimer);
+});
+
 const handleSave = async () => {
   const { valid } = await formRef.value!.validate();
   if (!valid) return;
+  formData.value.Nama = (formData.value.Nama || "").trim().replace(/\s+/g, " ");
+  await cekNama();
+  if (namaKembar.value.length) {
+    toast.error(pesanKembar.value);
+    return;
+  }
   if (formData.value.Korporasi === "Y") {
     if (!formData.value.NpwpKode) {
       toast.warning("Korporasi: NPWP wajib diisi!");
@@ -289,10 +348,28 @@ const divisiItems = [
                     variant="outlined"
                     density="compact"
                     :rules="[(v) => !!v || 'Wajib diisi']"
+                    :error-messages="namaKembar.length ? [pesanKembar] : []"
                     hide-details="auto"
                     autofocus
                     class="f-input"
+                    @update:model-value="onNamaInput"
                   />
+                </div>
+
+                <div v-if="namaMirip.length" class="nama-mirip">
+                  <div class="nama-mirip-title">
+                    Nama mirip yang sudah terdaftar:
+                  </div>
+                  <div
+                    v-for="m in namaMirip"
+                    :key="m.Kode"
+                    class="nama-mirip-item"
+                  >
+                    <b>{{ m.Kode }}</b> — {{ m.Nama }}
+                    <span class="nama-mirip-meta">
+                      ({{ m.Kota || "-" }}, {{ m.Status }})
+                    </span>
+                  </div>
                 </div>
 
                 <!-- Alamat -->
@@ -633,7 +710,7 @@ const divisiItems = [
           type="button"
           class="cus-btn-save"
           @click="handleSave"
-          :disabled="isSaving"
+          :disabled="isSaving || namaKembar.length > 0"
         >
           <span v-if="isSaving">Menyimpan...</span>
           <span v-else>Simpan (F10)</span>
@@ -755,6 +832,26 @@ const divisiItems = [
 
 .req {
   color: #e53935;
+}
+
+.nama-mirip {
+  margin: 0 0 6px 82px;
+  padding: 5px 8px;
+  background: #fff8e1;
+  border-left: 3px solid #f9a825;
+  border-radius: 3px;
+  font-size: 11px;
+  color: #5d4037;
+}
+.nama-mirip-title {
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+.nama-mirip-item {
+  line-height: 1.5;
+}
+.nama-mirip-meta {
+  color: #8d6e63;
 }
 
 /* ── Vuetify field height ── */

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from "vue";
+import { ref, watch, computed } from "vue";
 import api from "@/services/api";
 import { IconUsers, IconX, IconSearch } from "@tabler/icons-vue";
 
@@ -7,6 +7,8 @@ interface Customer {
   Kode: string;
   Nama: string;
   Alamat: string;
+  TglTrx?: string;
+  Nominal?: number | null;
 }
 
 interface RowClickEvent<T> {
@@ -21,33 +23,54 @@ const emit = defineEmits(["update:modelValue", "selected"]);
 const search = ref("");
 const items = ref<Customer[]>([]);
 const isLoading = ref(false);
+const showRiwayat = ref(false);
 
 // Pagination state
 const page = ref(1);
 const itemsPerPage = ref(50);
 const totalItems = ref(0);
 
-const headers = [
-  { title: "KODE", key: "Kode", width: "120px" },
-  { title: "NAMA CUSTOMER", key: "Nama", minWidth: "200px" },
-  { title: "ALAMAT", key: "Alamat", minWidth: "250px" },
-];
+const headers = computed(() => {
+  const base: any[] = [
+    { title: "KODE", key: "Kode", width: "120px" },
+    { title: "NAMA CUSTOMER", key: "Nama", minWidth: "200px" },
+    { title: "ALAMAT", key: "Alamat", minWidth: "250px" },
+  ];
+  if (showRiwayat.value) {
+    base.push(
+      { title: "TRX TERAKHIR", key: "TglTrx", width: "110px" },
+      { title: "NOMINAL", key: "Nominal", width: "130px", align: "end" },
+    );
+  }
+  return base;
+});
+
+const rupiah = (n: any) =>
+  n == null ? "-" : new Intl.NumberFormat("id-ID").format(Number(n));
 
 let searchTimeout: ReturnType<typeof setTimeout> | null = null;
 
 const fetchData = async () => {
   isLoading.value = true;
   try {
-    // 2. GANTI ENDPOINT SECARA DINAMIS
     const endpoint = props.isKaosan
       ? "/lookups/cust-kaosan"
       : "/lookups/customer";
 
+    const q = (search.value || "").trim();
+    const pakaiRiwayat = !props.isKaosan && q !== "";
+
     const res = await api.get(endpoint, {
-      params: { q: search.value, page: page.value, limit: itemsPerPage.value },
+      params: {
+        q,
+        page: page.value,
+        limit: itemsPerPage.value,
+        riwayat: pakaiRiwayat ? 1 : 0,
+      },
     });
     items.value = res.data.data.items;
     totalItems.value = res.data.data.total;
+    showRiwayat.value = pakaiRiwayat; // kolom mengikuti hasil yang SUDAH dimuat
   } catch (error) {
     console.error("Gagal memuat data customer:", error);
   } finally {
@@ -125,6 +148,7 @@ const selectItem = (item: Customer) => {
         <v-text-field
           v-model="search"
           @input="onSearchInput"
+          @click:clear="onSearchInput"
           label="Cari Kode atau Nama Customer..."
           variant="outlined"
           density="compact"
@@ -159,6 +183,12 @@ const selectItem = (item: Customer) => {
           @click:row="onRowClick"
           :items-per-page-options="[25, 50, 100]"
         >
+          <template #item.TglTrx="{ item }">
+            <span class="nowrap">{{ item.TglTrx || "-" }}</span>
+          </template>
+          <template #item.Nominal="{ item }">
+            <span class="nowrap">{{ rupiah(item.Nominal) }}</span>
+          </template>
         </v-data-table-server>
       </v-card-text>
     </v-card>
@@ -181,5 +211,8 @@ const selectItem = (item: Customer) => {
 }
 .lookup-table :deep(tbody tr:hover td) {
   background-color: #e3f2fd !important;
+}
+.nowrap {
+  white-space: nowrap;
 }
 </style>

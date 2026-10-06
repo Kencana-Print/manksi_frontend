@@ -35,7 +35,7 @@ const totalItems = ref(0);
 
 const headers = [
   { title: "NOMOR", key: "Nomor", width: "120px" },
-  { title: "TANGGAL", key: "Tanggal", width: "90px" },
+  { title: "TANGGAL", key: "Tanggal", width: "110px", minWidth: "110px" },
   { title: "NAMA / BARANG", key: "Nama", minWidth: "200px" },
   { title: "DIVISI", key: "Divisi", width: "90px" },
   { title: "SALES", key: "Sales", width: "100px" },
@@ -182,6 +182,9 @@ const rp = (val: number) => new Intl.NumberFormat("id-ID").format(val || 0);
           @click:row="onRowClick"
           :items-per-page-options="[25, 50, 100]"
         >
+          <template #item.Tanggal="{ item }">
+            <span class="nowrap">{{ item.Tanggal }}</span>
+          </template>
           <template #item.Harga="{ item }">
             {{ rp(item.Harga) }}
           </template>
@@ -200,6 +203,9 @@ const rp = (val: number) => new Intl.NumberFormat("id-ID").format(val || 0);
   color: white !important;
   font-weight: bold !important;
   height: 32px !important;
+  white-space: nowrap;
+}
+.nowrap {
   white-space: nowrap;
 }
 .lookup-table :deep(tbody tr) {
