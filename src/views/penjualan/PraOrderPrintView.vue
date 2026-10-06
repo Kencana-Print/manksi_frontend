@@ -177,9 +177,11 @@ const bahanNames = computed(() =>
                 <td class="sep">:</td>
                 <td class="val">
                   {{
-                    new Intl.NumberFormat("id-ID").format(
-                      getVal("pro_qty_rencana") || 0,
-                    )
+                    Number(getVal("pro_qty_rencana")) > 0
+                      ? new Intl.NumberFormat("id-ID").format(
+                          Number(getVal("pro_qty_rencana")),
+                        )
+                      : "-"
                   }}
                 </td>
               </tr>
@@ -192,6 +194,11 @@ const bahanNames = computed(() =>
                 <td class="lbl">Spesifikasi</td>
                 <td class="sep">:</td>
                 <td class="val">{{ getVal("pro_spesifikasi") }}</td>
+              </tr>
+              <tr v-if="getVal('pro_ukuran_bebas')">
+                <td class="lbl">Ukuran</td>
+                <td class="sep">:</td>
+                <td class="val pre-wrap">{{ getVal("pro_ukuran_bebas") }}</td>
               </tr>
               <tr>
                 <td class="lbl">Tgl Kirim</td>
@@ -389,6 +396,9 @@ const bahanNames = computed(() =>
 .info-table .sep {
   width: 10px;
   text-align: center;
+}
+.info-table .pre-wrap {
+  white-space: pre-wrap;
 }
 
 .font-weight-bold {

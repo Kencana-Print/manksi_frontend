@@ -280,4 +280,29 @@ export const dashboardService = {
   getBufferKaosanSummary: () => api.get("/dashboard/buffer-kaosan-summary"),
   getBufferKaosanList: (limit = 20, offset = 0) =>
     api.get("/dashboard/buffer-kaosan-list", { params: { limit, offset } }),
+  getOutstandingBeliSummary: () =>
+    api.get("/dashboard/outstanding-beli-summary"),
+  getOutstandingBeliList: (tab: string, limit = 20, offset = 0) =>
+    api.get("/dashboard/outstanding-beli-list", {
+      params: { tab, limit, offset },
+    }),
+  getInkasoDashboard: () => api.get("/dashboard/inkaso-dashboard"),
+  getInkasoSourceOptions: (
+    namaCustomer = "",
+    limit = 20,
+    offset = 0,
+    salKode?: string,
+  ) =>
+    api.get("/dashboard/inkaso-source-options", {
+      params: { namaCustomer, limit, offset, salKode },
+    }),
+  setInkasoBulk: (
+    items: { nota: string; tglTarget?: string; catatan?: string }[],
+  ) => api.post("/dashboard/inkaso-bulk", { items }),
+  batalInkaso: (nomor: string, alasan: string) =>
+    api.patch(`/dashboard/inkaso/${encodeURIComponent(nomor)}/batal`, {
+      alasan,
+    }),
+  getInkasoBatalList: (limit = 20, offset = 0) =>
+    api.get("/dashboard/inkaso-batal-list", { params: { limit, offset } }),
 };
