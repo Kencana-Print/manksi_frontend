@@ -155,14 +155,6 @@ const validateAction = (action: "ubah" | "hapus" | "cetak"): boolean => {
     return false;
   }
   const r = selectedItem.value;
-  if (r.Link && action !== "cetak") {
-    const msg =
-      action === "ubah"
-        ? "BBK terbentuk otomatis dari BON/PJT. Tidak bisa diubah."
-        : "BBK terbentuk otomatis dari BON/PJT. Tidak bisa dihapus.";
-    toast.warning(msg);
-    return false;
-  }
   if (r.Closed === "Sudah" && action !== "cetak") {
     toast.warning("Transaksi sudah diclose. Tidak bisa diubah/dihapus.");
     return false;
