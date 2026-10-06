@@ -462,7 +462,7 @@ const showBarangJadi = computed(
     ["ADMIN", "PRODUKSI", "PPIC"].includes(bagian.value) || isSuperViewer.value,
 );
 const showPembelian = computed(
-  () => bagian.value === "PEMBELIAN" || isSuperViewer.value,
+  () => ["PEMBELIAN", "FINANCE"].includes(bagian.value) || isSuperViewer.value,
 );
 
 // ── State Dashboard ──
