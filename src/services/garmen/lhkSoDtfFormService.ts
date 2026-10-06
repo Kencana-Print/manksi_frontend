@@ -23,9 +23,10 @@ export const lhkSoDtfFormService = {
     api.get(
       `/garmen/dtf/lhk-so-dtf-form/validate-maklon/${encodeURIComponent(kode)}`,
     ),
-  getMaklonAutofill: (mklNomor: string) =>
+  getMaklonAutofill: (mklNomor: string, cab?: string, tanggal?: string) =>
     api.get(
       `/garmen/dtf/lhk-so-dtf-form/maklon-autofill/${encodeURIComponent(mklNomor)}`,
+      { params: { cab, tanggal } },
     ),
   validateKode: (kode: string) =>
     api.get(

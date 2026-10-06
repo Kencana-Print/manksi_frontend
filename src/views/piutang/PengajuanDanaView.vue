@@ -183,17 +183,25 @@ const onUbah = () => {
   router.push(`/piutang/pengajuan-dana/edit/${encodeURIComponent(item.Nomor)}`);
 };
 
-const onHapus = async () => {
+const onHapus = () => {
   if (!isSingleSelected.value) return;
-  const target = selected.value[0];
-  if (!confirm(`Yakin ingin menghapus pengajuan ${target.Nomor}?`)) return;
+  hapusTarget.value = selected.value[0];
+  showHapusDialog.value = true;
+};
+
+const onConfirmHapus = async () => {
+  if (!hapusTarget.value) return;
+  isDeleting.value = true;
   try {
-    await pengajuanDanaService.deletePengajuan(target.Nomor);
+    await pengajuanDanaService.deletePengajuan(hapusTarget.value.Nomor);
     toast.success("Berhasil dihapus.");
+    showHapusDialog.value = false;
     clearSelection();
     fetchData();
   } catch (error: any) {
     toast.error(error.response?.data?.message || "Gagal menghapus data.");
+  } finally {
+    isDeleting.value = false;
   }
 };
 
@@ -225,6 +233,9 @@ const openPrint = (layout: "full" | "half") => {
 const showCloseManualDialog = ref(false);
 const closeManualAlasan = ref("");
 const isClosingManual = ref(false);
+const showHapusDialog = ref(false);
+const isDeleting = ref(false);
+const hapusTarget = ref<any>(null);
 
 const canCloseManual = computed(() => {
   if (!isSingleSelected.value) return false;
@@ -673,6 +684,49 @@ const fmtNum = (val: number) =>
       </div>
     </template>
   </BaseBrowse>
+
+  <v-dialog v-model="showHapusDialog" max-width="420px" persistent>
+    <v-card class="rounded-lg">
+      <v-card-title
+        class="bg-error text-white pa-3 d-flex align-center"
+        style="font-size: 13px; font-weight: 700; gap: 6px"
+      >
+        <IconTrash :size="16" />
+        Hapus Pengajuan Dana
+      </v-card-title>
+      <v-card-text class="pa-4">
+        <div style="font-size: 13px">
+          Yakin ingin menghapus pengajuan
+          <strong>{{ hapusTarget?.Nomor }}</strong
+          >?
+        </div>
+        <div class="text-caption text-grey-darken-1 mt-2">
+          {{ hapusTarget?.Nama }} · {{ hapusTarget?.Keterangan || "-" }}
+        </div>
+        <div class="text-caption text-error mt-2">
+          Data yang dihapus tidak dapat dikembalikan.
+        </div>
+      </v-card-text>
+      <v-card-actions class="pa-3 border-t bg-grey-lighten-4">
+        <v-spacer />
+        <v-btn
+          variant="text"
+          :disabled="isDeleting"
+          @click="showHapusDialog = false"
+        >
+          Batal
+        </v-btn>
+        <v-btn
+          variant="elevated"
+          color="error"
+          :loading="isDeleting"
+          @click="onConfirmHapus"
+        >
+          Ya, Hapus
+        </v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
 
   <v-dialog v-model="showPrintChoiceDialog" max-width="380px" persistent>
     <v-card class="rounded-lg">

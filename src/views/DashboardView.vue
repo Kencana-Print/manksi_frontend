@@ -72,16 +72,23 @@ interface TargetCollectionItem {
   salKode: string;
   namaSales: string;
   targetBulanIni: number;
+  targetPiutangLama: number;
+  targetTotal: number;
   piutangSaatIni: number;
+  piutangRealtime: number;
   collectionMtd: number;
   collectionYtd: number;
   sisaCollectionMtd: number;
   pctCollectionMtd: number | null;
   pctCollectionYtd: number | null;
 }
+
 interface TargetCollectionGrandTotal {
   targetBulanIni: number;
+  targetPiutangLama: number;
+  targetTotal: number;
   piutangSaatIni: number;
+  piutangRealtime: number;
   collectionMtd: number;
   collectionYtd: number;
   sisaCollectionMtd: number;
@@ -5109,8 +5116,8 @@ const sisaClass = (item: any) => {
                 <IconCoin :size="14" :stroke-width="1.7" class="mr-1" />
                 Target Collection
                 <span v-if="targetCollectionData" class="panel-header-sub ml-1">
-                  (target dari omzet
-                  {{ targetCollectionData.targetBulanLabel }})
+                  (target = omzet {{ targetCollectionData.targetBulanLabel }} +
+                  piutang lama belum lunas)
                 </span>
               </div>
               <div class="panel-body">
@@ -5122,15 +5129,33 @@ const sisaClass = (item: any) => {
                 />
                 <template v-else-if="targetCollectionData">
                   <div style="overflow-x: auto">
-                    <table class="gb-tbl" style="min-width: 720px">
+                    <table class="gb-tbl" style="min-width: 1040px">
                       <thead>
                         <tr>
                           <th>Sales</th>
-                          <th class="tr">Target Bulan Ini</th>
-                          <th class="tr">Piutang Saat Ini</th>
+                          <th class="tr">Target Omzet</th>
+                          <th
+                            class="tr"
+                            title="Sisa piutang invoice sebelum bulan target, per akhir bulan lalu"
+                          >
+                            Target Piutang Lama
+                          </th>
+                          <th class="tr">Total Target</th>
+                          <th
+                            class="tr"
+                            title="Sisa piutang invoice bulan target saat ini"
+                          >
+                            Piutang Saat Ini
+                          </th>
                           <th class="tr">Collection Bulan Ini</th>
-                          <th class="tc">% MTD</th>
-                          <th class="tc">% YTD</th>
+                          <th class="tr">% MTD</th>
+                          <th class="tr">% YTD</th>
+                          <th
+                            class="tr"
+                            title="Seluruh sisa piutang all-time per sales, per hari ini"
+                          >
+                            Piutang Real-Time
+                          </th>
                         </tr>
                       </thead>
                       <tbody>
@@ -5147,9 +5172,13 @@ const sisaClass = (item: any) => {
                             </span>
                           </td>
                           <td class="tr">{{ fmtNum(row.targetBulanIni) }}</td>
-                          <td class="tr" style="color: #c62828">
-                            {{ fmtNum(row.piutangSaatIni) }}
+                          <td class="tr">
+                            {{ fmtNum(row.targetPiutangLama) }}
                           </td>
+                          <td class="tr" style="font-weight: 600">
+                            {{ fmtNum(row.targetTotal) }}
+                          </td>
+                          <td class="tr">{{ fmtNum(row.piutangSaatIni) }}</td>
                           <td
                             class="tr"
                             :style="{
@@ -5157,74 +5186,64 @@ const sisaClass = (item: any) => {
                                 row.sisaCollectionMtd > 0
                                   ? '#c62828'
                                   : '#2e7d32',
+                              fontWeight: 600,
                             }"
                           >
                             {{ fmtNum(row.collectionMtd) }}
                           </td>
-                          <td class="tc">
-                            <span
-                              class="gb-badge"
-                              :style="{
-                                background:
-                                  pctColor(row.pctCollectionMtd) + '18',
-                                color: pctColor(row.pctCollectionMtd),
-                              }"
-                            >
-                              {{ fmtPct(row.pctCollectionMtd) }}
-                            </span>
-                          </td>
-                          <td class="tc">
-                            <span
-                              class="gb-badge"
-                              :style="{
-                                background:
-                                  pctColor(row.pctCollectionYtd) + '18',
-                                color: pctColor(row.pctCollectionYtd),
-                              }"
-                            >
-                              {{ fmtPct(row.pctCollectionYtd) }}
-                            </span>
+                          <td class="tr">{{ fmtPct(row.pctCollectionMtd) }}</td>
+                          <td class="tr">{{ fmtPct(row.pctCollectionYtd) }}</td>
+                          <td
+                            class="tr"
+                            :style="{
+                              color:
+                                row.piutangRealtime > 0 ? '#c62828' : undefined,
+                            }"
+                          >
+                            {{ fmtNum(row.piutangRealtime) }}
                           </td>
                         </tr>
                       </tbody>
                       <tfoot>
                         <tr class="rp-total-row">
                           <td style="font-weight: 700">GRAND TOTAL</td>
-                          <td class="tr" style="font-weight: 700">
+                          <td class="tr">
                             {{
                               fmtNum(
                                 targetCollectionData.grandTotal.targetBulanIni,
                               )
                             }}
                           </td>
-                          <td
-                            class="tr"
-                            style="font-weight: 700; color: #c62828"
-                          >
+                          <td class="tr">
+                            {{
+                              fmtNum(
+                                targetCollectionData.grandTotal
+                                  .targetPiutangLama,
+                              )
+                            }}
+                          </td>
+                          <td class="tr">
+                            {{
+                              fmtNum(
+                                targetCollectionData.grandTotal.targetTotal,
+                              )
+                            }}
+                          </td>
+                          <td class="tr">
                             {{
                               fmtNum(
                                 targetCollectionData.grandTotal.piutangSaatIni,
                               )
                             }}
                           </td>
-                          <td
-                            class="tr"
-                            :style="{
-                              fontWeight: 700,
-                              color:
-                                targetCollectionData.grandTotal
-                                  .sisaCollectionMtd > 0
-                                  ? '#c62828'
-                                  : '#2e7d32',
-                            }"
-                          >
+                          <td class="tr">
                             {{
                               fmtNum(
                                 targetCollectionData.grandTotal.collectionMtd,
                               )
                             }}
                           </td>
-                          <td class="tc" style="font-weight: 700">
+                          <td class="tr">
                             {{
                               fmtPct(
                                 targetCollectionData.grandTotal
@@ -5232,11 +5251,18 @@ const sisaClass = (item: any) => {
                               )
                             }}
                           </td>
-                          <td class="tc" style="font-weight: 700">
+                          <td class="tr">
                             {{
                               fmtPct(
                                 targetCollectionData.grandTotal
                                   .pctCollectionYtd,
+                              )
+                            }}
+                          </td>
+                          <td class="tr">
+                            {{
+                              fmtNum(
+                                targetCollectionData.grandTotal.piutangRealtime,
                               )
                             }}
                           </td>
@@ -7338,15 +7364,33 @@ const sisaClass = (item: any) => {
                 />
                 <template v-else-if="targetCollectionData">
                   <div style="overflow-x: auto">
-                    <table class="gb-tbl" style="min-width: 720px">
+                    <table class="gb-tbl" style="min-width: 1040px">
                       <thead>
                         <tr>
                           <th>Sales</th>
-                          <th class="tr">Target Bulan Ini</th>
-                          <th class="tr">Piutang Saat Ini</th>
+                          <th class="tr">Target Omzet</th>
+                          <th
+                            class="tr"
+                            title="Sisa piutang invoice sebelum bulan target, per akhir bulan lalu"
+                          >
+                            Target Piutang Lama
+                          </th>
+                          <th class="tr">Total Target</th>
+                          <th
+                            class="tr"
+                            title="Sisa piutang invoice bulan target saat ini"
+                          >
+                            Piutang Saat Ini
+                          </th>
                           <th class="tr">Collection Bulan Ini</th>
-                          <th class="tc">% MTD</th>
-                          <th class="tc">% YTD</th>
+                          <th class="tr">% MTD</th>
+                          <th class="tr">% YTD</th>
+                          <th
+                            class="tr"
+                            title="Seluruh sisa piutang all-time per sales, per hari ini"
+                          >
+                            Piutang Real-Time
+                          </th>
                         </tr>
                       </thead>
                       <tbody>
@@ -7363,9 +7407,13 @@ const sisaClass = (item: any) => {
                             </span>
                           </td>
                           <td class="tr">{{ fmtNum(row.targetBulanIni) }}</td>
-                          <td class="tr" style="color: #c62828">
-                            {{ fmtNum(row.piutangSaatIni) }}
+                          <td class="tr">
+                            {{ fmtNum(row.targetPiutangLama) }}
                           </td>
+                          <td class="tr" style="font-weight: 600">
+                            {{ fmtNum(row.targetTotal) }}
+                          </td>
+                          <td class="tr">{{ fmtNum(row.piutangSaatIni) }}</td>
                           <td
                             class="tr"
                             :style="{
@@ -7373,74 +7421,64 @@ const sisaClass = (item: any) => {
                                 row.sisaCollectionMtd > 0
                                   ? '#c62828'
                                   : '#2e7d32',
+                              fontWeight: 600,
                             }"
                           >
                             {{ fmtNum(row.collectionMtd) }}
                           </td>
-                          <td class="tc">
-                            <span
-                              class="gb-badge"
-                              :style="{
-                                background:
-                                  pctColor(row.pctCollectionMtd) + '18',
-                                color: pctColor(row.pctCollectionMtd),
-                              }"
-                            >
-                              {{ fmtPct(row.pctCollectionMtd) }}
-                            </span>
-                          </td>
-                          <td class="tc">
-                            <span
-                              class="gb-badge"
-                              :style="{
-                                background:
-                                  pctColor(row.pctCollectionYtd) + '18',
-                                color: pctColor(row.pctCollectionYtd),
-                              }"
-                            >
-                              {{ fmtPct(row.pctCollectionYtd) }}
-                            </span>
+                          <td class="tr">{{ fmtPct(row.pctCollectionMtd) }}</td>
+                          <td class="tr">{{ fmtPct(row.pctCollectionYtd) }}</td>
+                          <td
+                            class="tr"
+                            :style="{
+                              color:
+                                row.piutangRealtime > 0 ? '#c62828' : undefined,
+                            }"
+                          >
+                            {{ fmtNum(row.piutangRealtime) }}
                           </td>
                         </tr>
                       </tbody>
                       <tfoot>
                         <tr class="rp-total-row">
                           <td style="font-weight: 700">GRAND TOTAL</td>
-                          <td class="tr" style="font-weight: 700">
+                          <td class="tr">
                             {{
                               fmtNum(
                                 targetCollectionData.grandTotal.targetBulanIni,
                               )
                             }}
                           </td>
-                          <td
-                            class="tr"
-                            style="font-weight: 700; color: #c62828"
-                          >
+                          <td class="tr">
+                            {{
+                              fmtNum(
+                                targetCollectionData.grandTotal
+                                  .targetPiutangLama,
+                              )
+                            }}
+                          </td>
+                          <td class="tr">
+                            {{
+                              fmtNum(
+                                targetCollectionData.grandTotal.targetTotal,
+                              )
+                            }}
+                          </td>
+                          <td class="tr">
                             {{
                               fmtNum(
                                 targetCollectionData.grandTotal.piutangSaatIni,
                               )
                             }}
                           </td>
-                          <td
-                            class="tr"
-                            :style="{
-                              fontWeight: 700,
-                              color:
-                                targetCollectionData.grandTotal
-                                  .sisaCollectionMtd > 0
-                                  ? '#c62828'
-                                  : '#2e7d32',
-                            }"
-                          >
+                          <td class="tr">
                             {{
                               fmtNum(
                                 targetCollectionData.grandTotal.collectionMtd,
                               )
                             }}
                           </td>
-                          <td class="tc" style="font-weight: 700">
+                          <td class="tr">
                             {{
                               fmtPct(
                                 targetCollectionData.grandTotal
@@ -7448,11 +7486,18 @@ const sisaClass = (item: any) => {
                               )
                             }}
                           </td>
-                          <td class="tc" style="font-weight: 700">
+                          <td class="tr">
                             {{
                               fmtPct(
                                 targetCollectionData.grandTotal
                                   .pctCollectionYtd,
+                              )
+                            }}
+                          </td>
+                          <td class="tr">
+                            {{
+                              fmtNum(
+                                targetCollectionData.grandTotal.piutangRealtime,
                               )
                             }}
                           </td>
@@ -11467,7 +11512,7 @@ const sisaClass = (item: any) => {
       </v-card>
     </v-dialog>
 
-        <!-- Dialog: Set Inkaso -->
+    <!-- Dialog: Set Inkaso -->
     <v-dialog v-model="showSetInkasoDialog" max-width="1000px" scrollable>
       <v-card
         class="rounded-lg"

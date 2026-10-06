@@ -18,6 +18,7 @@ interface HasilRow {
   NamaHasil: string;
   QtyHasil: number;
   BsAfval: number;
+  SudahSj?: boolean;
 }
 interface DtfRow {
   Kode: string;
@@ -37,6 +38,8 @@ interface DtfRow {
   CabTujuan: string;
   TargetJadiOptions?: any[];
   HasilRows: HasilRow[];
+  Rencana?: number;
+  HasilLain?: number;
 }
 interface DtfFormData {
   cab: string;
@@ -72,6 +75,8 @@ const emptyRow = (): DtfRow => ({
   Satuan: "",
   CabTujuan: "",
   HasilRows: [],
+  Rencana: 0,
+  HasilLain: 0,
 });
 
 const KETERANGAN_OPTIONS = [
@@ -139,6 +144,13 @@ const {
   // cuma reload data (refreshdata()) dan tampilkan pesan sukses.
   onSuccess: (res: any) => {
     toast.success("LHK berhasil disimpan.");
+    (res?.data?.data?.progress || [])
+      .filter((p: any) => !p.selesai)
+      .forEach((p: any) =>
+        toast.info(
+          `${p.mklNomor}: hasil ${p.hasil}/${p.rencana}. Masih terbuka untuk LHK berikutnya.`,
+        ),
+      );
     const sjList = res?.data?.data?.sjHasilMaklon || [];
     if (sjList.length) {
       generatedSjList.value = sjList;
@@ -182,6 +194,8 @@ const reloadRows = async () => {
             Satuan: r.Satuan || "",
             CabTujuan: "",
             HasilRows: [],
+            Rencana: Number(r.Rencana) || 0,
+            HasilLain: Number(r.HasilLain) || 0,
           };
           maklonGroups.set(r.DtfMaklonId, row);
           rows.push(row);
@@ -193,6 +207,7 @@ const reloadRows = async () => {
             NamaHasil: r.NamaHasil || "",
             QtyHasil: Number(r.QtyHasil) || 0,
             BsAfval: Number(r.BsAfval) || 0,
+            SudahSj: !!Number(r.SudahSj),
           });
         }
       } else {
@@ -299,19 +314,41 @@ const onKodeBlur = async (row: DtfRow) => {
   }
 };
 
-const applyMaklonAutofill = async (row: DtfRow) => {
+const isDuplicateMaklon = (row: DtfRow) =>
+  formData.value.rows.some(
+    (r) => r !== row && r.Tipe === "MAKLON" && r.Kode === row.Kode,
+  );
+
+const applyMaklonAutofill = async (row: DtfRow): Promise<boolean> => {
+  if (isDuplicateMaklon(row)) {
+    toast.warning(`${row.Kode} sudah ada di daftar. Gunakan baris yang sama.`);
+    Object.assign(row, emptyRow());
+    return false;
+  }
   try {
-    const res = await lhkSoDtfFormService.getMaklonAutofill(row.Kode);
+    const res = await lhkSoDtfFormService.getMaklonAutofill(
+      row.Kode,
+      formData.value.cab,
+      formData.value.tanggal,
+    );
     const d = res.data.data;
+
+    if (d.selesai) {
+      toast.warning(
+        `${row.Kode} sudah terpenuhi sesuai rencana (${d.sudahHasil}/${d.rencana}).`,
+      );
+      Object.assign(row, emptyRow());
+      return false;
+    }
+
     row.KodePolos = d.kodePolos;
     row.Satuan = d.satuan;
     row.Depan = Number(d.qtyMasuk) || 0;
     row.CabTujuan = d.cabTujuan;
+    row.Rencana = Number(d.rencana) || 0;
+    row.HasilLain = Number(d.sudahHasil) || 0;
 
     if (d.targetJadiOptions.length >= 1) {
-      // Langsung tampilkan SEMUA target Barang Jadi sebagai baris Item
-      // Hasil (Qty 0 default) — user tinggal isi qty yang relevan,
-      // baris yang dibiarkan 0 otomatis diabaikan saat simpan.
       row.HasilRows = d.targetJadiOptions.map((opt: any) => ({
         Id: null,
         KodeHasil: opt.Kode,
@@ -326,12 +363,29 @@ const applyMaklonAutofill = async (row: DtfRow) => {
 
     if (d.multiItem) {
       toast.warning(
-        `${row.Kode} punya lebih dari 1 item barang polos — Qty Masuk digabung, silakan cek manual.`,
+        `${row.Kode} punya lebih dari 1 item barang polos. Qty Masuk digabung, silakan cek manual.`,
       );
     }
+    return true;
   } catch (e: any) {
     toast.error(e.response?.data?.message || "Gagal memuat data Maklon.");
+    return false;
   }
+};
+
+const progressOf = (row: DtfRow) => {
+  const baru = row.HasilRows.reduce(
+    (s, h) => s + (Number(h.QtyHasil) || 0) + (Number(h.BsAfval) || 0),
+    0,
+  );
+  const total = (row.HasilLain || 0) + baru;
+  const rencana = row.Rencana || 0;
+  return {
+    total,
+    rencana,
+    sisa: Math.max(rencana - total, 0),
+    selesai: rencana > 0 && total >= rencana,
+  };
 };
 
 // ── F1 (SPK/MAP) & F2 (SO DTF Kaosan) — sekarang pakai SearchModal reusable ──
@@ -688,6 +742,30 @@ const num = (v: number) => new Intl.NumberFormat("id-ID").format(v || 0);
                     class="tipe-badge"
                     >MAKLON</span
                   >
+
+                  <div
+                    v-if="
+                      rr.isFirst &&
+                      formData.rows[rr.rowIdx].Tipe === 'MAKLON' &&
+                      formData.rows[rr.rowIdx].Rencana
+                    "
+                    class="prog-badge"
+                    :class="
+                      progressOf(formData.rows[rr.rowIdx]).selesai
+                        ? 'prog-done'
+                        : 'prog-open'
+                    "
+                  >
+                    Hasil
+                    {{ num(progressOf(formData.rows[rr.rowIdx]).total) }} /
+                    {{ num(progressOf(formData.rows[rr.rowIdx]).rencana) }} ·
+                    {{
+                      progressOf(formData.rows[rr.rowIdx]).selesai
+                        ? "Terpenuhi"
+                        : "sisa " +
+                          num(progressOf(formData.rows[rr.rowIdx]).sisa)
+                    }}
+                  </div>
                 </td>
 
                 <template v-if="rr.isFirst">
@@ -737,6 +815,10 @@ const num = (v: number) => new Intl.NumberFormat("id-ID").format(v || 0);
                       class="lk-btn"
                       tabindex="-1"
                       title="Pilih Item Hasil"
+                      :disabled="
+                        !!formData.rows[rr.rowIdx].HasilRows[rr.hasilIdx]
+                          ?.SudahSj
+                      "
                       @click="openItemHasilModal(rr.rowIdx, rr.hasilIdx)"
                     >
                       <IconSearch :size="10" />
@@ -751,7 +833,11 @@ const num = (v: number) => new Intl.NumberFormat("id-ID").format(v || 0);
                       +
                     </button>
                     <button
-                      v-if="rr.hasilCount > 1"
+                      v-if="
+                        rr.hasilCount > 1 &&
+                        !formData.rows[rr.rowIdx].HasilRows[rr.hasilIdx]
+                          ?.SudahSj
+                      "
                       class="lk-btn"
                       tabindex="-1"
                       title="Hapus Item Hasil ini"
@@ -777,6 +863,9 @@ const num = (v: number) => new Intl.NumberFormat("id-ID").format(v || 0);
                       formData.rows[rr.rowIdx].HasilRows[rr.hasilIdx].QtyHasil
                     "
                     class="cell-input tr"
+                    :disabled="
+                      !!formData.rows[rr.rowIdx].HasilRows[rr.hasilIdx]?.SudahSj
+                    "
                   />
                   <input
                     v-else
@@ -1123,5 +1212,21 @@ const num = (v: number) => new Intl.NumberFormat("id-ID").format(v || 0);
   padding: 1px 4px;
   border-radius: 3px;
   margin-left: 4px;
+}
+.prog-badge {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 3px;
+  margin-top: 2px;
+  display: inline-block;
+}
+.prog-open {
+  background: #fff3e0;
+  color: #e65100;
+}
+.prog-done {
+  background: #e8f5e9;
+  color: #2e7d32;
 }
 </style>

@@ -2874,6 +2874,18 @@ const router = createRouter({
       },
     },
     {
+      path: "/penjualan/permintaan-desain/edit/:nomor",
+      name: "PermintaanDesainEdit",
+      component: () => import("@/views/penjualan/PermintaanDesainFormView.vue"),
+      meta: {
+        title: "Edit Permintaan Desain",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "184",
+        browseRoute: "PermintaanDesainBrowse",
+      },
+    },
+    {
       path: "/penjualan/permintaan-desain/print/:nomor",
       name: "PermintaanDesainPrint",
       component: () =>
@@ -4575,6 +4587,31 @@ const router = createRouter({
         layout: "DefaultLayout",
         requiresAuth: true,
         menuId: "565",
+      },
+    },
+
+    {
+      path: "/laporan/ppic/keberhasilan-komitmen-kirim",
+      name: "LapKeberhasilanKomitmenKirim",
+      component: () =>
+        import("@/views/laporan/ppic/KeberhasilanKomitmenKirimView.vue"),
+      meta: {
+        title: "Keberhasilan Komitmen Kirim",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "1326",
+      },
+    },
+    {
+      path: "/laporan/ppic/keberhasilan-komitmen-kirim/print",
+      name: "LapKeberhasilanKomitmenKirimPrint",
+      component: () =>
+        import("@/views/laporan/ppic/KeberhasilanKomitmenKirimPrintView.vue"),
+      meta: {
+        title: "Cetak Keberhasilan Komitmen Kirim",
+        layout: "BlankLayout",
+        requiresAuth: true,
+        menuId: "1326",
       },
     },
 

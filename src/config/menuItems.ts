@@ -101,6 +101,7 @@ import {
   IconList,
   IconPalette,
   IconChecklist,
+  IconTargetArrow,
 } from "@tabler/icons-vue";
 
 export interface NavItem {
@@ -1356,6 +1357,19 @@ export const createMenuItems = (): NavItem[] => {
               to: "/laporan/produksi-garmen/pemakaian-obat",
               icon: IconFlask,
               menuId: 565,
+            },
+          ],
+        },
+        {
+          title: "Laporan PPIC Garmen",
+          icon: IconCalendarStats,
+          menuId: 962,
+          subItems: [
+            {
+              title: "Keberhasilan Komitmen Kirim",
+              to: "/laporan/ppic/keberhasilan-komitmen-kirim",
+              icon: IconTargetArrow,
+              menuId: 1326,
             },
           ],
         },
