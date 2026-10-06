@@ -449,6 +449,7 @@ const onExportHistory = async () => {
   try {
     const rows = data.map((r: any) => ({
       Nomor: r.Nomor || "-",
+      BonNomor: r.BonNomor || "-",
       Tanggal: tglFmt(r.Tanggal),
       Jenis: r.Jenis || "-",
       Account: r.Account || "-",
@@ -471,6 +472,7 @@ const onExportHistory = async () => {
       "Realisasi",
       [
         { header: "Nomor", key: "Nomor" },
+        { header: "No. Bon", key: "BonNomor" },
         { header: "Tanggal", key: "Tanggal" },
         { header: "Jenis", key: "Jenis" },
         { header: "Account", key: "Account" },
@@ -828,6 +830,7 @@ const pumHeaders = [
 
 const historyHeaders = [
   { title: "Nomor", key: "Nomor", width: "150px" },
+  { title: "No. Bon", key: "BonNomor", width: "150px" },
   { title: "Tanggal", key: "Tanggal", width: "100px", align: "center" },
   { title: "Jenis", key: "Jenis", width: "80px" },
   { title: "Account", key: "Account", width: "180px" },
