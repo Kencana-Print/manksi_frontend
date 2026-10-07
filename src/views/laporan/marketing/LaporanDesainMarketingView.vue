@@ -117,13 +117,22 @@ const summaryTotal = computed(() => {
     (acc, r) => {
       acc.JumlahTot += Number(r.JumlahTot) || 0;
       acc.Acc += Number(r.Acc) || 0;
-      acc.Revisi += Number(r.Revisi) || 0;
+      acc.Progress += Number(r.Progress) || 0;
+      acc.Belum += Number(r.Belum) || 0;
       acc.Pending += Number(r.Pending) || 0;
       acc.Cancel += Number(r.Cancel) || 0;
       acc.CancelAlt += Number(r.CancelAlt) || 0;
       return acc;
     },
-    { JumlahTot: 0, Acc: 0, Revisi: 0, Pending: 0, Cancel: 0, CancelAlt: 0 },
+    {
+      JumlahTot: 0,
+      Acc: 0,
+      Progress: 0,
+      Belum: 0,
+      Pending: 0,
+      Cancel: 0,
+      CancelAlt: 0,
+    },
   );
 });
 
@@ -133,17 +142,52 @@ const headers = [
   { title: "Nama Project", key: "NamaProject", minWidth: "180px" },
   { title: "Customer", key: "Customer", minWidth: "160px" },
   { title: "Jenis", key: "JenisPekerjaan", width: "90px" },
-  { title: "Desainer", key: "Desainer", width: "120px" },
+  { title: "Desainer", key: "Desainer", width: "130px" },
   { title: "Marketing", key: "Marketing", width: "120px" },
   { title: "Jml", key: "Jml", width: "60px", align: "end" },
   { title: "Acc", key: "Acc", width: "60px", align: "end" },
-  { title: "Revisi", key: "Revisi", width: "60px", align: "end" },
+  { title: "Progress", key: "Progress", width: "70px", align: "end" },
+  { title: "Belum", key: "Belum", width: "60px", align: "end" },
   { title: "Pending", key: "Pending", width: "70px", align: "end" },
   { title: "Cancel", key: "Cancel", width: "70px", align: "end" },
   { title: "Cancel Alt", key: "CancelAlt", width: "80px", align: "end" },
   { title: "Status", key: "Status", width: "100px" },
-  { title: "No. LHK", key: "LhkNomor", width: "150px" },
+  { title: "No. LHK", key: "LhkNomor", minWidth: "170px" },
+  { title: "SO/MAP", key: "SoMap", width: "150px" },
 ];
+
+interface LaporanRow {
+  Acc: number | string;
+  Progress: number | string;
+  Belum: number | string;
+  Pending: number | string;
+  Cancel: number | string;
+  CancelAlt: number | string;
+}
+
+// Urutan = prioritas saat jumlah seri (yang butuh perhatian menang)
+const BUCKETS = [
+  { key: "Belum", cls: "row-belum" },
+  { key: "Progress", cls: "row-progress" },
+  { key: "Pending", cls: "row-pending" },
+  { key: "Cancel", cls: "row-cancel" },
+  { key: "CancelAlt", cls: "row-cancelalt" },
+  { key: "Acc", cls: "row-acc" },
+] as const;
+
+const rowPropsFn = (arg: LaporanRow | { item: LaporanRow }) => {
+  const row = "item" in arg ? arg.item : arg;
+  let best = 0;
+  let cls = "";
+  for (const b of BUCKETS) {
+    const v = Number(row[b.key]) || 0;
+    if (v > best) {
+      best = v;
+      cls = b.cls;
+    }
+  }
+  return cls ? { class: cls } : {};
+};
 
 // ── Export Excel multi-sheet: per desainer + Total Semua ──
 const isExporting = ref(false);
@@ -167,10 +211,13 @@ const onExport = async () => {
       { header: "Jenis Pekerjaan", key: "JenisPekerjaan", width: 14 },
       { header: "Jumlah", key: "Jml", width: 10, align: "right" },
       { header: "Acc", key: "Acc", width: 8, align: "right" },
-      { header: "Revisi", key: "Revisi", width: 8, align: "right" },
+      { header: "Progress", key: "Progress", width: 9, align: "right" },
+      { header: "Belum", key: "Belum", width: 8, align: "right" },
       { header: "Pending", key: "Pending", width: 8, align: "right" },
       { header: "Cancel", key: "Cancel", width: 8, align: "right" },
       { header: "Cancel Alt", key: "CancelAlt", width: 10, align: "right" },
+      { header: "No. LHK", key: "LhkNomor", width: 26 },
+      { header: "SO/MAP", key: "SoMap", width: 20 },
       { header: "Keterangan", key: "Keterangan", width: 30 },
     ];
 
@@ -189,7 +236,8 @@ const onExport = async () => {
         { header: "Marketing", key: "Marketing", width: 16 },
         { header: "Jumlah Tot", key: "JumlahTot", width: 12, align: "right" },
         { header: "Acc", key: "Acc", width: 10, align: "right" },
-        { header: "Revisi", key: "Revisi", width: 10, align: "right" },
+        { header: "Progress", key: "Progress", width: 10, align: "right" },
+        { header: "Belum", key: "Belum", width: 10, align: "right" },
         { header: "Pending", key: "Pending", width: 10, align: "right" },
         { header: "Cancel", key: "Cancel", width: 10, align: "right" },
         { header: "Cancel Alt", key: "CancelAlt", width: 12, align: "right" },
@@ -222,6 +270,7 @@ const onExport = async () => {
     :items="items ?? []"
     :is-loading="isLoading"
     item-value="Nomor"
+    :row-props-fn="rowPropsFn"
     v-model:filter-state="filterState"
     can-export
     :loading="isExporting"
@@ -254,6 +303,7 @@ const onExport = async () => {
           <option value="">- Semua Status -</option>
           <option value="OPEN">Open</option>
           <option value="PROGRESS">Progress</option>
+          <option value="DONE">Done</option>
           <option value="CLOSE">Close</option>
           <option value="PENDING">Pending</option>
           <option value="CANCEL">Cancel</option>
@@ -277,6 +327,34 @@ const onExport = async () => {
     <template #item.Tanggal="{ item }">{{
       formatTanggal(item.Tanggal)
     }}</template>
+    <template #item.Acc="{ item }">
+      <span :class="{ 'num-acc': Number(item.Acc) > 0 }">{{ item.Acc }}</span>
+    </template>
+    <template #item.Progress="{ item }">
+      <span :class="{ 'num-progress': Number(item.Progress) > 0 }">{{
+        item.Progress
+      }}</span>
+    </template>
+    <template #item.Belum="{ item }">
+      <span :class="{ 'num-belum': Number(item.Belum) > 0 }">{{
+        item.Belum
+      }}</span>
+    </template>
+    <template #item.Pending="{ item }">
+      <span :class="{ 'num-pending': Number(item.Pending) > 0 }">{{
+        item.Pending
+      }}</span>
+    </template>
+    <template #item.Cancel="{ item }">
+      <span :class="{ 'num-cancel': Number(item.Cancel) > 0 }">{{
+        item.Cancel
+      }}</span>
+    </template>
+    <template #item.CancelAlt="{ item }">
+      <span :class="{ 'num-cancelalt': Number(item.CancelAlt) > 0 }">{{
+        item.CancelAlt
+      }}</span>
+    </template>
   </BaseBrowse>
 
   <v-dialog v-model="showRekapDialog" max-width="900px">
@@ -295,7 +373,8 @@ const onExport = async () => {
               <th>Marketing</th>
               <th class="tr">Jumlah</th>
               <th class="tr">Acc</th>
-              <th class="tr">Revisi</th>
+              <th class="tr">Progress</th>
+              <th class="tr">Belum</th>
               <th class="tr">Pending</th>
               <th class="tr">Cancel</th>
               <th class="tr">Cancel Alt</th>
@@ -307,13 +386,14 @@ const onExport = async () => {
               <td>{{ r.Marketing }}</td>
               <td class="tr">{{ r.JumlahTot }}</td>
               <td class="tr">{{ r.Acc }}</td>
-              <td class="tr">{{ r.Revisi }}</td>
+              <td class="tr">{{ r.Progress }}</td>
+              <td class="tr">{{ r.Belum }}</td>
               <td class="tr">{{ r.Pending }}</td>
               <td class="tr">{{ r.Cancel }}</td>
               <td class="tr">{{ r.CancelAlt }}</td>
             </tr>
             <tr v-if="!summaryItems.length && !isLoadingSummary">
-              <td colspan="8" class="tc" style="color: #999">
+              <td colspan="9" class="tc" style="color: #999">
                 Tidak ada data.
               </td>
             </tr>
@@ -323,7 +403,8 @@ const onExport = async () => {
               <td colspan="2" class="tr fw">TOTAL</td>
               <td class="tr fw">{{ summaryTotal.JumlahTot }}</td>
               <td class="tr fw">{{ summaryTotal.Acc }}</td>
-              <td class="tr fw">{{ summaryTotal.Revisi }}</td>
+              <td class="tr fw">{{ summaryTotal.Progress }}</td>
+              <td class="tr fw">{{ summaryTotal.Belum }}</td>
               <td class="tr fw">{{ summaryTotal.Pending }}</td>
               <td class="tr fw">{{ summaryTotal.Cancel }}</td>
               <td class="tr fw">{{ summaryTotal.CancelAlt }}</td>
@@ -399,5 +480,47 @@ const onExport = async () => {
 }
 .select-inp {
   min-width: 140px;
+}
+:deep(tr.row-acc td) {
+  color: #2e7d32 !important;
+}
+:deep(tr.row-progress td) {
+  color: #1565c0 !important;
+}
+:deep(tr.row-belum td) {
+  color: #ef6c00 !important;
+}
+:deep(tr.row-pending td) {
+  color: #7b1fa2 !important;
+}
+:deep(tr.row-cancel td) {
+  color: #c62828 !important;
+}
+:deep(tr.row-cancelalt td) {
+  color: #6d4c41 !important;
+}
+.num-acc {
+  color: #2e7d32;
+  font-weight: 700;
+}
+.num-progress {
+  color: #1565c0;
+  font-weight: 700;
+}
+.num-belum {
+  color: #ef6c00;
+  font-weight: 700;
+}
+.num-pending {
+  color: #7b1fa2;
+  font-weight: 700;
+}
+.num-cancel {
+  color: #c62828;
+  font-weight: 700;
+}
+.num-cancelalt {
+  color: #6d4c41;
+  font-weight: 700;
 }
 </style>

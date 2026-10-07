@@ -41,15 +41,30 @@ const detailCustomerNama = ref("");
 const detailHeaders = [
   { title: "Nota", key: "Nota" },
   { title: "Tanggal", key: "Tanggal" },
+  { title: "Jatuh Tempo", key: "JatuhTempo" },
   { title: "Debet", key: "Debet", align: "end" },
   { title: "Bayar", key: "Bayar", align: "end" },
   { title: "Sisa", key: "Sisa", align: "end" },
 ] as const;
 
-const fmtDate = (val: string) => {
+const fmtDate = (val: string | Date) => {
   if (!val) return "";
   const d = new Date(val);
   return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
+};
+
+// Jatuh tempo = 2 bulan dari tanggal invoice (tanggal di-clamp ke akhir bulan tujuan)
+const calcJatuhTempo = (val: string) => {
+  if (!val) return "";
+  const d = new Date(val);
+  const target = new Date(d.getFullYear(), d.getMonth() + 2, 1);
+  const lastDay = new Date(
+    target.getFullYear(),
+    target.getMonth() + 1,
+    0,
+  ).getDate();
+  target.setDate(Math.min(d.getDate(), lastDay));
+  return fmtDate(target);
 };
 
 const openDetailDialog = async (item: any) => {
@@ -256,6 +271,7 @@ const doExportDetail = async () => {
           Customer: c.Customer,
           Nota: r.Nota,
           Tanggal: fmtDate(r.Tanggal),
+          JatuhTempo: calcJatuhTempo(r.Tanggal),
           Debet: debet,
           Bayar: bayar,
           Sisa: sisa,
@@ -306,6 +322,7 @@ const doExportDetail = async () => {
         { header: "Customer", key: "Customer" },
         { header: "Nota", key: "Nota" },
         { header: "Tanggal", key: "Tanggal" },
+        { header: "Jatuh Tempo", key: "JatuhTempo" },
         { header: "Debet", key: "Debet", align: "right", numFmt: "#,##0" },
         { header: "Bayar", key: "Bayar", align: "right", numFmt: "#,##0" },
         { header: "Sisa", key: "Sisa", align: "right", numFmt: "#,##0" },
@@ -471,6 +488,9 @@ const summaryFormatters = computed(() => {
         >
           <template #item.Tanggal="{ item }">{{
             fmtDate(item.Tanggal)
+          }}</template>
+          <template #item.JatuhTempo="{ item }">{{
+            calcJatuhTempo(item.Tanggal)
           }}</template>
           <template #item.Debet="{ item }">{{ fmtNum(item.Debet) }}</template>
           <template #item.Bayar="{ item }">{{ fmtNum(item.Bayar) }}</template>

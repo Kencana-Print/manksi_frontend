@@ -373,6 +373,7 @@ watch(activeTab, async (tab) => {
     setupMtsDetailObserver();
     setupPotensiListObserver();
     setupPotensiBatalListObserver();
+    setupInkasoBatalObserver();
   }
   if (tab === "finance") {
     if (!financeLoaded.value) await loadFinanceData();
@@ -2251,18 +2252,6 @@ interface InkasoSales {
   totalTerealisasi: number;
   items: InkasoItem[];
 }
-interface InkasoSourceOption {
-  Nota: string;
-  NotaTampil: string;
-  Tanggal: string;
-  Tempo: string;
-  TerlambatHari: number;
-  CusKode: string;
-  CusNama: string;
-  SalKode: string;
-  SalNama: string | null;
-  Sisa: number;
-}
 
 const inkasoSummary = ref({
   jmlItem: 0,
@@ -2289,6 +2278,65 @@ const fetchInkaso = async () => {
   }
 };
 
+// ── Proyeksi Inkaso — Batal (infinite scroll) ──
+interface InkasoBatalItem {
+  Nomor: string;
+  Nota: string;
+  Nominal: number;
+  AlasanBatal: string | null;
+  DateCreate: string;
+  TanggalBatal: string;
+  UserCreate: string;
+  UserModified: string;
+  SalNama: string | null;
+  CusNama: string | null;
+}
+
+const INK_BATAL_PAGE_SIZE = 20;
+const inkasoBatalList = ref<InkasoBatalItem[]>([]);
+const inkasoBatalOffset = ref(0);
+const inkasoBatalHasMore = ref(true);
+const isLoadingMoreInkasoBatal = ref(false);
+const inkasoBatalSentinelEl = ref<HTMLElement | null>(null);
+let inkasoBatalScrollObserver: IntersectionObserver | null = null;
+
+const loadMoreInkasoBatal = async () => {
+  if (!inkasoBatalHasMore.value || isLoadingMoreInkasoBatal.value) return;
+  isLoadingMoreInkasoBatal.value = true;
+  try {
+    const res = await dashboardService.getInkasoBatalList(
+      INK_BATAL_PAGE_SIZE,
+      inkasoBatalOffset.value,
+    );
+    const rows: InkasoBatalItem[] = res.data.data.items ?? [];
+    inkasoBatalList.value.push(...rows);
+    inkasoBatalOffset.value += rows.length;
+    if (rows.length < INK_BATAL_PAGE_SIZE) inkasoBatalHasMore.value = false;
+  } catch {
+    inkasoBatalHasMore.value = false;
+  } finally {
+    isLoadingMoreInkasoBatal.value = false;
+  }
+};
+
+const setupInkasoBatalObserver = () => {
+  if (inkasoBatalScrollObserver) inkasoBatalScrollObserver.disconnect();
+  if (!inkasoBatalSentinelEl.value) return;
+  inkasoBatalScrollObserver = new IntersectionObserver(
+    (entries) => {
+      if (entries[0].isIntersecting) loadMoreInkasoBatal();
+    },
+    { threshold: 0.1 },
+  );
+  inkasoBatalScrollObserver.observe(inkasoBatalSentinelEl.value);
+};
+
+const resetInkasoBatal = () => {
+  inkasoBatalList.value = [];
+  inkasoBatalOffset.value = 0;
+  inkasoBatalHasMore.value = true;
+};
+
 const todayLocalStr = () => new Date().toLocaleDateString("sv-SE"); // YYYY-MM-DD lokal
 const fmtTglIso = (s: string | null) =>
   s ? s.split("-").reverse().join("-") : "-";
@@ -2297,121 +2345,145 @@ const lewatTarget = (it: InkasoItem) =>
 const telatColor = (hari: number) =>
   hari > 90 ? "#b71c1c" : hari > 30 ? "#e65100" : "#f57f17";
 
-// ── Dialog: Set Inkaso (multi-select) ──
-const INK_SRC_PAGE_SIZE = 20;
-const showSetInkasoDialog = ref(false);
-const inkasoSourceCust = ref("");
-const inkasoSourceList = ref<InkasoSourceOption[]>([]);
-const inkasoSourceTotal = ref(0);
-const inkasoSourceOffset = ref(0);
-const inkasoSourceHasMore = ref(true);
-const isLoadingMoreInkasoSource = ref(false);
-const inkasoSourceSentinelEl = ref<HTMLElement | null>(null);
-let inkasoSourceObserver: IntersectionObserver | null = null;
-let inkasoSourceReq = 0; // buang respons lama kalau user ganti kata kunci
+// ── Dialog: Set Inkaso (per sales, sumber Target Collection bulan ini) ──
+interface InkasoTargetRow {
+  jenis: "BARU" | "LAMA";
+  nota: string;
+  notaAsli: string;
+  tanggal: string;
+  tempo: string;
+  terlambatHari: number;
+  cusKode: string;
+  cusNama: string;
+  debet: number;
+  sisaKini: number;
+  sudahDitandai: boolean;
+}
 
-const selectedInkasoMap = ref(new Map<string, InkasoSourceOption>());
-const selectedInkasoCount = computed(() => selectedInkasoMap.value.size);
+const INKASO_TOL = 1000; // sisa <= Rp 1.000 tidak ditampilkan (sama dengan Rekap Piutang)
+const showSetInkasoDialog = ref(false);
+const isLoadingInkasoSales = ref(false);
+const isLoadingInkasoRows = ref(false);
+const inkasoPeriode = ref({ bulan: 0, tahun: 0 });
+const inkasoSalesList = ref<TargetCollectionItem[]>([]);
+const inkasoSalesTab = ref("");
+const inkasoRowsBySales = ref<Record<string, InkasoTargetRow[]>>({});
 const inkasoTglTarget = ref<Record<string, string>>({});
 const inkasoCatatan = ref("");
 const isSubmittingInkaso = ref(false);
 
-const isInkasoSelected = (opt: InkasoSourceOption) =>
-  selectedInkasoMap.value.has(opt.Nota);
-const toggleInkasoSelect = (opt: InkasoSourceOption) => {
-  const next = new Map(selectedInkasoMap.value);
-  if (next.has(opt.Nota)) {
-    next.delete(opt.Nota);
-    delete inkasoTglTarget.value[opt.Nota];
-  } else {
-    next.set(opt.Nota, opt);
-  }
-  selectedInkasoMap.value = next;
-};
+const inkasoPeriodeLabel = computed(() =>
+  inkasoPeriode.value.bulan
+    ? `${BULAN_LABEL[inkasoPeriode.value.bulan - 1]} ${inkasoPeriode.value.tahun}`
+    : "",
+);
 
-const loadMoreInkasoSource = async () => {
-  if (!inkasoSourceHasMore.value || isLoadingMoreInkasoSource.value) return;
-  isLoadingMoreInkasoSource.value = true;
-  const myReq = inkasoSourceReq;
+// Urut per customer; sort stabil, jadi urutan tanggal di dalam customer tetap
+const inkasoRowsAktif = computed(() =>
+  [...(inkasoRowsBySales.value[inkasoSalesTab.value] ?? [])].sort((a, b) =>
+    a.cusNama.localeCompare(b.cusNama),
+  ),
+);
+const inkasoTotalTab = computed(() =>
+  inkasoRowsAktif.value.reduce((s, r) => s + r.sisaKini, 0),
+);
+
+// Baris (di semua tab) yang tanggal pembayarannya sudah diisi
+const inkasoRowsTerisi = computed(() =>
+  Object.values(inkasoRowsBySales.value)
+    .flat()
+    .filter((r) => !!inkasoTglTarget.value[r.notaAsli]),
+);
+const inkasoTotalTerisi = computed(() =>
+  inkasoRowsTerisi.value.reduce((s, r) => s + r.sisaKini, 0),
+);
+const terisiPerSales = (salKode: string) =>
+  (inkasoRowsBySales.value[salKode] ?? []).filter(
+    (r) => !!inkasoTglTarget.value[r.notaAsli],
+  ).length;
+
+const loadInkasoSales = async () => {
+  isLoadingInkasoSales.value = true;
   try {
-    const res = await dashboardService.getInkasoSourceOptions(
-      inkasoSourceCust.value,
-      INK_SRC_PAGE_SIZE,
-      inkasoSourceOffset.value,
+    const now = new Date();
+    const bulan = now.getMonth() + 1;
+    const tahun = now.getFullYear();
+    const key = `${tahun}-${bulan}`;
+    let data = targetCollectionCache.get(key);
+    if (!data) {
+      const res = await dashboardService.getTargetCollectionSales(bulan, tahun);
+      data = res.data.data as TargetCollectionData;
+      targetCollectionCache.set(key, data);
+    }
+    inkasoPeriode.value = { bulan, tahun };
+    inkasoSalesList.value = (data.items ?? []).filter(
+      (s) => s.piutangSaatIni > 0 || s.targetPiutangLama > 0,
     );
-    if (myReq !== inkasoSourceReq) return;
-    const d = res.data?.data;
-    const rows: InkasoSourceOption[] = d?.items ?? [];
-    inkasoSourceList.value.push(...rows);
-    inkasoSourceTotal.value = d?.total ?? inkasoSourceTotal.value;
-    inkasoSourceOffset.value += rows.length;
-    if (rows.length < INK_SRC_PAGE_SIZE) inkasoSourceHasMore.value = false;
   } catch {
-    inkasoSourceHasMore.value = false;
+    inkasoSalesList.value = [];
   } finally {
-    if (myReq === inkasoSourceReq) isLoadingMoreInkasoSource.value = false;
+    isLoadingInkasoSales.value = false;
   }
 };
 
-const setupInkasoSourceObserver = () => {
-  if (inkasoSourceObserver) inkasoSourceObserver.disconnect();
-  if (!inkasoSourceSentinelEl.value) return;
-  inkasoSourceObserver = new IntersectionObserver(
-    (entries) => {
-      if (entries[0].isIntersecting) loadMoreInkasoSource();
-    },
-    { threshold: 0.1 },
-  );
-  inkasoSourceObserver.observe(inkasoSourceSentinelEl.value);
+const loadInkasoRows = async (salKode: string) => {
+  if (inkasoRowsBySales.value[salKode]) return;
+  isLoadingInkasoRows.value = true;
+  try {
+    const res = await dashboardService.getTargetCollectionDetail({
+      salKode,
+      bulan: inkasoPeriode.value.bulan,
+      tahun: inkasoPeriode.value.tahun,
+    });
+    const items: InkasoTargetRow[] = res.data.data?.items ?? [];
+    inkasoRowsBySales.value = {
+      ...inkasoRowsBySales.value,
+      [salKode]: items.filter(
+        (r) => r.sisaKini > INKASO_TOL && !r.sudahDitandai,
+      ),
+    };
+  } catch (e: unknown) {
+    const msg = (e as { response?: { data?: { message?: string } } })?.response
+      ?.data?.message;
+    alert(msg || "Gagal memuat invoice sales ini.");
+  } finally {
+    isLoadingInkasoRows.value = false;
+  }
 };
 
-const resetInkasoSource = () => {
-  inkasoSourceReq++;
-  inkasoSourceList.value = [];
-  inkasoSourceTotal.value = 0;
-  inkasoSourceOffset.value = 0;
-  inkasoSourceHasMore.value = true;
-  isLoadingMoreInkasoSource.value = false;
-};
+watch(inkasoSalesTab, (kode) => {
+  if (kode) loadInkasoRows(kode);
+});
 
 const openSetInkasoDialog = async () => {
   showSetInkasoDialog.value = true;
-  inkasoSourceCust.value = "";
   inkasoCatatan.value = "";
   inkasoTglTarget.value = {};
-  selectedInkasoMap.value = new Map();
-  resetInkasoSource();
-  await loadMoreInkasoSource();
-  await nextTick();
-  setupInkasoSourceObserver();
+  inkasoRowsBySales.value = {};
+  inkasoSalesTab.value = "";
+  await loadInkasoSales();
+  if (inkasoSalesList.value.length) {
+    inkasoSalesTab.value = inkasoSalesList.value[0].salKode;
+  }
 };
-
-const searchInkasoSource = async () => {
-  resetInkasoSource();
-  await loadMoreInkasoSource();
-  await nextTick();
-  setupInkasoSourceObserver();
-};
-
-watch(showSetInkasoDialog, (v) => {
-  if (!v) inkasoSourceObserver?.disconnect();
-});
 
 const submitSetInkaso = async () => {
-  if (!selectedInkasoMap.value.size) return;
+  if (!inkasoRowsTerisi.value.length) return;
   isSubmittingInkaso.value = true;
   try {
-    const items = Array.from(selectedInkasoMap.value.keys()).map((nota) => ({
-      nota,
-      tglTarget: inkasoTglTarget.value[nota] || undefined,
+    const items = inkasoRowsTerisi.value.map((r) => ({
+      nota: r.notaAsli,
+      tglTarget: inkasoTglTarget.value[r.notaAsli],
       catatan: inkasoCatatan.value.trim() || undefined,
     }));
     await dashboardService.setInkasoBulk(items);
     showSetInkasoDialog.value = false;
     await fetchInkaso();
-  } catch (e: any) {
+  } catch (e: unknown) {
     // all-or-nothing: pesan server menyebut invoice mana yang bermasalah
-    alert(e?.response?.data?.message || "Gagal menyimpan proyeksi inkaso.");
+    const msg = (e as { response?: { data?: { message?: string } } })?.response
+      ?.data?.message;
+    alert(msg || "Gagal menyimpan proyeksi inkaso.");
   } finally {
     isSubmittingInkaso.value = false;
   }
@@ -2438,7 +2510,10 @@ const submitBatalInkaso = async () => {
       batalInkasoAlasan.value.trim(),
     );
     showBatalInkasoDialog.value = false;
-    await fetchInkaso();
+    resetInkasoBatal();
+    await Promise.allSettled([fetchInkaso(), loadMoreInkasoBatal()]);
+    await nextTick();
+    setupInkasoBatalObserver();
   } catch (e: any) {
     alert(e?.response?.data?.message || "Gagal membatalkan proyeksi inkaso.");
   } finally {
@@ -3477,6 +3552,7 @@ const loadMarketingData = async () => {
     pvrPage.value = 1;
     pvrHasMore.value = true;
     potensiList.value = [];
+    resetInkasoBatal();
     potensiOffset.value = 0;
     potensiHasMore.value = true;
     ptmDetailList.value = [];
@@ -3602,6 +3678,7 @@ const loadMarketingData = async () => {
       loadMorePotensiList(),
       loadMorePotensiBatalList(),
       fetchInkaso(),
+      loadMoreInkasoBatal(),
     ]);
 
     marketingLoaded.value = true;
@@ -4144,6 +4221,7 @@ onMounted(async () => {
     setupMtsDetailObserver();
     setupPotensiListObserver();
     setupPotensiBatalListObserver();
+    setupInkasoBatalObserver();
   }
   if (activeTab.value === "finance") {
     setupOverdueObserver();
@@ -4209,7 +4287,7 @@ onUnmounted(() => {
   potensiScrollObserver?.disconnect();
   potensiBatalScrollObserver?.disconnect();
   obScrollObserver?.disconnect();
-  inkasoSourceObserver?.disconnect();
+  inkasoBatalScrollObserver?.disconnect();
 });
 
 const closeSpkDialog = () => {
@@ -6581,7 +6659,7 @@ const sisaClass = (item: any) => {
 
         <!-- ── Proyeksi Inkaso ── -->
         <v-row dense class="mt-2">
-          <v-col cols="12">
+          <v-col cols="12" md="8">
             <div class="manksi-panel content-panel">
               <div class="panel-header panel-header--teal">
                 <IconCoin :size="14" :stroke-width="1.7" class="mr-1" />
@@ -6778,6 +6856,103 @@ const sisaClass = (item: any) => {
                     Belum ada invoice yang ditandai proyeksi inkaso.
                   </div>
                 </template>
+              </div>
+            </div>
+          </v-col>
+
+          <v-col cols="12" md="4">
+            <div class="manksi-panel content-panel fill-height">
+              <div
+                class="panel-header"
+                style="
+                  background: #eceff1;
+                  color: #37474f;
+                  border-bottom: 1px solid #cfd8dc;
+                "
+              >
+                <IconAlertTriangle
+                  :size="14"
+                  :stroke-width="1.7"
+                  class="mr-1"
+                />
+                Proyeksi Inkaso — Batal
+                <span
+                  v-if="inkasoSummary.totalBatal"
+                  class="badge-count ml-auto"
+                  style="background: #757575"
+                >
+                  {{ shortNum(inkasoSummary.totalBatal) }}
+                </span>
+              </div>
+              <div class="panel-body">
+                <div
+                  v-if="inkasoBatalList.length || isLoadingMoreInkasoBatal"
+                  class="gb-list"
+                  style="max-height: 340px"
+                >
+                  <div
+                    v-for="item in inkasoBatalList"
+                    :key="item.Nomor"
+                    class="gb-row row-minus"
+                    style="align-items: flex-start"
+                  >
+                    <div class="gb-nama" style="width: 130px">
+                      <span class="pen-nomor" style="font-size: 10px">{{
+                        item.Nomor
+                      }}</span>
+                      <div style="font-size: 10px; color: #9e9e9e">
+                        {{ item.Nota }}
+                      </div>
+                    </div>
+                    <div
+                      class="gb-bar-wrap"
+                      style="flex-direction: column; align-items: stretch"
+                    >
+                      <div class="d-flex justify-space-between">
+                        <span class="pen-cus">{{ item.CusNama || "-" }}</span>
+                        <span
+                          style="
+                            font-size: 11px;
+                            font-weight: 700;
+                            color: #757575;
+                          "
+                        >
+                          {{ shortNum(item.Nominal) }}
+                        </span>
+                      </div>
+                      <div style="font-size: 10px; color: #9e9e9e">
+                        {{ item.SalNama || "-" }} · dibatalkan oleh
+                        {{ item.UserModified }} ·
+                        {{ formatTanggalJam(item.TanggalBatal) }}
+                      </div>
+                      <div
+                        v-if="item.AlasanBatal"
+                        style="
+                          font-size: 10px;
+                          font-style: italic;
+                          color: #c62828;
+                          margin-top: 2px;
+                        "
+                      >
+                        Alasan: {{ item.AlasanBatal }}
+                      </div>
+                    </div>
+                  </div>
+                  <div ref="inkasoBatalSentinelEl" class="pen-sentinel">
+                    <span v-if="isLoadingMoreInkasoBatal" class="pen-loading"
+                      >Memuat...</span
+                    >
+                    <span
+                      v-else-if="!inkasoBatalHasMore && inkasoBatalList.length"
+                      class="pen-end"
+                    >
+                      {{ inkasoBatalList.length }} proyeksi batal ditampilkan
+                    </span>
+                  </div>
+                </div>
+                <div v-else class="text-center text-grey py-3 text-caption">
+                  Belum ada proyeksi inkaso yang dibatalkan.
+                </div>
               </div>
             </div>
           </v-col>
@@ -11522,18 +11697,26 @@ const sisaClass = (item: any) => {
     </v-dialog>
 
     <!-- Dialog: Set Inkaso -->
-    <v-dialog v-model="showSetInkasoDialog" max-width="1000px" scrollable>
+    <v-dialog v-model="showSetInkasoDialog" max-width="1200px" scrollable>
       <v-card
         class="rounded-lg"
-        style="height: 80vh; display: flex; flex-direction: column"
+        style="height: 85vh; display: flex; flex-direction: column"
       >
         <div
           class="pa-3 d-flex align-center justify-space-between"
           style="background: #00695c; color: white; flex-shrink: 0"
         >
-          <span style="font-size: 14px; font-weight: 700"
-            >Set Proyeksi Inkaso</span
-          >
+          <div>
+            <span style="font-size: 14px; font-weight: 700"
+              >Set Proyeksi Inkaso</span
+            >
+            <span
+              v-if="inkasoPeriodeLabel"
+              style="font-size: 11px; margin-left: 8px; opacity: 0.85"
+            >
+              Target Collection {{ inkasoPeriodeLabel }}
+            </span>
+          </div>
           <v-btn
             icon
             variant="text"
@@ -11545,140 +11728,139 @@ const sisaClass = (item: any) => {
           </v-btn>
         </div>
 
-        <div class="pa-3" style="flex-shrink: 0; border-bottom: 1px solid #eee">
-          <div class="d-flex" style="gap: 8px">
-            <input
-              v-model="inkasoSourceCust"
-              placeholder="Cari customer..."
-              class="map-date-inp"
-              style="flex: 1"
-              @keyup.enter="searchInkasoSource"
-            />
-            <button class="map-filter-btn" @click="searchInkasoSource">
-              Cari
-            </button>
-          </div>
-          <div class="text-caption text-grey mt-1">
-            {{ inkasoSourceTotal }} invoice jatuh tempo yang belum ditandai
-          </div>
-        </div>
+        <v-tabs
+          v-model="inkasoSalesTab"
+          density="compact"
+          color="teal-darken-2"
+          show-arrows
+          style="flex-shrink: 0; border-bottom: 1px solid #eee"
+        >
+          <v-tab
+            v-for="s in inkasoSalesList"
+            :key="s.salKode"
+            :value="s.salKode"
+            class="text-caption font-weight-bold"
+          >
+            {{ s.namaSales }}
+            <span
+              v-if="terisiPerSales(s.salKode)"
+              class="badge-count ml-1"
+              style="background: #00695c"
+            >
+              {{ terisiPerSales(s.salKode) }}
+            </span>
+          </v-tab>
+        </v-tabs>
 
-        <div style="flex: 1; overflow-y: auto; min-height: 0">
-          <div
-            v-if="!inkasoSourceList.length && isLoadingMoreInkasoSource"
-            class="text-center py-6 text-caption"
-          >
-            Memuat...
-          </div>
-          <div
-            v-for="opt in inkasoSourceList"
-            :key="opt.Nota"
-            class="pen-item potensi-src-row"
-            :class="{ 'potensi-src-row--selected': isInkasoSelected(opt) }"
-            style="cursor: pointer"
-            @click="toggleInkasoSelect(opt)"
-          >
-            <div class="d-flex align-center" style="gap: 10px">
-              <input
-                type="checkbox"
-                :checked="isInkasoSelected(opt)"
-                @click.stop="toggleInkasoSelect(opt)"
-              />
-              <div style="flex: 1; min-width: 0">
-                <div class="pen-item-top">
-                  <span class="pen-nomor">{{ opt.NotaTampil }}</span>
-                  <div class="d-flex align-center" style="gap: 14px">
-                    <span
-                      style="
-                        font-size: 10px;
-                        color: #757575;
-                        white-space: nowrap;
-                      "
-                      >{{ opt.SalNama || "(Tanpa Sales)" }}</span
-                    >
-                    <span
-                      :style="{
-                        fontSize: '10px',
-                        fontWeight: 700,
-                        color: telatColor(opt.TerlambatHari),
-                        whiteSpace: 'nowrap',
-                      }"
-                      >{{ opt.TerlambatHari }}h</span
-                    >
-                    <span
-                      style="
-                        font-size: 11px;
-                        color: #c62828;
-                        font-weight: 700;
-                        white-space: nowrap;
-                      "
-                      >{{ fmtNum(opt.Sisa) }}</span
-                    >
-                  </div>
-                </div>
-                <div class="pen-cus">{{ opt.CusNama }}</div>
-                <div class="pen-ket">
-                  Tgl {{ opt.Tanggal }} · Tempo {{ opt.Tempo }}
-                </div>
-                <div
-                  v-if="isInkasoSelected(opt)"
-                  class="d-flex align-center mt-1"
-                  style="gap: 6px"
-                  @click.stop
-                >
-                  <span style="font-size: 10px; color: #757575"
-                    >Target bayar (opsional):</span
+        <div style="flex: 1; overflow: auto; min-height: 0">
+          <v-progress-linear
+            v-if="isLoadingInkasoSales || isLoadingInkasoRows"
+            indeterminate
+            color="teal"
+            height="2"
+          />
+
+          <table v-if="inkasoRowsAktif.length" class="ink-table">
+            <thead>
+              <tr>
+                <th>No. Invoice</th>
+                <th>Tanggal</th>
+                <th>Jatuh Tempo</th>
+                <th>Customer</th>
+                <th class="ink-num">Debet</th>
+                <th class="ink-num">Bayar</th>
+                <th class="ink-num">Sisa</th>
+                <th style="width: 160px">Tanggal Pembayaran</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="r in inkasoRowsAktif"
+                :key="r.notaAsli"
+                class="ink-row"
+                :class="{ 'ink-row--terisi': !!inkasoTglTarget[r.notaAsli] }"
+              >
+                <td class="ink-nota">
+                  {{ r.nota }}
+                  <span v-if="r.jenis === 'LAMA'" class="td-badge-old"
+                    >LAMA</span
                   >
+                </td>
+                <td>{{ r.tanggal }}</td>
+                <td>
+                  {{ r.tempo }}
+                  <span
+                    v-if="r.terlambatHari > 0"
+                    :style="{
+                      color: telatColor(r.terlambatHari),
+                      fontWeight: 700,
+                    }"
+                    >· {{ r.terlambatHari }}h</span
+                  >
+                </td>
+                <td>{{ r.cusNama || r.cusKode }}</td>
+                <td class="ink-num">{{ fmtNum(r.debet) }}</td>
+                <td class="ink-num">{{ fmtNum(r.debet - r.sisaKini) }}</td>
+                <td class="ink-num ink-sisa">{{ fmtNum(r.sisaKini) }}</td>
+                <td>
                   <input
-                    v-model="inkasoTglTarget[opt.Nota]"
+                    v-model="inkasoTglTarget[r.notaAsli]"
                     type="date"
                     class="map-date-inp"
+                    style="width: 100%"
+                    :min="todayLocalStr()"
                   />
-                </div>
-              </div>
-            </div>
-          </div>
-          <div ref="inkasoSourceSentinelEl" class="pen-sentinel">
-            <span
-              v-if="isLoadingMoreInkasoSource && inkasoSourceList.length"
-              class="pen-loading"
-              >Memuat...</span
-            >
-            <span
-              v-else-if="!inkasoSourceHasMore && inkasoSourceList.length"
-              class="pen-end"
-            >
-              {{ inkasoSourceList.length }} invoice ditampilkan
-            </span>
-          </div>
+                </td>
+              </tr>
+            </tbody>
+            <tfoot>
+              <tr>
+                <td colspan="6">{{ inkasoRowsAktif.length }} invoice</td>
+                <td class="ink-num">{{ fmtNum(inkasoTotalTab) }}</td>
+                <td></td>
+              </tr>
+            </tfoot>
+          </table>
+
           <div
-            v-if="!isLoadingMoreInkasoSource && !inkasoSourceList.length"
+            v-else-if="
+              !isLoadingInkasoSales &&
+              !isLoadingInkasoRows &&
+              inkasoSalesList.length
+            "
             class="text-center py-6 text-caption text-grey"
           >
-            Tidak ada invoice jatuh tempo yang bisa ditandai.
+            Tidak ada invoice outstanding untuk sales ini.
+          </div>
+          <div
+            v-else-if="!isLoadingInkasoSales && !inkasoSalesList.length"
+            class="text-center py-6 text-caption text-grey"
+          >
+            Belum ada data Target Collection bulan ini.
           </div>
         </div>
 
         <div class="spk-footer" style="flex-shrink: 0; gap: 10px">
           <input
             v-model="inkasoCatatan"
-            placeholder="Catatan untuk semua yang dipilih (opsional)"
+            placeholder="Catatan untuk semua yang disimpan (opsional)"
             class="map-date-inp"
             style="flex: 1"
             maxlength="255"
           />
-          <span style="font-size: 12px; color: #757575; white-space: nowrap"
-            >{{ selectedInkasoCount }} dipilih</span
-          >
+          <span style="font-size: 12px; color: #757575; white-space: nowrap">
+            {{ inkasoRowsTerisi.length }} invoice ·
+            {{ fmtNum(inkasoTotalTerisi) }}
+          </span>
           <v-btn
             color="primary"
             variant="flat"
             size="small"
             :loading="isSubmittingInkaso"
-            :disabled="selectedInkasoCount === 0"
+            :disabled="inkasoRowsTerisi.length === 0"
             @click="submitSetInkaso"
           >
-            Simpan ({{ selectedInkasoCount }})
+            Simpan ({{ inkasoRowsTerisi.length }})
           </v-btn>
         </div>
       </v-card>
@@ -13416,6 +13598,57 @@ const sisaClass = (item: any) => {
   background: #fff3e0;
 }
 
+.ink-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+.ink-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #1565c0;
+  color: #fff;
+  font-weight: 700;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  text-align: left;
+  padding: 7px 8px;
+  white-space: nowrap;
+}
+.ink-table td {
+  padding: 5px 8px;
+  border-bottom: 1px solid #f0f0f0;
+  vertical-align: middle;
+}
+.ink-table tfoot td {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  background: #1565c0;
+  color: #fff;
+  font-weight: 700;
+  padding: 7px 8px;
+  border-bottom: none;
+}
+.ink-num {
+  text-align: right;
+  white-space: nowrap;
+}
+.ink-row:hover {
+  background: #fafafa;
+}
+.ink-row--terisi {
+  background: #e8f5e9;
+}
+.ink-nota {
+  font-weight: 700;
+  white-space: nowrap;
+}
+.ink-sisa {
+  color: #c62828;
+  font-weight: 700;
+}
 .td-sales-link {
   cursor: pointer;
   text-decoration: underline;
