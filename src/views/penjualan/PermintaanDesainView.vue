@@ -21,14 +21,25 @@ import {
 } from "@tabler/icons-vue";
 import { getFileUrl } from "@/utils/fileUrl";
 import PermintaanDesainSearchModal from "@/components/lookups/PermintaanDesainSearchModal.vue";
+import SpkSearchModal from "@/components/lookups/SpkSearchModal.vue";
+import AntreanDesainPanel from "./components/AntreanDesainPanel.vue";
 
 const router = useRouter();
 const toast = useToast();
 const authStore = useAuthStore();
 
-const isDesain = computed(
-  () => (authStore.user?.bagian || "").toUpperCase() === "DESAIN",
+const bagianUser = computed(() => (authStore.user?.bagian || "").toUpperCase());
+const isDesainTeam = computed(() =>
+  ["DESAIN", "EDP", "AUDIT"].includes(bagianUser.value),
 );
+const canCreatePD = computed(
+  () => canInsert.value && bagianUser.value !== "DESAIN",
+);
+
+const activeTab = ref<"antrean" | "semua">(
+  bagianUser.value === "DESAIN" ? "antrean" : "semua",
+);
+const antreanCount = ref(0);
 
 const todayLocal = () => {
   const d = new Date(
@@ -93,6 +104,7 @@ const headers = [
   { title: "Jml", key: "Jml", width: "70px", align: "right" },
   { title: "Jadi", key: "JmlJadi", width: "70px", align: "right" },
   { title: "Status", key: "Status", width: "110px" },
+  { title: "SO/MAP", key: "SoMapNomor", width: "150px" },
   { title: "Marketing", key: "NamaMarketing", width: "130px" },
 ];
 
@@ -100,7 +112,8 @@ const STATUS_LABEL: Record<string, { label: string; bg: string; fg: string }> =
   {
     OPEN: { label: "Open", bg: "#e3f2fd", fg: "#1565c0" },
     PROGRESS: { label: "Progress", bg: "#fff3e0", fg: "#e65100" },
-    CLOSE: { label: "Close", bg: "#e8f5e9", fg: "#2e7d32" },
+    DONE: { label: "Done", bg: "#e8f5e9", fg: "#2e7d32" },
+    CLOSE: { label: "Close", bg: "#2e7d32", fg: "#ffffff" },
     PENDING: { label: "Pending", bg: "#eeeeee", fg: "#757575" },
     CANCEL: { label: "Cancel", bg: "#eeeeee", fg: "#9e9e9e" },
     CANCEL_ALT: { label: "Cancel Alt", bg: "#eeeeee", fg: "#9e9e9e" },
@@ -122,7 +135,7 @@ const rowStyleFn = (data: any) => {
   if (MANUAL_STATUSES.includes(item.Status)) {
     return { style: "opacity: 0.5" };
   }
-  if (item.Status === "CLOSE" || !item.Dateline) return {};
+  if (["DONE", "CLOSE"].includes(item.Status) || !item.Dateline) return {};
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const dl = new Date(item.Dateline);
@@ -135,6 +148,7 @@ const rowStyleFn = (data: any) => {
 // ── Expand detail item per PD ──
 const expandedRows = ref<any[]>([]);
 const detailCache = ref<Record<string, any[]>>({});
+const kerjaCache = ref<Record<string, any[]>>({});
 const detailLoading = ref<Record<string, boolean>>({});
 
 const onUpdateExpanded = async (newExpanded: any[]) => {
@@ -149,12 +163,30 @@ const onUpdateExpanded = async (newExpanded: any[]) => {
     try {
       const res = await svc.getDetail(nomor);
       detailCache.value[nomor] = res.data.data?.detail ?? [];
+      kerjaCache.value[nomor] = res.data.data?.kerja ?? [];
     } catch {
       toast.error(`Gagal memuat detail ${nomor}`);
     } finally {
       detailLoading.value[nomor] = false;
     }
   }
+};
+
+const lhkUntuk = (nomor: string, pd2Id: number) => {
+  const set = new Set(
+    (kerjaCache.value[nomor] ?? [])
+      .filter((k: any) => k.kerja_pd2_id === pd2Id && k.kerja_lhk_nomor)
+      .map((k: any) => k.kerja_lhk_nomor),
+  );
+  return [...set].join(", ") || "-";
+};
+
+// Antrean berubah (mulai/close/ambil alih) → cache detail & browse ikut disegarkan
+const onAntreanChanged = () => {
+  detailCache.value = {};
+  kerjaCache.value = {};
+  expandedRows.value = [];
+  fetchData();
 };
 
 // ── Dialog Lampiran ──
@@ -349,43 +381,27 @@ const onExportDetail = async () => {
   }
 };
 
-// ── Dialog Update Progress (Tim Desain) ──
-const showProgressDialog = ref(false);
-const progressNomor = ref("");
-const progressJml = ref(0);
-const progressJmlJadi = ref(0);
-const isSavingProgress = ref(false);
-
-const openProgressDialog = () => {
-  if (!selectedItem.value) return;
-  progressNomor.value = selectedItem.value.Nomor;
-  progressJml.value = Number(selectedItem.value.Jml);
-  progressJmlJadi.value = Number(selectedItem.value.JmlJadi);
-  showProgressDialog.value = true;
-};
-
-const saveProgress = async () => {
-  isSavingProgress.value = true;
-  try {
-    if (authStore.user?.kode !== (selectedItem.value?.DesainerKode || "")) {
-      await svc.updateDesainer(progressNomor.value, authStore.user!.kode);
-    }
-    await svc.updateProgress(progressNomor.value, progressJmlJadi.value);
-    toast.success("Progress berhasil diupdate.");
-    showProgressDialog.value = false;
-    fetchData();
-  } catch (e: any) {
-    toast.error(e.response?.data?.message || "Gagal update progress.");
-  } finally {
-    isSavingProgress.value = false;
-  }
-};
-
 const isSelectedManual = computed(() =>
   selectedItem.value
     ? MANUAL_STATUSES.includes(selectedItem.value.Status)
     : false,
 );
+
+const isSuperUser = computed(() => ["EDP", "AUDIT"].includes(bagianUser.value));
+
+// DONE: hanya EDP/IT atau desainer yang menyelesaikan PD tsb; CLOSE: tidak ada aksi status
+const canSetStatus = computed(() => {
+  const it = selectedItem.value;
+  if (!it) return false;
+  if (it.Status === "CLOSE") return false;
+  if (it.Status === "DONE") {
+    return (
+      isSuperUser.value ||
+      (bagianUser.value === "DESAIN" && it.UserDone === authStore.user?.kode)
+    );
+  }
+  return !MANUAL_STATUSES.includes(it.Status);
+});
 
 const showStatusDialog = ref(false);
 const showStatusReferensiModal = ref(false);
@@ -393,15 +409,37 @@ const statusNomor = ref("");
 const statusValue = ref("PENDING");
 const statusKeterangan = ref("");
 const statusReferensi = ref("");
+const statusSoMap = ref("");
+const statusPath = ref("");
+
+const showSoMapModal = ref(false);
+const onSoMapSelected = (item: any) => {
+  statusSoMap.value = item.Nomor;
+};
+
 const isSavingStatus = ref(false);
 const isResumingStatus = ref(false);
+
+const isCloseMode = computed(() => statusValue.value === "CLOSE");
+const statusOptions = computed(() =>
+  isCloseMode.value
+    ? [{ title: "Close", value: "CLOSE" }]
+    : [
+        { title: "Pending", value: "PENDING" },
+        { title: "Cancel", value: "CANCEL" },
+        { title: "Cancel Alt", value: "CANCEL_ALT" },
+      ],
+);
 
 const openStatusDialog = () => {
   if (!selectedItem.value) return;
   statusNomor.value = selectedItem.value.Nomor;
-  statusValue.value = "PENDING";
+  statusValue.value =
+    selectedItem.value.Status === "DONE" ? "CLOSE" : "PENDING";
   statusKeterangan.value = "";
   statusReferensi.value = "";
+  statusSoMap.value = "";
+  statusPath.value = "";
   showStatusDialog.value = true;
 };
 
@@ -410,29 +448,68 @@ const onStatusReferensiSelected = (item: any) => {
 };
 
 const saveStatusManual = async () => {
-  if (!statusKeterangan.value.trim()) {
-    toast.error("Keterangan wajib diisi.");
-    return;
-  }
-  if (statusValue.value === "CANCEL_ALT" && !statusReferensi.value) {
-    toast.error("PD terkait wajib dipilih untuk status Cancel Alt.");
-    return;
+  if (isCloseMode.value) {
+    if (!statusSoMap.value.trim()) {
+      toast.error("Nomor SO/MAP wajib diisi.");
+      return;
+    }
+    if (!statusPath.value.trim()) {
+      toast.error("Path desain wajib diisi.");
+      return;
+    }
+  } else {
+    if (!statusKeterangan.value.trim()) {
+      toast.error("Keterangan wajib diisi.");
+      return;
+    }
+    if (statusValue.value === "CANCEL_ALT" && !statusReferensi.value) {
+      toast.error("PD terkait wajib dipilih untuk status Cancel Alt.");
+      return;
+    }
   }
   isSavingStatus.value = true;
   try {
-    await svc.setStatusManual(statusNomor.value, {
-      status: statusValue.value,
-      keterangan: statusKeterangan.value.trim(),
-      referensi:
-        statusValue.value === "CANCEL_ALT" ? statusReferensi.value : undefined,
-    });
-    toast.success("Status berhasil diubah.");
+    if (isCloseMode.value) {
+      await svc.closePD(statusNomor.value, {
+        soMapNomor: statusSoMap.value.trim(),
+        path: statusPath.value.trim(),
+      });
+      toast.success("PD berhasil di-close.");
+    } else {
+      await svc.setStatusManual(statusNomor.value, {
+        status: statusValue.value,
+        keterangan: statusKeterangan.value.trim(),
+        referensi:
+          statusValue.value === "CANCEL_ALT"
+            ? statusReferensi.value
+            : undefined,
+      });
+      toast.success("Status berhasil diubah.");
+    }
     showStatusDialog.value = false;
     fetchData();
   } catch (e: any) {
-    toast.error(e.response?.data?.message || "Gagal mengubah status.");
+    toast.error(e.response?.data?.message || "Gagal menyimpan status.");
   } finally {
     isSavingStatus.value = false;
+  }
+};
+
+// ── Buka kembali PD CLOSE (EDP/IT) ──
+const showBukaDialog = ref(false);
+const isBukaKembali = ref(false);
+const bukaKembali = async () => {
+  if (!selectedItem.value) return;
+  isBukaKembali.value = true;
+  try {
+    await svc.bukaKembali(selectedItem.value.Nomor);
+    toast.success("PD dibuka kembali (DONE).");
+    showBukaDialog.value = false;
+    fetchData();
+  } catch (e: any) {
+    toast.error(e.response?.data?.message || "Gagal membuka kembali.");
+  } finally {
+    isBukaKembali.value = false;
   }
 };
 
@@ -461,7 +538,9 @@ const canEditPD = computed(() => {
   return it.Marketing === kode || it.UserCreate === kode;
 });
 
-const isSelectedClosed = computed(() => selectedItem.value?.Status === "CLOSE");
+const isSelectedDone = computed(() =>
+  ["DONE", "CLOSE"].includes(selectedItem.value?.Status ?? ""),
+);
 
 const openEdit = () => {
   if (!selectedItem.value) return;
@@ -473,227 +552,241 @@ const openEdit = () => {
 </script>
 
 <template>
-  <BaseBrowse
-    ref="baseBrowseRef"
-    title="Permintaan Desain"
-    menu-id="184"
-    :icon="IconPalette"
-    :headers="headers"
-    :items="items ?? []"
-    :is-loading="isLoading"
-    item-value="Nomor"
-    :can-insert="canInsert"
-    :can-edit="false"
-    :can-delete="false"
-    :can-export="false"
-    select-strategy="single"
-    v-model:selected="selected"
-    :filter-state="filterState"
-    @update:filter-state="onFilterStateRestore"
-    @add="goCreate"
-    @refresh="fetchData"
-    :row-props-fn="rowStyleFn"
-    show-expand
-    :expanded="expandedRows"
-    @update:expanded="onUpdateExpanded"
-  >
-    <template #filter-left>
-      <label class="flbl">Tanggal</label>
-      <input type="date" v-model="tglAwal" class="finp" />
-      <span class="fsep">s.d.</span>
-      <input type="date" v-model="tglAkhir" class="finp" />
-      <select v-model="statusFilter" class="finp">
-        <option value="">Semua Status</option>
-        <option value="OPEN">Open</option>
-        <option value="PROGRESS">Progress</option>
-        <option value="CLOSE">Close</option>
-        <option value="PENDING">Pending</option>
-        <option value="CANCEL">Cancel</option>
-        <option value="CANCEL_ALT">Cancel Alt</option>
-      </select>
-      <select v-model="jenisFilter" class="finp">
-        <option value="">Semua Jenis</option>
-        <option value="BARU">Baru</option>
-        <option value="REVISI">Revisi</option>
-        <option value="CEK">Cek</option>
-        <option value="PLOTTER">Plotter</option>
-        <option value="EDIT">Edit</option>
-      </select>
-    </template>
+  <div class="pd-wrap">
+    <div v-if="isDesainTeam" class="pd-tabs">
+      <button
+        type="button"
+        class="pd-tab"
+        :class="{ active: activeTab === 'antrean' }"
+        @click="activeTab = 'antrean'"
+      >
+        Antrean Saya<span v-if="antreanCount" class="pd-badge">{{
+          antreanCount
+        }}</span>
+      </button>
+      <button
+        type="button"
+        class="pd-tab"
+        :class="{ active: activeTab === 'semua' }"
+        @click="activeTab = 'semua'"
+      >
+        Semua PD
+      </button>
+    </div>
 
-    <template #extra-actions>
-      <v-btn
-        v-if="canEditPD"
-        size="small"
-        color="orange-darken-2"
-        :disabled="!selectedItem || isSelectedManual || isSelectedClosed"
-        @click="openEdit"
-      >
-        <template #prepend><IconEdit :size="15" /></template>
-        Edit
-      </v-btn>
-      <v-btn
-        v-if="isDesain"
-        size="small"
-        color="teal"
-        :disabled="!selectedItem || isSelectedManual"
-        @click="openProgressDialog"
-      >
-        <template #prepend><IconEdit :size="15" /></template>
-        Update Progress
-      </v-btn>
-      <v-btn
-        size="small"
-        color="grey-darken-1"
-        :disabled="!selectedItem || isSelectedManual"
-        @click="openStatusDialog"
-      >
-        <template #prepend><IconBan :size="15" /></template>
-        Set Status
-      </v-btn>
-      <v-btn
-        v-if="isSelectedManual"
-        size="small"
-        color="primary"
-        :disabled="!selectedItem"
-        :loading="isResumingStatus"
-        @click="resumeSelected"
-      >
-        <template #prepend><IconRefresh :size="15" /></template>
-        Aktifkan Kembali
-      </v-btn>
-      <v-btn
-        size="small"
-        color="indigo"
-        :disabled="!selectedItem"
-        @click="openPrint"
-      >
-        <template #prepend><IconPrinter :size="15" /></template>
-        Cetak
-      </v-btn>
-      <v-btn
-        size="small"
-        variant="outlined"
-        color="success"
-        :loading="isExporting"
-        @click="onExport"
-      >
-        <template #prepend><IconFileExport :size="15" /></template>
-        Export
-      </v-btn>
-      <v-btn
-        size="small"
-        variant="outlined"
-        color="success"
-        :loading="isExportingDetail"
-        @click="onExportDetail"
-      >
-        <template #prepend><IconListDetails :size="15" /></template>
-        Export Detail
-      </v-btn>
-      <v-btn
-        size="small"
-        color="indigo"
-        :disabled="!selectedItem"
-        @click="openLampiranDialog"
-      >
-        <template #prepend><IconPaperclip :size="15" /></template>
-        Lampiran
-      </v-btn>
-    </template>
+    <div
+      v-if="isDesainTeam"
+      v-show="activeTab === 'antrean'"
+      class="pd-tab-body"
+    >
+      <AntreanDesainPanel
+        @count="antreanCount = $event"
+        @changed="onAntreanChanged"
+      />
+    </div>
 
-    <template #item.Status="{ item }">
-      <v-chip
-        size="x-small"
-        :style="{
-          backgroundColor: STATUS_LABEL[item.Status]?.bg,
-          color: STATUS_LABEL[item.Status]?.fg,
-        }"
-        class="font-weight-bold"
+    <div v-show="activeTab === 'semua'" class="pd-tab-body">
+      <BaseBrowse
+        ref="baseBrowseRef"
+        title="Permintaan Desain"
+        menu-id="184"
+        :icon="IconPalette"
+        :headers="headers"
+        :items="items ?? []"
+        :is-loading="isLoading"
+        item-value="Nomor"
+        :can-insert="canCreatePD"
+        :can-edit="false"
+        :can-delete="false"
+        :can-export="false"
+        select-strategy="single"
+        v-model:selected="selected"
+        :filter-state="filterState"
+        @update:filter-state="onFilterStateRestore"
+        @add="goCreate"
+        @refresh="fetchData"
+        :row-props-fn="rowStyleFn"
+        show-expand
+        :expanded="expandedRows"
+        @update:expanded="onUpdateExpanded"
       >
-        {{ STATUS_LABEL[item.Status]?.label || item.Status }}
-      </v-chip>
-    </template>
+        <template #filter-left>
+          <label class="flbl">Tanggal</label>
+          <input type="date" v-model="tglAwal" class="finp" />
+          <span class="fsep">s.d.</span>
+          <input type="date" v-model="tglAkhir" class="finp" />
+          <select v-model="statusFilter" class="finp">
+            <option value="">Semua Status</option>
+            <option value="OPEN">Open</option>
+            <option value="PROGRESS">Progress</option>
+            <option value="DONE">Done</option>
+            <option value="CLOSE">Close</option>
+            <option value="PENDING">Pending</option>
+            <option value="CANCEL">Cancel</option>
+            <option value="CANCEL_ALT">Cancel Alt</option>
+          </select>
+          <select v-model="jenisFilter" class="finp">
+            <option value="">Semua Jenis</option>
+            <option value="BARU">Baru</option>
+            <option value="REVISI">Revisi</option>
+            <option value="CEK">Cek</option>
+            <option value="PLOTTER">Plotter</option>
+            <option value="EDIT">Edit</option>
+          </select>
+        </template>
 
-    <template #item.Prioritas="{ item }">
-      <v-chip
-        size="x-small"
-        :style="{
-          backgroundColor: PRIORITAS_LABEL[item.Prioritas]?.bg,
-          color: PRIORITAS_LABEL[item.Prioritas]?.fg,
-        }"
-        class="font-weight-bold"
-      >
-        {{ PRIORITAS_LABEL[item.Prioritas]?.label || item.Prioritas }}
-      </v-chip>
-    </template>
+        <template #extra-actions>
+          <v-btn
+            v-if="canEditPD"
+            size="small"
+            color="orange-darken-2"
+            :disabled="!selectedItem || isSelectedManual || isSelectedDone"
+            @click="openEdit"
+          >
+            <template #prepend><IconEdit :size="15" /></template>
+            Edit
+          </v-btn>
+          <v-btn
+            size="small"
+            color="grey-darken-1"
+            :disabled="!canSetStatus"
+            @click="openStatusDialog"
+          >
+            <template #prepend><IconBan :size="15" /></template>
+            Set Status
+          </v-btn>
+          <v-btn
+            v-if="isSelectedManual"
+            size="small"
+            color="primary"
+            :disabled="!selectedItem"
+            :loading="isResumingStatus"
+            @click="resumeSelected"
+          >
+            <template #prepend><IconRefresh :size="15" /></template>
+            Aktifkan Kembali
+          </v-btn>
+          <v-btn
+            v-if="selectedItem?.Status === 'CLOSE' && isSuperUser"
+            size="small"
+            color="orange-darken-2"
+            @click="showBukaDialog = true"
+          >
+            <template #prepend><IconRefresh :size="15" /></template>
+            Buka Kembali
+          </v-btn>
+          <v-btn
+            size="small"
+            color="indigo"
+            :disabled="!selectedItem"
+            @click="openPrint"
+          >
+            <template #prepend><IconPrinter :size="15" /></template>
+            Cetak
+          </v-btn>
+          <v-btn
+            size="small"
+            variant="outlined"
+            color="success"
+            :loading="isExporting"
+            @click="onExport"
+          >
+            <template #prepend><IconFileExport :size="15" /></template>
+            Export
+          </v-btn>
+          <v-btn
+            size="small"
+            variant="outlined"
+            color="success"
+            :loading="isExportingDetail"
+            @click="onExportDetail"
+          >
+            <template #prepend><IconListDetails :size="15" /></template>
+            Export Detail
+          </v-btn>
+          <v-btn
+            size="small"
+            color="indigo"
+            :disabled="!selectedItem"
+            @click="openLampiranDialog"
+          >
+            <template #prepend><IconPaperclip :size="15" /></template>
+            Lampiran
+          </v-btn>
+        </template>
 
-    <template #detail="{ item }">
-      <div class="pd-detail-wrap">
-        <v-progress-linear
-          v-if="detailLoading[item.Nomor]"
-          indeterminate
-          color="primary"
-          height="2"
-        />
-        <table v-else-if="detailCache[item.Nomor]" class="pd-detail-table">
-          <thead>
-            <tr>
-              <th>Nama Desain</th>
-              <th style="width: 100px">Jumlah</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="(d, i) in detailCache[item.Nomor]" :key="i">
-              <td>{{ d.pd2_pd_desain }}</td>
-              <td class="tr">{{ d.pd2_pd_jml }}</td>
-            </tr>
-            <tr v-if="!detailCache[item.Nomor]?.length">
-              <td colspan="2" class="tc" style="color: #999">
-                Tidak ada item.
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </template>
-  </BaseBrowse>
+        <template #item.Status="{ item }">
+          <v-chip
+            size="x-small"
+            :style="{
+              backgroundColor: STATUS_LABEL[item.Status]?.bg,
+              color: STATUS_LABEL[item.Status]?.fg,
+            }"
+            class="font-weight-bold"
+          >
+            {{ STATUS_LABEL[item.Status]?.label || item.Status }}
+          </v-chip>
+        </template>
 
-  <v-dialog v-model="showProgressDialog" max-width="380px" persistent>
-    <v-card class="rounded-lg">
-      <v-card-title
-        class="pa-3 bg-primary text-white"
-        style="font-size: 13px; font-weight: 700"
-      >
-        Update Progress — {{ progressNomor }}
-      </v-card-title>
-      <v-card-text class="pa-4">
-        <label class="status-lbl">Jumlah Jadi (dari {{ progressJml }})</label>
-        <input
-          type="number"
-          v-model.number="progressJmlJadi"
-          class="status-inp"
-          :min="0"
-          :max="progressJml"
-        />
-      </v-card-text>
-      <v-card-actions class="pa-3 border-t">
-        <v-btn variant="text" size="small" @click="showProgressDialog = false"
-          >Batal</v-btn
-        >
-        <v-spacer />
-        <v-btn
-          variant="flat"
-          size="small"
-          color="primary"
-          :loading="isSavingProgress"
-          @click="saveProgress"
-        >
-          Simpan
-        </v-btn>
-      </v-card-actions>
-    </v-card>
-  </v-dialog>
+        <template #item.Prioritas="{ item }">
+          <v-chip
+            size="x-small"
+            :style="{
+              backgroundColor: PRIORITAS_LABEL[item.Prioritas]?.bg,
+              color: PRIORITAS_LABEL[item.Prioritas]?.fg,
+            }"
+            class="font-weight-bold"
+          >
+            {{ PRIORITAS_LABEL[item.Prioritas]?.label || item.Prioritas }}
+          </v-chip>
+        </template>
+
+        <template #detail="{ item }">
+          <div class="pd-detail-wrap">
+            <div v-if="item.SoMapNomor" class="pd-close-info">
+              <b>{{ item.SoMapTipe }}</b> {{ item.SoMapNomor }} &middot; Path:
+              {{ item.PathDesain }}
+            </div>
+            <v-progress-linear
+              v-if="detailLoading[item.Nomor]"
+              indeterminate
+              color="primary"
+              height="2"
+            />
+            <table v-else-if="detailCache[item.Nomor]" class="pd-detail-table">
+              <thead>
+                <tr>
+                  <th>Nama Desain</th>
+                  <th style="width: 130px">Desainer</th>
+                  <th style="width: 70px">Jml</th>
+                  <th style="width: 90px">Dikerjakan</th>
+                  <th style="width: 70px">Selesai</th>
+                  <th style="width: 70px">Sisa</th>
+                  <th style="width: 170px">LHK</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="d in detailCache[item.Nomor]" :key="d.pd2_id">
+                  <td>{{ d.pd2_pd_desain }}</td>
+                  <td>{{ d.pd2_desainer_nama || "-" }}</td>
+                  <td class="tr">{{ d.pd2_pd_jml }}</td>
+                  <td class="tr">{{ d.dikerjakan }}</td>
+                  <td class="tr">{{ d.selesai }}</td>
+                  <td class="tr">{{ d.sisa }}</td>
+                  <td>{{ lhkUntuk(item.Nomor, d.pd2_id) }}</td>
+                </tr>
+                <tr v-if="!detailCache[item.Nomor]?.length">
+                  <td colspan="7" class="tc" style="color: #999">
+                    Tidak ada item.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </template>
+      </BaseBrowse>
+    </div>
+  </div>
 
   <v-dialog v-model="showStatusDialog" max-width="420px" persistent>
     <v-card class="rounded-lg">
@@ -701,16 +794,13 @@ const openEdit = () => {
         class="pa-3 bg-primary text-white"
         style="font-size: 13px; font-weight: 700"
       >
-        Set Status Manual — {{ statusNomor }}
+        {{ isCloseMode ? "Close PD" : "Set Status Manual" }} —
+        {{ statusNomor }}
       </v-card-title>
       <v-card-text class="pa-4">
         <v-select
           v-model="statusValue"
-          :items="[
-            { title: 'Pending', value: 'PENDING' },
-            { title: 'Cancel', value: 'CANCEL' },
-            { title: 'Cancel Alt', value: 'CANCEL_ALT' },
-          ]"
+          :items="statusOptions"
           item-title="title"
           item-value="value"
           label="Status"
@@ -718,27 +808,50 @@ const openEdit = () => {
           density="compact"
           class="mb-3"
           hide-details
+          :disabled="isCloseMode"
         />
-        <div v-if="statusValue === 'CANCEL_ALT'" class="lookup-field mb-3">
-          <label class="lookup-label">PD Terkait (wajib)</label>
-          <div
-            class="lookup-input-wrap"
-            @click="showStatusReferensiModal = true"
-          >
-            <span :class="{ 'text-grey': !statusReferensi }">
-              {{ statusReferensi || "Pilih PD pasangan yang sudah di-ACC..." }}
-            </span>
-            <IconSearch :size="15" :stroke-width="1.7" />
+        <template v-if="isCloseMode">
+          <div class="lookup-field mb-3">
+            <label class="lookup-label">Nomor SO / MAP (wajib)</label>
+            <div class="lookup-input-wrap" @click="showSoMapModal = true">
+              <span :class="{ 'text-grey': !statusSoMap }">
+                {{ statusSoMap || "Pilih SO/MAP..." }}
+              </span>
+              <IconSearch :size="15" :stroke-width="1.7" />
+            </div>
           </div>
-        </div>
-        <v-textarea
-          v-model="statusKeterangan"
-          label="Keterangan (wajib)"
-          variant="outlined"
-          density="compact"
-          rows="3"
-          hide-details
-        />
+          <v-text-field
+            v-model="statusPath"
+            label="Path desain (wajib)"
+            variant="outlined"
+            density="compact"
+            hide-details
+          />
+        </template>
+        <template v-else>
+          <div v-if="statusValue === 'CANCEL_ALT'" class="lookup-field mb-3">
+            <label class="lookup-label">PD Terkait (wajib)</label>
+            <div
+              class="lookup-input-wrap"
+              @click="showStatusReferensiModal = true"
+            >
+              <span :class="{ 'text-grey': !statusReferensi }">
+                {{
+                  statusReferensi || "Pilih PD pasangan yang sudah di-ACC..."
+                }}
+              </span>
+              <IconSearch :size="15" :stroke-width="1.7" />
+            </div>
+          </div>
+          <v-textarea
+            v-model="statusKeterangan"
+            label="Keterangan (wajib)"
+            variant="outlined"
+            density="compact"
+            rows="3"
+            hide-details
+          />
+        </template>
       </v-card-text>
       <v-card-actions class="pa-3 border-t">
         <v-btn
@@ -762,9 +875,49 @@ const openEdit = () => {
     </v-card>
   </v-dialog>
 
+  <v-dialog v-model="showBukaDialog" max-width="400px" persistent>
+    <v-card class="rounded-lg">
+      <v-card-title
+        class="pa-3 bg-primary text-white"
+        style="font-size: 13px; font-weight: 700"
+      >
+        Buka Kembali — {{ selectedItem?.Nomor }}
+      </v-card-title>
+      <v-card-text class="pa-4" style="font-size: 12px">
+        PD kembali ke status Done. Nomor SO/MAP dan path desain yang tersimpan
+        dikosongkan supaya bisa diinput ulang.
+      </v-card-text>
+      <v-card-actions class="pa-3 border-t">
+        <v-btn
+          variant="text"
+          size="small"
+          :disabled="isBukaKembali"
+          @click="showBukaDialog = false"
+          >Batal</v-btn
+        >
+        <v-spacer />
+        <v-btn
+          variant="flat"
+          size="small"
+          color="primary"
+          :loading="isBukaKembali"
+          @click="bukaKembali"
+        >
+          Ya, Buka Kembali
+        </v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
+
   <PermintaanDesainSearchModal
     v-model="showStatusReferensiModal"
     @selected="onStatusReferensiSelected"
+  />
+
+  <SpkSearchModal
+    v-model="showSoMapModal"
+    filter-mode="so-map"
+    @selected="onSoMapSelected"
   />
 
   <v-dialog v-model="showLampiranDialog" max-width="480px">
@@ -831,6 +984,48 @@ const openEdit = () => {
 </template>
 
 <style scoped>
+.pd-wrap {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.pd-tab-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.pd-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 8px 8px 0;
+  flex-shrink: 0;
+}
+.pd-tab {
+  padding: 8px 16px;
+  font-size: 12px;
+  font-weight: 700;
+  border: none;
+  background: transparent;
+  color: #757575;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+}
+.pd-tab.active {
+  color: #1565c0;
+  border-bottom-color: #1565c0;
+}
+.pd-badge {
+  display: inline-block;
+  margin-left: 6px;
+  min-width: 18px;
+  padding: 0 6px;
+  border-radius: 9px;
+  background: #e65100;
+  color: white;
+  font-size: 10px;
+  text-align: center;
+}
 .flbl {
   font-size: 11px;
   font-weight: 600;
@@ -852,25 +1047,6 @@ const openEdit = () => {
   font-size: 11px;
   color: #777;
 }
-.status-lbl {
-  font-size: 11px;
-  font-weight: 600;
-  color: #444;
-  display: block;
-  margin-bottom: 4px;
-}
-.status-inp {
-  width: 100%;
-  height: 28px;
-  border: 1px solid #bdbdbd;
-  border-radius: 4px;
-  padding: 0 8px;
-  font-size: 12px;
-  outline: none;
-}
-.status-inp:focus {
-  border-color: #1565c0;
-}
 .mt8 {
   margin-top: 8px;
 }
@@ -878,6 +1054,11 @@ const openEdit = () => {
 .pd-detail-wrap {
   padding: 8px 16px 12px;
   background: #f5f7fb;
+}
+.pd-close-info {
+  font-size: 11px;
+  color: #37474f;
+  margin-bottom: 6px;
 }
 .pd-detail-table {
   width: 100%;

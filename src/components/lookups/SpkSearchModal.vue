@@ -11,6 +11,7 @@ const props = defineProps<{
   modelValue: boolean;
   filterMode?:
     | "so"
+    | "so-map"
     | "spk-ppic"
     | "mutasi"
     | "sj"

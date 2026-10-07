@@ -34,7 +34,6 @@ import MppbSearchModal from "@/components/lookups/MppbSearchModal.vue";
 import HistoryAlokasiModal from "@/components/lookups/HistoryAlokasiModal.vue";
 import BarangKaosanSearchModal from "@/components/lookups/BarangKaosanSearchModal.vue";
 import SetoranSearchModal from "@/components/lookups/SetoranSearchModal.vue";
-import LhkDesainSearchModal from "@/components/lookups/LhkDesainSearchModal.vue";
 
 const route = useRoute();
 const router = useRouter();
@@ -67,7 +66,6 @@ const showWorkshopModal = ref(false);
 const showStokDcModal = ref(false);
 const showSoKaosanModal = ref(false);
 const showSpkLamaModal = ref(false);
-const showLhkModal = ref(false);
 const showSjMemoModal = ref(false);
 const showMemoModal = ref(false);
 const showMppbModal = ref(false);
@@ -223,7 +221,9 @@ const defaultData = {
 
   spk_desain: "",
   spk_newdesign: "N",
-  spk_lhk_nomor: "",
+  PdNomor: "",
+  PdPath: "",
+  LhkList: [] as string[],
 
   spk_warna_badan: "",
   spk_warna_lengan: "",
@@ -340,7 +340,9 @@ const {
       mkb: d.header.mkb || "",
       dtmkb: d.header.dtmkb || "",
       jmlmppb: d.header.jmlmppb || 0,
-      spk_lhk_nomor: d.header.spk_lhk_nomor || "",
+      PdNomor: d.header.PdNomor || "",
+      PdPath: d.header.PdPath || "",
+      LhkList: d.header.LhkList || [],
       jmlinvdc: d.header.jmlinvdc || 0,
 
       // Fallback Checkbox (jika di DB null)
@@ -885,9 +887,6 @@ const handleLookup = (type: string) => {
       }
       showSetoranModal.value = true;
       break;
-    case "lhkDesain":
-      showLhkModal.value = true;
-      break;
   }
 };
 
@@ -1018,6 +1017,10 @@ const loadDataMemo = async (nomor: string) => {
       formData.value.spk_acc_tanggal_display = h.mspk_acc_tanggal
         ? getLocalDateString(h.mspk_acc_tanggal)
         : "";
+      // Link PDM ikut dari MAP yang dipilih (read-only, diisi tim Desain)
+      formData.value.PdNomor = data.pd?.PdNomor || "";
+      formData.value.PdPath = data.pd?.PdPath || "";
+      formData.value.LhkList = data.pd?.LhkList || [];
 
       if (
         h.mspk_dateline &&
@@ -1160,6 +1163,11 @@ watch(
         isSjMemoLocked.value = false;
         formData.value.spk_nomormemo = "";
       }
+      if (!isEditMode.value) {
+        formData.value.PdNomor = "";
+        formData.value.PdPath = "";
+        formData.value.LhkList = [];
+      }
     }
   },
 );
@@ -1192,9 +1200,6 @@ const setRepeat = (v: any) => {
 };
 const setSpkLama = (v: any) =>
   (formData.value.spk_lama = v.Nomor || v.spk_nomor);
-const setLhk = (v: any) => {
-  formData.value.spk_lhk_nomor = v.Nomor || v.lhk_nomor;
-};
 const setMppb = (v: any) => {
   formData.value.spk_mppb = v.Nomor || v.mpb_nomor;
   formData.value.jmlmppb = v.Jumlah || v.mpb_jmlorder || 0;
@@ -2025,7 +2030,6 @@ const onPilihKatalog = (item: any) => {
       @selected="setRepeat"
     />
     <SpkSearchModal v-model="showSpkLamaModal" @selected="setSpkLama" />
-    <LhkDesainSearchModal v-model="showLhkModal" @selected="setLhk" />
     <InvDcSearchModal v-model="showStokDcModal" @selected="setStokDc" />
     <SoKaosanSearchModal
       v-model="showSoKaosanModal"

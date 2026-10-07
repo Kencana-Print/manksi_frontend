@@ -18,6 +18,8 @@ interface ItemRow {
   id?: number | null;
   desain: string;
   jml: number;
+  desainer: string;
+  dikerjakan: number;
 }
 
 interface PDFormData {
@@ -38,7 +40,6 @@ const toast = useToast();
 const route = useRoute();
 const editNomor = computed(() => String(route.params.nomor || ""));
 const isEdit = computed(() => !!editNomor.value);
-const editJmlJadi = ref(0);
 
 const toInputDate = (v: any) => {
   if (!v) return "";
@@ -59,7 +60,7 @@ const initialData: PDFormData = {
   referensi: "",
   keterangan: "",
   desainer: "",
-  items: [{ desain: "", jml: 1 }],
+  items: [{ desain: "", jml: 1, desainer: "", dikerjakan: 0 }],
 };
 
 const {
@@ -82,6 +83,7 @@ const {
         id: i.id ?? null,
         desain: i.desain.trim(),
         jml: Number(i.jml),
+        desainer: i.desainer || null,
       }));
 
     if (isEdit.value) {
@@ -106,7 +108,11 @@ const {
       prioritas: data.prioritas,
       desainer: data.desainer || undefined,
       referensi: data.jenisPekerjaan === "REVISI" ? data.referensi : undefined,
-      items: items.map(({ desain, jml }) => ({ desain, jml })),
+      items: items.map(({ desain, jml, desainer }) => ({
+        desain,
+        jml,
+        desainer,
+      })),
     });
   },
   onSuccess: (response: any) => {
@@ -120,11 +126,29 @@ const {
 });
 
 const addRow = () => {
-  formData.value.items.push({ desain: "", jml: 1 });
+  formData.value.items.push({
+    desain: "",
+    jml: 1,
+    desainer: formData.value.desainer || "",
+    dikerjakan: 0,
+  });
 };
 const removeRow = (index: number) => {
-  if (formData.value.items.length <= 1) return;
+  const row = formData.value.items[index];
+  if (!row || formData.value.items.length <= 1) return;
+  if (row.dikerjakan > 0) {
+    toast.warning("Baris yang sudah dikerjakan tidak dapat dihapus.");
+    return;
+  }
   formData.value.items.splice(index, 1);
+};
+
+// Dropdown desainer di header = pintasan: isi semua baris yang masih kosong
+const onHeaderDesainerChange = (kode: string | null) => {
+  if (!kode) return;
+  formData.value.items.forEach((r) => {
+    if (!r.desainer) r.desainer = kode;
+  });
 };
 
 const showCustomerModal = ref(false);
@@ -154,14 +178,16 @@ onMounted(async () => {
     const res = await svc.getDetail(editNomor.value);
     const d = res.data.data;
     if (!d) throw new Error("not found");
-    if (["CLOSE", "PENDING", "CANCEL", "CANCEL_ALT"].includes(d.pd_status)) {
+    if (
+      ["DONE", "CLOSE", "PENDING", "CANCEL", "CANCEL_ALT"].includes(d.pd_status)
+    ) {
       toast.error(
         `PD berstatus ${d.pd_status} tidak dapat diedit. Aktifkan kembali dulu jika perlu.`,
       );
       goBack();
       return;
     }
-    editJmlJadi.value = Number(d.pd_jmljadi) || 0;
+
     formData.value = {
       tanggal: toInputDate(d.pd_tanggal),
       namaProject: d.pd_nama_project ?? "",
@@ -177,6 +203,8 @@ onMounted(async () => {
         id: x.pd2_id,
         desain: x.pd2_pd_desain ?? "",
         jml: Number(x.pd2_pd_jml) || 1,
+        desainer: x.pd2_desainer ?? "",
+        dikerjakan: Number(x.dikerjakan) || 0,
       })),
     };
   } catch {
@@ -202,6 +230,8 @@ const onReferensiSelected = async (item: any) => {
       formData.value.items = detail.detail.map((d: any) => ({
         desain: d.pd2_pd_desain ?? "",
         jml: Number(d.pd2_pd_jml) || 1,
+        desainer: "",
+        dikerjakan: 0,
       }));
     }
   } catch {
@@ -227,11 +257,14 @@ const onValidateSave = () => {
     toast.error("Minimal 1 baris detail desain dengan jumlah > 0.");
     return;
   }
-  if (isEdit.value && totalJml.value < editJmlJadi.value) {
-    toast.error(
-      `Total jumlah tidak boleh kurang dari yang sudah jadi (${editJmlJadi.value}).`,
-    );
-    return;
+  if (isEdit.value) {
+    const kurang = validItems.find((i) => i.id && Number(i.jml) < i.dikerjakan);
+    if (kurang) {
+      toast.error(
+        `Jumlah "${kurang.desain}" tidak boleh kurang dari yang sudah dikerjakan (${kurang.dikerjakan}).`,
+      );
+      return;
+    }
   }
   showSaveDialog.value = true;
 };
@@ -343,13 +376,14 @@ const onValidateSave = () => {
           :items="desainerOptions"
           item-title="Nama"
           item-value="Kode"
-          label="Desainer (opsional)"
+          label="Desainer (isi semua baris kosong)"
           variant="outlined"
           density="compact"
           class="mb-3"
           clearable
           :disabled="isEdit"
           hide-details
+          @update:model-value="onHeaderDesainerChange"
         />
 
         <v-textarea
@@ -377,6 +411,7 @@ const onValidateSave = () => {
             <tr>
               <th>Nama Desain</th>
               <th style="width: 100px">Jumlah</th>
+              <th style="width: 150px">Desainer</th>
               <th style="width: 40px"></th>
             </tr>
           </thead>
@@ -397,11 +432,27 @@ const onValidateSave = () => {
                   min="1"
                 />
               </td>
+              <td>
+                <select
+                  v-model="row.desainer"
+                  class="cell-inp"
+                  :disabled="row.dikerjakan > 0"
+                >
+                  <option value="">-</option>
+                  <option
+                    v-for="d in desainerOptions"
+                    :key="d.Kode"
+                    :value="d.Kode"
+                  >
+                    {{ d.Nama }}
+                  </option>
+                </select>
+              </td>
               <td class="tc">
                 <button
                   type="button"
                   class="del-btn"
-                  :disabled="formData.items.length <= 1"
+                  :disabled="formData.items.length <= 1 || row.dikerjakan > 0"
                   @click="removeRow(i)"
                 >
                   <IconTrash :size="14" />
@@ -413,7 +464,7 @@ const onValidateSave = () => {
             <tr>
               <td class="tr fw">Total Jumlah</td>
               <td class="tr fw">{{ totalJml }}</td>
-              <td></td>
+              <td colspan="2"></td>
             </tr>
           </tfoot>
         </table>

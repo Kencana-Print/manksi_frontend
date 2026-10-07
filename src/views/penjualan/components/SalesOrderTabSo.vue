@@ -1970,24 +1970,37 @@ watch(
         </div>
 
         <div class="fr">
+          <label class="lbl" style="width: 72px">No. PDM</label>
+          <input
+            :value="formData.PdNomor"
+            readonly
+            class="inp ro"
+            style="flex: 1"
+            placeholder="Diisi tim Desain"
+          />
+        </div>
+
+        <div class="fr">
           <label class="lbl" style="width: 72px">LHK Desain</label>
-          <div class="igrp" style="flex: 1">
-            <input
-              v-model="formData.spk_lhk_nomor"
-              readonly
-              class="inp ro"
-              style="flex: 1"
-              @keydown="onLhkF1"
-            />
-            <button
-              type="button"
-              class="blkp"
-              title="Cari LHK Desain (F1)"
-              @mousedown.prevent="$emit('open-lookup', 'lhkDesain')"
-            >
-              <IconSearch :size="12" color="#1565c0" />
-            </button>
-          </div>
+          <input
+            :value="(formData.LhkList || []).join(', ')"
+            :title="(formData.LhkList || []).join(', ')"
+            readonly
+            class="inp ro"
+            style="flex: 1"
+            placeholder="Otomatis dari PDM"
+          />
+        </div>
+
+        <div v-if="formData.PdPath" class="fr">
+          <label class="lbl" style="width: 72px">Path Desain</label>
+          <input
+            :value="formData.PdPath"
+            :title="formData.PdPath"
+            readonly
+            class="inp ro"
+            style="flex: 1"
+          />
         </div>
 
         <div class="fr">
