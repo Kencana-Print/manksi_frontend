@@ -207,7 +207,7 @@ const reloadRows = async () => {
             NamaHasil: r.NamaHasil || "",
             QtyHasil: Number(r.QtyHasil) || 0,
             BsAfval: Number(r.BsAfval) || 0,
-            SudahSj: !!Number(r.SudahSj),
+            SudahSj: r.SudahDiterima ?? !!Number(r.SudahSj),
           });
         }
       } else {
@@ -742,6 +742,15 @@ const num = (v: number) => new Intl.NumberFormat("id-ID").format(v || 0);
                     class="tipe-badge"
                     >MAKLON</span
                   >
+                  <span
+                    v-if="
+                      formData.rows[rr.rowIdx].Tipe === 'MAKLON' &&
+                      formData.rows[rr.rowIdx].HasilRows[rr.hasilIdx]?.SudahSj
+                    "
+                    class="tipe-badge badge-terima"
+                    title="Sudah diterima gudang, tidak bisa diubah"
+                    >DITERIMA GUDANG</span
+                  >
 
                   <div
                     v-if="
@@ -815,6 +824,11 @@ const num = (v: number) => new Intl.NumberFormat("id-ID").format(v || 0);
                       class="lk-btn"
                       tabindex="-1"
                       title="Pilih Item Hasil"
+                      :class="{
+                        'cell-locked':
+                          formData.rows[rr.rowIdx].HasilRows[rr.hasilIdx]
+                            ?.SudahSj,
+                      }"
                       :disabled="
                         !!formData.rows[rr.rowIdx].HasilRows[rr.hasilIdx]
                           ?.SudahSj
@@ -884,6 +898,14 @@ const num = (v: number) => new Intl.NumberFormat("id-ID").format(v || 0);
                       formData.rows[rr.rowIdx].HasilRows[rr.hasilIdx].BsAfval
                     "
                     class="cell-input tr"
+                    :class="{
+                      'cell-locked':
+                        formData.rows[rr.rowIdx].HasilRows[rr.hasilIdx]
+                          ?.SudahSj,
+                    }"
+                    :disabled="
+                      !!formData.rows[rr.rowIdx].HasilRows[rr.hasilIdx]?.SudahSj
+                    "
                   />
                   <input
                     v-else
@@ -1133,6 +1155,15 @@ const num = (v: number) => new Intl.NumberFormat("id-ID").format(v || 0);
 .cell-input:focus {
   border-color: #1976d2;
   background: white;
+}
+.cell-locked {
+  background: #eeeeee;
+  color: #888;
+  cursor: not-allowed;
+}
+.badge-terima {
+  color: #2e7d32;
+  background: #e8f5e9;
 }
 .cell-select {
   width: 100%;
