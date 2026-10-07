@@ -282,6 +282,7 @@ const onExport = async () => {
       Jml: Number(r.Jml) || 0,
       JmlJadi: Number(r.JmlJadi) || 0,
       Status: STATUS_LABEL[r.Status]?.label || r.Status,
+      AlasanStatus: r.StatusKeterangan || "",
       Marketing: r.NamaMarketing,
     }));
     await exportExcelSingle(
@@ -299,6 +300,7 @@ const onExport = async () => {
         { header: "Jml", key: "Jml", align: "right" },
         { header: "Jml Jadi", key: "JmlJadi", align: "right" },
         { header: "Status", key: "Status" },
+        { header: "Alasan Status", key: "AlasanStatus" },
         { header: "Marketing", key: "Marketing" },
       ],
       rows,
@@ -718,6 +720,7 @@ const openEdit = () => {
         <template #item.Status="{ item }">
           <v-chip
             size="x-small"
+            :title="item.StatusKeterangan || undefined"
             :style="{
               backgroundColor: STATUS_LABEL[item.Status]?.bg,
               color: STATUS_LABEL[item.Status]?.fg,
@@ -746,6 +749,13 @@ const openEdit = () => {
             <div v-if="item.SoMapNomor" class="pd-close-info">
               <b>{{ item.SoMapTipe }}</b> {{ item.SoMapNomor }} &middot; Path:
               {{ item.PathDesain }}
+            </div>
+            <div v-if="item.StatusKeterangan" class="pd-status-ket">
+              <b>{{ STATUS_LABEL[item.Status]?.label || item.Status }}:</b>
+              {{ item.StatusKeterangan }}
+              <template v-if="item.Referensi">
+                &middot; PD terkait {{ item.Referensi }}
+              </template>
             </div>
             <v-progress-linear
               v-if="detailLoading[item.Nomor]"
@@ -1058,6 +1068,14 @@ const openEdit = () => {
 .pd-close-info {
   font-size: 11px;
   color: #37474f;
+  margin-bottom: 6px;
+}
+.pd-status-ket {
+  font-size: 11px;
+  color: #e65100;
+  background: #fff8e1;
+  border-left: 3px solid #f57f17;
+  padding: 4px 8px;
   margin-bottom: 6px;
 }
 .pd-detail-table {
