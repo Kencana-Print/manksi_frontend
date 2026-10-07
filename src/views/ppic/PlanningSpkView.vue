@@ -714,8 +714,6 @@ fetchData();
                       <td class="tc">{{ n + 1 }}</td>
                       <td class="mono">{{ d.NomorSPK }}</td>
                       <td>{{ d.NamaSPK || "—" }}</td>
-                      <td class="tr">{{ fmt(d.Wip) }}</td>
-                      <td class="tr">{{ fmt(d.QtyPo) }}</td>
                       <td
                         class="tr"
                         :class="{ 'smv-manual': d.SmvSumber === 'MANUAL' }"
@@ -1010,6 +1008,9 @@ fetchData();
   padding: 3px 8px;
   border-bottom: 1px solid #eee;
   white-space: nowrap;
+}
+.dt td.mono {
+  font-family: monospace;
 }
 .dt tbody tr:nth-of-type(even) td {
   background: #fafafa;
