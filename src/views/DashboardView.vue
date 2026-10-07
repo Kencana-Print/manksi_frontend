@@ -37,6 +37,7 @@ import {
 import AiChatWidget from "@/components/AiChatWidget.vue";
 import api from "@/services/api";
 import { exportExcelSingle } from "@/utils/excelExport";
+import { exportExcelMulti } from "@/utils/excelExportMulti";
 import { formatTanggalJam } from "@/utils/dateFormat";
 
 interface OverdueItem {
@@ -3949,6 +3950,8 @@ const loadGudangBahanData = async () => {
 interface OutstandingBeliItem {
   Nomor: string;
   Tanggal: string;
+  TglInput: string;
+  WaktuTunggu: number;
   Peminta: string;
   Nourut: number;
   Item: string;
@@ -4049,6 +4052,96 @@ watch(obTab, async () => {
   await nextTick();
   setupObObserver();
 });
+
+const isExportingOb = ref(false);
+
+// Ambil semua baris satu tab; berhenti saat total tercapai (aman kalau
+// server membatasi ukuran halaman)
+const fetchAllOb = async (tab: string): Promise<OutstandingBeliItem[]> => {
+  const all: OutstandingBeliItem[] = [];
+  let offset = 0;
+  while (true) {
+    const res = await dashboardService.getOutstandingBeliList(tab, 200, offset);
+    const d = res.data?.data;
+    const rows: OutstandingBeliItem[] = d?.items ?? [];
+    all.push(...rows);
+    offset += rows.length;
+    if (!rows.length || offset >= Number(d?.total ?? 0)) break;
+  }
+  return all;
+};
+
+const exportObExcel = async () => {
+  isExportingOb.value = true;
+  try {
+    const hasil = await Promise.all(
+      OB_TABS.map(async (t) => ({ tab: t, rows: await fetchAllOb(t.value) })),
+    );
+    if (!hasil.some((h) => h.rows.length)) {
+      alert("Tidak ada data Outstanding Beli untuk diexport.");
+      return;
+    }
+
+    const sheets = hasil.map(({ tab, rows }) => ({
+      name: tab.label,
+      columns: [
+        { header: "No. Pengajuan", key: "nomor", width: 18 },
+        { header: "Tgl Input", key: "tglInput", width: 18 },
+        { header: "Peminta", key: "peminta", width: 20 },
+        { header: "Item Barang", key: "item", width: 40 },
+        { header: "Satuan", key: "satuan", width: 10 },
+        {
+          header: "Qty Minta",
+          key: "qtyMinta",
+          width: 12,
+          numFmt: "#,##0",
+          align: "right" as const,
+        },
+        {
+          header: "Qty Beli",
+          key: "qtyBeli",
+          width: 12,
+          numFmt: "#,##0",
+          align: "right" as const,
+        },
+        {
+          header: "Kekurangan",
+          key: "kekurangan",
+          width: 12,
+          numFmt: "#,##0",
+          align: "right" as const,
+        },
+        {
+          header: "Waktu Tunggu (hari)",
+          key: "waktuTunggu",
+          width: 18,
+          numFmt: "#,##0",
+          align: "right" as const,
+        },
+      ],
+      rows: rows.map((r) => ({
+        nomor: r.Nomor,
+        tglInput: r.TglInput,
+        peminta: r.Peminta || "-",
+        item: r.Item,
+        satuan: r.Satuan,
+        qtyMinta: Number(r.QtyMinta) || 0,
+        qtyBeli: Number(r.QtyBeli) || 0,
+        kekurangan: Number(r.Kekurangan) || 0,
+        waktuTunggu: Number(r.WaktuTunggu) || 0,
+      })),
+    }));
+
+    await exportExcelMulti(`Outstanding_Beli_${todayLocalStr()}.xlsx`, sheets);
+  } catch (e: unknown) {
+    alert(
+      "Gagal export Outstanding Beli: " +
+        (e instanceof Error ? e.message : String(e)),
+    );
+  } finally {
+    isExportingOb.value = false;
+  }
+};
 
 // ── Barang Jadi ──
 const loadBarangJadiData = async () => {
@@ -10733,6 +10826,18 @@ const sisaClass = (item: any) => {
             <span class="panel-header-sub ml-1"
               >(bulan berjalan · belum close &amp; belum terpenuhi penuh)</span
             >
+            <button
+              class="knj-detail-btn ml-auto"
+              style="border-color: #ffcc80; color: #e65100"
+              :disabled="isExportingOb"
+              @click="exportObExcel"
+            >
+              <IconFileSpreadsheet
+                :size="12"
+                style="vertical-align: middle; margin-right: 2px"
+              />
+              {{ isExportingOb ? "Mengexport..." : "Export Excel" }}
+            </button>
           </div>
           <v-tabs v-model="obTab" density="compact" color="orange-darken-2">
             <v-tab
@@ -10759,15 +10864,17 @@ const sisaClass = (item: any) => {
               height="2"
             />
             <div v-else style="overflow: auto; max-height: 560px">
-              <table class="gb-tbl" style="min-width: 760px">
+              <table class="gb-tbl" style="min-width: 960px">
                 <thead>
                   <tr>
                     <th style="width: 150px">No. Pengajuan</th>
-                    <th style="width: 130px">Peminta</th>
+                    <th style="width: 130px">Tgl Input</th>
+                    <th style="width: 120px">Peminta</th>
                     <th>Item Barang</th>
                     <th class="tr" style="width: 90px">Qty Minta</th>
                     <th class="tr" style="width: 90px">Qty Beli</th>
                     <th class="tr" style="width: 100px">Kekurangan</th>
+                    <th class="tc" style="width: 110px">Waktu Tunggu</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -10781,6 +10888,7 @@ const sisaClass = (item: any) => {
                     >
                       {{ r.Nomor }}
                     </td>
+                    <td style="white-space: nowrap">{{ r.TglInput }}</td>
                     <td>{{ r.Peminta || "-" }}</td>
                     <td>{{ r.Item }}</td>
                     <td class="tr">
@@ -10790,9 +10898,14 @@ const sisaClass = (item: any) => {
                     <td class="tr" style="font-weight: 700; color: #c62828">
                       {{ fmtDec(r.Kekurangan, 0) }}
                     </td>
+                    <td class="tc">
+                      <span class="pen-age" :class="umurClass(r.WaktuTunggu)"
+                        >{{ r.WaktuTunggu }} hari</span
+                      >
+                    </td>
                   </tr>
                   <tr v-if="!obList.length && !isLoadingMoreOb">
-                    <td colspan="6" class="text-center text-grey py-3">
+                    <td colspan="8" class="text-center text-grey py-3">
                       Tidak ada outstanding untuk tab ini 🎉
                     </td>
                   </tr>
