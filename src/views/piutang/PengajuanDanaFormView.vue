@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, nextTick } from "vue";
 import { useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
 import { useAuthStore } from "@/stores/authStore";
@@ -235,6 +235,22 @@ const onNamaInput = (idx: number) => {
   const rows = fd.value.items;
   if (idx === rows.length - 1 && rows[idx].Nama.trim()) {
     addItem();
+  }
+};
+
+// Enter di kolom Nama → pindah ke Nama baris berikutnya
+const focusNextNama = async (idx: number) => {
+  const rows = fd.value.items;
+  if (idx === rows.length - 1 && rows[idx].Nama.trim()) {
+    addItem();
+  }
+  await nextTick();
+  const next = document.querySelector<HTMLInputElement>(
+    `input[data-nama-row="${idx + 1}"]`,
+  );
+  if (next) {
+    next.focus();
+    next.select();
   }
 };
 
@@ -595,7 +611,9 @@ onMounted(async () => {
                   <input
                     v-model="row.Nama"
                     class="ci"
+                    :data-nama-row="i"
                     @input="onNamaInput(i)"
+                    @keydown.enter.prevent="focusNextNama(i)"
                   />
                 </td>
                 <td><input v-model="row.Kegunaan" class="ci" /></td>
