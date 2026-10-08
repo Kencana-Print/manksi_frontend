@@ -100,14 +100,23 @@ const needsAlokasiPage2 = computed(() => {
 });
 // -------------------------------------
 
-const alokasiChunks = computed(() => {
+const ALOKASI_ROWS_PER_COL = 20;
+const ALOKASI_COLS_PER_PAGE = 4;
+
+// Hasil: pages[halaman][kolom][baris]
+const alokasiPages = computed(() => {
   const list = data.value.alokasiList || [];
-  const chunkSize = 24;
-  const chunks = [];
-  for (let i = 0; i < list.length; i += chunkSize) {
-    chunks.push(list.slice(i, i + chunkSize));
+  const perPage = ALOKASI_ROWS_PER_COL * ALOKASI_COLS_PER_PAGE;
+  const pages: any[][][] = [];
+  for (let p = 0; p < list.length; p += perPage) {
+    const items = list.slice(p, p + perPage);
+    const cols: any[][] = [];
+    for (let c = 0; c < items.length; c += ALOKASI_ROWS_PER_COL) {
+      cols.push(items.slice(c, c + ALOKASI_ROWS_PER_COL));
+    }
+    pages.push(cols);
   }
-  return chunks;
+  return pages;
 });
 
 const isNewFormatSO = computed(() =>
@@ -957,71 +966,57 @@ onMounted(async () => {
       </template>
 
       <!-- ══ ALOKASI PANEL (Halaman 2 / Overflow) ══ -->
-      <div v-if="needsAlokasiPage2" class="print-half full-width alokasi-panel">
-        <h2
-          class="title mb-2"
-          style="text-decoration: underline; font-size: 13pt; font-weight: bold"
-        >
-          ALOKASI PENGIRIMAN :
-        </h2>
-
+      <template v-if="needsAlokasiPage2">
         <div
-          v-if="data.alokasiList?.length > 0"
-          style="display: flex; gap: 8px; align-items: flex-start; width: 100%"
+          v-for="(page, pIdx) in alokasiPages"
+          :key="'alo-page-' + pIdx"
+          class="print-half full-width alokasi-panel"
         >
-          <table
-            class="alokasi-table mt-2"
-            v-for="(chunk, idx) in alokasiChunks"
-            :key="idx"
-            style="flex: 1; min-width: 0"
-          >
-            <thead>
-              <tr>
-                <th class="text-left pl-2">Nama Toko</th>
-                <th class="text-left pl-2">Alokasi</th>
-                <th width="50" class="text-center">Jumlah</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="alo in chunk" :key="alo.urut">
-                <td class="pl-2" style="padding: 3px 6px; font-size: 8pt">
-                  {{ alo.toko || "-" }}
-                </td>
-                <td class="pl-2" style="padding: 3px 6px; font-size: 8pt">
-                  {{ alo.kota || alo.alamat }}
-                </td>
-                <td
-                  class="text-center"
-                  style="padding: 3px 6px; font-size: 8pt"
-                >
-                  {{ Number(alo.jumlah).toLocaleString("id-ID") }}
-                </td>
-              </tr>
-            </tbody>
-            <tfoot v-if="idx === alokasiChunks.length - 1">
-              <tr>
-                <td
-                  colspan="2"
-                  class="fw text-left pl-2"
-                  style="padding: 3px 6px; font-size: 8pt"
-                >
-                  Total
-                </td>
-                <td
-                  class="fw text-center"
-                  style="padding: 3px 6px; font-size: 8pt"
-                >
-                  {{ totalAlokasi.toLocaleString("id-ID") }}
-                </td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
+          <div class="alokasi-page-title">
+            ALOKASI PENGIRIMAN : {{ data.spk_nomor }}
+            <span class="alokasi-page-no">
+              (Hal {{ pIdx + 1 }}/{{ alokasiPages.length }})
+            </span>
+          </div>
 
-        <div v-else class="text-xs mt-2 italic">
-          Tidak ada data alokasi pengiriman.
+          <div class="alokasi-page-cols">
+            <table
+              v-for="(chunk, cIdx) in page"
+              :key="cIdx"
+              class="alokasi-table alokasi-page-table"
+            >
+              <thead>
+                <tr>
+                  <th class="text-left">Nama Toko</th>
+                  <th class="text-left">Alokasi</th>
+                  <th class="text-center">Jml</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="alo in chunk" :key="alo.urut">
+                  <td>{{ namaToko(alo) }}</td>
+                  <td>{{ alo.kota || alo.alamat }}</td>
+                  <td class="text-center">
+                    {{ Number(alo.jumlah).toLocaleString("id-ID") }}
+                  </td>
+                </tr>
+              </tbody>
+              <tfoot
+                v-if="
+                  pIdx === alokasiPages.length - 1 && cIdx === page.length - 1
+                "
+              >
+                <tr>
+                  <td colspan="2" class="fw text-left">Total</td>
+                  <td class="fw text-center">
+                    {{ totalAlokasi.toLocaleString("id-ID") }}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
         </div>
-      </div>
+      </template>
     </div>
   </div>
 </template>
@@ -1073,7 +1068,7 @@ onMounted(async () => {
   display: flex;
   flex-wrap: wrap;
   width: 297mm;
-  height: 190mm;
+  min-height: 190mm; /* sebelumnya height: 190mm */
   margin: 0 auto;
   box-sizing: border-box;
 }
@@ -1128,6 +1123,7 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  min-height: 0; /* BARU */
 }
 .garmen-kanan {
   flex: 1;
@@ -1182,21 +1178,21 @@ onMounted(async () => {
 
 /* Gambar + Size + Komponen dalam satu baris */
 .garmen-img-center {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 45mm; /* jangan sampai terjepit blok lain */
+  flex: 1 1 0; /* ambil sisa ruang saja */
+  min-height: 30mm; /* sebelumnya 45mm */
+  position: relative; /* BARU */
   overflow: hidden;
-  padding: 8px 0;
+  margin: 6px 0; /* gantikan padding */
 }
 .garmen-kiri > *:not(.garmen-img-center) {
   flex-shrink: 0; /* info, komponen, size tidak ikut diperas */
 }
 
 .garmen-img-fit {
-  max-width: 100%;
-  max-height: 100%; /* tidak melebihi flex container */
+  position: absolute; /* BARU: tidak ikut menentukan tinggi */
+  inset: 0;
+  width: 100%;
+  height: 100%;
   object-fit: contain;
 }
 .garmen-size-box {
@@ -1643,6 +1639,48 @@ onMounted(async () => {
   font-size: 9pt;
   margin-left: 10px;
 }
+.alokasi-page-title {
+  font-size: 12pt;
+  font-weight: bold;
+  text-decoration: underline;
+  margin-bottom: 6px;
+}
+.alokasi-page-no {
+  font-size: 8pt;
+  font-weight: normal;
+  text-decoration: none;
+}
+.alokasi-page-cols {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  width: 100%;
+}
+.alokasi-page-table {
+  /* lebar tetap 1/4, supaya halaman terakhir yang kolomnya sedikit tidak melebar */
+  flex: 0 0 calc((100% - 3 * 8px) / 4);
+  min-width: 0;
+  table-layout: fixed;
+}
+.alokasi-page-table th,
+.alokasi-page-table td {
+  font-size: 7.5pt;
+  padding: 2px 4px;
+  word-break: normal; /* jangan pecah "HIJAU" jadi "HIJA/U" */
+  overflow-wrap: break-word; /* hanya pecah kalau satu kata terlalu panjang */
+}
+.alokasi-page-table th:nth-child(1),
+.alokasi-page-table td:nth-child(1) {
+  width: 52%;
+}
+.alokasi-page-table th:nth-child(2),
+.alokasi-page-table td:nth-child(2) {
+  width: 32%;
+}
+.alokasi-page-table th:nth-child(3),
+.alokasi-page-table td:nth-child(3) {
+  width: 16%;
+}
 
 @media screen {
   .print-container {
@@ -1672,7 +1710,7 @@ onMounted(async () => {
   .print-wrapper,
   .print-wrapper-so {
     width: 100% !important;
-    height: 196mm !important;
+    height: auto !important; /* sebelumnya 196mm */
   }
 
   .alokasi-panel {
