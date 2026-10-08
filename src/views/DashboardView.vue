@@ -335,6 +335,22 @@ interface BufferKaosanItem {
   Tipe: "BAHAN" | "AKSESORIS";
 }
 
+// Sinkron dengan token --dsh-* di <style>. Harus hex 6 digit karena
+// ada yang ditambah suffix alpha (mis. C.accent + "22") dan dipakai chart c3.
+const C = {
+  accent: "#1565c0",
+  accentMid: "#9cc0f0",
+  good: "#1f8a4c",
+  goodSoft: "#e6f5ec",
+  warn: "#b86500",
+  warnSoft: "#fdf1dc",
+  bad: "#d03a34",
+  badSoft: "#fdecea",
+  neutral: "#6a7388",
+  slate: "#3a4354",
+  track: "#d5dae3",
+} as const;
+
 const authStore = useAuthStore();
 setSnapshotScope(authStore.user?.kode);
 // Ambil payload `data.data` dari response API; tipe hasil ditentukan pemanggil
@@ -446,10 +462,10 @@ const fmtSisaCollection = (val: number) => {
 const fmtPct = (val: number | null) =>
   val === null ? "—" : `${val >= 100 ? Math.round(val) : fmtDec(val, 1)}%`;
 const pctColor = (val: number | null) => {
-  if (val === null) return "#9e9e9e";
-  if (val >= 80) return "#2e7d32";
-  if (val >= 50) return "#f57f17";
-  return "#c62828";
+  if (val === null) return C.neutral;
+  if (val >= 80) return C.good;
+  if (val >= 50) return C.warn;
+  return C.bad;
 };
 
 // ── Role helpers ──
@@ -795,9 +811,9 @@ const coverageRate = computed(() => {
 });
 
 const coverageRateColor = computed(() => {
-  if (coverageRate.value >= 100) return "#2e7d32";
-  if (coverageRate.value >= 70) return "#f57f17";
-  return "#c62828";
+  if (coverageRate.value >= 100) return C.good;
+  if (coverageRate.value >= 70) return C.warn;
+  return C.bad;
 });
 
 // --- Gudang Garmen ---
@@ -835,20 +851,16 @@ const pipelineFilter = ref({
 });
 
 const pipelineStages = computed(() => [
-  {
-    label: "SPK Masuk",
-    value: pipelineData.value.TotalMasuk,
-    color: "#1565c0",
-  },
-  { label: "Ada MKB", value: pipelineData.value.AdaMkb, color: "#00695c" },
+  { label: "SPK Masuk", value: pipelineData.value.TotalMasuk, color: C.accent },
+  { label: "Ada MKB", value: pipelineData.value.AdaMkb, color: C.accent },
   {
     label: "Realisasi Minta",
     value: pipelineData.value.AdaRealisasi,
-    color: "#f57f17",
+    color: C.accent,
   },
-  { label: "LHK Cutting", value: pipelineData.value.AdaLhk, color: "#6a1b9a" },
-  { label: "STBJ", value: pipelineData.value.AdaStbj, color: "#0277bd" },
-  { label: "Kirim (SJ)", value: pipelineData.value.AdaKirim, color: "#2e7d32" },
+  { label: "LHK Cutting", value: pipelineData.value.AdaLhk, color: C.accent },
+  { label: "STBJ", value: pipelineData.value.AdaStbj, color: C.accent },
+  { label: "Kirim (SJ)", value: pipelineData.value.AdaKirim, color: C.good },
 ]);
 
 const pipelinePct = (value: number) => {
@@ -880,22 +892,22 @@ const pipelinePenyelesaianStages = computed(() => [
   {
     label: "SPK Aktif",
     value: pipelinePenyelesaianSpk.value.TotalAktif,
-    color: "#1565c0",
+    color: C.accent,
   },
   {
     label: "Sudah STBJ",
     value: pipelinePenyelesaianSpk.value.SudahStbj,
-    color: "#00695c",
+    color: C.accent,
   },
   {
     label: "Sudah Kirim",
     value: pipelinePenyelesaianSpk.value.SudahKirim,
-    color: "#f57f17",
+    color: C.accent,
   },
   {
     label: "Full Invoice",
     value: pipelinePenyelesaianSpk.value.FullInvoice,
-    color: "#2e7d32",
+    color: C.good,
   },
 ]);
 
@@ -1684,23 +1696,23 @@ const growthVsTargetStatus = computed(() => {
   const growing = Number(growth.yoy) >= 0;
   const onTarget = achievementData.value.totalAch >= 100;
   if (growing && onTarget)
-    return { label: "Tumbuh & Capai Target", color: "#2e7d32", bg: "#e8f5e9" };
+    return { label: "Tumbuh & Capai Target", color: C.good, bg: C.goodSoft };
   if (growing && !onTarget)
     return {
       label: "Tumbuh, Target Belum Tercapai",
-      color: "#f57f17",
-      bg: "#fff8e1",
+      color: C.warn,
+      bg: C.warnSoft,
     };
   if (!growing && onTarget)
     return {
       label: "Target Tercapai, Growth Turun",
-      color: "#f57f17",
-      bg: "#fff8e1",
+      color: C.warn,
+      bg: C.warnSoft,
     };
   return {
     label: "Growth Turun & Target Belum Tercapai",
-    color: "#c62828",
-    bg: "#ffebee",
+    color: C.bad,
+    bg: C.badSoft,
   };
 });
 
@@ -2374,8 +2386,7 @@ const fmtTglIso = (s: string | null) =>
   s ? s.split("-").reverse().join("-") : "-";
 const lewatTarget = (it: InkasoItem) =>
   !!it.tglTarget && it.tglTarget < todayLocalStr();
-const telatColor = (hari: number) =>
-  hari > 90 ? "#b71c1c" : hari > 30 ? "#e65100" : "#f57f17";
+const telatColor = (hari: number) => (hari > 90 ? C.bad : C.warn);
 
 // ── Dialog: Set Inkaso (per sales, sumber Target Collection bulan ini) ──
 interface InkasoTargetRow {
@@ -2581,9 +2592,9 @@ const submitBatalInkaso = async () => {
 
 // ── Computed helper: Achievement rate color ──
 const achColor = (ach: number) => {
-  if (ach >= 100) return "#2e7d32";
-  if (ach >= 70) return "#f57f17";
-  return "#c62828";
+  if (ach >= 100) return "var(--dsh-good)";
+  if (ach >= 70) return "var(--dsh-warn)";
+  return "var(--dsh-bad)";
 };
 
 const achChartEl = ref<HTMLElement | null>(null);
@@ -2609,7 +2620,7 @@ const renderAchievementChart = async () => {
             ["Realisasi", ...divisi.map((d) => d.Realisasi)],
           ],
           type: "bar",
-          colors: { Target: "#bdbdbd", Realisasi: "#1565c0" },
+          colors: { Target: C.track, Realisasi: C.accent },
         },
         bar: { width: { ratio: 0.5 } },
         axis: {
@@ -2639,7 +2650,7 @@ const renderAchievementChart = async () => {
             ["Ach%", ...top.map((s) => Math.round(s.Ach))],
           ],
           type: "bar",
-          colors: { "Ach%": "#1565c0" },
+          colors: { "Ach%": C.accent },
         },
         bar: { width: { ratio: 0.6 } },
         axis: {
@@ -3314,9 +3325,9 @@ const renderTrendChart = async () => {
       ],
       type: "line",
       colors: {
-        "MAP Baru": "#00695c",
-        "SO Baru": "#e65100",
-        "SPK Baru": "#1565c0",
+        "MAP Baru": C.accent,
+        "SO Baru": C.slate,
+        "SPK Baru": C.warn,
       },
     },
     axis: {
@@ -3330,12 +3341,12 @@ const renderTrendChart = async () => {
 };
 
 const jenisColor: Record<string, string> = {
-  SPK: "#1565c0",
-  SO: "#0277bd",
-  MAP: "#00695c",
-  SJ: "#00897b",
-  PENAWARAN: "#6a1b9a",
-  INVOICE: "#2e7d32",
+  PENAWARAN: C.accent,
+  MAP: C.accent,
+  SO: C.accent,
+  SPK: C.slate,
+  SJ: C.slate,
+  INVOICE: C.good,
 };
 
 // Ref untuk animasi
@@ -4586,13 +4597,13 @@ const KATEGORI_LABEL: Record<string, string> = {
   CLOSE: "Close",
 };
 const KATEGORI_COLOR: Record<string, string> = {
-  CEPAT: "#2e7d32",
-  NORMAL: "#185FA5",
-  LAMBAT: "#f57f17",
-  SANGAT_LAMBAT: "#c62828",
-  BELUM: "#bdbdbd",
-  BATAL: "#616161",
-  CLOSE: "#00897b",
+  CEPAT: C.good,
+  NORMAL: C.accent,
+  LAMBAT: C.warn,
+  SANGAT_LAMBAT: C.bad,
+  BELUM: C.track,
+  BATAL: C.neutral,
+  CLOSE: C.slate,
 };
 const BULAN_LABEL = [
   "Jan",
@@ -4628,9 +4639,9 @@ const bufferPct = (stok: number, buffer: number): number => {
 };
 
 const bufferColor = (pct: number): string => {
-  if (pct < 20) return "#c62828";
-  if (pct < 50) return "#f57f17";
-  return "#2e7d32";
+  if (pct < 20) return C.bad;
+  if (pct < 50) return C.warn;
+  return C.good;
 };
 
 // Persentase per bucket
@@ -4655,9 +4666,9 @@ const collectionRate = computed(() => {
 });
 
 const collectionRateColor = computed(() => {
-  if (collectionRate.value >= 80) return "#2e7d32";
-  if (collectionRate.value >= 50) return "#f57f17";
-  return "#c62828";
+  if (collectionRate.value >= 80) return C.good;
+  if (collectionRate.value >= 50) return C.warn;
+  return C.bad;
 });
 
 // ── Aging bucket dari overdueList ──
@@ -4715,7 +4726,7 @@ const sisaClass = (item: any) => {
 </script>
 
 <template>
-  <v-container fluid class="pa-3">
+  <v-container fluid class="pa-3 dsh-root">
     <!-- ── Header ── -->
     <div
       class="manksi-panel header-panel mb-3 d-flex justify-space-between align-center"
@@ -4768,7 +4779,7 @@ const sisaClass = (item: any) => {
       density="compact"
       class="mb-3"
       bg-color="white"
-      style="border: 1px solid #e0e0e0; border-radius: 4px"
+      style="border: 1px solid var(--dsh-line); border-radius: 4px"
     >
       <v-tab value="overview" class="text-caption font-weight-bold">
         <IconLayoutDashboard :size="14" class="mr-1" :stroke-width="1.7" />
@@ -4833,7 +4844,11 @@ const sisaClass = (item: any) => {
           <v-col cols="12">
             <div
               class="manksi-panel d-flex flex-wrap align-center"
-              style="padding: 10px 16px; gap: 0; border-left: 4px solid #6a1b9a"
+              style="
+                padding: 10px 16px;
+                gap: 0;
+                border-left: 4px solid var(--dsh-accent);
+              "
             >
               <div class="pen-stat" style="padding: 0 20px">
                 <span class="pen-stat-val text-primary" style="font-size: 18px">
@@ -4858,7 +4873,7 @@ const sisaClass = (item: any) => {
               <div class="pen-stat" style="padding: 0 20px">
                 <span
                   class="pen-stat-val"
-                  style="font-size: 18px; color: #e65100"
+                  style="font-size: 18px; color: var(--dsh-warn)"
                 >
                   {{
                     isLoadingDashboard ? "—" : companyPulse.approvalPendingTotal
@@ -4931,7 +4946,7 @@ const sisaClass = (item: any) => {
           <v-col cols="6" sm="3">
             <div class="sum-card">
               <div class="sum-label">Segera Deadline (≤3hr)</div>
-              <div class="sum-value" style="color: #e65100">
+              <div class="sum-value" style="color: var(--dsh-warn)">
                 {{ isLoadingDashboard ? "—" : animatedSegera }}
               </div>
             </div>
@@ -4950,7 +4965,10 @@ const sisaClass = (item: any) => {
                 v-if="!isLoadingDashboard && soAktifTrend.delta !== null"
                 class="sum-sub"
                 :style="{
-                  color: soAktifTrend.delta >= 0 ? '#2e7d32' : '#c62828',
+                  color:
+                    soAktifTrend.delta >= 0
+                      ? 'var(--dsh-good)'
+                      : 'var(--dsh-bad)',
                   fontWeight: 600,
                 }"
               >
@@ -4978,7 +4996,7 @@ const sisaClass = (item: any) => {
           <v-col cols="6" sm="3">
             <div class="sum-card">
               <div class="sum-label">Belum Jadi</div>
-              <div class="sum-value" style="color: #e65100">
+              <div class="sum-value" style="color: var(--dsh-warn)">
                 {{ isLoadingDashboard ? "—" : soSummary.BelumJadi }}
               </div>
             </div>
@@ -4989,7 +5007,7 @@ const sisaClass = (item: any) => {
         <v-row dense>
           <v-col v-if="showPenawaran" cols="12" sm="3">
             <div class="shortcut-card" @click="activeTab = 'marketing'">
-              <IconChartBar :size="20" color="#1565c0" :stroke-width="1.5" />
+              <IconChartBar :size="20" :stroke-width="1.5" />
               <div style="flex: 1; min-width: 0">
                 <div class="shortcut-title">Marketing</div>
                 <div class="shortcut-sub">
@@ -5000,12 +5018,12 @@ const sisaClass = (item: any) => {
                   </span>
                 </div>
               </div>
-              <IconChevronRight :size="16" color="#9e9e9e" />
+              <IconChevronRight :size="16" />
             </div>
           </v-col>
           <v-col v-if="showPiutang" cols="12" sm="3">
             <div class="shortcut-card" @click="activeTab = 'finance'">
-              <IconCoin :size="20" color="#6a1b9a" :stroke-width="1.5" />
+              <IconCoin :size="20" :stroke-width="1.5" />
               <div style="flex: 1; min-width: 0">
                 <div class="shortcut-title">Finance / Piutang</div>
                 <div class="shortcut-sub">
@@ -5017,12 +5035,12 @@ const sisaClass = (item: any) => {
                   </span>
                 </div>
               </div>
-              <IconChevronRight :size="16" color="#9e9e9e" />
+              <IconChevronRight :size="16" />
             </div>
           </v-col>
           <v-col v-if="showGudangBahan" cols="12" sm="3">
             <div class="shortcut-card" @click="activeTab = 'gudang-bahan'">
-              <IconPackage :size="20" color="#5c6bc0" :stroke-width="1.5" />
+              <IconPackage :size="20" :stroke-width="1.5" />
               <div style="flex: 1; min-width: 0">
                 <div class="shortcut-title">Gudang Bahan</div>
                 <div class="shortcut-sub">
@@ -5035,14 +5053,14 @@ const sisaClass = (item: any) => {
                   </span>
                 </div>
               </div>
-              <IconChevronRight :size="16" color="#9e9e9e" />
+              <IconChevronRight :size="16" />
             </div>
           </v-col>
           <v-col v-if="showPoBpb" cols="12" sm="3">
             <div class="shortcut-card" @click="activeTab = 'gudang'">
               <IconTruckDelivery
                 :size="20"
-                color="#00695c"
+                color="var(--dsh-accent)"
                 :stroke-width="1.5"
               />
               <div style="flex: 1; min-width: 0">
@@ -5058,12 +5076,12 @@ const sisaClass = (item: any) => {
                   </span>
                 </div>
               </div>
-              <IconChevronRight :size="16" color="#9e9e9e" />
+              <IconChevronRight :size="16" />
             </div>
           </v-col>
           <v-col v-if="showBarangJadi" cols="12" sm="3">
             <div class="shortcut-card" @click="activeTab = 'barang-jadi'">
-              <IconBoxSeam :size="20" color="#00695c" :stroke-width="1.5" />
+              <IconBoxSeam :size="20" :stroke-width="1.5" />
               <div style="flex: 1; min-width: 0">
                 <div class="shortcut-title">Barang Jadi</div>
                 <div class="shortcut-sub">
@@ -5076,14 +5094,14 @@ const sisaClass = (item: any) => {
                   </span>
                 </div>
               </div>
-              <IconChevronRight :size="16" color="#9e9e9e" />
+              <IconChevronRight :size="16" />
             </div>
           </v-col>
           <v-col v-if="showPembelian" cols="12" sm="3">
             <div class="shortcut-card" @click="activeTab = 'pembelian'">
               <IconShoppingCart
                 :size="20"
-                color="#e65100"
+                color="var(--dsh-warn)"
                 :stroke-width="1.5"
               />
               <div style="flex: 1; min-width: 0">
@@ -5096,7 +5114,7 @@ const sisaClass = (item: any) => {
                   </span>
                 </div>
               </div>
-              <IconChevronRight :size="16" color="#9e9e9e" />
+              <IconChevronRight :size="16" />
             </div>
           </v-col>
         </v-row>
@@ -5112,7 +5130,7 @@ const sisaClass = (item: any) => {
               <div class="panel-header">
                 <IconTrendingUp
                   :size="14"
-                  style="color: #1565c0"
+                  style="color: var(--dsh-accent)"
                   class="mr-1"
                 />
                 <span>Trend 7 Hari Terakhir</span>
@@ -5141,7 +5159,11 @@ const sisaClass = (item: any) => {
               style="height: 280px; display: flex; flex-direction: column"
             >
               <div class="panel-header">
-                <IconActivity :size="14" style="color: #6a1b9a" class="mr-1" />
+                <IconActivity
+                  :size="14"
+                  style="color: var(--dsh-accent)"
+                  class="mr-1"
+                />
                 <span>Aktivitas Hari Ini</span>
                 <span class="ms-auto text-caption text-medium-emphasis">
                   {{ animatedAktivitasCount
@@ -5258,10 +5280,10 @@ const sisaClass = (item: any) => {
                   <div
                     v-if="achievementData.topSales.length"
                     style="
-                      border-top: 1px solid #f0f0f0;
+                      border-top: 1px solid var(--dsh-fill);
                       padding: 5px 12px 0;
                       font-size: 10px;
-                      color: #9e9e9e;
+                      color: var(--dsh-ink-3);
                       font-weight: 600;
                     "
                   >
@@ -5301,7 +5323,7 @@ const sisaClass = (item: any) => {
                 <v-progress-linear
                   v-if="isLoadingDashboard"
                   indeterminate
-                  color="success"
+                  color="primary"
                   height="2"
                 />
                 <template v-else-if="growthYoyData.length">
@@ -5320,8 +5342,8 @@ const sisaClass = (item: any) => {
                         :style="{
                           color:
                             calcYoyPct(row.aktual, row.ly) >= 0
-                              ? '#2e7d32'
-                              : '#c62828',
+                              ? 'var(--dsh-good)'
+                              : 'var(--dsh-bad)',
                         }"
                       >
                         {{ calcYoyPct(row.aktual, row.ly) >= 0 ? "+" : ""
@@ -5333,9 +5355,13 @@ const sisaClass = (item: any) => {
                           class="gyy-ach-badge"
                           :style="{
                             color:
-                              row.achInfo.ach >= 100 ? '#2e7d32' : '#c62828',
+                              row.achInfo.ach >= 100
+                                ? 'var(--dsh-good)'
+                                : 'var(--dsh-bad)',
                             background:
-                              row.achInfo.ach >= 100 ? '#e8f5e9' : '#ffebee',
+                              row.achInfo.ach >= 100
+                                ? 'var(--dsh-good-soft)'
+                                : 'var(--dsh-bad-soft)',
                           }"
                         >
                           Ach {{ Math.round(row.achInfo.ach) }}%
@@ -5376,7 +5402,7 @@ const sisaClass = (item: any) => {
                 <v-progress-linear
                   v-if="isLoadingTargetCollection"
                   indeterminate
-                  color="success"
+                  color="primary"
                   height="2"
                 />
                 <template v-else-if="targetCollectionData">
@@ -5436,8 +5462,8 @@ const sisaClass = (item: any) => {
                             :style="{
                               color:
                                 row.sisaCollectionMtd > 0
-                                  ? '#c62828'
-                                  : '#2e7d32',
+                                  ? 'var(--dsh-bad)'
+                                  : 'var(--dsh-good)',
                               fontWeight: 600,
                             }"
                           >
@@ -5449,7 +5475,9 @@ const sisaClass = (item: any) => {
                             class="tr"
                             :style="{
                               color:
-                                row.piutangRealtime > 0 ? '#c62828' : undefined,
+                                row.piutangRealtime > 0
+                                  ? 'var(--dsh-bad)'
+                                  : undefined,
                             }"
                           >
                             {{ fmtNum(row.piutangRealtime) }}
@@ -5562,7 +5590,7 @@ const sisaClass = (item: any) => {
                 <span
                   v-if="mapSummary.BelumMAPAdaClose"
                   class="badge-count ml-1"
-                  style="background: #e65100"
+                  style="background: var(--dsh-warn)"
                 >
                   {{ mapSummary.BelumMAPAdaClose }} perlu perhatian
                 </span>
@@ -5573,16 +5601,16 @@ const sisaClass = (item: any) => {
                   <span
                     >Total: <b>{{ mapSummary.TotalPenawaran }}</b> item</span
                   >
-                  <span style="color: #2e7d32"
+                  <span style="color: var(--dsh-good)"
                     >Sudah MAP: <b>{{ mapSummary.SudahMAP }}</b></span
                   >
-                  <span style="color: #c62828"
+                  <span style="color: var(--dsh-bad)"
                     >Belum MAP: <b>{{ mapSummary.BelumMAP }}</b></span
                   >
-                  <span style="color: #757575"
+                  <span style="color: var(--dsh-ink-2)"
                     >Close: <b>{{ mapSummary.Close || "-" }}</b></span
                   >
-                  <span style="color: #9e9e9e"
+                  <span style="color: var(--dsh-ink-3)"
                     >Batal: <b>{{ mapSummary.Batal || "-" }}</b></span
                   >
                 </span>
@@ -5591,7 +5619,7 @@ const sisaClass = (item: any) => {
                 <v-progress-linear
                   v-if="isLoadingDashboard"
                   indeterminate
-                  color="orange"
+                  color="primary"
                   height="2"
                 />
                 <template
@@ -5621,7 +5649,10 @@ const sisaClass = (item: any) => {
                         <div class="d-flex align-center" style="gap: 5px">
                           <span
                             class="map-close-badge"
-                            style="background: #e8f5e9; color: #2e7d32"
+                            style="
+                              background: var(--dsh-good-soft);
+                              color: var(--dsh-good);
+                            "
                           >
                             {{ p.JmlItem }} item
                           </span>
@@ -5657,7 +5688,7 @@ const sisaClass = (item: any) => {
                   </div>
                 </template>
                 <div v-else class="text-center text-grey py-3 text-caption">
-                  Semua penawaran sudah ada MAP-nya 🎉
+                  Semua penawaran sudah ada MAP-nya
                 </div>
               </div>
             </div>
@@ -5669,9 +5700,9 @@ const sisaClass = (item: any) => {
               <div
                 class="panel-header"
                 style="
-                  background: #eeeeee;
-                  color: #616161;
-                  border-bottom: 1px solid #e0e0e0;
+                  background: var(--dsh-line);
+                  color: var(--dsh-ink-2);
+                  border-bottom: 1px solid var(--dsh-line);
                 "
               >
                 <IconAlertTriangle
@@ -5684,7 +5715,7 @@ const sisaClass = (item: any) => {
                 <span
                   v-if="penawaranBatalSummary.total"
                   class="badge-count ml-auto"
-                  style="background: #757575"
+                  style="background: var(--dsh-ink-2)"
                 >
                   {{ penawaranBatalSummary.total }}
                 </span>
@@ -5716,7 +5747,7 @@ const sisaClass = (item: any) => {
                         style="
                           font-size: 10px;
                           font-style: italic;
-                          color: #c62828;
+                          color: var(--dsh-bad);
                           margin-top: 2px;
                         "
                       >
@@ -5737,7 +5768,7 @@ const sisaClass = (item: any) => {
                   </div>
                 </template>
                 <div v-else class="text-center text-grey py-3 text-caption">
-                  Tidak ada penawaran batal 90 hari terakhir 🎉
+                  Tidak ada penawaran batal 90 hari terakhir
                 </div>
               </div>
             </div>
@@ -5758,7 +5789,7 @@ const sisaClass = (item: any) => {
                 <v-progress-linear
                   v-if="isLoadingDashboard"
                   indeterminate
-                  color="warning"
+                  color="primary"
                   height="2"
                 />
                 <template v-else>
@@ -5840,7 +5871,7 @@ const sisaClass = (item: any) => {
                     </div>
                   </div>
                   <div v-else class="text-center text-grey py-3 text-caption">
-                    Semua penawaran sudah ada SPK-nya 🎉
+                    Semua penawaran sudah ada SPK-nya
                   </div>
                 </template>
               </div>
@@ -5922,14 +5953,17 @@ const sisaClass = (item: any) => {
                       </div>
                     </div>
                     <div class="real-legend">
-                      <span class="leg-dot" style="background: #43a047" />Close
+                      <span
+                        class="leg-dot"
+                        style="background: var(--dsh-good)"
+                      />Close
                       <span
                         class="leg-dot ml-2"
-                        style="background: #e53935"
+                        style="background: var(--dsh-bad)"
                       />Batal
                       <span
                         class="leg-dot ml-2"
-                        style="background: #90caf9"
+                        style="background: var(--dsh-accent-mid)"
                       />Open
                     </div>
                   </template>
@@ -5992,7 +6026,7 @@ const sisaClass = (item: any) => {
                       overflow-x: auto;
                       max-height: 320px;
                       overflow-y: auto;
-                      border-top: 1px solid #f0f0f0;
+                      border-top: 1px solid var(--dsh-fill);
                     "
                   >
                     <table class="rp-tbl">
@@ -6016,7 +6050,7 @@ const sisaClass = (item: any) => {
                           <td
                             style="
                               font-family: monospace;
-                              color: #1565c0;
+                              color: var(--dsh-accent);
                               font-weight: 600;
                             "
                           >
@@ -6104,7 +6138,7 @@ const sisaClass = (item: any) => {
                 <v-progress-linear
                   v-if="isLoadingDashboard"
                   indeterminate
-                  color="teal"
+                  color="primary"
                   height="2"
                 />
                 <template v-else-if="realisasiMapToSo.totalItem">
@@ -6144,7 +6178,7 @@ const sisaClass = (item: any) => {
                       overflow-x: auto;
                       max-height: 320px;
                       overflow-y: auto;
-                      border-top: 1px solid #f0f0f0;
+                      border-top: 1px solid var(--dsh-fill);
                     "
                   >
                     <table class="rp-tbl">
@@ -6168,7 +6202,7 @@ const sisaClass = (item: any) => {
                           <td
                             style="
                               font-family: monospace;
-                              color: #1565c0;
+                              color: var(--dsh-accent);
                               font-weight: 600;
                             "
                           >
@@ -6267,7 +6301,7 @@ const sisaClass = (item: any) => {
                 <v-progress-linear
                   v-if="isLoadingDashboard"
                   indeterminate
-                  color="green"
+                  color="primary"
                   height="2"
                 />
                 <template v-else-if="kunjunganRows.length">
@@ -6357,14 +6391,17 @@ const sisaClass = (item: any) => {
                     </div>
                   </div>
                   <div class="real-legend">
-                    <span class="leg-dot" style="background: #43a047" />Done
+                    <span
+                      class="leg-dot"
+                      style="background: var(--dsh-good)"
+                    />Done
                     <span
                       class="leg-dot ml-2"
-                      style="background: #90caf9"
+                      style="background: var(--dsh-accent-mid)"
                     />Unplan
                     <span
                       class="leg-dot ml-2"
-                      style="background: #e53935"
+                      style="background: var(--dsh-bad)"
                     />Failed
                     <span class="ml-2" style="font-size: 10px"
                       >P = Penawaran · MH = Minta Harga</span
@@ -6385,9 +6422,9 @@ const sisaClass = (item: any) => {
               <div
                 class="panel-header"
                 style="
-                  background: #eceff1;
-                  color: #37474f;
-                  border-bottom: 1px solid #cfd8dc;
+                  background: var(--dsh-fill);
+                  color: var(--dsh-ink);
+                  border-bottom: 1px solid var(--dsh-line);
                 "
               >
                 <IconAlertTriangle
@@ -6402,7 +6439,7 @@ const sisaClass = (item: any) => {
                 <v-progress-linear
                   v-if="isLoadingDashboard"
                   indeterminate
-                  color="grey"
+                  color="primary"
                   height="2"
                 />
                 <template v-else-if="slowDeadStockData.length">
@@ -6411,8 +6448,8 @@ const sisaClass = (item: any) => {
                     class="d-flex flex-wrap"
                     style="
                       gap: 0;
-                      border-bottom: 1px solid #f0f0f0;
-                      background: #fafafa;
+                      border-bottom: 1px solid var(--dsh-fill);
+                      background: var(--dsh-fill);
                     "
                   >
                     <div
@@ -6447,24 +6484,25 @@ const sisaClass = (item: any) => {
                             flex-wrap: wrap;
                           "
                         >
-                          <span style="font-weight: 700; color: #37474f">{{
-                            grp.jenisNama
-                          }}</span>
+                          <span
+                            style="font-weight: 700; color: var(--dsh-ink)"
+                            >{{ grp.jenisNama }}</span
+                          >
                           <span
                             v-if="grp.jmlSlowmoving"
                             class="badge-count"
-                            style="background: #f57f17"
+                            style="background: var(--dsh-warn)"
                           >
                             Slowmoving {{ grp.jmlSlowmoving }}
                           </span>
                           <span
                             v-if="grp.jmlDeadStock"
                             class="badge-count"
-                            style="background: #c62828"
+                            style="background: var(--dsh-bad)"
                           >
                             Dead Stock {{ grp.jmlDeadStock }}
                           </span>
-                          <span style="color: #9e9e9e">
+                          <span style="color: var(--dsh-ink-3)">
                             Total stok:
                             <template
                               v-for="(t, i) in grp.totalStokList"
@@ -6518,7 +6556,7 @@ const sisaClass = (item: any) => {
                       style="
                         gap: 10px;
                         padding: 8px 12px;
-                        border-top: 1px solid #f0f0f0;
+                        border-top: 1px solid var(--dsh-fill);
                       "
                     >
                       <button
@@ -6529,7 +6567,7 @@ const sisaClass = (item: any) => {
                       >
                         ← Sebelumnya
                       </button>
-                      <span style="font-size: 11px; color: #757575">
+                      <span style="font-size: 11px; color: var(--dsh-ink-2)">
                         Halaman {{ slowDeadStockPage }} dari
                         {{ slowDeadStockTotalPages }} ({{
                           slowDeadStockData.length
@@ -6555,7 +6593,7 @@ const sisaClass = (item: any) => {
                   </v-expansion-panels>
                 </template>
                 <div v-else class="text-center text-grey py-3 text-caption">
-                  Tidak ada bahan slow moving atau dead stock 🎉
+                  Tidak ada bahan slow moving atau dead stock
                 </div>
               </div>
             </div>
@@ -6569,9 +6607,9 @@ const sisaClass = (item: any) => {
               <div
                 class="panel-header"
                 style="
-                  background: #fff3e0;
-                  color: #e65100;
-                  border-bottom: 1px solid #ffe0b2;
+                  background: var(--dsh-warn-soft);
+                  color: var(--dsh-warn);
+                  border-bottom: 1px solid var(--dsh-warn-soft);
                 "
               >
                 <IconCoin :size="14" :stroke-width="1.7" class="mr-1" />
@@ -6581,7 +6619,10 @@ const sisaClass = (item: any) => {
                 >
                 <button
                   class="knj-detail-btn ml-auto"
-                  style="border-color: #ffcc80; color: #e65100"
+                  style="
+                    border-color: var(--dsh-warn-soft);
+                    color: var(--dsh-warn);
+                  "
                   :disabled="isExportingPotensi"
                   @click="exportPotensiExcel"
                 >
@@ -6593,7 +6634,10 @@ const sisaClass = (item: any) => {
                 </button>
                 <button
                   class="knj-detail-btn"
-                  style="border-color: #ffcc80; color: #e65100"
+                  style="
+                    border-color: var(--dsh-warn-soft);
+                    color: var(--dsh-warn);
+                  "
                   @click="openSetPotensiDialog"
                 >
                   + Set Potensial
@@ -6608,9 +6652,11 @@ const sisaClass = (item: any) => {
                     <span class="pen-stat-lbl">Jml Item</span>
                   </div>
                   <div class="pen-stat">
-                    <span class="pen-stat-val" style="color: #6a1b9a">{{
-                      shortNum(potensiSummary.totalPotensi)
-                    }}</span>
+                    <span
+                      class="pen-stat-val"
+                      style="color: var(--dsh-accent)"
+                      >{{ shortNum(potensiSummary.totalPotensi) }}</span
+                    >
                     <span class="pen-stat-lbl">Total Potensi</span>
                   </div>
                   <div class="pen-stat">
@@ -6640,7 +6686,7 @@ const sisaClass = (item: any) => {
                       <div
                         style="
                           font-size: 10px;
-                          color: #9e9e9e;
+                          color: var(--dsh-ink-3);
                           cursor: pointer;
                           text-decoration: underline dotted;
                         "
@@ -6660,7 +6706,7 @@ const sisaClass = (item: any) => {
                           style="
                             font-size: 11px;
                             font-weight: 700;
-                            color: #6a1b9a;
+                            color: var(--dsh-accent);
                           "
                         >
                           {{ shortNum(item.pot_harga) }}
@@ -6669,7 +6715,7 @@ const sisaClass = (item: any) => {
                       <div
                         class="d-flex justify-space-between align-center mt-1"
                       >
-                        <span style="font-size: 10px; color: #757575">
+                        <span style="font-size: 10px; color: var(--dsh-ink-2)">
                           {{ item.cus_nama || "-" }} ·
                           {{ item.sal_nama || "-" }} · oleh
                           {{ item.user_create }}
@@ -6677,21 +6723,30 @@ const sisaClass = (item: any) => {
                         <span
                           v-if="item.pot_status === 'BATAL'"
                           class="rp-badge"
-                          style="background: #f5f5f5; color: #9e9e9e"
+                          style="
+                            background: var(--dsh-fill);
+                            color: var(--dsh-ink-3);
+                          "
                         >
                           Batal
                         </span>
                         <span
                           v-else-if="item.IsRealisasi"
                           class="rp-badge"
-                          style="background: #e8f5e9; color: #2e7d32"
+                          style="
+                            background: var(--dsh-good-soft);
+                            color: var(--dsh-good);
+                          "
                         >
                           Realisasi
                         </span>
                         <button
                           v-else
                           class="knj-detail-btn"
-                          style="border-color: #ffcdd2; color: #c62828"
+                          style="
+                            border-color: var(--dsh-bad-soft);
+                            color: var(--dsh-bad);
+                          "
                           @click="openBatalPotensiDialog(item)"
                         >
                           Batal
@@ -6702,7 +6757,7 @@ const sisaClass = (item: any) => {
                         style="
                           font-size: 10px;
                           font-style: italic;
-                          color: #c62828;
+                          color: var(--dsh-bad);
                         "
                       >
                         {{ item.pot_alasan_batal }}
@@ -6734,9 +6789,9 @@ const sisaClass = (item: any) => {
               <div
                 class="panel-header"
                 style="
-                  background: #eceff1;
-                  color: #37474f;
-                  border-bottom: 1px solid #cfd8dc;
+                  background: var(--dsh-fill);
+                  color: var(--dsh-ink);
+                  border-bottom: 1px solid var(--dsh-line);
                 "
               >
                 <IconAlertTriangle
@@ -6748,7 +6803,7 @@ const sisaClass = (item: any) => {
                 <span
                   v-if="potensiSummary.totalBatal"
                   class="badge-count ml-auto"
-                  style="background: #757575"
+                  style="background: var(--dsh-ink-2)"
                 >
                   {{ shortNum(potensiSummary.totalBatal) }}
                 </span>
@@ -6769,7 +6824,7 @@ const sisaClass = (item: any) => {
                       <span class="pen-nomor" style="font-size: 10px">{{
                         item.pot_nomor
                       }}</span>
-                      <div style="font-size: 10px; color: #9e9e9e">
+                      <div style="font-size: 10px; color: var(--dsh-ink-3)">
                         {{ item.Sumber }} {{ item.NomorSumber }}
                       </div>
                     </div>
@@ -6783,13 +6838,13 @@ const sisaClass = (item: any) => {
                           style="
                             font-size: 11px;
                             font-weight: 700;
-                            color: #757575;
+                            color: var(--dsh-ink-2);
                           "
                         >
                           {{ shortNum(item.pot_harga) }}
                         </span>
                       </div>
-                      <div style="font-size: 10px; color: #9e9e9e">
+                      <div style="font-size: 10px; color: var(--dsh-ink-3)">
                         {{ item.cus_nama || "-" }} ·
                         {{ item.sal_nama || "-" }} · dibatalkan
                         {{ formatTanggalJam(item.TanggalBatal) }}
@@ -6799,7 +6854,7 @@ const sisaClass = (item: any) => {
                         style="
                           font-size: 10px;
                           font-style: italic;
-                          color: #c62828;
+                          color: var(--dsh-bad);
                           margin-top: 2px;
                         "
                       >
@@ -6841,7 +6896,10 @@ const sisaClass = (item: any) => {
                 >
                 <button
                   class="knj-detail-btn ml-auto"
-                  style="border-color: #80cbc4; color: #00695c"
+                  style="
+                    border-color: var(--dsh-accent-mid);
+                    color: var(--dsh-accent);
+                  "
                   @click="openSetInkasoDialog"
                 >
                   + Set Inkaso
@@ -6851,7 +6909,7 @@ const sisaClass = (item: any) => {
                 <v-progress-linear
                   v-if="isLoadingInkaso"
                   indeterminate
-                  color="teal"
+                  color="primary"
                   height="2"
                 />
                 <template v-else>
@@ -6863,9 +6921,11 @@ const sisaClass = (item: any) => {
                       <span class="pen-stat-lbl">Invoice Aktif</span>
                     </div>
                     <div class="pen-stat">
-                      <span class="pen-stat-val" style="color: #c62828">{{
-                        shortNum(inkasoSummary.totalProyeksi)
-                      }}</span>
+                      <span
+                        class="pen-stat-val"
+                        style="color: var(--dsh-bad)"
+                        >{{ shortNum(inkasoSummary.totalProyeksi) }}</span
+                      >
                       <span class="pen-stat-lbl">Sisa Ditagih</span>
                     </div>
                     <div class="pen-stat">
@@ -6901,20 +6961,22 @@ const sisaClass = (item: any) => {
                           <span
                             style="
                               font-weight: 700;
-                              color: #00695c;
+                              color: var(--dsh-accent);
                               text-transform: uppercase;
                             "
                             >{{ grp.salNama }}</span
                           >
-                          <span class="badge-count" style="background: #00695c"
+                          <span
+                            class="badge-count"
+                            style="background: var(--dsh-accent)"
                             >{{ grp.jmlItem }} invoice</span
                           >
-                          <span style="color: #c62828; font-weight: 700"
+                          <span style="color: var(--dsh-bad); font-weight: 700"
                             >Sisa {{ shortNum(grp.totalSisa) }}</span
                           >
                           <span
                             v-if="grp.totalTerealisasi"
-                            style="color: #2e7d32"
+                            style="color: var(--dsh-good)"
                             >Terealisasi
                             {{ shortNum(grp.totalTerealisasi) }}</span
                           >
@@ -6941,7 +7003,7 @@ const sisaClass = (item: any) => {
                                   style="
                                     font-family: monospace;
                                     font-weight: 600;
-                                    color: #1565c0;
+                                    color: var(--dsh-accent);
                                   "
                                 >
                                   {{ it.nota }}
@@ -6971,7 +7033,10 @@ const sisaClass = (item: any) => {
                                 <td class="tr">{{ fmtNum(it.nominalAwal) }}</td>
                                 <td
                                   class="tr"
-                                  style="font-weight: 700; color: #c62828"
+                                  style="
+                                    font-weight: 700;
+                                    color: var(--dsh-bad);
+                                  "
                                 >
                                   {{ fmtNum(it.sisa) }}
                                 </td>
@@ -6979,8 +7044,8 @@ const sisaClass = (item: any) => {
                                   <span
                                     :style="{
                                       color: lewatTarget(it)
-                                        ? '#c62828'
-                                        : '#424242',
+                                        ? 'var(--dsh-bad)'
+                                        : 'var(--dsh-ink)',
                                       fontWeight: lewatTarget(it) ? 700 : 400,
                                     }"
                                   >
@@ -6995,12 +7060,15 @@ const sisaClass = (item: any) => {
                                     overflow: hidden;
                                     text-overflow: ellipsis;
                                     white-space: nowrap;
-                                    color: #757575;
+                                    color: var(--dsh-ink-2);
                                   "
                                 >
                                   {{ it.catatan || "-" }}
                                   <span
-                                    style="font-size: 9px; color: #bdbdbd"
+                                    style="
+                                      font-size: 9px;
+                                      color: var(--dsh-ink-3);
+                                    "
                                     :title="'Ditandai oleh ' + it.userCreate"
                                     >· {{ it.userCreate }}</span
                                   >
@@ -7009,8 +7077,8 @@ const sisaClass = (item: any) => {
                                   <button
                                     class="knj-detail-btn"
                                     style="
-                                      border-color: #ffcdd2;
-                                      color: #c62828;
+                                      border-color: var(--dsh-bad-soft);
+                                      color: var(--dsh-bad);
                                     "
                                     @click="openBatalInkasoDialog(it)"
                                   >
@@ -7037,9 +7105,9 @@ const sisaClass = (item: any) => {
               <div
                 class="panel-header"
                 style="
-                  background: #eceff1;
-                  color: #37474f;
-                  border-bottom: 1px solid #cfd8dc;
+                  background: var(--dsh-fill);
+                  color: var(--dsh-ink);
+                  border-bottom: 1px solid var(--dsh-line);
                 "
               >
                 <IconAlertTriangle
@@ -7051,7 +7119,7 @@ const sisaClass = (item: any) => {
                 <span
                   v-if="inkasoSummary.totalBatal"
                   class="badge-count ml-auto"
-                  style="background: #757575"
+                  style="background: var(--dsh-ink-2)"
                 >
                   {{ shortNum(inkasoSummary.totalBatal) }}
                 </span>
@@ -7072,7 +7140,7 @@ const sisaClass = (item: any) => {
                       <span class="pen-nomor" style="font-size: 10px">{{
                         item.Nomor
                       }}</span>
-                      <div style="font-size: 10px; color: #9e9e9e">
+                      <div style="font-size: 10px; color: var(--dsh-ink-3)">
                         {{ item.Nota }}
                       </div>
                     </div>
@@ -7086,13 +7154,13 @@ const sisaClass = (item: any) => {
                           style="
                             font-size: 11px;
                             font-weight: 700;
-                            color: #757575;
+                            color: var(--dsh-ink-2);
                           "
                         >
                           {{ shortNum(item.Nominal) }}
                         </span>
                       </div>
-                      <div style="font-size: 10px; color: #9e9e9e">
+                      <div style="font-size: 10px; color: var(--dsh-ink-3)">
                         {{ item.SalNama || "-" }} · dibatalkan oleh
                         {{ item.UserModified }} ·
                         {{ formatTanggalJam(item.TanggalBatal) }}
@@ -7102,7 +7170,7 @@ const sisaClass = (item: any) => {
                         style="
                           font-size: 10px;
                           font-style: italic;
-                          color: #c62828;
+                          color: var(--dsh-bad);
                           margin-top: 2px;
                         "
                       >
@@ -7243,10 +7311,10 @@ const sisaClass = (item: any) => {
                   <!-- Divider -->
                   <div
                     style="
-                      border-top: 1px solid #f0f0f0;
+                      border-top: 1px solid var(--dsh-fill);
                       padding: 5px 12px 0;
                       font-size: 10px;
-                      color: #9e9e9e;
+                      color: var(--dsh-ink-3);
                       font-weight: 600;
                     "
                   >
@@ -7288,7 +7356,7 @@ const sisaClass = (item: any) => {
                         <span
                           style="
                             font-size: 10px;
-                            color: #6a1b9a;
+                            color: var(--dsh-accent);
                             font-weight: 600;
                           "
                         >
@@ -7312,7 +7380,7 @@ const sisaClass = (item: any) => {
                     v-if="!mapSpkList.length && !isLoadingMoreMapSpk"
                     class="text-center text-grey py-3 text-caption"
                   >
-                    Semua MAP sudah ada SPK-nya 🎉
+                    Semua MAP sudah ada SPK-nya
                   </div>
                 </template>
               </div>
@@ -7325,9 +7393,9 @@ const sisaClass = (item: any) => {
               <div
                 class="panel-header"
                 style="
-                  background: #f3e5f5;
-                  color: #6a1b9a;
-                  border-bottom: 1px solid #e1bee7;
+                  background: var(--dsh-accent-soft);
+                  color: var(--dsh-accent);
+                  border-bottom: 1px solid var(--dsh-accent-soft);
                 "
               >
                 <IconCoin :size="14" :stroke-width="1.7" class="mr-1" />
@@ -7338,7 +7406,7 @@ const sisaClass = (item: any) => {
                 <v-progress-linear
                   v-if="isLoadingDashboard"
                   indeterminate
-                  color="purple"
+                  color="primary"
                   height="2"
                 />
                 <template v-else>
@@ -7346,16 +7414,16 @@ const sisaClass = (item: any) => {
                   <div
                     style="
                       padding: 8px 12px;
-                      border-bottom: 1px solid #f0f0f0;
+                      border-bottom: 1px solid var(--dsh-fill);
                       display: flex;
                       gap: 0;
-                      background: #fafafa;
+                      background: var(--dsh-fill);
                     "
                   >
                     <div class="pen-stat">
                       <span
                         class="pen-stat-val"
-                        style="color: #6a1b9a; font-size: 14px"
+                        style="color: var(--dsh-accent); font-size: 14px"
                       >
                         {{ shortNum(mapSpkMetric.TotalNilai) }}
                       </span>
@@ -7389,22 +7457,27 @@ const sisaClass = (item: any) => {
                       class="knj-row"
                     >
                       <div class="knj-meta mb-1">
-                        <span class="knj-sales" style="color: #4a148c">{{
-                          row.Divisi
-                        }}</span>
+                        <span
+                          class="knj-sales"
+                          style="color: var(--dsh-accent)"
+                          >{{ row.Divisi }}</span
+                        >
                         <span
                           class="knj-pct"
-                          style="color: #6a1b9a; font-weight: 700"
+                          style="color: var(--dsh-accent); font-weight: 700"
                         >
                           {{ shortNum(row.NilaiSO + row.NilaiPotensi) }}
                         </span>
                       </div>
                       <div class="knj-bar-wrap">
-                        <div class="knj-bar" style="background: #f3e5f5">
+                        <div
+                          class="knj-bar"
+                          style="background: var(--dsh-accent-soft)"
+                        >
                           <!-- SPK (confirmed) -->
                           <div
                             class="knj-seg"
-                            style="background: #7b1fa2"
+                            style="background: var(--dsh-accent)"
                             :style="{
                               width:
                                 row.NilaiSO + row.NilaiPotensi
@@ -7418,7 +7491,7 @@ const sisaClass = (item: any) => {
                           <!-- Potensi -->
                           <div
                             class="knj-seg"
-                            style="background: #ce93d8"
+                            style="background: var(--dsh-accent-mid)"
                             :style="{
                               width:
                                 row.NilaiSO + row.NilaiPotensi
@@ -7432,13 +7505,13 @@ const sisaClass = (item: any) => {
                         </div>
                       </div>
                       <div class="real-detail mt-1">
-                        <span style="color: #7b1fa2"
+                        <span style="color: var(--dsh-accent)"
                           >✓ {{ shortNum(row.NilaiSO) }}</span
                         >
-                        <span style="color: #9c27b0"
+                        <span style="color: var(--dsh-accent)"
                           >○ {{ shortNum(row.NilaiPotensi) }}</span
                         >
-                        <span style="color: #9e9e9e"
+                        <span style="color: var(--dsh-ink-3)"
                           >{{ row.SudahSO }}/{{ row.TotalMAP }} MAP</span
                         >
                       </div>
@@ -7453,9 +7526,12 @@ const sisaClass = (item: any) => {
                   <div class="real-legend">
                     <span
                       class="leg-dot"
-                      style="background: #7b1fa2"
+                      style="background: var(--dsh-accent)"
                     />Confirmed (SO)
-                    <span class="leg-dot" style="background: #ce93d8" />Potensi
+                    <span
+                      class="leg-dot"
+                      style="background: var(--dsh-accent-mid)"
+                    />Potensi
                   </div>
                 </template>
               </div>
@@ -7486,7 +7562,7 @@ const sisaClass = (item: any) => {
                 <v-progress-linear
                   v-if="isLoadingDashboard"
                   indeterminate
-                  color="teal"
+                  color="primary"
                   height="2"
                 />
                 <table v-else class="gb-tbl" style="min-width: 780px">
@@ -7521,28 +7597,28 @@ const sisaClass = (item: any) => {
                       <td class="tr" style="font-weight: 700">
                         {{ m.JumlahMAP }}
                       </td>
-                      <td class="tr" style="color: #2e7d32">
+                      <td class="tr" style="color: var(--dsh-good)">
                         {{ m.real[0] || "-" }}
                       </td>
-                      <td class="tr" style="color: #2e7d32">
+                      <td class="tr" style="color: var(--dsh-good)">
                         {{ m.real[1] || "-" }}
                       </td>
-                      <td class="tr" style="color: #f57f17">
+                      <td class="tr" style="color: var(--dsh-warn)">
                         {{ m.real[2] || "-" }}
                       </td>
-                      <td class="tr" style="color: #c62828">
+                      <td class="tr" style="color: var(--dsh-bad)">
                         {{ m.real[3] || "-" }}
                       </td>
-                      <td class="tr" style="color: #757575">
+                      <td class="tr" style="color: var(--dsh-ink-2)">
                         {{ m.belum[0] || "-" }}
                       </td>
-                      <td class="tr" style="color: #f57f17">
+                      <td class="tr" style="color: var(--dsh-warn)">
                         {{ m.belum[1] || "-" }}
                       </td>
-                      <td class="tr" style="color: #e65100">
+                      <td class="tr" style="color: var(--dsh-warn)">
                         {{ m.belum[2] || "-" }}
                       </td>
-                      <td class="tr" style="color: #c62828">
+                      <td class="tr" style="color: var(--dsh-bad)">
                         {{ m.belum[3] || "-" }}
                       </td>
                     </tr>
@@ -7660,7 +7736,7 @@ const sisaClass = (item: any) => {
           <v-col cols="6" sm="3">
             <div class="sum-card">
               <div class="sum-label">Belum Diaplikasi</div>
-              <div class="sum-value" style="color: #e65100">
+              <div class="sum-value" style="color: var(--dsh-warn)">
                 <span v-if="isLoadingDashboard">—</span>
                 <span v-else>{{
                   shortNum(penerimaanSummary.SaldoBelumAplikasi)
@@ -7708,7 +7784,7 @@ const sisaClass = (item: any) => {
                 <v-progress-linear
                   v-if="isLoadingTargetCollection"
                   indeterminate
-                  color="success"
+                  color="primary"
                   height="2"
                 />
                 <template v-else-if="targetCollectionData">
@@ -7768,8 +7844,8 @@ const sisaClass = (item: any) => {
                             :style="{
                               color:
                                 row.sisaCollectionMtd > 0
-                                  ? '#c62828'
-                                  : '#2e7d32',
+                                  ? 'var(--dsh-bad)'
+                                  : 'var(--dsh-good)',
                               fontWeight: 600,
                             }"
                           >
@@ -7781,7 +7857,9 @@ const sisaClass = (item: any) => {
                             class="tr"
                             :style="{
                               color:
-                                row.piutangRealtime > 0 ? '#c62828' : undefined,
+                                row.piutangRealtime > 0
+                                  ? 'var(--dsh-bad)'
+                                  : undefined,
                             }"
                           >
                             {{ fmtNum(row.piutangRealtime) }}
@@ -7887,9 +7965,9 @@ const sisaClass = (item: any) => {
               <div
                 class="panel-header"
                 style="
-                  background: #ffebee;
-                  color: #c62828;
-                  border-bottom: 1px solid #ffcdd2;
+                  background: var(--dsh-bad-soft);
+                  color: var(--dsh-bad);
+                  border-bottom: 1px solid var(--dsh-bad-soft);
                 "
               >
                 <IconAlertTriangle
@@ -7902,7 +7980,7 @@ const sisaClass = (item: any) => {
                 <span
                   v-if="piutangData.summary.overdueTotal"
                   class="badge-count ml-auto"
-                  style="background: #c62828"
+                  style="background: var(--dsh-bad)"
                 >
                   {{ piutangData.summary.overdueTotal }} Tagihan
                 </span>
@@ -7911,7 +7989,7 @@ const sisaClass = (item: any) => {
                 <v-progress-linear
                   v-if="isLoadingDashboard"
                   indeterminate
-                  color="red"
+                  color="primary"
                   height="2"
                 />
                 <template v-else>
@@ -8027,7 +8105,7 @@ const sisaClass = (item: any) => {
                     </div>
                   </template>
                   <div v-else class="text-center text-grey py-3 text-caption">
-                    Tidak ada invoice yang melewati jatuh tempo 🎉
+                    Tidak ada invoice yang melewati jatuh tempo
                   </div>
                 </template>
               </div>
@@ -8040,9 +8118,9 @@ const sisaClass = (item: any) => {
               <div
                 class="panel-header"
                 style="
-                  background: #f3e5f5;
-                  color: #6a1b9a;
-                  border-bottom: 1px solid #e1bee7;
+                  background: var(--dsh-accent-soft);
+                  color: var(--dsh-accent);
+                  border-bottom: 1px solid var(--dsh-accent-soft);
                 "
               >
                 <IconChartBar :size="14" :stroke-width="1.7" class="mr-1" />
@@ -8052,7 +8130,7 @@ const sisaClass = (item: any) => {
                 <v-progress-linear
                   v-if="isLoadingDashboard"
                   indeterminate
-                  color="purple"
+                  color="primary"
                   height="2"
                 />
                 <template v-else>
@@ -8063,21 +8141,26 @@ const sisaClass = (item: any) => {
                       class="knj-row"
                     >
                       <div class="knj-meta mb-1">
-                        <span class="knj-sales" style="color: #4a148c">{{
-                          top.Customer
-                        }}</span>
+                        <span
+                          class="knj-sales"
+                          style="color: var(--dsh-accent)"
+                          >{{ top.Customer }}</span
+                        >
                         <span
                           class="knj-pct"
-                          style="color: #6a1b9a; font-weight: 700"
+                          style="color: var(--dsh-accent); font-weight: 700"
                         >
                           {{ shortNum(top.Saldo) }}
                         </span>
                       </div>
                       <div class="knj-bar-wrap">
-                        <div class="knj-bar" style="background: #f3e5f5">
+                        <div
+                          class="knj-bar"
+                          style="background: var(--dsh-accent-soft)"
+                        >
                           <div
                             class="knj-seg"
-                            style="background: #ab47bc"
+                            style="background: var(--dsh-accent)"
                             :style="{
                               width: piutangData.top5[0]?.Saldo
                                 ? (top.Saldo / piutangData.top5[0].Saldo) *
@@ -8107,9 +8190,9 @@ const sisaClass = (item: any) => {
               <div
                 class="panel-header"
                 style="
-                  background: #e3f2fd;
-                  color: #1565c0;
-                  border-bottom: 1px solid #bbdefb;
+                  background: var(--dsh-accent-soft);
+                  color: var(--dsh-accent);
+                  border-bottom: 1px solid var(--dsh-accent-soft);
                 "
               >
                 <IconChartBar :size="14" :stroke-width="1.7" class="mr-1" />
@@ -8120,7 +8203,7 @@ const sisaClass = (item: any) => {
                 <v-progress-linear
                   v-if="isLoadingDashboard"
                   indeterminate
-                  color="blue"
+                  color="primary"
                   height="2"
                 />
                 <template v-else>
@@ -8142,7 +8225,7 @@ const sisaClass = (item: any) => {
                       >
                         <span
                           class="font-weight-bold"
-                          style="font-size: 11px; color: #424242"
+                          style="font-size: 11px; color: var(--dsh-ink)"
                         >
                           {{ t.Bulan }}
                         </span>
@@ -8194,7 +8277,7 @@ const sisaClass = (item: any) => {
                       <v-divider
                         v-if="i !== piutangData.trend.length - 1"
                         class="mt-2"
-                        color="#f0f0f0"
+                        color="var(--dsh-fill)"
                       />
                     </div>
                     <div
@@ -8216,9 +8299,9 @@ const sisaClass = (item: any) => {
               <div
                 class="panel-header"
                 style="
-                  background: #fff3e0;
-                  color: #e65100;
-                  border-bottom: 1px solid #ffe0b2;
+                  background: var(--dsh-warn-soft);
+                  color: var(--dsh-warn);
+                  border-bottom: 1px solid var(--dsh-warn-soft);
                 "
               >
                 <IconAlertTriangle
@@ -8234,7 +8317,7 @@ const sisaClass = (item: any) => {
                     spkBelumTagihSummary.SebagianInvoice
                   "
                   class="badge-count ml-auto"
-                  style="background: #e65100"
+                  style="background: var(--dsh-warn)"
                 >
                   {{
                     spkBelumTagihSummary.BelumInvoice +
@@ -8247,7 +8330,7 @@ const sisaClass = (item: any) => {
                 <v-progress-linear
                   v-if="isLoadingDashboard"
                   indeterminate
-                  color="warning"
+                  color="primary"
                   height="2"
                 />
                 <template v-else>
@@ -8265,9 +8348,11 @@ const sisaClass = (item: any) => {
                       <span class="pen-stat-lbl">Belum Invoice</span>
                     </div>
                     <div class="pen-stat">
-                      <span class="pen-stat-val" style="color: #f57f17">{{
-                        spkBelumTagihSummary.SebagianInvoice
-                      }}</span>
+                      <span
+                        class="pen-stat-val"
+                        style="color: var(--dsh-warn)"
+                        >{{ spkBelumTagihSummary.SebagianInvoice }}</span
+                      >
                       <span class="pen-stat-lbl">Sebagian</span>
                     </div>
                     <div class="pen-stat">
@@ -8277,9 +8362,13 @@ const sisaClass = (item: any) => {
                       <span class="pen-stat-lbl">Full Invoice</span>
                     </div>
                     <div class="pen-stat">
-                      <span class="pen-stat-val" style="color: #e65100">{{
-                        fmtNum(spkBelumTagihSummary.TotalQtyBelumDitagih)
-                      }}</span>
+                      <span
+                        class="pen-stat-val"
+                        style="color: var(--dsh-warn)"
+                        >{{
+                          fmtNum(spkBelumTagihSummary.TotalQtyBelumDitagih)
+                        }}</span
+                      >
                       <span class="pen-stat-lbl">Qty Belum Ditagih</span>
                     </div>
                   </div>
@@ -8307,7 +8396,7 @@ const sisaClass = (item: any) => {
                           style="
                             font-size: 10px;
                             font-weight: 700;
-                            color: #e65100;
+                            color: var(--dsh-warn);
                           "
                         >
                           Belum {{ fmtNum(s.QtyBelumDitagih) }} /
@@ -8328,7 +8417,7 @@ const sisaClass = (item: any) => {
                     </div>
                   </div>
                   <div v-else class="text-center text-grey py-3 text-caption">
-                    Semua SPK terkirim sudah full invoice 🎉
+                    Semua SPK terkirim sudah full invoice
                   </div>
                 </template>
               </div>
@@ -8380,7 +8469,7 @@ const sisaClass = (item: any) => {
           <v-col cols="6" sm="3">
             <div class="sum-card">
               <div class="sum-label">Bahan utama stok minus</div>
-              <div class="sum-value" style="color: #e65100">
+              <div class="sum-value" style="color: var(--dsh-warn)">
                 <span v-if="isLoadingGudangBahan">—</span>
                 <span v-else>{{ gudangBahanData.metric.JmlMinus }}</span>
               </div>
@@ -8397,9 +8486,9 @@ const sisaClass = (item: any) => {
               <div
                 class="panel-header"
                 style="
-                  background: #ffebee;
-                  color: #c62828;
-                  border-bottom: 1px solid #ffcdd2;
+                  background: var(--dsh-bad-soft);
+                  color: var(--dsh-bad);
+                  border-bottom: 1px solid var(--dsh-bad-soft);
                 "
               >
                 <IconAlertTriangle
@@ -8411,7 +8500,7 @@ const sisaClass = (item: any) => {
                 <span
                   v-if="mapSpkBelumPermintaanSummary.total"
                   class="badge-count ml-auto"
-                  style="background: #c62828"
+                  style="background: var(--dsh-bad)"
                 >
                   {{ mapSpkBelumPermintaanSummary.total }}
                 </span>
@@ -8420,7 +8509,7 @@ const sisaClass = (item: any) => {
                 <v-progress-linear
                   v-if="isLoadingGudangBahan"
                   indeterminate
-                  color="red"
+                  color="primary"
                   height="2"
                 />
                 <template
@@ -8480,7 +8569,7 @@ const sisaClass = (item: any) => {
                   </div>
                 </template>
                 <div v-else class="text-center text-grey py-3 text-caption">
-                  Semua MAP/SPK sudah ada permintaan atau realisasi bahan 🎉
+                  Semua MAP/SPK sudah ada permintaan atau realisasi bahan
                 </div>
               </div>
             </div>
@@ -8503,7 +8592,7 @@ const sisaClass = (item: any) => {
                 <v-progress-linear
                   v-if="isLoadingGudangBahan"
                   indeterminate
-                  color="warning"
+                  color="primary"
                   height="2"
                 />
                 <template
@@ -8519,9 +8608,11 @@ const sisaClass = (item: any) => {
                       <span class="pen-stat-lbl">Belum Sama Sekali</span>
                     </div>
                     <div class="pen-stat">
-                      <span class="pen-stat-val" style="color: #f57f17">{{
-                        permintaanBelumRealisasiSummary.Sebagian
-                      }}</span>
+                      <span
+                        class="pen-stat-val"
+                        style="color: var(--dsh-warn)"
+                        >{{ permintaanBelumRealisasiSummary.Sebagian }}</span
+                      >
                       <span class="pen-stat-lbl">Sebagian</span>
                     </div>
                   </div>
@@ -8577,7 +8668,7 @@ const sisaClass = (item: any) => {
                   </div>
                 </template>
                 <div v-else class="text-center text-grey py-3 text-caption">
-                  Semua permintaan bahan sudah direalisasi 🎉
+                  Semua permintaan bahan sudah direalisasi
                 </div>
               </div>
             </div>
@@ -8599,7 +8690,7 @@ const sisaClass = (item: any) => {
                 <v-progress-linear
                   v-if="isLoadingGudangBahan"
                   indeterminate
-                  color="warning"
+                  color="primary"
                   height="2"
                 />
                 <template
@@ -8654,7 +8745,7 @@ const sisaClass = (item: any) => {
                   </div>
                 </template>
                 <div v-else class="text-center text-grey py-3 text-caption">
-                  Semua SO bulan ini sudah ada MKB 🎉
+                  Semua SO bulan ini sudah ada MKB
                 </div>
               </div>
             </div>
@@ -8666,9 +8757,9 @@ const sisaClass = (item: any) => {
               <div
                 class="panel-header"
                 style="
-                  background: #fff3e0;
-                  color: #e65100;
-                  border-bottom: 1px solid #ffe0b2;
+                  background: var(--dsh-warn-soft);
+                  color: var(--dsh-warn);
+                  border-bottom: 1px solid var(--dsh-warn-soft);
                 "
               >
                 <IconAlertTriangle
@@ -8680,7 +8771,7 @@ const sisaClass = (item: any) => {
                 <span
                   v-if="gbStokAccVsMkaCount"
                   class="badge-count ml-auto"
-                  style="background: #e65100"
+                  style="background: var(--dsh-warn)"
                 >
                   {{ gbStokAccVsMkaCount }}
                 </span>
@@ -8689,7 +8780,7 @@ const sisaClass = (item: any) => {
                 <v-progress-linear
                   v-if="isLoadingGudangBahan"
                   indeterminate
-                  color="warning"
+                  color="primary"
                   height="2"
                 />
                 <template
@@ -8731,7 +8822,7 @@ const sisaClass = (item: any) => {
                             style="
                               font-size: 10px;
                               font-weight: 700;
-                              color: #e65100;
+                              color: var(--dsh-warn);
                             "
                           >
                             Kurang {{ fmtNum(Math.abs(item.Free)) }}
@@ -8768,7 +8859,7 @@ const sisaClass = (item: any) => {
                   </div>
                 </template>
                 <div v-else class="text-center text-grey py-3 text-caption">
-                  Semua aksesoris tercukupi untuk kebutuhan MKA 🎉
+                  Semua aksesoris tercukupi untuk kebutuhan MKA
                 </div>
               </div>
             </div>
@@ -8787,7 +8878,7 @@ const sisaClass = (item: any) => {
                 <span
                   v-if="poBahanBelumDatangSummary.total"
                   class="badge-count ml-auto"
-                  style="background: #00695c"
+                  style="background: var(--dsh-accent)"
                 >
                   {{ poBahanBelumDatangSummary.total }}
                 </span>
@@ -8796,7 +8887,7 @@ const sisaClass = (item: any) => {
                 <v-progress-linear
                   v-if="isLoadingGudangBahan"
                   indeterminate
-                  color="teal"
+                  color="primary"
                   height="2"
                 />
                 <template
@@ -8841,7 +8932,7 @@ const sisaClass = (item: any) => {
                   </div>
                 </template>
                 <div v-else class="text-center text-grey py-3 text-caption">
-                  Semua PO bahan sudah selesai diterima 🎉
+                  Semua PO bahan sudah selesai diterima
                 </div>
               </div>
             </div>
@@ -8856,9 +8947,9 @@ const sisaClass = (item: any) => {
               <div
                 class="panel-header"
                 style="
-                  background: #fff8e1;
-                  color: #854f0b;
-                  border-bottom: 1px solid #ffe0b2;
+                  background: var(--dsh-warn-soft);
+                  color: var(--dsh-warn);
+                  border-bottom: 1px solid var(--dsh-warn-soft);
                 "
               >
                 <IconAlertTriangle
@@ -8870,7 +8961,7 @@ const sisaClass = (item: any) => {
                 <span
                   v-if="gudangBahanData.metric.JmlBawahBuffer"
                   class="badge-count ml-auto"
-                  style="background: #854f0b"
+                  style="background: var(--dsh-warn)"
                 >
                   {{ gudangBahanData.metric.JmlBawahBuffer }} item
                 </span>
@@ -8879,7 +8970,7 @@ const sisaClass = (item: any) => {
                 <v-progress-linear
                   v-if="isLoadingGudangBahan"
                   indeterminate
-                  color="warning"
+                  color="primary"
                   height="2"
                 />
                 <template v-else-if="bufferList.length || isLoadingMoreBuffer">
@@ -8947,7 +9038,7 @@ const sisaClass = (item: any) => {
                   </div>
                 </template>
                 <div v-else class="text-center text-grey py-3 text-caption">
-                  Semua stok di atas buffer 🎉
+                  Semua stok di atas buffer
                 </div>
               </div>
             </div>
@@ -8989,7 +9080,7 @@ const sisaClass = (item: any) => {
                                     100 +
                                   '%'
                                 : '0%',
-                              background: '#185FA5',
+                              background: 'var(--dsh-accent)',
                             }"
                           />
                         </div>
@@ -9015,9 +9106,9 @@ const sisaClass = (item: any) => {
               <div
                 class="panel-header"
                 style="
-                  background: #fff8e1;
-                  color: #854f0b;
-                  border-bottom: 1px solid #ffe0b2;
+                  background: var(--dsh-warn-soft);
+                  color: var(--dsh-warn);
+                  border-bottom: 1px solid var(--dsh-warn-soft);
                 "
               >
                 <IconAlertTriangle
@@ -9030,7 +9121,7 @@ const sisaClass = (item: any) => {
                 <span
                   v-if="bufferKaosanSummary.total"
                   class="badge-count ml-auto"
-                  style="background: #854f0b"
+                  style="background: var(--dsh-warn)"
                 >
                   {{ bufferKaosanSummary.total }} item
                 </span>
@@ -9039,7 +9130,7 @@ const sisaClass = (item: any) => {
                 <v-progress-linear
                   v-if="isLoadingGudangBahan"
                   indeterminate
-                  color="warning"
+                  color="primary"
                   height="2"
                 />
                 <template
@@ -9066,9 +9157,13 @@ const sisaClass = (item: any) => {
                           "
                           :style="{
                             background:
-                              item.Tipe === 'BAHAN' ? '#e3f2fd' : '#f3e5f5',
+                              item.Tipe === 'BAHAN'
+                                ? 'var(--dsh-accent-soft)'
+                                : 'var(--dsh-accent-soft)',
                             color:
-                              item.Tipe === 'BAHAN' ? '#1565c0' : '#6a1b9a',
+                              item.Tipe === 'BAHAN'
+                                ? 'var(--dsh-accent)'
+                                : 'var(--dsh-accent)',
                           }"
                         >
                           {{ item.Tipe === "BAHAN" ? "BHN" : "ACC" }}
@@ -9128,7 +9223,7 @@ const sisaClass = (item: any) => {
                   </div>
                 </template>
                 <div v-else class="text-center text-grey py-3 text-caption">
-                  Semua bahan &amp; aksesoris KAOSAN di atas buffer 🎉
+                  Semua bahan &amp; aksesoris KAOSAN di atas buffer
                 </div>
               </div>
             </div>
@@ -9142,9 +9237,9 @@ const sisaClass = (item: any) => {
               <div
                 class="panel-header"
                 style="
-                  background: #fff3e0;
-                  color: #e65100;
-                  border-bottom: 1px solid #ffe0b2;
+                  background: var(--dsh-warn-soft);
+                  color: var(--dsh-warn);
+                  border-bottom: 1px solid var(--dsh-warn-soft);
                 "
               >
                 <IconAlertTriangle
@@ -9159,7 +9254,7 @@ const sisaClass = (item: any) => {
                 <span
                   v-if="stokAccVsMkaCount"
                   class="badge-count ml-auto"
-                  style="background: #e65100"
+                  style="background: var(--dsh-warn)"
                 >
                   {{ stokAccVsMkaCount }} item
                 </span>
@@ -9168,7 +9263,7 @@ const sisaClass = (item: any) => {
                 <v-progress-linear
                   v-if="isLoadingGudangBahan"
                   indeterminate
-                  color="warning"
+                  color="primary"
                   height="2"
                 />
                 <template
@@ -9209,7 +9304,7 @@ const sisaClass = (item: any) => {
                             style="
                               font-size: 10px;
                               font-weight: 700;
-                              color: #e65100;
+                              color: var(--dsh-warn);
                             "
                           >
                             Kurang {{ fmtNum(Math.abs(item.Free)) }}
@@ -9247,7 +9342,7 @@ const sisaClass = (item: any) => {
                   </div>
                 </template>
                 <div v-else class="text-center text-grey py-3 text-caption">
-                  Semua aksesoris tercukupi untuk kebutuhan MKA bulan ini 🎉
+                  Semua aksesoris tercukupi untuk kebutuhan MKA bulan ini
                 </div>
               </div>
             </div>
@@ -9260,9 +9355,9 @@ const sisaClass = (item: any) => {
               <div
                 class="panel-header"
                 style="
-                  background: #eceff1;
-                  color: #37474f;
-                  border-bottom: 1px solid #cfd8dc;
+                  background: var(--dsh-fill);
+                  color: var(--dsh-ink);
+                  border-bottom: 1px solid var(--dsh-line);
                 "
               >
                 <IconAlertTriangle
@@ -9277,7 +9372,7 @@ const sisaClass = (item: any) => {
                 <v-progress-linear
                   v-if="isLoadingGudangBahan"
                   indeterminate
-                  color="grey"
+                  color="primary"
                   height="2"
                 />
                 <template v-else-if="slowDeadStockData.length">
@@ -9286,8 +9381,8 @@ const sisaClass = (item: any) => {
                     class="d-flex flex-wrap"
                     style="
                       gap: 0;
-                      border-bottom: 1px solid #f0f0f0;
-                      background: #fafafa;
+                      border-bottom: 1px solid var(--dsh-fill);
+                      background: var(--dsh-fill);
                     "
                   >
                     <div
@@ -9322,24 +9417,25 @@ const sisaClass = (item: any) => {
                             flex-wrap: wrap;
                           "
                         >
-                          <span style="font-weight: 700; color: #37474f">{{
-                            grp.jenisNama
-                          }}</span>
+                          <span
+                            style="font-weight: 700; color: var(--dsh-ink)"
+                            >{{ grp.jenisNama }}</span
+                          >
                           <span
                             v-if="grp.jmlSlowmoving"
                             class="badge-count"
-                            style="background: #f57f17"
+                            style="background: var(--dsh-warn)"
                           >
                             Slowmoving {{ grp.jmlSlowmoving }}
                           </span>
                           <span
                             v-if="grp.jmlDeadStock"
                             class="badge-count"
-                            style="background: #c62828"
+                            style="background: var(--dsh-bad)"
                           >
                             Dead Stock {{ grp.jmlDeadStock }}
                           </span>
-                          <span style="color: #9e9e9e">
+                          <span style="color: var(--dsh-ink-3)">
                             Total stok:
                             <template
                               v-for="(t, i) in grp.totalStokList"
@@ -9393,7 +9489,7 @@ const sisaClass = (item: any) => {
                       style="
                         gap: 10px;
                         padding: 8px 12px;
-                        border-top: 1px solid #f0f0f0;
+                        border-top: 1px solid var(--dsh-fill);
                       "
                     >
                       <button
@@ -9404,7 +9500,7 @@ const sisaClass = (item: any) => {
                       >
                         ← Sebelumnya
                       </button>
-                      <span style="font-size: 11px; color: #757575">
+                      <span style="font-size: 11px; color: var(--dsh-ink-2)">
                         Halaman {{ slowDeadStockPage }} dari
                         {{ slowDeadStockTotalPages }} ({{
                           slowDeadStockData.length
@@ -9430,7 +9526,7 @@ const sisaClass = (item: any) => {
                   </v-expansion-panels>
                 </template>
                 <div v-else class="text-center text-grey py-3 text-caption">
-                  Tidak ada bahan slow moving atau dead stock 🎉
+                  Tidak ada bahan slow moving atau dead stock
                 </div>
               </div>
             </div>
@@ -9444,9 +9540,9 @@ const sisaClass = (item: any) => {
               <div
                 class="panel-header"
                 style="
-                  background: #ffebee;
-                  color: #c62828;
-                  border-bottom: 1px solid #ffcdd2;
+                  background: var(--dsh-bad-soft);
+                  color: var(--dsh-bad);
+                  border-bottom: 1px solid var(--dsh-bad-soft);
                 "
               >
                 <IconAlertTriangle
@@ -9461,7 +9557,7 @@ const sisaClass = (item: any) => {
                 <span
                   v-if="stokBebasSummary.total"
                   class="badge-count ml-auto"
-                  style="background: #c62828"
+                  style="background: var(--dsh-bad)"
                 >
                   {{ stokBebasSummary.total }} kekurangan
                 </span>
@@ -9470,7 +9566,7 @@ const sisaClass = (item: any) => {
                 <v-progress-linear
                   v-if="isLoadingGudangBahan"
                   indeterminate
-                  color="red"
+                  color="primary"
                   height="2"
                 />
                 <template v-else-if="stokBebasList.length || isLoadingMoreSb">
@@ -9504,12 +9600,12 @@ const sisaClass = (item: any) => {
                             {{ item.Nama || item.Kode }}
                           </td>
                           <td class="tr">{{ fmtNum(item.Stok) }}</td>
-                          <td class="tr" style="color: #e65100">
+                          <td class="tr" style="color: var(--dsh-warn)">
                             {{ fmtNum(item.MkbBelumRealisasi) }}
                           </td>
                           <td
                             class="tr"
-                            style="font-weight: 700; color: #c62828"
+                            style="font-weight: 700; color: var(--dsh-bad)"
                           >
                             {{ fmtNum(item.Free) }}
                           </td>
@@ -9533,7 +9629,7 @@ const sisaClass = (item: any) => {
                   </div>
                 </template>
                 <div v-else class="text-center text-grey py-3 text-caption">
-                  Tidak ada bahan dengan stok bebas negatif 🎉
+                  Tidak ada bahan dengan stok bebas negatif
                 </div>
               </div>
             </div>
@@ -9563,7 +9659,7 @@ const sisaClass = (item: any) => {
                 <v-progress-linear
                   v-if="isLoadingGudangBahan"
                   indeterminate
-                  color="teal"
+                  color="primary"
                   height="2"
                 />
                 <template v-else-if="bahanList.length || isLoadingMoreBahan">
@@ -9597,10 +9693,10 @@ const sisaClass = (item: any) => {
                           >
                             {{ item.Nama || item.Kode }}
                           </td>
-                          <td class="tr" style="color: #2e7d32">
+                          <td class="tr" style="color: var(--dsh-good)">
                             +{{ fmtNum(item.Masuk) }}
                           </td>
-                          <td class="tr" style="color: #c62828">
+                          <td class="tr" style="color: var(--dsh-bad)">
                             -{{ fmtNum(item.Keluar) }}
                           </td>
                           <td
@@ -9609,10 +9705,10 @@ const sisaClass = (item: any) => {
                               fontWeight: '600',
                               color:
                                 item.Stok < 0
-                                  ? '#c62828'
+                                  ? 'var(--dsh-bad)'
                                   : item.Stok === 0
-                                    ? '#f57f17'
-                                    : '#212121',
+                                    ? 'var(--dsh-warn)'
+                                    : 'var(--dsh-ink)',
                             }"
                           >
                             {{ fmtNum(item.Stok) }}
@@ -9782,9 +9878,9 @@ const sisaClass = (item: any) => {
               <div
                 class="panel-header"
                 style="
-                  background: #ffebee;
-                  color: #c62828;
-                  border-bottom: 1px solid #ffcdd2;
+                  background: var(--dsh-bad-soft);
+                  color: var(--dsh-bad);
+                  border-bottom: 1px solid var(--dsh-bad-soft);
                 "
               >
                 <IconAlertTriangle
@@ -9796,7 +9892,7 @@ const sisaClass = (item: any) => {
                 <span
                   v-if="bahanKurangSummary.total"
                   class="badge-count ml-auto"
-                  style="background: #c62828"
+                  style="background: var(--dsh-bad)"
                 >
                   {{ bahanKurangSummary.total }} SPK
                 </span>
@@ -9805,7 +9901,7 @@ const sisaClass = (item: any) => {
                 <v-progress-linear
                   v-if="isLoadingDashboard"
                   indeterminate
-                  color="red"
+                  color="primary"
                   height="2"
                 />
                 <template
@@ -9841,7 +9937,7 @@ const sisaClass = (item: any) => {
                             style="
                               font-size: 10px;
                               font-weight: 700;
-                              color: #c62828;
+                              color: var(--dsh-bad);
                             "
                           >
                             {{ item.JmlBahanKurang }} bahan
@@ -9879,7 +9975,7 @@ const sisaClass = (item: any) => {
                   </div>
                 </template>
                 <div v-else class="text-center text-grey py-3 text-caption">
-                  Semua kebutuhan bahan produksi tercukupi 🎉
+                  Semua kebutuhan bahan produksi tercukupi
                 </div>
               </div>
             </div>
@@ -9901,7 +9997,7 @@ const sisaClass = (item: any) => {
                 <v-progress-linear
                   v-if="isLoadingDashboard"
                   indeterminate
-                  color="warning"
+                  color="primary"
                   height="2"
                 />
                 <template
@@ -9958,7 +10054,7 @@ const sisaClass = (item: any) => {
                   </div>
                 </template>
                 <div v-else class="text-center text-grey py-3 text-caption">
-                  Semua SPK bulan ini sudah ada MKB 🎉
+                  Semua SPK bulan ini sudah ada MKB
                 </div>
               </div>
             </div>
@@ -9989,7 +10085,7 @@ const sisaClass = (item: any) => {
                   <v-progress-linear
                     v-if="isLoadingDashboard"
                     indeterminate
-                    color="teal"
+                    color="primary"
                     height="2"
                   />
                   <template v-else>
@@ -10007,16 +10103,20 @@ const sisaClass = (item: any) => {
                           router.push('/laporan/gudang-garmen/po-bahan-vs-bpb')
                         "
                       >
-                        <span class="po-bpb-val" style="color: #c62828">{{
-                          poBpbSummary.Open
-                        }}</span>
+                        <span
+                          class="po-bpb-val"
+                          style="color: var(--dsh-bad)"
+                          >{{ poBpbSummary.Open }}</span
+                        >
                         <span class="po-bpb-lbl">OPEN</span>
                       </div>
                       <div class="po-bpb-divider" />
                       <div class="po-bpb-stat">
-                        <span class="po-bpb-val" style="color: #0277bd">{{
-                          poBpbSummary.OnProses
-                        }}</span>
+                        <span
+                          class="po-bpb-val"
+                          style="color: var(--dsh-accent)"
+                          >{{ poBpbSummary.OnProses }}</span
+                        >
                         <span class="po-bpb-lbl">ON PROSES</span>
                       </div>
                       <div class="po-bpb-divider" />
@@ -10064,14 +10164,17 @@ const sisaClass = (item: any) => {
                         />
                       </div>
                       <div class="po-bpb-legend">
-                        <span class="leg-dot" style="background: #c62828" />OPEN
+                        <span
+                          class="leg-dot"
+                          style="background: var(--dsh-bad)"
+                        />OPEN
                         <span
                           class="leg-dot ml-2"
-                          style="background: #0277bd"
+                          style="background: var(--dsh-accent)"
                         />ON PROSES
                         <span
                           class="leg-dot ml-2"
-                          style="background: #43a047"
+                          style="background: var(--dsh-good)"
                         />CLOSE
                       </div>
                     </div>
@@ -10094,7 +10197,7 @@ const sisaClass = (item: any) => {
                   <v-progress-linear
                     v-if="isLoadingDashboard"
                     indeterminate
-                    color="teal"
+                    color="primary"
                     height="2"
                   />
                   <template v-else>
@@ -10107,16 +10210,20 @@ const sisaClass = (item: any) => {
                       </div>
                       <div class="po-bpb-divider" />
                       <div class="po-bpb-stat">
-                        <span class="po-bpb-val" style="color: #c62828">{{
-                          poJasaVsBpjData.Belum
-                        }}</span>
+                        <span
+                          class="po-bpb-val"
+                          style="color: var(--dsh-bad)"
+                          >{{ poJasaVsBpjData.Belum }}</span
+                        >
                         <span class="po-bpb-lbl">BELUM</span>
                       </div>
                       <div class="po-bpb-divider" />
                       <div class="po-bpb-stat">
-                        <span class="po-bpb-val" style="color: #0277bd">{{
-                          poJasaVsBpjData.Proses
-                        }}</span>
+                        <span
+                          class="po-bpb-val"
+                          style="color: var(--dsh-accent)"
+                          >{{ poJasaVsBpjData.Proses }}</span
+                        >
                         <span class="po-bpb-lbl">PROSES</span>
                       </div>
                       <div class="po-bpb-divider" />
@@ -10166,15 +10273,15 @@ const sisaClass = (item: any) => {
                       <div class="po-bpb-legend">
                         <span
                           class="leg-dot"
-                          style="background: #c62828"
+                          style="background: var(--dsh-bad)"
                         />BELUM
                         <span
                           class="leg-dot ml-2"
-                          style="background: #0277bd"
+                          style="background: var(--dsh-accent)"
                         />PROSES
                         <span
                           class="leg-dot ml-2"
-                          style="background: #43a047"
+                          style="background: var(--dsh-good)"
                         />CLOSED
                       </div>
                     </div>
@@ -10203,7 +10310,7 @@ const sisaClass = (item: any) => {
                 <v-progress-linear
                   v-if="isLoadingDashboard"
                   indeterminate
-                  color="warning"
+                  color="primary"
                   height="2"
                 />
                 <template v-else>
@@ -10275,7 +10382,7 @@ const sisaClass = (item: any) => {
                     </div>
                   </div>
                   <div v-else class="text-center text-grey py-3 text-caption">
-                    Semua SPK bulan ini sudah ada STBJ 🎉
+                    Semua SPK bulan ini sudah ada STBJ
                   </div>
                 </template>
               </div>
@@ -10300,7 +10407,7 @@ const sisaClass = (item: any) => {
                 <v-progress-linear
                   v-if="isLoadingDashboard"
                   indeterminate
-                  color="teal"
+                  color="primary"
                   height="2"
                 />
                 <template v-else>
@@ -10310,7 +10417,10 @@ const sisaClass = (item: any) => {
                   >
                     <div
                       class="aging-chip"
-                      style="background: #ffebee; color: #c62828"
+                      style="
+                        background: var(--dsh-bad-soft);
+                        color: var(--dsh-bad);
+                      "
                     >
                       <span class="aging-count">{{
                         spkVsSjSummary.BelumKirim
@@ -10319,7 +10429,10 @@ const sisaClass = (item: any) => {
                     </div>
                     <div
                       class="aging-chip"
-                      style="background: #fff8e1; color: #f57f17"
+                      style="
+                        background: var(--dsh-warn-soft);
+                        color: var(--dsh-warn);
+                      "
                     >
                       <span class="aging-count">{{
                         spkVsSjSummary.SebagianKirim
@@ -10328,7 +10441,10 @@ const sisaClass = (item: any) => {
                     </div>
                     <div
                       class="aging-chip"
-                      style="background: #e8f5e9; color: #2e7d32"
+                      style="
+                        background: var(--dsh-good-soft);
+                        color: var(--dsh-good);
+                      "
                     >
                       <span class="aging-count">{{
                         spkVsSjSummary.LunasKirim
@@ -10338,17 +10454,20 @@ const sisaClass = (item: any) => {
                   </div>
 
                   <div
-                    style="padding: 8px 12px; border-bottom: 1px solid #f0f0f0"
+                    style="
+                      padding: 8px 12px;
+                      border-bottom: 1px solid var(--dsh-fill);
+                    "
                   >
                     <div class="d-flex justify-space-between mb-1">
-                      <span style="font-size: 10px; color: #9e9e9e"
+                      <span style="font-size: 10px; color: var(--dsh-ink-3)"
                         >Total qty terkirim</span
                       >
                       <span
                         style="
                           font-size: 10px;
                           font-weight: 700;
-                          color: #00695c;
+                          color: var(--dsh-accent);
                         "
                       >
                         {{ fmtNum(spkVsSjSummary.TotalQtyKirim) }} /
@@ -10367,7 +10486,7 @@ const sisaClass = (item: any) => {
                                   100,
                               ) + '%'
                             : '0%',
-                          background: '#00897b',
+                          background: 'var(--dsh-good)',
                         }"
                       />
                     </div>
@@ -10375,10 +10494,10 @@ const sisaClass = (item: any) => {
 
                   <div
                     style="
-                      border-top: 1px solid #f0f0f0;
+                      border-top: 1px solid var(--dsh-fill);
                       padding: 5px 12px 0;
                       font-size: 10px;
-                      color: #9e9e9e;
+                      color: var(--dsh-ink-3);
                       font-weight: 600;
                     "
                   >
@@ -10398,7 +10517,10 @@ const sisaClass = (item: any) => {
                           :style="{
                             fontSize: '10px',
                             fontWeight: '700',
-                            color: s.QtyKirim === 0 ? '#c62828' : '#f57f17',
+                            color:
+                              s.QtyKirim === 0
+                                ? 'var(--dsh-bad)'
+                                : 'var(--dsh-warn)',
                           }"
                         >
                           {{ fmtNum(s.QtyKirim) }}/{{ fmtNum(s.QtyOrder) }} pcs
@@ -10423,7 +10545,7 @@ const sisaClass = (item: any) => {
                     v-if="!spkBelumKirimList.length && !isLoadingMoreSpkSj"
                     class="text-center text-grey py-3 text-caption"
                   >
-                    Semua SPK sudah lunas kirim 🎉
+                    Semua SPK sudah lunas kirim
                   </div>
                 </template>
               </div>
@@ -10438,9 +10560,9 @@ const sisaClass = (item: any) => {
               <div
                 class="panel-header"
                 style="
-                  background: #f3e5f5;
-                  color: #6a1b9a;
-                  border-bottom: 1px solid #e1bee7;
+                  background: var(--dsh-accent-soft);
+                  color: var(--dsh-accent);
+                  border-bottom: 1px solid var(--dsh-accent-soft);
                 "
               >
                 <IconGauge :size="14" :stroke-width="1.7" class="mr-1" />
@@ -10449,7 +10571,7 @@ const sisaClass = (item: any) => {
                 <span
                   v-if="outstandingPoMitraSummary.totalMitra"
                   class="badge-count ml-auto"
-                  style="background: #6a1b9a"
+                  style="background: var(--dsh-accent)"
                 >
                   {{ outstandingPoMitraSummary.totalMitra }} mitra
                 </span>
@@ -10458,7 +10580,7 @@ const sisaClass = (item: any) => {
                 <v-progress-linear
                   v-if="isLoadingDashboard"
                   indeterminate
-                  color="purple"
+                  color="primary"
                   height="2"
                 />
                 <template
@@ -10469,9 +10591,9 @@ const sisaClass = (item: any) => {
                   <div
                     style="
                       padding: 6px 12px;
-                      border-bottom: 1px solid #f0f0f0;
+                      border-bottom: 1px solid var(--dsh-fill);
                       font-size: 11px;
-                      color: #6a1b9a;
+                      color: var(--dsh-accent);
                       font-weight: 700;
                     "
                   >
@@ -10506,7 +10628,7 @@ const sisaClass = (item: any) => {
                           style="
                             font-size: 10px;
                             font-weight: 700;
-                            color: #6a1b9a;
+                            color: var(--dsh-accent);
                           "
                         >
                           Kurang {{ fmtNum(m.Kurang) }}
@@ -10529,7 +10651,7 @@ const sisaClass = (item: any) => {
                   </div>
                 </template>
                 <div v-else class="text-center text-grey py-3 text-caption">
-                  Tidak ada outstanding PO mitra jasa jahit bulan ini 🎉
+                  Tidak ada outstanding PO mitra jasa jahit bulan ini
                 </div>
               </div>
             </div>
@@ -10540,9 +10662,9 @@ const sisaClass = (item: any) => {
               <div
                 class="panel-header"
                 style="
-                  background: #fff3e0;
-                  color: #e65100;
-                  border-bottom: 1px solid #ffe0b2;
+                  background: var(--dsh-warn-soft);
+                  color: var(--dsh-warn);
+                  border-bottom: 1px solid var(--dsh-warn-soft);
                 "
               >
                 <IconScale :size="14" :stroke-width="1.7" class="mr-1" />
@@ -10566,7 +10688,7 @@ const sisaClass = (item: any) => {
                 <v-progress-linear
                   v-if="isLoadingDashboard"
                   indeterminate
-                  color="orange"
+                  color="primary"
                   height="2"
                 />
                 <template v-else-if="efisiensiBabaranSummary.totalSpk">
@@ -10578,9 +10700,11 @@ const sisaClass = (item: any) => {
                       <span class="pen-stat-lbl">Total SPK</span>
                     </div>
                     <div class="pen-stat">
-                      <span class="pen-stat-val" style="color: #e65100">{{
-                        efisiensiBabaranSummary.jmlDeviasi
-                      }}</span>
+                      <span
+                        class="pen-stat-val"
+                        style="color: var(--dsh-warn)"
+                        >{{ efisiensiBabaranSummary.jmlDeviasi }}</span
+                      >
                       <span class="pen-stat-lbl">Deviasi Minus</span>
                     </div>
                   </div>
@@ -10607,7 +10731,7 @@ const sisaClass = (item: any) => {
                           style="
                             font-size: 10px;
                             font-weight: 700;
-                            color: #c62828;
+                            color: var(--dsh-bad);
                           "
                         >
                           {{ fmtDec(s.Minus, 3) }}
@@ -10664,7 +10788,7 @@ const sisaClass = (item: any) => {
           <v-col cols="6" sm="3">
             <div class="sum-card">
               <div class="sum-label">Item Bergerak Bulan Ini</div>
-              <div class="sum-value" style="color: #0277bd">
+              <div class="sum-value" style="color: var(--dsh-accent)">
                 <span v-if="isLoadingBarangJadi">—</span>
                 <span v-else>{{ barangJadiMetric.ItemBergerak }}</span>
               </div>
@@ -10737,7 +10861,7 @@ const sisaClass = (item: any) => {
                               font-family: monospace;
                               font-size: 9px;
                               font-weight: 700;
-                              color: #1565c0;
+                              color: var(--dsh-accent);
                             "
                             :title="item.Kode"
                           >
@@ -10762,7 +10886,7 @@ const sisaClass = (item: any) => {
                             style="
                               font-size: 13px;
                               font-weight: 700;
-                              color: #1565c0;
+                              color: var(--dsh-accent);
                               white-space: nowrap;
                             "
                           >
@@ -10774,7 +10898,7 @@ const sisaClass = (item: any) => {
                         v-if="item.Ukuran"
                         style="
                           font-size: 9px;
-                          color: #9e9e9e;
+                          color: var(--dsh-ink-3);
                           padding-left: 168px;
                           overflow: hidden;
                           text-overflow: ellipsis;
@@ -10820,7 +10944,7 @@ const sisaClass = (item: any) => {
                 <v-progress-linear
                   v-if="isLoadingBarangJadi"
                   indeterminate
-                  color="teal"
+                  color="primary"
                   height="2"
                 />
                 <template
@@ -10865,8 +10989,8 @@ const sisaClass = (item: any) => {
                           :style="{
                             color:
                               Number(item.StokAkhir) < 0
-                                ? '#c62828'
-                                : '#00695c',
+                                ? 'var(--dsh-bad)'
+                                : 'var(--dsh-accent)',
                           }"
                         >
                           Akhir {{ fmtNum(item.StokAkhir) }}
@@ -10907,7 +11031,7 @@ const sisaClass = (item: any) => {
             >
             <button
               class="knj-detail-btn ml-auto"
-              style="border-color: #ffcc80; color: #e65100"
+              style="border-color: var(--dsh-warn-soft); color: var(--dsh-warn)"
               :disabled="isExportingOb"
               @click="exportObExcel"
             >
@@ -10918,7 +11042,7 @@ const sisaClass = (item: any) => {
               {{ isExportingOb ? "Mengexport..." : "Export Excel" }}
             </button>
           </div>
-          <v-tabs v-model="obTab" density="compact" color="orange-darken-2">
+          <v-tabs v-model="obTab" density="compact" color="primary">
             <v-tab
               v-for="t in OB_TABS"
               :key="t.value"
@@ -10929,7 +11053,7 @@ const sisaClass = (item: any) => {
               <span
                 v-if="obSummary[t.value]"
                 class="badge-count ml-1"
-                style="background: #e65100"
+                style="background: var(--dsh-warn)"
               >
                 {{ obSummary[t.value] }}
               </span>
@@ -10939,7 +11063,7 @@ const sisaClass = (item: any) => {
             <v-progress-linear
               v-if="isLoadingPembelian"
               indeterminate
-              color="orange"
+              color="primary"
               height="2"
             />
             <div v-else style="overflow: auto; max-height: 560px">
@@ -10962,7 +11086,7 @@ const sisaClass = (item: any) => {
                       style="
                         font-family: monospace;
                         font-weight: 600;
-                        color: #1565c0;
+                        color: var(--dsh-accent);
                       "
                     >
                       {{ r.Nomor }}
@@ -10974,7 +11098,10 @@ const sisaClass = (item: any) => {
                       {{ fmtDec(r.QtyMinta, 0) }} {{ r.Satuan }}
                     </td>
                     <td class="tr">{{ fmtDec(r.QtyBeli, 0) }}</td>
-                    <td class="tr" style="font-weight: 700; color: #c62828">
+                    <td
+                      class="tr"
+                      style="font-weight: 700; color: var(--dsh-bad)"
+                    >
                       {{ fmtDec(r.Kekurangan, 0) }}
                     </td>
                     <td class="tc">
@@ -10985,7 +11112,7 @@ const sisaClass = (item: any) => {
                   </tr>
                   <tr v-if="!obList.length && !isLoadingMoreOb">
                     <td colspan="8" class="text-center text-grey py-3">
-                      Tidak ada outstanding untuk tab ini 🎉
+                      Tidak ada outstanding untuk tab ini
                     </td>
                   </tr>
                 </tbody>
@@ -11117,7 +11244,7 @@ const sisaClass = (item: any) => {
       <v-card class="rounded-lg">
         <div
           class="pa-3 d-flex align-center justify-space-between"
-          style="background: #1867c0; color: white"
+          style="background: var(--dsh-accent); color: white"
         >
           <span style="font-size: 13px; font-weight: 700">
             Effective Calling — {{ effectiveCallingNama }}
@@ -11168,7 +11295,7 @@ const sisaClass = (item: any) => {
                 <td
                   style="
                     font-family: monospace;
-                    color: #1565c0;
+                    color: var(--dsh-accent);
                     font-weight: 600;
                   "
                 >
@@ -11187,8 +11314,8 @@ const sisaClass = (item: any) => {
                         v-bind="props"
                         class="rp-badge"
                         style="
-                          background: #e8f5e9;
-                          color: #2e7d32;
+                          background: var(--dsh-good-soft);
+                          color: var(--dsh-good);
                           cursor: help;
                         "
                         >Sudah ({{ row.JmlMap }})</span
@@ -11215,7 +11342,7 @@ const sisaClass = (item: any) => {
                   <span
                     v-else
                     class="rp-badge"
-                    style="background: #f5f5f5; color: #9e9e9e"
+                    style="background: var(--dsh-fill); color: var(--dsh-ink-3)"
                     >Belum</span
                   >
                 </td>
@@ -11229,8 +11356,8 @@ const sisaClass = (item: any) => {
                         v-bind="props"
                         class="rp-badge"
                         style="
-                          background: #e8f5e9;
-                          color: #2e7d32;
+                          background: var(--dsh-good-soft);
+                          color: var(--dsh-good);
                           cursor: help;
                         "
                         >Sudah ({{ row.JmlSo }})</span
@@ -11257,7 +11384,7 @@ const sisaClass = (item: any) => {
                   <span
                     v-else
                     class="rp-badge"
-                    style="background: #f5f5f5; color: #9e9e9e"
+                    style="background: var(--dsh-fill); color: var(--dsh-ink-3)"
                     >Belum</span
                   >
                 </td>
@@ -11315,12 +11442,14 @@ const sisaClass = (item: any) => {
                   <td>{{ it.tanggal }}</td>
                   <td>{{ it.cusNama || it.cusKode }}</td>
                   <td class="tr">{{ it.debet.toLocaleString("id-ID") }}</td>
-                  <td class="tr" style="color: #2e7d32">
+                  <td class="tr" style="color: var(--dsh-good)">
                     {{ it.terbayar.toLocaleString("id-ID") }}
                   </td>
                   <td
                     class="tr"
-                    :style="{ color: it.sisa > 0 ? '#c62828' : '#2e7d32' }"
+                    :style="{
+                      color: it.sisa > 0 ? 'var(--dsh-bad)' : 'var(--dsh-good)',
+                    }"
                   >
                     {{ it.sisa.toLocaleString("id-ID") }}
                   </td>
@@ -11340,7 +11469,7 @@ const sisaClass = (item: any) => {
                   <td class="tr fw">
                     {{ targetDetailTotal.toLocaleString("id-ID") }}
                   </td>
-                  <td class="tr fw" style="color: #2e7d32">
+                  <td class="tr fw" style="color: var(--dsh-good)">
                     {{
                       targetDetailItems
                         .reduce((s, it) => s + it.terbayar, 0)
@@ -11366,10 +11495,7 @@ const sisaClass = (item: any) => {
 
     <v-dialog v-model="isBapAuditDialogVisible" persistent max-width="900px">
       <v-card class="spk-dialog-card" rounded="lg">
-        <div
-          class="spk-header"
-          style="background: linear-gradient(135deg, #6a1b9a 0%, #8e24aa 100%)"
-        >
+        <div class="spk-header">
           <div class="spk-header-left">
             <div class="spk-header-icon">
               <IconClipboardList :size="18" :stroke-width="1.6" color="white" />
@@ -11451,10 +11577,7 @@ const sisaClass = (item: any) => {
       max-width="900px"
     >
       <v-card class="spk-dialog-card" rounded="lg">
-        <div
-          class="spk-header"
-          style="background: linear-gradient(135deg, #ef6c00 0%, #f57c00 100%)"
-        >
+        <div class="spk-header">
           <div class="spk-header-left">
             <div class="spk-header-icon">
               <IconClipboardList :size="18" :stroke-width="1.6" color="white" />
@@ -11536,10 +11659,7 @@ const sisaClass = (item: any) => {
 
     <v-dialog v-model="isBapReviewedDialogVisible" persistent max-width="750px">
       <v-card class="spk-dialog-card" rounded="lg">
-        <div
-          class="spk-header"
-          style="background: linear-gradient(135deg, #2e7d32 0%, #43a047 100%)"
-        >
+        <div class="spk-header">
           <div class="spk-header-left">
             <div class="spk-header-icon">
               <IconClipboardList :size="18" :stroke-width="1.6" color="white" />
@@ -11562,7 +11682,7 @@ const sisaClass = (item: any) => {
             :key="item.Nomor"
             style="
               padding: 12px 16px;
-              border-bottom: 1px solid #eee;
+              border-bottom: 1px solid var(--dsh-line);
               cursor: pointer;
             "
             @click="goToBapDetailFromReviewed(item.Nomor)"
@@ -11575,22 +11695,24 @@ const sisaClass = (item: any) => {
               "
             >
               <span class="spk-badge">{{ item.Nomor }}</span>
-              <span style="font-size: 10px; color: #757575">{{
+              <span style="font-size: 10px; color: var(--dsh-ink-2)">{{
                 item.Tanggal
               }}</span>
             </div>
-            <div style="font-size: 11px; color: #424242; margin-top: 2px">
+            <div
+              style="font-size: 11px; color: var(--dsh-ink); margin-top: 2px"
+            >
               {{ item.Masalah }}
             </div>
             <div
               style="
                 margin-top: 6px;
                 padding: 8px 10px;
-                background: #f1f8e9;
-                border-left: 3px solid #43a047;
+                background: var(--dsh-good-soft);
+                border-left: 3px solid var(--dsh-good);
                 border-radius: 3px;
                 font-size: 11px;
-                color: #212121;
+                color: var(--dsh-ink);
                 white-space: pre-wrap;
               "
             >
@@ -11599,7 +11721,7 @@ const sisaClass = (item: any) => {
             <div
               style="
                 font-size: 10px;
-                color: #9e9e9e;
+                color: var(--dsh-ink-3);
                 margin-top: 3px;
                 text-align: right;
               "
@@ -11617,7 +11739,7 @@ const sisaClass = (item: any) => {
             <input
               type="checkbox"
               v-model="hasReadBapReviewed"
-              style="accent-color: #2e7d32"
+              style="accent-color: var(--dsh-good)"
             />
             Saya sudah membaca semua catatan review di atas
           </label>
@@ -11642,7 +11764,7 @@ const sisaClass = (item: any) => {
       >
         <div
           class="pa-3 d-flex align-center justify-space-between"
-          style="background: #e65100; color: white; flex-shrink: 0"
+          style="background: var(--dsh-warn); color: white; flex-shrink: 0"
         >
           <span style="font-size: 14px; font-weight: 700">Set Potensial</span>
           <v-btn
@@ -11656,7 +11778,10 @@ const sisaClass = (item: any) => {
           </v-btn>
         </div>
 
-        <div class="pa-3" style="flex-shrink: 0; border-bottom: 1px solid #eee">
+        <div
+          class="pa-3"
+          style="flex-shrink: 0; border-bottom: 1px solid var(--dsh-line)"
+        >
           <div class="d-flex mb-2" style="gap: 8px">
             <input
               v-model="potensiSourceCustFilter"
@@ -11669,11 +11794,7 @@ const sisaClass = (item: any) => {
               Cari
             </button>
           </div>
-          <v-tabs
-            v-model="potensiDialogTab"
-            density="compact"
-            color="orange-darken-2"
-          >
+          <v-tabs v-model="potensiDialogTab" density="compact" color="primary">
             <v-tab value="PENAWARAN" class="text-caption font-weight-bold"
               >Penawaran Open</v-tab
             >
@@ -11713,7 +11834,7 @@ const sisaClass = (item: any) => {
                         <span
                           style="
                             font-size: 10px;
-                            color: #757575;
+                            color: var(--dsh-ink-2);
                             white-space: nowrap;
                           "
                         >
@@ -11722,7 +11843,7 @@ const sisaClass = (item: any) => {
                         <span
                           style="
                             font-size: 11px;
-                            color: #6a1b9a;
+                            color: var(--dsh-accent);
                             font-weight: 700;
                             white-space: nowrap;
                           "
@@ -11785,7 +11906,7 @@ const sisaClass = (item: any) => {
                         <span
                           style="
                             font-size: 10px;
-                            color: #757575;
+                            color: var(--dsh-ink-2);
                             white-space: nowrap;
                           "
                         >
@@ -11794,7 +11915,7 @@ const sisaClass = (item: any) => {
                         <span
                           style="
                             font-size: 11px;
-                            color: #6a1b9a;
+                            color: var(--dsh-accent);
                             font-weight: 700;
                             white-space: nowrap;
                           "
@@ -11832,7 +11953,7 @@ const sisaClass = (item: any) => {
         </div>
 
         <div class="spk-footer" style="flex-shrink: 0">
-          <span style="font-size: 12px; color: #757575"
+          <span style="font-size: 12px; color: var(--dsh-ink-2)"
             >{{ selectedPotensiCount }} item dipilih</span
           >
           <v-btn
@@ -11861,7 +11982,7 @@ const sisaClass = (item: any) => {
           rows="3"
           style="
             width: 100%;
-            border: 1px solid #e0e0e0;
+            border: 1px solid var(--dsh-line);
             border-radius: 4px;
             padding: 6px;
             font-size: 12px;
@@ -11896,7 +12017,7 @@ const sisaClass = (item: any) => {
       >
         <div
           class="pa-3 d-flex align-center justify-space-between"
-          style="background: #00695c; color: white; flex-shrink: 0"
+          style="background: var(--dsh-accent); color: white; flex-shrink: 0"
         >
           <div>
             <span style="font-size: 14px; font-weight: 700"
@@ -11923,9 +12044,9 @@ const sisaClass = (item: any) => {
         <v-tabs
           v-model="inkasoSalesTab"
           density="compact"
-          color="teal-darken-2"
+          color="primary"
           show-arrows
-          style="flex-shrink: 0; border-bottom: 1px solid #eee"
+          style="flex-shrink: 0; border-bottom: 1px solid var(--dsh-line)"
         >
           <v-tab
             v-for="s in inkasoSalesList"
@@ -11937,7 +12058,7 @@ const sisaClass = (item: any) => {
             <span
               v-if="terisiPerSales(s.salKode)"
               class="badge-count ml-1"
-              style="background: #00695c"
+              style="background: var(--dsh-accent)"
             >
               {{ terisiPerSales(s.salKode) }}
             </span>
@@ -11948,7 +12069,7 @@ const sisaClass = (item: any) => {
           <v-progress-linear
             v-if="isLoadingInkasoSales || isLoadingInkasoRows"
             indeterminate
-            color="teal"
+            color="primary"
             height="2"
           />
 
@@ -12015,7 +12136,13 @@ const sisaClass = (item: any) => {
             style="flex: 1"
             maxlength="255"
           />
-          <span style="font-size: 12px; color: #757575; white-space: nowrap">
+          <span
+            style="
+              font-size: 12px;
+              color: var(--dsh-ink-2);
+              white-space: nowrap;
+            "
+          >
             {{ inkasoCustomersTerisi.length }} customer ·
             {{ fmtNum(inkasoTotalTerisi) }}
           </span>
@@ -12045,7 +12172,7 @@ const sisaClass = (item: any) => {
           rows="3"
           style="
             width: 100%;
-            border: 1px solid #e0e0e0;
+            border: 1px solid var(--dsh-line);
             border-radius: 4px;
             padding: 6px;
             font-size: 12px;
@@ -12077,88 +12204,135 @@ const sisaClass = (item: any) => {
 </template>
 
 <style scoped>
+:global(:root) {
+  --dsh-canvas: #eef1f6;
+  --dsh-ink: #1b2232;
+  --dsh-ink-2: #475066;
+  --dsh-ink-3: #6a7388;
+  --dsh-line: #e1e5ec;
+  --dsh-fill: #f1f3f7;
+  --dsh-surface: #ffffff;
+  --dsh-accent: #1565c0;
+  --dsh-accent-mid: #9cc0f0;
+  --dsh-accent-soft: #e6f0fc;
+  --dsh-good: #1f8a4c;
+  --dsh-good-soft: #e6f5ec;
+  --dsh-warn: #b86500;
+  --dsh-warn-soft: #fdf1dc;
+  --dsh-bad: #d03a34;
+  --dsh-bad-soft: #fdecea;
+  --dsh-radius: 12px;
+  --dsh-shadow:
+    0 1px 2px rgba(16, 24, 40, 0.04), 0 2px 8px rgba(16, 24, 40, 0.05);
+  --dsh-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* Angka sejajar rata digit */
+.gb-tbl,
+.rp-tbl,
+.ink-table,
+.td-detail-table,
+.spk-table,
+.pen-stat-val,
+.po-bpb-val,
+.aging-count,
+.aging-nominal,
+.funnel-val,
+.funnel-pct,
+.gb-bar-val,
+.gb-pct,
+.saldo-kas-val,
+.saldo-kas-sub-val,
+.trend-val-mini,
+.kk-nilai,
+.rp-bulanan-total,
+.knj-pct,
+.real-pct {
+  font-variant-numeric: tabular-nums;
+}
+
 /* ── Panel ── */
 .manksi-panel {
-  background: #fff;
-  border: 1px solid #e0e0e0;
-  border-radius: 4px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  background: var(--dsh-surface);
+  border: 1px solid var(--dsh-line);
+  border-radius: var(--dsh-radius);
+  box-shadow: var(--dsh-shadow);
   overflow: hidden;
 }
 .header-panel {
-  padding: 10px 14px;
-  border-left: 4px solid #1867c0;
+  padding: 12px 16px;
+  border-left: 4px solid var(--dsh-accent);
 }
 .content-panel {
   display: flex;
   flex-direction: column;
 }
 .panel-header {
-  padding: 6px 12px;
-  font-weight: 600;
-  border-bottom: 1px solid #e0e0e0;
+  padding: 9px 14px;
   display: flex;
   align-items: center;
-  font-size: 12px;
+  gap: 4px;
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.005em;
+  background: var(--dsh-surface);
+  color: var(--dsh-ink);
+  border-bottom: 1px solid var(--dsh-line);
 }
-.panel-header--warning {
-  background: #fffde7;
-  color: #f57f17;
-  border-bottom: 1px solid #fff9c4;
+.panel-header svg {
+  opacity: 0.85;
 }
-.panel-header--blue {
-  background: #e3f2fd;
-  color: #1565c0;
-  border-bottom: 1px solid #bbdefb;
-}
+.panel-header--blue,
 .panel-header--teal {
-  background: #e0f2f1;
-  color: #00695c;
-  border-bottom: 1px solid #b2dfdb;
-}
-.panel-header--orange {
-  background: #fff3e0;
-  color: #e65100;
-  border-bottom: 1px solid #ffe0b2;
+  background: var(--dsh-accent-soft);
+  color: var(--dsh-accent);
+  border-bottom-color: var(--dsh-accent-soft);
 }
 .panel-header--green {
-  background: #e8f5e9;
-  color: #2e7d32;
-  border-bottom: 1px solid #c8e6c9;
+  background: var(--dsh-good-soft);
+  color: var(--dsh-good);
+  border-bottom-color: var(--dsh-good-soft);
+}
+.panel-header--orange,
+.panel-header--warning {
+  background: var(--dsh-warn-soft);
+  color: var(--dsh-warn);
+  border-bottom-color: var(--dsh-warn-soft);
 }
 .panel-header-sub {
-  font-size: 10px;
-  color: #9e9e9e;
+  font-size: 11px;
   font-weight: 400;
+  color: var(--dsh-ink-3);
 }
 
 .badge-count {
-  background: #f57f17;
-  color: white;
-  border-radius: 10px;
-  font-size: 10px;
-  font-weight: 700;
-  padding: 1px 6px;
-  line-height: 1.4;
+  background: var(--dsh-warn);
+  color: #fff;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 1px 8px;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
 }
 .pct-badge {
-  font-size: 10px;
-  font-weight: 700;
-  padding: 1px 7px;
-  border-radius: 10px;
-  line-height: 1.4;
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 1px 8px;
+  border-radius: 999px;
+  line-height: 1.5;
 }
 .pct-good {
-  background: #e8f5e9;
-  color: #2e7d32;
+  background: var(--dsh-good-soft);
+  color: var(--dsh-good);
 }
 .pct-mid {
-  background: #fff8e1;
-  color: #f57f17;
+  background: var(--dsh-warn-soft);
+  color: var(--dsh-warn);
 }
 .pct-low {
-  background: #ffebee;
-  color: #c62828;
+  background: var(--dsh-bad-soft);
+  color: var(--dsh-bad);
 }
 
 .panel-body {
@@ -12168,49 +12342,70 @@ const sisaClass = (item: any) => {
 
 /* ── Summary Cards ── */
 .sum-card {
-  background: #fff;
-  border: 1px solid #e0e0e0;
-  border-radius: 4px;
-  padding: 8px 12px;
-  text-align: center;
+  background: var(--dsh-surface);
+  border: 1px solid var(--dsh-line);
+  border-radius: var(--dsh-radius);
+  box-shadow: var(--dsh-shadow);
+  padding: 14px 16px;
+  text-align: left;
 }
 .sum-label {
-  font-size: 10px;
-  color: #757575;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  margin-bottom: 2px;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--dsh-ink-2);
+  margin-bottom: 4px;
 }
 .sum-value {
-  font-size: 22px;
-  font-weight: 700;
-  line-height: 1.2;
+  font-size: 28px;
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.sum-sub {
+  font-size: 11px;
+  color: var(--dsh-ink-3);
+  margin-top: 4px;
 }
 
 /* ── Shortcut Cards (Overview) ── */
 .shortcut-card {
-  background: white;
-  border: 1px solid #e0e0e0;
-  border-radius: 4px;
+  background: var(--dsh-surface);
+  border: 1px solid var(--dsh-line);
+  border-radius: var(--dsh-radius);
+  box-shadow: var(--dsh-shadow);
   padding: 12px 14px;
   display: flex;
   align-items: center;
   gap: 12px;
   cursor: pointer;
-  transition: background 0.15s;
+  transition:
+    transform 0.18s var(--dsh-ease),
+    border-color 0.15s,
+    box-shadow 0.18s;
 }
 .shortcut-card:hover {
-  background: #f5f5f5;
+  border-color: var(--dsh-accent);
+  box-shadow: 0 4px 14px rgba(21, 101, 192, 0.12);
+}
+.shortcut-card:active {
+  transform: scale(0.985);
+  transition-duration: 0.08s;
+}
+.shortcut-card svg:first-child {
+  color: var(--dsh-accent);
+}
+.shortcut-card svg:last-child {
+  color: var(--dsh-ink-3);
 }
 .shortcut-title {
-  font-size: 12px;
-  font-weight: 700;
-  color: #212121;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--dsh-ink);
 }
 .shortcut-sub {
-  font-size: 10px;
-  color: #9e9e9e;
+  font-size: 11px;
+  color: var(--dsh-ink-2);
   margin-top: 2px;
   white-space: nowrap;
   overflow: hidden;
@@ -12220,7 +12415,7 @@ const sisaClass = (item: any) => {
 /* ── Penawaran ── */
 .pen-summary-bar {
   display: flex;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--dsh-fill);
   padding: 6px 0;
 }
 .pen-stat {
@@ -12229,7 +12424,7 @@ const sisaClass = (item: any) => {
   flex-direction: column;
   align-items: center;
   gap: 1px;
-  border-right: 1px solid #f0f0f0;
+  border-right: 1px solid var(--dsh-fill);
 }
 .pen-stat:last-child {
   border-right: none;
@@ -12241,7 +12436,7 @@ const sisaClass = (item: any) => {
 }
 .pen-stat-lbl {
   font-size: 9px;
-  color: #9e9e9e;
+  color: var(--dsh-ink-3);
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
@@ -12251,14 +12446,14 @@ const sisaClass = (item: any) => {
 }
 .pen-item {
   padding: 5px 12px;
-  border-bottom: 1px solid #f5f5f5;
+  border-bottom: 1px solid var(--dsh-fill);
   font-size: 11px;
 }
 .pen-item.umur-danger {
-  background: #fff5f5;
+  background: var(--dsh-bad-soft);
 }
 .pen-item.umur-warn {
-  background: #fffde7;
+  background: var(--dsh-warn-soft);
 }
 .pen-item-top {
   display: flex;
@@ -12268,12 +12463,12 @@ const sisaClass = (item: any) => {
 .pen-nomor {
   font-family: monospace;
   font-weight: 700;
-  color: #1565c0;
+  color: var(--dsh-accent);
   font-size: 11px;
 }
 .pen-divisi {
   font-size: 10px;
-  color: #9e9e9e;
+  color: var(--dsh-ink-3);
 }
 .pen-age {
   font-size: 10px;
@@ -12282,19 +12477,19 @@ const sisaClass = (item: any) => {
   border-radius: 3px;
 }
 .pen-age.umur-danger {
-  background: #ffebee;
-  color: #c62828;
+  background: var(--dsh-bad-soft);
+  color: var(--dsh-bad);
 }
 .pen-age.umur-warn {
-  background: #fff8e1;
-  color: #f57f17;
+  background: var(--dsh-warn-soft);
+  color: var(--dsh-warn);
 }
 .pen-age.umur-ok {
-  background: #e8f5e9;
-  color: #2e7d32;
+  background: var(--dsh-good-soft);
+  color: var(--dsh-good);
 }
 .pen-cus {
-  color: #424242;
+  color: var(--dsh-ink);
   margin-top: 1px;
   white-space: nowrap;
   overflow: hidden;
@@ -12303,7 +12498,7 @@ const sisaClass = (item: any) => {
 }
 .pen-ket {
   font-size: 10px;
-  color: #9e9e9e;
+  color: var(--dsh-ink-3);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -12314,12 +12509,12 @@ const sisaClass = (item: any) => {
 }
 .pen-loading {
   font-size: 10px;
-  color: #9e9e9e;
+  color: var(--dsh-ink-3);
   font-style: italic;
 }
 .pen-end {
   font-size: 10px;
-  color: #bdbdbd;
+  color: var(--dsh-ink-3);
 }
 
 .real-list {
@@ -12328,7 +12523,7 @@ const sisaClass = (item: any) => {
 }
 .real-row {
   padding: 6px 12px;
-  border-bottom: 1px solid #f5f5f5;
+  border-bottom: 1px solid var(--dsh-fill);
 }
 .real-meta {
   display: flex;
@@ -12339,11 +12534,11 @@ const sisaClass = (item: any) => {
 .real-divisi {
   font-size: 11px;
   font-weight: 700;
-  color: #1565c0;
+  color: var(--dsh-accent);
 }
 .real-nominal {
   font-size: 10px;
-  color: #757575;
+  color: var(--dsh-ink-2);
 }
 .real-bar-wrap {
   display: flex;
@@ -12354,7 +12549,7 @@ const sisaClass = (item: any) => {
 .real-bar {
   flex: 1;
   height: 8px;
-  background: #f0f0f0;
+  background: var(--dsh-fill);
   border-radius: 4px;
   overflow: hidden;
   display: flex;
@@ -12364,18 +12559,18 @@ const sisaClass = (item: any) => {
   transition: width 0.3s;
 }
 .real-seg--close {
-  background: #43a047;
+  background: var(--dsh-good);
 }
 .real-seg--batal {
-  background: #e53935;
+  background: var(--dsh-bad);
 }
 .real-seg--open {
-  background: #90caf9;
+  background: var(--dsh-accent-mid);
 }
 .real-pct {
   font-size: 10px;
   font-weight: 700;
-  color: #2e7d32;
+  color: var(--dsh-good);
   min-width: 28px;
   text-align: right;
 }
@@ -12385,13 +12580,13 @@ const sisaClass = (item: any) => {
   font-size: 10px;
 }
 .rd-close {
-  color: #2e7d32;
+  color: var(--dsh-good);
 }
 .rd-batal {
-  color: #c62828;
+  color: var(--dsh-bad);
 }
 .rd-open {
-  color: #1565c0;
+  color: var(--dsh-accent);
 }
 .real-legend {
   display: flex;
@@ -12399,9 +12594,9 @@ const sisaClass = (item: any) => {
   gap: 5px;
   padding: 5px 12px;
   font-size: 10px;
-  color: #757575;
-  border-top: 1px solid #f0f0f0;
-  background: #fafafa;
+  color: var(--dsh-ink-2);
+  border-top: 1px solid var(--dsh-fill);
+  background: var(--dsh-fill);
 }
 .leg-dot {
   display: inline-block;
@@ -12411,15 +12606,15 @@ const sisaClass = (item: any) => {
   margin-right: 3px;
 }
 .leg-close {
-  background: #43a047;
+  background: var(--dsh-good);
   margin-left: 8px;
 }
 .leg-batal {
-  background: #e53935;
+  background: var(--dsh-bad);
   margin-left: 8px;
 }
 .leg-open {
-  background: #90caf9;
+  background: var(--dsh-accent-mid);
   margin-left: 8px;
 }
 
@@ -12439,19 +12634,19 @@ const sisaClass = (item: any) => {
 }
 .map-item {
   padding: 6px 10px;
-  border-bottom: 1px solid #f5f5f5;
-  border-right: 1px solid #f5f5f5;
+  border-bottom: 1px solid var(--dsh-fill);
+  border-right: 1px solid var(--dsh-fill);
   font-size: 11px;
   transition: background 0.1s;
 }
 .map-item:hover {
-  background: #fff8e1 !important;
+  background: var(--dsh-warn-soft) !important;
 }
 .map-item.map-danger {
-  background: #fff5f5;
+  background: var(--dsh-bad-soft);
 }
 .map-item.map-warn {
-  background: #fffde7;
+  background: var(--dsh-warn-soft);
 }
 .map-item-top {
   display: flex;
@@ -12462,11 +12657,11 @@ const sisaClass = (item: any) => {
 .map-nomor {
   font-family: monospace;
   font-weight: 700;
-  color: #1565c0;
+  color: var(--dsh-accent);
   font-size: 11px;
 }
 .map-cus {
-  color: #424242;
+  color: var(--dsh-ink);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -12486,7 +12681,7 @@ const sisaClass = (item: any) => {
 }
 .knj-row {
   padding: 5px 12px;
-  border-bottom: 1px solid #f5f5f5;
+  border-bottom: 1px solid var(--dsh-fill);
 }
 .knj-meta {
   display: flex;
@@ -12497,7 +12692,7 @@ const sisaClass = (item: any) => {
 .knj-sales {
   font-size: 11px;
   font-weight: 700;
-  color: #1565c0;
+  color: var(--dsh-accent);
   text-transform: uppercase;
 }
 .knj-stats {
@@ -12512,20 +12707,20 @@ const sisaClass = (item: any) => {
   border-radius: 3px;
 }
 .knj-badge.done {
-  background: #e8f5e9;
-  color: #2e7d32;
+  background: var(--dsh-good-soft);
+  color: var(--dsh-good);
 }
 .knj-badge.failed {
-  background: #ffebee;
-  color: #c62828;
+  background: var(--dsh-bad-soft);
+  color: var(--dsh-bad);
 }
 .knj-badge.unplan {
-  background: #e3f2fd;
-  color: #1565c0;
+  background: var(--dsh-accent-soft);
+  color: var(--dsh-accent);
 }
 .knj-total {
   font-size: 9px;
-  color: #9e9e9e;
+  color: var(--dsh-ink-3);
   margin-left: 2px;
 }
 .knj-bar-wrap {
@@ -12536,7 +12731,7 @@ const sisaClass = (item: any) => {
 .knj-bar {
   flex: 1;
   height: 7px;
-  background: #f0f0f0;
+  background: var(--dsh-fill);
   border-radius: 4px;
   overflow: hidden;
   display: flex;
@@ -12546,54 +12741,54 @@ const sisaClass = (item: any) => {
   transition: width 0.3s;
 }
 .knj-done {
-  background: #43a047;
+  background: var(--dsh-good);
 }
 .knj-unplan {
-  background: #90caf9;
+  background: var(--dsh-accent-mid);
 }
 .knj-failed {
-  background: #e53935;
+  background: var(--dsh-bad);
 }
 .knj-pct {
   font-size: 10px;
   font-weight: 700;
-  color: #2e7d32;
+  color: var(--dsh-good);
   min-width: 28px;
   text-align: right;
 }
 .knj-nominal-badge {
   font-size: 9px;
   font-weight: 700;
-  background: #ede7f6;
-  color: #4527a0;
+  background: var(--dsh-accent-soft);
+  color: var(--dsh-accent);
   padding: 1px 6px;
   border-radius: 3px;
   white-space: nowrap;
 }
 .knj-nominal-badge--mh {
-  background: #f3e5f5;
-  color: #6a1b9a;
+  background: var(--dsh-accent-soft);
+  color: var(--dsh-accent);
 }
 .knj-detail-btn {
   font-size: 9px;
   font-weight: 700;
-  color: #2e7d32;
+  color: var(--dsh-good);
   background: none;
-  border: 1px solid #c8e6c9;
+  border: 1px solid var(--dsh-line);
   border-radius: 3px;
   padding: 1px 6px;
   cursor: pointer;
   line-height: 1.4;
 }
 .knj-detail-btn:hover {
-  background: #e8f5e9;
+  background: var(--dsh-good-soft);
 }
 
 /* ── PO BPB ── */
 .po-bpb-link {
   font-size: 10px;
   font-weight: 700;
-  color: #00695c;
+  color: var(--dsh-accent);
   background: none;
   border: none;
   cursor: pointer;
@@ -12628,14 +12823,14 @@ const sisaClass = (item: any) => {
 }
 .po-bpb-lbl {
   font-size: 9px;
-  color: #9e9e9e;
+  color: var(--dsh-ink-3);
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
 .po-bpb-divider {
   width: 1px;
   height: 32px;
-  background: #e0e0e0;
+  background: var(--dsh-line);
   flex-shrink: 0;
 }
 .po-bpb-bar-wrap {
@@ -12645,7 +12840,7 @@ const sisaClass = (item: any) => {
 }
 .po-bpb-bar {
   height: 10px;
-  background: #f0f0f0;
+  background: var(--dsh-fill);
   border-radius: 5px;
   overflow: hidden;
   display: flex;
@@ -12656,20 +12851,20 @@ const sisaClass = (item: any) => {
   transition: width 0.3s;
 }
 .seg-open {
-  background: #c62828;
+  background: var(--dsh-bad);
 }
 .seg-onproses {
-  background: #0277bd;
+  background: var(--dsh-accent);
 }
 .seg-close {
-  background: #43a047;
+  background: var(--dsh-good);
 }
 .po-bpb-legend {
   display: flex;
   align-items: center;
   gap: 4px;
   font-size: 10px;
-  color: #757575;
+  color: var(--dsh-ink-2);
 }
 
 /* ── Dialog SPK ── */
@@ -12680,7 +12875,7 @@ const sisaClass = (item: any) => {
   overflow: hidden;
 }
 .spk-header {
-  background: linear-gradient(135deg, #c62828 0%, #e53935 100%);
+  background: var(--dsh-ink);
   padding: 12px 16px;
   display: flex;
   align-items: center;
@@ -12722,7 +12917,7 @@ const sisaClass = (item: any) => {
   table-layout: fixed;
 }
 .spk-table thead tr {
-  background: #f5f5f5;
+  background: var(--dsh-fill);
   position: sticky;
   top: 0;
   z-index: 1;
@@ -12733,8 +12928,8 @@ const sisaClass = (item: any) => {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: #424242;
-  border-bottom: 2px solid #e0e0e0;
+  color: var(--dsh-ink);
+  border-bottom: 2px solid var(--dsh-line);
   white-space: nowrap;
   text-align: left;
 }
@@ -12744,8 +12939,8 @@ const sisaClass = (item: any) => {
 .spk-table td {
   padding: 6px 10px;
   font-size: 12px;
-  color: #212121;
-  border-bottom: 1px solid #f0f0f0;
+  color: var(--dsh-ink);
+  border-bottom: 1px solid var(--dsh-fill);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -12790,19 +12985,19 @@ const sisaClass = (item: any) => {
   width: 130px;
 }
 .row-overdue td {
-  background: #fff5f5;
+  background: var(--dsh-bad-soft);
 }
 .row-today td {
-  background: #fffde7;
+  background: var(--dsh-warn-soft);
 }
 .spk-table tbody tr:hover td {
-  background: #e8f4fd !important;
+  background: var(--dsh-accent-soft) !important;
 }
 .spk-badge {
   font-family: monospace;
   font-size: 11px;
   font-weight: 600;
-  color: #1565c0;
+  color: var(--dsh-accent);
 }
 .dl-badge {
   display: inline-block;
@@ -12810,24 +13005,24 @@ const sisaClass = (item: any) => {
   border-radius: 4px;
   font-size: 11px;
   font-weight: 600;
-  background: #f5f5f5;
-  color: #424242;
+  background: var(--dsh-fill);
+  color: var(--dsh-ink);
 }
 .dl-badge.overdue {
-  background: #ffebee;
-  color: #c62828;
+  background: var(--dsh-bad-soft);
+  color: var(--dsh-bad);
 }
 .dl-badge.today {
-  background: #fff8e1;
-  color: #f57f17;
+  background: var(--dsh-warn-soft);
+  color: var(--dsh-warn);
 }
 .spk-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 10px 16px;
-  background: #fafafa;
-  border-top: 1px solid #e0e0e0;
+  background: var(--dsh-fill);
+  border-top: 1px solid var(--dsh-line);
   flex-shrink: 0;
 }
 .spk-legend {
@@ -12835,7 +13030,7 @@ const sisaClass = (item: any) => {
   align-items: center;
   gap: 6px;
   font-size: 11px;
-  color: #757575;
+  color: var(--dsh-ink-2);
 }
 .legend-dot {
   display: inline-block;
@@ -12844,20 +13039,20 @@ const sisaClass = (item: any) => {
   border-radius: 50%;
 }
 .legend-dot.overdue {
-  background: #ef9a9a;
+  background: var(--dsh-bad-soft);
 }
 .legend-dot.today {
-  background: #ffe082;
+  background: var(--dsh-warn-soft);
 }
 .val-danger {
-  color: #c62828;
+  color: var(--dsh-bad);
   font-weight: 700;
 }
 .val-done {
-  color: #2e7d32;
+  color: var(--dsh-good);
 }
 .val-warn {
-  color: #f57f17;
+  color: var(--dsh-warn);
   font-weight: 600;
 }
 
@@ -12875,12 +13070,12 @@ const sisaClass = (item: any) => {
 }
 .overdue-item {
   padding: 7px 12px;
-  border-bottom: 1px solid #f5f5f5;
+  border-bottom: 1px solid var(--dsh-fill);
   font-size: 11px;
-  background: #fff5f5;
+  background: var(--dsh-bad-soft);
 }
 .overdue-item:hover {
-  background: #ffebee;
+  background: var(--dsh-bad-soft);
 }
 
 /* ── Collection Rate ── */
@@ -12889,7 +13084,7 @@ const sisaClass = (item: any) => {
 }
 .cr-bar {
   height: 5px;
-  background: #f0f0f0;
+  background: var(--dsh-fill);
   border-radius: 3px;
   overflow: hidden;
   margin-bottom: 3px;
@@ -12901,7 +13096,7 @@ const sisaClass = (item: any) => {
 }
 .cr-sub {
   font-size: 9px;
-  color: #9e9e9e;
+  color: var(--dsh-ink-3);
 }
 
 /* ── Aging Bucket ── */
@@ -12909,8 +13104,8 @@ const sisaClass = (item: any) => {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 1px;
-  background: #f0f0f0;
-  border-bottom: 1px solid #f0f0f0;
+  background: var(--dsh-fill);
+  border-bottom: 1px solid var(--dsh-fill);
 }
 .aging-chip {
   display: flex;
@@ -12941,38 +13136,38 @@ const sisaClass = (item: any) => {
 }
 
 .aging-chip--a {
-  background: #fff8e1;
-  color: #f57f17;
+  background: var(--dsh-warn-soft);
+  color: var(--dsh-warn);
 }
 .aging-chip--a .aging-nominal {
-  color: #bf360c;
+  color: var(--dsh-warn);
 }
 
 .aging-chip--b {
-  background: #fff3e0;
-  color: #e65100;
+  background: var(--dsh-warn-soft);
+  color: var(--dsh-warn);
 }
 .aging-chip--b .aging-nominal {
-  color: #bf360c;
+  color: var(--dsh-warn);
 }
 
 .aging-chip--c {
-  background: #ffebee;
-  color: #c62828;
+  background: var(--dsh-bad-soft);
+  color: var(--dsh-bad);
 }
 .aging-chip--c .aging-nominal {
-  color: #b71c1c;
+  color: var(--dsh-bad);
 }
 
 .aging-chip--d {
-  background: #ffcdd2;
-  color: #b71c1c;
+  background: var(--dsh-bad-soft);
+  color: var(--dsh-bad);
 }
 .aging-chip--d .aging-count {
   font-size: 20px;
 }
 .aging-chip--d .aging-nominal {
-  color: #7f0000;
+  color: var(--dsh-bad);
   font-weight: 700;
 }
 
@@ -12983,29 +13178,29 @@ const sisaClass = (item: any) => {
 }
 .overdue-item {
   padding: 7px 12px;
-  border-bottom: 1px solid #f5f5f5;
+  border-bottom: 1px solid var(--dsh-fill);
   font-size: 11px;
   border-left: 3px solid transparent;
   transition: background 0.1s;
 }
 .overdue-item:hover {
-  background: #fff8f8;
+  background: var(--dsh-bad-soft);
 }
 .overdue-low {
-  border-left-color: #ffcc02;
-  background: #fffde7;
+  border-left-color: var(--dsh-warn);
+  background: var(--dsh-warn-soft);
 }
 .overdue-mid {
-  border-left-color: #f57f17;
-  background: #fff3e0;
+  border-left-color: var(--dsh-warn);
+  background: var(--dsh-warn-soft);
 }
 .overdue-high {
-  border-left-color: #e53935;
-  background: #ffebee;
+  border-left-color: var(--dsh-bad);
+  background: var(--dsh-bad-soft);
 }
 .overdue-critical {
-  border-left-color: #b71c1c;
-  background: #ffcdd2;
+  border-left-color: var(--dsh-bad);
+  background: var(--dsh-bad-soft);
 }
 
 /* ── Trend Cashflow ── */
@@ -13020,12 +13215,12 @@ const sisaClass = (item: any) => {
   font-weight: 700;
   width: 45px;
   text-align: right;
-  color: #616161;
+  color: var(--dsh-ink-2);
 }
 .trend-bar-bg {
   flex: 1;
   height: 6px;
-  background: #f5f5f5;
+  background: var(--dsh-fill);
   border-radius: 3px;
   overflow: hidden;
 }
@@ -13036,7 +13231,7 @@ const sisaClass = (item: any) => {
 }
 .sum-sub {
   font-size: 9px;
-  color: #9e9e9e;
+  color: var(--dsh-ink-3);
   margin-top: 2px;
 }
 
@@ -13051,7 +13246,7 @@ const sisaClass = (item: any) => {
   align-items: center;
   gap: 8px;
   padding: 5px 12px;
-  border-bottom: 1px solid #f5f5f5;
+  border-bottom: 1px solid var(--dsh-fill);
 }
 .gb-row:last-child {
   border-bottom: none;
@@ -13060,7 +13255,7 @@ const sisaClass = (item: any) => {
   width: 130px;
   flex-shrink: 0;
   font-size: 11px;
-  color: #424242;
+  color: var(--dsh-ink);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -13075,7 +13270,7 @@ const sisaClass = (item: any) => {
 .gb-bar-track {
   flex: 1;
   height: 10px;
-  background: #f0f0f0;
+  background: var(--dsh-fill);
   border-radius: 3px;
   overflow: hidden;
 }
@@ -13086,7 +13281,7 @@ const sisaClass = (item: any) => {
 }
 .gb-bar-val {
   font-size: 10px;
-  color: #616161;
+  color: var(--dsh-ink-2);
   white-space: nowrap;
   min-width: 80px;
   text-align: right;
@@ -13105,23 +13300,23 @@ const sisaClass = (item: any) => {
   min-width: 500px;
 }
 .gb-tbl thead th {
-  background: #e0f2f1;
-  color: #00695c;
+  background: var(--dsh-accent-soft);
+  color: var(--dsh-accent);
   font-weight: 600;
   padding: 6px 10px;
   text-align: left;
-  border-bottom: 1px solid #b2dfdb;
+  border-bottom: 1px solid var(--dsh-accent-soft);
   white-space: nowrap;
 }
 .gb-tbl tbody td {
   padding: 6px 10px;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--dsh-fill);
 }
 .gb-tbl tbody tr:last-child td {
   border-bottom: none;
 }
 .gb-tbl tbody tr:hover td {
-  background: #f5f5f5;
+  background: var(--dsh-fill);
 }
 .gb-tbl .tr {
   text-align: right;
@@ -13137,20 +13332,20 @@ const sisaClass = (item: any) => {
   font-weight: 600;
 }
 .gb-badge--ok {
-  background: #e8f5e9;
-  color: #2e7d32;
+  background: var(--dsh-good-soft);
+  color: var(--dsh-good);
 }
 .gb-badge--warn {
-  background: #fff8e1;
-  color: #f57f17;
+  background: var(--dsh-warn-soft);
+  color: var(--dsh-warn);
 }
 .gb-badge--danger {
-  background: #ffebee;
-  color: #c62828;
+  background: var(--dsh-bad-soft);
+  color: var(--dsh-bad);
 }
 .sum-sub {
   font-size: 9px;
-  color: #9e9e9e;
+  color: var(--dsh-ink-3);
   margin-top: 2px;
 }
 /* ── Realisasi Penawaran ── */
@@ -13158,7 +13353,7 @@ const sisaClass = (item: any) => {
   display: flex;
   align-items: center;
   padding: 8px 12px;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--dsh-fill);
   flex-wrap: wrap;
   gap: 0;
 }
@@ -13172,7 +13367,7 @@ const sisaClass = (item: any) => {
 .rp-divider {
   width: 1px;
   height: 28px;
-  background: #e0e0e0;
+  background: var(--dsh-line);
   flex-shrink: 0;
 }
 .rp-val {
@@ -13183,19 +13378,19 @@ const sisaClass = (item: any) => {
 .rp-pct {
   font-size: 10px;
   font-weight: 400;
-  color: #9e9e9e;
+  color: var(--dsh-ink-3);
   margin-left: 2px;
 }
 .rp-lbl {
   font-size: 9px;
-  color: #9e9e9e;
+  color: var(--dsh-ink-3);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   white-space: nowrap;
 }
 .rp-stack-wrap {
   padding: 10px 12px 6px;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--dsh-fill);
 }
 .rp-stack {
   display: flex;
@@ -13222,7 +13417,7 @@ const sisaClass = (item: any) => {
   gap: 10px;
   padding: 5px 0 2px;
   font-size: 10px;
-  color: #757575;
+  color: var(--dsh-ink-2);
 }
 .rp-tren-wrap {
   padding: 8px 12px;
@@ -13230,7 +13425,7 @@ const sisaClass = (item: any) => {
 .rp-tren-title {
   font-size: 10px;
   font-weight: 600;
-  color: #9e9e9e;
+  color: var(--dsh-ink-3);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   margin-bottom: 6px;
@@ -13247,7 +13442,7 @@ const sisaClass = (item: any) => {
 }
 .rp-tren-bulan {
   font-size: 10px;
-  color: #616161;
+  color: var(--dsh-ink-2);
   width: 55px;
   flex-shrink: 0;
   font-weight: 500;
@@ -13257,7 +13452,7 @@ const sisaClass = (item: any) => {
 }
 .rp-tren-track {
   height: 10px;
-  background: #f0f0f0;
+  background: var(--dsh-fill);
   border-radius: 3px;
   overflow: visible;
   position: relative;
@@ -13272,8 +13467,8 @@ const sisaClass = (item: any) => {
   top: -3px;
   bottom: -3px;
   width: 1px;
-  background: #9e9e9e;
-  border-left: 2px dashed #9e9e9e;
+  background: var(--dsh-ink-3);
+  border-left: 2px dashed var(--dsh-ink-3);
 }
 .rp-tren-val {
   font-size: 10px;
@@ -13284,7 +13479,7 @@ const sisaClass = (item: any) => {
 }
 .rp-tren-konversi {
   font-size: 10px;
-  color: #9e9e9e;
+  color: var(--dsh-ink-3);
   width: 38px;
   text-align: right;
   flex-shrink: 0;
@@ -13297,25 +13492,26 @@ const sisaClass = (item: any) => {
   font-size: 11px;
   min-width: 700px;
 }
+.gb-tbl thead th,
 .rp-tbl thead th {
-  background: #e3f2fd;
-  color: #1565c0;
+  background: var(--dsh-fill);
+  color: var(--dsh-ink-2);
   font-weight: 600;
-  padding: 6px 10px;
+  padding: 7px 10px;
   text-align: left;
-  border-bottom: 1px solid #bbdefb;
+  border-bottom: 1px solid var(--dsh-line);
   white-space: nowrap;
 }
 .rp-tbl tbody td {
   padding: 5px 10px;
-  border-bottom: 1px solid #f0f0f0;
-  color: var(--color-text-primary, #212121);
+  border-bottom: 1px solid var(--dsh-fill);
+  color: var(--color-text-primary, var(--dsh-ink));
 }
 .rp-tbl tbody tr:last-child td {
   border-bottom: none;
 }
 .rp-tbl tbody tr:hover td {
-  background: #f5f5f5;
+  background: var(--dsh-fill);
 }
 .rp-badge {
   display: inline-block;
@@ -13325,40 +13521,40 @@ const sisaClass = (item: any) => {
   font-weight: 600;
 }
 .rp-badge--fast {
-  background: #e8f5e9;
-  color: #2e7d32;
+  background: var(--dsh-good-soft);
+  color: var(--dsh-good);
 }
 .rp-badge--mid {
-  background: #e3f2fd;
-  color: #185fa5;
+  background: var(--dsh-accent-soft);
+  color: var(--dsh-accent);
 }
 .rp-badge--slow {
-  background: #fff8e1;
-  color: #854f0b;
+  background: var(--dsh-warn-soft);
+  color: var(--dsh-warn);
 }
 .rp-badge--vslow {
-  background: #ffebee;
-  color: #c62828;
+  background: var(--dsh-bad-soft);
+  color: var(--dsh-bad);
 }
 .rp-badge--none {
-  background: #f5f5f5;
-  color: #757575;
+  background: var(--dsh-fill);
+  color: var(--dsh-ink-2);
 }
 
 .map-date-inp {
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--dsh-line);
   border-radius: 4px;
   padding: 3px 7px;
   font-size: 11px;
-  color: #424242;
+  color: var(--dsh-ink);
   background: white;
   outline: none;
 }
 .map-date-inp:focus {
-  border-color: #1867c0;
+  border-color: var(--dsh-accent);
 }
 .map-filter-btn {
-  background: #1867c0;
+  background: var(--dsh-accent);
   color: white;
   border: none;
   border-radius: 4px;
@@ -13368,7 +13564,7 @@ const sisaClass = (item: any) => {
   cursor: pointer;
 }
 .map-filter-btn:hover {
-  background: #1565c0;
+  background: var(--dsh-accent);
 }
 
 .gyy-list {
@@ -13384,7 +13580,7 @@ const sisaClass = (item: any) => {
   align-items: center;
   gap: 8px;
   padding: 6px 12px;
-  border-bottom: 1px solid #f5f5f5;
+  border-bottom: 1px solid var(--dsh-fill);
   font-size: 11px;
 }
 .gyy-row:last-child {
@@ -13393,13 +13589,13 @@ const sisaClass = (item: any) => {
 .gyy-col-bulan {
   width: 55px;
   flex-shrink: 0;
-  color: #1565c0;
+  color: var(--dsh-accent);
   font-weight: 600;
 }
 .gyy-col-aktual {
   flex: 1;
   min-width: 0;
-  color: #424242;
+  color: var(--dsh-ink);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -13419,7 +13615,7 @@ const sisaClass = (item: any) => {
   width: 110px;
   flex-shrink: 0;
   text-align: right;
-  color: #757575;
+  color: var(--dsh-ink-2);
   font-size: 10px;
   white-space: nowrap;
   overflow: hidden;
@@ -13433,8 +13629,8 @@ const sisaClass = (item: any) => {
   white-space: nowrap;
 }
 .gyy-ach-badge--none {
-  background: #f5f5f5;
-  color: #9e9e9e;
+  background: var(--dsh-fill);
+  color: var(--dsh-ink-3);
 }
 .gyy-list-fill {
   max-height: none;
@@ -13456,11 +13652,11 @@ const sisaClass = (item: any) => {
   align-items: center;
   gap: 8px;
   padding: 5px 10px;
-  border-bottom: 1px solid #f5f5f5;
+  border-bottom: 1px solid var(--dsh-fill);
   font-size: 11px;
 }
 .aktivitas-item:hover {
-  background: #f5f9ff;
+  background: var(--dsh-fill);
 }
 .jenis-badge {
   flex-shrink: 0;
@@ -13475,7 +13671,7 @@ const sisaClass = (item: any) => {
 .akt-nomor {
   font-family: monospace;
   font-weight: 600;
-  color: #1565c0;
+  color: var(--dsh-accent);
   width: 160px;
   flex-shrink: 0;
 }
@@ -13484,17 +13680,17 @@ const sisaClass = (item: any) => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: #212121;
+  color: var(--dsh-ink);
 }
 .akt-divisi {
   width: 100px;
   flex-shrink: 0;
-  color: #757575;
+  color: var(--dsh-ink-2);
   font-size: 10px;
 }
 .akt-jam {
   flex-shrink: 0;
-  color: #9e9e9e;
+  color: var(--dsh-ink-3);
   font-size: 10px;
   font-family: monospace;
 }
@@ -13503,11 +13699,11 @@ const sisaClass = (item: any) => {
   text-align: center;
   padding: 24px;
   font-size: 12px;
-  color: #bdbdbd;
+  color: var(--dsh-ink-3);
 }
 
 .aktivitas-item--new {
-  background: #e8f5e9 !important;
+  background: var(--dsh-good-soft) !important;
   animation: highlight-fade 3s ease-out forwards;
 }
 
@@ -13526,12 +13722,12 @@ const sisaClass = (item: any) => {
   flex-shrink: 0;
   font-size: 11px;
   font-weight: 600;
-  color: #424242;
+  color: var(--dsh-ink);
 }
 .funnel-bar-track {
   flex: 1;
   height: 14px;
-  background: #f0f0f0;
+  background: var(--dsh-fill);
   border-radius: 4px;
   overflow: hidden;
 }
@@ -13551,12 +13747,12 @@ const sisaClass = (item: any) => {
   width: 38px;
   text-align: right;
   font-size: 10px;
-  color: #9e9e9e;
+  color: var(--dsh-ink-3);
   flex-shrink: 0;
 }
 
 .bk-row {
-  border-bottom: 1px solid #f5f5f5;
+  border-bottom: 1px solid var(--dsh-fill);
 }
 .bk-bahan-list {
   padding: 2px 12px 6px 34px;
@@ -13565,7 +13761,7 @@ const sisaClass = (item: any) => {
   display: flex;
   justify-content: space-between;
   font-size: 10px;
-  color: #757575;
+  color: var(--dsh-ink-2);
   padding: 1px 0;
 }
 .bk-bahan-nama {
@@ -13575,20 +13771,20 @@ const sisaClass = (item: any) => {
   max-width: 70%;
 }
 .bk-bahan-kurang {
-  color: #c62828;
+  color: var(--dsh-bad);
   font-weight: 600;
   white-space: nowrap;
 }
 .row-minus {
-  background: #fff5f5;
+  background: var(--dsh-bad-soft);
 }
 .gj-filter-sel {
   font-size: 10px;
-  border: 1px solid #bbdefb;
+  border: 1px solid var(--dsh-accent-soft);
   border-radius: 3px;
   padding: 2px 6px;
   background: white;
-  color: #1565c0;
+  color: var(--dsh-accent);
   font-weight: 600;
   cursor: pointer;
   outline: none;
@@ -13603,7 +13799,7 @@ const sisaClass = (item: any) => {
   align-items: center;
   gap: 8px;
   padding: 5px 12px;
-  border-bottom: 1px solid #f5f5f5;
+  border-bottom: 1px solid var(--dsh-fill);
 }
 .rp-bulanan-row:last-child {
   border-bottom: none;
@@ -13612,7 +13808,7 @@ const sisaClass = (item: any) => {
   width: 48px;
   flex-shrink: 0;
   font-size: 10px;
-  color: #616161;
+  color: var(--dsh-ink-2);
   font-weight: 600;
 }
 .rp-bulanan-bar-wrap {
@@ -13624,7 +13820,7 @@ const sisaClass = (item: any) => {
   height: 14px;
   border-radius: 3px;
   overflow: visible;
-  background: #f0f0f0;
+  background: var(--dsh-fill);
 }
 .rp-bulanan-seg {
   position: relative;
@@ -13632,13 +13828,13 @@ const sisaClass = (item: any) => {
   transition: width 0.3s;
 }
 .rp-seg--open {
-  background: #90caf9;
+  background: var(--dsh-accent-mid);
 }
 .rp-seg--close {
-  background: #43a047;
+  background: var(--dsh-good);
 }
 .rp-seg--batal {
-  background: #e53935;
+  background: var(--dsh-bad);
 }
 .rp-tooltip {
   display: none;
@@ -13646,7 +13842,7 @@ const sisaClass = (item: any) => {
   bottom: 120%;
   left: 50%;
   transform: translateX(-50%);
-  background: #212121;
+  background: var(--dsh-ink);
   color: #fff;
   font-size: 10px;
   padding: 4px 8px;
@@ -13663,14 +13859,14 @@ const sisaClass = (item: any) => {
   margin-bottom: 2px;
 }
 .rp-total-row td {
-  background: #fafafa;
-  border-top: 2px solid #e0e0e0;
+  background: var(--dsh-fill);
+  border-top: 2px solid var(--dsh-line);
   position: sticky;
   bottom: 0;
   z-index: 1;
 }
 .rp-total-card {
-  border: 2px solid #2e7d32;
+  border: 2px solid var(--dsh-good);
 }
 .rp-bulanan-seg:hover .rp-tooltip {
   display: block;
@@ -13681,7 +13877,7 @@ const sisaClass = (item: any) => {
   text-align: right;
   font-size: 10px;
   font-weight: 700;
-  color: #424242;
+  color: var(--dsh-ink);
 }
 .kk-stack {
   display: flex;
@@ -13719,15 +13915,15 @@ const sisaClass = (item: any) => {
 .kk-label {
   width: 100px;
   flex-shrink: 0;
-  color: #424242;
+  color: var(--dsh-ink);
 }
 .kk-item {
   flex: 1;
-  color: #616161;
+  color: var(--dsh-ink-2);
 }
 .kk-nilai {
   font-weight: 700;
-  color: #212121;
+  color: var(--dsh-ink);
   white-space: nowrap;
 }
 
@@ -13735,9 +13931,9 @@ const sisaClass = (item: any) => {
   display: flex;
   gap: 6px;
   padding: 8px 12px;
-  border-top: 1px solid #f0f0f0;
+  border-top: 1px solid var(--dsh-fill);
   overflow-x: auto;
-  background: #fafafa;
+  background: var(--dsh-fill);
 }
 .tc-month-chip {
   flex-shrink: 0;
@@ -13745,24 +13941,24 @@ const sisaClass = (item: any) => {
   font-weight: 600;
   padding: 4px 10px;
   border-radius: 12px;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--dsh-line);
   background: white;
-  color: #616161;
+  color: var(--dsh-ink-2);
   cursor: pointer;
   transition: all 0.15s;
 }
 .tc-month-chip:hover {
-  border-color: #2e7d32;
-  color: #2e7d32;
+  border-color: var(--dsh-good);
+  color: var(--dsh-good);
 }
 .tc-month-chip--active {
-  background: #2e7d32;
-  border-color: #2e7d32;
+  background: var(--dsh-good);
+  border-color: var(--dsh-good);
   color: white;
 }
 
 .potensi-src-row--selected {
-  background: #fff3e0;
+  background: var(--dsh-warn-soft);
 }
 
 .ink-table {
@@ -13774,28 +13970,29 @@ const sisaClass = (item: any) => {
   position: sticky;
   top: 0;
   z-index: 2;
-  background: #1565c0;
-  color: #fff;
-  font-weight: 700;
-  font-size: 10.5px;
-  text-transform: uppercase;
+  background: var(--dsh-fill);
+  color: var(--dsh-ink-2);
+  font-weight: 600;
+  font-size: 11px;
   text-align: left;
   padding: 7px 8px;
   white-space: nowrap;
+  border-bottom: 1px solid var(--dsh-line);
 }
 .ink-table td {
   padding: 5px 8px;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--dsh-fill);
   vertical-align: middle;
 }
 .ink-table tfoot td {
   position: sticky;
   bottom: 0;
   z-index: 2;
-  background: #1565c0;
-  color: #fff;
-  font-weight: 700;
+  background: var(--dsh-fill);
+  color: var(--dsh-ink);
+  font-weight: 600;
   padding: 7px 8px;
+  border-top: 1px solid var(--dsh-line);
   border-bottom: none;
 }
 .ink-num {
@@ -13803,17 +14000,17 @@ const sisaClass = (item: any) => {
   white-space: nowrap;
 }
 .ink-row:hover {
-  background: #fafafa;
+  background: var(--dsh-fill);
 }
 .ink-row--terisi {
-  background: #e8f5e9;
+  background: var(--dsh-good-soft);
 }
 .ink-nota {
   font-weight: 700;
   white-space: nowrap;
 }
 .ink-sisa {
-  color: #c62828;
+  color: var(--dsh-bad);
   font-weight: 700;
 }
 .td-sales-link {
@@ -13823,7 +14020,7 @@ const sisaClass = (item: any) => {
   color: inherit;
 }
 .td-sales-link:hover {
-  color: #1565c0;
+  color: var(--dsh-accent);
 }
 .td-detail-table {
   width: 100%;
@@ -13831,14 +14028,14 @@ const sisaClass = (item: any) => {
   font-size: 12px;
 }
 .td-detail-table th {
-  background: #eceff1;
+  background: var(--dsh-fill);
   padding: 6px 8px;
   text-align: left;
-  border-bottom: 2px solid #b0bec5;
+  border-bottom: 2px solid var(--dsh-ink-3);
 }
 .td-detail-table td {
   padding: 5px 8px;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--dsh-fill);
 }
 .td-detail-table .tr {
   text-align: right;
@@ -13852,7 +14049,7 @@ const sisaClass = (item: any) => {
 }
 .td-badge-old {
   display: inline-block;
-  background: #e65100;
+  background: var(--dsh-warn);
   color: white;
   font-size: 9px;
   font-weight: 700;
@@ -13864,7 +14061,7 @@ const sisaClass = (item: any) => {
 
 @keyframes highlight-fade {
   0% {
-    background: #c8e6c9;
+    background: var(--dsh-good-soft);
   }
   100% {
     background: transparent;
@@ -13873,22 +14070,21 @@ const sisaClass = (item: any) => {
 
 .saldo-kas-card {
   position: relative;
-  background: #fff;
-  border-radius: 8px;
-  padding: 14px 20px;
+  border-radius: var(--dsh-radius);
+  padding: 16px 22px;
   display: flex;
   align-items: center;
   gap: 16px;
-  border-left: 4px solid #2e7d32;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  border: 1px solid var(--dsh-line);
+  box-shadow: var(--dsh-shadow);
 }
 .saldo-kas-card--pos {
-  border-left-color: #2e7d32;
-  animation: saldoGlowGreen 2.2s ease-in-out infinite;
+  background: var(--dsh-good-soft);
+  border-color: rgba(31, 138, 76, 0.2);
 }
 .saldo-kas-card--neg {
-  border-left-color: #c62828;
-  animation: saldoGlowRed 2.2s ease-in-out infinite;
+  background: var(--dsh-bad-soft);
+  border-color: rgba(208, 58, 52, 0.22);
 }
 .saldo-kas-icon-wrap {
   width: 40px;
@@ -13900,12 +14096,12 @@ const sisaClass = (item: any) => {
   flex-shrink: 0;
 }
 .saldo-kas-card--pos .saldo-kas-icon-wrap {
-  background: #e8f5e9;
-  color: #2e7d32;
+  background: var(--dsh-good-soft);
+  color: var(--dsh-good);
 }
 .saldo-kas-card--neg .saldo-kas-icon-wrap {
-  background: #ffebee;
-  color: #c62828;
+  background: var(--dsh-bad-soft);
+  color: var(--dsh-bad);
 }
 .saldo-kas-main {
   flex: 1;
@@ -13920,14 +14116,14 @@ const sisaClass = (item: any) => {
   text-overflow: ellipsis;
 }
 .saldo-kas-card--pos .saldo-kas-val {
-  color: #2e7d32;
+  color: var(--dsh-good);
 }
 .saldo-kas-card--neg .saldo-kas-val {
-  color: #c62828;
+  color: var(--dsh-bad);
 }
 .saldo-kas-lbl {
   font-size: 10px;
-  color: #9e9e9e;
+  color: var(--dsh-ink-3);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   margin-top: 2px;
@@ -13935,7 +14131,7 @@ const sisaClass = (item: any) => {
 .saldo-kas-divider {
   width: 1px;
   height: 36px;
-  background: #e0e0e0;
+  background: var(--dsh-line);
   flex-shrink: 0;
 }
 .saldo-kas-sub {
@@ -13948,40 +14144,64 @@ const sisaClass = (item: any) => {
 .saldo-kas-sub-val {
   font-size: 18px;
   font-weight: 700;
-  color: #616161;
+  color: var(--dsh-ink-2);
 }
 .saldo-kas-sub-lbl {
   font-size: 9px;
-  color: #9e9e9e;
+  color: var(--dsh-ink-3);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   white-space: nowrap;
 }
 
-@keyframes saldoGlowGreen {
-  0%,
-  100% {
-    box-shadow:
-      0 1px 2px rgba(0, 0, 0, 0.05),
-      0 0 0 0 rgba(46, 125, 50, 0);
-  }
-  50% {
-    box-shadow:
-      0 1px 2px rgba(0, 0, 0, 0.05),
-      0 0 14px 2px rgba(46, 125, 50, 0.35);
-  }
+/* ── Canvas, tipografi sistem, dan warna utilitas khusus dashboard ── */
+.dsh-root {
+  background: var(--dsh-canvas);
+  min-height: 100%;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  color: var(--dsh-ink);
 }
-@keyframes saldoGlowRed {
-  0%,
-  100% {
-    box-shadow:
-      0 1px 2px rgba(0, 0, 0, 0.05),
-      0 0 0 0 rgba(198, 40, 40, 0);
-  }
-  50% {
-    box-shadow:
-      0 1px 2px rgba(0, 0, 0, 0.05),
-      0 0 14px 2px rgba(198, 40, 40, 0.35);
+.dsh-root .text-primary {
+  color: var(--dsh-accent) !important;
+}
+.dsh-root .text-success {
+  color: var(--dsh-good) !important;
+}
+.dsh-root .text-warning {
+  color: var(--dsh-warn) !important;
+}
+.dsh-root .text-error {
+  color: var(--dsh-bad) !important;
+}
+.dsh-root .bg-primary {
+  background: var(--dsh-accent) !important;
+}
+.dsh-root .bg-success {
+  background: var(--dsh-good) !important;
+}
+
+/* Lingkaran ikon Saldo Kas: putih di atas kartu bertinta */
+.saldo-kas-card--pos .saldo-kas-icon-wrap,
+.saldo-kas-card--neg .saldo-kas-icon-wrap {
+  background: var(--dsh-surface);
+}
+
+/* Tekan terasa instan */
+.tc-month-chip:active,
+.knj-detail-btn:active,
+.map-filter-btn:active {
+  transform: scale(0.96);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shortcut-card,
+  .shortcut-card:active,
+  .tc-month-chip:active,
+  .knj-detail-btn:active,
+  .map-filter-btn:active {
+    transition: none;
+    transform: none;
   }
 }
 </style>
