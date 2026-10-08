@@ -93,7 +93,10 @@ const {
       jenis: filterState.value.jenis,
       cabang: filterState.value.cabang,
     });
-    return res.data.data;
+    return res.data.data.map((r: any) => ({
+      ...r,
+      Status: r.Status?.trim() ? r.Status : "OPEN",
+    }));
   },
   immediate: false,
 });
@@ -151,7 +154,7 @@ const rowPropsFn = (data: any) => {
     return { style: "color: #333333;" };
   }
   // OPEN = Merah
-  if (status === "") {
+  if (status === "OPEN") {
     return { style: "color: #d32f2f; font-weight: 600;" };
   }
   // PROSES BELI = Biru
@@ -179,7 +182,7 @@ const onAdd = () => {
 };
 
 const onEdit = (item: any) => {
-  if (item.Status !== "") {
+  if (item.Status !== "OPEN") {
     return toast.warning(`Data sudah ${item.Status}, tidak bisa diubah.`);
   }
   // <--- Sesuaikan path-nya ke /edit/ (bukan /form/)
@@ -189,7 +192,7 @@ const onEdit = (item: any) => {
 };
 
 const onDelete = async (item: any) => {
-  if (item.Status !== "")
+  if (item.Status !== "OPEN")
     return toast.error(`Sudah ${item.Status}. Tidak bisa dihapus.`);
   try {
     await permintaanPembelianService.delete(item.Nomor);
@@ -242,7 +245,7 @@ const onExportDetail = async () => {
           User: item.Usr,
           Bagian: item.Bagian,
           Cabang: item.Cab,
-          Status: item.Status === "" ? "OPEN" : item.Status,
+          Status: item.Status,
           "Kode Barang": d.Kode,
           "Nama Barang": d.Nama,
           Satuan: d.Satuan,
@@ -291,7 +294,7 @@ const onAjukanPerubahan = () => {
   if (
     selectedItem.value.Ngedit === "" &&
     canEdit.value &&
-    selectedItem.value.Status === ""
+    selectedItem.value.Status === "OPEN"
   ) {
     toast.info(
       "Tidak perlu pengajuan perubahan data. Transaksi masih terbuka.",
