@@ -5896,10 +5896,14 @@ const sisaClass = (item: any) => {
                   </div>
                 </template>
                 <DashState
-                  v-else
-                  kind="empty"
-                  message="Semua penawaran sudah ada MAP-nya"
+                  v-else-if="loadFailed.Map"
+                  kind="error"
+                  message="Penawaran belum MAP gagal dimuat."
+                  @retry="loadMoreMap"
                 />
+                <div v-else class="text-center text-grey py-3 text-caption">
+                  Semua penawaran sudah ada MAP-nya
+                </div>
               </div>
             </div>
           </v-col>
@@ -12773,7 +12777,7 @@ const sisaClass = (item: any) => {
   background: none;
   border: 1px solid var(--dsh-line);
   border-radius: 3px;
-padding: 3px 8px;
+  padding: 3px 8px;
   cursor: pointer;
   line-height: 1.4;
 }
