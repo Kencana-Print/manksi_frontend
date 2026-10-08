@@ -4794,6 +4794,14 @@ const rpSegPct = (m: RealisasiBulananMonth, status: string) => {
   return Math.round((v / m.totalNilai) * 100);
 };
 const shortNumID = (n: number) => shortNum(n).replace(".", ",");
+// Format singkat dengan pembulatan KE BAWAH (6,351 M → 6,3 M, bukan 6,4 M)
+const shortNumFloor = (n: number): string => {
+  const floor1 = (x: number) => (Math.floor(x * 10) / 10).toFixed(1);
+  if (n >= 1_000_000_000) return floor1(n / 1_000_000_000) + "M";
+  if (n >= 1_000_000) return floor1(n / 1_000_000) + "jt";
+  if (n >= 1_000) return Math.floor(n / 1_000) + "rb";
+  return String(n);
+};
 const calcYoyPct = (aktual: number, ly: number): number => {
   if (!ly) return aktual > 0 ? 100 : 0;
   return ((aktual - ly) / ly) * 100;
@@ -6852,7 +6860,7 @@ const sisaClass = (item: any) => {
                     <span
                       class="pen-stat-val"
                       style="color: var(--dsh-accent)"
-                      >{{ shortNum(potensiSummary.totalPotensi) }}</span
+                      >{{ shortNumFloor(potensiSummary.totalPotensi) }}</span
                     >
                     <span class="pen-stat-lbl">Total Potensi</span>
                   </div>
