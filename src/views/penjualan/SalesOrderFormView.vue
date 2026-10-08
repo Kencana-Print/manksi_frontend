@@ -246,6 +246,9 @@ const defaultData = {
   pin_customer: "N",
   kepentingan_acc: "",
 
+  IsInvoiced: 0,
+  HasApprovedInvoice: false,
+
   spk_iscetak: "N",
   spk_standar_ukuran: "KENCANA",
 

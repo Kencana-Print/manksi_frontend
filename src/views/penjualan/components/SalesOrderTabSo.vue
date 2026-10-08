@@ -43,6 +43,13 @@ const isOpeningModal = ref(false);
 const isDivisiTiga = computed(() =>
   String(props.formData.spk_divisi).startsWith("3"),
 );
+// Harga terkunci: SO sudah diinvoice dan belum ada ACC Perubahan Data (INVOICE)
+const hargaLocked = computed(
+  () =>
+    props.isEdit &&
+    !!props.formData.IsInvoiced &&
+    !props.formData.HasApprovedInvoice,
+);
 const labelStdSistem = computed(() =>
   isDivisiTiga.value ? "Std. Kaosan" : "Std. Kencana",
 );
@@ -1721,12 +1728,20 @@ watch(
             Sublim</label
           >
           <div class="ml-auto d-flex align-center" style="gap: 4px">
+            <span
+              v-if="hargaLocked"
+              style="color: #c62828; font-weight: 700; font-size: 10px"
+              title="SO sudah diinvoice. Info ke Accounting, lalu ajukan Pengajuan Perubahan Data."
+            >
+              🔒 Harga terkunci (sudah diinvoice)
+            </span>
             <label class="lbl text-right" style="width: 68px">Harga Jual</label>
             <input
               v-model.number="formData.spk_harga"
               type="number"
               class="inp text-right"
               style="width: 90px"
+              :disabled="hargaLocked"
               v-select-on-focus
             />
             <label class="lbl text-right ml-1" style="width: 62px"
@@ -1737,6 +1752,7 @@ watch(
               type="number"
               class="inp text-right"
               style="width: 90px"
+              :disabled="hargaLocked"
               v-select-on-focus
             />
             <label class="lbl text-right ml-1" style="width: 62px"
@@ -1747,6 +1763,7 @@ watch(
               type="number"
               class="inp text-right"
               style="width: 90px"
+              :disabled="hargaLocked"
               v-select-on-focus
             />
           </div>

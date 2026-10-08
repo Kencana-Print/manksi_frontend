@@ -78,9 +78,13 @@ export const salesOrderService = {
       payload,
     ),
 
-  requestRevisiPin: (nomor: string, alasan: string) =>
+  requestRevisiPin: (
+    nomor: string,
+    alasan: string,
+    jenis: "TUTUPBUKU" | "INVOICE" = "TUTUPBUKU",
+  ) =>
     api.post(
       `/penjualan/sales-order/${encodeURIComponent(nomor)}/request-revisi-pin`,
-      { alasan },
+      { alasan, jenis },
     ),
 };

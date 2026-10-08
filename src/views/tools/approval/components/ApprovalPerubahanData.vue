@@ -34,6 +34,22 @@ const selectedRows = ref<any[]>([]);
 const authData = ref<any>({}); // Data row dari grid master
 const authStatus = ref("Y");
 
+const JENIS_META: Record<string, { label: string; color: string }> = {
+  UBAH: { label: "SPK PPIC", color: "blue-grey" },
+  TUTUPBUKU: { label: "Tutup Buku", color: "deep-orange" },
+  INVOICE: { label: "Invoice (Harga)", color: "purple" },
+};
+
+// UBAH hanya bermakna "SPK PPIC" untuk transaksi SO; di modul lain
+// (pelunasan piutang, MKB, dst.) jenisnya default UBAH tanpa arti khusus.
+const jenisMeta = (row: { Jenis?: string; Transaksi?: string }) => {
+  if (row.Jenis === "UBAH" && row.Transaksi !== "SO") return null;
+  return JENIS_META[row.Jenis ?? ""] ?? null;
+};
+
+const jenisLabel = (row: { Jenis?: string; Transaksi?: string }) =>
+  jenisMeta(row)?.label ?? "";
+
 // Sesuai dengan kolom di Delphi untuk Perubahan Data
 const headers = [
   { title: "Program", key: "Program", width: "100px" },
@@ -218,11 +234,12 @@ const getRowProps = (data: any) => {
 
     <template #item.Jenis="{ item }">
       <v-chip
+        v-if="jenisMeta(item)"
         size="x-small"
-        :color="item.Jenis === 'TUTUPBUKU' ? 'deep-orange' : 'blue-grey'"
+        :color="jenisMeta(item)!.color"
         variant="flat"
       >
-        {{ item.Jenis === "TUTUPBUKU" ? "Tutup Buku" : "SPK PPIC" }}
+        {{ jenisMeta(item)!.label }}
       </v-chip>
     </template>
   </BaseBrowse>
@@ -281,13 +298,7 @@ const getRowProps = (data: any) => {
               <span class="d-lbl">Jenis</span>
               <input
                 type="text"
-                :value="
-                  authData.Jenis === 'TUTUPBUKU'
-                    ? 'Tutup Buku'
-                    : authData.Jenis === 'UBAH'
-                      ? 'SPK PPIC Closed'
-                      : authData.Jenis
-                "
+                :value="jenisLabel(authData)"
                 readonly
                 class="d-inp flex-1 font-weight-bold"
               />

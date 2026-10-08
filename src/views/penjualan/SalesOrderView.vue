@@ -1085,9 +1085,12 @@ const revisiData = ref<any>({
   namaExternal: "",
   isTutupBuku: false,
   canSaveNow: true,
+  isInvoiced: false,
+  canEditHarga: true,
 });
 const showRevisiPinDialog = ref(false);
 const revisiPinAlasan = ref("");
+const revisiPinJenis = ref<"TUTUPBUKU" | "INVOICE">("TUTUPBUKU");
 const isRevisiPinSubmitting = ref(false);
 
 // ⬅ BARU: lookup modal khusus dialog Revisi SO
@@ -1171,7 +1174,8 @@ const submitRevisi = async () => {
   }
 };
 
-const openRevisiPinDialog = () => {
+const openRevisiPinDialog = (jenis: "TUTUPBUKU" | "INVOICE") => {
+  revisiPinJenis.value = jenis;
   revisiPinAlasan.value = "";
   showRevisiPinDialog.value = true;
 };
@@ -1187,6 +1191,7 @@ const submitRevisiPin = async () => {
     const res = await salesOrderService.requestRevisiPin(
       selectedItem.value.Nomor,
       revisiPinAlasan.value,
+      revisiPinJenis.value,
     );
     toast.success(res.data.message);
     showRevisiPinDialog.value = false;
@@ -2193,7 +2198,7 @@ const submitRevisiPin = async () => {
                 size="x-small"
                 color="warning"
                 variant="elevated"
-                @click="openRevisiPinDialog"
+                @click="openRevisiPinDialog('TUTUPBUKU')"
               >
                 Ajukan Perubahan Data
               </v-btn>
@@ -2205,6 +2210,32 @@ const submitRevisiPin = async () => {
           >
             ✓ Pengajuan perubahan data sudah di-ACC. Anda bisa menyimpan revisi
             ini.
+          </div>
+
+          <div
+            v-if="revisiData.isInvoiced && !revisiData.canEditHarga"
+            class="revisi-alert mb-3"
+          >
+            SO ini sudah diinvoice, sehingga harga dikunci. Perlu info ke
+            Accounting. Untuk mengubah harga, ajukan Perubahan Data dan tunggu
+            ACC.
+            <div class="mt-2">
+              <v-btn
+                size="x-small"
+                color="warning"
+                variant="elevated"
+                @click="openRevisiPinDialog('INVOICE')"
+              >
+                Ajukan Perubahan Data (Harga)
+              </v-btn>
+            </div>
+          </div>
+          <div
+            v-else-if="revisiData.isInvoiced && revisiData.canEditHarga"
+            class="revisi-alert-ok mb-3"
+          >
+            ✓ Pengajuan perubahan harga sudah di-ACC. Pastikan Accounting sudah
+            diinfo.
           </div>
 
           <div class="revisi-field">
@@ -2230,19 +2261,28 @@ const submitRevisiPin = async () => {
           <v-divider class="my-3" />
           <div class="revisi-field">
             <label>Harga Jual</label>
-            <div class="revisi-inp-wrap">
+            <div
+              class="revisi-inp-wrap"
+              :class="{ 'revisi-inp-locked': !revisiData.canEditHarga }"
+            >
               <NumberInputIDR v-model="revisiData.hargaJual" cursor-to-end />
             </div>
           </div>
           <div class="revisi-field">
             <label>Harga Riil</label>
-            <div class="revisi-inp-wrap">
+            <div
+              class="revisi-inp-wrap"
+              :class="{ 'revisi-inp-locked': !revisiData.canEditHarga }"
+            >
               <NumberInputIDR v-model="revisiData.hargaRiil" cursor-to-end />
             </div>
           </div>
           <div class="revisi-field">
             <label>Harga Fee</label>
-            <div class="revisi-inp-wrap">
+            <div
+              class="revisi-inp-wrap"
+              :class="{ 'revisi-inp-locked': !revisiData.canEditHarga }"
+            >
               <NumberInputIDR v-model="revisiData.hargaFee" cursor-to-end />
             </div>
           </div>
@@ -2754,5 +2794,10 @@ const submitRevisiPin = async () => {
 }
 .revisi-lkp-btn:hover {
   background: #bbdefb;
+}
+.revisi-inp-locked {
+  pointer-events: none;
+  background: #f5f5f5;
+  opacity: 0.65;
 }
 </style>
