@@ -74,6 +74,7 @@ interface BahanRow {
   jumlah: number;
   harga: number;
   nilai: number;
+  tambah: boolean;
 }
 
 const detail = ref<DetailRow[]>([]);
@@ -91,7 +92,10 @@ const pin5Config = computed(() => {
 });
 
 const xpotonganBahan = computed(() =>
-  bahanTambahan.value.reduce((s, b) => s + (Number(b.nilai) || 0), 0),
+  bahanTambahan.value.reduce(
+    (s, b) => s + (b.tambah ? -1 : 1) * (Number(b.nilai) || 0),
+    0,
+  ),
 );
 const xtotalDetail = computed(() =>
   detail.value.reduce((s, d) => {
@@ -217,6 +221,7 @@ const addBahanRow = () =>
     jumlah: 0,
     harga: 0,
     nilai: 0,
+    tambah: false,
   });
 const removeBahanRow = (idx: number) => bahanTambahan.value.splice(idx, 1);
 
@@ -938,6 +943,7 @@ const executeClose = () => {
                   <th style="width: 90px" class="text-right">Jumlah</th>
                   <th style="width: 100px" class="text-right">Harga</th>
                   <th style="width: 110px" class="text-right">Nilai</th>
+                  <th style="width: 60px" class="text-center">Tambah</th>
                   <th style="width: 30px"></th>
                 </tr>
               </thead>
@@ -980,7 +986,20 @@ const executeClose = () => {
                       @blur="onBahanHargaBlur(b, $event)"
                     />
                   </td>
-                  <td class="td-inp cell-total tr">{{ numFmt(b.nilai) }}</td>
+                  <td
+                    class="td-inp cell-total tr"
+                    :class="{ 'cell-plus': b.tambah }"
+                  >
+                    {{ b.tambah ? "+" : "" }}{{ numFmt(b.nilai) }}
+                  </td>
+                  <td class="td-ctr">
+                    <input
+                      type="checkbox"
+                      v-model="b.tambah"
+                      class="tambah-check"
+                      title="Centang bila bahan ini menambah tagihan"
+                    />
+                  </td>
                   <td class="td-ctr">
                     <button
                       type="button"
@@ -993,7 +1012,7 @@ const executeClose = () => {
                 </tr>
                 <tr v-if="!bahanTambahan.length">
                   <td
-                    colspan="7"
+                    colspan="8"
                     class="text-center text-grey py-4 font-italic"
                   >
                     Belum ada bahan tambahan.
@@ -1002,9 +1021,11 @@ const executeClose = () => {
               </tbody>
               <tfoot v-if="bahanTambahan.length">
                 <tr>
-                  <td colspan="5" class="foot-lbl">Total Bahan</td>
+                  <td colspan="5" class="foot-lbl">
+                    Total Bahan (net pengurang)
+                  </td>
                   <td class="foot-val tr">{{ numFmt(xpotonganBahan) }}</td>
-                  <td></td>
+                  <td colspan="2"></td>
                 </tr>
               </tfoot>
             </table>
@@ -1630,6 +1651,13 @@ const executeClose = () => {
 }
 .mini-table input[type="checkbox"] {
   accent-color: #1565c0;
+  cursor: pointer;
+}
+.cell-plus {
+  color: #2e7d32;
+}
+.tambah-check {
+  accent-color: #2e7d32;
   cursor: pointer;
 }
 </style>

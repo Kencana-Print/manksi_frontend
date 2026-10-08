@@ -5,6 +5,14 @@ import { voucherPembayaranFormService } from "@/services/piutang/voucherPembayar
 
 const route = useRoute();
 const rows = ref<any[]>([]);
+interface BahanPrint {
+  nama: string;
+  satuan: string;
+  jumlah: number;
+  harga: number;
+  nilai: number;
+  tambah: boolean;
+}
 const isLoading = ref(true);
 const error = ref("");
 
@@ -35,6 +43,10 @@ const grandNet = computed(() => {
 const bahanTambahan = computed(() =>
   Number(rows.value[0]?.bahan_tambahan || 0),
 );
+const bahanList = computed<BahanPrint[]>(() => rows.value[0]?.bahan ?? []);
+
+// Positif = mengurangi tagihan, negatif = menambah
+const fmtBahan = (v: number) => (v < 0 ? `+${fmt(Math.abs(v))}` : fmt(v));
 const disc = computed(() => Number(rows.value[0]?.vou_disc || 0));
 const grandTotal = computed(
   () => grandNet.value - bahanTambahan.value - disc.value,
@@ -132,6 +144,32 @@ const grandTotal = computed(
         </tbody>
       </table>
 
+      <div v-if="bahanList.length" class="bahan-block">
+        <div class="bahan-title">Bahan Tambahan</div>
+        <table class="detail-tbl">
+          <thead>
+            <tr>
+              <th style="width: 28px">No</th>
+              <th>Nama</th>
+              <th style="width: 60px">Satuan</th>
+              <th style="width: 70px; text-align: right">Jumlah</th>
+              <th style="width: 90px; text-align: right">Harga</th>
+              <th style="width: 90px; text-align: right">Nilai</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(b, i) in bahanList" :key="i">
+              <td class="tc">{{ i + 1 }}</td>
+              <td>{{ b.nama }}</td>
+              <td>{{ b.satuan }}</td>
+              <td class="tr">{{ fmt(b.jumlah) }}</td>
+              <td class="tr">{{ fmt(b.harga) }}</td>
+              <td class="tr fw">{{ b.tambah ? "+" : "" }}{{ fmt(b.nilai) }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
       <div class="footer">
         <div class="footer-left">
           <div class="footer-lbl">Dibuat Oleh</div>
@@ -146,7 +184,7 @@ const grandTotal = computed(
           </div>
           <div class="footer-row">
             <span>Bahan Tambahan</span
-            ><span class="footer-val">{{ fmt(bahanTambahan) }}</span>
+            ><span class="footer-val">{{ fmtBahan(bahanTambahan) }}</span>
           </div>
           <div v-if="disc" class="footer-row">
             <span>Discount</span><span class="footer-val">{{ fmt(disc) }}</span>
@@ -294,6 +332,13 @@ body {
 }
 .mono {
   font-family: "Courier New", monospace;
+}
+.bahan-block {
+  margin-bottom: 12px;
+}
+.bahan-title {
+  font-weight: bold;
+  margin-bottom: 4px;
 }
 @media print {
   .print-page {
