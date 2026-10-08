@@ -18,6 +18,12 @@ const rows = computed(() =>
     return {
       ...s,
       pct: total.value ? Math.round((s.value / total.value) * 100) : 0,
+      pctLabel:
+        total.value &&
+        s.value > 0 &&
+        Math.round((s.value / total.value) * 100) === 0
+          ? "<1"
+          : String(total.value ? Math.round((s.value / total.value) * 100) : 0),
       stuck: next ? Math.max(0, s.value - next.value) : 0,
     };
   }),
@@ -62,7 +68,7 @@ const fmt = (n: number) => new Intl.NumberFormat("id-ID").format(n);
         <div class="pf-fill" :style="{ width: r.pct + '%' }" />
       </div>
       <div class="pf-meta">
-        {{ i === 0 ? "acuan 100%" : `${r.pct}% dari SPK masuk` }}
+        {{ i === 0 ? "acuan 100%" : `${r.pctLabel}% dari SPK masuk` }}
       </div>
       <div v-if="r.stuck" class="pf-stuck">{{ fmt(r.stuck) }} belum lanjut</div>
       <span v-if="i === worstIndex" class="pf-tag">Tersendat</span>

@@ -166,7 +166,10 @@ export const dashboardService = {
     api.get("/dashboard/pipeline-penyelesaian-spk", {
       params: { startDate, endDate },
     }),
-
+  getPipelinePerCabang: (startDate: string, endDate: string) =>
+    api.get("/dashboard/pipeline-per-cabang", {
+      params: { startDate, endDate },
+    }),
   getSpkVsStbjSummary: (startDate: string, endDate: string) =>
     api.get("/dashboard/spk-vs-stbj-summary", {
       params: { startDate, endDate },

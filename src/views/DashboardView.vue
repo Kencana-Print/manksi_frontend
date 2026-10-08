@@ -442,6 +442,7 @@ const PANEL_META: Record<string, { label: string; tab: string }> = {
   Efisiensi: { label: "Efisiensi babaran", tab: "gudang" },
   SpkStbj: { label: "SPK belum STBJ", tab: "gudang" },
   SpkSj: { label: "Status pengiriman SPK", tab: "gudang" },
+  PipeCab: { label: "Alur produksi per workshop", tab: "gudang" },
   StokBj: { label: "Stok barang jadi", tab: "barang-jadi" },
   MutasiBj: { label: "Mutasi barang jadi", tab: "barang-jadi" },
   Ob: { label: "Outstanding beli", tab: "pembelian" },
@@ -943,14 +944,19 @@ const efisiensiBabaranSummary = ref({
   pctDeviasi: 0,
 });
 
+// Format tanggal LOKAL (YYYY-MM-DD). Jangan pakai toISOString(): itu UTC,
+// sehingga di WIB tanggal 1 jadi tanggal terakhir bulan sebelumnya.
+const toLocalDateStr = (d: Date): string => d.toLocaleDateString("sv-SE");
+const nowDate = new Date();
+
 // Filter periode pipeline — default bulan berjalan (spk_dateline)
 const pipelineFilter = ref({
-  startDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1)
-    .toISOString()
-    .substring(0, 10),
-  endDate: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0)
-    .toISOString()
-    .substring(0, 10),
+  startDate: toLocalDateStr(
+    new Date(nowDate.getFullYear(), nowDate.getMonth(), 1),
+  ),
+  endDate: toLocalDateStr(
+    new Date(nowDate.getFullYear(), nowDate.getMonth() + 1, 0),
+  ),
 });
 
 const fetchPipelineData = async () => {
@@ -1003,6 +1009,75 @@ const fetchPipelinePenyelesaianSpk = async () => {
     /* silent */
   }
 };
+
+interface PipelineCabangRow {
+  Cab: string;
+  Workshop: string | null;
+  TotalMasuk: number;
+  AdaMkb: number;
+  AdaRealisasi: number;
+  AdaLhk: number;
+  AdaStbj: number;
+  AdaKirim: number;
+  FullInvoice: number;
+}
+const pipelineCabangData = ref<PipelineCabangRow[]>([]);
+
+const fetchPipelineCabang = async () => {
+  try {
+    loadFailed.PipeCab = false;
+    const res = await dashboardService.getPipelinePerCabang(
+      pipelineFilter.value.startDate,
+      pipelineFilter.value.endDate,
+    );
+    pipelineCabangData.value = (res.data?.data ?? []) as PipelineCabangRow[];
+  } catch {
+    loadFailed.PipeCab = true;
+  }
+};
+
+const PIPE_CAB_STAGES = [
+  { key: "AdaMkb", label: "MKB" },
+  { key: "AdaRealisasi", label: "Realisasi" },
+  { key: "AdaLhk", label: "LHK" },
+  { key: "AdaStbj", label: "STBJ" },
+  { key: "AdaKirim", label: "Kirim" },
+  { key: "FullInvoice", label: "Invoice" },
+] as const;
+
+// Tahap dengan selisih terbesar ke tahap berikutnya (sama dengan logika "Tersendat")
+const pipelineCabangRows = computed(() =>
+  pipelineCabangData.value.map((r) => {
+    const seq: number[] = [
+      r.TotalMasuk,
+      r.AdaMkb,
+      r.AdaRealisasi,
+      r.AdaLhk,
+      r.AdaStbj,
+      r.AdaKirim,
+      r.FullInvoice,
+    ];
+    const names = ["SPK masuk", "MKB", "Realisasi", "LHK", "STBJ", "Kirim"];
+    let worst = -1;
+    let max = 0;
+    // Hanya workshop dengan alur MKB (divisi 3/4/6) yang dinilai tersendat
+    if (r.AdaMkb > 0) {
+      for (let i = 0; i < names.length; i++) {
+        const drop = seq[i] - seq[i + 1];
+        if (drop > max) {
+          max = drop;
+          worst = i;
+        }
+      }
+    }
+    return {
+      ...r,
+      label: r.Cab === "LAIN" ? "Lainnya" : r.Cab,
+      stuckAt: worst >= 0 ? names[worst] : "-",
+      stuckCount: max,
+    };
+  }),
+);
 
 // ── SPK vs STBJ ──
 const spkVsStbjSummary = ref<SpkVsStbjSummary>({
@@ -1122,10 +1197,10 @@ const spkBelumTagihSummary = ref<SpkBelumTagihSummary>({
   TotalQtyBelumDitagih: 0,
 });
 const spkTagihFilter = ref({
-  startDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1)
-    .toISOString()
-    .substring(0, 10),
-  endDate: new Date().toISOString().substring(0, 10),
+  startDate: toLocalDateStr(
+    new Date(nowDate.getFullYear(), nowDate.getMonth(), 1),
+  ),
+  endDate: toLocalDateStr(new Date()),
 });
 
 const SPK_TAGIH_PAGE_SIZE = 20;
@@ -1584,10 +1659,8 @@ const setupRpDetailObserver = () => {
 };
 
 // ── Range tetap 90 hari untuk panel MAP/Proyeksi (filter periode dihapus) ──
-const mapRangeEnd = new Date().toISOString().substring(0, 10);
-const mapRangeStart = new Date(Date.now() - 89 * 86400000)
-  .toISOString()
-  .substring(0, 10);
+const mapRangeEnd = toLocalDateStr(new Date());
+const mapRangeStart = toLocalDateStr(new Date(Date.now() - 89 * 86400000));
 
 // ── State MAP vs SPK ──
 interface MapVsSpkMetric {
@@ -4116,8 +4189,11 @@ const loadGudangData = async () => {
       loadMoreSpkSj(),
     ]);
 
-    await fetchPipelineData();
-    await fetchPipelinePenyelesaianSpk();
+    await Promise.allSettled([
+      fetchPipelineData(),
+      fetchPipelinePenyelesaianSpk(),
+      fetchPipelineCabang(),
+    ]);
 
     gudangLoaded.value = true;
   } finally {
@@ -9925,6 +10001,85 @@ const sisaClass = (item: any) => {
                   v-else
                   kind="empty"
                   message="Belum ada SPK dengan dateline pada periode ini."
+                />
+              </div>
+            </div>
+          </v-col>
+        </v-row>
+
+        <v-row dense class="mt-2">
+          <v-col cols="12">
+            <div class="manksi-panel content-panel">
+              <div class="panel-header panel-header--blue">
+                <IconTrendingUp :size="14" :stroke-width="1.7" class="mr-1" />
+                Alur produksi per workshop
+                <span class="panel-header-sub ml-1"
+                  >(semua divisi; panel atas hanya divisi 3/4/6)</span
+                >
+              </div>
+              <div class="panel-body" style="overflow-x: auto">
+                <DashState v-if="isLoadingDashboard" kind="loading" />
+                <DashState
+                  v-else-if="loadFailed.PipeCab"
+                  kind="error"
+                  message="Alur produksi per workshop gagal dimuat."
+                  @retry="fetchPipelineCabang"
+                />
+                <table
+                  v-else-if="pipelineCabangRows.length"
+                  class="gb-tbl"
+                  style="min-width: 760px"
+                >
+                  <thead>
+                    <tr>
+                      <th>Workshop</th>
+                      <th class="tr">SPK masuk</th>
+                      <th
+                        v-for="st in PIPE_CAB_STAGES"
+                        :key="st.key"
+                        class="tr"
+                      >
+                        {{ st.label }}
+                      </th>
+                      <th>Tersendat di</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="r in pipelineCabangRows" :key="r.Cab">
+                      <td style="font-weight: 600">
+                        {{ r.label }}
+                        <span
+                          v-if="r.Workshop"
+                          style="font-weight: 400; color: var(--dsh-ink-3)"
+                          >· {{ r.Workshop }}</span
+                        >
+                      </td>
+                      <td class="tr" style="font-weight: 700">
+                        {{ fmtNum(r.TotalMasuk) }}
+                      </td>
+                      <td
+                        v-for="st in PIPE_CAB_STAGES"
+                        :key="st.key"
+                        class="tr"
+                      >
+                        {{ fmtNum(r[st.key]) }}
+                      </td>
+                      <td>
+                        <span
+                          v-if="r.stuckCount"
+                          class="gb-badge gb-badge--warn"
+                        >
+                          {{ r.stuckAt }} (−{{ fmtNum(r.stuckCount) }})
+                        </span>
+                        <span v-else>-</span>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+                <DashState
+                  v-else
+                  kind="empty"
+                  message="Belum ada SPK pada periode ini."
                 />
               </div>
             </div>
