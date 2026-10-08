@@ -6082,9 +6082,10 @@ const sisaClass = (item: any) => {
                     </div>
                   </div>
                   <DashState
-                    v-else
-                    kind="empty"
-                    message="Semua penawaran sudah ada SPK-nya"
+                    v-else-if="loadFailed.Pen"
+                    kind="error"
+                    message="Penawaran belum SO gagal dimuat."
+                    @retry="loadMorePenawaran"
                   />
                 </template>
               </div>
@@ -8281,9 +8282,10 @@ const sisaClass = (item: any) => {
                     </div>
                   </template>
                   <DashState
-                    v-else
-                    kind="empty"
-                    message="Tidak ada invoice yang melewati jatuh tempo"
+                    v-else-if="loadFailed.Overdue"
+                    kind="error"
+                    message="Invoice jatuh tempo gagal dimuat."
+                    @retry="loadMoreOverdue"
                   />
                 </template>
               </div>
@@ -8580,9 +8582,10 @@ const sisaClass = (item: any) => {
                     </div>
                   </div>
                   <DashState
-                    v-else
-                    kind="empty"
-                    message="Semua SPK terkirim sudah full invoice"
+                    v-else-if="loadFailed.SpkTagih"
+                    kind="error"
+                    message="SPK terkirim belum ditagih gagal dimuat."
+                    @retry="loadMoreSpkTagih"
                   />
                 </template>
               </div>
@@ -10019,9 +10022,10 @@ const sisaClass = (item: any) => {
                   </div>
                 </template>
                 <DashState
-                  v-else
-                  kind="empty"
-                  message="Semua kebutuhan bahan produksi tercukupi"
+                  v-else-if="loadFailed.BahanKurang"
+                  kind="error"
+                  message="Bahan kurang untuk produksi gagal dimuat."
+                  @retry="loadMoreBahanKurang"
                 />
               </div>
             </div>
@@ -10095,9 +10099,10 @@ const sisaClass = (item: any) => {
                   </div>
                 </template>
                 <DashState
-                  v-else
-                  kind="empty"
-                  message="Semua SPK bulan ini sudah ada MKB"
+                  v-else-if="loadFailed.SpkBelumMkb"
+                  kind="error"
+                  message="SO belum ada MKB gagal dimuat."
+                  @retry="loadMoreSpkBelumMkb"
                 />
               </div>
             </div>
@@ -10410,9 +10415,10 @@ const sisaClass = (item: any) => {
                     </div>
                   </div>
                   <DashState
-                    v-else
-                    kind="empty"
-                    message="Semua SPK bulan ini sudah ada STBJ"
+                    v-else-if="loadFailed.SpkStbj"
+                    kind="error"
+                    message="SPK belum STBJ gagal dimuat."
+                    @retry="loadMoreSpkStbj"
                   />
                 </template>
               </div>

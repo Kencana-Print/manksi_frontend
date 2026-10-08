@@ -42,6 +42,63 @@ const formData = ref({
   accProject: "REGULER",
 });
 
+interface KodeStatus {
+  editable: boolean;
+  pemakaian: string[];
+}
+
+const originalKode = ref("");
+const kodeStatus = ref<KodeStatus | null>(null);
+
+// Boleh diubah hanya di mode edit dan hanya bila server bilang kode belum
+// dipakai BPB maupun penyelesaian uang muka. Selama status belum dimuat: terkunci.
+const canEditKode = computed(
+  () => !props.isNewMode && kodeStatus.value?.editable === true,
+);
+
+// ACCESORIES: kode dirakit dari komponen, tidak pernah diketik.
+const kodeReadonly = computed(() =>
+  props.jenisGarmen === "ACCESORIES"
+    ? true
+    : !props.isNewMode && !canEditKode.value,
+);
+
+const kodeLockText = computed(() => {
+  const s = kodeStatus.value;
+  if (!s || s.editable) return "";
+  return `Kode terkunci karena sudah dipakai di ${s.pemakaian.join(" dan ")}.`;
+});
+
+const assembleAccKode = (): string => {
+  const f = formData.value;
+  const p = f.accProject === "REGULER" ? "" : f.accProject.substring(0, 1);
+  return (
+    f.accBarang.Kode +
+    f.accWarna.Kode +
+    f.accUkuran.Kode +
+    f.accKet.Kode +
+    p
+  ).toUpperCase();
+};
+
+// Dipanggil setelah komponen dipilih ulang; hanya berefek bila kode boleh diubah
+const syncAccKode = () => {
+  if (props.jenisGarmen === "ACCESORIES" && canEditKode.value)
+    formData.value.brg_kode = assembleAccKode();
+};
+
+const loadKodeStatus = async (kode: string) => {
+  kodeStatus.value = null;
+  try {
+    const res = await api.get(
+      `/master/barang-garmen/${encodeURIComponent(kode)}/kode-status`,
+    );
+    kodeStatus.value = res.data.data;
+  } catch {
+    kodeStatus.value = null; // gagal cek: biarkan terkunci
+  }
+};
+
 // Auto-generate nama Accesories
 const generatedAccName = computed(() => {
   if (props.jenisGarmen !== "ACCESORIES") return formData.value.brg_nama;
@@ -67,7 +124,7 @@ watch(
 // Lookup modal
 const lookupState = ref({ show: false, title: "", category: "", target: "" });
 const openLookup = (category: string, title: string, target: string) => {
-  if (!props.isNewMode) return;
+  if (!props.isNewMode && !canEditKode.value) return;
   lookupState.value = { show: true, title, category, target };
 };
 const handleLookupSelect = (item: any) => {
@@ -79,6 +136,7 @@ const handleLookupSelect = (item: any) => {
   if (t === "ukuran")
     formData.value.accUkuran = { Kode: item.Kode, Nama: item.Nama };
   if (t === "ket") formData.value.accKet = { Kode: item.Kode, Nama: item.Nama };
+  syncAccKode();
 };
 
 const loadOptions = async () => {
@@ -135,6 +193,8 @@ watch(
     await loadOptions();
     if (props.isNewMode) {
       resetForm();
+      originalKode.value = "";
+      kodeStatus.value = null;
     } else if (props.editData) {
       const ed = props.editData;
       formData.value = {
@@ -164,6 +224,8 @@ watch(
         },
         accProject: ed.project || "REGULER",
       };
+      originalKode.value = ed.brg_kode;
+      void loadKodeStatus(ed.brg_kode);
     }
     formRef.value?.resetValidation();
   },
@@ -196,28 +258,50 @@ const checkKodeExist = async () => {
 const handleSave = async () => {
   const { valid } = await formRef.value!.validate();
   if (!valid) return;
+  if (canEditKode.value && !formData.value.brg_kode.trim()) {
+    toast.error("Kode tidak boleh kosong.");
+    return;
+  }
   isSaving.value = true;
   try {
     const payload: any = { ...formData.value };
     if (props.isNewMode && props.jenisGarmen === "ACCESORIES") {
-      const p =
-        payload.accProject === "REGULER"
-          ? ""
-          : payload.accProject.substring(0, 1);
-      payload.accKodeAssembled = (
-        payload.accBarang.Kode +
-        payload.accWarna.Kode +
-        payload.accUkuran.Kode +
-        payload.accKet.Kode +
-        p
-      ).toUpperCase();
+      payload.accKodeAssembled = assembleAccKode();
     }
+
     if (props.isNewMode) {
       await api.post("/master/barang-garmen", payload);
       toast.success("Barang berhasil ditambahkan");
     } else {
+      // 1) simpan data lain memakai kode LAMA sebagai kunci
+      payload.brg_kode = originalKode.value;
       await api.put(`/master/barang-garmen/${payload.brg_kode}`, payload);
-      toast.success("Barang berhasil diperbarui");
+
+      // 2) ganti kode (bila diubah): langkah paling berisiko, jadi paling akhir
+      const kodeBaru = formData.value.brg_kode.trim().toUpperCase();
+      const kodeBerubah =
+        canEditKode.value && kodeBaru !== originalKode.value.toUpperCase();
+      if (kodeBerubah) {
+        try {
+          await api.put(
+            `/master/barang-garmen/${encodeURIComponent(originalKode.value)}/kode`,
+            { kode_baru: kodeBaru },
+          );
+        } catch (e: any) {
+          emit("saved"); // data lain sudah tersimpan
+          toast.error(
+            `Data tersimpan, tetapi kode gagal diubah: ${
+              e.response?.data?.message || "terjadi kesalahan"
+            }`,
+          );
+          return;
+        }
+      }
+      toast.success(
+        kodeBerubah
+          ? "Barang berhasil diperbarui, kode diubah"
+          : "Barang berhasil diperbarui",
+      );
     }
     dialogVisible.value = false;
     emit("saved");
@@ -262,13 +346,8 @@ const handleSave = async () => {
               <label class="f-label">Kode</label>
               <input
                 v-model="formData.brg_kode"
-                :readonly="!isNewMode || jenisGarmen === 'ACCESORIES'"
-                :class="[
-                  'f-inp',
-                  !isNewMode || jenisGarmen === 'ACCESORIES'
-                    ? 'f-readonly'
-                    : '',
-                ]"
+                :readonly="kodeReadonly"
+                :class="['f-inp', kodeReadonly ? 'f-readonly' : '']"
                 :placeholder="
                   isNewMode && jenisGarmen !== 'ACCESORIES'
                     ? 'Ketik Kode...'
@@ -291,6 +370,21 @@ const handleSave = async () => {
                 required
               />
             </div>
+          </div>
+
+          <div
+            v-if="!isNewMode && kodeStatus"
+            class="f-note"
+            :class="canEditKode ? 'f-note--ok' : 'f-note--lock'"
+          >
+            <template v-if="canEditKode">
+              Kode belum dipakai di BPB maupun penyelesaian uang muka, jadi
+              masih boleh diubah.
+              <template v-if="jenisGarmen === 'ACCESORIES'">
+                Pilih ulang komponen di bawah untuk mengganti kode.
+              </template>
+            </template>
+            <template v-else>{{ kodeLockText }}</template>
           </div>
 
           <div class="f-divider" />
@@ -733,5 +827,20 @@ const handleSave = async () => {
 }
 .dlg-btn.secondary:hover:not(:disabled) {
   background: #d0d0d0;
+}
+/* ── Catatan status kode ── */
+.f-note {
+  font-size: 11px;
+  line-height: 1.4;
+  padding: 6px 9px;
+  border-radius: 4px;
+}
+.f-note--ok {
+  background: #e6f5ec;
+  color: #1f8a4c;
+}
+.f-note--lock {
+  background: #fdf1dc;
+  color: #b86500;
 }
 </style>
