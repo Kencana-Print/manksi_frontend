@@ -152,8 +152,28 @@ const MAX_DATA_ROWS_PER_PAGE = 7;
 
 const LINE = "_".repeat(PAGE_WIDTH);
 
+// ── Teks BESAR (lebar dobel + tebal) hanya untuk Nomor SJ & Keterangan ──
+const ESC = "\x1B";
+const BIG_ON = `${ESC}E${ESC}W\x01`; // tebal nyala + lebar dobel nyala
+const BIG_OFF = `${ESC}W\x00${ESC}F`; // lebar dobel mati + tebal mati
+
+// Label normal + nilai BESAR, total tetap `width` kolom.
+// Nilai terlalu panjang untuk ukuran besar → dicetak normal (tidak dipotong).
+const bigField = (
+  label: string,
+  value: string,
+  width: number,
+  withCodes: boolean,
+): string => {
+  const text = (value || "").toString();
+  const maxBig = Math.floor((width - label.length - 1) / 2);
+  if (!withCodes || text.length > maxBig) return padR(label + text, width);
+  const used = label.length + text.length * 2;
+  return label + BIG_ON + text + BIG_OFF + " ".repeat(width - used);
+};
+
 // ── Generate TXT (Dot Matrix) ──────────────
-const generateTxt = () => {
+const generateTxt = (withCodes = true) => {
   const h = header.value;
   const rows = detail.value;
   const halfL = 67;
@@ -176,13 +196,13 @@ const generateTxt = () => {
       : baseAlamat;
     const alamatLines = wrapText(alamatFull, halfR);
     lines.push(
-      `${padR("Nomor      : " + (h.sj_nomor || ""), halfL)} ${padR("Customer : " + (h.cus_nama || ""), halfR)}`,
+      `${bigField("Nomor      : ", h.sj_nomor || "", halfL, withCodes)} ${padR("Customer : " + (h.cus_nama || ""), halfR)}`,
     );
     lines.push(
       `${padR("Tanggal    : " + fmtDate(h.sj_tanggal), halfL)} ${padR(alamatLines[0] || "", halfR)}`,
     );
     lines.push(
-      `${padR("Keterangan : " + (h.keterangan_cetak || h.sj_keterangan || ""), halfL)} ${padR(alamatLines[1] || "", halfR)}`,
+      `${bigField("Keterangan : ", h.keterangan_cetak || h.sj_keterangan || "", halfL, withCodes)} ${padR(alamatLines[1] || "", halfR)}`,
     );
     for (let i = 2; i < alamatLines.length; i++) {
       lines.push(`${padR("", halfL)} ${padR(alamatLines[i], halfR)}`);
@@ -307,7 +327,8 @@ const downloadTxt = () => {
   // menghasilkan salinan fisik ke seluruh lapisan kertas. Tidak perlu
   // generate teks berulang per "lembar" — itu justru bikin isi
   // tercetak 3x lipat di atas kertas yang sama.
-  const content = generateTxt();
+  const content = generateTxt(false);
+  console.log(JSON.stringify(content.split("\n").slice(4, 8), null, 2));
   const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
