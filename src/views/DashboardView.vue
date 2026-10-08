@@ -40,6 +40,7 @@ import { exportExcelSingle } from "@/utils/excelExport";
 import { exportExcelMulti } from "@/utils/excelExportMulti";
 import { formatTanggalJam } from "@/utils/dateFormat";
 import { swr, setSnapshotScope, hasSnapshot } from "@/utils/snapshot";
+import { runFresh } from "@/utils/freshMode";
 
 interface OverdueItem {
   Invoice: string;
@@ -336,17 +337,19 @@ interface BufferKaosanItem {
 
 const authStore = useAuthStore();
 setSnapshotScope(authStore.user?.kode);
+// Ambil payload `data.data` dari response API; tipe hasil ditentukan pemanggil
+const payload = <T = unknown,>(
+  req: Promise<{ data: { data: unknown } }>,
+): Promise<T> => req.then((res) => res.data.data as T);
 
-// Ambil payload `data.data` dari response API
-const payload = <T,>(req: Promise<{ data: { data: T } }>): Promise<T> =>
-  req.then((res) => res.data.data);
-
-// swr yang tidak pernah melempar error (pola silent seperti di view ini)
+// Tipe data diambil dari parameter `apply`, jadi fetcher cukup mengembalikan unknown.
+// Tidak pernah melempar error (pola silent seperti di view ini).
 const snap = <T,>(
   key: string,
-  fetcher: () => Promise<T>,
+  fetcher: () => Promise<unknown>,
   apply: (v: T) => void,
-): Promise<void> => swr<T>(key, fetcher, apply).catch(() => undefined);
+): Promise<void> =>
+  swr<T>(key, async () => (await fetcher()) as T, apply).catch(() => undefined);
 const AI_CHAT_ALLOWED_KODE = [
   "DARUL",
   "DIR",
@@ -2407,29 +2410,53 @@ const inkasoPeriodeLabel = computed(() =>
     : "",
 );
 
-// Urut per customer; sort stabil, jadi urutan tanggal di dalam customer tetap
-const inkasoRowsAktif = computed(() =>
-  [...(inkasoRowsBySales.value[inkasoSalesTab.value] ?? [])].sort((a, b) =>
-    a.cusNama.localeCompare(b.cusNama),
-  ),
+// Satu baris per customer di tab sales aktif; kuncinya dipakai untuk menyimpan tanggal
+interface InkasoCustomerRow {
+  key: string; // salKode|cusKode
+  cusNama: string;
+  totalSisa: number;
+  notas: string[]; // semua invoice outstanding customer ini (dikirim saat simpan)
+}
+
+const buildInkasoCustomers = (salKode: string): InkasoCustomerRow[] => {
+  const map = new Map<string, InkasoCustomerRow>();
+  for (const r of inkasoRowsBySales.value[salKode] ?? []) {
+    const key = `${salKode}|${r.cusKode || r.cusNama}`;
+    const cur = map.get(key);
+    if (cur) {
+      cur.totalSisa += r.sisaKini;
+      cur.notas.push(r.notaAsli);
+    } else {
+      map.set(key, {
+        key,
+        cusNama: r.cusNama || r.cusKode,
+        totalSisa: r.sisaKini,
+        notas: [r.notaAsli],
+      });
+    }
+  }
+  return [...map.values()].sort((a, b) => a.cusNama.localeCompare(b.cusNama));
+};
+
+const inkasoCustomersAktif = computed(() =>
+  buildInkasoCustomers(inkasoSalesTab.value),
 );
 const inkasoTotalTab = computed(() =>
-  inkasoRowsAktif.value.reduce((s, r) => s + r.sisaKini, 0),
+  inkasoCustomersAktif.value.reduce((s, c) => s + c.totalSisa, 0),
 );
 
-// Baris (di semua tab) yang tanggal pembayarannya sudah diisi
-const inkasoRowsTerisi = computed(() =>
-  Object.values(inkasoRowsBySales.value)
-    .flat()
-    .filter((r) => !!inkasoTglTarget.value[r.notaAsli]),
+// Customer (di semua tab sales) yang tanggal pembayarannya sudah diisi
+const inkasoCustomersTerisi = computed(() =>
+  Object.keys(inkasoRowsBySales.value)
+    .flatMap((salKode) => buildInkasoCustomers(salKode))
+    .filter((c) => !!inkasoTglTarget.value[c.key]),
 );
 const inkasoTotalTerisi = computed(() =>
-  inkasoRowsTerisi.value.reduce((s, r) => s + r.sisaKini, 0),
+  inkasoCustomersTerisi.value.reduce((s, c) => s + c.totalSisa, 0),
 );
 const terisiPerSales = (salKode: string) =>
-  (inkasoRowsBySales.value[salKode] ?? []).filter(
-    (r) => !!inkasoTglTarget.value[r.notaAsli],
-  ).length;
+  buildInkasoCustomers(salKode).filter((c) => !!inkasoTglTarget.value[c.key])
+    .length;
 
 const loadInkasoSales = async () => {
   isLoadingInkasoSales.value = true;
@@ -2497,14 +2524,16 @@ const openSetInkasoDialog = async () => {
 };
 
 const submitSetInkaso = async () => {
-  if (!inkasoRowsTerisi.value.length) return;
+  if (!inkasoCustomersTerisi.value.length) return;
   isSubmittingInkaso.value = true;
   try {
-    const items = inkasoRowsTerisi.value.map((r) => ({
-      nota: r.notaAsli,
-      tglTarget: inkasoTglTarget.value[r.notaAsli],
-      catatan: inkasoCatatan.value.trim() || undefined,
-    }));
+    const items = inkasoCustomersTerisi.value.flatMap((c) =>
+      c.notas.map((nota) => ({
+        nota,
+        tglTarget: inkasoTglTarget.value[c.key],
+        catatan: inkasoCatatan.value.trim() || undefined,
+      })),
+    );
     await dashboardService.setInkasoBulk(items);
     showSetInkasoDialog.value = false;
     await fetchInkaso();
@@ -3480,10 +3509,10 @@ const loadOverviewShortcuts = async () => {
       snap(
         "ov:piutang-summary",
         () =>
-          payload(dashboardService.getPiutangDashboard()).then(
+          payload<PiutangData>(dashboardService.getPiutangDashboard()).then(
             (d) => d.summary,
           ),
-        (d: typeof piutangData.value.summary) => {
+        (d: PiutangData["summary"]) => {
           piutangData.value.summary = d;
         },
       ),
@@ -3534,9 +3563,9 @@ const loadOverviewShortcuts = async () => {
       snap(
         "ov:gb-metric",
         () =>
-          payload(dashboardService.getGudangBahanDashboard()).then(
-            (d) => d.metric,
-          ),
+          payload<GudangBahanData>(
+            dashboardService.getGudangBahanDashboard(),
+          ).then((d) => d.metric),
         (d: GudangBahanMetric) => {
           gudangBahanData.value.metric = d;
         },
@@ -4267,31 +4296,33 @@ const loadBarangJadiData = async () => {
   }
 };
 
-// ── Refresh: reload tab yang lagi aktif aja ──
+// ── Refresh: reload tab yang lagi aktif aja, melewati simpanan server ──
 const loadDashboard = async () => {
-  if (activeTab.value === "overview") {
-    await loadOverviewData();
-  } else if (activeTab.value === "marketing") {
-    marketingLoaded.value = false;
-    await loadMarketingData();
-  } else if (activeTab.value === "finance") {
-    financeLoaded.value = false;
-    await loadFinanceData();
-  } else if (activeTab.value === "gudang") {
-    gudangLoaded.value = false;
-    await loadGudangData();
-  } else if (activeTab.value === "gudang-bahan") {
-    gudangBahanLoaded.value = false;
-    await loadGudangBahanData();
-  } else if (activeTab.value === "barang-jadi") {
-    barangJadiLoaded.value = false;
-    await loadBarangJadiData();
-  } else if (activeTab.value === "pembelian") {
-    pembelianLoaded.value = false;
-    await loadPembelianData();
-    await nextTick();
-    setupObObserver();
-  }
+  await runFresh(async () => {
+    if (activeTab.value === "overview") {
+      await Promise.allSettled([loadOverviewData(), loadOverviewShortcuts()]);
+    } else if (activeTab.value === "marketing") {
+      marketingLoaded.value = false;
+      await loadMarketingData();
+    } else if (activeTab.value === "finance") {
+      financeLoaded.value = false;
+      await loadFinanceData();
+    } else if (activeTab.value === "gudang") {
+      gudangLoaded.value = false;
+      await loadGudangData();
+    } else if (activeTab.value === "gudang-bahan") {
+      gudangBahanLoaded.value = false;
+      await loadGudangBahanData();
+    } else if (activeTab.value === "barang-jadi") {
+      barangJadiLoaded.value = false;
+      await loadBarangJadiData();
+    } else if (activeTab.value === "pembelian") {
+      pembelianLoaded.value = false;
+      await loadPembelianData();
+      await nextTick();
+      setupObObserver();
+    }
+  });
 };
 
 const reloadMapPanels = async () => {
@@ -11858,7 +11889,7 @@ const sisaClass = (item: any) => {
     </v-dialog>
 
     <!-- Dialog: Set Inkaso -->
-    <v-dialog v-model="showSetInkasoDialog" max-width="1200px" scrollable>
+    <v-dialog v-model="showSetInkasoDialog" max-width="760px" scrollable>
       <v-card
         class="rounded-lg"
         style="height: 85vh; display: flex; flex-direction: column"
@@ -11921,51 +11952,26 @@ const sisaClass = (item: any) => {
             height="2"
           />
 
-          <table v-if="inkasoRowsAktif.length" class="ink-table">
+          <table v-if="inkasoCustomersAktif.length" class="ink-table">
             <thead>
               <tr>
-                <th>No. Invoice</th>
-                <th>Tanggal</th>
-                <th>Jatuh Tempo</th>
                 <th>Customer</th>
-                <th class="ink-num">Debet</th>
-                <th class="ink-num">Bayar</th>
-                <th class="ink-num">Sisa</th>
-                <th style="width: 160px">Tanggal Pembayaran</th>
+                <th class="ink-num">Total Sisa</th>
+                <th style="width: 180px">Tanggal Pembayaran</th>
               </tr>
             </thead>
             <tbody>
               <tr
-                v-for="r in inkasoRowsAktif"
-                :key="r.notaAsli"
+                v-for="c in inkasoCustomersAktif"
+                :key="c.key"
                 class="ink-row"
-                :class="{ 'ink-row--terisi': !!inkasoTglTarget[r.notaAsli] }"
+                :class="{ 'ink-row--terisi': !!inkasoTglTarget[c.key] }"
               >
-                <td class="ink-nota">
-                  {{ r.nota }}
-                  <span v-if="r.jenis === 'LAMA'" class="td-badge-old"
-                    >LAMA</span
-                  >
-                </td>
-                <td>{{ r.tanggal }}</td>
-                <td>
-                  {{ r.tempo }}
-                  <span
-                    v-if="r.terlambatHari > 0"
-                    :style="{
-                      color: telatColor(r.terlambatHari),
-                      fontWeight: 700,
-                    }"
-                    >· {{ r.terlambatHari }}h</span
-                  >
-                </td>
-                <td>{{ r.cusNama || r.cusKode }}</td>
-                <td class="ink-num">{{ fmtNum(r.debet) }}</td>
-                <td class="ink-num">{{ fmtNum(r.debet - r.sisaKini) }}</td>
-                <td class="ink-num ink-sisa">{{ fmtNum(r.sisaKini) }}</td>
+                <td class="ink-nota">{{ c.cusNama }}</td>
+                <td class="ink-num ink-sisa">{{ fmtNum(c.totalSisa) }}</td>
                 <td>
                   <input
-                    v-model="inkasoTglTarget[r.notaAsli]"
+                    v-model="inkasoTglTarget[c.key]"
                     type="date"
                     class="map-date-inp"
                     style="width: 100%"
@@ -11976,7 +11982,7 @@ const sisaClass = (item: any) => {
             </tbody>
             <tfoot>
               <tr>
-                <td colspan="6">{{ inkasoRowsAktif.length }} invoice</td>
+                <td>{{ inkasoCustomersAktif.length }} customer</td>
                 <td class="ink-num">{{ fmtNum(inkasoTotalTab) }}</td>
                 <td></td>
               </tr>
@@ -12010,7 +12016,7 @@ const sisaClass = (item: any) => {
             maxlength="255"
           />
           <span style="font-size: 12px; color: #757575; white-space: nowrap">
-            {{ inkasoRowsTerisi.length }} invoice ·
+            {{ inkasoCustomersTerisi.length }} customer ·
             {{ fmtNum(inkasoTotalTerisi) }}
           </span>
           <v-btn
@@ -12018,10 +12024,10 @@ const sisaClass = (item: any) => {
             variant="flat"
             size="small"
             :loading="isSubmittingInkaso"
-            :disabled="inkasoRowsTerisi.length === 0"
+            :disabled="inkasoCustomersTerisi.length === 0"
             @click="submitSetInkaso"
           >
-            Simpan ({{ inkasoRowsTerisi.length }})
+            Simpan ({{ inkasoCustomersTerisi.length }})
           </v-btn>
         </div>
       </v-card>
