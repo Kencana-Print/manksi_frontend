@@ -62,12 +62,20 @@ const showFilterObat = computed(() => {
 
 const showFilterSparepart = computed(() => {
   const b = authStore.user?.bagian || "";
-  return ["TEKNISI", "IT", "FINANCE", "AUDIT", "DIREKSI", "EDP","ADMIN"].includes(b);
+  return [
+    "TEKNISI",
+    "IT",
+    "FINANCE",
+    "AUDIT",
+    "DIREKSI",
+    "EDP",
+    "ADMIN",
+  ].includes(b);
 });
 
 const showFilterAtk = computed(() => {
   const b = authStore.user?.bagian || "";
-  return ["GA", "FINANCE", "AUDIT", "DIREKSI", "EDP","ADMIN"].includes(b);
+  return ["GA", "FINANCE", "AUDIT", "DIREKSI", "EDP", "ADMIN"].includes(b);
 });
 
 // Menentukan Default Check (Migrasi rbacc.Checked:=True dll)
@@ -77,15 +85,24 @@ onMounted(async () => {
   else if (showFilterAtk.value) selectedJenis.value = "ATK/RTK";
   else if (showFilterSparepart.value) selectedJenis.value = "SPAREPART";
 
-  // 2. Fetch Data Cabang
+  // 2. Daftar cabang sepenuhnya dari backend
   try {
-    const res = await api.get("/master/barang-garmen/lookups/cabang");
-    cabangOptions.value = res.data.data.map((c: any) => c.Kode);
+    const res = await api.get("/master/barang-garmen/lookups/cabang_browse");
+    cabangOptions.value = res.data.data.map((c: { Kode: string }) => c.Kode);
   } catch (error) {
     toast.error("Gagal memuat daftar cabang");
-    cabangOptions.value = [authStore.userCabang || "HO-"]; // Fallback
+    cabangOptions.value = [];
   }
-  fetchData();
+
+  // 3. Cabang user di luar daftar → pakai opsi pertama dari backend
+  if (
+    cabangOptions.value.length &&
+    !cabangOptions.value.includes(selectedCabang.value)
+  ) {
+    selectedCabang.value = cabangOptions.value[0];
+  }
+
+  if (cabangOptions.value.length) fetchData();
 });
 
 // --- KONFIGURASI BROWSE ---
@@ -147,14 +164,9 @@ const headers = computed(() => {
 });
 
 // --- PEWARNAAN BARIS ---
-const rowPropsFn = (data: any) => {
-  const item = data.item?.raw || data.item;
-  let customClass = "";
-
-  if (item.Aktif === "N") customClass = "row-pasif";
-
-  return { class: customClass };
-};
+const rowPropsFn = ({ item }: { item: { Aktif?: string } }) => ({
+  class: item.Aktif === "N" ? "row-pasif" : "",
+});
 
 // --- LOGIC HAPUS ---
 const showDelete = ref(false);
@@ -277,7 +289,7 @@ const handleEdit = async (item: any) => {
           >
         </div>
         <div class="d-flex align-center">
-          <div class="legend-box bg-red-darken-4 mr-2"></div>
+          <div class="legend-box mr-2" style="background: #b71c1c"></div>
           <span class="text-caption font-weight-bold">Pasif</span>
         </div>
       </div>
@@ -342,12 +354,12 @@ const handleEdit = async (item: any) => {
   height: 14px;
   border-radius: 2px;
 }
+</style>
 
-/* CUSTOM ROW COLORS */
-:deep(.row-pasif) {
-  color: #b71c1c !important;
-}
-:deep(.row-pasif) {
+<style>
+/* Barang pasif — merah, tetap terlihat walau baris sedang dipilih */
+.row-pasif td,
+.row-pasif td * {
   color: #b71c1c !important;
 }
 </style>
