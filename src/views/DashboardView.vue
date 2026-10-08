@@ -39,6 +39,7 @@ import api from "@/services/api";
 import { exportExcelSingle } from "@/utils/excelExport";
 import { exportExcelMulti } from "@/utils/excelExportMulti";
 import { formatTanggalJam } from "@/utils/dateFormat";
+import { swr, setSnapshotScope, hasSnapshot } from "@/utils/snapshot";
 
 interface OverdueItem {
   Invoice: string;
@@ -334,6 +335,18 @@ interface BufferKaosanItem {
 }
 
 const authStore = useAuthStore();
+setSnapshotScope(authStore.user?.kode);
+
+// Ambil payload `data.data` dari response API
+const payload = <T,>(req: Promise<{ data: { data: T } }>): Promise<T> =>
+  req.then((res) => res.data.data);
+
+// swr yang tidak pernah melempar error (pola silent seperti di view ini)
+const snap = <T,>(
+  key: string,
+  fetcher: () => Promise<T>,
+  apply: (v: T) => void,
+): Promise<void> => swr<T>(key, fetcher, apply).catch(() => undefined);
 const AI_CHAT_ALLOWED_KODE = [
   "DARUL",
   "DIR",
@@ -725,7 +738,22 @@ const fetchTargetCollection = async (bulan: number, tahun: number) => {
 const ensureTargetCollectionLoaded = async () => {
   if (targetCollectionData.value) return;
   const now = new Date();
-  await fetchTargetCollection(now.getMonth() + 1, now.getFullYear());
+  const bulan = now.getMonth() + 1;
+  const tahun = now.getFullYear();
+  const key = `${tahun}-${bulan}`;
+  isLoadingTargetCollection.value = !hasSnapshot(`tc:${key}`);
+  try {
+    await snap(
+      `tc:${key}`,
+      () => payload(dashboardService.getTargetCollectionSales(bulan, tahun)),
+      (d: TargetCollectionData) => {
+        targetCollectionCache.set(key, d);
+        targetCollectionData.value = d;
+      },
+    );
+  } finally {
+    isLoadingTargetCollection.value = false;
+  }
 };
 const aktivitasList = ref<any[]>([]);
 const trendData = ref<any[]>([]);
@@ -3310,6 +3338,7 @@ const animateNumber = (target: Ref<number>, newVal: number, duration = 600) => {
 let pollingTimer: ReturnType<typeof setInterval> | null = null;
 
 const pollLightData = async () => {
+  if (document.hidden) return;
   try {
     const [rSpk, rAktivitas] = await Promise.allSettled([
       dashboardService.getSpkSummary(),
@@ -3354,7 +3383,7 @@ const newAktivitasIds = ref<Set<string>>(new Set());
 
 const startPolling = () => {
   stopPolling();
-  pollingTimer = setInterval(pollLightData, 30_000); // 30 detik
+  pollingTimer = setInterval(pollLightData, 60_000);
 };
 
 const stopPolling = () => {
@@ -3364,155 +3393,176 @@ const stopPolling = () => {
   }
 };
 
+interface TrendHariRow {
+  label: string;
+  map_baru: number;
+  so_baru: number;
+  spk_baru: number;
+}
+
+const applySpkSummary = (d: typeof spkSummary.value) => {
+  spkSummary.value = d;
+  animatedSpkAktif.value = d.TotalAktif;
+  animatedTerlambat.value = d.Terlambat;
+  animatedDeadlineHariIni.value = d.DeadlineHariIni;
+  animatedSegera.value = d.SegeredDeadline;
+};
+
 // ── Overview (selalu di-fetch saat mount, tab ini selalu terlihat) ──
 const loadOverviewData = async () => {
-  isLoadingDashboard.value = true;
+  // Kalau snapshot ada, kartu langsung terisi; "—" hanya muncul di kunjungan pertama
+  isLoadingDashboard.value = !hasSnapshot("ov:spk-summary");
+  aktivitasList.value = [];
+  aktOffset.value = 0;
+  aktHasMore.value = true;
   try {
-    aktivitasList.value = [];
-    aktOffset.value = 0;
-    aktHasMore.value = true;
-
-    const [rTrend] = await Promise.allSettled([
-      dashboardService.getTrendSpk7Hari(),
+    await Promise.allSettled([
+      snap(
+        "ov:trend7",
+        () => payload(dashboardService.getTrendSpk7Hari()),
+        (d: TrendHariRow[]) => {
+          trendData.value = d || [];
+          renderTrendChart();
+        },
+      ),
+      loadMoreAktivitas(),
+      snap(
+        "ov:spk-summary",
+        () => payload(dashboardService.getSpkSummary()),
+        applySpkSummary,
+      ),
+      snap(
+        "ov:so-summary",
+        () => payload(dashboardService.getSoSummary()),
+        (d: typeof soSummary.value) => {
+          soSummary.value = d;
+        },
+      ),
+      snap(
+        "ov:so-trend",
+        () => payload(dashboardService.getSoAktifTrend()),
+        (d: typeof soAktifTrend.value) => {
+          soAktifTrend.value = d;
+        },
+      ),
     ]);
-    if (rTrend.status === "fulfilled") {
-      trendData.value = rTrend.value.data.data || [];
-      renderTrendChart();
-    }
-
-    await loadMoreAktivitas();
-
-    const [spkSumRes, soSumRes, soTrendRes] = await Promise.allSettled([
-      dashboardService.getSpkSummary(),
-      dashboardService.getSoSummary(),
-      dashboardService.getSoAktifTrend(),
-    ]);
-    if (spkSumRes.status === "fulfilled") {
-      spkSummary.value = spkSumRes.value.data.data;
-      animatedSpkAktif.value = spkSummary.value.TotalAktif;
-      animatedTerlambat.value = spkSummary.value.Terlambat;
-      animatedDeadlineHariIni.value = spkSummary.value.DeadlineHariIni;
-      animatedSegera.value = spkSummary.value.SegeredDeadline;
-    }
-    if (soSumRes.status === "fulfilled") {
-      soSummary.value = soSumRes.value.data.data;
-    }
-    if (soTrendRes.status === "fulfilled") {
-      soAktifTrend.value = soTrendRes.value.data.data;
-    }
     animatedAktivitasCount.value = aktivitasList.value.length;
   } finally {
     isLoadingDashboard.value = false;
   }
 };
 
-// ── Shortcut card di Overview — cuma summary ringan (bukan list
-// penuh), biar card gak nunjukin 0 padahal tabnya belum dibuka ──
+// ── Shortcut card di Overview — summary ringan dari tab lain ──
 const loadOverviewShortcuts = async () => {
-  const calls: Promise<any>[] = [];
+  const { startDate, endDate } = pipelineFilter.value;
+  const calls: Promise<void>[] = [];
 
   if (showPenawaran.value) {
     calls.push(
-      dashboardService
-        .getPenawaranSummary()
-        .then((res) => {
-          penSummary.value = res.data.data;
-        })
-        .catch(() => {}),
-    );
-    calls.push(
-      dashboardService
-        .getPenawaranMapSummary()
-        .then((res) => {
-          mapSummary.value = res.data.data;
-        })
-        .catch(() => {}),
+      snap(
+        "ov:pen-summary",
+        () => payload(dashboardService.getPenawaranSummary()),
+        (d: typeof penSummary.value) => {
+          penSummary.value = d;
+        },
+      ),
+      snap(
+        "ov:map-summary",
+        () => payload(dashboardService.getPenawaranMapSummary()),
+        (d: typeof mapSummary.value) => {
+          mapSummary.value = d;
+        },
+      ),
     );
   }
   if (showPiutang.value) {
     calls.push(
-      dashboardService
-        .getPiutangDashboard()
-        .then((res) => {
-          if (res.data?.data?.summary)
-            piutangData.value.summary = res.data.data.summary;
-        })
-        .catch(() => {}),
+      snap(
+        "ov:piutang-summary",
+        () =>
+          payload(dashboardService.getPiutangDashboard()).then(
+            (d) => d.summary,
+          ),
+        (d: typeof piutangData.value.summary) => {
+          piutangData.value.summary = d;
+        },
+      ),
     );
   }
   if (showCompanyPulse.value) {
     calls.push(
-      dashboardService
-        .getCompanyPulseSummary()
-        .then((res) => {
-          if (res.data?.data) companyPulse.value = res.data.data;
-        })
-        .catch(() => {}),
+      snap(
+        "ov:pulse",
+        () => payload(dashboardService.getCompanyPulseSummary()),
+        (d: typeof companyPulse.value) => {
+          companyPulse.value = d;
+        },
+      ),
     );
   }
   if (showSaldoKas.value) {
     calls.push(
-      dashboardService
-        .getSaldoKas()
-        .then((res) => {
-          if (res.data?.data) saldoKas.value = res.data.data;
-        })
-        .catch(() => {}),
+      snap(
+        "ov:saldo-kas",
+        () => payload(dashboardService.getSaldoKas()),
+        (d: typeof saldoKas.value) => {
+          saldoKas.value = d;
+        },
+      ),
     );
   }
   if (showPoBpb.value) {
     calls.push(
-      dashboardService
-        .getSpkVsStbjSummary(
-          pipelineFilter.value.startDate,
-          pipelineFilter.value.endDate,
-        )
-        .then((res) => {
-          if (res.data?.data) spkVsStbjSummary.value = res.data.data;
-        })
-        .catch(() => {}),
-    );
-    calls.push(
-      dashboardService
-        .getSpkVsSjSummary(
-          pipelineFilter.value.startDate,
-          pipelineFilter.value.endDate,
-        )
-        .then((res) => {
-          if (res.data?.data) spkVsSjSummary.value = res.data.data;
-        })
-        .catch(() => {}),
+      snap(
+        `ov:stbj:${startDate}:${endDate}`,
+        () => payload(dashboardService.getSpkVsStbjSummary(startDate, endDate)),
+        (d: SpkVsStbjSummary) => {
+          spkVsStbjSummary.value = d;
+        },
+      ),
+      snap(
+        `ov:sj:${startDate}:${endDate}`,
+        () => payload(dashboardService.getSpkVsSjSummary(startDate, endDate)),
+        (d: SpkVsSjSummary) => {
+          spkVsSjSummary.value = d;
+        },
+      ),
     );
   }
   if (showGudangBahan.value) {
     calls.push(
-      dashboardService
-        .getGudangBahanDashboard()
-        .then((res) => {
-          if (res.data?.data?.metric)
-            gudangBahanData.value.metric = res.data.data.metric;
-        })
-        .catch(() => {}),
+      snap(
+        "ov:gb-metric",
+        () =>
+          payload(dashboardService.getGudangBahanDashboard()).then(
+            (d) => d.metric,
+          ),
+        (d: GudangBahanMetric) => {
+          gudangBahanData.value.metric = d;
+        },
+      ),
     );
   }
   if (showBarangJadi.value) {
     calls.push(
-      dashboardService
-        .getBarangJadiMetric()
-        .then((res) => {
-          if (res.data?.data) barangJadiMetric.value = res.data.data;
-        })
-        .catch(() => {}),
+      snap(
+        "ov:bj-metric",
+        () => payload(dashboardService.getBarangJadiMetric()),
+        (d: BarangJadiMetric) => {
+          barangJadiMetric.value = d;
+        },
+      ),
     );
   }
   if (showPembelian.value) {
     calls.push(
-      dashboardService
-        .getOutstandingBeliSummary()
-        .then((res) => {
-          obSummary.value = res.data?.data ?? {};
-        })
-        .catch(() => {}),
+      snap(
+        "ov:ob-summary",
+        () => payload(dashboardService.getOutstandingBeliSummary()),
+        (d: Record<string, number>) => {
+          obSummary.value = d ?? {};
+        },
+      ),
     );
   }
 
@@ -3520,10 +3570,11 @@ const loadOverviewShortcuts = async () => {
 };
 
 // ── Marketing ──
-const loadMarketingData = async () => {
+const loadMarketingDataInner = async () => {
   if (!showPenawaran.value) return;
-  isLoadingDashboard.value = true;
+  isLoadingDashboard.value = !hasSnapshot("mkt:pen-summary");
   try {
+    // ── reset semua list ──
     rpDetailList.value = [];
     rpDetailOffset.value = 0;
     rpDetailHasMore.value = true;
@@ -3539,6 +3590,9 @@ const loadMarketingData = async () => {
     penawaranBelumMap.value = [];
     mapOffset.value = 0;
     mapHasMore.value = true;
+    penawaranBatalList.value = [];
+    pbBatalOffset.value = 0;
+    pbBatalHasMore.value = true;
     achievementData.value = {
       totalTarget: 0,
       totalRealisasi: 0,
@@ -3553,9 +3607,12 @@ const loadMarketingData = async () => {
     pvrPage.value = 1;
     pvrHasMore.value = true;
     potensiList.value = [];
-    resetInkasoBatal();
     potensiOffset.value = 0;
     potensiHasMore.value = true;
+    potensiBatalList.value = [];
+    potensiBatalOffset.value = 0;
+    potensiBatalHasMore.value = true;
+    resetInkasoBatal();
     ptmDetailList.value = [];
     ptmDetailOffset.value = 0;
     ptmDetailHasMore.value = true;
@@ -3567,114 +3624,143 @@ const loadMarketingData = async () => {
     slowDeadStockPage.value = 1;
     konversiBabaranData.value = [];
 
-    const [
-      sumRes,
-      mapSumRes,
-      batalSumRes,
-      kunjunganRes,
-      realisasiPenRes,
-      realisasiBulananRes,
-      penToMapRes,
-      mapToSoRes,
-      statusKirimMapRes,
-      slowDeadMktRes,
-      konversiBabaranRes,
-    ] = await Promise.allSettled([
-      dashboardService.getPenawaranSummary(),
-      dashboardService.getPenawaranMapSummary(),
-      dashboardService.getPenawaranBatalSummary(),
-      dashboardService.getKunjunganSalesSummary(),
-      dashboardService.getRealisasiPenawaranDashboard(),
-      dashboardService.getRealisasiPenawaranBulanan(),
-      dashboardService.getRealisasiPenawaranToMap(),
-      dashboardService.getRealisasiMapToSo(),
-      dashboardService.getStatusPengirimanMapBulanan(),
-      dashboardService.getStokSlowDeadStockBahan(),
-      dashboardService.getKonversiBabaranAktual(),
-    ]);
-    ensureTargetCollectionLoaded();
-    if (
-      konversiBabaranRes.status === "fulfilled" &&
-      konversiBabaranRes.value?.data?.data
-    ) {
-      konversiBabaranData.value = konversiBabaranRes.value.data.data;
-    }
-    if (
-      slowDeadMktRes.status === "fulfilled" &&
-      slowDeadMktRes.value?.data?.data
-    ) {
-      slowDeadStockData.value = slowDeadMktRes.value.data.data;
-    }
-    if (
-      statusKirimMapRes.status === "fulfilled" &&
-      statusKirimMapRes.value?.data?.data
-    ) {
-      statusKirimMapData.value = statusKirimMapRes.value.data.data;
-    }
-    if (penToMapRes.status === "fulfilled" && penToMapRes.value?.data?.data)
-      realisasiPenToMap.value = penToMapRes.value.data.data;
-    if (mapToSoRes.status === "fulfilled" && mapToSoRes.value?.data?.data)
-      realisasiMapToSo.value = mapToSoRes.value.data.data;
-    if (
-      realisasiBulananRes.status === "fulfilled" &&
-      realisasiBulananRes.value?.data?.data
-    ) {
-      realisasiBulananData.value = realisasiBulananRes.value.data.data;
-    }
-    if (batalSumRes.status === "fulfilled")
-      penawaranBatalSummary.value = batalSumRes.value.data.data;
-    if (sumRes.status === "fulfilled")
-      penSummary.value = sumRes.value.data.data;
-    if (mapSumRes.status === "fulfilled")
-      mapSummary.value = mapSumRes.value.data.data;
-    if (kunjunganRes.status === "fulfilled")
-      kunjunganRows.value = kunjunganRes.value.data.data || [];
-    if (
-      realisasiPenRes.status === "fulfilled" &&
-      realisasiPenRes.value?.data?.data
-    ) {
-      realisasiPenawaranData.value = realisasiPenRes.value.data.data;
-    }
+    // ── jalankan SEMUA request sekaligus; ringkasan tampil dari snapshot lebih dulu ──
+    void ensureTargetCollectionLoaded();
 
-    await Promise.allSettled([
+    const summaryCalls: Promise<void>[] = [
+      snap(
+        "mkt:pen-summary",
+        () => payload(dashboardService.getPenawaranSummary()),
+        (d: typeof penSummary.value) => {
+          penSummary.value = d;
+        },
+      ),
+      snap(
+        "mkt:map-summary",
+        () => payload(dashboardService.getPenawaranMapSummary()),
+        (d: typeof mapSummary.value) => {
+          mapSummary.value = d;
+        },
+      ),
+      snap(
+        "mkt:batal-summary",
+        () => payload(dashboardService.getPenawaranBatalSummary()),
+        (d: typeof penawaranBatalSummary.value) => {
+          penawaranBatalSummary.value = d;
+        },
+      ),
+      snap(
+        "mkt:kunjungan",
+        () => payload(dashboardService.getKunjunganSalesSummary()),
+        (d: typeof kunjunganRows.value) => {
+          kunjunganRows.value = d || [];
+        },
+      ),
+      snap(
+        "mkt:realisasi-pen",
+        () => payload(dashboardService.getRealisasiPenawaranDashboard()),
+        (d: RealisasiData) => {
+          realisasiPenawaranData.value = d;
+        },
+      ),
+      snap(
+        "mkt:realisasi-bulanan",
+        () => payload(dashboardService.getRealisasiPenawaranBulanan()),
+        (d: RealisasiBulananDivisi[]) => {
+          realisasiBulananData.value = d;
+        },
+      ),
+      snap(
+        "mkt:pen-to-map",
+        () => payload(dashboardService.getRealisasiPenawaranToMap()),
+        (d: KategoriKonversiData) => {
+          realisasiPenToMap.value = d;
+        },
+      ),
+      snap(
+        "mkt:map-to-so",
+        () => payload(dashboardService.getRealisasiMapToSo()),
+        (d: KategoriKonversiData) => {
+          realisasiMapToSo.value = d;
+        },
+      ),
+      snap(
+        "mkt:status-kirim-map",
+        () => payload(dashboardService.getStatusPengirimanMapBulanan()),
+        (d: StatusKirimMapDivisi[]) => {
+          statusKirimMapData.value = d;
+        },
+      ),
+      snap(
+        "slow-dead-stock",
+        () => payload(dashboardService.getStokSlowDeadStockBahan()),
+        (d: SlowDeadStockJenis[]) => {
+          slowDeadStockData.value = d;
+        },
+      ),
+      snap(
+        "konversi-babaran",
+        () => payload(dashboardService.getKonversiBabaranAktual()),
+        (d: KonversiBabaranItem[]) => {
+          konversiBabaranData.value = d;
+        },
+      ),
+      snap(
+        "mkt:map-vs-spk",
+        () =>
+          payload(
+            dashboardService.getMapVsSpkDashboard(mapRangeStart, mapRangeEnd),
+          ),
+        (d: { metric: MapVsSpkMetric; divisi: MapDivisiItem[] }) => {
+          mapSpkMetric.value = d.metric;
+          mapDivisi.value = d.divisi;
+        },
+      ),
+      snap(
+        "mkt:map-vs-sj",
+        () =>
+          payload(
+            dashboardService.getMapVsSjDashboard(mapRangeStart, mapRangeEnd),
+          ),
+        (d: MapVsSjMetric) => {
+          mapSjMetric.value = d;
+        },
+      ),
+      snap(
+        "mkt:ach-summary",
+        () => payload(dashboardService.getAchievementSummary()),
+        (d: typeof achievementData.value) => {
+          achievementData.value = d;
+          renderAchievementChart();
+        },
+      ),
+      snap(
+        "mkt:ach-monthly",
+        () => payload(dashboardService.getAchievementMonthly()),
+        (d: AchievementMonthlyRow[]) => {
+          achievementMonthly.value = d;
+        },
+      ),
+      snap(
+        "mkt:growth-yoy",
+        () => payload(dashboardService.getGrowthYoy()),
+        (d: GrowthYoyRow[]) => {
+          growthYoyData.value = d;
+        },
+      ),
+    ];
+
+    // list ber-scroll: tetap live, tiap fungsi mengisi state-nya sendiri
+    const listsP = Promise.allSettled([
       loadMorePenawaran(),
       loadMoreMap(),
       loadMorePbBatal(),
       loadMoreRpDetail(),
-    ]);
-
-    const [mapVsSpkRes, mapVsSjRes] = await Promise.allSettled([
-      dashboardService.getMapVsSpkDashboard(mapRangeStart, mapRangeEnd),
-      dashboardService.getMapVsSjDashboard(mapRangeStart, mapRangeEnd),
-    ]);
-    if (mapVsSpkRes.status === "fulfilled" && mapVsSpkRes.value?.data?.data) {
-      mapSpkMetric.value = mapVsSpkRes.value.data.data.metric;
-      mapDivisi.value = mapVsSpkRes.value.data.data.divisi;
-    }
-    if (mapVsSjRes.status === "fulfilled" && mapVsSjRes.value?.data?.data) {
-      mapSjMetric.value = mapVsSjRes.value.data.data;
-    }
-    await Promise.allSettled([loadMoreMapSpk(), loadMoreMapKirim()]);
-
-    const [achRes, achMonthlyRes, growthRes] = await Promise.allSettled([
-      dashboardService.getAchievementSummary(),
-      dashboardService.getAchievementMonthly(),
-      dashboardService.getGrowthYoy(),
-    ]);
-    if (achRes.status === "fulfilled" && achRes.value?.data?.data) {
-      achievementData.value = achRes.value.data.data;
-      renderAchievementChart();
-    }
-    if (achMonthlyRes.status === "fulfilled" && achMonthlyRes.value?.data?.data)
-      achievementMonthly.value = achMonthlyRes.value.data.data;
-    if (growthRes.status === "fulfilled" && growthRes.value?.data?.data)
-      growthYoyData.value = growthRes.value.data.data;
-
-    await loadMorePvr();
-
-    await Promise.allSettled([loadMorePtmDetail(), loadMoreMtsDetail()]);
-
-    await Promise.allSettled([
+      loadMoreMapSpk(),
+      loadMoreMapKirim(),
+      loadMorePvr(),
+      loadMorePtmDetail(),
+      loadMoreMtsDetail(),
       fetchPotensiSummary(),
       loadMorePotensiList(),
       loadMorePotensiBatalList(),
@@ -3682,10 +3768,22 @@ const loadMarketingData = async () => {
       loadMoreInkasoBatal(),
     ]);
 
+    await Promise.all(summaryCalls);
+    await listsP;
+
     marketingLoaded.value = true;
   } finally {
     isLoadingDashboard.value = false;
   }
+};
+
+let marketingInFlight: Promise<void> | null = null;
+const loadMarketingData = (): Promise<void> => {
+  if (marketingInFlight) return marketingInFlight;
+  marketingInFlight = loadMarketingDataInner().finally(() => {
+    marketingInFlight = null;
+  });
+  return marketingInFlight;
 };
 
 // ── Finance / Piutang ──
@@ -4284,66 +4382,16 @@ onMounted(async () => {
     showPraOrderPpicIfNeeded(); // ⬅ DIUBAH: dulu langsung showBapReviewedIfNeeded()
   }
 
-  // Overview SELALU di-fetch (tab-nya selalu terlihat)
+  // Shortcut card butuh summary ringan dari tab lain; jalan paralel dengan overview
+  void loadOverviewShortcuts();
   await loadOverviewData();
-  // Shortcut card butuh summary ringan dari tab lain, tanpa nge-load
-  // list penuhnya (list tetap lazy pas tab beneran dibuka)
-  loadOverviewShortcuts();
-
-  // Kalau default tab BUKAN overview, fetch data tab itu juga
-  if (activeTab.value === "marketing") await loadMarketingData();
-  else if (activeTab.value === "finance") await loadFinanceData();
-  else if (activeTab.value === "gudang") await loadGudangData();
-  else if (activeTab.value === "gudang-bahan") await loadGudangBahanData();
-  else if (activeTab.value === "barang-jadi") await loadBarangJadiData();
-  else if (activeTab.value === "pembelian") await loadPembelianData();
 
   startPolling();
 
-  // Setup observer untuk tab yang aktif saat ini
+  // Tab non-overview dimuat oleh watcher(activeTab); di sini hanya overview
   await nextTick();
-  if (activeTab.value === "marketing") {
-    setupPenObserver();
-    setupMapObserver();
-    setupPbBatalObserver();
-    setupRpDetailObserver();
-    setupMapSpkObserver();
-    setupMapKirimObserver();
-    setupPvrObserver();
-    setupPtmDetailObserver();
-    setupMtsDetailObserver();
-    setupPotensiListObserver();
-    setupPotensiBatalListObserver();
-    setupInkasoBatalObserver();
-  }
-  if (activeTab.value === "finance") {
-    setupOverdueObserver();
-    setupSpkTagihObserver();
-  }
-  if (activeTab.value === "gudang-bahan") {
-    setupMspObserver();
-    setupPbrObserver();
-    setupPbdObserver();
-    setupGbMkbObserver();
-    setupGbMkaObserver();
-    setupBufferObserver();
-    setupBahanObserver();
-    setupStokAccVsMkaObserver();
-    setupSbObserver();
-    setupBkObserver();
-  }
   if (activeTab.value === "overview") {
     setupAktObserver();
-  }
-  if (activeTab.value === "gudang") {
-    setupGudangObservers();
-  }
-  if (activeTab.value === "barang-jadi") {
-    setupStokBjObserver();
-    setupMutasiBjObserver();
-  }
-  if (activeTab.value === "pembelian") {
-    setupObObserver();
   }
 });
 

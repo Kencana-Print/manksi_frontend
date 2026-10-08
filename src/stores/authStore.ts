@@ -4,6 +4,7 @@ import { defineStore } from "pinia";
 import { computed, ref } from "vue";
 import { useRouter } from "vue-router";
 import { useTabsStore } from "@/stores/tabsStore";
+import { clearSnapshots } from "@/utils/snapshot";
 
 // --- INTERFACES SESUAI PAYLOAD MANKSI ---
 interface Gudang {
@@ -217,6 +218,7 @@ export const useAuthStore = defineStore(
       sessionStorage.removeItem("hasSeenBapReviewed");
       praOrderPendingPpic.value = [];
       sessionStorage.removeItem("hasSeenPraOrderPpic");
+      clearSnapshots();
       useTabsStore().resetTabs();
       router.push("/login");
     }
@@ -244,6 +246,7 @@ export const useAuthStore = defineStore(
       bapReviewedNotif.value = [];
       praOrderPendingPpic.value = [];
       isSessionExpired.value = true;
+      clearSnapshots();
       useTabsStore().resetTabs();
     }
 
