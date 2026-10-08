@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import {
   ref,
+  reactive,
+  provide,
   computed,
   onMounted,
   onUnmounted,
@@ -35,6 +37,8 @@ import {
   IconShoppingCart,
 } from "@tabler/icons-vue";
 import AiChatWidget from "@/components/AiChatWidget.vue";
+import DashState from "@/components/dashboard/DashState.vue";
+import ProductionFlow from "@/components/dashboard/ProductionFlow.vue";
 import api from "@/services/api";
 import { exportExcelSingle } from "@/utils/excelExport";
 import { exportExcelMulti } from "@/utils/excelExportMulti";
@@ -346,7 +350,7 @@ const C = {
   warnSoft: "#fdf1dc",
   bad: "#d03a34",
   badSoft: "#fdecea",
-  neutral: "#6a7388",
+  neutral: "#5b6479",
   slate: "#3a4354",
   track: "#d5dae3",
 } as const;
@@ -358,14 +362,33 @@ const payload = <T = unknown,>(
   req: Promise<{ data: { data: unknown } }>,
 ): Promise<T> => req.then((res) => res.data.data as T);
 
-// Tipe data diambil dari parameter `apply`, jadi fetcher cukup mengembalikan unknown.
-// Tidak pernah melempar error (pola silent seperti di view ini).
+// ── Status muat: gagal, sedang memperbarui, waktu terakhir berhasil ──
+const loadFailed = reactive<Record<string, boolean>>({});
+const pendingSnaps = ref(0);
+const lastUpdatedAt = ref<number | null>(null);
+const nowTick = ref(Date.now());
+let nowTickTimer: ReturnType<typeof setInterval> | null = null;
+
+// Tipe data diambil dari parameter `apply`. Tidak pernah melempar error,
+// tetapi kegagalan dicatat di loadFailed[key] supaya bisa ditampilkan.
 const snap = <T,>(
   key: string,
   fetcher: () => Promise<unknown>,
   apply: (v: T) => void,
-): Promise<void> =>
-  swr<T>(key, async () => (await fetcher()) as T, apply).catch(() => undefined);
+): Promise<void> => {
+  pendingSnaps.value++;
+  loadFailed[key] = false;
+  return swr<T>(key, async () => (await fetcher()) as T, apply)
+    .then(() => {
+      lastUpdatedAt.value = Date.now();
+    })
+    .catch(() => {
+      loadFailed[key] = true;
+    })
+    .finally(() => {
+      pendingSnaps.value--;
+    });
+};
 const AI_CHAT_ALLOWED_KODE = [
   "DARUL",
   "DIR",
@@ -385,6 +408,86 @@ const isPraOrderPpicDialogVisible = ref(false);
 const isBapReviewedDialogVisible = ref(false);
 const hasReadBapReviewed = ref(false);
 const activeTab = ref("overview");
+
+// Nama panel untuk banner kegagalan. Kunci = akhiran isLoadingMore<Kunci>.
+const PANEL_META: Record<string, { label: string; tab: string }> = {
+  Akt: { label: "Aktivitas hari ini", tab: "overview" },
+  Pen: { label: "Penawaran belum SO", tab: "marketing" },
+  Map: { label: "Penawaran belum MAP", tab: "marketing" },
+  PbBatal: { label: "Penawaran batal", tab: "marketing" },
+  MapSpk: { label: "MAP belum SO", tab: "marketing" },
+  PtmDetail: { label: "Penawaran → MAP", tab: "marketing" },
+  MtsDetail: { label: "MAP → SO", tab: "marketing" },
+  Potensi: { label: "Proyeksi potensial", tab: "marketing" },
+  PotensiBatal: { label: "Proyeksi potensial batal", tab: "marketing" },
+  InkasoBatal: { label: "Proyeksi inkaso batal", tab: "marketing" },
+  Overdue: { label: "Invoice jatuh tempo", tab: "finance" },
+  SpkTagih: { label: "SPK terkirim belum ditagih", tab: "finance" },
+  Msp: { label: "MAP/SPK belum ada permintaan bahan", tab: "gudang-bahan" },
+  Pbr: { label: "Permintaan bahan belum direalisasi", tab: "gudang-bahan" },
+  Pbd: { label: "PO bahan belum datang", tab: "gudang-bahan" },
+  GbMkb: { label: "SO belum ada MKB", tab: "gudang-bahan" },
+  GbMka: { label: "MKA belum direalisasi", tab: "gudang-bahan" },
+  Buffer: { label: "Bahan penolong di bawah buffer", tab: "gudang-bahan" },
+  Bahan: { label: "Stok bahan utama", tab: "gudang-bahan" },
+  StokAccVsMka: {
+    label: "Stok aksesoris vs kebutuhan MKA",
+    tab: "gudang-bahan",
+  },
+  Sb: { label: "Stok bebas", tab: "gudang-bahan" },
+  Bk: { label: "Buffer bahan & aksesoris KAOSAN", tab: "gudang-bahan" },
+  BahanKurang: { label: "Bahan kurang untuk produksi", tab: "gudang" },
+  SpkBelumMkb: { label: "SO belum ada MKB", tab: "gudang" },
+  Outstanding: { label: "Outstanding PO mitra", tab: "gudang" },
+  Efisiensi: { label: "Efisiensi babaran", tab: "gudang" },
+  SpkStbj: { label: "SPK belum STBJ", tab: "gudang" },
+  SpkSj: { label: "Status pengiriman SPK", tab: "gudang" },
+  StokBj: { label: "Stok barang jadi", tab: "barang-jadi" },
+  MutasiBj: { label: "Mutasi barang jadi", tab: "barang-jadi" },
+  Ob: { label: "Outstanding beli", tab: "pembelian" },
+};
+
+const tabOfKey = (key: string): string | null => {
+  const meta = PANEL_META[key];
+  if (meta) return meta.tab;
+  if (key.startsWith("ov:")) return "overview";
+  if (key.startsWith("mkt:")) return "marketing";
+  // Target Collection tampil di Marketing dan Finance
+  if (key.startsWith("tc:"))
+    return activeTab.value === "finance" ? "finance" : "marketing";
+  // dimuat hanya dari tab Marketing
+  if (key === "slow-dead-stock" || key === "konversi-babaran")
+    return "marketing";
+  return null;
+};
+
+const failedPanelLabels = computed(() => {
+  const labels = new Set<string>();
+  let ringkasan = 0;
+  for (const [key, failed] of Object.entries(loadFailed)) {
+    if (!failed || tabOfKey(key) !== activeTab.value) continue;
+    const meta = PANEL_META[key];
+    if (meta) labels.add(meta.label);
+    else ringkasan++;
+  }
+  const out = [...labels];
+  if (ringkasan) out.push(`${ringkasan} ringkasan angka`);
+  return out;
+});
+
+provide(
+  "dashHasFailures",
+  computed(() => failedPanelLabels.value.length > 0),
+);
+
+const refreshLabel = computed(() => {
+  if (pendingSnaps.value > 0) return "Memperbarui…";
+  if (!lastUpdatedAt.value) return "";
+  const menit = Math.floor((nowTick.value - lastUpdatedAt.value) / 60000);
+  if (menit < 1) return "Diperbarui baru saja";
+  if (menit < 60) return `Diperbarui ${menit} menit lalu`;
+  return `Diperbarui ${Math.floor(menit / 60)} jam lalu`;
+});
 
 watch(activeTab, async (tab) => {
   if (tab === "overview") {
@@ -850,24 +953,6 @@ const pipelineFilter = ref({
     .substring(0, 10),
 });
 
-const pipelineStages = computed(() => [
-  { label: "SPK Masuk", value: pipelineData.value.TotalMasuk, color: C.accent },
-  { label: "Ada MKB", value: pipelineData.value.AdaMkb, color: C.accent },
-  {
-    label: "Realisasi Minta",
-    value: pipelineData.value.AdaRealisasi,
-    color: C.accent,
-  },
-  { label: "LHK Cutting", value: pipelineData.value.AdaLhk, color: C.accent },
-  { label: "STBJ", value: pipelineData.value.AdaStbj, color: C.accent },
-  { label: "Kirim (SJ)", value: pipelineData.value.AdaKirim, color: C.good },
-]);
-
-const pipelinePct = (value: number) => {
-  const total = pipelineData.value.TotalMasuk || 1;
-  return Math.round((value / total) * 100);
-};
-
 const fetchPipelineData = async () => {
   try {
     const res = await dashboardService.getPipelineSpkProduksi(
@@ -888,33 +973,24 @@ const pipelinePenyelesaianSpk = ref<PipelinePenyelesaianSpk>({
   FullInvoice: 0,
 });
 
-const pipelinePenyelesaianStages = computed(() => [
+const flowReady = ref(false);
+const productionFlowStages = computed(() => [
+  { key: "spk", label: "SPK masuk", value: pipelineData.value.TotalMasuk },
+  { key: "mkb", label: "MKB", value: pipelineData.value.AdaMkb },
   {
-    label: "SPK Aktif",
-    value: pipelinePenyelesaianSpk.value.TotalAktif,
-    color: C.accent,
+    key: "realisasi",
+    label: "Realisasi minta",
+    value: pipelineData.value.AdaRealisasi,
   },
+  { key: "lhk", label: "LHK cutting", value: pipelineData.value.AdaLhk },
+  { key: "stbj", label: "STBJ", value: pipelineData.value.AdaStbj },
+  { key: "kirim", label: "Kirim (SJ)", value: pipelineData.value.AdaKirim },
   {
-    label: "Sudah STBJ",
-    value: pipelinePenyelesaianSpk.value.SudahStbj,
-    color: C.accent,
-  },
-  {
-    label: "Sudah Kirim",
-    value: pipelinePenyelesaianSpk.value.SudahKirim,
-    color: C.accent,
-  },
-  {
-    label: "Full Invoice",
+    key: "invoice",
+    label: "Invoice penuh",
     value: pipelinePenyelesaianSpk.value.FullInvoice,
-    color: C.good,
   },
 ]);
-
-const pipelinePenyelesaianPct = (value: number) => {
-  const total = pipelinePenyelesaianSpk.value.TotalAktif || 1;
-  return Math.round((value / total) * 100);
-};
 
 const fetchPipelinePenyelesaianSpk = async () => {
   try {
@@ -948,6 +1024,7 @@ const loadMoreSpkStbj = async () => {
   if (!spkStbjHasMore.value || isLoadingMoreSpkStbj.value) return;
   isLoadingMoreSpkStbj.value = true;
   try {
+    loadFailed.SpkStbj = false;
     const res = await dashboardService.getSpkVsStbjList(
       SPK_STBJ_PAGE_SIZE,
       spkStbjOffset.value,
@@ -959,6 +1036,7 @@ const loadMoreSpkStbj = async () => {
     spkStbjOffset.value += rows.length;
     if (rows.length < SPK_STBJ_PAGE_SIZE) spkStbjHasMore.value = false;
   } catch {
+    loadFailed.SpkStbj = true;
   } finally {
     isLoadingMoreSpkStbj.value = false;
   }
@@ -1005,6 +1083,7 @@ const loadMoreSpkSj = async () => {
   if (!spkSjHasMore.value || isLoadingMoreSpkSj.value) return;
   isLoadingMoreSpkSj.value = true;
   try {
+    loadFailed.SpkSj = false;
     const res = await dashboardService.getSpkVsSjList(
       SPK_SJ_PAGE_SIZE,
       spkSjOffset.value,
@@ -1016,6 +1095,7 @@ const loadMoreSpkSj = async () => {
     spkSjOffset.value += rows.length;
     if (rows.length < SPK_SJ_PAGE_SIZE) spkSjHasMore.value = false;
   } catch {
+    loadFailed.SpkSj = true;
   } finally {
     isLoadingMoreSpkSj.value = false;
   }
@@ -1060,6 +1140,7 @@ const loadMoreSpkTagih = async () => {
   if (!spkTagihHasMore.value || isLoadingMoreSpkTagih.value) return;
   isLoadingMoreSpkTagih.value = true;
   try {
+    loadFailed.SpkTagih = false;
     const res = await dashboardService.getSpkTerkirimBelumTagihList(
       SPK_TAGIH_PAGE_SIZE,
       spkTagihOffset.value,
@@ -1071,6 +1152,7 @@ const loadMoreSpkTagih = async () => {
     spkTagihOffset.value += rows.length;
     if (rows.length < SPK_TAGIH_PAGE_SIZE) spkTagihHasMore.value = false;
   } catch {
+    loadFailed.SpkTagih = true;
   } finally {
     isLoadingMoreSpkTagih.value = false;
   }
@@ -1116,6 +1198,7 @@ const loadMoreStokBj = async () => {
   if (!stokBjHasMore.value || isLoadingMoreStokBj.value) return;
   isLoadingMoreStokBj.value = true;
   try {
+    loadFailed.StokBj = false;
     const res = await dashboardService.getStokBarangJadiList(
       STOK_BJ_PAGE_SIZE,
       stokBjOffset.value,
@@ -1126,6 +1209,7 @@ const loadMoreStokBj = async () => {
     stokBjOffset.value += rows.length;
     if (rows.length < STOK_BJ_PAGE_SIZE) stokBjHasMore.value = false;
   } catch {
+    loadFailed.StokBj = true;
   } finally {
     isLoadingMoreStokBj.value = false;
   }
@@ -1163,6 +1247,7 @@ const loadMoreMutasiBj = async () => {
   if (!mutasiBjHasMore.value || isLoadingMoreMutasiBj.value) return;
   isLoadingMoreMutasiBj.value = true;
   try {
+    loadFailed.MutasiBj = false;
     const res = await dashboardService.getMutasiBarangJadiList(
       MUTASI_BJ_PAGE_SIZE,
       mutasiBjOffset.value,
@@ -1172,6 +1257,7 @@ const loadMoreMutasiBj = async () => {
     mutasiBjOffset.value += rows.length;
     if (rows.length < MUTASI_BJ_PAGE_SIZE) mutasiBjHasMore.value = false;
   } catch {
+    loadFailed.MutasiBj = true;
   } finally {
     isLoadingMoreMutasiBj.value = false;
   }
@@ -1203,6 +1289,7 @@ const loadMorePenawaran = async () => {
   if (!penHasMore.value || isLoadingMorePen.value) return;
   isLoadingMorePen.value = true;
   try {
+    loadFailed.Pen = false;
     const res = await dashboardService.getPenawaranBelumSpk(
       PEN_PAGE_SIZE,
       penOffset.value,
@@ -1212,7 +1299,7 @@ const loadMorePenawaran = async () => {
     penOffset.value += rows.length;
     if (rows.length < PEN_PAGE_SIZE) penHasMore.value = false;
   } catch {
-    /* silent */
+    loadFailed.Pen = true;
   } finally {
     isLoadingMorePen.value = false;
   }
@@ -1242,6 +1329,7 @@ const loadMoreMap = async () => {
   if (!mapHasMore.value || isLoadingMoreMap.value) return;
   isLoadingMoreMap.value = true;
   try {
+    loadFailed.Map = false;
     const res = await dashboardService.getPenawaranBelumMap(
       MAP_PAGE_SIZE,
       mapOffset.value,
@@ -1251,7 +1339,7 @@ const loadMoreMap = async () => {
     mapOffset.value += rows.length;
     if (rows.length < MAP_PAGE_SIZE) mapHasMore.value = false;
   } catch {
-    /* silent */
+    loadFailed.Map = true;
   } finally {
     isLoadingMoreMap.value = false;
   }
@@ -1292,6 +1380,7 @@ const loadMorePbBatal = async () => {
   if (!pbBatalHasMore.value || isLoadingMorePbBatal.value) return;
   isLoadingMorePbBatal.value = true;
   try {
+    loadFailed.PbBatal = false;
     const res = await dashboardService.getPenawaranBatalList(
       PB_PAGE_SIZE,
       pbBatalOffset.value,
@@ -1301,6 +1390,7 @@ const loadMorePbBatal = async () => {
     pbBatalOffset.value += rows.length;
     if (rows.length < PB_PAGE_SIZE) pbBatalHasMore.value = false;
   } catch {
+    loadFailed.PbBatal = true;
   } finally {
     isLoadingMorePbBatal.value = false;
   }
@@ -1331,6 +1421,7 @@ const loadMoreOverdue = async () => {
   if (!overdueHasMore.value || isLoadingMoreOverdue.value) return;
   isLoadingMoreOverdue.value = true;
   try {
+    loadFailed.Overdue = false;
     const res = await dashboardService.getPiutangOverdue(
       OVERDUE_PAGE_SIZE,
       overdueOffset.value,
@@ -1340,7 +1431,7 @@ const loadMoreOverdue = async () => {
     overdueOffset.value += rows.length;
     if (rows.length < OVERDUE_PAGE_SIZE) overdueHasMore.value = false;
   } catch {
-    /* silent */
+    loadFailed.Overdue = true;
   } finally {
     isLoadingMoreOverdue.value = false;
   }
@@ -1371,6 +1462,7 @@ const loadMoreBuffer = async () => {
   if (!bufferHasMore.value || isLoadingMoreBuffer.value) return;
   isLoadingMoreBuffer.value = true;
   try {
+    loadFailed.Buffer = false;
     const res = await dashboardService.getGudangBahanBuffer(
       BUFFER_PAGE_SIZE,
       bufferOffset.value,
@@ -1380,7 +1472,7 @@ const loadMoreBuffer = async () => {
     bufferOffset.value += rows.length;
     if (rows.length < BUFFER_PAGE_SIZE) bufferHasMore.value = false;
   } catch {
-    /* silent */
+    loadFailed.Buffer = true;
   } finally {
     isLoadingMoreBuffer.value = false;
   }
@@ -1411,6 +1503,7 @@ const loadMoreBahan = async () => {
   if (!bahanHasMore.value || isLoadingMoreBahan.value) return;
   isLoadingMoreBahan.value = true;
   try {
+    loadFailed.Bahan = false;
     const res = await dashboardService.getGudangBahanBarcode(
       BAHAN_PAGE_SIZE,
       bahanOffset.value,
@@ -1420,7 +1513,7 @@ const loadMoreBahan = async () => {
     bahanOffset.value += rows.length;
     if (rows.length < BAHAN_PAGE_SIZE) bahanHasMore.value = false;
   } catch {
-    /* silent */
+    loadFailed.Bahan = true;
   } finally {
     isLoadingMoreBahan.value = false;
   }
@@ -1462,6 +1555,7 @@ const loadMoreRpDetail = async () => {
   if (!rpDetailHasMore.value || isLoadingMoreRpDetail.value) return;
   isLoadingMoreRpDetail.value = true;
   try {
+    loadFailed.RpDetail = false;
     const res = await dashboardService.getRealisasiPenawaranDetail(
       RP_DETAIL_PAGE_SIZE,
       rpDetailOffset.value,
@@ -1471,7 +1565,7 @@ const loadMoreRpDetail = async () => {
     rpDetailOffset.value += rows.length;
     if (rows.length < RP_DETAIL_PAGE_SIZE) rpDetailHasMore.value = false;
   } catch {
-    /* silent */
+    loadFailed.RpDetail = true;
   } finally {
     isLoadingMoreRpDetail.value = false;
   }
@@ -1572,6 +1666,7 @@ const loadMoreMapSpk = async () => {
   if (!mapSpkHasMore.value || isLoadingMoreMapSpk.value) return;
   isLoadingMoreMapSpk.value = true;
   try {
+    loadFailed.MapSpk = false;
     const res = await dashboardService.getMapBelumSpk(
       MAP_SPK_PAGE_SIZE,
       mapSpkOffset.value,
@@ -1583,6 +1678,7 @@ const loadMoreMapSpk = async () => {
     mapSpkOffset.value += rows.length;
     if (rows.length < MAP_SPK_PAGE_SIZE) mapSpkHasMore.value = false;
   } catch {
+    loadFailed.MapSpk = true;
   } finally {
     isLoadingMoreMapSpk.value = false;
   }
@@ -1613,6 +1709,7 @@ const loadMoreMapKirim = async () => {
   if (!mapKirimHasMore.value || isLoadingMoreMapKirim.value) return;
   isLoadingMoreMapKirim.value = true;
   try {
+    loadFailed.MapKirim = false;
     const res = await dashboardService.getMapBelumKirim(
       MAP_KIRIM_PAGE_SIZE,
       mapKirimOffset.value,
@@ -1624,6 +1721,7 @@ const loadMoreMapKirim = async () => {
     mapKirimOffset.value += rows.length;
     if (rows.length < MAP_KIRIM_PAGE_SIZE) mapKirimHasMore.value = false;
   } catch {
+    loadFailed.MapKirim = true;
   } finally {
     isLoadingMoreMapKirim.value = false;
   }
@@ -1764,6 +1862,7 @@ const loadMorePvr = async () => {
   if (!pvrHasMore.value || isLoadingMorePvr.value) return;
   isLoadingMorePvr.value = true;
   try {
+    loadFailed.Pvr = false;
     const res = await dashboardService.getProyeksiVsRealisasiSummary(
       mapRangeStart,
       mapRangeEnd,
@@ -1780,6 +1879,7 @@ const loadMorePvr = async () => {
     pvrPage.value += 1;
     pvrHasMore.value = !!d.hasMore;
   } catch {
+    loadFailed.Pvr = true;
   } finally {
     isLoadingMorePvr.value = false;
   }
@@ -1861,6 +1961,7 @@ const loadMorePotensiList = async () => {
   if (!potensiHasMore.value || isLoadingMorePotensi.value) return;
   isLoadingMorePotensi.value = true;
   try {
+    loadFailed.Potensi = false;
     const res = await dashboardService.getPotensiList(
       POTENSI_PAGE_SIZE,
       potensiOffset.value,
@@ -1870,6 +1971,7 @@ const loadMorePotensiList = async () => {
     potensiOffset.value += rows.length;
     if (rows.length < POTENSI_PAGE_SIZE) potensiHasMore.value = false;
   } catch {
+    loadFailed.Potensi = true;
   } finally {
     isLoadingMorePotensi.value = false;
   }
@@ -1974,6 +2076,7 @@ const loadMorePotensiBatalList = async () => {
   if (!potensiBatalHasMore.value || isLoadingMorePotensiBatal.value) return;
   isLoadingMorePotensiBatal.value = true;
   try {
+    loadFailed.PotensiBatal = false;
     const res = await dashboardService.getPotensiBatalList(
       PB2_PAGE_SIZE,
       potensiBatalOffset.value,
@@ -1983,6 +2086,7 @@ const loadMorePotensiBatalList = async () => {
     potensiBatalOffset.value += rows.length;
     if (rows.length < PB2_PAGE_SIZE) potensiBatalHasMore.value = false;
   } catch {
+    loadFailed.PotensiBatal = true;
   } finally {
     isLoadingMorePotensiBatal.value = false;
   }
@@ -2087,6 +2191,7 @@ const loadMorePenSource = async () => {
   if (!penSourceHasMore.value || isLoadingMorePenSource.value) return;
   isLoadingMorePenSource.value = true;
   try {
+    loadFailed.PenSource = false;
     const res = await dashboardService.getPotensiSourceOptions(
       potensiSourceCustFilter.value,
       "PENAWARAN",
@@ -2098,6 +2203,7 @@ const loadMorePenSource = async () => {
     penSourceOffset.value += rows.length;
     if (rows.length < PSRC_PAGE_SIZE) penSourceHasMore.value = false;
   } catch {
+    loadFailed.PenSource = true;
   } finally {
     isLoadingMorePenSource.value = false;
   }
@@ -2107,6 +2213,7 @@ const loadMoreMapSource = async () => {
   if (!mapSourceHasMore.value || isLoadingMoreMapSource.value) return;
   isLoadingMoreMapSource.value = true;
   try {
+    loadFailed.MapSource = false;
     const res = await dashboardService.getPotensiSourceOptions(
       potensiSourceCustFilter.value,
       "MAP",
@@ -2118,6 +2225,7 @@ const loadMoreMapSource = async () => {
     mapSourceOffset.value += rows.length;
     if (rows.length < PSRC_PAGE_SIZE) mapSourceHasMore.value = false;
   } catch {
+    loadFailed.MapSource = true;
   } finally {
     isLoadingMoreMapSource.value = false;
   }
@@ -2348,6 +2456,7 @@ const loadMoreInkasoBatal = async () => {
   if (!inkasoBatalHasMore.value || isLoadingMoreInkasoBatal.value) return;
   isLoadingMoreInkasoBatal.value = true;
   try {
+    loadFailed.InkasoBatal = false;
     const res = await dashboardService.getInkasoBatalList(
       INK_BATAL_PAGE_SIZE,
       inkasoBatalOffset.value,
@@ -2358,6 +2467,7 @@ const loadMoreInkasoBatal = async () => {
     if (rows.length < INK_BATAL_PAGE_SIZE) inkasoBatalHasMore.value = false;
   } catch {
     inkasoBatalHasMore.value = false;
+    loadFailed.InkasoBatal = true;
   } finally {
     isLoadingMoreInkasoBatal.value = false;
   }
@@ -2690,6 +2800,7 @@ const loadMoreBahanKurang = async () => {
   if (!bahanKurangHasMore.value || isLoadingMoreBahanKurang.value) return;
   isLoadingMoreBahanKurang.value = true;
   try {
+    loadFailed.BahanKurang = false;
     const res = await dashboardService.getBahanKurangList(
       BAHAN_KURANG_PAGE_SIZE,
       bahanKurangOffset.value,
@@ -2699,6 +2810,7 @@ const loadMoreBahanKurang = async () => {
     bahanKurangOffset.value += rows.length;
     if (rows.length < BAHAN_KURANG_PAGE_SIZE) bahanKurangHasMore.value = false;
   } catch {
+    loadFailed.BahanKurang = true;
   } finally {
     isLoadingMoreBahanKurang.value = false;
   }
@@ -2739,6 +2851,7 @@ const loadMoreStokAccVsMka = async () => {
   if (!stokAccVsMkaHasMore.value || isLoadingMoreStokAccVsMka.value) return;
   isLoadingMoreStokAccVsMka.value = true;
   try {
+    loadFailed.StokAccVsMka = false;
     const res = await dashboardService.getStokAccVsMkaList(
       STOK_ACC_MKA_PAGE_SIZE,
       stokAccVsMkaOffset.value,
@@ -2748,6 +2861,7 @@ const loadMoreStokAccVsMka = async () => {
     stokAccVsMkaOffset.value += rows.length;
     if (rows.length < STOK_ACC_MKA_PAGE_SIZE) stokAccVsMkaHasMore.value = false;
   } catch {
+    loadFailed.StokAccVsMka = true;
   } finally {
     isLoadingMoreStokAccVsMka.value = false;
   }
@@ -2778,6 +2892,7 @@ const loadMoreSpkBelumMkb = async () => {
   if (!spkBelumMkbHasMore.value || isLoadingMoreSpkBelumMkb.value) return;
   isLoadingMoreSpkBelumMkb.value = true;
   try {
+    loadFailed.SpkBelumMkb = false;
     const res = await dashboardService.getSpkBelumMkbListPaged(
       SPK_BELUM_MKB_PAGE_SIZE,
       spkBelumMkbOffset.value,
@@ -2787,6 +2902,7 @@ const loadMoreSpkBelumMkb = async () => {
     spkBelumMkbOffset.value += rows.length;
     if (rows.length < SPK_BELUM_MKB_PAGE_SIZE) spkBelumMkbHasMore.value = false;
   } catch {
+    loadFailed.SpkBelumMkb = true;
   } finally {
     isLoadingMoreSpkBelumMkb.value = false;
   }
@@ -2817,6 +2933,7 @@ const loadMoreOutstanding = async () => {
   if (!outstandingHasMore.value || isLoadingMoreOutstanding.value) return;
   isLoadingMoreOutstanding.value = true;
   try {
+    loadFailed.Outstanding = false;
     const res = await dashboardService.getOutstandingPoMitraList(
       OUTSTANDING_PAGE_SIZE,
       outstandingOffset.value,
@@ -2826,6 +2943,7 @@ const loadMoreOutstanding = async () => {
     outstandingOffset.value += rows.length;
     if (rows.length < OUTSTANDING_PAGE_SIZE) outstandingHasMore.value = false;
   } catch {
+    loadFailed.Outstanding = true;
   } finally {
     isLoadingMoreOutstanding.value = false;
   }
@@ -2856,6 +2974,7 @@ const loadMoreEfisiensi = async () => {
   if (!efisiensiHasMore.value || isLoadingMoreEfisiensi.value) return;
   isLoadingMoreEfisiensi.value = true;
   try {
+    loadFailed.Efisiensi = false;
     const res = await dashboardService.getEfisiensiBabaranList(
       EFISIENSI_PAGE_SIZE,
       efisiensiOffset.value,
@@ -2865,6 +2984,7 @@ const loadMoreEfisiensi = async () => {
     efisiensiOffset.value += rows.length;
     if (rows.length < EFISIENSI_PAGE_SIZE) efisiensiHasMore.value = false;
   } catch {
+    loadFailed.Efisiensi = true;
   } finally {
     isLoadingMoreEfisiensi.value = false;
   }
@@ -2896,6 +3016,7 @@ const loadMoreMsp = async () => {
   if (!mspHasMore.value || isLoadingMoreMsp.value) return;
   isLoadingMoreMsp.value = true;
   try {
+    loadFailed.Msp = false;
     const res = await dashboardService.getMapSpkBelumPermintaanList(
       MSP_PAGE_SIZE,
       mspOffset.value,
@@ -2905,6 +3026,7 @@ const loadMoreMsp = async () => {
     mspOffset.value += rows.length;
     if (rows.length < MSP_PAGE_SIZE) mspHasMore.value = false;
   } catch {
+    loadFailed.Msp = true;
   } finally {
     isLoadingMoreMsp.value = false;
   }
@@ -2939,6 +3061,7 @@ const loadMorePbr = async () => {
   if (!pbrHasMore.value || isLoadingMorePbr.value) return;
   isLoadingMorePbr.value = true;
   try {
+    loadFailed.Pbr = false;
     const res = await dashboardService.getPermintaanBelumRealisasiList(
       PBR_PAGE_SIZE,
       pbrOffset.value,
@@ -2948,6 +3071,7 @@ const loadMorePbr = async () => {
     pbrOffset.value += rows.length;
     if (rows.length < PBR_PAGE_SIZE) pbrHasMore.value = false;
   } catch {
+    loadFailed.Pbr = true;
   } finally {
     isLoadingMorePbr.value = false;
   }
@@ -2978,6 +3102,7 @@ const loadMorePbd = async () => {
   if (!pbdHasMore.value || isLoadingMorePbd.value) return;
   isLoadingMorePbd.value = true;
   try {
+    loadFailed.Pbd = false;
     const res = await dashboardService.getPoBahanBelumDatangList(
       PBD_PAGE_SIZE,
       pbdOffset.value,
@@ -2987,6 +3112,7 @@ const loadMorePbd = async () => {
     pbdOffset.value += rows.length;
     if (rows.length < PBD_PAGE_SIZE) pbdHasMore.value = false;
   } catch {
+    loadFailed.Pbd = true;
   } finally {
     isLoadingMorePbd.value = false;
   }
@@ -3017,6 +3143,7 @@ const loadMoreGbMkb = async () => {
   if (!gbMkbHasMore.value || isLoadingMoreGbMkb.value) return;
   isLoadingMoreGbMkb.value = true;
   try {
+    loadFailed.GbMkb = false;
     const res = await dashboardService.getSpkBelumMkbListPaged(
       GB_MKB_PAGE_SIZE,
       gbMkbOffset.value,
@@ -3026,6 +3153,7 @@ const loadMoreGbMkb = async () => {
     gbMkbOffset.value += rows.length;
     if (rows.length < GB_MKB_PAGE_SIZE) gbMkbHasMore.value = false;
   } catch {
+    loadFailed.GbMkb = true;
   } finally {
     isLoadingMoreGbMkb.value = false;
   }
@@ -3056,6 +3184,7 @@ const loadMoreGbMka = async () => {
   if (!gbMkaHasMore.value || isLoadingMoreGbMka.value) return;
   isLoadingMoreGbMka.value = true;
   try {
+    loadFailed.GbMka = false;
     const res = await dashboardService.getStokAccVsMkaList(
       GB_MKA_PAGE_SIZE,
       gbMkaOffset.value,
@@ -3065,6 +3194,7 @@ const loadMoreGbMka = async () => {
     gbMkaOffset.value += rows.length;
     if (rows.length < GB_MKA_PAGE_SIZE) gbMkaHasMore.value = false;
   } catch {
+    loadFailed.GbMka = true;
   } finally {
     isLoadingMoreGbMka.value = false;
   }
@@ -3084,6 +3214,7 @@ const loadMoreSb = async () => {
   if (!sbHasMore.value || isLoadingMoreSb.value) return;
   isLoadingMoreSb.value = true;
   try {
+    loadFailed.Sb = false;
     const res = await dashboardService.getStokBebasList(
       SB_PAGE_SIZE,
       sbOffset.value,
@@ -3093,6 +3224,7 @@ const loadMoreSb = async () => {
     sbOffset.value += rows.length;
     if (rows.length < SB_PAGE_SIZE) sbHasMore.value = false;
   } catch {
+    loadFailed.Sb = true;
   } finally {
     isLoadingMoreSb.value = false;
   }
@@ -3112,6 +3244,7 @@ const loadMoreBk = async () => {
   if (!bkHasMore.value || isLoadingMoreBk.value) return;
   isLoadingMoreBk.value = true;
   try {
+    loadFailed.Bk = false;
     const res = await dashboardService.getBufferKaosanList(
       BK_PAGE_SIZE,
       bkOffset.value,
@@ -3121,6 +3254,7 @@ const loadMoreBk = async () => {
     bkOffset.value += rows.length;
     if (rows.length < BK_PAGE_SIZE) bkHasMore.value = false;
   } catch {
+    loadFailed.Bk = true;
   } finally {
     isLoadingMoreBk.value = false;
   }
@@ -3166,6 +3300,7 @@ const loadMorePtmDetail = async () => {
   if (!ptmDetailHasMore.value || isLoadingMorePtmDetail.value) return;
   isLoadingMorePtmDetail.value = true;
   try {
+    loadFailed.PtmDetail = false;
     const res = await dashboardService.getRealisasiPenawaranToMapDetail(
       PTM_DETAIL_PAGE_SIZE,
       ptmDetailOffset.value,
@@ -3175,6 +3310,7 @@ const loadMorePtmDetail = async () => {
     ptmDetailOffset.value += rows.length;
     if (rows.length < PTM_DETAIL_PAGE_SIZE) ptmDetailHasMore.value = false;
   } catch {
+    loadFailed.PtmDetail = true;
   } finally {
     isLoadingMorePtmDetail.value = false;
   }
@@ -3203,6 +3339,7 @@ const loadMoreMtsDetail = async () => {
   if (!mtsDetailHasMore.value || isLoadingMoreMtsDetail.value) return;
   isLoadingMoreMtsDetail.value = true;
   try {
+    loadFailed.MtsDetail = false;
     const res = await dashboardService.getRealisasiMapToSoDetail(
       MTS_DETAIL_PAGE_SIZE,
       mtsDetailOffset.value,
@@ -3212,6 +3349,7 @@ const loadMoreMtsDetail = async () => {
     mtsDetailOffset.value += rows.length;
     if (rows.length < MTS_DETAIL_PAGE_SIZE) mtsDetailHasMore.value = false;
   } catch {
+    loadFailed.MtsDetail = true;
   } finally {
     isLoadingMoreMtsDetail.value = false;
   }
@@ -3272,6 +3410,7 @@ const loadMoreAktivitas = async () => {
   if (!aktHasMore.value || isLoadingMoreAkt.value) return;
   isLoadingMoreAkt.value = true;
   try {
+    loadFailed.Akt = false;
     const res = await dashboardService.getAktivitasHariIni(
       AKT_PAGE_SIZE,
       aktOffset.value,
@@ -3285,7 +3424,7 @@ const loadMoreAktivitas = async () => {
     // ← tambah ini: update count setiap kali ada data baru masuk
     animatedAktivitasCount.value = aktivitasList.value.length;
   } catch {
-    /* silent */
+    loadFailed.Akt = true;
   } finally {
     isLoadingMoreAkt.value = false;
   }
@@ -3567,6 +3706,24 @@ const loadOverviewShortcuts = async () => {
           spkVsSjSummary.value = d;
         },
       ),
+      snap(
+        `ov:pipe:${startDate}:${endDate}`,
+        () =>
+          payload(dashboardService.getPipelineSpkProduksi(startDate, endDate)),
+        (d: PipelineData) => {
+          if (d) pipelineData.value = d;
+        },
+      ),
+      snap(
+        `ov:pipe2:${startDate}:${endDate}`,
+        () =>
+          payload(
+            dashboardService.getPipelinePenyelesaianSpk(startDate, endDate),
+          ),
+        (d: PipelinePenyelesaianSpk) => {
+          if (d) pipelinePenyelesaianSpk.value = d;
+        },
+      ),
     );
   }
   if (showGudangBahan.value) {
@@ -3607,6 +3764,7 @@ const loadOverviewShortcuts = async () => {
   }
 
   await Promise.allSettled(calls);
+  flowReady.value = true;
 };
 
 // ── Marketing ──
@@ -4127,6 +4285,7 @@ const loadMoreOb = async () => {
   if (!obHasMore.value || isLoadingMoreOb.value) return;
   isLoadingMoreOb.value = true;
   const myReq = obReqId;
+  loadFailed.Ob = false;
   try {
     const res = await dashboardService.getOutstandingBeliList(
       obTab.value,
@@ -4142,6 +4301,7 @@ const loadMoreOb = async () => {
     if (rows.length < OB_PAGE_SIZE) obHasMore.value = false;
   } catch {
     obHasMore.value = false;
+    loadFailed.Ob = true;
   } finally {
     if (myReq === obReqId) isLoadingMoreOb.value = false;
   }
@@ -4430,6 +4590,10 @@ onMounted(async () => {
 
   startPolling();
 
+  nowTickTimer = setInterval(() => {
+    nowTick.value = Date.now();
+  }, 30_000);
+
   // Tab non-overview dimuat oleh watcher(activeTab); di sini hanya overview
   await nextTick();
   if (activeTab.value === "overview") {
@@ -4439,6 +4603,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   stopPolling();
+  if (nowTickTimer) clearInterval(nowTickTimer);
   aktScrollObserver?.disconnect();
   penScrollObserver?.disconnect();
   mapScrollObserver?.disconnect();
@@ -4745,16 +4910,26 @@ const sisaClass = (item: any) => {
         </div>
       </div>
       <div class="d-flex align-center" style="gap: 8px">
+        <span
+          v-if="refreshLabel"
+          class="dsh-updated"
+          :class="{ 'dsh-updated--busy': pendingSnaps > 0 }"
+          role="status"
+        >
+          {{ refreshLabel }}
+        </span>
         <v-btn
           icon
           variant="text"
           size="small"
           :loading="isLoadingDashboard"
           title="Refresh Dashboard"
+          aria-label="Refresh dashboard"
           @click="loadDashboard"
         >
           <IconRefresh :size="16" :stroke-width="1.7" />
         </v-btn>
+
         <div class="text-right text-grey-darken-2" style="font-size: 12px">
           <div>
             Bagian:
@@ -4779,7 +4954,11 @@ const sisaClass = (item: any) => {
       density="compact"
       class="mb-3"
       bg-color="white"
-      style="border: 1px solid var(--dsh-line); border-radius: 4px"
+      style="
+        border: 1px solid var(--dsh-line);
+        border-radius: var(--dsh-radius);
+        box-shadow: var(--dsh-shadow);
+      "
     >
       <v-tab value="overview" class="text-caption font-weight-bold">
         <IconLayoutDashboard :size="14" class="mr-1" :stroke-width="1.7" />
@@ -4834,6 +5013,18 @@ const sisaClass = (item: any) => {
         Pembelian
       </v-tab>
     </v-tabs>
+
+    <div v-if="failedPanelLabels.length" class="dsh-banner" role="alert">
+      <IconAlertTriangle :size="16" :stroke-width="1.7" />
+      <div class="dsh-banner-text">
+        <strong>Sebagian data gagal dimuat:</strong>
+        {{ failedPanelLabels.join(", ") }}. Panel yang tampak kosong belum tentu
+        benar-benar kosong.
+      </div>
+      <button type="button" class="dsh-banner-btn" @click="loadDashboard">
+        Muat ulang tab
+      </button>
+    </div>
 
     <v-window v-model="activeTab">
       <!-- ════════════════════════════════════════
@@ -5119,6 +5310,37 @@ const sisaClass = (item: any) => {
           </v-col>
         </v-row>
 
+        <v-row v-if="showPoBpb" dense class="mt-2">
+          <v-col cols="12">
+            <div class="manksi-panel content-panel">
+              <div class="panel-header">
+                <IconTrendingUp :size="14" :stroke-width="1.7" class="mr-1" />
+                Alur produksi bulan ini
+                <button
+                  type="button"
+                  class="po-bpb-link ml-auto"
+                  @click="activeTab = 'gudang'"
+                >
+                  Lihat rincian
+                </button>
+              </div>
+              <div class="panel-body">
+                <DashState v-if="!flowReady" kind="loading" :rows="2" />
+                <ProductionFlow
+                  v-else-if="pipelineData.TotalMasuk"
+                  :stages="productionFlowStages"
+                  compact
+                />
+                <DashState
+                  v-else
+                  kind="empty"
+                  message="Belum ada SPK dengan dateline pada periode ini."
+                />
+              </div>
+            </div>
+          </v-col>
+        </v-row>
+
         <!-- ── Row 3: Trend Chart + Aktivitas Hari Ini ── -->
         <v-row dense class="mt-2">
           <!-- Trend 7 Hari -->
@@ -5253,12 +5475,7 @@ const sisaClass = (item: any) => {
                 class="panel-body"
                 style="display: flex; flex-direction: column; height: 100%"
               >
-                <v-progress-linear
-                  v-if="isLoadingDashboard"
-                  indeterminate
-                  color="primary"
-                  height="2"
-                />
+                <DashState v-if="isLoadingDashboard" kind="loading" />
                 <template v-else-if="achievementData.byDivisi.length">
                   <div class="pen-summary-bar">
                     <div class="pen-stat">
@@ -5296,9 +5513,11 @@ const sisaClass = (item: any) => {
                     <div ref="achTopSalesChartEl" style="width: 100%" />
                   </div>
                 </template>
-                <div v-else class="text-center text-grey py-3 text-caption">
-                  Belum ada data target/achievement bulan ini.
-                </div>
+                <DashState
+                  v-else
+                  kind="empty"
+                  message="Belum ada data target/achievement bulan ini."
+                />
               </div>
             </div>
           </v-col>
@@ -5320,12 +5539,7 @@ const sisaClass = (item: any) => {
                 </span>
               </div>
               <div class="panel-body">
-                <v-progress-linear
-                  v-if="isLoadingDashboard"
-                  indeterminate
-                  color="primary"
-                  height="2"
-                />
+                <DashState v-if="isLoadingDashboard" kind="loading" />
                 <template v-else-if="growthYoyData.length">
                   <div class="gb-list gyy-list">
                     <div
@@ -5379,9 +5593,11 @@ const sisaClass = (item: any) => {
                     </div>
                   </div>
                 </template>
-                <div v-else class="text-center text-grey py-3 text-caption">
-                  Belum ada data growth YoY.
-                </div>
+                <DashState
+                  v-else
+                  kind="empty"
+                  message="Belum ada data growth YoY."
+                />
               </div>
             </div>
           </v-col>
@@ -5399,12 +5615,7 @@ const sisaClass = (item: any) => {
                 </span>
               </div>
               <div class="panel-body">
-                <v-progress-linear
-                  v-if="isLoadingTargetCollection"
-                  indeterminate
-                  color="primary"
-                  height="2"
-                />
+                <DashState v-if="isLoadingTargetCollection" kind="loading" />
                 <template v-else-if="targetCollectionData">
                   <div style="overflow-x: auto">
                     <table class="gb-tbl" style="min-width: 1040px">
@@ -5567,9 +5778,11 @@ const sisaClass = (item: any) => {
                     </button>
                   </div>
                 </template>
-                <div v-else class="text-center text-grey py-3 text-caption">
-                  Belum ada data target collection.
-                </div>
+                <DashState
+                  v-else
+                  kind="empty"
+                  message="Belum ada data target collection."
+                />
               </div>
             </div>
           </v-col>
@@ -5616,12 +5829,7 @@ const sisaClass = (item: any) => {
                 </span>
               </div>
               <div class="panel-body">
-                <v-progress-linear
-                  v-if="isLoadingDashboard"
-                  indeterminate
-                  color="primary"
-                  height="2"
-                />
+                <DashState v-if="isLoadingDashboard" kind="loading" />
                 <template
                   v-else-if="penawaranBelumMap.length || isLoadingMoreMap"
                 >
@@ -5687,9 +5895,11 @@ const sisaClass = (item: any) => {
                     </div>
                   </div>
                 </template>
-                <div v-else class="text-center text-grey py-3 text-caption">
-                  Semua penawaran sudah ada MAP-nya
-                </div>
+                <DashState
+                  v-else
+                  kind="empty"
+                  message="Semua penawaran sudah ada MAP-nya"
+                />
               </div>
             </div>
           </v-col>
@@ -5767,9 +5977,11 @@ const sisaClass = (item: any) => {
                     </div>
                   </div>
                 </template>
-                <div v-else class="text-center text-grey py-3 text-caption">
-                  Tidak ada penawaran batal 90 hari terakhir
-                </div>
+                <DashState
+                  v-else
+                  kind="empty"
+                  message="Tidak ada penawaran batal 90 hari terakhir"
+                />
               </div>
             </div>
           </v-col>
@@ -5786,12 +5998,7 @@ const sisaClass = (item: any) => {
                 </span>
               </div>
               <div class="panel-body">
-                <v-progress-linear
-                  v-if="isLoadingDashboard"
-                  indeterminate
-                  color="primary"
-                  height="2"
-                />
+                <DashState v-if="isLoadingDashboard" kind="loading" />
                 <template v-else>
                   <div class="pen-summary-bar">
                     <div class="pen-stat">
@@ -5870,9 +6077,11 @@ const sisaClass = (item: any) => {
                       </span>
                     </div>
                   </div>
-                  <div v-else class="text-center text-grey py-3 text-caption">
-                    Semua penawaran sudah ada SPK-nya
-                  </div>
+                  <DashState
+                    v-else
+                    kind="empty"
+                    message="Semua penawaran sudah ada SPK-nya"
+                  />
                 </template>
               </div>
             </div>
@@ -5906,12 +6115,7 @@ const sisaClass = (item: any) => {
                   <span class="panel-header-sub ml-1">(12 bulan)</span>
                 </div>
                 <div class="panel-body">
-                  <v-progress-linear
-                    v-if="isLoadingDashboard"
-                    indeterminate
-                    color="primary"
-                    height="2"
-                  />
+                  <DashState v-if="isLoadingDashboard" kind="loading" />
                   <template v-else>
                     <div class="rp-bulanan-list">
                       <div
@@ -5983,12 +6187,7 @@ const sisaClass = (item: any) => {
                 <span class="panel-header-sub ml-1">(90 hari terakhir)</span>
               </div>
               <div class="panel-body">
-                <v-progress-linear
-                  v-if="isLoadingDashboard"
-                  indeterminate
-                  color="primary"
-                  height="2"
-                />
+                <DashState v-if="isLoadingDashboard" kind="loading" />
                 <template v-else-if="realisasiPenToMap.totalItem">
                   <div class="kk-stack">
                     <div
@@ -6120,9 +6319,11 @@ const sisaClass = (item: any) => {
                     </div>
                   </div>
                 </template>
-                <div v-else class="text-center text-grey py-3 text-caption">
-                  Belum ada data penawaran 90 hari terakhir.
-                </div>
+                <DashState
+                  v-else
+                  kind="empty"
+                  message="Belum ada data penawaran 90 hari terakhir."
+                />
               </div>
             </div>
           </v-col>
@@ -6135,12 +6336,7 @@ const sisaClass = (item: any) => {
                 <span class="panel-header-sub ml-1">(90 hari terakhir)</span>
               </div>
               <div class="panel-body">
-                <v-progress-linear
-                  v-if="isLoadingDashboard"
-                  indeterminate
-                  color="primary"
-                  height="2"
-                />
+                <DashState v-if="isLoadingDashboard" kind="loading" />
                 <template v-else-if="realisasiMapToSo.totalItem">
                   <div class="kk-stack">
                     <div
@@ -6274,9 +6470,11 @@ const sisaClass = (item: any) => {
                     </div>
                   </div>
                 </template>
-                <div v-else class="text-center text-grey py-3 text-caption">
-                  Belum ada data MAP 90 hari terakhir.
-                </div>
+                <DashState
+                  v-else
+                  kind="empty"
+                  message="Belum ada data MAP 90 hari terakhir."
+                />
               </div>
             </div>
           </v-col>
@@ -6298,12 +6496,7 @@ const sisaClass = (item: any) => {
                 </button>
               </div>
               <div class="panel-body">
-                <v-progress-linear
-                  v-if="isLoadingDashboard"
-                  indeterminate
-                  color="primary"
-                  height="2"
-                />
+                <DashState v-if="isLoadingDashboard" kind="loading" />
                 <template v-else-if="kunjunganRows.length">
                   <div class="knj-wrap">
                     <div
@@ -6408,9 +6601,11 @@ const sisaClass = (item: any) => {
                     >
                   </div>
                 </template>
-                <div v-else class="text-center text-grey py-3 text-caption">
-                  Belum ada data kunjungan bulan ini.
-                </div>
+                <DashState
+                  v-else
+                  kind="empty"
+                  message="Belum ada data kunjungan bulan ini."
+                />
               </div>
             </div>
           </v-col>
@@ -6436,12 +6631,7 @@ const sisaClass = (item: any) => {
                 <span class="panel-header-sub ml-1">(per jenis bahan)</span>
               </div>
               <div class="panel-body">
-                <v-progress-linear
-                  v-if="isLoadingDashboard"
-                  indeterminate
-                  color="primary"
-                  height="2"
-                />
+                <DashState v-if="isLoadingDashboard" kind="loading" />
                 <template v-else-if="slowDeadStockData.length">
                   <div
                     v-if="konversiBabaranData.length"
@@ -6592,9 +6782,11 @@ const sisaClass = (item: any) => {
                     </div>
                   </v-expansion-panels>
                 </template>
-                <div v-else class="text-center text-grey py-3 text-caption">
-                  Tidak ada bahan slow moving atau dead stock
-                </div>
+                <DashState
+                  v-else
+                  kind="empty"
+                  message="Tidak ada bahan slow moving atau dead stock"
+                />
               </div>
             </div>
           </v-col>
@@ -6776,9 +6968,11 @@ const sisaClass = (item: any) => {
                     </span>
                   </div>
                 </div>
-                <div v-else class="text-center text-grey py-3 text-caption">
-                  Belum ada penawaran/MAP yang ditandai potensial.
-                </div>
+                <DashState
+                  v-else
+                  kind="empty"
+                  message="Belum ada penawaran/MAP yang ditandai potensial."
+                />
               </div>
             </div>
           </v-col>
@@ -6876,9 +7070,11 @@ const sisaClass = (item: any) => {
                     </span>
                   </div>
                 </div>
-                <div v-else class="text-center text-grey py-3 text-caption">
-                  Belum ada potensi yang dibatalkan.
-                </div>
+                <DashState
+                  v-else
+                  kind="empty"
+                  message="Belum ada potensi yang dibatalkan."
+                />
               </div>
             </div>
           </v-col>
@@ -6906,12 +7102,7 @@ const sisaClass = (item: any) => {
                 </button>
               </div>
               <div class="panel-body">
-                <v-progress-linear
-                  v-if="isLoadingInkaso"
-                  indeterminate
-                  color="primary"
-                  height="2"
-                />
+                <DashState v-if="isLoadingInkaso" kind="loading" />
                 <template v-else>
                   <div class="pen-summary-bar">
                     <div class="pen-stat">
@@ -7092,9 +7283,11 @@ const sisaClass = (item: any) => {
                       </v-expansion-panel-text>
                     </v-expansion-panel>
                   </v-expansion-panels>
-                  <div v-else class="text-center text-grey py-3 text-caption">
-                    Belum ada invoice yang ditandai proyeksi inkaso.
-                  </div>
+                  <DashState
+                    v-else
+                    kind="empty"
+                    message="Belum ada invoice yang ditandai proyeksi inkaso."
+                  />
                 </template>
               </div>
             </div>
@@ -7190,9 +7383,11 @@ const sisaClass = (item: any) => {
                     </span>
                   </div>
                 </div>
-                <div v-else class="text-center text-grey py-3 text-caption">
-                  Belum ada proyeksi inkaso yang dibatalkan.
-                </div>
+                <DashState
+                  v-else
+                  kind="empty"
+                  message="Belum ada proyeksi inkaso yang dibatalkan."
+                />
               </div>
             </div>
           </v-col>
@@ -7219,12 +7414,7 @@ const sisaClass = (item: any) => {
                 </span>
               </div>
               <div class="panel-body">
-                <v-progress-linear
-                  v-if="isLoadingDashboard"
-                  indeterminate
-                  color="primary"
-                  height="2"
-                />
+                <DashState v-if="isLoadingDashboard" kind="loading" />
                 <template v-else>
                   <!-- Metric mini -->
                   <div class="pen-summary-bar">
@@ -7403,12 +7593,7 @@ const sisaClass = (item: any) => {
                 <span class="panel-header-sub ml-1">(90 hari terakhir)</span>
               </div>
               <div class="panel-body">
-                <v-progress-linear
-                  v-if="isLoadingDashboard"
-                  indeterminate
-                  color="primary"
-                  height="2"
-                />
+                <DashState v-if="isLoadingDashboard" kind="loading" />
                 <template v-else>
                   <!-- Total nilai -->
                   <div
@@ -7559,12 +7744,7 @@ const sisaClass = (item: any) => {
                 <span class="panel-header-sub ml-1">(tahun berjalan)</span>
               </div>
               <div class="panel-body" style="overflow-x: auto">
-                <v-progress-linear
-                  v-if="isLoadingDashboard"
-                  indeterminate
-                  color="primary"
-                  height="2"
-                />
+                <DashState v-if="isLoadingDashboard" kind="loading" />
                 <table v-else class="gb-tbl" style="min-width: 780px">
                   <thead>
                     <tr>
@@ -7781,12 +7961,7 @@ const sisaClass = (item: any) => {
                 </span>
               </div>
               <div class="panel-body">
-                <v-progress-linear
-                  v-if="isLoadingTargetCollection"
-                  indeterminate
-                  color="primary"
-                  height="2"
-                />
+                <DashState v-if="isLoadingTargetCollection" kind="loading" />
                 <template v-else-if="targetCollectionData">
                   <div style="overflow-x: auto">
                     <table class="gb-tbl" style="min-width: 1040px">
@@ -7949,9 +8124,11 @@ const sisaClass = (item: any) => {
                     </button>
                   </div>
                 </template>
-                <div v-else class="text-center text-grey py-3 text-caption">
-                  Belum ada data target collection.
-                </div>
+                <DashState
+                  v-else
+                  kind="empty"
+                  message="Belum ada data target collection."
+                />
               </div>
             </div>
           </v-col>
@@ -7986,12 +8163,7 @@ const sisaClass = (item: any) => {
                 </span>
               </div>
               <div class="panel-body">
-                <v-progress-linear
-                  v-if="isLoadingDashboard"
-                  indeterminate
-                  color="primary"
-                  height="2"
-                />
+                <DashState v-if="isLoadingDashboard" kind="loading" />
                 <template v-else>
                   <!-- Aging Bucket -->
                   <div v-if="overdueList.length" class="aging-wrap">
@@ -8104,9 +8276,11 @@ const sisaClass = (item: any) => {
                       </div>
                     </div>
                   </template>
-                  <div v-else class="text-center text-grey py-3 text-caption">
-                    Tidak ada invoice yang melewati jatuh tempo
-                  </div>
+                  <DashState
+                    v-else
+                    kind="empty"
+                    message="Tidak ada invoice yang melewati jatuh tempo"
+                  />
                 </template>
               </div>
             </div>
@@ -8127,12 +8301,7 @@ const sisaClass = (item: any) => {
                 Top Piutang Terbesar
               </div>
               <div class="panel-body pa-2">
-                <v-progress-linear
-                  v-if="isLoadingDashboard"
-                  indeterminate
-                  color="primary"
-                  height="2"
-                />
+                <DashState v-if="isLoadingDashboard" kind="loading" />
                 <template v-else>
                   <div class="knj-wrap" style="max-height: 450px">
                     <div
@@ -8200,12 +8369,7 @@ const sisaClass = (item: any) => {
                 <span class="panel-header-sub ml-1">(6 bln)</span>
               </div>
               <div class="panel-body pa-3">
-                <v-progress-linear
-                  v-if="isLoadingDashboard"
-                  indeterminate
-                  color="primary"
-                  height="2"
-                />
+                <DashState v-if="isLoadingDashboard" kind="loading" />
                 <template v-else>
                   <div
                     class="knj-wrap"
@@ -8327,12 +8491,7 @@ const sisaClass = (item: any) => {
                 </span>
               </div>
               <div class="panel-body">
-                <v-progress-linear
-                  v-if="isLoadingDashboard"
-                  indeterminate
-                  color="primary"
-                  height="2"
-                />
+                <DashState v-if="isLoadingDashboard" kind="loading" />
                 <template v-else>
                   <div class="pen-summary-bar">
                     <div class="pen-stat">
@@ -8416,9 +8575,11 @@ const sisaClass = (item: any) => {
                       </span>
                     </div>
                   </div>
-                  <div v-else class="text-center text-grey py-3 text-caption">
-                    Semua SPK terkirim sudah full invoice
-                  </div>
+                  <DashState
+                    v-else
+                    kind="empty"
+                    message="Semua SPK terkirim sudah full invoice"
+                  />
                 </template>
               </div>
             </div>
@@ -8506,12 +8667,7 @@ const sisaClass = (item: any) => {
                 </span>
               </div>
               <div class="panel-body">
-                <v-progress-linear
-                  v-if="isLoadingGudangBahan"
-                  indeterminate
-                  color="primary"
-                  height="2"
-                />
+                <DashState v-if="isLoadingGudangBahan" kind="loading" />
                 <template
                   v-else-if="
                     mapSpkBelumPermintaanList.length || isLoadingMoreMsp
@@ -8568,9 +8724,11 @@ const sisaClass = (item: any) => {
                     </div>
                   </div>
                 </template>
-                <div v-else class="text-center text-grey py-3 text-caption">
-                  Semua MAP/SPK sudah ada permintaan atau realisasi bahan
-                </div>
+                <DashState
+                  v-else
+                  kind="empty"
+                  message="Semua MAP/SPK sudah ada permintaan atau realisasi bahan"
+                />
               </div>
             </div>
           </v-col>
@@ -8589,12 +8747,7 @@ const sisaClass = (item: any) => {
                 </span>
               </div>
               <div class="panel-body">
-                <v-progress-linear
-                  v-if="isLoadingGudangBahan"
-                  indeterminate
-                  color="primary"
-                  height="2"
-                />
+                <DashState v-if="isLoadingGudangBahan" kind="loading" />
                 <template
                   v-else-if="
                     permintaanBelumRealisasiList.length || isLoadingMorePbr
@@ -8667,9 +8820,11 @@ const sisaClass = (item: any) => {
                     </div>
                   </div>
                 </template>
-                <div v-else class="text-center text-grey py-3 text-caption">
-                  Semua permintaan bahan sudah direalisasi
-                </div>
+                <DashState
+                  v-else
+                  kind="empty"
+                  message="Semua permintaan bahan sudah direalisasi"
+                />
               </div>
             </div>
           </v-col>
@@ -8687,12 +8842,7 @@ const sisaClass = (item: any) => {
                 }}</span>
               </div>
               <div class="panel-body">
-                <v-progress-linear
-                  v-if="isLoadingGudangBahan"
-                  indeterminate
-                  color="primary"
-                  height="2"
-                />
+                <DashState v-if="isLoadingGudangBahan" kind="loading" />
                 <template
                   v-else-if="gbSpkBelumMkbList.length || isLoadingMoreGbMkb"
                 >
@@ -8744,9 +8894,11 @@ const sisaClass = (item: any) => {
                     </div>
                   </div>
                 </template>
-                <div v-else class="text-center text-grey py-3 text-caption">
-                  Semua SO bulan ini sudah ada MKB
-                </div>
+                <DashState
+                  v-else
+                  kind="empty"
+                  message="Semua SO bulan ini sudah ada MKB"
+                />
               </div>
             </div>
           </v-col>
@@ -8777,12 +8929,7 @@ const sisaClass = (item: any) => {
                 </span>
               </div>
               <div class="panel-body">
-                <v-progress-linear
-                  v-if="isLoadingGudangBahan"
-                  indeterminate
-                  color="primary"
-                  height="2"
-                />
+                <DashState v-if="isLoadingGudangBahan" kind="loading" />
                 <template
                   v-else-if="gbStokAccVsMkaList.length || isLoadingMoreGbMka"
                 >
@@ -8858,9 +9005,11 @@ const sisaClass = (item: any) => {
                     </div>
                   </div>
                 </template>
-                <div v-else class="text-center text-grey py-3 text-caption">
-                  Semua aksesoris tercukupi untuk kebutuhan MKA
-                </div>
+                <DashState
+                  v-else
+                  kind="empty"
+                  message="Semua aksesoris tercukupi untuk kebutuhan MKA"
+                />
               </div>
             </div>
           </v-col>
@@ -8884,12 +9033,7 @@ const sisaClass = (item: any) => {
                 </span>
               </div>
               <div class="panel-body">
-                <v-progress-linear
-                  v-if="isLoadingGudangBahan"
-                  indeterminate
-                  color="primary"
-                  height="2"
-                />
+                <DashState v-if="isLoadingGudangBahan" kind="loading" />
                 <template
                   v-else-if="poBahanBelumDatangList.length || isLoadingMorePbd"
                 >
@@ -8931,9 +9075,11 @@ const sisaClass = (item: any) => {
                     </div>
                   </div>
                 </template>
-                <div v-else class="text-center text-grey py-3 text-caption">
-                  Semua PO bahan sudah selesai diterima
-                </div>
+                <DashState
+                  v-else
+                  kind="empty"
+                  message="Semua PO bahan sudah selesai diterima"
+                />
               </div>
             </div>
           </v-col>
@@ -8967,12 +9113,7 @@ const sisaClass = (item: any) => {
                 </span>
               </div>
               <div class="panel-body">
-                <v-progress-linear
-                  v-if="isLoadingGudangBahan"
-                  indeterminate
-                  color="primary"
-                  height="2"
-                />
+                <DashState v-if="isLoadingGudangBahan" kind="loading" />
                 <template v-else-if="bufferList.length || isLoadingMoreBuffer">
                   <div class="gb-list">
                     <div
@@ -9037,9 +9178,11 @@ const sisaClass = (item: any) => {
                     </div>
                   </div>
                 </template>
-                <div v-else class="text-center text-grey py-3 text-caption">
-                  Semua stok di atas buffer
-                </div>
+                <DashState
+                  v-else
+                  kind="empty"
+                  message="Semua stok di atas buffer"
+                />
               </div>
             </div>
           </v-col>
@@ -9053,12 +9196,7 @@ const sisaClass = (item: any) => {
                 <span class="panel-header-sub ml-1">(aksesori)</span>
               </div>
               <div class="panel-body">
-                <v-progress-linear
-                  v-if="isLoadingGudangBahan"
-                  indeterminate
-                  color="primary"
-                  height="2"
-                />
+                <DashState v-if="isLoadingGudangBahan" kind="loading" />
                 <template v-else-if="gudangBahanData.topStok.length">
                   <div class="gb-list">
                     <div
@@ -9091,9 +9229,7 @@ const sisaClass = (item: any) => {
                     </div>
                   </div>
                 </template>
-                <div v-else class="text-center text-grey py-3 text-caption">
-                  Belum ada data stok.
-                </div>
+                <DashState v-else kind="empty" message="Belum ada data stok." />
               </div>
             </div>
           </v-col>
@@ -9127,12 +9263,7 @@ const sisaClass = (item: any) => {
                 </span>
               </div>
               <div class="panel-body">
-                <v-progress-linear
-                  v-if="isLoadingGudangBahan"
-                  indeterminate
-                  color="primary"
-                  height="2"
-                />
+                <DashState v-if="isLoadingGudangBahan" kind="loading" />
                 <template
                   v-else-if="bufferKaosanList.length || isLoadingMoreBk"
                 >
@@ -9222,9 +9353,11 @@ const sisaClass = (item: any) => {
                     </div>
                   </div>
                 </template>
-                <div v-else class="text-center text-grey py-3 text-caption">
-                  Semua bahan &amp; aksesoris KAOSAN di atas buffer
-                </div>
+                <DashState
+                  v-else
+                  kind="empty"
+                  message="Semua bahan &amp; aksesoris KAOSAN di atas buffer"
+                />
               </div>
             </div>
           </v-col>
@@ -9260,12 +9393,7 @@ const sisaClass = (item: any) => {
                 </span>
               </div>
               <div class="panel-body">
-                <v-progress-linear
-                  v-if="isLoadingGudangBahan"
-                  indeterminate
-                  color="primary"
-                  height="2"
-                />
+                <DashState v-if="isLoadingGudangBahan" kind="loading" />
                 <template
                   v-else-if="
                     stokAccVsMkaList.length || isLoadingMoreStokAccVsMka
@@ -9341,9 +9469,11 @@ const sisaClass = (item: any) => {
                     </div>
                   </div>
                 </template>
-                <div v-else class="text-center text-grey py-3 text-caption">
-                  Semua aksesoris tercukupi untuk kebutuhan MKA bulan ini
-                </div>
+                <DashState
+                  v-else
+                  kind="empty"
+                  message="Semua aksesoris tercukupi untuk kebutuhan MKA bulan ini"
+                />
               </div>
             </div>
           </v-col>
@@ -9369,12 +9499,7 @@ const sisaClass = (item: any) => {
                 <span class="panel-header-sub ml-1">(per jenis bahan)</span>
               </div>
               <div class="panel-body">
-                <v-progress-linear
-                  v-if="isLoadingGudangBahan"
-                  indeterminate
-                  color="primary"
-                  height="2"
-                />
+                <DashState v-if="isLoadingGudangBahan" kind="loading" />
                 <template v-else-if="slowDeadStockData.length">
                   <div
                     v-if="konversiBabaranData.length"
@@ -9525,9 +9650,11 @@ const sisaClass = (item: any) => {
                     </div>
                   </v-expansion-panels>
                 </template>
-                <div v-else class="text-center text-grey py-3 text-caption">
-                  Tidak ada bahan slow moving atau dead stock
-                </div>
+                <DashState
+                  v-else
+                  kind="empty"
+                  message="Tidak ada bahan slow moving atau dead stock"
+                />
               </div>
             </div>
           </v-col>
@@ -9563,12 +9690,7 @@ const sisaClass = (item: any) => {
                 </span>
               </div>
               <div class="panel-body">
-                <v-progress-linear
-                  v-if="isLoadingGudangBahan"
-                  indeterminate
-                  color="primary"
-                  height="2"
-                />
+                <DashState v-if="isLoadingGudangBahan" kind="loading" />
                 <template v-else-if="stokBebasList.length || isLoadingMoreSb">
                   <div
                     style="
@@ -9628,9 +9750,11 @@ const sisaClass = (item: any) => {
                     </div>
                   </div>
                 </template>
-                <div v-else class="text-center text-grey py-3 text-caption">
-                  Tidak ada bahan dengan stok bebas negatif
-                </div>
+                <DashState
+                  v-else
+                  kind="empty"
+                  message="Tidak ada bahan dengan stok bebas negatif"
+                />
               </div>
             </div>
           </v-col>
@@ -9656,12 +9780,7 @@ const sisaClass = (item: any) => {
                 </button>
               </div>
               <div class="panel-body">
-                <v-progress-linear
-                  v-if="isLoadingGudangBahan"
-                  indeterminate
-                  color="primary"
-                  height="2"
-                />
+                <DashState v-if="isLoadingGudangBahan" kind="loading" />
                 <template v-else-if="bahanList.length || isLoadingMoreBahan">
                   <div
                     style="
@@ -9754,9 +9873,11 @@ const sisaClass = (item: any) => {
                     </div>
                   </div>
                 </template>
-                <div v-else class="text-center text-grey py-3 text-caption">
-                  Belum ada data bahan barcode.
-                </div>
+                <DashState
+                  v-else
+                  kind="empty"
+                  message="Belum ada data bahan barcode."
+                />
               </div>
             </div>
           </v-col>
@@ -9767,105 +9888,29 @@ const sisaClass = (item: any) => {
            TAB GUDANG GARMEN
       ════════════════════════════════════════ -->
       <v-window-item value="gudang">
-        <!-- ── Row baru: Pipeline SPK → Produksi ── -->
+        <!-- ── Alur produksi: SPK → Invoice ── -->
         <v-row dense class="mt-2">
           <v-col cols="12">
             <div class="manksi-panel content-panel">
               <div class="panel-header panel-header--blue">
                 <IconTrendingUp :size="14" :stroke-width="1.7" class="mr-1" />
-                Pipeline SPK → Produksi
+                Alur produksi
                 <span class="panel-header-sub ml-1"
-                  >(dateline {{ pipelineFilter.startDate }} s.d
+                  >(SPK dengan dateline {{ pipelineFilter.startDate }} s.d
                   {{ pipelineFilter.endDate }})</span
                 >
               </div>
-              <div class="panel-body pa-3">
-                <v-progress-linear
-                  v-if="isLoadingDashboard"
-                  indeterminate
-                  color="primary"
-                  height="2"
+              <div class="panel-body">
+                <DashState v-if="isLoadingDashboard" kind="loading" :rows="2" />
+                <ProductionFlow
+                  v-else-if="pipelineData.TotalMasuk"
+                  :stages="productionFlowStages"
                 />
-                <template v-else-if="pipelineData.TotalMasuk">
-                  <div class="funnel-wrap">
-                    <div
-                      v-for="(stage, i) in pipelineStages"
-                      :key="stage.label"
-                      class="funnel-row"
-                    >
-                      <span class="funnel-label">{{ stage.label }}</span>
-                      <div class="funnel-bar-track">
-                        <div
-                          class="funnel-bar-fill"
-                          :style="{
-                            width: pipelinePct(stage.value) + '%',
-                            background: stage.color,
-                          }"
-                        />
-                      </div>
-                      <span class="funnel-val" :style="{ color: stage.color }">
-                        {{ stage.value }}
-                      </span>
-                      <span class="funnel-pct"
-                        >{{ pipelinePct(stage.value) }}%</span
-                      >
-                    </div>
-                  </div>
-                </template>
-                <div v-else class="text-center text-grey py-3 text-caption">
-                  Tidak ada SPK dengan dateline pada periode ini.
-                </div>
-              </div>
-            </div>
-          </v-col>
-        </v-row>
-
-        <v-row dense class="mt-2">
-          <v-col cols="12">
-            <div class="manksi-panel content-panel">
-              <div class="panel-header panel-header--green">
-                <IconTrendingUp :size="14" :stroke-width="1.7" class="mr-1" />
-                Pipeline Penyelesaian SPK
-                <span class="panel-header-sub ml-1"
-                  >(SPK Aktif → STBJ → Kirim → Full Invoice)</span
-                >
-              </div>
-              <div class="panel-body pa-3">
-                <v-progress-linear
-                  v-if="isLoadingDashboard"
-                  indeterminate
-                  color="primary"
-                  height="2"
+                <DashState
+                  v-else
+                  kind="empty"
+                  message="Belum ada SPK dengan dateline pada periode ini."
                 />
-                <template v-else-if="pipelinePenyelesaianSpk.TotalAktif">
-                  <div class="funnel-wrap">
-                    <div
-                      v-for="stage in pipelinePenyelesaianStages"
-                      :key="stage.label"
-                      class="funnel-row"
-                    >
-                      <span class="funnel-label">{{ stage.label }}</span>
-                      <div class="funnel-bar-track">
-                        <div
-                          class="funnel-bar-fill"
-                          :style="{
-                            width: pipelinePenyelesaianPct(stage.value) + '%',
-                            background: stage.color,
-                          }"
-                        />
-                      </div>
-                      <span class="funnel-val" :style="{ color: stage.color }">
-                        {{ stage.value }}
-                      </span>
-                      <span class="funnel-pct"
-                        >{{ pipelinePenyelesaianPct(stage.value) }}%</span
-                      >
-                    </div>
-                  </div>
-                </template>
-                <div v-else class="text-center text-grey py-3 text-caption">
-                  Tidak ada SPK aktif pada periode ini.
-                </div>
               </div>
             </div>
           </v-col>
@@ -9898,12 +9943,7 @@ const sisaClass = (item: any) => {
                 </span>
               </div>
               <div class="panel-body">
-                <v-progress-linear
-                  v-if="isLoadingDashboard"
-                  indeterminate
-                  color="primary"
-                  height="2"
-                />
+                <DashState v-if="isLoadingDashboard" kind="loading" />
                 <template
                   v-else-if="bahanKurangList.length || isLoadingMoreBahanKurang"
                 >
@@ -9974,9 +10014,11 @@ const sisaClass = (item: any) => {
                     </div>
                   </div>
                 </template>
-                <div v-else class="text-center text-grey py-3 text-caption">
-                  Semua kebutuhan bahan produksi tercukupi
-                </div>
+                <DashState
+                  v-else
+                  kind="empty"
+                  message="Semua kebutuhan bahan produksi tercukupi"
+                />
               </div>
             </div>
           </v-col>
@@ -9994,12 +10036,7 @@ const sisaClass = (item: any) => {
                 </span>
               </div>
               <div class="panel-body">
-                <v-progress-linear
-                  v-if="isLoadingDashboard"
-                  indeterminate
-                  color="primary"
-                  height="2"
-                />
+                <DashState v-if="isLoadingDashboard" kind="loading" />
                 <template
                   v-else-if="spkBelumMkbList.length || isLoadingMoreSpkBelumMkb"
                 >
@@ -10053,9 +10090,11 @@ const sisaClass = (item: any) => {
                     </div>
                   </div>
                 </template>
-                <div v-else class="text-center text-grey py-3 text-caption">
-                  Semua SPK bulan ini sudah ada MKB
-                </div>
+                <DashState
+                  v-else
+                  kind="empty"
+                  message="Semua SPK bulan ini sudah ada MKB"
+                />
               </div>
             </div>
           </v-col>
@@ -10082,12 +10121,7 @@ const sisaClass = (item: any) => {
                   </button>
                 </div>
                 <div class="panel-body">
-                  <v-progress-linear
-                    v-if="isLoadingDashboard"
-                    indeterminate
-                    color="primary"
-                    height="2"
-                  />
+                  <DashState v-if="isLoadingDashboard" kind="loading" />
                   <template v-else>
                     <div class="po-bpb-summary">
                       <div class="po-bpb-stat">
@@ -10194,12 +10228,7 @@ const sisaClass = (item: any) => {
                   <span class="panel-header-sub ml-1">(bulan ini)</span>
                 </div>
                 <div class="panel-body">
-                  <v-progress-linear
-                    v-if="isLoadingDashboard"
-                    indeterminate
-                    color="primary"
-                    height="2"
-                  />
+                  <DashState v-if="isLoadingDashboard" kind="loading" />
                   <template v-else>
                     <div class="po-bpb-summary">
                       <div class="po-bpb-stat">
@@ -10307,12 +10336,7 @@ const sisaClass = (item: any) => {
                 </span>
               </div>
               <div class="panel-body">
-                <v-progress-linear
-                  v-if="isLoadingDashboard"
-                  indeterminate
-                  color="primary"
-                  height="2"
-                />
+                <DashState v-if="isLoadingDashboard" kind="loading" />
                 <template v-else>
                   <div class="pen-summary-bar">
                     <div class="pen-stat">
@@ -10381,9 +10405,11 @@ const sisaClass = (item: any) => {
                       </span>
                     </div>
                   </div>
-                  <div v-else class="text-center text-grey py-3 text-caption">
-                    Semua SPK bulan ini sudah ada STBJ
-                  </div>
+                  <DashState
+                    v-else
+                    kind="empty"
+                    message="Semua SPK bulan ini sudah ada STBJ"
+                  />
                 </template>
               </div>
             </div>
@@ -10404,12 +10430,7 @@ const sisaClass = (item: any) => {
                 </span>
               </div>
               <div class="panel-body">
-                <v-progress-linear
-                  v-if="isLoadingDashboard"
-                  indeterminate
-                  color="primary"
-                  height="2"
-                />
+                <DashState v-if="isLoadingDashboard" kind="loading" />
                 <template v-else>
                   <div
                     class="aging-wrap"
@@ -10577,12 +10598,7 @@ const sisaClass = (item: any) => {
                 </span>
               </div>
               <div class="panel-body">
-                <v-progress-linear
-                  v-if="isLoadingDashboard"
-                  indeterminate
-                  color="primary"
-                  height="2"
-                />
+                <DashState v-if="isLoadingDashboard" kind="loading" />
                 <template
                   v-else-if="
                     outstandingPoMitraList.length || isLoadingMoreOutstanding
@@ -10650,9 +10666,11 @@ const sisaClass = (item: any) => {
                     </div>
                   </div>
                 </template>
-                <div v-else class="text-center text-grey py-3 text-caption">
-                  Tidak ada outstanding PO mitra jasa jahit bulan ini
-                </div>
+                <DashState
+                  v-else
+                  kind="empty"
+                  message="Tidak ada outstanding PO mitra jasa jahit bulan ini"
+                />
               </div>
             </div>
           </v-col>
@@ -10685,12 +10703,7 @@ const sisaClass = (item: any) => {
                 </span>
               </div>
               <div class="panel-body">
-                <v-progress-linear
-                  v-if="isLoadingDashboard"
-                  indeterminate
-                  color="primary"
-                  height="2"
-                />
+                <DashState v-if="isLoadingDashboard" kind="loading" />
                 <template v-else-if="efisiensiBabaranSummary.totalSpk">
                   <div class="pen-summary-bar">
                     <div class="pen-stat">
@@ -10753,9 +10766,11 @@ const sisaClass = (item: any) => {
                     </div>
                   </div>
                 </template>
-                <div v-else class="text-center text-grey py-3 text-caption">
-                  Belum ada data babaran bulan ini.
-                </div>
+                <DashState
+                  v-else
+                  kind="empty"
+                  message="Belum ada data babaran bulan ini."
+                />
               </div>
             </div>
           </v-col>
@@ -10826,12 +10841,7 @@ const sisaClass = (item: any) => {
                 </select>
               </div>
               <div class="panel-body">
-                <v-progress-linear
-                  v-if="isLoadingBarangJadi"
-                  indeterminate
-                  color="primary"
-                  height="2"
-                />
+                <DashState v-if="isLoadingBarangJadi" kind="loading" />
                 <template
                   v-else-if="stokBarangJadiList.length || isLoadingMoreStokBj"
                 >
@@ -10922,9 +10932,11 @@ const sisaClass = (item: any) => {
                     </div>
                   </div>
                 </template>
-                <div v-else class="text-center text-grey py-3 text-caption">
-                  Belum ada data stok barang jadi.
-                </div>
+                <DashState
+                  v-else
+                  kind="empty"
+                  message="Belum ada data stok barang jadi."
+                />
               </div>
             </div>
           </v-col>
@@ -10941,12 +10953,7 @@ const sisaClass = (item: any) => {
                 <span class="panel-header-sub ml-1">(bulan ini)</span>
               </div>
               <div class="panel-body">
-                <v-progress-linear
-                  v-if="isLoadingBarangJadi"
-                  indeterminate
-                  color="primary"
-                  height="2"
-                />
+                <DashState v-if="isLoadingBarangJadi" kind="loading" />
                 <template
                   v-else-if="
                     mutasiBarangJadiList.length || isLoadingMoreMutasiBj
@@ -11012,9 +11019,11 @@ const sisaClass = (item: any) => {
                     </div>
                   </div>
                 </template>
-                <div v-else class="text-center text-grey py-3 text-caption">
-                  Belum ada mutasi barang jadi bulan ini.
-                </div>
+                <DashState
+                  v-else
+                  kind="empty"
+                  message="Belum ada mutasi barang jadi bulan ini."
+                />
               </div>
             </div>
           </v-col>
@@ -11060,12 +11069,7 @@ const sisaClass = (item: any) => {
             </v-tab>
           </v-tabs>
           <div class="panel-body">
-            <v-progress-linear
-              v-if="isLoadingPembelian"
-              indeterminate
-              color="primary"
-              height="2"
-            />
+            <DashState v-if="isLoadingPembelian" kind="loading" />
             <div v-else style="overflow: auto; max-height: 560px">
               <table class="gb-tbl" style="min-width: 960px">
                 <thead>
@@ -11260,12 +11264,7 @@ const sisaClass = (item: any) => {
           </v-btn>
         </div>
         <div style="max-height: 70vh; overflow-y: auto">
-          <v-progress-linear
-            v-if="isLoadingEffectiveCalling"
-            indeterminate
-            color="primary"
-            height="2"
-          />
+          <DashState v-if="isLoadingEffectiveCalling" kind="loading" />
           <table v-else class="rp-tbl" style="min-width: 900px">
             <thead>
               <tr>
@@ -12066,11 +12065,9 @@ const sisaClass = (item: any) => {
         </v-tabs>
 
         <div style="flex: 1; overflow: auto; min-height: 0">
-          <v-progress-linear
+          <DashState
             v-if="isLoadingInkasoSales || isLoadingInkasoRows"
-            indeterminate
-            color="primary"
-            height="2"
+            kind="loading"
           />
 
           <table v-if="inkasoCustomersAktif.length" class="ink-table">
@@ -12205,10 +12202,10 @@ const sisaClass = (item: any) => {
 
 <style scoped>
 :global(:root) {
-  --dsh-canvas: #eef1f6;
+  --dsh-canvas: #e8ecf3;
   --dsh-ink: #1b2232;
-  --dsh-ink-2: #475066;
-  --dsh-ink-3: #6a7388;
+  --dsh-ink-2: #3b4358;
+  --dsh-ink-3: #5b6479;
   --dsh-line: #e1e5ec;
   --dsh-fill: #f1f3f7;
   --dsh-surface: #ffffff;
@@ -12223,7 +12220,7 @@ const sisaClass = (item: any) => {
   --dsh-bad-soft: #fdecea;
   --dsh-radius: 12px;
   --dsh-shadow:
-    0 1px 2px rgba(16, 24, 40, 0.04), 0 2px 8px rgba(16, 24, 40, 0.05);
+    0 1px 2px rgba(16, 24, 40, 0.08), 0 4px 14px rgba(16, 24, 40, 0.09);
   --dsh-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
@@ -12363,7 +12360,7 @@ const sisaClass = (item: any) => {
   font-variant-numeric: tabular-nums;
 }
 .sum-sub {
-  font-size: 11px;
+  font-size: 11.5px;
   color: var(--dsh-ink-3);
   margin-top: 4px;
 }
@@ -12404,7 +12401,7 @@ const sisaClass = (item: any) => {
   color: var(--dsh-ink);
 }
 .shortcut-sub {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--dsh-ink-2);
   margin-top: 2px;
   white-space: nowrap;
@@ -12435,7 +12432,7 @@ const sisaClass = (item: any) => {
   line-height: 1.2;
 }
 .pen-stat-lbl {
-  font-size: 9px;
+  font-size: 10px;
   color: var(--dsh-ink-3);
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -12447,7 +12444,7 @@ const sisaClass = (item: any) => {
 .pen-item {
   padding: 5px 12px;
   border-bottom: 1px solid var(--dsh-fill);
-  font-size: 11px;
+  font-size: 12px;
 }
 .pen-item.umur-danger {
   background: var(--dsh-bad-soft);
@@ -12464,14 +12461,14 @@ const sisaClass = (item: any) => {
   font-family: monospace;
   font-weight: 700;
   color: var(--dsh-accent);
-  font-size: 11px;
+  font-size: 12px;
 }
 .pen-divisi {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--dsh-ink-3);
 }
 .pen-age {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   padding: 1px 5px;
   border-radius: 3px;
@@ -12494,10 +12491,10 @@ const sisaClass = (item: any) => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  font-size: 11px;
+  font-size: 12px;
 }
 .pen-ket {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--dsh-ink-3);
   white-space: nowrap;
   overflow: hidden;
@@ -12690,7 +12687,7 @@ const sisaClass = (item: any) => {
   margin-bottom: 3px;
 }
 .knj-sales {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   color: var(--dsh-accent);
   text-transform: uppercase;
@@ -12701,7 +12698,7 @@ const sisaClass = (item: any) => {
   gap: 5px;
 }
 .knj-badge {
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 700;
   padding: 1px 5px;
   border-radius: 3px;
@@ -12770,13 +12767,13 @@ const sisaClass = (item: any) => {
   color: var(--dsh-accent);
 }
 .knj-detail-btn {
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 700;
   color: var(--dsh-good);
   background: none;
   border: 1px solid var(--dsh-line);
   border-radius: 3px;
-  padding: 1px 6px;
+padding: 3px 8px;
   cursor: pointer;
   line-height: 1.4;
 }
@@ -12822,7 +12819,7 @@ const sisaClass = (item: any) => {
   line-height: 1.2;
 }
 .po-bpb-lbl {
-  font-size: 9px;
+  font-size: 10px;
   color: var(--dsh-ink-3);
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -13095,7 +13092,7 @@ const sisaClass = (item: any) => {
   transition: width 0.4s ease;
 }
 .cr-sub {
-  font-size: 9px;
+  font-size: 10px;
   color: var(--dsh-ink-3);
 }
 
@@ -13125,13 +13122,13 @@ const sisaClass = (item: any) => {
   line-height: 1;
 }
 .aging-label {
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
 .aging-nominal {
-  font-size: 9px;
+  font-size: 10px;
   margin-top: 1px;
 }
 
@@ -13229,11 +13226,6 @@ const sisaClass = (item: any) => {
   border-radius: 3px;
   transition: width 0.4s ease;
 }
-.sum-sub {
-  font-size: 9px;
-  color: var(--dsh-ink-3);
-  margin-top: 2px;
-}
 
 /* ── Gudang Bahan ── */
 .gb-list {
@@ -13254,7 +13246,7 @@ const sisaClass = (item: any) => {
 .gb-nama {
   width: 130px;
   flex-shrink: 0;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--dsh-ink);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -13280,7 +13272,7 @@ const sisaClass = (item: any) => {
   transition: width 0.3s;
 }
 .gb-bar-val {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--dsh-ink-2);
   white-space: nowrap;
   min-width: 80px;
@@ -13296,7 +13288,7 @@ const sisaClass = (item: any) => {
 .gb-tbl {
   width: 100%;
   border-collapse: collapse;
-  font-size: 11px;
+  font-size: 12px;
   min-width: 500px;
 }
 .gb-tbl thead th {
@@ -13343,11 +13335,7 @@ const sisaClass = (item: any) => {
   background: var(--dsh-bad-soft);
   color: var(--dsh-bad);
 }
-.sum-sub {
-  font-size: 9px;
-  color: var(--dsh-ink-3);
-  margin-top: 2px;
-}
+
 /* ── Realisasi Penawaran ── */
 .rp-summary {
   display: flex;
@@ -13489,7 +13477,7 @@ const sisaClass = (item: any) => {
 .rp-tbl {
   width: 100%;
   border-collapse: collapse;
-  font-size: 11px;
+  font-size: 12px;
   min-width: 700px;
 }
 .gb-tbl thead th,
@@ -13653,7 +13641,7 @@ const sisaClass = (item: any) => {
   gap: 8px;
   padding: 5px 10px;
   border-bottom: 1px solid var(--dsh-fill);
-  font-size: 11px;
+  font-size: 12px;
 }
 .aktivitas-item:hover {
   background: var(--dsh-fill);
@@ -13686,12 +13674,12 @@ const sisaClass = (item: any) => {
   width: 100px;
   flex-shrink: 0;
   color: var(--dsh-ink-2);
-  font-size: 10px;
+  font-size: 11px;
 }
 .akt-jam {
   flex-shrink: 0;
   color: var(--dsh-ink-3);
-  font-size: 10px;
+  font-size: 11px;
   font-family: monospace;
 }
 
@@ -13705,50 +13693,6 @@ const sisaClass = (item: any) => {
 .aktivitas-item--new {
   background: var(--dsh-good-soft) !important;
   animation: highlight-fade 3s ease-out forwards;
-}
-
-.funnel-wrap {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.funnel-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.funnel-label {
-  width: 120px;
-  flex-shrink: 0;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--dsh-ink);
-}
-.funnel-bar-track {
-  flex: 1;
-  height: 14px;
-  background: var(--dsh-fill);
-  border-radius: 4px;
-  overflow: hidden;
-}
-.funnel-bar-fill {
-  height: 100%;
-  border-radius: 4px;
-  transition: width 0.4s ease;
-}
-.funnel-val {
-  width: 36px;
-  text-align: right;
-  font-size: 12px;
-  font-weight: 700;
-  flex-shrink: 0;
-}
-.funnel-pct {
-  width: 38px;
-  text-align: right;
-  font-size: 10px;
-  color: var(--dsh-ink-3);
-  flex-shrink: 0;
 }
 
 .bk-row {
@@ -14160,6 +14104,7 @@ const sisaClass = (item: any) => {
   min-height: 100%;
   font-family:
     -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  font-weight: 500;
   color: var(--dsh-ink);
 }
 .dsh-root .text-primary {
@@ -14192,6 +14137,54 @@ const sisaClass = (item: any) => {
 .knj-detail-btn:active,
 .map-filter-btn:active {
   transform: scale(0.96);
+}
+
+/* ── Label pembaruan dan banner kegagalan ── */
+.dsh-updated {
+  font-size: 11px;
+  color: var(--dsh-ink-3);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.dsh-updated--busy {
+  color: var(--dsh-accent);
+}
+.dsh-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding: 10px 14px;
+  font-size: 12px;
+  color: var(--dsh-warn);
+  background: var(--dsh-warn-soft);
+  border: 1px solid rgba(184, 101, 0, 0.25);
+  border-radius: var(--dsh-radius);
+}
+.dsh-banner-text {
+  flex: 1;
+  min-width: 0;
+  color: var(--dsh-ink);
+}
+.dsh-banner-text strong {
+  font-weight: 600;
+  color: var(--dsh-warn);
+}
+.dsh-banner-btn {
+  flex-shrink: 0;
+  min-height: 30px;
+  padding: 0 12px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--dsh-warn);
+  background: var(--dsh-surface);
+  border: 1px solid rgba(184, 101, 0, 0.35);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.dsh-banner-btn:focus-visible {
+  outline: 2px solid var(--dsh-accent);
+  outline-offset: 2px;
 }
 
 @media (prefers-reduced-motion: reduce) {

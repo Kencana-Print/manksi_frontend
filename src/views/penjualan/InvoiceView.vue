@@ -163,18 +163,18 @@ const goNew = () => {
   router.push({ name: "InvoiceFormCreate" });
 };
 
+const isTak = (item: any) => item?.Status === "Tidak Normal";
+
 const goEdit = async () => {
   if (!selectedItem.value) return;
+  const nomor = selectedItem.value.Nomor;
   try {
-    const res = await svc.cekBisaUbah(selectedItem.value.Nomor);
+    const res = await svc.cekBisaUbah(nomor);
     const cek = res.data.data;
-    if (!cek.bisa) {
-      toast.error(cek.reason);
-      return;
-    }
+    if (!cek.bisa) return toast.error(cek.reason);
     router.push({
-      name: "InvoiceFormEdit",
-      params: { nomor: selectedItem.value.Nomor },
+      name: cek.tak ? "InvoiceTakNormalFormEdit" : "InvoiceFormEdit",
+      params: { nomor },
     });
   } catch (e: any) {
     toast.error(e.response?.data?.message || "Gagal cek data.");
@@ -228,8 +228,15 @@ const onCetak = async () => {
   try {
     const res = await svc.cekBisaCetak(selectedItem.value.Nomor);
     const cek = res.data.data;
-    if (!cek.bisa) {
-      toast.error(cek.reason);
+    if (!cek.bisa) return toast.error(cek.reason);
+
+    if (cek.tak) {
+      // Tak Normal tidak punya pilihan dot matrix/inkjet di sini
+      const url = router.resolve({
+        name: "InvoiceTakNormalPrint",
+        query: { nomor: selectedItem.value.Nomor },
+      }).href;
+      window.open(url, "_blank");
       return;
     }
     showCetakDialog.value = true;
