@@ -113,7 +113,7 @@ const statusMapClass = (status: string) => {
 <template>
   <v-dialog
     :model-value="modelValue"
-    max-width="1100px"
+    max-width="1400px"
     scrollable
     @update:model-value="close"
   >
@@ -206,7 +206,7 @@ const statusMapClass = (status: string) => {
           "
         >
           ℹ️ Hanya menampilkan SO yang sudah Aktif, disetujui CMO, dan belum
-          dibuatkan SPK PPIC.
+          dibuatkan SPK PPIC. SO non-Kaosan wajib sudah punya No. PDM.
         </div>
       </div>
 
@@ -224,9 +224,10 @@ const statusMapClass = (status: string) => {
               <th width="95">Tanggal</th>
               <th width="180">Customer</th>
               <th width="260">Nama Pesanan</th>
-              <th width="80" class="tr">Pesan</th>
-              <th width="120">MAP</th>
-              <th width="90">Status MAP</th>
+              <th width="70" class="tr">Pesan</th>
+              <th width="150">MAP</th>
+              <th width="150">No. PDM</th>
+              <th width="100">Status MAP</th>
               <th width="100">Workshop</th>
               <th width="110">MO</th>
             </tr>
@@ -257,6 +258,9 @@ const statusMapClass = (status: string) => {
               <td class="font-mono" :title="item.MAP || ''">
                 {{ item.MAP || "-" }}
               </td>
+              <td class="font-mono" :title="item.PdNomor || ''">
+                {{ item.PdNomor || "-" }}
+              </td>
               <td>
                 <span
                   class="status-chip"
@@ -270,7 +274,7 @@ const statusMapClass = (status: string) => {
             </tr>
             <tr v-if="!isLoading && items.length === 0">
               <td
-                colspan="9"
+                colspan="10"
                 class="text-center text-grey pa-4"
                 style="font-size: 12px"
               >
@@ -358,13 +362,6 @@ const statusMapClass = (status: string) => {
   color: #1565c0;
 }
 
-.status-chip {
-  display: inline-block;
-  padding: 1px 8px;
-  border-radius: 10px;
-  font-size: 9.5px;
-  font-weight: 700;
-}
 .status-chip {
   display: inline-block;
   padding: 1px 8px;
