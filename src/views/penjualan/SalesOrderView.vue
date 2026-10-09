@@ -287,7 +287,7 @@ const tailHeadersFront = [
   { title: "Acc JO", key: "AccJO", width: "80px", align: "center" },
   { title: "Acc Pending", key: "AccPending", width: "90px", align: "center" },
   { title: "MPPB", key: "MPPB", width: "120px" },
-  { title: "No. LHK Desain", key: "LhkNomor", width: "130px" },
+  { title: "No. Permintaan Desain", key: "PdNomor", width: "150px" },
   {
     title: "Design Tgl",
     key: "Design_Tanggal",
