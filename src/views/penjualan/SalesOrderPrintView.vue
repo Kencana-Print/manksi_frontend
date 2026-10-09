@@ -17,7 +17,15 @@ const layoutMode = computed(() =>
   route.query.layout === "horizontal" ? "horizontal" : "vertical",
 );
 const withAlokasi = computed(() => route.query.alokasi === "true");
-
+// Non-Garmen + cetak dengan alokasi: tampil di separuh kanan halaman 1
+const ALOKASI_SIDE_MAX = 30;
+const isAlokasiSide = computed(
+  () =>
+    !isGarmen.value &&
+    withAlokasi.value &&
+    hasAlokasi.value &&
+    (data.value.alokasiList?.length || 0) <= ALOKASI_SIDE_MAX,
+);
 const kodeDivisi = computed(() => String(data.value.spk_divisi).charAt(0));
 const isKaosan = computed(() => kodeDivisi.value === "3");
 const isGarmen = computed(
@@ -94,8 +102,8 @@ const alokasiInlineSize = computed(() => {
 // Cek apakah butuh merender alokasi di halaman ke-2
 const needsAlokasiPage2 = computed(() => {
   if (!withAlokasi.value || !hasAlokasi.value) return false;
-  // Jika sudah dirender inline di halaman 1, sembunyikan halaman 2
   if (isAlokasiInline.value) return false;
+  if (isAlokasiSide.value) return false; // ← BARU
   return true;
 });
 // -------------------------------------
@@ -965,6 +973,38 @@ onMounted(async () => {
         </div>
       </template>
 
+      <div v-if="isAlokasiSide && !isGarmen" class="print-half alokasi-side">
+        <div class="alokasi-page-title">
+          ALOKASI PENGIRIMAN : {{ data.spk_nomor }}
+        </div>
+        <table class="alokasi-table alokasi-side-table">
+          <thead>
+            <tr>
+              <th class="text-left">Nama Toko</th>
+              <th class="text-left">Alokasi</th>
+              <th class="text-center">Jml</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="alo in data.alokasiList" :key="alo.urut">
+              <td>{{ namaToko(alo) }}</td>
+              <td>{{ alo.kota || alo.alamat }}</td>
+              <td class="text-center">
+                {{ Number(alo.jumlah).toLocaleString("id-ID") }}
+              </td>
+            </tr>
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colspan="2" class="fw text-left">Total</td>
+              <td class="fw text-center">
+                {{ totalAlokasi.toLocaleString("id-ID") }}
+              </td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
       <!-- ══ ALOKASI PANEL (Halaman 2 / Overflow) ══ -->
       <template v-if="needsAlokasiPage2">
         <div
@@ -1680,6 +1720,24 @@ onMounted(async () => {
 .alokasi-page-table th:nth-child(3),
 .alokasi-page-table td:nth-child(3) {
   width: 16%;
+}
+.alokasi-side {
+  padding-top: 4mm;
+}
+.alokasi-side-table {
+  font-size: 8.5pt;
+}
+.alokasi-side-table th:nth-child(1),
+.alokasi-side-table td:nth-child(1) {
+  width: 55%;
+}
+.alokasi-side-table th:nth-child(2),
+.alokasi-side-table td:nth-child(2) {
+  width: 30%;
+}
+.alokasi-side-table th:nth-child(3),
+.alokasi-side-table td:nth-child(3) {
+  width: 15%;
 }
 
 @media screen {
