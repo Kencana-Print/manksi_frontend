@@ -1759,12 +1759,13 @@ watch(
               >Harga Fee</label
             >
             <input
-              v-model.number="formData.spk_hargafee"
+              :value="formData.spk_hargafee"
               type="number"
-              class="inp text-right"
+              class="inp text-right ro"
               style="width: 90px"
-              :disabled="hargaLocked"
-              v-select-on-focus
+              readonly
+              tabindex="-1"
+              title="Otomatis: Harga Jual - Harga Riil"
             />
           </div>
         </div>

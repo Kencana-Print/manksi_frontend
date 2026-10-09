@@ -571,6 +571,16 @@ watch(
   { immediate: true },
 );
 
+// Harga Fee otomatis = Harga Jual - Harga Riil
+watch(
+  [() => formData.value.spk_harga, () => formData.value.spk_hargariil],
+  ([harga, riil]) => {
+    const fee = (Number(harga) || 0) - (Number(riil) || 0);
+    formData.value.spk_hargafee = Math.round(fee * 100) / 100;
+  },
+  { immediate: true },
+);
+
 // Panggil API saat form di-mount
 onMounted(async () => {
   try {
