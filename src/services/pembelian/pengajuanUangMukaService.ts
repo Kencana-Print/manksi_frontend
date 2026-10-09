@@ -39,4 +39,8 @@ export const pengajuanUangMukaService = {
       `/pembelian/pengajuan-uang-muka/print/${encodeURIComponent(nomor)}`,
     );
   },
+  getPrintPenyerahan: (nomor: string) =>
+    api.get(
+      `/pembelian/pengajuan-uang-muka/${encodeURIComponent(nomor)}/print-penyerahan`,
+    ),
 };

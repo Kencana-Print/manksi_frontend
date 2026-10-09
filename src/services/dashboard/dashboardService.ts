@@ -289,6 +289,12 @@ export const dashboardService = {
     api.get("/dashboard/outstanding-beli-list", {
       params: { tab, limit, offset },
     }),
+  setCatatanOutstandingBeli: (payload: {
+    tab: string;
+    nomor: string;
+    nourut: number;
+    catatan: string;
+  }) => api.post("/dashboard/outstanding-beli/catatan", payload),
   getInkasoDashboard: () => api.get("/dashboard/inkaso-dashboard"),
   getInkasoSourceOptions: (
     namaCustomer = "",

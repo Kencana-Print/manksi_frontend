@@ -70,7 +70,11 @@ const nomorToPrint = ref("");
 
 const showPermintaanFinanceModal = ref(false);
 const isFinance = computed(() => formData.value.Bagian === "FINANCE");
-
+const canCariPermintaan = computed(() =>
+  ["FINANCE", "PEMBELIAN", "AUDIT"].includes(
+    String(formData.value.Bagian || "").toUpperCase(),
+  ),
+);
 const emptyDetailRow = () => ({
   NoPermintaan: "",
   Kode: "",
@@ -171,6 +175,7 @@ const setPermintaanFinance = async (noPermintaan: string) => {
       noPermintaan,
       cabangAsal: formData.value.CabangAsal,
       nomorMso: formData.value.Nomor,
+      jenis: formJenis.value,
     });
 
     const details = res.data.data;
@@ -280,7 +285,7 @@ const setBarang = async (v: any) => {
 
 const onPermintaanKeydown = (e: KeyboardEvent, idx: number) => {
   // Hanya berlaku untuk Finance
-  if (!isFinance.value) return;
+  if (!canCariPermintaan.value) return;
 
   if (e.key === "F1") {
     e.preventDefault();
@@ -290,7 +295,7 @@ const onPermintaanKeydown = (e: KeyboardEvent, idx: number) => {
 
 const onPermintaanEnter = async (idx: number) => {
   // Hanya berlaku untuk Finance
-  if (!isFinance.value) return;
+  if (!canCariPermintaan.value) return;
 
   const nomor = (formData.value.Detail[idx]?.NoPermintaan || "")
     .trim()
@@ -587,22 +592,26 @@ const formatQty = (val: any) =>
                     <input
                       v-model="item.NoPermintaan"
                       class="ci fw text-primary"
-                      :class="{ ro: isEditMode || !isFinance }"
-                      :readonly="isEditMode || !isFinance"
-                      :placeholder="isFinance ? 'F1 / nomor + Enter' : ''"
+                      :class="{ ro: isEditMode || !canCariPermintaan }"
+                      :readonly="isEditMode || !canCariPermintaan"
+                      :placeholder="
+                        canCariPermintaan ? 'F1 / nomor + Enter' : ''
+                      "
                       style="text-transform: uppercase"
                       @keydown="
-                        isFinance
+                        canCariPermintaan
                           ? onPermintaanKeydown($event, Number(idx))
                           : undefined
                       "
                       @keydown.enter.prevent="
-                        isFinance ? onPermintaanEnter(Number(idx)) : undefined
+                        canCariPermintaan
+                          ? onPermintaanEnter(Number(idx))
+                          : undefined
                       "
                       @focus="activeGridIndex = Number(idx)"
                     />
                     <button
-                      v-if="!isEditMode && isFinance"
+                      v-if="!isEditMode && canCariPermintaan"
                       type="button"
                       class="ci-btn"
                       title="Cari Permintaan (F1)"

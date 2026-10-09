@@ -27,6 +27,7 @@ export const mutasiOutBarangFormService = {
     noPermintaan: string;
     cabangAsal: string;
     nomorMso: string;
+    jenis: string;
   }) =>
     api.get("/garmen/barang/mutasi-out/form/detail-permintaan-finance", {
       params,

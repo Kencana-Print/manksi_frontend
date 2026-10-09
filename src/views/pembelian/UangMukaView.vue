@@ -953,6 +953,15 @@ const openPrintHistory = () => {
   );
 };
 
+const openPrintPenyerahan = () => {
+  const item = selectedPumHistory.value[0];
+  if (!item?.Nomor) return;
+  window.open(
+    `/pembelian/uang-muka/print-penyerahan/${encodeURIComponent(item.Nomor)}`,
+    "_blank",
+  );
+};
+
 const openPrintPenyelesaian = () => {
   const item = selectedPumHistory.value[0];
   if (!item) return;
@@ -997,7 +1006,7 @@ const goPenyelesaian = () => {
         :class="{ active: activeTab === 'history' }"
         @click="activeTab = 'history'"
       >
-        Realisasi Pengajuan UM
+        Penyelesaian Pengajuan UM
       </button>
     </div>
 
@@ -1403,7 +1412,7 @@ const goPenyelesaian = () => {
     <BaseBrowse
       ref="baseBrowseRef"
       v-else
-      title="Pengajuan Uang Muka — History"
+      title="Penyelesaian Pengajuan UM"
       menu-id="315"
       :icon="IconCash"
       :headers="historyHeaders"
@@ -1452,6 +1461,19 @@ const goPenyelesaian = () => {
         >
           <template #prepend><IconPrinter :size="15" /></template>
           Cetak Realisasi
+        </v-btn>
+        <v-btn
+          size="small"
+          color="brown"
+          :disabled="
+            !selectedPumHistory[0] ||
+            selectedPumHistory[0].Status !== 'REALISASI' ||
+            !selectedPumHistory[0].Nomor
+          "
+          @click="openPrintPenyerahan"
+        >
+          <template #prepend><IconPrinter :size="15" /></template>
+          Penyerahan Dana Belanja
         </v-btn>
         <v-btn
           size="small"

@@ -4331,6 +4331,7 @@ interface OutstandingBeliItem {
   QtyMinta: number;
   QtyBeli: number;
   Kekurangan: number;
+  Catatan: string;
 }
 const OB_TABS = [
   { value: "ATK", label: "ATK" },
@@ -4356,6 +4357,49 @@ let obReqId = 0; // cegah respons tab lama menimpa tab baru
 const obTotalAll = computed(() =>
   Object.values(obSummary.value).reduce((s, n) => s + Number(n || 0), 0),
 );
+const canEditCatatanOb = computed(() =>
+  ["PEMBELIAN", "FINANCE"].includes(bagian.value),
+);
+const obCatatanSaving = ref<Set<string>>(new Set());
+const obErrorDialog = ref(false);
+const obErrorMsg = ref("");
+const showObError = (msg: string) => {
+  obErrorMsg.value = msg;
+  obErrorDialog.value = true;
+};
+const obRowKey = (r: OutstandingBeliItem) => `${r.Nomor}-${r.Nourut}`;
+
+// Dipanggil dari event native "change": hanya jalan saat nilai berubah
+// dan fokus keluar (atau Enter), jadi tidak ada request per ketikan.
+const saveCatatanOb = async (r: OutstandingBeliItem, ev: Event) => {
+  const el = ev.target as HTMLInputElement;
+  const teks = el.value.trim();
+  if (teks === (r.Catatan || "")) return;
+
+  const tab = obTab.value;
+  const key = obRowKey(r);
+  obCatatanSaving.value = new Set(obCatatanSaving.value).add(key);
+  try {
+    await dashboardService.setCatatanOutstandingBeli({
+      tab,
+      nomor: r.Nomor,
+      nourut: r.Nourut,
+      catatan: teks,
+    });
+    r.Catatan = teks;
+    el.value = teks;
+  } catch (e: unknown) {
+    (ev.target as HTMLInputElement).value = r.Catatan || "";
+    showObError(
+      (e as { response?: { data?: { message?: string } } })?.response?.data
+        ?.message || "Gagal menyimpan catatan.",
+    );
+  } finally {
+    const next = new Set(obCatatanSaving.value);
+    next.delete(key);
+    obCatatanSaving.value = next;
+  }
+};
 
 const loadMoreOb = async () => {
   if (!obHasMore.value || isLoadingMoreOb.value) return;
@@ -4492,6 +4536,7 @@ const exportObExcel = async () => {
           numFmt: "#,##0",
           align: "right" as const,
         },
+        { header: "Catatan", key: "catatan", width: 36 },
       ],
       rows: rows.map((r) => ({
         nomor: r.Nomor,
@@ -4503,6 +4548,7 @@ const exportObExcel = async () => {
         qtyBeli: Number(r.QtyBeli) || 0,
         kekurangan: Number(r.Kekurangan) || 0,
         waktuTunggu: Number(r.WaktuTunggu) || 0,
+        catatan: r.Catatan || "",
       })),
     }));
 
@@ -11244,7 +11290,7 @@ const sisaClass = (item: any) => {
           <div class="panel-body">
             <DashState v-if="isLoadingPembelian" kind="loading" />
             <div v-else style="overflow: auto; max-height: 560px">
-              <table class="gb-tbl" style="min-width: 960px">
+              <table class="gb-tbl" style="min-width: 1200px">
                 <thead>
                   <tr>
                     <th style="width: 150px">No. Pengajuan</th>
@@ -11255,6 +11301,7 @@ const sisaClass = (item: any) => {
                     <th class="tr" style="width: 90px">Qty Beli</th>
                     <th class="tr" style="width: 100px">Kekurangan</th>
                     <th class="tc" style="width: 110px">Waktu Tunggu</th>
+                    <th style="width: 240px">Catatan</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -11286,9 +11333,26 @@ const sisaClass = (item: any) => {
                         >{{ r.WaktuTunggu }} hari</span
                       >
                     </td>
+                    <td>
+                      <input
+                        v-if="canEditCatatanOb"
+                        :value="r.Catatan"
+                        class="ob-note-inp"
+                        :class="{
+                          'ob-note-inp--busy': obCatatanSaving.has(obRowKey(r)),
+                        }"
+                        :disabled="obCatatanSaving.has(obRowKey(r))"
+                        maxlength="255"
+                        placeholder="Tulis catatan..."
+                        @change="saveCatatanOb(r, $event)"
+                      />
+                      <span v-else style="color: var(--dsh-ink-2)">{{
+                        r.Catatan || "-"
+                      }}</span>
+                    </td>
                   </tr>
                   <tr v-if="!obList.length && !isLoadingMoreOb">
-                    <td colspan="8" class="text-center text-grey py-3">
+                    <td colspan="9" class="text-center text-grey py-3">
                       Tidak ada outstanding untuk tab ini
                     </td>
                   </tr>
@@ -12366,6 +12430,30 @@ const sisaClass = (item: any) => {
             Konfirmasi Batal
           </v-btn>
         </div>
+      </v-card>
+    </v-dialog>
+
+    <v-dialog v-model="obErrorDialog" max-width="380">
+      <v-card rounded="lg">
+        <v-card-title
+          class="pa-4 pb-2"
+          style="
+            font-size: 13px;
+            font-weight: 700;
+            border-top: 3px solid #c62828;
+          "
+        >
+          Catatan Tidak Tersimpan
+        </v-card-title>
+        <v-card-text class="pa-4 pt-2" style="font-size: 12px">
+          {{ obErrorMsg }}
+        </v-card-text>
+        <v-card-actions class="pa-3">
+          <v-spacer />
+          <v-btn color="primary" variant="flat" @click="obErrorDialog = false">
+            OK
+          </v-btn>
+        </v-card-actions>
       </v-card>
     </v-dialog>
   </v-container>
@@ -13726,6 +13814,22 @@ const sisaClass = (item: any) => {
 }
 .map-filter-btn:hover {
   background: var(--dsh-accent);
+}
+.ob-note-inp {
+  width: 100%;
+  border: 1px solid var(--dsh-line);
+  border-radius: 4px;
+  padding: 3px 7px;
+  font-size: 11px;
+  color: var(--dsh-ink);
+  background: var(--dsh-surface);
+  outline: none;
+}
+.ob-note-inp:focus {
+  border-color: var(--dsh-accent);
+}
+.ob-note-inp--busy {
+  opacity: 0.6;
 }
 
 .gyy-list {

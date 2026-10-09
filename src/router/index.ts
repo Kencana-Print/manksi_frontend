@@ -641,6 +641,17 @@ const router = createRouter({
       },
     },
     {
+      path: "/pembelian/uang-muka/print-penyerahan/:nomor",
+      name: "UangMukaPenyerahanPrint",
+      component: () =>
+        import("@/views/pembelian/UangMukaPenyerahanPrintView.vue"),
+      meta: {
+        title: "Penyerahan Dana Belanja",
+        layout: "BlankLayout",
+        requiresAuth: true,
+      },
+    },
+    {
       path: "/pembelian/uang-muka/penyelesaian/:nomor",
       name: "UangMukaPenyelesaianForm",
       component: () =>
