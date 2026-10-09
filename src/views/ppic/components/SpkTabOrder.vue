@@ -106,15 +106,14 @@ const resolveDesignImage = () => {
   }
 
   // --- LOGIC LAMA / STANDAR ---
+  // Prioritas: gambar SO (final, diterbitkan Marketing), lalu gambar SPK
+  // sendiri, terakhir MAP sebagai fallback.
   const candidates: string[] = [];
-  // Prioritas: gambar SO sendiri (final, diterbitkan Marketing) —
-  // dicoba duluan. MAP cuma fallback kalau SO belum/tidak ada gambar
-  // sendiri (SO lama, atau proses upload gambar SO belum jalan).
-  if (soRef && soRef !== nomor) {
+  if (soRef) {
     candidates.push(`${base}/images/${cab}/${encodeURIComponent(soRef)}.jpg`);
     candidates.push(`/file-gambar/${encodeURIComponent(soRef)}.jpg`);
   }
-  if (nomor) {
+  if (nomor && nomor !== soRef) {
     candidates.push(`${base}/images/${cab}/${encodeURIComponent(nomor)}.jpg`);
     candidates.push(`/file-gambar/${encodeURIComponent(nomor)}.jpg`);
   }
@@ -124,6 +123,7 @@ const resolveDesignImage = () => {
     );
     candidates.push(`/file-gambar/${encodeURIComponent(mapNomor)}.jpg`);
   }
+
   isLoadingImage.value = true;
   resolvedImageUrl.value = "";
   const tryNext = (idx: number) => {
@@ -139,8 +139,6 @@ const resolveDesignImage = () => {
     img.onerror = () => tryNext(idx + 1);
     img.src = candidates[idx];
   };
-  tryNext(0);
-
   tryNext(0);
 };
 
@@ -174,6 +172,7 @@ const totalExtraCols = computed(() => {
 watch(
   [
     () => props.formData.so_nomor,
+    () => props.formData.spk_nomor,
     () => props.formData.so_map,
     () => props.formData.so_cab,
   ],

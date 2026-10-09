@@ -522,14 +522,20 @@ const onLihatGambar = () => {
     return;
   }
 
-  // ── Logic lama (non-Kaosan / legacy) — TIDAK berubah ──
-  const fallbackSoNomor = nomor.startsWith("SPK-")
-    ? nomor.replace("SPK-", "SO-")
-    : nomor.startsWith("SO-")
-      ? nomor
-      : `SO-${nomor}`;
+  // ── Urutan gambar: SO dulu (jika ada), baru MAP / gambar SPK sendiri ──
+  const soNomor = soRef
+    ? soRef
+    : nomor.startsWith("SPK-")
+      ? nomor.replace("SPK-", "SO-")
+      : "";
   const isLegacyFormat = !nomor.startsWith("SPK-");
-  const candidates: string[] = [];
+
+  const soCandidates = soNomor
+    ? [
+        `${base}/images/${cab}/${encodeURIComponent(soNomor)}.jpg`,
+        `/file-gambar/${encodeURIComponent(soNomor)}.jpg`,
+      ]
+    : [];
   const mapCandidates = map
     ? [
         `/file-gambar/${encodeURIComponent(map)}.jpg`,
@@ -541,21 +547,10 @@ const onLihatGambar = () => {
     `${base}/images/${cab}/${encodeURIComponent(nomor)}.jpg`,
     `/file-gambar/${encodeURIComponent(nomor)}.jpg`,
   ];
-  if (isLegacyFormat) {
-    candidates.push(...ownCandidates, ...mapCandidates);
-  } else {
-    candidates.push(...mapCandidates, ...ownCandidates);
-  }
-  if (soRef && soRef !== nomor) {
-    candidates.push(`${base}/images/${cab}/${encodeURIComponent(soRef)}.jpg`);
-    candidates.push(`/file-gambar/${encodeURIComponent(soRef)}.jpg`);
-  }
-  if (fallbackSoNomor !== nomor && fallbackSoNomor !== soRef) {
-    candidates.push(
-      `${base}/images/${cab}/${encodeURIComponent(fallbackSoNomor)}.jpg`,
-    );
-    candidates.push(`/file-gambar/${encodeURIComponent(fallbackSoNomor)}.jpg`);
-  }
+
+  const candidates: string[] = isLegacyFormat
+    ? [...soCandidates, ...ownCandidates, ...mapCandidates]
+    : [...soCandidates, ...mapCandidates, ...ownCandidates];
   gambarUrl.value = "";
   dialogGambar.value = true;
   const tryNext = (idx: number) => {
