@@ -299,6 +299,36 @@ const alokasiChunks = computed(() => {
   return chunks;
 });
 
+const namaToko = (a: any) => a.toko || a.nama_toko || a.nama || "-";
+
+const ALOKASI_ROWS_PER_COL = 25;
+
+const alokasiPages = computed(() => {
+  const list = alokasi.value;
+  // Data ≤ 25 baris → 1 kolom selebar halaman; lebih banyak → 2 kolom
+  const cols = list.length > ALOKASI_ROWS_PER_COL ? 2 : 1;
+  const perPage = ALOKASI_ROWS_PER_COL * cols;
+
+  const pages: any[][][] = [];
+  for (let p = 0; p < list.length; p += perPage) {
+    const items = list.slice(p, p + perPage);
+    const chunks: any[][] = [];
+    for (let c = 0; c < items.length; c += ALOKASI_ROWS_PER_COL) {
+      chunks.push(items.slice(c, c + ALOKASI_ROWS_PER_COL));
+    }
+    pages.push(chunks);
+  }
+  return pages;
+});
+
+const alokasiCols = computed(() =>
+  alokasi.value.length > ALOKASI_ROWS_PER_COL ? 2 : 1,
+);
+
+const totalAlokasi = computed(() =>
+  alokasi.value.reduce((s, a) => s + (Number(a.jumlah) || 0), 0),
+);
+
 // ── Signature helper (dipakai format lama, sama pola SalesOrderPrintView) ──
 const getSignatureUrl = (kodeUser: string) => {
   if (!kodeUser) return "";
@@ -692,7 +722,7 @@ onMounted(async () => {
             </thead>
             <tbody>
               <tr v-for="(a, idx) in alokasi" :key="idx">
-                <td class="pl-2-p01">{{ a.kota || a.alamat }}</td>
+                <td class="pl-2-p01">{{ a.toko || a.kota || a.alamat }}</td>
                 <td class="text-center-p01">
                   {{ Number(a.jumlah).toLocaleString("id-ID") }}
                 </td>
@@ -892,7 +922,7 @@ Keterangan Komponen :
                 </thead>
                 <tbody>
                   <tr v-for="(a, i2) in chunk" :key="i2">
-                    <td class="pl-2-so">{{ a.kota || a.alamat }}</td>
+                    <td class="pl-2-so">{{ a.toko || a.kota || a.alamat }}</td>
                     <td class="text-center-so">
                       {{ Number(a.jumlah).toLocaleString("id-ID") }}
                     </td>
@@ -1484,70 +1514,74 @@ Keterangan Komponen :
          Muncul hanya jika ada data alokasi. Kalau ada, halaman Layout
          Proses Sewing di bawah otomatis jadi halaman ke-3.
     ══════════════════════════════════════════════ -->
-      <div v-if="hasAlokasi" class="print-page page-alokasi">
-        <div class="ph">
-          <div class="ph-left">
-            <img src="@/assets/logo.png" class="ph-logo" />
+      <template v-if="hasAlokasi">
+        <div
+          v-for="(page, pIdx) in alokasiPages"
+          :key="'alo-' + pIdx"
+          class="print-page page-alokasi"
+        >
+          <div class="ph">
+            <div class="ph-left">
+              <img src="@/assets/logo.png" class="ph-logo" />
+            </div>
+            <div class="ph-center">
+              <div class="ph-title">Alokasi Pengiriman</div>
+            </div>
+            <div class="ph-right">
+              <div class="ph-nomor">{{ spk.spk_nomor }}</div>
+              <div class="ph-meta">No. SO: {{ spk.spk_so_ref || "—" }}</div>
+              <div class="ph-meta">
+                Hal {{ pIdx + 1 }}/{{ alokasiPages.length }}
+              </div>
+            </div>
           </div>
-          <div class="ph-center">
-            <div class="ph-title">Alokasi Pengiriman</div>
-          </div>
-          <div class="ph-right">
-            <div class="ph-nomor">{{ spk.spk_nomor }}</div>
-            <div class="ph-meta">No. SO: {{ spk.spk_so_ref || "—" }}</div>
-          </div>
-        </div>
 
-        <div class="box">
-          <div class="box-title">Daftar Alokasi</div>
-          <table class="dt">
-            <thead>
-              <tr>
-                <th style="width: 30px" class="tc">No</th>
-                <th>Alamat</th>
-                <th style="width: 130px">Toko</th>
-                <th style="width: 100px">Kota</th>
-                <th style="width: 120px">Kontak Person</th>
-                <th style="width: 100px">No. HP</th>
-                <th style="width: 70px" class="tr">Jumlah</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="(a, idx) in alokasi" :key="idx">
-                <td class="tc">{{ idx + 1 }}</td>
-                <td>{{ a.alamat || "-" }}</td>
-                <td>{{ a.toko || "-" }}</td>
-                <td>{{ a.kota || "-" }}</td>
-                <td>{{ a.person || "-" }}</td>
-                <td>{{ a.hp || "-" }}</td>
-                <td class="tr">
-                  {{ Number(a.jumlah || 0).toLocaleString("id-ID") }}
-                </td>
-              </tr>
-            </tbody>
-            <tfoot>
-              <tr>
-                <td colspan="6" class="tc fw">Total</td>
-                <td class="tr fw">
-                  {{
-                    alokasi
-                      .reduce((s, a) => s + (Number(a.jumlah) || 0), 0)
-                      .toLocaleString("id-ID")
-                  }}
-                </td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
+          <div class="alokasi-page-cols" :class="`cols-${alokasiCols}`">
+            <table
+              v-for="(chunk, cIdx) in page"
+              :key="cIdx"
+              class="alokasi-page-table"
+            >
+              <thead>
+                <tr>
+                  <th class="text-left">Nama Toko</th>
+                  <th class="text-left">Alokasi</th>
+                  <th class="text-center">Jml</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(a, i) in chunk" :key="i">
+                  <td>{{ namaToko(a) }}</td>
+                  <td>{{ a.kota || "-" }}</td>
+                  <td class="text-center">
+                    {{ Number(a.jumlah || 0).toLocaleString("id-ID") }}
+                  </td>
+                </tr>
+              </tbody>
+              <tfoot
+                v-if="
+                  pIdx === alokasiPages.length - 1 && cIdx === page.length - 1
+                "
+              >
+                <tr>
+                  <td colspan="2" class="fw">Total</td>
+                  <td class="fw text-center">
+                    {{ totalAlokasi.toLocaleString("id-ID") }}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
 
-        <div class="pf">
-          <span
-            >Dibuat: {{ spk.user_create }} —
-            {{ formatWaktu(spk.date_create) }}</span
-          >
-          <span>Referensi SO: {{ spk.spk_so_ref || "—" }}</span>
+          <div class="pf">
+            <span
+              >Dibuat: {{ spk.user_create }} —
+              {{ formatWaktu(spk.date_create) }}</span
+            >
+            <span>Referensi SO: {{ spk.spk_so_ref || "—" }}</span>
+          </div>
         </div>
-      </div>
+      </template>
 
       <!-- ══════════════════════════════════════════════
          HALAMAN 2/3 — Layout Proses Sewing
@@ -2991,6 +3025,69 @@ Keterangan Komponen :
 }
 .pl-2-p01 {
   padding-left: 8px;
+}
+.alokasi-page-cols {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  width: 100%;
+}
+.alokasi-page-table {
+  flex: 1 1 0; /* sebelumnya: 0 0 calc((100% - 8px) / 2) */
+  min-width: 0;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-size: 7.5pt;
+  color: #000;
+}
+.alokasi-page-table th,
+.alokasi-page-table td {
+  border: 1px solid #000;
+  padding: 2px 4px;
+  vertical-align: top;
+  line-height: 1.2;
+  word-break: normal;
+  overflow-wrap: break-word;
+}
+.alokasi-page-table th {
+  font-weight: bold;
+  background: #f5f5f5;
+}
+.alokasi-page-table tbody tr {
+  break-inside: avoid;
+}
+
+/* Satu kolom: font lebih besar karena ruangnya longgar */
+.alokasi-page-cols.cols-1 .alokasi-page-table {
+  font-size: 9pt;
+}
+.alokasi-page-cols.cols-1 .alokasi-page-table th,
+.alokasi-page-cols.cols-1 .alokasi-page-table td {
+  padding: 3px 6px;
+}
+.alokasi-page-cols.cols-1 .alokasi-page-table th:nth-child(1),
+.alokasi-page-cols.cols-1 .alokasi-page-table td:nth-child(1) {
+  width: 62%;
+}
+.alokasi-page-cols.cols-1 .alokasi-page-table th:nth-child(2),
+.alokasi-page-cols.cols-1 .alokasi-page-table td:nth-child(2) {
+  width: 25%;
+}
+.alokasi-page-cols.cols-1 .alokasi-page-table th:nth-child(3),
+.alokasi-page-cols.cols-1 .alokasi-page-table td:nth-child(3) {
+  width: 13%;
+}
+.alokasi-page-table th:nth-child(1),
+.alokasi-page-table td:nth-child(1) {
+  width: 58%;
+}
+.alokasi-page-table th:nth-child(2),
+.alokasi-page-table td:nth-child(2) {
+  width: 28%;
+}
+.alokasi-page-table th:nth-child(3),
+.alokasi-page-table td:nth-child(3) {
+  width: 14%;
 }
 
 @media screen {
