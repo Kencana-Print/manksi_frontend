@@ -18,4 +18,7 @@ export const bpbBahanFormService = {
     api.get("/garmen/bahan-baku/bpb-bahan/form/max-barcode", {
       params: { kode, tahun },
     }),
+
+  getQcSiap: (po = "") =>
+    api.get("/garmen/bahan-baku/bpb-bahan/form/qc-siap", { params: { po } }),
 };

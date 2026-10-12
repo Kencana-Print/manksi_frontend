@@ -14,6 +14,11 @@ const isPo = computed(() => {
     data.value?.header?.bpb_po_Nomor || data.value?.header?.bpb_po_nomor;
   return !!(noPo && noPo.trim() !== "");
 });
+const sumberQc = computed(() =>
+  [
+    ...new Set((data.value?.qcLots ?? []).map((l: { qc: string }) => l.qc)),
+  ].join(", "),
+);
 
 const loadData = async () => {
   try {
@@ -118,6 +123,10 @@ const numFmt = (v: any) =>
               <td>
                 : {{ data.header.bpb_po_Nomor || data.header.bpb_po_nomor }}
               </td>
+            </tr>
+            <tr v-if="data.dariQc">
+              <td>No. QC</td>
+              <td>: {{ sumberQc }}</td>
             </tr>
           </table>
         </div>

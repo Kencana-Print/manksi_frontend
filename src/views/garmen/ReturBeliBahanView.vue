@@ -11,6 +11,8 @@ import {
   IconArrowBackUp,
   IconPrinter,
   IconFileExport,
+  IconFileInvoice,
+  IconClipboardX,
 } from "@tabler/icons-vue";
 import { formatTanggal } from "@/utils/dateFormat";
 
@@ -63,8 +65,10 @@ const {
 // --- HEADERS UTAMA ---
 const headers = [
   { title: "Nomor", key: "nomor", width: "150px", fixed: true },
+  { title: "Jenis", key: "jenis", width: "80px", align: "center" },
   { title: "Tanggal", key: "tanggal", width: "100px", align: "center" },
   { title: "No. BPB", key: "noBpb", width: "150px" },
+  { title: "No. QC", key: "noQc", width: "150px" },
   { title: "Kd. Supplier", key: "kdSup", width: "100px" },
   { title: "Supplier", key: "supplier", width: "220px" },
   { title: "Keterangan", key: "keterangan", width: "260px" },
@@ -101,15 +105,26 @@ onMounted(() => fetchData());
 watch(() => filterState.value.dtAwal, fetchData);
 watch(() => filterState.value.dtAkhir, fetchData);
 
+const modeDialog = ref(false);
+
 const onAdd = () => {
-  router.push({ name: "ReturBeliBahanCreate" });
+  modeDialog.value = true;
+};
+
+const goAdd = (mode: "BPB" | "QC") => {
+  modeDialog.value = false;
+  router.push({
+    name: mode === "QC" ? "ReturBeliBahanQcCreate" : "ReturBeliBahanCreate",
+  });
 };
 
 const onEdit = (item: any) => {
   if (!item || !item.nomor) return;
-  router.push(
-    `/garmen/bahan-baku/retur-pembelian-bahan/form/${encodeURIComponent(item.nomor)}`,
-  );
+  const base =
+    item.jenis === "QC"
+      ? "/garmen/bahan-baku/retur-pembelian-bahan/qc/form"
+      : "/garmen/bahan-baku/retur-pembelian-bahan/form";
+  router.push(`${base}/${encodeURIComponent(item.nomor)}`);
 };
 
 const onDelete = async (item: any) => {
@@ -144,8 +159,10 @@ const onExport = async () => {
       "Retur Pembelian Bahan",
       [
         { header: "Nomor", key: "nomor", width: 20 },
+        { header: "Jenis", key: "jenis", width: 8, align: "center" },
         { header: "Tanggal", key: "tanggal", width: 14, align: "center" },
         { header: "No. BPB", key: "noBpb", width: 20 },
+        { header: "No. QC", key: "noQc", width: 20 },
         { header: "Kd. Supplier", key: "kdSup", width: 14 },
         { header: "Supplier", key: "supplier", width: 26 },
         { header: "Keterangan", key: "keterangan", width: 30 },
@@ -186,14 +203,16 @@ const exportDetail = async () => {
           const row: any = {
             nomor: item.nomor,
             tanggal: formatTanggal(item.tanggal),
-            noBpb: item.noBpb,
+            noBpb: item.noBpb || item.noQc,
             supplier: item.supplier,
+            lot: dRow.lot || "",
             kode: dRow.kode,
             nama: dRow.nama,
             satuan: dRow.satuan,
             jumlah: Number(dRow.jumlah) || 0,
+            roll: Number(dRow.roll) || 0,
           };
-          if (canLihatBeli.value) {
+          if (canLihatBeli.value && item.jenis !== "QC") {
             row.harga = Number(dRow.harga) || 0;
             row.total = Number(dRow.total) || 0;
           }
@@ -211,8 +230,9 @@ const exportDetail = async () => {
     const columns: ExcelColumn[] = [
       { header: "No. Retur", key: "nomor", width: 20 },
       { header: "Tanggal", key: "tanggal", width: 14, align: "center" },
-      { header: "No. BPB", key: "noBpb", width: 20 },
+      { header: "No. BPB / QC", key: "noBpb", width: 20 },
       { header: "Supplier", key: "supplier", width: 24 },
+      { header: "Lot", key: "lot", width: 16 },
       { header: "Kode Bahan", key: "kode", width: 14 },
       { header: "Nama Bahan", key: "nama", width: 30 },
       { header: "Satuan", key: "satuan", width: 10, align: "center" },
@@ -220,6 +240,13 @@ const exportDetail = async () => {
         header: "Jumlah",
         key: "jumlah",
         width: 14,
+        align: "right",
+        numFmt: "#,##0",
+      },
+      {
+        header: "Roll",
+        key: "roll",
+        width: 8,
         align: "right",
         numFmt: "#,##0",
       },
@@ -298,6 +325,15 @@ const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
       {{ formatTanggal(item.tanggal) }}
     </template>
 
+    <template #item.jenis="{ item }">
+      <span
+        class="jenis-chip"
+        :class="item.jenis === 'QC' ? 'jenis-qc' : 'jenis-bpb'"
+      >
+        {{ item.jenis }}
+      </span>
+    </template>
+
     <!-- Detail Expand (Lazy Load) -->
     <template #detail="{ item }">
       <div class="expand-wrap">
@@ -312,26 +348,49 @@ const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
           <table class="detail-table">
             <thead>
               <tr>
+                <th v-if="item.jenis === 'QC'" width="140">Lot</th>
                 <th width="100">Kode</th>
                 <th>Nama Bahan</th>
                 <th width="80" class="text-center">Satuan</th>
                 <th width="100" class="tr">Jumlah</th>
-                <th v-if="canLihatBeli" width="100" class="tr">Harga</th>
-                <th v-if="canLihatBeli" width="120" class="tr">Total</th>
+                <th v-if="item.jenis === 'QC'" width="70" class="tr">Roll</th>
+                <th
+                  v-if="canLihatBeli && item.jenis !== 'QC'"
+                  width="100"
+                  class="tr"
+                >
+                  Harga
+                </th>
+                <th
+                  v-if="canLihatBeli && item.jenis !== 'QC'"
+                  width="120"
+                  class="tr"
+                >
+                  Total
+                </th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="(dRow, i) in detailCache[item.nomor]" :key="i">
+                <td v-if="item.jenis === 'QC'" class="font-weight-bold">
+                  {{ dRow.lot }}
+                </td>
                 <td>{{ dRow.kode }}</td>
                 <td class="font-weight-bold">{{ dRow.nama }}</td>
                 <td class="text-center">{{ dRow.satuan }}</td>
                 <td class="tr text-blue-darken-2 font-weight-bold">
                   {{ numFmt(dRow.jumlah) }}
                 </td>
-                <td v-if="canLihatBeli" class="tr">
+                <td v-if="item.jenis === 'QC'" class="tr">
+                  {{ numFmt(dRow.roll) }}
+                </td>
+                <td v-if="canLihatBeli && item.jenis !== 'QC'" class="tr">
                   {{ numFmt(dRow.harga) }}
                 </td>
-                <td v-if="canLihatBeli" class="tr font-weight-bold">
+                <td
+                  v-if="canLihatBeli && item.jenis !== 'QC'"
+                  class="tr font-weight-bold"
+                >
                   {{ numFmt(dRow.total) }}
                 </td>
               </tr>
@@ -342,7 +401,7 @@ const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
                 "
               >
                 <td
-                  :colspan="canLihatBeli ? 6 : 4"
+                  :colspan="item.jenis === 'QC' ? 6 : canLihatBeli ? 6 : 4"
                   class="text-center text-grey py-3 font-italic"
                 >
                   Detail retur tidak ditemukan.
@@ -369,6 +428,41 @@ const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
       </v-btn>
     </template>
   </BaseBrowse>
+
+  <v-dialog v-model="modeDialog" max-width="420">
+    <v-card rounded="lg">
+      <v-card-title class="bg-primary text-white pa-3 text-subtitle-1">
+        Retur Pembelian Bahan Baru
+      </v-card-title>
+      <v-card-text class="pa-4">
+        <p class="text-caption mb-3">Pilih sumber retur:</p>
+        <v-btn
+          block
+          variant="outlined"
+          color="primary"
+          class="mb-2 justify-start"
+          @click="goAdd('BPB')"
+        >
+          <template #prepend><IconFileInvoice :size="18" /></template>
+          Retur dari BPB (barang sudah diterima)
+        </v-btn>
+        <v-btn
+          block
+          variant="outlined"
+          color="deep-orange-darken-2"
+          class="justify-start"
+          @click="goAdd('QC')"
+        >
+          <template #prepend><IconClipboardX :size="18" /></template>
+          Retur dari QC Reject (belum diterima)
+        </v-btn>
+      </v-card-text>
+      <v-card-actions class="pa-3 border-t">
+        <v-spacer />
+        <v-btn variant="text" @click="modeDialog = false">Batal</v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
 </template>
 
 <style scoped>
@@ -429,5 +523,20 @@ const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
 }
 .tr {
   text-align: right !important;
+}
+.jenis-chip {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-size: 9.5px;
+  font-weight: 700;
+}
+.jenis-bpb {
+  background: #e3f2fd;
+  color: #1565c0;
+}
+.jenis-qc {
+  background: #fbe9e7;
+  color: #d84315;
 }
 </style>

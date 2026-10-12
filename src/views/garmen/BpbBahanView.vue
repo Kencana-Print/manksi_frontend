@@ -177,11 +177,19 @@ const onSearchInput = () => {
   searchTimeout = setTimeout(() => fetchData(), 500);
 };
 
+const addDialog = ref(false);
+
+const goAdd = (type: "PO" | "QC" | "NON") => {
+  addDialog.value = false;
+  router.push({ name: "BpbBahanCreate", query: { type } });
+};
+
 const onAdd = () => {
-  router.push({
-    name: "BpbBahanCreate",
-    query: { type: filterState.value.isPo ? "PO" : "NON" },
-  });
+  if (filterState.value.isPo) {
+    addDialog.value = true;
+    return;
+  }
+  goAdd("NON");
 };
 const onEdit = (item: any) => {
   if (!item || !item.Nomor) return;
@@ -519,6 +527,34 @@ const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
       </v-menu>
     </template>
   </BaseBrowse>
+
+  <!-- Dialog Pilih Sumber BPB PO -->
+  <v-dialog v-model="addDialog" max-width="420">
+    <v-card rounded="lg">
+      <v-card-title class="bg-primary text-white pa-3 text-subtitle-1">
+        Tambah BPB PO
+      </v-card-title>
+      <v-card-text class="pa-4">
+        <v-btn block color="success" variant="elevated" @click="goAdd('QC')">
+          Dari QC Bahan
+        </v-btn>
+        <div class="text-caption text-grey-darken-1 mt-1 mb-4">
+          Untuk bahan yang sudah dicek di QC Bahan. Hanya lot berkeputusan
+          LANJUT yang bisa diterima.
+        </div>
+        <v-btn block color="primary" variant="outlined" @click="goAdd('PO')">
+          Dari PO langsung
+        </v-btn>
+        <div class="text-caption text-grey-darken-1 mt-1">
+          Hanya untuk PO lama yang belum memiliki QC Bahan.
+        </div>
+      </v-card-text>
+      <v-card-actions class="pa-3 border-t">
+        <v-spacer />
+        <v-btn variant="text" @click="addDialog = false">Batal</v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
 
   <!-- Dialog Request PIN -->
   <v-dialog v-model="pinDialog" max-width="400">

@@ -24,6 +24,7 @@ import MkbSearchModal from "@/components/lookups/MkbSearchModal.vue";
 import MkbDetailSearchModal from "@/components/lookups/MkbDetailSearchModal.vue";
 
 import BpbBahanBarcodeDialog from "./BpbBahanBarcodeDialog.vue";
+import BpbQcSiapDialog from "./BpbQcSiapDialog.vue";
 
 const authStore = useAuthStore();
 const router = useRouter();
@@ -32,6 +33,9 @@ const toast = useToast();
 
 const isEditMode = computed(() => !!route.params.nomor);
 const isPo = ref(route.query.type !== "NON");
+// BPB dari QC memakai type=QC. isPo tetap true (PO terikat, grid terkunci)
+const isQc = ref(route.query.type === "QC");
+
 const formatDateLocal = (value?: string | Date) => {
   if (!value) return "";
 
@@ -46,6 +50,25 @@ const formatDateLocal = (value?: string | Date) => {
   return `${year}-${month}-${day}`;
 };
 const todayLocal = formatDateLocal(new Date());
+
+interface QcLotRef {
+  qc: string;
+  lot: string;
+  nourut: number;
+}
+interface BpbRowRef {
+  kode: string;
+  roll: number | string;
+  lot?: string;
+}
+interface QcTarikItem {
+  nourut_po: number;
+  [key: string]: unknown;
+}
+interface QcTarikPo {
+  nourut: number;
+  namaspk: string | null;
+}
 
 // ⚠️ Panel Supplier disembunyikan (bukan dihapus dari formData) kalau
 // user gak punya izin lihatSup — replikasi `if zLihatSup=0 then
@@ -69,6 +92,7 @@ const showMkbModal = ref(false);
 const activeMkbGridIndex = ref(-1);
 const showMkbDetailModal = ref(false);
 const selectedMkbNomor = ref("");
+const showQcModal = ref(false);
 
 const showBarcodeDialog = ref(false);
 const printMode = ref({
@@ -99,6 +123,8 @@ const defaultData = {
   items: [] as any[],
   poItems: [] as any[],
   barcodes: [] as any[],
+  qcNomor: [] as string[],
+  qcLots: [] as QcLotRef[],
   statusNgedit: "AMAN",
   isTutupBuku: false,
 };
@@ -126,6 +152,7 @@ const {
     const ketBpb = d.header.bpb_Keterangan || d.header.bpb_keterangan || "";
     const noBpb = d.header.bpb_Nomor || d.header.bpb_nomor || "";
     isPo.value = !!noPo.trim();
+    isQc.value = !!d.dariQc;
     return {
       header: {
         ...d.header,
@@ -142,6 +169,8 @@ const {
       poItems: d.poItems || [],
       barcodes: d.barcodes || [],
       statusNgedit: d.statusNgedit || "AMAN",
+      qcNomor: [] as string[],
+      qcLots: (d.qcLots || []) as QcLotRef[],
       isTutupBuku: d.isTutupBuku || false,
     };
   },
@@ -153,6 +182,7 @@ const {
       poItems: data.poItems,
       barcodes: data.barcodes,
       statusNgedit: data.statusNgedit,
+      qcNomor: isQc.value && !isEditMode.value ? data.qcNomor : undefined,
     });
   },
   onSuccess: (res: any) => {
@@ -163,6 +193,9 @@ const {
       if (result?.noBarcodeHdr) {
         formData.value.header.no_buat_barcode = result.noBarcodeHdr;
       }
+      (result.warnings || []).forEach((w: string) =>
+        toast.warning(w, { timeout: 8000 }),
+      );
       showPrintConfirm.value = true;
     }
   },
@@ -213,6 +246,59 @@ const loadPoData = async () => {
     formData.value.header.bpb_po_nomor = "";
   }
 };
+
+// ── QC load ──
+const setQc = async (daftarQc: string[]) => {
+  try {
+    const res = await bpbBahanFormService.validateField(
+      "qc",
+      daftarQc.join(","),
+    );
+    const { header, poDetails, items, qcNomor } = res.data.data;
+
+    formData.value.header.bpb_po_nomor = header.po_nomor;
+    formData.value.header.bpb_sup_kode = header.sup_kode;
+    formData.value.header.sup_nama = header.sup_nama;
+    formData.value.header.sup_alamat = header.sup_alamat;
+    formData.value.header.sup_kota = header.sup_kota;
+    const dt = new Date(formData.value.header.bpb_tanggal);
+    dt.setDate(dt.getDate() + (Number(header.jatuhtempo_days) || 0));
+    formData.value.header.bpb_jatuhtempo = formatDateLocal(dt);
+
+    formData.value.qcNomor = qcNomor;
+    formData.value.poItems = poDetails;
+    formData.value.items = items.map((d: QcTarikItem) => ({
+      ...d,
+      jumlahmeter: 0,
+      namaspk:
+        poDetails.find((p: QcTarikPo) => Number(p.nourut) === d.nourut_po)
+          ?.namaspk || "",
+    }));
+    formData.value.barcodes = [];
+
+    // Barcode dibuat per kode bahan: satu pemanggilan per kode, berurutan
+    const kodeSudah = new Set<string>();
+    for (const [i, r] of formData.value.items.entries()) {
+      if (kodeSudah.has(r.kode)) continue;
+      kodeSudah.add(r.kode);
+      await onRollChange(i);
+    }
+    toast.success(`Berhasil menarik ${items.length} lot dari QC Bahan.`);
+  } catch (e) {
+    const err = e as { response?: { data?: { message?: string } } };
+    toast.error(err.response?.data?.message || "Gagal menarik data QC Bahan.");
+  }
+};
+
+const sumberQcText = computed(() => {
+  const lots = formData.value.qcLots;
+  const qc = [...new Set(lots.map((l: QcLotRef) => l.qc))];
+  return `${qc.join(", ")} (${lots.length} lot)`;
+});
+
+const adaLot = computed(() =>
+  formData.value.items.some((r: BpbRowRef) => !!r.lot),
+);
 
 const openLookupMkb = (i: number) => {
   if (isPo.value) return;
@@ -303,6 +389,7 @@ const isMeterBased = (item: any) => item.satuan === "MTR";
 
 // Yard diisi user → Meter (kolom bantu) & Terima Skrg (jumlah) otomatis terhitung
 const onJumlahYardChange = (idx: number) => {
+  if (isQc.value) return;
   const row = formData.value.items[idx];
   if (!isMeterBased(row)) return; // ⬅ guard: cuma bahan METER
   const meter = Number(
@@ -315,6 +402,7 @@ const onJumlahYardChange = (idx: number) => {
 
 // Meter (kolom bantu) diisi user → Yard & Terima Skrg (jumlah) otomatis terhitung
 const onJumlahMeterChange = (idx: number) => {
+  if (isQc.value) return;
   const row = formData.value.items[idx];
   if (!isMeterBased(row)) return; // ⬅ guard: cuma bahan METER
   row.jumlahyard = Number(
@@ -325,6 +413,7 @@ const onJumlahMeterChange = (idx: number) => {
 };
 
 const onJumlahChange = (idx: number) => {
+  if (isQc.value) return;
   const row = formData.value.items[idx];
   // ⬅ FIX: dulu row.jumlahmeter = row.jumlah SELALU dieksekusi tanpa
   // cek satuan — utk bahan KG, ini bikin nilai KG yg diketik user
@@ -351,6 +440,7 @@ const onJumlahChange = (idx: number) => {
 // Grid 1 itu agregat lintas SPK, jadi jumlah-nya harus dihitung ulang
 // dari total SEMUA baris Grid 2 yang kodenya sama, bukan 1:1 per baris.
 const onPoTerimaChange = (idx: number) => {
+  if (isQc.value) return;
   const po = formData.value.poItems[idx];
   const kode = po.kode;
 
@@ -365,9 +455,15 @@ const onPoTerimaChange = (idx: number) => {
 };
 const onRollChange = async (idx: number) => {
   const row = formData.value.items[idx];
-  const targetRoll = Number(row.roll) || 0;
   const kode = row.kode;
   if (!kode) return;
+  // BPB dari QC: satu baris per lot, barcode dibuat per kode, jadi target = total roll
+  // semua baris sekode. Jalur PO dan Non PO tetap memakai roll baris ini.
+  const targetRoll = isQc.value
+    ? formData.value.items
+        .filter((r: BpbRowRef) => r.kode === kode)
+        .reduce((s: number, r: BpbRowRef) => s + (Number(r.roll) || 0), 0)
+    : Number(row.roll) || 0;
   const dtTanggal = new Date(formData.value.header.bpb_tanggal || todayLocal);
   const yy = String(dtTanggal.getFullYear()).slice(-2);
   let newBarcodes = formData.value.barcodes.filter(
@@ -544,6 +640,10 @@ const validateSave = () => {
     return toast.warning("Nomor PO belum diisi.");
   }
 
+  if (isQc.value && !isEditMode.value && formData.value.qcNomor.length === 0) {
+    return toast.warning("Pilih dokumen QC Bahan terlebih dahulu.");
+  }
+
   // 5. Validasi Baris Detail (Grid 1)
   let validJumlah = false;
   for (const [i, r] of formData.value.items.entries()) {
@@ -554,7 +654,9 @@ const validateSave = () => {
     // Cek kewajiban isi roll
     if (Number(r.jumlah) !== 0 && Number(r.roll) === 0) {
       return toast.warning(
-        `Baris ${i + 1}: Bahan ${r.nama} - Roll harus diisi!`,
+        isQc.value
+          ? `Lot ${r.lot || r.kode}: roll di QC Bahan masih kosong. Lengkapi dulu di QC Bahan.`
+          : `Baris ${i + 1}: Bahan ${r.nama} - Roll harus diisi!`,
       );
     }
   }
@@ -567,7 +669,7 @@ const validateSave = () => {
   }
 
   // 6. Validasi Sinkronisasi PO vs Terima
-  if (isPo.value) {
+  if (isPo.value && !isQc.value) {
     const t1 = formData.value.items.reduce(
       (s: number, r: any) => s + (Number(r.jumlah) || 0),
       0,
@@ -668,8 +770,8 @@ const printBarcodeAll = (): boolean => {
         <!-- Tipe BPB badge -->
         <div class="fr shaded-row mb-2">
           <span class="lbl fw">Tipe BPB</span>
-          <span class="type-badge" :class="isPo ? 'po' : 'nonpo'">
-            {{ isPo ? "BPB DARI PO" : "BPB NON-PO" }}
+          <span class="type-badge" :class="isQc ? 'qc' : isPo ? 'po' : 'nonpo'">
+            {{ isQc ? "BPB DARI QC" : isPo ? "BPB DARI PO" : "BPB NON-PO" }}
           </span>
         </div>
 
@@ -696,6 +798,32 @@ const printBarcodeAll = (): boolean => {
 
         <div class="sep" />
 
+        <!-- Nomor QC (khusus BPB dari QC) -->
+        <div v-if="isQc && !isEditMode" class="fr">
+          <label class="lbl fw text-primary">Nomor QC</label>
+          <div class="igrp" style="flex: 1">
+            <input
+              :value="formData.qcNomor.join(', ')"
+              class="inp"
+              style="flex: 1; background: #ddeeff"
+              readonly
+              placeholder="Klik cari..."
+            />
+            <button type="button" class="blkp" @click="showQcModal = true">
+              <IconSearch :size="13" />
+            </button>
+          </div>
+        </div>
+        <div v-if="isQc && isEditMode" class="fr">
+          <label class="lbl fw">Sumber QC</label>
+          <input
+            :value="sumberQcText"
+            class="inp ro"
+            style="flex: 1"
+            readonly
+          />
+        </div>
+
         <!-- Nomor PO -->
         <div v-if="isPo" class="fr">
           <label class="lbl fw text-primary">Nomor PO</label>
@@ -704,15 +832,15 @@ const printBarcodeAll = (): boolean => {
               v-model="formData.header.bpb_po_nomor"
               class="inp"
               style="flex: 1; background: #ddeeff"
-              :readonly="isEditMode"
+              :readonly="isEditMode || isQc"
               placeholder="Ketik / cari..."
-              @change="!isEditMode && loadPoData()"
+              @change="!isEditMode && !isQc && loadPoData()"
             />
             <button
               type="button"
               class="blkp"
-              @click="!isEditMode && (showPoModal = true)"
-              :disabled="isEditMode"
+              @click="!isEditMode && !isQc && (showPoModal = true)"
+              :disabled="isEditMode || isQc"
             >
               <IconSearch :size="13" />
             </button>
@@ -856,6 +984,7 @@ const printBarcodeAll = (): boolean => {
             <thead>
               <tr>
                 <th style="width: 32px" class="tc">No</th>
+                <th v-if="adaLot" style="width: 110px">Lot</th>
                 <th v-if="!isPo" style="width: 90px">MKB</th>
                 <th style="width: 90px">Kode</th>
                 <th style="width: 160px">Nama Bahan</th>
@@ -879,6 +1008,7 @@ const printBarcodeAll = (): boolean => {
             <tbody>
               <tr v-for="(item, idx) in formData.items" :key="idx">
                 <td class="tc gt-lbl">{{ Number(idx) + 1 }}</td>
+                <td v-if="adaLot" class="px-1 fw">{{ item.lot }}</td>
                 <td v-if="!isPo" class="p0">
                   <div class="cell-grp">
                     <input v-model="item.mkb" class="ci" readonly />
@@ -937,8 +1067,8 @@ const printBarcodeAll = (): boolean => {
                     type="number"
                     step="0.01"
                     class="ci tr fw bg-yellow-light"
-                    :readonly="item.satuan !== 'MTR'"
-                    :class="{ ro: item.satuan !== 'MTR' }"
+                    :readonly="item.satuan !== 'MTR' || isQc"
+                    :class="{ ro: item.satuan !== 'MTR' || isQc }"
                     title="Isi Yard → Meter & Terima Skrg otomatis terhitung (khusus bahan METER)"
                     :ref="
                       (el) => setItemFieldRef(el, Number(idx), 'jumlahyard')
@@ -956,8 +1086,8 @@ const printBarcodeAll = (): boolean => {
                     type="number"
                     step="0.01"
                     class="ci tr fw bg-yellow-light"
-                    :readonly="item.satuan !== 'MTR'"
-                    :class="{ ro: item.satuan !== 'MTR' }"
+                    :readonly="item.satuan !== 'MTR' || isQc"
+                    :class="{ ro: item.satuan !== 'MTR' || isQc }"
                     title="Isi Meter → Yard & Terima Skrg otomatis terhitung (khusus bahan METER)"
                     :ref="
                       (el) => setItemFieldRef(el, Number(idx), 'jumlahmeter')
@@ -973,7 +1103,9 @@ const printBarcodeAll = (): boolean => {
                   <input
                     v-model.number="item.jumlah"
                     type="number"
-                    class="ci tr fw bg-yellow-light"
+                    class="ci tr fw"
+                    :class="isQc ? 'ro' : 'bg-yellow-light'"
+                    :readonly="isQc"
                     :ref="(el) => setItemFieldRef(el, Number(idx), 'jumlah')"
                     @blur="onJumlahChange(Number(idx))"
                     @keydown.enter.prevent="
@@ -993,7 +1125,8 @@ const printBarcodeAll = (): boolean => {
                         : 'bg-yellow-light'
                     "
                     :ref="(el) => setItemFieldRef(el, Number(idx), 'roll')"
-                    @blur="onRollChange(Number(idx))"
+                    :readonly="isQc"
+                    @blur="!isQc && onRollChange(Number(idx))"
                     @keydown.enter.prevent="
                       onItemFieldEnter(Number(idx), 'roll')
                     "
@@ -1003,6 +1136,8 @@ const printBarcodeAll = (): boolean => {
                 <td class="p0">
                   <input
                     v-model="item.gramasi"
+                    :readonly="isQc"
+                    :class="{ ro: isQc }"
                     class="ci"
                     :ref="(el) => setItemFieldRef(el, Number(idx), 'gramasi')"
                     @keydown.enter.prevent="
@@ -1013,6 +1148,8 @@ const printBarcodeAll = (): boolean => {
                 <td class="p0">
                   <input
                     v-model="item.warna"
+                    :readonly="isQc"
+                    :class="{ ro: isQc }"
                     class="ci"
                     :ref="(el) => setItemFieldRef(el, Number(idx), 'warna')"
                     @keydown.enter.prevent="
@@ -1023,6 +1160,8 @@ const printBarcodeAll = (): boolean => {
                 <td class="p0">
                   <input
                     v-model="item.setting"
+                    :readonly="isQc"
+                    :class="{ ro: isQc }"
                     class="ci"
                     :ref="(el) => setItemFieldRef(el, Number(idx), 'setting')"
                     @keydown.enter.prevent="
@@ -1035,14 +1174,17 @@ const printBarcodeAll = (): boolean => {
                     <input
                       v-model="item.spk"
                       class="ci"
+                      :class="{ ro: isQc }"
+                      :readonly="isQc"
                       placeholder="..."
                       :ref="(el) => setItemFieldRef(el, Number(idx), 'spk')"
-                      @change="onSpkChange(Number(idx))"
+                      @change="!isQc && onSpkChange(Number(idx))"
                       @keydown.enter.prevent="
                         onItemFieldEnter(Number(idx), 'spk')
                       "
                     />
                     <button
+                      v-if="!isQc"
                       type="button"
                       class="ci-btn"
                       @click="openLookupSpk(Number(idx))"
@@ -1071,7 +1213,7 @@ const printBarcodeAll = (): boolean => {
                 </td>
               </tr>
               <tr v-if="formData.items.length === 0">
-                <td :colspan="isPo ? 16 : 18" class="empty-row">
+                <td :colspan="20" class="empty-row">
                   Tidak ada data rincian bahan.
                 </td>
               </tr>
@@ -1121,7 +1263,9 @@ const printBarcodeAll = (): boolean => {
                       <input
                         v-model.number="p.terima"
                         type="number"
-                        class="ci tr fw bg-yellow-light"
+                        class="ci tr fw"
+                        :class="isQc ? 'ro' : 'bg-yellow-light'"
+                        :readonly="isQc"
                         @blur="onPoTerimaChange(Number(i))"
                         v-select-on-focus
                       />
@@ -1231,7 +1375,7 @@ const printBarcodeAll = (): boolean => {
     "
   />
   <SpkSearchModal v-model="showSpkModal" @selected="setSpk" />
-
+  <BpbQcSiapDialog v-model="showQcModal" @selected="setQc" />
   <BpbBahanBarcodeDialog
     v-model="showBarcodeDialog"
     :nomor="formData.header.bpb_nomor"
@@ -1410,6 +1554,11 @@ const printBarcodeAll = (): boolean => {
   background: #fff8e1;
   color: #e65100;
   border: 1px solid #ffcc80;
+}
+.type-badge.qc {
+  background: #e8f5e9;
+  color: #2e7d32;
+  border: 1px solid #a5d6a7;
 }
 
 .inp {

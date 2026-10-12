@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref, computed, onMounted } from "vue";
 import { useRoute } from "vue-router";
 import { returBeliBahanService } from "@/services/garmen/returBeliBahanService";
 import logoKP from "@/assets/kp.jpg";
@@ -12,6 +12,8 @@ const detail = ref<any[]>([]);
 const isReady = ref(false);
 const isLoading = ref(true);
 const errorMsg = ref("");
+
+const isQc = computed(() => header.value.jenis === "QC");
 
 const doPrint = () => window.print();
 const doClose = () => window.close();
@@ -83,7 +85,9 @@ onMounted(() => {
           </div>
         </div>
 
-        <div class="doc-title">RETUR PEMBELIAN</div>
+        <div class="doc-title">
+          {{ isQc ? "RETUR PEMBELIAN (HASIL QC REJECT)" : "RETUR PEMBELIAN" }}
+        </div>
 
         <!-- Info -->
         <table class="info-tbl">
@@ -97,6 +101,23 @@ onMounted(() => {
             <td class="sep">:</td>
             <td>{{ fmtDateSlash(header.tanggal) }}</td>
           </tr>
+          <template v-if="isQc">
+            <tr>
+              <td class="lbl">Supplier</td>
+              <td class="sep">:</td>
+              <td>{{ header.supplier }}</td>
+            </tr>
+            <tr>
+              <td class="lbl">No. QC</td>
+              <td class="sep">:</td>
+              <td>{{ header.noQc }}</td>
+            </tr>
+            <tr>
+              <td class="lbl">No. Surat Jalan</td>
+              <td class="sep">:</td>
+              <td>{{ header.noSj || "-" }}</td>
+            </tr>
+          </template>
           <tr>
             <td class="lbl">Keterangan</td>
             <td class="sep">:</td>
@@ -109,19 +130,25 @@ onMounted(() => {
           <thead>
             <tr>
               <th style="width: 28px" class="text-center">No</th>
+              <th v-if="isQc" style="width: 100px">Lot</th>
               <th style="width: 110px">Kode</th>
               <th>Nama</th>
               <th style="width: 60px" class="text-center">Satuan</th>
               <th style="width: 90px" class="text-right">Jumlah</th>
+              <th v-if="isQc" style="width: 60px" class="text-right">Roll</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="(r, i) in detail" :key="i">
               <td class="text-center">{{ i + 1 }}</td>
+              <td v-if="isQc">{{ r.lot }}</td>
               <td>{{ r.kode }}</td>
               <td>{{ r.nama }}</td>
               <td class="text-center">{{ r.satuan }}</td>
               <td class="text-right">{{ numFmt(r.jumlah) }}</td>
+              <td v-if="isQc" class="text-right">
+                {{ Number(r.roll || 0).toLocaleString("id-ID") }}
+              </td>
             </tr>
           </tbody>
         </table>

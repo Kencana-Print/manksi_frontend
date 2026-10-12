@@ -102,6 +102,7 @@ import {
   IconPalette,
   IconChecklist,
   IconTargetArrow,
+  IconGavel,
 } from "@tabler/icons-vue";
 
 export interface NavItem {
@@ -379,6 +380,12 @@ export const createMenuItems = (): NavItem[] => {
           icon: IconTransfer,
           menuId: 958,
         },
+        {
+          title: "Tindak Lanjut QC Bahan",
+          to: "/pembelian/tindak-lanjut-qc",
+          icon: IconGavel,
+          menuId: 187,
+        },
         { divider: true },
         {
           title: "Setting Harga Bahan",
@@ -500,6 +507,12 @@ export const createMenuItems = (): NavItem[] => {
               menuId: 115,
             },
             { divider: true },
+            {
+              title: "QC Bahan",
+              to: "/garmen/bahan-baku/qc-bahan",
+              icon: IconClipboardCheck,
+              menuId: 186,
+            },
             {
               title: "BPB",
               to: "/garmen/bahan-baku/bpb-bahan",

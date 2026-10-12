@@ -739,6 +739,17 @@ const router = createRouter({
       },
     },
     {
+      path: "/pembelian/tindak-lanjut-qc",
+      name: "TindakLanjutQc",
+      component: () => import("@/views/pembelian/TindakLanjutQcView.vue"),
+      meta: {
+        title: "Tindak Lanjut QC Bahan",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "187",
+      },
+    },
+    {
       path: "/pembelian/setting-harga-bahan",
       redirect: "/pembelian/setting-harga-bahan/garmen",
     },
@@ -1215,6 +1226,51 @@ const router = createRouter({
       },
     },
     {
+      path: "/garmen/bahan-baku/qc-bahan",
+      name: "QcBahanBrowse",
+      component: () => import("@/views/garmen/QcBahanView.vue"),
+      meta: {
+        title: "Browse QC Bahan",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "186",
+      },
+    },
+    {
+      path: "/garmen/bahan-baku/qc-bahan/form",
+      name: "QcBahanCreate",
+      component: () => import("@/views/garmen/QcBahanFormView.vue"),
+      meta: {
+        title: "Tambah QC Bahan",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "186",
+        browseRoute: "QcBahanBrowse",
+      },
+    },
+    {
+      path: "/garmen/bahan-baku/qc-bahan/form/:nomor",
+      name: "QcBahanEdit",
+      component: () => import("@/views/garmen/QcBahanFormView.vue"),
+      meta: {
+        title: "Ubah QC Bahan",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "186",
+        browseRoute: "QcBahanBrowse",
+      },
+    },
+    {
+      path: "/garmen/bahan-baku/qc-bahan/print/:nomor",
+      name: "QcBahanPrint",
+      component: () => import("@/views/garmen/QcBahanPrintView.vue"),
+      meta: {
+        title: "Cetak QC Bahan",
+        layout: "BlankLayout",
+        requiresAuth: true,
+      },
+    },
+    {
       path: "/garmen/bahan-baku/bpb-bahan",
       name: "BpbBahanBrowse",
       component: () => import("@/views/garmen/BpbBahanView.vue"),
@@ -1288,6 +1344,30 @@ const router = createRouter({
       component: () => import("@/views/garmen/ReturBeliBahanFormView.vue"),
       meta: {
         title: "Ubah Retur Pembelian Bahan",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "55",
+        browseRoute: "ReturBeliBahanBrowse",
+      },
+    },
+    {
+      path: "/garmen/bahan-baku/retur-pembelian-bahan/qc/form",
+      name: "ReturBeliBahanQcCreate",
+      component: () => import("@/views/garmen/ReturBeliBahanQcFormView.vue"),
+      meta: {
+        title: "Tambah Retur dari QC Reject",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "55",
+        browseRoute: "ReturBeliBahanBrowse",
+      },
+    },
+    {
+      path: "/garmen/bahan-baku/retur-pembelian-bahan/qc/form/:nomor",
+      name: "ReturBeliBahanQcEdit",
+      component: () => import("@/views/garmen/ReturBeliBahanQcFormView.vue"),
+      meta: {
+        title: "Ubah Retur dari QC Reject",
         layout: "DefaultLayout",
         requiresAuth: true,
         menuId: "55",
