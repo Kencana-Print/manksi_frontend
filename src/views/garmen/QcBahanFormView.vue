@@ -13,6 +13,8 @@ import {
   type QcLotRow,
   type QcPoLookupItem,
   type QcPoSource,
+  type QcRollHasil,
+  type QcRollRow,
   type QcSaveResult,
 } from "@/services/garmen/qcBahanFormService";
 import QcBahanPoSearchModal from "@/components/lookups/QcBahanPoSearchModal.vue";
@@ -31,7 +33,10 @@ const todayLocal = (() => {
   ).padStart(2, "0")}`;
 })();
 
-const emptyHasil = () => ({
+const EPS = 1e-9;
+const MAX_LOT = 50;
+
+const emptyHasil = (): QcRollHasil => ({
   gramasi: "",
   setting: "",
   warna: "",
@@ -40,6 +45,52 @@ const emptyHasil = () => ({
   shrinkage: "",
   kelunturan: "",
 });
+
+const newRoll = (): QcRollRow => ({
+  no_roll: "",
+  qty: 0,
+  gramasi_atas: 0,
+  gramasi_bawah: 0,
+  setting_cek: 0,
+  sesuai: false,
+  catatan: "",
+  hasil: emptyHasil(),
+});
+
+const r2 = (n: number): number => Math.round(n * 100) / 100;
+
+// Roll wajib cek: dibulatkan ke atas, minimal 1 (sama dengan backend)
+const rollCekOf = (roll: number, persen: number): number =>
+  roll > 0 ? Math.max(1, Math.ceil((roll * persen) / 100)) : 0;
+
+const isRollBlank = (x: QcRollRow): boolean =>
+  !x.no_roll.trim() &&
+  !(Number(x.qty) > 0) &&
+  !(Number(x.gramasi_atas) > 0) &&
+  !(Number(x.gramasi_bawah) > 0) &&
+  !(Number(x.setting_cek) > 0) &&
+  !x.catatan.trim() &&
+  Object.values(x.hasil).every((v) => !v.trim());
+
+const rollTerisi = (x: QcRollRow): boolean =>
+  Number(x.gramasi_atas) > 0 &&
+  Number(x.gramasi_bawah) > 0 &&
+  Number(x.setting_cek) > 0;
+
+const MAX_ROLL = 300;
+
+// Jumlah baris roll = jumlah roll lot. Baris kosong dibuang dari belakang
+// bila jumlah roll dikurangi; baris yang sudah terisi tidak pernah dihapus.
+const syncRolls = (row: QcLotRow, persen: number) => {
+  const raw = Math.max(0, Math.floor(Number(row.qty_roll) || 0));
+  const total = Math.min(raw, MAX_ROLL);
+  row.roll_cek = rollCekOf(raw, persen);
+  while (row.rolls.length < total) row.rolls.push(newRoll());
+  for (let i = row.rolls.length - 1; i >= 0 && row.rolls.length > total; i--) {
+    const rl = row.rolls[i];
+    if (rl && isRollBlank(rl)) row.rolls.splice(i, 1);
+  }
+};
 
 const defaultData: QcFormData = {
   header: {
@@ -51,6 +102,10 @@ const defaultData: QcFormData = {
     qc_vendor_greige: "",
     qc_jenis_kain: "",
     qc_vendor_celup: "",
+    qc_qty_datang: 0,
+    qc_jml_lot: 0,
+    qc_jenis_cek: "",
+    qc_persen_cek: 0,
     qc_status: "DRAFT",
     qc_keterangan: "",
     jenis_po: "",
@@ -58,15 +113,19 @@ const defaultData: QcFormData = {
   dtl: [],
   po: {
     qty: 0,
+    sisa: 0,
     roll: 0,
     satuan: "",
     gramasi: "",
     gramasi_min: 0,
     gramasi_max: 0,
     setting: "",
+    setting_min: 0,
+    setting_max: 0,
+    spec_terbaca: false,
     warna: "",
   },
-  toleransi: 0,
+  toleransi: { gramasi: 5, setting: 0.5 },
 };
 
 // ── Dialog setelah simpan ──
@@ -91,21 +150,34 @@ const {
     const res = await qcBahanFormService.getDetail(String(route.params.nomor));
     const d = res.data.data as QcDetailResponse;
     const first = d.dtl[0];
+    const persen = Number(d.header.qc_persen_cek) || 0;
     return {
       header: {
         ...d.header,
         qc_keterangan: d.header.qc_keterangan || "",
         jenis_po: "",
       },
-      dtl: d.dtl.map((r) => ({ ...r })),
+      dtl: d.dtl.map((r) => {
+        // nilai = 0 berarti mengikuti saran sistem (tidak di-override)
+        const row: QcLotRow = {
+          ...r,
+          nilai: r.nilai === r.nilai_saran ? 0 : r.nilai,
+        };
+        syncRolls(row, persen);
+        return row;
+      }),
       po: {
         qty: d.po?.qty ?? 0,
+        sisa: d.po?.sisa ?? 0,
         roll: d.po?.roll ?? 0,
         satuan: d.po?.satuan ?? "",
         gramasi: first?.gramasi_po ?? "",
-        gramasi_min: first?.gramasi_min ?? 0,
-        gramasi_max: first?.gramasi_max ?? 0,
+        gramasi_min: d.po?.gramasi_min ?? 0,
+        gramasi_max: d.po?.gramasi_max ?? 0,
         setting: first?.setting_po ?? "",
+        setting_min: d.po?.setting_min ?? 0,
+        setting_max: d.po?.setting_max ?? 0,
+        spec_terbaca: d.po?.spec_terbaca ?? false,
         warna: first?.warna ?? "",
       },
       toleransi: d.toleransi,
@@ -119,17 +191,24 @@ const {
       qc_pod_nourut: data.header.qc_pod_nourut,
       qc_tgl_datang: data.header.qc_tgl_datang,
       qc_keterangan: data.header.qc_keterangan,
-      submit: false,
+      qc_qty_datang: Number(data.header.qc_qty_datang) || 0,
+      submit: simpanSubmit.value,
       dtl: data.dtl.map((r) => ({
         lot: r.lot,
         qty_kg: Number(r.qty_kg) || 0,
         qty_roll: Number(r.qty_roll) || 0,
         warna: r.warna,
-        gramasi_cek: Number(r.gramasi_cek) || 0,
-        setting_cek: r.setting_cek,
         nilai: Number(r.nilai) || 0,
         alasan_nilai: r.alasan_nilai,
-        hasil: r.hasil,
+        rolls: rollsTersimpan(r).map((x) => ({
+          no_roll: x.no_roll,
+          qty: Number(x.qty) || 0,
+          gramasi_atas: Number(x.gramasi_atas) || 0,
+          gramasi_bawah: Number(x.gramasi_bawah) || 0,
+          setting_cek: Number(x.setting_cek) || 0,
+          catatan: x.catatan,
+          hasil: x.hasil,
+        })),
       })),
     });
   },
@@ -141,11 +220,14 @@ const {
     if (!isEditMode.value) {
       await uploadFotoPending(result.qc_nomor);
     }
-    toast.success(
-      result.status === "DRAFT"
-        ? "Tersimpan sebagai DRAFT."
-        : "QC Bahan berhasil disubmit.",
-    );
+    if (result.status === "DRAFT") {
+      toast.success("Tersimpan sebagai DRAFT.");
+    } else {
+      toast.success(
+        `QC Bahan disubmit. ${result.lot_lanjut} lot otomatis LANJUT, ${result.lot_pembelian} lot menunggu keputusan Pembelian.`,
+        { timeout: 8000 },
+      );
+    }
     result.warnings.forEach((w) => toast.warning(w, { timeout: 8000 }));
     showPrintConfirm.value = true;
   },
@@ -154,6 +236,8 @@ const {
 const forceSubmit = computed<boolean>(
   () => isEditMode.value && formData.value.header.qc_status !== "DRAFT",
 );
+
+const simpanSubmit = ref(false);
 
 // ── Foto (2 per dokumen) ──
 type JenisFoto = "BAHAN" | "TRIMCARD";
@@ -263,18 +347,110 @@ watch(
   { immediate: true },
 );
 
-// ── Saran nilai (sama dengan backend) ──
-const hitungSaran = (cek: number, min: number, max: number, tol: number) => {
-  if (!(min > 0 && max > 0) || !(cek > 0)) return 0;
-  if (cek >= min && cek <= max) return 3;
-  const selisih = cek < min ? min - cek : cek - max;
-  return selisih <= tol ? 2 : 1;
+// ── Perhitungan per roll / per lot (preview; server menghitung ulang) ──
+interface LotCalc {
+  rollCek: number;
+  dicek: number;
+  sesuai: number;
+  saran: number;
+  atasRata: number;
+  bawahRata: number;
+  settingRata: number;
+}
+const EMPTY_CALC: LotCalc = {
+  rollCek: 0,
+  dicek: 0,
+  sesuai: 0,
+  saran: 0,
+  atasRata: 0,
+  bawahRata: 0,
+  settingRata: 0,
+};
+
+const rollsTersimpan = (row: QcLotRow): QcRollRow[] =>
+  row.rolls.filter((x) => !isRollBlank(x));
+
+// "OK" = atas, bawah, dan setting masuk rentang PO +/- toleransi
+const rollStatus = (x: QcRollRow): "OK" | "NO" | "-" => {
+  const p = formData.value.po;
+  const t = formData.value.toleransi;
+  if (!rollTerisi(x) || !p.spec_terbaca) return "-";
+  const okG = (v: number) =>
+    v >= p.gramasi_min - t.gramasi - EPS &&
+    v <= p.gramasi_max + t.gramasi + EPS;
+  const s = Number(x.setting_cek);
+  const okS =
+    s >= p.setting_min - t.setting - EPS &&
+    s <= p.setting_max + t.setting + EPS;
+  return okG(Number(x.gramasi_atas)) && okG(Number(x.gramasi_bawah)) && okS
+    ? "OK"
+    : "NO";
+};
+
+const hitungLot = (row: QcLotRow): LotCalc => {
+  const rollCek = rollCekOf(
+    Number(row.qty_roll) || 0,
+    Number(formData.value.header.qc_persen_cek) || 0,
+  );
+  const dicek = row.rolls.filter(rollTerisi);
+  const sesuai = dicek.filter((x) => rollStatus(x) === "OK").length;
+  let saran = 0;
+  if (formData.value.po.spec_terbaca && dicek.length > 0) {
+    saran = sesuai === dicek.length ? 3 : sesuai === 0 ? 1 : 2;
+  }
+  const rata = (vals: number[]): number =>
+    vals.length ? r2(vals.reduce((a, b) => a + b, 0) / vals.length) : 0;
+  return {
+    rollCek,
+    dicek: dicek.length,
+    sesuai,
+    saran,
+    atasRata: rata(dicek.map((x) => Number(x.gramasi_atas))),
+    bawahRata: rata(dicek.map((x) => Number(x.gramasi_bawah))),
+    settingRata: rata(dicek.map((x) => Number(x.setting_cek))),
+  };
+};
+
+const lotCalc = computed<LotCalc[]>(() => formData.value.dtl.map(hitungLot));
+const calcOf = (i: number): LotCalc => lotCalc.value[i] ?? EMPTY_CALC;
+
+interface RollFlat {
+  li: number;
+  ri: number;
+  lot: string;
+  rl: QcRollRow;
+}
+// Roll yang sudah ada isinya, dari semua lot, untuk tabel Hasil Cek Detail
+const rollDicek = computed<RollFlat[]>(() =>
+  formData.value.dtl.flatMap((lot, li) =>
+    lot.rolls.flatMap((rl, ri) =>
+      isRollBlank(rl) ? [] : [{ li, ri, lot: lot.lot, rl }],
+    ),
+  ),
+);
+
+// nilai = 0 berarti mengikuti saran sistem
+const efektif = (i: number): number =>
+  Number(formData.value.dtl[i]?.nilai) || calcOf(i).saran;
+
+const perluAlasan = (i: number): boolean =>
+  efektif(i) > 0 && efektif(i) !== calcOf(i).saran;
+
+const setNilai = (row: QcLotRow, ev: Event) => {
+  row.nilai = Number((ev.target as HTMLInputElement).value) || 0;
+};
+
+const prediksi = (i: number): string => {
+  const n = efektif(i);
+  if (n === 3) return "Auto LANJUT";
+  return n > 0 ? "Ke Pembelian" : "-";
 };
 
 const newLot = (): QcLotRow => ({
   lot: "",
   qty_kg: 0,
   qty_roll: 0,
+  roll_cek: 0,
   qty_kg_po: formData.value.po.qty,
   gramasi_po: formData.value.po.gramasi,
   gramasi_min: formData.value.po.gramasi_min,
@@ -287,12 +463,21 @@ const newLot = (): QcLotRow => ({
   nilai_saran: 0,
   alasan_nilai: "",
   keputusan: "",
-  hasil: emptyHasil(),
+  rolls: [],
 });
+
+const lotAdaIsi = (r: QcLotRow): boolean =>
+  !!r.lot.trim() ||
+  Number(r.qty_kg) > 0 ||
+  Number(r.qty_roll) > 0 ||
+  r.rolls.some((x) => !isRollBlank(x));
 
 const addLot = () => {
   if (!formData.value.header.qc_po_nomor) {
     return toast.warning("Pilih PO Bahan terlebih dahulu.");
+  }
+  if (formData.value.dtl.length >= MAX_LOT) {
+    return toast.warning(`Maksimal ${MAX_LOT} lot.`);
   }
   formData.value.dtl.push(newLot());
 };
@@ -304,20 +489,65 @@ const removeLot = (idx: number) => {
   formData.value.dtl.splice(idx, 1);
 };
 
-const onGramasiCekChange = (row: QcLotRow) => {
-  const saran = hitungSaran(
-    Number(row.gramasi_cek) || 0,
-    row.gramasi_min,
-    row.gramasi_max,
-    formData.value.toleransi,
-  );
-  // Nilai ikut saran selama user belum menimpanya secara manual
-  if (!row.nilai || row.nilai === row.nilai_saran) row.nilai = saran;
-  row.nilai_saran = saran;
+// Input "Jumlah Lot" di header: menambah/mengurangi baris lot otomatis
+const jmlLotInput = ref(0);
+watch(
+  () => formData.value.dtl.length,
+  (n) => {
+    jmlLotInput.value = n;
+  },
+  { immediate: true },
+);
+
+const showKurangiLot = ref(false);
+const pendingJml = ref(0);
+
+const onJmlLotChange = () => {
+  const sekarang = formData.value.dtl.length;
+  const n = Math.floor(Number(jmlLotInput.value) || 0);
+  if (!formData.value.header.qc_po_nomor) {
+    jmlLotInput.value = sekarang;
+    return toast.warning("Pilih PO Bahan terlebih dahulu.");
+  }
+  if (n < 1 || n > MAX_LOT) {
+    jmlLotInput.value = sekarang;
+    return toast.warning(`Jumlah lot harus 1 sampai ${MAX_LOT}.`);
+  }
+  if (n > sekarang) {
+    for (let i = sekarang; i < n; i++) formData.value.dtl.push(newLot());
+    return;
+  }
+  if (n < sekarang) {
+    if (formData.value.dtl.slice(n).some(lotAdaIsi)) {
+      pendingJml.value = n;
+      showKurangiLot.value = true;
+      return;
+    }
+    formData.value.dtl.splice(n);
+  }
 };
 
-const perluAlasan = (row: QcLotRow) =>
-  row.nilai_saran > 0 && row.nilai > 0 && row.nilai !== row.nilai_saran;
+const konfirmasiKurangi = () => {
+  formData.value.dtl.splice(pendingJml.value);
+  showKurangiLot.value = false;
+};
+const batalKurangi = () => {
+  jmlLotInput.value = formData.value.dtl.length;
+  showKurangiLot.value = false;
+};
+
+watch(
+  () =>
+    `${formData.value.header.qc_persen_cek}|` +
+    formData.value.dtl.map((r) => Number(r.qty_roll) || 0).join(","),
+  () => {
+    const persen = Number(formData.value.header.qc_persen_cek) || 0;
+    if (formData.value.dtl.some((r) => Number(r.qty_roll) > MAX_ROLL)) {
+      toast.warning(`Baris roll dibatasi ${MAX_ROLL} per lot.`);
+    }
+    formData.value.dtl.forEach((r) => syncRolls(r, persen));
+  },
+);
 
 // ── PO ──
 const showPoModal = ref(false);
@@ -329,8 +559,10 @@ const onPoSelected = async (item: QcPoLookupItem) => {
     Object.assign(formData.value.header, src.header);
     formData.value.po = src.po;
     formData.value.toleransi = src.toleransi;
+    formData.value.header.qc_qty_datang = 0;
     formData.value.dtl = [newLot()];
-    toast.success(`PO ${item.PO} dimuat. Isi lot dan hasil cek.`);
+
+    toast.success(`PO ${item.PO} dimuat. Isi qty kedatangan dan jumlah lot.`);
   } catch (e) {
     const err = e as { response?: { data?: { message?: string } } };
     toast.error(err.response?.data?.message || "Gagal memuat data PO.");
@@ -344,8 +576,15 @@ const totalQty = computed(() =>
 const totalRoll = computed(() =>
   formData.value.dtl.reduce((s, r) => s + (Number(r.qty_roll) || 0), 0),
 );
-const qtyLebih = computed(
-  () => formData.value.po.qty > 0 && totalQty.value > formData.value.po.qty,
+const qtyDatang = computed(
+  () => Number(formData.value.header.qc_qty_datang) || 0,
+);
+const qtyBeda = computed(
+  () =>
+    qtyDatang.value > 0 && Math.abs(totalQty.value - qtyDatang.value) > 0.01,
+);
+const melebihiSisa = computed(
+  () => qtyDatang.value > 0 && qtyDatang.value > formData.value.po.sisa + 0.01,
 );
 
 // ── Enter pindah ke input berikutnya dalam tabel ──
@@ -364,7 +603,49 @@ const onEnterNext = (e: KeyboardEvent) => {
   if (next instanceof HTMLInputElement) next.select();
 };
 
-// ── Validasi ──
+// ── Validasi (cermin aturan server; server tetap penentu) ──
+const cekSubmit = (): string => {
+  if (!(qtyDatang.value > 0)) return "Qty kedatangan wajib diisi.";
+  if (qtyBeda.value) {
+    return `Total qty lot (${totalQty.value.toFixed(2)}) tidak sama dengan qty kedatangan (${qtyDatang.value.toFixed(2)}).`;
+  }
+  const persen = formData.value.header.qc_persen_cek;
+  for (const [i, r] of formData.value.dtl.entries()) {
+    const c = calcOf(i);
+    if (!(Number(r.qty_kg) > 0)) return `Lot ${r.lot}: qty wajib diisi.`;
+    if (!(Number(r.qty_roll) > 0)) return `Lot ${r.lot}: roll wajib diisi.`;
+
+    const rolls = rollsTersimpan(r);
+    const idxKurang = r.rolls.findIndex(
+      (x) => !isRollBlank(x) && !rollTerisi(x),
+    );
+    if (idxKurang >= 0) {
+      return `Lot ${r.lot}, baris roll ke-${idxKurang + 1}: gramasi atas, bawah, dan setting harus diisi lengkap.`;
+    }
+    if (rolls.length < c.rollCek) {
+      return `Lot ${r.lot}: minimal ${c.rollCek} roll harus dicek (${persen}% dari ${r.qty_roll} roll). Baru ${rolls.length}.`;
+    }
+    if (rolls.length > Number(r.qty_roll)) {
+      return `Lot ${r.lot}: roll yang dicek (${rolls.length}) melebihi jumlah roll lot.`;
+    }
+
+    const n = efektif(i);
+    if (!n) return `Lot ${r.lot}: nilai wajib diisi.`;
+    if (n === 3 && c.saran !== 3) {
+      return `Lot ${r.lot}: nilai 3 hanya berasal dari hasil hitung sistem. Untuk melanjutkan lot bernilai 2, gunakan Tindakan > Submit di browse.`;
+    }
+    if (c.saran > 0 && n > c.saran) {
+      return `Lot ${r.lot}: nilai tidak boleh lebih tinggi dari hasil sistem (${c.saran}).`;
+    }
+    if (n !== c.saran && !r.alasan_nilai.trim()) {
+      return c.saran === 0
+        ? `Lot ${r.lot}: spesifikasi PO tidak terbaca, nilai diisi manual. Alasan wajib diisi.`
+        : `Lot ${r.lot}: nilai berbeda dari hasil sistem (${c.saran}). Alasan wajib diisi.`;
+    }
+  }
+  return "";
+};
+
 const validateSave = () => {
   const h = formData.value.header;
   if (!h.qc_tgl_datang) return toast.warning("Tanggal kedatangan wajib diisi.");
@@ -379,27 +660,11 @@ const validateSave = () => {
     if (!lot) return toast.warning(`Baris ${i + 1}: Lot No. wajib diisi.`);
     if (seen.has(lot)) return toast.warning(`Lot ${r.lot} terduplikasi.`);
     seen.add(lot);
+  }
 
-    if (forceSubmit.value) {
-      if (!r.nilai) return toast.warning(`Lot ${r.lot}: nilai wajib diisi.`);
-      if (!(Number(r.gramasi_cek) > 0)) {
-        return toast.warning(`Lot ${r.lot}: gramasi hasil cek wajib diisi.`);
-      }
-      if (!r.setting_cek.trim()) {
-        return toast.warning(`Lot ${r.lot}: setting hasil cek wajib diisi.`);
-      }
-      if (perluAlasan(r) && !r.alasan_nilai.trim()) {
-        return toast.warning(
-          `Lot ${r.lot}: nilai berbeda dari saran (${r.nilai_saran}), alasan wajib diisi.`,
-        );
-      }
-      if (!(Number(r.qty_roll) > 0)) {
-        return toast.warning(`Lot ${r.lot}: roll wajib diisi.`);
-      }
-      if (!(Number(r.qty_kg) > 0)) {
-        return toast.warning(`Lot ${r.lot}: qty wajib diisi.`);
-      }
-    }
+  if (forceSubmit.value || simpanSubmit.value) {
+    const err = cekSubmit();
+    if (err) return toast.warning(err);
   }
   showSaveDialog.value = true;
 };
@@ -423,6 +688,9 @@ const nilaiClass = (n: number) =>
       : n === 1
         ? "chip-reject"
         : "chip-draft";
+
+const rollClass = (s: "OK" | "NO" | "-"): string =>
+  s === "OK" ? "chip-ok" : s === "NO" ? "chip-reject" : "chip-draft";
 </script>
 
 <template>
@@ -530,7 +798,7 @@ const nilaiClass = (n: number) =>
             class="inp ro"
             style="width: 90px"
           />
-          <label class="lbl" style="width: 55px">Setting</label>
+          <label class="lbl" style="width: 70px">Setting PO</label>
           <input
             :value="formData.po.setting"
             readonly
@@ -546,7 +814,7 @@ const nilaiClass = (n: number) =>
             class="inp ro"
             style="width: 110px"
           />
-          <label class="lbl" style="width: 55px">Roll PO</label>
+          <label class="lbl" style="width: 70px">Roll PO</label>
           <input
             :value="formData.po.roll"
             readonly
@@ -555,15 +823,70 @@ const nilaiClass = (n: number) =>
           />
         </div>
         <div class="fr">
-          <label class="lbl">Total Lot</label>
+          <label class="lbl">Sisa PO</label>
+          <input
+            :value="`${formData.po.sisa} ${formData.po.satuan}`"
+            readonly
+            class="inp ro"
+            style="width: 110px"
+          />
+          <label class="lbl" style="width: 70px">Jenis Cek</label>
+          <input
+            :value="
+              formData.header.qc_jenis_cek
+                ? `${formData.header.qc_jenis_cek} ${formData.header.qc_persen_cek}%`
+                : ''
+            "
+            readonly
+            class="inp ro"
+            style="width: 110px"
+          />
+        </div>
+        <div
+          v-if="formData.header.qc_po_nomor && !formData.po.spec_terbaca"
+          class="warn-box"
+        >
+          Gramasi/setting di PO tidak terbaca. Penilaian otomatis mati: nilai
+          lot diisi manual dengan alasan.
+        </div>
+
+        <div class="sep" />
+
+        <div class="fr">
+          <label class="lbl fw text-primary">Qty Datang</label>
+          <input
+            v-model.number="formData.header.qc_qty_datang"
+            type="number"
+            step="0.01"
+            min="0"
+            class="inp"
+            style="width: 110px"
+            v-select-on-focus
+          />
+          <label class="lbl fw text-primary" style="width: 70px"
+            >Jumlah Lot</label
+          >
+          <input
+            v-model.number="jmlLotInput"
+            type="number"
+            min="1"
+            :max="MAX_LOT"
+            class="inp"
+            style="width: 70px"
+            @change="onJmlLotChange"
+            v-select-on-focus
+          />
+        </div>
+        <div class="fr">
+          <label class="lbl">Total Qty</label>
           <input
             :value="`${totalQty.toFixed(2)} ${formData.po.satuan}`"
             readonly
             class="inp ro fw"
-            :class="{ 'bg-red text-white': qtyLebih }"
+            :class="{ 'bg-red': qtyBeda }"
             style="width: 110px"
           />
-          <label class="lbl" style="width: 55px">Roll</label>
+          <label class="lbl" style="width: 70px">Total Roll</label>
           <input
             :value="totalRoll"
             readonly
@@ -571,9 +894,13 @@ const nilaiClass = (n: number) =>
             style="width: 70px"
           />
         </div>
-        <div v-if="qtyLebih" class="warn-box">
-          Total qty lot melebihi qty PO ({{ formData.po.qty }}
-          {{ formData.po.satuan }}).
+        <div v-if="qtyBeda" class="warn-box">
+          Total qty lot ({{ totalQty.toFixed(2) }}) tidak sama dengan qty
+          kedatangan ({{ qtyDatang.toFixed(2) }}). Submit akan ditolak.
+        </div>
+        <div v-if="melebihiSisa" class="warn-box warn-amber">
+          Qty kedatangan melebihi sisa PO ({{ formData.po.sisa }}
+          {{ formData.po.satuan }}). Hanya peringatan, tetap bisa disimpan.
         </div>
 
         <div class="sep" />
@@ -587,181 +914,280 @@ const nilaiClass = (n: number) =>
             style="flex: 1"
           />
         </div>
+
+        <div v-if="!forceSubmit" class="fr">
+          <label class="lbl"></label>
+          <label style="display: flex; gap: 6px; align-items: center">
+            <input v-model="simpanSubmit" type="checkbox" />
+            Simpan &amp; Submit sekarang
+          </label>
+        </div>
+        <div v-if="simpanSubmit && !forceSubmit" class="warn-line">
+          Lot nilai 3 otomatis LANJUT, lot nilai 1 atau 2 langsung ke Pembelian.
+          Untuk melanjutkan lot nilai 2 sebagai Gudang, simpan sebagai DRAFT
+          lalu Submit dari browse.
+        </div>
       </div>
     </template>
 
     <!-- ══ KOLOM KANAN: DETAIL ══ -->
     <template #right-column>
       <div class="qc-right">
-        <!-- Tabel 1 -->
+        <!-- Tabel 1: Lot + roll -->
         <div class="tbl-header">
-          <span class="tbl-title">1. Detail Lot dan Hasil Cek</span>
+          <span class="tbl-title">1. Lot dan Pengecekan Roll</span>
           <button type="button" class="btn-add" @click="addLot">
             + Tambah Lot
           </button>
         </div>
-        <div class="tbl-wrap" style="max-height: 38vh; min-height: 150px">
-          <table class="gt" style="min-width: 1180px">
+        <div class="tbl-wrap" style="max-height: 46vh; min-height: 150px">
+          <table class="gt" style="min-width: 1200px">
             <thead>
               <tr>
                 <th style="width: 32px" class="tc">No</th>
-                <th style="width: 120px">Lot No.</th>
+                <th style="width: 110px">Lot No.</th>
                 <th style="width: 80px" class="tr">
                   Qty {{ formData.po.satuan }}
                 </th>
-                <th style="width: 60px" class="tr">Roll</th>
-                <th style="width: 120px">Warna</th>
-                <th style="width: 85px" class="tc">Gramasi PO</th>
-                <th style="width: 70px" class="tc">Setting PO</th>
-                <th style="width: 90px" class="tr bg-yellow">Gramasi Cek</th>
-                <th style="width: 80px" class="bg-yellow">Setting Cek</th>
-                <th style="width: 75px" class="tc bg-yellow">Nilai</th>
-                <th style="width: 55px" class="tc">Saran</th>
-                <th style="width: 170px">Alasan (jika beda saran)</th>
-                <th style="width: 85px" class="tc">Keputusan</th>
+                <th style="width: 55px" class="tr">Roll</th>
+                <th style="width: 95px" class="tc">Dicek</th>
+                <th style="width: 110px">Warna</th>
+                <th style="width: 90px" class="tr bg-yellow">Gramasi Atas</th>
+                <th style="width: 90px" class="tr bg-yellow">Gramasi Bawah</th>
+                <th style="width: 75px" class="tr bg-yellow">Setting</th>
+                <th style="width: 65px" class="tc">Sesuai</th>
+                <th style="width: 50px" class="tc">Saran</th>
+                <th style="width: 60px" class="tc bg-yellow">Nilai</th>
+                <th style="width: 180px">Alasan (lot) / Catatan (roll)</th>
+                <th style="width: 95px" class="tc">Keputusan</th>
                 <th style="width: 32px" class="tc"></th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="(row, idx) in formData.dtl" :key="idx">
-                <td class="tc gt-lbl">{{ idx + 1 }}</td>
-                <td class="p0">
-                  <input
-                    v-model="row.lot"
-                    class="ci fw"
-                    @keydown.enter.prevent="onEnterNext"
-                  />
-                </td>
-                <td class="p0">
-                  <input
-                    v-model.number="row.qty_kg"
-                    type="number"
-                    step="0.01"
-                    class="ci tr"
-                    @keydown.enter.prevent="onEnterNext"
-                    v-select-on-focus
-                  />
-                </td>
-                <td class="p0">
-                  <input
-                    v-model.number="row.qty_roll"
-                    type="number"
-                    class="ci tr"
-                    @keydown.enter.prevent="onEnterNext"
-                    v-select-on-focus
-                  />
-                </td>
-                <td class="p0">
-                  <input
-                    v-model="row.warna"
-                    class="ci"
-                    @keydown.enter.prevent="onEnterNext"
-                  />
-                </td>
-                <td class="p0">
-                  <input :value="row.gramasi_po" class="ci tc ro" readonly />
-                </td>
-                <td class="p0">
-                  <input :value="row.setting_po" class="ci tc ro" readonly />
-                </td>
-                <td class="p0">
-                  <input
-                    v-model.number="row.gramasi_cek"
-                    type="number"
-                    step="0.01"
-                    class="ci tr fw bg-yellow-light"
-                    @blur="onGramasiCekChange(row)"
-                    @keydown.enter.prevent="onEnterNext"
-                    v-select-on-focus
-                  />
-                </td>
-                <td class="p0">
-                  <input
-                    v-model="row.setting_cek"
-                    class="ci bg-yellow-light"
-                    @keydown.enter.prevent="onEnterNext"
-                  />
-                </td>
-                <td class="p0">
-                  <input
-                    v-model.number="row.nilai"
-                    type="number"
-                    min="0"
-                    step="1"
-                    class="ci tc fw"
-                    placeholder="-"
-                    @keydown.enter.prevent="onEnterNext"
-                    v-select-on-focus
-                  />
-                </td>
-                <td class="tc">
-                  <span
-                    v-if="row.nilai_saran"
-                    class="status-chip"
-                    :class="nilaiClass(row.nilai_saran)"
-                  >
-                    {{ row.nilai_saran }}
-                  </span>
-                  <span v-else class="text-grey">-</span>
-                </td>
-                <td class="p0">
-                  <input
-                    v-model="row.alasan_nilai"
-                    class="ci"
+              <template v-for="(row, idx) in formData.dtl" :key="idx">
+                <!-- Baris lot -->
+                <tr class="lot-row">
+                  <td class="tc gt-lbl">{{ idx + 1 }}</td>
+                  <td class="p0">
+                    <input
+                      v-model="row.lot"
+                      class="ci fw"
+                      @keydown.enter.prevent="onEnterNext"
+                    />
+                  </td>
+                  <td class="p0">
+                    <input
+                      v-model.number="row.qty_kg"
+                      type="number"
+                      step="0.01"
+                      class="ci tr"
+                      @keydown.enter.prevent="onEnterNext"
+                      v-select-on-focus
+                    />
+                  </td>
+                  <td class="p0">
+                    <input
+                      v-model.number="row.qty_roll"
+                      type="number"
+                      min="0"
+                      class="ci tr"
+                      @keydown.enter.prevent="onEnterNext"
+                      v-select-on-focus
+                    />
+                  </td>
+                  <td
+                    class="tc"
                     :class="{
-                      'bg-red-light': perluAlasan(row) && !row.alasan_nilai,
+                      'text-red': calcOf(idx).dicek < calcOf(idx).rollCek,
                     }"
-                    :placeholder="perluAlasan(row) ? 'Wajib diisi' : ''"
-                    @keydown.enter.prevent="onEnterNext"
-                  />
-                </td>
-                <td class="tc">{{ row.keputusan || "-" }}</td>
-                <td class="tc">
-                  <button type="button" class="btn-del" @click="removeLot(idx)">
-                    ✕
-                  </button>
-                </td>
-              </tr>
+                  >
+                    {{ calcOf(idx).dicek }} (min {{ calcOf(idx).rollCek }})
+                  </td>
+                  <td class="p0">
+                    <input
+                      v-model="row.warna"
+                      class="ci"
+                      @keydown.enter.prevent="onEnterNext"
+                    />
+                  </td>
+                  <td class="tr px-1">{{ calcOf(idx).atasRata || "-" }}</td>
+                  <td class="tr px-1">{{ calcOf(idx).bawahRata || "-" }}</td>
+                  <td class="tr px-1">{{ calcOf(idx).settingRata || "-" }}</td>
+                  <td class="tc">
+                    {{
+                      calcOf(idx).dicek
+                        ? `${calcOf(idx).sesuai}/${calcOf(idx).dicek}`
+                        : "-"
+                    }}
+                  </td>
+                  <td class="tc">
+                    <span
+                      v-if="calcOf(idx).saran"
+                      class="status-chip"
+                      :class="nilaiClass(calcOf(idx).saran)"
+                    >
+                      {{ calcOf(idx).saran }}
+                    </span>
+                    <span v-else class="text-grey">-</span>
+                  </td>
+                  <td class="p0">
+                    <input
+                      v-model.number="row.nilai"
+                      type="number"
+                      min="0"
+                      max="3"
+                      step="1"
+                      class="ci tc fw"
+                      :placeholder="
+                        calcOf(idx).saran ? String(calcOf(idx).saran) : '-'
+                      "
+                      @keydown.enter.prevent="onEnterNext"
+                      v-select-on-focus
+                      :value="row.nilai || ''"
+                      @input="setNilai(row, $event)"
+                    />
+                  </td>
+                  <td class="p0">
+                    <input
+                      v-model="row.alasan_nilai"
+                      class="ci"
+                      :class="{
+                        'bg-red-light': perluAlasan(idx) && !row.alasan_nilai,
+                      }"
+                      :placeholder="perluAlasan(idx) ? 'Wajib diisi' : ''"
+                      @keydown.enter.prevent="onEnterNext"
+                    />
+                  </td>
+                  <td class="tc">{{ row.keputusan || prediksi(idx) }}</td>
+                  <td class="tc">
+                    <button
+                      type="button"
+                      class="btn-del"
+                      @click="removeLot(idx)"
+                    >
+                      ✕
+                    </button>
+                  </td>
+                </tr>
+
+                <!-- Baris roll (otomatis sebanyak jumlah roll) -->
+                <tr
+                  v-for="(rl, ri) in row.rolls"
+                  :key="`${idx}-${ri}`"
+                  class="roll-row"
+                >
+                  <td class="gt-lbl"></td>
+                  <td class="roll-lbl">Roll {{ ri + 1 }}</td>
+                  <td class="p0">
+                    <input
+                      v-model.number="rl.qty"
+                      type="number"
+                      step="0.01"
+                      class="ci tr"
+                      @keydown.enter.prevent="onEnterNext"
+                      v-select-on-focus
+                    />
+                  </td>
+                  <td colspan="3"></td>
+                  <td class="p0">
+                    <input
+                      v-model.number="rl.gramasi_atas"
+                      type="number"
+                      step="0.01"
+                      class="ci tr fw bg-yellow-light"
+                      @keydown.enter.prevent="onEnterNext"
+                      v-select-on-focus
+                    />
+                  </td>
+                  <td class="p0">
+                    <input
+                      v-model.number="rl.gramasi_bawah"
+                      type="number"
+                      step="0.01"
+                      class="ci tr fw bg-yellow-light"
+                      @keydown.enter.prevent="onEnterNext"
+                      v-select-on-focus
+                    />
+                  </td>
+                  <td class="p0">
+                    <input
+                      v-model.number="rl.setting_cek"
+                      type="number"
+                      step="0.01"
+                      class="ci tr fw bg-yellow-light"
+                      @keydown.enter.prevent="onEnterNext"
+                      v-select-on-focus
+                    />
+                  </td>
+                  <td class="tc">
+                    <span
+                      class="status-chip"
+                      :class="rollClass(rollStatus(rl))"
+                    >
+                      {{ rollStatus(rl) }}
+                    </span>
+                  </td>
+                  <td colspan="2"></td>
+                  <td class="p0">
+                    <input
+                      v-model="rl.catatan"
+                      class="ci"
+                      @keydown.enter.prevent="onEnterNext"
+                    />
+                  </td>
+                  <td colspan="2"></td>
+                </tr>
+              </template>
               <tr v-if="formData.dtl.length === 0">
-                <td colspan="14" class="empty-row">
-                  Pilih PO Bahan di kiri untuk mulai mengisi lot.
+                <td colspan="15" class="empty-row">
+                  Pilih PO Bahan di kiri, lalu isi Jumlah Lot.
                 </td>
               </tr>
             </tbody>
           </table>
         </div>
         <div class="legend">
-          Nilai: <b>1</b> = Tidak diterima, <b>2</b> = Kebijakan (tambah jumlah
-          cek), <b>3</b> = Diterima. Saran dihitung dari gramasi hasil cek
-          terhadap rentang PO (toleransi {{ formData.toleransi }} gram).
+          Isi nomor lot dan jumlah roll, baris roll muncul otomatis. Isi gramasi
+          atas, bawah, dan setting hanya pada roll yang dicek (minimal sesuai
+          kolom Dicek); baris kosong tidak dihitung. Nilai kosong = mengikuti
+          saran sistem. <b>3</b> = semua roll sesuai, lot otomatis LANJUT.
+          <b>2</b> = sebagian roll sesuai, diputuskan Pembelian (atau Gudang
+          naikkan ke 3 dengan alasan). <b>1</b> = semua roll di luar toleransi,
+          diputuskan Pembelian. Sesuai = dalam rentang PO ±{{
+            formData.toleransi.gramasi
+          }}
+          gram (gramasi) / ±{{ formData.toleransi.setting }}
+          (setting).
         </div>
 
-        <!-- Tabel 2 -->
+        <!-- Tabel 2: Hasil cek detail per roll -->
         <div class="tbl-header teal mt-2">
-          <span class="tbl-title">2. Hasil Cek Detail (per Lot)</span>
+          <span class="tbl-title">2. Hasil Cek Detail per Roll</span>
         </div>
-        <div class="tbl-wrap" style="max-height: 30vh; min-height: 130px">
-          <table class="gt" style="min-width: 1050px">
+        <div class="tbl-wrap" style="max-height: 28vh; min-height: 110px">
+          <table class="gt" style="min-width: 1000px">
             <thead>
               <tr>
                 <th style="width: 32px" class="tc">No</th>
-                <th style="width: 120px">Lot No.</th>
-                <th style="width: 150px">Gramasi</th>
-                <th style="width: 130px">Setting</th>
-                <th style="width: 130px">Warna</th>
-                <th style="width: 130px">Handfeel</th>
+                <th style="width: 110px">Lot No.</th>
+                <th style="width: 60px">Roll</th>
+                <th style="width: 130px">Gramasi</th>
+                <th style="width: 120px">Setting</th>
+                <th style="width: 120px">Warna</th>
+                <th style="width: 120px">Handfeel</th>
                 <th style="width: 110px">Bowing</th>
                 <th style="width: 110px">Shrinkage</th>
                 <th style="width: 110px">Kelunturan</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="(row, idx) in formData.dtl" :key="idx">
-                <td class="tc gt-lbl">{{ idx + 1 }}</td>
-                <td class="px-1 fw">{{ row.lot || "-" }}</td>
+              <tr v-for="(f, n) in rollDicek" :key="`${f.li}-${f.ri}`">
+                <td class="tc gt-lbl">{{ n + 1 }}</td>
+                <td class="px-1 fw">{{ f.lot || "-" }}</td>
+                <td class="tc">{{ f.ri + 1 }}</td>
                 <td class="p0">
                   <input
-                    v-model="row.hasil.gramasi"
+                    v-model="f.rl.hasil.gramasi"
                     class="ci"
                     placeholder="mis. Rendah"
                     @keydown.enter.prevent="onEnterNext"
@@ -769,7 +1195,7 @@ const nilaiClass = (n: number) =>
                 </td>
                 <td class="p0">
                   <input
-                    v-model="row.hasil.setting"
+                    v-model="f.rl.hasil.setting"
                     class="ci"
                     placeholder="mis. OK"
                     @keydown.enter.prevent="onEnterNext"
@@ -777,7 +1203,7 @@ const nilaiClass = (n: number) =>
                 </td>
                 <td class="p0">
                   <input
-                    v-model="row.hasil.warna"
+                    v-model="f.rl.hasil.warna"
                     class="ci"
                     placeholder="mis. 0,41"
                     @keydown.enter.prevent="onEnterNext"
@@ -785,7 +1211,7 @@ const nilaiClass = (n: number) =>
                 </td>
                 <td class="p0">
                   <input
-                    v-model="row.hasil.handfeel"
+                    v-model="f.rl.hasil.handfeel"
                     class="ci"
                     placeholder="mis. OK"
                     @keydown.enter.prevent="onEnterNext"
@@ -793,28 +1219,30 @@ const nilaiClass = (n: number) =>
                 </td>
                 <td class="p0">
                   <input
-                    v-model="row.hasil.bowing"
+                    v-model="f.rl.hasil.bowing"
                     class="ci"
                     @keydown.enter.prevent="onEnterNext"
                   />
                 </td>
                 <td class="p0">
                   <input
-                    v-model="row.hasil.shrinkage"
+                    v-model="f.rl.hasil.shrinkage"
                     class="ci"
                     @keydown.enter.prevent="onEnterNext"
                   />
                 </td>
                 <td class="p0">
                   <input
-                    v-model="row.hasil.kelunturan"
+                    v-model="f.rl.hasil.kelunturan"
                     class="ci"
                     @keydown.enter.prevent="onEnterNext"
                   />
                 </td>
               </tr>
-              <tr v-if="formData.dtl.length === 0">
-                <td colspan="9" class="empty-row">Belum ada lot.</td>
+              <tr v-if="rollDicek.length === 0">
+                <td colspan="10" class="empty-row">
+                  Roll yang sudah diisi di tabel 1 muncul di sini.
+                </td>
               </tr>
             </tbody>
           </table>
@@ -887,6 +1315,27 @@ const nilaiClass = (n: number) =>
         <v-spacer />
         <v-btn color="primary" variant="elevated" @click="doPrint">
           <IconPrinter :size="16" class="mr-1" /> Ya, Cetak
+        </v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
+
+  <!-- Dialog konfirmasi kurangi jumlah lot -->
+  <v-dialog v-model="showKurangiLot" max-width="400" persistent>
+    <v-card class="rounded-lg">
+      <v-card-title class="bg-warning text-white pa-3">
+        Kurangi Jumlah Lot
+      </v-card-title>
+      <v-card-text class="pa-4">
+        Lot yang dihapus sudah berisi data (lot no., qty, atau hasil cek roll).
+        Data baris ke-{{ pendingJml + 1 }} sampai terakhir akan hilang.
+        Lanjutkan?
+      </v-card-text>
+      <v-card-actions class="pa-3 border-t">
+        <v-btn variant="text" @click="batalKurangi">Batal</v-btn>
+        <v-spacer />
+        <v-btn color="warning" variant="elevated" @click="konfirmasiKurangi">
+          Ya, Hapus
         </v-btn>
       </v-card-actions>
     </v-card>
@@ -1033,23 +1482,33 @@ const nilaiClass = (n: number) =>
   font-size: 10px;
   font-weight: 600;
 }
-.submit-box {
-  margin-top: 6px;
+.warn-box.warn-amber {
   background: #fff8e1;
-  border: 1px solid #ffe082;
-  border-radius: 3px;
-  padding: 6px 8px;
+  color: #e65100;
+  border-color: #ffe082;
 }
-.chk {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  cursor: pointer;
+.warn-line {
+  margin-top: 4px;
+  font-size: 11px;
+  color: #b26a00;
 }
-.hint {
+
+.text-red {
+  color: #c62828;
+  font-weight: 700;
+}
+
+.gt tbody tr.lot-row td {
+  background: #eef3fb;
+  font-weight: 600;
+}
+.gt tbody tr.roll-row td {
+  background: #fff;
+}
+.roll-lbl {
+  padding-left: 18px;
+  color: #607d8b;
   font-size: 10px;
-  color: #6d4c41;
-  margin-top: 2px;
 }
 
 .status-chip {

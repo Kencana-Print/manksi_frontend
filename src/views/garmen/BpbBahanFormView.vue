@@ -61,14 +61,6 @@ interface BpbRowRef {
   roll: number | string;
   lot?: string;
 }
-interface QcTarikItem {
-  nourut_po: number;
-  [key: string]: unknown;
-}
-interface QcTarikPo {
-  nourut: number;
-  namaspk: string | null;
-}
 
 // ⚠️ Panel Supplier disembunyikan (bukan dihapus dari formData) kalau
 // user gak punya izin lihatSup — replikasi `if zLihatSup=0 then
@@ -206,40 +198,72 @@ const setPo = async (v: any) => {
   formData.value.header.bpb_po_nomor = v.Nomor;
   await loadPoData();
 };
+interface PoTarikHeader {
+  sup_kode: string;
+  sup_nama: string;
+  sup_alamat: string;
+  sup_kota: string;
+  jatuhtempo_days: number | string;
+}
+interface PoTarikItem {
+  kode: string;
+  nama: string;
+  satuan: string;
+  satuanpo: string;
+  harga: number;
+  totalpo: number;
+  terima: number;
+  kurang: number;
+  gramasi?: string;
+  warna?: string;
+  setting?: string;
+  spk?: string;
+  namaspk?: string;
+}
+
+// Dipakai jalur PO dan jalur QC
+const terapkanDataPo = (
+  header: PoTarikHeader,
+  poDetails: Record<string, unknown>[],
+  items: PoTarikItem[],
+) => {
+  formData.value.header.bpb_sup_kode = header.sup_kode;
+  formData.value.header.sup_nama = header.sup_nama;
+  formData.value.header.sup_alamat = header.sup_alamat;
+  formData.value.header.sup_kota = header.sup_kota;
+  const dt = new Date(formData.value.header.bpb_tanggal);
+  dt.setDate(dt.getDate() + (Number(header.jatuhtempo_days) || 0));
+  formData.value.header.bpb_jatuhtempo = formatDateLocal(dt);
+  formData.value.poItems = poDetails.map((d) => ({ ...d, terima: 0 }));
+  formData.value.items = items.map((d) => ({
+    kode: d.kode,
+    nama: d.nama,
+    satuan: d.satuan,
+    satuanpo: d.satuanpo,
+    jumlahyard: 0,
+    jumlahmeter: 0,
+    jumlah: 0,
+    roll: 0,
+    harga: d.harga,
+    totalpo: d.totalpo,
+    terima: d.terima,
+    kurang: d.kurang,
+    gramasi: d.gramasi ?? "",
+    warna: d.warna ?? "",
+    setting: d.setting ?? "",
+    spk: d.spk ?? "",
+    namaspk: d.namaspk ?? "",
+    mkb: "",
+  }));
+};
+
 const loadPoData = async () => {
   const noPo = formData.value.header.bpb_po_nomor;
   if (!noPo) return;
   try {
     const res = await bpbBahanFormService.validateField("po", noPo);
     const { header, poDetails, items } = res.data.data;
-    formData.value.header.bpb_sup_kode = header.sup_kode;
-    formData.value.header.sup_nama = header.sup_nama;
-    formData.value.header.sup_alamat = header.sup_alamat;
-    formData.value.header.sup_kota = header.sup_kota;
-    const dt = new Date(formData.value.header.bpb_tanggal);
-    dt.setDate(dt.getDate() + (Number(header.jatuhtempo_days) || 0));
-    formData.value.header.bpb_jatuhtempo = formatDateLocal(dt);
-    formData.value.poItems = poDetails.map((d: any) => ({ ...d, terima: 0 }));
-    formData.value.items = items.map((d: any) => ({
-      kode: d.kode,
-      nama: d.nama,
-      satuan: d.satuan,
-      satuanpo: d.satuanpo,
-      jumlahyard: 0,
-      jumlahmeter: 0,
-      jumlah: 0,
-      roll: 0,
-      harga: d.harga,
-      totalpo: d.totalpo,
-      terima: d.terima,
-      kurang: d.kurang,
-      gramasi: "",
-      warna: "",
-      setting: "",
-      spk: "",
-      namaspk: "",
-      mkb: "",
-    }));
+    terapkanDataPo(header, poDetails, items);
     toast.success("Berhasil menarik detail PO.");
   } catch (e: any) {
     toast.error(e.response?.data?.message || "Gagal menarik data PO.");
@@ -247,7 +271,6 @@ const loadPoData = async () => {
   }
 };
 
-// ── QC load ──
 const setQc = async (daftarQc: string[]) => {
   try {
     const res = await bpbBahanFormService.validateField(
@@ -255,35 +278,13 @@ const setQc = async (daftarQc: string[]) => {
       daftarQc.join(","),
     );
     const { header, poDetails, items, qcNomor } = res.data.data;
-
     formData.value.header.bpb_po_nomor = header.po_nomor;
-    formData.value.header.bpb_sup_kode = header.sup_kode;
-    formData.value.header.sup_nama = header.sup_nama;
-    formData.value.header.sup_alamat = header.sup_alamat;
-    formData.value.header.sup_kota = header.sup_kota;
-    const dt = new Date(formData.value.header.bpb_tanggal);
-    dt.setDate(dt.getDate() + (Number(header.jatuhtempo_days) || 0));
-    formData.value.header.bpb_jatuhtempo = formatDateLocal(dt);
-
+    terapkanDataPo(header, poDetails, items);
     formData.value.qcNomor = qcNomor;
-    formData.value.poItems = poDetails;
-    formData.value.items = items.map((d: QcTarikItem) => ({
-      ...d,
-      jumlahmeter: 0,
-      namaspk:
-        poDetails.find((p: QcTarikPo) => Number(p.nourut) === d.nourut_po)
-          ?.namaspk || "",
-    }));
     formData.value.barcodes = [];
-
-    // Barcode dibuat per kode bahan: satu pemanggilan per kode, berurutan
-    const kodeSudah = new Set<string>();
-    for (const [i, r] of formData.value.items.entries()) {
-      if (kodeSudah.has(r.kode)) continue;
-      kodeSudah.add(r.kode);
-      await onRollChange(i);
-    }
-    toast.success(`Berhasil menarik ${items.length} lot dari QC Bahan.`);
+    toast.success(
+      `Berhasil menarik data PO dari ${qcNomor.length} dokumen QC.`,
+    );
   } catch (e) {
     const err = e as { response?: { data?: { message?: string } } };
     toast.error(err.response?.data?.message || "Gagal menarik data QC Bahan.");
@@ -389,7 +390,6 @@ const isMeterBased = (item: any) => item.satuan === "MTR";
 
 // Yard diisi user → Meter (kolom bantu) & Terima Skrg (jumlah) otomatis terhitung
 const onJumlahYardChange = (idx: number) => {
-  if (isQc.value) return;
   const row = formData.value.items[idx];
   if (!isMeterBased(row)) return; // ⬅ guard: cuma bahan METER
   const meter = Number(
@@ -402,7 +402,6 @@ const onJumlahYardChange = (idx: number) => {
 
 // Meter (kolom bantu) diisi user → Yard & Terima Skrg (jumlah) otomatis terhitung
 const onJumlahMeterChange = (idx: number) => {
-  if (isQc.value) return;
   const row = formData.value.items[idx];
   if (!isMeterBased(row)) return; // ⬅ guard: cuma bahan METER
   row.jumlahyard = Number(
@@ -413,7 +412,6 @@ const onJumlahMeterChange = (idx: number) => {
 };
 
 const onJumlahChange = (idx: number) => {
-  if (isQc.value) return;
   const row = formData.value.items[idx];
   // ⬅ FIX: dulu row.jumlahmeter = row.jumlah SELALU dieksekusi tanpa
   // cek satuan — utk bahan KG, ini bikin nilai KG yg diketik user
@@ -440,7 +438,6 @@ const onJumlahChange = (idx: number) => {
 // Grid 1 itu agregat lintas SPK, jadi jumlah-nya harus dihitung ulang
 // dari total SEMUA baris Grid 2 yang kodenya sama, bukan 1:1 per baris.
 const onPoTerimaChange = (idx: number) => {
-  if (isQc.value) return;
   const po = formData.value.poItems[idx];
   const kode = po.kode;
 
@@ -457,13 +454,7 @@ const onRollChange = async (idx: number) => {
   const row = formData.value.items[idx];
   const kode = row.kode;
   if (!kode) return;
-  // BPB dari QC: satu baris per lot, barcode dibuat per kode, jadi target = total roll
-  // semua baris sekode. Jalur PO dan Non PO tetap memakai roll baris ini.
-  const targetRoll = isQc.value
-    ? formData.value.items
-        .filter((r: BpbRowRef) => r.kode === kode)
-        .reduce((s: number, r: BpbRowRef) => s + (Number(r.roll) || 0), 0)
-    : Number(row.roll) || 0;
+  const targetRoll = Number(row.roll) || 0;
   const dtTanggal = new Date(formData.value.header.bpb_tanggal || todayLocal);
   const yy = String(dtTanggal.getFullYear()).slice(-2);
   let newBarcodes = formData.value.barcodes.filter(
@@ -654,9 +645,7 @@ const validateSave = () => {
     // Cek kewajiban isi roll
     if (Number(r.jumlah) !== 0 && Number(r.roll) === 0) {
       return toast.warning(
-        isQc.value
-          ? `Lot ${r.lot || r.kode}: roll di QC Bahan masih kosong. Lengkapi dulu di QC Bahan.`
-          : `Baris ${i + 1}: Bahan ${r.nama} - Roll harus diisi!`,
+        `Baris ${i + 1}: Bahan ${r.nama} - Roll harus diisi!`,
       );
     }
   }
@@ -669,7 +658,7 @@ const validateSave = () => {
   }
 
   // 6. Validasi Sinkronisasi PO vs Terima
-  if (isPo.value && !isQc.value) {
+  if (isPo.value) {
     const t1 = formData.value.items.reduce(
       (s: number, r: any) => s + (Number(r.jumlah) || 0),
       0,
@@ -1067,8 +1056,8 @@ const printBarcodeAll = (): boolean => {
                     type="number"
                     step="0.01"
                     class="ci tr fw bg-yellow-light"
-                    :readonly="item.satuan !== 'MTR' || isQc"
-                    :class="{ ro: item.satuan !== 'MTR' || isQc }"
+                    :readonly="item.satuan !== 'MTR'"
+                    :class="{ ro: item.satuan !== 'MTR' }"
                     title="Isi Yard → Meter & Terima Skrg otomatis terhitung (khusus bahan METER)"
                     :ref="
                       (el) => setItemFieldRef(el, Number(idx), 'jumlahyard')
@@ -1086,8 +1075,8 @@ const printBarcodeAll = (): boolean => {
                     type="number"
                     step="0.01"
                     class="ci tr fw bg-yellow-light"
-                    :readonly="item.satuan !== 'MTR' || isQc"
-                    :class="{ ro: item.satuan !== 'MTR' || isQc }"
+                    :readonly="item.satuan !== 'MTR'"
+                    :class="{ ro: item.satuan !== 'MTR' }"
                     title="Isi Meter → Yard & Terima Skrg otomatis terhitung (khusus bahan METER)"
                     :ref="
                       (el) => setItemFieldRef(el, Number(idx), 'jumlahmeter')
@@ -1103,9 +1092,7 @@ const printBarcodeAll = (): boolean => {
                   <input
                     v-model.number="item.jumlah"
                     type="number"
-                    class="ci tr fw"
-                    :class="isQc ? 'ro' : 'bg-yellow-light'"
-                    :readonly="isQc"
+                    class="ci tr fw bg-yellow-light"
                     :ref="(el) => setItemFieldRef(el, Number(idx), 'jumlah')"
                     @blur="onJumlahChange(Number(idx))"
                     @keydown.enter.prevent="
@@ -1125,8 +1112,7 @@ const printBarcodeAll = (): boolean => {
                         : 'bg-yellow-light'
                     "
                     :ref="(el) => setItemFieldRef(el, Number(idx), 'roll')"
-                    :readonly="isQc"
-                    @blur="!isQc && onRollChange(Number(idx))"
+                    @blur="onRollChange(Number(idx))"
                     @keydown.enter.prevent="
                       onItemFieldEnter(Number(idx), 'roll')
                     "
@@ -1136,9 +1122,9 @@ const printBarcodeAll = (): boolean => {
                 <td class="p0">
                   <input
                     v-model="item.gramasi"
+                    class="ci"
                     :readonly="isQc"
                     :class="{ ro: isQc }"
-                    class="ci"
                     :ref="(el) => setItemFieldRef(el, Number(idx), 'gramasi')"
                     @keydown.enter.prevent="
                       onItemFieldEnter(Number(idx), 'gramasi')
@@ -1148,9 +1134,9 @@ const printBarcodeAll = (): boolean => {
                 <td class="p0">
                   <input
                     v-model="item.warna"
+                    class="ci"
                     :readonly="isQc"
                     :class="{ ro: isQc }"
-                    class="ci"
                     :ref="(el) => setItemFieldRef(el, Number(idx), 'warna')"
                     @keydown.enter.prevent="
                       onItemFieldEnter(Number(idx), 'warna')
@@ -1160,9 +1146,9 @@ const printBarcodeAll = (): boolean => {
                 <td class="p0">
                   <input
                     v-model="item.setting"
+                    class="ci"
                     :readonly="isQc"
                     :class="{ ro: isQc }"
-                    class="ci"
                     :ref="(el) => setItemFieldRef(el, Number(idx), 'setting')"
                     @keydown.enter.prevent="
                       onItemFieldEnter(Number(idx), 'setting')
@@ -1174,17 +1160,14 @@ const printBarcodeAll = (): boolean => {
                     <input
                       v-model="item.spk"
                       class="ci"
-                      :class="{ ro: isQc }"
-                      :readonly="isQc"
                       placeholder="..."
                       :ref="(el) => setItemFieldRef(el, Number(idx), 'spk')"
-                      @change="!isQc && onSpkChange(Number(idx))"
+                      @change="onSpkChange(Number(idx))"
                       @keydown.enter.prevent="
                         onItemFieldEnter(Number(idx), 'spk')
                       "
                     />
                     <button
-                      v-if="!isQc"
                       type="button"
                       class="ci-btn"
                       @click="openLookupSpk(Number(idx))"
@@ -1263,9 +1246,7 @@ const printBarcodeAll = (): boolean => {
                       <input
                         v-model.number="p.terima"
                         type="number"
-                        class="ci tr fw"
-                        :class="isQc ? 'ro' : 'bg-yellow-light'"
-                        :readonly="isQc"
+                        class="ci tr fw bg-yellow-light"
                         @blur="onPoTerimaChange(Number(i))"
                         v-select-on-focus
                       />
@@ -1382,31 +1363,6 @@ const printBarcodeAll = (): boolean => {
     :barcode-hdr="printMode.barcodeHdr"
     :single-barcode="printMode.singleBarcode"
   />
-
-  <!-- Dialog Konfirmasi Cetak Setelah Simpan -->
-  <v-dialog v-model="showPrintConfirm" max-width="400" persistent>
-    <v-card class="rounded-lg">
-      <v-card-title class="bg-primary text-white d-flex align-center pa-3">
-        <IconPrinter class="mr-2" :size="20" />
-        <span>Simpan Berhasil</span>
-      </v-card-title>
-      <v-card-text class="pa-4 text-center">
-        <div class="text-body-1 mb-2">
-          Data BPB <b>{{ nomorTerakhir }}</b> telah disimpan.
-        </div>
-        <div class="text-body-2 text-grey-darken-1">
-          Apakah Anda ingin mencetak dokumen BPB ini sekarang?
-        </div>
-      </v-card-text>
-      <v-card-actions class="pa-3 border-t">
-        <v-btn variant="text" @click="goBack">Tidak, Tutup</v-btn>
-        <v-spacer />
-        <v-btn color="primary" variant="elevated" @click="doPrintDocument">
-          <IconPrinter :size="16" class="mr-1" /> Ya, Cetak
-        </v-btn>
-      </v-card-actions>
-    </v-card>
-  </v-dialog>
 
   <!-- Dialog Konfirmasi Cetak A4 Setelah Simpan -->
   <v-dialog v-model="showPrintConfirm" max-width="400" persistent>

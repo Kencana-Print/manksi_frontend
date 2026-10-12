@@ -23,6 +23,7 @@ export interface TlQcLot {
   KlienKontak: string;
   SudahBpb: number;
   QtyRetur: number;
+  KeputusanTahap: string;
 }
 
 export interface TlQcRiwayat {

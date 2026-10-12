@@ -39,6 +39,7 @@ interface TlQcRow {
   Usr: string;
   Created: string;
   Ngedit: string;
+  KeputusanTahap: string;
 }
 
 interface LotEdit extends TlQcLot {
@@ -293,9 +294,6 @@ const openKeputusanDialog = async () => {
 
 const simpanKeputusan = async () => {
   if (!kepDoc.value) return;
-  if (!kepKontak.value.trim()) {
-    return toast.error("Kontak klien yang dikonfirmasi wajib diisi.");
-  }
 
   const payloadItems: TlQcKeputusanItem[] = [];
   for (const r of kepRows.value) {
@@ -545,7 +543,7 @@ const submitPin = async () => {
                 <th width="100" class="text-center">Keputusan</th>
                 <th width="90" class="tr">Diretur</th>
                 <th width="110">Oleh</th>
-                <th>Hasil Konfirmasi Klien</th>
+                <th>Catatan Keputusan</th>
               </tr>
             </thead>
             <tbody>
@@ -569,7 +567,16 @@ const submitPin = async () => {
                   {{ d.QtyRetur > 0 ? numFmt(d.QtyRetur) : "-" }}
                 </td>
                 <td>{{ d.KeputusanOleh || "-" }}</td>
-                <td>{{ d.KeputusanCatatan || "-" }}</td>
+                <td>
+                  <b
+                    v-if="d.KeputusanTahap && d.KeputusanTahap !== 'PEMBELIAN'"
+                  >
+                    [{{
+                      d.KeputusanTahap === "SISTEM" ? "Otomatis" : "Gudang"
+                    }}]
+                  </b>
+                  {{ d.KeputusanCatatan || "-" }}
+                </td>
               </tr>
               <tr
                 v-if="
@@ -646,7 +653,7 @@ const submitPin = async () => {
         <template v-else>
           <div class="f-group mb-3">
             <span class="f-label" style="width: 150px"
-              >Kontak Klien (wajib)</span
+              >Kontak Klien (opsional)</span
             >
             <input
               v-model="kepKontak"
@@ -654,7 +661,7 @@ const submitPin = async () => {
               maxlength="100"
               class="f-date"
               style="flex: 1"
-              placeholder="Nama / nomor klien yang dikonfirmasi"
+              placeholder="Nama / nomor klien (boleh dikosongkan)"
             />
           </div>
 
@@ -751,7 +758,7 @@ const submitPin = async () => {
               <th width="90">Tahap</th>
               <th width="90" class="text-center">Keputusan</th>
               <th width="130">Kontak Klien</th>
-              <th>Hasil Konfirmasi</th>
+              <th>Catatan</th>
               <th width="90">User</th>
             </tr>
           </thead>

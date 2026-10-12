@@ -4,7 +4,10 @@ import { useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
 import BaseBrowse from "@/components/BaseBrowse.vue";
 import { useBrowse } from "@/composables/useBrowse";
-import { qcBahanService } from "@/services/garmen/qcBahanService";
+import {
+  qcBahanService,
+  type QcLanjutGudang,
+} from "@/services/garmen/qcBahanService";
 import {
   IconClipboardCheck,
   IconDotsVertical,
@@ -305,10 +308,21 @@ const submitPin = async () => {
 };
 
 // --- SUBMIT DOKUMEN ---
+interface SubmitLot {
+  Lot: string;
+  Kg: number;
+  Roll: number;
+  Nilai: number;
+  lanjut: boolean;
+  alasan: string;
+}
+
 const submitDialog = ref(false);
 const isSubmitting = ref(false);
+const submitLoading = ref(false);
+const submitLots = ref<SubmitLot[]>([]);
 
-const openSubmitDialog = () => {
+const openSubmitDialog = async () => {
   if (selected.value.length === 0) {
     return toast.warning("Pilih data terlebih dahulu.");
   }
@@ -317,12 +331,49 @@ const openSubmitDialog = () => {
     return toast.info("Hanya dokumen berstatus DRAFT yang dapat disubmit.");
   }
   submitDialog.value = true;
+  submitLoading.value = true;
+  submitLots.value = [];
+  try {
+    const res = await qcBahanService.getDetail(row.Nomor);
+    submitLots.value = res.data.data.map((d: QcBahanDetailRow) => ({
+      Lot: d.Lot,
+      Kg: d.Kg,
+      Roll: d.Roll,
+      Nilai: Number(d.Nilai) || 0,
+      lanjut: false,
+      alasan: "",
+    }));
+  } catch {
+    toast.error("Gagal memuat data lot.");
+    submitDialog.value = false;
+  } finally {
+    submitLoading.value = false;
+  }
+};
+
+const keputusanSetelahSubmit = (l: SubmitLot): string => {
+  if (l.Nilai === 3) return "LANJUT otomatis";
+  if (l.Nilai === 2 && l.lanjut) return "LANJUT (Gudang)";
+  return "Menunggu Pembelian";
 };
 
 const confirmSubmit = async () => {
+  const lanjut: QcLanjutGudang[] = submitLots.value
+    .filter((l) => l.Nilai === 2 && l.lanjut)
+    .map((l) => ({ lot: l.Lot, alasan: l.alasan.trim() }));
+  const tanpaAlasan = lanjut.find((x) => !x.alasan);
+  if (tanpaAlasan) {
+    return toast.warning(
+      `Alasan melanjutkan lot ${tanpaAlasan.lot} wajib diisi.`,
+    );
+  }
+
   isSubmitting.value = true;
   try {
-    await qcBahanService.submit((selectedItem.value as QcBahanRow).Nomor);
+    await qcBahanService.submit(
+      (selectedItem.value as QcBahanRow).Nomor,
+      lanjut,
+    );
     toast.success("Dokumen berhasil disubmit.");
     submitDialog.value = false;
     detailCache.value = {};
@@ -607,14 +658,58 @@ const numFmt = (v: number | string | null) =>
   </v-dialog>
 
   <!-- Dialog Submit -->
-  <v-dialog v-model="submitDialog" max-width="400">
+  <v-dialog v-model="submitDialog" max-width="760" persistent>
     <v-card rounded="lg">
       <v-card-title class="bg-success text-white pa-3 text-subtitle-1">
-        Submit Dokumen
+        Submit Dokumen {{ selectedItem?.Nomor }}
       </v-card-title>
-      <v-card-text class="pa-4 text-body-2">
-        Submit <b>{{ selectedItem?.Nomor }}</b> untuk ditindaklanjuti Pembelian?
-        Setelah disubmit, perubahan data hanya bisa lewat pengajuan perubahan.
+      <v-card-text class="pa-3 text-body-2">
+        <v-progress-linear v-if="submitLoading" indeterminate height="2" />
+        <template v-else>
+          <div class="mb-2">
+            Nilai 3 otomatis LANJUT. Nilai 1 dan 2 menunggu Pembelian, kecuali
+            lot nilai 2 yang Anda lanjutkan di sini dengan alasan. Setelah
+            disubmit, perubahan data hanya bisa lewat pengajuan perubahan.
+          </div>
+          <table class="detail-table">
+            <thead>
+              <tr>
+                <th width="130">Lot No.</th>
+                <th width="90" class="tr">Qty</th>
+                <th width="50" class="text-center">Nilai</th>
+                <th width="150">Setelah Submit</th>
+                <th width="80" class="text-center">Lanjutkan</th>
+                <th>Alasan</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="l in submitLots" :key="l.Lot">
+                <td class="font-weight-bold">{{ l.Lot }}</td>
+                <td class="tr">{{ l.Kg }}</td>
+                <td class="text-center">{{ l.Nilai || "-" }}</td>
+                <td>{{ keputusanSetelahSubmit(l) }}</td>
+                <td class="text-center">
+                  <input
+                    v-if="l.Nilai === 2"
+                    v-model="l.lanjut"
+                    type="checkbox"
+                  />
+                </td>
+                <td>
+                  <input
+                    v-if="l.Nilai === 2"
+                    v-model="l.alasan"
+                    type="text"
+                    class="f-date"
+                    style="width: 100%"
+                    :disabled="!l.lanjut"
+                    :placeholder="l.lanjut ? 'Wajib diisi' : ''"
+                  />
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </template>
       </v-card-text>
       <v-card-actions class="pa-3 border-t">
         <v-spacer />
@@ -623,6 +718,7 @@ const numFmt = (v: number | string | null) =>
           color="success"
           variant="elevated"
           :loading="isSubmitting"
+          :disabled="submitLoading"
           @click="confirmSubmit"
           >Submit</v-btn
         >

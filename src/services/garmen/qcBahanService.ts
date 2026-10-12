@@ -6,6 +6,11 @@ export interface QcBahanBrowseParams {
   status: string;
 }
 
+export interface QcLanjutGudang {
+  lot: string;
+  alasan: string;
+}
+
 export const qcBahanService = {
   // Ambil data header (Master)
   getBrowse: (params: QcBahanBrowseParams) =>
@@ -25,6 +30,9 @@ export const qcBahanService = {
   requestPin: (payload: { nomor: string; alasan: string }) =>
     api.post("/garmen/bahan-baku/qc-bahan/request-pin", payload),
 
-  submit: (nomor: string) =>
-    api.post(`/garmen/bahan-baku/qc-bahan/submit/${encodeURIComponent(nomor)}`),
+  submit: (nomor: string, lanjut: QcLanjutGudang[] = []) =>
+    api.post(
+      `/garmen/bahan-baku/qc-bahan/submit/${encodeURIComponent(nomor)}`,
+      { lanjut },
+    ),
 };

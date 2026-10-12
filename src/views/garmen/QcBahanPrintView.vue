@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { ref, onMounted, nextTick } from "vue";
+import { ref, computed, onMounted, nextTick } from "vue";
 import { useRoute } from "vue-router";
 import { useToast } from "vue-toastification";
 import {
   qcBahanFormService,
   type QcDetailResponse,
   type QcLampiran,
+  type QcRollRow,
 } from "@/services/garmen/qcBahanFormService";
 import api from "@/services/api";
 
@@ -82,6 +83,35 @@ const formatDate = (val?: string) => {
 };
 const numFmt = (v: number | string) =>
   Number(v || 0).toLocaleString("id-ID", { maximumFractionDigits: 2 });
+
+interface PrintRoll {
+  lot: string;
+  ke: number;
+  rl: QcRollRow;
+  first: boolean;
+  span: number;
+}
+
+// Roll yang dicek dari semua lot; baris pertama tiap lot membawa rowspan
+const rollList = computed<PrintRoll[]>(() =>
+  (data.value?.dtl ?? []).flatMap((d) =>
+    d.rolls.map((rl, i) => ({
+      lot: d.lot,
+      ke: i + 1,
+      rl,
+      first: i === 0,
+      span: d.rolls.length,
+    })),
+  ),
+);
+
+// Spesifikasi PO tidak terbaca -> sesuai/tidak tidak bisa dinilai
+const sesuaiText = (rl: QcRollRow): string =>
+  !data.value?.po?.spec_terbaca ? "-" : rl.sesuai ? "OK" : "NO";
+
+const lotBerAlasan = computed(() =>
+  (data.value?.dtl ?? []).filter((d) => d.alasan_nilai?.trim()),
+);
 </script>
 
 <template>
@@ -122,22 +152,30 @@ const numFmt = (v: number | string) =>
           <tr>
             <td>No. PO</td>
             <td>: {{ data.header.qc_po_nomor }}</td>
+            <td>Qty Kedatangan</td>
+            <td>
+              : {{ numFmt(data.header.qc_qty_datang) }}
+              {{ data.po?.satuan || "Kg" }} ({{ data.header.qc_jml_lot }} lot)
+            </td>
+          </tr>
+          <tr>
             <td>Catatan</td>
-            <td>: {{ data.header.qc_keterangan || "-" }}</td>
+            <td colspan="3">: {{ data.header.qc_keterangan || "-" }}</td>
           </tr>
         </table>
       </div>
 
+      <div class="section-title">RINGKASAN PER LOT</div>
       <table class="detail-table">
         <thead>
           <tr>
             <th rowspan="2" width="24">No</th>
             <th rowspan="2">Lot No.</th>
-            <th rowspan="2">PO No.</th>
             <th colspan="2">Qty</th>
+            <th rowspan="2" width="52">Roll Dicek</th>
             <th colspan="2">Gramasi / Setting PO</th>
             <th rowspan="2">Warna</th>
-            <th colspan="2">Hasil Cek</th>
+            <th colspan="2">Hasil Cek (Rata²)</th>
             <th rowspan="2" width="34">Nilai</th>
           </tr>
           <tr>
@@ -153,9 +191,9 @@ const numFmt = (v: number | string) =>
           <tr v-for="(d, i) in data.dtl" :key="i">
             <td class="tc">{{ i + 1 }}</td>
             <td class="fw-bold">{{ d.lot }}</td>
-            <td>{{ data.header.qc_po_nomor }}</td>
             <td class="tr">{{ numFmt(d.qty_kg) }}</td>
-            <td class="tr">{{ numFmt(d.qty_roll) }}</td>
+            <td class="tc">{{ d.rolls.length }}</td>
+            <td class="tc">{{ d.rolls.length }} (min {{ d.roll_cek }})</td>
             <td class="tc">{{ d.gramasi_po }}</td>
             <td class="tc">{{ d.setting_po }}</td>
             <td>{{ d.warna }}</td>
@@ -166,29 +204,74 @@ const numFmt = (v: number | string) =>
         </tbody>
         <tfoot>
           <tr>
-            <td colspan="3" class="tr fw-bold">TOTAL</td>
+            <td colspan="2" class="tr fw-bold">TOTAL</td>
             <td class="tr fw-bold">
               {{ numFmt(data.dtl.reduce((s, r) => s + Number(r.qty_kg), 0)) }}
             </td>
             <td class="tr fw-bold">
               {{ numFmt(data.dtl.reduce((s, r) => s + Number(r.qty_roll), 0)) }}
             </td>
-            <td colspan="6"></td>
+            <td colspan="7"></td>
           </tr>
         </tfoot>
       </table>
 
       <div class="note">
-        Nilai 1: Tidak diterima &nbsp;|&nbsp; Nilai 2: Kebijakan (menambah
-        jumlah cek) &nbsp;|&nbsp; Nilai 3: Diterima
+        Nilai 1: semua roll yang dicek di luar toleransi (diputuskan Pembelian)
+        &nbsp;|&nbsp; Nilai 2: sebagian roll sesuai (diputuskan Pembelian, atau
+        dinaikkan Gudang ke 3 dengan alasan) &nbsp;|&nbsp; Nilai 3: semua roll
+        sesuai (otomatis lanjut). Sesuai = gramasi atas, gramasi bawah, dan
+        setting dalam rentang PO &plusmn;{{ data.toleransi.gramasi }} gram /
+        &plusmn;{{ data.toleransi.setting }}.
+      </div>
+      <div v-if="lotBerAlasan.length" class="note">
+        <b>Alasan nilai:</b>
+        <span v-for="(d, i) in lotBerAlasan" :key="i">
+          Lot {{ d.lot }}: {{ d.alasan_nilai
+          }}<span v-if="i < lotBerAlasan.length - 1">; </span>
+        </span>
       </div>
 
-      <div class="section-title">HASIL CEK</div>
+      <div class="section-title">PENGECEKAN ROLL</div>
       <table class="detail-table">
         <thead>
           <tr>
             <th width="24">No</th>
-            <th>Lot No.</th>
+            <th width="90">Lot No.</th>
+            <th width="40">Roll</th>
+            <th width="70">Gramasi Atas</th>
+            <th width="70">Gramasi Bawah</th>
+            <th width="60">Setting</th>
+            <th width="50">Sesuai</th>
+            <th>Catatan</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="(r, i) in rollList" :key="i">
+            <td class="tc">{{ i + 1 }}</td>
+            <td v-if="r.first" :rowspan="r.span" class="fw-bold">
+              {{ r.lot }}
+            </td>
+            <td class="tc">{{ r.ke }}</td>
+            <td class="tr">{{ numFmt(r.rl.gramasi_atas) }}</td>
+            <td class="tr">{{ numFmt(r.rl.gramasi_bawah) }}</td>
+            <td class="tr">{{ numFmt(r.rl.setting_cek) }}</td>
+            <td class="tc fw-bold">{{ sesuaiText(r.rl) }}</td>
+            <td>{{ r.rl.catatan }}</td>
+          </tr>
+          <tr v-if="rollList.length === 0">
+            <td colspan="8" class="tc">Belum ada roll yang dicek.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="section-title">HASIL CEK DETAIL PER ROLL</div>
+      <table class="detail-table">
+        <thead>
+          <tr>
+            <th width="24">No</th>
+            <th width="90">Lot No.</th>
+            <th width="40">Roll</th>
             <th>Gramasi</th>
             <th>Setting</th>
             <th>Warna</th>
@@ -199,16 +282,22 @@ const numFmt = (v: number | string) =>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="(d, i) in data.dtl" :key="i">
+          <tr v-for="(r, i) in rollList" :key="i">
             <td class="tc">{{ i + 1 }}</td>
-            <td class="fw-bold">{{ d.lot }}</td>
-            <td>{{ d.hasil.gramasi }}</td>
-            <td>{{ d.hasil.setting }}</td>
-            <td>{{ d.hasil.warna }}</td>
-            <td>{{ d.hasil.handfeel }}</td>
-            <td>{{ d.hasil.bowing }}</td>
-            <td>{{ d.hasil.shrinkage }}</td>
-            <td>{{ d.hasil.kelunturan }}</td>
+            <td v-if="r.first" :rowspan="r.span" class="fw-bold">
+              {{ r.lot }}
+            </td>
+            <td class="tc">{{ r.ke }}</td>
+            <td>{{ r.rl.hasil.gramasi }}</td>
+            <td>{{ r.rl.hasil.setting }}</td>
+            <td>{{ r.rl.hasil.warna }}</td>
+            <td>{{ r.rl.hasil.handfeel }}</td>
+            <td>{{ r.rl.hasil.bowing }}</td>
+            <td>{{ r.rl.hasil.shrinkage }}</td>
+            <td>{{ r.rl.hasil.kelunturan }}</td>
+          </tr>
+          <tr v-if="rollList.length === 0">
+            <td colspan="10" class="tc">Belum ada roll yang dicek.</td>
           </tr>
         </tbody>
       </table>
@@ -597,6 +686,14 @@ const numFmt = (v: number | string) =>
     margin: 0;
     width: 100%;
     min-height: auto;
+  }
+  .foto-table,
+  .print-footer,
+  .detail-table tr {
+    page-break-inside: avoid;
+  }
+  .detail-table thead {
+    display: table-header-group;
   }
   .page-2 {
     page-break-before: always;
