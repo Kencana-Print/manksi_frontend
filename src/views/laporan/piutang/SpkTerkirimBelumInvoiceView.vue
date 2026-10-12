@@ -13,21 +13,13 @@ const getLocalDate = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
 
-const getAwalBulan = () => {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
-};
-
 const filterState = ref({
-  startDate: getAwalBulan(),
   endDate: getLocalDate(),
   perusahaan: "",
 });
 
-// State hasil restore bisa tidak punya startDate/endDate (versi lama), isi ulang
+// State hasil restore versi lama bisa tidak punya endDate, isi ulang
 const onFilterStateRestored = () => {
-  if (!filterState.value.startDate)
-    filterState.value.startDate = getAwalBulan();
   if (!filterState.value.endDate) filterState.value.endDate = getLocalDate();
 };
 
@@ -80,7 +72,6 @@ const { items, isLoading, canExport, fetchData, exportToExcel } = useBrowse({
   menuId,
   fetchApi: async () => {
     const res = await spkTerkirimBelumInvoiceService.getBrowse({
-      startDate: filterState.value.startDate || getAwalBulan(),
       endDate: filterState.value.endDate || getLocalDate(),
       perusahaan: filterState.value.perusahaan || undefined,
     });
@@ -160,13 +151,6 @@ const jumlahBaris = computed(() => (items.value ?? []).length);
   >
     <template #filter-left>
       <div class="d-flex align-center gap-2">
-        <span class="f-label">Periode Kirim</span>
-        <input
-          type="date"
-          v-model="filterState.startDate"
-          class="f-date"
-          @change="fetchData"
-        />
         <span class="f-label">s.d.</span>
         <input
           type="date"

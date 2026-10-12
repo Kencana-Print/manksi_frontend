@@ -16,7 +16,7 @@ type RouteParams = { nomor?: string };
 
 const toast = useToast();
 const router = useRouter();
-const pendingFiles = ref<File[]>([]);
+const pendingFile = ref<File | null>(null);
 const showPrintDialog = ref(false);
 const savedNomor = ref("");
 
@@ -160,10 +160,10 @@ const {
   },
   onSuccess: async (response: any) => {
     const nomor = response.data?.nomor || formData.value.Nomor;
-    if (pendingFiles.value.length > 0 && nomor) {
+    if (pendingFile.value && nomor) {
       try {
         const fd = new FormData();
-        pendingFiles.value.forEach((f) => fd.append("files", f));
+        fd.append("files", pendingFile.value);
         await praOrderService.uploadGambar(nomor, fd);
         toast.success("Data dan gambar berhasil disimpan!");
       } catch {
@@ -227,8 +227,8 @@ const tabs = [
   { text: "3. Katalog Referensi", icon: IconPhoto },
 ];
 
-const handleFilesSelected = (files: File[]) => {
-  pendingFiles.value = [...pendingFiles.value, ...files];
+const handleFileSelected = (file: File | null) => {
+  pendingFile.value = file;
 };
 </script>
 
@@ -266,7 +266,7 @@ const handleFilesSelected = (files: File[]) => {
           <PraOrderTabRencana
             :form-data="formData"
             :is-edit="isEditMode"
-            @files-selected="handleFilesSelected"
+            @file-selected="handleFileSelected"
           />
         </div>
         <div v-show="currentTab === 1" class="po-tab-pane">

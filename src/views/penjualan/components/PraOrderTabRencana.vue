@@ -18,7 +18,7 @@ import {
 
 const props = defineProps<{ formData: any; isEdit: boolean }>();
 const toast = useToast();
-const emit = defineEmits(["files-selected"]);
+const emit = defineEmits<{ (e: "file-selected", file: File | null): void }>();
 
 const showCustModal = ref(false);
 const showSalesModal = ref(false);
@@ -28,7 +28,7 @@ const fileRef = ref<HTMLInputElement | null>(null);
 const divisiOptions = ref<any[]>([]);
 const bahanMaster = ref<any[]>([]);
 const selectedBahanToAdd = ref("");
-const previewFiles = ref<{ name: string; url: string }[]>([]);
+const previewFile = ref<{ name: string; url: string } | null>(null);
 const showPreviewDialog = ref(false);
 const previewUrl = ref("");
 
@@ -187,21 +187,29 @@ const readyBadgeClass = (status: string) => {
 };
 
 // ── Gambar upload (multi) ──
+// ── Gambar desain (satu saja) ──
 const onFileChange = (e: Event) => {
-  const files = Array.from((e.target as HTMLInputElement).files || []);
-  if (!files.length) return;
-  const oversized = files.filter((f) => f.size > 2_000_000);
-  if (oversized.length) {
-    toast.error("Ukuran setiap gambar tidak boleh > 2 Mb.");
+  const input = e.target as HTMLInputElement;
+  const file = input.files?.[0];
+  input.value = "";
+  if (!file) return;
+  if (!file.type.startsWith("image/")) {
+    toast.error("File harus berupa gambar.");
     return;
   }
-  const newPreviews = files.map((f) => ({
-    name: f.name,
-    url: URL.createObjectURL(f),
-  }));
-  previewFiles.value = [...previewFiles.value, ...newPreviews];
-  emit("files-selected", files);
-  if (fileRef.value) fileRef.value.value = "";
+  if (file.size > 2_000_000) {
+    toast.error("Ukuran gambar tidak boleh > 2 Mb.");
+    return;
+  }
+  if (previewFile.value) URL.revokeObjectURL(previewFile.value.url);
+  previewFile.value = { name: file.name, url: URL.createObjectURL(file) };
+  emit("file-selected", file);
+};
+
+const batalPilih = () => {
+  if (previewFile.value) URL.revokeObjectURL(previewFile.value.url);
+  previewFile.value = null;
+  emit("file-selected", null);
 };
 
 const getBaseUrl = () => api.defaults.baseURL?.replace(/\/api\/?$/, "") || "";
@@ -209,6 +217,15 @@ const gambarUrl = (path: string) => {
   if (!path) return "";
   return `${getBaseUrl()}${path}`;
 };
+
+// Yang tampil: gambar baru yang dipilih, kalau tidak ada gambar yang sudah tersimpan
+const gambarTampil = computed(
+  () =>
+    previewFile.value?.url ||
+    (props.formData.Gambar?.[0]
+      ? gambarUrl(props.formData.Gambar[0].Path)
+      : ""),
+);
 
 const openPreview = (url: string) => {
   previewUrl.value = url;
@@ -554,52 +571,50 @@ const openPreview = (url: string) => {
           <div class="tp-sec-title">Design</div>
 
           <div
-            v-if="formData.Gambar.length || previewFiles.length"
-            class="tp-gambar-grid"
+            v-if="gambarTampil"
+            class="tp-gambar-single"
+            @click="openPreview(gambarTampil)"
           >
-            <div
-              v-for="(g, idx) in formData.Gambar"
-              :key="'saved-' + idx"
-              class="tp-gambar-thumb"
-              @click="openPreview(gambarUrl(g.Path))"
-            >
-              <img :src="gambarUrl(g.Path)" />
-            </div>
-            <div
-              v-for="(p, idx) in previewFiles"
-              :key="'new-' + idx"
-              class="tp-gambar-thumb new"
-              @click="openPreview(p.url)"
-            >
-              <img :src="p.url" />
-              <span class="tp-gambar-new-badge">Baru</span>
-            </div>
+            <img :src="gambarTampil" />
+            <span v-if="previewFile" class="tp-gambar-new-badge">Baru</span>
           </div>
-          <div v-else class="tp-img-empty" style="height: 120px">
+          <div v-else class="tp-img-empty" style="height: 160px">
             <IconPhotoOff :size="28" color="#bdbdbd" />
             <div class="mt-1">Belum ada gambar desain</div>
           </div>
 
-          <div class="tp-upload-row" style="margin-top: 6px">
+          <div
+            class="tp-upload-row"
+            style="margin-top: 6px; display: flex; gap: 6px"
+          >
             <input
               ref="fileRef"
               type="file"
               accept="image/*"
-              multiple
               style="display: none"
               @change="onFileChange"
             />
             <button
               class="tp-upload-btn"
               type="button"
-              style="width: 100%"
+              style="flex: 1"
               @click="fileRef?.click()"
             >
-              + Tambah Gambar Desain
+              {{
+                gambarTampil ? "Ganti Gambar Desain" : "+ Pilih Gambar Desain"
+              }}
+            </button>
+            <button
+              v-if="previewFile"
+              class="tp-upload-btn tp-upload-cancel"
+              type="button"
+              @click="batalPilih"
+            >
+              Batal
             </button>
           </div>
           <div class="tp-img-hint">
-            Ukuran Maksimal 2 Mb per gambar, bisa lebih dari satu
+            Satu gambar desain, ukuran maksimal 2 Mb.
           </div>
 
           <div
@@ -962,26 +977,26 @@ const openPreview = (url: string) => {
 }
 
 /* Gambar grid */
-.tp-gambar-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 6px;
-}
-.tp-gambar-thumb {
+.tp-gambar-single {
   position: relative;
-  height: 90px;
+  height: 200px;
   border-radius: 3px;
   overflow: hidden;
   border: 1px solid #e0e0e0;
+  background: #fafafa;
   cursor: pointer;
 }
-.tp-gambar-thumb img {
+.tp-gambar-single img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
 }
-.tp-gambar-thumb.new {
-  border-color: #1565c0;
+.tp-upload-cancel {
+  background: #e0e0e0;
+  color: #424242;
+}
+.tp-upload-cancel:hover {
+  background: #bdbdbd;
 }
 .tp-gambar-new-badge {
   position: absolute;

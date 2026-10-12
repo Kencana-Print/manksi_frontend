@@ -18,7 +18,12 @@ import {
   type QcSaveResult,
 } from "@/services/garmen/qcBahanFormService";
 import QcBahanPoSearchModal from "@/components/lookups/QcBahanPoSearchModal.vue";
-import { IconClipboardCheck, IconSearch, IconPrinter } from "@tabler/icons-vue";
+import {
+  IconClipboardCheck,
+  IconSearch,
+  IconPrinter,
+  IconCamera,
+} from "@tabler/icons-vue";
 
 const route = useRoute();
 const router = useRouter();
@@ -261,6 +266,11 @@ const fotoTersimpan = ref<Record<JenisFoto, string>>({
 const fotoSrc = (jenis: JenisFoto) =>
   fotoPreview.value[jenis] || fotoTersimpan.value[jenis];
 
+const showFoto = ref(false);
+const fotoCount = computed(
+  () => FOTO_SLOTS.filter((s) => !!fotoSrc(s.jenis)).length,
+);
+
 const loadFoto = async (nomor: string) => {
   try {
     const res = await qcBahanFormService.getLampiran(nomor);
@@ -413,6 +423,19 @@ const hitungLot = (row: QcLotRow): LotCalc => {
 
 const lotCalc = computed<LotCalc[]>(() => formData.value.dtl.map(hitungLot));
 const calcOf = (i: number): LotCalc => lotCalc.value[i] ?? EMPTY_CALC;
+
+// Rata-rata semua roll yang sudah dicek (lintas lot), untuk footer tabel 1
+const rataSemua = computed(() => {
+  const dicek = formData.value.dtl.flatMap((r) => r.rolls.filter(rollTerisi));
+  const rata = (vals: number[]): number =>
+    vals.length ? r2(vals.reduce((a, b) => a + b, 0) / vals.length) : 0;
+  return {
+    n: dicek.length,
+    atas: rata(dicek.map((x) => Number(x.gramasi_atas))),
+    bawah: rata(dicek.map((x) => Number(x.gramasi_bawah))),
+    setting: rata(dicek.map((x) => Number(x.setting_cek))),
+  };
+});
 
 interface RollFlat {
   li: number;
@@ -709,6 +732,22 @@ const rollClass = (s: "OK" | "NO" | "-"): string =>
     @confirm-cancel="executeCancel"
     @confirm-close="executeClose"
   >
+    <template #header-actions-prepend>
+      <v-btn
+        size="small"
+        variant="outlined"
+        color="primary"
+        class="mr-2"
+        @click="showFoto = true"
+      >
+        <template #prepend>
+          <span class="d-flex align-center">
+            <IconCamera :size="15" :stroke-width="1.7" />
+          </span>
+        </template>
+        Foto ({{ fotoCount }}/2)
+      </v-btn>
+    </template>
     <!-- ══ KOLOM KIRI: HEADER ══ -->
     <template #left-column>
       <div class="qc-left">
@@ -940,7 +979,7 @@ const rollClass = (s: "OK" | "NO" | "-"): string =>
             + Tambah Lot
           </button>
         </div>
-        <div class="tbl-wrap" style="max-height: 46vh; min-height: 150px">
+        <div class="tbl-wrap" style="min-height: 50vh; max-height: 64vh">
           <table class="gt" style="min-width: 1200px">
             <thead>
               <tr>
@@ -1144,6 +1183,17 @@ const rollClass = (s: "OK" | "NO" | "-"): string =>
                 </td>
               </tr>
             </tbody>
+            <tfoot v-if="formData.dtl.length">
+              <tr>
+                <td colspan="6" class="tr">
+                  Rata-rata semua roll dicek ({{ rataSemua.n }} roll)
+                </td>
+                <td class="tr px-1">{{ rataSemua.atas || "-" }}</td>
+                <td class="tr px-1">{{ rataSemua.bawah || "-" }}</td>
+                <td class="tr px-1">{{ rataSemua.setting || "-" }}</td>
+                <td colspan="6"></td>
+              </tr>
+            </tfoot>
           </table>
         </div>
         <div class="legend">
@@ -1164,7 +1214,7 @@ const rollClass = (s: "OK" | "NO" | "-"): string =>
         <div class="tbl-header teal mt-2">
           <span class="tbl-title">2. Hasil Cek Detail per Roll</span>
         </div>
-        <div class="tbl-wrap" style="max-height: 28vh; min-height: 110px">
+        <div class="tbl-wrap" style="max-height: 22vh; min-height: 110px">
           <table class="gt" style="min-width: 1000px">
             <thead>
               <tr>
@@ -1247,12 +1297,20 @@ const rollClass = (s: "OK" | "NO" | "-"): string =>
             </tbody>
           </table>
         </div>
+      </div>
+    </template>
+  </BaseForm>
 
-        <!-- Foto -->
-        <div class="tbl-header mt-2" style="background: #37474f">
-          <span class="tbl-title">3. Dokumentasi Foto</span>
-        </div>
-        <div class="foto-grid">
+  <QcBahanPoSearchModal v-model="showPoModal" @selected="onPoSelected" />
+
+  <v-dialog v-model="showFoto" max-width="820">
+    <v-card class="rounded-lg">
+      <v-card-title class="bg-primary text-white pa-3 d-flex align-center">
+        <IconCamera :size="18" class="mr-2" />
+        <span style="font-size: 13px">Dokumentasi Foto</span>
+      </v-card-title>
+      <v-card-text class="pa-0">
+        <div class="foto-grid" style="border: none">
           <div v-for="slot in FOTO_SLOTS" :key="slot.jenis" class="foto-box">
             <div class="foto-label">{{ slot.label }}</div>
             <div class="foto-area">
@@ -1285,15 +1343,23 @@ const rollClass = (s: "OK" | "NO" | "-"): string =>
             </div>
           </div>
         </div>
-        <div class="legend">
-          Maksimal 2 MB per foto. Pada dokumen baru, foto terkirim otomatis
-          setelah disimpan.
+        <div class="legend pa-3">
+          Maksimal 2 MB per foto.
+          {{
+            isEditMode
+              ? "Foto langsung tersimpan saat dipilih."
+              : "Pada dokumen baru, foto terkirim otomatis setelah dokumen disimpan."
+          }}
         </div>
-      </div>
-    </template>
-  </BaseForm>
-
-  <QcBahanPoSearchModal v-model="showPoModal" @selected="onPoSelected" />
+      </v-card-text>
+      <v-card-actions class="pa-3 border-t">
+        <v-spacer />
+        <v-btn variant="text" size="small" @click="showFoto = false">
+          Tutup
+        </v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
 
   <!-- Dialog cetak setelah simpan -->
   <v-dialog v-model="showPrintConfirm" max-width="400" persistent>
@@ -1612,6 +1678,18 @@ const rollClass = (s: "OK" | "NO" | "-"): string =>
 }
 .gt tbody tr:hover td {
   background: #e3f2fd !important;
+}
+.gt tfoot td {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  background: #fff9c4;
+  border: 1px solid #bdbdbd;
+  height: 26px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #37474f;
+  white-space: nowrap;
 }
 .p0 {
   padding: 0 !important;
