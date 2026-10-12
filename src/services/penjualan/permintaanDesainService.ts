@@ -63,6 +63,7 @@ export const permintaanDesainService = {
     startDate: string;
     endDate: string;
     status?: string;
+    statusKlien?: string;
     customer?: string;
     marketing?: string;
     jenisPekerjaan?: string;

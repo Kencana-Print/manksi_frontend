@@ -57,12 +57,14 @@ const firstOfMonth = () => {
 const tglAwal = ref(firstOfMonth());
 const tglAkhir = ref(todayLocal());
 const statusFilter = ref("");
+const statusKlienFilter = ref("");
 const jenisFilter = ref("");
 
 const filterState = computed(() => ({
   tglAwal: tglAwal.value,
   tglAkhir: tglAkhir.value,
   statusFilter: statusFilter.value,
+  statusKlienFilter: statusKlienFilter.value,
   jenisFilter: jenisFilter.value,
 }));
 const onFilterStateRestore = (val: any) => {
@@ -70,6 +72,8 @@ const onFilterStateRestore = (val: any) => {
   if (val?.tglAkhir) tglAkhir.value = val.tglAkhir;
   if (val?.statusFilter != null) statusFilter.value = val.statusFilter;
   if (val?.jenisFilter != null) jenisFilter.value = val.jenisFilter;
+  if (val?.statusKlienFilter != null)
+    statusKlienFilter.value = val.statusKlienFilter;
 };
 
 const baseBrowseRef = ref<InstanceType<typeof BaseBrowse> | null>(null);
@@ -81,6 +85,7 @@ const { items, isLoading, selected, canInsert, fetchData } = useBrowse({
       startDate: tglAwal.value,
       endDate: tglAkhir.value,
       status: statusFilter.value || undefined,
+      statusKlien: statusKlienFilter.value || undefined,
       jenisPekerjaan: jenisFilter.value || undefined,
     });
     return res.data.data ?? [];
@@ -89,7 +94,10 @@ const { items, isLoading, selected, canInsert, fetchData } = useBrowse({
 
 const selectedItem = computed(() => selected.value[0] ?? null);
 
-watch([tglAwal, tglAkhir, statusFilter, jenisFilter], fetchData);
+watch(
+  [tglAwal, tglAkhir, statusFilter, statusKlienFilter, jenisFilter],
+  fetchData,
+);
 onMounted(fetchData);
 
 const headers = [
@@ -104,6 +112,7 @@ const headers = [
   { title: "Jml", key: "Jml", width: "70px", align: "right" },
   { title: "Jadi", key: "JmlJadi", width: "70px", align: "right" },
   { title: "Status", key: "Status", width: "110px" },
+  { title: "Status Klien", key: "StatusKlien", width: "120px" },
   { title: "SO/MAP", key: "SoMapNomor", width: "150px" },
   { title: "Marketing", key: "NamaMarketing", width: "130px" },
 ];
@@ -113,12 +122,18 @@ const STATUS_LABEL: Record<string, { label: string; bg: string; fg: string }> =
     OPEN: { label: "Open", bg: "#e3f2fd", fg: "#1565c0" },
     PROGRESS: { label: "Progress", bg: "#fff3e0", fg: "#e65100" },
     DONE: { label: "Done", bg: "#e8f5e9", fg: "#2e7d32" },
-    CLOSE: { label: "ACC", bg: "#2e7d32", fg: "#ffffff" },
-    PENDING: { label: "Pending", bg: "#eeeeee", fg: "#757575" },
-    CANCEL: { label: "Cancel", bg: "#eeeeee", fg: "#9e9e9e" },
-    CANCEL_ALT: { label: "Cancel Alt", bg: "#eeeeee", fg: "#9e9e9e" },
+    CLOSE: { label: "Close", bg: "#2e7d32", fg: "#ffffff" },
   };
-const MANUAL_STATUSES = ["PENDING", "CANCEL", "CANCEL_ALT"];
+const STATUS_KLIEN_LABEL: Record<
+  string,
+  { label: string; bg: string; fg: string }
+> = {
+  ACC: { label: "ACC", bg: "#2e7d32", fg: "#ffffff" },
+  PENDING: { label: "Pending", bg: "#eeeeee", fg: "#757575" },
+  CANCEL: { label: "Cancel", bg: "#eeeeee", fg: "#9e9e9e" },
+  CANCEL_ALT: { label: "Cancel Alt", bg: "#eeeeee", fg: "#9e9e9e" },
+};
+const KLIEN_MANUAL = ["PENDING", "CANCEL", "CANCEL_ALT"];
 const PRIORITAS_LABEL: Record<
   string,
   { label: string; bg: string; fg: string }
@@ -132,7 +147,7 @@ const PRIORITAS_LABEL: Record<
 const rowStyleFn = (data: any) => {
   const item = data.item?.raw || data.item;
   if (!item) return {};
-  if (MANUAL_STATUSES.includes(item.Status)) {
+  if (KLIEN_MANUAL.includes(item.StatusKlien)) {
     return { style: "opacity: 0.5" };
   }
   if (["DONE", "CLOSE"].includes(item.Status) || !item.Dateline) return {};
@@ -282,6 +297,7 @@ const onExport = async () => {
       Jml: Number(r.Jml) || 0,
       JmlJadi: Number(r.JmlJadi) || 0,
       Status: STATUS_LABEL[r.Status]?.label || r.Status,
+      StatusKlien: STATUS_KLIEN_LABEL[r.StatusKlien]?.label || "",
       AlasanStatus: r.StatusKeterangan || "",
       Marketing: r.NamaMarketing,
     }));
@@ -300,6 +316,7 @@ const onExport = async () => {
         { header: "Jml", key: "Jml", align: "right" },
         { header: "Jml Jadi", key: "JmlJadi", align: "right" },
         { header: "Status", key: "Status" },
+        { header: "Status Klien", key: "StatusKlien" },
         { header: "Alasan Status", key: "AlasanStatus" },
         { header: "Marketing", key: "Marketing" },
       ],
@@ -385,7 +402,7 @@ const onExportDetail = async () => {
 
 const isSelectedManual = computed(() =>
   selectedItem.value
-    ? MANUAL_STATUSES.includes(selectedItem.value.Status)
+    ? KLIEN_MANUAL.includes(selectedItem.value.StatusKlien)
     : false,
 );
 
@@ -396,9 +413,7 @@ const isSuperUser = computed(() =>
 // Hanya setelah DONE (atau sudah berstatus manual), oleh desainer yang menyelesaikan PD / EDP-IT.
 const canSetStatus = computed(() => {
   const it = selectedItem.value;
-  if (!it) return false;
-  if (it.Status !== "DONE" && !MANUAL_STATUSES.includes(it.Status))
-    return false;
+  if (!it || it.Status !== "DONE") return false;
   return (
     isSuperUser.value ||
     (bagianUser.value === "DESAIN" && it.UserDone === authStore.user?.kode)
@@ -422,20 +437,20 @@ const onSoMapSelected = (item: any) => {
 const isSavingStatus = ref(false);
 const isResumingStatus = ref(false);
 
-const isCloseMode = computed(() => statusValue.value === "CLOSE");
+const isCloseMode = computed(() => statusValue.value === "ACC");
 const statusOptions = computed(() =>
   [
-    { title: "ACC", value: "CLOSE" },
+    { title: "ACC", value: "ACC" },
     { title: "Pending", value: "PENDING" },
     { title: "Cancel", value: "CANCEL" },
     { title: "Cancel Alt", value: "CANCEL_ALT" },
-  ].filter((o) => o.value !== selectedItem.value?.Status),
+  ].filter((o) => o.value !== selectedItem.value?.StatusKlien),
 );
 
 const openStatusDialog = () => {
   if (!selectedItem.value) return;
   statusNomor.value = selectedItem.value.Nomor;
-  statusValue.value = "CLOSE";
+  statusValue.value = "ACC";
   statusKeterangan.value = "";
   statusReferensi.value = "";
   statusSoMap.value = "";
@@ -518,10 +533,10 @@ const resumeSelected = async () => {
   isResumingStatus.value = true;
   try {
     await svc.resumeStatus(selectedItem.value.Nomor);
-    toast.success("PD diaktifkan kembali.");
+    toast.success("Status klien dikembalikan ke Menunggu.");
     fetchData();
   } catch (e: any) {
-    toast.error(e.response?.data?.message || "Gagal mengaktifkan kembali.");
+    toast.error(e.response?.data?.message || "Gagal mereset status klien.");
   } finally {
     isResumingStatus.value = false;
   }
@@ -616,11 +631,16 @@ const openEdit = () => {
           <span class="fsep">s.d.</span>
           <input type="date" v-model="tglAkhir" class="finp" />
           <select v-model="statusFilter" class="finp">
-            <option value="">Semua Status</option>
+            <option value="">Semua Status Desain</option>
             <option value="OPEN">Open</option>
             <option value="PROGRESS">Progress</option>
             <option value="DONE">Done</option>
-            <option value="CLOSE">ACC</option>
+            <option value="CLOSE">Close</option>
+          </select>
+          <select v-model="statusKlienFilter" class="finp">
+            <option value="">Semua Status Klien</option>
+            <option value="MENUNGGU">Menunggu</option>
+            <option value="ACC">ACC</option>
             <option value="PENDING">Pending</option>
             <option value="CANCEL">Cancel</option>
             <option value="CANCEL_ALT">Cancel Alt</option>
@@ -640,7 +660,7 @@ const openEdit = () => {
             v-if="canEditPD"
             size="small"
             color="orange-darken-2"
-            :disabled="!selectedItem || isSelectedManual || isSelectedDone"
+            :disabled="!selectedItem || isSelectedDone"
             @click="openEdit"
           >
             <template #prepend><IconEdit :size="15" /></template>
@@ -656,15 +676,14 @@ const openEdit = () => {
             Set Status
           </v-btn>
           <v-btn
-            v-if="isSelectedManual"
+            v-if="isSelectedManual && canSetStatus"
             size="small"
             color="primary"
-            :disabled="!selectedItem"
             :loading="isResumingStatus"
             @click="resumeSelected"
           >
             <template #prepend><IconRefresh :size="15" /></template>
-            Aktifkan Kembali
+            Reset Status Klien
           </v-btn>
           <v-btn
             v-if="selectedItem?.Status === 'CLOSE' && isSuperUser"
@@ -718,7 +737,6 @@ const openEdit = () => {
         <template #item.Status="{ item }">
           <v-chip
             size="x-small"
-            :title="item.StatusKeterangan || undefined"
             :style="{
               backgroundColor: STATUS_LABEL[item.Status]?.bg,
               color: STATUS_LABEL[item.Status]?.fg,
@@ -727,6 +745,26 @@ const openEdit = () => {
           >
             {{ STATUS_LABEL[item.Status]?.label || item.Status }}
           </v-chip>
+        </template>
+
+        <template #item.StatusKlien="{ item }">
+          <v-chip
+            v-if="item.StatusKlien"
+            size="x-small"
+            :title="item.StatusKeterangan || undefined"
+            :style="{
+              backgroundColor: STATUS_KLIEN_LABEL[item.StatusKlien]?.bg,
+              color: STATUS_KLIEN_LABEL[item.StatusKlien]?.fg,
+            }"
+            class="font-weight-bold"
+          >
+            {{
+              STATUS_KLIEN_LABEL[item.StatusKlien]?.label || item.StatusKlien
+            }}
+          </v-chip>
+          <span v-else-if="item.Status === 'DONE'" class="text-grey">
+            Menunggu
+          </span>
         </template>
 
         <template #item.Prioritas="{ item }">
@@ -749,7 +787,12 @@ const openEdit = () => {
               {{ item.PathDesain }}
             </div>
             <div v-if="item.StatusKeterangan" class="pd-status-ket">
-              <b>{{ STATUS_LABEL[item.Status]?.label || item.Status }}:</b>
+              <b
+                >{{
+                  STATUS_KLIEN_LABEL[item.StatusKlien]?.label ||
+                  item.StatusKlien
+                }}:</b
+              >
               {{ item.StatusKeterangan }}
               <template v-if="item.Referensi">
                 &middot; PD terkait {{ item.Referensi }}
@@ -802,7 +845,7 @@ const openEdit = () => {
         class="pa-3 bg-primary text-white"
         style="font-size: 13px; font-weight: 700"
       >
-        {{ isCloseMode ? "ACC PD" : "Set Status" }} —
+        {{ isCloseMode ? "ACC PD" : "Set Status Klien" }} —
         {{ statusNomor }}
       </v-card-title>
       <v-card-text class="pa-4">
