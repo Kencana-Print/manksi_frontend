@@ -113,7 +113,7 @@ const STATUS_LABEL: Record<string, { label: string; bg: string; fg: string }> =
     OPEN: { label: "Open", bg: "#e3f2fd", fg: "#1565c0" },
     PROGRESS: { label: "Progress", bg: "#fff3e0", fg: "#e65100" },
     DONE: { label: "Done", bg: "#e8f5e9", fg: "#2e7d32" },
-    CLOSE: { label: "Close", bg: "#2e7d32", fg: "#ffffff" },
+    CLOSE: { label: "ACC", bg: "#2e7d32", fg: "#ffffff" },
     PENDING: { label: "Pending", bg: "#eeeeee", fg: "#757575" },
     CANCEL: { label: "Cancel", bg: "#eeeeee", fg: "#9e9e9e" },
     CANCEL_ALT: { label: "Cancel Alt", bg: "#eeeeee", fg: "#9e9e9e" },
@@ -389,20 +389,20 @@ const isSelectedManual = computed(() =>
     : false,
 );
 
-const isSuperUser = computed(() => ["EDP", "AUDIT"].includes(bagianUser.value));
+const isSuperUser = computed(() =>
+  ["EDP", "IT", "AUDIT"].includes(bagianUser.value),
+);
 
-// DONE: hanya EDP/IT atau desainer yang menyelesaikan PD tsb; CLOSE: tidak ada aksi status
+// Hanya setelah DONE (atau sudah berstatus manual), oleh desainer yang menyelesaikan PD / EDP-IT.
 const canSetStatus = computed(() => {
   const it = selectedItem.value;
   if (!it) return false;
-  if (it.Status === "CLOSE") return false;
-  if (it.Status === "DONE") {
-    return (
-      isSuperUser.value ||
-      (bagianUser.value === "DESAIN" && it.UserDone === authStore.user?.kode)
-    );
-  }
-  return !MANUAL_STATUSES.includes(it.Status);
+  if (it.Status !== "DONE" && !MANUAL_STATUSES.includes(it.Status))
+    return false;
+  return (
+    isSuperUser.value ||
+    (bagianUser.value === "DESAIN" && it.UserDone === authStore.user?.kode)
+  );
 });
 
 const showStatusDialog = ref(false);
@@ -424,20 +424,18 @@ const isResumingStatus = ref(false);
 
 const isCloseMode = computed(() => statusValue.value === "CLOSE");
 const statusOptions = computed(() =>
-  isCloseMode.value
-    ? [{ title: "Close", value: "CLOSE" }]
-    : [
-        { title: "Pending", value: "PENDING" },
-        { title: "Cancel", value: "CANCEL" },
-        { title: "Cancel Alt", value: "CANCEL_ALT" },
-      ],
+  [
+    { title: "ACC", value: "CLOSE" },
+    { title: "Pending", value: "PENDING" },
+    { title: "Cancel", value: "CANCEL" },
+    { title: "Cancel Alt", value: "CANCEL_ALT" },
+  ].filter((o) => o.value !== selectedItem.value?.Status),
 );
 
 const openStatusDialog = () => {
   if (!selectedItem.value) return;
   statusNomor.value = selectedItem.value.Nomor;
-  statusValue.value =
-    selectedItem.value.Status === "DONE" ? "CLOSE" : "PENDING";
+  statusValue.value = "CLOSE";
   statusKeterangan.value = "";
   statusReferensi.value = "";
   statusSoMap.value = "";
@@ -476,7 +474,7 @@ const saveStatusManual = async () => {
         soMapNomor: statusSoMap.value.trim(),
         path: statusPath.value.trim(),
       });
-      toast.success("PD berhasil di-close.");
+      toast.success("PD berhasil di-ACC.");
     } else {
       await svc.setStatusManual(statusNomor.value, {
         status: statusValue.value,
@@ -622,7 +620,7 @@ const openEdit = () => {
             <option value="OPEN">Open</option>
             <option value="PROGRESS">Progress</option>
             <option value="DONE">Done</option>
-            <option value="CLOSE">Close</option>
+            <option value="CLOSE">ACC</option>
             <option value="PENDING">Pending</option>
             <option value="CANCEL">Cancel</option>
             <option value="CANCEL_ALT">Cancel Alt</option>
@@ -804,7 +802,7 @@ const openEdit = () => {
         class="pa-3 bg-primary text-white"
         style="font-size: 13px; font-weight: 700"
       >
-        {{ isCloseMode ? "Close PD" : "Set Status Manual" }} —
+        {{ isCloseMode ? "ACC PD" : "Set Status" }} —
         {{ statusNomor }}
       </v-card-title>
       <v-card-text class="pa-4">
@@ -818,7 +816,6 @@ const openEdit = () => {
           density="compact"
           class="mb-3"
           hide-details
-          :disabled="isCloseMode"
         />
         <template v-if="isCloseMode">
           <div class="lookup-field mb-3">
