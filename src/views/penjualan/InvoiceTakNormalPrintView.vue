@@ -206,7 +206,7 @@ const generateTxt = () => {
       `${padR(LABEL_TERBILANG + tb1, wTerbilang)}${padR("Total", wLabel)}: ${padL(num(t.totalBarang), wAngka)}`,
     );
     lines.push(
-      `${padR(tb2, wTerbilang)}${padR("Diskon", wLabel)}: ${padL(num(t.disc), wAngka)}`,
+      `${padR(tb2, wTerbilang)}${padR("Disc", wLabel)}: ${padL(num(t.disc), wAngka)}`,
     );
     lines.push(
       `${padR("", wTerbilang)}${padR("Total PPN", wLabel)}: ${padL(num(t.totalPpn), wAngka)}`,
@@ -555,7 +555,7 @@ onMounted(() => {
               <span>Total</span><span>{{ num(totals.totalBarang) }}</span>
             </div>
             <div class="summary-row">
-              <span>Diskon</span><span>{{ num(totals.disc) }}</span>
+              <span>Disc</span><span>{{ num(totals.disc) }}</span>
             </div>
             <div class="summary-row">
               <span>Total PPN</span><span>{{ num(totals.totalPpn) }}</span>
