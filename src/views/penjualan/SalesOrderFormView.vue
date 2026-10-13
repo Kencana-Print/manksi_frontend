@@ -207,6 +207,8 @@ const defaultData = {
   spk_bordir: "N",
   spk_sublim: "N",
   spk_tipe: "Medium",
+  spk_pen_nomor: "",
+  spk_pen_id: "",
 
   // Array untuk Tabel Detail
   spk_repeat: "",
@@ -428,6 +430,8 @@ const {
         spk_pjahit: data.spk_pjahit,
         spk_pfinishing: data.spk_pfinishing,
         spk_nomormemo: data.spk_nomormemo, // ← No SJ Memo
+        spk_pen_nomor: data.spk_pen_nomor || "", // ← baru
+        spk_pen_id: data.spk_pen_id || "", // ← baru
         spk_memo: data.spk_memo, // ← No MAP
         spk_tipe: data.spk_tipe, // ← Tipe SPK
         spk_nama2: data.spk_nama2, // ← Nama Ext
