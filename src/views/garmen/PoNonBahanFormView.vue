@@ -190,10 +190,11 @@ const {
         bpb: item.bpb,
         jumlah: item.jumlah,
         harga: item.harga,
-        // ⚠️ FIX: item.pod_jumlah/item.pod_harga tidak pernah ada di
-        // response (field asli namanya jumlah/harga) — sebelumnya selalu
-        // NaN. Ganti pakai field yang benar-benar dikirim backend.
-        total: (Number(item.jumlah) || 0) * (Number(item.harga) || 0),
+        ppn: Number(item.ppn) || 0,
+        total:
+          (Number(item.jumlah) || 0) *
+          (Number(item.harga) || 0) *
+          (1 + (Number(item.ppn) || 0) / 100),
       })),
     };
   },
@@ -318,7 +319,10 @@ const onSupEnter = async () => {
 
 const recalcTotal = (idx: number) => {
   const row = formData.value.items[idx];
-  row.total = (Number(row.jumlah) || 0) * (Number(row.harga) || 0);
+  row.total =
+    (Number(row.jumlah) || 0) *
+    (Number(row.harga) || 0) *
+    (1 + (Number(row.ppn) || 0) / 100);
 };
 
 // --- VALIDATION BEFORE SAVE (1:1 Delphi Logic) ---
@@ -560,6 +564,13 @@ const onPrintCancel = () => {
                 >
                   Harga
                 </th>
+                <th
+                  v-if="canSeeBeli"
+                  style="width: 70px; background: #ffeb3b"
+                  class="text-right text-dark"
+                >
+                  PPN %
+                </th>
                 <th v-if="canSeeBeli" style="width: 110px" class="text-right">
                   Total
                 </th>
@@ -616,6 +627,20 @@ const onPrintCancel = () => {
                     @input="onHargaInput($event, Number(idx))"
                   />
                 </td>
+                <td v-if="canSeeBeli" class="p0">
+                  <input
+                    v-model.number="item.ppn"
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="any"
+                    class="ci text-right"
+                    :class="{ ro: item.bpb > 0 || formData.header.isTutupBuku }"
+                    :readonly="item.bpb > 0 || formData.header.isTutupBuku"
+                    @input="recalcTotal(Number(idx))"
+                    v-select-on-focus
+                  />
+                </td>
                 <td
                   v-if="canSeeBeli"
                   class="text-right px-2 font-weight-bold text-error ro"
@@ -634,7 +659,7 @@ const onPrintCancel = () => {
             <tfoot v-if="canSeeBeli">
               <tr class="footer-row">
                 <td
-                  colspan="10"
+                  colspan="11"
                   class="text-right font-weight-bold footer-lbl pr-3"
                 >
                   GRAND TOTAL

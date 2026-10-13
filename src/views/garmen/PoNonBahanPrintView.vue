@@ -1,46 +1,38 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
 import { useRoute } from "vue-router";
-// Menggunakan Form Service yang sudah ada
 import { poNonBahanFormService } from "@/services/garmen/poNonBahanFormService";
-
-// Import logo kencana print
-import LogoImg from "@/assets/logo.png";
 
 const route = useRoute();
 const reportData = ref<any[]>([]);
 const master = ref<any>({});
 const isLoading = ref(true);
 
-// Format bulan Indonesia sesuai cetakan contoh: 05-Mei-2026
+const BULAN = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "Mei",
+  "Jun",
+  "Jul",
+  "Agu",
+  "Sep",
+  "Okt",
+  "Nov",
+  "Des",
+];
 const formatDateDisplay = (val: string) => {
   if (!val) return "";
   const d = new Date(val);
   if (isNaN(d.getTime())) return val;
-  const IndonesianMonths = [
-    "Jan",
-    "Feb",
-    "Mar",
-    "Apr",
-    "Mei",
-    "Jun",
-    "Jul",
-    "Agu",
-    "Sep",
-    "Okt",
-    "Nov",
-    "Des",
-  ];
-  return `${String(d.getDate()).padStart(2, "0")}-${IndonesianMonths[d.getMonth()]}-${d.getFullYear()}`;
+  return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
 };
-
-const formatCurrency = (val: any) => {
-  return Number(val || 0).toLocaleString("id-ID", { minimumFractionDigits: 0 });
-};
+const fmt = (val: any) =>
+  Number(val || 0).toLocaleString("id-ID", { maximumFractionDigits: 2 });
 
 const fetchData = async () => {
   try {
-    // Memanggil getDetail dari Form Service lama
     const res = await poNonBahanFormService.getDetail(
       route.params.nomor as string,
     );
@@ -51,280 +43,357 @@ const fetchData = async () => {
       po_nomor: header.po_nomor,
       po_tanggal: header.po_tanggal,
       po_ket: header.po_ket,
-      // Mengambil user pembuat
+      // ASUMSI nama field, sesuaikan dengan service kamu
+      cabang: header.po_cab || header.po_cabang || header.cab || "",
+      kurs: header.po_kurs || header.kurs || "",
+      vendor:
+        header.sup_nama ||
+        header.Supplier ||
+        header.po_sup_nama ||
+        header.po_sup ||
+        "",
       usr: header.user_create || header.Usr || "",
     };
 
-    // Mapping detail agar sesuai nama field template
-    reportData.value = detail.map((item: any) => ({
-      pod_brg_kode: item.pod_brg_kode || item.Kode,
-      Nama: item.Nama,
-      Satuan: item.Satuan,
-      pod_jumlah: item.pod_jumlah || item.jumlah || 0,
-      pod_harga: item.pod_harga || item.harga || 0,
-    }));
+    reportData.value = detail.map((item: any) => {
+      const qty = Number(item.pod_jumlah ?? item.jumlah ?? 0);
+      const harga = Number(item.pod_harga ?? item.harga ?? 0);
+      const ppnPct = Number(item.pod_ppn ?? item.ppn ?? 0); // ASUMSI: persen
+      const subtotal = qty * harga;
+      return {
+        kode: item.pod_brg_kode || item.Kode,
+        nama: item.Nama,
+        satuan: item.Satuan,
+        qty,
+        harga,
+        ppnPct,
+        subtotal,
+        ppnNilai: (subtotal * ppnPct) / 100,
+      };
+    });
   } catch (error) {
     console.error("Gagal memuat data cetak PO:", error);
   } finally {
     isLoading.value = false;
-    // Memicu dialog cetak browser
-    setTimeout(() => {
-      window.print();
-    }, 500);
+    setTimeout(() => window.print(), 500);
   }
 };
 
-// Hitung total nilai PO
-const grandTotal = computed(() => {
-  return reportData.value.reduce(
-    (sum, item) => sum + Number(item.pod_jumlah) * Number(item.pod_harga),
-    0,
-  );
-});
+const totalSub = computed(() =>
+  reportData.value.reduce((s, i) => s + i.subtotal, 0),
+);
+const totalPpn = computed(() =>
+  reportData.value.reduce((s, i) => s + i.ppnNilai, 0),
+);
+const grandTotal = computed(() => totalSub.value + totalPpn.value);
 
-onMounted(() => fetchData());
+onMounted(fetchData);
 </script>
 
 <template>
-  <div class="print-container" v-if="!isLoading">
-    <div class="company-header">
-      <div class="comp-left">
-        <div class="comp-name">CV. Kencana Print</div>
-        <div class="comp-address">
-          Padokan RT 04 / 04 Sawahan Ngemplak Boyolali
+  <div class="po" v-if="!isLoading">
+    <div class="top-bar">Purchase Order</div>
+
+    <div class="head">
+      <div class="head-left">
+        <div class="comp-name">CV. KENCANA PRINT</div>
+        <div class="small">Padokan, RT. 04 / RW. 04, Sawahan</div>
+        <div class="small">Ngempak Boyolali</div>
+        <div class="small">Telp 0271-740634 Fax 0271-740634</div>
+        <div class="small">NPWP 02.765.779.0-527.000</div>
+      </div>
+      <div class="head-right">
+        <div class="big-title">Purchase Order</div>
+        <div class="meta">
+          <div class="meta-row">
+            <span class="ml">Date</span
+            ><span class="mv">{{ formatDateDisplay(master.po_tanggal) }}</span>
+          </div>
+          <div class="meta-row">
+            <span class="ml">P.O. Number</span
+            ><span class="mv">{{ master.po_nomor }}</span>
+          </div>
+          <div class="meta-row">
+            <span class="ml">Order from</span
+            ><span class="mv">{{ master.cabang }}</span>
+          </div>
         </div>
-        <div class="comp-phone">0271-740634</div>
-      </div>
-      <div class="comp-right">
-        <img :src="LogoImg" alt="Kencana Print" class="comp-logo" />
       </div>
     </div>
 
-    <div class="thick-line mb-3"></div>
+    <div class="vendor-bar">Vendor</div>
+    <div class="vendor-name">{{ master.vendor }}</div>
 
-    <div class="doc-title">PO {{ master.po_jenis }}</div>
-    <div class="thick-line mb-3"></div>
-
-    <div class="meta-grid">
-      <div class="meta-row">
-        <span class="meta-lbl">No</span><span class="meta-sep">:</span>
-        <span class="meta-val font-code font-bold">{{ master.po_nomor }}</span>
-      </div>
-      <div class="meta-row">
-        <span class="meta-lbl">Tanggal</span><span class="meta-sep">:</span>
-        <span class="meta-val">{{ formatDateDisplay(master.po_tanggal) }}</span>
-      </div>
-      <div class="meta-row">
-        <span class="meta-lbl">Keterangan</span><span class="meta-sep">:</span>
-        <span class="meta-val text-upper">{{ master.po_ket || "-" }}</span>
-      </div>
-    </div>
-
-    <table class="print-table full-grid">
+    <table class="tbl">
       <thead>
         <tr>
-          <th style="width: 40px" class="text-center">No</th>
-          <th style="width: 110px">Kode Barang</th>
-          <th>Nama Barang</th>
-          <th style="width: 80px" class="text-center">Satuan</th>
-          <th style="width: 80px" class="text-center">Qty</th>
-          <th style="width: 100px" class="text-right">Harga</th>
-          <th style="width: 110px" class="text-right">Jumlah</th>
+          <th style="width: 70px">Code</th>
+          <th>Product Name/Description</th>
+          <th style="width: 110px">Quantity</th>
+          <th style="width: 110px">Unit Price</th>
+          <th style="width: 120px">Total</th>
         </tr>
       </thead>
       <tbody>
-        <tr v-for="(item, idx) in reportData" :key="idx">
-          <td class="text-center">{{ idx + 1 }}</td>
-          <td class="font-code text-center">{{ item.pod_brg_kode }}</td>
-          <td class="font-bold text-upper">{{ item.Nama }}</td>
-          <td class="text-center text-upper">{{ item.Satuan }}</td>
-          <td class="text-center font-bold">
-            {{ formatCurrency(item.pod_jumlah) }}
-          </td>
-          <td class="text-right">{{ formatCurrency(item.pod_harga) }}</td>
-          <td class="text-right font-bold">
-            {{ formatCurrency(item.pod_jumlah * item.pod_harga) }}
-          </td>
-        </tr>
-        <tr class="total-row font-bold">
-          <td colspan="6" class="text-right">TOTAL :</td>
-          <td class="text-right grand-total-cell">
-            {{ formatCurrency(grandTotal) }}
-          </td>
+        <template v-for="(it, i) in reportData" :key="i">
+          <tr class="item-row">
+            <td class="tc">{{ it.kode }}</td>
+            <td>
+              <div class="nm">{{ it.nama }}</div>
+              <div v-if="it.ppnPct > 0" class="ppn-line">
+                PPN {{ it.ppnPct }}%
+              </div>
+            </td>
+            <td class="qty">
+              <span class="qty-n">{{ fmt(it.qty) }}</span>
+              <span class="qty-u">{{ it.satuan }}</span>
+            </td>
+            <td class="tr">{{ fmt(it.harga) }}</td>
+            <td class="tr">
+              <div>{{ fmt(it.subtotal) }}</div>
+              <div v-if="it.ppnPct > 0" class="ppn-line">
+                {{ fmt(it.ppnNilai) }}
+              </div>
+            </td>
+          </tr>
+        </template>
+        <tr class="fill">
+          <td></td>
+          <td></td>
+          <td></td>
+          <td></td>
+          <td></td>
         </tr>
       </tbody>
+      <tfoot>
+        <tr>
+          <td colspan="3" class="no-b"></td>
+          <td class="total-lbl">TOTAL</td>
+          <td class="tr total-val">{{ fmt(grandTotal) }}</td>
+        </tr>
+      </tfoot>
     </table>
 
-    <div class="sign-block">
-      <div class="sign-title">Dibuat Oleh,</div>
+    <div v-if="master.kurs" class="kurs">
+      <span>KURS</span><span class="kurs-v">{{ master.kurs }}</span>
+    </div>
+
+    <div class="ket-box">{{ master.po_ket }}</div>
+
+    <div class="notes">
+      <div class="notes-h">Notes and Instructions</div>
+      <div class="notes-b">
+        <b>alamat pengiriman di:</b><br />
+        CV Kencana Print<br />
+        Jeron RT01 RW03 Demen, Jeron, Nogosari<br />
+        Boyolali, Jawa Tengah
+      </div>
+    </div>
+
+    <div class="sign">
       <div class="sign-space"></div>
-      <div class="sign-name text-upper">{{ master.usr }}</div>
+      <div class="sign-name">{{ master.usr }}</div>
+      <div class="sign-role">Purchasing</div>
     </div>
   </div>
 </template>
 
 <style scoped>
-/* Container Setup */
-.print-container {
+.po {
+  --navy: #0b3d66;
   width: 210mm;
   margin: 0 auto;
-  padding: 15px 20px;
-  color: #000;
   background: #fff;
+  color: #000;
   font-family: Arial, sans-serif;
   font-size: 11px;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
 }
-.company-header {
+.top-bar {
+  background: var(--navy);
+  color: #fff;
+  font-size: 26px;
+  font-weight: 700;
+  padding: 4px 6px;
+}
+.head {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 2px;
+  padding: 8px 0 14px;
 }
 .comp-name {
-  font-size: 13px;
+  font-size: 17px;
   font-weight: 700;
-  color: #000;
+  margin-bottom: 6px;
 }
-.comp-address,
-.comp-phone {
-  font-size: 11px;
-  color: #000;
+.small {
+  font-size: 10px;
+  line-height: 1.7;
 }
-.comp-logo {
-  height: 28px;
-  object-fit: contain;
+.head-right {
+  width: 270px;
 }
-
-/* Separator bar tebal */
-.thick-line {
-  width: 100%;
-  height: 2px;
-  background-color: #000;
-}
-.doc-title {
-  font-size: 15px;
+.big-title {
+  font-size: 32px;
   font-weight: 700;
-  text-transform: uppercase;
-  padding: 5px 0;
-  letter-spacing: 0.02em;
-}
-.meta-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  margin-bottom: 12px;
+  color: var(--navy);
+  text-align: right;
+  margin-bottom: 8px;
 }
 .meta-row {
   display: flex;
-  align-items: center;
-  font-size: 11px;
+  align-items: flex-end;
+  margin-bottom: 2px;
 }
-.meta-lbl {
-  width: 70px;
-  font-weight: bold;
+.ml {
+  width: 100px;
+  padding-left: 12px;
 }
-.meta-sep {
-  width: 15px;
-}
-.meta-val {
-  font-weight: normal;
+.mv {
+  flex: 1;
+  border-bottom: 1px solid #000;
+  padding: 0 4px;
 }
 
-/* STYLING FULL GRID TABLE (SOLUSI) */
-.print-table.full-grid {
+.vendor-bar {
+  background: var(--navy);
+  color: #fff;
+  font-weight: 700;
+  width: 190px;
+  padding: 1px 4px;
+}
+.vendor-name {
+  font-weight: 700;
+  font-size: 12px;
+  margin: 2px 0 18px;
+  text-transform: uppercase;
+}
+
+.tbl {
   width: 100%;
   border-collapse: collapse;
-  margin-top: 5px;
-  font-size: 11px;
-  border: 1px solid #000; /* Border luar solid */
 }
-.print-table.full-grid thead tr th {
-  border: 1px solid #000; /* Garis grid header solid */
-  padding: 6px 4px;
+.tbl thead th {
+  background: var(--navy);
+  color: #fff;
   font-weight: 700;
-  color: #000;
-  text-align: left;
-  background-color: #f2f2f2; /* Sedikit shading abu di header agar kontras */
+  padding: 3px 4px;
+  text-align: center;
+  border-right: 1px solid #fff;
 }
-.print-table.full-grid tbody td {
-  padding: 5px 4px;
-  border: 1px solid #000; /* Garis grid body solid di semua sisi sel */
-  vertical-align: middle;
+.tbl tbody td {
+  border-left: 1px solid #888;
+  border-right: 1px solid #888;
+  padding: 2px 6px;
+  vertical-align: top;
 }
-
-/* Total Row Integrasi Grid */
-.print-table.full-grid tbody tr.total-row td {
-  border: 1px solid #000; /* Tetap ada garis grid di baris total */
-  padding: 6px 4px;
+.tbl tbody tr:first-child td {
+  padding-top: 14px;
 }
-.grand-total-cell {
-  font-size: 12px;
+.tbl tbody {
+  border-bottom: 1px solid #888;
 }
-
-/* Signature Block */
-.sign-block {
-  margin-top: 30px;
-  float: right;
-  width: 160px;
+.tc {
   text-align: center;
 }
-.sign-title {
-  font-size: 11px;
+.tr {
+  text-align: right;
+}
+.nm {
+  text-transform: uppercase;
+}
+.ppn-line {
+  padding-left: 6px;
+}
+.tr .ppn-line {
+  padding-left: 0;
+}
+.qty {
+  display: flex;
+  justify-content: space-between;
+}
+.qty-n {
+  text-align: right;
+  flex: 1;
+}
+.qty-u {
+  width: 36px;
+  padding-left: 6px;
+}
+.fill td {
+  height: 200px;
+}
+.tbl tfoot td {
+  padding: 3px 6px;
+}
+.no-b {
+  border: none;
+}
+.total-lbl {
+  font-weight: 700;
+  border: 1px solid #888;
+  border-top: none;
+}
+.total-val {
+  font-weight: 700;
+  border: 1px solid #888;
+  border-top: none;
+  border-left: none;
+}
+
+.kurs {
+  display: flex;
+  gap: 40px;
+  margin-top: 8px;
+  font-size: 12px;
+}
+.ket-box {
+  border: 1px solid #000;
+  min-height: 20px;
+  margin-top: 22px;
+  width: 62%;
+  padding: 3px 6px;
+}
+
+.notes {
+  width: 55%;
+  margin-top: 40px;
+  border: 1px solid #000;
+}
+.notes-h {
+  background: var(--navy);
+  color: #fff;
+  font-weight: 700;
+  text-align: center;
+  padding: 1px;
+}
+.notes-b {
+  padding: 40px 14px 12px;
+  line-height: 1.5;
+}
+
+.sign {
+  width: 150px;
+  margin: 24px 0 0 auto;
 }
 .sign-space {
-  height: 55px;
+  height: 40px;
 }
 .sign-name {
   font-weight: 700;
-  text-decoration: underline;
+  border-bottom: 1px solid #000;
+}
+.sign-role {
+  font-size: 10px;
 }
 
-/* Helpers */
-.text-center {
-  text-align: center !important;
-}
-.text-right {
-  text-align: right !important;
-}
-.text-upper {
-  text-transform: uppercase !important;
-}
-.font-code {
-  font-family: monospace;
-  font-size: 12px;
-}
-.font-bold {
-  font-weight: 700;
-}
-.mb-3 {
-  margin-bottom: 12px;
-}
-.truncate {
-  max-width: 250px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* Media Query untuk Print */
 @media print {
-  body {
-    background: #fff;
-    padding: 0;
-    margin: 0;
-  }
-  .print-container {
+  .po {
     width: 100%;
-    padding: 0;
-    box-shadow: none;
   }
-  /* Pastikan garis tercetak jelas */
-  .print-table.full-grid {
-    border: 1px solid #000 !important;
-  }
-  .print-table.full-grid th,
-  .print-table.full-grid td {
-    border: 1px solid #000 !important;
+  @page {
+    margin: 8mm;
   }
 }
 </style>

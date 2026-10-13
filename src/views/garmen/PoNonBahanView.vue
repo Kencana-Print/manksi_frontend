@@ -278,6 +278,7 @@ const onExportDetail = () => {
       Jumlah: "",
       "Qty BPB": "",
       Harga: "",
+      "PPN %": "",
       Total: "",
     });
 
@@ -298,6 +299,7 @@ const onExportDetail = () => {
         Jumlah: Number(det.Jumlah) || 0,
         "Qty BPB": Number(det.QtyBpb) || 0,
         Harga: Number(det.Harga) || 0,
+        "PPN %": Number(det.Ppn) || 0,
         Total: Number(det.Total) || 0,
       });
     });
@@ -590,6 +592,13 @@ const rowPropsFn = (data: any) => {
                     </th>
                     <th
                       v-if="canLihatBeli"
+                      style="width: 70px"
+                      class="text-right"
+                    >
+                      PPN %
+                    </th>
+                    <th
+                      v-if="canLihatBeli"
                       style="width: 110px"
                       class="text-right"
                     >
@@ -627,6 +636,9 @@ const rowPropsFn = (data: any) => {
                     <td v-if="canLihatBeli" class="text-right">
                       {{ formatQty(dtl.Harga) }}
                     </td>
+                    <td v-if="canLihatBeli" class="text-right">
+                      {{ Number(dtl.Ppn) ? Number(dtl.Ppn) + "%" : "-" }}
+                    </td>
                     <td
                       v-if="canLihatBeli"
                       class="text-right font-weight-bold text-error"
@@ -636,7 +648,7 @@ const rowPropsFn = (data: any) => {
                   </tr>
                   <tr v-if="getDetailItems(item.Nomor).length === 0">
                     <td
-                      colspan="9"
+                      colspan="10"
                       class="text-center text-grey py-3 font-italic"
                     >
                       Tidak ada detail barang.
