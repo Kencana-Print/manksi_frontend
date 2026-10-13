@@ -277,24 +277,32 @@ const onExport = async () => {
         NomorPO: m.NomorPO,
         Spk: displaySpk,
       };
+
+      // sebelumnya: semua key master dikosongkan dengan ""
+      const numKeysMaster = ["Jumlah", "Prasj", "Kirim"];
       const blankMaster = Object.fromEntries(
-        Object.keys(masterCells).map((k) => [k, ""]),
+        Object.keys(masterCells).map((k) => [
+          k,
+          numKeysMaster.includes(k) ? null : "",
+        ]),
       );
+
       const blankSj = {
         NomorSJ: "",
         TanggalSJ: "",
         Gudang: "",
         UkuranSJ: "",
-        JumlahSJ: "",
+        JumlahSJ: null, // was ""
         Alamat: "",
         Kota: "",
       };
+
       const blankInv = {
         NomorInv: "",
         TanggalInv: "",
         Keterangan: "",
-        JumlahInv: "",
-        Harga: "",
+        JumlahInv: null, // was ""
+        Harga: null, // was ""
       };
 
       for (let i = 0; i < rowCount; i++) {
