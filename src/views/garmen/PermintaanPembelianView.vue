@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, onMounted } from "vue";
+import { ref, computed, watch, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
 import * as XLSX from "xlsx";
@@ -16,6 +16,7 @@ import {
   IconCircleCheck,
   IconFileDescription,
   IconCalendarEvent,
+  IconPhoto,
 } from "@tabler/icons-vue";
 import { formatTanggal, formatTanggalJam } from "@/utils/dateFormat";
 
@@ -281,6 +282,57 @@ const onPrint = () => {
   );
 };
 
+// --- LIHAT GAMBAR (read-only, tidak terpengaruh kunci edit) ---
+const gambarDialog = ref(false);
+const gambarLoading = ref(false);
+const gambarNomor = ref("");
+const gambarItems = ref<any[]>([]);
+const gambarFailed = ref<Record<string, boolean>>({});
+const gambarZoom = ref("");
+const zoomDialog = ref(false);
+
+const openZoom = (kode: string) => {
+  gambarZoom.value = gambarUrl(gambarNomor.value, kode);
+  zoomDialog.value = true;
+};
+
+const gambarUrl = (nomor: string, kode: string) =>
+  `/images/permintaan-pembelian/${nomor}${kode}.jpg`;
+
+const gambarAdaTampil = computed(() =>
+  gambarItems.value.some((d) => !gambarFailed.value[d.Kode]),
+);
+
+const onLihatGambar = async () => {
+  if (!selectedItem.value) return toast.warning("Pilih data terlebih dahulu.");
+  const { Nomor, Jenis } = selectedItem.value;
+
+  gambarNomor.value = Nomor;
+  gambarItems.value = [];
+  gambarFailed.value = {};
+  gambarDialog.value = true;
+  gambarLoading.value = true;
+  try {
+    let detail = detailsData.value[Nomor];
+    if (!detail) {
+      const res = await permintaanPembelianService.getDetail(Nomor, Jenis);
+      detail = res.data.data;
+      detailsData.value[Nomor] = detail;
+    }
+    gambarItems.value = detail;
+  } catch {
+    toast.error(`Gagal memuat detail ${Nomor}`);
+    gambarDialog.value = false;
+  } finally {
+    gambarLoading.value = false;
+  }
+};
+
+// Item yang tidak punya file gambar (404) disembunyikan
+const onGambarItemError = (kode: string) => {
+  gambarFailed.value[kode] = true;
+};
+
 // --- PENGAJUAN PERUBAHAN (PIN 5) ---
 const actionDialog = ref(false);
 const actionForm = ref({
@@ -493,6 +545,18 @@ const submitEstimasi = async () => {
       </v-btn>
 
       <v-btn
+        size="small"
+        color="indigo-darken-1"
+        :disabled="selected.length === 0"
+        @click="onLihatGambar"
+      >
+        <template #prepend
+          ><IconPhoto :size="15" :stroke-width="1.7"
+        /></template>
+        Lihat Gambar
+      </v-btn>
+
+      <v-btn
         v-if="canExport"
         size="small"
         color="teal-darken-2"
@@ -699,6 +763,62 @@ const submitEstimasi = async () => {
         </button>
       </div>
     </div>
+  </v-dialog>
+
+  <!-- DIALOG LIHAT GAMBAR -->
+  <v-dialog v-model="gambarDialog" max-width="760px">
+    <div class="close-dlg">
+      <div class="close-dlg-header" style="background: #3949ab">
+        <IconPhoto :size="14" color="white" class="mr-2" />
+        Gambar Barang - {{ gambarNomor }}
+        <button class="dlg-x" @click="gambarDialog = false">✕</button>
+      </div>
+      <div class="close-dlg-body gbr-body">
+        <div v-if="gambarLoading" class="text-center py-6">
+          <v-progress-circular
+            indeterminate
+            color="primary"
+            size="24"
+            width="2"
+          />
+        </div>
+        <template v-else>
+          <div v-if="!gambarAdaTampil" class="text-center text-grey py-6">
+            Tidak ada gambar pada permintaan ini.
+          </div>
+          <div class="gbr-grid">
+            <div
+              v-for="d in gambarItems"
+              v-show="!gambarFailed[d.Kode]"
+              :key="d.Kode"
+              class="gbr-card"
+              @click="openZoom(d.Kode)"
+            >
+              <img
+                :src="gambarUrl(gambarNomor, d.Kode)"
+                :alt="d.Nama"
+                loading="lazy"
+                @error="onGambarItemError(d.Kode)"
+              />
+              <div class="gbr-cap">
+                <b>{{ d.Kode }}</b
+                ><br />{{ d.Nama }}
+              </div>
+            </div>
+          </div>
+        </template>
+      </div>
+      <div class="close-dlg-footer">
+        <button class="dlg-btn cancel" @click="gambarDialog = false">
+          Tutup
+        </button>
+      </div>
+    </div>
+  </v-dialog>
+
+  <!-- ZOOM -->
+  <v-dialog v-model="zoomDialog" max-width="900px">
+    <img :src="gambarZoom" class="gbr-zoom" @click="zoomDialog = false" />
   </v-dialog>
 </template>
 
@@ -914,5 +1034,42 @@ const submitEstimasi = async () => {
 }
 .dlg-btn.cancel:hover {
   background: #d6d6d6;
+}
+
+.gbr-body {
+  max-height: 70vh;
+  overflow: auto;
+}
+.gbr-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 10px;
+}
+.gbr-card {
+  border: 1px solid #d0d0d0;
+  border-radius: 4px;
+  overflow: hidden;
+  cursor: zoom-in;
+  background: #fafafa;
+}
+.gbr-card img {
+  width: 100%;
+  height: 140px;
+  object-fit: contain;
+  background: white;
+  display: block;
+}
+.gbr-cap {
+  padding: 4px 6px;
+  font-size: 10px;
+  line-height: 1.3;
+  border-top: 1px solid #eee;
+}
+.gbr-zoom {
+  width: 100%;
+  max-height: 90vh;
+  object-fit: contain;
+  background: white;
+  cursor: zoom-out;
 }
 </style>
