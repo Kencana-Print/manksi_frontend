@@ -185,7 +185,7 @@ const generateTxt = () => {
     return lines;
   };
 
-  // Tidak ada baris Disc — modul ini tidak punya konsep diskon
+  // Baris Diskon tampil di antara Total dan Total PPN
   const buildFooterLines = (): string[] => {
     const lines: string[] = [];
     lines.push(LINE);
@@ -206,7 +206,10 @@ const generateTxt = () => {
       `${padR(LABEL_TERBILANG + tb1, wTerbilang)}${padR("Total", wLabel)}: ${padL(num(t.totalBarang), wAngka)}`,
     );
     lines.push(
-      `${padR(tb2, wTerbilang)}${padR("Total PPN", wLabel)}: ${padL(num(t.totalPpn), wAngka)}`,
+      `${padR(tb2, wTerbilang)}${padR("Diskon", wLabel)}: ${padL(num(t.disc), wAngka)}`,
+    );
+    lines.push(
+      `${padR("", wTerbilang)}${padR("Total PPN", wLabel)}: ${padL(num(t.totalPpn), wAngka)}`,
     );
     lines.push(
       `${padR("", wTerbilang)}${padR("Grand Total", wLabel)}: ${padL(num(t.grandTotal), wAngka)}`,
@@ -375,6 +378,7 @@ const fetchData = async () => {
     detail.value = d.detail;
     totals.value = {
       totalBarang: d.totalBarang,
+      disc: d.disc,
       totalPpn: d.totalPpn,
       grandTotal: d.grandTotal,
       uangMuka: d.uangMuka,
@@ -545,10 +549,13 @@ onMounted(() => {
             </tbody>
           </table>
 
-          <!-- Summary hanya tampil di halaman terakhir — TANPA baris Disc -->
+          <!-- Summary hanya tampil di halaman terakhir -->
           <div v-if="pi === paginatedDetails.length - 1" class="summary-box">
             <div class="summary-row">
               <span>Total</span><span>{{ num(totals.totalBarang) }}</span>
+            </div>
+            <div class="summary-row">
+              <span>Diskon</span><span>{{ num(totals.disc) }}</span>
             </div>
             <div class="summary-row">
               <span>Total PPN</span><span>{{ num(totals.totalPpn) }}</span>
