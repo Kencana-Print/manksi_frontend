@@ -1201,9 +1201,10 @@ const rollClass = (s: "OK" | "NO" | "-"): string =>
           atas, bawah, dan setting hanya pada roll yang dicek (minimal sesuai
           kolom Dicek); baris kosong tidak dihitung. Nilai kosong = mengikuti
           saran sistem. <b>3</b> = semua roll sesuai, lot otomatis LANJUT.
-          <b>2</b> = sebagian roll sesuai, diputuskan Pembelian (atau Gudang
-          naikkan ke 3 dengan alasan). <b>1</b> = semua roll di luar toleransi,
-          diputuskan Pembelian. Sesuai = dalam rentang PO ±{{
+          <b>2</b> = sebagian roll sesuai, diputuskan Pembelian (atau
+          dilanjutkan Gudang lewat Tindakan &gt; Submit di browse, dengan
+          alasan). <b>1</b> = semua roll di luar toleransi, diputuskan
+          Pembelian. Sesuai = dalam rentang PO ±{{
             formData.toleransi.gramasi
           }}
           gram (gramasi) / ±{{ formData.toleransi.setting }}

@@ -109,6 +109,7 @@ const groupIdenticalItems = (items: any[], poJenis: number) => {
     const nama = item.pod_namaext || item.bhn_name || "";
     const kode = item.pod_bhn_kode || "";
     const key = [
+      item.pod_sup_kode || "",
       kode,
       nama,
       item.satuan_print,
@@ -171,6 +172,14 @@ onMounted(async () => {
       itemsConverted = groupIdenticalItems(itemsConverted, d.header?.po_jenis);
     }
 
+    if (d.header?.po_jenis === 4) {
+      itemsConverted.sort((a: any, b: any) =>
+        String(a.pod_sup_nama || a.pod_sup_kode || "").localeCompare(
+          String(b.pod_sup_nama || b.pod_sup_kode || ""),
+        ),
+      );
+    }
+
     const rollsConverted = (d.rolls || []).map((row: any) => ({
       no: Number(row.pod3_no) || 0,
       kode: row.pod3_bhn_kode || "",
@@ -204,6 +213,7 @@ const isBahan = computed(
     dataPO.value?.header?.po_jenis !== 1 &&
     dataPO.value?.header?.po_jenis !== 2,
 );
+const isLainLain = computed(() => dataPO.value?.header?.po_jenis === 4);
 
 const groupedRolls = computed(() => {
   if (!dataPO.value?.rolls) return [];
@@ -231,6 +241,7 @@ const totalColumns = computed(() => {
   let n = 8; // No, Nama, Satuan, Qty, Gramasi(kedua), Setting, Harga Dpp, Harga
   if (isBahan.value) n += 1; // Kode
   if (!isBahan.value) n += 1; // Gramasi Awal
+  if (isLainLain.value) n += 1; // Supplier
   n += 2; // Disc, Total
   return n;
 });
@@ -253,11 +264,17 @@ const totalColumns = computed(() => {
 
       <div class="info-box">
         <div class="info-left">
-          <p>Kepada YTH :</p>
-          <p class="supplier-name">{{ dataPO.header.sup_nama }}</p>
-          <p>{{ dataPO.header.sup_alamat }}</p>
-          <p>{{ dataPO.header.sup_kota }}</p>
-          <p>Up. {{ dataPO.header.sup_cp || "" }}</p>
+          <template v-if="isLainLain">
+            <p>Kepada YTH :</p>
+            <p class="supplier-name">Sesuai kolom Supplier</p>
+          </template>
+          <template v-else>
+            <p>Kepada YTH :</p>
+            <p class="supplier-name">{{ dataPO.header.sup_nama }}</p>
+            <p>{{ dataPO.header.sup_alamat }}</p>
+            <p>{{ dataPO.header.sup_kota }}</p>
+            <p>Up. {{ dataPO.header.sup_cp || "" }}</p>
+          </template>
         </div>
         <div class="info-right">
           <table>
@@ -275,7 +292,9 @@ const totalColumns = computed(() => {
                     ? "PO GREIGE"
                     : dataPO.header.po_jenis === 2
                       ? "PO CELUP"
-                      : "PO BAHAN"
+                      : dataPO.header.po_jenis === 4
+                        ? "PO LAIN-LAIN"
+                        : "PO BAHAN"
                 }}
               </td>
             </tr>
@@ -295,6 +314,7 @@ const totalColumns = computed(() => {
             <!-- Kolom Kode muncul khusus untuk PO Bahan -->
             <th width="80" v-if="isBahan">Kode</th>
             <th>Nama</th>
+            <th width="110" v-if="isLainLain">Supplier</th>
             <th width="45">Satuan</th>
             <th width="65">Qty</th>
             <!-- Gramasi Awal HANYA untuk Greige & Celup, tidak untuk Bahan -->
@@ -312,6 +332,9 @@ const totalColumns = computed(() => {
             <td class="tc">{{ Number(index) + 1 }}.</td>
             <td class="tc" v-if="isBahan">{{ item.pod_bhn_kode }}</td>
             <td class="nama-cell">{{ item.pod_namaext || item.bhn_name }}</td>
+            <td v-if="isLainLain">
+              {{ item.pod_sup_nama || item.pod_sup_kode }}
+            </td>
             <td class="tc">{{ item.satuan_print }}</td>
             <td class="tr">{{ formatNum(item.qty_print, 2) }}</td>
             <td class="tc" v-if="!isBahan">{{ item.gramasiAwal || "-" }}</td>

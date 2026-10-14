@@ -15,6 +15,8 @@ interface QcSiapRow {
   qty: number | string;
   roll: number | string;
   satuan: string;
+  sup_kode: string | null;
+  supplier: string;
 }
 
 const props = defineProps<{ modelValue: boolean }>();
@@ -33,7 +35,7 @@ const filtered = computed(() => {
   const q = search.value.trim().toLowerCase();
   if (!q) return rows.value;
   return rows.value.filter((r) =>
-    [r.nomor, r.po, r.jenis, r.vendor].some((v) =>
+    [r.nomor, r.po, r.jenis, r.vendor, r.supplier].some((v) =>
       String(v ?? "")
         .toLowerCase()
         .includes(q),
@@ -41,12 +43,15 @@ const filtered = computed(() => {
   );
 });
 
-// QC yang digabung dalam satu BPB harus dari PO yang sama
-const poTerpilih = computed(
-  () => rows.value.find((r) => r.nomor === picked.value[0])?.po ?? "",
+// QC yang digabung dalam satu BPB harus dari PO dan supplier yang sama
+const qcPertama = computed(() =>
+  rows.value.find((r) => r.nomor === picked.value[0]),
 );
-const bolehPilih = (r: QcSiapRow) =>
-  !poTerpilih.value || r.po === poTerpilih.value;
+const bolehPilih = (r: QcSiapRow) => {
+  const p = qcPertama.value;
+  if (!p) return true;
+  return r.po === p.po && (r.sup_kode ?? "") === (p.sup_kode ?? "");
+};
 
 const tutup = () => emit("update:modelValue", false);
 
@@ -133,6 +138,11 @@ const numFmt = (v: number | string) =>
                 v-for="r in filtered"
                 :key="r.nomor"
                 :class="{ off: !bolehPilih(r) }"
+                :title="
+                  bolehPilih(r)
+                    ? ''
+                    : 'Beda PO atau supplier dengan QC yang sudah dipilih'
+                "
                 @click="toggle(r)"
               >
                 <td class="tc">
@@ -164,7 +174,7 @@ const numFmt = (v: number | string) =>
         </div>
         <p class="qs-note">
           Hanya lot berkeputusan LANJUT yang belum diterima yang akan ditarik.
-          QC yang digabung harus dari PO yang sama.
+          QC yang digabung harus dari PO dan supplier yang sama.
         </p>
       </v-card-text>
       <v-card-actions class="pa-3 border-t">

@@ -48,6 +48,10 @@ export const pengajuanTransferFormService = {
     api.get("/pembelian/pengajuan-transfer-form/bkk-options", {
       params: { search },
     }),
+  getPoLainOptions: (search = "", nomor = "") =>
+    api.get("/pembelian/pengajuan-transfer-form/po-lain-options", {
+      params: { search, nomor },
+    }),
   getDetailForm(nomor: string) {
     return api.get("/pembelian/pengajuan-transfer-form/detail", {
       params: { nomor },

@@ -256,6 +256,8 @@ const onExportDetail = async () => {
     order.forEach((key) => {
       const rowsInGroup = groups[key];
       const first = rowsInGroup[0];
+      // PO Lain-lain: supplier berbeda per baris, jadi tidak ditaruh di master
+      const isLainLain = first.JenisPO === "LAIN-LAIN";
 
       // Data Header/Master yang hanya muncul di baris pertama
       const masterCells = {
@@ -263,7 +265,9 @@ const onExportDetail = async () => {
         Tanggal: formatTanggal(first.Tanggal),
         Comm_Delivery: formatTanggal(first.Comm_Delivery),
         JenisPO: first.JenisPO,
-        ...(canLihatSup.value ? { Supplier: first.Supplier } : {}),
+        ...(canLihatSup.value && !isLainLain
+          ? { Supplier: first.Supplier }
+          : {}),
       };
 
       // Baris blanko untuk detail kedua dan seterusnya
@@ -274,6 +278,7 @@ const onExportDetail = async () => {
       rowsInGroup.forEach((r, idx) => {
         combinedRows.push({
           ...(idx === 0 ? masterCells : blankMaster),
+          ...(canLihatSup.value && isLainLain ? { Supplier: r.Supplier } : {}),
           Kode: r.Kode,
           Nama: r.Nama,
           Satuan: r.Satuan,
@@ -573,6 +578,12 @@ const summaryFormatters = {
                 <th width="120">No. MKB</th>
                 <th width="120">No. SPK</th>
                 <th width="200">Nama SPK</th>
+                <th
+                  v-if="canLihatSup && item.JenisPO === 'LAIN-LAIN'"
+                  width="180"
+                >
+                  Supplier
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -604,6 +615,9 @@ const summaryFormatters = {
                 <td>{{ d.MKB || "-" }}</td>
                 <td>{{ d.SPK || "-" }}</td>
                 <td>{{ d.Nama_SPK || "-" }}</td>
+                <td v-if="canLihatSup && item.JenisPO === 'LAIN-LAIN'">
+                  {{ d.Supplier || "-" }}
+                </td>
               </tr>
               <tr
                 v-if="

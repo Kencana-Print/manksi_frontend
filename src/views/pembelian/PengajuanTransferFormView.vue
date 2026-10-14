@@ -369,6 +369,54 @@ const selectPc = (p: any) => {
   showPcModal.value = false;
 };
 
+// ── PO Lain-lain (F6) ──
+const showPoLainModal = ref(false);
+const poLainState = ref<ModalState<any>>(createModalState());
+let poLainDebounce: ReturnType<typeof setTimeout> | null = null;
+
+const doSearchPoLain = async () => {
+  poLainState.value.loading = true;
+  try {
+    const res = await pengajuanTransferFormService.getPoLainOptions(
+      poLainState.value.search,
+      form.value.nomor,
+    );
+    poLainState.value.allItems = res.data.data || [];
+  } finally {
+    poLainState.value.loading = false;
+  }
+};
+const searchPoLainDebounced = () => {
+  if (poLainDebounce) clearTimeout(poLainDebounce);
+  poLainDebounce = setTimeout(doSearchPoLain, 350);
+};
+const openPoLainModal = async (idx: number) => {
+  activeTrsIdx.value = idx;
+  poLainState.value = createModalState();
+  showPoLainModal.value = true;
+  await doSearchPoLain();
+};
+const selectPoLain = async (p: any) => {
+  const exists = form.value.detail.some(
+    (d, i) =>
+      i !== activeTrsIdx.value && d.trs === p.nomor && d.kode === p.supKode,
+  );
+  if (exists) {
+    toast.warning("PO Lain-lain tsb untuk supplier ini sudah di input.");
+    return;
+  }
+  const idx = activeTrsIdx.value;
+  const d = form.value.detail[idx];
+  d.trs = p.nomor;
+  d.nominal = Number(p.nominal) || 0;
+  showPoLainModal.value = false;
+
+  // Isi kode/nama/bank/rekening supplier dari baris PO yang dipilih
+  // (reuse alur pilih supplier; kalau rekening >1, muncul pilihan rekening)
+  activeSupIdx.value = idx;
+  await selectSupplier({ Kode: p.supKode, Nama: p.supplier });
+};
+
 // ── Account (realisasi) ──
 const showAccModal = ref(false);
 const activeAccIdx = ref(-1);
@@ -813,6 +861,9 @@ const skipCetak = () => {
             <div class="hint-row">
               <span class="hint-key">F4</span> Petty Cash
             </div>
+            <div class="hint-row">
+              <span class="hint-key">F6</span> PO Lain-lain
+            </div>
           </div>
         </div>
       </CollapsiblePanel>
@@ -836,7 +887,7 @@ const skipCetak = () => {
                 <th style="width: 80px">Bank</th>
                 <th style="min-width: 150px">Atas Nama</th>
                 <th style="min-width: 130px">Rek. Tujuan</th>
-                <th style="min-width: 120px">No. Transaksi</th>
+                <th style="min-width: 160px">No. Transaksi</th>
                 <th style="width: 110px" class="text-right">Nominal</th>
                 <th style="min-width: 160px">Keterangan</th>
                 <th style="width: 100px">Tgl Realisasi</th>
@@ -928,6 +979,9 @@ const skipCetak = () => {
                       @keydown.f4.prevent="
                         !d.jurnal && !isRealisasi && openPcModal(idx)
                       "
+                      @keydown.f6.prevent="
+                        !d.jurnal && !isRealisasi && openPoLainModal(idx)
+                      "
                     />
                     <div v-if="!d.jurnal && !isRealisasi" class="trs-btn-group">
                       <button
@@ -961,6 +1015,14 @@ const skipCetak = () => {
                         @click="openPcModal(idx)"
                       >
                         C
+                      </button>
+                      <button
+                        type="button"
+                        class="trs-btn"
+                        title="F6: PO Lain-lain"
+                        @click="openPoLainModal(idx)"
+                      >
+                        L
                       </button>
                     </div>
                   </div>
@@ -1345,6 +1407,63 @@ const skipCetak = () => {
               </tr>
               <tr v-if="pcState.allItems.length === 0">
                 <td colspan="5" class="text-center text-grey py-3">
+                  Tidak ada hasil
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </v-card-text>
+    </v-card>
+  </v-dialog>
+
+  <!-- Modal PO Lain-lain (F6) -->
+  <v-dialog v-model="showPoLainModal" max-width="820px" scrollable>
+    <v-card class="rounded-lg">
+      <v-card-title
+        class="pa-3 text-subtitle-1 text-white"
+        style="background: #455a64"
+        >F6 — PO Lain-lain</v-card-title
+      >
+      <v-card-text class="pa-3">
+        <input
+          v-model="poLainState.search"
+          class="f-inp mb-2"
+          placeholder="Cari nomor PO atau supplier..."
+          autofocus
+          @input="searchPoLainDebounced"
+        />
+        <div style="max-height: 340px; overflow-y: auto">
+          <div v-if="poLainState.loading" class="text-center py-4 text-grey">
+            Memuat...
+          </div>
+          <table v-else class="mini-table">
+            <thead>
+              <tr>
+                <th style="width: 130px">Nomor PO</th>
+                <th style="width: 95px">Tanggal</th>
+                <th>Supplier</th>
+                <th style="width: 110px" class="text-right">Total</th>
+                <th style="width: 110px" class="text-right">Diajukan</th>
+                <th style="width: 110px" class="text-right">Sisa</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="p in poLainState.allItems"
+                :key="p.nomor + '|' + p.supKode"
+                class="mini-row"
+                @click="selectPoLain(p)"
+              >
+                <td>{{ p.nomor }}</td>
+                <td>{{ p.tanggal }}</td>
+                <td>{{ p.supplier }}</td>
+                <td class="text-right">{{ numFmt(p.total) }}</td>
+                <td class="text-right">{{ numFmt(p.sudah) }}</td>
+                <td class="text-right">{{ numFmt(p.nominal) }}</td>
+              </tr>
+              <tr v-if="poLainState.allItems.length === 0">
+                <td colspan="6" class="text-center text-grey py-3">
                   Tidak ada hasil
                 </td>
               </tr>

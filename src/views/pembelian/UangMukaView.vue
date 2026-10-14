@@ -660,8 +660,15 @@ const tglFmt = (v: any) => {
   if (isNaN(d.getTime())) return v;
   return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
 };
-const sumberLabel = (v: string) =>
-  v === "PENGAJUAN_DANA" ? "Pengajuan Dana" : "Permintaan Pembelian";
+const SUMBER_META: Record<string, { label: string; color: string }> = {
+  PENGAJUAN_DANA: { label: "Pengajuan Dana", color: "blue" },
+  PERMINTAAN_PEMBELIAN: { label: "Permintaan Pembelian", color: "orange" },
+  INSENTIF: { label: "Insentif", color: "purple" },
+  PO_LAIN_LAIN: { label: "PO Lain-lain", color: "teal" },
+  BKK_P04: { label: "BKK Kas Kecil P04", color: "indigo" },
+};
+const sumberLabel = (v: string) => SUMBER_META[v]?.label ?? v;
+const sumberColor = (v: string) => SUMBER_META[v]?.color ?? "grey";
 
 const STATUS_LABEL: Record<
   string,
@@ -1075,11 +1082,7 @@ const goPenyelesaian = () => {
       </template>
 
       <template #item.Sumber="{ item }">
-        <v-chip
-          size="x-small"
-          :color="item.Sumber === 'PENGAJUAN_DANA' ? 'blue' : 'orange'"
-          variant="flat"
-        >
+        <v-chip size="x-small" :color="sumberColor(item.Sumber)" variant="flat">
           {{ sumberLabel(item.Sumber) }}
         </v-chip>
       </template>
@@ -1172,7 +1175,10 @@ const goPenyelesaian = () => {
                 </tbody>
               </table>
 
-              <table v-else class="dtl-table">
+              <table
+                v-else-if="item.Sumber === 'PERMINTAAN_PEMBELIAN'"
+                class="dtl-table"
+              >
                 <thead>
                   <tr>
                     <th>Kode</th>
@@ -1222,6 +1228,43 @@ const goPenyelesaian = () => {
                   </tr>
                   <tr v-if="!outstandingDetailCache[item.RowKey]?.length">
                     <td colspan="8" class="tc" style="color: #999">
+                      Tidak ada item tersisa.
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+              <table v-else class="dtl-table">
+                <thead>
+                  <tr>
+                    <th>Ref</th>
+                    <th>Item</th>
+                    <th>Keterangan</th>
+                    <th class="tr">Qty</th>
+                    <th>Satuan</th>
+                    <th class="tr">Nominal</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr
+                    v-for="(d, i) in outstandingDetailCache[item.RowKey]"
+                    :key="i"
+                  >
+                    <td class="mono">
+                      {{ d.Invoice || d.Kode || d.Account || "-" }}
+                    </td>
+                    <td class="fw">{{ d.Nama }}</td>
+                    <td>
+                      {{
+                        d.Supplier ||
+                        (d.Fee != null ? `Fee ${numFmt(d.Fee)}` : "")
+                      }}
+                    </td>
+                    <td class="tr">{{ numFmt(d.Qty) }}</td>
+                    <td>{{ d.Satuan }}</td>
+                    <td class="tr fw">{{ numFmt(d.Nominal) }}</td>
+                  </tr>
+                  <tr v-if="!outstandingDetailCache[item.RowKey]?.length">
+                    <td colspan="6" class="tc" style="color: #999">
                       Tidak ada item tersisa.
                     </td>
                   </tr>
@@ -1370,9 +1413,7 @@ const goPenyelesaian = () => {
                       <v-chip
                         v-if="d.Sumber !== 'KASBON'"
                         size="x-small"
-                        :color="
-                          d.Sumber === 'PENGAJUAN_DANA' ? 'blue' : 'orange'
-                        "
+                        :color="sumberColor(d.Sumber)"
                         variant="flat"
                         >{{ sumberLabel(d.Sumber) }}</v-chip
                       >

@@ -608,20 +608,18 @@ const numFmt = (v: number | string | null) =>
           </v-btn>
         </template>
         <v-list density="compact" class="text-caption">
-          <v-list density="compact" class="text-caption">
-            <v-list-item @click="openSubmitDialog" :disabled="!canEdit">
-              <template #prepend
-                ><IconSend :size="14" class="mr-2 text-success"
-              /></template>
-              <v-list-item-title>Submit Dokumen</v-list-item-title>
-            </v-list-item>
-            <v-list-item @click="openPinDialog" :disabled="!canEdit">
-              <template #prepend
-                ><IconShieldLock :size="14" class="mr-2 text-primary"
-              /></template>
-              <v-list-item-title>Pengajuan Perubahan Data</v-list-item-title>
-            </v-list-item>
-          </v-list>
+          <v-list-item @click="openSubmitDialog" :disabled="!canEdit">
+            <template #prepend
+              ><IconSend :size="14" class="mr-2 text-success"
+            /></template>
+            <v-list-item-title>Submit Dokumen</v-list-item-title>
+          </v-list-item>
+          <v-list-item @click="openPinDialog" :disabled="!canEdit">
+            <template #prepend
+              ><IconShieldLock :size="14" class="mr-2 text-primary"
+            /></template>
+            <v-list-item-title>Pengajuan Perubahan Data</v-list-item-title>
+          </v-list-item>
         </v-list>
       </v-menu>
     </template>

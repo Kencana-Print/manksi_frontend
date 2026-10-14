@@ -103,6 +103,10 @@ import {
   IconChecklist,
   IconTargetArrow,
   IconGavel,
+  IconEraser,
+  IconBulb,
+  IconFlame,
+  IconFold,
 } from "@tabler/icons-vue";
 
 export interface NavItem {
@@ -129,6 +133,7 @@ export const createMenuItems = (): NavItem[] => {
   const daftarMenu = ref(false);
   const pembelianMenu = ref(false);
   const ppicMenu = ref(false);
+  const spandukMenu = ref(false);
   const garmenMenu = ref(false);
   const penjualanMenu = ref(false);
   const piutangMenu = ref(false);
@@ -461,6 +466,92 @@ export const createMenuItems = (): NavItem[] => {
           to: "/ppic/lhk-marker",
           icon: IconRuler2,
           menuId: 179,
+        },
+      ],
+    },
+    {
+      title: "Spanduk",
+      icon: IconFlag,
+      model: spandukMenu,
+      menuId: 4,
+      items: [
+        {
+          title: "Daftar",
+          icon: IconLayoutList,
+          subItems: [
+            {
+              title: "Master Bahan",
+              to: "/spanduk/daftar/master-bahan",
+              icon: IconListDetails,
+              // Tanpa menuId, mengikuti hak akses parent (4)
+            },
+            {
+              title: "Bahan Penolong",
+              to: "/spanduk/daftar/bahan-penolong",
+              icon: IconFlask,
+            },
+            {
+              title: "Toleransi",
+              to: "/spanduk/daftar/toleransi",
+              icon: IconRuler2,
+            },
+          ],
+        },
+        {
+          title: "Lembar Harian Kerja (LHK)",
+          icon: IconClipboardList,
+          subItems: [
+            {
+              title: "LHK Plotter",
+              to: "/spanduk/lhk/lhk-plotter",
+              icon: IconListDetails,
+            },
+            {
+              title: "LHK Hapus Plankan",
+              to: "/spanduk/lhk/lhk-hapus-plankan",
+              icon: IconEraser,
+            },
+            {
+              title: "LHK Afdruk",
+              to: "/spanduk/lhk/lhk-afdruk",
+              icon: IconBulb,
+            },
+            {
+              title: "LHK Tinta/Cat",
+              to: "/spanduk/lhk/lhk-tinta",
+              icon: IconPalette,
+            },
+            {
+              title: "LHK Cetak",
+              to: "/spanduk/lhk/lhk-cetak",
+              icon: IconPrinter,
+            },
+            {
+              title: "LHK Quiring",
+              to: "/spanduk/lhk/lhk-quiring",
+              icon: IconFlame,
+              menuId: 1224,
+            },
+            {
+              title: "LHK Jahit",
+              to: "/spanduk/lhk/lhk-jahit",
+              icon: IconScissors,
+              menuId: 1222,
+            },
+            {
+              title: "LHK Lipat",
+              to: "/spanduk/lhk/lhk-lipat",
+              icon: IconFold,
+              menuId: 1223,
+            },
+          ],
+        },
+        { divider: true },
+        {
+          title: "Mutasi Produksi",
+          to: "/spanduk/mutasi-produksi",
+          icon: IconArrowsExchange,
+          // Tanpa menuId, mengikuti hak akses parent (4)
         },
       ],
     },

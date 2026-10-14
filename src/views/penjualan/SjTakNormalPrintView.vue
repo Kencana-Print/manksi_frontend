@@ -112,12 +112,29 @@ const wrapText = (text: string, maxWidth: number): string[] => {
 };
 
 const PAGE_WIDTH = 136;
-const NAMA_W = 50;
-const KET_W = 26;
+const NAMA_W = 45;
+const KET_W = 40;
+const SO_W = 15;
 const MAX_DATA_ROWS_PER_PAGE = 7;
 const LINE = "_".repeat(PAGE_WIDTH);
 
-const generateTxt = () => {
+const ESC = "\x1B";
+const BIG_ON = `${ESC}E${ESC}W\x01`;
+const BIG_OFF = `${ESC}W\x00${ESC}F`;
+const bigField = (
+  label: string,
+  value: string,
+  width: number,
+  withCodes: boolean,
+): string => {
+  const text = (value || "").toString();
+  const maxBig = Math.floor((width - label.length - 1) / 2);
+  if (!withCodes || text.length > maxBig) return padR(label + text, width);
+  const used = label.length + text.length * 2;
+  return label + BIG_ON + text + BIG_OFF + " ".repeat(width - used);
+};
+
+const generateTxt = (withCodes = true) => {
   const h = header.value;
   const rows = detail.value;
   const halfL = 67;
@@ -138,20 +155,20 @@ const generateTxt = () => {
     const alamatLines = wrapText(alamatFull, halfR);
 
     lines.push(
-      `${padR("Nomor      : " + (h.sj_nomor || ""), halfL)} ${padR("Customer : " + (h.cus_nama || ""), halfR)}`,
+      `${bigField("Nomor      : ", h.sj_nomor || "", halfL, withCodes)} ${padR("Customer : " + (h.cus_nama || ""), halfR)}`,
     );
     lines.push(
       `${padR("Tanggal    : " + (h.sj_tanggal_fmt || "").replace(/-/g, "/"), halfL)} ${padR(alamatLines[0] || "", halfR)}`,
     );
     lines.push(
-      `${padR("Keterangan : " + (h.sj_keterangan || ""), halfL)} ${padR(alamatLines[1] || "", halfR)}`,
+      `${bigField("Keterangan : ", h.sj_keterangan || "", halfL, withCodes)} ${padR(alamatLines[1] || "", halfR)}`,
     );
     for (let i = 2; i < alamatLines.length; i++) {
       lines.push(`${padR("", halfL)} ${padR(alamatLines[i], halfR)}`);
     }
     lines.push(LINE);
     lines.push(
-      `${padR("No", 3)} ${padR("SPK", 12)} ${padR("Nama", NAMA_W)} ${padR("Ukuran", 20)} ${padL("Jumlah", 10)} ${padL("Koli", 9)} ${padR("Keterangan", KET_W)}`,
+      `${padR("No", 3)} ${padR("SO", SO_W)} ${padR("Nama", NAMA_W)} ${padR("Ukuran", 13)} ${padL("Jumlah", 10)} ${padL("Koli", 9)} ${padR("Keterangan", KET_W)}`,
     );
     lines.push(LINE);
     return lines;
@@ -162,7 +179,7 @@ const generateTxt = () => {
       (s: number, r: any) => s + Number(r.sjd_jumlah || 0),
       0,
     );
-    const FAX_NO = h.perush_fax || h.perush_telp || "";
+    const FAX_NO = h.perush_telp || h.perush_fax || "";
     const EMAIL = h.perush_email || "";
     const lines: string[] = [];
     lines.push(LINE);
@@ -174,7 +191,7 @@ const generateTxt = () => {
       ),
     );
     lines.push(
-      `${padR(EMAIL ? "ATAU EMAIL DI " + EMAIL : "", PAGE_WIDTH - 24)}${padL("Total Jumlah: " + num(totalJml), 24)}`,
+      `${padR("ATAU EMAIL DI " + EMAIL, PAGE_WIDTH - 24)}${padL("Total Jumlah: " + num(totalJml), 24)}`,
     );
     lines.push("");
     lines.push(
@@ -183,7 +200,17 @@ const generateTxt = () => {
     lines.push("");
     lines.push("");
     lines.push(
-      `${padR("(               )", 27)} ${padR("(               )", 27)} ${padR("(               )", 27)} ${padR("(               )", 27)} ${padR("(               )", 27)}`,
+      `${padR("(                )", 27)} ${padR("(                )", 27)} ${padR("(                )", 27)} ${padR("(                )", 27)} ${padR("(                )", 27)}`,
+    );
+    lines.push("");
+    lines.push(
+      padR(
+        "Note : Pengaduan konsumen maks. 14 hari dari tanggal penerimaan barang.",
+        PAGE_WIDTH,
+      ),
+    );
+    lines.push(
+      padR("Melebihi batas waktu pengaduan, tidak diterima.", PAGE_WIDTH),
     );
     return lines;
   };
@@ -199,15 +226,16 @@ const generateTxt = () => {
   let currentRowNo = 1;
 
   for (const r of rows) {
-    const namaFull = (r.nama_barang || "").trim();
-    const namaLines = wrapText(namaFull, NAMA_W);
+    const namaLines = wrapText((r.nama_barang || "").trim(), NAMA_W);
+    const ketLines = wrapText((r.sjd_keterangan || "").trim(), KET_W);
+    const maxLines = Math.max(namaLines.length, ketLines.length);
 
     allPhysicalRows.push(
-      `${padR(String(currentRowNo), 3)} ${padR(r.sjd_spk_nomor || "", 12)} ${padR(namaLines[0], NAMA_W)} ${padR(r.sjd_ukuran || "", 20)} ${padL(num(r.sjd_jumlah), 10)} ${padL(num(r.sjd_koli), 9)} ${padR(r.sjd_keterangan || "", KET_W)}`,
+      `${padR(String(currentRowNo), 3)} ${padR(r.sjd_spk_nomor || "", SO_W)} ${padR(namaLines[0], NAMA_W)} ${padR(r.sjd_ukuran || "", 13)} ${padL(num(r.sjd_jumlah), 10)} ${padL(num(r.sjd_koli), 9)} ${padR(r.sjd_keterangan || "", KET_W)}`,
     );
-    for (let i = 1; i < namaLines.length; i++) {
+    for (let i = 1; i < maxLines; i++) {
       allPhysicalRows.push(
-        `${padR("", 3)} ${padR("", 12)} ${padR(namaLines[i], NAMA_W)} ${padR("", 20)} ${padL("", 10)} ${padL("", 9)} ${padR("", KET_W)}`,
+        `${padR("", 3)} ${padR("", SO_W)} ${padR(namaLines[i] || "", NAMA_W)} ${padR("", 13)} ${padL("", 10)} ${padL("", 9)} ${padR("", KET_W)}`,
       );
     }
     currentRowNo++;
@@ -239,7 +267,7 @@ const generateTxt = () => {
 };
 
 const downloadTxt = () => {
-  const content = generateTxt();
+  const content = generateTxt(true);
   const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -269,7 +297,7 @@ const printQZ = async () => {
       }
     }
     const config = qz.configs.create(printerName.value);
-    const content = generateTxt();
+    const content = generateTxt(false);
     const data = [
       "\x1B\x40",
       "\x1B\x4F",

@@ -219,7 +219,7 @@ const lotBerAlasan = computed(() =>
       <div class="note">
         Nilai 1: semua roll yang dicek di luar toleransi (diputuskan Pembelian)
         &nbsp;|&nbsp; Nilai 2: sebagian roll sesuai (diputuskan Pembelian, atau
-        dinaikkan Gudang ke 3 dengan alasan) &nbsp;|&nbsp; Nilai 3: semua roll
+        dilanjutkan Gudang dengan alasan) &nbsp;|&nbsp; Nilai 3: semua roll
         sesuai (otomatis lanjut). Sesuai = gramasi atas, gramasi bawah, dan
         setting dalam rentang PO &plusmn;{{ data.toleransi.gramasi }} gram /
         &plusmn;{{ data.toleransi.setting }}.

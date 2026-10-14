@@ -32,7 +32,9 @@ const route = useRoute();
 const toast = useToast();
 
 const isEditMode = computed(() => !!route.params.nomor);
-const isPo = ref(route.query.type !== "NON");
+// Mode tambah selalu BPB PO (Non PO dikunci). Saat edit, nilai ini
+// ditimpa dari data (BPB Non PO lama tetap tampil apa adanya).
+const isPo = ref(true);
 // BPB dari QC memakai type=QC. isPo tetap true (PO terikat, grid terkunci)
 const isQc = ref(route.query.type === "QC");
 

@@ -1027,6 +1027,454 @@ const router = createRouter({
       },
     },
 
+    // ── Spanduk ───────────────────────────────────────────────────────
+    {
+      path: "/spanduk/daftar/master-bahan",
+      name: "SpandukMasterBahan",
+      component: () => import("@/views/spanduk/daftar/MasterBahanView.vue"),
+      meta: {
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "4",
+        title: "Master Bahan Spanduk",
+      },
+    },
+    {
+      path: "/spanduk/daftar/bahan-penolong",
+      name: "SpandukBahanPenolong",
+      component: () => import("@/views/spanduk/daftar/BahanPenolongView.vue"),
+      meta: {
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "4",
+        title: "Bahan Penolong Spanduk",
+      },
+    },
+    {
+      path: "/spanduk/daftar/toleransi",
+      name: "SpandukToleransi",
+      component: () => import("@/views/spanduk/daftar/ToleransiView.vue"),
+      meta: {
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "4",
+        title: "Toleransi Spanduk",
+      },
+    },
+
+    {
+      path: "/spanduk/lhk/lhk-plotter",
+      name: "SpandukLhkPlotter",
+      component: () => import("@/views/spanduk/lhk/LhkPlotterView.vue"),
+      meta: {
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "4",
+        title: "LHK Plotter",
+      },
+    },
+    {
+      path: "/spanduk/lhk/lhk-plotter/form",
+      name: "SpandukLhkPlotterCreate",
+      component: () => import("@/views/spanduk/lhk/LhkPlotterFormView.vue"),
+      meta: {
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "4",
+        title: "Tambah LHK Plotter",
+        browseRoute: "SpandukLhkPlotter",
+      },
+    },
+    {
+      path: "/spanduk/lhk/lhk-plotter/form/:nomor",
+      name: "SpandukLhkPlotterEdit",
+      component: () => import("@/views/spanduk/lhk/LhkPlotterFormView.vue"),
+      meta: {
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "4",
+        title: "Ubah LHK Plotter",
+        browseRoute: "SpandukLhkPlotter",
+      },
+    },
+    {
+      path: "/spanduk/lhk/lhk-plotter/print/:nomor",
+      name: "SpandukLhkPlotterPrint",
+      component: () => import("@/views/spanduk/lhk/LhkPlotterPrintView.vue"),
+      meta: {
+        title: "Cetak LHK Plotter",
+        layout: "BlankLayout",
+        requiresAuth: true,
+      },
+    },
+    {
+      path: "/spanduk/lhk/lhk-hapus-plankan",
+      name: "SpandukLhkHapusPlankan",
+      component: () => import("@/views/spanduk/lhk/LhkHapusPlankanView.vue"),
+      meta: {
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "4",
+        title: "LHK Hapus Plankan",
+      },
+    },
+    {
+      path: "/spanduk/lhk/lhk-hapus-plankan/form",
+      name: "SpandukLhkHapusPlankanCreate",
+      component: () =>
+        import("@/views/spanduk/lhk/LhkHapusPlankanFormView.vue"),
+      meta: {
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "4",
+        title: "Tambah LHK Hapus Plankan",
+        browseRoute: "SpandukLhkHapusPlankan",
+      },
+    },
+    {
+      path: "/spanduk/lhk/lhk-hapus-plankan/form/:nomor",
+      name: "SpandukLhkHapusPlankanEdit",
+      component: () =>
+        import("@/views/spanduk/lhk/LhkHapusPlankanFormView.vue"),
+      meta: {
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "4",
+        title: "Ubah LHK Hapus Plankan",
+        browseRoute: "SpandukLhkHapusPlankan",
+      },
+    },
+    {
+      path: "/spanduk/lhk/lhk-hapus-plankan/print/:nomor",
+      name: "SpandukLhkHapusPlankanPrint",
+      component: () =>
+        import("@/views/spanduk/lhk/LhkHapusPlankanPrintView.vue"),
+      meta: {
+        title: "Cetak LHK Hapus Plankan",
+        layout: "BlankLayout",
+        requiresAuth: true,
+      },
+    },
+    {
+      path: "/spanduk/lhk/lhk-afdruk",
+      name: "SpandukLhkAfdruk",
+      component: () => import("@/views/spanduk/lhk/LhkAfdrukView.vue"),
+      meta: {
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "4",
+        title: "LHK Afdruk",
+      },
+    },
+    {
+      path: "/spanduk/lhk/lhk-afdruk/form",
+      name: "SpandukLhkAfdrukCreate",
+      component: () => import("@/views/spanduk/lhk/LhkAfdrukFormView.vue"),
+      meta: {
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "4",
+        title: "Tambah LHK Afdruk",
+        browseRoute: "SpandukLhkAfdruk",
+      },
+    },
+    {
+      path: "/spanduk/lhk/lhk-afdruk/form/:nomor",
+      name: "SpandukLhkAfdrukEdit",
+      component: () => import("@/views/spanduk/lhk/LhkAfdrukFormView.vue"),
+      meta: {
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "4",
+        title: "Ubah LHK Afdruk",
+        browseRoute: "SpandukLhkAfdruk",
+      },
+    },
+    {
+      path: "/spanduk/lhk/lhk-afdruk/print/:nomor",
+      name: "SpandukLhkAfdrukPrint",
+      component: () => import("@/views/spanduk/lhk/LhkAfdrukPrintView.vue"),
+      meta: {
+        layout: "BlankLayout",
+        requiresAuth: true,
+        title: "Cetak LHK Afdruk",
+      },
+    },
+    {
+      path: "/spanduk/lhk/lhk-tinta",
+      name: "SpandukLhkTinta",
+      component: () => import("@/views/spanduk/lhk/LhkTintaView.vue"),
+      meta: {
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "4",
+        title: "LHK Tinta/Cat",
+      },
+    },
+    {
+      path: "/spanduk/lhk/lhk-tinta/form",
+      name: "SpandukLhkTintaCreate",
+      component: () => import("@/views/spanduk/lhk/LhkTintaFormView.vue"),
+      meta: {
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "4",
+        title: "Tambah LHK Tinta/Cat",
+        browseRoute: "SpandukLhkTinta",
+      },
+    },
+    {
+      path: "/spanduk/lhk/lhk-tinta/form/:nomor",
+      name: "SpandukLhkTintaEdit",
+      component: () => import("@/views/spanduk/lhk/LhkTintaFormView.vue"),
+      meta: {
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "4",
+        title: "Ubah LHK Tinta/Cat",
+        browseRoute: "SpandukLhkTinta",
+      },
+    },
+    {
+      path: "/spanduk/lhk/lhk-tinta/print/:nomor",
+      name: "SpandukLhkTintaPrint",
+      component: () => import("@/views/spanduk/lhk/LhkTintaPrintView.vue"),
+      meta: {
+        layout: "BlankLayout",
+        requiresAuth: true,
+        title: "Cetak LHK Tinta/Cat",
+      },
+    },
+    {
+      path: "/spanduk/lhk/lhk-cetak",
+      name: "SpandukLhkCetak",
+      component: () => import("@/views/spanduk/lhk/LhkCetakView.vue"),
+      meta: {
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "4",
+        title: "LHK Cetak",
+      },
+    },
+    {
+      path: "/spanduk/lhk/lhk-cetak/form",
+      name: "SpandukLhkCetakCreate",
+      component: () => import("@/views/spanduk/lhk/LhkCetakFormView.vue"),
+      meta: {
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "4",
+        title: "Tambah LHK Cetak",
+        browseRoute: "SpandukLhkCetak",
+      },
+    },
+    {
+      path: "/spanduk/lhk/lhk-cetak/form/:nomor",
+      name: "SpandukLhkCetakEdit",
+      component: () => import("@/views/spanduk/lhk/LhkCetakFormView.vue"),
+      meta: {
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "4",
+        title: "Ubah LHK Cetak",
+        browseRoute: "SpandukLhkCetak",
+      },
+    },
+    {
+      path: "/spanduk/lhk/lhk-cetak/print/:nomor",
+      name: "SpandukLhkCetakPrint",
+      component: () => import("@/views/spanduk/lhk/LhkCetakPrintView.vue"),
+      meta: {
+        layout: "BlankLayout",
+        requiresAuth: true,
+        title: "Cetak LHK Cetak",
+      },
+    },
+    {
+      path: "/spanduk/lhk/lhk-quiring",
+      name: "SpandukLhkQuiring",
+      component: () => import("@/views/spanduk/lhk/LhkQuiringView.vue"),
+      meta: {
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "1224",
+        title: "LHK Quiring",
+      },
+    },
+    {
+      path: "/spanduk/lhk/lhk-quiring/form",
+      name: "SpandukLhkQuiringCreate",
+      component: () => import("@/views/spanduk/lhk/LhkQuiringFormView.vue"),
+      meta: {
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "1224",
+        title: "Tambah LHK Quiring",
+        browseRoute: "SpandukLhkQuiring",
+      },
+    },
+    {
+      path: "/spanduk/lhk/lhk-quiring/form/:nomor",
+      name: "SpandukLhkQuiringEdit",
+      component: () => import("@/views/spanduk/lhk/LhkQuiringFormView.vue"),
+      meta: {
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "1224",
+        title: "Ubah LHK Quiring",
+        browseRoute: "SpandukLhkQuiring",
+      },
+    },
+    {
+      path: "/spanduk/lhk/lhk-quiring/print/:nomor",
+      name: "SpandukLhkQuiringPrint",
+      component: () => import("@/views/spanduk/lhk/LhkQuiringPrintView.vue"),
+      meta: {
+        layout: "BlankLayout",
+        requiresAuth: true,
+        title: "Cetak LHK Quiring",
+      },
+    },
+    {
+      path: "/spanduk/lhk/lhk-jahit",
+      name: "SpandukLhkJahit",
+      component: () => import("@/views/spanduk/lhk/LhkJahitView.vue"),
+      meta: {
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "1222",
+        title: "LHK Jahit",
+      },
+    },
+    {
+      path: "/spanduk/lhk/lhk-jahit/form",
+      name: "SpandukLhkJahitCreate",
+      component: () => import("@/views/spanduk/lhk/LhkJahitFormView.vue"),
+      meta: {
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "1222",
+        title: "Tambah LHK Jahit",
+        browseRoute: "SpandukLhkJahit",
+      },
+    },
+    {
+      path: "/spanduk/lhk/lhk-jahit/form/:nomor",
+      name: "SpandukLhkJahitEdit",
+      component: () => import("@/views/spanduk/lhk/LhkJahitFormView.vue"),
+      meta: {
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "1222",
+        title: "Ubah LHK Jahit",
+        browseRoute: "SpandukLhkJahit",
+      },
+    },
+    {
+      path: "/spanduk/lhk/lhk-jahit/print/:nomor",
+      name: "SpandukLhkJahitPrint",
+      component: () => import("@/views/spanduk/lhk/LhkJahitPrintView.vue"),
+      meta: {
+        layout: "BlankLayout",
+        requiresAuth: true,
+        title: "Cetak LHK Jahit",
+      },
+    },
+    {
+      path: "/spanduk/lhk/lhk-lipat",
+      name: "SpandukLhkLipat",
+      component: () => import("@/views/spanduk/lhk/LhkLipatView.vue"),
+      meta: {
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "1223",
+        title: "LHK Lipat",
+      },
+    },
+    {
+      path: "/spanduk/lhk/lhk-lipat/form",
+      name: "SpandukLhkLipatCreate",
+      component: () => import("@/views/spanduk/lhk/LhkLipatFormView.vue"),
+      meta: {
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "1223",
+        title: "Tambah LHK Lipat",
+        browseRoute: "SpandukLhkLipat",
+      },
+    },
+    {
+      path: "/spanduk/lhk/lhk-lipat/form/:nomor",
+      name: "SpandukLhkLipatEdit",
+      component: () => import("@/views/spanduk/lhk/LhkLipatFormView.vue"),
+      meta: {
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "1223",
+        title: "Ubah LHK Lipat",
+        browseRoute: "SpandukLhkLipat",
+      },
+    },
+    {
+      path: "/spanduk/lhk/lhk-lipat/print/:nomor",
+      name: "SpandukLhkLipatPrint",
+      component: () => import("@/views/spanduk/lhk/LhkLipatPrintView.vue"),
+      meta: {
+        layout: "BlankLayout",
+        requiresAuth: true,
+        title: "Cetak LHK Lipat",
+      },
+    },
+
+    {
+      path: "/spanduk/mutasi-produksi",
+      name: "SpandukMutasiProduksi",
+      component: () => import("@/views/spanduk/MutasiProduksiSpandukView.vue"),
+      meta: {
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "4",
+        title: "Mutasi Produksi Spanduk",
+      },
+    },
+    {
+      path: "/spanduk/mutasi-produksi/form",
+      name: "SpandukMutasiProduksiCreate",
+      component: () =>
+        import("@/views/spanduk/MutasiProduksiSpandukFormView.vue"),
+      meta: {
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "4",
+        title: "Tambah Mutasi Produksi Spanduk",
+        browseRoute: "SpandukMutasiProduksi",
+      },
+    },
+    {
+      path: "/spanduk/mutasi-produksi/form/:nomor",
+      name: "SpandukMutasiProduksiEdit",
+      component: () =>
+        import("@/views/spanduk/MutasiProduksiSpandukFormView.vue"),
+      meta: {
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "4",
+        title: "Ubah Mutasi Produksi Spanduk",
+        browseRoute: "SpandukMutasiProduksi",
+      },
+    },
+    {
+      path: "/spanduk/mutasi-produksi/print/:nomor",
+      name: "SpandukMutasiProduksiPrint",
+      component: () =>
+        import("@/views/spanduk/MutasiProduksiSpandukPrintView.vue"),
+      meta: {
+        layout: "BlankLayout",
+        requiresAuth: true,
+        title: "Cetak Mutasi Produksi Spanduk",
+      },
+    },
+
     // ── Garmen ──────────────────────────────────────────────────────────
     {
       path: "/garmen/bahan-baku/minta-bahan",

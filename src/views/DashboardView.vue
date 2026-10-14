@@ -609,6 +609,7 @@ const showBarangJadi = computed(
 const showPembelian = computed(
   () => ["PEMBELIAN", "FINANCE"].includes(bagian.value) || isSuperViewer.value,
 );
+const canWriteProyeksi = computed(() => bagian.value !== "FINANCE");
 
 // ── State Dashboard ──
 const mapSummary = ref({
@@ -6960,6 +6961,7 @@ const sisaClass = (item: any) => {
                   {{ isExportingPotensi ? "Mengexport..." : "Export" }}
                 </button>
                 <button
+                  v-if="canWriteProyeksi"
                   class="knj-detail-btn"
                   style="
                     border-color: var(--dsh-warn-soft);
@@ -7068,7 +7070,7 @@ const sisaClass = (item: any) => {
                           Realisasi
                         </span>
                         <button
-                          v-else
+                          v-else-if="canWriteProyeksi"
                           class="knj-detail-btn"
                           style="
                             border-color: var(--dsh-bad-soft);
@@ -7226,6 +7228,7 @@ const sisaClass = (item: any) => {
                   >(invoice jatuh tempo yang ditagih, per sales)</span
                 >
                 <button
+                  v-if="canWriteProyeksi"
                   class="knj-detail-btn ml-auto"
                   style="
                     border-color: var(--dsh-accent-mid);
@@ -7401,6 +7404,7 @@ const sisaClass = (item: any) => {
                                 </td>
                                 <td class="tc">
                                   <button
+                                    v-if="canWriteProyeksi"
                                     class="knj-detail-btn"
                                     style="
                                       border-color: var(--dsh-bad-soft);

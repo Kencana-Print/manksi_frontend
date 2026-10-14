@@ -138,7 +138,7 @@ const numFmt = (v: number) => Number(v || 0).toLocaleString("id-ID");
           <thead>
             <tr>
               <th width="140">Nomor PO</th>
-              <th width="70">Jenis</th>
+              <th width="90">Jenis</th>
               <th width="90">Tgl PO</th>
               <th width="170">Supplier</th>
               <th width="40" class="tc">#</th>

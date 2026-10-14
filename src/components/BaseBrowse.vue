@@ -30,6 +30,8 @@ const props = withDefaults(
   defineProps<{
     title: string;
     menuId: string;
+    // Opsional: kunci penyimpanan state browse bila beberapa halaman berbagi menuId
+    storageId?: string;
     icon?: any;
     headers: any[];
     items: any[];
@@ -96,7 +98,9 @@ const closeCurrentTab = () => {
 };
 
 // ── Session storage key — unik per halaman berdasarkan menuId ──────────
-const storageKey = computed(() => `browse_filter_${props.menuId}`);
+const storageKey = computed(
+  () => `browse_filter_${props.storageId ?? props.menuId}`,
+);
 
 const loadState = () => {
   try {
@@ -176,7 +180,9 @@ const internalSelected = computed({
 const isSingleSelected = computed(() => internalSelected.value.length === 1);
 
 // ── Column Order (Drag & Drop) ──────────────────────────────────────
-const colOrderKey = computed(() => `browse_colorder_${props.menuId}`);
+const colOrderKey = computed(
+  () => `browse_colorder_${props.storageId ?? props.menuId}`,
+);
 
 const loadColOrder = (): string[] => {
   try {

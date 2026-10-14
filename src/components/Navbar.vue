@@ -655,6 +655,11 @@ onUnmounted(() => {
 .nav-item-title {
   font-size: 0.82rem !important;
 }
+/* jarak antara judul dan panah folder (ikon Tabler tidak dapat jarak dari Vuetify) */
+.nav-item :deep(.v-list-item__append) {
+  padding-inline-start: 12px;
+  flex-shrink: 0;
+}
 .nav-divider {
   margin: 3px 0;
 }

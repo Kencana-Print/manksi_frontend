@@ -53,7 +53,6 @@ const today = toLocalDateStr(d);
 const filterState = ref({
   dtAwal: firstDay,
   dtAkhir: today,
-  isPo: true, // true = PO, false = NON PO
   gudang: "GB001",
   search: "",
 });
@@ -85,7 +84,7 @@ const {
     const res = await bpbBahanService.getBrowse({
       startDate: filterState.value.dtAwal,
       endDate: filterState.value.dtAkhir,
-      isPo: filterState.value.isPo,
+      isPo: true,
       gudang: filterState.value.gudang,
     });
     return res.data.data;
@@ -163,13 +162,6 @@ onMounted(() => fetchData());
 watch(() => filterState.value.dtAwal, fetchData);
 watch(() => filterState.value.dtAkhir, fetchData);
 watch(() => filterState.value.gudang, fetchData);
-watch(
-  () => filterState.value.isPo,
-  (val) => {
-    if (!val) filterState.value.gudang = "GB001";
-    fetchData();
-  },
-);
 
 let searchTimeout: any;
 const onSearchInput = () => {
@@ -179,17 +171,13 @@ const onSearchInput = () => {
 
 const addDialog = ref(false);
 
-const goAdd = (type: "PO" | "QC" | "NON") => {
+const goAdd = (type: "PO" | "QC") => {
   addDialog.value = false;
   router.push({ name: "BpbBahanCreate", query: { type } });
 };
 
 const onAdd = () => {
-  if (filterState.value.isPo) {
-    addDialog.value = true;
-    return;
-  }
-  goAdd("NON");
+  addDialog.value = true;
 };
 const onEdit = (item: any) => {
   if (!item || !item.Nomor) return;
@@ -364,21 +352,8 @@ const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
   >
     <template #filter-left>
       <div class="f-group">
-        <span class="f-label">Kategori</span>
-        <select
-          v-model="filterState.isPo"
-          class="f-date font-weight-bold text-primary"
-        >
-          <option :value="true">BPB PO</option>
-          <option :value="false">BPB Non PO</option>
-        </select>
-
-        <span class="f-sep ml-2">Gudang</span>
-        <select
-          v-model="filterState.gudang"
-          class="f-date font-weight-bold"
-          :disabled="!filterState.isPo"
-        >
+        <span class="f-label">Gudang</span>
+        <select v-model="filterState.gudang" class="f-date font-weight-bold">
           <option value="GB001">GB001</option>
           <option value="GC001">GC001</option>
           <option value="GB002">GB002</option>

@@ -57,6 +57,8 @@ const showPoGreigeModal = ref(false);
 const showBahanModal = ref(false);
 const showSpkModal = ref(false);
 const showMkbModal = ref(false);
+const showSupRowModal = ref(false);
+const activeSupIdx = ref(-1);
 const activeGridIndex = ref(-1);
 // delivery bahan modal needs separate index
 const activeDeliveryIdx = ref(-1);
@@ -150,6 +152,8 @@ const {
           (1 - (Number(row.pod_disc) || 0) / 100),
         spk: row.pod_spk_nomor || "",
         mkb: row.pod_mkb_nomor || "",
+        supKode: row.pod_sup_kode || "",
+        supNama: row.pod_sup_nama || "",
       })),
       delivery: (d.delivery || []).map((row: any) => ({
         tanggal: formatDateLocal(row.pod2_tanggal || new Date()),
@@ -194,11 +198,23 @@ const {
 const isGreige = computed(() => formData.value.header.po_jenis === 1);
 const isCelup = computed(() => formData.value.header.po_jenis === 2);
 const isBahan = computed(() => formData.value.header.po_jenis === 3);
+const isLainLain = computed(() => formData.value.header.po_jenis === 4);
+// Bahan & Lain-lain berbagi perilaku kolom gramasi dan Delivery Commitment
+const isBahanLike = computed(() => isBahan.value || isLainLain.value);
+// Kolom supplier per baris: hanya PO Lain-lain, dan hanya untuk user yang boleh lihat supplier
+const showSupCol = computed(() => isLainLain.value && canLihatSup.value);
 
 watch(
   () => formData.value.header.po_jenis,
   (v) => {
     if (v !== 2) formData.value.header.po_greige = "";
+    // PO Lain-lain: supplier ada di baris, bukan di header
+    if (v === 4) {
+      formData.value.header.po_sup_kode = "";
+      formData.value.header.sup_nama = "";
+      formData.value.header.sup_alamat = "";
+      formData.value.header.sup_kota = "";
+    }
   },
 );
 
@@ -238,6 +254,7 @@ const fmt = (n: number) => n.toLocaleString("id-ID");
 const colSpanCount = computed(() => {
   let n = 13; // No, Kode, Nama Bahan, Nama External, Sat, Gramasi Awal, Gramasi, Setting, Jenis, Jumlah, SPK, MKB, Aksi
   if (isCelup.value) n += 1; // Roll
+  if (showSupCol.value) n += 1; // Supplier per baris
   if (canLihatBeli.value) n += 3; // Harga Beli, Disc, Total
   return n;
 });
@@ -395,6 +412,8 @@ const addItem = () =>
     total: 0,
     spk: "",
     mkb: "",
+    supKode: "",
+    supNama: "",
   });
 
 // ─────────────────────────────────────────────
@@ -447,7 +466,9 @@ const setBahan = (v: any) => {
     : v.Nama || v.bhn_name;
   formData.value.items[i].satuan = v.Satuan || v.bhn_satuan || "";
   formData.value.items[i].gramasi = v.Gramasi || "";
-  formData.value.items[i].gramasiAwal = isBahan.value ? v.Gramasi || "" : "";
+  formData.value.items[i].gramasiAwal = isBahanLike.value
+    ? v.Gramasi || ""
+    : "";
   formData.value.items[i].setting = v.Setting || "";
   formData.value.items[i].jenis = v.Jenis || "";
   formData.value.items[i].harga = Number(v.Harga || v.bhn_hargabeli) || 0;
@@ -572,6 +593,19 @@ const setBahanHandler = (v: any) => {
   }
 };
 
+// ── Supplier per baris (PO Lain-lain) ──
+const openLookupSupRow = (i: number) => {
+  activeSupIdx.value = i;
+  showSupRowModal.value = true;
+};
+const setSupRow = (v: any) => {
+  const i = activeSupIdx.value;
+  if (i < 0) return;
+  formData.value.items[i].supKode = v.Kode || v.sup_kode;
+  formData.value.items[i].supNama = v.Nama || v.sup_nama;
+  activeSupIdx.value = -1;
+};
+
 // ── Validate ──
 const validateSave = () => {
   // Filter baris trailing kosong dulu sebelum validasi
@@ -596,8 +630,8 @@ const validateSave = () => {
       return toast.warning("Sudah ONPROSES. Tidak bisa disimpan.");
   }
 
-  // 3. Validasi Header
-  if (!formData.value.header.po_sup_kode)
+  // 3. Validasi Header (PO Lain-lain: supplier ada di baris)
+  if (!isLainLain.value && !formData.value.header.po_sup_kode)
     return toast.warning("Supplier belum diisi.");
   if (isCelup.value && !formData.value.header.po_greige)
     return toast.warning("PO Greige harus diisi untuk PO Celup.");
@@ -607,6 +641,8 @@ const validateSave = () => {
     return toast.warning("Tidak ada detail, tidak dapat disimpan.");
 
   for (const [idx, r] of validItems.entries()) {
+    if (isLainLain.value && !r.supKode)
+      return toast.warning(`Baris ${idx + 1}: Supplier harus diisi.`);
     if ((Number(r.jumlah) || 0) <= 0)
       return toast.warning(
         `Baris ${idx + 1}: Jumlah PO harus diisi, tidak dapat disimpan.`,
@@ -619,15 +655,26 @@ const validateSave = () => {
       return toast.warning(`Baris ${idx + 1}: PO Celup Roll harus diisi.`);
   }
 
+  // PO Lain-lain: satu bahan hanya boleh satu baris (delivery dikunci per kode bahan)
+  if (isLainLain.value) {
+    const seen = new Set<string>();
+    for (const [idx, r] of validItems.entries()) {
+      if (seen.has(r.kode))
+        return toast.warning(
+          `Baris ${idx + 1}: Bahan ${r.kode} dobel. Satu bahan hanya boleh satu baris.`,
+        );
+      seen.add(r.kode);
+    }
+  }
+
   // Ganti items dengan yang valid sebelum submit
   formData.value.items = validItems;
 
-  // 5. Validasi Delivery Commitment (Khusus PO Bahan)
-  if (isBahan.value) {
-    if (formData.value.delivery.length === 0)
+  // 5. Validasi Delivery Commitment (wajib untuk PO Bahan, opsional untuk Lain-lain)
+  if (isBahanLike.value) {
+    if (isBahan.value && formData.value.delivery.length === 0)
       return toast.warning("Untuk PO Bahan Delivery commitment harus di isi.");
 
-    // Cek apakah ada yang diinput 0
     for (const [idx, d] of formData.value.delivery.entries()) {
       if (!d.tanggal)
         return toast.warning(`Delivery baris ${idx + 1}: Tanggal harus diisi.`);
@@ -661,33 +708,17 @@ const validateSave = () => {
       <div class="po-left-container desktop-form-section header-section">
         <div class="fr shaded-row mb-2">
           <span class="lbl fw">Jenis PO</span>
-          <label class="ck mr-2"
-            ><input
-              type="radio"
-              :value="1"
-              v-model="formData.header.po_jenis"
-              :disabled="isEditMode"
-            />
-            Greige</label
+          <select
+            v-model="formData.header.po_jenis"
+            class="inp"
+            style="width: 160px"
+            :disabled="isEditMode"
           >
-          <label class="ck mr-2"
-            ><input
-              type="radio"
-              :value="2"
-              v-model="formData.header.po_jenis"
-              :disabled="isEditMode"
-            />
-            Celup</label
-          >
-          <label class="ck"
-            ><input
-              type="radio"
-              :value="3"
-              v-model="formData.header.po_jenis"
-              :disabled="isEditMode"
-            />
-            Bahan</label
-          >
+            <option :value="1">Greige</option>
+            <option :value="2">Celup</option>
+            <option :value="3">Bahan</option>
+            <option :value="4">Lain-lain</option>
+          </select>
         </div>
 
         <div class="fr">
@@ -762,51 +793,58 @@ const validateSave = () => {
 
         <div class="sep mt-1 mb-1" />
 
-        <div v-if="canLihatSup" class="fr">
-          <label class="lbl">Supplier</label>
-          <div class="igrp" style="width: 110px">
-            <input
-              v-model="formData.header.po_sup_kode"
-              class="inp"
-              style="background: #ddeeff; text-transform: uppercase"
-              placeholder="F1 / Enter"
-              @keydown="onSupKeydown"
-              @keydown.enter.prevent="onSupEnter"
-            />
-            <button
-              type="button"
-              class="blkp"
-              title="Cari Supplier (F1)"
-              @click="showSupModal = true"
-            >
-              <IconSearch :size="13" />
-            </button>
+        <template v-if="canLihatSup">
+          <template v-if="!isLainLain">
+            <div class="fr">
+              <label class="lbl">Supplier</label>
+              <div class="igrp" style="width: 110px">
+                <input
+                  v-model="formData.header.po_sup_kode"
+                  class="inp"
+                  style="background: #ddeeff; text-transform: uppercase"
+                  placeholder="F1 / Enter"
+                  @keydown="onSupKeydown"
+                  @keydown.enter.prevent="onSupEnter"
+                />
+                <button
+                  type="button"
+                  class="blkp"
+                  title="Cari Supplier (F1)"
+                  @click="showSupModal = true"
+                >
+                  <IconSearch :size="13" />
+                </button>
+              </div>
+            </div>
+            <div class="fr">
+              <label class="lbl"></label
+              ><input
+                :value="formData.header.sup_nama"
+                readonly
+                class="inp ro flex-grow-1"
+              />
+            </div>
+            <div class="fr">
+              <label class="lbl"></label
+              ><input
+                :value="formData.header.sup_alamat"
+                readonly
+                class="inp ro flex-grow-1"
+              />
+            </div>
+            <div class="fr">
+              <label class="lbl"></label
+              ><input
+                :value="formData.header.sup_kota"
+                readonly
+                class="inp ro flex-grow-1"
+              />
+            </div>
+          </template>
+          <div v-else class="fr">
+            <span class="hint">Supplier diisi per baris bahan.</span>
           </div>
-        </div>
-        <div v-if="canLihatSup" class="fr">
-          <label class="lbl"></label
-          ><input
-            :value="formData.header.sup_nama"
-            readonly
-            class="inp ro flex-grow-1"
-          />
-        </div>
-        <div v-if="canLihatSup" class="fr">
-          <label class="lbl"></label
-          ><input
-            :value="formData.header.sup_alamat"
-            readonly
-            class="inp ro flex-grow-1"
-          />
-        </div>
-        <div v-if="canLihatSup" class="fr">
-          <label class="lbl"></label
-          ><input
-            :value="formData.header.sup_kota"
-            readonly
-            class="inp ro flex-grow-1"
-          />
-        </div>
+        </template>
 
         <div class="sep mt-1 mb-1" />
 
@@ -881,12 +919,16 @@ const validateSave = () => {
           class="tbl-wrap"
           style="flex: 1; min-height: 180px; max-height: 40vh; overflow-y: auto"
         >
-          <table class="gt" style="min-width: 1300px">
+          <table
+            class="gt"
+            :style="{ minWidth: showSupCol ? '1470px' : '1300px' }"
+          >
             <thead>
               <tr>
                 <th style="width: 35px" class="tc">No</th>
                 <th style="width: 90px">Kode</th>
                 <th style="width: 160px">Nama Bahan</th>
+
                 <th style="width: 120px">Nama External</th>
                 <th style="width: 50px" class="tc">Sat</th>
                 <th style="width: 70px">Gramasi Awal</th>
@@ -916,6 +958,7 @@ const validateSave = () => {
                 </th>
                 <th style="width: 90px">SPK</th>
                 <th style="width: 90px">MKB</th>
+                <th v-if="showSupCol" style="width: 170px">Supplier</th>
                 <th style="width: 35px" class="tc">Aksi</th>
               </tr>
             </thead>
@@ -1028,6 +1071,24 @@ const validateSave = () => {
                     </button>
                   </div>
                 </td>
+                <td v-if="showSupCol" class="p0">
+                  <div class="cell-grp">
+                    <input
+                      :value="row.supNama"
+                      :title="row.supKode"
+                      class="ci ro"
+                      readonly
+                      placeholder="Pilih supplier"
+                    />
+                    <button
+                      type="button"
+                      class="ci-btn"
+                      @click="openLookupSupRow(Number(idx))"
+                    >
+                      <IconSearch :size="12" />
+                    </button>
+                  </div>
+                </td>
                 <td class="tc">
                   <button
                     type="button"
@@ -1050,7 +1111,7 @@ const validateSave = () => {
 
         <div class="bottom-row mt-2">
           <div
-            v-if="isBahan"
+            v-if="isBahanLike"
             class="bottom-panel"
             style="flex: 1.5; min-width: 350px"
           >
@@ -1222,6 +1283,7 @@ const validateSave = () => {
   </BaseForm>
 
   <SupplierSearchModal v-model="showSupModal" @selected="setSup" />
+  <SupplierSearchModal v-model="showSupRowModal" @selected="setSupRow" />
   <MppbSearchModal v-model="showMppbModal" @selected="setMppb" />
   <PoGreigeSearchModal v-model="showPoGreigeModal" @selected="setPoGreige" />
   <BahanSearchModal v-model="showBahanModal" @selected="setBahanHandler" />
@@ -1334,6 +1396,11 @@ const validateSave = () => {
 }
 .text-xs {
   font-size: 10px;
+}
+.hint {
+  font-size: 10px;
+  color: #757575;
+  font-style: italic;
 }
 .text-primary {
   color: #1565c0;
