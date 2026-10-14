@@ -18,13 +18,17 @@ const layoutMode = computed(() =>
 );
 const withAlokasi = computed(() => route.query.alokasi === "true");
 // Non-Garmen + cetak dengan alokasi: tampil di separuh kanan halaman 1
-const ALOKASI_SIDE_MAX = 30;
+const ALOKASI_SIDE_MAX = 30; // divisi lain
+const ALOKASI_SIDE_MAX_MMT = 120; // Spanduk/MMT: tetap di halaman 1, kolom dipecah
+const alokasiSideMax = computed(() =>
+  isSpandukMMT.value ? ALOKASI_SIDE_MAX_MMT : ALOKASI_SIDE_MAX,
+);
 const isAlokasiSide = computed(
   () =>
     !isGarmen.value &&
     withAlokasi.value &&
     hasAlokasi.value &&
-    (data.value.alokasiList?.length || 0) <= ALOKASI_SIDE_MAX,
+    (data.value.alokasiList?.length || 0) <= alokasiSideMax.value,
 );
 const kodeDivisi = computed(() => String(data.value.spk_divisi).charAt(0));
 const isKaosan = computed(() => kodeDivisi.value === "3");
@@ -97,6 +101,27 @@ const alokasiInlineSize = computed(() => {
   if (n <= 14) return "md";
   if (n <= 20) return "sm";
   return "xs";
+});
+
+// Alokasi di separuh kanan halaman 1: >30 baris dipecah 2-3 kolom
+const alokasiSideChunks = computed(() => {
+  const list = data.value.alokasiList || [];
+  const cols = list.length <= 24 ? 1 : list.length <= 50 ? 2 : 3;
+  const size = Math.ceil(list.length / cols) || 1;
+  const chunks: any[][] = [];
+  for (let i = 0; i < list.length; i += size) {
+    chunks.push(list.slice(i, i + size));
+  }
+  return chunks;
+});
+
+// Kolom sempit → nama sering wrap, jadi font dikecilkan sesuai jumlah kolom
+const alokasiSideSize = computed(() => {
+  const cols = alokasiSideChunks.value.length;
+  const n = data.value.alokasiList?.length || 0;
+  if (cols <= 1) return "";
+  if (cols === 2) return n <= 40 ? "sz-md" : "sz-sm";
+  return n <= 90 ? "sz-sm" : "sz-xs";
 });
 
 // Cek apakah butuh merender alokasi di halaman ke-2
@@ -977,32 +1002,39 @@ onMounted(async () => {
         <div class="alokasi-page-title">
           ALOKASI PENGIRIMAN : {{ data.spk_nomor }}
         </div>
-        <table class="alokasi-table alokasi-side-table">
-          <thead>
-            <tr>
-              <th class="text-left">Nama Toko</th>
-              <th class="text-left">Alokasi</th>
-              <th class="text-center">Jml</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="alo in data.alokasiList" :key="alo.urut">
-              <td>{{ namaToko(alo) }}</td>
-              <td>{{ alo.kota || alo.alamat }}</td>
-              <td class="text-center">
-                {{ Number(alo.jumlah).toLocaleString("id-ID") }}
-              </td>
-            </tr>
-          </tbody>
-          <tfoot>
-            <tr>
-              <td colspan="2" class="fw text-left">Total</td>
-              <td class="fw text-center">
-                {{ totalAlokasi.toLocaleString("id-ID") }}
-              </td>
-            </tr>
-          </tfoot>
-        </table>
+        <div class="alokasi-inline-cols">
+          <table
+            v-for="(chunk, cidx) in alokasiSideChunks"
+            :key="cidx"
+            class="alokasi-table alokasi-side-table"
+            :class="alokasiSideSize"
+          >
+            <thead>
+              <tr>
+                <th class="text-left">Nama Toko</th>
+                <th class="text-left">Alokasi</th>
+                <th class="text-center">Jml</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="alo in chunk" :key="alo.urut">
+                <td>{{ namaToko(alo) }}</td>
+                <td>{{ alo.kota || alo.alamat }}</td>
+                <td class="text-center">
+                  {{ Number(alo.jumlah).toLocaleString("id-ID") }}
+                </td>
+              </tr>
+            </tbody>
+            <tfoot v-if="cidx === alokasiSideChunks.length - 1">
+              <tr>
+                <td colspan="2" class="fw text-left">Total</td>
+                <td class="fw text-center">
+                  {{ totalAlokasi.toLocaleString("id-ID") }}
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
       </div>
 
       <!-- ══ ALOKASI PANEL (Halaman 2 / Overflow) ══ -->
@@ -1738,6 +1770,49 @@ onMounted(async () => {
 .alokasi-side-table th:nth-child(3),
 .alokasi-side-table td:nth-child(3) {
   width: 15%;
+}
+.alokasi-side-table.sz-md th,
+.alokasi-side-table.sz-md td {
+  font-size: 7pt;
+  padding: 1.5px 3px;
+}
+.alokasi-side-table.sz-sm th,
+.alokasi-side-table.sz-sm td {
+  font-size: 6pt;
+  padding: 1px 2px;
+}
+.alokasi-side-table.sz-xs th,
+.alokasi-side-table.sz-xs td {
+  font-size: 5.5pt;
+  padding: 1px 2px;
+}
+.alokasi-inline-cols .alokasi-side-table {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.alokasi-side-table.sz-md th:nth-child(3),
+.alokasi-side-table.sz-sm th:nth-child(3),
+.alokasi-side-table.sz-xs th:nth-child(3),
+.alokasi-side-table.sz-md td:nth-child(3),
+.alokasi-side-table.sz-sm td:nth-child(3),
+.alokasi-side-table.sz-xs td:nth-child(3) {
+  width: 12%;
+}
+.alokasi-side-table.sz-md th:nth-child(1),
+.alokasi-side-table.sz-sm th:nth-child(1),
+.alokasi-side-table.sz-xs th:nth-child(1),
+.alokasi-side-table.sz-md td:nth-child(1),
+.alokasi-side-table.sz-sm td:nth-child(1),
+.alokasi-side-table.sz-xs td:nth-child(1) {
+  width: 46%;
+}
+.alokasi-side-table.sz-md th:nth-child(2),
+.alokasi-side-table.sz-sm th:nth-child(2),
+.alokasi-side-table.sz-xs th:nth-child(2),
+.alokasi-side-table.sz-md td:nth-child(2),
+.alokasi-side-table.sz-sm td:nth-child(2),
+.alokasi-side-table.sz-xs td:nth-child(2) {
+  width: 42%;
 }
 
 @media screen {
