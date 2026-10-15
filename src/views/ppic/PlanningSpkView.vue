@@ -11,7 +11,12 @@ import {
   IconFileExport,
   IconTrash,
 } from "@tabler/icons-vue";
-import { exportExcelSingle } from "@/utils/excelExport";
+import {
+  exportExcel,
+  exportExcelSingle,
+  type ExcelColumn,
+  type ExcelSheetConfig,
+} from "@/utils/excelExport";
 import { formatTanggal } from "@/utils/dateFormat";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -22,6 +27,7 @@ interface BrowseItem {
   Cabang: string;
   Close: string;
   Keterangan: string;
+  JumlahSPK: number;
 }
 interface DetailRow {
   NomorSPK: string;
@@ -50,10 +56,21 @@ interface DetailCache {
   sewing: DetailRow[];
   koli: DetailRow[];
 }
+interface ExportPlan {
+  Nomor: string;
+  TglAwal: string;
+  TglAkhir: string;
+  Cabang: string;
+  cutting: DetailRow[];
+  sewing: DetailRow[];
+  koli: DetailRow[];
+}
+type BarisExport = Record<string, string | number | boolean>;
 
 // ─── Router / Toast ───────────────────────────────────────────────────────────
 const router = useRouter();
 const toast = useToast();
+const browseRef = ref<InstanceType<typeof BaseBrowse> | null>(null);
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -287,128 +304,243 @@ const confirmDelete = async () => {
 // ─── Export ───────────────────────────────────────────────────────────────────
 const isExportingDetail = ref(false);
 
+// Data yang sedang tampil di BaseBrowse (search + filter kolom ikut dihitung)
+const dataTampil = (): BrowseItem[] =>
+  (browseRef.value?.getFilteredItems() as BrowseItem[] | undefined) ??
+  items.value;
+
+const angkaAtauKosong = (n: number | null | undefined) =>
+  n == null ? "" : Number(n);
+
 const doExportMaster = async () => {
+  const rows = dataTampil();
+  if (!rows.length) {
+    toast.warning("Tidak ada data untuk diekspor.");
+    return;
+  }
   try {
-    const params = { startDate: filterStart.value, endDate: filterEnd.value };
-    const res = await planningSpkService.exportMaster(params);
-    const url = URL.createObjectURL(new Blob([res.data]));
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `PlanningSpk_${filterStart.value}_${filterEnd.value}.xlsx`;
-    a.click();
-    URL.revokeObjectURL(url);
+    await exportExcelSingle(
+      `PlanningSpk_${filterStart.value}_${filterEnd.value}.xlsx`,
+      "Planning SPK",
+      [
+        { header: "Nomor", key: "Nomor", width: 24 },
+        { header: "Tgl Awal", key: "TglAwal", width: 12 },
+        { header: "Tgl Akhir", key: "TglAkhir", width: 12 },
+        { header: "Cabang", key: "Cabang", width: 9 },
+        { header: "Status", key: "Status", width: 10 },
+        {
+          header: "Jml SPK",
+          key: "JumlahSPK",
+          align: "right",
+          numFmt: "#,##0",
+        },
+        { header: "Keterangan", key: "Keterangan", width: 40 },
+      ],
+      rows.map((r) => ({
+        Nomor: r.Nomor,
+        TglAwal: formatTanggal(r.TglAwal),
+        TglAkhir: formatTanggal(r.TglAkhir),
+        Cabang: r.Cabang,
+        Status: r.Close === "Y" ? "Closed" : "Open",
+        JumlahSPK: Number(r.JumlahSPK) || 0,
+        Keterangan: r.Keterangan || "",
+      })),
+    );
   } catch {
     toast.error("Gagal export.");
   }
 };
 
+const kolomMaster: ExcelColumn[] = [
+  { header: "Nomor Plan", key: "NomorPlan", width: 24 },
+  { header: "Tgl Awal", key: "TglAwal", width: 12 },
+  { header: "Tgl Akhir", key: "TglAkhir", width: 12 },
+  { header: "Cabang", key: "Cabang", width: 9 },
+];
+
+// Cutting, Koli, dan Sewing format lama (sama dengan tabel di expand)
+const kolomJadwal: ExcelColumn[] = [
+  { header: "Nomor SPK", key: "NomorSPK", width: 22 },
+  { header: "Nama SPK", key: "NamaSPK", width: 34 },
+  { header: "Tgl Jadwal", key: "TglJadwal", width: 12 },
+  { header: "WIP", key: "Wip", align: "right", numFmt: "#,##0" },
+  { header: "Qty PO", key: "QtyPo", align: "right", numFmt: "#,##0" },
+  { header: "Qty Jadwal", key: "QtyJadwal", align: "right", numFmt: "#,##0" },
+  { header: "Line/Kelompok", key: "LineKelompok", width: 16 },
+  { header: "Keterangan", key: "Keterangan", width: 30 },
+];
+
+// Sewing format baru (sama dengan tabel di expand + baris judul per Line)
+const kolomSewing: ExcelColumn[] = [
+  { header: "Line", key: "Line", width: 16 },
+  { header: "MP", key: "Mp", align: "right", numFmt: "#,##0" },
+  { header: "Act. Jam", key: "ActualJam", align: "right", numFmt: "#,##0.00" },
+  { header: "No", key: "No", align: "center", width: 6 },
+  { header: "Nomor SPK", key: "NomorSPK", width: 22 },
+  { header: "Nama SPK", key: "NamaSPK", width: 34 },
+  { header: "SMV (mnt)", key: "Smv", align: "right", numFmt: "#,##0.000" },
+  { header: "Sumber SMV", key: "SmvSumber", width: 12 },
+  { header: "Hari", key: "Hari", align: "right", numFmt: "#,##0.0" },
+  { header: "Jam", key: "Jam", align: "right", numFmt: "#,##0.0" },
+  { header: "Target", key: "Target", align: "right", numFmt: "#,##0" },
+  {
+    header: "Act. Output",
+    key: "ActualOutput",
+    align: "right",
+    numFmt: "#,##0",
+  },
+  {
+    header: "Waktu Prod (mnt)",
+    key: "WaktuProduksi",
+    align: "right",
+    numFmt: "#,##0",
+  },
+  { header: "Resume (mnt)", key: "Resume", align: "right", numFmt: "#,##0.0" },
+  { header: "Keterangan", key: "Keterangan", width: 30 },
+];
+
+const styleSewing = (row: BarisExport) => {
+  if (row._grp) return { fillColor: "C8E6C9", fontColor: "1B5E20", bold: true };
+  if (row._over) return { fontColor: "C62828", bold: true };
+  return null;
+};
+
 const doExportDetail = async () => {
+  // Hanya plan yang sedang tampil (search + filter kolom BaseBrowse)
+  const nomorTampil = new Set(dataTampil().map((r) => r.Nomor));
+  if (!nomorTampil.size) {
+    toast.warning("Tidak ada data untuk diekspor.");
+    return;
+  }
+
   isExportingDetail.value = true;
   try {
     const res = await planningSpkService.exportDetail({
       startDate: filterStart.value,
       endDate: filterEnd.value,
     });
-    const allDetail: any[] = res.data.data ?? [];
-    if (!allDetail.length) {
+    const plans = ((res.data.data ?? []) as ExportPlan[]).filter((p) =>
+      nomorTampil.has(p.Nomor),
+    );
+
+    const induk = (p: ExportPlan, tampil: boolean): BarisExport =>
+      tampil
+        ? {
+            NomorPlan: p.Nomor,
+            TglAwal: formatTanggal(p.TglAwal),
+            TglAkhir: formatTanggal(p.TglAkhir),
+            Cabang: p.Cabang,
+          }
+        : { NomorPlan: "", TglAwal: "", TglAkhir: "", Cabang: "" };
+
+    const barisJadwal = (d: DetailRow): BarisExport => ({
+      NomorSPK: d.NomorSPK,
+      NamaSPK: d.NamaSPK || "",
+      TglJadwal: formatTanggal(d.TglJadwal),
+      Wip: angkaAtauKosong(d.Wip),
+      QtyPo: angkaAtauKosong(d.QtyPo),
+      QtyJadwal: Number(d.QtyJadwal) || 0,
+      LineKelompok: d.LineKelompok || "",
+      Keterangan: d.Keterangan || "",
+    });
+
+    const sheetCutting: BarisExport[] = [];
+    const sheetKoli: BarisExport[] = [];
+    const sheetSewingBaru: BarisExport[] = [];
+    const sheetSewingLama: BarisExport[] = [];
+
+    const isiJadwal = (
+      p: ExportPlan,
+      rows: DetailRow[],
+      tujuan: BarisExport[],
+    ) =>
+      rows.forEach((d, i) =>
+        tujuan.push({ ...induk(p, i === 0), ...barisJadwal(d) }),
+      );
+
+    for (const p of plans) {
+      isiJadwal(p, p.cutting, sheetCutting);
+      isiJadwal(p, p.koli, sheetKoli);
+      isiJadwal(
+        p,
+        p.sewing.filter((r) => r.Format !== "BARU"),
+        sheetSewingLama,
+      );
+
+      let barisPertama = true;
+      for (const g of groupSewing(
+        p.sewing.filter((r) => r.Format === "BARU"),
+      )) {
+        sheetSewingBaru.push({
+          ...induk(p, barisPertama),
+          Line: g.line || "(Tanpa line)",
+          Mp: angkaAtauKosong(g.items[0].Mp),
+          ActualJam: angkaAtauKosong(g.items[0].ActualJam),
+          Target: g.totalTarget,
+          ActualOutput: g.totalActual,
+          _grp: true,
+        });
+        barisPertama = false;
+        g.items.forEach((d, n) =>
+          sheetSewingBaru.push({
+            ...induk(p, false),
+            No: n + 1,
+            NomorSPK: d.NomorSPK,
+            NamaSPK: d.NamaSPK || "",
+            Smv: angkaAtauKosong(d.Smv),
+            SmvSumber: d.SmvSumber ?? "",
+            Hari: angkaAtauKosong(d.Hari),
+            Jam: angkaAtauKosong(d.Jam),
+            Target: angkaAtauKosong(d.Target),
+            ActualOutput: angkaAtauKosong(d.ActualOutput),
+            WaktuProduksi: angkaAtauKosong(d.WaktuProduksi),
+            Resume: angkaAtauKosong(d.Resume),
+            Keterangan: d.Keterangan || "",
+            _over: isOver(d),
+          }),
+        );
+      }
+    }
+
+    const sheets: ExcelSheetConfig[] = [];
+    if (sheetCutting.length)
+      sheets.push({
+        sheetName: "Cutting",
+        columns: [...kolomMaster, ...kolomJadwal],
+        rows: sheetCutting,
+        headerColor: "546E7A",
+      });
+    if (sheetSewingBaru.length)
+      sheets.push({
+        sheetName: "Sewing",
+        columns: [...kolomMaster, ...kolomSewing],
+        rows: sheetSewingBaru,
+        headerColor: "2E7D32",
+        rowStyleFn: styleSewing,
+      });
+    if (sheetSewingLama.length)
+      sheets.push({
+        sheetName: "Sewing (Format Lama)",
+        columns: [...kolomMaster, ...kolomJadwal],
+        rows: sheetSewingLama,
+        headerColor: "2E7D32",
+      });
+    if (sheetKoli.length)
+      sheets.push({
+        sheetName: "Koli",
+        columns: [...kolomMaster, ...kolomJadwal],
+        rows: sheetKoli,
+        headerColor: "E65100",
+      });
+
+    if (!sheets.length) {
       toast.warning("Tidak ada data untuk diekspor.");
       return;
     }
 
-    // Kelompokkan per Nomor Plan (jaga urutan kemunculan pertama)
-    const groups: Record<string, any[]> = {};
-    const order: string[] = [];
-    allDetail.forEach((r) => {
-      const key = r.NomorPlan;
-      if (!groups[key]) {
-        groups[key] = [];
-        order.push(key);
-      }
-      groups[key].push(r);
-    });
-
-    const combinedRows: any[] = [];
-    order.forEach((key) => {
-      const rowsInGroup = groups[key];
-      const first = rowsInGroup[0];
-      const masterCells = {
-        NomorPlan: first.NomorPlan,
-        TglAwal: formatTanggal(first.TglAwal),
-        TglAkhir: formatTanggal(first.TglAkhir),
-        Cabang: first.Cabang,
-      };
-      const blankMaster = Object.fromEntries(
-        Object.keys(masterCells).map((k) => [k, ""]),
-      );
-      rowsInGroup.forEach((r, idx) => {
-        combinedRows.push({
-          ...(idx === 0 ? masterCells : blankMaster),
-          NomorSPK: r.NomorSPK || "-",
-          NamaOrder: r.NamaOrder || "-",
-          QtySPK: Number(r.QtySPK) || 0,
-          Divisi: r.Divisi,
-          TglJadwal: formatTanggal(r.TglJadwal),
-          Wip: r.Wip == null ? "" : Number(r.Wip),
-          QtyPO: r.QtyPO == null ? "" : Number(r.QtyPO),
-          QtyJadwal: Number(r.QtyJadwal) || 0,
-          LineKelompok: r.LineKelompok || "-",
-          Keterangan: r.Keterangan || "-",
-          Mp: r.Mp == null ? "" : Number(r.Mp),
-          Smv: r.Smv == null ? "" : Number(r.Smv),
-          Hari: r.Hari == null ? "" : Number(r.Hari),
-          Jam: r.Jam == null ? "" : Number(r.Jam),
-          WaktuProduksi: r.WaktuProduksi == null ? "" : Number(r.WaktuProduksi),
-          Resume: r.Resume == null ? "" : Number(r.Resume),
-        });
-      });
-    });
-
-    await exportExcelSingle(
+    await exportExcel(
       `Detail_PlanningSpk_${filterStart.value}_${filterEnd.value}.xlsx`,
-      "Detail",
-      [
-        { header: "Nomor Plan", key: "NomorPlan" },
-        { header: "Tgl Awal", key: "TglAwal" },
-        { header: "Tgl Akhir", key: "TglAkhir" },
-        { header: "Cabang", key: "Cabang" },
-        { header: "Nomor SPK", key: "NomorSPK" },
-        { header: "Nama Order", key: "NamaOrder" },
-        { header: "Qty SPK", key: "QtySPK", align: "right", numFmt: "#,##0" },
-        { header: "Divisi", key: "Divisi" },
-        { header: "Tgl Jadwal", key: "TglJadwal" },
-        { header: "WIP", key: "Wip", align: "right", numFmt: "#,##0" },
-        { header: "Qty PO", key: "QtyPO", align: "right", numFmt: "#,##0" },
-        {
-          header: "Qty Jadwal",
-          key: "QtyJadwal",
-          align: "right",
-          numFmt: "#,##0",
-        },
-        { header: "Line/Kelompok", key: "LineKelompok" },
-        { header: "Keterangan", key: "Keterangan" },
-        { header: "MP", key: "Mp", align: "right", numFmt: "#,##0" },
-        {
-          header: "SMV (mnt)",
-          key: "Smv",
-          align: "right",
-          numFmt: "#,##0.000",
-        },
-        { header: "Hari", key: "Hari", align: "right", numFmt: "#,##0.0" },
-        { header: "Jam", key: "Jam", align: "right", numFmt: "#,##0.0" },
-        {
-          header: "Waktu Prod (mnt)",
-          key: "WaktuProduksi",
-          align: "right",
-          numFmt: "#,##0",
-        },
-        {
-          header: "Resume (mnt)",
-          key: "Resume",
-          align: "right",
-          numFmt: "#,##0.0",
-        },
-      ],
-      combinedRows,
+      sheets,
     );
   } catch {
     toast.error("Gagal export detail.");
@@ -430,7 +562,7 @@ const sewingBaru = (nomor: string) =>
 const sewingLama = (nomor: string) =>
   detailCache.value[nomor]?.sewing.filter((r) => r.Format !== "BARU") ?? [];
 
-const sewingGroups = (nomor: string) => {
+const groupSewing = (rows: DetailRow[]) => {
   const map = new Map<
     string,
     {
@@ -440,7 +572,7 @@ const sewingGroups = (nomor: string) => {
       totalActual: number;
     }
   >();
-  for (const r of sewingBaru(nomor)) {
+  for (const r of rows) {
     const k = r.LineKelompok || "";
     if (!map.has(k))
       map.set(k, { line: k, items: [], totalTarget: 0, totalActual: 0 });
@@ -456,6 +588,8 @@ const sewingGroups = (nomor: string) => {
   );
 };
 
+const sewingGroups = (nomor: string) => groupSewing(sewingBaru(nomor));
+
 const isOver = (d: DetailRow) =>
   d.Resume != null && d.WaktuProduksi != null && d.Resume > d.WaktuProduksi;
 
@@ -465,6 +599,7 @@ fetchData();
 
 <template>
   <BaseBrowse
+    ref="browseRef"
     title="Planning SPK PPIC"
     menu-id="56"
     :icon="IconCalendarStats"
@@ -568,9 +703,6 @@ fetchData();
     <template #item.TglAkhir="{ item }">
       {{ formatTanggal(item.TglAkhir) }}
     </template>
-    <template #item.JumlahOrder="{ item }">{{
-      fmt(item.JumlahOrder)
-    }}</template>
 
     <!-- ─── Expand: 3 panel divisi ─── -->
     <template #detail="{ item }">
