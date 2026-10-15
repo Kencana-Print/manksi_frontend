@@ -169,23 +169,15 @@ const onRealisasi = () => {
 };
 
 // --- Delete ---
-const showDeleteDialog = ref(false);
-const deleteWarning = ref(false);
+// Konfirmasi memakai dialog bawaan BaseBrowse; @delete hanya terpanggil setelah user klik "Ya, Hapus".
 const isDeleting = ref(false);
 
-const onHapus = () => {
-  if (!requireSelected()) return;
-  deleteWarning.value = selectedItem.value!.Status_ !== "BELUM";
-  showDeleteDialog.value = true;
-};
-
-const confirmDelete = async () => {
-  if (!selectedItem.value) return;
+const onHapus = async (item: { Nomor: string }) => {
+  if (isDeleting.value) return;
   isDeleting.value = true;
   try {
-    await pengajuanTransferService.deleteData(selectedItem.value.Nomor);
+    await pengajuanTransferService.deleteData(item.Nomor);
     toast.success("Data berhasil dihapus.");
-    showDeleteDialog.value = false;
     fetchData();
   } catch (e: any) {
     toast.error(e.response?.data?.message || "Gagal menghapus data.");
@@ -629,44 +621,14 @@ const onExcelPerNomor = async () => {
         </table>
       </div>
     </template>
+    <template #delete-warning="{ item }">
+      <div class="font-weight-bold text-primary mt-1">{{ item?.Nomor }}</div>
+      <div v-if="item?.Status_ !== 'BELUM'" class="delete-warning-box mt-2">
+        ⚠️ Pengajuan ini sudah di Realisasi. Jika dihapus, Jurnal akan ikut
+        dihapus.
+      </div>
+    </template>
   </BaseBrowse>
-
-  <v-dialog v-model="showDeleteDialog" max-width="440px" persistent>
-    <v-card rounded="lg">
-      <v-card-title
-        class="bg-error text-white pa-3 text-subtitle-1 d-flex align-center"
-      >
-        <IconTransfer :size="16" color="white" class="mr-2" />
-        Konfirmasi Hapus
-      </v-card-title>
-      <v-card-text class="pa-4 text-body-2">
-        <div v-if="deleteWarning" class="delete-warning-box">
-          ⚠️ Pengajuan ini sudah di Realisasi. Jika dihapus, Jurnal akan ikut
-          dihapus.
-        </div>
-        Yakin ingin menghapus:
-        <div class="font-weight-bold text-primary mt-1">
-          {{ selectedItem?.Nomor }}
-        </div>
-      </v-card-text>
-      <v-card-actions class="pa-3 border-t bg-grey-lighten-4">
-        <v-spacer />
-        <v-btn
-          variant="text"
-          :disabled="isDeleting"
-          @click="showDeleteDialog = false"
-          >Batal</v-btn
-        >
-        <v-btn
-          color="error"
-          variant="elevated"
-          :loading="isDeleting"
-          @click="confirmDelete"
-          >Ya, Hapus</v-btn
-        >
-      </v-card-actions>
-    </v-card>
-  </v-dialog>
 </template>
 
 <style scoped>

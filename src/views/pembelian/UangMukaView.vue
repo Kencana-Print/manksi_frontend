@@ -17,6 +17,7 @@ import {
   IconListDetails,
 } from "@tabler/icons-vue";
 import NumberInputIDR from "@/components/NumberInputIDR.vue";
+import { isAxiosError } from "axios";
 
 const authStore = useAuthStore();
 const router = useRouter();
@@ -978,9 +979,18 @@ const openPrintPenyelesaian = () => {
   );
 };
 
-const goPenyelesaian = () => {
+const goPenyelesaian = async () => {
   const item = selectedPumHistory.value[0];
   if (!item) return;
+  try {
+    await uangMukaPenyelesaianFormService.cekBatas(item.BonNomor);
+  } catch (e) {
+    toast.error(
+      (isAxiosError(e) && e.response?.data?.message) ||
+        "Gagal memeriksa batas waktu penyelesaian.",
+    );
+    return;
+  }
   router.push(
     `/pembelian/uang-muka/penyelesaian/${encodeURIComponent(item.BonNomor)}`,
   );

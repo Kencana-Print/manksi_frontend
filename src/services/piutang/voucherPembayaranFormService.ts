@@ -11,9 +11,9 @@ export const voucherPembayaranFormService = {
       params: { search },
     });
   },
-  getNotaDetail(kode: string, statusPpn: number, type: string) {
+  getNotaDetail(kode: string, statusPpn: number, type: string, supKode = "") {
     return api.get("/piutang/voucher-pembayaran-form/nota-detail", {
-      params: { kode, statusPpn, type },
+      params: { kode, statusPpn, type, supKode },
     });
   },
   searchNota(type: string, supKode: string, search: string) {

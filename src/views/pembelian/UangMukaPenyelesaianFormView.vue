@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
 import BaseForm from "@/components/BaseForm.vue";
@@ -68,6 +68,13 @@ interface RealisasiFormState {
   is_edit: boolean;
   info_permintaan: any;
   detail: PenyelesaianDetail[];
+  sisa: {
+    wajib: boolean;
+    ambang: number;
+    rek_kode: string;
+    nominal: number;
+    jur_no: string;
+  };
 }
 
 const route = useRoute();
@@ -122,6 +129,7 @@ const form = ref<RealisasiFormState>({
   is_edit: false,
   info_permintaan: null,
   detail: [],
+  sisa: { wajib: false, ambang: 100, rek_kode: "", nominal: 0, jur_no: "" },
 });
 
 const columns = [
@@ -157,10 +165,35 @@ const accountOptions = ref<{ kode: string; nama: string; cabang: string }[]>(
   [],
 );
 
+// ── Sisa kasbon → Kas/Bank ──
+const sisaJenis = ref<"KAS" | "BANK">("KAS");
+const sisaRekKode = ref("");
+const sisaOptions = ref<{ kode: string; nama: string; cabang: string }[]>([]);
+const sisaItems = computed(() =>
+  sisaOptions.value.map((o) => ({
+    title: `${o.kode} - ${o.nama}`,
+    value: o.kode,
+  })),
+);
+
+const muatOpsiSisa = async (jenis: "KAS" | "BANK") => {
+  sisaOptions.value = await uangMukaPenyelesaianApi.getAccountOptions(
+    jenis,
+    form.value.cabang,
+  );
+};
+
+watch(sisaJenis, async (j) => {
+  await muatOpsiSisa(j);
+  if (!sisaOptions.value.some((o) => o.kode === sisaRekKode.value))
+    sisaRekKode.value = "";
+});
+
 onMounted(async () => {
   isLoading.value = true;
   try {
     const nomor = decodeURIComponent(route.params.nomor as string);
+    await uangMukaPenyelesaianApi.cekBatas(nomor);
     const d = await uangMukaPenyelesaianApi.getFormData(nomor);
 
     Object.assign(form.value, d);
@@ -170,6 +203,11 @@ onMounted(async () => {
       d.jenis,
       d.cabang,
     );
+    if (d.sisa?.rek_kode) {
+      sisaJenis.value = d.sisa.rek_kode.startsWith("A-111") ? "KAS" : "BANK";
+      sisaRekKode.value = d.sisa.rek_kode;
+    }
+    await muatOpsiSisa(sisaJenis.value);
   } catch (e: any) {
     if (e?.isAuthExpired) return;
     toast.error(e.response?.data?.message ?? "Gagal memuat data.");
@@ -189,6 +227,10 @@ const totalTerpakai = computed(() =>
   ),
 );
 const totalSisa = computed(() => totalKasbon.value - totalTerpakai.value);
+
+const perluSisa = computed(
+  () => form.value.sisa.wajib && totalSisa.value >= form.value.sisa.ambang,
+);
 
 const hitungTotal = (d: PenyelesaianDetail) => {
   d.total = d.qty * d.harga;
@@ -700,6 +742,13 @@ const validateSave = () => {
     }
   }
 
+  if (perluSisa.value && !sisaRekKode.value) {
+    toast.warning(
+      "Sisa kasbon harus dimasukkan ke Kas atau Bank. Pilih rekening tujuan.",
+    );
+    return;
+  }
+
   showSaveDialog.value = true;
 };
 
@@ -709,6 +758,7 @@ const confirmSave = async () => {
     const res = await uangMukaPenyelesaianApi.save({
       ...form.value,
       no_bkk_lama: form.value.no_bkk,
+      sisa_rek_kode: perluSisa.value ? sisaRekKode.value : "",
     });
     savedNoBkk.value = res.data.no_bkk || "";
     showSaveDialog.value = false;
@@ -964,6 +1014,31 @@ const onStatusFinanceChange = async (d: PenyelesaianDetail, idx: number) => {
           hide-details
           readonly
         /> -->
+      </div>
+
+      <div v-if="perluSisa" class="desktop-form-section">
+        <div class="section-label">Sisa Kasbon</div>
+        <div class="info-row">
+          <span>Sisa</span><b>{{ fmt(totalSisa) }}</b>
+        </div>
+        <div class="sisa-radio-row">
+          <label class="sisa-radio">
+            <input type="radio" v-model="sisaJenis" value="KAS" />
+            <span>Kas (BKM)</span>
+          </label>
+          <label class="sisa-radio">
+            <input type="radio" v-model="sisaJenis" value="BANK" />
+            <span>Bank (BBM)</span>
+          </label>
+        </div>
+        <v-select
+          v-model="sisaRekKode"
+          :items="sisaItems"
+          label="Rekening tujuan sisa"
+          variant="outlined"
+          density="compact"
+          hide-details
+        />
       </div>
 
       <div v-if="form.info_permintaan" class="desktop-form-section">
@@ -2198,5 +2273,18 @@ const onStatusFinanceChange = async (d: PenyelesaianDetail, idx: number) => {
 .rl-table th:nth-child(25),
 .rl-table td:nth-child(25) {
   width: 28px;
+}
+
+.sisa-radio-row {
+  display: flex;
+  gap: 14px;
+  margin: 8px 0 10px;
+  font-size: 12px;
+}
+.sisa-radio {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
 }
 </style>

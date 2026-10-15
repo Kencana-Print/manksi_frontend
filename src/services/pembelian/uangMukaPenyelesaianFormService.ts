@@ -5,6 +5,10 @@ const base = "/pembelian/uang-muka-penyelesaian";
 export const uangMukaPenyelesaianFormService = {
   getFormData: (nomor: string) =>
     api.get(`${base}/${encodeURIComponent(nomor)}`).then((r) => r.data.data),
+  cekBatas: (nomor: string) =>
+    api
+      .get(`${base}/${encodeURIComponent(nomor)}/cek-batas`)
+      .then((r) => r.data),
   getAccountOptions: (jenis: string, cabang: string) =>
     api
       .get(`${base}/account-options`, { params: { jenis, cabang } })

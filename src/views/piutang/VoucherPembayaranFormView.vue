@@ -100,7 +100,7 @@ const xpotonganBahan = computed(() =>
 const xtotalDetail = computed(() =>
   detail.value.reduce((s, d) => {
     if (!d.tipe) return s;
-    if (["BPB", "BPJ", "POE", "MMT", "BPE", "BPG"].includes(d.tipe))
+    if (["BPB", "BPJ", "POE", "MMT", "BPE", "BPG", "POL"].includes(d.tipe))
       return s + (Number(d.total) || 0);
     if (["RET", "PJG"].includes(d.tipe)) return s - (Number(d.total) || 0);
     return s;
@@ -188,6 +188,7 @@ const loadNotaDetail = async (idx: number, nomor: string, searchType = "") => {
       nomor,
       statusPpn,
       searchType,
+      form.value.supKode,
     );
     Object.assign(detail.value[idx], res.data.data);
     recalcDetail(detail.value[idx]);
@@ -298,6 +299,7 @@ const notaTypeConfig = computed(() => {
     MMT: { title: "BPB MMT", color: "#00695c" },
     BPE: { title: "BPB PO External MMT", color: "#0277bd" },
     BPG: { title: "BPB Non Bahan", color: "#6a1b9a" },
+    POL: { title: "PO Lain-lain", color: "#ef6c00" },
   };
   return map[notaModalType.value] ?? { title: "Cari Nota", color: "#1565c0" };
 });
@@ -470,6 +472,7 @@ onMounted(async () => {
         POE: "POE",
         PJG: "PJG",
         BPG: "BPG",
+        POL: "POL",
       };
       detail.value = (d.detail || []).map((row: any) => ({
         ...row,
@@ -809,6 +812,7 @@ const executeClose = () => {
                         <option value="MMT">BPB MMT</option>
                         <option value="BPE">BPB PO Ext MMT</option>
                         <option value="BPG">BPB Non Bahan</option>
+                        <option value="POL">PO Lain-lain</option>
                       </select>
                       <button
                         type="button"
@@ -1527,6 +1531,10 @@ const executeClose = () => {
 .type-bpg {
   background: #f3e5f5;
   color: #6a1b9a;
+}
+.type-pol {
+  background: #fff3e0;
+  color: #ef6c00;
 }
 .btn-del {
   background: transparent;
