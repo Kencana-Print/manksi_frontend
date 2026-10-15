@@ -160,6 +160,8 @@ const {
         jumlah: Number(row.pod2_jumlah) || 0,
         kode: row.pod2_bhn_kode || "",
         nama: row.bhn_name || "",
+        supKode: row.pod2_sup_kode || "",
+        supNama: row.pod2_sup_nama || "",
       })),
       rolls: (d.rolls || []).map((row: any) => ({
         no: Number(row.pod3_no) || 0,
@@ -567,6 +569,16 @@ const recalcRow = (i: number) => {
   }
 };
 
+// Supplier yang memesan bahan ini di baris PO (untuk dropdown Delivery PO Lain-lain)
+const supplierOptions = (kodeBahan: string) => {
+  const peta = new Map<string, string>();
+  for (const r of formData.value.items) {
+    if (r.kode === kodeBahan && r.supKode && !peta.has(r.supKode))
+      peta.set(r.supKode, r.supNama || r.supKode);
+  }
+  return [...peta].map(([kode, nama]) => ({ kode, nama }));
+};
+
 // ── Delivery ──
 const addDelivery = () =>
   formData.value.delivery.push({
@@ -574,6 +586,8 @@ const addDelivery = () =>
     jumlah: 0,
     kode: "",
     nama: "",
+    supKode: "",
+    supNama: "",
   });
 const removeDelivery = (i: number) => formData.value.delivery.splice(i, 1);
 const openDeliveryBahan = (i: number) => {
@@ -587,6 +601,8 @@ const setBahanHandler = (v: any) => {
     const i = activeDeliveryIdx.value;
     formData.value.delivery[i].kode = v.Kode || v.bhn_kode;
     formData.value.delivery[i].nama = v.Nama || v.bhn_name;
+    const opsi = supplierOptions(formData.value.delivery[i].kode);
+    formData.value.delivery[i].supKode = opsi.length === 1 ? opsi[0].kode : "";
     activeDeliveryIdx.value = -1;
   } else {
     setBahan(v);
@@ -610,7 +626,7 @@ const setSupRow = (v: any) => {
 const validateSave = () => {
   // Filter baris trailing kosong dulu sebelum validasi
   const validItems = formData.value.items.filter(
-    (r: any) => r.kode && r.kode.trim() !== "",
+    (r: { kode?: string }) => r.kode && r.kode.trim() !== "",
   );
 
   if (validItems.length === 0)
@@ -655,15 +671,20 @@ const validateSave = () => {
       return toast.warning(`Baris ${idx + 1}: PO Celup Roll harus diisi.`);
   }
 
-  // PO Lain-lain: satu bahan hanya boleh satu baris (delivery dikunci per kode bahan)
+  // PO Lain-lain: satu bahan boleh ke beberapa supplier. Baris dobel hanya kalau
+  // bahan + supplier + SPK/MAP sama persis. SPK/MAP wajib (keberadaan dicek server).
   if (isLainLain.value) {
     const seen = new Set<string>();
     for (const [idx, r] of validItems.entries()) {
-      if (seen.has(r.kode))
+      const spk = String(r.spk || "").trim();
+      if (!spk)
+        return toast.warning(`Baris ${idx + 1}: Nomor SPK/MAP harus diisi.`);
+      const kunci = `${r.kode}|${r.supKode}|${spk.toUpperCase()}`;
+      if (seen.has(kunci))
         return toast.warning(
-          `Baris ${idx + 1}: Bahan ${r.kode} dobel. Satu bahan hanya boleh satu baris.`,
+          `Baris ${idx + 1}: Bahan ${r.kode} dengan supplier dan SPK/MAP yang sama dobel.`,
         );
-      seen.add(r.kode);
+      seen.add(kunci);
     }
   }
 
@@ -682,6 +703,21 @@ const validateSave = () => {
         return toast.warning(
           `Delivery baris ${idx + 1}: Jumlah Commitment harus di isi.`,
         );
+      if (isLainLain.value) {
+        if (!d.supKode)
+          return toast.warning(
+            `Delivery baris ${idx + 1}: Supplier harus dipilih.`,
+          );
+        if (
+          !validItems.some(
+            (r: { kode?: string; supKode?: string }) =>
+              r.kode === d.kode && r.supKode === d.supKode,
+          )
+        )
+          return toast.warning(
+            `Delivery baris ${idx + 1}: Bahan ${d.kode} tidak dipesan ke supplier tersebut.`,
+          );
+      }
     }
   }
 
@@ -956,7 +992,9 @@ const validateSave = () => {
                 <th v-if="canLihatBeli" style="width: 100px" class="tr bg-blue">
                   Total
                 </th>
-                <th style="width: 90px">SPK</th>
+                <th style="width: 90px">
+                  {{ isLainLain ? "SPK/MAP *" : "SPK" }}
+                </th>
                 <th style="width: 90px">MKB</th>
                 <th v-if="showSupCol" style="width: 170px">Supplier</th>
                 <th style="width: 35px" class="tc">Aksi</th>
@@ -1130,6 +1168,7 @@ const validateSave = () => {
                     <th style="width: 80px" class="tr bg-yellow">Jumlah</th>
                     <th>Nama Bahan</th>
                     <th style="width: 110px">Kode</th>
+                    <th v-if="showSupCol" style="width: 150px">Supplier</th>
                     <th style="width: 40px" class="tc"></th>
                   </tr>
                 </thead>
@@ -1161,6 +1200,18 @@ const validateSave = () => {
                     </td>
                     <td class="p0">
                       <input v-model="d.kode" class="ci ro w-100" readonly />
+                    </td>
+                    <td v-if="showSupCol" class="p0">
+                      <select v-model="d.supKode" class="ci w-100">
+                        <option value="">— pilih —</option>
+                        <option
+                          v-for="s in supplierOptions(d.kode)"
+                          :key="s.kode"
+                          :value="s.kode"
+                        >
+                          {{ s.nama }}
+                        </option>
+                      </select>
                     </td>
                     <td class="tc">
                       <button
