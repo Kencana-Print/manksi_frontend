@@ -21,10 +21,57 @@ const filters = ref({
   endDate: toLocalDate(today),
 });
 
+// ── Tipe data ──
+interface MasterRow {
+  Nomor: string;
+  Tanggal: string;
+  Keterangan: string;
+  KodeSupplier: string;
+  Supplier: string;
+  QtyPO: number;
+  QtyCommit: number;
+  QtyBPB: number;
+  QtyRetur: number;
+  Status: string;
+}
+
+interface DetailRow {
+  Nomor: string;
+  Kode: string;
+  Nama: string;
+  Satuan: string;
+  Supplier: string;
+  SPK: string;
+  NamaSPK: string;
+  Awal: boolean;
+  QtyPO: number;
+  Sisa: number;
+  TglCommit: string | null;
+  QtyCommit: number;
+  NoBPB: string;
+  TglBPB: string | null;
+  QtyBPB: number;
+  NoRetur: string;
+  TglRetur: string | null;
+  QtyRetur: number;
+}
+
+type ExpandedItem = string | { Nomor?: string };
+
+// ── Expand state (harus di atas useBrowse karena dipakai fetchApi) ──
+const expandedRows = ref<ExpandedItem[]>([]);
+const detailData = ref<Record<string, DetailRow[]>>({});
+const detailLoading = ref<Record<string, boolean>>({});
+const detailFilter = ref<Record<string, string>>({});
+
 // ── Composable ──
 const { items, isLoading, canExport, fetchData } = useBrowse({
   menuId: "512",
   fetchApi: async () => {
+    // Data dimuat ulang: buang cache rincian & tutup semua expand
+    detailData.value = {};
+    detailFilter.value = {};
+    expandedRows.value = [];
     const res = await poBahanVsBpbService.getBrowse({
       startDate: filters.value.startDate,
       endDate: filters.value.endDate,
@@ -35,6 +82,32 @@ const { items, isLoading, canExport, fetchData } = useBrowse({
 });
 
 watch([() => filters.value.startDate, () => filters.value.endDate], fetchData);
+
+// ── Headers Master ── (biarkan blok masterHeaders yang sekarang di sini)
+
+const loadDetail = async (nomor: string) => {
+  if (!nomor || detailData.value[nomor] || detailLoading.value[nomor]) return;
+  detailLoading.value = { ...detailLoading.value, [nomor]: true };
+  try {
+    const res = await poBahanVsBpbService.getDetail(nomor);
+    detailData.value = {
+      ...detailData.value,
+      [nomor]: res.data.data as DetailRow[],
+    };
+  } catch {
+    detailData.value = { ...detailData.value, [nomor]: [] };
+  } finally {
+    detailLoading.value = { ...detailLoading.value, [nomor]: false };
+  }
+};
+
+const onUpdateExpanded = async (val: ExpandedItem[]) => {
+  expandedRows.value = val;
+  const nomorList = val.map((v) =>
+    typeof v === "object" && v !== null ? String(v.Nomor ?? "") : String(v),
+  );
+  await Promise.all(nomorList.map(loadDetail));
+};
 
 // ── Headers Master ──
 const masterHeaders = [
@@ -50,30 +123,6 @@ const masterHeaders = [
   { title: "Status", key: "Status", width: "100px", align: "center" },
 ];
 
-// ── Expand state ──
-const expandedRows = ref<any[]>([]);
-const detailData = ref<Record<string, any[]>>({});
-const detailLoading = ref<Record<string, boolean>>({});
-
-const onUpdateExpanded = async (val: any[]) => {
-  expandedRows.value = val;
-  const nomorList: string[] = val.map((v) =>
-    typeof v === "object" && v !== null ? String(v.Nomor ?? v) : String(v),
-  );
-
-  for (const nomor of nomorList.filter((n) => n && !detailData.value[n])) {
-    detailLoading.value = { ...detailLoading.value, [nomor]: true };
-    try {
-      const res = await poBahanVsBpbService.getDetail(nomor);
-      detailData.value = { ...detailData.value, [nomor]: res.data.data };
-    } catch {
-      detailData.value = { ...detailData.value, [nomor]: [] };
-    } finally {
-      detailLoading.value = { ...detailLoading.value, [nomor]: false };
-    }
-  }
-};
-
 // ── Helpers ──
 const getNomor = (item: any): string =>
   String((item?.raw ?? item)?.Nomor ?? "");
@@ -86,6 +135,36 @@ const formatTgl = (v: string | null) => {
   const [y, m, d] = s.split("-");
   return `${d}/${m}/${y}`;
 };
+
+// ── Filter & total rincian per PO ──
+const filteredDetail = (nomor: string): DetailRow[] => {
+  const rows = detailData.value[nomor] ?? [];
+  const q = (detailFilter.value[nomor] ?? "").trim().toLowerCase();
+  if (!q) return rows;
+  return rows.filter((r) =>
+    [r.Kode, r.Nama, r.Supplier, r.SPK, r.NamaSPK].some((v) =>
+      String(v ?? "")
+        .toLowerCase()
+        .includes(q),
+    ),
+  );
+};
+
+const totalOf = (nomor: string) => {
+  const t = { QtyPO: 0, Sisa: 0, QtyCommit: 0, QtyBPB: 0, QtyRetur: 0 };
+  for (const r of filteredDetail(nomor)) {
+    t.QtyPO += Number(r.QtyPO) || 0;
+    t.Sisa += Number(r.Sisa) || 0;
+    t.QtyCommit += Number(r.QtyCommit) || 0;
+    t.QtyBPB += Number(r.QtyBPB) || 0;
+    t.QtyRetur += Number(r.QtyRetur) || 0;
+  }
+  return t;
+};
+
+// Kolom Supplier & SPK hanya muncul bila PO punya data itu (PO Lain-lain)
+const adaSupplier = (nomor: string): boolean =>
+  (detailData.value[nomor] ?? []).some((r) => !!r.Supplier);
 
 // ── Pewarnaan Baris (Status) ──
 const getRowTextColor = (data: any) => {
@@ -104,29 +183,42 @@ const getRowTextColor = (data: any) => {
 };
 
 // ── Export ──
-const onExport = () => {
-  if (!canExport.value) return;
-  const rows: any[] = [];
+const isExporting = ref(false);
 
-  (items.value ?? []).forEach((master: any) => {
-    // Baris Master
-    rows.push({
-      "Nomor PO": master.Nomor,
-      "Tanggal PO": formatTgl(master.Tanggal),
-      Keterangan: master.Keterangan,
-      "Kode Supplier": master.KodeSupplier,
-      Supplier: master.Supplier,
-      "Qty PO (Master)": master.QtyPO,
-      "Qty Commit (Master)": master.QtyCommit,
-      "Qty BPB (Master)": master.QtyBPB,
-      "Qty Retur (Master)": master.QtyRetur,
-      Status: master.Status,
+const onExport = async () => {
+  if (!canExport.value || isExporting.value) return;
+  const masters = (items.value ?? []) as MasterRow[];
+  isExporting.value = true;
+  try {
+    // Muat rincian semua PO yang belum ada di cache (5 request paralel)
+    const belum = masters
+      .map((m) => m.Nomor)
+      .filter((n) => !detailData.value[n]);
+    for (let i = 0; i < belum.length; i += 5) {
+      await Promise.all(belum.slice(i, i + 5).map(loadDetail));
+    }
 
-      // Kolom Detail dikosongkan
+    const blankMaster = {
+      "Nomor PO": "",
+      "Tanggal PO": "",
+      Keterangan: "",
+      "Kode Supplier": "",
+      Supplier: "",
+      "Qty PO (Master)": "",
+      "Qty Commit (Master)": "",
+      "Qty BPB (Master)": "",
+      "Qty Retur (Master)": "",
+      Status: "",
+    };
+    const blankDetail = {
       "Kode Bahan": "",
       "Nama Bahan": "",
       Satuan: "",
+      "Supplier Item": "",
+      SPK: "",
+      "Nama SPK": "",
       "Jml PO": "",
+      Sisa: "",
       "Tgl Commit": "",
       "Jml Commit": "",
       "No BPB": "",
@@ -135,42 +227,54 @@ const onExport = () => {
       "No Retur": "",
       "Tgl Retur": "",
       "Jml Retur": "",
-    });
+    };
 
-    // Baris Detail
-    (detailData.value[master.Nomor] || []).forEach((det: any) => {
+    const rows: Record<string, string | number>[] = [];
+    masters.forEach((master) => {
       rows.push({
-        "Nomor PO": "",
-        "Tanggal PO": "",
-        Keterangan: "",
-        "Kode Supplier": "",
-        Supplier: "",
-        "Qty PO (Master)": "",
-        "Qty Commit (Master)": "",
-        "Qty BPB (Master)": "",
-        "Qty Retur (Master)": "",
-        Status: "",
+        "Nomor PO": master.Nomor,
+        "Tanggal PO": formatTgl(master.Tanggal),
+        Keterangan: master.Keterangan,
+        "Kode Supplier": master.KodeSupplier,
+        Supplier: master.Supplier,
+        "Qty PO (Master)": master.QtyPO,
+        "Qty Commit (Master)": master.QtyCommit,
+        "Qty BPB (Master)": master.QtyBPB,
+        "Qty Retur (Master)": master.QtyRetur,
+        Status: master.Status,
+        ...blankDetail,
+      });
 
-        "Kode Bahan": det.Kode,
-        "Nama Bahan": det.Nama,
-        Satuan: det.Satuan,
-        "Jml PO": det.QtyPO || "",
-        "Tgl Commit": formatTgl(det.TglCommit),
-        "Jml Commit": det.QtyCommit || "",
-        "No BPB": det.NoBPB,
-        "Tgl BPB": formatTgl(det.TglBPB),
-        "Jml BPB": det.QtyBPB || "",
-        "No Retur": det.NoRetur,
-        "Tgl Retur": formatTgl(det.TglRetur),
-        "Jml Retur": det.QtyRetur || "",
+      (detailData.value[master.Nomor] ?? []).forEach((det) => {
+        rows.push({
+          ...blankMaster,
+          "Kode Bahan": det.Kode,
+          "Nama Bahan": det.Nama,
+          Satuan: det.Satuan,
+          "Supplier Item": det.Supplier,
+          SPK: det.SPK,
+          "Nama SPK": det.NamaSPK,
+          "Jml PO": det.Awal ? det.QtyPO : "",
+          Sisa: det.Awal ? det.Sisa : "",
+          "Tgl Commit": formatTgl(det.TglCommit),
+          "Jml Commit": det.QtyCommit || "",
+          "No BPB": det.NoBPB,
+          "Tgl BPB": formatTgl(det.TglBPB),
+          "Jml BPB": det.QtyBPB || "",
+          "No Retur": det.NoRetur,
+          "Tgl Retur": formatTgl(det.TglRetur),
+          "Jml Retur": det.QtyRetur || "",
+        });
       });
     });
-  });
 
-  const ws = XLSX.utils.json_to_sheet(rows);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "PO vs BPB");
-  XLSX.writeFile(wb, "Laporan_PO_vs_BPB.xlsx");
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "PO vs BPB");
+    XLSX.writeFile(wb, "Laporan_PO_vs_BPB.xlsx");
+  } finally {
+    isExporting.value = false;
+  }
 };
 </script>
 
@@ -250,6 +354,15 @@ const onExport = () => {
           <div class="tbl-header">
             Rincian Barang & BPB — {{ getNomor(item) }}
           </div>
+          <div class="filter-bar">
+            <input
+              v-model="detailFilter[getNomor(item)]"
+              type="text"
+              class="f-date"
+              style="width: 320px"
+              placeholder="Filter kode / nama bahan / supplier / SPK..."
+            />
+          </div>
           <div class="tbl-wrap">
             <table class="gt">
               <thead>
@@ -257,7 +370,12 @@ const onExport = () => {
                   <th style="width: 100px">Kode</th>
                   <th style="min-width: 180px">Nama Bahan</th>
                   <th style="width: 70px; text-align: center">Satuan</th>
+                  <template v-if="adaSupplier(getNomor(item))">
+                    <th style="width: 160px">Supplier</th>
+                    <th style="width: 170px">SPK</th>
+                  </template>
                   <th style="width: 90px; text-align: right">Qty PO</th>
+                  <th style="width: 90px; text-align: right">Sisa</th>
                   <th style="width: 90px; text-align: center">Tgl Commit</th>
                   <th style="width: 90px; text-align: right">Qty Commit</th>
                   <th style="width: 120px">No. BPB</th>
@@ -270,15 +388,35 @@ const onExport = () => {
               </thead>
               <tbody>
                 <tr
-                  v-for="(det, idx) in detailData[getNomor(item)]"
+                  v-for="(det, idx) in filteredDetail(getNomor(item))"
                   :key="idx"
                   class="tr-bahan"
+                  :class="{ 'row-awal': det.Awal }"
                 >
-                  <td class="fw text-primary">{{ det.Kode }}</td>
-                  <td class="fw">{{ det.Nama }}</td>
-                  <td class="tc">{{ det.Satuan }}</td>
+                  <td class="fw text-primary">
+                    {{ det.Awal ? det.Kode : "" }}
+                  </td>
+                  <td class="fw">{{ det.Awal ? det.Nama : "" }}</td>
+                  <td class="tc">{{ det.Awal ? det.Satuan : "" }}</td>
+                  <template v-if="adaSupplier(getNomor(item))">
+                    <td>{{ det.Awal ? det.Supplier : "" }}</td>
+                    <td>
+                      <template v-if="det.Awal">
+                        {{ det.SPK }}
+                        <span v-if="det.NamaSPK" class="text-grey">
+                          — {{ det.NamaSPK }}</span
+                        >
+                      </template>
+                    </td>
+                  </template>
                   <td class="tr fw text-success">
-                    {{ det.QtyPO ? num(det.QtyPO) : "" }}
+                    {{ det.Awal ? num(det.QtyPO) : "" }}
+                  </td>
+                  <td
+                    class="tr fw"
+                    :class="{ 'text-error': det.Awal && det.Sisa < 0 }"
+                  >
+                    {{ det.Awal ? num(det.Sisa) : "" }}
                   </td>
                   <td class="tc">{{ formatTgl(det.TglCommit) }}</td>
                   <td class="tr">
@@ -295,7 +433,35 @@ const onExport = () => {
                     {{ det.QtyRetur ? num(det.QtyRetur) : "" }}
                   </td>
                 </tr>
+                <tr v-if="!filteredDetail(getNomor(item)).length">
+                  <td
+                    :colspan="adaSupplier(getNomor(item)) ? 15 : 13"
+                    class="tc text-grey"
+                    style="height: 32px"
+                  >
+                    Tidak ada data yang cocok dengan filter.
+                  </td>
+                </tr>
               </tbody>
+              <tfoot>
+                <tr class="tr-total">
+                  <td :colspan="adaSupplier(getNomor(item)) ? 5 : 3">TOTAL</td>
+                  <td class="tr">{{ num(totalOf(getNomor(item)).QtyPO) }}</td>
+                  <td class="tr">{{ num(totalOf(getNomor(item)).Sisa) }}</td>
+                  <td></td>
+                  <td class="tr">
+                    {{ num(totalOf(getNomor(item)).QtyCommit) }}
+                  </td>
+                  <td></td>
+                  <td></td>
+                  <td class="tr">{{ num(totalOf(getNomor(item)).QtyBPB) }}</td>
+                  <td></td>
+                  <td></td>
+                  <td class="tr">
+                    {{ num(totalOf(getNomor(item)).QtyRetur) }}
+                  </td>
+                </tr>
+              </tfoot>
             </table>
           </div>
         </template>
@@ -414,6 +580,22 @@ const onExport = () => {
 }
 .tr-bahan:hover td {
   background: #e3f2fd;
+}
+.row-awal td {
+  border-top: 2px solid #90a4ae;
+}
+.filter-bar {
+  padding: 6px 8px;
+  background: #f5f7f9;
+  border: 1px solid #bdbdbd;
+  border-top: none;
+}
+.tr-total td {
+  background: #e8eef3;
+  font-weight: 700;
+  border-top: 2px solid #607d8b;
+  position: sticky;
+  bottom: 0;
 }
 
 /* ── Utility ── */
