@@ -64,6 +64,12 @@ const newRoll = (): QcRollRow => ({
 
 const r2 = (n: number): number => Math.round(n * 100) / 100;
 
+// Rata-rata hanya dari bacaan > 0 (gramasi atas/bawah boleh kosong bila PO tanpa gramasi)
+const rataPositif = (vals: number[]): number => {
+  const v = vals.filter((n) => n > 0);
+  return v.length ? r2(v.reduce((a, b) => a + b, 0) / v.length) : 0;
+};
+
 // Roll wajib cek: dibulatkan ke atas, minimal 1 (sama dengan backend)
 const rollCekOf = (roll: number, persen: number): number =>
   roll > 0 ? Math.max(1, Math.ceil((roll * persen) / 100)) : 0;
@@ -77,10 +83,16 @@ const isRollBlank = (x: QcRollRow): boolean =>
   !x.catatan.trim() &&
   Object.values(x.hasil).every((v) => !v.trim());
 
+// Gramasi PO kosong / "-" / tidak terbaca → gramasi atas & bawah tidak wajib
+const gramasiPoAda = (): boolean => {
+  const p = formData.value.po;
+  return p.gramasi_min > 0 && p.gramasi_max > 0;
+};
+
 const rollTerisi = (x: QcRollRow): boolean =>
-  Number(x.gramasi_atas) > 0 &&
-  Number(x.gramasi_bawah) > 0 &&
-  Number(x.setting_cek) > 0;
+  Number(x.setting_cek) > 0 &&
+  (!gramasiPoAda() ||
+    (Number(x.gramasi_atas) > 0 && Number(x.gramasi_bawah) > 0));
 
 const MAX_ROLL = 300;
 
@@ -392,9 +404,10 @@ const rollStatus = (x: QcRollRow): "OK" | "NO" | "-" => {
   const okS =
     s >= p.setting_min - t.setting - EPS &&
     s <= p.setting_max + t.setting + EPS;
-  return okG(Number(x.gramasi_atas)) && okG(Number(x.gramasi_bawah)) && okS
-    ? "OK"
-    : "NO";
+  const okGramasi =
+    !gramasiPoAda() ||
+    (okG(Number(x.gramasi_atas)) && okG(Number(x.gramasi_bawah)));
+  return okGramasi && okS ? "OK" : "NO";
 };
 
 const hitungLot = (row: QcLotRow): LotCalc => {
@@ -408,16 +421,15 @@ const hitungLot = (row: QcLotRow): LotCalc => {
   if (formData.value.po.spec_terbaca && dicek.length > 0) {
     saran = sesuai === dicek.length ? 3 : sesuai === 0 ? 1 : 2;
   }
-  const rata = (vals: number[]): number =>
-    vals.length ? r2(vals.reduce((a, b) => a + b, 0) / vals.length) : 0;
+
   return {
     rollCek,
     dicek: dicek.length,
     sesuai,
     saran,
-    atasRata: rata(dicek.map((x) => Number(x.gramasi_atas))),
-    bawahRata: rata(dicek.map((x) => Number(x.gramasi_bawah))),
-    settingRata: rata(dicek.map((x) => Number(x.setting_cek))),
+    atasRata: rataPositif(dicek.map((x) => Number(x.gramasi_atas))),
+    bawahRata: rataPositif(dicek.map((x) => Number(x.gramasi_bawah))),
+    settingRata: rataPositif(dicek.map((x) => Number(x.setting_cek))),
   };
 };
 
@@ -427,13 +439,12 @@ const calcOf = (i: number): LotCalc => lotCalc.value[i] ?? EMPTY_CALC;
 // Rata-rata semua roll yang sudah dicek (lintas lot), untuk footer tabel 1
 const rataSemua = computed(() => {
   const dicek = formData.value.dtl.flatMap((r) => r.rolls.filter(rollTerisi));
-  const rata = (vals: number[]): number =>
-    vals.length ? r2(vals.reduce((a, b) => a + b, 0) / vals.length) : 0;
+
   return {
     n: dicek.length,
-    atas: rata(dicek.map((x) => Number(x.gramasi_atas))),
-    bawah: rata(dicek.map((x) => Number(x.gramasi_bawah))),
-    setting: rata(dicek.map((x) => Number(x.setting_cek))),
+    atas: rataPositif(dicek.map((x) => Number(x.gramasi_atas))),
+    bawah: rataPositif(dicek.map((x) => Number(x.gramasi_bawah))),
+    setting: rataPositif(dicek.map((x) => Number(x.setting_cek))),
   };
 });
 
@@ -643,7 +654,9 @@ const cekSubmit = (): string => {
       (x) => !isRollBlank(x) && !rollTerisi(x),
     );
     if (idxKurang >= 0) {
-      return `Lot ${r.lot}, baris roll ke-${idxKurang + 1}: gramasi atas, bawah, dan setting harus diisi lengkap.`;
+      return gramasiPoAda()
+        ? `Lot ${r.lot}, baris roll ke-${idxKurang + 1}: gramasi atas, bawah, dan setting harus diisi lengkap.`
+        : `Lot ${r.lot}, baris roll ke-${idxKurang + 1}: setting harus diisi.`;
     }
     if (rolls.length < c.rollCek) {
       return `Lot ${r.lot}: minimal ${c.rollCek} roll harus dicek (${persen}% dari ${r.qty_roll} roll). Baru ${rolls.length}.`;
