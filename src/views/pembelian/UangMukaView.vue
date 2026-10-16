@@ -6,6 +6,7 @@ import { useToast } from "vue-toastification";
 import BaseBrowse from "@/components/BaseBrowse.vue";
 import { uangMukaService } from "@/services/pembelian/uangMukaService";
 import { pengajuanUangMukaService } from "@/services/pembelian/pengajuanUangMukaService";
+const CABANG_VALIDASI = ["HO-", "P01"];
 import { uangMukaPenyelesaianFormService } from "@/services/pembelian/uangMukaPenyelesaianFormService";
 import { exportExcelSingle } from "@/utils/excelExport";
 import {
@@ -15,6 +16,9 @@ import {
   IconCheck,
   IconFileExport,
   IconListDetails,
+  IconSignature,
+  IconCashBanknote,
+  IconChecklist,
 } from "@tabler/icons-vue";
 import NumberInputIDR from "@/components/NumberInputIDR.vue";
 import { isAxiosError } from "axios";
@@ -38,6 +42,11 @@ const canSeeOutstandingSumber = computed(
 );
 const canRealisasi = computed(
   () => isAdmin.value || ["FINANCE", "EDP", "AUDIT"].includes(userBagian.value),
+);
+const canValidasi = computed(
+  () =>
+    isAdmin.value ||
+    ["FINANCE", "EDP", "AUDIT", "DIREKSI"].includes(userBagian.value),
 );
 
 const today = new Date();
@@ -809,6 +818,41 @@ const openPrintPumAjuan = () => {
     "_blank",
   );
 };
+const bisaValidasiPilihan = computed(() => {
+  const item = selectedPumOutstanding.value[0];
+  return (
+    !!item &&
+    CABANG_VALIDASI.includes(String(item.Cabang)) &&
+    item.ValAksi !== "VALIDASI"
+  );
+});
+const openValidasiPum = () => {
+  const item = selectedPumOutstanding.value[0];
+  if (!item) return;
+  window.open(
+    `/pembelian/uang-muka/print-pengajuan/${encodeURIComponent(item.Nomor)}?mode=layar`,
+    "_blank",
+  );
+};
+const bisaValidasiPenyelesaianPilihan = computed(() => {
+  const item = selectedPumHistory.value[0];
+  return (
+    !!item &&
+    !!item.Nomor &&
+    item.Status === "REALISASI" &&
+    Number(item.BonSelesai) === 1 &&
+    CABANG_VALIDASI.includes(String(item.Cabang)) &&
+    item.ValAksiSelesai !== "VALIDASI"
+  );
+});
+const openValidasiPenyelesaian = () => {
+  const item = selectedPumHistory.value[0];
+  if (!item) return;
+  window.open(
+    `/pembelian/uang-muka/print-penyelesaian/${encodeURIComponent(item.BonNomor)}?mode=layar`,
+    "_blank",
+  );
+};
 const outstandingHeaders = [
   { title: "Sumber", key: "Sumber", width: "150px" },
   { title: "Nomor", key: "Nomor", width: "150px" },
@@ -824,6 +868,7 @@ const pumHeaders = [
   { title: "Nomor", key: "Nomor", width: "150px" },
   { title: "Tanggal", key: "Tanggal", width: "100px", align: "center" },
   { title: "Status", key: "Status", width: "110px", align: "center" },
+  { title: "Validasi", key: "ValAksi", width: "100px", align: "center" },
   { title: "Keterangan", key: "Keterangan", minWidth: "180px" },
   { title: "Cabang", key: "Cabang", width: "90px" },
   {
@@ -851,6 +896,7 @@ const historyHeaders = [
   { title: "Keterangan", key: "Keterangan", minWidth: "160px" },
   { title: "No Bukti", key: "NoBukti", width: "150px" },
   { title: "Selesai", key: "SelesaiLabel", width: "90px", align: "center" },
+  { title: "Validasi", key: "ValAksiSelesai", width: "100px", align: "center" },
   { title: "Closed", key: "ClosedLabel", width: "90px", align: "center" },
   { title: "Dibuat Oleh", key: "DibuatOleh", width: "110px" },
   { title: "Tgl Dibuat", key: "TglDibuat", width: "140px", align: "center" },
@@ -1336,12 +1382,23 @@ const goPenyelesaian = async () => {
           Cetak
         </v-btn>
         <v-btn
+          v-if="canValidasi"
+          size="small"
+          color="success"
+          :disabled="!bisaValidasiPilihan"
+          @click="openValidasiPum"
+        >
+          <template #prepend><IconSignature :size="15" /></template>
+          Validasi
+        </v-btn>
+        <v-btn
           v-if="canRealisasi"
           size="small"
           color="teal"
           :disabled="!selectedPumOutstanding[0]"
           @click="goRealisasi(selectedPumOutstanding[0])"
         >
+          <template #prepend><IconCashBanknote :size="15" /></template>
           Realisasi
         </v-btn>
         <v-btn
@@ -1374,6 +1431,17 @@ const goPenyelesaian = async () => {
         numFmt(item.TotalNominal)
       }}</template>
       <template #item.BonNomor="{ item }">-</template>
+      <template #item.ValAksi="{ item }">
+        <v-chip
+          v-if="CABANG_VALIDASI.includes(String(item.Cabang))"
+          size="x-small"
+          :color="item.ValAksi === 'VALIDASI' ? 'success' : 'grey'"
+          class="font-weight-bold"
+        >
+          {{ item.ValAksi === "VALIDASI" ? "Valid" : "Belum" }}
+        </v-chip>
+        <span v-else>-</span>
+      </template>
       <template #item.Status="{ item }">
         <v-chip
           size="x-small"
@@ -1535,7 +1603,18 @@ const goPenyelesaian = async () => {
           "
           @click="goPenyelesaian"
         >
+          <template #prepend><IconChecklist :size="15" /></template>
           Lanjut ke Penyelesaian
+        </v-btn>
+        <v-btn
+          v-if="canValidasi"
+          size="small"
+          color="success"
+          :disabled="!bisaValidasiPenyelesaianPilihan"
+          @click="openValidasiPenyelesaian"
+        >
+          <template #prepend><IconSignature :size="15" /></template>
+          Validasi
         </v-btn>
         <v-btn
           size="small"
@@ -1616,6 +1695,17 @@ const goPenyelesaian = async () => {
         >
           {{ selesaiLabel((item.raw || item).BonSelesai) }}
         </v-chip>
+      </template>
+      <template #item.ValAksiSelesai="{ item }">
+        <v-chip
+          v-if="item.Nomor && CABANG_VALIDASI.includes(String(item.Cabang))"
+          size="x-small"
+          :color="item.ValAksiSelesai === 'VALIDASI' ? 'success' : 'grey'"
+          class="font-weight-bold"
+        >
+          {{ item.ValAksiSelesai === "VALIDASI" ? "Valid" : "Belum" }}
+        </v-chip>
+        <span v-else>-</span>
       </template>
       <template #item.ClosedLabel="{ item }">
         <v-chip

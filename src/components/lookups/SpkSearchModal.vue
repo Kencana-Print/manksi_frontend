@@ -17,7 +17,8 @@ const props = defineProps<{
     | "sj"
     | "spk-map"
     | "po-external"
-    | "all";
+    | "all"
+    | "stbj-spanduk";
   cusKode?: string;
   perushKode?: string;
   divisi?: string | number;

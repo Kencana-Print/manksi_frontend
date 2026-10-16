@@ -61,6 +61,18 @@ const route = useRoute();
 const router = useRouter();
 const toast = useToast();
 
+interface GudangTetap {
+  kode: string;
+  nama: string;
+}
+const gudangTetap = computed(
+  () => route.meta.gudangTetap as GudangTetap | undefined,
+);
+const modeSpanduk = computed(() => !!gudangTetap.value);
+const browseRouteName = computed(
+  () => (route.meta.browseRoute as string) || "StbjBrowse",
+);
+
 const userCab = computed(() => auth.user?.cabang || "");
 const userKode = computed(() => auth.user?.kode || "");
 
@@ -261,14 +273,10 @@ const openSpkModal = (rowKey?: number) => {
 
 const selectSpk = async (item: any) => {
   showSpkModal.value = false;
-  // Jika dipanggil dari baris kosong, hapus dulu baris placeholder itu
-  if (activeRowKey.value !== null) {
-    const idx = fd.value.Detail.findIndex(
-      (r) => r._key === activeRowKey.value && !r.SpkNomor,
-    );
-    if (idx !== -1) fd.value.Detail.splice(idx, 1);
-    activeRowKey.value = null;
-  }
+  activeRowKey.value = null;
+  // Buang semua baris kosong (placeholder) dulu supaya SPK baru menempel
+  // langsung di bawah baris terakhir; ensureEmptyRow() memasang satu lagi.
+  fd.value.Detail = fd.value.Detail.filter((r) => r.SpkNomor);
   await addSpkToGrid(item.Nomor);
   ensureEmptyRow();
 };
@@ -284,6 +292,7 @@ const selectSpg = async (item: any) => {
     fd.value.GudangNama = "GUDANG JADI KAOS";
     toast.info("Gudang otomatis menjadi GUDANG JADI KAOS");
   }
+  fd.value.Detail = fd.value.Detail.filter((r) => r.SpkNomor);
   await addSpgToGrid(item.Nomor);
   ensureEmptyRow();
 };
@@ -623,6 +632,12 @@ const validateSave = () => {
     toast.warning("Jumlah belum diisi.");
     return;
   }
+  const jumlahMelebihi = validDtl.filter(
+    (r) => Number(r.Jumlah) > Number(r.Kurang),
+  ).length;
+  if (jumlahMelebihi > 0) {
+    toast.warning(`${jumlahMelebihi} baris jumlahnya melebihi sisa order.`);
+  }
 
   if (isWH003.value) {
     const validDtl2 = fd.value.Detail2.filter(
@@ -641,7 +656,7 @@ const validateSave = () => {
 // ── Print ─────────────────────────────────────────────────────────────
 const skipPrint = () => {
   showPrintDialog.value = false;
-  router.push({ name: "StbjBrowse" });
+  router.push({ name: browseRouteName.value });
 };
 const doCetak = (mode: "biasa" | "rangkap3" = "biasa") => {
   const url = router.resolve({
@@ -650,7 +665,7 @@ const doCetak = (mode: "biasa" | "rangkap3" = "biasa") => {
   }).href;
   window.open(url, "_blank");
   showPrintDialog.value = false;
-  router.push({ name: "StbjBrowse" });
+  router.push({ name: browseRouteName.value });
 };
 
 // ── Lifecycle ─────────────────────────────────────────────────────────
@@ -667,8 +682,10 @@ const initFormForRoute = async () => {
   } else {
     fd.value.Nomor = "";
     fd.value.Tanggal = todayLocal();
-    fd.value.GudangKode = (route.params.gudang as string) || "";
-    fd.value.GudangNama = (route.params.gudangNama as string) || "";
+    fd.value.GudangKode =
+      gudangTetap.value?.kode || (route.params.gudang as string) || "";
+    fd.value.GudangNama =
+      gudangTetap.value?.nama || (route.params.gudangNama as string) || "";
     const gp = defaultGdgProduksi();
     fd.value.GudangProduksiKode = gp.kode;
     fd.value.GudangProduksiNama = gp.nama;
@@ -685,7 +702,12 @@ onMounted(initFormForRoute);
 // tanpa remount), watch ini yang jaga supaya form tetap sinkron sama
 // route terbaru.
 watch(
-  () => [route.params.gudang, route.params.gudangNama, route.params.nomor],
+  () => [
+    route.params.gudang,
+    route.params.gudangNama,
+    route.params.nomor,
+    route.name,
+  ],
   (newVal, oldVal) => {
     // Skip di render pertama (sudah ditangani onMounted) — cuma react
     // ke PERUBAHAN setelah komponen sudah hidup
@@ -746,10 +768,11 @@ const totalJumlah2 = computed(() =>
               :value="fd.GudangKode"
               readonly
               class="inp ro"
-              style="width: 65px; flex-shrink: 0"
+              style="width: 52px; flex-shrink: 0"
             />
             <input
               :value="fd.GudangNama"
+              :title="fd.GudangNama"
               readonly
               class="inp ro"
               style="flex: 1; min-width: 0"
@@ -763,10 +786,11 @@ const totalJumlah2 = computed(() =>
               :value="fd.GudangProduksiKode"
               readonly
               class="inp ro"
-              style="width: 65px; flex-shrink: 0"
+              style="width: 52px; flex-shrink: 0"
             />
             <input
               :value="fd.GudangProduksiNama"
+              :title="fd.GudangProduksiNama"
               readonly
               class="inp ro"
               style="flex: 1; min-width: 0"
@@ -932,8 +956,12 @@ const totalJumlah2 = computed(() =>
                       <th style="min-width: 150px">Nama SPK</th>
                       <th style="width: 130px">Ukuran</th>
                       <th style="width: 72px" class="tr">Total Order</th>
-                      <th style="width: 60px" class="tc">Size</th>
-                      <th style="width: 72px" class="tr">Order</th>
+                      <th v-if="!modeSpanduk" style="width: 60px" class="tc">
+                        Size
+                      </th>
+                      <th v-if="!modeSpanduk" style="width: 72px" class="tr">
+                        Order
+                      </th>
                       <th style="width: 80px" class="tr hl-col">Jumlah</th>
                       <th style="width: 72px" class="tr hl-col">Koli</th>
                       <th style="width: 68px" class="tr">Jadi</th>
@@ -1018,14 +1046,14 @@ const totalJumlah2 = computed(() =>
                           class="ci tr ro"
                         />
                       </td>
-                      <td class="tc">
+                      <td v-if="!modeSpanduk" class="tc">
                         <input
                           :value="row.Size || (row.SpkNomor ? '-' : '')"
                           readonly
                           class="ci tc"
                         />
                       </td>
-                      <td>
+                      <td v-if="!modeSpanduk">
                         <input
                           :value="row.SpkNomor ? num(row.QtyOrder) : ''"
                           readonly
@@ -1338,7 +1366,8 @@ const totalJumlah2 = computed(() =>
   <!-- ── Modal SPK ── -->
   <SpkSearchModal
     v-model="showSpkModal"
-    filter-mode="mutasi"
+    :filter-mode="modeSpanduk ? 'stbj-spanduk' : 'mutasi'"
+    :divisi="modeSpanduk ? 1 : '3,4,6'"
     @selected="selectSpk"
   />
 
@@ -1443,7 +1472,7 @@ const totalJumlah2 = computed(() =>
   white-space: nowrap;
 }
 .w100 {
-  width: 100px;
+  width: 82px;
   flex-shrink: 0;
 }
 .note {
@@ -1499,6 +1528,7 @@ const totalJumlah2 = computed(() =>
   border-radius: 0;
   flex: 1;
   min-width: 0;
+  text-overflow: ellipsis;
 }
 .ibtn {
   width: 24px;

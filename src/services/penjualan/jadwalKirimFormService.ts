@@ -6,9 +6,9 @@ export const jadwalKirimFormService = {
       params: { tanggal },
     }),
 
-  getSpkInfo: (nomor: string, divisiUser: number) =>
+  getSpkInfo: (nomor: string, divisiUser: number, gudang = "") =>
     api.get("/penjualan/jadwal-kirim-form/spk-info", {
-      params: { nomor, divisiUser },
+      params: { nomor, divisiUser, gudang },
     }),
 
   getSudahDijadwalkan: (nomorSpk: string, excludeNomor = "") =>

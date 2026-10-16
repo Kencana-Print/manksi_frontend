@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from "vue";
-import { useRouter } from "vue-router";
+import { useRouter, useRoute } from "vue-router";
 import { useToast } from "vue-toastification";
 import { useForm } from "@/composables/useForm";
 import { useAuthStore } from "@/stores/authStore";
@@ -65,6 +65,19 @@ interface FormData {
 // ── Store & router ─────────────────────────────────────────────────────
 const authStore = useAuthStore();
 const router = useRouter();
+const route = useRoute();
+
+interface GudangTetap {
+  kode: string;
+  nama: string;
+}
+const gudangTetap = computed(
+  () => route.meta.gudangTetap as GudangTetap | undefined,
+);
+const modeSpanduk = computed(() => !!gudangTetap.value);
+const browseRouteName = computed(
+  () => (route.meta.browseRoute as string) || "JadwalKirimBrowse",
+);
 const toast = useToast();
 
 // Divisi user untuk validasi SPK
@@ -193,11 +206,18 @@ const {
   submitApi: async (data) => {
     // Ambil planning yang dipilih
     const planDipilih = planningList.value.find((p) => p.dipilih);
+    // Spanduk: panel planning disembunyikan, field plan diteruskan apa adanya
+    const planOtomatis = !modeSpanduk.value;
     const payload = {
       ...data,
-      JkPlanNomor: planDipilih?.no_planning || "",
-      JkPlanTanggal: planDipilih?.tanggal || null,
-      JkPlanJumlah: planDipilih?.jumlah || 0,
+      Gudang: gudangTetap.value?.kode ?? data.Gudang,
+      JkPlanNomor: planOtomatis
+        ? planDipilih?.no_planning || ""
+        : data.JkPlanNomor,
+      JkPlanTanggal: planOtomatis
+        ? planDipilih?.tanggal || null
+        : data.JkPlanTanggal || null,
+      JkPlanJumlah: planOtomatis ? planDipilih?.jumlah || 0 : data.JkPlanJumlah,
       // Strip internal field _key
       Detail: data.Detail.map(({ _key, ...r }) => r),
     };
@@ -209,7 +229,7 @@ const {
   onSuccess: (res: any) => {
     const nomor = res?.data?.data?.nomor || "";
     toast.success(`Data ${nomor} berhasil disimpan.`);
-    router.push("/penjualan/jadwal-kirim");
+    router.push({ name: browseRouteName.value });
   },
 });
 
@@ -217,7 +237,7 @@ const {
 const planningList = ref<PlanningRow[]>([]);
 
 const loadPlanning = async (nomorSpk: string) => {
-  if (!nomorSpk) {
+  if (modeSpanduk.value || !nomorSpk) {
     planningList.value = [];
     return;
   }
@@ -259,6 +279,7 @@ const onGudangSelected = (item: { Kode: string; Nama: string }) => {
 };
 
 const onGudangKodeEnter = async () => {
+  if (modeSpanduk.value) return; // gudang dikunci
   const kode = formData.value.Gudang?.trim();
   if (!kode) {
     formData.value.NamaGudang = "";
@@ -297,6 +318,7 @@ const applySpk = async (nomorSpk: string) => {
     const res = await jadwalKirimFormService.getSpkInfo(
       nomorSpk,
       divisiUser.value,
+      formData.value.Gudang,
     );
     const spk = res.data.data;
     formData.value.NomorSpk = spk.spk_nomor;
@@ -565,8 +587,12 @@ onMounted(async () => {
     if (formData.value.NomorSpk) {
       await loadPlanning(formData.value.NomorSpk);
     }
+  } else if (gudangTetap.value) {
+    // Spanduk: gudang dikunci
+    formData.value.Gudang = gudangTetap.value.kode;
+    formData.value.NamaGudang = gudangTetap.value.nama;
   } else {
-    // Mode create — default gudang dari gudang jadi user
+    // Garmen: default gudang jadi milik user
     const gudangJadi = authStore.user?.gudang?.jadi;
     if (gudangJadi?.kode) {
       formData.value.Gudang = gudangJadi.kode;
@@ -628,12 +654,12 @@ onMounted(async () => {
                       v-model="formData.Gudang"
                       class="f-inp"
                       style="width: 60px"
-                      :readonly="isHoMode"
-                      :class="{ 'f-ro': isHoMode }"
+                      :readonly="isHoMode || modeSpanduk"
+                      :class="{ 'f-ro': isHoMode || modeSpanduk }"
                       placeholder="Kode"
                       @keydown.enter.prevent="onGudangKodeEnter"
                       @keydown.f1.prevent="
-                        !isHoMode && (showGudangModal = true)
+                        !isHoMode && !modeSpanduk && (showGudangModal = true)
                       "
                       @blur="onGudangKodeEnter"
                     />
@@ -644,7 +670,7 @@ onMounted(async () => {
                       style="flex: 1; min-width: 140px"
                     />
                     <button
-                      v-if="!isHoMode"
+                      v-if="!isHoMode && !modeSpanduk"
                       type="button"
                       class="f-btn-icon"
                       @click="showGudangModal = true"
@@ -770,36 +796,6 @@ onMounted(async () => {
                     "
                   />
                 </div>
-
-                <!-- Import Excel -->
-                <div
-                  v-if="!isHoMode"
-                  class="f-row"
-                  style="margin-top: 10px; gap: 6px"
-                >
-                  <button
-                    type="button"
-                    class="f-btn"
-                    style="background: #546e7a"
-                    @click="downloadTemplate"
-                  >
-                    Template Excel
-                  </button>
-                  <button
-                    type="button"
-                    class="f-btn"
-                    @click="fileImportRef?.click()"
-                  >
-                    Import Excel
-                  </button>
-                  <input
-                    ref="fileImportRef"
-                    type="file"
-                    accept=".xlsx,.xls"
-                    style="display: none"
-                    @change="importExcel"
-                  />
-                </div>
               </div>
             </div>
           </div>
@@ -836,7 +832,7 @@ onMounted(async () => {
           </div>
 
           <!-- Planning PPIC — sisa ruang penuh -->
-          <div class="jk-section jk-plan-section">
+          <div v-if="!modeSpanduk" class="jk-section jk-plan-section">
             <div class="jk-section-title">Planning PPIC</div>
             <div v-if="!formData.NomorSpk" class="plan-empty">
               Pilih SPK terlebih dahulu
@@ -1126,6 +1122,7 @@ onMounted(async () => {
   <SpkSearchModal
     v-model="showSpkModal"
     filter-mode="spk-ppic"
+    :divisi="modeSpanduk ? 1 : undefined"
     @selected="onSpkSelected"
   />
 

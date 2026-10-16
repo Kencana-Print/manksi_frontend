@@ -58,6 +58,8 @@ const isAdmin = computed(() => {
 });
 
 const hasAccess = (item: NavItem): boolean => {
+  if (item.sembunyikanCabang?.includes(authStore.user?.cabang ?? ""))
+    return false;
   if (item.adminOnly && !isAdmin.value) return false; // Cek admin
   if (item.menuId && !authStore.can(item.menuId.toString(), "view"))
     return false;

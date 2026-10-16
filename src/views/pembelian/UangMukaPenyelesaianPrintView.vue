@@ -1,27 +1,71 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from "vue";
+import { ref, onMounted, computed, nextTick } from "vue";
 import { useRoute } from "vue-router";
+import { useToast } from "vue-toastification";
 import { uangMukaPenyelesaianFormService as uangMukaPenyelesaianApi } from "@/services/pembelian/uangMukaPenyelesaianFormService";
+import {
+  pengajuanUangMukaValidasiService,
+  type ValidasiInfo,
+} from "@/services/pembelian/pengajuanUangMukaValidasiService";
 import logoUrl from "@/assets/logo.png";
 
 const route = useRoute();
+const toast = useToast();
 const data = ref<any>(null);
 const isLoading = ref(true);
 const error = ref("");
 const yangBersangkutan = ref("");
+const validasi = ref<ValidasiInfo | null>(null);
+const isBusy = ref(false);
+const showValidasiDialog = ref(false);
+const showBatalDialog = ref(false);
+const alasanBatal = ref("");
+
+// ?mode=layar -> halaman validasi: tanpa prompt dan tanpa auto-print
+const modeLayar = computed(() => route.query.mode === "layar");
+const nomorBon = computed(() =>
+  decodeURIComponent(route.params.nomor as string),
+);
+const adaStamp = computed(
+  () =>
+    validasi.value?.status === "VALID" ||
+    validasi.value?.status === "TIDAK_BERLAKU",
+);
+
+const errMsg = (e: unknown, fallback: string): string =>
+  (e as { response?: { data?: { message?: string } } })?.response?.data
+    ?.message || fallback;
+
+// Nama "Yang Bersangkutan" tidak ada di data tersimpan, diisi manual
+// oleh yang mencetak.
+const tanyaYangBersangkutan = () => {
+  yangBersangkutan.value =
+    window.prompt("Nama Yang Bersangkutan (penerima):", "") || "";
+};
+
+const cetak = async () => {
+  if (!yangBersangkutan.value) tanyaYangBersangkutan();
+  await nextTick();
+  window.print();
+};
 
 onMounted(async () => {
   try {
-    const res = await uangMukaPenyelesaianApi.getFormData(
-      decodeURIComponent(route.params.nomor as string),
-    );
+    const res = await uangMukaPenyelesaianApi.getFormData(nomorBon.value);
     data.value = res;
     isLoading.value = false;
-    // Minta nama "Yang Bersangkutan" sebelum cetak — tidak ada di data
-    // tersimpan, diisi manual oleh yang mencetak.
-    yangBersangkutan.value =
-      window.prompt("Nama Yang Bersangkutan (penerima):", "") || "";
-    setTimeout(() => window.print(), 300);
+    try {
+      validasi.value =
+        await pengajuanUangMukaValidasiService.getStatusPenyelesaian(
+          nomorBon.value,
+        );
+    } catch {
+      validasi.value = null;
+    }
+    if (!modeLayar.value) {
+      tanyaYangBersangkutan();
+      setTimeout(() => window.print(), 300);
+    }
     return;
   } catch (e: any) {
     error.value = e.response?.data?.message ?? "Gagal memuat data cetak.";
@@ -29,6 +73,39 @@ onMounted(async () => {
     isLoading.value = false;
   }
 });
+
+const doValidasi = async () => {
+  isBusy.value = true;
+  try {
+    validasi.value =
+      await pengajuanUangMukaValidasiService.validasiPenyelesaian(
+        nomorBon.value,
+      );
+    showValidasiDialog.value = false;
+    toast.success("Penyelesaian berhasil divalidasi.");
+  } catch (e: unknown) {
+    toast.error(errMsg(e, "Gagal memvalidasi."));
+  } finally {
+    isBusy.value = false;
+  }
+};
+
+const doBatal = async () => {
+  isBusy.value = true;
+  try {
+    validasi.value = await pengajuanUangMukaValidasiService.batalPenyelesaian(
+      nomorBon.value,
+      alasanBatal.value,
+    );
+    showBatalDialog.value = false;
+    alasanBatal.value = "";
+    toast.success("Validasi dibatalkan.");
+  } catch (e: unknown) {
+    toast.error(errMsg(e, "Gagal membatalkan validasi."));
+  } finally {
+    isBusy.value = false;
+  }
+};
 
 const printDetails = computed(() => {
   if (!data.value) return [];
@@ -122,6 +199,79 @@ const terbilang = (n: number): string => {
   <div v-if="isLoading" class="loading">Memuat data cetak...</div>
   <div v-else-if="error" class="loading">{{ error }}</div>
   <div v-else-if="data" class="print-page">
+    <div v-if="modeLayar" class="toolbar no-print">
+      <v-btn
+        v-if="validasi?.boleh_validasi"
+        size="small"
+        color="success"
+        @click="showValidasiDialog = true"
+      >
+        Validasi
+      </v-btn>
+      <v-btn
+        v-if="validasi?.boleh_batal"
+        size="small"
+        color="error"
+        variant="outlined"
+        @click="showBatalDialog = true"
+      >
+        Batalkan Validasi
+      </v-btn>
+      <v-btn size="small" color="indigo" @click="cetak">Cetak</v-btn>
+      <span v-if="validasi && !validasi.berlaku" class="toolbar-note">
+        E-validasi hanya untuk cabang HO-/P01.
+      </span>
+    </div>
+
+    <v-dialog v-model="showValidasiDialog" max-width="420">
+      <v-card>
+        <v-card-title>Validasi Penyelesaian</v-card-title>
+        <v-card-text>
+          Validasi penyelesaian bon <strong>{{ data.nomor }}</strong> dengan
+          total terpakai <strong>{{ fmt(totalTerpakai) }}</strong
+          >? Kalau data penyelesaian diubah setelah ini, validasi otomatis tidak
+          berlaku dan harus divalidasi ulang.
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn variant="text" @click="showValidasiDialog = false"
+            >Batal</v-btn
+          >
+          <v-btn color="success" :loading="isBusy" @click="doValidasi">
+            Validasi
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <v-dialog v-model="showBatalDialog" max-width="420">
+      <v-card>
+        <v-card-title>Batalkan Validasi</v-card-title>
+        <v-card-text>
+          <v-textarea
+            v-model="alasanBatal"
+            label="Alasan pembatalan (wajib)"
+            rows="2"
+            density="compact"
+            variant="outlined"
+            hide-details
+          />
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn variant="text" @click="showBatalDialog = false">Tutup</v-btn>
+          <v-btn
+            color="error"
+            :loading="isBusy"
+            :disabled="alasanBatal.trim().length < 3"
+            @click="doBatal"
+          >
+            Batalkan Validasi
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
     <div class="header-row">
       <div class="doc-title-wrapper">
         <div class="doc-title">PENYELESAIAN KASBON</div>
@@ -218,10 +368,23 @@ const terbilang = (n: number): string => {
           <div class="ttd-name">({{ yangBersangkutan || "           " }})</div>
         </div>
         <div class="ttd-col">
-          <div class="ttd-title">Mengetahui,</div>
-          <div class="ttd-space"></div>
+          <div class="ttd-title" :class="{ tight: adaStamp }">Mengetahui,</div>
+          <div v-if="validasi?.status === 'VALID'" class="stamp stamp-valid">
+            Divalidasi elektronik<br />{{ validasi.tanggal_fmt }}
+          </div>
+          <div
+            v-else-if="validasi?.status === 'TIDAK_BERLAKU'"
+            class="stamp stamp-batal"
+          >
+            VALIDASI TIDAK BERLAKU
+          </div>
+          <div v-else class="ttd-space"></div>
           <div class="ttd-name">
-            ({{ data.pum_user_realisasi || "           " }})
+            ({{
+              (validasi?.status === "VALID" ? validasi.nama : "") ||
+              data.pum_user_realisasi ||
+              "           "
+            }})
           </div>
         </div>
       </div>
@@ -396,6 +559,42 @@ body {
   flex: 1;
   text-align: right;
 }
+.toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.toolbar-note {
+  font-size: 8pt;
+  color: #777;
+}
+.ttd-title.tight {
+  min-height: 0;
+  margin-bottom: 4px;
+}
+.stamp {
+  height: 36px;
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-size: 7.5pt;
+  line-height: 1.2;
+  border: 1.5px solid;
+  border-radius: 3px;
+  padding: 2px 4px;
+}
+.stamp-valid {
+  color: #1b5e20;
+  border-color: #1b5e20;
+}
+.stamp-batal {
+  color: #b71c1c;
+  border-color: #b71c1c;
+  font-weight: bold;
+}
 @media print {
   @page {
     size: A5;
@@ -405,6 +604,9 @@ body {
     width: 100%;
     padding: 0;
     margin: 0;
+  }
+  .no-print {
+    display: none !important;
   }
 }
 </style>

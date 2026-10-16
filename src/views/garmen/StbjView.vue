@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from "vue";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
 import { useAuthStore } from "@/stores/authStore";
 import BaseBrowse from "@/components/BaseBrowse.vue";
@@ -13,6 +13,7 @@ import { formatTanggal } from "@/utils/dateFormat";
 
 const MENU_ID = "105";
 const router = useRouter();
+const route = useRoute();
 const toast = useToast();
 const auth = useAuthStore();
 const userCab = computed(() => auth.user?.cabang || "");
@@ -39,14 +40,25 @@ const num = (v: any, d = 0) =>
 // ── Filter ─────────────────────────────────────────────────
 const tglAwal = ref(firstOfMonth());
 const tglAkhir = ref(todayLocal());
-const filterGudang = ref("GJ001");
-const filterGudangNama = ref("GUDANG BARANG JADI JERON");
+interface GudangTetap {
+  kode: string;
+  nama: string;
+}
+const GUDANG_DEFAULT: GudangTetap = {
+  kode: "GJ001",
+  nama: "GUDANG BARANG JADI JERON",
+};
+const gudangTetap = computed(
+  () => route.meta.gudangTetap as GudangTetap | undefined,
+);
+const modeSpanduk = computed(() => !!gudangTetap.value);
+const filterGudang = ref((gudangTetap.value ?? GUDANG_DEFAULT).kode);
+const filterGudangNama = ref((gudangTetap.value ?? GUDANG_DEFAULT).nama);
 const showGudangModal = ref(false);
 
 const selectGudang = (item: any) => {
   filterGudang.value = item.Kode;
   filterGudangNama.value = item.Nama;
-  fetchData();
 };
 
 // ── Browse ─────────────────────────────────────────────────
@@ -82,6 +94,20 @@ const detailCache = ref<Record<string, any[]>>({});
 const loadingDetail = ref<Set<string>>(new Set());
 const expandedNomors = ref<string[]>([]);
 const expandedItems = ref<any[]>([]);
+
+const NAMA_ROUTE_BROWSE = ["StbjBrowse", "SpandukStbjBrowse"];
+watch(
+  () => route.name,
+  (nama) => {
+    if (!NAMA_ROUTE_BROWSE.includes(String(nama))) return;
+    const g = gudangTetap.value ?? GUDANG_DEFAULT;
+    filterGudang.value = g.kode;
+    filterGudangNama.value = g.nama;
+    detailCache.value = {};
+    expandedItems.value = [];
+    clearSelection();
+  },
+);
 
 const onExpandChange = async (newExpanded: any[]) => {
   expandedItems.value = newExpanded;
@@ -126,6 +152,10 @@ const ngeditClass = (row: any) => {
 
 // ── Actions ────────────────────────────────────────────────
 const goNew = () => {
+  if (modeSpanduk.value) {
+    router.push({ name: "SpandukStbjCreate" });
+    return;
+  }
   router.push({
     name: "StbjFormCreate",
     params: {
@@ -137,22 +167,10 @@ const goNew = () => {
 
 const goEdit = () => {
   if (!selectedItem.value) return;
-  router.push(
-    `/garmen/bahan-jadi/stbj/edit/${encodeURIComponent(selectedItem.value.Nomor)}`,
-  );
-};
-
-const onDelete = async () => {
-  if (!selectedItem.value) return;
-  if (!confirm(`Yakin hapus ${selectedItem.value.Nomor}?`)) return;
-  try {
-    await svc.deleteData(selectedItem.value.Nomor);
-    toast.success("Data berhasil dihapus.");
-    clearSelection();
-    fetchData();
-  } catch (e: any) {
-    toast.error(e.response?.data?.message || "Gagal menghapus.");
-  }
+  const dasar = modeSpanduk.value
+    ? "/spanduk/stbj/edit"
+    : "/garmen/bahan-jadi/stbj/edit";
+  router.push(`${dasar}/${encodeURIComponent(selectedItem.value.Nomor)}`);
 };
 
 const showCetakDialog = ref(false);
@@ -291,7 +309,11 @@ const totalRows = computed(() => items.value?.length ?? 0);
 
 <template>
   <BaseBrowse
-    title="Surat Terima Barang Jadi"
+    :title="
+      modeSpanduk
+        ? 'Surat Terima Barang Jadi (Spanduk)'
+        : 'Surat Terima Barang Jadi'
+    "
     menu-id="105"
     :icon="IconClipboardCheck"
     :is-loading="isLoading"
@@ -335,7 +357,11 @@ const totalRows = computed(() => items.value?.length ?? 0);
           class="finp ro"
           style="width: 160px; min-width: 0"
         />
-        <button class="ibtn" @click="showGudangModal = true">
+        <button
+          v-if="!modeSpanduk"
+          class="ibtn"
+          @click="showGudangModal = true"
+        >
           <IconSearch :size="11" color="#1565c0" />
         </button>
       </div>
@@ -423,7 +449,7 @@ const totalRows = computed(() => items.value?.length ?? 0);
             <th style="width: 130px">SPK</th>
             <th style="min-width: 180px">Nama</th>
             <th style="width: 120px">Ukuran</th>
-            <th style="width: 80px">Size</th>
+            <th v-if="!modeSpanduk" style="width: 80px">Size</th>
             <th style="width: 80px; text-align: right">Jumlah</th>
             <th style="width: 70px; text-align: right">Koli</th>
             <th>Keterangan</th>
@@ -442,7 +468,9 @@ const totalRows = computed(() => items.value?.length ?? 0);
               </td>
               <td>{{ d.Nama }}</td>
               <td>{{ d.Ukuran }}</td>
-              <td style="text-align: center">{{ d.Size }}</td>
+              <td v-if="!modeSpanduk" style="text-align: center">
+                {{ d.Size }}
+              </td>
               <td style="text-align: right">{{ num(d.Jumlah) }}</td>
               <td style="text-align: right">{{ num(d.Koli) }}</td>
               <td>{{ d.Keterangan }}</td>
@@ -450,7 +478,7 @@ const totalRows = computed(() => items.value?.length ?? 0);
           </template>
           <tr v-else-if="loadingDetail.has(item.Nomor)">
             <td
-              colspan="8"
+              :colspan="modeSpanduk ? 7 : 8"
               style="text-align: center; padding: 8px; color: #9e9e9e"
             >
               Memuat...
@@ -458,7 +486,7 @@ const totalRows = computed(() => items.value?.length ?? 0);
           </tr>
           <tr v-else>
             <td
-              colspan="8"
+              :colspan="modeSpanduk ? 7 : 8"
               style="
                 text-align: center;
                 padding: 8px;

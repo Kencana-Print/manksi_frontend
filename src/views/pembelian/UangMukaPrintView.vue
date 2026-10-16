@@ -165,8 +165,13 @@ const terbilang = (n: number): string => {
       </div>
       <div class="ttd-col">
         <div class="ttd-title">Kasir</div>
-        <div class="ttd-space"></div>
-        <div class="ttd-name">({{ data.kasir || "           " }})</div>
+        <div v-if="data.kasir_stempel" class="stamp stamp-valid">
+          Divalidasi elektronik<br />{{ data.kasir_stempel.tanggal_fmt }}
+        </div>
+        <div v-else class="ttd-space"></div>
+        <div class="ttd-name">
+          ({{ data.kasir_stempel?.nama || data.kasir || "           " }})
+        </div>
       </div>
     </div>
   </div>
@@ -302,6 +307,24 @@ body {
   padding-top: 2px;
   display: inline-block;
   min-width: 100px;
+}
+.stamp {
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-size: 6.5pt;
+  line-height: 1.15;
+  border: 1.5px solid;
+  border-radius: 3px;
+  padding: 1px 3px;
+  margin: 0 auto 2px;
+  max-width: 130px;
+}
+.stamp-valid {
+  color: #1b5e20;
+  border-color: #1b5e20;
 }
 .row-kasbon td {
   font-weight: bold;

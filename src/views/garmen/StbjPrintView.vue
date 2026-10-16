@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref, computed, onMounted } from "vue";
 import { useRoute } from "vue-router";
 import api from "@/services/api";
 import QrcodeVue from "qrcode.vue";
@@ -10,10 +10,15 @@ const mode = (route.query.mode as string) || "biasa";
 const copies = mode === "rangkap3" ? 3 : 2;
 
 const WATERMARKS = ["ASLI", "COPY 1", "COPY 2"];
+const GUDANG_SPANDUK = "WH002";
+const TTD = ["Diserahkan Oleh,", "Diterima,", "Checkers,", "Kepala Gudang,"];
 
 const data = ref<any>(null);
 const isLoading = ref(true);
 const error = ref("");
+const isSpanduk = computed(
+  () => data.value?.header?.stbj_gdg_kode === GUDANG_SPANDUK,
+);
 
 const fmtDate = (s: string) => {
   if (!s) return "-";
@@ -57,7 +62,12 @@ const totalJumlah = (dtl: any[]) =>
   <div v-else-if="error" class="state err">{{ error }}</div>
 
   <template v-else-if="data">
-    <div v-for="(copy, ci) in copies" :key="ci" class="copy">
+    <div
+      v-for="(copy, ci) in copies"
+      :key="ci"
+      class="copy"
+      :class="{ 'copy-spd': isSpanduk }"
+    >
       <!-- Watermark rangkap 3 -->
       <div v-if="mode === 'rangkap3'" class="watermark">
         {{ WATERMARKS[ci] }}
@@ -103,7 +113,7 @@ const totalJumlah = (dtl: any[]) =>
         <thead>
           <tr>
             <th class="c-no">No</th>
-            <th style="width: 60px">No Pack</th>
+            <th v-if="!isSpanduk" style="width: 60px">No Pack</th>
             <th class="c-kode">Kode</th>
             <th>Nama</th>
             <th style="width: 80px">Ukuran</th>
@@ -115,10 +125,10 @@ const totalJumlah = (dtl: any[]) =>
         <tbody>
           <tr v-for="(r, i) in data.detail" :key="i">
             <td class="tc">{{ Number(i) + 1 }}</td>
-            <td class="tc">{{ r.stbjd_packing || "-" }}</td>
+            <td v-if="!isSpanduk" class="tc">{{ r.stbjd_packing || "-" }}</td>
             <td class="mono">{{ r.stbjd_spk_nomor }}</td>
             <td>{{ r.spk_nama }}</td>
-            <td>{{ r.stbjd_size }}</td>
+            <td>{{ isSpanduk ? r.spk_ukuran : r.stbjd_size }}</td>
             <td class="tr">{{ num(r.stbjd_jumlah) }}</td>
             <td class="tr">{{ r.stbjd_koli || "" }}</td>
             <td>{{ r.stbjd_keterangan }}</td>
@@ -127,7 +137,7 @@ const totalJumlah = (dtl: any[]) =>
         <tfoot>
           <tr>
             <td
-              colspan="5"
+              :colspan="isSpanduk ? 4 : 5"
               class="tr"
               style="font-weight: 700; padding-right: 4mm"
             >
@@ -143,25 +153,12 @@ const totalJumlah = (dtl: any[]) =>
 
       <!-- TTD -->
       <div class="ttd-wrap">
-        <div class="ttd">
-          <div>Diserahkan Oleh,</div>
-          <div class="gap"></div>
-          <div>(________________)</div>
-        </div>
-        <div class="ttd">
-          <div>Diterima,</div>
-          <div class="gap"></div>
-          <div>(________________)</div>
-        </div>
-        <div class="ttd">
-          <div>Checkers,</div>
-          <div class="gap"></div>
-          <div>(________________)</div>
-        </div>
-        <div class="ttd">
-          <div>Kepala Gudang,</div>
-          <div class="gap"></div>
-          <div>(________________)</div>
+        <div v-for="t in TTD" :key="t" class="ttd">
+          <div>{{ t }}</div>
+          <template v-if="!isSpanduk">
+            <div class="gap"></div>
+            <div>(________________)</div>
+          </template>
         </div>
       </div>
 
@@ -332,6 +329,27 @@ body {
 }
 .gap {
   height: 12mm;
+}
+/* Gaya cetak Delphi P02 (gudang WH002) */
+.copy-spd .dtbl thead tr {
+  border: 1px solid black;
+}
+.copy-spd .dtbl th {
+  padding: 2mm;
+}
+.copy-spd .ttd-wrap {
+  border: 1px dashed #000;
+  margin: 3mm 8mm 0;
+}
+.copy-spd .ttd {
+  border: none;
+  border-left: 1px solid #000;
+  margin: 0;
+  padding: 2mm;
+  height: 24mm;
+}
+.copy-spd .ttd:first-child {
+  border-left: none;
 }
 
 @media print {

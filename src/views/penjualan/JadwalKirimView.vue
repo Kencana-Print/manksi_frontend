@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from "vue";
 import { useAuthStore } from "@/stores/authStore";
-import { useRouter } from "vue-router";
+import { useRouter, useRoute } from "vue-router";
 import { useToast } from "vue-toastification";
 import { useBrowse } from "@/composables/useBrowse";
 import { jadwalKirimService } from "@/services/penjualan/jadwalKirimService";
@@ -63,6 +63,27 @@ interface DetailRow {
 // ── Router & Toast ─────────────────────────────────────────────────────
 const authStore = useAuthStore();
 const router = useRouter();
+const route = useRoute();
+
+interface GudangTetap {
+  kode: string;
+  nama: string;
+}
+const gudangTetap = computed(
+  () => route.meta.gudangTetap as GudangTetap | undefined,
+);
+const modeSpanduk = computed(() => !!gudangTetap.value);
+
+const goNew = () =>
+  router.push({
+    name: modeSpanduk.value ? "SpandukJadwalKirimCreate" : "JadwalKirimCreate",
+  });
+
+const goEdit = (item: { Nomor: string }) =>
+  router.push({
+    name: modeSpanduk.value ? "SpandukJadwalKirimEdit" : "JadwalKirimEdit",
+    params: { nomor: item.Nomor },
+  });
 const toast = useToast();
 
 const canInsertJK = computed(
@@ -457,7 +478,8 @@ const confirmTunda = async () => {
 const onFilterStateRestored = (saved: Record<string, any>) => {
   if (saved.tglAwal) filterState.value.tglAwal = saved.tglAwal;
   if (saved.tglAkhir) filterState.value.tglAkhir = saved.tglAkhir;
-  // Restore gudang hanya jika ada nilai (tidak override default GJ001 dengan kosong)
+  // Spanduk: gudang dikunci, jangan dipulihkan dari sessionStorage
+  if (modeSpanduk.value) return;
   if (saved.gudang !== undefined && saved.gudang !== "") {
     filterState.value.gudang = saved.gudang;
     filterState.value.gudangNama = saved.gudangNama || "";
@@ -465,21 +487,43 @@ const onFilterStateRestored = (saved: Record<string, any>) => {
 };
 
 // ── Lifecycle ──────────────────────────────────────────────────────────
+const terapkanGudangAwal = () => {
+  if (gudangTetap.value) {
+    filterState.value.gudang = gudangTetap.value.kode;
+    filterState.value.gudangNama = gudangTetap.value.nama;
+    return;
+  }
+  const def = gudangList.value.find((g) => g.Kode === "GJ001");
+  filterState.value.gudang = def?.Kode ?? "";
+  filterState.value.gudangNama = def?.Nama ?? "";
+};
+
 onMounted(async () => {
   await loadGudang();
 
-  // Set default gudang GJ001 dari list yang sudah diload
-  // (hanya jika belum ada nilai dari sessionStorage)
-  if (!filterState.value.gudang) {
-    const defaultGudang = gudangList.value.find((g) => g.Kode === "GJ001");
-    if (defaultGudang) {
-      filterState.value.gudang = defaultGudang.Kode;
-      filterState.value.gudangNama = defaultGudang.Nama;
-    }
+  if (modeSpanduk.value) {
+    terapkanGudangAwal();
+  } else if (!filterState.value.gudang) {
+    // Garmen: default GJ001 bila belum ada nilai dari sessionStorage
+    terapkanGudangAwal();
   }
 
   await fetchData();
 });
+
+// Vue memakai ulang instance ini antara route Garmen dan Spanduk
+watch(
+  () => route.name,
+  () => {
+    detailCache.value = {};
+    expanded.value = [];
+    clearSelection();
+    const gudangLama = filterState.value.gudang;
+    terapkanGudangAwal();
+    // Kalau gudang berubah, watch filter di bawah yang fetch
+    if (filterState.value.gudang === gudangLama) fetchData();
+  },
+);
 
 // Re-fetch otomatis saat filter tanggal berubah (debounce 400ms)
 let filterTimer: ReturnType<typeof setTimeout> | null = null;
@@ -498,7 +542,7 @@ watch(
 
 <template>
   <BaseBrowse
-    title="Jadwal Kirim"
+    :title="modeSpanduk ? 'Jadwal Kirim — Spanduk' : 'Jadwal Kirim'"
     menu-id="119"
     :icon="IconTruckDelivery"
     :headers="headers"
@@ -516,13 +560,8 @@ watch(
     :filter-state="filterState"
     search-placeholder="Cari nomor, SPK, nama..."
     @refresh="fetchData"
-    @add="router.push('/penjualan/jadwal-kirim/create')"
-    @edit="
-      (item) =>
-        router.push(
-          `/penjualan/jadwal-kirim/edit/${encodeURIComponent(item.Nomor)}`,
-        )
-    "
+    @add="goNew"
+    @edit="goEdit"
     @delete="onDelete"
     @export="onExport"
     @update:expanded="onUpdateExpanded"
@@ -553,7 +592,7 @@ watch(
             class="f-inp"
             style="width: 60px; cursor: pointer"
             placeholder="Semua"
-            @click="showGudangModal = true"
+            @click="!modeSpanduk && (showGudangModal = true)"
           />
           <input
             :value="filterState.gudangNama"
@@ -562,6 +601,7 @@ watch(
             style="width: 220px"
           />
           <button
+            v-if="!modeSpanduk"
             class="f-btn-icon"
             title="Cari Gudang"
             @click="showGudangModal = true"
@@ -569,7 +609,7 @@ watch(
             <IconSearch :size="13" color="#1565c0" />
           </button>
           <button
-            v-if="filterState.gudang"
+            v-if="filterState.gudang && !modeSpanduk"
             class="f-btn-icon"
             title="Hapus Filter Gudang"
             @click="clearGudang"

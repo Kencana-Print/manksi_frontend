@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from "vue";
 import { useToast } from "vue-toastification";
+import { useRoute } from "vue-router";
 import { useAuthStore } from "@/stores/authStore";
 import BaseBrowse from "@/components/BaseBrowse.vue";
 import { useBrowse } from "@/composables/useBrowse";
@@ -19,6 +20,17 @@ import { formatTanggal } from "@/utils/dateFormat";
 const toast = useToast();
 const auth = useAuthStore();
 const userCab = computed(() => auth.user?.cabang || "");
+const route = useRoute();
+
+interface GudangTetap {
+  kode: string;
+  nama: string;
+}
+const gudangTetap = computed(
+  () => route.meta.gudangTetap as GudangTetap | undefined,
+);
+const modeSpanduk = computed(() => !!gudangTetap.value);
+const gudangParam = computed(() => gudangTetap.value?.kode ?? "");
 
 // ── Helpers ────────────────────────────────────────────────
 const todayLocal = () => {
@@ -47,13 +59,14 @@ const { items, isLoading, selected, fetchData } = useBrowse({
   menuId: "165",
   fetchApi: async () => {
     if (showAllMode.value) {
-      const res = await svc.getAllNotApproved();
+      const res = await svc.getAllNotApproved(gudangParam.value);
       return res.data.data ?? [];
     }
     const res = await svc.getBrowse(
       tglAwal.value,
       tglAkhir.value,
       userCab.value,
+      gudangParam.value,
     );
     return res.data.data ?? [];
   },
@@ -78,6 +91,7 @@ const onExpandChange = async (newExpanded: any[]) => {
           tglAkhir.value,
           userCab.value,
           nomor,
+          gudangParam.value,
         );
         detailCache.value[nomor] = res.data.data ?? [];
       } catch {
@@ -136,6 +150,17 @@ watch([tglAwal, tglAkhir], () => {
   if (!showAllMode.value) fetchData();
 });
 onMounted(fetchData);
+// Vue memakai ulang instance ini antara route Garmen dan Spanduk
+watch(
+  () => route.name,
+  () => {
+    showAllMode.value = false;
+    detailCache.value = {};
+    expandedItems.value = [];
+    selected.value = [];
+    fetchData();
+  },
+);
 
 const toggleShowAll = () => {
   showAllMode.value = !showAllMode.value;
@@ -235,7 +260,7 @@ const bulkAllChecked = computed({
 
 const openBulkDialog = async () => {
   showBulkDialog.value = true;
-  bulkDivisiFilter.value = "0";
+  bulkDivisiFilter.value = modeSpanduk.value ? "1" : "0";
   bulkChecked.value = {};
   await Promise.all([loadBulkDivisi(), loadBulkList()]);
 };
@@ -270,7 +295,11 @@ const loadBulkList = async () => {
   isLoadingBulk.value = true;
   bulkChecked.value = {};
   try {
-    const res = await svc.getBulkList(bulkDivisiFilter.value, userCab.value);
+    const res = await svc.getBulkList(
+      bulkDivisiFilter.value,
+      userCab.value,
+      gudangParam.value,
+    );
     bulkList.value = res.data.data || [];
   } catch (e: any) {
     toast.error(e.response?.data?.message || "Gagal memuat data.");
@@ -380,6 +409,7 @@ const onExportDetail = async () => {
       tglAwal.value,
       tglAkhir.value,
       userCab.value,
+      gudangParam.value,
     );
     const allDetail: any[] = (res.data.data ?? []).filter((r: any) =>
       allowedNomors.has(r.Nomor),
@@ -481,7 +511,9 @@ const onExportDetail = async () => {
 <template>
   <BaseBrowse
     ref="baseBrowseRef"
-    title="Approval Surat Jalan"
+    :title="
+      modeSpanduk ? 'Approval Surat Jalan — Spanduk' : 'Approval Surat Jalan'
+    "
     menu-id="165"
     :icon="IconClipboardCheck"
     :is-loading="isLoading"
@@ -750,9 +782,10 @@ const onExportDetail = async () => {
         <select
           v-model="bulkDivisiFilter"
           class="bulk-divisi-sel"
+          :disabled="modeSpanduk"
           @change="loadBulkList"
         >
-          <option value="0">Semua Divisi</option>
+          <option v-if="!modeSpanduk" value="0">Semua Divisi</option>
           <option
             v-for="d in bulkDivisiList"
             :key="d.kode"
@@ -815,10 +848,10 @@ const onExportDetail = async () => {
                   <th style="width: 140px">Nomor</th>
                   <th style="width: 95px">Tanggal</th>
                   <th style="min-width: 160px">Gudang</th>
-                  <th style="width: 90px">Kd Cus</th>
-                  <th style="min-width: 180px">Customer</th>
-                  <th style="min-width: 220px">Alamat</th>
-                  <th style="width: 100px">Kota</th>
+                  <th v-if="canLihatCus" style="width: 90px">Kd Cus</th>
+                  <th v-if="canLihatCus" style="min-width: 180px">Customer</th>
+                  <th v-if="canLihatCus" style="min-width: 220px">Alamat</th>
+                  <th v-if="canLihatCus" style="width: 100px">Kota</th>
                 </tr>
               </thead>
               <tbody>
@@ -838,10 +871,10 @@ const onExportDetail = async () => {
                   </td>
                   <td>{{ formatTanggal(row.Tanggal) }}</td>
                   <td>{{ row.Gudang }}</td>
-                  <td>{{ row.KdCus }}</td>
-                  <td>{{ row.Nama }}</td>
-                  <td>{{ row.Alamat }}</td>
-                  <td>{{ row.Kota }}</td>
+                  <td v-if="canLihatCus">{{ row.KdCus }}</td>
+                  <td v-if="canLihatCus">{{ row.Nama }}</td>
+                  <td v-if="canLihatCus">{{ row.Alamat }}</td>
+                  <td v-if="canLihatCus">{{ row.Kota }}</td>
                 </tr>
               </tbody>
             </table>

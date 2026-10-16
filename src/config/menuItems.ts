@@ -120,6 +120,7 @@ export interface NavItem {
   subItems?: NavItem[];
   model?: { value: boolean };
   adminOnly?: boolean;
+  sembunyikanCabang?: string[];
 }
 
 // ⚠️ PENTING: array di bawah pakai `model: daftarMenu` dst yang tadinya
@@ -498,7 +499,7 @@ export const createMenuItems = (): NavItem[] => {
           ],
         },
         {
-          title: "Lembar Harian Kerja (LHK)",
+          title: "Laporan Harian Kerja (LHK)",
           icon: IconClipboardList,
           subItems: [
             {
@@ -527,6 +528,11 @@ export const createMenuItems = (): NavItem[] => {
               icon: IconPrinter,
             },
             {
+              title: "LHK Proof",
+              to: "/spanduk/lhk/lhk-proof",
+              icon: IconFileCheck,
+            },
+            {
               title: "LHK Quiring",
               to: "/spanduk/lhk/lhk-quiring",
               icon: IconFlame,
@@ -548,10 +554,39 @@ export const createMenuItems = (): NavItem[] => {
         },
         { divider: true },
         {
+          title: "Cetak BAST MAP",
+          to: "/spanduk/bast-map",
+          icon: IconPrinter,
+          // Tanpa menuId, mengikuti hak akses parent (4)
+        },
+        {
+          title: "Mutasi Marketing",
+          to: "/spanduk/mutasi-marketing",
+          icon: IconTruckDelivery,
+        },
+        {
           title: "Mutasi Produksi",
           to: "/spanduk/mutasi-produksi",
           icon: IconArrowsExchange,
           // Tanpa menuId, mengikuti hak akses parent (4)
+        },
+        {
+          title: "Surat Terima Barang Jadi (STBJ)",
+          to: "/spanduk/stbj",
+          icon: IconClipboardCheck,
+          menuId: 105,
+        },
+        {
+          title: "Jadwal Kirim",
+          to: "/spanduk/jadwal-kirim",
+          icon: IconTruckDelivery,
+          menuId: 119,
+        },
+        {
+          title: "Approval Surat Jalan",
+          to: "/spanduk/approval-sj",
+          icon: IconClipboardCheck,
+          menuId: 165,
         },
       ],
     },
@@ -647,6 +682,7 @@ export const createMenuItems = (): NavItem[] => {
               to: "/garmen/bahan-jadi/stbj",
               icon: IconClipboardCheck,
               menuId: 105,
+              sembunyikanCabang: ["P02"],
             },
             {
               title: "Cetak Bukti Keluar Barang Jadi (BKBJ)",
@@ -989,6 +1025,7 @@ export const createMenuItems = (): NavItem[] => {
           to: "/penjualan/approval-sj",
           icon: IconClipboardCheck,
           menuId: 165,
+          sembunyikanCabang: ["P02"],
         },
         { divider: true },
         {
@@ -1058,6 +1095,7 @@ export const createMenuItems = (): NavItem[] => {
           to: "/penjualan/jadwal-kirim",
           icon: IconTruckDelivery,
           menuId: 119,
+          sembunyikanCabang: ["P02"],
         },
         {
           title: "Komitmen Kirim",

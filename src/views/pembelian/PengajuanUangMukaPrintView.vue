@@ -1,27 +1,91 @@
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref, onMounted, computed } from "vue";
 import { useRoute } from "vue-router";
+import { useToast } from "vue-toastification";
 import { pengajuanUangMukaService } from "@/services/pembelian/pengajuanUangMukaService";
+import {
+  pengajuanUangMukaValidasiService,
+  type ValidasiInfo,
+} from "@/services/pembelian/pengajuanUangMukaValidasiService";
 import logoUrl from "@/assets/logo.png";
 
 const route = useRoute();
+const toast = useToast();
 const data = ref<any>(null);
 const isLoading = ref(true);
 const error = ref("");
+const validasi = ref<ValidasiInfo | null>(null);
+const isBusy = ref(false);
+const showBatalDialog = ref(false);
+const showValidasiDialog = ref(false);
+const alasanBatal = ref("");
+
+// ?mode=layar -> halaman validasi: tidak auto-print, ada toolbar aksi
+const modeLayar = computed(() => route.query.mode === "layar");
+const nomorPum = computed(() =>
+  decodeURIComponent(route.params.nomor as string),
+);
+const adaStamp = computed(
+  () =>
+    validasi.value?.status === "VALID" ||
+    validasi.value?.status === "TIDAK_BERLAKU",
+);
+
+const errMsg = (e: unknown, fallback: string): string =>
+  (e as { response?: { data?: { message?: string } } })?.response?.data
+    ?.message || fallback;
 
 onMounted(async () => {
   try {
-    const res = await pengajuanUangMukaService.getPrintData(
-      decodeURIComponent(route.params.nomor as string),
-    );
+    const res = await pengajuanUangMukaService.getPrintData(nomorPum.value);
     data.value = res.data.data;
-    setTimeout(() => window.print(), 600);
+    // Gagal ambil status validasi tidak boleh menghalangi cetak biasa
+    try {
+      validasi.value = await pengajuanUangMukaValidasiService.getStatus(
+        nomorPum.value,
+      );
+    } catch {
+      validasi.value = null;
+    }
+    if (!modeLayar.value) setTimeout(() => window.print(), 600);
   } catch (e: any) {
     error.value = e.response?.data?.message ?? "Gagal memuat data cetak.";
   } finally {
     isLoading.value = false;
   }
 });
+
+const doValidasi = async () => {
+  isBusy.value = true;
+  try {
+    validasi.value = await pengajuanUangMukaValidasiService.validasi(
+      nomorPum.value,
+    );
+    showValidasiDialog.value = false;
+    toast.success("Pengajuan berhasil divalidasi.");
+  } catch (e: unknown) {
+    toast.error(errMsg(e, "Gagal memvalidasi."));
+  } finally {
+    isBusy.value = false;
+  }
+};
+
+const doBatal = async () => {
+  isBusy.value = true;
+  try {
+    validasi.value = await pengajuanUangMukaValidasiService.batal(
+      nomorPum.value,
+      alasanBatal.value,
+    );
+    showBatalDialog.value = false;
+    alasanBatal.value = "";
+    toast.success("Validasi dibatalkan.");
+  } catch (e: unknown) {
+    toast.error(errMsg(e, "Gagal membatalkan validasi."));
+  } finally {
+    isBusy.value = false;
+  }
+};
 
 const fmt = (v: number) => new Intl.NumberFormat("id-ID").format(v || 0);
 
@@ -79,12 +143,86 @@ const terbilang = (n: number): string => {
 
   return convert(n).trim().toUpperCase();
 };
+
+const cetak = () => window.print();
 </script>
 
 <template>
   <div v-if="isLoading" class="loading">Memuat data cetak...</div>
   <div v-else-if="error" class="loading">{{ error }}</div>
   <div v-else-if="data" class="print-page">
+    <div v-if="modeLayar" class="toolbar no-print">
+      <v-btn
+        v-if="validasi?.boleh_validasi"
+        size="small"
+        color="success"
+        @click="showValidasiDialog = true"
+      >
+        Validasi
+      </v-btn>
+      <v-btn
+        v-if="validasi?.boleh_batal"
+        size="small"
+        color="error"
+        variant="outlined"
+        @click="showBatalDialog = true"
+      >
+        Batalkan Validasi
+      </v-btn>
+      <v-btn size="small" color="indigo" @click="cetak"> Cetak </v-btn>
+      <span v-if="validasi && !validasi.berlaku" class="toolbar-note">
+        E-validasi hanya untuk cabang HO-/P01.
+      </span>
+    </div>
+
+    <v-dialog v-model="showValidasiDialog" max-width="420">
+      <v-card>
+        <v-card-title>Validasi Pengajuan</v-card-title>
+        <v-card-text>
+          Validasi pengajuan <strong>{{ data.nomor }}</strong> sebesar
+          <strong>{{ fmt(data.totalDiajukan) }}</strong
+          >? Setelah divalidasi, data tertera sebagai diterima Finance secara
+          elektronik.
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn variant="text" @click="showValidasiDialog = false"
+            >Batal</v-btn
+          >
+          <v-btn color="success" :loading="isBusy" @click="doValidasi">
+            Validasi
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <v-dialog v-model="showBatalDialog" max-width="420">
+      <v-card>
+        <v-card-title>Batalkan Validasi</v-card-title>
+        <v-card-text>
+          <v-textarea
+            v-model="alasanBatal"
+            label="Alasan pembatalan (wajib)"
+            rows="2"
+            density="compact"
+            variant="outlined"
+            hide-details
+          />
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn variant="text" @click="showBatalDialog = false">Tutup</v-btn>
+          <v-btn
+            color="error"
+            :loading="isBusy"
+            :disabled="alasanBatal.trim().length < 3"
+            @click="doBatal"
+          >
+            Batalkan Validasi
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
     <div class="header-row">
       <div class="doc-title-wrapper">
         <div class="doc-title">BUKTI PENGAJUAN UANG MUKA</div>
@@ -172,10 +310,23 @@ const terbilang = (n: number): string => {
           <div class="ttd-name">({{ data.pemohon }})</div>
         </div>
         <div class="ttd-col">
-          <div class="ttd-title">Diterima Finance</div>
-          <div class="ttd-space"></div>
+          <div class="ttd-title" :class="{ tight: adaStamp }">
+            Diterima Finance
+          </div>
+          <div v-if="validasi?.status === 'VALID'" class="stamp stamp-valid">
+            Divalidasi elektronik<br />{{ validasi.tanggal_fmt }}
+          </div>
+          <div
+            v-else-if="validasi?.status === 'TIDAK_BERLAKU'"
+            class="stamp stamp-batal"
+          >
+            VALIDASI TIDAK BERLAKU
+          </div>
           <div class="ttd-name">
-            (<span style="display: inline-block; width: 60px"></span>)
+            (<template v-if="validasi?.status === 'VALID'">{{
+              validasi.nama
+            }}</template
+            ><span v-else style="display: inline-block; width: 60px"></span>)
           </div>
         </div>
       </div>
@@ -316,6 +467,41 @@ body {
 .ttd-name {
   white-space: nowrap;
 }
+.toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.toolbar-note {
+  font-size: 8pt;
+  color: #777;
+}
+.ttd-title.tight {
+  margin-bottom: 4px;
+}
+.stamp {
+  height: 36px;
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-size: 7.5pt;
+  line-height: 1.2;
+  border: 1.5px solid;
+  border-radius: 3px;
+  padding: 2px 4px;
+}
+.stamp-valid {
+  color: #1b5e20;
+  border-color: #1b5e20;
+}
+.stamp-batal {
+  color: #b71c1c;
+  border-color: #b71c1c;
+  font-weight: bold;
+}
 @media print {
   @page {
     size: A5;
@@ -325,6 +511,9 @@ body {
     width: 100%;
     padding: 0;
     margin: 0;
+  }
+  .no-print {
+    display: none !important;
   }
 }
 </style>
