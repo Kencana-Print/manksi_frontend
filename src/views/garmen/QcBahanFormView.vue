@@ -70,6 +70,40 @@ const rataPositif = (vals: number[]): number => {
   return v.length ? r2(v.reduce((a, b) => a + b, 0) / v.length) : 0;
 };
 
+const OK_NO = ["OK", "NO"];
+const PARAM_OKNO = ["handfeel", "bowing", "shrinkage", "kelunturan"] as const;
+
+// null = kosong / bukan angka
+const parseWarna = (v: string): number | null => {
+  const s = String(v ?? "")
+    .trim()
+    .replace(",", ".");
+  if (s === "") return null;
+  const n = Number(s);
+  return Number.isFinite(n) && n >= 0 ? n : null;
+};
+
+const okNoBersih = (v: string): string => {
+  const s = String(v ?? "")
+    .trim()
+    .toUpperCase();
+  return OK_NO.includes(s) ? s : "";
+};
+
+// Dokumen lama menyimpan hasil sebagai teks bebas. Dirapikan saat dibuka.
+const bersihHasil = (h: QcRollHasil): QcRollHasil => {
+  const w = parseWarna(h.warna);
+  return {
+    gramasi: "",
+    setting: "",
+    warna: w === null ? "" : String(w),
+    handfeel: okNoBersih(h.handfeel),
+    bowing: okNoBersih(h.bowing),
+    shrinkage: okNoBersih(h.shrinkage),
+    kelunturan: okNoBersih(h.kelunturan),
+  };
+};
+
 // Roll wajib cek: dibulatkan ke atas, minimal 1 (sama dengan backend)
 const rollCekOf = (roll: number, persen: number): number =>
   roll > 0 ? Math.max(1, Math.ceil((roll * persen) / 100)) : 0;
@@ -89,10 +123,22 @@ const gramasiPoAda = (): boolean => {
   return p.gramasi_min > 0 && p.gramasi_max > 0;
 };
 
-const rollTerisi = (x: QcRollRow): boolean =>
-  Number(x.setting_cek) > 0 &&
-  (!gramasiPoAda() ||
-    (Number(x.gramasi_atas) > 0 && Number(x.gramasi_bawah) > 0));
+// Kolom yang belum lengkap pada satu roll
+const rollKurang = (x: QcRollRow): string[] => {
+  const kurang: string[] = [];
+  if (gramasiPoAda()) {
+    if (!(Number(x.gramasi_atas) > 0)) kurang.push("gramasi atas");
+    if (!(Number(x.gramasi_bawah) > 0)) kurang.push("gramasi bawah");
+  }
+  if (!(Number(x.setting_cek) > 0)) kurang.push("setting");
+  if (parseWarna(x.hasil.warna) === null) kurang.push("warna");
+  for (const k of PARAM_OKNO) {
+    if (!OK_NO.includes(x.hasil[k])) kurang.push(k);
+  }
+  return kurang;
+};
+
+const rollTerisi = (x: QcRollRow): boolean => rollKurang(x).length === 0;
 
 const MAX_ROLL = 300;
 
@@ -142,7 +188,7 @@ const defaultData: QcFormData = {
     spec_terbaca: false,
     warna: "",
   },
-  toleransi: { gramasi: 5, setting: 0.5 },
+  toleransi: { gramasi: 5, setting: 0.5, warna_nilai3: 1.5, warna_nilai2: 2 },
 };
 
 // ── Dialog setelah simpan ──
@@ -175,10 +221,11 @@ const {
         jenis_po: "",
       },
       dtl: d.dtl.map((r) => {
-        // nilai = 0 berarti mengikuti saran sistem (tidak di-override)
         const row: QcLotRow = {
           ...r,
-          nilai: r.nilai === r.nilai_saran ? 0 : r.nilai,
+          nilai: 0,
+          alasan_nilai: "",
+          rolls: r.rolls.map((x) => ({ ...x, hasil: bersihHasil(x.hasil) })),
         };
         syncRolls(row, persen);
         return row;
@@ -215,8 +262,8 @@ const {
         qty_kg: Number(r.qty_kg) || 0,
         qty_roll: Number(r.qty_roll) || 0,
         warna: r.warna,
-        nilai: Number(r.nilai) || 0,
-        alasan_nilai: r.alasan_nilai,
+        nilai: 0, // dihitung server
+        alasan_nilai: "",
         rolls: rollsTersimpan(r).map((x) => ({
           no_roll: x.no_roll,
           qty: Number(x.qty) || 0,
@@ -369,12 +416,10 @@ watch(
   { immediate: true },
 );
 
-// ── Perhitungan per roll / per lot (preview; server menghitung ulang) ──
 interface LotCalc {
   rollCek: number;
   dicek: number;
-  sesuai: number;
-  saran: number;
+  nilai: number;
   atasRata: number;
   bawahRata: number;
   settingRata: number;
@@ -382,8 +427,7 @@ interface LotCalc {
 const EMPTY_CALC: LotCalc = {
   rollCek: 0,
   dicek: 0,
-  sesuai: 0,
-  saran: 0,
+  nilai: 0,
   atasRata: 0,
   bawahRata: 0,
   settingRata: 0,
@@ -392,22 +436,36 @@ const EMPTY_CALC: LotCalc = {
 const rollsTersimpan = (row: QcLotRow): QcRollRow[] =>
   row.rolls.filter((x) => !isRollBlank(x));
 
-// "OK" = atas, bawah, dan setting masuk rentang PO +/- toleransi
-const rollStatus = (x: QcRollRow): "OK" | "NO" | "-" => {
+// Nilai satu roll = nilai terendah dari semua parameter. 0 bila belum lengkap.
+// Server tetap penentu; ini hanya tampilan.
+const rollNilai = (x: QcRollRow): number => {
+  if (!rollTerisi(x)) return 0;
   const p = formData.value.po;
   const t = formData.value.toleransi;
-  if (!rollTerisi(x) || !p.spec_terbaca) return "-";
-  const okG = (v: number) =>
-    v >= p.gramasi_min - t.gramasi - EPS &&
-    v <= p.gramasi_max + t.gramasi + EPS;
-  const s = Number(x.setting_cek);
-  const okS =
-    s >= p.setting_min - t.setting - EPS &&
-    s <= p.setting_max + t.setting + EPS;
-  const okGramasi =
-    !gramasiPoAda() ||
-    (okG(Number(x.gramasi_atas)) && okG(Number(x.gramasi_bawah)));
-  return okGramasi && okS ? "OK" : "NO";
+  const w = parseWarna(x.hasil.warna) ?? 0;
+  const skor: number[] = [
+    w <= t.warna_nilai3 + EPS ? 3 : w <= t.warna_nilai2 + EPS ? 2 : 1,
+    x.hasil.handfeel === "OK" ? 3 : 2,
+    x.hasil.bowing === "OK" ? 3 : 1,
+    x.hasil.shrinkage === "OK" ? 3 : 1,
+    x.hasil.kelunturan === "OK" ? 3 : 1,
+  ];
+  if (p.spec_terbaca) {
+    const okG = (v: number) =>
+      v >= p.gramasi_min - t.gramasi - EPS &&
+      v <= p.gramasi_max + t.gramasi + EPS;
+    const s = Number(x.setting_cek);
+    const okS =
+      s >= p.setting_min - t.setting - EPS &&
+      s <= p.setting_max + t.setting + EPS;
+    if (gramasiPoAda()) {
+      skor.push(
+        okG(Number(x.gramasi_atas)) && okG(Number(x.gramasi_bawah)) ? 3 : 1,
+      );
+    }
+    skor.push(okS ? 3 : 1);
+  }
+  return Math.min(...skor);
 };
 
 const hitungLot = (row: QcLotRow): LotCalc => {
@@ -416,17 +474,15 @@ const hitungLot = (row: QcLotRow): LotCalc => {
     Number(formData.value.header.qc_persen_cek) || 0,
   );
   const dicek = row.rolls.filter(rollTerisi);
-  const sesuai = dicek.filter((x) => rollStatus(x) === "OK").length;
-  let saran = 0;
-  if (formData.value.po.spec_terbaca && dicek.length > 0) {
-    saran = sesuai === dicek.length ? 3 : sesuai === 0 ? 1 : 2;
+  const ns = dicek.map(rollNilai);
+  let nilai = 0;
+  if (ns.length > 0) {
+    nilai = ns.every((n) => n === 3) ? 3 : ns.every((n) => n === 1) ? 1 : 2;
   }
-
   return {
     rollCek,
     dicek: dicek.length,
-    sesuai,
-    saran,
+    nilai,
     atasRata: rataPositif(dicek.map((x) => Number(x.gramasi_atas))),
     bawahRata: rataPositif(dicek.map((x) => Number(x.gramasi_bawah))),
     settingRata: rataPositif(dicek.map((x) => Number(x.setting_cek))),
@@ -448,34 +504,8 @@ const rataSemua = computed(() => {
   };
 });
 
-interface RollFlat {
-  li: number;
-  ri: number;
-  lot: string;
-  rl: QcRollRow;
-}
-// Roll yang sudah ada isinya, dari semua lot, untuk tabel Hasil Cek Detail
-const rollDicek = computed<RollFlat[]>(() =>
-  formData.value.dtl.flatMap((lot, li) =>
-    lot.rolls.flatMap((rl, ri) =>
-      isRollBlank(rl) ? [] : [{ li, ri, lot: lot.lot, rl }],
-    ),
-  ),
-);
-
-// nilai = 0 berarti mengikuti saran sistem
-const efektif = (i: number): number =>
-  Number(formData.value.dtl[i]?.nilai) || calcOf(i).saran;
-
-const perluAlasan = (i: number): boolean =>
-  efektif(i) > 0 && efektif(i) !== calcOf(i).saran;
-
-const setNilai = (row: QcLotRow, ev: Event) => {
-  row.nilai = Number((ev.target as HTMLInputElement).value) || 0;
-};
-
 const prediksi = (i: number): string => {
-  const n = efektif(i);
+  const n = calcOf(i).nilai;
   if (n === 3) return "Auto LANJUT";
   return n > 0 ? "Ke Pembelian" : "-";
 };
@@ -654,9 +684,8 @@ const cekSubmit = (): string => {
       (x) => !isRollBlank(x) && !rollTerisi(x),
     );
     if (idxKurang >= 0) {
-      return gramasiPoAda()
-        ? `Lot ${r.lot}, baris roll ke-${idxKurang + 1}: gramasi atas, bawah, dan setting harus diisi lengkap.`
-        : `Lot ${r.lot}, baris roll ke-${idxKurang + 1}: setting harus diisi.`;
+      const rl = r.rolls[idxKurang];
+      return `Lot ${r.lot}, baris roll ke-${idxKurang + 1}: ${rl ? rollKurang(rl).join(", ") : "data"} harus diisi lengkap.`;
     }
     if (rolls.length < c.rollCek) {
       return `Lot ${r.lot}: minimal ${c.rollCek} roll harus dicek (${persen}% dari ${r.qty_roll} roll). Baru ${rolls.length}.`;
@@ -664,19 +693,8 @@ const cekSubmit = (): string => {
     if (rolls.length > Number(r.qty_roll)) {
       return `Lot ${r.lot}: roll yang dicek (${rolls.length}) melebihi jumlah roll lot.`;
     }
-
-    const n = efektif(i);
-    if (!n) return `Lot ${r.lot}: nilai wajib diisi.`;
-    if (n === 3 && c.saran !== 3) {
-      return `Lot ${r.lot}: nilai 3 hanya berasal dari hasil hitung sistem. Untuk melanjutkan lot bernilai 2, gunakan Tindakan > Submit di browse.`;
-    }
-    if (c.saran > 0 && n > c.saran) {
-      return `Lot ${r.lot}: nilai tidak boleh lebih tinggi dari hasil sistem (${c.saran}).`;
-    }
-    if (n !== c.saran && !r.alasan_nilai.trim()) {
-      return c.saran === 0
-        ? `Lot ${r.lot}: spesifikasi PO tidak terbaca, nilai diisi manual. Alasan wajib diisi.`
-        : `Lot ${r.lot}: nilai berbeda dari hasil sistem (${c.saran}). Alasan wajib diisi.`;
+    if (!c.nilai) {
+      return `Lot ${r.lot}: nilai belum dapat dihitung. Lengkapi hasil cek roll.`;
     }
   }
   return "";
@@ -724,9 +742,6 @@ const nilaiClass = (n: number) =>
       : n === 1
         ? "chip-reject"
         : "chip-draft";
-
-const rollClass = (s: "OK" | "NO" | "-"): string =>
-  s === "OK" ? "chip-ok" : s === "NO" ? "chip-reject" : "chip-draft";
 </script>
 
 <template>
@@ -882,11 +897,11 @@ const rollClass = (s: "OK" | "NO" | "-"): string =>
             class="inp ro"
             style="width: 110px"
           />
-          <label class="lbl" style="width: 70px">Jenis Cek</label>
+          <label class="lbl" style="width: 70px">Persen Cek</label>
           <input
             :value="
-              formData.header.qc_jenis_cek
-                ? `${formData.header.qc_jenis_cek} ${formData.header.qc_persen_cek}%`
+              formData.header.qc_persen_cek
+                ? `${formData.header.qc_persen_cek}%`
                 : ''
             "
             readonly
@@ -985,15 +1000,14 @@ const rollClass = (s: "OK" | "NO" | "-"): string =>
     <!-- ══ KOLOM KANAN: DETAIL ══ -->
     <template #right-column>
       <div class="qc-right">
-        <!-- Tabel 1: Lot + roll -->
         <div class="tbl-header">
-          <span class="tbl-title">1. Lot dan Pengecekan Roll</span>
+          <span class="tbl-title">Lot dan Pengecekan Roll</span>
           <button type="button" class="btn-add" @click="addLot">
             + Tambah Lot
           </button>
         </div>
-        <div class="tbl-wrap" style="min-height: 50vh; max-height: 64vh">
-          <table class="gt" style="min-width: 1200px">
+        <div class="tbl-wrap" style="min-height: 50vh; max-height: 78vh">
+          <table class="gt" style="min-width: 1520px">
             <thead>
               <tr>
                 <th style="width: 32px" class="tc">No</th>
@@ -1003,14 +1017,17 @@ const rollClass = (s: "OK" | "NO" | "-"): string =>
                 </th>
                 <th style="width: 55px" class="tr">Roll</th>
                 <th style="width: 95px" class="tc">Dicek</th>
-                <th style="width: 110px">Warna</th>
+                <th style="width: 110px">Nama Warna</th>
                 <th style="width: 90px" class="tr bg-yellow">Gramasi Atas</th>
                 <th style="width: 90px" class="tr bg-yellow">Gramasi Bawah</th>
                 <th style="width: 75px" class="tr bg-yellow">Setting</th>
-                <th style="width: 65px" class="tc">Sesuai</th>
-                <th style="width: 50px" class="tc">Saran</th>
-                <th style="width: 60px" class="tc bg-yellow">Nilai</th>
-                <th style="width: 180px">Alasan (lot) / Catatan (roll)</th>
+                <th style="width: 85px" class="tr bg-yellow">Warna ΔE</th>
+                <th style="width: 80px" class="tc bg-yellow">Handfeel</th>
+                <th style="width: 75px" class="tc bg-yellow">Bowing</th>
+                <th style="width: 85px" class="tc bg-yellow">Shrinkage</th>
+                <th style="width: 90px" class="tc bg-yellow">Kelunturan</th>
+                <th style="width: 60px" class="tc">Nilai</th>
+                <th style="width: 180px">Catatan Roll</th>
                 <th style="width: 95px" class="tc">Keputusan</th>
                 <th style="width: 32px" class="tc"></th>
               </tr>
@@ -1065,51 +1082,18 @@ const rollClass = (s: "OK" | "NO" | "-"): string =>
                   <td class="tr px-1">{{ calcOf(idx).atasRata || "-" }}</td>
                   <td class="tr px-1">{{ calcOf(idx).bawahRata || "-" }}</td>
                   <td class="tr px-1">{{ calcOf(idx).settingRata || "-" }}</td>
-                  <td class="tc">
-                    {{
-                      calcOf(idx).dicek
-                        ? `${calcOf(idx).sesuai}/${calcOf(idx).dicek}`
-                        : "-"
-                    }}
-                  </td>
+                  <td colspan="5"></td>
                   <td class="tc">
                     <span
-                      v-if="calcOf(idx).saran"
+                      v-if="calcOf(idx).nilai"
                       class="status-chip"
-                      :class="nilaiClass(calcOf(idx).saran)"
+                      :class="nilaiClass(calcOf(idx).nilai)"
                     >
-                      {{ calcOf(idx).saran }}
+                      {{ calcOf(idx).nilai }}
                     </span>
                     <span v-else class="text-grey">-</span>
                   </td>
-                  <td class="p0">
-                    <input
-                      v-model.number="row.nilai"
-                      type="number"
-                      min="0"
-                      max="3"
-                      step="1"
-                      class="ci tc fw"
-                      :placeholder="
-                        calcOf(idx).saran ? String(calcOf(idx).saran) : '-'
-                      "
-                      @keydown.enter.prevent="onEnterNext"
-                      v-select-on-focus
-                      :value="row.nilai || ''"
-                      @input="setNilai(row, $event)"
-                    />
-                  </td>
-                  <td class="p0">
-                    <input
-                      v-model="row.alasan_nilai"
-                      class="ci"
-                      :class="{
-                        'bg-red-light': perluAlasan(idx) && !row.alasan_nilai,
-                      }"
-                      :placeholder="perluAlasan(idx) ? 'Wajib diisi' : ''"
-                      @keydown.enter.prevent="onEnterNext"
-                    />
-                  </td>
+                  <td></td>
                   <td class="tc">{{ row.keputusan || prediksi(idx) }}</td>
                   <td class="tc">
                     <button
@@ -1171,15 +1155,36 @@ const rollClass = (s: "OK" | "NO" | "-"): string =>
                       v-select-on-focus
                     />
                   </td>
+                  <td class="p0">
+                    <input
+                      v-model="rl.hasil.warna"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      class="ci tr fw bg-yellow-light"
+                      @keydown.enter.prevent="onEnterNext"
+                      v-select-on-focus
+                    />
+                  </td>
+                  <td v-for="k in PARAM_OKNO" :key="k" class="p0">
+                    <select
+                      v-model="rl.hasil[k]"
+                      class="ci fw bg-yellow-light"
+                      @keydown.enter.prevent="onEnterNext"
+                    >
+                      <option value="">-</option>
+                      <option value="OK">OK</option>
+                      <option value="NO">NO</option>
+                    </select>
+                  </td>
                   <td class="tc">
                     <span
                       class="status-chip"
-                      :class="rollClass(rollStatus(rl))"
+                      :class="nilaiClass(rollNilai(rl))"
                     >
-                      {{ rollStatus(rl) }}
+                      {{ rollNilai(rl) || "-" }}
                     </span>
                   </td>
-                  <td colspan="2"></td>
                   <td class="p0">
                     <input
                       v-model="rl.catatan"
@@ -1191,7 +1196,7 @@ const rollClass = (s: "OK" | "NO" | "-"): string =>
                 </tr>
               </template>
               <tr v-if="formData.dtl.length === 0">
-                <td colspan="15" class="empty-row">
+                <td colspan="18" class="empty-row">
                   Pilih PO Bahan di kiri, lalu isi Jumlah Lot.
                 </td>
               </tr>
@@ -1204,112 +1209,28 @@ const rollClass = (s: "OK" | "NO" | "-"): string =>
                 <td class="tr px-1">{{ rataSemua.atas || "-" }}</td>
                 <td class="tr px-1">{{ rataSemua.bawah || "-" }}</td>
                 <td class="tr px-1">{{ rataSemua.setting || "-" }}</td>
-                <td colspan="6"></td>
+                <td colspan="9"></td>
               </tr>
             </tfoot>
           </table>
         </div>
         <div class="legend">
-          Isi nomor lot dan jumlah roll, baris roll muncul otomatis. Isi gramasi
-          atas, bawah, dan setting hanya pada roll yang dicek (minimal sesuai
-          kolom Dicek); baris kosong tidak dihitung. Nilai kosong = mengikuti
-          saran sistem. <b>3</b> = semua roll sesuai, lot otomatis LANJUT.
-          <b>2</b> = sebagian roll sesuai, diputuskan Pembelian (atau
-          dilanjutkan Gudang lewat Tindakan &gt; Submit di browse, dengan
-          alasan). <b>1</b> = semua roll di luar toleransi, diputuskan
-          Pembelian. Sesuai = dalam rentang PO ±{{
-            formData.toleransi.gramasi
+          Isi nomor lot dan jumlah roll, baris roll muncul otomatis. Isi semua
+          kolom kuning hanya pada roll yang dicek (minimal sesuai kolom Dicek);
+          baris kosong tidak dihitung. Nilai dihitung sistem dan tidak dapat
+          diubah. Nilai roll = nilai terendah dari semua parameter. Gramasi dan
+          setting: dalam rentang PO ±{{ formData.toleransi.gramasi }} gram / ±{{
+            formData.toleransi.setting
           }}
-          gram (gramasi) / ±{{ formData.toleransi.setting }}
-          (setting).
-        </div>
-
-        <!-- Tabel 2: Hasil cek detail per roll -->
-        <div class="tbl-header teal mt-2">
-          <span class="tbl-title">2. Hasil Cek Detail per Roll</span>
-        </div>
-        <div class="tbl-wrap" style="max-height: 22vh; min-height: 110px">
-          <table class="gt" style="min-width: 1000px">
-            <thead>
-              <tr>
-                <th style="width: 32px" class="tc">No</th>
-                <th style="width: 110px">Lot No.</th>
-                <th style="width: 60px">Roll</th>
-                <th style="width: 130px">Gramasi</th>
-                <th style="width: 120px">Setting</th>
-                <th style="width: 120px">Warna</th>
-                <th style="width: 120px">Handfeel</th>
-                <th style="width: 110px">Bowing</th>
-                <th style="width: 110px">Shrinkage</th>
-                <th style="width: 110px">Kelunturan</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="(f, n) in rollDicek" :key="`${f.li}-${f.ri}`">
-                <td class="tc gt-lbl">{{ n + 1 }}</td>
-                <td class="px-1 fw">{{ f.lot || "-" }}</td>
-                <td class="tc">{{ f.ri + 1 }}</td>
-                <td class="p0">
-                  <input
-                    v-model="f.rl.hasil.gramasi"
-                    class="ci"
-                    placeholder="mis. Rendah"
-                    @keydown.enter.prevent="onEnterNext"
-                  />
-                </td>
-                <td class="p0">
-                  <input
-                    v-model="f.rl.hasil.setting"
-                    class="ci"
-                    placeholder="mis. OK"
-                    @keydown.enter.prevent="onEnterNext"
-                  />
-                </td>
-                <td class="p0">
-                  <input
-                    v-model="f.rl.hasil.warna"
-                    class="ci"
-                    placeholder="mis. 0,41"
-                    @keydown.enter.prevent="onEnterNext"
-                  />
-                </td>
-                <td class="p0">
-                  <input
-                    v-model="f.rl.hasil.handfeel"
-                    class="ci"
-                    placeholder="mis. OK"
-                    @keydown.enter.prevent="onEnterNext"
-                  />
-                </td>
-                <td class="p0">
-                  <input
-                    v-model="f.rl.hasil.bowing"
-                    class="ci"
-                    @keydown.enter.prevent="onEnterNext"
-                  />
-                </td>
-                <td class="p0">
-                  <input
-                    v-model="f.rl.hasil.shrinkage"
-                    class="ci"
-                    @keydown.enter.prevent="onEnterNext"
-                  />
-                </td>
-                <td class="p0">
-                  <input
-                    v-model="f.rl.hasil.kelunturan"
-                    class="ci"
-                    @keydown.enter.prevent="onEnterNext"
-                  />
-                </td>
-              </tr>
-              <tr v-if="rollDicek.length === 0">
-                <td colspan="10" class="empty-row">
-                  Roll yang sudah diisi di tabel 1 muncul di sini.
-                </td>
-              </tr>
-            </tbody>
-          </table>
+          bernilai 3, di luar rentang bernilai 1 (dilewati bila spesifikasi PO
+          tidak terbaca). Warna: sampai
+          {{ formData.toleransi.warna_nilai3 }} bernilai 3, sampai
+          {{ formData.toleransi.warna_nilai2 }} bernilai 2, di atasnya bernilai
+          1. Handfeel: OK 3, NO 2. Bowing, shrinkage, kelunturan: OK 3, NO 1.
+          Nilai lot: <b>3</b> bila semua roll bernilai 3 (otomatis LANJUT),
+          <b>1</b> bila semua roll bernilai 1, selain itu <b>2</b>
+          (diputuskan Pembelian, atau dilanjutkan Gudang lewat Tindakan &gt;
+          Submit di browse dengan alasan).
         </div>
       </div>
     </template>

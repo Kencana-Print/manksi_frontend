@@ -14,8 +14,6 @@ export interface TlQcLot {
   GramasiCek: number;
   SettingCek: string;
   Nilai: number;
-  Saran: number;
-  AlasanNilai: string;
   Keputusan: string;
   KeputusanOleh: string;
   KeputusanTgl: string | null;
@@ -24,6 +22,7 @@ export interface TlQcLot {
   SudahBpb: number;
   QtyRetur: number;
   KeputusanTahap: string;
+  KeputusanAtasNama: string;
 }
 
 export interface TlQcRiwayat {
@@ -41,6 +40,7 @@ export interface TlQcKeputusanItem {
   nourut: number;
   keputusan: string;
   catatan: string;
+  atas_nama: string;
 }
 
 export interface TlQcKeputusanPayload {

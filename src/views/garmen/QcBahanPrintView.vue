@@ -112,6 +112,14 @@ const sesuaiText = (rl: QcRollRow): string =>
 const lotBerAlasan = computed(() =>
   (data.value?.dtl ?? []).filter((d) => d.alasan_nilai?.trim()),
 );
+
+// Dokumen versi 2 = aturan nilai baru; selain itu (versi 1 / kosong) = aturan lama
+const versiBaru = computed(
+  () => Number(data.value?.header?.qc_versi_nilai) === 2,
+);
+
+const nilaiRollText = (rl: QcRollRow): string =>
+  versiBaru.value ? (rl.nilai ? String(rl.nilai) : "-") : sesuaiText(rl);
 </script>
 
 <template>
@@ -172,7 +180,6 @@ const lotBerAlasan = computed(() =>
             <th rowspan="2" width="24">No</th>
             <th rowspan="2">Lot No.</th>
             <th colspan="2">Qty</th>
-            <th rowspan="2" width="52">Roll Dicek</th>
             <th colspan="2">Gramasi / Setting PO</th>
             <th rowspan="2">Warna</th>
             <th colspan="2">Hasil Cek (Rata²)</th>
@@ -192,8 +199,7 @@ const lotBerAlasan = computed(() =>
             <td class="tc">{{ i + 1 }}</td>
             <td class="fw-bold">{{ d.lot }}</td>
             <td class="tr">{{ numFmt(d.qty_kg) }}</td>
-            <td class="tc">{{ d.rolls.length }}</td>
-            <td class="tc">{{ d.rolls.length }} (min {{ d.roll_cek }})</td>
+            <td class="tc">{{ d.qty_roll }}</td>
             <td class="tc">{{ d.gramasi_po }}</td>
             <td class="tc">{{ d.setting_po }}</td>
             <td>{{ d.warna }}</td>
@@ -211,25 +217,28 @@ const lotBerAlasan = computed(() =>
             <td class="tr fw-bold">
               {{ numFmt(data.dtl.reduce((s, r) => s + Number(r.qty_roll), 0)) }}
             </td>
-            <td colspan="7"></td>
+            <td colspan="6"></td>
           </tr>
         </tfoot>
       </table>
 
-      <div class="note">
+      <div v-if="versiBaru" class="note">
+        Nilai roll = nilai terendah dari gramasi atas/bawah (rentang PO
+        &plusmn;{{ data.toleransi.gramasi }} gram), setting (&plusmn;{{
+          data.toleransi.setting
+        }}), warna (&Delta;E &le; {{ data.toleransi.warna_nilai3 }} = 3; &le;
+        {{ data.toleransi.warna_nilai2 }} = 2; lebih = 1), handfeel (OK = 3, NO
+        = 2), serta bowing, shrinkage, dan kelunturan (OK = 3, NO = 1). Nilai
+        lot: 3 bila semua roll yang dicek bernilai 3 (otomatis lanjut), 1 bila
+        semua bernilai 1, selain itu 2.
+      </div>
+      <div v-else class="note">
         Nilai 1: semua roll yang dicek di luar toleransi (diputuskan Pembelian)
         &nbsp;|&nbsp; Nilai 2: sebagian roll sesuai (diputuskan Pembelian, atau
         dilanjutkan Gudang dengan alasan) &nbsp;|&nbsp; Nilai 3: semua roll
         sesuai (otomatis lanjut). Sesuai = gramasi atas, gramasi bawah, dan
         setting dalam rentang PO &plusmn;{{ data.toleransi.gramasi }} gram /
         &plusmn;{{ data.toleransi.setting }}.
-      </div>
-      <div v-if="lotBerAlasan.length" class="note">
-        <b>Alasan nilai:</b>
-        <span v-for="(d, i) in lotBerAlasan" :key="i">
-          Lot {{ d.lot }}: {{ d.alasan_nilai
-          }}<span v-if="i < lotBerAlasan.length - 1">; </span>
-        </span>
       </div>
 
       <div class="section-title">PENGECEKAN ROLL</div>
@@ -242,7 +251,7 @@ const lotBerAlasan = computed(() =>
             <th width="70">Gramasi Atas</th>
             <th width="70">Gramasi Bawah</th>
             <th width="60">Setting</th>
-            <th width="50">Sesuai</th>
+            <th width="50">{{ versiBaru ? "Nilai" : "Sesuai" }}</th>
             <th>Catatan</th>
           </tr>
         </thead>
@@ -256,7 +265,7 @@ const lotBerAlasan = computed(() =>
             <td class="tr">{{ numFmt(r.rl.gramasi_atas) }}</td>
             <td class="tr">{{ numFmt(r.rl.gramasi_bawah) }}</td>
             <td class="tr">{{ numFmt(r.rl.setting_cek) }}</td>
-            <td class="tc fw-bold">{{ sesuaiText(r.rl) }}</td>
+            <td class="tc fw-bold">{{ nilaiRollText(r.rl) }}</td>
             <td>{{ r.rl.catatan }}</td>
           </tr>
           <tr v-if="rollList.length === 0">

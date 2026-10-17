@@ -15,8 +15,10 @@ import {
   IconSearch,
   IconSend,
   IconPrinter,
+  IconFileSpreadsheet,
 } from "@tabler/icons-vue";
 import { formatTanggal, formatTanggalJam } from "@/utils/dateFormat";
+import { exportExcelSingle, type ExcelColumn } from "@/utils/excelExport";
 
 interface QcBahanRow {
   Nomor: string;
@@ -35,6 +37,7 @@ interface QcBahanRow {
   Usr: string;
   Created: string;
   Ngedit: string;
+  Lots: { Lot: string; Nilai: number; Keputusan: string }[];
 }
 
 interface QcBahanDetailRow {
@@ -49,8 +52,6 @@ interface QcBahanDetailRow {
   GramasiCek: number;
   SettingCek: string;
   Nilai: number;
-  Saran: number;
-  AlasanNilai: string;
   Keputusan: string;
 }
 
@@ -101,7 +102,6 @@ const {
   canExport,
   selectedItem,
   fetchData,
-  exportToExcel,
 } = useBrowse({
   menuId: "186",
   fetchApi: async () => {
@@ -134,11 +134,238 @@ const filteredItems = computed<QcBahanRow[]>(() => {
   );
 });
 
+const baseBrowseRef = ref<InstanceType<typeof BaseBrowse> | null>(null);
+
+// Data yang sedang tertampil (setelah search/filter kolom BaseBrowse)
+const getExportSource = (): QcBahanRow[] =>
+  (baseBrowseRef.value?.getFilteredItems() ??
+    items.value ??
+    []) as QcBahanRow[];
+
+// "YYYY-MM-DD" -> Date UTC-midnight, supaya Excel tidak geser tanggal
+const toExcelDate = (val: string | null): Date | "" => {
+  if (!val) return "";
+  const [y, m, d] = val.split("-").map(Number);
+  if (!y || !m || !d) return "";
+  return new Date(Date.UTC(y, m - 1, d));
+};
+
+const periodeJudul = () =>
+  `${formatTanggal(filterState.value.dtAwal)} s.d ${formatTanggal(filterState.value.dtAkhir)}`;
+
+const onExportHeader = async () => {
+  const source = getExportSource();
+  if (!source.length) return toast.warning("Tidak ada data untuk diekspor.");
+
+  const columns: ExcelColumn[] = [
+    { header: "Nomor", key: "Nomor", width: 20 },
+    {
+      header: "Tgl Datang",
+      key: "TglDatang",
+      width: 12,
+      align: "center",
+      numFmt: "dd mmm yy",
+    },
+    { header: "Status", key: "Status", width: 12, align: "center" },
+    { header: "Nomor PO", key: "Nomor_PO", width: 18 },
+    { header: "Jenis Kain", key: "JenisKain", width: 36 },
+    { header: "Vendor Greige", key: "VendorGreige", width: 24 },
+    { header: "Vendor Celup", key: "VendorCelup", width: 24 },
+    { header: "Lot", key: "JumlahLot", width: 8, align: "right" },
+    {
+      header: "Total Qty",
+      key: "TotalKg",
+      width: 12,
+      align: "right",
+      numFmt: "#,##0.00",
+    },
+    { header: "Satuan", key: "Satuan", width: 8, align: "center" },
+    {
+      header: "Total Roll",
+      key: "TotalRoll",
+      width: 10,
+      align: "right",
+      numFmt: "#,##0",
+    },
+    { header: "Nilai per Lot", key: "LotNilai", width: 48 },
+    { header: "Keterangan", key: "Keterangan", width: 30 },
+    { header: "User", key: "Usr", width: 14 },
+  ];
+
+  const rows = source.map((r) => ({
+    ...r,
+    TglDatang: toExcelDate(r.TglDatang),
+    JumlahLot: Number(r.JumlahLot) || 0,
+    TotalKg: Number(r.TotalKg) || 0,
+    TotalRoll: Number(r.TotalRoll) || 0,
+    LotNilai: (r.Lots ?? [])
+      .map(
+        (l) =>
+          `${l.Lot}: ${l.Nilai || "-"}${l.Keputusan ? ` (${l.Keputusan})` : ""}`,
+      )
+      .join("; "),
+  }));
+
+  try {
+    await exportExcelSingle(
+      `QC_Bahan_${filterState.value.dtAwal}_sd_${filterState.value.dtAkhir}.xlsx`,
+      "QC Bahan",
+      columns,
+      rows,
+      `QC Bahan Periode ${periodeJudul()}`,
+    );
+  } catch (e) {
+    console.error(e);
+    toast.error("Gagal export Excel.");
+  }
+};
+
+// --- Export Detail (satu baris per lot) ---
+interface QcBahanExportDetailRow {
+  Nomor: string;
+  TglDatang: string;
+  Status: string;
+  Nomor_PO: string;
+  JenisKain: string;
+  VendorGreige: string;
+  VendorCelup: string;
+  Lot: string;
+  Kg: number;
+  Satuan: string;
+  Roll: number;
+  RollCek: number;
+  GramasiPO: string;
+  SettingPO: string;
+  Warna: string;
+  GramasiCek: number;
+  SettingCek: string;
+  Nilai: number;
+  Keputusan: string;
+}
+
+const isExportingDetail = ref(false);
+
+const onExportDetail = async () => {
+  isExportingDetail.value = true;
+  try {
+    const res = await qcBahanService.getAllDetail({
+      startDate: filterState.value.dtAwal,
+      endDate: filterState.value.dtAkhir,
+      status: filterState.value.status,
+    });
+    let allDetail: QcBahanExportDetailRow[] = res.data.data || [];
+
+    // Batasi ke dokumen yang sedang tertampil (search/filter kolom BaseBrowse)
+    const visible = new Set(getExportSource().map((r) => r.Nomor));
+    allDetail = allDetail.filter((r) => visible.has(r.Nomor));
+
+    if (!allDetail.length) {
+      toast.warning("Tidak ada data detail pada filter ini.");
+      return;
+    }
+
+    // Data header hanya di baris lot pertama tiap dokumen
+    let prevNomor = "";
+    const rows = allDetail.map((r) => {
+      const first = r.Nomor !== prevNomor;
+      prevNomor = r.Nomor;
+      return {
+        Nomor: first ? r.Nomor : "",
+        TglDatang: first ? toExcelDate(r.TglDatang) : "",
+        Status: first ? r.Status : "",
+        Nomor_PO: first ? r.Nomor_PO : "",
+        JenisKain: first ? r.JenisKain : "",
+        VendorGreige: first ? r.VendorGreige : "",
+        VendorCelup: first ? r.VendorCelup : "",
+        Lot: r.Lot,
+        Kg: Number(r.Kg) || 0,
+        Satuan: r.Satuan,
+        Roll: Number(r.Roll) || 0,
+        RollCek: Number(r.RollCek) || 0,
+        GramasiPO: r.GramasiPO || "",
+        SettingPO: r.SettingPO || "",
+        Warna: r.Warna || "",
+        GramasiCek: Number(r.GramasiCek) || 0,
+        SettingCek: r.SettingCek || "",
+        Nilai: Number(r.Nilai) || "",
+        Keputusan: r.Keputusan || "",
+      };
+    });
+
+    const columns: ExcelColumn[] = [
+      { header: "Nomor", key: "Nomor", width: 20 },
+      {
+        header: "Tgl Datang",
+        key: "TglDatang",
+        width: 12,
+        align: "center",
+        numFmt: "dd mmm yy",
+      },
+      { header: "Status", key: "Status", width: 12, align: "center" },
+      { header: "Nomor PO", key: "Nomor_PO", width: 18 },
+      { header: "Jenis Kain", key: "JenisKain", width: 34 },
+      { header: "Vendor Greige", key: "VendorGreige", width: 24 },
+      { header: "Vendor Celup", key: "VendorCelup", width: 24 },
+      { header: "Lot No.", key: "Lot", width: 18 },
+      {
+        header: "Qty",
+        key: "Kg",
+        width: 12,
+        align: "right",
+        numFmt: "#,##0.00",
+      },
+      { header: "Sat", key: "Satuan", width: 7, align: "center" },
+      {
+        header: "Roll",
+        key: "Roll",
+        width: 8,
+        align: "right",
+        numFmt: "#,##0",
+      },
+      {
+        header: "Roll Dicek",
+        key: "RollCek",
+        width: 10,
+        align: "right",
+        numFmt: "#,##0",
+      },
+      { header: "Gramasi PO", key: "GramasiPO", width: 14, align: "center" },
+      { header: "Setting PO", key: "SettingPO", width: 12, align: "center" },
+      { header: "Warna", key: "Warna", width: 22 },
+      {
+        header: "Gramasi Cek",
+        key: "GramasiCek",
+        width: 12,
+        align: "right",
+        numFmt: "#,##0.00",
+      },
+      { header: "Setting Cek", key: "SettingCek", width: 12, align: "center" },
+      { header: "Nilai", key: "Nilai", width: 8, align: "center" },
+      { header: "Keputusan", key: "Keputusan", width: 12, align: "center" },
+    ];
+
+    await exportExcelSingle(
+      `Detail_QC_Bahan_${filterState.value.dtAwal}_sd_${filterState.value.dtAkhir}.xlsx`,
+      "Detail QC Bahan",
+      columns,
+      rows,
+      `Rincian Lot QC Bahan | Periode: ${periodeJudul()}`,
+    );
+    toast.success("Berhasil export detail data.");
+  } catch (e) {
+    console.error(e);
+    toast.error("Gagal export Excel.");
+  } finally {
+    isExportingDetail.value = false;
+  }
+};
+
 // --- HEADERS ---
 const headers = [
   { title: "Nomor", key: "Nomor", width: "150px", fixed: true },
   { title: "Tgl Datang", key: "TglDatang", width: "100px", align: "center" },
   { title: "Status", key: "Status", width: "110px", align: "center" },
+  { title: "Nilai per Lot", key: "Lots", width: "280px", sortable: false },
   { title: "Nomor PO", key: "Nomor_PO", width: "140px" },
   { title: "Jenis Kain", key: "JenisKain", width: "260px" },
   { title: "Vendor Greige", key: "VendorGreige", width: "170px" },
@@ -403,6 +630,7 @@ const numFmt = (v: number | string | null) =>
 
 <template>
   <BaseBrowse
+    ref="baseBrowseRef"
     title="QC Bahan"
     menu-id="186"
     :icon="IconClipboardCheck"
@@ -421,7 +649,7 @@ const numFmt = (v: number | string | null) =>
     @edit="onEdit"
     @delete="onDelete"
     @refresh="fetchData"
-    @export="exportToExcel('QC_Bahan_Header')"
+    @export="onExportHeader"
     show-expand
     :expanded="expandedRows"
     @update:expanded="onUpdateExpanded"
@@ -516,6 +744,20 @@ const numFmt = (v: number | string | null) =>
       </span>
     </template>
 
+    <template #item.Lots="{ item }">
+      <div class="lot-chips">
+        <span
+          v-for="l in item.Lots"
+          :key="l.Lot"
+          class="status-chip"
+          :class="nilaiClass(l.Nilai)"
+        >
+          {{ l.Lot }}: {{ l.Nilai || "-"
+          }}<template v-if="l.Keputusan"> · {{ l.Keputusan }}</template>
+        </span>
+      </div>
+    </template>
+
     <template #item.TotalKg="{ item }">
       {{ numFmt(item.TotalKg) }} {{ item.Satuan }}
     </template>
@@ -599,6 +841,20 @@ const numFmt = (v: number | string | null) =>
           ><IconPrinter :size="15" :stroke-width="1.7"
         /></template>
         Cetak
+      </v-btn>
+      <v-btn
+        v-if="canExport"
+        size="small"
+        color="green-darken-3"
+        variant="outlined"
+        class="ml-2"
+        :loading="isExportingDetail"
+        @click="onExportDetail"
+      >
+        <template #prepend>
+          <IconFileSpreadsheet :size="15" :stroke-width="1.7" />
+        </template>
+        Export Detail
       </v-btn>
       <v-menu v-if="selected.length > 0">
         <template #activator="{ props }">
@@ -841,6 +1097,12 @@ const numFmt = (v: number | string | null) =>
 .chip-hold {
   background: #f3e5f5;
   color: #6a1b9a;
+}
+.lot-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 2px 0;
 }
 
 .expand-wrap {

@@ -119,7 +119,7 @@ const initialData = {
   RencanaOrder: 0,
   HargaJual: 0,
   HargaRiil: 0,
-  RencanaSize: "BRAKEDOWN SIZE",
+  RencanaSize: "",
   IsRevisi: "N",
   RevisiNo: 0,
   Referensi: "",
@@ -212,7 +212,7 @@ const mapMapData = (rawData: any) => {
     RencanaOrder: Number(d.mspk_rencana_order) || 0,
     HargaJual: Number(d.mspk_harga) || 0,
     HargaRiil: Number(d.mspk_hargariil) || 0,
-    RencanaSize: d.mspk_rencana_size || "BRAKEDOWN SIZE",
+    RencanaSize: d.mspk_rencana_size || "",
     IsRevisi: d.mspk_revisi || "N",
     RevisiNo: Number(d.mspk_revisi_no) || 0,
     AccCustomer: d.mspk_acc_customer || "N",
@@ -387,6 +387,12 @@ const validateSave = async (skipPoCheck = false) => {
 
   const wasAlreadyApprovedOnLoad = wasApprovedOnLoad.value;
   const isDivisi3 = String(formData.value.Divisi || "").charAt(0) === "3";
+
+  const isDivisi4 = String(formData.value.Divisi || "").charAt(0) === "4";
+  if (isDivisi4 && !formData.value.RencanaSize) {
+    toast.warning("Rencana Size wajib dipilih.");
+    return;
+  }
 
   if (!isEditMode.value) {
     // CREATE — hard block, sesuai semula

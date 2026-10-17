@@ -1398,6 +1398,7 @@ const setSetoranPembayaran = (v: any) => {
             class="f-inp f-sel"
             style="width: 160px"
           >
+            <option value="">-</option>
             <option v-for="o in rencanaSizeOptions" :key="o" :value="o">
               {{ o }}
             </option>

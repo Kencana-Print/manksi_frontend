@@ -17,6 +17,7 @@ export interface QcRollRow {
   gramasi_bawah: number;
   setting_cek: number;
   sesuai: boolean;
+  nilai?: number;
   catatan: string;
   hasil: QcRollHasil;
 }
@@ -78,6 +79,8 @@ export interface QcPoInfo {
 export interface QcToleransi {
   gramasi: number;
   setting: number;
+  warna_nilai3: number;
+  warna_nilai2: number;
 }
 
 export interface QcFormData {
@@ -91,6 +94,7 @@ export interface QcDetailResponse {
   header: Omit<QcFormHeader, "jenis_po"> & {
     user_create?: string;
     date_create?: string;
+    qc_versi_nilai?: number;
   };
   dtl: QcLotRow[];
   po: Omit<QcPoInfo, "gramasi" | "setting" | "warna"> | null;

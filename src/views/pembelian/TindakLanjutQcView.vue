@@ -45,6 +45,7 @@ interface TlQcRow {
 interface LotEdit extends TlQcLot {
   keputusanBaru: string;
   catatan: string;
+  atasNama: string;
 }
 
 const toast = useToast();
@@ -283,6 +284,7 @@ const openKeputusanDialog = async () => {
       ...d,
       keputusanBaru: d.Keputusan || "",
       catatan: "",
+      atasNama: "",
     }));
   } catch (e) {
     toast.error(getErr(e, "Gagal memuat detail lot."));
@@ -301,10 +303,14 @@ const simpanKeputusan = async () => {
     if (!r.catatan.trim()) {
       return toast.error(`Hasil konfirmasi klien lot ${r.Lot} wajib diisi.`);
     }
+    if (!r.atasNama.trim()) {
+      return toast.error(`Atas nama yang menyetujui lot ${r.Lot} wajib diisi.`);
+    }
     payloadItems.push({
       nourut: r.Nourut,
       keputusan: r.keputusanBaru,
       catatan: r.catatan.trim(),
+      atas_nama: r.atasNama.trim(),
     });
   }
   if (payloadItems.length === 0) {
@@ -672,11 +678,10 @@ const submitPin = async () => {
                 <th width="90" class="tr">Qty</th>
                 <th>Warna</th>
                 <th width="50" class="text-center">Nilai</th>
-                <th width="50" class="text-center">Saran</th>
-                <th width="200">Alasan Nilai</th>
                 <th width="100" class="text-center">Saat Ini</th>
                 <th width="130">Keputusan Baru</th>
                 <th width="260">Hasil Konfirmasi Klien</th>
+                <th width="170">Atas Nama Penyetuju</th>
               </tr>
             </thead>
             <tbody>
@@ -689,8 +694,6 @@ const submitPin = async () => {
                     {{ r.Nilai || "-" }}
                   </span>
                 </td>
-                <td class="text-center">{{ r.Saran || "-" }}</td>
-                <td>{{ r.AlasanNilai || "-" }}</td>
                 <td class="text-center font-weight-bold">
                   {{ r.Keputusan || "-" }}
                 </td>
@@ -718,12 +721,29 @@ const submitPin = async () => {
                     :placeholder="lotBerubah(r) ? 'Wajib diisi' : ''"
                   />
                 </td>
+                <td>
+                  <input
+                    v-if="!lotTerkunci(r)"
+                    v-model="r.atasNama"
+                    type="text"
+                    maxlength="100"
+                    class="f-date"
+                    style="width: 100%"
+                    :disabled="!lotBerubah(r)"
+                    :placeholder="lotBerubah(r) ? 'Wajib diisi' : ''"
+                  />
+                  <span v-else class="qc-dlg-note">
+                    {{ r.KeputusanAtasNama || "-" }}
+                  </span>
+                </td>
               </tr>
             </tbody>
           </table>
           <p class="qc-dlg-note mt-2 mb-0">
-            Hanya lot yang keputusannya berubah yang disimpan. Lot LANJUT/REJECT
-            hanya bisa diubah setelah pengajuan perubahan keputusan di-ACC.
+            Hanya lot yang keputusannya berubah yang disimpan, dan hasil
+            konfirmasi klien serta atas nama penyetuju wajib diisi. Lot
+            LANJUT/REJECT hanya bisa diubah setelah pengajuan perubahan
+            keputusan di-ACC.
           </p>
         </template>
       </v-card-text>

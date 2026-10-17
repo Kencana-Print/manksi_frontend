@@ -20,6 +20,10 @@ export const qcBahanService = {
   getDetail: (nomor: string) =>
     api.get(`/garmen/bahan-baku/qc-bahan/detail/${encodeURIComponent(nomor)}`),
 
+  // Semua lot pada rentang tanggal (Export Detail)
+  getAllDetail: (params: QcBahanBrowseParams) =>
+    api.get("/garmen/bahan-baku/qc-bahan/all-detail", { params }),
+
   // Hapus data (hanya DRAFT, dicek di backend)
   delete: (nomor: string) =>
     api.delete(

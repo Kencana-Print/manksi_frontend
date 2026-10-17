@@ -62,6 +62,28 @@ interface BpbRowRef {
   kode: string;
   roll: number | string;
   lot?: string;
+  jumlah?: number | string;
+  kodepo?: string;
+}
+interface KodeBaruQc {
+  kode: string;
+  kodePo: string;
+  nama: string;
+  satuan: string;
+  satuanpo: string;
+  harga: number;
+  totalpo: number;
+  terima: number;
+  kurang: number;
+  gramasi: string;
+  setting: string;
+  warna: string;
+  spk?: string;
+  namaspk?: string;
+  sudahAda: boolean;
+  qty: number;
+  roll: number;
+  lots: { qc: string; lot: string; qty: number; roll: number }[];
 }
 
 // ⚠️ Panel Supplier disembunyikan (bukan dihapus dari formData) kalau
@@ -87,6 +109,8 @@ const activeMkbGridIndex = ref(-1);
 const showMkbDetailModal = ref(false);
 const selectedMkbNomor = ref("");
 const showQcModal = ref(false);
+const kodeBaruQc = ref<KodeBaruQc[]>([]);
+const kodeDisetujui = ref(false);
 
 const showBarcodeDialog = ref(false);
 const printMode = ref({
@@ -177,6 +201,8 @@ const {
       barcodes: data.barcodes,
       statusNgedit: data.statusNgedit,
       qcNomor: isQc.value && !isEditMode.value ? data.qcNomor : undefined,
+      kodeDisetujui:
+        isQc.value && !isEditMode.value ? kodeDisetujui.value : undefined,
     });
   },
   onSuccess: (res: any) => {
@@ -279,18 +305,66 @@ const setQc = async (daftarQc: string[]) => {
       "qc",
       daftarQc.join(","),
     );
-    const { header, poDetails, items, qcNomor } = res.data.data;
+    const { header, poDetails, items, qcNomor, kodeBaru } = res.data.data;
     formData.value.header.bpb_po_nomor = header.po_nomor;
     terapkanDataPo(header, poDetails, items);
     formData.value.qcNomor = qcNomor;
     formData.value.barcodes = [];
+    kodeBaruQc.value = (kodeBaru || []) as KodeBaruQc[];
+    kodeDisetujui.value = false;
     toast.success(
       `Berhasil menarik data PO dari ${qcNomor.length} dokumen QC.`,
     );
+    if (kodeBaruQc.value.length > 0) {
+      toast.warning(
+        `${kodeBaruQc.value.length} kode bahan baru perlu disetujui sebelum simpan.`,
+        { timeout: 8000 },
+      );
+    }
   } catch (e) {
     const err = e as { response?: { data?: { message?: string } } };
-    toast.error(err.response?.data?.message || "Gagal menarik data QC Bahan.");
+    const pesan = err.response?.data?.message || "Gagal menarik data QC Bahan.";
+    toast.error(pesan.split("\n").join(" • "), { timeout: 12000 });
   }
+};
+
+const barisKodeBaru = (k: KodeBaruQc) => ({
+  kode: k.kode,
+  nama: k.nama,
+  satuan: k.satuan,
+  satuanpo: k.satuanpo,
+  jumlahyard: 0,
+  jumlahmeter: 0,
+  jumlah: 0,
+  roll: 0,
+  harga: k.harga,
+  totalpo: k.totalpo,
+  terima: k.terima,
+  kurang: k.kurang,
+  gramasi: k.gramasi,
+  warna: k.warna,
+  setting: k.setting,
+  spk: k.spk ?? "",
+  namaspk: k.namaspk ?? "",
+  mkb: "",
+  kodepo: k.kodePo,
+});
+
+// Gudang menyetujui: baris kode baru muncul di Tabel 1, tepat di bawah baris kode PO-nya
+const setujuiKodeBaru = () => {
+  if (kodeDisetujui.value || kodeBaruQc.value.length === 0) return;
+  for (const k of kodeBaruQc.value) {
+    let posisi = -1;
+    formData.value.items.forEach((r: BpbRowRef, i: number) => {
+      if ((r.kodepo || r.kode) === k.kodePo) posisi = i;
+    });
+    const sisip = posisi >= 0 ? posisi + 1 : formData.value.items.length;
+    formData.value.items.splice(sisip, 0, barisKodeBaru(k));
+  }
+  kodeDisetujui.value = true;
+  toast.success(
+    "Kode bahan baru disetujui. Isi jumlah dan roll pada baris kode baru.",
+  );
 };
 
 const sumberQcText = computed(() => {
@@ -413,43 +487,60 @@ const onJumlahMeterChange = (idx: number) => {
   onJumlahChange(idx);
 };
 
+// Jumlah semua baris (kode PO + kode baru) yang berinduk ke satu kode PO
+const jumlahPerInduk = (kodeInduk: string): number =>
+  Math.round(
+    formData.value.items
+      .filter((r: BpbRowRef) => (r.kodepo || r.kode) === kodeInduk)
+      .reduce((s: number, r: BpbRowRef) => s + (Number(r.jumlah) || 0), 0) *
+      100,
+  ) / 100;
+
 const onJumlahChange = (idx: number) => {
   const row = formData.value.items[idx];
-  // ⬅ FIX: dulu row.jumlahmeter = row.jumlah SELALU dieksekusi tanpa
-  // cek satuan — utk bahan KG, ini bikin nilai KG yg diketik user
-  // langsung "nyasar" ke kolom Jml METER (kelihatan seperti konversi
-  // padahal cuma salah tempel field). Sekarang cuma sinkron balik ke
-  // Meter kalau memang bahan bersatuan METER.
   if (isMeterBased(row)) {
     row.jumlahmeter = row.jumlah;
   }
   if (isPo.value) {
+    const kodeInduk: string = row.kodepo || row.kode;
     const matches = formData.value.poItems.filter(
-      (p: any) => p.kode === row.kode,
+      (p: { kode: string }) => p.kode === kodeInduk,
     );
     if (matches.length === 1) {
-      matches[0].terima = row.jumlah;
+      matches[0].terima = jumlahPerInduk(kodeInduk);
     } else if (matches.length > 1) {
       toast.info(
-        `Kode ${row.kode} punya ${matches.length} baris SPK di Realisasi PO — isi manual per baris di sana.`,
+        `Kode ${kodeInduk} punya ${matches.length} baris SPK di Realisasi PO — isi manual per baris di sana.`,
       );
     }
   }
 };
-// Sinkron Grid 2 (Realisasi PO per-SPK) → Grid 1 (Rekap per Kode Bahan).
-// Grid 1 itu agregat lintas SPK, jadi jumlah-nya harus dihitung ulang
-// dari total SEMUA baris Grid 2 yang kodenya sama, bukan 1:1 per baris.
+
+// Grid 2 (per-SPK) → Grid 1. Baris kode PO mengambil sisanya setelah
+// dikurangi jumlah baris kode baru yang berinduk ke kode yang sama.
 const onPoTerimaChange = (idx: number) => {
   const po = formData.value.poItems[idx];
-  const kode = po.kode;
+  const kode: string = po.kode;
 
   const totalTerima = formData.value.poItems
-    .filter((p: any) => p.kode === kode)
-    .reduce((s: number, p: any) => s + (Number(p.terima) || 0), 0);
+    .filter((p: { kode: string }) => p.kode === kode)
+    .reduce(
+      (s: number, p: { terima?: number | string }) =>
+        s + (Number(p.terima) || 0),
+      0,
+    );
 
-  const itemRow = formData.value.items.find((r: any) => r.kode === kode);
+  const itemRow = formData.value.items.find(
+    (r: BpbRowRef) => r.kode === kode && !r.kodepo,
+  );
   if (itemRow) {
-    itemRow.jumlah = totalTerima;
+    const jumlahBaru = formData.value.items
+      .filter((r: BpbRowRef) => r.kodepo === kode)
+      .reduce((s: number, r: BpbRowRef) => s + (Number(r.jumlah) || 0), 0);
+    itemRow.jumlah = Math.max(
+      0,
+      Math.round((totalTerima - jumlahBaru) * 100) / 100,
+    );
   }
 };
 const onRollChange = async (idx: number) => {
@@ -637,10 +728,32 @@ const validateSave = () => {
     return toast.warning("Pilih dokumen QC Bahan terlebih dahulu.");
   }
 
+  if (
+    isQc.value &&
+    !isEditMode.value &&
+    kodeBaruQc.value.length > 0 &&
+    !kodeDisetujui.value
+  ) {
+    return toast.warning(
+      "Kode bahan baru dari hasil QC belum disetujui. Klik Setujui pada panel Kode Bahan Baru.",
+    );
+  }
+
   // 5. Validasi Baris Detail (Grid 1)
   let validJumlah = false;
   for (const [i, r] of formData.value.items.entries()) {
     if (!r.kode) continue;
+
+    if (
+      isQc.value &&
+      !isEditMode.value &&
+      r.kodepo &&
+      !(Number(r.jumlah) > 0)
+    ) {
+      return toast.warning(
+        `Baris ${i + 1}: kode bahan baru ${r.kode} harus diisi jumlahnya.`,
+      );
+    }
 
     if (Number(r.jumlah) > 0) validJumlah = true;
 
@@ -813,6 +926,36 @@ const printBarcodeAll = (): boolean => {
             style="flex: 1"
             readonly
           />
+        </div>
+        <!-- Kode bahan baru hasil QC (khusus BPB dari QC) -->
+        <div v-if="isQc && !isEditMode && kodeBaruQc.length > 0" class="kb-box">
+          <div class="kb-title">
+            Kode Bahan Baru dari Hasil QC ({{ kodeBaruQc.length }})
+          </div>
+          <div v-for="k in kodeBaruQc" :key="k.kode" class="kb-item">
+            <div class="kb-kode">
+              {{ k.kodePo }} → {{ k.kode }}
+              <span class="kb-tag" :class="k.sudahAda ? 'ada' : 'baru'">
+                {{ k.sudahAda ? "SUDAH ADA" : "BARU" }}
+              </span>
+            </div>
+            <div class="kb-nama">{{ k.nama }}</div>
+            <div class="kb-lot">
+              Lot: {{ k.lots.map((l) => l.lot).join(", ") }} · {{ k.qty }} kg ·
+              {{ k.roll }} roll
+            </div>
+          </div>
+          <button
+            v-if="!kodeDisetujui"
+            type="button"
+            class="kb-btn"
+            @click="setujuiKodeBaru"
+          >
+            Setujui Kode Bahan Baru
+          </button>
+          <div v-else class="kb-ok">
+            Disetujui. Baris kode baru ada di Tabel 1.
+          </div>
         </div>
 
         <!-- Nomor PO -->
@@ -1014,7 +1157,13 @@ const printBarcodeAll = (): boolean => {
                 </td>
                 <td class="p0">
                   <div class="cell-grp">
-                    <input v-model="item.kode" class="ci" readonly />
+                    <input
+                      v-model="item.kode"
+                      class="ci"
+                      :class="{ 'kode-baru': !!item.kodepo }"
+                      :title="item.kodepo ? `Kode PO: ${item.kodepo}` : ''"
+                      readonly
+                    />
                     <button
                       v-if="!isPo"
                       type="button"
@@ -1858,5 +2007,67 @@ input.bg-red {
 
 .ci.bg-yellow-light {
   background: #fffde7 !important;
+}
+
+.kb-box {
+  border: 1px solid #f9a825;
+  background: #fffde7;
+  border-radius: 4px;
+  padding: 6px 8px;
+  margin: 6px 0;
+  font-size: 11px;
+}
+.kb-title {
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+.kb-item {
+  border-top: 1px dashed #e0c36a;
+  padding: 4px 0;
+}
+.kb-kode {
+  font-weight: 700;
+}
+.kb-nama {
+  color: #424242;
+}
+.kb-lot {
+  color: #757575;
+}
+.kb-tag {
+  font-size: 9px;
+  padding: 0 4px;
+  border-radius: 2px;
+  margin-left: 4px;
+  color: #fff;
+}
+.kb-tag.baru {
+  background: #2e7d32;
+}
+.kb-tag.ada {
+  background: #1976d2;
+}
+.kb-btn {
+  width: 100%;
+  margin-top: 6px;
+  padding: 5px 8px;
+  background: #2e7d32;
+  color: #fff;
+  border: none;
+  border-radius: 3px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.kb-btn:hover {
+  background: #1b5e20;
+}
+.kb-ok {
+  margin-top: 6px;
+  color: #2e7d32;
+  font-weight: 700;
+}
+.ci.kode-baru {
+  background: #fff3cd;
+  font-weight: 700;
 }
 </style>
