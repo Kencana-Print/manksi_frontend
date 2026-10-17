@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, nextTick, watch } from "vue";
+import { ref, computed, onMounted, onBeforeUnmount } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
 import { useAuthStore } from "@/stores/authStore";
@@ -31,23 +31,32 @@ interface DetailRow {
   awal: number;
   akhir: number;
   jumlah: number;
+  good: number;
+  bsA: number;
+  bsB: number;
+  bsC: number;
   cetak: boolean;
   packing: string;
   sudahCetak?: number;
 }
 
-// ⚠️ ASUMSI: bentuk 1 unit fisik yang dikembalikan backend di
-// res.data.data.units setelah save — sesuai cetakBarcodeKaosanFormService.saveData()
+type Grade = "" | "A" | "B" | "C";
+
+// Satu unit fisik dari backend (res.data.data.units / hasil preview)
 interface PrintUnit {
   bcdNourut: number;
-  kode: string; // SPK nomor
-  kodek: string; // kode barang kaosan
+  kode: string; // nomor SPK
+  kodek: string;
   ukuran: string;
   nama: string;
   harga: number;
   tglspk: string;
-  unit_serial: string; // konten yang di-encode ke QR
-  posisi: number; // "No Urut" dalam range awal..akhir baris itu
+  grade: Grade;
+  kodeBarang: string; // barcode Good / kode BS
+  unit_serial: string; // isi QR (sementara = kodeBarang)
+  urut: number; // nomor urut di label
+  posisi: number;
+  isConflict?: boolean;
 }
 
 interface QtyMismatchItem {
@@ -74,6 +83,8 @@ const todayLocal = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
 const num = (v: any) => Number(v || 0).toLocaleString("id-ID");
+const BS_KOSONG = { good: 0, bsA: 0, bsB: 0, bsC: 0 };
+const BS_FIELDS = ["good", "bsA", "bsB", "bsC"] as const;
 
 // [ASUMSI] daftar cabang sama seperti dropdown filter cabang di modul
 // lain (PermintaanPembelianView dkk) — kalau daftar aslinya beda,
@@ -84,6 +95,7 @@ interface CetakBarcodeKaosanFormState {
   nomor: string;
   tanggal: string;
   cab: string;
+  bs: boolean;
   detail: DetailRow[];
 }
 
@@ -91,6 +103,7 @@ const emptyData: CetakBarcodeKaosanFormState = {
   nomor: "",
   tanggal: todayLocal(),
   cab: "",
+  bs: false,
   detail: [],
 };
 
@@ -117,7 +130,6 @@ const {
     showBarcodePickDialog.value = false;
     barcodePickResults.value = [];
     selectedPrinter.value = "XP360B";
-    cetakHarga.value = false;
     isPrintPreviewVisible.value = false;
     printPreviewData.value = [];
     isPreviewMode.value = false;
@@ -134,6 +146,7 @@ const {
       nomor: d.header.nomor,
       tanggal: d.header.tanggal,
       cab: d.header.cab,
+      bs: Boolean(d.header.bs),
       detail: d.detail.map((r: Omit<DetailRow, "_key">) => ({
         ...r,
         _key: newKey(),
@@ -146,6 +159,7 @@ const {
       nomor: payload.nomor,
       tanggal: payload.tanggal,
       cab: payload.cab,
+      bs: payload.bs,
       detail: (payload.detail as DetailRow[]).map(({ _key, ...rest }) => rest),
     };
     return svc.save(clean);
@@ -165,6 +179,10 @@ const {
 const cabFixed = computed(() => !!authStore.user?.cabang);
 
 onMounted(async () => {
+  labelStyleEl = document.createElement("style");
+  labelStyleEl.textContent = LABEL_CSS;
+  document.head.appendChild(labelStyleEl);
+
   if (isEdit.value) {
     // fetchData otomatis dijalankan oleh useForm
   } else {
@@ -198,6 +216,10 @@ const addSpkToGrid = async (spkNomor: string, replaceKey?: number | null) => {
     const result = res.data.data;
     if (!result.exists) {
       toast.error(result.error || "Spk tsb tidak ada.");
+      return;
+    }
+    if (formData.value.bs && Number(result.spkDivisi) !== 3) {
+      toast.error("Barang BS hanya untuk SPK Kaosan (divisi 3).");
       return;
     }
     if (!result.items?.length) {
@@ -240,6 +262,7 @@ const addSpkToGrid = async (spkNomor: string, replaceKey?: number | null) => {
         jumlah: 0,
         cetak: it.cetak,
         packing: "",
+        ...BS_KOSONG,
       };
 
       if (!firstUsed && replaceKey != null) {
@@ -275,6 +298,10 @@ const showKaosanModal = ref(false);
 const activeKaosanRowKey = ref<number | null>(null);
 
 const openKaosanModal = (rowKey?: number) => {
+  if (formData.value.bs) {
+    toast.warning("Barang BS hanya bisa dipilih dari SPK (F1).");
+    return;
+  }
   activeKaosanRowKey.value = rowKey ?? null;
   showKaosanModal.value = true;
 };
@@ -335,6 +362,7 @@ const onKaosanItemsSelected = async (selectedItems: any[]) => {
       jumlah: 0,
       cetak: !!it.Barcode,
       packing: "",
+      ...BS_KOSONG,
     };
 
     if (!firstUsed && replaceKey != null) {
@@ -369,6 +397,11 @@ const addKodeKaosanToGrid = async (
   kode: string,
   replaceKey?: number | null,
 ) => {
+  if (formData.value.bs) {
+    toast.warning("Barang BS hanya bisa dipilih dari SPK (F1).");
+    return;
+  }
+
   try {
     const res = await svc.lookupKodeKaosan(kode);
     const items = res.data.data.items || [];
@@ -409,6 +442,7 @@ const addKodeKaosanToGrid = async (
         jumlah: 0,
         cetak: it.cetak,
         packing: "",
+        ...BS_KOSONG,
       };
       if (!firstUsed && replaceKey != null) {
         const idx = formData.value.detail.findIndex(
@@ -446,6 +480,10 @@ const showQtyMismatchDialog = ref(false);
 const qtyMismatchDetails = ref<QtyMismatchItem[]>([]);
 
 const onScanBarcodeEnter = async () => {
+  if (formData.value.bs) {
+    toast.warning("Barang BS hanya bisa dipilih dari SPK (F1).");
+    return;
+  }
   const val = scanBarcodeValue.value.trim();
   if (!val) return;
   try {
@@ -494,6 +532,7 @@ const ensureEmptyRow = () => {
       jumlah: 0,
       cetak: false,
       packing: "",
+      ...BS_KOSONG,
     });
   }
 };
@@ -538,6 +577,24 @@ const onToggleCetak = (row: DetailRow) => {
   }
 };
 
+const hasFilledRows = computed(() =>
+  formData.value.detail.some((r) => !!r.nama),
+);
+
+// Mode BS: Jumlah = Good + A + B + C, Akhir = Awal + Jumlah - 1 (urutan Good → A → B → C)
+const onBsChange = (row: DetailRow) => {
+  if (!row.nama) return;
+  for (const f of BS_FIELDS) {
+    row[f] = Math.max(0, Math.floor(Number(row[f]) || 0));
+  }
+  row.jumlah = row.good + row.bsA + row.bsB + row.bsC;
+  row.akhir = row.jumlah > 0 && row.awal > 0 ? row.awal + row.jumlah - 1 : 0;
+  if (row.cetak) row.packing = row.akhir > 0 ? `${row.awal}-${row.akhir}` : "";
+};
+
+const onRangeChange = (row: DetailRow) =>
+  formData.value.bs ? onBsChange(row) : onAwalAkhirChange(row);
+
 // ─── Validasi & Save (replika F10 Delphi) ───────────────────
 const validateSave = () => {
   const validRows = formData.value.detail.filter((d) => d.nama.trim() !== "");
@@ -547,6 +604,11 @@ const validateSave = () => {
   }
   for (const d of validRows) {
     if (d.cetak) {
+      if (formData.value.bs && d.awal && d.jumlah <= 0) {
+        toast.warning(`Isi jumlah Good/BS untuk "${d.nama}" (${d.ukuran}).`);
+        return;
+      }
+
       if (!d.awal || !d.akhir) {
         toast.warning("Awal atau Akhir harus diisi.");
         return;
@@ -591,54 +653,152 @@ const confirmQtyMismatchAndSave = () => {
 
 // ─── Printer & Print Preview (client-side) ──────────────────
 type PrinterType = "XP360B" | "POSTEK";
+
+interface PrintLabel {
+  _k: number;
+  nama: string;
+  namaPt: number;
+  kodeBarang: string;
+  tgl: string;
+  ukuran: string;
+  spk: string;
+  urut: number;
+  grade: Grade;
+  qrSvg: string;
+  isConflict: boolean;
+}
+
 const selectedPrinter = ref<PrinterType>("XP360B");
-const cetakHarga = ref(false);
 const isPrintPreviewVisible = ref(false);
-const printPreviewData = ref<any[]>([]);
-// BARU: true kalau dialog sedang menampilkan preview (belum simpan),
-// dipakai supaya closePreview tidak pindah tab/browse seperti pas
-// print sungguhan setelah save
+const printPreviewData = ref<PrintLabel[]>([]);
+// true = dialog menampilkan preview (belum simpan) → closePreview tidak pindah tab
 const isPreviewMode = ref(false);
 
-const fr = (v: number) =>
-  Number(v || 0).toLocaleString("id-ID", { maximumFractionDigits: 0 });
+let labelStyleEl: HTMLStyleElement | null = null;
+onBeforeUnmount(() => {
+  labelStyleEl?.remove();
+  labelStyleEl = null;
+});
+
+// CSS label — SATU sumber untuk preview layar dan iframe cetak.
+// Label 33 x 13 mm di dalam halaman setinggi 15 mm (batas aman 1 mm atas/bawah).
+// QR 10.5 mm = 21 modul x 4 dot (203 dpi) → tajam selama isi QR masih versi 1.
+// Postek: halaman 108 mm, sel 34 mm, gap 2 mm (3-up).
+// XP-360B: halaman 68 mm, sel 31 mm, gap 3 mm (2-up), label diskalakan 0.94
+// (BELUM diukur — sesuaikan --cw/--gap/--scale setelah ada ukuran gulungan).
+const LABEL_CSS = `
+.bck-sheet { --pw: 108mm; --ph: 15mm; --padx: 1mm; --gap: 2mm; --cw: 34mm; --scale: 1; }
+.bck-sheet.printer-xp360b { --pw: 68mm; --ph: 15mm; --padx: 1mm; --gap: 3mm; --cw: 31mm; --scale: 0.94; }
+.bck-sheet .bck-row { display:flex; width:var(--pw); height:var(--ph); align-items:center; gap:var(--gap); padding:0 var(--padx); box-sizing:border-box; }
+.bck-sheet .bck-cellwrap { flex:none; width:var(--cw); height:var(--ph); display:flex; align-items:center; justify-content:center; overflow:hidden; }
+.bck-sheet .bck-label { flex:none; width:33mm; height:13mm; box-sizing:border-box; padding:0 0.5mm; overflow:hidden; display:grid; grid-template-columns:11.5mm 1fr; align-items:center; transform:scale(var(--scale)); transform-origin:center center; background:#fff; color:#000; }
+.bck-sheet .bck-qr { width:10.5mm; height:10.5mm; justify-self:center; }
+.bck-sheet .bck-qr svg { display:block; width:100%; height:100%; }
+.bck-sheet .bck-info { display:flex; flex-direction:column; min-width:0; overflow:hidden; }
+.bck-sheet .bck-nama { height:3.8mm; overflow:hidden; font:bold 5pt/1.9mm Arial,Helvetica,sans-serif; display:-webkit-box; -webkit-line-clamp:2; line-clamp:2; -webkit-box-orient:vertical; word-break:break-word; }
+.bck-sheet .bck-kodeline { display:flex; align-items:center; justify-content:space-between; height:2.2mm; }
+.bck-sheet .bck-badge { flex:none; height:2.2mm; padding:0 1mm; background:#000; color:#fff; border-radius:0.4mm; font:bold 5.5pt/2.2mm Arial,sans-serif; letter-spacing:0.1mm; -webkit-text-stroke:0.1mm #fff; white-space:nowrap; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+.bck-sheet .bck-sep { border-top:0.2mm solid #000; margin:0.3mm 0; }
+.bck-sheet .bck-line { font:4.6pt/2mm Arial,sans-serif; white-space:nowrap; overflow:hidden; }
+.bck-sheet .bck-kode { font-weight:bold; }
+.bck-sheet .bck-size { margin-left:1.5mm; font-weight:bold; font-size:6pt; }
+`;
+
+const PAGE_CSS: Record<PrinterType, string> = {
+  XP360B: `
+@page { size: 68mm 15mm landscape; margin: 0 !important; }
+html, body { margin:0; padding:0; width:68mm; background:#fff; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+.bck-row { page-break-after: always !important; }
+`,
+  POSTEK: `
+@page { size: 108mm 15mm landscape; margin: 0 !important; }
+html, body { margin:0; padding:0; width:108mm; background:#fff; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+.bck-row:not(:last-child) { page-break-after: always !important; }
+`,
+};
+
+const fmtTgl = (iso: string) => {
+  const [y, m, d] = (iso || "").split("-");
+  return y && m && d ? `${d}/${m}/${y.slice(2)}` : "";
+};
 
 const chunkedPreviewData = computed(() => {
   const chunkSize = selectedPrinter.value === "POSTEK" ? 3 : 2;
-  const result = [];
+  const result: PrintLabel[][] = [];
   for (let i = 0; i < printPreviewData.value.length; i += chunkSize) {
     result.push(printPreviewData.value.slice(i, i + chunkSize));
   }
   return result;
 });
 
-// BARU: sumber data print sekarang array unit fisik (unit_serial per
-// pcs) dari backend, bukan lagi dihitung ulang dari awal..akhir di
-// frontend. qrValue = konten yang di-encode ke QR (unit_serial),
-// nourut = posisi dalam range (tampilan "No Urut" di label).
-const buildPrintData = (units: PrintUnit[], nomorDok: string) => {
-  return units.map((u: any) => {
-    const hargaFormatted =
-      cetakHarga.value && Number(u.harga) > 0 ? `Rp ${fr(u.harga)}` : "";
-    return {
-      nomor: nomorDok,
-      tgl: u.tglspk ? u.tglspk.split("-").reverse().join("/") : "",
-      kode: u.kodek,
-      spk: u.kode,
-      ukuran: u.ukuran,
-      qrValue: u.unit_serial,
-      nama: u.nama,
-      harga: u.harga,
-      charga: hargaFormatted,
-      nourut: u.posisi,
-      isConflict: !!u.isConflict,
-    };
-  });
+const adaKodeBaru = computed(() =>
+  printPreviewData.value.some((l) => l.kodeBarang.includes("(BARU)")),
+);
+
+// QR sebagai SVG (vektor) → tajam di thermal; tanggal label = tanggal dokumen
+const buatQrSvg = (isi: string) =>
+  QRCode.toString(isi, { type: "svg", margin: 0, errorCorrectionLevel: "M" });
+
+const NAMA_LEBAR_MM = 20.3;
+const NAMA_PT_MAX = 5;
+const NAMA_PT_MIN = 3.5;
+const PT_KE_MM = 25.4 / 72;
+let ctxUkur: CanvasRenderingContext2D | null = null;
+
+// Font nama terbesar (5pt → 3.5pt) yang masih muat 2 baris di kolom info
+const hitungNamaPt = (nama: string): number => {
+  if (!ctxUkur) ctxUkur = document.createElement("canvas").getContext("2d");
+  const ctx = ctxUkur;
+  if (!ctx) return NAMA_PT_MAX;
+  ctx.font = "bold 100px Arial, Helvetica, sans-serif";
+  const lebarKata = nama
+    .trim()
+    .split(/\s+/)
+    .map((k) => ctx.measureText(k).width / 100); // satuan em
+  const lebarSpasi = ctx.measureText(" ").width / 100;
+
+  for (let pt = NAMA_PT_MAX; pt >= NAMA_PT_MIN; pt -= 0.1) {
+    const maxEm = NAMA_LEBAR_MM / (pt * PT_KE_MM);
+    if (lebarKata.some((w) => w > maxEm)) continue;
+    let baris = 1;
+    let terpakai = 0;
+    for (const w of lebarKata) {
+      if (terpakai === 0) terpakai = w;
+      else if (terpakai + lebarSpasi + w <= maxEm) terpakai += lebarSpasi + w;
+      else {
+        baris++;
+        terpakai = w;
+      }
+    }
+    if (baris <= 2) return Math.round(pt * 10) / 10;
+  }
+  return NAMA_PT_MIN;
 };
 
-const triggerPrintFromGrid = (units: PrintUnit[] = []) => {
+const buildPrintData = async (units: PrintUnit[]): Promise<PrintLabel[]> => {
+  const tgl = fmtTgl(formData.value.tanggal);
+  return Promise.all(
+    units.map(
+      async (u, i): Promise<PrintLabel> => ({
+        _k: i,
+        nama: u.nama,
+        namaPt: hitungNamaPt(u.nama),
+        kodeBarang: u.kodeBarang,
+        tgl,
+        ukuran: u.ukuran,
+        spk: u.kode,
+        urut: u.urut,
+        grade: u.grade,
+        qrSvg: await buatQrSvg(u.unit_serial),
+        isConflict: !!u.isConflict,
+      }),
+    ),
+  );
+};
+
+const triggerPrintFromGrid = async (units: PrintUnit[] = []) => {
   isPreviewMode.value = false;
-  const data = buildPrintData(units, formData.value.nomor);
+  const data = await buildPrintData(units);
   if (!data.length) {
     // Tidak ada yang perlu dicetak -> langsung balik ke browse
     const currentPath = route.path; // snapshot SEBELUM push
@@ -654,9 +814,7 @@ const triggerPrintFromGrid = (units: PrintUnit[] = []) => {
   isPrintPreviewVisible.value = true;
 };
 
-// BARU: Preview Cetak — panggil endpoint read-only (tidak insert
-// apapun), bisa dipakai kapan saja termasuk saat sedang edit, tanpa
-// perlu simpan dulu
+// Preview Cetak — endpoint read-only, boleh kapan saja tanpa simpan
 const previewPrintClick = async () => {
   const validRows = formData.value.detail.filter(
     (d) => d.nama.trim() !== "" && d.cetak,
@@ -677,130 +835,56 @@ const previewPrintClick = async () => {
   }
 
   try {
-    const payload = {
+    const res = await svc.previewPrint({
       nomor: formData.value.nomor || "",
+      tanggal: formData.value.tanggal,
+      bs: formData.value.bs,
       detail: formData.value.detail.map(({ _key, ...rest }) => rest),
-    };
-    const res = await svc.previewPrint(payload);
-    const units = res.data.data || [];
+    });
+    const units: PrintUnit[] = res.data.data || [];
     if (!units.length) {
       toast.warning("Tidak ada unit yang bisa dipreview.");
       return;
     }
-    const hasConflict = units.some((u: any) => u.isConflict);
-    if (hasConflict) {
+    if (units.some((u) => u.isConflict)) {
       toast.warning(
-        "Beberapa nomor urut sudah pernah dicetak sebelumnya — cek ulang sebelum simpan.",
+        "Beberapa nomor urut sudah dipakai di dokumen lain — cek ulang sebelum simpan.",
       );
     }
     isPreviewMode.value = true;
-    printPreviewData.value = buildPrintData(
-      units,
-      formData.value.nomor || "PREVIEW",
-    );
+    printPreviewData.value = await buildPrintData(units);
     isPrintPreviewVisible.value = true;
-  } catch (e: any) {
-    toast.error(e.response?.data?.message || "Gagal memuat preview cetak.");
+  } catch (e) {
+    const err = e as { response?: { data?: { message?: string } } };
+    toast.error(err.response?.data?.message || "Gagal memuat preview cetak.");
   }
 };
 
-// BARU: dummy QR untuk tes printer (dulu dummy CODE128)
-const testPrinter = () => {
+// Tes printer: label contoh (baris kedua memakai badge RJ A)
+const testPrinter = async () => {
   isPreviewMode.value = false;
   const jumlahTes = selectedPrinter.value === "POSTEK" ? 3 : 2;
-  const dummy: any[] = [];
-  for (let i = 1; i <= jumlahTes; i++) {
-    dummy.push({
-      nomor: "TES",
-      tgl: todayLocal().split("-").reverse().join("/"),
-      kode: "TESKODE",
-      spk: "TES.SPK",
-      ukuran: "TES",
-      qrValue: `TES.SPK.TES.${i}`,
-      nama: "TES PRINTER",
-      harga: 0,
-      charga: "",
-      nourut: i,
-    });
-  }
-  printPreviewData.value = dummy;
+  const tgl = fmtTgl(todayLocal());
+  const qrSvg = await buatQrSvg("22023204");
+  printPreviewData.value = Array.from(
+    { length: jumlahTes },
+    (_, i): PrintLabel => ({
+      _k: i,
+      nama: "KO POLOS PANJANG COMBED 24 BENHUR",
+      namaPt: hitungNamaPt("KO POLOS PANJANG COMBED 24 BENHUR"),
+      kodeBarang: "22023204",
+      tgl,
+      ukuran: "L",
+      spk: "SPK-SM-KO-005325",
+      urut: 306 + i,
+      grade: i === 1 ? "A" : "",
+      qrSvg,
+      isConflict: false,
+    }),
+  );
   isPrintPreviewVisible.value = true;
 };
 
-// BARU: generate QR di preview layar (ganti generateBarcodesInPreview)
-const generateQrInPreview = async () => {
-  await nextTick();
-  const area = document.getElementById("bck-print-area");
-  if (!area) return;
-  const canvases = area.querySelectorAll<HTMLCanvasElement>(".bck-qr-canvas");
-  for (const canvas of Array.from(canvases)) {
-    const val = canvas.getAttribute("data-qr-value");
-    if (!val) continue;
-    try {
-      await QRCode.toCanvas(canvas, val, {
-        margin: 0,
-        width: 90,
-        errorCorrectionLevel: "M",
-      });
-    } catch (e: any) {
-      console.error(e);
-    }
-  }
-};
-
-watch([printPreviewData, isPrintPreviewVisible], () => {
-  if (isPrintPreviewVisible.value && printPreviewData.value.length) {
-    setTimeout(() => generateQrInPreview(), 100);
-  }
-});
-
-const printStylesXP360B = `
-  @page { size: 68mm 15mm landscape; margin: 0 !important; }
-  html, body { margin:0; padding:0; width:68mm; background:#fff; -webkit-print-color-adjust: exact; }
-  .bck-row { display:flex; width:68mm; height:15mm; align-items:center; gap:3mm; padding:0 1mm; box-sizing:border-box; page-break-after: always !important; }
-  .bck-label { width:31mm; height:14mm; box-sizing:border-box; overflow:hidden;
-    display:grid;
-    grid-template-columns: 8mm 16mm 7mm;
-    grid-template-rows: 6mm 4mm 4mm;
-    grid-template-areas:
-      "nama nama nourut"
-      "qr   spk  ukuran"
-      "qr   tgl  ukuran";
-  }
-  .bck-cell { display:flex; align-items:center; justify-content:center; overflow:hidden; padding:0.15mm; box-sizing:border-box; text-align:center; line-height:1; }
-  .bck-c-nama { grid-area:nama; justify-content:flex-start; text-align:left; align-items:flex-start; padding-top:0.4mm; font-size:5.5pt; font-weight:bold; font-family:'Arial Narrow',Arial,sans-serif; line-height:1.05; word-break:break-word; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
-  .bck-c-ukuran { grid-area:ukuran; font-size:8pt; font-weight:bold; font-family:Arial,sans-serif; }
-  .bck-c-qr { grid-area:qr; }
-  .bck-qr-canvas { width:7mm !important; height:7mm !important; }
-  .bck-c-spk { grid-area:spk; font-size:3.8pt; font-weight:bold; font-family:Arial,sans-serif; padding:0; }
-  .bck-c-tgl { grid-area:tgl; font-size:3.5pt; font-family:Arial,sans-serif; color:#333; padding:0; }
-  .bck-c-nourut { grid-area:nourut; font-size:4.5pt; font-weight:bold; font-family:Arial,sans-serif; }
-`;
-const printStylesPostek = `
-  @page { size: 108mm 17mm landscape; margin: 0 !important; }
-  html, body { margin:0; padding:0; width:108mm; background:#fff; -webkit-print-color-adjust: exact; }
-  .bck-row { display:flex; width:108mm; height:17mm; align-items:center; gap:2mm; padding:0 1mm; box-sizing:border-box; }
-  .bck-row:not(:last-child) { page-break-after: always !important; }
-  .bck-label { width:34mm; height:16mm; box-sizing:border-box; overflow:hidden;
-    display:grid;
-    grid-template-columns: 9mm 17mm 8mm;
-    grid-template-rows: 6.5mm 4.75mm 4.75mm;
-    grid-template-areas:
-      "nama nama nourut"
-      "qr   spk  ukuran"
-      "qr   tgl  ukuran";
-  }
-  .bck-cell { display:flex; align-items:center; justify-content:center; overflow:hidden; padding:0.15mm; box-sizing:border-box; text-align:center; line-height:1; }
-  .bck-c-nama { grid-area:nama; justify-content:flex-start; text-align:left; align-items:flex-start; padding-top:0.4mm; font-size:6pt; font-weight:bold; font-family:'Arial Narrow',Arial,sans-serif; line-height:1.05; word-break:break-word; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
-  .bck-c-ukuran { grid-area:ukuran; font-size:9pt; font-weight:bold; font-family:Arial,sans-serif; }
-  .bck-c-qr { grid-area:qr; }
-  .bck-qr-canvas { width:8mm !important; height:8mm !important; }
-  .bck-c-spk { grid-area:spk; font-size:4pt; font-weight:bold; font-family:Arial,sans-serif; padding:0; }
-  .bck-c-tgl { grid-area:tgl; font-size:3.7pt; font-family:Arial,sans-serif; color:#333; padding:0; }
-  .bck-c-nourut { grid-area:nourut; font-size:4.8pt; font-weight:bold; font-family:Arial,sans-serif; }
-`;
-
-// BARU: regenerate QR di iframe cetak (ganti regenerate JsBarcode)
 const triggerBrowserPrint = () => {
   const content = document.getElementById("bck-print-area");
   if (!content) return;
@@ -814,40 +898,18 @@ const triggerBrowserPrint = () => {
 
   const doc = frame.contentWindow?.document;
   if (doc) {
+    const kelas =
+      selectedPrinter.value === "POSTEK" ? "printer-postek" : "printer-xp360b";
     doc.open();
-    const styles =
-      selectedPrinter.value === "POSTEK"
-        ? printStylesPostek
-        : printStylesXP360B;
     doc.write(
-      `<html><head><title>Cetak Barcode</title><style>${styles}</style></head><body>`,
+      `<html><head><title>Cetak Barcode</title><style>${LABEL_CSS}${PAGE_CSS[selectedPrinter.value]}</style></head><body><div class="bck-sheet ${kelas}">${content.innerHTML}</div></body></html>`,
     );
-    doc.write(content.innerHTML);
-    doc.write("</body></html>");
     doc.close();
-
-    const canvases = doc.querySelectorAll<HTMLCanvasElement>(".bck-qr-canvas");
-    const renderPromises: Promise<void>[] = [];
-    canvases.forEach((canvas) => {
-      const val = canvas.getAttribute("data-qr-value");
-      if (val) {
-        renderPromises.push(
-          QRCode.toCanvas(canvas, val, {
-            margin: 0,
-            width: 90,
-            errorCorrectionLevel: "M",
-          }).catch((e: any) => console.error(e)),
-        );
-      }
-    });
-
-    Promise.all(renderPromises).then(() => {
-      setTimeout(() => {
-        frame.contentWindow?.focus();
-        frame.contentWindow?.print();
-        setTimeout(() => document.body.removeChild(frame), 1500);
-      }, 200);
-    });
+    setTimeout(() => {
+      frame.contentWindow?.focus();
+      frame.contentWindow?.print();
+      setTimeout(() => document.body.removeChild(frame), 1500);
+    }, 300);
   }
   closePreview();
 };
@@ -921,6 +983,15 @@ const closePreview = () => {
           </select>
         </div>
 
+        <label class="chk mt-2">
+          <input
+            type="checkbox"
+            v-model="formData.bs"
+            :disabled="isEdit || hasFilledRows"
+          />
+          Barang BS (Good + RJ A/B/C)
+        </label>
+
         <div class="sep mt-2 mb-2" />
 
         <div class="fr">
@@ -928,6 +999,7 @@ const closePreview = () => {
         </div>
         <input
           v-model="scanBarcodeValue"
+          :disabled="formData.bs"
           class="inp w-100"
           placeholder="Scan / ketik barcode + Enter"
           @keydown.enter.prevent="onScanBarcodeEnter"
@@ -960,11 +1032,6 @@ const closePreview = () => {
             Xprinter XP-360B
           </label>
         </div>
-
-        <label class="chk mt-2">
-          <input type="checkbox" v-model="cetakHarga" />
-          Cetak Harga
-        </label>
       </div>
     </template>
 
@@ -1003,6 +1070,32 @@ const closePreview = () => {
                   >
                     Akhir
                   </th>
+                  <template v-if="formData.bs">
+                    <th
+                      style="width: 60px; background: #2e7d32"
+                      class="text-center"
+                    >
+                      Good
+                    </th>
+                    <th
+                      style="width: 60px; background: #212121"
+                      class="text-center"
+                    >
+                      RJ A
+                    </th>
+                    <th
+                      style="width: 60px; background: #212121"
+                      class="text-center"
+                    >
+                      RJ B
+                    </th>
+                    <th
+                      style="width: 60px; background: #212121"
+                      class="text-center"
+                    >
+                      RJ C
+                    </th>
+                  </template>
                   <th style="width: 60px" class="text-right">Jumlah</th>
                   <th style="width: 55px" class="text-center">Cetak</th>
                   <th style="width: 100px; background: #fff59d">
@@ -1047,8 +1140,8 @@ const closePreview = () => {
                       <input
                         v-model="row.kodek"
                         class="ci"
-                        :class="{ ro: !!row.nama }"
-                        :readonly="!!row.nama"
+                        :class="{ ro: !!row.nama || formData.bs }"
+                        :readonly="!!row.nama || formData.bs"
                         placeholder="F2"
                         @keydown.f2.prevent="openKaosanModal(row._key)"
                         @keydown.enter.prevent="
@@ -1089,7 +1182,7 @@ const closePreview = () => {
                       :class="{ ro: (row.sudahCetak || 0) > 0 }"
                       style="background: #fffde7"
                       :readonly="(row.sudahCetak || 0) > 0"
-                      @input="onAwalAkhirChange(row)"
+                      @input="onRangeChange(row)"
                       v-select-on-focus
                     />
                   </td>
@@ -1099,11 +1192,28 @@ const closePreview = () => {
                       type="number"
                       min="0"
                       class="ci text-right"
+                      :class="{ ro: formData.bs }"
+                      :readonly="formData.bs"
                       style="background: #fffde7"
                       @input="onAwalAkhirChange(row)"
                       v-select-on-focus
                     />
                   </td>
+                  <template v-if="formData.bs">
+                    <td v-for="f in BS_FIELDS" :key="f" class="p0">
+                      <input
+                        v-model.number="row[f]"
+                        type="number"
+                        min="0"
+                        step="1"
+                        class="ci text-right"
+                        :class="{ ro: (row.sudahCetak || 0) > 0 }"
+                        :readonly="(row.sudahCetak || 0) > 0"
+                        @input="onBsChange(row)"
+                        v-select-on-focus
+                      />
+                    </td>
+                  </template>
                   <td class="text-right font-weight-bold">
                     {{ num(row.jumlah) }}
                   </td>
@@ -1132,7 +1242,7 @@ const closePreview = () => {
                   </td>
                 </tr>
                 <tr v-if="!formData.detail.length">
-                  <td colspan="15" class="empty-row">
+                  <td :colspan="formData.bs ? 19 : 15" class="empty-row">
                     Scan barcode atau F1/F2 untuk menambah item
                   </td>
                 </tr>
@@ -1148,6 +1258,7 @@ const closePreview = () => {
   <SpkSearchModal
     v-model="showSpkModal"
     filter-mode="spk-ppic"
+    :divisi="formData.bs ? 3 : undefined"
     @selected="onSpkSelected"
   />
 
@@ -1197,12 +1308,13 @@ const closePreview = () => {
         <v-btn icon="mdi-close" size="small" @click="closePreview" />
       </v-toolbar>
       <div v-if="isPreviewMode" class="preview-banner">
-        Mode Preview — data belum disimpan, nomor/serial final baru terkunci
-        saat disimpan.
+        Mode Preview — kode BS sudah final dan sama dengan hasil Simpan; nomor
+        urut baru terkunci saat disimpan.
       </div>
       <v-card-text class="pa-4" style="background: #525659">
         <div
           id="bck-print-area"
+          class="bck-sheet"
           :class="
             selectedPrinter === 'POSTEK' ? 'printer-postek' : 'printer-xp360b'
           "
@@ -1212,26 +1324,35 @@ const closePreview = () => {
             :key="i"
             class="bck-row bck-preview"
           >
-            <div
-              v-for="item in chunk"
-              :key="item.nourut"
-              class="bck-label bck-preview-label"
-              :class="{ 'bck-conflict': item.isConflict }"
-            >
-              <div class="bck-cell bck-c-nama">{{ item.nama }}</div>
-              <div class="bck-cell bck-c-ukuran">{{ item.ukuran }}</div>
-              <div class="bck-cell bck-c-qr">
-                <canvas
-                  class="bck-qr-canvas"
-                  :data-qr-value="item.qrValue"
-                ></canvas>
+            <div v-for="item in chunk" :key="item._k" class="bck-cellwrap">
+              <div
+                class="bck-label bck-preview-label"
+                :class="{ 'bck-conflict': item.isConflict }"
+              >
+                <!-- eslint-disable-next-line vue/no-v-html -->
+                <div class="bck-qr" v-html="item.qrSvg"></div>
+                <div class="bck-info">
+                  <div
+                    class="bck-nama"
+                    :style="{ fontSize: item.namaPt + 'pt' }"
+                  >
+                    {{ item.nama }}
+                  </div>
+                  <div class="bck-sep"></div>
+                  <div class="bck-line bck-kodeline">
+                    <span class="bck-kode">{{ item.kodeBarang }}</span>
+                    <span v-if="item.grade" class="bck-badge">
+                      RJ {{ item.grade }}
+                    </span>
+                  </div>
+                  <div class="bck-line">
+                    {{ item.tgl
+                    }}<span class="bck-size">{{ item.ukuran }}</span>
+                  </div>
+                  <div class="bck-line">{{ item.spk }}</div>
+                  <div class="bck-line">{{ item.urut }}</div>
+                </div>
               </div>
-              <div class="bck-cell bck-c-spk">{{ item.spk }}</div>
-              <div class="bck-cell bck-c-tgl">
-                {{ item.tgl
-                }}<span v-if="item.charga"> · {{ item.charga }}</span>
-              </div>
-              <div class="bck-cell bck-c-nourut">{{ item.nourut }}</div>
             </div>
           </div>
         </div>
@@ -1239,7 +1360,11 @@ const closePreview = () => {
       <v-card-actions class="pa-3 border-t">
         <v-spacer />
         <v-btn variant="text" @click="closePreview">Tutup</v-btn>
-        <v-btn color="primary" @click="triggerBrowserPrint">
+        <v-btn
+          color="primary"
+          :disabled="adaKodeBaru"
+          @click="triggerBrowserPrint"
+        >
           <template #prepend><IconPrinter :size="15" /></template>Cetak
         </v-btn>
       </v-card-actions>
@@ -1582,7 +1707,7 @@ const closePreview = () => {
 </style>
 
 <style>
-/* ── Print preview & print (non-scoped, dipakai iframe cetak juga) ── */
+/* Hanya "chrome" preview. CSS label ada di LABEL_CSS (script). */
 #bck-print-area {
   display: flex;
   flex-direction: column;
@@ -1594,11 +1719,10 @@ const closePreview = () => {
   background: white;
 }
 .bck-preview-label {
-  border: 1px dashed #ccc;
+  outline: 1px dashed #ccc;
 }
 .bck-preview-label.bck-conflict {
-  border: 1px solid #d32f2f;
-  box-shadow: 0 0 0 1px #d32f2f;
+  outline: 2px solid #d32f2f;
 }
 .preview-banner {
   background: #fff3e0;
@@ -1608,175 +1732,5 @@ const closePreview = () => {
   padding: 8px 16px;
   border-bottom: 1px solid #ffcc80;
   text-align: center;
-}
-.bck-qr-canvas {
-  display: block;
-  image-rendering: pixelated;
-}
-
-/* ── XP-360B ── */
-.printer-xp360b .bck-row {
-  display: flex;
-  width: 68mm;
-  height: 15mm;
-  align-items: center;
-  gap: 3mm;
-  padding: 0 1mm;
-  box-sizing: border-box;
-}
-.printer-xp360b .bck-label {
-  width: 31mm;
-  height: 14mm;
-  box-sizing: border-box;
-  overflow: hidden;
-  display: grid;
-  grid-template-columns: 8mm 16mm 7mm;
-  grid-template-rows: 6mm 4mm 4mm;
-  grid-template-areas:
-    "nama nama nourut"
-    "qr   spk  ukuran"
-    "qr   tgl  ukuran";
-}
-.printer-xp360b .bck-cell {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  padding: 0.15mm;
-  box-sizing: border-box;
-  text-align: center;
-  line-height: 1;
-}
-.printer-xp360b .bck-c-nama {
-  grid-area: nama;
-  justify-content: flex-start;
-  text-align: left;
-  align-items: flex-start;
-  padding-top: 0.4mm;
-  font-size: 5.5pt;
-  font-weight: bold;
-  font-family: "Arial Narrow", Arial, sans-serif;
-  line-height: 1.05;
-  word-break: break-word;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-  -webkit-box-orient: vertical;
-}
-.printer-xp360b .bck-c-ukuran {
-  grid-area: ukuran;
-  font-size: 8pt;
-  font-weight: bold;
-  font-family: Arial, sans-serif;
-}
-.printer-xp360b .bck-c-qr {
-  grid-area: qr;
-}
-.printer-xp360b .bck-qr-canvas {
-  width: 7mm !important;
-  height: 7mm !important;
-}
-.printer-xp360b .bck-c-spk {
-  grid-area: spk;
-  font-size: 3.8pt;
-  font-weight: bold;
-  font-family: Arial, sans-serif;
-  padding: 0;
-}
-.printer-xp360b .bck-c-tgl {
-  grid-area: tgl;
-  font-size: 3.5pt;
-  font-family: Arial, sans-serif;
-  color: #333;
-  padding: 0;
-}
-.printer-xp360b .bck-c-nourut {
-  grid-area: nourut;
-  font-size: 4.5pt;
-  font-weight: bold;
-  font-family: Arial, sans-serif;
-}
-
-/* ── Postek ── */
-.printer-postek .bck-row {
-  display: flex;
-  width: 108mm;
-  height: 17mm;
-  align-items: center;
-  gap: 2mm;
-  padding: 0 1mm;
-  box-sizing: border-box;
-}
-.printer-postek .bck-label {
-  width: 34mm;
-  height: 16mm;
-  box-sizing: border-box;
-  overflow: hidden;
-  display: grid;
-  grid-template-columns: 9mm 17mm 8mm;
-  grid-template-rows: 6.5mm 4.75mm 4.75mm;
-  grid-template-areas:
-    "nama nama nourut"
-    "qr   spk  ukuran"
-    "qr   tgl  ukuran";
-}
-.printer-postek .bck-cell {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  padding: 0.15mm;
-  box-sizing: border-box;
-  text-align: center;
-  line-height: 1;
-}
-.printer-postek .bck-c-nama {
-  grid-area: nama;
-  justify-content: flex-start;
-  text-align: left;
-  align-items: flex-start;
-  padding-top: 0.4mm;
-  font-size: 6pt;
-  font-weight: bold;
-  font-family: "Arial Narrow", Arial, sans-serif;
-  line-height: 1.05;
-  word-break: break-word;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-  -webkit-box-orient: vertical;
-}
-.printer-postek .bck-c-ukuran {
-  grid-area: ukuran;
-  font-size: 9pt;
-  font-weight: bold;
-  font-family: Arial, sans-serif;
-}
-.printer-postek .bck-c-qr {
-  grid-area: qr;
-}
-.printer-postek .bck-qr-canvas {
-  width: 8mm !important;
-  height: 8mm !important;
-}
-.printer-postek .bck-c-spk {
-  grid-area: spk;
-  font-size: 4pt;
-  font-weight: bold;
-  font-family: Arial, sans-serif;
-  padding: 0;
-}
-.printer-postek .bck-c-tgl {
-  grid-area: tgl;
-  font-size: 3.7pt;
-  font-family: Arial, sans-serif;
-  color: #333;
-  padding: 0;
-}
-.printer-postek .bck-c-nourut {
-  grid-area: nourut;
-  font-size: 4.8pt;
-  font-weight: bold;
-  font-family: Arial, sans-serif;
 }
 </style>
