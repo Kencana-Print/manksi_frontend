@@ -82,8 +82,16 @@ interface KodeBaruQc {
   namaspk?: string;
   sudahAda: boolean;
   qty: number;
+  jumlah: number;
+  jumlahyard: number;
+  jumlahmeter: number;
   roll: number;
   lots: { qc: string; lot: string; qty: number; roll: number }[];
+}
+interface PoRealisasiRef {
+  kode: string;
+  terima?: number | string;
+  kurang?: number | string;
 }
 
 // ⚠️ Panel Supplier disembunyikan (bukan dihapus dari formData) kalau
@@ -247,6 +255,9 @@ interface PoTarikItem {
   setting?: string;
   spk?: string;
   namaspk?: string;
+  jumlah?: number;
+  jumlahyard?: number;
+  jumlahmeter?: number;
 }
 
 // Dipakai jalur PO dan jalur QC
@@ -262,15 +273,18 @@ const terapkanDataPo = (
   const dt = new Date(formData.value.header.bpb_tanggal);
   dt.setDate(dt.getDate() + (Number(header.jatuhtempo_days) || 0));
   formData.value.header.bpb_jatuhtempo = formatDateLocal(dt);
-  formData.value.poItems = poDetails.map((d) => ({ ...d, terima: 0 }));
+  formData.value.poItems = poDetails.map((d) => ({
+    ...d,
+    terima: Number(d.terima) || 0,
+  }));
   formData.value.items = items.map((d) => ({
     kode: d.kode,
     nama: d.nama,
     satuan: d.satuan,
     satuanpo: d.satuanpo,
-    jumlahyard: 0,
-    jumlahmeter: 0,
-    jumlah: 0,
+    jumlahyard: d.jumlahyard ?? 0,
+    jumlahmeter: d.jumlahmeter ?? 0,
+    jumlah: d.jumlah ?? 0,
     roll: 0,
     harga: d.harga,
     totalpo: d.totalpo,
@@ -315,6 +329,17 @@ const setQc = async (daftarQc: string[]) => {
     toast.success(
       `Berhasil menarik data PO dari ${qcNomor.length} dokumen QC.`,
     );
+    const lewatPo = formData.value.poItems.filter(
+      (p: PoRealisasiRef) => Number(p.terima) > Number(p.kurang) + 0.001,
+    );
+    if (lewatPo.length > 0) {
+      toast.warning(
+        `Jumlah lot QC melebihi sisa PO pada ${lewatPo.length} baris (${lewatPo
+          .map((p: PoRealisasiRef) => p.kode)
+          .join(", ")}). Tetap bisa disimpan.`,
+        { timeout: 10000 },
+      );
+    }
     if (kodeBaruQc.value.length > 0) {
       toast.warning(
         `${kodeBaruQc.value.length} kode bahan baru perlu disetujui sebelum simpan.`,
@@ -333,9 +358,9 @@ const barisKodeBaru = (k: KodeBaruQc) => ({
   nama: k.nama,
   satuan: k.satuan,
   satuanpo: k.satuanpo,
-  jumlahyard: 0,
-  jumlahmeter: 0,
-  jumlah: 0,
+  jumlahyard: k.jumlahyard,
+  jumlahmeter: k.jumlahmeter,
+  jumlah: k.jumlah,
   roll: 0,
   harga: k.harga,
   totalpo: k.totalpo,
@@ -1207,8 +1232,8 @@ const printBarcodeAll = (): boolean => {
                     type="number"
                     step="0.01"
                     class="ci tr fw bg-yellow-light"
-                    :readonly="item.satuan !== 'MTR'"
-                    :class="{ ro: item.satuan !== 'MTR' }"
+                    :readonly="isQc || item.satuan !== 'MTR'"
+                    :class="{ ro: isQc || item.satuan !== 'MTR' }"
                     title="Isi Yard → Meter & Terima Skrg otomatis terhitung (khusus bahan METER)"
                     :ref="
                       (el) => setItemFieldRef(el, Number(idx), 'jumlahyard')
@@ -1226,8 +1251,8 @@ const printBarcodeAll = (): boolean => {
                     type="number"
                     step="0.01"
                     class="ci tr fw bg-yellow-light"
-                    :readonly="item.satuan !== 'MTR'"
-                    :class="{ ro: item.satuan !== 'MTR' }"
+                    :readonly="isQc || item.satuan !== 'MTR'"
+                    :class="{ ro: isQc || item.satuan !== 'MTR' }"
                     title="Isi Meter → Yard & Terima Skrg otomatis terhitung (khusus bahan METER)"
                     :ref="
                       (el) => setItemFieldRef(el, Number(idx), 'jumlahmeter')
@@ -1244,6 +1269,8 @@ const printBarcodeAll = (): boolean => {
                     v-model.number="item.jumlah"
                     type="number"
                     class="ci tr fw bg-yellow-light"
+                    :readonly="isQc"
+                    :class="{ ro: isQc }"
                     :ref="(el) => setItemFieldRef(el, Number(idx), 'jumlah')"
                     @blur="onJumlahChange(Number(idx))"
                     @keydown.enter.prevent="
@@ -1398,6 +1425,8 @@ const printBarcodeAll = (): boolean => {
                         v-model.number="p.terima"
                         type="number"
                         class="ci tr fw bg-yellow-light"
+                        :class="{ ro: isQc }"
+                        :readonly="isQc"
                         @blur="onPoTerimaChange(Number(i))"
                         v-select-on-focus
                       />
@@ -2069,5 +2098,8 @@ input.bg-red {
 .ci.kode-baru {
   background: #fff3cd;
   font-weight: 700;
+}
+.ci.bg-yellow-light.ro {
+  background: #eceff1 !important;
 }
 </style>
