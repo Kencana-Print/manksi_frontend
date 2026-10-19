@@ -1779,6 +1779,12 @@ export const createMenuItems = (): NavItem[] => {
           icon: IconCalendarCog,
           menuId: 124,
         },
+        {
+          title: "Notulensi Meeting",
+          to: "/tools/notulensi-meeting",
+          icon: IconNotes,
+          menuId: 1328,
+        },
       ],
     },
   ];

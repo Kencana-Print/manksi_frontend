@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import { useRoute } from "vue-router";
 import { useToast } from "vue-toastification";
 import { useAuthStore } from "@/stores/authStore";
-import { useTabsStore } from "@/stores/tabsStore";
 import { useForm } from "@/composables/useForm";
 import { bbkFormService } from "@/services/piutang/bbkFormService";
 import BaseForm from "@/components/BaseForm.vue";
@@ -19,10 +18,8 @@ import {
 } from "@tabler/icons-vue";
 
 const route = useRoute();
-const router = useRouter();
 const toast = useToast();
 const authStore = useAuthStore();
-const tabsStore = useTabsStore();
 const isEditMode = computed(() => !!route.params.nomor);
 
 const showPrintDialog = ref(false);
@@ -325,6 +322,7 @@ const {
   executeSave,
   executeCancel,
   executeClose,
+  goBack,
 } = useForm({
   menuId: "955",
   initialData,
@@ -481,8 +479,7 @@ const validateSave = () => {
 // ── Dialog cetak ──
 const closePrintAndExit = () => {
   showPrintDialog.value = false;
-  tabsStore.closeTab(route.path);
-  router.push("/piutang/bbk");
+  goBack();
 };
 const pilihCetak = () => {
   showPrintDialog.value = false;
@@ -490,8 +487,7 @@ const pilihCetak = () => {
     `/piutang/bbk/print/${encodeURIComponent(savedNomor.value)}`,
     "_blank",
   );
-  tabsStore.closeTab(route.path);
-  router.push("/piutang/bbk");
+  goBack();
 };
 </script>
 

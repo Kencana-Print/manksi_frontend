@@ -24,6 +24,10 @@ interface TabRow {
   QtySPK: number;
   plan_tgl_jadwal: string;
   plan_wip: number;
+  WipBahan: number;
+  WipQty: number;
+  WipSatuan: string;
+  WipCatatan: string;
   plan_qty_po: number;
   plan_qty_jadwal: number;
   plan_line_kelompok: string; // tidak dipakai di koli
@@ -46,6 +50,7 @@ interface TabRow {
   _spkLoading: boolean;
   _supplierLoading: boolean;
   _spkDetail: string;
+  Output: number;
 }
 
 interface RiwayatRow {
@@ -63,12 +68,9 @@ interface FormState {
   pl_nomor: string;
   pl_tgl1: string;
   pl_tgl2: string;
-  pl_cab: string;
-  pl_keterangan: string;
   detail: {
     cutting: TabRow[];
     sewing: TabRow[];
-    koli: TabRow[];
   };
 }
 
@@ -91,27 +93,6 @@ const formatDateLocal = (v?: string | Date): string => {
   if (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
   const d = new Date(v);
   return isNaN(d.getTime()) ? "" : toLocalDate(d);
-};
-// Clamp tanggal jadwal Sewing/Koli supaya tidak bisa keluar dari
-// periode planning (pl_tgl1 s/d pl_tgl2). Dipanggil di @change karena
-// min/max HTML5 date input cuma membatasi popup kalender, bukan input
-// manual via keyboard.
-const clampToPeriode = (tab: TabKey, idx: number) => {
-  if (tab === "cutting") return; // cutting tidak terikat periode mingguan
-  const row = formData.value.detail[tab][idx];
-  if (!row.plan_tgl_jadwal) return;
-
-  const val = row.plan_tgl_jadwal;
-  const min = formData.value.pl_tgl1;
-  const max = formData.value.pl_tgl2;
-
-  if (min && val < min) {
-    row.plan_tgl_jadwal = min;
-    toast.warning(`Tanggal jadwal disesuaikan ke awal periode (${min}).`);
-  } else if (max && val > max) {
-    row.plan_tgl_jadwal = max;
-    toast.warning(`Tanggal jadwal disesuaikan ke akhir periode (${max}).`);
-  }
 };
 
 // Ganti getMondayOfWeek agar tidak kena timezone issue
@@ -145,6 +126,10 @@ const emptyRow = (defaultTgl: string): TabRow => ({
   QtySPK: 0,
   plan_tgl_jadwal: defaultTgl,
   plan_wip: 0,
+  WipBahan: 0,
+  WipQty: 0,
+  WipSatuan: "",
+  WipCatatan: "",
   plan_qty_po: 0,
   plan_qty_jadwal: 0,
   plan_line_kelompok: "",
@@ -166,6 +151,7 @@ const emptyRow = (defaultTgl: string): TabRow => ({
   _key: newKey(),
   _spkLoading: false,
   _supplierLoading: false,
+  Output: 0,
 });
 
 const mapRow = (r: any, defaultTgl: string): TabRow => ({
@@ -174,6 +160,10 @@ const mapRow = (r: any, defaultTgl: string): TabRow => ({
   QtySPK: Number(r.QtySPK) || 0,
   plan_tgl_jadwal: formatDateLocal(r.plan_tgl_jadwal) || defaultTgl,
   plan_wip: Number(r.plan_wip) || 0,
+  WipBahan: Number(r.WipBahan) || 0,
+  WipQty: Number(r.WipQty) || 0,
+  WipSatuan: r.WipSatuan ?? "",
+  WipCatatan: r.WipCatatan ?? "",
   plan_qty_po: Number(r.plan_qty_po) || 0,
   plan_qty_jadwal: Number(r.plan_qty_jadwal) || 0,
   plan_line_kelompok: r.plan_line_kelompok ?? "",
@@ -195,18 +185,16 @@ const mapRow = (r: any, defaultTgl: string): TabRow => ({
   _key: newKey(),
   _spkLoading: false,
   _supplierLoading: false,
+  Output: Number(r.Output) || 0,
 });
 
 const emptyData: FormState = {
   pl_nomor: "",
   pl_tgl1: toLocalDate(monday),
   pl_tgl2: toLocalDate(saturday),
-  pl_cab: "",
-  pl_keterangan: "",
   detail: {
     cutting: [emptyRow(toLocalDate(tomorrow))],
     sewing: [],
-    koli: [emptyRow(toLocalDate(monday))],
   },
 };
 
@@ -221,7 +209,6 @@ const getAllSpkList = (): string[] => {
   const all = [
     ...fd.detail.cutting.map((r) => r.NomorSPK),
     ...fd.detail.sewing.map((r) => r.NomorSPK),
-    ...fd.detail.koli.map((r) => r.NomorSPK),
   ].filter(Boolean);
   return [...new Set(all)];
 };
@@ -270,8 +257,6 @@ const {
       pl_nomor: h.pl_nomor ?? "",
       pl_tgl1: formatDateLocal(h.pl_tgl1) || toLocalDate(monday),
       pl_tgl2: formatDateLocal(h.pl_tgl2) || toLocalDate(saturday),
-      pl_cab: h.pl_cab ?? "",
-      pl_keterangan: h.pl_keterangan ?? "",
       detail: {
         cutting: (d.detail?.cutting?.length
           ? d.detail.cutting
@@ -280,10 +265,6 @@ const {
         sewing: (d.detail?.sewing ?? []).map((r: any) =>
           mapRow(r, toLocalDate(monday)),
         ),
-        koli: (d.detail?.koli?.length
-          ? d.detail.koli
-          : [emptyRow(toLocalDate(monday))]
-        ).map((r: any) => mapRow(r, toLocalDate(monday))),
       },
     };
 
@@ -296,19 +277,13 @@ const {
       ...payload,
       detail: {
         cutting: (payload.detail.cutting as TabRow[])
-          .filter((r) => r.NomorSPK && r.plan_tgl_jadwal)
-          .map(
-            ({
-              _key,
-              _spkLoading,
-              _supplierLoading,
-              NamaSPK,
-              QtySPK,
-              supplierKode,
-              supplierNama,
-              ...r
-            }) => r,
-          ),
+          .filter((r) => r.NomorSPK)
+          .map((r) => ({
+            NomorSPK: r.NomorSPK,
+            plan_tgl_jadwal: payload.pl_tgl1,
+            plan_qty_jadwal: r.plan_qty_jadwal,
+            plan_line_kelompok: r.plan_line_kelompok,
+          })),
         sewing: (payload.detail.sewing as TabRow[])
           .filter((r) => r.NomorSPK)
           .map((r) => ({
@@ -322,21 +297,6 @@ const {
             plan_smv: r.plan_smv,
             plan_mp: r.mp,
           })),
-        koli: (payload.detail.koli as TabRow[])
-          .filter((r) => r.NomorSPK && r.plan_tgl_jadwal)
-          .map(
-            ({
-              _key,
-              _spkLoading,
-              _supplierLoading,
-              NamaSPK,
-              QtySPK,
-              plan_line_kelompok,
-              supplierKode,
-              supplierNama,
-              ...r
-            }) => r,
-          ),
       },
     };
     return planningSpkFormService.saveData(clean);
@@ -349,13 +309,12 @@ const {
 });
 
 // ─── SPK Lookup per baris ─────────────────────────────────────────────────────
-type TabKey = "cutting" | "sewing" | "koli";
+type TabKey = "cutting" | "sewing";
 const showSpkModal = ref(false);
 const activeTab = ref<TabKey>("cutting");
 const activeRowIdx = ref(-1);
 
 // Master Line/Kelompok dari tkelompok (cab P04)
-const kelompokCutting = ref<string[]>([]); // lini POTONG
 const kelompokSewing = ref<string[]>([]); // lini JAHIT
 const LINE_EXTERNAL = "LINE EXTERNAL"; // bukan bagian dari master
 const LINE_OPTIONS = computed(() => [
@@ -365,11 +324,7 @@ const LINE_OPTIONS = computed(() => [
 
 const loadKelompok = async () => {
   try {
-    const [potong, jahit] = await Promise.all([
-      planningSpkFormService.getKelompok("POTONG", "P04"),
-      planningSpkFormService.getKelompok("JAHIT", "P04"),
-    ]);
-    kelompokCutting.value = potong.data.data ?? [];
+    const jahit = await planningSpkFormService.getKelompok("JAHIT", "P04");
     kelompokSewing.value = jahit.data.data ?? [];
   } catch (e: any) {
     toast.error(
@@ -378,14 +333,6 @@ const loadKelompok = async () => {
   }
 };
 loadKelompok();
-
-// Data lama bisa berisi teks bebas yang tidak ada di master: tetap ditampilkan
-// supaya tidak hilang diam-diam saat form dibuka dan disimpan ulang.
-const cuttingOptions = (row: TabRow) =>
-  !row.plan_line_kelompok ||
-  kelompokCutting.value.includes(row.plan_line_kelompok)
-    ? kelompokCutting.value
-    : [row.plan_line_kelompok, ...kelompokCutting.value];
 
 const openSpkModal = (tab: TabKey, idx: number) => {
   activeTab.value = tab;
@@ -420,28 +367,22 @@ const resolveSpk = async (tab: TabKey, idx: number, nomor: string) => {
   const rows = formData.value.detail[tab];
   const row = rows[idx];
 
-  // Sewing: duplikat dinilai per SPK + Line (satu SPK boleh di beberapa line).
-  // Tab lain: SPK + tanggal jadwal yang sama.
+  // Sewing & Cutting: duplikat dinilai per SPK + Line / Proses Produksi
+  // (satu SPK boleh di beberapa line / di MANUAL dan MESIN).
+  // Kalau Proses belum dipilih, validasi final ada di validateSave.
   const isDup =
-    tab === "sewing"
-      ? !!row.plan_line_kelompok &&
-        rows.some(
-          (r, i) =>
-            i !== idx &&
-            r.NomorSPK === nomor &&
-            r.plan_line_kelompok === row.plan_line_kelompok,
-        )
-      : rows.some(
-          (r, i) =>
-            i !== idx &&
-            r.NomorSPK === nomor &&
-            r.plan_tgl_jadwal === row.plan_tgl_jadwal,
-        );
+    !!row.plan_line_kelompok &&
+    rows.some(
+      (r, i) =>
+        i !== idx &&
+        r.NomorSPK === nomor &&
+        r.plan_line_kelompok === row.plan_line_kelompok,
+    );
   if (isDup) {
     toast.warning(
       tab === "sewing"
         ? `SPK ${nomor} sudah ada di ${row.plan_line_kelompok} pada tab Sewing.`
-        : `SPK ${nomor} sudah ada di baris lain pada tanggal ${row.plan_tgl_jadwal} untuk tab ini.`,
+        : `SPK ${nomor} sudah ada dengan Proses Produksi ${row.plan_line_kelompok} pada tab Cutting.`,
     );
     row.NomorSPK = "";
     return;
@@ -449,17 +390,15 @@ const resolveSpk = async (tab: TabKey, idx: number, nomor: string) => {
 
   row._spkLoading = true;
   try {
-    // Paralel: ambil info SPK + qty PO Jasa sekaligus
-    const [resSpk, resPo] = await Promise.all([
-      planningSpkFormService.getSpkInfo(nomor),
-      planningSpkFormService.getQtyPoJasa(nomor),
-    ]);
-
+    const resSpk = await planningSpkFormService.getSpkInfo(nomor);
     const s = resSpk.data.data;
-    const po = resPo.data.data;
 
     row.NamaSPK = s.spk_nama ?? "";
     row.QtySPK = Number(s.spk_jumlah) || 0;
+    row.WipBahan = Number(s.WipBahan) || 0;
+    row.WipQty = Number(s.WipQty) || 0;
+    row.WipSatuan = s.WipSatuan ?? "";
+    row.WipCatatan = s.WipCatatan ?? "";
     row._spkDetail = [
       `SPK     : ${s.spk_nomor}`,
       `Tgl SPK : ${s.spk_tanggal ?? "-"}`,
@@ -480,9 +419,6 @@ const resolveSpk = async (tab: TabKey, idx: number, nomor: string) => {
           .join(", ") || "-"
       }`,
     ].join("\n");
-
-    if (tab === "koli") row.plan_qty_po = po.koli;
-    // cutting: qty_po tetap 0, tidak ada PO Jasa
 
     if (tab === "sewing") {
       // SPK berganti → buang nilai lama yang melekat ke SPK sebelumnya
@@ -520,6 +456,10 @@ const resolveSpk = async (tab: TabKey, idx: number, nomor: string) => {
     row.NomorSPK = "";
     row.NamaSPK = "";
     row.QtySPK = 0;
+    row.WipBahan = 0;
+    row.WipQty = 0;
+    row.WipSatuan = "";
+    row.WipCatatan = "";
     row._spkDetail = "";
   } finally {
     row._spkLoading = false;
@@ -614,16 +554,25 @@ const applyActual = (row: TabRow) => {
       : 0;
 };
 
-// Rumus sama persis dengan backend
+// Waktu produksi per line (menit-orang) = MP x Hari x Jam x 60
 const waktuProduksi = (row: TabRow) =>
-  (Number(row.plan_hari) || 0) * (Number(row.plan_jam) || 0) * 60;
+  (Number(row.mp) || 0) *
+  (Number(row.plan_hari) || 0) *
+  (Number(row.plan_jam) || 0) *
+  60;
 const resumeOf = (row: TabRow): number | null =>
   row.mp > 0 && row.plan_smv > 0
     ? ((Number(row.plan_target_output) || 0) * row.plan_smv) / row.mp
     : null;
+// Output menit = SMV x Act. Output (kosong kalau SMV belum ada)
+const outputMenit = (row: TabRow): number | null =>
+  row.NomorSPK && row.plan_smv > 0
+    ? row.plan_smv * (Number(row.actual_output) || 0)
+    : null;
+// Resume per operator vs kapasitas per operator (hari x jam x 60): perilaku lama tidak berubah
 const isOverTime = (row: TabRow) => {
   const r = resumeOf(row);
-  return r !== null && r > waktuProduksi(row);
+  return r !== null && r > waktuProduksi(row) / row.mp;
 };
 const fmtDec = (n: number | null | undefined, d = 2) =>
   n == null
@@ -749,6 +698,8 @@ const newSewingRow = (line: string): TabRow => {
     row.mp = sib.mp;
     row._mpLocked = sib._mpLocked;
     row.actual_jam = sib.actual_jam;
+    row.plan_hari = sib.plan_hari;
+    row.plan_jam = sib.plan_jam;
   }
   return row;
 };
@@ -779,6 +730,18 @@ const setLineMp = (line: string, val: string) => {
       r.mp = mp;
       r._mpLocked = true; // jangan ditimpa refresh dari DB
     }
+  });
+};
+
+// Hari / Jam per line: berlaku ke semua SPK di line itu (disimpan tetap per baris)
+const setLineHariJam = (
+  line: string,
+  field: "plan_hari" | "plan_jam",
+  val: string,
+) => {
+  const n = Math.max(0, Number(val) || 0);
+  formData.value.detail.sewing.forEach((r) => {
+    if (r.plan_line_kelompok === line) r[field] = n;
   });
 };
 
@@ -856,8 +819,7 @@ const validateSave = () => {
 
   const hasData =
     formData.value.detail.cutting.some((r) => r.NomorSPK) ||
-    formData.value.detail.sewing.some((r) => r.NomorSPK) ||
-    formData.value.detail.koli.some((r) => r.NomorSPK);
+    formData.value.detail.sewing.some((r) => r.NomorSPK);
   if (!hasData)
     return toast.warning("Minimal isi satu baris SPK di salah satu tab.");
 
@@ -896,17 +858,31 @@ const validateSave = () => {
       "SMV wajib diisi untuk SPK Sewing tanpa Proof Garmen.",
     );
 
+  const kunciCutting = new Set<string>();
+  for (const r of formData.value.detail.cutting) {
+    if (!r.NomorSPK) continue;
+    if (!["MANUAL", "MESIN"].includes(r.plan_line_kelompok)) {
+      toast.warning(
+        `Cutting: Proses Produksi untuk SPK ${r.NomorSPK} wajib dipilih (MANUAL / MESIN).`,
+      );
+      activeTab.value = "cutting";
+      return;
+    }
+    const k = `${r.NomorSPK}|${r.plan_line_kelompok}`;
+    if (kunciCutting.has(k)) {
+      toast.warning(
+        `Cutting: SPK ${r.NomorSPK} dengan Proses Produksi yang sama muncul lebih dari sekali. Gabungkan jadi satu baris.`,
+      );
+      activeTab.value = "cutting";
+      return;
+    }
+    kunciCutting.add(k);
+  }
+
   showSaveDialog.value = true;
 };
 
 const fmt = (n: number | null | undefined) => (n ?? 0).toLocaleString("id-ID");
-
-watch(
-  () => [formData.value.pl_tgl1, formData.value.pl_tgl2],
-  () => {
-    formData.value.detail.koli.forEach((_, i) => clampToPeriode("koli", i));
-  },
-);
 </script>
 
 <template>
@@ -946,18 +922,6 @@ watch(
             <span class="lbl">Tgl Akhir</span>
             <input type="date" v-model="formData.pl_tgl2" class="idate" />
           </div>
-          <div class="fr">
-            <span class="lbl">Cabang</span>
-            <input v-model="formData.pl_cab" class="inp" maxlength="10" />
-          </div>
-          <div class="fr">
-            <span class="lbl">Keterangan</span>
-            <input
-              v-model="formData.pl_keterangan"
-              class="inp"
-              maxlength="200"
-            />
-          </div>
         </div>
 
         <!-- Tombol Riwayat -->
@@ -987,10 +951,7 @@ watch(
         <!-- Info SPK yang sudah diinput -->
         <div class="spk-summary mt-2" v-if="getAllSpkList().length">
           <div class="sec-label">SPK Dalam Planning Ini</div>
-          <div
-            v-for="tab in ['cutting', 'sewing', 'koli'] as TabKey[]"
-            :key="tab"
-          >
+          <div v-for="tab in ['cutting', 'sewing'] as TabKey[]" :key="tab">
             <template v-if="formData.detail[tab].some((r) => r.NomorSPK)">
               <div class="spk-summary-tab">{{ tab.toUpperCase() }}</div>
               <div
@@ -1036,26 +997,11 @@ watch(
               {{ formData.detail.sewing.filter((r) => r.NomorSPK).length }}
             </v-chip>
           </v-tab>
-          <v-tab value="koli" class="tab-item"
-            >Koli
-            <v-chip
-              v-if="formData.detail.koli.some((r) => r.NomorSPK)"
-              size="x-small"
-              color="orange"
-              variant="flat"
-              class="ml-1"
-            >
-              {{ formData.detail.koli.filter((r) => r.NomorSPK).length }}
-            </v-chip>
-          </v-tab>
         </v-tabs>
 
         <v-tabs-window v-model="activeTab" class="tab-content">
           <!-- ── Tab Cutting ── -->
           <v-tabs-window-item value="cutting" class="tab-pane">
-            <div class="tab-info">
-              Jadwal default: <b>H+1</b> (hari sesudah planning dibuat)
-            </div>
             <div class="tbl-hdr blue">
               <span>Divisi Cutting</span>
               <button type="button" class="btn-add" @click="addRow('cutting')">
@@ -1065,18 +1011,22 @@ watch(
             <div class="tbl-wrap">
               <table class="gt">
                 <thead>
-                  <tr>
-                    <th style="width: 28px">No</th>
-                    <th style="width: 130px">Nomor SPK</th>
-                    <th style="width: 220px">Nama SPK</th>
-                    <th style="width: 75px" class="tr">Qty SPK</th>
-                    <th style="width: 110px">Tgl Jadwal</th>
-                    <th style="width: 80px" class="tr">WIP</th>
-                    <th style="width: 80px" class="tr">Qty PO</th>
-                    <th style="width: 85px" class="tr bg-yellow">Qty Jadwal</th>
-                    <th style="width: 150px">Line/Kelompok</th>
-                    <th style="width: 150px">Keterangan</th>
-                    <th style="width: 32px"></th>
+                  <tr class="th-r1">
+                    <th rowspan="2" style="width: 28px">No</th>
+                    <th rowspan="2" style="width: 130px">Nomor SPK</th>
+                    <th rowspan="2" style="width: 220px">Nama SPK</th>
+                    <th rowspan="2" style="width: 75px" class="tr">Qty SPK</th>
+                    <th colspan="2" class="tcen">WIP Bahan</th>
+                    <th rowspan="2" style="width: 85px" class="tr bg-yellow">
+                      Qty Target
+                    </th>
+                    <th rowspan="2" style="width: 150px">Proses Produksi</th>
+                    <th rowspan="2" style="width: 85px" class="tr">Output</th>
+                    <th rowspan="2" style="width: 32px"></th>
+                  </tr>
+                  <tr class="th-r2">
+                    <th style="width: 90px" class="tr">Qty</th>
+                    <th style="width: 60px">Satuan</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1114,31 +1064,16 @@ watch(
                     <td class="ro-cell tr">
                       {{ row.QtySPK ? fmt(row.QtySPK) : "—" }}
                     </td>
-                    <td style="padding: 0">
-                      <input
-                        type="date"
-                        v-model="row.plan_tgl_jadwal"
-                        class="gi"
-                      />
+                    <td
+                      class="ro-cell tr"
+                      :title="
+                        row.WipCatatan ? 'Satuan lain: ' + row.WipCatatan : ''
+                      "
+                    >
+                      {{ row.WipSatuan ? fmt(row.WipBahan) : "—" }}
+                      <span v-if="row.WipCatatan">*</span>
                     </td>
-                    <td style="padding: 0">
-                      <input
-                        type="number"
-                        v-model.number="row.plan_wip"
-                        min="0"
-                        class="gi tr"
-                        v-select-on-focus
-                      />
-                    </td>
-                    <td style="padding: 0">
-                      <input
-                        type="number"
-                        v-model.number="row.plan_qty_po"
-                        min="0"
-                        class="gi tr"
-                        v-select-on-focus
-                      />
-                    </td>
+                    <td class="ro-cell">{{ row.WipSatuan || "—" }}</td>
                     <td style="padding: 0">
                       <input
                         type="number"
@@ -1154,23 +1089,12 @@ watch(
                         class="gi gi-sel"
                       >
                         <option value="">-- Pilih --</option>
-                        <option
-                          v-for="k in cuttingOptions(row)"
-                          :key="k"
-                          :value="k"
-                        >
-                          {{ k }}
-                        </option>
+                        <option value="MANUAL">MANUAL</option>
+                        <option value="MESIN">MESIN</option>
                       </select>
                     </td>
-                    <td style="padding: 0">
-                      <input
-                        type="text"
-                        v-model="row.plan_keterangan"
-                        class="gi"
-                        maxlength="200"
-                        placeholder="Keterangan..."
-                      />
+                    <td class="ro-cell tr">
+                      {{ row.Output ? fmt(row.Output) : "—" }}
                     </td>
                     <td class="tc" style="padding: 0">
                       <button
@@ -1183,7 +1107,7 @@ watch(
                     </td>
                   </tr>
                   <tr v-if="!formData.detail.cutting.length">
-                    <td colspan="11" class="empty-row">Klik + Tambah Baris</td>
+                    <td colspan="10" class="empty-row">Klik + Tambah Baris</td>
                   </tr>
                 </tbody>
               </table>
@@ -1220,11 +1144,9 @@ watch(
                     <th style="width: 220px">Nama SPK</th>
                     <th style="width: 70px" class="tr">Qty SPK</th>
                     <th style="width: 80px" class="tr">SMV (mnt)</th>
-                    <th style="width: 55px" class="tr">Hari</th>
-                    <th style="width: 55px" class="tr">Jam</th>
                     <th style="width: 85px" class="tr bg-yellow">Target</th>
                     <th style="width: 80px" class="tr">Act. Output</th>
-                    <th style="width: 85px" class="tr">Waktu Prod (mnt)</th>
+                    <th style="width: 85px" class="tr">Output (mnt)</th>
                     <th style="width: 85px" class="tr">Resume (mnt)</th>
                     <th style="width: 200px">Keterangan</th>
                     <th style="width: 32px"></th>
@@ -1234,7 +1156,7 @@ watch(
                   <template v-for="g in sewingGroups" :key="g.line || '_blank'">
                     <!-- Header blok Line: Line, MP, Actual Jam sekali saja -->
                     <tr class="grp-row">
-                      <td colspan="13">
+                      <td colspan="11">
                         <div class="grp-bar">
                           <span v-if="g.line" class="grp-title">{{
                             g.line
@@ -1292,6 +1214,53 @@ watch(
                               reset
                             </button>
                           </span>
+                          <span class="grp-chip"
+                            >Hari
+                            <input
+                              type="number"
+                              class="grp-mp"
+                              min="0"
+                              step="0.5"
+                              :disabled="!g.line"
+                              :value="g.line ? g.items[0].row.plan_hari : ''"
+                              v-select-on-focus
+                              @change="
+                                setLineHariJam(
+                                  g.line,
+                                  'plan_hari',
+                                  ($event.target as HTMLInputElement).value,
+                                )
+                              "
+                            />
+                          </span>
+                          <span class="grp-chip"
+                            >Jam
+                            <input
+                              type="number"
+                              class="grp-mp"
+                              min="0"
+                              step="0.5"
+                              :disabled="!g.line"
+                              :value="g.line ? g.items[0].row.plan_jam : ''"
+                              v-select-on-focus
+                              @change="
+                                setLineHariJam(
+                                  g.line,
+                                  'plan_jam',
+                                  ($event.target as HTMLInputElement).value,
+                                )
+                              "
+                            />
+                          </span>
+                          <span class="grp-chip"
+                            >Waktu Prod
+                            <b>{{
+                              waktuProduksi(g.items[0].row) > 0
+                                ? fmtDec(waktuProduksi(g.items[0].row), 0)
+                                : "—"
+                            }}</b>
+                            mnt</span
+                          >
                           <span class="grp-chip"
                             >Act. Jam
                             <b>{{ fmtDec(g.items[0].row.actual_jam) }}</b></span
@@ -1373,26 +1342,6 @@ watch(
                       <td style="padding: 0">
                         <input
                           type="number"
-                          v-model.number="row.plan_hari"
-                          min="0"
-                          step="0.5"
-                          class="gi tr"
-                          v-select-on-focus
-                        />
-                      </td>
-                      <td style="padding: 0">
-                        <input
-                          type="number"
-                          v-model.number="row.plan_jam"
-                          min="0"
-                          step="0.5"
-                          class="gi tr"
-                          v-select-on-focus
-                        />
-                      </td>
-                      <td style="padding: 0">
-                        <input
-                          type="number"
                           v-model.number="row.plan_target_output"
                           min="0"
                           class="gi tr yellow-cell"
@@ -1403,9 +1352,11 @@ watch(
                       <td class="ro-cell tr">
                         {{ row.NomorSPK ? fmt(row.actual_output) : "—" }}
                       </td>
+
                       <td class="ro-cell tr">
-                        {{ row.NomorSPK ? fmtDec(waktuProduksi(row), 0) : "—" }}
+                        {{ fmtDec(outputMenit(row), 1) }}
                       </td>
+
                       <td
                         class="ro-cell tr"
                         :class="{ over: isOverTime(row) }"
@@ -1439,136 +1390,9 @@ watch(
                     </tr>
                   </template>
                   <tr v-if="!formData.detail.sewing.length">
-                    <td colspan="13" class="empty-row">
+                    <td colspan="11" class="empty-row">
                       Pilih "+ Tambah Line..." untuk mulai
                     </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </v-tabs-window-item>
-
-          <!-- ── Tab Koli ── -->
-          <v-tabs-window-item value="koli" class="tab-pane">
-            <div class="tab-info">
-              Periode: <b>{{ formData.pl_tgl1 }}</b> s/d
-              <b>{{ formData.pl_tgl2 }}</b>
-            </div>
-            <div class="tbl-hdr orange">
-              <span>Divisi Koli</span>
-              <button type="button" class="btn-add" @click="addRow('koli')">
-                <IconPlus :size="12" /> Tambah Baris
-              </button>
-            </div>
-            <div class="tbl-wrap">
-              <table class="gt">
-                <thead>
-                  <tr>
-                    <th style="width: 28px">No</th>
-                    <th style="width: 130px">Nomor SPK</th>
-                    <th style="width: 220px">Nama SPK</th>
-                    <th style="width: 75px" class="tr">Qty SPK</th>
-                    <th style="width: 110px">Tgl Jadwal</th>
-                    <th style="width: 80px" class="tr">WIP</th>
-                    <th style="width: 80px" class="tr">Qty PO</th>
-                    <th style="width: 85px" class="tr bg-yellow">Qty Jadwal</th>
-                    <th style="width: 150px">Keterangan</th>
-                    <th style="width: 32px"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr
-                    v-for="(row, idx) in formData.detail.koli"
-                    :key="row._key"
-                  >
-                    <td class="tc lbl-cell">{{ (idx as number) + 1 }}</td>
-                    <td style="padding: 0">
-                      <div class="gi-group">
-                        <input
-                          v-model="row.NomorSPK"
-                          class="gi"
-                          style="text-transform: uppercase"
-                          placeholder="F1 / Enter"
-                          @keydown="
-                            (e) => onSpkKeydown(e, 'koli', idx as number)
-                          "
-                          @keydown.enter.prevent="
-                            onSpkEnter('koli', idx as number)
-                          "
-                        />
-                        <button
-                          class="btn-gi-lkp"
-                          :class="{ loading: row._spkLoading }"
-                          @click="openSpkModal('koli', idx as number)"
-                        >
-                          <IconSearch :size="11" />
-                        </button>
-                      </div>
-                    </td>
-                    <td class="ro-cell" :title="row._spkDetail">
-                      {{ row.NamaSPK || "—" }}
-                    </td>
-                    <td class="ro-cell tr">
-                      {{ row.QtySPK ? fmt(row.QtySPK) : "—" }}
-                    </td>
-                    <td style="padding: 0">
-                      <input
-                        type="date"
-                        v-model="row.plan_tgl_jadwal"
-                        class="gi"
-                        :min="formData.pl_tgl1"
-                        :max="formData.pl_tgl2"
-                        @blur="clampToPeriode('koli', idx as number)"
-                      />
-                    </td>
-                    <td style="padding: 0">
-                      <input
-                        type="number"
-                        v-model.number="row.plan_wip"
-                        min="0"
-                        class="gi tr"
-                        v-select-on-focus
-                      />
-                    </td>
-                    <td style="padding: 0">
-                      <input
-                        type="number"
-                        v-model.number="row.plan_qty_po"
-                        min="0"
-                        class="gi tr"
-                        v-select-on-focus
-                      />
-                    </td>
-                    <td style="padding: 0">
-                      <input
-                        type="number"
-                        v-model.number="row.plan_qty_jadwal"
-                        min="0"
-                        class="gi tr yellow-cell"
-                        v-select-on-focus
-                      />
-                    </td>
-                    <td style="padding: 0">
-                      <input
-                        type="text"
-                        v-model="row.plan_keterangan"
-                        class="gi"
-                        maxlength="200"
-                        placeholder="Keterangan..."
-                      />
-                    </td>
-                    <td class="tc" style="padding: 0">
-                      <button
-                        type="button"
-                        class="btn-del"
-                        @click="removeRow('koli', idx as number)"
-                      >
-                        <IconTrash :size="12" />
-                      </button>
-                    </td>
-                  </tr>
-                  <tr v-if="!formData.detail.koli.length">
-                    <td colspan="10" class="empty-row">Klik + Tambah Baris</td>
                   </tr>
                 </tbody>
               </table>
@@ -1895,6 +1719,18 @@ watch(
 .gt thead th.bg-yellow {
   background: #f9a825 !important;
   color: #000;
+}
+.gt thead th.tcen {
+  text-align: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.25);
+}
+.gt thead tr.th-r1 th,
+.gt thead tr.th-r2 th {
+  box-sizing: border-box;
+  height: 24px;
+}
+.gt thead tr.th-r2 th {
+  top: 24px;
 }
 .gt tbody td {
   border-bottom: 1px solid #eee;

@@ -946,6 +946,16 @@ const router = createRouter({
         browseRoute: "PpicPlanningSpk",
       },
     },
+    {
+      path: "/ppic/planning-spk/print/:nomor",
+      name: "PpicPlanningSpkPrint",
+      component: () => import("@/views/ppic/PlanningSpkPrintView.vue"),
+      meta: {
+        title: "Cetak Planning SPK PPIC",
+        layout: "BlankLayout",
+        requiresAuth: true,
+      },
+    },
     // router/index.ts
     {
       path: "/ppic/penjadwalan",
@@ -5891,6 +5901,47 @@ const router = createRouter({
         menuId: "124",
       },
     },
+    {
+      path: "/tools/notulensi-meeting",
+      name: "NotulensiMeeting",
+      component: () => import("@/views/tools/NotulensiMeetingView.vue"),
+      meta: {
+        title: "Notulensi Meeting",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "1328",
+      },
+    },
+    {
+      path: "/tools/notulensi-meeting/create",
+      name: "NotulensiMeetingCreate",
+      component: () => import("@/views/tools/NotulensiMeetingFormView.vue"),
+      meta: {
+        title: "Buat Notulensi Meeting",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "1328",
+        browseRoute: "NotulensiMeeting",
+      },
+    },
+    {
+      path: "/tools/notulensi-meeting/edit/:nomor",
+      name: "NotulensiMeetingEdit",
+      component: () => import("@/views/tools/NotulensiMeetingFormView.vue"),
+      meta: {
+        title: "Ubah Notulensi Meeting",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "1328",
+        browseRoute: "NotulensiMeeting",
+      },
+    },
+    {
+      path: "/tools/notulensi-meeting/print/:nomor",
+      name: "NotulensiMeetingPrint",
+      component: () => import("@/views/tools/NotulensiMeetingPrintView.vue"),
+      meta: { requiresAuth: true, layout: "BlankLayout" },
+    },
 
     // ── Error Pages ───────────────────────────────────────────────────
     {
@@ -5921,10 +5972,6 @@ const router = createRouter({
 router.beforeEach((to, _from) => {
   const authStore = useAuthStore();
 
-  // Update judul tab browser
-  const pageTitle = to.meta?.title || to.name || "App";
-  document.title = `${String(pageTitle)} - MANKSI`;
-
   // 1. Belum login → ke Login
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
     return { name: "Login" }; // Gunakan return object, bukan next()
@@ -5952,26 +5999,25 @@ router.beforeEach((to, _from) => {
 // klik link di dalam halaman, router.push() programatik, browser
 // back/forward — bukan cuma klik di TabBar.
 router.afterEach((to) => {
+  // Judul di-set setelah navigasi sukses, supaya navigasi yang dibatalkan
+  // atau ditimpa tidak meninggalkan judul basi.
+  const pageTitle = to.meta?.title || to.name || "App";
+  document.title = `${String(pageTitle)} - MANKSI`;
+
   // Halaman print/blank/login/error gak perlu jadi tab
   if (to.meta.layout !== "DefaultLayout") return;
   if (!to.meta.requiresAuth) return;
 
   const tabsStore = useTabsStore();
 
-  // Lazy-init: kalau user baru login dan tabsStore belum di-init,
-  // bikin Dashboard tab dulu sebelum buka tab halaman yang dituju.
   if (!tabsStore.isReady) {
     tabsStore.initDefaultTabs();
-    // Kalau tujuan navigasi memang Dashboard, cukup init-nya saja
     if (to.path === "/") return;
   }
 
   tabsStore.openTab({
     title: (to.meta.title as string) || to.name?.toString() || "Halaman",
     path: to.path,
-    // Laporan dengan filter di query tetap 1 tab (tab id = path saja,
-    // sesuai keputusan yang sudah dibahas), tapi query tetap disimpan
-    // supaya TabView bisa restore filter saat tab di-switch balik.
     query: Object.keys(to.query).length > 0 ? to.query : undefined,
     icon: getMenuIcon(to.path),
     closable: to.path !== "/",

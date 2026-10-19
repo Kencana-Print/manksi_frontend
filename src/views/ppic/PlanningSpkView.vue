@@ -3,13 +3,17 @@ import { ref, computed, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
 import BaseBrowse from "@/components/BaseBrowse.vue";
-import { planningSpkService } from "@/services/ppic/planningSpkService";
+import {
+  planningSpkService,
+  type PlanningSpkKeteranganPayload,
+} from "@/services/ppic/planningSpkService";
 import {
   IconCalendarStats,
   IconLock,
   IconLockOpen,
   IconFileExport,
   IconTrash,
+  IconPrinter,
 } from "@tabler/icons-vue";
 import {
   exportExcel,
@@ -26,7 +30,6 @@ interface BrowseItem {
   TglAkhir: string;
   Cabang: string;
   Close: string;
-  Keterangan: string;
   JumlahSPK: number;
 }
 interface DetailRow {
@@ -34,10 +37,15 @@ interface DetailRow {
   NamaSPK: string;
   TglJadwal: string;
   Wip: number;
+  WipBahan?: number;
+  WipQty?: number;
+  WipSatuan?: string;
+  WipCatatan?: string;
   QtyPo: number;
   QtyJadwal: number;
   LineKelompok: string;
   Keterangan: string;
+  KeyTanggal: string;
   // Khusus Sewing format baru (Format === "BARU"); selain itu kosong
   Format?: "BARU" | "LAMA";
   Mp?: number;
@@ -50,11 +58,11 @@ interface DetailRow {
   ActualJam?: number | null;
   WaktuProduksi?: number;
   Resume?: number | null;
+  Output?: number;
 }
 interface DetailCache {
   cutting: DetailRow[];
   sewing: DetailRow[];
-  koli: DetailRow[];
 }
 interface ExportPlan {
   Nomor: string;
@@ -63,7 +71,6 @@ interface ExportPlan {
   Cabang: string;
   cutting: DetailRow[];
   sewing: DetailRow[];
-  koli: DetailRow[];
 }
 type BarisExport = Record<string, string | number | boolean>;
 
@@ -152,6 +159,34 @@ const showDeleteDialog = ref(false);
 const isActioning = ref(false);
 const selectedItem = ref<BrowseItem | null>(null);
 
+const showPrintDialog = ref(false);
+const printDivisi = ref<"cutting" | "sewing">("cutting");
+
+const openPrintDialog = () => {
+  if (!selected.value.length) {
+    toast.warning("Pilih planning yang akan dicetak.");
+    return;
+  }
+  selectedItem.value = selected.value[0];
+  showPrintDialog.value = true;
+};
+
+const doPrint = () => {
+  if (!selectedItem.value) return;
+  const url = router.resolve({
+    name: "PpicPlanningSpkPrint",
+    params: { nomor: selectedItem.value.Nomor },
+    query: {
+      divisi: printDivisi.value,
+      awal: selectedItem.value.TglAwal,
+      akhir: selectedItem.value.TglAkhir,
+      cab: selectedItem.value.Cabang,
+    },
+  }).href;
+  window.open(url, "_blank");
+  showPrintDialog.value = false;
+};
+
 // ─── Headers ──────────────────────────────────────────────────────────────────
 const headers = [
   { title: "NOMOR", key: "Nomor", width: "200px" },
@@ -160,7 +195,6 @@ const headers = [
   { title: "CABANG", key: "Cabang", width: "70px", align: "center" },
   { title: "STATUS", key: "Close", width: "80px", align: "center" },
   { title: "JML SPK", key: "JumlahSPK", width: "80px", align: "center" },
-  { title: "KETERANGAN", key: "Keterangan", width: "300px" },
 ];
 
 // ─── Fetch ────────────────────────────────────────────────────────────────────
@@ -211,7 +245,7 @@ const handleExpand = async (newExpanded: BrowseItem[]) => {
     const res = await planningSpkService.getDetail(nomor);
     detailCache.value = {
       ...detailCache.value,
-      [nomor]: res.data.data ?? { cutting: [], sewing: [], koli: [] },
+      [nomor]: res.data.data ?? { cutting: [], sewing: [] },
     };
   } catch {
     toast.error(`Gagal memuat detail ${nomor}`);
@@ -334,7 +368,6 @@ const doExportMaster = async () => {
           align: "right",
           numFmt: "#,##0",
         },
-        { header: "Keterangan", key: "Keterangan", width: 40 },
       ],
       rows.map((r) => ({
         Nomor: r.Nomor,
@@ -343,7 +376,6 @@ const doExportMaster = async () => {
         Cabang: r.Cabang,
         Status: r.Close === "Y" ? "Closed" : "Open",
         JumlahSPK: Number(r.JumlahSPK) || 0,
-        Keterangan: r.Keterangan || "",
       })),
     );
   } catch {
@@ -358,7 +390,7 @@ const kolomMaster: ExcelColumn[] = [
   { header: "Cabang", key: "Cabang", width: 9 },
 ];
 
-// Cutting, Koli, dan Sewing format lama (sama dengan tabel di expand)
+// Sewing format lama (sama dengan tabel di expand)
 const kolomJadwal: ExcelColumn[] = [
   { header: "Nomor SPK", key: "NomorSPK", width: 22 },
   { header: "Nama SPK", key: "NamaSPK", width: 34 },
@@ -370,18 +402,39 @@ const kolomJadwal: ExcelColumn[] = [
   { header: "Keterangan", key: "Keterangan", width: 30 },
 ];
 
+const kolomCutting: ExcelColumn[] = [
+  { header: "Nomor SPK", key: "NomorSPK", width: 22 },
+  { header: "Nama SPK", key: "NamaSPK", width: 34 },
+  {
+    header: "WIP Bahan Qty",
+    key: "WipBahan",
+    align: "right",
+    numFmt: "#,##0.00",
+  },
+  { header: "WIP Bahan Satuan", key: "WipSatuan", width: 16 },
+  { header: "Qty Target", key: "QtyJadwal", align: "right", numFmt: "#,##0" },
+  { header: "Proses Produksi", key: "LineKelompok", width: 16 },
+  { header: "Output", key: "Output", align: "right", numFmt: "#,##0" },
+];
+
 // Sewing format baru (sama dengan tabel di expand + baris judul per Line)
 const kolomSewing: ExcelColumn[] = [
   { header: "Line", key: "Line", width: 16 },
   { header: "MP", key: "Mp", align: "right", numFmt: "#,##0" },
+  { header: "Hari", key: "Hari", align: "right", numFmt: "#,##0.0" },
+  { header: "Jam", key: "Jam", align: "right", numFmt: "#,##0.0" },
+  {
+    header: "Waktu Prod (mnt)",
+    key: "WaktuProduksi",
+    align: "right",
+    numFmt: "#,##0",
+  },
   { header: "Act. Jam", key: "ActualJam", align: "right", numFmt: "#,##0.00" },
   { header: "No", key: "No", align: "center", width: 6 },
   { header: "Nomor SPK", key: "NomorSPK", width: 22 },
   { header: "Nama SPK", key: "NamaSPK", width: 34 },
   { header: "SMV (mnt)", key: "Smv", align: "right", numFmt: "#,##0.000" },
   { header: "Sumber SMV", key: "SmvSumber", width: 12 },
-  { header: "Hari", key: "Hari", align: "right", numFmt: "#,##0.0" },
-  { header: "Jam", key: "Jam", align: "right", numFmt: "#,##0.0" },
   { header: "Target", key: "Target", align: "right", numFmt: "#,##0" },
   {
     header: "Act. Output",
@@ -390,10 +443,10 @@ const kolomSewing: ExcelColumn[] = [
     numFmt: "#,##0",
   },
   {
-    header: "Waktu Prod (mnt)",
-    key: "WaktuProduksi",
+    header: "Output (mnt)",
+    key: "OutputMenit",
     align: "right",
-    numFmt: "#,##0",
+    numFmt: "#,##0.0",
   },
   { header: "Resume (mnt)", key: "Resume", align: "right", numFmt: "#,##0.0" },
   { header: "Keterangan", key: "Keterangan", width: 30 },
@@ -445,7 +498,6 @@ const doExportDetail = async () => {
     });
 
     const sheetCutting: BarisExport[] = [];
-    const sheetKoli: BarisExport[] = [];
     const sheetSewingBaru: BarisExport[] = [];
     const sheetSewingLama: BarisExport[] = [];
 
@@ -459,8 +511,18 @@ const doExportDetail = async () => {
       );
 
     for (const p of plans) {
-      isiJadwal(p, p.cutting, sheetCutting);
-      isiJadwal(p, p.koli, sheetKoli);
+      p.cutting.forEach((d, i) =>
+        sheetCutting.push({
+          ...induk(p, i === 0),
+          NomorSPK: d.NomorSPK,
+          NamaSPK: d.NamaSPK || "",
+          WipBahan: angkaAtauKosong(d.WipSatuan ? d.WipBahan : undefined),
+          WipSatuan: d.WipSatuan || "",
+          QtyJadwal: Number(d.QtyJadwal) || 0,
+          LineKelompok: d.LineKelompok || "",
+          Output: angkaAtauKosong(d.Output),
+        }),
+      );
       isiJadwal(
         p,
         p.sewing.filter((r) => r.Format !== "BARU"),
@@ -475,6 +537,11 @@ const doExportDetail = async () => {
           ...induk(p, barisPertama),
           Line: g.line || "(Tanpa line)",
           Mp: angkaAtauKosong(g.items[0].Mp),
+          Hari: angkaAtauKosong(g.items[0].Hari),
+          Jam: angkaAtauKosong(g.items[0].Jam),
+          WaktuProduksi: g.items[0].WaktuProduksi
+            ? g.items[0].WaktuProduksi
+            : "",
           ActualJam: angkaAtauKosong(g.items[0].ActualJam),
           Target: g.totalTarget,
           ActualOutput: g.totalActual,
@@ -489,11 +556,9 @@ const doExportDetail = async () => {
             NamaSPK: d.NamaSPK || "",
             Smv: angkaAtauKosong(d.Smv),
             SmvSumber: d.SmvSumber ?? "",
-            Hari: angkaAtauKosong(d.Hari),
-            Jam: angkaAtauKosong(d.Jam),
             Target: angkaAtauKosong(d.Target),
             ActualOutput: angkaAtauKosong(d.ActualOutput),
-            WaktuProduksi: angkaAtauKosong(d.WaktuProduksi),
+            OutputMenit: angkaAtauKosong(outputMenit(d)),
             Resume: angkaAtauKosong(d.Resume),
             Keterangan: d.Keterangan || "",
             _over: isOver(d),
@@ -506,7 +571,7 @@ const doExportDetail = async () => {
     if (sheetCutting.length)
       sheets.push({
         sheetName: "Cutting",
-        columns: [...kolomMaster, ...kolomJadwal],
+        columns: [...kolomMaster, ...kolomCutting],
         rows: sheetCutting,
         headerColor: "546E7A",
       });
@@ -524,13 +589,6 @@ const doExportDetail = async () => {
         columns: [...kolomMaster, ...kolomJadwal],
         rows: sheetSewingLama,
         headerColor: "2E7D32",
-      });
-    if (sheetKoli.length)
-      sheets.push({
-        sheetName: "Koli",
-        columns: [...kolomMaster, ...kolomJadwal],
-        rows: sheetKoli,
-        headerColor: "E65100",
       });
 
     if (!sheets.length) {
@@ -590,8 +648,47 @@ const groupSewing = (rows: DetailRow[]) => {
 
 const sewingGroups = (nomor: string) => groupSewing(sewingBaru(nomor));
 
+// Resume per operator vs kapasitas per operator (Hari x Jam x 60).
+// WaktuProduksi sudah termasuk MP, jadi tidak bisa dipakai untuk pembanding ini.
 const isOver = (d: DetailRow) =>
-  d.Resume != null && d.WaktuProduksi != null && d.Resume > d.WaktuProduksi;
+  d.Resume != null &&
+  d.Hari != null &&
+  d.Jam != null &&
+  d.Resume > d.Hari * d.Jam * 60;
+
+// Output menit = SMV x Act. Output (kosong kalau SMV belum ada)
+const outputMenit = (d: DetailRow): number | null =>
+  d.Smv != null && d.Smv > 0 ? d.Smv * (Number(d.ActualOutput) || 0) : null;
+
+const simpanKeterangan = async (
+  nomor: string,
+  divisi: PlanningSpkKeteranganPayload["divisi"],
+  d: DetailRow,
+  e: Event,
+) => {
+  const el = e.target as HTMLInputElement;
+  const baru = el.value.trim();
+  if (baru === (d.Keterangan ?? "")) {
+    el.value = baru;
+    return;
+  }
+  try {
+    await planningSpkService.updateKeterangan(nomor, {
+      divisi,
+      spk: d.NomorSPK,
+      tanggal: d.KeyTanggal,
+      line: d.LineKelompok ?? "",
+      keterangan: baru,
+    });
+    d.Keterangan = baru;
+    toast.success("Keterangan disimpan.");
+  } catch (err) {
+    const msg = (err as { response?: { data?: { message?: string } } }).response
+      ?.data?.message;
+    toast.error(msg || "Gagal menyimpan keterangan.");
+    el.value = d.Keterangan ?? "";
+  }
+};
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 fetchData();
@@ -677,6 +774,14 @@ fetchData();
       </v-btn>
       <v-btn
         size="small"
+        color="indigo-darken-2"
+        :disabled="!selected.length"
+        @click="openPrintDialog"
+      >
+        <template #prepend><IconPrinter :size="14" /></template>Cetak
+      </v-btn>
+      <v-btn
+        size="small"
         color="green-darken-2"
         :loading="isExportingDetail"
         @click="doExportDetail"
@@ -743,18 +848,6 @@ fetchData();
                 {{ detailCache[item.Nomor].sewing.length }}
               </v-chip>
             </v-tab>
-            <v-tab value="koli" class="expand-tab-item"
-              >Koli
-              <v-chip
-                v-if="detailCache[item.Nomor].koli.length"
-                size="x-small"
-                color="orange"
-                variant="flat"
-                class="ml-1"
-              >
-                {{ detailCache[item.Nomor].koli.length }}
-              </v-chip>
-            </v-tab>
           </v-tabs>
 
           <v-tabs-window v-model="expandTab[item.Nomor]">
@@ -763,14 +856,16 @@ fetchData();
               <table class="dt">
                 <thead>
                   <tr class="thead-cutting">
-                    <th>Nomor SPK</th>
-                    <th>Nama SPK</th>
-                    <th>Tgl Jadwal</th>
-                    <th class="tr">WIP</th>
-                    <th class="tr">Qty PO</th>
-                    <th class="tr">Qty Jadwal</th>
-                    <th>Line/Kelompok</th>
-                    <th>Keterangan</th>
+                    <th rowspan="2">Nomor SPK</th>
+                    <th rowspan="2">Nama SPK</th>
+                    <th colspan="2" style="text-align: center">WIP Bahan</th>
+                    <th rowspan="2" class="tr">Qty Target</th>
+                    <th rowspan="2">Proses Produksi</th>
+                    <th rowspan="2" class="tr">Output</th>
+                  </tr>
+                  <tr class="thead-cutting">
+                    <th class="tr">Qty</th>
+                    <th>Satuan</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -780,12 +875,19 @@ fetchData();
                   >
                     <td class="mono">{{ d.NomorSPK }}</td>
                     <td>{{ d.NamaSPK || "—" }}</td>
-                    <td>{{ formatTanggal(d.TglJadwal) }}</td>
-                    <td class="tr">{{ fmt(d.Wip) }}</td>
-                    <td class="tr">{{ fmt(d.QtyPo) }}</td>
+                    <td
+                      class="tr"
+                      :title="
+                        d.WipCatatan ? 'Satuan lain: ' + d.WipCatatan : ''
+                      "
+                    >
+                      {{ d.WipSatuan ? fmt(d.WipBahan) : "—"
+                      }}<span v-if="d.WipCatatan">*</span>
+                    </td>
+                    <td>{{ d.WipSatuan || "—" }}</td>
                     <td class="tr fw">{{ fmt(d.QtyJadwal) }}</td>
                     <td>{{ d.LineKelompok || "—" }}</td>
-                    <td>{{ d.Keterangan || "—" }}</td>
+                    <td class="tr fw">{{ d.Output ? fmt(d.Output) : "—" }}</td>
                   </tr>
                   <tr v-if="!detailCache[item.Nomor].cutting.length">
                     <td colspan="8" class="empty-row">
@@ -806,11 +908,9 @@ fetchData();
                     <th>Nomor SPK</th>
                     <th>Nama SPK</th>
                     <th class="tr">SMV (mnt)</th>
-                    <th class="tr">Hari</th>
-                    <th class="tr">Jam</th>
                     <th class="tr">Target</th>
                     <th class="tr">Act. Output</th>
-                    <th class="tr">Waktu Prod (mnt)</th>
+                    <th class="tr">Output (mnt)</th>
                     <th class="tr">Resume (mnt)</th>
                     <th>Keterangan</th>
                   </tr>
@@ -821,13 +921,28 @@ fetchData();
                     :key="g.line || '_blank'"
                   >
                     <tr class="grp-row">
-                      <td colspan="11">
+                      <td colspan="9">
                         <div class="grp-bar">
                           <span class="grp-title">{{
                             g.line || "(Tanpa line)"
                           }}</span>
                           <span class="grp-chip"
                             >MP <b>{{ fmtDec(g.items[0].Mp, 0) }}</b></span
+                          >
+                          <span class="grp-chip"
+                            >Hari <b>{{ fmtDec(g.items[0].Hari, 1) }}</b></span
+                          >
+                          <span class="grp-chip"
+                            >Jam <b>{{ fmtDec(g.items[0].Jam, 1) }}</b></span
+                          >
+                          <span class="grp-chip"
+                            >Waktu Prod
+                            <b>{{
+                              (g.items[0].WaktuProduksi ?? 0) > 0
+                                ? fmtDec(g.items[0].WaktuProduksi, 0)
+                                : "—"
+                            }}</b>
+                            mnt</span
                           >
                           <span class="grp-chip"
                             >Act. Jam
@@ -862,15 +977,30 @@ fetchData();
                         />
                         {{ fmtDec(d.Smv, 3) }}
                       </td>
-                      <td class="tr">{{ fmtDec(d.Hari, 1) }}</td>
-                      <td class="tr">{{ fmtDec(d.Jam, 1) }}</td>
                       <td class="tr fw">{{ fmt(d.Target) }}</td>
                       <td class="tr">{{ fmt(d.ActualOutput) }}</td>
-                      <td class="tr">{{ fmtDec(d.WaktuProduksi, 0) }}</td>
+                      <td class="tr">{{ fmtDec(outputMenit(d), 1) }}</td>
                       <td class="tr" :class="{ over: isOver(d) }">
                         {{ fmtDec(d.Resume, 1) }}
                       </td>
-                      <td>{{ d.Keterangan || "—" }}</td>
+                      <td class="ket-cell">
+                        <input
+                          class="ket-inp"
+                          :value="d.Keterangan"
+                          :disabled="item.Close === 'Y'"
+                          :title="
+                            item.Close === 'Y' ? 'Planning sudah Close' : ''
+                          "
+                          maxlength="200"
+                          placeholder="—"
+                          @keydown.enter.prevent="
+                            ($event.target as HTMLInputElement).blur()
+                          "
+                          @blur="
+                            simpanKeterangan(item.Nomor, 'SEWING', d, $event)
+                          "
+                        />
+                      </td>
                     </tr>
                   </template>
                 </tbody>
@@ -899,7 +1029,24 @@ fetchData();
                     <td class="tr">{{ fmt(d.QtyPo) }}</td>
                     <td class="tr fw">{{ fmt(d.QtyJadwal) }}</td>
                     <td>{{ d.LineKelompok || "—" }}</td>
-                    <td>{{ d.Keterangan || "—" }}</td>
+                    <td class="ket-cell">
+                      <input
+                        class="ket-inp"
+                        :value="d.Keterangan"
+                        :disabled="item.Close === 'Y'"
+                        :title="
+                          item.Close === 'Y' ? 'Planning sudah Close' : ''
+                        "
+                        maxlength="200"
+                        placeholder="—"
+                        @keydown.enter.prevent="
+                          ($event.target as HTMLInputElement).blur()
+                        "
+                        @blur="
+                          simpanKeterangan(item.Nomor, 'SEWING', d, $event)
+                        "
+                      />
+                    </td>
                   </tr>
                 </tbody>
               </table>
@@ -910,39 +1057,6 @@ fetchData();
               >
                 Tidak ada data sewing
               </div>
-            </v-tabs-window-item>
-
-            <!-- Koli -->
-            <v-tabs-window-item value="koli">
-              <table class="dt">
-                <thead>
-                  <tr class="thead-koli">
-                    <th>Nomor SPK</th>
-                    <th>Nama SPK</th>
-                    <th>Tgl Jadwal</th>
-                    <th class="tr">WIP</th>
-                    <th class="tr">Qty PO</th>
-                    <th class="tr">Qty Jadwal</th>
-                    <th>Line/Kelompok</th>
-                    <th>Keterangan</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="(d, i) in detailCache[item.Nomor].koli" :key="i">
-                    <td class="mono">{{ d.NomorSPK }}</td>
-                    <td>{{ d.NamaSPK || "—" }}</td>
-                    <td>{{ formatTanggal(d.TglJadwal) }}</td>
-                    <td class="tr">{{ fmt(d.Wip) }}</td>
-                    <td class="tr">{{ fmt(d.QtyPo) }}</td>
-                    <td class="tr fw">{{ fmt(d.QtyJadwal) }}</td>
-                    <td>{{ d.LineKelompok || "—" }}</td>
-                    <td>{{ d.Keterangan || "—" }}</td>
-                  </tr>
-                  <tr v-if="!detailCache[item.Nomor].koli.length">
-                    <td colspan="8" class="empty-row">Tidak ada data koli</td>
-                  </tr>
-                </tbody>
-              </table>
             </v-tabs-window-item>
           </v-tabs-window>
         </template>
@@ -974,6 +1088,31 @@ fetchData();
           @click="confirmClose"
           >Ya, Close</v-btn
         >
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
+
+  <!-- ─── Dialog Cetak ─── -->
+  <v-dialog v-model="showPrintDialog" max-width="340" persistent>
+    <v-card class="rounded-lg">
+      <v-card-title class="bg-indigo-darken-2 text-white pa-3 text-subtitle-1">
+        Cetak Planning SPK
+      </v-card-title>
+      <v-card-text class="pa-4">
+        <div class="mb-2">
+          Planning <b>{{ selectedItem?.Nomor }}</b>
+        </div>
+        <v-radio-group v-model="printDivisi" hide-details density="compact">
+          <v-radio label="Cutting" value="cutting" />
+          <v-radio label="Sewing" value="sewing" />
+        </v-radio-group>
+      </v-card-text>
+      <v-card-actions class="pa-3 border-t bg-grey-lighten-4">
+        <v-btn variant="text" @click="showPrintDialog = false">Batal</v-btn>
+        <v-spacer />
+        <v-btn color="indigo-darken-2" variant="elevated" @click="doPrint">
+          Cetak
+        </v-btn>
       </v-card-actions>
     </v-card>
   </v-dialog>
@@ -1131,11 +1270,6 @@ fetchData();
   background: #2e7d32;
   color: white;
 }
-.thead-koli th {
-  background: #e65100;
-  color: white;
-}
-
 .dt tbody td {
   padding: 3px 8px;
   border-bottom: 1px solid #eee;
@@ -1208,6 +1342,33 @@ fetchData();
 }
 .tc {
   text-align: center;
+}
+
+.dt td.ket-cell {
+  padding: 1px 4px;
+}
+.ket-inp {
+  width: 100%;
+  min-width: 180px;
+  height: 22px;
+  padding: 0 4px;
+  font-size: 11px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  outline: none;
+}
+.ket-inp:hover:not(:disabled) {
+  background: white;
+  border-color: #bdbdbd;
+}
+.ket-inp:focus {
+  background: #fffde7;
+  border-color: #1976d2;
+}
+.ket-inp:disabled {
+  color: inherit;
+  cursor: default;
 }
 
 /* Override Vuetify tabs di dalam expand */

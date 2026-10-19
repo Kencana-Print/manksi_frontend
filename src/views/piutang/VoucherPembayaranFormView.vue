@@ -100,7 +100,9 @@ const xpotonganBahan = computed(() =>
 const xtotalDetail = computed(() =>
   detail.value.reduce((s, d) => {
     if (!d.tipe) return s;
-    if (["BPB", "BPJ", "POE", "MMT", "BPE", "BPG", "POL"].includes(d.tipe))
+    if (
+      ["BPB", "BPJ", "POE", "MMT", "BPE", "BPG", "POL", "PCL"].includes(d.tipe)
+    )
       return s + (Number(d.total) || 0);
     if (["RET", "PJG"].includes(d.tipe)) return s - (Number(d.total) || 0);
     return s;
@@ -195,6 +197,7 @@ const loadNotaDetail = async (idx: number, nomor: string, searchType = "") => {
   } catch (e: any) {
     toast.error(e.response?.data?.message ?? "Nota tidak ditemukan.");
     Object.assign(d, {
+      nomor: "",
       tipe: "",
       tanggal: "",
       keterangan: "",
@@ -300,6 +303,7 @@ const notaTypeConfig = computed(() => {
     BPE: { title: "BPB PO External MMT", color: "#0277bd" },
     BPG: { title: "BPB Non Bahan", color: "#6a1b9a" },
     POL: { title: "PO Lain-lain", color: "#ef6c00" },
+    PCL: { title: "PO Celup", color: "#ad1457" },
   };
   return map[notaModalType.value] ?? { title: "Cari Nota", color: "#1565c0" };
 });
@@ -340,10 +344,9 @@ const doSearchNota = async () => {
     notaLoading.value = false;
   }
 };
-// Nota yang sudah dipakai di baris lain (baris aktif tidak dihitung,
-// karena baris aktif akan ditimpa)
-const isNotaUsed = (n: any) =>
-  detail.value.some((d, i) => i !== activeNotaIdx.value && d.nomor === n.Nomor);
+// Nota yang sudah dipakai di baris mana pun. Baris aktif yang terisi tidak
+// ditimpa (nota baru ditambahkan di bawahnya), jadi ikut dihitung.
+const isNotaUsed = (n: any) => detail.value.some((d) => d.nomor === n.Nomor);
 
 const isNotaSelected = (n: any) =>
   selectedNotas.value.some((s) => s.Nomor === n.Nomor);
@@ -389,12 +392,14 @@ const confirmNotaSelection = async () => {
   const picked = [...selectedNotas.value];
   showNotaModal.value = false;
 
-  // Siapkan baris: pertama di baris aktif, sisanya reuse baris kosong
-  // di bawahnya atau sisipkan baris baru
+  // Baris aktif kosong → dipakai nota pertama. Baris aktif sudah terisi →
+  // semua nota ditambahkan di bawahnya (pakai baris kosong yang ada, atau
+  // sisipkan baris baru).
+  const aktifTerisi = !!detail.value[startIdx]?.nomor;
   const targetIdx: number[] = [];
   let cursor = startIdx;
   picked.forEach((n, i) => {
-    if (i > 0) {
+    if (i > 0 || aktifTerisi) {
       cursor++;
       const next = detail.value[cursor];
       if (!next || next.nomor) {
@@ -473,6 +478,7 @@ onMounted(async () => {
         PJG: "PJG",
         BPG: "BPG",
         POL: "POL",
+        PCL: "PCL",
       };
       detail.value = (d.detail || []).map((row: any) => ({
         ...row,
@@ -496,7 +502,7 @@ onMounted(async () => {
     }
   } catch (e: any) {
     toast.error(e.response?.data?.message ?? "Gagal memuat data.");
-    router.back();
+    kembaliKeBrowse();
   } finally {
     isLoading.value = false;
   }
@@ -555,19 +561,31 @@ const executeSave = async () => {
   }
 };
 
+// Urutan sama dengan useForm.goBack: pindah ke Browse dulu, baru tutup tab
+// form, supaya tab aktif tidak sempat melompat ke tab tetangga.
+// route.path HARUS diambil sebelum push (setelah push nilainya berubah).
+const kembaliKeBrowse = async () => {
+  const currentPath = route.path;
+  try {
+    await router.push({ name: "VoucherPembayaranBrowse" });
+  } catch {
+    /* navigasi dibatalkan, tab tetap ditutup */
+  }
+  tabsStore.closeTab(currentPath);
+};
+
 const pilihCetak = () => {
   window.open(
     `/piutang/voucher-pembayaran/print/${encodeURIComponent(savedNomor.value)}`,
     "_blank",
   );
   showPrintDialog.value = false;
-  tabsStore.closeTab(route.path);
-  router.push("/piutang/voucher-pembayaran");
+  kembaliKeBrowse();
 };
+
 const skipCetak = () => {
   showPrintDialog.value = false;
-  tabsStore.closeTab(route.path);
-  router.push("/piutang/voucher-pembayaran");
+  kembaliKeBrowse();
 };
 
 const executeCancel = () => {
@@ -607,8 +625,7 @@ const executeCancel = () => {
 
 const executeClose = () => {
   showCloseDialog.value = false;
-  tabsStore.closeTab(route.path);
-  router.push("/piutang/voucher-pembayaran");
+  kembaliKeBrowse();
 };
 </script>
 
@@ -813,6 +830,7 @@ const executeClose = () => {
                         <option value="BPE">BPB PO Ext MMT</option>
                         <option value="BPG">BPB Non Bahan</option>
                         <option value="POL">PO Lain-lain</option>
+                        <option value="PCL">PO Celup</option>
                       </select>
                       <button
                         type="button"
@@ -1535,6 +1553,10 @@ const executeClose = () => {
 .type-pol {
   background: #fff3e0;
   color: #ef6c00;
+}
+.type-pcl {
+  background: #fce4ec;
+  color: #ad1457;
 }
 .btn-del {
   background: transparent;

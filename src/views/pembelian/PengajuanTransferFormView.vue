@@ -285,7 +285,7 @@ const openVoucherModal = async (idx: number) => {
   showVoucherModal.value = true;
   await doSearchVoucher();
 };
-const selectVoucher = (v: any) => {
+const selectVoucher = async (v: any) => {
   const exists = form.value.detail.some(
     (d, i) => i !== activeTrsIdx.value && d.trs === v.nomor,
   );
@@ -293,10 +293,21 @@ const selectVoucher = (v: any) => {
     toast.warning("Nomor Voucher tsb sudah di input.");
     return;
   }
-  const d = form.value.detail[activeTrsIdx.value];
+  const idx = activeTrsIdx.value;
+  const d = form.value.detail[idx];
   d.trs = v.nomor;
   d.nominal = Number(v.nominal) || 0;
   showVoucherModal.value = false;
+
+  // Isi kode/nama/bank/atas nama/rekening dari supplier voucher
+  // (kalau rekening >1, muncul pilihan rekening)
+  activeSupIdx.value = idx;
+  await selectSupplier({ Kode: v.supKode, Nama: v.supplier });
+
+  if (!d.rekening && !showSupDetModal.value)
+    toast.warning(
+      `Supplier ${d.nama || v.supKode} belum punya data rekening di master supplier.`,
+    );
 };
 
 const doSearchPo = async () => {
@@ -699,6 +710,18 @@ const validateSave = () => {
   showSaveDialog.value = true;
 };
 
+// Urutan sama dengan useForm.goBack: pindah ke Browse dulu, baru tutup tab form.
+// route.path diambil sebelum push (setelah push nilainya berubah).
+const kembaliKeBrowse = async () => {
+  const currentPath = route.path;
+  try {
+    await router.push({ name: "PengajuanTransferBrowse" });
+  } catch {
+    /* navigasi dibatalkan, tab tetap ditutup */
+  }
+  tabsStore.closeTab(currentPath);
+};
+
 const executeSave = async () => {
   isSaving.value = true;
   try {
@@ -720,8 +743,8 @@ const executeSave = async () => {
 
     if (isRealisasi.value) {
       toast.success(`Berhasil disimpan. Nomor: ${savedNomor.value}`);
-      tabsStore.closeTab(route.path);
-      router.push("/pembelian/pengajuan-transfer");
+
+      kembaliKeBrowse();
     } else {
       toast.success("Data berhasil disimpan.");
       showPrintDialog.value = true;
@@ -745,8 +768,7 @@ const executeCancel = () => {
 };
 const executeClose = () => {
   showCloseDialog.value = false;
-  tabsStore.closeTab(route.path);
-  router.push("/pembelian/pengajuan-transfer");
+  kembaliKeBrowse();
 };
 
 const pilihCetak = () => {
@@ -755,13 +777,11 @@ const pilihCetak = () => {
     "_blank",
   );
   showPrintDialog.value = false;
-  tabsStore.closeTab(route.path);
-  router.push("/pembelian/pengajuan-transfer");
+  kembaliKeBrowse();
 };
 const skipCetak = () => {
   showPrintDialog.value = false;
-  tabsStore.closeTab(route.path);
-  router.push("/pembelian/pengajuan-transfer");
+  kembaliKeBrowse();
 };
 </script>
 

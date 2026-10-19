@@ -40,6 +40,18 @@ const tglVerifikasi = ref("");
 const userVerifikasi = ref("");
 const xLoad = ref(false);
 
+// Urutan sama dengan useForm.goBack: pindah ke Browse dulu, baru tutup tab form.
+// route.path diambil sebelum push (setelah push nilainya berubah).
+const kembaliKeBrowse = async () => {
+  const currentPath = route.path;
+  try {
+    await router.push({ name: "TerimaSetoranBrowse" });
+  } catch {
+    /* navigasi dibatalkan, tab tetap ditutup */
+  }
+  tabsStore.closeTab(currentPath);
+};
+
 // ── Load ──
 const loadData = async () => {
   isLoading.value = true;
@@ -61,7 +73,7 @@ const loadData = async () => {
     xLoad.value = false;
   } catch (e: any) {
     toast.error(e.response?.data?.message || "Gagal memuat data.");
-    router.back();
+    kembaliKeBrowse();
   } finally {
     isLoading.value = false;
   }
@@ -164,8 +176,7 @@ const onConfirmSave = async () => {
       })),
     });
     toast.success("Data berhasil disimpan.");
-    tabsStore.closeTab(route.path);
-    router.push("/piutang/terima-setoran");
+    kembaliKeBrowse();
   } catch (e: any) {
     toast.error(e.response?.data?.message || "Gagal menyimpan.");
   } finally {
@@ -180,8 +191,7 @@ const onConfirmCancel = () => {
 
 const onConfirmClose = () => {
   showCloseDialog.value = false;
-  tabsStore.closeTab(route.path);
-  router.push("/piutang/terima-setoran");
+  kembaliKeBrowse();
 };
 
 const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");

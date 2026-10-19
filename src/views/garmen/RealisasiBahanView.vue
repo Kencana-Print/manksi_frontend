@@ -57,6 +57,7 @@ const headers = [
   { title: "Nomor", key: "Nomor", width: "130px" },
   { title: "Status", key: "StatusAktif", width: "90px" },
   { title: "Tanggal", key: "Tanggal", width: "95px" },
+  { title: "Jam", key: "Jam", width: "70px" },
   { title: "No. Minta", key: "NoMinta", width: "130px" },
   { title: "Gudang", key: "Gudang", minWidth: "150px" },
   { title: "Gdg Produksi", key: "GdgProduksi", width: "100px" },

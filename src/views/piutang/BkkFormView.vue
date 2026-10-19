@@ -506,11 +506,22 @@ const validateSave = () => {
   showSaveDialog.value = true;
 };
 
+// Urutan sama dengan useForm.goBack: pindah ke Browse dulu, baru tutup tab form.
+// route.path diambil sebelum push (setelah push nilainya berubah).
+const kembaliKeBrowse = async () => {
+  const currentPath = route.path;
+  try {
+    await router.push({ name: "BkkBrowse" });
+  } catch {
+    /* navigasi dibatalkan, tab tetap ditutup */
+  }
+  tabsStore.closeTab(currentPath);
+};
+
 // ── Dialog cetak ──
 const closePrintAndExit = () => {
   showPrintDialog.value = false;
-  tabsStore.closeTab(route.path);
-  router.push("/piutang/bkk");
+  kembaliKeBrowse();
 };
 const pilihCetak = () => {
   showPrintDialog.value = false;
@@ -518,8 +529,7 @@ const pilihCetak = () => {
     `/piutang/bkk/print/${encodeURIComponent(savedNomor.value)}`,
     "_blank",
   );
-  tabsStore.closeTab(route.path);
-  router.push("/piutang/bkk");
+  kembaliKeBrowse();
 };
 </script>
 

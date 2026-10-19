@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import { useRoute } from "vue-router";
 import { useToast } from "vue-toastification";
-import { useTabsStore } from "@/stores/tabsStore";
 import { useForm } from "@/composables/useForm";
 import { bbmFormService } from "@/services/piutang/bbmFormService";
 import BaseForm from "@/components/BaseForm.vue";
@@ -17,9 +16,7 @@ import {
 import api from "@/services/api";
 
 const route = useRoute();
-const router = useRouter();
 const toast = useToast();
-const tabsStore = useTabsStore();
 const isEditMode = computed(() => !!route.params.nomor);
 
 const ALLOWED_CABANG = ["HO-", "P01", "P04"];
@@ -204,6 +201,7 @@ const {
   executeSave,
   executeCancel,
   executeClose,
+  goBack,
 } = useForm({
   menuId: "954",
   initialData,
@@ -335,8 +333,7 @@ const validateSave = () => {
 // ── Dialog cetak ──
 const closePrintAndExit = () => {
   showPrintDialog.value = false;
-  tabsStore.closeTab(route.path);
-  router.push("/piutang/bbm");
+  goBack();
 };
 const pilihCetak = () => {
   showPrintDialog.value = false;
@@ -344,8 +341,7 @@ const pilihCetak = () => {
     `/piutang/bbm/print/${encodeURIComponent(savedNomor.value)}`,
     "_blank",
   );
-  tabsStore.closeTab(route.path);
-  router.push("/piutang/bbm");
+  goBack();
 };
 </script>
 

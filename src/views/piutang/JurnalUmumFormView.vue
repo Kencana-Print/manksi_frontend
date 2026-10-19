@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import { useRoute } from "vue-router";
 import { useToast } from "vue-toastification";
 import { useForm } from "@/composables/useForm";
-import { useTabsStore } from "@/stores/tabsStore";
 import { jurnalUmumFormService } from "@/services/piutang/jurnalUmumFormService";
 import BaseForm from "@/components/BaseForm.vue";
 import AccountSearchModal from "@/components/lookups/AccountSearchModal.vue";
@@ -12,9 +11,7 @@ import { IconBook, IconPlus, IconTrash, IconSearch } from "@tabler/icons-vue";
 import api from "@/services/api";
 
 const route = useRoute();
-const router = useRouter();
 const toast = useToast();
-const tabsStore = useTabsStore();
 const isEditMode = computed(() => !!route.params.nomor);
 
 const ALLOWED_CABANG = ["HO-", "P01", "P04"];
@@ -114,6 +111,7 @@ const {
   executeSave,
   executeCancel,
   executeClose,
+  goBack,
 } = useForm({
   menuId: "956",
   initialData,
@@ -144,8 +142,7 @@ const {
   },
   onSuccess: () => {
     toast.success("Data Jurnal Umum berhasil disimpan.");
-    tabsStore.closeTab(route.path);
-    router.push("/piutang/jurnal-umum");
+    goBack();
   },
 });
 

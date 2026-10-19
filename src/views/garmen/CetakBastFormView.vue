@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, watch, nextTick } from "vue";
+import { ref, computed, onMounted, watch, nextTick } from "vue";
 import { useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
 import BaseForm from "@/components/BaseForm.vue";
@@ -209,6 +209,21 @@ const {
     showPrintDialog.value = true;
   },
 });
+
+const isBreakdownSize = computed(
+  () =>
+    (formData.value.header.mspk_rencana_size || "").trim().toUpperCase() ===
+    "BRAKEDOWN SIZE",
+);
+
+// Mode edit: BAST lama yang belum punya baris size untuk komponennya
+// digenerate otomatis (hanya kalau Rencana Size = BRAKEDOWN SIZE).
+const generateMissingSizeRows = async () => {
+  if (!isBreakdownSize.value) return;
+  for (const k of formData.value.komponen) {
+    await ensureSizeRowsForKomponen((k.komponen || "").trim());
+  }
+};
 
 // ── SINKRONISASI: Babaran di grid Bahan (komponen) ↔ Keterangan
 // checklist no.8 (Babaran), dan propagasi ke Babaran per Size.
@@ -491,6 +506,30 @@ const validateBeforeSave = () => {
     return false;
   }
 
+  if (isBreakdownSize.value) {
+    const namaKomponen = [
+      ...new Set(
+        data.komponen.map((k) => (k.komponen || "").trim()).filter(Boolean),
+      ),
+    ];
+    const kurang = namaKomponen.filter((nm) => {
+      const rows = data.sizeBreakdown.filter(
+        (s) => (s.komponen || "").trim() === nm,
+      );
+      return (
+        rows.length === 0 ||
+        rows.some((s) => !(s.size || "").trim() || !(Number(s.babaran) > 0))
+      );
+    });
+    if (kurang.length > 0) {
+      activeTab.value = 2;
+      toast.error(
+        `Rencana Size BRAKEDOWN SIZE: Babaran per Size wajib diisi (> 0) untuk komponen: ${kurang.join(", ")}.`,
+      );
+      return false;
+    }
+  }
+
   // Update otomatis Checklist No 8 (Babaran)
   const check8 = data.checklist.find((c: any) => Number(c.no) === 8);
   if (check8 && keteranganBabaran) {
@@ -543,9 +582,12 @@ const skipPrint = () => {
   router.push("/garmen/cetak-bast");
 };
 
-onMounted(() => {
+onMounted(async () => {
   fetchListKomponen(); // Ambil list dropdown komponen
-  if (isEditMode.value) fetchData();
+  if (isEditMode.value) {
+    await fetchData();
+    await generateMissingSizeRows();
+  }
 });
 </script>
 
@@ -1004,6 +1046,10 @@ onMounted(() => {
 
         <!-- Tab 2: Babaran per Size -->
         <div v-show="activeTab === 2" style="flex: 1; overflow-y: auto">
+          <div v-if="isBreakdownSize" class="size-wajib">
+            Rencana Size MAP = BRAKEDOWN SIZE: Babaran per Size wajib diisi
+            (&gt; 0) untuk semua baris.
+          </div>
           <table class="bt" style="max-width: 460px">
             <thead>
               <tr>
@@ -1028,6 +1074,11 @@ onMounted(() => {
                     type="number"
                     v-model.number="s.babaran"
                     class="cell-inp tr"
+                    :style="
+                      isBreakdownSize && !(Number(s.babaran) > 0)
+                        ? 'background:#ffebee'
+                        : ''
+                    "
                     v-select-on-focus
                   />
                 </td>
@@ -1396,6 +1447,16 @@ onMounted(() => {
   font-size: 10px;
   color: #0d47a1;
   flex-shrink: 0;
+}
+
+.size-wajib {
+  margin-bottom: 6px;
+  padding: 4px 8px;
+  background: #ffebee;
+  border: 1px solid #ef9a9a;
+  border-radius: 3px;
+  font-size: 10px;
+  color: #c62828;
 }
 
 /* ── Keterangan textarea ── */

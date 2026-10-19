@@ -46,6 +46,14 @@ export interface PlanningSpkDetail {
   KetKirim: string;
 }
 
+export interface PlanningSpkKeteranganPayload {
+  divisi: "CUTTING" | "SEWING";
+  spk: string;
+  tanggal: string;
+  line: string;
+  keterangan: string;
+}
+
 export const planningSpkService = {
   getBrowse: (params: { startDate: string; endDate: string }) =>
     api.get("/ppic/planning-spk", { params }),
@@ -60,6 +68,12 @@ export const planningSpkService = {
     api.patch(`/ppic/planning-spk/${encodeURIComponent(nomor)}/toggle-close`, {
       isClose,
     }),
+
+  updateKeterangan: (nomor: string, payload: PlanningSpkKeteranganPayload) =>
+    api.patch(
+      `/ppic/planning-spk/${encodeURIComponent(nomor)}/keterangan`,
+      payload,
+    ),
 
   deleteData: (nomor: string) =>
     api.delete(`/ppic/planning-spk/${encodeURIComponent(nomor)}`),

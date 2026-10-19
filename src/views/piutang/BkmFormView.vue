@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import { useRoute } from "vue-router";
 import { useToast } from "vue-toastification";
-import { useTabsStore } from "@/stores/tabsStore";
 import { useForm } from "@/composables/useForm";
 import { bkmFormService } from "@/services/piutang/bkmFormService";
 import api from "@/services/api";
@@ -18,9 +17,7 @@ import {
 } from "@tabler/icons-vue";
 
 const route = useRoute();
-const router = useRouter();
 const toast = useToast();
-const tabsStore = useTabsStore();
 const isEditMode = computed(() => !!route.params.nomor);
 
 // Cabang diambil dari backend, dibatasi hanya HO-, P01, P04
@@ -74,6 +71,7 @@ const {
   executeSave,
   executeCancel,
   executeClose,
+  goBack,
 } = useForm({
   menuId: "952",
   initialData,
@@ -221,8 +219,7 @@ const validateSave = () => {
 // ── Dialog cetak ──
 const closePrintAndExit = () => {
   showPrintDialog.value = false;
-  tabsStore.closeTab(route.path);
-  router.push("/piutang/bkm");
+  goBack();
 };
 const pilihCetak = () => {
   showPrintDialog.value = false;
@@ -230,8 +227,7 @@ const pilihCetak = () => {
     `/piutang/bkm/print/${encodeURIComponent(savedNomor.value)}`,
     "_blank",
   );
-  tabsStore.closeTab(route.path);
-  router.push("/piutang/bkm");
+  goBack();
 };
 </script>
 

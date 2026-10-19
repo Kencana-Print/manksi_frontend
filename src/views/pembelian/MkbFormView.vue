@@ -16,6 +16,8 @@ import {
   IconTrash,
   IconPlus,
   IconLock,
+  IconChevronRight,
+  IconChevronDown,
 } from "@tabler/icons-vue";
 
 interface DtlLinkItem {
@@ -26,6 +28,17 @@ interface DtlLinkItem {
   kode: string;
   qtylink: number;
   link: number;
+}
+
+interface BreakdownSizeItem {
+  size: string;
+  qty: number | null;
+  babaran: number;
+}
+
+interface BreakdownKomponen {
+  komponen: string;
+  sizes: BreakdownSizeItem[];
 }
 
 const route = useRoute();
@@ -99,6 +112,7 @@ const emptyData = {
   dtlLink: [] as DtlLinkItem[],
   dtlPlan: [] as any[],
   dtlMap: [] as any[],
+  breakdownSize: [] as BreakdownKomponen[],
   pin_status: "",
 };
 
@@ -210,6 +224,7 @@ const {
         size: val(m, "ks_size"),
         babaran: Number(val(m, "ks_babaran")) || 0,
       })),
+      breakdownSize: (d.breakdownSize || []) as BreakdownKomponen[],
     };
   },
   submitApi: async (payload) => {
@@ -391,17 +406,57 @@ const autofillFromBast = (bastKomponen: any[]) => {
   );
 };
 
+// ── BREAKDOWN SIZE (info saja, tidak masuk perhitungan) ──
+const expandedUids = ref<number[]>([]);
+const isExpanded = (uid: number) => expandedUids.value.includes(uid);
+const toggleExpand = (uid: number) => {
+  expandedUids.value = isExpanded(uid)
+    ? expandedUids.value.filter((u) => u !== uid)
+    : [...expandedUids.value, uid];
+};
+
+const normKomp = (s?: string) =>
+  String(s || "")
+    .trim()
+    .toUpperCase();
+
+const breakdownMap = computed(() => {
+  const m = new Map<string, BreakdownKomponen>();
+  formData.value.breakdownSize.forEach((b) => m.set(normKomp(b.komponen), b));
+  return m;
+});
+
+// Breakdown hanya dipasang di baris PERTAMA tiap komponen
+const breakdownSizes = (idx: number): BreakdownSizeItem[] => {
+  const rows = formData.value.dtlBahan;
+  const key = normKomp(rows[idx]?.komponen);
+  if (!key) return [];
+  if (
+    rows.findIndex(
+      (r: { komponen?: string }) => normKomp(r.komponen) === key,
+    ) !== idx
+  )
+    return [];
+  return breakdownMap.value.get(key)?.sizes ?? [];
+};
+
+const isKomponenGanda = (komponen?: string) =>
+  formData.value.dtlBahan.filter(
+    (r: { komponen?: string }) => normKomp(r.komponen) === normKomp(komponen),
+  ).length > 1;
+
 const onSpkSelected = async (spk: any) => {
   try {
     isLoading.value = true;
     const res = await mkbFormService.checkSpk(spk.Nomor, formData.value.nomor);
-    const { info, planning, bastKomponen } = res.data.data;
+    const { info, planning, bastKomponen, breakdownSize } = res.data.data;
     formData.value.nomorSpk = info.Nomor;
     formData.value.namaSpk = info.Nama;
     formData.value.jumlahSpk = info.Jumlah;
     formData.value.jenisOrder = info.JenisOrder;
     formData.value.memoSpk = info.Memo;
     formData.value.dtlBahan.forEach(recalcRowFull);
+    formData.value.breakdownSize = (breakdownSize || []) as BreakdownKomponen[];
     autofillFromBast(bastKomponen);
     if (!isMapMode.value) {
       formData.value.dtlPlan = planning.map((p: any) => ({
@@ -437,13 +492,14 @@ const onSpkEnter = async () => {
   try {
     isLoading.value = true;
     const res = await mkbFormService.checkSpk(nomor, formData.value.nomor);
-    const { info, planning, bastKomponen } = res.data.data;
+    const { info, planning, bastKomponen, breakdownSize } = res.data.data;
     formData.value.nomorSpk = info.Nomor;
     formData.value.namaSpk = info.Nama;
     formData.value.jumlahSpk = info.Jumlah;
     formData.value.jenisOrder = info.JenisOrder;
     formData.value.memoSpk = info.Memo;
     formData.value.dtlBahan.forEach(recalcRowFull);
+    formData.value.breakdownSize = (breakdownSize || []) as BreakdownKomponen[];
     autofillFromBast(bastKomponen); // ← tambah
     if (!isMapMode.value) {
       formData.value.dtlPlan = planning.map((p: any) => ({
@@ -644,6 +700,7 @@ const resetFormState = () => {
     dtlLink: [],
     dtlPlan: [],
     dtlMap: [],
+    breakdownSize: [],
   };
   savedNomor.value = "";
   selectedRowIdx.value = -1;
@@ -870,6 +927,7 @@ const onPoSelected = (po: any) => {
           <table class="grid-table">
             <thead>
               <tr>
+                <th style="width: 28px"></th>
                 <th style="width: 32px">No</th>
                 <th style="width: 120px">Komponen</th>
                 <th style="width: 120px">Ket Komp.</th>
@@ -899,170 +957,238 @@ const onPoSelected = (po: any) => {
               </tr>
             </thead>
             <tbody>
-              <tr
-                v-for="(row, idx) in formData.dtlBahan"
-                :key="idx"
-                :class="{ 'bg-blue-lighten-5': selectedRowIdx === Number(idx) }"
-                @click="selectedRowIdx = Number(idx)"
-              >
-                <td class="tc bg-grey-lighten-4">{{ Number(idx) + 1 }}</td>
-                <td style="padding: 0">
-                  <select
-                    v-model="row.komponen"
-                    class="gi"
-                    style="cursor: pointer"
-                  >
-                    <option value="" disabled selected>Pilih...</option>
-                    <option v-for="k in listKomponen" :key="k" :value="k">
-                      {{ k }}
-                    </option>
-                  </select>
-                </td>
-                <td><input type="text" v-model="row.ketk" class="gi" /></td>
-                <td>
-                  <input
-                    type="number"
-                    v-model="row.babaran"
-                    class="gi tr"
-                    @input="recalcRowFull(row)"
-                    v-select-on-focus
-                  />
-                </td>
-                <td><input type="text" v-model="row.warna" class="gi" /></td>
-                <td style="padding: 0">
-                  <select
-                    v-model="row.jenis"
-                    class="gi"
-                    style="cursor: pointer"
-                  >
-                    <option value="" disabled selected>Pilih...</option>
-                    <option v-for="j in jenisOptions" :key="j" :value="j">
-                      {{ j }}
-                    </option>
-                  </select>
-                </td>
-                <td>
-                  <div class="gi-group">
+              <template v-for="(row, idx) in formData.dtlBahan" :key="idx">
+                <tr
+                  :class="{
+                    'bg-blue-lighten-5': selectedRowIdx === Number(idx),
+                  }"
+                  @click="selectedRowIdx = Number(idx)"
+                >
+                  <td class="tc bg-grey-lighten-4" style="padding: 0">
+                    <button
+                      v-if="breakdownSizes(Number(idx)).length > 0"
+                      class="btn-expand"
+                      title="Lihat breakdown size"
+                      @click.stop="toggleExpand(row._uid)"
+                    >
+                      <IconChevronDown v-if="isExpanded(row._uid)" :size="14" />
+                      <IconChevronRight v-else :size="14" />
+                    </button>
+                  </td>
+                  <td class="tc bg-grey-lighten-4">{{ Number(idx) + 1 }}</td>
+                  <td style="padding: 0">
+                    <select
+                      v-model="row.komponen"
+                      class="gi"
+                      style="cursor: pointer"
+                    >
+                      <option value="" disabled selected>Pilih...</option>
+                      <option v-for="k in listKomponen" :key="k" :value="k">
+                        {{ k }}
+                      </option>
+                    </select>
+                  </td>
+                  <td><input type="text" v-model="row.ketk" class="gi" /></td>
+                  <td>
+                    <input
+                      type="number"
+                      v-model="row.babaran"
+                      class="gi tr"
+                      @input="recalcRowFull(row)"
+                      v-select-on-focus
+                    />
+                  </td>
+                  <td><input type="text" v-model="row.warna" class="gi" /></td>
+                  <td style="padding: 0">
+                    <select
+                      v-model="row.jenis"
+                      class="gi"
+                      style="cursor: pointer"
+                    >
+                      <option value="" disabled selected>Pilih...</option>
+                      <option v-for="j in jenisOptions" :key="j" :value="j">
+                        {{ j }}
+                      </option>
+                    </select>
+                  </td>
+                  <td>
+                    <div class="gi-group">
+                      <input
+                        type="text"
+                        :value="
+                          row.kode ? `${row.kode} - ${row.namaBahan}` : ''
+                        "
+                        class="gi gi-ro"
+                        readonly
+                        placeholder="Pilih Bahan..."
+                      />
+                      <button
+                        class="btn-gi-search"
+                        @click="openBahanModal(Number(idx))"
+                      >
+                        <IconSearch :size="12" />
+                      </button>
+                    </div>
+                  </td>
+                  <td>
                     <input
                       type="text"
-                      :value="row.kode ? `${row.kode} - ${row.namaBahan}` : ''"
+                      v-model="row.satuan"
                       class="gi gi-ro"
                       readonly
-                      placeholder="Pilih Bahan..."
+                      tabindex="-1"
                     />
-                    <button
-                      class="btn-gi-search"
-                      @click="openBahanModal(Number(idx))"
+                  </td>
+                  <td>
+                    <input
+                      type="text"
+                      v-model="row.gramasi"
+                      class="gi gi-ro"
+                      readonly
+                      tabindex="-1"
+                    />
+                  </td>
+                  <td>
+                    <input
+                      type="number"
+                      v-model="row.jumlah"
+                      class="gi tr fw bg-blue-lighten-5"
+                      :class="{ 'gi-manual': isJumlahBahanManual }"
+                      :title="
+                        isJumlahBahanManual ? 'Diisi manual — SO khusus' : ''
+                      "
+                      @input="recalcRowFull(row)"
+                      v-select-on-focus
+                    />
+                  </td>
+                  <td>
+                    <input
+                      type="number"
+                      v-model="row.allowance"
+                      class="gi tr"
+                      :class="{ 'gi-ro': row.allowanceLocked }"
+                      :readonly="row.allowanceLocked"
+                      :title="
+                        row.allowanceLocked
+                          ? 'Allowance COMBED tetap, tidak bisa diubah'
+                          : ''
+                      "
+                      placeholder="-"
+                      @input="onAllowanceInput(row)"
+                      v-select-on-focus
+                    />
+                  </td>
+                  <td>
+                    <input
+                      type="number"
+                      v-model="row.ready"
+                      class="gi tr"
+                      title="Bisa diedit manual — otomatis mengurangi Jumlah PO"
+                      @input="recalcRowBahan(row)"
+                      v-select-on-focus
+                    />
+                  </td>
+                  <td class="tc" style="padding: 0 6px">
+                    <span
+                      v-if="row.free === undefined"
+                      class="text-grey"
+                      style="font-size: 10px"
+                      >...</span
                     >
-                      <IconSearch :size="12" />
+                    <span
+                      v-else-if="row.free === null"
+                      class="text-grey"
+                      style="font-size: 10px"
+                      >-</span
+                    >
+                    <span
+                      v-else
+                      :style="{
+                        color: row.free < 0 ? '#c62828' : '#2e7d32',
+                        fontWeight: 600,
+                      }"
+                    >
+                      {{ row.free.toLocaleString("id-ID") }}
+                    </span>
+                  </td>
+                  <td>
+                    <input
+                      type="number"
+                      v-model="row.po"
+                      class="gi tr fw"
+                      style="color: #c62828; background: #ffebee"
+                      v-select-on-focus
+                    />
+                  </td>
+                  <td>
+                    <input type="date" v-model="row.tglbeli" class="gi" />
+                  </td>
+                  <td>
+                    <input type="text" v-model="row.keterangan" class="gi" />
+                  </td>
+                  <td class="tc">
+                    <button
+                      class="btn-gi-del"
+                      @click="removeRowBahan(Number(idx))"
+                    >
+                      <IconTrash :size="13" />
                     </button>
-                  </div>
-                </td>
-                <td>
-                  <input
-                    type="text"
-                    v-model="row.satuan"
-                    class="gi gi-ro"
-                    readonly
-                    tabindex="-1"
-                  />
-                </td>
-                <td>
-                  <input
-                    type="text"
-                    v-model="row.gramasi"
-                    class="gi gi-ro"
-                    readonly
-                    tabindex="-1"
-                  />
-                </td>
-                <td>
-                  <input
-                    type="number"
-                    v-model="row.jumlah"
-                    class="gi tr fw bg-blue-lighten-5"
-                    :class="{ 'gi-manual': isJumlahBahanManual }"
-                    :title="
-                      isJumlahBahanManual ? 'Diisi manual — SO khusus' : ''
-                    "
-                    @input="recalcRowFull(row)"
-                    v-select-on-focus
-                  />
-                </td>
-                <td>
-                  <input
-                    type="number"
-                    v-model="row.allowance"
-                    class="gi tr"
-                    :class="{ 'gi-ro': row.allowanceLocked }"
-                    :readonly="row.allowanceLocked"
-                    :title="
-                      row.allowanceLocked
-                        ? 'Allowance COMBED tetap, tidak bisa diubah'
-                        : ''
-                    "
-                    placeholder="-"
-                    @input="onAllowanceInput(row)"
-                    v-select-on-focus
-                  />
-                </td>
-                <td>
-                  <input
-                    type="number"
-                    v-model="row.ready"
-                    class="gi tr"
-                    title="Bisa diedit manual — otomatis mengurangi Jumlah PO"
-                    @input="recalcRowBahan(row)"
-                    v-select-on-focus
-                  />
-                </td>
-                <td class="tc" style="padding: 0 6px">
-                  <span
-                    v-if="row.free === undefined"
-                    class="text-grey"
-                    style="font-size: 10px"
-                    >...</span
-                  >
-                  <span
-                    v-else-if="row.free === null"
-                    class="text-grey"
-                    style="font-size: 10px"
-                    >-</span
-                  >
-                  <span
-                    v-else
-                    :style="{
-                      color: row.free < 0 ? '#c62828' : '#2e7d32',
-                      fontWeight: 600,
-                    }"
-                  >
-                    {{ row.free.toLocaleString("id-ID") }}
-                  </span>
-                </td>
-                <td>
-                  <input
-                    type="number"
-                    v-model="row.po"
-                    class="gi tr fw"
-                    style="color: #c62828; background: #ffebee"
-                    v-select-on-focus
-                  />
-                </td>
-                <td><input type="date" v-model="row.tglbeli" class="gi" /></td>
-                <td>
-                  <input type="text" v-model="row.keterangan" class="gi" />
-                </td>
-                <td class="tc">
-                  <button
-                    class="btn-gi-del"
-                    @click="removeRowBahan(Number(idx))"
-                  >
-                    <IconTrash :size="13" />
-                  </button>
-                </td>
-              </tr>
+                  </td>
+                </tr>
+                <tr
+                  v-if="
+                    breakdownSizes(Number(idx)).length > 0 &&
+                    isExpanded(row._uid)
+                  "
+                  class="bd-row"
+                >
+                  <td colspan="18">
+                    <div class="bd-note">
+                      Info breakdown size dari BAST MAP, tidak mempengaruhi
+                      perhitungan.
+                      <span v-if="isKomponenGanda(row.komponen)">
+                        Berlaku untuk komponen {{ row.komponen }} (semua warna),
+                        bukan per warna.
+                      </span>
+                    </div>
+                    <table class="bd-table">
+                      <thead>
+                        <tr>
+                          <th>Size</th>
+                          <th
+                            v-for="s in breakdownSizes(Number(idx))"
+                            :key="s.size"
+                          >
+                            {{ s.size }}
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <td>Qty</td>
+                          <td
+                            v-for="s in breakdownSizes(Number(idx))"
+                            :key="s.size"
+                          >
+                            {{ s.qty ?? "-" }}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td>Babaran</td>
+                          <td
+                            v-for="s in breakdownSizes(Number(idx))"
+                            :key="s.size"
+                          >
+                            {{ s.babaran > 0 ? s.babaran : "-" }}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </td>
+                </tr>
+              </template>
               <tr v-if="formData.dtlBahan.length === 0">
-                <td colspan="16" class="empty-row">
+                <td colspan="18" class="empty-row">
                   Klik Tambah Bahan untuk memulai
                 </td>
               </tr>
@@ -1576,6 +1702,42 @@ const onPoSelected = (po: any) => {
   font-style: italic;
   padding: 12px 8px;
   font-size: 11px;
+}
+
+.btn-expand {
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  padding: 4px;
+  display: inline-flex;
+  color: #455a64;
+}
+.grid-table tbody tr.bd-row td,
+.grid-table tbody tr.bd-row:hover td {
+  background: #f5f9ff;
+  padding: 6px 12px;
+}
+.bd-note {
+  font-size: 11px;
+  color: #607d8b;
+  margin-bottom: 4px;
+}
+.bd-table {
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.bd-table th,
+.bd-table td {
+  border: 1px solid #cfd8dc;
+  padding: 2px 10px;
+  text-align: right;
+  white-space: nowrap;
+}
+.bd-table th:first-child,
+.bd-table td:first-child {
+  text-align: left;
+  background: #eceff1;
+  font-weight: 600;
 }
 
 .gi-manual {

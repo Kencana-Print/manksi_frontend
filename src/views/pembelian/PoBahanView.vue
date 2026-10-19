@@ -285,8 +285,13 @@ const onExportDetail = async () => {
           Jumlah: Number(r.Jumlah) || 0,
           QtyBpb: Number(r.QtyBpb) || 0,
           QtyRetur: Number(r.QtyRetur) || 0,
+          Roll: isLainLain ? Number(r.Roll) || 0 : "",
           ...(canLihatBeli.value
-            ? { Harga: Number(r.Harga) || 0, Disc: Number(r.Disc) || 0 }
+            ? {
+                Harga: Number(r.Harga) || 0,
+                HargaRoll: isLainLain ? Number(r.HargaRoll) || 0 : "",
+                Disc: Number(r.Disc) || 0,
+              }
             : {}),
           Status_barang: r.Status_barang,
           MKB: r.MKB,
@@ -328,11 +333,25 @@ const onExportDetail = async () => {
         align: "right",
         numFmt: "#,##0.00",
       },
+      {
+        header: "Roll",
+        key: "Roll",
+        width: 10,
+        align: "right",
+        numFmt: "#,##0.00",
+      },
       ...(canLihatBeli.value
         ? [
             {
               header: "Harga",
               key: "Harga",
+              width: 14,
+              align: "right",
+              numFmt: "#,##0.00",
+            },
+            {
+              header: "Harga Roll",
+              key: "HargaRoll",
               width: 14,
               align: "right",
               numFmt: "#,##0.00",
@@ -572,7 +591,17 @@ const summaryFormatters = {
                 <th width="100" class="tr">Qty PO</th>
                 <th width="100" class="tr">Qty BPB</th>
                 <th width="100" class="tr">Qty Retur</th>
+                <th v-if="item.JenisPO === 'LAIN-LAIN'" width="70" class="tr">
+                  Roll
+                </th>
                 <th v-if="canLihatBeli" width="100" class="tr">Harga</th>
+                <th
+                  v-if="canLihatBeli && item.JenisPO === 'LAIN-LAIN'"
+                  width="100"
+                  class="tr"
+                >
+                  Harga Roll
+                </th>
                 <th v-if="canLihatBeli" width="80" class="tr">Disc</th>
                 <th width="80" class="text-center">Status</th>
                 <th width="120">No. MKB</th>
@@ -596,7 +625,16 @@ const summaryFormatters = {
                 </td>
                 <td class="tr">{{ numFmt(d.QtyBpb) }}</td>
                 <td class="tr text-error">{{ numFmt(d.QtyRetur) }}</td>
+                <td v-if="item.JenisPO === 'LAIN-LAIN'" class="tr">
+                  {{ numFmt(d.Roll) }}
+                </td>
                 <td v-if="canLihatBeli" class="tr">{{ numFmt(d.Harga) }}</td>
+                <td
+                  v-if="canLihatBeli && item.JenisPO === 'LAIN-LAIN'"
+                  class="tr"
+                >
+                  {{ numFmt(d.HargaRoll) }}
+                </td>
                 <td v-if="canLihatBeli" class="tr">{{ numFmt(d.Disc) }}</td>
                 <td class="text-center">
                   <v-chip

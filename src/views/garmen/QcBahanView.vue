@@ -40,12 +40,31 @@ interface QcBahanRow {
   Lots: { Lot: string; Nilai: number; Keputusan: string }[];
 }
 
+interface QcBahanRollRow {
+  Nourut: number;
+  NoRoll: string;
+  Qty: number;
+  GramasiAtas: number;
+  GramasiBawah: number;
+  SettingCek: number;
+  HGramasi: string;
+  HSetting: string;
+  Warna: string;
+  Handfeel: string;
+  Bowing: string;
+  Shrinkage: string;
+  Kelunturan: string;
+  Nilai: number;
+  Catatan: string | null;
+}
+
 interface QcBahanDetailRow {
   Nourut: number;
   Lot: string;
   Kg: number;
   Satuan: string;
   Roll: number;
+  RollCek: number;
   GramasiPO: string;
   SettingPO: string;
   Warna: string;
@@ -53,6 +72,7 @@ interface QcBahanDetailRow {
   SettingCek: string;
   Nilai: number;
   Keputusan: string;
+  Rolls: QcBahanRollRow[];
 }
 
 const router = useRouter();
@@ -241,6 +261,20 @@ interface QcBahanExportDetailRow {
   SettingCek: string;
   Nilai: number;
   Keputusan: string;
+  LotNourut: number;
+  RollNourut: number | null;
+  NoRoll: string | null;
+  RollQty: number | null;
+  GramasiAtas: number | null;
+  GramasiBawah: number | null;
+  SettingRoll: number | null;
+  WarnaMeter: string | null;
+  Handfeel: string | null;
+  Bowing: string | null;
+  Shrinkage: string | null;
+  Kelunturan: string | null;
+  NilaiRoll: number | null;
+  CatatanRoll: string | null;
 }
 
 const isExportingDetail = ref(false);
@@ -264,31 +298,49 @@ const onExportDetail = async () => {
       return;
     }
 
-    // Data header hanya di baris lot pertama tiap dokumen
+    // Satu baris per roll. Data header hanya di baris pertama dokumen, metrik lot
+    // hanya di baris pertama lot (agar SUM di Excel tidak dobel). Lot No. diulang
+    // di setiap baris supaya mudah difilter.
     let prevNomor = "";
+    let prevLot = "";
     const rows = allDetail.map((r) => {
-      const first = r.Nomor !== prevNomor;
+      const firstDoc = r.Nomor !== prevNomor;
+      const lotKey = `${r.Nomor}|${r.LotNourut}`;
+      const firstLot = lotKey !== prevLot;
       prevNomor = r.Nomor;
+      prevLot = lotKey;
       return {
-        Nomor: first ? r.Nomor : "",
-        TglDatang: first ? toExcelDate(r.TglDatang) : "",
-        Status: first ? r.Status : "",
-        Nomor_PO: first ? r.Nomor_PO : "",
-        JenisKain: first ? r.JenisKain : "",
-        VendorGreige: first ? r.VendorGreige : "",
-        VendorCelup: first ? r.VendorCelup : "",
+        Nomor: firstDoc ? r.Nomor : "",
+        TglDatang: firstDoc ? toExcelDate(r.TglDatang) : "",
+        Status: firstDoc ? r.Status : "",
+        Nomor_PO: firstDoc ? r.Nomor_PO : "",
+        JenisKain: firstDoc ? r.JenisKain : "",
+        VendorGreige: firstDoc ? r.VendorGreige : "",
+        VendorCelup: firstDoc ? r.VendorCelup : "",
         Lot: r.Lot,
-        Kg: Number(r.Kg) || 0,
-        Satuan: r.Satuan,
-        Roll: Number(r.Roll) || 0,
-        RollCek: Number(r.RollCek) || 0,
-        GramasiPO: r.GramasiPO || "",
-        SettingPO: r.SettingPO || "",
-        Warna: r.Warna || "",
-        GramasiCek: Number(r.GramasiCek) || 0,
-        SettingCek: r.SettingCek || "",
-        Nilai: Number(r.Nilai) || "",
-        Keputusan: r.Keputusan || "",
+        Kg: firstLot ? Number(r.Kg) || 0 : "",
+        Satuan: firstLot ? r.Satuan : "",
+        Roll: firstLot ? Number(r.Roll) || 0 : "",
+        RollCek: firstLot ? Number(r.RollCek) || 0 : "",
+        GramasiPO: firstLot ? r.GramasiPO || "" : "",
+        SettingPO: firstLot ? r.SettingPO || "" : "",
+        Warna: firstLot ? r.Warna || "" : "",
+        GramasiCek: firstLot ? Number(r.GramasiCek) || "" : "",
+        SettingCek: firstLot ? r.SettingCek || "" : "",
+        Nilai: firstLot ? Number(r.Nilai) || "" : "",
+        Keputusan: firstLot ? r.Keputusan || "" : "",
+        NoRoll: r.RollNourut ? r.NoRoll || r.RollNourut : "",
+        RollQty: Number(r.RollQty) || "",
+        GramasiAtas: Number(r.GramasiAtas) || "",
+        GramasiBawah: Number(r.GramasiBawah) || "",
+        SettingRoll: Number(r.SettingRoll) || "",
+        WarnaMeter: r.WarnaMeter || "",
+        Handfeel: r.Handfeel || "",
+        Bowing: r.Bowing || "",
+        Shrinkage: r.Shrinkage || "",
+        Kelunturan: r.Kelunturan || "",
+        NilaiRoll: Number(r.NilaiRoll) || "",
+        CatatanRoll: r.CatatanRoll || "",
       };
     });
 
@@ -308,7 +360,7 @@ const onExportDetail = async () => {
       { header: "Vendor Celup", key: "VendorCelup", width: 24 },
       { header: "Lot No.", key: "Lot", width: 18 },
       {
-        header: "Qty",
+        header: "Qty Lot",
         key: "Kg",
         width: 12,
         align: "right",
@@ -316,9 +368,9 @@ const onExportDetail = async () => {
       },
       { header: "Sat", key: "Satuan", width: 7, align: "center" },
       {
-        header: "Roll",
+        header: "Roll Lot",
         key: "Roll",
-        width: 8,
+        width: 9,
         align: "right",
         numFmt: "#,##0",
       },
@@ -331,17 +383,63 @@ const onExportDetail = async () => {
       },
       { header: "Gramasi PO", key: "GramasiPO", width: 14, align: "center" },
       { header: "Setting PO", key: "SettingPO", width: 12, align: "center" },
-      { header: "Warna", key: "Warna", width: 22 },
+      { header: "Warna PO", key: "Warna", width: 22 },
       {
-        header: "Gramasi Cek",
+        header: "Gramasi Cek (Rata2)",
         key: "GramasiCek",
+        width: 14,
+        align: "right",
+        numFmt: "#,##0.00",
+      },
+      {
+        header: "Setting Cek (Rata2)",
+        key: "SettingCek",
+        width: 14,
+        align: "center",
+      },
+      { header: "Nilai Lot", key: "Nilai", width: 9, align: "center" },
+      { header: "Keputusan", key: "Keputusan", width: 12, align: "center" },
+      { header: "Roll Ke", key: "NoRoll", width: 8, align: "center" },
+      {
+        header: "Qty Roll",
+        key: "RollQty",
+        width: 10,
+        align: "right",
+        numFmt: "#,##0.00",
+      },
+      {
+        header: "Gramasi Atas",
+        key: "GramasiAtas",
         width: 12,
         align: "right",
         numFmt: "#,##0.00",
       },
-      { header: "Setting Cek", key: "SettingCek", width: 12, align: "center" },
-      { header: "Nilai", key: "Nilai", width: 8, align: "center" },
-      { header: "Keputusan", key: "Keputusan", width: 12, align: "center" },
+      {
+        header: "Gramasi Bawah",
+        key: "GramasiBawah",
+        width: 12,
+        align: "right",
+        numFmt: "#,##0.00",
+      },
+      {
+        header: "Setting Roll",
+        key: "SettingRoll",
+        width: 11,
+        align: "right",
+        numFmt: "#,##0.00",
+      },
+      {
+        header: "Warna (Color Meter)",
+        key: "WarnaMeter",
+        width: 14,
+        align: "center",
+      },
+      { header: "Handfeel", key: "Handfeel", width: 10, align: "center" },
+      { header: "Bowing", key: "Bowing", width: 10, align: "center" },
+      { header: "Shrinkage", key: "Shrinkage", width: 10, align: "center" },
+      { header: "Kelunturan", key: "Kelunturan", width: 10, align: "center" },
+      { header: "Nilai Roll", key: "NilaiRoll", width: 9, align: "center" },
+      { header: "Catatan Roll", key: "CatatanRoll", width: 30 },
     ];
 
     await exportExcelSingle(
@@ -349,7 +447,7 @@ const onExportDetail = async () => {
       "Detail QC Bahan",
       columns,
       rows,
-      `Rincian Lot QC Bahan | Periode: ${periodeJudul()}`,
+      `Rincian Lot dan Roll QC Bahan | Periode: ${periodeJudul()}`,
     );
     toast.success("Berhasil export detail data.");
   } catch (e) {
@@ -626,6 +724,20 @@ const onPrint = () => {
 
 const numFmt = (v: number | string | null) =>
   v ? Number(v).toLocaleString("id-ID") : "0";
+
+const angka = (v: number | string | null) => {
+  const n = Number(v);
+  return n ? n.toLocaleString("id-ID") : "-";
+};
+
+const okNoClass = (v: string) => {
+  const s = String(v ?? "").toUpperCase();
+  if (s === "OK") return "chip-ok";
+  if (s === "NO") return "chip-reject";
+  return "chip-draft";
+};
+
+const diLuarSpec = (h: string) => /RENDAH|TINGGI/i.test(String(h ?? ""));
 </script>
 
 <template>
@@ -784,6 +896,7 @@ const numFmt = (v: number | string | null) =>
                 <th width="140">Lot No.</th>
                 <th width="110" class="tr">Qty</th>
                 <th width="70" class="tr">Roll</th>
+                <th width="80" class="tr">Roll Dicek</th>
                 <th width="110" class="text-center">Gramasi PO</th>
                 <th width="90" class="text-center">Setting PO</th>
                 <th>Warna</th>
@@ -794,31 +907,108 @@ const numFmt = (v: number | string | null) =>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="(d, i) in detailCache[item.Nomor]" :key="i">
-                <td class="font-weight-bold">{{ d.Lot }}</td>
-                <td class="tr text-blue-darken-2 font-weight-bold">
-                  {{ numFmt(d.Kg) }} {{ d.Satuan }}
-                </td>
-                <td class="tr">{{ numFmt(d.Roll) }}</td>
-                <td class="text-center">{{ d.GramasiPO || "-" }}</td>
-                <td class="text-center">{{ d.SettingPO || "-" }}</td>
-                <td>{{ d.Warna || "-" }}</td>
-                <td class="tr">{{ numFmt(d.GramasiCek) }}</td>
-                <td class="text-center">{{ d.SettingCek || "-" }}</td>
-                <td class="text-center">
-                  <span class="status-chip" :class="nilaiClass(d.Nilai)">
-                    {{ d.Nilai || "-" }}
-                  </span>
-                </td>
-                <td class="text-center">{{ d.Keputusan || "-" }}</td>
-              </tr>
+              <template v-for="d in detailCache[item.Nomor]" :key="d.Nourut">
+                <tr>
+                  <td class="font-weight-bold">{{ d.Lot }}</td>
+                  <td class="tr text-blue-darken-2 font-weight-bold">
+                    {{ numFmt(d.Kg) }} {{ d.Satuan }}
+                  </td>
+                  <td class="tr">{{ numFmt(d.Roll) }}</td>
+                  <td class="tr">{{ numFmt(d.RollCek) }}</td>
+                  <td class="text-center">{{ d.GramasiPO || "-" }}</td>
+                  <td class="text-center">{{ d.SettingPO || "-" }}</td>
+                  <td>{{ d.Warna || "-" }}</td>
+                  <td class="tr">{{ angka(d.GramasiCek) }}</td>
+                  <td class="text-center">{{ d.SettingCek || "-" }}</td>
+                  <td class="text-center">
+                    <span class="status-chip" :class="nilaiClass(d.Nilai)">
+                      {{ d.Nilai || "-" }}
+                    </span>
+                  </td>
+                  <td class="text-center">{{ d.Keputusan || "-" }}</td>
+                </tr>
+                <tr v-if="d.Rolls && d.Rolls.length">
+                  <td colspan="11" class="roll-cell">
+                    <table class="roll-table">
+                      <thead>
+                        <tr>
+                          <th width="50">Roll</th>
+                          <th width="80">Qty</th>
+                          <th width="90">Gramasi Atas</th>
+                          <th width="90">Gramasi Bawah</th>
+                          <th width="80">Setting</th>
+                          <th width="70">Warna</th>
+                          <th width="80">Handfeel</th>
+                          <th width="80">Bowing</th>
+                          <th width="80">Shrinkage</th>
+                          <th width="80">Kelunturan</th>
+                          <th width="60">Nilai</th>
+                          <th>Catatan</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr v-for="r in d.Rolls" :key="r.Nourut">
+                          <td>{{ r.NoRoll || r.Nourut }}</td>
+                          <td>{{ angka(r.Qty) }}</td>
+                          <td :class="{ 'roll-bad': diLuarSpec(r.HGramasi) }">
+                            {{ angka(r.GramasiAtas) }}
+                          </td>
+                          <td :class="{ 'roll-bad': diLuarSpec(r.HGramasi) }">
+                            {{ angka(r.GramasiBawah) }}
+                          </td>
+                          <td :class="{ 'roll-bad': diLuarSpec(r.HSetting) }">
+                            {{ angka(r.SettingCek) }}
+                          </td>
+                          <td>{{ r.Warna || "-" }}</td>
+                          <td>
+                            <span
+                              class="status-chip"
+                              :class="okNoClass(r.Handfeel)"
+                              >{{ r.Handfeel || "-" }}</span
+                            >
+                          </td>
+                          <td>
+                            <span
+                              class="status-chip"
+                              :class="okNoClass(r.Bowing)"
+                              >{{ r.Bowing || "-" }}</span
+                            >
+                          </td>
+                          <td>
+                            <span
+                              class="status-chip"
+                              :class="okNoClass(r.Shrinkage)"
+                              >{{ r.Shrinkage || "-" }}</span
+                            >
+                          </td>
+                          <td>
+                            <span
+                              class="status-chip"
+                              :class="okNoClass(r.Kelunturan)"
+                              >{{ r.Kelunturan || "-" }}</span
+                            >
+                          </td>
+                          <td>
+                            <span
+                              class="status-chip"
+                              :class="nilaiClass(r.Nilai)"
+                              >{{ r.Nilai || "-" }}</span
+                            >
+                          </td>
+                          <td class="tl">{{ r.Catatan || "-" }}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </td>
+                </tr>
+              </template>
               <tr
                 v-if="
                   !detailCache[item.Nomor] ||
                   detailCache[item.Nomor].length === 0
                 "
               >
-                <td colspan="10" class="text-center text-grey py-3 font-italic">
+                <td colspan="11" class="text-center text-grey py-3 font-italic">
                   Detail lot tidak ditemukan.
                 </td>
               </tr>
@@ -1137,5 +1327,34 @@ const numFmt = (v: number | string | null) =>
 }
 .tr {
   text-align: right !important;
+}
+.roll-cell {
+  padding: 4px 8px 10px 28px !important;
+  background: #f5f7f8;
+}
+.roll-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+  font-size: 10.5px;
+}
+.roll-table th {
+  background: #78909c;
+  color: white;
+  padding: 3px 6px;
+  text-align: center;
+  font-weight: bold;
+}
+.roll-table td {
+  padding: 3px 6px;
+  border-bottom: 1px solid #eee;
+  text-align: center;
+}
+.roll-table .tl {
+  text-align: left;
+}
+.roll-bad {
+  color: #c62828;
+  font-weight: 700;
 }
 </style>
