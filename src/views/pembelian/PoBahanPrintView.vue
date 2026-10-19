@@ -310,21 +310,21 @@ const totalColumns = computed(() => {
       <table class="items-table">
         <thead>
           <tr>
-            <th width="30">No</th>
+            <th width="25">No</th>
             <!-- Kolom Kode muncul khusus untuk PO Bahan -->
-            <th width="80" v-if="isBahan">Kode</th>
+            <th width="70" v-if="isBahan">Kode</th>
             <th>Nama</th>
             <th width="110" v-if="isLainLain">Supplier</th>
-            <th width="45">Satuan</th>
-            <th width="65">Qty</th>
+            <th width="40">Satuan</th>
+            <th width="55">Qty</th>
             <!-- Gramasi Awal HANYA untuk Greige & Celup, tidak untuk Bahan -->
             <th width="60" v-if="!isBahan">Gramasi<br />Awal</th>
             <th width="60">{{ isBahan ? "Gramasi" : "Gramasi Akhir" }}</th>
-            <th width="50">Setting</th>
-            <th width="80">Harga Dpp</th>
-            <th width="80">Harga</th>
-            <th width="40">Disc</th>
-            <th width="100">Total</th>
+            <th width="45">Setting</th>
+            <th width="65">Harga Dpp</th>
+            <th width="65">Harga</th>
+            <th width="30">Disc</th>
+            <th width="80">Total</th>
           </tr>
         </thead>
         <tbody>
@@ -469,15 +469,28 @@ const totalColumns = computed(() => {
 @media print {
   @page {
     size: A4 portrait;
-    margin: 15mm;
+    margin: 0;
   }
-  body {
-    background: white;
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
+  .print-container {
+    max-width: none;
+    width: 100%;
   }
-  .page-break {
-    page-break-before: always;
+  .print-page {
+    padding: 12mm 8mm;
+  }
+  .items-table th,
+  .items-table td {
+    padding: 3px 3px;
+    font-size: 8.5px;
+  }
+  .items-table {
+    table-layout: fixed;
+    width: 100%;
+  }
+  .nama-cell {
+    white-space: nowrap;
+    overflow: hidden;
+    font-size: 7.5px;
   }
 }
 
@@ -556,8 +569,8 @@ const totalColumns = computed(() => {
 .items-table th,
 .items-table td {
   border: 1px solid #000;
-  padding: 4px 6px;
-  font-size: 10px;
+  padding: 4px 4px;
+  font-size: 9px;
 }
 .items-table th {
   text-align: center;
