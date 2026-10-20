@@ -683,11 +683,13 @@ const validateSave = () => {
         `Baris ${idx + 1}: Jumlah PO harus diisi, tidak dapat disimpan.`,
       );
     if (isLainLain.value) {
-      if ((Number(r.roll) || 0) <= 0)
-        return toast.warning(`Baris ${idx + 1}: Roll harus diisi.`);
       if ((Number(r.harga) || 0) <= 0 && (Number(r.hargaRoll) || 0) <= 0)
         return toast.warning(
           `Baris ${idx + 1}: Harga Beli atau Harga Roll harus diisi.`,
+        );
+      if ((Number(r.hargaRoll) || 0) > 0 && (Number(r.roll) || 0) <= 0)
+        return toast.warning(
+          `Baris ${idx + 1}: Roll harus diisi jika Harga Roll diisi.`,
         );
     } else if ((Number(r.harga) || 0) <= 0) {
       return toast.warning(
