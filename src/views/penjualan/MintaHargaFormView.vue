@@ -74,6 +74,7 @@ const initialData = {
   Perfect: "",
   Kalkulasi: {
     NomorKalkulasi: "",
+    SumberKalkulasi: "",
     TanggalKalkulasi: "",
     Model: "KH-0001",
     JenisKain: "",
@@ -161,6 +162,14 @@ const {
     );
 
     const d: any = res.data.data;
+    const nomorKalAktif =
+      d.NoKalkulasi ||
+      d.mh_nomor_kalkulasi ||
+      d.NoKals ||
+      d.Kalkulasi?.ActiveNomor ||
+      d.Kalkulasi?.Header?.kal_nomor ||
+      "";
+
     return {
       Nomor: d.mh_nomor,
       Tanggal: formatDateLocal(d.mh_tanggal),
@@ -187,7 +196,7 @@ const {
       Keterangan: d.mh_ket,
       Status: d.mh_status,
       StatusEdit: d.StatusEdit,
-      SimpanKalkulasi: !!d.mh_nomor_kalkulasi,
+      SimpanKalkulasi: !!nomorKalAktif,
       PathImage: d.imageUrl || "",
       isKalkulasiLocked: d.isKalkulasiLocked || false,
       KalkulasiInfo: d.KalkulasiInfo || "",
@@ -197,8 +206,15 @@ const {
       Perfect: d.mh_perfect || d.Perfect || "",
       Kalkulasi: d.Kalkulasi
         ? {
-            NomorKalkulasi: d.mh_nomor_kalkulasi,
-            TanggalKalkulasi: d.Kalkulasi.Header.tglFormat,
+            NomorKalkulasi: nomorKalAktif,
+            SumberKalkulasi:
+              d.Kalkulasi.SumberKalkulasi ||
+              (nomorKalAktif.toUpperCase().startsWith("KALS")
+                ? "SALES"
+                : nomorKalAktif
+                  ? "FINANCE"
+                  : ""),
+            TanggalKalkulasi: d.Kalkulasi.Header?.tglFormat || "",
             Model: d.Kalkulasi.Header.kal_kh_kode || "KH-0001",
             JenisKain: d.Kalkulasi.LoadedJenisKain,
             Warna: d.Kalkulasi.LoadedWarna,
