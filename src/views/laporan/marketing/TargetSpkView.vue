@@ -45,25 +45,25 @@ const filterState = ref({
   cusNama: "",
 });
 
-const isAllMode = computed(() => filterState.value.divisi === "ALL");
 const meta = ref<{ tahun: number; n3: number; n2: number; n1: number } | null>(
   null,
 );
 
-const { items, isLoading, canExport, canEdit, fetchData } = useBrowse({
-  menuId: MENU_ID,
-  fetchApi: async () => {
-    const res = await targetSpkService.getBrowse({
-      startDate: filterState.value.dtAwal,
-      endDate: filterState.value.dtAkhir,
-      divisi: filterState.value.divisi,
-      salesKode: filterState.value.salesKode,
-      cusKode: filterState.value.cusKode,
-    });
-    meta.value = res.data.meta || null;
-    return res.data.data || [];
-  },
-});
+const { items, isLoading, canExport, canEdit, fetchData, exportToExcel } =
+  useBrowse({
+    menuId: MENU_ID,
+    fetchApi: async () => {
+      const res = await targetSpkService.getBrowse({
+        startDate: filterState.value.dtAwal,
+        endDate: filterState.value.dtAkhir,
+        divisi: filterState.value.divisi,
+        salesKode: filterState.value.salesKode,
+        cusKode: filterState.value.cusKode,
+      });
+      meta.value = res.data.meta || null;
+      return res.data.data || [];
+    },
+  });
 
 watch(
   () => [
@@ -81,15 +81,8 @@ const numFmt = (v: any) =>
 const pctFmt = (v: any) =>
   v || v === 0 ? `${(Number(v) * 100).toFixed(1)}%` : "0%";
 
-const ALL_PREFIXES = [
-  { key: "sp", label: "SP" },
-  { key: "gm", label: "GM" },
-  { key: "gp", label: "GP" },
-  { key: "mmt", label: "MMT" },
-];
-
-// ── Headers — flat, disesuaikan mode single-divisi vs ALL DIVISI ──
-const headersSingle = computed(() => [
+// ── Headers — flat, seragam untuk seluruh mode divisi (termasuk ALL DIVISI) ──
+const headers = computed(() => [
   { title: "Kode", key: "Kode", width: "90px" },
   { title: "Customer", key: "Customer", minWidth: "200px" },
   { title: "Alamat", key: "Alamat", minWidth: "180px" },
@@ -126,68 +119,7 @@ const headersSingle = computed(() => [
   { title: "Nama Sales", key: "NamaSales", minWidth: "140px" },
 ]);
 
-const headersAll = computed(() => {
-  const base = [
-    { title: "Kode", key: "kode", width: "90px" },
-    { title: "Customer", key: "customer", minWidth: "200px" },
-    { title: "Alamat", key: "alamat", minWidth: "160px" },
-  ];
-  const perDivisi = ALL_PREFIXES.flatMap((p) => [
-    {
-      title: `${p.label} SPK${meta.value?.n3 ?? ""}`,
-      key: `${p.key}_spk3`,
-      width: "95px",
-      align: "end",
-    },
-    {
-      title: `${p.label} SPK${meta.value?.n2 ?? ""}`,
-      key: `${p.key}_spk2`,
-      width: "95px",
-      align: "end",
-    },
-    {
-      title: `${p.label} SPK${meta.value?.n1 ?? ""}`,
-      key: `${p.key}_spk1`,
-      width: "95px",
-      align: "end",
-    },
-    {
-      title: `${p.label} Avg`,
-      key: `${p.key}_average`,
-      width: "95px",
-      align: "end",
-    },
-    {
-      title: `${p.label} Target`,
-      key: `${p.key}_target`,
-      width: "95px",
-      align: "end",
-    },
-    {
-      title: `${p.label} Actual`,
-      key: `${p.key}_actual`,
-      width: "95px",
-      align: "end",
-    },
-    {
-      title: `${p.label} %Tgt`,
-      key: `${p.key}_pct_target`,
-      width: "80px",
-      align: "end",
-    },
-  ]);
-  return [
-    ...base,
-    ...perDivisi,
-    { title: "Kode Sales", key: "kodeSales", width: "90px" },
-    { title: "Nama Sales", key: "namaSales", minWidth: "140px" },
-  ];
-});
-
-const headers = computed(() =>
-  isAllMode.value ? headersAll.value : headersSingle.value,
-);
-const itemValue = computed(() => (isAllMode.value ? "kode" : "Kode"));
+const itemValue = "Kode";
 
 // ── Lookup Customer & Sales ──
 const showCustModal = ref(false);
@@ -292,6 +224,39 @@ const saveKodeSales = async (row: any) => {
     savingRow.value[row.Kode] = false;
   }
 };
+
+const handleExport = () => {
+  const y = meta.value?.tahun ?? new Date().getFullYear();
+  const n3 = meta.value?.n3 ?? y - 3;
+  const n2 = meta.value?.n2 ?? y - 2;
+  const n1 = meta.value?.n1 ?? y - 1;
+
+  const columns = [
+    { header: "Kode", key: "Kode", width: 12 },
+    { header: "Customer", key: "Customer", width: 30 },
+    { header: "Alamat", key: "Alamat", width: 35 },
+    { header: "Sales Terakhir", key: "Sales", width: 22 },
+    { header: `SPK ${n3}`, key: "Spk3", width: 16, numFmt: "#,##0", align: "right" },
+    { header: `SPK ${n2}`, key: "Spk2", width: 16, numFmt: "#,##0", align: "right" },
+    { header: `SPK ${n1}`, key: "Spk1", width: 16, numFmt: "#,##0", align: "right" },
+    { header: "Average", key: "Average", width: 16, numFmt: "#,##0", align: "right" },
+    { header: "Target", key: "Target", width: 16, numFmt: "#,##0", align: "right" },
+    { header: `Actual ${y}`, key: "Actual", width: 16, numFmt: "#,##0", align: "right" },
+    { header: "% Average", key: "PctAverage", width: 14, numFmt: "0.0%", align: "right" },
+    { header: "% Target", key: "PctTarget", width: 14, numFmt: "0.0%", align: "right" },
+    { header: "Kode Sales", key: "KodeSales", width: 12 },
+    { header: "Nama Sales", key: "NamaSales", width: 22 },
+  ];
+
+  exportToExcel(
+    `Laporan_Target_SPK_${filterState.value.divisi}_${filterState.value.dtAwal}_${filterState.value.dtAkhir}`,
+    {
+      columns,
+      sheetName: "Target SPK",
+      title: `LAPORAN TARGET SPK - DIVISI ${filterState.value.divisi} (PERIODE: ${filterState.value.dtAwal} s.d ${filterState.value.dtAkhir})`,
+    },
+  );
+};
 </script>
 
 <template>
@@ -307,6 +272,7 @@ const saveKodeSales = async (row: any) => {
     :summary-columns="['Spk3', 'Spk2', 'Spk1', 'Average', 'Target', 'Actual']"
     search-placeholder="Cari kode / nama customer..."
     @refresh="fetchData"
+    @export="handleExport"
   >
     <template #filter-left>
       <div class="f-group">
@@ -356,82 +322,19 @@ const saveKodeSales = async (row: any) => {
       </v-btn>
     </template>
 
-    <!-- Format angka & persen — mode single-divisi -->
-    <template v-if="!isAllMode" #item.Spk3="{ item }">{{
-      numFmt(item.Spk3)
-    }}</template>
-    <template v-if="!isAllMode" #item.Spk2="{ item }">{{
-      numFmt(item.Spk2)
-    }}</template>
-    <template v-if="!isAllMode" #item.Spk1="{ item }">{{
-      numFmt(item.Spk1)
-    }}</template>
-    <template v-if="!isAllMode" #item.Average="{ item }">{{
-      numFmt(item.Average)
-    }}</template>
-    <template v-if="!isAllMode" #item.Target="{ item }">{{
-      numFmt(item.Target)
-    }}</template>
-    <template v-if="!isAllMode" #item.Actual="{ item }">{{
-      numFmt(item.Actual)
-    }}</template>
-    <template v-if="!isAllMode" #item.PctAverage="{ item }">{{
+    <!-- Format angka & persen -->
+    <template #item.Spk3="{ item }">{{ numFmt(item.Spk3) }}</template>
+    <template #item.Spk2="{ item }">{{ numFmt(item.Spk2) }}</template>
+    <template #item.Spk1="{ item }">{{ numFmt(item.Spk1) }}</template>
+    <template #item.Average="{ item }">{{ numFmt(item.Average) }}</template>
+    <template #item.Target="{ item }">{{ numFmt(item.Target) }}</template>
+    <template #item.Actual="{ item }">{{ numFmt(item.Actual) }}</template>
+    <template #item.PctAverage="{ item }">{{
       pctFmt(item.PctAverage)
     }}</template>
-    <template v-if="!isAllMode" #item.PctTarget="{ item }">{{
+    <template #item.PctTarget="{ item }">{{
       pctFmt(item.PctTarget)
     }}</template>
-
-    <!-- Format angka & persen — mode ALL DIVISI -->
-    <template
-      v-if="isAllMode"
-      v-for="p in ALL_PREFIXES"
-      :key="p.key + '-spk3'"
-      #[`item.${p.key}_spk3`]="{ item }"
-      >{{ numFmt(item[`${p.key}_spk3`]) }}</template
-    >
-    <template
-      v-if="isAllMode"
-      v-for="p in ALL_PREFIXES"
-      :key="p.key + '-spk2'"
-      #[`item.${p.key}_spk2`]="{ item }"
-      >{{ numFmt(item[`${p.key}_spk2`]) }}</template
-    >
-    <template
-      v-if="isAllMode"
-      v-for="p in ALL_PREFIXES"
-      :key="p.key + '-spk1'"
-      #[`item.${p.key}_spk1`]="{ item }"
-      >{{ numFmt(item[`${p.key}_spk1`]) }}</template
-    >
-    <template
-      v-if="isAllMode"
-      v-for="p in ALL_PREFIXES"
-      :key="p.key + '-avg'"
-      #[`item.${p.key}_average`]="{ item }"
-      >{{ numFmt(item[`${p.key}_average`]) }}</template
-    >
-    <template
-      v-if="isAllMode"
-      v-for="p in ALL_PREFIXES"
-      :key="p.key + '-tgt'"
-      #[`item.${p.key}_target`]="{ item }"
-      >{{ numFmt(item[`${p.key}_target`]) }}</template
-    >
-    <template
-      v-if="isAllMode"
-      v-for="p in ALL_PREFIXES"
-      :key="p.key + '-act'"
-      #[`item.${p.key}_actual`]="{ item }"
-      >{{ numFmt(item[`${p.key}_actual`]) }}</template
-    >
-    <template
-      v-if="isAllMode"
-      v-for="p in ALL_PREFIXES"
-      :key="p.key + '-pcttgt'"
-      #[`item.${p.key}_pct_target`]="{ item }"
-      >{{ pctFmt(item[`${p.key}_pct_target`]) }}</template
-    >
   </BaseBrowse>
 
   <CustomerSearchModal v-model="showCustModal" @selected="onCustSelected" />

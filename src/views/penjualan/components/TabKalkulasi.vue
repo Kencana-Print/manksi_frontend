@@ -19,6 +19,7 @@ const skipNextAutoFetch = ref(props.isEdit);
 const handleKainSelected = (item: any) => {
   kal.value.JenisKain = item.Jeniskain;
   kal.value.KategoriKain = item.Kategori;
+  loadDropdownOptions();
 };
 
 const hitungBarisKomponen = (item: any) => {
@@ -39,20 +40,44 @@ const hitungBarisKomponen = (item: any) => {
 const loadDropdownOptions = async () => {
   try {
     const [resCetak, resTambahan] = await Promise.all([
-      api.get("/lookups/cetak"),
+      api.get("/lookups/cetak", {
+        params: {
+          kategori: kal.value?.KategoriKain || "",
+          jenisKain: kal.value?.JenisKain || "",
+        },
+      }),
       api.get("/lookups/tambahan"),
     ]);
     cetakOptions.value = resCetak.data.data.map((c: any) => ({
       label: `${c.mhb_jenis} ${c.mhb_ket}`.trim(),
-      harga: Number(c.mhb_biaya),
+      harga: Number(c.mhb_biaya ?? c.biaya ?? 0),
     }));
     tambahanOptions.value = resTambahan.data.data;
+
+    // Sinkronkan harga item cetak yang sudah dipilih dengan tarif master baru
+    if (kal.value?.GridCetak?.length) {
+      kal.value.GridCetak.forEach((row: any) => {
+        const opt = cetakOptions.value.find((o: any) => o.label === row.Keterangan);
+        if (opt) {
+          row.Harga = opt.harga;
+        }
+      });
+    }
   } catch (e) {
     console.error("Gagal memuat dropdown", e);
   }
 };
 
 onMounted(loadDropdownOptions);
+
+watch(
+  () => kal.value?.JenisKain,
+  (newKain, oldKain) => {
+    if (newKain && newKain !== oldKain) {
+      loadDropdownOptions();
+    }
+  },
+);
 
 // ── Logika loadKomponen (Metadata) ─────────────────────────────────────
 const fetchKalkulasiMetadata = async () => {
@@ -138,8 +163,8 @@ const onCetakChange = (item: any) => {
 const onTambahanChange = (item: any) => {
   const opt = tambahanOptions.value.find((o) => o.mht_ket === item.Keterangan);
   if (opt) {
-    const ktg = kal.value.KategoriKain;
-    const isPartaiBesar = Number(kal.value.QtyOrder || 0) >= 1000;
+    const ktg = (kal.value.KategoriKain || "").toUpperCase();
+    const isPartaiBesar = Number(props.formData.RencanaOrder || kal.value.QtyOrder || 0) >= 1000;
     item.Harga =
       ktg === "LACOST"
         ? Number(opt.mht_lacost)
@@ -335,6 +360,13 @@ watch(
 );
 
 watch(
+  () => [kal.value?.JenisKain, kal.value?.KategoriKain],
+  () => {
+    loadDropdownOptions();
+  },
+);
+
+watch(
   () => [kal.value.HargaSesuai, kal.value.PersenPpn, kal.value.UpdateOtomatis],
   () => {
     if (kal.value.UpdateOtomatis) {
@@ -418,6 +450,26 @@ const rows8 = Array.from({ length: 8 }, (_, i) => i + 1);
               readonly
               style="width: 140px; background: #e8e8e8"
             />
+            <span
+              v-if="kal.SumberKalkulasi"
+              :style="{
+                marginLeft: '4px',
+                padding: '2px 6px',
+                fontSize: '10px',
+                fontWeight: '700',
+                borderRadius: '4px',
+                background:
+                  kal.SumberKalkulasi === 'FINANCE' ? '#e0f2fe' : '#fef3c7',
+                color:
+                  kal.SumberKalkulasi === 'FINANCE' ? '#0369a1' : '#b45309',
+                border:
+                  kal.SumberKalkulasi === 'FINANCE'
+                    ? '1px solid #bae6fd'
+                    : '1px solid #fde68a',
+              }"
+            >
+              {{ kal.SumberKalkulasi }}
+            </span>
             <input
               :value="kal.TanggalKalkulasi"
               readonly
@@ -583,6 +635,15 @@ const rows8 = Array.from({ length: 8 }, (_, i) => i + 1);
                   >
                     <option value="" disabled>-- Pilih Cetak --</option>
                     <option
+                      v-if="
+                        item.Keterangan &&
+                        !cetakOptions.some((o) => o.label === item.Keterangan)
+                      "
+                      :value="item.Keterangan"
+                    >
+                      {{ item.Keterangan }}
+                    </option>
+                    <option
                       v-for="opt in cetakOptions"
                       :key="opt.label"
                       :value="opt.label"
@@ -637,6 +698,17 @@ const rows8 = Array.from({ length: 8 }, (_, i) => i + 1);
                     style="cursor: pointer"
                   >
                     <option value="" disabled>-- Pilih Tambahan --</option>
+                    <option
+                      v-if="
+                        item.Keterangan &&
+                        !tambahanOptions.some(
+                          (o) => o.mht_ket === item.Keterangan
+                        )
+                      "
+                      :value="item.Keterangan"
+                    >
+                      {{ item.Keterangan }}
+                    </option>
                     <option
                       v-for="opt in tambahanOptions"
                       :key="opt.mht_ket"
