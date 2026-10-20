@@ -107,18 +107,15 @@ const defaultData = {
 interface BarisHitung {
   jumlah?: number;
   harga?: number;
-  roll?: number;
-  hargaRoll?: number;
   diskon?: number;
 }
 
-// PO Lain-lain: bagian kg (Jumlah × Harga) + bagian roll (Roll × Harga Roll)
-function hitungTotal(r: BarisHitung, lainLain: boolean): number {
-  const kg = (Number(r.jumlah) || 0) * (Number(r.harga) || 0);
-  const roll = lainLain
-    ? (Number(r.roll) || 0) * (Number(r.hargaRoll) || 0)
-    : 0;
-  return (kg + roll) * (1 - (Number(r.diskon) || 0) / 100);
+function hitungTotal(r: BarisHitung): number {
+  return (
+    (Number(r.jumlah) || 0) *
+    (Number(r.harga) || 0) *
+    (1 - (Number(r.diskon) || 0) / 100)
+  );
 }
 
 const {
@@ -162,18 +159,12 @@ const {
         roll: Number(row.pod_roll) || 0,
         jumlah: Number(row.pod_Jumlah) || 0,
         harga: Number(row.pod_hargabeli) || 0,
-        hargaRoll: Number(row.pod_hargaroll) || 0,
         diskon: Number(row.pod_disc) || 0,
-        total: hitungTotal(
-          {
-            jumlah: Number(row.pod_Jumlah),
-            harga: Number(row.pod_hargabeli),
-            roll: Number(row.pod_roll),
-            hargaRoll: Number(row.pod_hargaroll),
-            diskon: Number(row.pod_disc),
-          },
-          Number(d.header.po_jenis) === 4,
-        ),
+        total: hitungTotal({
+          jumlah: Number(row.pod_Jumlah),
+          harga: Number(row.pod_hargabeli),
+          diskon: Number(row.pod_disc),
+        }),
         spk: row.pod_spk_nomor || "",
         mkb: row.pod_mkb_nomor || "",
         supKode: row.pod_sup_kode || "",
@@ -260,7 +251,7 @@ watch(
 // ── Totals ──
 const subTotal = computed(() =>
   formData.value.items.reduce(
-    (s: number, r: BarisHitung) => s + hitungTotal(r, isLainLain.value),
+    (s: number, r: BarisHitung) => s + hitungTotal(r),
     0,
   ),
 );
@@ -275,10 +266,9 @@ const fmt = (n: number) => n.toLocaleString("id-ID");
 // columns + kolom kondisional (Gramasi Awal, Roll, Harga/Disc/Total)
 const colSpanCount = computed(() => {
   let n = 13; // No, Kode, Nama Bahan, Nama External, Sat, Gramasi Awal, Gramasi, Setting, Jenis, Jumlah, SPK, MKB, Aksi
-  if (isCelup.value || isLainLain.value) n += 1; // Roll
+  if (isCelup.value) n += 1; // Roll
   if (showSupCol.value) n += 1; // Supplier per baris
   if (canLihatBeli.value) n += 3; // Harga Beli, Disc, Total
-  if (canLihatBeli.value && isLainLain.value) n += 1; // Harga Roll
   return n;
 });
 
@@ -431,7 +421,6 @@ const addItem = () =>
     roll: 0,
     jumlah: 0,
     harga: 0,
-    hargaRoll: 0,
     diskon: 0,
     total: 0,
     spk: "",
@@ -570,7 +559,6 @@ const setMkb = async (v: any) => {
 };
 const recalcRow = (i: number) => {
   const r = formData.value.items[i];
-  r.total = hitungTotal(r, isLainLain.value);
   if (isCelup.value && r.kode) {
     formData.value.rolls = formData.value.rolls.filter(
       (x: any) => x.kode !== r.kode,
@@ -683,13 +671,9 @@ const validateSave = () => {
         `Baris ${idx + 1}: Jumlah PO harus diisi, tidak dapat disimpan.`,
       );
     if (isLainLain.value) {
-      if ((Number(r.harga) || 0) <= 0 && (Number(r.hargaRoll) || 0) <= 0)
+      if ((Number(r.harga) || 0) <= 0)
         return toast.warning(
-          `Baris ${idx + 1}: Harga Beli atau Harga Roll harus diisi.`,
-        );
-      if ((Number(r.hargaRoll) || 0) > 0 && (Number(r.roll) || 0) <= 0)
-        return toast.warning(
-          `Baris ${idx + 1}: Roll harus diisi jika Harga Roll diisi.`,
+          `Baris ${idx + 1}: Harga Beli harus diisi, tidak dapat disimpan.`,
         );
     } else if ((Number(r.harga) || 0) <= 0) {
       return toast.warning(
@@ -987,7 +971,7 @@ const validateSave = () => {
           <table
             class="gt"
             :style="{
-              minWidth: `${1300 + (showSupCol ? 170 : 0) + (isLainLain ? 50 + (canLihatBeli ? 90 : 0) : 0)}px`,
+              minWidth: `${1300 + (showSupCol ? 170 : 0)}px`,
             }"
           >
             <thead>
@@ -1004,9 +988,7 @@ const validateSave = () => {
                 </th>
                 <th style="width: 50px">Setting</th>
                 <th style="width: 80px">Jenis Bahan</th>
-                <th style="width: 50px" class="tr" v-if="isCelup || isLainLain">
-                  Roll
-                </th>
+                <th style="width: 50px" class="tr" v-if="isCelup">Roll</th>
                 <th style="width: 75px" class="tr bg-yellow">Jumlah</th>
                 <th
                   v-if="canLihatBeli"
@@ -1014,13 +996,6 @@ const validateSave = () => {
                   class="tr bg-yellow"
                 >
                   Harga Beli
-                </th>
-                <th
-                  v-if="canLihatBeli && isLainLain"
-                  style="width: 90px"
-                  class="tr bg-yellow"
-                >
-                  Harga Roll
                 </th>
                 <th
                   v-if="canLihatBeli"
@@ -1082,7 +1057,7 @@ const validateSave = () => {
                 <td class="p0">
                   <input v-model="row.jenis" class="ci ro" readonly />
                 </td>
-                <td class="p0" v-if="isCelup || isLainLain">
+                <td class="p0" v-if="isCelup">
                   <input
                     v-model.number="row.roll"
                     type="number"
@@ -1103,15 +1078,6 @@ const validateSave = () => {
                 <td v-if="canLihatBeli" class="p0">
                   <input
                     v-model.number="row.harga"
-                    type="number"
-                    class="ci tr bg-yellow-light"
-                    @blur="recalcRow(Number(idx))"
-                    v-select-on-focus
-                  />
-                </td>
-                <td v-if="canLihatBeli && isLainLain" class="p0">
-                  <input
-                    v-model.number="row.hargaRoll"
                     type="number"
                     class="ci tr bg-yellow-light"
                     @blur="recalcRow(Number(idx))"
