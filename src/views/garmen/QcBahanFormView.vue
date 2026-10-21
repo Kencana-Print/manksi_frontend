@@ -1018,8 +1018,8 @@ const nilaiClass = (n: number) =>
                 <th style="width: 55px" class="tr">Roll</th>
                 <th style="width: 95px" class="tc">Dicek</th>
                 <th style="width: 110px">Nama Warna</th>
-                <th style="width: 90px" class="tr bg-yellow">Gramasi Atas</th>
                 <th style="width: 90px" class="tr bg-yellow">Gramasi Bawah</th>
+                <th style="width: 90px" class="tr bg-yellow">Gramasi Atas</th>
                 <th style="width: 75px" class="tr bg-yellow">Setting</th>
                 <th style="width: 85px" class="tr bg-yellow">Warna ΔE</th>
                 <th style="width: 80px" class="tc bg-yellow">Handfeel</th>
@@ -1079,8 +1079,8 @@ const nilaiClass = (n: number) =>
                       @keydown.enter.prevent="onEnterNext"
                     />
                   </td>
-                  <td class="tr px-1">{{ calcOf(idx).atasRata || "-" }}</td>
                   <td class="tr px-1">{{ calcOf(idx).bawahRata || "-" }}</td>
+                  <td class="tr px-1">{{ calcOf(idx).atasRata || "-" }}</td>
                   <td class="tr px-1">{{ calcOf(idx).settingRata || "-" }}</td>
                   <td colspan="5"></td>
                   <td class="tc">
