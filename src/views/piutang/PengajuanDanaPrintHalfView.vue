@@ -157,18 +157,6 @@ const grandTotal = computed(
 </template>
 
 <style scoped>
-@media print {
-  @page {
-    size: A4 landscape;
-    margin: 10mm 5mm;
-  }
-  body {
-    background: white;
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
-  }
-}
-
 .loading-screen {
   padding: 40px;
   text-align: center;
@@ -210,6 +198,7 @@ const grandTotal = computed(
   width: 100%;
   border-collapse: collapse;
   margin-top: 6px;
+  table-layout: fixed;
 }
 .items-table th,
 .items-table td {
@@ -256,5 +245,21 @@ const grandTotal = computed(
   border-top: none;
   border-bottom: none;
   height: 25px;
+}
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 0;
+  }
+  .print-page {
+    width: 210mm;
+    height: 147mm;
+    margin-top: 148.5mm; /* dorong ke setengah bawah */
+    padding: 8mm 12mm;
+    overflow: hidden;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
 }
 </style>
