@@ -21,11 +21,14 @@ import { exportExcelSingle, type ExcelColumn } from "@/utils/excelExport";
 const toast = useToast();
 
 // ── Filter ──
-const getToday = () => new Date().toISOString().substr(0, 10);
+const pad = (n: number) => String(n).padStart(2, "0");
+const tglLokal = (d: Date): string =>
+  `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const getToday = () => tglLokal(new Date());
 const getMinus7 = () => {
   const d = new Date();
   d.setDate(d.getDate() - 7);
-  return d.toISOString().substr(0, 10);
+  return tglLokal(d);
 };
 const filterState = ref<Record<string, any>>({});
 
@@ -138,7 +141,10 @@ const openDialog = async (item: any) => {
 const appendHistoryAlokasi = (selectedRows: any[]) => {
   selectedRows.forEach((row) => {
     const exists = dialogData.value.alokasi.some(
-      (a: any) => a.alamat === row.Alamat && a.kota === row.Kota,
+      (a: any) =>
+        a.alamat === row.Alamat &&
+        a.kota === row.Kota &&
+        a.toko === (row.Toko || ""),
     );
     if (!exists) {
       dialogData.value.alokasi.push({
@@ -185,7 +191,10 @@ const handleExcelUpload = (e: Event) => {
       let count = 0;
       for (let r = 1; r < jsonData.length; r++) {
         const row = jsonData[r];
-        if (row[0] && String(row[0]).trim() !== "") {
+        if (
+          String(row[0] ?? "").trim() !== "" ||
+          String(row[1] ?? "").trim() !== ""
+        ) {
           dialogData.value.alokasi.push({
             alamat: String(row[0] || "").trim(),
             toko: String(row[1] || "").trim(), // ⬅ BARU, kolom baru di posisi 1
@@ -219,6 +228,8 @@ const saveDialog = async () => {
         ? `Alokasi tersimpan dan tersinkron ke SPK ${res.data.data.spkNomor}.`
         : "Alokasi berhasil disimpan.",
     );
+    const peringatan: string[] = res.data.data?.peringatan ?? [];
+    peringatan.forEach((p) => toast.warning(p, { timeout: 8000 }));
     showDialog.value = false;
     fetchData();
   } catch (e: any) {

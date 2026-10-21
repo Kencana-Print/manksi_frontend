@@ -1749,7 +1749,7 @@ const printWithAlokasi = ref(false);
 const hasAlokasi = computed(() => {
   return (
     formData.value.Alokasi?.length > 0 &&
-    formData.value.Alokasi.some((a: any) => a.kota || a.alamat)
+    formData.value.Alokasi.some((a: any) => a.kota || a.alamat || a.toko)
   );
 });
 
