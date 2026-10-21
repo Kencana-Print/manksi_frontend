@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from "vue";
+import { ref, computed, watch, onMounted, nextTick } from "vue";
 import { useRoute } from "vue-router";
 import { useToast } from "vue-toastification";
 import { useForm } from "@/composables/useForm";
@@ -224,6 +224,20 @@ const validateSave = () => {
   }
   showSaveDialog.value = true;
 };
+
+const autoGrow = (el: HTMLTextAreaElement | null) => {
+  if (!el) return;
+  el.style.height = "auto";
+  el.style.height = `${el.scrollHeight}px`;
+};
+
+const onHasilInput = (e: Event) => autoGrow(e.target as HTMLTextAreaElement);
+
+// Directive lokal: hitung ulang saat mount dan saat nilai berubah dari luar (mis. data dimuat)
+const vAutoGrow = {
+  mounted: (el: HTMLTextAreaElement) => autoGrow(el),
+  updated: (el: HTMLTextAreaElement) => autoGrow(el),
+};
 </script>
 
 <template>
@@ -361,9 +375,11 @@ const validateSave = () => {
                 <td>
                   <textarea
                     v-model="r.hasil"
+                    v-auto-grow
                     class="gi gi-ta"
                     :disabled="statusSaja"
-                    rows="2"
+                    rows="1"
+                    @input="onHasilInput"
                   />
                 </td>
                 <td style="padding: 0">
@@ -617,10 +633,14 @@ const validateSave = () => {
 }
 .gi-ta {
   height: auto;
-  min-height: 40px;
+  min-height: 28px;
   padding: 4px 6px;
-  resize: vertical;
+  resize: none;
+  overflow: hidden;
   display: block;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 .gi:focus {
   background: #e3f2fd !important;
