@@ -18,6 +18,11 @@ import {
 } from "@tabler/icons-vue";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
+interface ActualHarian {
+  tgl: string; // YYYY-MM-DD
+  qty: number;
+}
+
 interface TabRow {
   NomorSPK: string;
   NamaSPK: string;
@@ -42,6 +47,7 @@ interface TabRow {
   smv_sumber: "" | "PROOF" | "MANUAL";
   mp: number;
   actual_output: number;
+  actual_harian: ActualHarian[];
   actual_jam: number | null;
   _mpLocked: boolean; // MP tersimpan di DB, tidak ikut berubah
   _smvConfirmed: boolean; // warning SMV manual sudah dikonfirmasi
@@ -51,6 +57,7 @@ interface TabRow {
   _supplierLoading: boolean;
   _spkDetail: string;
   Output: number;
+  OutputHarian: ActualHarian[];
 }
 
 interface RiwayatRow {
@@ -143,6 +150,7 @@ const emptyRow = (defaultTgl: string): TabRow => ({
   smv_sumber: "",
   mp: 0,
   actual_output: 0,
+  actual_harian: [],
   actual_jam: null,
   _mpLocked: false,
   _smvConfirmed: false,
@@ -152,6 +160,7 @@ const emptyRow = (defaultTgl: string): TabRow => ({
   _spkLoading: false,
   _supplierLoading: false,
   Output: 0,
+  OutputHarian: [],
 });
 
 const mapRow = (r: any, defaultTgl: string): TabRow => ({
@@ -177,6 +186,7 @@ const mapRow = (r: any, defaultTgl: string): TabRow => ({
   smv_sumber: r.smv_sumber ?? "",
   mp: Number(r.mp) || 0,
   actual_output: Number(r.actual_output) || 0,
+  actual_harian: Array.isArray(r.actual_harian) ? r.actual_harian : [],
   actual_jam: r.actual_jam == null ? null : Number(r.actual_jam),
   _mpLocked: Number(r.plan_mp) > 0,
   _smvConfirmed: true, // baris yang sudah tersimpan dianggap sudah dikonfirmasi
@@ -186,6 +196,7 @@ const mapRow = (r: any, defaultTgl: string): TabRow => ({
   _spkLoading: false,
   _supplierLoading: false,
   Output: Number(r.Output) || 0,
+  OutputHarian: Array.isArray(r.OutputHarian) ? r.OutputHarian : [],
 });
 
 const emptyData: FormState = {
@@ -475,12 +486,14 @@ interface SewingRef {
   actualJamByLine: Record<string, number>;
   smvBySpk: Record<string, { smv: number; sumber: "PROOF" | "MANUAL" }>;
   actualOutputBySpkLine: Record<string, number>;
+  actualHarianBySpkLine: Record<string, ActualHarian[]>;
 }
 const emptySewingRef = (): SewingRef => ({
   mpByLine: {},
   actualJamByLine: {},
   smvBySpk: {},
   actualOutputBySpkLine: {},
+  actualHarianBySpkLine: {},
 });
 const sewingRef = ref<SewingRef>(emptySewingRef());
 let refSeq = 0; // buang respons lama kalau ada request yang lebih baru
@@ -552,6 +565,12 @@ const applyActual = (row: TabRow) => {
           `${row.NomorSPK}|${row.plan_line_kelompok}`
         ] ?? 0)
       : 0;
+  row.actual_harian =
+    row.NomorSPK && row.plan_line_kelompok
+      ? (ref.actualHarianBySpkLine[
+          `${row.NomorSPK}|${row.plan_line_kelompok}`
+        ] ?? [])
+      : [];
 };
 
 // Waktu produksi per line (menit-orang) = MP x Hari x Jam x 60
@@ -569,6 +588,21 @@ const outputMenit = (row: TabRow): number | null =>
   row.NomorSPK && row.plan_smv > 0
     ? row.plan_smv * (Number(row.actual_output) || 0)
     : null;
+// Output menit untuk satu hari = SMV x qty hari itu (kosong kalau SMV belum ada)
+const outputMenitHari = (row: TabRow, qty: number): number | null =>
+  row.plan_smv > 0 ? row.plan_smv * qty : null;
+
+// Format tanggal YYYY-MM-DD -> DD/MM/YYYY
+const fmtTgl = (t: string) => t.split("-").reverse().join("/");
+
+// Baris SPK yang breakdown hariannya sedang dibuka (kunci = row._key)
+const bukaHarian = ref<Set<number>>(new Set());
+const toggleHarian = (key: number) => {
+  const s = new Set(bukaHarian.value);
+  if (s.has(key)) s.delete(key);
+  else s.add(key);
+  bukaHarian.value = s;
+};
 // Resume per operator vs kapasitas per operator (hari x jam x 60): perilaku lama tidak berubah
 const isOverTime = (row: TabRow) => {
   const r = resumeOf(row);
@@ -1030,82 +1064,119 @@ const fmt = (n: number | null | undefined) => (n ?? 0).toLocaleString("id-ID");
                   </tr>
                 </thead>
                 <tbody>
-                  <tr
+                  <template
                     v-for="(row, idx) in formData.detail.cutting"
                     :key="row._key"
                   >
-                    <td class="tc lbl-cell">{{ (idx as number) + 1 }}</td>
-                    <td style="padding: 0">
-                      <div class="gi-group">
+                    <tr>
+                      <td class="tc lbl-cell">{{ (idx as number) + 1 }}</td>
+                      <td style="padding: 0">
+                        <div class="gi-group">
+                          <input
+                            v-model="row.NomorSPK"
+                            class="gi"
+                            style="text-transform: uppercase"
+                            placeholder="F1 / Enter"
+                            @keydown="
+                              (e) => onSpkKeydown(e, 'cutting', idx as number)
+                            "
+                            @keydown.enter.prevent="
+                              onSpkEnter('cutting', idx as number)
+                            "
+                          />
+                          <button
+                            class="btn-gi-lkp"
+                            :class="{ loading: row._spkLoading }"
+                            @click="openSpkModal('cutting', idx as number)"
+                          >
+                            <IconSearch :size="11" />
+                          </button>
+                        </div>
+                      </td>
+                      <td class="ro-cell" :title="row._spkDetail">
+                        {{ row.NamaSPK || "—" }}
+                      </td>
+                      <td class="ro-cell tr">
+                        {{ row.QtySPK ? fmt(row.QtySPK) : "—" }}
+                      </td>
+                      <td
+                        class="ro-cell tr"
+                        :title="
+                          row.WipCatatan ? 'Satuan lain: ' + row.WipCatatan : ''
+                        "
+                      >
+                        {{ row.WipSatuan ? fmt(row.WipBahan) : "—" }}
+                        <span v-if="row.WipCatatan">*</span>
+                      </td>
+                      <td class="ro-cell">{{ row.WipSatuan || "—" }}</td>
+                      <td style="padding: 0">
                         <input
-                          v-model="row.NomorSPK"
-                          class="gi"
-                          style="text-transform: uppercase"
-                          placeholder="F1 / Enter"
-                          @keydown="
-                            (e) => onSpkKeydown(e, 'cutting', idx as number)
-                          "
-                          @keydown.enter.prevent="
-                            onSpkEnter('cutting', idx as number)
-                          "
+                          type="number"
+                          v-model.number="row.plan_qty_jadwal"
+                          min="0"
+                          class="gi tr yellow-cell"
+                          v-select-on-focus
                         />
-                        <button
-                          class="btn-gi-lkp"
-                          :class="{ loading: row._spkLoading }"
-                          @click="openSpkModal('cutting', idx as number)"
+                      </td>
+                      <td style="padding: 0">
+                        <select
+                          v-model="row.plan_line_kelompok"
+                          class="gi gi-sel"
                         >
-                          <IconSearch :size="11" />
+                          <option value="">-- Pilih --</option>
+                          <option value="MANUAL">MANUAL</option>
+                          <option value="MESIN">MESIN</option>
+                        </select>
+                      </td>
+                      <td class="ro-cell tr">
+                        <span
+                          v-if="row.OutputHarian.length"
+                          class="hr-toggle"
+                          title="Lihat breakdown per tanggal"
+                          @click="toggleHarian(row._key)"
+                        >
+                          {{ bukaHarian.has(row._key) ? "▾" : "▸" }}
+                          {{ fmt(row.Output) }}
+                        </span>
+                        <template v-else>
+                          {{ row.Output ? fmt(row.Output) : "—" }}
+                        </template>
+                      </td>
+                      <td class="tc" style="padding: 0">
+                        <button
+                          type="button"
+                          class="btn-del"
+                          @click="removeRow('cutting', idx as number)"
+                        >
+                          <IconTrash :size="12" />
                         </button>
-                      </div>
-                    </td>
-                    <td class="ro-cell" :title="row._spkDetail">
-                      {{ row.NamaSPK || "—" }}
-                    </td>
-                    <td class="ro-cell tr">
-                      {{ row.QtySPK ? fmt(row.QtySPK) : "—" }}
-                    </td>
-                    <td
-                      class="ro-cell tr"
-                      :title="
-                        row.WipCatatan ? 'Satuan lain: ' + row.WipCatatan : ''
-                      "
-                    >
-                      {{ row.WipSatuan ? fmt(row.WipBahan) : "—" }}
-                      <span v-if="row.WipCatatan">*</span>
-                    </td>
-                    <td class="ro-cell">{{ row.WipSatuan || "—" }}</td>
-                    <td style="padding: 0">
-                      <input
-                        type="number"
-                        v-model.number="row.plan_qty_jadwal"
-                        min="0"
-                        class="gi tr yellow-cell"
-                        v-select-on-focus
-                      />
-                    </td>
-                    <td style="padding: 0">
-                      <select
-                        v-model="row.plan_line_kelompok"
-                        class="gi gi-sel"
-                      >
-                        <option value="">-- Pilih --</option>
-                        <option value="MANUAL">MANUAL</option>
-                        <option value="MESIN">MESIN</option>
-                      </select>
-                    </td>
-                    <td class="ro-cell tr">
-                      {{ row.Output ? fmt(row.Output) : "—" }}
-                    </td>
-                    <td class="tc" style="padding: 0">
-                      <button
-                        type="button"
-                        class="btn-del"
-                        @click="removeRow('cutting', idx as number)"
-                      >
-                        <IconTrash :size="12" />
-                      </button>
-                    </td>
-                  </tr>
+                      </td>
+                    </tr>
+
+                    <!-- Breakdown Output per tanggal -->
+                    <tr v-if="bukaHarian.has(row._key)" class="hr-row">
+                      <td colspan="10">
+                        <table class="hr-table">
+                          <thead>
+                            <tr>
+                              <th>Tanggal</th>
+                              <th class="tr">Output</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr v-for="h in row.OutputHarian" :key="h.tgl">
+                              <td>{{ fmtTgl(h.tgl) }}</td>
+                              <td class="tr">{{ fmt(h.qty) }}</td>
+                            </tr>
+                            <tr class="hr-total">
+                              <td>Total</td>
+                              <td class="tr">{{ fmt(row.Output) }}</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </td>
+                    </tr>
+                  </template>
                   <tr v-if="!formData.detail.cutting.length">
                     <td colspan="10" class="empty-row">Klik + Tambah Baris</td>
                   </tr>
@@ -1287,107 +1358,156 @@ const fmt = (n: number | null | undefined) => (n ?? 0).toLocaleString("id-ID");
                     </tr>
 
                     <!-- Baris SPK di dalam line -->
-                    <tr v-for="({ row, idx }, n) in g.items" :key="row._key">
-                      <td class="tc lbl-cell">{{ n + 1 }}</td>
+                    <template
+                      v-for="({ row, idx }, n) in g.items"
+                      :key="row._key"
+                    >
+                      <tr>
+                        <td class="tc lbl-cell">{{ n + 1 }}</td>
 
-                      <td style="padding: 0">
-                        <div class="gi-group">
-                          <input
-                            v-model="row.NomorSPK"
-                            class="gi"
-                            style="text-transform: uppercase"
-                            placeholder="F1 / Enter"
-                            @keydown="(e) => onSpkKeydown(e, 'sewing', idx)"
-                            @keydown.enter.prevent="onSpkEnter('sewing', idx)"
-                          />
-                          <button
-                            class="btn-gi-lkp"
-                            :class="{ loading: row._spkLoading }"
-                            @click="openSpkModal('sewing', idx)"
+                        <td style="padding: 0">
+                          <div class="gi-group">
+                            <input
+                              v-model="row.NomorSPK"
+                              class="gi"
+                              style="text-transform: uppercase"
+                              placeholder="F1 / Enter"
+                              @keydown="(e) => onSpkKeydown(e, 'sewing', idx)"
+                              @keydown.enter.prevent="onSpkEnter('sewing', idx)"
+                            />
+                            <button
+                              class="btn-gi-lkp"
+                              :class="{ loading: row._spkLoading }"
+                              @click="openSpkModal('sewing', idx)"
+                            >
+                              <IconSearch :size="11" />
+                            </button>
+                          </div>
+                        </td>
+                        <td class="ro-cell" :title="row._spkDetail">
+                          {{ row.NamaSPK || "—" }}
+                        </td>
+                        <td class="ro-cell tr">
+                          {{ row.QtySPK ? fmt(row.QtySPK) : "—" }}
+                        </td>
+
+                        <!-- SMV: PROOF = terkunci, MANUAL = input -->
+                        <td style="padding: 0">
+                          <span v-if="!row.NomorSPK" class="ro-cell dash"
+                            >—</span
                           >
-                            <IconSearch :size="11" />
+                          <div
+                            v-else-if="row.smv_sumber === 'PROOF'"
+                            class="lock-cell"
+                            title="Dari Proof Garmen lini Jahit (tidak bisa diubah)"
+                          >
+                            <IconLock :size="11" />
+                            {{ fmtDec(row.plan_smv, 3) }}
+                          </div>
+                          <input
+                            v-else
+                            type="number"
+                            v-model.number="row.plan_smv"
+                            min="0"
+                            step="0.01"
+                            class="gi tr manual-cell"
+                            title="Input manual: SPK ini tidak punya Proof Garmen lini Jahit"
+                            v-select-on-focus
+                          />
+                        </td>
+
+                        <td style="padding: 0">
+                          <input
+                            type="number"
+                            v-model.number="row.plan_target_output"
+                            min="0"
+                            class="gi tr yellow-cell"
+                            v-select-on-focus
+                          />
+                        </td>
+
+                        <td class="ro-cell tr">
+                          <span
+                            v-if="row.NomorSPK && row.actual_harian.length"
+                            class="hr-toggle"
+                            title="Lihat breakdown per tanggal"
+                            @click="toggleHarian(row._key)"
+                          >
+                            {{ bukaHarian.has(row._key) ? "▾" : "▸" }}
+                            {{ fmt(row.actual_output) }}
+                          </span>
+                          <template v-else>
+                            {{ row.NomorSPK ? fmt(row.actual_output) : "—" }}
+                          </template>
+                        </td>
+
+                        <td class="ro-cell tr">
+                          {{ fmtDec(outputMenit(row), 1) }}
+                        </td>
+
+                        <td
+                          class="ro-cell tr"
+                          :class="{ over: isOverTime(row) }"
+                          :title="
+                            isOverTime(row)
+                              ? 'Resume melebihi waktu produksi: target tidak muat'
+                              : ''
+                          "
+                        >
+                          {{ fmtDec(resumeOf(row), 1) }}
+                        </td>
+
+                        <td style="padding: 0">
+                          <input
+                            type="text"
+                            v-model="row.plan_keterangan"
+                            class="gi"
+                            maxlength="200"
+                            placeholder="Keterangan..."
+                          />
+                        </td>
+                        <td class="tc" style="padding: 0">
+                          <button
+                            type="button"
+                            class="btn-del"
+                            @click="removeRow('sewing', idx)"
+                          >
+                            <IconTrash :size="12" />
                           </button>
-                        </div>
-                      </td>
-                      <td class="ro-cell" :title="row._spkDetail">
-                        {{ row.NamaSPK || "—" }}
-                      </td>
-                      <td class="ro-cell tr">
-                        {{ row.QtySPK ? fmt(row.QtySPK) : "—" }}
-                      </td>
+                        </td>
+                      </tr>
 
-                      <!-- SMV: PROOF = terkunci, MANUAL = input -->
-                      <td style="padding: 0">
-                        <span v-if="!row.NomorSPK" class="ro-cell dash">—</span>
-                        <div
-                          v-else-if="row.smv_sumber === 'PROOF'"
-                          class="lock-cell"
-                          title="Dari Proof Garmen lini Jahit (tidak bisa diubah)"
-                        >
-                          <IconLock :size="11" />
-                          {{ fmtDec(row.plan_smv, 3) }}
-                        </div>
-                        <input
-                          v-else
-                          type="number"
-                          v-model.number="row.plan_smv"
-                          min="0"
-                          step="0.01"
-                          class="gi tr manual-cell"
-                          title="Input manual: SPK ini tidak punya Proof Garmen lini Jahit"
-                          v-select-on-focus
-                        />
-                      </td>
-
-                      <td style="padding: 0">
-                        <input
-                          type="number"
-                          v-model.number="row.plan_target_output"
-                          min="0"
-                          class="gi tr yellow-cell"
-                          v-select-on-focus
-                        />
-                      </td>
-
-                      <td class="ro-cell tr">
-                        {{ row.NomorSPK ? fmt(row.actual_output) : "—" }}
-                      </td>
-
-                      <td class="ro-cell tr">
-                        {{ fmtDec(outputMenit(row), 1) }}
-                      </td>
-
-                      <td
-                        class="ro-cell tr"
-                        :class="{ over: isOverTime(row) }"
-                        :title="
-                          isOverTime(row)
-                            ? 'Resume melebihi waktu produksi: target tidak muat'
-                            : ''
-                        "
-                      >
-                        {{ fmtDec(resumeOf(row), 1) }}
-                      </td>
-
-                      <td style="padding: 0">
-                        <input
-                          type="text"
-                          v-model="row.plan_keterangan"
-                          class="gi"
-                          maxlength="200"
-                          placeholder="Keterangan..."
-                        />
-                      </td>
-                      <td class="tc" style="padding: 0">
-                        <button
-                          type="button"
-                          class="btn-del"
-                          @click="removeRow('sewing', idx)"
-                        >
-                          <IconTrash :size="12" />
-                        </button>
-                      </td>
-                    </tr>
+                      <!-- Breakdown Act. Output per tanggal -->
+                      <tr v-if="bukaHarian.has(row._key)" class="hr-row">
+                        <td colspan="11">
+                          <table class="hr-table">
+                            <thead>
+                              <tr>
+                                <th>Tanggal</th>
+                                <th class="tr">Act. Output</th>
+                                <th class="tr">Output (mnt)</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <tr v-for="h in row.actual_harian" :key="h.tgl">
+                                <td>{{ fmtTgl(h.tgl) }}</td>
+                                <td class="tr">{{ fmt(h.qty) }}</td>
+                                <td class="tr">
+                                  {{ fmtDec(outputMenitHari(row, h.qty), 1) }}
+                                </td>
+                              </tr>
+                              <tr class="hr-total">
+                                <td>Total</td>
+                                <td class="tr">{{ fmt(row.actual_output) }}</td>
+                                <td class="tr">
+                                  {{ fmtDec(outputMenit(row), 1) }}
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </td>
+                      </tr>
+                    </template>
                   </template>
                   <tr v-if="!formData.detail.sewing.length">
                     <td colspan="11" class="empty-row">
@@ -1925,6 +2045,31 @@ input[type="number"]::-webkit-inner-spin-button {
   background: #c8e6c9 !important;
   padding: 0;
   border-bottom: 1px solid #81c784;
+}
+.hr-toggle {
+  cursor: pointer;
+  user-select: none;
+  color: #1565c0;
+  font-weight: 600;
+}
+.gt tbody tr.hr-row td,
+.gt tbody tr.hr-row:hover td {
+  background: #f1f8e9 !important;
+  padding: 4px 8px 6px 60px;
+}
+.hr-table {
+  border-collapse: collapse;
+  font-size: 11px;
+  min-width: 360px;
+}
+.hr-table th,
+.hr-table td {
+  border: 1px solid #c5e1a5;
+  padding: 2px 8px;
+}
+.hr-table tr.hr-total td {
+  font-weight: 700;
+  background: #dcedc8;
 }
 .grp-bar {
   display: flex;

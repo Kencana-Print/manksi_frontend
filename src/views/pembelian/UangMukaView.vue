@@ -8,6 +8,7 @@ import { uangMukaService } from "@/services/pembelian/uangMukaService";
 import { pengajuanUangMukaService } from "@/services/pembelian/pengajuanUangMukaService";
 const CABANG_VALIDASI = ["HO-", "P01"];
 import { uangMukaPenyelesaianFormService } from "@/services/pembelian/uangMukaPenyelesaianFormService";
+import { uangMukaRealisasiService } from "@/services/pembelian/uangMukaRealisasiService";
 import { exportExcelSingle } from "@/utils/excelExport";
 import {
   IconCash,
@@ -896,6 +897,7 @@ const historyHeaders = [
   { title: "Keterangan", key: "Keterangan", minWidth: "160px" },
   { title: "No Bukti", key: "NoBukti", width: "150px" },
   { title: "Selesai", key: "SelesaiLabel", width: "90px", align: "center" },
+  { title: "Terima", key: "KonfirmasiStatus", width: "90px", align: "center" },
   { title: "Validasi", key: "ValAksiSelesai", width: "100px", align: "center" },
   { title: "Closed", key: "ClosedLabel", width: "90px", align: "center" },
   { title: "Dibuat Oleh", key: "DibuatOleh", width: "110px" },
@@ -1040,6 +1042,37 @@ const goPenyelesaian = async () => {
   router.push(
     `/pembelian/uang-muka/penyelesaian/${encodeURIComponent(item.BonNomor)}`,
   );
+};
+
+const isConfirming = ref(false);
+
+const bisaKonfirmasiTerima = computed(() => {
+  const item = selectedPumHistory.value[0];
+  if (!item) return false;
+  return (
+    item.KonfirmasiStatus === "BELUM" &&
+    !!item.LaciPemilik &&
+    String(item.LaciPemilik).toUpperCase() ===
+      (authStore.user?.kode || "").toUpperCase()
+  );
+});
+
+const onKonfirmasiTerima = async () => {
+  const item = selectedPumHistory.value[0];
+  if (!item) return;
+  isConfirming.value = true;
+  try {
+    await uangMukaRealisasiService.konfirmasiTerima(item.BonNomor);
+    toast.success(`Penerimaan ${item.BonNomor} dikonfirmasi.`);
+    await fetchPumHistory();
+  } catch (e) {
+    toast.error(
+      (isAxiosError(e) && e.response?.data?.message) ||
+        "Gagal mengonfirmasi penerimaan.",
+    );
+  } finally {
+    isConfirming.value = false;
+  }
 };
 </script>
 
@@ -1596,6 +1629,16 @@ const goPenyelesaian = async () => {
         </v-btn>
         <v-btn
           size="small"
+          color="primary"
+          :loading="isConfirming"
+          :disabled="!bisaKonfirmasiTerima"
+          @click="onKonfirmasiTerima"
+        >
+          <template #prepend><IconCheck :size="15" /></template>
+          Konfirmasi Terima
+        </v-btn>
+        <v-btn
+          size="small"
           color="deep-orange"
           :disabled="
             !selectedPumHistory[0] ||
@@ -1704,6 +1747,23 @@ const goPenyelesaian = async () => {
           class="font-weight-bold"
         >
           {{ item.ValAksiSelesai === "VALIDASI" ? "Valid" : "Belum" }}
+        </v-chip>
+        <span v-else>-</span>
+      </template>
+      <template #item.KonfirmasiStatus="{ item }">
+        <v-chip
+          v-if="(item.raw || item).KonfirmasiStatus"
+          size="x-small"
+          :color="
+            (item.raw || item).KonfirmasiStatus === 'SUDAH'
+              ? 'success'
+              : 'warning'
+          "
+          variant="flat"
+        >
+          {{
+            (item.raw || item).KonfirmasiStatus === "SUDAH" ? "Sudah" : "Belum"
+          }}
         </v-chip>
         <span v-else>-</span>
       </template>

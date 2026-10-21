@@ -15,6 +15,10 @@ const toast = useToast();
 const isSaving = ref(false);
 const kelompokList = ref<{ id: number; nama: string }[]>([]);
 const cabangList = ref<{ cabang: string }[]>([]);
+const indukList = ref<
+  { kode: string; nama: string; kol_id: number; cabang: string }[]
+>([]);
+const pemilikList = ref<{ kode: string; nama: string }[]>([]);
 
 const form = ref({
   kode: "",
@@ -25,18 +29,24 @@ const form = ref({
   store: "",
   keterangan: "",
   is_aktif: true,
+  parent: "",
+  pemilik: "",
 });
 
 const loadOptions = async () => {
   try {
-    const [resKelompok, resCabang] = await Promise.all([
+    const [resKelompok, resCabang, resInduk, resPemilik] = await Promise.all([
       accountService.getKelompok(),
       accountService.getCabang(),
+      accountService.getInduk(),
+      accountService.getPemilik(),
     ]);
     kelompokList.value = resKelompok.data.data;
     cabangList.value = resCabang.data.data;
+    indukList.value = resInduk.data.data;
+    pemilikList.value = resPemilik.data.data;
   } catch (error) {
-    toast.error("Gagal memuat data kelompok/cabang.");
+    toast.error("Gagal memuat data kelompok/cabang/induk/pemilik.");
   }
 };
 
@@ -55,6 +65,8 @@ watch(
         store: "",
         keterangan: "",
         is_aktif: true,
+        parent: "",
+        pemilik: "",
       };
     } else if (props.editData) {
       form.value = {
@@ -66,8 +78,21 @@ watch(
         store: props.editData.store || "",
         keterangan: props.editData.keterangan || "",
         is_aktif: Number(props.editData.is_aktif) === 0,
+        parent: props.editData.parent || "",
+        pemilik: props.editData.pemilik || "",
       };
     }
+  },
+);
+
+watch(
+  () => form.value.parent,
+  (kode) => {
+    if (!props.isNewMode || !kode) return;
+    const induk = indukList.value.find((i) => i.kode === kode);
+    if (!induk) return;
+    form.value.kol_id = induk.kol_id;
+    form.value.cabang = induk.cabang;
   },
 );
 
@@ -92,6 +117,10 @@ const handleSave = async () => {
     toast.error("Cabang wajib dipilih.");
     return;
   }
+  if (props.isNewMode && form.value.parent && !form.value.pemilik) {
+    toast.error("Pemilik wajib dipilih untuk sub-account.");
+    return;
+  }
 
   isSaving.value = true;
   try {
@@ -105,6 +134,8 @@ const handleSave = async () => {
       store: form.value.store.trim(),
       keterangan: form.value.keterangan.trim(),
       is_aktif: form.value.is_aktif,
+      parent: form.value.parent,
+      pemilik: form.value.pemilik,
     });
     toast.success("Account berhasil disimpan.");
     emit("saved");
@@ -152,11 +183,45 @@ const handleSave = async () => {
               label="Cabang"
               density="compact"
               variant="outlined"
-              :disabled="!isNewMode"
+              :disabled="!isNewMode || !!form.parent"
               class="mb-2"
             />
           </v-col>
         </v-row>
+
+        <v-select
+          v-if="isNewMode"
+          v-model="form.parent"
+          :items="indukList"
+          item-title="nama"
+          item-value="kode"
+          label="Induk (kosongkan jika bukan sub-account)"
+          density="compact"
+          variant="outlined"
+          clearable
+          class="mb-2"
+        />
+        <v-text-field
+          v-else-if="form.parent"
+          :model-value="form.parent"
+          label="Induk"
+          density="compact"
+          variant="outlined"
+          readonly
+          class="mb-2"
+        />
+        <v-autocomplete
+          v-if="form.parent"
+          v-model="form.pemilik"
+          :items="pemilikList"
+          item-title="nama"
+          item-value="kode"
+          label="Pemilik (pemegang kas)"
+          density="compact"
+          variant="outlined"
+          clearable
+          class="mb-2"
+        />
 
         <v-text-field
           v-model="form.nama"
@@ -175,6 +240,7 @@ const handleSave = async () => {
           density="compact"
           variant="outlined"
           class="mb-2"
+          :disabled="!!form.parent"
         />
 
         <v-text-field

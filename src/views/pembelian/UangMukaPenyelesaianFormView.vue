@@ -67,6 +67,8 @@ interface RealisasiFormState {
   cabang: string;
   is_edit: boolean;
   info_permintaan: any;
+  mode_laci: boolean;
+  laci_asal: string;
   detail: PenyelesaianDetail[];
   sisa: {
     wajib: boolean;
@@ -128,6 +130,8 @@ const form = ref<RealisasiFormState>({
   cabang: "P01",
   is_edit: false,
   info_permintaan: null,
+  mode_laci: false,
+  laci_asal: "",
   detail: [],
   sisa: { wajib: false, ambang: 100, rek_kode: "", nominal: 0, jur_no: "" },
 });
@@ -936,6 +940,9 @@ const onStatusFinanceChange = async (d: PenyelesaianDetail, idx: number) => {
         <div class="info-row">
           <span>Jenis</span><b>{{ form.jenis }}</b>
         </div>
+        <div class="info-row">
+          <span>Kas</span><b class="mono">{{ form.rek_kode }}</b>
+        </div>
       </div>
 
       <div class="desktop-form-section">
@@ -1021,24 +1028,30 @@ const onStatusFinanceChange = async (d: PenyelesaianDetail, idx: number) => {
         <div class="info-row">
           <span>Sisa</span><b>{{ fmt(totalSisa) }}</b>
         </div>
-        <div class="sisa-radio-row">
-          <label class="sisa-radio">
-            <input type="radio" v-model="sisaJenis" value="KAS" />
-            <span>Kas (BKM)</span>
-          </label>
-          <label class="sisa-radio">
-            <input type="radio" v-model="sisaJenis" value="BANK" />
-            <span>Bank (BBM)</span>
-          </label>
+        <div v-if="form.mode_laci" class="laci-info">
+          Sisa dikembalikan otomatis ke laci Finance ({{ form.laci_asal }})
+          lewat BKK transfer balik. Tidak perlu memilih rekening tujuan.
         </div>
-        <v-select
-          v-model="sisaRekKode"
-          :items="sisaItems"
-          label="Rekening tujuan sisa"
-          variant="outlined"
-          density="compact"
-          hide-details
-        />
+        <template v-else>
+          <div class="sisa-radio-row">
+            <label class="sisa-radio">
+              <input type="radio" v-model="sisaJenis" value="KAS" />
+              <span>Kas (BKM)</span>
+            </label>
+            <label class="sisa-radio">
+              <input type="radio" v-model="sisaJenis" value="BANK" />
+              <span>Bank (BBM)</span>
+            </label>
+          </div>
+          <v-select
+            v-model="sisaRekKode"
+            :items="sisaItems"
+            label="Rekening tujuan sisa"
+            variant="outlined"
+            density="compact"
+            hide-details
+          />
+        </template>
       </div>
 
       <div v-if="form.info_permintaan" class="desktop-form-section">
@@ -2286,5 +2299,13 @@ const onStatusFinanceChange = async (d: PenyelesaianDetail, idx: number) => {
   align-items: center;
   gap: 4px;
   cursor: pointer;
+}
+.laci-info {
+  font-size: 11px;
+  color: #546e7a;
+  background: #eceff1;
+  border-radius: 4px;
+  padding: 6px 8px;
+  margin-top: 6px;
 }
 </style>

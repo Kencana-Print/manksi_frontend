@@ -34,6 +34,11 @@ export const pengajuanTransferFormService = {
       params: { search },
     });
   },
+  getRekapVoucherOptions(search: string) {
+    return api.get("/pembelian/pengajuan-transfer-form/rekap-voucher-options", {
+      params: { search },
+    });
+  },
   getPoExternalOptions(search: string) {
     return api.get("/pembelian/pengajuan-transfer-form/poexternal-options", {
       params: { search },

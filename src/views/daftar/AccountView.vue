@@ -34,13 +34,16 @@ const fmtNum = (val: number) =>
 const rows = computed(() =>
   (items.value ?? []).map((h: any) => ({
     ...h,
+    namaTampil: h.parent ? `↳ ${h.nama}` : h.nama,
+    pemilikTampil: h.pemilik ? `${h.pemilik_nama} (${h.pemilik})` : "",
     SaldoFmt: fmtNum(h.saldo_akhir),
   })),
 );
 
 const headers = [
   { title: "KODE", key: "kode", width: "100px" },
-  { title: "NAMA", key: "nama", minWidth: "220px" },
+  { title: "NAMA", key: "namaTampil", minWidth: "260px" },
+  { title: "PEMILIK", key: "pemilikTampil", width: "170px" },
   { title: "NO. REK BANK", key: "no_rekening", width: "150px" },
   { title: "KELOMPOK", key: "kelompok", width: "160px" },
   { title: "CABANG", key: "cabang", width: "90px" },

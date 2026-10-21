@@ -59,10 +59,16 @@ interface DetailRow {
   WaktuProduksi?: number;
   Resume?: number | null;
   Output?: number;
+  ActualHarian?: ActualHarian[];
+  OutputHarian?: ActualHarian[];
 }
 interface DetailCache {
   cutting: DetailRow[];
   sewing: DetailRow[];
+}
+interface ActualHarian {
+  tgl: string; // YYYY-MM-DD
+  qty: number;
 }
 interface ExportPlan {
   Nomor: string;
@@ -215,6 +221,7 @@ const fetchData = async () => {
   selected.value = [];
   expandedRows.value = [];
   detailCache.value = {};
+  bukaHarian.value = new Set();
   try {
     const res = await planningSpkService.getBrowse({
       startDate: filterStart.value,
@@ -452,6 +459,35 @@ const kolomSewing: ExcelColumn[] = [
   { header: "Keterangan", key: "Keterangan", width: 30 },
 ];
 
+// Breakdown harian (datar: 1 baris per SPK per tanggal, siap di-pivot)
+const kolomCuttingHarian: ExcelColumn[] = [
+  { header: "Nomor SPK", key: "NomorSPK", width: 22 },
+  { header: "Nama SPK", key: "NamaSPK", width: 34 },
+  { header: "Proses Produksi", key: "LineKelompok", width: 16 },
+  { header: "Tanggal", key: "Tanggal", width: 12 },
+  { header: "Output", key: "Output", align: "right", numFmt: "#,##0" },
+];
+
+const kolomSewingHarian: ExcelColumn[] = [
+  { header: "Line", key: "Line", width: 16 },
+  { header: "Nomor SPK", key: "NomorSPK", width: 22 },
+  { header: "Nama SPK", key: "NamaSPK", width: 34 },
+  { header: "SMV (mnt)", key: "Smv", align: "right", numFmt: "#,##0.000" },
+  { header: "Tanggal", key: "Tanggal", width: 12 },
+  {
+    header: "Act. Output",
+    key: "ActualOutput",
+    align: "right",
+    numFmt: "#,##0",
+  },
+  {
+    header: "Output (mnt)",
+    key: "OutputMenit",
+    align: "right",
+    numFmt: "#,##0.0",
+  },
+];
+
 const styleSewing = (row: BarisExport) => {
   if (row._grp) return { fillColor: "C8E6C9", fontColor: "1B5E20", bold: true };
   if (row._over) return { fontColor: "C62828", bold: true };
@@ -500,6 +536,8 @@ const doExportDetail = async () => {
     const sheetCutting: BarisExport[] = [];
     const sheetSewingBaru: BarisExport[] = [];
     const sheetSewingLama: BarisExport[] = [];
+    const sheetCuttingHarian: BarisExport[] = [];
+    const sheetSewingHarian: BarisExport[] = [];
 
     const isiJadwal = (
       p: ExportPlan,
@@ -523,6 +561,32 @@ const doExportDetail = async () => {
           Output: angkaAtauKosong(d.Output),
         }),
       );
+      for (const d of p.cutting) {
+        for (const h of d.OutputHarian ?? []) {
+          sheetCuttingHarian.push({
+            ...induk(p, true),
+            NomorSPK: d.NomorSPK,
+            NamaSPK: d.NamaSPK || "",
+            LineKelompok: d.LineKelompok || "",
+            Tanggal: formatTanggal(h.tgl),
+            Output: h.qty,
+          });
+        }
+      }
+      for (const d of p.sewing.filter((r) => r.Format === "BARU")) {
+        for (const h of d.ActualHarian ?? []) {
+          sheetSewingHarian.push({
+            ...induk(p, true),
+            Line: d.LineKelompok || "(Tanpa line)",
+            NomorSPK: d.NomorSPK,
+            NamaSPK: d.NamaSPK || "",
+            Smv: angkaAtauKosong(d.Smv),
+            Tanggal: formatTanggal(h.tgl),
+            ActualOutput: h.qty,
+            OutputMenit: angkaAtauKosong(outputMenitHari(d, h.qty)),
+          });
+        }
+      }
       isiJadwal(
         p,
         p.sewing.filter((r) => r.Format !== "BARU"),
@@ -575,6 +639,13 @@ const doExportDetail = async () => {
         rows: sheetCutting,
         headerColor: "546E7A",
       });
+    if (sheetCuttingHarian.length)
+      sheets.push({
+        sheetName: "Cutting Harian",
+        columns: [...kolomMaster, ...kolomCuttingHarian],
+        rows: sheetCuttingHarian,
+        headerColor: "546E7A",
+      });
     if (sheetSewingBaru.length)
       sheets.push({
         sheetName: "Sewing",
@@ -582,6 +653,13 @@ const doExportDetail = async () => {
         rows: sheetSewingBaru,
         headerColor: "2E7D32",
         rowStyleFn: styleSewing,
+      });
+    if (sheetSewingHarian.length)
+      sheets.push({
+        sheetName: "Sewing Harian",
+        columns: [...kolomMaster, ...kolomSewingHarian],
+        rows: sheetSewingHarian,
+        headerColor: "2E7D32",
       });
     if (sheetSewingLama.length)
       sheets.push({
@@ -659,6 +737,24 @@ const isOver = (d: DetailRow) =>
 // Output menit = SMV x Act. Output (kosong kalau SMV belum ada)
 const outputMenit = (d: DetailRow): number | null =>
   d.Smv != null && d.Smv > 0 ? d.Smv * (Number(d.ActualOutput) || 0) : null;
+
+// Output menit untuk satu hari = SMV x qty hari itu (kosong kalau SMV belum ada)
+const outputMenitHari = (d: DetailRow, qty: number): number | null =>
+  d.Smv != null && d.Smv > 0 ? d.Smv * qty : null;
+
+// Format tanggal YYYY-MM-DD -> DD/MM/YYYY
+const fmtTgl = (t: string) => t.split("-").reverse().join("/");
+
+// Baris SPK yang breakdown hariannya sedang dibuka
+const bukaHarian = ref<Set<string>>(new Set());
+const kunciHarian = (nomor: string, d: DetailRow) =>
+  `${nomor}|${d.LineKelompok ?? ""}|${d.NomorSPK}|${d.KeyTanggal}`;
+const toggleHarian = (key: string) => {
+  const s = new Set(bukaHarian.value);
+  if (s.has(key)) s.delete(key);
+  else s.add(key);
+  bukaHarian.value = s;
+};
 
 const simpanKeterangan = async (
   nomor: string,
@@ -869,26 +965,70 @@ fetchData();
                   </tr>
                 </thead>
                 <tbody>
-                  <tr
+                  <template
                     v-for="(d, i) in detailCache[item.Nomor].cutting"
                     :key="i"
                   >
-                    <td class="mono">{{ d.NomorSPK }}</td>
-                    <td>{{ d.NamaSPK || "—" }}</td>
-                    <td
-                      class="tr"
-                      :title="
-                        d.WipCatatan ? 'Satuan lain: ' + d.WipCatatan : ''
-                      "
+                    <tr>
+                      <td class="mono">{{ d.NomorSPK }}</td>
+                      <td>{{ d.NamaSPK || "—" }}</td>
+                      <td
+                        class="tr"
+                        :title="
+                          d.WipCatatan ? 'Satuan lain: ' + d.WipCatatan : ''
+                        "
+                      >
+                        {{ d.WipSatuan ? fmt(d.WipBahan) : "—"
+                        }}<span v-if="d.WipCatatan">*</span>
+                      </td>
+                      <td>{{ d.WipSatuan || "—" }}</td>
+                      <td class="tr fw">{{ fmt(d.QtyJadwal) }}</td>
+                      <td>{{ d.LineKelompok || "—" }}</td>
+                      <td class="tr fw">
+                        <span
+                          v-if="d.OutputHarian?.length"
+                          class="hr-toggle"
+                          title="Lihat breakdown per tanggal"
+                          @click="toggleHarian(`${item.Nomor}|CUT|${i}`)"
+                        >
+                          {{
+                            bukaHarian.has(`${item.Nomor}|CUT|${i}`) ? "▾" : "▸"
+                          }}
+                          {{ fmt(d.Output) }}
+                        </span>
+                        <template v-else>
+                          {{ d.Output ? fmt(d.Output) : "—" }}
+                        </template>
+                      </td>
+                    </tr>
+
+                    <!-- Breakdown Output per tanggal -->
+                    <tr
+                      v-if="bukaHarian.has(`${item.Nomor}|CUT|${i}`)"
+                      class="hr-row"
                     >
-                      {{ d.WipSatuan ? fmt(d.WipBahan) : "—"
-                      }}<span v-if="d.WipCatatan">*</span>
-                    </td>
-                    <td>{{ d.WipSatuan || "—" }}</td>
-                    <td class="tr fw">{{ fmt(d.QtyJadwal) }}</td>
-                    <td>{{ d.LineKelompok || "—" }}</td>
-                    <td class="tr fw">{{ d.Output ? fmt(d.Output) : "—" }}</td>
-                  </tr>
+                      <td colspan="7">
+                        <table class="hr-table">
+                          <thead>
+                            <tr>
+                              <th>Tanggal</th>
+                              <th class="tr">Output</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr v-for="h in d.OutputHarian" :key="h.tgl">
+                              <td>{{ fmtTgl(h.tgl) }}</td>
+                              <td class="tr">{{ fmt(h.qty) }}</td>
+                            </tr>
+                            <tr class="hr-total">
+                              <td>Total</td>
+                              <td class="tr">{{ fmt(d.Output) }}</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </td>
+                    </tr>
+                  </template>
                   <tr v-if="!detailCache[item.Nomor].cutting.length">
                     <td colspan="8" class="empty-row">
                       Tidak ada data cutting
@@ -957,51 +1097,102 @@ fetchData();
                         </div>
                       </td>
                     </tr>
-                    <tr v-for="(d, n) in g.items" :key="n">
-                      <td class="tc">{{ n + 1 }}</td>
-                      <td class="mono">{{ d.NomorSPK }}</td>
-                      <td>{{ d.NamaSPK || "—" }}</td>
-                      <td
-                        class="tr"
-                        :class="{ 'smv-manual': d.SmvSumber === 'MANUAL' }"
-                        :title="
-                          d.SmvSumber === 'PROOF'
-                            ? 'Dari Proof Garmen lini Jahit'
-                            : 'Input manual'
-                        "
-                      >
-                        <IconLock
-                          v-if="d.SmvSumber === 'PROOF'"
-                          :size="10"
-                          class="smv-lock"
-                        />
-                        {{ fmtDec(d.Smv, 3) }}
-                      </td>
-                      <td class="tr fw">{{ fmt(d.Target) }}</td>
-                      <td class="tr">{{ fmt(d.ActualOutput) }}</td>
-                      <td class="tr">{{ fmtDec(outputMenit(d), 1) }}</td>
-                      <td class="tr" :class="{ over: isOver(d) }">
-                        {{ fmtDec(d.Resume, 1) }}
-                      </td>
-                      <td class="ket-cell">
-                        <input
-                          class="ket-inp"
-                          :value="d.Keterangan"
-                          :disabled="item.Close === 'Y'"
+                    <template v-for="(d, n) in g.items" :key="n">
+                      <tr>
+                        <td class="tc">{{ n + 1 }}</td>
+                        <td class="mono">{{ d.NomorSPK }}</td>
+                        <td>{{ d.NamaSPK || "—" }}</td>
+                        <td
+                          class="tr"
+                          :class="{ 'smv-manual': d.SmvSumber === 'MANUAL' }"
                           :title="
-                            item.Close === 'Y' ? 'Planning sudah Close' : ''
+                            d.SmvSumber === 'PROOF'
+                              ? 'Dari Proof Garmen lini Jahit'
+                              : 'Input manual'
                           "
-                          maxlength="200"
-                          placeholder="—"
-                          @keydown.enter.prevent="
-                            ($event.target as HTMLInputElement).blur()
-                          "
-                          @blur="
-                            simpanKeterangan(item.Nomor, 'SEWING', d, $event)
-                          "
-                        />
-                      </td>
-                    </tr>
+                        >
+                          <IconLock
+                            v-if="d.SmvSumber === 'PROOF'"
+                            :size="10"
+                            class="smv-lock"
+                          />
+                          {{ fmtDec(d.Smv, 3) }}
+                        </td>
+                        <td class="tr fw">{{ fmt(d.Target) }}</td>
+                        <td class="tr">
+                          <span
+                            v-if="d.ActualHarian?.length"
+                            class="hr-toggle"
+                            title="Lihat breakdown per tanggal"
+                            @click="toggleHarian(kunciHarian(item.Nomor, d))"
+                          >
+                            {{
+                              bukaHarian.has(kunciHarian(item.Nomor, d))
+                                ? "▾"
+                                : "▸"
+                            }}
+                            {{ fmt(d.ActualOutput) }}
+                          </span>
+                          <template v-else>{{ fmt(d.ActualOutput) }}</template>
+                        </td>
+                        <td class="tr">{{ fmtDec(outputMenit(d), 1) }}</td>
+                        <td class="tr" :class="{ over: isOver(d) }">
+                          {{ fmtDec(d.Resume, 1) }}
+                        </td>
+                        <td class="ket-cell">
+                          <input
+                            class="ket-inp"
+                            :value="d.Keterangan"
+                            :disabled="item.Close === 'Y'"
+                            :title="
+                              item.Close === 'Y' ? 'Planning sudah Close' : ''
+                            "
+                            maxlength="200"
+                            placeholder="—"
+                            @keydown.enter.prevent="
+                              ($event.target as HTMLInputElement).blur()
+                            "
+                            @blur="
+                              simpanKeterangan(item.Nomor, 'SEWING', d, $event)
+                            "
+                          />
+                        </td>
+                      </tr>
+
+                      <!-- Breakdown Act. Output per tanggal -->
+                      <tr
+                        v-if="bukaHarian.has(kunciHarian(item.Nomor, d))"
+                        class="hr-row"
+                      >
+                        <td colspan="9">
+                          <table class="hr-table">
+                            <thead>
+                              <tr>
+                                <th>Tanggal</th>
+                                <th class="tr">Act. Output</th>
+                                <th class="tr">Output (mnt)</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <tr v-for="h in d.ActualHarian" :key="h.tgl">
+                                <td>{{ fmtTgl(h.tgl) }}</td>
+                                <td class="tr">{{ fmt(h.qty) }}</td>
+                                <td class="tr">
+                                  {{ fmtDec(outputMenitHari(d, h.qty), 1) }}
+                                </td>
+                              </tr>
+                              <tr class="hr-total">
+                                <td>Total</td>
+                                <td class="tr">{{ fmt(d.ActualOutput) }}</td>
+                                <td class="tr">
+                                  {{ fmtDec(outputMenit(d), 1) }}
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </td>
+                      </tr>
+                    </template>
                   </template>
                 </tbody>
               </table>
@@ -1339,6 +1530,41 @@ fetchData();
   color: #c62828;
   font-weight: 700;
   background: #ffebee !important;
+}
+.hr-toggle {
+  cursor: pointer;
+  user-select: none;
+  color: #1565c0;
+  font-weight: 600;
+}
+.dt tbody tr.hr-row td,
+.dt tbody tr.hr-row:hover td {
+  background: #f1f8e9 !important;
+  padding: 4px 8px 6px 60px;
+}
+.hr-table {
+  border-collapse: collapse;
+  font-size: 11px;
+  min-width: 360px;
+}
+.hr-table th {
+  position: static;
+  background: #c5e1a5;
+  color: #33691e;
+  border: 1px solid #aed581;
+  padding: 2px 8px;
+}
+.hr-table td {
+  border: 1px solid #c5e1a5;
+  padding: 2px 8px;
+  background: transparent !important;
+}
+.hr-table td:first-child {
+  text-align: left;
+}
+.hr-table tr.hr-total td {
+  font-weight: 700;
+  background: #dcedc8 !important;
 }
 .tc {
   text-align: center;

@@ -298,6 +298,7 @@ const selectVoucher = async (v: any) => {
   d.trs = v.nomor;
   d.nominal = Number(v.nominal) || 0;
   showVoucherModal.value = false;
+  showRekapVouModal.value = false;
 
   // Isi kode/nama/bank/atas nama/rekening dari supplier voucher
   // (kalau rekening >1, muncul pilihan rekening)
@@ -309,6 +310,45 @@ const selectVoucher = async (v: any) => {
       `Supplier ${d.nama || v.supKode} belum punya data rekening di master supplier.`,
     );
 };
+
+// ── Voucher hasil Rekap Pembayaran (F7) ──
+interface RekapVoucherOption {
+  nomor: string;
+  tanggal: string;
+  supKode: string;
+  supplier: string;
+  nominal: number;
+  rekapNomor: string;
+  tglRencana: string;
+}
+const showRekapVouModal = ref(false);
+const rekapVouState =
+  ref<ModalState<RekapVoucherOption>>(createModalState<RekapVoucherOption>());
+let rekapVouDebounce: ReturnType<typeof setTimeout> | null = null;
+
+const doSearchRekapVou = async () => {
+  rekapVouState.value.loading = true;
+  try {
+    const res = await pengajuanTransferFormService.getRekapVoucherOptions(
+      rekapVouState.value.search,
+    );
+    rekapVouState.value.allItems = res.data.data || [];
+  } finally {
+    rekapVouState.value.loading = false;
+  }
+};
+const searchRekapVouDebounced = () => {
+  if (rekapVouDebounce) clearTimeout(rekapVouDebounce);
+  rekapVouDebounce = setTimeout(doSearchRekapVou, 350);
+};
+const openRekapVouModal = async (idx: number) => {
+  activeTrsIdx.value = idx;
+  rekapVouState.value = createModalState<RekapVoucherOption>();
+  showRekapVouModal.value = true;
+  await doSearchRekapVou();
+};
+// Memakai ulang alur F2: cek duplikat, isi nominal, isi supplier + rekening.
+const selectRekapVou = (v: RekapVoucherOption) => selectVoucher(v);
 
 const doSearchPo = async () => {
   poState.value.loading = true;
@@ -426,6 +466,42 @@ const selectPoLain = async (p: any) => {
   // (reuse alur pilih supplier; kalau rekening >1, muncul pilihan rekening)
   activeSupIdx.value = idx;
   await selectSupplier({ Kode: p.supKode, Nama: p.supplier });
+};
+
+// ── Sumber No. Transaksi (dropdown + satu tombol cari, pola Voucher) ──
+type SumberTrs = "" | "BKK" | "VOU" | "POE" | "PC" | "POL" | "RKP";
+
+const bukaModalSumber = (sumber: SumberTrs, idx: number) => {
+  switch (sumber) {
+    case "BKK":
+      openBkkModal(idx);
+      break;
+    case "VOU":
+      openVoucherModal(idx);
+      break;
+    case "POE":
+      openPoModal(idx);
+      break;
+    case "PC":
+      openPcModal(idx);
+      break;
+    case "POL":
+      openPoLainModal(idx);
+      break;
+    case "RKP":
+      openRekapVouModal(idx);
+      break;
+    default:
+      toast.warning("Pilih sumber transaksi dahulu.");
+  }
+};
+
+// Dipakai pintasan F1-F7: set sumber di dropdown lalu buka modalnya.
+const pilihSumber = (sumber: SumberTrs, idx: number) => {
+  const d = form.value.detail[idx];
+  if (d.jurnal || isRealisasi.value) return;
+  d.sumber = sumber;
+  bukaModalSumber(sumber, idx);
 };
 
 // ── Account (realisasi) ──
@@ -589,6 +665,7 @@ const addRow = () => {
     rekening: "",
     atasnama: "",
     trs: "",
+    sumber: "",
     nominal: 0,
     ket: "",
     tglRealisasi: "",
@@ -884,6 +961,9 @@ const skipCetak = () => {
             <div class="hint-row">
               <span class="hint-key">F6</span> PO Lain-lain
             </div>
+            <div class="hint-row">
+              <span class="hint-key">F7</span> Voucher dari Rekap
+            </div>
           </div>
         </div>
       </CollapsiblePanel>
@@ -907,7 +987,7 @@ const skipCetak = () => {
                 <th style="width: 80px">Bank</th>
                 <th style="min-width: 150px">Atas Nama</th>
                 <th style="min-width: 130px">Rek. Tujuan</th>
-                <th style="min-width: 160px">No. Transaksi</th>
+                <th style="min-width: 300px">No. Transaksi</th>
                 <th style="width: 110px" class="text-right">Nominal</th>
                 <th style="min-width: 160px">Keterangan</th>
                 <th style="width: 100px">Tgl Realisasi</th>
@@ -986,65 +1066,35 @@ const skipCetak = () => {
                     <input
                       v-model="d.trs"
                       class="cell"
+                      style="min-width: 110px"
+                      placeholder="No. transaksi (opsional)"
                       :readonly="!!d.jurnal || isRealisasi"
-                      @keydown.f1.prevent="
-                        !d.jurnal && !isRealisasi && openBkkModal(idx)
-                      "
-                      @keydown.f2.prevent="
-                        !d.jurnal && !isRealisasi && openVoucherModal(idx)
-                      "
-                      @keydown.f3.prevent="
-                        !d.jurnal && !isRealisasi && openPoModal(idx)
-                      "
-                      @keydown.f4.prevent="
-                        !d.jurnal && !isRealisasi && openPcModal(idx)
-                      "
-                      @keydown.f6.prevent="
-                        !d.jurnal && !isRealisasi && openPoLainModal(idx)
-                      "
+                      @keydown.f1.prevent="pilihSumber('BKK', idx)"
+                      @keydown.f2.prevent="pilihSumber('VOU', idx)"
+                      @keydown.f3.prevent="pilihSumber('POE', idx)"
+                      @keydown.f4.prevent="pilihSumber('PC', idx)"
+                      @keydown.f6.prevent="pilihSumber('POL', idx)"
+                      @keydown.f7.prevent="pilihSumber('RKP', idx)"
                     />
-                    <div v-if="!d.jurnal && !isRealisasi" class="trs-btn-group">
+                    <template v-if="!d.jurnal && !isRealisasi">
+                      <select v-model="d.sumber" class="type-select">
+                        <option value="">—</option>
+                        <option value="BKK">BKK</option>
+                        <option value="VOU">Voucher</option>
+                        <option value="POE">PO External</option>
+                        <option value="PC">Petty Cash</option>
+                        <option value="POL">PO Lain-lain</option>
+                        <option value="RKP">Voucher Rekap</option>
+                      </select>
                       <button
                         type="button"
-                        class="trs-btn"
-                        title="F1: BKK"
-                        @click="openBkkModal(idx)"
+                        class="cell-search"
+                        title="Cari transaksi sesuai sumber"
+                        @click="bukaModalSumber(d.sumber, idx)"
                       >
-                        K
+                        <IconSearch :size="12" color="#1565c0" />
                       </button>
-                      <button
-                        type="button"
-                        class="trs-btn"
-                        title="F2: Voucher"
-                        @click="openVoucherModal(idx)"
-                      >
-                        V
-                      </button>
-                      <button
-                        type="button"
-                        class="trs-btn"
-                        title="F3: PO External"
-                        @click="openPoModal(idx)"
-                      >
-                        P
-                      </button>
-                      <button
-                        type="button"
-                        class="trs-btn"
-                        title="F4: Petty Cash"
-                        @click="openPcModal(idx)"
-                      >
-                        C
-                      </button>
-                      <button
-                        type="button"
-                        class="trs-btn"
-                        title="F6: PO Lain-lain"
-                        @click="openPoLainModal(idx)"
-                      >
-                        L
-                      </button>
-                    </div>
+                    </template>
                   </div>
                 </td>
 
@@ -1318,6 +1368,61 @@ const skipCetak = () => {
               <tr v-if="vouState.allItems.length === 0">
                 <td colspan="4" class="text-center text-grey py-3">
                   Tidak ada hasil
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </v-card-text>
+    </v-card>
+  </v-dialog>
+
+  <!-- Modal Voucher dari Rekap (F7) -->
+  <v-dialog v-model="showRekapVouModal" max-width="900px" scrollable>
+    <v-card class="rounded-lg">
+      <v-card-title
+        class="pa-3 text-subtitle-1 text-white"
+        style="background: #3949ab"
+        >F7 — Voucher dari Rekap Pembayaran</v-card-title
+      >
+      <v-card-text class="pa-3">
+        <input
+          v-model="rekapVouState.search"
+          class="f-inp mb-2"
+          placeholder="Cari nomor voucher, supplier, atau nomor rekap..."
+          autofocus
+          @input="searchRekapVouDebounced"
+        />
+        <div style="max-height: 340px; overflow-y: auto">
+          <div v-if="rekapVouState.loading" class="text-center py-4 text-grey">
+            Memuat...
+          </div>
+          <table v-else class="mini-table">
+            <thead>
+              <tr>
+                <th style="width: 130px">Voucher</th>
+                <th style="width: 100px">Tgl Rencana</th>
+                <th style="width: 150px">Rekap</th>
+                <th>Supplier</th>
+                <th style="width: 120px" class="text-right">Nominal</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="v in rekapVouState.allItems"
+                :key="v.nomor"
+                class="mini-row"
+                @click="selectRekapVou(v)"
+              >
+                <td>{{ v.nomor }}</td>
+                <td>{{ v.tglRencana ? fmtDate(v.tglRencana) : "-" }}</td>
+                <td>{{ v.rekapNomor }}</td>
+                <td>{{ v.supplier }}</td>
+                <td class="text-right">{{ numFmt(v.nominal) }}</td>
+              </tr>
+              <tr v-if="rekapVouState.allItems.length === 0">
+                <td colspan="5" class="text-center text-grey py-3">
+                  Tidak ada voucher dari rekap yang belum diajukan
                 </td>
               </tr>
             </tbody>
@@ -1989,30 +2094,23 @@ const skipCetak = () => {
 .cell-search:hover {
   background: #bbdefb;
 }
-.trs-btn-group {
-  display: flex;
-  gap: 1px;
-  flex-shrink: 0;
-}
-.trs-btn {
-  width: 18px;
-  height: 18px;
-  border: 1px solid #ccc;
-  border-radius: 2px;
-  background: #f5f5f5;
+.type-select {
+  height: 22px;
+  border: 1px solid #e0e0e0;
+  border-radius: 3px;
+  padding: 0 18px 0 4px;
+  font-size: 10px;
+  font-weight: 600;
+  outline: none;
+  background: white;
+  color: #374151;
   cursor: pointer;
-  font-size: 9px;
-  font-weight: 700;
-  color: #555;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
+  flex-shrink: 0;
+  min-width: 80px;
+  margin: 0 2px;
 }
-.trs-btn:hover {
-  background: #e3f2fd;
+.type-select:focus {
   border-color: #1565c0;
-  color: #1565c0;
 }
 .btn-del {
   background: transparent;

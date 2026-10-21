@@ -4757,6 +4757,52 @@ const router = createRouter({
       },
     },
     {
+      path: "/piutang/rekap-pembayaran",
+      name: "RekapPembayaranBrowse",
+      component: () => import("@/views/piutang/RekapPembayaranView.vue"),
+      meta: {
+        title: "Rekap Pembayaran",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "970",
+      },
+    },
+    {
+      path: "/piutang/rekap-pembayaran/create",
+      name: "RekapPembayaranCreate",
+      component: () => import("@/views/piutang/RekapPembayaranFormView.vue"),
+      meta: {
+        title: "Tambah Rekap Pembayaran",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "970",
+        browseRoute: "RekapPembayaranBrowse",
+      },
+    },
+    {
+      path: "/piutang/rekap-pembayaran/edit/:nomor",
+      name: "RekapPembayaranEdit",
+      component: () => import("@/views/piutang/RekapPembayaranFormView.vue"),
+      meta: {
+        title: "Ubah Rekap Pembayaran",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "970",
+        browseRoute: "RekapPembayaranBrowse",
+      },
+    },
+    {
+      path: "/piutang/rekap-pembayaran/print/:nomor",
+      name: "RekapPembayaranPrint",
+      component: () => import("@/views/piutang/RekapPembayaranPrintView.vue"),
+      meta: {
+        title: "Cetak Rekap Pembayaran",
+        layout: "BlankLayout",
+        requiresAuth: true,
+        menuId: "970",
+      },
+    },
+    {
       path: "/piutang/voucher-pembayaran",
       name: "VoucherPembayaranBrowse",
       component: () => import("@/views/piutang/VoucherPembayaranView.vue"),

@@ -6,12 +6,14 @@ import { useTabsStore } from "@/stores/tabsStore";
 import BaseForm from "@/components/BaseForm.vue";
 import SupplierSearchModal from "@/components/lookups/SupplierSearchModal.vue";
 import { voucherPembayaranFormService } from "@/services/piutang/voucherPembayaranFormService";
+import type { RekapUnit } from "@/services/piutang/voucherPembayaranFormService";
 import {
   IconFileInvoice,
   IconSearch,
   IconPlus,
   IconTrash,
   IconPrinter,
+  IconCalendarDue,
 } from "@tabler/icons-vue";
 
 const route = useRoute();
@@ -29,11 +31,15 @@ const showCloseDialog = ref(false);
 const showPrintDialog = ref(false);
 const savedNomor = ref("");
 
-const today = new Date().toISOString().slice(0, 10);
+const pad2 = (n: number) => String(n).padStart(2, "0");
+const hariIni = (): string => {
+  const d = new Date();
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+};
 
 const form = ref({
   nomor: "",
-  tanggal: today,
+  tanggal: hariIni(),
   supKode: "",
   supNama: "",
   supRekening: "",
@@ -67,6 +73,8 @@ interface DetailRow {
   tarif: number;
   potongan: number;
   total: number;
+  rekapNomor?: string;
+  rekapNoUrut?: number;
 }
 interface BahanRow {
   nama: string;
@@ -116,6 +124,8 @@ const grandTotal = computed(
 const numFmt = (v: number) => new Intl.NumberFormat("id-ID").format(v || 0);
 const parseNum = (v: string) =>
   Number(String(v).replace(/\./g, "").replace(",", ".")) || 0;
+// Nilai mentah untuk diedit: pakai koma desimal supaya cocok dengan parseNum
+const rawNum = (v: number) => (v ? String(v).replace(".", ",") : "");
 
 // ── Detail row ops ──
 const createDetailRow = (searchType = "BPB"): DetailRow => ({
@@ -144,7 +154,7 @@ const recalcDetail = (d: DetailRow) => {
 
 const onNilaiFocus = (d: DetailRow, e: Event) => {
   if (d.tipe === "RET") return;
-  (e.target as HTMLInputElement).value = d.nilai ? String(d.nilai) : "";
+  (e.target as HTMLInputElement).value = rawNum(d.nilai);
 };
 const onNilaiInput = (d: DetailRow, e: Event) => {
   if (d.tipe === "RET") return;
@@ -159,7 +169,7 @@ const onNilaiBlur = (d: DetailRow, e: Event) => {
   (e.target as HTMLInputElement).value = numFmt(d.nilai);
 };
 const onBsFocus = (d: DetailRow, e: Event) => {
-  (e.target as HTMLInputElement).value = d.bs ? String(d.bs) : "";
+  (e.target as HTMLInputElement).value = rawNum(d.bs);
 };
 const onBsInput = (d: DetailRow, e: Event) => {
   d.bs = parseNum((e.target as HTMLInputElement).value);
@@ -169,7 +179,7 @@ const onBsBlur = (d: DetailRow, e: Event) => {
   (e.target as HTMLInputElement).value = numFmt(d.bs);
 };
 const onTarifFocus = (d: DetailRow, e: Event) => {
-  (e.target as HTMLInputElement).value = d.tarif ? String(d.tarif) : "";
+  (e.target as HTMLInputElement).value = rawNum(d.tarif);
 };
 const onTarifInput = (d: DetailRow, e: Event) => {
   d.tarif = parseNum((e.target as HTMLInputElement).value);
@@ -217,6 +227,107 @@ const onDetailNomorEnter = async (idx: number) => {
   await loadNotaDetail(idx, d.nomor, d.searchType);
 };
 
+// ── Panggil Rekap Pembayaran ──
+const showRekapModal = ref(false);
+const rekapLoading = ref(false);
+const rekapUnits = ref<RekapUnit[]>([]);
+const rekapTerpilih = ref("");
+
+const unitTerpilih = computed(
+  () => rekapUnits.value.find((u) => u.key === rekapTerpilih.value) ?? null,
+);
+
+const openRekapModal = async () => {
+  if (!form.value.supKode) {
+    toast.warning("Pilih supplier dahulu.");
+    return;
+  }
+  if (detail.value.some((d) => d.nomor)) {
+    toast.warning(
+      "Kosongkan detail nota dahulu. Satu voucher dipanggil dari satu faktur atau satu nota.",
+    );
+    return;
+  }
+  rekapTerpilih.value = "";
+  rekapUnits.value = [];
+  showRekapModal.value = true;
+  rekapLoading.value = true;
+  try {
+    const res = await voucherPembayaranFormService.getRekap(form.value.supKode);
+    rekapUnits.value = res.data.data || [];
+  } catch {
+    toast.error("Gagal memuat rekap pembayaran.");
+  } finally {
+    rekapLoading.value = false;
+  }
+};
+
+const bisaDimuat = async (
+  nota: string,
+  searchType: string,
+  ppn: number,
+): Promise<boolean> => {
+  try {
+    await voucherPembayaranFormService.getNotaDetail(
+      nota,
+      ppn,
+      searchType,
+      form.value.supKode,
+    );
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+// Status PPN voucher mengikuti nota: nota PPN menolak voucher Non PPN dan
+// sebaliknya. Nota yang tidak peduli PPN (PJG, POE) menerima keduanya.
+const tentukanPpn = async (baris: RekapUnit["baris"]): Promise<boolean> => {
+  for (const b of baris) {
+    const tipe = b.tipe === "RET" ? "RTG" : b.tipe;
+    if (await bisaDimuat(b.nota, tipe, 0)) continue;
+    if (await bisaDimuat(b.nota, tipe, 1)) return true;
+  }
+  return false;
+};
+
+const pakaiRekap = async () => {
+  const u = unitTerpilih.value;
+  if (!u) {
+    toast.warning("Pilih satu faktur atau satu nota.");
+    return;
+  }
+  showRekapModal.value = false;
+
+  form.value.nomorPajak = u.fakturPajak;
+  form.value.statusPpn = await tentukanPpn(u.baris);
+
+  detail.value = u.baris.map((b) => ({
+    ...createDetailRow(b.tipe === "RET" ? "RTG" : b.tipe),
+    nomor: b.nota,
+    rekapNomor: b.rekapNomor,
+    rekapNoUrut: b.noUrut,
+  }));
+
+  await Promise.all(
+    detail.value.map((d, i) => loadNotaDetail(i, d.nomor, d.searchType)),
+  );
+
+  // Nilai voucher = rencana di rekap (dibatasi sisa nota). RET nilainya terkunci.
+  detail.value.forEach((d, i) => {
+    if (!d.tipe || !d.nomor || d.tipe === "RET") return;
+    d.nilai = Math.min(u.baris[i].nominal, d.nilaiMax);
+    recalcDetail(d);
+  });
+
+  const gagal = detail.value.filter((d) => !d.nomor).length;
+  if (gagal > 0) {
+    toast.warning(
+      `${gagal} nota gagal dimuat. Periksa status PPN voucher, lalu cek pesan di atas.`,
+    );
+  }
+};
+
 // ── Bahan tambahan ops ──
 const addBahanRow = () =>
   bahanTambahan.value.push({
@@ -230,7 +341,7 @@ const addBahanRow = () =>
 const removeBahanRow = (idx: number) => bahanTambahan.value.splice(idx, 1);
 
 const onBahanJumlahFocus = (b: BahanRow, e: Event) => {
-  (e.target as HTMLInputElement).value = b.jumlah ? String(b.jumlah) : "";
+  (e.target as HTMLInputElement).value = rawNum(b.jumlah);
 };
 const onBahanJumlahInput = (b: BahanRow, e: Event) => {
   b.jumlah = parseNum((e.target as HTMLInputElement).value);
@@ -240,7 +351,7 @@ const onBahanJumlahBlur = (b: BahanRow, e: Event) => {
   (e.target as HTMLInputElement).value = numFmt(b.jumlah);
 };
 const onBahanHargaFocus = (b: BahanRow, e: Event) => {
-  (e.target as HTMLInputElement).value = b.harga ? String(b.harga) : "";
+  (e.target as HTMLInputElement).value = rawNum(b.harga);
 };
 const onBahanHargaInput = (b: BahanRow, e: Event) => {
   b.harga = parseNum((e.target as HTMLInputElement).value);
@@ -432,9 +543,7 @@ const onPpnChange = (val: boolean) => {
   }
 };
 const onDiscFocus = (e: Event) => {
-  (e.target as HTMLInputElement).value = form.value.disc
-    ? String(form.value.disc)
-    : "";
+  (e.target as HTMLInputElement).value = rawNum(form.value.disc);
 };
 const onDiscInput = (e: Event) => {
   form.value.disc = parseNum((e.target as HTMLInputElement).value);
@@ -599,7 +708,7 @@ const executeCancel = () => {
     bahanTambahan.value = JSON.parse(JSON.stringify(originalState.value.bahan));
   } else {
     Object.assign(form.value, {
-      tanggal: today,
+      tanggal: hariIni(),
       supKode: "",
       supNama: "",
       supRekening: "",
@@ -790,9 +899,20 @@ const executeClose = () => {
         <div class="vp-detail-section" style="flex: 0 0 auto">
           <div class="vp-sec-header">
             <span class="vp-sec-title">Detail Nota</span>
-            <button type="button" class="btn-add" @click="addDetailRow">
-              <IconPlus :size="14" class="mr-1" /> Tambah
-            </button>
+            <div class="d-flex" style="gap: 6px">
+              <button
+                v-if="!isEdit"
+                type="button"
+                class="btn-add"
+                style="background: #6a1b9a"
+                @click="openRekapModal"
+              >
+                <IconCalendarDue :size="14" class="mr-1" /> Panggil Rekap
+              </button>
+              <button type="button" class="btn-add" @click="addDetailRow">
+                <IconPlus :size="14" class="mr-1" /> Tambah
+              </button>
+            </div>
           </div>
           <div class="vp-table-wrap">
             <table class="vp-table">
@@ -1202,6 +1322,111 @@ const executeClose = () => {
         >
           Pilih ({{ selectedNotas.length }})
         </v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
+
+  <!-- Modal Panggil Rekap -->
+  <v-dialog v-model="showRekapModal" max-width="1000px" scrollable>
+    <v-card class="rounded-lg">
+      <v-card-title class="pa-3 text-subtitle-1 text-white bg-primary">
+        Panggil Rekap Pembayaran, {{ form.supNama }}
+      </v-card-title>
+      <v-card-text class="pa-3">
+        <div style="max-height: 260px; overflow-y: auto">
+          <div v-if="rekapLoading" class="text-center py-4 text-grey">
+            Memuat...
+          </div>
+          <table v-else class="mini-table">
+            <thead>
+              <tr>
+                <th style="width: 32px"></th>
+                <th style="width: 170px">Faktur Pajak</th>
+                <th style="width: 170px">Invoice</th>
+                <th style="width: 90px" class="text-center">Jml Nota</th>
+                <th style="width: 150px" class="text-right">Total</th>
+                <th>Rekap</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="u in rekapUnits"
+                :key="u.key"
+                class="mini-row"
+                :class="{ 'mini-row--selected': rekapTerpilih === u.key }"
+                @click="rekapTerpilih = u.key"
+              >
+                <td class="text-center">
+                  <input
+                    type="radio"
+                    :checked="rekapTerpilih === u.key"
+                    @click.stop
+                    @change="rekapTerpilih = u.key"
+                  />
+                </td>
+                <td>{{ u.fakturPajak || "(tanpa faktur)" }}</td>
+                <td>{{ u.invoice || "-" }}</td>
+                <td class="text-center">{{ u.baris.length }}</td>
+                <td class="text-right">{{ numFmt(u.total) }}</td>
+                <td>
+                  {{
+                    [...new Set(u.baris.map((b) => b.rekapNomor))].join(", ")
+                  }}
+                </td>
+              </tr>
+              <tr v-if="!rekapUnits.length">
+                <td colspan="6" class="text-center text-grey py-3">
+                  Tidak ada rekap yang belum dipakai untuk supplier ini
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div v-if="unitTerpilih" style="margin-top: 10px">
+          <div class="text-caption text-grey-darken-1 mb-1">
+            Isi yang akan dipanggil:
+          </div>
+          <table class="mini-table">
+            <thead>
+              <tr>
+                <th style="width: 60px">Tipe</th>
+                <th>Nomor Nota</th>
+                <th style="width: 110px">Bulan Tagihan</th>
+                <th style="width: 110px">Tgl Rencana</th>
+                <th style="width: 140px" class="text-right">Nominal Rencana</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="b in unitTerpilih.baris"
+                :key="`${b.rekapNomor}-${b.noUrut}`"
+              >
+                <td>{{ b.tipe }}</td>
+                <td>{{ b.nota }}</td>
+                <td>{{ b.bulanTagihan }}</td>
+                <td>{{ b.tglRencana || "-" }}</td>
+                <td class="text-right">{{ numFmt(b.nominal) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </v-card-text>
+      <v-card-actions class="pa-3 border-t bg-grey-lighten-4">
+        <v-spacer />
+        <v-btn
+          variant="text"
+          color="grey-darken-1"
+          @click="showRekapModal = false"
+          >Batal</v-btn
+        >
+        <v-btn
+          variant="flat"
+          color="primary"
+          :disabled="!unitTerpilih"
+          @click="pakaiRekap"
+          >Pakai</v-btn
+        >
       </v-card-actions>
     </v-card>
   </v-dialog>

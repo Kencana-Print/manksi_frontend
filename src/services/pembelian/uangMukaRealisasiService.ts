@@ -26,4 +26,9 @@ export const uangMukaRealisasiService = {
       payload,
     );
   },
+  konfirmasiTerima(bonNomor: string) {
+    return api.post(
+      `/pembelian/uang-muka-realisasi/${encodeURIComponent(bonNomor)}/konfirmasi-terima`,
+    );
+  },
 };

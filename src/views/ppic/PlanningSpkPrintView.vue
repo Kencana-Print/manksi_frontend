@@ -5,6 +5,10 @@ import { useToast } from "vue-toastification";
 import { planningSpkService } from "@/services/ppic/planningSpkService";
 import { formatTanggal } from "@/utils/dateFormat";
 
+interface ActualHarian {
+  tgl: string; // YYYY-MM-DD
+  qty: number;
+}
 interface DetailRow {
   NomorSPK: string;
   NamaSPK: string;
@@ -29,6 +33,8 @@ interface DetailRow {
   WaktuProduksi?: number;
   Resume?: number | null;
   Output?: number;
+  ActualHarian?: ActualHarian[];
+  OutputHarian?: ActualHarian[];
 }
 interface DetailCache {
   cutting: DetailRow[];
@@ -131,6 +137,15 @@ const isOver = (d: DetailRow) =>
   d.Hari != null &&
   d.Jam != null &&
   d.Resume > d.Hari * d.Jam * 60;
+
+// 2026-10-19 -> 19/10
+const tglPendek = (t: string) => {
+  const [, m, d] = t.split("-");
+  return `${d}/${m}`;
+};
+// Output menit untuk satu hari = SMV x qty hari itu (kosong kalau SMV belum ada)
+const outputMenitHari = (d: DetailRow, qty: number): number | null =>
+  d.Smv != null && d.Smv > 0 ? d.Smv * qty : null;
 </script>
 
 <template>
@@ -180,6 +195,7 @@ const isOver = (d: DetailRow) =>
             <th rowspan="2" width="70">Qty Target</th>
             <th rowspan="2" width="90">Proses Produksi</th>
             <th rowspan="2" width="70">Output</th>
+            <th rowspan="2" width="170">Output per Tanggal</th>
           </tr>
           <tr>
             <th width="70">Qty</th>
@@ -199,15 +215,24 @@ const isOver = (d: DetailRow) =>
             <td class="tr">{{ fmt(d.QtyJadwal) }}</td>
             <td class="tc">{{ d.LineKelompok || "-" }}</td>
             <td class="tr">{{ d.Output ? fmt(d.Output) : "-" }}</td>
+            <td class="hr-cell">
+              <template v-if="d.OutputHarian?.length">
+                <span v-for="h in d.OutputHarian" :key="h.tgl" class="hr-item">
+                  {{ tglPendek(h.tgl) }}: {{ fmt(h.qty) }}
+                </span>
+              </template>
+              <template v-else>-</template>
+            </td>
           </tr>
           <tr v-if="!detail.cutting.length">
-            <td colspan="8" class="tc">Tidak ada data cutting</td>
+            <td colspan="9" class="tc">Tidak ada data cutting</td>
           </tr>
           <tr v-else class="row-total">
             <td colspan="5">Total</td>
             <td class="tr">{{ fmt(totalCutting.target) }}</td>
             <td></td>
             <td class="tr">{{ fmt(totalCutting.output) }}</td>
+            <td></td>
           </tr>
         </tbody>
       </table>
@@ -224,6 +249,7 @@ const isOver = (d: DetailRow) =>
               <th width="60">Target</th>
               <th width="65">Act. Output</th>
               <th width="70">Output (mnt)</th>
+              <th width="190">Act. Output per Tanggal</th>
               <th width="70">Resume (mnt)</th>
               <th width="150">Keterangan</th>
             </tr>
@@ -231,7 +257,7 @@ const isOver = (d: DetailRow) =>
           <tbody>
             <template v-for="g in sewingGroups" :key="g.line || '_blank'">
               <tr class="grp-row">
-                <td colspan="9">
+                <td colspan="10">
                   <b>{{ g.line || "(Tanpa line)" }}</b>
                   &nbsp;|&nbsp; MP {{ fmtDec(g.items[0].Mp, 0) }} &nbsp;|&nbsp;
                   Hari {{ fmtDec(g.items[0].Hari, 1) }} &nbsp;|&nbsp; Jam
@@ -256,6 +282,21 @@ const isOver = (d: DetailRow) =>
                 <td class="tr">{{ fmt(d.Target) }}</td>
                 <td class="tr">{{ fmt(d.ActualOutput) }}</td>
                 <td class="tr">{{ fmtDec(outputMenit(d), 1) }}</td>
+                <td class="hr-cell">
+                  <template v-if="d.ActualHarian?.length">
+                    <span
+                      v-for="h in d.ActualHarian"
+                      :key="h.tgl"
+                      class="hr-item"
+                    >
+                      {{ tglPendek(h.tgl) }}: {{ fmt(h.qty) }}
+                      <template v-if="outputMenitHari(d, h.qty) != null">
+                        ({{ fmtDec(outputMenitHari(d, h.qty), 0) }} mnt)
+                      </template>
+                    </span>
+                  </template>
+                  <template v-else>-</template>
+                </td>
                 <td class="tr" :class="{ over: isOver(d) }">
                   {{ fmtDec(d.Resume, 1) }}
                 </td>
@@ -415,6 +456,15 @@ const isOver = (d: DetailRow) =>
 .over {
   font-weight: bold;
   text-decoration: underline;
+}
+.hr-cell {
+  font-size: 7.5pt;
+  line-height: 1.3;
+}
+.hr-item {
+  display: inline-block;
+  margin-right: 6px;
+  white-space: nowrap;
 }
 .tc {
   text-align: center;

@@ -6,6 +6,8 @@ export const accountService = {
     api.get(`/master/account/${encodeURIComponent(kode)}`),
   getKelompok: () => api.get("/master/account/kelompok"),
   getCabang: () => api.get("/master/account/cabang"),
+  getInduk: () => api.get("/master/account/induk"),
+  getPemilik: () => api.get("/master/account/pemilik"),
   save: (payload: {
     isEdit: boolean;
     kode: string;
@@ -16,6 +18,8 @@ export const accountService = {
     store?: string;
     keterangan?: string;
     is_aktif: boolean;
+    parent?: string;
+    pemilik?: string;
   }) => api.post("/master/account", payload),
   delete: (kode: string) =>
     api.delete(`/master/account/${encodeURIComponent(kode)}`),

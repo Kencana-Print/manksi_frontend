@@ -1192,6 +1192,12 @@ export const createMenuItems = (): NavItem[] => {
           menuId: 959,
         },
         {
+          title: "Rekap Pembayaran",
+          to: "/piutang/rekap-pembayaran",
+          icon: IconCalendarDue,
+          menuId: 970,
+        },
+        {
           title: "Voucher Pembayaran",
           to: "/piutang/voucher-pembayaran",
           icon: IconFileInvoice,

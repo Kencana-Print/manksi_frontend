@@ -646,13 +646,50 @@ const saldoKas = ref({
   Cabang: null as string | null,
   Saldo: 0,
   JumlahRekening: 0,
+  Mode: "" as "" | "PUSAT" | "LACI_SENDIRI",
+  Tampil: true,
+  Label: "",
+  Finance: 0,
+  Purchasing: 0,
+  BelumDialokasi: 0,
 });
 const showCompanyPulse = computed(
   () => isSuperViewer.value || bagian.value === "FINANCE",
 );
 const showSaldoKas = computed(
-  () => ["FINANCE", "PEMBELIAN"].includes(bagian.value) || isSuperViewer.value,
+  () =>
+    ["FINANCE", "PEMBELIAN", "EDP"].includes(bagian.value) ||
+    isSuperViewer.value,
 );
+
+interface SaldoLaciRow {
+  Kode: string;
+  Nama: string;
+  Pemilik: string;
+  PemilikNama: string | null;
+  Kelompok: "FINANCE" | "PURCHASING";
+  Saldo: number;
+  JmlBelumSelesai: number;
+  NominalBelumSelesai: number;
+  JmlBelumKonfirmasi: number;
+  NominalBelumKonfirmasi: number;
+}
+interface SaldoLaciData {
+  Laci: SaldoLaciRow[];
+  BelumDialokasi: number;
+  TotalSaldo: number;
+}
+const saldoLaci = ref<SaldoLaciData>({
+  Laci: [],
+  BelumDialokasi: 0,
+  TotalSaldo: 0,
+});
+const showSaldoLaci = computed(
+  () =>
+    ["FINANCE", "DIREKSI", "DIR", "AUDIT", "EDP"].includes(bagian.value) ||
+    isSuperViewer.value,
+);
+
 // const realisasiRows = ref<any[]>([]);
 interface RealisasiBulananStatus {
   JmlItem: number;
@@ -4070,7 +4107,7 @@ const loadFinanceData = async () => {
     spkTagihOffset.value = 0;
     spkTagihHasMore.value = true;
 
-    const [piutangRes, penerimaanRes, spkTagihSumRes] =
+    const [piutangRes, penerimaanRes, spkTagihSumRes, saldoLaciRes] =
       await Promise.allSettled([
         dashboardService.getPiutangDashboard(),
         dashboardService.getPenerimaanSummary(),
@@ -4078,6 +4115,9 @@ const loadFinanceData = async () => {
           spkTagihFilter.value.startDate,
           spkTagihFilter.value.endDate,
         ),
+        showSaldoLaci.value
+          ? dashboardService.getSaldoLaci()
+          : Promise.resolve(null),
       ]);
     ensureTargetCollectionLoaded();
     if (piutangRes.status === "fulfilled" && piutangRes.value?.data?.data) {
@@ -4097,6 +4137,10 @@ const loadFinanceData = async () => {
       spkTagihSumRes.value?.data?.data
     )
       spkBelumTagihSummary.value = spkTagihSumRes.value.data.data;
+
+    if (saldoLaciRes.status === "fulfilled" && saldoLaciRes.value?.data?.data) {
+      saldoLaci.value = saldoLaciRes.value.data.data;
+    }
 
     await Promise.allSettled([loadMoreOverdue(), loadMoreSpkTagih()]);
 
@@ -5207,7 +5251,11 @@ const sisaClass = (item: any) => {
           </v-col>
         </v-row>
 
-        <v-row v-if="showSaldoKas" dense class="mb-3">
+        <v-row
+          v-if="showSaldoKas && saldoKas.Tampil !== false"
+          dense
+          class="mb-3"
+        >
           <v-col cols="12">
             <div
               class="saldo-kas-card"
@@ -5225,11 +5273,35 @@ const sisaClass = (item: any) => {
                   {{ isLoadingDashboard ? "—" : fmtNum(saldoKas.Saldo) }}
                 </div>
                 <div class="saldo-kas-lbl">
-                  Saldo Kas ({{ saldoKas.Cabang || cabang }})
+                  {{
+                    saldoKas.Label || `Saldo Kas (${saldoKas.Cabang || cabang})`
+                  }}
                 </div>
               </div>
               <div class="saldo-kas-divider" />
-              <div class="saldo-kas-sub">
+              <template v-if="saldoKas.Mode === 'PUSAT'">
+                <div class="saldo-kas-sub">
+                  <div class="saldo-kas-sub-val">
+                    {{ isLoadingDashboard ? "—" : fmtNum(saldoKas.Finance) }}
+                  </div>
+                  <div class="saldo-kas-sub-lbl">Finance</div>
+                </div>
+                <div class="saldo-kas-sub">
+                  <div class="saldo-kas-sub-val">
+                    {{ isLoadingDashboard ? "—" : fmtNum(saldoKas.Purchasing) }}
+                  </div>
+                  <div class="saldo-kas-sub-lbl">Purchasing</div>
+                </div>
+                <div v-if="saldoKas.BelumDialokasi !== 0" class="saldo-kas-sub">
+                  <div class="saldo-kas-sub-val">
+                    {{
+                      isLoadingDashboard ? "—" : fmtNum(saldoKas.BelumDialokasi)
+                    }}
+                  </div>
+                  <div class="saldo-kas-sub-lbl">Belum dialokasikan</div>
+                </div>
+              </template>
+              <div v-else class="saldo-kas-sub">
                 <div class="saldo-kas-sub-val">
                   {{ isLoadingDashboard ? "—" : saldoKas.JumlahRekening }}
                 </div>
@@ -7959,6 +8031,88 @@ const sisaClass = (item: any) => {
            TAB FINANCE / PIUTANG
       ════════════════════════════════════════ -->
       <v-window-item value="finance">
+        <v-row v-if="showSaldoLaci" dense class="mb-2">
+          <v-col cols="12">
+            <div class="manksi-panel content-panel">
+              <div class="panel-header panel-header--green">
+                <IconCoin :size="14" :stroke-width="1.7" class="mr-1" />
+                Kas Operasional Pusat per Laci
+                <span class="panel-header-sub ml-1">
+                  (total {{ fmtNum(saldoLaci.TotalSaldo) }})
+                </span>
+              </div>
+              <div class="panel-body">
+                <DashState v-if="isLoadingDashboard" kind="loading" />
+                <div v-else-if="!saldoLaci.Laci.length" class="text-caption">
+                  Belum ada laci.
+                </div>
+                <div v-else style="overflow-x: auto">
+                  <table class="gb-tbl" style="min-width: 760px">
+                    <thead>
+                      <tr>
+                        <th>Laci</th>
+                        <th>Pemilik</th>
+                        <th class="tr">Saldo Buku</th>
+                        <th class="tr">Kasbon Belum Selesai</th>
+                        <th class="tr">Belum Dikonfirmasi</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="l in saldoLaci.Laci" :key="l.Kode">
+                        <td>
+                          {{ l.Nama }}
+                          <span class="panel-header-sub">
+                            ·
+                            {{
+                              l.Kelompok === "FINANCE"
+                                ? "Finance"
+                                : "Purchasing"
+                            }}
+                          </span>
+                        </td>
+                        <td>{{ l.PemilikNama || l.Pemilik || "-" }}</td>
+                        <td
+                          class="tr"
+                          :style="l.Saldo < 0 ? 'color: var(--dsh-bad)' : ''"
+                        >
+                          {{ fmtNum(l.Saldo) }}
+                        </td>
+                        <td class="tr">
+                          {{
+                            l.JmlBelumSelesai
+                              ? `${l.JmlBelumSelesai} · ${fmtNum(l.NominalBelumSelesai)}`
+                              : "-"
+                          }}
+                        </td>
+                        <td
+                          class="tr"
+                          :style="
+                            l.JmlBelumKonfirmasi ? 'color: var(--dsh-warn)' : ''
+                          "
+                        >
+                          {{
+                            l.JmlBelumKonfirmasi
+                              ? `${l.JmlBelumKonfirmasi} · ${fmtNum(l.NominalBelumKonfirmasi)}`
+                              : "-"
+                          }}
+                        </td>
+                      </tr>
+                      <tr v-if="saldoLaci.BelumDialokasi !== 0">
+                        <td colspan="2">Induk A-111101 (belum dialokasikan)</td>
+                        <td class="tr" style="color: var(--dsh-warn)">
+                          {{ fmtNum(saldoLaci.BelumDialokasi) }}
+                        </td>
+                        <td class="tr">-</td>
+                        <td class="tr">-</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </v-col>
+        </v-row>
+
         <!-- Metric cards piutang -->
         <!-- Metric cards piutang — 5 card dalam 2 baris -->
         <v-row dense class="mb-2">

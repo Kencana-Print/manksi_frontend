@@ -47,6 +47,10 @@ interface RealisasiFormData {
   penerima: string;
   keterangan: string;
   detail: RealisasiDetail[];
+  laci_kode: string;
+  laci_nama: string;
+  laci_asal: string;
+  cutoff: string;
 }
 
 const toast = useToast();
@@ -63,7 +67,18 @@ const initialData: RealisasiFormData = {
   penerima: "",
   keterangan: "",
   detail: [],
+  laci_kode: "",
+  laci_nama: "",
+  laci_asal: "",
+  cutoff: "9999-12-31",
 };
+
+// Mode laci: kas penerima otomatis (laci milik pembuat PUM) mulai cut-off.
+const pakaiLaci = (d: RealisasiFormData): boolean =>
+  !!d.laci_kode &&
+  d.jenis === "KAS" &&
+  ["HO-", "P01"].includes(d.pum_cabang) &&
+  d.tanggal >= d.cutoff;
 
 const {
   isLoading,
@@ -86,6 +101,7 @@ const {
 
     // Cabang HO- disamakan dengan P01 untuk keperluan default rekening/kas
     const effectiveCabang = d.pum_cabang === "HO-" ? "P01" : d.pum_cabang;
+    const setelahCutoff = todayStr >= d.cutoff;
     let defaultRekKode = "";
     let defaultRekNama = "";
     try {
@@ -98,7 +114,10 @@ const {
       // pola controller yang dipakai.
       const body = accRes.data;
       const accounts = Array.isArray(body) ? body : (body?.data ?? []);
-      if (accounts.length > 0) {
+      // Pusat setelah cut-off: A-111101 sudah induk, jangan mengisi kas acak.
+      // Kas ditentukan otomatis (laci) atau dipilih Finance.
+      const pusatSetelahCutoff = effectiveCabang === "P01" && setelahCutoff;
+      if (accounts.length > 0 && !pusatSetelahCutoff) {
         defaultRekKode = accounts[0].kode;
         defaultRekNama = accounts[0].nama;
       }
@@ -116,6 +135,10 @@ const {
       nota: d.pum_nota || "",
       penerima: d.pum_user_create || "",
       keterangan: d.pum_keterangan || "",
+      laci_kode: d.laci_kode || "",
+      laci_nama: d.laci_nama || "",
+      laci_asal: d.laci_asal || "",
+      cutoff: d.cutoff || "9999-12-31",
       detail: d.detail.map((r: any) => ({
         ...r,
         status_acc: "ACC",
@@ -126,7 +149,7 @@ const {
   submitApi: (data) =>
     uangMukaRealisasiService.saveRealisasi(data.pum_nomor, {
       jenis: data.jenis,
-      rek_kode: data.rek_kode,
+      rek_kode: pakaiLaci(data) ? data.laci_kode : data.rek_kode,
       tanggal: data.tanggal,
       nota: data.nota,
       penerima: data.penerima,
@@ -140,6 +163,11 @@ const {
       toast.success(
         `Realisasi berhasil. No. Bon: ${response?.bonNomor ?? "-"}`,
       );
+      if (response?.transferJurNo) {
+        toast.info(
+          `Kas ditransfer ke ${response.rekKode}. No. BKK: ${response.transferJurNo}`,
+        );
+      }
       window.open(
         `/pembelian/uang-muka/print/${encodeURIComponent(formData.value.pum_nomor)}`,
         "_blank",
@@ -160,6 +188,10 @@ const totalAcc = computed(() =>
   formData.value.detail
     .filter((d) => d.status_acc === "ACC")
     .reduce((s, d) => s + Number(d.nominal_acc || 0), 0),
+);
+const modeLaciAktif = computed(() => pakaiLaci(formData.value));
+const pembuatPumPemilikLaciFinance = computed(
+  () => formData.value.laci_kode === formData.value.laci_asal,
 );
 
 const toggleAcc = (row: RealisasiDetail, val: "ACC" | "TOLAK") => {
@@ -231,7 +263,7 @@ const onValidateSave = () => {
 
   // Rekening/Kas hanya wajib kalau ada baris yang benar-benar direalisasi (ACC).
   // Kalau semua baris ditolak, ini murni penolakan PUM — tidak perlu rekening/kas.
-  if (adaAcc && !formData.value.rek_kode) {
+  if (adaAcc && !modeLaciAktif.value && !formData.value.rek_kode) {
     toast.error("Pilih rekening/kas terlebih dahulu.");
     return;
   }
@@ -283,7 +315,28 @@ const onValidateSave = () => {
           hide-details
         />
 
-        <div class="lookup-field mb-3">
+        <template v-if="modeLaciAktif">
+          <v-text-field
+            :model-value="`${formData.laci_kode} — ${formData.laci_nama}`"
+            label="Rekening/Kas (laci penerima)"
+            variant="outlined"
+            density="compact"
+            class="mb-1"
+            hide-details
+            readonly
+          />
+          <div class="laci-info mb-3">
+            <template v-if="pembuatPumPemilikLaciFinance">
+              Pembuat PUM adalah pemilik laci Finance. Tidak ada transfer kas.
+            </template>
+            <template v-else>
+              Saat disimpan, uang ditransfer otomatis dari laci Finance ({{
+                formData.laci_asal
+              }}) ke laci ini.
+            </template>
+          </div>
+        </template>
+        <div v-else class="lookup-field mb-3">
           <label class="lookup-label">Rekening/Kas</label>
           <div class="lookup-input-wrap" @click="showAccountModal = true">
             <span :class="{ 'text-grey': !formData.rek_kode }">
@@ -556,5 +609,12 @@ const onValidateSave = () => {
 .row-detail td {
   padding-left: 20px;
   font-size: 11px;
+}
+.laci-info {
+  font-size: 11px;
+  color: #546e7a;
+  background: #eceff1;
+  border-radius: 4px;
+  padding: 6px 8px;
 }
 </style>
