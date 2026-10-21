@@ -418,6 +418,14 @@ fetchData();
             <b>Peserta:</b> {{ item.peserta }}
           </div>
           <table class="dt">
+            <colgroup>
+              <col style="width: 40px" />
+              <col />
+              <col style="width: 160px" />
+              <col style="width: 150px" />
+              <col style="width: 110px" />
+              <col style="width: 110px" />
+            </colgroup>
             <thead>
               <tr>
                 <th style="width: 40px">NO</th>
@@ -571,10 +579,22 @@ fetchData();
 
 /* ─── Detail table ─── */
 .dt {
+  table-layout: fixed;
   width: 100%;
-  border-collapse: collapse;
-  font-size: 11px;
-  background: white;
+  min-width: 900px;
+}
+.expand-wrap .dt tbody td.cell-wrap {
+  white-space: pre-wrap !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  max-width: none !important;
+  height: auto !important;
+  word-break: break-word;
+  line-height: 1.4;
+}
+.expand-wrap .dt tbody td {
+  height: auto !important;
+  vertical-align: top;
 }
 .dt thead th {
   padding: 4px 8px;
