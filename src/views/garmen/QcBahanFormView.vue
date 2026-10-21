@@ -123,6 +123,11 @@ const gramasiPoAda = (): boolean => {
   return p.gramasi_min > 0 && p.gramasi_max > 0;
 };
 
+const settingPoAda = (): boolean => {
+  const p = formData.value.po;
+  return p.setting_min > 0 && p.setting_max > 0;
+};
+
 // Kolom yang belum lengkap pada satu roll
 const rollKurang = (x: QcRollRow): string[] => {
   const kurang: string[] = [];
@@ -450,21 +455,19 @@ const rollNilai = (x: QcRollRow): number => {
     x.hasil.shrinkage === "OK" ? 3 : 1,
     x.hasil.kelunturan === "OK" ? 3 : 1,
   ];
-  if (p.spec_terbaca) {
-    const okG = (v: number) =>
-      v >= p.gramasi_min - t.gramasi - EPS &&
-      v <= p.gramasi_max + t.gramasi + EPS;
-    const s = Number(x.setting_cek);
-    const okS =
-      s >= p.setting_min - t.setting - EPS &&
-      s <= p.setting_max + t.setting + EPS;
-    if (gramasiPoAda()) {
-      skor.push(
-        okG(Number(x.gramasi_atas)) && okG(Number(x.gramasi_bawah)) ? 3 : 1,
-      );
-    }
-    skor.push(okS ? 3 : 1);
+  const okG = (v: number) =>
+    v >= p.gramasi_min - t.gramasi - EPS &&
+    v <= p.gramasi_max + t.gramasi + EPS;
+  const s = Number(x.setting_cek);
+  const okS =
+    s >= p.setting_min - t.setting - EPS &&
+    s <= p.setting_max + t.setting + EPS;
+  if (gramasiPoAda()) {
+    skor.push(
+      okG(Number(x.gramasi_atas)) && okG(Number(x.gramasi_bawah)) ? 3 : 1,
+    );
   }
+  if (settingPoAda()) skor.push(okS ? 3 : 1);
   return Math.min(...skor);
 };
 
@@ -910,11 +913,13 @@ const nilaiClass = (n: number) =>
           />
         </div>
         <div
-          v-if="formData.header.qc_po_nomor && !formData.po.spec_terbaca"
+          v-if="
+            formData.header.qc_po_nomor && (!gramasiPoAda() || !settingPoAda())
+          "
           class="warn-box"
         >
-          Gramasi/setting di PO tidak terbaca. Penilaian otomatis mati: nilai
-          lot diisi manual dengan alasan.
+          {{ !gramasiPoAda() ? "Gramasi" : "Setting" }} di PO tidak terbaca,
+          jadi parameter itu tidak ikut dinilai.
         </div>
 
         <div class="sep" />
