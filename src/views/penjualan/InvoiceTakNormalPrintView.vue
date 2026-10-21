@@ -214,9 +214,11 @@ const generateTxt = () => {
     lines.push(
       `${padR("", wTerbilang)}${padR("Grand Total", wLabel)}: ${padL(num(t.grandTotal), wAngka)}`,
     );
-    lines.push(
-      `${padR("", wTerbilang)}${padR("Uang Muka", wLabel)}: ${padL(num(t.uangMuka), wAngka)}`,
-    );
+    if (Number(t.uangMuka) > 0) {
+      lines.push(
+        `${padR("", wTerbilang)}${padR("Uang Muka", wLabel)}: ${padL(num(t.uangMuka), wAngka)}`,
+      );
+    }
     lines.push(
       `${padR("", wTerbilang)}${padR("Nilai Piutang", wLabel)}: ${padL(num(t.nilaiPiutang), wAngka)}`,
     );
@@ -563,7 +565,7 @@ onMounted(() => {
             <div class="summary-row summary-bold">
               <span>Grand Total</span><span>{{ num(totals.grandTotal) }}</span>
             </div>
-            <div class="summary-row">
+            <div v-if="Number(totals.uangMuka) > 0" class="summary-row">
               <span>Uang Muka</span><span>{{ num(totals.uangMuka) }}</span>
             </div>
             <div class="summary-row summary-bold">

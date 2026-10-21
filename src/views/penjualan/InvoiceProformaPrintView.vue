@@ -249,9 +249,11 @@ const generateTxt = () => {
     lines.push(
       `${padR("", wTerbilang)} ${padR("Grand Total", wLabel)}: ${padL(numFmt(grandTotal.value), wAngka)}`,
     );
-    lines.push(
-      `${padR("", wTerbilang)} ${padR("Uang Muka", wLabel)}: ${padL(numFmt(h.uang_muka), wAngka)}`,
-    );
+    if (roundRp(h.uang_muka) > 0) {
+      lines.push(
+        `${padR("", wTerbilang)} ${padR("Uang Muka", wLabel)}: ${padL(numFmt(h.uang_muka), wAngka)}`,
+      );
+    }
     lines.push(
       `${padR("", wTerbilang)} ${padR("Nilai Piutang", wLabel)}: ${padL(numFmt(nilaiPiutang.value), wAngka)}`,
     );
