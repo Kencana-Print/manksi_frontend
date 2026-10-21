@@ -267,7 +267,7 @@ const generateTxt = (withCodes = true) => {
 };
 
 const downloadTxt = () => {
-  const content = generateTxt(true);
+  const content = generateTxt(false);
   const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
