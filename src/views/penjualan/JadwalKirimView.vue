@@ -475,14 +475,16 @@ const confirmTunda = async () => {
 };
 
 // ── Filter state restore dari BaseBrowse sessionStorage ───────────────
+let gudangRestored = false;
+
 const onFilterStateRestored = (saved: Record<string, any>) => {
   if (saved.tglAwal) filterState.value.tglAwal = saved.tglAwal;
   if (saved.tglAkhir) filterState.value.tglAkhir = saved.tglAkhir;
-  // Spanduk: gudang dikunci, jangan dipulihkan dari sessionStorage
   if (modeSpanduk.value) return;
-  if (saved.gudang !== undefined && saved.gudang !== "") {
+  if (saved.gudang !== undefined) {
     filterState.value.gudang = saved.gudang;
     filterState.value.gudangNama = saved.gudangNama || "";
+    gudangRestored = true;
   }
 };
 
@@ -501,26 +503,26 @@ const terapkanGudangAwal = () => {
 onMounted(async () => {
   await loadGudang();
 
-  if (modeSpanduk.value) {
-    terapkanGudangAwal();
-  } else if (!filterState.value.gudang) {
-    // Garmen: default GJ001 bila belum ada nilai dari sessionStorage
+  if (modeSpanduk.value || !gudangRestored) {
     terapkanGudangAwal();
   }
 
   await fetchData();
 });
 
-// Vue memakai ulang instance ini antara route Garmen dan Spanduk
+const isFormRoute = (n: unknown) => /(Create|Edit)$/.test(String(n ?? ""));
+
 watch(
   () => route.name,
-  () => {
+  (baru, lama) => {
+    // Pindah ke/dari form Baru/Ubah bukan ganti mode Garmen<->Spanduk
+    if (isFormRoute(baru) || isFormRoute(lama)) return;
+
     detailCache.value = {};
     expanded.value = [];
     clearSelection();
     const gudangLama = filterState.value.gudang;
     terapkanGudangAwal();
-    // Kalau gudang berubah, watch filter di bawah yang fetch
     if (filterState.value.gudang === gudangLama) fetchData();
   },
 );
@@ -544,6 +546,7 @@ watch(
   <BaseBrowse
     :title="modeSpanduk ? 'Jadwal Kirim — Spanduk' : 'Jadwal Kirim'"
     menu-id="119"
+    :storage-id="modeSpanduk ? '119-spanduk' : '119'"
     :icon="IconTruckDelivery"
     :headers="headers"
     :items="items ?? []"
