@@ -20,6 +20,7 @@ import {
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface ActualHarian {
   tgl: string; // YYYY-MM-DD
+  nomor?: string; // No. Mutasi Produksi (hanya Sewing)
   qty: number;
 }
 
@@ -579,10 +580,48 @@ const waktuProduksi = (row: TabRow) =>
   (Number(row.plan_hari) || 0) *
   (Number(row.plan_jam) || 0) *
   60;
+// Resume = sisa waktu produksi line setelah dikurangi Output (mnt), kumulatif
+// urut ke bawah per line. SMV kosong dihitung 0. Minus = melebihi waktu produksi.
+const resumeByKey = computed(() => {
+  const m = new Map<number, number | null>();
+  for (const g of sewingGroups.value) {
+    const wp = g.items.length ? waktuProduksi(g.items[0].row) : 0;
+    let sisa = wp;
+    for (const { row } of g.items) {
+      if (!row.NomorSPK || wp <= 0) {
+        m.set(row._key, null);
+        continue;
+      }
+      sisa -= outputMenit(row) ?? 0;
+      m.set(row._key, sisa);
+    }
+  }
+  return m;
+});
 const resumeOf = (row: TabRow): number | null =>
-  row.mp > 0 && row.plan_smv > 0
-    ? ((Number(row.plan_target_output) || 0) * row.plan_smv) / row.mp
-    : null;
+  resumeByKey.value.get(row._key) ?? null;
+const isOverTime = (row: TabRow) => {
+  const r = resumeOf(row);
+  return r !== null && r < 0;
+};
+
+// Target Waktu per line (menit-orang) = jumlah (SMV x Target) semua SPK di line
+const targetWaktuLine = (items: { row: TabRow; idx: number }[]) =>
+  items.reduce(
+    (s, { row }) =>
+      s +
+      (row.plan_smv > 0
+        ? row.plan_smv * (Number(row.plan_target_output) || 0)
+        : 0),
+    0,
+  );
+// Pencapaian (%) = Target Waktu / Waktu Produksi
+const pencapaianLine = (
+  items: { row: TabRow; idx: number }[],
+): number | null => {
+  const wp = items.length ? waktuProduksi(items[0].row) : 0;
+  return wp > 0 ? (targetWaktuLine(items) / wp) * 100 : null;
+};
 // Output menit = SMV x Act. Output (kosong kalau SMV belum ada)
 const outputMenit = (row: TabRow): number | null =>
   row.NomorSPK && row.plan_smv > 0
@@ -602,11 +641,6 @@ const toggleHarian = (key: number) => {
   if (s.has(key)) s.delete(key);
   else s.add(key);
   bukaHarian.value = s;
-};
-// Resume per operator vs kapasitas per operator (hari x jam x 60): perilaku lama tidak berubah
-const isOverTime = (row: TabRow) => {
-  const r = resumeOf(row);
-  return r !== null && r > waktuProduksi(row) / row.mp;
 };
 const fmtDec = (n: number | null | undefined, d = 2) =>
   n == null
@@ -1190,8 +1224,7 @@ const fmt = (n: number | null | undefined) => (n ?? 0).toLocaleString("id-ID");
             <div class="tab-info">
               Periode: <b>{{ formData.pl_tgl1 }}</b> s/d
               <b>{{ formData.pl_tgl2 }}</b>
-              · Actual output (mutasi GP003 → GP004) dan actual jam (absensi)
-              dihitung pada periode ini.
+              · Actual output (mutasi GP003 → GP004) dihitung pada periode ini.
             </div>
             <div class="tbl-hdr green">
               <span>Divisi Sewing</span>
@@ -1333,8 +1366,21 @@ const fmt = (n: number | null | undefined) => (n ?? 0).toLocaleString("id-ID");
                             mnt</span
                           >
                           <span class="grp-chip"
-                            >Act. Jam
-                            <b>{{ fmtDec(g.items[0].row.actual_jam) }}</b></span
+                            >Target Waktu
+                            <b>{{
+                              targetWaktuLine(g.items) > 0
+                                ? fmtDec(targetWaktuLine(g.items), 0)
+                                : "—"
+                            }}</b>
+                            mnt</span
+                          >
+                          <span class="grp-chip"
+                            >Pencapaian
+                            <b>{{
+                              pencapaianLine(g.items) === null
+                                ? "—"
+                                : fmtDec(pencapaianLine(g.items), 1) + "%"
+                            }}</b></span
                           >
                           <span class="grp-spacer"></span>
                           <button
@@ -1450,7 +1496,7 @@ const fmt = (n: number | null | undefined) => (n ?? 0).toLocaleString("id-ID");
                           :class="{ over: isOverTime(row) }"
                           :title="
                             isOverTime(row)
-                              ? 'Resume melebihi waktu produksi: target tidak muat'
+                              ? 'Resume minus: output sudah melebihi waktu produksi line'
                               : ''
                           "
                         >
@@ -1484,20 +1530,25 @@ const fmt = (n: number | null | undefined) => (n ?? 0).toLocaleString("id-ID");
                             <thead>
                               <tr>
                                 <th>Tanggal</th>
+                                <th>No. Mutasi</th>
                                 <th class="tr">Act. Output</th>
                                 <th class="tr">Output (mnt)</th>
                               </tr>
                             </thead>
                             <tbody>
-                              <tr v-for="h in row.actual_harian" :key="h.tgl">
+                              <tr
+                                v-for="h in row.actual_harian"
+                                :key="h.nomor ?? h.tgl"
+                              >
                                 <td>{{ fmtTgl(h.tgl) }}</td>
+                                <td>{{ h.nomor ?? "—" }}</td>
                                 <td class="tr">{{ fmt(h.qty) }}</td>
                                 <td class="tr">
                                   {{ fmtDec(outputMenitHari(row, h.qty), 1) }}
                                 </td>
                               </tr>
                               <tr class="hr-total">
-                                <td>Total</td>
+                                <td colspan="2">Total</td>
                                 <td class="tr">{{ fmt(row.actual_output) }}</td>
                                 <td class="tr">
                                   {{ fmtDec(outputMenit(row), 1) }}

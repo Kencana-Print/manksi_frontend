@@ -68,6 +68,7 @@ interface DetailCache {
 }
 interface ActualHarian {
   tgl: string; // YYYY-MM-DD
+  nomor?: string; // No. Mutasi Produksi (hanya Sewing)
   qty: number;
 }
 interface ExportPlan {
@@ -436,7 +437,18 @@ const kolomSewing: ExcelColumn[] = [
     align: "right",
     numFmt: "#,##0",
   },
-  { header: "Act. Jam", key: "ActualJam", align: "right", numFmt: "#,##0.00" },
+  {
+    header: "Target Waktu (mnt)",
+    key: "TargetWaktu",
+    align: "right",
+    numFmt: "#,##0",
+  },
+  {
+    header: "Pencapaian (%)",
+    key: "Pencapaian",
+    align: "right",
+    numFmt: "#,##0.0",
+  },
   { header: "No", key: "No", align: "center", width: 6 },
   { header: "Nomor SPK", key: "NomorSPK", width: 22 },
   { header: "Nama SPK", key: "NamaSPK", width: 34 },
@@ -474,6 +486,7 @@ const kolomSewingHarian: ExcelColumn[] = [
   { header: "Nama SPK", key: "NamaSPK", width: 34 },
   { header: "SMV (mnt)", key: "Smv", align: "right", numFmt: "#,##0.000" },
   { header: "Tanggal", key: "Tanggal", width: 12 },
+  { header: "No. Mutasi", key: "NomorMutasi", width: 24 },
   {
     header: "Act. Output",
     key: "ActualOutput",
@@ -582,6 +595,7 @@ const doExportDetail = async () => {
             NamaSPK: d.NamaSPK || "",
             Smv: angkaAtauKosong(d.Smv),
             Tanggal: formatTanggal(h.tgl),
+            NomorMutasi: h.nomor ?? "",
             ActualOutput: h.qty,
             OutputMenit: angkaAtauKosong(outputMenitHari(d, h.qty)),
           });
@@ -606,7 +620,8 @@ const doExportDetail = async () => {
           WaktuProduksi: g.items[0].WaktuProduksi
             ? g.items[0].WaktuProduksi
             : "",
-          ActualJam: angkaAtauKosong(g.items[0].ActualJam),
+          TargetWaktu: g.totalTargetWaktu,
+          Pencapaian: angkaAtauKosong(pencapaian(g)),
           Target: g.totalTarget,
           ActualOutput: g.totalActual,
           _grp: true,
@@ -706,16 +721,26 @@ const groupSewing = (rows: DetailRow[]) => {
       items: DetailRow[];
       totalTarget: number;
       totalActual: number;
+      totalTargetWaktu: number;
     }
   >();
   for (const r of rows) {
     const k = r.LineKelompok || "";
     if (!map.has(k))
-      map.set(k, { line: k, items: [], totalTarget: 0, totalActual: 0 });
+      map.set(k, {
+        line: k,
+        items: [],
+        totalTarget: 0,
+        totalActual: 0,
+        totalTargetWaktu: 0,
+      });
     const g = map.get(k)!;
     g.items.push(r);
     g.totalTarget += Number(r.Target) || 0;
     g.totalActual += Number(r.ActualOutput) || 0;
+    // Target Waktu = SMV x Target (SMV kosong dihitung 0)
+    g.totalTargetWaktu +=
+      r.Smv != null && r.Smv > 0 ? r.Smv * (Number(r.Target) || 0) : 0;
   }
   const rank = (l: string) =>
     !l ? "0" : l === "LINE EXTERNAL" ? "2" : "1" + l;
@@ -726,13 +751,17 @@ const groupSewing = (rows: DetailRow[]) => {
 
 const sewingGroups = (nomor: string) => groupSewing(sewingBaru(nomor));
 
-// Resume per operator vs kapasitas per operator (Hari x Jam x 60).
-// WaktuProduksi sudah termasuk MP, jadi tidak bisa dipakai untuk pembanding ini.
-const isOver = (d: DetailRow) =>
-  d.Resume != null &&
-  d.Hari != null &&
-  d.Jam != null &&
-  d.Resume > d.Hari * d.Jam * 60;
+// Resume minus = output sudah melebihi waktu produksi line
+const isOver = (d: DetailRow) => d.Resume != null && d.Resume < 0;
+
+// Pencapaian (%) = Target Waktu / Waktu Produksi line
+const pencapaian = (g: {
+  items: DetailRow[];
+  totalTargetWaktu: number;
+}): number | null => {
+  const wp = Number(g.items[0]?.WaktuProduksi) || 0;
+  return wp > 0 ? (g.totalTargetWaktu / wp) * 100 : null;
+};
 
 // Output menit = SMV x Act. Output (kosong kalau SMV belum ada)
 const outputMenit = (d: DetailRow): number | null =>
@@ -1085,8 +1114,21 @@ fetchData();
                             mnt</span
                           >
                           <span class="grp-chip"
-                            >Act. Jam
-                            <b>{{ fmtDec(g.items[0].ActualJam) }}</b></span
+                            >Target Waktu
+                            <b>{{
+                              g.totalTargetWaktu > 0
+                                ? fmtDec(g.totalTargetWaktu, 0)
+                                : "—"
+                            }}</b>
+                            mnt</span
+                          >
+                          <span class="grp-chip"
+                            >Pencapaian
+                            <b>{{
+                              pencapaian(g) === null
+                                ? "—"
+                                : fmtDec(pencapaian(g), 1) + "%"
+                            }}</b></span
                           >
                           <span class="grp-chip"
                             >Σ Target <b>{{ fmt(g.totalTarget) }}</b></span
@@ -1169,20 +1211,25 @@ fetchData();
                             <thead>
                               <tr>
                                 <th>Tanggal</th>
+                                <th>No. Mutasi</th>
                                 <th class="tr">Act. Output</th>
                                 <th class="tr">Output (mnt)</th>
                               </tr>
                             </thead>
                             <tbody>
-                              <tr v-for="h in d.ActualHarian" :key="h.tgl">
+                              <tr
+                                v-for="h in d.ActualHarian"
+                                :key="h.nomor ?? h.tgl"
+                              >
                                 <td>{{ fmtTgl(h.tgl) }}</td>
+                                <td>{{ h.nomor ?? "—" }}</td>
                                 <td class="tr">{{ fmt(h.qty) }}</td>
                                 <td class="tr">
                                   {{ fmtDec(outputMenitHari(d, h.qty), 1) }}
                                 </td>
                               </tr>
                               <tr class="hr-total">
-                                <td>Total</td>
+                                <td colspan="2">Total</td>
                                 <td class="tr">{{ fmt(d.ActualOutput) }}</td>
                                 <td class="tr">
                                   {{ fmtDec(outputMenit(d), 1) }}

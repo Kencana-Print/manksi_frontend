@@ -7,6 +7,7 @@ import { formatTanggal } from "@/utils/dateFormat";
 
 interface ActualHarian {
   tgl: string; // YYYY-MM-DD
+  nomor?: string; // No. Mutasi Produksi (hanya Sewing)
   qty: number;
 }
 interface DetailRow {
@@ -45,6 +46,7 @@ interface SewingGroup {
   items: DetailRow[];
   totalTarget: number;
   totalActual: number;
+  totalTargetWaktu: number;
 }
 
 const route = useRoute();
@@ -117,11 +119,19 @@ const sewingGroups = computed<SewingGroup[]>(() => {
   for (const r of sewingBaru.value) {
     const k = r.LineKelompok || "";
     if (!map.has(k))
-      map.set(k, { line: k, items: [], totalTarget: 0, totalActual: 0 });
+      map.set(k, {
+        line: k,
+        items: [],
+        totalTarget: 0,
+        totalActual: 0,
+        totalTargetWaktu: 0,
+      });
     const g = map.get(k)!;
     g.items.push(r);
     g.totalTarget += Number(r.Target) || 0;
     g.totalActual += Number(r.ActualOutput) || 0;
+    g.totalTargetWaktu +=
+      r.Smv != null && r.Smv > 0 ? r.Smv * (Number(r.Target) || 0) : 0;
   }
   const rank = (l: string) =>
     !l ? "0" : l === "LINE EXTERNAL" ? "2" : "1" + l;
@@ -132,12 +142,14 @@ const sewingGroups = computed<SewingGroup[]>(() => {
 
 const outputMenit = (d: DetailRow): number | null =>
   d.Smv != null && d.Smv > 0 ? d.Smv * (Number(d.ActualOutput) || 0) : null;
-const isOver = (d: DetailRow) =>
-  d.Resume != null &&
-  d.Hari != null &&
-  d.Jam != null &&
-  d.Resume > d.Hari * d.Jam * 60;
+// Resume minus = output sudah melebihi waktu produksi line
+const isOver = (d: DetailRow) => d.Resume != null && d.Resume < 0;
 
+// Pencapaian (%) = Target Waktu / Waktu Produksi line
+const pencapaian = (g: SewingGroup): number | null => {
+  const wp = Number(g.items[0]?.WaktuProduksi) || 0;
+  return wp > 0 ? (g.totalTargetWaktu / wp) * 100 : null;
+};
 // 2026-10-19 -> 19/10
 const tglPendek = (t: string) => {
   const [, m, d] = t.split("-");
@@ -249,7 +261,7 @@ const outputMenitHari = (d: DetailRow, qty: number): number | null =>
               <th width="60">Target</th>
               <th width="65">Act. Output</th>
               <th width="70">Output (mnt)</th>
-              <th width="190">Act. Output per Tanggal</th>
+              <th width="270">Mutasi / Act. Output per Tanggal</th>
               <th width="70">Resume (mnt)</th>
               <th width="150">Keterangan</th>
             </tr>
@@ -268,10 +280,18 @@ const outputMenitHari = (d: DetailRow, qty: number): number | null =>
                       ? fmtDec(g.items[0].WaktuProduksi, 0)
                       : "-"
                   }}
-                  mnt &nbsp;|&nbsp; Act. Jam
-                  {{ fmtDec(g.items[0].ActualJam) }} &nbsp;|&nbsp; Σ Target
-                  {{ fmt(g.totalTarget) }} &nbsp;|&nbsp; Σ Act. Output
-                  {{ fmt(g.totalActual) }}
+                  mnt &nbsp;|&nbsp; Target Waktu
+                  {{
+                    g.totalTargetWaktu > 0 ? fmtDec(g.totalTargetWaktu, 0) : "-"
+                  }}
+                  mnt &nbsp;|&nbsp; Pencapaian
+                  {{
+                    pencapaian(g) === null
+                      ? "-"
+                      : fmtDec(pencapaian(g), 1) + "%"
+                  }}
+                  &nbsp;|&nbsp; Σ Target {{ fmt(g.totalTarget) }} &nbsp;|&nbsp;
+                  Σ Act. Output {{ fmt(g.totalActual) }}
                 </td>
               </tr>
               <tr v-for="(d, n) in g.items" :key="n">
@@ -286,10 +306,11 @@ const outputMenitHari = (d: DetailRow, qty: number): number | null =>
                   <template v-if="d.ActualHarian?.length">
                     <span
                       v-for="h in d.ActualHarian"
-                      :key="h.tgl"
-                      class="hr-item"
+                      :key="h.nomor ?? h.tgl"
+                      class="hr-item blok"
                     >
-                      {{ tglPendek(h.tgl) }}: {{ fmt(h.qty) }}
+                      {{ tglPendek(h.tgl) }} {{ h.nomor ?? "" }}:
+                      {{ fmt(h.qty) }}
                       <template v-if="outputMenitHari(d, h.qty) != null">
                         ({{ fmtDec(outputMenitHari(d, h.qty), 0) }} mnt)
                       </template>
@@ -465,6 +486,10 @@ const outputMenitHari = (d: DetailRow, qty: number): number | null =>
   display: inline-block;
   margin-right: 6px;
   white-space: nowrap;
+}
+.hr-item.blok {
+  display: block;
+  margin-right: 0;
 }
 .tc {
   text-align: center;
