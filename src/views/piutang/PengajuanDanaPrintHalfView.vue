@@ -249,17 +249,14 @@ const grandTotal = computed(
 
 @media print {
   @page {
-    size: A4 portrait;
-    margin: 0;
+    margin: 5mm;
   }
   .print-page {
-    width: 210mm;
-    height: 147mm;
-    margin-top: 148.5mm; /* dorong ke setengah bawah */
-    padding: 8mm 12mm;
-    overflow: hidden;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
+    width: 100%;
+    height: auto;
+    margin: 0;
+    padding: 0;
+    overflow: visible;
   }
 }
 </style>
