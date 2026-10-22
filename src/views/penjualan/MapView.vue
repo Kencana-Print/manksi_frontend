@@ -184,7 +184,7 @@ const headers = computed(() => {
       width: "130px",
       align: "right",
     },
-    { title: "Berita Acara", key: "Berita_Acara", width: "120px" },
+    { title: "BAST MAP", key: "Berita_Acara", width: "120px" },
     { title: "Divisi", key: "Divisi", width: "100px" },
     { title: "Cab", key: "Cab", width: "60px" },
     { title: "Workshop", key: "Workshop", width: "120px" },
@@ -331,7 +331,7 @@ const onExportMap = () => {
     { header: "Tgl. BAST", key: "TglBast", align: "center" },
     { header: "Nama", key: "Nama", width: 30 },
     { header: "Selisih (BAST-MAP)", key: "SelisihBastMap", align: "right" },
-    { header: "Berita Acara", key: "Berita_Acara" },
+    { header: "BAST MAP", key: "Berita_Acara" },
     { header: "Divisi", key: "Divisi" },
     { header: "Cab", key: "Cab" },
     { header: "Workshop", key: "Workshop" },
@@ -451,12 +451,13 @@ const onGambarLoad = () => {
 };
 
 const onGambarError = () => {
-  gambarLoaded.value = false; // ⬅ tetap false selama masih dalam proses fallback
+  gambarLoaded.value = false;
   if (selected.value.length === 0) return;
   const item = selected.value[0];
 
   const nomor = item.Nomor;
   const referensi = item.NoReferensi || item.MAP || "";
+  const mh = item.MhNomor || "";
   const cab = item.Cab || "HO-";
   const base = api.defaults.baseURL?.replace(/\/api\/?$/, "") || "";
 
@@ -468,12 +469,8 @@ const onGambarError = () => {
     );
   if (referensi)
     fallbacks.push(`/file-gambar/${encodeURIComponent(referensi)}.jpg`);
-  if (nomor)
-    fallbacks.push(`/file-gambar/mintaharga/${encodeURIComponent(nomor)}.jpg`);
-  if (referensi)
-    fallbacks.push(
-      `/file-gambar/mintaharga/${encodeURIComponent(referensi)}.jpg`,
-    );
+  if (mh)
+    fallbacks.push(`/file-gambar/mintaharga/${encodeURIComponent(mh)}.jpg`);
 
   if (fallbackStep.value < fallbacks.length) {
     gambarUrl.value = fallbacks[fallbackStep.value];

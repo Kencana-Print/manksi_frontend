@@ -162,7 +162,8 @@ watch(
     props.formData.MainImageBlob,
   ],
   () => {
-    resolvedImageUrl.value = ""; // reset saat ganti record atau saat upload file baru
+    resolvedImageUrl.value = "";
+    fallbackStep.value = 0;
   },
 );
 
@@ -206,51 +207,32 @@ const displayImageUrl = computed(() => {
   return "";
 });
 
-const handleFallbackImage = (e: Event) => {
-  const img = e.target as HTMLImageElement;
+const fallbackStep = ref(0);
 
-  // Jika URL yang gagal sudah merupakan URL /file-gambar/ (fallback),
-  // berarti gambar fisik memang benar-benar tidak ada di server. Sembunyikan.
-  if (
-    resolvedImageUrl.value &&
-    resolvedImageUrl.value.includes("/file-gambar/")
-  ) {
-    img.style.display = "none";
-    return;
-  }
-
-  let fallbackUrl = "";
-
-  if (!props.isEdit && props.formData.Referensi) {
-    fallbackUrl = `/file-gambar/${encodeURIComponent(props.formData.Referensi)}.jpg`;
-  } else if (props.isEdit && props.formData.Nomor) {
-    fallbackUrl = `/file-gambar/${encodeURIComponent(props.formData.Nomor)}.jpg`;
-  } else if (props.formData.MintaHarga) {
-    fallbackUrl = `/file-gambar/mintaharga/${encodeURIComponent(props.formData.MintaHarga)}.jpg`;
-  }
-
-  if (fallbackUrl) {
-    resolvedImageUrl.value = fallbackUrl;
-  } else {
-    img.style.display = "none";
-  }
+const buildFallbacks = () => {
+  const f = props.formData;
+  const enc = encodeURIComponent;
+  const list: string[] = [];
+  if (f.Referensi) list.push(`/file-gambar/${enc(f.Referensi)}.jpg`);
+  if (props.isEdit && f.Nomor) list.push(`/file-gambar/${enc(f.Nomor)}.jpg`);
+  if (f.MintaHarga)
+    list.push(`/file-gambar/mintaharga/${enc(f.MintaHarga)}.jpg`);
+  return list;
 };
 
-// Handler khusus buat v-img (Vuetify) — beda tipe event dari native <img>.
-// v-img emit src (string) yang gagal, bukan Event DOM.
-const handlePreviewImageError = (failedSrc: string | undefined) => {
-  if (resolvedImageUrl.value?.includes("/file-gambar/")) {
-    return;
-  }
+const nextFallback = (): boolean => {
+  const list = buildFallbacks();
+  if (fallbackStep.value >= list.length) return false;
+  resolvedImageUrl.value = list[fallbackStep.value++];
+  return true;
+};
 
-  // ⚠️ PERBAIKAN: Ikuti logika fallback yang sama persis
-  if (!props.isEdit && props.formData.Referensi) {
-    resolvedImageUrl.value = `/file-gambar/${encodeURIComponent(props.formData.Referensi)}.jpg`;
-  } else if (props.isEdit && props.formData.Nomor) {
-    resolvedImageUrl.value = `/file-gambar/${encodeURIComponent(props.formData.Nomor)}.jpg`;
-  } else if (props.formData.MintaHarga) {
-    resolvedImageUrl.value = `/file-gambar/mintaharga/${encodeURIComponent(props.formData.MintaHarga)}.jpg`;
-  }
+const handleFallbackImage = (e: Event) => {
+  if (!nextFallback()) (e.target as HTMLImageElement).style.display = "none";
+};
+
+const handlePreviewImageError = () => {
+  nextFallback();
 };
 
 const onMainImageLoad = () => {
