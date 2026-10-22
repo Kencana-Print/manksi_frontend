@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, nextTick } from "vue";
+import { useAuthStore } from "@/stores/authStore";
 import { useRoute, useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
 import { useForm } from "@/composables/useForm";
@@ -40,6 +41,8 @@ interface MkaFormState {
 const route = useRoute();
 const router = useRouter();
 const toast = useToast();
+const authStore = useAuthStore();
+const cabangMka = computed(() => authStore.user?.cabang || "");
 
 const isEdit = computed(() => !!route.params.nomor);
 const nomorParam = computed(() =>
@@ -813,6 +816,7 @@ const validateSave = () => {
   <AksesorisSearchModal
     v-model="showAksesoriModal"
     :size-filter="aksSizeFilter"
+    :cabang="cabangMka"
     multiple
     @selected="onAksesoriSelected"
     @selected-many="onAksesoriSelectedMany"

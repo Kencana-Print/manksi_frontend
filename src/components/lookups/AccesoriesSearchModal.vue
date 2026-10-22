@@ -11,7 +11,8 @@ import {
 const props = defineProps<{
   modelValue: boolean;
   sizeFilter?: string;
-  multiple?: boolean; // mode pilih banyak (checkbox + tombol Pilih)
+  multiple?: boolean;
+  cabang?: string;
 }>();
 const emit = defineEmits(["update:modelValue", "selected", "selected-many"]);
 
@@ -35,6 +36,7 @@ const fetchData = async () => {
         q: search.value,
         limit: 50,
         size: activeSizeFilter(),
+        cab: props.cabang || "",
       },
     });
     items.value = res.data.data.items || [];
