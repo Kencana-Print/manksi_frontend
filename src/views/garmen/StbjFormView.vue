@@ -319,6 +319,53 @@ const ensureEmptyRow = () => {
   }
 };
 
+// ── Enter pindah field ────────────────────────────────────────────────
+const EDIT_COLS = ["Jumlah", "Koli", "Keterangan"] as const;
+const fieldRefs = new Map<string, HTMLInputElement>();
+
+const setFieldRef = (el: any, key: number, col: string) => {
+  const k = `${key}_${col}`;
+  if (el) fieldRefs.set(k, el as HTMLInputElement);
+  else fieldRefs.delete(k);
+};
+
+const focusField = (key: number, col: string): boolean => {
+  const el = fieldRefs.get(`${key}_${col}`);
+  if (!el || el.readOnly) return false; // Jumlah readonly kalau dari packing -> dilewati
+  el.focus();
+  el.select?.();
+  return true;
+};
+
+const onEnterField = async (idx: number, col: string) => {
+  await nextTick();
+  const rows = fd.value.Detail;
+  let c = EDIT_COLS.indexOf(col as any);
+  let r = idx;
+  while (true) {
+    c++;
+    if (c >= EDIT_COLS.length) {
+      c = 0;
+      r++;
+    }
+    if (r >= rows.length) return;
+    const row = rows[r];
+    if (!row.SpkNomor) {
+      openSpkModal(row._key); // sampai baris kosong -> pilih SPK
+      return;
+    }
+    if (focusField(row._key, EDIT_COLS[c])) return;
+  }
+};
+
+// Dari header Keterangan -> langsung ke grid
+const focusFirstGrid = async () => {
+  await nextTick();
+  const first = fd.value.Detail.find((r) => r.SpkNomor);
+  if (!first) return openSpkModal();
+  if (!focusField(first._key, "Jumlah")) focusField(first._key, "Koli");
+};
+
 // ── Add SPK ke Grid ────────────────────────────────────────────────────
 const addSpkToGrid = async (spkNomor: string) => {
   if (!spkNomor) return;
@@ -807,6 +854,7 @@ const totalJumlah2 = computed(() =>
             class="inp"
             style="flex: 1"
             placeholder="Keterangan..."
+            @keydown.enter.prevent="focusFirstGrid"
           />
         </div>
       </div>
@@ -1067,8 +1115,10 @@ const totalJumlah2 = computed(() =>
                           type="number"
                           class="ci tr hl"
                           :readonly="!!row.Packing"
+                          :ref="(el) => setFieldRef(el, row._key, 'Jumlah')"
                           @focus="sel"
                           @input="syncJumlahToDetail2(row)"
+                          @keydown.enter.prevent="onEnterField(i, 'Jumlah')"
                         />
                       </td>
                       <td>
@@ -1077,7 +1127,9 @@ const totalJumlah2 = computed(() =>
                           v-model.number="row.Koli"
                           type="number"
                           class="ci tr hl"
+                          :ref="(el) => setFieldRef(el, row._key, 'Koli')"
                           @focus="sel"
+                          @keydown.enter.prevent="onEnterField(i, 'Koli')"
                         />
                       </td>
                       <td>
@@ -1105,6 +1157,8 @@ const totalJumlah2 = computed(() =>
                           v-if="row.SpkNomor"
                           v-model="row.Keterangan"
                           class="ci"
+                          :ref="(el) => setFieldRef(el, row._key, 'Keterangan')"
+                          @keydown.enter.prevent="onEnterField(i, 'Keterangan')"
                         />
                       </td>
                       <td class="tc">
