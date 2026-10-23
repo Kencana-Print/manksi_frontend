@@ -1,92 +1,97 @@
-// Logika murni (tanpa Vue/DOM) untuk tampilan siap-pakai
-// Laporan Mutasi Produksi Detail: Alur Mutasi, Per Gudang, BS.
+// Penyiapan data & preset untuk pivot Laporan Mutasi Produksi Detail.
+// Pivot tetap pivot sungguhan (drag and drop, bisa disusun ulang); file ini
+// hanya (1) menambah field turunan supaya urutan baris/kolom benar,
+// (2) menyiapkan dataset tambahan, dan (3) mendefinisikan preset susunan.
 
-export type ViewMutasi = "alur" | "gudang" | "bs";
+export type IdDataset = "mutasi" | "gudang" | "bs";
+export type IdPreset = "alur" | "alurSize" | "gudang" | "bs";
 
-export interface ExportCell {
-  text: string;
-  colSpan: number;
-  rowSpan: number;
-}
-export interface ExportTable {
-  headerRows: ExportCell[][];
-  bodyRows: ExportCell[][];
-}
-
-export interface MutasiRow {
-  spk: string;
-  kelompok: string;
-  asal: string;
-  tujuan: string;
-  tanggal: string;
-  kode: string;
-  komponen: string;
-  size: string;
-  jumlah: number;
-  bsLini: number;
-  bsKainSablon: number;
-  bsKain: number;
+export interface PresetPivot {
+  id: IdPreset;
+  label: string;
+  dataset: IdDataset;
+  rows: string[];
+  cols: string[];
+  vals: { field: string; agg: string }[];
+  petunjuk: string;
 }
 
-export interface KolomGrid {
-  key: string;
-  judul: string;
-  sub?: string;
-  tip?: string;
-  heat?: boolean;
-}
-export interface BarisGrid {
-  label: string[];
-  nilai: (number | null)[];
-}
-export interface Grid {
-  judulLabel: string[];
-  lebarLabel: number[];
-  kolom: KolomGrid[];
-  baris: BarisGrid[];
-  total: (number | null)[] | null;
-  skalaHeat: "global" | "kolom";
-}
-export interface OpsiGrid {
-  rincianSize: boolean;
-  hanyaAdaBs: boolean;
-}
+export const DAFTAR_PRESET: PresetPivot[] = [
+  {
+    id: "alur",
+    label: "Alur Mutasi",
+    dataset: "mutasi",
+    rows: ["NamaSpk", "Komponen"],
+    cols: ["Rute"],
+    vals: [{ field: "Jumlah", agg: "sum" }],
+    petunjuk:
+      'Pcs per rute mutasi (Asal → Tujuan), urut mengikuti alur gudang. Susunan bisa diubah: seret field dari panel susunan. Persentase terhadap Jumlah SPK: tambah Rumus Custom "Jumlah / JumlahSpk * 100" (benar bila baris dikelompokkan per SPK dan Komponen).',
+  },
+  {
+    id: "alurSize",
+    label: "Alur per Size",
+    dataset: "mutasi",
+    rows: ["NamaSpk", "Komponen", "Size"],
+    cols: ["Rute"],
+    vals: [{ field: "Jumlah", agg: "sum" }],
+    petunjuk:
+      "Sama seperti Alur Mutasi, dirinci per size (urut XS-S-M-L-XL-2XL).",
+  },
+  {
+    id: "gudang",
+    label: "Per Gudang",
+    dataset: "gudang",
+    rows: ["Gudang", "NamaSpk", "Komponen"],
+    cols: ["Arah"],
+    vals: [{ field: "Jumlah", agg: "sum" }],
+    petunjuk:
+      "Masuk = pcs bertujuan gudang ini; Keluar = pcs berasal dari gudang ini. Setiap mutasi dihitung dua kali (sekali per gudang), jadi jangan menjumlahkan Masuk dan Keluar.",
+  },
+  {
+    id: "bs",
+    label: "BS",
+    dataset: "bs",
+    rows: ["NamaSpk", "Tahap", "Komponen"],
+    cols: ["Jenis"],
+    vals: [{ field: "Nilai", agg: "sum" }],
+    petunjuk:
+      "Jumlah dan BS per tahap dan komponen. Satu kolom per jenis (Jumlah, BS Lini, BS Kain Sablon, BS Kain).",
+  },
+];
 
 // ── Util kecil ──
 const NUL = "\u0000";
 const str = (v: unknown): string => (v == null ? "" : String(v).trim());
-const num = (v: unknown): number => {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : 0;
-};
 const bandingAlami = (a: string, b: string): number =>
   a.localeCompare(b, "id", { numeric: true, sensitivity: "base" });
 
-const formatter = new Intl.NumberFormat("id-ID", { maximumFractionDigits: 2 });
-export const fmtAngka = (n: number): string => formatter.format(n);
+// Library mengurutkan baris/kolom berdasarkan teks, jadi urutan yang benar
+// dipaksa lewat awalan nomor: "1. XS", "2. S", ... (nol di depan bila >= 10 item).
+const beriNomor = (urut: string[]): Map<string, string> => {
+  const lebar = String(urut.length).length;
+  return new Map(
+    urut.map(
+      (v, i) => [v, `${String(i + 1).padStart(lebar, "0")}. ${v}`] as const,
+    ),
+  );
+};
 
-export const toMutasiRows = (data: Record<string, unknown>[]): MutasiRow[] =>
-  data.map((r) => {
-    const nomor = str(r.Nomor);
-    const nama = str(r.NamaSpk);
-    return {
-      spk:
-        nomor && nama ? `${nomor} — ${nama}` : nomor || nama || "(tanpa SPK)",
-      kelompok: str(r.Kelompok) || "(tanpa kelompok)",
-      asal: str(r.GudangAsal) || "(kosong)",
-      tujuan: str(r.GudangTujuan) || "(kosong)",
-      tanggal: str(r.TanggalMutasi).substring(0, 10),
-      kode: str(r.Kode),
-      komponen: str(r.Komponen) || "(tanpa komponen)",
-      size: str(r.Size) || "-",
-      jumlah: num(r.Jumlah),
-      bsLini: num(r.BsLini),
-      bsKainSablon: num(r.BsKainSablon),
-      bsKain: num(r.BsKain),
-    };
-  });
+interface Ringkas {
+  asal: string;
+  tujuan: string;
+  tanggal: string;
+  kelompok: string;
+  size: string;
+}
+const ringkas = (r: Record<string, unknown>): Ringkas => ({
+  asal: str(r.GudangAsal) || "(kosong)",
+  tujuan: str(r.GudangTujuan) || "(kosong)",
+  tanggal: str(r.TanggalMutasi).substring(0, 10),
+  kelompok: str(r.Kelompok) || "(tanpa kelompok)",
+  size: str(r.Size) || "-",
+});
 
-// ── Urutan size: XS-S-M-L-XL-2XL..., sisanya alfabetis/numerik ──
+// ── Urutan size: XS-S-M-L-XL-2XL..., sisanya numerik/alfabetis ──
 const ALIAS_SIZE: Record<string, string> = {
   XXL: "2XL",
   XXXL: "3XL",
@@ -115,11 +120,11 @@ const peringkatSize = (size: string): number => {
 export const bandingSize = (a: string, b: string): number =>
   peringkatSize(a) - peringkatSize(b) || bandingAlami(a, b);
 
-// ── Urutan gudang: DITURUNKAN dari data (Asal → Tujuan), bukan hardcode.
-// Topological sort (Kahn). Bila ada siklus (mis. retur), ambil gudang dengan
-// jumlah arus-masuk tersisa paling kecil; seri diputus tanggal mutasi
-// paling awal lalu nama. ──
-export const urutkanGudang = (rows: MutasiRow[]): string[] => {
+// ── Urutan gudang DITURUNKAN dari data (Asal → Tujuan), bukan hardcode.
+// Topological sort (Kahn). Graf yang terputus atau berputar (siklus) tetap
+// menghasilkan urutan: gudang dengan arus-masuk tersisa paling sedikit
+// dulu, seri diputus tanggal mutasi paling awal lalu nama. ──
+export const urutkanGudang = (rows: Ringkas[]): string[] => {
   const nodes = new Set<string>();
   const edges = new Map<string, { a: string; t: string }>();
   const tglKeluar = new Map<string, string>();
@@ -163,317 +168,121 @@ export const urutkanGudang = (rows: MutasiRow[]): string[] => {
   return hasil;
 };
 
-export interface Rute {
-  key: string;
-  asal: string;
-  tujuan: string;
-}
-export const urutkanRute = (rows: MutasiRow[]): Rute[] => {
-  const rank = new Map(urutkanGudang(rows).map((g, i) => [g, i] as const));
-  const unik = new Map<string, Rute>();
+// ── Peta nilai → nilai ber-nomor untuk field turunan ──
+const petaTurunan = (data: Record<string, unknown>[]) => {
+  const rows = data.map(ringkas);
+  const gudang = urutkanGudang(rows);
+  const rank = new Map(gudang.map((g, i) => [g, i] as const));
+
+  // Rute: urut (rank asal, rank tujuan)
+  const unikRute = new Map<string, { asal: string; tujuan: string }>();
   for (const r of rows) {
-    const key = `${r.asal}${NUL}${r.tujuan}`;
-    if (!unik.has(key)) unik.set(key, { key, asal: r.asal, tujuan: r.tujuan });
+    unikRute.set(`${r.asal}${NUL}${r.tujuan}`, {
+      asal: r.asal,
+      tujuan: r.tujuan,
+    });
   }
-  return [...unik.values()].sort(
+  const ruteUrut = [...unikRute.values()].sort(
     (x, y) =>
       (rank.get(x.asal) ?? 0) - (rank.get(y.asal) ?? 0) ||
       (rank.get(x.tujuan) ?? 0) - (rank.get(y.tujuan) ?? 0),
   );
-};
+  const teksRute = ruteUrut.map((r) => `${r.asal} → ${r.tujuan}`);
 
-// ── Tampilan 1: Alur Mutasi (SPK > Komponen [> Size]) × Rute ──
-// Tidak ada total antar rute: pcs yang sama berpindah di tiap tahap,
-// menjumlahkannya melipatgandakan angka.
-const bangunAlur = (rows: MutasiRow[], opsi: OpsiGrid): Grid => {
-  const rute = urutkanRute(rows);
-  const idx = new Map(rute.map((r, i) => [r.key, i] as const));
-
-  interface Akum {
-    label: string[];
-    spk: string;
-    kode: string;
-    komponen: string;
-    size: string;
-    nilai: (number | null)[];
-  }
-  const peta = new Map<string, Akum>();
-  for (const r of rows) {
-    const kunci = [
-      r.spk,
-      r.kode,
-      r.komponen,
-      opsi.rincianSize ? r.size : "",
-    ].join(NUL);
-    let b = peta.get(kunci);
-    if (!b) {
-      b = {
-        label: opsi.rincianSize
-          ? [r.spk, r.komponen, r.size]
-          : [r.spk, r.komponen],
-        spk: r.spk,
-        kode: r.kode,
-        komponen: r.komponen,
-        size: r.size,
-        nilai: rute.map(() => null),
-      };
-      peta.set(kunci, b);
-    }
-    const i = idx.get(`${r.asal}${NUL}${r.tujuan}`);
-    if (i !== undefined) b.nilai[i] = (b.nilai[i] ?? 0) + r.jumlah;
-  }
-
-  const baris = [...peta.values()].sort(
-    (a, b) =>
-      bandingAlami(a.spk, b.spk) ||
-      bandingAlami(a.kode, b.kode) ||
-      bandingAlami(a.komponen, b.komponen) ||
-      (opsi.rincianSize ? bandingSize(a.size, b.size) : 0),
-  );
-
-  return {
-    judulLabel: opsi.rincianSize
-      ? ["SPK", "Komponen", "Size"]
-      : ["SPK", "Komponen"],
-    lebarLabel: opsi.rincianSize ? [260, 150, 60] : [260, 150],
-    kolom: rute.map((r) => ({
-      key: r.key,
-      judul: r.asal,
-      sub: `→ ${r.tujuan}`,
-      tip: `${r.asal} → ${r.tujuan}`,
-      heat: true,
-    })),
-    baris: baris.map(({ label, nilai }) => ({ label, nilai })),
-    total: null,
-    skalaHeat: "global",
-  };
-};
-
-// ── Tampilan 2: Per Gudang (Gudang > SPK > Komponen) × Masuk/Keluar/Selisih ──
-const bangunGudang = (rows: MutasiRow[]): Grid => {
-  const rank = new Map(urutkanGudang(rows).map((g, i) => [g, i] as const));
-
-  interface Akum {
-    gudang: string;
-    spk: string;
-    kode: string;
-    komponen: string;
-    masuk: number | null;
-    keluar: number | null;
-  }
-  const peta = new Map<string, Akum>();
-  const ambil = (gudang: string, r: MutasiRow): Akum => {
-    const kunci = [gudang, r.spk, r.kode, r.komponen].join(NUL);
-    let a = peta.get(kunci);
-    if (!a) {
-      a = {
-        gudang,
-        spk: r.spk,
-        kode: r.kode,
-        komponen: r.komponen,
-        masuk: null,
-        keluar: null,
-      };
-      peta.set(kunci, a);
-    }
-    return a;
-  };
-  for (const r of rows) {
-    const m = ambil(r.tujuan, r);
-    m.masuk = (m.masuk ?? 0) + r.jumlah;
-    const k = ambil(r.asal, r);
-    k.keluar = (k.keluar ?? 0) + r.jumlah;
-  }
-
-  const baris = [...peta.values()].sort(
-    (a, b) =>
-      (rank.get(a.gudang) ?? 0) - (rank.get(b.gudang) ?? 0) ||
-      bandingAlami(a.spk, b.spk) ||
-      bandingAlami(a.kode, b.kode) ||
-      bandingAlami(a.komponen, b.komponen),
-  );
-
-  return {
-    judulLabel: ["Gudang", "SPK", "Komponen"],
-    lebarLabel: [190, 260, 150],
-    kolom: [
-      {
-        key: "masuk",
-        judul: "Masuk",
-        tip: "pcs yang tujuannya gudang ini",
-        heat: true,
-      },
-      {
-        key: "keluar",
-        judul: "Keluar",
-        tip: "pcs yang asalnya gudang ini",
-        heat: true,
-      },
-      {
-        key: "selisih",
-        judul: "Selisih",
-        tip: "Masuk − Keluar dari mutasi pada laporan ini. Bukan saldo stok.",
-      },
-    ],
-    baris: baris.map((a) => ({
-      label: [a.gudang, a.spk, a.komponen],
-      nilai: [a.masuk, a.keluar, (a.masuk ?? 0) - (a.keluar ?? 0)],
-    })),
-    total: null,
-    skalaHeat: "global",
-  };
-};
-
-// ── Tampilan 3: BS (SPK > Tahap > Komponen) × Jumlah + BS ──
-// Jumlah dihitung per tahap, tidak dijumlah lintas tahap.
-const bangunBs = (rows: MutasiRow[], opsi: OpsiGrid): Grid => {
-  const rank = new Map(urutkanGudang(rows).map((g, i) => [g, i] as const));
-
-  interface Akum {
-    spk: string;
-    kelompok: string;
-    kode: string;
-    komponen: string;
-    nilai: [number, number, number, number]; // jumlah, lini, sablon, kain
-  }
-  const peta = new Map<string, Akum>();
+  // Tahap (Kelompok): urut rank gudang asal paling awal, lalu nama
   const rankKelompok = new Map<string, number>();
   for (const r of rows) {
-    const kunci = [r.spk, r.kelompok, r.kode, r.komponen].join(NUL);
-    let a = peta.get(kunci);
-    if (!a) {
-      a = {
-        spk: r.spk,
-        kelompok: r.kelompok,
-        kode: r.kode,
-        komponen: r.komponen,
-        nilai: [0, 0, 0, 0],
-      };
-      peta.set(kunci, a);
-    }
-    a.nilai[0] += r.jumlah;
-    a.nilai[1] += r.bsLini;
-    a.nilai[2] += r.bsKainSablon;
-    a.nilai[3] += r.bsKain;
-
-    const kk = `${r.spk}${NUL}${r.kelompok}`;
     const rk = rank.get(r.asal) ?? 0;
-    const lama = rankKelompok.get(kk);
-    if (lama === undefined || rk < lama) rankKelompok.set(kk, rk);
+    const lama = rankKelompok.get(r.kelompok);
+    if (lama === undefined || rk < lama) rankKelompok.set(r.kelompok, rk);
   }
+  const kelompokUrut = [...rankKelompok.keys()].sort(
+    (a, b) =>
+      (rankKelompok.get(a) ?? 0) - (rankKelompok.get(b) ?? 0) ||
+      bandingAlami(a, b),
+  );
 
-  const totalBs = (a: Akum): number => a.nilai[1] + a.nilai[2] + a.nilai[3];
-  const baris = [...peta.values()]
-    .filter((a) => !opsi.hanyaAdaBs || totalBs(a) > 0)
-    .sort(
-      (a, b) =>
-        bandingAlami(a.spk, b.spk) ||
-        (rankKelompok.get(`${a.spk}${NUL}${a.kelompok}`) ?? 0) -
-          (rankKelompok.get(`${b.spk}${NUL}${b.kelompok}`) ?? 0) ||
-        bandingAlami(a.kelompok, b.kelompok) ||
-        bandingAlami(a.kode, b.kode),
-    );
-
-  const jumlahKolom = (i: number): number =>
-    baris.reduce((s, a) => s + (a.nilai[i] ?? 0), 0);
-  const tBs = baris.reduce((s, a) => s + totalBs(a), 0);
+  const sizeUrut = [...new Set(rows.map((r) => r.size))].sort(bandingSize);
 
   return {
-    judulLabel: ["SPK", "Tahap", "Komponen"],
-    lebarLabel: [260, 120, 150],
-    kolom: [
-      {
-        key: "jumlah",
-        judul: "Jumlah",
-        tip: "pcs yang dimutasi pada tahap ini",
-      },
-      { key: "lini", judul: "BS Lini", heat: true },
-      { key: "sablon", judul: "BS Kain Sablon", heat: true },
-      { key: "kain", judul: "BS Kain", heat: true },
-      {
-        key: "total",
-        judul: "Total BS",
-        tip: "BS Lini + BS Kain Sablon + BS Kain",
-        heat: true,
-      },
-    ],
-    baris: baris.map((a) => ({
-      label: [a.spk, a.kelompok, a.komponen],
-      nilai: [a.nilai[0], a.nilai[1], a.nilai[2], a.nilai[3], totalBs(a)],
-    })),
-    // Total Jumlah sengaja kosong: menjumlahkan lintas tahap melipatgandakan pcs.
-    total: [null, jumlahKolom(1), jumlahKolom(2), jumlahKolom(3), tBs],
-    skalaHeat: "kolom",
+    rows,
+    gudang: beriNomor(gudang),
+    rute: beriNomor(teksRute),
+    tahap: beriNomor(kelompokUrut),
+    size: beriNomor(sizeUrut),
   };
 };
 
-export const bangunGrid = (
-  view: ViewMutasi,
+const JENIS_BS: { nama: string; kunci: string }[] = [
+  { nama: "Jumlah", kunci: "Jumlah" },
+  { nama: "BS Lini", kunci: "BsLini" },
+  { nama: "BS Kain Sablon", kunci: "BsKainSablon" },
+  { nama: "BS Kain", kunci: "BsKain" },
+];
+const angka = (v: unknown): number => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+};
+
+// Menghasilkan data untuk pivot. Field asli dipertahankan; yang ditambah/diganti:
+//  mutasi : Rute, Tahap, Size (ber-nomor)
+//  gudang : tiap baris jadi 2 (Masuk di gudang tujuan, Keluar di gudang asal) + Gudang, Arah
+//  bs     : tiap baris jadi 4 (Jumlah, BS Lini, BS Kain Sablon, BS Kain) + Jenis, Nilai
+export const bangunDataset = (
+  dataset: IdDataset,
   data: Record<string, unknown>[],
-  opsi: OpsiGrid,
-): Grid => {
-  const rows = toMutasiRows(data);
-  if (view === "gudang") return bangunGudang(rows);
-  if (view === "bs") return bangunBs(rows, opsi);
-  return bangunAlur(rows, opsi);
-};
+): Record<string, unknown>[] => {
+  const p = petaTurunan(data);
+  const nomori = (m: Map<string, string>, v: string): string => m.get(v) ?? v;
 
-// ── Rowspan label bertingkat: nilai >0 di baris awal run, 0 = sel tidak dirender ──
-export const hitungRowspan = (baris: BarisGrid[], level: number): number[] => {
-  const hasil = baris.map(() => 0);
-  const sama = (
-    a: BarisGrid | undefined,
-    b: BarisGrid | undefined,
-  ): boolean => {
-    if (!a || !b) return false;
-    for (let k = 0; k <= level; k++)
-      if (a.label[k] !== b.label[k]) return false;
-    return true;
-  };
-  let mulai = 0;
-  for (let i = 1; i <= baris.length; i++) {
-    if (!(i < baris.length && sama(baris[i], baris[mulai]))) {
-      hasil[mulai] = i - mulai;
-      mulai = i;
-    }
-  }
-  return hasil;
-};
-
-const sel = (text: string): ExportCell => ({ text, colSpan: 1, rowSpan: 1 });
-const selAngka = (v: number | null): ExportCell =>
-  sel(v === null ? "" : fmtAngka(v));
-
-// Bentuk sama dengan hasil scrape TinyPivotOnly.getExportTable(), jadi Export
-// Excel & Grafik yang sudah ada tetap jalan. denganTotal=false untuk grafik.
-export const toExportTable = (g: Grid, denganTotal: boolean): ExportTable => {
-  const headerRows: ExportCell[][] = [
-    [
-      ...g.judulLabel.map(sel),
-      ...g.kolom.map((k) => sel(k.sub ? `${k.judul} ${k.sub}` : k.judul)),
-    ],
-  ];
-  const spans = g.judulLabel.map((_, lv) => hitungRowspan(g.baris, lv));
-  const bodyRows: ExportCell[][] = g.baris.map((b, r) => {
-    const row: ExportCell[] = [];
-    b.label.forEach((t, lv) => {
-      const rs = spans[lv]?.[r] ?? 0;
-      if (rs > 0) row.push({ text: t, colSpan: 1, rowSpan: rs });
-    });
-    b.nilai.forEach((v) => row.push(selAngka(v)));
-    return row;
+  const dasar: Record<string, unknown>[] = data.map((r, i) => {
+    const s = p.rows[i];
+    const asal = s?.asal ?? "(kosong)";
+    const tujuan = s?.tujuan ?? "(kosong)";
+    return {
+      ...r,
+      Rute: nomori(p.rute, `${asal} → ${tujuan}`),
+      Tahap: nomori(p.tahap, s?.kelompok ?? "(tanpa kelompok)"),
+      Size: nomori(p.size, s?.size ?? "-"),
+    };
   });
-  if (denganTotal && g.total) {
-    bodyRows.push([
-      { text: "Total", colSpan: g.judulLabel.length, rowSpan: 1 },
-      ...g.total.map(selAngka),
-    ]);
+
+  if (dataset === "gudang") {
+    return dasar.flatMap((r, i) => {
+      const s = p.rows[i];
+      const asal = s?.asal ?? "(kosong)";
+      const tujuan = s?.tujuan ?? "(kosong)";
+      return [
+        { ...r, Gudang: nomori(p.gudang, tujuan), Arah: "1. Masuk" },
+        { ...r, Gudang: nomori(p.gudang, asal), Arah: "2. Keluar" },
+      ];
+    });
   }
-  return { headerRows, bodyRows };
+
+  if (dataset === "bs") {
+    return dasar.flatMap((r) =>
+      JENIS_BS.map((j, k) => ({
+        ...r,
+        Jenis: `${k + 1}. ${j.nama}`,
+        Nilai: angka(r[j.kunci]),
+      })),
+    );
+  }
+
+  return dasar;
 };
 
-// Ratakan sel ber-rowSpan/colSpan jadi grid penuh (tiap baris punya semua sel).
-// Dipakai grafik, yang membaca baris per indeks kolom.
+// ── Bantu grafik: ratakan sel ber-rowSpan/colSpan jadi grid penuh.
+// Layout "grouped" pivot menghilangkan sel label di baris turunan, sedangkan
+// grafik membaca baris per indeks kolom. ──
+export interface ExportCell {
+  text: string;
+  colSpan: number;
+  rowSpan: number;
+}
+
+const salin = (text: string): ExportCell => ({ text, colSpan: 1, rowSpan: 1 });
+
 export const densifyBody = (rows: ExportCell[][]): ExportCell[][] => {
   const carry: { text: string; left: number }[] = [];
   return rows.map((row) => {
@@ -483,7 +292,7 @@ export const densifyBody = (rows: ExportCell[][]): ExportCell[][] => {
       for (;;) {
         const c = carry[col];
         if (!c || c.left <= 0) return;
-        out.push(sel(c.text));
+        out.push(salin(c.text));
         c.left -= 1;
         col += 1;
       }
@@ -491,7 +300,7 @@ export const densifyBody = (rows: ExportCell[][]): ExportCell[][] => {
     for (const cell of row) {
       isiCarry();
       for (let k = 0; k < cell.colSpan; k++) {
-        out.push(sel(cell.text));
+        out.push(salin(cell.text));
         if (cell.rowSpan > 1)
           carry[col] = { text: cell.text, left: cell.rowSpan - 1 };
         col += 1;

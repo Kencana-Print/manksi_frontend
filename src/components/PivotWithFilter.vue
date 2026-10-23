@@ -116,6 +116,7 @@ defineExpose({ exportPivotToExcel, getRowFieldCount });
   <div class="pivot-filter-wrap">
     <!-- ── Filter bar ── -->
     <div class="pf-bar">
+      <slot name="toolbar-left" />
       <span class="pf-lbl">Filter:</span>
       <div v-for="col in filterableColumns" :key="col" class="pf-col-btn-wrap">
         <button
@@ -169,20 +170,19 @@ defineExpose({ exportPivotToExcel, getRowFieldCount });
       <span class="pf-count"
         >{{ filteredData.length }} / {{ data.length }} baris</span
       >
+      <slot name="toolbar-right" />
     </div>
 
-    <!-- ── Pivot ── (isi slot menimpa pivot bebas; tanpa slot = pivot bebas) -->
+    <!-- ── Pivot ── -->
     <div class="pivot-body">
-      <slot :data="filteredData">
-        <TinyPivotOnly
-          ref="pivotRef"
-          :data="filteredData"
-          :default-rows="defaultRows"
-          :default-cols="defaultCols"
-          :default-vals="defaultVals"
-          @pivot-changed="onPivotChanged"
-        />
-      </slot>
+      <TinyPivotOnly
+        ref="pivotRef"
+        :data="filteredData"
+        :default-rows="defaultRows"
+        :default-cols="defaultCols"
+        :default-vals="defaultVals"
+        @pivot-changed="onPivotChanged"
+      />
     </div>
   </div>
 </template>
@@ -198,7 +198,7 @@ defineExpose({ exportPivotToExcel, getRowFieldCount });
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 12px;
+  padding: 4px 10px;
   background: #f5f7fa;
   border-bottom: 1px solid #e0e0e0;
   flex-wrap: wrap;

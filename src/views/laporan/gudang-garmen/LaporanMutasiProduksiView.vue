@@ -8,8 +8,12 @@ import PageLayout from "@/components/PageLayout.vue";
 import BaseTable from "@/components/BaseTable.vue";
 import SpkSearchModal from "@/components/lookups/SpkSearchModal.vue";
 import PivotWithFilter from "@/components/PivotWithFilter.vue";
-import MutasiPivotPreset from "@/components/MutasiPivotPreset.vue";
-import { densifyBody, type ViewMutasi } from "@/utils/mutasiPivot";
+import {
+  DAFTAR_PRESET,
+  bangunDataset,
+  densifyBody,
+  type IdPreset,
+} from "@/utils/mutasiPivot";
 import { laporanMutasiProduksiService } from "@/services/laporan/gudang-garmen/laporanMutasiProduksiService";
 import { exportExcelSingle } from "@/utils/excelExport";
 import {
@@ -21,6 +25,7 @@ import {
   IconLayoutGrid,
   IconSearch,
   IconExternalLink,
+  IconInfoCircle,
 } from "@tabler/icons-vue";
 
 const MENU_ID = "524";
@@ -286,7 +291,7 @@ const onExport = async () => {
 };
 
 const onExportPivot = async () => {
-  const table = await activePivot()?.exportPivotToExcel?.();
+  const table = await pivotWithFilterRef.value?.exportPivotToExcel?.();
   if (!table) {
     toast.warning(
       "Tidak ada hasil pivot untuk diekspor. Susun pivot dulu di panel kiri.",
@@ -395,25 +400,14 @@ const onExportPivot = async () => {
 const pivotWithFilterRef = ref<InstanceType<typeof PivotWithFilter> | null>(
   null,
 );
-const presetRef = ref<InstanceType<typeof MutasiPivotPreset> | null>(null);
 
-const viewMode = ref<ViewMutasi | "bebas">("alur");
-const presetView = computed<ViewMutasi>(() =>
-  viewMode.value === "bebas" ? "alur" : viewMode.value,
+const idPreset = ref<IdPreset>("alur");
+const presetAktif = computed(() =>
+  DAFTAR_PRESET.find((p) => p.id === idPreset.value),
 );
-const rincianSize = ref(false);
-const hanyaAdaBs = ref(false);
-const warnaIntensitas = ref(true);
-const petunjukView: Record<ViewMutasi | "bebas", string> = {
-  alur: 'Pcs per rute mutasi, urut mengikuti alur gudang. "–" = belum ada mutasi di rute itu. Tidak ada total antar rute karena pcs yang sama berpindah di tiap tahap.',
-  gudang:
-    "Masuk = pcs bertujuan gudang ini; Keluar = pcs berasal dari gudang ini. Selisih hanya dari mutasi dalam rentang tanggal laporan, bukan saldo stok.",
-  bs: "BS per tahap dan komponen. Jumlah dihitung per tahap, jadi tidak dijumlah antar tahap.",
-  bebas:
-    "Seret field ke Baris/Kolom/Nilai. Jangan menjumlahkan Terpakai dan Babaran (nilainya diulang di tiap baris size). Total baris lintas gudang menghitung pcs yang sama berulang kali.",
-};
-const activePivot = () =>
-  viewMode.value === "bebas" ? pivotWithFilterRef.value : presetRef.value;
+const dataPivot = computed(() =>
+  bangunDataset(presetAktif.value?.dataset ?? "mutasi", itemsWithBulan.value),
+);
 
 // ── Chart reaktif — dibangun ulang OTOMATIS setiap kali user
 // menyusun ulang pivot (rows/cols/values), lewat event pivot-changed
@@ -471,7 +465,7 @@ const rebuildChart = async (table: any) => {
     return;
   }
 
-  const rowFieldCount = activePivot()?.getRowFieldCount?.() ?? 1;
+  const rowFieldCount = pivotWithFilterRef.value?.getRowFieldCount?.() ?? 1;
   const colLabels = buildColumnLabels(table.headerRows).slice(rowFieldCount);
 
   const parsedRows = densifyBody(table.bodyRows).map((row) => {
@@ -857,50 +851,9 @@ const rowPropsFn = (data: any) => {
           Tampilkan data terlebih dahulu.
         </div>
         <template v-else>
-          <div class="pivot-export-bar">
-            <div class="pivot-bar-left">
-              <v-btn-toggle
-                v-model="viewMode"
-                mandatory
-                density="compact"
-                variant="outlined"
-                divided
-                color="primary"
-              >
-                <v-btn value="alur" size="small">Alur Mutasi</v-btn>
-                <v-btn value="gudang" size="small">Per Gudang</v-btn>
-                <v-btn value="bs" size="small">BS</v-btn>
-                <v-btn value="bebas" size="small">Susun Sendiri</v-btn>
-              </v-btn-toggle>
-              <label v-if="viewMode === 'alur'" class="pivot-opt">
-                <input v-model="rincianSize" type="checkbox" /> Rinci per size
-              </label>
-              <label v-if="viewMode === 'bs'" class="pivot-opt">
-                <input v-model="hanyaAdaBs" type="checkbox" /> Hanya yang ada BS
-              </label>
-              <label v-if="viewMode !== 'bebas'" class="pivot-opt">
-                <input v-model="warnaIntensitas" type="checkbox" /> Warna
-                intensitas
-              </label>
-            </div>
-            <v-btn
-              size="small"
-              color="green"
-              variant="tonal"
-              @click="onExportPivot"
-            >
-              <template #prepend
-                ><IconFileSpreadsheet :size="14" :stroke-width="1.7"
-              /></template>
-              Export Pivot Ini
-            </v-btn>
-          </div>
-          <div class="pivot-hint-txt pivot-hint-row">
-            {{ petunjukView[viewMode] }}
-          </div>
           <PivotWithFilter
             ref="pivotWithFilterRef"
-            :data="itemsWithBulan"
+            :data="dataPivot"
             :filterable-columns="[
               'DivisiNama',
               'Kelompok',
@@ -915,21 +868,46 @@ const rowPropsFn = (data: any) => {
               'NoPermintaan',
               'BsKain',
             ]"
-            :default-rows="['Kelompok', 'Size', 'NamaSpk', 'Komponen']"
-            :default-cols="['GudangAsal']"
-            :default-vals="[{ field: 'Jumlah', agg: 'sum' }]"
+            :default-rows="presetAktif?.rows ?? []"
+            :default-cols="presetAktif?.cols ?? []"
+            :default-vals="presetAktif?.vals ?? []"
             @pivot-changed="onPivotChanged"
           >
-            <template v-if="viewMode !== 'bebas'" #default="{ data }">
-              <MutasiPivotPreset
-                ref="presetRef"
-                :data="data"
-                :view="presetView"
-                :rincian-size="rincianSize"
-                :hanya-ada-bs="hanyaAdaBs"
-                :heat="warnaIntensitas"
-                @pivot-changed="onPivotChanged"
-              />
+            <template #toolbar-left>
+              <v-btn-toggle
+                v-model="idPreset"
+                mandatory
+                density="compact"
+                divided
+                color="primary"
+                variant="outlined"
+              >
+                <v-btn
+                  v-for="p in DAFTAR_PRESET"
+                  :key="p.id"
+                  :value="p.id"
+                  size="x-small"
+                >
+                  {{ p.label }}
+                </v-btn>
+              </v-btn-toggle>
+              <v-tooltip location="bottom" max-width="420">
+                <template #activator="{ props: tip }">
+                  <IconInfoCircle v-bind="tip" :size="18" class="pivot-info" />
+                </template>
+                {{ presetAktif?.petunjuk }}
+              </v-tooltip>
+              <span class="pivot-sep"></span>
+            </template>
+            <template #toolbar-right>
+              <v-btn
+                size="x-small"
+                color="success"
+                variant="tonal"
+                @click="onExportPivot"
+              >
+                Export Pivot Ini
+              </v-btn>
             </template>
           </PivotWithFilter>
         </template>
@@ -1089,42 +1067,20 @@ const rowPropsFn = (data: any) => {
   flex-direction: column;
   overflow: hidden;
 }
-.pivot-export-bar {
-  padding: 6px 12px;
-  background: #f5f7fa;
-  border-bottom: 1px solid #e0e0e0;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-.pivot-hint-txt {
-  font-size: 10.5px;
-  color: #757575;
-}
 .pivot-wrap {
   display: flex;
   flex-direction: column;
 }
-.pivot-bar-left {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-.pivot-opt {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 11.5px;
-  color: #455a64;
-  cursor: pointer;
-}
-.pivot-hint-row {
-  padding: 4px 12px;
-  border-bottom: 1px solid #eceff1;
+.pivot-info {
+  color: #607d8b;
+  cursor: help;
   flex-shrink: 0;
+}
+.pivot-sep {
+  width: 1px;
+  height: 18px;
+  background: #cfd8dc;
+  margin: 0 4px;
 }
 .chart-header {
   display: flex;

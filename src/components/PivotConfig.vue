@@ -62,6 +62,16 @@ const usedFields = () =>
 const unusedFields = () =>
   props.availableFields.filter((f) => !usedFields().has(f.field));
 
+const onDragStart = (e: DragEvent, field: string) => {
+  e.dataTransfer?.setData("text", field);
+  emit("drag-start", field);
+};
+
+const onDropNilai = (e: DragEvent) => {
+  const f = e.dataTransfer?.getData("text") || "";
+  if (f) emit("add-value-field", f, "sum");
+};
+
 // ── Calculated field form ──
 const showCalcForm = ref(false);
 const editingCalcId = ref<string | null>(null);
@@ -110,7 +120,7 @@ const saveCalc = () => {
           :key="f.field"
           class="pvcfg-pill"
           draggable="true"
-          @dragstart="emit('drag-start', f.field)"
+          @dragstart="onDragStart($event, f.field)"
           @dragend="emit('drag-end')"
         >
           {{ f.field }}
@@ -192,7 +202,7 @@ const saveCalc = () => {
     <!-- Values -->
     <div class="pvcfg-section">
       <div class="pvcfg-title">Nilai (Values) — bisa lebih dari satu</div>
-      <div class="pvcfg-dropzone">
+      <div class="pvcfg-dropzone" @dragover.prevent @drop="onDropNilai($event)">
         <select
           class="pvcfg-add-select"
           @change="
