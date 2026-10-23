@@ -52,6 +52,7 @@ interface FormData {
   StsPpn: number;
   Ppn: number;
   Disc: number;
+  Pph: string; // "" = Disc, "PPh" = PPh
   Xminta5: string;
   Xurut5: number;
   IsTutupBuku: boolean;
@@ -115,6 +116,7 @@ const init: FormData = {
   StsPpn: 1,
   Ppn: 11,
   Disc: 0,
+  Pph: "",
   Xminta5: "",
   Xurut5: 0,
   IsTutupBuku: false,
@@ -194,6 +196,7 @@ const {
       StsPpn: h.inv_sts_ppn ?? 1,
       Ppn: h.inv_ppn ?? 11,
       Disc: Number(h.inv_disc) || 0,
+      Pph: h.inv_pph || "",
       Xminta5: d.xminta5 || "",
       Xurut5: d.xurut5 || 0,
       IsTutupBuku: !!h.isTutupBuku,
@@ -571,9 +574,14 @@ const totalBarang = computed(() => Math.round(totalBarangRaw.value));
 
 const discRounded = computed(() => Math.round(Number(fd.value.Disc || 0)));
 
-// Dasar PPN dari RAW (belum dibulatkan) dikurangi Disc yang sudah
-// dibulatkan — persis pola dasarPpnRaw di backend.
-const dasarPpnRaw = computed(() => totalBarangRaw.value - discRounded.value);
+// Mode Disc : PPN dari (total - disc)
+// Mode PPh  : PPN dari total penuh, nilai di kolom ini dipotong dari
+//             grand total (sama seperti Invoice Normal)
+const dasarPpnRaw = computed(() =>
+  fd.value.Pph === "PPh"
+    ? totalBarangRaw.value
+    : totalBarangRaw.value - discRounded.value,
+);
 
 const totalPpn = computed(() => {
   if (!fd.value.StsPpn) return 0;
@@ -1222,7 +1230,10 @@ onMounted(async () => {
             <span class="rk-val">{{ num(totalBarang) }}</span>
           </div>
           <div class="rk-row">
-            <span class="rk-lbl">Diskon</span>
+            <select v-model="fd.Pph" class="sel-disc">
+              <option value="">Disc</option>
+              <option value="PPh">PPh</option>
+            </select>
             <input
               type="number"
               class="rk-input"
@@ -1798,5 +1809,12 @@ onMounted(async () => {
 .rk-input:focus {
   border-color: #1565c0;
   background: #fffde7;
+}
+.sel-disc {
+  height: 22px;
+  font-size: 11px;
+  border: 1px solid #bdbdbd;
+  border-radius: 3px;
+  outline: none;
 }
 </style>
