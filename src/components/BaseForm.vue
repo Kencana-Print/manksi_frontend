@@ -16,6 +16,7 @@ const props = defineProps<{
   icon?: any;
   isLoading?: boolean;
   isSaving?: boolean;
+  disabledSave?: boolean;
   itemName?: string; // Teks khusus di dialog (Opsional)
 }>();
 
@@ -45,7 +46,7 @@ const isLeftCollapsed = ref(false);
         color="primary"
         @click="emit('validate-save')"
         :loading="isSaving"
-        :disabled="isSaving"
+        :disabled="isSaving || disabledSave"
       >
         <template #prepend>
           <span class="d-flex align-center">
