@@ -108,6 +108,7 @@ import {
   IconFlame,
   IconFold,
   IconSkull,
+  IconSteeringWheel,
 } from "@tabler/icons-vue";
 
 export interface NavItem {
@@ -1098,6 +1099,12 @@ export const createMenuItems = (): NavItem[] => {
           to: "/ppic/penjadwalan",
           icon: IconCalendarWeek,
           menuId: 176,
+        },
+        {
+          title: "Permintaan Driver",
+          to: "/penjualan/permintaan-driver",
+          icon: IconSteeringWheel,
+          menuId: 189,
         },
       ],
     },
