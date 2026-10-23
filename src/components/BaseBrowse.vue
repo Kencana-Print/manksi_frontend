@@ -58,10 +58,16 @@ const props = withDefaults(
     beforeDelete?: (item: any) => Promise<boolean> | boolean;
     summaryColumns?: string[];
     summaryFormatters?: Record<string, (filteredItems: any[]) => string>;
+    editText?: string;
+    editIcon?: any;
+    deleteText?: string;
+    deleteIcon?: any;
   }>(),
   {
     icon: () => IconTable,
     isLoading: false,
+    editText: "Ubah",
+    deleteText: "Hapus",
     searchPlaceholder: "Cari data...",
     itemValue: "Kode",
     canInsert: false,
@@ -769,10 +775,10 @@ watch(
         :disabled="!isSingleSelected"
         @click="emit('edit', internalSelected[0])"
       >
-        <template #prepend
-          ><IconPencil :size="15" :stroke-width="1.7"
-        /></template>
-        Ubah
+        <template #prepend>
+          <component :is="editIcon || IconPencil" :size="15" :stroke-width="1.7" />
+        </template>
+        {{ editText || "Ubah" }}
       </v-btn>
       <v-btn
         v-if="canDelete"
@@ -781,10 +787,10 @@ watch(
         :disabled="!isSingleSelected"
         @click="requestDelete(internalSelected[0])"
       >
-        <template #prepend
-          ><IconTrash :size="15" :stroke-width="1.7"
-        /></template>
-        Hapus
+        <template #prepend>
+          <component :is="deleteIcon || IconTrash" :size="15" :stroke-width="1.7" />
+        </template>
+        {{ deleteText || "Hapus" }}
       </v-btn>
       <v-btn
         v-if="canExport"
@@ -1190,13 +1196,13 @@ watch(
             class="mr-2"
           />
           <span class="text-subtitle-1 font-weight-bold text-error">
-            Konfirmasi Hapus
+            Konfirmasi {{ deleteText || "Hapus" }}
           </span>
         </v-card-title>
 
         <v-card-text class="pa-5 pt-4">
           <div class="text-body-2 mb-1">
-            Apakah Anda yakin ingin menghapus data ini?
+            Apakah Anda yakin ingin {{ deleteText === 'Batal' ? 'membatalkan' : 'menghapus' }} data ini?
           </div>
 
           <div
@@ -1238,7 +1244,7 @@ watch(
             class="font-weight-bold px-6"
             @click="confirmDelete"
           >
-            Ya, Hapus
+            Ya, {{ deleteText || "Hapus" }}
           </v-btn>
         </v-card-actions>
       </v-card>
