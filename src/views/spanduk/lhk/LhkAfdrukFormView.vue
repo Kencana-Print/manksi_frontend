@@ -9,11 +9,17 @@ import { useAuthStore } from "@/stores/authStore";
 import { IconBulb, IconSearch } from "@tabler/icons-vue";
 import * as lhkForm from "@/services/spanduk/lhk/lhkAfdrukFormService";
 import type {
+  BahanOption,
+  LhkAfdrukBahan,
   LhkAfdrukPayload,
   PabrikOption,
   SaveResponse,
   UkuranOption,
 } from "@/services/spanduk/lhk/lhkAfdrukFormService";
+import {
+  SLOT_BAHAN,
+  type SlotBahan,
+} from "@/services/spanduk/lhk/lhkAfdrukBahan";
 
 const route = useRoute();
 const router = useRouter();
@@ -49,12 +55,37 @@ interface FormRow {
   jumlahOrder: number;
   panjang: number;
   lebar: number;
-  ulano: number;
-  screen: number;
-  lem: number;
-  katalis: number;
+  keterangan: string;
+  jPlangkanAwal: number; // J Plangkan saat dimuat (untuk menampilkan J Meter tersimpan)
+  jMeterAwal: number | null; // J Meter tersimpan; null = baris baru
   plangkan: PlangkanItem[]; // 15 ukuran dari master, J Plangkan = jumlah qty
 }
+
+type QtyBahan = Record<SlotBahan["key"], number>;
+
+const qtyBahanKosong = (): QtyBahan => ({
+  rinso: 0,
+  porstek: 0,
+  m46: 0,
+  kaporit: 0,
+  caustik: 0,
+  ulano: 0,
+  screen: 0,
+  lem: 0,
+  katalis: 0,
+});
+
+// Bahan lain di luar sembilan slot tidak ditampilkan (lihat catatan risiko)
+const bahanDariServer = (daftar: LhkAfdrukBahan[]): QtyBahan => {
+  const hasil = qtyBahanKosong();
+  for (const s of SLOT_BAHAN) {
+    const b = daftar.find((x) => x.Kode_Bahan === s.kode);
+    if (b) {
+      hasil[s.key] = Number(b.Qty) || 0;
+    }
+  }
+  return hasil;
+};
 
 interface FormState {
   header: {
@@ -64,16 +95,11 @@ interface FormState {
     namaPabrik: string;
   };
   items: FormRow[];
+  bahan: QtyBahan;
 }
 
-const KOLOM_BAHAN = [
-  { key: "ulano", label: "Ulano" },
-  { key: "screen", label: "Screen" },
-  { key: "lem", label: "Lem" },
-  { key: "katalis", label: "Katalis" },
-] as const;
-
 const num = (v: unknown) => Number(v) || 0;
+const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
 // Master ukuran plangkan (15 ukuran), dimuat sekali saat mount
 const ukuranList = ref<UkuranOption[]>([]);
@@ -87,21 +113,39 @@ const barisKosong = (): FormRow => ({
   jumlahOrder: 0,
   panjang: 0,
   lebar: 0,
-  ulano: 0,
-  screen: 0,
-  lem: 0,
-  katalis: 0,
+  keterangan: "",
+  jPlangkanAwal: 0,
+  jMeterAwal: null,
   plangkan: plangkanKosong(),
 });
 
 const defaultData = (): FormState => ({
-  header: { nomor: "", tanggal: todayLocal, kodePabrik: "", namaPabrik: "" },
+  header: {
+    nomor: "",
+    tanggal: todayLocal,
+    kodePabrik: "",
+    namaPabrik: "",
+  },
   items: [barisKosong()],
+  bahan: qtyBahanKosong(),
 });
 
 // J Plangkan = jumlah Qty semua ukuran (dihitung juga oleh server)
 const jumlahPlangkan = (row: FormRow) =>
   row.plangkan.reduce((a, p) => a + num(p.qty), 0);
+
+// J Meter = J Plangkan x panjang SPK/MAP. Baris lama yang J Plangkan-nya tidak
+// berubah menampilkan nilai tersimpan (server mempertahankannya juga).
+const jumlahMeter = (row: FormRow) => {
+  const j = jumlahPlangkan(row);
+  return row.jMeterAwal !== null && j === row.jPlangkanAwal
+    ? row.jMeterAwal
+    : round2(j * num(row.panjang));
+};
+
+// Jumlah Meter = jumlah (ukuran x qty) semua ukuran
+const jumlahMeterUkuran = (row: FormRow) =>
+  round2(row.plangkan.reduce((a, p) => a + num(p.ukuran) * num(p.qty), 0));
 
 // ── State UI ──
 const showSpkModal = ref(false);
@@ -110,19 +154,22 @@ const fokusIdx = ref(0); // baris yang detail plangkannya tampil di panel bawah
 const showSelesai = ref(false);
 const nomorTerakhir = ref("");
 const pabrikOpts = ref<PabrikOption[]>([]);
+const bahanOpts = ref<BahanOption[]>([]);
 
 const bangunPayload = (data: FormState): LhkAfdrukPayload => ({
   Tanggal: data.header.tanggal,
   Kode_Pabrik: data.header.kodePabrik,
+  Bahan: SLOT_BAHAN.flatMap((s) =>
+    s.kode !== null && num(data.bahan[s.key]) > 0
+      ? [{ Kode_Bahan: s.kode, Qty: num(data.bahan[s.key]) }]
+      : [],
+  ),
   // Delphi: baris tanpa nomor SPK tidak disimpan
   Detail: data.items
     .filter((r) => r.spk.trim() !== "")
     .map((r) => ({
       Nomor_SPK: r.spk.trim(),
-      Ulano: num(r.ulano),
-      Screen: num(r.screen),
-      Lem: num(r.lem),
-      Katalis: num(r.katalis),
+      Keterangan: r.keterangan.trim(),
       Plangkan: r.plangkan
         .filter((p) => num(p.qty) > 0)
         .map((p) => ({ Ukuran: p.ukuran, Qty: num(p.qty) })),
@@ -145,21 +192,23 @@ const {
   initialData: defaultData(),
   fetchApi: async (): Promise<FormState> => {
     const d = await lhkForm.getById(String(route.params.nomor));
-    const items: FormRow[] = d.Detail.map((r) => ({
-      spk: r.Nomor_SPK,
-      nama: r.Nama_SPK ?? "",
-      jumlahOrder: num(r.Jumlah_Order),
-      panjang: num(r.Panjang),
-      lebar: num(r.Lebar),
-      ulano: num(r.Ulano),
-      screen: num(r.Screen),
-      lem: num(r.Lem),
-      katalis: num(r.Katalis),
-      plangkan: r.Plangkan.map((p) => ({
+    const items: FormRow[] = d.Detail.map((r) => {
+      const plangkan = r.Plangkan.map((p) => ({
         ukuran: num(p.Ukuran),
         qty: num(p.Qty),
-      })),
-    }));
+      }));
+      return {
+        spk: r.Nomor_SPK,
+        nama: r.Nama_SPK ?? "",
+        jumlahOrder: num(r.Jumlah_Order),
+        panjang: num(r.Panjang),
+        lebar: num(r.Lebar),
+        keterangan: r.Keterangan ?? "",
+        jPlangkanAwal: plangkan.reduce((a, p) => a + p.qty, 0),
+        jMeterAwal: r.J_Meter === null ? null : num(r.J_Meter),
+        plangkan,
+      };
+    });
     return {
       header: {
         nomor: d.Nomor,
@@ -168,6 +217,7 @@ const {
         namaPabrik: d.Nama_Pabrik ?? "",
       },
       items: items.length > 0 ? items : [barisKosong()],
+      bahan: bahanDariServer(d.Bahan),
     };
   },
   submitApi: async (data: FormState): Promise<SaveResponse> => {
@@ -239,18 +289,49 @@ const isiLokasiDefault = () => {
 
 onMounted(async () => {
   try {
-    const [pabrik, ukuran] = await Promise.all([
+    const [pabrik, ukuran, bahan] = await Promise.all([
       lhkForm.getLookupPabrik(),
       lhkForm.getLookupUkuran(),
+      lhkForm.getLookupBahan(),
     ]);
     pabrikOpts.value = pabrik;
     ukuranList.value = ukuran;
+    bahanOpts.value = bahan;
     lengkapiPlangkan();
     isiLokasiDefault();
   } catch (e) {
     toast.error(lhkForm.pesanError(e, "Gagal memuat data lookup."));
   }
 });
+
+// ── Bahan pemakaian: nama, satuan & stok dari master ──
+const infoBahan = (kode: number | null): BahanOption | undefined =>
+  kode === null ? undefined : bahanOpts.value.find((o) => o.Kode === kode);
+
+const namaSlot = (s: SlotBahan): string =>
+  s.kode === null
+    ? `${s.label} (belum ada di master)`
+    : (infoBahan(s.kode)?.Nama ?? s.label);
+
+const satuanSlot = (s: SlotBahan): string => infoBahan(s.kode)?.Satuan ?? "";
+
+// null = belum ada catatan stok di gudang itu
+const stokSlot = (s: SlotBahan): number | null =>
+  infoBahan(s.kode)?.Stok ?? null;
+
+// Hanya penanda: qty melebihi stok tidak memblokir simpan.
+// Stok belum tercatat bukan "kurang", jadi tidak ditandai merah.
+const kurangStok = (s: SlotBahan): boolean => {
+  const stok = stokSlot(s);
+  return stok !== null && num(formData.value.bahan[s.key]) > stok;
+};
+
+const fmtStok = (s: SlotBahan): string => {
+  const stok = stokSlot(s);
+  return stok === null
+    ? "belum tercatat"
+    : `${stok.toLocaleString("id-ID", { maximumFractionDigits: 2 })} ${satuanSlot(s)}`;
+};
 
 // ── Grid ──
 const addRow = () => {
@@ -298,6 +379,8 @@ const isiBarisDariSpk = async (
     row.panjang = num(info.Panjang);
     row.lebar = num(info.Lebar);
     row.plangkan = plangkanKosong(); // SPK baru: semua qty mulai dari 0
+    row.jPlangkanAwal = 0;
+    row.jMeterAwal = null;
     fokusIdx.value = idx;
     return true;
   } catch (e) {
@@ -306,10 +389,8 @@ const isiBarisDariSpk = async (
   }
 };
 
-// Urutan Enter: SPK → Qty ukuran (atas ke bawah) → Ulano → Screen → Lem →
-// Katalis → SPK baris berikutnya (baris baru ditambah bila perlu)
-const KOLOM_EDIT = ["ulano", "screen", "lem", "katalis"] as const;
-type KolomEdit = (typeof KOLOM_EDIT)[number];
+// Urutan Enter: SPK → Qty ukuran (atas ke bawah) → Keterangan → SPK baris
+// berikutnya (baris baru ditambah bila perlu)
 
 const fieldRefs = ref<Record<string, HTMLInputElement>>({});
 
@@ -333,16 +414,11 @@ const onEnterQty = async (i: number) => {
   if (i < total - 1) {
     await fokusKunci(`q_${i + 1}`);
   } else {
-    await fokusKunci(`${fokusIdx.value}_${KOLOM_EDIT[0]}`);
+    await fokusKunci(`${fokusIdx.value}_ket`);
   }
 };
 
-const onEnter = async (idx: number, col: KolomEdit) => {
-  const ci = KOLOM_EDIT.indexOf(col);
-  if (ci < KOLOM_EDIT.length - 1) {
-    await fokusKunci(`${idx}_${KOLOM_EDIT[ci + 1]}`);
-    return;
-  }
+const onEnterKet = async (idx: number) => {
   if (idx + 1 >= formData.value.items.length) {
     addRow();
   }
@@ -388,6 +464,19 @@ const validateSave = () => {
     toast.warning("Lokasi belum dipilih.");
     return;
   }
+  const salahBahan = SLOT_BAHAN.find(
+    (s) => num(formData.value.bahan[s.key]) < 0,
+  );
+  if (salahBahan) {
+    toast.warning(`${salahBahan.label} tidak boleh negatif.`);
+    return;
+  }
+  const kurang = SLOT_BAHAN.filter((s) => s.kode !== null && kurangStok(s));
+  if (kurang.length > 0) {
+    toast.warning(
+      `Qty melebihi stok: ${kurang.map((s) => s.label).join(", ")}. Tetap bisa disimpan.`,
+    );
+  }
 
   const terisi = formData.value.items
     .map((r, i) => ({ r, no: i + 1 }))
@@ -415,10 +504,6 @@ const validateSave = () => {
         );
         return;
       }
-    }
-    if ([r.ulano, r.screen, r.lem, r.katalis].some((v) => num(v) < 0)) {
-      toast.warning(`Baris ${no}: angka tidak boleh negatif.`);
-      return;
     }
   }
 
@@ -506,6 +591,33 @@ const tutupSetelahSimpan = () => {
             style="flex: 1"
           />
         </div>
+
+        <div class="sep" />
+
+        <div class="grp-title">Pemakaian Bahan</div>
+        <div v-for="s in SLOT_BAHAN" :key="s.key" class="bhn-row">
+          <span class="bhn-nama" :title="namaSlot(s)">
+            {{ namaSlot(s) }}
+            <small
+              v-if="s.kode !== null"
+              class="bhn-stok"
+              :class="{ 'bhn-kurang': kurangStok(s) }"
+            >
+              Stok {{ fmtStok(s) }}
+            </small>
+          </span>
+          <input
+            v-model.number="formData.bahan[s.key]"
+            type="number"
+            min="0"
+            step="0.01"
+            class="inp tr bg-yellow-light"
+            style="width: 84px"
+            :disabled="s.kode === null"
+            v-select-on-focus
+          />
+          <span class="bhn-sat">{{ satuanSlot(s) }}</span>
+        </div>
       </div>
     </template>
 
@@ -519,7 +631,7 @@ const tutupSetelahSimpan = () => {
           </button>
         </div>
         <div class="tbl-wrap" style="flex: 1; min-height: 160px">
-          <table class="gt" style="min-width: 1060px">
+          <table class="gt" style="min-width: 1100px">
             <thead>
               <tr>
                 <th style="width: 32px" class="tc">No</th>
@@ -529,14 +641,8 @@ const tutupSetelahSimpan = () => {
                 <th style="width: 70px" class="tr">Panjang</th>
                 <th style="width: 70px" class="tr">Lebar</th>
                 <th style="width: 85px" class="tr">J Plangkan</th>
-                <th
-                  v-for="k in KOLOM_BAHAN"
-                  :key="k.key"
-                  style="width: 75px"
-                  class="tr bg-yellow"
-                >
-                  {{ k.label }}
-                </th>
+                <th style="width: 90px" class="tr">J Meter</th>
+                <th style="width: 260px" class="bg-yellow">Keterangan</th>
                 <th style="width: 32px" class="tc"></th>
               </tr>
             </thead>
@@ -595,16 +701,22 @@ const tutupSetelahSimpan = () => {
                     title="Jumlah Qty semua ukuran (isi di Detail Plangkan)"
                   />
                 </td>
-                <td v-for="k in KOLOM_BAHAN" :key="k.key" class="p0">
+                <td class="p0">
                   <input
-                    v-model.number="row[k.key]"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    class="ci tr bg-yellow-light"
-                    :ref="(el) => simpanRef(el, `${idx}_${k.key}`)"
-                    @keydown.enter.prevent="onEnter(idx, k.key)"
-                    v-select-on-focus
+                    :value="jumlahMeter(row)"
+                    class="ci tr ro"
+                    readonly
+                    title="J Plangkan x panjang SPK/MAP"
+                  />
+                </td>
+                <td class="p0">
+                  <input
+                    v-model="row.keterangan"
+                    class="ci bg-yellow-light"
+                    maxlength="200"
+                    :title="row.keterangan"
+                    :ref="(el) => simpanRef(el, `${idx}_ket`)"
+                    @keydown.enter.prevent="onEnterKet(idx)"
                   />
                 </td>
                 <td class="tc">
@@ -658,9 +770,14 @@ const tutupSetelahSimpan = () => {
                   <td class="tr fw">Total</td>
                   <td class="tr fw">{{ jumlahPlangkan(rowAktif) }}</td>
                 </tr>
+                <tr>
+                  <td class="tr fw">Jumlah Meter</td>
+                  <td class="tr fw">{{ jumlahMeterUkuran(rowAktif) }}</td>
+                </tr>
               </tfoot>
             </table>
           </div>
+
           <div v-else class="plg-kosong">
             Pilih SPK/MAP pada tabel di atas untuk mengisi detail plangkan.
           </div>
@@ -669,7 +786,12 @@ const tutupSetelahSimpan = () => {
     </template>
   </BaseForm>
 
-  <SpkSearchModal v-model="showSpkModal" @selected="onSpkSelected" />
+  <SpkSearchModal
+    v-model="showSpkModal"
+    filter-mode="lhk-design"
+    :divisi="1"
+    @selected="onSpkSelected"
+  />
 
   <!-- Setelah simpan: pengganti Save & New / Save & Close -->
   <v-dialog v-model="showSelesai" max-width="400" persistent>
@@ -780,6 +902,49 @@ const tutupSetelahSimpan = () => {
 .ro {
   background: #dde8f0 !important;
   color: #444 !important;
+}
+.inp.bg-yellow-light {
+  background: #fffde7;
+}
+.grp-title {
+  font-size: 10px;
+  font-weight: 700;
+  color: #1565c0;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin: 2px 0;
+}
+.bhn-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 26px;
+  width: 100%;
+}
+.bhn-nama {
+  flex: 1;
+  min-width: 0;
+  font-size: 10px;
+  font-weight: 600;
+  color: #333;
+  line-height: 1.15;
+  word-break: break-word;
+}
+.bhn-sat {
+  width: 44px;
+  flex-shrink: 0;
+  font-size: 10px;
+  color: #555;
+}
+.bhn-stok {
+  display: block;
+  font-weight: 400;
+  font-size: 9.5px;
+  color: #757575;
+}
+.bhn-kurang {
+  color: #d32f2f;
+  font-weight: 700;
 }
 .idate {
   height: 24px;
@@ -950,7 +1115,6 @@ const tutupSetelahSimpan = () => {
   background: #ffebee;
   border-radius: 2px;
 }
-
 /* Detail Plangkan */
 .plg {
   display: flex;

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, nextTick } from "vue";
+import { ref, computed, watch, nextTick } from "vue";
 
 const props = defineProps<{ formData: any; isEdit: boolean }>();
 
@@ -9,6 +9,20 @@ const totalQty = computed(() =>
     0,
   ),
 );
+
+const isSpanduk = computed(() => String(props.formData.Divisi) === "1");
+const rencana = computed(() => Number(props.formData.QtyRencana) || 0);
+// rincian opsional: beda dengan Rencana Order hanya diperingatkan
+const bedaRencana = computed(
+  () => totalQty.value > 0 && totalQty.value !== rencana.value,
+);
+
+// Kenyamanan: selama Rencana Order masih kosong atau masih mengikuti total
+// rincian, ia ikut berubah. Kalau sudah diubah manual, tidak ditimpa lagi.
+watch(totalQty, (baru, lama) => {
+  const r = Number(props.formData.QtyRencana) || 0;
+  if (r === 0 || r === lama) props.formData.QtyRencana = baru;
+});
 
 // ── Enter pindah ke qty baris berikutnya ──
 const qtyInputRefs = ref<(HTMLInputElement | null)[]>([]);
@@ -26,7 +40,7 @@ const focusNextQty = (idx: number) => {
 
 <template>
   <div class="tu-wrapper">
-    <div class="tu-left">
+    <div v-if="!isSpanduk" class="tu-left">
       <div class="tu-section">
         <div class="tu-sec-title">Breakdown Ukuran &amp; Qty</div>
         <table class="tu-table">
@@ -59,9 +73,16 @@ const focusNextQty = (idx: number) => {
           </tbody>
           <tfoot>
             <tr>
-              <td colspan="2" class="tu-total-lbl">Total Qty Rencana</td>
+              <td colspan="2" class="tu-total-lbl">Total Rincian Ukuran</td>
               <td class="tu-total-val">
                 {{ totalQty.toLocaleString("id-ID") }}
+              </td>
+            </tr>
+            <tr v-if="bedaRencana">
+              <td colspan="3" class="tu-warn">
+                Rencana Order {{ rencana.toLocaleString("id-ID") }} pcs, beda
+                {{ Math.abs(totalQty - rencana).toLocaleString("id-ID") }} dari
+                total rincian.
               </td>
             </tr>
           </tfoot>
@@ -69,7 +90,7 @@ const focusNextQty = (idx: number) => {
       </div>
     </div>
 
-    <div class="tu-right">
+    <div class="tu-right" :style="isSpanduk ? 'width: 100%' : ''">
       <div
         class="tu-section"
         style="flex: 1; display: flex; flex-direction: column; min-height: 0"
@@ -178,6 +199,12 @@ const focusNextQty = (idx: number) => {
   font-size: 13px;
   color: #1565c0;
   padding-top: 8px;
+}
+.tu-warn {
+  text-align: right;
+  font-size: 11px;
+  color: #f57f17;
+  padding-top: 4px;
 }
 
 .f-inp {

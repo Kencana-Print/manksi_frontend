@@ -17,7 +17,13 @@ export const konfirmasiPraOrderService = {
     nomor: string,
     status: string,
     catatan: string,
-    extra?: { tglMap?: string; tglSoEstimasi?: string },
+    extra?: {
+      tglMap?: string;
+      tglSoEstimasi?: string;
+      syaratKetentuan?: string;
+      kirim?: string;
+      kirimKet?: string;
+    },
   ) =>
     api.patch(
       `/ppic/konfirmasi-pra-order/${encodeURIComponent(nomor)}/konfirmasi`,
@@ -28,4 +34,10 @@ export const konfirmasiPraOrderService = {
     api.patch(`/ppic/konfirmasi-pra-order/bahan/${probId}/status`, {
       status,
     }),
+
+  confirmStatusBahanSpanduk: (nomor: string, status: string) =>
+    api.patch(
+      `/ppic/konfirmasi-pra-order/${encodeURIComponent(nomor)}/bahan-spanduk`,
+      { status },
+    ),
 };

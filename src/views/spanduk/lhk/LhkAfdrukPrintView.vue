@@ -58,10 +58,7 @@ const total = computed(() => {
     rows.value.reduce((s, r) => s + Number(pilih(r) ?? 0), 0);
   return {
     plangkan: jumlah((r) => r.J_Plangkan),
-    ulano: jumlah((r) => r.Ulano),
-    screen: jumlah((r) => r.Screen),
-    lem: jumlah((r) => r.Lem),
-    katalis: jumlah((r) => r.Katalis),
+    jMeter: jumlah((r) => r.J_Meter),
   };
 });
 
@@ -94,6 +91,29 @@ const totalPerUkuran = computed(() =>
         </tr>
       </table>
 
+      <!-- Pemakaian bahan (per LHK) -->
+      <table v-if="data.Bahan.length > 0" class="detail-table pemakaian">
+        <thead>
+          <tr>
+            <th colspan="4">Pemakaian Bahan</th>
+          </tr>
+          <tr>
+            <th width="30">No</th>
+            <th>Bahan</th>
+            <th width="80">Qty</th>
+            <th width="70">Satuan</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="(b, i) in data.Bahan" :key="b.Kode_Bahan">
+            <td class="tc">{{ i + 1 }}</td>
+            <td>{{ b.Nama_Bahan }}</td>
+            <td class="tr">{{ fmt(b.Qty) }}</td>
+            <td class="tc">{{ b.Satuan }}</td>
+          </tr>
+        </tbody>
+      </table>
+
       <!-- Tabel 1: data SPK -->
       <table class="detail-table">
         <thead>
@@ -103,10 +123,8 @@ const totalPerUkuran = computed(() =>
             <th colspan="2">Spesifikasi</th>
             <th rowspan="2" width="110">Nomor SPK</th>
             <th rowspan="2" width="60">J<br />Plangkan</th>
-            <th rowspan="2" width="60">Ulano</th>
-            <th rowspan="2" width="60">Screen</th>
-            <th rowspan="2" width="60">Lem</th>
-            <th rowspan="2" width="60">Katalis</th>
+            <th rowspan="2" width="70">J<br />Meter</th>
+            <th rowspan="2" width="160">Keterangan</th>
           </tr>
           <tr>
             <th width="45">P</th>
@@ -121,18 +139,14 @@ const totalPerUkuran = computed(() =>
             <td class="tr">{{ fmt(r.Lebar) }}</td>
             <td class="tc">{{ r.Nomor_SPK }}</td>
             <td class="tr">{{ fmtInt(r.J_Plangkan) }}</td>
-            <td class="tr">{{ fmtInt(r.Ulano) }}</td>
-            <td class="tr">{{ fmtInt(r.Screen) }}</td>
-            <td class="tr">{{ fmtInt(r.Lem) }}</td>
-            <td class="tr">{{ fmt(r.Katalis) }}</td>
+            <td class="tr">{{ fmt(r.J_Meter) }}</td>
+            <td>{{ r.Keterangan || "" }}</td>
           </tr>
           <tr class="row-total">
             <td colspan="5">Total</td>
             <td class="tr">{{ fmtInt(total.plangkan) }}</td>
-            <td class="tr">{{ fmtInt(total.ulano) }}</td>
-            <td class="tr">{{ fmtInt(total.screen) }}</td>
-            <td class="tr">{{ fmtInt(total.lem) }}</td>
-            <td class="tr">{{ fmt(total.katalis) }}</td>
+            <td class="tr">{{ fmt(total.jMeter) }}</td>
+            <td></td>
           </tr>
         </tbody>
       </table>
@@ -240,6 +254,10 @@ const totalPerUkuran = computed(() =>
 }
 .detail-table tr {
   page-break-inside: avoid;
+}
+.pemakaian {
+  width: 50%;
+  margin-bottom: 8px;
 }
 .row-total td {
   font-weight: bold;

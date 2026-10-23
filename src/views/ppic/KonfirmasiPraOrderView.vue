@@ -91,7 +91,24 @@ const headers = [
   { title: "SALES", key: "Sales", width: "130px" },
   { title: "NAMA PEKERJAAN", key: "NamaPekerjaan", width: "220px" },
   { title: "BAHAN", key: "Bahan", width: "180px" },
-  { title: "Qty Rencana", key: "QtyRencana", width: "110px", align: "end" },
+  {
+    title: "Sumber Bahan",
+    key: "SumberBahan",
+    width: "120px",
+    align: "center",
+  },
+  {
+    title: "Status Bahan",
+    key: "StatusBahan",
+    width: "130px",
+    align: "center",
+  },
+  { title: "Rencana Order", key: "QtyRencana", width: "120px", align: "end" },
+  { title: "Jml Desain", key: "JmlDesain", width: "100px", align: "end" },
+  { title: "Panjang (Mtr)", key: "Panjang", width: "110px", align: "end" },
+  { title: "Lebar (Mtr)", key: "Lebar", width: "110px", align: "end" },
+  { title: "Ket. Ukuran", key: "KetUkuran", width: "180px" },
+  { title: "Finishing", key: "Finishing", width: "150px" },
   { title: "Tgl Kirim", key: "TglKirim", width: "110px", align: "center" },
   {
     title: "Tgl Est. SO",
@@ -111,6 +128,7 @@ const headers = [
     width: "140px",
     align: "center",
   },
+  { title: "Syarat & Ketentuan", key: "SyaratKetentuan", width: "220px" },
   { title: "Created", key: "Created", width: "150px" },
 ];
 
@@ -126,6 +144,18 @@ const rowPropsFn = (data: any) => {
 const fmtNum = (v: any) =>
   new Intl.NumberFormat("id-ID").format(Number(v) || 0);
 
+const fmtMtr = (v: number | string | null | undefined) => {
+  const n = Number(v) || 0;
+  return n > 0
+    ? new Intl.NumberFormat("id-ID", { maximumFractionDigits: 3 }).format(n)
+    : "—";
+};
+const SUMBER_LABEL: Record<string, string> = {
+  STOK: "Stok Tersedia",
+  PENGAJUAN: "Pengajuan",
+};
+const labelSumber = (v?: string | null) => (v ? (SUMBER_LABEL[v] ?? v) : "—");
+
 // ── Panel detail/preview ─────────────────────────────────────────────
 const showDetailDialog = ref(false);
 const isDetailLoading = ref(false);
@@ -137,6 +167,9 @@ const estTglSo = ref("");
 const estTglMap = ref("");
 const showSanggupInput = ref(false);
 const catatanSanggup = ref("");
+const syaratKetentuan = ref("");
+const kirim = ref("");
+const kirimKet = ref("");
 
 const openDetail = async (item: any) => {
   showDetailDialog.value = true;
@@ -147,6 +180,9 @@ const openDetail = async (item: any) => {
   estTglSo.value = "";
   estTglMap.value = "";
   catatanSanggup.value = "";
+  syaratKetentuan.value = "";
+  kirim.value = "";
+  kirimKet.value = "";
   try {
     const res = await konfirmasiPraOrderService.getDetail(item.Nomor);
     detailData.value = res.data.data;
@@ -172,10 +208,16 @@ const confirmSanggup = async () => {
     toast.warning("Tanggal Estimasi SO dan Estimasi MAP wajib diisi.");
     return;
   }
+  if (!kirim.value) {
+    toast.warning("Pilih pengiriman: Closed atau Parsial.");
+    return;
+  }
+  if (kirim.value === "PARSIAL" && !kirimKet.value.trim()) {
+    toast.warning("Keterangan wajib diisi untuk pengiriman Parsial.");
+    return;
+  }
   if (belumSemuaBahanDipilih.value) {
-    toast.warning(
-      "Status Ready/Tidak Ready untuk semua alternatif bahan wajib dipilih dulu.",
-    );
+    toast.warning("Status Ready/Tidak Ready bahan wajib dipilih dulu.");
     return;
   }
   if (!detailData.value) return;
@@ -185,7 +227,13 @@ const confirmSanggup = async () => {
       detailData.value.pro_nomor,
       "SANGGUP",
       catatanSanggup.value,
-      { tglSoEstimasi: estTglSo.value, tglMap: estTglMap.value },
+      {
+        tglSoEstimasi: estTglSo.value,
+        tglMap: estTglMap.value,
+        syaratKetentuan: syaratKetentuan.value,
+        kirim: kirim.value,
+        kirimKet: kirim.value === "PARSIAL" ? kirimKet.value : "",
+      },
     );
     toast.success("Pra Order dikonfirmasi SANGGUP.");
     showDetailDialog.value = false;
@@ -241,12 +289,49 @@ const setBahanStatus = async (bahan: any, status: string) => {
   }
 };
 
+const isSavingBahanSpanduk = ref(false);
+
+const setBahanSpandukStatus = async (status: string) => {
+  if (!detailData.value || isSavingBahanSpanduk.value) return;
+  isSavingBahanSpanduk.value = true;
+  try {
+    await konfirmasiPraOrderService.confirmStatusBahanSpanduk(
+      detailData.value.pro_nomor,
+      status,
+    );
+    detailData.value.pro_bahan_status = status;
+    toast.success("Status bahan diperbarui.");
+    fetchData();
+  } catch (e: any) {
+    toast.error(e.response?.data?.message || "Gagal memperbarui status bahan.");
+  } finally {
+    isSavingBahanSpanduk.value = false;
+  }
+};
+
 const canConfirm = computed(
   () => detailData.value?.pro_status_ppic === "PENDING",
 );
-const belumSemuaBahanDipilih = computed(() =>
-  (detailData.value?.bahan || []).some((b: any) => !b.prob_status_ready),
+const belumSemuaBahanDipilih = computed(() => {
+  const d = detailData.value;
+  if (!d) return false;
+  if (String(d.pro_divisi) === "1") return !d.pro_bahan_status;
+  return (d.bahan || []).some((b: any) => !b.prob_status_ready);
+});
+const isSpandukDetail = computed(
+  () => String(detailData.value?.pro_divisi) === "1",
 );
+const ukuranPLDetail = computed(() => {
+  const p = Number(detailData.value?.pro_panjang) || 0;
+  const l = Number(detailData.value?.pro_lebar) || 0;
+  return p > 0 && l > 0 ? `${fmtMtr(p)} x ${fmtMtr(l)} Mtr` : "";
+});
+const statusBahanSpanduk = computed(() => {
+  const s = String(detailData.value?.pro_bahan_status || "");
+  if (s === "READY") return { text: "READY", color: "success" };
+  if (s === "TIDAK READY") return { text: "TIDAK READY", color: "error" };
+  return { text: "BELUM DIKONFIRMASI", color: "grey" };
+});
 </script>
 
 <template>
@@ -328,6 +413,37 @@ const belumSemuaBahanDipilih = computed(() =>
 
     <template #item.QtyRencana="{ item }">{{
       fmtNum((item.raw || item).QtyRencana)
+    }}</template>
+    <template #item.SumberBahan="{ item }">{{
+      labelSumber((item.raw || item).SumberBahan)
+    }}</template>
+    <template #item.StatusBahan="{ item }">
+      <v-chip
+        v-if="(item.raw || item).StatusBahan"
+        size="x-small"
+        :color="
+          (item.raw || item).StatusBahan === 'READY'
+            ? 'success'
+            : (item.raw || item).StatusBahan === 'TIDAK READY'
+              ? 'error'
+              : 'grey'
+        "
+        variant="flat"
+      >
+        {{ (item.raw || item).StatusBahan }}
+      </v-chip>
+      <span v-else>—</span>
+    </template>
+    <template #item.JmlDesain="{ item }">{{
+      (item.raw || item).JmlDesain == null
+        ? "—"
+        : fmtNum((item.raw || item).JmlDesain)
+    }}</template>
+    <template #item.Panjang="{ item }">{{
+      fmtMtr((item.raw || item).Panjang)
+    }}</template>
+    <template #item.Lebar="{ item }">{{
+      fmtMtr((item.raw || item).Lebar)
     }}</template>
     <template #item.Tanggal="{ item }">{{
       formatTanggal((item.raw || item).Tanggal)
@@ -421,8 +537,18 @@ const belumSemuaBahanDipilih = computed(() =>
                   </td>
                 </tr>
                 <tr>
-                  <td class="lbl">Qty Rencana</td>
-                  <td class="val">{{ fmtNum(detailData.pro_qty_rencana) }}</td>
+                  <td class="lbl">Rencana Order</td>
+                  <td class="val">
+                    {{ fmtNum(detailData.pro_qty_rencana) }} pcs
+                  </td>
+                </tr>
+                <tr v-if="detailData.pro_jml_desain != null">
+                  <td class="lbl">Jumlah Desain</td>
+                  <td class="val">{{ fmtNum(detailData.pro_jml_desain) }}</td>
+                </tr>
+                <tr v-if="isSpandukDetail && ukuranPLDetail">
+                  <td class="lbl">Ukuran (P x L)</td>
+                  <td class="val">{{ ukuranPLDetail }}</td>
                 </tr>
                 <tr>
                   <td class="lbl">Finishing</td>
@@ -439,14 +565,59 @@ const belumSemuaBahanDipilih = computed(() =>
                   </td>
                 </tr>
                 <tr v-if="detailData.pro_ukuran_bebas">
-                  <td class="lbl">Ukuran (Free Text)</td>
+                  <td class="lbl">Ket. Ukuran</td>
                   <td class="val">{{ detailData.pro_ukuran_bebas }}</td>
                 </tr>
                 <tr v-if="detailData.pro_catatan_deadline">
                   <td class="lbl">Ket. Deadline</td>
                   <td class="val">{{ detailData.pro_catatan_deadline }}</td>
                 </tr>
+                <tr v-if="detailData.pro_syarat_ketentuan">
+                  <td class="lbl">Syarat &amp; Ketentuan</td>
+                  <td class="val" style="white-space: pre-wrap">
+                    {{ detailData.pro_syarat_ketentuan }}
+                  </td>
+                </tr>
               </table>
+
+              <div v-if="isSpandukDetail" class="section-block">
+                <div class="section-title">Kebutuhan Bahan</div>
+                <div class="bahan-status-list">
+                  <div class="bahan-row">
+                    <span class="bahan-nama">
+                      {{ detailData.BahanSpandukNama || "—" }}
+                      <span v-if="detailData.BahanSpandukSatuan">
+                        ({{ detailData.BahanSpandukSatuan }})</span
+                      >
+                      · {{ labelSumber(detailData.pro_sumber_bahan) }}
+                    </span>
+                    <div class="bahan-btn-grp">
+                      <button
+                        type="button"
+                        class="bahan-btn ready"
+                        :class="{
+                          active: detailData.pro_bahan_status === 'READY',
+                        }"
+                        :disabled="isSavingBahanSpanduk"
+                        @click="setBahanSpandukStatus('READY')"
+                      >
+                        Ready
+                      </button>
+                      <button
+                        type="button"
+                        class="bahan-btn not-ready"
+                        :class="{
+                          active: detailData.pro_bahan_status === 'TIDAK READY',
+                        }"
+                        :disabled="isSavingBahanSpanduk"
+                        @click="setBahanSpandukStatus('TIDAK READY')"
+                      >
+                        Tidak Ready
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
 
               <div v-if="detailData.bahan?.length" class="section-block">
                 <div class="section-title">Alternatif Bahan</div>
@@ -570,6 +741,32 @@ const belumSemuaBahanDipilih = computed(() =>
                 hide-details
               />
             </div>
+            <div class="d-flex align-center mt-2" style="gap: 8px">
+              <span style="font-size: 12px; font-weight: 600">
+                Kirim <b style="color: #e53935">*</b>
+              </span>
+              <v-radio-group
+                v-model="kirim"
+                inline
+                hide-details
+                density="compact"
+              >
+                <v-radio label="Closed" value="CLOSED" />
+                <v-radio label="Parsial" value="PARSIAL" />
+              </v-radio-group>
+            </div>
+            <v-textarea
+              v-if="kirim === 'PARSIAL'"
+              v-model="kirimKet"
+              label="Keterangan Kirim Parsial (wajib)"
+              placeholder="mis. Kirim 50 pcs tgl 28/10, sisanya menyusul tgl 2/11"
+              variant="outlined"
+              density="compact"
+              rows="2"
+              maxlength="255"
+              counter
+              class="mt-1"
+            />
             <v-textarea
               v-model="catatanSanggup"
               label="Keterangan (opsional)"
@@ -577,6 +774,17 @@ const belumSemuaBahanDipilih = computed(() =>
               density="compact"
               rows="2"
               hide-details
+              class="mt-2"
+            />
+            <v-textarea
+              v-model="syaratKetentuan"
+              label="Syarat & Ketentuan (opsional)"
+              placeholder="Contoh: SO harus sudah tersedia besok"
+              variant="outlined"
+              density="compact"
+              rows="2"
+              maxlength="500"
+              counter
               class="mt-2"
             />
             <div class="d-flex justify-end mt-2" style="gap: 8px">
@@ -616,7 +824,7 @@ const belumSemuaBahanDipilih = computed(() =>
               :disabled="isConfirming || belumSemuaBahanDipilih"
               :title="
                 belumSemuaBahanDipilih
-                  ? 'Pilih status Ready/Tidak Ready untuk semua alternatif bahan dulu'
+                  ? 'Pilih status Ready/Tidak Ready bahan dulu'
                   : ''
               "
               @click="openSanggupInput"

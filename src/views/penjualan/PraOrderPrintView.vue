@@ -110,6 +110,28 @@ const totalQty = computed(() =>
 const bahanNames = computed(() =>
   (rawData.value?.Bahan || []).map((b: any) => b.Nama).filter(Boolean),
 );
+const jmlDesain = computed<number | null>(() => {
+  const v = getVal("pro_jml_desain");
+  return v === "" || v == null ? null : Number(v);
+});
+const isSpanduk = computed(() => String(getVal("pro_divisi")) === "1");
+const fmtMtr = (v: number) =>
+  new Intl.NumberFormat("id-ID", { maximumFractionDigits: 3 }).format(v);
+const ukuranPL = computed(() => {
+  const p = Number(getVal("pro_panjang")) || 0;
+  const l = Number(getVal("pro_lebar")) || 0;
+  return p > 0 && l > 0 ? `${fmtMtr(p)} x ${fmtMtr(l)} Mtr` : "";
+});
+const SUMBER_LABEL: Record<string, string> = {
+  STOK: "Stok Tersedia",
+  PENGAJUAN: "Pengajuan",
+};
+const sumberBahan = computed(
+  () => SUMBER_LABEL[String(getVal("pro_sumber_bahan"))] ?? "",
+);
+const statusBahan = computed(
+  () => String(getVal("pro_bahan_status") || "") || "Belum dikonfirmasi",
+);
 </script>
 
 <template>
@@ -173,30 +195,55 @@ const bahanNames = computed(() =>
                 </td>
               </tr>
               <tr>
-                <td class="lbl">Qty Rencana</td>
+                <td class="lbl">Rencana Order</td>
                 <td class="sep">:</td>
                 <td class="val">
                   {{
                     Number(getVal("pro_qty_rencana")) > 0
                       ? new Intl.NumberFormat("id-ID").format(
                           Number(getVal("pro_qty_rencana")),
-                        )
+                        ) + " pcs"
                       : "-"
                   }}
                 </td>
+              </tr>
+              <tr v-if="jmlDesain !== null">
+                <td class="lbl">Jumlah Desain</td>
+                <td class="sep">:</td>
+                <td class="val">
+                  {{ new Intl.NumberFormat("id-ID").format(jmlDesain) }}
+                </td>
+              </tr>
+              <tr v-if="isSpanduk && ukuranPL">
+                <td class="lbl">Ukuran (P x L)</td>
+                <td class="sep">:</td>
+                <td class="val">{{ ukuranPL }}</td>
               </tr>
               <tr>
                 <td class="lbl">Finishing</td>
                 <td class="sep">:</td>
                 <td class="val">{{ getVal("pro_finishing") }}</td>
               </tr>
+              <tr v-if="isSpanduk && getVal('BahanSpandukNama')">
+                <td class="lbl">Kebutuhan Bahan</td>
+                <td class="sep">:</td>
+                <td class="val">
+                  {{ getVal("BahanSpandukNama") }}
+                  <span v-if="sumberBahan">({{ sumberBahan }})</span>
+                </td>
+              </tr>
+              <tr v-if="isSpanduk && getVal('BahanSpandukNama')">
+                <td class="lbl">Status Bahan</td>
+                <td class="sep">:</td>
+                <td class="val">{{ statusBahan }}</td>
+              </tr>
               <tr v-if="getVal('pro_spesifikasi')">
-                <td class="lbl">Spesifikasi</td>
+                <td class="lbl">Ket. Bahan</td>
                 <td class="sep">:</td>
                 <td class="val">{{ getVal("pro_spesifikasi") }}</td>
               </tr>
               <tr v-if="getVal('pro_ukuran_bebas')">
-                <td class="lbl">Ukuran</td>
+                <td class="lbl">Ket. Ukuran</td>
                 <td class="sep">:</td>
                 <td class="val pre-wrap">{{ getVal("pro_ukuran_bebas") }}</td>
               </tr>
@@ -209,11 +256,6 @@ const bahanNames = computed(() =>
                 <td class="lbl">Ket. Deadline</td>
                 <td class="sep">:</td>
                 <td class="val">{{ getVal("pro_catatan_deadline") }}</td>
-              </tr>
-              <tr>
-                <td class="lbl">Cabang</td>
-                <td class="sep">:</td>
-                <td class="val">{{ getVal("pro_cabang") }}</td>
               </tr>
             </table>
 
@@ -301,6 +343,12 @@ const bahanNames = computed(() =>
               <div class="val">
                 <pre class="catatan-text">{{ getVal("pro_keterangan") }}</pre>
               </div>
+            </div>
+            <div v-if="getVal('pro_syarat_ketentuan')" class="sk-box">
+              <div class="sk-title">Syarat &amp; Ketentuan :</div>
+              <pre class="catatan-text">{{
+                getVal("pro_syarat_ketentuan")
+              }}</pre>
             </div>
           </td>
         </tr>
@@ -391,7 +439,7 @@ const bahanNames = computed(() =>
   vertical-align: top;
 }
 .info-table .lbl {
-  width: 90px;
+  width: 100px;
 }
 .info-table .sep {
   width: 10px;
@@ -526,6 +574,15 @@ const bahanNames = computed(() =>
   white-space: pre-wrap;
   margin: 0;
   line-height: 1.4;
+}
+.sk-box {
+  margin-top: 14px;
+  font-size: 10px;
+  line-height: 1.4;
+}
+.sk-title {
+  font-weight: bold;
+  margin-bottom: 2px;
 }
 </style>
 

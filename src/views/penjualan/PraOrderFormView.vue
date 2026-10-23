@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, nextTick } from "vue";
+import { ref, computed, onMounted, nextTick } from "vue";
 import { useRouter } from "vue-router";
 import { useForm } from "@/composables/useForm";
 import { praOrderService } from "@/services/penjualan/praOrderService";
@@ -45,9 +45,18 @@ const initialData = {
   CatatanDeadline: "",
   Keterangan: "",
   UkuranBebas: "",
+  QtyRencana: 0,
+  Panjang: 0,
+  Lebar: 0,
+  JmlDesain: null as number | null,
+  BrgKode: null as number | null,
+  SumberBahan: "",
+  BahanStatus: "",
+  BahanSpandukNama: "",
   StatusBahan: "BELUM DICEK",
   StatusPpic: "PENDING",
   CatatanPpic: "",
+  SyaratKetentuan: "",
   NomorMH: "",
   Status: "OPEN",
   StatusEdit: "",
@@ -107,9 +116,18 @@ const {
       CatatanDeadline: d.pro_catatan_deadline,
       Keterangan: d.pro_keterangan,
       UkuranBebas: d.pro_ukuran_bebas || "",
+      QtyRencana: Number(d.pro_qty_rencana) || 0,
+      Panjang: Number(d.pro_panjang) || 0,
+      Lebar: Number(d.pro_lebar) || 0,
+      JmlDesain: d.pro_jml_desain == null ? null : Number(d.pro_jml_desain),
+      BrgKode: d.pro_brg_kode ?? null,
+      SumberBahan: d.pro_sumber_bahan || "",
+      BahanStatus: d.pro_bahan_status || "",
+      BahanSpandukNama: d.BahanSpandukNama || "",
       StatusBahan: d.pro_status_bahan,
       StatusPpic: d.pro_status_ppic,
       CatatanPpic: d.pro_catatan_ppic,
+      SyaratKetentuan: d.pro_syarat_ketentuan || "",
       NomorMH: d.pro_mh_nomor,
       Status: d.pro_status,
       StatusEdit: d.StatusEdit,
@@ -151,6 +169,12 @@ const {
         catatanDeadline: dataToSave.CatatanDeadline,
         keterangan: dataToSave.Keterangan,
         ukuranBebas: dataToSave.UkuranBebas,
+        qtyRencana: dataToSave.QtyRencana,
+        panjang: dataToSave.Panjang,
+        lebar: dataToSave.Lebar,
+        jmlDesain: dataToSave.JmlDesain,
+        brgKode: dataToSave.BrgKode,
+        sumberBahan: dataToSave.SumberBahan,
         bahan: dataToSave.Bahan.map((b) => ({ kode: b.Kode })),
         ukuran: dataToSave.Ukuran.map((u) => ({ kode: u.Kode, qty: u.Qty })),
         StatusEdit: dataToSave.StatusEdit,
@@ -221,14 +245,49 @@ onMounted(async () => {
 });
 
 const currentTab = ref(0);
-const tabs = [
+const tabs = computed(() => [
   { text: "1. Rencana Order", icon: IconNotebook },
-  { text: "2. Ukuran & Keterangan", icon: IconRuler2 },
+  {
+    text:
+      String(formData.value.Divisi) === "1"
+        ? "2. Keterangan"
+        : "2. Ukuran & Keterangan",
+    icon: IconRuler2,
+  },
   { text: "3. Katalog Referensi", icon: IconPhoto },
-];
+]);
 
 const handleFileSelected = (file: File | null) => {
   pendingFile.value = file;
+};
+
+const onValidateSave = () => {
+  if (!(Number(formData.value.QtyRencana) > 0)) {
+    toast.warning("Rencana Order wajib diisi.");
+    currentTab.value = 0;
+    return;
+  }
+  if (String(formData.value.Divisi) === "1") {
+    // hapus blok ini kalau P x L Spanduk tidak jadi wajib
+    if (
+      !(Number(formData.value.Panjang) > 0 && Number(formData.value.Lebar) > 0)
+    ) {
+      toast.warning("Ukuran (Panjang x Lebar) wajib diisi.");
+      currentTab.value = 0;
+      return;
+    }
+    if (!formData.value.BrgKode) {
+      toast.warning("Kebutuhan bahan wajib dipilih.");
+      currentTab.value = 0;
+      return;
+    }
+    if (!formData.value.SumberBahan) {
+      toast.warning("Pilih sumber bahan: Stok Tersedia atau Pengajuan.");
+      currentTab.value = 0;
+      return;
+    }
+  }
+  showSaveDialog.value = true;
 };
 </script>
 
@@ -243,7 +302,7 @@ const handleFileSelected = (file: File | null) => {
     v-model:show-save-dialog="showSaveDialog"
     v-model:show-cancel-dialog="showCancelDialog"
     v-model:show-close-dialog="showCloseDialog"
-    @validate-save="showSaveDialog = true"
+    @validate-save="onValidateSave"
     @confirm-save="executeSave"
     @confirm-cancel="executeCancel"
     @confirm-close="executeClose"

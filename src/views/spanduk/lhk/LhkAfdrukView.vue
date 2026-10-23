@@ -1,11 +1,17 @@
 <script setup lang="ts">
-import { ref, watch, onMounted } from "vue";
+import { ref, computed, watch, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
 import BaseBrowse from "@/components/BaseBrowse.vue";
 import { useBrowse } from "@/composables/useBrowse";
 import { exportExcelSingle, type ExcelColumn } from "@/utils/excelExport";
 import * as lhkService from "@/services/spanduk/lhk/lhkAfdrukService";
+import { getLookupBahan } from "@/services/spanduk/lhk/lhkAfdrukFormService";
+import type { BahanOption } from "@/services/spanduk/lhk/lhkAfdrukFormService";
+import {
+  SLOT_BAHAN,
+  type SlotBahan,
+} from "@/services/spanduk/lhk/lhkAfdrukBahan";
 import type {
   LhkAfdrukRow,
   LhkAfdrukDetailRow,
@@ -24,8 +30,8 @@ interface ExportDetailRow {
   Panjang: number;
   Lebar: number;
   J_Plangkan: number;
-  Ulano: number;
-  Screen: number;
+  J_Meter: number;
+  Keterangan: string;
 }
 
 const toast = useToast();
@@ -98,7 +104,21 @@ const {
 
 const baseBrowseRef = ref<InstanceType<typeof BaseBrowse> | null>(null);
 
-const headers = [
+// Judul kolom bahan = nama + satuan dari master; label slot sebagai cadangan
+const bahanMaster = ref<BahanOption[]>([]);
+
+const judulBahan = (s: SlotBahan): string => {
+  const m =
+    s.kode === null
+      ? undefined
+      : bahanMaster.value.find((o) => o.Kode === s.kode);
+  if (!m) {
+    return s.label;
+  }
+  return m.Satuan ? `${m.Nama} (${m.Satuan})` : m.Nama;
+};
+
+const headersTetap = [
   { title: "Nomor", key: "Nomor", width: "170px" },
   { title: "Tanggal", key: "Tanggal", width: "110px", align: "center" },
   { title: "Kode Pabrik", key: "Kode_Pabrik", width: "120px" },
@@ -106,6 +126,16 @@ const headers = [
   { title: "Kar Borongan", key: "Kar_Borongan", width: "120px", align: "end" },
   { title: "Kar Harian", key: "Kar_Harian", width: "110px", align: "end" },
 ];
+
+const headers = computed(() => [
+  ...headersTetap,
+  ...SLOT_BAHAN.map((s) => ({
+    title: judulBahan(s),
+    key: s.kolom,
+    width: "170px",
+    align: "end",
+  })),
+]);
 
 const INT = "#,##0";
 const NUM = "#,##0.00";
@@ -131,6 +161,19 @@ const kolomMaster: ExcelColumn[] = [
   },
 ];
 
+const kolomExportMaster = computed<ExcelColumn[]>(() => [
+  ...kolomMaster,
+  ...SLOT_BAHAN.map(
+    (s): ExcelColumn => ({
+      header: judulBahan(s),
+      key: s.kolom,
+      width: 22,
+      align: "right",
+      numFmt: NUM,
+    }),
+  ),
+]);
+
 const kolomDetail: ExcelColumn[] = [
   { header: "Nomor", key: "Nomor", width: 20 },
   { header: "Tanggal", key: "Tanggal", width: 14, align: "center" },
@@ -154,15 +197,23 @@ const kolomDetail: ExcelColumn[] = [
     align: "right",
     numFmt: INT,
   },
-  { header: "Ulano", key: "Ulano", width: 10, align: "right", numFmt: NUM },
-  { header: "Screen", key: "Screen", width: 10, align: "right", numFmt: NUM },
+  { header: "J Meter", key: "J_Meter", width: 12, align: "right", numFmt: NUM },
+  { header: "Keterangan", key: "Keterangan", width: 30 },
 ];
 
 // Data master yang sedang tampil (ikut search + filter kolom BaseBrowse)
 const dataTampil = (): LhkAfdrukRow[] =>
   baseBrowseRef.value?.getFilteredItems() ?? items.value ?? [];
 
-onMounted(() => fetchData());
+onMounted(async () => {
+  fetchData();
+  try {
+    bahanMaster.value = await getLookupBahan();
+  } catch (e) {
+    // judul kolom bahan memakai label slot
+    console.error(e);
+  }
+});
 
 watch(() => filterState.value.dtAwal, fetchData);
 watch(() => filterState.value.dtAkhir, fetchData);
@@ -207,7 +258,7 @@ const onPrint = () => {
 // --- EXPORT ---
 const exportMaster = () =>
   exportToExcel("LHK_Afdruk_Header", {
-    columns: kolomMaster,
+    columns: kolomExportMaster.value,
     getData: () =>
       dataTampil().map((r) => ({ ...r, Tanggal: formatTanggal(r.Tanggal) })),
   });
@@ -237,8 +288,8 @@ const exportDetail = async () => {
         Panjang: Number(r.Panjang) || 0,
         Lebar: Number(r.Lebar) || 0,
         J_Plangkan: Number(r.J_Plangkan) || 0,
-        Ulano: Number(r.Ulano) || 0,
-        Screen: Number(r.Screen) || 0,
+        J_Meter: Number(r.J_Meter) || 0,
+        Keterangan: r.Keterangan ?? "",
       });
     }
   }
@@ -316,8 +367,8 @@ const numFmt = (v: number | null) =>
               <th width="80" class="tr">Panjang</th>
               <th width="80" class="tr">Lebar</th>
               <th width="90" class="tr">J Plangkan</th>
-              <th width="80" class="tr">Ulano</th>
-              <th width="80" class="tr">Screen</th>
+              <th width="90" class="tr">J Meter</th>
+              <th>Keterangan</th>
             </tr>
           </thead>
           <tbody>
@@ -328,8 +379,8 @@ const numFmt = (v: number | null) =>
               <td class="tr">{{ numFmt(r.Panjang) }}</td>
               <td class="tr">{{ numFmt(r.Lebar) }}</td>
               <td class="tr">{{ numFmt(r.J_Plangkan) }}</td>
-              <td class="tr">{{ numFmt(r.Ulano) }}</td>
-              <td class="tr">{{ numFmt(r.Screen) }}</td>
+              <td class="tr">{{ numFmt(r.J_Meter) }}</td>
+              <td>{{ r.Keterangan }}</td>
             </tr>
             <tr v-if="!detailMap[item.Nomor]?.length">
               <td colspan="8" class="text-center text-grey py-3 font-italic">

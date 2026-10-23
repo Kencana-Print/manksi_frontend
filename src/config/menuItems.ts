@@ -107,6 +107,7 @@ import {
   IconBulb,
   IconFlame,
   IconFold,
+  IconSkull,
 } from "@tabler/icons-vue";
 
 export interface NavItem {
@@ -503,14 +504,9 @@ export const createMenuItems = (): NavItem[] => {
           icon: IconClipboardList,
           subItems: [
             {
-              title: "LHK Plotter",
-              to: "/spanduk/lhk/lhk-plotter",
-              icon: IconListDetails,
-            },
-            {
-              title: "LHK Hapus Plankan",
-              to: "/spanduk/lhk/lhk-hapus-plankan",
-              icon: IconEraser,
+              title: "LHK Design",
+              to: "/spanduk/lhk/lhk-design",
+              icon: IconSkull,
             },
             {
               title: "LHK Afdruk",
@@ -564,12 +560,12 @@ export const createMenuItems = (): NavItem[] => {
           to: "/spanduk/mutasi-marketing",
           icon: IconTruckDelivery,
         },
-        {
-          title: "Mutasi Produksi",
-          to: "/spanduk/mutasi-produksi",
-          icon: IconArrowsExchange,
-          // Tanpa menuId, mengikuti hak akses parent (4)
-        },
+        // {
+        //   title: "Mutasi Produksi",
+        //   to: "/spanduk/mutasi-produksi",
+        //   icon: IconArrowsExchange,
+        //   // Tanpa menuId, mengikuti hak akses parent (4)
+        // },
         {
           title: "Surat Terima Barang Jadi (STBJ)",
           to: "/spanduk/stbj",

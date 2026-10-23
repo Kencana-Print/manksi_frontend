@@ -23,11 +23,29 @@ export interface LhkAfdrukDetail {
   Panjang: number | null;
   Lebar: number | null;
   J_Plangkan: number;
-  Ulano: number | null;
-  Screen: number | null;
-  Lem: number | null;
-  Katalis: number | null;
+  J_Meter: number | null;
+  Jumlah_Meter: number;
+  Keterangan: string | null;
   Plangkan: LhkAfdrukPlangkan[];
+}
+
+export interface LhkAfdrukBahan {
+  Kode_Bahan: number;
+  Nama_Bahan: string | null;
+  Satuan: string | null;
+  Qty: number;
+}
+
+export interface BahanOption {
+  Kode: number;
+  Nama: string;
+  Satuan: string | null;
+  Stok: number | null;
+}
+
+export interface LhkAfdrukPayloadBahan {
+  Kode_Bahan: number;
+  Qty: number;
 }
 
 export interface LhkAfdrukForm {
@@ -35,21 +53,20 @@ export interface LhkAfdrukForm {
   Tanggal: string;
   Kode_Pabrik: string | null;
   Nama_Pabrik: string | null;
+  Bahan: LhkAfdrukBahan[];
   Detail: LhkAfdrukDetail[];
 }
 
 export interface LhkAfdrukPayloadRow {
   Nomor_SPK: string;
-  Ulano: number;
-  Screen: number;
-  Lem: number;
-  Katalis: number;
+  Keterangan: string;
   Plangkan: LhkAfdrukPlangkan[];
 }
 
 export interface LhkAfdrukPayload {
   Tanggal: string;
   Kode_Pabrik: string;
+  Bahan: LhkAfdrukPayloadBahan[];
   Detail: LhkAfdrukPayloadRow[];
 }
 
@@ -97,6 +114,13 @@ export const getLookupPabrik = async (): Promise<PabrikOption[]> => {
 export const getLookupUkuran = async (): Promise<UkuranOption[]> => {
   const res = await api.get<ApiResponse<UkuranOption[]>>(
     `${BASE}/lookups/ukuran`,
+  );
+  return res.data.data ?? [];
+};
+
+export const getLookupBahan = async (): Promise<BahanOption[]> => {
+  const res = await api.get<ApiResponse<BahanOption[]>>(
+    `${BASE}/lookups/bahan`,
   );
   return res.data.data ?? [];
 };

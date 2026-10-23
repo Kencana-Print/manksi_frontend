@@ -1073,96 +1073,38 @@ const router = createRouter({
     },
 
     {
-      path: "/spanduk/lhk/lhk-plotter",
-      name: "SpandukLhkPlotter",
-      component: () => import("@/views/spanduk/lhk/LhkPlotterView.vue"),
+      path: "/spanduk/lhk/lhk-design",
+      name: "SpandukLhkDesign",
+      component: () => import("@/views/spanduk/lhk/LhkDesignView.vue"),
       meta: {
         layout: "DefaultLayout",
         requiresAuth: true,
         menuId: "4",
-        title: "LHK Plotter",
+        title: "LHK Design",
       },
     },
     {
-      path: "/spanduk/lhk/lhk-plotter/form",
-      name: "SpandukLhkPlotterCreate",
-      component: () => import("@/views/spanduk/lhk/LhkPlotterFormView.vue"),
+      path: "/spanduk/lhk/lhk-design/form",
+      name: "SpandukLhkDesignCreate",
+      component: () => import("@/views/spanduk/lhk/LhkDesignFormView.vue"),
       meta: {
         layout: "DefaultLayout",
         requiresAuth: true,
         menuId: "4",
-        title: "Tambah LHK Plotter",
-        browseRoute: "SpandukLhkPlotter",
+        title: "Tambah LHK Design",
+        browseRoute: "SpandukLhkDesign",
       },
     },
     {
-      path: "/spanduk/lhk/lhk-plotter/form/:nomor",
-      name: "SpandukLhkPlotterEdit",
-      component: () => import("@/views/spanduk/lhk/LhkPlotterFormView.vue"),
+      path: "/spanduk/lhk/lhk-design/form/:nomor",
+      name: "SpandukLhkDesignEdit",
+      component: () => import("@/views/spanduk/lhk/LhkDesignFormView.vue"),
       meta: {
         layout: "DefaultLayout",
         requiresAuth: true,
         menuId: "4",
-        title: "Ubah LHK Plotter",
-        browseRoute: "SpandukLhkPlotter",
-      },
-    },
-    {
-      path: "/spanduk/lhk/lhk-plotter/print/:nomor",
-      name: "SpandukLhkPlotterPrint",
-      component: () => import("@/views/spanduk/lhk/LhkPlotterPrintView.vue"),
-      meta: {
-        title: "Cetak LHK Plotter",
-        layout: "BlankLayout",
-        requiresAuth: true,
-      },
-    },
-    {
-      path: "/spanduk/lhk/lhk-hapus-plankan",
-      name: "SpandukLhkHapusPlankan",
-      component: () => import("@/views/spanduk/lhk/LhkHapusPlankanView.vue"),
-      meta: {
-        layout: "DefaultLayout",
-        requiresAuth: true,
-        menuId: "4",
-        title: "LHK Hapus Plankan",
-      },
-    },
-    {
-      path: "/spanduk/lhk/lhk-hapus-plankan/form",
-      name: "SpandukLhkHapusPlankanCreate",
-      component: () =>
-        import("@/views/spanduk/lhk/LhkHapusPlankanFormView.vue"),
-      meta: {
-        layout: "DefaultLayout",
-        requiresAuth: true,
-        menuId: "4",
-        title: "Tambah LHK Hapus Plankan",
-        browseRoute: "SpandukLhkHapusPlankan",
-      },
-    },
-    {
-      path: "/spanduk/lhk/lhk-hapus-plankan/form/:nomor",
-      name: "SpandukLhkHapusPlankanEdit",
-      component: () =>
-        import("@/views/spanduk/lhk/LhkHapusPlankanFormView.vue"),
-      meta: {
-        layout: "DefaultLayout",
-        requiresAuth: true,
-        menuId: "4",
-        title: "Ubah LHK Hapus Plankan",
-        browseRoute: "SpandukLhkHapusPlankan",
-      },
-    },
-    {
-      path: "/spanduk/lhk/lhk-hapus-plankan/print/:nomor",
-      name: "SpandukLhkHapusPlankanPrint",
-      component: () =>
-        import("@/views/spanduk/lhk/LhkHapusPlankanPrintView.vue"),
-      meta: {
-        title: "Cetak LHK Hapus Plankan",
-        layout: "BlankLayout",
-        requiresAuth: true,
+        title: "Ubah LHK Design",
+        browseRoute: "SpandukLhkDesign",
       },
     },
     {
@@ -1574,54 +1516,54 @@ const router = createRouter({
         title: "Cetak Mutasi Marketing",
       },
     },
-    {
-      path: "/spanduk/mutasi-produksi",
-      name: "SpandukMutasiProduksi",
-      component: () => import("@/views/spanduk/MutasiProduksiSpandukView.vue"),
-      meta: {
-        layout: "DefaultLayout",
-        requiresAuth: true,
-        menuId: "4",
-        title: "Mutasi Produksi Spanduk",
-      },
-    },
-    {
-      path: "/spanduk/mutasi-produksi/form",
-      name: "SpandukMutasiProduksiCreate",
-      component: () =>
-        import("@/views/spanduk/MutasiProduksiSpandukFormView.vue"),
-      meta: {
-        layout: "DefaultLayout",
-        requiresAuth: true,
-        menuId: "4",
-        title: "Tambah Mutasi Produksi Spanduk",
-        browseRoute: "SpandukMutasiProduksi",
-      },
-    },
-    {
-      path: "/spanduk/mutasi-produksi/form/:nomor",
-      name: "SpandukMutasiProduksiEdit",
-      component: () =>
-        import("@/views/spanduk/MutasiProduksiSpandukFormView.vue"),
-      meta: {
-        layout: "DefaultLayout",
-        requiresAuth: true,
-        menuId: "4",
-        title: "Ubah Mutasi Produksi Spanduk",
-        browseRoute: "SpandukMutasiProduksi",
-      },
-    },
-    {
-      path: "/spanduk/mutasi-produksi/print/:nomor",
-      name: "SpandukMutasiProduksiPrint",
-      component: () =>
-        import("@/views/spanduk/MutasiProduksiSpandukPrintView.vue"),
-      meta: {
-        layout: "BlankLayout",
-        requiresAuth: true,
-        title: "Cetak Mutasi Produksi Spanduk",
-      },
-    },
+    // {
+    //   path: "/spanduk/mutasi-produksi",
+    //   name: "SpandukMutasiProduksi",
+    //   component: () => import("@/views/spanduk/MutasiProduksiSpandukView.vue"),
+    //   meta: {
+    //     layout: "DefaultLayout",
+    //     requiresAuth: true,
+    //     menuId: "4",
+    //     title: "Mutasi Produksi Spanduk",
+    //   },
+    // },
+    // {
+    //   path: "/spanduk/mutasi-produksi/form",
+    //   name: "SpandukMutasiProduksiCreate",
+    //   component: () =>
+    //     import("@/views/spanduk/MutasiProduksiSpandukFormView.vue"),
+    //   meta: {
+    //     layout: "DefaultLayout",
+    //     requiresAuth: true,
+    //     menuId: "4",
+    //     title: "Tambah Mutasi Produksi Spanduk",
+    //     browseRoute: "SpandukMutasiProduksi",
+    //   },
+    // },
+    // {
+    //   path: "/spanduk/mutasi-produksi/form/:nomor",
+    //   name: "SpandukMutasiProduksiEdit",
+    //   component: () =>
+    //     import("@/views/spanduk/MutasiProduksiSpandukFormView.vue"),
+    //   meta: {
+    //     layout: "DefaultLayout",
+    //     requiresAuth: true,
+    //     menuId: "4",
+    //     title: "Ubah Mutasi Produksi Spanduk",
+    //     browseRoute: "SpandukMutasiProduksi",
+    //   },
+    // },
+    // {
+    //   path: "/spanduk/mutasi-produksi/print/:nomor",
+    //   name: "SpandukMutasiProduksiPrint",
+    //   component: () =>
+    //     import("@/views/spanduk/MutasiProduksiSpandukPrintView.vue"),
+    //   meta: {
+    //     layout: "BlankLayout",
+    //     requiresAuth: true,
+    //     title: "Cetak Mutasi Produksi Spanduk",
+    //   },
+    // },
     {
       path: "/spanduk/stbj",
       name: "SpandukStbjBrowse",

@@ -17,6 +17,15 @@ export interface LhkAfdrukRow {
   Nama_Pabrik: string | null;
   Kar_Borongan: number | null;
   Kar_Harian: number | null;
+  Rinso: number | null;
+  Porstek: number | null;
+  M46: number | null;
+  Kaporit: number | null;
+  Caustik: number | null;
+  Ulano: number | null;
+  Screen: number | null;
+  Lem: number | null;
+  Katalis: number | null;
 }
 
 export interface LhkAfdrukDetailRow {
@@ -27,8 +36,8 @@ export interface LhkAfdrukDetailRow {
   Panjang: number | null;
   Lebar: number | null;
   J_Plangkan: number | null;
-  Ulano: number | null;
-  Screen: number | null;
+  J_Meter: number | null;
+  Keterangan: string | null;
 }
 
 export const getBrowse = async (

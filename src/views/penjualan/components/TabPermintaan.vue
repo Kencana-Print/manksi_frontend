@@ -154,6 +154,8 @@ const fillFromProOrder = async (kode: string) => {
     props.formData.RencanaOrder = d.rencanaOrder;
     props.formData.Kain = d.kain;
     props.formData.Ukuran = d.ukuran;
+    props.formData.Panjang = Number(d.panjang) || 0;
+    props.formData.Lebar = Number(d.lebar) || 0;
     // ⬅ BARU: Keterangan & gambar referensi dari Pra Order
     if (d.keterangan) props.formData.Keterangan = d.keterangan;
     if (d.imageUrl) props.formData.PathImage = d.imageUrl;

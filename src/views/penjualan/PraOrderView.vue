@@ -114,7 +114,23 @@ const headers = [
   { title: "SALES", key: "Sales", width: "130px" },
   { title: "NAMA PEKERJAAN", key: "NamaPekerjaan", width: "220px" },
   { title: "BAHAN", key: "Bahan", width: "180px" },
+  {
+    title: "Sumber Bahan",
+    key: "SumberBahan",
+    width: "120px",
+    align: "center",
+  },
+  { title: "Rencana Order", key: "QtyRencana", width: "120px", align: "end" },
+  { title: "Jml Desain", key: "JmlDesain", width: "100px", align: "end" },
+  { title: "Panjang (Mtr)", key: "Panjang", width: "110px", align: "end" },
+  { title: "Lebar (Mtr)", key: "Lebar", width: "110px", align: "end" },
+  { title: "Ket. Ukuran", key: "KetUkuran", width: "180px" },
+  { title: "Finishing", key: "Finishing", width: "150px" },
+  { title: "Kirim", key: "Kirim", width: "90px", align: "center" },
+  { title: "Ket. Kirim", key: "KetKirim", width: "200px" },
+  { title: "Syarat & Ketentuan", key: "SyaratKetentuan", width: "220px" },
   { title: "Qty Rencana", key: "QtyRencana", width: "110px", align: "end" },
+  { title: "Jml Desain", key: "JmlDesain", width: "100px", align: "end" },
   { title: "Tgl Kirim", key: "TglKirim", width: "110px", align: "center" },
   {
     title: "Status Bahan",
@@ -146,6 +162,24 @@ const rowPropsFn = (data: any) => {
 
 const fmtNum = (v: any) =>
   new Intl.NumberFormat("id-ID").format(Number(v) || 0);
+
+// Panjang / Lebar (Mtr): 0 atau kosong (non-Spanduk) tampil "—"
+const fmtMtr = (v: number | string | null | undefined) => {
+  const n = Number(v) || 0;
+  return n > 0
+    ? new Intl.NumberFormat("id-ID", { maximumFractionDigits: 3 }).format(n)
+    : "—";
+};
+const SUMBER_LABEL: Record<string, string> = {
+  STOK: "Stok Tersedia",
+  PENGAJUAN: "Pengajuan",
+};
+const labelSumber = (v?: string | null) => (v ? (SUMBER_LABEL[v] ?? v) : "—");
+const KIRIM_LABEL: Record<string, string> = {
+  CLOSED: "Closed",
+  PARSIAL: "Parsial",
+};
+const labelKirim = (v?: string | null) => (v ? (KIRIM_LABEL[v] ?? v) : "—");
 
 // ── Navigation ────────────────────────────────────────────────────────
 const handleAdd = () => router.push("/penjualan/pra-order/create");
@@ -179,12 +213,31 @@ const onExport = () => {
     { header: "SALES", key: "Sales" },
     { header: "NAMA PEKERJAAN", key: "NamaPekerjaan", width: 26 },
     { header: "BAHAN", key: "Bahan", width: 24 },
+    { header: "Sumber Bahan", key: "SumberBahan", align: "center" },
     {
-      header: "Qty Rencana",
+      header: "Rencana Order",
       key: "QtyRencana",
       align: "right",
       numFmt: "#,##0",
     },
+    {
+      header: "Jml Desain",
+      key: "JmlDesain",
+      align: "right",
+      numFmt: "#,##0",
+    },
+    {
+      header: "Panjang (Mtr)",
+      key: "Panjang",
+      align: "right",
+      numFmt: "#,##0.00",
+    },
+    { header: "Lebar (Mtr)", key: "Lebar", align: "right", numFmt: "#,##0.00" },
+    { header: "Ket. Ukuran", key: "KetUkuran", width: 26 },
+    { header: "Finishing", key: "Finishing", width: 20 },
+    { header: "Kirim", key: "Kirim" },
+    { header: "Ket. Kirim", key: "KetKirim" },
+    { header: "Syarat & Ketentuan", key: "SyaratKetentuan" },
     { header: "Tgl Kirim", key: "TglKirim", align: "center" },
     { header: "Status Bahan", key: "StatusBahan", align: "center" },
     { header: "Status PPIC", key: "StatusPpic", align: "center" },
@@ -207,6 +260,10 @@ const onExport = () => {
         TglSoEstimasi: formatTanggal(r.TglSoEstimasi),
         TglMap: formatTanggal(r.TglMap),
         Created: formatTanggalJam(r.Created),
+        JmlDesain: r.JmlDesain ?? "",
+        SumberBahan: labelSumber(r.SumberBahan),
+        Panjang: Number(r.Panjang) > 0 ? Number(r.Panjang) : "",
+        Lebar: Number(r.Lebar) > 0 ? Number(r.Lebar) : "",
       }));
     },
     columns,
@@ -275,6 +332,13 @@ const handleConvert = async () => {
   );
   if (!isDivisiTanpaCekPpic && item.StatusPpic !== "SANGGUP") {
     toast.warning("PPIC belum menyatakan sanggup untuk order ini.");
+    return;
+  }
+  if (
+    (item.Divisi || "").toUpperCase() === "SPANDUK" &&
+    item.StatusBahan !== "READY"
+  ) {
+    toast.warning("Kebutuhan bahan belum dikonfirmasi READY.");
     return;
   }
   isConverting.value = true;
@@ -433,6 +497,31 @@ const handleConvert = async () => {
 
     <template #item.QtyRencana="{ item }">{{
       fmtNum((item.raw || item).QtyRencana)
+    }}</template>
+    <template #item.Kirim="{ item }">
+      <v-chip
+        v-if="(item.raw || item).Kirim"
+        size="x-small"
+        :color="(item.raw || item).Kirim === 'PARSIAL' ? 'warning' : 'success'"
+        variant="flat"
+      >
+        {{ labelKirim((item.raw || item).Kirim) }}
+      </v-chip>
+      <span v-else>—</span>
+    </template>
+    <template #item.JmlDesain="{ item }">{{
+      (item.raw || item).JmlDesain == null
+        ? "—"
+        : fmtNum((item.raw || item).JmlDesain)
+    }}</template>
+    <template #item.SumberBahan="{ item }">{{
+      labelSumber((item.raw || item).SumberBahan)
+    }}</template>
+    <template #item.Panjang="{ item }">{{
+      fmtMtr((item.raw || item).Panjang)
+    }}</template>
+    <template #item.Lebar="{ item }">{{
+      fmtMtr((item.raw || item).Lebar)
     }}</template>
     <template #item.Tanggal="{ item }">{{
       formatTanggal((item.raw || item).Tanggal)

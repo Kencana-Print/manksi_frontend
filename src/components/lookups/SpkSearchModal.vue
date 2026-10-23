@@ -18,7 +18,8 @@ const props = defineProps<{
     | "spk-map"
     | "po-external"
     | "all"
-    | "stbj-spanduk";
+    | "stbj-spanduk"
+    | "lhk-design";
   cusKode?: string;
   perushKode?: string;
   divisi?: string | number;
@@ -174,6 +175,9 @@ const selectItem = (item: any) => {
               <th style="width: 88px">TANGGAL</th>
               <th style="width: 72px; text-align: right">JUMLAH</th>
               <th style="width: 90px">UKURAN</th>
+              <th v-if="props.filterMode === 'lhk-design'" style="width: 60px">
+                JENIS
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -191,6 +195,7 @@ const selectItem = (item: any) => {
                 {{ Number(item.Jumlah).toLocaleString("id-ID") }}
               </td>
               <td>{{ item.Ukuran }}</td>
+              <td v-if="props.filterMode === 'lhk-design'">{{ item.Jenis }}</td>
             </tr>
           </tbody>
         </table>
