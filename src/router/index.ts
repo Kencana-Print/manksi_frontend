@@ -4204,6 +4204,41 @@ const router = createRouter({
         menuId: "119",
       },
     },
+    {
+      path: "/penjualan/permintaan-driver",
+      name: "PermintaanDriverBrowse",
+      component: () => import("@/views/penjualan/PermintaanDriverView.vue"),
+      meta: {
+        title: "Permintaan Driver",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "189",
+      },
+    },
+    {
+      path: "/penjualan/permintaan-driver/create",
+      name: "PermintaanDriverCreate",
+      component: () => import("@/views/penjualan/PermintaanDriverFormView.vue"),
+      meta: {
+        title: "Tambah Permintaan Driver",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "189",
+        browseRoute: "PermintaanDriverBrowse",
+      },
+    },
+    {
+      path: "/penjualan/permintaan-driver/edit/:nomor",
+      name: "PermintaanDriverEdit",
+      component: () => import("@/views/penjualan/PermintaanDriverFormView.vue"),
+      meta: {
+        title: "Ubah Permintaan Driver",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "189",
+        browseRoute: "PermintaanDriverBrowse",
+      },
+    },
 
     // ── Piutang ───────────────────────────────────────────────────
     {
