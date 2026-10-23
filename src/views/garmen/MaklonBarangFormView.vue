@@ -363,9 +363,6 @@ const validateSave = () => {
   if (!formData.value.CabAsal || !formData.value.CabTujuan) {
     return toast.warning("Cabang Asal dan Cabang Tujuan wajib diisi.");
   }
-  if (formData.value.CabAsal === formData.value.CabTujuan) {
-    return toast.warning("Cabang Asal dan Cabang Tujuan tidak boleh sama.");
-  }
   if (!formData.value.Deadline) {
     return toast.warning("Deadline wajib diisi.");
   }
