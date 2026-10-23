@@ -15,22 +15,23 @@ export interface LhkTintaRow {
   Tanggal: string;
   Kode_Pabrik: string | null;
   Nama_Pabrik: string | null;
+  Nomor_Cetak: string | null;
+  Tanggal_Cetak: string | null;
   Jml_SPK: number | null;
+  Jml_Bahan: number | null;
 }
 
-// Satu baris per SPK per bahan. SPK tanpa pemakaian tinta tetap muncul
-// dengan Kode_Bahan/Nama_Bahan/Qty bernilai null.
+// Satu baris per LHK per bahan
 export interface LhkTintaDetailRow {
   Nomor: string;
-  Nomor_SPK: string;
-  Nama_SPK: string | null;
-  Jumlah_Order: number | null;
-  Panjang: number | null;
-  Lebar: number | null;
-  Kode_Bahan: number | null;
+  Tanggal: string;
+  Nomor_Cetak: string | null;
+  Kode_Bahan: number;
   Nama_Bahan: string | null;
+  Qty_Input: number;
+  Satuan_Input: string | null;
+  Qty: number;
   Satuan: string | null;
-  Qty: number | null;
 }
 
 export const getBrowse = async (

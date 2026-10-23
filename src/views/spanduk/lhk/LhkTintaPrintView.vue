@@ -3,7 +3,10 @@ import { ref, onMounted, computed } from "vue";
 import { useRoute } from "vue-router";
 import { useToast } from "vue-toastification";
 import * as lhkForm from "@/services/spanduk/lhk/lhkTintaFormService";
-import type { LhkTintaForm } from "@/services/spanduk/lhk/lhkTintaFormService";
+import type {
+  LhkTintaBahan,
+  LhkTintaForm,
+} from "@/services/spanduk/lhk/lhkTintaFormService";
 
 const route = useRoute();
 const toast = useToast();
@@ -39,26 +42,23 @@ const fmtInt = (v: number | null | undefined): string =>
   Number(v ?? 0).toLocaleString("id-ID", { maximumFractionDigits: 2 });
 
 const rows = computed(() => data.value?.Detail ?? []);
+const bahan = computed(() => data.value?.Bahan ?? []);
 
-// Rekap per bahan (satuan bahan sama, jadi aman dijumlahkan)
-const rekap = computed(() => {
-  const peta = new Map<number, { nama: string; satuan: string; qty: number }>();
-  for (const r of rows.value) {
-    for (const t of r.Tinta) {
-      const ada = peta.get(t.Kode_Bahan);
-      if (ada) {
-        ada.qty += Number(t.Qty) || 0;
-      } else {
-        peta.set(t.Kode_Bahan, {
-          nama: t.Nama_Bahan ?? String(t.Kode_Bahan),
-          satuan: t.Satuan ?? "",
-          qty: Number(t.Qty) || 0,
-        });
-      }
-    }
-  }
-  return [...peta.values()].sort((a, b) => a.nama.localeCompare(b.nama));
-});
+const fmtQty = (v: number | null | undefined): string =>
+  Number(v ?? 0).toLocaleString("id-ID", { maximumFractionDigits: 4 });
+
+// Satuan master "0" (data master belum benar) tidak ditampilkan
+const satuanTampil = (s: string | null | undefined): string =>
+  s && s !== "0" ? s : "";
+
+// Kolom "Setara" hanya terisi bila satuan yang diketik beda dari satuan master
+const setara = (b: LhkTintaBahan): string => {
+  const dari = (b.Satuan_Input ?? "").toUpperCase();
+  const master = (b.Satuan ?? "").toUpperCase();
+  return dari && master && dari !== master
+    ? `${fmtQty(b.Qty)} ${b.Satuan}`
+    : "";
+};
 </script>
 
 <template>
@@ -78,12 +78,19 @@ const rekap = computed(() => {
           <td>: {{ data.Nomor }}</td>
         </tr>
         <tr>
+          <td>LHK Cetak</td>
+          <td>
+            : {{ data.Nomor_Cetak || "-" }} ({{ fmtTgl(data.Tanggal_Cetak) }})
+          </td>
+        </tr>
+        <tr>
           <td>Lokasi</td>
           <td>: {{ data.Nama_Pabrik || data.Kode_Pabrik || "-" }}</td>
         </tr>
       </table>
 
       <!-- Satu tbody per SPK supaya satu SPK tidak terpotong antar halaman -->
+      <div class="sub-title">SPK / MAP</div>
       <table class="detail-table">
         <thead>
           <tr>
@@ -91,48 +98,41 @@ const rekap = computed(() => {
             <th rowspan="2" width="62">Jumlah<br />Order (Pcs)</th>
             <th colspan="2">Spesifikasi</th>
             <th rowspan="2" width="105">Nomor SPK</th>
-            <th colspan="3">Pemakaian Tinta/Cat</th>
           </tr>
           <tr>
             <th width="38">P</th>
             <th width="38">L</th>
-            <th>Bahan</th>
-            <th width="60">Qty</th>
-            <th width="46">Satuan</th>
           </tr>
         </thead>
-        <tbody v-for="(r, idx) in rows" :key="idx" class="blok-spk">
-          <tr v-for="(t, i) in r.Tinta" :key="t.Kode_Bahan">
-            <template v-if="i === 0">
-              <td :rowspan="r.Tinta.length">{{ r.Nama_SPK }}</td>
-              <td :rowspan="r.Tinta.length" class="tr">
-                {{ fmtInt(r.Jumlah_Order) }}
-              </td>
-              <td :rowspan="r.Tinta.length" class="tr">{{ fmt(r.Panjang) }}</td>
-              <td :rowspan="r.Tinta.length" class="tr">{{ fmt(r.Lebar) }}</td>
-              <td :rowspan="r.Tinta.length" class="tc">{{ r.Nomor_SPK }}</td>
-            </template>
-            <td>{{ t.Nama_Bahan }}</td>
-            <td class="tr">{{ fmt(t.Qty) }}</td>
-            <td>{{ t.Satuan }}</td>
+        <tbody>
+          <tr v-for="r in rows" :key="r.Nomor_SPK">
+            <td>{{ r.Nama_SPK }}</td>
+            <td class="tr">{{ fmtInt(r.Jumlah_Order) }}</td>
+            <td class="tr">{{ fmt(r.Panjang) }}</td>
+            <td class="tr">{{ fmt(r.Lebar) }}</td>
+            <td class="tc">{{ r.Nomor_SPK }}</td>
           </tr>
         </tbody>
       </table>
 
-      <div class="sub-title">Rekap per Bahan</div>
-      <table class="detail-table rekap">
+      <div class="sub-title">Pemakaian Tinta/Cat</div>
+      <table class="detail-table pemakaian">
         <thead>
           <tr>
+            <th width="28">No</th>
             <th>Bahan</th>
-            <th width="80">Total Qty</th>
-            <th width="50">Satuan</th>
+            <th width="70">Jumlah</th>
+            <th width="46">Satuan</th>
+            <th width="90">Setara</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="(b, i) in rekap" :key="i">
-            <td>{{ b.nama }}</td>
-            <td class="tr">{{ fmt(b.qty) }}</td>
-            <td>{{ b.satuan }}</td>
+          <tr v-for="(b, i) in bahan" :key="b.Kode_Bahan">
+            <td class="tc">{{ i + 1 }}</td>
+            <td>{{ b.Nama_Bahan }}</td>
+            <td class="tr">{{ fmtQty(b.Qty_Input) }}</td>
+            <td>{{ satuanTampil(b.Satuan_Input) }}</td>
+            <td class="tr">{{ setara(b) }}</td>
           </tr>
         </tbody>
       </table>
@@ -214,12 +214,8 @@ const rekap = computed(() => {
 .detail-table tr {
   page-break-inside: avoid;
 }
-.blok-spk {
-  break-inside: avoid;
-  page-break-inside: avoid;
-}
-.rekap {
-  width: 60%;
+.pemakaian {
+  width: 70%;
 }
 
 .tc {

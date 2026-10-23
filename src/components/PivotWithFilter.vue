@@ -171,16 +171,18 @@ defineExpose({ exportPivotToExcel, getRowFieldCount });
       >
     </div>
 
-    <!-- ── Pivot ── -->
+    <!-- ── Pivot ── (isi slot menimpa pivot bebas; tanpa slot = pivot bebas) -->
     <div class="pivot-body">
-      <TinyPivotOnly
-        ref="pivotRef"
-        :data="filteredData"
-        :default-rows="defaultRows"
-        :default-cols="defaultCols"
-        :default-vals="defaultVals"
-        @pivot-changed="onPivotChanged"
-      />
+      <slot :data="filteredData">
+        <TinyPivotOnly
+          ref="pivotRef"
+          :data="filteredData"
+          :default-rows="defaultRows"
+          :default-cols="defaultCols"
+          :default-vals="defaultVals"
+          @pivot-changed="onPivotChanged"
+        />
+      </slot>
     </div>
   </div>
 </template>

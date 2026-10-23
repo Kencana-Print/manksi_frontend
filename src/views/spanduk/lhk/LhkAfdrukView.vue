@@ -19,7 +19,9 @@ import type {
 import { IconBulb, IconPrinter, IconFileExport } from "@tabler/icons-vue";
 import { formatTanggal } from "@/utils/dateFormat";
 
-interface ExportDetailRow {
+type BahanExport = Record<SlotBahan["kolom"], number | null>;
+
+interface ExportDetailRow extends BahanExport {
   Nomor: string;
   Tanggal: string;
   Kode_Pabrik: string;
@@ -201,6 +203,32 @@ const kolomDetail: ExcelColumn[] = [
   { header: "Keterangan", key: "Keterangan", width: 30 },
 ];
 
+// Bahan di Export Detail: kolom di paling kanan, judul dari master
+const kolomExportDetail = computed<ExcelColumn[]>(() => [
+  ...kolomDetail,
+  ...SLOT_BAHAN.map(
+    (s): ExcelColumn => ({
+      header: judulBahan(s),
+      key: s.kolom,
+      width: 22,
+      align: "right",
+      numFmt: NUM,
+    }),
+  ),
+]);
+
+const bahanExport = (item: LhkAfdrukRow, tampil: boolean): BahanExport => ({
+  Rinso: tampil ? item.Rinso : null,
+  Porstek: tampil ? item.Porstek : null,
+  M46: tampil ? item.M46 : null,
+  Kaporit: tampil ? item.Kaporit : null,
+  Caustik: tampil ? item.Caustik : null,
+  Ulano: tampil ? item.Ulano : null,
+  Screen: tampil ? item.Screen : null,
+  Lem: tampil ? item.Lem : null,
+  Katalis: tampil ? item.Katalis : null,
+});
+
 // Data master yang sedang tampil (ikut search + filter kolom BaseBrowse)
 const dataTampil = (): LhkAfdrukRow[] =>
   baseBrowseRef.value?.getFilteredItems() ?? items.value ?? [];
@@ -276,12 +304,14 @@ const exportDetail = async () => {
 
   const rows: ExportDetailRow[] = [];
   for (const item of master) {
-    for (const r of detailMap.value[item.Nomor] ?? []) {
+    (detailMap.value[item.Nomor] ?? []).forEach((r, idx) => {
+      // Data LHK (header) dan bahan hanya di baris pertama tiap LHK
+      const pertama = idx === 0;
       rows.push({
-        Nomor: item.Nomor,
-        Tanggal: formatTanggal(item.Tanggal),
-        Kode_Pabrik: item.Kode_Pabrik ?? "",
-        Nama_Pabrik: item.Nama_Pabrik ?? "",
+        Nomor: pertama ? item.Nomor : "",
+        Tanggal: pertama ? formatTanggal(item.Tanggal) : "",
+        Kode_Pabrik: pertama ? (item.Kode_Pabrik ?? "") : "",
+        Nama_Pabrik: pertama ? (item.Nama_Pabrik ?? "") : "",
         Nomor_SPK: r.Nomor_SPK,
         Nama_SPK: r.Nama_SPK ?? "",
         Jumlah_Order: Number(r.Jumlah_Order) || 0,
@@ -290,8 +320,9 @@ const exportDetail = async () => {
         J_Plangkan: Number(r.J_Plangkan) || 0,
         J_Meter: Number(r.J_Meter) || 0,
         Keterangan: r.Keterangan ?? "",
+        ...bahanExport(item, pertama),
       });
-    }
+    });
   }
 
   if (rows.length === 0) {
@@ -302,7 +333,7 @@ const exportDetail = async () => {
     await exportExcelSingle(
       `Export_Detail_LHK_Afdruk_${today}.xlsx`,
       "Detail LHK Afdruk",
-      kolomDetail,
+      kolomExportDetail.value,
       rows,
     );
     toast.success("Berhasil export detail LHK Afdruk.");

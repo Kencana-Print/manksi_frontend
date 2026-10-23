@@ -23,6 +23,7 @@ const props = withDefaults(
 );
 
 const enableDrillDown = ref(true);
+const showConfig = ref(true);
 const tableData = computed(() => props.data);
 const {
   rowFields,
@@ -179,7 +180,7 @@ defineExpose({ getExportTable, rowFields, columnFields, valueFields });
 
 <template>
   <div class="vpg-pivot-container" ref="pivotRootEl">
-    <div class="vpg-pivot-config-panel">
+    <div v-show="showConfig" class="vpg-pivot-config-panel">
       <PivotConfig
         :available-fields="availableFields"
         :row-fields="rowFields"
@@ -207,6 +208,9 @@ defineExpose({ getExportTable, rowFields, columnFields, valueFields });
       />
     </div>
     <div class="vpg-pivot-main">
+      <button type="button" class="pc-toggle" @click="showConfig = !showConfig">
+        {{ showConfig ? "Sembunyikan panel" : "Tampilkan panel" }}
+      </button>
       <PivotSkeleton
         :row-fields="rowFields"
         :column-fields="columnFields"
@@ -222,6 +226,7 @@ defineExpose({ getExportTable, rowFields, columnFields, valueFields });
         :theme="theme"
         :enable-drill-down="enableDrillDown"
         :enable-drill-through="false"
+        pivot-layout="grouped"
         @add-row-field="onAddRowField"
         @remove-row-field="onRemoveRowField"
         @add-column-field="onAddColumnField"
@@ -256,6 +261,17 @@ defineExpose({ getExportTable, rowFields, columnFields, valueFields });
   flex: 1;
   min-height: 0;
   overflow: auto;
+}
+.pc-toggle {
+  position: sticky;
+  left: 0;
+  margin: 4px 8px;
+  font-size: 11px;
+  padding: 2px 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background: #fff;
+  cursor: pointer;
 }
 </style>
 

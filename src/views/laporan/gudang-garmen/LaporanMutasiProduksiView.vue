@@ -8,6 +8,8 @@ import PageLayout from "@/components/PageLayout.vue";
 import BaseTable from "@/components/BaseTable.vue";
 import SpkSearchModal from "@/components/lookups/SpkSearchModal.vue";
 import PivotWithFilter from "@/components/PivotWithFilter.vue";
+import MutasiPivotPreset from "@/components/MutasiPivotPreset.vue";
+import { densifyBody, type ViewMutasi } from "@/utils/mutasiPivot";
 import { laporanMutasiProduksiService } from "@/services/laporan/gudang-garmen/laporanMutasiProduksiService";
 import { exportExcelSingle } from "@/utils/excelExport";
 import {
@@ -284,7 +286,7 @@ const onExport = async () => {
 };
 
 const onExportPivot = async () => {
-  const table = await pivotWithFilterRef.value?.exportPivotToExcel?.();
+  const table = await activePivot()?.exportPivotToExcel?.();
   if (!table) {
     toast.warning(
       "Tidak ada hasil pivot untuk diekspor. Susun pivot dulu di panel kiri.",
@@ -393,6 +395,25 @@ const onExportPivot = async () => {
 const pivotWithFilterRef = ref<InstanceType<typeof PivotWithFilter> | null>(
   null,
 );
+const presetRef = ref<InstanceType<typeof MutasiPivotPreset> | null>(null);
+
+const viewMode = ref<ViewMutasi | "bebas">("alur");
+const presetView = computed<ViewMutasi>(() =>
+  viewMode.value === "bebas" ? "alur" : viewMode.value,
+);
+const rincianSize = ref(false);
+const hanyaAdaBs = ref(false);
+const warnaIntensitas = ref(true);
+const petunjukView: Record<ViewMutasi | "bebas", string> = {
+  alur: 'Pcs per rute mutasi, urut mengikuti alur gudang. "–" = belum ada mutasi di rute itu. Tidak ada total antar rute karena pcs yang sama berpindah di tiap tahap.',
+  gudang:
+    "Masuk = pcs bertujuan gudang ini; Keluar = pcs berasal dari gudang ini. Selisih hanya dari mutasi dalam rentang tanggal laporan, bukan saldo stok.",
+  bs: "BS per tahap dan komponen. Jumlah dihitung per tahap, jadi tidak dijumlah antar tahap.",
+  bebas:
+    "Seret field ke Baris/Kolom/Nilai. Jangan menjumlahkan Terpakai dan Babaran (nilainya diulang di tiap baris size). Total baris lintas gudang menghitung pcs yang sama berulang kali.",
+};
+const activePivot = () =>
+  viewMode.value === "bebas" ? pivotWithFilterRef.value : presetRef.value;
 
 // ── Chart reaktif — dibangun ulang OTOMATIS setiap kali user
 // menyusun ulang pivot (rows/cols/values), lewat event pivot-changed
@@ -450,10 +471,10 @@ const rebuildChart = async (table: any) => {
     return;
   }
 
-  const rowFieldCount = pivotWithFilterRef.value?.getRowFieldCount?.() ?? 1;
+  const rowFieldCount = activePivot()?.getRowFieldCount?.() ?? 1;
   const colLabels = buildColumnLabels(table.headerRows).slice(rowFieldCount);
 
-  const parsedRows = table.bodyRows.map((row: any) => {
+  const parsedRows = densifyBody(table.bodyRows).map((row) => {
     const label = row
       .slice(0, rowFieldCount)
       .map((c: any) => c.text)
@@ -837,11 +858,31 @@ const rowPropsFn = (data: any) => {
         </div>
         <template v-else>
           <div class="pivot-export-bar">
-            <span class="pivot-hint-txt">
-              Field "Jenis" berisi Jumlah/Terpakai/Babaran/BS Lini/BS Kain
-              Sablon/BS Kain — susun sebagai baris/kolom untuk bandingkan antar
-              ukuran.
-            </span>
+            <div class="pivot-bar-left">
+              <v-btn-toggle
+                v-model="viewMode"
+                mandatory
+                density="compact"
+                variant="outlined"
+                divided
+                color="primary"
+              >
+                <v-btn value="alur" size="small">Alur Mutasi</v-btn>
+                <v-btn value="gudang" size="small">Per Gudang</v-btn>
+                <v-btn value="bs" size="small">BS</v-btn>
+                <v-btn value="bebas" size="small">Susun Sendiri</v-btn>
+              </v-btn-toggle>
+              <label v-if="viewMode === 'alur'" class="pivot-opt">
+                <input v-model="rincianSize" type="checkbox" /> Rinci per size
+              </label>
+              <label v-if="viewMode === 'bs'" class="pivot-opt">
+                <input v-model="hanyaAdaBs" type="checkbox" /> Hanya yang ada BS
+              </label>
+              <label v-if="viewMode !== 'bebas'" class="pivot-opt">
+                <input v-model="warnaIntensitas" type="checkbox" /> Warna
+                intensitas
+              </label>
+            </div>
             <v-btn
               size="small"
               color="green"
@@ -853,6 +894,9 @@ const rowPropsFn = (data: any) => {
               /></template>
               Export Pivot Ini
             </v-btn>
+          </div>
+          <div class="pivot-hint-txt pivot-hint-row">
+            {{ petunjukView[viewMode] }}
           </div>
           <PivotWithFilter
             ref="pivotWithFilterRef"
@@ -875,7 +919,19 @@ const rowPropsFn = (data: any) => {
             :default-cols="['GudangAsal']"
             :default-vals="[{ field: 'Jumlah', agg: 'sum' }]"
             @pivot-changed="onPivotChanged"
-          />
+          >
+            <template v-if="viewMode !== 'bebas'" #default="{ data }">
+              <MutasiPivotPreset
+                ref="presetRef"
+                :data="data"
+                :view="presetView"
+                :rincian-size="rincianSize"
+                :hanya-ada-bs="hanyaAdaBs"
+                :heat="warnaIntensitas"
+                @pivot-changed="onPivotChanged"
+              />
+            </template>
+          </PivotWithFilter>
         </template>
       </div>
 
@@ -1046,6 +1102,29 @@ const rowPropsFn = (data: any) => {
 .pivot-hint-txt {
   font-size: 10.5px;
   color: #757575;
+}
+.pivot-wrap {
+  display: flex;
+  flex-direction: column;
+}
+.pivot-bar-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.pivot-opt {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11.5px;
+  color: #455a64;
+  cursor: pointer;
+}
+.pivot-hint-row {
+  padding: 4px 12px;
+  border-bottom: 1px solid #eceff1;
+  flex-shrink: 0;
 }
 .chart-header {
   display: flex;

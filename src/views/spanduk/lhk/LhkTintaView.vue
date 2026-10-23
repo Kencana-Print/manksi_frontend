@@ -16,15 +16,13 @@ import { formatTanggal } from "@/utils/dateFormat";
 interface ExportDetailRow {
   Nomor: string;
   Tanggal: string;
+  Nomor_Cetak: string;
   Kode_Pabrik: string;
   Nama_Pabrik: string;
-  Nomor_SPK: string;
-  Nama_SPK: string;
-  Jumlah_Order: number;
-  Panjang: number;
-  Lebar: number;
   Kode_Bahan: string;
   Nama_Bahan: string;
+  Qty_Input: number;
+  Satuan_Input: string;
   Qty: number;
   Satuan: string;
 }
@@ -102,9 +100,12 @@ const baseBrowseRef = ref<InstanceType<typeof BaseBrowse> | null>(null);
 const headers = [
   { title: "Nomor", key: "Nomor", width: "170px" },
   { title: "Tanggal", key: "Tanggal", width: "110px", align: "center" },
+  { title: "LHK Cetak", key: "Nomor_Cetak", width: "170px" },
+  { title: "Tgl Cetak", key: "Tanggal_Cetak", width: "110px", align: "center" },
   { title: "Kode Pabrik", key: "Kode_Pabrik", width: "120px" },
-  { title: "Nama Pabrik", key: "Nama_Pabrik", width: "260px" },
+  { title: "Nama Pabrik", key: "Nama_Pabrik", width: "240px" },
   { title: "Jml SPK", key: "Jml_SPK", width: "90px", align: "end" },
+  { title: "Jml Bahan", key: "Jml_Bahan", width: "100px", align: "end" },
 ];
 
 const INT = "#,##0";
@@ -113,30 +114,43 @@ const NUM = "#,##0.00";
 const kolomMaster: ExcelColumn[] = [
   { header: "Nomor", key: "Nomor", width: 20 },
   { header: "Tanggal", key: "Tanggal", width: 14, align: "center" },
+  { header: "LHK Cetak", key: "Nomor_Cetak", width: 20 },
+  { header: "Tgl Cetak", key: "Tanggal_Cetak", width: 14, align: "center" },
   { header: "Kode Pabrik", key: "Kode_Pabrik", width: 14 },
   { header: "Nama Pabrik", key: "Nama_Pabrik", width: 30 },
   { header: "Jml SPK", key: "Jml_SPK", width: 10, align: "right", numFmt: INT },
+  {
+    header: "Jml Bahan",
+    key: "Jml_Bahan",
+    width: 11,
+    align: "right",
+    numFmt: INT,
+  },
 ];
 
 const kolomDetail: ExcelColumn[] = [
   { header: "Nomor", key: "Nomor", width: 20 },
   { header: "Tanggal", key: "Tanggal", width: 14, align: "center" },
+  { header: "LHK Cetak", key: "Nomor_Cetak", width: 20 },
   { header: "Kode Pabrik", key: "Kode_Pabrik", width: 14 },
   { header: "Nama Pabrik", key: "Nama_Pabrik", width: 28 },
-  { header: "Nomor SPK", key: "Nomor_SPK", width: 20 },
-  { header: "Nama SPK", key: "Nama_SPK", width: 36 },
-  {
-    header: "Jumlah Order",
-    key: "Jumlah_Order",
-    width: 14,
-    align: "right",
-    numFmt: NUM,
-  },
-  { header: "Panjang", key: "Panjang", width: 10, align: "right", numFmt: NUM },
-  { header: "Lebar", key: "Lebar", width: 10, align: "right", numFmt: NUM },
   { header: "Kode Bahan", key: "Kode_Bahan", width: 12 },
-  { header: "Nama Bahan", key: "Nama_Bahan", width: 32 },
-  { header: "Qty", key: "Qty", width: 10, align: "right", numFmt: NUM },
+  { header: "Nama Bahan", key: "Nama_Bahan", width: 36 },
+  {
+    header: "Qty Input",
+    key: "Qty_Input",
+    width: 12,
+    align: "right",
+    numFmt: "#,##0.0000",
+  },
+  { header: "Satuan Input", key: "Satuan_Input", width: 13 },
+  {
+    header: "Qty",
+    key: "Qty",
+    width: 12,
+    align: "right",
+    numFmt: "#,##0.0000",
+  },
   { header: "Satuan", key: "Satuan", width: 10 },
 ];
 
@@ -191,7 +205,11 @@ const exportMaster = () =>
   exportToExcel("LHK_Tinta_Header", {
     columns: kolomMaster,
     getData: () =>
-      dataTampil().map((r) => ({ ...r, Tanggal: formatTanggal(r.Tanggal) })),
+      dataTampil().map((r) => ({
+        ...r,
+        Tanggal: formatTanggal(r.Tanggal),
+        Tanggal_Cetak: r.Tanggal_Cetak ? formatTanggal(r.Tanggal_Cetak) : "",
+      })),
   });
 
 // Hanya detail dari LHK yang sedang tampil di grid
@@ -211,15 +229,13 @@ const exportDetail = async () => {
       rows.push({
         Nomor: item.Nomor,
         Tanggal: formatTanggal(item.Tanggal),
+        Nomor_Cetak: item.Nomor_Cetak ?? "",
         Kode_Pabrik: item.Kode_Pabrik ?? "",
         Nama_Pabrik: item.Nama_Pabrik ?? "",
-        Nomor_SPK: r.Nomor_SPK,
-        Nama_SPK: r.Nama_SPK ?? "",
-        Jumlah_Order: Number(r.Jumlah_Order) || 0,
-        Panjang: Number(r.Panjang) || 0,
-        Lebar: Number(r.Lebar) || 0,
-        Kode_Bahan: r.Kode_Bahan != null ? String(r.Kode_Bahan) : "",
+        Kode_Bahan: String(r.Kode_Bahan),
         Nama_Bahan: r.Nama_Bahan ?? "",
+        Qty_Input: Number(r.Qty_Input) || 0,
+        Satuan_Input: r.Satuan_Input ?? "",
         Qty: Number(r.Qty) || 0,
         Satuan: r.Satuan ?? "",
       });
@@ -245,7 +261,7 @@ const exportDetail = async () => {
 };
 
 const numFmt = (v: number | null) =>
-  v ? Number(v).toLocaleString("id-ID", { maximumFractionDigits: 2 }) : "0";
+  v ? Number(v).toLocaleString("id-ID", { maximumFractionDigits: 4 }) : "0";
 </script>
 
 <template>
@@ -286,43 +302,39 @@ const numFmt = (v: number | null) =>
       {{ formatTanggal(item.Tanggal) }}
     </template>
 
+    <template #item.Tanggal_Cetak="{ item }">
+      {{ item.Tanggal_Cetak ? formatTanggal(item.Tanggal_Cetak) : "" }}
+    </template>
+
     <!-- Detail Expand -->
     <template #detail="{ item }">
       <div class="expand-wrap">
         <div class="expand-title mb-2">
-          Pemakaian Tinta/Cat - {{ item.Nomor }}
+          Pemakaian Tinta/Cat - {{ item.Nomor }} (LHK Cetak
+          {{ item.Nomor_Cetak }})
         </div>
         <table class="detail-table">
           <thead>
             <tr>
-              <th width="130">Nomor SPK</th>
-              <th>Nama SPK</th>
-              <th width="90" class="tr">Jml Order</th>
-              <th width="80" class="tr">Panjang</th>
-              <th width="80" class="tr">Lebar</th>
-              <th width="260">Bahan</th>
-              <th width="90" class="tr">Qty</th>
+              <th width="80">Kode</th>
+              <th>Bahan</th>
+              <th width="100" class="tr">Qty Input</th>
+              <th width="90">Satuan Input</th>
+              <th width="100" class="tr">Qty</th>
               <th width="70">Satuan</th>
             </tr>
           </thead>
           <tbody>
-            <tr
-              v-for="(r, idx) in detailMap[item.Nomor]"
-              :key="`${r.Nomor_SPK}|${r.Kode_Bahan ?? idx}`"
-            >
-              <td>{{ r.Nomor_SPK }}</td>
-              <td class="font-weight-bold">{{ r.Nama_SPK }}</td>
-              <td class="tr">{{ numFmt(r.Jumlah_Order) }}</td>
-              <td class="tr">{{ numFmt(r.Panjang) }}</td>
-              <td class="tr">{{ numFmt(r.Lebar) }}</td>
-              <td>{{ r.Nama_Bahan ?? "-" }}</td>
-              <td class="tr">
-                {{ r.Kode_Bahan != null ? numFmt(r.Qty) : "-" }}
-              </td>
+            <tr v-for="r in detailMap[item.Nomor]" :key="r.Kode_Bahan">
+              <td>{{ r.Kode_Bahan }}</td>
+              <td class="font-weight-bold">{{ r.Nama_Bahan }}</td>
+              <td class="tr">{{ numFmt(r.Qty_Input) }}</td>
+              <td>{{ r.Satuan_Input ?? "" }}</td>
+              <td class="tr">{{ numFmt(r.Qty) }}</td>
               <td>{{ r.Satuan ?? "" }}</td>
             </tr>
             <tr v-if="!detailMap[item.Nomor]?.length">
-              <td colspan="8" class="text-center text-grey py-3 font-italic">
+              <td colspan="6" class="text-center text-grey py-3 font-italic">
                 Detail LHK Tinta tidak ditemukan.
               </td>
             </tr>

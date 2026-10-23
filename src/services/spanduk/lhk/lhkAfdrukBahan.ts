@@ -4,7 +4,7 @@
 export const SLOT_BAHAN = [
   { key: "rinso", kolom: "Rinso", label: "Rinso", kode: 10401 },
   { key: "porstek", kolom: "Porstek", label: "Porstek", kode: 10400 },
-  { key: "m46", kolom: "M46", label: "M-46", kode: null },
+  { key: "m46", kolom: "M46", label: "M-46", kode: 10622 },
   { key: "kaporit", kolom: "Kaporit", label: "Kaporit", kode: 10438 },
   { key: "caustik", kolom: "Caustik", label: "Caustik", kode: 10439 },
   { key: "ulano", kolom: "Ulano", label: "Ulano", kode: 10435 },
