@@ -46,6 +46,16 @@ const totalCetak = computed(() =>
 const totalPlangkan = computed(() =>
   rows.value.reduce((a, r) => a + (Number(r.Jml_Plangkan) || 0), 0),
 );
+
+// Output Produksi = panjang x J. Cetak (dihitung, tidak disimpan)
+const outputProduksi = (
+  panjang: number | null | undefined,
+  qty: number | null | undefined,
+): number => (Number(panjang) || 0) * (Number(qty) || 0);
+
+const totalOutput = computed(() =>
+  rows.value.reduce((a, r) => a + outputProduksi(r.Panjang, r.Qty_Cetak), 0),
+);
 </script>
 
 <template>
@@ -58,7 +68,7 @@ const totalPlangkan = computed(() =>
       <div class="head">
         <table class="info">
           <tr>
-            <td width="60">Tanggal</td>
+            <td width="95">Tanggal</td>
             <td>: {{ fmtTgl(data.Tanggal) }}</td>
           </tr>
           <tr>
@@ -68,6 +78,14 @@ const totalPlangkan = computed(() =>
           <tr>
             <td>Lokasi</td>
             <td>: {{ data.Nama_Pabrik || data.Kode_Pabrik || "-" }}</td>
+          </tr>
+          <tr v-if="data.Sesi">
+            <td>Sesi</td>
+            <td>: {{ data.Sesi === "PAGI" ? "Pagi" : "Siang" }}</td>
+          </tr>
+          <tr>
+            <td>Akumulasi Total</td>
+            <td>: {{ fmt(totalOutput) }}</td>
           </tr>
         </table>
 
@@ -91,6 +109,7 @@ const totalPlangkan = computed(() =>
             <th colspan="2">Spesifikasi</th>
             <th rowspan="2" width="105">Nomor SPK</th>
             <th rowspan="2" width="62">J. Cetak<br />(Pcs)</th>
+            <th rowspan="2" width="72">Output<br />Produksi</th>
             <th rowspan="2" width="62">Jumlah<br />Plangkan</th>
           </tr>
           <tr>
@@ -106,6 +125,9 @@ const totalPlangkan = computed(() =>
             <td class="tr">{{ fmt(r.Lebar) }}</td>
             <td class="tc">{{ r.Nomor_SPK }}</td>
             <td class="tr">{{ fmtInt(r.Qty_Cetak) }}</td>
+            <td class="tr">
+              {{ fmt(outputProduksi(r.Panjang, r.Qty_Cetak)) }}
+            </td>
             <td class="tr">{{ fmtInt(r.Jml_Plangkan) }}</td>
           </tr>
         </tbody>
@@ -113,6 +135,7 @@ const totalPlangkan = computed(() =>
           <tr>
             <td colspan="5" class="tr fw">Total</td>
             <td class="tr fw">{{ fmtInt(totalCetak) }}</td>
+            <td class="tr fw">{{ fmt(totalOutput) }}</td>
             <td class="tr fw">{{ fmtInt(totalPlangkan) }}</td>
           </tr>
         </tfoot>
@@ -183,6 +206,7 @@ const totalPlangkan = computed(() =>
 .detail-table td {
   border: 1px solid black;
   padding: 2px 4px;
+  word-break: break-word;
 }
 .detail-table th {
   font-weight: normal;

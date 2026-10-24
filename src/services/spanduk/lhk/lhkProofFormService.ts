@@ -31,6 +31,9 @@ export interface LhkProofDetail {
   U5: string | null;
   U6: string | null;
   U7: string | null;
+  U8: string | null;
+  U9: string | null;
+  U10: string | null;
   Plangkan: LhkProofPlangkan[];
 }
 
@@ -40,6 +43,8 @@ export interface LhkProofForm {
   Kode_Pabrik: string | null;
   Nama_Pabrik: string | null;
   Detail: LhkProofDetail[];
+  Resep: ResepItem[];
+  Resep_Terkunci: boolean;
 }
 
 export interface LhkProofPayloadRow {
@@ -53,6 +58,9 @@ export interface LhkProofPayloadRow {
   U5: string;
   U6: string;
   U7: string;
+  U8: string;
+  U9: string;
+  U10: string;
   Plangkan: LhkProofPlangkan[];
 }
 
@@ -60,6 +68,7 @@ export interface LhkProofPayload {
   Tanggal: string;
   Kode_Pabrik: string;
   Detail: LhkProofPayloadRow[];
+  Resep: { Brg_Kode: number; Qty_Resep: number; Qty_Actual: number }[];
 }
 
 export interface InfoSpk {
@@ -68,6 +77,8 @@ export interface InfoSpk {
   Jumlah_Order: number | null;
   Panjang: number | null;
   Lebar: number | null;
+  Terkunci: boolean;
+  Plangkan: LhkProofPlangkan[];
 }
 
 export interface PabrikOption {
@@ -78,6 +89,20 @@ export interface PabrikOption {
 export interface UkuranOption {
   Kode: number;
   Ukuran: number;
+}
+
+export interface ResepItem {
+  Kode: number;
+  Nama: string;
+  Satuan: string;
+  Qty_Resep: number;
+  Qty_Actual: number;
+}
+
+export interface ResepOption {
+  Kode: number;
+  Nama: string;
+  Satuan: string;
 }
 
 export type SaveResponse = AxiosResponse<ApiResponse<{ Nomor: string }>>;
@@ -106,6 +131,13 @@ export const getLookupPabrik = async (): Promise<PabrikOption[]> => {
 export const getLookupUkuran = async (): Promise<UkuranOption[]> => {
   const res = await api.get<ApiResponse<UkuranOption[]>>(
     `${BASE}/lookups/ukuran`,
+  );
+  return res.data.data ?? [];
+};
+
+export const getLookupResep = async (): Promise<ResepOption[]> => {
+  const res = await api.get<ApiResponse<ResepOption[]>>(
+    `${BASE}/lookups/resep`,
   );
   return res.data.data ?? [];
 };

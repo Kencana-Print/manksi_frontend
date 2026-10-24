@@ -24,6 +24,7 @@ import {
   IconSortDescending,
 } from "@tabler/icons-vue";
 import PivotWithFilter from "@/components/PivotWithFilter.vue";
+import { densifyBody } from "@/utils/mutasiPivot";
 
 const MENU_ID = "966";
 const authStore = useAuthStore();
@@ -379,7 +380,7 @@ const rebuildChart = async (table: any) => {
   const rowFieldCount = pivotWithFilterRef.value?.getRowFieldCount?.() ?? 1;
   const colLabels = buildColumnLabels(table.headerRows).slice(rowFieldCount);
 
-  const parsedRows = table.bodyRows.map((row: any) => {
+  const parsedRows = densifyBody(table.bodyRows).map((row) => {
     const label = row
       .slice(0, rowFieldCount)
       .map((c: any) => c.text)

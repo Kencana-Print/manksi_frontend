@@ -19,6 +19,8 @@ interface ExportDetailRow {
   Nomor_Cetak: string;
   Kode_Pabrik: string;
   Nama_Pabrik: string;
+  Jml_SPK: number | null;
+  Jml_Bahan: number | null;
   Kode_Bahan: string;
   Nama_Bahan: string;
   Qty_Input: number;
@@ -134,6 +136,14 @@ const kolomDetail: ExcelColumn[] = [
   { header: "LHK Cetak", key: "Nomor_Cetak", width: 20 },
   { header: "Kode Pabrik", key: "Kode_Pabrik", width: 14 },
   { header: "Nama Pabrik", key: "Nama_Pabrik", width: 28 },
+  { header: "Jml SPK", key: "Jml_SPK", width: 10, align: "right", numFmt: INT },
+  {
+    header: "Jml Bahan",
+    key: "Jml_Bahan",
+    width: 11,
+    align: "right",
+    numFmt: INT,
+  },
   { header: "Kode Bahan", key: "Kode_Bahan", width: 12 },
   { header: "Nama Bahan", key: "Nama_Bahan", width: 36 },
   {
@@ -225,13 +235,17 @@ const exportDetail = async () => {
 
   const rows: ExportDetailRow[] = [];
   for (const item of master) {
-    for (const r of detailMap.value[item.Nomor] ?? []) {
+    (detailMap.value[item.Nomor] ?? []).forEach((r, idx) => {
+      // Data LHK (header) hanya di baris pertama tiap LHK
+      const pertama = idx === 0;
       rows.push({
-        Nomor: item.Nomor,
-        Tanggal: formatTanggal(item.Tanggal),
-        Nomor_Cetak: item.Nomor_Cetak ?? "",
-        Kode_Pabrik: item.Kode_Pabrik ?? "",
-        Nama_Pabrik: item.Nama_Pabrik ?? "",
+        Nomor: pertama ? item.Nomor : "",
+        Tanggal: pertama ? formatTanggal(item.Tanggal) : "",
+        Nomor_Cetak: pertama ? (item.Nomor_Cetak ?? "") : "",
+        Kode_Pabrik: pertama ? (item.Kode_Pabrik ?? "") : "",
+        Nama_Pabrik: pertama ? (item.Nama_Pabrik ?? "") : "",
+        Jml_SPK: pertama ? Number(item.Jml_SPK) || 0 : null,
+        Jml_Bahan: pertama ? Number(item.Jml_Bahan) || 0 : null,
         Kode_Bahan: String(r.Kode_Bahan),
         Nama_Bahan: r.Nama_Bahan ?? "",
         Qty_Input: Number(r.Qty_Input) || 0,
@@ -239,7 +253,7 @@ const exportDetail = async () => {
         Qty: Number(r.Qty) || 0,
         Satuan: r.Satuan ?? "",
       });
-    }
+    });
   }
 
   if (rows.length === 0) {
@@ -267,7 +281,7 @@ const numFmt = (v: number | null) =>
 <template>
   <BaseBrowse
     ref="baseBrowseRef"
-    title="LHK Tinta/Cat"
+    title="LHK Pemakaian Obat"
     menu-id="4"
     storage-id="spanduk-lhk-tinta"
     :icon="IconPalette"

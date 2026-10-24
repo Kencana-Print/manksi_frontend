@@ -34,7 +34,7 @@ const formatDateLocal = (d: Date) => {
   const day = String(d.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
 };
-const todayLocal = formatDateLocal(new Date());
+const hariIni = () => formatDateLocal(new Date());
 
 // ── Model data ──
 interface FormRow {
@@ -50,8 +50,12 @@ interface FormRow {
 interface KaryawanRow {
   nik: string;
   nama: string;
-  absensi: number;
-  lembur: number;
+  jamMasuk: string;
+  jamPulang: string;
+  jamKerja: string;
+  jamLembur: string;
+  absensi: number; // legacy (LHK lama)
+  lembur: number; // legacy (LHK lama)
 }
 
 interface FormState {
@@ -60,6 +64,7 @@ interface FormState {
     tanggal: string;
     kodePabrik: string;
     namaPabrik: string;
+    sesi: string;
     karBorongan: number;
     karHarian: number;
   };
@@ -82,9 +87,10 @@ const barisKosong = (): FormRow => ({
 const defaultData = (): FormState => ({
   header: {
     nomor: "",
-    tanggal: todayLocal,
+    tanggal: hariIni(),
     kodePabrik: "",
     namaPabrik: "",
+    sesi: "",
     karBorongan: 0,
     karHarian: 0,
   },
@@ -100,14 +106,10 @@ const nomorTerakhir = ref("");
 const pabrikOpts = ref<PabrikOption[]>([]);
 const isLoadingKaryawan = ref(false);
 
-// Dialog konfirmasi ganti Lokasi (superadmin)
-const showGantiLokasi = ref(false);
-const lokasiLama = ref("");
-const lokasiBaru = ref("");
-
 const bangunPayload = (data: FormState): LhkCetakPayload => ({
   Tanggal: data.header.tanggal,
   Kode_Pabrik: data.header.kodePabrik,
+  Sesi: data.header.sesi,
   Kar_Borongan: num(data.header.karBorongan),
   Kar_Harian: num(data.header.karHarian),
   // Delphi: baris tanpa nomor SPK tidak disimpan
@@ -118,11 +120,8 @@ const bangunPayload = (data: FormState): LhkCetakPayload => ({
       Qty_Cetak: num(r.qtyCetak),
       Jml_Plangkan: num(r.jmlPlangkan),
     })),
-  Karyawan: data.karyawan.map((k) => ({
-    Nik: k.nik,
-    Absensi: num(k.absensi),
-    Lembur: num(k.lembur),
-  })),
+  // Jam kerja dan lembur dihitung server; client hanya mengirim NIK
+  Karyawan: data.karyawan.map((k) => ({ Nik: k.nik })),
 });
 
 const {
@@ -156,6 +155,7 @@ const {
         tanggal: d.Tanggal,
         kodePabrik: d.Kode_Pabrik ?? "",
         namaPabrik: d.Nama_Pabrik ?? "",
+        sesi: d.Sesi ?? "",
         karBorongan: num(d.Kar_Borongan),
         karHarian: num(d.Kar_Harian),
       },
@@ -163,6 +163,10 @@ const {
       karyawan: d.Karyawan.map((k) => ({
         nik: k.Nik,
         nama: k.Nama,
+        jamMasuk: "",
+        jamPulang: "",
+        jamKerja: k.Jam_Kerja,
+        jamLembur: k.Jam_Lembur,
         absensi: num(k.Absensi),
         lembur: num(k.Lembur),
       })),
@@ -226,30 +230,44 @@ onMounted(async () => {
 });
 
 // ── Karyawan ──
-// Daftar karyawan dimuat dari master (aktif, bagian cetak, pabrik terpilih).
-// Hanya absensi dan lembur yang bisa diubah; baris tidak bisa ditambah/dihapus.
+// Daftar diambil dari absensi fingerprint hari ini sesuai sesi. Read-only:
+// jam kerja dan lembur dihitung server saat simpan.
+const isLegacy = computed(
+  () => isEditMode.value && formData.value.header.sesi === "",
+);
+
 let tokenKaryawan = 0;
 
-const muatKaryawan = async (kodePabrik: string) => {
-  if (!kodePabrik) {
+const muatKaryawan = async () => {
+  const h = formData.value.header;
+  if (isEditMode.value || !h.kodePabrik || !h.sesi) {
     formData.value.karyawan = [];
     return;
   }
   const token = ++tokenKaryawan;
   isLoadingKaryawan.value = true;
   try {
-    const list = await lhkForm.getLookupKaryawan(kodePabrik);
+    const list = await lhkForm.getLookupKaryawan(
+      h.kodePabrik,
+      h.sesi,
+      h.tanggal,
+    );
     if (token !== tokenKaryawan) {
       return; // ada permintaan yang lebih baru
     }
     formData.value.karyawan = list.map((k) => ({
       nik: k.Nik,
       nama: k.Nama,
+      jamMasuk: k.Jam_Masuk,
+      jamPulang: k.Jam_Pulang,
+      jamKerja: k.Jam_Kerja,
+      jamLembur: k.Jam_Lembur,
       absensi: 0,
       lembur: 0,
     }));
   } catch (e) {
     if (token === tokenKaryawan) {
+      formData.value.karyawan = [];
       toast.error(lhkForm.pesanError(e, "Gagal memuat daftar karyawan."));
     }
   } finally {
@@ -259,53 +277,14 @@ const muatKaryawan = async (kodePabrik: string) => {
   }
 };
 
-const karyawanSudahDiisi = () =>
-  formData.value.karyawan.some(
-    (k) => num(k.absensi) !== 0 || num(k.lembur) !== 0,
-  );
+const onSesiChange = () => {
+  void muatKaryawan();
+};
 
-// Ganti Lokasi (hanya bisa oleh superadmin)
-const onPabrikChange = (e: Event) => {
+const onPabrikChange = () => {
   const h = formData.value.header;
-  const baru = (e.target as HTMLSelectElement).value;
-  const lama = lokasiLama.value;
-
-  // Belum ada karyawan termuat: cukup ganti lokasi
-  if (formData.value.karyawan.length === 0) {
-    h.namaPabrik = namaPabrikDari(baru);
-    lokasiLama.value = baru;
-    return;
-  }
-
-  // Ada absensi/lembur yang sudah diisi: minta konfirmasi, kembalikan dulu
-  if (karyawanSudahDiisi()) {
-    lokasiBaru.value = baru;
-    h.kodePabrik = lama;
-    showGantiLokasi.value = true;
-    return;
-  }
-
-  h.namaPabrik = namaPabrikDari(baru);
-  lokasiLama.value = baru;
-  void muatKaryawan(baru);
-};
-
-const konfirmasiGantiLokasi = () => {
-  const h = formData.value.header;
-  h.kodePabrik = lokasiBaru.value;
-  h.namaPabrik = namaPabrikDari(lokasiBaru.value);
-  lokasiLama.value = lokasiBaru.value;
-  showGantiLokasi.value = false;
-  void muatKaryawan(lokasiBaru.value);
-};
-
-const batalGantiLokasi = () => {
-  showGantiLokasi.value = false; // kodePabrik sudah dikembalikan
-};
-
-// Simpan lokasi terakhir yang sah (untuk dikembalikan bila ganti dibatalkan)
-const catatLokasi = () => {
-  lokasiLama.value = formData.value.header.kodePabrik;
+  h.namaPabrik = namaPabrikDari(h.kodePabrik);
+  void muatKaryawan();
 };
 
 // ── Grid SPK ──
@@ -351,10 +330,6 @@ const isiBarisDariSpk = async (
     row.panjang = num(info.Panjang);
     row.lebar = num(info.Lebar);
 
-    // Delphi: karyawan dimuat saat SPK pertama dipilih
-    if (formData.value.karyawan.length === 0) {
-      void muatKaryawan(formData.value.header.kodePabrik);
-    }
     return true;
   } catch (e) {
     toast.error(lhkForm.pesanError(e, "Gagal memuat data SPK/MAP."));
@@ -415,15 +390,6 @@ const onBlurSpk = (e: FocusEvent, idx: number) => {
   (e.target as HTMLInputElement).value = formData.value.items[idx].spk;
 };
 
-// Enter di grid karyawan: Absensi → Lembur → Absensi karyawan berikutnya
-const onEnterKar = async (i: number, kolom: "abs" | "lbr") => {
-  if (kolom === "abs") {
-    await fokusKunci(`k${i}_lbr`);
-  } else if (i + 1 < formData.value.karyawan.length) {
-    await fokusKunci(`k${i + 1}_abs`);
-  }
-};
-
 // Total
 const totalCetak = computed(() =>
   formData.value.items.reduce((a, r) => a + num(r.qtyCetak), 0),
@@ -432,13 +398,24 @@ const totalPlangkan = computed(() =>
   formData.value.items.reduce((a, r) => a + num(r.jmlPlangkan), 0),
 );
 
-// ── Validasi sebelum konfirmasi simpan (sama dengan server) ──
-const dua = (v: number) => Math.round(v * 100) / 100 === v;
+// Output produksi = panjang SPK/MAP x jumlah cetak (dihitung, tidak disimpan)
+const dibulatkan2 = (n: number) => Math.round(n * 100) / 100;
+const outputProduksi = (r: FormRow) =>
+  dibulatkan2(num(r.panjang) * num(r.qtyCetak));
+const akumulasiTotal = computed(() =>
+  dibulatkan2(formData.value.items.reduce((a, r) => a + outputProduksi(r), 0)),
+);
+const fmt2 = (n: number) =>
+  n.toLocaleString("id-ID", { maximumFractionDigits: 2 });
 
 const validateSave = () => {
   const h = formData.value.header;
   if (!h.tanggal) {
     toast.warning("Tanggal tidak boleh kosong.");
+    return;
+  }
+  if (!isLegacy.value && !h.sesi) {
+    toast.warning("Sesi belum dipilih.");
     return;
   }
   if (!h.kodePabrik) {
@@ -488,21 +465,6 @@ const validateSave = () => {
     }
   }
 
-  for (const k of formData.value.karyawan) {
-    for (const [label, v] of [
-      ["Absensi", k.absensi],
-      ["Lembur", k.lembur],
-    ] as const) {
-      const n = num(v);
-      if (n < 0 || n > 999.99 || !dua(n)) {
-        toast.warning(
-          `${k.nama}: ${label} harus 0 sampai 999,99 (maksimal 2 desimal).`,
-        );
-        return;
-      }
-    }
-  }
-
   showSaveDialog.value = true;
 };
 
@@ -515,7 +477,6 @@ const resetBaru = () => {
   }
   formData.value = defaultData();
   isiLokasiDefault();
-  catatLokasi();
 };
 
 const tutupSetelahSimpan = () => {
@@ -560,7 +521,23 @@ const tutupSetelahSimpan = () => {
             v-model="formData.header.tanggal"
             class="idate"
             style="width: 150px"
+            :disabled="!isLegacy"
           />
+        </div>
+
+        <div class="fr">
+          <label class="lbl">Sesi</label>
+          <select
+            v-model="formData.header.sesi"
+            class="inp"
+            style="width: 110px"
+            :disabled="isEditMode"
+            @change="onSesiChange"
+          >
+            <option value="" disabled>Pilih...</option>
+            <option value="PAGI">Pagi</option>
+            <option value="SIANG">Siang</option>
+          </select>
         </div>
 
         <div class="sep" />
@@ -571,8 +548,7 @@ const tutupSetelahSimpan = () => {
             v-model="formData.header.kodePabrik"
             class="inp"
             style="width: 90px"
-            :disabled="!isSuperadmin"
-            @focus="catatLokasi"
+            :disabled="!isSuperadmin || isEditMode"
             @change="onPabrikChange"
           >
             <option value="" disabled>Pilih...</option>
@@ -615,6 +591,20 @@ const tutupSetelahSimpan = () => {
             v-select-on-focus
           />
         </div>
+
+        <div class="sep" />
+
+        <div class="fr">
+          <label class="lbl" title="Jumlah Output Produksi semua baris">
+            Akumulasi Total
+          </label>
+          <input
+            :value="fmt2(akumulasiTotal)"
+            readonly
+            class="inp ro tr"
+            style="width: 110px"
+          />
+        </div>
       </div>
     </template>
 
@@ -630,7 +620,7 @@ const tutupSetelahSimpan = () => {
             </button>
           </div>
           <div class="tbl-wrap" style="max-height: 260px; min-height: 110px">
-            <table class="gt" style="min-width: 900px">
+            <table class="gt" style="min-width: 960px">
               <thead>
                 <tr>
                   <th style="width: 32px" class="tc">No</th>
@@ -641,6 +631,7 @@ const tutupSetelahSimpan = () => {
                   <th style="width: 65px" class="tr">Lebar</th>
                   <th style="width: 85px" class="tr bg-yellow">J. Cetak</th>
                   <th style="width: 95px" class="tr bg-yellow">J. Plangkan</th>
+                  <th style="width: 110px" class="tr">Output Produksi</th>
                   <th style="width: 32px" class="tc"></th>
                 </tr>
               </thead>
@@ -669,13 +660,10 @@ const tutupSetelahSimpan = () => {
                       </button>
                     </div>
                   </td>
-                  <td class="p0">
-                    <input
-                      :value="row.nama"
-                      class="ci ro"
-                      readonly
-                      :title="row.nama"
-                    />
+                  <td class="p0 td-wrap">
+                    <div class="ci-wrap ro" :title="row.nama">
+                      {{ row.nama }}
+                    </div>
                   </td>
                   <td class="p0">
                     <input :value="row.jumlahOrder" class="ci tr ro" readonly />
@@ -710,6 +698,13 @@ const tutupSetelahSimpan = () => {
                       v-select-on-focus
                     />
                   </td>
+                  <td class="p0">
+                    <input
+                      :value="fmt2(outputProduksi(row))"
+                      class="ci tr ro"
+                      readonly
+                    />
+                  </td>
                   <td class="tc">
                     <button
                       type="button"
@@ -727,6 +722,7 @@ const tutupSetelahSimpan = () => {
                   <td class="tr fw">{{ totalCetak }}</td>
                   <td class="tr fw">{{ totalPlangkan }}</td>
                   <td />
+                  <td />
                 </tr>
               </tfoot>
             </table>
@@ -740,6 +736,14 @@ const tutupSetelahSimpan = () => {
               Karyawan ({{ formData.karyawan.length }})
             </span>
             <span v-if="isLoadingKaryawan" class="tbl-info">Memuat...</span>
+            <button
+              v-else-if="!isEditMode"
+              type="button"
+              class="btn-add"
+              @click="muatKaryawan"
+            >
+              Muat Ulang
+            </button>
           </div>
           <div class="tbl-wrap" style="flex: 1; min-height: 120px">
             <table class="gt" style="min-width: 560px">
@@ -747,16 +751,25 @@ const tutupSetelahSimpan = () => {
                 <tr>
                   <th style="width: 32px" class="tc">No</th>
                   <th style="width: 110px">NIK</th>
-                  <th style="width: 240px">Nama</th>
-                  <th style="width: 90px" class="tr bg-yellow">Absensi</th>
-                  <th style="width: 90px" class="tr bg-yellow">Lembur</th>
+                  <th style="width: 260px">Nama</th>
+                  <template v-if="isLegacy">
+                    <th style="width: 90px" class="tr">Absensi</th>
+                    <th style="width: 90px" class="tr">Lembur</th>
+                  </template>
+                  <template v-else>
+                    <th style="width: 100px" class="tr">Jam Kerja</th>
+                    <th style="width: 100px" class="tr">Lembur</th>
+                  </template>
                 </tr>
               </thead>
               <tbody>
                 <tr v-if="formData.karyawan.length === 0">
                   <td colspan="5" class="kosong">
-                    Daftar karyawan terisi otomatis setelah SPK/MAP pertama
-                    dipilih.
+                    {{
+                      isEditMode
+                        ? "Tidak ada karyawan tercatat."
+                        : "Pilih Sesi dan Lokasi. Daftar terisi otomatis dari absensi hari ini."
+                    }}
                   </td>
                 </tr>
                 <tr v-for="(k, i) in formData.karyawan" :key="k.nik">
@@ -772,32 +785,22 @@ const tutupSetelahSimpan = () => {
                       :title="k.nama"
                     />
                   </td>
-                  <td class="p0">
-                    <input
-                      v-model.number="k.absensi"
-                      type="number"
-                      min="0"
-                      max="999.99"
-                      step="0.01"
-                      class="ci tr bg-yellow-light"
-                      :ref="(el) => simpanRef(el, `k${i}_abs`)"
-                      @keydown.enter.prevent="onEnterKar(i, 'abs')"
-                      v-select-on-focus
-                    />
-                  </td>
-                  <td class="p0">
-                    <input
-                      v-model.number="k.lembur"
-                      type="number"
-                      min="0"
-                      max="999.99"
-                      step="0.01"
-                      class="ci tr bg-yellow-light"
-                      :ref="(el) => simpanRef(el, `k${i}_lbr`)"
-                      @keydown.enter.prevent="onEnterKar(i, 'lbr')"
-                      v-select-on-focus
-                    />
-                  </td>
+                  <template v-if="isLegacy">
+                    <td class="p0">
+                      <input :value="k.absensi" class="ci tr ro" readonly />
+                    </td>
+                    <td class="p0">
+                      <input :value="k.lembur" class="ci tr ro" readonly />
+                    </td>
+                  </template>
+                  <template v-else>
+                    <td class="p0">
+                      <input :value="k.jamKerja" class="ci tr ro" readonly />
+                    </td>
+                    <td class="p0">
+                      <input :value="k.jamLembur" class="ci tr ro" readonly />
+                    </td>
+                  </template>
                 </tr>
               </tbody>
             </table>
@@ -807,32 +810,11 @@ const tutupSetelahSimpan = () => {
     </template>
   </BaseForm>
 
-  <SpkSearchModal v-model="showSpkModal" @selected="onSpkSelected" />
-
-  <!-- Konfirmasi ganti Lokasi -->
-  <v-dialog v-model="showGantiLokasi" max-width="420" persistent>
-    <v-card class="rounded-lg">
-      <v-card-title class="bg-warning text-white pa-3">
-        Ganti Lokasi?
-      </v-card-title>
-      <v-card-text class="pa-4">
-        Daftar karyawan akan diganti dengan karyawan lokasi
-        <b>{{ lokasiBaru }}</b
-        >. Absensi dan lembur yang sudah diisi akan hilang.
-      </v-card-text>
-      <v-card-actions class="pa-3 border-t">
-        <v-btn variant="text" @click="batalGantiLokasi">Batal</v-btn>
-        <v-spacer />
-        <v-btn
-          color="warning"
-          variant="elevated"
-          @click="konfirmasiGantiLokasi"
-        >
-          Ya, Ganti
-        </v-btn>
-      </v-card-actions>
-    </v-card>
-  </v-dialog>
+  <SpkSearchModal
+    v-model="showSpkModal"
+    filter-mode="lhk-design"
+    @selected="onSpkSelected"
+  />
 
   <!-- Setelah simpan -->
   <v-dialog v-model="showSelesai" max-width="400" persistent>
@@ -1126,8 +1108,21 @@ const tutupSetelahSimpan = () => {
   justify-content: center;
   margin: 0 auto;
 }
-.btn-del:hover {
-  background: #ffebee;
-  border-radius: 2px;
+/* Nama Order: teks panjang dibungkus supaya terbaca seluruhnya */
+.gt tbody td.td-wrap {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  vertical-align: top;
+}
+.ci-wrap {
+  min-height: 25px;
+  padding: 4px 5px;
+  font-size: 11px;
+  line-height: 1.3;
+  box-sizing: border-box;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  color: #212121;
 }
 </style>

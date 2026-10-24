@@ -30,6 +30,8 @@ export interface BastMapHeader {
   mspk_kendala: string | null;
   mspk_jumlah_jadi: number | null;
   mspk_tipe: string | null;
+  jenis_order: string | null;
+  nomor_lhk_proof: string | null;
 }
 
 export interface KesesuaianRow {
@@ -75,6 +77,7 @@ export interface BastMapPrintHeader {
   mspk_keterangan: string | null;
   mspk_jumlah_jadi: number | null;
   mspk_tipe: string | null;
+  mspk_kendala: string | null;
 }
 
 export interface BastMapPrintData {
@@ -127,3 +130,8 @@ export const update = (
   payload: BastMapPayload,
 ): Promise<SaveResponse> =>
   api.put(`${BASE}/${encodeURIComponent(nomor)}`, payload);
+
+export const setKeputusan = (
+  nomor: string,
+  payload: { keputusan: "LANJUT" | "ULANG"; alasan: string },
+) => api.put(`${BASE}/${encodeURIComponent(nomor)}/keputusan`, payload);

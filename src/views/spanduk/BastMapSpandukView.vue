@@ -12,6 +12,7 @@ import {
 import { IconPrinter } from "@tabler/icons-vue";
 import { formatTanggal } from "@/utils/dateFormat";
 import { exportExcelSingle, type ExcelColumn } from "@/utils/excelExport";
+import { setKeputusan } from "@/services/spanduk/bastMapSpandukFormService";
 
 const toast = useToast();
 const router = useRouter();
@@ -58,6 +59,7 @@ const headers = [
   { title: "Tipe", key: "Tipe", width: "80px" },
   { title: "Tanggal", key: "Tanggal", width: "100px" },
   { title: "Status BAST", key: "CetakBAST", width: "100px", align: "center" },
+  { title: "Keputusan", key: "Keputusan", width: "120px", align: "center" },
   { title: "Nama Pekerjaan", key: "NamaPekerjaan", width: "250px" },
   { title: "Nama Ext", key: "NamaExt", width: "250px" },
   { title: "Ukuran", key: "Ukuran", width: "150px" },
@@ -80,6 +82,52 @@ const cetak = () => {
     `/spanduk/bast-map/print/${encodeURIComponent(row.Nomor)}`,
     "_blank",
   );
+};
+// ── KEPUTUSAN BAST N ──
+const showKeputusan = ref(false);
+const isSavingKeputusan = ref(false);
+const formKeputusan = ref<{ keputusan: "LANJUT" | "ULANG"; alasan: string }>({
+  keputusan: "LANJUT",
+  alasan: "",
+});
+
+const bukaKeputusan = () => {
+  const row = selected.value[0];
+  if (!row) return;
+  if (Number(row.SemuaN) !== 1) {
+    toast.warning("Keputusan hanya untuk BAST yang seluruh kesesuaiannya N.");
+    return;
+  }
+  formKeputusan.value = {
+    keputusan: row.Keputusan === "ULANG" ? "ULANG" : "LANJUT",
+    alasan: row.AlasanKeputusan ?? "",
+  };
+  showKeputusan.value = true;
+};
+
+const simpanKeputusan = async () => {
+  const row = selected.value[0];
+  if (!row) return;
+  const alasan = formKeputusan.value.alasan.trim();
+  if (!alasan) {
+    toast.warning("Alasan wajib diisi.");
+    return;
+  }
+  isSavingKeputusan.value = true;
+  try {
+    await setKeputusan(row.Nomor, {
+      keputusan: formKeputusan.value.keputusan,
+      alasan,
+    });
+    toast.success("Keputusan disimpan.");
+    showKeputusan.value = false;
+    selected.value = [];
+    await fetchData();
+  } catch (e) {
+    toast.error(pesanError(e, "Gagal menyimpan keputusan."));
+  } finally {
+    isSavingKeputusan.value = false;
+  }
 };
 
 // OnProgres 'N' = merah, 'Y' = biru (sama dengan Delphi garmen)
@@ -114,6 +162,8 @@ const onExport = async () => {
       { header: "Tipe", key: "Tipe", width: 10, align: "center" },
       { header: "Tanggal", key: "Tanggal", width: 12, align: "center" },
       { header: "Status BAST", key: "CetakBAST", width: 14, align: "center" },
+      { header: "Keputusan", key: "Keputusan", width: 12, align: "center" },
+      { header: "Alasan Keputusan", key: "AlasanKeputusan", width: 30 },
       { header: "Nama Pekerjaan", key: "NamaPekerjaan", width: 30 },
       { header: "Nama Ext", key: "NamaExt", width: 30 },
       { header: "Ukuran", key: "Ukuran", width: 16 },
@@ -223,6 +273,17 @@ const onExport = async () => {
         /></template>
         Cetak
       </v-btn>
+      <v-btn
+        size="small"
+        variant="flat"
+        color="orange-darken-2"
+        :disabled="
+          selected.length === 0 || !canEdit || selected[0]?.SemuaN !== 1
+        "
+        @click="bukaKeputusan"
+      >
+        Keputusan
+      </v-btn>
     </template>
 
     <template #item.Tanggal="{ item }">
@@ -238,7 +299,70 @@ const onExport = async () => {
         >SUDAH</v-chip
       >
     </template>
+    <template #item.Keputusan="{ item }">
+      <v-chip
+        v-if="item.Keputusan"
+        :color="item.Keputusan === 'LANJUT' ? 'success' : 'error'"
+        size="x-small"
+        label
+        class="font-weight-bold"
+        :title="item.AlasanKeputusan ?? ''"
+      >
+        {{ item.Keputusan === "LANJUT" ? "LANJUT" : "PRODUKSI ULANG" }}
+      </v-chip>
+      <span
+        v-else-if="item.SemuaN === 1"
+        class="text-red-darken-2 text-caption"
+      >
+        Belum diputuskan
+      </span>
+    </template>
   </BaseBrowse>
+
+  <v-dialog v-model="showKeputusan" max-width="440" persistent>
+    <v-card class="rounded-lg">
+      <v-card-title class="bg-orange-darken-2 text-white pa-3">
+        Keputusan BAST MAP {{ selected[0]?.Nomor }}
+      </v-card-title>
+      <v-card-text class="pa-4">
+        <v-radio-group
+          v-model="formKeputusan.keputusan"
+          density="compact"
+          hide-details
+        >
+          <v-radio label="Lanjut (boleh ke Mutasi Marketing)" value="LANJUT" />
+          <v-radio label="Produksi ulang (tertahan)" value="ULANG" />
+        </v-radio-group>
+        <v-textarea
+          v-model="formKeputusan.alasan"
+          label="Alasan (wajib)"
+          rows="3"
+          maxlength="200"
+          counter
+          class="mt-3"
+          hide-details="auto"
+        />
+      </v-card-text>
+      <v-card-actions class="pa-3 border-t">
+        <v-btn
+          variant="text"
+          :disabled="isSavingKeputusan"
+          @click="showKeputusan = false"
+        >
+          Batal
+        </v-btn>
+        <v-spacer />
+        <v-btn
+          color="orange-darken-2"
+          variant="elevated"
+          :loading="isSavingKeputusan"
+          @click="simpanKeputusan"
+        >
+          Simpan
+        </v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
 </template>
 
 <style scoped>

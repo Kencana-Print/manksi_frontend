@@ -120,6 +120,13 @@ onMounted(async () => {
               {{ printData.header.mspk_keterangan }}
             </td>
           </tr>
+          <tr>
+            <td class="align-top">Keterangan</td>
+            <td class="align-top">:</td>
+            <td style="white-space: pre-wrap">
+              {{ printData.header.mspk_kendala || "-" }}
+            </td>
+          </tr>
         </table>
 
         <div
@@ -142,7 +149,12 @@ onMounted(async () => {
           <tbody>
             <tr v-for="(d, i) in printData.details" :key="d.no">
               <td class="text-center">{{ i + 1 }}</td>
-              <td>{{ d.kesesuaian }}</td>
+              <td
+                class="text-center font-weight-bold"
+                :class="{ 'status-n': d.status === 'N' }"
+              >
+                {{ d.status }}
+              </td>
               <td class="text-center font-weight-bold">{{ d.status }}</td>
               <td>{{ d.keterangan }}</td>
             </tr>
@@ -289,6 +301,9 @@ onMounted(async () => {
 }
 .detail-table th {
   font-weight: bold;
+}
+.status-n {
+  background: #d9d9d9;
 }
 
 .image-box {

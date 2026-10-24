@@ -13,4 +13,8 @@ export const SLOT_BAHAN = [
   { key: "katalis", kolom: "Katalis", label: "Katalis", kode: 10437 },
 ] as const;
 
-export type SlotBahan = (typeof SLOT_BAHAN)[number];
+// kode dilebarkan jadi number | null: data sekarang semuanya angka (literal),
+// padahal slot yang belum ada di master harus tetap bisa bernilai null
+export type SlotBahan = Omit<(typeof SLOT_BAHAN)[number], "kode"> & {
+  kode: number | null;
+};

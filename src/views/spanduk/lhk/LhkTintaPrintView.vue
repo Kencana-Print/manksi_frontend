@@ -66,7 +66,7 @@ const setara = (b: LhkTintaBahan): string => {
 
   <div v-else-if="data" class="print-container">
     <div class="print-page">
-      <div class="doc-title">Laporan Hasil Kerja Tinta/Cat</div>
+      <div class="doc-title">Laporan Hasil Kerja Pemakaian Obat</div>
 
       <table class="info">
         <tr>

@@ -515,14 +515,14 @@ export const createMenuItems = (): NavItem[] => {
               icon: IconBulb,
             },
             {
-              title: "LHK Tinta/Cat",
-              to: "/spanduk/lhk/lhk-tinta",
-              icon: IconPalette,
-            },
-            {
               title: "LHK Cetak",
               to: "/spanduk/lhk/lhk-cetak",
               icon: IconPrinter,
+            },
+            {
+              title: "LHK Pemakaian Obat",
+              to: "/spanduk/lhk/lhk-tinta",
+              icon: IconPalette,
             },
             {
               title: "LHK Proof",

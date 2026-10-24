@@ -24,8 +24,12 @@ export interface LhkCetakDetail {
 export interface LhkCetakKaryawan {
   Nik: string;
   Nama: string;
-  Absensi: number;
-  Lembur: number;
+  Absensi: number; // legacy (LHK lama)
+  Lembur: number; // legacy (LHK lama)
+  Menit_Kerja: number;
+  Menit_Lembur: number;
+  Jam_Kerja: string;
+  Jam_Lembur: string;
 }
 
 export interface LhkCetakForm {
@@ -35,6 +39,8 @@ export interface LhkCetakForm {
   Nama_Pabrik: string | null;
   Kar_Borongan: number;
   Kar_Harian: number;
+  Sesi: string;
+  Jam_Input: string | null;
   Detail: LhkCetakDetail[];
   Karyawan: LhkCetakKaryawan[];
 }
@@ -42,10 +48,11 @@ export interface LhkCetakForm {
 export interface LhkCetakPayload {
   Tanggal: string;
   Kode_Pabrik: string;
+  Sesi: string;
   Kar_Borongan: number;
   Kar_Harian: number;
   Detail: { Nomor_SPK: string; Qty_Cetak: number; Jml_Plangkan: number }[];
-  Karyawan: { Nik: string; Absensi: number; Lembur: number }[];
+  Karyawan: { Nik: string }[];
 }
 
 export interface InfoSpk {
@@ -64,6 +71,12 @@ export interface PabrikOption {
 export interface KaryawanOption {
   Nik: string;
   Nama: string;
+  Jam_Masuk: string;
+  Jam_Pulang: string;
+  Menit_Kerja: number;
+  Menit_Lembur: number;
+  Jam_Kerja: string;
+  Jam_Lembur: string;
 }
 
 export type SaveResponse = AxiosResponse<ApiResponse<{ Nomor: string }>>;
@@ -91,10 +104,12 @@ export const getLookupPabrik = async (): Promise<PabrikOption[]> => {
 
 export const getLookupKaryawan = async (
   pabrik: string,
+  sesi: string,
+  tanggal: string,
 ): Promise<KaryawanOption[]> => {
   const res = await api.get<ApiResponse<KaryawanOption[]>>(
     `${BASE}/lookups/karyawan`,
-    { params: { pabrik } },
+    { params: { pabrik, sesi, tanggal } },
   );
   return res.data.data ?? [];
 };

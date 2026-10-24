@@ -437,7 +437,9 @@ const tutupSetelahSimpan = () => {
 
 <template>
   <BaseForm
-    :title="isEditMode ? 'Ubah LHK Tinta/Cat' : 'Tambah LHK Tinta/Cat'"
+    :title="
+      isEditMode ? 'Ubah LHK Pemakaian Obat' : 'Tambah LHK Pemakaian Obat'
+    "
     menu-id="4"
     :icon="IconPalette"
     :is-loading="isLoading"
@@ -530,8 +532,8 @@ const tutupSetelahSimpan = () => {
         </div>
 
         <div v-if="isEditMode" class="catatan">
-          LHK Cetak tidak dapat diubah. Hapus lalu buat LHK Tinta/Cat baru bila
-          salah pilih.
+          LHK Cetak tidak dapat diubah. Hapus lalu buat LHK Pemakaian Obat baru
+          bila salah pilih.
         </div>
       </div>
     </template>
@@ -611,7 +613,9 @@ const tutupSetelahSimpan = () => {
                   <td class="tc gt-lbl">{{ b.kode }}</td>
                   <td class="gt-ro" :title="b.nama">
                     {{ b.nama }}
-                    <span v-if="b.nonaktif" class="tag-nonaktif">nonaktif</span>
+                    <span v-if="b.nonaktif" class="tag-nonaktif"
+                      >di luar daftar</span
+                    >
                   </td>
                   <td class="gt-lbl">{{ labelSatuan(b.satuanMaster) }}</td>
                   <td class="p0">
@@ -665,10 +669,10 @@ const tutupSetelahSimpan = () => {
       </v-card-title>
       <v-card-text class="pa-4 text-center">
         <div class="text-body-1 mb-2">
-          LHK Tinta/Cat <b>{{ nomorTerakhir }}</b> telah disimpan.
+          LHK Pemakaian Obat <b>{{ nomorTerakhir }}</b> telah disimpan.
         </div>
         <div class="text-body-2 text-grey-darken-1">
-          Mau input LHK Tinta/Cat baru?
+          Mau input LHK Pemakaian Obat baru?
         </div>
       </v-card-text>
       <v-card-actions class="pa-3 border-t">

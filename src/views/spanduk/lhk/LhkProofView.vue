@@ -9,6 +9,7 @@ import * as lhkService from "@/services/spanduk/lhk/lhkProofService";
 import type {
   LhkProofRow,
   LhkProofDetailRow,
+  LhkProofResepRow,
 } from "@/services/spanduk/lhk/lhkProofService";
 import { IconFileCheck, IconPrinter, IconFileExport } from "@tabler/icons-vue";
 import { formatTanggal } from "@/utils/dateFormat";
@@ -26,6 +27,29 @@ interface ExportDetailRow {
   J_Plangkan: number;
   J_Proof: number;
   J_Meter: number;
+  Warna1: string;
+  Warna2: string;
+  Warna3: string;
+  Warna4: string;
+  Warna5: string;
+  Warna6: string;
+  Warna7: string;
+  Warna8: string;
+  Warna9: string;
+  Warna10: string;
+}
+
+interface ExportResepRow {
+  Nomor: string;
+  Tanggal: string;
+  Kode_Pabrik: string;
+  Nama_Pabrik: string;
+  Kode: number;
+  Nama: string;
+  Satuan: string;
+  Qty_Resep: number;
+  Qty_Actual: number;
+  Selisih: number;
 }
 
 const toast = useToast();
@@ -51,6 +75,7 @@ const filterState = ref({
 
 // --- DETAIL: dimuat sekali untuk seluruh periode, dikelompokkan per nomor ---
 const detailMap = ref<Record<string, LhkProofDetailRow[]>>({});
+const resepMap = ref<Record<string, LhkProofResepRow[]>>({});
 const expandedRows = ref<unknown[]>([]);
 
 const muatData = async (): Promise<LhkProofRow[]> => {
@@ -64,9 +89,10 @@ const muatData = async (): Promise<LhkProofRow[]> => {
     return [];
   }
 
-  const [master, detail] = await Promise.all([
+  const [master, detail, resep] = await Promise.all([
     lhkService.getBrowse(dtAwal, dtAkhir),
     lhkService.getDetail(dtAwal, dtAkhir),
+    lhkService.getResep(dtAwal, dtAkhir),
   ]);
 
   const peta: Record<string, LhkProofDetailRow[]> = {};
@@ -74,6 +100,12 @@ const muatData = async (): Promise<LhkProofRow[]> => {
     (peta[row.Nomor] ??= []).push(row);
   }
   detailMap.value = peta;
+
+  const petaResep: Record<string, LhkProofResepRow[]> = {};
+  for (const row of resep) {
+    (petaResep[row.Nomor] ??= []).push(row);
+  }
+  resepMap.value = petaResep;
   expandedRows.value = [];
   return master;
 };
@@ -114,6 +146,57 @@ const kolomMaster: ExcelColumn[] = [
 
 const NUM = "#,##0.00";
 const INT = "#,##0";
+const QTY4 = "#,##0.0000";
+
+const kolomResep: ExcelColumn[] = [
+  { header: "Nomor", key: "Nomor", width: 20 },
+  { header: "Tanggal", key: "Tanggal", width: 14, align: "center" },
+  { header: "Kode Pabrik", key: "Kode_Pabrik", width: 14 },
+  { header: "Nama Pabrik", key: "Nama_Pabrik", width: 28 },
+  { header: "Kode Bahan", key: "Kode", width: 12 },
+  { header: "Nama Bahan", key: "Nama", width: 34 },
+  { header: "Satuan", key: "Satuan", width: 10 },
+  {
+    header: "Resep",
+    key: "Qty_Resep",
+    width: 14,
+    align: "right",
+    numFmt: QTY4,
+  },
+  {
+    header: "Actual",
+    key: "Qty_Actual",
+    width: 14,
+    align: "right",
+    numFmt: QTY4,
+  },
+  {
+    header: "Selisih",
+    key: "Selisih",
+    width: 14,
+    align: "right",
+    numFmt: QTY4,
+  },
+];
+
+const fmtQty = (v: number | null | undefined): string =>
+  Number(v ?? 0).toLocaleString("id-ID", { maximumFractionDigits: 4 });
+
+const selisih = (r: LhkProofResepRow): number =>
+  Math.round((r.Qty_Actual - r.Qty_Resep) * 10000) / 10000;
+const warnaDari = (r: LhkProofDetailRow): string[] =>
+  [r.U1, r.U2, r.U3, r.U4, r.U5, r.U6, r.U7, r.U8, r.U9, r.U10].map((v) =>
+    (v ?? "").trim(),
+  );
+// Jumlah kolom warna yang ditampilkan di expand: sampai warna terisi paling akhir
+const jumlahKolomWarna = (nomor: string): number => {
+  const terjauh = (detailMap.value[nomor] ?? []).reduce((mx, r) => {
+    const idx = warnaDari(r).reduce((a, w, i) => (w !== "" ? i + 1 : a), 0);
+    return Math.max(mx, idx);
+  }, 0);
+  return Math.max(1, terjauh);
+};
+
 const kolomDetail: ExcelColumn[] = [
   { header: "Nomor", key: "Nomor", width: 20 },
   { header: "Tanggal", key: "Tanggal", width: 14, align: "center" },
@@ -139,6 +222,11 @@ const kolomDetail: ExcelColumn[] = [
   },
   { header: "J Proof", key: "J_Proof", width: 10, align: "right", numFmt: INT },
   { header: "J Meter", key: "J_Meter", width: 10, align: "right", numFmt: NUM },
+  ...Array.from({ length: 10 }, (_, i) => ({
+    header: `Warna ${i + 1}`,
+    key: `Warna${i + 1}`,
+    width: 14,
+  })),
 ];
 
 // Data master yang sedang tampil (ikut search + filter kolom BaseBrowse)
@@ -222,6 +310,16 @@ const exportDetail = async () => {
         J_Plangkan: Number(r.J_Plangkan) || 0,
         J_Proof: Number(r.J_Proof) || 0,
         J_Meter: Number(r.J_Meter) || 0,
+        Warna1: warnaDari(r)[0],
+        Warna2: warnaDari(r)[1],
+        Warna3: warnaDari(r)[2],
+        Warna4: warnaDari(r)[3],
+        Warna5: warnaDari(r)[4],
+        Warna6: warnaDari(r)[5],
+        Warna7: warnaDari(r)[6],
+        Warna8: warnaDari(r)[7],
+        Warna9: warnaDari(r)[8],
+        Warna10: warnaDari(r)[9],
       });
     }
   }
@@ -241,6 +339,53 @@ const exportDetail = async () => {
   } catch (e) {
     console.error(e);
     toast.error("Terjadi kesalahan saat mengekspor detail LHK Proof.");
+  }
+};
+
+// Resep & Actual per dokumen, hanya dari LHK yang sedang tampil di grid
+const exportResep = async () => {
+  if (!canExport.value) {
+    return toast.error("Akses ditolak: Anda tidak memiliki izin untuk export.");
+  }
+
+  const master = dataTampil();
+  if (master.length === 0) {
+    return toast.warning("Tidak ada data untuk diexport.");
+  }
+
+  const rows: ExportResepRow[] = [];
+  for (const item of master) {
+    for (const r of resepMap.value[item.Nomor] ?? []) {
+      rows.push({
+        Nomor: item.Nomor,
+        Tanggal: formatTanggal(item.Tanggal),
+        Kode_Pabrik: item.Kode_Pabrik ?? "",
+        Nama_Pabrik: item.Nama_Pabrik ?? "",
+        Kode: r.Kode,
+        Nama: r.Nama,
+        Satuan: r.Satuan,
+        Qty_Resep: r.Qty_Resep,
+        Qty_Actual: r.Qty_Actual,
+        Selisih: selisih(r),
+      });
+    }
+  }
+
+  if (rows.length === 0) {
+    return toast.warning("Tidak ada data resep pada LHK yang tampil.");
+  }
+
+  try {
+    await exportExcelSingle(
+      `Export_Resep_LHK_Proof_${today}.xlsx`,
+      "Resep LHK Proof",
+      kolomResep,
+      rows,
+    );
+    toast.success("Berhasil export resep LHK Proof.");
+  } catch (e) {
+    console.error(e);
+    toast.error("Terjadi kesalahan saat mengekspor resep LHK Proof.");
   }
 };
 
@@ -301,6 +446,9 @@ const numFmt = (v: number | null) =>
               <th width="90" class="tr">J Plangkan</th>
               <th width="80" class="tr">J Proof</th>
               <th width="80" class="tr">J Meter</th>
+              <th v-for="i in jumlahKolomWarna(item.Nomor)" :key="i" width="90">
+                Warna {{ i }}
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -315,14 +463,49 @@ const numFmt = (v: number | null) =>
                 {{ numFmt(r.J_Proof) }}
               </td>
               <td class="tr">{{ numFmt(r.J_Meter) }}</td>
+              <td v-for="i in jumlahKolomWarna(item.Nomor)" :key="i">
+                {{ warnaDari(r)[i - 1] }}
+              </td>
             </tr>
             <tr v-if="!detailMap[item.Nomor]?.length">
-              <td colspan="8" class="text-center text-grey py-3 font-italic">
-                Detail LHK Proof tidak ditemukan.
-              </td>
+              <td
+                :colspan="8 + jumlahKolomWarna(item.Nomor)"
+                class="text-center text-grey py-3 font-italic"
+              ></td>
             </tr>
           </tbody>
         </table>
+
+        <div v-if="resepMap[item.Nomor]?.length" class="mt-3">
+          <div class="expand-title mb-2">
+            Resep &amp; Actual Pemakaian Obat - {{ item.Nomor }}
+          </div>
+          <table class="detail-table">
+            <thead>
+              <tr>
+                <th>Nama Bahan</th>
+                <th width="70">Satuan</th>
+                <th width="110" class="tr">Resep</th>
+                <th width="110" class="tr">Actual</th>
+                <th width="110" class="tr">Selisih</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="r in resepMap[item.Nomor]" :key="r.Kode">
+                <td>{{ r.Nama }}</td>
+                <td>{{ r.Satuan }}</td>
+                <td class="tr">{{ fmtQty(r.Qty_Resep) }}</td>
+                <td class="tr font-weight-bold">{{ fmtQty(r.Qty_Actual) }}</td>
+                <td
+                  class="tr"
+                  :class="selisih(r) > 0 ? 'text-red-darken-2' : ''"
+                >
+                  {{ fmtQty(selisih(r)) }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </template>
 
@@ -337,6 +520,9 @@ const numFmt = (v: number | null) =>
       </v-btn>
       <v-btn size="small" color="deep-purple-darken-1" @click="exportDetail">
         <template #prepend><IconFileExport :size="15" /></template>Export Detail
+      </v-btn>
+      <v-btn size="small" color="teal-darken-1" @click="exportResep">
+        <template #prepend><IconFileExport :size="15" /></template>Export Resep
       </v-btn>
     </template>
   </BaseBrowse>

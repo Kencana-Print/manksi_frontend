@@ -13,6 +13,7 @@ import type {
   PabrikOption,
   SaveResponse,
   UkuranOption,
+  ResepOption,
 } from "@/services/spanduk/lhk/lhkProofFormService";
 
 const route = useRoute();
@@ -34,9 +35,21 @@ const LOKASI_MANUAL = "MT1";
 const isManualLokasi = (kode: string) =>
   kode.trim().toUpperCase() === LOKASI_MANUAL;
 
-const JUMLAH_WARNA = 7;
+const JUMLAH_WARNA = 10;
+const KOLOM_WARNA_AWAL = 7;
 const MAKS_WARNA = 40;
 const INDEKS_WARNA = Array.from({ length: JUMLAH_WARNA }, (_, i) => i);
+
+// Jumlah kolom warna yang tampil (bisa ditambah admin sampai JUMLAH_WARNA)
+const jumlahKolomWarna = ref(KOLOM_WARNA_AWAL);
+const indeksTampil = computed(() =>
+  INDEKS_WARNA.slice(0, jumlahKolomWarna.value),
+);
+const tambahKolomWarna = () => {
+  if (jumlahKolomWarna.value < JUMLAH_WARNA) {
+    jumlahKolomWarna.value += 1;
+  }
+};
 
 const formatDateLocal = (d: Date) => {
   const year = d.getFullYear();
@@ -52,6 +65,14 @@ interface PlangkanItem {
   qty: number;
 }
 
+interface ResepRow {
+  kode: number;
+  nama: string;
+  satuan: string;
+  resep: number;
+  actual: number;
+}
+
 interface FormRow {
   spk: string;
   nama: string;
@@ -62,6 +83,7 @@ interface FormRow {
   jProof: number;
   warna: string[]; // U1..U7
   plangkan: PlangkanItem[]; // 15 ukuran dari master
+  terkunci: boolean; // qty plangkan berasal dari LHK Afdruk (read-only)
 }
 
 interface FormState {
@@ -72,12 +94,31 @@ interface FormState {
     namaPabrik: string;
   };
   items: FormRow[];
+  resep: ResepRow[];
+  resepTerkunci: boolean;
 }
 
 const num = (v: unknown) => Number(v) || 0;
 
 // Master ukuran plangkan (15 ukuran), dimuat sekali saat mount
 const ukuranList = ref<UkuranOption[]>([]);
+
+const resepOpts = ref<ResepOption[]>([]);
+
+const resepKosong = (): ResepRow[] =>
+  resepOpts.value.map((o) => ({
+    kode: o.Kode,
+    nama: o.Nama,
+    satuan: o.Satuan,
+    resep: 0,
+    actual: 0,
+  }));
+
+const lengkapiResep = () => {
+  if (formData.value.resep.length === 0) {
+    formData.value.resep = resepKosong();
+  }
+};
 
 const plangkanKosong = (): PlangkanItem[] =>
   ukuranList.value.map((u) => ({ ukuran: u.Ukuran, qty: 0 }));
@@ -92,11 +133,14 @@ const barisKosong = (): FormRow => ({
   jProof: 0,
   warna: INDEKS_WARNA.map(() => ""),
   plangkan: plangkanKosong(),
+  terkunci: false,
 });
 
 const defaultData = (): FormState => ({
   header: { nomor: "", tanggal: todayLocal, kodePabrik: "", namaPabrik: "" },
   items: [barisKosong()],
+  resep: [],
+  resepTerkunci: false,
 });
 
 // J Plangkan (selain MT1) = jumlah Qty semua ukuran (dihitung juga oleh server)
@@ -132,11 +176,21 @@ const bangunPayload = (data: FormState): LhkProofPayload => {
           U5: w(4),
           U6: w(5),
           U7: w(6),
+          U8: w(7),
+          U9: w(8),
+          U10: w(9),
           Plangkan: r.plangkan
             .filter((p) => num(p.qty) > 0)
             .map((p) => ({ Ukuran: p.ukuran, Qty: num(p.qty) })),
         };
       }),
+    Resep: data.resep
+      .filter((r) => num(r.resep) > 0 || num(r.actual) > 0)
+      .map((r) => ({
+        Brg_Kode: r.kode,
+        Qty_Resep: num(r.resep),
+        Qty_Actual: num(r.actual),
+      })),
   };
 };
 
@@ -164,12 +218,21 @@ const {
       lebar: num(r.Lebar),
       jPlangkan: num(r.J_Plangkan),
       jProof: num(r.J_Proof),
-      warna: [r.U1, r.U2, r.U3, r.U4, r.U5, r.U6, r.U7].map((v) => v ?? ""),
+      warna: [r.U1, r.U2, r.U3, r.U4, r.U5, r.U6, r.U7, r.U8, r.U9, r.U10].map(
+        (v) => v ?? "",
+      ),
       plangkan: r.Plangkan.map((p) => ({
         ukuran: num(p.Ukuran),
         qty: num(p.Qty),
       })),
+      terkunci: false,
     }));
+    // Lebarkan kolom sampai warna terisi paling akhir (minimal 7)
+    const terjauh = items.reduce((mx, r) => {
+      const idx = r.warna.reduce((a, w, i) => (w.trim() !== "" ? i + 1 : a), 0);
+      return Math.max(mx, idx);
+    }, 0);
+    jumlahKolomWarna.value = Math.max(KOLOM_WARNA_AWAL, terjauh);
     return {
       header: {
         nomor: d.Nomor,
@@ -178,6 +241,14 @@ const {
         namaPabrik: d.Nama_Pabrik ?? "",
       },
       items: items.length > 0 ? items : [barisKosong()],
+      resep: d.Resep.map((r) => ({
+        kode: r.Kode,
+        nama: r.Nama,
+        satuan: r.Satuan,
+        resep: num(r.Qty_Resep),
+        actual: num(r.Qty_Actual),
+      })),
+      resepTerkunci: d.Resep_Terkunci,
     };
   },
   submitApi: async (data: FormState): Promise<SaveResponse> => {
@@ -195,7 +266,9 @@ const {
   },
   onFormReset: () => {
     lengkapiPlangkan();
+    lengkapiResep();
     fokusIdx.value = 0;
+    jumlahKolomWarna.value = KOLOM_WARNA_AWAL;
     isiLokasiDefault();
   },
 });
@@ -253,13 +326,16 @@ const isiLokasiDefault = () => {
 
 onMounted(async () => {
   try {
-    const [pabrik, ukuran] = await Promise.all([
+    const [pabrik, ukuran, resep] = await Promise.all([
       lhkForm.getLookupPabrik(),
       lhkForm.getLookupUkuran(),
+      lhkForm.getLookupResep(),
     ]);
     pabrikOpts.value = pabrik;
     ukuranList.value = ukuran;
+    resepOpts.value = resep;
     lengkapiPlangkan();
+    lengkapiResep();
     isiLokasiDefault();
   } catch (e) {
     toast.error(lhkForm.pesanError(e, "Gagal memuat data lookup."));
@@ -311,7 +387,11 @@ const isiBarisDariSpk = async (
     row.jumlahOrder = num(info.Jumlah_Order);
     row.panjang = num(info.Panjang);
     row.lebar = num(info.Lebar);
-    row.plangkan = plangkanKosong(); // SPK baru: semua qty mulai dari 0
+    row.terkunci = info.Terkunci;
+    row.plangkan =
+      info.Plangkan.length > 0
+        ? info.Plangkan.map((p) => ({ ukuran: num(p.Ukuran), qty: num(p.Qty) }))
+        : plangkanKosong();
     fokusIdx.value = idx;
     return true;
   } catch (e) {
@@ -325,7 +405,7 @@ const isiBarisDariSpk = async (
 const urutanKolom = computed<string[]>(() => [
   ...(isManual.value ? ["jplangkan"] : []),
   "jproof",
-  ...INDEKS_WARNA.map((i) => `u${i}`),
+  ...indeksTampil.value.map((i) => `u${i}`),
 ]);
 
 const fieldRefs = ref<Record<string, HTMLInputElement>>({});
@@ -456,6 +536,12 @@ const validateSave = () => {
       return;
     }
   }
+  for (const r of formData.value.resep) {
+    if (num(r.resep) < 0 || num(r.actual) < 0) {
+      toast.warning(`${r.nama}: Resep dan Actual tidak boleh negatif.`);
+      return;
+    }
+  }
 
   showSaveDialog.value = true;
 };
@@ -468,7 +554,9 @@ const resetBaru = () => {
     return;
   }
   formData.value = defaultData();
+  jumlahKolomWarna.value = KOLOM_WARNA_AWAL;
   lengkapiPlangkan();
+  lengkapiResep();
   fokusIdx.value = 0;
   isiLokasiDefault();
 };
@@ -549,12 +637,26 @@ const tutupSetelahSimpan = () => {
       <div class="lhk-right">
         <div class="tbl-header">
           <span class="tbl-title">Rincian SPK / MAP</span>
-          <button type="button" class="btn-add" @click="addRow">
-            + Tambah Baris
-          </button>
+          <div>
+            <button
+              type="button"
+              class="btn-add"
+              style="margin-right: 6px"
+              :disabled="jumlahKolomWarna >= 10"
+              @click="tambahKolomWarna"
+            >
+              + Warna ({{ jumlahKolomWarna }}/10)
+            </button>
+            <button type="button" class="btn-add" @click="addRow">
+              + Tambah Baris
+            </button>
+          </div>
         </div>
         <div class="tbl-wrap" style="flex: 1; min-height: 160px">
-          <table class="gt" style="min-width: 1560px">
+          <table
+            class="gt"
+            :style="{ minWidth: `${860 + jumlahKolomWarna * 100}px` }"
+          >
             <thead>
               <tr>
                 <th style="width: 32px" class="tc">No</th>
@@ -678,59 +780,144 @@ const tutupSetelahSimpan = () => {
           </table>
         </div>
 
-        <!-- Detail Plangkan untuk baris yang sedang dipilih -->
-        <div class="plg">
-          <div class="tbl-header tbl-header-sub">
-            <span class="tbl-title">
-              Detail Plangkan<template v-if="rowAktif?.spk">
-                — {{ rowAktif.spk }}</template
-              >
-            </span>
+        <!-- Detail Plangkan + Resep (berdampingan) -->
+        <div class="bawah">
+          <!-- Detail Plangkan untuk baris yang sedang dipilih -->
+          <div class="plg">
+            <div class="tbl-header tbl-header-sub">
+              <span class="tbl-title">
+                Detail Plangkan<template v-if="rowAktif?.spk">
+                  — {{ rowAktif.spk }}</template
+                >
+              </span>
+            </div>
+            <div v-if="rowAktif?.spk && rowAktif.terkunci" class="plg-info">
+              Qty diambil dari LHK Afdruk (terkunci).
+            </div>
+            <div v-else-if="rowAktif?.spk" class="plg-info plg-info-manual">
+              Belum ada data ukuran di LHK Afdruk, isi manual.
+            </div>
+            <div v-if="rowAktif?.spk" class="tbl-wrap plg-wrap">
+              <table class="gt plg-tbl">
+                <thead>
+                  <tr>
+                    <th style="width: 130px" class="tr">Ukuran</th>
+                    <th style="width: 130px" class="tr bg-yellow">
+                      Qty Plangkan
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(p, i) in rowAktif.plangkan" :key="p.ukuran">
+                    <td class="tr gt-lbl">{{ p.ukuran }}</td>
+                    <td class="p0">
+                      <input
+                        v-model.number="p.qty"
+                        class="ci tr"
+                        :class="rowAktif.terkunci ? 'ro' : 'bg-yellow-light'"
+                        :readonly="rowAktif.terkunci"
+                        :title="
+                          rowAktif.terkunci ? 'Diambil dari LHK Afdruk' : ''
+                        "
+                        type="number"
+                        min="0"
+                        step="1"
+                        :ref="(el) => simpanRef(el, `q_${i}`)"
+                        @keydown.enter.prevent="onEnterQty(i)"
+                        v-select-on-focus
+                      />
+                    </td>
+                  </tr>
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td class="tr fw">Total</td>
+                    <td class="tr fw">{{ jumlahPlangkan(rowAktif) }}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+            <div v-else class="plg-kosong">
+              Pilih SPK/MAP pada tabel di atas untuk mengisi detail plangkan.
+            </div>
           </div>
-          <div v-if="rowAktif?.spk" class="tbl-wrap plg-wrap">
-            <table class="gt plg-tbl">
-              <thead>
-                <tr>
-                  <th style="width: 130px" class="tr">Ukuran</th>
-                  <th style="width: 130px" class="tr bg-yellow">
-                    Qty Plangkan
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="(p, i) in rowAktif.plangkan" :key="p.ukuran">
-                  <td class="tr gt-lbl">{{ p.ukuran }}</td>
-                  <td class="p0">
-                    <input
-                      v-model.number="p.qty"
-                      type="number"
-                      min="0"
-                      step="1"
-                      class="ci tr bg-yellow-light"
-                      :ref="(el) => simpanRef(el, `q_${i}`)"
-                      @keydown.enter.prevent="onEnterQty(i)"
-                      v-select-on-focus
-                    />
-                  </td>
-                </tr>
-              </tbody>
-              <tfoot>
-                <tr>
-                  <td class="tr fw">Total</td>
-                  <td class="tr fw">{{ jumlahPlangkan(rowAktif) }}</td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-          <div v-else class="plg-kosong">
-            Pilih SPK/MAP pada tabel di atas untuk mengisi detail plangkan.
+
+          <!-- Resep & Actual Pemakaian Obat (per dokumen) -->
+          <div class="rsp">
+            <div class="tbl-header tbl-header-sub">
+              <span class="tbl-title">
+                Resep &amp; Actual Pemakaian Obat
+                <template v-if="formData.resepTerkunci">
+                  (resep terkunci)</template
+                >
+              </span>
+            </div>
+            <div class="tbl-wrap rsp-wrap">
+              <table class="gt">
+                <thead>
+                  <tr>
+                    <th style="width: 30px" class="tc">No</th>
+                    <th>Nama Bahan</th>
+                    <th style="width: 50px" class="tc">Sat</th>
+                    <th style="width: 90px" class="tr bg-yellow">Resep</th>
+                    <th style="width: 90px" class="tr bg-yellow">Actual</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-if="formData.resep.length === 0">
+                    <td colspan="5" class="kosong">Memuat daftar bahan...</td>
+                  </tr>
+                  <tr v-for="(b, i) in formData.resep" :key="b.kode">
+                    <td class="tc gt-lbl">{{ i + 1 }}</td>
+                    <td class="p0">
+                      <input
+                        :value="b.nama"
+                        class="ci ro"
+                        readonly
+                        :title="b.nama"
+                      />
+                    </td>
+                    <td class="tc gt-lbl">{{ b.satuan }}</td>
+                    <td class="p0">
+                      <input
+                        v-model.number="b.resep"
+                        type="number"
+                        min="0"
+                        step="0.0001"
+                        class="ci tr"
+                        :class="
+                          formData.resepTerkunci ? 'ro' : 'bg-yellow-light'
+                        "
+                        :readonly="formData.resepTerkunci"
+                        v-select-on-focus
+                      />
+                    </td>
+                    <td class="p0">
+                      <input
+                        v-model.number="b.actual"
+                        type="number"
+                        min="0"
+                        step="0.0001"
+                        class="ci tr bg-yellow-light"
+                        v-select-on-focus
+                      />
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>
     </template>
   </BaseForm>
 
-  <SpkSearchModal v-model="showSpkModal" @selected="onSpkSelected" />
+  <SpkSearchModal
+    v-model="showSpkModal"
+    filter-mode="lhk-design"
+    :divisi="1"
+    @selected="onSpkSelected"
+  />
 
   <!-- Setelah simpan: pengganti Save & New / Save & Close -->
   <v-dialog v-model="showSelesai" max-width="400" persistent>
@@ -1040,5 +1227,38 @@ const tutupSetelahSimpan = () => {
   color: #757575;
   font-style: italic;
   font-size: 11px;
+}
+.plg-info {
+  padding: 4px 10px;
+  font-size: 10px;
+  background: #e3f2fd;
+  color: #0d47a1;
+  border: 1px solid #bdbdbd;
+  border-top: none;
+}
+.plg-info-manual {
+  background: #fff8e1;
+  color: #8d6e00;
+}
+.bawah {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+.rsp {
+  display: flex;
+  flex-direction: column;
+  width: 430px;
+  flex-shrink: 0;
+}
+.rsp-wrap {
+  max-height: 330px;
+}
+.kosong {
+  padding: 14px 10px !important;
+  color: #757575;
+  font-style: italic;
+  font-size: 11px;
+  text-align: center;
 }
 </style>
