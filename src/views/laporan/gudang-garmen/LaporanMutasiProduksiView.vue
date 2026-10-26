@@ -8,6 +8,12 @@ import PageLayout from "@/components/PageLayout.vue";
 import BaseTable from "@/components/BaseTable.vue";
 import SpkSearchModal from "@/components/lookups/SpkSearchModal.vue";
 import PivotWithFilter from "@/components/PivotWithFilter.vue";
+import {
+  DAFTAR_PRESET,
+  bangunDataset,
+  densifyBody,
+  type IdPreset,
+} from "@/utils/mutasiPivot";
 import { laporanMutasiProduksiService } from "@/services/laporan/gudang-garmen/laporanMutasiProduksiService";
 import { exportExcelSingle } from "@/utils/excelExport";
 import {
@@ -19,6 +25,7 @@ import {
   IconLayoutGrid,
   IconSearch,
   IconExternalLink,
+  IconInfoCircle,
 } from "@tabler/icons-vue";
 
 const MENU_ID = "524";
@@ -394,6 +401,14 @@ const pivotWithFilterRef = ref<InstanceType<typeof PivotWithFilter> | null>(
   null,
 );
 
+const idPreset = ref<IdPreset>("alur");
+const presetAktif = computed(() =>
+  DAFTAR_PRESET.find((p) => p.id === idPreset.value),
+);
+const dataPivot = computed(() =>
+  bangunDataset(presetAktif.value?.dataset ?? "mutasi", itemsWithBulan.value),
+);
+
 // ── Chart reaktif — dibangun ulang OTOMATIS setiap kali user
 // menyusun ulang pivot (rows/cols/values), lewat event pivot-changed
 // yang di-emit TinyPivotOnly berdasarkan tabel HTML yang baru
@@ -453,7 +468,7 @@ const rebuildChart = async (table: any) => {
   const rowFieldCount = pivotWithFilterRef.value?.getRowFieldCount?.() ?? 1;
   const colLabels = buildColumnLabels(table.headerRows).slice(rowFieldCount);
 
-  const parsedRows = table.bodyRows.map((row: any) => {
+  const parsedRows = densifyBody(table.bodyRows).map((row) => {
     const label = row
       .slice(0, rowFieldCount)
       .map((c: any) => c.text)
@@ -836,27 +851,9 @@ const rowPropsFn = (data: any) => {
           Tampilkan data terlebih dahulu.
         </div>
         <template v-else>
-          <div class="pivot-export-bar">
-            <span class="pivot-hint-txt">
-              Field "Jenis" berisi Jumlah/Terpakai/Babaran/BS Lini/BS Kain
-              Sablon/BS Kain — susun sebagai baris/kolom untuk bandingkan antar
-              ukuran.
-            </span>
-            <v-btn
-              size="small"
-              color="green"
-              variant="tonal"
-              @click="onExportPivot"
-            >
-              <template #prepend
-                ><IconFileSpreadsheet :size="14" :stroke-width="1.7"
-              /></template>
-              Export Pivot Ini
-            </v-btn>
-          </div>
           <PivotWithFilter
             ref="pivotWithFilterRef"
-            :data="itemsWithBulan"
+            :data="dataPivot"
             :filterable-columns="[
               'DivisiNama',
               'Kelompok',
@@ -871,11 +868,48 @@ const rowPropsFn = (data: any) => {
               'NoPermintaan',
               'BsKain',
             ]"
-            :default-rows="['Kelompok', 'Size', 'NamaSpk', 'Komponen']"
-            :default-cols="['GudangAsal']"
-            :default-vals="[{ field: 'Jumlah', agg: 'sum' }]"
+            :default-rows="presetAktif?.rows ?? []"
+            :default-cols="presetAktif?.cols ?? []"
+            :default-vals="presetAktif?.vals ?? []"
             @pivot-changed="onPivotChanged"
-          />
+          >
+            <template #toolbar-left>
+              <v-btn-toggle
+                v-model="idPreset"
+                mandatory
+                density="compact"
+                divided
+                color="primary"
+                variant="outlined"
+              >
+                <v-btn
+                  v-for="p in DAFTAR_PRESET"
+                  :key="p.id"
+                  :value="p.id"
+                  size="x-small"
+                >
+                  {{ p.label }}
+                </v-btn>
+              </v-btn-toggle>
+              <v-tooltip location="bottom" max-width="420">
+                <template #activator="{ props: tip }">
+                  <IconInfoCircle v-bind="tip" :size="18" class="pivot-info" />
+                </template>
+                {{ presetAktif?.petunjuk }}
+              </v-tooltip>
+              <span class="pivot-sep"></span>
+            </template>
+            <template #toolbar-right>
+              <v-btn
+                size="x-small"
+                color="success"
+                variant="tonal"
+                @click="onExportPivot"
+              >
+                Export Pivot Ini
+              </v-btn>
+            </template>
+          </PivotWithFilter>
         </template>
       </div>
 
@@ -1033,19 +1067,20 @@ const rowPropsFn = (data: any) => {
   flex-direction: column;
   overflow: hidden;
 }
-.pivot-export-bar {
-  padding: 6px 12px;
-  background: #f5f7fa;
-  border-bottom: 1px solid #e0e0e0;
-  flex-shrink: 0;
+.pivot-wrap {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  flex-direction: column;
 }
-.pivot-hint-txt {
-  font-size: 10.5px;
-  color: #757575;
+.pivot-info {
+  color: #607d8b;
+  cursor: help;
+  flex-shrink: 0;
+}
+.pivot-sep {
+  width: 1px;
+  height: 18px;
+  background: #cfd8dc;
+  margin: 0 4px;
 }
 .chart-header {
   display: flex;

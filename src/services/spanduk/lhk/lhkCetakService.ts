@@ -19,6 +19,7 @@ export interface LhkCetakRow {
   Kar_Borongan: number | null;
   Kar_Harian: number | null;
   Jml_Meter: number | string | null;
+  Sesi: string;
 }
 
 export interface LhkCetakDetailRow {

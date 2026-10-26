@@ -12,6 +12,7 @@ import { useToast } from "vue-toastification";
 import PageLayout from "@/components/PageLayout.vue";
 import BaseTable from "@/components/BaseTable.vue";
 import PivotWithFilter from "@/components/PivotWithFilter.vue";
+import { densifyBody } from "@/utils/mutasiPivot";
 import type ExcelJS from "exceljs";
 import { spkBelumClosingService } from "@/services/laporan/marketing/spkBelumClosingService";
 import { exportExcelSingle } from "@/utils/excelExport";
@@ -373,7 +374,7 @@ const rebuildChart = async (table: any) => {
   const rowFieldCount = pivotWithFilterRef.value?.getRowFieldCount?.() ?? 1;
   const colLabels = buildColumnLabels(table.headerRows).slice(rowFieldCount);
 
-  const parsedRows = table.bodyRows.map((row: any) => {
+  const parsedRows = densifyBody(table.bodyRows).map((row) => {
     const label = row
       .slice(0, rowFieldCount)
       .map((c: any) => c.text)

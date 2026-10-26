@@ -16,6 +16,7 @@ import { formatTanggal } from "@/utils/dateFormat";
 interface ExportMasterRow {
   Nomor: string;
   Tanggal: string;
+  Sesi: string;
   Kode_Pabrik: string;
   Nama_Pabrik: string;
   Kar_Borongan: number;
@@ -34,6 +35,7 @@ interface ExportDetailRow {
   Panjang: number;
   Lebar: number;
   Qty_Cetak: number;
+  Output_Produksi: number;
   Jml_Plangkan: number;
 }
 
@@ -110,19 +112,31 @@ const baseBrowseRef = ref<InstanceType<typeof BaseBrowse> | null>(null);
 const headers = [
   { title: "Nomor", key: "Nomor", width: "170px" },
   { title: "Tanggal", key: "Tanggal", width: "110px", align: "center" },
+  { title: "Sesi", key: "Sesi", width: "90px", align: "center" },
   { title: "Kode Pabrik", key: "Kode_Pabrik", width: "120px" },
   { title: "Nama Pabrik", key: "Nama_Pabrik", width: "260px" },
   { title: "Kar Borongan", key: "Kar_Borongan", width: "120px", align: "end" },
   { title: "Kar Harian", key: "Kar_Harian", width: "110px", align: "end" },
-  { title: "Jml Meter", key: "Jml_Meter", width: "120px", align: "end" },
+  { title: "Output Produksi", key: "Jml_Meter", width: "140px", align: "end" },
 ];
 
 const INT = "#,##0";
 const NUM = "#,##0.00";
 
+const sesiLabel = (s: string | null | undefined): string =>
+  s === "PAGI" ? "Pagi" : s === "SIANG" ? "Siang" : "-";
+
+// Output Produksi = panjang x J. Cetak (dihitung, tidak disimpan)
+const outputProduksi = (
+  panjang: number | null | undefined,
+  qty: number | null | undefined,
+): number =>
+  Math.round((Number(panjang) || 0) * (Number(qty) || 0) * 100) / 100;
+
 const kolomMaster: ExcelColumn[] = [
   { header: "Nomor", key: "Nomor", width: 20 },
   { header: "Tanggal", key: "Tanggal", width: 14, align: "center" },
+  { header: "Sesi", key: "Sesi", width: 10, align: "center" },
   { header: "Kode Pabrik", key: "Kode_Pabrik", width: 14 },
   { header: "Nama Pabrik", key: "Nama_Pabrik", width: 30 },
   {
@@ -140,9 +154,9 @@ const kolomMaster: ExcelColumn[] = [
     numFmt: INT,
   },
   {
-    header: "Jml Meter",
+    header: "Output Produksi",
     key: "Jml_Meter",
-    width: 14,
+    width: 16,
     align: "right",
     numFmt: NUM,
   },
@@ -170,6 +184,13 @@ const kolomDetail: ExcelColumn[] = [
     width: 12,
     align: "right",
     numFmt: INT,
+  },
+  {
+    header: "Output Produksi",
+    key: "Output_Produksi",
+    width: 16,
+    align: "right",
+    numFmt: NUM,
   },
   {
     header: "Jml Plangkan",
@@ -234,6 +255,7 @@ const exportMaster = () =>
       dataTampil().map((r) => ({
         Nomor: r.Nomor,
         Tanggal: formatTanggal(r.Tanggal),
+        Sesi: sesiLabel(r.Sesi),
         Kode_Pabrik: r.Kode_Pabrik ?? "",
         Nama_Pabrik: r.Nama_Pabrik ?? "",
         Kar_Borongan: Number(r.Kar_Borongan) || 0,
@@ -267,6 +289,7 @@ const exportDetail = async () => {
         Panjang: Number(r.Panjang) || 0,
         Lebar: Number(r.Lebar) || 0,
         Qty_Cetak: Number(r.Qty_Cetak) || 0,
+        Output_Produksi: outputProduksi(r.Panjang, r.Qty_Cetak),
         Jml_Plangkan: Number(r.Jml_Plangkan) || 0,
       });
     }
@@ -332,6 +355,10 @@ const numFmt = (v: number | string | null) =>
       {{ formatTanggal(item.Tanggal) }}
     </template>
 
+    <template #item.Sesi="{ item }">
+      {{ sesiLabel(item.Sesi) }}
+    </template>
+
     <template #item.Jml_Meter="{ item }">
       {{
         Number(item.Jml_Meter ?? 0).toLocaleString("id-ID", {
@@ -354,6 +381,7 @@ const numFmt = (v: number | string | null) =>
               <th width="80" class="tr">Panjang</th>
               <th width="80" class="tr">Lebar</th>
               <th width="90" class="tr">Qty Cetak</th>
+              <th width="110" class="tr">Output Produksi</th>
               <th width="100" class="tr">Jml Plangkan</th>
             </tr>
           </thead>
@@ -365,10 +393,13 @@ const numFmt = (v: number | string | null) =>
               <td class="tr">{{ numFmt(r.Panjang) }}</td>
               <td class="tr">{{ numFmt(r.Lebar) }}</td>
               <td class="tr">{{ numFmt(r.Qty_Cetak) }}</td>
+              <td class="tr">
+                {{ numFmt(outputProduksi(r.Panjang, r.Qty_Cetak)) }}
+              </td>
               <td class="tr">{{ numFmt(r.Jml_Plangkan) }}</td>
             </tr>
             <tr v-if="!detailMap[item.Nomor]?.length">
-              <td colspan="7" class="text-center text-grey py-3 font-italic">
+              <td colspan="8" class="text-center text-grey py-3 font-italic">
                 Detail LHK Cetak tidak ditemukan.
               </td>
             </tr>

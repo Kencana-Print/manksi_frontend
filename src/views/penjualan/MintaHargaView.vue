@@ -145,7 +145,10 @@ const headers = [
 const rowPropsFn = (data: any) => {
   const item = data.item?.raw || data.item;
   const s = item.Status;
-  if (s === "MINTA") return { class: "text-red font-weight-medium" };
+  if (s === "BELUM DIVERIFIKASI")
+    return { style: "color: #e65100", class: "font-weight-medium" };
+  if (s === "MINTA")
+    return { style: "color: #f70606", class: "font-weight-medium" };
   if (s === "WAIT") return { class: "text-green font-weight-medium" };
   if (s === "CANCEL") return { class: "text-blue font-weight-medium" };
   if (s === "BELUM") return { class: "text-grey-darken-1 font-weight-medium" };
@@ -394,12 +397,17 @@ const submitPengajuan = async () => {
       <div class="legend-box">
         <div class="legend-row">
           <div class="legend-item">
+            <div class="legend-dot" style="background: #e65100"></div>
+            <span>BELUM DIVERIFIKASI</span>
+          </div>
+
+          <div class="legend-item">
             <div class="legend-dot" style="background: #757575"></div>
             <span>BELUM</span>
           </div>
 
           <div class="legend-item">
-            <div class="legend-dot" style="background: #e53935"></div>
+            <div class="legend-dot" style="background: #f70606"></div>
             <span>MINTA</span>
           </div>
           <div class="legend-item">

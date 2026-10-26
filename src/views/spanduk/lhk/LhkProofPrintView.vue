@@ -44,7 +44,7 @@ const fmtInt = (v: number | null | undefined): string =>
 const fmtQty = (v: number | null | undefined): string =>
   Number(v ?? 0) > 0 ? fmtInt(v) : "";
 
-const INDEKS_WARNA = [0, 1, 2, 3, 4, 5, 6];
+const MINIMAL_KOLOM_WARNA = 7;
 
 const warna = (r: BarisCetak): string[] => [
   r.U1 ?? "",
@@ -54,9 +54,25 @@ const warna = (r: BarisCetak): string[] => [
   r.U5 ?? "",
   r.U6 ?? "",
   r.U7 ?? "",
+  r.U8 ?? "",
+  r.U9 ?? "",
+  r.U10 ?? "",
 ];
 
 const rows = computed(() => data.value?.Detail ?? []);
+
+// Jumlah kolom warna yang dicetak: sampai warna terisi paling akhir (minimal 7)
+const jumlahKolomWarna = computed(() => {
+  const terjauh = rows.value.reduce((mx, r) => {
+    const idx = warna(r).reduce((a, w, i) => (w.trim() !== "" ? i + 1 : a), 0);
+    return Math.max(mx, idx);
+  }, 0);
+  return Math.max(MINIMAL_KOLOM_WARNA, terjauh);
+});
+
+const indeksWarna = computed(() =>
+  Array.from({ length: jumlahKolomWarna.value }, (_, i) => i),
+);
 
 // Daftar 15 ukuran selalu sama di tiap baris, ambil dari baris pertama
 const daftarUkuran = computed(() =>
@@ -81,6 +97,19 @@ const totalPerUkuran = computed(() =>
     rows.value.reduce((s, r) => s + Number(r.Plangkan?.[i]?.Qty ?? 0), 0),
   ),
 );
+
+// Resep & Actual: hanya bahan yang terisi
+const fmtQty4 = (v: number | null | undefined): string =>
+  Number(v ?? 0).toLocaleString("id-ID", { maximumFractionDigits: 4 });
+
+const resepTampil = computed(() =>
+  (data.value?.Resep ?? []).filter(
+    (r) => Number(r.Qty_Resep) > 0 || Number(r.Qty_Actual) > 0,
+  ),
+);
+
+const selisihResep = (r: { Qty_Resep: number; Qty_Actual: number }): number =>
+  Math.round((Number(r.Qty_Actual) - Number(r.Qty_Resep)) * 10000) / 10000;
 </script>
 
 <template>
@@ -115,7 +144,7 @@ const totalPerUkuran = computed(() =>
             <th rowspan="2" width="105">Nomor SPK</th>
             <th rowspan="2" width="55">J<br />Plangkan</th>
             <th rowspan="2" width="50">J<br />Proof</th>
-            <th v-for="i in INDEKS_WARNA" :key="i" rowspan="2" width="62">
+            <th v-for="i in indeksWarna" :key="i" rowspan="2" width="62">
               Warna<br />{{ i + 1 }}
             </th>
           </tr>
@@ -133,15 +162,15 @@ const totalPerUkuran = computed(() =>
             <td class="tc">{{ r.Nomor_SPK }}</td>
             <td class="tr">{{ fmtInt(r.J_Plangkan) }}</td>
             <td class="tr">{{ fmtInt(r.J_Proof) }}</td>
-            <td v-for="(w, i) in warna(r)" :key="i" class="tc warna">
-              {{ w }}
+            <td v-for="i in indeksWarna" :key="i" class="tc warna">
+              {{ warna(r)[i] }}
             </td>
           </tr>
           <tr class="row-total">
             <td colspan="5">Total</td>
             <td class="tr">{{ fmtInt(total.plangkan) }}</td>
             <td class="tr">{{ fmtInt(total.proof) }}</td>
-            <td :colspan="INDEKS_WARNA.length"></td>
+            <td :colspan="indeksWarna.length"></td>
           </tr>
         </tbody>
       </table>
@@ -173,6 +202,33 @@ const totalPerUkuran = computed(() =>
           </tr>
         </tbody>
       </table>
+
+      <!-- Tabel 3: Resep & Actual Pemakaian Obat -->
+      <template v-if="resepTampil.length > 0">
+        <div class="sub-title">Resep &amp; Actual Pemakaian Obat</div>
+        <table class="detail-table resep-table">
+          <thead>
+            <tr>
+              <th width="30">No</th>
+              <th>Nama Bahan</th>
+              <th width="55">Satuan</th>
+              <th width="90">Resep</th>
+              <th width="90">Actual</th>
+              <th width="90">Selisih</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(r, i) in resepTampil" :key="r.Kode">
+              <td class="tc">{{ i + 1 }}</td>
+              <td>{{ r.Nama }}</td>
+              <td class="tc">{{ r.Satuan }}</td>
+              <td class="tr">{{ fmtQty4(r.Qty_Resep) }}</td>
+              <td class="tr">{{ fmtQty4(r.Qty_Actual) }}</td>
+              <td class="tr">{{ fmtQty4(selisihResep(r)) }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </template>
 
       <div class="print-footer">
         <div class="sign">Mengetahui: 1 <span class="line"></span></div>
@@ -277,6 +333,9 @@ const totalPerUkuran = computed(() =>
   display: inline-block;
   width: 160px;
   border-bottom: 1px solid black;
+}
+.resep-table {
+  width: 60%;
 }
 
 @media print {

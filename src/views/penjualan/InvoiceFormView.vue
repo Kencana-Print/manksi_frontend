@@ -46,6 +46,7 @@ interface FormData {
   StsPpn: number;
   Ppn: number;
   Pph: string;
+  
   Disc: number;
   Apv: string;
   Xminta5: string;

@@ -1160,7 +1160,7 @@ const router = createRouter({
         layout: "DefaultLayout",
         requiresAuth: true,
         menuId: "4",
-        title: "LHK Tinta/Cat",
+        title: "LHK Pemakaian Obat",
       },
     },
     {
@@ -1171,7 +1171,7 @@ const router = createRouter({
         layout: "DefaultLayout",
         requiresAuth: true,
         menuId: "4",
-        title: "Tambah LHK Tinta/Cat",
+        title: "Tambah LHK Pemakaian Obat",
         browseRoute: "SpandukLhkTinta",
       },
     },
@@ -1183,7 +1183,7 @@ const router = createRouter({
         layout: "DefaultLayout",
         requiresAuth: true,
         menuId: "4",
-        title: "Ubah LHK Tinta/Cat",
+        title: "Ubah LHK Pemakaian Obat",
         browseRoute: "SpandukLhkTinta",
       },
     },
@@ -1194,7 +1194,7 @@ const router = createRouter({
       meta: {
         layout: "BlankLayout",
         requiresAuth: true,
-        title: "Cetak LHK Tinta/Cat",
+        title: "Cetak LHK Pemakaian Obat",
       },
     },
     {

@@ -3,31 +3,24 @@ import { ref, computed, onMounted, nextTick } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
 import BaseForm from "@/components/BaseForm.vue";
-import SpkSearchModal from "@/components/lookups/SpkSearchModal.vue";
+import LhkCetakSearchModal from "@/components/lookups/LhkCetakSearchModal.vue";
 import { useForm } from "@/composables/useForm";
-import { useAuthStore } from "@/stores/authStore";
 import { IconPalette, IconSearch } from "@tabler/icons-vue";
 import * as lhkForm from "@/services/spanduk/lhk/lhkTintaFormService";
 import type {
   BahanOption,
+  CetakOption,
+  LhkTintaBahan,
   LhkTintaPayload,
-  PabrikOption,
+  LhkTintaSpk,
   SaveResponse,
 } from "@/services/spanduk/lhk/lhkTintaFormService";
 
 const route = useRoute();
 const router = useRouter();
 const toast = useToast();
-const authStore = useAuthStore();
 
 const isEditMode = computed(() => !!route.params.nomor);
-
-const BAGIAN_SUPERADMIN = ["EDP", "DIR", "AUDIT"];
-const isSuperadmin = computed(() =>
-  BAGIAN_SUPERADMIN.includes(
-    (authStore.user?.bagian ?? "").trim().toUpperCase(),
-  ),
-);
 
 const formatDateLocal = (d: Date) => {
   const year = d.getFullYear();
@@ -38,85 +31,191 @@ const formatDateLocal = (d: Date) => {
 const todayLocal = formatDateLocal(new Date());
 
 // ── Model data ──
-interface TintaItem {
-  kode: number; // 0 = belum dipilih
-  qty: number;
-}
-
-interface FormRow {
+interface SpkRow {
   spk: string;
   nama: string;
   jumlahOrder: number;
   panjang: number;
   lebar: number;
-  tinta: TintaItem[];
+}
+
+interface BahanRow {
+  kode: number;
+  nama: string;
+  satuanMaster: string;
+  pilihan: string[]; // kosong = diinput dalam satuan master
+  qty: string; // teks agar kosong = tidak dipakai
+  satuanInput: string; // hanya bermakna bila pilihan tidak kosong
+  nonaktif: boolean; // sudah tercatat di LHK tapi kini tidak ada di master aktif
 }
 
 interface FormState {
   header: {
     nomor: string;
     tanggal: string;
+    nomorCetak: string;
+    tanggalCetak: string;
     kodePabrik: string;
     namaPabrik: string;
   };
-  items: FormRow[];
+  spk: SpkRow[];
+  bahan: BahanRow[];
 }
 
 const num = (v: unknown) => Number(v) || 0;
 
-const tintaKosong = (): TintaItem => ({ kode: 0, qty: 0 });
-
-const barisKosong = (): FormRow => ({
-  spk: "",
-  nama: "",
-  jumlahOrder: 0,
-  panjang: 0,
-  lebar: 0,
-  tinta: [tintaKosong()],
-});
-
 const defaultData = (): FormState => ({
-  header: { nomor: "", tanggal: todayLocal, kodePabrik: "", namaPabrik: "" },
-  items: [barisKosong()],
+  header: {
+    nomor: "",
+    tanggal: todayLocal,
+    nomorCetak: "",
+    tanggalCetak: "",
+    kodePabrik: "",
+    namaPabrik: "",
+  },
+  spk: [],
+  bahan: [],
 });
 
-// ── Master bahan tinta/cat ──
-// Bahan yang sudah tercatat di LHK tapi kini nonaktif tidak ada di lookup;
-// ditambahkan dari data LHK supaya tetap tampil di dropdown.
-const bahanOpts = ref<BahanOption[]>([]);
+const spkDariServer = (r: LhkTintaSpk): SpkRow => ({
+  spk: r.Nomor_SPK,
+  nama: r.Nama_SPK ?? "",
+  jumlahOrder: num(r.Jumlah_Order),
+  panjang: num(r.Panjang),
+  lebar: num(r.Lebar),
+});
 
-const gabungBahan = (daftar: BahanOption[]) => {
-  for (const b of daftar) {
-    if (!bahanOpts.value.some((x) => x.Kode === b.Kode)) {
-      bahanOpts.value.push(b);
-    }
-  }
+// ── Qty & konversi satuan ──
+// Hanya untuk tampilan. Hasil yang disimpan dihitung server (sumber kebenaran).
+const GRAM_PER_SATUAN: Record<string, number> = { KG: 1000, ONS: 100, GR: 1 };
+
+// Koma boleh dipakai sebagai pemisah desimal; maksimal 4 desimal
+const normQty = (s: string) => s.trim().replace(",", ".");
+
+const parseQty = (s: string): number | null => {
+  const t = normQty(s);
+  return /^\d+(\.\d{1,4})?$/.test(t) ? Number(t) : null;
 };
 
-const satuanBahan = (kode: number): string =>
-  bahanOpts.value.find((b) => b.Kode === kode)?.Satuan ?? "";
+const qtyInvalid = (b: BahanRow) => {
+  if (b.qty.trim() === "") {
+    return false;
+  }
+  const n = parseQty(b.qty);
+  return n === null || n <= 0;
+};
+
+const labelSatuan = (s: string) => (s && s !== "0" ? s : "-");
+
+const setaraMaster = (b: BahanRow): string => {
+  if (b.pilihan.length === 0) {
+    return "";
+  }
+  const n = parseQty(b.qty);
+  if (n === null || n <= 0) {
+    return "";
+  }
+  const master = b.satuanMaster.trim().toUpperCase();
+  const dari = b.satuanInput.toUpperCase();
+  if (dari === master) {
+    return "";
+  }
+  const f1 = GRAM_PER_SATUAN[dari];
+  const f2 = GRAM_PER_SATUAN[master];
+  if (!f1 || !f2) {
+    return "";
+  }
+  const hasil = Math.round(((n * f1) / f2) * 10000) / 10000;
+  if (hasil <= 0) {
+    return "terlalu kecil";
+  }
+  return `= ${hasil.toLocaleString("id-ID", { maximumFractionDigits: 4 })} ${master}`;
+};
+
+// ── Master bahan tinta/cat = baris default ──
+let masterPromise: Promise<BahanOption[]> | null = null;
+const muatMaster = (): Promise<BahanOption[]> => {
+  if (!masterPromise) {
+    masterPromise = lhkForm.getLookupBahan().catch((e: unknown) => {
+      masterPromise = null;
+      throw e;
+    });
+  }
+  return masterPromise;
+};
+
+const satuanAwal = (pilihan: string[], satuanMaster: string) =>
+  pilihan.length > 0 ? satuanMaster.trim().toUpperCase() : "";
+
+// Gabungkan master (semua bahan aktif) dengan isian yang sudah tersimpan.
+// Bahan tersimpan yang tidak ada di master aktif ditambahkan di bawah.
+const susunBahan = (
+  master: BahanOption[],
+  tersimpan: LhkTintaBahan[],
+): BahanRow[] => {
+  const peta = new Map(tersimpan.map((t) => [t.Kode_Bahan, t]));
+  const baris: BahanRow[] = master.map((m) => {
+    const sm = m.Satuan ?? "";
+    const t = peta.get(m.Kode);
+    return {
+      kode: m.Kode,
+      nama: m.Nama,
+      satuanMaster: sm,
+      pilihan: m.Pilihan_Satuan,
+      qty: t ? String(t.Qty_Input) : "",
+      satuanInput:
+        t && m.Pilihan_Satuan.length > 0
+          ? (t.Satuan_Input ?? "").toUpperCase()
+          : satuanAwal(m.Pilihan_Satuan, sm),
+      nonaktif: false,
+    };
+  });
+  const ada = new Set(master.map((m) => m.Kode));
+  for (const t of tersimpan) {
+    if (ada.has(t.Kode_Bahan)) {
+      continue;
+    }
+    const sm = t.Satuan_Master ?? "";
+    baris.push({
+      kode: t.Kode_Bahan,
+      nama: t.Nama_Bahan ?? String(t.Kode_Bahan),
+      satuanMaster: sm,
+      pilihan: t.Pilihan_Satuan,
+      qty: String(t.Qty_Input),
+      satuanInput:
+        t.Pilihan_Satuan.length > 0 ? (t.Satuan_Input ?? "").toUpperCase() : "",
+      nonaktif: true,
+    });
+  }
+  return baris;
+};
 
 // ── State UI ──
-const showSpkModal = ref(false);
-const activeIdx = ref(-1);
-const fokusIdx = ref(0); // baris SPK yang pemakaian tintanya tampil di panel bawah
 const showSelesai = ref(false);
 const nomorTerakhir = ref("");
-const pabrikOpts = ref<PabrikOption[]>([]);
+const cari = ref("");
+const hanyaTerisi = ref(false);
 
 const bangunPayload = (data: FormState): LhkTintaPayload => ({
   Tanggal: data.header.tanggal,
   Kode_Pabrik: data.header.kodePabrik,
-  // Baris tanpa nomor SPK dan baris tinta kosong tidak dikirim
-  Detail: data.items
-    .filter((r) => r.spk.trim() !== "")
-    .map((r) => ({
-      Nomor_SPK: r.spk.trim(),
-      Tinta: r.tinta
-        .filter((t) => t.kode > 0)
-        .map((t) => ({ Kode_Bahan: t.kode, Qty: num(t.qty) })),
+  Nomor_Cetak: data.header.nomorCetak,
+  // Hanya bahan yang Qty-nya diisi
+  Bahan: data.bahan
+    .filter((b) => b.qty.trim() !== "")
+    .map((b) => ({
+      Kode_Bahan: b.kode,
+      Qty: normQty(b.qty),
+      Satuan: b.pilihan.length > 0 ? b.satuanInput : "",
     })),
 });
+
+const isiBahanDefault = async () => {
+  if (isEditMode.value) {
+    return;
+  }
+  formData.value.bahan = susunBahan(await muatMaster(), []);
+};
 
 const {
   isLoading,
@@ -133,35 +232,21 @@ const {
   menuId: "4",
   initialData: defaultData(),
   fetchApi: async (): Promise<FormState> => {
-    const d = await lhkForm.getById(String(route.params.nomor));
-    gabungBahan(
-      d.Detail.flatMap((r) =>
-        r.Tinta.map((t) => ({
-          Kode: t.Kode_Bahan,
-          Nama: t.Nama_Bahan ?? String(t.Kode_Bahan),
-          Satuan: t.Satuan,
-        })),
-      ),
-    );
-    const items: FormRow[] = d.Detail.map((r) => ({
-      spk: r.Nomor_SPK,
-      nama: r.Nama_SPK ?? "",
-      jumlahOrder: num(r.Jumlah_Order),
-      panjang: num(r.Panjang),
-      lebar: num(r.Lebar),
-      tinta: [
-        ...r.Tinta.map((t) => ({ kode: t.Kode_Bahan, qty: num(t.Qty) })),
-        tintaKosong(),
-      ],
-    }));
+    const [d, master] = await Promise.all([
+      lhkForm.getById(String(route.params.nomor)),
+      muatMaster(),
+    ]);
     return {
       header: {
         nomor: d.Nomor,
         tanggal: d.Tanggal,
+        nomorCetak: d.Nomor_Cetak ?? "",
+        tanggalCetak: d.Tanggal_Cetak ?? "",
         kodePabrik: d.Kode_Pabrik ?? "",
         namaPabrik: d.Nama_Pabrik ?? "",
       },
-      items: items.length > 0 ? items : [barisKosong()],
+      spk: d.Detail.map(spkDariServer),
+      bahan: susunBahan(master, d.Bahan),
     };
   },
   submitApi: async (data: FormState): Promise<SaveResponse> => {
@@ -178,131 +263,35 @@ const {
     showSelesai.value = true;
   },
   onFormReset: () => {
-    fokusIdx.value = 0;
-    isiLokasiDefault();
+    isiBahanDefault().catch(() => undefined);
   },
 });
 
-const rowAktif = computed<FormRow | undefined>(
-  () => formData.value.items[fokusIdx.value],
-);
-
-// Jumlah tinta yang sudah terisi per SPK (ditampilkan di grid atas)
-const jumlahTinta = (row: FormRow) =>
-  row.tinta.filter((t) => t.kode > 0).length;
-
-// ── Lokasi (pabrik) ──
-const opsiPabrik = computed<PabrikOption[]>(() => {
-  const h = formData.value.header;
-  const ada = pabrikOpts.value.some((p) => p.Kode === h.kodePabrik);
-  return h.kodePabrik && !ada
-    ? [{ Kode: h.kodePabrik, Nama: h.namaPabrik }, ...pabrikOpts.value]
-    : pabrikOpts.value;
-});
-
-const onPabrikChange = () => {
-  const h = formData.value.header;
-  h.namaPabrik =
-    pabrikOpts.value.find((p) => p.Kode === h.kodePabrik)?.Nama ?? "";
-};
-
-// Lokasi default = cabang user. Hanya mode tambah dan bila Lokasi masih kosong.
-const isiLokasiDefault = () => {
-  if (isEditMode.value) {
-    return;
-  }
-  const h = formData.value.header;
-  if (h.kodePabrik) {
-    return;
-  }
-  const cabang = (authStore.user?.cabang ?? "").trim().toUpperCase();
-  const p = pabrikOpts.value.find((x) => x.Kode.toUpperCase() === cabang);
-  if (!p) {
-    return;
-  }
-  h.kodePabrik = p.Kode;
-  h.namaPabrik = p.Nama;
-};
-
 onMounted(async () => {
   try {
-    const [pabrik, bahan] = await Promise.all([
-      lhkForm.getLookupPabrik(),
-      lhkForm.getLookupBahan(),
-    ]);
-    pabrikOpts.value = pabrik;
-    gabungBahan(bahan);
-    isiLokasiDefault();
+    await isiBahanDefault();
   } catch (e) {
-    toast.error(lhkForm.pesanError(e, "Gagal memuat data lookup."));
+    toast.error(lhkForm.pesanError(e, "Gagal memuat daftar bahan."));
   }
 });
 
-// ── Grid SPK ──
-const addRow = () => {
-  formData.value.items.push(barisKosong());
-};
-
-const removeRow = (idx: number) => {
-  formData.value.items.splice(idx, 1);
-  if (formData.value.items.length === 0) {
-    formData.value.items.push(barisKosong());
-  }
-  fokusIdx.value = Math.min(fokusIdx.value, formData.value.items.length - 1);
-};
-
-const openLookupSpk = (idx: number) => {
-  activeIdx.value = idx;
-  showSpkModal.value = true;
-};
-
-// Isi satu baris dari nomor SPK/MAP. Data diambil server (sekaligus validasi
-// divisi dan cabang). Mengembalikan true kalau baris berhasil terisi.
-const isiBarisDariSpk = async (
-  idx: number,
-  nomorInput: string,
-): Promise<boolean> => {
-  const nomor = nomorInput.trim();
-  if (idx < 0 || !nomor) {
-    return false;
-  }
-
-  const row = formData.value.items[idx];
-
-  // Nomor yang sama dengan isi baris ini: cukup fokus, jangan reset tintanya
-  if (row.spk.toUpperCase() === nomor.toUpperCase()) {
-    fokusIdx.value = idx;
-    return true;
-  }
-
-  const dup = formData.value.items.findIndex(
-    (r, i) => i !== idx && r.spk.toUpperCase() === nomor.toUpperCase(),
+// ── Daftar bahan: filter cari + hanya yang terisi ──
+const bahanTampil = computed(() => {
+  const kata = cari.value.trim().toUpperCase();
+  return formData.value.bahan.filter(
+    (b) =>
+      (!hanyaTerisi.value || b.qty.trim() !== "") &&
+      (!kata ||
+        b.nama.toUpperCase().includes(kata) ||
+        String(b.kode).includes(kata)),
   );
-  if (dup >= 0) {
-    toast.warning(`SPK/MAP sudah ada di baris ${dup + 1}`);
-    return false;
-  }
+});
 
-  try {
-    const info = await lhkForm.getInfoSpk(nomor);
-    row.spk = info.Nomor_SPK;
-    row.nama = info.Nama_SPK ?? "";
-    row.jumlahOrder = num(info.Jumlah_Order);
-    row.panjang = num(info.Panjang);
-    row.lebar = num(info.Lebar);
-    row.tinta = [tintaKosong()]; // SPK baru: pemakaian tinta mulai kosong
-    fokusIdx.value = idx;
-    return true;
-  } catch (e) {
-    toast.error(lhkForm.pesanError(e, "Gagal memuat data SPK/MAP."));
-    return false;
-  }
-};
+const jumlahTerisi = computed(
+  () => formData.value.bahan.filter((b) => b.qty.trim() !== "").length,
+);
 
 // ── Fokus & Enter ──
-// Alur: SPK → Bahan → Qty → Bahan berikutnya (baris tinta baru) → ...
-// Enter di Bahan yang masih kosong = selesai untuk SPK ini, pindah ke SPK
-// berikutnya (baris tinta kosong dibuang saat simpan).
 const fieldRefs = ref<Record<string, HTMLInputElement | HTMLSelectElement>>({});
 
 const simpanRef = (el: unknown, kunci: string) => {
@@ -322,153 +311,105 @@ const fokusKunci = async (kunci: string) => {
   }
 };
 
-const keSpkBerikutnya = async () => {
-  const idx = fokusIdx.value;
-  if (idx + 1 >= formData.value.items.length) {
-    addRow();
-  }
-  fokusIdx.value = idx + 1;
-  await fokusKunci(`${idx + 1}_spk`);
-};
-
-// Pastikan selalu ada satu baris tinta kosong di paling bawah
-const pastikanBarisKosong = (row: FormRow) => {
-  const terakhir = row.tinta[row.tinta.length - 1];
-  if (!terakhir || terakhir.kode > 0) {
-    row.tinta.push(tintaKosong());
+// Enter di Qty = lanjut ke Qty bahan berikutnya pada daftar yang tampil
+const onEnterQty = async (kode: number) => {
+  const daftar = bahanTampil.value;
+  const i = daftar.findIndex((b) => b.kode === kode);
+  const berikut = daftar[i + 1];
+  if (berikut) {
+    await fokusKunci(`q_${berikut.kode}`);
   }
 };
 
-const onBahanDipilih = async () => {
-  await nextTick(); // tunggu v-model memperbarui kode
-  const row = rowAktif.value;
-  if (row) {
-    pastikanBarisKosong(row);
+// ── LHK Cetak (rujukan) ──
+const pilihCetak = async (nomorInput: string): Promise<boolean> => {
+  const nomor = nomorInput.trim();
+  if (!nomor) {
+    return false;
+  }
+  try {
+    const info = await lhkForm.getInfoCetak(nomor);
+    const h = formData.value.header;
+    h.nomorCetak = info.Nomor;
+    h.tanggalCetak = info.Tanggal;
+    h.kodePabrik = info.Kode_Pabrik ?? "";
+    h.namaPabrik = info.Nama_Pabrik ?? "";
+    formData.value.spk = info.Detail.map(spkDariServer);
+    return true;
+  } catch (e) {
+    toast.error(lhkForm.pesanError(e, "Gagal memuat LHK Cetak."));
+    return false;
   }
 };
 
-const addTinta = async () => {
-  const row = rowAktif.value;
-  if (!row) {
+const showCetakModal = ref(false);
+
+const bukaCetak = () => {
+  if (isEditMode.value) {
     return;
   }
-  row.tinta.push(tintaKosong());
-  await fokusKunci(`b_${row.tinta.length - 1}`);
+  showCetakModal.value = true;
 };
 
-const removeTinta = (i: number) => {
-  const row = rowAktif.value;
-  if (!row) {
-    return;
-  }
-  row.tinta.splice(i, 1);
-  pastikanBarisKosong(row);
-};
-
-const onEnterBahan = async (i: number) => {
-  const row = rowAktif.value;
-  if (!row) {
-    return;
-  }
-  if (row.tinta[i].kode > 0) {
-    await fokusKunci(`q_${i}`);
-    return;
-  }
-  await keSpkBerikutnya();
-};
-
-const onEnterQty = async (i: number) => {
-  const row = rowAktif.value;
-  if (!row) {
-    return;
-  }
-  pastikanBarisKosong(row);
-  await fokusKunci(`b_${i + 1}`);
-};
-
-// Dari modal pencarian (tombol atau F1)
-const onSpkSelected = async (v: { Nomor?: string }) => {
-  const idx = activeIdx.value;
-  if (await isiBarisDariSpk(idx, String(v?.Nomor ?? ""))) {
-    await fokusKunci("b_0");
+// Modal menutup dirinya sendiri setelah event selected
+const onCetakDipilih = async (c: CetakOption) => {
+  if (await pilihCetak(c.Nomor)) {
+    await fokusKunci("cari");
   }
 };
 
 // Ketik nomor lalu Enter
-const onEnterSpk = async (e: KeyboardEvent, idx: number) => {
+const onEnterCetak = async (e: KeyboardEvent) => {
+  if (isEditMode.value) {
+    return;
+  }
   const el = e.target as HTMLInputElement;
   if (!el.value.trim()) {
     return;
   }
-  if (await isiBarisDariSpk(idx, el.value)) {
-    await fokusKunci("b_0");
+  if (await pilihCetak(el.value)) {
+    await fokusKunci("cari");
   } else {
-    el.value = formData.value.items[idx].spk; // balikkan ke nilai terakhir yang valid
+    el.value = formData.value.header.nomorCetak; // balikkan ke nilai valid terakhir
     el.select();
   }
 };
 
 // Keluar dari field tanpa Enter: buang ketikan yang belum divalidasi
-const onBlurSpk = (e: FocusEvent, idx: number) => {
-  (e.target as HTMLInputElement).value = formData.value.items[idx].spk;
+const onBlurCetak = (e: FocusEvent) => {
+  (e.target as HTMLInputElement).value = formData.value.header.nomorCetak;
 };
 
 // ── Validasi sebelum konfirmasi simpan ──
 const validateSave = () => {
-  const { tanggal, kodePabrik } = formData.value.header;
+  const { tanggal, tanggalCetak, nomorCetak } = formData.value.header;
   if (!tanggal) {
     toast.warning("Tanggal tidak boleh kosong.");
     return;
   }
-  if (!kodePabrik) {
-    toast.warning("Lokasi belum dipilih.");
+  if (!nomorCetak) {
+    toast.warning("LHK Cetak belum dipilih.");
+    return;
+  }
+  if (tanggalCetak && tanggal < tanggalCetak) {
+    toast.warning(
+      `Tanggal tidak boleh lebih awal dari tanggal LHK Cetak (${tanggalCetak}).`,
+    );
     return;
   }
 
-  const terisi = formData.value.items
-    .map((r, i) => ({ r, no: i + 1 }))
-    .filter(({ r }) => r.spk.trim() !== "");
+  const terisi = formData.value.bahan.filter((b) => b.qty.trim() !== "");
   if (terisi.length === 0) {
-    toast.warning("Minimal satu baris SPK/MAP harus diisi.");
+    toast.warning("Minimal satu pemakaian tinta/cat harus diisi.");
     return;
   }
-
-  const sudahSpk = new Map<string, number>();
-  for (const { r, no } of terisi) {
-    const kunci = r.spk.trim().toUpperCase();
-    const pertama = sudahSpk.get(kunci);
-    if (pertama !== undefined) {
-      toast.warning(`Baris ${no}: SPK/MAP sama dengan baris ${pertama}.`);
+  for (const b of terisi) {
+    const n = parseQty(b.qty);
+    if (n === null || n <= 0) {
+      toast.warning(
+        `${b.nama}: Qty harus angka lebih dari 0 (maksimal 4 desimal).`,
+      );
       return;
-    }
-    sudahSpk.set(kunci, no);
-
-    // baris tinta yang sama sekali kosong diabaikan
-    const dipakai = r.tinta.filter((t) => t.kode > 0 || num(t.qty) > 0);
-    if (dipakai.length === 0) {
-      toast.warning(`Baris ${no}: minimal satu pemakaian tinta harus diisi.`);
-      return;
-    }
-
-    const sudahBahan = new Set<number>();
-    for (const t of dipakai) {
-      if (t.kode <= 0) {
-        toast.warning(
-          `Baris ${no}: ada Qty tinta yang bahannya belum dipilih.`,
-        );
-        return;
-      }
-      if (sudahBahan.has(t.kode)) {
-        toast.warning(
-          `Baris ${no}: bahan tinta yang sama diisi lebih dari sekali.`,
-        );
-        return;
-      }
-      sudahBahan.add(t.kode);
-      if (num(t.qty) <= 0) {
-        toast.warning(`Baris ${no}: Qty tinta harus lebih dari 0.`);
-        return;
-      }
     }
   }
 
@@ -483,8 +424,9 @@ const resetBaru = () => {
     return;
   }
   formData.value = defaultData();
-  fokusIdx.value = 0;
-  isiLokasiDefault();
+  cari.value = "";
+  hanyaTerisi.value = false;
+  isiBahanDefault().catch(() => undefined);
 };
 
 const tutupSetelahSimpan = () => {
@@ -495,7 +437,9 @@ const tutupSetelahSimpan = () => {
 
 <template>
   <BaseForm
-    :title="isEditMode ? 'Ubah LHK Tinta/Cat' : 'Tambah LHK Tinta/Cat'"
+    :title="
+      isEditMode ? 'Ubah LHK Pemakaian Obat' : 'Tambah LHK Pemakaian Obat'
+    "
     menu-id="4"
     :icon="IconPalette"
     :is-loading="isLoading"
@@ -535,19 +479,50 @@ const tutupSetelahSimpan = () => {
         <div class="sep" />
 
         <div class="fr">
+          <label class="lbl">LHK Cetak</label>
+          <div class="cell-grp cetak-grp">
+            <input
+              :value="formData.header.nomorCetak"
+              class="ci"
+              :class="{ ro: isEditMode }"
+              :readonly="isEditMode"
+              placeholder="Ketik nomor + Enter / F1 cari"
+              autocomplete="off"
+              :ref="(el) => simpanRef(el, 'cetak')"
+              @keydown.enter.prevent="onEnterCetak"
+              @keydown.f1.prevent="bukaCetak"
+              @blur="onBlurCetak"
+            />
+            <button
+              v-if="!isEditMode"
+              type="button"
+              class="ci-btn"
+              title="Cari LHK Cetak"
+              @click="bukaCetak"
+            >
+              <IconSearch :size="11" />
+            </button>
+          </div>
+        </div>
+
+        <div class="fr">
+          <label class="lbl">Tgl Cetak</label>
+          <input
+            :value="formData.header.tanggalCetak"
+            readonly
+            class="inp ro"
+            style="width: 150px"
+          />
+        </div>
+
+        <div class="fr">
           <label class="lbl">Lokasi</label>
-          <select
-            v-model="formData.header.kodePabrik"
-            class="inp"
+          <input
+            :value="formData.header.kodePabrik"
+            readonly
+            class="inp ro"
             style="width: 90px"
-            :disabled="!isSuperadmin"
-            @change="onPabrikChange"
-          >
-            <option value="" disabled>Pilih...</option>
-            <option v-for="p in opsiPabrik" :key="p.Kode" :value="p.Kode">
-              {{ p.Kode }}
-            </option>
-          </select>
+          />
           <input
             :value="formData.header.namaPabrik"
             readonly
@@ -555,181 +530,135 @@ const tutupSetelahSimpan = () => {
             style="flex: 1"
           />
         </div>
+
+        <div v-if="isEditMode" class="catatan">
+          LHK Cetak tidak dapat diubah. Hapus lalu buat LHK Pemakaian Obat baru
+          bila salah pilih.
+        </div>
       </div>
     </template>
 
     <!-- ══ KOLOM KANAN ══ -->
     <template #right-column>
       <div class="lhk-right">
-        <div class="tbl-header">
-          <span class="tbl-title">Rincian SPK / MAP</span>
-          <button type="button" class="btn-add" @click="addRow">
-            + Tambah Baris
-          </button>
+        <div class="tbl-header" style="flex-shrink: 0">
+          <span class="tbl-title">SPK / MAP pada LHK Cetak</span>
+          <span class="hint">{{ formData.spk.length }} baris</span>
         </div>
-        <div class="tbl-wrap" style="flex: 1; min-height: 160px">
-          <table class="gt" style="min-width: 800px">
+        <div class="tbl-wrap" style="max-height: 170px; flex-shrink: 0">
+          <table class="gt" style="min-width: 640px">
             <thead>
               <tr>
                 <th style="width: 32px" class="tc">No</th>
-                <th style="width: 160px">Nomor SPK</th>
-                <th style="width: 240px">Nama Order</th>
+                <th style="width: 150px">Nomor SPK/MAP</th>
+                <th>Nama Order</th>
                 <th style="width: 80px" class="tr">Jml Order</th>
                 <th style="width: 70px" class="tr">Panjang</th>
                 <th style="width: 70px" class="tr">Lebar</th>
-                <th style="width: 75px" class="tr">Jml Tinta</th>
-                <th style="width: 32px" class="tc"></th>
               </tr>
             </thead>
             <tbody>
-              <tr
-                v-for="(row, idx) in formData.items"
-                :key="idx"
-                :class="{ 'row-aktif': idx === fokusIdx }"
-                @focusin="fokusIdx = idx"
-              >
+              <tr v-for="(r, idx) in formData.spk" :key="r.spk">
                 <td class="tc gt-lbl">{{ idx + 1 }}</td>
-                <td class="p0">
-                  <div class="cell-grp">
-                    <input
-                      :value="row.spk"
-                      class="ci"
-                      placeholder="Ketik nomor + Enter / F1 cari"
-                      autocomplete="off"
-                      :ref="(el) => simpanRef(el, `${idx}_spk`)"
-                      @keydown.enter.prevent="onEnterSpk($event, idx)"
-                      @keydown.f1.prevent="openLookupSpk(idx)"
-                      @blur="onBlurSpk($event, idx)"
-                    />
-                    <button
-                      type="button"
-                      class="ci-btn"
-                      title="Cari SPK/MAP"
-                      @click="openLookupSpk(idx)"
-                    >
-                      <IconSearch :size="11" />
-                    </button>
-                  </div>
-                </td>
-                <td class="p0">
-                  <input
-                    :value="row.nama"
-                    class="ci ro"
-                    readonly
-                    :title="row.nama"
-                  />
-                </td>
-                <td class="p0">
-                  <input :value="row.jumlahOrder" class="ci tr ro" readonly />
-                </td>
-                <td class="p0">
-                  <input :value="row.panjang" class="ci tr ro" readonly />
-                </td>
-                <td class="p0">
-                  <input :value="row.lebar" class="ci tr ro" readonly />
-                </td>
-                <td class="p0">
-                  <input
-                    :value="jumlahTinta(row)"
-                    class="ci tr ro fw"
-                    readonly
-                    title="Jumlah jenis tinta/cat yang sudah diisi"
-                  />
-                </td>
-                <td class="tc">
-                  <button type="button" class="btn-del" @click="removeRow(idx)">
-                    ✕
-                  </button>
+                <td class="gt-ro">{{ r.spk }}</td>
+                <td class="gt-ro" :title="r.nama">{{ r.nama }}</td>
+                <td class="gt-ro tr">{{ r.jumlahOrder }}</td>
+                <td class="gt-ro tr">{{ r.panjang }}</td>
+                <td class="gt-ro tr">{{ r.lebar }}</td>
+              </tr>
+              <tr v-if="formData.spk.length === 0">
+                <td colspan="6" class="plg-kosong-sel">
+                  Pilih LHK Cetak untuk menampilkan SPK/MAP-nya.
                 </td>
               </tr>
             </tbody>
           </table>
         </div>
 
-        <!-- Pemakaian tinta untuk baris yang sedang dipilih -->
+        <!-- Pemakaian tinta/cat: semua bahan master, isi yang dipakai saja -->
         <div class="plg">
           <div class="tbl-header tbl-header-sub">
-            <span class="tbl-title">
-              Pemakaian Tinta/Cat<template v-if="rowAktif?.spk">
-                — {{ rowAktif.spk }}</template
-              >
-            </span>
-            <button
-              v-if="rowAktif?.spk"
-              type="button"
-              class="btn-add"
-              @click="addTinta"
-            >
-              + Tambah Tinta
-            </button>
+            <span class="tbl-title">Pemakaian Tinta/Cat</span>
+            <span class="hint">1 ons = 100 gram</span>
           </div>
-          <div v-if="rowAktif?.spk" class="tbl-wrap plg-wrap">
-            <table class="gt plg-tbl">
+          <div class="cari-row">
+            <input
+              v-model="cari"
+              class="inp"
+              style="flex: 1"
+              placeholder="Cari bahan (nama / kode)..."
+              autocomplete="off"
+              :ref="(el) => simpanRef(el, 'cari')"
+            />
+            <label class="chk">
+              <input type="checkbox" v-model="hanyaTerisi" />
+              Hanya yang terisi
+            </label>
+            <span class="cnt">{{ jumlahTerisi }} terisi</span>
+          </div>
+          <div class="tbl-wrap plg-wrap">
+            <table class="gt" style="min-width: 640px">
               <thead>
                 <tr>
-                  <th style="width: 32px" class="tc">No</th>
+                  <th style="width: 60px" class="tc">Kode</th>
                   <th>Bahan (Obat &amp; Tinta)</th>
                   <th style="width: 70px">Satuan</th>
                   <th style="width: 110px" class="tr bg-yellow">Qty</th>
-                  <th style="width: 32px" class="tc"></th>
+                  <th style="width: 80px">Dalam</th>
+                  <th style="width: 130px">Setara</th>
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="(t, i) in rowAktif.tinta" :key="i">
-                  <td class="tc gt-lbl">{{ i + 1 }}</td>
-                  <td class="p0">
-                    <select
-                      v-model.number="t.kode"
-                      class="ci bg-yellow-light"
-                      :ref="(el) => simpanRef(el, `b_${i}`)"
-                      @keydown.enter.prevent="onEnterBahan(i)"
-                      @change="onBahanDipilih"
+                <tr v-for="b in bahanTampil" :key="b.kode">
+                  <td class="tc gt-lbl">{{ b.kode }}</td>
+                  <td class="gt-ro" :title="b.nama">
+                    {{ b.nama }}
+                    <span v-if="b.nonaktif" class="tag-nonaktif"
+                      >di luar daftar</span
                     >
-                      <option :value="0" disabled>Pilih bahan...</option>
-                      <option
-                        v-for="b in bahanOpts"
-                        :key="b.Kode"
-                        :value="b.Kode"
-                      >
-                        {{ b.Nama }}
-                      </option>
-                    </select>
                   </td>
-                  <td class="gt-lbl">{{ satuanBahan(t.kode) }}</td>
+                  <td class="gt-lbl">{{ labelSatuan(b.satuanMaster) }}</td>
                   <td class="p0">
                     <input
-                      v-model.number="t.qty"
-                      type="number"
-                      min="0"
-                      step="0.01"
+                      v-model="b.qty"
+                      type="text"
+                      inputmode="decimal"
+                      autocomplete="off"
                       class="ci tr bg-yellow-light"
-                      :ref="(el) => simpanRef(el, `q_${i}`)"
-                      @keydown.enter.prevent="onEnterQty(i)"
+                      :class="{ 'qty-bad': qtyInvalid(b) }"
+                      :ref="(el) => simpanRef(el, `q_${b.kode}`)"
+                      @keydown.enter.prevent="onEnterQty(b.kode)"
                       v-select-on-focus
                     />
                   </td>
-                  <td class="tc">
-                    <button
-                      type="button"
-                      class="btn-del"
-                      @click="removeTinta(i)"
+                  <td class="p0">
+                    <select
+                      v-if="b.pilihan.length > 0"
+                      v-model="b.satuanInput"
+                      class="ci"
                     >
-                      ✕
-                    </button>
+                      <option v-for="s in b.pilihan" :key="s" :value="s">
+                        {{ s }}
+                      </option>
+                    </select>
+                    <span v-else class="gt-lbl-inline">-</span>
+                  </td>
+                  <td class="gt-lbl">{{ setaraMaster(b) }}</td>
+                </tr>
+                <tr v-if="bahanTampil.length === 0">
+                  <td colspan="6" class="plg-kosong-sel">
+                    Tidak ada bahan yang cocok.
                   </td>
                 </tr>
               </tbody>
             </table>
-          </div>
-          <div v-else class="plg-kosong">
-            Pilih SPK/MAP pada tabel di atas untuk mengisi pemakaian tinta.
           </div>
         </div>
       </div>
     </template>
   </BaseForm>
 
-  <SpkSearchModal v-model="showSpkModal" @selected="onSpkSelected" />
+  <LhkCetakSearchModal v-model="showCetakModal" @selected="onCetakDipilih" />
 
   <!-- Setelah simpan: pengganti Save & New / Save & Close -->
   <v-dialog v-model="showSelesai" max-width="400" persistent>
@@ -740,10 +669,10 @@ const tutupSetelahSimpan = () => {
       </v-card-title>
       <v-card-text class="pa-4 text-center">
         <div class="text-body-1 mb-2">
-          LHK Tinta/Cat <b>{{ nomorTerakhir }}</b> telah disimpan.
+          LHK Pemakaian Obat <b>{{ nomorTerakhir }}</b> telah disimpan.
         </div>
         <div class="text-body-2 text-grey-darken-1">
-          Mau input LHK Tinta/Cat baru?
+          Mau input LHK Pemakaian Obat baru?
         </div>
       </v-card-text>
       <v-card-actions class="pa-3 border-t">
@@ -1015,12 +944,13 @@ const tutupSetelahSimpan = () => {
 .plg {
   display: flex;
   flex-direction: column;
-  flex-shrink: 0;
-  width: 560px;
-  max-width: 100%;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
 }
 .plg-wrap {
-  max-height: 300px;
+  flex: 1;
+  min-height: 0;
 }
 .plg-tbl {
   width: 100%;
@@ -1033,5 +963,75 @@ const tutupSetelahSimpan = () => {
   color: #757575;
   font-style: italic;
   font-size: 11px;
+}
+
+.hint {
+  font-size: 10px;
+  opacity: 0.85;
+}
+.catatan {
+  margin-top: 6px;
+  font-size: 10px;
+  color: #757575;
+  font-style: italic;
+}
+.cetak-grp {
+  flex: 1;
+  border: 1px solid #a0a0a0;
+  background: white;
+}
+.cari-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 6px;
+  border: 1px solid #bdbdbd;
+  border-top: none;
+  background: #fafafa;
+  flex-shrink: 0;
+}
+.chk {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: #333;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.cnt {
+  font-size: 11px;
+  font-weight: 700;
+  color: #1565c0;
+  white-space: nowrap;
+}
+.gt-ro {
+  padding: 0 6px;
+  font-size: 11px;
+}
+.gt-lbl-inline {
+  display: block;
+  padding: 0 6px;
+  color: #757575;
+  font-size: 11px;
+}
+.ci.qty-bad {
+  background: #ffebee !important;
+  outline: 1px solid #d32f2f;
+  outline-offset: -1px;
+}
+.tag-nonaktif {
+  margin-left: 6px;
+  font-size: 9px;
+  color: #b71c1c;
+  border: 1px solid #b71c1c;
+  border-radius: 2px;
+  padding: 0 3px;
+}
+.plg-kosong-sel {
+  padding: 12px 10px;
+  color: #757575;
+  font-style: italic;
+  text-align: center;
 }
 </style>

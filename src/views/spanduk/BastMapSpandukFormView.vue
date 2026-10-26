@@ -40,6 +40,8 @@ interface HeaderForm {
   mspk_kendala: string;
   mspk_jumlah_jadi: number;
   mspk_tipe: string;
+  jenis_order: string;
+  nomor_lhk_proof: string;
 }
 
 interface BahanRow {
@@ -54,8 +56,6 @@ interface FormState {
   bahan: BahanRow[];
 }
 
-const barisBahanKosong = (): BahanRow => ({ kode: "", nama: "", satuan: "" });
-
 const defaultData = (): FormState => ({
   header: {
     mspk_nomor: "",
@@ -69,9 +69,11 @@ const defaultData = (): FormState => ({
     mspk_kendala: "",
     mspk_jumlah_jadi: 0,
     mspk_tipe: TIPE_DEFAULT,
+    jenis_order: "",
+    nomor_lhk_proof: "",
   },
   checklist: [],
-  bahan: [barisBahanKosong()],
+  bahan: [],
 });
 
 const bangunState = (d: BastMapFormData): FormState => ({
@@ -87,16 +89,15 @@ const bangunState = (d: BastMapFormData): FormState => ({
     mspk_kendala: d.header.mspk_kendala ?? "",
     mspk_jumlah_jadi: Number(d.header.mspk_jumlah_jadi) || 0,
     mspk_tipe: (d.header.mspk_tipe ?? "").trim() || TIPE_DEFAULT,
+    jenis_order: d.header.jenis_order ?? "",
+    nomor_lhk_proof: d.header.nomor_lhk_proof ?? "",
   },
   checklist: d.checklist,
-  bahan:
-    d.bahan.length > 0
-      ? d.bahan.map((b) => ({
-          kode: String(b.Kode),
-          nama: b.Nama ?? "",
-          satuan: b.Satuan ?? "",
-        }))
-      : [barisBahanKosong()],
+  bahan: d.bahan.map((b) => ({
+    kode: String(b.Kode),
+    nama: b.Nama ?? "",
+    satuan: b.Satuan ?? "",
+  })),
 });
 
 const bangunPayload = (data: FormState): BastMapPayload => ({
@@ -180,34 +181,27 @@ const pilihMap = async (m: MapOption) => {
   }
 };
 
-const openBahanModal = (idx: number) => {
-  activeBahanIdx.value = idx;
+const KODE_SESUAI_BAHAN = 11;
+
+const openBahanModal = () => {
   showBahanModal.value = true;
 };
 
 const pilihBahan = (b: BahanOption) => {
   const kode = String(b.Kode);
-  const dobel = formData.value.bahan.some(
-    (r, i) => i !== activeBahanIdx.value && r.kode === kode,
-  );
-  if (dobel) {
+  if (formData.value.bahan.some((r) => r.kode === kode)) {
     toast.warning(`Bahan ${kode} sudah ada di daftar.`);
     return;
   }
-  const row = formData.value.bahan[activeBahanIdx.value];
-  if (row) {
-    row.kode = kode;
-    row.nama = b.Nama ?? "";
-    row.satuan = b.Satuan ?? "";
-  }
+  formData.value.bahan.push({
+    kode,
+    nama: b.Nama ?? "",
+    satuan: b.Satuan ?? "",
+  });
 };
 
-const addBahanRow = () => formData.value.bahan.push(barisBahanKosong());
-const removeBahanRow = (i: number) => {
+const removeBahan = (i: number) => {
   formData.value.bahan.splice(i, 1);
-  if (formData.value.bahan.length === 0) {
-    formData.value.bahan.push(barisBahanKosong());
-  }
 };
 
 // ── Kesesuaian ──
@@ -219,13 +213,6 @@ const onKeteranganFocus = (c: KesesuaianRow) => {
 const onKeteranganBlur = (c: KesesuaianRow) => {
   if (c.keterangan.trim() === "") {
     c.keterangan = "-";
-  }
-};
-// Mengetik keterangan otomatis menandai Y (kosong atau "-" tidak mengubah status)
-const onKeteranganInput = (c: KesesuaianRow) => {
-  const isi = c.keterangan.trim();
-  if (isi !== "" && isi !== "-") {
-    c.status = "Y";
   }
 };
 
@@ -268,6 +255,7 @@ const validateSave = () => {
   }
 
   for (const c of formData.value.checklist) {
+    if (c.no === KODE_SESUAI_BAHAN) continue;
     if (c.keterangan.length > MAKS_KETERANGAN) {
       toast.warning(
         `Keterangan "${c.kesesuaian}" maksimal ${MAKS_KETERANGAN} karakter.`,
@@ -358,6 +346,24 @@ const cetakSekarang = () => {
         </div>
 
         <div class="f-row">
+          <label class="f-lbl">LHK Proof</label>
+          <input
+            :value="formData.header.nomor_lhk_proof || '-'"
+            readonly
+            class="f-inp f-ro"
+            style="font-weight: 600; color: #1565c0"
+          />
+        </div>
+        <div class="f-row">
+          <label class="f-lbl">Jenis Order</label>
+          <input
+            :value="formData.header.jenis_order"
+            readonly
+            class="f-inp f-ro"
+          />
+        </div>
+
+        <div class="f-row">
           <label class="f-lbl">Nama Pekerjaan</label>
           <input
             :value="formData.header.mspk_nama"
@@ -401,11 +407,11 @@ const cetakSekarang = () => {
         <div class="f-divider" />
 
         <div class="f-row">
-          <label class="f-lbl">Kendala</label>
+          <label class="f-lbl">Keterangan</label>
           <input
             v-model="formData.header.mspk_kendala"
             class="f-inp"
-            placeholder="Input kendala produksi..."
+            placeholder="Input keterangan..."
           />
         </div>
         <div class="f-row">
@@ -424,8 +430,8 @@ const cetakSekarang = () => {
           <input
             v-model="formData.header.mspk_tipe"
             readonly
-            class="f-inp"
-            style="max-width: 140px; font-weight: 600"
+            class="f-inp f-ro"
+            style="max-width: 140px"
           />
         </div>
       </div>
@@ -441,68 +447,6 @@ const cetakSekarang = () => {
           {{ peringatan }}
         </div>
 
-        <div class="sec-title">Bahan :</div>
-        <div style="overflow: auto; flex: 0 0 auto; max-height: 260px">
-          <table class="bt" style="min-width: 520px">
-            <thead>
-              <tr>
-                <th style="width: 28px">No</th>
-                <th style="width: 140px">Kode</th>
-                <th style="text-align: left">Nama Bahan</th>
-                <th style="width: 70px">Satuan</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="(b, i) in formData.bahan" :key="i">
-                <td class="tc">{{ i + 1 }}</td>
-                <td class="p0">
-                  <div class="inp-grp" style="border: none; height: 22px">
-                    <input
-                      :value="b.kode"
-                      readonly
-                      class="cell-inp tc"
-                      style="font-family: monospace; background: #e3f2fd"
-                      placeholder="F1/Enter cari..."
-                      @keydown.enter.prevent="openBahanModal(i)"
-                      @keydown.f1.prevent="openBahanModal(i)"
-                    />
-                    <button
-                      type="button"
-                      class="btn-lkp"
-                      style="
-                        border: none;
-                        border-left: 1px solid #ddd;
-                        background: #e3f2fd;
-                      "
-                      @click="openBahanModal(i)"
-                    >
-                      <IconSearch :size="12" color="#1565c0" />
-                    </button>
-                  </div>
-                </td>
-                <td class="cell-ro">{{ b.nama }}</td>
-                <td class="tc cell-ro">
-                  <div class="d-flex align-center justify-space-between px-1">
-                    <span>{{ b.satuan }}</span>
-                    <button
-                      type="button"
-                      class="del-btn"
-                      style="width: 16px; height: 16px; font-size: 9px"
-                      @click="removeBahanRow(i)"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-          <button type="button" class="add-row-btn" @click="addBahanRow">
-            + Tambah Baris
-          </button>
-        </div>
-
-        <div class="f-divider" />
         <div class="sec-title">Kesesuaian :</div>
         <div style="overflow: auto; flex: 1; min-height: 0">
           <table class="bt" style="table-layout: fixed; min-width: 760px">
@@ -511,7 +455,7 @@ const cetakSekarang = () => {
                 <th style="width: 28px">No</th>
                 <th style="text-align: left">Kesesuaian</th>
                 <th class="th-yellow" style="width: 48px">Y/N</th>
-                <th class="th-yellow" style="width: 180px; text-align: left">
+                <th class="th-yellow" style="width: 320px; text-align: left">
                   Keterangan
                 </th>
                 <th style="width: 55px">Created</th>
@@ -539,13 +483,31 @@ const cetakSekarang = () => {
                   </select>
                 </td>
                 <td class="p0">
+                  <div v-if="c.no === KODE_SESUAI_BAHAN" class="bhn-cell">
+                    <span
+                      v-for="(b, bi) in formData.bahan"
+                      :key="b.kode"
+                      class="bhn-chip"
+                      :title="`${b.nama} (${b.satuan})`"
+                    >
+                      {{ b.nama }}
+                      <button type="button" @click="removeBahan(bi)">✕</button>
+                    </span>
+                    <button
+                      type="button"
+                      class="bhn-add"
+                      @click="openBahanModal"
+                    >
+                      <IconSearch :size="11" /> Pilih Bahan
+                    </button>
+                  </div>
                   <input
+                    v-else
                     v-model="c.keterangan"
                     class="cell-inp"
                     :maxlength="MAKS_KETERANGAN"
                     @focus="onKeteranganFocus(c)"
                     @blur="onKeteranganBlur(c)"
-                    @input="onKeteranganInput(c)"
                   />
                 </td>
                 <td class="tc muted">{{ c.user_create || "" }}</td>
@@ -565,7 +527,7 @@ const cetakSekarang = () => {
         class="bast-card"
         style="display: flex; flex-direction: column; height: 100%"
       >
-        <div class="sec-title">Keterangan MAP</div>
+        <div class="sec-title">Catatan MAP</div>
         <textarea
           :value="formData.header.mspk_keterangan"
           readonly
@@ -828,5 +790,38 @@ const cetakSekarang = () => {
   color: #616161;
   background: #f8f8f8;
   line-height: 1.5;
+}
+.bhn-cell {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  padding: 2px 4px;
+  align-items: center;
+}
+.bhn-chip {
+  background: #e3f2fd;
+  border: 1px solid #90caf9;
+  border-radius: 10px;
+  padding: 0 6px;
+  font-size: 10px;
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+}
+.bhn-chip button {
+  border: none;
+  background: transparent;
+  color: #c62828;
+  cursor: pointer;
+  font-size: 9px;
+}
+.bhn-add {
+  border: 1px dashed #1565c0;
+  background: transparent;
+  color: #1565c0;
+  border-radius: 3px;
+  font-size: 10px;
+  padding: 0 6px;
+  cursor: pointer;
 }
 </style>

@@ -1115,7 +1115,7 @@ checkUnnotifiedMap();
                   <td class="tr">
                     {{ d.QtyKesepakatan ? fmt(d.QtyKesepakatan) : "-" }}
                   </td>
-                  <td>
+                  <td class="kesepakatan-cell">
                     <span v-if="d.Kesepakatan" class="kesepakatan-tgl">{{
                       formatTanggal(d.Kesepakatan)
                     }}</span>
@@ -1230,7 +1230,7 @@ checkUnnotifiedMap();
     </v-card>
   </v-dialog>
 
-  <v-dialog v-model="showPreviewDialog" max-width="1150">
+  <v-dialog v-model="showPreviewDialog" max-width="1400">
     <v-card class="rounded-lg">
       <v-card-title
         class="bg-primary text-white pa-3 text-subtitle-1 d-flex align-center justify-space-between"
@@ -1276,103 +1276,117 @@ checkUnnotifiedMap();
               placeholder="Cari nomor / nama / keterangan..."
             />
           </div>
-          <table class="dt dt-detail" style="width: 100%">
-            <thead>
-              <tr>
-                <th>Tanggal</th>
-                <th>Sumber</th>
-                <th class="nomor-nama-header">Nomor / Nama</th>
-                <th v-if="showPanjangLebar(previewCabang)" class="tr">
-                  Panjang
-                </th>
-                <th v-if="showPanjangLebar(previewCabang)" class="tr">Lebar</th>
-                <th class="tr">Pesan</th>
-                <th class="tr">Kirim</th>
-                <th class="tr">Kurang</th>
-                <th class="tr">Rencana</th>
-                <th class="tr">Realisasi</th>
-                <th class="tc">Permintaan Kirim</th>
-                <th class="tc">Permintaan</th>
-                <th class="tr">Qty Kesepakatan</th>
-                <th>Kesepakatan</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr
-                v-for="d in filterDetail(
-                  previewDetail,
-                  activePreviewTab,
-                  previewSearch,
-                )"
-                :key="d.PjwdId"
-                :class="detailRowClass(d)"
-              >
-                <td>{{ formatTanggal(d.Tanggal) }}</td>
-                <td>
-                  <v-chip size="x-small" variant="tonal">{{ d.Sumber }}</v-chip>
-                </td>
-                <td class="nomor-nama-cell">
-                  <div class="mono">{{ nomorTampil(d) }}</div>
-                  <div>{{ d.Nama }}</div>
-                </td>
-                <td v-if="showPanjangLebar(previewCabang)" class="tr">
-                  {{ fmt(d.Panjang) }}
-                </td>
-                <td v-if="showPanjangLebar(previewCabang)" class="tr">
-                  {{ fmt(d.Lebar) }}
-                </td>
-                <td class="tr">{{ fmt(d.Pesan) }}</td>
-                <td class="tr">{{ fmt(d.Kirim) }}</td>
-                <td class="tr" :class="{ 'text-red fw': Number(d.Kurang) > 0 }">
-                  {{ fmt(d.Kurang) }}
-                </td>
-                <td class="tr">{{ fmt(d.Rencana) }}</td>
-                <td class="tr">{{ fmt(d.Realisasi) }}</td>
-                <td class="tc">{{ formatTanggal(d.PermintaanKirim) }}</td>
-                <td class="tc">
-                  <v-chip
-                    size="x-small"
-                    :color="d.StatusPermintaan === 'CLOSE' ? 'success' : 'grey'"
-                    variant="flat"
-                  >
-                    {{ d.StatusPermintaan }}
-                  </v-chip>
-                </td>
-                <td class="tr">
-                  {{ d.QtyKesepakatan ? fmt(d.QtyKesepakatan) : "-" }}
-                </td>
-                <td>
-                  <span v-if="d.Kesepakatan" class="kesepakatan-tgl">{{
-                    formatTanggal(d.Kesepakatan)
-                  }}</span>
-                  <span v-if="d.KetKesepakatan" class="kesepakatan-ket">
-                    — {{ d.KetKesepakatan }}</span
-                  >
-                  <span v-if="!d.Kesepakatan" class="text-grey">-</span>
-                </td>
-              </tr>
-              <tr
-                v-if="
-                  !filterDetail(previewDetail, activePreviewTab, previewSearch)
-                    .length
-                "
-              >
-                <td
-                  :colspan="showPanjangLebar(previewCabang) ? 14 : 12"
-                  class="empty-row"
+          <div class="dt-scroll dt-scroll-preview">
+            <table class="dt dt-detail dt-preview">
+              <thead>
+                <tr>
+                  <th>Tanggal</th>
+                  <th>Sumber</th>
+                  <th class="nomor-nama-header">Nomor / Nama</th>
+                  <th v-if="showPanjangLebar(previewCabang)" class="tr">
+                    Panjang
+                  </th>
+                  <th v-if="showPanjangLebar(previewCabang)" class="tr">
+                    Lebar
+                  </th>
+                  <th class="tr">Pesan</th>
+                  <th class="tr">Kirim</th>
+                  <th class="tr">Kurang</th>
+                  <th class="tr">Rencana</th>
+                  <th class="tr">Realisasi</th>
+                  <th class="tc">Permintaan Kirim</th>
+                  <th class="tc">Permintaan</th>
+                  <th class="tr">Qty Kesepakatan</th>
+                  <th>Kesepakatan</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="d in filterDetail(
+                    previewDetail,
+                    activePreviewTab,
+                    previewSearch,
+                  )"
+                  :key="d.PjwdId"
+                  :class="detailRowClass(d)"
                 >
-                  <template v-if="previewSearch">
-                    Tidak ada hasil untuk "{{ previewSearch }}".
-                  </template>
-                  <template v-else>
-                    Belum ada
-                    {{ activePreviewTab === "MAP" ? "MAP/sampel" : "SO" }} di
-                    periode ini.
-                  </template>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+                  <td>{{ formatTanggal(d.Tanggal) }}</td>
+                  <td>
+                    <v-chip size="x-small" variant="tonal">{{
+                      d.Sumber
+                    }}</v-chip>
+                  </td>
+                  <td class="nomor-nama-cell">
+                    <div class="mono">{{ nomorTampil(d) }}</div>
+                    <div>{{ d.Nama }}</div>
+                  </td>
+                  <td v-if="showPanjangLebar(previewCabang)" class="tr">
+                    {{ fmt(d.Panjang) }}
+                  </td>
+                  <td v-if="showPanjangLebar(previewCabang)" class="tr">
+                    {{ fmt(d.Lebar) }}
+                  </td>
+                  <td class="tr">{{ fmt(d.Pesan) }}</td>
+                  <td class="tr">{{ fmt(d.Kirim) }}</td>
+                  <td
+                    class="tr"
+                    :class="{ 'text-red fw': Number(d.Kurang) > 0 }"
+                  >
+                    {{ fmt(d.Kurang) }}
+                  </td>
+                  <td class="tr">{{ fmt(d.Rencana) }}</td>
+                  <td class="tr">{{ fmt(d.Realisasi) }}</td>
+                  <td class="tc">{{ formatTanggal(d.PermintaanKirim) }}</td>
+                  <td class="tc">
+                    <v-chip
+                      size="x-small"
+                      :color="
+                        d.StatusPermintaan === 'CLOSE' ? 'success' : 'grey'
+                      "
+                      variant="flat"
+                    >
+                      {{ d.StatusPermintaan }}
+                    </v-chip>
+                  </td>
+                  <td class="tr">
+                    {{ d.QtyKesepakatan ? fmt(d.QtyKesepakatan) : "-" }}
+                  </td>
+                  <td>
+                    <span v-if="d.Kesepakatan" class="kesepakatan-tgl">{{
+                      formatTanggal(d.Kesepakatan)
+                    }}</span>
+                    <span v-if="d.KetKesepakatan" class="kesepakatan-ket">
+                      — {{ d.KetKesepakatan }}</span
+                    >
+                    <span v-if="!d.Kesepakatan" class="text-grey">-</span>
+                  </td>
+                </tr>
+                <tr
+                  v-if="
+                    !filterDetail(
+                      previewDetail,
+                      activePreviewTab,
+                      previewSearch,
+                    ).length
+                  "
+                >
+                  <td
+                    :colspan="showPanjangLebar(previewCabang) ? 14 : 12"
+                    class="empty-row"
+                  >
+                    <template v-if="previewSearch">
+                      Tidak ada hasil untuk "{{ previewSearch }}".
+                    </template>
+                    <template v-else>
+                      Belum ada
+                      {{ activePreviewTab === "MAP" ? "MAP/sampel" : "SO" }} di
+                      periode ini.
+                    </template>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </template>
       </v-card-text>
     </v-card>
@@ -1955,5 +1969,26 @@ checkUnnotifiedMap();
 }
 .f-search:focus {
   border-color: #1976d2;
+}
+.dt-scroll-preview {
+  max-height: 70vh;
+}
+/* Preview: lebar mengikuti isi, scroll horizontal kalau melebihi dialog */
+.dt.dt-detail.dt-preview {
+  table-layout: auto !important;
+  width: 100% !important;
+  min-width: max-content;
+}
+/* Semua sel selain Nomor/Nama tidak boleh wrap (tanggal, angka, chip) */
+.dt.dt-detail.dt-preview th,
+.dt.dt-detail.dt-preview td:not(.nomor-nama-cell) {
+  white-space: nowrap !important;
+}
+.dt.dt-detail.dt-preview td.kesepakatan-cell {
+  white-space: normal !important;
+  min-width: 160px;
+}
+.kesepakatan-tgl {
+  white-space: nowrap;
 }
 </style>

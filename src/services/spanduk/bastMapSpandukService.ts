@@ -16,6 +16,9 @@ export interface BastMapRow {
   kendalaProduksi: string | null;
   Jumlah: number | null;
   OnProgres: string | null;
+  SemuaN: number;
+  Keputusan: string | null;
+  AlasanKeputusan: string | null;
 }
 
 export interface BastMapFilter {
