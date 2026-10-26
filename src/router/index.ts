@@ -1423,6 +1423,47 @@ const router = createRouter({
       },
     },
     {
+      path: "/spanduk/lhk/lhk-koli",
+      name: "SpandukLhkKoli",
+      component: () => import("@/views/spanduk/lhk/LhkKoliView.vue"),
+      meta: {
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "4",
+        title: "LHK Koli",
+      },
+    },
+    {
+      path: "/spanduk/lhk/lhk-koli/form",
+      name: "SpandukLhkKoliCreate",
+      component: () => import("@/views/spanduk/lhk/LhkKoliFormView.vue"),
+      meta: {
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "4",
+        title: "Tambah LHK Koli",
+        browseRoute: "SpandukLhkKoli",
+      },
+    },
+    {
+      path: "/spanduk/lhk/lhk-koli/form/:nomor",
+      name: "SpandukLhkKoliEdit",
+      component: () => import("@/views/spanduk/lhk/LhkKoliFormView.vue"),
+      meta: {
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "4",
+        title: "Ubah LHK Koli",
+        browseRoute: "SpandukLhkKoli",
+      },
+    },
+    {
+      path: "/spanduk/lhk/lhk-koli/print/:nomor",
+      name: "SpandukLhkKoliPrint",
+      component: () => import("@/views/spanduk/lhk/LhkKoliPrintView.vue"),
+      meta: { layout: "BlankLayout", requiresAuth: true, title: "Label Koli" },
+    },
+    {
       path: "/spanduk/bast-map",
       name: "SpandukBastMap",
       component: () => import("@/views/spanduk/BastMapSpandukView.vue"),
@@ -4242,7 +4283,8 @@ const router = createRouter({
     {
       path: "/penjualan/permintaan-driver/print/:nomor",
       name: "PermintaanDriverPrint",
-      component: () => import("@/views/penjualan/PermintaanDriverPrintView.vue"),
+      component: () =>
+        import("@/views/penjualan/PermintaanDriverPrintView.vue"),
       meta: {
         title: "Cetak Surat Jalan Permintaan Driver",
         layout: "BlankLayout",

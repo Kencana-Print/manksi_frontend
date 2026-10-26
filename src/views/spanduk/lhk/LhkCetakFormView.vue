@@ -521,7 +521,8 @@ const tutupSetelahSimpan = () => {
             v-model="formData.header.tanggal"
             class="idate"
             style="width: 150px"
-            :disabled="!isLegacy"
+            :max="todayLocal"
+            @change="muatKaryawan"
           />
         </div>
 

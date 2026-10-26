@@ -109,6 +109,7 @@ import {
   IconFold,
   IconSkull,
   IconSteeringWheel,
+  IconBox,
 } from "@tabler/icons-vue";
 
 export interface NavItem {
@@ -546,6 +547,11 @@ export const createMenuItems = (): NavItem[] => {
               to: "/spanduk/lhk/lhk-lipat",
               icon: IconFold,
               menuId: 1223,
+            },
+            {
+              title: "LHK Koli",
+              to: "/spanduk/lhk/lhk-koli",
+              icon: IconBox,
             },
           ],
         },
