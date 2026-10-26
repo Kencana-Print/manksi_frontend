@@ -12,7 +12,13 @@ import {
 } from "@/services/penjualan/permintaanDriverService";
 import { exportExcelSingle, type ExcelColumn } from "@/utils/excelExport";
 import { formatTanggal } from "@/utils/dateFormat";
-import { IconSteeringWheel, IconTrash, IconEye, IconBan } from "@tabler/icons-vue";
+import {
+  IconSteeringWheel,
+  IconTrash,
+  IconEye,
+  IconBan,
+  IconPrinter,
+} from "@tabler/icons-vue";
 
 const router = useRouter();
 const toast = useToast();
@@ -162,6 +168,19 @@ const goEdit = (item: { Nomor: string }) => {
   });
 };
 
+// ── Cetak Ulang Surat Jalan ───────────────────────────────────────────
+const onCetak = (item?: { Nomor: string }) => {
+  const target = item || selectedItem.value;
+  if (!target || !target.Nomor) {
+    toast.warning("Pilih data yang ingin dicetak terlebih dahulu.");
+    return;
+  }
+  window.open(
+    `/penjualan/permintaan-driver/print/${encodeURIComponent(target.Nomor)}`,
+    "_blank",
+  );
+};
+
 // ── Hapus / Batalkan Data ──────────────────────────────────────────────
 const onDelete = async (item: { Nomor: string; Peminta?: string; IsClosed?: string }) => {
   const currentUser = (authStore.user?.kode || "").toUpperCase();
@@ -281,6 +300,24 @@ onMounted(() => {
     @update:selected="(val) => (selected = val)"
     @update:filter-state="onFilterStateRestore"
   >
+    <!-- Tombol Cetak Surat Jalan Permintaan Driver -->
+    <template #extra-actions="{ selected }">
+      <v-btn
+        size="small"
+        variant="flat"
+        color="blue-grey"
+        :disabled="selected.length === 0"
+        @click="onCetak(selected[0])"
+      >
+        <template #prepend>
+          <span class="d-flex align-center">
+            <IconPrinter :size="15" :stroke-width="1.7" />
+          </span>
+        </template>
+        Cetak
+      </v-btn>
+    </template>
+
     <!-- Filter Kiri: Tanggal & Keterangan Status Pengerjaan -->
     <template #filter-left>
       <div class="f-grp">
