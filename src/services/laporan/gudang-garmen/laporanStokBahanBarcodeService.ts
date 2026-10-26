@@ -25,4 +25,14 @@ export const laporanStokBahanBarcodeService = {
     api.get(
       `/laporan/gudang-garmen/stok-bahan-barcode/${encodeURIComponent(kode)}/mkb-belum-realisasi`,
     ),
+
+  getExportDetail: (payload: {
+    kodeList: string[];
+    endDate: string;
+    janganTampilkanKosongDetail: boolean;
+  }) =>
+    api.post(
+      "/laporan/gudang-garmen/stok-bahan-barcode/export-detail",
+      payload,
+    ),
 };

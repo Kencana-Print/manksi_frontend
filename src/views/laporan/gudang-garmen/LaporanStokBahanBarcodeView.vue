@@ -4,11 +4,21 @@ import { useToast } from "vue-toastification";
 import BaseBrowse from "@/components/BaseBrowse.vue";
 import { useBrowse } from "@/composables/useBrowse";
 import { laporanStokBahanBarcodeService } from "@/services/laporan/gudang-garmen/laporanStokBahanBarcodeService";
-import { IconEdit, IconX, IconDatabase } from "@tabler/icons-vue";
-import { exportExcelSingle, type ExcelColumn } from "@/utils/excelExport";
+import {
+  IconEdit,
+  IconX,
+  IconDatabase,
+  IconListDetails,
+} from "@tabler/icons-vue";
+import {
+  exportExcel,
+  exportExcelSingle,
+  type ExcelColumn,
+} from "@/utils/excelExport";
 import { formatTanggal } from "@/utils/dateFormat";
 
 const toast = useToast();
+const browseRef = ref<InstanceType<typeof BaseBrowse> | null>(null);
 
 const getLocalDate = () => {
   const d = new Date();
@@ -164,7 +174,10 @@ const fmtNum = (val: any) =>
 
 const isExporting = ref(false);
 const onExport = async () => {
-  if (!items.value || items.value.length === 0) {
+  const dataExport = (browseRef.value?.getFilteredItems() ??
+    items.value ??
+    []) as MasterRow[];
+  if (dataExport.length === 0) {
     return toast.warning("Tidak ada data untuk diexport.");
   }
   isExporting.value = true;
@@ -227,7 +240,7 @@ const onExport = async () => {
       },
     ];
 
-    const rows = items.value.map((it: any) => ({
+    const rows = dataExport.map((it) => ({
       Kode: it.Kode,
       Nama: it.Nama,
       Satuan: it.Satuan,
@@ -258,10 +271,309 @@ const onExport = async () => {
     isExporting.value = false;
   }
 };
+
+interface MasterRow {
+  Kode: string;
+  Nama: string;
+  Satuan: string;
+  Warna: string;
+  Gramasi: string | number;
+  Setting: string | number;
+  Buffer: number;
+  Masuk_In: number;
+  Keluar_Out: number;
+  Stok: number;
+  MkbBelumRealisasi: number;
+  PoBelumBpb: number;
+  BahanBelumPo: number;
+}
+interface BarcodeRow {
+  Kode?: string;
+  Barcode: string;
+  Firts_In: string | null;
+  Last_Out: string | null;
+  IN: number;
+  OUT: number;
+  Stok: number;
+  Kategori: string;
+  NomorPO: string | null;
+  NomorSpk: string | null;
+  Keterangan: string | null;
+}
+interface MkbRow {
+  NomorMkb: string;
+  TglMkb: string | null;
+  Spk: string;
+  NamaSpk: string;
+  Butuh: number;
+  Ready: number;
+  Terima: number;
+  Kurang: number;
+  Kode?: string;
+}
+type SelExport = Record<string, string | number>;
+
+const isExportingDetail = ref(false);
+
+const tglExport = (v: string | null | undefined): string =>
+  v ? formatTanggal(v) : "";
+
+const kelompokkan = <T extends { Kode?: string }>(
+  rows: T[],
+): Map<string, T[]> => {
+  const peta = new Map<string, T[]>();
+  for (const r of rows) {
+    const k = r.Kode ?? "";
+    const arr = peta.get(k);
+    if (arr) arr.push(r);
+    else peta.set(k, [r]);
+  }
+  return peta;
+};
+
+const onExportDetail = async () => {
+  // Ikut search box + filter kolom yang sedang aktif di BaseBrowse
+  const masters = (browseRef.value?.getFilteredItems() ??
+    items.value ??
+    []) as MasterRow[];
+  if (masters.length === 0) {
+    return toast.warning("Tidak ada data untuk diexport.");
+  }
+  isExportingDetail.value = true;
+  try {
+    const res = await laporanStokBahanBarcodeService.getExportDetail({
+      kodeList: masters.map((m) => m.Kode).filter(Boolean),
+      endDate: filterState.value.endDate,
+      janganTampilkanKosongDetail:
+        filterState.value.janganTampilkanKosongDetail,
+    });
+    const barcodePerKode = kelompokkan<BarcodeRow>(
+      res.data?.data?.barcode ?? [],
+    );
+    const mkbPerKode = kelompokkan<MkbRow>(res.data?.data?.mkb ?? []);
+    const tanpaKode = masters.filter((m) => !m.Kode).length;
+
+    const kolomMaster: ExcelColumn[] = [
+      { header: "Kode", key: "Kode", width: 14 },
+      { header: "Nama Bahan", key: "Nama", width: 32 },
+      { header: "Satuan", key: "Satuan", width: 10, align: "center" },
+      { header: "Warna", key: "Warna", width: 16 },
+      { header: "Gramasi", key: "Gramasi", width: 12 },
+      { header: "Setting", key: "Setting", width: 12 },
+      {
+        header: "Buffer",
+        key: "Buffer",
+        width: 11,
+        align: "right",
+        numFmt: "#,##0",
+      },
+      {
+        header: "In",
+        key: "Masuk_In",
+        width: 11,
+        align: "right",
+        numFmt: "#,##0",
+      },
+      {
+        header: "Out",
+        key: "Keluar_Out",
+        width: 11,
+        align: "right",
+        numFmt: "#,##0",
+      },
+      {
+        header: "Stok",
+        key: "Stok",
+        width: 11,
+        align: "right",
+        numFmt: "#,##0",
+      },
+      {
+        header: "MKB Belum Realisasi",
+        key: "MkbBelumRealisasi",
+        width: 18,
+        align: "right",
+        numFmt: "#,##0",
+      },
+      {
+        header: "PO Belum BPB (Open)",
+        key: "PoBelumBpb",
+        width: 18,
+        align: "right",
+        numFmt: "#,##0",
+      },
+      {
+        header: "Bahan Belum PO",
+        key: "BahanBelumPo",
+        width: 16,
+        align: "right",
+        numFmt: "#,##0",
+      },
+    ];
+
+    // Sel master hanya dirender di baris detail pertama, sisanya dikosongkan
+    const selMaster = (m: MasterRow): SelExport => ({
+      Kode: m.Kode,
+      Nama: m.Nama,
+      Satuan: m.Satuan,
+      Warna: m.Warna,
+      Gramasi: m.Gramasi,
+      Setting: m.Setting,
+      Buffer: Number(m.Buffer) || 0,
+      Masuk_In: Number(m.Masuk_In) || 0,
+      Keluar_Out: Number(m.Keluar_Out) || 0,
+      Stok: Number(m.Stok) || 0,
+      MkbBelumRealisasi: Number(m.MkbBelumRealisasi) || 0,
+      PoBelumBpb: Number(m.PoBelumBpb) || 0,
+      BahanBelumPo: Number(m.BahanBelumPo) || 0,
+    });
+    const kosongMaster: SelExport = Object.fromEntries(
+      kolomMaster.map((c) => [c.key, ""]),
+    );
+
+    // ── Sheet 1: Rincian Barcode ──
+    const kolomBarcode: ExcelColumn[] = [
+      { header: "Barcode", key: "Barcode", width: 18 },
+      { header: "First In", key: "FirstIn", width: 12, align: "center" },
+      { header: "In", key: "In", width: 10, align: "right", numFmt: "#,##0" },
+      { header: "Last Out", key: "LastOut", width: 12, align: "center" },
+      { header: "Out", key: "Out", width: 10, align: "right", numFmt: "#,##0" },
+      {
+        header: "Stok Barcode",
+        key: "StokBarcode",
+        width: 12,
+        align: "right",
+        numFmt: "#,##0",
+      },
+      { header: "Kategori", key: "Kategori", width: 10, align: "center" },
+      { header: "Nama Bahan Barcode", key: "NamaBarcode", width: 32 },
+      { header: "Nomor PO", key: "NomorPO", width: 20 },
+      { header: "No. SPK Pemakai", key: "NomorSpk", width: 20 },
+      { header: "Keterangan", key: "Keterangan", width: 30 },
+    ];
+    const kosongBarcode: SelExport = Object.fromEntries(
+      kolomBarcode.map((c) => [c.key, ""]),
+    );
+
+    const rowsBarcode: SelExport[] = [];
+    for (const m of masters) {
+      const dtl = barcodePerKode.get(m.Kode) ?? [];
+      if (dtl.length === 0) {
+        rowsBarcode.push({ ...selMaster(m), ...kosongBarcode });
+        continue;
+      }
+      dtl.forEach((d, idx) => {
+        rowsBarcode.push({
+          ...(idx === 0 ? selMaster(m) : kosongMaster),
+          Barcode: d.Barcode,
+          FirstIn: tglExport(d.Firts_In),
+          In: Number(d.IN) || 0,
+          LastOut: tglExport(d.Last_Out),
+          Out: Number(d.OUT) || 0,
+          StokBarcode: Number(d.Stok) || 0,
+          Kategori: d.Kategori === "ECER" ? "Ecer" : "Reguler",
+          NamaBarcode: `${m.Nama}${d.Kategori === "ECER" ? " -R" : ""}`,
+          NomorPO: d.NomorPO || "",
+          NomorSpk: d.NomorSpk || "",
+          Keterangan: d.Keterangan || "",
+        });
+      });
+    }
+
+    // ── Sheet 2: MKB Belum Realisasi (hanya bahan yang punya MKB outstanding) ──
+    const kolomMkb: ExcelColumn[] = [
+      { header: "No. MKB", key: "NomorMkb", width: 20 },
+      { header: "Tgl MKB", key: "TglMkb", width: 12, align: "center" },
+      { header: "SPK", key: "Spk", width: 20 },
+      { header: "Nama SPK", key: "NamaSpk", width: 36 },
+      {
+        header: "Butuh",
+        key: "Butuh",
+        width: 11,
+        align: "right",
+        numFmt: "#,##0",
+      },
+      {
+        header: "Ready",
+        key: "Ready",
+        width: 11,
+        align: "right",
+        numFmt: "#,##0",
+      },
+      {
+        header: "Terima",
+        key: "Terima",
+        width: 11,
+        align: "right",
+        numFmt: "#,##0",
+      },
+      {
+        header: "Kurang",
+        key: "Kurang",
+        width: 11,
+        align: "right",
+        numFmt: "#,##0",
+      },
+    ];
+    const rowsMkb: SelExport[] = [];
+    for (const m of masters) {
+      const dtl = mkbPerKode.get(m.Kode) ?? [];
+      dtl.forEach((d, idx) => {
+        rowsMkb.push({
+          ...(idx === 0 ? selMaster(m) : kosongMaster),
+          NomorMkb: d.NomorMkb,
+          TglMkb: tglExport(d.TglMkb),
+          Spk: d.Spk,
+          NamaSpk: d.NamaSpk,
+          Butuh: Number(d.Butuh) || 0,
+          Ready: Number(d.Ready) || 0,
+          Terima: Number(d.Terima) || 0,
+          Kurang: Number(d.Kurang) || 0,
+        });
+      });
+    }
+
+    const judul = `Laporan Stok Bahan Barcode (Detail)  |  Per Tanggal: ${formatTanggal(filterState.value.endDate)}`;
+    const sheets = [
+      {
+        sheetName: "Rincian Barcode",
+        title: judul,
+        columns: [...kolomMaster, ...kolomBarcode],
+        rows: rowsBarcode,
+      },
+    ];
+    if (rowsMkb.length > 0) {
+      sheets.push({
+        sheetName: "MKB Belum Realisasi",
+        title: judul,
+        columns: [...kolomMaster, ...kolomMkb],
+        rows: rowsMkb,
+      });
+    }
+
+    await exportExcel(
+      `Laporan_Stok_Bahan_Barcode_Detail_${filterState.value.endDate}.xlsx`,
+      sheets,
+    );
+    if (tanpaKode > 0) {
+      toast.warning(
+        `Export selesai, tetapi ${tanpaKode} bahan tanpa kode tidak punya rincian.`,
+      );
+    } else {
+      toast.success("Berhasil export detail.");
+    }
+  } catch (e) {
+    console.error(e);
+    toast.error("Terjadi kesalahan saat export detail.");
+  } finally {
+    isExportingDetail.value = false;
+  }
+};
 </script>
 
 <template>
   <BaseBrowse
+    ref="browseRef"
     title="Laporan Stok Bahan Barcode"
     menu-id="501"
     :headers="headers"
@@ -305,6 +617,16 @@ const onExport = async () => {
       >
         <template #prepend><IconEdit :size="15" /></template>
         Update Keterangan
+      </v-btn>
+      <v-btn
+        size="small"
+        variant="outlined"
+        color="success"
+        :loading="isExportingDetail"
+        @click="onExportDetail"
+      >
+        <template #prepend><IconListDetails :size="15" /></template>
+        Export Detail
       </v-btn>
     </template>
 
