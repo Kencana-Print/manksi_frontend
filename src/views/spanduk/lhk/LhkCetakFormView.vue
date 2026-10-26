@@ -521,7 +521,7 @@ const tutupSetelahSimpan = () => {
             v-model="formData.header.tanggal"
             class="idate"
             style="width: 150px"
-            :max="todayLocal"
+            :max="hariIni()"
             @change="muatKaryawan"
           />
         </div>
