@@ -686,10 +686,17 @@ const ZOOM_STEP = 0.1;
 
 const zoomPercentDisplay = computed(() => Math.round(previewScale.value * 100));
 
-const isPreviewLandscape = computed(() => {
-  if (!selectedItem.value) return false;
-  const cab = selectedItem.value.Cab;
-  return ["P01", "P02", "P05"].includes(cab);
+const isPreviewLandscape = computed(() => printFormat.value !== "baru");
+
+// Harus sama persis dengan aturan di SpkPrintView
+const printFormat = computed<"p01" | "spanduk" | "baru">(() => {
+  const item = selectedItem.value;
+  if (!item) return "baru";
+  const cab = item.Cab;
+  if (["P02", "P05"].includes(cab)) return "spanduk";
+  const isLegacyNomor = !String(item.Nomor || "").startsWith("SPK-");
+  if (cab === "P01" || isLegacyNomor) return "p01";
+  return "baru";
 });
 
 // ── FIX: lebar asli tiap format print, bukan asumsi A4 landscape generik ──
@@ -697,13 +704,10 @@ const isPreviewLandscape = computed(() => {
 // P02/P05 → .print-wrapper-so { width: 297mm } ≈ 1123px (2 kolom, memang A4 landscape)
 // Portrait (format baru) → .print-page.page-1 { width: 210mm } ≈ 794px
 const PAGE_WIDTH_PX = computed(() => {
-  if (!selectedItem.value) return 793;
-  const cab = selectedItem.value.Cab;
-  if (cab === "P01") return 1047;
-  if (["P02", "P05"].includes(cab)) return 1123;
+  if (printFormat.value === "p01") return 1047;
+  if (printFormat.value === "spanduk") return 1123;
   return 793;
 });
-
 // Fit-to-screen: hitung scale berdasarkan LEBAR *dan* TINGGI viewport
 // dialog yang tersedia (bukan cuma lebar seperti sebelumnya) — supaya
 // defaultnya benar-benar "satu halaman penuh kelihatan" sesuai

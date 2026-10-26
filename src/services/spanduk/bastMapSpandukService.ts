@@ -19,6 +19,8 @@ export interface BastMapRow {
   SemuaN: number;
   Keputusan: string | null;
   AlasanKeputusan: string | null;
+  NomorProof: string | null;
+  HariBAST: number | null;
 }
 
 export interface BastMapFilter {

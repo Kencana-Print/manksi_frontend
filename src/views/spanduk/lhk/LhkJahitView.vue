@@ -9,6 +9,7 @@ import * as lhkService from "@/services/spanduk/lhk/lhkJahitService";
 import type {
   LhkJahitRow,
   LhkJahitDetailRow,
+  LhkJahitKaryawanRow,
 } from "@/services/spanduk/lhk/lhkJahitService";
 import { IconScissors, IconFileExport, IconPrinter } from "@tabler/icons-vue";
 import { formatTanggal } from "@/utils/dateFormat";
@@ -16,6 +17,7 @@ import { formatTanggal } from "@/utils/dateFormat";
 interface ExportDetailRow {
   Nomor: string;
   Tanggal: string;
+  Sesi: string;
   Kode_Pabrik: string;
   Nama_Pabrik: string;
   Nomor_SPK: string;
@@ -26,6 +28,7 @@ interface ExportDetailRow {
   Qty_Jahit: number;
   Tambah_Jahit: number;
   Tambah_Tali: number;
+  BS_Jahit: number;
 }
 
 const toast = useToast();
@@ -51,6 +54,15 @@ const filterState = ref({
 
 // --- DETAIL: dimuat sekali untuk seluruh periode, dikelompokkan per nomor ---
 const detailMap = ref<Record<string, LhkJahitDetailRow[]>>({});
+const karyawanMap = ref<Record<string, LhkJahitKaryawanRow[]>>({});
+
+const sesiLabel = (s: string | null | undefined): string =>
+  s === "PAGI" ? "Pagi" : s === "SIANG" ? "Siang" : "-";
+
+const fmtJam = (menit: number | null | undefined): string => {
+  const m = Math.max(0, Number(menit) || 0);
+  return `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+};
 const expandedRows = ref<unknown[]>([]);
 
 const muatData = async (): Promise<LhkJahitRow[]> => {
@@ -64,9 +76,10 @@ const muatData = async (): Promise<LhkJahitRow[]> => {
     return [];
   }
 
-  const [master, detail] = await Promise.all([
+  const [master, detail, karyawan] = await Promise.all([
     lhkService.getBrowse(dtAwal, dtAkhir),
     lhkService.getDetail(dtAwal, dtAkhir),
+    lhkService.getKaryawan(dtAwal, dtAkhir),
   ]);
 
   const peta: Record<string, LhkJahitDetailRow[]> = {};
@@ -74,6 +87,12 @@ const muatData = async (): Promise<LhkJahitRow[]> => {
     (peta[row.Nomor] ??= []).push(row);
   }
   detailMap.value = peta;
+
+  const petaKar: Record<string, LhkJahitKaryawanRow[]> = {};
+  for (const row of karyawan) {
+    (petaKar[`${row.Nomor}|${row.Nomor_SPK}`] ??= []).push(row);
+  }
+  karyawanMap.value = petaKar;
   expandedRows.value = [];
   return master;
 };
@@ -101,6 +120,7 @@ const baseBrowseRef = ref<InstanceType<typeof BaseBrowse> | null>(null);
 const headers = [
   { title: "Nomor", key: "Nomor", width: "170px" },
   { title: "Tanggal", key: "Tanggal", width: "110px", align: "center" },
+  { title: "Sesi", key: "Sesi", width: "90px", align: "center" },
   { title: "Kode Pabrik", key: "Kode_Pabrik", width: "120px" },
   { title: "Nama Pabrik", key: "Nama_Pabrik", width: "260px" },
 ];
@@ -110,6 +130,7 @@ const NUM = "#,##0.00";
 const kolomMaster: ExcelColumn[] = [
   { header: "Nomor", key: "Nomor", width: 20 },
   { header: "Tanggal", key: "Tanggal", width: 14, align: "center" },
+  { header: "Sesi", key: "Sesi", width: 10, align: "center" },
   { header: "Kode Pabrik", key: "Kode_Pabrik", width: 14 },
   { header: "Nama Pabrik", key: "Nama_Pabrik", width: 30 },
 ];
@@ -117,6 +138,7 @@ const kolomMaster: ExcelColumn[] = [
 const kolomDetail: ExcelColumn[] = [
   { header: "Nomor", key: "Nomor", width: 20 },
   { header: "Tanggal", key: "Tanggal", width: 14, align: "center" },
+  { header: "Sesi", key: "Sesi", width: 10, align: "center" },
   { header: "Kode Pabrik", key: "Kode_Pabrik", width: 14 },
   { header: "Nama Pabrik", key: "Nama_Pabrik", width: 28 },
   { header: "Nomor SPK", key: "Nomor_SPK", width: 20 },
@@ -150,6 +172,13 @@ const kolomDetail: ExcelColumn[] = [
     width: 14,
     align: "right",
     numFmt: NUM,
+  },
+  {
+    header: "BS Jahit",
+    key: "BS_Jahit",
+    width: 12,
+    align: "right",
+    numFmt: "#,##0",
   },
 ];
 
@@ -204,7 +233,11 @@ const exportMaster = () =>
   exportToExcel("LHK_Jahit_Header", {
     columns: kolomMaster,
     getData: () =>
-      dataTampil().map((r) => ({ ...r, Tanggal: formatTanggal(r.Tanggal) })),
+      dataTampil().map((r) => ({
+        ...r,
+        Tanggal: formatTanggal(r.Tanggal),
+        Sesi: sesiLabel(r.Sesi),
+      })),
   });
 
 // Hanya detail dari LHK yang sedang tampil di grid
@@ -224,6 +257,7 @@ const exportDetail = async () => {
       rows.push({
         Nomor: item.Nomor,
         Tanggal: formatTanggal(item.Tanggal),
+        Sesi: sesiLabel(item.Sesi),
         Kode_Pabrik: item.Kode_Pabrik ?? "",
         Nama_Pabrik: item.Nama_Pabrik ?? "",
         Nomor_SPK: r.Nomor_SPK,
@@ -234,6 +268,7 @@ const exportDetail = async () => {
         Qty_Jahit: Number(r.Qty_Jahit) || 0,
         Tambah_Jahit: Number(r.Tambah_Jahit) || 0,
         Tambah_Tali: Number(r.Tambah_Tali) || 0,
+        BS_Jahit: Number(r.BS_Jahit) || 0,
       });
     }
   }
@@ -298,6 +333,10 @@ const numFmt = (v: number | null) =>
       {{ formatTanggal(item.Tanggal) }}
     </template>
 
+    <template #item.Sesi="{ item }">
+      {{ sesiLabel(item.Sesi) }}
+    </template>
+
     <!-- Detail Expand -->
     <template #detail="{ item }">
       <div class="expand-wrap">
@@ -313,21 +352,45 @@ const numFmt = (v: number | null) =>
               <th width="80" class="tr">Qty Jahit</th>
               <th width="90" class="tr">Tambah Jahit</th>
               <th width="90" class="tr">Tambah Tali</th>
+              <th width="80" class="tr">BS Jahit</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="r in detailMap[item.Nomor]" :key="r.Nomor_SPK">
-              <td>{{ r.Nomor_SPK }}</td>
-              <td class="font-weight-bold">{{ r.Nama_SPK }}</td>
-              <td class="tr">{{ numFmt(r.Jumlah_Order) }}</td>
-              <td class="tr">{{ numFmt(r.Panjang) }}</td>
-              <td class="tr">{{ numFmt(r.Lebar) }}</td>
-              <td class="tr">{{ numFmt(r.Qty_Jahit) }}</td>
-              <td class="tr">{{ numFmt(r.Tambah_Jahit) }}</td>
-              <td class="tr">{{ numFmt(r.Tambah_Tali) }}</td>
-            </tr>
+            <template v-for="r in detailMap[item.Nomor]" :key="r.Nomor_SPK">
+              <tr>
+                <td>{{ r.Nomor_SPK }}</td>
+                <td class="font-weight-bold">{{ r.Nama_SPK }}</td>
+                <td class="tr">{{ numFmt(r.Jumlah_Order) }}</td>
+                <td class="tr">{{ numFmt(r.Panjang) }}</td>
+                <td class="tr">{{ numFmt(r.Lebar) }}</td>
+                <td class="tr">{{ numFmt(r.Qty_Jahit) }}</td>
+                <td class="tr">{{ numFmt(r.Tambah_Jahit) }}</td>
+                <td class="tr">{{ numFmt(r.Tambah_Tali) }}</td>
+                <td class="tr">{{ numFmt(r.BS_Jahit) }}</td>
+              </tr>
+              <tr
+                v-if="karyawanMap[`${item.Nomor}|${r.Nomor_SPK}`]?.length"
+                class="kar-row"
+              >
+                <td colspan="9">
+                  <span class="kar-lbl">Karyawan:</span>
+                  <span
+                    v-for="k in karyawanMap[`${item.Nomor}|${r.Nomor_SPK}`]"
+                    :key="k.NIK"
+                    class="kar-chip"
+                  >
+                    {{ k.Nama }} · {{ numFmt(k.Qty) }} pcs ·
+                    {{
+                      item.Sesi
+                        ? fmtJam(k.Menit_Kerja) + " jam"
+                        : "abs " + numFmt(k.Absensi)
+                    }}
+                  </span>
+                </td>
+              </tr>
+            </template>
             <tr v-if="!detailMap[item.Nomor]?.length">
-              <td colspan="8" class="text-center text-grey py-3 font-italic">
+              <td colspan="9" class="text-center text-grey py-3 font-italic">
                 Detail LHK Jahit tidak ditemukan.
               </td>
             </tr>
@@ -410,5 +473,22 @@ const numFmt = (v: number | null) =>
 }
 .tr {
   text-align: right !important;
+}
+.kar-row td {
+  background: #f5f9ff;
+  font-size: 10px;
+}
+.kar-lbl {
+  font-weight: 700;
+  color: #546e7a;
+  margin-right: 6px;
+}
+.kar-chip {
+  display: inline-block;
+  background: #e3f2fd;
+  border: 1px solid #90caf9;
+  border-radius: 10px;
+  padding: 0 8px;
+  margin: 1px 4px 1px 0;
 }
 </style>

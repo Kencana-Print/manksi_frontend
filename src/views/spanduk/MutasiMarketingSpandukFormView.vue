@@ -29,7 +29,8 @@ interface MapRow {
   ukuran: string;
   mo: string;
   lokasi: string;
-  qty: number;
+  qtyJadi: number;
+  qtyKirim: number;
   tglDiterima: string | null;
 }
 
@@ -75,7 +76,8 @@ const bangunState = (d: MutasiMarketingFormData): FormState => ({
     ukuran: m.ukuran ?? "",
     mo: m.mo ?? "",
     lokasi: d.header.cab ?? "",
-    qty: Number(m.qty) || 0,
+    qtyJadi: Number(m.qtyJadi) || 0,
+    qtyKirim: Number(m.qtyKirim) || 0,
     tglDiterima: m.tglDiterima,
   })),
   sudahDiterima: d.sudahDiterima,
@@ -84,7 +86,10 @@ const bangunState = (d: MutasiMarketingFormData): FormState => ({
 const bangunPayload = (data: FormState): MutasiMarketingPayload => ({
   tanggal: data.header.tanggal,
   keterangan: data.header.keterangan.trim(),
-  maps: data.maps.map((m) => m.nomor),
+  maps: data.maps.map((m) => ({
+    nomor: m.nomor,
+    qtyKirim: Number(m.qtyKirim) || 0,
+  })),
 });
 
 // ── State UI ──
@@ -140,8 +145,11 @@ const lokasiTampil = computed(() => {
   return [...set].join(", ");
 });
 
-const totalQty = computed(() =>
-  formData.value.maps.reduce((s, m) => s + m.qty, 0),
+const totalJadi = computed(() =>
+  formData.value.maps.reduce((s, m) => s + m.qtyJadi, 0),
+);
+const totalKirim = computed(() =>
+  formData.value.maps.reduce((s, m) => s + (Number(m.qtyKirim) || 0), 0),
 );
 
 const fmtQty = (v: number) =>
@@ -160,7 +168,8 @@ const pilihMap = (daftar: MapSerahOption[]) => {
       ukuran: m.Ukuran,
       mo: m.MO,
       lokasi: m.Lokasi,
-      qty: Number(m.Jumlah) || 0,
+      qtyJadi: Number(m.Jumlah) || 0,
+      qtyKirim: Number(m.Jumlah) || 0,
       tglDiterima: null,
     });
   }
@@ -199,6 +208,17 @@ const validateSave = () => {
       "Semua MAP dalam satu dokumen harus berasal dari cabang yang sama.",
     );
     return;
+  }
+  for (const m of formData.value.maps) {
+    const k = Number(m.qtyKirim);
+    if (!Number.isFinite(k) || k <= 0) {
+      toast.warning(`Jumlah kirim MAP ${m.nomor} harus lebih dari 0.`);
+      return;
+    }
+    if (Math.round(k * 100) / 100 !== k) {
+      toast.warning(`Jumlah kirim MAP ${m.nomor} maksimal 2 desimal.`);
+      return;
+    }
   }
   showSaveDialog.value = true;
 };
@@ -289,9 +309,18 @@ const cetakSekarang = () => {
           />
         </div>
         <div class="f-row">
-          <label class="f-lbl">Total Qty</label>
+          <label class="f-lbl">Total Jadi</label>
           <input
-            :value="fmtQty(totalQty)"
+            :value="fmtQty(totalJadi)"
+            readonly
+            class="f-inp f-ro"
+            style="max-width: 100px; text-align: right; font-weight: 600"
+          />
+        </div>
+        <div class="f-row">
+          <label class="f-lbl">Total Kirim</label>
+          <input
+            :value="fmtQty(totalKirim)"
             readonly
             class="f-inp f-ro"
             style="max-width: 100px; text-align: right; font-weight: 600"
@@ -311,8 +340,8 @@ const cetakSekarang = () => {
         ></textarea>
 
         <div class="note-box">
-          Qty diambil dari BAST MAP (jumlah jadi) saat dokumen disimpan. Tidak
-          ada pengurangan stok.
+          Jumlah jadi diambil dari BAST MAP saat dokumen disimpan. Jumlah kirim
+          bisa diubah. Tidak ada pengurangan stok.
         </div>
       </div>
     </template>
@@ -329,7 +358,7 @@ const cetakSekarang = () => {
 
         <div class="sec-title">MAP yang diserahkan :</div>
         <div style="overflow: auto; flex: 1; min-height: 0">
-          <table class="bt" style="min-width: 760px">
+          <table class="bt" style="min-width: 840px">
             <thead>
               <tr>
                 <th style="width: 30px">No</th>
@@ -337,7 +366,8 @@ const cetakSekarang = () => {
                 <th style="text-align: left">Nama Pekerjaan</th>
                 <th style="width: 110px; text-align: left">Ukuran</th>
                 <th style="width: 160px; text-align: left">MO</th>
-                <th style="width: 80px">Qty</th>
+                <th style="width: 80px">Jadi</th>
+                <th class="th-kirim" style="width: 100px">Kirim</th>
                 <th style="width: 90px">Diterima</th>
                 <th style="width: 30px"></th>
               </tr>
@@ -349,7 +379,18 @@ const cetakSekarang = () => {
                 <td class="font-weight-bold">{{ m.nama }}</td>
                 <td>{{ m.ukuran }}</td>
                 <td>{{ m.mo }}</td>
-                <td class="tr">{{ fmtQty(m.qty) }}</td>
+                <td class="tr">{{ fmtQty(m.qtyJadi) }}</td>
+                <td class="p0">
+                  <input
+                    v-model.number="m.qtyKirim"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    class="kirim-inp"
+                    :disabled="terkunci"
+                    v-select-on-focus
+                  />
+                </td>
                 <td class="tc muted">
                   {{ m.tglDiterima ? formatTanggal(m.tglDiterima) : "-" }}
                 </td>
@@ -365,7 +406,7 @@ const cetakSekarang = () => {
                 </td>
               </tr>
               <tr v-if="formData.maps.length === 0">
-                <td colspan="8" class="empty-row">
+                <td colspan="9" class="empty-row">
                   Belum ada MAP. Klik "Tambah MAP" untuk memilih.
                 </td>
               </tr>
@@ -613,6 +654,30 @@ const cetakSekarang = () => {
   border-color: #1565c0;
 }
 .ket-textarea:disabled {
+  background: #f0f0f0;
+  color: #616161;
+}
+.th-kirim {
+  background: #f9a825 !important;
+  color: #4a2e00 !important;
+  border-color: #e65100 !important;
+}
+.kirim-inp {
+  width: 100%;
+  height: 22px;
+  border: none;
+  background: #fffde7;
+  outline: none;
+  font-size: 10px;
+  text-align: right;
+  padding: 0 6px;
+  font-family: inherit;
+  font-weight: 600;
+}
+.kirim-inp:focus {
+  background: #e3f2fd;
+}
+.kirim-inp:disabled {
   background: #f0f0f0;
   color: #616161;
 }

@@ -53,11 +53,13 @@ interface Header {
   mspk_gramasi: string;
   mspk_rencana_size: string;
   mspk_keterangan: string;
+  mspk_cab: string;
 }
 
 const router = useRouter();
 const toast = useToast();
 const activeTab = ref(0);
+const TAB_GAMBAR = 3;
 const showMapModal = ref(false);
 const showAccModal = ref(false);
 const activeAccIdx = ref(-1);
@@ -66,6 +68,54 @@ const savedNomor = ref("");
 const showBahanModal = ref(false);
 const activeBahanIdx = ref(-1);
 const listKomponen = ref<string[]>([]);
+// ── Tab Gambar (gambar MAP, pola sama dengan halaman cetak) ──
+const gambarUrl = ref("");
+const gambarNomor = ref(""); // nomor MAP yang gambarnya sudah dicari
+const isLoadingGambar = ref(false);
+let tokenGambar = 0;
+
+const gambarBisaDimuat = (url: string) =>
+  new Promise<boolean>((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve(true);
+    img.onerror = () => resolve(false);
+    img.src = url;
+  });
+
+const muatGambar = async () => {
+  const nomor = formData.value.header.mspk_nomor;
+  if (!nomor) {
+    gambarUrl.value = "";
+    gambarNomor.value = "";
+    return;
+  }
+  const token = ++tokenGambar;
+  isLoadingGambar.value = true;
+  const cab = (formData.value.header.mspk_cab ?? "").trim() || "HO-";
+  const base = api.defaults.baseURL?.replace(/\/api\/?$/, "") ?? "";
+  const enc = encodeURIComponent(nomor);
+  const primary = `${base}/images/${cab}/map/${enc}.jpg`;
+  const fallback = `/file-gambar/${enc}.jpg`;
+
+  let hasil = "";
+  if (await gambarBisaDimuat(primary)) {
+    hasil = primary;
+  } else if (await gambarBisaDimuat(fallback)) {
+    hasil = fallback;
+  }
+  if (token !== tokenGambar) {
+    return; // MAP sudah berganti
+  }
+  gambarUrl.value = hasil;
+  gambarNomor.value = nomor;
+  isLoadingGambar.value = false;
+};
+
+const bukaGambarPenuh = () => {
+  if (gambarUrl.value) {
+    window.open(gambarUrl.value, "_blank");
+  }
+};
 let cachedSizesNomor = "";
 let cachedSizes: any[] | null = null;
 
@@ -84,6 +134,7 @@ function normalizeHeader(h: any) {
     mspk_gramasi: h.mspk_gramasi ?? h.Mspk_gramasi ?? "",
     mspk_rencana_size: h.mspk_rencana_size ?? h.Mspk_rencana_size ?? "",
     mspk_keterangan: h.mspk_keterangan ?? h.Mspk_keterangan ?? "",
+    mspk_cab: h.mspk_cab ?? h.mspk_cabang ?? h.Mspk_cab ?? "",
   };
 }
 
@@ -132,6 +183,7 @@ const initialData: {
     mspk_gramasi: "",
     mspk_rencana_size: "",
     mspk_keterangan: "",
+    mspk_cab: "",
   },
   checklist: [],
   komponen: [],
@@ -171,6 +223,9 @@ const {
     activeBahanIdx.value = -1;
     cachedSizesNomor = "";
     cachedSizes = null;
+    gambarUrl.value = "";
+    gambarNomor.value = "";
+    isLoadingGambar.value = false;
   },
   fetchApi: async (): Promise<typeof initialData> => {
     const res = await api.get<{ data: typeof initialData }>(
@@ -209,6 +264,24 @@ const {
     showPrintDialog.value = true;
   },
 });
+
+// Gambar dicari saat tab Gambar dibuka, dan dicari ulang bila MAP berganti
+watch(
+  () => [activeTab.value, formData.value.header.mspk_nomor] as [number, string],
+  ([tab, nomor]) => {
+    if (tab !== TAB_GAMBAR) {
+      return;
+    }
+    if (!nomor) {
+      gambarUrl.value = "";
+      gambarNomor.value = "";
+      return;
+    }
+    if (gambarNomor.value !== nomor) {
+      void muatGambar();
+    }
+  },
+);
 
 const isBreakdownSize = computed(
   () =>
@@ -789,7 +862,12 @@ onMounted(async () => {
         <!-- Tab nav native -->
         <div class="tab-nav">
           <button
-            v-for="(t, i) in ['BAST & Bahan', 'Accesories', 'Babaran per Size']"
+            v-for="(t, i) in [
+              'BAST & Bahan',
+              'Accesories',
+              'Babaran per Size',
+              'Gambar',
+            ]"
             :key="i"
             class="tab-btn"
             :class="{ active: activeTab === i }"
@@ -1099,6 +1177,31 @@ onMounted(async () => {
           </button>
         </div>
 
+        <!-- Tab 3: Gambar MAP -->
+        <div
+          v-show="activeTab === 3"
+          style="flex: 1; min-height: 0; display: flex; flex-direction: column"
+        >
+          <div class="gbr-box">
+            <span v-if="!formData.header.mspk_nomor" class="gbr-info">
+              Pilih MAP terlebih dahulu.
+            </span>
+            <span v-else-if="isLoadingGambar" class="gbr-info">
+              Memuat gambar...
+            </span>
+            <img
+              v-else-if="gambarUrl"
+              :src="gambarUrl"
+              class="gbr-img"
+              title="Klik untuk membuka ukuran penuh"
+              @click="bukaGambarPenuh"
+            />
+            <span v-else class="gbr-info">
+              (Tidak ada gambar desain untuk MAP ini)
+            </span>
+          </div>
+        </div>
+
         <!-- NOTE box -->
         <div class="note-box">
           <strong>NOTE:</strong> Jika
@@ -1327,6 +1430,30 @@ onMounted(async () => {
   border-color: #bdbdbd;
   border-bottom: 2px solid white;
   margin-bottom: -2px;
+}
+
+/* ── Tab Gambar ── */
+.gbr-box {
+  flex: 1;
+  min-height: 240px;
+  border: 1px solid #bdbdbd;
+  border-radius: 3px;
+  background: #fafafa;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: auto;
+}
+.gbr-img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  cursor: zoom-in;
+}
+.gbr-info {
+  font-size: 11px;
+  color: #757575;
+  font-style: italic;
 }
 
 /* ── Section title ── */

@@ -83,93 +83,91 @@ onMounted(async () => {
 
   <div v-else class="print-container">
     <div class="print-page">
-      <div class="header-title">{{ JUDUL }}</div>
+      <div v-for="copy in 2" :key="copy" class="copy">
+        <div class="header-title">{{ JUDUL }}</div>
 
-      <table class="info-table">
-        <tr>
-          <td width="18%">Nomor</td>
-          <td width="2%">:</td>
-          <td>{{ printData.header.nomor }}</td>
-        </tr>
-        <tr>
-          <td>Tanggal</td>
-          <td>:</td>
-          <td>{{ fmtTanggal(printData.header.tanggal) }}</td>
-        </tr>
-        <tr>
-          <td>Lokasi</td>
-          <td>:</td>
-          <td>{{ printData.header.cab }}</td>
-        </tr>
-        <tr v-if="printData.header.keterangan">
-          <td class="align-top">Keterangan</td>
-          <td class="align-top">:</td>
-          <td style="white-space: pre-wrap">
-            {{ printData.header.keterangan }}
-          </td>
-        </tr>
-      </table>
-
-      <div v-for="k in kelompok" :key="k.mo" class="mo-block">
-        <div class="mo-title">MO : {{ k.mo }}</div>
-        <table class="detail-table">
-          <thead>
-            <tr>
-              <th width="6%">No</th>
-              <th width="22%">Nomor MAP</th>
-              <th>Nama Pekerjaan</th>
-              <th width="18%">Ukuran</th>
-              <th width="10%">Tipe</th>
-              <th width="9%">Qty</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="(r, i) in k.rows" :key="r.nomor">
-              <td class="text-center">{{ i + 1 }}</td>
-              <td>{{ r.nomor }}</td>
-              <td>{{ r.nama }}</td>
-              <td>{{ r.ukuran }}</td>
-              <td class="text-center">{{ r.tipe }}</td>
-              <td class="text-right">{{ fmtQty(r.qty) }}</td>
-            </tr>
-            <tr class="row-total">
-              <td colspan="5" class="text-right">Total {{ k.mo }}</td>
-              <td class="text-right">{{ fmtQty(k.total) }}</td>
-            </tr>
-          </tbody>
+        <table class="info-table">
+          <tr>
+            <td width="18%">Nomor</td>
+            <td width="2%">:</td>
+            <td>{{ printData.header.nomor }}</td>
+          </tr>
+          <tr>
+            <td>Tanggal</td>
+            <td>:</td>
+            <td>{{ fmtTanggal(printData.header.tanggal) }}</td>
+          </tr>
+          <tr>
+            <td>Lokasi</td>
+            <td>:</td>
+            <td>{{ printData.header.cab }}</td>
+          </tr>
+          <tr v-if="printData.header.keterangan">
+            <td class="align-top">Keterangan</td>
+            <td class="align-top">:</td>
+            <td style="white-space: pre-wrap">
+              {{ printData.header.keterangan }}
+            </td>
+          </tr>
         </table>
 
-        <table class="ttd-table">
-          <thead>
-            <tr>
-              <th width="33.3%">{{ LABEL_SERAH }}</th>
-              <th width="33.3%">{{ LABEL_MO }}</th>
-              <th width="33.3%">{{ LABEL_CMO }}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td class="ttd-space"></td>
-              <td class="ttd-space"></td>
-              <td class="ttd-space"></td>
-            </tr>
-            <tr>
-              <td class="ttd-name">( {{ printData.header.pembuat }} )</td>
-              <td class="ttd-name">( {{ k.mo }} )</td>
-              <td class="ttd-name">( ......................... )</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+        <div v-for="k in kelompok" :key="k.mo" class="mo-block">
+          <div class="mo-title">MO : {{ k.mo }}</div>
+          <table class="detail-table">
+            <thead>
+              <tr>
+                <th width="6%">No</th>
+                <th width="22%">Nomor MAP</th>
+                <th>Nama Pekerjaan</th>
+                <th width="18%">Ukuran</th>
+                <th width="10%">Tipe</th>
+                <th width="9%">Qty</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(r, i) in k.rows" :key="r.nomor">
+                <td class="text-center">{{ i + 1 }}</td>
+                <td>{{ r.nomor }}</td>
+                <td>{{ r.nama }}</td>
+                <td>{{ r.ukuran }}</td>
+                <td class="text-center">{{ r.tipe }}</td>
+                <td class="text-right">{{ fmtQty(r.qty) }}</td>
+              </tr>
+            </tbody>
+          </table>
 
-      <div class="doc-foot">
-        <div>
-          Total keseluruhan : <b>{{ fmtQty(totalQty) }}</b> ({{
-            printData.maps.length
-          }}
-          MAP)
+          <table class="ttd-table">
+            <thead>
+              <tr>
+                <th width="33.3%">{{ LABEL_SERAH }}</th>
+                <th width="33.3%">{{ LABEL_MO }}</th>
+                <th width="33.3%">{{ LABEL_CMO }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="ttd-space"></td>
+                <td class="ttd-space"></td>
+                <td class="ttd-space"></td>
+              </tr>
+              <tr>
+                <td class="ttd-name">( {{ printData.header.pembuat }} )</td>
+                <td class="ttd-name">( {{ k.mo }} )</td>
+                <td class="ttd-name">( ......................... )</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
-        <div>Dicetak : {{ hariIni() }}</div>
+
+        <div class="doc-foot">
+          <div>
+            Total keseluruhan : <b>{{ fmtQty(totalQty) }}</b> ({{
+              printData.maps.length
+            }}
+            MAP)
+          </div>
+          <div>Dicetak : {{ hariIni() }}</div>
+        </div>
       </div>
     </div>
   </div>
@@ -278,9 +276,6 @@ onMounted(async () => {
   font-weight: bold;
   text-align: center;
 }
-.row-total td {
-  font-weight: bold;
-}
 
 .text-center {
   text-align: center;
@@ -305,7 +300,7 @@ onMounted(async () => {
   padding: 3px 4px;
 }
 .ttd-table .ttd-space {
-  height: 50px;
+  height: 34px;
 }
 .ttd-table .ttd-name {
   padding: 3px 4px;
@@ -324,5 +319,15 @@ onMounted(async () => {
 .ttd-cmo {
   width: 200px;
   font-size: 10.5px;
+}
+
+.copy {
+  min-height: 133mm;
+  box-sizing: border-box;
+}
+.copy + .copy {
+  border-top: 1px dashed #000;
+  margin-top: 4mm;
+  padding-top: 4mm;
 }
 </style>

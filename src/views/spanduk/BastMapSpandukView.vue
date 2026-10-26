@@ -17,6 +17,7 @@ import { setKeputusan } from "@/services/spanduk/bastMapSpandukFormService";
 const toast = useToast();
 const router = useRouter();
 const menuId = "4";
+const BATAS_HARI_BAST = 3;
 
 // Tanggal lokal (toISOString memakai UTC, lewat tengah malam WIB jadi mundur sehari)
 const getLocalDate = () => {
@@ -60,6 +61,13 @@ const headers = [
   { title: "Tanggal", key: "Tanggal", width: "100px" },
   { title: "Status BAST", key: "CetakBAST", width: "100px", align: "center" },
   { title: "Keputusan", key: "Keputusan", width: "120px", align: "center" },
+  { title: "LHK Proof", key: "NomorProof", width: "150px" },
+  {
+    title: "Umur MAP (hari kerja)",
+    key: "HariBAST",
+    width: "150px",
+    align: "center",
+  },
   { title: "Nama Pekerjaan", key: "NamaPekerjaan", width: "250px" },
   { title: "Nama Ext", key: "NamaExt", width: "250px" },
   { title: "Ukuran", key: "Ukuran", width: "150px" },
@@ -69,8 +77,15 @@ const headers = [
 ];
 
 const goAdd = () => router.push({ name: "SpandukBastMapCreate" });
-const goEdit = (item: BastMapRow) =>
+const goEdit = (item: BastMapRow) => {
+  if (!item.CetakBAST && !item.NomorProof) {
+    toast.warning(
+      `MAP ${item.Nomor} belum punya LHK Proof. Jika bukan MAP lama, BAST akan ditolak.`,
+      { timeout: 6000 },
+    );
+  }
   router.push({ name: "SpandukBastMapEdit", params: { nomor: item.Nomor } });
+};
 const cetak = () => {
   const row = selected.value[0];
   if (!row) return;
@@ -164,6 +179,12 @@ const onExport = async () => {
       { header: "Status BAST", key: "CetakBAST", width: 14, align: "center" },
       { header: "Keputusan", key: "Keputusan", width: 12, align: "center" },
       { header: "Alasan Keputusan", key: "AlasanKeputusan", width: 30 },
+      {
+        header: "Umur MAP (hari kerja)",
+        key: "HariBAST",
+        width: 18,
+        align: "center",
+      },
       { header: "Nama Pekerjaan", key: "NamaPekerjaan", width: 30 },
       { header: "Nama Ext", key: "NamaExt", width: 30 },
       { header: "Ukuran", key: "Ukuran", width: 16 },
@@ -316,6 +337,27 @@ const onExport = async () => {
       >
         Belum diputuskan
       </span>
+    </template>
+    <template #item.NomorProof="{ item }">
+      <span v-if="item.NomorProof">{{ item.NomorProof }}</span>
+      <span v-else class="text-red-darken-2 text-caption">Belum ada</span>
+    </template>
+    <template #item.HariBAST="{ item }">
+      <v-chip
+        v-if="item.HariBAST !== null"
+        :color="item.HariBAST > BATAS_HARI_BAST ? 'error' : 'success'"
+        size="x-small"
+        label
+        class="font-weight-bold"
+        :title="
+          item.CetakBAST
+            ? 'Selisih MAP dibuat s.d. BAST dibuat'
+            : 'Selisih MAP dibuat s.d. hari ini'
+        "
+      >
+        {{ item.HariBAST
+        }}{{ item.HariBAST > BATAS_HARI_BAST ? " · Terlambat" : "" }}
+      </v-chip>
     </template>
   </BaseBrowse>
 

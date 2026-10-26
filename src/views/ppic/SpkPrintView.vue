@@ -270,16 +270,23 @@ const isMoveSpecialProcess = computed(() => {
 
 // --- CETAK SPK P01 ---
 // ── Deteksi Workshop legacy (P01/P02/P05) → pakai format cetak lama ──
-const isP01Print = computed(
-  () => spk.value.spk_cab === "P01" || spk.value.spk_cab2 === "P01",
-);
 const isSpandukMmtPrint = computed(
   () =>
     ["P02", "P05"].includes(spk.value.spk_cab) ||
     ["P02", "P05"].includes(spk.value.spk_cab2),
 );
-const isAnyLegacyPrint = computed(
-  () => isP01Print.value || isSpandukMmtPrint.value,
+
+// SPK legacy = nomor tidak berawalan "SPK-" (contoh SM-KO-006850)
+const isLegacyNomor = computed(
+  () =>
+    !!spk.value.spk_nomor && !String(spk.value.spk_nomor).startsWith("SPK-"),
+);
+
+const isP01Print = computed(
+  () =>
+    spk.value.spk_cab === "P01" ||
+    spk.value.spk_cab2 === "P01" ||
+    (isLegacyNomor.value && !isSpandukMmtPrint.value),
 );
 
 const spkKetKomponenText = computed(() =>
@@ -466,8 +473,8 @@ onMounted(async () => {
   try {
     const [resDetail, resLayout, resAlokasi] = await Promise.all([
       spkFormService.getDetail(printNomor),
-      spkFormService.getLayoutProses(printNomor),
-      spkFormService.getAlokasi(printNomor),
+      spkFormService.getLayoutProses(printNomor).catch(() => null),
+      spkFormService.getAlokasi(printNomor).catch(() => null),
     ]);
 
     const d = resDetail.data.data;
@@ -482,11 +489,11 @@ onMounted(async () => {
     ketKomponenList.value = (d.ketKomponenList || []).filter(
       (k: any) => k.checked,
     );
-    alokasi.value = resAlokasi.data.data || [];
+    alokasi.value = resAlokasi?.data?.data || [];
 
-    layoutHeader.value = resLayout.data.data?.header || null;
-    layoutProof.value = resLayout.data.data?.proof || [];
-    layoutSewing.value = resLayout.data.data?.sewing || [];
+    layoutHeader.value = resLayout?.data?.data?.header || null;
+    layoutProof.value = resLayout?.data?.data?.proof || [];
+    layoutSewing.value = resLayout?.data?.data?.sewing || [];
 
     // Fetch MKB pakai spk_so_ref yang sudah diketahui
     if (spk.value.spk_so_ref) {

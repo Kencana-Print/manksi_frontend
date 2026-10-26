@@ -149,13 +149,13 @@ onMounted(async () => {
           <tbody>
             <tr v-for="(d, i) in printData.details" :key="d.no">
               <td class="text-center">{{ i + 1 }}</td>
+              <td>{{ d.kesesuaian }}</td>
               <td
                 class="text-center font-weight-bold"
                 :class="{ 'status-n': d.status === 'N' }"
               >
                 {{ d.status }}
               </td>
-              <td class="text-center font-weight-bold">{{ d.status }}</td>
               <td>{{ d.keterangan }}</td>
             </tr>
           </tbody>

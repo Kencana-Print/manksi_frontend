@@ -27,6 +27,9 @@ interface ExportDetailRow {
   J_Oven: number;
   J_Jemuran: number;
   J_Potong: number;
+  BS_Quiring: number;
+  BS_Cetak: number;
+  BS_Bahan: number;
 }
 
 const toast = useToast();
@@ -107,6 +110,7 @@ const headers = [
 ];
 
 const NUM = "#,##0.00";
+const INT = "#,##0";
 
 const kolomMaster: ExcelColumn[] = [
   { header: "Nomor", key: "Nomor", width: 20 },
@@ -146,6 +150,27 @@ const kolomDetail: ExcelColumn[] = [
     width: 12,
     align: "right",
     numFmt: NUM,
+  },
+  {
+    header: "BS Quiring",
+    key: "BS_Quiring",
+    width: 12,
+    align: "right",
+    numFmt: INT,
+  },
+  {
+    header: "BS Cetak",
+    key: "BS_Cetak",
+    width: 12,
+    align: "right",
+    numFmt: INT,
+  },
+  {
+    header: "BS Bahan",
+    key: "BS_Bahan",
+    width: 12,
+    align: "right",
+    numFmt: INT,
   },
 ];
 
@@ -231,6 +256,9 @@ const exportDetail = async () => {
         J_Oven: Number(r.J_Oven) || 0,
         J_Jemuran: Number(r.J_Jemuran) || 0,
         J_Potong: Number(r.J_Potong) || 0,
+        BS_Quiring: Number(r.BS_Quiring) || 0,
+        BS_Cetak: Number(r.BS_Cetak) || 0,
+        BS_Bahan: Number(r.BS_Bahan) || 0,
       });
     }
   }
@@ -311,6 +339,9 @@ const numFmt = (v: number | null) =>
               <th width="70" class="tr">J Oven</th>
               <th width="80" class="tr">J Jemuran</th>
               <th width="80" class="tr">J Potong</th>
+              <th width="80" class="tr">BS Quiring</th>
+              <th width="80" class="tr">BS Cetak</th>
+              <th width="80" class="tr">BS Bahan</th>
             </tr>
           </thead>
           <tbody>
@@ -324,9 +355,12 @@ const numFmt = (v: number | null) =>
               <td class="tr">{{ numFmt(r.J_Oven) }}</td>
               <td class="tr">{{ numFmt(r.J_Jemuran) }}</td>
               <td class="tr">{{ numFmt(r.J_Potong) }}</td>
+              <td class="tr">{{ numFmt(r.BS_Quiring) }}</td>
+              <td class="tr">{{ numFmt(r.BS_Cetak) }}</td>
+              <td class="tr">{{ numFmt(r.BS_Bahan) }}</td>
             </tr>
             <tr v-if="!detailMap[item.Nomor]?.length">
-              <td colspan="9" class="text-center text-grey py-3 font-italic">
+              <td colspan="12" class="text-center text-grey py-3 font-italic">
                 Detail LHK Quiring tidak ditemukan.
               </td>
             </tr>

@@ -32,12 +32,23 @@ const desimal = (v: number | null | undefined): string =>
 const baris = computed(() => data.value?.Detail ?? []);
 
 const total = computed(() => {
-  const t = { koli: 0, oven: 0, jemuran: 0, potong: 0 };
+  const t = {
+    koli: 0,
+    oven: 0,
+    jemuran: 0,
+    potong: 0,
+    bsQuiring: 0,
+    bsCetak: 0,
+    bsBahan: 0,
+  };
   for (const r of baris.value) {
     t.koli += Number(r.J_Koli) || 0;
     t.oven += Number(r.J_Oven) || 0;
     t.jemuran += Number(r.J_Jemuran) || 0;
     t.potong += Number(r.J_Potong) || 0;
+    t.bsQuiring += Number(r.BS_Quiring) || 0;
+    t.bsCetak += Number(r.BS_Cetak) || 0;
+    t.bsBahan += Number(r.BS_Bahan) || 0;
   }
   return t;
 });
@@ -90,10 +101,14 @@ onMounted(async () => {
             <th rowspan="2" class="c-j">Oven<br />(pcs)</th>
             <th rowspan="2" class="c-j">Jemuran<br />(meter)</th>
             <th rowspan="2" class="c-j">Potong<br />Tambahan</th>
+            <th colspan="3">BS (pcs)</th>
           </tr>
           <tr>
             <th class="c-pl">P</th>
             <th class="c-pl">L</th>
+            <th class="c-j">Quiring</th>
+            <th class="c-j">Cetak</th>
+            <th class="c-j">Bahan</th>
           </tr>
         </thead>
         <tbody>
@@ -107,6 +122,9 @@ onMounted(async () => {
             <td class="tr">{{ bulat(r.J_Oven) }}</td>
             <td class="tr">{{ bulat(r.J_Jemuran) }}</td>
             <td class="tr">{{ bulat(r.J_Potong) }}</td>
+            <td class="tr">{{ bulat(r.BS_Quiring) }}</td>
+            <td class="tr">{{ bulat(r.BS_Cetak) }}</td>
+            <td class="tr">{{ bulat(r.BS_Bahan) }}</td>
           </tr>
         </tbody>
         <tfoot>
@@ -116,6 +134,9 @@ onMounted(async () => {
             <td class="tr">{{ bulat(total.oven) }}</td>
             <td class="tr">{{ bulat(total.jemuran) }}</td>
             <td class="tr">{{ bulat(total.potong) }}</td>
+            <td class="tr">{{ bulat(total.bsQuiring) }}</td>
+            <td class="tr">{{ bulat(total.bsCetak) }}</td>
+            <td class="tr">{{ bulat(total.bsBahan) }}</td>
           </tr>
         </tfoot>
       </table>

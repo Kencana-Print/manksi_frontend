@@ -32,6 +32,10 @@ export interface BastMapHeader {
   mspk_tipe: string | null;
   jenis_order: string | null;
   nomor_lhk_proof: string | null;
+  tgl_buat_map: string | null;
+  hari_pembuatan: number | null;
+  batas_hari: number;
+  terlambat: number;
 }
 
 export interface KesesuaianRow {

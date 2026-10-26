@@ -25,6 +25,9 @@ export interface LhkQuiringDetail {
   J_Oven: number | null;
   J_Jemuran: number | null;
   J_Potong: number | null;
+  BS_Quiring: number | null;
+  BS_Cetak: number | null;
+  BS_Bahan: number | null;
 }
 
 export interface LhkQuiringForm {
@@ -52,6 +55,9 @@ export interface LhkQuiringPayload {
     J_Oven: number;
     J_Jemuran: number;
     J_Potong: number;
+    BS_Quiring: number;
+    BS_Cetak: number;
+    BS_Bahan: number;
   }[];
 }
 

@@ -40,6 +40,9 @@ interface FormRow {
   oven: number;
   jemuran: number;
   potong: number;
+  bsQuiring: number | "";
+  bsCetak: number | "";
+  bsBahan: number | "";
 }
 
 interface FormState {
@@ -59,6 +62,12 @@ const KOLOM_JUMLAH = [
   { key: "potong", label: "J Potong" },
 ] as const;
 
+const KOLOM_BS = [
+  { key: "bsQuiring", label: "BS Quiring" },
+  { key: "bsCetak", label: "BS Cetak" },
+  { key: "bsBahan", label: "BS Bahan" },
+] as const;
+
 const num = (v: unknown) => Number(v) || 0;
 
 const barisKosong = (): FormRow => ({
@@ -71,6 +80,9 @@ const barisKosong = (): FormRow => ({
   oven: 0,
   jemuran: 0,
   potong: 0,
+  bsQuiring: "",
+  bsCetak: "",
+  bsBahan: "",
 });
 
 const defaultData = (): FormState => ({
@@ -97,6 +109,9 @@ const bangunPayload = (data: FormState): LhkQuiringPayload => ({
       J_Oven: num(r.oven),
       J_Jemuran: num(r.jemuran),
       J_Potong: num(r.potong),
+      BS_Quiring: num(r.bsQuiring),
+      BS_Cetak: num(r.bsCetak),
+      BS_Bahan: num(r.bsBahan),
     })),
 });
 
@@ -126,6 +141,9 @@ const {
       oven: num(r.J_Oven),
       jemuran: num(r.J_Jemuran),
       potong: num(r.J_Potong),
+      bsQuiring: num(r.BS_Quiring),
+      bsCetak: num(r.BS_Cetak),
+      bsBahan: num(r.BS_Bahan),
     }));
     return {
       header: {
@@ -250,7 +268,15 @@ const isiBarisDariSpk = async (
 };
 
 // Enter → kolom berikutnya (Delphi: SelectNext), akhir baris → baris berikutnya
-const KOLOM_EDIT = ["koli", "oven", "jemuran", "potong"] as const;
+const KOLOM_EDIT = [
+  "koli",
+  "oven",
+  "jemuran",
+  "potong",
+  "bsQuiring",
+  "bsCetak",
+  "bsBahan",
+] as const;
 type KolomEdit = (typeof KOLOM_EDIT)[number];
 
 const fieldRefs = ref<Record<string, HTMLInputElement>>({});
@@ -335,6 +361,18 @@ const validateSave = () => {
       return;
     }
     sudah.set(kunci, no);
+
+    const bs = [r.bsQuiring, r.bsCetak, r.bsBahan];
+    if (bs.some((v) => v === "" || v === null)) {
+      toast.warning(
+        `Baris ${no}: BS Quiring, BS Cetak, dan BS Bahan wajib diisi (isi 0 bila tidak ada).`,
+      );
+      return;
+    }
+    if (bs.some((v) => !Number.isInteger(num(v)) || num(v) < 0)) {
+      toast.warning(`Baris ${no}: BS harus bilangan bulat tidak negatif.`);
+      return;
+    }
 
     const angkaInput = [r.koli, r.oven, r.jemuran, r.potong];
     if (angkaInput.some((v) => !Number.isInteger(num(v)))) {
@@ -447,7 +485,7 @@ const tutupSetelahSimpan = () => {
           </button>
         </div>
         <div class="tbl-wrap" style="flex: 1; min-height: 240px">
-          <table class="gt" style="min-width: 1100px">
+          <table class="gt" style="min-width: 1360px">
             <thead>
               <tr>
                 <th style="width: 32px" class="tc">No</th>
@@ -460,6 +498,14 @@ const tutupSetelahSimpan = () => {
                   v-for="k in KOLOM_JUMLAH"
                   :key="k.key"
                   style="width: 85px"
+                  class="tr bg-yellow"
+                >
+                  {{ k.label }}
+                </th>
+                <th
+                  v-for="k in KOLOM_BS"
+                  :key="k.key"
+                  style="width: 90px"
                   class="tr bg-yellow"
                 >
                   {{ k.label }}
@@ -520,6 +566,18 @@ const tutupSetelahSimpan = () => {
                     v-select-on-focus
                   />
                 </td>
+                <td v-for="k in KOLOM_BS" :key="k.key" class="p0">
+                  <input
+                    v-model.number="row[k.key]"
+                    type="number"
+                    min="0"
+                    step="1"
+                    class="ci tr fw bg-yellow-light"
+                    :ref="(el) => setFieldRef(el, idx, k.key)"
+                    @keydown.enter.prevent="onEnter(idx, k.key)"
+                    v-select-on-focus
+                  />
+                </td>
                 <td class="tc">
                   <button type="button" class="btn-del" @click="removeRow(idx)">
                     ✕
@@ -535,7 +593,8 @@ const tutupSetelahSimpan = () => {
 
   <SpkSearchModal
     v-model="showSpkModal"
-    filter-mode="spk-ppic"
+    filter-mode="lhk-design"
+    :divisi="1"
     @selected="onSpkSelected"
   />
 

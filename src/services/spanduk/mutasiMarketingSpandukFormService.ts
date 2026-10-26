@@ -25,7 +25,8 @@ export interface MutasiMarketingMapRow {
   nomor: string;
   nama: string;
   ukuran: string;
-  qty: number;
+  qtyJadi: number;
+  qtyKirim: number;
   mo: string;
   tglDiterima: string | null;
 }
@@ -44,7 +45,7 @@ export interface MutasiMarketingFormData {
 export interface MutasiMarketingPayload {
   tanggal: string;
   keterangan: string;
-  maps: string[];
+  maps: { nomor: string; qtyKirim: number }[];
 }
 
 export interface SaveResponse {
@@ -58,7 +59,8 @@ export interface MutasiMarketingPrintRow {
   nama: string;
   ukuran: string;
   tipe: string;
-  qty: number;
+  qty: number; // jumlah kirim
+  qtyJadi: number;
   mo: string;
 }
 

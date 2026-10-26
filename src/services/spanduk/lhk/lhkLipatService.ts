@@ -13,6 +13,7 @@ interface ApiResponse<T> {
 export interface LhkLipatRow {
   Nomor: string;
   Tanggal: string;
+  Sesi: string;
   Kode_Pabrik: string | null;
   Nama_Pabrik: string | null;
 }
@@ -27,6 +28,17 @@ export interface LhkLipatDetailRow {
   Qty_Lipat: number | null;
   Tambah_Lipat: number | null;
   Mata_Ayam: number | null;
+  BS_Lipat: number | null;
+}
+
+export interface LhkLipatKaryawanRow {
+  Nomor: string;
+  Nomor_SPK: string;
+  NIK: string;
+  Nama: string | null;
+  Absensi: number | null; // legacy (LHK lama)
+  Qty: number | null;
+  Menit_Kerja: number;
 }
 
 export const getBrowse = async (
@@ -48,6 +60,17 @@ export const getDetail = async (
     { params: { tglAwal, tglAkhir } },
   );
   return res.data.data;
+};
+
+export const getKaryawan = async (
+  tglAwal: string,
+  tglAkhir: string,
+): Promise<LhkLipatKaryawanRow[]> => {
+  const res = await api.get<ApiResponse<LhkLipatKaryawanRow[]>>(
+    `${BASE}/karyawan`,
+    { params: { tglAwal, tglAkhir } },
+  );
+  return res.data.data ?? [];
 };
 
 export const remove = async (nomor: string): Promise<void> => {

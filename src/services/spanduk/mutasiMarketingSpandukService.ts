@@ -16,7 +16,8 @@ export interface MutasiMarketingRow {
   Lokasi: string;
   Keterangan: string;
   Jumlah_MAP: number;
-  Total_Qty: number;
+  Total_Jadi: number;
+  Total_Kirim: number;
   MO: string;
   Jumlah_Diterima: number;
 }
@@ -25,7 +26,8 @@ export interface MutasiMarketingDetailRow {
   Nomor: string;
   Nomor_MAP: string;
   Nama_MAP: string;
-  Qty: number;
+  Qty_Jadi: number;
+  Qty_Kirim: number;
   MO: string;
   Tgl_Diterima: string | null;
 }

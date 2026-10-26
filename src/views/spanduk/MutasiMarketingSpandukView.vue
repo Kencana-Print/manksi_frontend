@@ -83,7 +83,8 @@ const headers = [
   { title: "Lokasi", key: "Lokasi", width: "80px", align: "center" },
   { title: "MO", key: "MO", width: "220px" },
   { title: "Jml MAP", key: "Jumlah_MAP", width: "90px", align: "end" },
-  { title: "Total Qty", key: "Total_Qty", width: "100px", align: "end" },
+  { title: "Total Jadi", key: "Total_Jadi", width: "100px", align: "end" },
+  { title: "Total Kirim", key: "Total_Kirim", width: "100px", align: "end" },
   { title: "Diterima", key: "Diterima", width: "100px", align: "center" },
   { title: "Keterangan", key: "Keterangan", width: "260px" },
 ];
@@ -95,8 +96,15 @@ const kolomMaster: ExcelColumn[] = [
   { header: "MO", key: "MO", width: 28 },
   { header: "Jml MAP", key: "Jumlah_MAP", width: 10, align: "right" },
   {
-    header: "Total Qty",
-    key: "Total_Qty",
+    header: "Total Jadi",
+    key: "Total_Jadi",
+    width: 12,
+    align: "right",
+    numFmt: "#,##0.##",
+  },
+  {
+    header: "Total Kirim",
+    key: "Total_Kirim",
     width: 12,
     align: "right",
     numFmt: "#,##0.##",
@@ -213,8 +221,19 @@ const numFmt = (v: number | null) =>
       {{ formatTanggal(item.Tanggal) }}
     </template>
 
-    <template #item.Total_Qty="{ item }">
-      {{ numFmt(item.Total_Qty) }}
+    <template #item.Total_Jadi="{ item }">
+      {{ numFmt(item.Total_Jadi) }}
+    </template>
+    <template #item.Total_Kirim="{ item }">
+      <span
+        :class="
+          item.Total_Kirim !== item.Total_Jadi
+            ? 'text-orange-darken-2 font-weight-bold'
+            : ''
+        "
+      >
+        {{ numFmt(item.Total_Kirim) }}
+      </span>
     </template>
 
     <template #item.Diterima="{ item }">
@@ -230,7 +249,8 @@ const numFmt = (v: number | null) =>
             <tr>
               <th width="170">Nomor MAP</th>
               <th>Nama Pekerjaan</th>
-              <th width="90" class="tr">Qty</th>
+              <th width="90" class="tr">Jadi</th>
+              <th width="90" class="tr">Kirim</th>
               <th width="220">MO</th>
               <th width="110" class="tc">Diterima</th>
             </tr>
@@ -239,14 +259,22 @@ const numFmt = (v: number | null) =>
             <tr v-for="r in detailMap[item.Nomor]" :key="r.Nomor_MAP">
               <td>{{ r.Nomor_MAP }}</td>
               <td class="font-weight-bold">{{ r.Nama_MAP }}</td>
-              <td class="tr">{{ numFmt(r.Qty) }}</td>
+              <td class="tr">{{ numFmt(r.Qty_Jadi) }}</td>
+              <td
+                class="tr font-weight-bold"
+                :class="
+                  r.Qty_Kirim !== r.Qty_Jadi ? 'text-orange-darken-2' : ''
+                "
+              >
+                {{ numFmt(r.Qty_Kirim) }}
+              </td>
               <td>{{ r.MO }}</td>
               <td class="tc">
                 {{ r.Tgl_Diterima ? formatTanggal(r.Tgl_Diterima) : "-" }}
               </td>
             </tr>
             <tr v-if="!detailMap[item.Nomor]?.length">
-              <td colspan="5" class="text-center text-grey py-3 font-italic">
+              <td colspan="6" class="text-center text-grey py-3 font-italic">
                 Detail Mutasi Marketing tidak ditemukan.
               </td>
             </tr>

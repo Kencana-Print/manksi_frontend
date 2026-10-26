@@ -32,12 +32,33 @@ const desimal = (v: number | null | undefined): string =>
 const baris = computed(() => data.value?.Detail ?? []);
 
 const total = computed(() => {
-  const t = { lipat: 0, mata: 0 };
+  const t = { lipat: 0, mata: 0, bs: 0 };
   for (const r of baris.value) {
     t.lipat += Number(r.Qty_Lipat) || 0;
     t.mata += Number(r.Mata_Ayam) || 0;
+    t.bs += Number(r.BS_Lipat) || 0;
   }
   return t;
+});
+
+// Karyawan unik per NIK (jam kerja sama di semua SPK dalam satu LHK)
+const karyawanUnik = computed(() => {
+  const peta = new Map<string, { nama: string; jam: string; qty: number }>();
+  for (const r of baris.value) {
+    for (const k of r.Karyawan ?? []) {
+      const ada = peta.get(k.NIK);
+      if (ada) {
+        ada.qty += Number(k.Qty) || 0;
+      } else {
+        peta.set(k.NIK, {
+          nama: k.Nama ?? k.NIK,
+          jam: k.Jam_Kerja,
+          qty: Number(k.Qty) || 0,
+        });
+      }
+    }
+  }
+  return [...peta.values()];
 });
 
 onMounted(async () => {
@@ -75,6 +96,11 @@ onMounted(async () => {
           <td>:</td>
           <td>{{ data.Kode_Pabrik ?? "" }}</td>
         </tr>
+        <tr v-if="data.Sesi">
+          <td>Sesi</td>
+          <td>:</td>
+          <td>{{ data.Sesi === "PAGI" ? "Pagi" : "Siang" }}</td>
+        </tr>
       </table>
 
       <table class="grid">
@@ -86,6 +112,7 @@ onMounted(async () => {
             <th rowspan="2" class="c-spk">Nomor SPK</th>
             <th rowspan="2" class="c-j">J. Lipat<br />(pcs)</th>
             <th rowspan="2" class="c-t">Mata<br />Ayam</th>
+            <th rowspan="2" class="c-t">BS<br />Lipat</th>
           </tr>
           <tr>
             <th class="c-pl">P</th>
@@ -101,6 +128,7 @@ onMounted(async () => {
             <td>{{ r.Nomor_SPK }}</td>
             <td class="tr">{{ bulat(r.Qty_Lipat) }}</td>
             <td class="tr">{{ bulat(r.Mata_Ayam) }}</td>
+            <td class="tr">{{ bulat(r.BS_Lipat) }}</td>
           </tr>
         </tbody>
         <tfoot>
@@ -108,9 +136,32 @@ onMounted(async () => {
             <td colspan="5" class="tot-lbl">Total</td>
             <td class="tr">{{ bulat(total.lipat) }}</td>
             <td class="tr">{{ bulat(total.mata) }}</td>
+            <td class="tr">{{ bulat(total.bs) }}</td>
           </tr>
         </tfoot>
       </table>
+
+      <template v-if="data.Sesi && karyawanUnik.length > 0">
+        <div class="sub-judul">Karyawan</div>
+        <table class="grid kar-grid">
+          <thead>
+            <tr>
+              <th class="c-no">No</th>
+              <th>Nama</th>
+              <th class="c-j">Jam Kerja</th>
+              <th class="c-j">Qty (pcs)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(k, i) in karyawanUnik" :key="i">
+              <td class="tr">{{ i + 1 }}</td>
+              <td>{{ k.nama }}</td>
+              <td class="tr">{{ k.jam }}</td>
+              <td class="tr">{{ bulat(k.qty) }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </template>
 
       <div class="ttd">
         <span>Mengetahui: 1<span class="garis" /></span>
@@ -227,6 +278,17 @@ onMounted(async () => {
   width: 160px;
   border-bottom: 1px solid #000;
   margin-left: 4px;
+}
+.sub-judul {
+  font-weight: 700;
+  font-size: 12px;
+  margin: 12px 0 4px 2px;
+}
+.kar-grid {
+  width: 60%;
+}
+.c-no {
+  width: 30px;
 }
 
 @page {

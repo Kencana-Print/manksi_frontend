@@ -18,13 +18,15 @@ export interface PabrikOption {
 export interface KaryawanOption {
   NIK: string;
   Nama: string;
+  Jam_Kerja: string;
 }
 
 export interface LhkLipatKaryawan {
   NIK: string;
   Nama: string | null;
-  Absensi: number | null;
+  Absensi: number | null; // legacy (LHK lama)
   Qty: number | null;
+  Jam_Kerja: string;
 }
 
 export interface LhkLipatDetail {
@@ -36,6 +38,7 @@ export interface LhkLipatDetail {
   Qty_Lipat: number | null;
   Tambah_Lipat: number | null;
   Mata_Ayam: number | null;
+  BS_Lipat: number | null;
   Karyawan: LhkLipatKaryawan[];
 }
 
@@ -44,6 +47,7 @@ export interface LhkLipatForm {
   Tanggal: string;
   Kode_Pabrik: string | null;
   Nama_Pabrik: string | null;
+  Sesi: string;
   Detail: LhkLipatDetail[];
 }
 
@@ -58,12 +62,14 @@ export interface InfoSpk {
 export interface LhkLipatPayload {
   Tanggal: string;
   Kode_Pabrik: string;
+  Sesi: string;
   Detail: {
     Nomor_SPK: string;
     Qty_Lipat: number;
     Tambah_Lipat: number;
     Mata_Ayam: number;
-    Karyawan: { NIK: string; Absensi: number; Qty: number }[];
+    BS_Lipat: number;
+    Karyawan: { NIK: string; Qty: number }[];
   }[];
 }
 
@@ -95,10 +101,12 @@ export const getLookupPabrik = async (search = ""): Promise<PabrikOption[]> => {
 
 export const getLookupKaryawan = async (
   pabrik: string,
+  sesi: string,
+  tanggal: string,
 ): Promise<KaryawanOption[]> => {
   const res = await api.get<ApiResponse<KaryawanOption[]>>(
     `${BASE}/lookups/karyawan`,
-    { params: { pabrik } },
+    { params: { pabrik, sesi, tanggal } },
   );
   return res.data.data;
 };

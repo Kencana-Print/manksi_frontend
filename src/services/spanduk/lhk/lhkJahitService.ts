@@ -13,6 +13,7 @@ interface ApiResponse<T> {
 export interface LhkJahitRow {
   Nomor: string;
   Tanggal: string;
+  Sesi: string;
   Kode_Pabrik: string | null;
   Nama_Pabrik: string | null;
 }
@@ -27,7 +28,29 @@ export interface LhkJahitDetailRow {
   Qty_Jahit: number | null;
   Tambah_Jahit: number | null;
   Tambah_Tali: number | null;
+  BS_Jahit: number | null;
 }
+
+export interface LhkJahitKaryawanRow {
+  Nomor: string;
+  Nomor_SPK: string;
+  NIK: string;
+  Nama: string | null;
+  Absensi: number | null; // legacy (LHK lama)
+  Qty: number | null;
+  Menit_Kerja: number;
+}
+
+export const getKaryawan = async (
+  tglAwal: string,
+  tglAkhir: string,
+): Promise<LhkJahitKaryawanRow[]> => {
+  const res = await api.get<ApiResponse<LhkJahitKaryawanRow[]>>(
+    `${BASE}/karyawan`,
+    { params: { tglAwal, tglAkhir } },
+  );
+  return res.data.data ?? [];
+};
 
 export const getBrowse = async (
   tglAwal: string,

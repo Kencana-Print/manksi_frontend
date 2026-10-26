@@ -22,9 +22,12 @@ const authStore = useAuthStore();
 
 const isEditMode = computed(() => !!route.params.nomor);
 
+const isLegacy = computed(
+  () => isEditMode.value && formData.value.header.sesi === "",
+);
+
 // Delphi: hanya Lokasi MT1 yang boleh mengisi Qty Lipat manual
 const LOKASI_QTY_MANUAL = "MT1";
-const MAKS_ABSENSI = 999.99;
 
 const formatDateLocal = (d: Date) => {
   const year = d.getFullYear();
@@ -38,7 +41,8 @@ const todayLocal = formatDateLocal(new Date());
 interface KarRow {
   nik: string;
   nama: string;
-  absensi: number;
+  jamKerja: string;
+  absensi: number; // legacy (LHK lama)
   qty: number;
 }
 
@@ -51,6 +55,7 @@ interface FormRow {
   qtyManual: number; // dipakai hanya bila Lokasi = MT1
   tambahLipat: number;
   mataAyam: number;
+  bsLipat: number | "";
   karyawan: KarRow[];
 }
 
@@ -60,6 +65,7 @@ interface FormState {
     tanggal: string;
     kodePabrik: string;
     namaPabrik: string;
+    sesi: string;
   };
   items: FormRow[];
 }
@@ -76,10 +82,17 @@ const barisKosong = (): FormRow => ({
   tambahLipat: 0,
   mataAyam: 0,
   karyawan: [],
+  bsLipat: "",
 });
 
 const defaultData = (): FormState => ({
-  header: { nomor: "", tanggal: todayLocal, kodePabrik: "", namaPabrik: "" },
+  header: {
+    nomor: "",
+    tanggal: todayLocal,
+    kodePabrik: "",
+    namaPabrik: "",
+    sesi: "",
+  },
   items: [barisKosong()],
 });
 
@@ -89,7 +102,6 @@ const activeIdx = ref(0); // baris SPK yang karyawannya sedang ditampilkan
 const showSelesai = ref(false);
 const nomorTerakhir = ref("");
 const pabrikOpts = ref<PabrikOption[]>([]);
-const cacheKaryawan = new Map<string, KaryawanOption[]>();
 
 const jumlahKaryawan = (row: FormRow) =>
   row.karyawan.reduce((a, k) => a + num(k.qty), 0);
@@ -99,7 +111,7 @@ const bangunPayload = (data: FormState): LhkLipatPayload => {
   return {
     Tanggal: data.header.tanggal,
     Kode_Pabrik: data.header.kodePabrik,
-    // Delphi: baris tanpa nomor SPK tidak disimpan
+    Sesi: data.header.sesi,
     Detail: data.items
       .filter((r) => r.spk.trim() !== "")
       .map((r) => ({
@@ -107,11 +119,8 @@ const bangunPayload = (data: FormState): LhkLipatPayload => {
         Qty_Lipat: manual ? num(r.qtyManual) : jumlahKaryawan(r),
         Tambah_Lipat: num(r.tambahLipat),
         Mata_Ayam: num(r.mataAyam),
-        Karyawan: r.karyawan.map((k) => ({
-          NIK: k.nik,
-          Absensi: num(k.absensi),
-          Qty: num(k.qty),
-        })),
+        BS_Lipat: num(r.bsLipat),
+        Karyawan: r.karyawan.map((k) => ({ NIK: k.nik, Qty: num(k.qty) })),
       })),
   };
 };
@@ -141,9 +150,11 @@ const {
       qtyManual: num(r.Qty_Lipat),
       tambahLipat: num(r.Tambah_Lipat),
       mataAyam: num(r.Mata_Ayam),
+      bsLipat: num(r.BS_Lipat),
       karyawan: r.Karyawan.map((k) => ({
         nik: k.NIK,
         nama: k.Nama ?? "",
+        jamKerja: k.Jam_Kerja,
         absensi: num(k.Absensi),
         qty: num(k.Qty),
       })),
@@ -155,6 +166,7 @@ const {
         tanggal: d.Tanggal,
         kodePabrik: d.Kode_Pabrik ?? "",
         namaPabrik: d.Nama_Pabrik ?? "",
+        sesi: d.Sesi ?? "",
       },
       items: items.length > 0 ? items : [barisKosong()],
     };
@@ -212,6 +224,29 @@ const onPabrikChange = () => {
   }
 };
 
+const onSesiChange = async () => {
+  const kode = formData.value.header.kodePabrik;
+  const terisi = formData.value.items.filter((r) => r.spk.trim() !== "");
+  if (!kode || terisi.length === 0) {
+    return;
+  }
+  try {
+    const daftar = await ambilKaryawanLokasi(kode);
+    for (const r of terisi) {
+      r.karyawan = daftar.map((k) => ({
+        nik: k.NIK,
+        nama: k.Nama,
+        jamKerja: k.Jam_Kerja,
+        absensi: 0,
+        qty: 0,
+      }));
+    }
+    toast.info("Sesi diubah: daftar karyawan dimuat ulang, qty direset.");
+  } catch (e) {
+    toast.error(lhkForm.pesanError(e, "Gagal memuat daftar karyawan."));
+  }
+};
+
 // Lokasi default = cabang user (kode pabrik sama dengan kode cabang).
 // Hanya di mode tambah, hanya bila Lokasi masih kosong dan kodenya ada di daftar.
 const isiLokasiDefault = () => {
@@ -222,6 +257,7 @@ const isiLokasiDefault = () => {
   if (h.kodePabrik) {
     return;
   }
+
   const cabang = (authStore.user?.cabang ?? "").trim().toUpperCase();
   const p = pabrikOpts.value.find((x) => x.Kode.toUpperCase() === cabang);
   if (!p) {
@@ -267,15 +303,12 @@ const openLookupSpk = (idx: number) => {
 };
 
 // Daftar karyawan lipat aktif di Lokasi (di-cache per lokasi)
-const ambilKaryawanLokasi = async (kode: string): Promise<KaryawanOption[]> => {
-  const cache = cacheKaryawan.get(kode);
-  if (cache) {
-    return cache;
-  }
-  const daftar = await lhkForm.getLookupKaryawan(kode);
-  cacheKaryawan.set(kode, daftar);
-  return daftar;
-};
+const ambilKaryawanLokasi = (kode: string): Promise<KaryawanOption[]> =>
+  lhkForm.getLookupKaryawan(
+    kode,
+    formData.value.header.sesi,
+    formData.value.header.tanggal,
+  );
 
 // Isi satu baris dari nomor SPK/MAP. Data diambil server (sekaligus validasi
 // divisi dan cabang). Karyawan diisi dari master per Lokasi, absensi & qty 0.
@@ -291,6 +324,14 @@ const isiBarisDariSpk = async (
   const kodePabrik = formData.value.header.kodePabrik;
   if (!kodePabrik) {
     toast.warning("Pilih Lokasi terlebih dahulu.");
+    return false;
+  }
+  if (isLegacy.value) {
+    toast.warning("LHK lama tidak bisa menambah SPK. Buat LHK Lipat baru.");
+    return false;
+  }
+  if (!formData.value.header.sesi && kodePabrik !== LOKASI_QTY_MANUAL) {
+    toast.warning("Pilih Sesi terlebih dahulu.");
     return false;
   }
 
@@ -319,6 +360,7 @@ const isiBarisDariSpk = async (
       row.karyawan = daftar.map((k) => ({
         nik: k.NIK,
         nama: k.Nama,
+        jamKerja: k.Jam_Kerja,
         absensi: 0,
         qty: 0,
       }));
@@ -326,7 +368,7 @@ const isiBarisDariSpk = async (
     activeIdx.value = idx;
     if (daftar.length === 0) {
       toast.warning(
-        `Tidak ada karyawan lipat aktif di lokasi ${kodePabrik}. LHK tidak bisa disimpan tanpa karyawan.`,
+        `Tidak ada karyawan lipat yang hadir (sesuai absensi HRD) untuk sesi ini. LHK tidak bisa disimpan tanpa karyawan.`,
       );
     }
     return true;
@@ -354,11 +396,13 @@ const fokusKunci = async (kunci: string) => {
   }
 };
 
-const KOLOM_SPK = ["qty", "tambahLipat", "mataAyam"] as const;
+const KOLOM_SPK = ["qty", "tambahLipat", "mataAyam", "bsLipat"] as const;
 type KolomSpk = (typeof KOLOM_SPK)[number];
 
 const kolomSpkAktif = computed<readonly KolomSpk[]>(() =>
-  qtyManual.value ? KOLOM_SPK : ["tambahLipat", "mataAyam"],
+  qtyManual.value
+    ? KOLOM_SPK
+    : (["tambahLipat", "mataAyam", "bsLipat"] as const),
 );
 
 const onEnterSpkKolom = async (idx: number, col: KolomSpk) => {
@@ -368,23 +412,19 @@ const onEnterSpkKolom = async (idx: number, col: KolomSpk) => {
     await fokusKunci(`s_${idx}_${urut[ci + 1]}`);
   } else {
     pilihBaris(idx);
-    await fokusKunci("k_0_absensi");
+    await fokusKunci("k_0_qty");
   }
 };
 
-const onEnterKaryawan = async (j: number, col: "absensi" | "qty") => {
-  if (col === "absensi") {
-    await fokusKunci(`k_${j}_qty`);
-  } else {
-    await fokusKunci(`k_${j + 1}_absensi`);
-  }
+const onEnterKaryawan = async (j: number) => {
+  await fokusKunci(`k_${j + 1}_qty`);
 };
 
 // Dari modal pencarian (tombol atau F1)
 const onSpkSelected = async (v: { Nomor?: string }) => {
   const idx = activeIdx.value;
   if (await isiBarisDariSpk(idx, String(v?.Nomor ?? ""))) {
-    await fokusKunci(`k_0_absensi`);
+    await fokusKunci("k_0_qty");
   }
 };
 
@@ -395,7 +435,7 @@ const onEnterSpk = async (e: KeyboardEvent, idx: number) => {
     return;
   }
   if (await isiBarisDariSpk(idx, el.value)) {
-    await fokusKunci(`k_0_absensi`);
+    await fokusKunci("k_0_qty");
   } else {
     el.value = formData.value.items[idx].spk; // balikkan ke nilai terakhir yang valid
     el.select();
@@ -418,6 +458,10 @@ const validateSave = () => {
     toast.warning("Lokasi belum dipilih.");
     return;
   }
+  if (!isLegacy.value && !formData.value.header.sesi) {
+    toast.warning("Sesi belum dipilih.");
+    return;
+  }
 
   const terisi = formData.value.items
     .map((r, i) => ({ r, no: i + 1 }))
@@ -437,9 +481,21 @@ const validateSave = () => {
     }
     sudah.set(kunci, no);
 
-    const bulat = [r.mataAyam, ...(qtyManual.value ? [r.qtyManual] : [])];
+    if (r.bsLipat === "" || r.bsLipat === null) {
+      toast.warning(
+        `Baris ${no}: BS Lipat wajib diisi (isi 0 bila tidak ada BS).`,
+      );
+      return;
+    }
+    const bulat = [
+      r.mataAyam,
+      r.bsLipat,
+      ...(qtyManual.value ? [r.qtyManual] : []),
+    ];
     if (bulat.some((v) => !Number.isInteger(num(v)))) {
-      toast.warning(`Baris ${no}: qty dan mata ayam harus bilangan bulat.`);
+      toast.warning(
+        `Baris ${no}: qty, mata ayam, dan BS harus bilangan bulat.`,
+      );
       return;
     }
     if (bulat.some((v) => num(v) < 0) || num(r.tambahLipat) < 0) {
@@ -447,32 +503,26 @@ const validateSave = () => {
       return;
     }
 
-    let adaKerja = false;
-    for (const k of r.karyawan) {
-      if (!Number.isInteger(num(k.qty))) {
-        toast.warning(`Baris ${no}, ${k.nama}: qty harus bilangan bulat.`);
-        return;
+    if (!isLegacy.value && !qtyManual.value) {
+      let adaQty = false;
+      for (const k of r.karyawan) {
+        if (!Number.isInteger(num(k.qty)) || num(k.qty) < 0) {
+          toast.warning(
+            `Baris ${no}, ${k.nama}: qty harus bilangan bulat tidak negatif.`,
+          );
+          return;
+        }
+        if (num(k.qty) > 0) {
+          adaQty = true;
+        }
       }
-      if (num(k.qty) < 0 || num(k.absensi) < 0) {
-        toast.warning(`Baris ${no}, ${k.nama}: angka tidak boleh negatif.`);
-        return;
-      }
-      if (num(k.absensi) > MAKS_ABSENSI) {
+      if (!adaQty) {
         toast.warning(
-          `Baris ${no}, ${k.nama}: absensi maksimal ${MAKS_ABSENSI}.`,
+          `Baris ${no}: SPK ${r.spk} wajib punya minimal satu karyawan dengan qty lebih dari 0.`,
         );
+        pilihBaris(no - 1);
         return;
       }
-      if (num(k.absensi) > 0 || num(k.qty) > 0) {
-        adaKerja = true;
-      }
-    }
-    if (!adaKerja) {
-      toast.warning(
-        `Baris ${no}: SPK ${r.spk} wajib punya minimal satu karyawan dengan absensi atau qty lebih dari 0.`,
-      );
-      pilihBaris(no - 1);
-      return;
     }
   }
 
@@ -533,7 +583,23 @@ const tutupSetelahSimpan = () => {
             v-model="formData.header.tanggal"
             class="idate"
             style="width: 150px"
+            :disabled="!isLegacy"
           />
+        </div>
+
+        <div class="fr">
+          <label class="lbl">Sesi</label>
+          <select
+            v-model="formData.header.sesi"
+            class="inp"
+            style="width: 110px"
+            :disabled="isEditMode"
+            @change="onSesiChange"
+          >
+            <option value="" disabled>Pilih...</option>
+            <option value="PAGI">Pagi</option>
+            <option value="SIANG">Siang</option>
+          </select>
         </div>
 
         <div class="sep" />
@@ -545,6 +611,7 @@ const tutupSetelahSimpan = () => {
             class="inp"
             style="width: 90px"
             @change="onPabrikChange"
+            :disabled="isEditMode"
           >
             <option value="" disabled>Pilih...</option>
             <option v-for="p in opsiPabrik" :key="p.Kode" :value="p.Kode">
@@ -579,7 +646,7 @@ const tutupSetelahSimpan = () => {
           class="tbl-wrap"
           style="flex: 0 0 auto; max-height: 260px; min-height: 110px"
         >
-          <table class="gt" style="min-width: 1000px">
+          <table class="gt" style="min-width: 1100px">
             <thead>
               <tr>
                 <th style="width: 32px" class="tc">No</th>
@@ -591,6 +658,7 @@ const tutupSetelahSimpan = () => {
                 <th style="width: 90px" class="tr bg-yellow">Qty Lipat</th>
                 <th style="width: 100px" class="tr bg-yellow">Tambah Lipat</th>
                 <th style="width: 95px" class="tr bg-yellow">Mata Ayam</th>
+                <th style="width: 90px" class="tr bg-yellow">BS Lipat</th>
                 <th style="width: 32px" class="tc"></th>
               </tr>
             </thead>
@@ -683,6 +751,18 @@ const tutupSetelahSimpan = () => {
                     v-select-on-focus
                   />
                 </td>
+                <td class="p0">
+                  <input
+                    v-model.number="row.bsLipat"
+                    type="number"
+                    min="0"
+                    step="1"
+                    class="ci tr bg-yellow-light"
+                    :ref="(el) => setFieldRef(el, `s_${idx}_bsLipat`)"
+                    @keydown.enter.prevent="onEnterSpkKolom(idx, 'bsLipat')"
+                    v-select-on-focus
+                  />
+                </td>
                 <td class="tc">
                   <button
                     type="button"
@@ -721,7 +801,10 @@ const tutupSetelahSimpan = () => {
                   <th style="width: 32px" class="tc">No</th>
                   <th style="width: 110px">NIK</th>
                   <th>Nama</th>
-                  <th style="width: 90px" class="tr bg-yellow">Absensi</th>
+                  <th v-if="isLegacy" style="width: 90px" class="tr">
+                    Absensi
+                  </th>
+                  <th v-else style="width: 90px" class="tr">Jam Kerja</th>
                   <th style="width: 90px" class="tr bg-yellow">Qty</th>
                 </tr>
               </thead>
@@ -741,14 +824,9 @@ const tutupSetelahSimpan = () => {
                   </td>
                   <td class="p0">
                     <input
-                      v-model.number="k.absensi"
-                      type="number"
-                      min="0"
-                      step="any"
-                      class="ci tr bg-yellow-light"
-                      :ref="(el) => setFieldRef(el, `k_${j}_absensi`)"
-                      @keydown.enter.prevent="onEnterKaryawan(j, 'absensi')"
-                      v-select-on-focus
+                      :value="isLegacy ? k.absensi : k.jamKerja"
+                      class="ci tr ro"
+                      readonly
                     />
                   </td>
                   <td class="p0">
@@ -757,9 +835,11 @@ const tutupSetelahSimpan = () => {
                       type="number"
                       min="0"
                       step="1"
-                      class="ci tr fw bg-yellow-light"
+                      class="ci tr fw"
+                      :class="isLegacy ? 'ro' : 'bg-yellow-light'"
+                      :readonly="isLegacy"
                       :ref="(el) => setFieldRef(el, `k_${j}_qty`)"
-                      @keydown.enter.prevent="onEnterKaryawan(j, 'qty')"
+                      @keydown.enter.prevent="onEnterKaryawan(j)"
                       v-select-on-focus
                     />
                   </td>
@@ -768,15 +848,20 @@ const tutupSetelahSimpan = () => {
             </table>
           </div>
           <div class="hint">
-            Karyawan dengan absensi 0 dan qty 0 tidak disimpan. Tiap SPK wajib
-            punya minimal satu karyawan yang bekerja.
+            Jam kerja diambil otomatis dari absensi HRD. Karyawan dengan qty 0
+            tidak disimpan; tiap SPK wajib punya minimal satu karyawan ber-qty.
           </div>
         </div>
       </div>
     </template>
   </BaseForm>
 
-  <SpkSearchModal v-model="showSpkModal" @selected="onSpkSelected" />
+  <SpkSearchModal
+    v-model="showSpkModal"
+    filter-mode="lhk-design"
+    :divisi="1"
+    @selected="onSpkSelected"
+  />
 
   <!-- Setelah simpan: pengganti Save & New / Save & Close -->
   <v-dialog v-model="showSelesai" max-width="400" persistent>

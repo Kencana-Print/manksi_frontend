@@ -17,6 +17,7 @@ import type {
   MapOption,
   SaveResponse,
 } from "@/services/spanduk/bastMapSpandukFormService";
+import api from "@/services/api";
 
 const route = useRoute();
 const router = useRouter();
@@ -42,6 +43,11 @@ interface HeaderForm {
   mspk_tipe: string;
   jenis_order: string;
   nomor_lhk_proof: string;
+  mspk_cab: string;
+  tgl_buat_map: string;
+  hari_pembuatan: number;
+  batas_hari: number;
+  terlambat: number;
 }
 
 interface BahanRow {
@@ -71,6 +77,11 @@ const defaultData = (): FormState => ({
     mspk_tipe: TIPE_DEFAULT,
     jenis_order: "",
     nomor_lhk_proof: "",
+    mspk_cab: "",
+    tgl_buat_map: "",
+    hari_pembuatan: 0,
+    batas_hari: 3,
+    terlambat: 0,
   },
   checklist: [],
   bahan: [],
@@ -91,6 +102,11 @@ const bangunState = (d: BastMapFormData): FormState => ({
     mspk_tipe: (d.header.mspk_tipe ?? "").trim() || TIPE_DEFAULT,
     jenis_order: d.header.jenis_order ?? "",
     nomor_lhk_proof: d.header.nomor_lhk_proof ?? "",
+    mspk_cab: (d.header as { mspk_cab?: string | null }).mspk_cab ?? "",
+    tgl_buat_map: d.header.tgl_buat_map ?? "",
+    hari_pembuatan: Number(d.header.hari_pembuatan) || 0,
+    batas_hari: Number(d.header.batas_hari) || 3,
+    terlambat: Number(d.header.terlambat) || 0,
   },
   checklist: d.checklist,
   bahan: d.bahan.map((b) => ({
@@ -121,6 +137,58 @@ const sudahAda = ref(false);
 const peringatan = ref("");
 const showSelesai = ref(false);
 const nomorTerakhir = ref("");
+// ── Tab: 0 = BAST, 1 = Gambar ──
+const TAB_GAMBAR = 1;
+const activeTab = ref(0);
+
+// ── Gambar MAP (pola sama dengan halaman cetak) ──
+const gambarUrl = ref("");
+const gambarNomor = ref(""); // nomor MAP yang gambarnya sudah dicari
+const isLoadingGambar = ref(false);
+let tokenGambar = 0;
+
+const gambarBisaDimuat = (url: string) =>
+  new Promise<boolean>((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve(true);
+    img.onerror = () => resolve(false);
+    img.src = url;
+  });
+
+const muatGambar = async () => {
+  const nomor = formData.value.header.mspk_nomor;
+  if (!nomor) {
+    gambarUrl.value = "";
+    gambarNomor.value = "";
+    return;
+  }
+  const token = ++tokenGambar;
+  isLoadingGambar.value = true;
+  const cab = (formData.value.header.mspk_cab ?? "").trim() || "HO-";
+  const base = api.defaults.baseURL?.replace(/\/api\/?$/, "") ?? "";
+  const enc = encodeURIComponent(nomor);
+  const primary = `${base}/images/${cab}/map/${enc}.jpg`;
+  const fallback = `/file-gambar/${enc}.jpg`;
+
+  let hasil = "";
+  if (await gambarBisaDimuat(primary)) {
+    hasil = primary;
+  } else if (await gambarBisaDimuat(fallback)) {
+    hasil = fallback;
+  }
+  if (token !== tokenGambar) {
+    return; // MAP sudah berganti
+  }
+  gambarUrl.value = hasil;
+  gambarNomor.value = nomor;
+  isLoadingGambar.value = false;
+};
+
+const bukaGambarPenuh = () => {
+  if (gambarUrl.value) {
+    window.open(gambarUrl.value, "_blank");
+  }
+};
 
 const {
   isLoading,
@@ -137,10 +205,19 @@ const {
   menuId: "4",
   initialData: defaultData(),
   fetchApi: async (): Promise<FormState> => {
-    const d = await bastForm.getById(String(route.params.nomor));
-    sudahAda.value = d.sudahAda;
-    peringatan.value = d.peringatan;
-    return bangunState(d);
+    try {
+      const d = await bastForm.getById(String(route.params.nomor));
+      sudahAda.value = d.sudahAda;
+      peringatan.value = d.peringatan;
+      return bangunState(d);
+    } catch (e) {
+      // Tampilkan alasan dari server (mis. belum punya LHK Proof), bukan pesan generik
+      toast.error(bastForm.pesanError(e, "Gagal memuat data BAST MAP."), {
+        timeout: 6000,
+      });
+      goBack();
+      throw e;
+    }
   },
   submitApi: async (data: FormState): Promise<SaveResponse> => {
     const payload = bangunPayload(data);
@@ -159,8 +236,27 @@ const {
     peringatan.value = "";
     showMapModal.value = false;
     showBahanModal.value = false;
+    activeTab.value = 0;
+    gambarUrl.value = "";
+    gambarNomor.value = "";
+    isLoadingGambar.value = false;
   },
 });
+
+// Gambar dicari saat tab Gambar dibuka, dan dicari ulang bila MAP berganti
+watch(
+  () => [activeTab.value, formData.value.header.mspk_nomor] as [number, string],
+  ([tab, nomor]) => {
+    if (!nomor) {
+      gambarUrl.value = "";
+      gambarNomor.value = "";
+      return;
+    }
+    if (tab === TAB_GAMBAR && gambarNomor.value !== nomor) {
+      void muatGambar();
+    }
+  },
+);
 
 // ── Lookup (modal terpisah; filter divisi/kategori dijaga server) ──
 const showMapModal = ref(false);
@@ -233,9 +329,9 @@ const validateSave = () => {
   }
   if (
     !Number.isFinite(Number(mspk_jumlah_jadi)) ||
-    Number(mspk_jumlah_jadi) < 0
+    Number(mspk_jumlah_jadi) <= 0
   ) {
-    toast.warning("Jumlah tidak boleh negatif.");
+    toast.warning("Jumlah harus lebih dari 0.");
     return;
   }
   if (!sudahAda.value && peringatan.value) {
@@ -311,7 +407,7 @@ const cetakSekarang = () => {
     <template #left-column>
       <div class="bast-card">
         <div class="f-row">
-          <label class="f-lbl">No Pra SPK</label>
+          <label class="f-lbl">No MAP</label>
           <div class="inp-grp" style="flex: 1">
             <input
               :value="formData.header.mspk_nomor"
@@ -443,80 +539,143 @@ const cetakSekarang = () => {
         class="bast-card"
         style="display: flex; flex-direction: column; height: 100%"
       >
-        <div v-if="!sudahAda && peringatan" class="warn-box">
-          {{ peringatan }}
+        <div class="tab-nav">
+          <button
+            v-for="(t, i) in ['BAST', 'Gambar']"
+            :key="i"
+            type="button"
+            class="tab-btn"
+            :class="{ active: activeTab === i }"
+            @click="activeTab = i"
+          >
+            {{ t }}
+          </button>
         </div>
 
-        <div class="sec-title">Kesesuaian :</div>
-        <div style="overflow: auto; flex: 1; min-height: 0">
-          <table class="bt" style="table-layout: fixed; min-width: 760px">
-            <thead>
-              <tr>
-                <th style="width: 28px">No</th>
-                <th style="text-align: left">Kesesuaian</th>
-                <th class="th-yellow" style="width: 48px">Y/N</th>
-                <th class="th-yellow" style="width: 320px; text-align: left">
-                  Keterangan
-                </th>
-                <th style="width: 55px">Created</th>
-                <th style="width: 90px">Date Create</th>
-                <th style="width: 55px">Modified</th>
-                <th style="width: 90px">Date Modify</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="(c, i) in formData.checklist" :key="c.no">
-                <td class="tc">{{ i + 1 }}</td>
-                <td>{{ c.kesesuaian }}</td>
-                <td class="tc p0">
-                  <select
-                    v-model="c.status"
-                    class="cell-inp tc"
-                    :style="
-                      c.status === 'Y'
-                        ? 'background:#1565c0;color:white;font-weight:700'
-                        : ''
-                    "
-                  >
-                    <option value="Y">Y</option>
-                    <option value="N">N</option>
-                  </select>
-                </td>
-                <td class="p0">
-                  <div v-if="c.no === KODE_SESUAI_BAHAN" class="bhn-cell">
-                    <span
-                      v-for="(b, bi) in formData.bahan"
-                      :key="b.kode"
-                      class="bhn-chip"
-                      :title="`${b.nama} (${b.satuan})`"
+        <!-- Tab BAST -->
+        <div
+          v-show="activeTab === 0"
+          style="flex: 1; display: flex; flex-direction: column; min-height: 0"
+        >
+          <div v-if="!sudahAda && peringatan" class="warn-box">
+            {{ peringatan }}
+          </div>
+
+          <div v-if="formData.header.terlambat === 1" class="warn-box late-box">
+            <template v-if="sudahAda">
+              BAST MAP ini dibuat {{ formData.header.hari_pembuatan }} hari
+              kerja setelah MAP dibuat Marketing ({{
+                formatTanggal(formData.header.tgl_buat_map)
+              }}).
+            </template>
+            <template v-else>
+              Sudah {{ formData.header.hari_pembuatan }} hari kerja sejak MAP
+              dibuat Marketing ({{
+                formatTanggal(formData.header.tgl_buat_map)
+              }}).
+            </template>
+            Batas pembuatan BAST MAP adalah
+            {{ formData.header.batas_hari }} hari kerja. Segera selesaikan.
+          </div>
+
+          <div class="sec-title">Kesesuaian :</div>
+          <div style="overflow: auto; flex: 1; min-height: 0">
+            <table class="bt" style="table-layout: fixed; min-width: 760px">
+              <thead>
+                <tr>
+                  <th style="width: 28px">No</th>
+                  <th style="text-align: left">Kesesuaian</th>
+                  <th class="th-yellow" style="width: 48px">Y/N</th>
+                  <th class="th-yellow" style="width: 320px; text-align: left">
+                    Keterangan
+                  </th>
+                  <th style="width: 55px">Created</th>
+                  <th style="width: 90px">Date Create</th>
+                  <th style="width: 55px">Modified</th>
+                  <th style="width: 90px">Date Modify</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(c, i) in formData.checklist" :key="c.no">
+                  <td class="tc">{{ i + 1 }}</td>
+                  <td>{{ c.kesesuaian }}</td>
+                  <td class="tc p0">
+                    <select
+                      v-model="c.status"
+                      class="cell-inp tc"
+                      :style="
+                        c.status === 'Y'
+                          ? 'background:#1565c0;color:white;font-weight:700'
+                          : ''
+                      "
                     >
-                      {{ b.nama }}
-                      <button type="button" @click="removeBahan(bi)">✕</button>
-                    </span>
-                    <button
-                      type="button"
-                      class="bhn-add"
-                      @click="openBahanModal"
-                    >
-                      <IconSearch :size="11" /> Pilih Bahan
-                    </button>
-                  </div>
-                  <input
-                    v-else
-                    v-model="c.keterangan"
-                    class="cell-inp"
-                    :maxlength="MAKS_KETERANGAN"
-                    @focus="onKeteranganFocus(c)"
-                    @blur="onKeteranganBlur(c)"
-                  />
-                </td>
-                <td class="tc muted">{{ c.user_create || "" }}</td>
-                <td class="muted">{{ fmtDateTime(c.date_create) }}</td>
-                <td class="tc muted">{{ c.user_modify || "" }}</td>
-                <td class="muted">{{ fmtDateTime(c.date_modify) }}</td>
-              </tr>
-            </tbody>
-          </table>
+                      <option value="Y">Y</option>
+                      <option value="N">N</option>
+                    </select>
+                  </td>
+                  <td class="p0">
+                    <div v-if="c.no === KODE_SESUAI_BAHAN" class="bhn-cell">
+                      <span
+                        v-for="(b, bi) in formData.bahan"
+                        :key="b.kode"
+                        class="bhn-chip"
+                        :title="`${b.nama} (${b.satuan})`"
+                      >
+                        {{ b.nama }}
+                        <button type="button" @click="removeBahan(bi)">
+                          ✕
+                        </button>
+                      </span>
+                      <button
+                        type="button"
+                        class="bhn-add"
+                        @click="openBahanModal"
+                      >
+                        <IconSearch :size="11" /> Pilih Bahan
+                      </button>
+                    </div>
+                    <input
+                      v-else
+                      v-model="c.keterangan"
+                      class="cell-inp"
+                      :maxlength="MAKS_KETERANGAN"
+                      @focus="onKeteranganFocus(c)"
+                      @blur="onKeteranganBlur(c)"
+                    />
+                  </td>
+                  <td class="tc muted">{{ c.user_create || "" }}</td>
+                  <td class="muted">{{ fmtDateTime(c.date_create) }}</td>
+                  <td class="tc muted">{{ c.user_modify || "" }}</td>
+                  <td class="muted">{{ fmtDateTime(c.date_modify) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Tab Gambar -->
+        <div
+          v-show="activeTab === 1"
+          style="flex: 1; min-height: 0; display: flex; flex-direction: column"
+        >
+          <div class="gbr-box">
+            <span v-if="!formData.header.mspk_nomor" class="gbr-info">
+              Pilih MAP terlebih dahulu.
+            </span>
+            <span v-else-if="isLoadingGambar" class="gbr-info">
+              Memuat gambar...
+            </span>
+            <img
+              v-else-if="gambarUrl"
+              :src="gambarUrl"
+              class="gbr-img"
+              title="Klik untuk membuka ukuran penuh"
+              @click="bukaGambarPenuh"
+            />
+            <span v-else class="gbr-info">
+              (Tidak ada gambar desain untuk MAP ini)
+            </span>
+          </div>
         </div>
       </div>
     </template>
@@ -823,5 +982,61 @@ const cetakSekarang = () => {
   font-size: 10px;
   padding: 0 6px;
   cursor: pointer;
+}
+.tab-nav {
+  display: flex;
+  gap: 2px;
+  border-bottom: 2px solid #e0e0e0;
+  margin-bottom: 8px;
+  flex-shrink: 0;
+}
+.tab-btn {
+  padding: 5px 14px;
+  border: 1px solid #d0d0d0;
+  border-bottom: none;
+  border-radius: 4px 4px 0 0;
+  background: #f5f5f5;
+  font-size: 11px;
+  font-weight: 600;
+  color: #555;
+  cursor: pointer;
+}
+.tab-btn:hover {
+  background: #e3f2fd;
+  color: #1565c0;
+}
+.tab-btn.active {
+  background: white;
+  color: #1565c0;
+  border-color: #bdbdbd;
+  border-bottom: 2px solid white;
+  margin-bottom: -2px;
+}
+.gbr-box {
+  flex: 1;
+  min-height: 240px;
+  border: 1px solid #bdbdbd;
+  border-radius: 3px;
+  background: #fafafa;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: auto;
+}
+.gbr-img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  cursor: zoom-in;
+}
+.gbr-info {
+  font-size: 11px;
+  color: #757575;
+  font-style: italic;
+}
+.late-box {
+  background: #ffebee;
+  border-color: #ef9a9a;
+  color: #b71c1c;
 }
 </style>
