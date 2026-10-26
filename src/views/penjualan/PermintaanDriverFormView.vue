@@ -16,6 +16,7 @@ import {
   IconTrash,
   IconPlus,
   IconListDetails,
+  IconPrinter,
 } from "@tabler/icons-vue";
 
 const route = useRoute();
@@ -67,6 +68,34 @@ const initialData: PermintaanDriverFormData = {
   ],
 };
 
+const showPrintDialog = ref(false);
+const savedNomor = ref("");
+
+const confirmPrint = () => {
+  const no = savedNomor.value;
+  showPrintDialog.value = false;
+  if (no) {
+    window.open(
+      `/penjualan/permintaan-driver/print/${encodeURIComponent(no)}`,
+      "_blank",
+    );
+  }
+  router.push({ name: "PermintaanDriverBrowse" });
+};
+
+const skipPrint = () => {
+  showPrintDialog.value = false;
+  router.push({ name: "PermintaanDriverBrowse" });
+};
+
+const openPrint = (nomorStr: string) => {
+  if (!nomorStr) return;
+  window.open(
+    `/penjualan/permintaan-driver/print/${encodeURIComponent(nomorStr)}`,
+    "_blank",
+  );
+};
+
 const {
   isSaving,
   showSaveDialog,
@@ -103,7 +132,8 @@ const {
         ? `Permintaan Driver ${editNomor.value} berhasil diperbarui.`
         : `Berhasil disimpan: ${nomorBaru}`,
     );
-    router.push({ name: "PermintaanDriverBrowse" });
+    savedNomor.value = nomorBaru;
+    showPrintDialog.value = true;
   },
 });
 
@@ -283,6 +313,23 @@ onMounted(async () => {
     @confirm-cancel="executeCancel"
     @confirm-close="executeClose"
   >
+    <template #header-actions-prepend>
+      <v-btn
+        v-if="isEdit"
+        size="small"
+        color="blue-grey"
+        variant="flat"
+        class="mr-2"
+        @click="openPrint(editNomor)"
+      >
+        <template #prepend>
+          <span class="d-flex align-center">
+            <IconPrinter :size="15" :stroke-width="1.7" />
+          </span>
+        </template>
+        Cetak
+      </v-btn>
+    </template>
     <div class="delphi-container">
       <!-- Judul Form Delphi -->
       <div class="delphi-header-title">
@@ -560,9 +607,36 @@ onMounted(async () => {
     <!-- Modal Bantuan SPK -->
     <SpkSearchModal
       v-model="showSpkModal"
-      filter-mode="spk-map"
+      filter-mode="permintaan-driver"
       @selected="onSpkSelected"
     />
+
+    <!-- Dialog Konfirmasi Cetak Setelah Simpan -->
+    <v-dialog v-model="showPrintDialog" max-width="440px" persistent>
+      <v-card class="rounded-lg">
+        <v-card-title class="text-h6 pa-4 d-flex align-center">
+          <IconPrinter :size="22" class="text-primary mr-2" />
+          Cetak Surat Jalan
+        </v-card-title>
+        <v-card-text class="pa-4 pt-0">
+          Permintaan Driver <strong>{{ savedNomor }}</strong> berhasil disimpan.
+          <div class="mt-2 text-body-2 text-medium-emphasis">
+            Apakah Anda ingin mencetak dokumen Surat Jalan ke printer sekarang?
+          </div>
+        </v-card-text>
+        <v-card-actions class="pa-4 pt-0 d-flex justify-end ga-2">
+          <v-btn variant="outlined" color="grey-darken-1" @click="skipPrint">
+            Tidak, Kembali
+          </v-btn>
+          <v-btn color="primary" variant="elevated" @click="confirmPrint">
+            <template #prepend>
+              <IconPrinter :size="16" />
+            </template>
+            Ya, Cetak
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </BaseForm>
 </template>
 

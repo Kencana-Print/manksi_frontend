@@ -4239,6 +4239,17 @@ const router = createRouter({
         browseRoute: "PermintaanDriverBrowse",
       },
     },
+    {
+      path: "/penjualan/permintaan-driver/print/:nomor",
+      name: "PermintaanDriverPrint",
+      component: () => import("@/views/penjualan/PermintaanDriverPrintView.vue"),
+      meta: {
+        title: "Cetak Surat Jalan Permintaan Driver",
+        layout: "BlankLayout",
+        requiresAuth: true,
+        menuId: "189",
+      },
+    },
 
     // ── Piutang ───────────────────────────────────────────────────
     {
