@@ -607,7 +607,7 @@ onMounted(async () => {
     <!-- Modal Bantuan SPK -->
     <SpkSearchModal
       v-model="showSpkModal"
-      filter-mode="spk-map"
+      filter-mode="permintaan-driver"
       @selected="onSpkSelected"
     />
 

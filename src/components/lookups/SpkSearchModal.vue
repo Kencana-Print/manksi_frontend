@@ -19,7 +19,8 @@ const props = defineProps<{
     | "po-external"
     | "all"
     | "stbj-spanduk"
-    | "lhk-design";
+    | "lhk-design"
+    | "permintaan-driver";
   cusKode?: string;
   perushKode?: string;
   divisi?: string | number;
@@ -175,6 +176,9 @@ const selectItem = (item: any) => {
               <th style="width: 88px">TANGGAL</th>
               <th style="width: 72px; text-align: right">JUMLAH</th>
               <th style="width: 90px">UKURAN</th>
+              <th v-if="props.filterMode === 'permintaan-driver'" style="width: 70px; text-align: center">
+                TIPE
+              </th>
               <th v-if="props.filterMode === 'lhk-design'" style="width: 60px">
                 JENIS
               </th>
@@ -195,6 +199,18 @@ const selectItem = (item: any) => {
                 {{ Number(item.Jumlah).toLocaleString("id-ID") }}
               </td>
               <td>{{ item.Ukuran }}</td>
+              <td v-if="props.filterMode === 'permintaan-driver'" style="text-align: center">
+                <span
+                  class="badge-tipe"
+                  :class="{
+                    'badge-spk': item.Tipe === 'SPK',
+                    'badge-memo': item.Tipe === 'MEMO',
+                    'badge-so': item.Tipe === 'SO',
+                  }"
+                >
+                  {{ item.Tipe }}
+                </span>
+              </td>
               <td v-if="props.filterMode === 'lhk-design'">{{ item.Jenis }}</td>
             </tr>
           </tbody>
@@ -387,6 +403,30 @@ const selectItem = (item: any) => {
   font-weight: 600;
   font-size: 12px;
   color: #1565c0;
+}
+
+.badge-tipe {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  display: inline-block;
+  letter-spacing: 0.03em;
+}
+.badge-spk {
+  background: #e3f2fd;
+  color: #1565c0;
+  border: 1px solid #90caf9;
+}
+.badge-memo {
+  background: #fff3e0;
+  color: #e65100;
+  border: 1px solid #ffcc80;
+}
+.badge-so {
+  background: #e0f2f1;
+  color: #00695c;
+  border: 1px solid #80cbc4;
 }
 
 /* Pagination footer */
