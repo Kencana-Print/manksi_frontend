@@ -166,7 +166,9 @@ const goEdit = (item: { Nomor: string }) => {
 const onDelete = async (item: { Nomor: string; Peminta?: string; IsClosed?: string }) => {
   const currentUser = (authStore.user?.kode || "").toUpperCase();
   const isOwner = (item.Peminta || "").toUpperCase() === currentUser;
-  const isAdmin = authStore.user?.bagian?.toUpperCase() === "IT" || authStore.isAdmin;
+  const isAdmin =
+    authStore.user?.bagian?.toUpperCase() === "IT" ||
+    ["ADMIN", "DEVELOPER"].includes(authStore.user?.kode?.toUpperCase() || "");
 
   if (!isOwner && !isAdmin) {
     toast.warning("Anda hanya bisa membatalkan permintaan driver milik Anda sendiri.");
