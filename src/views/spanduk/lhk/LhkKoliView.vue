@@ -10,7 +10,12 @@ import type {
   LhkKoliRow,
   LhkKoliDetailRow,
 } from "@/services/spanduk/lhk/lhkKoliService";
-import { IconBox, IconFileExport, IconQrcode } from "@tabler/icons-vue";
+import {
+  IconBox,
+  IconFileExport,
+  IconQrcode,
+  IconPrinter,
+} from "@tabler/icons-vue";
 import { formatTanggal } from "@/utils/dateFormat";
 
 interface ExportDetailRow {
@@ -173,6 +178,19 @@ const onPrint = () => {
   window.open(url, "_blank");
 };
 
+// Cetak lembar LHK (arsip, tanda tangan)
+const onPrintLembar = () => {
+  const item = selectedItem.value;
+  if (!item) {
+    return toast.warning("Pilih data LHK Koli terlebih dahulu.");
+  }
+  const url = router.resolve({
+    name: "SpandukLhkKoliLembar",
+    params: { nomor: item.Nomor },
+  }).href;
+  window.open(url, "_blank");
+};
+
 const exportMaster = () =>
   exportToExcel("LHK_Koli_Header", {
     columns: kolomMaster,
@@ -307,6 +325,14 @@ const numFmt = (v: number | null) =>
         @click="onPrint"
       >
         <template #prepend><IconQrcode :size="15" /></template>Cetak Label QR
+      </v-btn>
+      <v-btn
+        size="small"
+        color="grey-darken-3"
+        :disabled="selected.length === 0"
+        @click="onPrintLembar"
+      >
+        <template #prepend><IconPrinter :size="15" /></template>Cetak LHK
       </v-btn>
       <v-btn size="small" color="deep-purple-darken-1" @click="exportDetail">
         <template #prepend><IconFileExport :size="15" /></template>Export Detail

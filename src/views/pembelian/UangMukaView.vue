@@ -29,8 +29,10 @@ const router = useRouter();
 const toast = useToast();
 
 const userBagian = computed(() => (authStore.user?.bagian || "").toUpperCase());
-const isAdmin = computed(
-  () => (authStore.user?.kode || "").toUpperCase() === "ADMIN",
+// Akses penuh: setara gabungan hak ADMIN, PEMBELIAN, FINANCE, EDP, AUDIT, DIREKSI
+const USER_AKSES_PENUH = ["ADMIN", "NANDA"];
+const aksesPenuh = computed(() =>
+  USER_AKSES_PENUH.includes((authStore.user?.kode || "").toUpperCase()),
 );
 
 const activeTab = ref<"outstanding" | "pum-outstanding" | "history">(
@@ -39,14 +41,16 @@ const activeTab = ref<"outstanding" | "pum-outstanding" | "history">(
 
 const canSeeOutstandingSumber = computed(
   () =>
-    isAdmin.value || ["PEMBELIAN", "EDP", "AUDIT"].includes(userBagian.value),
+    aksesPenuh.value ||
+    ["PEMBELIAN", "EDP", "AUDIT"].includes(userBagian.value),
 );
 const canRealisasi = computed(
-  () => isAdmin.value || ["FINANCE", "EDP", "AUDIT"].includes(userBagian.value),
+  () =>
+    aksesPenuh.value || ["FINANCE", "EDP", "AUDIT"].includes(userBagian.value),
 );
 const canValidasi = computed(
   () =>
-    isAdmin.value ||
+    aksesPenuh.value ||
     ["FINANCE", "EDP", "AUDIT", "DIREKSI"].includes(userBagian.value),
 );
 

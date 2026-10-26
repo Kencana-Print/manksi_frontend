@@ -105,14 +105,14 @@ onMounted(async () => {
 }
 .body {
   display: flex;
-  gap: 3mm;
+  gap: 2.5mm;
   flex: 1;
   min-height: 0;
   align-items: center;
 }
 .qr {
-  width: 36mm;
-  height: 36mm;
+  width: 28mm;
+  height: 28mm;
   flex-shrink: 0;
   image-rendering: pixelated;
 }
@@ -129,14 +129,15 @@ onMounted(async () => {
   line-height: 1;
 }
 .spk {
-  font-size: 9pt;
+  font-size: 8pt;
   font-weight: 700;
-  word-break: break-all;
+  white-space: nowrap;
+  overflow: hidden;
 }
 .nama {
   font-size: 7pt;
   line-height: 1.15;
-  max-height: 2.3em;
+  max-height: 3.5em;
   overflow: hidden;
 }
 .ukr {

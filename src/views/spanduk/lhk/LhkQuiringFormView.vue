@@ -36,7 +36,6 @@ interface FormRow {
   jumlahOrder: number;
   panjang: number;
   lebar: number;
-  koli: number;
   oven: number;
   jemuran: number;
   potong: number;
@@ -56,7 +55,6 @@ interface FormState {
 }
 
 const KOLOM_JUMLAH = [
-  { key: "koli", label: "J Koli" },
   { key: "oven", label: "J Oven" },
   { key: "jemuran", label: "J Jemuran" },
   { key: "potong", label: "J Potong" },
@@ -76,7 +74,6 @@ const barisKosong = (): FormRow => ({
   jumlahOrder: 0,
   panjang: 0,
   lebar: 0,
-  koli: 0,
   oven: 0,
   jemuran: 0,
   potong: 0,
@@ -105,7 +102,6 @@ const bangunPayload = (data: FormState): LhkQuiringPayload => ({
     .filter((r) => r.spk.trim() !== "")
     .map((r) => ({
       Nomor_SPK: r.spk.trim(),
-      J_Koli: num(r.koli),
       J_Oven: num(r.oven),
       J_Jemuran: num(r.jemuran),
       J_Potong: num(r.potong),
@@ -137,7 +133,6 @@ const {
       jumlahOrder: num(r.Jumlah_Order),
       panjang: num(r.Panjang),
       lebar: num(r.Lebar),
-      koli: num(r.J_Koli),
       oven: num(r.J_Oven),
       jemuran: num(r.J_Jemuran),
       potong: num(r.J_Potong),
@@ -269,7 +264,6 @@ const isiBarisDariSpk = async (
 
 // Enter → kolom berikutnya (Delphi: SelectNext), akhir baris → baris berikutnya
 const KOLOM_EDIT = [
-  "koli",
   "oven",
   "jemuran",
   "potong",
@@ -309,7 +303,7 @@ const onEnter = async (idx: number, col: KolomEdit) => {
 const onSpkSelected = async (v: { Nomor?: string }) => {
   const idx = activeIdx.value;
   if (await isiBarisDariSpk(idx, String(v?.Nomor ?? ""))) {
-    await fokusKolom(idx, "koli");
+    await fokusKolom(idx, "oven");
   }
 };
 
@@ -320,7 +314,7 @@ const onEnterSpk = async (e: KeyboardEvent, idx: number) => {
     return;
   }
   if (await isiBarisDariSpk(idx, el.value)) {
-    await fokusKolom(idx, "koli");
+    await fokusKolom(idx, "oven");
   } else {
     el.value = formData.value.items[idx].spk; // balikkan ke nilai terakhir yang valid
     el.select();
@@ -374,7 +368,7 @@ const validateSave = () => {
       return;
     }
 
-    const angkaInput = [r.koli, r.oven, r.jemuran, r.potong];
+    const angkaInput = [r.oven, r.jemuran, r.potong];
     if (angkaInput.some((v) => !Number.isInteger(num(v)))) {
       toast.warning(`Baris ${no}: jumlah harus bilangan bulat.`);
       return;
@@ -385,7 +379,7 @@ const validateSave = () => {
     }
     if (angkaInput.every((v) => num(v) === 0)) {
       toast.warning(
-        `Baris ${no}: minimal satu dari Koli, Oven, Jemuran, atau Potong harus lebih dari 0.`,
+        `Baris ${no}: minimal satu dari Oven, Jemuran, atau Potong harus lebih dari 0.`,
       );
       return;
     }
@@ -485,7 +479,7 @@ const tutupSetelahSimpan = () => {
           </button>
         </div>
         <div class="tbl-wrap" style="flex: 1; min-height: 240px">
-          <table class="gt" style="min-width: 1360px">
+          <table class="gt" style="min-width: 1270px">
             <thead>
               <tr>
                 <th style="width: 32px" class="tc">No</th>

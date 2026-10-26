@@ -1531,6 +1531,18 @@ export const createMenuItems = (): NavItem[] => {
           ],
         },
         {
+          title: "Laporan Produksi Spanduk",
+          icon: IconPrinter,
+          menuId: 963,
+          subItems: [
+            {
+              title: "Output by SPK",
+              to: "/laporan/produksi-spanduk/output-by-spk",
+              icon: IconListCheck,
+            },
+          ],
+        },
+        {
           title: "Laporan Penjualan",
           icon: IconChartBar,
           menuId: 965,

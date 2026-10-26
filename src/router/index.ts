@@ -1464,6 +1464,16 @@ const router = createRouter({
       meta: { layout: "BlankLayout", requiresAuth: true, title: "Label Koli" },
     },
     {
+      path: "/spanduk/lhk/lhk-koli/lembar/:nomor",
+      name: "SpandukLhkKoliLembar",
+      component: () => import("@/views/spanduk/lhk/LhkKoliLembarView.vue"),
+      meta: {
+        layout: "BlankLayout",
+        requiresAuth: true,
+        title: "Lembar LHK Koli",
+      },
+    },
+    {
       path: "/spanduk/bast-map",
       name: "SpandukBastMap",
       component: () => import("@/views/spanduk/BastMapSpandukView.vue"),
@@ -5464,6 +5474,18 @@ const router = createRouter({
         layout: "BlankLayout",
         requiresAuth: true,
         menuId: "1326",
+      },
+    },
+
+    {
+      path: "/laporan/produksi-spanduk/output-by-spk",
+      name: "LaporanSpandukOutputBySpk",
+      component: () => import("@/views/laporan/spanduk/OutputBySpkView.vue"),
+      meta: {
+        title: "Laporan Output by SPK",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "963",
       },
     },
 

@@ -33,7 +33,6 @@ const baris = computed(() => data.value?.Detail ?? []);
 
 const total = computed(() => {
   const t = {
-    koli: 0,
     oven: 0,
     jemuran: 0,
     potong: 0,
@@ -42,7 +41,6 @@ const total = computed(() => {
     bsBahan: 0,
   };
   for (const r of baris.value) {
-    t.koli += Number(r.J_Koli) || 0;
     t.oven += Number(r.J_Oven) || 0;
     t.jemuran += Number(r.J_Jemuran) || 0;
     t.potong += Number(r.J_Potong) || 0;
@@ -97,7 +95,6 @@ onMounted(async () => {
             <th rowspan="2" class="c-jml">Jumlah<br />Order (Pcs)</th>
             <th colspan="2">Spesifikasi</th>
             <th rowspan="2" class="c-spk">Nomor SPK</th>
-            <th rowspan="2" class="c-j">Colly<br />(pcs)</th>
             <th rowspan="2" class="c-j">Oven<br />(pcs)</th>
             <th rowspan="2" class="c-j">Jemuran<br />(meter)</th>
             <th rowspan="2" class="c-j">Potong<br />Tambahan</th>
@@ -118,7 +115,6 @@ onMounted(async () => {
             <td class="tr">{{ desimal(r.Panjang) }}</td>
             <td class="tr">{{ desimal(r.Lebar) }}</td>
             <td>{{ r.Nomor_SPK }}</td>
-            <td class="tr">{{ bulat(r.J_Koli) }}</td>
             <td class="tr">{{ bulat(r.J_Oven) }}</td>
             <td class="tr">{{ bulat(r.J_Jemuran) }}</td>
             <td class="tr">{{ bulat(r.J_Potong) }}</td>
@@ -130,7 +126,6 @@ onMounted(async () => {
         <tfoot>
           <tr>
             <td colspan="5" class="tot-lbl">Total</td>
-            <td class="tr">{{ bulat(total.koli) }}</td>
             <td class="tr">{{ bulat(total.oven) }}</td>
             <td class="tr">{{ bulat(total.jemuran) }}</td>
             <td class="tr">{{ bulat(total.potong) }}</td>

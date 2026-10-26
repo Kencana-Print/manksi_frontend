@@ -23,7 +23,6 @@ interface ExportDetailRow {
   Jumlah_Order: number;
   Panjang: number;
   Lebar: number;
-  J_Koli: number;
   J_Oven: number;
   J_Jemuran: number;
   J_Potong: number;
@@ -135,7 +134,6 @@ const kolomDetail: ExcelColumn[] = [
   },
   { header: "Panjang", key: "Panjang", width: 10, align: "right", numFmt: NUM },
   { header: "Lebar", key: "Lebar", width: 10, align: "right", numFmt: NUM },
-  { header: "J Koli", key: "J_Koli", width: 10, align: "right", numFmt: NUM },
   { header: "J Oven", key: "J_Oven", width: 10, align: "right", numFmt: NUM },
   {
     header: "J Jemuran",
@@ -252,7 +250,6 @@ const exportDetail = async () => {
         Jumlah_Order: Number(r.Jumlah_Order) || 0,
         Panjang: Number(r.Panjang) || 0,
         Lebar: Number(r.Lebar) || 0,
-        J_Koli: Number(r.J_Koli) || 0,
         J_Oven: Number(r.J_Oven) || 0,
         J_Jemuran: Number(r.J_Jemuran) || 0,
         J_Potong: Number(r.J_Potong) || 0,
@@ -335,7 +332,6 @@ const numFmt = (v: number | null) =>
               <th width="80" class="tr">Jml Order</th>
               <th width="70" class="tr">Panjang</th>
               <th width="70" class="tr">Lebar</th>
-              <th width="70" class="tr">J Koli</th>
               <th width="70" class="tr">J Oven</th>
               <th width="80" class="tr">J Jemuran</th>
               <th width="80" class="tr">J Potong</th>
@@ -351,7 +347,6 @@ const numFmt = (v: number | null) =>
               <td class="tr">{{ numFmt(r.Jumlah_Order) }}</td>
               <td class="tr">{{ numFmt(r.Panjang) }}</td>
               <td class="tr">{{ numFmt(r.Lebar) }}</td>
-              <td class="tr">{{ numFmt(r.J_Koli) }}</td>
               <td class="tr">{{ numFmt(r.J_Oven) }}</td>
               <td class="tr">{{ numFmt(r.J_Jemuran) }}</td>
               <td class="tr">{{ numFmt(r.J_Potong) }}</td>
@@ -360,7 +355,7 @@ const numFmt = (v: number | null) =>
               <td class="tr">{{ numFmt(r.BS_Bahan) }}</td>
             </tr>
             <tr v-if="!detailMap[item.Nomor]?.length">
-              <td colspan="12" class="text-center text-grey py-3 font-italic">
+              <td colspan="11" class="text-center text-grey py-3 font-italic">
                 Detail LHK Quiring tidak ditemukan.
               </td>
             </tr>

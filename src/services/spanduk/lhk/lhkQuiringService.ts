@@ -24,7 +24,6 @@ export interface LhkQuiringDetailRow {
   Jumlah_Order: number | null;
   Panjang: number | null;
   Lebar: number | null;
-  J_Koli: number | null;
   J_Oven: number | null;
   J_Jemuran: number | null;
   J_Potong: number | null;
