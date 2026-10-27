@@ -41,6 +41,8 @@ const filterState = ref({
   endDate: getLocalDate(),
 });
 
+const baseBrowseRef = ref<InstanceType<typeof BaseBrowse> | null>(null);
+
 // State untuk Dialog Alasan Pengajuan
 const dialogAlasan = ref(false);
 const alasanText = ref("");
@@ -93,6 +95,22 @@ const headers = computed<BrowseHeader[]>(() => {
 const fmtNum = (val: number | string | null) => {
   if (!val) return "0";
   return new Intl.NumberFormat("id-ID").format(Number(val));
+};
+
+const doExport = () => {
+  const { startDate, endDate } = filterState.value;
+  exportToExcel(`Penerimaan_Transfer_${startDate}_sd_${endDate}`, {
+    columns: headers.value.map((h) => ({ header: h.title, key: h.key })),
+    getData: () =>
+      (baseBrowseRef.value?.getFilteredItems() ?? items.value ?? []).map(
+        (r: any) => ({
+          ...r,
+          Tanggal: formatTanggal(r.Tanggal),
+          Tempo: formatTanggal(r.Tempo),
+        }),
+      ),
+    sheetName: "Penerimaan Transfer",
+  });
 };
 
 const goAdd = () => {
@@ -162,6 +180,7 @@ const getRowProps = () => ({});
 
 <template>
   <BaseBrowse
+    ref="baseBrowseRef"
     title="Penerimaan Transfer"
     :menu-id="menuId"
     :icon="IconBuildingBank"
@@ -182,7 +201,7 @@ const getRowProps = () => ({});
     @add="goAdd"
     @edit="goEdit"
     @delete="goDelete"
-    @export="exportToExcel('Penerimaan_Transfer')"
+    @export="doExport"
   >
     <template #filter-left>
       <div class="filter-group">

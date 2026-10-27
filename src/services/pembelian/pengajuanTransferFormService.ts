@@ -9,16 +9,6 @@ export const pengajuanTransferFormService = {
       params: { search },
     });
   },
-  getCostCenterOptions(search: string) {
-    return api.get("/pembelian/pengajuan-transfer-form/cost-center", {
-      params: { search },
-    });
-  },
-  getDcOptions(cckode: string | number, search: string) {
-    return api.get("/pembelian/pengajuan-transfer-form/dc-options", {
-      params: { cckode, search },
-    });
-  },
   getSupplierOptions(search: string) {
     return api.get("/pembelian/pengajuan-transfer-form/supplier-options", {
       params: { search },

@@ -8,6 +8,7 @@ import BaseForm from "@/components/BaseForm.vue";
 import CollapsiblePanel from "@/components/CollapsiblePanel.vue";
 import SupplierSearchModal from "@/components/lookups/SupplierSearchModal.vue";
 import BkkSearchModal from "@/components/lookups/BkkSearchModal.vue";
+import CostCenterSearchModal from "@/components/lookups/CostCenterSearchModal.vue";
 import {
   IconTransfer,
   IconSearch,
@@ -655,83 +656,29 @@ const onRekkodeEnter = async (d: any) => {
   }
 };
 
-// ── Cost Center (realisasi) ──
+// ── Cost Center + Detail CC (realisasi) — satu modal, sama seperti BKK ──
+interface CostCenterPick {
+  cc_kode: number;
+  cc_nama: string;
+  cc_cabang?: string;
+  dc_nama: string;
+}
 const showCcModal = ref(false);
 const activeCcIdx = ref(-1);
-const ccAllState = ref<ModalState<any>>(createModalState());
-let ccDebounce: ReturnType<typeof setTimeout> | null = null;
-const doSearchCc = async () => {
-  ccAllState.value.loading = true;
-  try {
-    const res = await pengajuanTransferFormService.getCostCenterOptions(
-      ccAllState.value.search,
-    );
-    ccAllState.value.allItems = res.data.data || [];
-  } finally {
-    ccAllState.value.loading = false;
-  }
-};
-const searchCcDebounced = () => {
-  if (ccDebounce) clearTimeout(ccDebounce);
-  ccDebounce = setTimeout(doSearchCc, 350);
-};
-const openCcModal = async (idx: number) => {
+const openCcModal = (idx: number) => {
   activeCcIdx.value = idx;
-  ccAllState.value = createModalState();
   showCcModal.value = true;
-  await doSearchCc();
 };
-const selectCc = (cc: any) => {
+const setRowCc = (item: CostCenterPick) => {
   if (activeCcIdx.value < 0) return;
   const d = form.value.detail[activeCcIdx.value];
-  const oldCc = d.cckode;
-  d.cckode = cc.kode;
-  d.ccnama = cc.nama;
-  if (oldCc !== cc.kode) {
-    d.dcnama = "";
-    d.dckode = 0;
-  }
-  showCcModal.value = false;
-};
-
-// ── Detail CC (realisasi) ──
-const showDcModal = ref(false);
-const activeDcIdx = ref(-1);
-const dcAllState = ref<ModalState<any>>(createModalState());
-let dcDebounce: ReturnType<typeof setTimeout> | null = null;
-const doSearchDc = async () => {
-  dcAllState.value.loading = true;
-  const cckode = form.value.detail[activeDcIdx.value]?.cckode || 0;
-  try {
-    const res = await pengajuanTransferFormService.getDcOptions(
-      cckode,
-      dcAllState.value.search,
-    );
-    dcAllState.value.allItems = res.data.data || [];
-  } finally {
-    dcAllState.value.loading = false;
-  }
-};
-const searchDcDebounced = () => {
-  if (dcDebounce) clearTimeout(dcDebounce);
-  dcDebounce = setTimeout(doSearchDc, 350);
-};
-const openDcModal = async (idx: number) => {
-  const d = form.value.detail[idx];
-  if (!d.cckode) {
-    toast.warning("Pilih Cost Center dahulu.");
-    return;
-  }
-  activeDcIdx.value = idx;
-  dcAllState.value = createModalState();
-  showDcModal.value = true;
-  await doSearchDc();
-};
-const selectDc = (dc: any) => {
-  if (activeDcIdx.value < 0) return;
-  form.value.detail[activeDcIdx.value].dcnama = dc.nama;
-  form.value.detail[activeDcIdx.value].dckode = dc.kode;
-  showDcModal.value = false;
+  if (!d) return;
+  d.cckode = item.cc_kode;
+  d.ccnama = item.cc_nama;
+  d.dcnama = item.dc_nama;
+  // Backend menyimpan ptd_cc_kode saja; getDetailForm juga memetakan dckode dari kolom itu.
+  // validateSave memeriksa dckode !== 0, jadi isi dengan kode yang sama.
+  d.dckode = item.cc_kode;
 };
 
 // ── Detail grid ──
@@ -1261,7 +1208,7 @@ const skipCetak = () => {
                       v-if="isRealisasi && d.tglRealisasi && !d.batal"
                       type="button"
                       class="cell-search"
-                      @click="d.cckode ? openDcModal(idx) : openCcModal(idx)"
+                      @click="openCcModal(idx)"
                     >
                       <IconSearch :size="12" color="#1565c0" />
                     </button>
@@ -1792,99 +1739,8 @@ const skipCetak = () => {
     </v-card>
   </v-dialog>
 
-  <!-- Modal Cost Center (realisasi) -->
-  <v-dialog v-model="showCcModal" max-width="440px" scrollable>
-    <v-card class="rounded-lg">
-      <v-card-title class="bg-primary text-white pa-3 text-subtitle-1"
-        >Pilih Cost Center</v-card-title
-      >
-      <v-card-text class="pa-3">
-        <input
-          v-model="ccAllState.search"
-          class="f-inp mb-2"
-          placeholder="Cari nama cost center..."
-          autofocus
-          @input="searchCcDebounced"
-        />
-        <div style="max-height: 340px; overflow-y: auto">
-          <div v-if="ccAllState.loading" class="text-center py-4 text-grey">
-            Memuat...
-          </div>
-          <table v-else class="mini-table">
-            <thead>
-              <tr>
-                <th style="width: 80px">Kode</th>
-                <th>Nama</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr
-                v-for="c in ccAllState.allItems"
-                :key="c.kode"
-                class="mini-row"
-                @click="selectCc(c)"
-              >
-                <td>{{ c.kode }}</td>
-                <td>{{ c.nama }}</td>
-              </tr>
-              <tr v-if="ccAllState.allItems.length === 0">
-                <td colspan="2" class="text-center text-grey py-3">
-                  Ketik utk cari
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </v-card-text>
-    </v-card>
-  </v-dialog>
-
-  <!-- Modal Detail CC (realisasi) -->
-  <v-dialog v-model="showDcModal" max-width="440px" scrollable>
-    <v-card class="rounded-lg">
-      <v-card-title class="bg-primary text-white pa-3 text-subtitle-1"
-        >Pilih Detail Cost Center</v-card-title
-      >
-      <v-card-text class="pa-3">
-        <input
-          v-model="dcAllState.search"
-          class="f-inp mb-2"
-          placeholder="Cari detail CC..."
-          autofocus
-          @input="searchDcDebounced"
-        />
-        <div style="max-height: 340px; overflow-y: auto">
-          <div v-if="dcAllState.loading" class="text-center py-4 text-grey">
-            Memuat...
-          </div>
-          <table v-else class="mini-table">
-            <thead>
-              <tr>
-                <th style="width: 80px">Kode</th>
-                <th>Nama</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr
-                v-for="dc in dcAllState.allItems"
-                :key="dc.kode"
-                class="mini-row"
-                @click="selectDc(dc)"
-              >
-                <td>{{ dc.kode }}</td>
-                <td>{{ dc.nama }}</td>
-              </tr>
-              <tr v-if="dcAllState.allItems.length === 0">
-                <td colspan="2" class="text-center text-grey py-3">
-                  Tidak ada hasil
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </v-card-text>
-    </v-card>
-  </v-dialog>
+  <!-- Modal Cost Center (realisasi) — shared lookup, sama seperti BKK -->
+  <CostCenterSearchModal v-model="showCcModal" @selected="setRowCc" />
 
   <!-- Dialog Batal Item -->
   <v-dialog v-model="showBatalDialog" max-width="380px" persistent>
