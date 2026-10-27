@@ -181,6 +181,7 @@ const generateTxt = (withCodes = true) => {
     );
     const EMAIL = h.perush_email || "";
     const lines: string[] = [];
+    lines.push(LINE);
     lines.push(
       `${padR("MOHON SURAT JALAN INI DITANDATANGANI, DISTEMPEL, DAN DI EMAIL KE " + EMAIL, PAGE_WIDTH - 24)}${padL("Total Jumlah: " + num(totalJml), 24)}`,
     );
@@ -258,7 +259,7 @@ const generateTxt = (withCodes = true) => {
 };
 
 const downloadTxt = () => {
-  const content = generateTxt();
+  const content = generateTxt(false);
   const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -288,7 +289,7 @@ const printQZ = async () => {
       }
     }
     const config = qz.configs.create(printerName.value);
-    const content = generateTxt(false);
+    const content = generateTxt();
     const data = [
       "\x1B\x40",
       "\x1B\x4F",

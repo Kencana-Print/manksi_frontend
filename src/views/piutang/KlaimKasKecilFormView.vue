@@ -26,12 +26,12 @@ interface BarisForm {
 
 interface KlaimForm {
   nomor: string;
+  cabang: string;
   tanggal: string;
   keterangan: string;
   status: string;
   nomorPjt: string;
   bisaUbah: boolean;
-  rekAsal: RekeningInfo;
   rekTujuan: RekeningInfo;
   detail: BarisForm[];
 }
@@ -63,12 +63,12 @@ const rekKosong = (): RekeningInfo => ({ kode: "", nama: "", rekening: "" });
 
 const buatInitial = (): KlaimForm => ({
   nomor: "",
+  cabang: "",
   tanggal: hariIni(),
   keterangan: "",
   status: "AKTIF",
   nomorPjt: "",
   bisaUbah: true,
-  rekAsal: rekKosong(),
   rekTujuan: rekKosong(),
   detail: [],
 });
@@ -77,18 +77,34 @@ const buatInitial = (): KlaimForm => ({
 const defaults = ref<KlaimDefaults | null>(null);
 const defaultsError = ref("");
 
-onMounted(async () => {
-  if (nomorEdit.value) return;
+const muatDefaults = async (cabang?: string) => {
+  defaultsError.value = "";
   try {
-    const res = await svc.getDefaults();
+    const res = await svc.getDefaults(cabang);
     defaults.value = res.data.data;
+    form.value.cabang = res.data.data.cabang;
   } catch (e) {
+    defaults.value = null;
     defaultsError.value = pesanError(
       e,
       "Gagal memuat data rekening klaim untuk cabang Anda.",
     );
   }
+};
+
+onMounted(async () => {
+  if (nomorEdit.value) return;
+  await muatDefaults();
 });
+
+// Akses penuh: ganti cabang -> rekening ikut berganti, daftar BKK dikosongkan
+const gantiCabang = async (cabang: string) => {
+  if (form.value.detail.length) {
+    toast.info("Cabang diganti, daftar BKK dikosongkan.");
+    form.value.detail = [];
+  }
+  await muatDefaults(cabang);
+};
 
 // ── useForm ──
 const {
@@ -111,12 +127,12 @@ const {
     const d = res.data.data;
     return {
       nomor: d.nomor,
+      cabang: d.cabang,
       tanggal: d.tanggal,
       keterangan: d.keterangan,
       status: d.status,
       nomorPjt: d.nomorPjt,
       bisaUbah: d.bisaUbah,
-      rekAsal: d.rekAsal,
       rekTujuan: d.rekTujuan,
       detail: d.detail.map((r) => ({
         key: ++seq,
@@ -130,6 +146,7 @@ const {
   },
   submitApi: async (data: KlaimForm): Promise<KlaimSaveHasil> => {
     const payload: KlaimPayload = {
+      cabang: data.cabang,
       tanggal: data.tanggal,
       keterangan: data.keterangan.trim(),
       detail: data.detail.map((b) => ({ bkk: b.bkk })),
@@ -153,11 +170,6 @@ const ro = computed(
   () => !form.value.bisaUbah || (!nomorEdit.value && !!defaultsError.value),
 );
 
-const tampilAsal = computed<RekeningInfo>(() =>
-  nomorEdit.value
-    ? form.value.rekAsal
-    : (defaults.value?.rekAsal ?? rekKosong()),
-);
 const tampilTujuan = computed<RekeningInfo>(() =>
   nomorEdit.value
     ? form.value.rekTujuan
@@ -189,7 +201,11 @@ const loadOpsi = async () => {
   const myReq = ++opsiReq;
   loadingOpsi.value = true;
   try {
-    const res = await svc.getBkkOptions(cari.value.trim(), nomorEdit.value);
+    const res = await svc.getBkkOptions(
+      cari.value.trim(),
+      nomorEdit.value,
+      form.value.cabang,
+    );
     if (myReq !== opsiReq) return;
     opsi.value = res.data.data ?? [];
     terpilih.value = [];
@@ -315,6 +331,21 @@ const validateSave = () => {
             <label class="f-lbl">Nomor</label>
             <input :value="form.nomor || 'Otomatis'" readonly class="f-inp" />
           </div>
+          <div
+            v-if="!nomorEdit && defaults && defaults.cabangOpsi.length > 0"
+            class="f-field"
+          >
+            <label class="f-lbl">Cabang <span class="req">*</span></label>
+            <select
+              class="f-inp"
+              :value="form.cabang"
+              @change="gantiCabang(($event.target as HTMLSelectElement).value)"
+            >
+              <option v-for="c in defaults.cabangOpsi" :key="c" :value="c">
+                {{ c }}
+              </option>
+            </select>
+          </div>
           <div class="f-field">
             <label class="f-lbl">Tanggal <span class="req">*</span></label>
             <input
@@ -324,15 +355,9 @@ const validateSave = () => {
               :disabled="ro"
             />
           </div>
+
           <div class="f-field">
-            <label class="f-lbl">Rekening Asal (diisi ulang)</label>
-            <input :value="labelRek(tampilAsal)" readonly class="f-inp" />
-            <div v-if="tampilAsal.rekening" class="f-sub">
-              No. Rek: {{ tampilAsal.rekening }}
-            </div>
-          </div>
-          <div class="f-field">
-            <label class="f-lbl">Rekening Tujuan (pusat)</label>
+            <label class="f-lbl">Rekening Tujuan (kas kecil)</label>
             <input :value="labelRek(tampilTujuan)" readonly class="f-inp" />
             <div v-if="tampilTujuan.rekening" class="f-sub">
               No. Rek: {{ tampilTujuan.rekening }}

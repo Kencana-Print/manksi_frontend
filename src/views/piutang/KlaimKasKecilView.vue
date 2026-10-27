@@ -137,7 +137,6 @@ const headers: HeaderDef[] = [
   { title: "Nomor", key: "Nomor", width: "160px", fixed: true },
   { title: "Tanggal", key: "Tanggal", width: "100px", align: "center" },
   { title: "Cabang", key: "Cabang", width: "70px", align: "center" },
-  { title: "Rekening Asal", key: "RekAsal", width: "210px" },
   { title: "Rekening Tujuan", key: "RekTujuan", width: "210px" },
   { title: "Jml BKK", key: "JumlahBkk", width: "75px", align: "center" },
   { title: "Total", key: "Total", width: "130px", align: "end" },
@@ -244,9 +243,6 @@ const onExport = async () => {
           case "Tanggal":
             row[c.key] = it.Tanggal ? formatTanggal(it.Tanggal) : "";
             break;
-          case "RekAsal":
-            row[c.key] = `${it.RekAsal} ${it.NamaRekAsal}`.trim();
-            break;
           case "RekTujuan":
             row[c.key] = `${it.RekTujuan} ${it.NamaRekTujuan}`.trim();
             break;
@@ -334,10 +330,6 @@ const onExport = async () => {
 
     <template #item.Tanggal="{ item }">
       {{ formatTanggal(rowOf(item).Tanggal) }}
-    </template>
-
-    <template #item.RekAsal="{ item }">
-      {{ rowOf(item).RekAsal }} - {{ rowOf(item).NamaRekAsal }}
     </template>
 
     <template #item.RekTujuan="{ item }">

@@ -11,9 +11,9 @@ export interface RekeningInfo {
 
 export interface KlaimDefaults {
   cabang: string;
-  rekAsal: RekeningInfo;
   rekTujuan: RekeningInfo;
   tanggalMulai: string;
+  cabangOpsi: string[];
 }
 
 export interface BkkOption {
@@ -37,7 +37,6 @@ export interface KlaimLoaded {
   nomor: string;
   tanggal: string;
   cabang: string;
-  rekAsal: RekeningInfo;
   rekTujuan: RekeningInfo;
   total: number;
   keterangan: string;
@@ -53,6 +52,7 @@ export interface KlaimDetailPayload {
 }
 
 export interface KlaimPayload {
+  cabang: string;
   tanggal: string;
   keterangan: string;
   detail: KlaimDetailPayload[];
@@ -64,11 +64,14 @@ export interface KlaimSaveHasil {
 }
 
 export const klaimKasKecilFormService = {
-  getDefaults: () => api.get<ApiResult<KlaimDefaults>>(`${BASE}/defaults`),
+  getDefaults: (cabang?: string) =>
+    api.get<ApiResult<KlaimDefaults>>(`${BASE}/defaults`, {
+      params: { cabang },
+    }),
 
-  getBkkOptions: (search: string, exceptNomor: string) =>
+  getBkkOptions: (search: string, exceptNomor: string, cabang: string) =>
     api.get<ApiResult<BkkOption[]>>(`${BASE}/bkk-options`, {
-      params: { search, exceptNomor },
+      params: { search, exceptNomor, cabang },
     }),
 
   getById: (nomor: string) =>

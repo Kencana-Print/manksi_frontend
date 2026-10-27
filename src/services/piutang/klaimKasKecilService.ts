@@ -11,8 +11,6 @@ export interface KlaimKasKecilRow {
   Nomor: string;
   Tanggal: string;
   Cabang: string;
-  RekAsal: string;
-  NamaRekAsal: string;
   RekTujuan: string;
   NamaRekTujuan: string;
   Total: number;
