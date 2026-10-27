@@ -24,6 +24,8 @@ const scrolled = ref(false);
 const drawer = ref(false);
 const drawerExpanded = ref<string[]>([]);
 const openedGroups = ref<string[]>([]);
+// Pemisah nilai folder anak: "<folder induk>::<folder anak>"
+const SEP = "::";
 const availableNavWidth = ref(9999);
 const showDesktopNav = computed(() => availableNavWidth.value >= 1200);
 
@@ -106,6 +108,21 @@ const closeMenus = () => {
   });
   openedGroups.value = [];
   drawer.value = false;
+};
+// Akordeon tingkat 1: hanya satu folder (beserta folder anaknya) yang terbuka.
+// Nilai folder anak berawalan "<induk>::" agar membukanya tidak menutup induk.
+const onOpenedChange = (val: unknown[]) => {
+  const semua = val.map(String);
+  const baru = semua.filter((v) => !openedGroups.value.includes(v));
+  let hasil = semua;
+  if (baru.length > 0) {
+    const induk = baru[baru.length - 1].split(SEP)[0];
+    hasil = semua.filter((v) => v.split(SEP)[0] === induk);
+  }
+  // Buang folder anak yatim (induknya sudah tertutup)
+  openedGroups.value = hasil.filter(
+    (v) => !v.includes(SEP) || hasil.includes(v.split(SEP)[0]),
+  );
 };
 
 const handleLogout = async () => {
@@ -225,7 +242,7 @@ onUnmounted(() => {
               class="nav-list"
               density="comfortable"
               :opened="openedGroups"
-              @update:opened="openedGroups = $event.slice(-1)"
+              @update:opened="onOpenedChange"
             >
               <template v-for="(item, i) in visibleItems(menu.items)" :key="i">
                 <v-divider v-if="item.divider" class="nav-divider" />
@@ -265,6 +282,63 @@ onUnmounted(() => {
                     :key="si"
                   >
                     <v-divider v-if="sub.divider" class="my-1 mx-2" />
+
+                    <!-- Folder tingkat 2 (mis. Monitoring Produksi) -->
+                    <v-list-group
+                      v-else-if="'subItems' in sub"
+                      :value="`${item.title}${SEP}${sub.title}`"
+                    >
+                      <template #activator="{ props, isOpen }">
+                        <v-list-item v-bind="props" class="nav-item nested">
+                          <template #prepend>
+                            <component
+                              :is="sub.icon"
+                              :size="13"
+                              :stroke-width="1.5"
+                              class="ic mr-2"
+                            />
+                          </template>
+                          <v-list-item-title class="nav-item-title">{{
+                            sub.title
+                          }}</v-list-item-title>
+                          <template #append>
+                            <IconChevronDown
+                              :size="12"
+                              :stroke-width="2"
+                              :style="{
+                                transform: isOpen ? 'rotate(180deg)' : '',
+                                transition: 'transform 0.2s',
+                              }"
+                            />
+                          </template>
+                        </v-list-item>
+                      </template>
+                      <template
+                        v-for="(leaf, li) in visibleItems(sub.subItems)"
+                        :key="li"
+                      >
+                        <v-divider v-if="leaf.divider" class="my-1 mx-2" />
+                        <v-list-item
+                          v-else
+                          :to="leaf.to"
+                          class="nav-item nested-2"
+                          @click="closeMenus"
+                        >
+                          <template #prepend>
+                            <component
+                              :is="leaf.icon"
+                              :size="13"
+                              :stroke-width="1.5"
+                              class="ic mr-2"
+                            />
+                          </template>
+                          <v-list-item-title class="nav-item-title">{{
+                            leaf.title
+                          }}</v-list-item-title>
+                        </v-list-item>
+                      </template>
+                    </v-list-group>
+
                     <v-list-item
                       v-else
                       :to="sub.to"
@@ -477,6 +551,56 @@ onUnmounted(() => {
                 :key="si"
               >
                 <v-divider v-if="sub.divider" class="mx-3 my-1" />
+
+                <!-- Folder tingkat 2 (mis. Monitoring Produksi) -->
+                <v-list-group v-else-if="'subItems' in sub" :value="sub.title">
+                  <template #activator="{ props, isOpen }">
+                    <v-list-item v-bind="props" class="drw-subsub">
+                      <template #prepend>
+                        <component
+                          :is="sub.icon"
+                          :size="13"
+                          :stroke-width="1.5"
+                          class="ic mr-2"
+                        />
+                      </template>
+                      <v-list-item-title>{{ sub.title }}</v-list-item-title>
+                      <template #append>
+                        <IconChevronDown
+                          :size="12"
+                          :stroke-width="2"
+                          :style="{
+                            transform: isOpen ? 'rotate(180deg)' : '',
+                            transition: 'transform 0.2s',
+                          }"
+                        />
+                      </template>
+                    </v-list-item>
+                  </template>
+                  <template
+                    v-for="(leaf, li) in visibleItems(sub.subItems)"
+                    :key="li"
+                  >
+                    <v-divider v-if="leaf.divider" class="mx-3 my-1" />
+                    <v-list-item
+                      v-else
+                      :to="leaf.to"
+                      class="drw-subsub"
+                      @click="closeMenus"
+                    >
+                      <template #prepend>
+                        <component
+                          :is="leaf.icon"
+                          :size="13"
+                          :stroke-width="1.5"
+                          class="ic mr-2"
+                        />
+                      </template>
+                      <v-list-item-title>{{ leaf.title }}</v-list-item-title>
+                    </v-list-item>
+                  </template>
+                </v-list-group>
+
                 <v-list-item
                   v-else
                   :to="sub.to"
@@ -653,6 +777,9 @@ onUnmounted(() => {
 }
 .nav-item.nested {
   padding-left: 26px !important;
+}
+.nav-item.nested-2 {
+  padding-left: 40px !important;
 }
 .nav-item-title {
   font-size: 0.82rem !important;
@@ -839,6 +966,28 @@ onUnmounted(() => {
 }
 :deep(
   .v-navigation-drawer .v-list-group__items .v-list-group__items > .v-list-item
+) {
+  padding-inline-start: 24px !important;
+  padding-left: 24px !important;
+}
+/* Level 4 drawer: leaf di dalam folder tingkat 2 */
+:deep(
+  .v-navigation-drawer
+    .v-list-group__items
+    .v-list-group__items
+    .v-list-group__items
+    > .v-list-item
+) {
+  padding-inline-start: 32px !important;
+  padding-left: 32px !important;
+}
+/* Header folder tingkat 2 di dalam folder tingkat 1 */
+:deep(
+  .v-navigation-drawer
+    .v-list-group__items
+    .v-list-group__items
+    > .v-list-group
+    > .v-list-group__header
 ) {
   padding-inline-start: 24px !important;
   padding-left: 24px !important;

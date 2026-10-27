@@ -9,6 +9,7 @@ import { useAuthStore } from "@/stores/authStore";
 import { IconPrinter, IconSearch } from "@tabler/icons-vue";
 import * as lhkForm from "@/services/spanduk/lhk/lhkCetakFormService";
 import type {
+  KainOption,
   LhkCetakPayload,
   PabrikOption,
   SaveResponse,
@@ -58,6 +59,13 @@ interface KaryawanRow {
   lembur: number; // legacy (LHK lama)
 }
 
+interface KainRow {
+  kode: string;
+  nama: string;
+  lebar: string;
+  qtyMeter: number;
+}
+
 interface FormState {
   header: {
     nomor: string;
@@ -70,6 +78,7 @@ interface FormState {
   };
   items: FormRow[];
   karyawan: KaryawanRow[];
+  kain: KainRow[];
 }
 
 const num = (v: unknown) => Number(v) || 0;
@@ -84,6 +93,13 @@ const barisKosong = (): FormRow => ({
   jmlPlangkan: 0,
 });
 
+const barisKainKosong = (): KainRow => ({
+  kode: "",
+  nama: "",
+  lebar: "",
+  qtyMeter: 0,
+});
+
 const defaultData = (): FormState => ({
   header: {
     nomor: "",
@@ -96,6 +112,7 @@ const defaultData = (): FormState => ({
   },
   items: [barisKosong()],
   karyawan: [],
+  kain: [barisKainKosong()],
 });
 
 // ── State UI ──
@@ -104,6 +121,7 @@ const activeIdx = ref(-1);
 const showSelesai = ref(false);
 const nomorTerakhir = ref("");
 const pabrikOpts = ref<PabrikOption[]>([]);
+const kainOpts = ref<KainOption[]>([]);
 const isLoadingKaryawan = ref(false);
 
 const bangunPayload = (data: FormState): LhkCetakPayload => ({
@@ -122,6 +140,10 @@ const bangunPayload = (data: FormState): LhkCetakPayload => ({
     })),
   // Jam kerja dan lembur dihitung server; client hanya mengirim NIK
   Karyawan: data.karyawan.map((k) => ({ Nik: k.nik })),
+  // Baris kain tanpa bahan tidak dikirim
+  Kain: data.kain
+    .filter((r) => r.kode !== "")
+    .map((r) => ({ Kode_Bahan: r.kode, Qty_Meter: num(r.qtyMeter) })),
 });
 
 const {
@@ -149,6 +171,12 @@ const {
       qtyCetak: num(r.Qty_Cetak),
       jmlPlangkan: num(r.Jml_Plangkan),
     }));
+    const kain: KainRow[] = d.Kain.map((k) => ({
+      kode: k.Kode_Bahan,
+      nama: k.Nama_Bahan ?? "",
+      lebar: k.Lebar ?? "",
+      qtyMeter: num(k.Qty_Meter),
+    }));
     return {
       header: {
         nomor: d.Nomor,
@@ -170,6 +198,7 @@ const {
         absensi: num(k.Absensi),
         lembur: num(k.Lembur),
       })),
+      kain: kain.length > 0 ? kain : [barisKainKosong()],
     };
   },
   submitApi: async (data: FormState): Promise<SaveResponse> => {
@@ -222,7 +251,12 @@ const isiLokasiDefault = () => {
 
 onMounted(async () => {
   try {
-    pabrikOpts.value = await lhkForm.getLookupPabrik();
+    const [pabrik, kain] = await Promise.all([
+      lhkForm.getLookupPabrik(),
+      lhkForm.getLookupKain(),
+    ]);
+    pabrikOpts.value = pabrik;
+    kainOpts.value = kain;
     isiLokasiDefault();
   } catch (e) {
     toast.error(lhkForm.pesanError(e, "Gagal memuat data lookup."));
@@ -398,6 +432,53 @@ const totalPlangkan = computed(() =>
   formData.value.items.reduce((a, r) => a + num(r.jmlPlangkan), 0),
 );
 
+// ── Pemakaian kain ──
+// Kain yang tersimpan di LHK tetap tampil walau sudah dinonaktifkan di master
+const opsiKain = computed<KainOption[]>(() => {
+  const ekstra: KainOption[] = formData.value.kain
+    .filter(
+      (r) => r.kode !== "" && !kainOpts.value.some((o) => o.Kode === r.kode),
+    )
+    .map((r) => ({
+      Kode: r.kode,
+      Nama: r.nama,
+      Konstruksi: null,
+      Lebar: r.lebar || null,
+    }));
+  return [...ekstra, ...kainOpts.value];
+});
+
+const labelKain = (o: KainOption) =>
+  `${o.Kode} - ${o.Nama}${o.Lebar ? ` (${o.Lebar})` : ""}`;
+
+const kainDipakaiBarisLain = (kode: string, idx: number) =>
+  formData.value.kain.some((r, i) => i !== idx && r.kode === kode);
+
+const addKain = () => {
+  formData.value.kain.push(barisKainKosong());
+};
+
+const removeKain = (idx: number) => {
+  formData.value.kain.splice(idx, 1);
+  if (formData.value.kain.length === 0) {
+    formData.value.kain.push(barisKainKosong());
+  }
+};
+
+const onKainChange = async (idx: number) => {
+  const row = formData.value.kain[idx];
+  const o = opsiKain.value.find((x) => x.Kode === row.kode);
+  row.nama = o?.Nama ?? "";
+  row.lebar = o?.Lebar ?? "";
+  if (row.kode) {
+    await fokusKunci(`${idx}_kqty`);
+  }
+};
+
+const totalKain = computed(() =>
+  dibulatkan2(formData.value.kain.reduce((a, r) => a + num(r.qtyMeter), 0)),
+);
+
 // Output produksi = panjang SPK/MAP x jumlah cetak (dihitung, tidak disimpan)
 const dibulatkan2 = (n: number) => Math.round(n * 100) / 100;
 const outputProduksi = (r: FormRow) =>
@@ -463,6 +544,31 @@ const validateSave = () => {
       );
       return;
     }
+  }
+
+  for (const [i, r] of formData.value.kain.entries()) {
+    const no = i + 1;
+    const q = num(r.qtyMeter);
+    if (r.kode === "") {
+      if (q > 0) {
+        toast.warning(`Kain baris ${no}: bahan belum dipilih.`);
+        return;
+      }
+      continue;
+    }
+    if (q <= 0) {
+      toast.warning(`Kain baris ${no}: qty (meter) harus lebih dari 0.`);
+      return;
+    }
+    if (Math.abs(q * 100 - Math.round(q * 100)) > 1e-6) {
+      toast.warning(`Kain baris ${no}: qty maksimal 2 desimal.`);
+      return;
+    }
+  }
+  // Wajib untuk LHK baru; LHK lama (tanpa sesi) boleh tanpa kain
+  if (!isLegacy.value && !formData.value.kain.some((r) => r.kode !== "")) {
+    toast.warning("Minimal satu baris kain harus diisi.");
+    return;
   }
 
   showSaveDialog.value = true;
@@ -723,6 +829,81 @@ const tutupSetelahSimpan = () => {
                   <td class="tr fw">{{ totalCetak }}</td>
                   <td class="tr fw">{{ totalPlangkan }}</td>
                   <td />
+                  <td />
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+
+        <!-- Grid Pemakaian Kain -->
+        <div class="blok" style="flex: 0 0 auto">
+          <div class="tbl-header">
+            <span class="tbl-title">Pemakaian Kain</span>
+            <button type="button" class="btn-add" @click="addKain">
+              + Tambah Baris
+            </button>
+          </div>
+          <div class="tbl-wrap" style="max-height: 150px; min-height: 60px">
+            <table class="gt" style="min-width: 620px">
+              <thead>
+                <tr>
+                  <th style="width: 32px" class="tc">No</th>
+                  <th style="width: 360px">Kain</th>
+                  <th style="width: 70px" class="tr">Lebar</th>
+                  <th style="width: 110px" class="tr bg-yellow">Qty (meter)</th>
+                  <th style="width: 32px" class="tc"></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(row, idx) in formData.kain" :key="idx">
+                  <td class="tc gt-lbl">{{ idx + 1 }}</td>
+                  <td class="p0">
+                    <select
+                      v-model="row.kode"
+                      class="ci"
+                      @change="onKainChange(idx)"
+                    >
+                      <option value="">Pilih kain...</option>
+                      <option
+                        v-for="o in opsiKain"
+                        :key="o.Kode"
+                        :value="o.Kode"
+                        :disabled="kainDipakaiBarisLain(o.Kode, idx)"
+                      >
+                        {{ labelKain(o) }}
+                      </option>
+                    </select>
+                  </td>
+                  <td class="p0">
+                    <input :value="row.lebar" class="ci tr ro" readonly />
+                  </td>
+                  <td class="p0">
+                    <input
+                      v-model.number="row.qtyMeter"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      class="ci tr bg-yellow-light"
+                      :ref="(el) => simpanRef(el, `${idx}_kqty`)"
+                      v-select-on-focus
+                    />
+                  </td>
+                  <td class="tc">
+                    <button
+                      type="button"
+                      class="btn-del"
+                      @click="removeKain(idx)"
+                    >
+                      ✕
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td colspan="3" class="tr fw">Total</td>
+                  <td class="tr fw">{{ fmt2(totalKain) }}</td>
                   <td />
                 </tr>
               </tfoot>

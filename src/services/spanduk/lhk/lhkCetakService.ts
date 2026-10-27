@@ -19,6 +19,8 @@ export interface LhkCetakRow {
   Kar_Borongan: number | null;
   Kar_Harian: number | null;
   Jml_Meter: number | string | null;
+  // NULL = LHK belum punya baris kain
+  Jml_Kain: number | string | null;
   Sesi: string;
 }
 
@@ -31,6 +33,14 @@ export interface LhkCetakDetailRow {
   Lebar: number | null;
   Qty_Cetak: number | null;
   Jml_Plangkan: number | null;
+}
+
+export interface LhkCetakKainRow {
+  Nomor: string;
+  Kode_Bahan: number | string;
+  Nama_Bahan: string | null;
+  Lebar: string | null;
+  Qty_Meter: number | string;
 }
 
 export const getBrowse = async (
@@ -51,6 +61,16 @@ export const getDetail = async (
     `${BASE}/detail`,
     { params: { tglAwal, tglAkhir } },
   );
+  return res.data.data;
+};
+
+export const getKain = async (
+  tglAwal: string,
+  tglAkhir: string,
+): Promise<LhkCetakKainRow[]> => {
+  const res = await api.get<ApiResponse<LhkCetakKainRow[]>>(`${BASE}/kain`, {
+    params: { tglAwal, tglAkhir },
+  });
   return res.data.data;
 };
 

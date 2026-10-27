@@ -1536,9 +1536,78 @@ export const createMenuItems = (): NavItem[] => {
           menuId: 963,
           subItems: [
             {
-              title: "Output by SPK",
-              to: "/laporan/produksi-spanduk/output-by-spk",
-              icon: IconListCheck,
+              title: "Monitoring Produksi",
+              icon: IconActivity,
+              subItems: [
+                {
+                  title: "Output by SPK",
+                  to: "/laporan/produksi-spanduk/output-by-spk",
+                  icon: IconListCheck,
+                },
+                {
+                  title: "Kekurangan Produksi",
+                  to: "/laporan/produksi-spanduk/kekurangan-produksi",
+                  icon: IconAlertTriangle,
+                },
+                { divider: true },
+                {
+                  title: "Monitoring Proof",
+                  to: "/laporan/produksi-spanduk/monitoring-proof",
+                  icon: IconFileCheck,
+                },
+                {
+                  title: "Resume Proof",
+                  to: "/laporan/produksi-spanduk/resume-proof",
+                  icon: IconChartBar,
+                },
+                { divider: true },
+                {
+                  title: "Monitoring Afdruk",
+                  to: "/laporan/produksi-spanduk/monitoring-afdruk",
+                  icon: IconPrinter,
+                },
+                {
+                  title: "Monitoring Cetak",
+                  to: "/laporan/produksi-spanduk/monitoring-cetak",
+                  icon: IconPrinter,
+                },
+                {
+                  title: "Monitoring Hasil Proof",
+                  to: "/laporan/produksi-spanduk/monitoring-hasil-proof",
+                  icon: IconPalette,
+                },
+                {
+                  title: "Monitoring Cuiring",
+                  to: "/laporan/produksi-spanduk/monitoring-cuiring",
+                  icon: IconFlame,
+                },
+                {
+                  title: "Monitoring Jahit",
+                  to: "/laporan/produksi-spanduk/monitoring-jahit",
+                  icon: IconScissors,
+                },
+                {
+                  title: "Monitoring Lipat",
+                  to: "/laporan/produksi-spanduk/monitoring-lipat",
+                  icon: IconFold,
+                },
+                {
+                  title: "Monitoring Koli",
+                  to: "/laporan/produksi-spanduk/monitoring-koli",
+                  icon: IconPackage,
+                },
+                { divider: true },
+                {
+                  title: "Rekap Monitoring by SPK",
+                  to: "/laporan/produksi-spanduk/rekap-monitoring-by-spk",
+                  icon: IconListDetails,
+                },
+              ],
+            },
+            {
+              title: "Pemakaian Bahan",
+              to: "/laporan/produksi-spanduk/pemakaian-bahan",
+              icon: IconRuler,
             },
           ],
         },

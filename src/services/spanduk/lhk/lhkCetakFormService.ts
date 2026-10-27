@@ -32,6 +32,13 @@ export interface LhkCetakKaryawan {
   Jam_Lembur: string;
 }
 
+export interface LhkCetakKain {
+  Kode_Bahan: string;
+  Nama_Bahan: string | null;
+  Lebar: string | null;
+  Qty_Meter: number;
+}
+
 export interface LhkCetakForm {
   Nomor: string;
   Tanggal: string;
@@ -43,6 +50,7 @@ export interface LhkCetakForm {
   Jam_Input: string | null;
   Detail: LhkCetakDetail[];
   Karyawan: LhkCetakKaryawan[];
+  Kain: LhkCetakKain[];
 }
 
 export interface LhkCetakPayload {
@@ -53,6 +61,7 @@ export interface LhkCetakPayload {
   Kar_Harian: number;
   Detail: { Nomor_SPK: string; Qty_Cetak: number; Jml_Plangkan: number }[];
   Karyawan: { Nik: string }[];
+  Kain: { Kode_Bahan: string; Qty_Meter: number }[];
 }
 
 export interface InfoSpk {
@@ -66,6 +75,13 @@ export interface InfoSpk {
 export interface PabrikOption {
   Kode: string;
   Nama: string;
+}
+
+export interface KainOption {
+  Kode: string;
+  Nama: string;
+  Konstruksi: string | null;
+  Lebar: string | null;
 }
 
 export interface KaryawanOption {
@@ -100,6 +116,14 @@ export const getLookupPabrik = async (): Promise<PabrikOption[]> => {
     `${BASE}/lookups/pabrik`,
   );
   return res.data.data ?? [];
+};
+
+export const getLookupKain = async (): Promise<KainOption[]> => {
+  const res = await api.get<
+    ApiResponse<(Omit<KainOption, "Kode"> & { Kode: number | string })[]>
+  >(`${BASE}/lookups/kain`);
+  // Kode dari DB bertipe angka; form memakai string
+  return (res.data.data ?? []).map((k) => ({ ...k, Kode: String(k.Kode) }));
 };
 
 export const getLookupKaryawan = async (

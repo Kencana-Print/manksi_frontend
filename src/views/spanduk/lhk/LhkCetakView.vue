@@ -4,11 +4,12 @@ import { useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
 import BaseBrowse from "@/components/BaseBrowse.vue";
 import { useBrowse } from "@/composables/useBrowse";
-import { exportExcelSingle, type ExcelColumn } from "@/utils/excelExport";
+import { exportExcel, type ExcelColumn } from "@/utils/excelExport";
 import * as lhkService from "@/services/spanduk/lhk/lhkCetakService";
 import type {
   LhkCetakRow,
   LhkCetakDetailRow,
+  LhkCetakKainRow,
 } from "@/services/spanduk/lhk/lhkCetakService";
 import { IconPrinter, IconFileExport } from "@tabler/icons-vue";
 import { formatTanggal } from "@/utils/dateFormat";
@@ -22,6 +23,18 @@ interface ExportMasterRow {
   Kar_Borongan: number;
   Kar_Harian: number;
   Jml_Meter: number;
+  Jml_Kain: number | null;
+}
+
+interface ExportKainRow {
+  Nomor: string;
+  Tanggal: string;
+  Kode_Pabrik: string;
+  Nama_Pabrik: string;
+  Kode_Bahan: string;
+  Nama_Bahan: string;
+  Lebar: string;
+  Qty_Meter: number;
 }
 
 interface ExportDetailRow {
@@ -62,6 +75,7 @@ const filterState = ref({
 
 // --- DETAIL: dimuat sekali untuk seluruh periode, dikelompokkan per nomor ---
 const detailMap = ref<Record<string, LhkCetakDetailRow[]>>({});
+const kainMap = ref<Record<string, LhkCetakKainRow[]>>({});
 const expandedRows = ref<unknown[]>([]);
 
 const muatData = async (): Promise<LhkCetakRow[]> => {
@@ -75,9 +89,10 @@ const muatData = async (): Promise<LhkCetakRow[]> => {
     return [];
   }
 
-  const [master, detail] = await Promise.all([
+  const [master, detail, kain] = await Promise.all([
     lhkService.getBrowse(dtAwal, dtAkhir),
     lhkService.getDetail(dtAwal, dtAkhir),
+    lhkService.getKain(dtAwal, dtAkhir),
   ]);
 
   const peta: Record<string, LhkCetakDetailRow[]> = {};
@@ -85,6 +100,13 @@ const muatData = async (): Promise<LhkCetakRow[]> => {
     (peta[row.Nomor] ??= []).push(row);
   }
   detailMap.value = peta;
+
+  const petaKain: Record<string, LhkCetakKainRow[]> = {};
+  for (const row of kain) {
+    (petaKain[row.Nomor] ??= []).push(row);
+  }
+  kainMap.value = petaKain;
+
   expandedRows.value = [];
   return master;
 };
@@ -118,6 +140,12 @@ const headers = [
   { title: "Kar Borongan", key: "Kar_Borongan", width: "120px", align: "end" },
   { title: "Kar Harian", key: "Kar_Harian", width: "110px", align: "end" },
   { title: "Output Produksi", key: "Jml_Meter", width: "140px", align: "end" },
+  {
+    title: "Pemakaian Kain (m)",
+    key: "Jml_Kain",
+    width: "150px",
+    align: "end",
+  },
 ];
 
 const INT = "#,##0";
@@ -160,6 +188,13 @@ const kolomMaster: ExcelColumn[] = [
     align: "right",
     numFmt: NUM,
   },
+  {
+    header: "Pemakaian Kain (m)",
+    key: "Jml_Kain",
+    width: 18,
+    align: "right",
+    numFmt: NUM,
+  },
 ];
 
 const kolomDetail: ExcelColumn[] = [
@@ -198,6 +233,23 @@ const kolomDetail: ExcelColumn[] = [
     width: 13,
     align: "right",
     numFmt: INT,
+  },
+];
+
+const kolomKain: ExcelColumn[] = [
+  { header: "Nomor", key: "Nomor", width: 20 },
+  { header: "Tanggal", key: "Tanggal", width: 14, align: "center" },
+  { header: "Kode Pabrik", key: "Kode_Pabrik", width: 14 },
+  { header: "Nama Pabrik", key: "Nama_Pabrik", width: 28 },
+  { header: "Kode Bahan", key: "Kode_Bahan", width: 14 },
+  { header: "Nama Kain", key: "Nama_Bahan", width: 36 },
+  { header: "Lebar", key: "Lebar", width: 10, align: "right" },
+  {
+    header: "Qty (meter)",
+    key: "Qty_Meter",
+    width: 14,
+    align: "right",
+    numFmt: NUM,
   },
 ];
 
@@ -261,10 +313,11 @@ const exportMaster = () =>
         Kar_Borongan: Number(r.Kar_Borongan) || 0,
         Kar_Harian: Number(r.Kar_Harian) || 0,
         Jml_Meter: Number(r.Jml_Meter) || 0,
+        Jml_Kain: r.Jml_Kain === null ? null : Number(r.Jml_Kain) || 0,
       })),
   });
 
-// Hanya detail dari LHK yang sedang tampil di grid
+// Hanya detail dari LHK yang sedang tampil di grid; dua sheet: SPK dan kain
 const exportDetail = async () => {
   if (!canExport.value) {
     return toast.error("Akses ditolak: Anda tidak memiliki izin untuk export.");
@@ -276,6 +329,7 @@ const exportDetail = async () => {
   }
 
   const rows: ExportDetailRow[] = [];
+  const rowsKain: ExportKainRow[] = [];
   for (const item of master) {
     for (const r of detailMap.value[item.Nomor] ?? []) {
       rows.push({
@@ -293,6 +347,18 @@ const exportDetail = async () => {
         Jml_Plangkan: Number(r.Jml_Plangkan) || 0,
       });
     }
+    for (const k of kainMap.value[item.Nomor] ?? []) {
+      rowsKain.push({
+        Nomor: item.Nomor,
+        Tanggal: formatTanggal(item.Tanggal),
+        Kode_Pabrik: item.Kode_Pabrik ?? "",
+        Nama_Pabrik: item.Nama_Pabrik ?? "",
+        Kode_Bahan: String(k.Kode_Bahan),
+        Nama_Bahan: k.Nama_Bahan ?? "",
+        Lebar: k.Lebar ?? "",
+        Qty_Meter: Number(k.Qty_Meter) || 0,
+      });
+    }
   }
 
   if (rows.length === 0) {
@@ -300,12 +366,12 @@ const exportDetail = async () => {
   }
 
   try {
-    await exportExcelSingle(
-      `Export_Detail_LHK_Cetak_${today}.xlsx`,
-      "Detail LHK Cetak",
-      kolomDetail,
-      rows,
-    );
+    await exportExcel(`Export_Detail_LHK_Cetak_${today}.xlsx`, [
+      { sheetName: "Detail LHK Cetak", columns: kolomDetail, rows },
+      ...(rowsKain.length > 0
+        ? [{ sheetName: "Pemakaian Kain", columns: kolomKain, rows: rowsKain }]
+        : []),
+    ]);
     toast.success("Berhasil export detail LHK Cetak.");
   } catch (e) {
     console.error(e);
@@ -368,6 +434,17 @@ const numFmt = (v: number | string | null) =>
       }}
     </template>
 
+    <template #item.Jml_Kain="{ item }">
+      {{
+        item.Jml_Kain === null
+          ? "-"
+          : Number(item.Jml_Kain).toLocaleString("id-ID", {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })
+      }}
+    </template>
+
     <!-- Detail Expand -->
     <template #detail="{ item }">
       <div class="expand-wrap">
@@ -401,6 +478,33 @@ const numFmt = (v: number | string | null) =>
             <tr v-if="!detailMap[item.Nomor]?.length">
               <td colspan="8" class="text-center text-grey py-3 font-italic">
                 Detail LHK Cetak tidak ditemukan.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="expand-title mt-3 mb-2">
+          Pemakaian Kain - {{ item.Nomor }}
+        </div>
+        <table class="detail-table" style="max-width: 560px">
+          <thead>
+            <tr>
+              <th width="100">Kode</th>
+              <th>Nama Kain</th>
+              <th width="80" class="tr">Lebar</th>
+              <th width="120" class="tr">Qty (meter)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="k in kainMap[item.Nomor]" :key="k.Kode_Bahan">
+              <td>{{ k.Kode_Bahan }}</td>
+              <td class="font-weight-bold">{{ k.Nama_Bahan }}</td>
+              <td class="tr">{{ k.Lebar }}</td>
+              <td class="tr">{{ numFmt(k.Qty_Meter) }}</td>
+            </tr>
+            <tr v-if="!kainMap[item.Nomor]?.length">
+              <td colspan="4" class="text-center text-grey py-3 font-italic">
+                Belum ada data kain (LHK lama atau dari aplikasi desktop).
               </td>
             </tr>
           </tbody>

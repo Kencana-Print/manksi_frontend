@@ -5488,6 +5488,173 @@ const router = createRouter({
         menuId: "963",
       },
     },
+    {
+      path: "/laporan/produksi-spanduk/kekurangan-produksi",
+      name: "LaporanSpandukKekuranganProduksi",
+      component: () =>
+        import("@/views/laporan/spanduk/KekuranganProduksiView.vue"),
+      meta: {
+        title: "Laporan Kekurangan Produksi",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "963",
+      },
+    },
+    {
+      path: "/laporan/produksi-spanduk/monitoring-proof",
+      name: "LaporanSpandukMonitoringProof",
+      component: () =>
+        import("@/views/laporan/spanduk/MonitoringProofView.vue"),
+      meta: {
+        title: "Laporan Monitoring Proof",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "963",
+      },
+    },
+    {
+      path: "/laporan/produksi-spanduk/monitoring-proof/form",
+      name: "LaporanSpandukMonitoringProofCreate",
+      component: () =>
+        import("@/views/laporan/spanduk/MonitoringProofFormView.vue"),
+      meta: {
+        title: "Monitoring Proof",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "963",
+        browseRoute: "LaporanSpandukMonitoringProof",
+      },
+    },
+    {
+      path: "/laporan/produksi-spanduk/monitoring-proof/form/:nomor",
+      name: "LaporanSpandukMonitoringProofEdit",
+      component: () =>
+        import("@/views/laporan/spanduk/MonitoringProofFormView.vue"),
+      meta: {
+        title: "Ubah Monitoring Proof",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "963",
+        browseRoute: "LaporanSpandukMonitoringProof",
+      },
+    },
+    {
+      path: "/laporan/produksi-spanduk/resume-proof",
+      name: "LaporanSpandukResumeProof",
+      component: () => import("@/views/laporan/spanduk/ResumeProofView.vue"),
+      meta: {
+        title: "Resume Proof",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "963",
+      },
+    },
+    {
+      path: "/laporan/produksi-spanduk/monitoring-cetak",
+      name: "LaporanSpandukMonitoringCetak",
+      component: () =>
+        import("@/views/laporan/spanduk/MonitoringCetakView.vue"),
+      meta: {
+        title: "Monitoring Cetak",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "963",
+      },
+    },
+    {
+      path: "/laporan/produksi-spanduk/monitoring-jahit",
+      name: "LaporanSpandukMonitoringJahit",
+      component: () =>
+        import("@/views/laporan/spanduk/MonitoringJahitView.vue"),
+      meta: {
+        title: "Monitoring Jahit",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "963",
+      },
+    },
+    {
+      path: "/laporan/produksi-spanduk/monitoring-lipat",
+      name: "LaporanSpandukMonitoringLipat",
+      component: () =>
+        import("@/views/laporan/spanduk/MonitoringLipatView.vue"),
+      meta: {
+        title: "Monitoring Lipat",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "963",
+      },
+    },
+    {
+      path: "/laporan/produksi-spanduk/monitoring-cuiring",
+      name: "LaporanSpandukMonitoringCuiring",
+      component: () =>
+        import("@/views/laporan/spanduk/MonitoringCuiringView.vue"),
+      meta: {
+        title: "Monitoring Cuiring",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "963",
+      },
+    },
+    {
+      path: "/laporan/produksi-spanduk/monitoring-afdruk",
+      name: "LaporanSpandukMonitoringAfdruk",
+      component: () =>
+        import("@/views/laporan/spanduk/MonitoringAfdrukView.vue"),
+      meta: {
+        title: "Monitoring Afdruk",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "963",
+      },
+    },
+    {
+      path: "/laporan/produksi-spanduk/monitoring-koli",
+      name: "LaporanSpandukMonitoringKoli",
+      component: () => import("@/views/laporan/spanduk/MonitoringKoliView.vue"),
+      meta: {
+        title: "Monitoring Koli",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "963",
+      },
+    },
+    {
+      path: "/laporan/produksi-spanduk/monitoring-hasil-proof",
+      name: "LaporanSpandukMonitoringHasilProof",
+      component: () =>
+        import("@/views/laporan/spanduk/MonitoringHasilProofView.vue"),
+      meta: {
+        title: "Monitoring Hasil Proof",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "963",
+      },
+    },
+    {
+      path: "/laporan/produksi-spanduk/rekap-monitoring-by-spk",
+      name: "LaporanSpandukRekapMonitoringBySpk",
+      component: () =>
+        import("@/views/laporan/spanduk/RekapMonitoringBySpkView.vue"),
+      meta: {
+        title: "Rekap Monitoring by SPK",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "963",
+      },
+    },
+    {
+      path: "/laporan/produksi-spanduk/pemakaian-bahan",
+      name: "LaporanSpandukPemakaianBahan",
+      component: () => import("@/views/laporan/spanduk/PemakaianBahanView.vue"),
+      meta: {
+        title: "Laporan Pemakaian Bahan",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "963",
+      },
+    },
 
     {
       path: "/laporan/marketing/laporan-desain",

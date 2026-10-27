@@ -56,6 +56,11 @@ const outputProduksi = (
 const totalOutput = computed(() =>
   rows.value.reduce((a, r) => a + outputProduksi(r.Panjang, r.Qty_Cetak), 0),
 );
+
+const kain = computed(() => data.value?.Kain ?? []);
+const totalKain = computed(() =>
+  kain.value.reduce((a, k) => a + (Number(k.Qty_Meter) || 0), 0),
+);
 </script>
 
 <template>
@@ -137,6 +142,32 @@ const totalOutput = computed(() =>
             <td class="tr fw">{{ fmtInt(totalCetak) }}</td>
             <td class="tr fw">{{ fmt(totalOutput) }}</td>
             <td class="tr fw">{{ fmtInt(totalPlangkan) }}</td>
+          </tr>
+        </tfoot>
+      </table>
+
+      <div v-if="kain.length > 0" class="sub-title">Pemakaian Kain</div>
+      <table v-if="kain.length > 0" class="detail-table kain-table">
+        <thead>
+          <tr>
+            <th width="70">Kode</th>
+            <th>Nama Kain</th>
+            <th width="60">Lebar</th>
+            <th width="90">Qty (meter)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="k in kain" :key="k.Kode_Bahan">
+            <td class="tc">{{ k.Kode_Bahan }}</td>
+            <td>{{ k.Nama_Bahan }}</td>
+            <td class="tr">{{ k.Lebar }}</td>
+            <td class="tr">{{ fmt(k.Qty_Meter) }}</td>
+          </tr>
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="3" class="tr fw">Total</td>
+            <td class="tr fw">{{ fmt(totalKain) }}</td>
           </tr>
         </tfoot>
       </table>
@@ -231,6 +262,14 @@ const totalOutput = computed(() =>
 }
 .fw {
   font-weight: bold;
+}
+.sub-title {
+  font-weight: bold;
+  font-size: 9pt;
+  margin: 12px 0 4px;
+}
+.kain-table {
+  width: 60%;
 }
 
 .print-footer {

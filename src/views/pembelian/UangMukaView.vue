@@ -30,7 +30,7 @@ const toast = useToast();
 
 const userBagian = computed(() => (authStore.user?.bagian || "").toUpperCase());
 // Akses penuh: setara gabungan hak ADMIN, PEMBELIAN, FINANCE, EDP, AUDIT, DIREKSI
-const USER_AKSES_PENUH = ["ADMIN", "NANDA"];
+const USER_AKSES_PENUH = ["ADMIN", "NANDA", "LIA"];
 const aksesPenuh = computed(() =>
   USER_AKSES_PENUH.includes((authStore.user?.kode || "").toUpperCase()),
 );
