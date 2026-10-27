@@ -8,7 +8,7 @@ import {
   permintaanDriverService,
   type PermintaanDriverFormData,
   type PermintaanDriverDetailItem,
-} from "@/services/penjualan/permintaanDriverService";
+} from "@/services/ga/permintaanDriverService";
 import SpkSearchModal from "@/components/lookups/SpkSearchModal.vue";
 import {
   IconSteeringWheel,
@@ -76,7 +76,7 @@ const confirmPrint = () => {
   showPrintDialog.value = false;
   if (no) {
     window.open(
-      `/penjualan/permintaan-driver/print/${encodeURIComponent(no)}`,
+      `/ga/permintaan-driver/print/${encodeURIComponent(no)}`,
       "_blank",
     );
   }
@@ -91,7 +91,7 @@ const skipPrint = () => {
 const openPrint = (nomorStr: string) => {
   if (!nomorStr) return;
   window.open(
-    `/penjualan/permintaan-driver/print/${encodeURIComponent(nomorStr)}`,
+    `/ga/permintaan-driver/print/${encodeURIComponent(nomorStr)}`,
     "_blank",
   );
 };
@@ -107,7 +107,7 @@ const {
   executeCancel,
   executeClose,
 } = useForm<PermintaanDriverFormData>({
-  menuId: "189",
+  menuId: "612",
   initialData,
   submitApi: async (data) => {
     const validItems = (data.items || []).filter(
@@ -300,7 +300,7 @@ onMounted(async () => {
 <template>
   <BaseForm
     :title="isEdit ? 'Lihat Permintaan Driver' : 'Permintaan Driver'"
-    menu-id="189"
+    menu-id="612"
     :icon="IconSteeringWheel"
     :is-saving="isSaving"
     :disabled-save="isEdit"

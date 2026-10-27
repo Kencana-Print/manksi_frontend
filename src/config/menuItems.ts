@@ -110,6 +110,8 @@ import {
   IconSkull,
   IconSteeringWheel,
   IconBox,
+  IconCar,
+  IconBuildingSkyscraper,
 } from "@tabler/icons-vue";
 
 export interface NavItem {
@@ -140,6 +142,7 @@ export const createMenuItems = (): NavItem[] => {
   const spandukMenu = ref(false);
   const garmenMenu = ref(false);
   const penjualanMenu = ref(false);
+  const gaMenu = ref(false);
   const piutangMenu = ref(false);
   const laporanMenu = ref(false);
   const toolsMenu = ref(false);
@@ -1106,11 +1109,44 @@ export const createMenuItems = (): NavItem[] => {
           icon: IconCalendarWeek,
           menuId: 176,
         },
+      ],
+    },
+    {
+      title: "GA",
+      icon: IconBuildingSkyscraper,
+      model: gaMenu,
+      menuId: 600,
+      items: [
+        {
+          title: "Master Kendaraan",
+          to: "/ga/master-kendaraan",
+          icon: IconCar,
+          menuId: 601,
+        },
+        {
+          title: "Master Pengguna",
+          to: "/ga/master-pengguna",
+          icon: IconUsers,
+          menuId: 602,
+        },
+        {
+          title: "Perawatan",
+          to: "/ga/perawatan",
+          icon: IconTool,
+          menuId: 611,
+        },
         {
           title: "Permintaan Driver",
-          to: "/penjualan/permintaan-driver",
+          to: "/ga/permintaan-driver",
           icon: IconSteeringWheel,
-          menuId: 189,
+          menuId: 612,
+        },
+        { divider: true },
+        {
+          title: "Laporan Pengajuan Perbaikan",
+          to: "/ga/laporan-pengajuan-perbaikan",
+          icon: IconFileDescription,
+          menuId: 621,
         },
       ],
     },
