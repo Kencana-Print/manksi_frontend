@@ -4255,52 +4255,199 @@ const router = createRouter({
         menuId: "119",
       },
     },
+    // ── GA (General Affairs) ──────────────────────────────────────────
     {
-      path: "/penjualan/permintaan-driver",
+      path: "/ga/master-kendaraan",
+      name: "GaMasterKendaraan",
+      component: () => import("@/views/ga/MasterKendaraanView.vue"),
+      meta: {
+        title: "Master Kendaraan",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "601",
+      },
+    },
+    {
+      path: "/ga/master-kendaraan/create",
+      name: "GaMasterKendaraanCreate",
+      component: () => import("@/views/ga/KendaraanFormView.vue"),
+      meta: {
+        title: "Tambah Kendaraan",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "601",
+        browseRoute: "GaMasterKendaraan",
+      },
+    },
+    {
+      path: "/ga/master-kendaraan/edit/:nopol",
+      name: "GaMasterKendaraanEdit",
+      component: () => import("@/views/ga/KendaraanFormView.vue"),
+      meta: {
+        title: "Ubah Kendaraan",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "601",
+        browseRoute: "GaMasterKendaraan",
+      },
+    },
+    {
+      path: "/ga/master-pengguna",
+      name: "GaMasterPengguna",
+      component: () => import("@/views/ga/MasterPenggunaView.vue"),
+      meta: {
+        title: "Master Pengguna",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "602",
+      },
+    },
+    {
+      path: "/ga/master-pengguna/create",
+      name: "GaMasterPenggunaCreate",
+      component: () => import("@/views/ga/PenggunaFormView.vue"),
+      meta: {
+        title: "Tambah Pengguna",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "602",
+        browseRoute: "GaMasterPengguna",
+      },
+    },
+    {
+      path: "/ga/master-pengguna/edit/:kode",
+      name: "GaMasterPenggunaEdit",
+      component: () => import("@/views/ga/PenggunaFormView.vue"),
+      meta: {
+        title: "Ubah Pengguna",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "602",
+        browseRoute: "GaMasterPengguna",
+      },
+    },
+    {
+      path: "/ga/perawatan",
+      name: "GaPerawatan",
+      component: () => import("@/views/ga/PerawatanView.vue"),
+      meta: {
+        title: "Perawatan",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "611",
+      },
+    },
+    {
+      path: "/ga/perawatan/create",
+      name: "GaPerawatanCreate",
+      component: () => import("@/views/ga/PerawatanFormView.vue"),
+      meta: {
+        title: "Tambah Perawatan",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "611",
+        browseRoute: "GaPerawatan",
+      },
+    },
+    {
+      path: "/ga/perawatan/edit/:nomor",
+      name: "GaPerawatanEdit",
+      component: () => import("@/views/ga/PerawatanFormView.vue"),
+      meta: {
+        title: "Ubah Perawatan",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "611",
+        browseRoute: "GaPerawatan",
+      },
+    },
+    {
+      path: "/ga/permintaan-driver",
       name: "PermintaanDriverBrowse",
-      component: () => import("@/views/penjualan/PermintaanDriverView.vue"),
+      component: () =>
+        import("@/views/ga/permintaan-driver/PermintaanDriverView.vue"),
       meta: {
         title: "Permintaan Driver",
         layout: "DefaultLayout",
         requiresAuth: true,
-        menuId: "189",
+        menuId: "612",
       },
     },
     {
-      path: "/penjualan/permintaan-driver/create",
+      path: "/ga/permintaan-driver/create",
       name: "PermintaanDriverCreate",
-      component: () => import("@/views/penjualan/PermintaanDriverFormView.vue"),
+      component: () =>
+        import("@/views/ga/permintaan-driver/PermintaanDriverFormView.vue"),
       meta: {
         title: "Tambah Permintaan Driver",
         layout: "DefaultLayout",
         requiresAuth: true,
-        menuId: "189",
+        menuId: "612",
         browseRoute: "PermintaanDriverBrowse",
       },
     },
     {
-      path: "/penjualan/permintaan-driver/edit/:nomor",
+      path: "/ga/permintaan-driver/edit/:nomor",
       name: "PermintaanDriverEdit",
-      component: () => import("@/views/penjualan/PermintaanDriverFormView.vue"),
+      component: () =>
+        import("@/views/ga/permintaan-driver/PermintaanDriverFormView.vue"),
       meta: {
         title: "Ubah Permintaan Driver",
         layout: "DefaultLayout",
         requiresAuth: true,
-        menuId: "189",
+        menuId: "612",
         browseRoute: "PermintaanDriverBrowse",
       },
     },
     {
-      path: "/penjualan/permintaan-driver/print/:nomor",
+      path: "/ga/permintaan-driver/print/:nomor",
       name: "PermintaanDriverPrint",
       component: () =>
-        import("@/views/penjualan/PermintaanDriverPrintView.vue"),
+        import("@/views/ga/permintaan-driver/PermintaanDriverPrintView.vue"),
       meta: {
         title: "Cetak Surat Jalan Permintaan Driver",
         layout: "BlankLayout",
         requiresAuth: true,
-        menuId: "189",
+        menuId: "612",
       },
+    },
+    {
+      path: "/ga/laporan-pengajuan-perbaikan",
+      name: "GaLaporanPengajuanPerbaikan",
+      component: () =>
+        import("@/views/ga/LaporanPengajuanPerbaikanView.vue"),
+      meta: {
+        title: "Laporan Pengajuan Perbaikan",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "621",
+      },
+    },
+    {
+      path: "/ga/laporan-pengajuan",
+      redirect: "/ga/laporan-pengajuan-perbaikan",
+    },
+    {
+      path: "/ga/laporan-perbaikan",
+      redirect: "/ga/laporan-pengajuan-perbaikan",
+    },
+
+    // Redirect rute lama penjualan/permintaan-driver ke ga/permintaan-driver
+    {
+      path: "/penjualan/permintaan-driver",
+      redirect: "/ga/permintaan-driver",
+    },
+    {
+      path: "/penjualan/permintaan-driver/create",
+      redirect: "/ga/permintaan-driver/create",
+    },
+    {
+      path: "/penjualan/permintaan-driver/edit/:nomor",
+      redirect: (to) => `/ga/permintaan-driver/edit/${to.params.nomor}`,
+    },
+    {
+      path: "/penjualan/permintaan-driver/print/:nomor",
+      redirect: (to) => `/ga/permintaan-driver/print/${to.params.nomor}`,
     },
 
     // ── Piutang ───────────────────────────────────────────────────

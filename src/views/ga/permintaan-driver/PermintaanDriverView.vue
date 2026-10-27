@@ -9,7 +9,7 @@ import {
   permintaanDriverService,
   type PermintaanDriverRow,
   type PermintaanDriverDetailRow,
-} from "@/services/penjualan/permintaanDriverService";
+} from "@/services/ga/permintaanDriverService";
 import { exportExcelSingle, type ExcelColumn } from "@/utils/excelExport";
 import { formatTanggal } from "@/utils/dateFormat";
 import {
@@ -64,7 +64,7 @@ const {
   fetchData,
   clearSelection,
 } = useBrowse({
-  menuId: "189",
+  menuId: "612",
   fetchApi: async () => {
     const res = await permintaanDriverService.getBrowse({
       tglAwal: tglAwal.value,
@@ -176,7 +176,7 @@ const onCetak = (item?: { Nomor: string }) => {
     return;
   }
   window.open(
-    `/penjualan/permintaan-driver/print/${encodeURIComponent(target.Nomor)}`,
+    `/ga/permintaan-driver/print/${encodeURIComponent(target.Nomor)}`,
     "_blank",
   );
 };
@@ -270,8 +270,8 @@ onMounted(() => {
 <template>
   <BaseBrowse
     title="Permintaan Driver"
-    menu-id="189"
-    storage-id="189"
+    menu-id="612"
+    storage-id="612"
     :icon="IconSteeringWheel"
     :headers="headers"
     :items="items ?? []"
