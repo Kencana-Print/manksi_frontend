@@ -220,20 +220,12 @@ const generateTxt = (withCodes = true) => {
       (s: number, r: any) => s + Number(r.sjd_jumlah || 0),
       0,
     );
-    const FAX_NO = h.perush_telp || h.perush_fax || "";
     const EMAIL = h.perush_email || "";
 
     const lines: string[] = [];
     lines.push(LINE);
     lines.push(
-      padR(
-        "MOHON SURAT JALAN INI DITANDATANGANI, DISTEMPEL, DAN DI FAX KE " +
-          FAX_NO,
-        PAGE_WIDTH,
-      ),
-    );
-    lines.push(
-      `${padR("ATAU EMAIL DI " + EMAIL, PAGE_WIDTH - 24)}${padL("Total Jumlah: " + num(totalJml), 24)}`,
+      `${padR("MOHON SURAT JALAN INI DITANDATANGANI, DISTEMPEL, DAN DI EMAIL KE " + EMAIL, PAGE_WIDTH - 24)}${padL("Total Jumlah: " + num(totalJml), 24)}`,
     );
     lines.push("");
     lines.push(
@@ -573,11 +565,10 @@ onMounted(() => {
           <div class="page-footer">
             <div class="foot-row">
               <div class="foot-note">
-                Mohon Surat Jalan ini ditanda tangani, distempel, dan di fax ke
-                {{ header.perush_telp }}<br />
-                atau email ke {{ header.perush_email }}
+                Mohon Surat Jalan ini ditanda tangani, distempel, dan di email
+                ke
+                {{ header.perush_email }}
               </div>
-
               <div class="foot-page">
                 Page: {{ pi + 1 }} of {{ paginatedDetails.length }}
               </div>

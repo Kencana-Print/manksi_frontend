@@ -179,19 +179,10 @@ const generateTxt = (withCodes = true) => {
       (s: number, r: any) => s + Number(r.sjd_jumlah || 0),
       0,
     );
-    const FAX_NO = h.perush_telp || h.perush_fax || "";
     const EMAIL = h.perush_email || "";
     const lines: string[] = [];
-    lines.push(LINE);
     lines.push(
-      padR(
-        "MOHON SURAT JALAN INI DITANDATANGANI, DISTEMPEL, DAN DI FAX KE " +
-          FAX_NO,
-        PAGE_WIDTH,
-      ),
-    );
-    lines.push(
-      `${padR("ATAU EMAIL DI " + EMAIL, PAGE_WIDTH - 24)}${padL("Total Jumlah: " + num(totalJml), 24)}`,
+      `${padR("MOHON SURAT JALAN INI DITANDATANGANI, DISTEMPEL, DAN DI EMAIL KE " + EMAIL, PAGE_WIDTH - 24)}${padL("Total Jumlah: " + num(totalJml), 24)}`,
     );
     lines.push("");
     lines.push(
@@ -267,7 +258,7 @@ const generateTxt = (withCodes = true) => {
 };
 
 const downloadTxt = () => {
-  const content = generateTxt(false);
+  const content = generateTxt();
   const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -497,12 +488,8 @@ onMounted(() => {
               class="foot-note-row"
             >
               <div class="foot-note">
-                MOHON SURAT JALAN INI DITANDATANGANI, DISTEMPEL, DAN DI FAX KE
-                {{ header.perush_fax || header.perush_telp
-                }}<br v-if="header.perush_email" />
-                <template v-if="header.perush_email">
-                  ATAU EMAIL DI {{ header.perush_email }}
-                </template>
+                MOHON SURAT JALAN INI DITANDATANGANI, DISTEMPEL, DAN DI EMAIL KE
+                {{ header.perush_email }}
               </div>
               <div class="foot-total">Total Jumlah: {{ num(totalJumlah) }}</div>
             </div>
