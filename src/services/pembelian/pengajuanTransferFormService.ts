@@ -57,6 +57,10 @@ export const pengajuanTransferFormService = {
     api.get("/pembelian/pengajuan-transfer-form/po-lain-options", {
       params: { search, nomor },
     }),
+  getKlaimKasKecilOptions: (search = "", nomor = "") =>
+    api.get("/pembelian/pengajuan-transfer-form/klaim-kas-kecil-options", {
+      params: { search, nomor },
+    }),
   getDetailForm(nomor: string) {
     return api.get("/pembelian/pengajuan-transfer-form/detail", {
       params: { nomor },

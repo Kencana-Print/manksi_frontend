@@ -4414,8 +4414,7 @@ const router = createRouter({
     {
       path: "/ga/laporan-pengajuan-perbaikan",
       name: "GaLaporanPengajuanPerbaikan",
-      component: () =>
-        import("@/views/ga/LaporanPengajuanPerbaikanView.vue"),
+      component: () => import("@/views/ga/LaporanPengajuanPerbaikanView.vue"),
       meta: {
         title: "Laporan Pengajuan Perbaikan",
         layout: "DefaultLayout",
@@ -4907,6 +4906,17 @@ const router = createRouter({
         requiresAuth: true,
         menuId: "971",
         browseRoute: "KlaimKasKecilBrowse",
+      },
+    },
+    {
+      path: "/piutang/klaim-kas-kecil/print/:nomor",
+      name: "KlaimKasKecilPrint",
+      component: () => import("@/views/piutang/KlaimKasKecilPrintView.vue"),
+      meta: {
+        title: "Cetak Klaim Kas Kecil",
+        layout: "BlankLayout",
+        requiresAuth: true,
+        menuId: "971",
       },
     },
     {

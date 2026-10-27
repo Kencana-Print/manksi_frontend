@@ -178,7 +178,7 @@ const selectSupplierDet = (det: any) => {
 // ── Kode Sup diketik manual + Enter/blur — validasi exact match ke
 // server, sama pola BKK/BBM ──
 const onKodeSupEnter = async (d: any) => {
-  if (d.jurnal || isRealisasi.value) return;
+  if (d.jurnal || isRealisasi.value || d.klaim) return;
   const kode = (d.kode || "").trim();
   if (!kode) {
     d.nama = "";
@@ -468,8 +468,84 @@ const selectPoLain = async (p: any) => {
   await selectSupplier({ Kode: p.supKode, Nama: p.supplier });
 };
 
+// ── Klaim Kas Kecil (F8) ──
+interface KlaimKasKecilOption {
+  nomor: string;
+  tanggal: string;
+  cabang: string;
+  rekKode: string;
+  rekNama: string;
+  rekRekening: string;
+  nominal: number;
+  keterangan: string;
+  jumlahBkk: number;
+  sup: {
+    kode: string;
+    nama: string;
+    bank: string;
+    rekening: string;
+    atasnama: string;
+  };
+}
+const showKlaimModal = ref(false);
+const klaimState =
+  ref<ModalState<KlaimKasKecilOption>>(createModalState<KlaimKasKecilOption>());
+let klaimDebounce: ReturnType<typeof setTimeout> | null = null;
+
+const doSearchKlaim = async () => {
+  klaimState.value.loading = true;
+  try {
+    const res = await pengajuanTransferFormService.getKlaimKasKecilOptions(
+      klaimState.value.search,
+      form.value.nomor,
+    );
+    klaimState.value.allItems = res.data.data || [];
+  } finally {
+    klaimState.value.loading = false;
+  }
+};
+const searchKlaimDebounced = () => {
+  if (klaimDebounce) clearTimeout(klaimDebounce);
+  klaimDebounce = setTimeout(doSearchKlaim, 350);
+};
+const openKlaimModal = async (idx: number) => {
+  activeTrsIdx.value = idx;
+  klaimState.value = createModalState<KlaimKasKecilOption>();
+  showKlaimModal.value = true;
+  await doSearchKlaim();
+};
+const selectKlaim = (k: KlaimKasKecilOption) => {
+  const exists = form.value.detail.some(
+    (d, i) => i !== activeTrsIdx.value && d.trs === k.nomor,
+  );
+  if (exists) {
+    toast.warning("Klaim tsb sudah di input.");
+    return;
+  }
+  if (k.rekKode === form.value.rek_kode) {
+    toast.warning(
+      "Account header tidak boleh sama dengan rekening kas kecil tujuan.",
+    );
+    return;
+  }
+  const d = form.value.detail[activeTrsIdx.value];
+  d.trs = k.nomor;
+  d.nominal = Number(k.nominal) || 0;
+  d.kode = k.sup.kode;
+  d.nama = k.sup.nama;
+  d.bank = k.sup.bank;
+  d.rekening = k.sup.rekening;
+  d.atasnama = k.sup.atasnama;
+  d.klaim = true;
+  d.rekkode = k.rekKode;
+  d.reknama = k.rekNama;
+  if (!String(d.ket || "").trim())
+    d.ket = `Klaim Kas Kecil ${k.cabang} (${k.jumlahBkk} BKK)`;
+  showKlaimModal.value = false;
+};
+
 // ── Sumber No. Transaksi (dropdown + satu tombol cari, pola Voucher) ──
-type SumberTrs = "" | "BKK" | "VOU" | "POE" | "PC" | "POL" | "RKP";
+type SumberTrs = "" | "BKK" | "VOU" | "POE" | "PC" | "POL" | "RKP" | "KKK";
 
 const bukaModalSumber = (sumber: SumberTrs, idx: number) => {
   switch (sumber) {
@@ -490,6 +566,9 @@ const bukaModalSumber = (sumber: SumberTrs, idx: number) => {
       break;
     case "RKP":
       openRekapVouModal(idx);
+      break;
+    case "KKK":
+      openKlaimModal(idx);
       break;
     default:
       toast.warning("Pilih sumber transaksi dahulu.");
@@ -677,6 +756,7 @@ const addRow = () => {
     dckode: 0,
     jurnal: "",
     batal: "",
+    klaim: false,
   });
 };
 const removeRow = (idx: number) => {
@@ -689,11 +769,11 @@ const removeRow = (idx: number) => {
 };
 
 const onNominalFocus = (d: any, e: Event) => {
-  if (d.jurnal || isRealisasi.value) return;
+  if (d.jurnal || isRealisasi.value || d.klaim) return;
   (e.target as HTMLInputElement).value = d.nominal ? String(d.nominal) : "";
 };
 const onNominalInput = (d: any, e: Event) => {
-  if (d.jurnal || isRealisasi.value) return;
+  if (d.jurnal || isRealisasi.value || d.klaim) return;
   d.nominal = parseNum((e.target as HTMLInputElement).value);
 };
 const onNominalBlur = (d: any, e: Event) => {
@@ -964,6 +1044,9 @@ const skipCetak = () => {
             <div class="hint-row">
               <span class="hint-key">F7</span> Voucher dari Rekap
             </div>
+            <div class="hint-row">
+              <span class="hint-key">F8</span> Klaim Kas Kecil
+            </div>
           </div>
         </div>
       </CollapsiblePanel>
@@ -1075,6 +1158,7 @@ const skipCetak = () => {
                       @keydown.f4.prevent="pilihSumber('PC', idx)"
                       @keydown.f6.prevent="pilihSumber('POL', idx)"
                       @keydown.f7.prevent="pilihSumber('RKP', idx)"
+                      @keydown.f8.prevent="pilihSumber('KKK', idx)"
                     />
                     <template v-if="!d.jurnal && !isRealisasi">
                       <select v-model="d.sumber" class="type-select">
@@ -1085,6 +1169,7 @@ const skipCetak = () => {
                         <option value="PC">Petty Cash</option>
                         <option value="POL">PO Lain-lain</option>
                         <option value="RKP">Voucher Rekap</option>
+                        <option value="KKK">Klaim Kas Kecil</option>
                       </select>
                       <button
                         type="button"
@@ -1104,7 +1189,7 @@ const skipCetak = () => {
                     type="text"
                     inputmode="numeric"
                     class="cell tr"
-                    :readonly="!!d.jurnal || isRealisasi"
+                    :readonly="!!d.jurnal || isRealisasi || !!d.klaim"
                     @focus="onNominalFocus(d, $event)"
                     @input="onNominalInput(d, $event)"
                     @blur="onNominalBlur(d, $event)"
@@ -1141,10 +1226,12 @@ const skipCetak = () => {
                       class="cell"
                       style="width: 65px; flex-shrink: 0"
                       placeholder="Kode"
+                      :readonly="!!d.klaim"
                       @keydown.enter.prevent="onRekkodeEnter(d)"
                       @blur="onRekkodeEnter(d)"
                     />
                     <button
+                      v-if="!d.klaim"
                       type="button"
                       class="cell-search"
                       @click="openAccModal(idx)"
@@ -1533,6 +1620,63 @@ const skipCetak = () => {
               <tr v-if="pcState.allItems.length === 0">
                 <td colspan="5" class="text-center text-grey py-3">
                   Tidak ada hasil
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </v-card-text>
+    </v-card>
+  </v-dialog>
+
+  <!-- Modal Klaim Kas Kecil (F8) -->
+  <v-dialog v-model="showKlaimModal" max-width="980px" scrollable>
+    <v-card class="rounded-lg">
+      <v-card-title
+        class="pa-3 text-subtitle-1 text-white"
+        style="background: #1565c0"
+        >F8 — Klaim Kas Kecil</v-card-title
+      >
+      <v-card-text class="pa-3">
+        <input
+          v-model="klaimState.search"
+          class="f-inp mb-2"
+          placeholder="Cari nomor klaim atau cabang..."
+          autofocus
+          @input="searchKlaimDebounced"
+        />
+        <div style="max-height: 340px; overflow-y: auto">
+          <div v-if="klaimState.loading" class="text-center py-4 text-grey">
+            Memuat...
+          </div>
+          <table v-else class="mini-table klaim-table">
+            <thead>
+              <tr>
+                <th style="width: 150px">Nomor</th>
+                <th style="width: 90px">Tanggal</th>
+                <th style="width: 60px">Cabang</th>
+                <th>Rekening Tujuan</th>
+                <th style="width: 60px" class="text-right">BKK</th>
+                <th style="width: 120px" class="text-right">Nominal</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="k in klaimState.allItems"
+                :key="k.nomor"
+                class="mini-row"
+                @click="selectKlaim(k)"
+              >
+                <td>{{ k.nomor }}</td>
+                <td>{{ k.tanggal }}</td>
+                <td>{{ k.cabang }}</td>
+                <td>{{ k.rekKode }} - {{ k.rekNama }}</td>
+                <td class="text-right">{{ k.jumlahBkk }}</td>
+                <td class="text-right">{{ numFmt(k.nominal) }}</td>
+              </tr>
+              <tr v-if="klaimState.allItems.length === 0">
+                <td colspan="6" class="text-center text-grey py-3">
+                  Tidak ada klaim yang siap diajukan
                 </td>
               </tr>
             </tbody>
@@ -2193,5 +2337,9 @@ const skipCetak = () => {
 }
 .mini-row:hover td {
   background: #e3f2fd;
+}
+.klaim-table th,
+.klaim-table td {
+  white-space: nowrap;
 }
 </style>

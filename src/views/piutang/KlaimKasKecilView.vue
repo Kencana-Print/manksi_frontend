@@ -10,7 +10,7 @@ import {
   type KlaimKasKecilRow,
   type KlaimKasKecilDetailRow,
 } from "@/services/piutang/klaimKasKecilService";
-import { IconCashBanknote, IconBan } from "@tabler/icons-vue";
+import { IconCashBanknote, IconBan, IconPrinter } from "@tabler/icons-vue";
 import { formatTanggal } from "@/utils/dateFormat";
 import { exportExcelSingle, type ExcelColumn } from "@/utils/excelExport";
 import api from "@/services/api";
@@ -213,6 +213,18 @@ const onEdit = (item: KlaimKasKecilRow) => {
   );
 };
 
+// --- Cetak ---
+const bisaDicetak = computed(
+  () => !!selectedRow.value && selectedRow.value.Status === "AKTIF",
+);
+const onPrint = () => {
+  if (!selectedRow.value || !bisaDicetak.value) return;
+  window.open(
+    `/piutang/klaim-kas-kecil/print/${encodeURIComponent(selectedRow.value.Nomor)}`,
+    "_blank",
+  );
+};
+
 // --- Export ---
 const isExporting = ref(false);
 
@@ -317,6 +329,14 @@ const onExport = async () => {
     </template>
 
     <template #extra-actions>
+      <v-btn
+        size="small"
+        color="grey-darken-3"
+        :disabled="!bisaDicetak"
+        @click="onPrint"
+      >
+        <template #prepend><IconPrinter :size="15" /></template>Cetak
+      </v-btn>
       <v-btn
         v-if="canDelete"
         size="small"

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from "vue";
+import { ref, onMounted, computed, nextTick } from "vue";
 import { useRoute } from "vue-router";
 import { salesOrderFormService } from "@/services/penjualan/salesOrderFormService";
 import api from "@/services/api";
@@ -360,6 +360,29 @@ const keteranganProduksiLengkap = computed(() => {
   return parts.join("\n");
 });
 
+const KET_FONT_MAX = 8;
+const KET_FONT_MIN = 5.5;
+const KET_FONT_STEP = 0.25;
+const ketFontPt = ref(KET_FONT_MAX);
+const ketTerpotong = ref(false);
+
+// Kecilkan font Ket. Produksi sampai kolom kanan tidak overflow
+const fitKetProduksi = async () => {
+  ketFontPt.value = KET_FONT_MAX;
+  ketTerpotong.value = false;
+  await nextTick();
+  const el = document.querySelector<HTMLElement>(".garmen-kanan");
+  if (!el) return;
+  while (
+    el.scrollHeight > el.clientHeight + 1 &&
+    ketFontPt.value > KET_FONT_MIN
+  ) {
+    ketFontPt.value = Math.round((ketFontPt.value - KET_FONT_STEP) * 100) / 100;
+    await nextTick();
+  }
+  ketTerpotong.value = el.scrollHeight > el.clientHeight + 1;
+};
+
 const renderKeteranganTambahan = computed(() => {
   const arr = [];
   if (!isGarmen.value && !isKaosan.value && data.value.ketKomponen)
@@ -426,6 +449,8 @@ onMounted(async () => {
 
     isLoaded.value = true;
     updateStatusCetak(printNomor);
+    await nextTick();
+    fitKetProduksi();
   } catch {
     isError.value = true;
   }
@@ -624,7 +649,11 @@ onMounted(async () => {
             <div class="garmen-kanan">
               <div class="ket-box ket-section">
                 <div class="ket-title">Ket. Produksi :</div>
-                <pre class="ket-produksi">{{ keteranganProduksiLengkap }}</pre>
+                <pre
+                  class="ket-produksi"
+                  :style="{ fontSize: ketFontPt + 'pt' }"
+                  >{{ keteranganProduksiLengkap }}</pre
+                >
               </div>
 
               <!-- ALOKASI INLINE: di bawah Ket. Produksi -->
@@ -1139,8 +1168,8 @@ onMounted(async () => {
 .print-wrapper {
   display: flex;
   flex-wrap: wrap;
-  width: 297mm;
-  min-height: 190mm; /* sebelumnya height: 190mm */
+  width: 287mm; /* sebelumnya 297mm */
+  min-height: 190mm;
   margin: 0 auto;
   box-sizing: border-box;
 }
@@ -1202,6 +1231,8 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  min-height: 0;
+  overflow: hidden; /* jangan sampai menimpa QR/footer */
   font-size: 8pt;
 }
 

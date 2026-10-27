@@ -63,6 +63,25 @@ export interface KlaimSaveHasil {
   total: number;
 }
 
+export interface KlaimPrintDetail {
+  no: number;
+  bkk: string;
+  tanggal: string;
+  uraian: string;
+  nominal: number;
+}
+
+export interface KlaimPrint {
+  nomor: string;
+  tanggal: string;
+  cabang: string;
+  rekTujuan: RekeningInfo;
+  keterangan: string;
+  kasir: string;
+  total: number;
+  detail: KlaimPrintDetail[];
+}
+
 export const klaimKasKecilFormService = {
   getDefaults: (cabang?: string) =>
     api.get<ApiResult<KlaimDefaults>>(`${BASE}/defaults`, {
@@ -76,6 +95,11 @@ export const klaimKasKecilFormService = {
 
   getById: (nomor: string) =>
     api.get<ApiResult<KlaimLoaded>>(`${BASE}/${encodeURIComponent(nomor)}`),
+
+  getPrintData: (nomor: string) =>
+    api.get<ApiResult<KlaimPrint>>(
+      `${BASE}/${encodeURIComponent(nomor)}/cetak`,
+    ),
 
   save: (payload: KlaimPayload) =>
     api.post<ApiResult<KlaimSaveHasil>>(`${BASE}`, payload),
