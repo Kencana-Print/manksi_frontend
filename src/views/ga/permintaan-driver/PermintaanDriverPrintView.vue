@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from "vue";
 import { useRoute } from "vue-router";
-import { permintaanDriverService } from "@/services/penjualan/permintaanDriverService";
+import { permintaanDriverService } from "@/services/ga/permintaanDriverService";
 import logoImg from "@/assets/logo.png";
 import { IconPrinter, IconX } from "@tabler/icons-vue";
 
