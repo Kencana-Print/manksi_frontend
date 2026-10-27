@@ -223,6 +223,44 @@ const onPabrikChange = () => {
   }
 };
 
+// Ganti tanggal: jam kerja mengikuti absensi tanggal baru. Qty dipertahankan untuk
+// NIK yang masih ada di daftar; yang tidak punya absensi di tanggal itu dibuang.
+const onTanggalChange = async () => {
+  const h = formData.value.header;
+  const terisi = formData.value.items.filter((r) => r.spk.trim() !== "");
+  if (!h.tanggal || !h.kodePabrik || terisi.length === 0 || isLegacy.value) {
+    return;
+  }
+  try {
+    const daftar = await ambilKaryawanLokasi(h.kodePabrik);
+    const nikAda = new Set(daftar.map((k) => k.NIK));
+    let hilang = 0;
+    for (const r of terisi) {
+      const qtyLama = new Map(r.karyawan.map((k) => [k.nik, num(k.qty)]));
+      hilang += r.karyawan.filter(
+        (k) => num(k.qty) > 0 && !nikAda.has(k.nik),
+      ).length;
+      r.karyawan = daftar.map((k) => ({
+        nik: k.NIK,
+        nama: k.Nama,
+        jamKerja: k.Jam_Kerja,
+        absensi: 0,
+        qty: qtyLama.get(k.NIK) ?? 0,
+      }));
+    }
+    toast.info(
+      "Tanggal diubah: daftar karyawan dan jam kerja dimuat ulang dari absensi tanggal tersebut.",
+    );
+    if (hilang > 0) {
+      toast.warning(
+        `${hilang} karyawan ber-qty tidak punya absensi lengkap di tanggal ini dan dihapus dari daftar.`,
+      );
+    }
+  } catch (e) {
+    toast.error(lhkForm.pesanError(e, "Gagal memuat daftar karyawan."));
+  }
+};
+
 // Lokasi default = cabang user (kode pabrik sama dengan kode cabang).
 // Hanya di mode tambah, hanya bila Lokasi masih kosong dan kodenya ada di daftar.
 const isiLokasiDefault = () => {
@@ -547,7 +585,8 @@ const tutupSetelahSimpan = () => {
             v-model="formData.header.tanggal"
             class="idate"
             style="width: 150px"
-            :disabled="!isLegacy"
+            :max="todayLocal"
+            @change="onTanggalChange"
           />
         </div>
 
@@ -797,10 +836,11 @@ const tutupSetelahSimpan = () => {
             </table>
           </div>
           <div class="hint">
-            Jam kerja dari absensi HRD satu hari penuh (dipotong istirahat
-            12:00–13:00); bila belum scan pulang dihitung sampai saat disimpan,
-            jadi angka di sini perkiraan. Karyawan dengan qty 0 tidak disimpan;
-            tiap SPK wajib punya minimal satu karyawan ber-qty.
+            Jam kerja dari absensi HRD tanggal LHK, satu hari penuh (dipotong
+            istirahat 12:00–13:00). Hari ini yang belum scan pulang dihitung
+            sampai saat disimpan, jadi angka di sini perkiraan. Tanggal lampau
+            wajib sudah scan pulang. Karyawan dengan qty 0 tidak disimpan; tiap
+            SPK wajib punya minimal satu karyawan ber-qty.
           </div>
         </div>
       </div>
