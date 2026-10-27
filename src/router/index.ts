@@ -4728,6 +4728,41 @@ const router = createRouter({
       },
     },
     {
+      path: "/piutang/klaim-kas-kecil",
+      name: "KlaimKasKecilBrowse",
+      component: () => import("@/views/piutang/KlaimKasKecilView.vue"),
+      meta: {
+        title: "Klaim Kas Kecil",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "971",
+      },
+    },
+    {
+      path: "/piutang/klaim-kas-kecil/create",
+      name: "KlaimKasKecilCreate",
+      component: () => import("@/views/piutang/KlaimKasKecilFormView.vue"),
+      meta: {
+        title: "Tambah Klaim Kas Kecil",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "971",
+        browseRoute: "KlaimKasKecilBrowse",
+      },
+    },
+    {
+      path: "/piutang/klaim-kas-kecil/edit/:nomor",
+      name: "KlaimKasKecilEdit",
+      component: () => import("@/views/piutang/KlaimKasKecilFormView.vue"),
+      meta: {
+        title: "Ubah Klaim Kas Kecil",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "971",
+        browseRoute: "KlaimKasKecilBrowse",
+      },
+    },
+    {
       path: "/piutang/jurnal-umum",
       name: "JurnalUmumBrowse",
       component: () => import("@/views/piutang/JurnalUmumView.vue"),

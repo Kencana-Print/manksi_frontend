@@ -1183,6 +1183,12 @@ export const createMenuItems = (): NavItem[] => {
           menuId: 955,
         },
         {
+          title: "Klaim Kas Kecil",
+          to: "/piutang/klaim-kas-kecil",
+          icon: IconCashBanknote,
+          menuId: 971,
+        },
+        {
           title: "Jurnal Umum",
           to: "/piutang/jurnal-umum",
           icon: IconBook,
