@@ -96,11 +96,6 @@ onMounted(async () => {
           <td>:</td>
           <td>{{ data.Kode_Pabrik ?? "" }}</td>
         </tr>
-        <tr v-if="data.Sesi">
-          <td>Sesi</td>
-          <td>:</td>
-          <td>{{ data.Sesi === "PAGI" ? "Pagi" : "Siang" }}</td>
-        </tr>
       </table>
 
       <table class="grid">
@@ -141,7 +136,7 @@ onMounted(async () => {
         </tfoot>
       </table>
 
-      <template v-if="data.Sesi && karyawanUnik.length > 0">
+      <template v-if="!data.Legacy && karyawanUnik.length > 0">
         <div class="sub-judul">Karyawan</div>
         <table class="grid kar-grid">
           <thead>

@@ -17,7 +17,6 @@ import { formatTanggal } from "@/utils/dateFormat";
 interface ExportDetailRow {
   Nomor: string;
   Tanggal: string;
-  Sesi: string;
   Kode_Pabrik: string;
   Nama_Pabrik: string;
   Nomor_SPK: string;
@@ -55,9 +54,6 @@ const filterState = ref({
 // --- DETAIL: dimuat sekali untuk seluruh periode, dikelompokkan per nomor ---
 const detailMap = ref<Record<string, LhkLipatDetailRow[]>>({});
 const karyawanMap = ref<Record<string, LhkLipatKaryawanRow[]>>({});
-
-const sesiLabel = (s: string | null | undefined): string =>
-  s === "PAGI" ? "Pagi" : s === "SIANG" ? "Siang" : "-";
 
 const fmtJam = (menit: number | null | undefined): string => {
   const m = Math.max(0, Number(menit) || 0);
@@ -120,7 +116,6 @@ const baseBrowseRef = ref<InstanceType<typeof BaseBrowse> | null>(null);
 const headers = [
   { title: "Nomor", key: "Nomor", width: "170px" },
   { title: "Tanggal", key: "Tanggal", width: "110px", align: "center" },
-  { title: "Sesi", key: "Sesi", width: "90px", align: "center" },
   { title: "Kode Pabrik", key: "Kode_Pabrik", width: "120px" },
   { title: "Nama Pabrik", key: "Nama_Pabrik", width: "260px" },
 ];
@@ -130,7 +125,6 @@ const NUM = "#,##0.00";
 const kolomMaster: ExcelColumn[] = [
   { header: "Nomor", key: "Nomor", width: 20 },
   { header: "Tanggal", key: "Tanggal", width: 14, align: "center" },
-  { header: "Sesi", key: "Sesi", width: 10, align: "center" },
   { header: "Kode Pabrik", key: "Kode_Pabrik", width: 14 },
   { header: "Nama Pabrik", key: "Nama_Pabrik", width: 30 },
 ];
@@ -138,7 +132,6 @@ const kolomMaster: ExcelColumn[] = [
 const kolomDetail: ExcelColumn[] = [
   { header: "Nomor", key: "Nomor", width: 20 },
   { header: "Tanggal", key: "Tanggal", width: 14, align: "center" },
-  { header: "Sesi", key: "Sesi", width: 10, align: "center" },
   { header: "Kode Pabrik", key: "Kode_Pabrik", width: 14 },
   { header: "Nama Pabrik", key: "Nama_Pabrik", width: 28 },
   { header: "Nomor SPK", key: "Nomor_SPK", width: 20 },
@@ -236,7 +229,6 @@ const exportMaster = () =>
       dataTampil().map((r) => ({
         ...r,
         Tanggal: formatTanggal(r.Tanggal),
-        Sesi: sesiLabel(r.Sesi),
       })),
   });
 
@@ -257,7 +249,6 @@ const exportDetail = async () => {
       rows.push({
         Nomor: item.Nomor,
         Tanggal: formatTanggal(item.Tanggal),
-        Sesi: sesiLabel(item.Sesi),
         Kode_Pabrik: item.Kode_Pabrik ?? "",
         Nama_Pabrik: item.Nama_Pabrik ?? "",
         Nomor_SPK: r.Nomor_SPK,
@@ -333,10 +324,6 @@ const numFmt = (v: number | null) =>
       {{ formatTanggal(item.Tanggal) }}
     </template>
 
-    <template #item.Sesi="{ item }">
-      {{ sesiLabel(item.Sesi) }}
-    </template>
-
     <!-- Detail Expand -->
     <template #detail="{ item }">
       <div class="expand-wrap">
@@ -381,9 +368,9 @@ const numFmt = (v: number | null) =>
                   >
                     {{ k.Nama }} · {{ numFmt(k.Qty) }} pcs ·
                     {{
-                      item.Sesi
-                        ? fmtJam(k.Menit_Kerja) + " jam"
-                        : "abs " + numFmt(k.Absensi)
+                      k.Legacy
+                        ? "abs " + numFmt(k.Absensi)
+                        : fmtJam(k.Menit_Kerja) + " jam"
                     }}
                   </span>
                 </td>

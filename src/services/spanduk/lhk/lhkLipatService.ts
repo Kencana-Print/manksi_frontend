@@ -13,7 +13,6 @@ interface ApiResponse<T> {
 export interface LhkLipatRow {
   Nomor: string;
   Tanggal: string;
-  Sesi: string;
   Kode_Pabrik: string | null;
   Nama_Pabrik: string | null;
 }
@@ -39,6 +38,7 @@ export interface LhkLipatKaryawanRow {
   Absensi: number | null; // legacy (LHK lama)
   Qty: number | null;
   Menit_Kerja: number;
+  Legacy: boolean;
 }
 
 export const getBrowse = async (

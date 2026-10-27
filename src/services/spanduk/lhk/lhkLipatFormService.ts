@@ -47,7 +47,7 @@ export interface LhkLipatForm {
   Tanggal: string;
   Kode_Pabrik: string | null;
   Nama_Pabrik: string | null;
-  Sesi: string;
+  Legacy: boolean;
   Detail: LhkLipatDetail[];
 }
 
@@ -62,7 +62,6 @@ export interface InfoSpk {
 export interface LhkLipatPayload {
   Tanggal: string;
   Kode_Pabrik: string;
-  Sesi: string;
   Detail: {
     Nomor_SPK: string;
     Qty_Lipat: number;
@@ -101,12 +100,11 @@ export const getLookupPabrik = async (search = ""): Promise<PabrikOption[]> => {
 
 export const getLookupKaryawan = async (
   pabrik: string,
-  sesi: string,
   tanggal: string,
 ): Promise<KaryawanOption[]> => {
   const res = await api.get<ApiResponse<KaryawanOption[]>>(
     `${BASE}/lookups/karyawan`,
-    { params: { pabrik, sesi, tanggal } },
+    { params: { pabrik, tanggal } },
   );
   return res.data.data;
 };

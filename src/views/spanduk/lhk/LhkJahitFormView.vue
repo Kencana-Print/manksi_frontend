@@ -23,7 +23,7 @@ const authStore = useAuthStore();
 const isEditMode = computed(() => !!route.params.nomor);
 
 const isLegacy = computed(
-  () => isEditMode.value && formData.value.header.sesi === "",
+  () => isEditMode.value && formData.value.header.legacy,
 );
 
 // Delphi: hanya Lokasi MT1 yang boleh mengisi Qty Jahit manual
@@ -65,7 +65,7 @@ interface FormState {
     tanggal: string;
     kodePabrik: string;
     namaPabrik: string;
-    sesi: string;
+    legacy: boolean;
   };
   items: FormRow[];
 }
@@ -91,7 +91,7 @@ const defaultData = (): FormState => ({
     tanggal: todayLocal,
     kodePabrik: "",
     namaPabrik: "",
-    sesi: "",
+    legacy: false,
   },
   items: [barisKosong()],
 });
@@ -111,7 +111,6 @@ const bangunPayload = (data: FormState): LhkJahitPayload => {
   return {
     Tanggal: data.header.tanggal,
     Kode_Pabrik: data.header.kodePabrik,
-    Sesi: data.header.sesi,
     Detail: data.items
       .filter((r) => r.spk.trim() !== "")
       .map((r) => ({
@@ -166,7 +165,7 @@ const {
         tanggal: d.Tanggal,
         kodePabrik: d.Kode_Pabrik ?? "",
         namaPabrik: d.Nama_Pabrik ?? "",
-        sesi: d.Sesi ?? "",
+        legacy: d.Legacy,
       },
       items: items.length > 0 ? items : [barisKosong()],
     };
@@ -224,30 +223,6 @@ const onPabrikChange = () => {
   }
 };
 
-// Ganti sesi: daftar karyawan di semua baris SPK diambil ulang (qty direset)
-const onSesiChange = async () => {
-  const kode = formData.value.header.kodePabrik;
-  const terisi = formData.value.items.filter((r) => r.spk.trim() !== "");
-  if (!kode || terisi.length === 0) {
-    return;
-  }
-  try {
-    const daftar = await ambilKaryawanLokasi(kode);
-    for (const r of terisi) {
-      r.karyawan = daftar.map((k) => ({
-        nik: k.NIK,
-        nama: k.Nama,
-        jamKerja: k.Jam_Kerja,
-        absensi: 0,
-        qty: 0,
-      }));
-    }
-    toast.info("Sesi diubah: daftar karyawan dimuat ulang, qty direset.");
-  } catch (e) {
-    toast.error(lhkForm.pesanError(e, "Gagal memuat daftar karyawan."));
-  }
-};
-
 // Lokasi default = cabang user (kode pabrik sama dengan kode cabang).
 // Hanya di mode tambah, hanya bila Lokasi masih kosong dan kodenya ada di daftar.
 const isiLokasiDefault = () => {
@@ -302,13 +277,9 @@ const openLookupSpk = (idx: number) => {
   showSpkModal.value = true;
 };
 
-// Daftar karyawan jahit: MT1 dari master, selain itu dari absensi hari ini sesuai sesi
+// Daftar karyawan jahit: MT1 dari master, selain itu dari absensi hari ini
 const ambilKaryawanLokasi = (kode: string): Promise<KaryawanOption[]> =>
-  lhkForm.getLookupKaryawan(
-    kode,
-    formData.value.header.sesi,
-    formData.value.header.tanggal,
-  );
+  lhkForm.getLookupKaryawan(kode, formData.value.header.tanggal);
 
 // Isi satu baris dari nomor SPK/MAP. Data diambil server (sekaligus validasi
 // divisi dan cabang). Karyawan diisi dari master per Lokasi, absensi & qty 0.
@@ -329,10 +300,6 @@ const isiBarisDariSpk = async (
   const kodePabrik = formData.value.header.kodePabrik;
   if (!kodePabrik) {
     toast.warning("Pilih Lokasi terlebih dahulu.");
-    return false;
-  }
-  if (!formData.value.header.sesi && kodePabrik !== LOKASI_QTY_MANUAL) {
-    toast.warning("Pilih Sesi terlebih dahulu.");
     return false;
   }
 
@@ -459,10 +426,6 @@ const validateSave = () => {
     toast.warning("Lokasi belum dipilih.");
     return;
   }
-  if (!isLegacy.value && !formData.value.header.sesi) {
-    toast.warning("Sesi belum dipilih.");
-    return;
-  }
 
   const terisi = formData.value.items
     .map((r, i) => ({ r, no: i + 1 }))
@@ -586,21 +549,6 @@ const tutupSetelahSimpan = () => {
             style="width: 150px"
             :disabled="!isLegacy"
           />
-        </div>
-
-        <div class="fr">
-          <label class="lbl">Sesi</label>
-          <select
-            v-model="formData.header.sesi"
-            class="inp"
-            style="width: 110px"
-            :disabled="isEditMode"
-            @change="onSesiChange"
-          >
-            <option value="" disabled>Pilih...</option>
-            <option value="PAGI">Pagi</option>
-            <option value="SIANG">Siang</option>
-          </select>
         </div>
 
         <div class="sep" />
@@ -849,8 +797,10 @@ const tutupSetelahSimpan = () => {
             </table>
           </div>
           <div class="hint">
-            Jam kerja diambil otomatis dari absensi HRD. Karyawan dengan qty 0
-            tidak disimpan; tiap SPK wajib punya minimal satu karyawan ber-qty.
+            Jam kerja dari absensi HRD satu hari penuh (dipotong istirahat
+            12:00–13:00); bila belum scan pulang dihitung sampai saat disimpan,
+            jadi angka di sini perkiraan. Karyawan dengan qty 0 tidak disimpan;
+            tiap SPK wajib punya minimal satu karyawan ber-qty.
           </div>
         </div>
       </div>
