@@ -23,8 +23,10 @@ import {
   IconTrash,
   IconSearch,
   IconX,
+  IconListDetails,
 } from "@tabler/icons-vue";
-import { formatTanggal } from "@/utils/dateFormat";
+import { formatTanggalSingkat as formatTanggal } from "@/utils/dateFormat";
+import TanggalInput from "@/components/TanggalInput.vue";
 
 const authStore = useAuthStore();
 const toast = useToast();
@@ -66,6 +68,8 @@ interface DetailRow {
   Sumber: string;
   Nama: string;
   Tanggal: string;
+  Panjang: number;
+  Lebar: number;
   Pesan: number;
   Kirim: number;
   Kurang: number;
@@ -78,6 +82,18 @@ interface DetailRow {
   Kesepakatan: string;
   QtyKesepakatan: number;
   KetKesepakatan: string;
+  KesepakatanBd: BdItem[];
+  SpkRef?: string | null; // undefined = belum diketahui
+}
+
+interface BdItem {
+  Tanggal: string;
+  Qty: number;
+}
+interface RiwayatKirim {
+  Nomor: string;
+  Tanggal: string;
+  Qty: number;
 }
 
 const showCloseDialog = ref(false);
@@ -290,6 +306,36 @@ const detailMap = computed(() => detail.value.filter((d) => d.Tipe === "MAP"));
 const visibleDetail = computed(() =>
   activeFormTab.value === "MAP" ? detailMap.value : detailSo.value,
 );
+const tampilPanjangLebar = computed(() =>
+  ["P02", "P05"].includes(header.pjw_cab),
+);
+
+// Baris yang baru ditarik/ditambah belum membawa Panjang & Lebar (data
+// kandidat tidak memuatnya). Ambil dari getDetail yang sama dengan browse,
+// tempel hanya ke baris yang sudah ada; di-debounce supaya Tarik banyak SO
+// cukup satu kali panggil.
+let syncPanjangLebarTimer: ReturnType<typeof setTimeout> | null = null;
+const syncPanjangLebar = () => {
+  if (!tampilPanjangLebar.value || !header.pjw_nomor) return;
+  if (syncPanjangLebarTimer) clearTimeout(syncPanjangLebarTimer);
+  syncPanjangLebarTimer = setTimeout(async () => {
+    try {
+      const res = await penjadwalanPpicService.getDetail(header.pjw_nomor);
+      const rows: { PjwdId: number; Panjang: number; Lebar: number }[] =
+        res.data.data ?? [];
+      const byId = new Map(rows.map((r) => [r.PjwdId, r]));
+      for (const d of detail.value) {
+        const p = d.PjwdId != null ? byId.get(d.PjwdId) : undefined;
+        if (p) {
+          d.Panjang = Number(p.Panjang) || 0;
+          d.Lebar = Number(p.Lebar) || 0;
+        }
+      }
+    } catch {
+      // hanya tampilan; abaikan bila gagal
+    }
+  }, 300);
+};
 
 // ═══════════════════════════════════════════════════════════════
 // LOAD DATA — mode edit (fetch existing) atau mode baru (create langsung)
@@ -306,6 +352,8 @@ const mapDetailRow = (r: any): DetailRow => ({
   Sumber: r.Sumber || (r.Nomor ? "SO" : r.NomorMap ? "MAP" : "PRA ORDER"),
   Nama: r.Nama,
   Tanggal: r.Tanggal,
+  Panjang: Number(r.Panjang) || 0,
+  Lebar: Number(r.Lebar) || 0,
   Pesan: Number(r.Pesan) || 0,
   Kirim: Number(r.Kirim) || 0,
   Kurang: Number(r.Kurang) || 0,
@@ -318,6 +366,13 @@ const mapDetailRow = (r: any): DetailRow => ({
   Kesepakatan: r.Kesepakatan || "",
   QtyKesepakatan: Number(r.QtyKesepakatan) || 0,
   KetKesepakatan: r.KetKesepakatan || "",
+  KesepakatanBd: Array.isArray(r.KesepakatanBd)
+    ? r.KesepakatanBd.map((b: { Tanggal: string; Qty: number }) => ({
+        Tanggal: b.Tanggal,
+        Qty: Number(b.Qty) || 0,
+      }))
+    : [],
+  SpkRef: r.SpkRef ?? null,
 });
 
 const loadExisting = async (nomor: string) => {
@@ -368,6 +423,12 @@ const createNew = async () => {
     );
     joinRoom(header.pjw_nomor);
     toast.success(`Komitmen Kirim ${header.pjw_nomor} berhasil dibuat.`);
+    if (res.data.data.jumlahSo > 0) {
+      await loadExisting(header.pjw_nomor);
+      toast.info(
+        `${res.data.data.jumlahSo} SO otomatis masuk berdasarkan dateline.`,
+      );
+    }
   } catch (e: any) {
     toast.error(
       e.response?.data?.message || "Gagal membuat Komitmen Kirim baru.",
@@ -437,6 +498,8 @@ const pushRowFromServer = (pjwdId: number, rowInput: any) => {
       (rowInput.SoNomor ? "SO" : rowInput.MapNomor ? "MAP" : "PRA ORDER"),
     Nama: rowInput.Nama,
     Tanggal: rowInput.Tanggal,
+    Panjang: Number(rowInput.Panjang) || 0,
+    Lebar: Number(rowInput.Lebar) || 0,
     Pesan: Number(rowInput.Pesan) || 0,
     Kirim: Number(rowInput.Kirim) || 0,
     Kurang: Number(rowInput.Kurang) || 0,
@@ -449,7 +512,10 @@ const pushRowFromServer = (pjwdId: number, rowInput: any) => {
     Kesepakatan: "",
     QtyKesepakatan: 0,
     KetKesepakatan: "",
+    KesepakatanBd: [],
+    SpkRef: undefined,
   });
+  syncPanjangLebar();
 };
 
 const isDuplicate = (sumber: string, nomor: string, penId?: string) => {
@@ -952,6 +1018,12 @@ const moveCursorToEnd = (e: Event) => {
 };
 
 const onRencanaInput = (row: DetailRow, raw: string, e: Event) => {
+  if (row.KesepakatanBd.length) {
+    (e.target as HTMLInputElement).value = String(row.Rencana);
+    pendingRencana.value = { row, raw, e };
+    showBdWarnDialog.value = true;
+    return;
+  }
   const val = raw.replace(/[^0-9]/g, "");
   row.Rencana = val ? Number(val) : 0;
   if (row.StatusPermintaan !== "NECESSARY") {
@@ -997,6 +1069,143 @@ const onQtyKesepakatanChange = (row: DetailRow) =>
   onDetailFieldChange(row, "QtyKesepakatan", "pjwd_qty_kesepakatan");
 const onKetKesepakatanChange = (row: DetailRow) =>
   onDetailFieldChange(row, "KetKesepakatan", "pjwd_ket_kesepakatan");
+// ═══════════════════════════════════════════════════════════════
+// BREAKDOWN KESEPAKATAN (kiriman parsial) + RIWAYAT SJ
+// ═══════════════════════════════════════════════════════════════
+const showBdDialog = ref(false);
+const bdRow = ref<DetailRow | null>(null);
+const bdItems = ref<BdItem[]>([]);
+const bdRiwayat = ref<RiwayatKirim[]>([]);
+const bdLoading = ref(false);
+const bdSaving = ref(false);
+
+const showBdWarnDialog = ref(false);
+const pendingRencana = ref<{ row: DetailRow; raw: string; e: Event } | null>(
+  null,
+);
+
+const bdTotal = computed(() =>
+  bdItems.value.reduce((s, it) => s + (Number(it.Qty) || 0), 0),
+);
+const bdTerkirim = computed(() =>
+  bdRiwayat.value.reduce((s, r) => s + (Number(r.Qty) || 0), 0),
+);
+
+// Aturan sama dengan validasi backend (simpanKesepakatan)
+const bdError = computed(() => {
+  const row = bdRow.value;
+  if (!row) return "";
+  if (bdItems.value.length < 2) return "Minimal 2 baris untuk memecah jadwal.";
+  if (bdItems.value.some((it) => !it.Tanggal))
+    return "Tanggal semua baris wajib diisi.";
+  if (bdItems.value.some((it) => !(Number(it.Qty) > 0)))
+    return "Qty setiap baris harus lebih dari 0.";
+  const awal = bdItems.value.map((it) => it.Tanggal).sort()[0];
+  if (awal < header.pjw_tgl1 || awal > header.pjw_tgl2)
+    return "Tanggal paling awal harus di dalam periode ini.";
+  const rencana = Number(row.Rencana) || 0;
+  if (bdTotal.value !== rencana)
+    return `Total ${fmt(bdTotal.value)} harus sama dengan Rencana ${fmt(rencana)}.`;
+  return "";
+});
+
+const openBreakdown = async (row: DetailRow) => {
+  if (!row.PjwdId) return;
+  bdRow.value = row;
+  bdItems.value = row.KesepakatanBd.length
+    ? row.KesepakatanBd.map((b) => ({ ...b }))
+    : [
+        { Tanggal: row.Kesepakatan || "", Qty: Number(row.Rencana) || 0 },
+        { Tanggal: "", Qty: 0 },
+      ];
+  bdRiwayat.value = [];
+  showBdDialog.value = true;
+  bdLoading.value = true;
+  try {
+    // Baris yang baru ditarik belum membawa acuan SPK: ambil dari getDetail
+    if (row.SpkRef === undefined) {
+      const res = await penjadwalanPpicService.getDetail(header.pjw_nomor);
+      const rows: { PjwdId: number; SpkRef: string | null }[] =
+        res.data.data ?? [];
+      row.SpkRef = rows.find((r) => r.PjwdId === row.PjwdId)?.SpkRef ?? null;
+    }
+    if (row.SpkRef) {
+      const res = await penjadwalanPpicService.getRiwayatKirim(row.SpkRef);
+      bdRiwayat.value = res.data.data ?? [];
+    }
+  } catch {
+    toast.error("Gagal memuat riwayat kirim.");
+  } finally {
+    bdLoading.value = false;
+  }
+};
+
+const onBdQtyInput = (it: BdItem, raw: string) => {
+  it.Qty = Number(raw.replace(/[^0-9]/g, "")) || 0;
+};
+const tambahBarisBd = () => bdItems.value.push({ Tanggal: "", Qty: 0 });
+const hapusBarisBd = (i: number) => bdItems.value.splice(i, 1);
+
+const kirimBreakdown = async (items: BdItem[]) => {
+  const row = bdRow.value;
+  if (!row?.PjwdId) return;
+  bdSaving.value = true;
+  try {
+    const res = await penjadwalanPpicService.saveKesepakatan(
+      header.pjw_nomor,
+      row.PjwdId,
+      items,
+    );
+    const d = res.data.data;
+    row.KesepakatanBd = d.items ?? [];
+    row.Kesepakatan = d.tglKesepakatan || "";
+    if (d.qtyKesepakatan !== null && d.qtyKesepakatan !== undefined)
+      row.QtyKesepakatan = Number(d.qtyKesepakatan);
+    showBdDialog.value = false;
+    toast.success("Kesepakatan disimpan.");
+  } catch (e: any) {
+    toast.error(e.response?.data?.message || "Gagal menyimpan breakdown.");
+  } finally {
+    bdSaving.value = false;
+  }
+};
+
+const simpanBreakdown = () => {
+  if (bdError.value) return;
+  const items = bdItems.value
+    .map((it) => ({ Tanggal: it.Tanggal, Qty: Number(it.Qty) }))
+    .sort((a, b) => a.Tanggal.localeCompare(b.Tanggal));
+  return kirimBreakdown(items);
+};
+
+// Kembali ke satu tanggal (tanpa breakdown) — tanggal paling awal dipertahankan
+const hapusBreakdown = () => {
+  const awal =
+    bdItems.value
+      .map((it) => it.Tanggal)
+      .filter(Boolean)
+      .sort()[0] ||
+    bdRow.value?.Kesepakatan ||
+    "";
+  if (!awal) return toast.warning("Isi minimal satu tanggal dulu.");
+  return kirimBreakdown([
+    { Tanggal: awal, Qty: Number(bdRow.value?.Rencana) || 0 },
+  ]);
+};
+
+const confirmUbahRencana = () => {
+  const p = pendingRencana.value;
+  showBdWarnDialog.value = false;
+  pendingRencana.value = null;
+  if (!p) return;
+  p.row.KesepakatanBd = []; // backend ikut menghapus saat Rencana benar-benar berubah
+  onRencanaInput(p.row, p.raw, p.e);
+};
+const batalUbahRencana = () => {
+  showBdWarnDialog.value = false;
+  pendingRencana.value = null;
+};
+
 const showMoveDialog = ref(false);
 const moveTargetInfo = ref<any>(null);
 const moveRowRef = ref<DetailRow | null>(null);
@@ -1149,6 +1358,11 @@ onMounted(() => {
     if (localField) (row as any)[localField] = payload.value;
   });
 
+  on("pjw:kesepakatan-updated", (payload: any) => {
+    const row = detail.value.find((d) => d.PjwdId === payload.pjwd_id);
+    if (row) row.KesepakatanBd = payload.items ?? [];
+  });
+
   on("pjw:row-deleted", (payload: any) => {
     const idx = detail.value.findIndex((d) => d.PjwdId === payload.pjwd_id);
     if (idx !== -1) detail.value.splice(idx, 1);
@@ -1257,15 +1471,13 @@ const rowClass = (d: DetailRow) => {
           />
 
           <label class="pjw-lbl" style="margin-left: 16px">Periode</label>
-          <input
-            type="date"
+          <TanggalInput
             v-model="header.pjw_tgl1"
             class="pjw-date"
             :disabled="isEditMode || !canEditMarketing"
           />
           <span class="pjw-sep">s/d</span>
-          <input
-            type="date"
+          <TanggalInput
             v-model="header.pjw_tgl2"
             class="pjw-date"
             :disabled="isEditMode || !canEditMarketing"
@@ -1394,6 +1606,12 @@ const rowClass = (d: DetailRow) => {
             <tr>
               <th style="width: 90px">Tanggal</th>
               <th>Nomor / Nama SO</th>
+              <th v-if="tampilPanjangLebar" style="width: 70px" class="tr">
+                Panjang
+              </th>
+              <th v-if="tampilPanjangLebar" style="width: 70px" class="tr">
+                Lebar
+              </th>
               <th style="width: 80px" class="tr">Pesan</th>
               <th style="width: 80px" class="tr">Kirim</th>
               <th style="width: 80px" class="tr">Kurang</th>
@@ -1446,6 +1664,8 @@ const rowClass = (d: DetailRow) => {
                   >{{ d.Sumber }}</span
                 >
               </td>
+              <td v-if="tampilPanjangLebar" class="tr">{{ fmt(d.Panjang) }}</td>
+              <td v-if="tampilPanjangLebar" class="tr">{{ fmt(d.Lebar) }}</td>
               <td class="tr">
                 <input
                   v-if="isManualRow(d)"
@@ -1557,8 +1777,7 @@ const rowClass = (d: DetailRow) => {
                     ].nama
                   }}
                 </span>
-                <input
-                  type="date"
+                <TanggalInput
                   v-model="d.PermintaanKirim"
                   class="pjw-cell-date"
                   :disabled="!canEditMarketing"
@@ -1627,7 +1846,9 @@ const rowClass = (d: DetailRow) => {
                       class="pjw-cell-num pjw-cell-qty"
                       placeholder="Qty"
                       :value="d.QtyKesepakatan"
-                      :disabled="!canEditKesepakatan"
+                      :disabled="
+                        !canEditKesepakatan || d.KesepakatanBd.length > 0
+                      "
                       @focus="
                         (e) => {
                           sel(e);
@@ -1643,11 +1864,12 @@ const rowClass = (d: DetailRow) => {
                         )
                       "
                     />
-                    <input
-                      type="date"
+                    <TanggalInput
                       v-model="d.Kesepakatan"
                       class="pjw-cell-date"
-                      :disabled="!canEditKesepakatan"
+                      :disabled="
+                        !canEditKesepakatan || d.KesepakatanBd.length > 0
+                      "
                       @focus="onKesepakatanFocus(d)"
                       @blur="onKesepakatanBlur(d)"
                     />
@@ -1661,6 +1883,23 @@ const rowClass = (d: DetailRow) => {
                     @blur="onFieldBlur(d, 'pjwd_ket_kesepakatan')"
                     @change="onKetKesepakatanChange(d)"
                   />
+                  <div class="pjw-bd-row">
+                    <button
+                      v-if="canEditKesepakatan && d.PjwdId"
+                      type="button"
+                      class="pjw-bd-btn"
+                      @click="openBreakdown(d)"
+                    >
+                      <IconListDetails :size="12" />
+                      {{ d.KesepakatanBd.length ? "Ubah pecahan" : "Pecah" }}
+                    </button>
+                    <span
+                      v-for="(b, i) in d.KesepakatanBd"
+                      :key="i"
+                      class="pjw-bd-chip"
+                      >{{ formatTanggal(b.Tanggal) }} · {{ fmt(b.Qty) }}</span
+                    >
+                  </div>
                 </div>
               </td>
               <td class="tc">
@@ -1675,7 +1914,7 @@ const rowClass = (d: DetailRow) => {
               </td>
             </tr>
             <tr v-if="!detail.length">
-              <td colspan="12" class="pjw-empty">
+              <td :colspan="tampilPanjangLebar ? 14 : 12" class="pjw-empty">
                 Belum ada SO/MAP/Pra Order. Klik tombol Tarik atau tambahkan
                 manual di atas.
               </td>
@@ -1683,7 +1922,10 @@ const rowClass = (d: DetailRow) => {
           </tbody>
           <tfoot>
             <tr class="pjw-footer-row">
-              <td colspan="5" class="pjw-footer-label">
+              <td
+                :colspan="tampilPanjangLebar ? 7 : 5"
+                class="pjw-footer-label"
+              >
                 Total Rencana{{ activeFormTab === "MAP" ? " (Sampel)" : "" }}
               </td>
               <td class="tr pjw-footer-val">{{ fmt(totalRencanaVisible) }}</td>
@@ -1694,6 +1936,156 @@ const rowClass = (d: DetailRow) => {
       </div>
     </div>
   </BaseForm>
+
+  <v-dialog v-model="showBdDialog" max-width="780" persistent>
+    <v-card class="rounded-lg">
+      <v-card-title class="bg-primary text-white pa-3 text-subtitle-1">
+        Breakdown Kesepakatan —
+        {{
+          bdRow?.SoNomor ||
+          bdRow?.MapNomor ||
+          bdRow?.NomorPraOrder ||
+          bdRow?.Nama
+        }}
+      </v-card-title>
+      <v-card-text class="pa-3">
+        <div class="bd-body">
+          <div class="bd-col">
+            <div class="bd-title">
+              Jadwal Sepakat
+              <span class="bd-sub"
+                >Rencana: {{ fmt(bdRow?.Rencana ?? 0) }}</span
+              >
+            </div>
+            <table class="bd-tbl">
+              <thead>
+                <tr>
+                  <th>Tgl Kirim</th>
+                  <th class="tr">Qty</th>
+                  <th style="width: 28px"></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(it, i) in bdItems" :key="i">
+                  <td><TanggalInput v-model="it.Tanggal" class="bd-date" /></td>
+                  <td class="tr">
+                    <input
+                      type="text"
+                      inputmode="numeric"
+                      class="bd-qty"
+                      :value="it.Qty"
+                      @focus="sel"
+                      @input="
+                        onBdQtyInput(
+                          it,
+                          ($event.target as HTMLInputElement).value,
+                        )
+                      "
+                    />
+                  </td>
+                  <td class="tc">
+                    <button
+                      v-if="bdItems.length > 1"
+                      type="button"
+                      class="pjw-row-del"
+                      @click="hapusBarisBd(i)"
+                    >
+                      <IconTrash :size="12" />
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+            <button
+              type="button"
+              class="pjw-bd-btn mt-1"
+              @click="tambahBarisBd"
+            >
+              + Baris
+            </button>
+            <div class="bd-total" :class="bdError ? 'err' : 'ok'">
+              Total {{ fmt(bdTotal) }} / Rencana {{ fmt(bdRow?.Rencana ?? 0) }}
+            </div>
+            <div v-if="bdError" class="bd-err">{{ bdError }}</div>
+          </div>
+
+          <div class="bd-col">
+            <div class="bd-title">
+              Riwayat Kirim (SJ)
+              <span class="bd-sub">Terkirim: {{ fmt(bdTerkirim) }}</span>
+            </div>
+            <div v-if="bdLoading" class="bd-note">Memuat...</div>
+            <div v-else-if="bdRow?.SpkRef === null" class="bd-note">
+              Baris ini tidak terhubung ke SPK, jadi tidak ada riwayat SJ.
+            </div>
+            <div v-else-if="!bdRiwayat.length" class="bd-note">
+              Belum ada SJ untuk SPK ini.
+            </div>
+            <table v-else class="bd-tbl">
+              <thead>
+                <tr>
+                  <th>Tgl Kirim</th>
+                  <th>No SJ</th>
+                  <th class="tr">Qty</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(r, i) in bdRiwayat" :key="i">
+                  <td>{{ formatTanggal(r.Tanggal) }}</td>
+                  <td class="mono">{{ r.Nomor }}</td>
+                  <td class="tr">{{ fmt(r.Qty) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </v-card-text>
+      <v-card-actions class="pa-3 border-t bg-grey-lighten-4">
+        <v-btn variant="text" :disabled="bdSaving" @click="showBdDialog = false"
+          >Batal</v-btn
+        >
+        <v-spacer />
+        <v-btn
+          v-if="bdRow?.KesepakatanBd.length"
+          variant="text"
+          color="error"
+          :disabled="bdSaving"
+          @click="hapusBreakdown"
+          >Hapus Pecahan</v-btn
+        >
+        <v-btn
+          color="primary"
+          variant="elevated"
+          :loading="bdSaving"
+          :disabled="!!bdError"
+          @click="simpanBreakdown"
+          >Simpan</v-btn
+        >
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
+
+  <v-dialog v-model="showBdWarnDialog" max-width="400" persistent>
+    <v-card class="rounded-lg">
+      <v-card-title class="bg-orange-darken-2 text-white pa-3 text-subtitle-1">
+        Ubah Rencana?
+      </v-card-title>
+      <v-card-text class="pa-4" style="font-size: 13px">
+        Baris ini sudah punya pecahan jadwal kesepakatan. Mengubah Rencana akan
+        <b>menghapus pecahan tersebut</b>, dan PPIC perlu mengisinya lagi.
+      </v-card-text>
+      <v-card-actions class="pa-3 border-t bg-grey-lighten-4">
+        <v-btn variant="text" @click="batalUbahRencana">Batal</v-btn>
+        <v-spacer />
+        <v-btn
+          color="orange-darken-2"
+          variant="elevated"
+          @click="confirmUbahRencana"
+          >Ya, Ubah</v-btn
+        >
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
 
   <v-dialog v-model="showMoveDialog" max-width="420" persistent>
     <v-card class="rounded-lg">
@@ -2308,5 +2700,103 @@ const rowClass = (d: DetailRow) => {
 .pen-status-badge.batal {
   background: #ffebee;
   color: #c62828;
+}
+.pjw-bd-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-top: 3px;
+}
+.pjw-bd-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 6px;
+  border: 1px solid #1976d2;
+  border-radius: 3px;
+  background: white;
+  color: #1976d2;
+  font-size: 11px;
+  cursor: pointer;
+}
+.pjw-bd-btn:hover {
+  background: #e3f2fd;
+}
+.pjw-bd-chip {
+  padding: 0 5px;
+  border-radius: 3px;
+  background: #fff3e0;
+  color: #e65100;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.bd-body {
+  display: flex;
+  gap: 16px;
+}
+.bd-col {
+  flex: 1;
+  min-width: 0;
+}
+.bd-title {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 4px;
+  font-size: 11px;
+  font-weight: 700;
+}
+.bd-sub {
+  font-weight: 400;
+  color: #666;
+}
+.bd-tbl {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+.bd-tbl th,
+.bd-tbl td {
+  padding: 3px 6px;
+  border-bottom: 1px solid #eee;
+}
+.bd-tbl th {
+  background: #f5f5f5;
+  text-align: left;
+}
+.bd-date {
+  width: 110px;
+  height: 24px;
+  border: 1px solid #bdbdbd;
+  border-radius: 3px;
+  font-size: 11px;
+}
+.bd-qty {
+  width: 70px;
+  height: 24px;
+  border: 1px solid #bdbdbd;
+  border-radius: 3px;
+  padding: 0 6px;
+  font-size: 11px;
+  text-align: right;
+}
+.bd-total {
+  margin-top: 6px;
+  font-size: 11px;
+  font-weight: 700;
+}
+.bd-total.ok {
+  color: #2e7d32;
+}
+.bd-total.err {
+  color: #c62828;
+}
+.bd-err {
+  font-size: 11px;
+  color: #c62828;
+}
+.bd-note {
+  font-size: 11px;
+  color: #777;
 }
 </style>

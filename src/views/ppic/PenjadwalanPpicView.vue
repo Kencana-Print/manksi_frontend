@@ -20,7 +20,8 @@ import {
   IconReportAnalytics,
 } from "@tabler/icons-vue";
 import { exportExcelSingle, exportExcel } from "@/utils/excelExport";
-import { formatTanggal } from "@/utils/dateFormat";
+import { formatTanggalSingkat as formatTanggal } from "@/utils/dateFormat";
+import TanggalInput from "@/components/TanggalInput.vue";
 
 interface BrowseItem {
   Nomor: string;
@@ -31,6 +32,19 @@ interface BrowseItem {
   Keterangan: string;
   JumlahSO: number;
   JumlahMap: number;
+}
+interface NotifSoPeriode {
+  pjwNomor: string;
+  cab: string;
+  tgl1: string;
+  tgl2: string;
+  items: {
+    pjwdId: number;
+    soNomor: string;
+    nama: string;
+    dateline: string;
+    rencana: number;
+  }[];
 }
 interface DetailRow {
   PjwdId: number;
@@ -58,6 +72,13 @@ interface DetailRow {
   QtyKesepakatan: number;
   KetKesepakatan: string;
   NomorPraOrder: string;
+  KesepakatanBd?: { Tanggal: string; Qty: number }[];
+  SpkRef?: string | null;
+}
+interface RiwayatKirim {
+  Nomor: string;
+  Tanggal: string;
+  Qty: number;
 }
 
 const router = useRouter();
@@ -326,32 +347,47 @@ watch(
 
 const showNotifDialog = ref(false);
 const notifPeriodeList = ref<any[]>([]);
+const notifSoList = ref<NotifSoPeriode[]>([]);
+const jumlahNotifSo = computed(() =>
+  notifSoList.value.reduce((s, p) => s + p.items.length, 0),
+);
 
 const checkUnnotifiedMap = async () => {
   const bagian = authStore.user?.bagian?.toUpperCase();
   if (bagian === "MARKETING") return; // notifikasi ini buat non-Marketing (yg isi Kesepakatan)
-  try {
-    const res = await penjadwalanPpicService.getUnnotifiedMap();
-    const list = res.data.data || [];
-    if (list.length > 0) {
-      notifPeriodeList.value = list;
-      showNotifDialog.value = true;
-    }
-  } catch {
-    // Silent — notifikasi bukan fitur kritikal, jangan ganggu load halaman
+  // Silent — notifikasi bukan fitur kritikal, jangan ganggu load halaman
+  const [resMap, resSo] = await Promise.allSettled([
+    penjadwalanPpicService.getUnnotifiedMap(),
+    penjadwalanPpicService.getUnnotifiedSo(),
+  ]);
+  if (resMap.status === "fulfilled")
+    notifPeriodeList.value = resMap.value.data.data || [];
+  if (resSo.status === "fulfilled")
+    notifSoList.value = resSo.value.data.data || [];
+  if (notifPeriodeList.value.length > 0 || notifSoList.value.length > 0) {
+    showNotifDialog.value = true;
   }
 };
 
 const closeNotifDialog = async () => {
-  const allIds = notifPeriodeList.value.flatMap((p) =>
+  const mapIds = notifPeriodeList.value.flatMap((p) =>
     p.items.map((i: any) => i.pjwdId),
   );
+  const soIds = notifSoList.value.flatMap((p) => p.items.map((i) => i.pjwdId));
   showNotifDialog.value = false;
-  if (allIds.length > 0) {
+  // Best-effort — kalau gagal, akan muncul lagi next load, tidak fatal
+  if (mapIds.length > 0) {
     try {
-      await penjadwalanPpicService.markMapNotified(allIds);
+      await penjadwalanPpicService.markMapNotified(mapIds);
     } catch {
-      // Best-effort — kalau gagal, akan muncul lagi next load, tidak fatal
+      /* diabaikan */
+    }
+  }
+  if (soIds.length > 0) {
+    try {
+      await penjadwalanPpicService.markSoNotified(soIds);
+    } catch {
+      /* diabaikan */
     }
   }
 };
@@ -373,7 +409,13 @@ const fetchData = async () => {
       endDate: filterEnd.value,
       cabang: filterState.value.cabang,
     });
-    items.value = res.data.data ?? [];
+    const data: BrowseItem[] = res.data.data ?? [];
+    items.value = [...data].sort(
+      (a, b) =>
+        a.TglAwal.localeCompare(b.TglAwal) ||
+        a.Cabang.localeCompare(b.Cabang) ||
+        a.Nomor.localeCompare(b.Nomor),
+    );
   } catch (e: any) {
     toast.error(e.response?.data?.message || "Gagal memuat data");
   } finally {
@@ -718,6 +760,7 @@ const buildDetailColumns = (cabang: string) => {
       numFmt: "#,##0",
     },
     { header: "Kesepakatan", key: "Kesepakatan", align: "center" },
+    { header: "Breakdown Kesepakatan", key: "BreakdownKesepakatan" },
     { header: "Ket Kesepakatan", key: "KetKesepakatan" },
   );
   return cols;
@@ -797,6 +840,7 @@ const onExportDetail = async (tipe: "SO" | "MAP") => {
         StatusPermintaan: d.StatusPermintaan,
         QtyKesepakatan: Number(d.QtyKesepakatan) || 0,
         Kesepakatan: formatTanggal(d.Kesepakatan),
+        BreakdownKesepakatan: teksBreakdown(d),
         KetKesepakatan: d.KetKesepakatan || "",
       }));
 
@@ -864,6 +908,35 @@ const onExportDetail = async (tipe: "SO" | "MAP") => {
 };
 
 const fmt = (n: number | null | undefined) => (n ?? 0).toLocaleString("id-ID");
+
+const showRiwayatDialog = ref(false);
+const riwayatLoading = ref(false);
+const riwayatJudul = ref("");
+const riwayatList = ref<RiwayatKirim[]>([]);
+const riwayatTotal = computed(() =>
+  riwayatList.value.reduce((s, r) => s + (Number(r.Qty) || 0), 0),
+);
+
+const openRiwayat = async (d: DetailRow) => {
+  if (!d.SpkRef) return;
+  riwayatJudul.value = `${nomorTampil(d)} — ${d.Nama}`;
+  riwayatList.value = [];
+  showRiwayatDialog.value = true;
+  riwayatLoading.value = true;
+  try {
+    const res = await penjadwalanPpicService.getRiwayatKirim(d.SpkRef);
+    riwayatList.value = res.data.data ?? [];
+  } catch {
+    toast.error("Gagal memuat riwayat kirim.");
+  } finally {
+    riwayatLoading.value = false;
+  }
+};
+
+const teksBreakdown = (d: DetailRow) =>
+  (d.KesepakatanBd ?? [])
+    .map((b) => `${formatTanggal(b.Tanggal)}: ${fmt(b.Qty)}`)
+    .join("; ");
 const showPanjangLebar = (cabang: string) => ["P02", "P05"].includes(cabang);
 const nomorTampil = (d: DetailRow) =>
   d.Nomor || d.NomorMap || d.NomorMh || d.NomorPen || d.NomorPraOrder || "-";
@@ -902,12 +975,12 @@ checkUnnotifiedMap();
       <div class="date-filter">
         <span class="f-label" style="margin-left: 10px">Periode</span>
         <div class="date-with-day">
-          <input type="date" v-model="filterStart" class="f-date" />
+          <TanggalInput v-model="filterStart" class="f-date" />
           <span class="f-day">{{ hariStart }}</span>
         </div>
         <span class="f-sep">sd</span>
         <div class="date-with-day">
-          <input type="date" v-model="filterEnd" class="f-date" />
+          <TanggalInput v-model="filterEnd" class="f-date" />
           <span class="f-day">{{ hariEnd }}</span>
         </div>
         <span class="f-label">Cabang</span>
@@ -1139,6 +1212,21 @@ checkUnnotifiedMap();
                       — {{ d.KetKesepakatan }}</span
                     >
                     <span v-if="!d.Kesepakatan" class="text-grey">-</span>
+                    <div v-if="d.KesepakatanBd?.length" class="bd-list">
+                      <div
+                        v-for="(b, i) in d.KesepakatanBd"
+                        :key="i"
+                        class="bd-item"
+                      >
+                        {{ formatTanggal(b.Tanggal) }} — {{ fmt(b.Qty) }}
+                      </div>
+                    </div>
+                    <a
+                      v-if="d.SpkRef"
+                      class="link-riwayat"
+                      @click.stop="openRiwayat(d)"
+                      >Riwayat kirim</a
+                    >
                   </td>
                 </tr>
                 <tr
@@ -1375,6 +1463,21 @@ checkUnnotifiedMap();
                       — {{ d.KetKesepakatan }}</span
                     >
                     <span v-if="!d.Kesepakatan" class="text-grey">-</span>
+                    <div v-if="d.KesepakatanBd?.length" class="bd-list">
+                      <div
+                        v-for="(b, i) in d.KesepakatanBd"
+                        :key="i"
+                        class="bd-item"
+                      >
+                        {{ formatTanggal(b.Tanggal) }} — {{ fmt(b.Qty) }}
+                      </div>
+                    </div>
+                    <a
+                      v-if="d.SpkRef"
+                      class="link-riwayat"
+                      @click.stop="openRiwayat(d)"
+                      >Riwayat kirim</a
+                    >
                   </td>
                 </tr>
                 <tr
@@ -1628,9 +1731,12 @@ checkUnnotifiedMap();
         style="font-size: 15px; font-weight: 700"
       >
         <IconCalendarWeek :size="18" class="mr-2" />
-        Komitmen Kirim Sampel Baru
+        Komitmen Kirim Baru
       </v-card-title>
       <v-card-text class="pa-4" style="flex: 1; overflow-y: auto">
+        <div v-if="notifPeriodeList.length" class="notif-sec">
+          Sampel (MAP) baru
+        </div>
         <div v-for="p in notifPeriodeList" :key="p.pjwNomor" class="mb-4">
           <div
             class="d-flex align-center justify-space-between mb-2"
@@ -1663,12 +1769,85 @@ checkUnnotifiedMap();
             </li>
           </ul>
         </div>
+
+        <div v-if="notifSoList.length" class="notif-sec">
+          SO baru (otomatis dari dateline)
+          <span class="notif-count">{{ jumlahNotifSo }} SO</span>
+        </div>
+        <div v-for="p in notifSoList" :key="p.pjwNomor" class="mb-4">
+          <div
+            class="d-flex align-center justify-space-between mb-1"
+            style="cursor: pointer"
+            @click="openFromNotif(p.pjwNomor)"
+          >
+            <div>
+              <span class="font-weight-bold text-primary notif-txt">{{
+                p.pjwNomor
+              }}</span>
+              <span class="text-grey ml-2 notif-txt">
+                ({{ formatTanggal(p.tgl1) }} s/d {{ formatTanggal(p.tgl2) }},
+                {{ p.cab }}) — {{ p.items.length }} SO
+              </span>
+            </div>
+            <v-icon size="18" color="primary">mdi-arrow-right</v-icon>
+          </div>
+          <ul class="notif-list">
+            <li v-for="it in p.items" :key="it.pjwdId">
+              <span class="mono">{{ it.soNomor }}</span> — {{ it.nama }}
+              <span class="text-grey"
+                >· dateline {{ formatTanggal(it.dateline) }} · Rencana
+                {{ fmt(it.rencana) }}</span
+              >
+            </li>
+          </ul>
+        </div>
       </v-card-text>
       <v-card-actions class="pa-3 border-t bg-grey-lighten-4 flex-shrink-0">
         <v-spacer />
         <v-btn variant="text" style="font-size: 13px" @click="closeNotifDialog"
           >Tutup</v-btn
         >
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
+
+  <v-dialog v-model="showRiwayatDialog" max-width="460">
+    <v-card class="rounded-lg">
+      <v-card-title class="bg-primary text-white pa-3 text-subtitle-1">
+        Riwayat Kirim — {{ riwayatJudul }}
+      </v-card-title>
+      <v-card-text class="pa-3">
+        <div v-if="riwayatLoading" class="expand-loading">
+          <v-progress-circular indeterminate color="primary" size="20" />
+          <span>Memuat...</span>
+        </div>
+        <div v-else-if="!riwayatList.length" class="text-grey">
+          Belum ada SJ untuk SPK ini.
+        </div>
+        <table v-else class="dt dt-summary">
+          <thead>
+            <tr>
+              <th>Tgl Kirim</th>
+              <th>No SJ</th>
+              <th class="tr">Qty</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(r, i) in riwayatList" :key="i">
+              <td>{{ formatTanggal(r.Tanggal) }}</td>
+              <td class="mono">{{ r.Nomor }}</td>
+              <td class="tr">{{ fmt(r.Qty) }}</td>
+            </tr>
+            <tr class="fw">
+              <td colspan="2">Total terkirim</td>
+              <td class="tr">{{ fmt(riwayatTotal) }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </v-card-text>
+      <v-card-actions class="pa-3 border-t bg-grey-lighten-4">
+        <v-spacer />
+        <v-btn variant="text" @click="showRiwayatDialog = false">Tutup</v-btn>
       </v-card-actions>
     </v-card>
   </v-dialog>
@@ -2006,5 +2185,43 @@ checkUnnotifiedMap();
 }
 .kesepakatan-tgl {
   white-space: nowrap;
+}
+.bd-list {
+  margin-top: 2px;
+}
+.bd-item {
+  font-size: 11px;
+  color: #e65100;
+}
+.link-riwayat {
+  display: inline-block;
+  margin-top: 2px;
+  font-size: 11px;
+  color: #1976d2;
+  cursor: pointer;
+  text-decoration: underline;
+}
+.notif-sec {
+  display: flex;
+  justify-content: space-between;
+  margin: 4px 0 8px;
+  padding-bottom: 3px;
+  border-bottom: 1px solid #e0e0e0;
+  font-size: 11px;
+  font-weight: 700;
+  color: #e65100;
+}
+.notif-count {
+  font-weight: 400;
+  color: #666;
+}
+.notif-txt {
+  font-size: 11px;
+}
+.notif-list {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 11px;
+  line-height: 1.7;
 }
 </style>
