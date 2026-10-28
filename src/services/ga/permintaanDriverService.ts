@@ -34,6 +34,7 @@ export interface PermintaanDriverDetailItem {
   spk: string;
   keterangan: string;
   penerima: string;
+  _lastValidatedSpk?: string;
 }
 
 export interface PermintaanDriverFormData {
