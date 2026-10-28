@@ -691,7 +691,8 @@ const validateSave = () => {
       (r) => r.NamaKaosan && Number(r.Jumlah) !== 0,
     );
     const totalJml2 = validDtl2.reduce((s, r) => s + Number(r.Jumlah), 0);
-    if (totalJumlah !== totalJml2) {
+    // Tanpa data DC (mis. STBJ kaosan/divisi 3) -> tidak dicek
+    if (validDtl2.length && totalJumlah !== totalJml2) {
       toast.warning("Total Qty STBJ vs Qty DC harus sama.");
       return;
     }
@@ -772,6 +773,10 @@ const totalKoli = computed(() =>
 );
 const totalJumlah2 = computed(() =>
   fd.value.Detail2.reduce((s, r) => s + Number(r.Jumlah || 0), 0),
+);
+// Selisih hanya relevan kalau ada data DC
+const dcBeda = computed(
+  () => totalJumlah2.value > 0 && totalJumlah.value !== totalJumlah2.value,
 );
 </script>
 
@@ -874,16 +879,10 @@ const totalJumlah2 = computed(() =>
           <label class="lb w100">Total DC</label>
           <span
             class="summary-val"
-            :style="
-              totalJumlah !== totalJumlah2
-                ? 'color:#c62828;font-weight:700'
-                : ''
-            "
+            :style="dcBeda ? 'color:#c62828;font-weight:700' : ''"
           >
             {{ num(totalJumlah2) }}
-            <span
-              v-if="totalJumlah !== totalJumlah2"
-              style="font-size: 10px; margin-left: 4px"
+            <span v-if="dcBeda" style="font-size: 10px; margin-left: 4px"
               >≠ Jumlah!</span
             >
           </span>
@@ -915,10 +914,7 @@ const totalJumlah2 = computed(() =>
             @click="activeTab = 1"
           >
             Detail DC Kaosan
-            <span
-              class="tab-badge"
-              :class="totalJumlah !== totalJumlah2 ? 'badge-red' : ''"
-            >
+            <span class="tab-badge" :class="dcBeda ? 'badge-red' : ''">
               {{ num(totalJumlah2) }}
             </span>
           </button>
@@ -1198,16 +1194,14 @@ const totalJumlah2 = computed(() =>
               <span
                 class="ml8"
                 :style="
-                  totalJumlah !== totalJumlah2
+                  dcBeda
                     ? 'color:#c62828;font-weight:700;font-size:11px'
                     : 'color:#388e3c;font-size:11px'
                 "
               >
                 Total DC: <b>{{ num(totalJumlah2) }}</b>
-                <span v-if="totalJumlah !== totalJumlah2">
-                  ≠ Total SPK {{ num(totalJumlah) }}</span
-                >
-                <span v-else> ✓</span>
+                <span v-if="dcBeda"> ≠ Total SPK {{ num(totalJumlah) }}</span>
+                <span v-else-if="totalJumlah2 > 0"> ✓</span>
               </span>
             </div>
             <div class="gwrap">
