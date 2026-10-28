@@ -975,12 +975,22 @@ checkUnnotifiedMap();
       <div class="date-filter">
         <span class="f-label" style="margin-left: 10px">Periode</span>
         <div class="date-with-day">
-          <TanggalInput v-model="filterStart" class="f-date" />
+          <TanggalInput
+            v-model="filterStart"
+            class="f-date"
+            ikon
+            placeholder="Pilih tanggal"
+          />
           <span class="f-day">{{ hariStart }}</span>
         </div>
         <span class="f-sep">sd</span>
         <div class="date-with-day">
-          <TanggalInput v-model="filterEnd" class="f-date" />
+          <TanggalInput
+            v-model="filterEnd"
+            class="f-date"
+            ikon
+            placeholder="Pilih tanggal"
+          />
           <span class="f-day">{{ hariEnd }}</span>
         </div>
         <span class="f-label">Cabang</span>

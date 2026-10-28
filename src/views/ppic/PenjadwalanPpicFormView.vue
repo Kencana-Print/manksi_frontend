@@ -1475,12 +1475,16 @@ const rowClass = (d: DetailRow) => {
             v-model="header.pjw_tgl1"
             class="pjw-date"
             :disabled="isEditMode || !canEditMarketing"
+            ikon
+            placeholder="Pilih tanggal"
           />
           <span class="pjw-sep">s/d</span>
           <TanggalInput
             v-model="header.pjw_tgl2"
             class="pjw-date"
             :disabled="isEditMode || !canEditMarketing"
+            ikon
+            placeholder="Pilih tanggal"
           />
 
           <label class="pjw-lbl" style="margin-left: 16px">Cabang</label>
@@ -1788,6 +1792,8 @@ const rowClass = (d: DetailRow) => {
                       onPermintaanKirimChange(d);
                     }
                   "
+                  ikon
+                  placeholder="Pilih tanggal"
                 />
               </td>
               <td class="tc" style="position: relative">
@@ -1872,6 +1878,8 @@ const rowClass = (d: DetailRow) => {
                       "
                       @focus="onKesepakatanFocus(d)"
                       @blur="onKesepakatanBlur(d)"
+                      ikon
+                      placeholder="Pilih tanggal"
                     />
                   </div>
                   <input
@@ -1967,7 +1975,14 @@ const rowClass = (d: DetailRow) => {
               </thead>
               <tbody>
                 <tr v-for="(it, i) in bdItems" :key="i">
-                  <td><TanggalInput v-model="it.Tanggal" class="bd-date" /></td>
+                  <td>
+                    <TanggalInput
+                      v-model="it.Tanggal"
+                      class="bd-date"
+                      ikon
+                      placeholder="Pilih tanggal"
+                    />
+                  </td>
                   <td class="tr">
                     <input
                       type="text"
@@ -2765,11 +2780,13 @@ const rowClass = (d: DetailRow) => {
   text-align: left;
 }
 .bd-date {
-  width: 110px;
+  width: 120px;
   height: 24px;
+  padding: 0 6px 0 8px;
   border: 1px solid #bdbdbd;
   border-radius: 3px;
   font-size: 11px;
+  background: #fff;
 }
 .bd-qty {
   width: 70px;
