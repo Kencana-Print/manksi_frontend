@@ -34,6 +34,9 @@ interface TabRow {
   WipQty: number;
   WipSatuan: string;
   WipCatatan: string;
+  StatusBahan: string;
+  MkbNomor: string;
+  EstimasiKedatangan: string;
   plan_qty_po: number;
   plan_qty_jadwal: number;
   plan_line_kelompok: string; // tidak dipakai di koli
@@ -138,6 +141,9 @@ const emptyRow = (defaultTgl: string): TabRow => ({
   WipQty: 0,
   WipSatuan: "",
   WipCatatan: "",
+  StatusBahan: "",
+  MkbNomor: "",
+  EstimasiKedatangan: "",
   plan_qty_po: 0,
   plan_qty_jadwal: 0,
   plan_line_kelompok: "",
@@ -174,6 +180,9 @@ const mapRow = (r: any, defaultTgl: string): TabRow => ({
   WipQty: Number(r.WipQty) || 0,
   WipSatuan: r.WipSatuan ?? "",
   WipCatatan: r.WipCatatan ?? "",
+  StatusBahan: r.StatusBahan ?? "",
+  MkbNomor: r.MkbNomor ?? "",
+  EstimasiKedatangan: r.EstimasiKedatangan ?? "",
   plan_qty_po: Number(r.plan_qty_po) || 0,
   plan_qty_jadwal: Number(r.plan_qty_jadwal) || 0,
   plan_line_kelompok: r.plan_line_kelompok ?? "",
@@ -411,6 +420,9 @@ const resolveSpk = async (tab: TabKey, idx: number, nomor: string) => {
     row.WipQty = Number(s.WipQty) || 0;
     row.WipSatuan = s.WipSatuan ?? "";
     row.WipCatatan = s.WipCatatan ?? "";
+    row.StatusBahan = s.StatusBahan ?? "";
+    row.MkbNomor = s.MkbNomor ?? "";
+    row.EstimasiKedatangan = s.EstimasiKedatangan ?? "";
     row._spkDetail = [
       `SPK     : ${s.spk_nomor}`,
       `Tgl SPK : ${s.spk_tanggal ?? "-"}`,
@@ -462,7 +474,7 @@ const resolveSpk = async (tab: TabKey, idx: number, nomor: string) => {
       rows.push(emptyRow(defaultTgl));
     }
 
-    await loadRiwayat();
+    void loadRiwayat(); // latar belakang: jangan tahan spinner baris SPK
   } catch (e: any) {
     toast.error(e.response?.data?.message ?? "SPK tidak ditemukan.");
     row.NomorSPK = "";
@@ -472,6 +484,9 @@ const resolveSpk = async (tab: TabKey, idx: number, nomor: string) => {
     row.WipQty = 0;
     row.WipSatuan = "";
     row.WipCatatan = "";
+    row.StatusBahan = "";
+    row.MkbNomor = "";
+    row.EstimasiKedatangan = "";
     row._spkDetail = "";
   } finally {
     row._spkLoading = false;
@@ -951,6 +966,13 @@ const validateSave = () => {
 };
 
 const fmt = (n: number | null | undefined) => (n ?? 0).toLocaleString("id-ID");
+
+const statusBahanClass = (s: string) => {
+  if (s === "Ready") return "sb-ready";
+  if (s === "PO") return "sb-po";
+  if (s === "MKB belum dibuat") return "sb-none";
+  return "sb-warn";
+};
 </script>
 
 <template>
@@ -1085,6 +1107,8 @@ const fmt = (n: number | null | undefined) => (n ?? 0).toLocaleString("id-ID");
                     <th rowspan="2" style="width: 220px">Nama SPK</th>
                     <th rowspan="2" style="width: 75px" class="tr">Qty SPK</th>
                     <th colspan="2" class="tcen">WIP Bahan</th>
+                    <th rowspan="2" style="width: 150px">Status Bahan</th>
+                    <th rowspan="2" style="width: 95px">Est. Kedatangan</th>
                     <th rowspan="2" style="width: 85px" class="tr bg-yellow">
                       Qty Target
                     </th>
@@ -1143,6 +1167,22 @@ const fmt = (n: number | null | undefined) => (n ?? 0).toLocaleString("id-ID");
                         <span v-if="row.WipCatatan">*</span>
                       </td>
                       <td class="ro-cell">{{ row.WipSatuan || "—" }}</td>
+                      <td class="ro-cell" :title="row.MkbNomor">
+                        <span
+                          v-if="row.StatusBahan"
+                          class="sb-badge"
+                          :class="statusBahanClass(row.StatusBahan)"
+                          >{{ row.StatusBahan }}</span
+                        >
+                        <template v-else>—</template>
+                      </td>
+                      <td class="ro-cell">
+                        {{
+                          row.EstimasiKedatangan
+                            ? fmtTgl(row.EstimasiKedatangan)
+                            : "—"
+                        }}
+                      </td>
                       <td style="padding: 0">
                         <input
                           type="number"
@@ -1189,7 +1229,7 @@ const fmt = (n: number | null | undefined) => (n ?? 0).toLocaleString("id-ID");
 
                     <!-- Breakdown Output per tanggal -->
                     <tr v-if="bukaHarian.has(row._key)" class="hr-row">
-                      <td colspan="10">
+                      <td colspan="12">
                         <table class="hr-table">
                           <thead>
                             <tr>
@@ -1212,7 +1252,7 @@ const fmt = (n: number | null | undefined) => (n ?? 0).toLocaleString("id-ID");
                     </tr>
                   </template>
                   <tr v-if="!formData.detail.cutting.length">
-                    <td colspan="10" class="empty-row">Klik + Tambah Baris</td>
+                    <td colspan="12" class="empty-row">Klik + Tambah Baris</td>
                   </tr>
                 </tbody>
               </table>
@@ -2240,5 +2280,29 @@ input[type="number"]::-webkit-inner-spin-button {
   display: flex;
   flex-direction: column;
   height: auto; /* Timpa height 100% bawaan */
+}
+.sb-badge {
+  display: inline-block;
+  padding: 0 6px;
+  border-radius: 8px;
+  font-size: 11px;
+  line-height: 16px;
+  white-space: nowrap;
+}
+.sb-ready {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+.sb-po {
+  background: #e3f2fd;
+  color: #1565c0;
+}
+.sb-warn {
+  background: #fff3e0;
+  color: #e65100;
+}
+.sb-none {
+  background: #fdecea;
+  color: #c62828;
 }
 </style>

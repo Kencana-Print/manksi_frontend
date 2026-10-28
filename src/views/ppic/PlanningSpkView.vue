@@ -41,6 +41,9 @@ interface DetailRow {
   WipQty?: number;
   WipSatuan?: string;
   WipCatatan?: string;
+  StatusBahan?: string;
+  MkbNomor?: string;
+  EstimasiKedatangan?: string;
   QtyPo: number;
   QtyJadwal: number;
   LineKelompok: string;
@@ -420,6 +423,8 @@ const kolomCutting: ExcelColumn[] = [
     numFmt: "#,##0.00",
   },
   { header: "WIP Bahan Satuan", key: "WipSatuan", width: 16 },
+  { header: "Status Bahan", key: "StatusBahan", width: 24 },
+  { header: "Est. Kedatangan", key: "EstKedatangan", width: 14 },
   { header: "Qty Target", key: "QtyJadwal", align: "right", numFmt: "#,##0" },
   { header: "Proses Produksi", key: "LineKelompok", width: 16 },
   { header: "Output", key: "Output", align: "right", numFmt: "#,##0" },
@@ -569,6 +574,10 @@ const doExportDetail = async () => {
           NamaSPK: d.NamaSPK || "",
           WipBahan: angkaAtauKosong(d.WipSatuan ? d.WipBahan : undefined),
           WipSatuan: d.WipSatuan || "",
+          StatusBahan: d.StatusBahan || "",
+          EstKedatangan: d.EstimasiKedatangan
+            ? formatTanggal(d.EstimasiKedatangan)
+            : "",
           QtyJadwal: Number(d.QtyJadwal) || 0,
           LineKelompok: d.LineKelompok || "",
           Output: angkaAtauKosong(d.Output),
@@ -701,6 +710,13 @@ const doExportDetail = async () => {
 };
 
 const fmt = (n: number | null | undefined) => (n ?? 0).toLocaleString("id-ID");
+
+const statusBahanClass = (s: string) => {
+  if (s === "Ready") return "sb-ready";
+  if (s === "PO") return "sb-po";
+  if (s === "MKB belum dibuat") return "sb-none";
+  return "sb-warn";
+};
 
 const fmtDec = (n: number | null | undefined, d = 2) =>
   n == null
@@ -984,6 +1000,8 @@ fetchData();
                     <th rowspan="2">Nomor SPK</th>
                     <th rowspan="2">Nama SPK</th>
                     <th colspan="2" style="text-align: center">WIP Bahan</th>
+                    <th rowspan="2">Status Bahan</th>
+                    <th rowspan="2">Est. Kedatangan</th>
                     <th rowspan="2" class="tr">Qty Target</th>
                     <th rowspan="2">Proses Produksi</th>
                     <th rowspan="2" class="tr">Output</th>
@@ -1011,6 +1029,22 @@ fetchData();
                         }}<span v-if="d.WipCatatan">*</span>
                       </td>
                       <td>{{ d.WipSatuan || "—" }}</td>
+                      <td :title="d.MkbNomor">
+                        <span
+                          v-if="d.StatusBahan"
+                          class="sb-badge"
+                          :class="statusBahanClass(d.StatusBahan)"
+                          >{{ d.StatusBahan }}</span
+                        >
+                        <template v-else>—</template>
+                      </td>
+                      <td>
+                        {{
+                          d.EstimasiKedatangan
+                            ? fmtTgl(d.EstimasiKedatangan)
+                            : "—"
+                        }}
+                      </td>
                       <td class="tr fw">{{ fmt(d.QtyJadwal) }}</td>
                       <td>{{ d.LineKelompok || "—" }}</td>
                       <td class="tr fw">
@@ -1036,7 +1070,7 @@ fetchData();
                       v-if="bukaHarian.has(`${item.Nomor}|CUT|${i}`)"
                       class="hr-row"
                     >
-                      <td colspan="7">
+                      <td colspan="9">
                         <table class="hr-table">
                           <thead>
                             <tr>
@@ -1059,7 +1093,7 @@ fetchData();
                     </tr>
                   </template>
                   <tr v-if="!detailCache[item.Nomor].cutting.length">
-                    <td colspan="8" class="empty-row">
+                    <td colspan="9" class="empty-row">
                       Tidak ada data cutting
                     </td>
                   </tr>
@@ -1642,6 +1676,31 @@ fetchData();
 .ket-inp:disabled {
   color: inherit;
   cursor: default;
+}
+
+.sb-badge {
+  display: inline-block;
+  padding: 0 6px;
+  border-radius: 8px;
+  font-size: 10px;
+  line-height: 15px;
+  white-space: nowrap;
+}
+.sb-ready {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+.sb-po {
+  background: #e3f2fd;
+  color: #1565c0;
+}
+.sb-warn {
+  background: #fff3e0;
+  color: #e65100;
+}
+.sb-none {
+  background: #fdecea;
+  color: #c62828;
 }
 
 /* Override Vuetify tabs di dalam expand */

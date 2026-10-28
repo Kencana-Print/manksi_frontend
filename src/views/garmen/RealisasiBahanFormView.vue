@@ -115,6 +115,7 @@ const {
           kode: b.promind2_bhn_kode,
           nama: b.Bhn_Name,
           satuan: b.Bhn_satuan,
+          setting: b.setting ?? "",
           stok: Number(b.stok) || 0,
           jumlah: qty,
         };
@@ -130,6 +131,7 @@ const {
           kodem: d.promind_kodem,
           nama: d.Bhn_Name,
           satuan: d.Bhn_satuan,
+          setting: d.setting ?? "",
           stk: Number(d.Stk) || 0,
           minta: minta,
           sudah: sudah,
@@ -314,6 +316,7 @@ const addBarcodeRow = () => {
     barcode: "",
     kode: "",
     nama: "",
+    setting: "",
     satuan: "",
     stok: 0,
     jumlah: 0,
@@ -346,6 +349,7 @@ const onBarcodeEntered = async (item: any, index: number) => {
     item.kode = data.kode;
     item.nama = data.nama;
     item.satuan = data.satuan;
+    item.setting = data.setting ?? "";
     item.stok = data.stok;
     item.jumlah = data.stok;
     item.kdsup = data.kdsup;
@@ -389,6 +393,7 @@ const recalculateNetto = () => {
       kdsup: string;
       nmsup: string;
       nama: string;
+      setting: string;
       satuan: string;
     }
   > = {};
@@ -402,6 +407,7 @@ const recalculateNetto = () => {
           kdsup: "",
           nmsup: "",
           nama: b.nama,
+          setting: b.setting ?? "",
           satuan: b.satuan,
         };
       }
@@ -457,6 +463,7 @@ const recalculateNetto = () => {
         kode,
         kodem: "", // [PENTING] kosong = di luar permintaan -> backend tandai PASIF
         nama: s.nama,
+        setting: s.setting,
         satuan: s.satuan,
         stk: 0,
         minta: 0,
@@ -795,6 +802,7 @@ onMounted(async () => {
                 <th width="140">Barcode</th>
                 <th width="110">Kode</th>
                 <th>Nama Bahan</th>
+                <th width="70">Setting</th>
                 <th width="60">Satuan</th>
                 <th width="80">Stok</th>
                 <th width="90" class="bg-yellow-darken-2">Jumlah</th>
@@ -827,6 +835,9 @@ onMounted(async () => {
                   >
                 </td>
                 <td class="bg-grey-lighten-4">{{ item.nama }}</td>
+                <td class="text-center bg-grey-lighten-4">
+                  {{ item.setting }}
+                </td>
                 <td class="text-center bg-grey-lighten-4">{{ item.satuan }}</td>
                 <td class="tr bg-grey-lighten-4">{{ item.stok }}</td>
                 <td class="bg-yellow-lighten-5">
@@ -881,6 +892,7 @@ onMounted(async () => {
                 <th width="40">No</th>
                 <th width="110">Kode</th>
                 <th>Nama Bahan</th>
+                <th width="70">Setting</th>
                 <th width="50">Sat</th>
                 <th width="65">Stok</th>
                 <th width="60" class="bg-green-darken-2">Minta</th>
@@ -914,6 +926,7 @@ onMounted(async () => {
                   >
                 </td>
                 <td>{{ dtl.nama }}</td>
+                <td class="text-center">{{ dtl.setting }}</td>
                 <td class="text-center">{{ dtl.satuan }}</td>
                 <td class="tr">{{ num(dtl.stk) }}</td>
                 <td
@@ -965,7 +978,7 @@ onMounted(async () => {
                 </td>
               </tr>
               <tr v-if="formData.details.length === 0">
-                <td colspan="10" class="text-center text-grey py-8 font-italic">
+                <td colspan="15" class="text-center text-grey py-8 font-italic">
                   Pilih No. Permintaan untuk memuat daftar bahan.
                 </td>
               </tr>

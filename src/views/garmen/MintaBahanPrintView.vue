@@ -75,6 +75,7 @@ onMounted(async () => {
             <th width="30">No</th>
             <th width="100">Kode</th>
             <th>Nama</th>
+            <th width="55">Setting</th>
             <th width="50">Satuan</th>
             <th width="70" class="tr">Jumlah</th>
             <th width="100">Komponen</th>
@@ -86,6 +87,7 @@ onMounted(async () => {
             <td class="tc">{{ Number(i) + 1 }}</td>
             <td>{{ item.Kode }}</td>
             <td>{{ item.Nama }}</td>
+            <td class="tc">{{ item.Setting }}</td>
             <td class="tc">{{ item.Satuan }}</td>
             <td class="tr fw">
               {{ Number(item.Jumlah).toLocaleString("id-ID") }}

@@ -21,6 +21,7 @@ import {
 interface DetailItem {
   kode: string;
   nama: string;
+  setting?: string;
   satuan: string;
   babaran: number;
   pcs: number;
@@ -255,6 +256,7 @@ const onBahanSelected = (item: any) => {
   const row = formData.value.details[activeDetailIndex.value];
   row.kode = item.Kode;
   row.nama = item.Nama;
+  row.setting = item.Setting ?? "";
   row.satuan = item.Satuan;
 
   showBahanModal.value = false;
@@ -464,6 +466,7 @@ watch(
                 <th width="40">No</th>
                 <th width="110">Kode</th>
                 <th>Nama Bahan</th>
+                <th width="80">Setting</th>
                 <th width="60">Sat</th>
                 <th width="80">Babaran</th>
                 <th width="80">Pcs</th>
@@ -500,6 +503,7 @@ watch(
                 <td>
                   <input v-model="item.nama" class="cell-input" readonly />
                 </td>
+                <td class="text-center">{{ item.setting }}</td>
                 <td class="text-center">{{ item.satuan }}</td>
                 <td>
                   <input
