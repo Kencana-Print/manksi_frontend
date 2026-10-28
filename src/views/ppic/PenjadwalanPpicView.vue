@@ -1231,12 +1231,15 @@ checkUnnotifiedMap();
                         {{ formatTanggal(b.Tanggal) }} — {{ fmt(b.Qty) }}
                       </div>
                     </div>
-                    <a
-                      v-if="d.SpkRef"
-                      class="link-riwayat"
-                      @click.stop="openRiwayat(d)"
-                      >Riwayat kirim</a
-                    >
+                    <div v-if="d.SpkRef">
+                      <button
+                        type="button"
+                        class="btn-riwayat"
+                        @click.stop="openRiwayat(d)"
+                      >
+                        Riwayat kirim
+                      </button>
+                    </div>
                   </td>
                 </tr>
                 <tr
@@ -1482,12 +1485,15 @@ checkUnnotifiedMap();
                         {{ formatTanggal(b.Tanggal) }} — {{ fmt(b.Qty) }}
                       </div>
                     </div>
-                    <a
-                      v-if="d.SpkRef"
-                      class="link-riwayat"
-                      @click.stop="openRiwayat(d)"
-                      >Riwayat kirim</a
-                    >
+                    <div v-if="d.SpkRef">
+                      <button
+                        type="button"
+                        class="btn-riwayat"
+                        @click.stop="openRiwayat(d)"
+                      >
+                        Riwayat kirim
+                      </button>
+                    </div>
                   </td>
                 </tr>
                 <tr
@@ -1821,38 +1827,41 @@ checkUnnotifiedMap();
     </v-card>
   </v-dialog>
 
-  <v-dialog v-model="showRiwayatDialog" max-width="460">
+  <v-dialog v-model="showRiwayatDialog" max-width="520">
     <v-card class="rounded-lg">
-      <v-card-title class="bg-primary text-white pa-3 text-subtitle-1">
-        Riwayat Kirim — {{ riwayatJudul }}
+      <v-card-title class="bg-primary text-white pa-3 rw-title">
+        <div class="rw-title-main">Riwayat Kirim</div>
+        <div class="rw-title-sub">{{ riwayatJudul }}</div>
       </v-card-title>
       <v-card-text class="pa-3">
         <div v-if="riwayatLoading" class="expand-loading">
           <v-progress-circular indeterminate color="primary" size="20" />
           <span>Memuat...</span>
         </div>
-        <div v-else-if="!riwayatList.length" class="text-grey">
+        <div v-else-if="!riwayatList.length" class="rw-empty">
           Belum ada SJ untuk SPK ini.
         </div>
-        <table v-else class="dt dt-summary">
+        <table v-else class="rw-tbl">
           <thead>
             <tr>
-              <th>Tgl Kirim</th>
+              <th style="width: 100px">Tgl Kirim</th>
               <th>No SJ</th>
-              <th class="tr">Qty</th>
+              <th class="tr" style="width: 70px">Qty</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="(r, i) in riwayatList" :key="i">
               <td>{{ formatTanggal(r.Tanggal) }}</td>
-              <td class="mono">{{ r.Nomor }}</td>
+              <td class="rw-sj">{{ r.Nomor }}</td>
               <td class="tr">{{ fmt(r.Qty) }}</td>
             </tr>
-            <tr class="fw">
+          </tbody>
+          <tfoot>
+            <tr>
               <td colspan="2">Total terkirim</td>
               <td class="tr">{{ fmt(riwayatTotal) }}</td>
             </tr>
-          </tbody>
+          </tfoot>
         </table>
       </v-card-text>
       <v-card-actions class="pa-3 border-t bg-grey-lighten-4">
@@ -2201,15 +2210,70 @@ checkUnnotifiedMap();
 }
 .bd-item {
   font-size: 11px;
-  color: #e65100;
+  font-weight: 600;
+  color: inherit;
 }
-.link-riwayat {
-  display: inline-block;
+.btn-riwayat {
+  margin-top: 4px;
+  padding: 1px 8px;
+  border: 1px solid #90caf9;
+  border-radius: 3px;
+  background: #fff;
+  color: #1565c0;
+  font-size: 11px;
+  line-height: 18px;
+  cursor: pointer;
+}
+.btn-riwayat:hover {
+  background: #e3f2fd;
+}
+.rw-title {
+  white-space: normal !important;
+  line-height: 1.3;
+}
+.rw-title-main {
+  font-size: 14px;
+  font-weight: 600;
+}
+.rw-title-sub {
   margin-top: 2px;
   font-size: 11px;
-  color: #1976d2;
-  cursor: pointer;
-  text-decoration: underline;
+  font-weight: 400;
+  opacity: 0.9;
+  word-break: break-word;
+}
+.rw-empty {
+  font-size: 11px;
+  color: #757575;
+}
+.rw-tbl {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+.rw-tbl th,
+.rw-tbl td {
+  padding: 4px 8px;
+  border-bottom: 1px solid #eee;
+  color: #212121;
+}
+.rw-tbl th {
+  background: #f5f5f5;
+  text-align: left;
+  font-weight: 600;
+}
+.rw-tbl th.tr,
+.rw-tbl td.tr {
+  text-align: right;
+}
+.rw-sj {
+  font-weight: 600;
+  white-space: nowrap;
+}
+.rw-tbl tfoot td {
+  border-top: 2px solid #bdbdbd;
+  border-bottom: none;
+  font-weight: 700;
 }
 .notif-sec {
   display: flex;
