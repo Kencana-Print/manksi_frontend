@@ -50,6 +50,7 @@ interface DetailRow {
   Kurang: number;
   Rencana: number;
   KetRencana: string;
+  RealisasiLalu: number;
   Realisasi: number;
   PermintaanKirim: string;
   StatusPermintaan: string;
@@ -696,7 +697,18 @@ const buildDetailColumns = (cabang: string) => {
     { header: "Kurang", key: "Kurang", align: "right", numFmt: "#,##0" },
     { header: "Rencana", key: "Rencana", align: "right", numFmt: "#,##0" },
     { header: "Ket. Rencana", key: "KetRencana" },
-    { header: "Realisasi", key: "Realisasi", align: "right", numFmt: "#,##0" },
+    {
+      header: "Realisasi Minggu Lalu",
+      key: "RealisasiLalu",
+      align: "right",
+      numFmt: "#,##0",
+    },
+    {
+      header: "Realisasi Minggu Ini",
+      key: "Realisasi",
+      align: "right",
+      numFmt: "#,##0",
+    },
     { header: "Permintaan Kirim", key: "PermintaanKirim", align: "center" },
     { header: "Permintaan", key: "StatusPermintaan", align: "center" },
     {
@@ -779,6 +791,7 @@ const onExportDetail = async (tipe: "SO" | "MAP") => {
         Kurang: Number(d.Kurang) || 0,
         Rencana: Number(d.Rencana) || 0,
         KetRencana: d.KetRencana || "",
+        RealisasiLalu: Number(d.RealisasiLalu) || 0,
         Realisasi: Number(d.Realisasi) || 0,
         PermintaanKirim: formatTanggal(d.PermintaanKirim),
         StatusPermintaan: d.StatusPermintaan,
@@ -806,6 +819,7 @@ const onExportDetail = async (tipe: "SO" | "MAP") => {
         Kurang: "" as any,
         Rencana: totalRencana,
         KetRencana: "",
+        RealisasiLalu: "" as any,
         Realisasi: "" as any,
         PermintaanKirim: "",
         StatusPermintaan: "",
@@ -1053,7 +1067,8 @@ checkUnnotifiedMap();
                   <th class="tr">Kirim</th>
                   <th class="tr">Kurang</th>
                   <th class="tr">Rencana</th>
-                  <th class="tr">Realisasi</th>
+                  <th class="tr">Real. Mgg Lalu</th>
+                  <th class="tr">Real. Mgg Ini</th>
                   <th class="tc">Permintaan Kirim</th>
                   <th class="tc">Permintaan</th>
                   <th class="tr">Qty Kesepakatan</th>
@@ -1099,6 +1114,7 @@ checkUnnotifiedMap();
                     {{ fmt(d.Kurang) }}
                   </td>
                   <td class="tr">{{ fmt(d.Rencana) }}</td>
+                  <td class="tr">{{ fmt(d.RealisasiLalu) }}</td>
                   <td class="tr">{{ fmt(d.Realisasi) }}</td>
                   <td class="tc">{{ formatTanggal(d.PermintaanKirim) }}</td>
                   <td class="tc">
@@ -1135,7 +1151,7 @@ checkUnnotifiedMap();
                   "
                 >
                   <td
-                    :colspan="showPanjangLebar(item.Cabang) ? 13 : 11"
+                    :colspan="showPanjangLebar(item.Cabang) ? 14 : 12"
                     class="empty-row"
                   >
                     <template v-if="globalSearch">
@@ -1371,7 +1387,7 @@ checkUnnotifiedMap();
                   "
                 >
                   <td
-                    :colspan="showPanjangLebar(previewCabang) ? 14 : 12"
+                    :colspan="showPanjangLebar(previewCabang) ? 15 : 13"
                     class="empty-row"
                   >
                     <template v-if="previewSearch">
@@ -1438,7 +1454,7 @@ checkUnnotifiedMap();
                 <td class="tr">{{ fmt(pencapaianRencana) }}</td>
               </tr>
               <tr>
-                <td>Realisasi</td>
+                <td>Realisasi (Minggu Ini)</td>
                 <td class="tr">{{ fmt(pencapaianRealisasi) }}</td>
               </tr>
               <tr class="fw">

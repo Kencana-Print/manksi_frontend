@@ -71,6 +71,7 @@ interface DetailRow {
   Kurang: number;
   Rencana: number;
   KetRencana: string;
+  RealisasiLalu: number;
   Realisasi: number;
   PermintaanKirim: string;
   StatusPermintaan: string;
@@ -310,6 +311,7 @@ const mapDetailRow = (r: any): DetailRow => ({
   Kurang: Number(r.Kurang) || 0,
   Rencana: Number(r.Rencana) || 0,
   KetRencana: r.KetRencana || "",
+  RealisasiLalu: Number(r.RealisasiLalu) || 0,
   Realisasi: Number(r.Realisasi) || 0,
   PermintaanKirim: r.PermintaanKirim || "",
   StatusPermintaan: r.StatusPermintaan || "CLOSE",
@@ -440,6 +442,7 @@ const pushRowFromServer = (pjwdId: number, rowInput: any) => {
     Kurang: Number(rowInput.Kurang) || 0,
     Rencana: Number(rowInput.Rencana) || 0,
     KetRencana: "",
+    RealisasiLalu: 0,
     Realisasi: Number(rowInput.Realisasi) || 0,
     PermintaanKirim: rowInput.PermintaanKirim || "",
     StatusPermintaan: "CLOSE",
@@ -1395,7 +1398,8 @@ const rowClass = (d: DetailRow) => {
               <th style="width: 80px" class="tr">Kirim</th>
               <th style="width: 80px" class="tr">Kurang</th>
               <th style="width: 80px" class="tr">Rencana</th>
-              <th style="width: 80px" class="tr">Realisasi</th>
+              <th style="width: 80px" class="tr">Real. Mgg Lalu</th>
+              <th style="width: 80px" class="tr">Real. Mgg Ini</th>
               <th style="width: 130px" class="tc">Permintaan Kirim</th>
               <th style="width: 100px" class="tc">Permintaan</th>
               <th style="width: 230px">Kesepakatan</th>
@@ -1525,6 +1529,7 @@ const rowClass = (d: DetailRow) => {
                   "
                 />
               </td>
+              <td class="tr">{{ fmt(d.RealisasiLalu) }}</td>
               <td class="tr">
                 <input
                   v-if="isManualRow(d)"
@@ -1670,7 +1675,7 @@ const rowClass = (d: DetailRow) => {
               </td>
             </tr>
             <tr v-if="!detail.length">
-              <td colspan="11" class="pjw-empty">
+              <td colspan="12" class="pjw-empty">
                 Belum ada SO/MAP/Pra Order. Klik tombol Tarik atau tambahkan
                 manual di atas.
               </td>
@@ -1682,7 +1687,7 @@ const rowClass = (d: DetailRow) => {
                 Total Rencana{{ activeFormTab === "MAP" ? " (Sampel)" : "" }}
               </td>
               <td class="tr pjw-footer-val">{{ fmt(totalRencanaVisible) }}</td>
-              <td colspan="5"></td>
+              <td colspan="6"></td>
             </tr>
           </tfoot>
         </table>
