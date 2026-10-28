@@ -40,6 +40,7 @@ export interface RekapDetailRow {
   invoice: string;
   keterangan: string;
   vouNomor: string;
+  pjtNomor: string;
 }
 
 export interface RekapRange {

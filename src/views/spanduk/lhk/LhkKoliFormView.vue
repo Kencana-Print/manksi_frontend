@@ -280,7 +280,7 @@ const totalKoli = computed(() =>
 );
 
 // ── Validasi (cermin server) ──
-const MAKS_KOLI = 999;
+const MAKS_KOLI = 9999;
 
 const validateSave = () => {
   const { tanggal, kodePabrik } = formData.value.header;

@@ -29,6 +29,16 @@ export const pengajuanTransferFormService = {
       params: { search },
     });
   },
+  getRekapPanggilOptions(search: string) {
+    return api.get("/pembelian/pengajuan-transfer-form/rekap-panggil-options", {
+      params: { search },
+    });
+  },
+  getRekapPanggilRows(nomor: string) {
+    return api.get("/pembelian/pengajuan-transfer-form/rekap-panggil-rows", {
+      params: { nomor },
+    });
+  },
   getPoExternalOptions(search: string) {
     return api.get("/pembelian/pengajuan-transfer-form/poexternal-options", {
       params: { search },

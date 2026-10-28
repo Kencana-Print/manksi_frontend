@@ -39,6 +39,17 @@ export interface TagihanParams {
   excludeNomor: string;
 }
 
+export interface VoucherOption {
+  nomor: string;
+  tanggal: string;
+  supKode: string;
+  supplier: string;
+  keterangan: string;
+  nominal: number;
+  kategori: string;
+  kategoriUrut: number;
+}
+
 export interface RekapDetailPayload {
   supKode: string;
   bulanTagihan: string;
@@ -79,6 +90,7 @@ export interface RekapDetailLoaded {
   invoice: string;
   keterangan: string;
   vouNomor: string;
+  pjtNomor: string;
 }
 
 export interface RekapLoaded {
@@ -112,6 +124,11 @@ export const rekapPembayaranFormService = {
 
   getTagihan: (params: TagihanParams) =>
     api.get<ApiResult<TagihanItem[]>>(`${BASE}/lookups/tagihan`, { params }),
+
+  getVoucherOptions: (search: string, excludeNomor: string) =>
+    api.get<ApiResult<VoucherOption[]>>(`${BASE}/lookups/voucher`, {
+      params: { search, excludeNomor },
+    }),
 
   getById: (nomor: string) =>
     api.get<ApiResult<RekapLoaded>>(`${BASE}/${encodeURIComponent(nomor)}`),

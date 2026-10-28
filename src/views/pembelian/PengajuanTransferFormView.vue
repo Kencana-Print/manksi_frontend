@@ -15,6 +15,7 @@ import {
   IconPlus,
   IconTrash,
   IconPrinter,
+  IconCalendarDue,
 } from "@tabler/icons-vue";
 
 const route = useRoute();
@@ -350,6 +351,137 @@ const openRekapVouModal = async (idx: number) => {
 };
 // Memakai ulang alur F2: cek duplikat, isi nominal, isi supplier + rekening.
 const selectRekapVou = (v: RekapVoucherOption) => selectVoucher(v);
+
+// ── Panggil Rekap Pembayaran: isi banyak baris sekaligus dari satu rekap ──
+interface RekapPanggilOption {
+  nomor: string;
+  tanggal: string;
+  keterangan: string;
+  jumlah: number;
+  total: number;
+}
+interface RekapPanggilRow {
+  trs: string;
+  kode: string;
+  nama: string;
+  bank: string;
+  rekening: string;
+  atasnama: string;
+  nominal: number;
+  rekapNomor: string;
+  cekRekening: "" | "BANYAK" | "KOSONG";
+}
+const showPanggilModal = ref(false);
+const panggilState =
+  ref<ModalState<RekapPanggilOption>>(createModalState<RekapPanggilOption>());
+const panggilRekap = ref<RekapPanggilOption | null>(null);
+const panggilRows = ref<RekapPanggilRow[]>([]);
+const panggilTerpilih = ref<string[]>([]);
+const panggilLoadingRows = ref(false);
+let panggilDebounce: ReturnType<typeof setTimeout> | null = null;
+
+const doSearchPanggil = async () => {
+  panggilState.value.loading = true;
+  try {
+    const res = await pengajuanTransferFormService.getRekapPanggilOptions(
+      panggilState.value.search,
+    );
+    panggilState.value.allItems = res.data.data || [];
+  } finally {
+    panggilState.value.loading = false;
+  }
+};
+const searchPanggilDebounced = () => {
+  if (panggilDebounce) clearTimeout(panggilDebounce);
+  panggilDebounce = setTimeout(doSearchPanggil, 350);
+};
+const openPanggilModal = async () => {
+  panggilState.value = createModalState<RekapPanggilOption>();
+  panggilRekap.value = null;
+  panggilRows.value = [];
+  panggilTerpilih.value = [];
+  showPanggilModal.value = true;
+  await doSearchPanggil();
+};
+const panggilSudahAda = (trs: string): boolean =>
+  form.value.detail.some((d) => d.trs === trs);
+const pilihRekapPanggil = async (r: RekapPanggilOption) => {
+  panggilLoadingRows.value = true;
+  try {
+    const res = await pengajuanTransferFormService.getRekapPanggilRows(r.nomor);
+    panggilRows.value = res.data.data || [];
+    panggilTerpilih.value = panggilRows.value
+      .filter((x) => !panggilSudahAda(x.trs))
+      .map((x) => x.trs);
+    panggilRekap.value = r;
+  } catch (e: any) {
+    toast.error(e.response?.data?.message || "Gagal memuat isi rekap.");
+  } finally {
+    panggilLoadingRows.value = false;
+  }
+};
+const kembaliPanggil = () => {
+  panggilRekap.value = null;
+  panggilRows.value = [];
+  panggilTerpilih.value = [];
+};
+const panggilSelectable = computed(() =>
+  panggilRows.value.filter((r) => !panggilSudahAda(r.trs)),
+);
+const panggilAllSelected = computed(
+  () =>
+    panggilSelectable.value.length > 0 &&
+    panggilSelectable.value.every((r) => panggilTerpilih.value.includes(r.trs)),
+);
+const togglePanggilAll = () => {
+  panggilTerpilih.value = panggilAllSelected.value
+    ? []
+    : panggilSelectable.value.map((r) => r.trs);
+};
+const togglePanggilOne = (r: RekapPanggilRow) => {
+  if (panggilSudahAda(r.trs)) return;
+  panggilTerpilih.value = panggilTerpilih.value.includes(r.trs)
+    ? panggilTerpilih.value.filter((x) => x !== r.trs)
+    : [...panggilTerpilih.value, r.trs];
+};
+const tambahkanPanggil = () => {
+  const pilih = panggilRows.value.filter(
+    (r) => panggilTerpilih.value.includes(r.trs) && !panggilSudahAda(r.trs),
+  );
+  if (!pilih.length) {
+    toast.warning("Pilih minimal satu voucher.");
+    return;
+  }
+  for (const r of pilih) {
+    let idx = form.value.detail.findIndex(
+      (d) => !d.nama && !d.trs && !d.nominal && !d.jurnal,
+    );
+    if (idx < 0) {
+      addRow();
+      idx = form.value.detail.length - 1;
+    }
+    const d = form.value.detail[idx];
+    d.kode = r.kode;
+    d.nama = r.nama;
+    d.bank = r.bank;
+    d.rekening = r.rekening;
+    d.atasnama = r.atasnama;
+    d.sumber = "RKP";
+    d.trs = r.trs;
+    d.nominal = Number(r.nominal) || 0;
+    if (!String(d.ket || "").trim()) d.ket = r.trs;
+  }
+  showPanggilModal.value = false;
+  toast.success(`${pilih.length} voucher ditambahkan dari rekap.`);
+  const cek = pilih.filter((r) => r.cekRekening);
+  if (cek.length)
+    toast.warning(
+      `${cek.length} baris perlu cek rekening (supplier punya lebih dari satu rekening atau belum punya): ${cek
+        .map((r) => r.nama)
+        .join(", ")}`,
+      { timeout: 10000 },
+    );
+};
 
 const doSearchPo = async () => {
   poState.value.loading = true;
@@ -1002,9 +1134,19 @@ const skipCetak = () => {
       <div class="pt-right">
         <div class="pt-sec-header">
           <span class="pt-sec-title">Detail Pengajuan</span>
-          <button type="button" class="btn-add" @click="addRow">
-            <IconPlus :size="14" class="mr-1" /> Tambah Baris
-          </button>
+          <div class="pt-sec-actions">
+            <button
+              v-if="!isRealisasi"
+              type="button"
+              class="btn-add btn-add--rekap"
+              @click="openPanggilModal"
+            >
+              <IconCalendarDue :size="14" class="mr-1" /> Panggil Rekap
+            </button>
+            <button type="button" class="btn-add" @click="addRow">
+              <IconPlus :size="14" class="mr-1" /> Tambah Baris
+            </button>
+          </div>
         </div>
 
         <div class="pt-table-wrap">
@@ -1463,6 +1605,161 @@ const skipCetak = () => {
           </table>
         </div>
       </v-card-text>
+    </v-card>
+  </v-dialog>
+
+  <!-- Modal Panggil Rekap Pembayaran -->
+  <v-dialog v-model="showPanggilModal" max-width="1100px" scrollable>
+    <v-card class="rounded-lg">
+      <v-card-title
+        class="pa-3 text-subtitle-1 text-white"
+        style="background: #3949ab"
+      >
+        {{
+          panggilRekap
+            ? `Panggil Rekap ${panggilRekap.nomor}`
+            : "Panggil Rekap Pembayaran"
+        }}
+      </v-card-title>
+      <v-card-text class="pa-3">
+        <template v-if="!panggilRekap">
+          <input
+            v-model="panggilState.search"
+            class="f-inp mb-2"
+            placeholder="Cari nomor rekap atau keterangan..."
+            autofocus
+            @input="searchPanggilDebounced"
+          />
+          <div style="max-height: 340px; overflow-y: auto">
+            <div
+              v-if="panggilState.loading || panggilLoadingRows"
+              class="text-center py-4 text-grey"
+            >
+              Memuat...
+            </div>
+            <table v-else class="mini-table">
+              <thead>
+                <tr>
+                  <th style="width: 160px">Rekap</th>
+                  <th style="width: 100px">Tanggal</th>
+                  <th>Keterangan</th>
+                  <th style="width: 90px" class="text-right">Voucher</th>
+                  <th style="width: 130px" class="text-right">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="r in panggilState.allItems"
+                  :key="r.nomor"
+                  class="mini-row"
+                  @click="pilihRekapPanggil(r)"
+                >
+                  <td>{{ r.nomor }}</td>
+                  <td>{{ fmtDate(r.tanggal) }}</td>
+                  <td>{{ r.keterangan || "-" }}</td>
+                  <td class="text-right">{{ r.jumlah }}</td>
+                  <td class="text-right">{{ numFmt(r.total) }}</td>
+                </tr>
+                <tr v-if="panggilState.allItems.length === 0">
+                  <td colspan="5" class="text-center text-grey py-3">
+                    Tidak ada rekap dengan voucher yang belum diajukan
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </template>
+
+        <template v-else>
+          <div style="max-height: 400px; overflow-y: auto">
+            <table class="mini-table">
+              <thead>
+                <tr>
+                  <th style="width: 32px" class="text-center">
+                    <input
+                      type="checkbox"
+                      :checked="panggilAllSelected"
+                      :disabled="!panggilSelectable.length"
+                      @change="togglePanggilAll"
+                    />
+                  </th>
+                  <th style="width: 130px">Voucher</th>
+                  <th>Supplier</th>
+                  <th style="width: 80px">Bank</th>
+                  <th>Atas Nama</th>
+                  <th style="width: 130px">Rekening</th>
+                  <th style="width: 110px" class="text-right">Nominal</th>
+                  <th style="width: 90px">Cek</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="r in panggilRows"
+                  :key="r.trs"
+                  class="mini-row"
+                  :style="panggilSudahAda(r.trs) ? 'opacity:0.45' : ''"
+                  @click="togglePanggilOne(r)"
+                >
+                  <td class="text-center">
+                    <input
+                      type="checkbox"
+                      :checked="panggilTerpilih.includes(r.trs)"
+                      :disabled="panggilSudahAda(r.trs)"
+                      @click.stop
+                      @change="togglePanggilOne(r)"
+                    />
+                  </td>
+                  <td>{{ r.trs }}</td>
+                  <td>{{ r.nama }}</td>
+                  <td>{{ r.bank || "-" }}</td>
+                  <td>{{ r.atasnama || "-" }}</td>
+                  <td>{{ r.rekening || "-" }}</td>
+                  <td class="text-right">{{ numFmt(r.nominal) }}</td>
+                  <td>
+                    <span
+                      v-if="r.cekRekening"
+                      style="color: #e65100; font-weight: 700"
+                    >
+                      {{
+                        r.cekRekening === "BANYAK" ? "Rek. >1" : "Tanpa rek."
+                      }}
+                    </span>
+                  </td>
+                </tr>
+                <tr v-if="panggilRows.length === 0">
+                  <td colspan="8" class="text-center text-grey py-3">
+                    Semua voucher rekap ini sudah diajukan
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </template>
+      </v-card-text>
+      <v-card-actions class="pa-3 border-t bg-grey-lighten-4">
+        <v-btn v-if="panggilRekap" variant="text" @click="kembaliPanggil"
+          >Kembali</v-btn
+        >
+        <span v-if="panggilRekap" class="text-caption text-grey-darken-1 ml-2">
+          {{ panggilTerpilih.length }} voucher dipilih
+        </span>
+        <v-spacer />
+        <v-btn
+          variant="text"
+          color="grey-darken-1"
+          @click="showPanggilModal = false"
+          >Tutup</v-btn
+        >
+        <v-btn
+          v-if="panggilRekap"
+          variant="flat"
+          color="primary"
+          :disabled="!panggilTerpilih.length"
+          @click="tambahkanPanggil"
+        >
+          Tambahkan ({{ panggilTerpilih.length }})
+        </v-btn>
+      </v-card-actions>
     </v-card>
   </v-dialog>
 
@@ -1999,6 +2296,16 @@ const skipCetak = () => {
 }
 .btn-add:hover {
   background: #0d47a1;
+}
+.pt-sec-actions {
+  display: flex;
+  gap: 6px;
+}
+.btn-add--rekap {
+  background: #3949ab;
+}
+.btn-add--rekap:hover {
+  background: #283593;
 }
 .pt-table-wrap {
   flex: 1;

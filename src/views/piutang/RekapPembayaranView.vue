@@ -417,6 +417,7 @@ const doExportDetail = async () => {
         { header: "Faktur Pajak", key: "fakturPajak", width: 24 },
         { header: "Invoice Tagihan", key: "invoice", width: 24 },
         { header: "No Voucher", key: "vouNomor", width: 18 },
+        { header: "Status Bayar", key: "pjtNomor", width: 20 },
         { header: "Keterangan", key: "keterangan", width: 36 },
       ],
       rows.map((r) => ({
@@ -438,6 +439,7 @@ const doExportDetail = async () => {
         invoice: r.invoice,
         keterangan: r.keterangan,
         vouNomor: r.vouNomor,
+        pjtNomor: r.pjtNomor === "-" ? "Realisasi voucher" : r.pjtNomor,
       })),
     );
   } catch (e) {
@@ -752,6 +754,7 @@ fetchData();
                 <th style="width: 170px">FAKTUR PAJAK</th>
                 <th style="width: 170px">INVOICE TAGIHAN</th>
                 <th style="width: 150px">VOUCHER</th>
+                <th style="width: 150px">STATUS BAYAR</th>
                 <th>KETERANGAN</th>
               </tr>
             </thead>
@@ -762,7 +765,7 @@ fetchData();
               <tr class="grp-row">
                 <td colspan="6">{{ g.kategori }}</td>
                 <td class="num">{{ fmtNominal(g.subtotal) }}</td>
-                <td colspan="5"></td>
+                <td colspan="6"></td>
               </tr>
               <tr v-for="d in g.rows" :key="d.noUrut">
                 <td>{{ d.namaSupplier }}</td>
@@ -776,12 +779,17 @@ fetchData();
                 <td>{{ d.fakturPajak || "-" }}</td>
                 <td>{{ d.invoice || "-" }}</td>
                 <td>{{ d.vouNomor || "-" }}</td>
+                <td>
+                  {{
+                    d.pjtNomor === "-" ? "Realisasi voucher" : d.pjtNomor || "-"
+                  }}
+                </td>
                 <td class="cell-wrap">{{ d.keterangan || "-" }}</td>
               </tr>
             </tbody>
             <tbody v-if="!(kelompokByNomor[item.nomor] ?? []).length">
               <tr>
-                <td colspan="12" class="empty-row">
+                <td colspan="13" class="empty-row">
                   &lt;Tidak ada transaksi&gt;
                 </td>
               </tr>
