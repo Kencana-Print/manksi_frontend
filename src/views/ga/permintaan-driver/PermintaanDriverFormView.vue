@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, nextTick } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
 import BaseForm from "@/components/BaseForm.vue";
@@ -170,6 +170,17 @@ const onPenerimaEnter = (idx: number) => {
   }
 };
 
+// ── Refs untuk Navigasi Grid ──────────────────────────────────────────
+const penerimaRefs = ref<Record<number, HTMLInputElement | null>>({});
+const setPenerimaRef = (el: any, idx: number) => {
+  if (el) penerimaRefs.value[idx] = el;
+};
+
+const spkRefs = ref<Record<number, HTMLInputElement | null>>({});
+const setSpkRef = (el: any, idx: number) => {
+  if (el) spkRefs.value[idx] = el;
+};
+
 // ── Lookup SPK (Pengganti F1 Delphi) ──────────────────────────────────
 const showSpkModal = ref(false);
 const activeDetailIndex = ref<number | null>(null);
@@ -182,8 +193,30 @@ const openSpkLookup = (idx: number) => {
 const onSpkSelected = (spkItem: any) => {
   if (activeDetailIndex.value !== null && formData.value.items && formData.value.items[activeDetailIndex.value]) {
     const target = formData.value.items[activeDetailIndex.value];
-    target.spk = (spkItem.Nomor || spkItem.spk || "").trim();
+    const spkNomor = (spkItem.Nomor || spkItem.spk || "").trim();
+
+    // Cek duplikasi di baris lain sesuai Delphi
+    const duplicateIndex = formData.value.items.findIndex(
+      (it, idx) =>
+        idx !== activeDetailIndex.value &&
+        (it.spk || "").trim().toUpperCase() === spkNomor.toUpperCase(),
+    );
+    if (duplicateIndex !== -1) {
+      toast.warning(`Spk ini sudah di input, di baris ${duplicateIndex + 1}`);
+      showSpkModal.value = false;
+      activeDetailIndex.value = null;
+      return;
+    }
+
+    target.spk = spkNomor;
     target.keterangan = (spkItem.Nama || spkItem.NamaPekerjaan || spkItem.NamaProduk || target.keterangan || "").trim();
+    target._lastValidatedSpk = spkNomor.toUpperCase();
+
+    const targetIdx = activeDetailIndex.value;
+    nextTick(() => {
+      penerimaRefs.value[targetIdx]?.focus();
+      penerimaRefs.value[targetIdx]?.select?.();
+    });
   }
   showSpkModal.value = false;
   activeDetailIndex.value = null;
@@ -196,21 +229,80 @@ const onSpkKeydown = (e: KeyboardEvent, idx: number) => {
   }
 };
 
-const onSpkBlur = async (row: PermintaanDriverDetailItem) => {
+// Validasi dan load SPK saat input langsung (tidak cek aktif atau close)
+const validateAndLoadSpk = async (
+  row: PermintaanDriverDetailItem,
+  idx: number,
+  isEnter = false,
+) => {
   const code = (row.spk || "").trim();
-  if (!code) return;
-  if (!row.keterangan) {
-    try {
-      const res = await permintaanDriverService.searchSpk(code);
-      const matches = res.data?.data || [];
-      const exact = matches.find((m: any) => m.Nomor?.toUpperCase() === code.toUpperCase());
-      if (exact) {
-        row.keterangan = exact.Nama;
-      }
-    } catch {
-      // Abaikan jika tidak ada koneksi
-    }
+  if (!code) {
+    row._lastValidatedSpk = "";
+    return;
   }
+
+  // Jika sudah divalidasi dengan kode yang sama
+  if (row._lastValidatedSpk === code.toUpperCase()) {
+    if (isEnter) {
+      nextTick(() => {
+        penerimaRefs.value[idx]?.focus();
+        penerimaRefs.value[idx]?.select?.();
+      });
+    }
+    return;
+  }
+
+  // Cek duplikasi di baris lain sesuai Delphi
+  const duplicateIndex = (formData.value.items || []).findIndex(
+    (it, i) =>
+      i !== idx && (it.spk || "").trim().toUpperCase() === code.toUpperCase(),
+  );
+  if (duplicateIndex !== -1) {
+    toast.warning(`Spk ini sudah di input, di baris ${duplicateIndex + 1}`);
+    row.spk = "";
+    row.keterangan = "";
+    row._lastValidatedSpk = "";
+    return;
+  }
+
+  try {
+    const res = await permintaanDriverService.searchSpk(code);
+    const matches = res.data?.data || [];
+    const exact = matches.find(
+      (m: any) => m.Nomor?.toUpperCase() === code.toUpperCase(),
+    );
+    // Jika persis sama atau hanya ada 1 hasil yang cocok
+    const match = exact || (matches.length === 1 ? matches[0] : null);
+
+    if (match) {
+      row.spk = match.Nomor;
+      row.keterangan = match.Nama;
+      row._lastValidatedSpk = match.Nomor.toUpperCase();
+      if (isEnter) {
+        nextTick(() => {
+          penerimaRefs.value[idx]?.focus();
+          penerimaRefs.value[idx]?.select?.();
+        });
+      }
+    } else {
+      // Tidak ditemukan di database
+      row.keterangan = "";
+      row._lastValidatedSpk = "";
+      if (isEnter) {
+        toast.warning(`Nomor SPK ${code} belum ada di database.`);
+      }
+    }
+  } catch {
+    // Abaikan jika error jaringan
+  }
+};
+
+const onSpkEnter = async (row: PermintaanDriverDetailItem, idx: number) => {
+  await validateAndLoadSpk(row, idx, true);
+};
+
+const onSpkBlur = async (row: PermintaanDriverDetailItem, idx: number) => {
+  await validateAndLoadSpk(row, idx, false);
 };
 
 // ── Validasi Form Sesuai Delphi 7 ─────────────────────────────────────
@@ -241,6 +333,17 @@ const onValidate = () => {
   ) {
     toast.warning("Isi Estimasi jam kerja yg benar.");
     return;
+  }
+
+  // Validasi jika SPK diisi tapi tidak ada keterangan (nomor SPK tidak ada di database)
+  for (let i = 0; i < (formData.value.items || []).length; i++) {
+    const it = formData.value.items[i];
+    if (it.spk?.trim() && !it.keterangan?.trim()) {
+      toast.warning(
+        `Baris ke-${i + 1}: Nomor SPK ${it.spk} belum valid atau tidak ada di database.`,
+      );
+      return;
+    }
   }
 
   const validItems = (formData.value.items || []).filter(
@@ -534,6 +637,7 @@ onMounted(async () => {
                     <td class="bg-yellow-lighten-5">
                       <div class="cell-kode-wrap">
                         <input
+                          :ref="(el) => setSpkRef(el, Number(index))"
                           v-model="item.spk"
                           class="cell-input"
                           placeholder="F1 / SPK"
@@ -544,8 +648,8 @@ onMounted(async () => {
                             color: #1565c0;
                           "
                           @keydown="onSpkKeydown($event, Number(index))"
-                          @keydown.enter.prevent="onSpkBlur(item)"
-                          @blur="onSpkBlur(item)"
+                          @keydown.enter.prevent="onSpkEnter(item, Number(index))"
+                          @blur="onSpkBlur(item, Number(index))"
                         />
                         <button
                           v-if="!isEdit"
@@ -572,6 +676,7 @@ onMounted(async () => {
                     <!-- Kolom Penerima (tekan Enter otomatis nambah baris baru jika mode create) -->
                     <td class="bg-yellow-lighten-5">
                       <input
+                        :ref="(el) => setPenerimaRef(el, Number(index))"
                         v-model="item.penerima"
                         class="cell-input"
                         placeholder="Nama penerima..."
