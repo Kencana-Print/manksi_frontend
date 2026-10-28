@@ -109,7 +109,7 @@ const xtotalDetail = computed(() =>
   detail.value.reduce((s, d) => {
     if (!d.tipe) return s;
     if (
-      ["BPB", "BPJ", "POE", "MMT", "BPE", "BPG", "POL", "PCL"].includes(d.tipe)
+      ["BPB", "BPJ", "POE", "MMT", "BPE", "BPG", "POL", "POB"].includes(d.tipe)
     )
       return s + (Number(d.total) || 0);
     if (["RET", "PJG"].includes(d.tipe)) return s - (Number(d.total) || 0);
@@ -414,7 +414,7 @@ const notaTypeConfig = computed(() => {
     BPE: { title: "BPB PO External MMT", color: "#0277bd" },
     BPG: { title: "BPB Non Bahan", color: "#6a1b9a" },
     POL: { title: "PO Lain-lain", color: "#ef6c00" },
-    PCL: { title: "PO Celup", color: "#ad1457" },
+    POB: { title: "PO Bahan, Greige, Celup", color: "#ad1457" },
   };
   return map[notaModalType.value] ?? { title: "Cari Nota", color: "#1565c0" };
 });
@@ -587,7 +587,7 @@ onMounted(async () => {
         PJG: "PJG",
         BPG: "BPG",
         POL: "POL",
-        PCL: "PCL",
+        POB: "POB",
       };
       detail.value = (d.detail || []).map((row: any) => ({
         ...row,
@@ -950,7 +950,7 @@ const executeClose = () => {
                         <option value="BPE">BPB PO Ext MMT</option>
                         <option value="BPG">BPB Non Bahan</option>
                         <option value="POL">PO Lain-lain</option>
-                        <option value="PCL">PO Celup</option>
+                        <option value="POB">PO Bahan</option>
                       </select>
                       <button
                         type="button"
@@ -1779,7 +1779,7 @@ const executeClose = () => {
   background: #fff3e0;
   color: #ef6c00;
 }
-.type-pcl {
+.type-pob {
   background: #fce4ec;
   color: #ad1457;
 }

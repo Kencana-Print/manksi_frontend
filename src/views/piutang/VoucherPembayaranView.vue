@@ -356,6 +356,7 @@ const detailExportColumns: ExcelColumn[] = [
   { header: "Nomor PO", key: "NomorPO", width: 16 },
   { header: "Tgl Nota", key: "TglNota", width: 14, align: "center" },
   { header: "Type", key: "Type", width: 10 },
+  { header: "Keterangan", key: "Keterangan", width: 22 },
   {
     header: "Total Detail",
     key: "TotalDetail",
@@ -423,6 +424,7 @@ const onExportDetail = async () => {
         NomorPO: d.NomorPO || "",
         TglNota: d.Tanggal ? formatTanggal(d.Tanggal) : "",
         Type: d.Type || "",
+        Keterangan: d.Keterangan || "",
         TotalDetail: Number(d.Total) || 0,
         SpkNomor: d.SpkNomor || "",
         SpkNama: d.SpkNama || "",
@@ -590,6 +592,7 @@ const onExportDetail = async () => {
               <th width="140">Nomor PO</th>
               <th width="100">Tanggal</th>
               <th width="80">Type</th>
+              <th width="150">Keterangan</th>
               <th width="130" class="tr">Total</th>
               <th width="130">SPK Nomor</th>
               <th width="220">SPK Nama</th>
@@ -607,6 +610,7 @@ const onExportDetail = async () => {
               <td>{{ d.NomorPO || "-" }}</td>
               <td class="tc">{{ formatTanggal(d.Tanggal) }}</td>
               <td class="tc">{{ d.Type }}</td>
+              <td>{{ d.Keterangan || "-" }}</td>
               <td class="tr">{{ numFmt(d.Total) }}</td>
               <td>{{ d.SpkNomor || "-" }}</td>
               <td>{{ d.SpkNama || "-" }}</td>
@@ -617,7 +621,7 @@ const onExportDetail = async () => {
           </tbody>
           <tfoot>
             <tr class="detail-foot">
-              <td colspan="4" class="tr detail-foot-lbl">Total</td>
+              <td colspan="5" class="tr detail-foot-lbl">Total</td>
               <td class="tr detail-foot-val">
                 {{
                   numFmt(
@@ -792,7 +796,7 @@ const onExportDetail = async () => {
 }
 .detail-table {
   width: 100%;
-  min-width: 1200px;
+  min-width: 1370px;
   border-collapse: collapse;
   background: white;
   border-radius: 4px;

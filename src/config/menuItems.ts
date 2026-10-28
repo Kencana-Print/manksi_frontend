@@ -1219,7 +1219,7 @@ export const createMenuItems = (): NavItem[] => {
           menuId: 955,
         },
         {
-          title: "Klaim Kas Kecil",
+          title: "Klaim Kas Kecil/ATM",
           to: "/piutang/klaim-kas-kecil",
           icon: IconCashBanknote,
           menuId: 971,

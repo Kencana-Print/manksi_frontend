@@ -30,6 +30,7 @@ interface KlaimForm {
   tanggal: string;
   keterangan: string;
   status: string;
+  jenis: string;
   nomorPjt: string;
   bisaUbah: boolean;
   rekTujuan: RekeningInfo;
@@ -67,6 +68,7 @@ const buatInitial = (): KlaimForm => ({
   tanggal: hariIni(),
   keterangan: "",
   status: "AKTIF",
+  jenis: "",
   nomorPjt: "",
   bisaUbah: true,
   rekTujuan: rekKosong(),
@@ -76,6 +78,7 @@ const buatInitial = (): KlaimForm => ({
 // ── Rekening default untuk mode Tambah (ditentukan server dari cabang user) ──
 const defaults = ref<KlaimDefaults | null>(null);
 const defaultsError = ref("");
+const rekPilih = ref(""); // kas / ATM yang dipilih (mode Tambah)
 
 const muatDefaults = async (cabang?: string) => {
   defaultsError.value = "";
@@ -83,6 +86,7 @@ const muatDefaults = async (cabang?: string) => {
     const res = await svc.getDefaults(cabang);
     defaults.value = res.data.data;
     form.value.cabang = res.data.data.cabang;
+    rekPilih.value = res.data.data.kasOpsi[0]?.kode ?? "";
   } catch (e) {
     defaults.value = null;
     defaultsError.value = pesanError(
@@ -104,6 +108,16 @@ const gantiCabang = async (cabang: string) => {
     form.value.detail = [];
   }
   await muatDefaults(cabang);
+};
+
+// Ganti ATM / kas -> daftar BKK dikosongkan (satu klaim = satu kas)
+const gantiKas = (kode: string) => {
+  if (rekPilih.value === kode) return;
+  if (form.value.detail.length) {
+    toast.info("Kas diganti, daftar BKK dikosongkan.");
+    form.value.detail = [];
+  }
+  rekPilih.value = kode;
 };
 
 // ── useForm ──
@@ -131,6 +145,7 @@ const {
       tanggal: d.tanggal,
       keterangan: d.keterangan,
       status: d.status,
+      jenis: d.jenis,
       nomorPjt: d.nomorPjt,
       bisaUbah: d.bisaUbah,
       rekTujuan: d.rekTujuan,
@@ -147,6 +162,7 @@ const {
   submitApi: async (data: KlaimForm): Promise<KlaimSaveHasil> => {
     const payload: KlaimPayload = {
       cabang: data.cabang,
+      rekTujuan: rekPilih.value,
       tanggal: data.tanggal,
       keterangan: data.keterangan.trim(),
       detail: data.detail.map((b) => ({ bkk: b.bkk })),
@@ -173,7 +189,16 @@ const ro = computed(
 const tampilTujuan = computed<RekeningInfo>(() =>
   nomorEdit.value
     ? form.value.rekTujuan
-    : (defaults.value?.rekTujuan ?? rekKosong()),
+    : (defaults.value?.kasOpsi.find((k) => k.kode === rekPilih.value) ??
+      rekKosong()),
+);
+
+// Mode halaman: ATM (pusat) atau Kas Kecil (cabang), ditentukan server
+const isAtm = computed(
+  () => (nomorEdit.value ? form.value.jenis : defaults.value?.jenis) === "ATM",
+);
+const labelJenis = computed(() =>
+  isAtm.value ? "Klaim ATM" : "Klaim Kas Kecil",
 );
 const labelRek = (r: RekeningInfo): string =>
   r.kode ? `${r.kode} - ${r.nama}` : "";
@@ -205,6 +230,7 @@ const loadOpsi = async () => {
       cari.value.trim(),
       nomorEdit.value,
       form.value.cabang,
+      rekPilih.value,
     );
     if (myReq !== opsiReq) return;
     opsi.value = res.data.data ?? [];
@@ -283,6 +309,10 @@ const validateSave = () => {
     toast.warning(defaultsError.value);
     return;
   }
+  if (!nomorEdit.value && !rekPilih.value) {
+    toast.warning("Pilih kas / ATM yang diklaim.");
+    return;
+  }
   if (!form.value.tanggal) {
     toast.warning("Tanggal klaim belum diisi.");
     return;
@@ -297,12 +327,12 @@ const validateSave = () => {
 
 <template>
   <BaseForm
-    :title="isEditMode ? 'Ubah Klaim Kas Kecil' : 'Tambah Klaim Kas Kecil'"
+    :title="(isEditMode ? 'Ubah ' : 'Tambah ') + labelJenis"
     menu-id="971"
     :icon="IconCashBanknote"
     :is-loading="isLoading"
     :is-saving="isSaving"
-    item-name="Klaim Kas Kecil"
+    :item-name="labelJenis"
     v-model:show-save-dialog="showSaveDialog"
     v-model:show-cancel-dialog="showCancelDialog"
     v-model:show-close-dialog="showCloseDialog"
@@ -346,6 +376,26 @@ const validateSave = () => {
               </option>
             </select>
           </div>
+          <div
+            v-if="!nomorEdit && defaults && defaults.kasOpsi.length > 1"
+            class="f-field"
+          >
+            <label class="f-lbl">ATM / Kas <span class="req">*</span></label>
+            <select
+              class="f-inp"
+              :value="rekPilih"
+              :disabled="ro"
+              @change="gantiKas(($event.target as HTMLSelectElement).value)"
+            >
+              <option
+                v-for="k in defaults.kasOpsi"
+                :key="k.kode"
+                :value="k.kode"
+              >
+                {{ labelRek(k) }}
+              </option>
+            </select>
+          </div>
           <div class="f-field">
             <label class="f-lbl">Tanggal <span class="req">*</span></label>
             <input
@@ -357,7 +407,9 @@ const validateSave = () => {
           </div>
 
           <div class="f-field">
-            <label class="f-lbl">Rekening Tujuan (kas kecil)</label>
+            <label class="f-lbl">{{
+              isAtm ? "ATM yang diisi" : "Rekening Tujuan (kas kecil)"
+            }}</label>
             <input :value="labelRek(tampilTujuan)" readonly class="f-inp" />
             <div v-if="tampilTujuan.rekening" class="f-sub">
               No. Rek: {{ tampilTujuan.rekening }}
@@ -393,10 +445,14 @@ const validateSave = () => {
           <template #prepend><IconSearch :size="14" /></template>
           Pilih BKK
         </v-btn>
-        <span class="kk-hint">
+        <template v-if="isAtm">
+          BKK/BBK diklaim utuh. Hanya pengeluaran dari ATM ini yang belum
+          diklaim yang bisa dipilih.
+        </template>
+        <template v-else>
           BKK diklaim utuh. Hanya BKK penyelesaian kas yang sudah selesai dan
           belum diklaim yang bisa dipilih.
-        </span>
+        </template>
       </div>
 
       <div class="kk-table-wrap">
