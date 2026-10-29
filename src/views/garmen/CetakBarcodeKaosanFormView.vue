@@ -1379,8 +1379,7 @@ const closePreview = () => {
       </v-card-title>
       <v-card-text class="pa-4">
         <p class="mb-2" style="font-size: 12px">
-          Jumlah yang akan dicetak berbeda dari qty pesanan SPK untuk baris
-          berikut:
+          Jumlah yang akan dicetak berbeda dari qty pesanan SPK untuk baris berikut:
         </p>
         <div v-for="(m, i) in qtyMismatchDetails" :key="i" class="mismatch-row">
           <strong>{{ m.nama }}</strong> ({{ m.ukuran }}) — Qty Pesanan:
