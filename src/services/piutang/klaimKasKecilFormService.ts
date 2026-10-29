@@ -27,6 +27,12 @@ export interface BkkOption {
 }
 
 export interface KlaimDetailLoaded {
+  tipe: "BKK" | "MANUAL";
+  akun: string;
+  akunNama: string;
+  cc: string;
+  dc: string;
+  ccNama: string;
   bkk: string;
   bon: string;
   tanggal: string;
@@ -53,12 +59,22 @@ export interface KlaimDetailPayload {
   bkk: string;
 }
 
+export interface KlaimManualPayload {
+  tanggal: string;
+  akun: string;
+  cc: string;
+  dc: string;
+  uraian: string;
+  nominal: number;
+}
+
 export interface KlaimPayload {
   cabang: string;
   rekTujuan: string;
   tanggal: string;
   keterangan: string;
   detail: KlaimDetailPayload[];
+  detailManual?: KlaimManualPayload[];
 }
 
 export interface KlaimSaveHasil {
@@ -68,6 +84,9 @@ export interface KlaimSaveHasil {
 
 export interface KlaimPrintDetail {
   no: number;
+  manual?: boolean;
+  akun?: string;
+  costCenter?: string;
   bkk: string;
   tanggal: string;
   uraian: string;

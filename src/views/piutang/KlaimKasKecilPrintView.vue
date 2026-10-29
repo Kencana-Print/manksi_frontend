@@ -87,11 +87,16 @@ const total = computed<number>(() =>
         </tr>
       </thead>
       <tbody>
-        <tr v-for="d in data.detail" :key="d.bkk">
+        <tr v-for="d in data.detail" :key="d.no">
           <td class="tc">{{ d.no }}</td>
           <td>{{ d.bkk }}</td>
           <td class="tc">{{ formatTanggal(d.tanggal) }}</td>
-          <td>{{ d.uraian }}</td>
+          <td>
+            {{ d.uraian }}
+            <div v-if="d.manual" class="sub-manual">
+              Akun: {{ d.akun }}<br />CC: {{ d.costCenter }}
+            </div>
+          </td>
           <td class="tr">{{ fmt(d.nominal) }}</td>
         </tr>
         <tr v-if="!data.detail.length">
@@ -211,6 +216,10 @@ const total = computed<number>(() =>
 .empty {
   color: #999;
   font-style: italic;
+}
+.sub-manual {
+  font-size: 7.5pt;
+  color: #444;
 }
 .terbilang-cell {
   font-style: italic;

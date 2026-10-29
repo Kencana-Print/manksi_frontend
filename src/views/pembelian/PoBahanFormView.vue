@@ -108,6 +108,7 @@ interface BarisHitung {
   jumlah?: number;
   harga?: number;
   diskon?: number;
+  ppn?: number;
 }
 
 function hitungTotal(r: BarisHitung): number {
@@ -167,6 +168,7 @@ const {
         }),
         spk: row.pod_spk_nomor || "",
         mkb: row.pod_mkb_nomor || "",
+        ppn: Number(row.pod_ppn) || 0,
         supKode: row.pod_sup_kode || "",
         supNama: row.pod_sup_nama || "",
       })),
@@ -220,6 +222,8 @@ const isLainLain = computed(() => formData.value.header.po_jenis === 4);
 const isBahanLike = computed(() => isBahan.value || isLainLain.value);
 // Kolom supplier per baris: hanya PO Lain-lain, dan hanya untuk user yang boleh lihat supplier
 const showSupCol = computed(() => isLainLain.value && canLihatSup.value);
+// PPN per baris: hanya PO Lain-lain, dan hanya untuk user yang boleh lihat harga
+const showPpnCol = computed(() => isLainLain.value && canLihatBeli.value);
 
 watch(
   () => formData.value.header.po_jenis,
@@ -231,6 +235,9 @@ watch(
       formData.value.header.sup_nama = "";
       formData.value.header.sup_alamat = "";
       formData.value.header.sup_kota = "";
+      // PPN per baris, header dikosongkan
+      formData.value.header.po_status_ppn = 0;
+      formData.value.header.po_ppn = 0;
     }
   },
 );
@@ -255,11 +262,19 @@ const subTotal = computed(() =>
     0,
   ),
 );
-const ppnValue = computed(() =>
-  formData.value.header.po_status_ppn === 1
+const ppnValue = computed(() => {
+  // PO Lain-lain: PPN per baris (beda supplier beda ketentuan)
+  if (isLainLain.value) {
+    return formData.value.items.reduce(
+      (s: number, r: BarisHitung) =>
+        s + hitungTotal(r) * ((Number(r.ppn) || 0) / 100),
+      0,
+    );
+  }
+  return formData.value.header.po_status_ppn === 1
     ? subTotal.value * (Number(formData.value.header.po_ppn) / 100)
-    : 0,
-);
+    : 0;
+});
 const grandTotal = computed(() => subTotal.value + ppnValue.value);
 const fmt = (n: number) => n.toLocaleString("id-ID");
 // Hitung colspan dinamis buat baris "Tidak ada data" — base fixed
@@ -269,6 +284,7 @@ const colSpanCount = computed(() => {
   if (isCelup.value) n += 1; // Roll
   if (showSupCol.value) n += 1; // Supplier per baris
   if (canLihatBeli.value) n += 3; // Harga Beli, Disc, Total
+  if (showPpnCol.value) n += 1; // PPN per baris
   return n;
 });
 
@@ -425,6 +441,7 @@ const addItem = () =>
     total: 0,
     spk: "",
     mkb: "",
+    ppn: 0,
     supKode: "",
     supNama: "",
   });
@@ -624,8 +641,14 @@ const openLookupSupRow = (i: number) => {
 const setSupRow = (v: any) => {
   const i = activeSupIdx.value;
   if (i < 0) return;
-  formData.value.items[i].supKode = v.Kode || v.sup_kode;
+  const kode = v.Kode || v.sup_kode;
+  formData.value.items[i].supKode = kode;
   formData.value.items[i].supNama = v.Nama || v.sup_nama;
+  // Supplier yang sama biasanya ketentuan PPN-nya sama: salin dari baris lain
+  const acuan = formData.value.items.find(
+    (r: any, j: number) => j !== i && r.kode && r.supKode === kode,
+  );
+  if (acuan) formData.value.items[i].ppn = Number(acuan.ppn) || 0;
   activeSupIdx.value = -1;
 };
 
@@ -679,6 +702,11 @@ const validateSave = () => {
       return toast.warning(
         `Baris ${idx + 1}: Harga Beli harus diisi, tidak dapat disimpan.`,
       );
+    }
+    if (isLainLain.value) {
+      const p = Number(r.ppn) || 0;
+      if (p < 0 || p > 100)
+        return toast.warning(`Baris ${idx + 1}: PPN harus antara 0 dan 100.`);
     }
     if (isCelup.value && (Number(r.roll) || 0) <= 0)
       return toast.warning(`Baris ${idx + 1}: PO Celup Roll harus diisi.`);
@@ -897,7 +925,7 @@ const validateSave = () => {
 
         <div class="sep mt-1 mb-1" />
 
-        <div class="fr">
+        <div v-if="!isLainLain" class="fr">
           <label class="ck fw" style="width: 90px">
             <input
               type="checkbox"
@@ -915,6 +943,10 @@ const validateSave = () => {
             :disabled="formData.header.po_status_ppn === 0"
             v-select-on-focus
           />
+        </div>
+
+        <div v-else class="fr">
+          <span class="hint">PPN diisi per baris bahan.</span>
         </div>
 
         <template v-if="isCelup">
@@ -971,7 +1003,7 @@ const validateSave = () => {
           <table
             class="gt"
             :style="{
-              minWidth: `${1300 + (showSupCol ? 170 : 0)}px`,
+              minWidth: `${1300 + (showSupCol ? 170 : 0) + (showPpnCol ? 60 : 0)}px`,
             }"
           >
             <thead>
@@ -1003,6 +1035,9 @@ const validateSave = () => {
                   class="tr bg-yellow"
                 >
                   Disc(%)
+                </th>
+                <th v-if="showPpnCol" style="width: 60px" class="tr bg-yellow">
+                  PPN(%)
                 </th>
                 <th v-if="canLihatBeli" style="width: 100px" class="tr bg-blue">
                   Total
@@ -1090,6 +1125,17 @@ const validateSave = () => {
                     type="number"
                     class="ci tr bg-yellow-light"
                     @blur="recalcRow(Number(idx))"
+                    v-select-on-focus
+                  />
+                </td>
+                <td v-if="showPpnCol" class="p0">
+                  <input
+                    v-model.number="row.ppn"
+                    type="number"
+                    class="ci tr bg-yellow-light"
+                    min="0"
+                    max="100"
+                    step="0.01"
                     v-select-on-focus
                   />
                 </td>

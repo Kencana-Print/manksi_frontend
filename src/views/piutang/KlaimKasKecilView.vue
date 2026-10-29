@@ -10,9 +10,19 @@ import {
   type KlaimKasKecilRow,
   type KlaimKasKecilDetailRow,
 } from "@/services/piutang/klaimKasKecilService";
-import { IconCashBanknote, IconBan, IconPrinter } from "@tabler/icons-vue";
-import { formatTanggal } from "@/utils/dateFormat";
-import { exportExcelSingle, type ExcelColumn } from "@/utils/excelExport";
+import {
+  IconCashBanknote,
+  IconBan,
+  IconPrinter,
+  IconFileSpreadsheet,
+  IconTableExport,
+} from "@tabler/icons-vue";
+import { formatTanggal, toExcelDate } from "@/utils/dateFormat";
+import {
+  exportExcel,
+  exportExcelSingle,
+  type ExcelColumn,
+} from "@/utils/excelExport";
 import api from "@/services/api";
 
 const toast = useToast();
@@ -138,7 +148,7 @@ const headers: HeaderDef[] = [
   { title: "Tanggal", key: "Tanggal", width: "100px", align: "center" },
   { title: "Cabang", key: "Cabang", width: "70px", align: "center" },
   { title: "Rekening Tujuan", key: "RekTujuan", width: "210px" },
-  { title: "Jml BKK", key: "JumlahBkk", width: "75px", align: "center" },
+  { title: "Jml Baris", key: "JumlahBkk", width: "75px", align: "center" },
   { title: "Total", key: "Total", width: "130px", align: "end" },
   { title: "Status", key: "Status", width: "85px", align: "center" },
   {
@@ -167,6 +177,10 @@ const summaryFormatters = {
       ),
     ),
 };
+
+// Kolom Akun Biaya / Cost Center hanya muncul bila klaim punya baris manual
+const punyaManual = (nomor: string): boolean =>
+  (detailCache.value[nomor] ?? []).some((d) => d.Tipe === "MANUAL");
 
 // --- Expand ---
 const expandedRows = ref<unknown[]>([]);
@@ -245,15 +259,20 @@ const onExport = async () => {
       key: h.key,
       width: Math.max(10, Math.round(parseInt(h.width) / 7)),
       align: h.align ?? "left",
-      numFmt: h.key === "Total" ? "#,##0" : undefined,
+      numFmt:
+        h.key === "Total"
+          ? "#,##0"
+          : h.key === "Tanggal"
+            ? "dd/mm/yyyy"
+            : undefined,
     }));
 
     const rows = dataToExport.map((it) => {
-      const row: Record<string, string | number> = {};
+      const row: Record<string, string | number | Date | null> = {};
       for (const c of columns) {
         switch (c.key) {
           case "Tanggal":
-            row[c.key] = it.Tanggal ? formatTanggal(it.Tanggal) : "";
+            row[c.key] = toExcelDate(it.Tanggal);
             break;
           case "RekTujuan":
             row[c.key] = `${it.RekTujuan} ${it.NamaRekTujuan}`.trim();
@@ -279,6 +298,136 @@ const onExport = async () => {
     toast.error("Terjadi kesalahan saat export.");
   } finally {
     isExporting.value = false;
+  }
+};
+
+// --- Export detail ---
+// Satu baris per baris detail. Kolom header (nomor, tanggal, total, dst) hanya
+// dirender di baris pertama tiap klaim, tidak diulang di baris detail berikutnya.
+const isExportingDetail = ref(false);
+
+type CellVal = string | number | boolean | Date | null;
+type ExportRow = Record<string, CellVal>;
+
+const onExportDetail = async () => {
+  const headerRows = (baseBrowseRef.value?.getFilteredItems?.() ??
+    items.value ??
+    []) as KlaimKasKecilRow[];
+
+  if (headerRows.length === 0) {
+    toast.warning("Tidak ada data untuk diexport.");
+    return;
+  }
+
+  isExportingDetail.value = true;
+  try {
+    const kolomHeader: ExcelColumn[] = [
+      { header: "Nomor", key: "Nomor", width: 22 },
+      {
+        header: "Tanggal",
+        key: "Tanggal",
+        width: 12,
+        align: "center",
+        numFmt: "dd/mm/yyyy",
+      },
+      { header: "Cabang", key: "Cabang", width: 9, align: "center" },
+      { header: "Rekening Tujuan", key: "RekTujuan", width: 32 },
+      {
+        header: "Total",
+        key: "Total",
+        width: 16,
+        align: "right",
+        numFmt: "#,##0",
+      },
+      { header: "Status", key: "Status", width: 11, align: "center" },
+      {
+        header: "Pengajuan Transfer",
+        key: "StatusTransfer",
+        width: 18,
+        align: "center",
+      },
+      { header: "No. Pengajuan Transfer", key: "NomorPjt", width: 22 },
+      { header: "Keterangan", key: "Keterangan", width: 30 },
+      { header: "Dibuat", key: "Dibuat", width: 12 },
+    ];
+    const kolomDetail: ExcelColumn[] = [
+      { header: "No. BKK", key: "Bkk", width: 24 },
+      { header: "No. Kasbon", key: "Bon", width: 20 },
+      {
+        header: "Tgl. Detail",
+        key: "TglDetail",
+        width: 12,
+        align: "center",
+        numFmt: "dd/mm/yyyy",
+      },
+      { header: "Akun Biaya", key: "Akun", width: 30 },
+      { header: "Cost Center / Dept", key: "CostCenter", width: 28 },
+      { header: "Uraian", key: "Uraian", width: 40 },
+      {
+        header: "Nominal",
+        key: "Nominal",
+        width: 16,
+        align: "right",
+        numFmt: "#,##0",
+      },
+    ];
+    const keyHeader = new Set(kolomHeader.map((c) => c.key));
+
+    const rows: ExportRow[] = [];
+    for (const h of headerRows) {
+      const detail = detailCache.value[h.Nomor] ?? [];
+      const nilaiHeader: ExportRow = {
+        Nomor: h.Nomor,
+        Tanggal: toExcelDate(h.Tanggal),
+        Cabang: h.Cabang,
+        RekTujuan: `${h.RekTujuan} ${h.NamaRekTujuan}`.trim(),
+        Total: Number(h.Total) || 0,
+        Status: h.Status,
+        StatusTransfer: h.StatusTransfer === "-" ? "" : h.StatusTransfer,
+        NomorPjt: h.NomorPjt || "",
+        Keterangan: h.Keterangan || "",
+        Dibuat: h.Dibuat || "",
+      };
+      const jumlah = Math.max(detail.length, 1);
+      for (let i = 0; i < jumlah; i++) {
+        const d = detail[i];
+        rows.push({
+          ...(i === 0 ? nilaiHeader : {}),
+          _first: i === 0,
+          Bkk: d?.Bkk ?? "",
+          Bon: d?.Bon ?? "",
+          TglDetail: d ? toExcelDate(d.Tanggal) : null,
+          Akun: d?.Akun ?? "",
+          CostCenter: d?.CostCenter ?? "",
+          Uraian: d?.Uraian ?? "",
+          Nominal: d ? Number(d.Nominal) || 0 : null,
+        });
+      }
+    }
+
+    const periodeLabel = `Periode: ${formatTanggal(startDate.value)} s/d ${formatTanggal(endDate.value)}`;
+    await exportExcel(
+      `Klaim_Kas_Kecil_Detail_${startDate.value}_${endDate.value}.xlsx`,
+      [
+        {
+          sheetName: "Detail Klaim",
+          columns: [...kolomHeader, ...kolomDetail],
+          rows,
+          title: `Laporan Detail Klaim Kas Kecil  |  ${periodeLabel}`,
+          zebra: false,
+          // Baris pertama tiap klaim diberi warna dan cetak tebal sebagai pemisah grup
+          rowStyleFn: (r) => (r._first ? { fillColor: "E3F2FD" } : null),
+          cellStyleFn: (r, key) =>
+            r._first && keyHeader.has(key) ? { bold: true } : null,
+        },
+      ],
+    );
+    toast.success("Berhasil export detail.");
+  } catch (e) {
+    console.error(e);
+    toast.error("Terjadi kesalahan saat export detail.");
+  } finally {
+    isExportingDetail.value = false;
   }
 };
 </script>
@@ -338,6 +487,16 @@ const onExport = async () => {
         <template #prepend><IconPrinter :size="15" /></template>Cetak
       </v-btn>
       <v-btn
+        v-if="canExport"
+        size="small"
+        color="success"
+        :loading="isExportingDetail"
+        @click="onExportDetail"
+      >
+        <template #prepend><IconTableExport :size="15" /></template>Export
+        Detail
+      </v-btn>
+      <v-btn
         v-if="canDelete"
         size="small"
         color="error"
@@ -392,7 +551,7 @@ const onExport = async () => {
     <template #detail="{ item }">
       <div class="expand-wrap">
         <div class="expand-title mb-2">
-          BKK yang diklaim - {{ rowOf(item).Nomor }}
+          Rincian klaim - {{ rowOf(item).Nomor }}
         </div>
         <table class="detail-table">
           <thead>
@@ -400,21 +559,41 @@ const onExport = async () => {
               <th width="160">No. BKK</th>
               <th width="160">No. Kasbon</th>
               <th width="100">Tanggal</th>
+              <template v-if="punyaManual(rowOf(item).Nomor)">
+                <th width="200">Akun Biaya</th>
+                <th width="200">Cost Center / Dept</th>
+              </template>
               <th>Uraian</th>
               <th width="120" class="tr">Nominal</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="d in detailCache[rowOf(item).Nomor] || []" :key="d.Bkk">
-              <td>{{ d.Bkk }}</td>
+            <tr
+              v-for="(d, i) in detailCache[rowOf(item).Nomor] || []"
+              :key="`${d.Nomor}-${i}`"
+              :class="{ 'row-manual': d.Tipe === 'MANUAL' }"
+            >
+              <td>
+                <span v-if="d.Tipe === 'MANUAL'" class="kk-tag-manual"
+                  >MANUAL</span
+                >
+                <template v-else>{{ d.Bkk }}</template>
+              </td>
               <td>{{ d.Bon }}</td>
               <td>{{ formatTanggal(d.Tanggal) }}</td>
+              <template v-if="punyaManual(rowOf(item).Nomor)">
+                <td>{{ d.Akun }}</td>
+                <td>{{ d.CostCenter }}</td>
+              </template>
               <td>{{ d.Uraian }}</td>
               <td class="tr">{{ numFmt(d.Nominal) }}</td>
             </tr>
             <tr v-if="!(detailCache[rowOf(item).Nomor] || []).length">
-              <td colspan="5" class="text-center text-grey py-4 font-italic">
-                Data BKK tidak ditemukan.
+              <td
+                :colspan="punyaManual(rowOf(item).Nomor) ? 7 : 5"
+                class="text-center text-grey py-4 font-italic"
+              >
+                Data rincian tidak ditemukan.
               </td>
             </tr>
           </tbody>
@@ -553,5 +732,17 @@ const onExport = async () => {
 }
 .tr {
   text-align: right !important;
+}
+.row-manual td {
+  background: #fffde7;
+}
+.kk-tag-manual {
+  display: inline-block;
+  background: #f9a825;
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 3px;
 }
 </style>

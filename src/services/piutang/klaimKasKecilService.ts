@@ -30,6 +30,9 @@ export interface KlaimKasKecilDetailRow {
   Tanggal: string;
   Uraian: string;
   Nominal: number;
+  Tipe: "BKK" | "MANUAL";
+  Akun: string;
+  CostCenter: string;
 }
 
 export interface KlaimKasKecilBrowseParams {

@@ -414,6 +414,7 @@ const handleRowProps = (data: any) => {
                 <th style="width: 30px">No</th>
                 <th style="width: 100px; text-align: left">Kode</th>
                 <th style="text-align: left">Nama Bahan</th>
+                <th style="width: 80px">Setting</th>
                 <th style="width: 70px">Satuan</th>
                 <th style="width: 90px; text-align: right">Net</th>
                 <th style="width: 90px; text-align: right">Gross</th>
@@ -425,6 +426,7 @@ const handleRowProps = (data: any) => {
                 <td class="text-center">{{ i + 1 }}</td>
                 <td style="font-weight: 600; color: #1565c0">{{ dtl.Kode }}</td>
                 <td>{{ dtl.Nama }}</td>
+                <td class="text-center">{{ dtl.Setting }}</td>
                 <td class="text-center">{{ dtl.Satuan }}</td>
                 <td
                   class="text-right font-weight-bold"

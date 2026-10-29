@@ -77,6 +77,9 @@ export interface RekapDetailLoaded {
   noUrut: number;
   supKode: string;
   supNama: string;
+  supRekening: string;
+  supBank: string;
+  supAtasnama: string;
   bulanTagihan: string;
   tipe: string;
   kategori: string;

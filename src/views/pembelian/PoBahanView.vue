@@ -16,7 +16,11 @@ import {
   IconShieldLock,
   IconSearch,
 } from "@tabler/icons-vue";
-import { formatTanggal, formatTanggalJam } from "@/utils/dateFormat";
+import {
+  formatTanggal,
+  formatTanggalJam,
+  formatTanggalSingkat,
+} from "@/utils/dateFormat";
 import { exportExcelSingle, type ExcelColumn } from "@/utils/excelExport";
 
 const authStore = useAuthStore();
@@ -70,6 +74,10 @@ const alasanPin = ref("");
 // --- STATE DIALOG CETAK ---
 const showPrintDialog = ref(false);
 
+// Ref BaseBrowse: getFilteredItems() = data yang tampil setelah search + filter kolom
+const browseRef = ref<{ getFilteredItems: () => any[] } | null>(null);
+const tglExport = (v: any) => (v ? formatTanggalSingkat(v) : "");
+
 // --- BROWSE SETUP ---
 const {
   items,
@@ -81,7 +89,6 @@ const {
   canExport,
   selectedItem,
   fetchData,
-  exportToExcel,
 } = useBrowse({
   menuId: "52",
   fetchApi: async () => {
@@ -175,7 +182,12 @@ const getNomorStyle = (ngedit: string) => {
 };
 
 // --- HANDLERS ---
-onActivated(() => fetchData());
+const muatUlang = () => {
+  expandedRows.value = [];
+  detailCache.value = {};
+  return fetchData();
+};
+onActivated(muatUlang);
 watch(() => filterState.value.dtAwal, fetchData);
 watch(() => filterState.value.dtAkhir, fetchData);
 // Debounce search agar tidak terlalu sering hit API saat mengetik
@@ -220,6 +232,80 @@ const processPrint = (satuan: string) => {
   window.open(url, "_blank");
 };
 
+// --- EXPORT HEADER PO (ikut search + filter kolom BaseBrowse) ---
+const onExportHeader = async () => {
+  const rows = browseRef.value?.getFilteredItems() ?? [];
+  if (!rows.length) return toast.warning("Tidak ada data untuk diexport.");
+
+  const data = rows.map((r: any) => ({
+    ...r,
+    Tanggal: tglExport(r.Tanggal),
+    Comm_Delivery: tglExport(r.Comm_Delivery),
+    TglClose: tglExport(r.TglClose),
+    Created: tglExport(r.Created),
+    QtyPO: Number(r.QtyPO) || 0,
+    QtyBPB: Number(r.QtyBPB) || 0,
+    QtyRetur: Number(r.QtyRetur) || 0,
+  }));
+
+  const columns: ExcelColumn[] = [
+    { header: "Nomor PO", key: "Nomor", width: 16 },
+    { header: "Jenis PO", key: "JenisPO", width: 12, align: "center" },
+    { header: "PO Greige", key: "PoGreige", width: 16 },
+    { header: "PO Celup", key: "PoCelup", width: 18 },
+    { header: "Tanggal", key: "Tanggal", width: 12, align: "center" },
+    { header: "Delivery", key: "Comm_Delivery", width: 12, align: "center" },
+    {
+      header: "Qty PO",
+      key: "QtyPO",
+      width: 12,
+      align: "right",
+      numFmt: "#,##0.00",
+    },
+    {
+      header: "Qty BPB",
+      key: "QtyBPB",
+      width: 12,
+      align: "right",
+      numFmt: "#,##0.00",
+    },
+    {
+      header: "Qty Retur",
+      key: "QtyRetur",
+      width: 12,
+      align: "right",
+      numFmt: "#,##0.00",
+    },
+    { header: "Keterangan", key: "Keterangan", width: 35 },
+    ...(canLihatSup.value
+      ? [
+          { header: "Kode Supplier", key: "KodeSupplier", width: 16 },
+          { header: "Supplier", key: "Supplier", width: 28 },
+        ]
+      : []),
+    { header: "Note", key: "Note", width: 30 },
+    { header: "Status", key: "Status", width: 12, align: "center" },
+    { header: "Alasan Close", key: "AlasanClose", width: 28 },
+    { header: "Tgl Close", key: "TglClose", width: 12, align: "center" },
+    { header: "Di Close Oleh", key: "DiCloseOleh", width: 14 },
+    { header: "User Create", key: "usr", width: 12 },
+    { header: "Created", key: "Created", width: 12, align: "center" },
+  ];
+
+  try {
+    await exportExcelSingle(
+      `PO_Bahan_${filterState.value.dtAwal}_to_${filterState.value.dtAkhir}.xlsx`,
+      "PO Bahan",
+      columns,
+      data,
+      `PO Bahan | Periode: ${tglExport(filterState.value.dtAwal)} s.d ${tglExport(filterState.value.dtAkhir)}`,
+    );
+    toast.success("Berhasil export PO Bahan.");
+  } catch {
+    toast.error("Gagal export PO Bahan.");
+  }
+};
+
 // --- EXPORT DETAIL PO ---
 const isExportingDetail = ref(false);
 
@@ -232,12 +318,13 @@ const onExportDetail = async () => {
       search: filterState.value.search,
     });
 
-    const allDetail: any[] = res.data.data || [];
-
-    if (!allDetail.length) {
-      toast.warning("Tidak ada data detail pada filter ini.");
-      return;
-    }
+    // Hanya PO yang tampil di browse (search + filter kolom BaseBrowse ikut)
+    const nomorTampil = new Set<string>(
+      (browseRef.value?.getFilteredItems() ?? []).map((r: any) => r.Nomor),
+    );
+    const allDetail: any[] = (res.data.data || []).filter((r: any) =>
+      nomorTampil.has(r.Nomor),
+    );
 
     // ✅ Kelompokkan per Nomor PO
     const groups: Record<string, any[]> = {};
@@ -262,9 +349,10 @@ const onExportDetail = async () => {
       // Data Header/Master yang hanya muncul di baris pertama
       const masterCells = {
         Nomor: first.Nomor,
-        Tanggal: formatTanggal(first.Tanggal),
-        Comm_Delivery: formatTanggal(first.Comm_Delivery),
+        Tanggal: tglExport(first.Tanggal),
+        Comm_Delivery: tglExport(first.Comm_Delivery),
         JenisPO: first.JenisPO,
+        Keterangan: first.Keterangan || "",
         ...(canLihatSup.value && !isLainLain
           ? { Supplier: first.Supplier }
           : {}),
@@ -291,6 +379,7 @@ const onExportDetail = async () => {
                 Harga: Number(r.Harga) || 0,
                 HargaRoll: isLainLain ? Number(r.HargaRoll) || 0 : "",
                 Disc: Number(r.Disc) || 0,
+                Ppn: Number(r.Ppn) || 0,
               }
             : {}),
           Status_barang: r.Status_barang,
@@ -306,6 +395,7 @@ const onExportDetail = async () => {
       { header: "Tanggal", key: "Tanggal", width: 12, align: "center" },
       { header: "Delivery", key: "Comm_Delivery", width: 12, align: "center" },
       { header: "Jenis PO", key: "JenisPO", width: 12, align: "center" },
+      { header: "Keterangan", key: "Keterangan", width: 35 },
       ...(canLihatSup.value
         ? [{ header: "Supplier", key: "Supplier", width: 28 }]
         : []),
@@ -363,6 +453,13 @@ const onExportDetail = async () => {
               align: "right",
               numFmt: "#,##0.00",
             },
+            {
+              header: "PPN (%)",
+              key: "Ppn",
+              width: 10,
+              align: "right",
+              numFmt: "#,##0.00",
+            },
           ]
         : []),
       { header: "Status", key: "Status_barang", width: 12, align: "center" },
@@ -376,7 +473,7 @@ const onExportDetail = async () => {
       "Detail PO Bahan",
       columns,
       combinedRows,
-      `Rincian PO Bahan | Periode: ${formatTanggal(filterState.value.dtAwal)} s.d ${formatTanggal(filterState.value.dtAkhir)}`,
+      `Rincian PO Bahan | Periode: ${tglExport(filterState.value.dtAwal)} s.d ${tglExport(filterState.value.dtAkhir)}`,
     );
 
     toast.success("Berhasil export detail PO.");
@@ -483,6 +580,7 @@ const summaryFormatters = {
 
 <template>
   <BaseBrowse
+    ref="browseRef"
     title="PO Bahan"
     menu-id="52"
     :icon="IconShoppingCartCopy"
@@ -500,8 +598,8 @@ const summaryFormatters = {
     @add="onAdd"
     @edit="onEdit"
     @delete="onDelete"
-    @refresh="fetchData"
-    @export="exportToExcel('PO_Bahan')"
+    @refresh="muatUlang"
+    @export="onExportHeader"
     show-expand
     :expanded="expandedRows"
     @update:expanded="onUpdateExpanded"
@@ -603,6 +701,7 @@ const summaryFormatters = {
                   Harga Roll
                 </th>
                 <th v-if="canLihatBeli" width="80" class="tr">Disc</th>
+                <th v-if="canLihatBeli" width="70" class="tr">PPN (%)</th>
                 <th width="80" class="text-center">Status</th>
                 <th width="120">No. MKB</th>
                 <th width="120">No. SPK</th>
@@ -616,7 +715,7 @@ const summaryFormatters = {
               </tr>
             </thead>
             <tbody>
-              <tr v-for="d in detailCache[item.Nomor]" :key="d.Kode + d.SPK">
+              <tr v-for="(d, i) in detailCache[item.Nomor]" :key="i">
                 <td>{{ d.Kode }}</td>
                 <td class="font-weight-bold">{{ d.Nama }}</td>
                 <td class="text-center">{{ d.Satuan }}</td>
@@ -636,6 +735,7 @@ const summaryFormatters = {
                   {{ numFmt(d.HargaRoll) }}
                 </td>
                 <td v-if="canLihatBeli" class="tr">{{ numFmt(d.Disc) }}</td>
+                <td v-if="canLihatBeli" class="tr">{{ numFmt(d.Ppn) }}</td>
                 <td class="text-center">
                   <v-chip
                     size="x-small"
@@ -683,6 +783,7 @@ const summaryFormatters = {
         <template #prepend><IconPrinter :size="15" /></template>Cetak
       </v-btn>
       <v-btn
+        v-if="canExport"
         size="small"
         color="deep-purple-darken-1"
         :loading="isExportingDetail"

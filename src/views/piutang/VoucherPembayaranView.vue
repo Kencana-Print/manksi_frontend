@@ -399,7 +399,14 @@ const onExportDetail = async () => {
           ),
         ]);
 
-    const detailRows = resDetail.data.data as any[];
+    // Hanya voucher yang tampil di browse (search + filter kolom ikut)
+    const tampil = baseBrowseRef.value?.getFilteredItems?.();
+    const nomorTampil = tampil
+      ? new Set<string>(tampil.map((r: any) => r.Nomor))
+      : null;
+    const detailRows = (resDetail.data.data as any[]).filter(
+      (d) => !nomorTampil || nomorTampil.has(d.Nomor),
+    );
     if (!detailRows.length) {
       toast.warning("Tidak ada data detail untuk diexport.");
       return;

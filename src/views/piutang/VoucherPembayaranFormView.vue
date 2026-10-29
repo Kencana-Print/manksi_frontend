@@ -14,6 +14,8 @@ import {
   IconTrash,
   IconPrinter,
   IconCalendarDue,
+  IconChevronDown,
+  IconChevronRight,
 } from "@tabler/icons-vue";
 
 const route = useRoute();
@@ -75,6 +77,23 @@ interface DetailRow {
   total: number;
   rekapNomor?: string;
   rekapNoUrut?: number;
+  breakdown?: boolean;
+  buka?: boolean;
+  items?: ItemRow[];
+  rekapBatas?: number;
+}
+interface ItemRow {
+  nourut: number;
+  kode: string;
+  nama: string;
+  satuan: string;
+  jumlah: number;
+  harga: number;
+  disc: number;
+  nilai: number;
+  vouLain: string;
+  milikIni: boolean;
+  checked: boolean;
 }
 interface BahanRow {
   nama: string;
@@ -152,12 +171,43 @@ const recalcDetail = (d: DetailRow) => {
   d.total = Number(d.nilai) - d.potongan;
 };
 
+// ── PO Celup per bahan (breakdown) ──
+const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
+const itemDipilih = (d: DetailRow): ItemRow[] =>
+  (d.items ?? []).filter((i) => i.checked);
+const itemBisa = (d: DetailRow): ItemRow[] =>
+  (d.items ?? []).filter((i) => !i.vouLain);
+const hitungBreakdown = (d: DetailRow) => {
+  d.nilai = round2(itemDipilih(d).reduce((s, i) => s + i.nilai, 0));
+  recalcDetail(d);
+};
+const toggleItem = (d: DetailRow, i: ItemRow) => {
+  if (i.vouLain) return;
+  if (!i.checked && d.rekapBatas != null) {
+    if (round2(d.nilai + i.nilai) > d.rekapBatas + 0.005) {
+      toast.warning(
+        `Melebihi nominal rencana di rekap (${numFmt(d.rekapBatas)}).`,
+      );
+      return;
+    }
+  }
+  i.checked = !i.checked;
+  hitungBreakdown(d);
+};
+const semuaTercentang = (d: DetailRow): boolean =>
+  itemBisa(d).length > 0 && itemBisa(d).every((i) => i.checked);
+const toggleSemuaItem = (d: DetailRow) => {
+  const semua = semuaTercentang(d);
+  itemBisa(d).forEach((i) => (i.checked = !semua));
+  hitungBreakdown(d);
+};
+
 const onNilaiFocus = (d: DetailRow, e: Event) => {
-  if (d.tipe === "RET") return;
+  if (d.tipe === "RET" || d.breakdown) return;
   (e.target as HTMLInputElement).value = rawNum(d.nilai);
 };
 const onNilaiInput = (d: DetailRow, e: Event) => {
-  if (d.tipe === "RET") return;
+  if (d.tipe === "RET" || d.breakdown) return;
   d.nilai = parseNum((e.target as HTMLInputElement).value);
 };
 const onNilaiBlur = (d: DetailRow, e: Event) => {
@@ -202,11 +252,18 @@ const loadNotaDetail = async (idx: number, nomor: string, searchType = "") => {
       searchType,
       form.value.supKode,
     );
-    Object.assign(detail.value[idx], res.data.data);
+    Object.assign(
+      detail.value[idx],
+      { breakdown: false, items: [] },
+      res.data.data,
+    );
+    detail.value[idx].buka = !!detail.value[idx].breakdown;
     recalcDetail(detail.value[idx]);
   } catch (e: any) {
     toast.error(e.response?.data?.message ?? "Nota tidak ditemukan.");
     Object.assign(d, {
+      breakdown: false,
+      items: [],
       nomor: "",
       tipe: "",
       tanggal: "",
@@ -316,6 +373,11 @@ const pakaiRekap = async () => {
   // Nilai voucher = rencana di rekap (dibatasi sisa nota). RET nilainya terkunci.
   detail.value.forEach((d, i) => {
     if (!d.tipe || !d.nomor || d.tipe === "RET") return;
+    if (d.breakdown) {
+      // PO Celup per bahan: nominal rekap hanya jadi batas atas, user mencentang bahan
+      d.rekapBatas = u.baris[i].nominal;
+      return;
+    }
     d.nilai = Math.min(u.baris[i].nominal, d.nilaiMax);
     recalcDetail(d);
   });
@@ -592,6 +654,7 @@ onMounted(async () => {
       detail.value = (d.detail || []).map((row: any) => ({
         ...row,
         searchType: typeMap[row.tipe] ?? "BPB",
+        buka: !!row.breakdown,
       }));
       bahanTambahan.value = d.bahanTambahan?.length ? d.bahanTambahan : [];
       originalSupRekening.value = d.supRekening || "";
@@ -635,6 +698,15 @@ const validateSave = () => {
   const filled = detail.value.filter((d) => d.tipe && d.nomor);
   if (!filled.length) {
     toast.warning("Detail nota harus diisi minimal satu baris.");
+    return;
+  }
+  const belumCentang = filled.find(
+    (d) => d.breakdown && !itemDipilih(d).length,
+  );
+  if (belumCentang) {
+    toast.warning(
+      `PO Celup ${belumCentang.nomor}: centang minimal satu bahan.`,
+    );
     return;
   }
   showSaveDialog.value = true;
@@ -932,107 +1004,195 @@ const executeClose = () => {
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="(d, idx) in detail" :key="idx">
-                  <td class="td-ctr">{{ idx + 1 }}</td>
-                  <td class="td-inp">
-                    <div class="cell-igrp">
+                <template v-for="(d, idx) in detail" :key="idx">
+                  <tr>
+                    <td class="td-ctr">
+                      <button
+                        v-if="d.breakdown"
+                        type="button"
+                        class="btn-exp"
+                        @click="d.buka = !d.buka"
+                      >
+                        <IconChevronDown v-if="d.buka" :size="14" />
+                        <IconChevronRight v-else :size="14" />
+                      </button>
+                      <span v-else>{{ idx + 1 }}</span>
+                    </td>
+                    <td class="td-inp">
+                      <div class="cell-igrp">
+                        <input
+                          v-model="d.nomor"
+                          class="cell"
+                          style="min-width: 90px"
+                          placeholder="Nomor nota..."
+                          @keydown.enter.prevent="onDetailNomorEnter(idx)"
+                        />
+                        <select v-model="d.searchType" class="type-select">
+                          <option value="BPB">BPB Bahan</option>
+                          <option value="BPJ">BPB Jasa</option>
+                          <option value="MMT">BPB MMT</option>
+                          <option value="BPE">BPB PO Ext MMT</option>
+                          <option value="BPG">BPB Non Bahan</option>
+                          <option value="POL">PO Lain-lain</option>
+                          <option value="POB">PO Bahan</option>
+                        </select>
+                        <button
+                          type="button"
+                          class="cell-search"
+                          :title="`Cari ${d.searchType}`"
+                          @click="openNotaModal(d.searchType, idx)"
+                        >
+                          <IconSearch :size="12" color="#1565c0" />
+                        </button>
+                      </div>
+                    </td>
+                    <td class="td-ctr" style="font-size: 10px">
+                      {{ d.tanggal || "-" }}
+                    </td>
+                    <td class="td-ctr">
+                      <span
+                        v-if="d.tipe"
+                        class="type-badge"
+                        :class="`type-${d.tipe.toLowerCase()}`"
+                        >{{ d.tipe }}</span
+                      >
+                    </td>
+                    <td
+                      class="td-inp"
+                      style="
+                        font-size: 10px;
+                        max-width: 160px;
+                        overflow: hidden;
+                        text-overflow: ellipsis;
+                        white-space: nowrap;
+                      "
+                    >
+                      {{ d.keterangan || "-" }}
+                    </td>
+                    <td class="td-inp">
                       <input
-                        v-model="d.nomor"
-                        class="cell"
-                        style="min-width: 90px"
-                        placeholder="Nomor nota..."
-                        @keydown.enter.prevent="onDetailNomorEnter(idx)"
+                        :value="numFmt(d.nilai)"
+                        type="text"
+                        inputmode="numeric"
+                        class="cell tr"
+                        :readonly="d.tipe === 'RET'"
+                        @focus="onNilaiFocus(d, $event)"
+                        @input="onNilaiInput(d, $event)"
+                        @blur="onNilaiBlur(d, $event)"
                       />
-                      <select v-model="d.searchType" class="type-select">
-                        <option value="BPB">BPB Bahan</option>
-                        <option value="BPJ">BPB Jasa</option>
-                        <option value="MMT">BPB MMT</option>
-                        <option value="BPE">BPB PO Ext MMT</option>
-                        <option value="BPG">BPB Non Bahan</option>
-                        <option value="POL">PO Lain-lain</option>
-                        <option value="POB">PO Bahan</option>
-                      </select>
+                    </td>
+                    <td class="td-inp">
+                      <input
+                        :value="numFmt(d.bs)"
+                        type="text"
+                        inputmode="numeric"
+                        class="cell tr"
+                        @focus="onBsFocus(d, $event)"
+                        @input="onBsInput(d, $event)"
+                        @blur="onBsBlur(d, $event)"
+                      />
+                    </td>
+                    <td class="td-inp">
+                      <input
+                        :value="numFmt(d.tarif)"
+                        type="text"
+                        inputmode="numeric"
+                        class="cell tr"
+                        @focus="onTarifFocus(d, $event)"
+                        @input="onTarifInput(d, $event)"
+                        @blur="onTarifBlur(d, $event)"
+                      />
+                    </td>
+                    <td class="td-inp cell-val-ro tr">
+                      {{ d.potongan ? numFmt(d.potongan) : "" }}
+                    </td>
+                    <td class="td-inp cell-total tr">{{ numFmt(d.total) }}</td>
+                    <td class="td-ctr">
                       <button
                         type="button"
-                        class="cell-search"
-                        :title="`Cari ${d.searchType}`"
-                        @click="openNotaModal(d.searchType, idx)"
+                        class="btn-del"
+                        @click="removeDetailRow(idx)"
                       >
-                        <IconSearch :size="12" color="#1565c0" />
+                        <IconTrash :size="14" />
                       </button>
-                    </div>
-                  </td>
-                  <td class="td-ctr" style="font-size: 10px">
-                    {{ d.tanggal || "-" }}
-                  </td>
-                  <td class="td-ctr">
-                    <span
-                      v-if="d.tipe"
-                      class="type-badge"
-                      :class="`type-${d.tipe.toLowerCase()}`"
-                      >{{ d.tipe }}</span
-                    >
-                  </td>
-                  <td
-                    class="td-inp"
-                    style="
-                      font-size: 10px;
-                      max-width: 160px;
-                      overflow: hidden;
-                      text-overflow: ellipsis;
-                      white-space: nowrap;
-                    "
-                  >
-                    {{ d.keterangan || "-" }}
-                  </td>
-                  <td class="td-inp">
-                    <input
-                      :value="numFmt(d.nilai)"
-                      type="text"
-                      inputmode="numeric"
-                      class="cell tr"
-                      :readonly="d.tipe === 'RET'"
-                      @focus="onNilaiFocus(d, $event)"
-                      @input="onNilaiInput(d, $event)"
-                      @blur="onNilaiBlur(d, $event)"
-                    />
-                  </td>
-                  <td class="td-inp">
-                    <input
-                      :value="numFmt(d.bs)"
-                      type="text"
-                      inputmode="numeric"
-                      class="cell tr"
-                      @focus="onBsFocus(d, $event)"
-                      @input="onBsInput(d, $event)"
-                      @blur="onBsBlur(d, $event)"
-                    />
-                  </td>
-                  <td class="td-inp">
-                    <input
-                      :value="numFmt(d.tarif)"
-                      type="text"
-                      inputmode="numeric"
-                      class="cell tr"
-                      @focus="onTarifFocus(d, $event)"
-                      @input="onTarifInput(d, $event)"
-                      @blur="onTarifBlur(d, $event)"
-                    />
-                  </td>
-                  <td class="td-inp cell-val-ro tr">
-                    {{ d.potongan ? numFmt(d.potongan) : "" }}
-                  </td>
-                  <td class="td-inp cell-total tr">{{ numFmt(d.total) }}</td>
-                  <td class="td-ctr">
-                    <button
-                      type="button"
-                      class="btn-del"
-                      @click="removeDetailRow(idx)"
-                    >
-                      <IconTrash :size="14" />
-                    </button>
-                  </td>
-                </tr>
+                    </td>
+                  </tr>
+                  <tr v-if="d.breakdown && d.buka" class="item-row">
+                    <td></td>
+                    <td colspan="10">
+                      <table class="item-tbl">
+                        <thead>
+                          <tr>
+                            <th style="width: 28px" class="text-center">
+                              <input
+                                v-if="d.rekapBatas == null"
+                                type="checkbox"
+                                :checked="semuaTercentang(d)"
+                                :disabled="!itemBisa(d).length"
+                                @click.stop.prevent="toggleSemuaItem(d)"
+                              />
+                            </th>
+                            <th style="width: 90px">Kode</th>
+                            <th>Nama Bahan</th>
+                            <th style="width: 50px">Sat</th>
+                            <th style="width: 80px" class="text-right">
+                              Jumlah
+                            </th>
+                            <th style="width: 100px" class="text-right">
+                              Harga
+                            </th>
+                            <th style="width: 55px" class="text-right">
+                              Disc %
+                            </th>
+                            <th style="width: 110px" class="text-right">
+                              Nilai
+                            </th>
+                            <th style="width: 170px">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr
+                            v-for="i in d.items"
+                            :key="i.nourut"
+                            :class="{ 'item-lunas': !!i.vouLain }"
+                            @click="toggleItem(d, i)"
+                          >
+                            <td class="text-center">
+                              <input
+                                type="checkbox"
+                                :checked="i.checked"
+                                :disabled="!!i.vouLain"
+                                @click.stop.prevent="toggleItem(d, i)"
+                              />
+                            </td>
+                            <td>{{ i.kode }}</td>
+                            <td>{{ i.nama }}</td>
+                            <td>{{ i.satuan }}</td>
+                            <td class="tr">{{ numFmt(i.jumlah) }}</td>
+                            <td class="tr">{{ numFmt(i.harga) }}</td>
+                            <td class="tr">{{ numFmt(i.disc) }}</td>
+                            <td class="tr">{{ numFmt(i.nilai) }}</td>
+                            <td>
+                              {{ i.vouLain ? `Dibayar ${i.vouLain}` : "" }}
+                            </td>
+                          </tr>
+                        </tbody>
+                        <tfoot>
+                          <tr>
+                            <td colspan="9" class="item-ket">
+                              Terpilih {{ itemDipilih(d).length }} dari
+                              {{ itemBisa(d).length }} bahan yang tersedia.
+                              Nilai sudah termasuk diskon dan PPN PO.
+                              <span v-if="d.rekapBatas != null">
+                                Batas rekap: {{ numFmt(d.rekapBatas) }}.
+                              </span>
+                            </td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </td>
+                  </tr>
+                </template>
                 <tr v-if="!detail.length">
                   <td
                     colspan="11"
@@ -1913,6 +2073,53 @@ const executeClose = () => {
 }
 .tambah-check {
   accent-color: #2e7d32;
+  cursor: pointer;
+}
+.btn-exp {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 2px;
+  color: #455a64;
+}
+.item-row > td {
+  background: #fafcff;
+  padding: 4px 6px;
+}
+.item-tbl {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+.item-tbl th {
+  background: #eceff1;
+  color: #37474f;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 3px 5px;
+  border: 1px solid #cfd8dc;
+  white-space: nowrap;
+}
+.item-tbl td {
+  border: 1px solid #eeeeee;
+  padding: 2px 5px;
+  cursor: pointer;
+}
+.item-tbl .tr {
+  text-align: right;
+}
+.item-lunas td {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.item-ket {
+  font-size: 10px;
+  color: #546e7a;
+  border: none;
+  cursor: default;
+}
+.item-tbl input[type="checkbox"] {
+  accent-color: #1565c0;
   cursor: pointer;
 }
 </style>

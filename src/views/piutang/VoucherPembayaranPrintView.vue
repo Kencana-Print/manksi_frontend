@@ -44,7 +44,17 @@ const bahanTambahan = computed(() =>
   Number(rows.value[0]?.bahan_tambahan || 0),
 );
 const bahanList = computed<BahanPrint[]>(() => rows.value[0]?.bahan ?? []);
-
+interface RincianPrint {
+  nota: string;
+  kode: string;
+  nama: string;
+  satuan: string;
+  jumlah: number;
+  nilai: number;
+}
+const rincianList = computed<RincianPrint[]>(
+  () => rows.value[0]?.rincian ?? [],
+);
 // Positif = mengurangi tagihan, negatif = menambah
 const fmtBahan = (v: number) => (v < 0 ? `+${fmt(Math.abs(v))}` : fmt(v));
 const disc = computed(() => Number(rows.value[0]?.vou_disc || 0));
@@ -165,6 +175,32 @@ const grandTotal = computed(
               <td class="tr">{{ fmt(b.jumlah) }}</td>
               <td class="tr">{{ fmt(b.harga) }}</td>
               <td class="tr fw">{{ b.tambah ? "+" : "" }}{{ fmt(b.nilai) }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div v-if="rincianList.length" class="bahan-block">
+        <div class="bahan-title">Rincian Bahan PO Celup</div>
+        <table class="detail-tbl">
+          <thead>
+            <tr>
+              <th style="width: 28px">No</th>
+              <th style="min-width: 110px">PO</th>
+              <th>Bahan</th>
+              <th style="width: 60px">Satuan</th>
+              <th style="width: 70px; text-align: right">Jumlah</th>
+              <th style="width: 90px; text-align: right">Nilai</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(x, i) in rincianList" :key="i">
+              <td class="tc">{{ i + 1 }}</td>
+              <td class="mono">{{ x.nota }}</td>
+              <td>{{ x.kode }} {{ x.nama }}</td>
+              <td>{{ x.satuan }}</td>
+              <td class="tr">{{ fmt(x.jumlah) }}</td>
+              <td class="tr fw">{{ fmt(x.nilai) }}</td>
             </tr>
           </tbody>
         </table>

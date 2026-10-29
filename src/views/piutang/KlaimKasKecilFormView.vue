@@ -4,7 +4,15 @@ import { useRoute } from "vue-router";
 import { useToast } from "vue-toastification";
 import BaseForm from "@/components/BaseForm.vue";
 import { useForm } from "@/composables/useForm";
-import { IconCashBanknote, IconSearch, IconTrash } from "@tabler/icons-vue";
+import {
+  IconCashBanknote,
+  IconPlus,
+  IconSearch,
+  IconTrash,
+} from "@tabler/icons-vue";
+import NumberInputIDR from "@/components/NumberInputIDR.vue";
+import AccountSearchModal from "@/components/lookups/AccountSearchModal.vue";
+import CostCenterSearchModal from "@/components/lookups/CostCenterSearchModal.vue";
 import { pesanError } from "@/services/piutang/rekapPembayaranService";
 import {
   klaimKasKecilFormService as svc,
@@ -22,6 +30,12 @@ interface BarisForm {
   tanggal: string;
   uraian: string;
   nominal: number;
+  manual: boolean;
+  akun: string;
+  akunNama: string;
+  cc: string;
+  dc: string;
+  ccNama: string;
 }
 
 interface KlaimForm {
@@ -101,21 +115,21 @@ onMounted(async () => {
   await muatDefaults();
 });
 
-// Akses penuh: ganti cabang -> rekening ikut berganti, daftar BKK dikosongkan
+// Akses penuh: ganti cabang -> rekening ikut berganti, daftar BKK dan baris manual dikosongkan
 const gantiCabang = async (cabang: string) => {
   if (form.value.detail.length) {
-    toast.info("Cabang diganti, daftar BKK dikosongkan.");
+    toast.info("Cabang diganti, daftar BKK dan baris manual dikosongkan.");
     form.value.detail = [];
   }
   await muatDefaults(cabang);
 };
 
-// Ganti ATM / kas -> daftar BKK dikosongkan (satu klaim = satu kas)
+// Ganti ATM / kas -> daftar BKK dikosongkan (satu klaim = satu kas), baris manual dipertahankan
 const gantiKas = (kode: string) => {
   if (rekPilih.value === kode) return;
-  if (form.value.detail.length) {
+  if (form.value.detail.some((b) => !b.manual)) {
     toast.info("Kas diganti, daftar BKK dikosongkan.");
-    form.value.detail = [];
+    form.value.detail = form.value.detail.filter((b) => b.manual);
   }
   rekPilih.value = kode;
 };
@@ -156,6 +170,12 @@ const {
         tanggal: r.tanggal,
         uraian: r.uraian,
         nominal: Number(r.nominal),
+        manual: r.tipe === "MANUAL",
+        akun: r.akun ?? "",
+        akunNama: r.akunNama ?? "",
+        cc: r.cc ?? "",
+        dc: r.dc ?? "",
+        ccNama: r.ccNama ?? "",
       })),
     };
   },
@@ -165,7 +185,17 @@ const {
       rekTujuan: rekPilih.value,
       tanggal: data.tanggal,
       keterangan: data.keterangan.trim(),
-      detail: data.detail.map((b) => ({ bkk: b.bkk })),
+      detail: data.detail.filter((b) => !b.manual).map((b) => ({ bkk: b.bkk })),
+      detailManual: data.detail
+        .filter((b) => b.manual)
+        .map((b) => ({
+          tanggal: b.tanggal,
+          akun: b.akun,
+          cc: b.cc,
+          dc: b.dc,
+          uraian: b.uraian.trim(),
+          nominal: b.nominal,
+        })),
     };
     const res = nomorEdit.value
       ? await svc.update(nomorEdit.value, payload)
@@ -206,6 +236,78 @@ const labelRek = (r: RekeningInfo): string =>
 const total = computed(() =>
   round2(form.value.detail.reduce((s, b) => s + b.nominal, 0)),
 );
+
+// ── Baris manual (khusus ATM) ──
+const MIN_URAIAN = 10;
+
+const jumlahBkk = computed(
+  () => form.value.detail.filter((b) => !b.manual).length,
+);
+const jumlahManual = computed(
+  () => form.value.detail.filter((b) => b.manual).length,
+);
+const totalManual = computed(() =>
+  round2(
+    form.value.detail
+      .filter((b) => b.manual)
+      .reduce((s, b) => s + b.nominal, 0),
+  ),
+);
+
+const tambahManual = () => {
+  form.value.detail.push({
+    key: ++seq,
+    bkk: "",
+    bon: "",
+    tanggal: hariIni(),
+    uraian: "",
+    nominal: 0,
+    manual: true,
+    akun: "",
+    akunNama: "",
+    cc: "",
+    dc: "",
+    ccNama: "",
+  });
+};
+
+interface AkunDipilih {
+  Kode: string;
+  Nama: string;
+  Rekening: string;
+}
+const showAkun = ref(false);
+const akunKey = ref(0);
+const bukaAkun = (key: number) => {
+  akunKey.value = key;
+  showAkun.value = true;
+};
+const onAkun = (a: AkunDipilih) => {
+  const b = form.value.detail.find((x) => x.key === akunKey.value);
+  if (!b) return;
+  b.akun = a.Kode;
+  b.akunNama = a.Nama;
+};
+
+interface CcDipilih {
+  cc_kode: string;
+  cc_nama: string;
+  cc_cabang: string;
+  dc_nama: string;
+}
+const showCc = ref(false);
+const ccKey = ref(0);
+const bukaCc = (key: number) => {
+  ccKey.value = key;
+  showCc.value = true;
+};
+const onCc = (c: CcDipilih) => {
+  const b = form.value.detail.find((x) => x.key === ccKey.value);
+  if (!b) return;
+  b.cc = String(c.cc_kode);
+  b.ccNama = c.cc_nama;
+  b.dc = c.dc_nama;
+};
 
 const hapusBaris = (key: number) => {
   form.value.detail = form.value.detail.filter((b) => b.key !== key);
@@ -293,6 +395,12 @@ const tambahkanTerpilih = () => {
       tanggal: o.tanggal,
       uraian: o.keterangan,
       nominal: o.nominal,
+      manual: false,
+      akun: "",
+      akunNama: "",
+      cc: "",
+      dc: "",
+      ccNama: "",
     });
   }
   showPilih.value = false;
@@ -318,8 +426,36 @@ const validateSave = () => {
     return;
   }
   if (!form.value.detail.length) {
-    toast.warning("Pilih minimal satu BKK.");
+    toast.warning("Pilih minimal satu BKK atau tambah baris manual.");
     return;
+  }
+  const mulai = defaults.value?.tanggalMulai ?? "";
+  const manual = form.value.detail.filter((b) => b.manual);
+  for (let i = 0; i < manual.length; i++) {
+    const b = manual[i];
+    const no = i + 1;
+    if (!b.tanggal || b.tanggal > hariIni() || (mulai && b.tanggal < mulai)) {
+      toast.warning(`Baris manual ${no}: tanggal tidak valid.`);
+      return;
+    }
+    if (!b.akun) {
+      toast.warning(`Baris manual ${no}: akun biaya belum dipilih.`);
+      return;
+    }
+    if (!b.cc || !b.dc) {
+      toast.warning(`Baris manual ${no}: cost center belum dipilih.`);
+      return;
+    }
+    if (b.uraian.trim().length < MIN_URAIAN) {
+      toast.warning(
+        `Baris manual ${no}: uraian minimal ${MIN_URAIAN} karakter.`,
+      );
+      return;
+    }
+    if (!(b.nominal > 0)) {
+      toast.warning(`Baris manual ${no}: nominal harus lebih dari 0.`);
+      return;
+    }
   }
   showSaveDialog.value = true;
 };
@@ -429,7 +565,11 @@ const validateSave = () => {
 
           <div class="kk-ringkas">
             <div class="kk-ringkas-row">
-              <span>Jumlah BKK</span><b>{{ form.detail.length }}</b>
+              <span>Jumlah BKK</span><b>{{ jumlahBkk }}</b>
+            </div>
+            <div v-if="isAtm" class="kk-ringkas-row">
+              <span>Baris Manual</span
+              ><b>{{ jumlahManual }} ({{ numFmt(totalManual) }})</b>
             </div>
             <div class="kk-ringkas-row kk-ringkas-total">
               <span>Total Klaim</span><b>{{ numFmt(total) }}</b>
@@ -444,6 +584,16 @@ const validateSave = () => {
         <v-btn v-if="!ro" size="small" color="primary" @click="openPilih">
           <template #prepend><IconSearch :size="14" /></template>
           Pilih BKK
+        </v-btn>
+        <v-btn
+          v-if="!ro && isAtm"
+          size="small"
+          color="warning"
+          variant="tonal"
+          @click="tambahManual"
+        >
+          <template #prepend><IconPlus :size="14" /></template>
+          Baris Manual
         </v-btn>
         <template v-if="isAtm">
           BKK/BBK diklaim utuh. Hanya pengeluaran dari ATM ini yang belum
@@ -462,20 +612,79 @@ const validateSave = () => {
               <th style="width: 40px" class="text-center">No</th>
               <th style="width: 160px">No. BKK</th>
               <th style="width: 160px">No. Kasbon</th>
-              <th style="width: 100px" class="text-center">Tanggal</th>
+              <th style="width: 110px" class="text-center">Tanggal</th>
+              <th v-if="isAtm" style="width: 210px">Akun Biaya</th>
+              <th v-if="isAtm" style="width: 210px">Cost Center / Dept</th>
               <th style="min-width: 240px">Uraian</th>
-              <th style="width: 130px" class="text-right">Nominal</th>
+              <th style="width: 140px" class="text-right">Nominal</th>
               <th style="width: 36px"></th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="(b, i) in form.detail" :key="b.key">
+            <tr
+              v-for="(b, i) in form.detail"
+              :key="b.key"
+              :class="{ 'row-manual': b.manual }"
+            >
               <td class="td-ctr">{{ i + 1 }}</td>
-              <td class="td-txt">{{ b.bkk }}</td>
+              <td class="td-txt">
+                <span v-if="b.manual" class="tag-manual">MANUAL</span>
+                <template v-else>{{ b.bkk }}</template>
+              </td>
               <td class="td-txt">{{ b.bon }}</td>
-              <td class="td-ctr">{{ fmtTgl(b.tanggal) }}</td>
-              <td class="td-txt">{{ b.uraian }}</td>
-              <td class="td-txt tr">{{ numFmt(b.nominal) }}</td>
+              <td class="td-ctr">
+                <input
+                  v-if="b.manual && !ro"
+                  v-model="b.tanggal"
+                  type="date"
+                  class="cell-inp"
+                  :min="defaults?.tanggalMulai"
+                  :max="hariIni()"
+                />
+                <template v-else>{{ fmtTgl(b.tanggal) }}</template>
+              </td>
+              <td v-if="isAtm" class="td-txt">
+                <template v-if="b.manual">
+                  <input
+                    v-if="!ro"
+                    readonly
+                    class="cell-inp cell-akun"
+                    :value="b.akun ? `${b.akun} - ${b.akunNama}` : ''"
+                    placeholder="Pilih akun biaya..."
+                    @click="bukaAkun(b.key)"
+                  />
+                  <template v-else>{{ b.akun }} - {{ b.akunNama }}</template>
+                </template>
+              </td>
+              <td v-if="isAtm" class="td-txt">
+                <template v-if="b.manual">
+                  <input
+                    v-if="!ro"
+                    readonly
+                    class="cell-inp cell-akun"
+                    :value="b.cc ? `${b.ccNama} - ${b.dc}` : ''"
+                    placeholder="Pilih cost center..."
+                    @click="bukaCc(b.key)"
+                  />
+                  <template v-else>{{ b.ccNama }} - {{ b.dc }}</template>
+                </template>
+              </td>
+              <td class="td-txt">
+                <input
+                  v-if="b.manual && !ro"
+                  v-model="b.uraian"
+                  class="cell-inp"
+                  maxlength="250"
+                  placeholder="Uraian pengeluaran (min. 10 karakter)"
+                />
+                <template v-else>{{ b.uraian }}</template>
+              </td>
+              <td class="td-txt tr">
+                <div v-if="b.manual && !ro" class="cell-nom">
+                  <NumberInputIDR v-model="b.nominal" />
+                </div>
+                <template v-else>{{ numFmt(b.nominal) }}</template>
+              </td>
               <td class="td-ctr">
                 <button
                   v-if="!ro"
@@ -488,14 +697,20 @@ const validateSave = () => {
               </td>
             </tr>
             <tr v-if="!form.detail.length">
-              <td colspan="7" class="text-center text-grey py-4 font-italic">
-                Belum ada BKK. Klik "Pilih BKK" untuk memilih BKK yang diklaim.
+              <td
+                :colspan="isAtm ? 9 : 7"
+                class="text-center text-grey py-4 font-italic"
+              >
+                Belum ada baris. Klik "Pilih BKK" untuk memilih BKK yang
+                diklaim<template v-if="isAtm"
+                  >, atau "Baris Manual" untuk pengeluaran tanpa BKK</template
+                >.
               </td>
             </tr>
           </tbody>
           <tfoot v-if="form.detail.length">
             <tr class="foot-row">
-              <td colspan="5" class="tr">TOTAL</td>
+              <td :colspan="isAtm ? 7 : 5" class="tr">TOTAL</td>
               <td class="tr">{{ numFmt(total) }}</td>
               <td></td>
             </tr>
@@ -612,6 +827,9 @@ const validateSave = () => {
       </v-card-actions>
     </v-card>
   </v-dialog>
+
+  <AccountSearchModal v-model="showAkun" jenis="ALL" @selected="onAkun" />
+  <CostCenterSearchModal v-model="showCc" @selected="onCc" />
 </template>
 
 <style scoped>
@@ -765,6 +983,45 @@ const validateSave = () => {
 .btn-del:hover {
   background: #ffebee;
   border-radius: 3px;
+}
+.row-manual td {
+  background: #fffde7;
+}
+.tag-manual {
+  display: inline-block;
+  background: #f9a825;
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 3px;
+}
+.cell-inp {
+  width: 100%;
+  height: 26px;
+  border: 1px solid #bdbdbd;
+  border-radius: 3px;
+  padding: 0 6px;
+  font-size: 11px;
+  outline: none;
+  background: white;
+  box-sizing: border-box;
+}
+.cell-inp:focus {
+  border-color: #1565c0;
+}
+.cell-akun {
+  cursor: pointer;
+}
+.cell-nom {
+  height: 26px;
+  border: 1px solid #bdbdbd;
+  border-radius: 3px;
+  background: white;
+  font-size: 11px;
+}
+.cell-nom:focus-within {
+  border-color: #1565c0;
 }
 .pilih-filter {
   display: flex;

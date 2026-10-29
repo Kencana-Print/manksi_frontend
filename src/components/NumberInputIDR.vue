@@ -37,10 +37,15 @@ const onFocus = (e: FocusEvent) => {
 };
 
 const onInput = (e: Event) => {
-  if (!props.cursorToEnd) return;
   const el = e.target as HTMLInputElement;
-  const len = el.value.length;
-  requestAnimationFrame(() => el.setSelectionRange(len, len));
+  // Paksa tampilan ikut ter-format, termasuk saat nilai tidak berubah
+  // (mis. user mengetik huruf) — di kasus itu v-model tidak memicu render ulang.
+  const digits = el.value.replace(/\D/g, "");
+  el.value = digits ? Number(digits).toLocaleString("id-ID") : "";
+  if (props.cursorToEnd) {
+    const len = el.value.length;
+    requestAnimationFrame(() => el.setSelectionRange(len, len));
+  }
 };
 </script>
 
