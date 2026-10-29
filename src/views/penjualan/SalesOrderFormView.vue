@@ -703,6 +703,7 @@ const JO_BEBAS_UKURAN = ["CM", "LL"];
 const isJoBebasUkuran = computed(() => {
   const jo = String(formData.value.spk_jo_kode || "").toUpperCase();
   const nama = String(formData.value.JenisOrder || "").toUpperCase();
+  if (jo === "LL" && isDivisiTiga.value) return false; // Kaosan tetap pakai standar
   return JO_BEBAS_UKURAN.includes(jo) || nama.includes("CELEMEK");
 });
 
