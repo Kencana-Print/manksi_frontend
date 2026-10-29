@@ -319,8 +319,10 @@ const onExportDetail = async () => {
     });
 
     // Hanya PO yang tampil di browse (search + filter kolom BaseBrowse ikut)
-    const nomorTampil = new Set<string>(
-      (browseRef.value?.getFilteredItems() ?? []).map((r: any) => r.Nomor),
+    const filteredRows = browseRef.value?.getFilteredItems() ?? [];
+    const nomorTampil = new Set<string>(filteredRows.map((r: any) => r.Nomor));
+    const noteByNomor = new Map<string, string>(
+      filteredRows.map((r: any) => [r.Nomor, r.Note || ""]),
     );
     const allDetail: any[] = (res.data.data || []).filter((r: any) =>
       nomorTampil.has(r.Nomor),
@@ -353,6 +355,7 @@ const onExportDetail = async () => {
         Comm_Delivery: tglExport(first.Comm_Delivery),
         JenisPO: first.JenisPO,
         Keterangan: first.Keterangan || "",
+        Note: noteByNomor.get(first.Nomor) ?? "",
         ...(canLihatSup.value && !isLainLain
           ? { Supplier: first.Supplier }
           : {}),
@@ -396,6 +399,7 @@ const onExportDetail = async () => {
       { header: "Delivery", key: "Comm_Delivery", width: 12, align: "center" },
       { header: "Jenis PO", key: "JenisPO", width: 12, align: "center" },
       { header: "Keterangan", key: "Keterangan", width: 35 },
+      { header: "Note", key: "Note", width: 30 },
       ...(canLihatSup.value
         ? [{ header: "Supplier", key: "Supplier", width: 28 }]
         : []),
