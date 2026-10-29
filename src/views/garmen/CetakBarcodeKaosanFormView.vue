@@ -683,13 +683,14 @@ onBeforeUnmount(() => {
 // CSS label — SATU sumber untuk preview layar dan iframe cetak.
 // Label 33 x 13 mm di dalam halaman setinggi 15 mm (batas aman 1 mm atas/bawah).
 // QR 10.5 mm = 21 modul x 4 dot (203 dpi) → tajam selama isi QR masih versi 1.
-// Postek: halaman 108 mm, sel 33.5 mm, gap 2.5 mm, pad kiri 2.5 mm (3-up).
+// Postek: halaman 108 mm, sel 33.5 mm, gap 2.5 mm, pad kiri 2.5 mm, geser kolom 3 +1 mm (3-up).
 // XP-360B: halaman 68 mm, sel 31 mm, gap 3 mm (2-up), label diskalakan 0.94
 // (BELUM diukur — sesuaikan --cw/--gap/--scale setelah ada ukuran gulungan).
 const LABEL_CSS = `
-.bck-sheet { --pw: 108mm; --ph: 15mm; --padl: 2.5mm; --padr: 0mm; --gap: 2.5mm; --cw: 33.5mm; --scale: 1; }
-.bck-sheet.printer-xp360b { --pw: 68mm; --ph: 15mm; --padl: 1mm; --padr: 1mm; --gap: 3mm; --cw: 31mm; --scale: 0.94; }
+.bck-sheet { --pw: 108mm; --ph: 15mm; --padl: 2.5mm; --padr: 0mm; --gap: 2.5mm; --cw: 33.5mm; --c3-shift: 1mm; --scale: 1; }
+.bck-sheet.printer-xp360b { --pw: 68mm; --ph: 15mm; --padl: 1mm; --padr: 1mm; --gap: 3mm; --cw: 31mm; --c3-shift: 0mm; --scale: 0.94; }
 .bck-sheet .bck-row { display:flex; width:var(--pw); height:var(--ph); align-items:center; gap:var(--gap); padding:0 var(--padr) 0 var(--padl); box-sizing:border-box; }
+.bck-sheet .bck-row > .bck-cellwrap:nth-child(3) { margin-left: var(--c3-shift, 0mm); }
 .bck-sheet .bck-cellwrap { flex:none; width:var(--cw); height:var(--ph); display:flex; align-items:center; justify-content:center; overflow:hidden; }
 .bck-sheet .bck-label { flex:none; width:33mm; height:13mm; box-sizing:border-box; padding:0 0.5mm; overflow:hidden; display:grid; grid-template-columns:11.5mm 1fr; align-items:center; transform:scale(var(--scale)); transform-origin:center center; background:#fff; color:#000; }
 .bck-sheet .bck-qr { width:10.5mm; height:10.5mm; justify-self:center; }
@@ -707,12 +708,12 @@ const LABEL_CSS = `
 const PAGE_CSS: Record<PrinterType, string> = {
   XP360B: `
 @page { size: 68mm 15mm landscape; margin: 0 !important; }
-html, body { margin:0; padding:0; width:68mm; background:#fff; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+html, body { margin:0; padding:0; width:68mm; overflow:hidden; background:#fff; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
 .bck-row { page-break-after: always !important; }
 `,
   POSTEK: `
 @page { size: 108mm 15mm landscape; margin: 0 !important; }
-html, body { margin:0; padding:0; width:108mm; background:#fff; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+html, body { margin:0; padding:0; width:108mm; overflow:hidden; background:#fff; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
 .bck-row:not(:last-child) { page-break-after: always !important; }
 `,
 };
