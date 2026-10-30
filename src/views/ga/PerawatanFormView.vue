@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, nextTick } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
 import BaseForm from "@/components/BaseForm.vue";
@@ -132,6 +132,8 @@ const onNominalInput = (e: Event, item: PerawatanDetailItem) => {
 };
 
 // ── Detail Items Actions ──────────────────────────────────────────────
+const gridScrollRef = ref<HTMLDivElement | null>(null);
+
 const addRow = () => {
   if (!formData.value.items) {
     formData.value.items = [];
@@ -142,6 +144,14 @@ const addRow = () => {
     qty: 1,
     nominal: 0,
     tglBeli: todayStr(),
+  });
+  nextTick(() => {
+    if (gridScrollRef.value) {
+      gridScrollRef.value.scrollTo({
+        top: gridScrollRef.value.scrollHeight,
+        behavior: "smooth",
+      });
+    }
   });
 };
 
@@ -444,7 +454,7 @@ onMounted(async () => {
 
       <!-- Panel 4: Detail Table Grid Sesuai Delphi 7 (AdvPanel4) -->
       <div class="mt-4">
-        <v-card border flat class="d-flex flex-column rounded">
+        <v-card border flat class="d-flex flex-column rounded overflow-hidden">
           <!-- Header Bar Gelap dengan Tombol Tambah Baris -->
           <div
             class="bg-blue-grey-darken-3 text-white px-3 py-2 font-weight-bold text-caption d-flex align-center justify-space-between"
@@ -469,7 +479,7 @@ onMounted(async () => {
           </div>
 
           <!-- Table Grid Sesuai Kolom Delphi: No, Nama, Satuan, Qty, Nominal, Total, Tgl Beli, Aksi -->
-          <div style="overflow-x: auto; background: #fff">
+          <div ref="gridScrollRef" class="delphi-grid-wrap">
             <table class="manksi-table">
               <thead>
                 <tr>
@@ -603,6 +613,9 @@ onMounted(async () => {
   padding: 16px 24px 80px 24px;
   font-family: Tahoma, "Segoe UI", Arial, sans-serif;
   color: #000000;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: auto;
   box-sizing: border-box;
 }
 
@@ -715,6 +728,33 @@ onMounted(async () => {
 }
 
 /* ── Grid MANKSI Table ── */
+.delphi-grid-wrap {
+  max-height: 390px;
+  overflow-y: auto;
+  overflow-x: auto;
+  background: #ffffff;
+  scrollbar-width: thin;
+  scrollbar-color: #94a3b8 #f1f5f9;
+}
+
+.delphi-grid-wrap::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.delphi-grid-wrap::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+.delphi-grid-wrap::-webkit-scrollbar-thumb {
+  background: #94a3b8;
+  border-radius: 4px;
+}
+
+.delphi-grid-wrap::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
 .manksi-table {
   width: 100%;
   border-collapse: collapse;
@@ -731,6 +771,10 @@ onMounted(async () => {
   font-weight: 700;
   font-size: 12px;
   white-space: nowrap;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  box-shadow: inset 0 -2px 0 #cbd5e1;
 }
 
 .manksi-table td {
@@ -739,6 +783,15 @@ onMounted(async () => {
   padding: 0;
   height: 32px;
   vertical-align: middle;
+}
+
+.manksi-table tfoot td {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  background: #f1f5f9 !important;
+  border-top: 2px solid #cbd5e1;
+  box-shadow: inset 0 2px 0 #cbd5e1;
 }
 
 .cell-input {
