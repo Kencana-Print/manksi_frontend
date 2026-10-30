@@ -11,6 +11,7 @@ import {
   IconArrowsExchange,
   IconTruckDelivery,
   IconPrinter,
+  IconPackageImport,
 } from "@tabler/icons-vue";
 import { formatTanggal, formatTanggalJam } from "@/utils/dateFormat";
 
@@ -54,6 +55,7 @@ const {
   selected,
   canInsert,
   canEdit,
+  canDelete,
   selectedItem,
   fetchData,
 } = useBrowse({
@@ -238,6 +240,36 @@ const submitSjKeluar = async () => {
   }
 };
 
+const STATUS_BISA_HAPUS = ["DRAFT", "SEBAGIAN DIKIRIM", "DIKIRIM"];
+
+// Cermin guard backend: belum diproses workshop tujuan
+const beforeHapus = (item: any) => {
+  const diproses =
+    item.mkl_tgl_selesai_dtf ||
+    item.mkl_tgl_otw_gudang ||
+    Number(item.TotalTerima) > 0 ||
+    Number(item.TotalBs) > 0;
+  if (!STATUS_BISA_HAPUS.includes(item.mkl_status) || diproses) {
+    toast.warning(
+      "Maklon sudah diproses workshop tujuan (selesai DTF / OTW gudang / diterima), tidak bisa dihapus.",
+    );
+    return false;
+  }
+  return true;
+};
+
+const onHapus = async (item: any) => {
+  try {
+    await maklonBarangService.deleteData(item.mkl_nomor);
+    toast.success(`Maklon ${item.mkl_nomor} berhasil dihapus.`);
+    delete detailCache.value[item.mkl_nomor];
+    selected.value = []; // kalau tidak, baris terhapus masih "terpilih" dan Hapus tetap aktif
+    await fetchData();
+  } catch (e: any) {
+    toast.error(e.response?.data?.message || "Gagal menghapus Maklon.");
+  }
+};
+
 const openPrintTab = () => {
   if (!selectedItem.value) return;
   if (!selectedItem.value.SjkNomorPertama) {
@@ -360,11 +392,13 @@ const submitTerima = async () => {
     v-model:selected="selected"
     :can-insert="canInsert"
     :can-edit="canEdit"
-    :can-delete="false"
+    :can-delete="canDelete"
+    :before-delete="beforeHapus"
     :can-export="false"
     item-value="mkl_nomor"
     @add="onAdd"
     @edit="onEdit"
+    @delete="onHapus"
     @refresh="fetchData"
   >
     <template #filter-left>
@@ -433,6 +467,17 @@ const submitTerima = async () => {
       >
         {{ item.mkl_status }}
       </v-chip>
+    </template>
+
+    <template #delete-warning="{ item }">
+      <template v-if="item">
+        <div class="text-body-2 font-weight-black text-decoration-underline">
+          {{ item.mkl_nomor }}
+        </div>
+        <div v-if="item.SjkNomorPertama" class="text-caption text-error mt-2">
+          SJ Keluar dan mutasi stok polos ke cabang tujuan ikut dibatalkan.
+        </div>
+      </template>
     </template>
 
     <template #detail="{ item }">
