@@ -8,6 +8,7 @@ import {
   IconTrash,
   IconBan,
   IconFileExport,
+  IconPrinter,
 } from "@tabler/icons-vue";
 import {
   exportExcel,
@@ -466,6 +467,19 @@ const onEdit = () => {
   router.push({ name: "RekapPembayaranEdit", params: { nomor: it.nomor } });
 };
 
+// ─── Cetak: halaman cetak dibuka di tab baru ──────────────
+const onCetak = () => {
+  const it = selected.value[0];
+  if (!it) {
+    return;
+  }
+  const href = router.resolve({
+    name: "RekapPembayaranPrint",
+    params: { nomor: it.nomor },
+  }).href;
+  window.open(href, "_blank");
+};
+
 // ─── Export Bulanan: satu sheet per bulan tagihan ─────────
 interface BarisBulanan {
   kategori: string;
@@ -686,6 +700,15 @@ fetchData();
       >
         <template #prepend><IconTrash :size="15" /></template>
         Hapus
+      </v-btn>
+      <v-btn
+        size="small"
+        color="primary"
+        :disabled="selected.length !== 1"
+        @click="onCetak"
+      >
+        <template #prepend><IconPrinter :size="15" /></template>
+        Cetak
       </v-btn>
       <v-btn
         size="small"
