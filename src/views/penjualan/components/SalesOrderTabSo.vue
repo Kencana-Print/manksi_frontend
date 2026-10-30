@@ -2406,11 +2406,12 @@ watch(
   height: 24px;
   background: white;
   flex-shrink: 0;
+  min-width: 0;
 }
 .igrp .inp {
   border: none;
   height: 22px;
-  flex-shrink: 0;
+  min-width: 0; /* izinkan input mengecil, supaya tombol cari tidak terdorong */
 }
 .igrp .inp + .inp {
   border-left: 1px solid #ccc;
