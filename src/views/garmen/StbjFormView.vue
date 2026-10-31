@@ -15,6 +15,7 @@ import {
 
 import SpkSearchModal from "@/components/lookups/SpkSearchModal.vue";
 import SpgSearchModal from "@/components/lookups/SpgSearchModal.vue";
+import KoliBarcodeDialog from "./KoliBarcodeDialog.vue";
 
 // ── Types ──────────────────────────────────────────────────────────────
 interface DetailRow {
@@ -116,6 +117,18 @@ const init: FormData = {
 // ── State ──────────────────────────────────────────────────────────────
 const showPrintDialog = ref(false);
 const savedNomor = ref("");
+
+// QR koli: dibuat otomatis backend saat simpan, user hanya memutuskan cetak
+interface QrKoli {
+  nomor: string; // nomor dokumen CBK
+  koliIdBaru: string[];
+  peringatan: string[]; // gate LHK, masa toleransi
+}
+const qrNomor = ref("");
+const qrKoliIds = ref<string[]>([]);
+const qrPeringatan = ref<string[]>([]);
+const showKoliConfirm = ref(false);
+const showKoliDialog = ref(false);
 const isLoadingPacking = ref(false);
 const activeTab = ref(0);
 
@@ -193,9 +206,18 @@ const {
 
   onSuccess: (res: any) => {
     const nomor = res?.data?.data?.nomor || "";
+    const qr: QrKoli | null = res?.data?.data?.qr ?? null;
     toast.success(`Data ${nomor} berhasil disimpan.`);
     savedNomor.value = nomor;
-    showPrintDialog.value = true;
+
+    if (qr && (qr.koliIdBaru.length || qr.peringatan.length)) {
+      qrNomor.value = qr.nomor;
+      qrKoliIds.value = qr.koliIdBaru;
+      qrPeringatan.value = qr.peringatan;
+      showKoliConfirm.value = true; // dialog cetak STBJ menyusul
+    } else {
+      showPrintDialog.value = true;
+    }
   },
 });
 
@@ -700,6 +722,20 @@ const validateSave = () => {
 
   showSaveDialog.value = true;
 };
+
+// ── Label koli ────────────────────────────────────────────────────────
+const lewatiLabelKoli = () => {
+  showKoliConfirm.value = false;
+  showPrintDialog.value = true;
+};
+const cetakLabelKoli = () => {
+  showKoliConfirm.value = false;
+  showKoliDialog.value = true;
+};
+// Dialog label ditutup (sudah dicetak, batal, atau gagal dimuat) → lanjut cetak STBJ
+watch(showKoliDialog, (terbuka) => {
+  if (!terbuka) showPrintDialog.value = true;
+});
 
 // ── Print ─────────────────────────────────────────────────────────────
 const skipPrint = () => {
@@ -1422,6 +1458,54 @@ const dcBeda = computed(
   <!-- ── Modal SPG (WH003) ── -->
   <SpgSearchModal v-model="showSpgModal" @selected="selectSpg" />
 
+  <!-- ── Konfirmasi cetak label koli ── -->
+  <v-dialog v-model="showKoliConfirm" max-width="420px" persistent>
+    <v-card class="rounded-lg">
+      <v-card-title
+        class="pa-3 bg-primary text-white"
+        style="font-size: 13px; font-weight: 700"
+      >
+        Label Koli
+      </v-card-title>
+      <v-card-text class="pa-4" style="font-size: 12px">
+        <template v-if="qrKoliIds.length">
+          <b>{{ qrKoliIds.length }}</b> label koli dibuat otomatis (<span
+            class="mono"
+            >{{ qrNomor }}</span
+          >).<br />
+          Cetak label sekarang?
+        </template>
+        <div v-if="qrPeringatan.length" class="qr-warn">
+          <b>Peringatan gate LHK:</b>
+          <ul>
+            <li v-for="(p, i) in qrPeringatan" :key="i">{{ p }}</li>
+          </ul>
+        </div>
+      </v-card-text>
+      <v-card-actions class="pa-3 border-t" style="gap: 8px">
+        <v-btn variant="text" size="small" @click="lewatiLabelKoli">
+          {{ qrKoliIds.length ? "Nanti" : "Lanjut" }}
+        </v-btn>
+        <v-spacer />
+        <v-btn
+          v-if="qrKoliIds.length"
+          variant="flat"
+          size="small"
+          color="primary"
+          @click="cetakLabelKoli"
+        >
+          Cetak Label
+        </v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
+
+  <KoliBarcodeDialog
+    v-model="showKoliDialog"
+    :nomor="qrNomor"
+    :koli-ids="qrKoliIds"
+  />
+
   <!-- ── Dialog Print ── -->
   <v-dialog v-model="showPrintDialog" max-width="380px" persistent>
     <v-card class="rounded-lg">
@@ -2028,5 +2112,19 @@ const dcBeda = computed(
 }
 .sp-chip-x:hover {
   background: rgba(255, 255, 255, 0.4);
+}
+.qr-warn {
+  margin-top: 8px;
+  padding: 6px 8px;
+  max-height: 140px;
+  overflow-y: auto;
+  background: #fff3e0;
+  border: 1px solid #ffcc80;
+  border-radius: 3px;
+  color: #e65100;
+  font-size: 11px;
+}
+.qr-warn ul {
+  margin: 4px 0 0 16px;
 }
 </style>

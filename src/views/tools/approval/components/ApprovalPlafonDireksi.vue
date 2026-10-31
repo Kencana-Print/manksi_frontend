@@ -43,6 +43,7 @@ const headers = [
     width: "140px",
     align: "right" as const,
   },
+  { title: "Kategori", key: "Kategori", width: "110px" },
   {
     title: "Status",
     key: "PlafonAcc",
@@ -89,6 +90,10 @@ const { items, isLoading, canEdit, fetchData, exportToExcel } = useBrowse({
 watch(() => filterState.value.belumAccSaja, fetchData);
 
 const openOtorisasi = (row: any) => {
+  if (row.PlafonAcc !== "PENDING_DIREKSI") {
+    toast.info("Plafon ini sudah diputuskan (ACC/TOLAK).");
+    return;
+  }
   authData.value = row;
   authStatus.value = row.PlafonAcc === "TOLAK" ? "N" : "Y";
   showAuthDialog.value = true;
@@ -242,7 +247,8 @@ const getRowProps = (data: any) => {
           <!-- Badge peringatan plafon besar -->
           <div class="plafon-warning mb-3">
             <span class="warning-icon">⚠</span>
-            Plafon melebihi Rp 20.000.000 — memerlukan persetujuan Direksi/Owner
+            Plafon kategori {{ authData.Kategori || "-" }} — memerlukan
+            persetujuan Direktur
           </div>
 
           <div class="d-row">
@@ -288,7 +294,7 @@ const getRowProps = (data: any) => {
             <span
               class="ml-2 text-caption font-weight-bold text-deep-purple-darken-2"
             >
-              &gt; 20 juta
+              {{ authData.Kategori }}
             </span>
           </div>
 

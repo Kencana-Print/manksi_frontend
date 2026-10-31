@@ -15,6 +15,7 @@ import {
   IconFilter,
   IconChevronUp,
   IconChevronDown,
+  IconChevronRight,
   IconDatabaseOff,
 } from "@tabler/icons-vue";
 import { exportExcel, type ExcelColumn } from "@/utils/excelExport";
@@ -24,7 +25,11 @@ import type {
   LaporanExportOpsi,
   LaporanFooterTambahan,
 } from "@/components/laporan/laporanTypes";
-import { formatTanggal, toExcelDate } from "@/utils/dateFormat";
+import {
+  formatTanggal,
+  formatTanggalSingkat,
+  toExcelDate,
+} from "@/utils/dateFormat";
 
 const props = withDefaults(
   defineProps<{
@@ -50,6 +55,11 @@ const props = withDefaults(
     // Baris footer tambahan di bawah TOTAL; menerima total per kolom
     // (sudah mengikuti pencarian dan filter kolom)
     footerTambahan?: (total: Record<string, number>) => LaporanFooterTambahan[];
+    // Master-detail: tiap baris punya array baris detail di field `detailKey`.
+    // Detail tampil saat baris di-expand; header detail mendukung band (group).
+    // Excel: satu baris per baris detail; kolom induk ber-total tidak ikut.
+    detailColumns?: LaporanKolom[];
+    detailKey?: string;
   }>(),
   {
     isLoading: false,
@@ -75,19 +85,24 @@ const tabsStore = useTabsStore();
 const tutup = () => tabsStore.closeTab(route.path);
 
 const LEBAR_NO = 46;
+const LEBAR_EXPAND = 30;
+const adaDetail = computed(
+  () => !!props.detailKey && (props.detailColumns?.length ?? 0) > 0,
+);
 
 // ── Helper ──
 const dua = (v: number) => Math.round(v * 100) / 100;
 const fmtAngka = (v: number) =>
   new Intl.NumberFormat("id-ID", { maximumFractionDigits: 2 }).format(v);
 const kosong = (v: unknown) => v === null || v === undefined || v === "";
-const baca = (row: T, key: string): unknown => Reflect.get(row, key);
+const baca = (row: object, key: string): unknown => Reflect.get(row, key);
 
 // Teks yang tampil di sel (juga dipakai pencarian, filter kolom, dan Excel)
-const teks = (row: T, k: LaporanKolom): string => {
+const teks = (row: object, k: LaporanKolom): string => {
   const v = baca(row, k.key);
   if (kosong(v)) return "";
   if (k.tipe === "date") return formatTanggal(String(v));
+  if (k.tipe === "dateSingkat") return formatTanggalSingkat(String(v));
   if (k.tipe === "datetime") {
     // Potong string, tanpa konversi zona waktu
     const s = String(v);
@@ -111,9 +126,9 @@ interface Blok {
   cols: LaporanKolom[];
 }
 
-const bloksDefault = computed<Blok[]>(() => {
+const kelompokBlok = (cols: LaporanKolom[]): Blok[] => {
   const hasil: Blok[] = [];
-  for (const k of props.columns) {
+  for (const k of cols) {
     const akhir = hasil[hasil.length - 1];
     if (k.group) {
       // Hanya kolom berurutan dengan group sama yang digabung jadi satu band
@@ -125,7 +140,9 @@ const bloksDefault = computed<Blok[]>(() => {
     }
   }
   return hasil;
-});
+};
+
+const bloksDefault = computed<Blok[]>(() => kelompokBlok(props.columns));
 
 const keyUrutan = computed(() => `laporan_order_${props.storageId}`);
 const muatUrutan = (): string[] => {
@@ -180,6 +197,17 @@ const barisHeader = computed<SelHeader[][]>(() => {
   const r1: SelHeader[] = [];
   const r2: SelHeader[] = [];
   const rs = adaGroup.value ? 2 : 1;
+  if (adaDetail.value) {
+    r1.push({
+      id: "__exp",
+      blokId: null,
+      kolom: null,
+      band: null,
+      rowspan: rs,
+      colspan: 1,
+      drag: false,
+    });
+  }
   if (props.showNo) {
     r1.push({
       id: "__no",
@@ -238,6 +266,7 @@ const lebar = ref<Record<string, number>>({});
 const lebarKolom = (k: LaporanKolom) => lebar.value[k.key] ?? k.width;
 const lebarTabel = computed(
   () =>
+    (adaDetail.value ? LEBAR_EXPAND : 0) +
     (props.showNo ? LEBAR_NO : 0) +
     kolomDaun.value.reduce((s, k) => s + lebarKolom(k), 0),
 );
@@ -465,12 +494,24 @@ const resetFilterKolom = () => {
 };
 
 // ── Data tampil: pencarian -> filter kolom -> urut ──
+const kolomDetail = computed<LaporanKolom[]>(() => props.detailColumns ?? []);
+
+const detailDari = (r: T): object[] => {
+  if (!props.detailKey) return [];
+  const v = baca(r, props.detailKey);
+  return Array.isArray(v) ? v : [];
+};
+const cocokBaris = (r: T, q: string): boolean =>
+  props.columns.some((k) => teks(r, k).toLowerCase().includes(q));
+const cocokDetail = (d: object, q: string): boolean =>
+  kolomDetail.value.some((k) => teks(d, k).toLowerCase().includes(q));
+
 const terfilter = computed<T[]>(() => {
   let hasil = props.items;
   const q = cari.value.trim().toLowerCase();
   if (q) {
-    hasil = hasil.filter((r) =>
-      props.columns.some((k) => teks(r, k).toLowerCase().includes(q)),
+    hasil = hasil.filter(
+      (r) => cocokBaris(r, q) || detailDari(r).some((d) => cocokDetail(d, q)),
     );
   }
   for (const [key, sembunyi] of Object.entries(sembunyiKolom.value)) {
@@ -495,6 +536,67 @@ const tampil = computed<T[]>(() => {
   });
 });
 
+// ── Master-detail ──
+const jumlahKolomTabel = computed(
+  () =>
+    kolomDaun.value.length + (props.showNo ? 1 : 0) + (adaDetail.value ? 1 : 0),
+);
+
+const barisHeaderDetail = computed(() => {
+  const adaBand = kolomDetail.value.some((k) => !!k.group);
+  const rs = adaBand ? 2 : 1;
+  const r1: { id: string; judul: string; rowspan: number; colspan: number }[] =
+    [];
+  const r2: { id: string; judul: string; rowspan: number; colspan: number }[] =
+    [];
+  for (const b of kelompokBlok(kolomDetail.value)) {
+    if (b.group) {
+      r1.push({ id: b.id, judul: b.group, rowspan: 1, colspan: b.cols.length });
+      for (const k of b.cols) {
+        r2.push({
+          id: `${b.id}:${k.key}`,
+          judul: k.title,
+          rowspan: 1,
+          colspan: 1,
+        });
+      }
+    } else {
+      r1.push({ id: b.id, judul: b.cols[0].title, rowspan: rs, colspan: 1 });
+    }
+  }
+  return adaBand ? [r1, r2] : [r1];
+});
+const lebarDetail = computed(() =>
+  kolomDetail.value.reduce((s, k) => s + k.width, 0),
+);
+
+// Saat pencarian aktif dan baris induk tidak cocok, hanya detail yang cocok tampil
+const detailTampil = (r: T): object[] => {
+  const semua = detailDari(r);
+  const q = cari.value.trim().toLowerCase();
+  if (!q || cocokBaris(r, q)) return semua;
+  return semua.filter((d) => cocokDetail(d, q));
+};
+
+const terbuka = ref<Set<string>>(new Set());
+const toggleDetail = (r: T) => {
+  const k = kunciBaris(r);
+  const s = new Set(terbuka.value);
+  if (s.has(k)) s.delete(k);
+  else s.add(k);
+  terbuka.value = s;
+};
+const semuaTerbuka = computed(
+  () =>
+    tampil.value.length > 0 &&
+    tampil.value.every((r) => terbuka.value.has(kunciBaris(r))),
+);
+const toggleSemua = () => {
+  terbuka.value = semuaTerbuka.value
+    ? new Set()
+    : new Set(tampil.value.map((r) => kunciBaris(r)));
+};
+
 // ── Footer total (mengikuti pencarian dan filter kolom) ──
 const totalKolom = computed<Record<string, number>>(() => {
   const hasil: Record<string, number> = {};
@@ -509,6 +611,7 @@ const totalKolom = computed<Record<string, number>>(() => {
 const awalTotal = computed(() => kolomDaun.value.findIndex((k) => k.total));
 const spanLabel = computed(
   () =>
+    (adaDetail.value ? 1 : 0) +
     (props.showNo ? 1 : 0) +
     (awalTotal.value === -1 ? kolomDaun.value.length : awalTotal.value),
 );
@@ -536,6 +639,27 @@ const clearSelection = () => emit("update:selectedKey", null);
 // ── Export Excel (diturunkan dari definisi kolom, urutan default) ──
 type NilaiExcel = string | number | Date | null;
 
+const nilaiExcel = (row: object, k: LaporanKolom): NilaiExcel => {
+  const v = baca(row, k.key);
+  if (k.tipe === "number") return Number(v) || 0;
+  if (k.tipe === "date") return toExcelDate(kosong(v) ? null : String(v));
+  return teks(row, k);
+};
+
+const kolomExcelDari = (cols: LaporanKolom[]): ExcelColumn[] =>
+  cols.map((k) => {
+    const kolom: ExcelColumn = {
+      header: k.group ?? k.title,
+      key: k.key,
+      width: k.excelWidth ?? Math.max(6, Math.round(k.width / 7)),
+      align: k.align ?? (k.tipe === "number" ? "right" : "left"),
+    };
+    if (k.group) kolom.subHeader = k.title;
+    if (k.tipe === "date") kolom.numFmt = "dd/mm/yyyy";
+    if (k.numFmt) kolom.numFmt = k.numFmt;
+    return kolom;
+  });
+
 const exportToExcel = async (opsi: LaporanExportOpsi) => {
   const data = tampil.value;
   if (data.length === 0) {
@@ -543,50 +667,58 @@ const exportToExcel = async (opsi: LaporanExportOpsi) => {
     return;
   }
   try {
+    // Master-detail: kolom induk non-total (diulang tiap baris) + kolom detail
+    const kolomHitung: LaporanKolom[] = adaDetail.value
+      ? [...props.columns.filter((k) => !k.total), ...kolomDetail.value]
+      : props.columns;
+
     const kolomExcel: ExcelColumn[] = [];
     if (props.showNo) {
       kolomExcel.push({ header: "No", key: "__no", width: 6, align: "center" });
     }
-    for (const b of bloksDefault.value) {
-      for (const k of b.cols) {
-        const kolom: ExcelColumn = {
-          header: k.group ?? k.title,
-          key: k.key,
-          width: k.excelWidth ?? Math.max(6, Math.round(k.width / 7)),
-          align: k.align ?? (k.tipe === "number" ? "right" : "left"),
-        };
-        if (k.group) kolom.subHeader = k.title;
-        if (k.tipe === "date") kolom.numFmt = "dd/mm/yyyy";
-        if (k.numFmt) kolom.numFmt = k.numFmt;
-        kolomExcel.push(kolom);
-      }
+    kolomExcel.push(...kolomExcelDari(kolomHitung));
+
+    const baris: Record<string, NilaiExcel>[] = adaDetail.value
+      ? data.flatMap((r) =>
+          detailTampil(r).map((d) => {
+            const o: Record<string, NilaiExcel> = {};
+            for (const k of props.columns) {
+              if (!k.total) o[k.key] = nilaiExcel(r, k);
+            }
+            for (const k of kolomDetail.value) o[k.key] = nilaiExcel(d, k);
+            return o;
+          }),
+        )
+      : data.map((r) => {
+          const o: Record<string, NilaiExcel> = {};
+          for (const k of props.columns) o[k.key] = nilaiExcel(r, k);
+          return o;
+        });
+    if (baris.length === 0) {
+      toast.warning("Tidak ada data untuk diexport.");
+      return;
+    }
+    if (props.showNo) {
+      baris.forEach((o, i) => {
+        o.__no = i + 1;
+      });
     }
 
-    const baris: Record<string, NilaiExcel>[] = data.map((r, i) => {
-      const o: Record<string, NilaiExcel> = {};
-      if (props.showNo) o.__no = i + 1;
-      for (const k of props.columns) {
-        const v = baca(r, k.key);
-        if (k.tipe === "number") o[k.key] = Number(v) || 0;
-        else if (k.tipe === "date")
-          o[k.key] = toExcelDate(kosong(v) ? null : String(v));
-        else o[k.key] = teks(r, k);
-      }
-      return o;
-    });
-
-    const pertamaBukanTotal = props.columns.find((k) => !k.total);
+    const pertamaBukanTotal = kolomHitung.find((k) => !k.total);
     const barisTotal: Record<string, NilaiExcel> = { _total: 1 };
     if (pertamaBukanTotal) barisTotal[pertamaBukanTotal.key] = "TOTAL";
-    for (const [key, nilai] of Object.entries(totalKolom.value)) {
-      barisTotal[key] = nilai;
+    for (const k of kolomHitung) {
+      if (!k.total) continue;
+      barisTotal[k.key] = dua(
+        baris.reduce((s, o) => s + (Number(o[k.key]) || 0), 0),
+      );
     }
     baris.push(barisTotal);
     for (const f of footerExtra.value) {
       baris.push({ _total: 1, [f.labelKey]: f.label, [f.nilaiKey]: f.nilai });
     }
     const kunciSorot = new Set(
-      props.columns.filter((k) => k.sorotPositif).map((k) => k.key),
+      kolomHitung.filter((k) => k.sorotPositif).map((k) => k.key),
     );
 
     await exportExcel(`${opsi.fileName}.xlsx`, [
@@ -697,6 +829,18 @@ defineExpose({
           <template #prepend><IconAdjustmentsHorizontal :size="15" /></template>
           Reset Kolom
         </v-btn>
+        <v-btn
+          v-if="adaDetail"
+          size="small"
+          variant="tonal"
+          @click="toggleSemua"
+        >
+          <template #prepend>
+            <IconChevronUp v-if="semuaTerbuka" :size="15" :stroke-width="1.7" />
+            <IconChevronDown v-else :size="15" :stroke-width="1.7" />
+          </template>
+          {{ semuaTerbuka ? "Tutup Semua" : "Buka Semua" }}
+        </v-btn>
         <v-spacer />
         <slot name="filter-right" />
       </div>
@@ -705,6 +849,7 @@ defineExpose({
       <div class="lp-wrap">
         <table class="lp-table" :style="{ width: lebarTabel + 'px' }">
           <colgroup>
+            <col v-if="adaDetail" :style="{ width: LEBAR_EXPAND + 'px' }" />
             <col v-if="showNo" :style="{ width: LEBAR_NO + 'px' }" />
             <col
               v-for="k in kolomDaun"
@@ -782,7 +927,9 @@ defineExpose({
                     </button>
                   </template>
                   <span v-else-if="s.band" class="lp-title">{{ s.band }}</span>
-                  <span v-else class="lp-title">No</span>
+                  <span v-else class="lp-title">{{
+                    s.id === "__no" ? "No" : ""
+                  }}</span>
                 </div>
                 <div
                   v-if="s.kolom"
@@ -795,46 +942,104 @@ defineExpose({
 
           <tbody>
             <tr v-if="isLoading">
-              <td
-                :colspan="kolomDaun.length + (showNo ? 1 : 0)"
-                class="lp-empty"
-              >
+              <td :colspan="jumlahKolomTabel" class="lp-empty">
                 Memuat data...
               </td>
             </tr>
             <tr v-else-if="tampil.length === 0">
-              <td
-                :colspan="kolomDaun.length + (showNo ? 1 : 0)"
-                class="lp-empty"
-              >
+              <td :colspan="jumlahKolomTabel" class="lp-empty">
                 <IconDatabaseOff :size="28" :stroke-width="1.3" />
                 <div>Tidak ada data.</div>
               </td>
             </tr>
             <template v-else>
-              <tr
-                v-for="(r, i) in tampil"
-                :key="kunciBaris(r)"
-                :class="{ 'lp-sel': selectedKey === kunciBaris(r) }"
-                @click="onKlikBaris(r)"
-                @dblclick="emit('row-dblclick', r)"
-              >
-                <td v-if="showNo" class="lp-no">{{ i + 1 }}</td>
-                <td
-                  v-for="k in kolomDaun"
-                  :key="k.key"
-                  :class="[
-                    kelasSel(k),
-                    { 'lp-neg': k.negativeRed && Number(baca(r, k.key)) < 0 },
-                    {
-                      'lp-kurang': k.sorotPositif && Number(baca(r, k.key)) > 0,
-                    },
-                  ]"
-                  :title="teks(r, k)"
+              <template v-for="(r, i) in tampil" :key="kunciBaris(r)">
+                <tr
+                  :class="{ 'lp-sel': selectedKey === kunciBaris(r) }"
+                  @click="onKlikBaris(r)"
+                  @dblclick="emit('row-dblclick', r)"
                 >
-                  {{ teks(r, k) }}
-                </td>
-              </tr>
+                  <td v-if="adaDetail" class="lp-exp">
+                    <button
+                      type="button"
+                      class="lp-exp-btn"
+                      title="Tampilkan / sembunyikan detail"
+                      @click.stop="toggleDetail(r)"
+                    >
+                      <IconChevronDown
+                        v-if="terbuka.has(kunciBaris(r))"
+                        :size="14"
+                      />
+                      <IconChevronRight v-else :size="14" />
+                    </button>
+                  </td>
+                  <td v-if="showNo" class="lp-no">{{ i + 1 }}</td>
+                  <td
+                    v-for="k in kolomDaun"
+                    :key="k.key"
+                    :class="[
+                      kelasSel(k),
+                      { 'lp-neg': k.negativeRed && Number(baca(r, k.key)) < 0 },
+                      {
+                        'lp-kurang':
+                          k.sorotPositif && Number(baca(r, k.key)) > 0,
+                      },
+                    ]"
+                    :title="teks(r, k)"
+                  >
+                    {{ teks(r, k) }}
+                  </td>
+                </tr>
+                <tr
+                  v-if="adaDetail && terbuka.has(kunciBaris(r))"
+                  class="lp-dtl-row"
+                >
+                  <td :colspan="jumlahKolomTabel" class="lp-dtl-cell">
+                    <table
+                      class="lp-dtl"
+                      :style="{ width: lebarDetail + 'px' }"
+                    >
+                      <colgroup>
+                        <col
+                          v-for="k in kolomDetail"
+                          :key="k.key"
+                          :style="{ width: k.width + 'px' }"
+                        />
+                      </colgroup>
+                      <thead>
+                        <tr v-for="(hb, hi) in barisHeaderDetail" :key="hi">
+                          <th
+                            v-for="h in hb"
+                            :key="h.id"
+                            :rowspan="h.rowspan"
+                            :colspan="h.colspan"
+                            class="lp-dth"
+                          >
+                            {{ h.judul }}
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr v-if="detailTampil(r).length === 0">
+                          <td :colspan="kolomDetail.length" class="a-center">
+                            Tidak ada data detail.
+                          </td>
+                        </tr>
+                        <tr v-for="(d, di) in detailTampil(r)" :key="di">
+                          <td
+                            v-for="k in kolomDetail"
+                            :key="k.key"
+                            :class="kelasSel(k)"
+                            :title="teks(d, k)"
+                          >
+                            {{ teks(d, k) }}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </td>
+                </tr>
+              </template>
             </template>
           </tbody>
 
@@ -854,6 +1059,7 @@ defineExpose({
               :key="fi"
               :style="{ '--bt': (footerExtra.length - 1 - fi) * 28 + 'px' }"
             >
+              <td v-if="adaDetail"></td>
               <td v-if="showNo"></td>
               <td v-for="k in kolomDaun" :key="k.key" class="a-right">
                 <template v-if="k.key === f.labelKey">{{ f.label }}</template>
@@ -1159,6 +1365,64 @@ defineExpose({
   height: 28px;
   z-index: 3;
   border-bottom: none;
+}
+
+/* ── Master-detail ── */
+.lp-exp {
+  padding: 0 !important;
+}
+.lp-exp-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.lp-table tbody tr.lp-dtl-row td.lp-dtl-cell {
+  padding: 4px 0 8px 30px;
+  height: auto;
+  overflow: visible;
+  background: #f4f8fd;
+  cursor: default;
+}
+.lp-dtl {
+  table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid #e0e0e0;
+  background: #fff;
+  font-size: 11px;
+}
+.lp-dth {
+  height: 26px;
+  padding: 0 8px;
+  background: #5b8fd0;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  text-align: center;
+  white-space: nowrap;
+  border-right: 1px solid rgba(255, 255, 255, 0.25);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.25);
+}
+.lp-table tbody tr.lp-dtl-row .lp-dtl tbody tr {
+  cursor: default;
+}
+.lp-table tbody tr.lp-dtl-row .lp-dtl tbody td {
+  background: #fff;
+}
+.lp-table tbody tr.lp-dtl-row .lp-dtl tbody tr:nth-child(even) td {
+  background: #fafafa;
+}
+.lp-table tbody tr.lp-dtl-row .lp-dtl tbody tr:hover td {
+  background: #e3f2fd;
 }
 
 /* ── Dropdown filter kolom ── */

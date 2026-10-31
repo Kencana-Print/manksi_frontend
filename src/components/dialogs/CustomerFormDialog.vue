@@ -5,6 +5,7 @@ import api from "@/services/api";
 import { useToast } from "vue-toastification";
 import { useAuthStore } from "@/stores/authStore";
 import CustomerSearchModal from "@/components/lookups/CustomerSearchModal.vue";
+import NumberInputIDR from "@/components/NumberInputIDR.vue";
 import { IconUsers, IconSearch, IconX } from "@tabler/icons-vue";
 
 const props = defineProps<{
@@ -62,13 +63,57 @@ const emptyForm = () => ({
 
 const formData = ref(emptyForm());
 
-const plafonWarning = computed(() => {
-  const p = formData.value.Plafon || 0;
-  if (p > 20_000_000)
-    return { text: "Butuh ACC Direksi/Owner", color: "#c62828" };
-  if (p > 0) return { text: "Butuh ACC Manager", color: "#e65100" };
-  return null;
+// Tier plafon — harus sama dengan TIER_PLAFON di customerService (backend).
+// Batas bawah inklusif (>=).
+const TIER_PLAFON = [
+  {
+    kategori: "PRIORITAS",
+    min: 250_000_000,
+    approver: "Direktur",
+    color: "#6a1b9a",
+  },
+  {
+    kategori: "LARGE",
+    min: 100_000_000,
+    approver: "Direktur",
+    color: "#1565c0",
+  },
+  {
+    kategori: "MEDIUM",
+    min: 50_000_000,
+    approver: "Direktur",
+    color: "#00838f",
+  },
+  {
+    kategori: "SMALL",
+    min: 10_000_000,
+    approver: "Manager Marketing",
+    color: "#ef6c00",
+  },
+  {
+    kategori: "EXTRA SMALL",
+    min: 0,
+    approver: "Manager Marketing",
+    color: "#757575",
+  },
+] as const;
+
+const plafonTier = computed(() => {
+  const p = Number(formData.value.Plafon) || 0;
+  if (p <= 0) return null;
+  return TIER_PLAFON.find((t) => p >= t.min) ?? null;
 });
+
+// Customer baru atau plafon diubah → customer PASIF sampai plafon di-ACC.
+const plafonBerubah = computed(
+  () =>
+    props.isNewMode ||
+    (Number(formData.value.Plafon) || 0) !==
+      (Number(props.editData?.Plafon) || 0),
+);
+
+const plafonDicoba = ref(false); // true setelah user menekan Simpan
+const plafonKosong = computed(() => (Number(formData.value.Plafon) || 0) <= 0);
 
 const loadLookups = async () => {
   try {
@@ -101,6 +146,7 @@ watch(
     namaKembar.value = [];
     namaAwal.value = props.isNewMode ? "" : (formData.value.Nama || "").trim();
     formRef.value?.resetValidation();
+    plafonDicoba.value = false;
   },
 );
 
@@ -163,7 +209,9 @@ onBeforeUnmount(() => {
 
 const handleSave = async () => {
   const { valid } = await formRef.value!.validate();
-  if (!valid) return;
+  plafonDicoba.value = true;
+  if (plafonKosong.value) toast.warning("Plafon piutang wajib diisi.");
+  if (!valid || plafonKosong.value) return;
   formData.value.Nama = (formData.value.Nama || "").trim().replace(/\s+/g, " ");
   await cekNama();
   if (namaKembar.value.length) {
@@ -226,9 +274,11 @@ const handleSave = async () => {
       const res = await api.post("/master/customer", formData.value);
       const plafonAcc = res.data.data?.plafonAcc;
       if (plafonAcc === "PENDING_MANAGER") {
-        toast.success("Customer disimpan. Plafon menunggu ACC Manager.");
+        toast.success(
+          "Customer disimpan. Plafon menunggu ACC Manager Marketing.",
+        );
       } else if (plafonAcc === "PENDING_DIREKSI") {
-        toast.success("Customer disimpan. Plafon > 20jt menunggu ACC Direksi.");
+        toast.success("Customer disimpan. Plafon menunggu ACC Direktur.");
       } else {
         toast.success("Customer berhasil disimpan.");
       }
@@ -240,11 +290,11 @@ const handleSave = async () => {
       const plafonAcc = res.data.data?.plafonAcc;
       if (plafonAcc === "PENDING_MANAGER") {
         toast.success(
-          "Customer diperbarui. Plafon berubah, menunggu ACC Manager.",
+          "Customer diperbarui. Plafon berubah, menunggu ACC Manager Marketing.",
         );
       } else if (plafonAcc === "PENDING_DIREKSI") {
         toast.success(
-          "Customer diperbarui. Plafon > 20jt menunggu ACC Direksi.",
+          "Customer diperbarui. Plafon berubah, menunggu ACC Direktur.",
         );
       } else {
         toast.success("Customer berhasil diperbarui.");
@@ -550,23 +600,29 @@ const divisiItems = [
                 </div>
 
                 <div class="f-row">
-                  <label class="f-label">Plafon (Rp)</label>
-                  <v-text-field
-                    v-model.number="formData.Plafon"
-                    type="number"
-                    variant="outlined"
-                    density="compact"
-                    hide-details
-                    class="f-input"
-                    style="max-width: 160px"
-                    v-select-on-focus
-                  />
-                  <span
-                    v-if="plafonWarning"
-                    class="text-caption font-weight-bold ml-2"
-                    :style="{ color: plafonWarning.color }"
+                  <label class="f-label"
+                    >Plafon <span class="req">*</span></label
                   >
-                    ⚠ {{ plafonWarning.text }}
+                  <div
+                    class="idr-wrap"
+                    :class="{ 'idr-error': plafonDicoba && plafonKosong }"
+                  >
+                    <span class="idr-prefix">Rp</span>
+                    <NumberInputIDR v-model="formData.Plafon" />
+                  </div>
+                </div>
+                <div v-if="plafonDicoba && plafonKosong" class="plafon-err">
+                  Wajib diisi, harus lebih dari 0
+                </div>
+                <div v-if="plafonTier" class="plafon-info">
+                  <span
+                    class="plafon-chip"
+                    :style="{ background: plafonTier.color }"
+                    >{{ plafonTier.kategori }}</span
+                  >
+                  <span>Butuh ACC {{ plafonTier.approver }}</span>
+                  <span v-if="plafonBerubah" class="plafon-pasif">
+                    · customer PASIF sampai di-ACC
                   </span>
                 </div>
 
@@ -852,6 +908,82 @@ const divisiItems = [
 }
 .nama-mirip-meta {
   color: #8d6e63;
+}
+
+/* ── Info tier plafon ── */
+.plafon-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 6px 82px;
+  font-size: 11px;
+  color: #555;
+}
+.plafon-chip {
+  padding: 1px 8px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 700;
+  color: white;
+  white-space: nowrap;
+}
+.plafon-pasif {
+  color: #c62828;
+  font-weight: 600;
+}
+
+/* ── Field plafon (NumberInputIDR) & info tier ── */
+.idr-wrap {
+  display: flex;
+  align-items: center;
+  width: 180px;
+  height: 30px;
+  border: 1px solid rgba(0, 0, 0, 0.38);
+  border-radius: 4px;
+  background: white;
+  font-size: 12px;
+  box-sizing: border-box;
+}
+.idr-wrap:hover {
+  border-color: rgba(0, 0, 0, 0.87);
+}
+.idr-wrap:focus-within {
+  border-color: #1565c0;
+  box-shadow: 0 0 0 1px #1565c0;
+}
+.idr-wrap.idr-error {
+  border-color: #e53935;
+  box-shadow: 0 0 0 1px #e53935;
+}
+.idr-prefix {
+  padding-left: 8px;
+  font-weight: 600;
+  color: #777;
+}
+.plafon-err {
+  margin: -3px 0 5px 82px;
+  font-size: 11px;
+  color: #e53935;
+}
+.plafon-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 6px 82px;
+  font-size: 11px;
+  color: #555;
+}
+.plafon-chip {
+  padding: 1px 8px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 700;
+  color: white;
+  white-space: nowrap;
+}
+.plafon-pasif {
+  color: #c62828;
+  font-weight: 600;
 }
 
 /* ── Vuetify field height ── */

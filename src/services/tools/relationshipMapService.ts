@@ -3,6 +3,8 @@ import api from "@/services/api";
 const BASE = "/tools/relationship-map";
 
 export type NodeType =
+  | "PRA_ORDER"
+  | "KONFIRMASI_PRA_ORDER"
   | "PERMINTAAN_HARGA"
   | "PENAWARAN"
   | "MAP"
@@ -11,9 +13,13 @@ export type NodeType =
   | "PROOF"
   | "SJ_MEMO"
   | "MPPB"
+  | "PERMINTAAN_DESAIN"
+  | "LHK_DESAIN"
   | "MKB"
   | "PO"
   | "BPB"
+  | "QC_BAHAN"
+  | "TINDAK_LANJUT_QC"
   | "BPB_NON_BAHAN"
   | "STBJ"
   | "SJ"
@@ -29,6 +35,16 @@ export type NodeType =
   | "REALISASI_GARMEN"
   | "PERMINTAAN_PEMBELIAN"
   | "KASBON"
+  | "PENGAJUAN_DANA"
+  | "PENGAJUAN_UANG_MUKA"
+  | "PENYELESAIAN_UANG_MUKA"
+  | "BKK"
+  | "BBK"
+  | "KLAIM_KAS_KECIL"
+  | "PENGAJUAN_TRANSFER"
+  | "REALISASI_PENGAJUAN_TRANSFER"
+  | "BKM"
+  | "REKAP_PEMBAYARAN"
   | "MUTASI_OUT"
   | "PO_NON_BAHAN"
   | "MUTASI_PRODUKSI"
@@ -40,7 +56,14 @@ export type NodeType =
   | "SJ_TAK_NORMAL"
   | "INVOICE_TAK_NORMAL"
   | "PENERIMAAN_PIUTANG"
-  | "PELUNASAN_PIUTANG";
+  | "PELUNASAN_PIUTANG"
+  | "MAKLON"
+  | "SJ_KELUAR_MAKLON"
+  | "LHK_MAKLON"
+  | "SJ_HASIL_MAKLON"
+  | "TERIMA_MAKLON"
+  | "COMPLAIN_CUSTOMER"
+  | "BAP_PRODUKSI";
 
 export interface PlanningDetailRow {
   spk: string;
@@ -65,7 +88,6 @@ export interface DocNode {
   planningDetail?: {
     cutting: PlanningDetailRow[];
     sewing: PlanningDetailRow[];
-    koli: PlanningDetailRow[];
   };
   closeStatus?: number; // khusus PERMINTAAN_BAHAN
   isFromLog?: boolean; // khusus RETUR_BAHAN
@@ -85,6 +107,13 @@ export interface DocNode {
   hasKuitansi?: boolean;
   noFakturPajak?: string;
   isExportedPpn?: boolean;
+  locked?: boolean; // tipe ini tidak boleh dilihat user (hanya tipe + nomor)
+  statusPpic?: string; // khusus KONFIRMASI_PRA_ORDER: PENDING/SANGGUP/TIDAK SANGGUP
+  statusKlien?: string; // khusus PERMINTAAN_DESAIN: ACC/PENDING/CANCEL/CANCEL_ALT
+  catatan?: string; // khusus KONFIRMASI_PRA_ORDER: catatan PPIC
+  tglEstimasiSo?: string; // khusus KONFIRMASI_PRA_ORDER
+  tglEstimasiMap?: string; // khusus KONFIRMASI_PRA_ORDER
+  pumNomor?: string;
 }
 
 export interface ExpandResult {
@@ -103,4 +132,6 @@ export const relationshipMapService = {
     api.get<{ success: boolean; data: DocNode[] }>(`${BASE}/search`, {
       params: { type: type || undefined, q },
     }),
+
+  types: () => api.get<{ success: boolean; data: NodeType[] }>(`${BASE}/types`),
 };

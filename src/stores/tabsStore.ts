@@ -112,6 +112,11 @@ export const useTabsStore = defineStore(
         .forEach((t) => closeTab(t.id));
     };
 
+    const updateTabQuery = (path: string, query?: Record<string, any>) => {
+      const tab = tabs.value.find((t) => t.id === generateTabId(path));
+      if (tab) tab.query = query;
+    };
+
     const setActiveTab = (tabId: string) => {
       const tab = tabs.value.find((t) => t.id === tabId);
       if (tab) activeTabId.value = tabId;
@@ -141,6 +146,7 @@ export const useTabsStore = defineStore(
       closeAllTabs,
       closeOtherTabs,
       closeTabsToRight,
+      updateTabQuery,
       setActiveTab,
       initDefaultTabs,
       resetTabs,

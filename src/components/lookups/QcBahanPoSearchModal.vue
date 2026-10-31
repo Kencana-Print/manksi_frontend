@@ -77,7 +77,7 @@ const numFmt = (v: number) => Number(v || 0).toLocaleString("id-ID");
 <template>
   <v-dialog
     :model-value="modelValue"
-    max-width="1300px"
+    max-width="1400px"
     scrollable
     @update:model-value="close"
   >
@@ -110,7 +110,7 @@ const numFmt = (v: number) => Number(v || 0).toLocaleString("id-ID");
           <input
             v-model="query"
             @input="onSearchInput"
-            placeholder="Cari nomor PO, nama kain, supplier..."
+            placeholder="Cari nomor PO, SPK, nama kain, supplier..."
             class="f-in"
             style="width: 100%; padding-left: 26px"
           />
@@ -138,11 +138,12 @@ const numFmt = (v: number) => Number(v || 0).toLocaleString("id-ID");
           <thead>
             <tr>
               <th width="140">Nomor PO</th>
+              <th width="150">Nomor SPK</th>
               <th width="90">Jenis</th>
               <th width="90">Tgl PO</th>
-              <th width="170">Supplier</th>
+              <th width="160">Supplier</th>
               <th width="40" class="tc">#</th>
-              <th width="280">Nama Kain</th>
+              <th width="250">Nama Kain</th>
               <th width="90">Gramasi</th>
               <th width="70">Setting</th>
               <th width="60" class="tr">Roll</th>
@@ -159,6 +160,9 @@ const numFmt = (v: number) => Number(v || 0).toLocaleString("id-ID");
               @click="onSelect(it)"
             >
               <td class="fw font-mono text-primary">{{ it.PO }}</td>
+              <td class="font-mono" :title="it.NomorSpk ?? ''">
+                {{ it.NomorSpk || "-" }}
+              </td>
               <td>{{ it.JenisPO }}</td>
               <td>{{ formatTgl(it.TanggalPO) }}</td>
               <td :title="it.Supplier">{{ it.Supplier }}</td>
@@ -179,7 +183,7 @@ const numFmt = (v: number) => Number(v || 0).toLocaleString("id-ID");
               </td>
             </tr>
             <tr v-if="!isLoading && items.length === 0">
-              <td colspan="12" class="text-center text-grey pa-4">
+              <td colspan="13" class="text-center text-grey pa-4">
                 Tidak ada baris PO ditemukan.
               </td>
             </tr>

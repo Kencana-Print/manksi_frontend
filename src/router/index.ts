@@ -2135,6 +2135,29 @@ const router = createRouter({
       },
     },
     {
+      path: "/garmen/bahan-jadi/cetak-barcode-koli",
+      name: "CetakBarcodeKoliBrowse",
+      component: () => import("@/views/garmen/CetakBarcodeKoliView.vue"),
+      meta: {
+        title: "Cetak Barcode Koli",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "188",
+      },
+    },
+    {
+      path: "/garmen/bahan-jadi/cetak-barcode-koli/detail/:nomor",
+      name: "CetakBarcodeKoliFormDetail",
+      component: () => import("@/views/garmen/CetakBarcodeKoliFormView.vue"),
+      meta: {
+        title: "Detail Barcode Koli",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "188",
+        browseRoute: "CetakBarcodeKoliBrowse",
+      },
+    },
+    {
       path: "/garmen/bahan-jadi/stbj",
       name: "StbjBrowse",
       component: () => import("@/views/garmen/StbjView.vue"),
@@ -5842,6 +5865,18 @@ const router = createRouter({
       component: () => import("@/views/laporan/spanduk/PemakaianBahanView.vue"),
       meta: {
         title: "Laporan Pemakaian Bahan",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "963",
+      },
+    },
+    {
+      path: "/laporan/produksi-spanduk/ketercapaian-komitmen-kirim",
+      name: "LaporanSpandukKetercapaianKomitmenKirim",
+      component: () =>
+        import("@/views/laporan/spanduk/KetercapaianKomitmenKirimView.vue"),
+      meta: {
+        title: "Laporan Ketercapaian Komitmen Kirim",
         layout: "DefaultLayout",
         requiresAuth: true,
         menuId: "963",

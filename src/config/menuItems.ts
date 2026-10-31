@@ -112,6 +112,7 @@ import {
   IconBox,
   IconCar,
   IconBuildingSkyscraper,
+  IconQrcode,
 } from "@tabler/icons-vue";
 
 export interface NavItem {
@@ -682,6 +683,13 @@ export const createMenuItems = (): NavItem[] => {
               to: "/garmen/bahan-jadi/cetak-barcode-kaosan",
               icon: IconBarcode,
               menuId: 130,
+            },
+            {
+              title: "Cetak Barcode Koli",
+              to: "/garmen/bahan-jadi/cetak-barcode-koli",
+              icon: IconQrcode,
+              menuId: 188,
+              sembunyikanCabang: ["P02"],
             },
             {
               title: "Surat Terima Barang Jadi (STBJ)",
@@ -1650,6 +1658,11 @@ export const createMenuItems = (): NavItem[] => {
               title: "Pemakaian Bahan",
               to: "/laporan/produksi-spanduk/pemakaian-bahan",
               icon: IconRuler,
+            },
+            {
+              title: "Ketercapaian Komitmen Kirim",
+              to: "/laporan/produksi-spanduk/ketercapaian-komitmen-kirim",
+              icon: IconTruckDelivery,
             },
           ],
         },
