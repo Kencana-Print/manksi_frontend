@@ -209,9 +209,7 @@ onBeforeUnmount(() => {
 
 const handleSave = async () => {
   const { valid } = await formRef.value!.validate();
-  plafonDicoba.value = true;
-  if (plafonKosong.value) toast.warning("Plafon piutang wajib diisi.");
-  if (!valid || plafonKosong.value) return;
+  if (!valid) return;
   formData.value.Nama = (formData.value.Nama || "").trim().replace(/\s+/g, " ");
   await cekNama();
   if (namaKembar.value.length) {
@@ -600,19 +598,11 @@ const divisiItems = [
                 </div>
 
                 <div class="f-row">
-                  <label class="f-label"
-                    >Plafon <span class="req">*</span></label
-                  >
-                  <div
-                    class="idr-wrap"
-                    :class="{ 'idr-error': plafonDicoba && plafonKosong }"
-                  >
+                  <label class="f-label">Plafon</label>
+                  <div class="idr-wrap">
                     <span class="idr-prefix">Rp</span>
                     <NumberInputIDR v-model="formData.Plafon" />
                   </div>
-                </div>
-                <div v-if="plafonDicoba && plafonKosong" class="plafon-err">
-                  Wajib diisi, harus lebih dari 0
                 </div>
                 <div v-if="plafonTier" class="plafon-info">
                   <span
