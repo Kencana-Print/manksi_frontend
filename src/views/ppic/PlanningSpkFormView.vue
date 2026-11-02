@@ -1427,8 +1427,8 @@ const statusBahanClass = (s: string) => {
                             }}</b>
                             mnt</span
                           >
-                          <span class="grp-chip"
-                            >Pencapaian
+                          <span class="grp-chip">
+                            Persentase Pencapaian
                             <b>{{
                               pencapaianLine(g.items) === null
                                 ? "—"

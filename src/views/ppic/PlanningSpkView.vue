@@ -449,7 +449,7 @@ const kolomSewing: ExcelColumn[] = [
     numFmt: "#,##0",
   },
   {
-    header: "Pencapaian (%)",
+    header: "Persentase Pencapaian (%)",
     key: "Pencapaian",
     align: "right",
     numFmt: "#,##0.0",
@@ -1200,8 +1200,8 @@ fetchData();
                             }}</b>
                             mnt</span
                           >
-                          <span class="grp-chip"
-                            >Pencapaian
+                          <span class="grp-chip">
+                            Persentase Pencapaian
                             <b>{{
                               pencapaian(g) === null
                                 ? "—"
