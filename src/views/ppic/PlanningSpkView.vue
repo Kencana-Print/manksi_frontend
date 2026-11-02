@@ -512,6 +512,9 @@ const styleSewing = (row: BarisExport) => {
   return null;
 };
 
+const styleCutting = (row: BarisExport) =>
+  row._grp ? { fillColor: "CFD8DC", fontColor: "263238", bold: true } : null;
+
 const doExportDetail = async () => {
   // Hanya plan yang sedang tampil (search + filter kolom BaseBrowse)
   const nomorTampil = new Set(dataTampil().map((r) => r.Nomor));
@@ -567,9 +570,28 @@ const doExportDetail = async () => {
       );
 
     for (const p of plans) {
-      p.cutting.forEach((d, i) =>
+      // Baris total di atas blok Cutting tiap planning (sama pola dengan baris Line di sheet Sewing)
+      if (p.cutting.length) {
         sheetCutting.push({
-          ...induk(p, i === 0),
+          ...induk(p, true),
+          NomorSPK: "TOTAL",
+          NamaSPK: "",
+          WipBahan: "",
+          WipSatuan: "",
+          StatusBahan: "",
+          EstKedatangan: "",
+          QtyJadwal: p.cutting.reduce(
+            (s, d) => s + (Number(d.QtyJadwal) || 0),
+            0,
+          ),
+          LineKelompok: "",
+          Output: "",
+          _grp: true,
+        });
+      }
+      p.cutting.forEach((d) =>
+        sheetCutting.push({
+          ...induk(p, false),
           NomorSPK: d.NomorSPK,
           NamaSPK: d.NamaSPK || "",
           WipBahan: angkaAtauKosong(d.WipSatuan ? d.WipBahan : undefined),
@@ -662,6 +684,7 @@ const doExportDetail = async () => {
         columns: [...kolomMaster, ...kolomCutting],
         rows: sheetCutting,
         headerColor: "546E7A",
+        rowStyleFn: styleCutting,
       });
     if (sheetCuttingHarian.length)
       sheets.push({
@@ -766,6 +789,13 @@ const groupSewing = (rows: DetailRow[]) => {
 };
 
 const sewingGroups = (nomor: string) => groupSewing(sewingBaru(nomor));
+
+// Σ Qty Target tab Cutting untuk satu planning (dari detail yang sudah dimuat)
+const cuttingTotalTarget = (nomor: string) =>
+  (detailCache.value[nomor]?.cutting ?? []).reduce(
+    (s, d) => s + (Number(d.QtyJadwal) || 0),
+    0,
+  );
 
 // Resume minus = output sudah melebihi waktu produksi line
 const isOver = (d: DetailRow) => d.Resume != null && d.Resume < 0;
@@ -1012,6 +1042,20 @@ fetchData();
                   </tr>
                 </thead>
                 <tbody>
+                  <tr
+                    v-if="detailCache[item.Nomor].cutting.length"
+                    class="sum-row-cutting"
+                  >
+                    <td colspan="9">
+                      <div class="grp-bar">
+                        <span class="grp-title">Cutting</span>
+                        <span class="grp-chip"
+                          >Σ Qty Target
+                          <b>{{ fmt(cuttingTotalTarget(item.Nomor)) }}</b></span
+                        >
+                      </div>
+                    </td>
+                  </tr>
                   <template
                     v-for="(d, i) in detailCache[item.Nomor].cutting"
                     :key="i"
@@ -1598,6 +1642,20 @@ fetchData();
 .grp-chip b {
   color: #1b5e20;
   margin-left: 2px;
+}
+/* Baris ringkasan di tab Cutting (versi biru-abu dari blok Line Sewing) */
+.dt tbody tr.sum-row-cutting td,
+.dt tbody tr.sum-row-cutting:hover td {
+  background: #cfd8dc !important;
+  padding: 0;
+  border-bottom: 1px solid #90a4ae;
+}
+.sum-row-cutting .grp-title,
+.sum-row-cutting .grp-chip b {
+  color: #263238;
+}
+.sum-row-cutting .grp-chip {
+  color: #455a64;
 }
 .smv-lock {
   color: #2e7d32;

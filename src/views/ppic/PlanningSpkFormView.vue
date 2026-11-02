@@ -967,6 +967,14 @@ const validateSave = () => {
 
 const fmt = (n: number | null | undefined) => (n ?? 0).toLocaleString("id-ID");
 
+// Ringkasan tab Cutting: jumlah Qty Target semua baris yang SPK-nya sudah diisi
+const cuttingTotalTarget = computed(() =>
+  formData.value.detail.cutting.reduce(
+    (s, r) => s + (r.NomorSPK ? Number(r.plan_qty_jadwal) || 0 : 0),
+    0,
+  ),
+);
+
 const statusBahanClass = (s: string) => {
   if (s === "Ready") return "sb-ready";
   if (s === "PO") return "sb-po";
@@ -1097,6 +1105,11 @@ const statusBahanClass = (s: string) => {
               <button type="button" class="btn-add" @click="addRow('cutting')">
                 <IconPlus :size="12" /> Tambah Baris
               </button>
+            </div>
+            <div class="sum-bar blue">
+              <span class="sum-chip"
+                >Total Qty Target <b>{{ fmt(cuttingTotalTarget) }}</b> pcs</span
+              >
             </div>
             <div class="tbl-wrap">
               <table class="gt">
@@ -2188,6 +2201,26 @@ input[type="number"]::-webkit-inner-spin-button {
 }
 .grp-chip b {
   color: #1b5e20;
+  margin-left: 2px;
+}
+.sum-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 28px;
+  padding: 0 10px;
+  font-size: 11px;
+  flex-shrink: 0;
+}
+.sum-bar.blue {
+  background: #e3f2fd;
+  border-bottom: 1px solid #bbdefb;
+}
+.sum-chip {
+  color: #1565c0;
+}
+.sum-chip b {
+  color: #0d47a1;
   margin-left: 2px;
 }
 .grp-mp {
