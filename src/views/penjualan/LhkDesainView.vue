@@ -48,6 +48,8 @@ const headers = [
   { title: "Tanggal", key: "Tanggal", width: "100px" },
   { title: "Nama Project", key: "NamaProject", minWidth: "180px" },
   { title: "Customer", key: "Customer", minWidth: "160px" },
+  { title: "SO / MAP", key: "SoMapNomor", minWidth: "170px" },
+  { title: "Path Desain", key: "PathDesain", minWidth: "220px" },
   { title: "Jml", key: "Jml", width: "70px", align: "right" },
   { title: "Desainer", key: "Desainer", width: "130px" },
   { title: "Tgl Selesai", key: "TglSelesai", width: "140px" },

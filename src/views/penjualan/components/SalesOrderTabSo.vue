@@ -57,6 +57,19 @@ const isDivisiSatuAtauLima = computed(() => {
   const d = String(props.formData.spk_divisi).charAt(0);
   return d === "1" || d === "5";
 });
+// Baris path desain — path ada di level LHK, jadi satu baris per LHK.
+// Fallback ke PdPath untuk data lama (PD format lama tanpa LHK).
+const pathRows = computed<string[]>(() => {
+  const detail: { nomor: string; pd: string; path: string }[] =
+    props.formData.LhkDetail || [];
+  const adaPath = detail.filter((l) => l.path);
+  if (adaPath.length === 0) {
+    return props.formData.PdPath ? [props.formData.PdPath] : [];
+  }
+  return adaPath.length === 1
+    ? [adaPath[0].path]
+    : adaPath.map((l) => `${l.nomor}: ${l.path}`);
+});
 
 const tipeSpkOptions = ["", "Premium", "Medium", "Reguler"];
 const pendingOptions = ["NORMAL", "PENDING SEBAGIAN", "PENDING PENUH"];
@@ -2010,11 +2023,13 @@ watch(
           />
         </div>
 
-        <div v-if="formData.PdPath" class="fr">
-          <label class="lbl" style="width: 72px">Path Desain</label>
+        <div v-for="(txt, i) in pathRows" :key="i" class="fr">
+          <label class="lbl" style="width: 72px">{{
+            i === 0 ? "Path Desain" : ""
+          }}</label>
           <input
-            :value="formData.PdPath"
-            :title="formData.PdPath"
+            :value="txt"
+            :title="txt"
             readonly
             class="inp ro"
             style="flex: 1"

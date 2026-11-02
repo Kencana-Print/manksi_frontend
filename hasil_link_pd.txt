@@ -1,0 +1,12 @@
+D:\my project\manksi_frontend\src\components\lookups\SpkSearchModal.vue:14: | "so-map"
+D:\my project\manksi_frontend\src\services\penjualan\mapService.ts:26: updateDesignStatus: (rows: { Nomor: string; DesignDone: string }[]) =>
+D:\my project\manksi_frontend\src\services\penjualan\permintaanDesainService.ts:116: closePD: (nomor: string, payload: { soMapNomor: string; path: string }) =>
+D:\my project\manksi_frontend\src\views\penjualan\MapView.vue:76: DesignDone: string;
+D:\my project\manksi_frontend\src\views\penjualan\MapView.vue:93: DesignDone: r.DesignDone || "N",
+D:\my project\manksi_frontend\src\views\penjualan\MapView.vue:1269: :checked="row.DesignDone === 'Y'"
+D:\my project\manksi_frontend\src\views\penjualan\MapView.vue:1270: @change="row.DesignDone = row.DesignDone === 'Y' ? 'N' : 'Y'"
+D:\my project\manksi_frontend\src\views\penjualan\PermintaanDesainView.vue:116: { title: "SO/MAP", key: "SoMapNomor", width: "150px" },
+D:\my project\manksi_frontend\src\views\penjualan\PermintaanDesainView.vue:489: soMapNomor: statusSoMap.value.trim(),
+D:\my project\manksi_frontend\src\views\penjualan\PermintaanDesainView.vue:785: <div v-if="item.SoMapNomor" class="pd-close-info">
+D:\my project\manksi_frontend\src\views\penjualan\PermintaanDesainView.vue:786: <b>{{ item.SoMapTipe }}</b> {{ item.SoMapNomor }} &middot; Path:
+D:\my project\manksi_frontend\src\views\penjualan\PermintaanDesainView.vue:969: filter-mode="so-map"

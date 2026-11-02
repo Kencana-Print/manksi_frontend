@@ -113,8 +113,12 @@ export const permintaanDesainService = {
   resumeStatus: (nomor: string) =>
     api.put(`${BASE}/${encodeURIComponent(nomor)}/resume`),
 
-  closePD: (nomor: string, payload: { soMapNomor: string; path: string }) =>
-    api.put(`${BASE}/${encodeURIComponent(nomor)}/close`, payload),
+  closePD: (
+    nomor: string,
+    payload: {
+      items: { lhkNomor: string; path: string; soMapNomor: string[] }[];
+    },
+  ) => api.put(`${BASE}/${encodeURIComponent(nomor)}/close`, payload),
 
   bukaKembali: (nomor: string) =>
     api.put(`${BASE}/${encodeURIComponent(nomor)}/buka-kembali`),

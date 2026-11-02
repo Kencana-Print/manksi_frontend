@@ -226,6 +226,7 @@ const defaultData = {
   PdNomor: "",
   PdPath: "",
   LhkList: [] as string[],
+  LhkDetail: [] as { nomor: string; pd: string; path: string }[],
 
   spk_warna_badan: "",
   spk_warna_lengan: "",
@@ -348,6 +349,7 @@ const {
       PdNomor: d.header.PdNomor || "",
       PdPath: d.header.PdPath || "",
       LhkList: d.header.LhkList || [],
+      LhkDetail: d.header.LhkDetail || [],
       jmlinvdc: d.header.jmlinvdc || 0,
 
       // Fallback Checkbox (jika di DB null)
@@ -1039,6 +1041,7 @@ const loadDataMemo = async (nomor: string) => {
       formData.value.PdNomor = data.pd?.PdNomor || "";
       formData.value.PdPath = data.pd?.PdPath || "";
       formData.value.LhkList = data.pd?.LhkList || [];
+      formData.value.LhkDetail = data.pd?.LhkDetail || [];
 
       if (
         h.mspk_dateline &&
@@ -1185,6 +1188,7 @@ watch(
         formData.value.PdNomor = "";
         formData.value.PdPath = "";
         formData.value.LhkList = [];
+        formData.value.LhkDetail = [];
       }
     }
   },

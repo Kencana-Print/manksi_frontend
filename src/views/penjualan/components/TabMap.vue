@@ -50,6 +50,20 @@ const canRemovePenawaran = computed(() => {
   );
 });
 
+// Baris path desain — path ada di level LHK, jadi satu baris per LHK.
+// Fallback ke PdPath untuk data lama (PD format lama tanpa LHK).
+const pathRows = computed<string[]>(() => {
+  const detail: { nomor: string; pd: string; path: string }[] =
+    props.formData.LhkDetail || [];
+  const adaPath = detail.filter((l) => l.path);
+  if (adaPath.length === 0) {
+    return props.formData.PdPath ? [props.formData.PdPath] : [];
+  }
+  return adaPath.length === 1
+    ? [adaPath[0].path]
+    : adaPath.map((l) => `${l.nomor}: ${l.path}`);
+});
+
 // ── Modal states ──
 const showPerushModal = ref(false);
 const showCustModal = ref(false);
@@ -349,6 +363,7 @@ const setRef = async (v: any) => {
       props.formData.PdNomor = "";
       props.formData.PdPath = "";
       props.formData.LhkList = [];
+      props.formData.LhkDetail = [];
 
       await nextTick();
 
@@ -947,10 +962,11 @@ const setSetoranPembayaran = (v: any) => {
               placeholder="Otomatis dari PDM"
             />
           </div>
-          <div v-if="formData.PdPath" class="f-row">
-            <label class="f-lbl">Path Desain</label>
+          <div v-for="(txt, i) in pathRows" :key="i" class="f-row">
+            <label class="f-lbl">{{ i === 0 ? "Path Desain" : "" }}</label>
             <input
-              :value="formData.PdPath"
+              :value="txt"
+              :title="txt"
               readonly
               class="f-inp f-ro"
               style="flex: 1"
