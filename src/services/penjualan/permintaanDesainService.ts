@@ -23,6 +23,7 @@ export interface AntreanItem {
   Prioritas: string;
   Dateline: string | null;
   StatusPd: string;
+  NamaMarketing: string;
 }
 
 export interface KerjaAktif {
@@ -37,6 +38,7 @@ export interface KerjaAktif {
   AsalDesainer: string | null;
   TglMulai: string;
   NamaProject: string;
+  NamaMarketing: string;
 }
 
 export interface AntreanData {
@@ -116,7 +118,11 @@ export const permintaanDesainService = {
   closePD: (
     nomor: string,
     payload: {
-      items: { lhkNomor: string; path: string; soMapNomor: string[] }[];
+      items: {
+        lhkNomor: string;
+        path: string;
+        targets: { soMapNomor: string; jml: number }[];
+      }[];
     },
   ) => api.put(`${BASE}/${encodeURIComponent(nomor)}/close`, payload),
 

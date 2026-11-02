@@ -104,6 +104,7 @@ onMounted(fetchData);
 const headers = [
   { title: "Nomor", key: "Nomor", width: "150px" },
   { title: "Tanggal", key: "Tanggal", width: "100px" },
+  { title: "Marketing", key: "NamaMarketing", width: "130px" },
   { title: "Nama Project", key: "NamaProject", minWidth: "180px" },
   { title: "Customer", key: "Customer", minWidth: "160px" },
   { title: "Jenis", key: "JenisPekerjaan", width: "100px" },
@@ -115,7 +116,6 @@ const headers = [
   { title: "Status", key: "Status", width: "110px" },
   { title: "Status Klien", key: "StatusKlien", width: "120px" },
   { title: "SO/MAP", key: "SoMapNomor", width: "150px" },
-  { title: "Marketing", key: "NamaMarketing", width: "130px" },
 ];
 
 const STATUS_LABEL: Record<string, { label: string; bg: string; fg: string }> =
@@ -435,7 +435,7 @@ interface AccLhk {
   nomor: string;
   jml: number;
   path: string;
-  somap: string[];
+  somap: { nomor: string; jml: number }[];
 }
 const accLhk = ref<AccLhk[]>([]);
 const isLoadingAccLhk = ref(false);
@@ -465,12 +465,20 @@ const openSoMapModal = (idx: number) => {
   accTargetIdx.value = idx;
   showSoMapModal.value = true;
 };
+const totalOf = (l: AccLhk) =>
+  l.somap.reduce((sum, s) => sum + (Number(s.jml) || 0), 0);
+const sisaOf = (l: AccLhk) => l.jml - totalOf(l);
+
 const onSoMapSelected = (item: any) => {
   const l = accLhk.value[accTargetIdx.value];
-  if (l && !l.somap.includes(item.Nomor)) l.somap.push(item.Nomor);
+  if (!l || l.somap.some((s) => s.nomor === item.Nomor)) return;
+  const sisa = sisaOf(l);
+  l.somap.push({ nomor: item.Nomor, jml: sisa > 0 ? sisa : 1 });
 };
 const removeSoMap = (idx: number, nomor: string) => {
-  accLhk.value[idx].somap = accLhk.value[idx].somap.filter((n) => n !== nomor);
+  accLhk.value[idx].somap = accLhk.value[idx].somap.filter(
+    (s) => s.nomor !== nomor,
+  );
 };
 
 const isSavingStatus = ref(false);
@@ -513,6 +521,18 @@ const saveStatusManual = async () => {
       );
       return;
     }
+    const salah = accLhk.value.find(
+      (l) =>
+        l.somap.some(
+          (s) => !Number.isInteger(Number(s.jml)) || Number(s.jml) < 1,
+        ) || sisaOf(l) < 0,
+    );
+    if (salah) {
+      toast.error(
+        `LHK ${salah.nomor}: jumlah ACC harus bilangan bulat minimal 1 dan total tidak boleh melebihi ${salah.jml}.`,
+      );
+      return;
+    }
   } else {
     if (!statusKeterangan.value.trim()) {
       toast.error("Keterangan wajib diisi.");
@@ -530,7 +550,10 @@ const saveStatusManual = async () => {
         items: accLhk.value.map((l) => ({
           lhkNomor: l.nomor,
           path: l.path.trim(),
-          soMapNomor: l.somap,
+          targets: l.somap.map((s) => ({
+            soMapNomor: s.nomor,
+            jml: Number(s.jml),
+          })),
         })),
       });
       toast.success("PD berhasil di-ACC.");
@@ -694,11 +717,14 @@ const openEdit = () => {
           </select>
           <select v-model="jenisFilter" class="finp">
             <option value="">Semua Jenis</option>
-            <option value="BARU">Baru</option>
-            <option value="REVISI">Revisi</option>
             <option value="CEK">Cek</option>
-            <option value="PLOTTER">Plotter</option>
             <option value="EDIT">Edit</option>
+            <option value="DESAIN ULANG">Desain Ulang</option>
+            <optgroup label="Data lama">
+              <option value="BARU">Baru</option>
+              <option value="REVISI">Revisi</option>
+              <option value="PLOTTER">Plotter</option>
+            </optgroup>
           </select>
         </template>
 
@@ -835,7 +861,14 @@ const openEdit = () => {
             >
               <div v-for="l in lhkCache[item.Nomor]" :key="l.nomor">
                 <b>{{ l.nomor }}</b> &rarr;
-                {{ l.somap.map((s: any) => s.nomor).join(", ") || "-" }}
+                {{
+                  l.somap.map((s: any) => `${s.nomor} (${s.jml})`).join(", ") ||
+                  "-"
+                }}
+                <template v-if="l.batal">
+                  &middot;
+                  <span class="pd-batal">dibatalkan {{ l.batal }}</span>
+                </template>
                 <template v-if="l.path"> &middot; Path: {{ l.path }}</template>
               </div>
             </div>
@@ -938,17 +971,25 @@ const openEdit = () => {
               </div>
               <div class="lookup-field mb-2">
                 <label class="lookup-label"
-                  >Nomor SO / MAP (wajib, boleh lebih dari satu)</label
+                  >SO / MAP dan jumlah ACC (wajib, boleh lebih dari satu)</label
                 >
                 <div class="acc-chips">
-                  <v-chip
-                    v-for="n in l.somap"
-                    :key="n"
-                    size="x-small"
-                    closable
-                    @click:close="removeSoMap(i, n)"
-                    >{{ n }}</v-chip
-                  >
+                  <div v-for="s in l.somap" :key="s.nomor" class="acc-row">
+                    <v-chip
+                      size="x-small"
+                      closable
+                      @click:close="removeSoMap(i, s.nomor)"
+                      >{{ s.nomor }}</v-chip
+                    >
+                    <input
+                      v-model.number="s.jml"
+                      type="number"
+                      min="1"
+                      :max="l.jml"
+                      class="acc-jml"
+                    />
+                    <span class="acc-unit">pcs</span>
+                  </div>
                   <button
                     type="button"
                     class="acc-add"
@@ -956,6 +997,22 @@ const openEdit = () => {
                   >
                     <IconPlus :size="12" /> Tambah
                   </button>
+                </div>
+                <div
+                  class="acc-sisa"
+                  :class="{
+                    'acc-sisa-over': sisaOf(l) < 0,
+                    'acc-sisa-batal': sisaOf(l) > 0,
+                  }"
+                >
+                  ACC {{ totalOf(l) }} dari {{ l.jml }} pcs<template
+                    v-if="sisaOf(l) > 0"
+                  >
+                    &mdash; sisa {{ sisaOf(l) }} pcs otomatis
+                    dibatalkan</template
+                  ><template v-else-if="sisaOf(l) < 0">
+                    &mdash; melebihi jumlah LHK</template
+                  >
                 </div>
               </div>
               <v-text-field
@@ -1310,5 +1367,44 @@ const openEdit = () => {
 }
 .acc-add:hover {
   background: #e3f2fd;
+}
+.acc-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.acc-jml {
+  width: 56px;
+  height: 22px;
+  border: 1px solid #bdbdbd;
+  border-radius: 4px;
+  padding: 0 4px;
+  font-size: 11px;
+  text-align: right;
+  outline: none;
+}
+.acc-jml:focus {
+  border-color: #1565c0;
+}
+.acc-unit {
+  font-size: 11px;
+  color: #777;
+}
+.acc-sisa {
+  margin-top: 4px;
+  font-size: 11px;
+  color: #2e7d32;
+}
+.acc-sisa-batal {
+  color: #e65100;
+  font-weight: 600;
+}
+.acc-sisa-over {
+  color: #c62828;
+  font-weight: 700;
+}
+.pd-batal {
+  color: #e65100;
+  font-weight: 600;
 }
 </style>

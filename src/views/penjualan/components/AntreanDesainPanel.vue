@@ -273,6 +273,7 @@ const confirmClose = async () => {
           <thead>
             <tr>
               <th>No. PD</th>
+              <th>Marketing</th>
               <th>Project</th>
               <th>Desain</th>
               <th class="tr">Jml</th>
@@ -287,6 +288,7 @@ const confirmClose = async () => {
           <tbody>
             <tr v-for="r in data.antrean" :key="r.Pd2Id">
               <td class="mono">{{ r.PdNomor }}</td>
+              <td>{{ r.NamaMarketing }}</td>
               <td>
                 {{ r.NamaProject }}
                 <div class="sub">{{ r.Customer }}</div>
@@ -320,7 +322,7 @@ const confirmClose = async () => {
               </td>
             </tr>
             <tr v-if="!data.antrean.length">
-              <td colspan="10" class="empty">
+              <td colspan="11" class="empty">
                 Tidak ada pekerjaan yang menunggu.
               </td>
             </tr>
@@ -351,6 +353,7 @@ const confirmClose = async () => {
             <tr>
               <th style="width: 30px"></th>
               <th>No. PD</th>
+              <th>Marketing</th>
               <th>Project</th>
               <th>Desain</th>
               <th class="tr">Jml Saya</th>
@@ -369,6 +372,7 @@ const confirmClose = async () => {
                 />
               </td>
               <td class="mono">{{ k.PdNomor }}</td>
+              <td>{{ k.NamaMarketing }}</td>
               <td>{{ k.NamaProject }}</td>
               <td>
                 {{ k.Desain }}
@@ -398,7 +402,7 @@ const confirmClose = async () => {
               </td>
             </tr>
             <tr v-if="!data.kerjaSaya.length">
-              <td colspan="8" class="empty">Belum ada pengerjaan aktif.</td>
+              <td colspan="9" class="empty">Belum ada pengerjaan aktif.</td>
             </tr>
           </tbody>
         </table>
@@ -419,6 +423,7 @@ const confirmClose = async () => {
             <tr>
               <th>Desainer</th>
               <th>No. PD</th>
+              <th>Marketing</th>
               <th>Project</th>
               <th>Desain</th>
               <th class="tr">Jml</th>
@@ -430,6 +435,7 @@ const confirmClose = async () => {
             <tr v-for="k in data.kerjaLain" :key="k.KerjaId">
               <td>{{ k.Desainer }}</td>
               <td class="mono">{{ k.PdNomor }}</td>
+              <td>{{ k.NamaMarketing }}</td>
               <td>{{ k.NamaProject }}</td>
               <td>{{ k.Desain }}</td>
               <td class="tr">{{ k.Jml }}</td>
@@ -445,7 +451,7 @@ const confirmClose = async () => {
               </td>
             </tr>
             <tr v-if="!data.kerjaLain.length">
-              <td colspan="7" class="empty">Tidak ada.</td>
+              <td colspan="8" class="empty">Tidak ada.</td>
             </tr>
           </tbody>
         </table>
