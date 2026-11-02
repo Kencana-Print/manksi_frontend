@@ -1,6 +1,13 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from "vue";
-import { useRouter } from "vue-router";
+import {
+  ref,
+  computed,
+  watch,
+  onMounted,
+  onUnmounted,
+  type Component,
+} from "vue";
+import { useRoute, useRouter } from "vue-router";
 import { useTheme } from "vuetify";
 import { useAuthStore } from "@/stores/authStore";
 import { dashboardService } from "@/services/dashboard/dashboardService";
@@ -20,6 +27,12 @@ import {
   IconHistory,
   IconTrash,
   IconCoin,
+  IconBan,
+  IconReplace,
+  IconArrowsExchange,
+  IconPrinter,
+  IconFileOff,
+  IconScale,
 } from "@tabler/icons-vue";
 
 import { useVersionCheck } from "@/composables/useVersionCheck";
@@ -65,6 +78,7 @@ const onDismissUpdate = () => {
 const theme = useTheme();
 const authStore = useAuthStore();
 const router = useRouter();
+const route = useRoute();
 
 const toggleTheme = () => {
   theme.global.name.value = theme.global.current.value.dark ? "light" : "dark";
@@ -84,19 +98,35 @@ const updateClock = () => {
   });
 };
 
+let notifTimer: ReturnType<typeof setInterval> | null = null;
+
 onMounted(() => {
   updateClock();
   clockInterval = setInterval(updateClock, 1000);
 
   const savedTheme = localStorage.getItem("manksi-theme");
   if (savedTheme) theme.global.name.value = savedTheme;
-  if (canSeeNotif.value) loadNotifications();
+  if (canSeeNotif.value) {
+    loadNotifications();
+    notifTimer = setInterval(() => loadNotifications(true), 120_000);
+  }
   loadAgendaBadge();
 });
 
 onUnmounted(() => {
   if (clockInterval) clearInterval(clockInterval);
+  if (notifTimer) clearInterval(notifTimer);
 });
+
+// Selesai approve lalu pindah dari halaman Approval → segarkan bulatan.
+watch(
+  () => route.path,
+  (_sekarang, sebelum) => {
+    if (sebelum === "/tools/approval" && canSeeNotif.value) {
+      loadNotifications(true);
+    }
+  },
+);
 
 // ── Role ──
 const bagian = computed(() =>
@@ -110,7 +140,9 @@ const canSeePoAlert = computed(
     ["PEMBELIAN", "GUDANG", "PPIC"].includes(bagian.value) ||
     isSuperViewer.value,
 );
-const canSeeNotif = computed(() => canSeePoAlert.value);
+const canSeeNotif = computed(
+  () => canSeePoAlert.value || authStore.canSeeApproval,
+);
 
 // ── Notifikasi state ──
 interface NotifItem {
@@ -125,29 +157,84 @@ interface NotifItem {
 const notifItems = ref<NotifItem[]>([]);
 const isLoading = ref(false);
 const showPopover = ref(false);
-const approvalCount = ref({
-  piutang: 0,
-  harga_nol: 0,
-  prioritas: 0,
-  inv_blm_sj: 0,
-  perubahan: 0,
-  hapus: 0,
-  plafon: 0,
-});
 
 const totalCount = computed(() =>
   notifItems.value.reduce((s, n) => s + n.count, 0),
 );
-const totalApprovalPending = computed(() =>
-  Object.values(approvalCount.value).reduce((s, n) => s + n, 0),
-);
 
-const loadNotifications = async () => {
-  isLoading.value = true;
-  try {
-    const items: NotifItem[] = [];
+const APPROVAL_META: Record<
+  string,
+  { label: string; icon: Component; color: string }
+> = {
+  piutang_90: {
+    label: "SO Piutang >90 Hari",
+    icon: IconCreditCard,
+    color: "#e65100",
+  },
+  harga_nol: {
+    label: "SO Harga 0",
+    icon: IconCurrencyDollar,
+    color: "#c62828",
+  },
+  prioritas: {
+    label: "SO Klien Prioritas",
+    icon: IconShieldCheck,
+    color: "#2e7d32",
+  },
+  perubahan_data: {
+    label: "Perubahan Data",
+    icon: IconHistory,
+    color: "#6a1b9a",
+  },
+  invoice_blmsj: {
+    label: "Invoice Belum SJ",
+    icon: IconFileInvoice,
+    color: "#1565c0",
+  },
+  hapus_data: { label: "Hapus Data", icon: IconTrash, color: "#c62828" },
+  pembatalan_spk: { label: "Pembatalan SO", icon: IconBan, color: "#ad1457" },
+  plafon_manager: {
+    label: "Plafon Customer (Manager)",
+    icon: IconCoin,
+    color: "#f57f17",
+  },
+  plafon_direksi: {
+    label: "Plafon Customer (Direksi)",
+    icon: IconCoin,
+    color: "#ef6c00",
+  },
+  ganti_qty_kain: {
+    label: "Ganti Qty & Jenis Kain",
+    icon: IconReplace,
+    color: "#00838f",
+  },
+  mutasi_noplan: {
+    label: "Mutasi Produksi Tanpa Planning",
+    icon: IconArrowsExchange,
+    color: "#4527a0",
+  },
+  spk_cetak_ulang: {
+    label: "Cetak SPK > 1 Kali",
+    icon: IconPrinter,
+    color: "#37474f",
+  },
+  nopo: { label: "SO/MAP Tanpa Nomor PO", icon: IconFileOff, color: "#bf360c" },
+  realisasi_beda_bahan: {
+    label: "Realisasi Beda Bahan",
+    icon: IconScale,
+    color: "#558b2f",
+  },
+};
 
-    if (canSeePoAlert.value) {
+// silent = refresh latar belakang (tanpa tanda "..." di lonceng).
+const loadNotifications = async (silent = false) => {
+  if (!silent) isLoading.value = true;
+  const items: NotifItem[] = [];
+
+  // Alert PO/MKB dibungkus sendiri supaya kegagalannya tidak ikut
+  // menggagalkan hitungan approval.
+  if (canSeePoAlert.value) {
+    try {
       const res = await dashboardService.getPoBahanSisa();
       const sisa = Number(res.data.data?.PoAdaSisa ?? 0);
       if (sisa > 0) {
@@ -173,111 +260,48 @@ const loadNotifications = async () => {
           route: "/laporan/gudang-garmen/spk-belum-mkb",
         });
       }
+    } catch {
+      /* silent */
     }
-
-    // ── Approval Pending ──
-    if (authStore.canSeeApproval) {
-      try {
-        const apvRes = await dashboardService.getApprovalPendingCount();
-        const apv = apvRes.data.data || {};
-
-        const apvList = [
-          {
-            id: "apv-piutang",
-            icon: IconCreditCard,
-            color: "#e65100",
-            label: "Piutang >90 Hari",
-            count: Number(apv.piutang ?? 0),
-            route: "/tools/approval",
-          },
-          {
-            id: "apv-harga-nol",
-            icon: IconCurrencyDollar,
-            color: "#c62828",
-            label: "SPK Harga 0",
-            count: Number(apv.harga_nol ?? 0),
-            route: "/tools/approval",
-          },
-          {
-            id: "apv-prioritas",
-            icon: IconShieldCheck,
-            color: "#2e7d32",
-            label: "SPK Prioritas",
-            count: Number(apv.prioritas ?? 0),
-            route: "/tools/approval",
-          },
-          {
-            id: "apv-inv-blm-sj",
-            icon: IconFileInvoice,
-            color: "#1565c0",
-            label: "Invoice Belum SJ",
-            count: Number(apv.inv_blm_sj ?? 0),
-            route: "/tools/approval",
-          },
-          {
-            id: "apv-perubahan",
-            icon: IconHistory,
-            color: "#6a1b9a",
-            label: "Perubahan Data",
-            count: Number(apv.perubahan ?? 0),
-            route: "/tools/approval",
-          },
-          {
-            id: "apv-hapus",
-            icon: IconTrash,
-            color: "#c62828",
-            label: "Hapus Data",
-            count: Number(apv.hapus ?? 0),
-            route: "/tools/approval",
-          },
-          {
-            id: "apv-plafon",
-            icon: IconCoin,
-            color: "#f57f17",
-            label: "Plafon Customer",
-            count: Number(apv.plafon ?? 0),
-            route: "/tools/approval",
-          },
-        ];
-
-        for (const a of apvList) {
-          if (a.count > 0) items.push(a);
-        }
-
-        const total = apvList.reduce((s, a) => s + a.count, 0);
-        authStore.setApprovalPendingTotal(total);
-      } catch {
-        /* silent */
-      }
-    }
-
-    notifItems.value = items;
-  } catch {
-    /* silent */
-  } finally {
-    isLoading.value = false;
   }
+
+  // Backend hanya mengembalikan jenis yang user berhak melihatnya.
+  if (authStore.canSeeApproval) {
+    try {
+      const apvRes = await dashboardService.getApprovalPendingCount();
+      const apv = (apvRes.data.data || {}) as Record<string, number>;
+      let total = 0;
+      for (const [id, meta] of Object.entries(APPROVAL_META)) {
+        const count = Number(apv[id] ?? 0);
+        if (count <= 0) continue;
+        total += count;
+        items.push({
+          id: `apv-${id}`,
+          icon: meta.icon,
+          color: meta.color,
+          label: meta.label,
+          count,
+          route: "/tools/approval",
+        });
+      }
+      authStore.setApprovalPendingTotal(total);
+    } catch {
+      /* silent: pertahankan angka sebelumnya */
+    }
+  } else {
+    authStore.setApprovalPendingTotal(0);
+  }
+
+  notifItems.value = items;
+  isLoading.value = false;
 };
 
 const onNotifClick = (item: NotifItem) => {
   showPopover.value = false;
-  // Kalau route ke approval, tambah query param type
-  if (item.route === "/tools/approval" && item.id.startsWith("apv-")) {
-    // Map notif id ke approval type id
-    const typeMap: Record<string, string> = {
-      "apv-piutang": "piutang_90",
-      "apv-harga-nol": "harga_nol",
-      "apv-prioritas": "prioritas",
-      "apv-inv-blm-sj": "invoice_blmsj",
-      "apv-perubahan": "perubahan_data",
-      "apv-hapus": "hapus_data",
-      "apv-plafon": "plafon_manager",
-    };
-    const type = typeMap[item.id];
-    if (type) {
-      router.push({ path: "/tools/approval", query: { type } });
-      return;
-    }
+  // id notif approval = "apv-<id jenis>", sama dengan ?type= di ToolsApprovalView
+  if (item.id.startsWith("apv-")) {
+    router.push({ path: "/tools/approval", query: { type: item.id.slice(4) } });
+    return;
   }
   router.push(item.route);
 };
@@ -406,7 +430,7 @@ const loadAgendaBadge = async () => {
             </div>
 
             <div class="notif-footer">
-              <button class="notif-refresh" @click="loadNotifications">
+              <button class="notif-refresh" @click="loadNotifications()">
                 Perbarui
               </button>
             </div>

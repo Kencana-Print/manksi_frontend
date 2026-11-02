@@ -166,9 +166,12 @@ export const useAuthStore = defineStore(
         user.value?.bagian?.toUpperCase() === "PPIC" ||
         user.value?.kode?.toUpperCase() === "ADMIN",
     );
+    const APPROVAL_MENU_IDS = [
+      256, 257, 258, 259, 260, 261, 262, 263, 264, 265, 266, 267, 268, 269,
+    ];
     const canSeeApproval = computed(() =>
-      [256, 257, 258, 259, 260, 261, 262, 263].some((id) =>
-        permissions.value.filter((p) => p.id === id).some((p) => p.view),
+      APPROVAL_MENU_IDS.some((id) =>
+        permissions.value.some((p) => p.id === id && p.view),
       ),
     );
 
