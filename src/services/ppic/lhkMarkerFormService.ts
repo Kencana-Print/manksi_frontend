@@ -2,6 +2,32 @@ import api from "@/services/api";
 
 const BASE = "/ppic/lhk-marker-form";
 
+import type { ApiResult } from "@/services/piutang/rekapPembayaranService";
+
+export interface AntreanMarkerItem {
+  nomor: string;
+  tanggal: string;
+  deadline: string;
+  sisaHari: number;
+  keterangan: string | null;
+  asalNomor: string | null;
+  pic: string | null;
+  picNama: string | null;
+  picAsalNama: string | null;
+  tglAmbil: string | null;
+  jmlSpk: number;
+  jmlSpkSelesai: number;
+  totalJml: number | string;
+  spkNomor: string | null;
+  status: string;
+}
+
+export interface AntreanMarkerData {
+  siap: AntreanMarkerItem[];
+  saya: AntreanMarkerItem[];
+  lain: AntreanMarkerItem[];
+}
+
 export const lhkMarkerFormService = {
   getDetail: (nomor: string) => api.get(`${BASE}/${encodeURIComponent(nomor)}`),
   create: (payload: any) => api.post(BASE, payload),
@@ -23,4 +49,10 @@ export const lhkMarkerFormService = {
       headers: { "Content-Type": "multipart/form-data" },
     });
   },
+  ambilPermintaan: (nomor: string) =>
+    api.post(`${BASE}/permintaan/${encodeURIComponent(nomor)}/ambil`),
+  ambilAlihPermintaan: (nomor: string) =>
+    api.post(`${BASE}/permintaan/${encodeURIComponent(nomor)}/ambil-alih`),
+  lepasPermintaan: (nomor: string) =>
+    api.post(`${BASE}/permintaan/${encodeURIComponent(nomor)}/lepas`),
 };

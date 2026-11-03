@@ -114,6 +114,7 @@ import {
   IconBuildingSkyscraper,
   IconQrcode,
 } from "@tabler/icons-vue";
+import { useMemoInternal } from "@/composables/useMemoInternal";
 
 export interface NavItem {
   title?: string;
@@ -147,6 +148,7 @@ export const createMenuItems = (): NavItem[] => {
   const piutangMenu = ref(false);
   const laporanMenu = ref(false);
   const toolsMenu = ref(false);
+  const { openMemoDialog } = useMemoInternal();
 
   return [
     {
@@ -810,6 +812,12 @@ export const createMenuItems = (): NavItem[] => {
               menuId: 182,
             },
           ],
+        },
+        {
+          title: "Permintaan Marker",
+          to: "/garmen/permintaan-marker",
+          icon: IconScissors,
+          menuId: 189,
         },
         { divider: true },
         {
@@ -1909,6 +1917,11 @@ export const createMenuItems = (): NavItem[] => {
       model: toolsMenu,
       adminOnly: false,
       items: [
+        {
+          title: "Memo Internal",
+          icon: IconFileText,
+          onClick: () => openMemoDialog(),
+        },
         { title: "Master User", to: "/tools/users", icon: IconUsers },
         { title: "Approval", to: "/tools/approval", icon: IconShieldCheck },
         { divider: true },

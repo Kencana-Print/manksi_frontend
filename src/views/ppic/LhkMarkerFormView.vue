@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, computed, watch } from "vue";
+import { ref, computed, watch, onMounted } from "vue";
+import { permintaanMarkerFormService } from "@/services/garmen/permintaanMarkerFormService";
 import { useRoute, useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
 import BaseForm from "@/components/BaseForm.vue";
@@ -24,6 +25,7 @@ const emptyMarkerRow = () => ({
   tujuanProses: "",
   keterangan: "",
   gambar: "",
+  pmNomor: "",
 });
 
 const defaultData = {
@@ -66,6 +68,7 @@ const {
               tujuanProses: r.tujuanProses || "",
               keterangan: r.keterangan || "",
               gambar: r.gambar || "",
+              pmNomor: r.pmNomor || "",
             }))
           : [emptyMarkerRow()],
     };
@@ -126,6 +129,46 @@ const removeMarkerRow = (idx: number) => {
   formData.value.marker.splice(idx, 1);
   if (formData.value.marker.length === 0) ensureTrailingMarkerRow();
 };
+// ── Prefill dari Permintaan Marker (?pm=PMK...) ──
+const pmQuery = computed(() =>
+  typeof route.query.pm === "string" ? route.query.pm : "",
+);
+
+onMounted(async () => {
+  if (isEditMode.value || !pmQuery.value) return;
+  try {
+    const res = await permintaanMarkerFormService.getDetail(pmQuery.value);
+    const d = res.data.data;
+    if (!d) return;
+    if (d.statusManual || d.status === "DONE" || d.status === "CLOSE") {
+      toast.error(
+        `Permintaan ${d.nomor} berstatus ${d.status}, tidak bisa diinput LHK.`,
+      );
+      router.push({ name: "PpicLhkMarker" });
+      return;
+    }
+    // SPK yang sudah punya LHK tidak diisi lagi
+    const sudahLhk = new Set(d.lhk.map((l) => l.spkNomor));
+    const baris = new Map<string, ReturnType<typeof emptyMarkerRow>>();
+    for (const r of d.detail) {
+      if (sudahLhk.has(r.spkNomor) || baris.has(r.spkNomor)) continue;
+      baris.set(r.spkNomor, {
+        ...emptyMarkerRow(),
+        spkNomor: r.spkNomor,
+        namaSpk: r.spkNama ?? "",
+        pmNomor: d.nomor,
+      });
+    }
+    if (baris.size === 0) {
+      toast.warning("Semua SPK di permintaan ini sudah punya LHK.");
+      router.push({ name: "PpicLhkMarker" });
+      return;
+    }
+    formData.value.marker = [...baris.values(), emptyMarkerRow()];
+  } catch {
+    toast.error("Gagal memuat permintaan marker.");
+  }
+});
 
 const showSpkModal = ref(false);
 const spkModalIdx = ref<number>(-1);
@@ -265,6 +308,7 @@ const validateSave = () => {
               <th style="width: 32px">No</th>
               <th style="width: 150px">No. SPK</th>
               <th>Nama SPK</th>
+              <th style="width: 140px">Permintaan</th>
               <th style="width: 100px">Lebar Kain</th>
               <th style="width: 110px">Size</th>
               <th style="width: 100px">For</th>
@@ -281,6 +325,7 @@ const validateSave = () => {
                   <input
                     v-model="row.spkNomor"
                     class="cell-inp"
+                    :readonly="!!row.pmNomor"
                     placeholder="F1/Enter cari..."
                     @keydown.enter.prevent="onMarkerSpkEnter(Number(idx))"
                     @keydown.f1.prevent="openSpkModal(Number(idx))"
@@ -288,6 +333,7 @@ const validateSave = () => {
                   <button
                     type="button"
                     class="btn-lkp"
+                    :disabled="!!row.pmNomor"
                     @click="openSpkModal(Number(idx))"
                   >
                     <IconSearch :size="12" color="#1565c0" />
@@ -296,6 +342,9 @@ const validateSave = () => {
               </td>
               <td>
                 <input :value="row.namaSpk" readonly class="cell-inp ro" />
+              </td>
+              <td>
+                <input :value="row.pmNomor" readonly class="cell-inp ro" />
               </td>
               <td>
                 <input

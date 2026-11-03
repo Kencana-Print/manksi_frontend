@@ -9,6 +9,7 @@ import { lhkMarkerFormService } from "@/services/ppic/lhkMarkerFormService";
 import { IconRuler2, IconFileSpreadsheet } from "@tabler/icons-vue";
 import { formatTanggal, formatTanggalJam } from "@/utils/dateFormat";
 import { exportExcelSingle, type ExcelColumn } from "@/utils/excelExport";
+import AntreanMarkerPanel from "./components/AntreanMarkerPanel.vue";
 
 const toast = useToast();
 const router = useRouter();
@@ -59,6 +60,18 @@ const {
 });
 const selectedItem = computed(() => selected.value?.[0] ?? null);
 
+// ── Tab: Antrean Saya (PIC) dan History nomor LHK ──
+const activeTab = ref<"antrean" | "history">("history");
+const antreanCount = ref(0);
+const showAntrean = computed(() => !!canInsert.value);
+watch(
+  showAntrean,
+  (v) => {
+    activeTab.value = v ? "antrean" : "history";
+  },
+  { immediate: true },
+);
+
 const onAdd = () => router.push({ name: "PpicLhkMarkerCreate" });
 const onEdit = (item: any) =>
   router.push({ name: "PpicLhkMarkerEdit", params: { nomor: item.Nomor } });
@@ -80,6 +93,7 @@ const headers = [
   { title: "Tanggal", key: "Tanggal", width: "100px", align: "center" },
   { title: "Keterangan", key: "Keterangan", minWidth: "200px" },
   { title: "SPK", key: "SpkNomor", minWidth: "160px" },
+  { title: "Permintaan", key: "PermintaanNomor", minWidth: "160px" },
   { title: "Pembuat", key: "Pembuat", width: "140px" },
   { title: "Jml Marker", key: "JmlMarker", width: "100px", align: "right" },
   { title: "User", key: "UserCreate", width: "90px" },
@@ -125,6 +139,7 @@ const onExport = async () => {
     { header: "Nomor", key: "Nomor", width: 18 },
     { header: "Tanggal", key: "Tanggal", width: 12, align: "center" },
     { header: "Keterangan", key: "Keterangan", width: 30 },
+    { header: "Permintaan", key: "PermintaanNomor", width: 22 },
     { header: "Pembuat", key: "Pembuat", width: 20 },
     {
       header: "Jml Marker",
@@ -193,6 +208,7 @@ const onExportDetail = async () => {
             NomorUlang: master.Nomor, // ⬅ tetap terisi tiap baris, buat filter/sort
             "No SPK": r.spkNomor,
             "Nama SPK": r.namaSpk || "",
+            Permintaan: r.pmNomor || "",
             "Lebar Kain": r.lebarKain || "",
             Size: r.size || "",
             For: r.tujuanProses || "",
@@ -246,101 +262,136 @@ const onExportDetail = async () => {
 </script>
 
 <template>
-  <BaseBrowse
-    ref="baseBrowseRef"
-    title="LHK Marker"
-    menu-id="179"
-    :icon="IconRuler2"
-    :headers="headers"
-    :items="items ?? []"
-    :is-loading="isLoading"
-    v-model:filter-state="filterState"
-    :can-insert="canInsert"
-    :can-edit="canEdit"
-    :can-delete="canDelete"
-    :can-export="canExport"
-    :selected="selected"
-    @update:selected="selected = $event"
-    @add="onAdd"
-    @edit="onEdit"
-    @delete="onDelete"
-    item-value="Nomor"
-    show-expand
-    :expanded="expandedRows"
-    @update:expanded="onUpdateExpanded"
-    @refresh="fetchData"
-    @export="onExport"
-  >
-    <template #filter-left>
-      <div class="f-group">
-        <span class="f-label">Periode</span>
-        <input type="date" v-model="filterState.dtAwal" class="f-date" />
-        <span class="f-sep">s/d</span>
-        <input type="date" v-model="filterState.dtAkhir" class="f-date" />
-      </div>
-    </template>
-
-    <template #extra-actions>
-      <v-btn
-        size="small"
-        color="green-darken-3"
-        variant="outlined"
-        :loading="isExportingDetail"
-        @click="onExportDetail"
+  <div class="lm-wrap">
+    <div v-if="showAntrean" class="lm-tabs">
+      <button
+        type="button"
+        class="lm-tab"
+        :class="{ active: activeTab === 'antrean' }"
+        @click="activeTab = 'antrean'"
       >
-        <template #prepend>
-          <IconFileSpreadsheet :size="15" :stroke-width="1.7" />
+        Antrean Saya<span v-if="antreanCount" class="lm-badge">{{
+          antreanCount
+        }}</span>
+      </button>
+      <button
+        type="button"
+        class="lm-tab"
+        :class="{ active: activeTab === 'history' }"
+        @click="activeTab = 'history'"
+      >
+        History nomor LHK
+      </button>
+    </div>
+
+    <div
+      v-if="showAntrean"
+      v-show="activeTab === 'antrean'"
+      class="lm-tab-body"
+    >
+      <AntreanMarkerPanel @count="antreanCount = $event" />
+    </div>
+
+    <div v-show="activeTab === 'history'" class="lm-tab-body">
+      <BaseBrowse
+        ref="baseBrowseRef"
+        title="LHK Marker"
+        menu-id="179"
+        :icon="IconRuler2"
+        :headers="headers"
+        :items="items ?? []"
+        :is-loading="isLoading"
+        v-model:filter-state="filterState"
+        :can-insert="canInsert"
+        :can-edit="canEdit"
+        :can-delete="canDelete"
+        :can-export="canExport"
+        :selected="selected"
+        @update:selected="selected = $event"
+        @add="onAdd"
+        @edit="onEdit"
+        @delete="onDelete"
+        item-value="Nomor"
+        show-expand
+        :expanded="expandedRows"
+        @update:expanded="onUpdateExpanded"
+        @refresh="fetchData"
+        @export="onExport"
+      >
+        <template #filter-left>
+          <div class="f-group">
+            <span class="f-label">Periode</span>
+            <input type="date" v-model="filterState.dtAwal" class="f-date" />
+            <span class="f-sep">s/d</span>
+            <input type="date" v-model="filterState.dtAkhir" class="f-date" />
+          </div>
         </template>
-        Export Detail
-      </v-btn>
-    </template>
 
-    <template #item.Tanggal="{ item }">
-      {{ formatTanggal(item.Tanggal) }}
-    </template>
-    <template #item.DateCreate="{ item }">
-      {{ formatTanggalJam(item.DateCreate) }}
-    </template>
+        <template #extra-actions>
+          <v-btn
+            size="small"
+            color="green-darken-3"
+            variant="outlined"
+            :loading="isExportingDetail"
+            @click="onExportDetail"
+          >
+            <template #prepend>
+              <IconFileSpreadsheet :size="15" :stroke-width="1.7" />
+            </template>
+            Export Detail
+          </v-btn>
+        </template>
 
-    <!-- ── Expand: hanya tabel Marker ── -->
-    <template #detail="{ item }">
-      <div class="expand-wrap">
-        <v-progress-linear
-          v-if="expandedLoading[item.Nomor]"
-          indeterminate
-          color="primary"
-          height="2"
-        />
-        <table v-else class="det-table">
-          <thead>
-            <tr>
-              <th style="width: 26px">No</th>
-              <th style="width: 100px">No SPK</th>
-              <th>Nama SPK</th>
-              <th style="width: 90px">Lebar Kain</th>
-              <th style="width: 90px">Size</th>
-              <th style="width: 80px">For</th>
-              <th style="width: 130px">Keterangan</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="(r, i) in detailCache[item.Nomor]" :key="r.id">
-              <td class="tc">{{ i + 1 }}</td>
-              <td class="mono">{{ r.spkNomor }}</td>
-              <td>{{ r.namaSpk || "-" }}</td>
-              <td>{{ r.lebarKain || "-" }}</td>
-              <td>{{ r.size || "-" }}</td>
-              <td>{{ r.tujuanProses || "-" }}</td>
-              <td>{{ r.keterangan || "-" }}</td>
-            </tr>
-            <tr v-if="!detailCache[item.Nomor]?.length">
-              <td colspan="7" class="empty-row">Tidak ada data</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </template>
-  </BaseBrowse>
+        <template #item.Tanggal="{ item }">
+          {{ formatTanggal(item.Tanggal) }}
+        </template>
+        <template #item.DateCreate="{ item }">
+          {{ formatTanggalJam(item.DateCreate) }}
+        </template>
+
+        <!-- ── Expand: hanya tabel Marker ── -->
+        <template #detail="{ item }">
+          <div class="expand-wrap">
+            <v-progress-linear
+              v-if="expandedLoading[item.Nomor]"
+              indeterminate
+              color="primary"
+              height="2"
+            />
+            <table v-else class="det-table">
+              <thead>
+                <tr>
+                  <th style="width: 26px">No</th>
+                  <th style="width: 100px">No SPK</th>
+                  <th>Nama SPK</th>
+                  <th style="width: 140px">Permintaan</th>
+                  <th style="width: 90px">Lebar Kain</th>
+                  <th style="width: 90px">Size</th>
+                  <th style="width: 80px">For</th>
+                  <th style="width: 130px">Keterangan</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(r, i) in detailCache[item.Nomor]" :key="r.id">
+                  <td class="tc">{{ i + 1 }}</td>
+                  <td class="mono">{{ r.spkNomor }}</td>
+                  <td>{{ r.namaSpk || "-" }}</td>
+                  <td class="mono">{{ r.pmNomor || "-" }}</td>
+                  <td>{{ r.lebarKain || "-" }}</td>
+                  <td>{{ r.size || "-" }}</td>
+                  <td>{{ r.tujuanProses || "-" }}</td>
+                  <td>{{ r.keterangan || "-" }}</td>
+                </tr>
+                <tr v-if="!detailCache[item.Nomor]?.length">
+                  <td colspan="8" class="empty-row">Tidak ada data</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </template>
+      </BaseBrowse>
+    </div>
+  </div>
 </template>
 
 <style scoped>
@@ -406,5 +457,47 @@ const onExportDetail = async () => {
   padding: 12px;
   color: #9e9e9e;
   font-style: italic;
+}
+.lm-wrap {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.lm-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 8px 8px 0;
+  flex-shrink: 0;
+}
+.lm-tab {
+  padding: 8px 16px;
+  font-size: 12px;
+  font-weight: 700;
+  border: none;
+  background: transparent;
+  color: #757575;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+}
+.lm-tab.active {
+  color: #1565c0;
+  border-bottom-color: #1565c0;
+}
+.lm-badge {
+  display: inline-block;
+  margin-left: 6px;
+  min-width: 18px;
+  padding: 0 6px;
+  border-radius: 9px;
+  background: #e65100;
+  color: white;
+  font-size: 10px;
+  text-align: center;
+}
+.lm-tab-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 </style>

@@ -2873,6 +2873,51 @@ const router = createRouter({
       },
     },
     {
+      path: "/garmen/permintaan-marker",
+      name: "PermintaanMarkerBrowse",
+      component: () => import("@/views/garmen/PermintaanMarkerView.vue"),
+      meta: {
+        title: "Permintaan Marker",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "189",
+      },
+    },
+    {
+      path: "/garmen/permintaan-marker/create",
+      name: "PermintaanMarkerCreate",
+      component: () => import("@/views/garmen/PermintaanMarkerFormView.vue"),
+      meta: {
+        title: "Tambah Permintaan Marker",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "189",
+        browseRoute: "PermintaanMarkerBrowse",
+      },
+    },
+    {
+      path: "/garmen/permintaan-marker/edit/:nomor",
+      name: "PermintaanMarkerEdit",
+      component: () => import("@/views/garmen/PermintaanMarkerFormView.vue"),
+      meta: {
+        title: "Ubah Permintaan Marker",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "189",
+        browseRoute: "PermintaanMarkerBrowse",
+      },
+    },
+    {
+      path: "/garmen/permintaan-marker/print/:nomor",
+      name: "PermintaanMarkerPrint",
+      component: () => import("@/views/garmen/PermintaanMarkerPrintView.vue"),
+      meta: {
+        title: "Cetak Permintaan Marker",
+        layout: "BlankLayout",
+        requiresAuth: true,
+      },
+    },
+    {
       path: "/garmen/po-jasa",
       name: "PoJasaBrowse",
       component: () => import("@/views/garmen/PoJasaView.vue"),

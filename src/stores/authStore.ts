@@ -221,6 +221,7 @@ export const useAuthStore = defineStore(
       sessionStorage.removeItem("hasSeenBapReviewed");
       praOrderPendingPpic.value = [];
       sessionStorage.removeItem("hasSeenPraOrderPpic");
+      sessionStorage.removeItem("hasSeenMemoInternal");
       clearSnapshots();
       useTabsStore().resetTabs();
       router.push("/login");
