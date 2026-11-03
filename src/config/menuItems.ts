@@ -113,6 +113,7 @@ import {
   IconCar,
   IconBuildingSkyscraper,
   IconQrcode,
+  IconTicket,
 } from "@tabler/icons-vue";
 import { useMemoInternal } from "@/composables/useMemoInternal";
 
@@ -1441,6 +1442,12 @@ export const createMenuItems = (): NavItem[] => {
           to: "/ga/perawatan",
           icon: IconTool,
           menuId: 611,
+        },
+        {
+          title: "Ambil Voucher",
+          to: "/ga/ambil-voucher",
+          icon: IconTicket,
+          menuId: 613,
         },
         {
           title: "Permintaan Driver",

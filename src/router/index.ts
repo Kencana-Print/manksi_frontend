@@ -5468,6 +5468,41 @@ const router = createRouter({
       },
     },
     {
+      path: "/ga/ambil-voucher",
+      name: "GaAmbilVoucher",
+      component: () => import("@/views/ga/AmbilVoucherView.vue"),
+      meta: {
+        title: "Ambil Voucher",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "613",
+      },
+    },
+    {
+      path: "/ga/ambil-voucher/create",
+      name: "GaAmbilVoucherCreate",
+      component: () => import("@/views/ga/AmbilVoucherFormView.vue"),
+      meta: {
+        title: "Tambah Ambil Voucher",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "613",
+        browseRoute: "GaAmbilVoucher",
+      },
+    },
+    {
+      path: "/ga/ambil-voucher/edit/:kode/:id",
+      name: "GaAmbilVoucherEdit",
+      component: () => import("@/views/ga/AmbilVoucherFormView.vue"),
+      meta: {
+        title: "Ubah Ambil Voucher",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "613",
+        browseRoute: "GaAmbilVoucher",
+      },
+    },
+    {
       path: "/ga/permintaan-driver",
       name: "PermintaanDriverBrowse",
       component: () =>
