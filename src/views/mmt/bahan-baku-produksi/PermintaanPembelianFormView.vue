@@ -439,7 +439,7 @@ const totalQty = computed(() => {
 
             <!-- Section 2: Tujuan & Approval -->
             <div class="desktop-form-section">
-                <div class="section-label">Informasi Tujuan & Approval</div>
+                <div class="section-label">Informasi Prioritas & Approval</div>
 
                 <!-- Priority -->
                 <div class="fr">
@@ -448,17 +448,6 @@ const totalQty = computed(() => {
                         <option value="Normal">Normal</option>
                         <option value="Urgent">Urgent</option>
                     </select>
-                </div>
-
-                <!-- Ditujukan Ke -->
-                <div class="fr">
-                    <label class="lbl">Ditujukan Ke</label>
-                    <input
-                        type="text"
-                        v-model="formData.kepada"
-                        class="inp flex-grow-1"
-                        placeholder="Contoh: Purchasing / Head Office"
-                    />
                 </div>
 
                 <!-- Keterangan -->
