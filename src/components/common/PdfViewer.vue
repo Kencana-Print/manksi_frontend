@@ -31,9 +31,19 @@ const render = async () => {
   const myId = ++renderId;
   task?.cancel();
   isRendering.value = true;
-  container.replaceChildren();
+  // posisi baca (proporsi) dipulihkan setelah render ulang
+  const rasioY =
+    container.scrollHeight > 0
+      ? container.scrollTop / container.scrollHeight
+      : 0;
+  const rasioX =
+    container.scrollWidth > 0
+      ? container.scrollLeft / container.scrollWidth
+      : 0;
   const lebar = Math.max(container.clientWidth - 24, 200);
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  // digambar di luar layar dulu, ditukar sekaligus agar tidak berkedip/meloncat
+  const frag = document.createDocumentFragment();
   try {
     for (let n = 1; n <= doc.numPages; n++) {
       const page = await doc.getPage(n);
@@ -45,12 +55,20 @@ const render = async () => {
       canvas.className = "pv-page";
       canvas.width = Math.floor(vp.width);
       canvas.height = Math.floor(vp.height);
-      canvas.style.width = `${Math.floor(vp.width / dpr)}px`;
-      canvas.style.height = `${Math.floor(vp.height / dpr)}px`;
-      container.appendChild(canvas);
+      const cssW = Math.floor(vp.width / dpr);
+      const cssH = Math.floor(vp.height / dpr);
+      canvas.style.width = `${cssW}px`;
+      canvas.style.height = `${cssH}px`;
+      canvas.dataset.w = String(cssW);
+      canvas.dataset.h = String(cssH);
+      frag.appendChild(canvas);
       task = page.render({ canvas, viewport: vp });
       await task.promise;
     }
+    if (myId !== renderId) return;
+    container.replaceChildren(frag);
+    container.scrollTop = rasioY * container.scrollHeight;
+    container.scrollLeft = rasioX * container.scrollWidth;
   } catch {
     // render dibatalkan karena zoom/ukuran berubah: abaikan; selain itu lapor
     if (myId === renderId) emit("error", "PDF tidak dapat ditampilkan.");
@@ -96,14 +114,97 @@ const ubahZoom = (delta: number) => {
   zoom.value = Math.min(3, Math.max(0.5, +(zoom.value + delta).toFixed(2)));
 };
 
+// Ctrl + scroll = zoom; scroll biasa tetap menggulung halaman
+const onWheel = (e: WheelEvent) => {
+  if (!e.ctrlKey) return;
+  e.preventDefault();
+  ubahZoom(e.deltaY < 0 ? 0.1 : -0.1);
+};
+
+// Ctrl +, Ctrl -, Ctrl 0 (menggantikan zoom halaman browser selama viewer terbuka)
+const onKey = (e: KeyboardEvent) => {
+  if (!(e.ctrlKey || e.metaKey)) return;
+  if (e.key === "+" || e.key === "=") {
+    e.preventDefault();
+    ubahZoom(0.25);
+  } else if (e.key === "-") {
+    e.preventDefault();
+    ubahZoom(-0.25);
+  } else if (e.key === "0") {
+    e.preventDefault();
+    zoom.value = 1;
+  }
+};
+
+// ── Pinch dua jari (tablet) ──
+interface PinchState {
+  jarak: number; // jarak dua jari di awal
+  zoom: number; // zoom saat pinch dimulai
+  x: number; // posisi scroll (proporsi) di awal
+  y: number;
+  akhir: number; // zoom hasil gerakan terakhir
+}
+let pinch: PinchState | null = null;
+
+const jarakJari = (t: TouchList): number => {
+  const a = t.item(0);
+  const b = t.item(1);
+  if (!a || !b) return 0;
+  return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+};
+
+const onTouchStart = (e: TouchEvent) => {
+  const el = wrap.value;
+  if (!el || e.touches.length !== 2) return;
+  const jarak = jarakJari(e.touches);
+  if (jarak === 0) return;
+  pinch = {
+    jarak,
+    zoom: zoom.value,
+    x: el.scrollWidth > 0 ? el.scrollLeft / el.scrollWidth : 0,
+    y: el.scrollHeight > 0 ? el.scrollTop / el.scrollHeight : 0,
+    akhir: zoom.value,
+  };
+};
+
+const onTouchMove = (e: TouchEvent) => {
+  const el = wrap.value;
+  if (!pinch || !el || e.touches.length !== 2) return;
+  e.preventDefault();
+  const baru = Math.min(
+    3,
+    Math.max(0.5, pinch.zoom * (jarakJari(e.touches) / pinch.jarak)),
+  );
+  // umpan balik langsung: skalakan halaman yang sudah tergambar (belum tajam)
+  const rasio = baru / pinch.zoom;
+  el.querySelectorAll<HTMLCanvasElement>("canvas.pv-page").forEach((c) => {
+    c.style.width = `${Number(c.dataset.w) * rasio}px`;
+    c.style.height = `${Number(c.dataset.h) * rasio}px`;
+  });
+  el.scrollLeft = pinch.x * el.scrollWidth;
+  el.scrollTop = pinch.y * el.scrollHeight;
+  pinch.akhir = +baru.toFixed(2);
+};
+
+// Jari dilepas: simpan zoom, render ulang tajam lewat watch(zoom)
+const onTouchEnd = (e: TouchEvent) => {
+  if (!pinch || e.touches.length >= 2) return;
+  zoom.value = pinch.akhir;
+  pinch = null;
+};
+
 watch(
   () => props.data,
   (buf) => void load(buf),
 );
-watch(zoom, () => void render());
+watch(zoom, () => {
+  clearTimeout(timer);
+  timer = setTimeout(() => void render(), 150);
+});
 
 onMounted(() => {
   void load(props.data);
+  window.addEventListener("keydown", onKey);
   if (!wrap.value) return;
   // Tablet diputar / dialog berubah ukuran: render ulang pas lebar baru
   ro = new ResizeObserver(() => {
@@ -119,6 +220,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   renderId++;
   clearTimeout(timer);
+  window.removeEventListener("keydown", onKey);
   ro?.disconnect();
   void buangDokumen();
 });
@@ -135,7 +237,9 @@ onBeforeUnmount(() => {
       >
         <IconZoomOut :size="14" :stroke-width="2" />
       </button>
-      <span class="pv-zoom">{{ Math.round(zoom * 100) }}%</span>
+      <span class="pv-zoom" title="Klik untuk 100% (Ctrl+0)" @click="zoom = 1"
+        >{{ Math.round(zoom * 100) }}%</span
+      >
       <button
         type="button"
         class="pv-btn"
@@ -148,7 +252,15 @@ onBeforeUnmount(() => {
         {{ isRendering ? "Memuat halaman..." : `${jumlahHalaman} halaman` }}
       </span>
     </div>
-    <div ref="wrap" class="pv-scroll" />
+    <div
+      ref="wrap"
+      class="pv-scroll"
+      @wheel="onWheel"
+      @touchstart="onTouchStart"
+      @touchmove="onTouchMove"
+      @touchend="onTouchEnd"
+      @touchcancel="onTouchEnd"
+    />
   </div>
 </template>
 
@@ -189,6 +301,7 @@ onBeforeUnmount(() => {
   text-align: center;
   font-weight: 600;
   color: #424242;
+  cursor: pointer;
 }
 .pv-info {
   margin-left: auto;
@@ -201,6 +314,7 @@ onBeforeUnmount(() => {
   scrollbar-gutter: stable;
   background: #eceff1;
   padding: 12px;
+  touch-action: pan-x pan-y;
 }
 /* canvas dibuat lewat JS, jadi butuh :deep agar scoped style terbaca */
 .pv-scroll :deep(.pv-page) {
