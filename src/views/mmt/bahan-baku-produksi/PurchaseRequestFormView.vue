@@ -646,7 +646,7 @@ const totalQty = computed(() => {
 
                 <!-- Untuk Gudang (Lookup GudangMmtSearchModal) -->
                 <div class="fr">
-                    <label class="lbl">Untuk Gudang</label>
+                    <label class="lbl">Gudang Tujuan</label>
                     <div class="igrp flex-grow-1">
                         <input
                             type="text"
@@ -843,17 +843,17 @@ const totalQty = computed(() => {
                     </select>
                 </div>
 
-                <!-- Keterangan Header -->
+                <!-- Keterangan -->
                 <div class="fr align-start">
                     <label class="lbl" style="padding-top: 4px"
-                        >Keterangan Header</label
+                        >Keterangan</label
                     >
                     <textarea
                         v-model="formData.keteranganHeader"
                         class="ta flex-grow-1"
                         rows="3"
                         :readonly="isLocked"
-                        placeholder="Catatan umum transaksi permintaan..."
+                        placeholder="Keterangan..."
                     ></textarea>
                 </div>
             </div>
@@ -1062,7 +1062,7 @@ const totalQty = computed(() => {
                                                 'item-struck': !it.isAcc,
                                             }"
                                             :readonly="isLocked"
-                                            placeholder="Kode..."
+                                            placeholder="Cari..."
                                             @click="openBahanLookup(idx)"
                                         />
                                         <button
@@ -1077,14 +1077,14 @@ const totalQty = computed(() => {
                                     </div>
                                 </td>
 
-                                <!-- 6. Nama Bahan -->
+                                <!-- 6. Nama Bahan (Readonly / Otomatis dari Master) -->
                                 <td class="p0">
                                     <input
                                         type="text"
                                         v-model="it.namaBahan"
-                                        class="ci"
+                                        class="ci ro fw"
                                         :class="{ 'item-struck': !it.isAcc }"
-                                        :readonly="isLocked"
+                                        readonly
                                         placeholder="Nama Bahan..."
                                     />
                                 </td>
