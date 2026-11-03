@@ -26,6 +26,7 @@ export interface NotulensiDetailRow {
   hasil: string;
   pic: string;
   deadline: string | null;
+  catatan: string;
   statusUser: string;
   statusSistem: string;
   terlambat: boolean;

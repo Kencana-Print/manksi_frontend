@@ -14,6 +14,7 @@ export interface NotulensiSaveDetail {
   hasil: string;
   pic: string;
   deadline: string;
+  catatan: string;
   statusUser: string;
   statusSistem: string;
 }

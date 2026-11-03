@@ -6,6 +6,7 @@ import BaseBrowse from "@/components/BaseBrowse.vue";
 import { IconNotes, IconTrash, IconFileExport } from "@tabler/icons-vue";
 import { exportExcelSingle } from "@/utils/excelExport";
 import { formatTanggal } from "@/utils/dateFormat";
+import { exportNotulenExcel } from "@/utils/notulenExcel";
 import {
   notulensiMeetingService,
   pesanError,
@@ -261,6 +262,7 @@ const doExportMaster = async () => {
 };
 
 const doExportDetail = async () => {
+  // Search + filter kolom di grid ikut dihitung (via BaseBrowse)
   const nomorTampil = new Set(dataTampil().map((r) => r.nomor));
   if (!nomorTampil.size) {
     toast.warning("Tidak ada data untuk diekspor.");
@@ -272,43 +274,14 @@ const doExportDetail = async () => {
       startDate: filterStart.value,
       endDate: filterEnd.value,
     });
-    // ikuti search/filter grid: hanya nomor yang sedang tampil
     const rows = (res.data.data ?? []).filter((r) => nomorTampil.has(r.nomor));
     if (!rows.length) {
       toast.warning("Tidak ada tindak lanjut untuk diekspor.");
       return;
     }
-    await exportExcelSingle(
+    await exportNotulenExcel(
+      rows,
       `NotulensiMeetingDetail_${filterStart.value}_${filterEnd.value}.xlsx`,
-      "Detail Tindak Lanjut",
-      [
-        { header: "Nomor", key: "nomor", width: 20 },
-        { header: "Tanggal", key: "tanggal", width: 12 },
-        { header: "Agenda", key: "agenda", width: 36 },
-        { header: "Lokasi", key: "lokasi", width: 20 },
-        { header: "Peserta", key: "peserta", width: 36 },
-        { header: "No", key: "noUrut", align: "right", width: 6 },
-        { header: "Hasil / Tindak Lanjut", key: "hasil", width: 60 },
-        { header: "PIC", key: "pic", width: 20 },
-        { header: "Deadline", key: "deadline", width: 12 },
-        { header: "Status User", key: "statusUser", width: 12 },
-        { header: "Status Sistem", key: "statusSistem", width: 16 },
-        { header: "Terlambat", key: "terlambat", width: 10 },
-      ],
-      rows.map((r) => ({
-        nomor: r.nomor,
-        tanggal: formatTanggal(r.tanggal),
-        agenda: r.agenda,
-        lokasi: r.lokasi,
-        peserta: r.peserta ?? "",
-        noUrut: r.noUrut,
-        hasil: r.hasil,
-        pic: r.pic,
-        deadline: r.deadline ? formatTanggal(r.deadline) : "",
-        statusUser: r.statusUser,
-        statusSistem: r.statusSistem,
-        terlambat: r.terlambat ? "YA" : "",
-      })),
     );
   } catch (e) {
     toast.error(pesanError(e, "Gagal export detail."));
@@ -425,6 +398,7 @@ fetchData();
               <col style="width: 150px" />
               <col style="width: 110px" />
               <col style="width: 110px" />
+              <col style="width: 220px" />
             </colgroup>
             <thead>
               <tr>
@@ -434,6 +408,7 @@ fetchData();
                 <th style="width: 100px">DEADLINE</th>
                 <th style="width: 190px">STATUS USER</th>
                 <th style="width: 190px">STATUS SISTEM</th>
+                <th style="width: 220px">CATATAN</th>
               </tr>
             </thead>
             <tbody>
@@ -475,6 +450,7 @@ fetchData();
                     {{ d.statusSistem }}
                   </v-chip>
                 </td>
+                <td class="cell-wrap">{{ d.catatan || "-" }}</td>
               </tr>
               <tr v-if="!detailCache[item.nomor].length">
                 <td colspan="6" class="empty-row">

@@ -18,6 +18,7 @@ interface BarisForm {
   hasil: string;
   pic: string;
   deadline: string;
+  catatan: string;
   statusUser: string;
   statusSistem: string;
 }
@@ -37,6 +38,7 @@ const barisBaru = (): BarisForm => ({
   hasil: "",
   pic: "",
   deadline: "",
+  catatan: "",
   statusUser: "OPEN",
   statusSistem: "OPEN",
 });
@@ -84,6 +86,7 @@ const {
         hasil: r.hasil,
         pic: r.pic,
         deadline: r.deadline ?? "",
+        catatan: r.catatan,
         statusUser: r.statusUser,
         statusSistem: r.statusSistem,
       })),
@@ -113,11 +116,15 @@ const {
       peserta: payload.peserta.trim(),
       lokasi: payload.lokasi.trim(),
       detail: payload.detail
-        .filter((r) => r.hasil.trim() || r.pic.trim() || r.deadline)
+        .filter(
+          (r) =>
+            r.hasil.trim() || r.pic.trim() || r.deadline || r.catatan.trim(),
+        )
         .map((r) => ({
           hasil: r.hasil.trim(),
           pic: r.pic.trim(),
           deadline: r.deadline,
+          catatan: r.catatan.trim(),
           statusUser: r.statusUser,
           statusSistem: r.statusSistem,
         })),
@@ -212,11 +219,14 @@ const validateSave = () => {
   const rows = formData.value.detail;
   for (let i = 0; i < rows.length; i++) {
     const r = rows[i];
-    if (!r.hasil.trim() && (r.pic.trim() || r.deadline)) {
+    if (!r.hasil.trim() && (r.pic.trim() || r.deadline || r.catatan.trim())) {
       return toast.warning(`Hasil/tindak lanjut baris ${i + 1} wajib diisi.`);
     }
     if (r.pic.length > 200) {
       return toast.warning(`PIC baris ${i + 1} maksimal 200 karakter.`);
+    }
+    if (r.catatan.length > 500) {
+      return toast.warning(`Catatan baris ${i + 1} maksimal 500 karakter.`);
     }
   }
   if (!rows.some((r) => r.hasil.trim())) {
@@ -366,6 +376,7 @@ const vAutoGrow = {
                 <th style="width: 140px">Deadline</th>
                 <th style="width: 110px">Status User</th>
                 <th style="width: 110px">Status Sistem</th>
+                <th style="min-width: 220px">Catatan</th>
                 <th style="width: 36px"></th>
               </tr>
             </thead>
@@ -436,6 +447,17 @@ const vAutoGrow = {
                       {{ s }}
                     </option>
                   </select>
+                </td>
+                <td>
+                  <textarea
+                    v-model="r.catatan"
+                    v-auto-grow
+                    class="gi gi-ta"
+                    :disabled="statusSaja"
+                    rows="1"
+                    maxlength="500"
+                    @input="onHasilInput"
+                  />
                 </td>
                 <td class="tc">
                   <button

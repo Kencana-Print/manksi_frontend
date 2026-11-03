@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref, computed, onMounted } from "vue";
 import { useRoute } from "vue-router";
 import { useToast } from "vue-toastification";
 import {
@@ -12,6 +12,9 @@ const route = useRoute();
 const toast = useToast();
 const isLoading = ref(true);
 const data = ref<NotulensiCetakData | null>(null);
+const adaCatatan = computed(() =>
+  (data.value?.detail ?? []).some((d) => d.catatan.trim()),
+);
 
 const nomor = String(route.params.nomor ?? "");
 
@@ -86,6 +89,7 @@ onMounted(async () => {
             <th width="75">Deadline</th>
             <th width="62">Status User</th>
             <th width="62">Status Sistem</th>
+            <th v-if="adaCatatan" width="130">Catatan</th>
           </tr>
         </thead>
         <tbody>
@@ -99,9 +103,12 @@ onMounted(async () => {
             </td>
             <td class="tc">{{ d.statusUser }}</td>
             <td class="tc">{{ d.statusSistem }}</td>
+            <td v-if="adaCatatan" class="wrap">{{ d.catatan || "-" }}</td>
           </tr>
           <tr v-if="!data.detail.length">
-            <td colspan="6" class="tc">Tidak ada tindak lanjut</td>
+            <td :colspan="adaCatatan ? 7 : 6" class="tc">
+              Tidak ada tindak lanjut
+            </td>
           </tr>
         </tbody>
       </table>
