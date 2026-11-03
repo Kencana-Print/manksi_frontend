@@ -1,7 +1,8 @@
 // src/composables/useKomitmenKirimSocket.ts
 import { ref, onUnmounted } from "vue";
-import { io, Socket } from "socket.io-client";
+import type { Socket } from "socket.io-client";
 import { useAuthStore } from "@/stores/authStore";
+import { getAppSocket } from "@/composables/useAppSocket";
 
 interface PresenceUser {
   kode: string;
@@ -9,34 +10,32 @@ interface PresenceUser {
   bagian: string;
 }
 
-// ── Semua state koneksi jadi singleton di level module — supaya
-// konsisten di mana pun/berapa kali pun composable ini dipanggil,
-// tidak terikat ke instance komponen tertentu. ──
+// ── State presence singleton di level module. Koneksi socket sendiri
+// kini dibagi lewat useAppSocket; listener presence dipasang sekali
+// per instance socket (instance baru muncul setelah logout/login). ──
 let socket: Socket | null = null;
+let boundTo: Socket | null = null;
 const presenceList = ref<PresenceUser[]>([]);
 const isConnected = ref(false);
 
 const connect = () => {
-  if (socket) return socket;
-  const authStore = useAuthStore();
-  const baseUrl = (import.meta.env.VITE_API_URL || "").replace(/\/api\/?$/, "");
-  socket = io(baseUrl, {
-    auth: { token: authStore.token },
-    transports: ["websocket", "polling"],
-  });
-
-  socket.on("connect", () => {
-    isConnected.value = true;
-  });
-  socket.on("disconnect", () => {
-    isConnected.value = false;
-    presenceList.value = []; // ⬅ reset saat koneksi putus, biar tidak stale
-  });
-  socket.on("pjw:presence", (list: PresenceUser[]) => {
-    presenceList.value = list;
-  });
-
-  return socket;
+  const s = getAppSocket();
+  socket = s;
+  if (boundTo !== s) {
+    boundTo = s;
+    isConnected.value = s.connected;
+    s.on("connect", () => {
+      isConnected.value = true;
+    });
+    s.on("disconnect", () => {
+      isConnected.value = false;
+      presenceList.value = []; // ⬅ reset saat koneksi putus, biar tidak stale
+    });
+    s.on("pjw:presence", (list: PresenceUser[]) => {
+      presenceList.value = list;
+    });
+  }
+  return s;
 };
 
 export function useKomitmenKirimSocket() {

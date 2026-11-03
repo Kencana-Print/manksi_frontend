@@ -18,6 +18,7 @@ import {
   IconBan,
   IconRefresh,
   IconSearch,
+  IconPlus,
 } from "@tabler/icons-vue";
 import { getFileUrl } from "@/utils/fileUrl";
 import PermintaanDesainSearchModal from "@/components/lookups/PermintaanDesainSearchModal.vue";
@@ -103,6 +104,7 @@ onMounted(fetchData);
 const headers = [
   { title: "Nomor", key: "Nomor", width: "150px" },
   { title: "Tanggal", key: "Tanggal", width: "100px" },
+  { title: "Marketing", key: "NamaMarketing", width: "130px" },
   { title: "Nama Project", key: "NamaProject", minWidth: "180px" },
   { title: "Customer", key: "Customer", minWidth: "160px" },
   { title: "Jenis", key: "JenisPekerjaan", width: "100px" },
@@ -114,7 +116,6 @@ const headers = [
   { title: "Status", key: "Status", width: "110px" },
   { title: "Status Klien", key: "StatusKlien", width: "120px" },
   { title: "SO/MAP", key: "SoMapNomor", width: "150px" },
-  { title: "Marketing", key: "NamaMarketing", width: "130px" },
 ];
 
 const STATUS_LABEL: Record<string, { label: string; bg: string; fg: string }> =
@@ -164,6 +165,7 @@ const rowStyleFn = (data: any) => {
 const expandedRows = ref<any[]>([]);
 const detailCache = ref<Record<string, any[]>>({});
 const kerjaCache = ref<Record<string, any[]>>({});
+const lhkCache = ref<Record<string, any[]>>({});
 const detailLoading = ref<Record<string, boolean>>({});
 
 const onUpdateExpanded = async (newExpanded: any[]) => {
@@ -179,6 +181,7 @@ const onUpdateExpanded = async (newExpanded: any[]) => {
       const res = await svc.getDetail(nomor);
       detailCache.value[nomor] = res.data.data?.detail ?? [];
       kerjaCache.value[nomor] = res.data.data?.kerja ?? [];
+      lhkCache.value[nomor] = res.data.data?.lhk ?? [];
     } catch {
       toast.error(`Gagal memuat detail ${nomor}`);
     } finally {
@@ -200,6 +203,7 @@ const lhkUntuk = (nomor: string, pd2Id: number) => {
 const onAntreanChanged = () => {
   detailCache.value = {};
   kerjaCache.value = {};
+  lhkCache.value = {};
   expandedRows.value = [];
   fetchData();
 };
@@ -426,12 +430,55 @@ const statusNomor = ref("");
 const statusValue = ref("PENDING");
 const statusKeterangan = ref("");
 const statusReferensi = ref("");
-const statusSoMap = ref("");
-const statusPath = ref("");
-
+// ── ACC: link SO/MAP + path per LHK ──
+interface AccLhk {
+  nomor: string;
+  jml: number;
+  path: string;
+  somap: { nomor: string; jml: number }[];
+}
+const accLhk = ref<AccLhk[]>([]);
+const isLoadingAccLhk = ref(false);
+const accTargetIdx = ref(0);
 const showSoMapModal = ref(false);
+
+const loadAccLhk = async (nomor: string) => {
+  isLoadingAccLhk.value = true;
+  accLhk.value = [];
+  try {
+    const res = await svc.getDetail(nomor);
+    const rows: any[] = res.data.data?.lhk ?? [];
+    accLhk.value = rows.map((l) => ({
+      nomor: l.nomor,
+      jml: Number(l.jml) || 0,
+      path: "",
+      somap: [],
+    }));
+  } catch {
+    toast.error("Gagal memuat LHK PD ini.");
+  } finally {
+    isLoadingAccLhk.value = false;
+  }
+};
+
+const openSoMapModal = (idx: number) => {
+  accTargetIdx.value = idx;
+  showSoMapModal.value = true;
+};
+const totalOf = (l: AccLhk) =>
+  l.somap.reduce((sum, s) => sum + (Number(s.jml) || 0), 0);
+const sisaOf = (l: AccLhk) => l.jml - totalOf(l);
+
 const onSoMapSelected = (item: any) => {
-  statusSoMap.value = item.Nomor;
+  const l = accLhk.value[accTargetIdx.value];
+  if (!l || l.somap.some((s) => s.nomor === item.Nomor)) return;
+  const sisa = sisaOf(l);
+  l.somap.push({ nomor: item.Nomor, jml: sisa > 0 ? sisa : 1 });
+};
+const removeSoMap = (idx: number, nomor: string) => {
+  accLhk.value[idx].somap = accLhk.value[idx].somap.filter(
+    (s) => s.nomor !== nomor,
+  );
 };
 
 const isSavingStatus = ref(false);
@@ -453,9 +500,8 @@ const openStatusDialog = () => {
   statusValue.value = "ACC";
   statusKeterangan.value = "";
   statusReferensi.value = "";
-  statusSoMap.value = "";
-  statusPath.value = "";
   showStatusDialog.value = true;
+  loadAccLhk(selectedItem.value.Nomor);
 };
 
 const onStatusReferensiSelected = (item: any) => {
@@ -464,12 +510,27 @@ const onStatusReferensiSelected = (item: any) => {
 
 const saveStatusManual = async () => {
   if (isCloseMode.value) {
-    if (!statusSoMap.value.trim()) {
-      toast.error("Nomor SO/MAP wajib diisi.");
+    if (!accLhk.value.length) {
+      toast.error("PD ini belum punya LHK.");
       return;
     }
-    if (!statusPath.value.trim()) {
-      toast.error("Path desain wajib diisi.");
+    const kurang = accLhk.value.find((l) => !l.somap.length || !l.path.trim());
+    if (kurang) {
+      toast.error(
+        `LHK ${kurang.nomor}: nomor SO/MAP dan path desain wajib diisi.`,
+      );
+      return;
+    }
+    const salah = accLhk.value.find(
+      (l) =>
+        l.somap.some(
+          (s) => !Number.isInteger(Number(s.jml)) || Number(s.jml) < 1,
+        ) || sisaOf(l) < 0,
+    );
+    if (salah) {
+      toast.error(
+        `LHK ${salah.nomor}: jumlah ACC harus bilangan bulat minimal 1 dan total tidak boleh melebihi ${salah.jml}.`,
+      );
       return;
     }
   } else {
@@ -486,10 +547,19 @@ const saveStatusManual = async () => {
   try {
     if (isCloseMode.value) {
       await svc.closePD(statusNomor.value, {
-        soMapNomor: statusSoMap.value.trim(),
-        path: statusPath.value.trim(),
+        items: accLhk.value.map((l) => ({
+          lhkNomor: l.nomor,
+          path: l.path.trim(),
+          targets: l.somap.map((s) => ({
+            soMapNomor: s.nomor,
+            jml: Number(s.jml),
+          })),
+        })),
       });
       toast.success("PD berhasil di-ACC.");
+      showStatusDialog.value = false;
+      onAntreanChanged();
+      return;
     } else {
       await svc.setStatusManual(statusNomor.value, {
         status: statusValue.value,
@@ -520,7 +590,7 @@ const bukaKembali = async () => {
     await svc.bukaKembali(selectedItem.value.Nomor);
     toast.success("PD dibuka kembali (DONE).");
     showBukaDialog.value = false;
-    fetchData();
+    onAntreanChanged();
   } catch (e: any) {
     toast.error(e.response?.data?.message || "Gagal membuka kembali.");
   } finally {
@@ -647,11 +717,14 @@ const openEdit = () => {
           </select>
           <select v-model="jenisFilter" class="finp">
             <option value="">Semua Jenis</option>
-            <option value="BARU">Baru</option>
-            <option value="REVISI">Revisi</option>
             <option value="CEK">Cek</option>
-            <option value="PLOTTER">Plotter</option>
             <option value="EDIT">Edit</option>
+            <option value="DESAIN ULANG">Desain Ulang</option>
+            <optgroup label="Data lama">
+              <option value="BARU">Baru</option>
+              <option value="REVISI">Revisi</option>
+              <option value="PLOTTER">Plotter</option>
+            </optgroup>
           </select>
         </template>
 
@@ -782,7 +855,24 @@ const openEdit = () => {
 
         <template #detail="{ item }">
           <div class="pd-detail-wrap">
-            <div v-if="item.SoMapNomor" class="pd-close-info">
+            <div
+              v-if="lhkCache[item.Nomor]?.some((l: any) => l.somap.length)"
+              class="pd-close-info"
+            >
+              <div v-for="l in lhkCache[item.Nomor]" :key="l.nomor">
+                <b>{{ l.nomor }}</b> &rarr;
+                {{
+                  l.somap.map((s: any) => `${s.nomor} (${s.jml})`).join(", ") ||
+                  "-"
+                }}
+                <template v-if="l.batal">
+                  &middot;
+                  <span class="pd-batal">dibatalkan {{ l.batal }}</span>
+                </template>
+                <template v-if="l.path"> &middot; Path: {{ l.path }}</template>
+              </div>
+            </div>
+            <div v-else-if="item.SoMapNomor" class="pd-close-info">
               <b>{{ item.SoMapTipe }}</b> {{ item.SoMapNomor }} &middot; Path:
               {{ item.PathDesain }}
             </div>
@@ -839,7 +929,11 @@ const openEdit = () => {
     </div>
   </div>
 
-  <v-dialog v-model="showStatusDialog" max-width="420px" persistent>
+  <v-dialog
+    v-model="showStatusDialog"
+    :max-width="isCloseMode ? '640px' : '420px'"
+    persistent
+  >
     <v-card class="rounded-lg">
       <v-card-title
         class="pa-3 bg-primary text-white"
@@ -861,22 +955,75 @@ const openEdit = () => {
           hide-details
         />
         <template v-if="isCloseMode">
-          <div class="lookup-field mb-3">
-            <label class="lookup-label">Nomor SO / MAP (wajib)</label>
-            <div class="lookup-input-wrap" @click="showSoMapModal = true">
-              <span :class="{ 'text-grey': !statusSoMap }">
-                {{ statusSoMap || "Pilih SO/MAP..." }}
-              </span>
-              <IconSearch :size="15" :stroke-width="1.7" />
+          <v-progress-linear
+            v-if="isLoadingAccLhk"
+            indeterminate
+            color="primary"
+            height="2"
+          />
+          <div v-else-if="!accLhk.length" class="text-caption text-grey">
+            PD ini belum punya LHK.
+          </div>
+          <div v-else class="acc-lhk-list">
+            <div v-for="(l, i) in accLhk" :key="l.nomor" class="acc-lhk-card">
+              <div class="acc-lhk-head">
+                <b>{{ l.nomor }}</b> &middot; {{ l.jml }} pcs
+              </div>
+              <div class="lookup-field mb-2">
+                <label class="lookup-label"
+                  >SO / MAP dan jumlah ACC (wajib, boleh lebih dari satu)</label
+                >
+                <div class="acc-chips">
+                  <div v-for="s in l.somap" :key="s.nomor" class="acc-row">
+                    <v-chip
+                      size="x-small"
+                      closable
+                      @click:close="removeSoMap(i, s.nomor)"
+                      >{{ s.nomor }}</v-chip
+                    >
+                    <input
+                      v-model.number="s.jml"
+                      type="number"
+                      min="1"
+                      :max="l.jml"
+                      class="acc-jml"
+                    />
+                    <span class="acc-unit">pcs</span>
+                  </div>
+                  <button
+                    type="button"
+                    class="acc-add"
+                    @click="openSoMapModal(i)"
+                  >
+                    <IconPlus :size="12" /> Tambah
+                  </button>
+                </div>
+                <div
+                  class="acc-sisa"
+                  :class="{
+                    'acc-sisa-over': sisaOf(l) < 0,
+                    'acc-sisa-batal': sisaOf(l) > 0,
+                  }"
+                >
+                  ACC {{ totalOf(l) }} dari {{ l.jml }} pcs<template
+                    v-if="sisaOf(l) > 0"
+                  >
+                    &mdash; sisa {{ sisaOf(l) }} pcs otomatis
+                    dibatalkan</template
+                  ><template v-else-if="sisaOf(l) < 0">
+                    &mdash; melebihi jumlah LHK</template
+                  >
+                </div>
+              </div>
+              <v-text-field
+                v-model="l.path"
+                label="Path desain (wajib)"
+                variant="outlined"
+                density="compact"
+                hide-details
+              />
             </div>
           </div>
-          <v-text-field
-            v-model="statusPath"
-            label="Path desain (wajib)"
-            variant="outlined"
-            density="compact"
-            hide-details
-          />
         </template>
         <template v-else>
           <div v-if="statusValue === 'CANCEL_ALT'" class="lookup-field mb-3">
@@ -934,8 +1081,8 @@ const openEdit = () => {
         Buka Kembali — {{ selectedItem?.Nomor }}
       </v-card-title>
       <v-card-text class="pa-4" style="font-size: 12px">
-        PD kembali ke status Done. Nomor SO/MAP dan path desain yang tersimpan
-        dikosongkan supaya bisa diinput ulang.
+        PD kembali ke status Done. Semua link SO/MAP dan path desain pada LHK PD
+        ini dihapus supaya bisa diinput ulang.
       </v-card-text>
       <v-card-actions class="pa-3 border-t">
         <v-btn
@@ -1176,5 +1323,88 @@ const openEdit = () => {
 }
 .lookup-input-wrap:hover {
   border-color: #1565c0;
+}
+.acc-lhk-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 55vh;
+  overflow-y: auto;
+}
+.acc-lhk-card {
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  padding: 10px;
+  background: #fafafa;
+}
+.acc-lhk-head {
+  font-size: 11px;
+  margin-bottom: 8px;
+  color: #37474f;
+}
+.acc-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 6px 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background: white;
+}
+.acc-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 8px;
+  font-size: 11px;
+  color: #1565c0;
+  background: none;
+  border: 1px dashed #90caf9;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.acc-add:hover {
+  background: #e3f2fd;
+}
+.acc-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.acc-jml {
+  width: 56px;
+  height: 22px;
+  border: 1px solid #bdbdbd;
+  border-radius: 4px;
+  padding: 0 4px;
+  font-size: 11px;
+  text-align: right;
+  outline: none;
+}
+.acc-jml:focus {
+  border-color: #1565c0;
+}
+.acc-unit {
+  font-size: 11px;
+  color: #777;
+}
+.acc-sisa {
+  margin-top: 4px;
+  font-size: 11px;
+  color: #2e7d32;
+}
+.acc-sisa-batal {
+  color: #e65100;
+  font-weight: 600;
+}
+.acc-sisa-over {
+  color: #c62828;
+  font-weight: 700;
+}
+.pd-batal {
+  color: #e65100;
+  font-weight: 600;
 }
 </style>

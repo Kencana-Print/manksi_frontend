@@ -118,6 +118,7 @@ const groupIdenticalItems = (items: any[], poJenis: number) => {
       item.setting || "",
       item.harga_dpp_print,
       item.harga_setelah_ppn_print,
+      item.ppn_persen_print,
     ].join("_");
 
     if (!groupedItems[key]) {
@@ -125,6 +126,7 @@ const groupIdenticalItems = (items: any[], poJenis: number) => {
     } else {
       groupedItems[key].qty_print += item.qty_print;
       groupedItems[key].total_print += item.total_print;
+      groupedItems[key].ppn_nilai_print += item.ppn_nilai_print;
     }
   });
   return Object.values(groupedItems);
@@ -135,8 +137,10 @@ onMounted(async () => {
     const res = await poBahanFormService.getDetail(nomorPO);
     const d = res.data.data;
 
-    const ppnPercent = Number(d.header?.po_ppn) || 0;
-    const ppnActive = Number(d.header?.po_status_ppn) === 1;
+    // PO Lain-lain: PPN per baris (pod_ppn); jenis lain: PPN header
+    const isLain = Number(d.header?.po_jenis) === 4;
+    const ppnHeader =
+      Number(d.header?.po_status_ppn) === 1 ? Number(d.header?.po_ppn) || 0 : 0;
 
     let itemsConverted = (d.items || []).map((row: any) => {
       let isMtr = row.pod_bhn_satuan === "MTR";
@@ -150,9 +154,9 @@ onMounted(async () => {
         hargaDpp = hargaDpp / 1.09361;
       }
 
-      const hargaSetelahPpn = ppnActive
-        ? hargaDpp * (1 + ppnPercent / 100)
-        : hargaDpp;
+      const ppnPersen = isLain ? Number(row.pod_ppn) || 0 : ppnHeader;
+      const hargaSetelahPpn = hargaDpp * (1 + ppnPersen / 100);
+      const total = qty * hargaDpp * (1 - (Number(row.pod_disc) || 0) / 100);
 
       return {
         ...row,
@@ -160,7 +164,9 @@ onMounted(async () => {
         qty_print: qty,
         harga_dpp_print: hargaDpp,
         harga_setelah_ppn_print: hargaSetelahPpn,
-        total_print: qty * hargaDpp * (1 - (Number(row.pod_disc) || 0) / 100),
+        ppn_persen_print: ppnPersen,
+        total_print: total,
+        ppn_nilai_print: total * (ppnPersen / 100),
       };
     });
 
@@ -230,10 +236,12 @@ const subTotal = computed(
     dataPO.value?.items.reduce((s: number, r: any) => s + r.total_print, 0) ||
     0,
 );
-const ppnValue = computed(() =>
-  dataPO.value?.header?.po_status_ppn === 1
-    ? subTotal.value * (Number(dataPO.value.header.po_ppn) / 100)
-    : 0,
+const ppnValue = computed(
+  () =>
+    dataPO.value?.items.reduce(
+      (s: number, r: any) => s + r.ppn_nilai_print,
+      0,
+    ) || 0,
 );
 const grandTotal = computed(() => subTotal.value + ppnValue.value);
 
@@ -351,7 +359,7 @@ const totalColumns = computed(() => {
             <td :colspan="totalColumns - 1" class="tr">Total</td>
             <td class="tr fw">{{ formatNum(subTotal) }}</td>
           </tr>
-          <tr v-if="dataPO.header.po_status_ppn === 1">
+          <tr v-if="ppnValue > 0">
             <td :colspan="totalColumns - 1" class="tr">Ppn</td>
             <td class="tr fw">{{ formatNum(ppnValue) }}</td>
           </tr>

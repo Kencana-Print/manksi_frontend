@@ -41,6 +41,9 @@ interface DetailRow {
   WipQty?: number;
   WipSatuan?: string;
   WipCatatan?: string;
+  StatusBahan?: string;
+  MkbNomor?: string;
+  EstimasiKedatangan?: string;
   QtyPo: number;
   QtyJadwal: number;
   LineKelompok: string;
@@ -420,6 +423,8 @@ const kolomCutting: ExcelColumn[] = [
     numFmt: "#,##0.00",
   },
   { header: "WIP Bahan Satuan", key: "WipSatuan", width: 16 },
+  { header: "Status Bahan", key: "StatusBahan", width: 24 },
+  { header: "Est. Kedatangan", key: "EstKedatangan", width: 14 },
   { header: "Qty Target", key: "QtyJadwal", align: "right", numFmt: "#,##0" },
   { header: "Proses Produksi", key: "LineKelompok", width: 16 },
   { header: "Output", key: "Output", align: "right", numFmt: "#,##0" },
@@ -444,7 +449,7 @@ const kolomSewing: ExcelColumn[] = [
     numFmt: "#,##0",
   },
   {
-    header: "Pencapaian (%)",
+    header: "Persentase Pencapaian (%)",
     key: "Pencapaian",
     align: "right",
     numFmt: "#,##0.0",
@@ -507,6 +512,9 @@ const styleSewing = (row: BarisExport) => {
   return null;
 };
 
+const styleCutting = (row: BarisExport) =>
+  row._grp ? { fillColor: "CFD8DC", fontColor: "263238", bold: true } : null;
+
 const doExportDetail = async () => {
   // Hanya plan yang sedang tampil (search + filter kolom BaseBrowse)
   const nomorTampil = new Set(dataTampil().map((r) => r.Nomor));
@@ -562,13 +570,36 @@ const doExportDetail = async () => {
       );
 
     for (const p of plans) {
-      p.cutting.forEach((d, i) =>
+      // Baris total di atas blok Cutting tiap planning (sama pola dengan baris Line di sheet Sewing)
+      if (p.cutting.length) {
         sheetCutting.push({
-          ...induk(p, i === 0),
+          ...induk(p, true),
+          NomorSPK: "TOTAL",
+          NamaSPK: "",
+          WipBahan: "",
+          WipSatuan: "",
+          StatusBahan: "",
+          EstKedatangan: "",
+          QtyJadwal: p.cutting.reduce(
+            (s, d) => s + (Number(d.QtyJadwal) || 0),
+            0,
+          ),
+          LineKelompok: "",
+          Output: "",
+          _grp: true,
+        });
+      }
+      p.cutting.forEach((d) =>
+        sheetCutting.push({
+          ...induk(p, false),
           NomorSPK: d.NomorSPK,
           NamaSPK: d.NamaSPK || "",
           WipBahan: angkaAtauKosong(d.WipSatuan ? d.WipBahan : undefined),
           WipSatuan: d.WipSatuan || "",
+          StatusBahan: d.StatusBahan || "",
+          EstKedatangan: d.EstimasiKedatangan
+            ? formatTanggal(d.EstimasiKedatangan)
+            : "",
           QtyJadwal: Number(d.QtyJadwal) || 0,
           LineKelompok: d.LineKelompok || "",
           Output: angkaAtauKosong(d.Output),
@@ -653,6 +684,7 @@ const doExportDetail = async () => {
         columns: [...kolomMaster, ...kolomCutting],
         rows: sheetCutting,
         headerColor: "546E7A",
+        rowStyleFn: styleCutting,
       });
     if (sheetCuttingHarian.length)
       sheets.push({
@@ -702,6 +734,13 @@ const doExportDetail = async () => {
 
 const fmt = (n: number | null | undefined) => (n ?? 0).toLocaleString("id-ID");
 
+const statusBahanClass = (s: string) => {
+  if (s === "Ready") return "sb-ready";
+  if (s === "PO") return "sb-po";
+  if (s === "MKB belum dibuat") return "sb-none";
+  return "sb-warn";
+};
+
 const fmtDec = (n: number | null | undefined, d = 2) =>
   n == null
     ? "—"
@@ -750,6 +789,13 @@ const groupSewing = (rows: DetailRow[]) => {
 };
 
 const sewingGroups = (nomor: string) => groupSewing(sewingBaru(nomor));
+
+// Σ Qty Target tab Cutting untuk satu planning (dari detail yang sudah dimuat)
+const cuttingTotalTarget = (nomor: string) =>
+  (detailCache.value[nomor]?.cutting ?? []).reduce(
+    (s, d) => s + (Number(d.QtyJadwal) || 0),
+    0,
+  );
 
 // Resume minus = output sudah melebihi waktu produksi line
 const isOver = (d: DetailRow) => d.Resume != null && d.Resume < 0;
@@ -984,6 +1030,8 @@ fetchData();
                     <th rowspan="2">Nomor SPK</th>
                     <th rowspan="2">Nama SPK</th>
                     <th colspan="2" style="text-align: center">WIP Bahan</th>
+                    <th rowspan="2">Status Bahan</th>
+                    <th rowspan="2">Est. Kedatangan</th>
                     <th rowspan="2" class="tr">Qty Target</th>
                     <th rowspan="2">Proses Produksi</th>
                     <th rowspan="2" class="tr">Output</th>
@@ -994,6 +1042,20 @@ fetchData();
                   </tr>
                 </thead>
                 <tbody>
+                  <tr
+                    v-if="detailCache[item.Nomor].cutting.length"
+                    class="sum-row-cutting"
+                  >
+                    <td colspan="9">
+                      <div class="grp-bar">
+                        <span class="grp-title">Cutting</span>
+                        <span class="grp-chip"
+                          >Σ Qty Target
+                          <b>{{ fmt(cuttingTotalTarget(item.Nomor)) }}</b></span
+                        >
+                      </div>
+                    </td>
+                  </tr>
                   <template
                     v-for="(d, i) in detailCache[item.Nomor].cutting"
                     :key="i"
@@ -1011,6 +1073,22 @@ fetchData();
                         }}<span v-if="d.WipCatatan">*</span>
                       </td>
                       <td>{{ d.WipSatuan || "—" }}</td>
+                      <td :title="d.MkbNomor">
+                        <span
+                          v-if="d.StatusBahan"
+                          class="sb-badge"
+                          :class="statusBahanClass(d.StatusBahan)"
+                          >{{ d.StatusBahan }}</span
+                        >
+                        <template v-else>—</template>
+                      </td>
+                      <td>
+                        {{
+                          d.EstimasiKedatangan
+                            ? fmtTgl(d.EstimasiKedatangan)
+                            : "—"
+                        }}
+                      </td>
                       <td class="tr fw">{{ fmt(d.QtyJadwal) }}</td>
                       <td>{{ d.LineKelompok || "—" }}</td>
                       <td class="tr fw">
@@ -1036,7 +1114,7 @@ fetchData();
                       v-if="bukaHarian.has(`${item.Nomor}|CUT|${i}`)"
                       class="hr-row"
                     >
-                      <td colspan="7">
+                      <td colspan="9">
                         <table class="hr-table">
                           <thead>
                             <tr>
@@ -1059,7 +1137,7 @@ fetchData();
                     </tr>
                   </template>
                   <tr v-if="!detailCache[item.Nomor].cutting.length">
-                    <td colspan="8" class="empty-row">
+                    <td colspan="9" class="empty-row">
                       Tidak ada data cutting
                     </td>
                   </tr>
@@ -1122,8 +1200,8 @@ fetchData();
                             }}</b>
                             mnt</span
                           >
-                          <span class="grp-chip"
-                            >Pencapaian
+                          <span class="grp-chip">
+                            Persentase Pencapaian
                             <b>{{
                               pencapaian(g) === null
                                 ? "—"
@@ -1565,6 +1643,20 @@ fetchData();
   color: #1b5e20;
   margin-left: 2px;
 }
+/* Baris ringkasan di tab Cutting (versi biru-abu dari blok Line Sewing) */
+.dt tbody tr.sum-row-cutting td,
+.dt tbody tr.sum-row-cutting:hover td {
+  background: #cfd8dc !important;
+  padding: 0;
+  border-bottom: 1px solid #90a4ae;
+}
+.sum-row-cutting .grp-title,
+.sum-row-cutting .grp-chip b {
+  color: #263238;
+}
+.sum-row-cutting .grp-chip {
+  color: #455a64;
+}
 .smv-lock {
   color: #2e7d32;
   vertical-align: -1px;
@@ -1642,6 +1734,31 @@ fetchData();
 .ket-inp:disabled {
   color: inherit;
   cursor: default;
+}
+
+.sb-badge {
+  display: inline-block;
+  padding: 0 6px;
+  border-radius: 8px;
+  font-size: 10px;
+  line-height: 15px;
+  white-space: nowrap;
+}
+.sb-ready {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+.sb-po {
+  background: #e3f2fd;
+  color: #1565c0;
+}
+.sb-warn {
+  background: #fff3e0;
+  color: #e65100;
+}
+.sb-none {
+  background: #fdecea;
+  color: #c62828;
 }
 
 /* Override Vuetify tabs di dalam expand */

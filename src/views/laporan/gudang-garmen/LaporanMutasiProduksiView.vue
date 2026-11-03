@@ -290,6 +290,30 @@ const onExport = async () => {
   );
 };
 
+// Deteksi format otomatis: "1,390" / "1.390" (ribuan) vs "1,5" / "1.5" (desimal)
+const parseAngkaPivot = (raw: string): number => {
+  const s = raw.replace(/\s/g, "");
+  const lastDot = s.lastIndexOf(".");
+  const lastComma = s.lastIndexOf(",");
+  const lastSep = Math.max(lastDot, lastComma);
+  if (lastSep === -1) return Number(s);
+
+  const sepChar = s[lastSep];
+  const after = s.slice(lastSep + 1);
+  const countSep = (s.match(new RegExp(`\\${sepChar}`, "g")) || []).length;
+  const adaSepLain = lastDot !== -1 && lastComma !== -1;
+
+  // Ribuan: tepat 3 digit setelah separator terakhir, atau separator berulang
+  const isRibuan = (after.length === 3 && !adaSepLain) || countSep > 1;
+  if (adaSepLain) {
+    // pemisah terakhir = desimal, yang lain = ribuan
+    const ribuan = sepChar === "." ? /,/g : /\./g;
+    return Number(s.replace(ribuan, "").replace(sepChar, "."));
+  }
+  if (isRibuan) return Number(s.replace(new RegExp(`\\${sepChar}`, "g"), ""));
+  return Number(s.replace(sepChar, "."));
+};
+
 const onExportPivot = async () => {
   const table = await pivotWithFilterRef.value?.exportPivotToExcel?.();
   if (!table) {
@@ -368,7 +392,7 @@ const onExportPivot = async () => {
     const text = String(cell.value ?? "");
     const isNumeric = /^-?[\d.,]+$/.test(text.replace(/\s/g, ""));
     if (isNumeric) {
-      const n = Number(text.replace(/\./g, "").replace(/,/g, "."));
+      const n = parseAngkaPivot(text);
       if (!isNaN(n)) {
         cell.value = n;
         cell.numFmt = "#,##0";
@@ -474,7 +498,7 @@ const rebuildChart = async (table: any) => {
       .map((c: any) => c.text)
       .join(" / ");
     const values = row.slice(rowFieldCount).map((c: any) => {
-      const n = Number(String(c.text).replace(/\./g, "").replace(/,/g, "."));
+      const n = parseAngkaPivot(String(c.text));
       return isNaN(n) ? 0 : n;
     });
     return {

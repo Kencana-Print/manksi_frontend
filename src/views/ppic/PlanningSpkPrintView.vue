@@ -19,6 +19,8 @@ interface DetailRow {
   WipQty?: number;
   WipSatuan?: string;
   WipCatatan?: string;
+  StatusBahan?: string;
+  EstimasiKedatangan?: string;
   QtyPo: number;
   QtyJadwal: number;
   LineKelompok: string;
@@ -204,6 +206,8 @@ const outputMenitHari = (d: DetailRow, qty: number): number | null =>
             <th rowspan="2" width="120">Nomor SPK</th>
             <th rowspan="2">Nama SPK</th>
             <th colspan="2">WIP Bahan</th>
+            <th rowspan="2" width="105">Status Bahan</th>
+            <th rowspan="2" width="70">Est. Kedatangan</th>
             <th rowspan="2" width="70">Qty Target</th>
             <th rowspan="2" width="90">Proses Produksi</th>
             <th rowspan="2" width="70">Output</th>
@@ -224,6 +228,12 @@ const outputMenitHari = (d: DetailRow, qty: number): number | null =>
               }}<span v-if="d.WipCatatan">*</span>
             </td>
             <td class="tc">{{ d.WipSatuan || "-" }}</td>
+            <td class="tc">{{ d.StatusBahan || "-" }}</td>
+            <td class="tc">
+              {{
+                d.EstimasiKedatangan ? formatTanggal(d.EstimasiKedatangan) : "-"
+              }}
+            </td>
             <td class="tr">{{ fmt(d.QtyJadwal) }}</td>
             <td class="tc">{{ d.LineKelompok || "-" }}</td>
             <td class="tr">{{ d.Output ? fmt(d.Output) : "-" }}</td>
@@ -237,10 +247,10 @@ const outputMenitHari = (d: DetailRow, qty: number): number | null =>
             </td>
           </tr>
           <tr v-if="!detail.cutting.length">
-            <td colspan="9" class="tc">Tidak ada data cutting</td>
+            <td colspan="11" class="tc">Tidak ada data cutting</td>
           </tr>
           <tr v-else class="row-total">
-            <td colspan="5">Total</td>
+            <td colspan="7">Total</td>
             <td class="tr">{{ fmt(totalCutting.target) }}</td>
             <td></td>
             <td class="tr">{{ fmt(totalCutting.output) }}</td>

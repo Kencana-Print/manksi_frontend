@@ -8,21 +8,22 @@ import {
 } from "@/services/piutang/rekapPembayaranFormService";
 import { pesanError } from "@/services/piutang/rekapPembayaranService";
 
-interface AgregatRow {
-  supNama: string;
-  bulan: string;
-  nominal: number;
-  rencana: Set<string>;
-}
 interface BarisCetak {
-  supNama: string;
-  bulan: string;
+  tanggal: string; // sudah diformat, kosong bila belum ada rencana
   nominal: number;
-  rencana: string;
+}
+interface GrupCetak {
+  supNama: string;
+  rekening: string;
+  bank: string;
+  atasNama: string;
+  bulan: string;
+  total: number;
+  baris: BarisCetak[];
 }
 interface BlokCetak {
   kategori: string;
-  baris: BarisCetak[];
+  grup: GrupCetak[];
 }
 
 const route = useRoute();
@@ -62,7 +63,8 @@ const fmt = (v: number): string =>
   });
 const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
-// Satu baris = supplier + bulan tagihan di dalam satu kategori (seperti Excel)
+// Satu kelompok = supplier + bulan tagihan di dalam satu kategori (seperti Excel).
+// Di dalamnya dipecah per tanggal rencana, masing-masing dengan nominalnya.
 const blok = computed<BlokCetak[]>(() => {
   const d = data.value;
   if (!d) return [];
@@ -70,31 +72,35 @@ const blok = computed<BlokCetak[]>(() => {
     (a, b) =>
       a.kategoriUrut - b.kategoriUrut ||
       a.supNama.localeCompare(b.supNama) ||
-      a.bulanTagihan.localeCompare(b.bulanTagihan),
+      a.bulanTagihan.localeCompare(b.bulanTagihan) ||
+      (a.tglRencana ?? "9999-99-99").localeCompare(
+        b.tglRencana ?? "9999-99-99",
+      ),
   );
-  const peta = new Map<string, Map<string, AgregatRow>>();
+  const peta = new Map<string, Map<string, GrupCetak>>();
   for (const r of urut) {
-    const baris = peta.get(r.kategori) ?? new Map<string, AgregatRow>();
+    const perKategori = peta.get(r.kategori) ?? new Map<string, GrupCetak>();
     const k = `${r.supKode}|${r.bulanTagihan}`;
-    const row = baris.get(k) ?? {
+    const g: GrupCetak = perKategori.get(k) ?? {
       supNama: r.supNama,
-      bulan: r.bulanTagihan,
-      nominal: 0,
-      rencana: new Set<string>(),
+      rekening: r.supRekening,
+      bank: r.supBank,
+      atasNama: r.supAtasnama,
+      bulan: fmtBulan(r.bulanTagihan),
+      total: 0,
+      baris: [],
     };
-    row.nominal += r.nominal;
-    if (r.tglRencana) row.rencana.add(r.tglRencana);
-    baris.set(k, row);
-    peta.set(r.kategori, baris);
+    const tgl = r.tglRencana ? fmtTgl(r.tglRencana) : "";
+    const ada = g.baris.find((x) => x.tanggal === tgl);
+    if (ada) ada.nominal = round2(ada.nominal + r.nominal);
+    else g.baris.push({ tanggal: tgl, nominal: r.nominal });
+    g.total = round2(g.total + r.nominal);
+    perKategori.set(k, g);
+    peta.set(r.kategori, perKategori);
   }
-  return [...peta.entries()].map(([kategori, baris]) => ({
+  return [...peta.entries()].map(([kategori, grup]) => ({
     kategori,
-    baris: [...baris.values()].map((x) => ({
-      supNama: x.supNama,
-      bulan: fmtBulan(x.bulan),
-      nominal: round2(x.nominal),
-      rencana: [...x.rencana].sort().map(fmtTgl).join(", ") || "",
-    })),
+    grup: [...grup.values()],
   }));
 });
 
@@ -169,30 +175,45 @@ onMounted(async () => {
         </div>
       </div>
 
-      <!-- Tabel (format Excel) -->
       <table class="detail-table">
         <thead>
           <tr>
             <th>NAMA</th>
+            <th width="220" class="tc">NO REKENING</th>
             <th width="120" class="tc">BULAN TAGIHAN</th>
             <th width="130" class="tr">NOMINAL</th>
-            <th width="170" class="tc">RENCANA PEMBAYARAN</th>
+            <th width="140" class="tc">RENCANA PEMBAYARAN</th>
           </tr>
         </thead>
         <tbody v-for="b in blok" :key="b.kategori">
           <tr class="grp-row">
-            <td colspan="4">{{ b.kategori }}</td>
+            <td colspan="5">{{ b.kategori }}</td>
           </tr>
-          <tr v-for="(r, i) in b.baris" :key="i">
-            <td>{{ r.supNama }}</td>
-            <td class="tc">{{ r.bulan }}</td>
-            <td class="tr">{{ fmt(r.nominal) }}</td>
-            <td class="tc">{{ r.rencana }}</td>
-          </tr>
+          <template v-for="(g, gi) in b.grup" :key="gi">
+            <tr v-for="(r, i) in g.baris" :key="i">
+              <td v-if="i === 0" :rowspan="g.baris.length">{{ g.supNama }}</td>
+              <td v-if="i === 0" :rowspan="g.baris.length">
+                <div class="rek-no">{{ g.rekening || "-" }}</div>
+                <div v-if="g.bank || g.atasNama" class="rek-sub">
+                  {{ [g.bank, g.atasNama].filter(Boolean).join(" a.n. ") }}
+                </div>
+              </td>
+              <td v-if="i === 0" :rowspan="g.baris.length" class="tc">
+                {{ g.bulan }}
+              </td>
+              <td class="tr">{{ fmt(r.nominal) }}</td>
+              <td class="tc">{{ r.tanggal }}</td>
+            </tr>
+            <tr v-if="g.baris.length > 1" class="sub-row">
+              <td colspan="3" class="tr">Subtotal {{ g.supNama }}</td>
+              <td class="tr">{{ fmt(g.total) }}</td>
+              <td></td>
+            </tr>
+          </template>
         </tbody>
         <tfoot>
           <tr>
-            <td colspan="2" class="tr fw-bold">TOTAL</td>
+            <td colspan="3" class="tr fw-bold">TOTAL</td>
             <td class="tr fw-bold">{{ fmt(data.total) }}</td>
             <td></td>
           </tr>
@@ -227,14 +248,14 @@ onMounted(async () => {
   font-family: sans-serif;
 }
 .print-container {
-  width: 21cm;
+  width: 29.7cm;
   margin: 0 auto;
   background: #525659;
   padding: 20px 0;
 }
 .print-page {
-  width: 21cm;
-  min-height: 29.7cm;
+  width: 29.7cm;
+  min-height: 21cm;
   padding: 1cm;
   background: white;
   color: black;
@@ -309,6 +330,22 @@ onMounted(async () => {
   font-size: 8pt;
   text-transform: uppercase;
 }
+.detail-table td {
+  vertical-align: top;
+}
+.rek-no {
+  font-weight: bold;
+  letter-spacing: 0.3px;
+}
+.rek-sub {
+  font-size: 7.5pt;
+  color: #444;
+}
+.detail-table .sub-row td {
+  font-style: italic;
+  font-size: 8pt;
+  background: #fafafa;
+}
 .tc {
   text-align: center !important;
 }
@@ -356,7 +393,7 @@ onMounted(async () => {
     box-shadow: none;
   }
   @page {
-    size: A4 portrait;
+    size: A4 landscape;
     margin: 1cm;
   }
 }

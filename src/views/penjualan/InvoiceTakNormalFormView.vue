@@ -740,12 +740,7 @@ onMounted(async () => {
 
         <div class="fg mt4">
           <label class="lb w90">Divisi</label>
-          <select
-            v-model="fd.Divisi"
-            class="inp sel"
-            :disabled="isEditMode"
-            style="flex: 1"
-          >
+          <select v-model="fd.Divisi" class="inp sel" style="flex: 1">
             <option
               v-for="d in divisiList"
               :key="d.kode"

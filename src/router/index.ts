@@ -2135,6 +2135,29 @@ const router = createRouter({
       },
     },
     {
+      path: "/garmen/bahan-jadi/cetak-barcode-koli",
+      name: "CetakBarcodeKoliBrowse",
+      component: () => import("@/views/garmen/CetakBarcodeKoliView.vue"),
+      meta: {
+        title: "Cetak Barcode Koli",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "188",
+      },
+    },
+    {
+      path: "/garmen/bahan-jadi/cetak-barcode-koli/detail/:nomor",
+      name: "CetakBarcodeKoliFormDetail",
+      component: () => import("@/views/garmen/CetakBarcodeKoliFormView.vue"),
+      meta: {
+        title: "Detail Barcode Koli",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "188",
+        browseRoute: "CetakBarcodeKoliBrowse",
+      },
+    },
+    {
       path: "/garmen/bahan-jadi/stbj",
       name: "StbjBrowse",
       component: () => import("@/views/garmen/StbjView.vue"),
@@ -2845,6 +2868,51 @@ const router = createRouter({
       component: () => import("@/views/garmen/SjHasilMakloonPrintView.vue"),
       meta: {
         title: "Cetak SJ Hasil Maklon",
+        layout: "BlankLayout",
+        requiresAuth: true,
+      },
+    },
+    {
+      path: "/garmen/permintaan-marker",
+      name: "PermintaanMarkerBrowse",
+      component: () => import("@/views/garmen/PermintaanMarkerView.vue"),
+      meta: {
+        title: "Permintaan Marker",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "189",
+      },
+    },
+    {
+      path: "/garmen/permintaan-marker/create",
+      name: "PermintaanMarkerCreate",
+      component: () => import("@/views/garmen/PermintaanMarkerFormView.vue"),
+      meta: {
+        title: "Tambah Permintaan Marker",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "189",
+        browseRoute: "PermintaanMarkerBrowse",
+      },
+    },
+    {
+      path: "/garmen/permintaan-marker/edit/:nomor",
+      name: "PermintaanMarkerEdit",
+      component: () => import("@/views/garmen/PermintaanMarkerFormView.vue"),
+      meta: {
+        title: "Ubah Permintaan Marker",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "189",
+        browseRoute: "PermintaanMarkerBrowse",
+      },
+    },
+    {
+      path: "/garmen/permintaan-marker/print/:nomor",
+      name: "PermintaanMarkerPrint",
+      component: () => import("@/views/garmen/PermintaanMarkerPrintView.vue"),
+      meta: {
+        title: "Cetak Permintaan Marker",
         layout: "BlankLayout",
         requiresAuth: true,
       },
@@ -6880,6 +6948,18 @@ const router = createRouter({
       component: () => import("@/views/laporan/spanduk/PemakaianBahanView.vue"),
       meta: {
         title: "Laporan Pemakaian Bahan",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "963",
+      },
+    },
+    {
+      path: "/laporan/produksi-spanduk/ketercapaian-komitmen-kirim",
+      name: "LaporanSpandukKetercapaianKomitmenKirim",
+      component: () =>
+        import("@/views/laporan/spanduk/KetercapaianKomitmenKirimView.vue"),
+      meta: {
+        title: "Laporan Ketercapaian Komitmen Kirim",
         layout: "DefaultLayout",
         requiresAuth: true,
         menuId: "963",

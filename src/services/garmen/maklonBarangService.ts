@@ -10,4 +10,6 @@ export const maklonBarangService = {
     api.get(`/garmen/maklon/makloon-barang/${encodeURIComponent(nomor)}`),
   getPrintData: (nomor: string) =>
     api.get(`/garmen/maklon/makloon-barang/print/${encodeURIComponent(nomor)}`),
+  deleteData: (nomor: string) =>
+    api.delete(`/garmen/maklon/makloon-barang/${encodeURIComponent(nomor)}`),
 };

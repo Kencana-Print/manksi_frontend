@@ -54,7 +54,7 @@ const initialData: PDFormData = {
   namaProject: "",
   customerKode: "",
   customerNama: "",
-  jenisPekerjaan: "BARU",
+  jenisPekerjaan: "",
   dateline: "",
   prioritas: "NORMAL",
   referensi: "",
@@ -107,7 +107,8 @@ const {
       keterangan: data.keterangan,
       prioritas: data.prioritas,
       desainer: data.desainer || undefined,
-      referensi: data.jenisPekerjaan === "REVISI" ? data.referensi : undefined,
+      referensi:
+        data.jenisPekerjaan === "DESAIN ULANG" ? data.referensi : undefined,
       items: items.map(({ desain, jml, desainer }) => ({
         desain,
         jml,
@@ -193,7 +194,7 @@ onMounted(async () => {
       namaProject: d.pd_nama_project ?? "",
       customerKode: d.pd_customer ?? "",
       customerNama: d.pd_customer_nama ?? "",
-      jenisPekerjaan: d.pd_jenis_pekerjaan ?? "BARU",
+      jenisPekerjaan: d.pd_jenis_pekerjaan ?? "",
       dateline: toInputDate(d.pd_dateline),
       prioritas: d.pd_prioritas ?? "NORMAL",
       referensi: d.pd_referensi ?? "",
@@ -248,6 +249,10 @@ const totalJml = computed(() =>
 const onValidateSave = () => {
   if (!formData.value.namaProject.trim()) {
     toast.error("Nama project wajib diisi.");
+    return;
+  }
+  if (!isEdit.value && !formData.value.jenisPekerjaan) {
+    toast.error("Jenis pekerjaan wajib dipilih.");
     return;
   }
   const validItems = formData.value.items.filter(
@@ -325,7 +330,7 @@ const onValidateSave = () => {
 
         <v-select
           v-model="formData.jenisPekerjaan"
-          :items="['BARU', 'REVISI', 'CEK', 'PLOTTER', 'EDIT']"
+          :items="['CEK', 'EDIT', 'DESAIN ULANG']"
           label="Jenis Pekerjaan"
           variant="outlined"
           density="compact"
@@ -335,7 +340,7 @@ const onValidateSave = () => {
         />
 
         <div
-          v-if="formData.jenisPekerjaan === 'REVISI'"
+          v-if="formData.jenisPekerjaan === 'DESAIN ULANG'"
           class="lookup-field mb-3"
         >
           <label class="lookup-label">No. PD Asal (referensi)</label>

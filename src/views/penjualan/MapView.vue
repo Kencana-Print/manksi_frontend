@@ -871,7 +871,7 @@ const confirmToggleClose = async () => {
       <div
         :class="{
           'bg-yellow pa-1 rounded font-weight-bold':
-            item.Design_Baru === 'Y' && item.Design_Done === 'N',
+            item.Design_Baru === 'Y' && item.Design_Done === 'N' && !!item.CMO,
         }"
         style="
           white-space: nowrap;

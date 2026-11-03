@@ -552,6 +552,7 @@ const onExportDetail = async () => {
           ...(idx === 0 ? masterCells : blankMaster),
           KodeBahan: r.KodeBahan,
           NamaBahan: r.NamaBahan,
+          Setting: r.Setting || "",
           Satuan: r.Satuan,
           Babaran: Number(r.Babaran) || 0,
           Pcs: Number(r.Pcs) || 0,
@@ -580,6 +581,7 @@ const onExportDetail = async () => {
       { header: "Status", key: "Status", width: 12, align: "center" },
       { header: "Kode Bahan", key: "KodeBahan", width: 14 },
       { header: "Nama Bahan", key: "NamaBahan", width: 26 },
+      { header: "Setting", key: "Setting", width: 10, align: "center" },
       { header: "Sat", key: "Satuan", width: 8, align: "center" },
       {
         header: "Babaran",
@@ -851,6 +853,7 @@ const num = (val: number) => new Intl.NumberFormat("id-ID").format(val || 0);
                     <th style="width: 140px; text-align: left">Nomor</th>
                     <th style="width: 90px; text-align: left">Kode</th>
                     <th style="text-align: left">Nama Bahan</th>
+                    <th style="width: 70px">Setting</th>
                     <th style="width: 50px">Satuan</th>
                     <th style="width: 70px; text-align: right">Babaran</th>
                     <th style="width: 60px; text-align: right">PCS</th>
@@ -873,6 +876,7 @@ const num = (val: number) => new Intl.NumberFormat("id-ID").format(val || 0);
                       {{ bhn.Kode }}
                     </td>
                     <td>{{ bhn.NamaBahan }}</td>
+                    <td class="tc">{{ bhn.Setting }}</td>
                     <td class="tc">{{ bhn.Satuan }}</td>
                     <td class="tr">{{ num(bhn.Babaran) }}</td>
                     <td class="tr">{{ num(bhn.Pcs) }}</td>
@@ -1007,6 +1011,7 @@ const num = (val: number) => new Intl.NumberFormat("id-ID").format(val || 0);
                       <th style="width: 28px">No</th>
                       <th style="width: 80px; text-align: left">Kode</th>
                       <th style="text-align: left">Nama</th>
+                      <th style="width: 70px">Setting</th>
                       <th style="width: 55px">Satuan</th>
                       <th style="width: 75px; text-align: right">Jumlah</th>
                     </tr>
@@ -1027,6 +1032,7 @@ const num = (val: number) => new Intl.NumberFormat("id-ID").format(val || 0);
                           {{ dtl.Kode }}
                         </td>
                         <td>{{ dtl.Nama }}</td>
+                        <td class="tc">{{ dtl.Setting }}</td>
                         <td class="tc">{{ dtl.Satuan }}</td>
                         <td
                           class="tr"
@@ -1037,7 +1043,7 @@ const num = (val: number) => new Intl.NumberFormat("id-ID").format(val || 0);
                       </tr>
                     </template>
                     <tr v-else>
-                      <td colspan="5" class="empty-td">
+                      <td colspan="6" class="empty-td">
                         Pilih data realisasi di sebelah kiri.
                       </td>
                     </tr>

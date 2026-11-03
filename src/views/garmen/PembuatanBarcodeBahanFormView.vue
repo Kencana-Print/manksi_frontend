@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
+import { useTabsStore } from "@/stores/tabsStore";
 import BaseForm from "@/components/BaseForm.vue";
 import PembuatanBarcodeBahanStickerDialog from "./PembuatanBarcodeBahanStickerDialog.vue";
 import { pembuatanBarcodeBahanFormService } from "@/services/garmen/pembuatanBarcodeBahanFormService";
@@ -39,6 +40,7 @@ const route = useRoute();
 const router = useRouter();
 const toast = useToast();
 const authStore = useAuthStore();
+const tabsStore = useTabsStore();
 
 const nomorParam = computed(() => route.params.nomor as string | undefined);
 const isEditMode = computed(() => !!nomorParam.value);
@@ -254,7 +256,10 @@ const processBpbOrRetur = async (kodeInput: string) => {
   }
 };
 
-const onBpbRetLostFocus = () => processBpbOrRetur(bpbNomor.value);
+const onBpbRetLostFocus = () => {
+  if (isEditMode.value) return; // readonly: blur biasa jangan memicu lookup ulang
+  processBpbOrRetur(bpbNomor.value);
+};
 const onBpbSelected = (item: any) => processBpbOrRetur(item.Nomor);
 const onReturSelected = (item: any) => processBpbOrRetur(item.Nomor);
 
@@ -357,6 +362,18 @@ const onValidateSave = () => {
   showSaveDialog.value = true;
 };
 
+// Kembali ke browse DAN tutup tab form ini (tanpa ini form tetap hidup di
+// tab, dan dialog yang masih terbuka ikut tersisa)
+const kembaliKeBrowse = () => {
+  const currentPath = route.path; // snapshot SEBELUM push
+  router
+    .push({ name: "PembuatanBarcodeBahanBrowse" })
+    .catch(() => {})
+    .then(() => {
+      tabsStore.closeTab(currentPath);
+    });
+};
+
 const onConfirmSave = async () => {
   isSaving.value = true;
   try {
@@ -374,12 +391,12 @@ const onConfirmSave = async () => {
         : await pembuatanBarcodeBahanFormService.create(payload);
 
     toast.success(res.data.message || "Berhasil disimpan.");
-    showSaveDialog.value = false;
-    router.push({ name: "PembuatanBarcodeBahanBrowse" });
+    kembaliKeBrowse();
   } catch (e: any) {
     toast.error(e.response?.data?.message || "Gagal menyimpan data.");
   } finally {
     isSaving.value = false;
+    showSaveDialog.value = false;
   }
 };
 
@@ -389,7 +406,8 @@ const onConfirmCancel = () => {
 };
 
 const onConfirmClose = () => {
-  router.push({ name: "PembuatanBarcodeBahanBrowse" });
+  showCloseDialog.value = false;
+  kembaliKeBrowse();
 };
 
 const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");

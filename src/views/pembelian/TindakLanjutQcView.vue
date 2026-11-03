@@ -23,6 +23,7 @@ interface TlQcRow {
   Nomor: string;
   TglDatang: string;
   Nomor_PO: string;
+  Nomor_SPK: string | null;
   VendorGreige: string;
   VendorCelup: string;
   JenisKain: string;
@@ -109,6 +110,7 @@ const filteredItems = computed<TlQcRow[]>(() => {
     [
       r.Nomor,
       r.Nomor_PO,
+      r.Nomor_SPK,
       r.JenisKain,
       r.VendorGreige,
       r.VendorCelup,
@@ -125,6 +127,7 @@ const headers = [
   { title: "Tgl Datang", key: "TglDatang", width: "100px", align: "center" },
   { title: "Status", key: "Status", width: "110px", align: "center" },
   { title: "Nomor PO", key: "Nomor_PO", width: "140px" },
+  { title: "Nomor SPK", key: "Nomor_SPK", width: "150px" },
   { title: "Jenis Kain", key: "JenisKain", width: "240px" },
   { title: "Vendor Greige", key: "VendorGreige", width: "160px" },
   { title: "Vendor Celup", key: "VendorCelup", width: "160px" },
@@ -494,7 +497,7 @@ const submitPin = async () => {
           <input
             type="text"
             v-model="filterState.search"
-            placeholder="Cari nomor, PO, kain, vendor..."
+            placeholder="Cari nomor, PO, SPK, kain, vendor..."
             class="f-search-inp"
           />
         </div>

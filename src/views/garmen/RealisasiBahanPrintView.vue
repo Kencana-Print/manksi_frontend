@@ -102,6 +102,7 @@ onMounted(async () => {
             <th width="30">No</th>
             <th width="120">Kode</th>
             <th>Nama</th>
+            <th width="60">Setting</th>
             <th width="60">Satuan</th>
             <th width="80" class="text-right">Jumlah</th>
           </tr>
@@ -111,6 +112,7 @@ onMounted(async () => {
             <td class="text-center">{{ Number(idx) + 1 }}</td>
             <td>{{ item.kode }}</td>
             <td>{{ item.nama }}</td>
+            <td class="text-center">{{ item.setting }}</td>
             <td class="text-center">{{ item.satuan }}</td>
             <td class="text-right">{{ num(item.jumlah) }}</td>
           </tr>

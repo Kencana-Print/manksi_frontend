@@ -172,6 +172,7 @@ export interface QcPoLookupItem {
   TanggalPO: string;
   Supplier: string;
   Nourut: number;
+  NomorSpk: string | null;
   KodeBahan: string;
   NamaKain: string;
   Gramasi: string;

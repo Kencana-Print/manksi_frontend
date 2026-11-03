@@ -42,6 +42,7 @@ const headers = [
   { title: "EMAIL", key: "Email", width: "150px" },
   { title: "PIUTANG", key: "Piutang", width: "120px", align: "right" },
   { title: "PLAFON", key: "Plafon", width: "120px", align: "right" },
+  { title: "KATEGORI", key: "Kategori", width: "100px", align: "center" },
   { title: "STATUS PLAFON", key: "PlafonAcc", width: "130px", align: "center" },
   { title: "STATUS", key: "Status", width: "110px", align: "center" },
   { title: "JENIS USAHA", key: "JenisUsaha", width: "130px" },
@@ -61,6 +62,14 @@ const formatCurrency = (val: any) => {
   return new Intl.NumberFormat("en-US", { minimumFractionDigits: 2 }).format(
     num,
   );
+};
+
+const KATEGORI_CLASS: Record<string, string> = {
+  PRIORITAS: "kat-prioritas",
+  LARGE: "kat-large",
+  MEDIUM: "kat-medium",
+  SMALL: "kat-small",
+  "EXTRA SMALL": "kat-xsmall",
 };
 
 const rowPropsFn = (data: any) => {
@@ -203,6 +212,17 @@ const handleDelete = async (item: any) => {
       }}
     </template>
 
+    <template #item.Kategori="{ item }">
+      <span
+        v-if="item.Kategori"
+        class="kat-chip"
+        :class="KATEGORI_CLASS[item.Kategori]"
+      >
+        {{ item.Kategori }}
+      </span>
+      <span v-else class="text-grey-lighten-1">—</span>
+    </template>
+
     <template #item.PlafonAcc="{ item }">
       <span
         v-if="item.PlafonAcc"
@@ -274,5 +294,29 @@ const handleDelete = async (item: any) => {
 }
 :deep(table tbody tr.row-induk td) {
   color: #1565c0 !important;
+}
+.kat-chip {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+  color: white;
+}
+.kat-prioritas {
+  background: #6a1b9a;
+}
+.kat-large {
+  background: #1565c0;
+}
+.kat-medium {
+  background: #00838f;
+}
+.kat-small {
+  background: #ef6c00;
+}
+.kat-xsmall {
+  background: #757575;
 }
 </style>

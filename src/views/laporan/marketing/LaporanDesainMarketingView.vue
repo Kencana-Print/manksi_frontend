@@ -292,11 +292,14 @@ const onExport = async () => {
 
         <select v-model="filterJenis" class="date-inp select-inp">
           <option value="">- Semua Jenis -</option>
-          <option value="BARU">Baru</option>
-          <option value="REVISI">Revisi</option>
           <option value="CEK">Cek</option>
-          <option value="PLOTTER">Plotter</option>
           <option value="EDIT">Edit</option>
+          <option value="DESAIN ULANG">Desain Ulang</option>
+          <optgroup label="Data lama">
+            <option value="BARU">Baru</option>
+            <option value="REVISI">Revisi</option>
+            <option value="PLOTTER">Plotter</option>
+          </optgroup>
         </select>
 
         <select v-model="filterStatus" class="date-inp select-inp">

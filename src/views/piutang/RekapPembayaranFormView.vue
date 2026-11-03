@@ -13,6 +13,7 @@ import {
   IconTrash,
   IconChevronDown,
   IconChevronRight,
+  IconReceipt,
 } from "@tabler/icons-vue";
 import { pesanError } from "@/services/piutang/rekapPembayaranService";
 import {
@@ -21,6 +22,7 @@ import {
   type RekapPayload,
   type SaveHasil,
   type TagihanItem,
+  type VoucherOption,
 } from "@/services/piutang/rekapPembayaranFormService";
 
 interface BarisForm {
@@ -41,6 +43,7 @@ interface BarisForm {
   invoice: string;
   keterangan: string;
   vouNomor: string;
+  pjtNomor: string;
 }
 
 interface RekapForm {
@@ -101,6 +104,12 @@ const isBulan = (v: string) => /^\d{4}-(0[1-9]|1[0-2])$/.test(v);
 
 const TIPE_MINUS = ["RET", "PJG"];
 const isMinus = (tipe: string) => TIPE_MINUS.includes(tipe);
+const TIPE_VOUCHER = "VOU";
+
+// Terkunci: baris transaksi yang sudah divoucher, atau baris voucher yang
+// sudah masuk Pengajuan Transfer. Baris VOU lain masih bebas diubah/dihapus.
+const isKunci = (b: BarisForm): boolean =>
+  b.tipe === TIPE_VOUCHER ? !!b.pjtNomor : !!b.vouNomor;
 
 let seq = 0;
 
@@ -200,6 +209,7 @@ const {
           invoice: r.invoice,
           keterangan: r.keterangan,
           vouNomor: r.vouNomor || "",
+          pjtNomor: r.pjtNomor || "",
         };
       }),
     };
@@ -209,7 +219,7 @@ const {
       tanggal: data.tanggal,
       keterangan: data.keterangan.trim(),
       detail: data.detail
-        .filter((b) => !b.vouNomor)
+        .filter((b) => !isKunci(b))
         .map((b) => ({
           supKode: b.supKode,
           bulanTagihan: b.bulanTagihan,
@@ -291,7 +301,7 @@ const kelompok = computed<Kelompok[]>(() => {
     }
     const nilai = isMinus(b.tipe) ? -b.nominal : b.nominal;
     g.rows.push(b);
-    if (b.vouNomor) g.terkunci = true;
+    if (isKunci(b)) g.terkunci = true;
     g.total = round2(g.total + nilai);
     kel.subtotal = round2(kel.subtotal + nilai);
   }
@@ -517,10 +527,103 @@ const tambahkanTerpilih = () => {
       invoice: "",
       keterangan: "",
       vouNomor: "",
+      pjtNomor: "",
     });
   }
   showTarik.value = false;
   toast.success(`${pilih.length} transaksi ditambahkan.`);
+};
+
+// ── Tambah Voucher (voucher yang sudah ada dipilih langsung) ──
+const showVoucher = ref(false);
+const vouLoading = ref(false);
+const vouSearch = ref("");
+const vouList = ref<VoucherOption[]>([]);
+const vouTerpilih = ref<string[]>([]);
+let vouReq = 0;
+let vouDebounce: ReturnType<typeof setTimeout> | null = null;
+
+const vouSudahAda = (v: VoucherOption): boolean =>
+  form.value.detail.some((b) => b.vouNomor === v.nomor || b.nota === v.nomor);
+const vouSelectable = computed(() =>
+  vouList.value.filter((v) => !vouSudahAda(v)),
+);
+const vouAllSelected = computed(
+  () =>
+    vouSelectable.value.length > 0 &&
+    vouSelectable.value.every((v) => vouTerpilih.value.includes(v.nomor)),
+);
+
+const loadVoucher = async () => {
+  const myReq = ++vouReq;
+  vouLoading.value = true;
+  try {
+    const res = await svc.getVoucherOptions(vouSearch.value, nomorEdit.value);
+    if (myReq !== vouReq) return;
+    vouList.value = res.data.data ?? [];
+  } catch (e) {
+    if (myReq === vouReq) {
+      toast.error(pesanError(e, "Gagal memuat voucher."));
+      vouList.value = [];
+    }
+  } finally {
+    if (myReq === vouReq) vouLoading.value = false;
+  }
+};
+const cariVoucherDebounced = () => {
+  if (vouDebounce) clearTimeout(vouDebounce);
+  vouDebounce = setTimeout(loadVoucher, 350);
+};
+const openVoucher = async () => {
+  vouSearch.value = "";
+  vouList.value = [];
+  vouTerpilih.value = [];
+  showVoucher.value = true;
+  await loadVoucher();
+};
+const toggleVouAll = () => {
+  vouTerpilih.value = vouAllSelected.value
+    ? []
+    : vouSelectable.value.map((v) => v.nomor);
+};
+const toggleVouOne = (v: VoucherOption) => {
+  if (vouSudahAda(v)) return;
+  vouTerpilih.value = vouTerpilih.value.includes(v.nomor)
+    ? vouTerpilih.value.filter((x) => x !== v.nomor)
+    : [...vouTerpilih.value, v.nomor];
+};
+const tambahkanVoucher = () => {
+  const pilih = vouList.value.filter(
+    (v) => vouTerpilih.value.includes(v.nomor) && !vouSudahAda(v),
+  );
+  if (!pilih.length) {
+    toast.warning("Pilih minimal satu voucher.");
+    return;
+  }
+  for (const v of pilih) {
+    form.value.detail.push({
+      key: ++seq,
+      kategori: v.kategori,
+      kategoriUrut: v.kategoriUrut,
+      supKode: v.supKode,
+      supNama: v.supplier,
+      bulanTagihan: v.tanggal.slice(0, 7),
+      tipe: TIPE_VOUCHER,
+      nota: v.nomor,
+      tglNota: v.tanggal,
+      sisaNota: v.nominal,
+      tersedia: 0,
+      nominal: v.nominal,
+      tglRencana: "",
+      fakturPajak: "",
+      invoice: "",
+      keterangan: "",
+      vouNomor: v.nomor,
+      pjtNomor: "",
+    });
+  }
+  showVoucher.value = false;
+  toast.success(`${pilih.length} voucher ditambahkan.`);
 };
 
 // ── Validasi (server tetap validasi ulang) ──
@@ -619,6 +722,16 @@ const validateSave = () => {
         <v-btn v-if="!ro" size="small" color="primary" @click="openTarik">
           <template #prepend><IconDownload :size="14" /></template>
           Tarik Tagihan
+        </v-btn>
+        <v-btn
+          v-if="!ro"
+          size="small"
+          color="primary"
+          variant="tonal"
+          @click="openVoucher"
+        >
+          <template #prepend><IconReceipt :size="14" /></template>
+          Tambah Voucher
         </v-btn>
         <v-spacer />
         <v-btn size="small" variant="text" @click="bukaSemua">Buka Semua</v-btn>
@@ -721,8 +834,15 @@ const validateSave = () => {
                       <tr v-for="b in g.rows" :key="b.key">
                         <td class="td-txt">
                           {{ b.nota }}
-                          <span v-if="b.vouNomor" class="rk-vou">{{
-                            b.vouNomor
+                          <span
+                            v-if="b.vouNomor && b.tipe !== TIPE_VOUCHER"
+                            class="rk-vou"
+                            >{{ b.vouNomor }}</span
+                          >
+                          <span v-if="b.pjtNomor" class="rk-pjt">{{
+                            b.pjtNomor === "-"
+                              ? "Sudah dibayar"
+                              : `PJT ${b.pjtNomor}`
                           }}</span>
                         </td>
                         <td class="td-ctr" style="font-size: 10px">
@@ -749,7 +869,7 @@ const validateSave = () => {
                             v-model="b.tglRencana"
                             type="date"
                             class="cell"
-                            :disabled="ro || !!b.vouNomor"
+                            :disabled="ro || isKunci(b)"
                           />
                         </td>
                         <td class="td-inp">
@@ -757,7 +877,7 @@ const validateSave = () => {
                             v-model="b.fakturPajak"
                             class="cell"
                             maxlength="30"
-                            :disabled="ro"
+                            :disabled="ro || isKunci(b)"
                           />
                         </td>
                         <td class="td-inp">
@@ -765,7 +885,7 @@ const validateSave = () => {
                             v-model="b.invoice"
                             class="cell"
                             maxlength="50"
-                            :disabled="ro"
+                            :disabled="ro || isKunci(b)"
                           />
                         </td>
                         <td class="td-inp">
@@ -773,12 +893,12 @@ const validateSave = () => {
                             v-model="b.keterangan"
                             class="cell"
                             maxlength="200"
-                            :disabled="ro"
+                            :disabled="ro || isKunci(b)"
                           />
                         </td>
                         <td class="td-ctr">
                           <button
-                            v-if="!ro && !b.vouNomor"
+                            v-if="!ro && !isKunci(b)"
                             type="button"
                             class="btn-del"
                             @click="hapusBaris(b.key)"
@@ -797,7 +917,8 @@ const validateSave = () => {
             <tr>
               <td colspan="7" class="text-center text-grey py-4 font-italic">
                 Belum ada transaksi. Klik "Tarik Tagihan" untuk memuat tagihan
-                supplier.
+                supplier, atau "Tambah Voucher" untuk memilih voucher yang sudah
+                ada.
               </td>
             </tr>
           </tbody>
@@ -952,6 +1073,96 @@ const validateSave = () => {
           @click="tambahkanTerpilih"
         >
           Tambahkan ({{ terpilih.length }})
+        </v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
+
+  <!-- Dialog Tambah Voucher -->
+  <v-dialog v-model="showVoucher" max-width="1000px" scrollable>
+    <v-card class="rounded-lg">
+      <v-card-title class="pa-3 text-subtitle-1 text-white bg-primary">
+        Tambah Voucher ke Rekap
+      </v-card-title>
+      <v-card-text class="pa-3">
+        <input
+          v-model="vouSearch"
+          class="f-inp"
+          placeholder="Cari nomor voucher, supplier, atau keterangan"
+          @input="cariVoucherDebounced"
+        />
+        <div style="max-height: 380px; overflow-y: auto; margin-top: 10px">
+          <div v-if="vouLoading" class="text-center py-4 text-grey">
+            Memuat...
+          </div>
+          <table v-else class="mini-table">
+            <thead>
+              <tr>
+                <th style="width: 32px" class="text-center">
+                  <input
+                    type="checkbox"
+                    :checked="vouAllSelected"
+                    :disabled="!vouSelectable.length"
+                    @change="toggleVouAll"
+                  />
+                </th>
+                <th style="width: 140px">Nomor Voucher</th>
+                <th style="width: 105px">Tanggal</th>
+                <th>Supplier</th>
+                <th>Keterangan</th>
+                <th style="width: 130px" class="text-right">Nominal</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="v in vouList"
+                :key="v.nomor"
+                class="mini-row"
+                :class="{
+                  'mini-row--selected': vouTerpilih.includes(v.nomor),
+                  'mini-row--used': vouSudahAda(v),
+                }"
+                @click="toggleVouOne(v)"
+              >
+                <td class="text-center">
+                  <input
+                    type="checkbox"
+                    :checked="vouTerpilih.includes(v.nomor)"
+                    :disabled="vouSudahAda(v)"
+                    @click.stop
+                    @change="toggleVouOne(v)"
+                  />
+                </td>
+                <td>{{ v.nomor }}</td>
+                <td>{{ fmtTgl(v.tanggal) }}</td>
+                <td>{{ v.supplier }}</td>
+                <td>{{ v.keterangan }}</td>
+                <td class="text-right">{{ numFmt(v.nominal) }}</td>
+              </tr>
+              <tr v-if="!vouList.length">
+                <td colspan="6" class="text-center text-grey py-3">
+                  Tidak ada voucher yang tersedia
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </v-card-text>
+      <v-card-actions class="pa-3 border-t bg-grey-lighten-4">
+        <span class="text-caption text-grey-darken-1">
+          {{ vouTerpilih.length }} voucher dipilih
+        </span>
+        <v-spacer />
+        <v-btn variant="text" color="grey-darken-1" @click="showVoucher = false"
+          >Batal</v-btn
+        >
+        <v-btn
+          variant="flat"
+          color="primary"
+          :disabled="!vouTerpilih.length"
+          @click="tambahkanVoucher"
+        >
+          Tambahkan ({{ vouTerpilih.length }})
         </v-btn>
       </v-card-actions>
     </v-card>
@@ -1232,6 +1443,15 @@ const validateSave = () => {
   border-radius: 3px;
   background: #e8f5e9;
   color: #2e7d32;
+  font-size: 10px;
+  font-weight: 700;
+}
+.rk-pjt {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: #e3f2fd;
+  color: #1565c0;
   font-size: 10px;
   font-weight: 700;
 }

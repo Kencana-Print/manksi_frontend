@@ -1,4 +1,9 @@
-export type LaporanTipe = "text" | "number" | "date" | "datetime";
+export type LaporanTipe =
+  | "text"
+  | "number"
+  | "date"
+  | "dateSingkat"
+  | "datetime";
 export type LaporanAlign = "left" | "center" | "right";
 
 export interface LaporanKolom {
@@ -9,7 +14,8 @@ export interface LaporanKolom {
   // Lebar awal dalam px
   width: number;
   align?: LaporanAlign;
-  // number: rata kanan, diformat id-ID; date: dd/mm/yyyy; datetime: dd/mm/yyyy hh:mm
+  // number: rata kanan, diformat id-ID; date: dd/mm/yyyy; dateSingkat: 12 Sep 26;
+  // datetime: dd/mm/yyyy hh:mm
   tipe?: LaporanTipe;
   // Dijumlahkan di footer dan baris TOTAL Excel
   total?: boolean;

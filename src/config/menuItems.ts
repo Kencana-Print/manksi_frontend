@@ -112,7 +112,9 @@ import {
   IconBox,
   IconCar,
   IconBuildingSkyscraper,
+  IconQrcode,
 } from "@tabler/icons-vue";
+import { useMemoInternal } from "@/composables/useMemoInternal";
 
 export interface NavItem {
   title?: string;
@@ -147,6 +149,7 @@ export const createMenuItems = (): NavItem[] => {
   const piutangMenu = ref(false);
   const laporanMenu = ref(false);
   const toolsMenu = ref(false);
+  const { openMemoDialog } = useMemoInternal();
 
   return [
     {
@@ -685,6 +688,13 @@ export const createMenuItems = (): NavItem[] => {
               menuId: 130,
             },
             {
+              title: "Cetak Barcode Koli",
+              to: "/garmen/bahan-jadi/cetak-barcode-koli",
+              icon: IconQrcode,
+              menuId: 188,
+              sembunyikanCabang: ["P02"],
+            },
+            {
               title: "Surat Terima Barang Jadi (STBJ)",
               to: "/garmen/bahan-jadi/stbj",
               icon: IconClipboardCheck,
@@ -803,6 +813,12 @@ export const createMenuItems = (): NavItem[] => {
               menuId: 182,
             },
           ],
+        },
+        {
+          title: "Permintaan Marker",
+          to: "/garmen/permintaan-marker",
+          icon: IconScissors,
+          menuId: 189,
         },
         { divider: true },
         {
@@ -1942,6 +1958,11 @@ export const createMenuItems = (): NavItem[] => {
               to: "/laporan/produksi-spanduk/pemakaian-bahan",
               icon: IconRuler,
             },
+            {
+              title: "Ketercapaian Komitmen Kirim",
+              to: "/laporan/produksi-spanduk/ketercapaian-komitmen-kirim",
+              icon: IconTruckDelivery,
+            },
           ],
         },
         {
@@ -2187,6 +2208,11 @@ export const createMenuItems = (): NavItem[] => {
       model: toolsMenu,
       adminOnly: false,
       items: [
+        {
+          title: "Memo Internal",
+          icon: IconFileText,
+          onClick: () => openMemoDialog(),
+        },
         { title: "Master User", to: "/tools/users", icon: IconUsers },
         { title: "Approval", to: "/tools/approval", icon: IconShieldCheck },
         { divider: true },

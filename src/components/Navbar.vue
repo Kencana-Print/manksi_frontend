@@ -1,10 +1,13 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from "vue";
+import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useAuthStore } from "@/stores/authStore";
 import logoSrc from "@/assets/logo.png";
 
 import { usePasswordDialog } from "@/composables/usePasswordDialog";
 import ChangePasswordDialog from "@/components/dialogs/ChangePasswordDialog.vue";
+import MemoInternalDialog from "@/components/dialogs/MemoInternalDialog.vue";
+import { useMemoInternal } from "@/composables/useMemoInternal";
+import { disconnectAppSocket } from "@/composables/useAppSocket";
 
 import {
   IconShield,
@@ -133,6 +136,29 @@ const handleLogout = async () => {
 
 const { openPasswordDialog } = usePasswordDialog();
 
+const {
+  isOpen: memoOpen,
+  unreadJumlah,
+  initMemoInternal,
+  resetMemoInternal,
+} = useMemoInternal();
+
+// Dialog Memo Internal dibuka dari item menu Tools: tutup dropdown/drawer-nya
+watch(memoOpen, (v) => {
+  if (v) closeMenus();
+});
+
+// Sesi berakhir/logout: putus socket bersama dan bersihkan state memo
+watch(
+  () => authStore.isAuthenticated,
+  (ok) => {
+    if (!ok) {
+      disconnectAppSocket();
+      resetMemoInternal();
+    }
+  },
+);
+
 const openPasswordDialogHandler = () => {
   closeMenus();
   openPasswordDialog(); // Membuka modal kustom global
@@ -152,6 +178,7 @@ onMounted(() => {
   const toolbar = document.querySelector(".v-toolbar__content");
   if (toolbar) resizeObserver.observe(toolbar);
   availableNavWidth.value = window.innerWidth;
+  void initMemoInternal();
 });
 
 onUnmounted(() => {
@@ -207,17 +234,31 @@ onUnmounted(() => {
           <template #activator="{ props }">
             <v-badge
               color="error"
-              dot
+              :dot="!(menu.title === 'Tools' && unreadJumlah > 0)"
+              :content="
+                menu.title === 'Tools' && unreadJumlah > 0
+                  ? unreadJumlah > 99
+                    ? '99+'
+                    : unreadJumlah
+                  : undefined
+              "
               :model-value="
                 (menu.title === 'Garmen' && hasSpkNotif) ||
                 (menu.title === 'Tools' &&
-                  authStore.canSeeApproval &&
-                  authStore.approvalPendingTotal > 0)
+                  (unreadJumlah > 0 ||
+                    (authStore.canSeeApproval &&
+                      authStore.approvalPendingTotal > 0)))
               "
               offset-x="10"
               offset-y="10"
             >
-              <button v-bind="props" class="nav-btn">
+              <button
+                v-bind="props"
+                class="nav-btn"
+                :class="{
+                  'memo-pulse': menu.title === 'Tools' && unreadJumlah > 0,
+                }"
+              >
                 <component
                   :is="menu.icon"
                   :size="15"
@@ -392,6 +433,14 @@ onUnmounted(() => {
                           ? "99+"
                           : authStore.approvalPendingTotal
                       }}
+                    </span>
+                    <span
+                      v-else-if="
+                        item.title === 'Memo Internal' && unreadJumlah > 0
+                      "
+                      class="approval-count-badge"
+                    >
+                      {{ unreadJumlah > 99 ? "99+" : unreadJumlah }}
                     </span>
                   </template>
                 </v-list-item>
@@ -634,6 +683,14 @@ onUnmounted(() => {
                 />
               </template>
               <v-list-item-title>{{ item.title }}</v-list-item-title>
+              <template #append>
+                <span
+                  v-if="item.title === 'Memo Internal' && unreadJumlah > 0"
+                  class="approval-count-badge"
+                >
+                  {{ unreadJumlah > 99 ? "99+" : unreadJumlah }}
+                </span>
+              </template>
             </v-list-item>
           </template>
         </v-list-group>
@@ -668,6 +725,8 @@ onUnmounted(() => {
       </div>
     </template>
   </v-navigation-drawer>
+
+  <MemoInternalDialog />
 
   <ChangePasswordDialog />
 </template>
@@ -1005,5 +1064,19 @@ onUnmounted(() => {
   height: 16px;
   display: inline-flex;
   align-items: center;
+}
+/* ── Tombol Tools berdenyut selama ada memo internal yang belum dibaca ── */
+.nav-btn.memo-pulse {
+  color: #c62828;
+  animation: memo-pulse 1.6s ease-in-out infinite;
+}
+@keyframes memo-pulse {
+  0%,
+  100% {
+    background: rgba(229, 57, 53, 0);
+  }
+  50% {
+    background: rgba(229, 57, 53, 0.14);
+  }
 }
 </style>

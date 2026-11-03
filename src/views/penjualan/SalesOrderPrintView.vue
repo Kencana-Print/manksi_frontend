@@ -133,22 +133,71 @@ const needsAlokasiPage2 = computed(() => {
 });
 // -------------------------------------
 
-const ALOKASI_ROWS_PER_COL = 20;
 const ALOKASI_COLS_PER_PAGE = 4;
+const ALOKASI_COL_MAX_MM = 160; // tinggi maksimal isi satu kolom
+const ALOKASI_LINE_MM = 3.1; // tinggi satu baris teks (7.5pt)
+const ALOKASI_ROW_PAD_MM = 1.8; // padding + border per baris
+const ALOKASI_CHARS_NAMA = 17; // perkiraan karakter per baris kolom Nama Toko
+const ALOKASI_CHARS_ALOK = 10; // perkiraan karakter per baris kolom Alokasi
+
+const wrapLines = (text: string, chars: number) => {
+  const words = String(text || "")
+    .split(/\s+/)
+    .filter(Boolean);
+  if (!words.length) return 1;
+  let lines = 1;
+  let cur = 0;
+  for (const w of words) {
+    const len = Math.max(w.length, 1);
+    if (cur === 0) {
+      cur = len;
+    } else if (cur + 1 + len <= chars) {
+      cur += 1 + len;
+    } else {
+      lines++;
+      cur = len;
+    }
+    // kata lebih panjang dari kolom dipecah paksa
+    if (len > chars) {
+      lines += Math.ceil(len / chars) - 1;
+      cur = len % chars;
+    }
+  }
+  return lines;
+};
+
+const alokasiRowMm = (a: any) => {
+  const lines = Math.max(
+    wrapLines(namaToko(a), ALOKASI_CHARS_NAMA),
+    wrapLines(a.kota || a.alamat, ALOKASI_CHARS_ALOK),
+  );
+  return lines * ALOKASI_LINE_MM + ALOKASI_ROW_PAD_MM;
+};
 
 // Hasil: pages[halaman][kolom][baris]
 const alokasiPages = computed(() => {
   const list = data.value.alokasiList || [];
-  const perPage = ALOKASI_ROWS_PER_COL * ALOKASI_COLS_PER_PAGE;
   const pages: any[][][] = [];
-  for (let p = 0; p < list.length; p += perPage) {
-    const items = list.slice(p, p + perPage);
-    const cols: any[][] = [];
-    for (let c = 0; c < items.length; c += ALOKASI_ROWS_PER_COL) {
-      cols.push(items.slice(c, c + ALOKASI_ROWS_PER_COL));
+  let cols: any[][] = [];
+  let col: any[] = [];
+  let used = 0;
+
+  for (const a of list) {
+    const h = alokasiRowMm(a);
+    if (col.length && used + h > ALOKASI_COL_MAX_MM) {
+      cols.push(col);
+      col = [];
+      used = 0;
+      if (cols.length === ALOKASI_COLS_PER_PAGE) {
+        pages.push(cols);
+        cols = [];
+      }
     }
-    pages.push(cols);
+    col.push(a);
+    used += h;
   }
+  if (col.length) cols.push(col);
+  if (cols.length) pages.push(cols);
   return pages;
 });
 

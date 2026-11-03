@@ -101,14 +101,15 @@ const totalQty = computed(() =>
   ),
 );
 
-const isJoBebasUkuran = computed(
-  () =>
-    ["CM", "LL"].includes(
-      String(props.formData.spk_jo_kode || "").toUpperCase(),
-    ) ||
-    String(props.formData.JenisOrder || "")
-      .toUpperCase()
-      .includes("CELEMEK"),
+const isJoBebasUkuran = computed(() => {
+  const jo = String(props.formData.spk_jo_kode || "").toUpperCase();
+  const nama = String(props.formData.JenisOrder || "").toUpperCase();
+  if (jo === "LL" && isDivisiTiga.value) return false;
+  return ["CM", "LL"].includes(jo) || nama.includes("CELEMEK");
+});
+
+const isDivisiTiga = computed(() =>
+  String(props.formData.spk_divisi).startsWith("3"),
 );
 
 const updateKetUkuran = () => {

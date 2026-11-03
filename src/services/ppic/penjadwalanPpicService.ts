@@ -25,6 +25,9 @@ export const penjadwalanPpicService = {
   getUnnotifiedMap: () => api.get("/ppic/penjadwalan/notif-map"),
   markMapNotified: (pjwdIds: number[]) =>
     api.post("/ppic/penjadwalan/notif-map/mark-read", { pjwdIds }),
+  getUnnotifiedSo: () => api.get("/ppic/penjadwalan/notif-so"),
+  markSoNotified: (pjwdIds: number[]) =>
+    api.post("/ppic/penjadwalan/notif-so/mark-read", { pjwdIds }),
 
   savePencapaian: (
     nomor: string,
@@ -165,4 +168,17 @@ export const penjadwalanPpicService = {
       tanggalBaru,
     });
   },
+
+  getRiwayatKirim: (spk: string) =>
+    api.get("/ppic/penjadwalan/riwayat-kirim", { params: { spk } }),
+
+  saveKesepakatan: (
+    pjwNomor: string,
+    pjwdId: number,
+    items: { Tanggal: string; Qty: number }[],
+  ) =>
+    api.put(`/ppic/penjadwalan-form/row/${pjwdId}/kesepakatan`, {
+      pjwNomor,
+      items,
+    }),
 };

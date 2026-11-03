@@ -1335,7 +1335,7 @@ const submitRevisiPin = async () => {
       <span
         :class="{
           'design-warning':
-            item.Design_Baru === 'Y' && item.Design_Done === 'N',
+            item.Design_Baru === 'Y' && item.Design_Done === 'N' && !!item.CMO,
         }"
       >
         {{ item.Nama }}
