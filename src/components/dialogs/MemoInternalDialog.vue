@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { ref, computed, watch } from "vue";
+import { ref, shallowRef, computed, watch, defineAsyncComponent } from "vue";
 import { useToast } from "vue-toastification";
 import {
   IconFileText,
   IconUpload,
   IconTrash,
-  IconExternalLink,
+  IconEye,
 } from "@tabler/icons-vue";
 import { useMemoInternal } from "@/composables/useMemoInternal";
 import {
@@ -13,6 +13,10 @@ import {
   type MemoItem,
 } from "@/services/tools/memoInternalService";
 import { formatTanggal } from "@/utils/dateFormat";
+// pdf.js hanya diunduh saat memo pertama dibuka (dialog ini global di Navbar)
+const PdfViewer = defineAsyncComponent(
+  () => import("@/components/common/PdfViewer.vue"),
+);
 
 const toast = useToast();
 const { isOpen, closeMemoDialog, refreshUnread } = useMemoInternal();
@@ -64,27 +68,37 @@ const fmtUkuran = (b: number): string =>
     ? `${(b / 1024 / 1024).toFixed(1)} MB`
     : `${Math.max(1, Math.round(b / 1024))} KB`;
 
-// ── Buka PDF (tab baru). Tab dibuka dulu agar tidak diblokir pop-up blocker ──
+// ── Baca PDF di dalam dialog ──
+const aktif = ref<MemoItem | null>(null);
+const pdfData = shallowRef<ArrayBuffer | null>(null);
+
+const subHeader = computed(() =>
+  aktif.value
+    ? [aktif.value.nomor, formatTanggal(aktif.value.tanggal)]
+        .filter(Boolean)
+        .join(" · ")
+    : "Dokumen memo resmi perusahaan (PDF)",
+);
+
+const tutupPdf = () => {
+  aktif.value = null;
+  pdfData.value = null;
+};
+
+const onPdfError = (pesan: string) => {
+  toast.error(pesan);
+  tutupPdf();
+};
+
 const bukaPdf = async (m: MemoItem) => {
-  const w = window.open("", "_blank");
-  if (!w) {
-    toast.warning(
-      "Pop-up diblokir browser. Izinkan pop-up untuk membuka memo.",
-    );
-    return;
-  }
   bukaId.value = m.id;
   try {
     const res = await memoInternalService.getFile(m.id);
-    const url = URL.createObjectURL(
-      new Blob([res.data], { type: "application/pdf" }),
-    );
-    w.location.href = url;
-    setTimeout(() => URL.revokeObjectURL(url), 5 * 60 * 1000);
+    pdfData.value = await res.data.arrayBuffer();
+    aktif.value = m;
     m.sudahBaca = true;
     await refreshUnread();
   } catch (e) {
-    w.close();
     toast.error(await errMsg(e, "Gagal membuka memo."));
   } finally {
     bukaId.value = null;
@@ -191,6 +205,7 @@ const hapus = async () => {
 };
 
 watch(isOpen, (val) => {
+  tutupPdf();
   if (val) {
     resetForm();
     showUpload.value = false;
@@ -200,22 +215,27 @@ watch(isOpen, (val) => {
 </script>
 
 <template>
-  <v-dialog v-model="isOpen" max-width="720px" scrollable>
-    <div class="mid-card">
+  <v-dialog v-model="isOpen" :max-width="aktif ? '1000px' : '720px'" scrollable>
+    <div class="mid-card" :class="{ 'mid-card-viewer': !!aktif }">
       <!-- Header -->
       <div class="mid-header">
         <div class="mid-icon-wrap">
           <IconFileText :size="18" :stroke-width="1.8" color="white" />
         </div>
-        <div>
-          <div class="mid-title">Memo Internal</div>
-          <div class="mid-sub">Dokumen memo resmi perusahaan (PDF)</div>
+        <div style="min-width: 0">
+          <div class="mid-title">
+            {{ aktif ? aktif.judul : "Memo Internal" }}
+          </div>
+          <div class="mid-sub">{{ subHeader }}</div>
         </div>
         <button class="mid-close" @click="closeMemoDialog">✕</button>
       </div>
 
       <!-- Body -->
-      <div class="mid-body">
+      <div v-if="aktif" class="mid-body mid-body-viewer">
+        <PdfViewer :data="pdfData" @error="onPdfError" />
+      </div>
+      <div v-else class="mid-body">
         <!-- Unggah -->
         <div v-if="bolehUpload" class="mid-upload">
           <button
@@ -352,12 +372,12 @@ watch(isOpen, (val) => {
                 :disabled="bukaId === m.id"
                 @click="bukaPdf(m)"
               >
-                <IconExternalLink
+                <IconEye
                   :size="13"
                   :stroke-width="2"
                   style="margin-right: 4px"
                 />
-                {{ bukaId === m.id ? "Membuka..." : "Buka" }}
+                {{ bukaId === m.id ? "Memuat..." : "Lihat" }}
               </button>
               <button
                 v-if="bolehUpload"
@@ -374,6 +394,14 @@ watch(isOpen, (val) => {
       </div>
 
       <div class="mid-footer">
+        <button
+          v-if="aktif"
+          type="button"
+          class="mid-btn-cancel"
+          @click="tutupPdf"
+        >
+          Kembali ke daftar
+        </button>
         <button type="button" class="mid-btn-cancel" @click="closeMemoDialog">
           Tutup
         </button>
@@ -430,6 +458,16 @@ watch(isOpen, (val) => {
   display: flex;
   flex-direction: column;
   max-height: 86vh;
+}
+.mid-card-viewer {
+  height: 90vh;
+  max-height: 90vh;
+}
+.mid-body-viewer {
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 .mid-header {
   display: flex;
