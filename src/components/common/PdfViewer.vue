@@ -2,14 +2,12 @@
 import { ref, watch, onMounted, onBeforeUnmount, nextTick } from "vue";
 import { IconZoomIn, IconZoomOut } from "@tabler/icons-vue";
 import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
-import pdfWorker from "pdfjs-dist/legacy/build/pdf.worker.min.mjs?url";
+import PdfWorker from "pdfjs-dist/legacy/build/pdf.worker.min.mjs?worker";
 import type {
   PDFDocumentLoadingTask,
   PDFDocumentProxy,
   RenderTask,
 } from "pdfjs-dist/types/src/display/api";
-
-pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
 
 const props = defineProps<{ data: ArrayBuffer | null }>();
 const emit = defineEmits<{ (e: "error", pesan: string): void }>();
@@ -78,6 +76,9 @@ const load = async (buf: ArrayBuffer | null) => {
   if (!buf) return;
   try {
     // getDocument memindahkan buffer ke worker, jadi kirim salinan
+    // worker baru per dokumen: loadingTask.destroy() mematikan worker-nya,
+    // jadi worker lama tidak boleh dipakai ulang
+    pdfjsLib.GlobalWorkerOptions.workerPort = new PdfWorker();
     const lt = pdfjsLib.getDocument({ data: new Uint8Array(buf.slice(0)) });
     loadingTask = lt;
     const hasil = await lt.promise;
