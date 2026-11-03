@@ -52,7 +52,8 @@ const filteredItems = computed(() => {
   return items.value.filter(
     (i) =>
       (i.pab_kode?.toLowerCase() || i.Kode?.toLowerCase() || "").includes(q) ||
-      (i.pab_nama?.toLowerCase() || i.Nama?.toLowerCase() || "").includes(q),
+      (i.pab_nama?.toLowerCase() || i.Nama?.toLowerCase() || "").includes(q) ||
+      (i.pab_alamat?.toLowerCase() || i.Alamat?.toLowerCase() || "").includes(q),
   );
 });
 
@@ -66,7 +67,7 @@ const selectItem = (item: any) => {
   <v-dialog
     :model-value="modelValue"
     @update:model-value="emit('update:modelValue', $event)"
-    max-width="500px"
+    max-width="650px"
   >
     <div class="lookup-card">
       <div class="lookup-header">
@@ -110,8 +111,9 @@ const selectItem = (item: any) => {
         <table v-else class="lookup-table">
           <thead>
             <tr>
-              <th style="width: 90px">KODE</th>
-              <th>NAMA WORKSHOP</th>
+              <th style="width: 80px">KODE</th>
+              <th style="width: 150px">NAMA WORKSHOP</th>
+              <th>ALAMAT</th>
             </tr>
           </thead>
           <tbody>
@@ -123,6 +125,9 @@ const selectItem = (item: any) => {
             >
               <td class="td-kode">{{ item.pab_kode || item.Kode }}</td>
               <td class="font-weight-bold">{{ item.pab_nama || item.Nama }}</td>
+              <td class="text-caption text-truncate" style="max-width: 250px" :title="item.Alamat || item.pab_alamat || ''">
+                {{ item.Alamat || item.pab_alamat || '-' }}
+              </td>
             </tr>
           </tbody>
         </table>

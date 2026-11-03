@@ -141,6 +141,7 @@ export const createMenuItems = (): NavItem[] => {
   const ppicMenu = ref(false);
   const spandukMenu = ref(false);
   const garmenMenu = ref(false);
+  const mmtMenu = ref(false);
   const penjualanMenu = ref(false);
   const gaMenu = ref(false);
   const piutangMenu = ref(false);
@@ -942,6 +943,296 @@ export const createMenuItems = (): NavItem[] => {
           to: "/garmen/po-dtf",
           icon: IconPhotoScan,
           menuId: 141,
+        },
+      ],
+    },
+    {
+      title: "MMT",
+      icon: IconPrinter,
+      model: mmtMenu,
+      menuId: 5,
+      items: [
+        {
+          title: "Daftar",
+          icon: IconLayoutList,
+          subItems: [
+            {
+              title: "Master Bahan MMT",
+              to: "/mmt/daftar/bahan",
+              icon: IconTexture,
+              menuId: 5501,
+            },
+            {
+              title: "Operator",
+              to: "/mmt/daftar/operator",
+              icon: IconUsers,
+              menuId: 5502,
+            },
+            {
+              title: "Mesin Produksi",
+              to: "/mmt/daftar/mesin",
+              icon: IconTool,
+              menuId: 5503,
+            },
+          ],
+        },
+        {
+          title: "Bahan Baku & Produksi",
+          icon: IconBuildingFactory2,
+          subItems: [
+            {
+              title: "Permintaan Pembelian",
+              to: "/mmt/bahan-baku-produksi/permintaan-pembelian",
+              icon: IconClipboardList,
+              menuId: 5531,
+            },
+            {
+              title: "Purchase Request (PR)",
+              to: "/mmt/bahan-baku-produksi/purchase-request",
+              icon: IconPackage,
+              menuId: 5532,
+            },
+            {
+              title: "Penerimaan Bahan",
+              to: "/mmt/bahan-baku-produksi/penerimaan-bahan",
+              icon: IconPackage,
+              menuId: 5533,
+            },
+            {
+              title: "Mutasi Bahan MMT",
+              to: "/mmt/bahan-baku-produksi/mutasi-bahan-mmt",
+              icon: IconArrowsExchange,
+              menuId: 5534,
+            },
+            {
+              title: "Koreksi Stok Bahan",
+              to: "/mmt/bahan-baku-produksi/koreksi-stok-bahan",
+              icon: IconClipboardCheck,
+              menuId: 5535,
+            },
+            {
+              title: "Permintaan Produksi",
+              to: "/mmt/bahan-baku-produksi/permintaan-produksi",
+              icon: IconBuildingFactory2,
+              menuId: 5536,
+            },
+            {
+              title: "Realisasi Produksi",
+              to: "/mmt/bahan-baku-produksi/realisasi-permintaan-produksi",
+              icon: IconChecks,
+              menuId: 5537,
+            },
+            {
+              title: "Pinjam Bahan MMT",
+              to: "/mmt/bahan-baku-produksi/pinjam-bahan-mmt",
+              icon: IconArrowsExchange,
+              menuId: 5538,
+            },
+            {
+              title: "Retur Produksi",
+              to: "/mmt/bahan-baku-produksi/retur-permintaan-produksi",
+              icon: IconArrowBackUp,
+              menuId: 5539,
+            },
+            {
+              title: "Barcode",
+              icon: IconBarcode,
+              subItems: [
+                {
+                  title: "Cari Barcode Rol",
+                  to: "/mmt/bahan-baku-produksi/cari-barcode-rol",
+                  icon: IconBarcode,
+                  menuId: 5540,
+                },
+                {
+                  title: "Cetak Ulang Barcode Rol",
+                  to: "/mmt/bahan-baku-produksi/cetak-ulang-barcode-rol",
+                  icon: IconBarcode,
+                  menuId: 5541,
+                },
+                {
+                  title: "Kartu Stok Bahan MMT",
+                  to: "/mmt/bahan-baku-produksi/kartu-stok-bahan-mmt",
+                  icon: IconReportAnalytics,
+                  menuId: 5542,
+                },
+              ],
+            },
+          ],
+        },
+        {
+          title: "Finance",
+          icon: IconCash,
+          subItems: [
+            {
+              title: "PO Bahan MMT",
+              to: "/mmt/finance/po-bahan",
+              icon: IconShoppingCart,
+              menuId: 5504,
+            },
+            {
+              title: "PO External MMT",
+              to: "/mmt/finance/po-external",
+              icon: IconShoppingCartDown,
+              menuId: 5505,
+            },
+            {
+              title: "Retur Beli",
+              to: "/mmt/finance/retur-beli",
+              icon: IconArrowBack,
+              menuId: 5506,
+            },
+          ],
+        },
+        {
+          title: "LHK",
+          icon: IconClipboardList,
+          subItems: [
+            {
+              title: "LHK Cetak (Mesin)",
+              to: "/mmt/lhk/mesin-cetak",
+              icon: IconPrinter,
+              menuId: 5507,
+            },
+            {
+              title: "LHK Approval Cetak",
+              to: "/mmt/lhk/cetak-mmt",
+              icon: IconPhoto,
+              menuId: 5508,
+            },
+            {
+              title: "LHK Tekstil",
+              to: "/mmt/lhk/tekstil",
+              icon: IconTexture,
+              menuId: 5509,
+            },
+            {
+              title: "LHK Approval Tekstil",
+              to: "/mmt/lhk/tekstil/approve",
+              icon: IconChecks,
+              menuId: 5510,
+            },
+            {
+              title: "LHK Finishing",
+              to: "/mmt/lhk/finishing",
+              icon: IconScissors,
+              menuId: 5511,
+            },
+            {
+              title: "LHK Proof",
+              to: "/mmt/lhk/proof",
+              icon: IconFileCheck,
+              menuId: 5512,
+            },
+            {
+              title: "LHK Paperprint",
+              to: "/mmt/lhk/paperprint",
+              icon: IconFileText,
+              menuId: 5513,
+            },
+            {
+              title: "LHK Sublim",
+              to: "/mmt/lhk/sublim",
+              icon: IconFlame,
+              menuId: 5514,
+            },
+            {
+              title: "LHK Layout",
+              to: "/mmt/lhk/layout",
+              icon: IconLayoutGrid,
+              menuId: 5515,
+            },
+          ],
+        },
+        {
+          title: "Maklon Barang",
+          to: "/mmt/maklon/barang",
+          icon: IconPackage,
+          menuId: 5516,
+        },
+        {
+          title: "SJ Hasil Maklon",
+          to: "/mmt/sj-hasil-maklon",
+          icon: IconTruckDelivery,
+          menuId: 5517,
+        },
+        {
+          title: "Planning Produksi",
+          to: "/mmt/planning-produksi",
+          icon: IconCalendarStats,
+          menuId: 5518,
+        },
+        {
+          title: "Komitmen Kirim",
+          to: "/mmt/komitmen-kirim",
+          icon: IconChecks,
+          menuId: 5519,
+        },
+        {
+          title: "Memo Approval Produk (MAP)",
+          to: "/mmt/map",
+          icon: IconFileDescription,
+          menuId: 5520,
+        },
+        {
+          title: "BAST-MAP",
+          to: "/mmt/bast-map",
+          icon: IconFileCheck,
+          menuId: 5521,
+        },
+        {
+          title: "Relationship Map",
+          to: "/mmt/relationship-map",
+          icon: IconChartLine,
+          menuId: 5522,
+        },
+        {
+          title: "SO TO SPK (Surat Perintah Kerja)",
+          to: "/mmt/so-spk",
+          icon: IconFileInvoice,
+          menuId: 5523,
+        },
+        {
+          title: "STBJ",
+          to: "/mmt/stbj",
+          icon: IconBoxSeam,
+          menuId: 5524,
+        },
+        {
+          title: "Surat Jalan",
+          to: "/mmt/surat-jalan",
+          icon: IconTruck,
+          menuId: 5525,
+        },
+        {
+          title: "Surat Jalan Approve",
+          to: "/mmt/surat-jalan/approve",
+          icon: IconShieldCheck,
+          menuId: 5526,
+        },
+        {
+          title: "Jadwal Kirim",
+          to: "/mmt/jadwal-kirim",
+          icon: IconCalendarWeek,
+          menuId: 5527,
+        },
+        {
+          title: "PO Internal",
+          to: "/mmt/po-paperprint",
+          icon: IconFileText,
+          menuId: 5528,
+        },
+        {
+          title: "Mutasi Internal",
+          to: "/mmt/mutasi-internal",
+          icon: IconArrowsExchange,
+          menuId: 5529,
+        },
+        {
+          title: "Penerimaan PO External",
+          to: "/mmt/penerimaan-po-external",
+          icon: IconShoppingCartDown,
+          menuId: 5530,
         },
       ],
     },

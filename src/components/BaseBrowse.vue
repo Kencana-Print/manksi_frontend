@@ -185,6 +185,22 @@ const internalSelected = computed({
 });
 const isSingleSelected = computed(() => internalSelected.value.length === 1);
 
+// ── Expanded Rows ──────────────────────────────────────────────────────
+const internalExpanded = ref<any[]>(props.expanded ?? []);
+
+watch(
+  () => props.expanded,
+  (val) => {
+    internalExpanded.value = val ?? [];
+  },
+  { deep: true },
+);
+
+const onTableUpdateExpanded = (val: any[]) => {
+  internalExpanded.value = val;
+  emit("update:expanded", val);
+};
+
 // ── Column Order (Drag & Drop) ──────────────────────────────────────
 const colOrderKey = computed(
   () => `browse_colorder_${props.storageId ?? props.menuId}`,
@@ -889,8 +905,8 @@ watch(
             :item-value="itemValue"
             :select-strategy="selectStrategy"
             :show-select="selectStrategy !== 'single'"
-            :expanded="expanded"
-            @update:expanded="emit('update:expanded', $event)"
+            :expanded="internalExpanded"
+            @update:expanded="onTableUpdateExpanded"
             return-object
             density="compact"
             fixed-header

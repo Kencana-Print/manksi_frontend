@@ -40,7 +40,8 @@ const isLeftCollapsed = ref(false);
 <template>
   <PageLayout :title="title" :icon="icon" :menu-id="menuId" desktop-mode>
     <template #header-actions>
-      <slot name="header-actions-prepend"></slot>
+      <slot name="header-actions">
+        <slot name="header-actions-prepend"></slot>
       <v-btn
         size="small"
         color="primary"
@@ -76,6 +77,7 @@ const isLeftCollapsed = ref(false);
         </template>
         Tutup
       </v-btn>
+      </slot>
     </template>
 
     <v-overlay

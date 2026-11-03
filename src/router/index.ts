@@ -3451,6 +3451,1044 @@ const router = createRouter({
       },
     },
 
+    // ── MMT > Daftar ─────────────────────────────────────────────────────
+    {
+      path: "/mmt/daftar/bahan",
+      name: "MasterBahanMmtBrowse",
+      component: () => import("@/views/mmt/daftar/MasterBahanMmtView.vue"),
+      meta: {
+        title: "Master Bahan MMT",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5501",
+      },
+    },
+    {
+      path: "/mmt/daftar/bahan/create",
+      name: "MasterBahanMmtCreate",
+      component: () => import("@/views/mmt/daftar/MasterBahanMmtFormView.vue"),
+      meta: {
+        title: "Tambah Master Bahan MMT",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5501",
+        browseRoute: "MasterBahanMmtBrowse",
+      },
+    },
+    {
+      path: "/mmt/daftar/bahan/edit/:kode",
+      name: "MasterBahanMmtEdit",
+      component: () => import("@/views/mmt/daftar/MasterBahanMmtFormView.vue"),
+      meta: {
+        title: "Ubah Master Bahan MMT",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5501",
+        browseRoute: "MasterBahanMmtBrowse",
+      },
+    },
+    {
+      path: "/mmt/daftar/operator",
+      name: "OperatorMmtBrowse",
+      component: () => import("@/views/mmt/daftar/OperatorMmtView.vue"),
+      meta: {
+        title: "Operator MMT",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5502",
+      },
+    },
+    {
+      path: "/mmt/daftar/operator/create",
+      name: "OperatorMmtCreate",
+      component: () => import("@/views/mmt/daftar/OperatorMmtFormView.vue"),
+      meta: {
+        title: "Tambah Operator MMT",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5502",
+        browseRoute: "OperatorMmtBrowse",
+      },
+    },
+    {
+      path: "/mmt/daftar/operator/edit/:kode",
+      name: "OperatorMmtEdit",
+      component: () => import("@/views/mmt/daftar/OperatorMmtFormView.vue"),
+      meta: {
+        title: "Ubah Operator MMT",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5502",
+        browseRoute: "OperatorMmtBrowse",
+      },
+    },
+    {
+      path: "/mmt/daftar/mesin",
+      name: "MesinMmtBrowse",
+      component: () => import("@/views/mmt/daftar/MesinMmtView.vue"),
+      meta: {
+        title: "Mesin Produksi MMT",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5503",
+      },
+    },
+    {
+      path: "/mmt/daftar/mesin/create",
+      name: "MesinMmtCreate",
+      component: () => import("@/views/mmt/daftar/MesinMmtFormView.vue"),
+      meta: {
+        title: "Tambah Mesin Produksi MMT",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5503",
+        browseRoute: "MesinMmtBrowse",
+      },
+    },
+    {
+      path: "/mmt/daftar/mesin/edit/:kode",
+      name: "MesinMmtEdit",
+      component: () => import("@/views/mmt/daftar/MesinMmtFormView.vue"),
+      meta: {
+        title: "Ubah Mesin Produksi MMT",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5503",
+        browseRoute: "MesinMmtBrowse",
+      },
+    },
+
+    // ── MMT > Bahan Baku & Produksi (5531 - 5542) ────────────────────────
+    {
+      path: "/mmt/bahan-baku-produksi/permintaan-pembelian",
+      alias: "/mmt/bahan-baku-produksi/pengajuan-permintaan",
+      name: "PermintaanPembelianBrowse",
+      component: () =>
+        import("@/views/mmt/bahan-baku-produksi/PermintaanPembelianView.vue"),
+      meta: {
+        title: "Permintaan Pembelian",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5531",
+      },
+    },
+    {
+      path: "/mmt/bahan-baku-produksi/permintaan-pembelian/create",
+      alias: "/mmt/bahan-baku-produksi/pengajuan-permintaan/create",
+      name: "PermintaanPembelianCreate",
+      component: () =>
+        import("@/views/mmt/bahan-baku-produksi/PermintaanPembelianFormView.vue"),
+      meta: {
+        title: "Tambah Permintaan Pembelian",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5531",
+        browseRoute: "PermintaanPembelianBrowse",
+      },
+    },
+    {
+      path: "/mmt/bahan-baku-produksi/permintaan-pembelian/edit/:nomor",
+      alias: "/mmt/bahan-baku-produksi/pengajuan-permintaan/edit/:nomor",
+      name: "PermintaanPembelianEdit",
+      component: () =>
+        import("@/views/mmt/bahan-baku-produksi/PermintaanPembelianFormView.vue"),
+      meta: {
+        title: "Ubah Permintaan Pembelian",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5531",
+        browseRoute: "PermintaanPembelianBrowse",
+      },
+    },
+    {
+      path: "/mmt/bahan-baku-produksi/permintaan-pembelian/print/:nomor",
+      alias: "/mmt/bahan-baku-produksi/pengajuan-permintaan/print/:nomor",
+      name: "PermintaanPembelianPrint",
+      component: () =>
+        import("@/views/mmt/bahan-baku-produksi/PermintaanPembelianPrintView.vue"),
+      meta: {
+        title: "Cetak Permintaan Pembelian",
+        layout: "BlankLayout",
+        requiresAuth: true,
+        menuId: "5531",
+      },
+    },
+    {
+      path: "/mmt/bahan-baku-produksi/purchase-request",
+      alias: [
+        "/mmt/bahan-baku-produksi/permintaan-bahan-gudang-utama",
+        "/mmt/bahan-baku-produksi/permintaan-bahan",
+      ],
+      name: "PurchaseRequestBrowse",
+      component: () =>
+        import("@/views/mmt/bahan-baku-produksi/PurchaseRequestView.vue"),
+      meta: {
+        title: "Purchase Request (PR)",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5532",
+      },
+    },
+    {
+      path: "/mmt/bahan-baku-produksi/purchase-request/create",
+      alias: [
+        "/mmt/bahan-baku-produksi/permintaan-bahan-gudang-utama/create",
+        "/mmt/bahan-baku-produksi/permintaan-bahan/create",
+      ],
+      name: "PurchaseRequestCreate",
+      component: () =>
+        import("@/views/mmt/bahan-baku-produksi/PurchaseRequestFormView.vue"),
+      meta: {
+        title: "Tambah Purchase Request (PR)",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5532",
+        browseRoute: "PurchaseRequestBrowse",
+      },
+    },
+    {
+      path: "/mmt/bahan-baku-produksi/purchase-request/edit/:nomor",
+      alias: [
+        "/mmt/bahan-baku-produksi/permintaan-bahan-gudang-utama/edit/:nomor",
+        "/mmt/bahan-baku-produksi/permintaan-bahan/edit/:nomor",
+      ],
+      name: "PurchaseRequestEdit",
+      component: () =>
+        import("@/views/mmt/bahan-baku-produksi/PurchaseRequestFormView.vue"),
+      meta: {
+        title: "Ubah Purchase Request (PR)",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5532",
+        browseRoute: "PurchaseRequestBrowse",
+      },
+    },
+    {
+      path: "/mmt/bahan-baku-produksi/purchase-request/print/:nomor",
+      alias: [
+        "/mmt/bahan-baku-produksi/permintaan-bahan-gudang-utama/print/:nomor",
+        "/mmt/bahan-baku-produksi/permintaan-bahan/print/:nomor",
+      ],
+      name: "PurchaseRequestPrint",
+      component: () =>
+        import("@/views/mmt/bahan-baku-produksi/PurchaseRequestPrintView.vue"),
+      meta: {
+        title: "Cetak Purchase Request (PR)",
+        layout: "BlankLayout",
+        requiresAuth: true,
+        menuId: "5532",
+      },
+    },
+    {
+      path: "/mmt/bahan-baku-produksi/penerimaan-bahan",
+      name: "PenerimaanBahanBrowse",
+      component: () =>
+        import("@/views/mmt/bahan-baku-produksi/PenerimaanBahanView.vue"),
+      meta: {
+        title: "Penerimaan Bahan",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5533",
+      },
+    },
+    {
+      path: "/mmt/bahan-baku-produksi/penerimaan-bahan/create",
+      name: "PenerimaanBahanCreate",
+      component: () =>
+        import("@/views/mmt/bahan-baku-produksi/PenerimaanBahanFormView.vue"),
+      meta: {
+        title: "Tambah Penerimaan Bahan",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5533",
+        browseRoute: "PenerimaanBahanBrowse",
+      },
+    },
+    {
+      path: "/mmt/bahan-baku-produksi/penerimaan-bahan/edit/:nomor",
+      name: "PenerimaanBahanEdit",
+      component: () =>
+        import("@/views/mmt/bahan-baku-produksi/PenerimaanBahanFormView.vue"),
+      meta: {
+        title: "Ubah Penerimaan Bahan",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5533",
+        browseRoute: "PenerimaanBahanBrowse",
+      },
+    },
+    {
+      path: "/mmt/bahan-baku-produksi/penerimaan-bahan/print/:nomor",
+      name: "PenerimaanBahanPrint",
+      component: () =>
+        import("@/views/mmt/bahan-baku-produksi/PenerimaanBahanPrintView.vue"),
+      meta: {
+        title: "Cetak Penerimaan Bahan",
+        layout: "BlankLayout",
+        requiresAuth: true,
+        menuId: "5533",
+      },
+    },
+    {
+      path: "/mmt/bahan-baku-produksi/mutasi-bahan-mmt",
+      name: "MutasiBahanMmtBrowse",
+      component: () =>
+        import("@/views/mmt/bahan-baku-produksi/MutasiBahanMmtView.vue"),
+      meta: {
+        title: "Mutasi Bahan MMT",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5534",
+      },
+    },
+    {
+      path: "/mmt/bahan-baku-produksi/mutasi-bahan-mmt/create",
+      name: "MutasiBahanMmtCreate",
+      component: () =>
+        import("@/views/mmt/bahan-baku-produksi/MutasiBahanMmtFormView.vue"),
+      meta: {
+        title: "Tambah Mutasi Bahan MMT",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5534",
+        browseRoute: "MutasiBahanMmtBrowse",
+      },
+    },
+    {
+      path: "/mmt/bahan-baku-produksi/mutasi-bahan-mmt/edit/:nomor",
+      name: "MutasiBahanMmtEdit",
+      component: () =>
+        import("@/views/mmt/bahan-baku-produksi/MutasiBahanMmtFormView.vue"),
+      meta: {
+        title: "Ubah Mutasi Bahan MMT",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5534",
+        browseRoute: "MutasiBahanMmtBrowse",
+      },
+    },
+    {
+      path: "/mmt/bahan-baku-produksi/mutasi-bahan-mmt/print/:nomor",
+      name: "MutasiBahanMmtPrint",
+      component: () =>
+        import("@/views/mmt/bahan-baku-produksi/MutasiBahanMmtPrintView.vue"),
+      meta: {
+        title: "Cetak Mutasi Bahan MMT",
+        layout: "BlankLayout",
+        requiresAuth: true,
+        menuId: "5534",
+      },
+    },
+    {
+      path: "/mmt/bahan-baku-produksi/koreksi-stok-bahan",
+      name: "KoreksiStokBahanBrowse",
+      component: () =>
+        import("@/views/mmt/bahan-baku-produksi/KoreksiStokBahanView.vue"),
+      meta: {
+        title: "Koreksi Stok Bahan",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5535",
+      },
+    },
+    {
+      path: "/mmt/bahan-baku-produksi/koreksi-stok-bahan/create",
+      name: "KoreksiStokBahanCreate",
+      component: () =>
+        import("@/views/mmt/bahan-baku-produksi/KoreksiStokBahanFormView.vue"),
+      meta: {
+        title: "Tambah Koreksi Stok Bahan",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5535",
+        browseRoute: "KoreksiStokBahanBrowse",
+      },
+    },
+    {
+      path: "/mmt/bahan-baku-produksi/koreksi-stok-bahan/edit/:nomor",
+      name: "KoreksiStokBahanEdit",
+      component: () =>
+        import("@/views/mmt/bahan-baku-produksi/KoreksiStokBahanFormView.vue"),
+      meta: {
+        title: "Ubah Koreksi Stok Bahan",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5535",
+        browseRoute: "KoreksiStokBahanBrowse",
+      },
+    },
+    {
+      path: "/mmt/bahan-baku-produksi/koreksi-stok-bahan/print/:nomor",
+      name: "KoreksiStokBahanPrint",
+      component: () =>
+        import("@/views/mmt/bahan-baku-produksi/KoreksiStokBahanPrintView.vue"),
+      meta: {
+        title: "Cetak Koreksi Stok Bahan",
+        layout: "BlankLayout",
+        requiresAuth: true,
+        menuId: "5535",
+      },
+    },
+    {
+      path: "/mmt/bahan-baku-produksi/permintaan-produksi",
+      name: "PermintaanProduksiBrowse",
+      component: () =>
+        import("@/views/mmt/bahan-baku-produksi/PermintaanProduksiView.vue"),
+      meta: {
+        title: "Permintaan Produksi",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5536",
+      },
+    },
+    {
+      path: "/mmt/bahan-baku-produksi/permintaan-produksi/create",
+      name: "PermintaanProduksiCreate",
+      component: () =>
+        import("@/views/mmt/bahan-baku-produksi/PermintaanProduksiFormView.vue"),
+      meta: {
+        title: "Tambah Permintaan Produksi",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5536",
+        browseRoute: "PermintaanProduksiBrowse",
+      },
+    },
+    {
+      path: "/mmt/bahan-baku-produksi/permintaan-produksi/edit/:nomor",
+      name: "PermintaanProduksiEdit",
+      component: () =>
+        import("@/views/mmt/bahan-baku-produksi/PermintaanProduksiFormView.vue"),
+      meta: {
+        title: "Ubah Permintaan Produksi",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5536",
+        browseRoute: "PermintaanProduksiBrowse",
+      },
+    },
+    {
+      path: "/mmt/bahan-baku-produksi/permintaan-produksi/print/:nomor",
+      name: "PermintaanProduksiPrint",
+      component: () =>
+        import("@/views/mmt/bahan-baku-produksi/PermintaanProduksiPrintView.vue"),
+      meta: {
+        title: "Cetak Permintaan Produksi",
+        layout: "BlankLayout",
+        requiresAuth: true,
+        menuId: "5536",
+      },
+    },
+    {
+      path: "/mmt/bahan-baku-produksi/realisasi-permintaan-produksi",
+      name: "RealisasiPermintaanProduksiBrowse",
+      component: () =>
+        import("@/views/mmt/bahan-baku-produksi/RealisasiPermintaanProduksiView.vue"),
+      meta: {
+        title: "Realisasi Produksi",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5537",
+      },
+    },
+    {
+      path: "/mmt/bahan-baku-produksi/realisasi-permintaan-produksi/create",
+      name: "RealisasiPermintaanProduksiCreate",
+      component: () =>
+        import("@/views/mmt/bahan-baku-produksi/RealisasiPermintaanProduksiFormView.vue"),
+      meta: {
+        title: "Tambah Realisasi Produksi",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5537",
+        browseRoute: "RealisasiPermintaanProduksiBrowse",
+      },
+    },
+    {
+      path: "/mmt/bahan-baku-produksi/realisasi-permintaan-produksi/edit/:nomor",
+      name: "RealisasiPermintaanProduksiEdit",
+      component: () =>
+        import("@/views/mmt/bahan-baku-produksi/RealisasiPermintaanProduksiFormView.vue"),
+      meta: {
+        title: "Ubah Realisasi Produksi",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5537",
+        browseRoute: "RealisasiPermintaanProduksiBrowse",
+      },
+    },
+    {
+      path: "/mmt/bahan-baku-produksi/realisasi-permintaan-produksi/print/:nomor",
+      name: "RealisasiPermintaanProduksiPrint",
+      component: () =>
+        import("@/views/mmt/bahan-baku-produksi/RealisasiPermintaanProduksiPrintView.vue"),
+      meta: {
+        title: "Cetak Realisasi Produksi",
+        layout: "BlankLayout",
+        requiresAuth: true,
+        menuId: "5537",
+      },
+    },
+    {
+      path: "/mmt/bahan-baku-produksi/pinjam-bahan-mmt",
+      name: "PinjamBahanMmtBrowse",
+      component: () =>
+        import("@/views/mmt/bahan-baku-produksi/PinjamBahanMmtView.vue"),
+      meta: {
+        title: "Pinjam Bahan MMT",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5538",
+      },
+    },
+    {
+      path: "/mmt/bahan-baku-produksi/pinjam-bahan-mmt/create",
+      name: "PinjamBahanMmtCreate",
+      component: () =>
+        import("@/views/mmt/bahan-baku-produksi/PinjamBahanMmtFormView.vue"),
+      meta: {
+        title: "Tambah Permintaan Pinjam Bahan",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5538",
+        browseRoute: "PinjamBahanMmtBrowse",
+      },
+    },
+    {
+      path: "/mmt/bahan-baku-produksi/retur-permintaan-produksi",
+      name: "ReturPermintaanProduksiBrowse",
+      component: () =>
+        import("@/views/mmt/bahan-baku-produksi/ReturPermintaanProduksiView.vue"),
+      meta: {
+        title: "Retur Produksi",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5539",
+      },
+    },
+    {
+      path: "/mmt/bahan-baku-produksi/retur-permintaan-produksi/create",
+      name: "ReturPermintaanProduksiCreate",
+      component: () =>
+        import("@/views/mmt/bahan-baku-produksi/ReturPermintaanProduksiFormView.vue"),
+      meta: {
+        title: "Tambah Retur Produksi",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5539",
+        browseRoute: "ReturPermintaanProduksiBrowse",
+      },
+    },
+    {
+      path: "/mmt/bahan-baku-produksi/retur-permintaan-produksi/edit/:nomor",
+      name: "ReturPermintaanProduksiEdit",
+      component: () =>
+        import("@/views/mmt/bahan-baku-produksi/ReturPermintaanProduksiFormView.vue"),
+      meta: {
+        title: "Ubah Retur Produksi",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5539",
+        browseRoute: "ReturPermintaanProduksiBrowse",
+      },
+    },
+    {
+      path: "/mmt/bahan-baku-produksi/retur-permintaan-produksi/print/:nomor",
+      name: "ReturPermintaanProduksiPrint",
+      component: () =>
+        import("@/views/mmt/bahan-baku-produksi/ReturPermintaanProduksiPrintView.vue"),
+      meta: {
+        title: "Cetak Retur Produksi",
+        layout: "BlankLayout",
+        requiresAuth: true,
+        menuId: "5539",
+      },
+    },
+    {
+      path: "/mmt/bahan-baku-produksi/cari-barcode-rol",
+      name: "CariBarcodeRolView",
+      component: () =>
+        import("@/views/mmt/bahan-baku-produksi/CariBarcodeRolView.vue"),
+      meta: {
+        title: "Cari Barcode Rol",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5540",
+      },
+    },
+    {
+      path: "/mmt/bahan-baku-produksi/cetak-ulang-barcode-rol",
+      name: "CetakUlangBarcodeRolBrowse",
+      component: () =>
+        import("@/views/mmt/bahan-baku-produksi/CetakUlangBarcodeRolView.vue"),
+      meta: {
+        title: "Cetak Ulang Barcode Rol",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5541",
+      },
+    },
+    {
+      path: "/mmt/bahan-baku-produksi/cetak-ulang-barcode-rol/create",
+      name: "CetakUlangBarcodeRolCreate",
+      component: () =>
+        import("@/views/mmt/bahan-baku-produksi/CetakUlangBarcodeRolFormView.vue"),
+      meta: {
+        title: "Generate Barcode Rol",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5541",
+        browseRoute: "CetakUlangBarcodeRolBrowse",
+      },
+    },
+    {
+      path: "/mmt/bahan-baku-produksi/kartu-stok-bahan-mmt",
+      name: "KartuStokBahanMmtView",
+      component: () =>
+        import("@/views/mmt/bahan-baku-produksi/KartuStokBahanMmtView.vue"),
+      meta: {
+        title: "Kartu Stok Bahan MMT",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5542",
+      },
+    },
+
+    // ── MMT > Finance ────────────────────────────────────────────────────
+    {
+      path: "/mmt/finance/po-bahan",
+      name: "PoBahanMmtBrowse",
+      component: () => import("@/views/mmt/finance/PoBahanMmtView.vue"),
+      meta: {
+        title: "PO Bahan MMT",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5504",
+      },
+    },
+    {
+      path: "/mmt/finance/po-bahan/create",
+      name: "PoBahanMmtCreate",
+      component: () => import("@/views/mmt/finance/PoBahanMmtFormView.vue"),
+      meta: {
+        title: "Tambah PO Bahan MMT",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5504",
+        browseRoute: "PoBahanMmtBrowse",
+      },
+    },
+    {
+      path: "/mmt/finance/po-bahan/edit/:nomor",
+      name: "PoBahanMmtEdit",
+      component: () => import("@/views/mmt/finance/PoBahanMmtFormView.vue"),
+      meta: {
+        title: "Ubah PO Bahan MMT",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5504",
+        browseRoute: "PoBahanMmtBrowse",
+      },
+    },
+    {
+      path: "/mmt/finance/po-bahan/print/:nomor",
+      name: "PoBahanMmtPrint",
+      component: () => import("@/views/mmt/finance/PoBahanMmtPrintView.vue"),
+      meta: {
+        title: "Cetak PO Bahan MMT",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5504",
+        browseRoute: "PoBahanMmtBrowse",
+      },
+    },
+    {
+      path: "/mmt/finance/po-external",
+      name: "PoExternalMmtBrowse",
+      component: () => import("@/views/mmt/finance/PoExternalMmtView.vue"),
+      meta: {
+        title: "PO External MMT",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5505",
+      },
+    },
+    {
+      path: "/mmt/finance/po-external/create",
+      name: "PoExternalMmtCreate",
+      component: () => import("@/views/mmt/finance/PoExternalMmtFormView.vue"),
+      meta: {
+        title: "Tambah PO External MMT",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5505",
+        browseRoute: "PoExternalMmtBrowse",
+      },
+    },
+    {
+      path: "/mmt/finance/po-external/edit/:nomor",
+      name: "PoExternalMmtEdit",
+      component: () => import("@/views/mmt/finance/PoExternalMmtFormView.vue"),
+      meta: {
+        title: "Ubah PO External MMT",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5505",
+        browseRoute: "PoExternalMmtBrowse",
+      },
+    },
+    {
+      path: "/mmt/finance/po-external/print/:nomor",
+      name: "PoExternalMmtPrint",
+      component: () => import("@/views/mmt/finance/PoExternalMmtPrintView.vue"),
+      meta: {
+        title: "Cetak PO External MMT",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5505",
+        browseRoute: "PoExternalMmtBrowse",
+      },
+    },
+    {
+      path: "/mmt/finance/retur-beli",
+      name: "ReturBeliMmtBrowse",
+      component: () => import("@/views/mmt/finance/ReturBeliMmtView.vue"),
+      meta: {
+        title: "Retur Beli MMT",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5506",
+      },
+    },
+    {
+      path: "/mmt/finance/retur-beli/create",
+      name: "ReturBeliMmtCreate",
+      component: () => import("@/views/mmt/finance/ReturBeliMmtFormView.vue"),
+      meta: {
+        title: "Tambah Retur Beli MMT",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5506",
+        browseRoute: "ReturBeliMmtBrowse",
+      },
+    },
+    {
+      path: "/mmt/finance/retur-beli/edit/:nomor",
+      name: "ReturBeliMmtEdit",
+      component: () => import("@/views/mmt/finance/ReturBeliMmtFormView.vue"),
+      meta: {
+        title: "Ubah Retur Beli MMT",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5506",
+        browseRoute: "ReturBeliMmtBrowse",
+      },
+    },
+
+    // ── MMT > LHK ────────────────────────────────────────────────────────
+    {
+      path: "/mmt/lhk/mesin-cetak",
+      name: "LhkCetakMesinBrowse",
+      component: () => import("@/views/mmt/lhk/LhkCetakMesinView.vue"),
+      meta: {
+        title: "LHK Cetak (Mesin)",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5507",
+      },
+    },
+    {
+      path: "/mmt/lhk/mesin-cetak/create",
+      name: "LhkCetakMesinCreate",
+      component: () => import("@/views/mmt/lhk/LhkCetakMesinFormView.vue"),
+      meta: {
+        title: "Tambah LHK Cetak Mesin",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5507",
+        browseRoute: "LhkCetakMesinBrowse",
+      },
+    },
+    {
+      path: "/mmt/lhk/mesin-cetak/edit/:nomor",
+      name: "LhkCetakMesinEdit",
+      component: () => import("@/views/mmt/lhk/LhkCetakMesinFormView.vue"),
+      meta: {
+        title: "Ubah LHK Cetak Mesin",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5507",
+        browseRoute: "LhkCetakMesinBrowse",
+      },
+    },
+    {
+      path: "/mmt/lhk/mesin-cetak/print/:nomor",
+      name: "LhkCetakMesinPrint",
+      component: () => import("@/views/mmt/lhk/LhkCetakMesinPrintView.vue"),
+      meta: {
+        title: "Cetak LHK Cetak Mesin",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5507",
+        browseRoute: "LhkCetakMesinBrowse",
+      },
+    },
+    {
+      path: "/mmt/lhk/cetak-mmt",
+      name: "LhkApprovalCetakBrowse",
+      component: () => import("@/views/mmt/lhk/LhkApprovalCetakView.vue"),
+      meta: {
+        title: "LHK Approval Cetak",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5508",
+      },
+    },
+    {
+      path: "/mmt/lhk/tekstil",
+      name: "LhkTekstilBrowse",
+      component: () => import("@/views/mmt/lhk/LhkTekstilView.vue"),
+      meta: {
+        title: "LHK Tekstil",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5509",
+      },
+    },
+    {
+      path: "/mmt/lhk/tekstil/approve",
+      name: "LhkApprovalTekstilBrowse",
+      component: () => import("@/views/mmt/lhk/LhkApprovalTekstilView.vue"),
+      meta: {
+        title: "LHK Approval Tekstil",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5510",
+      },
+    },
+    {
+      path: "/mmt/lhk/finishing",
+      name: "LhkFinishingBrowse",
+      component: () => import("@/views/mmt/lhk/LhkFinishingView.vue"),
+      meta: {
+        title: "LHK Finishing",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5511",
+      },
+    },
+    {
+      path: "/mmt/lhk/proof",
+      name: "LhkProofBrowse",
+      component: () => import("@/views/mmt/lhk/LhkProofView.vue"),
+      meta: {
+        title: "LHK Proof",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5512",
+      },
+    },
+    {
+      path: "/mmt/lhk/paperprint",
+      name: "LhkPaperprintBrowse",
+      component: () => import("@/views/mmt/lhk/LhkPaperprintView.vue"),
+      meta: {
+        title: "LHK Paperprint",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5513",
+      },
+    },
+    {
+      path: "/mmt/lhk/sublim",
+      name: "LhkSublimBrowse",
+      component: () => import("@/views/mmt/lhk/LhkSublimView.vue"),
+      meta: {
+        title: "LHK Sublim",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5514",
+      },
+    },
+    {
+      path: "/mmt/lhk/layout",
+      name: "LhkLayoutBrowse",
+      component: () => import("@/views/mmt/lhk/LhkLayoutView.vue"),
+      meta: {
+        title: "LHK Layout",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5515",
+      },
+    },
+
+    // ── MMT > Menu Mandiri (5516 - 5530) ─────────────────────────────────
+    {
+      path: "/mmt/maklon/barang",
+      name: "MaklonBarangMmtBrowse",
+      component: () => import("@/views/mmt/transaksi/MaklonBarangMmtView.vue"),
+      meta: {
+        title: "Maklon Barang MMT",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5516",
+      },
+    },
+    {
+      path: "/mmt/sj-hasil-maklon",
+      name: "SjHasilMaklonMmtBrowse",
+      component: () => import("@/views/mmt/transaksi/SjHasilMaklonMmtView.vue"),
+      meta: {
+        title: "SJ Hasil Maklon MMT",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5517",
+      },
+    },
+    {
+      path: "/mmt/planning-produksi",
+      name: "PlanningProduksiMmtBrowse",
+      component: () => import("@/views/mmt/transaksi/PlanningProduksiMmtView.vue"),
+      meta: {
+        title: "Planning Produksi MMT",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5518",
+      },
+    },
+    {
+      path: "/mmt/komitmen-kirim",
+      name: "KomitmenKirimMmtBrowse",
+      component: () => import("@/views/mmt/transaksi/KomitmenKirimMmtView.vue"),
+      meta: {
+        title: "Komitmen Kirim MMT",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5519",
+      },
+    },
+    {
+      path: "/mmt/map",
+      name: "MapMmtBrowse",
+      component: () => import("@/views/mmt/transaksi/MapMmtView.vue"),
+      meta: {
+        title: "Memo Approval Produk (MAP) MMT",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5520",
+      },
+    },
+    {
+      path: "/mmt/bast-map",
+      name: "BastMapMmtBrowse",
+      component: () => import("@/views/mmt/transaksi/BastMapMmtView.vue"),
+      meta: {
+        title: "BAST-MAP MMT",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5521",
+      },
+    },
+    {
+      path: "/mmt/relationship-map",
+      name: "RelationshipMapMmtBrowse",
+      component: () => import("@/views/mmt/transaksi/RelationshipMapMmtView.vue"),
+      meta: {
+        title: "Relationship Map MMT",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5522",
+      },
+    },
+    {
+      path: "/mmt/so-spk",
+      name: "SoToSpkMmtBrowse",
+      component: () => import("@/views/mmt/transaksi/SoToSpkMmtView.vue"),
+      meta: {
+        title: "SO TO SPK (Surat Perintah Kerja) MMT",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5523",
+      },
+    },
+    {
+      path: "/mmt/stbj",
+      name: "StbjMmtBrowse",
+      component: () => import("@/views/mmt/transaksi/StbjMmtView.vue"),
+      meta: {
+        title: "STBJ MMT",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5524",
+      },
+    },
+    {
+      path: "/mmt/surat-jalan",
+      name: "SuratJalanMmtBrowse",
+      component: () => import("@/views/mmt/transaksi/SuratJalanMmtView.vue"),
+      meta: {
+        title: "Surat Jalan MMT",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5525",
+      },
+    },
+    {
+      path: "/mmt/surat-jalan/approve",
+      name: "SuratJalanApproveMmtBrowse",
+      component: () => import("@/views/mmt/transaksi/SuratJalanApproveMmtView.vue"),
+      meta: {
+        title: "Surat Jalan Approve MMT",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5526",
+      },
+    },
+    {
+      path: "/mmt/jadwal-kirim",
+      name: "JadwalKirimMmtBrowse",
+      component: () => import("@/views/mmt/transaksi/JadwalKirimMmtView.vue"),
+      meta: {
+        title: "Jadwal Kirim MMT",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5527",
+      },
+    },
+    {
+      path: "/mmt/po-paperprint",
+      name: "PoInternalPaperprintMmtBrowse",
+      component: () => import("@/views/mmt/transaksi/PoInternalPaperprintMmtView.vue"),
+      meta: {
+        title: "PO Internal MMT",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5528",
+      },
+    },
+    {
+      path: "/mmt/mutasi-internal",
+      name: "MutasiInternalMmtBrowse",
+      component: () => import("@/views/mmt/transaksi/MutasiInternalMmtView.vue"),
+      meta: {
+        title: "Mutasi Internal MMT",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5529",
+      },
+    },
+    {
+      path: "/mmt/penerimaan-po-external",
+      name: "PenerimaanPoExtMmtBrowse",
+      component: () => import("@/views/mmt/transaksi/PenerimaanPoExtMmtView.vue"),
+      meta: {
+        title: "Penerimaan PO External MMT",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5530",
+      },
+    },
+
     // ── Penjualan ───────────────────────────────────────────────────────
     {
       path: "/penjualan/mppb",

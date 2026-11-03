@@ -6,7 +6,13 @@
 export const formatTanggal = (v: string | null | undefined): string => {
   if (!v) return "-";
 
-  const s = String(v);
+  const s = String(v).trim();
+  if (!s || s === "null" || s === "undefined") return "-";
+
+  // sudah dd/MM/yyyy
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(s)) {
+    return s;
+  }
 
   // sudah dd-MM-yyyy
   if (/^\d{2}-\d{2}-\d{4}$/.test(s)) {
@@ -17,6 +23,29 @@ export const formatTanggal = (v: string | null | undefined): string => {
   if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
     const [y, m, d] = s.split("-");
     return `${d}/${m}/${y}`;
+  }
+
+  // dd-Month-yyyy / dd Month yyyy (e.g. 02-November-2026, 02-Nov-2026, 2-May-2024)
+  const monthMap: Record<string, string> = {
+    jan: "01", january: "01", januari: "01",
+    feb: "02", february: "02", februari: "02",
+    mar: "03", march: "03", maret: "03",
+    apr: "04", april: "04",
+    may: "05", mei: "05",
+    jun: "06", june: "06", juni: "06",
+    jul: "07", july: "07", juli: "07",
+    aug: "08", august: "08", agustus: "08", agu: "08",
+    sep: "09", september: "09",
+    oct: "10", october: "10", oktober: "10", okt: "10",
+    nov: "11", november: "11",
+    dec: "12", december: "12", desember: "12", des: "12",
+  };
+  const textMonthMatch = s.match(/^(\d{1,2})[- /]([A-Za-z]+)[- /](\d{4})/);
+  if (textMonthMatch) {
+    const d = textMonthMatch[1].padStart(2, "0");
+    const m = monthMap[textMonthMatch[2].toLowerCase()];
+    const y = textMonthMatch[3];
+    if (m) return `${d}/${m}/${y}`;
   }
 
   // ISO

@@ -360,6 +360,8 @@ const customKainSettings = ref<
             allowancePersenPartaiBesar?: number;
             biayaJahit?: number;
             biayaJahitPartaiBesar?: number;
+            babaranBody?: number;
+            babaranLengan?: number;
             t1_margin?: number;
             t2_margin?: number;
             t3_margin?: number;
@@ -426,6 +428,23 @@ const onInlinePercentChange = (
     customKainSettings.value = { ...customKainSettings.value };
 };
 
+// Helper untuk inline edit desimal (Babaran Kg)
+const onInlineDecimalChange = (
+    row: any,
+    field: "babaranBody" | "babaranLengan",
+    event: Event,
+) => {
+    const input = event.target as HTMLInputElement;
+    const val = parseFloat(input.value) || 0;
+    const rowId = row.rowId;
+    if (!customKainSettings.value[rowId]) {
+        customKainSettings.value[rowId] = {};
+    }
+    customKainSettings.value[rowId][field] = val;
+    customKainSettings.value[rowId].isDirty = true;
+    customKainSettings.value = { ...customKainSettings.value };
+};
+
 const isRowDirty = (rowId: string) => {
     return !!customKainSettings.value[rowId]?.isDirty;
 };
@@ -469,10 +488,18 @@ const parseKainData = (kodeModel: "KH-0001" | "KH-0002") => {
         const b = babaranMap.get(jk)!;
         const komp = (item.mhk_komponen || "").toUpperCase();
         const warna = (item.mhk_warna || "").toUpperCase();
-        const val = Number(item.mhk_babaran) || 0;
+
         // Efektif harga dengan override inline-edit (agar preview HRG LENGAN ikut berubah saat TUA diedit)
         const rowIdTmp = `${item.mhk_kode}_${(item.mhk_jeniskain || "").trim()}_${item.mhk_warna}_${item.mhk_komponen}`;
         const csTmp = customKainSettings.value[rowIdTmp] || {};
+
+        const val =
+            csTmp.babaranBody !== undefined
+                ? Number(csTmp.babaranBody) || 0
+                : csTmp.babaranLengan !== undefined
+                  ? Number(csTmp.babaranLengan) || 0
+                  : Number(item.mhk_babaran) || 0;
+
         const hrgEff =
             csTmp.hargaBahan !== undefined
                 ? Number(csTmp.hargaBahan) || 0
@@ -638,10 +665,14 @@ const parseKainData = (kodeModel: "KH-0001" | "KH-0002") => {
         } else {
             // RE-CALCULATE HANYA KETIKA USER SEDANG INLINE-EDIT DI TABEL
             const bBody =
-                Number(item.babaranBody ?? item.babaran_body ?? b.body) || 0;
+                customSet.babaranBody !== undefined
+                    ? Number(customSet.babaranBody) || 0
+                    : Number(item.babaranBody ?? item.babaran_body ?? b.body) || 0;
             const bLengan =
-                Number(item.babaranLengan ?? item.babaran_lengan ?? b.lengan) ||
-                0;
+                customSet.babaranLengan !== undefined
+                    ? Number(customSet.babaranLengan) || 0
+                    : Number(item.babaranLengan ?? item.babaran_lengan ?? b.lengan) ||
+                      0;
             hargaBody = bBody > 0 ? Math.round(hargaBahan / bBody / 1.11) : 0;
             hargaLengan =
                 kodeModel === "KH-0002"
@@ -734,9 +765,14 @@ const parseKainData = (kodeModel: "KH-0001" | "KH-0002") => {
             jenisKain: jk,
             lengan: item.mhk_lengan || b.lenganText,
             gramasi: getGramasi(jk),
-            babaranBody: item.babaranBody ?? item.babaran_body ?? b.body,
+            babaranBody:
+                customSet.babaranBody !== undefined
+                    ? customSet.babaranBody
+                    : (item.babaranBody ?? item.babaran_body ?? b.body),
             babaranLengan:
-                item.babaranLengan ?? item.babaran_lengan ?? b.lengan,
+                customSet.babaranLengan !== undefined
+                    ? customSet.babaranLengan
+                    : (item.babaranLengan ?? item.babaran_lengan ?? b.lengan),
             babaranRib: item.babaranRib ?? item.babaran_rib ?? b.rib,
             warna: item.mhk_warna || "-",
             hargaBahan,
@@ -1470,9 +1506,13 @@ const executeSaveAllInlineChanges = async () => {
                         ? raw.mhk_lengan
                         : row.lengan || "",
                 mhk_babaran:
-                    raw.mhk_babaran !== undefined
-                        ? raw.mhk_babaran
-                        : row.babaranBody || 0,
+                    customKainSettings.value[row.rowId]?.babaranBody !== undefined
+                        ? customKainSettings.value[row.rowId].babaranBody
+                        : customKainSettings.value[row.rowId]?.babaranLengan !== undefined
+                          ? customKainSettings.value[row.rowId].babaranLengan
+                          : (raw.mhk_babaran !== undefined
+                              ? raw.mhk_babaran
+                              : row.babaranBody || 0),
                 mhk_harga: row.hargaBahan,
                 mhk_harga_partaibesar:
                     row.hargaBahanPartaiBesar ?? row.hargaBahan,
@@ -1495,6 +1535,8 @@ const executeSaveAllInlineChanges = async () => {
                 delete customKainSettings.value[row.rowId].allowancePersen;
                 delete customKainSettings.value[row.rowId]
                     .allowancePersenPartaiBesar;
+                delete customKainSettings.value[row.rowId].babaranBody;
+                delete customKainSettings.value[row.rowId].babaranLengan;
             }
         }
         customKainSettings.value = { ...customKainSettings.value };
@@ -3112,49 +3154,106 @@ const executeSaveTambahan = async () => {
                                             {{ row.gramasi }}
                                         </td>
 
-                                        <!-- Babaran -->
+                                        <!-- Babaran (Inline Editable) -->
                                         <td
                                             v-else-if="col.key === 'babaran'"
-                                            class="text-end num-cell"
+                                            class="text-end num-cell inline-edit-cell"
+                                            :class="{
+                                                'cell-dirty': isRowDirty(
+                                                    row.rowId,
+                                                ),
+                                            }"
+                                            @click.stop
                                         >
-                                            {{
-                                                row.babaranBody
-                                                    ? Number(
-                                                          row.babaranBody,
-                                                      ).toLocaleString("id-ID")
-                                                    : "-"
-                                            }}
-                                            kg
+                                            <div
+                                                class="inline-input-wrapper justify-end"
+                                            >
+                                                <input
+                                                    type="number"
+                                                    step="0.1"
+                                                    class="inline-table-input text-end"
+                                                    style="width: 58px"
+                                                    :value="row.babaranBody"
+                                                    @input="
+                                                        onInlineDecimalChange(
+                                                            row,
+                                                            'babaranBody',
+                                                            $event,
+                                                        )
+                                                    "
+                                                />
+                                                <span class="inline-suffix"
+                                                    >kg</span
+                                                >
+                                            </div>
                                         </td>
                                         <td
                                             v-else-if="
                                                 col.key === 'babaranBody'
                                             "
-                                            class="text-end num-cell"
+                                            class="text-end num-cell inline-edit-cell"
+                                            :class="{
+                                                'cell-dirty': isRowDirty(
+                                                    row.rowId,
+                                                ),
+                                            }"
+                                            @click.stop
                                         >
-                                            {{
-                                                row.babaranBody
-                                                    ? Number(
-                                                          row.babaranBody,
-                                                      ).toLocaleString("id-ID")
-                                                    : "-"
-                                            }}
-                                            kg
+                                            <div
+                                                class="inline-input-wrapper justify-end"
+                                            >
+                                                <input
+                                                    type="number"
+                                                    step="0.1"
+                                                    class="inline-table-input text-end"
+                                                    style="width: 58px"
+                                                    :value="row.babaranBody"
+                                                    @input="
+                                                        onInlineDecimalChange(
+                                                            row,
+                                                            'babaranBody',
+                                                            $event,
+                                                        )
+                                                    "
+                                                />
+                                                <span class="inline-suffix"
+                                                    >kg</span
+                                                >
+                                            </div>
                                         </td>
                                         <td
                                             v-else-if="
                                                 col.key === 'babaranLengan'
                                             "
-                                            class="text-end num-cell"
+                                            class="text-end num-cell inline-edit-cell"
+                                            :class="{
+                                                'cell-dirty': isRowDirty(
+                                                    row.rowId,
+                                                ),
+                                            }"
+                                            @click.stop
                                         >
-                                            {{
-                                                row.babaranLengan
-                                                    ? Number(
-                                                          row.babaranLengan,
-                                                      ).toLocaleString("id-ID")
-                                                    : "-"
-                                            }}
-                                            kg
+                                            <div
+                                                class="inline-input-wrapper justify-end"
+                                            >
+                                                <input
+                                                    type="number"
+                                                    step="0.1"
+                                                    class="inline-table-input text-end"
+                                                    style="width: 58px"
+                                                    :value="row.babaranLengan"
+                                                    @input="
+                                                        onInlineDecimalChange(
+                                                            row,
+                                                            'babaranLengan',
+                                                            $event,
+                                                        )
+                                                    "
+                                                />
+                                                <span class="inline-suffix"
+                                                    >kg</span
+                                                >
+                                            </div>
                                         </td>
 
                                         <!-- Warna -->
