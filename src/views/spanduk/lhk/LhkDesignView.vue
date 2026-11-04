@@ -27,6 +27,9 @@ interface ExportMasterRow {
 interface ExportDetailRow {
   Nomor: string;
   Nama_SPK: string;
+  Tanggal_SPK: string;
+  Dateline: string;
+  Tanggal_LHK: string;
   Bahan: string;
   Panjang_Output: number;
   Jumlah_Output: number;
@@ -133,6 +136,7 @@ const kolomMaster: ExcelColumn[] = [
   { header: "Tgl SPK", key: "Tanggal_SPK", width: 14, align: "center" },
   { header: "Dateline", key: "Dateline", width: 14, align: "center" },
   { header: "Tgl LHK", key: "Tanggal_LHK", width: 14, align: "center" },
+  { header: "Bahan", key: "Bahan", width: 28 },
   { header: "Status Terakhir", key: "Status_Terakhir", width: 18 },
   { header: "User", key: "User_Create", width: 12 },
 ];
@@ -173,6 +177,9 @@ const kolomDetail: ExcelColumn[] = [
 // Data master yang sedang tampil (ikut search + filter kolom BaseBrowse)
 const dataTampil = (): LhkDesignRow[] =>
   baseBrowseRef.value?.getFilteredItems() ?? items.value ?? [];
+
+const judulExport = () =>
+  `LHK Design\nPeriode ${formatTanggal(filterState.value.dtAwal)} - ${formatTanggal(filterState.value.dtAkhir)}`;
 
 onMounted(() => fetchData());
 
@@ -234,20 +241,34 @@ const onDelete = async (item: LhkDesignRow) => {
 };
 
 // --- EXPORT ---
-const exportMaster = () =>
-  exportToExcel("LHK_Design_Header", {
-    columns: kolomMaster,
-    getData: (): ExportMasterRow[] =>
-      dataTampil().map((r) => ({
-        Nomor: r.Nomor,
-        Nama_SPK: r.Nama_SPK ?? "",
-        Tanggal_SPK: formatTanggal(r.Tanggal_SPK),
-        Dateline: formatTanggal(r.Dateline),
-        Tanggal_LHK: formatTanggal(r.Tanggal_LHK),
-        Status_Terakhir: r.Status_Terakhir ?? "",
-        User_Create: r.User_Create ?? "",
-      })),
-  });
+const exportMaster = async () => {
+  const master = dataTampil();
+  if (!master.length) {
+    return toast.warning("Tidak ada data untuk diexport.");
+  }
+  try {
+    await exportExcelSingle(
+      `LHK_Design_Header_${today}.xlsx`,
+      "LHK Design",
+      kolomMaster,
+      master.map(
+        (r): ExportMasterRow => ({
+          Nomor: r.Nomor,
+          Nama_SPK: r.Nama_SPK ?? "",
+          Tanggal_SPK: formatTanggal(r.Tanggal_SPK),
+          Dateline: formatTanggal(r.Dateline),
+          Tanggal_LHK: formatTanggal(r.Tanggal_LHK),
+          Status_Terakhir: r.Status_Terakhir ?? "",
+          User_Create: r.User_Create ?? "",
+        }),
+      ),
+      judulExport(),
+    );
+  } catch (e) {
+    console.error(e);
+    toast.error("Terjadi kesalahan saat mengekspor LHK Design.");
+  }
+};
 
 // Hanya komponen dari LHK yang sedang tampil di grid
 const exportDetail = async () => {
@@ -266,6 +287,9 @@ const exportDetail = async () => {
       rows.push({
         Nomor: item.Nomor,
         Nama_SPK: item.Nama_SPK ?? "",
+        Tanggal_SPK: formatTanggal(item.Tanggal_SPK),
+        Dateline: formatTanggal(item.Dateline),
+        Tanggal_LHK: formatTanggal(item.Tanggal_LHK),
         Bahan: r.Bahan ?? "",
         Panjang_Output: angkaExcel(r.Panjang_Output),
         Jumlah_Output: angkaExcel(r.Jumlah_Output),
@@ -290,6 +314,7 @@ const exportDetail = async () => {
       "Detail LHK Design",
       kolomDetail,
       rows,
+      judulExport(),
     );
     toast.success("Berhasil export detail LHK Design.");
   } catch (e) {
