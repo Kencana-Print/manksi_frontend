@@ -606,11 +606,7 @@ fetchData();
       <v-btn
         size="small"
         color="success"
-        :disabled="
-          selected.length !== 1 ||
-          selected[0].status === 'DONE' ||
-          selected[0].status === 'CLOSE'
-        "
+        :disabled="selected.length !== 1 || selected[0].status === 'CLOSE'"
         @click="openCloseDialog"
       >
         <template #prepend><IconCircleCheck :size="15" /></template>
