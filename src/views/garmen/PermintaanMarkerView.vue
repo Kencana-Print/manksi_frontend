@@ -5,11 +5,9 @@ import { useToast } from "vue-toastification";
 import BaseBrowse from "@/components/BaseBrowse.vue";
 import {
   IconScissors,
-  IconRepeat,
-  IconFlag,
   IconFileExport,
   IconPrinter,
-  IconCircleCheck,
+  IconReceipt,
 } from "@tabler/icons-vue";
 import { exportExcelSingle } from "@/utils/excelExport";
 import { formatTanggal } from "@/utils/dateFormat";
@@ -18,7 +16,9 @@ import {
   permintaanMarkerService,
   type PermintaanMarkerBrowseItem,
   type PermintaanMarkerDetailRow,
+  type TandaTerimaPermintaanItem,
 } from "@/services/garmen/permintaanMarkerService";
+import { useAuthStore } from "@/stores/authStore";
 import { permintaanMarkerFormService } from "@/services/garmen/permintaanMarkerFormService";
 
 interface RowCtx {
@@ -43,6 +43,9 @@ const toLocalDate = (d: Date) =>
 
 const fmtJml = (v: number | string | null | undefined): string =>
   Number(v ?? 0).toLocaleString("id-ID");
+
+const tgl = (v: string | null | undefined): string =>
+  v ? formatTanggal(String(v).substring(0, 10)) : "-";
 
 const STATUS_OPTIONS = ["OPEN", "PROSES", "DONE", "CLOSE", "PENDING", "CANCEL"];
 
@@ -143,18 +146,24 @@ const kelompokByNomor = computed<Record<string, KelompokSpk[]>>(() => {
   return hasil;
 });
 
-const showStatusDialog = ref(false);
-const statusBaru = ref<"PENDING" | "CANCEL">("PENDING");
-const statusKet = ref("");
 const isActioning = ref(false);
-const selectedItem = ref<PermintaanMarkerBrowseItem | null>(null);
 const isExportingDetail = ref(false);
+const modeMenunggu = ref(false);
 
 // ─── Headers (SPK ada di detail → tampil di expand) ───────
 const headers = [
   { title: "NOMOR", key: "nomor", width: "170px" },
   { title: "TANGGAL", key: "tanggal", width: "100px", align: "center" },
   { title: "DEADLINE", key: "deadline", width: "100px", align: "center" },
+  {
+    title: "TGL DIKERJAKAN",
+    key: "tglDikerjakan",
+    width: "110px",
+    align: "center",
+  },
+  { title: "TGL LHK", key: "tglLhk", width: "100px", align: "center" },
+  { title: "TGL MUTASI", key: "tglMutasi", width: "100px", align: "center" },
+  { title: "TGL TERIMA", key: "tglTerima", width: "100px", align: "center" },
   {
     title: "SPK SELESAI",
     key: "jmlSpkSelesai",
@@ -193,17 +202,36 @@ const fetchData = async () => {
   expandedRows.value = [];
   resetDetail();
   try {
-    const res = await permintaanMarkerService.getBrowse({
-      startDate: filterStart.value,
-      endDate: filterEnd.value,
-      status: filterStatus.value,
-    });
-    items.value = res.data.data ?? [];
+    if (modeMenunggu.value) {
+      const res = await permintaanMarkerService.getMenungguValidasi();
+      items.value = res.data.data ?? [];
+    } else {
+      const res = await permintaanMarkerService.getBrowse({
+        startDate: filterStart.value,
+        endDate: filterEnd.value,
+        status: filterStatus.value,
+      });
+      items.value = res.data.data ?? [];
+    }
   } catch (e) {
     toast.error(pesanError(e, "Gagal memuat data."));
   } finally {
     isLoading.value = false;
   }
+};
+
+watch(modeMenunggu, () => {
+  fetchData();
+});
+
+const rentangDetail = (): { startDate: string; endDate: string } => {
+  if (!modeMenunggu.value || !items.value.length) {
+    return { startDate: filterStart.value, endDate: filterEnd.value };
+  }
+  const tglList = items.value
+    .map((r) => String(r.tanggal).substring(0, 10))
+    .sort();
+  return { startDate: tglList[0], endDate: tglList[tglList.length - 1] };
 };
 
 const ensureDetail = async (): Promise<boolean> => {
@@ -213,10 +241,7 @@ const ensureDetail = async (): Promise<boolean> => {
   const myReq = ++detailReq;
   detailLoading.value = true;
   try {
-    const res = await permintaanMarkerService.getDetail({
-      startDate: filterStart.value,
-      endDate: filterEnd.value,
-    });
+    const res = await permintaanMarkerService.getDetail(rentangDetail());
     if (myReq !== detailReq) {
       return false;
     }
@@ -283,39 +308,76 @@ const onEdit = () => {
   router.push({ name: "PermintaanMarkerEdit", params: { nomor: it.nomor } });
 };
 
-// Revisi: buka form dengan isi permintaan asal
-const onRevisi = () => {
+// ─── Tanda terima marker: validasi digital oleh pembuat permintaan ───
+const authStore = useAuthStore();
+const kodeUser = computed(() =>
+  String(authStore.user?.kode ?? "").toUpperCase(),
+);
+
+const showTtDialog = ref(false);
+const ttPermintaan = ref<PermintaanMarkerBrowseItem | null>(null);
+const ttList = ref<TandaTerimaPermintaanItem[]>([]);
+const ttLoading = ref(false);
+const ttPilih = ref<TandaTerimaPermintaanItem | null>(null);
+const showKonfirmasiValidasi = ref(false);
+
+const statusTt = (t: TandaTerimaPermintaanItem): string => {
+  if (t.tglTerima) return "Diterima";
+  if (t.tglMutasi) return "Diserahkan";
+  return "Belum dicetak";
+};
+
+const bisaValidasi = (t: TandaTerimaPermintaanItem): boolean =>
+  !!t.tglMutasi &&
+  !t.tglTerima &&
+  String(t.peminta).toUpperCase() === kodeUser.value;
+
+const muatTandaTerima = async () => {
+  const it = ttPermintaan.value;
+  if (!it) {
+    return;
+  }
+  ttLoading.value = true;
+  try {
+    const res = await permintaanMarkerService.listTandaTerima(it.nomor);
+    ttList.value = res.data.data ?? [];
+  } catch (e) {
+    toast.error(pesanError(e, "Gagal memuat tanda terima."));
+  } finally {
+    ttLoading.value = false;
+  }
+};
+
+const bukaTandaTerima = async () => {
   const it = selected.value[0];
   if (!it) {
     return;
   }
-  router.push({ name: "PermintaanMarkerCreate", query: { asal: it.nomor } });
+  ttPermintaan.value = it;
+  ttList.value = [];
+  showTtDialog.value = true;
+  await muatTandaTerima();
 };
 
-// ─── Close: Admin Cutting sudah mengambil hasil marker ────
-const showCloseDialog = ref(false);
-
-const openCloseDialog = () => {
-  if (selected.value.length !== 1) {
-    return;
-  }
-  selectedItem.value = selected.value[0];
-  showCloseDialog.value = true;
+const mintaValidasi = (t: TandaTerimaPermintaanItem) => {
+  ttPilih.value = t;
+  showKonfirmasiValidasi.value = true;
 };
 
-const confirmClose = async () => {
-  const it = selectedItem.value;
-  if (!it) {
+const konfirmasiValidasi = async () => {
+  const t = ttPilih.value;
+  if (!t) {
     return;
   }
   isActioning.value = true;
   try {
-    await permintaanMarkerFormService.closePermintaan(it.nomor);
-    toast.success("Permintaan di-CLOSE.");
-    showCloseDialog.value = false;
+    await permintaanMarkerService.validasiTandaTerima(t.nomor);
+    toast.success(`Tanda terima ${t.nomor} divalidasi.`);
+    showKonfirmasiValidasi.value = false;
+    await muatTandaTerima();
     fetchData();
   } catch (e) {
-    toast.error(pesanError(e, "Gagal melakukan close."));
+    toast.error(pesanError(e, "Gagal memvalidasi tanda terima."));
   } finally {
     isActioning.value = false;
   }
@@ -353,45 +415,6 @@ const onDelete = async (item: PermintaanMarkerBrowseItem) => {
   }
 };
 
-// ─── Status manual: PENDING / CANCEL / buka kembali ───────
-const openStatusDialog = () => {
-  if (selected.value.length !== 1) {
-    return;
-  }
-  selectedItem.value = selected.value[0];
-  statusBaru.value = "PENDING";
-  statusKet.value = "";
-  showStatusDialog.value = true;
-};
-
-const confirmStatus = async () => {
-  const it = selectedItem.value;
-  if (!it) {
-    return;
-  }
-  const bukaKembali = !!it.statusManual;
-  if (!bukaKembali && !statusKet.value.trim()) {
-    toast.warning("Keterangan wajib diisi.");
-    return;
-  }
-  isActioning.value = true;
-  try {
-    await permintaanMarkerFormService.setStatus(it.nomor, {
-      status: bukaKembali ? "" : statusBaru.value,
-      keterangan: bukaKembali ? "" : statusKet.value.trim(),
-    });
-    toast.success(
-      bukaKembali ? "Permintaan dibuka kembali." : "Status diperbarui.",
-    );
-    showStatusDialog.value = false;
-    fetchData();
-  } catch (e) {
-    toast.error(pesanError(e, "Gagal mengubah status."));
-  } finally {
-    isActioning.value = false;
-  }
-};
-
 // ─── Export ───────────────────────────────────────────────
 const dataTampil = (): PermintaanMarkerBrowseItem[] =>
   (browseRef.value?.getFilteredItems() as
@@ -412,6 +435,10 @@ const doExport = async () => {
         { header: "Nomor", key: "nomor", width: 22 },
         { header: "Tanggal", key: "tanggal", width: 12 },
         { header: "Deadline", key: "deadline", width: 12 },
+        { header: "Tgl Dikerjakan", key: "tglDikerjakan", width: 14 },
+        { header: "Tgl LHK", key: "tglLhk", width: 12 },
+        { header: "Tgl Mutasi", key: "tglMutasi", width: 12 },
+        { header: "Tgl Terima", key: "tglTerima", width: 12 },
         {
           header: "SPK Selesai",
           key: "jmlSpkSelesai",
@@ -438,6 +465,10 @@ const doExport = async () => {
         nomor: r.nomor,
         tanggal: formatTanggal(r.tanggal),
         deadline: formatTanggal(r.deadline),
+        tglDikerjakan: r.tglDikerjakan ? tgl(r.tglDikerjakan) : "",
+        tglLhk: r.tglLhk ? tgl(r.tglLhk) : "",
+        tglMutasi: r.tglMutasi ? tgl(r.tglMutasi) : "",
+        tglTerima: r.tglTerima ? tgl(r.tglTerima) : "",
         jmlSpkSelesai: Number(r.jmlSpkSelesai),
         jmlSpk: Number(r.jmlSpk),
         totalJml: Number(r.totalJml),
@@ -551,13 +582,23 @@ fetchData();
   >
     <!-- ─── Filter ─── -->
     <template #filter-left>
-      <div class="date-filter">
+            <div class="date-filter">
         <span class="f-label">Tanggal</span>
-        <input type="date" v-model="filterStart" class="f-date" />
+        <input
+          type="date"
+          v-model="filterStart"
+          class="f-date"
+          :disabled="modeMenunggu"
+        />
         <span class="f-sep">sd</span>
-        <input type="date" v-model="filterEnd" class="f-date" />
+        <input
+          type="date"
+          v-model="filterEnd"
+          class="f-date"
+          :disabled="modeMenunggu"
+        />
         <span class="f-label ml-2">Status</span>
-        <select v-model="filterStatus" class="f-date">
+        <select v-model="filterStatus" class="f-date" :disabled="modeMenunggu">
           <option value="">Semua</option>
           <option v-for="s in STATUS_OPTIONS" :key="s" :value="s">
             {{ s }}
@@ -572,11 +613,15 @@ fetchData();
           @click="fetchData"
           >Filter</v-btn
         >
+        <label class="f-chk">
+          <input type="checkbox" v-model="modeMenunggu" />
+          Menunggu validasi saya
+        </label>
       </div>
     </template>
 
     <!-- ─── Extra actions ─── -->
-    <template #extra-actions="{ selected }">
+       <template #extra-actions="{ selected }">
       <v-btn
         size="small"
         color="green-darken-2"
@@ -587,30 +632,12 @@ fetchData();
       </v-btn>
       <v-btn
         size="small"
-        color="primary"
-        :disabled="selected.length !== 1 || selected[0].status === 'CANCEL'"
-        @click="onRevisi"
-      >
-        <template #prepend><IconRepeat :size="15" /></template>
-        Revisi
-      </v-btn>
-      <v-btn
-        size="small"
-        color="warning"
-        :disabled="selected.length !== 1"
-        @click="openStatusDialog"
-      >
-        <template #prepend><IconFlag :size="15" /></template>
-        Status
-      </v-btn>
-      <v-btn
-        size="small"
         color="success"
-        :disabled="selected.length !== 1 || selected[0].status === 'CLOSE'"
-        @click="openCloseDialog"
+        :disabled="selected.length !== 1 || !(selected[0].jmlTt > 0)"
+        @click="bukaTandaTerima"
       >
-        <template #prepend><IconCircleCheck :size="15" /></template>
-        Close
+        <template #prepend><IconReceipt :size="15" /></template>
+        Tanda Terima
       </v-btn>
       <v-btn
         size="small"
@@ -629,6 +656,22 @@ fetchData();
 
     <template #item.deadline="{ item }">
       {{ formatTanggal(item.deadline) }}
+    </template>
+
+        <template #item.tglDikerjakan="{ item }">
+      {{ tgl(item.tglDikerjakan) }}
+    </template>
+
+    <template #item.tglLhk="{ item }">
+      {{ tgl(item.tglLhk) }}
+    </template>
+
+    <template #item.tglMutasi="{ item }">
+      {{ tgl(item.tglMutasi) }}
+    </template>
+
+    <template #item.tglTerima="{ item }">
+      {{ tgl(item.tglTerima) }}
     </template>
 
     <template #item.jmlSpkSelesai="{ item }">
@@ -722,76 +765,86 @@ fetchData();
     </template>
   </BaseBrowse>
 
-  <!-- ─── Dialog Close ─── -->
-  <v-dialog v-model="showCloseDialog" max-width="400" persistent>
+   <!-- ─── Dialog Tanda Terima ─── -->
+  <v-dialog v-model="showTtDialog" max-width="820">
     <v-card class="rounded-lg">
       <v-card-title class="bg-success text-white pa-3 text-subtitle-1">
-        Close Permintaan Marker
+        Tanda Terima Marker – {{ ttPermintaan?.nomor }}
       </v-card-title>
-      <v-card-text class="pa-4">
-        Tandai permintaan <b>{{ selectedItem?.nomor }}</b> selesai: hasil marker
-        sudah diambil Tim Cutting. LHK Marker yang terkait tidak bisa diubah
-        lagi setelah ini.
+      <v-card-text class="pa-3">
+        <div v-if="ttLoading" class="tt-info">Memuat...</div>
+        <div v-else-if="!ttList.length" class="tt-info">
+          Belum ada tanda terima. Tanda terima dibuat otomatis saat LHK Marker
+          disimpan.
+        </div>
+        <table v-else class="dt">
+          <thead>
+            <tr>
+              <th style="width: 150px">NO. TANDA TERIMA</th>
+              <th style="width: 150px">LHK</th>
+              <th>SPK</th>
+              <th style="width: 110px">DISERAHKAN</th>
+              <th style="width: 110px">DITERIMA</th>
+              <th style="width: 100px" class="ctr">STATUS</th>
+              <th style="width: 90px"></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="t in ttList" :key="t.nomor">
+              <td>{{ t.nomor }}</td>
+              <td>{{ t.lhkNomor }}</td>
+              <td class="cell-wrap">{{ t.spk || "-" }}</td>
+              <td>{{ tgl(t.tglMutasi) }}</td>
+              <td>{{ tgl(t.tglTerima) }}</td>
+              <td class="ctr">{{ statusTt(t) }}</td>
+              <td class="ctr">
+                <v-btn
+                  v-if="bisaValidasi(t)"
+                  size="x-small"
+                  color="success"
+                  variant="flat"
+                  @click="mintaValidasi(t)"
+                  >Validasi</v-btn
+                >
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <div v-if="ttList.length" class="tt-catatan">
+          Validasi hanya bisa dilakukan oleh pembuat permintaan, setelah tanda
+          terima dicetak dan diserahkan oleh pembuat marker.
+        </div>
       </v-card-text>
       <v-card-actions class="pa-3 border-t bg-grey-lighten-4">
-        <v-btn variant="text" @click="showCloseDialog = false">Batal</v-btn>
+        <v-spacer />
+        <v-btn variant="text" @click="showTtDialog = false">Tutup</v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
+
+  <!-- ─── Konfirmasi Validasi ─── -->
+  <v-dialog v-model="showKonfirmasiValidasi" max-width="420" persistent>
+    <v-card class="rounded-lg">
+      <v-card-title class="bg-success text-white pa-3 text-subtitle-1">
+        Validasi Tanda Terima
+      </v-card-title>
+      <v-card-text class="pa-4">
+        Dengan memvalidasi <b>{{ ttPilih?.nomor }}</b
+        >, Anda menyatakan hasil marker sudah diterima. Setelah ini LHK Marker
+        <b>{{ ttPilih?.lhkNomor }}</b> tidak bisa diubah atau dihapus, dan
+        validasi tidak bisa dibatalkan.
+      </v-card-text>
+      <v-card-actions class="pa-3 border-t bg-grey-lighten-4">
+        <v-btn variant="text" @click="showKonfirmasiValidasi = false"
+          >Batal</v-btn
+        >
         <v-spacer />
         <v-btn
           color="success"
           variant="elevated"
           :loading="isActioning"
-          @click="confirmClose"
-          >Ya, Close</v-btn
-        >
-      </v-card-actions>
-    </v-card>
-  </v-dialog>
-
-  <!-- ─── Dialog Status ─── -->
-  <v-dialog v-model="showStatusDialog" max-width="440" persistent>
-    <v-card class="rounded-lg">
-      <v-card-title class="bg-warning text-white pa-3 text-subtitle-1">
-        {{ selectedItem?.statusManual ? "Buka Kembali" : "Ubah Status" }}
-      </v-card-title>
-      <v-card-text class="pa-4">
-        <template v-if="selectedItem?.statusManual">
-          Permintaan <b>{{ selectedItem?.nomor }}</b> berstatus
-          <b>{{ selectedItem?.statusManual }}</b
-          >. Buka kembali supaya statusnya kembali mengikuti LHK Marker?
-        </template>
-        <template v-else>
-          <div class="mb-3">
-            Ubah status permintaan <b>{{ selectedItem?.nomor }}</b
-            >:
-          </div>
-          <v-radio-group v-model="statusBaru" inline hide-details class="mb-2">
-            <v-radio label="PENDING" value="PENDING" />
-            <v-radio label="CANCEL" value="CANCEL" />
-          </v-radio-group>
-          <v-textarea
-            v-model="statusKet"
-            label="Keterangan (wajib)"
-            rows="2"
-            auto-grow
-            density="compact"
-            variant="outlined"
-            maxlength="255"
-            counter
-            hide-details="auto"
-          />
-        </template>
-      </v-card-text>
-      <v-card-actions class="pa-3 border-t bg-grey-lighten-4">
-        <v-btn variant="text" @click="showStatusDialog = false">Tutup</v-btn>
-        <v-spacer />
-        <v-btn
-          color="warning"
-          variant="elevated"
-          :loading="isActioning"
-          @click="confirmStatus"
-          >{{
-            selectedItem?.statusManual ? "Ya, Buka Kembali" : "Simpan"
-          }}</v-btn
+          @click="konfirmasiValidasi"
+          >Ya, Validasi</v-btn
         >
       </v-card-actions>
     </v-card>
@@ -919,5 +972,29 @@ fetchData();
   font-style: italic;
   padding: 10px;
   font-size: 11px;
+}
+.f-chk {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #424242;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.tt-info {
+  font-size: 11px;
+  padding: 8px 0;
+}
+.tt-catatan {
+  font-size: 10px;
+  color: #757575;
+  font-style: italic;
+  margin-top: 8px;
+}
+.dt .ctr,
+.dt thead th.ctr {
+  text-align: center;
 }
 </style>

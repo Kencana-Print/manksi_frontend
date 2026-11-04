@@ -157,7 +157,7 @@ const {
         .map((r) => ({
           spkNomor: r.spkNomor,
           kode: r.kode,
-          setting: r.setting,
+          setting: rapikanSetting(r.setting),
           jml: Number(r.jml) || 0,
           alasan: r.alasan.trim(),
         })),
@@ -232,10 +232,21 @@ const opsiBahan = (row: MarkerRow): BahanMkb[] => {
   return list;
 };
 
-const opsiSetting = (row: MarkerRow): SettingBahan[] =>
-  row.setting && !settingList.value.some((s) => s.nama === row.setting)
-    ? [...settingList.value, { kode: "", nama: row.setting }]
-    : settingList.value;
+// Saran setting: default dari MKB bahan itu lebih dulu, lalu master; teks bebas tetap boleh
+const saranSetting = (row: MarkerRow): string[] => {
+  const hasil: string[] = [];
+  const dariMkb = (mkbCache.value[row.spkNomor] ?? []).find(
+    (b) => b.kode === row.kode,
+  )?.setting;
+  if (dariMkb) hasil.push(dariMkb);
+  for (const s of settingList.value) {
+    if (!hasil.includes(s.nama)) hasil.push(s.nama);
+  }
+  return hasil;
+};
+
+// Hanya spasi yang dirapikan; huruf besar/kecil tidak diubah
+const rapikanSetting = (v: string): string => v.trim().replace(/\s+/g, " ");
 
 // Di luar MKB hanya dinilai bila SPK punya MKB (dan sudah termuat)
 const luarMkb = (row: MarkerRow): boolean => {
@@ -384,7 +395,7 @@ const validateSave = () => {
         `Baris ${no}: bahan di luar MKB, alasan wajib diisi.`,
       );
     }
-    const key = `${r.spkNomor}|${r.kode}|${r.setting}`;
+    const key = `${r.spkNomor}|${r.kode}|${rapikanSetting(r.setting).toUpperCase()}`;
     if (seen.has(key)) {
       return toast.warning(
         `Baris ${no}: SPK, bahan, dan setting yang sama sudah ada.`,
@@ -550,7 +561,7 @@ const statusClass = (s: string) => `st-${s}`;
           </button>
         </div>
         <div class="tbl-wrap" style="min-height: 50vh; max-height: 78vh">
-          <table class="gt" style="min-width: 1230px">
+          <table class="gt" style="min-width: 1250px">
             <thead>
               <tr>
                 <th style="width: 32px" class="tc">No</th>
@@ -558,7 +569,7 @@ const statusClass = (s: string) => `st-${s}`;
                 <th style="width: 190px">Nama SPK</th>
                 <th style="width: 290px">Bahan</th>
                 <th style="width: 60px">Satuan</th>
-                <th style="width: 130px">Setting</th>
+                <th style="width: 150px">Setting</th>
                 <th style="width: 80px" class="tr">Jml Marker</th>
                 <th style="width: 220px">Alasan (bahan di luar MKB)</th>
                 <th style="width: 32px" class="tc"></th>
@@ -627,21 +638,25 @@ const statusClass = (s: string) => `st-${s}`;
                 </td>
                 <td class="px-1">{{ row.satuan }}</td>
                 <td class="p0">
-                  <select
+                  <input
                     v-model="row.setting"
                     class="ci"
+                    maxlength="50"
+                    autocomplete="off"
+                    placeholder="Pilih / ketik setting"
+                    :list="`dl-setting-${idx}`"
                     :disabled="!editable"
+                    @blur="row.setting = rapikanSetting(row.setting)"
                     @keydown.enter.prevent="onEnterNext"
-                  >
-                    <option value="">-- setting --</option>
+                    v-select-on-focus
+                  />
+                  <datalist :id="`dl-setting-${idx}`">
                     <option
-                      v-for="s in opsiSetting(row)"
-                      :key="s.nama"
-                      :value="s.nama"
-                    >
-                      {{ s.nama }}
-                    </option>
-                  </select>
+                      v-for="s in saranSetting(row)"
+                      :key="s"
+                      :value="s"
+                    />
+                  </datalist>
                 </td>
                 <td class="p0">
                   <input

@@ -9,6 +9,7 @@ import { lhkMarkerFormService } from "@/services/ppic/lhkMarkerFormService";
 import SpkPolaSearchModal from "@/components/lookups/SpkPolaSearchModal.vue";
 import { IconRuler2, IconSearch, IconTrash } from "@tabler/icons-vue";
 import api from "@/services/api";
+import TandaTerimaMarkerDialog from "@/components/dialogs/TandaTerimaMarkerDialog.vue";
 
 const route = useRoute();
 const router = useRouter();
@@ -35,6 +36,12 @@ const defaultData = {
   pembuatMarker: "",
   marker: [emptyMarkerRow()],
 };
+
+const showTandaTerima = ref(false);
+const punyaPermintaan = ref(false);
+const lhkTersimpan = ref("");
+const setelahSimpan = ref(false);
+const terkunci = ref(false);
 
 const {
   isLoading,
@@ -74,6 +81,9 @@ const {
     };
   },
   submitApi: async (data: any) => {
+    punyaPermintaan.value = data.marker.some((r: any) =>
+      String(r.pmNomor || "").trim(),
+    );
     const payload = {
       tanggal: data.tanggal,
       keterangan: data.keterangan,
@@ -84,6 +94,7 @@ const {
       ? await lhkMarkerFormService.update(String(route.params.nomor), payload)
       : await lhkMarkerFormService.create(payload);
     const savedNomor = res.data.data.nomor;
+    lhkTersimpan.value = savedNomor;
     try {
       for (const [spkNomor, file] of Object.entries(markerImageFiles.value)) {
         await lhkMarkerFormService.uploadGambar(file, savedNomor, spkNomor);
@@ -96,13 +107,39 @@ const {
     return res;
   },
   onSuccess: () => {
-    toast.success(
-      isEditMode.value
-        ? "LHK Marker berhasil diupdate."
-        : "LHK Marker berhasil disimpan.",
-    );
+    toast.success("LHK Marker berhasil disimpan");
+    if (punyaPermintaan.value) {
+      setelahSimpan.value = true;
+      showTandaTerima.value = true; // dialog muncul, navigasi menunggu dialog ditutup
+      return;
+    }
     router.push({ name: "PpicLhkMarker" });
   },
+});
+
+const nomorTandaTerima = computed(
+  () => lhkTersimpan.value || String(route.params.nomor || ""),
+);
+const adaPermintaan = computed(() =>
+  formData.value.marker.some((r: any) => String(r.pmNomor || "").trim()),
+);
+
+const tutupTandaTerima = () => {
+  if (setelahSimpan.value) {
+    setelahSimpan.value = false;
+    router.push({ name: "PpicLhkMarker" });
+  }
+};
+
+onMounted(async () => {
+  const nomor = String(route.params.nomor || "");
+  if (!nomor) return; // mode tambah
+  try {
+    const res = await lhkMarkerFormService.getTandaTerima(nomor);
+    terkunci.value = res.data.data.tandaTerima.some((t) => !!t.tglTerima);
+  } catch {
+    terkunci.value = false; // backend tetap menjadi penentu saat simpan
+  }
 });
 
 watch(
@@ -238,6 +275,12 @@ const openImagePreview = (row: any) => {
 };
 
 const validateSave = () => {
+  if (terkunci.value) {
+    toast.error(
+      "LHK sudah divalidasi peminta (tanda terima diterima), tidak bisa diubah",
+    );
+    return false;
+  }
   if (!formData.value.tanggal) {
     toast.warning("Tanggal wajib diisi.");
     return;
@@ -269,6 +312,9 @@ const validateSave = () => {
     @confirm-close="executeClose"
   >
     <div class="lp-container">
+      <div v-if="terkunci" class="banner-terkunci">
+        LHK ini sudah divalidasi peminta. Data tidak bisa diubah atau dihapus.
+      </div>
       <div class="lp-header-card">
         <div class="fr">
           <label class="lbl">No. LHK Marker</label>
@@ -285,6 +331,15 @@ const validateSave = () => {
             class="inp"
             style="width: 160px"
           />
+          <v-btn
+            v-if="isEditMode && adaPermintaan"
+            size="small"
+            variant="outlined"
+            class="btn-tt"
+            @click="showTandaTerima = true"
+          >
+            Tanda Terima
+          </v-btn>
         </div>
         <div class="fr">
           <label class="lbl">Keterangan</label>
@@ -407,6 +462,12 @@ const validateSave = () => {
         </table>
       </div>
     </div>
+
+    <TandaTerimaMarkerDialog
+      v-model="showTandaTerima"
+      :lhk-nomor="nomorTandaTerima"
+      @tutup="tutupTandaTerima"
+    />
 
     <SpkPolaSearchModal v-model="showSpkModal" @selected="onSpkSelected" />
 
@@ -620,5 +681,18 @@ const validateSave = () => {
 .preview-body {
   padding: 16px;
   background: #f5f5f5;
+}
+.btn-tt {
+  font-size: 11px;
+  text-transform: none;
+  margin-left: auto;
+}
+.banner-terkunci {
+  font-size: 11px;
+  padding: 6px 10px;
+  margin-bottom: 8px;
+  background: #fff3e0;
+  border: 1px solid #ffb74d;
+  border-radius: 4px;
 }
 </style>
