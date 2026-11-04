@@ -34,6 +34,12 @@ export interface PermintaanMarkerBrowseItem {
   jmlSpk: number;
   spkNomor: string | null;
   jmlSpkSelesai: number;
+  tglDikerjakan: string | null;
+  tglLhk: string | null;
+  tglMutasi: string | null;
+  tglTerima: string | null;
+  jmlTt: number;
+  jmlTtTerima: number;
   status: StatusPermintaanMarker;
 }
 
@@ -57,6 +63,18 @@ export interface PermintaanMarkerDetailRow {
   lhkNomor: string;
 }
 
+export interface TandaTerimaPermintaanItem {
+  nomor: string;
+  lhkNomor: string;
+  peminta: string;
+  tglLhk: string | null;
+  spk: string | null;
+  tglMutasi: string | null;
+  userMutasi: string | null;
+  tglTerima: string | null;
+  userTerima: string | null;
+}
+
 export const permintaanMarkerService = {
   getBrowse: (params: PermintaanMarkerBrowseParams) =>
     api.get<ApiResult<PermintaanMarkerBrowseItem[]>>(`${BASE}`, { params }),
@@ -68,4 +86,19 @@ export const permintaanMarkerService = {
 
   deleteData: (nomor: string) =>
     api.delete<ApiResult<null>>(`${BASE}/${encodeURIComponent(nomor)}`),
+
+  getMenungguValidasi: () =>
+    api.get<{ success: boolean; data: PermintaanMarkerBrowseItem[] }>(
+      `${BASE}/menunggu-validasi`,
+    ),
+
+  listTandaTerima: (nomor: string) =>
+    api.get<{ success: boolean; data: TandaTerimaPermintaanItem[] }>(
+      `${BASE}/${encodeURIComponent(nomor)}/tanda-terima`,
+    ),
+
+  validasiTandaTerima: (ttNomor: string) =>
+    api.post<{ success: boolean; data: { nomor: string; pmNomor: string } }>(
+      `${BASE}/tanda-terima/${encodeURIComponent(ttNomor)}/validasi`,
+    ),
 };

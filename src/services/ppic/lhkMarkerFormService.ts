@@ -28,6 +28,41 @@ export interface AntreanMarkerData {
   lain: AntreanMarkerItem[];
 }
 
+export interface TandaTerimaBaris {
+  urut: number;
+  spkNomor: string;
+  namaSpk: string;
+  lebarKain: string | number | null;
+  size: string | null;
+  tujuanProses: string | null;
+  keterangan: string | null;
+  gambar: string | null;
+}
+
+export interface TandaTerimaItem {
+  nomor: string;
+  pmNomor: string;
+  peminta: string;
+  deadline: string | null;
+  tglMutasi: string | null;
+  userMutasi: string | null;
+  tglTerima: string | null;
+  userTerima: string | null;
+  baris: TandaTerimaBaris[];
+}
+
+export interface TandaTerimaData {
+  lhk: {
+    nomor: string;
+    tanggal: string;
+    keterangan: string | null;
+    pembuatMarker: string | null;
+    userCreate: string | null;
+    dateCreate: string | null;
+  };
+  tandaTerima: TandaTerimaItem[];
+}
+
 export const lhkMarkerFormService = {
   getDetail: (nomor: string) => api.get(`${BASE}/${encodeURIComponent(nomor)}`),
   create: (payload: any) => api.post(BASE, payload),
@@ -55,4 +90,13 @@ export const lhkMarkerFormService = {
     api.post(`${BASE}/permintaan/${encodeURIComponent(nomor)}/ambil-alih`),
   lepasPermintaan: (nomor: string) =>
     api.post(`${BASE}/permintaan/${encodeURIComponent(nomor)}/lepas`),
+  getTandaTerima: (nomor: string) =>
+    api.get<{ success: boolean; data: TandaTerimaData }>(
+      `${BASE}/${encodeURIComponent(nomor)}/tanda-terima`,
+    ),
+
+  cetakTandaTerima: (nomor: string) =>
+    api.post<{ success: boolean; data: TandaTerimaData }>(
+      `${BASE}/${encodeURIComponent(nomor)}/tanda-terima/cetak`,
+    ),
 };

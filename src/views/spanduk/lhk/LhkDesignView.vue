@@ -4,7 +4,11 @@ import { useToast } from "vue-toastification";
 import { useRouter } from "vue-router";
 import BaseBrowse from "@/components/BaseBrowse.vue";
 import { useBrowse } from "@/composables/useBrowse";
-import { exportExcelSingle, type ExcelColumn } from "@/utils/excelExport";
+import {
+  exportExcel,
+  exportExcelSingle,
+  type ExcelColumn,
+} from "@/utils/excelExport";
 import * as lhkService from "@/services/spanduk/lhk/lhkDesignService";
 import type {
   LhkDesignRow,
@@ -27,6 +31,9 @@ interface ExportMasterRow {
 interface ExportDetailRow {
   Nomor: string;
   Nama_SPK: string;
+  Tanggal_SPK: string;
+  Dateline: string;
+  Tanggal_LHK: string;
   Bahan: string;
   Panjang_Output: number;
   Jumlah_Output: number;
@@ -133,6 +140,7 @@ const kolomMaster: ExcelColumn[] = [
   { header: "Tgl SPK", key: "Tanggal_SPK", width: 14, align: "center" },
   { header: "Dateline", key: "Dateline", width: 14, align: "center" },
   { header: "Tgl LHK", key: "Tanggal_LHK", width: 14, align: "center" },
+  { header: "Bahan", key: "Bahan", width: 28 },
   { header: "Status Terakhir", key: "Status_Terakhir", width: 18 },
   { header: "User", key: "User_Create", width: 12 },
 ];
@@ -140,6 +148,9 @@ const kolomMaster: ExcelColumn[] = [
 const kolomDetail: ExcelColumn[] = [
   { header: "Nomor SPK/MAP", key: "Nomor", width: 20 },
   { header: "Nama SPK", key: "Nama_SPK", width: 36 },
+  { header: "Tgl SPK", key: "Tanggal_SPK", width: 14, align: "center" },
+  { header: "Dateline", key: "Dateline", width: 14, align: "center" },
+  { header: "Tgl LHK", key: "Tanggal_LHK", width: 14, align: "center" },
   { header: "Bahan", key: "Bahan", width: 28 },
   {
     header: "Panjang Output",
@@ -173,6 +184,15 @@ const kolomDetail: ExcelColumn[] = [
 // Data master yang sedang tampil (ikut search + filter kolom BaseBrowse)
 const dataTampil = (): LhkDesignRow[] =>
   baseBrowseRef.value?.getFilteredItems() ?? items.value ?? [];
+
+const preLinesExport = () => [
+  { text: "LHK Design", bold: true, size: 12, color: "1565C0" },
+  {
+    text: `Periode ${formatTanggal(filterState.value.dtAwal)} - ${formatTanggal(filterState.value.dtAkhir)}`,
+    bold: true,
+  },
+  { text: "" },
+];
 
 onMounted(() => fetchData());
 
@@ -234,20 +254,35 @@ const onDelete = async (item: LhkDesignRow) => {
 };
 
 // --- EXPORT ---
-const exportMaster = () =>
-  exportToExcel("LHK_Design_Header", {
-    columns: kolomMaster,
-    getData: (): ExportMasterRow[] =>
-      dataTampil().map((r) => ({
-        Nomor: r.Nomor,
-        Nama_SPK: r.Nama_SPK ?? "",
-        Tanggal_SPK: formatTanggal(r.Tanggal_SPK),
-        Dateline: formatTanggal(r.Dateline),
-        Tanggal_LHK: formatTanggal(r.Tanggal_LHK),
-        Status_Terakhir: r.Status_Terakhir ?? "",
-        User_Create: r.User_Create ?? "",
-      })),
-  });
+const exportMaster = async () => {
+  const master = dataTampil();
+  if (!master.length) {
+    return toast.warning("Tidak ada data untuk diexport.");
+  }
+  try {
+    await exportExcel(`LHK_Design_Header_${today}.xlsx`, [
+      {
+        sheetName: "LHK Design",
+        columns: kolomMaster,
+        rows: master.map(
+          (r): ExportMasterRow => ({
+            Nomor: r.Nomor,
+            Nama_SPK: r.Nama_SPK ?? "",
+            Tanggal_SPK: formatTanggal(r.Tanggal_SPK),
+            Dateline: formatTanggal(r.Dateline),
+            Tanggal_LHK: formatTanggal(r.Tanggal_LHK),
+            Status_Terakhir: r.Status_Terakhir ?? "",
+            User_Create: r.User_Create ?? "",
+          }),
+        ),
+        preLines: preLinesExport(),
+      },
+    ]);
+  } catch (e) {
+    console.error(e);
+    toast.error("Terjadi kesalahan saat mengekspor LHK Design.");
+  }
+};
 
 // Hanya komponen dari LHK yang sedang tampil di grid
 const exportDetail = async () => {
@@ -266,6 +301,9 @@ const exportDetail = async () => {
       rows.push({
         Nomor: item.Nomor,
         Nama_SPK: item.Nama_SPK ?? "",
+        Tanggal_SPK: formatTanggal(item.Tanggal_SPK),
+        Dateline: formatTanggal(item.Dateline),
+        Tanggal_LHK: formatTanggal(item.Tanggal_LHK),
         Bahan: r.Bahan ?? "",
         Panjang_Output: angkaExcel(r.Panjang_Output),
         Jumlah_Output: angkaExcel(r.Jumlah_Output),
@@ -285,12 +323,14 @@ const exportDetail = async () => {
   }
 
   try {
-    await exportExcelSingle(
-      `Export_Detail_LHK_Design_${today}.xlsx`,
-      "Detail LHK Design",
-      kolomDetail,
-      rows,
-    );
+    await exportExcel(`Export_Detail_LHK_Design_${today}.xlsx`, [
+      {
+        sheetName: "Detail LHK Design",
+        columns: kolomDetail,
+        rows,
+        preLines: preLinesExport(),
+      },
+    ]);
     toast.success("Berhasil export detail LHK Design.");
   } catch (e) {
     console.error(e);

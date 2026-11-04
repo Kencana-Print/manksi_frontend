@@ -344,6 +344,7 @@ const onExportDetail = async () => {
         Nik: header.Nik,
         NamaPeminta: header.Nama,
         Bagian: header.Bagian,
+        PjhKe: header.PjhKe,
       };
       const blankMaster = Object.fromEntries(
         Object.keys(masterCells).map((k) => [k, ""]),
@@ -390,6 +391,7 @@ const onExportDetail = async () => {
             { header: "Nik", key: "Nik", width: 10 },
             { header: "Nama Peminta", key: "NamaPeminta", width: 18 },
             { header: "Bagian", key: "Bagian", width: 14 },
+            { header: "Pjh Ke", key: "PjhKe", width: 10 },
             { header: "Nama Item", key: "Nama", width: 22 },
             { header: "Spesifikasi", key: "Spesifikasi", width: 22 },
             { header: "Satuan", key: "Satuan", width: 10 },

@@ -427,6 +427,40 @@ const onBarangSelected = (item: any) => {
   focusDetailField(i, "jumlah");
 };
 
+const onBarangMultiSelected = async (list: any[]) => {
+  const terisi = formData.value.details.filter(
+    (d: any) => d.kode && d.kode.trim() !== "",
+  );
+  const sudahAda = new Set(terisi.map((d: any) => d.kode));
+  const baru = list.filter((b) => !sudahAda.has(b.Kode));
+  const dilewati = list.length - baru.length;
+
+  if (!baru.length) {
+    return toast.warning("Semua barang yang dipilih sudah ada di detail.");
+  }
+
+  formData.value.details = [
+    ...terisi,
+    ...baru.map((b) => ({
+      kode: b.Kode,
+      nama: b.Nama,
+      satuan: b.Satuan,
+      butuh: 0,
+      pemakaian: 0,
+      pcs: 0,
+      jumlah: 0,
+      ket: "",
+    })),
+  ];
+
+  if (dilewati > 0) {
+    toast.info(`${dilewati} barang dilewati karena sudah ada di detail.`);
+  }
+
+  // fokus ke Jumlah barang pertama yang baru masuk
+  focusDetailField(terisi.length, "jumlah");
+};
+
 // ─────────────────────────────────────────────
 // KEYBOARD HANDLERS: GUDANG PRODUKSI
 // ─────────────────────────────────────────────
@@ -1054,7 +1088,9 @@ const numFormat = (val: any) =>
     v-model="showBarangModal"
     :jenis="formData.jenis"
     :cabang="formData.cabang"
+    multiple
     @selected="onBarangSelected"
+    @selected-multiple="onBarangMultiSelected"
   />
 
   <v-dialog v-model="showPrintDialog" max-width="400px" persistent>
