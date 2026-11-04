@@ -3630,7 +3630,7 @@ const router = createRouter({
     {
       path: "/mmt/bahan-baku-produksi/permintaan-pembelian",
       alias: "/mmt/bahan-baku-produksi/pengajuan-permintaan",
-      name: "PermintaanPembelianBrowse",
+      name: "MmtPermintaanPembelianBrowse",
       component: () =>
         import("@/views/mmt/bahan-baku-produksi/PermintaanPembelianView.vue"),
       meta: {
@@ -3643,7 +3643,7 @@ const router = createRouter({
     {
       path: "/mmt/bahan-baku-produksi/permintaan-pembelian/create",
       alias: "/mmt/bahan-baku-produksi/pengajuan-permintaan/create",
-      name: "PermintaanPembelianCreate",
+      name: "MmtPermintaanPembelianCreate",
       component: () =>
         import("@/views/mmt/bahan-baku-produksi/PermintaanPembelianFormView.vue"),
       meta: {
@@ -3651,13 +3651,13 @@ const router = createRouter({
         layout: "DefaultLayout",
         requiresAuth: true,
         menuId: "5531",
-        browseRoute: "PermintaanPembelianBrowse",
+        browseRoute: "MmtPermintaanPembelianBrowse",
       },
     },
     {
       path: "/mmt/bahan-baku-produksi/permintaan-pembelian/edit/:nomor",
       alias: "/mmt/bahan-baku-produksi/pengajuan-permintaan/edit/:nomor",
-      name: "PermintaanPembelianEdit",
+      name: "MmtPermintaanPembelianEdit",
       component: () =>
         import("@/views/mmt/bahan-baku-produksi/PermintaanPembelianFormView.vue"),
       meta: {
@@ -3665,13 +3665,13 @@ const router = createRouter({
         layout: "DefaultLayout",
         requiresAuth: true,
         menuId: "5531",
-        browseRoute: "PermintaanPembelianBrowse",
+        browseRoute: "MmtPermintaanPembelianBrowse",
       },
     },
     {
       path: "/mmt/bahan-baku-produksi/permintaan-pembelian/print/:nomor",
       alias: "/mmt/bahan-baku-produksi/pengajuan-permintaan/print/:nomor",
-      name: "PermintaanPembelianPrint",
+      name: "MmtPermintaanPembelianPrint",
       component: () =>
         import("@/views/mmt/bahan-baku-produksi/PermintaanPembelianPrintView.vue"),
       meta: {
@@ -3849,7 +3849,7 @@ const router = createRouter({
     },
     {
       path: "/mmt/bahan-baku-produksi/koreksi-stok-bahan",
-      name: "KoreksiStokBahanBrowse",
+      name: "MmtKoreksiStokBahanBrowse",
       component: () =>
         import("@/views/mmt/bahan-baku-produksi/KoreksiStokBahanView.vue"),
       meta: {
@@ -3861,7 +3861,7 @@ const router = createRouter({
     },
     {
       path: "/mmt/bahan-baku-produksi/koreksi-stok-bahan/create",
-      name: "KoreksiStokBahanCreate",
+      name: "MmtKoreksiStokBahanCreate",
       component: () =>
         import("@/views/mmt/bahan-baku-produksi/KoreksiStokBahanFormView.vue"),
       meta: {
@@ -3869,12 +3869,12 @@ const router = createRouter({
         layout: "DefaultLayout",
         requiresAuth: true,
         menuId: "5535",
-        browseRoute: "KoreksiStokBahanBrowse",
+        browseRoute: "MmtKoreksiStokBahanBrowse",
       },
     },
     {
       path: "/mmt/bahan-baku-produksi/koreksi-stok-bahan/edit/:nomor",
-      name: "KoreksiStokBahanEdit",
+      name: "MmtKoreksiStokBahanEdit",
       component: () =>
         import("@/views/mmt/bahan-baku-produksi/KoreksiStokBahanFormView.vue"),
       meta: {
@@ -3882,12 +3882,12 @@ const router = createRouter({
         layout: "DefaultLayout",
         requiresAuth: true,
         menuId: "5535",
-        browseRoute: "KoreksiStokBahanBrowse",
+        browseRoute: "MmtKoreksiStokBahanBrowse",
       },
     },
     {
       path: "/mmt/bahan-baku-produksi/koreksi-stok-bahan/print/:nomor",
-      name: "KoreksiStokBahanPrint",
+      name: "MmtKoreksiStokBahanPrint",
       component: () =>
         import("@/views/mmt/bahan-baku-produksi/KoreksiStokBahanPrintView.vue"),
       meta: {
@@ -4416,7 +4416,8 @@ const router = createRouter({
     {
       path: "/mmt/planning-produksi",
       name: "PlanningProduksiMmtBrowse",
-      component: () => import("@/views/mmt/transaksi/PlanningProduksiMmtView.vue"),
+      component: () =>
+        import("@/views/mmt/transaksi/PlanningProduksiMmtView.vue"),
       meta: {
         title: "Planning Produksi MMT",
         layout: "DefaultLayout",
@@ -4460,7 +4461,8 @@ const router = createRouter({
     {
       path: "/mmt/relationship-map",
       name: "RelationshipMapMmtBrowse",
-      component: () => import("@/views/mmt/transaksi/RelationshipMapMmtView.vue"),
+      component: () =>
+        import("@/views/mmt/transaksi/RelationshipMapMmtView.vue"),
       meta: {
         title: "Relationship Map MMT",
         layout: "DefaultLayout",
@@ -4504,7 +4506,8 @@ const router = createRouter({
     {
       path: "/mmt/surat-jalan/approve",
       name: "SuratJalanApproveMmtBrowse",
-      component: () => import("@/views/mmt/transaksi/SuratJalanApproveMmtView.vue"),
+      component: () =>
+        import("@/views/mmt/transaksi/SuratJalanApproveMmtView.vue"),
       meta: {
         title: "Surat Jalan Approve MMT",
         layout: "DefaultLayout",
@@ -4526,7 +4529,8 @@ const router = createRouter({
     {
       path: "/mmt/po-paperprint",
       name: "PoInternalPaperprintMmtBrowse",
-      component: () => import("@/views/mmt/transaksi/PoInternalPaperprintMmtView.vue"),
+      component: () =>
+        import("@/views/mmt/transaksi/PoInternalPaperprintMmtView.vue"),
       meta: {
         title: "PO Internal MMT",
         layout: "DefaultLayout",
@@ -4537,7 +4541,8 @@ const router = createRouter({
     {
       path: "/mmt/mutasi-internal",
       name: "MutasiInternalMmtBrowse",
-      component: () => import("@/views/mmt/transaksi/MutasiInternalMmtView.vue"),
+      component: () =>
+        import("@/views/mmt/transaksi/MutasiInternalMmtView.vue"),
       meta: {
         title: "Mutasi Internal MMT",
         layout: "DefaultLayout",
@@ -4548,7 +4553,8 @@ const router = createRouter({
     {
       path: "/mmt/penerimaan-po-external",
       name: "PenerimaanPoExtMmtBrowse",
-      component: () => import("@/views/mmt/transaksi/PenerimaanPoExtMmtView.vue"),
+      component: () =>
+        import("@/views/mmt/transaksi/PenerimaanPoExtMmtView.vue"),
       meta: {
         title: "Penerimaan PO External MMT",
         layout: "DefaultLayout",
@@ -7508,7 +7514,7 @@ const router = createRouter({
         title: "Kelola PIC Agenda",
         layout: "DefaultLayout",
         requiresAuth: true,
-        menuId: "124",
+        menuId: "1324",
       },
     },
     {
