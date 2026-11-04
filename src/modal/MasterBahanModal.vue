@@ -129,6 +129,7 @@ interface MasterBahan {
 const props = defineProps<{
   isVisible: boolean;
   mode: "mmt" | "produksi" | "obat";
+  initialKeyword?: string;
 }>();
 
 const emit = defineEmits<{
@@ -156,11 +157,11 @@ const searchLabel = computed(
 const API_URL = computed(() => {
   switch (props.mode) {
     case "obat":
-      return "/master/bahan/obat";
+      return "/mmt/daftar/master-obat";
     case "produksi":
-      return "/master/bahan/mmt/produksi";
+      return "/mmt/daftar/bahan/mmt/produksi";
     default:
-      return "/master/bahan/mmt";
+      return "/mmt/daftar/bahan";
   }
 });
 
@@ -239,7 +240,7 @@ watch(
   () => props.isVisible,
   (newVal) => {
     if (newVal) {
-      searchKeyword.value = "";
+      searchKeyword.value = props.initialKeyword || "";
       fetchBahanData();
     } else {
       listData.value = [];
