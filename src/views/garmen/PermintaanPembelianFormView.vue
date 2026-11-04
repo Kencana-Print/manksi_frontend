@@ -5,7 +5,12 @@ import { useToast } from "vue-toastification";
 import { useAuthStore } from "@/stores/authStore";
 import BaseForm from "@/components/BaseForm.vue";
 import { useForm } from "@/composables/useForm";
-import { IconShoppingCart, IconSearch } from "@tabler/icons-vue";
+import {
+  IconShoppingCart,
+  IconSearch,
+  IconTrash,
+  IconPrinter,
+} from "@tabler/icons-vue";
 import { permintaanPembelianFormService } from "@/services/garmen/permintaanPembelianFormService";
 
 // Gunakan Search Modal yang sudah ada untuk pencarian barang
@@ -173,6 +178,54 @@ const setBarang = (v: any) => {
   if (i === formData.value.items.length - 1) {
     addItem();
   }
+};
+
+const barisKosong = () => ({
+  kode: "",
+  nama: "",
+  satuan: "",
+  jumlah: 0,
+  harga: 0,
+  total: 0,
+  ket: "",
+  kegunaan: "",
+  realisasi: 0,
+});
+
+const setBarangMulti = async (list: any[]) => {
+  const terisi = formData.value.items.filter(
+    (d: any) => d.kode && d.kode.trim() !== "",
+  );
+  const sudahAda = new Set(terisi.map((d: any) => d.kode));
+  const baru = list.filter((b) => !sudahAda.has(b.Kode || b.brg_kode));
+  const dilewati = list.length - baru.length;
+
+  if (!baru.length) {
+    return toast.warning("Semua barang yang dipilih sudah ada di detail.");
+  }
+
+  formData.value.items = [
+    ...terisi,
+    ...baru.map((b) => ({
+      ...barisKosong(),
+      kode: b.Kode || b.brg_kode,
+      nama: b.Nama || b.brg_nama,
+      satuan: b.Satuan || b.brg_satuan,
+    })),
+    barisKosong(),
+  ];
+
+  if (dilewati > 0) {
+    toast.info(`${dilewati} barang dilewati karena sudah ada di detail.`);
+  }
+
+  // fokus ke Jumlah barang pertama yang baru masuk
+  await nextTick();
+  const idxPertama = terisi.length;
+  activeGridIndex.value = idxPertama;
+  const el = jumlahFieldRefs.value[idxPertama];
+  el?.focus();
+  el?.select();
 };
 
 // ─────────────────────────────────────────────
@@ -588,14 +641,14 @@ const onHapusGambarItem = async (): Promise<void> => {
                   <th style="width: 40px" class="text-center">No</th>
                   <th style="width: 110px">Kode</th>
                   <th style="min-width: 180px">Nama Barang</th>
-                  <th v-if="isDetailRinci" style="min-width: 150px; background: #ffeb3b">
+                  <th
+                    v-if="isDetailRinci"
+                    style="min-width: 150px; background: #ffeb3b"
+                  >
                     Spesifikasi
                   </th>
                   <th style="width: 60px" class="text-center">Sat</th>
-                  <th
-                    style="width: 90px"
-                    class="text-right text-white"
-                  >
+                  <th style="width: 90px" class="text-right text-white">
                     Est.Realisasi
                   </th>
                   <th
@@ -702,9 +755,13 @@ const onHapusGambarItem = async (): Promise<void> => {
                     />
                   </td>
 
-                 <!-- Total -->
-                 <td class="ci text-right" :class="{ 'ci text-right': item.total === 0 }">
-                 {{ fmt(item.total) }}</td>
+                  <!-- Total -->
+                  <td
+                    class="ci text-right"
+                    :class="{ 'ci text-right': item.total === 0 }"
+                  >
+                    {{ fmt(item.total) }}
+                  </td>
 
                   <td v-if="isDetailRinci" class="p0">
                     <input
@@ -857,7 +914,9 @@ const onHapusGambarItem = async (): Promise<void> => {
     v-model="showBarangModal"
     :jenis="formJenis"
     :cabang="authStore.user?.cabang || 'ALL'"
+    multiple
     @selected="setBarang"
+    @selected-multiple="setBarangMulti"
   />
 
   <!-- DIALOG KONFIRMASI CETAK -->

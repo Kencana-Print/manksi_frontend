@@ -8,12 +8,45 @@ const props = defineProps<{
   jenis: string;
   cabang: string;
   initialKeyword?: string;
+  multiple?: boolean;
 }>();
-const emit = defineEmits(["update:modelValue", "selected"]);
+const emit = defineEmits([
+  "update:modelValue",
+  "selected",
+  "selected-multiple",
+]);
 
 const search = ref("");
 const items = ref<any[]>([]);
 const isLoading = ref(false);
+const picked = ref<Record<string, any>>({});
+const pickedCount = computed(() => Object.keys(picked.value).length);
+
+const isPicked = (item: any) => !!picked.value[item.Kode];
+const togglePick = (item: any) => {
+  if (picked.value[item.Kode]) {
+    delete picked.value[item.Kode];
+  } else {
+    picked.value[item.Kode] = item;
+  }
+};
+
+const allPagePicked = computed(
+  () => items.value.length > 0 && items.value.every((i) => isPicked(i)),
+);
+const togglePage = () => {
+  if (allPagePicked.value) {
+    items.value.forEach((i) => delete picked.value[i.Kode]);
+  } else {
+    items.value.forEach((i) => (picked.value[i.Kode] = i));
+  }
+};
+
+const confirmMulti = () => {
+  if (!pickedCount.value) return;
+  emit("selected-multiple", Object.values(picked.value));
+  emit("update:modelValue", false);
+};
 
 // Pagination
 const currentPage = ref(1);
@@ -80,6 +113,7 @@ watch(
   () => props.modelValue,
   (isOpen) => {
     if (isOpen) {
+      picked.value = {};
       search.value = props.initialKeyword || "";
       currentPage.value = 1;
       fetchData();
@@ -88,6 +122,10 @@ watch(
 );
 
 const selectItem = (item: any) => {
+  if (props.multiple) {
+    togglePick(item);
+    return;
+  }
   emit("selected", item);
   emit("update:modelValue", false);
 };
@@ -144,6 +182,13 @@ const selectItem = (item: any) => {
         <table v-else class="lookup-table">
           <thead>
             <tr>
+              <th v-if="multiple" style="width: 36px; text-align: center">
+                <input
+                  type="checkbox"
+                  :checked="allPagePicked"
+                  @change="togglePage"
+                />
+              </th>
               <th style="width: 140px">KODE</th>
               <th>NAMA BARANG</th>
               <th style="width: 80px">SATUAN</th>
@@ -155,8 +200,16 @@ const selectItem = (item: any) => {
               v-for="item in items"
               :key="item.Kode"
               class="lookup-row"
+              :class="{ 'row-picked': multiple && isPicked(item) }"
               @click="selectItem(item)"
             >
+              <td v-if="multiple" style="text-align: center" @click.stop>
+                <input
+                  type="checkbox"
+                  :checked="isPicked(item)"
+                  @change="togglePick(item)"
+                />
+              </td>
               <td class="td-kode">{{ item.Kode }}</td>
               <td>{{ item.Nama }}</td>
               <td>{{ item.Satuan }}</td>
@@ -212,6 +265,14 @@ const selectItem = (item: any) => {
             »
           </button>
         </div>
+        <button
+          v-if="multiple"
+          class="confirm-btn"
+          :disabled="!pickedCount"
+          @click="confirmMulti"
+        >
+          Pilih ({{ pickedCount }})
+        </button>
         <select v-model="perPage" class="per-page-select" @change="goToPage(1)">
           <option v-for="n in [25, 50, 100]" :key="n" :value="n">
             {{ n }} / hal
@@ -412,5 +473,23 @@ const selectItem = (item: any) => {
   background: white;
   cursor: pointer;
   outline: none;
+}
+.row-picked td {
+  background: #e8f5e9;
+}
+.confirm-btn {
+  height: 26px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 4px;
+  background: #2e7d32;
+  color: white;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.confirm-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 </style>
