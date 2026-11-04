@@ -58,7 +58,7 @@ const openHistory = async (barcodeVal?: string) => {
 
 <template>
   <BaseBrowse
-    title="Cari Barcode Rol"
+    title="Search Barcode"
     menu-id="5540"
     item-value="Barcode"
     :icon="IconBarcode"

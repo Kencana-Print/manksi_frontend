@@ -52,7 +52,7 @@ const {
 
 <template>
   <BaseBrowse
-    title="Kartu Stok Bahan MMT"
+    title="Kartu Barcode"
     menu-id="5542"
     item-value="KODE"
     :icon="IconReportAnalytics"
