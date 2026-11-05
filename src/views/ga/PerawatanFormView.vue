@@ -9,6 +9,7 @@ import {
   type PerawatanFormData,
   type PerawatanDetailItem,
 } from "@/services/ga/perawatanService";
+import { kendaraanService } from "@/services/ga/kendaraanService";
 import KendaraanSearchModal from "@/components/lookups/KendaraanSearchModal.vue";
 import {
   IconTool,
@@ -202,29 +203,77 @@ const onNopolBlur = async () => {
   if (!nopol) return;
 
   try {
-    const res = await perawatanService.searchKendaraan(nopol);
-    const matches = res.data?.data || [];
-    const exact = matches.find(
-      (m: any) => m.Nopol?.toUpperCase() === nopol,
-    );
-    if (exact) {
-      formData.value.stat = exact.Stat;
-      formData.value.namaKendaraan = exact.Keterangan;
-      if (exact.KmTerakhir && !formData.value.km) {
-        formData.value.km = exact.KmTerakhir;
+    const res = await kendaraanService.getById(nopol);
+    const k = res.data?.data;
+    if (k) {
+      formData.value.stat = k.Stat || "";
+      formData.value.namaKendaraan = k.Keterangan || "";
+      if (k.KmTerakhir && !formData.value.km) {
+        formData.value.km = Number(k.KmTerakhir) || 0;
+      }
+      if (String(k.Aktif || "").toUpperCase() === "N") {
+        toast.warning(
+          `Perhatian: Kendaraan [${nopol}] berstatus Pasif / Tidak Aktif.`,
+        );
       }
     }
   } catch {
-    // Abaikan jika error
+    // Jika tidak ditemukan di getById, coba searchKendaraan
+    try {
+      const res = await perawatanService.searchKendaraan(nopol);
+      const matches = res.data?.data || [];
+      const exact = matches.find(
+        (m: any) => m.Nopol?.toUpperCase() === nopol,
+      );
+      if (exact) {
+        formData.value.stat = exact.Stat;
+        formData.value.namaKendaraan = exact.Keterangan;
+        if (exact.KmTerakhir && !formData.value.km) {
+          formData.value.km = exact.KmTerakhir;
+        }
+      }
+    } catch {
+      // Abaikan jika error
+    }
   }
 };
 
 // ── Validasi Sesuai Delphi 7 ──────────────────────────────────────────
-const onValidate = () => {
-  if (!formData.value.nopol?.trim()) {
+const onValidate = async () => {
+  if (!formData.value.bengkel?.trim()) {
+    toast.warning("Nama Bengkel harus di isi.");
+    return;
+  }
+
+  const nopol = (formData.value.nopol || "").trim().toUpperCase();
+  if (!nopol) {
     toast.warning("No Polisi harus diisi.");
     return;
   }
+
+  // Cek apakah nomor polisi berstatus pasif
+  try {
+    const res = await kendaraanService.getById(nopol);
+    const k = res.data?.data;
+    if (!k) {
+      toast.warning(`Data kendaraan dengan nomor polisi ${nopol} tidak ditemukan.`);
+      return;
+    }
+    if (String(k.Aktif || "").toUpperCase() === "N") {
+      toast.warning(
+        `Kendaraan [${nopol}] berstatus Pasif / Tidak Aktif, tidak bisa disimpan.`,
+      );
+      return;
+    }
+  } catch (err: any) {
+    toast.warning(
+      err.response?.data?.message ||
+        err.message ||
+        `Data kendaraan ${nopol} tidak ditemukan.`,
+    );
+    return;
+  }
+
   const kmVal = Number(formData.value.km) || 0;
   if (kmVal <= 0) {
     toast.warning("KM harus diisi dan lebih dari 0.");
