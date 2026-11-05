@@ -220,10 +220,18 @@ const handleEdit = (item?: any) => {
     : (selected.value[0]?.raw || selected.value[0]);
   if (!row?.Nomor) return;
 
-  // 1. Validasi Otoritas Cabang (Aturan Delphi)
+  // 1. Validasi Otoritas Cabang (Aturan Delphi - Diizinkan untuk Head Office/Admin atau user yang memiliki hak akses menu)
   const u = user.value as any;
-  const userCab = u?.cabang || u?.CAB;
-  if (userCab && row.Cab && row.Cab !== userCab) {
+  const userCab = String(u?.cabang || u?.CAB || "").trim().toUpperCase();
+  const isBypassCabang =
+    !userCab ||
+    ["HO", "HO-", "PUSAT", "ALL", "ADMIN"].includes(userCab) ||
+    u?.is_admin ||
+    u?.role === "ADMIN" ||
+    u?.level === "ADMIN" ||
+    canEdit.value;
+
+  if (!isBypassCabang && row.Cab && userCab && row.Cab.trim().toUpperCase() !== userCab) {
     toast.warning(`Data tsb bukan cabang anda (${row.Cab} ≠ ${userCab}).`);
     return;
   }
@@ -248,10 +256,17 @@ const handleDelete = async (item?: any) => {
   if (!row?.Nomor) return;
 
   const u = user.value as any;
-  const userCab = u?.cabang || u?.CAB;
+  const userCab = String(u?.cabang || u?.CAB || "").trim().toUpperCase();
+  const isBypassCabang =
+    !userCab ||
+    ["HO", "HO-", "PUSAT", "ALL", "ADMIN"].includes(userCab) ||
+    u?.is_admin ||
+    u?.role === "ADMIN" ||
+    u?.level === "ADMIN" ||
+    canDelete.value;
 
   // 1. Validasi Hak Otoritas Cabang
-  if (userCab && row.Cab && row.Cab !== userCab) {
+  if (!isBypassCabang && userCab && row.Cab && row.Cab.trim().toUpperCase() !== userCab) {
     toast.warning(`Data tsb bukan cabang anda (${row.Cab} ≠ ${userCab}).`);
     return;
   }

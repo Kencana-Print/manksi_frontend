@@ -698,7 +698,7 @@ onMounted(() => {
                         <span
                             class="font-weight-bold text-caption text-uppercase text-grey-darken-2"
                         >
-                            Checklist
+                            Checklist Scan Barcode
                         </span>
                         <span
                             class="font-weight-bold text-primary text-caption font-monospace"
@@ -724,19 +724,19 @@ onMounted(() => {
                     <div
                         class="d-flex align-center justify-space-between mt-2 pt-2 border-top"
                     >
-                        <span class="text-caption text-grey">
+                        <!-- <span class="text-caption text-grey">
                             {{
                                 scannedBarcodes.size > 0
-                                    ? `${scannedBarcodes.size} rol telah diverifikasi`
+                                    ? `${scannedBarcodes.size} barcode terscan`
                                     : "Siap scan verifikasi fisik"
                             }}
-                        </span>
+                        </span> -->
                         <v-btn
                             v-if="scannedBarcodes.size > 0"
                             size="x-small"
-                            variant="text"
+                            variant="tonal"
                             color="error"
-                            class="text-none px-1"
+                            class="px-1 text-none"
                             @click="resetAllScans"
                         >
                             Reset

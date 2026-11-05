@@ -540,86 +540,103 @@ onMounted(() => {
 
             <!-- ── KONTEN DETAIL HASIL SEARCH KARTU BARCODE ── -->
             <div v-if="data" class="kartu-content-body mt-3">
-                <!-- 1. CARD RINGKASAN INFORMASI ROL & SALDO GUDANG -->
+                <!-- 1. CARD RINGKASAN INFORMASI ROL & SALDO GUDANG (SESUAI LAYOUT MMT DENGAN AKSEN SOFT) -->
                 <div class="summary-hero-card elevation-1">
-                    <div class="summary-header">
-                        <div class="d-flex align-center">
-                            <span class="barcode-badge-tag"
-                                >KARTU STOK BARCODE ROL</span
-                            >
-                            <span class="stock-status-chip">
-                                <IconCheck :size="12" class="mr-1" /> AKTIF DI
-                                SISTEM
-                            </span>
-                        </div>
-                        <div class="barcode-title-number">
-                            {{ data.info.Barcode }}
-                        </div>
-                    </div>
+                    <div class="summary-card-layout">
+                        <!-- Kolom Kiri: Informasi Utama Rol & Sisa Total -->
+                        <div class="info-main">
+                            <div class="summary-header">
+                                <div class="d-flex align-center">
+                                    <span class="barcode-badge-tag"
+                                        >KARTU STOK BARCODE ROL</span
+                                    >
+                                    <span class="stock-status-chip">
+                                        <IconCheck :size="12" class="mr-1" />
+                                        AKTIF DI SISTEM
+                                    </span>
+                                </div>
+                                <div class="barcode-title-number">
+                                    {{ data.info.Barcode }}
+                                </div>
+                            </div>
 
-                    <div class="summary-grid">
-                        <!-- Info Bahan -->
-                        <div class="info-block">
-                            <div class="info-label">Nama Bahan</div>
-                            <div
-                                class="info-val-highlight font-weight-bold text-dark"
-                            >
-                                {{ data.info.Nama_Bahan || "-" }}
+                            <div class="info-grid">
+                                <div class="info-block">
+                                    <div class="info-label">Nama Bahan</div>
+                                    <div
+                                        class="info-val-highlight font-weight-bold"
+                                    >
+                                        {{ data.info.Nama_Bahan || "-" }}
+                                    </div>
+                                </div>
+
+                                <div class="info-block">
+                                    <div class="info-label">Kode Bahan</div>
+                                    <div
+                                        class="info-val font-monospace font-weight-bold text-primary"
+                                    >
+                                        {{ data.info.Kode || "-" }}
+                                    </div>
+                                </div>
+
+                                <div class="info-block">
+                                    <div class="info-label">Satuan</div>
+                                    <div class="info-val font-weight-medium">
+                                        {{ data.info.Satuan || "ROLL" }}
+                                    </div>
+                                </div>
+
+                                <!-- Sisa Total Saldo (Field Krusial: qty-focus) -->
+                                <div class="info-block total-saldo-block">
+                                    <div class="info-label text-success-dark">
+                                        Sisa Total Berjalan
+                                    </div>
+                                    <div class="total-saldo-value">
+                                        {{ fmtM(data.saldoTotalM) }}
+                                        <span class="unit-text">meter</span>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
-                        <div class="info-block">
-                            <div class="info-label">Kode Bahan</div>
-                            <div
-                                class="info-val font-monospace font-weight-bold text-secondary"
-                            >
-                                {{ data.info.Kode || "-" }}
+                        <!-- Kolom Kanan: Rincian Sisa per Gudang (Sesuai MMT) -->
+                        <div class="saldo-list-panel">
+                            <div class="saldo-list-header">
+                                <IconBuildingWarehouse
+                                    :size="15"
+                                    class="mr-1 text-primary"
+                                />
+                                <span>Sisa per Gudang</span>
                             </div>
-                        </div>
 
-                        <div class="info-block">
-                            <div class="info-label">Satuan</div>
-                            <div class="info-val">
-                                {{ data.info.Satuan || "ROLL" }}
-                            </div>
-                        </div>
-
-                        <!-- Sisa Total Meter -->
-                        <div class="info-block total-saldo-block">
-                            <div class="info-label text-success-dark">Sisa</div>
-                            <div class="total-saldo-value">
-                                {{ fmtM(data.saldoTotalM) }}
-                                <span class="unit-text">meter</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Sisa per Gudang -->
-                    <div class="per-gudang-section">
-                        <div class="per-gudang-title">
-                            <IconBuildingWarehouse :size="14" class="mr-1" />
-                            Rincian Sisa per Gudang
-                        </div>
-                        <div class="per-gudang-chips">
-                            <div
-                                v-for="g in data.saldoPerGudang"
-                                :key="g.Gudang"
-                                class="gudang-pill"
-                                :class="{ 'has-stock': Number(g.SaldoM) > 0 }"
-                            >
-                                <span class="gdg-code">{{ g.Gudang }}</span>
-                                <span class="gdg-meter"
-                                    >{{ fmtM(g.SaldoM) }} m</span
+                            <div class="saldo-list-items">
+                                <div
+                                    v-for="s in data.saldoPerGudang"
+                                    :key="s.Gudang"
+                                    class="saldo-row"
+                                    :class="{
+                                        'has-stock': Number(s.SaldoM) > 0,
+                                    }"
                                 >
-                            </div>
-                            <div
-                                v-if="
-                                    !data.saldoPerGudang ||
-                                    data.saldoPerGudang.length === 0
-                                "
-                                class="text-caption text-grey"
-                            >
-                                Tidak ada data saldo gudang.
+                                    <div class="d-flex align-center">
+                                        <span class="badge-gdg">{{
+                                            s.Gudang
+                                        }}</span>
+                                    </div>
+                                    <span class="saldo-val font-monospace">
+                                        {{ fmtM(s.SaldoM) }} m
+                                    </span>
+                                </div>
+
+                                <div
+                                    v-if="
+                                        !data.saldoPerGudang ||
+                                        data.saldoPerGudang.length === 0
+                                    "
+                                    class="text-caption text-grey py-3 text-center"
+                                >
+                                    Tidak ada data saldo per gudang.
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1079,15 +1096,33 @@ onMounted(() => {
     pointer-events: none;
 }
 
-/* ── SUMMARY HERO CARD (LIGHT THEME DENGAN AKSEN SOFT MANKSI) ── */
+/* ── SUMMARY HERO CARD (MMT 2-COLUMN SPLIT WITH MANKSI SOFT ACCENTS) ── */
 .summary-hero-card {
     background: #ffffff;
     border: 1px solid #e2e8f0;
     border-left: 4px solid #1976d2;
-    border-radius: 6px;
-    padding: 14px 16px;
+    border-radius: 8px;
+    padding: 16px;
     color: #1e293b;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.summary-card-layout {
+    display: grid;
+    grid-template-columns: 1.6fr 1fr;
+    gap: 20px;
+}
+
+@media (max-width: 960px) {
+    .summary-card-layout {
+        grid-template-columns: 1fr;
+        gap: 14px;
+    }
+}
+
+.info-main {
+    display: flex;
+    flex-direction: column;
 }
 
 .summary-header {
@@ -1121,7 +1156,7 @@ onMounted(() => {
 }
 
 .barcode-title-number {
-    font-size: 20px;
+    font-size: 22px;
     font-weight: 800;
     font-family: monospace;
     color: #0f172a;
@@ -1129,11 +1164,10 @@ onMounted(() => {
     letter-spacing: 0.5px;
 }
 
-.summary-grid {
+.info-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px;
-    margin-bottom: 12px;
 }
 
 .info-block {
@@ -1146,7 +1180,7 @@ onMounted(() => {
 .info-label {
     font-size: 10px;
     color: #64748b;
-    margin-bottom: 3px;
+    margin-bottom: 2px;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.3px;
@@ -1163,88 +1197,103 @@ onMounted(() => {
     color: #0f172a;
 }
 
+/* Sisa Total Saldo (Field Krusial: qty-focus MMT) */
 .total-saldo-block {
     background: #f0fdf4;
-    border: 1px solid #bbf7d0;
+    border: 1.5px solid #86efac;
+    box-shadow: 0 1px 2px rgba(22, 163, 74, 0.08);
 }
 
 .text-success-dark {
-    color: #166534;
-}
-
-.total-saldo-value {
-    font-size: 19px;
-    font-weight: 800;
-    font-family: monospace;
     color: #15803d;
 }
 
-.unit-text {
-    font-size: 11px;
-    font-weight: 600;
-    color: #166534;
-}
-
-.per-gudang-section {
-    background: #f8fafc;
-    border: 1px dashed #cbd5e1;
-    border-radius: 6px;
-    padding: 8px 12px;
-}
-
-.per-gudang-title {
-    display: flex;
-    align-items: center;
-    font-size: 10px;
-    font-weight: 700;
-    color: #475569;
-    text-transform: uppercase;
-    letter-spacing: 0.3px;
-    margin-bottom: 6px;
-}
-
-.per-gudang-chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-}
-
-.gudang-pill {
-    display: inline-flex;
-    align-items: center;
-    background: white;
-    border: 1px solid #cbd5e1;
-    border-radius: 4px;
-    overflow: hidden;
-    font-size: 11px;
-}
-
-.gudang-pill.has-stock {
-    border-color: #93c5fd;
-    background: #eff6ff;
-}
-
-.gdg-code {
-    background: #f1f5f9;
-    padding: 2px 7px;
-    font-weight: 700;
-    color: #475569;
-}
-
-.gudang-pill.has-stock .gdg-code {
-    background: #dbeafe;
-    color: #1e40af;
-}
-
-.gdg-meter {
-    padding: 2px 8px;
+.total-saldo-value {
+    font-size: 22px;
+    font-weight: 800;
     font-family: monospace;
+    color: #16a34a;
+    line-height: 1.1;
+    margin-top: 2px;
+}
+
+.unit-text {
+    font-size: 12px;
+    font-weight: 600;
+    color: #15803d;
+}
+
+/* ── SALDO LIST PANEL (KANAN - SESUAI MMT) ── */
+.saldo-list-panel {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+}
+
+.saldo-list-header {
+    display: flex;
+    align-items: center;
+    font-size: 11px;
     font-weight: 700;
     color: #334155;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    margin-bottom: 10px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid #e2e8f0;
 }
 
-.gudang-pill.has-stock .gdg-meter {
+.saldo-list-items {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    flex-grow: 1;
+}
+
+.saldo-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+    padding: 6px 10px;
+    transition: all 0.15s ease;
+}
+
+.saldo-row.has-stock {
+    border-color: #bfdbfe;
+    background: #f8faff;
+}
+
+.badge-gdg {
+    background: #f1f5f9;
+    color: #475569;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 3px;
+    border: 1px solid #cbd5e1;
+}
+
+.saldo-row.has-stock .badge-gdg {
+    background: #eff6ff;
+    color: #1d4ed8;
+    border-color: #93c5fd;
+}
+
+.saldo-val {
+    font-size: 13px;
+    font-weight: 700;
+    color: #64748b;
+}
+
+.saldo-row.has-stock .saldo-val {
     color: #1565c0;
+    font-size: 14px;
 }
 
 /* ── PANEL TABLES ── */
