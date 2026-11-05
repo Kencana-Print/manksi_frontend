@@ -4576,6 +4576,119 @@ const loadPpicData = async () => {
 
 watch(ppicTab, loadPpicData);
 
+const isExportingPpic = ref(false);
+
+const exportPpicExcel = async () => {
+  isExportingPpic.value = true;
+  try {
+    const hasil = await Promise.all(
+      PPIC_TABS.map(async (t) => {
+        const res = await dashboardService.getPpicOutstandingSpk(t.value);
+        return {
+          tab: t,
+          data: (res.data?.data ?? null) as PpicOutstandingData | null,
+        };
+      }),
+    );
+    if (!hasil.some((h) => h.data?.rows.length)) {
+      alert("Tidak ada data Outstanding SPK PPIC untuk diexport.");
+      return;
+    }
+
+    type PpicExportRow = {
+      nomor: string;
+      nama: string;
+      order: number | null;
+      sewing: number | null;
+      outstanding: number | null;
+      smv: number | null;
+      waktu: number | null;
+    };
+
+    const num = (
+      header: string,
+      key: string,
+      width: number,
+      numFmt: string,
+    ) => ({
+      header,
+      key,
+      width,
+      numFmt,
+      align: "right" as const,
+    });
+
+    const sheets = hasil.map(({ tab, data }) => {
+      const rows: PpicExportRow[] = (data?.rows ?? []).map((r) => ({
+        nomor: r.nomor,
+        nama: r.nama,
+        order: r.jumlahOrder,
+        sewing: r.lhkSewing,
+        outstanding: r.outstanding,
+        smv: r.smvJam,
+        waktu: r.waktuDibutuhkan,
+      }));
+      if (data && rows.length) {
+        const t = data.total;
+        rows.push(
+          {
+            nomor: "TOTAL",
+            nama: `${t.jumlahSpk} SPK`,
+            order: t.jumlahOrder,
+            sewing: t.lhkSewing,
+            outstanding: t.outstanding,
+            smv: null,
+            waktu: t.waktuDibutuhkan,
+          },
+          {
+            nomor: "",
+            nama: "WAKTU PROSES / HARI",
+            order: null,
+            sewing: null,
+            outstanding: null,
+            smv: null,
+            waktu: t.waktuProsesPerHari,
+          },
+          {
+            nomor: "",
+            nama: "OUTSTANDING HARI",
+            order: null,
+            sewing: null,
+            outstanding: null,
+            smv: null,
+            waktu: t.outstandingHari,
+          },
+        );
+      }
+      return {
+        name: tab.label,
+        columns: [
+          { header: "No. SPK", key: "nomor", width: 20 },
+          { header: "Nama SPK", key: "nama", width: 44 },
+          num("Order (pcs)", "order", 14, "#,##0"),
+          num("LHK Sewing", "sewing", 14, "#,##0"),
+          num("Outstanding", "outstanding", 14, "#,##0"),
+          num("SMV (jam)", "smv", 12, "0.0000"),
+          num("Waktu Dibutuhkan (jam)", "waktu", 22, "#,##0.00"),
+        ],
+        rows,
+      };
+    });
+
+    await exportExcelMulti(
+      `Outstanding_SPK_PPIC_${todayLocalStr()}.xlsx`,
+      sheets,
+    );
+  } catch (e: unknown) {
+    alert(
+      "Gagal export Outstanding SPK PPIC: " +
+        (e instanceof Error ? e.message : String(e)),
+    );
+  } finally {
+    isExportingPpic.value = false;
+  }
+};
+
 watch(obTab, async () => {
   resetOb();
   await loadMoreOb();
@@ -11611,6 +11724,18 @@ const sisaClass = (item: any) => {
             <span class="panel-header-sub ml-1"
               >(SPK tahun berjalan · belum selesai dijahit)</span
             >
+            <button
+              class="knj-detail-btn ml-auto"
+              style="border-color: var(--dsh-warn-soft); color: var(--dsh-warn)"
+              :disabled="isExportingPpic"
+              @click="exportPpicExcel"
+            >
+              <IconFileSpreadsheet
+                :size="12"
+                style="vertical-align: middle; margin-right: 2px"
+              />
+              {{ isExportingPpic ? "Mengexport..." : "Export Excel" }}
+            </button>
           </div>
           <v-tabs v-model="ppicTab" density="compact" color="primary">
             <v-tab
