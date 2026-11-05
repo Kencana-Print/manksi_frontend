@@ -3,7 +3,7 @@ import api from "@/services/api";
 export const dashboardService = {
   getSpkUrgent: () => api.get("/dashboard/spk-urgent"),
   getSaldoKas: () => api.get("/dashboard/saldo-kas"),
-    getSaldoLaci: () => api.get("/dashboard/saldo-laci"),
+  getSaldoLaci: () => api.get("/dashboard/saldo-laci"),
   getPenawaranSummary: () => api.get("/dashboard/penawaran-summary"),
   getPenawaranBelumSpk: (limit = 20, offset = 0) =>
     api.get("/dashboard/penawaran-belum-spk", { params: { limit, offset } }),
@@ -296,6 +296,8 @@ export const dashboardService = {
     nourut: number;
     catatan: string;
   }) => api.post("/dashboard/outstanding-beli/catatan", payload),
+  getPpicOutstandingSpk: (jenis: "CORPORATE" | "KAOSAN") =>
+    api.get("/dashboard/ppic-outstanding-spk", { params: { jenis } }),
   getInkasoDashboard: () => api.get("/dashboard/inkaso-dashboard"),
   getInkasoSourceOptions: (
     namaCustomer = "",
