@@ -15,7 +15,6 @@ import { useAuthStore } from "@/stores/authStore";
 import { dashboardService } from "@/services/dashboard/dashboardService";
 import {
   IconX,
-  IconClipboardList,
   IconFileAlert,
   IconRefresh,
   IconChartBar,
@@ -35,6 +34,7 @@ import {
   IconFileInvoice,
   IconFileSpreadsheet,
   IconShoppingCart,
+  IconClipboardList,
 } from "@tabler/icons-vue";
 import AiChatWidget from "@/components/AiChatWidget.vue";
 import DashState from "@/components/dashboard/DashState.vue";
@@ -446,6 +446,7 @@ const PANEL_META: Record<string, { label: string; tab: string }> = {
   StokBj: { label: "Stok barang jadi", tab: "barang-jadi" },
   MutasiBj: { label: "Mutasi barang jadi", tab: "barang-jadi" },
   Ob: { label: "Outstanding beli", tab: "pembelian" },
+  Ppic: { label: "Outstanding SPK PPIC", tab: "ppic" },
 };
 
 const tabOfKey = (key: string): string | null => {
@@ -547,6 +548,9 @@ watch(activeTab, async (tab) => {
     await nextTick();
     setupObObserver();
   }
+  if (tab === "ppic") {
+    if (!ppicLoaded.value) await loadPpicData();
+  }
 });
 
 const fmtNum = (val: number) =>
@@ -608,6 +612,10 @@ const showBarangJadi = computed(
 );
 const showPembelian = computed(
   () => ["PEMBELIAN", "FINANCE"].includes(bagian.value) || isSuperViewer.value,
+);
+const showPpic = computed(
+  () =>
+    ["ADMIN", "PPIC", "PRODUKSI"].includes(bagian.value) || isSuperViewer.value,
 );
 const canWriteProyeksi = computed(() => bagian.value !== "FINANCE");
 
@@ -4509,6 +4517,178 @@ const loadPembelianData = async () => {
   }
 };
 
+// ── Dashboard PPIC: SPK tahun berjalan yang masih outstanding sewing ──
+interface PpicOutstandingRow {
+  nomor: string;
+  nama: string;
+  jumlahOrder: number;
+  lhkSewing: number;
+  outstanding: number;
+  smvJam: number | null;
+  waktuDibutuhkan: number;
+}
+interface PpicOutstandingData {
+  jenis: string;
+  rows: PpicOutstandingRow[];
+  total: {
+    jumlahOrder: number;
+    lhkSewing: number;
+    outstanding: number;
+    waktuDibutuhkan: number;
+    waktuProsesPerHari: number;
+    outstandingHari: number;
+    jumlahSpk: number;
+    spkTanpaSmv: number;
+  };
+  konstanta: {
+    line: number;
+    hariKerja: number;
+    jam: number;
+    mpPerLine: number;
+  };
+}
+const PPIC_TABS: { value: "CORPORATE" | "KAOSAN"; label: string }[] = [
+  { value: "CORPORATE", label: "Corporate" },
+  { value: "KAOSAN", label: "Kaosan" },
+];
+const ppicLoaded = ref(false);
+const isLoadingPpic = ref(false);
+const ppicTab = ref<"CORPORATE" | "KAOSAN">("CORPORATE");
+const ppicData = ref<PpicOutstandingData | null>(null);
+let ppicReqId = 0; // cegah respons tab lama menimpa tab baru
+
+const loadPpicData = async () => {
+  if (!showPpic.value) return;
+  const myReq = ++ppicReqId;
+  isLoadingPpic.value = true;
+  loadFailed.Ppic = false;
+  try {
+    const res = await dashboardService.getPpicOutstandingSpk(ppicTab.value);
+    if (myReq !== ppicReqId) return;
+    ppicData.value = res.data?.data ?? null;
+    ppicLoaded.value = true;
+  } catch {
+    if (myReq === ppicReqId) loadFailed.Ppic = true;
+  } finally {
+    if (myReq === ppicReqId) isLoadingPpic.value = false;
+  }
+};
+
+watch(ppicTab, loadPpicData);
+
+const isExportingPpic = ref(false);
+
+const exportPpicExcel = async () => {
+  isExportingPpic.value = true;
+  try {
+    const hasil = await Promise.all(
+      PPIC_TABS.map(async (t) => {
+        const res = await dashboardService.getPpicOutstandingSpk(t.value);
+        return {
+          tab: t,
+          data: (res.data?.data ?? null) as PpicOutstandingData | null,
+        };
+      }),
+    );
+    if (!hasil.some((h) => h.data?.rows.length)) {
+      alert("Tidak ada data Outstanding SPK PPIC untuk diexport.");
+      return;
+    }
+
+    type PpicExportRow = {
+      nomor: string;
+      nama: string;
+      order: number | null;
+      sewing: number | null;
+      outstanding: number | null;
+      smv: number | null;
+      waktu: number | null;
+    };
+
+    const num = (
+      header: string,
+      key: string,
+      width: number,
+      numFmt: string,
+    ) => ({
+      header,
+      key,
+      width,
+      numFmt,
+      align: "right" as const,
+    });
+
+    const sheets = hasil.map(({ tab, data }) => {
+      const rows: PpicExportRow[] = (data?.rows ?? []).map((r) => ({
+        nomor: r.nomor,
+        nama: r.nama,
+        order: r.jumlahOrder,
+        sewing: r.lhkSewing,
+        outstanding: r.outstanding,
+        smv: r.smvJam,
+        waktu: r.waktuDibutuhkan,
+      }));
+      if (data && rows.length) {
+        const t = data.total;
+        rows.push(
+          {
+            nomor: "TOTAL",
+            nama: `${t.jumlahSpk} SPK`,
+            order: t.jumlahOrder,
+            sewing: t.lhkSewing,
+            outstanding: t.outstanding,
+            smv: null,
+            waktu: t.waktuDibutuhkan,
+          },
+          {
+            nomor: "",
+            nama: "WAKTU PROSES / HARI",
+            order: null,
+            sewing: null,
+            outstanding: null,
+            smv: null,
+            waktu: t.waktuProsesPerHari,
+          },
+          {
+            nomor: "",
+            nama: "OUTSTANDING HARI",
+            order: null,
+            sewing: null,
+            outstanding: null,
+            smv: null,
+            waktu: t.outstandingHari,
+          },
+        );
+      }
+      return {
+        name: tab.label,
+        columns: [
+          { header: "No. SPK", key: "nomor", width: 20 },
+          { header: "Nama SPK", key: "nama", width: 44 },
+          num("Order (pcs)", "order", 14, "#,##0"),
+          num("LHK Sewing", "sewing", 14, "#,##0"),
+          num("Outstanding", "outstanding", 14, "#,##0"),
+          num("SMV (jam)", "smv", 12, "0.0000"),
+          num("Waktu Dibutuhkan (jam)", "waktu", 22, "#,##0.00"),
+        ],
+        rows,
+      };
+    });
+
+    await exportExcelMulti(
+      `Outstanding_SPK_PPIC_${todayLocalStr()}.xlsx`,
+      sheets,
+    );
+  } catch (e: unknown) {
+    alert(
+      "Gagal export Outstanding SPK PPIC: " +
+        (e instanceof Error ? e.message : String(e)),
+    );
+  } finally {
+    isExportingPpic.value = false;
+  }
+};
+
 watch(obTab, async () => {
   resetOb();
   await loadMoreOb();
@@ -4659,6 +4839,9 @@ const loadDashboard = async () => {
       await loadPembelianData();
       await nextTick();
       setupObObserver();
+    } else if (activeTab.value === "ppic") {
+      ppicLoaded.value = false;
+      await loadPpicData();
     }
   });
 };
@@ -5186,6 +5369,10 @@ const sisaClass = (item: any) => {
       >
         <IconShoppingCart :size="14" class="mr-1" :stroke-width="1.7" />
         Pembelian
+      </v-tab>
+      <v-tab v-if="showPpic" value="ppic" class="text-caption font-weight-bold">
+        <IconClipboardList :size="14" class="mr-1" :stroke-width="1.7" />
+        PPIC
       </v-tab>
     </v-tabs>
 
@@ -11528,6 +11715,179 @@ const sisaClass = (item: any) => {
           </div>
         </div>
       </v-window-item>
+
+      <v-window-item value="ppic">
+        <div class="manksi-panel content-panel">
+          <div class="panel-header panel-header--orange">
+            <IconClipboardList :size="14" :stroke-width="1.7" class="mr-1" />
+            Outstanding Order
+            <span class="panel-header-sub ml-1"
+              >(SPK tahun berjalan · belum selesai dijahit)</span
+            >
+            <button
+              class="knj-detail-btn ml-auto"
+              style="border-color: var(--dsh-warn-soft); color: var(--dsh-warn)"
+              :disabled="isExportingPpic"
+              @click="exportPpicExcel"
+            >
+              <IconFileSpreadsheet
+                :size="12"
+                style="vertical-align: middle; margin-right: 2px"
+              />
+              {{ isExportingPpic ? "Mengexport..." : "Export Excel" }}
+            </button>
+          </div>
+          <v-tabs v-model="ppicTab" density="compact" color="primary">
+            <v-tab
+              v-for="t in PPIC_TABS"
+              :key="t.value"
+              :value="t.value"
+              class="text-caption font-weight-bold"
+            >
+              {{ t.label }}
+            </v-tab>
+          </v-tabs>
+          <div class="panel-body">
+            <DashState v-if="isLoadingPpic" kind="loading" />
+            <div v-else-if="ppicData">
+              <div
+                style="
+                  display: flex;
+                  gap: 12px;
+                  flex-wrap: wrap;
+                  margin-bottom: 8px;
+                "
+              >
+                <div
+                  style="
+                    flex: 1 1 200px;
+                    border: 1px solid var(--dsh-line);
+                    border-radius: var(--dsh-radius);
+                    padding: 8px 12px;
+                  "
+                >
+                  <div style="color: var(--dsh-ink-2)">Waktu proses / hari</div>
+                  <div style="font-size: 18px; font-weight: 700">
+                    {{ fmtDec(ppicData.total.waktuProsesPerHari, 2) }} jam
+                  </div>
+                  <div style="color: var(--dsh-ink-2)">
+                    {{ ppicData.konstanta.line }} line ×
+                    {{ ppicData.konstanta.hariKerja }} hari ×
+                    {{ ppicData.konstanta.jam }} jam ×
+                    {{ ppicData.konstanta.mpPerLine }} MP
+                  </div>
+                </div>
+                <div
+                  style="
+                    flex: 1 1 200px;
+                    border: 1px solid var(--dsh-line);
+                    border-radius: var(--dsh-radius);
+                    padding: 8px 12px;
+                  "
+                >
+                  <div style="color: var(--dsh-ink-2)">Outstanding hari</div>
+                  <div
+                    style="
+                      font-size: 18px;
+                      font-weight: 700;
+                      color: var(--dsh-bad);
+                    "
+                  >
+                    {{ fmtDec(ppicData.total.outstandingHari, 2) }} hari
+                  </div>
+                  <div style="color: var(--dsh-ink-2)">
+                    {{ fmtDec(ppicData.total.waktuDibutuhkan, 2) }} jam ÷
+                    {{ fmtDec(ppicData.total.waktuProsesPerHari, 2) }} jam/hari
+                  </div>
+                </div>
+              </div>
+              <div
+                v-if="ppicData.total.spkTanpaSmv"
+                style="padding: 0 4px 8px; color: var(--dsh-warn)"
+              >
+                {{ ppicData.total.spkTanpaSmv }} SPK belum punya SMV di plan
+                PPIC sewing, waktunya dihitung 0 sehingga outstanding hari
+                terlalu kecil.
+              </div>
+              <div style="overflow: auto; max-height: 560px">
+                <table class="gb-tbl" style="min-width: 960px">
+                  <thead>
+                    <tr>
+                      <th style="width: 160px">No. SPK</th>
+                      <th>Nama SPK</th>
+                      <th class="tr" style="width: 100px">Order (pcs)</th>
+                      <th class="tr" style="width: 110px">LHK Sewing</th>
+                      <th class="tr" style="width: 110px">Outstanding</th>
+                      <th class="tr" style="width: 90px">SMV (jam)</th>
+                      <th class="tr" style="width: 130px">
+                        Waktu Dibutuhkan (jam)
+                      </th>
+                      <!-- ruang kosong supaya angka tidak tertutup bubble chat AI -->
+                      <th style="width: 64px"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="r in ppicData.rows" :key="r.nomor">
+                      <td
+                        style="
+                          font-family: monospace;
+                          font-weight: 600;
+                          color: var(--dsh-accent);
+                        "
+                      >
+                        {{ r.nomor }}
+                      </td>
+                      <td>{{ r.nama }}</td>
+                      <td class="tr">{{ fmtDec(r.jumlahOrder, 0) }}</td>
+                      <td class="tr">{{ fmtDec(r.lhkSewing, 0) }}</td>
+                      <td
+                        class="tr"
+                        style="font-weight: 700; color: var(--dsh-bad)"
+                      >
+                        {{ fmtDec(r.outstanding, 0) }}
+                      </td>
+                      <td class="tr">
+                        <span v-if="r.smvJam != null">{{
+                          fmtDec(r.smvJam, 4)
+                        }}</span>
+                        <span v-else style="color: var(--dsh-warn)"
+                          >belum ada</span
+                        >
+                      </td>
+                      <td class="tr">{{ fmtDec(r.waktuDibutuhkan, 2) }}</td>
+                      <td></td>
+                    </tr>
+                    <tr v-if="!ppicData.rows.length">
+                      <td colspan="8" class="text-center text-grey py-3">
+                        Tidak ada SPK outstanding
+                      </td>
+                    </tr>
+                    <tr v-if="ppicData.rows.length" class="ppic-total-row">
+                      <td colspan="2">
+                        TOTAL ({{ ppicData.total.jumlahSpk }} SPK)
+                      </td>
+                      <td class="tr">
+                        {{ fmtDec(ppicData.total.jumlahOrder, 0) }}
+                      </td>
+                      <td class="tr">
+                        {{ fmtDec(ppicData.total.lhkSewing, 0) }}
+                      </td>
+                      <td class="tr">
+                        {{ fmtDec(ppicData.total.outstanding, 0) }}
+                      </td>
+                      <td></td>
+                      <td class="tr">
+                        {{ fmtDec(ppicData.total.waktuDibutuhkan, 2) }}
+                      </td>
+                      <td></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </v-window-item>
     </v-window>
 
     <!-- ════════════════════════════════════════
@@ -14631,5 +14991,13 @@ const sisaClass = (item: any) => {
     transition: none;
     transform: none;
   }
+}
+.ppic-total-row td {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  background: #e8edf3;
+  font-weight: 700;
+  border-top: 1px solid var(--dsh-line);
 }
 </style>
