@@ -559,7 +559,7 @@ const applyMpSmv = (row: TabRow) => {
   }
   if (!row.NomorSPK) return;
 
-  const p = ref.smvBySpk[row.NomorSPK];
+  const p = ref.smvBySpk[spkKey(row.NomorSPK)];
   if (p?.sumber === "PROOF") {
     row.plan_smv = p.smv;
     row.smv_sumber = "PROOF";
@@ -575,18 +575,10 @@ const applyActual = (row: TabRow) => {
   row.actual_jam = row.plan_line_kelompok
     ? (ref.actualJamByLine[row.plan_line_kelompok] ?? null)
     : null;
-  row.actual_output =
-    row.NomorSPK && row.plan_line_kelompok
-      ? (ref.actualOutputBySpkLine[
-          `${row.NomorSPK}|${row.plan_line_kelompok}`
-        ] ?? 0)
-      : 0;
-  row.actual_harian =
-    row.NomorSPK && row.plan_line_kelompok
-      ? (ref.actualHarianBySpkLine[
-          `${row.NomorSPK}|${row.plan_line_kelompok}`
-        ] ?? [])
-      : [];
+  const key = `${spkKey(row.NomorSPK)}|${row.plan_line_kelompok}`;
+  const ada = !!row.NomorSPK && !!row.plan_line_kelompok;
+  row.actual_output = ada ? (ref.actualOutputBySpkLine[key] ?? 0) : 0;
+  row.actual_harian = ada ? (ref.actualHarianBySpkLine[key] ?? []) : [];
 };
 
 // Waktu produksi per line (menit-orang) = MP x Hari x Jam x 60
@@ -648,6 +640,10 @@ const outputMenitHari = (row: TabRow, qty: number): number | null =>
 
 // Format tanggal YYYY-MM-DD -> DD/MM/YYYY
 const fmtTgl = (t: string) => t.split("-").reverse().join("/");
+const spkKey = (spk: string) =>
+  String(spk || "")
+    .trim()
+    .toUpperCase();
 
 // Baris SPK yang breakdown hariannya sedang dibuka (kunci = row._key)
 const bukaHarian = ref<Set<number>>(new Set());
