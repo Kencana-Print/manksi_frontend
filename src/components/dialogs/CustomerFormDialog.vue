@@ -181,7 +181,11 @@ const cekNama = async () => {
   }
   try {
     const res = await api.get("/master/customer/check-nama", {
-      params: { nama, exclude: formData.value.Kode || "" },
+      params: {
+        nama,
+        kota: formData.value.Kota || "",
+        exclude: formData.value.Kode || "",
+      },
     });
     // Abaikan respons basi bila user sudah mengubah nama lagi.
     if ((formData.value.Nama || "").trim() === nama) {
