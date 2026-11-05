@@ -31,9 +31,16 @@ const initialData: KendaraanFormData = {
   nopol: "",
   stat: "INVENTARIS",
   keterangan: "",
+  tahun: "",
+  kondisi: "",
+  kepemilikan: "",
+  posisi: "",
+  usr: "",
   jadwal: 0,
   kmterakhir: 0,
   pajak: todayStr(),
+  kir: "",
+  aktif: "Y",
 };
 
 const {
@@ -55,9 +62,16 @@ const {
       nopol: (data.nopol || "").trim().toUpperCase(),
       stat: data.stat || "INVENTARIS",
       keterangan: (data.keterangan || "").trim().toUpperCase(),
+      tahun: String(data.tahun || "").replace(/[^\d]/g, "").slice(0, 4),
+      kondisi: (data.kondisi || "").trim().toUpperCase().slice(0, 20),
+      kepemilikan: (data.kepemilikan || "").trim().toUpperCase().slice(0, 50),
+      posisi: (data.posisi || "").trim().toUpperCase().slice(0, 20),
+      usr: (data.usr || "").trim().toUpperCase().slice(0, 30),
       jadwal: Number(data.jadwal) || 0,
       kmterakhir: Number(data.kmterakhir) || 0,
       pajak: data.pajak || todayStr(),
+      kir: data.kir || "",
+      aktif: data.aktif || "Y",
     };
 
     if (isEdit.value) {
@@ -99,9 +113,16 @@ const onNopolBlur = async () => {
       const d = res.data.data;
       formData.value.stat = (d.Stat as any) || "INVENTARIS";
       formData.value.keterangan = d.Keterangan || "";
+      formData.value.tahun = d.Tahun || "";
+      formData.value.kondisi = d.Kondisi || "";
+      formData.value.kepemilikan = d.Kepemilikan || "";
+      formData.value.posisi = d.Posisi || "";
+      formData.value.usr = d.Usr || "";
       formData.value.jadwal = Number(d.Jadwal_Servis) || 0;
       formData.value.kmterakhir = Number(d.KmTerakhir) || 0;
       formData.value.pajak = d.Pajak || todayStr();
+      formData.value.kir = d.Kir || "";
+      formData.value.aktif = d.Aktif || "Y";
       toast.info(`Data kendaraan ${code} ditemukan di database.`);
     }
   } catch {
@@ -120,9 +141,16 @@ onMounted(async () => {
         nopol: d.Nopol,
         stat: (d.Stat as any) || "INVENTARIS",
         keterangan: d.Keterangan || "",
+        tahun: d.Tahun || "",
+        kondisi: d.Kondisi || "",
+        kepemilikan: d.Kepemilikan || "",
+        posisi: d.Posisi || "",
+        usr: d.Usr || "",
         jadwal: Number(d.Jadwal_Servis) || 0,
         kmterakhir: Number(d.KmTerakhir) || 0,
         pajak: d.Pajak || todayStr(),
+        kir: d.Kir || "",
+        aktif: d.Aktif || "Y",
       };
     } catch (err: any) {
       toast.error(
@@ -203,9 +231,89 @@ onMounted(async () => {
           </div>
         </div>
 
-        <!-- Row 4: Jadwal Servis -->
+        <!-- Row 4: Tahun (Hanya angka) -->
         <div class="delphi-row">
-          <label class="delphi-lbl">Jadwal Servis</label>
+          <label class="delphi-lbl">Tahun</label>
+          <div class="delphi-val">
+            <input
+              type="text"
+              v-model="formData.tahun"
+              class="delphi-ctrl ctrl-tahun"
+              maxlength="4"
+              placeholder="YYYY"
+              inputmode="numeric"
+              @input="formData.tahun = ($event.target as HTMLInputElement).value.replace(/[^\d]/g, '')"
+            />
+          </div>
+        </div>
+
+        <!-- Row 5: Kondisi (Auto Huruf Besar) -->
+        <div class="delphi-row">
+          <label class="delphi-lbl">Kondisi</label>
+          <div class="delphi-val">
+            <input
+              type="text"
+              v-model="formData.kondisi"
+              class="delphi-ctrl ctrl-kondisi"
+              maxlength="20"
+              placeholder="Kondisi kendaraan..."
+              style="text-transform: uppercase"
+              @input="formData.kondisi = ($event.target as HTMLInputElement).value.toUpperCase()"
+            />
+          </div>
+        </div>
+
+        <!-- Row 6: Kepemilikan (Auto Huruf Besar) -->
+        <div class="delphi-row">
+          <label class="delphi-lbl">Kepemilikan</label>
+          <div class="delphi-val">
+            <input
+              type="text"
+              v-model="formData.kepemilikan"
+              class="delphi-ctrl ctrl-kepemilikan"
+              maxlength="50"
+              placeholder="Kepemilikan..."
+              style="text-transform: uppercase"
+              @input="formData.kepemilikan = ($event.target as HTMLInputElement).value.toUpperCase()"
+            />
+          </div>
+        </div>
+
+        <!-- Row 7: Posisi (Auto Huruf Besar) -->
+        <div class="delphi-row">
+          <label class="delphi-lbl">Posisi</label>
+          <div class="delphi-val">
+            <input
+              type="text"
+              v-model="formData.posisi"
+              class="delphi-ctrl ctrl-posisi"
+              maxlength="20"
+              placeholder="Posisi..."
+              style="text-transform: uppercase"
+              @input="formData.posisi = ($event.target as HTMLInputElement).value.toUpperCase()"
+            />
+          </div>
+        </div>
+
+        <!-- Row 8: User (Auto Huruf Besar) -->
+        <div class="delphi-row">
+          <label class="delphi-lbl">User</label>
+          <div class="delphi-val">
+            <input
+              type="text"
+              v-model="formData.usr"
+              class="delphi-ctrl ctrl-user"
+              maxlength="30"
+              placeholder="User..."
+              style="text-transform: uppercase"
+              @input="formData.usr = ($event.target as HTMLInputElement).value.toUpperCase()"
+            />
+          </div>
+        </div>
+
+        <!-- Row 9: Jadwal Service -->
+        <div class="delphi-row">
+          <label class="delphi-lbl">Jadwal Service</label>
           <div class="delphi-val d-flex align-center">
             <input
               type="number"
@@ -218,7 +326,7 @@ onMounted(async () => {
           </div>
         </div>
 
-        <!-- Row 5: KM Terakhir -->
+        <!-- Row 10: KM Terakhir -->
         <div class="delphi-row">
           <label class="delphi-lbl">KM Terakhir</label>
           <div class="delphi-val d-flex align-center">
@@ -233,7 +341,7 @@ onMounted(async () => {
           </div>
         </div>
 
-        <!-- Row 6: Jadwal Pajak -->
+        <!-- Row 11: Jadwal Pajak -->
         <div class="delphi-row">
           <label class="delphi-lbl">Jadwal Pajak</label>
           <div class="delphi-val">
@@ -242,6 +350,37 @@ onMounted(async () => {
               v-model="formData.pajak"
               class="delphi-ctrl ctrl-date"
             />
+          </div>
+        </div>
+
+        <!-- Row 12: Jadwal Kir -->
+        <div class="delphi-row">
+          <label class="delphi-lbl">Jadwal Kir</label>
+          <div class="delphi-val">
+            <input
+              type="date"
+              v-model="formData.kir"
+              class="delphi-ctrl ctrl-date"
+            />
+          </div>
+        </div>
+
+        <!-- Row 13: Aktif -->
+        <div class="delphi-row">
+          <label class="delphi-lbl">Aktif</label>
+          <div class="delphi-val d-flex align-center">
+            <label class="delphi-checkbox-label">
+              <input
+                type="checkbox"
+                v-model="formData.aktif"
+                true-value="Y"
+                false-value="N"
+                class="delphi-checkbox"
+              />
+              <span class="ml-2 font-weight-medium">
+                {{ formData.aktif === "Y" ? "Aktif" : "Pasif" }}
+              </span>
+            </label>
           </div>
         </div>
       </div>
@@ -335,6 +474,41 @@ onMounted(async () => {
 
 .ctrl-ket {
   width: 320px;
+}
+
+.ctrl-tahun {
+  width: 100px;
+}
+
+.ctrl-kondisi {
+  width: 220px;
+}
+
+.ctrl-kepemilikan {
+  width: 320px;
+}
+
+.ctrl-posisi {
+  width: 220px;
+}
+
+.ctrl-user {
+  width: 220px;
+}
+
+.delphi-checkbox-label {
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+  font-size: 12px;
+}
+
+.delphi-checkbox {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: #0055ea;
 }
 
 .ctrl-number {

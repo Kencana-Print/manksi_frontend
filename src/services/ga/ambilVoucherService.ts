@@ -18,6 +18,7 @@ export interface VoucherFormData {
   tanggal: string;
   id_spbu: number | null;
   kode_pengguna: string;
+  pengguna?: string;
   nopol: string;
   odometer: number;
   id_bbm: number | null;
@@ -25,6 +26,7 @@ export interface VoucherFormData {
 }
 
 export interface VoucherDetailResponse extends VoucherFormData {
+  pengguna?: string;
   namaspbu?: string;
   nama_pengguna?: string;
   namabbm?: string;
