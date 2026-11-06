@@ -211,6 +211,7 @@ const onDelete = async (item: { Nomor: string; Peminta?: string; IsClosed?: stri
 };
 
 // ── Export Excel ───────────────────────────────────────────────────────
+const baseBrowseRef = ref<{ getFilteredItems: () => PermintaanDriverRow[] } | null>(null);
 const isExporting = ref(false);
 
 const exportColumns: ExcelColumn[] = [
@@ -231,12 +232,20 @@ const exportColumns: ExcelColumn[] = [
   { header: "Status Pengerjaan", key: "IsClosed", width: 16, align: "center" },
 ];
 
-const onExport = async () => {
-  const rows = items.value ?? [];
-  if (!rows.length) {
+const onExport = async (exportedRows?: PermintaanDriverRow[]) => {
+  const rawRows =
+    Array.isArray(exportedRows) && exportedRows.length
+      ? exportedRows
+      : (baseBrowseRef.value?.getFilteredItems?.() ?? items.value ?? []);
+  if (!rawRows.length) {
     toast.warning("Tidak ada data untuk diexport.");
     return;
   }
+  const rows = rawRows.map((r: any) => ({
+    ...r,
+    Tanggal: formatTanggal(r.Tanggal),
+    TglKerja: r.TglKerja ? formatTanggal(r.TglKerja) : "-",
+  }));
   isExporting.value = true;
   try {
     const title = `Permintaan Driver — ${tglAwal.value} s.d. ${tglAkhir.value}`;
@@ -269,6 +278,7 @@ onMounted(() => {
 
 <template>
   <BaseBrowse
+    ref="baseBrowseRef"
     title="Permintaan Driver"
     menu-id="612"
     storage-id="612"
