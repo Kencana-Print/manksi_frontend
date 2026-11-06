@@ -35,9 +35,13 @@ export const konfirmasiPraOrderService = {
       status,
     }),
 
-  confirmStatusBahanSpanduk: (nomor: string, status: string) =>
+  confirmStatusBahanSpanduk: (
+    nomor: string,
+    status: string,
+    estDatang?: string,
+  ) =>
     api.patch(
       `/ppic/konfirmasi-pra-order/${encodeURIComponent(nomor)}/bahan-spanduk`,
-      { status },
+      { status, estDatang },
     ),
 };

@@ -57,7 +57,7 @@ onMounted(() => {
                 <span class="lbl">Tanggal</span><span class="sep">:</span>
                 <span class="val">{{ header.tgl_realisasi }}</span>
               </div>
-              <div class="info-row">
+              <div v-if="header.re_spk_nomor" class="info-row">
                 <span class="lbl">SPK</span><span class="sep">:</span>
                 <span class="val"
                   >{{ header.re_spk_nomor }} {{ header.NamaSpk }}</span
@@ -69,7 +69,7 @@ onMounted(() => {
                 <span class="lbl">Gudang Asal</span><span class="sep">:</span>
                 <span class="val">{{ header.re_cab }}</span>
               </div>
-              <div class="info-row">
+              <div v-if="header.GdgProduksi" class="info-row">
                 <span class="lbl">Gudang Tujuan</span><span class="sep">:</span>
                 <span class="val">{{ header.GdgProduksi }}</span>
               </div>

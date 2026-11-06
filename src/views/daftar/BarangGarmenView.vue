@@ -21,6 +21,11 @@ const editData = ref(null);
 const selectedJenis = ref("ACCESORIES");
 const selectedCabang = ref(authStore.userCabang || "HO-");
 const cabangOptions = ref<string[]>([]); // Sekarang dinamis
+// Sama dengan CABANG_SPANDUK di backend (garmenBrgService)
+const CABANG_SPANDUK = ["P02", "P05"];
+const isSpandukCabang = computed(() =>
+  CABANG_SPANDUK.includes(selectedCabang.value),
+);
 
 // --- KONFIGURASI AKSES FILTER (MIGRASI FormCreate DELPHI) ---
 // Di Delphi: if (zbagian='ADMIN') or (zbagian='PPIC') or ...
@@ -318,6 +323,7 @@ const handleEdit = async (item: any) => {
     :is-new-mode="isNewMode"
     :edit-data="editData"
     :jenis-garmen="selectedJenis"
+    :spanduk="isSpandukCabang"
     @saved="fetchData"
   />
 

@@ -509,20 +509,10 @@ export const createMenuItems = (): NavItem[] => {
           icon: IconLayoutList,
           subItems: [
             {
-              title: "Master Bahan",
-              to: "/spanduk/daftar/master-bahan",
-              icon: IconListDetails,
-              // Tanpa menuId, mengikuti hak akses parent (4)
-            },
-            {
-              title: "Bahan Penolong",
-              to: "/spanduk/daftar/bahan-penolong",
-              icon: IconFlask,
-            },
-            {
               title: "Toleransi",
               to: "/spanduk/daftar/toleransi",
               icon: IconRuler2,
+              // Tanpa menuId, mengikuti hak akses parent (4)
             },
           ],
         },

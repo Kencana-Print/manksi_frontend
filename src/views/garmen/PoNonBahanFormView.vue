@@ -23,7 +23,7 @@ const isEditMode = computed(() => !!route.params.nomor);
 const formJenis = ref(
   typeof route.params.jenis === "string" ? route.params.jenis : "ACCESORIES",
 );
-const todayLocal = new Date().toISOString().substring(0, 10);
+const todayLocal = new Date().toLocaleDateString("sv-SE");
 
 // --- LOOKUP CONTROL STATE ---
 const showMintaModal = ref(false);
@@ -37,6 +37,7 @@ const defaultData = {
     po_mb_nomor: "",
     tglminta: "",
     mb_cab: "",
+    po_kecab: "",
     po_sup_kode: "",
     sup_nama: "",
     sup_alamat: "",
@@ -153,6 +154,7 @@ const {
       po_mb_nomor: "",
       tglminta: "",
       mb_cab: "",
+      po_kecab: "",
       po_sup_kode: "",
       sup_nama: "",
       sup_alamat: "",
@@ -182,8 +184,8 @@ const {
         Kode: item.Kode || item.kode || "",
         Nama: item.Nama,
         Satuan: item.Satuan,
-        ket: item.pod_ket,
-        kegunaan: item.pod_kegunaan,
+        ket: item.ket,
+        kegunaan: item.kegunaan,
         minta: item.minta,
         sudah: item.sudah,
         belum: item.belum,
@@ -205,7 +207,7 @@ const {
       po_jenis: formJenis.value,
       po_tanggal: data.header.po_tanggal,
       po_mb_nomor: data.header.po_mb_nomor,
-      po_kecab: data.header.mb_cab,
+      po_kecab: data.header.po_kecab,
       po_ket: data.header.po_ket,
       po_sup_kode: data.header.po_sup_kode,
       detail: data.items,
@@ -237,6 +239,7 @@ const setPermintaan = async (v: any) => {
       formData.value.header.po_nomor,
     );
     formData.value.items = res.data.data;
+    formData.value.header.po_kecab = res.data.data?.[0]?.kecab || "";
   } catch (e: any) {
     toast.error(
       e.response?.data?.message || "Gagal memuat rincian permintaan.",
@@ -277,6 +280,7 @@ const onMintaEnter = async () => {
     if (firstRow) {
       formData.value.header.tglminta = firstRow.tglminta || "";
       formData.value.header.mb_cab = firstRow.cab || "";
+      formData.value.header.po_kecab = firstRow.kecab || "";
     }
     formData.value.items = res.data.data;
   } catch (e: any) {
@@ -467,7 +471,7 @@ const onPrintCancel = () => {
         </div>
         <div class="fr mt-1">
           <label class="lbl">Cabang Tujuan</label>
-          <input :value="formData.header.mb_cab" class="inp ro" readonly />
+          <input :value="formData.header.po_kecab" class="inp ro" readonly />
         </div>
 
         <template v-if="canSeeSup">

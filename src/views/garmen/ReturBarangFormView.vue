@@ -157,6 +157,14 @@ const showApproveFields = computed(
     ["ACCESORIES", "OBAT"].includes(formData.value.jenis) &&
     authStore.user?.cabang !== "P03",
 );
+// Cabang yang tidak memakai Gudang Produksi pada retur ACC/OBAT
+// (P03 sudah tersaring oleh showApproveFields)
+const CABANG_TANPA_GP = ["P02", "P03"];
+const showGudangProduksi = computed(
+  () =>
+    showApproveFields.value &&
+    !CABANG_TANPA_GP.includes(authStore.user?.cabang ?? ""),
+);
 // F1 pada Kode: ACCESORIES -> Realisasi search; OBAT/SPAREPART/ATK-RTK -> Barang search
 const kodeUsesRealisasi = computed(() => formData.value.jenis === "ACCESORIES");
 // F2 multi-select barang: semua jenis SELAIN ACCESORIES
@@ -507,7 +515,7 @@ const validateSave = () => {
     );
   }
 
-  if (showApproveFields.value && !formData.value.gpNama) {
+  if (showGudangProduksi.value && !formData.value.gpNama) {
     return toast.error("Gudang Produksi tidak boleh kosong.");
   }
 
@@ -590,7 +598,7 @@ const numFmt = (val: any) =>
         </div>
 
         <template v-if="showApproveFields">
-          <div class="f-row mb-2">
+          <div v-if="showGudangProduksi" class="f-row mb-2">
             <label class="f-lbl">Retur Dari</label>
             <div class="inp-grp" style="flex: 1; min-width: 0">
               <input

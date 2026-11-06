@@ -122,13 +122,6 @@ const ukuranPL = computed(() => {
   const l = Number(getVal("pro_lebar")) || 0;
   return p > 0 && l > 0 ? `${fmtMtr(p)} x ${fmtMtr(l)} Mtr` : "";
 });
-const SUMBER_LABEL: Record<string, string> = {
-  STOK: "Stok Tersedia",
-  PENGAJUAN: "Pengajuan",
-};
-const sumberBahan = computed(
-  () => SUMBER_LABEL[String(getVal("pro_sumber_bahan"))] ?? "",
-);
 const statusBahan = computed(
   () => String(getVal("pro_bahan_status") || "") || "Belum dikonfirmasi",
 );
@@ -208,7 +201,7 @@ const statusBahan = computed(
                 </td>
               </tr>
               <tr v-if="jmlDesain !== null">
-                <td class="lbl">Jumlah Desain</td>
+                <td class="lbl">Jumlah Motif</td>
                 <td class="sep">:</td>
                 <td class="val">
                   {{ new Intl.NumberFormat("id-ID").format(jmlDesain) }}
@@ -219,30 +212,32 @@ const statusBahan = computed(
                 <td class="sep">:</td>
                 <td class="val">{{ ukuranPL }}</td>
               </tr>
-              <tr>
-                <td class="lbl">Finishing</td>
-                <td class="sep">:</td>
-                <td class="val">{{ getVal("pro_finishing") }}</td>
-              </tr>
               <tr v-if="isSpanduk && getVal('BahanSpandukNama')">
                 <td class="lbl">Kebutuhan Bahan</td>
                 <td class="sep">:</td>
-                <td class="val">
-                  {{ getVal("BahanSpandukNama") }}
-                  <span v-if="sumberBahan">({{ sumberBahan }})</span>
-                </td>
+                <td class="val">{{ getVal("BahanSpandukNama") }}</td>
               </tr>
               <tr v-if="isSpanduk && getVal('BahanSpandukNama')">
                 <td class="lbl">Status Bahan</td>
                 <td class="sep">:</td>
                 <td class="val">{{ statusBahan }}</td>
               </tr>
+              <tr v-if="!isSpanduk">
+                <td class="lbl">Finishing</td>
+                <td class="sep">:</td>
+                <td class="val">{{ getVal("pro_finishing") }}</td>
+              </tr>
               <tr v-if="getVal('pro_spesifikasi')">
                 <td class="lbl">Ket. Bahan</td>
                 <td class="sep">:</td>
                 <td class="val">{{ getVal("pro_spesifikasi") }}</td>
               </tr>
-              <tr v-if="getVal('pro_ukuran_bebas')">
+              <tr v-if="isSpanduk">
+                <td class="lbl">Finishing</td>
+                <td class="sep">:</td>
+                <td class="val">{{ getVal("pro_finishing") || "-" }}</td>
+              </tr>
+              <tr v-if="!isSpanduk && getVal('pro_ukuran_bebas')">
                 <td class="lbl">Ket. Ukuran</td>
                 <td class="sep">:</td>
                 <td class="val pre-wrap">{{ getVal("pro_ukuran_bebas") }}</td>

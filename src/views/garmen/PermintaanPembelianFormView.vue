@@ -28,18 +28,21 @@ const formJenis = ref(
   typeof route.params.jenis === "string" ? route.params.jenis : "ACCESORIES",
 );
 
-const todayLocal = new Date().toISOString().substring(0, 10);
+const todayLocal = new Date().toLocaleDateString("sv-SE");
 
 // --- STATE MODAL & GRID ---
 const showBarangModal = ref(false);
 const activeGridIndex = ref(-1);
+
+// Tujuan permintaan pembelian per cabang; selain itu default HO
+const MINTA_KE_DEFAULT: Record<string, string> = { P02: "P04" };
 
 const defaultData = {
   header: {
     mb_nomor: "",
     mb_jenis: formJenis.value,
     mb_tanggal: todayLocal,
-    mb_mintake: "HO", // HO, P01, P02, P03, P04
+    mb_mintake: MINTA_KE_DEFAULT[authStore.user?.cabang ?? ""] ?? "HO",
     mb_priority: "URGENT",
     mb_ket: "",
     status: "", // Untuk validasi
@@ -755,11 +758,8 @@ const onHapusGambarItem = async (): Promise<void> => {
                     />
                   </td>
 
-                  <!-- Total -->
-                  <td
-                    class="ci text-right"
-                    :class="{ 'ci text-right': item.total === 0 }"
-                  >
+                  <!-- Total (hanya jenis rinci, sama dengan header) -->
+                  <td v-if="isDetailRinci" class="ci text-right">
                     {{ fmt(item.total) }}
                   </td>
 

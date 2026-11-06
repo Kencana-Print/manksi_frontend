@@ -222,13 +222,13 @@ onMounted(() => {
 const isAccesories = computed(() => formData.value.jenis === "ACCESORIES");
 const isSparepart = computed(() => formData.value.jenis === "SPAREPART");
 
-const showKolomButuh = computed(() => {
-  return (
-    isAccesories.value &&
-    formData.value.cabang !== "P03" &&
-    formData.value.cabang !== "P05"
-  );
-});
+// Cabang tanpa Gudang Produksi, SPK, dan MKA (sama dengan backend)
+const CABANG_TANPA_SPK = ["P02", "P03", "P05"];
+const tanpaSpk = computed(() =>
+  CABANG_TANPA_SPK.includes(formData.value.cabang),
+);
+
+const showKolomButuh = computed(() => isAccesories.value && !tanpaSpk.value);
 
 // -- HANDLER EVENT DARI MODAL --
 const openGudangModal = () => {
@@ -266,10 +266,8 @@ const openSpkModal = () => {
 };
 // Fungsi untuk memproses respon pemanggilan API validasi SPK
 const onGudangSelected = (item: any) => {
-  const cabang = formData.value.cabang;
-
   // Jika SPK sudah terisi, cek apakah gudang ini diblokir
-  if (cabang !== "P03" && cabang !== "P05" && formData.value.spk) {
+  if (!tanpaSpk.value && formData.value.spk) {
     const pendingPart = validateGudangPending(
       item.Kode,
       formData.value.spkFlags,
@@ -316,11 +314,7 @@ const processSpkData = (
   }
 
   // Jika Gudang sudah dipilih sebelumnya, validasi dengan data SPK yang baru ditarik
-  if (
-    formData.value.gudangPeminta &&
-    formData.value.cabang !== "P03" &&
-    formData.value.cabang !== "P05"
-  ) {
+  if (formData.value.gudangPeminta && !tanpaSpk.value) {
     const pendingPart = validateGudangPending(
       formData.value.gudangPeminta,
       formData.value.spkFlags,
@@ -397,11 +391,7 @@ const onSpkSelected = async (item: any) => {
 // Fungsi untuk memvalidasi SPK (Sesuai Delphi) sebelum modal terbuka
 const openBarangModal = (index: number) => {
   // Validasi khusus Accesories (Pengecualian untuk P03 dan P05)
-  if (
-    isAccesories.value &&
-    formData.value.cabang !== "P03" &&
-    formData.value.cabang !== "P05"
-  ) {
+  if (isAccesories.value && !tanpaSpk.value) {
     if (!formData.value.spk) {
       return toast.warning("SPK harus diisi dulu ya!");
     }
@@ -676,11 +666,7 @@ const validateSave = () => {
     return toast.error("Anda tidak memiliki hak akses simpan.");
 
   // Validasi SPK & Gudang khusus Accesories (Pengecualian P03 dan P05)
-  if (
-    isAccesories.value &&
-    formData.value.cabang !== "P03" &&
-    formData.value.cabang !== "P05"
-  ) {
+  if (isAccesories.value && !tanpaSpk.value) {
     if (!formData.value.spk) return toast.warning("SPK harus di isi.");
     if (!formData.value.gudangPeminta)
       return toast.warning("Gudang Produksi belum di isi.");
@@ -832,12 +818,7 @@ const numFormat = (val: any) =>
       </div>
 
       <!-- Section Gudang, SPK & MKA -->
-      <div
-        v-if="
-          isAccesories && formData.cabang !== 'P03' && formData.cabang !== 'P05'
-        "
-        class="desktop-form-section mt-2"
-      >
+      <div v-if="isAccesories && !tanpaSpk" class="desktop-form-section mt-2">
         <div class="tm-sec-title">INFO GUDANG, SPK & MKA</div>
 
         <!-- ── Gudang Produksi ── -->

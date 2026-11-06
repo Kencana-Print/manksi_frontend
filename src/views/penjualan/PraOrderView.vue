@@ -20,11 +20,13 @@ const toast = useToast();
 const router = useRouter();
 
 // ── Filter state ──────────────────────────────────────────────────────
-const getToday = () => new Date().toISOString().substr(0, 10);
+const toLocalISO = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const getToday = () => toLocalISO(new Date());
 const getPlus5 = () => {
   const d = new Date();
   d.setDate(d.getDate() + 5);
-  return d.toISOString().substr(0, 10);
+  return toLocalISO(d);
 };
 const filterState = ref<Record<string, any>>({});
 const divisiOptions = ref<any[]>([{ Kode: "0", Nama: "ALL" }]);
@@ -114,23 +116,21 @@ const headers = [
   { title: "SALES", key: "Sales", width: "130px" },
   { title: "NAMA PEKERJAAN", key: "NamaPekerjaan", width: "220px" },
   { title: "BAHAN", key: "Bahan", width: "180px" },
-  {
-    title: "Sumber Bahan",
-    key: "SumberBahan",
-    width: "120px",
-    align: "center",
-  },
   { title: "Rencana Order", key: "QtyRencana", width: "120px", align: "end" },
-  { title: "Jml Desain", key: "JmlDesain", width: "100px", align: "end" },
+  { title: "Jml Motif", key: "JmlDesain", width: "100px", align: "end" },
   { title: "Panjang (Mtr)", key: "Panjang", width: "110px", align: "end" },
   { title: "Lebar (Mtr)", key: "Lebar", width: "110px", align: "end" },
+  {
+    title: "Qty Kebutuhan Bahan",
+    key: "KebutuhanBahan",
+    width: "140px",
+    align: "end",
+  },
   { title: "Ket. Ukuran", key: "KetUkuran", width: "180px" },
   { title: "Finishing", key: "Finishing", width: "150px" },
   { title: "Kirim", key: "Kirim", width: "90px", align: "center" },
   { title: "Ket. Kirim", key: "KetKirim", width: "200px" },
   { title: "Syarat & Ketentuan", key: "SyaratKetentuan", width: "220px" },
-  { title: "Qty Rencana", key: "QtyRencana", width: "110px", align: "end" },
-  { title: "Jml Desain", key: "JmlDesain", width: "100px", align: "end" },
   { title: "Tgl Kirim", key: "TglKirim", width: "110px", align: "center" },
   {
     title: "Status Bahan",
@@ -170,11 +170,6 @@ const fmtMtr = (v: number | string | null | undefined) => {
     ? new Intl.NumberFormat("id-ID", { maximumFractionDigits: 3 }).format(n)
     : "—";
 };
-const SUMBER_LABEL: Record<string, string> = {
-  STOK: "Stok Tersedia",
-  PENGAJUAN: "Pengajuan",
-};
-const labelSumber = (v?: string | null) => (v ? (SUMBER_LABEL[v] ?? v) : "—");
 const KIRIM_LABEL: Record<string, string> = {
   CLOSED: "Closed",
   PARSIAL: "Parsial",
@@ -213,7 +208,6 @@ const onExport = () => {
     { header: "SALES", key: "Sales" },
     { header: "NAMA PEKERJAAN", key: "NamaPekerjaan", width: 26 },
     { header: "BAHAN", key: "Bahan", width: 24 },
-    { header: "Sumber Bahan", key: "SumberBahan", align: "center" },
     {
       header: "Rencana Order",
       key: "QtyRencana",
@@ -221,7 +215,7 @@ const onExport = () => {
       numFmt: "#,##0",
     },
     {
-      header: "Jml Desain",
+      header: "Jml Motif",
       key: "JmlDesain",
       align: "right",
       numFmt: "#,##0",
@@ -233,6 +227,12 @@ const onExport = () => {
       numFmt: "#,##0.00",
     },
     { header: "Lebar (Mtr)", key: "Lebar", align: "right", numFmt: "#,##0.00" },
+    {
+      header: "Qty Kebutuhan Bahan",
+      key: "KebutuhanBahan",
+      align: "right",
+      numFmt: "#,##0.000",
+    },
     { header: "Ket. Ukuran", key: "KetUkuran", width: 26 },
     { header: "Finishing", key: "Finishing", width: 20 },
     { header: "Kirim", key: "Kirim" },
@@ -261,8 +261,9 @@ const onExport = () => {
         TglMap: formatTanggal(r.TglMap),
         Created: formatTanggalJam(r.Created),
         JmlDesain: r.JmlDesain ?? "",
-        SumberBahan: labelSumber(r.SumberBahan),
         Panjang: Number(r.Panjang) > 0 ? Number(r.Panjang) : "",
+        KebutuhanBahan:
+          Number(r.KebutuhanBahan) > 0 ? Number(r.KebutuhanBahan) : "",
         Lebar: Number(r.Lebar) > 0 ? Number(r.Lebar) : "",
       }));
     },
@@ -514,14 +515,14 @@ const handleConvert = async () => {
         ? "—"
         : fmtNum((item.raw || item).JmlDesain)
     }}</template>
-    <template #item.SumberBahan="{ item }">{{
-      labelSumber((item.raw || item).SumberBahan)
-    }}</template>
     <template #item.Panjang="{ item }">{{
       fmtMtr((item.raw || item).Panjang)
     }}</template>
     <template #item.Lebar="{ item }">{{
       fmtMtr((item.raw || item).Lebar)
+    }}</template>
+    <template #item.KebutuhanBahan="{ item }">{{
+      fmtMtr((item.raw || item).KebutuhanBahan)
     }}</template>
     <template #item.Tanggal="{ item }">{{
       formatTanggal((item.raw || item).Tanggal)

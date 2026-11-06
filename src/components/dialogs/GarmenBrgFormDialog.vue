@@ -11,6 +11,7 @@ const props = defineProps<{
   isNewMode: boolean;
   editData?: any;
   jenisGarmen: string;
+  spanduk?: boolean;
 }>();
 
 const emit = defineEmits(["update:modelValue", "saved"]);
@@ -42,6 +43,12 @@ const formData = ref({
   accProject: "REGULER",
 });
 
+const KTG_SPANDUK = "SPANDUK";
+// Barang baru: ikut cabang browse. Barang yang sudah ada: dikenali dari kategorinya.
+const isSpanduk = computed(() =>
+  props.isNewMode ? !!props.spanduk : formData.value.brg_ktg === KTG_SPANDUK,
+);
+
 interface KodeStatus {
   editable: boolean;
   pemakaian: string[];
@@ -56,11 +63,10 @@ const canEditKode = computed(
   () => !props.isNewMode && kodeStatus.value?.editable === true,
 );
 
-// ACCESORIES: kode dirakit dari komponen, tidak pernah diketik.
-const kodeReadonly = computed(() =>
-  props.jenisGarmen === "ACCESORIES"
-    ? true
-    : !props.isNewMode && !canEditKode.value,
+// Kode tidak pernah diketik: ACCESORIES dirakit, jenis lain digenerate server.
+// Satu-satunya perubahan manual: mode edit, bila server bilang kode belum dipakai.
+const kodeReadonly = computed(
+  () => props.jenisGarmen === "ACCESORIES" || !canEditKode.value,
 );
 
 const kodeLockText = computed(() => {
@@ -107,13 +113,14 @@ const generatedAccName = computed(() => {
   return `${formData.value.accBarang.Nama} ${formData.value.accWarna.Nama} ${formData.value.accUkuran.Nama} ${formData.value.accKet.Nama} ${p}`.trim();
 });
 watch(generatedAccName, (v) => {
-  if (props.jenisGarmen === "ACCESORIES") formData.value.brg_nama = v;
+  if (props.jenisGarmen === "ACCESORIES" && !isSpanduk.value)
+    formData.value.brg_nama = v;
 });
 
 watch(
   () => formData.value.brg_nama,
   (v) => {
-    if (props.jenisGarmen === "ACCESORIES") {
+    if (props.jenisGarmen === "ACCESORIES" && !isSpanduk.value) {
       const u = v.toUpperCase();
       formData.value.brg_ktg =
         u.startsWith("PLASTIK") || u.startsWith("KARDUS") ? "TAMBAHAN" : "";
@@ -172,7 +179,9 @@ const resetForm = () => {
   formData.value = {
     brg_jenis: props.jenisGarmen,
     brg_kode: "",
-    brg_ktg: defaultKtg[props.jenisGarmen] ?? "",
+    brg_ktg: props.spanduk
+      ? KTG_SPANDUK
+      : (defaultKtg[props.jenisGarmen] ?? ""),
     brg_nama: "",
     brg_satuan: satuanOptions.value[0] || "",
     brg_note: "",
@@ -265,7 +274,11 @@ const handleSave = async () => {
   isSaving.value = true;
   try {
     const payload: any = { ...formData.value };
-    if (props.isNewMode && props.jenisGarmen === "ACCESORIES") {
+    if (
+      props.isNewMode &&
+      props.jenisGarmen === "ACCESORIES" &&
+      !isSpanduk.value
+    ) {
       payload.accKodeAssembled = assembleAccKode();
     }
 
@@ -326,7 +339,8 @@ const handleSave = async () => {
             class="mr-2"
           />
           <span
-            >{{ isNewMode ? "Tambah" : "Ubah" }} Barang {{ jenisGarmen }}</span
+            >{{ isNewMode ? "Tambah" : "Ubah" }} Barang {{ jenisGarmen
+            }}<template v-if="isSpanduk"> · SPANDUK</template></span
           >
           <v-spacer />
           <button
@@ -348,11 +362,7 @@ const handleSave = async () => {
                 v-model="formData.brg_kode"
                 :readonly="kodeReadonly"
                 :class="['f-inp', kodeReadonly ? 'f-readonly' : '']"
-                :placeholder="
-                  isNewMode && jenisGarmen !== 'ACCESORIES'
-                    ? 'Ketik Kode...'
-                    : 'Otomatis'
-                "
+                placeholder="Otomatis"
                 @blur="checkKodeExist"
               />
             </div>
@@ -362,10 +372,12 @@ const handleSave = async () => {
               >
               <input
                 v-model="formData.brg_nama"
-                :readonly="jenisGarmen === 'ACCESORIES'"
+                :readonly="jenisGarmen === 'ACCESORIES' && !isSpanduk"
                 :class="[
                   'f-inp',
-                  jenisGarmen === 'ACCESORIES' ? 'f-readonly' : '',
+                  jenisGarmen === 'ACCESORIES' && !isSpanduk
+                    ? 'f-readonly'
+                    : '',
                 ]"
                 required
               />
@@ -380,7 +392,7 @@ const handleSave = async () => {
             <template v-if="canEditKode">
               Kode belum dipakai di BPB maupun penyelesaian uang muka, jadi
               masih boleh diubah.
-              <template v-if="jenisGarmen === 'ACCESORIES'">
+              <template v-if="jenisGarmen === 'ACCESORIES' && !isSpanduk">
                 Pilih ulang komponen di bawah untuk mengganti kode.
               </template>
             </template>
@@ -390,7 +402,7 @@ const handleSave = async () => {
           <div class="f-divider" />
 
           <!-- ── ACCESORIES ── -->
-          <template v-if="jenisGarmen === 'ACCESORIES'">
+          <template v-if="jenisGarmen === 'ACCESORIES' && !isSpanduk">
             <div class="f-section-title">Komponen Kode</div>
 
             <div
@@ -505,7 +517,11 @@ const handleSave = async () => {
           <template v-else-if="jenisGarmen !== 'ACCESORIES'">
             <div class="f-section-title">Kategori</div>
             <div class="kategori-group">
-              <template v-if="jenisGarmen === 'OBAT'">
+              <template v-if="isSpanduk">
+                <span class="radio-lbl">SPANDUK</span>
+              </template>
+
+              <template v-else-if="jenisGarmen === 'OBAT'">
                 <label
                   v-for="opt in [
                     { val: 'GARMEN', lbl: '(G) Cetak Garmen' },
@@ -559,6 +575,12 @@ const handleSave = async () => {
             </div>
             <div class="f-divider" />
           </template>
+
+          <!-- Spesifikasi (barang spanduk: nama bebas, detail di sini) -->
+          <div v-if="isSpanduk" class="f-field-full">
+            <label class="f-label">Spesifikasi</label>
+            <input v-model="formData.brg_note" class="f-inp" maxlength="100" />
+          </div>
 
           <!-- Satuan + Buffer + Status -->
           <div class="f-row">

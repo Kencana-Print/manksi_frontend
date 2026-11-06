@@ -31,7 +31,7 @@ const formatDateLocal = (value?: string | Date) => {
 
 const initialData = {
   Nomor: "",
-  Tanggal: new Date().toISOString().substring(0, 10),
+  Tanggal: formatDateLocal(new Date()),
   Divisi: "1",
   CustKode: "",
   CustNama: "",
@@ -41,7 +41,7 @@ const initialData = {
   Finishing: "",
   Spesifikasi: "",
   Sampel: "N",
-  TglKirim: new Date().toISOString().substring(0, 10),
+  TglKirim: formatDateLocal(new Date()),
   CatatanDeadline: "",
   Keterangan: "",
   UkuranBebas: "",
@@ -49,8 +49,7 @@ const initialData = {
   Panjang: 0,
   Lebar: 0,
   JmlDesain: null as number | null,
-  BrgKode: null as number | null,
-  SumberBahan: "",
+  BrgKode: null as string | null,
   BahanStatus: "",
   BahanSpandukNama: "",
   StatusBahan: "BELUM DICEK",
@@ -120,8 +119,7 @@ const {
       Panjang: Number(d.pro_panjang) || 0,
       Lebar: Number(d.pro_lebar) || 0,
       JmlDesain: d.pro_jml_desain == null ? null : Number(d.pro_jml_desain),
-      BrgKode: d.pro_brg_kode ?? null,
-      SumberBahan: d.pro_sumber_bahan || "",
+      BrgKode: d.pro_brg_kode ? String(d.pro_brg_kode) : null,
       BahanStatus: d.pro_bahan_status || "",
       BahanSpandukNama: d.BahanSpandukNama || "",
       StatusBahan: d.pro_status_bahan,
@@ -174,7 +172,6 @@ const {
         lebar: dataToSave.Lebar,
         jmlDesain: dataToSave.JmlDesain,
         brgKode: dataToSave.BrgKode,
-        sumberBahan: dataToSave.SumberBahan,
         bahan: dataToSave.Bahan.map((b) => ({ kode: b.Kode })),
         ukuran: dataToSave.Ukuran.map((u) => ({ kode: u.Kode, qty: u.Qty })),
         StatusEdit: dataToSave.StatusEdit,
@@ -278,11 +275,6 @@ const onValidateSave = () => {
     }
     if (!formData.value.BrgKode) {
       toast.warning("Kebutuhan bahan wajib dipilih.");
-      currentTab.value = 0;
-      return;
-    }
-    if (!formData.value.SumberBahan) {
-      toast.warning("Pilih sumber bahan: Stok Tersedia atau Pengajuan.");
       currentTab.value = 0;
       return;
     }

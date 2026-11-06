@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onBeforeUnmount } from "vue";
+import { ref, computed, onMounted, onBeforeUnmount } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
 import BaseForm from "@/components/BaseForm.vue";
@@ -9,8 +9,9 @@ import { formatTanggal } from "@/utils/dateFormat";
 import * as lhkForm from "@/services/spanduk/lhk/lhkDesignFormService";
 import type {
   LhkDesignForm,
-  LhkDesignPayload,
+  LhkDesignBatchPayload,
   SaveResponse,
+  SesiTimer,
   DesignerOption,
   MesinOption,
   BahanOption,
@@ -23,9 +24,9 @@ const toast = useToast();
 
 const isEditMode = computed(() => !!route.params.nomor);
 
-const STATUS_MULAI = "ON PROGRESS";
 const STATUS_SELESAI = "DONE";
 const MAKS_ANGKA = 99999999.99;
+const MAKS_TAB = 20; // sama dengan MAKS_MAP_SESI di backend
 const KUNCI_DESIGNER = "lhk-design-designer-terakhir";
 
 const formatDateLocal = (d: Date) => {
@@ -59,20 +60,28 @@ interface StatusRow {
   catatan: string;
 }
 
-interface FormState {
-  header: {
-    nomor: string;
-    jenis: string;
-    nama: string;
-    tanggalSpk: string;
-    dateline: string;
-    finishing: string;
-    tanggal: string;
-    ada: boolean;
-    userCreate: string;
-  };
+// Satu tab = satu SPK/MAP = satu LHK Design (nomor LHK-D sendiri)
+interface TabMap {
+  nomor: string;
+  jenis: string;
+  nama: string;
+  tanggalSpk: string;
+  dateline: string;
+  finishing: string;
+  nomorLhk: string;
+  ada: boolean;
   status: StatusRow[];
   komponen: KomponenRow[];
+}
+
+interface FormState {
+  tanggal: string; // sama untuk semua tab
+  tabs: TabMap[];
+}
+
+interface PorsiRow {
+  nomor: string;
+  persen: number;
 }
 
 const num = (v: unknown) => Number(v) || 0;
@@ -90,21 +99,7 @@ const komponenKosong = (): KomponenRow => ({
   keterangan: "",
 });
 
-const defaultData = (): FormState => ({
-  header: {
-    nomor: "",
-    jenis: "",
-    nama: "",
-    tanggalSpk: "",
-    dateline: "",
-    finishing: "",
-    tanggal: todayLocal,
-    ada: false,
-    userCreate: "",
-  },
-  status: [],
-  komponen: [komponenKosong()],
-});
+const defaultData = (): FormState => ({ tanggal: todayLocal, tabs: [] });
 
 const mapStatus = (s: LhkDesignForm["Status"][number]): StatusRow => ({
   cabang: s.Kode_Cabang ?? "",
@@ -116,7 +111,7 @@ const mapStatus = (s: LhkDesignForm["Status"][number]): StatusRow => ({
   catatan: s.Catatan ?? "",
 });
 
-const mapDariServer = (d: LhkDesignForm): FormState => {
+const mapTab = (d: LhkDesignForm): TabMap => {
   const komponen: KomponenRow[] = d.Komponen.map((k) => ({
     bahan: k.Bahan ?? "",
     panjang: num(k.Panjang),
@@ -129,69 +124,18 @@ const mapDariServer = (d: LhkDesignForm): FormState => {
     keterangan: k.Keterangan ?? "",
   }));
   return {
-    header: {
-      nomor: d.Nomor,
-      jenis: d.Jenis,
-      nama: d.Nama_SPK ?? "",
-      tanggalSpk: d.Tanggal_SPK ?? "",
-      dateline: d.Dateline ?? "",
-      finishing: d.Finishing ?? "",
-      tanggal: d.Tanggal_LHK ?? todayLocal,
-      ada: d.Ada,
-      userCreate: d.User_Create ?? "",
-    },
+    nomor: d.Nomor,
+    jenis: d.Jenis,
+    nama: d.Nama_SPK ?? "",
+    tanggalSpk: d.Tanggal_SPK ?? "",
+    dateline: d.Dateline ?? "",
+    finishing: d.Finishing ?? "",
+    nomorLhk: d.Nomor_LHK ?? "",
+    ada: d.Ada,
     status: d.Status.map(mapStatus),
     komponen: komponen.length > 0 ? komponen : [komponenKosong()],
   };
 };
-
-// ── State UI ──
-const inputNomor = ref("");
-const nomorTerakhir = ref("");
-const showSelesai = ref(false);
-const showKonfirmasiSelesai = ref(false);
-const sedangAksi = ref(false);
-
-const designerOpts = ref<DesignerOption[]>([]);
-const mesinOpts = ref<MesinOption[]>([]);
-const bahanOpts = ref<BahanOption[]>([]);
-const designerIdx = ref(-1);
-const catatanAksi = ref("");
-
-// Lookup SPK/MAP
-const showSpk = ref(false);
-
-// Selisih jam server - jam browser, untuk stopwatch yang akurat
-const offsetMs = ref(0);
-const sekarangMs = ref(Date.now());
-let pewaktu: ReturnType<typeof setInterval> | null = null;
-
-// "YYYY-MM-DD HH:mm:ss" diparse sebagai jam lokal; selisihnya tetap benar
-const keMs = (s: string) => new Date(s.replace(" ", "T")).getTime();
-
-const aturOffset = (serverSekarang: string) => {
-  const ms = keMs(serverSekarang);
-  if (!Number.isNaN(ms)) {
-    offsetMs.value = ms - Date.now();
-  }
-};
-
-const bangunPayload = (data: FormState): LhkDesignPayload => ({
-  Tanggal: data.header.tanggal,
-  Komponen: data.komponen
-    .filter((r) => !barisKosong(r))
-    .map((r) => ({
-      Bahan: r.bahan,
-      Panjang: num(r.panjang),
-      Jumlah: num(r.jumlah),
-      C: num(r.c),
-      M: num(r.m),
-      Y: num(r.y),
-      K: num(r.k),
-      Mesin: r.mesin,
-      Keterangan: r.keterangan.trim(),
-    })),
-});
 
 function barisKosong(r: KomponenRow): boolean {
   return (
@@ -201,6 +145,46 @@ function barisKosong(r: KomponenRow): boolean {
     [r.panjang, r.jumlah, r.c, r.m, r.y, r.k].every((v) => num(v) === 0)
   );
 }
+
+const bangunPayload = (data: FormState): LhkDesignBatchPayload => ({
+  Tanggal: data.tanggal,
+  Daftar: data.tabs.map((t) => ({
+    Nomor_SPK: t.nomor,
+    Komponen: t.komponen
+      .filter((r) => !barisKosong(r))
+      .map((r) => ({
+        Bahan: r.bahan,
+        Panjang: num(r.panjang),
+        Jumlah: num(r.jumlah),
+        C: num(r.c),
+        M: num(r.m),
+        Y: num(r.y),
+        K: num(r.k),
+        Mesin: r.mesin,
+        Keterangan: r.keterangan.trim(),
+      })),
+  })),
+});
+
+// ── State UI ──
+const inputNomor = ref("");
+const showHasilSimpan = ref(false);
+const sedangAksi = ref(false);
+const tabIdx = ref(0);
+
+const designerOpts = ref<DesignerOption[]>([]);
+const mesinOpts = ref<MesinOption[]>([]);
+const bahanOpts = ref<BahanOption[]>([]);
+const designerIdx = ref(-1);
+const catatanAksi = ref("");
+
+const showSpk = ref(false);
+
+const showDlgPause = ref(false);
+const alasanPause = ref("");
+const showDlgSelesai = ref(false);
+const showDlgBatal = ref(false);
+const porsiInput = ref<PorsiRow[]>([]);
 
 const {
   isLoading,
@@ -218,30 +202,32 @@ const {
   initialData: defaultData(),
   fetchApi: async (): Promise<FormState> => {
     const d = await lhkForm.getById(String(route.params.nomor));
-    aturOffset(d.Server_Sekarang);
-    return mapDariServer(d);
+    return { tanggal: d.Tanggal_LHK ?? todayLocal, tabs: [mapTab(d)] };
   },
   submitApi: async (data: FormState): Promise<SaveResponse> =>
-    lhkForm.simpan(data.header.nomor, bangunPayload(data)),
-  onSuccess: (response: unknown) => {
-    const res = response as SaveResponse;
-    nomorTerakhir.value = res.data?.data?.Nomor ?? formData.value.header.nomor;
-    showSelesai.value = true;
+    lhkForm.simpanBatch(bangunPayload(data)),
+  onSuccess: () => {
+    showHasilSimpan.value = true;
   },
   onFormReset: () => {
     inputNomor.value = "";
     catatanAksi.value = "";
+    tabIdx.value = 0;
   },
 });
 
-watch(
-  () => formData.value.header.nomor,
-  (n) => {
-    inputNomor.value = n;
-  },
+const tabAktif = computed<TabMap | null>(
+  () => formData.value.tabs[tabIdx.value] ?? null,
 );
 
-const nomorTerkunci = computed(() => !!formData.value.header.nomor);
+const statusAkhirTab = computed<StatusRow | null>(() => {
+  const s = tabAktif.value?.status ?? [];
+  return s.length > 0 ? s[s.length - 1] : null;
+});
+
+const hasilSimpan = computed(() =>
+  formData.value.tabs.map((t) => t.nomorLhk || t.nomor),
+);
 
 // ── Lookup ──
 const opsiMesinUntuk = (nilai: string): MesinOption[] =>
@@ -253,6 +239,10 @@ const opsiBahanUntuk = (nilai: string): BahanOption[] =>
   nilai && !bahanOpts.value.some((b) => b.Kode === nilai)
     ? [{ Kode: nilai }, ...bahanOpts.value]
     : bahanOpts.value;
+
+const designerTerpilih = computed<DesignerOption | null>(
+  () => designerOpts.value[designerIdx.value] ?? null,
+);
 
 const pulihkanDesigner = () => {
   try {
@@ -283,6 +273,224 @@ const catatDesigner = () => {
   }
 };
 
+// ── Timer sesi ──
+// Server memberi durasi bersih pada saat respons; browser hanya menambah
+// selisih jam lokal sejak respons diterima.
+const sesi = ref<SesiTimer | null>(null);
+const sesiDiterimaMs = ref(0);
+const sekarangMs = ref(Date.now());
+let pewaktu: ReturnType<typeof setInterval> | null = null;
+
+const setSesi = (s: SesiTimer | null) => {
+  sesi.value = s;
+  sesiDiterimaMs.value = Date.now();
+};
+
+const berjalan = computed(() => sesi.value?.Status === "BERJALAN");
+const dipause = computed(() => sesi.value?.Status === "PAUSE");
+const sesiAktif = computed(() => berjalan.value || dipause.value);
+
+const selisihDetik = computed(() =>
+  Math.max(0, Math.floor((sekarangMs.value - sesiDiterimaMs.value) / 1000)),
+);
+
+const detikBersih = computed(() => {
+  const s = sesi.value;
+  if (!s || s.Durasi_Bersih_Detik === null) {
+    return 0;
+  }
+  return s.Durasi_Bersih_Detik + (berjalan.value ? selisihDetik.value : 0);
+});
+
+const sisaPauseDetik = computed(() => {
+  const p = sesi.value?.Pause_Aktif;
+  return p ? Math.max(0, p.Sisa_Detik - selisihDetik.value) : 0;
+});
+
+const pauseHabis = computed(() => dipause.value && sisaPauseDetik.value <= 0);
+
+const pad = (n: number) => String(n).padStart(2, "0");
+
+const formatDurasi = (detik: number) => {
+  const d = Math.max(0, Math.floor(detik));
+  return `${pad(Math.floor(d / 3600))}:${pad(Math.floor((d % 3600) / 60))}:${pad(d % 60)}`;
+};
+
+const formatMenitDetik = (detik: number) =>
+  `${pad(Math.floor(detik / 60))}:${pad(detik % 60)}`;
+
+const lamaTeks = computed(() => formatDurasi(detikBersih.value));
+
+const bisaMulai = computed(
+  () =>
+    formData.value.tabs.length > 0 &&
+    !sesiAktif.value &&
+    !sedangAksi.value &&
+    !!designerTerpilih.value,
+);
+
+const jalankan = async (kerja: () => Promise<void>, galatDefault: string) => {
+  sedangAksi.value = true;
+  try {
+    await kerja();
+  } catch (e) {
+    toast.error(lhkForm.pesanError(e, galatDefault));
+  } finally {
+    sedangAksi.value = false;
+  }
+};
+
+// Hanya status/nomor yang diperbarui: komponen yang sedang diedit tidak tertimpa
+const segarkanSemuaTab = async () => {
+  await Promise.all(
+    formData.value.tabs.map(async (t) => {
+      const d = await lhkForm.getById(t.nomor);
+      t.ada = d.Ada;
+      t.nomorLhk = d.Nomor_LHK ?? "";
+      t.status = d.Status.map(mapStatus);
+    }),
+  );
+};
+
+const mulaiTimer = () =>
+  jalankan(async () => {
+    const pelaku = designerTerpilih.value;
+    if (!pelaku) {
+      toast.warning("Pilih designer terlebih dahulu.");
+      return;
+    }
+    const s = await lhkForm.mulaiSesi({
+      Kode_Cabang: pelaku.Kode,
+      Designer: pelaku.Designer,
+      Catatan: catatanAksi.value.trim(),
+      Daftar_Spk: formData.value.tabs.map((t) => t.nomor),
+    });
+    setSesi(s);
+    catatDesigner();
+    catatanAksi.value = "";
+    await segarkanSemuaTab();
+    toast.success("Timer dimulai.");
+  }, "Gagal memulai timer.");
+
+const konfirmasiPause = () =>
+  jalankan(async () => {
+    const s = sesi.value;
+    if (!s) {
+      return;
+    }
+    const alasan = alasanPause.value.trim();
+    if (!alasan) {
+      toast.warning("Alasan pause wajib diisi.");
+      return;
+    }
+    setSesi(await lhkForm.pauseSesi(s.Sesi_Id, alasan));
+    showDlgPause.value = false;
+    alasanPause.value = "";
+    toast.success("Timer di-pause.");
+  }, "Gagal mem-pause timer.");
+
+const lanjutTimer = () =>
+  jalankan(async () => {
+    const s = sesi.value;
+    if (!s) {
+      return;
+    }
+    setSesi(await lhkForm.resumeSesi(s.Sesi_Id));
+    toast.success("Timer dilanjutkan.");
+  }, "Gagal melanjutkan timer.");
+
+// Porsi awal dibagi rata; designer yang mengatur per tab
+const bukaSelesai = () => {
+  const tabs = formData.value.tabs;
+  const n = tabs.length;
+  if (n === 0) {
+    return;
+  }
+  const dasar = Math.floor(10000 / n) / 100;
+  porsiInput.value = tabs.map((t, i) => ({
+    nomor: t.nomor,
+    persen: i === n - 1 ? round2(100 - dasar * (n - 1)) : dasar,
+  }));
+  showDlgSelesai.value = true;
+};
+
+const totalPorsi = computed(() =>
+  round2(porsiInput.value.reduce((a, p) => a + num(p.persen), 0)),
+);
+const porsiValid = computed(() => Math.abs(totalPorsi.value - 100) <= 0.01);
+
+const estimasiDurasi = (persen: number) =>
+  formatDurasi((detikBersih.value * num(persen)) / 100);
+
+const konfirmasiSelesai = () =>
+  jalankan(async () => {
+    const s = sesi.value;
+    if (!s) {
+      return;
+    }
+    if (!porsiValid.value) {
+      toast.warning("Total porsi harus 100%.");
+      return;
+    }
+    const banyak = porsiInput.value.length > 1;
+    const hasil = await lhkForm.selesaiSesi(s.Sesi_Id, {
+      Catatan: catatanAksi.value.trim(),
+      Porsi: banyak
+        ? porsiInput.value.map((p) => ({
+            Nomor_SPK: p.nomor,
+            Persen: num(p.persen),
+          }))
+        : undefined,
+    });
+    showDlgSelesai.value = false;
+    setSesi(hasil);
+    catatanAksi.value = "";
+    await segarkanSemuaTab();
+    toast.success("Pekerjaan selesai.");
+  }, "Gagal menyelesaikan timer.");
+
+const konfirmasiBatal = () =>
+  jalankan(async () => {
+    const s = sesi.value;
+    if (!s) {
+      return;
+    }
+    const hasil = await lhkForm.batalSesi(s.Sesi_Id);
+    showDlgBatal.value = false;
+    setSesi(null);
+    catatanAksi.value = "";
+    await segarkanSemuaTab();
+    const tahan = hasil.Header_Dipertahankan ?? [];
+    if (tahan.length > 0) {
+      toast.info(
+        `Timer dibatalkan. LHK ${tahan.join(", ")} dipertahankan karena sudah berisi komponen.`,
+      );
+    } else {
+      toast.success("Timer dibatalkan.");
+    }
+  }, "Gagal membatalkan timer.");
+
+// Memulihkan timer yang masih aktif setelah halaman dimuat ulang
+const pulihkanSesi = async () => {
+  const s = await lhkForm.getSesiAktif();
+  if (!s) {
+    return;
+  }
+  const daftar = await Promise.all(
+    s.Daftar.map((m) => lhkForm.getById(m.Nomor_SPK)),
+  );
+  formData.value.tabs = daftar.map(mapTab);
+  formData.value.tanggal = todayLocal;
+  tabIdx.value = 0;
+  setSesi(s);
+  const idx = designerOpts.value.findIndex(
+    (d) => d.Kode === s.Kode_Cabang && d.Designer === s.Designer,
+  );
+  if (idx >= 0) {
+    designerIdx.value = idx;
+  }
+};
+
 onMounted(async () => {
   pewaktu = setInterval(() => {
     sekarangMs.value = Date.now();
@@ -300,6 +508,13 @@ onMounted(async () => {
   } catch (e) {
     toast.error(lhkForm.pesanError(e, "Gagal memuat data lookup."));
   }
+  if (!isEditMode.value) {
+    try {
+      await pulihkanSesi();
+    } catch (e) {
+      toast.error(lhkForm.pesanError(e, "Gagal memulihkan timer."));
+    }
+  }
 });
 
 onBeforeUnmount(() => {
@@ -308,154 +523,94 @@ onBeforeUnmount(() => {
   }
 });
 
-// ── Pilih SPK/MAP ──
-const muatSpkNomor = async (nomorInput: string) => {
+// ── Tab SPK/MAP ──
+const tambahTab = async (nomorInput: string) => {
   const nomor = nomorInput.trim();
   if (!nomor) {
+    return;
+  }
+  if (sesiAktif.value) {
+    toast.warning(
+      "Daftar SPK/MAP dikunci selama timer berjalan atau di-pause.",
+    );
+    return;
+  }
+  const tabs = formData.value.tabs;
+  const sudahAda = (n: string) =>
+    tabs.some((t) => t.nomor.toUpperCase() === n.toUpperCase());
+  if (sudahAda(nomor)) {
+    toast.warning(`SPK/MAP ${nomor} sudah ada di daftar.`);
+    inputNomor.value = "";
+    return;
+  }
+  if (tabs.length >= MAKS_TAB) {
+    toast.warning(`Maksimal ${MAKS_TAB} SPK/MAP dalam satu timer.`);
     return;
   }
   isLoading.value = true;
   try {
     const d = await lhkForm.getById(nomor);
-    aturOffset(d.Server_Sekarang);
-    formData.value = mapDariServer(d);
+    if (sudahAda(d.Nomor)) {
+      toast.warning(`SPK/MAP ${d.Nomor} sudah ada di daftar.`);
+      inputNomor.value = "";
+      return;
+    }
+    tabs.push(mapTab(d));
+    tabIdx.value = tabs.length - 1;
+    inputNomor.value = "";
   } catch (e) {
     toast.error(lhkForm.pesanError(e, "Gagal memuat data SPK/MAP."));
-    inputNomor.value = "";
   } finally {
     isLoading.value = false;
   }
 };
 
-const onEnterNomor = () => {
-  if (!nomorTerkunci.value) {
-    void muatSpkNomor(inputNomor.value);
+const hapusTab = (idx: number) => {
+  if (sesiAktif.value) {
+    toast.warning(
+      "Daftar SPK/MAP dikunci selama timer berjalan atau di-pause.",
+    );
+    return;
+  }
+  formData.value.tabs.splice(idx, 1);
+  if (tabIdx.value >= formData.value.tabs.length) {
+    tabIdx.value = Math.max(0, formData.value.tabs.length - 1);
   }
 };
 
 const bukaLookupSpk = () => {
-  if (nomorTerkunci.value) {
+  if (sesiAktif.value) {
     return;
   }
   showSpk.value = true;
 };
 
 const onSpkDipilih = (item: { Nomor: string }) => {
-  void muatSpkNomor(item.Nomor);
+  void tambahTab(item.Nomor);
 };
 
-// ── Stopwatch ──
-const designerTerpilih = computed<DesignerOption | null>(
-  () => designerOpts.value[designerIdx.value] ?? null,
-);
-
-const statusAkhir = computed<StatusRow | null>(() => {
-  const s = formData.value.status;
-  return s.length > 0 ? s[s.length - 1] : null;
-});
-
-const berjalan = computed(() => statusAkhir.value?.status === STATUS_MULAI);
-
-const pad = (n: number) => String(n).padStart(2, "0");
-
-const lamaTeks = computed(() => {
-  const s = statusAkhir.value;
-  if (!s) {
-    return "00:00:00";
-  }
-  if (s.status !== STATUS_MULAI) {
-    return s.durasi || "00:00:00";
-  }
-  const mulai = keMs(`${s.tanggal} ${s.jam}`);
-  if (Number.isNaN(mulai)) {
-    return "00:00:00";
-  }
-  const detik = Math.max(
-    0,
-    Math.floor((sekarangMs.value + offsetMs.value - mulai) / 1000),
-  );
-  return `${pad(Math.floor(detik / 3600))}:${pad(Math.floor((detik % 3600) / 60))}:${pad(detik % 60)}`;
-});
-
-const bisaMulai = computed(
-  () =>
-    nomorTerkunci.value &&
-    !berjalan.value &&
-    !sedangAksi.value &&
-    !!designerTerpilih.value,
-);
-const bisaSelesai = computed(
-  () => berjalan.value && !sedangAksi.value && !!designerTerpilih.value,
-);
-
-// Hanya status (dan tanggal bila header baru dibuat) yang diganti:
-// komponen yang sedang diedit di layar tidak boleh tertimpa.
-const terapkanStatus = (d: LhkDesignForm) => {
-  const h = formData.value.header;
-  if (!h.ada) {
-    h.tanggal = d.Tanggal_LHK ?? h.tanggal;
-  }
-  h.ada = d.Ada;
-  h.userCreate = d.User_Create ?? h.userCreate;
-  formData.value.status = d.Status.map(mapStatus);
-  aturOffset(d.Server_Sekarang);
-};
-
-const jalankanAksi = async (aksi: "mulai" | "selesai") => {
-  const h = formData.value.header;
-  const pelaku = designerTerpilih.value;
-  if (!h.nomor) {
-    return toast.warning("Pilih SPK/MAP terlebih dahulu.");
-  }
-  if (!pelaku) {
-    return toast.warning("Pilih designer terlebih dahulu.");
-  }
-
-  sedangAksi.value = true;
-  try {
-    const payload = {
-      Kode_Cabang: pelaku.Kode,
-      Designer: pelaku.Designer,
-      Catatan: catatanAksi.value.trim(),
-    };
-    const d =
-      aksi === "mulai"
-        ? await lhkForm.mulai(h.nomor, payload)
-        : await lhkForm.selesai(h.nomor, payload);
-    terapkanStatus(d);
-    catatDesigner();
-    catatanAksi.value = "";
-    toast.success(
-      aksi === "mulai" ? "Pekerjaan dimulai." : "Pekerjaan selesai.",
-    );
-  } catch (e) {
-    toast.error(lhkForm.pesanError(e, "Gagal memperbarui status."));
-  } finally {
-    sedangAksi.value = false;
-  }
-};
-
-const konfirmasiSelesai = async () => {
-  showKonfirmasiSelesai.value = false;
-  await jalankanAksi("selesai");
-};
-
-// ── Komponen ──
+// ── Komponen (tab aktif) ──
 const addRow = () => {
-  formData.value.komponen.push(komponenKosong());
+  tabAktif.value?.komponen.push(komponenKosong());
 };
 
 const removeRow = (idx: number) => {
-  formData.value.komponen.splice(idx, 1);
-  if (formData.value.komponen.length === 0) {
-    formData.value.komponen.push(komponenKosong());
+  const t = tabAktif.value;
+  if (!t) {
+    return;
+  }
+  t.komponen.splice(idx, 1);
+  if (t.komponen.length === 0) {
+    t.komponen.push(komponenKosong());
   }
 };
 
 const totalBaris = (r: KomponenRow) => round2(num(r.panjang) * num(r.jumlah));
 
 const totalSemua = computed(() =>
-  round2(formData.value.komponen.reduce((a, r) => a + totalBaris(r), 0)),
+  round2(
+    (tabAktif.value?.komponen ?? []).reduce((a, r) => a + totalBaris(r), 0),
+  ),
 );
 
 const fmt = (n: number) =>
@@ -469,16 +624,12 @@ const selesaiStatus = (s: string | null | undefined) =>
 
 // ── Validasi sebelum konfirmasi simpan (sama dengan server) ──
 const validateSave = () => {
-  const h = formData.value.header;
-  if (!h.nomor) {
-    toast.warning("SPK/MAP harus diisi.");
+  const f = formData.value;
+  if (f.tabs.length === 0) {
+    toast.warning("Minimal satu SPK/MAP harus diisi.");
     return;
   }
-  if (!h.ada) {
-    toast.warning("Tekan Mulai terlebih dahulu sebelum menyimpan.");
-    return;
-  }
-  if (!h.tanggal) {
+  if (!f.tanggal) {
     toast.warning("Tanggal LHK tidak boleh kosong.");
     return;
   }
@@ -493,25 +644,37 @@ const validateSave = () => {
       ["K", r.k],
     ] as const;
 
-  for (const [i, r] of formData.value.komponen.entries()) {
-    if (barisKosong(r)) {
-      continue;
-    }
-    const no = i + 1;
-    if (!r.bahan) {
-      toast.warning(`Baris ${no}: Bahan wajib dipilih.`);
+  for (const t of f.tabs) {
+    if (!t.ada) {
+      toast.warning(
+        `${t.nomor}: tekan Mulai terlebih dahulu sebelum menyimpan.`,
+      );
       return;
     }
-    for (const [label, v] of kolom(r)) {
-      const n = num(v);
-      if (n < 0 || n > MAKS_ANGKA) {
-        toast.warning(`Baris ${no}: ${label} harus 0 sampai 99.999.999,99.`);
+    for (const [i, r] of t.komponen.entries()) {
+      if (barisKosong(r)) {
+        continue;
+      }
+      const no = i + 1;
+      if (!r.bahan) {
+        toast.warning(`${t.nomor} baris ${no}: Bahan wajib dipilih.`);
         return;
       }
-    }
-    if (r.keterangan.trim().length > 200) {
-      toast.warning(`Baris ${no}: Keterangan maksimal 200 karakter.`);
-      return;
+      for (const [label, v] of kolom(r)) {
+        const n = num(v);
+        if (n < 0 || n > MAKS_ANGKA) {
+          toast.warning(
+            `${t.nomor} baris ${no}: ${label} harus 0 sampai 99.999.999,99.`,
+          );
+          return;
+        }
+      }
+      if (r.keterangan.trim().length > 200) {
+        toast.warning(
+          `${t.nomor} baris ${no}: Keterangan maksimal 200 karakter.`,
+        );
+        return;
+      }
     }
   }
 
@@ -520,7 +683,11 @@ const validateSave = () => {
 
 // ── Setelah simpan ──
 const resetBaru = () => {
-  showSelesai.value = false;
+  showHasilSimpan.value = false;
+  if (sesiAktif.value) {
+    toast.warning("Timer masih aktif. Selesaikan atau batalkan dulu.");
+    return;
+  }
   if (isEditMode.value) {
     router.replace({ name: "SpandukLhkDesignCreate" });
     return;
@@ -528,10 +695,12 @@ const resetBaru = () => {
   formData.value = defaultData();
   inputNomor.value = "";
   catatanAksi.value = "";
+  tabIdx.value = 0;
+  setSesi(null);
 };
 
 const tutupSetelahSimpan = () => {
-  showSelesai.value = false;
+  showHasilSimpan.value = false;
   goBack();
 };
 </script>
@@ -555,23 +724,23 @@ const tutupSetelahSimpan = () => {
     <template #left-column>
       <div class="lhk-left">
         <div class="fr">
-          <label class="lbl">SPK/MAP</label>
+          <label class="lbl">Tambah SPK/MAP</label>
           <div class="cell-grp inp-grp" style="flex: 1">
             <input
               v-model="inputNomor"
-              :readonly="nomorTerkunci"
+              :readonly="sesiAktif"
               class="ci"
-              :class="{ ro: nomorTerkunci }"
-              placeholder="Ketik nomor + Enter / F1 cari"
+              :class="{ ro: sesiAktif }"
+              placeholder="Nomor + Enter / F1 cari"
               autocomplete="off"
-              @keydown.enter.prevent="onEnterNomor"
+              @keydown.enter.prevent="tambahTab(inputNomor)"
               @keydown.f1.prevent="bukaLookupSpk"
             />
             <button
               type="button"
               class="ci-btn"
               title="Cari SPK/MAP"
-              :disabled="nomorTerkunci"
+              :disabled="sesiAktif"
               @click="bukaLookupSpk"
             >
               <IconSearch :size="11" />
@@ -580,35 +749,52 @@ const tutupSetelahSimpan = () => {
         </div>
 
         <div class="fr">
-          <label class="lbl">Jenis</label>
-          <input
-            :value="formData.header.jenis"
-            readonly
-            class="inp ro"
-            style="width: 90px"
-          />
-        </div>
-
-        <div class="fr">
           <label class="lbl">Tgl LHK</label>
           <input
             type="date"
-            v-model="formData.header.tanggal"
+            v-model="formData.tanggal"
             class="idate"
             style="width: 150px"
           />
+          <span class="hint">semua tab</span>
         </div>
 
         <div class="sep" />
 
         <div class="fr">
+          <label class="lbl">No. LHK</label>
+          <input
+            :value="tabAktif?.nomorLhk || '-'"
+            readonly
+            class="inp ro"
+            style="width: 140px"
+          />
+        </div>
+
+        <div class="fr">
+          <label class="lbl">SPK/MAP</label>
+          <input
+            :value="tabAktif?.nomor ?? ''"
+            readonly
+            class="inp ro"
+            style="width: 140px"
+          />
+          <input
+            :value="tabAktif?.jenis ?? ''"
+            readonly
+            class="inp ro"
+            style="width: 50px"
+          />
+        </div>
+
+        <div class="fr">
           <label class="lbl">Nama Design</label>
           <input
-            :value="formData.header.nama"
+            :value="tabAktif?.nama ?? ''"
             readonly
             class="inp ro"
             style="flex: 1"
-            :title="formData.header.nama"
+            :title="tabAktif?.nama ?? ''"
           />
         </div>
 
@@ -616,9 +802,7 @@ const tutupSetelahSimpan = () => {
           <label class="lbl">Tgl SPK</label>
           <input
             :value="
-              formData.header.tanggalSpk
-                ? formatTanggal(formData.header.tanggalSpk)
-                : ''
+              tabAktif?.tanggalSpk ? formatTanggal(tabAktif.tanggalSpk) : ''
             "
             readonly
             class="inp ro"
@@ -629,11 +813,7 @@ const tutupSetelahSimpan = () => {
         <div class="fr">
           <label class="lbl">Dateline</label>
           <input
-            :value="
-              formData.header.dateline
-                ? formatTanggal(formData.header.dateline)
-                : ''
-            "
+            :value="tabAktif?.dateline ? formatTanggal(tabAktif.dateline) : ''"
             readonly
             class="inp ro"
             style="width: 110px"
@@ -643,11 +823,11 @@ const tutupSetelahSimpan = () => {
         <div class="fr">
           <label class="lbl">Finishing</label>
           <input
-            :value="formData.header.finishing"
+            :value="tabAktif?.finishing ?? ''"
             readonly
             class="inp ro"
             style="flex: 1"
-            :title="formData.header.finishing"
+            :title="tabAktif?.finishing ?? ''"
           />
         </div>
 
@@ -657,9 +837,11 @@ const tutupSetelahSimpan = () => {
           <label class="lbl">Status</label>
           <span
             class="status-chip"
-            :class="selesaiStatus(statusAkhir?.status) ? 'st-done' : 'st-open'"
+            :class="
+              selesaiStatus(statusAkhirTab?.status) ? 'st-done' : 'st-open'
+            "
           >
-            {{ statusAkhir?.status || "Belum dimulai" }}
+            {{ statusAkhirTab?.status || "Belum dimulai" }}
           </span>
         </div>
       </div>
@@ -668,10 +850,13 @@ const tutupSetelahSimpan = () => {
     <!-- ══ KOLOM KANAN ══ -->
     <template #right-column>
       <div class="lhk-right">
-        <!-- Status + stopwatch -->
+        <!-- Timer sesi + tab SPK/MAP + status tab aktif -->
         <div class="blok" style="flex: 0 0 auto">
           <div class="tbl-header">
-            <span class="tbl-title">Status Pengerjaan</span>
+            <span class="tbl-title">Timer Pengerjaan</span>
+            <span v-if="sesi" class="sesi-chip">
+              {{ sesi.Status }} · {{ sesi.Designer }}
+            </span>
           </div>
 
           <div class="sw-bar">
@@ -679,6 +864,7 @@ const tutupSetelahSimpan = () => {
               v-model.number="designerIdx"
               class="inp"
               style="width: 210px"
+              :disabled="sesiAktif"
             >
               <option :value="-1" disabled>Pilih designer...</option>
               <option
@@ -696,26 +882,96 @@ const tutupSetelahSimpan = () => {
               maxlength="100"
               placeholder="Catatan (opsional)"
             />
-            <div class="sw-time" :class="{ run: berjalan }">{{ lamaTeks }}</div>
+            <div class="sw-time" :class="{ run: berjalan, pause: dipause }">
+              {{ lamaTeks }}
+            </div>
+
             <button
+              v-if="!sesiAktif"
               type="button"
               class="btn-mulai"
               :disabled="!bisaMulai"
-              @click="jalankanAksi('mulai')"
+              @click="mulaiTimer"
             >
               ▶ Mulai
             </button>
-            <button
-              type="button"
-              class="btn-selesai"
-              :disabled="!bisaSelesai"
-              @click="showKonfirmasiSelesai = true"
-            >
-              ■ Selesai
-            </button>
+            <template v-else>
+              <button
+                v-if="berjalan"
+                type="button"
+                class="btn-pause"
+                :disabled="sedangAksi"
+                @click="showDlgPause = true"
+              >
+                ⏸ Pause
+              </button>
+              <button
+                v-else
+                type="button"
+                class="btn-mulai"
+                :disabled="sedangAksi || pauseHabis"
+                @click="lanjutTimer"
+              >
+                ▶ Lanjut
+              </button>
+              <button
+                type="button"
+                class="btn-selesai"
+                :disabled="sedangAksi"
+                @click="bukaSelesai"
+              >
+                ■ Selesai
+              </button>
+              <button
+                type="button"
+                class="btn-batal"
+                :disabled="sedangAksi"
+                @click="showDlgBatal = true"
+              >
+                ✕ Batal
+              </button>
+            </template>
           </div>
 
-          <div class="tbl-wrap" style="max-height: 170px; min-height: 80px">
+          <div v-if="dipause && sesi?.Pause_Aktif" class="sw-info">
+            <b>Di-pause:</b> {{ sesi.Pause_Aktif.Alasan }} ·
+            <span v-if="!pauseHabis">
+              sisa {{ formatMenitDetik(sisaPauseDetik) }} sebelum batas
+              {{ sesi.Batas_Pause_Menit }} menit
+            </span>
+            <span v-else class="st-open">
+              batas pause {{ sesi.Batas_Pause_Menit }} menit terlewati. Pilih
+              Selesai atau Batal.
+            </span>
+          </div>
+
+          <div class="tab-bar">
+            <button
+              v-for="(t, i) in formData.tabs"
+              :key="t.nomor"
+              type="button"
+              class="tab-btn"
+              :class="{ aktif: i === tabIdx }"
+              @click="tabIdx = i"
+            >
+              <span>{{ t.nomor }}</span>
+              <span v-if="t.nomorLhk" class="tab-lhk">{{ t.nomorLhk }}</span>
+              <span
+                v-if="!sesiAktif"
+                class="tab-x"
+                title="Hapus dari daftar"
+                @click.stop="hapusTab(i)"
+              >
+                ✕
+              </span>
+            </button>
+            <span v-if="formData.tabs.length === 0" class="tab-kosong">
+              Belum ada SPK/MAP. Isi nomor di kolom kiri, lalu pilih designer
+              dan tekan Mulai.
+            </span>
+          </div>
+
+          <div class="tbl-wrap" style="max-height: 130px; min-height: 60px">
             <table class="gt" style="min-width: 760px">
               <thead>
                 <tr>
@@ -730,12 +986,10 @@ const tutupSetelahSimpan = () => {
                 </tr>
               </thead>
               <tbody>
-                <tr v-if="formData.status.length === 0">
-                  <td colspan="8" class="kosong">
-                    Belum ada status. Pilih designer lalu tekan Mulai.
-                  </td>
+                <tr v-if="!tabAktif || tabAktif.status.length === 0">
+                  <td colspan="8" class="kosong">Belum ada status.</td>
                 </tr>
-                <tr v-for="(s, i) in formData.status" :key="i">
+                <tr v-for="(s, i) in tabAktif?.status ?? []" :key="i">
                   <td class="tc gt-lbl">{{ i + 1 }}</td>
                   <td class="pad">{{ s.cabang }}</td>
                   <td class="pad">{{ s.designer }}</td>
@@ -758,7 +1012,7 @@ const tutupSetelahSimpan = () => {
         </div>
 
         <!-- Komponen -->
-        <div class="blok" style="flex: 1; min-height: 0">
+        <div v-if="tabAktif" class="blok" style="flex: 1; min-height: 0">
           <div class="tbl-header tbl-header-sub">
             <span class="tbl-title">Komponen</span>
             <button type="button" class="btn-add" @click="addRow">
@@ -784,7 +1038,7 @@ const tutupSetelahSimpan = () => {
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="(row, idx) in formData.komponen" :key="idx">
+                <tr v-for="(row, idx) in tabAktif.komponen" :key="idx">
                   <td class="tc gt-lbl">{{ idx + 1 }}</td>
                   <td class="p0">
                     <select v-model="row.bahan" class="ci">
@@ -919,30 +1173,141 @@ const tutupSetelahSimpan = () => {
     @selected="onSpkDipilih"
   />
 
-  <!-- Konfirmasi Selesai -->
-  <v-dialog v-model="showKonfirmasiSelesai" max-width="420" persistent>
+  <!-- Pause -->
+  <v-dialog v-model="showDlgPause" max-width="420" persistent>
     <v-card class="rounded-lg">
-      <v-card-title class="bg-warning text-white pa-3">
-        Tandai DONE?
-      </v-card-title>
+      <v-card-title class="bg-orange text-white pa-3">Pause Timer</v-card-title>
       <v-card-text class="pa-4">
-        Status DONE dan durasi dicatat dengan jam server dan
-        <b>tidak dapat dibatalkan</b>.
+        <div class="text-body-2 mb-2">
+          Waktu pause tidak dihitung ke durasi. Maksimal
+          {{ sesi?.Batas_Pause_Menit ?? 30 }} menit; lewat batas, timer tidak
+          bisa dilanjutkan (hanya Selesai atau Batal).
+        </div>
+        <input
+          v-model="alasanPause"
+          class="inp"
+          style="width: 100%"
+          maxlength="100"
+          placeholder="Alasan pause (wajib)"
+          @keydown.enter.prevent="konfirmasiPause"
+        />
       </v-card-text>
       <v-card-actions class="pa-3 border-t">
-        <v-btn variant="text" @click="showKonfirmasiSelesai = false">
-          Batal
-        </v-btn>
+        <v-btn variant="text" @click="showDlgPause = false">Kembali</v-btn>
         <v-spacer />
-        <v-btn color="warning" variant="elevated" @click="konfirmasiSelesai">
+        <v-btn
+          color="orange"
+          variant="elevated"
+          :disabled="sedangAksi || !alasanPause.trim()"
+          @click="konfirmasiPause"
+        >
+          Pause
+        </v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
+
+  <!-- Selesai + porsi durasi -->
+  <v-dialog v-model="showDlgSelesai" max-width="560" persistent>
+    <v-card class="rounded-lg">
+      <v-card-title class="bg-warning text-white pa-3"
+        >Tandai DONE?</v-card-title
+      >
+      <v-card-text class="pa-4">
+        <div class="text-body-2 mb-3">
+          Status DONE dan durasi dicatat dengan jam server dan
+          <b>tidak dapat dibatalkan</b>. Durasi bersih
+          <b>{{ lamaTeks }}</b>
+          <span v-if="porsiInput.length > 1">
+            dibagi ke tiap LHK sesuai porsi di bawah.
+          </span>
+        </div>
+        <table
+          v-if="porsiInput.length > 1"
+          class="gt"
+          style="table-layout: auto"
+        >
+          <thead>
+            <tr>
+              <th>SPK/MAP</th>
+              <th style="width: 110px" class="tr">Porsi (%)</th>
+              <th style="width: 100px" class="tc">Durasi</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="p in porsiInput" :key="p.nomor">
+              <td class="pad">{{ p.nomor }}</td>
+              <td class="p0">
+                <input
+                  v-model.number="p.persen"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="any"
+                  class="ci tr bg-yellow-light"
+                  v-select-on-focus
+                />
+              </td>
+              <td class="tc">{{ estimasiDurasi(p.persen) }}</td>
+            </tr>
+          </tbody>
+          <tfoot>
+            <tr>
+              <td class="fw">Total</td>
+              <td class="tr fw" :class="porsiValid ? 'st-done' : 'st-open'">
+                {{ fmt(totalPorsi) }}
+              </td>
+              <td />
+            </tr>
+          </tfoot>
+        </table>
+        <div v-if="porsiInput.length > 1 && !porsiValid" class="hint-err">
+          Total porsi harus 100%.
+        </div>
+      </v-card-text>
+      <v-card-actions class="pa-3 border-t">
+        <v-btn variant="text" @click="showDlgSelesai = false">Kembali</v-btn>
+        <v-spacer />
+        <v-btn
+          color="warning"
+          variant="elevated"
+          :disabled="sedangAksi || !porsiValid"
+          @click="konfirmasiSelesai"
+        >
           Ya, Selesai
         </v-btn>
       </v-card-actions>
     </v-card>
   </v-dialog>
 
+  <!-- Batal -->
+  <v-dialog v-model="showDlgBatal" max-width="440" persistent>
+    <v-card class="rounded-lg">
+      <v-card-title class="bg-error text-white pa-3">
+        Batalkan Timer?
+      </v-card-title>
+      <v-card-text class="pa-4">
+        Timer dianggap <b>cancel, bukan DONE</b>. LHK yang baru dibuat oleh
+        timer ini dan belum berisi komponen akan dihapus (nomornya dipakai
+        ulang). LHK yang sudah berisi komponen tetap dipertahankan.
+      </v-card-text>
+      <v-card-actions class="pa-3 border-t">
+        <v-btn variant="text" @click="showDlgBatal = false">Kembali</v-btn>
+        <v-spacer />
+        <v-btn
+          color="error"
+          variant="elevated"
+          :disabled="sedangAksi"
+          @click="konfirmasiBatal"
+        >
+          Ya, Batalkan
+        </v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
+
   <!-- Setelah simpan -->
-  <v-dialog v-model="showSelesai" max-width="400" persistent>
+  <v-dialog v-model="showHasilSimpan" max-width="420" persistent>
     <v-card class="rounded-lg">
       <v-card-title class="bg-primary text-white d-flex align-center pa-3">
         <IconSkull class="mr-2" :size="20" />
@@ -950,7 +1315,8 @@ const tutupSetelahSimpan = () => {
       </v-card-title>
       <v-card-text class="pa-4 text-center">
         <div class="text-body-1 mb-2">
-          LHK Design <b>{{ nomorTerakhir }}</b> telah disimpan.
+          LHK Design telah disimpan:
+          <div v-for="n in hasilSimpan" :key="n" class="fw">{{ n }}</div>
         </div>
         <div class="text-body-2 text-grey-darken-1">
           Mau input LHK Design lain?
@@ -1159,6 +1525,105 @@ const tutupSetelahSimpan = () => {
 .btn-selesai:disabled {
   opacity: 0.35;
   cursor: default;
+}
+.btn-mulai,
+.btn-selesai,
+.btn-pause,
+.btn-batal {
+  height: 26px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 700;
+  color: white;
+  cursor: pointer;
+}
+.btn-pause {
+  background: #ef6c00;
+}
+.btn-batal {
+  background: #616161;
+}
+.btn-mulai:disabled,
+.btn-selesai:disabled,
+.btn-pause:disabled,
+.btn-batal:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.sw-time.pause {
+  color: #ef6c00;
+  border-color: #ef6c00;
+}
+.sw-info {
+  padding: 4px 8px;
+  font-size: 11px;
+  background: #fff3e0;
+  border: 1px solid #bdbdbd;
+  border-top: none;
+}
+.sesi-chip {
+  font-size: 10px;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 2px;
+  padding: 1px 8px;
+}
+.hint {
+  font-size: 10px;
+  color: #757575;
+}
+.hint-err {
+  margin-top: 6px;
+  font-size: 11px;
+  color: #c62828;
+}
+
+.tab-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 6px 8px 0;
+  background: #eceff1;
+  border: 1px solid #bdbdbd;
+  border-top: none;
+  border-bottom: none;
+}
+.tab-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #37474f;
+  background: #cfd8dc;
+  border: 1px solid #b0bec5;
+  border-bottom: none;
+  border-radius: 3px 3px 0 0;
+  cursor: pointer;
+}
+.tab-btn.aktif {
+  background: white;
+  color: #1565c0;
+  border-color: #1565c0;
+}
+.tab-lhk {
+  font-size: 10px;
+  font-weight: 400;
+  color: #546e7a;
+}
+.tab-x {
+  color: #c62828;
+  font-size: 10px;
+}
+.tab-kosong {
+  padding: 4px 6px;
+  font-size: 11px;
+  font-style: italic;
+  color: #757575;
 }
 
 .tbl-wrap {

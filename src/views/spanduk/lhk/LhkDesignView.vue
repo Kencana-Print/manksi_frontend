@@ -19,6 +19,7 @@ import { IconSkull, IconFileExport } from "@tabler/icons-vue";
 import { formatTanggal } from "@/utils/dateFormat";
 
 interface ExportMasterRow {
+  Nomor_LHK: string;
   Nomor: string;
   Nama_SPK: string;
   Tanggal_SPK: string;
@@ -123,6 +124,7 @@ const {
 const baseBrowseRef = ref<InstanceType<typeof BaseBrowse> | null>(null);
 
 const headers = [
+  { title: "No. LHK", key: "Nomor_LHK", width: "150px" },
   { title: "Nomor SPK/MAP", key: "Nomor", width: "170px" },
   { title: "Nama SPK", key: "Nama_SPK", width: "280px" },
   { title: "Tgl SPK", key: "Tanggal_SPK", width: "110px", align: "center" },
@@ -135,12 +137,12 @@ const headers = [
 const NUM = "#,##0.00";
 
 const kolomMaster: ExcelColumn[] = [
+  { header: "No. LHK", key: "Nomor_LHK", width: 18 },
   { header: "Nomor SPK/MAP", key: "Nomor", width: 20 },
   { header: "Nama SPK", key: "Nama_SPK", width: 36 },
   { header: "Tgl SPK", key: "Tanggal_SPK", width: 14, align: "center" },
   { header: "Dateline", key: "Dateline", width: 14, align: "center" },
   { header: "Tgl LHK", key: "Tanggal_LHK", width: 14, align: "center" },
-  { header: "Bahan", key: "Bahan", width: 28 },
   { header: "Status Terakhir", key: "Status_Terakhir", width: 18 },
   { header: "User", key: "User_Create", width: 12 },
 ];
@@ -266,6 +268,7 @@ const exportMaster = async () => {
         columns: kolomMaster,
         rows: master.map(
           (r): ExportMasterRow => ({
+            Nomor_LHK: r.Nomor_LHK ?? "",
             Nomor: r.Nomor,
             Nama_SPK: r.Nama_SPK ?? "",
             Tanggal_SPK: formatTanggal(r.Tanggal_SPK),
@@ -373,6 +376,9 @@ const exportDetail = async () => {
       </div>
     </template>
 
+    <template #item.Nomor_LHK="{ item }">
+      {{ item.Nomor_LHK || "-" }}
+    </template>
     <template #item.Tanggal_SPK="{ item }">
       {{ formatTanggal(item.Tanggal_SPK) }}
     </template>

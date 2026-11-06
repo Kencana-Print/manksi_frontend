@@ -138,18 +138,18 @@ watch(
 // ── Revisi checkboxes ──
 const revisiItems = ref([
   { label: "Ganti Design", value: false },
-  { label: "Salah Warna Sablon", value: false },
-  { label: "Salah Design", value: false },
-  { label: "Salah Ukuran Sablon", value: false },
-  { label: "Salah Cetak", value: false },
-  { label: "Salah Letak Sablon", value: false },
-  { label: "Salah Ukuran", value: false },
+  { label: "Penyesuaian Warna Sablon", value: false },
+  { label: "Perbaikan Design", value: false },
+  { label: "Penyesuaian Ukuran Sablon", value: false },
+  { label: "Perbaikan Cetak", value: false },
+  { label: "Penyesuaian Letak Sablon", value: false },
+  { label: "Penyesuaian Ukuran", value: false },
   { label: "Ganti Bahan", value: false },
-  { label: "Salah Bahan", value: false },
+  { label: "Penyesuaian Bahan", value: false },
   { label: "Menggunakan Bahan Sebenarnya", value: false },
-  { label: "Salah Warna Bahan", value: false },
+  { label: "Penyesuaian Warna Bahan", value: false },
   { label: "Cetak Sesuai Ukuran", value: false },
-  { label: "Salah Letak Komponen", value: false },
+  { label: "Penyesuaian Letak Komponen", value: false },
 ]);
 
 const buildRevisiNote = () => {
@@ -163,6 +163,26 @@ const isDivisiSatuAtauLima = computed(() => {
   const divStr = String(props.formData.Divisi).charAt(0);
   return divStr === "1" || divStr === "5";
 });
+
+const isDivisiSpanduk = computed(
+  () => String(props.formData.Divisi).charAt(0) === "1",
+);
+
+// Spanduk: Ukuran, Gramasi, Sablon/Bordir/Sublim tidak dipakai → kosongkan saat MAP baru
+watch(
+  () => props.formData.Divisi,
+  () => {
+    if (props.isEdit || !isDivisiSpanduk.value) return;
+    props.formData.Panjang = 0;
+    props.formData.Lebar = 0;
+    props.formData.KetUkuran = "";
+    props.formData.Gramasi = "";
+    props.formData.Sablon = "N";
+    props.formData.Bordir = "N";
+    props.formData.Sublim = "N";
+    props.formData.RencanaSize = "";
+  },
+);
 
 // ── Image ──
 const fileRef = ref<HTMLInputElement | null>(null);
@@ -303,11 +323,13 @@ const handleMintaHargaSelected = async (item: any) => {
         props.formData.HargaJual;
 
       props.formData.Kain = data.mh_kain || props.formData.Kain;
-      props.formData.Panjang =
-        Number(data.mh_panjang) || props.formData.Panjang;
-      props.formData.Lebar = Number(data.mh_lebar) || props.formData.Lebar;
-      props.formData.KetUkuran = data.mh_ukuran || props.formData.KetUkuran; // ← mh_ukuran → KetUkuran
-      props.formData.Gramasi = data.mh_gramasi || props.formData.Gramasi;
+      if (!isDivisiSpanduk.value) {
+        props.formData.Panjang =
+          Number(data.mh_panjang) || props.formData.Panjang;
+        props.formData.Lebar = Number(data.mh_lebar) || props.formData.Lebar;
+        props.formData.KetUkuran = data.mh_ukuran || props.formData.KetUkuran;
+        props.formData.Gramasi = data.mh_gramasi || props.formData.Gramasi;
+      }
       props.formData.Finishing = data.mh_finishing || props.formData.Finishing;
       props.formData.Keterangan = data.mh_ket || props.formData.Keterangan;
 
@@ -1137,7 +1159,7 @@ const setSetoranPembayaran = (v: any) => {
           />
         </div>
 
-        <div class="f-row">
+        <div class="f-row" v-if="!isDivisiSpanduk">
           <label class="f-lbl">Ukuran</label>
           <template v-if="isDivisiSatuAtauLima">
             <v-combobox
@@ -1182,7 +1204,7 @@ const setSetoranPembayaran = (v: any) => {
           <input v-model="formData.KetUkuran" class="f-inp" style="flex: 1" />
         </div>
 
-        <div class="f-row">
+        <div class="f-row" v-if="!isDivisiSpanduk">
           <label class="f-lbl">Gramasi</label>
           <v-combobox
             v-if="isDivisiSatuAtauLima"
@@ -1240,7 +1262,7 @@ const setSetoranPembayaran = (v: any) => {
           />
         </div>
 
-        <div class="f-row">
+        <div class="f-row" v-if="!isDivisiSpanduk">
           <label class="f-lbl"></label>
           <label class="chk-lbl mr-3"
             ><input
@@ -1389,7 +1411,7 @@ const setSetoranPembayaran = (v: any) => {
           />
         </div>
 
-        <div class="f-row">
+        <div class="f-row" v-if="!isDivisiSpanduk">
           <label class="f-lbl">Rencana Size</label>
           <select
             v-model="formData.RencanaSize"

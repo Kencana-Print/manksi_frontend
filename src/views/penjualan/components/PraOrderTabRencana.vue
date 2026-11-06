@@ -28,19 +28,49 @@ const fileRef = ref<HTMLInputElement | null>(null);
 const divisiOptions = ref<any[]>([]);
 const bahanMaster = ref<any[]>([]);
 interface BahanSpandukItem {
-  Kode: number;
+  Kode: string;
   Nama: string;
   Satuan: string;
+  Konstruksi?: string | null;
+  Panjang?: number | string | null;
+  Lebar?: number | string | null;
 }
 const bahanSpandukMaster = ref<BahanSpandukItem[]>([]);
 type FinishingSpanduk = { Kode: string; Nama: string };
 const finishingSpandukMaster = ref<FinishingSpanduk[]>([]);
 
+// Finishing Spanduk boleh lebih dari satu; disimpan sebagai teks "A, B"
+const pecahFinishing = (v: unknown): string[] =>
+  String(v ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+const finishingTerpilih = computed<string[]>({
+  get: () => pecahFinishing(props.formData.Finishing),
+  set: (v) => {
+    // urutan mengikuti master, bukan urutan klik
+    props.formData.Finishing = finishingSpandukMaster.value
+      .map((f) => f.Nama)
+      .filter((n) => v.includes(n))
+      .join(", ");
+  },
+});
+
 // Data lama Spanduk berisi teks bebas yang tidak ada di daftar
 const finishingLama = computed(() => {
-  const v = String(props.formData.Finishing || "").trim();
-  if (!isDivisiSpanduk.value || !v) return "";
-  return finishingSpandukMaster.value.some((f) => f.Nama === v) ? "" : v;
+  if (!isDivisiSpanduk.value || !finishingSpandukMaster.value.length) return "";
+  return finishingTerpilih.value
+    .filter((n) => !finishingSpandukMaster.value.some((f) => f.Nama === n))
+    .join(", ");
+});
+
+// Peringatan lunak (tidak memblokir): finishing lebih banyak dari jumlah motif
+const finishingMelebihiMotif = computed(() => {
+  const motif = Number(props.formData.JmlDesain) || 0;
+  return (
+    isDivisiSpanduk.value && motif > 0 && finishingTerpilih.value.length > motif
+  );
 });
 const selectedBahanToAdd = ref("");
 const previewFile = ref<{ name: string; url: string } | null>(null);
@@ -70,11 +100,22 @@ const isDivisiGarmen = computed(() => String(props.formData.Divisi) === "4");
 const isDivisiSpanduk = computed(() => String(props.formData.Divisi) === "1");
 
 // Judul memuat kode: master Spanduk punya nama kembar dengan kode berbeda
+const detailBahan = (b: BahanSpandukItem) => {
+  const p = Number(b.Panjang) || 0;
+  const l = Number(b.Lebar) || 0;
+  return [b.Konstruksi, p > 0 && l > 0 ? `${p} x ${l}` : ""]
+    .filter(Boolean)
+    .join(", ");
+};
+
 const bahanSpandukOptions = computed(() => {
-  const opts = bahanSpandukMaster.value.map((b) => ({
-    value: b.Kode,
-    title: `${b.Kode} - ${b.Nama}${b.Satuan ? ` (${b.Satuan})` : ""}`,
-  }));
+  const opts = bahanSpandukMaster.value.map((b) => {
+    const d = detailBahan(b);
+    return {
+      value: b.Kode,
+      title: `${b.Kode} - ${b.Nama}${d ? ` [${d}]` : ""}${b.Satuan ? ` (${b.Satuan})` : ""}`,
+    };
+  });
   // Pra Order lama dengan bahan yang kini nonaktif tetap terbaca namanya
   const kode = props.formData.BrgKode;
   if (kode && !opts.some((o) => o.value === kode)) {
@@ -85,6 +126,26 @@ const bahanSpandukOptions = computed(() => {
   }
   return opts;
 });
+
+const kebutuhanBahan = computed(() => {
+  const p = Number(props.formData.Panjang) || 0;
+  const q = Number(props.formData.QtyRencana) || 0;
+  return Math.round(p * q * 1000) / 1000;
+});
+
+const kebutuhanBahanText = computed(() =>
+  kebutuhanBahan.value > 0
+    ? new Intl.NumberFormat("id-ID", { maximumFractionDigits: 3 }).format(
+        kebutuhanBahan.value,
+      )
+    : "—",
+);
+
+const satuanBahanTerpilih = computed(
+  () =>
+    bahanSpandukMaster.value.find((b) => b.Kode === props.formData.BrgKode)
+      ?.Satuan || "",
+);
 
 const statusBahanLabel = (s: string) => (s ? s : "MENUNGGU KONFIRMASI");
 
@@ -99,7 +160,6 @@ watch(
     }
     if (String(newVal) !== "1") {
       props.formData.BrgKode = null;
-      props.formData.SumberBahan = "";
       props.formData.Panjang = 0;
       props.formData.Lebar = 0;
       props.formData.JmlDesain = null;
@@ -466,7 +526,7 @@ const openPreview = (url: string) => {
             <span class="tp-unit">pcs</span>
             <template v-if="isDivisiSpanduk">
               <label class="tp-lbl" style="width: 90px; margin-left: 20px"
-                >Jumlah Desain</label
+                >Jumlah Motif</label
               >
               <input
                 :value="formData.JmlDesain ?? ''"
@@ -477,9 +537,90 @@ const openPreview = (url: string) => {
                 v-select-on-focus
                 @input="onJmlDesain"
               />
-              <span class="tp-unit">desain</span>
+              <span class="tp-unit">motif</span>
             </template>
           </div>
+
+          <!-- Spanduk: urutan mengikuti Sales Order (ukuran, bahan, deadline) -->
+          <template v-if="isDivisiSpanduk">
+            <div class="tp-row">
+              <label class="tp-lbl"
+                >Ukuran (P x L) <b style="color: #e53935">*</b></label
+              >
+              <input
+                v-model.number="formData.Panjang"
+                type="number"
+                min="0"
+                step="any"
+                class="tp-inp-field tp-num"
+                style="width: 90px"
+                v-select-on-focus
+              />
+              <span class="tp-unit">x</span>
+              <input
+                v-model.number="formData.Lebar"
+                type="number"
+                min="0"
+                step="any"
+                class="tp-inp-field tp-num"
+                style="width: 90px"
+                v-select-on-focus
+              />
+              <span class="tp-unit">Mtr</span>
+            </div>
+
+            <div class="tp-row">
+              <label class="tp-lbl"
+                >Kebutuhan Bahan <b style="color: #e53935">*</b></label
+              >
+              <v-autocomplete
+                v-model="formData.BrgKode"
+                :items="bahanSpandukOptions"
+                item-title="title"
+                item-value="value"
+                variant="outlined"
+                density="compact"
+                hide-details
+                clearable
+                placeholder="Ketik kode atau nama bahan baku..."
+                no-data-text="Bahan tidak ditemukan"
+                class="f-inp"
+              />
+            </div>
+
+            <div class="tp-row">
+              <label class="tp-lbl">Qty Kebutuhan Bahan</label>
+              <input
+                :value="kebutuhanBahanText"
+                readonly
+                tabindex="-1"
+                class="tp-inp-field tp-num"
+                style="width: 120px; background: #f0f0f0"
+              />
+              <span class="tp-unit">{{ satuanBahanTerpilih }}</span>
+            </div>
+
+            <div v-if="isEdit" class="tp-row">
+              <label class="tp-lbl">Konfirmasi Bahan</label>
+              <span
+                class="status-chip"
+                :class="{
+                  'st-sanggup': formData.BahanStatus === 'READY',
+                  'st-tidak': formData.BahanStatus === 'TIDAK READY',
+                  'st-pending': !formData.BahanStatus,
+                }"
+              >
+                {{ statusBahanLabel(formData.BahanStatus) }}
+              </span>
+            </div>
+            <div
+              class="tp-img-hint"
+              style="margin-left: 136px; margin-bottom: 6px"
+            >
+              Diisi Marketing, dikonfirmasi PPIC/Produksi Spanduk. Mengubah
+              bahan akan mengulang konfirmasi.
+            </div>
+          </template>
 
           <div v-if="!isDivisiSpanduk" class="tp-row">
             <label class="tp-lbl">Finishing</label>
@@ -493,40 +634,6 @@ const openPreview = (url: string) => {
             />
           </div>
 
-          <template v-else>
-            <div class="tp-row" style="align-items: flex-start">
-              <label class="tp-lbl" style="padding-top: 4px">Finishing</label>
-              <v-radio-group
-                v-model="formData.Finishing"
-                inline
-                density="compact"
-                hide-details
-              >
-                <v-radio
-                  v-for="f in finishingSpandukMaster"
-                  :key="f.Kode"
-                  :label="f.Nama"
-                  :value="f.Nama"
-                />
-              </v-radio-group>
-              <v-btn
-                v-if="formData.Finishing"
-                size="x-small"
-                variant="text"
-                @click="formData.Finishing = ''"
-              >
-                Hapus
-              </v-btn>
-            </div>
-            <div v-if="finishingLama" class="tp-row" style="margin-top: -2px">
-              <label class="tp-lbl"></label>
-              <span style="font-size: 10px; color: #f57f17">
-                Nilai lama: "{{ finishingLama }}". Pilih salah satu untuk
-                menggantinya.
-              </span>
-            </div>
-          </template>
-
           <div class="tp-row tp-row-area" style="align-items: flex-start">
             <label class="tp-lbl" style="padding-top: 6px">Ket. Bahan</label>
             <v-textarea
@@ -538,6 +645,52 @@ const openPreview = (url: string) => {
               class="f-inp tp-textarea-2row"
               placeholder="mis. Leher pakai rip jadi, tanpa manset lengan"
             />
+          </div>
+
+          <!-- Spanduk: finishing boleh lebih dari satu (sesuai jumlah motif) -->
+          <div
+            v-if="isDivisiSpanduk"
+            class="tp-row"
+            style="align-items: flex-start"
+          >
+            <label class="tp-lbl" style="padding-top: 4px">Finishing</label>
+            <div class="fin-list">
+              <v-checkbox
+                v-for="f in finishingSpandukMaster"
+                :key="f.Kode"
+                v-model="finishingTerpilih"
+                :value="f.Nama"
+                :label="f.Nama"
+                density="compact"
+                hide-details
+              />
+            </div>
+            <v-btn
+              v-if="formData.Finishing"
+              size="x-small"
+              variant="text"
+              @click="formData.Finishing = ''"
+            >
+              Hapus
+            </v-btn>
+          </div>
+          <div v-if="finishingLama" class="tp-row" style="margin-top: -2px">
+            <label class="tp-lbl"></label>
+            <span class="tp-hint-warn">
+              Nilai lama: "{{ finishingLama }}". Pilih dari daftar untuk
+              menggantinya.
+            </span>
+          </div>
+          <div
+            v-if="finishingMelebihiMotif"
+            class="tp-row"
+            style="margin-top: -2px"
+          >
+            <label class="tp-lbl"></label>
+            <span class="tp-hint-warn">
+              Finishing dipilih {{ finishingTerpilih.length }}, melebihi Jumlah
+              Motif ({{ formData.JmlDesain }}).
+            </span>
           </div>
 
           <div class="tp-row">
@@ -581,33 +734,7 @@ const openPreview = (url: string) => {
             />
           </div>
 
-          <div v-if="isDivisiSpanduk" class="tp-row">
-            <label class="tp-lbl"
-              >Ukuran (P x L) <b style="color: #e53935">*</b></label
-            >
-            <input
-              v-model.number="formData.Panjang"
-              type="number"
-              min="0"
-              step="any"
-              class="tp-inp-field tp-num"
-              style="width: 90px"
-              v-select-on-focus
-            />
-            <span class="tp-unit">x</span>
-            <input
-              v-model.number="formData.Lebar"
-              type="number"
-              min="0"
-              step="any"
-              class="tp-inp-field tp-num"
-              style="width: 90px"
-              v-select-on-focus
-            />
-            <span class="tp-unit">Mtr</span>
-          </div>
-
-          <div class="tp-row">
+          <div v-if="!isDivisiSpanduk" class="tp-row">
             <label class="tp-lbl">Ket. Ukuran</label>
             <v-text-field
               v-model="formData.UkuranBebas"
@@ -616,11 +743,7 @@ const openPreview = (url: string) => {
               hide-details
               maxlength="100"
               class="f-inp"
-              :placeholder="
-                isDivisiSpanduk
-                  ? 'mis. 37 x 10 x 45 cm'
-                  : 'mis. S-10, M-20, L-15 atau keterangan ukuran lainnya'
-              "
+              placeholder="mis. S-10, M-20, L-15 atau keterangan ukuran lainnya"
             />
           </div>
 
@@ -675,59 +798,6 @@ const openPreview = (url: string) => {
               </div>
             </div>
           </div>
-
-          <!-- Kebutuhan Bahan (Spanduk) -->
-          <template v-if="isDivisiSpanduk">
-            <div class="tp-row" style="margin-top: 8px">
-              <label class="tp-lbl"
-                >Kebutuhan Bahan <b style="color: #e53935">*</b></label
-              >
-              <v-autocomplete
-                v-model="formData.BrgKode"
-                :items="bahanSpandukOptions"
-                item-title="title"
-                item-value="value"
-                variant="outlined"
-                density="compact"
-                hide-details
-                clearable
-                placeholder="Ketik kode atau nama bahan baku..."
-                no-data-text="Bahan tidak ditemukan"
-                class="f-inp"
-              />
-            </div>
-            <div class="tp-row">
-              <label class="tp-lbl"
-                >Sumber Bahan <b style="color: #e53935">*</b></label
-              >
-              <v-radio-group
-                v-model="formData.SumberBahan"
-                inline
-                hide-details
-                density="compact"
-              >
-                <v-radio label="Stok Tersedia" value="STOK" />
-                <v-radio label="Melalui Pengajuan" value="PENGAJUAN" />
-              </v-radio-group>
-            </div>
-            <div v-if="isEdit" class="tp-row">
-              <label class="tp-lbl">Konfirmasi Bahan</label>
-              <span
-                class="status-chip"
-                :class="{
-                  'st-sanggup': formData.BahanStatus === 'READY',
-                  'st-tidak': formData.BahanStatus === 'TIDAK READY',
-                  'st-pending': !formData.BahanStatus,
-                }"
-              >
-                {{ statusBahanLabel(formData.BahanStatus) }}
-              </span>
-            </div>
-            <div class="tp-img-hint" style="margin-left: 136px">
-              Diisi Marketing, dikonfirmasi PPIC/Produksi Spanduk. Mengubah
-              bahan atau sumber akan mengulang konfirmasi.
-            </div>
-          </template>
 
           <!-- Status PPIC (read only, diisi dari BrowseView) -->
           <div v-if="isEdit" class="tp-row" style="margin-top: 8px">
@@ -1247,6 +1317,20 @@ const openPreview = (url: string) => {
   font-size: 10px;
   color: #9e9e9e;
   margin-top: 3px;
+}
+.fin-list {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 14px;
+}
+.fin-list :deep(.v-label) {
+  font-size: 12px;
+}
+.tp-hint-warn {
+  font-size: 10px;
+  color: #f57f17;
 }
 
 .tp-status-badge {

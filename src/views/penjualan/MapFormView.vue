@@ -67,6 +67,11 @@ const duplikatList = ref<
   Array<{ mspk_nomor: string; tgl_formatted: string; mspk_jo_kode: string }>
 >([]);
 const showDuplikatDialog = ref(false);
+const todayLocal = () => {
+  const d = new Date();
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+};
 
 const initialData = {
   Nomor: "",
@@ -80,7 +85,7 @@ const initialData = {
   StatusKerja: "Normal",
   PerushKode: "",
   NamaPerusahaan: "",
-  Tanggal: new Date().toISOString().substring(0, 10),
+  Tanggal: todayLocal(),
   Created: "",
   TglPO: "",
   NomorPO: "",
@@ -116,7 +121,7 @@ const initialData = {
   DesignBaru: "N",
   Cab2: "",
   Workshop2: "",
-  DateLine: new Date().toISOString().substring(0, 10),
+  DateLine: todayLocal(),
   RencanaOrder: 0,
   HargaJual: 0,
   HargaRiil: 0,

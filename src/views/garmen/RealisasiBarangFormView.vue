@@ -7,8 +7,13 @@ import { useForm } from "@/composables/useForm";
 import { useAuthStore } from "@/stores/authStore";
 import BaseForm from "@/components/BaseForm.vue";
 import { realisasiBarangFormService } from "@/services/garmen/realisasiBarangFormService";
-// Import Tabler Icon
-import { IconListCheck, IconSearch, IconTrash } from "@tabler/icons-vue";
+import {
+  IconListCheck,
+  IconListDetails,
+  IconPlus,
+  IconSearch,
+  IconTrash,
+} from "@tabler/icons-vue";
 
 // Modal Pencarian
 import PermintaanBarangSearchModal from "@/components/lookups/PermintaanBarangSearchModal.vue";
@@ -164,6 +169,10 @@ onMounted(() => {
 
 const isAccesories = computed(() => formData.value.jenis === "ACCESORIES");
 const isSparepart = computed(() => formData.value.jenis === "SPAREPART");
+const CABANG_TANPA_SPK = ["P02", "P03", "P05"];
+const tanpaSpk = computed(() =>
+  CABANG_TANPA_SPK.includes(formData.value.cabMinta || formData.value.cabang),
+);
 
 // --- HANDLER PENCARIAN PERMINTAAN ---
 const openMintaModal = () => {
@@ -446,7 +455,9 @@ const onBarangSelected = (item: any) => {
       </div>
 
       <div class="desktop-form-section">
-        <div class="tm-sec-title">INFO PERMINTAAN & SPK</div>
+        <div class="tm-sec-title">
+          {{ tanpaSpk ? "INFO PERMINTAAN" : "INFO PERMINTAAN & SPK" }}
+        </div>
 
         <div class="f-row mb-1">
           <label class="f-lbl">Peminta</label>
@@ -458,7 +469,7 @@ const onBarangSelected = (item: any) => {
           <input :value="formData.approve" readonly class="f-inp f-ro w-100" />
         </div>
 
-        <template v-if="isAccesories">
+        <template v-if="isAccesories && !tanpaSpk">
           <div class="f-row mb-1">
             <label class="f-lbl">SPK</label>
             <input :value="formData.spk" readonly class="f-inp f-ro w-100" />

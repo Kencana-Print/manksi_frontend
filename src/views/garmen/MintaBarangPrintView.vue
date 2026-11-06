@@ -96,7 +96,11 @@ onMounted(() => {
           <td class="lbl">Tanggal</td>
           <td class="sep">:</td>
           <td class="val">{{ formatTglLong(header.min_tanggal) }}</td>
-          <td class="lbl2">SPK</td>
+          <template v-if="header.min_spk_nomor">
+            <td class="lbl2">SPK</td>
+            <td class="sep">:</td>
+            <td class="val">{{ header.min_spk_nomor }}</td>
+          </template>
           <td class="sep">:</td>
           <td class="val">{{ header.min_spk_nomor || "-" }}</td>
         </tr>

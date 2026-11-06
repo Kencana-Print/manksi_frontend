@@ -18,6 +18,7 @@ export interface LhkDesignRow {
   Tanggal_LHK: string | null;
   Status_Terakhir: string | null;
   User_Create: string | null;
+  Nomor_LHK: string | null;
 }
 
 // Kolom angka di tabel lama bisa datang sebagai angka atau string

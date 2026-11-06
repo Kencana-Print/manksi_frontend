@@ -145,14 +145,18 @@ const statusSaja = computed(() => isEdit.value && !formData.value.bisaUbah);
 
 // ─── Trailing row: selalu ada 1 baris kosong di bawah ─────
 watch(
-  () => formData.value.detail,
-  (rows) => {
+  () => {
+    const rows = formData.value.detail;
+    return [rows.length, rows[rows.length - 1]?.hasil?.trim() ?? ""] as const;
+  },
+  () => {
     if (statusSaja.value) return;
+    const rows = formData.value.detail;
     if (!rows.length || rows[rows.length - 1].hasil.trim()) {
       rows.push(barisBaru());
     }
   },
-  { deep: true, immediate: true },
+  { immediate: true },
 );
 
 const tambahBaris = () => {
@@ -246,7 +250,12 @@ const onHasilInput = (e: Event) => autoGrow(e.target as HTMLTextAreaElement);
 // Directive lokal: hitung ulang saat mount dan saat nilai berubah dari luar (mis. data dimuat)
 const vAutoGrow = {
   mounted: (el: HTMLTextAreaElement) => autoGrow(el),
-  updated: (el: HTMLTextAreaElement) => autoGrow(el),
+  updated: (
+    el: HTMLTextAreaElement,
+    binding: { value: string; oldValue: string },
+  ) => {
+    if (binding.value !== binding.oldValue) autoGrow(el);
+  },
 };
 </script>
 
@@ -386,11 +395,10 @@ const vAutoGrow = {
                 <td>
                   <textarea
                     v-model="r.hasil"
-                    v-auto-grow
+                    v-auto-grow="r.hasil"
                     class="gi gi-ta"
                     :disabled="statusSaja"
                     rows="1"
-                    @input="onHasilInput"
                   />
                 </td>
                 <td style="padding: 0">
@@ -451,12 +459,11 @@ const vAutoGrow = {
                 <td>
                   <textarea
                     v-model="r.catatan"
-                    v-auto-grow
+                    v-auto-grow="r.catatan"
                     class="gi gi-ta"
                     :disabled="statusSaja"
                     rows="1"
                     maxlength="500"
-                    @input="onHasilInput"
                   />
                 </td>
                 <td class="tc">
