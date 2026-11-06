@@ -23,6 +23,18 @@ const editId = computed(() =>
 );
 const isEdit = computed(() => !!editKode.value && !!editId.value);
 
+const onNoVoucherInput = (e: Event) => {
+  const target = e.target as HTMLInputElement;
+  const start = target.selectionStart;
+  const end = target.selectionEnd;
+  const upper = (target.value || "").toUpperCase();
+  formData.value.no_voucher = upper;
+  target.value = upper;
+  if (start !== null && end !== null) {
+    target.setSelectionRange(start, end);
+  }
+};
+
 const todayStr = () => {
   const d = new Date();
   const y = d.getFullYear();
@@ -141,7 +153,7 @@ const {
 
     const payload: VoucherFormData = {
       ...data,
-      no_voucher: isEdit.value ? (data.no_voucher || "").toUpperCase() : "",
+      no_voucher: (data.no_voucher || "").trim().toUpperCase(),
       id: isEdit.value && data.id ? Number(data.id) : null,
       tanggal: data.tanggal || todayStr(),
       id_spbu: data.id_spbu ? Number(data.id_spbu) : null,
@@ -176,6 +188,10 @@ const {
 
 // ── Validasi Sesuai Delphi 7 ───────────────────────────────────────────
 const onValidate = () => {
+  if (!formData.value.no_voucher?.trim()) {
+    toast.warning("Nomor Bon harus di isi");
+    return;
+  }
   if (!formData.value.id_spbu) {
     toast.warning("SPBU harus di isi");
     return;
@@ -292,15 +308,18 @@ onMounted(async () => {
 
         <!-- Form Inputs (AdvPanel1 Sesuai Layout Delphi 7) -->
         <div class="delphi-form-content">
-          <!-- 1. Nomor Bon (edtKode + lblid: tercipta saat simpan untuk input baru) -->
+          <!-- 1. Nomor Bon (edtKode + lblid: bisa di-input manual saat input baru) -->
           <div class="delphi-row">
             <label class="delphi-lbl">Nomor Bon</label>
             <div class="delphi-val">
               <input
                 type="text"
-                :value="isEdit ? formData.no_voucher : '[OTOMATIS SAAT SIMPAN]'"
-                :class="['delphi-ctrl', isEdit ? 'ctrl-bon' : 'ctrl-bon-auto']"
-                disabled
+                v-model="formData.no_voucher"
+                @input="onNoVoucherInput"
+                class="delphi-ctrl ctrl-bon"
+                :disabled="isEdit"
+                maxlength="20"
+                placeholder="NOMOR BON..."
               />
               <span class="delphi-id-badge ml-2" v-if="isEdit && formData.id">
                 ID: {{ formData.id }}
@@ -522,15 +541,8 @@ onMounted(async () => {
 
 /* ── Ukuran Kontrol Spesifik Sesuai Delphi 7 ── */
 .ctrl-bon {
-  width: 85px;
+  width: 155px;
   font-weight: bold;
-}
-
-.ctrl-bon-auto {
-  width: 175px;
-  font-style: italic;
-  font-size: 12px;
-  color: #555555 !important;
 }
 
 .ctrl-date {
