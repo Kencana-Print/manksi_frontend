@@ -50,6 +50,7 @@ const headers = [
   { title: "Customer", key: "Customer", minWidth: "220px" },
   { title: "Perush.", key: "Perusahaan", width: "80px", align: "center" },
   { title: "Tgl Order", key: "TglOrder", width: "100px", align: "center" },
+  { title: "Qty Order", key: "QtyOrder", width: "100px", align: "right" },
   { title: "Qty Kirim", key: "QtyKirim", width: "100px", align: "right" },
   { title: "Qty Invoice", key: "QtyInvoice", width: "100px", align: "right" },
   {
@@ -98,7 +99,7 @@ const umurClass = (hari: number) =>
   hari > 30 ? "umur-merah" : hari > 14 ? "umur-oranye" : "";
 
 // ── Summary footer ──
-const numericKeys = ["QtyKirim", "QtyInvoice", "QtyBelumDitagih"];
+const numericKeys = ["QtyOrder", "QtyKirim", "QtyInvoice", "QtyBelumDitagih"];
 const summaryFormatters: Record<string, (rows: any[]) => string> = {};
 for (const key of numericKeys) {
   summaryFormatters[key] = (rows: any[]) =>
@@ -210,6 +211,7 @@ const jumlahBaris = computed(() => (items.value ?? []).length);
     <template #item.TglKirimTerakhir="{ item }">{{
       fmtDate(item.TglKirimTerakhir)
     }}</template>
+    <template #item.QtyOrder="{ item }">{{ fmtNum(item.QtyOrder) }}</template>
 
     <template #item.QtyKirim="{ item }">{{ fmtNum(item.QtyKirim) }}</template>
     <template #item.QtyInvoice="{ item }">{{
