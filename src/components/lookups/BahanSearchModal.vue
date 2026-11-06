@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from "vue";
+import { ref, watch, computed } from "vue";
 import api from "@/services/api";
 import { IconPuzzle, IconX, IconSearch } from "@tabler/icons-vue";
 
@@ -7,6 +7,9 @@ interface Bahan {
   Kode: string;
   Nama: string;
   Satuan: string;
+  Konstruksi?: string;
+  Panjang?: number | string | null;
+  Lebar?: number | string | null;
 }
 
 interface RowClickEvent<T> {
@@ -20,6 +23,7 @@ const props = defineProps<{
   isBordir?: boolean;
   mode?: "komponen" | "all";
   mkbFilter?: string;
+  tipe?: "SPANDUK";
 }>();
 const emit = defineEmits(["update:modelValue", "selected"]);
 
@@ -31,10 +35,31 @@ const itemsPerPage = ref(50);
 const totalItems = ref(0);
 let requestSeq = 0;
 
-const headers = [
+const adaSpanduk = computed(() =>
+  items.value.some((i) => i.Kode.toUpperCase().startsWith("SB")),
+);
+
+const headers = computed(() => [
   { title: "KODE", key: "Kode", width: "120px" },
   { title: "NAMA KOMPONEN", key: "Nama" },
-];
+  ...(adaSpanduk.value
+    ? [
+        { title: "KONSTRUKSI", key: "Konstruksi", width: "90px" },
+        {
+          title: "PANJANG",
+          key: "Panjang",
+          width: "70px",
+          align: "end" as const,
+        },
+        { title: "LEBAR", key: "Lebar", width: "70px", align: "end" as const },
+      ]
+    : []),
+]);
+
+const fmtUkuran = (v: number | string | null | undefined) =>
+  v === null || v === undefined || v === ""
+    ? ""
+    : Number(v).toLocaleString("id-ID", { maximumFractionDigits: 2 });
 
 let searchTimeout: ReturnType<typeof setTimeout> | null = null;
 
@@ -50,6 +75,7 @@ const fetchData = async () => {
         isBordir: props.isBordir,
         mode: props.mode,
         mkb: props.mkbFilter,
+        tipe: props.tipe,
       },
     });
     if (mySeq !== requestSeq) return;
@@ -68,7 +94,7 @@ const onSearchInput = () => {
   if (searchTimeout) clearTimeout(searchTimeout);
   searchTimeout = setTimeout(() => {
     fetchData();
-  }, 500);
+  }, 300);
 };
 
 const onOptionsUpdate = (options: any) => {
@@ -161,7 +187,10 @@ const selectItem = (item: any) => {
           hover
           class="lookup-table border rounded elevation-1"
           @click:row="onRowClick"
-        ></v-data-table-server>
+        >
+          <template #item.Panjang="{ value }">{{ fmtUkuran(value) }}</template>
+          <template #item.Lebar="{ value }">{{ fmtUkuran(value) }}</template>
+        </v-data-table-server>
       </v-card-text>
     </v-card>
   </v-dialog>

@@ -36,6 +36,7 @@ interface RealisasiFormData {
   pin_dipakai?: string;
   promin_aktif?: string;
   alasanBedaBahan: string;
+  spanduk: boolean;
 }
 
 const route = useRoute();
@@ -77,6 +78,7 @@ const initialData: RealisasiFormData = {
   details: [] as any[],
   promin_aktif: "Y",
   alasanBedaBahan: "",
+  spanduk: false,
 };
 
 const {
@@ -160,7 +162,7 @@ const {
       mkb: h.promin_mkb, // <-- MAPPING MKB
       jumlah: h.promin_jumlah || 0, // <-- MAPPING JUMLAH
       gudangAsal: h.promin_gdg_asal,
-      gudangAsalNama: getNamaGudangAsal(h.promin_gdg_asal),
+      gudangAsalNama: h.gdg_asal_nama || "",
       gudangProduksi: h.promin_gdgp_kode,
       gudangProduksiNama: getNamaGudangProduksi(h.promin_gdgp_kode),
       isUtama: h.isstatus,
@@ -170,6 +172,7 @@ const {
       pin_dipakai: h.pin_dipakai,
       promin_aktif: h.promin_aktif ?? "Y",
       alasanBedaBahan: h.promin_alasan_beda || "",
+      spanduk: Boolean(h.spanduk),
     };
   },
   submitApi: async (data: RealisasiFormData): Promise<any> => {
@@ -220,6 +223,7 @@ const loadPermintaanData = async (nomor: string) => {
   formData.value.jumlahSpk = h.jumlahSpk;
   formData.value.mkb = h.mkb_nomor || h.mkb || "";
   formData.value.jumlah = 0;
+  formData.value.spanduk = Boolean(h.spanduk);
   formData.value.gudangAsal = h.gudangBahanKode;
   formData.value.gudangAsalNama = h.gudangBahanNama;
   formData.value.gudangProduksi = h.gudangProduksiKode;
@@ -288,14 +292,6 @@ watch(
   },
   { immediate: true },
 );
-
-// Fungsi Helper untuk Nama Gudang
-const getNamaGudangAsal = (cab: string) => {
-  if (cab === "P01") return "GUDANG BAHAN BAKU SRANDAKAN";
-  if (cab === "P04") return "GUDANG BAHAN BAKU JERON";
-  if (cab === "P05") return "GUDANG BAHAN BAKU P5";
-  return "GUDANG BAHAN BAKU";
-};
 
 const getNamaGudangProduksi = (kode: string) => {
   if (kode === "GP015") return "GD POTONG P1";
@@ -503,13 +499,15 @@ const validateBeforeSave = () => {
   if (!formData.value.gudangAsal) {
     return toast.warning("Gudang asal tidak boleh kosong.");
   }
-  if (!formData.value.gudangProduksi) {
-    return toast.warning("Gudang Produksi tidak boleh kosong.");
-  }
-  if (formData.value.gudangAsal === formData.value.gudangProduksi) {
-    return toast.warning(
-      "Gudang Produksi tidak boleh sama dengan gudang asal.",
-    );
+  if (!formData.value.spanduk) {
+    if (!formData.value.gudangProduksi) {
+      return toast.warning("Gudang Produksi tidak boleh kosong.");
+    }
+    if (formData.value.gudangAsal === formData.value.gudangProduksi) {
+      return toast.warning(
+        "Gudang Produksi tidak boleh sama dengan gudang asal.",
+      );
+    }
   }
   if (!formData.value.details || formData.value.details.length === 0) {
     return toast.warning("Detail harus diisi.");
@@ -728,6 +726,7 @@ onMounted(async () => {
           class="mb-2 bg-grey-lighten-4"
         />
         <v-text-field
+          v-if="!formData.spanduk"
           :model-value="
             formData.gudangProduksi
               ? `${formData.gudangProduksi} - ${formData.gudangProduksiNama}`
@@ -802,7 +801,7 @@ onMounted(async () => {
                 <th width="140">Barcode</th>
                 <th width="110">Kode</th>
                 <th>Nama Bahan</th>
-                <th width="70">Setting</th>
+                <th v-if="!formData.spanduk" width="70">Setting</th>
                 <th width="60">Satuan</th>
                 <th width="80">Stok</th>
                 <th width="90" class="bg-yellow-darken-2">Jumlah</th>
@@ -835,7 +834,10 @@ onMounted(async () => {
                   >
                 </td>
                 <td class="bg-grey-lighten-4">{{ item.nama }}</td>
-                <td class="text-center bg-grey-lighten-4">
+                <td
+                  v-if="!formData.spanduk"
+                  class="text-center bg-grey-lighten-4"
+                >
                   {{ item.setting }}
                 </td>
                 <td class="text-center bg-grey-lighten-4">{{ item.satuan }}</td>
@@ -978,7 +980,10 @@ onMounted(async () => {
                 </td>
               </tr>
               <tr v-if="formData.details.length === 0">
-                <td colspan="15" class="text-center text-grey py-8 font-italic">
+                <td
+                  :colspan="formData.spanduk ? 14 : 15"
+                  class="text-center text-grey py-8 font-italic"
+                >
                   Pilih No. Permintaan untuk memuat daftar bahan.
                 </td>
               </tr>

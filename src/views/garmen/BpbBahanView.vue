@@ -50,10 +50,17 @@ const toLocalDateStr = (date: Date) => {
 const firstDay = toLocalDateStr(new Date(d.getFullYear(), d.getMonth(), 1));
 const today = toLocalDateStr(d);
 
+// Gudang default = gudang bahan milik user (P02 = WH006).
+// Daftar selalu memuat gudang user supaya pilihan awal tidak kosong.
+const gudangUser = authStore.user?.gudang?.bahan?.kode || "GB001";
+const gudangOptions = [
+  ...new Set(["GB001", "GC001", "GB002", "WH006", gudangUser]),
+];
+
 const filterState = ref({
   dtAwal: firstDay,
   dtAkhir: today,
-  gudang: "GB001",
+  gudang: gudangUser,
   search: "",
 });
 
@@ -323,6 +330,10 @@ const submitPin = async () => {
 
 // Formatting helpers
 const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
+
+// BPB dari PO jenis 5 (Spanduk): tanpa gramasi, warna, setting
+const isSpanduk = (item: { PoJenis?: number | string }) =>
+  Number(item.PoJenis) === 5;
 </script>
 
 <template>
@@ -354,9 +365,9 @@ const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
       <div class="f-group">
         <span class="f-label">Gudang</span>
         <select v-model="filterState.gudang" class="f-date font-weight-bold">
-          <option value="GB001">GB001</option>
-          <option value="GC001">GC001</option>
-          <option value="GB002">GB002</option>
+          <option v-for="g in gudangOptions" :key="g" :value="g">
+            {{ g }}
+          </option>
         </select>
       </div>
 
@@ -436,9 +447,13 @@ const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
                 <th width="80" class="text-center">Satuan</th>
                 <th width="100" class="tr">Jumlah</th>
                 <th width="80" class="tr">Roll</th>
-                <th width="100" class="text-center">Gramasi</th>
-                <th width="120">Warna</th>
-                <th width="100" class="text-center">Setting</th>
+                <th v-if="!isSpanduk(item)" width="100" class="text-center">
+                  Gramasi
+                </th>
+                <th v-if="!isSpanduk(item)" width="120">Warna</th>
+                <th v-if="!isSpanduk(item)" width="100" class="text-center">
+                  Setting
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -450,9 +465,13 @@ const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
                   {{ numFmt(d.Jumlah) }}
                 </td>
                 <td class="tr">{{ numFmt(d.Roll) }}</td>
-                <td class="text-center">{{ d.Gramasi || "-" }}</td>
-                <td>{{ d.Warna || "-" }}</td>
-                <td class="text-center">{{ d.Setting || "-" }}</td>
+                <td v-if="!isSpanduk(item)" class="text-center">
+                  {{ d.Gramasi || "-" }}
+                </td>
+                <td v-if="!isSpanduk(item)">{{ d.Warna || "-" }}</td>
+                <td v-if="!isSpanduk(item)" class="text-center">
+                  {{ d.Setting || "-" }}
+                </td>
               </tr>
               <tr
                 v-if="
@@ -460,7 +479,10 @@ const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
                   detailCache[item.Nomor].length === 0
                 "
               >
-                <td colspan="8" class="text-center text-grey py-3 font-italic">
+                <td
+                  :colspan="isSpanduk(item) ? 5 : 8"
+                  class="text-center text-grey py-3 font-italic"
+                >
                   Detail BPB tidak ditemukan.
                 </td>
               </tr>
@@ -521,7 +543,7 @@ const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
           Dari PO langsung
         </v-btn>
         <div class="text-caption text-grey-darken-1 mt-1">
-          Hanya untuk PO lama yang belum memiliki QC Bahan.
+          Untuk PO yang belum memiliki QC Bahan, termasuk PO Spanduk.
         </div>
       </v-card-text>
       <v-card-actions class="pa-3 border-t">

@@ -37,6 +37,8 @@ const isEditMode = computed(() => !!route.params.nomor);
 const isPo = ref(true);
 // BPB dari QC memakai type=QC. isPo tetap true (PO terikat, grid terkunci)
 const isQc = ref(route.query.type === "QC");
+// PO jenis 5 (Spanduk): tanpa gramasi, warna, setting, dan No. MKB
+const isSpanduk = ref(false);
 
 const formatDateLocal = (value?: string | Date) => {
   if (!value) return "";
@@ -130,6 +132,7 @@ const showPrintConfirm = ref(false);
 const showPrintBarcodeConfirm = ref(false);
 const nomorTerakhir = ref("");
 
+const gudangBahanUser = authStore.user?.gudang?.bahan;
 // ── Default data ──
 const defaultData = {
   header: {
@@ -141,8 +144,8 @@ const defaultData = {
     sup_nama: "",
     sup_alamat: "",
     sup_kota: "",
-    bpb_gdg_kode: "GB001",
-    gdg_nama: "GUDANG BAHAN BAKU JERON",
+    bpb_gdg_kode: gudangBahanUser?.kode || "GB001",
+    gdg_nama: gudangBahanUser?.nama || "GUDANG BAHAN BAKU JERON",
     bpb_jatuhtempo: todayLocal,
     no_buat_barcode: "",
   },
@@ -179,6 +182,7 @@ const {
     const noBpb = d.header.bpb_Nomor || d.header.bpb_nomor || "";
     isPo.value = !!noPo.trim();
     isQc.value = !!d.dariQc;
+    isSpanduk.value = Number(d.header.po_jenis) === 5;
     return {
       header: {
         ...d.header,
@@ -235,6 +239,7 @@ const setPo = async (v: any) => {
   await loadPoData();
 };
 interface PoTarikHeader {
+  po_jenis?: number | string;
   sup_kode: string;
   sup_nama: string;
   sup_alamat: string;
@@ -266,6 +271,7 @@ const terapkanDataPo = (
   poDetails: Record<string, unknown>[],
   items: PoTarikItem[],
 ) => {
+  isSpanduk.value = Number(header.po_jenis) === 5;
   formData.value.header.bpb_sup_kode = header.sup_kode;
   formData.value.header.sup_nama = header.sup_nama;
   formData.value.header.sup_alamat = header.sup_alamat;
@@ -310,6 +316,7 @@ const loadPoData = async () => {
   } catch (e: any) {
     toast.error(e.response?.data?.message || "Gagal menarik data PO.");
     formData.value.header.bpb_po_nomor = "";
+    isSpanduk.value = false;
   }
 };
 
@@ -469,12 +476,21 @@ const setItemFieldRef = (el: any, idx: number, col: string) => {
   if (el) itemFieldRefs.value[`${idx}_${col}`] = el as HTMLInputElement;
 };
 
+// Spanduk tidak punya kolom gramasi, warna, dan setting
+const kolomAktif = computed(() =>
+  isSpanduk.value
+    ? ITEM_EDITABLE_COLS.filter(
+        (c) => !["gramasi", "warna", "setting"].includes(c),
+      )
+    : [...ITEM_EDITABLE_COLS],
+);
+
 const onItemFieldEnter = async (
   idx: number,
   col: (typeof ITEM_EDITABLE_COLS)[number],
 ) => {
-  const colIndex = ITEM_EDITABLE_COLS.indexOf(col);
-  const nextCol = ITEM_EDITABLE_COLS[colIndex + 1];
+  const colIndex = kolomAktif.value.indexOf(col);
+  const nextCol = kolomAktif.value[colIndex + 1];
   if (!nextCol) return; // sudah kolom terakhir (SPK), diam saja
   await nextTick();
   const next = itemFieldRefs.value[`${idx}_${nextCol}`];
@@ -1156,9 +1172,9 @@ const printBarcodeAll = (): boolean => {
                 <th style="width: 75px" class="tr bg-yellow">Jml METER</th>
                 <th style="width: 80px" class="tr bg-yellow">Terima Skrg</th>
                 <th style="width: 55px" class="tr bg-yellow">Roll</th>
-                <th style="width: 80px">Gramasi</th>
-                <th style="width: 100px">Warna</th>
-                <th style="width: 70px">Setting</th>
+                <th v-if="!isSpanduk" style="width: 80px">Gramasi</th>
+                <th v-if="!isSpanduk" style="width: 100px">Warna</th>
+                <th v-if="!isSpanduk" style="width: 70px">Setting</th>
                 <th style="width: 100px">No. SPK</th>
                 <th style="width: 150px">Nama SPK</th>
                 <th v-if="!isPo" style="width: 32px" class="tc"></th>
@@ -1297,7 +1313,7 @@ const printBarcodeAll = (): boolean => {
                     v-select-on-focus
                   />
                 </td>
-                <td class="p0">
+                <td v-if="!isSpanduk" class="p0">
                   <input
                     v-model="item.gramasi"
                     class="ci"
@@ -1309,7 +1325,7 @@ const printBarcodeAll = (): boolean => {
                     "
                   />
                 </td>
-                <td class="p0">
+                <td v-if="!isSpanduk" class="p0">
                   <input
                     v-model="item.warna"
                     class="ci"
@@ -1321,7 +1337,7 @@ const printBarcodeAll = (): boolean => {
                     "
                   />
                 </td>
-                <td class="p0">
+                <td v-if="!isSpanduk" class="p0">
                   <input
                     v-model="item.setting"
                     class="ci"
@@ -1404,7 +1420,7 @@ const printBarcodeAll = (): boolean => {
                     <th style="width: 90px" class="tr bg-yellow">
                       Terima (Sinkron)
                     </th>
-                    <th style="width: 90px">No. MKB</th>
+                    <th v-if="!isSpanduk" style="width: 90px">No. MKB</th>
                     <th style="width: 90px">No. SPK</th>
                   </tr>
                 </thead>
@@ -1431,7 +1447,7 @@ const printBarcodeAll = (): boolean => {
                         v-select-on-focus
                       />
                     </td>
-                    <td class="px-1">{{ p.mkb }}</td>
+                    <td v-if="!isSpanduk" class="px-1">{{ p.mkb }}</td>
                     <td class="px-1">{{ p.spk }}</td>
                   </tr>
                   <tr v-if="formData.poItems.length === 0">

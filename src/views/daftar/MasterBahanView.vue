@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, computed } from "vue";
 import api from "@/services/api";
 import { useToast } from "vue-toastification";
 import { useBrowse } from "@/composables/useBrowse";
@@ -10,21 +10,6 @@ import BaseBrowse from "@/components/BaseBrowse.vue";
 import MasterBahanFormDialog from "@/components/dialogs/MasterBahanFormDialog.vue";
 
 const toast = useToast();
-
-// 1. Konfigurasi Header
-const headers = [
-  { title: "KODE", key: "Kode", width: "100px", sortable: true },
-  { title: "NAMA", key: "Nama", width: "300px" },
-  { title: "SATUAN", key: "Satuan", width: "70px", align: "center" },
-  { title: "WARNA", key: "Warna", width: "120px" },
-  { title: "GRAMASI", key: "Gramasi", width: "80px" },
-  { title: "SETTING", key: "Setting", width: "70px" },
-  { title: "DEADSTOCK", key: "DeadStock", width: "80px", align: "center" },
-  { title: "BUFFER", key: "Buffer", width: "80px", align: "right" },
-  { title: "STOK", key: "Stok", width: "80px", align: "right" },
-  { title: "SAFETY", key: "Safety", width: "80px", align: "right" },
-  { title: "KETERANGAN", key: "Keterangan", minWidth: "150px" },
-];
 
 // 2. Logic Fetching menggunakan Composable
 const {
@@ -44,6 +29,48 @@ const {
     return response.data.data;
   },
 });
+
+// 1. Konfigurasi Header (kolom mengikuti tipe bahan yang tampil)
+interface BahanRow {
+  Kode: string;
+  Tipe: "GARMEN" | "SPANDUK";
+}
+
+const rows = computed(() => (items.value ?? []) as BahanRow[]);
+const adaSpanduk = computed(() => rows.value.some((r) => r.Tipe === "SPANDUK"));
+const adaGarmen = computed(
+  () => rows.value.some((r) => r.Tipe === "GARMEN") || !adaSpanduk.value,
+);
+
+const headers = computed(() => [
+  { title: "KODE", key: "Kode", width: "100px", sortable: true },
+  { title: "NAMA", key: "Nama", width: "300px" },
+  { title: "SATUAN", key: "Satuan", width: "70px", align: "center" },
+  ...(adaGarmen.value
+    ? [
+        { title: "WARNA", key: "Warna", width: "120px" },
+        { title: "GRAMASI", key: "Gramasi", width: "80px" },
+        { title: "SETTING", key: "Setting", width: "70px" },
+      ]
+    : []),
+  ...(adaSpanduk.value
+    ? [
+        { title: "KONSTRUKSI", key: "Konstruksi", width: "90px" },
+        { title: "PANJANG", key: "Panjang", width: "80px", align: "end" },
+        { title: "LEBAR", key: "Lebar", width: "80px", align: "end" },
+      ]
+    : []),
+  { title: "DEADSTOCK", key: "DeadStock", width: "80px", align: "center" },
+  { title: "BUFFER", key: "Buffer", width: "80px", align: "right" },
+  { title: "STOK", key: "Stok", width: "80px", align: "right" },
+  { title: "SAFETY", key: "Safety", width: "80px", align: "right" },
+  { title: "KETERANGAN", key: "Keterangan", minWidth: "150px" },
+]);
+
+const fmtUkuran = (v: number | string | null | undefined) =>
+  v === null || v === undefined || v === ""
+    ? ""
+    : Number(v).toLocaleString("id-ID", { maximumFractionDigits: 2 });
 
 // 3. Logic Pewarnaan Baris (DeadStock = Merah)
 const rowPropsFn = (data: any) => {
@@ -132,6 +159,9 @@ const handleDelete = async (item: any) => {
         class="mt-0 pt-0 mr-4"
       ></v-checkbox>
     </template>
+
+    <template #item.Panjang="{ value }">{{ fmtUkuran(value) }}</template>
+    <template #item.Lebar="{ value }">{{ fmtUkuran(value) }}</template>
 
     <template #item.DeadStock="{ value }">
       <v-chip

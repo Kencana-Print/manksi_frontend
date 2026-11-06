@@ -1,11 +1,34 @@
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref, computed, onMounted } from "vue";
 import { useRoute } from "vue-router";
 import { mintaBahanFormService } from "@/services/garmen/mintaBahanFormService";
 
 const route = useRoute();
 const data = ref<any>(null);
 const isLoading = ref(true);
+interface DetailCetak {
+  Kode: string;
+}
+const isSpanduk = computed(() =>
+  ((data.value?.details ?? []) as DetailCetak[]).some((d) =>
+    String(d.Kode ?? "")
+      .toUpperCase()
+      .startsWith("SB"),
+  ),
+);
+// Jabatan penerima: spanduk mengikuti Divisi yang dipilih di form (mis. "Helper Produksi P02")
+const jabatanPenerima = computed(() => {
+  if (!isSpanduk.value) return "Helper Cutting";
+  const div = String(data.value?.header?.Divisi ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/(^|\s)\S/g, (c) => c.toUpperCase());
+  return div ? `Helper ${div}` : "Penerima";
+});
+const fmtUkuran = (v: number | string | null | undefined) =>
+  v === null || v === undefined || v === ""
+    ? ""
+    : Number(v).toLocaleString("id-ID", { maximumFractionDigits: 2 });
 
 onMounted(async () => {
   try {
@@ -75,10 +98,15 @@ onMounted(async () => {
             <th width="30">No</th>
             <th width="100">Kode</th>
             <th>Nama</th>
-            <th width="55">Setting</th>
+            <template v-if="isSpanduk">
+              <th width="70">Konstruksi</th>
+              <th width="45" class="tr">Panjang</th>
+              <th width="45" class="tr">Lebar</th>
+            </template>
+            <th v-else width="55">Setting</th>
             <th width="50">Satuan</th>
             <th width="70" class="tr">Jumlah</th>
-            <th width="100">Komponen</th>
+            <th v-if="!isSpanduk" width="100">Komponen</th>
             <th width="120">Keterangan</th>
           </tr>
         </thead>
@@ -87,12 +115,17 @@ onMounted(async () => {
             <td class="tc">{{ Number(i) + 1 }}</td>
             <td>{{ item.Kode }}</td>
             <td>{{ item.Nama }}</td>
-            <td class="tc">{{ item.Setting }}</td>
+            <template v-if="isSpanduk">
+              <td class="tc">{{ item.Konstruksi }}</td>
+              <td class="tr">{{ fmtUkuran(item.Panjang) }}</td>
+              <td class="tr">{{ fmtUkuran(item.Lebar) }}</td>
+            </template>
+            <td v-else class="tc">{{ item.Setting }}</td>
             <td class="tc">{{ item.Satuan }}</td>
             <td class="tr fw">
               {{ Number(item.Jumlah).toLocaleString("id-ID") }}
             </td>
-            <td>{{ item.Komponen }}</td>
+            <td v-if="!isSpanduk">{{ item.Komponen }}</td>
             <td>{{ item.Keterangan }}</td>
           </tr>
         </tbody>
@@ -120,7 +153,7 @@ onMounted(async () => {
         <div class="ttd-box">
           <div class="ttd-title">Diterima,</div>
           <div class="ttd-sign">(........................)</div>
-          <div class="ttd-name">Helper Cutting</div>
+          <div class="ttd-name">{{ jabatanPenerima }}</div>
         </div>
       </div>
     </div>
@@ -151,12 +184,15 @@ onMounted(async () => {
 }
 
 .print-block {
-  height: 140mm; /* Setengah kertas A4 */
+  /* (297mm - 2 x margin 10mm) / 2 = 138.5mm; dibulatkan ke bawah agar tidak melompat halaman */
+  height: 138mm;
   padding: 10mm 15mm;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
   border-bottom: 1px dashed #ccc;
+  break-inside: avoid;
+  page-break-inside: avoid;
 }
 .print-block:last-child {
   border-bottom: none;

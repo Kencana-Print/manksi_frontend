@@ -95,6 +95,12 @@ watch(expandedRows, async (newVal) => {
   }
 });
 
+// Detail yang seluruhnya bahan spanduk (kode SB) tidak punya Setting
+const tanpaSetting = (nomor: string) =>
+  (detailsData.value[nomor] || []).every((d) =>
+    String(d.Kode).startsWith("SB"),
+  );
+
 // --- AKSI STANDAR ---
 const onAdd = () => {
   const sel = selected.value?.[0];
@@ -140,10 +146,14 @@ const onDelete = async (item: any) => {
 const onPrint = () => {
   if (!selected.value.length)
     return toast.warning("Pilih data terlebih dahulu.");
-  const nomor = selected.value[0].Nomor;
-  // Route print bisa disiapkan nanti
+  const sel = selected.value[0];
+  if (sel.RowType === "MINTA") {
+    return toast.warning(
+      "Permintaan ini belum direalisasi, tidak ada yang bisa dicetak.",
+    );
+  }
   window.open(
-    `/garmen/bahan-baku/realisasi-minta/print/${encodeURIComponent(nomor)}`,
+    `/garmen/bahan-baku/realisasi-minta/print/${encodeURIComponent(sel.Nomor)}`,
     "_blank",
   );
 };
@@ -414,7 +424,9 @@ const handleRowProps = (data: any) => {
                 <th style="width: 30px">No</th>
                 <th style="width: 100px; text-align: left">Kode</th>
                 <th style="text-align: left">Nama Bahan</th>
-                <th style="width: 80px">Setting</th>
+                <th v-if="!tanpaSetting(item.Nomor)" style="width: 80px">
+                  Setting
+                </th>
                 <th style="width: 70px">Satuan</th>
                 <th style="width: 90px; text-align: right">Net</th>
                 <th style="width: 90px; text-align: right">Gross</th>
@@ -426,7 +438,9 @@ const handleRowProps = (data: any) => {
                 <td class="text-center">{{ i + 1 }}</td>
                 <td style="font-weight: 600; color: #1565c0">{{ dtl.Kode }}</td>
                 <td>{{ dtl.Nama }}</td>
-                <td class="text-center">{{ dtl.Setting }}</td>
+                <td v-if="!tanpaSetting(item.Nomor)" class="text-center">
+                  {{ dtl.Setting }}
+                </td>
                 <td class="text-center">{{ dtl.Satuan }}</td>
                 <td
                   class="text-right font-weight-bold"

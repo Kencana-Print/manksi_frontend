@@ -5,6 +5,8 @@ import { useToast } from "vue-toastification";
 import {
   userFormService,
   type MenuGridRow,
+  type CabangUserRow,
+  type HrdKaryawan,
 } from "@/services/tools/userFormService";
 import {
   IconUserPlus,
@@ -15,6 +17,7 @@ import {
 } from "@tabler/icons-vue";
 
 import UserSearchModal from "@/components/lookups/UserSearchModal.vue";
+import NikSearchModal from "@/components/lookups/NikSearchModal.vue";
 
 const route = useRoute();
 const router = useRouter();
@@ -26,6 +29,7 @@ const isSaving = ref(false);
 
 const header = ref<UserHeaderState>({
   kode: "",
+  nik: "",
   nama: "",
   password: "",
   divisi: 0,
@@ -41,6 +45,7 @@ const header = ref<UserHeaderState>({
 });
 interface UserHeaderState {
   kode: string;
+  nik: string;
   nama: string;
   password: string;
   divisi: number;
@@ -56,6 +61,72 @@ interface UserHeaderState {
 }
 
 const menuGrid = ref<MenuGridRow[]>([]);
+const cabangList = ref<CabangUserRow[]>([
+  { cabang: "", divisi: 0, utama: true },
+]);
+const hrd = ref<HrdKaryawan | null>(null);
+const showNikModal = ref(false);
+
+const onNikSelected = (item: HrdKaryawan) => {
+  header.value.nik = item.nik;
+  hrd.value = item;
+  const lain = (item.userKode ?? "")
+    .split(",")
+    .map((k) => k.trim())
+    .filter((k) => k && k.toUpperCase() !== header.value.kode.toUpperCase());
+  if (lain.length > 0) {
+    toast.info(`NIK ini juga dipakai akun: ${lain.join(", ")}.`);
+  }
+  // User baru: bila cabang masih kosong dan HRD punya satu padanan, isi otomatis
+  if (
+    item.cabangHrd.length === 1 &&
+    cabangList.value.length === 1 &&
+    !cabangList.value[0].cabang
+  ) {
+    cabangList.value[0].cabang = item.cabangHrd[0];
+  }
+};
+const kosongkanNik = () => {
+  header.value.nik = "";
+  hrd.value = null;
+};
+const cabangSesuai = computed(() => {
+  const h = hrd.value;
+  if (!h || h.cabangHrd.length === 0) return true;
+  return cabangList.value.some((c) => h.cabangHrd.includes(c.cabang));
+});
+const tambahCabangHrd = () => {
+  const h = hrd.value;
+  if (!h || h.cabangHrd.length !== 1) return;
+  const cab = h.cabangHrd[0];
+  if (cabangList.value.some((c) => c.cabang === cab)) return;
+  const utama = cabangList.value.find((c) => c.utama);
+  cabangList.value.push({
+    cabang: cab,
+    divisi: utama?.divisi ?? 0,
+    utama: false,
+  });
+};
+
+const tambahCabang = () => {
+  const utama = cabangList.value.find((c) => c.utama);
+  cabangList.value.push({
+    cabang: "",
+    divisi: utama?.divisi ?? 0,
+    utama: false,
+  });
+};
+const hapusCabang = (idx: number) => {
+  if (cabangList.value.length <= 1) return;
+  const hapusUtama = cabangList.value[idx].utama;
+  cabangList.value.splice(idx, 1);
+  if (hapusUtama) cabangList.value[0].utama = true;
+};
+const jadikanUtama = (idx: number) => {
+  cabangList.value.forEach((c, i) => {
+    c.utama = i === idx;
+  });
+};
 const cekAllChecked = ref(false);
 
 const BAGIAN_OPTIONS = [
@@ -96,6 +167,17 @@ const loadData = async () => {
     const d = res.data.data;
     header.value = { ...d.header };
     menuGrid.value = d.menu;
+    const daftar: CabangUserRow[] = d.cabangList ?? [];
+    cabangList.value = daftar.length
+      ? daftar
+      : [
+          {
+            cabang: d.header.cabang || "",
+            divisi: Number(d.header.divisi) || 0,
+            utama: true,
+          },
+        ];
+    hrd.value = d.hrd ?? null;
   } catch (e: any) {
     toast.error(e.response?.data?.message || "Gagal memuat data.");
   } finally {
@@ -235,6 +317,19 @@ const validateSave = () => {
     toast.warning("Kode Kosong, tidak dapat disimpan");
     return false;
   }
+  const daftar = cabangList.value;
+  if (daftar.some((c) => !c.cabang)) {
+    toast.warning("Cabang wajib diisi di setiap baris.");
+    return false;
+  }
+  if (new Set(daftar.map((c) => c.cabang)).size !== daftar.length) {
+    toast.warning("Cabang tidak boleh dobel.");
+    return false;
+  }
+  if (daftar.filter((c) => c.utama).length !== 1) {
+    toast.warning("Pilih tepat satu cabang utama.");
+    return false;
+  }
   if (!isEditMode.value && kodeCheckState.value === "taken") {
     toast.warning(`Kode "${header.value.kode}" sudah digunakan.`);
     return false;
@@ -251,7 +346,14 @@ const requestSave = () => {
 const confirmSave = async () => {
   isSaving.value = true;
   try {
-    const payload = { ...header.value, menu: menuGrid.value };
+    const utama = cabangList.value.find((c) => c.utama);
+    const payload = {
+      ...header.value,
+      cabang: utama?.cabang ?? "",
+      divisi: utama?.divisi ?? 0,
+      cabangList: cabangList.value,
+      menu: menuGrid.value,
+    };
     if (isEditMode.value) {
       await userFormService.update(String(route.params.kode), payload);
       toast.success("User berhasil diupdate.");
@@ -274,6 +376,7 @@ const divisiOptions = [
   { value: 0, label: "Pusat" },
   { value: 1, label: "Spanduk" },
   { value: 4, label: "Garmen" },
+  { value: 5, label: "MMT" },
 ];
 
 const newMenuCount = computed(
@@ -348,6 +451,67 @@ const newMenuCount = computed(
             <input v-model="header.nama" class="inp" style="flex: 1" />
           </div>
           <div class="fr">
+            <label class="lbl">NIK</label>
+            <div class="igrp">
+              <input
+                :value="header.nik"
+                readonly
+                class="inp"
+                placeholder="Pilih karyawan HRD"
+              />
+              <button
+                type="button"
+                class="blkp"
+                title="Cari karyawan HRD"
+                @click="showNikModal = true"
+              >
+                <IconSearch :size="13" color="#1565c0" />
+              </button>
+            </div>
+            <button
+              v-if="header.nik"
+              type="button"
+              class="btn-nik-clear"
+              title="Kosongkan NIK"
+              @click="kosongkanNik"
+            >
+              <IconX :size="12" />
+            </button>
+          </div>
+
+          <div
+            v-if="header.nik"
+            class="hrd-info"
+            :class="{ 'hrd-warn': !hrd || !hrd.aktif }"
+          >
+            <template v-if="!hrd">NIK tidak ditemukan di data HRD.</template>
+            <template v-else>
+              {{ hrd.nama }} · {{ hrd.pabrik }} · {{ hrd.departemen }} ·
+              {{ hrd.jabatan }} · {{ hrd.bagian }}
+              <b v-if="!hrd.aktif"> · sudah keluar (HRD)</b>
+            </template>
+          </div>
+          <div
+            v-if="hrd && hrd.cabangHrd.length"
+            class="hrd-info"
+            :class="{ 'hrd-warn': !cabangSesuai }"
+          >
+            Cabang menurut pabrik HRD ({{ hrd.pabrik }}):
+            <b>{{ hrd.cabangHrd.join(", ") }}</b>
+            <template v-if="!cabangSesuai">
+              · tidak ada di daftar cabang user ini.</template
+            >
+            <button
+              v-if="!cabangSesuai && hrd.cabangHrd.length === 1"
+              type="button"
+              class="btn-cab-add"
+              style="margin-left: 8px"
+              @click="tambahCabangHrd"
+            >
+              + Tambah cabang {{ hrd.cabangHrd[0] }}
+            </button>
+          </div>
+          <div class="fr">
             <label class="lbl">Password</label>
             <input
               v-model="header.password"
@@ -356,28 +520,47 @@ const newMenuCount = computed(
               style="flex: 1"
             />
           </div>
-          <div class="fr">
-            <label class="lbl">Kantor</label>
-            <div class="radio-group">
-              <label
-                v-for="d in divisiOptions"
-                :key="d.value"
-                class="radio-lbl"
-              >
-                <input type="radio" v-model="header.divisi" :value="d.value" />
-                {{ d.label }}
-              </label>
+          <div class="cab-box">
+            <div class="cab-head">
+              <span class="cab-title">Cabang &amp; Divisi</span>
+              <button type="button" class="btn-cab-add" @click="tambahCabang">
+                + Tambah
+              </button>
             </div>
-          </div>
-
-          <div class="fr">
-            <label class="lbl">Cabang</label>
-            <select v-model="header.cabang" class="inp">
-              <option value="">-- Pilih --</option>
-              <option v-for="c in cabangOptions" :key="c" :value="c">
-                {{ c }}
-              </option>
-            </select>
+            <div v-for="(c, idx) in cabangList" :key="idx" class="cab-row">
+              <select v-model="c.cabang" class="inp">
+                <option value="">-- Cabang --</option>
+                <option v-for="o in cabangOptions" :key="o" :value="o">
+                  {{ o }}
+                </option>
+              </select>
+              <select v-model.number="c.divisi" class="inp">
+                <option
+                  v-for="d in divisiOptions"
+                  :key="d.value"
+                  :value="d.value"
+                >
+                  {{ d.label }}
+                </option>
+              </select>
+              <label class="cab-utama" title="Cabang awal saat login">
+                <input
+                  type="radio"
+                  name="cab-utama"
+                  :checked="c.utama"
+                  @change="jadikanUtama(idx)"
+                />
+                Utama
+              </label>
+              <button
+                type="button"
+                class="btn-cab-del"
+                :disabled="cabangList.length <= 1"
+                @click="hapusCabang(idx)"
+              >
+                <IconX :size="12" />
+              </button>
+            </div>
           </div>
           <div class="fr">
             <label class="lbl">Cabang Kaos</label>
@@ -505,6 +688,8 @@ const newMenuCount = computed(
 
     <!-- Copy Modal -->
     <UserSearchModal v-model="showUserSearchModal" @selected="onUserSelected" />
+
+    <NikSearchModal v-model="showNikModal" @selected="onNikSelected" />
 
     <!-- Confirm Save -->
     <v-dialog v-model="showSaveDialog" max-width="360px" persistent>
@@ -844,5 +1029,84 @@ const newMenuCount = computed(
 }
 .blkp:hover {
   background: #bbdefb;
+}
+.cab-box {
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  padding: 6px 8px;
+  margin-bottom: 8px;
+}
+.cab-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+.cab-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: #424242;
+}
+.btn-cab-add {
+  font-size: 11px;
+  font-weight: 600;
+  color: #1565c0;
+  background: #e3f2fd;
+  border: 1px solid #90caf9;
+  border-radius: 3px;
+  padding: 1px 8px;
+  cursor: pointer;
+}
+.cab-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+.cab-row .inp {
+  flex: 1;
+  min-width: 0;
+  font-size: 11px;
+}
+.cab-utama {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.btn-cab-del {
+  background: #ffebee;
+  border: 1px solid #ef9a9a;
+  border-radius: 3px;
+  padding: 3px 5px;
+  color: #c62828;
+  cursor: pointer;
+}
+.btn-cab-del:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.btn-nik-clear {
+  background: #ffebee;
+  border: 1px solid #ef9a9a;
+  border-radius: 3px;
+  padding: 3px 5px;
+  color: #c62828;
+  cursor: pointer;
+}
+.hrd-info {
+  font-size: 11px;
+  color: #37474f;
+  background: #eceff1;
+  border-radius: 4px;
+  padding: 4px 8px;
+  margin: -2px 0 8px;
+}
+.hrd-info.hrd-warn {
+  background: #fff3e0;
+  color: #e65100;
 }
 </style>

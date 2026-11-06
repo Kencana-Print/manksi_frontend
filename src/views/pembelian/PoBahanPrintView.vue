@@ -119,6 +119,7 @@ const groupIdenticalItems = (items: any[], poJenis: number) => {
       item.harga_dpp_print,
       item.harga_setelah_ppn_print,
       item.ppn_persen_print,
+      item.pod_keterangan || "",
     ].join("_");
 
     if (!groupedItems[key]) {
@@ -142,13 +143,15 @@ onMounted(async () => {
     const ppnHeader =
       Number(d.header?.po_status_ppn) === 1 ? Number(d.header?.po_ppn) || 0 : 0;
 
+    const isSpandukPO = Number(d.header?.po_jenis) === 5;
+
     let itemsConverted = (d.items || []).map((row: any) => {
       let isMtr = row.pod_bhn_satuan === "MTR";
       let qty = Number(row.pod_Jumlah) || 0;
       let hargaDpp = Number(row.pod_hargabeli) || 0;
       let sat = row.pod_bhn_satuan;
 
-      if (isMtr && satuanPilihan === "YARD") {
+      if (!isSpandukPO && isMtr && satuanPilihan === "YARD") {
         sat = "YARD";
         qty = qty * 1.09361;
         hargaDpp = hargaDpp / 1.09361;
@@ -220,6 +223,7 @@ const isBahan = computed(
     dataPO.value?.header?.po_jenis !== 2,
 );
 const isLainLain = computed(() => dataPO.value?.header?.po_jenis === 4);
+const isSpanduk = computed(() => Number(dataPO.value?.header?.po_jenis) === 5);
 
 const groupedRolls = computed(() => {
   if (!dataPO.value?.rolls) return [];
@@ -246,6 +250,8 @@ const ppnValue = computed(
 const grandTotal = computed(() => subTotal.value + ppnValue.value);
 
 const totalColumns = computed(() => {
+  // Spanduk: No, Kode, Nama, Satuan, Qty, Keterangan, Harga Dpp, Harga, Disc, Total
+  if (isSpanduk.value) return 10;
   let n = 8; // No, Nama, Satuan, Qty, Gramasi(kedua), Setting, Harga Dpp, Harga
   if (isBahan.value) n += 1; // Kode
   if (!isBahan.value) n += 1; // Gramasi Awal
@@ -302,7 +308,9 @@ const totalColumns = computed(() => {
                       ? "PO CELUP"
                       : dataPO.header.po_jenis === 4
                         ? "PO LAIN-LAIN"
-                        : "PO BAHAN"
+                        : dataPO.header.po_jenis === 5
+                          ? "PO SPANDUK"
+                          : "PO BAHAN"
                 }}
               </td>
             </tr>
@@ -325,10 +333,12 @@ const totalColumns = computed(() => {
             <th width="110" v-if="isLainLain">Supplier</th>
             <th width="40">Satuan</th>
             <th width="55">Qty</th>
-            <!-- Gramasi Awal HANYA untuk Greige & Celup, tidak untuk Bahan -->
+            <th width="120" v-if="isSpanduk">Keterangan</th>
             <th width="60" v-if="!isBahan">Gramasi<br />Awal</th>
-            <th width="60">{{ isBahan ? "Gramasi" : "Gramasi Akhir" }}</th>
-            <th width="45">Setting</th>
+            <th width="60" v-if="!isSpanduk">
+              {{ isBahan ? "Gramasi" : "Gramasi Akhir" }}
+            </th>
+            <th width="45" v-if="!isSpanduk">Setting</th>
             <th width="65">Harga Dpp</th>
             <th width="65">Harga</th>
             <th width="30">Disc</th>
@@ -345,9 +355,12 @@ const totalColumns = computed(() => {
             </td>
             <td class="tc">{{ item.satuan_print }}</td>
             <td class="tr">{{ formatNum(item.qty_print, 2) }}</td>
+            <td v-if="isSpanduk" class="ket-cell">
+              {{ item.pod_keterangan || "" }}
+            </td>
             <td class="tc" v-if="!isBahan">{{ item.gramasiAwal || "-" }}</td>
-            <td class="tc">{{ item.gramasi || "-" }}</td>
-            <td class="tc">{{ item.setting || "-" }}</td>
+            <td class="tc" v-if="!isSpanduk">{{ item.gramasi || "-" }}</td>
+            <td class="tc" v-if="!isSpanduk">{{ item.setting || "-" }}</td>
             <td class="tr">{{ formatNum(item.harga_dpp_print) }}</td>
             <td class="tr">{{ formatNum(item.harga_setelah_ppn_print) }}</td>
             <td class="tc">{{ item.pod_disc }}</td>
@@ -500,6 +513,10 @@ const totalColumns = computed(() => {
     overflow: hidden;
     font-size: 7.5px;
   }
+}
+.ket-cell {
+  white-space: normal;
+  word-break: break-word;
 }
 
 .loading-screen {

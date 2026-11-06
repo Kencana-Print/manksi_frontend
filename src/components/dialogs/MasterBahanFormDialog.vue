@@ -35,6 +35,7 @@ const confirmCancelDialogVisible = ref(false);
 
 const projectOptions = ref<any[]>([]);
 const satuanOptions = ref<string[]>([]);
+const tipeOptions = ref<{ Kode: string; Nama: string }[]>([]);
 
 // --- LOOKUP STATES ---
 const lookupState = ref({
@@ -67,7 +68,8 @@ const handleLookupSelect = (item: any) => {
 };
 
 // --- STATE FORM ---
-const formData = ref({
+const buatFormKosong = () => ({
+  Tipe: "GARMEN",
   Bhn_kode: "",
   Bhn_name: "",
   Bhn_satuan: "KG",
@@ -85,7 +87,19 @@ const formData = ref({
   kdSetting: "",
   nmSetting: "",
   project: "REGULER",
+  Bhn_konstruksi: "",
+  Bhn_panjang: "",
+  Bhn_lebar: "",
 });
+
+const formData = ref(buatFormKosong());
+const isSpanduk = computed(() => formData.value.Tipe === "SPANDUK");
+
+const wajibIsi = (v: string | number) =>
+  (v !== "" && v !== null && v !== undefined) || "Wajib diisi";
+const lebihDariNol = (v: string | number) => Number(v) > 0 || "Harus > 0";
+const panjangValid = (v: string | number) =>
+  v === "" || Number(v) > 0 || "Harus > 0";
 
 const generatedName = computed(() => {
   const p = formData.value.project === "REGULER" ? "" : formData.value.project;
@@ -94,61 +108,74 @@ const generatedName = computed(() => {
     .toUpperCase();
 });
 
+const loadSatuan = async (tipe: string) => {
+  try {
+    const res = await api.get("/master/bahan/lookups/satuan", {
+      params: { tipe },
+    });
+    satuanOptions.value = res.data.data.map((i: { Nama: string }) => i.Nama);
+  } catch (e) {
+    toast.error("Gagal memuat opsi satuan");
+  }
+};
+
 const loadOptions = async () => {
   try {
-    const [resProject, resSatuan] = await Promise.all([
+    const [resProject, resTipe] = await Promise.all([
       api.get("/master/bahan/lookups/project"),
-      api.get("/master/bahan/lookups/satuan"),
+      api.get("/master/bahan/lookups/tipe"),
     ]);
     projectOptions.value = resProject.data.data;
-    satuanOptions.value = resSatuan.data.data.map((i: any) => i.Nama);
+    tipeOptions.value = resTipe.data.data;
   } catch (e) {
     toast.error("Gagal memuat opsi referensi");
   }
 };
 
-watch(
-  () => props.modelValue,
-  (isOpen) => {
-    if (isOpen) {
-      loadOptions();
-      if (props.isNewMode) {
-        resetForm();
-      } else if (props.bahanData) {
-        formData.value = {
-          ...props.bahanData,
-          Bhn_ket: props.bahanData.Bhn_ket || "",
-          Bhn_hargabeli: Number(props.bahanData.Bhn_hargabeli) || 0,
-          Bhn_buffer: Number(props.bahanData.Bhn_buffer) || 0,
-          Bhn_dead: props.bahanData.Bhn_dead ?? 0,
-        };
-      }
-      formRef.value?.resetValidation();
-    }
-  },
-);
+// Dipanggil saat HO- memilih tipe di mode tambah
+const gantiTipe = async (tipe: string | null) => {
+  if (!tipe) return;
+  formData.value.Bhn_satuan = tipe === "SPANDUK" ? "YARD" : "KG";
+  await loadSatuan(tipe);
+  formRef.value?.resetValidation();
+};
 
 const resetForm = () => {
-  formData.value = {
-    Bhn_kode: "",
-    Bhn_name: "",
-    Bhn_satuan: "KG",
-    Bhn_ket: "",
-    Bhn_buffer: 0,
-    Bhn_dead: 0,
-    Bhn_hargabeli: 0,
-    Bhn_avgcost: 0,
-    kdJenis: "",
-    nmJenis: "",
-    kdWarna: "",
-    nmWarna: "",
-    kdGramasi: "",
-    nmGramasi: "",
-    kdSetting: "",
-    nmSetting: "",
-    project: "REGULER",
-  };
+  formData.value = buatFormKosong();
 };
+
+watch(
+  () => props.modelValue,
+  async (isOpen) => {
+    if (!isOpen) return;
+    if (props.isNewMode) {
+      resetForm();
+    } else if (props.bahanData) {
+      formData.value = {
+        ...buatFormKosong(),
+        ...props.bahanData,
+        Bhn_ket: props.bahanData.Bhn_ket || "",
+        Bhn_hargabeli: Number(props.bahanData.Bhn_hargabeli) || 0,
+        Bhn_buffer: Number(props.bahanData.Bhn_buffer) || 0,
+        Bhn_dead: props.bahanData.Bhn_dead ?? 0,
+        Bhn_konstruksi: props.bahanData.Bhn_konstruksi ?? "",
+        Bhn_panjang: String(props.bahanData.Bhn_panjang ?? ""),
+        Bhn_lebar: String(props.bahanData.Bhn_lebar ?? ""),
+      };
+    }
+    await loadOptions();
+    if (
+      props.isNewMode &&
+      !tipeOptions.value.some((t) => t.Kode === formData.value.Tipe)
+    ) {
+      formData.value.Tipe = tipeOptions.value[0]?.Kode ?? "GARMEN";
+      formData.value.Bhn_satuan =
+        formData.value.Tipe === "SPANDUK" ? "YARD" : "KG";
+    }
+    await loadSatuan(formData.value.Tipe);
+    formRef.value?.resetValidation();
+  },
+);
 
 const handleSave = async () => {
   const { valid } = await formRef.value!.validate();
@@ -159,23 +186,29 @@ const handleSave = async () => {
 const executeSave = async () => {
   isSaving.value = true;
   try {
-    const selectedProj = projectOptions.value.find(
-      (p) => p.Nama === formData.value.project,
-    );
-    const ckdProject = selectedProj ? selectedProj.Kode.trim() : "";
+    if (!isSpanduk.value) {
+      const selectedProj = projectOptions.value.find(
+        (p) => p.Nama === formData.value.project,
+      );
+      const ckdProject = selectedProj ? selectedProj.Kode.trim() : "";
 
-    formData.value.Bhn_name = generatedName.value;
+      formData.value.Bhn_name = generatedName.value;
+
+      if (props.isNewMode) {
+        formData.value.Bhn_kode = (
+          formData.value.kdJenis +
+          formData.value.kdWarna +
+          formData.value.kdGramasi +
+          formData.value.kdSetting +
+          ckdProject
+        ).toUpperCase();
+      }
+    }
+    // Spanduk: nama diisi manual, kode (SB + nomor urut) dibuat server.
 
     if (props.isNewMode) {
-      formData.value.Bhn_kode = (
-        formData.value.kdJenis +
-        formData.value.kdWarna +
-        formData.value.kdGramasi +
-        formData.value.kdSetting +
-        ckdProject
-      ).toUpperCase();
-      await api.post("/master/bahan", formData.value);
-      toast.success("Master Bahan berhasil dibuat.");
+      const res = await api.post("/master/bahan", formData.value);
+      toast.success(`Master Bahan berhasil dibuat (${res.data.kode}).`);
     } else {
       await api.put(`/master/bahan/${formData.value.Bhn_kode}`, formData.value);
       toast.success("Master Bahan berhasil diperbarui.");
@@ -232,11 +265,35 @@ const executeSave = async () => {
             </v-col>
             <v-col cols="12" md="8" class="d-flex align-center">
               <span class="text-error text-caption font-italic" v-if="isNewMode"
-                >* Terbentuk otomatis</span
+                >*
+                {{
+                  isSpanduk
+                    ? "Terbentuk otomatis (SB + nomor urut)"
+                    : "Terbentuk otomatis"
+                }}</span
               >
             </v-col>
 
-            <v-col cols="12">
+            <v-col cols="12" v-if="isNewMode && tipeOptions.length > 1">
+              <v-radio-group
+                v-model="formData.Tipe"
+                inline
+                label="Tipe Bahan"
+                density="compact"
+                hide-details
+                @update:model-value="gantiTipe"
+              >
+                <v-radio
+                  v-for="t in tipeOptions"
+                  :key="t.Kode"
+                  :label="t.Nama"
+                  :value="t.Kode"
+                  color="primary"
+                />
+              </v-radio-group>
+            </v-col>
+
+            <v-col cols="12" v-if="!isSpanduk">
               <v-text-field
                 :model-value="generatedName"
                 label="Nama Bahan (Otomatis)"
@@ -247,101 +304,150 @@ const executeSave = async () => {
                 hide-details="auto"
               />
             </v-col>
+            <template v-else>
+              <v-col cols="12">
+                <v-text-field
+                  v-model="formData.Bhn_name"
+                  label="Nama Bahan"
+                  variant="outlined"
+                  density="compact"
+                  hide-details="auto"
+                  :rules="[wajibIsi]"
+                />
+              </v-col>
+              <v-col cols="12" md="4">
+                <v-text-field
+                  v-model="formData.Bhn_konstruksi"
+                  label="Konstruksi"
+                  variant="outlined"
+                  density="compact"
+                  hide-details="auto"
+                  maxlength="20"
+                />
+              </v-col>
+              <v-col cols="6" md="4">
+                <v-text-field
+                  v-model="formData.Bhn_panjang"
+                  label="Panjang (opsional)"
+                  type="number"
+                  variant="outlined"
+                  density="compact"
+                  hide-details="auto"
+                  :rules="[panjangValid]"
+                  v-select-on-focus
+                />
+              </v-col>
+              <v-col cols="6" md="4">
+                <v-text-field
+                  v-model="formData.Bhn_lebar"
+                  label="Lebar"
+                  type="number"
+                  variant="outlined"
+                  density="compact"
+                  hide-details="auto"
+                  :rules="[wajibIsi, lebihDariNol]"
+                  v-select-on-focus
+                />
+              </v-col>
+            </template>
 
-            <v-col cols="6" md="3">
-              <v-text-field
-                v-model="formData.kdJenis"
-                label="Jenis"
-                variant="outlined"
-                density="compact"
-                readonly
-                hide-details="auto"
-              >
-                <template #append-inner>
-                  <IconSearch
-                    :size="15"
-                    :stroke-width="1.7"
-                    color="#1565c0"
-                    style="cursor: pointer"
-                    @click="openLookup('jenis', 'Jenis Bahan', 'jenis')"
-                  />
-                </template>
-              </v-text-field>
-            </v-col>
-            <v-col cols="6" md="3">
-              <v-text-field
-                v-model="formData.kdWarna"
-                label="Warna"
-                variant="outlined"
-                density="compact"
-                readonly
-                hide-details="auto"
-              >
-                <template #append-inner>
-                  <IconSearch
-                    :size="15"
-                    :stroke-width="1.7"
-                    color="#1565c0"
-                    style="cursor: pointer"
-                    @click="openLookup('warna', 'Warna Bahan', 'warna')"
-                  />
-                </template>
-              </v-text-field>
-            </v-col>
-            <v-col cols="6" md="3">
-              <v-text-field
-                v-model="formData.kdGramasi"
-                label="Gramasi"
-                variant="outlined"
-                density="compact"
-                readonly
-                hide-details="auto"
-              >
-                <template #append-inner>
-                  <IconSearch
-                    :size="15"
-                    :stroke-width="1.7"
-                    color="#1565c0"
-                    style="cursor: pointer"
-                    @click="openLookup('gramasi', 'Gramasi Bahan', 'gramasi')"
-                  />
-                </template>
-              </v-text-field>
-            </v-col>
-            <v-col cols="6" md="3">
-              <v-text-field
-                v-model="formData.kdSetting"
-                label="Setting"
-                variant="outlined"
-                density="compact"
-                readonly
-                hide-details="auto"
-              >
-                <template #append-inner>
-                  <IconSearch
-                    :size="15"
-                    :stroke-width="1.7"
-                    color="#1565c0"
-                    style="cursor: pointer"
-                    @click="openLookup('setting', 'Setting Bahan', 'setting')"
-                  />
-                </template>
-              </v-text-field>
-            </v-col>
+            <template v-if="!isSpanduk">
+              <v-col cols="6" md="3">
+                <v-text-field
+                  v-model="formData.kdJenis"
+                  label="Jenis"
+                  variant="outlined"
+                  density="compact"
+                  readonly
+                  hide-details="auto"
+                >
+                  <template #append-inner>
+                    <IconSearch
+                      :size="15"
+                      :stroke-width="1.7"
+                      color="#1565c0"
+                      style="cursor: pointer"
+                      @click="openLookup('jenis', 'Jenis Bahan', 'jenis')"
+                    />
+                  </template>
+                </v-text-field>
+              </v-col>
+              <v-col cols="6" md="3">
+                <v-text-field
+                  v-model="formData.kdWarna"
+                  label="Warna"
+                  variant="outlined"
+                  density="compact"
+                  readonly
+                  hide-details="auto"
+                >
+                  <template #append-inner>
+                    <IconSearch
+                      :size="15"
+                      :stroke-width="1.7"
+                      color="#1565c0"
+                      style="cursor: pointer"
+                      @click="openLookup('warna', 'Warna Bahan', 'warna')"
+                    />
+                  </template>
+                </v-text-field>
+              </v-col>
+              <v-col cols="6" md="3">
+                <v-text-field
+                  v-model="formData.kdGramasi"
+                  label="Gramasi"
+                  variant="outlined"
+                  density="compact"
+                  readonly
+                  hide-details="auto"
+                >
+                  <template #append-inner>
+                    <IconSearch
+                      :size="15"
+                      :stroke-width="1.7"
+                      color="#1565c0"
+                      style="cursor: pointer"
+                      @click="openLookup('gramasi', 'Gramasi Bahan', 'gramasi')"
+                    />
+                  </template>
+                </v-text-field>
+              </v-col>
+              <v-col cols="6" md="3">
+                <v-text-field
+                  v-model="formData.kdSetting"
+                  label="Setting"
+                  variant="outlined"
+                  density="compact"
+                  readonly
+                  hide-details="auto"
+                >
+                  <template #append-inner>
+                    <IconSearch
+                      :size="15"
+                      :stroke-width="1.7"
+                      color="#1565c0"
+                      style="cursor: pointer"
+                      @click="openLookup('setting', 'Setting Bahan', 'setting')"
+                    />
+                  </template>
+                </v-text-field>
+              </v-col>
 
-            <v-col cols="12" md="6">
-              <v-select
-                v-model="formData.project"
-                :items="projectOptions"
-                item-title="Nama"
-                item-value="Nama"
-                label="Project"
-                variant="outlined"
-                density="compact"
-                hide-details="auto"
-                :readonly="!isNewMode"
-              />
-            </v-col>
+              <v-col cols="12" md="6">
+                <v-select
+                  v-model="formData.project"
+                  :items="projectOptions"
+                  item-title="Nama"
+                  item-value="Nama"
+                  label="Project"
+                  variant="outlined"
+                  density="compact"
+                  hide-details="auto"
+                  :readonly="!isNewMode"
+                />
+              </v-col>
+            </template>
+
             <v-col cols="12" md="6">
               <v-select
                 v-model="formData.Bhn_satuan"

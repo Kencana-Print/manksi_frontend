@@ -218,6 +218,8 @@ const onDelete = async (item: any) => {
 const onPrint = () => {
   if (!selectedItem.value)
     return toast.warning("Pilih data PO terlebih dahulu.");
+  // Spanduk: satuan sesuai master, tanpa konversi → langsung cetak
+  if (selectedItem.value.JenisPO === "SPANDUK") return processPrint("ASLI");
   showPrintDialog.value = true;
 };
 
@@ -389,6 +391,7 @@ const onExportDetail = async () => {
           MKB: r.MKB,
           SPK: r.SPK,
           Nama_SPK: r.Nama_SPK,
+          KetItem: r.KetItem || "",
         });
       });
     });
@@ -470,6 +473,7 @@ const onExportDetail = async () => {
       { header: "No. MKB", key: "MKB", width: 16 },
       { header: "No. SPK", key: "SPK", width: 16 },
       { header: "Nama SPK", key: "Nama_SPK", width: 28 },
+      { header: "Ket. Item", key: "KetItem", width: 28 },
     ];
 
     await exportExcelSingle(
@@ -707,9 +711,12 @@ const summaryFormatters = {
                 <th v-if="canLihatBeli" width="80" class="tr">Disc</th>
                 <th v-if="canLihatBeli" width="70" class="tr">PPN (%)</th>
                 <th width="80" class="text-center">Status</th>
-                <th width="120">No. MKB</th>
+                <th v-if="item.JenisPO !== 'SPANDUK'" width="120">No. MKB</th>
                 <th width="120">No. SPK</th>
                 <th width="200">Nama SPK</th>
+                <th v-if="item.JenisPO === 'SPANDUK'" width="220">
+                  Keterangan
+                </th>
                 <th
                   v-if="canLihatSup && item.JenisPO === 'LAIN-LAIN'"
                   width="180"
@@ -754,9 +761,12 @@ const summaryFormatters = {
                     {{ d.Status_barang }}
                   </v-chip>
                 </td>
-                <td>{{ d.MKB || "-" }}</td>
+                <td v-if="item.JenisPO !== 'SPANDUK'">{{ d.MKB || "-" }}</td>
                 <td>{{ d.SPK || "-" }}</td>
                 <td>{{ d.Nama_SPK || "-" }}</td>
+                <td v-if="item.JenisPO === 'SPANDUK'">
+                  {{ d.KetItem || "-" }}
+                </td>
                 <td v-if="canLihatSup && item.JenisPO === 'LAIN-LAIN'">
                   {{ d.Supplier || "-" }}
                 </td>

@@ -46,6 +46,7 @@ const initialData = {
   namaGudangProduksi: "",
   details: [] as any[],
   barcodes: [] as any[],
+  spanduk: false,
 };
 
 // State untuk Print Dialog
@@ -83,6 +84,7 @@ const {
       namaGudangProduksi: header.gdgp_nama,
       details: details.map((d: any) => ({ ...d })),
       barcodes: barcodes.map((b: any) => ({ ...b })),
+      spanduk: Boolean(header.spanduk),
     };
   },
   submitApi: async (payload) => {
@@ -248,6 +250,7 @@ const getBcSum = (d: any) => {
           class="mb-2 bg-grey-lighten-4"
         />
         <v-text-field
+          v-if="!formData.spanduk"
           :model-value="`${formData.gudangProduksi} - ${formData.namaGudangProduksi}`"
           label="Gudang Produksi"
           readonly

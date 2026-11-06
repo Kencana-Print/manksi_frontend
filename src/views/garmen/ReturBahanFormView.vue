@@ -42,6 +42,7 @@ interface ReturBahanFormData {
   details: ReturBahanDetail[];
   pin_acc: string;
   pin_dipakai: string;
+  spanduk: boolean;
 }
 
 const route = useRoute();
@@ -67,6 +68,10 @@ const formatDateLocal = (value?: string | Date) => {
   return `${year}-${month}-${day}`;
 };
 
+// Gudang bahan P02 (spanduk), sama dengan konstanta backend
+const GUDANG_BAHAN_SPANDUK = "WH006";
+const gudangBahanUser = authStore.user?.gudang?.bahan;
+
 const emptyRow: ReturBahanDetail = {
   nominta: "",
   kode: "",
@@ -87,13 +92,15 @@ const initialData: ReturBahanFormData = {
   nomor: "",
   tanggal: formatDateLocal(new Date()),
   keterangan: "",
-  gudangAsal: "",
+  gudangAsal: gudangBahanUser?.kode || "",
   gudangProduksi: "",
   isUtama: 1,
   // Otomatis sedia 1 baris kosong saat form dibuka (Replikasi initgrid Delphi)
   details: [{ ...emptyRow }],
   pin_acc: "",
   pin_dipakai: "",
+  // User P02 (gudang bahan WH006) = mode spanduk sejak awal
+  spanduk: gudangBahanUser?.kode === GUDANG_BAHAN_SPANDUK,
 };
 
 const listGudangBahan = ref<any[]>([]);
@@ -151,6 +158,7 @@ const {
       isUtama: header.isstatus || 1,
       pin_acc: header.pin_acc,
       pin_dipakai: header.pin_dipakai,
+      spanduk: Boolean(header.spanduk),
       details: details.map((d: any) => ({
         nominta: d.nominta,
         kode: d.kode,
@@ -189,12 +197,26 @@ onMounted(async () => {
     listGudangBahan.value = resBahan.data.data;
     listGudangProduksi.value = resProd.data.data;
 
-    // Set default gudang jika baru
-    if (!isEditMode.value && listGudangBahan.value.length > 0) {
-      formData.value.gudangAsal = listGudangBahan.value[0].kode;
+    // Gudang tujuan mengikuti gudang bahan user; pastikan ada di daftar
+    const gudangUser = authStore.user?.gudang?.bahan;
+    if (
+      gudangUser?.kode &&
+      !listGudangBahan.value.some((g) => g.kode === gudangUser.kode)
+    ) {
+      listGudangBahan.value.push({
+        kode: gudangUser.kode,
+        nama: gudangUser.nama,
+      });
     }
-    if (!isEditMode.value && listGudangProduksi.value.length > 0) {
-      formData.value.gudangProduksi = listGudangProduksi.value[0].kode;
+    if (!isEditMode.value) {
+      if (gudangUser?.kode) {
+        formData.value.gudangAsal = gudangUser.kode;
+      } else if (listGudangBahan.value.length > 0) {
+        formData.value.gudangAsal = listGudangBahan.value[0].kode;
+      }
+      if (!formData.value.spanduk && listGudangProduksi.value.length > 0) {
+        formData.value.gudangProduksi = listGudangProduksi.value[0].kode;
+      }
     }
   } catch (error) {
     toast.error("Gagal memuat daftar gudang.");
@@ -329,24 +351,41 @@ const onDetailSelected = (item: any) => {
 };
 
 const validateBeforeSave = () => {
-  if (!formData.value.gudangAsal || !formData.value.gudangProduksi) {
-    return toast.warning("Gudang Asal dan Produksi wajib diisi.");
-  }
-  if (formData.value.gudangAsal === formData.value.gudangProduksi) {
-    return toast.warning(
-      "Gudang Tujuan tidak boleh sama dengan Gudang Produksi.",
-    );
-  }
-
-  const validDetails = formData.value.details.filter(
+  const terisi = formData.value.details.filter(
     (d: ReturBahanDetail) => d.kode && d.nama,
   );
-  if (validDetails.length === 0)
-    return toast.warning("Detail barang masih kosong.");
+  if (terisi.length === 0) return toast.warning("Detail barang masih kosong.");
 
-  const zeroQty = validDetails.some(
-    (d: ReturBahanDetail) => Number(d.jumlah) <= 0,
-  );
+  // Mode spanduk mengikuti isi detail: semua bahan SB, bukan campuran
+  const jumlahSB = terisi.filter((d: ReturBahanDetail) =>
+    d.kode.startsWith("SB"),
+  ).length;
+  if (jumlahSB > 0 && jumlahSB < terisi.length) {
+    return toast.warning(
+      "Bahan spanduk (SB) tidak boleh dicampur dengan bahan garmen dalam satu retur.",
+    );
+  }
+  formData.value.spanduk = jumlahSB === terisi.length;
+  if (formData.value.spanduk) {
+    formData.value.gudangAsal = GUDANG_BAHAN_SPANDUK;
+    formData.value.gudangProduksi = "";
+  }
+
+  if (!formData.value.gudangAsal) {
+    return toast.warning("Gudang Tujuan wajib diisi.");
+  }
+  if (!formData.value.spanduk) {
+    if (!formData.value.gudangProduksi) {
+      return toast.warning("Gudang Produksi wajib diisi.");
+    }
+    if (formData.value.gudangAsal === formData.value.gudangProduksi) {
+      return toast.warning(
+        "Gudang Tujuan tidak boleh sama dengan Gudang Produksi.",
+      );
+    }
+  }
+
+  const zeroQty = terisi.some((d: ReturBahanDetail) => Number(d.jumlah) <= 0);
   if (zeroQty) return toast.warning("Jumlah retur tidak boleh 0.");
 
   showSaveDialog.value = true;
@@ -441,11 +480,13 @@ const numFormat = (val: any) =>
           label="Gudang Tujuan (Bahan)"
           density="compact"
           variant="outlined"
+          :readonly="formData.spanduk"
           hide-details
           class="mb-2"
         />
 
         <v-autocomplete
+          v-if="!formData.spanduk"
           v-model="formData.gudangProduksi"
           :items="listGudangProduksi"
           item-title="nama"

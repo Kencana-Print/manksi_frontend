@@ -22,6 +22,8 @@ const isLoading = ref(false);
 const barcodes = ref<any[]>([]);
 const tanggalRetur = ref("");
 const tanggalCetak = ref("");
+const satuanByKode = ref<Record<string, string>>({});
+const satuanOf = (bc: any) => bc.satuan || satuanByKode.value[bc.kode] || "";
 
 const formatTanggalJamCetak = (d: Date) => {
   const pad = (n: number) => String(n).padStart(2, "0");
@@ -33,9 +35,14 @@ const loadData = async () => {
   isLoading.value = true;
   try {
     const res = await approveReturBahanFormService.getDetail(props.nomor);
-    barcodes.value = res.data.data.barcodes;
-    tanggalRetur.value = res.data.data.header.proret_tanggal;
+    const { header, details, barcodes: bcs } = res.data.data;
+    barcodes.value = bcs;
+    tanggalRetur.value = header.proret_tanggal;
     tanggalCetak.value = formatTanggalJamCetak(new Date());
+
+    const peta: Record<string, string> = {};
+    for (const d of details || []) peta[d.kode] = d.satuan || "";
+    satuanByKode.value = peta;
   } catch (error: any) {
     toast.error(error.message || "Gagal memuat data barcode");
     isOpen.value = false;
@@ -176,7 +183,9 @@ const printBarcode = () => {
                 </div>
 
                 <div class="info-wrapper">
-                  <div class="info-qty">{{ formatQty(bc.jumlah) }} KG</div>
+                  <div class="info-qty">
+                    {{ formatQty(bc.jumlah) }} {{ satuanOf(bc) }}
+                  </div>
                   <div class="info-date">{{ formatDate(tanggalRetur) }}</div>
                 </div>
               </div>

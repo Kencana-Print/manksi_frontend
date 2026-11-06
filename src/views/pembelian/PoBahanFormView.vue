@@ -171,6 +171,7 @@ const {
         ppn: Number(row.pod_ppn) || 0,
         supKode: row.pod_sup_kode || "",
         supNama: row.pod_sup_nama || "",
+        keterangan: row.pod_keterangan || "",
       })),
       delivery: (d.delivery || []).map((row: any) => ({
         tanggal: formatDateLocal(row.pod2_tanggal || new Date()),
@@ -218,6 +219,7 @@ const isGreige = computed(() => formData.value.header.po_jenis === 1);
 const isCelup = computed(() => formData.value.header.po_jenis === 2);
 const isBahan = computed(() => formData.value.header.po_jenis === 3);
 const isLainLain = computed(() => formData.value.header.po_jenis === 4);
+const isSpanduk = computed(() => formData.value.header.po_jenis === 5);
 // Bahan & Lain-lain berbagi perilaku kolom gramasi dan Delivery Commitment
 const isBahanLike = computed(() => isBahan.value || isLainLain.value);
 // Kolom supplier per baris: hanya PO Lain-lain, dan hanya untuk user yang boleh lihat supplier
@@ -227,7 +229,7 @@ const showPpnCol = computed(() => isLainLain.value && canLihatBeli.value);
 
 watch(
   () => formData.value.header.po_jenis,
-  (v) => {
+  (v, lama) => {
     if (v !== 2) formData.value.header.po_greige = "";
     // PO Lain-lain: supplier ada di baris, bukan di header
     if (v === 4) {
@@ -238,6 +240,17 @@ watch(
       // PPN per baris, header dikosongkan
       formData.value.header.po_status_ppn = 0;
       formData.value.header.po_ppn = 0;
+    }
+    // Pindah ke/dari PO Spanduk: bahan SB tidak boleh bercampur dengan bahan lain
+    if (!isEditMode.value && (v === 5) !== (lama === 5)) {
+      const adaIsi = formData.value.items.some(
+        (r: { kode?: string }) => !!r.kode,
+      );
+      formData.value.items = [];
+      formData.value.delivery = [];
+      formData.value.rolls = [];
+      if (adaIsi)
+        toast.info("Daftar bahan dikosongkan karena jenis PO berubah.");
     }
   },
 );
@@ -280,6 +293,8 @@ const fmt = (n: number) => n.toLocaleString("id-ID");
 // Hitung colspan dinamis buat baris "Tidak ada data" — base fixed
 // columns + kolom kondisional (Gramasi Awal, Roll, Harga/Disc/Total)
 const colSpanCount = computed(() => {
+  // Spanduk: No, Kode, Nama, Nama External, Sat, Qty, SPK/MAP, Keterangan, Aksi
+  if (isSpanduk.value) return 9 + (canLihatBeli.value ? 2 : 0);
   let n = 13; // No, Kode, Nama Bahan, Nama External, Sat, Gramasi Awal, Gramasi, Setting, Jenis, Jumlah, SPK, MKB, Aksi
   if (isCelup.value) n += 1; // Roll
   if (showSupCol.value) n += 1; // Supplier per baris
@@ -287,6 +302,11 @@ const colSpanCount = computed(() => {
   if (showPpnCol.value) n += 1; // PPN per baris
   return n;
 });
+const tblMinWidth = computed(() =>
+  isSpanduk.value
+    ? 960
+    : 1300 + (showSupCol.value ? 170 : 0) + (showPpnCol.value ? 60 : 0),
+);
 
 // ── Header lookups ──
 const setSup = (v: any) => {
@@ -444,6 +464,7 @@ const addItem = () =>
     ppn: 0,
     supKode: "",
     supNama: "",
+    keterangan: "",
   });
 
 // ─────────────────────────────────────────────
@@ -795,6 +816,7 @@ const validateSave = () => {
             <option :value="2">Celup</option>
             <option :value="3">Bahan</option>
             <option :value="4">Lain-lain</option>
+            <option :value="5">Spanduk</option>
           </select>
         </div>
 
@@ -1000,12 +1022,7 @@ const validateSave = () => {
           class="tbl-wrap"
           style="flex: 1; min-height: 180px; max-height: 40vh; overflow-y: auto"
         >
-          <table
-            class="gt"
-            :style="{
-              minWidth: `${1300 + (showSupCol ? 170 : 0) + (showPpnCol ? 60 : 0)}px`,
-            }"
-          >
+          <table class="gt" :style="{ minWidth: `${tblMinWidth}px` }">
             <thead>
               <tr>
                 <th style="width: 35px" class="tc">No</th>
@@ -1014,14 +1031,18 @@ const validateSave = () => {
 
                 <th style="width: 120px">Nama External</th>
                 <th style="width: 50px" class="tc">Sat</th>
-                <th style="width: 70px">Gramasi Awal</th>
-                <th style="width: 70px">
-                  {{ isBahan ? "Gramasi" : "Gramasi Akhir" }}
-                </th>
-                <th style="width: 50px">Setting</th>
-                <th style="width: 80px">Jenis Bahan</th>
+                <template v-if="!isSpanduk">
+                  <th style="width: 70px">Gramasi Awal</th>
+                  <th style="width: 70px">
+                    {{ isBahan ? "Gramasi" : "Gramasi Akhir" }}
+                  </th>
+                  <th style="width: 50px">Setting</th>
+                  <th style="width: 80px">Jenis Bahan</th>
+                </template>
                 <th style="width: 50px" class="tr" v-if="isCelup">Roll</th>
-                <th style="width: 75px" class="tr bg-yellow">Jumlah</th>
+                <th style="width: 75px" class="tr bg-yellow">
+                  {{ isSpanduk ? "Qty PO" : "Jumlah" }}
+                </th>
                 <th
                   v-if="canLihatBeli"
                   style="width: 80px"
@@ -1039,13 +1060,18 @@ const validateSave = () => {
                 <th v-if="showPpnCol" style="width: 60px" class="tr bg-yellow">
                   PPN(%)
                 </th>
-                <th v-if="canLihatBeli" style="width: 100px" class="tr bg-blue">
+                <th
+                  v-if="canLihatBeli && !isSpanduk"
+                  style="width: 100px"
+                  class="tr bg-blue"
+                >
                   Total
                 </th>
                 <th style="width: 90px">
-                  {{ isLainLain ? "SPK/MAP *" : "SPK" }}
+                  {{ isLainLain ? "SPK/MAP *" : isSpanduk ? "SPK/MAP" : "SPK" }}
                 </th>
-                <th style="width: 90px">MKB</th>
+                <th v-if="!isSpanduk" style="width: 90px">MKB</th>
+                <th v-if="isSpanduk" style="width: 150px">Keterangan</th>
                 <th v-if="showSupCol" style="width: 170px">Supplier</th>
                 <th style="width: 35px" class="tc">Aksi</th>
               </tr>
@@ -1072,26 +1098,28 @@ const validateSave = () => {
                 <td class="p0">
                   <input v-model="row.satuan" class="ci tc ro" readonly />
                 </td>
-                <td class="p0">
-                  <input
-                    v-model="row.gramasiAwal"
-                    class="ci"
-                    placeholder="Manual"
-                  />
-                </td>
-                <td class="p0">
-                  <input
-                    v-model="row.gramasi"
-                    class="ci"
-                    placeholder="Manual"
-                  />
-                </td>
-                <td class="p0">
-                  <input v-model="row.setting" class="ci" />
-                </td>
-                <td class="p0">
-                  <input v-model="row.jenis" class="ci ro" readonly />
-                </td>
+                <template v-if="!isSpanduk">
+                  <td class="p0">
+                    <input
+                      v-model="row.gramasiAwal"
+                      class="ci"
+                      placeholder="Manual"
+                    />
+                  </td>
+                  <td class="p0">
+                    <input
+                      v-model="row.gramasi"
+                      class="ci"
+                      placeholder="Manual"
+                    />
+                  </td>
+                  <td class="p0">
+                    <input v-model="row.setting" class="ci" />
+                  </td>
+                  <td class="p0">
+                    <input v-model="row.jenis" class="ci ro" readonly />
+                  </td>
+                </template>
                 <td class="p0" v-if="isCelup">
                   <input
                     v-model.number="row.roll"
@@ -1139,7 +1167,7 @@ const validateSave = () => {
                     v-select-on-focus
                   />
                 </td>
-                <td v-if="canLihatBeli" class="p0">
+                <td v-if="canLihatBeli && !isSpanduk" class="p0">
                   <input
                     :value="fmt(Number(row.total))"
                     readonly
@@ -1158,7 +1186,7 @@ const validateSave = () => {
                     </button>
                   </div>
                 </td>
-                <td class="p0">
+                <td v-if="!isSpanduk" class="p0">
                   <div class="cell-grp">
                     <input v-model="row.mkb" class="ci" />
                     <button
@@ -1169,6 +1197,9 @@ const validateSave = () => {
                       <IconSearch :size="12" />
                     </button>
                   </div>
+                </td>
+                <td v-if="isSpanduk" class="p0">
+                  <input v-model="row.keterangan" class="ci" maxlength="150" />
                 </td>
                 <td v-if="showSupCol" class="p0">
                   <div class="cell-grp">
@@ -1398,7 +1429,11 @@ const validateSave = () => {
   <SupplierSearchModal v-model="showSupRowModal" @selected="setSupRow" />
   <MppbSearchModal v-model="showMppbModal" @selected="setMppb" />
   <PoGreigeSearchModal v-model="showPoGreigeModal" @selected="setPoGreige" />
-  <BahanSearchModal v-model="showBahanModal" @selected="setBahanHandler" />
+  <BahanSearchModal
+    v-model="showBahanModal"
+    :tipe="isSpanduk ? 'SPANDUK' : undefined"
+    @selected="setBahanHandler"
+  />
   <SpkSearchModal v-model="showSpkModal" @selected="setSpk" />
   <MkbSearchModal v-model="showMkbModal" @selected="setMkb" />
 </template>

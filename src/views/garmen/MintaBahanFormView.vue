@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from "vue";
+import { ref, onMounted, watch, computed } from "vue";
 import { useToast } from "vue-toastification";
 import { useRoute, useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/authStore";
@@ -22,6 +22,9 @@ interface DetailItem {
   kode: string;
   nama: string;
   setting?: string;
+  konstruksi?: string;
+  panjang?: number | string | null;
+  lebar?: number | string | null;
   satuan: string;
   babaran: number;
   pcs: number;
@@ -29,6 +32,16 @@ interface DetailItem {
   jumlah: number;
   komponen: string;
   ket: string;
+}
+
+interface BahanItem {
+  Kode: string;
+  Nama: string;
+  Satuan: string;
+  Setting?: string;
+  Konstruksi?: string;
+  Panjang?: number | string | null;
+  Lebar?: number | string | null;
 }
 
 const route = useRoute(); // <-- Pastikan ini didefinisikan
@@ -50,12 +63,19 @@ const formatDateLocal = (value?: string | Date) => {
   return `${year}-${month}-${day}`;
 };
 
+// Cabang yang memakai tata cara Spanduk (harus sama dengan CABANG_SPANDUK di backend)
+const CABANG_SPANDUK = ["P02"];
+const DIVISI_GARMEN = ["CUTING", "SUBLIM", "PROOF"];
+const DIVISI_SPANDUK = ["PROOF", "PRODUKSI P02", "PRODUKSI MITRA", "BATIK"];
+
 // 1. Initial State
 const initialData = {
   nomor: "",
   tanggal: formatDateLocal(new Date()),
   cabang: authStore.userCabang || "P04",
-  divisi: "CUTING",
+  divisi: CABANG_SPANDUK.includes(authStore.userCabang ?? "")
+    ? DIVISI_SPANDUK[0]
+    : DIVISI_GARMEN[0],
   spk: "",
   namaSpk: "",
   jumlahSpk: 0,
@@ -127,7 +147,17 @@ const {
 const showSpkModal = ref(false);
 const komponenOptions = ref<string[]>([]);
 const ketOptions = ["BARU", "GANTI BS", "GANTI HILANG", "TAMBAHAN", "LAINNYA"];
-const divisiOptions = ["CUTING", "SUBLIM", "PROOF"];
+const isSpanduk = computed(() =>
+  CABANG_SPANDUK.includes(formData.value.cabang),
+);
+const divisiOptions = computed(() =>
+  isSpanduk.value ? DIVISI_SPANDUK : DIVISI_GARMEN,
+);
+
+const fmtUkuran = (v: number | string | null | undefined) =>
+  v === null || v === undefined || v === ""
+    ? ""
+    : Number(v).toLocaleString("id-ID", { maximumFractionDigits: 2 });
 
 const cabangOptions = ref<string[]>([]);
 
@@ -154,9 +184,9 @@ onMounted(async () => {
       .filter((c: any) => c.Kode.startsWith("P") && c.Kode !== "P03")
       .map((c: any) => c.Kode);
 
-    const userCab = authStore.userCabang;
+    const userCab = authStore.userCabang ?? "";
 
-    if (userCab === "P01" || userCab === "P04" || userCab === "P05") {
+    if (["P01", "P02", "P04", "P05"].includes(userCab)) {
       cabangOptions.value = [userCab];
       formData.value.cabang = userCab;
     } else {
@@ -164,7 +194,7 @@ onMounted(async () => {
       if (!isEditMode.value) formData.value.cabang = "P04";
     }
   } catch (e) {
-    cabangOptions.value = ["P01", "P04", "P05"]; // Fallback
+    cabangOptions.value = ["P01", "P02", "P04", "P05"]; // Fallback
   }
 
   // --- 3. TAMBAHKAN KODE INI UNTUK MEMICU REQUEST DATA EDIT ---
@@ -184,7 +214,7 @@ const addRow = () => {
     pcs: 0,
     butuh: 0,
     jumlah: 0,
-    komponen: "BODY",
+    komponen: isSpanduk.value ? "" : "BODY",
     ket: "",
   });
   // Opsional: Langsung buka lookup untuk baris baru
@@ -219,7 +249,7 @@ const onSpkSelected = async (spk: any) => {
           pcs: 0,
           butuh: 0,
           jumlah: 0,
-          komponen: "BODY",
+          komponen: isSpanduk.value ? "" : "BODY",
           ket: "",
         },
       ];
@@ -239,8 +269,14 @@ const openBahanLookup = (index: number) => {
 };
 
 // Fungsi saat bahan dipilih dari modal
-const onBahanSelected = (item: any) => {
+const onBahanSelected = (item: BahanItem) => {
   if (activeDetailIndex.value === -1) return;
+
+  // Spanduk hanya boleh bahan spanduk (server juga memeriksa)
+  if (isSpanduk.value && !item.Kode.toUpperCase().startsWith("SB")) {
+    toast.error("Cabang Spanduk hanya boleh memilih bahan spanduk.");
+    return;
+  }
 
   // Cek duplikasi kode di baris lain (Logic Delphi: loadkode)
   const isDuplicate = formData.value.details.some(
@@ -257,6 +293,9 @@ const onBahanSelected = (item: any) => {
   row.kode = item.Kode;
   row.nama = item.Nama;
   row.setting = item.Setting ?? "";
+  row.konstruksi = item.Konstruksi ?? "";
+  row.panjang = item.Panjang ?? null;
+  row.lebar = item.Lebar ?? null;
   row.satuan = item.Satuan;
 
   showBahanModal.value = false;
@@ -307,6 +346,18 @@ watch(
     }
   },
 );
+
+// Ganti cabang (mis. user HO-) mengubah tata cara: reset divisi dan isian yang bergantung SPK
+watch(isSpanduk, (spandukBaru) => {
+  if (isEditMode.value) return;
+  formData.value.divisi = spandukBaru ? DIVISI_SPANDUK[0] : DIVISI_GARMEN[0];
+  formData.value.spk = "";
+  formData.value.namaSpk = "";
+  formData.value.jumlahSpk = 0;
+  formData.value.mkbNomor = "";
+  formData.value.mkbTanggal = "";
+  formData.value.details = [];
+});
 </script>
 
 <template>
@@ -387,9 +438,7 @@ watch(
           variant="outlined"
           hide-details
           class="mb-2"
-          :readonly="
-            authStore.userCabang === 'P01' || authStore.userCabang === 'P04'
-          "
+          :readonly="cabangOptions.length <= 1"
         />
 
         <v-text-field
@@ -466,12 +515,17 @@ watch(
                 <th width="40">No</th>
                 <th width="110">Kode</th>
                 <th>Nama Bahan</th>
-                <th width="80">Setting</th>
+                <template v-if="isSpanduk">
+                  <th width="90">Konstruksi</th>
+                  <th width="70">Panjang</th>
+                  <th width="70">Lebar</th>
+                </template>
+                <th v-else width="80">Setting</th>
                 <th width="60">Sat</th>
                 <th width="80">Babaran</th>
                 <th width="80">Pcs</th>
                 <th width="90">Jumlah</th>
-                <th width="120">Komponen</th>
+                <th v-if="!isSpanduk" width="120">Komponen</th>
                 <th>Ket</th>
                 <th width="40"></th>
               </tr>
@@ -503,7 +557,12 @@ watch(
                 <td>
                   <input v-model="item.nama" class="cell-input" readonly />
                 </td>
-                <td class="text-center">{{ item.setting }}</td>
+                <template v-if="isSpanduk">
+                  <td class="text-center">{{ item.konstruksi }}</td>
+                  <td class="text-right pr-1">{{ fmtUkuran(item.panjang) }}</td>
+                  <td class="text-right pr-1">{{ fmtUkuran(item.lebar) }}</td>
+                </template>
+                <td v-else class="text-center">{{ item.setting }}</td>
                 <td class="text-center">{{ item.satuan }}</td>
                 <td>
                   <input
@@ -531,7 +590,7 @@ watch(
                     v-select-on-focus
                   />
                 </td>
-                <td>
+                <td v-if="!isSpanduk">
                   <select v-model="item.komponen" class="cell-input">
                     <option
                       v-for="opt in komponenOptions"
@@ -565,7 +624,7 @@ watch(
             variant="flat"
             @click="
               formData.details.push({
-                komponen: 'BODY',
+                komponen: isSpanduk ? '' : 'BODY',
                 pcs: formData.jumlahSpk,
               })
             "
@@ -595,6 +654,7 @@ watch(
   <SpkSearchModal
     v-model="showSpkModal"
     filter-mode="spk-map"
+    :divisi="isSpanduk ? 1 : undefined"
     @selected="onSpkSelected"
   />
   <BahanSearchModal

@@ -27,6 +27,9 @@ interface UserFlags {
 interface User {
   kode: string;
   nama: string;
+  namaLengkap?: string;
+  bagianHrd?: string;
+  jabatanHrd?: string;
   cabang: string;
   cabangKaos: string;
   divisi: number;
@@ -37,6 +40,12 @@ interface User {
     bahan: Gudang;
   };
   flags: UserFlags;
+}
+
+export interface GantiCabangResponse {
+  token: string;
+  user: User;
+  message: string;
 }
 
 interface Permission {
@@ -74,6 +83,7 @@ interface LoginResponse {
   praOrderPendingPpic: PraOrderPendingItem[];
   isDefaultPassword?: boolean;
   specialMessage?: string | null;
+  cabangBoleh?: string[];
   message: string;
 }
 
@@ -120,6 +130,7 @@ export const useAuthStore = defineStore(
     const bapBaruAudit = ref<BapBaruItem[]>([]);
     const bapReviewedNotif = ref<BapReviewedItem[]>([]);
     const praOrderPendingPpic = ref<PraOrderPendingItem[]>([]);
+    const cabangBoleh = ref<string[]>([]);
     const isSessionExpired = ref(false);
     const isOnline = ref(navigator.onLine);
     const approvalPendingTotal = ref(0);
@@ -142,7 +153,9 @@ export const useAuthStore = defineStore(
     const isAuthenticated = computed(
       () => !!token.value && !isTokenExpired.value,
     );
-    const userName = computed(() => user.value?.nama || "User");
+    const userName = computed(
+      () => user.value?.namaLengkap || user.value?.nama || "User",
+    );
     const userInitial = computed(() => userName.value.charAt(0).toUpperCase());
     const userCabang = computed(() => user.value?.cabang || "HO-");
     const gudangJadi = computed(
@@ -204,6 +217,7 @@ export const useAuthStore = defineStore(
       bapBaruAudit.value = loginResponse.bapBaruAudit || [];
       bapReviewedNotif.value = loginResponse.bapReviewedNotif || [];
       praOrderPendingPpic.value = loginResponse.praOrderPendingPpic || [];
+      cabangBoleh.value = loginResponse.cabangBoleh || [];
 
       // Router push akan ditangani di komponen Login.vue agar bisa show modal SPK dulu
     }
@@ -220,6 +234,7 @@ export const useAuthStore = defineStore(
       bapReviewedNotif.value = [];
       sessionStorage.removeItem("hasSeenBapReviewed");
       praOrderPendingPpic.value = [];
+      cabangBoleh.value = [];
       sessionStorage.removeItem("hasSeenPraOrderPpic");
       sessionStorage.removeItem("hasSeenMemoInternal");
       clearSnapshots();
@@ -249,6 +264,7 @@ export const useAuthStore = defineStore(
       bapBaruAudit.value = [];
       bapReviewedNotif.value = [];
       praOrderPendingPpic.value = [];
+      cabangBoleh.value = [];
       isSessionExpired.value = true;
       clearSnapshots();
       useTabsStore().resetTabs();
@@ -256,6 +272,15 @@ export const useAuthStore = defineStore(
 
     function setApprovalPendingTotal(n: number) {
       approvalPendingTotal.value = n;
+    }
+
+    // Dipanggil setelah /auth/cabang berhasil: token dan user baru. Tab dan
+    // snapshot dibuang karena datanya milik cabang sebelumnya.
+    function terapkanCabangBaru(res: GantiCabangResponse) {
+      token.value = res.token;
+      user.value = res.user;
+      clearSnapshots();
+      useTabsStore().resetTabs();
     }
 
     return {
@@ -270,6 +295,7 @@ export const useAuthStore = defineStore(
       isSessionExpired,
       isOnline,
       approvalPendingTotal,
+      cabangBoleh,
       // Getters
       isAuthenticated,
       userName,
@@ -294,13 +320,14 @@ export const useAuthStore = defineStore(
       initConnectivityCheck,
       clearConnectivityCheck,
       setApprovalPendingTotal,
+      terapkanCabangBaru,
     };
   },
   {
     // Plugin Persisted State agar otomatis save ke localStorage
     persist: {
       storage: localStorage,
-      pick: ["token", "user", "permissions"],
+      pick: ["token", "user", "permissions", "cabangBoleh"],
     },
   },
 );

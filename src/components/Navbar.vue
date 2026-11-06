@@ -1,11 +1,17 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch } from "vue";
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from "vue";
+import api from "@/services/api";
+import { useToast } from "vue-toastification";
+import type { AxiosError } from "axios";
+import type { GantiCabangResponse } from "@/stores/authStore";
 import { useAuthStore } from "@/stores/authStore";
 import logoSrc from "@/assets/logo.png";
 
 import { usePasswordDialog } from "@/composables/usePasswordDialog";
 import ChangePasswordDialog from "@/components/dialogs/ChangePasswordDialog.vue";
 import MemoInternalDialog from "@/components/dialogs/MemoInternalDialog.vue";
+import MegaMenuPanel from "@/components/MegaMenuPanel.vue";
+import NavDrawerNode from "@/components/NavDrawerNode.vue";
 import { useMemoInternal } from "@/composables/useMemoInternal";
 import { disconnectAppSocket } from "@/composables/useAppSocket";
 
@@ -18,17 +24,22 @@ import {
   IconMenu2,
   IconLogout,
   IconLock,
+  IconSearch,
 } from "@tabler/icons-vue";
-import { createMenuItems, type NavItem } from "@/config/menuItems";
+import {
+  createMenuItems,
+  type NavItem,
+  type MenuCari,
+} from "@/config/menuItems";
+import { useRouter } from "vue-router";
+import MenuSearchDialog from "@/components/dialogs/MenuSearchDialog.vue";
 
 const authStore = useAuthStore();
+const toast = useToast();
 
 const scrolled = ref(false);
 const drawer = ref(false);
 const drawerExpanded = ref<string[]>([]);
-const openedGroups = ref<string[]>([]);
-// Pemisah nilai folder anak: "<folder induk>::<folder anak>"
-const SEP = "::";
 const availableNavWidth = ref(9999);
 const showDesktopNav = computed(() => availableNavWidth.value >= 1200);
 
@@ -45,21 +56,19 @@ const isScrolled = computed(() => scrolled.value);
 const appBarElevation = computed(() => (scrolled.value ? 2 : 0));
 const hasSpkNotif = computed(() => authStore.spkUrgent?.length > 0);
 
+const isAdmin = computed(() => {
+  const kode = authStore.user?.kode?.toUpperCase() || "";
+  return kode === "ADMIN" || kode === "DEVELOPER";
+});
+
 const userRoleConfig = computed(() => {
-  const name = authStore.userName?.toUpperCase() || "";
   const bagian = authStore.user?.bagian?.toUpperCase() || "";
-  if (name.includes("ADMIN") || name === "DEVELOPER")
-    return { icon: IconShield, color: "red-darken-2" };
+  if (isAdmin.value) return { icon: IconShield, color: "red-darken-2" };
   if (bagian === "MARKETING")
     return { icon: IconSpeakerphone, color: "orange-darken-3" };
   if (bagian.includes("GUDANG"))
     return { icon: IconBuildingWarehouse, color: "teal-darken-1" };
   return { icon: IconTie, color: "indigo-darken-2" };
-});
-
-const isAdmin = computed(() => {
-  const kode = authStore.user?.kode?.toUpperCase() || "";
-  return kode === "ADMIN" || kode === "DEVELOPER";
 });
 
 const hasAccess = (item: NavItem): boolean => {
@@ -105,27 +114,53 @@ const openMenu = (targetModel: { value: boolean }) => {
 
 const menuItems: NavItem[] = createMenuItems();
 
+const router = useRouter();
+const cariOpen = ref(false);
+
+// Ratakan menu yang boleh dilihat user menjadi daftar cari; jalur = induk › folder
+const ratakan = (items: NavItem[] = [], jalur: string[] = []): MenuCari[] => {
+  const hasil: MenuCari[] = [];
+  for (const it of visibleItems(items)) {
+    if (it.divider || !it.title) continue;
+    const anak = it.subItems ?? it.items;
+    if (anak?.length) {
+      hasil.push(...ratakan(anak, [...jalur, it.title]));
+    } else if (it.to || it.onClick) {
+      hasil.push({
+        judul: it.title,
+        jalur: jalur.join(" › "),
+        to: it.to,
+        aksi: it.onClick,
+      });
+    }
+  }
+  return hasil;
+};
+
+const daftarCari = computed<MenuCari[]>(() =>
+  menuItems
+    .filter((m) => hasAccess(m))
+    .flatMap((m) => ratakan(m.items, [m.title ?? ""])),
+);
+
+const pilihCari = (m: MenuCari) => {
+  closeMenus();
+  if (m.aksi) m.aksi();
+  else if (m.to) void router.push(m.to);
+};
+
+const onKeydownGlobal = (e: KeyboardEvent) => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+    e.preventDefault();
+    cariOpen.value = true;
+  }
+};
+
 const closeMenus = () => {
   menuItems.forEach((m) => {
     if (m.model) m.model.value = false;
   });
-  openedGroups.value = [];
   drawer.value = false;
-};
-// Akordeon tingkat 1: hanya satu folder (beserta folder anaknya) yang terbuka.
-// Nilai folder anak berawalan "<induk>::" agar membukanya tidak menutup induk.
-const onOpenedChange = (val: unknown[]) => {
-  const semua = val.map(String);
-  const baru = semua.filter((v) => !openedGroups.value.includes(v));
-  let hasil = semua;
-  if (baru.length > 0) {
-    const induk = baru[baru.length - 1].split(SEP)[0];
-    hasil = semua.filter((v) => v.split(SEP)[0] === induk);
-  }
-  // Buang folder anak yatim (induknya sudah tertutup)
-  openedGroups.value = hasil.filter(
-    (v) => !v.includes(SEP) || hasil.includes(v.split(SEP)[0]),
-  );
 };
 
 const handleLogout = async () => {
@@ -142,6 +177,86 @@ const {
   initMemoInternal,
   resetMemoInternal,
 } = useMemoInternal();
+
+interface MenuUtama {
+  menu: NavItem;
+  bagian: NavItem[]; // bagian yang sudah dipangkas sesuai hak user
+  drawer: NavItem[]; // isi drawer (bagian tunggal diratakan)
+}
+
+// Pangkas pohon menu sesuai hak: buang item tanpa akses, divider yatim,
+// dan folder yang kosong setelah dipangkas.
+const pangkas = (items: NavItem[] = []): NavItem[] =>
+  visibleItems(items)
+    .map(
+      (it): NavItem =>
+        it.subItems ? { ...it, subItems: pangkas(it.subItems) } : it,
+    )
+    .filter(
+      (it) =>
+        it.divider || it.to || it.onClick || (it.subItems?.length ?? 0) > 0,
+    );
+
+const menuTampil = computed<MenuUtama[]>(() =>
+  menuItems
+    .filter((m) => hasAccess(m))
+    .map((m) => {
+      const bagian = pangkas(m.items);
+      return {
+        menu: m,
+        bagian,
+        drawer: bagian.length === 1 ? (bagian[0].subItems ?? []) : bagian,
+      };
+    })
+    .filter((x) => x.bagian.length > 0),
+);
+
+const badgeItem = (it: NavItem): number => {
+  if (it.to === "/tools/approval" && authStore.canSeeApproval)
+    return authStore.approvalPendingTotal;
+  if (it.title === "Memo Internal") return unreadJumlah.value;
+  return 0;
+};
+
+// Titik merah SPK urgent: dulu di tombol Garmen, sekarang di Transaksi dan
+// pada modul Garmen di rail, dan hanya bila user memang punya modul Garmen.
+const titikRail = (it: NavItem): boolean =>
+  it.title === "Garmen" && hasSpkNotif.value;
+
+const titikTransaksi = computed(
+  () =>
+    hasSpkNotif.value &&
+    (menuTampil.value
+      .find((x) => x.menu.title === "Transaksi")
+      ?.bagian.some((b) => b.title === "Garmen") ??
+      false),
+);
+
+const onPilih = (it: NavItem) => {
+  if (it.onClick) it.onClick();
+  else closeMenus();
+};
+
+const gantiBusy = ref(false);
+
+const gantiCabang = async (cabang: string) => {
+  if (gantiBusy.value || cabang === authStore.userCabang) return;
+  gantiBusy.value = true;
+  try {
+    const { data } = await api.post<GantiCabangResponse>("/auth/cabang", {
+      cabang,
+    });
+    authStore.terapkanCabangBaru(data);
+    // Tunggu penyimpanan state (persist) selesai sebelum memuat ulang,
+    // kalau tidak halaman baru masih membaca token lama.
+    await nextTick();
+    window.location.assign("/");
+  } catch (err) {
+    const error = err as AxiosError<{ message: string }>;
+    toast.error(error.response?.data?.message || "Gagal mengganti cabang.");
+    gantiBusy.value = false;
+  }
+};
 
 // Dialog Memo Internal dibuka dari item menu Tools: tutup dropdown/drawer-nya
 watch(memoOpen, (v) => {
@@ -172,6 +287,7 @@ let resizeObserver: ResizeObserver | null = null;
 
 onMounted(() => {
   window.addEventListener("scroll", handleScroll);
+  window.addEventListener("keydown", onKeydownGlobal);
   resizeObserver = new ResizeObserver((entries) => {
     for (const e of entries) availableNavWidth.value = e.contentRect.width;
   });
@@ -183,6 +299,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener("scroll", handleScroll);
+  window.removeEventListener("keydown", onKeydownGlobal);
   resizeObserver?.disconnect();
 });
 </script>
@@ -214,37 +331,34 @@ onUnmounted(() => {
 
     <!-- Desktop Nav -->
     <nav v-if="showDesktopNav" class="main-nav">
-      <template
-        v-for="menu in menuItems.filter((m) => hasAccess(m))"
-        :key="menu.title"
-      >
+      <template v-for="entri in menuTampil" :key="entri.menu.title">
         <v-menu
-          v-if="menu.model"
-          v-model="menu.model.value"
+          v-if="entri.menu.model"
+          v-model="entri.menu.model.value"
           :close-on-content-click="false"
           transition="fade-transition"
           location="bottom center"
           origin="top center"
           @update:modelValue="
             (val) => {
-              if (val) openMenu(menu.model!);
+              if (val) openMenu(entri.menu.model!);
             }
           "
         >
           <template #activator="{ props }">
             <v-badge
               color="error"
-              :dot="!(menu.title === 'Tools' && unreadJumlah > 0)"
+              :dot="!(entri.menu.title === 'Tools' && unreadJumlah > 0)"
               :content="
-                menu.title === 'Tools' && unreadJumlah > 0
+                entri.menu.title === 'Tools' && unreadJumlah > 0
                   ? unreadJumlah > 99
                     ? '99+'
                     : unreadJumlah
                   : undefined
               "
               :model-value="
-                (menu.title === 'Garmen' && hasSpkNotif) ||
-                (menu.title === 'Tools' &&
+                (entri.menu.title === 'Transaksi' && titikTransaksi) ||
+                (entri.menu.title === 'Tools' &&
                   (unreadJumlah > 0 ||
                     (authStore.canSeeApproval &&
                       authStore.approvalPendingTotal > 0)))
@@ -256,202 +370,49 @@ onUnmounted(() => {
                 v-bind="props"
                 class="nav-btn"
                 :class="{
-                  'memo-pulse': menu.title === 'Tools' && unreadJumlah > 0,
+                  'memo-pulse':
+                    entri.menu.title === 'Tools' && unreadJumlah > 0,
                 }"
               >
                 <component
-                  :is="menu.icon"
-                  :size="15"
+                  :is="entri.menu.icon"
+                  :size="17"
                   :stroke-width="1.6"
                   class="nav-btn-icon"
                 />
-                <span>{{ menu.title }}</span>
+                <span>{{ entri.menu.title }}</span>
                 <IconChevronDown
                   :size="12"
                   :stroke-width="2.2"
                   class="nav-btn-chev"
                   :style="{
-                    transform: menu.model.value ? 'rotate(180deg)' : '',
+                    transform: entri.menu.model.value ? 'rotate(180deg)' : '',
                   }"
                 />
               </button>
             </v-badge>
           </template>
 
-          <v-card class="nav-dropdown" elevation="6">
-            <v-list
-              class="nav-list"
-              density="comfortable"
-              :opened="openedGroups"
-              @update:opened="onOpenedChange"
-            >
-              <template v-for="(item, i) in visibleItems(menu.items)" :key="i">
-                <v-divider v-if="item.divider" class="nav-divider" />
-
-                <!-- Folder dengan subItems -->
-                <v-list-group
-                  v-else-if="'subItems' in item"
-                  :value="item.title"
-                >
-                  <template #activator="{ props, isOpen }">
-                    <v-list-item v-bind="props" class="nav-item">
-                      <template #prepend>
-                        <component
-                          :is="item.icon"
-                          :size="15"
-                          :stroke-width="1.5"
-                          class="ic mr-2"
-                        />
-                      </template>
-                      <v-list-item-title class="nav-item-title">{{
-                        item.title
-                      }}</v-list-item-title>
-                      <template #append>
-                        <IconChevronDown
-                          :size="13"
-                          :stroke-width="2"
-                          :style="{
-                            transform: isOpen ? 'rotate(180deg)' : '',
-                            transition: 'transform 0.2s',
-                          }"
-                        />
-                      </template>
-                    </v-list-item>
-                  </template>
-                  <template
-                    v-for="(sub, si) in visibleItems(item.subItems)"
-                    :key="si"
-                  >
-                    <v-divider v-if="sub.divider" class="my-1 mx-2" />
-
-                    <!-- Folder tingkat 2 (mis. Monitoring Produksi) -->
-                    <v-list-group
-                      v-else-if="'subItems' in sub"
-                      :value="`${item.title}${SEP}${sub.title}`"
-                    >
-                      <template #activator="{ props, isOpen }">
-                        <v-list-item v-bind="props" class="nav-item nested">
-                          <template #prepend>
-                            <component
-                              :is="sub.icon"
-                              :size="13"
-                              :stroke-width="1.5"
-                              class="ic mr-2"
-                            />
-                          </template>
-                          <v-list-item-title class="nav-item-title">{{
-                            sub.title
-                          }}</v-list-item-title>
-                          <template #append>
-                            <IconChevronDown
-                              :size="12"
-                              :stroke-width="2"
-                              :style="{
-                                transform: isOpen ? 'rotate(180deg)' : '',
-                                transition: 'transform 0.2s',
-                              }"
-                            />
-                          </template>
-                        </v-list-item>
-                      </template>
-                      <template
-                        v-for="(leaf, li) in visibleItems(sub.subItems)"
-                        :key="li"
-                      >
-                        <v-divider v-if="leaf.divider" class="my-1 mx-2" />
-                        <v-list-item
-                          v-else
-                          :to="leaf.to"
-                          class="nav-item nested-2"
-                          @click="closeMenus"
-                        >
-                          <template #prepend>
-                            <component
-                              :is="leaf.icon"
-                              :size="13"
-                              :stroke-width="1.5"
-                              class="ic mr-2"
-                            />
-                          </template>
-                          <v-list-item-title class="nav-item-title">{{
-                            leaf.title
-                          }}</v-list-item-title>
-                        </v-list-item>
-                      </template>
-                    </v-list-group>
-
-                    <v-list-item
-                      v-else
-                      :to="sub.to"
-                      class="nav-item nested"
-                      @click="closeMenus"
-                    >
-                      <template #prepend>
-                        <component
-                          :is="sub.icon"
-                          :size="13"
-                          :stroke-width="1.5"
-                          class="ic mr-2"
-                        />
-                      </template>
-                      <v-list-item-title class="nav-item-title">{{
-                        sub.title
-                      }}</v-list-item-title>
-                    </v-list-item>
-                  </template>
-                </v-list-group>
-
-                <!-- Item biasa -->
-                <v-list-item
-                  v-else
-                  :to="item.to"
-                  class="nav-item"
-                  @click="item.onClick ? item.onClick() : closeMenus()"
-                >
-                  <template #prepend>
-                    <component
-                      :is="item.icon"
-                      :size="15"
-                      :stroke-width="1.5"
-                      class="ic mr-2"
-                    />
-                  </template>
-                  <v-list-item-title class="nav-item-title">{{
-                    item.title
-                  }}</v-list-item-title>
-                  <template #append>
-                    <span
-                      v-if="
-                        item.to === '/tools/approval' &&
-                        authStore.canSeeApproval &&
-                        authStore.approvalPendingTotal > 0
-                      "
-                      class="approval-count-badge"
-                    >
-                      {{
-                        authStore.approvalPendingTotal > 99
-                          ? "99+"
-                          : authStore.approvalPendingTotal
-                      }}
-                    </span>
-                    <span
-                      v-else-if="
-                        item.title === 'Memo Internal' && unreadJumlah > 0
-                      "
-                      class="approval-count-badge"
-                    >
-                      {{ unreadJumlah > 99 ? "99+" : unreadJumlah }}
-                    </span>
-                  </template>
-                </v-list-item>
-              </template>
-            </v-list>
-          </v-card>
+          <MegaMenuPanel
+            :bagian="entri.bagian"
+            :rail="entri.menu.tampilan === 'rail'"
+            :badge="badgeItem"
+            :titik="titikRail"
+            @pilih="onPilih"
+          />
         </v-menu>
       </template>
     </nav>
 
     <v-spacer />
+
+    <button
+      class="nav-btn mr-2"
+      title="Cari menu (Ctrl+K)"
+      @click="cariOpen = true"
+    >
+      <IconSearch :size="16" :stroke-width="1.6" class="nav-btn-icon" />
+    </button>
 
     <!-- User Menu -->
     <v-menu location="bottom end" transition="fade-transition">
@@ -490,6 +451,20 @@ onUnmounted(() => {
             </div>
           </div>
           <v-divider class="my-1" />
+          <template v-if="authStore.cabangBoleh.length > 1">
+            <div class="cb-judul">Cabang aktif</div>
+            <v-list-item
+              v-for="cab in authStore.cabangBoleh"
+              :key="cab"
+              class="um-item"
+              :active="cab === authStore.userCabang"
+              :disabled="gantiBusy"
+              @click="gantiCabang(cab)"
+            >
+              <v-list-item-title>{{ cab }}</v-list-item-title>
+            </v-list-item>
+            <v-divider class="my-1" />
+          </template>
           <v-list-item class="drw-item" @click="openPasswordDialogHandler">
             <template #prepend>
               <IconLock :size="15" :stroke-width="1.5" class="ic mr-2" />
@@ -540,22 +515,19 @@ onUnmounted(() => {
     <v-divider />
 
     <v-list density="compact" v-model:opened="drawerExpanded">
-      <template
-        v-for="menu in menuItems.filter((m) => hasAccess(m))"
-        :key="menu.title"
-      >
-        <v-list-group :value="menu.title" v-if="menu.items?.length">
+      <template v-for="entri in menuTampil" :key="entri.menu.title">
+        <v-list-group :value="entri.menu.title">
           <template #activator="{ props, isOpen }">
             <v-list-item v-bind="props" class="drw-item">
               <template #prepend>
                 <component
-                  :is="menu.icon"
+                  :is="entri.menu.icon"
                   :size="17"
                   :stroke-width="1.5"
                   class="ic mr-2"
                 />
               </template>
-              <v-list-item-title>{{ menu.title }}</v-list-item-title>
+              <v-list-item-title>{{ entri.menu.title }}</v-list-item-title>
               <template #append>
                 <IconChevronDown
                   :size="13"
@@ -569,130 +541,15 @@ onUnmounted(() => {
             </v-list-item>
           </template>
 
-          <template v-for="(item, i) in visibleItems(menu.items)" :key="i">
-            <v-divider v-if="item.divider" class="mx-3 my-1" />
-            <v-list-group :value="item.title" v-else-if="'subItems' in item">
-              <template #activator="{ props, isOpen }">
-                <v-list-item v-bind="props" class="drw-sub">
-                  <template #prepend>
-                    <component
-                      :is="item.icon"
-                      :size="15"
-                      :stroke-width="1.5"
-                      class="ic mr-2"
-                    />
-                  </template>
-                  <v-list-item-title>{{ item.title }}</v-list-item-title>
-                  <template #append>
-                    <IconChevronDown
-                      :size="12"
-                      :stroke-width="2"
-                      :style="{
-                        transform: isOpen ? 'rotate(180deg)' : '',
-                        transition: 'transform 0.2s',
-                      }"
-                    />
-                  </template>
-                </v-list-item>
-              </template>
-              <template
-                v-for="(sub, si) in visibleItems(item.subItems)"
-                :key="si"
-              >
-                <v-divider v-if="sub.divider" class="mx-3 my-1" />
-
-                <!-- Folder tingkat 2 (mis. Monitoring Produksi) -->
-                <v-list-group v-else-if="'subItems' in sub" :value="sub.title">
-                  <template #activator="{ props, isOpen }">
-                    <v-list-item v-bind="props" class="drw-subsub">
-                      <template #prepend>
-                        <component
-                          :is="sub.icon"
-                          :size="13"
-                          :stroke-width="1.5"
-                          class="ic mr-2"
-                        />
-                      </template>
-                      <v-list-item-title>{{ sub.title }}</v-list-item-title>
-                      <template #append>
-                        <IconChevronDown
-                          :size="12"
-                          :stroke-width="2"
-                          :style="{
-                            transform: isOpen ? 'rotate(180deg)' : '',
-                            transition: 'transform 0.2s',
-                          }"
-                        />
-                      </template>
-                    </v-list-item>
-                  </template>
-                  <template
-                    v-for="(leaf, li) in visibleItems(sub.subItems)"
-                    :key="li"
-                  >
-                    <v-divider v-if="leaf.divider" class="mx-3 my-1" />
-                    <v-list-item
-                      v-else
-                      :to="leaf.to"
-                      class="drw-subsub"
-                      @click="closeMenus"
-                    >
-                      <template #prepend>
-                        <component
-                          :is="leaf.icon"
-                          :size="13"
-                          :stroke-width="1.5"
-                          class="ic mr-2"
-                        />
-                      </template>
-                      <v-list-item-title>{{ leaf.title }}</v-list-item-title>
-                    </v-list-item>
-                  </template>
-                </v-list-group>
-
-                <v-list-item
-                  v-else
-                  :to="sub.to"
-                  class="drw-subsub"
-                  @click="closeMenus"
-                >
-                  <template #prepend>
-                    <component
-                      :is="sub.icon"
-                      :size="13"
-                      :stroke-width="1.5"
-                      class="ic mr-2"
-                    />
-                  </template>
-                  <v-list-item-title>{{ sub.title }}</v-list-item-title>
-                </v-list-item>
-              </template>
-            </v-list-group>
-            <v-list-item
-              v-else
-              :to="item.to"
-              class="drw-sub"
-              @click="item.onClick ? item.onClick() : closeMenus()"
-            >
-              <template #prepend>
-                <component
-                  :is="item.icon"
-                  :size="15"
-                  :stroke-width="1.5"
-                  class="ic mr-2"
-                />
-              </template>
-              <v-list-item-title>{{ item.title }}</v-list-item-title>
-              <template #append>
-                <span
-                  v-if="item.title === 'Memo Internal' && unreadJumlah > 0"
-                  class="approval-count-badge"
-                >
-                  {{ unreadJumlah > 99 ? "99+" : unreadJumlah }}
-                </span>
-              </template>
-            </v-list-item>
-          </template>
+          <NavDrawerNode
+            v-for="(node, i) in entri.drawer"
+            :key="i"
+            :item="node"
+            :path="entri.menu.title ?? ''"
+            :level="1"
+            :badge="badgeItem"
+            @pilih="onPilih"
+          />
         </v-list-group>
       </template>
     </v-list>
@@ -725,6 +582,12 @@ onUnmounted(() => {
       </div>
     </template>
   </v-navigation-drawer>
+
+  <MenuSearchDialog
+    v-model="cariOpen"
+    :daftar="daftarCari"
+    @pilih="pilihCari"
+  />
 
   <MemoInternalDialog />
 
@@ -779,13 +642,13 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  height: 34px;
-  padding: 0 7px;
+  height: 40px;
+  padding: 0 12px;
   border: none;
   background: transparent;
   border-radius: 7px;
   cursor: pointer;
-  font-size: 0.78rem;
+  font-size: 0.92rem;
   font-weight: 600;
   color: rgb(var(--v-theme-on-surface));
   font-family: inherit;
@@ -806,50 +669,6 @@ onUnmounted(() => {
   opacity: 0.45;
   transition: transform 0.2s;
   flex-shrink: 0;
-}
-
-/* ── Dropdown ── */
-.nav-dropdown {
-  border-radius: 10px;
-  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
-  background: rgba(var(--v-theme-surface), 0.98) !important;
-  backdrop-filter: blur(16px);
-  min-width: 205px;
-}
-.nav-list {
-  padding: 4px;
-  max-height: calc(100vh - 80px);
-  overflow-y: auto;
-}
-.nav-list::-webkit-scrollbar {
-  width: 4px;
-}
-.nav-list::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.12);
-  border-radius: 3px;
-}
-
-.nav-item {
-  min-height: 32px !important;
-  border-radius: 6px;
-  margin: 1px 0;
-}
-.nav-item.nested {
-  padding-left: 26px !important;
-}
-.nav-item.nested-2 {
-  padding-left: 40px !important;
-}
-.nav-item-title {
-  font-size: 0.82rem !important;
-}
-/* jarak antara judul dan panah folder (ikon Tabler tidak dapat jarak dari Vuetify) */
-.nav-item :deep(.v-list-item__append) {
-  padding-inline-start: 12px;
-  flex-shrink: 0;
-}
-.nav-divider {
-  margin: 3px 0;
 }
 
 /* icons */
@@ -914,6 +733,14 @@ onUnmounted(() => {
 .up-sub {
   font-size: 0.73rem;
   color: rgba(var(--v-theme-on-surface), 0.5);
+}
+.cb-judul {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(var(--v-theme-on-surface), 0.55);
+  padding: 6px 12px 2px;
 }
 .um-item {
   min-height: 33px !important;
@@ -1050,6 +877,30 @@ onUnmounted(() => {
 ) {
   padding-inline-start: 24px !important;
   padding-left: 24px !important;
+}
+/* Header folder tingkat 3 di drawer */
+:deep(
+  .v-navigation-drawer
+    .v-list-group__items
+    .v-list-group__items
+    .v-list-group__items
+    > .v-list-group
+    > .v-list-group__header
+) {
+  padding-inline-start: 32px !important;
+  padding-left: 32px !important;
+}
+/* Leaf di dalam folder tingkat 3 di drawer */
+:deep(
+  .v-navigation-drawer
+    .v-list-group__items
+    .v-list-group__items
+    .v-list-group__items
+    .v-list-group__items
+    > .v-list-item
+) {
+  padding-inline-start: 40px !important;
+  padding-left: 40px !important;
 }
 .approval-count-badge {
   font-size: 10px;

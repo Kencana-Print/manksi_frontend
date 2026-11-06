@@ -553,6 +553,13 @@ const onExportDetail = async () => {
           KodeBahan: r.KodeBahan,
           NamaBahan: r.NamaBahan,
           Setting: r.Setting || "",
+          Konstruksi: r.Konstruksi || "",
+          Panjang:
+            r.Panjang === null || r.Panjang === undefined
+              ? ""
+              : Number(r.Panjang),
+          Lebar:
+            r.Lebar === null || r.Lebar === undefined ? "" : Number(r.Lebar),
           Satuan: r.Satuan,
           Babaran: Number(r.Babaran) || 0,
           Pcs: Number(r.Pcs) || 0,
@@ -582,6 +589,21 @@ const onExportDetail = async () => {
       { header: "Kode Bahan", key: "KodeBahan", width: 14 },
       { header: "Nama Bahan", key: "NamaBahan", width: 26 },
       { header: "Setting", key: "Setting", width: 10, align: "center" },
+      { header: "Konstruksi", key: "Konstruksi", width: 14 },
+      {
+        header: "Panjang",
+        key: "Panjang",
+        width: 9,
+        align: "right",
+        numFmt: "#,##0.##",
+      },
+      {
+        header: "Lebar",
+        key: "Lebar",
+        width: 9,
+        align: "right",
+        numFmt: "#,##0.##",
+      },
       { header: "Sat", key: "Satuan", width: 8, align: "center" },
       {
         header: "Babaran",
@@ -627,6 +649,37 @@ const onExportDetail = async () => {
 };
 
 const num = (val: number) => new Intl.NumberFormat("id-ID").format(val || 0);
+
+interface RowKode {
+  Kode: string;
+}
+interface RowUkuran {
+  Konstruksi?: string;
+  Panjang?: number | string | null;
+  Lebar?: number | string | null;
+}
+
+// Dokumen spanduk = ada bahan berkode SB (kolom Setting/Komponen tidak berlaku)
+const adaSpanduk = (list: RowKode[] | undefined): boolean =>
+  !!list?.some((r) =>
+    String(r.Kode ?? "")
+      .toUpperCase()
+      .startsWith("SB"),
+  );
+
+const fmtUkuran = (v: number | string | null | undefined) =>
+  v === null || v === undefined || v === ""
+    ? ""
+    : Number(v).toLocaleString("id-ID", { maximumFractionDigits: 2 });
+
+// Ringkas untuk kolom sempit: "KONSTRUKSI 1,5 x 50"
+const ringkasUkuran = (r: RowUkuran) =>
+  [
+    r.Konstruksi,
+    [fmtUkuran(r.Panjang), fmtUkuran(r.Lebar)].filter(Boolean).join(" x "),
+  ]
+    .filter(Boolean)
+    .join(" ");
 </script>
 
 <template>
@@ -853,13 +906,23 @@ const num = (val: number) => new Intl.NumberFormat("id-ID").format(val || 0);
                     <th style="width: 140px; text-align: left">Nomor</th>
                     <th style="width: 90px; text-align: left">Kode</th>
                     <th style="text-align: left">Nama Bahan</th>
-                    <th style="width: 70px">Setting</th>
+                    <template v-if="adaSpanduk(detailsData[item.Nomor].bahan)">
+                      <th style="width: 90px">Konstruksi</th>
+                      <th style="width: 60px; text-align: right">Panjang</th>
+                      <th style="width: 60px; text-align: right">Lebar</th>
+                    </template>
+                    <th v-else style="width: 70px">Setting</th>
                     <th style="width: 50px">Satuan</th>
                     <th style="width: 70px; text-align: right">Babaran</th>
                     <th style="width: 60px; text-align: right">PCS</th>
                     <th style="width: 75px; text-align: right">Jumlah</th>
                     <th style="width: 75px; text-align: right">Realisasi</th>
-                    <th style="width: 120px; text-align: left">Komponen</th>
+                    <th
+                      v-if="!adaSpanduk(detailsData[item.Nomor].bahan)"
+                      style="width: 120px; text-align: left"
+                    >
+                      Komponen
+                    </th>
                     <th style="text-align: left">Keterangan</th>
                   </tr>
                 </thead>
@@ -876,7 +939,12 @@ const num = (val: number) => new Intl.NumberFormat("id-ID").format(val || 0);
                       {{ bhn.Kode }}
                     </td>
                     <td>{{ bhn.NamaBahan }}</td>
-                    <td class="tc">{{ bhn.Setting }}</td>
+                    <template v-if="adaSpanduk(detailsData[item.Nomor].bahan)">
+                      <td class="tc">{{ bhn.Konstruksi }}</td>
+                      <td class="tr">{{ fmtUkuran(bhn.Panjang) }}</td>
+                      <td class="tr">{{ fmtUkuran(bhn.Lebar) }}</td>
+                    </template>
+                    <td v-else class="tc">{{ bhn.Setting }}</td>
                     <td class="tc">{{ bhn.Satuan }}</td>
                     <td class="tr">{{ num(bhn.Babaran) }}</td>
                     <td class="tr">{{ num(bhn.Pcs) }}</td>
@@ -889,7 +957,9 @@ const num = (val: number) => new Intl.NumberFormat("id-ID").format(val || 0);
                     <td class="tr" style="font-weight: 700; color: #2e7d32">
                       {{ num(bhn.Realisasi) }}
                     </td>
-                    <td>{{ bhn.Komponen }}</td>
+                    <td v-if="!adaSpanduk(detailsData[item.Nomor].bahan)">
+                      {{ bhn.Komponen }}
+                    </td>
                     <td>{{ bhn.Keterangan }}</td>
                   </tr>
                 </tbody>
@@ -1011,7 +1081,13 @@ const num = (val: number) => new Intl.NumberFormat("id-ID").format(val || 0);
                       <th style="width: 28px">No</th>
                       <th style="width: 80px; text-align: left">Kode</th>
                       <th style="text-align: left">Nama</th>
-                      <th style="width: 70px">Setting</th>
+                      <th
+                        v-if="adaSpanduk(detailsData[item.Nomor].realisasiDtl)"
+                        style="width: 130px"
+                      >
+                        Ukuran
+                      </th>
+                      <th v-else style="width: 70px">Setting</th>
                       <th style="width: 55px">Satuan</th>
                       <th style="width: 75px; text-align: right">Jumlah</th>
                     </tr>
@@ -1032,7 +1108,15 @@ const num = (val: number) => new Intl.NumberFormat("id-ID").format(val || 0);
                           {{ dtl.Kode }}
                         </td>
                         <td>{{ dtl.Nama }}</td>
-                        <td class="tc">{{ dtl.Setting }}</td>
+                        <td
+                          v-if="
+                            adaSpanduk(detailsData[item.Nomor].realisasiDtl)
+                          "
+                          class="tc"
+                        >
+                          {{ ringkasUkuran(dtl) }}
+                        </td>
+                        <td v-else class="tc">{{ dtl.Setting }}</td>
                         <td class="tc">{{ dtl.Satuan }}</td>
                         <td
                           class="tr"

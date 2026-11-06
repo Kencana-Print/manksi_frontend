@@ -350,7 +350,10 @@ const loadAgendaBadge = async () => {
         />
         <strong>{{ authStore.userName }}</strong>
         <span class="mx-2 text-disabled">|</span>
-        <span>{{ authStore.userCabang }} - {{ authStore.user?.bagian }}</span>
+        <span>
+          {{ authStore.userCabang }} -
+          {{ authStore.user?.bagianHrd || authStore.user?.bagian }}
+        </span>
       </div>
 
       <v-spacer />

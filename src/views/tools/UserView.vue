@@ -1,26 +1,36 @@
 <script setup lang="ts">
-import { ref, computed } from "vue";
 import { useRouter } from "vue-router";
 import api from "@/services/api";
 import { useBrowse } from "@/composables/useBrowse";
-import { useToast } from "vue-toastification";
-import { useAuthStore } from "@/stores/authStore";
 import BaseBrowse from "@/components/BaseBrowse.vue";
 import { IconUsers } from "@tabler/icons-vue";
 
-const toast = useToast();
+interface UserBrowseItem {
+  Kode: string;
+  Nama: string;
+  Nik: string;
+  DepJab: string;
+  Bagian: string;
+  Pabrik: string;
+  Cabang: string;
+  JmlCabang: number;
+  Role: string;
+  Aktif: "YA" | "TIDAK";
+  Tipe: string;
+  DariHrd: boolean;
+  KeluarHrd: boolean;
+  CabangHrd: string;
+  CabangSesuai: boolean;
+}
+
+interface RowCtx {
+  item: UserBrowseItem & { raw?: UserBrowseItem };
+}
+
 const router = useRouter();
-const authStore = useAuthStore();
 
-// Modul ini admin-only (dijaga di backend via requireAdmin), BUKAN via
-// sistem permission thakuser/menuId — makanya menuId dikirim kosong ke
-// useBrowse/BaseBrowse dan validasi akses sesungguhnya cukup mengandalkan
-// backend + guard ringan berikut.
-const isAdmin = computed(() => {
-  const kode = authStore.user?.kode?.toUpperCase();
-  return kode === "ADMIN" || kode === "DEVELOPER";
-});
-
+// Modul ini admin-only (dijaga di backend via requireAdmin), bukan lewat
+// permission thakuser/menuId, makanya menuId dikirim kosong.
 const { items, isLoading, selected, fetchData, exportToExcel } = useBrowse({
   menuId: "",
   fetchApi: async () => {
@@ -30,21 +40,27 @@ const { items, isLoading, selected, fetchData, exportToExcel } = useBrowse({
 });
 
 const headers = [
-  { title: "KODE USER", key: "Kode", width: "150px" },
-  { title: "NAMA USER", key: "Nama", minWidth: "300px" },
-  { title: "CABANG", key: "Cabang", width: "100px", align: "center" },
-  { title: "BAGIAN", key: "Bagian", width: "130px" },
-  { title: "AKTIF", key: "Aktif", width: "120px", align: "center" },
+  { title: "KODE USER", key: "Kode", width: "130px" },
+  { title: "NAMA", key: "Nama", minWidth: "220px" },
+  { title: "NIK", key: "Nik", width: "120px" },
+  { title: "DEPT/JABATAN", key: "DepJab", width: "120px" },
+  { title: "BAGIAN", key: "Bagian", width: "180px" },
+  { title: "PABRIK", key: "Pabrik", width: "80px", align: "center" },
+  { title: "CABANG", key: "Cabang", width: "90px", align: "center" },
+  { title: "ROLE", key: "Role", minWidth: "150px" },
+  { title: "AKTIF", key: "Aktif", width: "100px", align: "center" },
 ];
 
-const rowPropsFn = (data: any) => {
-  const item = data.item?.raw || data.item;
+const rowPropsFn = (data: RowCtx) => {
+  const item = data.item.raw ?? data.item;
   if (item.Aktif === "TIDAK") return { class: "text-red font-weight-bold" };
+  // Akun aktif milik karyawan yang sudah keluar menurut HRD
+  if (item.KeluarHrd) return { class: "text-orange-darken-3 font-weight-bold" };
   return {};
 };
 
 const handleAdd = () => router.push({ name: "UserFormCreate" });
-const handleEdit = (item: any) =>
+const handleEdit = (item: UserBrowseItem) =>
   router.push({ name: "UserFormEdit", params: { kode: item.Kode } });
 </script>
 
@@ -68,6 +84,38 @@ const handleEdit = (item: any) =>
     @edit="handleEdit"
     @export="exportToExcel('Data_Master_User')"
   >
+    <template #item.Nama="{ item }">
+      <span :class="{ fallback: !item.DariHrd }">{{ item.Nama }}</span>
+    </template>
+
+    <template #item.Nik="{ item }">
+      <span v-if="item.Nik">{{ item.Nik }}</span>
+      <span v-else-if="item.Tipe === 'BERSAMA'" class="fallback"
+        >Akun bersama</span
+      >
+      <span v-else class="fallback">-</span>
+    </template>
+
+    <template #item.Bagian="{ item }">
+      <span :class="{ fallback: !item.DariHrd }">{{ item.Bagian }}</span>
+    </template>
+
+    <template #item.Cabang="{ item }">
+      <span
+        :class="{ 'cab-warn': !item.CabangSesuai }"
+        :title="
+          !item.CabangSesuai
+            ? `Cabang menurut pabrik HRD: ${item.CabangHrd}`
+            : ''
+        "
+      >
+        {{ item.Cabang }}
+      </span>
+      <span v-if="item.JmlCabang > 1" class="plus"
+        >+{{ item.JmlCabang - 1 }}</span
+      >
+    </template>
+
     <template #item.Aktif="{ item }">
       <span
         class="status-chip"
@@ -88,6 +136,17 @@ const handleEdit = (item: any) =>
           <div class="legend-item">
             <div class="legend-dot" style="background: #c62828"></div>
             User Pasif
+          </div>
+          <div class="legend-item">
+            <div class="legend-dot" style="background: #e65100"></div>
+            Sudah keluar di HRD
+          </div>
+          <div class="legend-item">
+            <span class="fallback">Miring abu-abu</span> = data MANKSI (belum
+            ada NIK)
+          </div>
+          <div class="legend-item">
+            <span class="cab-warn">Cabang</span> = berbeda dari pabrik HRD
           </div>
         </div>
       </div>
@@ -147,5 +206,20 @@ const handleEdit = (item: any) =>
   height: 9px;
   border-radius: 2px;
   flex-shrink: 0;
+}
+.fallback {
+  color: #9e9e9e;
+  font-style: italic;
+}
+.plus {
+  font-size: 9px;
+  font-weight: 700;
+  color: #1565c0;
+  margin-left: 2px;
+}
+.cab-warn {
+  color: #e65100;
+  font-weight: 700;
+  text-decoration: underline dotted;
 }
 </style>

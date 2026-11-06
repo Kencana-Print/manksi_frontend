@@ -57,9 +57,11 @@ onMounted(async () => {
             <td width="60">No.Minta</td>
             <td width="5">:</td>
             <td width="150">{{ printData.header.promin_minta }}</td>
-            <td width="50">Tujuan</td>
-            <td width="5">:</td>
-            <td>{{ printData.header.tujuan }}</td>
+            <td v-if="printData.header.tujuan" width="50">Tujuan</td>
+            <td v-if="printData.header.tujuan" width="5">:</td>
+            <td v-if="printData.header.tujuan">
+              {{ printData.header.tujuan }}
+            </td>
           </tr>
           <tr>
             <td>Tanggal</td>
@@ -102,7 +104,7 @@ onMounted(async () => {
             <th width="30">No</th>
             <th width="120">Kode</th>
             <th>Nama</th>
-            <th width="60">Setting</th>
+            <th v-if="!printData.header.spanduk" width="60">Setting</th>
             <th width="60">Satuan</th>
             <th width="80" class="text-right">Jumlah</th>
           </tr>
@@ -112,7 +114,9 @@ onMounted(async () => {
             <td class="text-center">{{ Number(idx) + 1 }}</td>
             <td>{{ item.kode }}</td>
             <td>{{ item.nama }}</td>
-            <td class="text-center">{{ item.setting }}</td>
+            <td v-if="!printData.header.spanduk" class="text-center">
+              {{ item.setting }}
+            </td>
             <td class="text-center">{{ item.satuan }}</td>
             <td class="text-right">{{ num(item.jumlah) }}</td>
           </tr>
@@ -145,7 +149,7 @@ onMounted(async () => {
 @media print {
   @page {
     size: A4 portrait;
-    margin: 10mm;
+    margin: 0;
   }
   body {
     -webkit-print-color-adjust: exact;
@@ -164,9 +168,11 @@ onMounted(async () => {
 }
 
 .print-section {
-  height: 148mm; /* Setengah A4 */
+  height: 148mm; /* Setengah A4, dua salinan = 296mm dari 297mm */
   padding: 10mm 15mm;
   box-sizing: border-box;
+  overflow: hidden;
+  break-inside: avoid;
   page-break-inside: avoid;
   position: relative;
 }
