@@ -161,6 +161,7 @@ const onUpdateExpanded = async (val: any[]) => {
 };
 
 // ── Export Master ke Excel ─────────────────────────────────────────────
+const baseBrowseRef = ref<{ getFilteredItems: () => PengajuanPerbaikanRow[] } | null>(null);
 const isExportingMaster = ref(false);
 
 const exportColumnsMaster: ExcelColumn[] = [
@@ -183,12 +184,24 @@ const exportColumnsMaster: ExcelColumn[] = [
   { header: "Tgl Close", key: "TglClose", width: 16, align: "center" },
 ];
 
-const onExportMaster = async () => {
-  const rows = items.value ?? [];
-  if (!rows.length) {
+const onExportMaster = async (exportedRows?: PengajuanPerbaikanRow[]) => {
+  const rawRows =
+    Array.isArray(exportedRows) && exportedRows.length
+      ? exportedRows
+      : (baseBrowseRef.value?.getFilteredItems?.() ?? items.value ?? []);
+  if (!rawRows.length) {
     toast.warning("Tidak ada data untuk diexport.");
     return;
   }
+  const rows = rawRows.map((r: any) => ({
+    ...r,
+    Tanggal: r.Tanggal ? formatTanggal(r.Tanggal) : "-",
+    TglKonfirmasiTeknisi: r.TglKonfirmasiTeknisi ? formatTanggal(r.TglKonfirmasiTeknisi) : "-",
+    Jadwal1: r.Jadwal1 ? formatTanggal(r.Jadwal1) : "-",
+    Jadwal2: r.Jadwal2 ? formatTanggal(r.Jadwal2) : "-",
+    TglSelesai: r.TglSelesai ? formatTanggal(r.TglSelesai) : "-",
+    TglClose: r.TglClose ? formatTanggal(r.TglClose) : "-",
+  }));
   isExportingMaster.value = true;
   try {
     const title = `Laporan Pengajuan Perbaikan — ${tglAwal.value} s.d. ${tglAkhir.value}`;
@@ -238,17 +251,35 @@ const onExportDetail = async () => {
       tglAkhir: tglAkhir.value,
       cabang: filterCabang.value,
     });
-    const rows = res.data.data ?? [];
+    let rows = res.data.data ?? [];
     if (!rows.length) {
       toast.warning("Tidak ada rincian detail barang untuk diexport pada periode ini.");
       return;
     }
+
+    // Filter detail berdasarkan data master yang sedang difilter
+    const filteredMaster = baseBrowseRef.value?.getFilteredItems?.() ?? items.value ?? [];
+    if (filteredMaster.length > 0) {
+      const allowedNomor = new Set(filteredMaster.map((m: any) => m.Nomor));
+      rows = rows.filter((d: any) => allowedNomor.has(d.Nomor));
+    }
+
+    if (!rows.length) {
+      toast.warning("Tidak ada data rincian detail yang sesuai dengan filter yang aktif.");
+      return;
+    }
+
+    const formattedRows = rows.map((r: any) => ({
+      ...r,
+      Tanggal: r.Tanggal ? formatTanggal(r.Tanggal) : "-",
+    }));
+
     const title = `Laporan Rincian Detail Pengajuan Perbaikan — ${tglAwal.value} s.d. ${tglAkhir.value}`;
     await exportExcelSingle(
       `Laporan_Pengajuan_Perbaikan_Detail_${tglAwal.value}_${tglAkhir.value}.xlsx`,
       "Detail Perbaikan",
       exportColumnsDetail,
-      rows,
+      formattedRows,
       title,
     );
     toast.success("Export detail berhasil.");
@@ -272,6 +303,7 @@ onMounted(() => {
 
 <template>
   <BaseBrowse
+    ref="baseBrowseRef"
     title="Browse Pengajuan Perbaikan"
     menu-id="621"
     storage-id="621"

@@ -276,7 +276,7 @@ const onValidate = async () => {
 
   const kmVal = Number(formData.value.km) || 0;
   if (kmVal <= 0) {
-    toast.warning("KM harus diisi dan lebih dari 0.");
+    toast.warning("KM harus diisi.");
     return;
   }
 

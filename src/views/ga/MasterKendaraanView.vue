@@ -169,6 +169,7 @@ const onDelete = async (item: { Nopol: string; Keterangan?: string }) => {
 };
 
 // ── Export Excel ───────────────────────────────────────────────────────
+const baseBrowseRef = ref<{ getFilteredItems: () => KendaraanRow[] } | null>(null);
 const isExporting = ref(false);
 
 const exportColumns: ExcelColumn[] = [
@@ -192,12 +193,20 @@ const exportColumns: ExcelColumn[] = [
   { header: "Aktif", key: "Aktif", width: 10, align: "center" },
 ];
 
-const onExport = async () => {
-  const rows = items.value ?? [];
-  if (!rows.length) {
+const onExport = async (exportedRows?: KendaraanRow[]) => {
+  const rawRows =
+    Array.isArray(exportedRows) && exportedRows.length
+      ? exportedRows
+      : (baseBrowseRef.value?.getFilteredItems?.() ?? items.value ?? []);
+  if (!rawRows.length) {
     toast.warning("Tidak ada data untuk diexport.");
     return;
   }
+  const rows = rawRows.map((r: any) => ({
+    ...r,
+    Pajak: r.Pajak ? formatTanggal(r.Pajak) : "-",
+    Kir: r.Kir ? formatTanggal(r.Kir) : "-",
+  }));
   isExporting.value = true;
   try {
     await exportExcelSingle(
@@ -222,6 +231,7 @@ const onFormSaved = () => {
 
 <template>
   <BaseBrowse
+    ref="baseBrowseRef"
     title="Master Kendaraan"
     menu-id="601"
     storage-id="601"
