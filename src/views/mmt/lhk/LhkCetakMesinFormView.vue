@@ -19,11 +19,13 @@
         v-if="isEditMode"
         size="small"
         color="success"
-        class="mr-2"
+        class="mr-2 text-none font-weight-medium"
         :loading="isSaving"
         @click="handleApprove"
       >
-        <v-icon start size="16">mdi-check-decagram</v-icon>
+        <template #prepend>
+          <IconCheck :size="16" />
+        </template>
         ACC Admin
       </v-btn>
 
@@ -32,11 +34,13 @@
         size="small"
         color="orange-darken-3"
         variant="tonal"
-        class="mr-2"
+        class="mr-2 text-none font-weight-medium"
         :loading="isSaving"
         @click="validateBeforeSave('DRAFT')"
       >
-        <v-icon start size="16">mdi-content-save-edit-outline</v-icon>
+        <template #prepend>
+          <IconDeviceFloppy :size="16" />
+        </template>
         Simpan Draft
       </v-btn>
 
@@ -45,11 +49,13 @@
         size="small"
         color="primary"
         variant="elevated"
-        class="mr-2"
+        class="mr-2 text-none font-weight-bold"
         :loading="isSaving"
         @click="validateBeforeSave('POSTED')"
       >
-        <v-icon start size="16">mdi-send-check-outline</v-icon>
+        <template #prepend>
+          <IconSend :size="16" />
+        </template>
         Simpan Posted
       </v-btn>
 
@@ -57,7 +63,7 @@
       <v-btn
         size="small"
         variant="outlined"
-        class="mr-2"
+        class="mr-2 text-none"
         @click="showCancelDialog = true"
       >
         Batal
@@ -68,143 +74,164 @@
         size="small"
         variant="tonal"
         color="error"
+        class="text-none"
         @click="showCloseDialog = true"
       >
         <template #prepend>
-          <span class="d-flex align-center">
-            <IconX :size="15" :stroke-width="2" />
-          </span>
+          <IconX :size="15" />
         </template>
         Tutup
       </v-btn>
     </template>
 
-    <!-- KOLOM KIRI: Informasi Utama LHK & Material -->
+    <!-- KOLOM KIRI: Informasi Utama LHK & Material (Standar Desktop Manksi) -->
     <template #left-column>
+      <!-- Section 1: Informasi Utama LHK -->
       <div class="desktop-form-section header-section">
-        <div class="text-caption font-weight-bold mb-3 text-primary">
-          INFORMASI UTAMA LHK
+        <div class="section-label">Informasi Utama LHK</div>
+
+        <!-- Nomor LHK -->
+        <div class="fr">
+          <label class="lbl">Nomor LHK</label>
+          <input
+            :value="formData.nomor"
+            readonly
+            class="inp ro fw flex-grow-1"
+            placeholder="AUTO"
+          />
         </div>
 
-        <v-text-field
-          label="Nomor LHK"
-          v-model="formData.nomor"
-          readonly
-          density="compact"
-          variant="outlined"
-          class="mb-2"
-          hide-details
-        />
-        <v-text-field
-          label="Tanggal"
-          v-model="formData.tanggal"
-          type="date"
-          density="compact"
-          variant="outlined"
-          class="mb-2"
-          hide-details
-        />
+        <!-- Tanggal -->
+        <div class="fr">
+          <label class="lbl">Tanggal</label>
+          <input
+            type="date"
+            v-model="formData.tanggal"
+            class="idate flex-grow-1"
+            required
+          />
+        </div>
 
-        <v-row dense class="mb-2">
-          <v-col cols="6">
-            <v-text-field
-              label="Shift"
-              v-model.number="formData.shift"
+        <!-- Shift & Operator -->
+        <div class="fr">
+          <label class="lbl">Shift</label>
+          <div class="d-flex align-center gap-2 flex-grow-1">
+            <input
               type="number"
-              density="compact"
-              variant="outlined"
-              hide-details
+              v-model.number="formData.shift"
+              min="1"
+              max="3"
+              class="inp tc fw"
+              style="width: 45px"
             />
-          </v-col>
-          <v-col cols="6">
-            <v-text-field
-              label="Operator"
+            <span class="text-caption text-grey-darken-1 font-weight-medium">Operator:</span>
+            <input
+              type="text"
               v-model="formData.operator"
-              density="compact"
-              variant="outlined"
-              hide-details
+              class="inp flex-grow-1 font-weight-medium"
+              placeholder="Nama operator..."
             />
-          </v-col>
-        </v-row>
+          </div>
+        </div>
 
-        <v-text-field
-          label="Pilih Mesin"
-          v-model="formData.mesin"
-          readonly
-          density="compact"
-          variant="outlined"
-          class="mb-4 cursor-pointer"
-          hide-details
-          color="primary"
-          @click="lookup.mesin = true"
-        >
-          <template #append-inner>
-            <IconSearch
-              :size="16"
-              style="cursor: pointer"
+        <!-- Mesin Cetak (Lookup) -->
+        <div class="fr">
+          <label class="lbl">Mesin Cetak</label>
+          <div class="igrp flex-grow-1">
+            <input
+              type="text"
+              :value="formData.mesin"
+              readonly
+              class="inp ro fw text-primary cursor-pointer"
+              placeholder="Pilih Mesin Cetak..."
               @click="lookup.mesin = true"
             />
-          </template>
-        </v-text-field>
+            <button
+              type="button"
+              class="blkp"
+              @click="lookup.mesin = true"
+              title="Pilih Mesin"
+            >
+              <IconSearch :size="13" />
+            </button>
+          </div>
+        </div>
+      </div>
 
-        <div
-          class="text-caption font-weight-bold mb-2 text-success d-flex align-center"
-        >
-          INFORMASI MEDIA / ROLL
-          <v-spacer />
-          <!-- TOMBOL SYNC STOK DARI LHK SEBELUMNYA -->
+      <!-- Section 2: Informasi Media / Rol Bahan -->
+      <div class="desktop-form-section">
+        <div class="d-flex align-center justify-space-between mb-2 pb-1 border-bottom">
+          <div class="section-label mb-0 pb-0 border-0 text-success">
+            Informasi Media / Rol
+          </div>
+          <!-- Tombol Sync Stok dari LHK Sebelumnya -->
           <v-btn
             v-if="formData.barcode_input"
             size="x-small"
             color="teal-darken-1"
             variant="tonal"
+            class="text-none px-2"
             :loading="isSyncingStok"
             @click="handleSyncStokBahan"
-            title="Seleraskan sisa bahan dengan LHK sebelumnya"
+            title="Selaraskan sisa bahan dengan LHK sebelumnya"
           >
-            <v-icon start size="12">mdi-sync</v-icon> Sync Stok LHK A
+            <IconRefresh :size="12" class="mr-1" /> Sync Stok
           </v-btn>
         </div>
 
-        <v-text-field
-          label="Scan Barcode Roll"
-          v-model="formData.barcode_input"
-          @keyup.enter="handleBarcodeScan"
-          density="compact"
-          variant="outlined"
-          class="mb-2"
-          hide-details
-        >
-          <template #prepend-inner>
-            <IconBarcode :size="16" class="text-grey" />
-          </template>
-        </v-text-field>
+        <!-- Scan Barcode Roll -->
+        <div class="fr">
+          <label class="lbl">Barcode Rol</label>
+          <div class="igrp flex-grow-1">
+            <input
+              type="text"
+              v-model="formData.barcode_input"
+              class="inp font-monospace fw text-primary"
+              placeholder="Scan barcode roll lalu ENTER..."
+              @keyup.enter="handleBarcodeScan(false)"
+            />
+            <button
+              type="button"
+              class="blkp"
+              @click="handleBarcodeScan(false)"
+              title="Muat Data Barcode Rol"
+            >
+              <IconBarcode :size="13" />
+            </button>
+          </div>
+        </div>
 
-        <v-row dense class="mb-2">
-          <v-col cols="6">
-            <v-text-field
-              label="P. Bahan (M)"
-              :model-value="formData.Panjang_bahan"
+        <!-- Kode Bahan Terpilih -->
+        <div v-if="formData.kode_bahan_aktif" class="fr">
+          <label class="lbl">Kode Bahan</label>
+          <input
+            :value="formData.kode_bahan_aktif"
+            readonly
+            class="inp ro fw text-secondary flex-grow-1"
+          />
+        </div>
+
+        <!-- Dimensi Bahan (Panjang x Lebar) -->
+        <div class="fr">
+          <label class="lbl">Dimensi Bahan</label>
+          <div class="d-flex align-center gap-1 flex-grow-1">
+            <input
+              type="text"
+              :value="Number(formData.Panjang_bahan || 0).toFixed(2) + ' m'"
               readonly
-              density="compact"
-              variant="filled"
-              hide-details
-              suffix="M"
-              color="teal"
+              class="inp ro tr fw text-teal flex-1"
+              title="Panjang Bahan Awal (Meter)"
             />
-          </v-col>
-          <v-col cols="6">
-            <v-text-field
-              label="L. Bahan (M)"
-              :model-value="formData.Lebar_bahan"
+            <span class="text-caption text-grey">&times;</span>
+            <input
+              type="text"
+              :value="Number(formData.Lebar_bahan || 0).toFixed(2) + ' m'"
               readonly
-              density="compact"
-              variant="filled"
-              hide-details
-              suffix="M"
+              class="inp ro tr fw flex-1"
+              title="Lebar Bahan (Meter)"
             />
-          </v-col>
-        </v-row>
+          </div>
+        </div>
       </div>
     </template>
 
@@ -212,45 +239,52 @@
     <template #right-column>
       <div class="d-flex flex-column fill-height">
         <v-card border flat class="d-flex flex-column table-card mb-2">
-          <!-- py-1 membuat padding atas-bawah sangat minimal -->
+          <!-- Header Bar Navy Manksi -->
           <div class="py-1 px-2 bg-blue-grey-lighten-5 d-flex flex-column">
-            <div class="d-flex align-center w-100">
+            <div class="d-flex align-center w-100 flex-wrap gap-2">
               <span
                 class="text-subtitle-2 font-weight-bold text-blue-grey-darken-4 text-no-wrap"
               >
                 Daftar Produksi (Combine SPK)
               </span>
+              <v-chip size="x-small" color="primary" class="font-weight-bold">
+                {{ formData.details.length }} SPK
+              </v-chip>
               <v-spacer />
               <div class="d-flex align-center ga-2">
                 <v-btn
                   size="x-small"
                   color="success"
-                  prepend-icon="mdi-plus"
-                  style="height: 28px !important; text-transform: none"
+                  variant="flat"
+                  class="text-none font-weight-medium"
+                  style="height: 26px !important;"
                   @click="lookup.spk = true"
                 >
+                  <template #prepend><IconPlus :size="13" /></template>
                   Tambah SPK
                 </v-btn>
                 <v-btn
                   size="x-small"
-                  color="deep-purple"
-                  prepend-icon="mdi-swap-horizontal-circle"
-                  style="height: 28px !important; text-transform: none"
+                  color="purple-darken-2"
+                  variant="flat"
+                  class="text-none font-weight-medium"
+                  style="height: 26px !important;"
                   @click="lookup.maklon = true"
                 >
+                  <template #prepend><IconArrowsExchange :size="13" /></template>
                   Tambah Maklon
                 </v-btn>
-                <v-text-field
-                  v-model="formData.barcode_spk"
-                  placeholder="Scan Barcode SPK..."
-                  density="compact"
-                  variant="outlined"
-                  hide-details
-                  class="compact-barcode-field"
-                  style="max-width: 200px"
-                  @keyup.enter="handleSpkScan"
-                  :disabled="!formData.kode_bahan_aktif"
-                />
+                <div class="igrp" style="width: 190px;">
+                  <IconBarcode :size="14" class="ml-1 text-grey" />
+                  <input
+                    type="text"
+                    v-model="formData.barcode_spk"
+                    class="inp font-monospace"
+                    placeholder="Scan Barcode SPK..."
+                    :disabled="!formData.kode_bahan_aktif"
+                    @keyup.enter="handleSpkScan"
+                  />
+                </div>
               </div>
             </div>
             <!-- mt-n1 menarik baris note agar mendekat ke baris atasnya -->
@@ -436,147 +470,150 @@
             </table>
           </div>
 
-          <!-- FOOTER SUMMARY & AFAL PANEL -->
-          <div class="pa-3 bg-grey-lighten-4 border-t footer-container">
-            <div class="d-flex flex-wrap align-center ga-2 mb-1">
-              <span class="text-caption font-weight-bold text-teal-darken-3"
-                >Total M² per SPK:</span
-              >
+          <!-- FOOTER SUMMARY & AFAL PANEL (STANDAR MANKSI) -->
+          <div class="pa-2 bg-grey-lighten-4 border-t footer-container">
+            <div class="d-flex flex-wrap align-center ga-2 mb-2">
+              <span class="text-caption font-weight-bold text-teal-darken-3">
+                Total M² per SPK:
+              </span>
               <span
                 v-for="r in luasPerSpk"
                 :key="r.spk"
-                class="text-caption bg-white px-2 py-1 rounded border"
+                class="text-caption bg-white px-2 py-0.5 rounded border"
                 :title="r.nama"
               >
                 <strong>{{ r.spk }}</strong> = {{ r.luas.toFixed(2) }} M²
               </span>
               <v-spacer />
-              <span
-                class="text-subtitle-2 font-weight-black text-teal-darken-2"
-              >
+              <span class="text-caption font-weight-black text-teal-darken-2 bg-white px-2 py-0.5 rounded border">
                 Total LHK: {{ grandTotalLuas.toFixed(2) }} M²
               </span>
             </div>
-            <v-row dense align="center">
-              <v-col cols="12" sm="4" class="border-e pr-4">
-                <v-row no-gutters>
-                  <v-col cols="6" class="border-e pr-2">
+
+            <div class="footer-calc-grid">
+              <!-- Box 1: Sisa Panjang (Otomatis & Manual) -->
+              <div class="calc-box">
+                <div class="calc-title">Sisa Bahan (Panjang)</div>
+                <div class="d-flex align-center justify-space-between mt-1">
+                  <div>
+                    <span class="sub-lbl">Sistem:</span>
                     <span
-                      class="text-caption text-grey-darken-1 font-weight-bold"
-                      >Sisa Otomatis:</span
-                    >
-                    <div
-                      class="text-h6 font-weight-black lh-1"
-                      :class="
-                        sisaStokOtomatis < 0 ? 'text-red' : 'text-success'
-                      "
+                      class="calc-val-lg"
+                      :class="sisaStokOtomatis < 0 ? 'text-red' : 'text-success'"
                     >
                       {{ sisaStokOtomatis.toFixed(2) }} M
+                    </span>
+                    <span class="sub-note">Pakai: {{ totalPanjangTerpakai.toFixed(2) }} M</span>
+                  </div>
+                  <div class="text-end">
+                    <span class="sub-lbl text-primary font-weight-bold">Fisik (Manual):</span>
+                    <div class="d-flex align-center gap-1 justify-end">
+                      <input
+                        type="number"
+                        step="0.01"
+                        v-model.number="formData.sisa_panjang_manual"
+                        class="inp tr font-weight-bold"
+                        style="width: 75px"
+                        placeholder="Manual..."
+                      />
+                      <span class="text-caption text-grey">M</span>
                     </div>
-                    <span class="text-xxs text-grey d-block">
-                      P. Pakai Sistem: {{ totalPanjangTerpakai.toFixed(2) }} M
+                    <span class="sub-note text-primary font-weight-semibold">
+                      Final: {{ displayPanjangTerpakai.toFixed(2) }} M
                     </span>
-                  </v-col>
-                  <v-col cols="6" class="pl-2">
-                    <span
-                      class="text-caption font-weight-bold text-blue-darken-3"
-                      >Sisa Manual (Fisik):</span
-                    >
-                    <v-text-field
-                      v-model.number="formData.sisa_panjang_manual"
-                      placeholder="Isi sisa..."
-                      density="compact"
-                      variant="outlined"
-                      hide-details
-                      type="number"
-                      class="mt-1 bg-white"
-                      suffix="M"
-                    />
-                    <span class="text-xxs font-weight-bold text-primary">
-                      P. Pakai Final: {{ displayPanjangTerpakai.toFixed(2) }} M
-                    </span>
-                  </v-col>
-                </v-row>
-              </v-col>
-
-              <v-col cols="12" sm="3" class="px-4 border-e">
-                <div class="d-flex flex-column">
-                  <span class="text-caption text-grey-darken-1 font-weight-bold"
-                    >Sisa Samping (Sistem):</span
-                  >
-                  <span class="text-h6 text-teal-darken-2 font-weight-black">
-                    {{ (formData.Lebar_bahan - totalLebarGabungan).toFixed(2) }}
-                    M
-                  </span>
-                  <v-text-field
-                    v-model.number="formData.sisa_lebar_manual"
-                    label="Sisa Lebar Manual"
-                    density="compact"
-                    variant="underlined"
-                    hide-details
-                    type="number"
-                    class="mt-1"
-                  />
+                  </div>
                 </div>
-              </v-col>
+              </div>
 
-              <v-col cols="12" sm="5" class="pl-4">
-                <v-row dense>
-                  <v-col cols="6" class="text-right border-e pr-4">
-                    <span
-                      class="text-caption text-orange-darken-4 font-weight-bold"
-                      >Afal (Sistem):</span
-                    >
-                    <div
-                      class="text-subtitle-1 font-weight-bold text-orange-darken-2"
-                    >
-                      {{ panjangSisaLayoutGanjil.toFixed(2) }} x
-                      {{ lebarSisaLayoutGanjil.toFixed(2) }}
+              <!-- Box 2: Sisa Lebar Samping -->
+              <div class="calc-box">
+                <div class="calc-title">Sisa Lebar (Samping)</div>
+                <div class="d-flex align-center justify-space-between mt-1">
+                  <div>
+                    <span class="sub-lbl">Sistem:</span>
+                    <span class="calc-val-lg text-teal-darken-2">
+                      {{ (Number(formData.Lebar_bahan || 0) - totalLebarGabungan).toFixed(2) }} M
+                    </span>
+                  </div>
+                  <div class="text-end">
+                    <span class="sub-lbl">Manual:</span>
+                    <div class="d-flex align-center gap-1 justify-end">
+                      <input
+                        type="number"
+                        step="0.01"
+                        v-model.number="formData.sisa_lebar_manual"
+                        class="inp tr"
+                        style="width: 65px"
+                        placeholder="Lebar..."
+                      />
+                      <span class="text-caption text-grey">M</span>
                     </div>
-                    <div class="d-flex gap-1 mt-1">
-                      <v-text-field
+                  </div>
+                </div>
+              </div>
+
+              <!-- Box 3: Afal Sisa Layout Ganjil -->
+              <div class="calc-box">
+                <div class="calc-title text-orange-darken-4">Afal Sisa Ganjil</div>
+                <div class="d-flex align-center justify-space-between mt-1">
+                  <div>
+                    <span class="sub-lbl">Sistem:</span>
+                    <span class="calc-val-md text-orange-darken-3 font-monospace">
+                      {{ panjangSisaLayoutGanjil.toFixed(2) }} &times; {{ lebarSisaLayoutGanjil.toFixed(2) }}
+                    </span>
+                  </div>
+                  <div class="text-end">
+                    <span class="sub-lbl">Manual (P &times; L):</span>
+                    <div class="d-flex align-center gap-1 justify-end">
+                      <input
+                        type="number"
+                        step="0.01"
                         v-model.number="formData.panjang_nyempil_manual"
+                        class="inp tr"
+                        style="width: 50px"
                         placeholder="P"
-                        density="compact"
-                        variant="underlined"
-                        hide-details
                       />
-                      <v-text-field
+                      <span class="text-caption text-grey">&times;</span>
+                      <input
+                        type="number"
+                        step="0.01"
                         v-model.number="formData.lebar_nyempil_manual"
+                        class="inp tr"
+                        style="width: 50px"
                         placeholder="L"
-                        density="compact"
-                        variant="underlined"
-                        hide-details
                       />
                     </div>
-                  </v-col>
+                  </div>
+                </div>
+              </div>
 
-                  <v-col cols="6" class="pl-4">
-                    <span class="text-caption font-weight-bold text-red"
-                      >BS / Rusak:</span
-                    >
-                    <v-text-field
-                      :model-value="formData.panjang_bs"
+              <!-- Box 4: BS / Rusak -->
+              <div class="calc-box box-bs">
+                <div class="calc-title text-red">BS / Rusak</div>
+                <div class="d-flex align-center gap-2 mt-1">
+                  <div class="flex-1">
+                    <span class="sub-lbl">P. BS:</span>
+                    <input
+                      type="text"
+                      :value="formData.panjang_bs"
+                      class="inp tr w-100 font-weight-bold text-red"
                       placeholder="P. BS"
-                      density="compact"
-                      variant="outlined"
-                      hide-details="auto"
-                      class="mb-1 bg-white"
                       @input="handleBsInput"
                     />
-                    <v-text-field
-                      :model-value="formData.lebar_bs"
+                  </div>
+                  <div class="flex-1">
+                    <span class="sub-lbl">L. BS:</span>
+                    <input
+                      type="text"
+                      :value="formData.lebar_bs"
+                      class="inp tr w-100 font-weight-bold text-red"
                       placeholder="L. BS"
-                      density="compact"
-                      variant="outlined"
-                      hide-details="auto"
-                      class="bg-white"
                       @input="handleBsLebarInput"
                     />
-                  </v-col>
-                </v-row>
-              </v-col>
-            </v-row>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </v-card>
 
@@ -809,6 +846,13 @@ import {
   IconBarcode,
   IconRefresh,
   IconSparkles,
+  IconCheck,
+  IconDeviceFloppy,
+  IconSend,
+  IconPlus,
+  IconArrowsExchange,
+  IconPrinter,
+  IconX,
 } from "@tabler/icons-vue";
 
 const toast = useToast();
@@ -2595,5 +2639,187 @@ onMounted(async () => {
   align-items: center;
   justify-content: center;
   text-transform: uppercase;
+}
+
+/* ── Form Section Standar Manksi ── */
+.desktop-form-section {
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 10px;
+  font-family: "Segoe UI", system-ui, sans-serif;
+  font-size: 11px;
+}
+.header-section {
+  padding-right: 32px;
+}
+.section-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #1565c0;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+  border-bottom: 1px solid #f0f0f0;
+  padding-bottom: 4px;
+  letter-spacing: 0.3px;
+}
+.fr {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  min-height: 26px;
+}
+.lbl {
+  width: 95px;
+  flex-shrink: 0;
+  font-weight: 600;
+  color: #444;
+  font-size: 11px;
+}
+.inp {
+  height: 24px;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  padding: 0 6px;
+  font-size: 11px;
+  background: white;
+  outline: none;
+  min-width: 0;
+  box-sizing: border-box;
+}
+.inp:focus,
+.idate:focus {
+  border-color: #1976d2;
+}
+.idate {
+  height: 24px;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  padding: 0 4px;
+  font-size: 11px;
+  background: white;
+  outline: none;
+  min-width: 0;
+  box-sizing: border-box;
+}
+.ro {
+  background: #f5f5f5 !important;
+  color: #555 !important;
+}
+.fw {
+  font-weight: 700;
+}
+.tc {
+  text-align: center;
+}
+.tr {
+  text-align: right;
+}
+.cursor-pointer {
+  cursor: pointer;
+}
+.flex-1 {
+  flex: 1;
+}
+
+/* ── Input Group Lookup ── */
+.igrp {
+  display: flex;
+  align-items: center;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  background: white;
+  height: 24px;
+  overflow: hidden;
+  min-width: 0;
+  box-sizing: border-box;
+}
+.igrp .inp {
+  border: none;
+  border-radius: 0;
+  flex: 1;
+}
+.blkp {
+  background: #f0f0f0;
+  border: none;
+  border-left: 1px solid #ccc;
+  height: 100%;
+  padding: 0 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #555;
+}
+.blkp:hover {
+  background: #e0e0e0;
+  color: #1565c0;
+}
+
+/* ── Footer Calculation Grid ── */
+.footer-calc-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+@media (max-width: 1200px) {
+  .footer-calc-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (max-width: 768px) {
+  .footer-calc-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.calc-box {
+  background: white;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  padding: 6px 8px;
+  font-size: 11px;
+}
+.box-bs {
+  border-color: #fca5a5;
+  background: #fef2f2;
+}
+
+.calc-title {
+  font-size: 10px;
+  font-weight: 700;
+  color: #334155;
+  text-transform: uppercase;
+  border-bottom: 1px dashed #e2e8f0;
+  padding-bottom: 3px;
+}
+
+.sub-lbl {
+  font-size: 9.5px;
+  color: #64748b;
+  display: block;
+}
+
+.calc-val-lg {
+  font-size: 14px;
+  font-weight: 800;
+  display: block;
+  line-height: 1.1;
+}
+
+.calc-val-md {
+  font-size: 12px;
+  font-weight: 800;
+  display: block;
+  line-height: 1.1;
+}
+
+.sub-note {
+  font-size: 9px;
+  color: #64748b;
+  display: block;
+  margin-top: 1px;
 }
 </style>

@@ -166,6 +166,7 @@ const onDelete = async (item: { Nomor: string; NoPolisi?: string }) => {
 };
 
 // ── Export Excel ───────────────────────────────────────────────────────
+const baseBrowseRef = ref<{ getFilteredItems: () => PerawatanRow[] } | null>(null);
 const isExporting = ref(false);
 
 const exportColumns: ExcelColumn[] = [
@@ -180,12 +181,19 @@ const exportColumns: ExcelColumn[] = [
   { header: "Total Biaya", key: "TotalBiaya", width: 18, align: "right" },
 ];
 
-const onExport = async () => {
-  const rows = items.value ?? [];
-  if (!rows.length) {
+const onExport = async (exportedRows?: PerawatanRow[]) => {
+  const rawRows =
+    Array.isArray(exportedRows) && exportedRows.length
+      ? exportedRows
+      : (baseBrowseRef.value?.getFilteredItems?.() ?? items.value ?? []);
+  if (!rawRows.length) {
     toast.warning("Tidak ada data untuk diexport.");
     return;
   }
+  const rows = rawRows.map((r: any) => ({
+    ...r,
+    Tanggal: formatTanggal(r.Tanggal),
+  }));
   isExporting.value = true;
   try {
     const title = `Perawatan Kendaraan — ${tglAwal.value} s.d. ${tglAkhir.value}`;
@@ -217,6 +225,7 @@ onMounted(() => {
 
 <template>
   <BaseBrowse
+    ref="baseBrowseRef"
     title="Browse Perawatan"
     menu-id="611"
     storage-id="611"

@@ -4026,7 +4026,7 @@ const router = createRouter({
       path: "/mmt/bahan-baku-produksi/retur-permintaan-produksi",
       name: "ReturPermintaanProduksiBrowse",
       component: () =>
-        import("@/views/mmt/bahan-baku-produksi/ReturPermintaanProduksiView.vue"),
+        import("@/views/mmt/bahan-baku-produksi/ReturProduksiView.vue"),
       meta: {
         title: "Retur Produksi",
         layout: "DefaultLayout",
@@ -4038,7 +4038,7 @@ const router = createRouter({
       path: "/mmt/bahan-baku-produksi/retur-permintaan-produksi/create",
       name: "ReturPermintaanProduksiCreate",
       component: () =>
-        import("@/views/mmt/bahan-baku-produksi/ReturPermintaanProduksiFormView.vue"),
+        import("@/views/mmt/bahan-baku-produksi/ReturProduksiFormView.vue"),
       meta: {
         title: "Tambah Retur Produksi",
         layout: "DefaultLayout",
@@ -4051,7 +4051,7 @@ const router = createRouter({
       path: "/mmt/bahan-baku-produksi/retur-permintaan-produksi/edit/:nomor",
       name: "ReturPermintaanProduksiEdit",
       component: () =>
-        import("@/views/mmt/bahan-baku-produksi/ReturPermintaanProduksiFormView.vue"),
+        import("@/views/mmt/bahan-baku-produksi/ReturProduksiFormView.vue"),
       meta: {
         title: "Ubah Retur Produksi",
         layout: "DefaultLayout",
@@ -4064,7 +4064,7 @@ const router = createRouter({
       path: "/mmt/bahan-baku-produksi/retur-permintaan-produksi/print/:nomor",
       name: "ReturPermintaanProduksiPrint",
       component: () =>
-        import("@/views/mmt/bahan-baku-produksi/ReturPermintaanProduksiPrintView.vue"),
+        import("@/views/mmt/bahan-baku-produksi/ReturProduksiPrintView.vue"),
       meta: {
         title: "Cetak Retur Produksi",
         layout: "BlankLayout",
@@ -4073,49 +4073,53 @@ const router = createRouter({
       },
     },
     {
-      path: "/mmt/bahan-baku-produksi/cari-barcode-rol",
-      name: "CariBarcodeRolView",
+      path: "/mmt/bahan-baku-produksi/search-barcode",
+      alias: "/mmt/bahan-baku-produksi/cari-barcode-rol",
+      name: "SearchBarcodeView",
       component: () =>
-        import("@/views/mmt/bahan-baku-produksi/CariBarcodeRolView.vue"),
+        import("@/views/mmt/bahan-baku-produksi/SearchBarcodeView.vue"),
       meta: {
-        title: "Cari Barcode Rol",
+        title: "Search Barcode",
         layout: "DefaultLayout",
         requiresAuth: true,
         menuId: "5540",
       },
     },
     {
-      path: "/mmt/bahan-baku-produksi/cetak-ulang-barcode-rol",
-      name: "CetakUlangBarcodeRolBrowse",
+      path: "/mmt/bahan-baku-produksi/create-barcode",
+      alias: "/mmt/bahan-baku-produksi/cetak-ulang-barcode-rol",
+      name: "CreateBarcodeBrowse",
       component: () =>
-        import("@/views/mmt/bahan-baku-produksi/CetakUlangBarcodeRolView.vue"),
+        import("@/views/mmt/bahan-baku-produksi/CreateBarcodeView.vue"),
       meta: {
-        title: "Cetak Ulang Barcode Rol",
+        title: "Create Barcode",
         layout: "DefaultLayout",
         requiresAuth: true,
         menuId: "5541",
       },
     },
     {
-      path: "/mmt/bahan-baku-produksi/cetak-ulang-barcode-rol/create",
-      name: "CetakUlangBarcodeRolCreate",
+      path: "/mmt/bahan-baku-produksi/create-barcode/create",
+      alias: "/mmt/bahan-baku-produksi/cetak-ulang-barcode-rol/create",
+      name: "CreateBarcodeCreate",
       component: () =>
-        import("@/views/mmt/bahan-baku-produksi/CetakUlangBarcodeRolFormView.vue"),
+        import("@/views/mmt/bahan-baku-produksi/CreateBarcodeFormView.vue"),
       meta: {
-        title: "Generate Barcode Rol",
+        title: "Create Barcode",
         layout: "DefaultLayout",
         requiresAuth: true,
         menuId: "5541",
-        browseRoute: "CetakUlangBarcodeRolBrowse",
+        browseRoute: "CreateBarcodeBrowse",
       },
     },
     {
-      path: "/mmt/bahan-baku-produksi/kartu-stok-bahan-mmt",
-      name: "KartuStokBahanMmtView",
+      path: "/mmt/bahan-baku-produksi/kartu-barcode",
+      alias: "/mmt/bahan-baku-produksi/kartu-stok-bahan-mmt",
+      name: "KartuBarcodeView",
       component: () =>
-        import("@/views/mmt/bahan-baku-produksi/KartuStokBahanMmtView.vue"),
+        import("@/views/mmt/bahan-baku-produksi/KartuBarcodeView.vue"),
       meta: {
-        title: "Kartu Stok Bahan MMT",
+        title: "Kartu Barcode",
         layout: "DefaultLayout",
         requiresAuth: true,
         menuId: "5542",

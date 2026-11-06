@@ -37,6 +37,7 @@ const initialData: VoucherFormData = {
   tanggal: todayStr(),
   id_spbu: 1,
   kode_pengguna: "",
+  pengguna: "",
   nopol: "",
   odometer: 0,
   id_bbm: null,
@@ -60,21 +61,53 @@ const spbuItems = computed(() =>
   })),
 );
 
-const penggunaItems = computed(() =>
-  (lookups.value.pengguna || []).map((p) => ({
-    title: (p.nama || "").toUpperCase(),
-    value: p.kode,
-  })),
-);
+const penggunaItems = computed(() => {
+  const list = (lookups.value.pengguna || []).map((p) =>
+    (p.nama || "").toUpperCase(),
+  );
+  if (
+    formData.value.pengguna &&
+    !list.includes(formData.value.pengguna.toUpperCase())
+  ) {
+    list.unshift(formData.value.pengguna.toUpperCase());
+  }
+  return list;
+});
 
-const kendaraanItems = computed(() =>
-  (lookups.value.kendaraan || []).map((k) => ({
+const onPenggunaChange = (val: any) => {
+  const nameStr = (
+    typeof val === "string" ? val : val?.title || ""
+  ).trim().toUpperCase();
+  formData.value.pengguna = nameStr;
+  const match = (lookups.value.pengguna || []).find(
+    (p) => (p.nama || "").trim().toUpperCase() === nameStr,
+  );
+  if (match) {
+    formData.value.kode_pengguna = match.kode;
+  }
+};
+
+const kendaraanItems = computed(() => {
+  const list = (lookups.value.kendaraan || []).map((k) => ({
     title: (
       (k.nopol || "") + (k.keterangan ? ` - ${k.keterangan}` : "")
     ).toUpperCase(),
     value: (k.nopol || "").toUpperCase(),
-  })),
-);
+  }));
+
+  // Jika sedang edit data lama dan nopolnya tidak ada di daftar kendaraan aktif, tambahkan agar tetap tampil
+  if (
+    formData.value.nopol &&
+    !list.some((item) => item.value === formData.value.nopol.toUpperCase())
+  ) {
+    list.unshift({
+      title: `${formData.value.nopol.toUpperCase()} (TIDAK AKTIF)`,
+      value: formData.value.nopol.toUpperCase(),
+    });
+  }
+
+  return list;
+});
 
 const bbmItems = computed(() =>
   (lookups.value.bbm || []).map((b) => ({
@@ -97,13 +130,23 @@ const {
   menuId: "613",
   initialData,
   submitApi: async (data) => {
+    const namaPengguna = (data.pengguna || "").trim().toUpperCase();
+    let kodePengguna = (data.kode_pengguna || "").trim().toUpperCase();
+    if (!kodePengguna && namaPengguna) {
+      const match = (lookups.value.pengguna || []).find(
+        (p) => (p.nama || "").trim().toUpperCase() === namaPengguna,
+      );
+      if (match) kodePengguna = match.kode;
+    }
+
     const payload: VoucherFormData = {
       ...data,
       no_voucher: isEdit.value ? (data.no_voucher || "").toUpperCase() : "",
       id: isEdit.value && data.id ? Number(data.id) : null,
       tanggal: data.tanggal || todayStr(),
       id_spbu: data.id_spbu ? Number(data.id_spbu) : null,
-      kode_pengguna: (data.kode_pengguna || "").toUpperCase(),
+      kode_pengguna: kodePengguna,
+      pengguna: namaPengguna,
       nopol: (data.nopol || "").trim().toUpperCase(),
       odometer: Number(data.odometer) || 0,
       id_bbm: data.id_bbm ? Number(data.id_bbm) : null,
@@ -137,7 +180,7 @@ const onValidate = () => {
     toast.warning("SPBU harus di isi");
     return;
   }
-  if (!formData.value.kode_pengguna) {
+  if (!formData.value.pengguna?.trim()) {
     toast.warning("Pengguna harus di isi");
     return;
   }
@@ -181,12 +224,16 @@ onMounted(async () => {
       const d = res.data.data;
       if (!d) throw new Error("Data tidak ditemukan");
 
+      // Saat ubah, isian text di form pengguna mengambil dari tvoucher.pengguna
+      const namaPengguna = (d.pengguna || d.nama_pengguna || "").toUpperCase();
+
       formData.value = {
         no_voucher: (d.no_voucher || "").toUpperCase(),
         id: Number(d.id),
         tanggal: d.tanggal,
         id_spbu: d.id_spbu ? Number(d.id_spbu) : null,
         kode_pengguna: (d.kode_pengguna || "").toUpperCase(),
+        pengguna: namaPengguna,
         nopol: (d.nopol || "").toUpperCase(),
         odometer: Number(d.odometer) || 0,
         id_bbm: d.id_bbm ? Number(d.id_bbm) : null,
@@ -206,6 +253,7 @@ onMounted(async () => {
     formData.value.id = null;
     formData.value.nopol = ""; // default nomor polisi kosong
     formData.value.kode_pengguna = "";
+    formData.value.pengguna = "";
     formData.value.id_bbm = null;
 
     // Default SPBU 'SPBU 44.571.11'
@@ -294,16 +342,17 @@ onMounted(async () => {
           <div class="delphi-row">
             <label class="delphi-lbl">Pengguna</label>
             <div class="delphi-val">
-              <v-autocomplete
-                v-model="formData.kode_pengguna"
+              <v-combobox
+                v-model="formData.pengguna"
                 :items="penggunaItems"
-                item-title="title"
-                item-value="value"
-                placeholder="PILIH PENGGUNA..."
+                placeholder="PILIH / KETIK PENGGUNA..."
                 density="compact"
                 variant="outlined"
                 hide-details
+                maxlength="30"
                 class="delphi-select"
+                style="text-transform: uppercase"
+                @update:model-value="onPenggunaChange"
               />
             </div>
           </div>

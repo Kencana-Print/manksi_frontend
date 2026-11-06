@@ -812,7 +812,7 @@ watch(
         v-if="canExport"
         size="small"
         color="green"
-        @click="emit('export')"
+        @click="emit('export', filteredItems)"
       >
         <template #prepend
           ><IconFileSpreadsheet :size="15" :stroke-width="1.7"

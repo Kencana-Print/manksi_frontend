@@ -136,6 +136,7 @@ const onDelete = async (item: { Kode: string; Id: number }) => {
 };
 
 // ── Export Excel ───────────────────────────────────────────────────────
+const baseBrowseRef = ref<{ getFilteredItems: () => VoucherRow[] } | null>(null);
 const isExporting = ref(false);
 
 const exportColumns: ExcelColumn[] = [
@@ -150,12 +151,19 @@ const exportColumns: ExcelColumn[] = [
   { header: "Jumlah (Liter)", key: "Jumlah", width: 16, align: "right" },
 ];
 
-const onExport = async () => {
-  const rows = items.value ?? [];
-  if (!rows.length) {
+const onExport = async (exportedRows?: VoucherRow[]) => {
+  const rawRows =
+    Array.isArray(exportedRows) && exportedRows.length
+      ? exportedRows
+      : (baseBrowseRef.value?.getFilteredItems?.() ?? items.value ?? []);
+  if (!rawRows.length) {
     toast.warning("Tidak ada data untuk diexport.");
     return;
   }
+  const rows = rawRows.map((r: any) => ({
+    ...r,
+    Tanggal: formatTanggal(r.Tanggal),
+  }));
   isExporting.value = true;
   try {
     const title = `Browse Voucher — ${tglAwal.value} s.d. ${tglAkhir.value}`;
@@ -187,6 +195,7 @@ onMounted(() => {
 
 <template>
   <BaseBrowse
+    ref="baseBrowseRef"
     title="Browse Voucher"
     menu-id="613"
     storage-id="613"

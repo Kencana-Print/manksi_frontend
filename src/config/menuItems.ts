@@ -1071,12 +1071,12 @@ export const createMenuItems = (): NavItem[] => {
               icon: IconChecks,
               menuId: 5537,
             },
-            {
-              title: "Pinjam Bahan MMT",
-              to: "/mmt/bahan-baku-produksi/pinjam-bahan-mmt",
-              icon: IconArrowsExchange,
-              menuId: 5538,
-            },
+            // {
+            //   title: "Pinjam Bahan MMT",
+            //   to: "/mmt/bahan-baku-produksi/pinjam-bahan-mmt",
+            //   icon: IconArrowsExchange,
+            //   menuId: 5538,
+            // },
             {
               title: "Retur Produksi",
               to: "/mmt/bahan-baku-produksi/retur-permintaan-produksi",
@@ -1088,20 +1088,20 @@ export const createMenuItems = (): NavItem[] => {
               icon: IconBarcode,
               subItems: [
                 {
-                  title: "Cari Barcode Rol",
-                  to: "/mmt/bahan-baku-produksi/cari-barcode-rol",
+                  title: "Search Barcode",
+                  to: "/mmt/bahan-baku-produksi/search-barcode",
                   icon: IconBarcode,
                   menuId: 5540,
                 },
                 {
-                  title: "Cetak Ulang Barcode Rol",
-                  to: "/mmt/bahan-baku-produksi/cetak-ulang-barcode-rol",
+                  title: "Create Barcode",
+                  to: "/mmt/bahan-baku-produksi/create-barcode",
                   icon: IconBarcode,
                   menuId: 5541,
                 },
                 {
-                  title: "Kartu Stok Bahan MMT",
-                  to: "/mmt/bahan-baku-produksi/kartu-stok-bahan-mmt",
+                  title: "Kartu Barcode",
+                  to: "/mmt/bahan-baku-produksi/kartu-barcode",
                   icon: IconReportAnalytics,
                   menuId: 5542,
                 },

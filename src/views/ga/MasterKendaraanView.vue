@@ -47,7 +47,12 @@ const selectedItem = computed(
 const headers = [
   { title: "NOMOR POLISI", key: "Nopol", width: "140px" },
   { title: "STATUS", key: "Stat", width: "130px", align: "center" as const },
-  { title: "KETERANGAN", key: "Keterangan", minWidth: "220px" },
+  { title: "KETERANGAN", key: "Keterangan", minWidth: "200px" },
+  { title: "TAHUN", key: "Tahun", width: "90px", align: "center" as const },
+  { title: "KONDISI", key: "Kondisi", width: "120px" },
+  { title: "KEPEMILIKAN", key: "Kepemilikan", minWidth: "150px" },
+  { title: "POSISI", key: "Posisi", width: "120px" },
+  { title: "USER", key: "Usr", width: "120px" },
   {
     title: "JADWAL SERVIS (KM)",
     key: "Jadwal_Servis",
@@ -67,15 +72,32 @@ const headers = [
     align: "center" as const,
   },
   {
+    title: "JADWAL KIR",
+    key: "Kir",
+    width: "130px",
+    align: "center" as const,
+  },
+  {
     title: "STATUS SERVIS",
     key: "StatusServis",
     width: "140px",
+    align: "center" as const,
+  },
+  {
+    title: "AKTIF",
+    key: "Aktif",
+    width: "90px",
     align: "center" as const,
   },
 ];
 
 // ── Aturan Pewarnaan Record Sesuai Delphi cxStyle ─────────────────────
 // Delphi 7: if (jadwal_servis > 0) and (jadwal_servis - 200 < kmterakhir) then AStyle := cxStyle1 (Waspada/Merah)
+// Jika aktif isinya N maka warna font baris tsb = silver (menandakan tidak dipakai / dijual), walaupun perlu servis.
+const isTidakAktif = (item: any) => {
+  return String(item?.Aktif || "").trim().toUpperCase() === "N";
+};
+
 const perluServis = (item: any) => {
   const jadwal = Number(item?.Jadwal_Servis) || 0;
   const km = Number(item?.KmTerakhir) || 0;
@@ -84,6 +106,12 @@ const perluServis = (item: any) => {
 
 const rowPropsFn = (data: any) => {
   const item = data.item?.raw || data.item;
+  if (isTidakAktif(item)) {
+    return {
+      class: "row-tidak-aktif",
+      style: "color: #a0a0a0 !important;",
+    };
+  }
   if (perluServis(item)) {
     return {
       class: "row-perlu-servis",
@@ -141,12 +169,18 @@ const onDelete = async (item: { Nopol: string; Keterangan?: string }) => {
 };
 
 // ── Export Excel ───────────────────────────────────────────────────────
+const baseBrowseRef = ref<{ getFilteredItems: () => KendaraanRow[] } | null>(null);
 const isExporting = ref(false);
 
 const exportColumns: ExcelColumn[] = [
   { header: "Nomor Polisi", key: "Nopol", width: 16, align: "left" },
   { header: "Status", key: "Stat", width: 15, align: "center" },
   { header: "Keterangan", key: "Keterangan", width: 25, align: "left" },
+  { header: "Tahun", key: "Tahun", width: 10, align: "center" },
+  { header: "Kondisi", key: "Kondisi", width: 15, align: "left" },
+  { header: "Kepemilikan", key: "Kepemilikan", width: 20, align: "left" },
+  { header: "Posisi", key: "Posisi", width: 15, align: "left" },
+  { header: "User", key: "Usr", width: 15, align: "left" },
   {
     header: "Jadwal Servis (KM)",
     key: "Jadwal_Servis",
@@ -155,14 +189,24 @@ const exportColumns: ExcelColumn[] = [
   },
   { header: "KM Terakhir", key: "KmTerakhir", width: 16, align: "right" },
   { header: "Jadwal Pajak", key: "Pajak", width: 15, align: "center" },
+  { header: "Jadwal Kir", key: "Kir", width: 15, align: "center" },
+  { header: "Aktif", key: "Aktif", width: 10, align: "center" },
 ];
 
-const onExport = async () => {
-  const rows = items.value ?? [];
-  if (!rows.length) {
+const onExport = async (exportedRows?: KendaraanRow[]) => {
+  const rawRows =
+    Array.isArray(exportedRows) && exportedRows.length
+      ? exportedRows
+      : (baseBrowseRef.value?.getFilteredItems?.() ?? items.value ?? []);
+  if (!rawRows.length) {
     toast.warning("Tidak ada data untuk diexport.");
     return;
   }
+  const rows = rawRows.map((r: any) => ({
+    ...r,
+    Pajak: r.Pajak ? formatTanggal(r.Pajak) : "-",
+    Kir: r.Kir ? formatTanggal(r.Kir) : "-",
+  }));
   isExporting.value = true;
   try {
     await exportExcelSingle(
@@ -187,6 +231,7 @@ const onFormSaved = () => {
 
 <template>
   <BaseBrowse
+    ref="baseBrowseRef"
     title="Master Kendaraan"
     menu-id="601"
     storage-id="601"
@@ -212,10 +257,14 @@ const onFormSaved = () => {
     <!-- Filter Kiri: Legend Status Servis Sesuai Delphi cxStyle -->
     <template #filter-left>
       <div class="legend-bar">
-        <span class="legend-lbl">Status Servis:</span>
+        <span class="legend-lbl">Status:</span>
         <div class="legend-item">
           <span class="legend-badge badge-warning"></span>
           <span>Perlu Servis (&lt; 200 KM)</span>
+        </div>
+        <div class="legend-item">
+          <span class="legend-badge badge-silver"></span>
+          <span>Tidak Aktif (N)</span>
         </div>
         <div class="legend-item">
           <span class="legend-badge badge-normal"></span>
@@ -258,10 +307,35 @@ const onFormSaved = () => {
       {{ item.Pajak ? formatTanggal(item.Pajak) : "—" }}
     </template>
 
+    <!-- Custom Render Tanggal Kir -->
+    <template #item.Kir="{ item }">
+      {{ item.Kir ? formatTanggal(item.Kir) : "—" }}
+    </template>
+
+    <!-- Custom Render Kolom Aktif -->
+    <template #item.Aktif="{ item }">
+      <v-chip
+        size="x-small"
+        :color="item.Aktif === 'N' ? 'grey' : 'success'"
+        :variant="item.Aktif === 'N' ? 'tonal' : 'flat'"
+        class="font-weight-bold"
+      >
+        {{ item.Aktif || "Y" }}
+      </v-chip>
+    </template>
+
     <!-- Kolom Indikator Status Servis -->
     <template #item.StatusServis="{ item }">
       <v-chip
-        v-if="perluServis(item)"
+        v-if="isTidakAktif(item)"
+        size="x-small"
+        color="grey"
+        variant="tonal"
+      >
+        Tidak Aktif
+      </v-chip>
+      <v-chip
+        v-else-if="perluServis(item)"
         size="x-small"
         color="error"
         variant="flat"
@@ -328,6 +402,10 @@ const onFormSaved = () => {
   background-color: #d32f2f;
 }
 
+.badge-silver {
+  background-color: #a0a0a0;
+}
+
 .badge-normal {
   background-color: #2e7d32;
 }
@@ -337,5 +415,11 @@ const onFormSaved = () => {
 :deep(.v-data-table tbody tr.row-perlu-servis) {
   color: #d32f2f !important;
   font-weight: 600 !important;
+}
+
+/* ── Baris tidak aktif / N (Delphi cxStyle silver) ── */
+:deep(.v-data-table tbody tr.row-tidak-aktif td),
+:deep(.v-data-table tbody tr.row-tidak-aktif) {
+  color: #a0a0a0 !important;
 }
 </style>

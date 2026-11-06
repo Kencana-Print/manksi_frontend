@@ -4,18 +4,32 @@ export interface KendaraanRow {
   Nopol: string;
   Stat: string;
   Keterangan: string;
+  Tahun?: string;
+  Kondisi?: string;
+  Kepemilikan?: string;
+  Posisi?: string;
+  Usr?: string;
   Jadwal_Servis: number;
   KmTerakhir: number;
   Pajak: string | null;
+  Kir?: string | null;
+  Aktif?: string;
 }
 
 export interface KendaraanFormData {
   nopol: string;
   stat: "INVENTARIS" | "PRIBADI";
   keterangan: string;
+  tahun: string;
+  kondisi: string;
+  kepemilikan: string;
+  posisi: string;
+  usr: string;
   jadwal: number;
   kmterakhir: number;
   pajak: string;
+  kir: string;
+  aktif?: string;
 }
 
 export const kendaraanService = {
