@@ -6984,6 +6984,18 @@ const router = createRouter({
       },
     },
     {
+      path: "/laporan/produksi-spanduk/rekap-monitoring-by-gudang",
+      name: "LaporanSpandukRekapMonitoringByGudang",
+      component: () =>
+        import("@/views/laporan/spanduk/RekapMonitoringByGudangView.vue"),
+      meta: {
+        title: "Rekap Monitoring by Gudang",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "963",
+      },
+    },
+    {
       path: "/laporan/produksi-spanduk/pemakaian-bahan",
       name: "LaporanSpandukPemakaianBahan",
       component: () => import("@/views/laporan/spanduk/PemakaianBahanView.vue"),
@@ -7456,6 +7468,17 @@ const router = createRouter({
       component: () => import("@/views/tools/UserView.vue"),
       meta: {
         title: "Master User",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        // Tidak perlu menuId karena backend menggunakan requireAdmin
+      },
+    },
+    {
+      path: "/tools/master-role",
+      name: "MasterRole",
+      component: () => import("@/views/tools/MasterRoleView.vue"),
+      meta: {
+        title: "Master Role",
         layout: "DefaultLayout",
         requiresAuth: true,
         // Tidak perlu menuId karena backend menggunakan requireAdmin

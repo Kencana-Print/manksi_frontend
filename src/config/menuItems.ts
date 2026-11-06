@@ -114,6 +114,7 @@ import {
   IconBuildingSkyscraper,
   IconQrcode,
   IconTicket,
+  IconShieldLock,
 } from "@tabler/icons-vue";
 import { useMemoInternal } from "@/composables/useMemoInternal";
 
@@ -129,6 +130,15 @@ export interface NavItem {
   model?: { value: boolean };
   adminOnly?: boolean;
   sembunyikanCabang?: string[];
+  tampilan?: "rail" | "kolom";
+}
+
+// Satu baris hasil pencarian menu (hasil perataan NavItem yang lolos hak akses)
+export interface MenuCari {
+  judul: string;
+  jalur: string;
+  to?: string;
+  aksi?: () => void;
 }
 
 // ⚠️ PENTING: array di bawah pakai `model: daftarMenu` dst yang tadinya
@@ -150,9 +160,11 @@ export const createMenuItems = (): NavItem[] => {
   const piutangMenu = ref(false);
   const laporanMenu = ref(false);
   const toolsMenu = ref(false);
+  const transaksiMenu = ref(false);
+
   const { openMemoDialog } = useMemoInternal();
 
-  return [
+  const modul: NavItem[] = [
     {
       title: "Daftar",
       icon: IconLayoutList,
@@ -466,18 +478,23 @@ export const createMenuItems = (): NavItem[] => {
           icon: IconClipboardCheck,
           menuId: 1325,
         },
-        { divider: true },
         {
-          title: "LHK Pola",
-          to: "/garmen/lhk-pola",
+          title: "LHK PPIC",
           icon: IconRuler2,
-          menuId: 174,
-        },
-        {
-          title: "LHK Marker",
-          to: "/ppic/lhk-marker",
-          icon: IconRuler2,
-          menuId: 179,
+          subItems: [
+            {
+              title: "LHK Pola",
+              to: "/garmen/lhk-pola",
+              icon: IconRuler2,
+              menuId: 174,
+            },
+            {
+              title: "LHK Marker",
+              to: "/ppic/lhk-marker",
+              icon: IconRuler2,
+              menuId: 179,
+            },
+          ],
         },
       ],
     },
@@ -574,6 +591,7 @@ export const createMenuItems = (): NavItem[] => {
           title: "Mutasi Marketing",
           to: "/spanduk/mutasi-marketing",
           icon: IconTruckDelivery,
+          menuId: 1327,
         },
         // {
         //   title: "Mutasi Produksi",
@@ -821,26 +839,30 @@ export const createMenuItems = (): NavItem[] => {
           icon: IconScissors,
           menuId: 189,
         },
-        { divider: true },
         {
-          title: "PO Jasa",
-          to: "/garmen/po-jasa",
-          icon: IconClipboardList,
-          menuId: 102,
+          title: "CMT",
+          icon: IconScissors,
+          subItems: [
+            {
+              title: "PO Jasa",
+              to: "/garmen/po-jasa",
+              icon: IconClipboardList,
+              menuId: 102,
+            },
+            {
+              title: "Approve PO Jasa",
+              to: "/garmen/approve-po-jasa",
+              icon: IconClipboardCheck,
+              menuId: 113,
+            },
+            {
+              title: "Bukti Penerimaan Jasa (BPB Jasa)",
+              to: "/garmen/bpb-jasa",
+              icon: IconFileCheck,
+              menuId: 104,
+            },
+          ],
         },
-        {
-          title: "Approve PO Jasa",
-          to: "/garmen/approve-po-jasa",
-          icon: IconClipboardCheck,
-          menuId: 113,
-        },
-        {
-          title: "Bukti Penerimaan Jasa (BPB Jasa)",
-          to: "/garmen/bpb-jasa",
-          icon: IconFileCheck,
-          menuId: 104,
-        },
-        { divider: true },
         {
           title: "PO Internal MAP",
           icon: IconFileShredder,
@@ -916,19 +938,17 @@ export const createMenuItems = (): NavItem[] => {
             },
           ],
         },
-        { divider: true },
         {
-          title: "Mutasi Produksi",
-          to: "/garmen/mutasi-produksi",
-          icon: IconBuildingFactory2,
-          menuId: 109,
-        },
-        { divider: true },
-        {
-          title: "Pemakaian Obat",
-          to: "/garmen/pemakaian-obat",
-          icon: IconFlask,
-          menuId: 120,
+          title: "LHK Garmen",
+          icon: IconClipboardList,
+          subItems: [
+            {
+              title: "Mutasi Produksi",
+              to: "/garmen/mutasi-produksi",
+              icon: IconBuildingFactory2,
+              menuId: 109,
+            },
+          ],
         },
         {
           title: "DTF/DTG",
@@ -950,16 +970,28 @@ export const createMenuItems = (): NavItem[] => {
           ],
         },
         {
-          title: "PO Paperprint",
-          to: "/garmen/po-paperprint",
-          icon: IconFileText,
-          menuId: 103,
-        },
-        {
-          title: "PO DTF",
-          to: "/garmen/po-dtf",
-          icon: IconPhotoScan,
-          menuId: 141,
+          title: "Jasa Internal",
+          icon: IconBuildingFactory2,
+          subItems: [
+            {
+              title: "Pemakaian Obat",
+              to: "/garmen/pemakaian-obat",
+              icon: IconFlask,
+              menuId: 120,
+            },
+            {
+              title: "PO Paperprint",
+              to: "/garmen/po-paperprint",
+              icon: IconFileText,
+              menuId: 103,
+            },
+            {
+              title: "PO DTF",
+              to: "/garmen/po-dtf",
+              icon: IconPhotoScan,
+              menuId: 141,
+            },
+          ],
         },
       ],
     },
@@ -1260,162 +1292,182 @@ export const createMenuItems = (): NavItem[] => {
       menuId: 6,
       items: [
         {
-          title: "MPPB",
-          to: "/penjualan/mppb",
-          icon: IconFileDescription,
-          menuId: 150,
+          title: "Marketing",
+          icon: IconSpeakerphone,
+          subItems: [
+            {
+              title: "MPPB",
+              to: "/penjualan/mppb",
+              icon: IconFileDescription,
+              menuId: 150,
+            },
+            {
+              title: "Pra Order",
+              to: "/penjualan/pra-order",
+              icon: IconNotebook,
+              menuId: 175,
+            },
+            {
+              title: "Permintaan Harga",
+              to: "/penjualan/minta-harga",
+              icon: IconReceipt,
+              menuId: 166,
+            },
+            {
+              title: "Penawaran",
+              to: "/penjualan/penawaran",
+              icon: IconFileText,
+              menuId: 151,
+            },
+            {
+              title: "MAP (Memo Approval Produk)",
+              to: "/penjualan/map",
+              icon: IconFileInvoice,
+              menuId: 162,
+            },
+            {
+              title: "Surat Jalan MAP",
+              to: "/penjualan/sj-map",
+              icon: IconTruckDelivery,
+              menuId: 163,
+            },
+            {
+              title: "Update Status SJ Memo",
+              to: "/penjualan/update-sj-map",
+              icon: IconChecks,
+              menuId: 164,
+            },
+            {
+              title: "Sales Order",
+              to: "/penjualan/sales-order",
+              icon: IconShoppingCartCopy,
+              menuId: 172,
+            },
+            {
+              title: "Alokasi SO",
+              to: "/penjualan/alokasi-so",
+              icon: IconMapPin,
+              menuId: 183,
+            },
+            {
+              title: "Insentif",
+              to: "/penjualan/insentif",
+              icon: IconCoin,
+              menuId: 167,
+            },
+          ],
         },
         {
-          title: "Pra Order",
-          to: "/penjualan/pra-order",
-          icon: IconNotebook,
-          menuId: 175,
-        },
-        {
-          title: "Permintaan Harga",
-          to: "/penjualan/minta-harga",
-          icon: IconReceipt,
-          menuId: 166,
-        },
-        {
-          title: "Penawaran",
-          to: "/penjualan/penawaran",
-          icon: IconFileText,
-          menuId: 151,
-        },
-        { divider: true },
-        {
-          title: "Permintaan Desain",
-          to: "/penjualan/permintaan-desain",
+          title: "Desain Marketing",
           icon: IconPalette,
-          menuId: 184,
+          subItems: [
+            {
+              title: "Permintaan Desain",
+              to: "/penjualan/permintaan-desain",
+              icon: IconPalette,
+              menuId: 184,
+            },
+            {
+              title: "LHK Desain",
+              to: "/penjualan/lhk-desain",
+              icon: IconChecklist,
+              menuId: 185,
+            },
+          ],
         },
         {
-          title: "LHK Desain",
-          to: "/penjualan/lhk-desain",
-          icon: IconChecklist,
-          menuId: 185,
-        },
-        { divider: true },
-        {
-          title: "Sales Order",
-          to: "/penjualan/sales-order",
-          icon: IconShoppingCartCopy,
-          menuId: 172,
-        },
-        {
-          title: "Alokasi SO",
-          to: "/penjualan/alokasi-so",
-          icon: IconMapPin,
-          menuId: 183,
-        },
-        { divider: true },
-        {
-          title: "Pra Surat Jalan",
-          to: "/penjualan/pra-sj",
-          icon: IconFileDots,
-          menuId: 168,
-        },
-        {
-          title: "Surat Jalan",
-          to: "/penjualan/surat-jalan",
-          icon: IconTruck,
-          menuId: 153,
-        },
-        {
-          title: "Surat Jalan Tak Normal",
-          to: "/penjualan/sj-tak-normal",
-          icon: IconTruckOff,
-          menuId: 154,
-        },
-        {
-          title: "Update Status Surat Jalan",
-          to: "/penjualan/update-status-sj",
+          title: "Pengiriman",
           icon: IconTruckDelivery,
-          menuId: 155,
+          subItems: [
+            {
+              title: "Pra Surat Jalan",
+              to: "/penjualan/pra-sj",
+              icon: IconFileDots,
+              menuId: 168,
+            },
+            {
+              title: "Surat Jalan",
+              to: "/penjualan/surat-jalan",
+              icon: IconTruck,
+              menuId: 153,
+            },
+            {
+              title: "Surat Jalan Tak Normal",
+              to: "/penjualan/sj-tak-normal",
+              icon: IconTruckOff,
+              menuId: 154,
+            },
+            {
+              title: "Update Status Surat Jalan",
+              to: "/penjualan/update-status-sj",
+              icon: IconTruckDelivery,
+              menuId: 155,
+            },
+            // Tiga menu di bawah dicabut ke Lintas Divisi oleh komposisi di akhir
+            // createMenuItems; tetap ditulis di sini sebagai sumbernya.
+            {
+              title: "Approval Surat Jalan",
+              to: "/penjualan/approval-sj",
+              icon: IconClipboardCheck,
+              menuId: 165,
+              sembunyikanCabang: ["P02"],
+            },
+            {
+              title: "Jadwal Kirim",
+              to: "/penjualan/jadwal-kirim",
+              icon: IconTruckDelivery,
+              menuId: 119,
+              sembunyikanCabang: ["P02"],
+            },
+            {
+              title: "Komitmen Kirim",
+              to: "/ppic/penjadwalan",
+              icon: IconCalendarWeek,
+              menuId: 176,
+            },
+          ],
         },
-        {
-          title: "Approval Surat Jalan",
-          to: "/penjualan/approval-sj",
-          icon: IconClipboardCheck,
-          menuId: 165,
-          sembunyikanCabang: ["P02"],
-        },
-        { divider: true },
         {
           title: "Invoice",
-          to: "/penjualan/invoice",
-          icon: IconReceipt,
-          menuId: 156,
-        },
-        {
-          title: "Invoice Proforma",
-          to: "/penjualan/invoice-proforma",
           icon: IconFileInvoice,
-          menuId: 157,
-        },
-        {
-          title: "Invoice Tak Normal",
-          to: "/penjualan/invoice-tak-normal",
-          icon: IconReceipt2,
-          menuId: 158,
-        },
-        {
-          title: "Cetak Kuitansi",
-          to: "/penjualan/cetak-kuitansi",
-          icon: IconReceipt2,
-          menuId: 1317,
-        },
-        {
-          title: "Cetak Faktur Pajak",
-          to: "/penjualan/cetak-faktur-pajak",
-          icon: IconReceiptTax,
-          menuId: 159,
-        },
-        {
-          title: "Export CSV ke Faktur Pajak",
-          to: "/penjualan/export-csv-pajak",
-          icon: IconFileSpreadsheet,
-          menuId: 160,
-        },
-        { divider: true },
-        {
-          title: "MAP (Memo Approval Produk)",
-          to: "/penjualan/map",
-          icon: IconFileInvoice,
-          menuId: 162,
-        },
-        {
-          title: "Surat Jalan MAP",
-          to: "/penjualan/sj-map",
-          icon: IconTruckDelivery,
-          menuId: 163,
-        },
-        {
-          title: "Update Status SJ Memo",
-          to: "/penjualan/update-sj-map",
-          icon: IconChecks,
-          menuId: 164,
-        },
-        {
-          title: "Insentif",
-          to: "/penjualan/insentif",
-          icon: IconCoin,
-          menuId: 167,
-        },
-        { divider: true },
-        {
-          title: "Jadwal Kirim",
-          to: "/penjualan/jadwal-kirim",
-          icon: IconTruckDelivery,
-          menuId: 119,
-          sembunyikanCabang: ["P02"],
-        },
-        {
-          title: "Komitmen Kirim",
-          to: "/ppic/penjadwalan",
-          icon: IconCalendarWeek,
-          menuId: 176,
+          subItems: [
+            {
+              title: "Invoice",
+              to: "/penjualan/invoice",
+              icon: IconReceipt,
+              menuId: 156,
+            },
+            {
+              title: "Invoice Proforma",
+              to: "/penjualan/invoice-proforma",
+              icon: IconFileInvoice,
+              menuId: 157,
+            },
+            {
+              title: "Invoice Tak Normal",
+              to: "/penjualan/invoice-tak-normal",
+              icon: IconReceipt2,
+              menuId: 158,
+            },
+            {
+              title: "Cetak Kuitansi",
+              to: "/penjualan/cetak-kuitansi",
+              icon: IconReceipt2,
+              menuId: 1317,
+            },
+            {
+              title: "Cetak Faktur Pajak",
+              to: "/penjualan/cetak-faktur-pajak",
+              icon: IconReceiptTax,
+              menuId: 159,
+            },
+            {
+              title: "Export CSV ke Faktur Pajak",
+              to: "/penjualan/export-csv-pajak",
+              icon: IconFileSpreadsheet,
+              menuId: 160,
+            },
+          ],
         },
       ],
     },
@@ -1582,204 +1634,232 @@ export const createMenuItems = (): NavItem[] => {
           menuId: 960,
           subItems: [
             {
-              title: "Stok Bahan Barcode",
-              to: "/laporan/gudang-garmen/stok-bahan-barcode",
-              icon: IconFileDescription,
-              menuId: 501,
-            },
-            {
-              title: "Kartu Stok Bahan",
-              to: "/laporan/gudang-garmen/kartu-stok-bahan",
+              title: "Stok & Kartu Stok",
               icon: IconClipboardList,
-              menuId: 502,
+              subItems: [
+                {
+                  title: "Stok Bahan Barcode",
+                  to: "/laporan/gudang-garmen/stok-bahan-barcode",
+                  icon: IconFileDescription,
+                  menuId: 501,
+                },
+                {
+                  title: "Kartu Stok Bahan",
+                  to: "/laporan/gudang-garmen/kartu-stok-bahan",
+                  icon: IconClipboardList,
+                  menuId: 502,
+                },
+                {
+                  title: "Kartu Stok Barang",
+                  to: "/laporan/gudang-garmen/kartu-stok-barang",
+                  icon: IconFileSpreadsheet,
+                  menuId: 503,
+                },
+                {
+                  title: "Mutasi Stok Bahan",
+                  to: "/laporan/gudang-garmen/mutasi-stok-bahan",
+                  icon: IconArrowsExchange,
+                  menuId: 505,
+                },
+                {
+                  title: "Stok Accesories vs MKA",
+                  to: "/laporan/gudang-garmen/stok-acc-vs-mka",
+                  icon: IconScale,
+                  menuId: 569,
+                },
+                {
+                  title: "Monitoring Status & Stock Transaksi Maklon",
+                  to: "/laporan/gudang-garmen/monitoring-makloon",
+                  icon: IconArrowsExchange,
+                  menuId: 572,
+                },
+                {
+                  title: "Stok Gudang DC",
+                  to: "/laporan/gudang-garmen/stok-dc",
+                  icon: IconBuildingWarehouse,
+                  menuId: 570,
+                },
+              ],
             },
             {
-              title: "Kartu Stok Barang",
-              to: "/laporan/gudang-garmen/kartu-stok-barang",
-              icon: IconFileSpreadsheet,
-              menuId: 503,
-            },
-            {
-              title: "Mutasi Stok Bahan",
-              to: "/laporan/gudang-garmen/mutasi-stok-bahan",
-              icon: IconArrowsExchange,
-              menuId: 505,
-            },
-            {
-              title: "Stok Accesories vs MKA",
-              to: "/laporan/gudang-garmen/stok-acc-vs-mka",
-              icon: IconScale,
-              menuId: 569,
-            },
-            {
-              title: "Monitoring Status & Stock Transaksi Maklon",
-              to: "/laporan/gudang-garmen/monitoring-makloon",
-              icon: IconArrowsExchange,
-              menuId: 572,
-            },
-            {
-              title: "Stok Gudang DC",
-              to: "/laporan/gudang-garmen/stok-dc",
-              icon: IconBuildingWarehouse,
-              menuId: 570,
-            },
-            { divider: true },
-            {
-              title: "Stok Barang Jadi",
-              to: "/laporan/gudang-garmen/stok-barang-jadi",
+              title: "Barang Jadi & Bahan",
               icon: IconBoxSeam,
-              menuId: 506,
+              subItems: [
+                {
+                  title: "Stok Barang Jadi",
+                  to: "/laporan/gudang-garmen/stok-barang-jadi",
+                  icon: IconBoxSeam,
+                  menuId: 506,
+                },
+                {
+                  title: "Kartu Stok Barang Jadi",
+                  to: "/laporan/gudang-garmen/kartu-stok-barangjadi",
+                  icon: IconClipboardData,
+                  menuId: 507,
+                },
+                {
+                  title: "Mutasi Stok Barang Jadi",
+                  to: "/laporan/gudang-garmen/mutasi-stok-barang-jadi",
+                  icon: IconArrowsExchange,
+                  menuId: 508,
+                },
+                {
+                  title: "Realisasi Keluar Bahan",
+                  to: "/laporan/gudang-garmen/realisasi-keluar-bahan",
+                  icon: IconClipboardCheck,
+                  menuId: 529,
+                },
+                {
+                  title: "Umur Stok Bahan",
+                  to: "/laporan/gudang-garmen/umur-stok-bahan",
+                  icon: IconHourglass,
+                  menuId: 530,
+                },
+              ],
             },
             {
-              title: "Kartu Stok Barang Jadi",
-              to: "/laporan/gudang-garmen/kartu-stok-barangjadi",
-              icon: IconClipboardData,
-              menuId: 507,
-            },
-            {
-              title: "Mutasi Stok Barang Jadi",
-              to: "/laporan/gudang-garmen/mutasi-stok-barang-jadi",
-              icon: IconArrowsExchange,
-              menuId: 508,
-            },
-            {
-              title: "Realisasi Keluar Bahan",
-              to: "/laporan/gudang-garmen/realisasi-keluar-bahan",
-              icon: IconClipboardCheck,
-              menuId: 529,
-            },
-            {
-              title: "Umur Stok Bahan",
-              to: "/laporan/gudang-garmen/umur-stok-bahan",
-              icon: IconHourglass,
-              menuId: 530,
-            },
-            { divider: true },
-            {
-              title: "Standart Babaran vs Realisasi",
-              to: "/laporan/gudang-garmen/standart-babaran-vs-realisasi",
-              icon: IconScale,
-              menuId: 509,
-            },
-            {
-              title: "SO Belum Ada MKB",
-              to: "/laporan/gudang-garmen/spk-belum-mkb",
-              icon: IconFileAlert,
-              menuId: 510,
-            },
-            {
-              title: "PO Bahan vs MKB",
-              to: "/laporan/gudang-garmen/po-bahan-vs-mkb",
-              icon: IconFileAnalytics,
-              menuId: 511,
-            },
-            {
-              title: "PO Bahan vs BPB",
-              to: "/laporan/gudang-garmen/po-bahan-vs-bpb",
-              icon: IconTruckDelivery,
-              menuId: 512,
-            },
-            {
-              title: "PO Jasa vs BPB Jasa",
-              to: "/laporan/gudang-garmen/poj-vs-bpj",
+              title: "PO & Penerimaan",
               icon: IconFileInvoice,
-              menuId: 513,
+              subItems: [
+                {
+                  title: "SO Belum Ada MKB",
+                  to: "/laporan/gudang-garmen/spk-belum-mkb",
+                  icon: IconFileAlert,
+                  menuId: 510,
+                },
+                {
+                  title: "PO Bahan vs MKB",
+                  to: "/laporan/gudang-garmen/po-bahan-vs-mkb",
+                  icon: IconFileAnalytics,
+                  menuId: 511,
+                },
+                {
+                  title: "PO Bahan vs BPB",
+                  to: "/laporan/gudang-garmen/po-bahan-vs-bpb",
+                  icon: IconTruckDelivery,
+                  menuId: 512,
+                },
+                {
+                  title: "PO Jasa vs BPB Jasa",
+                  to: "/laporan/gudang-garmen/poj-vs-bpj",
+                  icon: IconFileInvoice,
+                  menuId: 513,
+                },
+                {
+                  title: "Outstanding PO Mitra",
+                  to: "/laporan/gudang-garmen/outstanding-po-mitra",
+                  icon: IconGauge,
+                  menuId: 514,
+                },
+                {
+                  title: "SPK DTF Belum PO DTF",
+                  to: "/laporan/gudang-garmen/spk-dtf-belum-po",
+                  icon: IconFileAlert,
+                  menuId: 516,
+                },
+                {
+                  title: "SPK MKB vs PO BPB",
+                  to: "/laporan/gudang-garmen/spk-mkb-vs-po-bpb",
+                  icon: IconFileAnalytics,
+                  menuId: 519,
+                },
+                {
+                  title: "SPK vs PO",
+                  to: "/laporan/gudang-garmen/spk-vs-po",
+                  icon: IconFileInvoice,
+                  menuId: 520,
+                },
+                {
+                  title: "SPK vs BPB",
+                  to: "/laporan/gudang-garmen/spk-vs-bpb",
+                  icon: IconTruckDelivery,
+                  menuId: 521,
+                },
+                {
+                  title: "SPK vs BPB Non PO",
+                  to: "/laporan/gudang-garmen/spk-vs-bpb-non-po",
+                  icon: IconTruckDelivery,
+                  menuId: 522,
+                },
+              ],
             },
             {
-              title: "Outstanding PO Mitra",
-              to: "/laporan/gudang-garmen/outstanding-po-mitra",
-              icon: IconGauge,
-              menuId: 514,
+              title: "Realisasi Bahan & Produksi",
+              icon: IconChecks,
+              subItems: [
+                {
+                  title: "Standart Babaran vs Realisasi",
+                  to: "/laporan/gudang-garmen/standart-babaran-vs-realisasi",
+                  icon: IconScale,
+                  menuId: 509,
+                },
+                {
+                  title: "Realisasi Minta Bahan",
+                  to: "/laporan/gudang-garmen/realisasi-minta-bahan",
+                  icon: IconClipboardList,
+                  menuId: 515,
+                },
+                {
+                  title: "Realisasi Minta Bahan vs LHK Cutting",
+                  to: "/laporan/gudang-garmen/realisasi-minta-vs-lhk-cutt",
+                  icon: IconClipboardCheck,
+                  menuId: 568,
+                },
+                {
+                  title: "SPK vs Realisasi vs LHK Cutting",
+                  to: "/laporan/gudang-garmen/spkv-realisasiv-lhkcutt",
+                  icon: IconListCheck,
+                  menuId: 517,
+                },
+                {
+                  title: "Mutasi Produksi with Detail",
+                  to: "/laporan/gudang-garmen/mutasi-prod-detail",
+                  icon: IconLayoutGrid,
+                  menuId: 524,
+                },
+                {
+                  title: "Laporan Kekurangan Produksi",
+                  to: "/laporan/gudang-garmen/kekurangan-produksi",
+                  icon: IconAlertTriangle,
+                  menuId: 525,
+                },
+              ],
             },
             {
-              title: "Realisasi Minta Bahan",
-              to: "/laporan/gudang-garmen/realisasi-minta-bahan",
-              icon: IconClipboardList,
-              menuId: 515,
-            },
-            {
-              title: "Realisasi Minta Bahan vs LHK Cutting",
-              to: "/laporan/gudang-garmen/realisasi-minta-vs-lhk-cutt",
+              title: "SPK & MAP",
               icon: IconClipboardCheck,
-              menuId: 568,
-            },
-            {
-              title: "SPK DTF Belum PO DTF",
-              to: "/laporan/gudang-garmen/spk-dtf-belum-po",
-              icon: IconFileAlert,
-              menuId: 516,
-            },
-            {
-              title: "SPK vs Realisasi vs LHK Cutting",
-              to: "/laporan/gudang-garmen/spkv-realisasiv-lhkcutt",
-              icon: IconListCheck,
-              menuId: 517,
-            },
-            {
-              title: "SPK vs STBJ vs SJ",
-              to: "/laporan/gudang-garmen/spk-vs-stbj-vs-sj",
-              icon: IconTruckLoading,
-              menuId: 518,
-            },
-            {
-              title: "SPK MKB vs PO BPB",
-              to: "/laporan/gudang-garmen/spk-mkb-vs-po-bpb",
-              icon: IconFileAnalytics,
-              menuId: 519,
-            },
-            {
-              title: "SPK vs PO",
-              to: "/laporan/gudang-garmen/spk-vs-po",
-              icon: IconFileInvoice,
-              menuId: 520,
-            },
-            {
-              title: "SPK vs BPB",
-              to: "/laporan/gudang-garmen/spk-vs-bpb",
-              icon: IconTruckDelivery,
-              menuId: 521,
-            },
-            {
-              title: "SPK vs BPB Non PO",
-              to: "/laporan/gudang-garmen/spk-vs-bpb-non-po",
-              icon: IconTruckDelivery,
-              menuId: 522,
-            },
-            {
-              title: "SPK Close STBJ",
-              to: "/laporan/gudang-garmen/spk-close-stbj",
-              icon: IconCircleCheck,
-              menuId: 523,
-            },
-            {
-              title: "Mutasi Produksi with Detail",
-              to: "/laporan/gudang-garmen/mutasi-prod-detail",
-              icon: IconLayoutGrid,
-              menuId: 524,
-            },
-            {
-              title: "Laporan Kekurangan Produksi",
-              to: "/laporan/gudang-garmen/kekurangan-produksi",
-              icon: IconAlertTriangle,
-              menuId: 525,
-            },
-            {
-              title: "Outstanding SPK",
-              to: "/laporan/gudang-garmen/lap-outstanding-spk",
-              icon: IconClipboardList,
-              menuId: 526,
-            },
-            {
-              title: "Browse SPK",
-              to: "/laporan/gudang-garmen/browse-spk",
-              icon: IconClipboardList,
-              menuId: 527,
-            },
-            {
-              title: "Browse MAP",
-              to: "/laporan/gudang-garmen/browse-map",
-              icon: IconClipboardList,
-              menuId: 528,
+              subItems: [
+                {
+                  title: "SPK vs STBJ vs SJ",
+                  to: "/laporan/gudang-garmen/spk-vs-stbj-vs-sj",
+                  icon: IconTruckLoading,
+                  menuId: 518,
+                },
+                {
+                  title: "SPK Close STBJ",
+                  to: "/laporan/gudang-garmen/spk-close-stbj",
+                  icon: IconCircleCheck,
+                  menuId: 523,
+                },
+                {
+                  title: "Outstanding SPK",
+                  to: "/laporan/gudang-garmen/lap-outstanding-spk",
+                  icon: IconClipboardList,
+                  menuId: 526,
+                },
+                {
+                  title: "Browse SPK",
+                  to: "/laporan/gudang-garmen/browse-spk",
+                  icon: IconClipboardList,
+                  menuId: 527,
+                },
+                {
+                  title: "Browse MAP",
+                  to: "/laporan/gudang-garmen/browse-map",
+                  icon: IconClipboardList,
+                  menuId: 528,
+                },
+              ],
             },
           ],
         },
@@ -1957,6 +2037,11 @@ export const createMenuItems = (): NavItem[] => {
                   title: "Rekap Monitoring by SPK",
                   to: "/laporan/produksi-spanduk/rekap-monitoring-by-spk",
                   icon: IconListDetails,
+                },
+                {
+                  title: "Rekap Monitoring by Gudang",
+                  to: "/laporan/produksi-spanduk/rekap-monitoring-by-gudang",
+                  icon: IconBuildingWarehouse,
                 },
               ],
             },
@@ -2220,7 +2305,18 @@ export const createMenuItems = (): NavItem[] => {
           icon: IconFileText,
           onClick: () => openMemoDialog(),
         },
-        { title: "Master User", to: "/tools/users", icon: IconUsers },
+        {
+          title: "Master User",
+          to: "/tools/users",
+          icon: IconUsers,
+          adminOnly: true,
+        },
+        {
+          title: "Master Role",
+          to: "/tools/master-role",
+          icon: IconShieldLock,
+          adminOnly: true,
+        },
         { title: "Approval", to: "/tools/approval", icon: IconShieldCheck },
         { divider: true },
         {
@@ -2239,7 +2335,7 @@ export const createMenuItems = (): NavItem[] => {
           title: "Kelola PIC Agenda",
           to: "/tools/kelola-pic-agenda",
           icon: IconCalendarCog,
-          menuId: 124,
+          menuId: 1324,
         },
         {
           title: "Notulensi Meeting",
@@ -2248,6 +2344,162 @@ export const createMenuItems = (): NavItem[] => {
           menuId: 1328,
         },
       ],
+    },
+  ];
+
+  // ── PENATAAN ULANG: 4 menu utama (Daftar, Transaksi, Laporan, Tools) ──────
+  // Aturan hak akses: menu utama baru (Daftar, Transaksi) tidak punya pintu
+  // sendiri; tiap bagian membawa menuId pintu lama modulnya, sehingga siapa
+  // yang melihat menu apa tidak berubah. Pengecualian yang disengaja: 9 menu
+  // Lintas Divisi dilepas dari pintu modul dan hanya dikendalikan menuId-nya.
+  const dapatkan = (judul: string): NavItem => {
+    const m = modul.find((x) => x.title === judul);
+    if (!m) {
+      console.error(`[menuItems] modul "${judul}" tidak ditemukan`);
+      return { title: judul, items: [] };
+    }
+    return m;
+  };
+
+  // Cabut satu item (rekursif) dari sumbernya; null + log bila tidak ketemu.
+  const cabut = (
+    daftar: NavItem[] | undefined,
+    cocok: (it: NavItem) => boolean,
+    label: string,
+  ): NavItem | null => {
+    const cari = (arr: NavItem[] | undefined): NavItem | null => {
+      if (!arr) return null;
+      for (let i = 0; i < arr.length; i++) {
+        const it = arr[i];
+        if (cocok(it)) return arr.splice(i, 1)[0];
+        const dalam = cari(it.subItems ?? it.items);
+        if (dalam) return dalam;
+      }
+      return null;
+    };
+    const hasil = cari(daftar);
+    if (!hasil) console.error(`[menuItems] item "${label}" tidak ditemukan`);
+    return hasil;
+  };
+
+  const daftar = dapatkan("Daftar");
+  const pembelian = dapatkan("Pembelian");
+  const ppic = dapatkan("PPIC");
+  const spanduk = dapatkan("Spanduk");
+  const garmen = dapatkan("Garmen");
+  const mmt = dapatkan("MMT");
+  const penjualan = dapatkan("Penjualan");
+  const ga = dapatkan("GA");
+  const finance = dapatkan("Finance");
+  const laporan = dapatkan("Laporan");
+  const tools = dapatkan("Tools");
+
+  // Menu "Daftar" milik Spanduk dan MMT pindah ke menu utama Daftar
+  const daftarSpanduk = cabut(
+    spanduk.items,
+    (i) => i.title === "Daftar",
+    "Spanduk > Daftar",
+  );
+  const daftarMmt = cabut(
+    mmt.items,
+    (i) => i.title === "Daftar",
+    "MMT > Daftar",
+  );
+
+  // Menu Lintas Divisi: dicabut dari modul asalnya
+  const lintasDivisi: NavItem[] = [
+    cabut(ppic.items, (i) => i.to === "/garmen/cetak-bast", "Cetak BAST MAP"),
+    cabut(
+      spanduk.items,
+      (i) => i.to === "/spanduk/mutasi-marketing",
+      "Mutasi Marketing",
+    ),
+    cabut(garmen.items, (i) => i.to === "/garmen/bahan-jadi/stbj", "STBJ"),
+    cabut(
+      penjualan.items,
+      (i) => i.to === "/penjualan/jadwal-kirim",
+      "Jadwal Kirim",
+    ),
+    cabut(
+      penjualan.items,
+      (i) => i.to === "/penjualan/approval-sj",
+      "Approval Surat Jalan",
+    ),
+    cabut(
+      garmen.items,
+      (i) => i.to === "/piutang/pengajuan-dana",
+      "Pengajuan Dana",
+    ),
+    cabut(
+      penjualan.items,
+      (i) => i.to === "/ppic/penjadwalan",
+      "Komitmen Kirim",
+    ),
+    cabut(garmen.items, (i) => i.menuId === 59, "Barang (Garmen)"),
+    cabut(garmen.items, (i) => i.menuId === 920, "Bahan Baku (Garmen)"),
+  ].filter((i): i is NavItem => i !== null);
+
+  // Satu modul menjadi satu bagian, membawa menuId pintu lamanya
+  const bagian = (m: NavItem): NavItem => ({
+    title: m.title,
+    icon: m.icon,
+    menuId: m.menuId,
+    subItems: m.items,
+  });
+
+  return [
+    {
+      title: "Daftar",
+      icon: IconLayoutList,
+      model: daftarMenu,
+      tampilan: "kolom",
+      items: [
+        {
+          title: "Umum",
+          icon: IconLayoutList,
+          menuId: daftar.menuId,
+          subItems: daftar.items,
+        },
+        {
+          title: "Spanduk",
+          icon: IconFlag,
+          menuId: spanduk.menuId,
+          subItems: daftarSpanduk?.subItems,
+        },
+        {
+          title: "MMT",
+          icon: IconPrinter,
+          menuId: mmt.menuId,
+          subItems: daftarMmt?.subItems,
+        },
+      ],
+    },
+    {
+      title: "Transaksi",
+      icon: IconReceipt2,
+      model: transaksiMenu,
+      tampilan: "rail",
+      items: [
+        {
+          title: "Lintas Divisi",
+          icon: IconArrowsExchange,
+          subItems: lintasDivisi,
+        },
+        bagian(pembelian),
+        bagian(ppic),
+        bagian(spanduk),
+        bagian(garmen),
+        bagian(mmt),
+        bagian(penjualan),
+        bagian(ga),
+        bagian(finance),
+      ],
+    },
+    { ...laporan, tampilan: "rail" },
+    {
+      ...tools,
+      tampilan: "kolom",
+      items: [{ title: "Tools", icon: tools.icon, subItems: tools.items }],
     },
   ];
 };
