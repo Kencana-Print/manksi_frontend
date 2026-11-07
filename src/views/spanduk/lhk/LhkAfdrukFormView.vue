@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, nextTick } from "vue";
+import { ref, computed, watch, onMounted, nextTick } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
 import BaseForm from "@/components/BaseForm.vue";
@@ -28,7 +28,7 @@ const authStore = useAuthStore();
 
 const isEditMode = computed(() => !!route.params.nomor);
 
-const BAGIAN_SUPERADMIN = ["EDP", "DIR", "AUDIT"];
+const BAGIAN_SUPERADMIN = ["EDP", "DIREKSI", "AUDIT"];
 const isSuperadmin = computed(() =>
   BAGIAN_SUPERADMIN.includes(
     (authStore.user?.bagian ?? "").trim().toUpperCase(),
@@ -56,9 +56,8 @@ interface FormRow {
   panjang: number;
   lebar: number;
   keterangan: string;
-  jPlangkanAwal: number; // J Plangkan saat dimuat (untuk menampilkan J Meter tersimpan)
-  jMeterAwal: number | null; // J Meter tersimpan; null = baris baru
   plangkan: PlangkanItem[]; // 15 ukuran dari master, J Plangkan = jumlah qty
+  terkunci: boolean; // plangkan terkunci dari LHK Hapus Plankan
 }
 
 type QtyBahan = Record<SlotBahan["key"], number>;
@@ -114,9 +113,8 @@ const barisKosong = (): FormRow => ({
   panjang: 0,
   lebar: 0,
   keterangan: "",
-  jPlangkanAwal: 0,
-  jMeterAwal: null,
   plangkan: plangkanKosong(),
+  terkunci: false,
 });
 
 const defaultData = (): FormState => ({
@@ -134,17 +132,9 @@ const defaultData = (): FormState => ({
 const jumlahPlangkan = (row: FormRow) =>
   row.plangkan.reduce((a, p) => a + num(p.qty), 0);
 
-// J Meter = J Plangkan x panjang SPK/MAP. Baris lama yang J Plangkan-nya tidak
-// berubah menampilkan nilai tersimpan (server mempertahankannya juga).
-const jumlahMeter = (row: FormRow) => {
-  const j = jumlahPlangkan(row);
-  return row.jMeterAwal !== null && j === row.jPlangkanAwal
-    ? row.jMeterAwal
-    : round2(j * num(row.panjang));
-};
-
-// Jumlah Meter = jumlah (ukuran x qty) semua ukuran
-const jumlahMeterUkuran = (row: FormRow) =>
+// J Meter = jumlah (ukuran x Qty) semua ukuran pada Detail Plangkan.
+// Dipakai di grid dan footer Detail Plangkan; server menghitung hal yang sama.
+const jumlahMeter = (row: FormRow) =>
   round2(row.plangkan.reduce((a, p) => a + num(p.ukuran) * num(p.qty), 0));
 
 // ── State UI ──
@@ -204,9 +194,8 @@ const {
         panjang: num(r.Panjang),
         lebar: num(r.Lebar),
         keterangan: r.Keterangan ?? "",
-        jPlangkanAwal: plangkan.reduce((a, p) => a + p.qty, 0),
-        jMeterAwal: r.J_Meter === null ? null : num(r.J_Meter),
         plangkan,
+        terkunci: false,
       };
     });
     return {
@@ -289,14 +278,12 @@ const isiLokasiDefault = () => {
 
 onMounted(async () => {
   try {
-    const [pabrik, ukuran, bahan] = await Promise.all([
+    const [pabrik, ukuran] = await Promise.all([
       lhkForm.getLookupPabrik(),
       lhkForm.getLookupUkuran(),
-      lhkForm.getLookupBahan(),
     ]);
     pabrikOpts.value = pabrik;
     ukuranList.value = ukuran;
-    bahanOpts.value = bahan;
     lengkapiPlangkan();
     isiLokasiDefault();
   } catch (e) {
@@ -304,8 +291,38 @@ onMounted(async () => {
   }
 });
 
+// Stok bahan dihitung per Lokasi dan tanpa pemakaian LHK ini sendiri, jadi
+// dimuat ulang saat Lokasi atau Nomor berubah. urutBahan membuang respons basi
+// (Lokasi diganti cepat).
+let urutBahan = 0;
+const muatBahan = async () => {
+  const urut = ++urutBahan;
+  const { kodePabrik, nomor } = formData.value.header;
+  if (!kodePabrik) {
+    bahanOpts.value = [];
+    return;
+  }
+  try {
+    const hasil = await lhkForm.getLookupBahan(kodePabrik, nomor);
+    if (urut === urutBahan) {
+      bahanOpts.value = hasil;
+    }
+  } catch (e) {
+    if (urut === urutBahan) {
+      bahanOpts.value = [];
+      toast.error(lhkForm.pesanError(e, "Gagal memuat stok bahan."));
+    }
+  }
+};
+
+watch(
+  [() => formData.value.header.kodePabrik, () => formData.value.header.nomor],
+  muatBahan,
+  { immediate: true },
+);
+
 // ── Bahan pemakaian: nama, satuan & stok dari master ──
-const infoBahan = (kode: number | null): BahanOption | undefined =>
+const infoBahan = (kode: string | null): BahanOption | undefined =>
   kode === null ? undefined : bahanOpts.value.find((o) => o.Kode === kode);
 
 const namaSlot = (s: SlotBahan): string =>
@@ -315,7 +332,7 @@ const namaSlot = (s: SlotBahan): string =>
 
 const satuanSlot = (s: SlotBahan): string => infoBahan(s.kode)?.Satuan ?? "";
 
-// null = belum ada catatan stok di gudang itu
+// null = bahan tidak ada di daftar lookup (belum termuat / bukan master spanduk)
 const stokSlot = (s: SlotBahan): number | null =>
   infoBahan(s.kode)?.Stok ?? null;
 
@@ -378,9 +395,11 @@ const isiBarisDariSpk = async (
     row.jumlahOrder = num(info.Jumlah_Order);
     row.panjang = num(info.Panjang);
     row.lebar = num(info.Lebar);
-    row.plangkan = plangkanKosong(); // SPK baru: semua qty mulai dari 0
-    row.jPlangkanAwal = 0;
-    row.jMeterAwal = null;
+    row.terkunci = info.Terkunci;
+    // Terkunci: plangkan dari LHK Hapus Plankan. Selain itu diisi manual dari 0.
+    row.plangkan = info.Terkunci
+      ? info.Plangkan.map((p) => ({ ukuran: num(p.Ukuran), qty: num(p.Qty) }))
+      : plangkanKosong();
     fokusIdx.value = idx;
     return true;
   } catch (e) {
@@ -706,7 +725,7 @@ const tutupSetelahSimpan = () => {
                     :value="jumlahMeter(row)"
                     class="ci tr ro"
                     readonly
-                    title="J Plangkan x panjang SPK/MAP"
+                    title="Jumlah (ukuran x Qty) pada Detail Plangkan"
                   />
                 </td>
                 <td class="p0">
@@ -737,6 +756,13 @@ const tutupSetelahSimpan = () => {
                 — {{ rowAktif.spk }}</template
               >
             </span>
+            <span
+              v-if="rowAktif?.terkunci"
+              class="plg-lock"
+              title="Qty dijumlahkan dari LHK Hapus Plankan MAP ini dan tidak bisa diubah di sini"
+            >
+              Dari Hapus Plankan
+            </span>
           </div>
           <div v-if="rowAktif?.spk" class="tbl-wrap plg-wrap">
             <table class="gt plg-tbl">
@@ -757,7 +783,9 @@ const tutupSetelahSimpan = () => {
                       type="number"
                       min="0"
                       step="1"
-                      class="ci tr bg-yellow-light"
+                      class="ci tr"
+                      :class="rowAktif.terkunci ? 'ro' : 'bg-yellow-light'"
+                      :readonly="rowAktif.terkunci"
                       :ref="(el) => simpanRef(el, `q_${i}`)"
                       @keydown.enter.prevent="onEnterQty(i)"
                       v-select-on-focus
@@ -772,7 +800,7 @@ const tutupSetelahSimpan = () => {
                 </tr>
                 <tr>
                   <td class="tr fw">Jumlah Meter</td>
-                  <td class="tr fw">{{ jumlahMeterUkuran(rowAktif) }}</td>
+                  <td class="tr fw">{{ jumlahMeter(rowAktif) }}</td>
                 </tr>
               </tfoot>
             </table>
@@ -1143,5 +1171,14 @@ const tutupSetelahSimpan = () => {
   color: #757575;
   font-style: italic;
   font-size: 11px;
+}
+.plg-lock {
+  font-size: 10px;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  padding: 1px 6px;
+  border-radius: 2px;
+  text-transform: none;
 }
 </style>

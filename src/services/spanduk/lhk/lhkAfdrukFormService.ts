@@ -23,28 +23,27 @@ export interface LhkAfdrukDetail {
   Panjang: number | null;
   Lebar: number | null;
   J_Plangkan: number;
-  J_Meter: number | null;
   Jumlah_Meter: number;
   Keterangan: string | null;
   Plangkan: LhkAfdrukPlangkan[];
 }
 
 export interface LhkAfdrukBahan {
-  Kode_Bahan: number;
+  Kode_Bahan: string;
   Nama_Bahan: string | null;
   Satuan: string | null;
   Qty: number;
 }
 
 export interface BahanOption {
-  Kode: number;
+  Kode: string;
   Nama: string;
   Satuan: string | null;
-  Stok: number | null;
+  Stok: number | null; // null = Lokasi tidak dikirim (browse); 0 = belum ada transaksi
 }
 
 export interface LhkAfdrukPayloadBahan {
-  Kode_Bahan: number;
+  Kode_Bahan: string;
   Qty: number;
 }
 
@@ -76,6 +75,8 @@ export interface InfoSpk {
   Jumlah_Order: number | null;
   Panjang: number | null;
   Lebar: number | null;
+  Terkunci: boolean; // plangkan terkunci dari LHK Hapus Plankan
+  Plangkan: LhkAfdrukPlangkan[];
 }
 
 export interface PabrikOption {
@@ -118,9 +119,13 @@ export const getLookupUkuran = async (): Promise<UkuranOption[]> => {
   return res.data.data ?? [];
 };
 
-export const getLookupBahan = async (): Promise<BahanOption[]> => {
+export const getLookupBahan = async (
+  pabrik = "",
+  nomor = "",
+): Promise<BahanOption[]> => {
   const res = await api.get<ApiResponse<BahanOption[]>>(
     `${BASE}/lookups/bahan`,
+    { params: { pabrik, nomor } },
   );
   return res.data.data ?? [];
 };

@@ -694,7 +694,7 @@ const saldoLaci = ref<SaldoLaciData>({
 });
 const showSaldoLaci = computed(
   () =>
-    ["FINANCE", "DIREKSI", "DIR", "AUDIT", "EDP"].includes(bagian.value) ||
+    ["FINANCE", "DIREKSI", "DIREKSI", "AUDIT", "EDP"].includes(bagian.value) ||
     isSuperViewer.value,
 );
 

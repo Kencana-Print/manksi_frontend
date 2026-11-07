@@ -125,8 +125,6 @@ const headersTetap = [
   { title: "Tanggal", key: "Tanggal", width: "110px", align: "center" },
   { title: "Kode Pabrik", key: "Kode_Pabrik", width: "120px" },
   { title: "Nama Pabrik", key: "Nama_Pabrik", width: "260px" },
-  { title: "Kar Borongan", key: "Kar_Borongan", width: "120px", align: "end" },
-  { title: "Kar Harian", key: "Kar_Harian", width: "110px", align: "end" },
 ];
 
 const headers = computed(() => [
@@ -147,20 +145,6 @@ const kolomMaster: ExcelColumn[] = [
   { header: "Tanggal", key: "Tanggal", width: 14, align: "center" },
   { header: "Kode Pabrik", key: "Kode_Pabrik", width: 14 },
   { header: "Nama Pabrik", key: "Nama_Pabrik", width: 30 },
-  {
-    header: "Kar Borongan",
-    key: "Kar_Borongan",
-    width: 14,
-    align: "right",
-    numFmt: INT,
-  },
-  {
-    header: "Kar Harian",
-    key: "Kar_Harian",
-    width: 12,
-    align: "right",
-    numFmt: INT,
-  },
 ];
 
 const kolomExportMaster = computed<ExcelColumn[]>(() => [

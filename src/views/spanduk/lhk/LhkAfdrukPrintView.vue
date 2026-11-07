@@ -58,7 +58,7 @@ const total = computed(() => {
     rows.value.reduce((s, r) => s + Number(pilih(r) ?? 0), 0);
   return {
     plangkan: jumlah((r) => r.J_Plangkan),
-    jMeter: jumlah((r) => r.J_Meter),
+    jMeter: jumlah((r) => r.Jumlah_Meter),
   };
 });
 
@@ -139,7 +139,7 @@ const totalPerUkuran = computed(() =>
             <td class="tr">{{ fmt(r.Lebar) }}</td>
             <td class="tc">{{ r.Nomor_SPK }}</td>
             <td class="tr">{{ fmtInt(r.J_Plangkan) }}</td>
-            <td class="tr">{{ fmt(r.J_Meter) }}</td>
+            <td class="tr">{{ fmt(r.Jumlah_Meter) }}</td>
             <td>{{ r.Keterangan || "" }}</td>
           </tr>
           <tr class="row-total">

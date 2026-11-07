@@ -15,8 +15,6 @@ export interface LhkAfdrukRow {
   Tanggal: string;
   Kode_Pabrik: string | null;
   Nama_Pabrik: string | null;
-  Kar_Borongan: number | null;
-  Kar_Harian: number | null;
   Rinso: number | null;
   Porstek: number | null;
   M46: number | null;

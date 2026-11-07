@@ -526,6 +526,11 @@ export const createMenuItems = (): NavItem[] => {
               icon: IconSkull,
             },
             {
+              title: "LHK Hapus Plankan",
+              to: "/spanduk/lhk/lhk-hapus-plankan",
+              icon: IconEraser,
+            },
+            {
               title: "LHK Afdruk",
               to: "/spanduk/lhk/lhk-afdruk",
               icon: IconBulb,

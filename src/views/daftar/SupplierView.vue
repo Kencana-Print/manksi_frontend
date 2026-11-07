@@ -14,7 +14,13 @@ const authStore = useAuthStore();
 
 // Harus sama dengan BAGIAN_LIHAT_REKENING di backend (backend yang menentukan
 // data terkirim atau tidak; ini hanya mengatur tampilan kolom).
-const BAGIAN_LIHAT_REKENING = ["PEMBELIAN", "FINANCE", "EDP", "DIR", "AUDIT"];
+const BAGIAN_LIHAT_REKENING = [
+  "PEMBELIAN",
+  "FINANCE",
+  "EDP",
+  "DIREKSI",
+  "AUDIT",
+];
 const canLihatRekening = computed(() =>
   BAGIAN_LIHAT_REKENING.includes((authStore.user?.bagian || "").toUpperCase()),
 );

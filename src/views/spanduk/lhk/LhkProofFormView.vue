@@ -23,7 +23,7 @@ const authStore = useAuthStore();
 
 const isEditMode = computed(() => !!route.params.nomor);
 
-const BAGIAN_SUPERADMIN = ["EDP", "DIR", "AUDIT"];
+const BAGIAN_SUPERADMIN = ["EDP", "DIREKSI", "AUDIT"];
 const isSuperadmin = computed(() =>
   BAGIAN_SUPERADMIN.includes(
     (authStore.user?.bagian ?? "").trim().toUpperCase(),

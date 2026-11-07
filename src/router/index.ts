@@ -1108,6 +1108,54 @@ const router = createRouter({
       },
     },
     {
+      path: "/spanduk/lhk/lhk-hapus-plankan",
+      name: "SpandukLhkHapusPlankan",
+      component: () => import("@/views/spanduk/lhk/LhkHapusPlankanView.vue"),
+      meta: {
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "4",
+        title: "LHK Hapus Plankan",
+      },
+    },
+    {
+      path: "/spanduk/lhk/lhk-hapus-plankan/form",
+      name: "SpandukLhkHapusPlankanCreate",
+      component: () =>
+        import("@/views/spanduk/lhk/LhkHapusPlankanFormView.vue"),
+      meta: {
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "4",
+        title: "Tambah LHK Hapus Plankan",
+        browseRoute: "SpandukLhkHapusPlankan",
+      },
+    },
+    {
+      path: "/spanduk/lhk/lhk-hapus-plankan/form/:nomor",
+      name: "SpandukLhkHapusPlankanEdit",
+      component: () =>
+        import("@/views/spanduk/lhk/LhkHapusPlankanFormView.vue"),
+      meta: {
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "4",
+        title: "Ubah LHK Hapus Plankan",
+        browseRoute: "SpandukLhkHapusPlankan",
+      },
+    },
+    {
+      path: "/spanduk/lhk/lhk-hapus-plankan/print/:nomor",
+      name: "SpandukLhkHapusPlankanPrint",
+      component: () =>
+        import("@/views/spanduk/lhk/LhkHapusPlankanPrintView.vue"),
+      meta: {
+        layout: "BlankLayout",
+        requiresAuth: true,
+        title: "Cetak LHK Hapus Plankan",
+      },
+    },
+    {
       path: "/spanduk/lhk/lhk-afdruk",
       name: "SpandukLhkAfdruk",
       component: () => import("@/views/spanduk/lhk/LhkAfdrukView.vue"),
