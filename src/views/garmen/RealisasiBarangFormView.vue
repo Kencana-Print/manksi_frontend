@@ -46,6 +46,7 @@ const jenisSlugReverseMap: Record<string, string> = {
   OBAT: "OBAT",
   SPAREPART: "SPAREPART",
   "ATK-RTK": "ATK/RTK",
+  ASET: "ASET",
 };
 const jenisFromParam = computed(() => {
   const raw = route.params.jenis as string;

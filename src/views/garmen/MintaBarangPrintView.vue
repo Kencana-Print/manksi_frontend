@@ -101,8 +101,11 @@ onMounted(() => {
             <td class="sep">:</td>
             <td class="val">{{ header.min_spk_nomor }}</td>
           </template>
-          <td class="sep">:</td>
-          <td class="val">{{ header.min_spk_nomor || "-" }}</td>
+          <template v-else>
+            <td></td>
+            <td></td>
+            <td></td>
+          </template>
         </tr>
         <tr>
           <td class="lbl">Keterangan</td>
