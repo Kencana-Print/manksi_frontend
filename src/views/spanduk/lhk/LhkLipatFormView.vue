@@ -53,9 +53,7 @@ interface FormRow {
   panjang: number;
   lebar: number;
   qtyManual: number; // dipakai hanya bila Lokasi = MT1
-  tambahLipat: number;
   mataAyam: number;
-  bsLipat: number | "";
   karyawan: KarRow[];
 }
 
@@ -79,10 +77,8 @@ const barisKosong = (): FormRow => ({
   panjang: 0,
   lebar: 0,
   qtyManual: 0,
-  tambahLipat: 0,
   mataAyam: 0,
   karyawan: [],
-  bsLipat: "",
 });
 
 const defaultData = (): FormState => ({
@@ -116,9 +112,7 @@ const bangunPayload = (data: FormState): LhkLipatPayload => {
       .map((r) => ({
         Nomor_SPK: r.spk.trim(),
         Qty_Lipat: manual ? num(r.qtyManual) : jumlahKaryawan(r),
-        Tambah_Lipat: num(r.tambahLipat),
         Mata_Ayam: num(r.mataAyam),
-        BS_Lipat: num(r.bsLipat),
         Karyawan: r.karyawan.map((k) => ({ NIK: k.nik, Qty: num(k.qty) })),
       })),
   };
@@ -147,9 +141,7 @@ const {
       panjang: num(r.Panjang),
       lebar: num(r.Lebar),
       qtyManual: num(r.Qty_Lipat),
-      tambahLipat: num(r.Tambah_Lipat),
       mataAyam: num(r.Mata_Ayam),
-      bsLipat: num(r.BS_Lipat),
       karyawan: r.Karyawan.map((k) => ({
         nik: k.NIK,
         nama: k.Nama ?? "",
@@ -402,13 +394,11 @@ const fokusKunci = async (kunci: string) => {
   }
 };
 
-const KOLOM_SPK = ["qty", "tambahLipat", "mataAyam", "bsLipat"] as const;
+const KOLOM_SPK = ["qty", "mataAyam"] as const;
 type KolomSpk = (typeof KOLOM_SPK)[number];
 
 const kolomSpkAktif = computed<readonly KolomSpk[]>(() =>
-  qtyManual.value
-    ? KOLOM_SPK
-    : (["tambahLipat", "mataAyam", "bsLipat"] as const),
+  qtyManual.value ? KOLOM_SPK : (["mataAyam"] as const),
 );
 
 const onEnterSpkKolom = async (idx: number, col: KolomSpk) => {
@@ -483,24 +473,12 @@ const validateSave = () => {
     }
     sudah.set(kunci, no);
 
-    if (r.bsLipat === "" || r.bsLipat === null) {
-      toast.warning(
-        `Baris ${no}: BS Lipat wajib diisi (isi 0 bila tidak ada BS).`,
-      );
-      return;
-    }
-    const bulat = [
-      r.mataAyam,
-      r.bsLipat,
-      ...(qtyManual.value ? [r.qtyManual] : []),
-    ];
+    const bulat = [r.mataAyam, ...(qtyManual.value ? [r.qtyManual] : [])];
     if (bulat.some((v) => !Number.isInteger(num(v)))) {
-      toast.warning(
-        `Baris ${no}: qty, mata ayam, dan BS harus bilangan bulat.`,
-      );
+      toast.warning(`Baris ${no}: qty dan mata ayam harus bilangan bulat.`);
       return;
     }
-    if (bulat.some((v) => num(v) < 0) || num(r.tambahLipat) < 0) {
+    if (bulat.some((v) => num(v) < 0)) {
       toast.warning(`Baris ${no}: angka tidak boleh negatif.`);
       return;
     }
@@ -634,7 +612,7 @@ const tutupSetelahSimpan = () => {
           class="tbl-wrap"
           style="flex: 0 0 auto; max-height: 260px; min-height: 110px"
         >
-          <table class="gt" style="min-width: 1100px">
+          <table class="gt" style="min-width: 960px">
             <thead>
               <tr>
                 <th style="width: 32px" class="tc">No</th>
@@ -643,10 +621,12 @@ const tutupSetelahSimpan = () => {
                 <th style="width: 90px" class="tr">Jml Order</th>
                 <th style="width: 75px" class="tr">Panjang</th>
                 <th style="width: 75px" class="tr">Lebar</th>
-                <th style="width: 90px" class="tr bg-yellow">Qty Lipat</th>
-                <th style="width: 100px" class="tr bg-yellow">Tambah Lipat</th>
-                <th style="width: 95px" class="tr bg-yellow">Mata Ayam</th>
-                <th style="width: 90px" class="tr bg-yellow">BS Lipat</th>
+                <th style="width: 105px" class="tr bg-yellow">
+                  Qty Lipat (pcs)
+                </th>
+                <th style="width: 115px" class="tr bg-yellow">
+                  Mata Ayam (pcs)
+                </th>
                 <th style="width: 32px" class="tc"></th>
               </tr>
             </thead>
@@ -717,18 +697,6 @@ const tutupSetelahSimpan = () => {
                 </td>
                 <td class="p0">
                   <input
-                    v-model.number="row.tambahLipat"
-                    type="number"
-                    min="0"
-                    step="any"
-                    class="ci tr bg-yellow-light"
-                    :ref="(el) => setFieldRef(el, `s_${idx}_tambahLipat`)"
-                    @keydown.enter.prevent="onEnterSpkKolom(idx, 'tambahLipat')"
-                    v-select-on-focus
-                  />
-                </td>
-                <td class="p0">
-                  <input
                     v-model.number="row.mataAyam"
                     type="number"
                     min="0"
@@ -736,18 +704,6 @@ const tutupSetelahSimpan = () => {
                     class="ci tr bg-yellow-light"
                     :ref="(el) => setFieldRef(el, `s_${idx}_mataAyam`)"
                     @keydown.enter.prevent="onEnterSpkKolom(idx, 'mataAyam')"
-                    v-select-on-focus
-                  />
-                </td>
-                <td class="p0">
-                  <input
-                    v-model.number="row.bsLipat"
-                    type="number"
-                    min="0"
-                    step="1"
-                    class="ci tr bg-yellow-light"
-                    :ref="(el) => setFieldRef(el, `s_${idx}_bsLipat`)"
-                    @keydown.enter.prevent="onEnterSpkKolom(idx, 'bsLipat')"
                     v-select-on-focus
                   />
                 </td>

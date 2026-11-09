@@ -21,14 +21,10 @@ export interface LhkTintaSpk {
 }
 
 export interface LhkTintaBahan {
-  Kode_Bahan: number;
+  Kode_Bahan: string;
   Nama_Bahan: string | null;
-  Satuan_Master: string | null;
-  Pilihan_Satuan: string[];
-  Qty_Input: number;
-  Satuan_Input: string | null;
-  Qty: number;
   Satuan: string | null;
+  Qty: number; // total dalam satuan master
 }
 
 export interface LhkTintaForm {
@@ -43,9 +39,10 @@ export interface LhkTintaForm {
 }
 
 export interface LhkTintaPayloadBahan {
-  Kode_Bahan: number;
-  Qty: string;
-  Satuan: string;
+  Kode_Bahan: string;
+  Kg: string;
+  Ons: string;
+  Gram: string;
 }
 
 export interface LhkTintaPayload {
@@ -60,6 +57,8 @@ export interface CetakInfo {
   Tanggal: string;
   Kode_Pabrik: string | null;
   Nama_Pabrik: string | null;
+  Apv_Status: string | null;
+  Lewat_Batas: number; // 1 = hari ini sudah lewat h+7 dari tanggal LHK Cetak
   Detail: LhkTintaSpk[];
 }
 
@@ -76,12 +75,12 @@ export interface CetakPage {
   total: number;
 }
 
-// Pilihan_Satuan kosong = bahan diinput dalam satuan master
+// Stok per lokasi; null bila lokasi belum dipilih
 export interface BahanOption {
-  Kode: number;
+  Kode: string;
   Nama: string;
-  Satuan: string | null;
-  Pilihan_Satuan: string[];
+  Satuan: string;
+  Stok: number | null;
 }
 
 export type SaveResponse = AxiosResponse<ApiResponse<{ Nomor: string }>>;
@@ -111,10 +110,14 @@ export const getLookupCetak = async (
   return res.data.data;
 };
 
-// Semua bahan tinta/cat aktif = baris default form (maksimal 500)
-export const getLookupBahan = async (): Promise<BahanOption[]> => {
+// Daftar obat (baris default form) + stok per lokasi
+export const getLookupBahan = async (
+  pabrik: string,
+  nomor: string,
+): Promise<BahanOption[]> => {
   const res = await api.get<ApiResponse<BahanOption[]>>(
     `${BASE}/lookups/bahan`,
+    { params: { pabrik, nomor } },
   );
   return res.data.data ?? [];
 };

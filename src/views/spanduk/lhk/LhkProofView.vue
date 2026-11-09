@@ -44,12 +44,10 @@ interface ExportResepRow {
   Tanggal: string;
   Kode_Pabrik: string;
   Nama_Pabrik: string;
-  Kode: number;
+  Kode: string;
   Nama: string;
   Satuan: string;
-  Qty_Resep: number;
   Qty_Actual: number;
-  Selisih: number;
 }
 
 const toast = useToast();
@@ -157,23 +155,9 @@ const kolomResep: ExcelColumn[] = [
   { header: "Nama Bahan", key: "Nama", width: 34 },
   { header: "Satuan", key: "Satuan", width: 10 },
   {
-    header: "Resep",
-    key: "Qty_Resep",
-    width: 14,
-    align: "right",
-    numFmt: QTY4,
-  },
-  {
-    header: "Actual",
+    header: "Jumlah (KG/LTR)",
     key: "Qty_Actual",
-    width: 14,
-    align: "right",
-    numFmt: QTY4,
-  },
-  {
-    header: "Selisih",
-    key: "Selisih",
-    width: 14,
+    width: 16,
     align: "right",
     numFmt: QTY4,
   },
@@ -182,8 +166,6 @@ const kolomResep: ExcelColumn[] = [
 const fmtQty = (v: number | null | undefined): string =>
   Number(v ?? 0).toLocaleString("id-ID", { maximumFractionDigits: 4 });
 
-const selisih = (r: LhkProofResepRow): number =>
-  Math.round((r.Qty_Actual - r.Qty_Resep) * 10000) / 10000;
 const warnaDari = (r: LhkProofDetailRow): string[] =>
   [r.U1, r.U2, r.U3, r.U4, r.U5, r.U6, r.U7, r.U8, r.U9, r.U10].map((v) =>
     (v ?? "").trim(),
@@ -364,9 +346,7 @@ const exportResep = async () => {
         Kode: r.Kode,
         Nama: r.Nama,
         Satuan: r.Satuan,
-        Qty_Resep: r.Qty_Resep,
         Qty_Actual: r.Qty_Actual,
-        Selisih: selisih(r),
       });
     }
   }
@@ -478,30 +458,21 @@ const numFmt = (v: number | null) =>
 
         <div v-if="resepMap[item.Nomor]?.length" class="mt-3">
           <div class="expand-title mb-2">
-            Resep &amp; Actual Pemakaian Obat - {{ item.Nomor }}
+            Pemakaian Obat (Actual) - {{ item.Nomor }}
           </div>
           <table class="detail-table">
             <thead>
               <tr>
                 <th>Nama Bahan</th>
                 <th width="70">Satuan</th>
-                <th width="110" class="tr">Resep</th>
-                <th width="110" class="tr">Actual</th>
-                <th width="110" class="tr">Selisih</th>
+                <th width="130" class="tr">Jumlah</th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="r in resepMap[item.Nomor]" :key="r.Kode">
                 <td>{{ r.Nama }}</td>
                 <td>{{ r.Satuan }}</td>
-                <td class="tr">{{ fmtQty(r.Qty_Resep) }}</td>
                 <td class="tr font-weight-bold">{{ fmtQty(r.Qty_Actual) }}</td>
-                <td
-                  class="tr"
-                  :class="selisih(r) > 0 ? 'text-red-darken-2' : ''"
-                >
-                  {{ fmtQty(selisih(r)) }}
-                </td>
               </tr>
             </tbody>
           </table>

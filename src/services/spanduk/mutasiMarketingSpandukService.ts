@@ -20,6 +20,7 @@ export interface MutasiMarketingRow {
   Total_Kirim: number;
   MO: string;
   Jumlah_Diterima: number;
+  Tipe: "DOKUMEN" | "OUTSTANDING";
 }
 
 export interface MutasiMarketingDetailRow {

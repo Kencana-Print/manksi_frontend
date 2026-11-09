@@ -170,6 +170,7 @@ const defaultData = {
   spk_ukuran: "",
   spk_jumlah: 0,
   spk_kain: "",
+  spk_bhn_kode: "",
   spk_finishing: "",
   spk_panjang: 0,
   spk_lebar: 0,
@@ -303,6 +304,7 @@ const {
       isLegacy: d.header.isLegacy || false,
       spk_accpending: d.header.spk_accpending || "",
       spk_cmo: d.header.spk_cmo || "",
+      spk_bhn_kode: d.header.spk_bhn_kode || "",
       Customer: d.header.cus_nama,
       Sales: d.header.sal_nama,
       JenisOrder: d.header.jo_nama,
@@ -384,6 +386,11 @@ const {
     };
   },
   submitApi: async (data: any) => {
+    // Divisi Spanduk (1): field ini disembunyikan di form. Untuk SO baru, kosongkan
+    // supaya nilai bawaan dari MAP / salin SO tidak ikut tersimpan.
+    const kosongkanSpanduk =
+      !isEditMode.value && String(data.spk_divisi).charAt(0) === "1";
+
     // Siapkan Payload ke Backend
     const payload = {
       isEdit: isEditMode.value,
@@ -400,13 +407,14 @@ const {
         spk_sal_kode: data.spk_sal_kode,
         spk_jo_kode: data.spk_jo_kode,
         spk_nama: data.spk_nama,
-        spk_ukuran: data.spk_ukuran,
+        spk_ukuran: kosongkanSpanduk ? "" : data.spk_ukuran,
         spk_jumlah: data.spk_jumlah,
         spk_kain: data.spk_kain,
+        spk_bhn_kode: data.spk_bhn_kode || "",
         spk_finishing: data.spk_finishing,
         spk_panjang: data.spk_panjang,
         spk_lebar: data.spk_lebar,
-        spk_gramasi: data.spk_gramasi,
+        spk_gramasi: kosongkanSpanduk ? "" : data.spk_gramasi,
         spk_harga: data.spk_harga,
         spk_hargariil: data.spk_hargariil,
         spk_hargafee: data.spk_hargafee,
@@ -447,9 +455,9 @@ const {
         spk_sizekhusus: data.spk_sizekhusus,
         spk_standar_ukuran: data.spk_standar_ukuran,
         spk_varian_ukuran: data.spk_varian_ukuran,
-        spk_sablon: data.spk_sablon,
-        spk_bordir: data.spk_bordir,
-        spk_sublim: data.spk_sublim,
+        spk_sablon: kosongkanSpanduk ? "N" : data.spk_sablon,
+        spk_bordir: kosongkanSpanduk ? "N" : data.spk_bordir,
+        spk_sublim: kosongkanSpanduk ? "N" : data.spk_sublim,
         spk_acc_customer: data.spk_acc_customer,
         spk_acc_tanggal: data.spk_acc_tanggal || null,
         spk_desain: data.spk_desain || "",
@@ -1264,6 +1272,7 @@ const loadRepeatDetail = async (nomor: string) => {
     formData.value.spk_nama2 = h.spk_nama2 || "";
     formData.value.spk_ukuran = h.spk_ukuran || "";
     formData.value.spk_kain = h.spk_kain || "";
+    formData.value.spk_bhn_kode = h.spk_bhn_kode || "";
     formData.value.spk_finishing = h.spk_finishing || "";
     formData.value.spk_panjang = Number(h.spk_panjang) || 0;
     formData.value.spk_lebar = Number(h.spk_lebar) || 0;
@@ -1559,6 +1568,12 @@ const validateSave = async (skipPoCheck = false) => {
       );
       return;
     }
+  }
+
+  // 3b. Spanduk: bahan wajib untuk SO baru (sama dengan backend)
+  if (divisiStr === "1" && !isEditMode.value && !fd.spk_bhn_kode) {
+    toast.warning("Bahan belum dipilih.");
+    return;
   }
 
   // 4. Validasi Harga 0

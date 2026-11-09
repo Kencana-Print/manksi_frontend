@@ -10,6 +10,7 @@ import {
 import { useToast } from "vue-toastification";
 import { useAuthStore } from "@/stores/authStore";
 import api from "@/services/api";
+import { praOrderService } from "@/services/penjualan/praOrderService";
 
 const props = defineProps<{
   formData: any;
@@ -57,6 +58,56 @@ const isDivisiSatuAtauLima = computed(() => {
   const d = String(props.formData.spk_divisi).charAt(0);
   return d === "1" || d === "5";
 });
+const isDivisiSpanduk = computed(
+  () => String(props.formData.spk_divisi).charAt(0) === "1",
+);
+interface BahanSpandukItem {
+  Kode: string;
+  Nama: string;
+  Satuan: string;
+  Konstruksi?: string | null;
+  Panjang?: number | string | null;
+  Lebar?: number | string | null;
+}
+const bahanSpandukMaster = ref<BahanSpandukItem[]>([]);
+
+// Judul memuat kode: master Spanduk punya nama kembar dengan kode berbeda
+const bahanSpandukOptions = computed(() => {
+  const opts = bahanSpandukMaster.value.map((b) => {
+    const p = Number(b.Panjang) || 0;
+    const l = Number(b.Lebar) || 0;
+    const d = [b.Konstruksi, p > 0 && l > 0 ? `${p} x ${l}` : ""]
+      .filter(Boolean)
+      .join(", ");
+    return {
+      value: b.Kode,
+      title: `${b.Kode} - ${b.Nama}${d ? ` [${d}]` : ""}${b.Satuan ? ` (${b.Satuan})` : ""}`,
+    };
+  });
+  // SO dengan bahan yang kini nonaktif tetap menampilkan kodenya
+  const kode = props.formData.spk_bhn_kode;
+  if (kode && !opts.some((o) => o.value === kode)) {
+    opts.unshift({
+      value: kode,
+      title: `${kode} (nonaktif / tidak ditemukan)`,
+    });
+  }
+  return opts;
+});
+
+watch(
+  isDivisiSpanduk,
+  async (val) => {
+    if (!val || bahanSpandukMaster.value.length > 0) return;
+    try {
+      const res = await praOrderService.getInitGrids();
+      bahanSpandukMaster.value = res.data.data.bahanSpanduk || [];
+    } catch {
+      toast.error("Gagal memuat daftar bahan.");
+    }
+  },
+  { immediate: true },
+);
 // Baris path desain — path ada di level LHK, jadi satu baris per LHK.
 // Fallback ke PdPath untuk data lama (PD format lama tanpa LHK).
 const pathRows = computed<string[]>(() => {
@@ -1589,8 +1640,14 @@ watch(
             />
             <span class="ml-1 sep-txt">Mtr</span>
 
-            <label class="lbl ml-2" style="width: 80px">Ket. Ukuran</label>
-            <input v-model="formData.spk_ukuran" class="inp" style="flex: 1" />
+            <template v-if="!isDivisiSpanduk">
+              <label class="lbl ml-2" style="width: 80px">Ket. Ukuran</label>
+              <input
+                v-model="formData.spk_ukuran"
+                class="inp"
+                style="flex: 1"
+              />
+            </template>
           </template>
 
           <template v-else>
@@ -1648,8 +1705,27 @@ watch(
           </template>
         </div>
 
+        <!-- Kebutuhan Bahan (Spanduk): kode bahan baku tbahan SB… -->
+        <div v-if="isDivisiSpanduk" class="fr">
+          <label class="lbl">Bahan <b style="color: #e53935">*</b></label>
+          <v-autocomplete
+            v-model="formData.spk_bhn_kode"
+            :items="bahanSpandukOptions"
+            item-title="title"
+            item-value="value"
+            variant="outlined"
+            density="compact"
+            hide-details
+            clearable
+            placeholder="Ketik kode atau nama bahan baku..."
+            no-data-text="Bahan tidak ditemukan"
+            class="f-vselect"
+            style="flex: 1; max-width: 420px"
+          />
+        </div>
+
         <!-- Gramasi -->
-        <div class="fr">
+        <div v-if="!isDivisiSpanduk" class="fr">
           <label class="lbl">Gramasi</label>
           <v-combobox
             v-if="isDivisiSatuAtauLima"
@@ -1713,33 +1789,35 @@ watch(
 
         <!-- Sablon / Bordir / Sublim + Harga -->
         <div class="fr mt-1 shaded-row">
-          <label class="chk-lbl mr-3"
-            ><input
-              type="checkbox"
-              v-model="formData.spk_sablon"
-              true-value="Y"
-              false-value="N"
-            />
-            Sablon</label
-          >
-          <label class="chk-lbl mr-3"
-            ><input
-              type="checkbox"
-              v-model="formData.spk_bordir"
-              true-value="Y"
-              false-value="N"
-            />
-            Bordir</label
-          >
-          <label class="chk-lbl mr-3"
-            ><input
-              type="checkbox"
-              v-model="formData.spk_sublim"
-              true-value="Y"
-              false-value="N"
-            />
-            Sublim</label
-          >
+          <template v-if="!isDivisiSpanduk">
+            <label class="chk-lbl mr-3"
+              ><input
+                type="checkbox"
+                v-model="formData.spk_sablon"
+                true-value="Y"
+                false-value="N"
+              />
+              Sablon</label
+            >
+            <label class="chk-lbl mr-3"
+              ><input
+                type="checkbox"
+                v-model="formData.spk_bordir"
+                true-value="Y"
+                false-value="N"
+              />
+              Bordir</label
+            >
+            <label class="chk-lbl mr-3"
+              ><input
+                type="checkbox"
+                v-model="formData.spk_sublim"
+                true-value="Y"
+                false-value="N"
+              />
+              Sublim</label
+            >
+          </template>
           <div class="ml-auto d-flex align-center" style="gap: 4px">
             <span
               v-if="hargaLocked"
@@ -1784,7 +1862,7 @@ watch(
         </div>
 
         <!-- Warna — satu baris horizontal di kolom kiri -->
-        <div class="fieldset-box mt-1">
+        <div v-if="!isDivisiSpanduk" class="fieldset-box mt-1">
           <div class="fieldset-legend">Warna</div>
           <div class="fr" style="gap: 5px">
             <label class="lbl" style="width: 48px">Badan</label>

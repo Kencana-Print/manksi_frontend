@@ -18,10 +18,18 @@ export interface LhkCetakRow {
   Nama_Pabrik: string | null;
   Kar_Borongan: number | null;
   Kar_Harian: number | null;
+  // Output produksi = kebutuhan kain (meter lari)
   Jml_Meter: number | string | null;
   // NULL = LHK belum punya baris kain
   Jml_Kain: number | string | null;
   Sesi: string;
+  // '' tidak perlu, W menunggu, Y disetujui, N ditolak
+  Apv_Status: string;
+  Apv_User: string | null;
+  Apv_Tgl: string | null;
+  Apv_Alasan: string | null;
+  // 1 = sesi pagi diinput setelah 13.00
+  Input_Terlambat: number;
 }
 
 export interface LhkCetakDetailRow {
@@ -37,9 +45,9 @@ export interface LhkCetakDetailRow {
 
 export interface LhkCetakKainRow {
   Nomor: string;
-  Kode_Bahan: number | string;
+  Kode_Bahan: string;
   Nama_Bahan: string | null;
-  Lebar: string | null;
+  Lebar: number | string | null;
   Qty_Meter: number | string;
 }
 
@@ -76,4 +84,17 @@ export const getKain = async (
 
 export const remove = async (nomor: string): Promise<void> => {
   await api.delete(`${BASE}/${encodeURIComponent(nomor)}`);
+};
+
+export type AksiApproval = "APPROVE" | "TOLAK";
+
+export const approve = async (
+  nomor: string,
+  status: AksiApproval,
+  alasan: string,
+): Promise<void> => {
+  await api.put(`${BASE}/${encodeURIComponent(nomor)}/approve`, {
+    status,
+    alasan,
+  });
 };

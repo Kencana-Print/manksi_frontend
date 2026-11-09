@@ -38,6 +38,9 @@ const isManualLokasi = (kode: string) =>
 const JUMLAH_WARNA = 10;
 const KOLOM_WARNA_AWAL = 7;
 const MAKS_WARNA = 40;
+// Konversi input obat ke KG/LITER (sama dengan server): 1 ons = 0,1; 1 gram = 0,001
+const FAKTOR_ONS = 0.1;
+const FAKTOR_GRAM = 0.001;
 const INDEKS_WARNA = Array.from({ length: JUMLAH_WARNA }, (_, i) => i);
 
 // Jumlah kolom warna yang tampil (bisa ditambah admin sampai JUMLAH_WARNA)
@@ -66,11 +69,13 @@ interface PlangkanItem {
 }
 
 interface ResepRow {
-  kode: number;
+  kode: string;
   nama: string;
   satuan: string;
-  resep: number;
-  actual: number;
+  stok: number | null; // stok per Lokasi (null = belum dimuat)
+  kg: number;
+  ons: number;
+  gram: number;
 }
 
 interface FormRow {
@@ -95,7 +100,6 @@ interface FormState {
   };
   items: FormRow[];
   resep: ResepRow[];
-  resepTerkunci: boolean;
 }
 
 const num = (v: unknown) => Number(v) || 0;
@@ -110,8 +114,10 @@ const resepKosong = (): ResepRow[] =>
     kode: o.Kode,
     nama: o.Nama,
     satuan: o.Satuan,
-    resep: 0,
-    actual: 0,
+    stok: o.Stok,
+    kg: 0,
+    ons: 0,
+    gram: 0,
   }));
 
 const lengkapiResep = () => {
@@ -140,12 +146,49 @@ const defaultData = (): FormState => ({
   header: { nomor: "", tanggal: todayLocal, kodePabrik: "", namaPabrik: "" },
   items: [barisKosong()],
   resep: [],
-  resepTerkunci: false,
 });
 
 // J Plangkan (selain MT1) = jumlah Qty semua ukuran (dihitung juga oleh server)
 const jumlahPlangkan = (row: FormRow) =>
   row.plangkan.reduce((a, p) => a + num(p.qty), 0);
+
+// J Meter = Σ ukuran × Qty pada Detail Plangkan (server memakai rumus yang sama)
+const jumlahMeter = (row: FormRow) =>
+  Math.round(
+    (row.plangkan.reduce((a, p) => a + p.ukuran * num(p.qty), 0) +
+      Number.EPSILON) *
+      100,
+  ) / 100;
+
+// Jumlah obat dalam KG/LITER dari tiga kolom input
+const jumlahObat = (b: ResepRow) =>
+  Math.round(
+    (num(b.kg) +
+      num(b.ons) * FAKTOR_ONS +
+      num(b.gram) * FAKTOR_GRAM +
+      Number.EPSILON) *
+      10000,
+  ) / 10000;
+
+const kurangStok = (b: ResepRow) => b.stok !== null && jumlahObat(b) > b.stok;
+
+// Muat ulang stok per Lokasi ke baris obat (pemakaian LHK ini sendiri
+// tidak dihitung server saat nomor dikirim)
+const muatStok = async () => {
+  const h = formData.value.header;
+  if (!h.kodePabrik) {
+    return;
+  }
+  try {
+    const opts = await lhkForm.getLookupResep(h.kodePabrik, h.nomor);
+    const peta = new Map(opts.map((o) => [o.Kode, o.Stok]));
+    for (const r of formData.value.resep) {
+      r.stok = peta.get(r.kode) ?? null;
+    }
+  } catch (e) {
+    toast.error(lhkForm.pesanError(e, "Gagal memuat stok obat."));
+  }
+};
 
 // ── State UI ──
 const showSpkModal = ref(false);
@@ -154,6 +197,7 @@ const fokusIdx = ref(0); // baris yang detail plangkannya tampil di panel bawah
 const showSelesai = ref(false);
 const nomorTerakhir = ref("");
 const pabrikOpts = ref<PabrikOption[]>([]);
+const resepDimuat = ref(false);
 
 const bangunPayload = (data: FormState): LhkProofPayload => {
   const manual = isManualLokasi(data.header.kodePabrik);
@@ -185,11 +229,12 @@ const bangunPayload = (data: FormState): LhkProofPayload => {
         };
       }),
     Resep: data.resep
-      .filter((r) => num(r.resep) > 0 || num(r.actual) > 0)
+      .filter((r) => jumlahObat(r) > 0)
       .map((r) => ({
-        Brg_Kode: r.kode,
-        Qty_Resep: num(r.resep),
-        Qty_Actual: num(r.actual),
+        Kode_Bahan: r.kode,
+        Kg: num(r.kg),
+        Ons: num(r.ons),
+        Gram: num(r.gram),
       })),
   };
 };
@@ -233,6 +278,10 @@ const {
       return Math.max(mx, idx);
     }, 0);
     jumlahKolomWarna.value = Math.max(KOLOM_WARNA_AWAL, terjauh);
+    const stokOpts = await lhkForm
+      .getLookupResep(d.Kode_Pabrik ?? "", d.Nomor)
+      .catch((): ResepOption[] => []);
+    const petaStok = new Map(stokOpts.map((o) => [o.Kode, o.Stok]));
     return {
       header: {
         nomor: d.Nomor,
@@ -245,10 +294,11 @@ const {
         kode: r.Kode,
         nama: r.Nama,
         satuan: r.Satuan,
-        resep: num(r.Qty_Resep),
-        actual: num(r.Qty_Actual),
+        stok: petaStok.get(r.Kode) ?? null,
+        kg: num(r.Qty_Actual),
+        ons: 0,
+        gram: 0,
       })),
-      resepTerkunci: d.Resep_Terkunci,
     };
   },
   submitApi: async (data: FormState): Promise<SaveResponse> => {
@@ -270,6 +320,7 @@ const {
     fokusIdx.value = 0;
     jumlahKolomWarna.value = KOLOM_WARNA_AWAL;
     isiLokasiDefault();
+    void muatStok();
   },
 });
 
@@ -303,6 +354,7 @@ const onPabrikChange = () => {
   const h = formData.value.header;
   h.namaPabrik =
     pabrikOpts.value.find((p) => p.Kode === h.kodePabrik)?.Nama ?? "";
+  void muatStok();
 };
 
 // Lokasi default = cabang user (kode pabrik sama dengan kode cabang).
@@ -326,19 +378,23 @@ const isiLokasiDefault = () => {
 
 onMounted(async () => {
   try {
-    const [pabrik, ukuran, resep] = await Promise.all([
+    const [pabrik, ukuran] = await Promise.all([
       lhkForm.getLookupPabrik(),
       lhkForm.getLookupUkuran(),
-      lhkForm.getLookupResep(),
     ]);
     pabrikOpts.value = pabrik;
     ukuranList.value = ukuran;
-    resepOpts.value = resep;
     lengkapiPlangkan();
-    lengkapiResep();
     isiLokasiDefault();
+    resepOpts.value = await lhkForm.getLookupResep(
+      formData.value.header.kodePabrik,
+      formData.value.header.nomor,
+    );
+    lengkapiResep();
   } catch (e) {
     toast.error(lhkForm.pesanError(e, "Gagal memuat data lookup."));
+  } finally {
+    resepDimuat.value = true;
   }
 });
 
@@ -481,6 +537,12 @@ const bulatTakNegatif = (v: unknown) => {
   return Number.isInteger(n) && n >= 0;
 };
 
+// Angka tidak negatif, maksimal 4 desimal (cermin validasi server)
+const desimalValid = (v: unknown) => {
+  const n = num(v);
+  return n >= 0 && Math.abs(n * 10000 - Math.round(n * 10000)) < 1e-6;
+};
+
 const validateSave = () => {
   const { tanggal, kodePabrik } = formData.value.header;
   if (!tanggal) {
@@ -537,8 +599,10 @@ const validateSave = () => {
     }
   }
   for (const r of formData.value.resep) {
-    if (num(r.resep) < 0 || num(r.actual) < 0) {
-      toast.warning(`${r.nama}: Resep dan Actual tidak boleh negatif.`);
+    if (!desimalValid(r.kg) || !desimalValid(r.ons) || !desimalValid(r.gram)) {
+      toast.warning(
+        `${r.nama}: KG/LTR, Ons, dan Gram harus angka tidak negatif (maks 4 desimal).`,
+      );
       return;
     }
   }
@@ -559,6 +623,7 @@ const resetBaru = () => {
   lengkapiResep();
   fokusIdx.value = 0;
   isiLokasiDefault();
+  void muatStok();
 };
 
 const tutupSetelahSimpan = () => {
@@ -655,7 +720,7 @@ const tutupSetelahSimpan = () => {
         <div class="tbl-wrap" style="flex: 1; min-height: 160px">
           <table
             class="gt"
-            :style="{ minWidth: `${860 + jumlahKolomWarna * 100}px` }"
+            :style="{ minWidth: `${945 + jumlahKolomWarna * 100}px` }"
           >
             <thead>
               <tr>
@@ -666,6 +731,7 @@ const tutupSetelahSimpan = () => {
                 <th style="width: 70px" class="tr">Panjang</th>
                 <th style="width: 70px" class="tr">Lebar</th>
                 <th style="width: 85px" class="tr">J Plangkan</th>
+                <th style="width: 85px" class="tr">J Meter</th>
                 <th style="width: 80px" class="tr bg-yellow">J Proof</th>
                 <th
                   v-for="i in INDEKS_WARNA"
@@ -744,6 +810,14 @@ const tutupSetelahSimpan = () => {
                     class="ci tr ro fw"
                     readonly
                     title="Jumlah Qty semua ukuran (isi di Detail Plangkan)"
+                  />
+                </td>
+                <td class="p0">
+                  <input
+                    :value="jumlahMeter(row)"
+                    class="ci tr ro fw"
+                    readonly
+                    title="Σ ukuran × Qty Plangkan"
                   />
                 </td>
                 <td class="p0">
@@ -834,6 +908,10 @@ const tutupSetelahSimpan = () => {
                     <td class="tr fw">Total</td>
                     <td class="tr fw">{{ jumlahPlangkan(rowAktif) }}</td>
                   </tr>
+                  <tr>
+                    <td class="tr fw">J Meter</td>
+                    <td class="tr fw">{{ jumlahMeter(rowAktif) }}</td>
+                  </tr>
                 </tfoot>
               </table>
             </div>
@@ -842,15 +920,10 @@ const tutupSetelahSimpan = () => {
             </div>
           </div>
 
-          <!-- Resep & Actual Pemakaian Obat (per dokumen) -->
+          <!-- Pemakaian Obat (Actual, per dokumen) -->
           <div class="rsp">
             <div class="tbl-header tbl-header-sub">
-              <span class="tbl-title">
-                Resep &amp; Actual Pemakaian Obat
-                <template v-if="formData.resepTerkunci">
-                  (resep terkunci)</template
-                >
-              </span>
+              <span class="tbl-title">Pemakaian Obat (Actual)</span>
             </div>
             <div class="tbl-wrap rsp-wrap">
               <table class="gt">
@@ -859,13 +932,22 @@ const tutupSetelahSimpan = () => {
                     <th style="width: 30px" class="tc">No</th>
                     <th>Nama Bahan</th>
                     <th style="width: 50px" class="tc">Sat</th>
-                    <th style="width: 90px" class="tr bg-yellow">Resep</th>
-                    <th style="width: 90px" class="tr bg-yellow">Actual</th>
+                    <th style="width: 70px" class="tr">Stok</th>
+                    <th style="width: 70px" class="tr bg-yellow">KG / LTR</th>
+                    <th style="width: 60px" class="tr bg-yellow">Ons</th>
+                    <th style="width: 60px" class="tr bg-yellow">Gram</th>
+                    <th style="width: 80px" class="tr">Jumlah</th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr v-if="formData.resep.length === 0">
-                    <td colspan="5" class="kosong">Memuat daftar bahan...</td>
+                    <td colspan="8" class="kosong">
+                      {{
+                        isLoading || !resepDimuat
+                          ? "Memuat daftar bahan..."
+                          : "Tidak ada obat di master (cek kode di tgarmen_brg)."
+                      }}
+                    </td>
                   </tr>
                   <tr v-for="(b, i) in formData.resep" :key="b.kode">
                     <td class="tc gt-lbl">{{ i + 1 }}</td>
@@ -878,23 +960,16 @@ const tutupSetelahSimpan = () => {
                       />
                     </td>
                     <td class="tc gt-lbl">{{ b.satuan }}</td>
-                    <td class="p0">
-                      <input
-                        v-model.number="b.resep"
-                        type="number"
-                        min="0"
-                        step="0.0001"
-                        class="ci tr"
-                        :class="
-                          formData.resepTerkunci ? 'ro' : 'bg-yellow-light'
-                        "
-                        :readonly="formData.resepTerkunci"
-                        v-select-on-focus
-                      />
+                    <td
+                      class="tr gt-lbl"
+                      :class="{ 'stok-kurang': kurangStok(b) }"
+                      :title="kurangStok(b) ? 'Jumlah melebihi stok' : ''"
+                    >
+                      {{ b.stok === null ? "-" : b.stok }}
                     </td>
                     <td class="p0">
                       <input
-                        v-model.number="b.actual"
+                        v-model.number="b.kg"
                         type="number"
                         min="0"
                         step="0.0001"
@@ -902,6 +977,29 @@ const tutupSetelahSimpan = () => {
                         v-select-on-focus
                       />
                     </td>
+                    <td class="p0">
+                      <input
+                        v-model.number="b.ons"
+                        type="number"
+                        min="0"
+                        step="0.0001"
+                        class="ci tr bg-yellow-light"
+                        title="1 ons = 0,1 KG/LTR"
+                        v-select-on-focus
+                      />
+                    </td>
+                    <td class="p0">
+                      <input
+                        v-model.number="b.gram"
+                        type="number"
+                        min="0"
+                        step="0.0001"
+                        class="ci tr bg-yellow-light"
+                        title="1 gram = 0,001 KG/LTR"
+                        v-select-on-focus
+                      />
+                    </td>
+                    <td class="tr gt-lbl fw">{{ jumlahObat(b) || "-" }}</td>
                   </tr>
                 </tbody>
               </table>
@@ -968,7 +1066,8 @@ const tutupSetelahSimpan = () => {
   box-sizing: border-box;
   min-height: 0;
   min-width: 0;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
   gap: 10px;
 }
 
@@ -1244,15 +1343,21 @@ const tutupSetelahSimpan = () => {
   display: flex;
   gap: 10px;
   align-items: flex-start;
+  flex-shrink: 0;
 }
 .rsp {
   display: flex;
   flex-direction: column;
-  width: 430px;
+  width: 600px;
   flex-shrink: 0;
 }
 .rsp-wrap {
   max-height: 330px;
+}
+.stok-kurang {
+  background: #ffebee !important;
+  color: #c62828 !important;
+  font-weight: 700;
 }
 .kosong {
   padding: 14px 10px !important;

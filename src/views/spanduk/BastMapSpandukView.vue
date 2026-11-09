@@ -109,8 +109,8 @@ const formKeputusan = ref<{ keputusan: "LANJUT" | "ULANG"; alasan: string }>({
 const bukaKeputusan = () => {
   const row = selected.value[0];
   if (!row) return;
-  if (Number(row.SemuaN) !== 1) {
-    toast.warning("Keputusan hanya untuk BAST yang seluruh kesesuaiannya N.");
+  if (!row.CetakBAST) {
+    toast.warning("MAP ini belum memiliki BAST.");
     return;
   }
   formKeputusan.value = {
@@ -298,9 +298,7 @@ const onExport = async () => {
         size="small"
         variant="flat"
         color="orange-darken-2"
-        :disabled="
-          selected.length === 0 || !canEdit || selected[0]?.SemuaN !== 1
-        "
+        :disabled="selected.length === 0 || !canEdit || !selected[0]?.CetakBAST"
         @click="bukaKeputusan"
       >
         Keputusan
@@ -372,7 +370,10 @@ const onExport = async () => {
           density="compact"
           hide-details
         >
-          <v-radio label="Lanjut (boleh ke Mutasi Marketing)" value="LANJUT" />
+          <v-radio
+            label="Lanjut (boleh ke Form Mutasi (Sample))"
+            value="LANJUT"
+          />
           <v-radio label="Produksi ulang (tertahan)" value="ULANG" />
         </v-radio-group>
         <v-textarea

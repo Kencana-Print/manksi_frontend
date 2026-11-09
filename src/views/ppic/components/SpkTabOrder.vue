@@ -21,6 +21,54 @@ const isPremiumFlow = computed(() => {
   return cab === "P04";
 });
 
+const isDivisiSpanduk = computed(
+  () => String(props.formData.so_divisi).charAt(0) === "1",
+);
+
+const STATUS_BAHAN = [
+  "Stok ready",
+  "Belum ready",
+  "Belum ready dan sudah PO",
+  "Ready sebagian dan belum PO",
+  "Ready sebagian dan sudah PO",
+  "Belum ready dan kedatangan partial",
+];
+// Sama dengan STATUS_WAJIB_EST di spkFormService.js
+const STATUS_WAJIB_EST = [
+  "Belum ready",
+  "Belum ready dan sudah PO",
+  "Belum ready dan kedatangan partial",
+];
+
+const fmtQty = (n: number) =>
+  new Intl.NumberFormat("id-ID", { maximumFractionDigits: 3 }).format(n);
+
+// Pemakaian bahan = Panjang x Jumlah SO (meter lari, lebar tidak dihitung)
+const kebutuhanBahan = computed(
+  () =>
+    Math.round(
+      (Number(props.formData.so_panjang) || 0) *
+        (Number(props.formData.so_jumlah) || 0) *
+        1000,
+    ) / 1000,
+);
+const selisihStok = computed(
+  () => (Number(props.formData.so_bhn_stok) || 0) - kebutuhanBahan.value,
+);
+const butuhQtyReady = computed(() =>
+  String(props.formData.spk_bhn_status || "").startsWith("Ready sebagian"),
+);
+const butuhEst = computed(() =>
+  STATUS_WAJIB_EST.includes(String(props.formData.spk_bhn_status || "")),
+);
+
+const onStatusBahan = () => {
+  if (!butuhQtyReady.value) props.formData.spk_bhn_qty_ready = 0;
+  if (props.formData.spk_bhn_status === "Stok ready") {
+    props.formData.spk_bhn_est_datang = "";
+  }
+};
+
 const showSoModal = ref(false);
 const isLoadingSo = ref(false);
 const showPreviewDialog = ref(false);
@@ -226,6 +274,12 @@ const loadSoDetail = async (nomor: string) => {
     props.formData.spk_keterangan = h.spk_keterangan || "";
     props.formData.spk_invdc = h.spk_invdc || "";
     props.formData.spk_pen_nomor = h.spk_pen_nomor || "";
+    props.formData.so_bhn_kode = h.spk_bhn_kode || "";
+    props.formData.so_bhn_nama = d.bahan?.nama || "";
+    props.formData.so_bhn_stok = Number(d.bahan?.stok) || 0;
+    props.formData.spk_bhn_status = "";
+    props.formData.spk_bhn_qty_ready = 0;
+    props.formData.spk_bhn_est_datang = "";
 
     // Ambil detail size dari SO (jadi starting point, boleh disesuaikan PPIC nanti)
     props.formData.Sizes = d.dtlSize || [];
@@ -285,6 +339,12 @@ const clearSo = () => {
   props.formData.so_customer = "";
   props.formData.so_cust_perfect = "N";
   props.formData.so_jo_kode = "";
+  props.formData.so_bhn_kode = "";
+  props.formData.so_bhn_nama = "";
+  props.formData.so_bhn_stok = 0;
+  props.formData.spk_bhn_status = "";
+  props.formData.spk_bhn_qty_ready = 0;
+  props.formData.spk_bhn_est_datang = "";
   props.formData.Sizes = [];
   mkbDetail.value = [];
   resolvedImageUrl.value = "";
@@ -414,15 +474,17 @@ onMounted(async () => {
                 style="width: 80px"
               />
               <span class="ml-1 sep-txt">Mtr</span>
-              <label class="lbl ml-2" style="width: 80px">Ket. Ukuran</label>
-              <input
-                :value="formData.so_ket_ukuran"
-                readonly
-                class="inp ro"
-                style="flex: 1"
-              />
+              <template v-if="!isDivisiSpanduk">
+                <label class="lbl ml-2" style="width: 80px">Ket. Ukuran</label>
+                <input
+                  :value="formData.so_ket_ukuran"
+                  readonly
+                  class="inp ro"
+                  style="flex: 1"
+                />
+              </template>
             </div>
-            <div class="fr">
+            <div v-if="!isDivisiSpanduk" class="fr">
               <label class="lbl">Gramasi</label>
               <input
                 :value="formData.so_gramasi"
@@ -460,6 +522,21 @@ onMounted(async () => {
             </div>
           </template>
 
+          <div v-if="isDivisiSpanduk" class="fr">
+            <label class="lbl">Bahan</label>
+            <input
+              :value="
+                formData.so_bhn_kode
+                  ? `${formData.so_bhn_kode} - ${formData.so_bhn_nama}`
+                  : ''
+              "
+              readonly
+              class="inp ro"
+              style="flex: 1"
+              placeholder="SO ini belum memiliki bahan"
+            />
+          </div>
+
           <div class="fr">
             <label class="lbl">Finishing</label>
             <input
@@ -478,13 +555,15 @@ onMounted(async () => {
               class="inp ro"
               style="width: 70px"
             />
-            <label class="lbl ml-2" style="width: 50px">Tipe</label>
-            <input
-              :value="formData.so_tipe"
-              readonly
-              class="inp ro"
-              style="width: 100px"
-            />
+            <template v-if="!isDivisiSpanduk">
+              <label class="lbl ml-2" style="width: 50px">Tipe</label>
+              <input
+                :value="formData.so_tipe"
+                readonly
+                class="inp ro"
+                style="width: 100px"
+              />
+            </template>
             <label class="lbl ml-2" style="width: 50px">Qty</label>
             <input
               :value="Number(formData.so_jumlah).toLocaleString('id-ID')"
@@ -561,6 +640,71 @@ onMounted(async () => {
         <div v-else class="so-empty">
           <IconSearch :size="32" color="#bdbdbd" />
           <div>Pilih Sales Order untuk memuat data</div>
+        </div>
+      </div>
+
+      <!-- Spanduk: cek stok bahan (menggantikan breakdown size) -->
+      <div
+        v-if="isDivisiSpanduk && formData.so_nomor"
+        class="section-card mt-2"
+      >
+        <div class="sec-title">Cek Stok Bahan</div>
+        <template v-if="formData.so_bhn_kode">
+          <div class="fr">
+            <label class="lbl">Stok Saat Ini</label>
+            <input
+              :value="fmtQty(Number(formData.so_bhn_stok) || 0)"
+              readonly
+              class="inp ro text-right"
+              style="width: 110px"
+            />
+            <span class="sep-txt">Mtr</span>
+            <label class="lbl ml-2" style="width: 60px">Selisih</label>
+            <input
+              :value="fmtQty(selisihStok)"
+              readonly
+              class="inp ro text-right"
+              :class="{ neg: selisihStok < 0 }"
+              style="width: 110px"
+              title="Stok saat ini dikurangi pemakaian bahan"
+            />
+            <span class="sep-txt">Mtr</span>
+          </div>
+          <div class="stat-list">
+            <label v-for="s in STATUS_BAHAN" :key="s" class="stat-opt">
+              <input
+                type="radio"
+                v-model="formData.spk_bhn_status"
+                :value="s"
+                @change="onStatusBahan"
+              />
+              {{ s }}
+            </label>
+          </div>
+          <div v-if="butuhQtyReady" class="fr">
+            <label class="lbl">Qty Ready <b class="req-star">*</b></label>
+            <input
+              v-model.number="formData.spk_bhn_qty_ready"
+              type="number"
+              min="0"
+              step="any"
+              class="inp text-right"
+              style="width: 110px"
+            />
+            <span class="sep-txt">Mtr</span>
+          </div>
+          <div v-if="butuhEst" class="fr">
+            <label class="lbl">Estimasi Datang <b class="req-star">*</b></label>
+            <input
+              v-model="formData.spk_bhn_est_datang"
+              type="date"
+              class="inp"
+              style="width: 140px"
+            />
+          </div>
+        </template>
+        <div v-else class="so-empty" style="padding: 10px 0">
+          SO ini belum memiliki bahan, cek stok tidak tersedia.
         </div>
       </div>
 
@@ -672,7 +816,33 @@ onMounted(async () => {
         </button>
       </div>
 
-      <div class="section-card mt-2">
+      <div
+        v-if="isDivisiSpanduk && formData.so_nomor"
+        class="section-card mt-2"
+      >
+        <div class="sec-title">Pemakaian Bahan</div>
+        <table v-if="formData.so_bhn_kode" class="pb-table">
+          <thead>
+            <tr>
+              <th>Bahan</th>
+              <th class="tr">Panjang</th>
+              <th class="tr">Jml SO</th>
+              <th class="tr">Butuh (Mtr)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>{{ formData.so_bhn_kode }} - {{ formData.so_bhn_nama }}</td>
+              <td class="tr">{{ fmtQty(Number(formData.so_panjang) || 0) }}</td>
+              <td class="tr">{{ fmtQty(Number(formData.so_jumlah) || 0) }}</td>
+              <td class="tr fw-bold">{{ fmtQty(kebutuhanBahan) }}</td>
+            </tr>
+          </tbody>
+        </table>
+        <div v-else class="mkb-empty">SO ini belum memiliki bahan.</div>
+      </div>
+
+      <div v-if="!isDivisiSpanduk" class="section-card mt-2">
         <div class="sec-title d-flex align-center">
           <span>Bahan dari MKB</span>
           <v-progress-circular
@@ -1081,5 +1251,51 @@ onMounted(async () => {
 .sep-txt {
   color: #555;
   font-size: 11px;
+}
+.unit-txt {
+  color: #555;
+  font-size: 11px;
+}
+.stat-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: 6px 0 8px 100px;
+}
+.stat-opt {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  cursor: pointer;
+}
+.stat-opt input {
+  accent-color: #1565c0;
+}
+.inp.neg {
+  color: #c62828 !important;
+  font-weight: 700;
+}
+.req-star {
+  color: #e53935;
+}
+.pb-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+.pb-table th {
+  background: #1565c0;
+  color: white;
+  padding: 4px 6px;
+  font-weight: 600;
+  text-align: left;
+}
+.pb-table th.tr {
+  text-align: right;
+}
+.pb-table td {
+  padding: 4px 6px;
+  border-bottom: 1px solid #f0f0f0;
 }
 </style>

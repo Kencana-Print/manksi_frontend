@@ -11,26 +11,27 @@ interface ApiResponse<T> {
 }
 
 export interface LhkTintaRow {
-  Nomor: string;
-  Tanggal: string;
+  Kunci: string; // nomor Tinta, atau 'CETAK:<nomor LHK Cetak>' untuk baris merah
+  Nomor: string | null; // null = baris merah
+  Tanggal: string | null;
   Kode_Pabrik: string | null;
   Nama_Pabrik: string | null;
   Nomor_Cetak: string | null;
   Tanggal_Cetak: string | null;
   Jml_SPK: number | null;
   Jml_Bahan: number | null;
+  Outstanding: number; // 1 = LHK Cetak belum punya LHK Pemakaian Obat
+  Lewat_Batas: number; // lihat statusTeks di view
 }
 
-// Satu baris per LHK per bahan
+// Satu baris per LHK per obat
 export interface LhkTintaDetailRow {
   Nomor: string;
   Tanggal: string;
   Nomor_Cetak: string | null;
-  Kode_Bahan: number;
+  Kode_Bahan: string;
   Nama_Bahan: string | null;
-  Qty_Input: number;
-  Satuan_Input: string | null;
-  Qty: number;
+  Qty: number; // total dalam satuan master
   Satuan: string | null;
 }
 

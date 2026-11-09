@@ -25,9 +25,7 @@ interface ExportDetailRow {
   Panjang: number;
   Lebar: number;
   Qty_Lipat: number;
-  Tambah_Lipat: number;
   Mata_Ayam: number;
-  BS_Lipat: number;
 }
 
 const toast = useToast();
@@ -146,32 +144,18 @@ const kolomDetail: ExcelColumn[] = [
   { header: "Panjang", key: "Panjang", width: 10, align: "right", numFmt: NUM },
   { header: "Lebar", key: "Lebar", width: 10, align: "right", numFmt: NUM },
   {
-    header: "Qty Lipat",
+    header: "Qty Lipat (pcs)",
     key: "Qty_Lipat",
-    width: 12,
+    width: 16,
     align: "right",
     numFmt: NUM,
   },
   {
-    header: "Tambah Lipat",
-    key: "Tambah_Lipat",
-    width: 14,
-    align: "right",
-    numFmt: NUM,
-  },
-  {
-    header: "Mata Ayam",
+    header: "Mata Ayam (pcs)",
     key: "Mata_Ayam",
-    width: 12,
+    width: 17,
     align: "right",
     numFmt: NUM,
-  },
-  {
-    header: "BS Lipat",
-    key: "BS_Lipat",
-    width: 12,
-    align: "right",
-    numFmt: "#,##0",
   },
 ];
 
@@ -257,9 +241,7 @@ const exportDetail = async () => {
         Panjang: Number(r.Panjang) || 0,
         Lebar: Number(r.Lebar) || 0,
         Qty_Lipat: Number(r.Qty_Lipat) || 0,
-        Tambah_Lipat: Number(r.Tambah_Lipat) || 0,
         Mata_Ayam: Number(r.Mata_Ayam) || 0,
-        BS_Lipat: Number(r.BS_Lipat) || 0,
       });
     }
   }
@@ -336,10 +318,8 @@ const numFmt = (v: number | null) =>
               <th width="80" class="tr">Jml Order</th>
               <th width="70" class="tr">Panjang</th>
               <th width="70" class="tr">Lebar</th>
-              <th width="80" class="tr">Qty Lipat</th>
-              <th width="90" class="tr">Tambah Lipat</th>
-              <th width="90" class="tr">Mata Ayam</th>
-              <th width="80" class="tr">BS Lipat</th>
+              <th width="100" class="tr">Qty Lipat (pcs)</th>
+              <th width="110" class="tr">Mata Ayam (pcs)</th>
             </tr>
           </thead>
           <tbody>
@@ -351,15 +331,13 @@ const numFmt = (v: number | null) =>
                 <td class="tr">{{ numFmt(r.Panjang) }}</td>
                 <td class="tr">{{ numFmt(r.Lebar) }}</td>
                 <td class="tr">{{ numFmt(r.Qty_Lipat) }}</td>
-                <td class="tr">{{ numFmt(r.Tambah_Lipat) }}</td>
                 <td class="tr">{{ numFmt(r.Mata_Ayam) }}</td>
-                <td class="tr">{{ numFmt(r.BS_Lipat) }}</td>
               </tr>
               <tr
                 v-if="karyawanMap[`${item.Nomor}|${r.Nomor_SPK}`]?.length"
                 class="kar-row"
               >
-                <td colspan="9">
+                <td colspan="7">
                   <span class="kar-lbl">Karyawan:</span>
                   <span
                     v-for="k in karyawanMap[`${item.Nomor}|${r.Nomor_SPK}`]"
@@ -377,7 +355,7 @@ const numFmt = (v: number | null) =>
               </tr>
             </template>
             <tr v-if="!detailMap[item.Nomor]?.length">
-              <td colspan="9" class="text-center text-grey py-3 font-italic">
+              <td colspan="7" class="text-center text-grey py-3 font-italic">
                 Detail LHK Lipat tidak ditemukan.
               </td>
             </tr>

@@ -55,7 +55,6 @@ interface FormRow {
   qtyManual: number; // dipakai hanya bila Lokasi = MT1
   tambahJahit: number;
   tambahTali: number;
-  bsJahit: number | "";
   karyawan: KarRow[];
 }
 
@@ -81,7 +80,6 @@ const barisKosong = (): FormRow => ({
   qtyManual: 0,
   tambahJahit: 0,
   tambahTali: 0,
-  bsJahit: "",
   karyawan: [],
 });
 
@@ -118,7 +116,6 @@ const bangunPayload = (data: FormState): LhkJahitPayload => {
         Qty_Jahit: manual ? num(r.qtyManual) : jumlahKaryawan(r),
         Tambah_Jahit: num(r.tambahJahit),
         Tambah_Tali: num(r.tambahTali),
-        BS_Jahit: num(r.bsJahit),
         Karyawan: r.karyawan.map((k) => ({ NIK: k.nik, Qty: num(k.qty) })),
       })),
   };
@@ -149,7 +146,6 @@ const {
       qtyManual: num(r.Qty_Jahit),
       tambahJahit: num(r.Tambah_Jahit),
       tambahTali: num(r.Tambah_Tali),
-      bsJahit: num(r.BS_Jahit),
       karyawan: r.Karyawan.map((k) => ({
         nik: k.NIK,
         nama: k.Nama ?? "",
@@ -402,13 +398,11 @@ const fokusKunci = async (kunci: string) => {
   }
 };
 
-const KOLOM_SPK = ["qty", "tambahJahit", "tambahTali", "bsJahit"] as const;
+const KOLOM_SPK = ["qty", "tambahJahit", "tambahTali"] as const;
 type KolomSpk = (typeof KOLOM_SPK)[number];
 
 const kolomSpkAktif = computed<readonly KolomSpk[]>(() =>
-  qtyManual.value
-    ? KOLOM_SPK
-    : (["tambahJahit", "tambahTali", "bsJahit"] as const),
+  qtyManual.value ? KOLOM_SPK : (["tambahJahit", "tambahTali"] as const),
 );
 
 const onEnterSpkKolom = async (idx: number, col: KolomSpk) => {
@@ -483,17 +477,11 @@ const validateSave = () => {
     }
     sudah.set(kunci, no);
 
-    if (r.bsJahit === "" || r.bsJahit === null) {
-      toast.warning(
-        `Baris ${no}: BS Jahit wajib diisi (isi 0 bila tidak ada BS).`,
-      );
+    const bulat = [r.tambahTali, ...(qtyManual.value ? [r.qtyManual] : [])];
+    if (bulat.some((v) => !Number.isInteger(num(v)))) {
+      toast.warning(`Baris ${no}: qty dan tambah tali harus bilangan bulat.`);
       return;
     }
-    const bulat = [
-      r.tambahTali,
-      r.bsJahit,
-      ...(qtyManual.value ? [r.qtyManual] : []),
-    ];
     if (bulat.some((v) => !Number.isInteger(num(v)))) {
       toast.warning(
         `Baris ${no}: qty, tambah tali, dan BS harus bilangan bulat.`,
@@ -634,7 +622,7 @@ const tutupSetelahSimpan = () => {
           class="tbl-wrap"
           style="flex: 0 0 auto; max-height: 260px; min-height: 110px"
         >
-          <table class="gt" style="min-width: 1100px">
+          <table class="gt" style="min-width: 1070px">
             <thead>
               <tr>
                 <th style="width: 32px" class="tc">No</th>
@@ -643,10 +631,15 @@ const tutupSetelahSimpan = () => {
                 <th style="width: 90px" class="tr">Jml Order</th>
                 <th style="width: 75px" class="tr">Panjang</th>
                 <th style="width: 75px" class="tr">Lebar</th>
-                <th style="width: 90px" class="tr bg-yellow">Qty Jahit</th>
-                <th style="width: 100px" class="tr bg-yellow">Tambah Jahit</th>
-                <th style="width: 95px" class="tr bg-yellow">Tambah Tali</th>
-                <th style="width: 90px" class="tr bg-yellow">BS Jahit</th>
+                <th style="width: 105px" class="tr bg-yellow">
+                  Qty Jahit (pcs)
+                </th>
+                <th style="width: 110px" class="tr bg-yellow">
+                  Tambah Jahit (M)
+                </th>
+                <th style="width: 115px" class="tr bg-yellow">
+                  Tambah Tali (pcs)
+                </th>
                 <th style="width: 32px" class="tc"></th>
               </tr>
             </thead>
@@ -736,18 +729,6 @@ const tutupSetelahSimpan = () => {
                     class="ci tr bg-yellow-light"
                     :ref="(el) => setFieldRef(el, `s_${idx}_tambahTali`)"
                     @keydown.enter.prevent="onEnterSpkKolom(idx, 'tambahTali')"
-                    v-select-on-focus
-                  />
-                </td>
-                <td class="p0">
-                  <input
-                    v-model.number="row.bsJahit"
-                    type="number"
-                    min="0"
-                    step="1"
-                    class="ci tr bg-yellow-light"
-                    :ref="(el) => setFieldRef(el, `s_${idx}_bsJahit`)"
-                    @keydown.enter.prevent="onEnterSpkKolom(idx, 'bsJahit')"
                     v-select-on-focus
                   />
                 </td>

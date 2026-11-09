@@ -1336,6 +1336,51 @@ const router = createRouter({
       },
     },
     {
+      path: "/spanduk/lhk/lhk-bs",
+      name: "SpandukLhkBs",
+      component: () => import("@/views/spanduk/lhk/LhkBsView.vue"),
+      meta: {
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "4",
+        title: "LHK BS (Bad Stock)",
+      },
+    },
+    {
+      path: "/spanduk/lhk/lhk-bs/form",
+      name: "SpandukLhkBsCreate",
+      component: () => import("@/views/spanduk/lhk/LhkBsFormView.vue"),
+      meta: {
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "4",
+        title: "Tambah LHK BS",
+        browseRoute: "SpandukLhkBs",
+      },
+    },
+    {
+      path: "/spanduk/lhk/lhk-bs/form/:nomor",
+      name: "SpandukLhkBsEdit",
+      component: () => import("@/views/spanduk/lhk/LhkBsFormView.vue"),
+      meta: {
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "4",
+        title: "Ubah LHK BS",
+        browseRoute: "SpandukLhkBs",
+      },
+    },
+    {
+      path: "/spanduk/lhk/lhk-bs/print/:nomor",
+      name: "SpandukLhkBsPrint",
+      component: () => import("@/views/spanduk/lhk/LhkBsPrintView.vue"),
+      meta: {
+        layout: "BlankLayout",
+        requiresAuth: true,
+        title: "Cetak LHK BS",
+      },
+    },
+    {
       path: "/spanduk/lhk/lhk-jahit",
       name: "SpandukLhkJahit",
       component: () => import("@/views/spanduk/lhk/LhkJahitView.vue"),
@@ -1574,7 +1619,7 @@ const router = createRouter({
         layout: "DefaultLayout",
         requiresAuth: true,
         menuId: "1327",
-        title: "Mutasi Marketing",
+        title: "Form Mutasi (Sample)",
       },
     },
     {
@@ -1586,7 +1631,7 @@ const router = createRouter({
         layout: "DefaultLayout",
         requiresAuth: true,
         menuId: "1327",
-        title: "Buat Mutasi Marketing",
+        title: "Buat Form Mutasi (Sample)",
         browseRoute: "SpandukMutasiMarketing",
       },
     },
@@ -1599,7 +1644,7 @@ const router = createRouter({
         layout: "DefaultLayout",
         requiresAuth: true,
         menuId: "1327",
-        title: "Ubah Mutasi Marketing",
+        title: "Ubah Form Mutasi (Sample)",
         browseRoute: "SpandukMutasiMarketing",
       },
     },
@@ -1612,7 +1657,7 @@ const router = createRouter({
         layout: "BlankLayout",
         requiresAuth: true,
         menuId: "1327",
-        title: "Cetak Mutasi Marketing",
+        title: "Cetak Form Mutasi (Sample)",
       },
     },
     // {
@@ -4838,6 +4883,18 @@ const router = createRouter({
         layout: "DefaultLayout",
         requiresAuth: true,
         menuId: "185",
+      },
+    },
+    {
+      path: "/penjualan/terima-mutasi",
+      name: "TerimaMutasiBrowse",
+      component: () =>
+        import("@/views/penjualan/TerimaMutasiDariProduksiView.vue"),
+      meta: {
+        title: "Terima Mutasi dari Produksi",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "191",
       },
     },
     {

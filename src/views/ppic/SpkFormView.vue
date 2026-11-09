@@ -50,12 +50,18 @@ const defaultData = {
   so_bordir: "N",
   so_sublim: "N",
   so_cust_perfect: "N",
+  so_bhn_kode: "",
+  so_bhn_nama: "",
+  so_bhn_stok: 0,
 
   // SPK header (yang benar-benar diisi/diubah form PPIC)
   spk_nomor: "",
   spk_tanggal: new Date().toISOString().substring(0, 10),
   spk_ketbeli: "",
   spk_keterangan: "",
+  spk_bhn_status: "",
+  spk_bhn_qty_ready: 0,
+  spk_bhn_est_datang: "",
 
   spk_cab: "",
   isPremiumFlow: true,
@@ -131,6 +137,8 @@ const {
       Babaran: d.babaran || [],
       BabaranSource: d.babaranSource || "manual",
       Kaosan: d.dtlKaosan || [],
+      so_bhn_nama: d.bahan?.nama || "",
+      so_bhn_stok: Number(d.bahan?.stok) || 0,
     };
   },
 
@@ -155,6 +163,15 @@ const {
       payload.so_nomor = data.so_nomor;
     }
 
+    if (isDivisiSpanduk.value) {
+      payload.bahanStatus = {
+        status: data.spk_bhn_status || "",
+        qtyReady: data.spk_bhn_qty_ready,
+        estDatang: data.spk_bhn_est_datang || "",
+      };
+      delete payload.babaran; // tab Babaran tidak dipakai Spanduk
+    }
+
     return spkFormService.save(payload);
   },
 
@@ -171,6 +188,10 @@ function mapHeaderToFormData(h: any) {
     spk_tanggal: h.spk_tanggal?.substring(0, 10) || "",
     spk_ketbeli: h.spk_ketbeli || "",
     spk_keterangan: h.spk_keterangan || "",
+    so_bhn_kode: h.spk_bhn_kode || "",
+    spk_bhn_status: h.spk_bhn_status || "",
+    spk_bhn_qty_ready: Number(h.spk_bhn_qty_ready) || 0,
+    spk_bhn_est_datang: h.spk_bhn_est_datang || "",
 
     so_nomor: h.spk_so_ref || "",
     so_nama: h.spk_nama || "",
@@ -229,6 +250,9 @@ const validateSave = () => {
 
 const isDivisiTiga = computed(() =>
   String(formData.value.so_divisi).startsWith("3"),
+);
+const isDivisiSpanduk = computed(
+  () => String(formData.value.so_divisi).charAt(0) === "1",
 );
 
 const showBarangKaosanModal = ref(false);
@@ -295,7 +319,7 @@ const tabs = computed(() => {
     { key: "order", title: "Order" },
     ...kaosanTab,
     { key: "alokasi", title: "Alokasi" },
-    { key: "babaran", title: "Babaran" },
+    ...(isDivisiSpanduk.value ? [] : [{ key: "babaran", title: "Babaran" }]),
     { key: "keterangan", title: "Keterangan" },
   ];
 });
@@ -374,7 +398,7 @@ watch(tabs, (newTabs) => {
         </div>
 
         <div
-          v-if="!formData.isPremiumFlow"
+          v-if="!formData.isPremiumFlow && !isDivisiSpanduk"
           v-show="tabs[activeTab]?.key === 'babaran'"
           class="pf-tab-pane"
         >

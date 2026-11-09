@@ -65,6 +65,8 @@ interface BpbRowRef {
   roll: number | string;
   lot?: string;
   jumlah?: number | string;
+  jumlahyard?: number | string;
+  yardmeter?: boolean;
   kodepo?: string;
 }
 interface KodeBaruQc {
@@ -263,6 +265,7 @@ interface PoTarikItem {
   jumlah?: number;
   jumlahyard?: number;
   jumlahmeter?: number;
+  yardmeter?: boolean;
 }
 
 // Dipakai jalur PO dan jalur QC
@@ -288,6 +291,7 @@ const terapkanDataPo = (
     nama: d.nama,
     satuan: d.satuan,
     satuanpo: d.satuanpo,
+    yardmeter: d.yardmeter ?? false,
     jumlahyard: d.jumlahyard ?? 0,
     jumlahmeter: d.jumlahmeter ?? 0,
     jumlah: d.jumlah ?? 0,
@@ -489,14 +493,16 @@ const onItemFieldEnter = async (
   idx: number,
   col: (typeof ITEM_EDITABLE_COLS)[number],
 ) => {
-  const colIndex = kolomAktif.value.indexOf(col);
-  const nextCol = kolomAktif.value[colIndex + 1];
-  if (!nextCol) return; // sudah kolom terakhir (SPK), diam saja
+  const sisa = kolomAktif.value.slice(kolomAktif.value.indexOf(col) + 1);
   await nextTick();
-  const next = itemFieldRefs.value[`${idx}_${nextCol}`];
-  if (next) {
-    next.focus();
-    next.select();
+  // Lewati kolom read-only (mis. Meter dan Terima Skrg pada baris PO yard)
+  for (const nextCol of sisa) {
+    const next = itemFieldRefs.value[`${idx}_${nextCol}`];
+    if (next && !next.readOnly) {
+      next.focus();
+      next.select();
+      return;
+    }
   }
 };
 
@@ -505,22 +511,42 @@ const onItemFieldEnter = async (
 const YARD_TO_METER = 0.9144;
 const isMeterBased = (item: any) => item.satuan === "MTR";
 
-// Yard diisi user → Meter (kolom bantu) & Terima Skrg (jumlah) otomatis terhitung
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
+// Jumlah baris dalam satuan PO: yard untuk baris PO yard (spanduk), selain itu = jumlah
+const jumlahSatuanPo = (r: BpbRowRef): number =>
+  Number(r.yardmeter ? r.jumlahyard : r.jumlah) || 0;
+
+// Meter (stok masuk) dan Terima Skrg dihitung dari yard, pembulatan sama dengan server
+const hitungMeterDariYard = (idx: number) => {
+  const row = formData.value.items[idx];
+  row.jumlahmeter = round2(Number(row.jumlahyard || 0) * YARD_TO_METER);
+  row.jumlah = row.jumlahmeter;
+};
+
+// Jml YARD bisa diketik: baris PO yard (spanduk) atau bahan METER, kecuali BPB dari QC
+const yardBisaDiisi = (item: BpbRowRef & { satuan?: string }): boolean =>
+  !isQc.value && (!!item.yardmeter || item.satuan === "MTR");
+
+// Jml METER hanya diketik untuk bahan METER non-yard (perilaku lama)
+const meterBisaDiisi = (item: BpbRowRef & { satuan?: string }): boolean =>
+  !isQc.value && !item.yardmeter && item.satuan === "MTR";
+
+// Yard diisi user → Meter (kolom bantu) & Terima Skrg (jumlah) otomatis terhitung.
+// Berlaku untuk baris PO yard (spanduk) dan bahan satuan METER.
 const onJumlahYardChange = (idx: number) => {
   const row = formData.value.items[idx];
-  if (!isMeterBased(row)) return; // ⬅ guard: cuma bahan METER
-  const meter = Number(
-    (Number(row.jumlahyard || 0) * YARD_TO_METER).toFixed(2),
-  );
-  row.jumlahmeter = meter;
-  row.jumlah = meter;
+  if (!row.yardmeter && !isMeterBased(row)) return;
+  row.jumlahyard = round2(Number(row.jumlahyard || 0));
+  hitungMeterDariYard(idx);
   onJumlahChange(idx);
 };
 
-// Meter (kolom bantu) diisi user → Yard & Terima Skrg (jumlah) otomatis terhitung
+// Meter diisi user → Yard & Terima Skrg otomatis terhitung (khusus bahan METER non-yard;
+// baris PO yard dikunci karena yard adalah sumber kebenarannya)
 const onJumlahMeterChange = (idx: number) => {
   const row = formData.value.items[idx];
-  if (!isMeterBased(row)) return; // ⬅ guard: cuma bahan METER
+  if (row.yardmeter || !isMeterBased(row)) return;
   row.jumlahyard = Number(
     (Number(row.jumlahmeter || 0) / YARD_TO_METER).toFixed(2),
   );
@@ -528,18 +554,18 @@ const onJumlahMeterChange = (idx: number) => {
   onJumlahChange(idx);
 };
 
-// Jumlah semua baris (kode PO + kode baru) yang berinduk ke satu kode PO
+// Jumlah semua baris (kode PO + kode baru) yang berinduk ke satu kode PO,
+// dalam satuan PO (yard untuk baris PO yard)
 const jumlahPerInduk = (kodeInduk: string): number =>
-  Math.round(
+  round2(
     formData.value.items
       .filter((r: BpbRowRef) => (r.kodepo || r.kode) === kodeInduk)
-      .reduce((s: number, r: BpbRowRef) => s + (Number(r.jumlah) || 0), 0) *
-      100,
-  ) / 100;
+      .reduce((s: number, r: BpbRowRef) => s + jumlahSatuanPo(r), 0),
+  );
 
 const onJumlahChange = (idx: number) => {
   const row = formData.value.items[idx];
-  if (isMeterBased(row)) {
+  if (!row.yardmeter && isMeterBased(row)) {
     row.jumlahmeter = row.jumlah;
   }
   if (isPo.value) {
@@ -559,6 +585,7 @@ const onJumlahChange = (idx: number) => {
 
 // Grid 2 (per-SPK) → Grid 1. Baris kode PO mengambil sisanya setelah
 // dikurangi jumlah baris kode baru yang berinduk ke kode yang sama.
+// Baris PO yard: Realisasi (yard) → Jml YARD, lalu Meter & Terima Skrg ikut.
 const onPoTerimaChange = (idx: number) => {
   const po = formData.value.poItems[idx];
   const kode: string = po.kode;
@@ -574,15 +601,18 @@ const onPoTerimaChange = (idx: number) => {
   const itemRow = formData.value.items.find(
     (r: BpbRowRef) => r.kode === kode && !r.kodepo,
   );
-  if (itemRow) {
-    const jumlahBaru = formData.value.items
-      .filter((r: BpbRowRef) => r.kodepo === kode)
-      .reduce((s: number, r: BpbRowRef) => s + (Number(r.jumlah) || 0), 0);
-    itemRow.jumlah = Math.max(
-      0,
-      Math.round((totalTerima - jumlahBaru) * 100) / 100,
-    );
+  if (!itemRow) return;
+
+  if (itemRow.yardmeter) {
+    itemRow.jumlahyard = Math.max(0, round2(totalTerima));
+    hitungMeterDariYard(formData.value.items.indexOf(itemRow));
+    return;
   }
+
+  const jumlahBaru = formData.value.items
+    .filter((r: BpbRowRef) => r.kodepo === kode)
+    .reduce((s: number, r: BpbRowRef) => s + (Number(r.jumlah) || 0), 0);
+  itemRow.jumlah = Math.max(0, round2(totalTerima - jumlahBaru));
 };
 const onRollChange = async (idx: number) => {
   const row = formData.value.items[idx];
@@ -816,7 +846,7 @@ const validateSave = () => {
   // 6. Validasi Sinkronisasi PO vs Terima
   if (isPo.value) {
     const t1 = formData.value.items.reduce(
-      (s: number, r: any) => s + (Number(r.jumlah) || 0),
+      (s: number, r: BpbRowRef) => s + jumlahSatuanPo(r),
       0,
     );
     const t2 = formData.value.poItems.reduce(
@@ -1170,7 +1200,13 @@ const printBarcodeAll = (): boolean => {
                 <th style="width: 72px" class="tr text-red">Kurang</th>
                 <th style="width: 75px" class="tr bg-yellow">Jml YARD</th>
                 <th style="width: 75px" class="tr bg-yellow">Jml METER</th>
-                <th style="width: 80px" class="tr bg-yellow">Terima Skrg</th>
+                <th
+                  style="width: 80px"
+                  class="tr bg-yellow"
+                  title="Stok masuk. Untuk PO yard Spanduk = meter"
+                >
+                  Terima Skrg
+                </th>
                 <th style="width: 55px" class="tr bg-yellow">Roll</th>
                 <th v-if="!isSpanduk" style="width: 80px">Gramasi</th>
                 <th v-if="!isSpanduk" style="width: 100px">Warna</th>
@@ -1248,9 +1284,9 @@ const printBarcodeAll = (): boolean => {
                     type="number"
                     step="0.01"
                     class="ci tr fw bg-yellow-light"
-                    :readonly="isQc || item.satuan !== 'MTR'"
-                    :class="{ ro: isQc || item.satuan !== 'MTR' }"
-                    title="Isi Yard → Meter & Terima Skrg otomatis terhitung (khusus bahan METER)"
+                    :readonly="!yardBisaDiisi(item)"
+                    :class="{ ro: !yardBisaDiisi(item) }"
+                    title="Isi Yard → Meter & Terima Skrg otomatis terhitung (PO yard Spanduk / bahan METER)"
                     :ref="
                       (el) => setItemFieldRef(el, Number(idx), 'jumlahyard')
                     "
@@ -1267,9 +1303,13 @@ const printBarcodeAll = (): boolean => {
                     type="number"
                     step="0.01"
                     class="ci tr fw bg-yellow-light"
-                    :readonly="isQc || item.satuan !== 'MTR'"
-                    :class="{ ro: isQc || item.satuan !== 'MTR' }"
-                    title="Isi Meter → Yard & Terima Skrg otomatis terhitung (khusus bahan METER)"
+                    :readonly="!meterBisaDiisi(item)"
+                    :class="{ ro: !meterBisaDiisi(item) }"
+                    :title="
+                      item.yardmeter
+                        ? 'Otomatis dari Yard × 0,9144 (stok masuk dalam meter)'
+                        : 'Isi Meter → Yard & Terima Skrg otomatis terhitung (khusus bahan METER)'
+                    "
                     :ref="
                       (el) => setItemFieldRef(el, Number(idx), 'jumlahmeter')
                     "
@@ -1285,8 +1325,11 @@ const printBarcodeAll = (): boolean => {
                     v-model.number="item.jumlah"
                     type="number"
                     class="ci tr fw bg-yellow-light"
-                    :readonly="isQc"
-                    :class="{ ro: isQc }"
+                    :readonly="isQc || item.yardmeter"
+                    :class="{ ro: isQc || item.yardmeter }"
+                    :title="
+                      item.yardmeter ? 'Stok masuk (meter) = Yard × 0,9144' : ''
+                    "
                     :ref="(el) => setItemFieldRef(el, Number(idx), 'jumlah')"
                     @blur="onJumlahChange(Number(idx))"
                     @keydown.enter.prevent="
@@ -1478,7 +1521,9 @@ const printBarcodeAll = (): boolean => {
                     <th style="width: 80px">Kode</th>
                     <th>Nama Bahan</th>
                     <th style="width: 130px" class="tc">Barcode ID</th>
-                    <th style="width: 80px" class="tr bg-yellow">Qty/Roll</th>
+                    <th style="width: 90px" class="tr bg-yellow">
+                      {{ isSpanduk ? "Qty/Roll (Mtr)" : "Qty/Roll" }}
+                    </th>
                     <th style="width: 30px" class="tc"></th>
                   </tr>
                 </thead>

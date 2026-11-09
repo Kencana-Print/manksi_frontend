@@ -40,13 +40,14 @@ interface SpkRow {
 }
 
 interface BahanRow {
-  kode: number;
+  kode: string;
   nama: string;
-  satuanMaster: string;
-  pilihan: string[]; // kosong = diinput dalam satuan master
-  qty: string; // teks agar kosong = tidak dipakai
-  satuanInput: string; // hanya bermakna bila pilihan tidak kosong
-  nonaktif: boolean; // sudah tercatat di LHK tapi kini tidak ada di master aktif
+  satuan: string; // satuan master (KG / LITER)
+  stok: number | null; // stok per lokasi, null = lokasi belum dipilih
+  kg: string; // teks agar kosong = tidak dipakai
+  ons: string;
+  gram: string;
+  nonaktif: boolean; // sudah tercatat di LHK tapi kini tidak ada di daftar aktif
 }
 
 interface FormState {
@@ -87,86 +88,90 @@ const spkDariServer = (r: LhkTintaSpk): SpkRow => ({
 
 // ── Qty & konversi satuan ──
 // Hanya untuk tampilan. Hasil yang disimpan dihitung server (sumber kebenaran).
-const GRAM_PER_SATUAN: Record<string, number> = { KG: 1000, ONS: 100, GR: 1 };
+// Total dalam satuan master (KG/LITER), sama dengan LHK Proof:
+// 1 ons = 0,1 dan 1 gram = 0,001
+const FAKTOR_ONS = 0.1;
+const FAKTOR_GRAM = 0.001;
+
+type KolomQty = "kg" | "ons" | "gram";
+const URUTAN: KolomQty[] = ["kg", "ons", "gram"];
+
+const round4 = (n: number) => Math.round(n * 10000) / 10000;
+
+const tampilAngka = (n: number) =>
+  n.toLocaleString("id-ID", { maximumFractionDigits: 4 });
 
 // Koma boleh dipakai sebagai pemisah desimal; maksimal 4 desimal
 const normQty = (s: string) => s.trim().replace(",", ".");
 
+// Kosong dianggap 0; null = format salah
 const parseQty = (s: string): number | null => {
   const t = normQty(s);
+  if (t === "") {
+    return 0;
+  }
   return /^\d+(\.\d{1,4})?$/.test(t) ? Number(t) : null;
 };
 
-const qtyInvalid = (b: BahanRow) => {
-  if (b.qty.trim() === "") {
-    return false;
+const barisTerisi = (b: BahanRow) =>
+  b.kg.trim() !== "" || b.ons.trim() !== "" || b.gram.trim() !== "";
+
+const kolomInvalid = (b: BahanRow, k: KolomQty) => parseQty(b[k]) === null;
+
+// null bila ada kolom yang formatnya salah
+const totalBaris = (b: BahanRow): number | null => {
+  const kg = parseQty(b.kg);
+  const ons = parseQty(b.ons);
+  const gram = parseQty(b.gram);
+  if (kg === null || ons === null || gram === null) {
+    return null;
   }
-  const n = parseQty(b.qty);
-  return n === null || n <= 0;
+  return round4(kg + ons * FAKTOR_ONS + gram * FAKTOR_GRAM);
+};
+
+const tampilTotal = (b: BahanRow): string => {
+  if (!barisTerisi(b)) {
+    return "";
+  }
+  const t = totalBaris(b);
+  return t === null ? "" : tampilAngka(t);
+};
+
+const stokKurang = (b: BahanRow): boolean => {
+  const t = totalBaris(b);
+  return b.stok !== null && t !== null && t > round4(b.stok);
 };
 
 const labelSatuan = (s: string) => (s && s !== "0" ? s : "-");
 
-const setaraMaster = (b: BahanRow): string => {
-  if (b.pilihan.length === 0) {
-    return "";
-  }
-  const n = parseQty(b.qty);
-  if (n === null || n <= 0) {
-    return "";
-  }
-  const master = b.satuanMaster.trim().toUpperCase();
-  const dari = b.satuanInput.toUpperCase();
-  if (dari === master) {
-    return "";
-  }
-  const f1 = GRAM_PER_SATUAN[dari];
-  const f2 = GRAM_PER_SATUAN[master];
-  if (!f1 || !f2) {
-    return "";
-  }
-  const hasil = Math.round(((n * f1) / f2) * 10000) / 10000;
-  if (hasil <= 0) {
-    return "terlalu kecil";
-  }
-  return `= ${hasil.toLocaleString("id-ID", { maximumFractionDigits: 4 })} ${master}`;
+// Total tersimpan (satuan master) dipecah ke KG/Ons/Gram untuk ditampilkan.
+// Dihitung dalam satuan 0,0001 supaya total tidak bergeser saat disimpan ulang.
+const pecahQty = (total: number) => {
+  const t = Math.round(total * 10000);
+  const sisa = t % 10000;
+  const teks = (n: number) => (n > 0 ? String(n) : "");
+  return {
+    kg: teks(Math.floor(t / 10000)),
+    ons: teks(Math.floor(sisa / 1000)),
+    gram: teks((sisa % 1000) / 10),
+  };
 };
 
-// ── Master bahan tinta/cat = baris default ──
-let masterPromise: Promise<BahanOption[]> | null = null;
-const muatMaster = (): Promise<BahanOption[]> => {
-  if (!masterPromise) {
-    masterPromise = lhkForm.getLookupBahan().catch((e: unknown) => {
-      masterPromise = null;
-      throw e;
-    });
-  }
-  return masterPromise;
-};
-
-const satuanAwal = (pilihan: string[], satuanMaster: string) =>
-  pilihan.length > 0 ? satuanMaster.trim().toUpperCase() : "";
-
-// Gabungkan master (semua bahan aktif) dengan isian yang sudah tersimpan.
-// Bahan tersimpan yang tidak ada di master aktif ditambahkan di bawah.
+// Gabungkan daftar obat aktif dengan isian yang sudah tersimpan.
+// Obat tersimpan yang tidak ada di daftar ditambahkan di bawah.
 const susunBahan = (
   master: BahanOption[],
   tersimpan: LhkTintaBahan[],
 ): BahanRow[] => {
   const peta = new Map(tersimpan.map((t) => [t.Kode_Bahan, t]));
   const baris: BahanRow[] = master.map((m) => {
-    const sm = m.Satuan ?? "";
     const t = peta.get(m.Kode);
     return {
       kode: m.Kode,
       nama: m.Nama,
-      satuanMaster: sm,
-      pilihan: m.Pilihan_Satuan,
-      qty: t ? String(t.Qty_Input) : "",
-      satuanInput:
-        t && m.Pilihan_Satuan.length > 0
-          ? (t.Satuan_Input ?? "").toUpperCase()
-          : satuanAwal(m.Pilihan_Satuan, sm),
+      satuan: m.Satuan,
+      stok: m.Stok,
+      ...(t ? pecahQty(t.Qty) : { kg: "", ons: "", gram: "" }),
       nonaktif: false,
     };
   });
@@ -175,15 +180,12 @@ const susunBahan = (
     if (ada.has(t.Kode_Bahan)) {
       continue;
     }
-    const sm = t.Satuan_Master ?? "";
     baris.push({
       kode: t.Kode_Bahan,
-      nama: t.Nama_Bahan ?? String(t.Kode_Bahan),
-      satuanMaster: sm,
-      pilihan: t.Pilihan_Satuan,
-      qty: String(t.Qty_Input),
-      satuanInput:
-        t.Pilihan_Satuan.length > 0 ? (t.Satuan_Input ?? "").toUpperCase() : "",
+      nama: t.Nama_Bahan ?? t.Kode_Bahan,
+      satuan: t.Satuan ?? "",
+      stok: null,
+      ...pecahQty(t.Qty),
       nonaktif: true,
     });
   }
@@ -195,26 +197,45 @@ const showSelesai = ref(false);
 const nomorTerakhir = ref("");
 const cari = ref("");
 const hanyaTerisi = ref(false);
+const lewatBatas = ref(false); // LHK Cetak terpilih sudah lewat h+7 (hanya penanda)
 
 const bangunPayload = (data: FormState): LhkTintaPayload => ({
   Tanggal: data.header.tanggal,
   Kode_Pabrik: data.header.kodePabrik,
   Nomor_Cetak: data.header.nomorCetak,
-  // Hanya bahan yang Qty-nya diisi
-  Bahan: data.bahan
-    .filter((b) => b.qty.trim() !== "")
-    .map((b) => ({
-      Kode_Bahan: b.kode,
-      Qty: normQty(b.qty),
-      Satuan: b.pilihan.length > 0 ? b.satuanInput : "",
-    })),
+  // Hanya obat yang salah satu kolomnya diisi
+  Bahan: data.bahan.filter(barisTerisi).map((b) => ({
+    Kode_Bahan: b.kode,
+    Kg: normQty(b.kg),
+    Ons: normQty(b.ons),
+    Gram: normQty(b.gram),
+  })),
 });
 
 const isiBahanDefault = async () => {
   if (isEditMode.value) {
     return;
   }
-  formData.value.bahan = susunBahan(await muatMaster(), []);
+  const h = formData.value.header;
+  formData.value.bahan = susunBahan(
+    await lhkForm.getLookupBahan(h.kodePabrik, ""),
+    [],
+  );
+};
+
+// Stok bergantung pada lokasi: muat ulang setelah LHK Cetak dipilih.
+// Isian tidak disentuh, hanya kolom stok.
+const segarkanStok = async () => {
+  const h = formData.value.header;
+  try {
+    const master = await lhkForm.getLookupBahan(h.kodePabrik, h.nomor);
+    const peta = new Map(master.map((m) => [m.Kode, m.Stok]));
+    for (const b of formData.value.bahan) {
+      b.stok = peta.get(b.kode) ?? null;
+    }
+  } catch (e) {
+    toast.error(lhkForm.pesanError(e, "Gagal memuat stok obat."));
+  }
 };
 
 const {
@@ -232,10 +253,9 @@ const {
   menuId: "4",
   initialData: defaultData(),
   fetchApi: async (): Promise<FormState> => {
-    const [d, master] = await Promise.all([
-      lhkForm.getById(String(route.params.nomor)),
-      muatMaster(),
-    ]);
+    const d = await lhkForm.getById(String(route.params.nomor));
+    // stok per lokasi LHK ini, tanpa pemakaian LHK itu sendiri
+    const master = await lhkForm.getLookupBahan(d.Kode_Pabrik ?? "", d.Nomor);
     return {
       header: {
         nomor: d.Nomor,
@@ -273,22 +293,31 @@ onMounted(async () => {
   } catch (e) {
     toast.error(lhkForm.pesanError(e, "Gagal memuat daftar bahan."));
   }
+  // Dari baris merah browse: ?cetak=<nomor LHK Cetak>
+  const cetak = route.query.cetak;
+  if (!isEditMode.value && typeof cetak === "string" && cetak.trim()) {
+    if (await pilihCetak(cetak)) {
+      await fokusKunci("cari");
+    }
+  }
 });
 
-// ── Daftar bahan: filter cari + hanya yang terisi ──
+// ── Daftar obat: filter cari + hanya yang terisi ──
 const bahanTampil = computed(() => {
   const kata = cari.value.trim().toUpperCase();
   return formData.value.bahan.filter(
     (b) =>
-      (!hanyaTerisi.value || b.qty.trim() !== "") &&
-      (!kata ||
-        b.nama.toUpperCase().includes(kata) ||
-        String(b.kode).includes(kata)),
+      (!hanyaTerisi.value || barisTerisi(b)) &&
+      (!kata || b.nama.toUpperCase().includes(kata) || b.kode.includes(kata)),
   );
 });
 
 const jumlahTerisi = computed(
-  () => formData.value.bahan.filter((b) => b.qty.trim() !== "").length,
+  () => formData.value.bahan.filter(barisTerisi).length,
+);
+
+const jumlahStokKurang = computed(
+  () => formData.value.bahan.filter(stokKurang).length,
 );
 
 // ── Fokus & Enter ──
@@ -311,13 +340,17 @@ const fokusKunci = async (kunci: string) => {
   }
 };
 
-// Enter di Qty = lanjut ke Qty bahan berikutnya pada daftar yang tampil
-const onEnterQty = async (kode: number) => {
+// Enter: KG → Ons → Gram → KG obat berikutnya pada daftar yang tampil
+const onEnterQty = async (kode: string, kolom: KolomQty) => {
+  const i = URUTAN.indexOf(kolom);
+  if (i < URUTAN.length - 1) {
+    await fokusKunci(`${URUTAN[i + 1]}_${kode}`);
+    return;
+  }
   const daftar = bahanTampil.value;
-  const i = daftar.findIndex((b) => b.kode === kode);
-  const berikut = daftar[i + 1];
+  const berikut = daftar[daftar.findIndex((b) => b.kode === kode) + 1];
   if (berikut) {
-    await fokusKunci(`q_${berikut.kode}`);
+    await fokusKunci(`kg_${berikut.kode}`);
   }
 };
 
@@ -329,17 +362,25 @@ const pilihCetak = async (nomorInput: string): Promise<boolean> => {
   }
   try {
     const info = await lhkForm.getInfoCetak(nomor);
+    if (!["", "Y"].includes((info.Apv_Status ?? "").trim())) {
+      toast.warning(
+        `LHK Cetak ${info.Nomor} belum disetujui (menunggu atau ditolak approval).`,
+      );
+      return false;
+    }
     const h = formData.value.header;
     h.nomorCetak = info.Nomor;
     h.tanggalCetak = info.Tanggal;
     h.kodePabrik = info.Kode_Pabrik ?? "";
     h.namaPabrik = info.Nama_Pabrik ?? "";
     formData.value.spk = info.Detail.map(spkDariServer);
-    return true;
+    lewatBatas.value = info.Lewat_Batas === 1;
   } catch (e) {
     toast.error(lhkForm.pesanError(e, "Gagal memuat LHK Cetak."));
     return false;
   }
+  await segarkanStok();
+  return true;
 };
 
 const showCetakModal = ref(false);
@@ -398,16 +439,22 @@ const validateSave = () => {
     return;
   }
 
-  const terisi = formData.value.bahan.filter((b) => b.qty.trim() !== "");
+  const terisi = formData.value.bahan.filter(barisTerisi);
   if (terisi.length === 0) {
-    toast.warning("Minimal satu pemakaian tinta/cat harus diisi.");
+    toast.warning("Minimal satu pemakaian obat harus diisi.");
     return;
   }
   for (const b of terisi) {
-    const n = parseQty(b.qty);
-    if (n === null || n <= 0) {
+    const total = totalBaris(b);
+    if (total === null) {
       toast.warning(
-        `${b.nama}: Qty harus angka lebih dari 0 (maksimal 4 desimal).`,
+        `${b.nama}: KG/Ons/Gram harus angka 0 atau lebih (maksimal 4 desimal).`,
+      );
+      return;
+    }
+    if (total <= 0) {
+      toast.warning(
+        `${b.nama}: jumlah harus lebih dari 0, atau kosongkan barisnya.`,
       );
       return;
     }
@@ -426,6 +473,7 @@ const resetBaru = () => {
   formData.value = defaultData();
   cari.value = "";
   hanyaTerisi.value = false;
+  lewatBatas.value = false;
   isiBahanDefault().catch(() => undefined);
 };
 
@@ -531,6 +579,11 @@ const tutupSetelahSimpan = () => {
           />
         </div>
 
+        <div v-if="lewatBatas" class="peringatan">
+          LHK Cetak ini sudah lewat batas input (h+7 dari tanggal LHK Cetak).
+          Tetap bisa disimpan, tetapi akan ditandai terlambat.
+        </div>
+
         <div v-if="isEditMode" class="catatan">
           LHK Cetak tidak dapat diubah. Hapus lalu buat LHK Pemakaian Obat baru
           bila salah pilih.
@@ -575,18 +628,20 @@ const tutupSetelahSimpan = () => {
           </table>
         </div>
 
-        <!-- Pemakaian tinta/cat: semua bahan master, isi yang dipakai saja -->
+        <!-- Pemakaian obat: semua obat dalam daftar, isi yang dipakai saja -->
         <div class="plg">
           <div class="tbl-header tbl-header-sub">
-            <span class="tbl-title">Pemakaian Tinta/Cat</span>
-            <span class="hint">1 ons = 100 gram</span>
+            <span class="tbl-title">Pemakaian Obat</span>
+            <span class="hint"
+              >1 ons = 0,1 · 1 gram = 0,001 (satuan master)</span
+            >
           </div>
           <div class="cari-row">
             <input
               v-model="cari"
               class="inp"
               style="flex: 1"
-              placeholder="Cari bahan (nama / kode)..."
+              placeholder="Cari obat (nama / kode)..."
               autocomplete="off"
               :ref="(el) => simpanRef(el, 'cari')"
             />
@@ -595,17 +650,22 @@ const tutupSetelahSimpan = () => {
               Hanya yang terisi
             </label>
             <span class="cnt">{{ jumlahTerisi }} terisi</span>
+            <span v-if="jumlahStokKurang > 0" class="cnt-warn">
+              {{ jumlahStokKurang }} stok kurang
+            </span>
           </div>
           <div class="tbl-wrap plg-wrap">
-            <table class="gt" style="min-width: 640px">
+            <table class="gt" style="min-width: 720px">
               <thead>
                 <tr>
-                  <th style="width: 60px" class="tc">Kode</th>
-                  <th>Bahan (Obat &amp; Tinta)</th>
-                  <th style="width: 70px">Satuan</th>
-                  <th style="width: 110px" class="tr bg-yellow">Qty</th>
-                  <th style="width: 80px">Dalam</th>
-                  <th style="width: 130px">Setara</th>
+                  <th style="width: 70px" class="tc">Kode</th>
+                  <th>Obat</th>
+                  <th style="width: 60px">Satuan</th>
+                  <th style="width: 80px" class="tr">Stok</th>
+                  <th style="width: 85px" class="tr bg-yellow">KG/LTR</th>
+                  <th style="width: 70px" class="tr bg-yellow">Ons</th>
+                  <th style="width: 70px" class="tr bg-yellow">Gram</th>
+                  <th style="width: 100px" class="tr">Total</th>
                 </tr>
               </thead>
               <tbody>
@@ -617,37 +677,36 @@ const tutupSetelahSimpan = () => {
                       >di luar daftar</span
                     >
                   </td>
-                  <td class="gt-lbl">{{ labelSatuan(b.satuanMaster) }}</td>
-                  <td class="p0">
+                  <td class="gt-lbl">{{ labelSatuan(b.satuan) }}</td>
+                  <td
+                    class="gt-lbl tr"
+                    :class="{ 'stok-kurang': stokKurang(b) }"
+                  >
+                    {{ b.stok === null ? "-" : tampilAngka(b.stok) }}
+                  </td>
+                  <td v-for="k in URUTAN" :key="k" class="p0">
                     <input
-                      v-model="b.qty"
+                      v-model="b[k]"
                       type="text"
                       inputmode="decimal"
                       autocomplete="off"
                       class="ci tr bg-yellow-light"
-                      :class="{ 'qty-bad': qtyInvalid(b) }"
-                      :ref="(el) => simpanRef(el, `q_${b.kode}`)"
-                      @keydown.enter.prevent="onEnterQty(b.kode)"
+                      :class="{ 'qty-bad': kolomInvalid(b, k) }"
+                      :ref="(el) => simpanRef(el, `${k}_${b.kode}`)"
+                      @keydown.enter.prevent="onEnterQty(b.kode, k)"
                       v-select-on-focus
                     />
                   </td>
-                  <td class="p0">
-                    <select
-                      v-if="b.pilihan.length > 0"
-                      v-model="b.satuanInput"
-                      class="ci"
-                    >
-                      <option v-for="s in b.pilihan" :key="s" :value="s">
-                        {{ s }}
-                      </option>
-                    </select>
-                    <span v-else class="gt-lbl-inline">-</span>
+                  <td
+                    class="gt-lbl tr"
+                    :class="{ 'stok-kurang': stokKurang(b) }"
+                  >
+                    {{ tampilTotal(b) }}
                   </td>
-                  <td class="gt-lbl">{{ setaraMaster(b) }}</td>
                 </tr>
                 <tr v-if="bahanTampil.length === 0">
-                  <td colspan="6" class="plg-kosong-sel">
-                    Tidak ada bahan yang cocok.
+                  <td colspan="8" class="plg-kosong-sel">
+                    Tidak ada obat yang cocok.
                   </td>
                 </tr>
               </tbody>
@@ -1009,12 +1068,6 @@ const tutupSetelahSimpan = () => {
   padding: 0 6px;
   font-size: 11px;
 }
-.gt-lbl-inline {
-  display: block;
-  padding: 0 6px;
-  color: #757575;
-  font-size: 11px;
-}
 .ci.qty-bad {
   background: #ffebee !important;
   outline: 1px solid #d32f2f;
@@ -1027,6 +1080,25 @@ const tutupSetelahSimpan = () => {
   border: 1px solid #b71c1c;
   border-radius: 2px;
   padding: 0 3px;
+}
+.peringatan {
+  margin-top: 6px;
+  padding: 5px 8px;
+  font-size: 10px;
+  color: #e65100;
+  background: #fff3e0;
+  border: 1px solid #ffb74d;
+  border-radius: 2px;
+}
+.cnt-warn {
+  font-size: 11px;
+  font-weight: 700;
+  color: #d32f2f;
+  white-space: nowrap;
+}
+.gt tbody td.stok-kurang {
+  color: #d32f2f;
+  font-weight: 700;
 }
 .plg-kosong-sel {
   padding: 12px 10px;

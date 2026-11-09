@@ -27,7 +27,6 @@ export interface LhkJahitDetailRow {
   Qty_Jahit: number | null;
   Tambah_Jahit: number | null;
   Tambah_Tali: number | null;
-  BS_Jahit: number | null;
 }
 
 export interface LhkJahitKaryawanRow {

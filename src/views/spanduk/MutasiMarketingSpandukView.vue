@@ -124,11 +124,53 @@ onMounted(() => fetchData());
 watch(() => filterState.value.dtAwal, fetchData);
 watch(() => filterState.value.dtAkhir, fetchData);
 
+const barisTerpilih = (): MutasiMarketingRow[] =>
+  (selected.value as unknown[]).flatMap((s) => {
+    const kunci =
+      typeof s === "string"
+        ? s
+        : s && typeof s === "object" && "Nomor" in s
+          ? String((s as { Nomor: string }).Nomor)
+          : "";
+    const r = (items.value ?? []).find((x) => x.Nomor === kunci);
+    return r ? [r] : [];
+  });
+
+const rowProps = (data: { item: unknown }) => {
+  const it = data.item as {
+    raw?: MutasiMarketingRow;
+  } & Partial<MutasiMarketingRow>;
+  const row = it.raw ?? it;
+  return row.Tipe === "OUTSTANDING"
+    ? {
+        class: "row-outstanding",
+        style: "background-color: #ffcdd2; color: #b71c1c; font-weight: 600;",
+      }
+    : {};
+};
+
+// Dipanggil BaseBrowse sebelum dialog hapus dibuka
+const sebelumHapus = (item: MutasiMarketingRow): boolean => {
+  if (item.Tipe !== "OUTSTANDING") return true;
+  toast.warning("Baris merah adalah MAP yang belum dimutasi, bukan dokumen.");
+  return false;
+};
+
 const onAdd = () => {
   router.push({ name: "SpandukMutasiMarketingCreate" });
 };
 
 const onEdit = (item: MutasiMarketingRow) => {
+  if (item.Tipe === "OUTSTANDING") {
+    const maps = barisTerpilih()
+      .filter((r) => r.Tipe === "OUTSTANDING")
+      .map((r) => r.Nomor);
+    router.push({
+      name: "SpandukMutasiMarketingCreate",
+      query: { map: (maps.length ? maps : [item.Nomor]).join(",") },
+    });
+    return;
+  }
   router.push({
     name: "SpandukMutasiMarketingEdit",
     params: { nomor: item.Nomor },
@@ -138,7 +180,7 @@ const onEdit = (item: MutasiMarketingRow) => {
 const onDelete = async (item: MutasiMarketingRow) => {
   try {
     await mmService.remove(item.Nomor);
-    toast.success(`Mutasi Marketing ${item.Nomor} berhasil dihapus.`);
+    toast.success(`Form Mutasi (Sample) ${item.Nomor} berhasil dihapus.`);
     selected.value = [];
     await fetchData();
   } catch (e) {
@@ -158,7 +200,7 @@ const nomorTerpilih = (): string => {
 
 const onCetak = () => {
   const nomor = nomorTerpilih();
-  if (!nomor) {
+  if (!nomor || barisTerpilih()[0]?.Tipe === "OUTSTANDING") {
     toast.warning("Pilih dokumen yang akan dicetak.");
     return;
   }
@@ -172,11 +214,13 @@ const onExport = () =>
   exportToExcel("Mutasi_Marketing", {
     columns: kolomMaster,
     getData: () =>
-      dataTampil().map((r) => ({
-        ...r,
-        Tanggal: formatTanggal(r.Tanggal),
-        Diterima: statusDiterima(r),
-      })),
+      dataTampil()
+        .filter((r) => r.Tipe === "DOKUMEN")
+        .map((r) => ({
+          ...r,
+          Tanggal: formatTanggal(r.Tanggal),
+          Diterima: statusDiterima(r),
+        })),
   });
 
 const numFmt = (v: number | null) =>
@@ -186,7 +230,7 @@ const numFmt = (v: number | null) =>
 <template>
   <BaseBrowse
     ref="baseBrowseRef"
-    title="Mutasi Marketing"
+    title="Form Mutasi (Sample)"
     menu-id="1327"
     storage-id="spanduk-mutasi-marketing"
     :icon="IconTruckDelivery"
@@ -200,6 +244,8 @@ const numFmt = (v: number | null) =>
     :can-delete="canDelete"
     :can-export="canExport"
     item-value="Nomor"
+    :row-props-fn="rowProps"
+    :before-delete="sebelumHapus"
     @add="onAdd"
     @edit="onEdit"
     @delete="onDelete"
@@ -225,7 +271,9 @@ const numFmt = (v: number | null) =>
       {{ numFmt(item.Total_Jadi) }}
     </template>
     <template #item.Total_Kirim="{ item }">
+      <span v-if="item.Tipe === 'OUTSTANDING'">-</span>
       <span
+        v-else
         :class="
           item.Total_Kirim !== item.Total_Jadi
             ? 'text-orange-darken-2 font-weight-bold'
@@ -237,12 +285,16 @@ const numFmt = (v: number | null) =>
     </template>
 
     <template #item.Diterima="{ item }">
-      {{ statusDiterima(item) }}
+      <span v-if="item.Tipe === 'OUTSTANDING'">-</span>
+      <template v-else>{{ statusDiterima(item) }}</template>
     </template>
 
     <!-- Detail Expand -->
     <template #detail="{ item }">
-      <div class="expand-wrap">
+      <div v-if="item.Tipe === 'OUTSTANDING'" class="expand-wrap">
+        MAP ini belum dimutasi ke marketing. Klik Ubah untuk membuat dokumen.
+      </div>
+      <div v-else class="expand-wrap">
         <div class="expand-title mb-2">Detail MAP - {{ item.Nomor }}</div>
         <table class="detail-table">
           <thead>
@@ -275,7 +327,7 @@ const numFmt = (v: number | null) =>
             </tr>
             <tr v-if="!detailMap[item.Nomor]?.length">
               <td colspan="6" class="text-center text-grey py-3 font-italic">
-                Detail Mutasi Marketing tidak ditemukan.
+                Detail Form Mutasi (Sample) tidak ditemukan.
               </td>
             </tr>
           </tbody>

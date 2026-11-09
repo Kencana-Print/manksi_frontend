@@ -23,7 +23,7 @@ const fmtTgl = (v: string | null | undefined): string => {
 const bulat = (v: number | null | undefined): string =>
   Number(v ?? 0).toLocaleString(LOCALE, { maximumFractionDigits: 0 });
 
-const desimal = (v: number | null | undefined): string =>
+const desimal = (v: number | string | null | undefined): string =>
   Number(v ?? 0).toLocaleString(LOCALE, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
@@ -32,24 +32,16 @@ const desimal = (v: number | null | undefined): string =>
 const baris = computed(() => data.value?.Detail ?? []);
 
 const total = computed(() => {
-  const t = {
-    oven: 0,
-    jemuran: 0,
-    potong: 0,
-    bsQuiring: 0,
-    bsCetak: 0,
-    bsBahan: 0,
-  };
+  const t = { oven: 0, jemuran: 0, potong: 0 };
   for (const r of baris.value) {
     t.oven += Number(r.J_Oven) || 0;
     t.jemuran += Number(r.J_Jemuran) || 0;
     t.potong += Number(r.J_Potong) || 0;
-    t.bsQuiring += Number(r.BS_Quiring) || 0;
-    t.bsCetak += Number(r.BS_Cetak) || 0;
-    t.bsBahan += Number(r.BS_Bahan) || 0;
   }
   return t;
 });
+
+const karyawan = computed(() => data.value?.Karyawan ?? []);
 
 onMounted(async () => {
   try {
@@ -86,6 +78,11 @@ onMounted(async () => {
           <td>:</td>
           <td>{{ data.Kode_Pabrik ?? "" }}</td>
         </tr>
+        <tr>
+          <td>Sesi</td>
+          <td>:</td>
+          <td>{{ data.Sesi || "-" }}</td>
+        </tr>
       </table>
 
       <table class="grid">
@@ -95,17 +92,13 @@ onMounted(async () => {
             <th rowspan="2" class="c-jml">Jumlah<br />Order (Pcs)</th>
             <th colspan="2">Spesifikasi</th>
             <th rowspan="2" class="c-spk">Nomor SPK</th>
-            <th rowspan="2" class="c-j">Oven<br />(pcs)</th>
-            <th rowspan="2" class="c-j">Jemuran<br />(meter)</th>
-            <th rowspan="2" class="c-j">Potong<br />Tambahan</th>
-            <th colspan="3">BS (pcs)</th>
+            <th rowspan="2" class="c-j">Oven<br />(m)</th>
+            <th rowspan="2" class="c-j">Jemuran<br />(m)</th>
+            <th rowspan="2" class="c-j">Potong Tambahan<br />(pcs)</th>
           </tr>
           <tr>
             <th class="c-pl">P</th>
             <th class="c-pl">L</th>
-            <th class="c-j">Quiring</th>
-            <th class="c-j">Cetak</th>
-            <th class="c-j">Bahan</th>
           </tr>
         </thead>
         <tbody>
@@ -118,9 +111,6 @@ onMounted(async () => {
             <td class="tr">{{ bulat(r.J_Oven) }}</td>
             <td class="tr">{{ bulat(r.J_Jemuran) }}</td>
             <td class="tr">{{ bulat(r.J_Potong) }}</td>
-            <td class="tr">{{ bulat(r.BS_Quiring) }}</td>
-            <td class="tr">{{ bulat(r.BS_Cetak) }}</td>
-            <td class="tr">{{ bulat(r.BS_Bahan) }}</td>
           </tr>
         </tbody>
         <tfoot>
@@ -129,11 +119,29 @@ onMounted(async () => {
             <td class="tr">{{ bulat(total.oven) }}</td>
             <td class="tr">{{ bulat(total.jemuran) }}</td>
             <td class="tr">{{ bulat(total.potong) }}</td>
-            <td class="tr">{{ bulat(total.bsQuiring) }}</td>
-            <td class="tr">{{ bulat(total.bsCetak) }}</td>
-            <td class="tr">{{ bulat(total.bsBahan) }}</td>
           </tr>
         </tfoot>
+      </table>
+
+      <table v-if="karyawan.length" class="kar">
+        <thead>
+          <tr>
+            <th class="k-no">No</th>
+            <th class="k-nik">NIK</th>
+            <th class="k-nama">Nama Karyawan</th>
+            <th class="k-jam">Jam Kerja</th>
+            <th class="k-jam">Jam Lembur</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="(k, i) in karyawan" :key="k.Nik">
+            <td class="tr">{{ i + 1 }}</td>
+            <td>{{ k.Nik }}</td>
+            <td class="nama">{{ k.Nama }}</td>
+            <td class="tr">{{ desimal(k.Jam_Kerja) }}</td>
+            <td class="tr">{{ desimal(k.Jam_Lembur) }}</td>
+          </tr>
+        </tbody>
       </table>
 
       <div class="ttd">
@@ -236,7 +244,33 @@ onMounted(async () => {
 .tot-lbl {
   text-align: left;
 }
-
+.kar {
+  border-collapse: collapse;
+  margin-top: 14px;
+  font-size: 11px;
+  break-inside: avoid;
+}
+.kar th,
+.kar td {
+  border: 1px solid #000;
+  padding: 2px 6px;
+}
+.kar th {
+  font-weight: 400;
+  text-align: center;
+}
+.k-no {
+  width: 32px;
+}
+.k-nik {
+  width: 90px;
+}
+.k-nama {
+  width: 200px;
+}
+.k-jam {
+  width: 80px;
+}
 .ttd {
   display: flex;
   gap: 56px;

@@ -26,9 +26,6 @@ interface ExportDetailRow {
   J_Oven: number;
   J_Jemuran: number;
   J_Potong: number;
-  BS_Quiring: number;
-  BS_Cetak: number;
-  BS_Bahan: number;
 }
 
 const toast = useToast();
@@ -104,8 +101,15 @@ const baseBrowseRef = ref<InstanceType<typeof BaseBrowse> | null>(null);
 const headers = [
   { title: "Nomor", key: "Nomor", width: "170px" },
   { title: "Tanggal", key: "Tanggal", width: "110px", align: "center" },
+  { title: "Sesi", key: "Sesi", width: "80px", align: "center" },
   { title: "Kode Pabrik", key: "Kode_Pabrik", width: "120px" },
   { title: "Nama Pabrik", key: "Nama_Pabrik", width: "260px" },
+  {
+    title: "Jml Karyawan",
+    key: "Jumlah_Karyawan",
+    width: "110px",
+    align: "end",
+  },
 ];
 
 const NUM = "#,##0.00";
@@ -136,37 +140,23 @@ const kolomDetail: ExcelColumn[] = [
   { header: "Lebar", key: "Lebar", width: 10, align: "right", numFmt: NUM },
   { header: "J Oven", key: "J_Oven", width: 10, align: "right", numFmt: NUM },
   {
-    header: "J Jemuran",
+    header: "J Oven (m)",
+    key: "J_Oven",
+    width: 12,
+    align: "right",
+    numFmt: INT,
+  },
+  {
+    header: "J Jemuran (m)",
     key: "J_Jemuran",
-    width: 12,
+    width: 14,
     align: "right",
-    numFmt: NUM,
+    numFmt: INT,
   },
   {
-    header: "J Potong",
+    header: "J Potong (pcs)",
     key: "J_Potong",
-    width: 12,
-    align: "right",
-    numFmt: NUM,
-  },
-  {
-    header: "BS Quiring",
-    key: "BS_Quiring",
-    width: 12,
-    align: "right",
-    numFmt: INT,
-  },
-  {
-    header: "BS Cetak",
-    key: "BS_Cetak",
-    width: 12,
-    align: "right",
-    numFmt: INT,
-  },
-  {
-    header: "BS Bahan",
-    key: "BS_Bahan",
-    width: 12,
+    width: 14,
     align: "right",
     numFmt: INT,
   },
@@ -223,7 +213,11 @@ const exportMaster = () =>
   exportToExcel("LHK_Quiring_Header", {
     columns: kolomMaster,
     getData: () =>
-      dataTampil().map((r) => ({ ...r, Tanggal: formatTanggal(r.Tanggal) })),
+      dataTampil().map((r) => ({
+        ...r,
+        Tanggal: formatTanggal(r.Tanggal),
+        Sesi: r.Sesi || "-",
+      })),
   });
 
 // Hanya detail dari LHK yang sedang tampil di grid
@@ -253,9 +247,6 @@ const exportDetail = async () => {
         J_Oven: Number(r.J_Oven) || 0,
         J_Jemuran: Number(r.J_Jemuran) || 0,
         J_Potong: Number(r.J_Potong) || 0,
-        BS_Quiring: Number(r.BS_Quiring) || 0,
-        BS_Cetak: Number(r.BS_Cetak) || 0,
-        BS_Bahan: Number(r.BS_Bahan) || 0,
       });
     }
   }
@@ -320,6 +311,10 @@ const numFmt = (v: number | null) =>
       {{ formatTanggal(item.Tanggal) }}
     </template>
 
+    <template #item.Sesi="{ item }">
+      {{ item.Sesi || "-" }}
+    </template>
+
     <!-- Detail Expand -->
     <template #detail="{ item }">
       <div class="expand-wrap">
@@ -332,12 +327,9 @@ const numFmt = (v: number | null) =>
               <th width="80" class="tr">Jml Order</th>
               <th width="70" class="tr">Panjang</th>
               <th width="70" class="tr">Lebar</th>
-              <th width="70" class="tr">J Oven</th>
-              <th width="80" class="tr">J Jemuran</th>
-              <th width="80" class="tr">J Potong</th>
-              <th width="80" class="tr">BS Quiring</th>
-              <th width="80" class="tr">BS Cetak</th>
-              <th width="80" class="tr">BS Bahan</th>
+              <th width="90" class="tr">J Oven (m)</th>
+              <th width="100" class="tr">J Jemuran (m)</th>
+              <th width="100" class="tr">J Potong (pcs)</th>
             </tr>
           </thead>
           <tbody>
@@ -350,12 +342,9 @@ const numFmt = (v: number | null) =>
               <td class="tr">{{ numFmt(r.J_Oven) }}</td>
               <td class="tr">{{ numFmt(r.J_Jemuran) }}</td>
               <td class="tr">{{ numFmt(r.J_Potong) }}</td>
-              <td class="tr">{{ numFmt(r.BS_Quiring) }}</td>
-              <td class="tr">{{ numFmt(r.BS_Cetak) }}</td>
-              <td class="tr">{{ numFmt(r.BS_Bahan) }}</td>
             </tr>
             <tr v-if="!detailMap[item.Nomor]?.length">
-              <td colspan="11" class="text-center text-grey py-3 font-italic">
+              <td colspan="8" class="text-center text-grey py-3 font-italic">
                 Detail LHK Quiring tidak ditemukan.
               </td>
             </tr>

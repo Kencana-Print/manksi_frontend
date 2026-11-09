@@ -46,6 +46,8 @@ interface FormRow {
   lebar: number;
   qtyCetak: number;
   jmlPlangkan: number;
+  plgOtomatis: boolean; // dari HP: read-only, server yang menghitung
+  plgInfo: string;
 }
 
 interface KaryawanRow {
@@ -75,6 +77,10 @@ interface FormState {
     sesi: string;
     karBorongan: number;
     karHarian: number;
+    apvStatus: string;
+    apvUser: string;
+    apvTgl: string;
+    apvAlasan: string;
   };
   items: FormRow[];
   karyawan: KaryawanRow[];
@@ -91,6 +97,8 @@ const barisKosong = (): FormRow => ({
   lebar: 0,
   qtyCetak: 0,
   jmlPlangkan: 0,
+  plgOtomatis: false,
+  plgInfo: "",
 });
 
 const barisKainKosong = (): KainRow => ({
@@ -109,6 +117,10 @@ const defaultData = (): FormState => ({
     sesi: "",
     karBorongan: 0,
     karHarian: 0,
+    apvStatus: "",
+    apvUser: "",
+    apvTgl: "",
+    apvAlasan: "",
   },
   items: [barisKosong()],
   karyawan: [],
@@ -120,6 +132,7 @@ const showSpkModal = ref(false);
 const activeIdx = ref(-1);
 const showSelesai = ref(false);
 const nomorTerakhir = ref("");
+const menungguApproval = ref(false);
 const pabrikOpts = ref<PabrikOption[]>([]);
 const kainOpts = ref<KainOption[]>([]);
 const isLoadingKaryawan = ref(false);
@@ -170,6 +183,8 @@ const {
       lebar: num(r.Lebar),
       qtyCetak: num(r.Qty_Cetak),
       jmlPlangkan: num(r.Jml_Plangkan),
+      plgOtomatis: r.Plangkan_Otomatis === true,
+      plgInfo: "",
     }));
     const kain: KainRow[] = d.Kain.map((k) => ({
       kode: k.Kode_Bahan,
@@ -186,6 +201,10 @@ const {
         sesi: d.Sesi ?? "",
         karBorongan: num(d.Kar_Borongan),
         karHarian: num(d.Kar_Harian),
+        apvStatus: d.Apv_Status ?? "",
+        apvUser: d.Apv_User ?? "",
+        apvTgl: d.Apv_Tgl ?? "",
+        apvAlasan: d.Apv_Alasan ?? "",
       },
       items: items.length > 0 ? items : [barisKosong()],
       karyawan: d.Karyawan.map((k) => ({
@@ -212,6 +231,7 @@ const {
     const nomor = res.data?.data?.Nomor ?? "";
     nomorTerakhir.value = nomor;
     formData.value.header.nomor = nomor;
+    menungguApproval.value = res.data?.data?.Menunggu_Approval === true;
     showSelesai.value = true;
   },
   onFormReset: () => {
@@ -363,6 +383,12 @@ const isiBarisDariSpk = async (
     row.jumlahOrder = num(info.Jumlah_Order);
     row.panjang = num(info.Panjang);
     row.lebar = num(info.Lebar);
+    isiKainDariSpk(info.Kode_Bahan);
+    row.plgOtomatis = info.Plangkan_Otomatis === true;
+    row.jmlPlangkan = row.plgOtomatis ? num(info.Plangkan) : 0;
+    row.plgInfo = row.plgOtomatis
+      ? `Total HP ${info.Plangkan_Total} - dipakai LHK Cetak lain ${info.Plangkan_Terpakai}`
+      : "";
 
     return true;
   } catch (e) {
@@ -454,6 +480,27 @@ const labelKain = (o: KainOption) =>
 const kainDipakaiBarisLain = (kode: string, idx: number) =>
   formData.value.kain.some((r, i) => i !== idx && r.kode === kode);
 
+// Kain otomatis dari bahan SPK (qty tetap diisi manual). Bahan yang tidak ada di
+// daftar kain aktif diabaikan: SPK lama tanpa bahan, MAP, atau bahan nonaktif.
+const isiKainDariSpk = (kode: string) => {
+  const o = kainOpts.value.find((x) => x.Kode === kode);
+  if (!kode || !o) {
+    return;
+  }
+  const kain = formData.value.kain;
+  if (kain.some((r) => r.kode === kode)) {
+    return;
+  }
+  let idx = kain.findIndex((r) => r.kode === "" && num(r.qtyMeter) === 0);
+  if (idx < 0) {
+    kain.push(barisKainKosong());
+    idx = kain.length - 1;
+  }
+  kain[idx].kode = kode;
+  kain[idx].nama = o.Nama;
+  kain[idx].lebar = o.Lebar ?? "";
+};
+
 const addKain = () => {
   formData.value.kain.push(barisKainKosong());
 };
@@ -486,6 +533,35 @@ const outputProduksi = (r: FormRow) =>
 const akumulasiTotal = computed(() =>
   dibulatkan2(formData.value.items.reduce((a, r) => a + outputProduksi(r), 0)),
 );
+// Pratinjau saja; server yang memutuskan perlu approval.
+// Samakan dengan TOLERANSI_KAIN di lhkCetakShared.js.
+const TOLERANSI_KAIN = 0.025;
+const kebutuhanKain = computed(() =>
+  dibulatkan2(
+    formData.value.items.reduce(
+      (a, r) => a + num(r.panjang) * num(r.qtyCetak),
+      0,
+    ),
+  ),
+);
+const batasKain = computed(() =>
+  dibulatkan2(kebutuhanKain.value * (1 + TOLERANSI_KAIN)),
+);
+const kainBerlebih = computed(() => totalKain.value > batasKain.value);
+
+const labelApproval = computed(() => {
+  const h = formData.value.header;
+  if (h.apvStatus === "W") {
+    return "Menunggu approval SPV/Manager";
+  }
+  if (h.apvStatus === "Y") {
+    return `Disetujui ${h.apvUser} (${h.apvTgl})`;
+  }
+  if (h.apvStatus === "N") {
+    return `Ditolak ${h.apvUser}: ${h.apvAlasan}`;
+  }
+  return "";
+});
 const fmt2 = (n: number) =>
   n.toLocaleString("id-ID", { maximumFractionDigits: 2 });
 
@@ -647,6 +723,17 @@ const tutupSetelahSimpan = () => {
           </select>
         </div>
 
+        <div v-if="isEditMode && labelApproval" class="fr">
+          <label class="lbl">Approval</label>
+          <input
+            :value="labelApproval"
+            readonly
+            class="inp ro"
+            style="flex: 1"
+            :title="labelApproval"
+          />
+        </div>
+
         <div class="sep" />
 
         <div class="fr">
@@ -799,7 +886,10 @@ const tutupSetelahSimpan = () => {
                       type="number"
                       min="0"
                       step="1"
-                      class="ci tr bg-yellow-light"
+                      class="ci tr"
+                      :class="row.plgOtomatis ? 'ro' : 'bg-yellow-light'"
+                      :readonly="row.plgOtomatis"
+                      :title="row.plgInfo"
                       :ref="(el) => simpanRef(el, `${idx}_plg`)"
                       @keydown.enter.prevent="onEnterPlangkan(idx)"
                       v-select-on-focus
@@ -911,6 +1001,14 @@ const tutupSetelahSimpan = () => {
           </div>
         </div>
 
+        <div class="kain-info" :class="{ over: kainBerlebih }">
+          Kebutuhan {{ fmt2(kebutuhanKain) }} m · Batas (+2,5%)
+          {{ fmt2(batasKain) }} m
+          <template v-if="kainBerlebih">
+            · Melebihi batas: LHK menunggu approval SPV/Manager
+          </template>
+        </div>
+
         <!-- Grid Karyawan -->
         <div class="blok" style="flex: 1; min-height: 0">
           <div class="tbl-header tbl-header-sub">
@@ -1008,6 +1106,10 @@ const tutupSetelahSimpan = () => {
       <v-card-text class="pa-4 text-center">
         <div class="text-body-1 mb-2">
           LHK Cetak <b>{{ nomorTerakhir }}</b> telah disimpan.
+        </div>
+        <div v-if="menungguApproval" class="text-body-2 text-warning mb-2">
+          LHK ini menunggu approval SPV/Manager karena pemakaian kain melebihi
+          kebutuhan dan belum aktif sebelum disetujui.
         </div>
         <div class="text-body-2 text-grey-darken-1">
           Mau input LHK Cetak baru?
@@ -1306,5 +1408,19 @@ const tutupSetelahSimpan = () => {
   white-space: normal;
   overflow-wrap: anywhere;
   color: #212121;
+}
+.kain-info {
+  padding: 3px 6px;
+  font-size: 11px;
+  color: #546e7a;
+  background: #eceff1;
+  border: 1px solid #bdbdbd;
+  border-top: none;
+  border-radius: 0 0 3px 3px;
+}
+.kain-info.over {
+  color: #c62828;
+  font-weight: 700;
+  background: #ffebee;
 }
 </style>

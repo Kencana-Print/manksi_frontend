@@ -573,6 +573,11 @@ export const createMenuItems = (): NavItem[] => {
               to: "/spanduk/lhk/lhk-koli",
               icon: IconBox,
             },
+            {
+              title: "LHK BS (Bad Stock)",
+              to: "/spanduk/lhk/lhk-bs",
+              icon: IconAlertTriangle,
+            },
           ],
         },
         { divider: true },
@@ -583,7 +588,7 @@ export const createMenuItems = (): NavItem[] => {
           // Tanpa menuId, mengikuti hak akses parent (4)
         },
         {
-          title: "Mutasi Marketing",
+          title: "Form Mutasi (Sampel)",
           to: "/spanduk/mutasi-marketing",
           icon: IconTruckDelivery,
           menuId: 1327,
@@ -1397,6 +1402,12 @@ export const createMenuItems = (): NavItem[] => {
               to: "/penjualan/update-status-sj",
               icon: IconTruckDelivery,
               menuId: 155,
+            },
+            {
+              title: "Terima Mutasi dari Produksi",
+              to: "/penjualan/terima-mutasi",
+              icon: IconClipboardCheck,
+              menuId: 191,
             },
             // Tiga menu di bawah dicabut ke Lintas Divisi oleh komposisi di akhir
             // createMenuItems; tetap ditulis di sini sebagai sumbernya.
@@ -2407,7 +2418,7 @@ export const createMenuItems = (): NavItem[] => {
     cabut(
       spanduk.items,
       (i) => i.to === "/spanduk/mutasi-marketing",
-      "Mutasi Marketing",
+      "Form Mutasi (Sample)",
     ),
     cabut(garmen.items, (i) => i.to === "/garmen/bahan-jadi/stbj", "STBJ"),
     cabut(

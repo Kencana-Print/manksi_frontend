@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { ref, computed, onMounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
 import BaseForm from "@/components/BaseForm.vue";
@@ -179,6 +179,29 @@ const hapusMap = (i: number) => {
   formData.value.maps.splice(i, 1);
 };
 
+// Datang dari baris merah di browse: ?map=NOMOR1,NOMOR2
+const isiDariQuery = async () => {
+  if (isEditMode.value) return;
+  const raw = route.query.map;
+  const nomor = (Array.isArray(raw) ? raw.join(",") : (raw ?? ""))
+    .split(",")
+    .map((s) => s.trim().toUpperCase())
+    .filter((s) => s !== "");
+  if (nomor.length === 0) return;
+  try {
+    const daftar = await mmForm.getLookupMap();
+    const cocok = daftar.filter((m) => nomor.includes(m.Nomor.toUpperCase()));
+    pilihMap(cocok);
+    if (cocok.length < nomor.length) {
+      toast.warning("Sebagian MAP tidak lagi tersedia untuk diserahkan.");
+    }
+  } catch (e) {
+    toast.error(mmForm.pesanError(e, "Gagal memuat MAP."));
+  }
+};
+
+onMounted(isiDariQuery);
+
 // ── Validasi ──
 const validateSave = () => {
   const { tanggal, keterangan } = formData.value.header;
@@ -250,7 +273,9 @@ const cetakSekarang = () => {
 
 <template>
   <BaseForm
-    :title="modeUbah ? 'Ubah Mutasi Marketing' : 'Buat Mutasi Marketing'"
+    :title="
+      modeUbah ? 'Ubah Form Mutasi (Sample)' : 'Buat Form Mutasi (Sample)'
+    "
     menu-id="1327"
     :icon="IconTruckDelivery"
     :is-loading="isLoading"
@@ -440,10 +465,10 @@ const cetakSekarang = () => {
       </v-card-title>
       <v-card-text class="pa-4 text-center">
         <div class="text-body-1 mb-2">
-          Mutasi Marketing <b>{{ nomorTerakhir }}</b> telah disimpan.
+          Form Mutasi (Sample) <b>{{ nomorTerakhir }}</b> telah disimpan.
         </div>
         <div class="text-body-2 text-grey-darken-1">
-          Mau input Mutasi Marketing baru?
+          Mau input Form Mutasi (Sample) baru?
         </div>
       </v-card-text>
       <v-card-actions class="pa-3 border-t">
