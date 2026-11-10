@@ -13,6 +13,21 @@ import { formatTanggal, formatTanggalJam } from "@/utils/dateFormat";
 const router = useRouter();
 const toast = useToast();
 const authStore = useAuthStore();
+const userBagian = computed(() => authStore.user?.bagian?.toUpperCase() || "");
+// Bagian yang boleh melihat BPB Aset; samakan dengan backend. [KONFIRMASI]
+const showFilterAset = computed(() =>
+  [
+    "GA",
+    "EDP",
+    "FINANCE",
+    "AUDIT",
+    "DIREKSI",
+    "PEMBELIAN",
+    "PURCHASING",
+  ].includes(userBagian.value),
+);
+// Jenis yang memakai kolom Spesifikasi dan Kegunaan
+const JENIS_RINCI = ["SPAREPART", "ATK/RTK", "ASET"];
 
 // ── Hak Akses Ekstra ──
 const canSeeSup = computed(() => Number(authStore.user?.flags?.lihatSup) === 1);
@@ -344,6 +359,15 @@ const formatQty = (val: any) => {
             />
             ATK
           </label>
+          <label class="radio-label" v-if="showFilterAset">
+            <input
+              type="radio"
+              v-model="filterState.jenis"
+              value="ASET"
+              @change="fetchData"
+            />
+            ASET
+          </label>
         </div>
       </div>
 
@@ -423,17 +447,13 @@ const formatQty = (val: any) => {
                     <th style="min-width: 200px">Nama Barang</th>
                     <th style="width: 70px" class="text-center">Satuan</th>
                     <th
-                      v-if="
-                        item.Jenis === 'SPAREPART' || item.Jenis === 'ATK/RTK'
-                      "
+                      v-if="JENIS_RINCI.includes(item.Jenis)"
                       style="min-width: 150px"
                     >
                       Spesifikasi
                     </th>
                     <th
-                      v-if="
-                        item.Jenis === 'SPAREPART' || item.Jenis === 'ATK/RTK'
-                      "
+                      v-if="JENIS_RINCI.includes(item.Jenis)"
                       style="min-width: 150px"
                     >
                       Kegunaan
@@ -456,18 +476,10 @@ const formatQty = (val: any) => {
                     <td class="fw-mono text-primary">{{ dtl.Kode }}</td>
                     <td class="font-weight-bold">{{ dtl.Nama }}</td>
                     <td class="text-center">{{ dtl.Satuan }}</td>
-                    <td
-                      v-if="
-                        item.Jenis === 'SPAREPART' || item.Jenis === 'ATK/RTK'
-                      "
-                    >
+                    <td v-if="JENIS_RINCI.includes(item.Jenis)">
                       {{ dtl.Spesifikasi || "-" }}
                     </td>
-                    <td
-                      v-if="
-                        item.Jenis === 'SPAREPART' || item.Jenis === 'ATK/RTK'
-                      "
-                    >
+                    <td v-if="JENIS_RINCI.includes(item.Jenis)">
                       {{ dtl.Kegunaan || "-" }}
                     </td>
                     <td v-if="item.Jenis === 'ACCESORIES'" class="fw-mono">

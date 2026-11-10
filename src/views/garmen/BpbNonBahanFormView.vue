@@ -79,7 +79,12 @@ const defaultData = {
 const canSeeSup = computed(() => !!authStore.user?.flags?.lihatSup);
 const canSeeBeli = computed(() => !!authStore.user?.flags?.lihatBeli);
 const isDetailRinci = computed(() =>
-  ["SPAREPART", "ATK/RTK"].includes(String(formJenis.value)),
+  ["SPAREPART", "ATK/RTK", "ASET"].includes(String(formJenis.value)),
+);
+// Aset selalu masuk P04; samakan dengan KECAB_ASET di backend
+const KECAB_ASET = "P04";
+const cabangTujuan = computed(() =>
+  formJenis.value === "ASET" ? KECAB_ASET : authStore.user?.cabang || "",
 );
 const isSupLocked = computed(
   () =>
@@ -156,7 +161,6 @@ const {
       bpb_sup_kode: data.header.bpb_sup_kode,
       bpb_ket: data.header.bpb_ket,
       detail: data.detail,
-      user: authStore.user,
     });
   },
   onSuccess: (res: any) => {
@@ -493,7 +497,7 @@ watch(
         <div class="fr mt-1">
           <label class="lbl">Cabang</label>
           <input
-            :value="authStore.user?.cabang || ''"
+            :value="cabangTujuan"
             class="inp ro font-weight-bold text-primary"
             readonly
           />
@@ -778,7 +782,7 @@ watch(
         <div class="tbl-footer-info">
           <span class="footer-icon">📦</span>
           Barang akan disimpan ke gudang:
-          <span class="footer-cabang">{{ authStore.user?.cabang || "—" }}</span>
+          <span class="footer-cabang">{{ cabangTujuan || "—" }}</span>
           <span class="footer-sep">|</span>
           <span class="footer-bagian">{{ authStore.user?.bagian || "—" }}</span>
         </div>

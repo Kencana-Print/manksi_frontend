@@ -173,9 +173,9 @@ watch(
   () => props.formData.Divisi,
   () => {
     if (props.isEdit || !isDivisiSpanduk.value) return;
-    props.formData.Panjang = 0;
-    props.formData.Lebar = 0;
-    props.formData.KetUkuran = "";
+    // props.formData.Panjang = 0;     ← hapus
+    // props.formData.Lebar = 0;       ← hapus
+    // props.formData.KetUkuran = "";  ← hapus
     props.formData.Gramasi = "";
     props.formData.Sablon = "N";
     props.formData.Bordir = "N";
@@ -323,11 +323,11 @@ const handleMintaHargaSelected = async (item: any) => {
         props.formData.HargaJual;
 
       props.formData.Kain = data.mh_kain || props.formData.Kain;
+      props.formData.Panjang =
+        Number(data.mh_panjang) || props.formData.Panjang;
+      props.formData.Lebar = Number(data.mh_lebar) || props.formData.Lebar;
+      props.formData.KetUkuran = data.mh_ukuran || props.formData.KetUkuran;
       if (!isDivisiSpanduk.value) {
-        props.formData.Panjang =
-          Number(data.mh_panjang) || props.formData.Panjang;
-        props.formData.Lebar = Number(data.mh_lebar) || props.formData.Lebar;
-        props.formData.KetUkuran = data.mh_ukuran || props.formData.KetUkuran;
         props.formData.Gramasi = data.mh_gramasi || props.formData.Gramasi;
       }
       props.formData.Finishing = data.mh_finishing || props.formData.Finishing;
@@ -1159,7 +1159,7 @@ const setSetoranPembayaran = (v: any) => {
           />
         </div>
 
-        <div class="f-row" v-if="!isDivisiSpanduk">
+        <div class="f-row">
           <label class="f-lbl">Ukuran</label>
           <template v-if="isDivisiSatuAtauLima">
             <v-combobox
