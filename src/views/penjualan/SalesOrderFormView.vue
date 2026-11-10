@@ -170,7 +170,6 @@ const defaultData = {
   spk_ukuran: "",
   spk_jumlah: 0,
   spk_kain: "",
-  spk_bhn_kode: "",
   spk_finishing: "",
   spk_panjang: 0,
   spk_lebar: 0,
@@ -304,7 +303,6 @@ const {
       isLegacy: d.header.isLegacy || false,
       spk_accpending: d.header.spk_accpending || "",
       spk_cmo: d.header.spk_cmo || "",
-      spk_bhn_kode: d.header.spk_bhn_kode || "",
       Customer: d.header.cus_nama,
       Sales: d.header.sal_nama,
       JenisOrder: d.header.jo_nama,
@@ -410,7 +408,6 @@ const {
         spk_ukuran: kosongkanSpanduk ? "" : data.spk_ukuran,
         spk_jumlah: data.spk_jumlah,
         spk_kain: data.spk_kain,
-        spk_bhn_kode: data.spk_bhn_kode || "",
         spk_finishing: data.spk_finishing,
         spk_panjang: data.spk_panjang,
         spk_lebar: data.spk_lebar,
@@ -1272,7 +1269,6 @@ const loadRepeatDetail = async (nomor: string) => {
     formData.value.spk_nama2 = h.spk_nama2 || "";
     formData.value.spk_ukuran = h.spk_ukuran || "";
     formData.value.spk_kain = h.spk_kain || "";
-    formData.value.spk_bhn_kode = h.spk_bhn_kode || "";
     formData.value.spk_finishing = h.spk_finishing || "";
     formData.value.spk_panjang = Number(h.spk_panjang) || 0;
     formData.value.spk_lebar = Number(h.spk_lebar) || 0;
@@ -1568,12 +1564,6 @@ const validateSave = async (skipPoCheck = false) => {
       );
       return;
     }
-  }
-
-  // 3b. Spanduk: bahan wajib untuk SO baru (sama dengan backend)
-  if (divisiStr === "1" && !isEditMode.value && !fd.spk_bhn_kode) {
-    toast.warning("Bahan belum dipilih.");
-    return;
   }
 
   // 4. Validasi Harga 0

@@ -164,6 +164,7 @@ const {
     }
 
     if (isDivisiSpanduk.value) {
+      payload.bahanKode = data.so_bhn_kode || "";
       payload.bahanStatus = {
         status: data.spk_bhn_status || "",
         qtyReady: data.spk_bhn_qty_ready,

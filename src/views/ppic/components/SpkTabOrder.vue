@@ -69,6 +69,74 @@ const onStatusBahan = () => {
   }
 };
 
+interface BahanSpandukItem {
+  Kode: string;
+  Nama: string;
+  Satuan: string;
+  Konstruksi?: string | null;
+  Panjang?: number | string | null;
+  Lebar?: number | string | null;
+}
+const bahanSpandukMaster = ref<BahanSpandukItem[]>([]);
+
+// Judul memuat kode: master Spanduk punya nama kembar dengan kode berbeda
+const bahanSpandukOptions = computed(() => {
+  const opts = bahanSpandukMaster.value.map((b) => {
+    const p = Number(b.Panjang) || 0;
+    const l = Number(b.Lebar) || 0;
+    const d = [b.Konstruksi, p > 0 && l > 0 ? `${p} x ${l}` : ""]
+      .filter(Boolean)
+      .join(", ");
+    return {
+      value: b.Kode,
+      title: `${b.Kode} - ${b.Nama}${d ? ` [${d}]` : ""}${b.Satuan ? ` (${b.Satuan})` : ""}`,
+    };
+  });
+  // Bahan yang kini nonaktif tetap tampil dengan kodenya
+  const kode = props.formData.so_bhn_kode;
+  if (kode && !opts.some((o) => o.value === kode)) {
+    opts.unshift({
+      value: kode,
+      title: `${kode} - ${props.formData.so_bhn_nama || ""} (nonaktif / tidak ditemukan)`,
+    });
+  }
+  return opts;
+});
+
+watch(
+  isDivisiSpanduk,
+  async (val) => {
+    if (!val || bahanSpandukMaster.value.length > 0) return;
+    try {
+      const res = await spkFormService.getBahanSpanduk();
+      bahanSpandukMaster.value = res.data.data || [];
+    } catch {
+      toast.error("Gagal memuat daftar bahan.");
+    }
+  },
+  { immediate: true },
+);
+
+// Ganti bahan: status stok milik bahan lama, jadi direset; stok bahan baru dimuat.
+const onBahanChange = async (kode: string | null) => {
+  const f = props.formData;
+  f.so_bhn_kode = kode || "";
+  f.so_bhn_nama = "";
+  f.so_bhn_stok = 0;
+  f.spk_bhn_status = "";
+  f.spk_bhn_qty_ready = 0;
+  f.spk_bhn_est_datang = "";
+  if (!kode) return;
+  try {
+    const res = await spkFormService.getBahanInfo(kode);
+    if (f.so_bhn_kode !== kode) return; // user sudah ganti lagi sebelum respons tiba
+    f.so_bhn_nama = res.data.data?.nama || "";
+    f.so_bhn_stok = Number(res.data.data?.stok) || 0;
+  } catch {
+    toast.error("Gagal memuat stok bahan.");
+  }
+};
+
 const showSoModal = ref(false);
 const isLoadingSo = ref(false);
 const showPreviewDialog = ref(false);
@@ -524,16 +592,20 @@ onMounted(async () => {
 
           <div v-if="isDivisiSpanduk" class="fr">
             <label class="lbl">Bahan</label>
-            <input
-              :value="
-                formData.so_bhn_kode
-                  ? `${formData.so_bhn_kode} - ${formData.so_bhn_nama}`
-                  : ''
-              "
-              readonly
-              class="inp ro"
-              style="flex: 1"
-              placeholder="SO ini belum memiliki bahan"
+            <v-autocomplete
+              :model-value="formData.so_bhn_kode"
+              :items="bahanSpandukOptions"
+              item-title="title"
+              item-value="value"
+              variant="outlined"
+              density="compact"
+              hide-details
+              clearable
+              placeholder="Ketik kode atau nama bahan baku..."
+              no-data-text="Bahan tidak ditemukan"
+              class="f-vselect"
+              style="flex: 1; max-width: 420px"
+              @update:model-value="onBahanChange"
             />
           </div>
 
@@ -704,7 +776,7 @@ onMounted(async () => {
           </div>
         </template>
         <div v-else class="so-empty" style="padding: 10px 0">
-          SO ini belum memiliki bahan, cek stok tidak tersedia.
+          Pilih bahan terlebih dahulu untuk melihat stok.
         </div>
       </div>
 
@@ -839,7 +911,7 @@ onMounted(async () => {
             </tr>
           </tbody>
         </table>
-        <div v-else class="mkb-empty">SO ini belum memiliki bahan.</div>
+        <div v-else class="mkb-empty">Bahan belum dipilih.</div>
       </div>
 
       <div v-if="!isDivisiSpanduk" class="section-card mt-2">

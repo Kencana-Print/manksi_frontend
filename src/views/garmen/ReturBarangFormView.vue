@@ -172,6 +172,12 @@ const canMultiSelectBarang = computed(
   () => formData.value.jenis !== "ACCESORIES",
 );
 
+const KECAB_ASET = "P04";
+// Aset selalu dicatat di P04 (server menentukan; ini hanya tampilan)
+const cabangTampil = computed(() =>
+  formData.value.jenis === "ASET" ? KECAB_ASET : formData.value.cabang,
+);
+
 const statusLabel: Record<string, { text: string; color: string }> = {
   MINTA: { text: "Perlu Pengajuan", color: "#c62828" },
   WAIT: { text: "Nunggu ACC", color: "#1976d2" },
@@ -594,7 +600,7 @@ const numFmt = (val: any) =>
 
         <div class="f-row mb-2">
           <label class="f-lbl">Cabang</label>
-          <input :value="formData.cabang" readonly class="f-inp f-ro w-100" />
+          <input :value="cabangTampil" readonly class="f-inp f-ro w-100" />
         </div>
 
         <template v-if="showApproveFields">
