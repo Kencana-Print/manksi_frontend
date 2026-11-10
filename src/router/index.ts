@@ -1551,12 +1551,6 @@ const router = createRouter({
       },
     },
     {
-      path: "/spanduk/lhk/lhk-koli/print/:nomor",
-      name: "SpandukLhkKoliPrint",
-      component: () => import("@/views/spanduk/lhk/LhkKoliPrintView.vue"),
-      meta: { layout: "BlankLayout", requiresAuth: true, title: "Label Koli" },
-    },
-    {
       path: "/spanduk/lhk/lhk-koli/lembar/:nomor",
       name: "SpandukLhkKoliLembar",
       component: () => import("@/views/spanduk/lhk/LhkKoliLembarView.vue"),

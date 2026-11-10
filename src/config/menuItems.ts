@@ -711,7 +711,6 @@ export const createMenuItems = (): NavItem[] => {
               to: "/garmen/bahan-jadi/cetak-barcode-koli",
               icon: IconQrcode,
               menuId: 188,
-              sembunyikanCabang: ["P02"],
             },
             {
               title: "Surat Terima Barang Jadi (STBJ)",
@@ -2443,6 +2442,7 @@ export const createMenuItems = (): NavItem[] => {
     ),
     cabut(garmen.items, (i) => i.menuId === 59, "Barang (Garmen)"),
     cabut(garmen.items, (i) => i.menuId === 920, "Bahan Baku (Garmen)"),
+    cabut(garmen.items, (i) => i.menuId === 188, "Cetak Barcode Koli"),
   ].filter((i): i is NavItem => i !== null);
 
   // Satu modul menjadi satu bagian, membawa menuId pintu lamanya
