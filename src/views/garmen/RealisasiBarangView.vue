@@ -70,7 +70,7 @@ const getExportSource = () =>
 
 // [KONFIRMASI] bagian yang boleh merealisasikan ASET. Sengaja lebih sempit
 // dari yang boleh meminta, supaya peminta tidak merealisasikan sendiri.
-const BAGIAN_REALISASI_ASET = ["GA", "ADMIN"];
+const BAGIAN_REALISASI_ASET = ["GA", "EDP"];
 
 onMounted(async () => {
   // Penyesuaian Jenis berdasarkan Bagian/Role User (Sesuai FormCreate Delphi)

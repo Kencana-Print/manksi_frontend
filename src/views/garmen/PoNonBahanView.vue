@@ -92,21 +92,23 @@ const showFilterSparepart = computed(() =>
     "AUDIT",
     "DIREKSI",
     "EDP",
-    "ADMIN",
     ...BAGIAN_PEMBELIAN,
   ].includes(userBagian.value),
 );
 const showFilterAtk = computed(() =>
-  [
-    "GA",
-    "FINANCE",
-    "AUDIT",
-    "DIREKSI",
-    "EDP",
-    "ADMIN",
-    ...BAGIAN_PEMBELIAN,
-  ].includes(userBagian.value),
+  ["GA", "FINANCE", "AUDIT", "DIREKSI", "EDP", ...BAGIAN_PEMBELIAN].includes(
+    userBagian.value,
+  ),
 );
+
+// Bagian yang boleh melihat PO Aset; samakan dengan BAGIAN_PO_ASET di backend
+const showFilterAset = computed(() =>
+  ["GA", "EDP", "FINANCE", "AUDIT", "DIREKSI", ...BAGIAN_PEMBELIAN].includes(
+    userBagian.value,
+  ),
+);
+// Jenis yang memakai kolom Spesifikasi dan Kegunaan
+const JENIS_RINCI = ["SPAREPART", "ATK/RTK", "ASET"];
 
 // Fallback: kalau bagian tidak cocok dengan daftar mana pun, tampilkan semua
 const noJenisMatched = computed(
@@ -459,6 +461,15 @@ const rowPropsFn = (data: any) => {
             />
             ATK
           </label>
+          <label class="radio-label" v-if="showFilterAset">
+            <input
+              type="radio"
+              v-model="filterState.jenis"
+              value="ASET"
+              @change="fetchData"
+            />
+            ASET
+          </label>
         </div>
       </div>
 
@@ -564,19 +575,13 @@ const rowPropsFn = (data: any) => {
                     <th style="min-width: 250px">Nama Barang</th>
                     <th style="width: 80px" class="text-center">Satuan</th>
                     <th
-                      v-if="
-                        filterState.jenis === 'SPAREPART' ||
-                        filterState.jenis === 'ATK/RTK'
-                      "
+                      v-if="JENIS_RINCI.includes(filterState.jenis)"
                       style="min-width: 150px"
                     >
                       Spesifikasi
                     </th>
                     <th
-                      v-if="
-                        filterState.jenis === 'SPAREPART' ||
-                        filterState.jenis === 'ATK/RTK'
-                      "
+                      v-if="JENIS_RINCI.includes(filterState.jenis)"
                       style="min-width: 150px"
                     >
                       Kegunaan

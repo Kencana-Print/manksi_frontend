@@ -129,7 +129,7 @@ const {
 
 // --- DYNAMIC COLUMNS (Meniru Delphi) ---
 const isDetailRinci = computed(() =>
-  ["SPAREPART", "ATK/RTK"].includes(String(formJenis.value)),
+  ["SPAREPART", "ATK/RTK", "ASET"].includes(String(formJenis.value)),
 );
 
 // --- GRID HANDLERS ---

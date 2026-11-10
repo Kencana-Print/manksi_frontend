@@ -223,7 +223,7 @@ const {
 });
 
 const isDetailRinci = computed(() =>
-  ["SPAREPART", "ATK/RTK"].includes(String(formJenis.value)),
+  ["SPAREPART", "ATK/RTK", "ASET"].includes(String(formJenis.value)),
 );
 
 // --- LOOKUP CALLBACKS ---
