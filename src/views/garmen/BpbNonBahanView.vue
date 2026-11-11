@@ -74,7 +74,7 @@ const headers = computed(() => {
     { title: "Nomor", key: "Nomor", width: "150px", fixed: true },
     { title: "Jenis", key: "Jenis", width: "100px" },
     { title: "Tanggal", key: "Tanggal", width: "90px", align: "center" },
-    { title: "No. Minta", key: "NoMinta", width: "135px" },
+    { title: "No. Minta", key: "NoMinta", minWidth: "170px" },
     { title: "No. PO", key: "NoPO", width: "135px" },
     { title: "Voucher", key: "VoucherPembelian", width: "120px" },
   ];

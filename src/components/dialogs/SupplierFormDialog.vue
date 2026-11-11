@@ -15,6 +15,8 @@ const emit = defineEmits(["update:modelValue", "saved"]);
 const toast = useToast();
 const formRef = ref<VForm | null>(null);
 const isSaving = ref(false);
+// true = user bukan bagian yang berhak lihat/ubah rekening (dikirim backend lewat getById)
+const rekeningTerkunci = ref(false);
 
 const dialogVisible = computed({
   get: () => props.modelValue,
@@ -151,6 +153,8 @@ watch(
         RekeningList: ed.RekeningList ? [...ed.RekeningList] : [],
       };
     }
+    rekeningTerkunci.value =
+      !props.isNewMode && !!props.editData?.RekeningTerkunci;
     namaAwal.value = props.isNewMode
       ? ""
       : String(formData.value.Nama || "").trim();
@@ -474,7 +478,7 @@ const jenisItems = [
           </div>
 
           <!-- ── Seksi 2: Rekening ── -->
-          <div class="sup-section" style="padding: 0">
+          <div v-if="!rekeningTerkunci" class="sup-section" style="padding: 0">
             <div class="rek-header">
               <span>
                 <IconBuildingBank
@@ -545,6 +549,16 @@ const jenisItems = [
                 </tr>
               </tbody>
             </table>
+          </div>
+          <div v-else class="rek-terkunci">
+            <IconBuildingBank
+              :size="13"
+              :stroke-width="1.7"
+              class="mr-1"
+              style="vertical-align: middle"
+            />
+            Data rekening hanya dapat dilihat dan diubah oleh bagian yang
+            berwenang.
           </div>
         </v-form>
       </v-card-text>
@@ -805,6 +819,14 @@ const jenisItems = [
 }
 .rek-del-btn:hover {
   color: #b71c1c;
+}
+.rek-terkunci {
+  padding: 8px 12px;
+  background: #f5f5f5;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  font-size: 11px;
+  color: #607d8b;
 }
 
 /* ── Footer ── */

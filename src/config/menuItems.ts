@@ -404,10 +404,10 @@ export const createMenuItems = (): NavItem[] => {
           menuId: 70,
         },
         {
-          title: "Pengajuan Transfer",
-          to: "/pembelian/pengajuan-transfer",
-          icon: IconTransfer,
-          menuId: 958,
+          title: "Rekap Pembayaran",
+          to: "/piutang/rekap-pembayaran",
+          icon: IconCalendarDue,
+          menuId: 970,
         },
         {
           title: "Tindak Lanjut QC Bahan",
@@ -662,6 +662,12 @@ export const createMenuItems = (): NavItem[] => {
               menuId: 115,
             },
             { divider: true },
+            {
+              title: "Permintaan Pembelian Bahan",
+              to: "/garmen/bahan-baku/permintaan-pembelian-bahan",
+              icon: IconShoppingCart,
+              menuId: 190,
+            },
             {
               title: "QC Bahan",
               to: "/garmen/bahan-baku/qc-bahan",
@@ -1614,10 +1620,10 @@ export const createMenuItems = (): NavItem[] => {
           menuId: 959,
         },
         {
-          title: "Rekap Pembayaran",
-          to: "/piutang/rekap-pembayaran",
-          icon: IconCalendarDue,
-          menuId: 970,
+          title: "Pengajuan Transfer",
+          to: "/pembelian/pengajuan-transfer",
+          icon: IconTransfer,
+          menuId: 958,
         },
         {
           title: "Voucher Pembayaran",

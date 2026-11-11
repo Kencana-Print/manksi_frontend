@@ -209,6 +209,7 @@ const defaultData = {
   spk_tipe: "Medium",
   spk_pen_nomor: "",
   spk_pen_id: "",
+  spk_bahan: "Y", // Y = pakai bahan (perlu MKB), N = Non Bahan
 
   // Array untuk Tabel Detail
   spk_repeat: "",
@@ -338,6 +339,7 @@ const {
       spk_pinjo: d.header.spk_pinjo || "",
 
       spk_alokasi: d.header.spk_alokasi || "N",
+      spk_bahan: d.header.spk_bahan === "N" ? "N" : "Y",
 
       spk_revisi: d.header.spk_revisi || "N",
       spk_ketrevisi: d.header.spk_ketrevisi || "",
@@ -424,6 +426,7 @@ const {
         spk_ketpo: data.spk_ketpo,
         spk_lama: data.spk_lama,
         spk_alokasi: data.spk_alokasi || "N",
+        spk_bahan: data.spk_bahan === "N" ? "N" : "Y",
         spk_repeat: data.spk_repeat,
         spk_label: data.spk_label,
         spk_cmo: data.spk_cmo,

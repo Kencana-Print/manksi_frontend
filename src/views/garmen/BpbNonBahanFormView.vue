@@ -68,6 +68,7 @@ const defaultData = {
     ketpo: "",
     tglminta: "",
     tglpo: "",
+    po_mb_daftar: "",
     isTutupBuku: false,
     hasVoucher: false,
     pin_status: "",
@@ -125,6 +126,7 @@ const {
       ketpo: "",
       tglminta: "",
       tglpo: "",
+      po_mb_daftar: "",
       isTutupBuku: false,
       hasVoucher: false,
       pin_status: "",
@@ -182,6 +184,7 @@ const setPermintaan = async (v: any) => {
   formData.value.header.bpb_po_nomor = "";
   formData.value.header.tglpo = "";
   formData.value.header.ketpo = "";
+  formData.value.header.po_mb_daftar = "";
   formData.value.header.bpb_sup_kode = "";
   formData.value.header.sup_nama = "";
   formData.value.header.sup_alamat = "";
@@ -220,6 +223,7 @@ const setPo = async (v: any) => {
     formData.value.header.tglminta = hdr.tglminta;
     formData.value.header.tglpo = hdr.tglpo;
     formData.value.header.ketpo = hdr.ketpo;
+    formData.value.header.po_mb_daftar = hdr.po_mb_daftar || "";
     formData.value.header.bpb_sup_kode = hdr.po_sup_kode;
     formData.value.header.sup_nama = hdr.sup_nama;
     formData.value.header.sup_alamat = hdr.sup_alamat;
@@ -581,6 +585,19 @@ watch(
         <div class="fr mt-1">
           <label class="lbl">Ket. PO</label>
           <input :value="formData.header.ketpo" class="inp ro" readonly />
+        </div>
+
+        <div
+          v-if="formData.header.bpb_po_nomor && formData.header.po_mb_daftar"
+          class="fr mt-1"
+        >
+          <label class="lbl">Permintaan PO</label>
+          <input
+            :value="formData.header.po_mb_daftar"
+            class="inp ro"
+            :title="formData.header.po_mb_daftar"
+            readonly
+          />
         </div>
 
         <template v-if="canSeeSup">

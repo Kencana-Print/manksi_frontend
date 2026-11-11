@@ -1945,6 +1945,55 @@ const router = createRouter({
       },
     },
     {
+      path: "/garmen/bahan-baku/permintaan-pembelian-bahan",
+      name: "PermintaanPembelianBahanBrowse",
+      component: () =>
+        import("@/views/garmen/PermintaanPembelianBahanView.vue"),
+      meta: {
+        title: "Permintaan Pembelian Bahan",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "190",
+      },
+    },
+    {
+      path: "/garmen/bahan-baku/permintaan-pembelian-bahan/form",
+      name: "PermintaanPembelianBahanCreate",
+      component: () =>
+        import("@/views/garmen/PermintaanPembelianBahanFormView.vue"),
+      meta: {
+        title: "Tambah Permintaan Pembelian Bahan",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "190",
+        browseRoute: "PermintaanPembelianBahanBrowse",
+      },
+    },
+    {
+      path: "/garmen/bahan-baku/permintaan-pembelian-bahan/form/:nomor",
+      name: "PermintaanPembelianBahanEdit",
+      component: () =>
+        import("@/views/garmen/PermintaanPembelianBahanFormView.vue"),
+      meta: {
+        title: "Ubah Permintaan Pembelian Bahan",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "190",
+        browseRoute: "PermintaanPembelianBahanBrowse",
+      },
+    },
+    {
+      path: "/garmen/bahan-baku/permintaan-pembelian-bahan/print/:nomor",
+      name: "PermintaanPembelianBahanPrint",
+      component: () =>
+        import("@/views/garmen/PermintaanPembelianBahanPrintView.vue"),
+      meta: {
+        title: "Cetak Permintaan Pembelian Bahan",
+        layout: "BlankLayout", // Wajib agar tidak ada navbar/sidebar saat diprint
+        requiresAuth: true,
+      },
+    },
+    {
       path: "/garmen/bahan-baku/koreksi-stok",
       name: "KoreksiStokBahanBrowse",
       component: () => import("@/views/garmen/KoreksiStokBahanView.vue"),

@@ -118,8 +118,19 @@ const pin5Config = computed(() => {
   return map[form.value.pin5Status] ?? null;
 });
 
+const adaBpj = computed(() =>
+  detail.value.some((d) => d.tipe === "BPJ" && d.nomor),
+);
+// Baris bahan yang benar-benar terisi (hanya ini yang ikut tersimpan)
+const bahanTerisi = computed(() => bahanTambahan.value.filter((b) => b.nama));
+// Seksi tampil bila ada nota BPB Jasa, atau masih ada isi (data lama / sisa input),
+// supaya isi yang tidak sah tidak tersembunyi lalu ikut tersimpan.
+const tampilBahan = computed(
+  () => adaBpj.value || bahanTerisi.value.length > 0,
+);
+
 const xpotonganBahan = computed(() =>
-  bahanTambahan.value.reduce(
+  bahanTerisi.value.reduce(
     (s, b) => s + (b.tambah ? -1 : 1) * (Number(b.nilai) || 0),
     0,
   ),
@@ -700,6 +711,12 @@ const validateSave = () => {
     toast.warning("Detail nota harus diisi minimal satu baris.");
     return;
   }
+  if (bahanTerisi.value.length && !adaBpj.value) {
+    toast.warning(
+      "Bahan tambahan hanya untuk nota BPB Jasa. Hapus bahan tambahan, atau tambahkan nota BPB Jasa.",
+    );
+    return;
+  }
   const belumCentang = filled.find(
     (d) => d.breakdown && !itemDipilih(d).length,
   );
@@ -1223,13 +1240,20 @@ const executeClose = () => {
         </div>
 
         <!-- Bahan Tambahan -->
-        <div class="vp-detail-section vp-detail-section--compact">
+        <div
+          v-if="tampilBahan"
+          class="vp-detail-section vp-detail-section--compact"
+        >
           <div class="vp-sec-header">
             <span class="vp-sec-title">Bahan Tambahan</span>
+            <span v-if="!adaBpj" class="bahan-warn">
+              Tidak ada nota BPB Jasa. Hapus bahan tambahan ini.
+            </span>
             <button
               type="button"
               class="btn-add"
               style="background: #00695c"
+              :disabled="!adaBpj"
               @click="addBahanRow"
             >
               <IconPlus :size="14" class="mr-1" /> Tambah
@@ -2121,5 +2145,16 @@ const executeClose = () => {
 .item-tbl input[type="checkbox"] {
   accent-color: #1565c0;
   cursor: pointer;
+}
+.bahan-warn {
+  font-size: 11px;
+  font-weight: 600;
+  color: #c62828;
+  margin-left: auto;
+  margin-right: 8px;
+}
+.btn-add:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 </style>
