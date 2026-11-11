@@ -8,6 +8,13 @@ import { bbkFormService } from "@/services/piutang/bbkFormService";
 import BaseForm from "@/components/BaseForm.vue";
 import CollapsiblePanel from "@/components/CollapsiblePanel.vue";
 import CostCenterSearchModal from "@/components/lookups/CostCenterSearchModal.vue";
+import RekapPanggilModal, {
+  type RekapOption,
+  type RekapRow,
+} from "@/components/lookups/RekapPanggilModal.vue";
+import KlaimPanggilModal, {
+  type KlaimOption,
+} from "@/components/lookups/KlaimPanggilModal.vue";
 import {
   IconBuildingBank,
   IconPlus,
@@ -377,6 +384,106 @@ onMounted(async () => {
   }
 });
 
+// ── Panggil Rekap Pembayaran (baris voucher) ──
+const showRekapModal = ref(false);
+const fetchRekapOptions = async (search: string): Promise<RekapOption[]> => {
+  const res = await bbkFormService.getRekapOptions(search);
+  return res.data.data || [];
+};
+const fetchRekapRows = async (nomor: string): Promise<RekapRow[]> => {
+  const res = await bbkFormService.getRekapRows(nomor);
+  return res.data.data || [];
+};
+const pilihRekapRows = (rows: RekapRow[]) => {
+  const sudah = new Set(
+    formData.value.Detail.map((d: any) => d.vou).filter(Boolean),
+  );
+  const emptyIdx = formData.value.Detail.findIndex(
+    (d: any) => !d.uraian && !d.mb && !d.vou,
+  );
+  if (emptyIdx !== -1) formData.value.Detail.splice(emptyIdx, 1);
+
+  let tambah = 0;
+  let perluCek = 0;
+  rows.forEach((r) => {
+    if (sudah.has(r.trs)) return;
+    if (r.cekRekening) perluCek++;
+    formData.value.Detail.push({
+      no: formData.value.Detail.length + 1,
+      uraian: `Pembayaran voucher ${r.trs}`,
+      satuan: "",
+      qty: 1,
+      harga: r.nominal,
+      total: r.nominal,
+      rekkode: "",
+      reknama: "",
+      cckode: 0,
+      ccnama: "",
+      dcnama: "",
+      kdsup: r.kode,
+      supplier: r.nama,
+      bank: r.bank,
+      rekening: r.rekening,
+      atasnama: r.atasnama,
+      kdbrg: "",
+      mb: "",
+      vou: r.trs,
+      jenis_item: "",
+      cab_item: "",
+    });
+    tambah++;
+  });
+  toast.success(`${tambah} voucher dari rekap ditambahkan.`);
+  if (perluCek > 0)
+    toast.warning(
+      `${perluCek} voucher perlu cek rekening (kosong atau lebih dari satu). Periksa lewat tombol Detail.`,
+    );
+};
+
+// ── Panggil Klaim Kas Kecil ──
+const showKlaimModal = ref(false);
+const fetchKlaimOptions = (search: string) =>
+  bbkFormService.getKlaimOptions(
+    search,
+    isEditMode.value ? String(route.params.nomor || "") : "",
+  );
+const klaimTerpakai = computed(() =>
+  formData.value.Detail.filter((d: any) => d.klaim).map((d: any) => d.klaim),
+);
+
+const pilihKlaim = (o: KlaimOption) => {
+  if (o.rekKode === formData.value.RekKode) {
+    toast.warning(
+      `Account header tidak boleh sama dengan kas kecil tujuan (${o.rekKode}).`,
+    );
+    return;
+  }
+  formData.value.Detail.push({
+    no: formData.value.Detail.length + 1,
+    uraian: `Klaim Kas Kecil ${o.nomor}`,
+    satuan: "",
+    qty: 1,
+    harga: o.nominal,
+    total: o.nominal,
+    rekkode: o.rekKode,
+    reknama: o.rekNama,
+    cckode: 0,
+    ccnama: "",
+    dcnama: "",
+    kdsup: o.sup.kode,
+    supplier: o.sup.nama,
+    bank: o.sup.bank,
+    rekening: o.sup.rekening,
+    atasnama: o.sup.atasnama,
+    kdbrg: "",
+    mb: "",
+    vou: "",
+    klaim: o.nomor,
+    jenis_item: "",
+    cab_item: "",
+  });
+};
+
 // ── Detail grid ──
 const addRow = () => {
   formData.value.Detail.push({
@@ -398,6 +505,8 @@ const addRow = () => {
     atasnama: "",
     kdbrg: "",
     mb: "",
+    vou: "",
+    klaim: "",
     jenis_item: "",
     cab_item: "",
   });
@@ -467,7 +576,20 @@ const validateSave = () => {
     toast.warning("Minimal 1 baris detail harus memiliki uraian.");
     return;
   }
+  if (
+    validRows.some((d: any) => d.vou || d.klaim) &&
+    formData.value.Cabang !== "P01"
+  ) {
+    toast.warning(
+      "Baris Rekap Pembayaran / Klaim Kas Kecil hanya untuk BBK cabang P01.",
+    );
+    return;
+  }
   for (const row of validRows) {
+    if (!row.rekkode) {
+      toast.warning(`Account untuk "${row.uraian}" wajib diisi.`);
+      return;
+    }
     if (!Number(row.total) || Number(row.total) <= 0) {
       toast.warning(`Total untuk "${row.uraian}" harus lebih dari 0.`);
       return;
@@ -605,6 +727,28 @@ const pilihCetak = () => {
             <button
               type="button"
               class="btn-add btn-secondary"
+              :disabled="formData.Cabang !== 'P01'"
+              :title="
+                formData.Cabang !== 'P01'
+                  ? 'Rekap Pembayaran hanya untuk cabang P01'
+                  : ''
+              "
+              @click="showRekapModal = true"
+            >
+              <IconSearch :size="14" class="mr-1" /> Panggil Rekap
+            </button>
+            <button
+              type="button"
+              class="btn-add btn-secondary"
+              :disabled="formData.Cabang !== 'P01' || !formData.RekKode"
+              title="Wajib cabang P01 dan Account header sudah dipilih"
+              @click="showKlaimModal = true"
+            >
+              <IconShoppingCartPlus :size="14" class="mr-1" /> Panggil Klaim
+            </button>
+            <button
+              type="button"
+              class="btn-add btn-secondary"
               @click="openMbSearchModal"
             >
               <IconShoppingCartPlus :size="14" class="mr-1" /> Ambil dari Minta
@@ -638,7 +782,7 @@ const pilihCetak = () => {
                 <td class="td-ctr">{{ Number(idx) + 1 }}</td>
                 <td class="td-inp">
                   <span class="cell-val-ro" style="font-size: 10px">{{
-                    row.mb || "-"
+                    row.mb || row.vou || row.klaim || "-"
                   }}</span>
                 </td>
                 <td class="td-inp">
@@ -653,6 +797,7 @@ const pilihCetak = () => {
                     type="number"
                     v-model.number="row.qty"
                     class="cell tr"
+                    :disabled="!!row.vou || !!row.klaim"
                     v-select-on-focus
                     @input="recalcRowTotal(row)"
                   />
@@ -662,6 +807,7 @@ const pilihCetak = () => {
                     type="number"
                     v-model.number="row.harga"
                     class="cell tr"
+                    :disabled="!!row.vou"
                     v-select-on-focus
                     @input="recalcRowTotal(row)"
                   />
@@ -673,6 +819,7 @@ const pilihCetak = () => {
                   <div class="cell-igrp">
                     <input
                       v-model="row.rekkode"
+                      :disabled="!!row.klaim"
                       class="cell"
                       style="width: 70px; flex-shrink: 0"
                       placeholder="Kode"
@@ -682,6 +829,7 @@ const pilihCetak = () => {
                     <button
                       type="button"
                       class="cell-search"
+                      :disabled="!!row.klaim"
                       @click="openRowAccModal(Number(idx))"
                     >
                       <IconSearch :size="12" color="#1565c0" />
@@ -974,6 +1122,19 @@ const pilihCetak = () => {
     </v-card>
   </v-dialog>
 
+  <RekapPanggilModal
+    v-model="showRekapModal"
+    :fetch-options="fetchRekapOptions"
+    :fetch-rows="fetchRekapRows"
+    @pilih="pilihRekapRows"
+  />
+  <KlaimPanggilModal
+    v-model="showKlaimModal"
+    :fetch-options="fetchKlaimOptions"
+    :exclude-nomor="klaimTerpakai"
+    @pilih="pilihKlaim"
+  />
+
   <v-dialog v-model="showRemoveRowDialog" max-width="440px" persistent>
     <v-card class="rounded-lg">
       <v-card-title
@@ -1055,6 +1216,7 @@ const pilihCetak = () => {
             <button
               type="button"
               class="dr-search"
+              v-if="!activeDetailRow.vou && !activeDetailRow.klaim"
               @click="
                 openSupplierModal(formData.Detail.indexOf(activeDetailRow))
               "
@@ -1094,6 +1256,15 @@ const pilihCetak = () => {
           <div class="dr-hint">
             Terkait Minta Beli: <b>{{ activeDetailRow.mb }}</b>
             (hapus lewat tombol hapus baris, akan hapus semua item terkait)
+          </div>
+        </template>
+        <template v-if="activeDetailRow.vou">
+          <v-divider class="my-3" />
+          <div class="dr-section-title">Referensi</div>
+          <div class="dr-hint">
+            Dari Rekap Pembayaran, voucher <b>{{ activeDetailRow.vou }}</b
+            >. Supplier dan nominal mengikuti voucher dan tidak bisa diubah.
+            Bank/rekening boleh dipilih.
           </div>
         </template>
       </v-card-text>

@@ -59,4 +59,10 @@ export const bkkFormService = {
       params: { nomor },
     });
   },
+  getRekapOptions(search: string) {
+    return api.get("/piutang/bkk-form/rekap-options", { params: { search } });
+  },
+  getRekapRows(nomor: string) {
+    return api.get("/piutang/bkk-form/rekap-rows", { params: { nomor } });
+  },
 };

@@ -48,4 +48,16 @@ export const bbkFormService = {
       params: { nomor },
     });
   },
+  getRekapOptions(search: string) {
+    return api.get("/piutang/bbk-form/rekap-options", { params: { search } });
+  },
+  getRekapRows(nomor: string) {
+    return api.get("/piutang/bbk-form/rekap-rows", { params: { nomor } });
+  },
+  getKlaimOptions: async (search = "", nomor = "") => {
+    const res = await api.get("/piutang/bbk-form/klaim-options", {
+      params: { search, nomor },
+    });
+    return res.data.data;
+  },
 };

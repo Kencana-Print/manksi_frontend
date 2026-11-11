@@ -5,6 +5,7 @@ import { useToast } from "vue-toastification";
 import BaseForm from "@/components/BaseForm.vue";
 import SupplierSearchModal from "@/components/lookups/SupplierSearchModal.vue";
 import { useForm } from "@/composables/useForm";
+import { useAuthStore } from "@/stores/authStore";
 import {
   IconCalendarDue,
   IconDownload,
@@ -44,6 +45,10 @@ interface BarisForm {
   keterangan: string;
   vouNomor: string;
   pjtNomor: string;
+  bank: string;
+  rekening: string;
+  atasnama: string;
+  jumlahRekening: number;
 }
 
 interface RekapForm {
@@ -65,6 +70,10 @@ interface Grup {
   total: number;
   terkunci: boolean;
   rows: BarisForm[];
+  bank: string;
+  rekening: string;
+  atasnama: string;
+  jumlahRekening: number;
 }
 
 interface Kelompok {
@@ -75,6 +84,33 @@ interface Kelompok {
 
 const route = useRoute();
 const toast = useToast();
+const authStore = useAuthStore();
+
+// Harus sama dengan BAGIAN_LIHAT_REKENING di backend (backend yang menentukan
+// data terkirim atau tidak; ini hanya mengatur tampilan).
+const BAGIAN_LIHAT_REKENING = [
+  "PEMBELIAN",
+  "FINANCE",
+  "EDP",
+  "DIREKSI",
+  "AUDIT",
+];
+const canLihatRekening = computed(() =>
+  BAGIAN_LIHAT_REKENING.includes((authStore.user?.bagian || "").toUpperCase()),
+);
+
+interface RekeningInfo {
+  bank: string;
+  rekening: string;
+  atasnama: string;
+  jumlahRekening: number;
+}
+const REK_KOSONG: RekeningInfo = {
+  bank: "",
+  rekening: "",
+  atasnama: "",
+  jumlahRekening: 0,
+};
 
 const nomorEdit = computed(() =>
   typeof route.params.nomor === "string" ? route.params.nomor : "",
@@ -210,6 +246,10 @@ const {
           keterangan: r.keterangan,
           vouNomor: r.vouNomor || "",
           pjtNomor: r.pjtNomor || "",
+          bank: r.supBank,
+          rekening: r.supRekening,
+          atasnama: r.supAtasnama,
+          jumlahRekening: r.jumlahRekening,
         };
       }),
     };
@@ -295,6 +335,10 @@ const kelompok = computed<Kelompok[]>(() => {
         total: 0,
         rows: [],
         terkunci: false,
+        bank: b.bank,
+        rekening: b.rekening,
+        atasnama: b.atasnama,
+        jumlahRekening: b.jumlahRekening,
       };
       petaGrup.set(k, g);
       kel.grup.push(g);
@@ -404,6 +448,7 @@ const showSupplierModal = ref(false);
 const tarikSupKode = ref("");
 const tarikSupNama = ref("");
 const tarikSupInput = ref("");
+const tarikRek = ref<RekeningInfo>({ ...REK_KOSONG });
 const tarikStart = ref("");
 const tarikEnd = ref("");
 const tarikBulan = ref("");
@@ -421,6 +466,7 @@ const openTarik = () => {
   tarikSupKode.value = "";
   tarikSupNama.value = "";
   tarikSupInput.value = "";
+  tarikRek.value = { ...REK_KOSONG };
   tarikStart.value = awalTigaBulan();
   tarikEnd.value = hariIni();
   tarikBulan.value = bulanIni();
@@ -468,6 +514,12 @@ const applyTarikSupplier = async (kode: string) => {
     tarikSupKode.value = res.data.data.kode;
     tarikSupNama.value = res.data.data.nama;
     tarikSupInput.value = res.data.data.kode;
+    tarikRek.value = {
+      bank: res.data.data.bank,
+      rekening: res.data.data.rekening,
+      atasnama: res.data.data.atasnama,
+      jumlahRekening: res.data.data.jumlahRekening,
+    };
     await loadTagihan();
   } catch (e) {
     toast.error(pesanError(e, "Kode supplier tidak ditemukan."));
@@ -528,6 +580,7 @@ const tambahkanTerpilih = () => {
       keterangan: "",
       vouNomor: "",
       pjtNomor: "",
+      ...tarikRek.value,
     });
   }
   showTarik.value = false;
@@ -620,6 +673,10 @@ const tambahkanVoucher = () => {
       keterangan: "",
       vouNomor: v.nomor,
       pjtNomor: "",
+      bank: v.bank,
+      rekening: v.rekening,
+      atasnama: v.atasnama,
+      jumlahRekening: v.jumlahRekening,
     });
   }
   showVoucher.value = false;
@@ -745,7 +802,7 @@ const validateSave = () => {
           <thead>
             <tr>
               <th style="width: 34px"></th>
-              <th style="min-width: 260px">Supplier</th>
+              <th style="min-width: 320px">Supplier</th>
               <th style="width: 150px">Bulan Tagihan</th>
               <th style="width: 60px" class="text-center">Tipe</th>
               <th style="width: 80px" class="text-center">Jml Nota</th>
@@ -774,6 +831,19 @@ const validateSave = () => {
                 </td>
                 <td class="td-txt">
                   <b>{{ g.supNama }}</b>
+                  <div v-if="canLihatRekening" class="rk-rek">
+                    <template v-if="g.rekening">
+                      {{ g.bank }} {{ g.rekening }}
+                      <span v-if="g.atasnama"> a.n. {{ g.atasnama }}</span>
+                      <span
+                        v-if="g.jumlahRekening > 1"
+                        class="rk-banyak"
+                        title="Supplier punya lebih dari satu rekening; rekening dipilih saat Pengajuan Transfer"
+                        >+{{ g.jumlahRekening - 1 }} rekening</span
+                      >
+                    </template>
+                    <span v-else class="rk-kosong">Rekening belum ada</span>
+                  </div>
                 </td>
                 <td class="td-inp">
                   <input
@@ -1436,6 +1506,23 @@ const validateSave = () => {
 .rk-minus {
   color: #e65100;
   font-weight: 700;
+}
+.rk-rek {
+  margin-top: 1px;
+  font-size: 10px;
+  color: #546e7a;
+}
+.rk-banyak {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: #fff3e0;
+  color: #e65100;
+  font-weight: 700;
+}
+.rk-kosong {
+  color: #c62828;
+  font-style: italic;
 }
 .rk-vou {
   margin-left: 6px;
