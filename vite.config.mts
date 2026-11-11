@@ -124,6 +124,9 @@ export default defineConfig({
     },
     extensions: [".js", ".json", ".jsx", ".mjs", ".ts", ".tsx", ".vue"],
   },
+  build: {
+    target: ["es2020", "chrome87", "edge88", "firefox78", "safari14"],
+  },
   server: {
     port: 3000,
   },

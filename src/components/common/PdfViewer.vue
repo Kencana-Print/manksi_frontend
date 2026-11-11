@@ -2,7 +2,7 @@
 import { ref, watch, onMounted, onBeforeUnmount, nextTick } from "vue";
 import { IconZoomIn, IconZoomOut } from "@tabler/icons-vue";
 import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
-import PdfWorker from "pdfjs-dist/legacy/build/pdf.worker.min.mjs?worker";
+import PdfWorker from "@/workers/pdfWorker?worker";
 import type {
   PDFDocumentLoadingTask,
   PDFDocumentProxy,
@@ -69,9 +69,13 @@ const render = async () => {
     container.replaceChildren(frag);
     container.scrollTop = rasioY * container.scrollHeight;
     container.scrollLeft = rasioX * container.scrollWidth;
-  } catch {
-    // render dibatalkan karena zoom/ukuran berubah: abaikan; selain itu lapor
-    if (myId === renderId) emit("error", "PDF tidak dapat ditampilkan.");
+  } catch (e: any) {
+    if (myId === renderId) {
+      if (e?.name !== "RenderingCancelledException") {
+        console.error("PDF gagal digambar:", e);
+        emit("error", `PDF tidak dapat ditampilkan: ${e?.message || e}`);
+      }
+    }
   } finally {
     if (myId === renderId) isRendering.value = false;
   }
@@ -105,8 +109,9 @@ const load = async (buf: ArrayBuffer | null) => {
     jumlahHalaman.value = hasil.numPages;
     await nextTick();
     await render();
-  } catch {
-    emit("error", "PDF tidak dapat dibaca.");
+  } catch (e: any) {
+    console.error("PDF gagal dimuat:", e);
+    emit("error", `PDF tidak dapat dibaca: ${e?.message || e}`);
   }
 };
 
