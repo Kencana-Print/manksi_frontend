@@ -124,6 +124,23 @@ const loadLookups = async () => {
   }
 };
 
+const onNpwpInput = (v: string) => {
+  formData.value.NpwpKode = String(v || "").replace(/[^\d.\-]/g, "");
+};
+
+const npwpDigits = computed(
+  () => (formData.value.NpwpKode || "").replace(/\D/g, "").length,
+);
+
+const npwpRule = (v: string) => {
+  if (!v) return formData.value.Korporasi === "Y" ? "NPWP wajib diisi" : true;
+  return (
+    /^\d{15,16}$/.test(v) ||
+    /^\d{2}\.\d{3}\.\d{3}\.\d-\d{3}\.\d{3}$/.test(v) ||
+    "Isi 16 digit tanpa spasi atau 00.000.000.0-000.000"
+  );
+};
+
 // Load saat komponen dipasang — tidak perlu tunggu dialog buka
 onMounted(() => {
   loadLookups();
@@ -225,37 +242,15 @@ const handleSave = async () => {
       toast.warning("Korporasi: NPWP wajib diisi!");
       return;
     }
-    // Validasi format NPWP (xx.xxx.xxx.x-xxx.xxx = 20 karakter)
-    if (formData.value.Korporasi === "Y" && formData.value.NpwpKode) {
-      const npwp = formData.value.NpwpKode.trim();
-      const validPos: Record<number, string> = {
-        2: ".",
-        6: ".",
-        10: ".",
-        12: "-",
-        16: ".",
-      };
-      let npwpValid = npwp.length === 20;
-      if (npwpValid) {
-        for (let i = 0; i < npwp.length; i++) {
-          const expected = validPos[i];
-          if (expected) {
-            if (npwp[i] !== expected) {
-              npwpValid = false;
-              break;
-            }
-          } else {
-            if (!/\d/.test(npwp[i])) {
-              npwpValid = false;
-              break;
-            }
-          }
-        }
-      }
-      if (!npwpValid) {
-        toast.warning("Format NPWP tidak valid. Contoh: 02.843.715.0-651.000");
-        return;
-      }
+    const npwp = formData.value.NpwpKode.trim();
+    const npwpValid =
+      /^\d{15,16}$/.test(npwp) ||
+      /^\d{2}\.\d{3}\.\d{3}\.\d-\d{3}\.\d{3}$/.test(npwp);
+    if (!npwpValid) {
+      toast.warning(
+        "Format NPWP tidak valid. Isi 16 digit tanpa spasi (0028437150651000) atau 02.843.715.0-651.000",
+      );
+      return;
     }
     if (!formData.value.NpwpNama) {
       toast.warning("Korporasi: Nama NPWP wajib diisi!");
@@ -530,9 +525,15 @@ const divisiItems = [
                 <div class="f-row">
                   <label class="f-label">No. NPWP</label>
                   <v-text-field
-                    v-model="formData.NpwpKode"
+                    :model-value="formData.NpwpKode"
+                    @update:model-value="onNpwpInput"
                     variant="outlined"
                     density="compact"
+                    maxlength="20"
+                    placeholder="16 digit tanpa spasi / 00.000.000.0-000.000"
+                    :rules="[npwpRule]"
+                    :hint="npwpDigits ? `${npwpDigits} digit` : ''"
+                    persistent-hint
                     hide-details="auto"
                     class="f-input"
                   />

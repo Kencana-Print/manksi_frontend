@@ -6,10 +6,12 @@ import { useToast } from "vue-toastification";
 import BaseBrowse from "@/components/BaseBrowse.vue";
 import CustomerFormDialog from "@/components/dialogs/CustomerFormDialog.vue";
 import { IconUsers } from "@tabler/icons-vue";
+import { exportExcelSingle, type ExcelColumn } from "@/utils/excelExport";
 
 const toast = useToast();
 
-const filterKorporasi = ref(""); // "", "Y", "N"
+const filterKorporasi = ref("");
+const npwpFormat = ref("DIGIT"); // "DIGIT" | "TITIK"
 
 const {
   items,
@@ -25,7 +27,10 @@ const {
   menuId: "20",
   fetchApi: async () => {
     const res = await api.get("/master/customer", {
-      params: { filterKorporasi: filterKorporasi.value },
+      params: {
+        filterKorporasi: filterKorporasi.value,
+        npwpFormat: npwpFormat.value,
+      },
     });
     return res.data.data;
   },
@@ -158,6 +163,38 @@ const handleDelete = async (item: any) => {
     toast.error("Gagal menghapus customer.");
   }
 };
+
+const handleExport = async () => {
+  const rows = items.value ?? [];
+  if (!rows.length) {
+    toast.warning("Tidak ada data untuk diexport.");
+    return;
+  }
+
+  const columns: ExcelColumn[] = headers.map((h) => {
+    const col: ExcelColumn = {
+      header: h.title,
+      key: h.key,
+      width: parseInt(String(h.width ?? h.minWidth ?? "120"), 10) / 6,
+      align: h.align ?? "left",
+    };
+    if (h.key === "Piutang" || h.key === "Plafon") col.numFmt = "#,##0.00";
+    if (h.key === "NPWP") col.numFmt = "@"; // paksa Text
+    return col;
+  });
+
+  try {
+    await exportExcelSingle(
+      "Data_Master_Customer.xlsx",
+      "Customer",
+      columns,
+      rows,
+      "MASTER CUSTOMER",
+    );
+  } catch (e) {
+    toast.error("Gagal export Excel.");
+  }
+};
 </script>
 
 <template>
@@ -179,7 +216,7 @@ const handleDelete = async (item: any) => {
     @add="handleAdd"
     @edit="handleEdit"
     @delete="handleDelete"
-    @export="exportToExcel('Data_Master_Customer')"
+    @export="handleExport"
   >
     <template #filter-left>
       <div
@@ -192,6 +229,25 @@ const handleDelete = async (item: any) => {
             { title: 'ALL', value: '' },
             { title: 'KORPORASI', value: 'Y' },
             { title: 'PERORANGAN', value: 'N' },
+          ]"
+          item-title="title"
+          item-value="value"
+          variant="underlined"
+          density="compact"
+          hide-details
+          class="text-caption font-weight-medium"
+          @update:model-value="fetchData"
+        ></v-select>
+      </div>
+      <div
+        class="d-flex align-center bg-white px-2 py-1 rounded border mr-2"
+        style="width: 230px"
+      >
+        <v-select
+          v-model="npwpFormat"
+          :items="[
+            { title: 'NPWP: 16 Digit', value: 'DIGIT' },
+            { title: 'NPWP: 00.000.000.0-000.000', value: 'TITIK' },
           ]"
           item-title="title"
           item-value="value"
