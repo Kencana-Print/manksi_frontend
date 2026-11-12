@@ -87,8 +87,14 @@ const headers = [
 
 // Sinkronisasi prop isVisible ke internal state
 watch(() => props.isVisible, (val) => {
-  internalVisible.ref = val;
+  internalVisible.value = val;
   if (val) fetchData();
+});
+
+watch(internalVisible, (val) => {
+  if (!val) {
+    emit('close');
+  }
 });
 
 const fetchData = async () => {
