@@ -68,6 +68,7 @@ const defaultData = {
     ketpo: "",
     tglminta: "",
     tglpo: "",
+    po_mb_daftar: "",
     isTutupBuku: false,
     hasVoucher: false,
     pin_status: "",
@@ -79,7 +80,12 @@ const defaultData = {
 const canSeeSup = computed(() => !!authStore.user?.flags?.lihatSup);
 const canSeeBeli = computed(() => !!authStore.user?.flags?.lihatBeli);
 const isDetailRinci = computed(() =>
-  ["SPAREPART", "ATK/RTK"].includes(String(formJenis.value)),
+  ["SPAREPART", "ATK/RTK", "ASET"].includes(String(formJenis.value)),
+);
+// Aset selalu masuk P04; samakan dengan KECAB_ASET di backend
+const KECAB_ASET = "P04";
+const cabangTujuan = computed(() =>
+  formJenis.value === "ASET" ? KECAB_ASET : authStore.user?.cabang || "",
 );
 const isSupLocked = computed(
   () =>
@@ -120,6 +126,7 @@ const {
       ketpo: "",
       tglminta: "",
       tglpo: "",
+      po_mb_daftar: "",
       isTutupBuku: false,
       hasVoucher: false,
       pin_status: "",
@@ -156,7 +163,6 @@ const {
       bpb_sup_kode: data.header.bpb_sup_kode,
       bpb_ket: data.header.bpb_ket,
       detail: data.detail,
-      user: authStore.user,
     });
   },
   onSuccess: (res: any) => {
@@ -178,6 +184,7 @@ const setPermintaan = async (v: any) => {
   formData.value.header.bpb_po_nomor = "";
   formData.value.header.tglpo = "";
   formData.value.header.ketpo = "";
+  formData.value.header.po_mb_daftar = "";
   formData.value.header.bpb_sup_kode = "";
   formData.value.header.sup_nama = "";
   formData.value.header.sup_alamat = "";
@@ -216,6 +223,7 @@ const setPo = async (v: any) => {
     formData.value.header.tglminta = hdr.tglminta;
     formData.value.header.tglpo = hdr.tglpo;
     formData.value.header.ketpo = hdr.ketpo;
+    formData.value.header.po_mb_daftar = hdr.po_mb_daftar || "";
     formData.value.header.bpb_sup_kode = hdr.po_sup_kode;
     formData.value.header.sup_nama = hdr.sup_nama;
     formData.value.header.sup_alamat = hdr.sup_alamat;
@@ -493,7 +501,7 @@ watch(
         <div class="fr mt-1">
           <label class="lbl">Cabang</label>
           <input
-            :value="authStore.user?.cabang || ''"
+            :value="cabangTujuan"
             class="inp ro font-weight-bold text-primary"
             readonly
           />
@@ -577,6 +585,19 @@ watch(
         <div class="fr mt-1">
           <label class="lbl">Ket. PO</label>
           <input :value="formData.header.ketpo" class="inp ro" readonly />
+        </div>
+
+        <div
+          v-if="formData.header.bpb_po_nomor && formData.header.po_mb_daftar"
+          class="fr mt-1"
+        >
+          <label class="lbl">Permintaan PO</label>
+          <input
+            :value="formData.header.po_mb_daftar"
+            class="inp ro"
+            :title="formData.header.po_mb_daftar"
+            readonly
+          />
         </div>
 
         <template v-if="canSeeSup">
@@ -778,7 +799,7 @@ watch(
         <div class="tbl-footer-info">
           <span class="footer-icon">📦</span>
           Barang akan disimpan ke gudang:
-          <span class="footer-cabang">{{ authStore.user?.cabang || "—" }}</span>
+          <span class="footer-cabang">{{ cabangTujuan || "—" }}</span>
           <span class="footer-sep">|</span>
           <span class="footer-bagian">{{ authStore.user?.bagian || "—" }}</span>
         </div>

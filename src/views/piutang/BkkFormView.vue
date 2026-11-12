@@ -12,6 +12,10 @@ import AccountSearchModal from "@/components/lookups/AccountSearchModal.vue";
 import CostCenterSearchModal from "@/components/lookups/CostCenterSearchModal.vue";
 import SupplierSearchModal from "@/components/lookups/SupplierSearchModal.vue";
 import PettyCashSearchModal from "@/components/lookups/PettyCashSearchModal.vue";
+import RekapPanggilModal, {
+  type RekapOption,
+  type RekapRow,
+} from "@/components/lookups/RekapPanggilModal.vue";
 import {
   IconReceipt2,
   IconPlus,
@@ -254,6 +258,64 @@ onMounted(async () => {
   }
 });
 
+// ── Panggil Rekap Pembayaran (baris voucher) ──
+const showRekapModal = ref(false);
+const fetchRekapOptions = async (search: string): Promise<RekapOption[]> => {
+  const res = await bkkFormService.getRekapOptions(search);
+  return res.data.data || [];
+};
+const fetchRekapRows = async (nomor: string): Promise<RekapRow[]> => {
+  const res = await bkkFormService.getRekapRows(nomor);
+  return res.data.data || [];
+};
+const pilihRekapRows = (rows: RekapRow[]) => {
+  const sudah = new Set(
+    formData.value.Detail.map((d: any) => d.vou).filter(Boolean),
+  );
+  const emptyIdx = formData.value.Detail.findIndex(
+    (d: any) => !d.uraian && !d.mb && !d.pck && !d.vou,
+  );
+  if (emptyIdx !== -1) formData.value.Detail.splice(emptyIdx, 1);
+
+  let tambah = 0;
+  let perluCek = 0;
+  rows.forEach((r) => {
+    if (sudah.has(r.trs)) return;
+    if (r.cekRekening) perluCek++;
+    formData.value.Detail.push({
+      no: formData.value.Detail.length + 1,
+      uraian: `Pembayaran voucher ${r.trs}`,
+      satuan: "",
+      qty: 1,
+      harga: r.nominal,
+      total: r.nominal,
+      rekkode: "",
+      reknama: "",
+      cckode: 0,
+      ccnama: "",
+      dcnama: "",
+      supkode: r.kode,
+      supnama: r.nama,
+      bank: r.bank,
+      rekening: r.rekening,
+      atasnama: r.atasnama,
+      mb: "",
+      pck: "",
+      pckStore: "",
+      vou: r.trs,
+      kdbrg: "",
+      jenis_item: "",
+      cab_item: "",
+    });
+    tambah++;
+  });
+  toast.success(`${tambah} voucher dari rekap ditambahkan.`);
+  if (perluCek > 0)
+    toast.warning(
+      `${perluCek} voucher perlu cek rekening (kosong atau lebih dari satu). Periksa lewat tombol Detail.`,
+    );
+};
+
 // ── Detail grid ──
 const addRow = () => {
   formData.value.Detail.push({
@@ -276,6 +338,7 @@ const addRow = () => {
     mb: "",
     pck: "",
     pckStore: "",
+    vou: "",
     kdbrg: "",
     jenis_item: "",
     cab_item: "",
@@ -497,7 +560,15 @@ const validateSave = () => {
     toast.warning("Minimal 1 baris detail harus memiliki uraian.");
     return;
   }
+  if (validRows.some((d: any) => d.vou) && formData.value.Cabang !== "P01") {
+    toast.warning("Baris dari Rekap Pembayaran hanya untuk BKK cabang P01.");
+    return;
+  }
   for (const row of validRows) {
+    if (!row.rekkode) {
+      toast.warning(`Account untuk "${row.uraian}" wajib diisi.`);
+      return;
+    }
     if (!Number(row.total) || Number(row.total) <= 0) {
       toast.warning(`Total untuk "${row.uraian}" harus lebih dari 0.`);
       return;
@@ -647,6 +718,19 @@ const pilihCetak = () => {
             <button
               type="button"
               class="btn-add btn-secondary"
+              :disabled="formData.Cabang !== 'P01'"
+              :title="
+                formData.Cabang !== 'P01'
+                  ? 'Rekap Pembayaran hanya untuk BKK cabang P01 (pilih Account kas P01)'
+                  : ''
+              "
+              @click="showRekapModal = true"
+            >
+              <IconSearch :size="14" class="mr-1" /> Panggil Rekap
+            </button>
+            <button
+              type="button"
+              class="btn-add btn-secondary"
               @click="openMbSearchModal"
             >
               <IconShoppingCartPlus :size="14" class="mr-1" /> Ambil dari Minta
@@ -688,6 +772,7 @@ const pilihCetak = () => {
                 <td class="td-inp">
                   <input
                     :value="numFmt(row.qty)"
+                    :disabled="!!row.vou"
                     type="text"
                     inputmode="numeric"
                     class="cell tr"
@@ -699,6 +784,7 @@ const pilihCetak = () => {
                 <td class="td-inp">
                   <input
                     :value="numFmt(row.harga)"
+                    :disabled="!!row.vou"
                     type="text"
                     inputmode="numeric"
                     class="cell tr"
@@ -759,7 +845,9 @@ const pilihCetak = () => {
                         ? `MB: ${row.mb}`
                         : row.pck
                           ? `PCK: ${row.pck}`
-                          : "-"
+                          : row.vou
+                            ? `VOU: ${row.vou}`
+                            : "-"
                     }}
                   </span>
                 </td>
@@ -940,6 +1028,12 @@ const pilihCetak = () => {
     @selected="setRowSupplier"
   />
   <PettyCashSearchModal v-model="showRowPckModal" @selected="setRowPck" />
+  <RekapPanggilModal
+    v-model="showRekapModal"
+    :fetch-options="fetchRekapOptions"
+    :fetch-rows="fetchRekapRows"
+    @pilih="pilihRekapRows"
+  />
 
   <!-- Dialog Detail Baris — Supplier + Petty Cash -->
   <v-dialog v-model="showRowDetailDialog" max-width="760px" persistent>
@@ -970,6 +1064,7 @@ const pilihCetak = () => {
                 <button
                   type="button"
                   class="dr-search"
+                  v-if="!activeDetailRow.vou"
                   @click="
                     openRowSupplierModal(
                       formData.Detail.indexOf(activeDetailRow),
@@ -1001,6 +1096,11 @@ const pilihCetak = () => {
               Terkait Minta Beli: <b>{{ activeDetailRow.mb }}</b>
               (hapus lewat tombol hapus baris, akan hapus semua item terkait)
             </div>
+            <div v-if="activeDetailRow.vou" class="dr-hint mb-2">
+              Dari Rekap Pembayaran, voucher <b>{{ activeDetailRow.vou }}</b
+              >. Supplier dan nominal mengikuti voucher dan tidak bisa diubah.
+              Bank/rekening boleh dipilih.
+            </div>
             <div class="dr-field">
               <label class="dr-lbl">No. Petty Cash</label>
               <div class="dr-igrp">
@@ -1008,7 +1108,7 @@ const pilihCetak = () => {
                 <button
                   type="button"
                   class="dr-search"
-                  :disabled="!!activeDetailRow.mb"
+                  :disabled="!!activeDetailRow.mb || !!activeDetailRow.vou"
                   @click="
                     openRowPckModal(formData.Detail.indexOf(activeDetailRow))
                   "
@@ -1041,7 +1141,7 @@ const pilihCetak = () => {
               <input
                 v-model="activeDetailRow.kdbrg"
                 class="dr-inp"
-                :readonly="!!activeDetailRow.mb"
+                :readonly="!!activeDetailRow.mb || !!activeDetailRow.vou"
               />
             </div>
           </div>
@@ -1265,6 +1365,10 @@ const pilihCetak = () => {
 }
 .btn-add.btn-secondary:hover {
   background: #6a1b9a;
+}
+.btn-add:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .bkk-table-wrap {

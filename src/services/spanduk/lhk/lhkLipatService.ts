@@ -25,9 +25,7 @@ export interface LhkLipatDetailRow {
   Panjang: number | null;
   Lebar: number | null;
   Qty_Lipat: number | null;
-  Tambah_Lipat: number | null;
   Mata_Ayam: number | null;
-  BS_Lipat: number | null;
 }
 
 export interface LhkLipatKaryawanRow {

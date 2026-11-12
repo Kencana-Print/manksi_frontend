@@ -32,11 +32,10 @@ const desimal = (v: number | null | undefined): string =>
 const baris = computed(() => data.value?.Detail ?? []);
 
 const total = computed(() => {
-  const t = { jahit: 0, tali: 0, bs: 0 };
+  const t = { jahit: 0, tali: 0 };
   for (const r of baris.value) {
     t.jahit += Number(r.Qty_Jahit) || 0;
     t.tali += Number(r.Tambah_Tali) || 0;
-    t.bs += Number(r.BS_Jahit) || 0;
   }
   return t;
 });
@@ -106,8 +105,7 @@ onMounted(async () => {
             <th colspan="2">Spesifikasi</th>
             <th rowspan="2" class="c-spk">Nomor SPK</th>
             <th rowspan="2" class="c-j">J. Jahit<br />(pcs)</th>
-            <th rowspan="2" class="c-t">Tambah<br />Tali</th>
-            <th rowspan="2" class="c-t">BS<br />Jahit</th>
+            <th rowspan="2" class="c-t">Tambah<br />Tali (pcs)</th>
           </tr>
           <tr>
             <th class="c-pl">P</th>
@@ -123,7 +121,6 @@ onMounted(async () => {
             <td>{{ r.Nomor_SPK }}</td>
             <td class="tr">{{ bulat(r.Qty_Jahit) }}</td>
             <td class="tr">{{ bulat(r.Tambah_Tali) }}</td>
-            <td class="tr">{{ bulat(r.BS_Jahit) }}</td>
           </tr>
         </tbody>
         <tfoot>
@@ -131,7 +128,6 @@ onMounted(async () => {
             <td colspan="5" class="tot-lbl">Total</td>
             <td class="tr">{{ bulat(total.jahit) }}</td>
             <td class="tr">{{ bulat(total.tali) }}</td>
-            <td class="tr">{{ bulat(total.bs) }}</td>
           </tr>
         </tfoot>
       </table>
@@ -250,7 +246,7 @@ onMounted(async () => {
   width: 62px;
 }
 .c-t {
-  width: 54px;
+  width: 62px;
 }
 .nama {
   text-transform: uppercase;

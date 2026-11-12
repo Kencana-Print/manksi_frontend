@@ -57,6 +57,42 @@ const isDivisiSatuAtauLima = computed(() => {
   const d = String(props.formData.spk_divisi).charAt(0);
   return d === "1" || d === "5";
 });
+const isDivisiSpanduk = computed(
+  () => String(props.formData.spk_divisi).charAt(0) === "1",
+);
+
+// ── Flag Bahan / Non Bahan (menentukan perlu-tidaknya MKB) ──
+// Salinan aturan backend (JO_NON_BAHAN_OTOMATIS di salesOrderFormService.js).
+// Backend tetap penentu akhir saat simpan; ini hanya untuk tampilan form.
+const JO_NON_BAHAN_OTOMATIS = ["BR", "DP", "KS", "PL", "SB", "SD", "TG", "PM"];
+
+const isDivisiTigaAtauEmpat = computed(() =>
+  ["3", "4"].includes(String(props.formData.spk_divisi).charAt(0)),
+);
+const isBahanOtomatis = computed(
+  () =>
+    isDivisiTiga.value &&
+    JO_NON_BAHAN_OTOMATIS.includes(
+      String(props.formData.spk_jo_kode || "")
+        .toUpperCase()
+        .trim(),
+    ),
+);
+const sudahAdaMkb = computed(() => props.isEdit && !!props.formData.mkb);
+const bahanTerkunci = computed(
+  () => isBahanOtomatis.value || sudahAdaMkb.value,
+);
+const bahanKeterangan = computed(() =>
+  isBahanOtomatis.value ? "🔒 Otomatis" : sudahAdaMkb.value ? "🔒 Ada MKB" : "",
+);
+
+// Jenis order pengerjaan → paksa N. Dilepas lagi (kembali Y) hanya kalau
+// sebelumnya terkunci otomatis, supaya pilihan manual Marketing tidak tertimpa.
+watch(isBahanOtomatis, (otomatis, sebelumnya) => {
+  if (otomatis) props.formData.spk_bahan = "N";
+  else if (sebelumnya) props.formData.spk_bahan = "Y";
+});
+
 // Baris path desain — path ada di level LHK, jadi satu baris per LHK.
 // Fallback ke PdPath untuk data lama (PD format lama tanpa LHK).
 const pathRows = computed<string[]>(() => {
@@ -1469,6 +1505,25 @@ watch(
                 style="flex: 1"
               />
             </div>
+            <div v-if="isDivisiTigaAtauEmpat" class="fr mt-1">
+              <label class="lbl" style="width: 85px">Pakai Bahan</label>
+              <select
+                v-model="formData.spk_bahan"
+                class="inp sel"
+                style="width: 60px"
+                :disabled="bahanTerkunci"
+                title="Y = perlu MKB, N = Non Bahan (tidak perlu MKB)"
+              >
+                <option value="Y">Y</option>
+                <option value="N">N</option>
+              </select>
+              <span
+                v-if="bahanKeterangan"
+                class="ml-2"
+                style="font-size: 10px; color: #1565c0"
+                >{{ bahanKeterangan }}</span
+              >
+            </div>
             <div class="fr mt-1">
               <label class="lbl" style="width: 85px">MKB</label>
               <input
@@ -1589,8 +1644,14 @@ watch(
             />
             <span class="ml-1 sep-txt">Mtr</span>
 
-            <label class="lbl ml-2" style="width: 80px">Ket. Ukuran</label>
-            <input v-model="formData.spk_ukuran" class="inp" style="flex: 1" />
+            <template v-if="!isDivisiSpanduk">
+              <label class="lbl ml-2" style="width: 80px">Ket. Ukuran</label>
+              <input
+                v-model="formData.spk_ukuran"
+                class="inp"
+                style="flex: 1"
+              />
+            </template>
           </template>
 
           <template v-else>
@@ -1649,7 +1710,7 @@ watch(
         </div>
 
         <!-- Gramasi -->
-        <div class="fr">
+        <div v-if="!isDivisiSpanduk" class="fr">
           <label class="lbl">Gramasi</label>
           <v-combobox
             v-if="isDivisiSatuAtauLima"
@@ -1713,33 +1774,35 @@ watch(
 
         <!-- Sablon / Bordir / Sublim + Harga -->
         <div class="fr mt-1 shaded-row">
-          <label class="chk-lbl mr-3"
-            ><input
-              type="checkbox"
-              v-model="formData.spk_sablon"
-              true-value="Y"
-              false-value="N"
-            />
-            Sablon</label
-          >
-          <label class="chk-lbl mr-3"
-            ><input
-              type="checkbox"
-              v-model="formData.spk_bordir"
-              true-value="Y"
-              false-value="N"
-            />
-            Bordir</label
-          >
-          <label class="chk-lbl mr-3"
-            ><input
-              type="checkbox"
-              v-model="formData.spk_sublim"
-              true-value="Y"
-              false-value="N"
-            />
-            Sublim</label
-          >
+          <template v-if="!isDivisiSpanduk">
+            <label class="chk-lbl mr-3"
+              ><input
+                type="checkbox"
+                v-model="formData.spk_sablon"
+                true-value="Y"
+                false-value="N"
+              />
+              Sablon</label
+            >
+            <label class="chk-lbl mr-3"
+              ><input
+                type="checkbox"
+                v-model="formData.spk_bordir"
+                true-value="Y"
+                false-value="N"
+              />
+              Bordir</label
+            >
+            <label class="chk-lbl mr-3"
+              ><input
+                type="checkbox"
+                v-model="formData.spk_sublim"
+                true-value="Y"
+                false-value="N"
+              />
+              Sublim</label
+            >
+          </template>
           <div class="ml-auto d-flex align-center" style="gap: 4px">
             <span
               v-if="hargaLocked"
@@ -1784,7 +1847,7 @@ watch(
         </div>
 
         <!-- Warna — satu baris horizontal di kolom kiri -->
-        <div class="fieldset-box mt-1">
+        <div v-if="!isDivisiSpanduk" class="fieldset-box mt-1">
           <div class="fieldset-legend">Warna</div>
           <div class="fr" style="gap: 5px">
             <label class="lbl" style="width: 48px">Badan</label>

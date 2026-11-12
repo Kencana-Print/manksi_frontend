@@ -27,7 +27,6 @@ interface ExportDetailRow {
   Qty_Jahit: number;
   Tambah_Jahit: number;
   Tambah_Tali: number;
-  BS_Jahit: number;
 }
 
 const toast = useToast();
@@ -146,32 +145,25 @@ const kolomDetail: ExcelColumn[] = [
   { header: "Panjang", key: "Panjang", width: 10, align: "right", numFmt: NUM },
   { header: "Lebar", key: "Lebar", width: 10, align: "right", numFmt: NUM },
   {
-    header: "Qty Jahit",
+    header: "Qty Jahit (pcs)",
     key: "Qty_Jahit",
-    width: 12,
+    width: 16,
     align: "right",
     numFmt: NUM,
   },
   {
-    header: "Tambah Jahit",
+    header: "Tambah Jahit (M)",
     key: "Tambah_Jahit",
-    width: 14,
+    width: 18,
     align: "right",
     numFmt: NUM,
   },
   {
-    header: "Tambah Tali",
+    header: "Tambah Tali (pcs)",
     key: "Tambah_Tali",
-    width: 14,
+    width: 18,
     align: "right",
     numFmt: NUM,
-  },
-  {
-    header: "BS Jahit",
-    key: "BS_Jahit",
-    width: 12,
-    align: "right",
-    numFmt: "#,##0",
   },
 ];
 
@@ -259,7 +251,6 @@ const exportDetail = async () => {
         Qty_Jahit: Number(r.Qty_Jahit) || 0,
         Tambah_Jahit: Number(r.Tambah_Jahit) || 0,
         Tambah_Tali: Number(r.Tambah_Tali) || 0,
-        BS_Jahit: Number(r.BS_Jahit) || 0,
       });
     }
   }
@@ -336,10 +327,9 @@ const numFmt = (v: number | null) =>
               <th width="80" class="tr">Jml Order</th>
               <th width="70" class="tr">Panjang</th>
               <th width="70" class="tr">Lebar</th>
-              <th width="80" class="tr">Qty Jahit</th>
-              <th width="90" class="tr">Tambah Jahit</th>
-              <th width="90" class="tr">Tambah Tali</th>
-              <th width="80" class="tr">BS Jahit</th>
+              <th width="100" class="tr">Qty Jahit (pcs)</th>
+              <th width="110" class="tr">Tambah Jahit (M)</th>
+              <th width="110" class="tr">Tambah Tali (pcs)</th>
             </tr>
           </thead>
           <tbody>
@@ -353,13 +343,12 @@ const numFmt = (v: number | null) =>
                 <td class="tr">{{ numFmt(r.Qty_Jahit) }}</td>
                 <td class="tr">{{ numFmt(r.Tambah_Jahit) }}</td>
                 <td class="tr">{{ numFmt(r.Tambah_Tali) }}</td>
-                <td class="tr">{{ numFmt(r.BS_Jahit) }}</td>
               </tr>
               <tr
                 v-if="karyawanMap[`${item.Nomor}|${r.Nomor_SPK}`]?.length"
                 class="kar-row"
               >
-                <td colspan="9">
+                <td colspan="8">
                   <span class="kar-lbl">Karyawan:</span>
                   <span
                     v-for="k in karyawanMap[`${item.Nomor}|${r.Nomor_SPK}`]"
@@ -377,7 +366,7 @@ const numFmt = (v: number | null) =>
               </tr>
             </template>
             <tr v-if="!detailMap[item.Nomor]?.length">
-              <td colspan="9" class="text-center text-grey py-3 font-italic">
+              <td colspan="8" class="text-center text-grey py-3 font-italic">
                 Detail LHK Jahit tidak ditemukan.
               </td>
             </tr>

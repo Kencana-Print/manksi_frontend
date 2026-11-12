@@ -47,7 +47,6 @@ interface FormState {
     namaPabrik: string;
   };
   items: FormRow[];
-  jmlDiscan: number;
 }
 
 const num = (v: unknown) => Number(v) || 0;
@@ -64,7 +63,6 @@ const barisKosong = (): FormRow => ({
 const defaultData = (): FormState => ({
   header: { nomor: "", tanggal: todayLocal, kodePabrik: "", namaPabrik: "" },
   items: [barisKosong()],
-  jmlDiscan: 0,
 });
 
 // ── State UI ──
@@ -114,7 +112,6 @@ const {
         namaPabrik: d.Nama_Pabrik ?? "",
       },
       items: items.length > 0 ? items : [barisKosong()],
-      jmlDiscan: num(d.Jml_Discan),
     };
   },
   submitApi: async (data: FormState): Promise<SaveResponse> => {
@@ -134,9 +131,6 @@ const {
     isiLokasiDefault();
   },
 });
-
-// Koli sudah discan di STBJ: LHK tidak bisa diubah
-const terkunci = computed(() => formData.value.jmlDiscan > 0);
 
 // ── Lokasi (pabrik) ──
 const opsiPabrik = computed<PabrikOption[]>(() => {
@@ -284,10 +278,6 @@ const MAKS_KOLI = 9999;
 
 const validateSave = () => {
   const { tanggal, kodePabrik } = formData.value.header;
-  if (terkunci.value) {
-    toast.error("LHK tidak bisa diubah: ada koli yang sudah discan di STBJ.");
-    return;
-  }
   if (!tanggal) {
     toast.warning("Tanggal tidak boleh kosong.");
     return;
@@ -334,14 +324,6 @@ const validateSave = () => {
 };
 
 // ── Setelah simpan ──
-const cetakLabel = () => {
-  const url = router.resolve({
-    name: "SpandukLhkKoliPrint",
-    params: { nomor: nomorTerakhir.value },
-  }).href;
-  window.open(url, "_blank");
-};
-
 const resetBaru = () => {
   showSelesai.value = false;
   if (isEditMode.value) {
@@ -394,7 +376,6 @@ const tutupSetelahSimpan = () => {
             v-model="formData.header.tanggal"
             class="idate"
             style="width: 150px"
-            :disabled="terkunci"
           />
         </div>
 
@@ -406,7 +387,6 @@ const tutupSetelahSimpan = () => {
             v-model="formData.header.kodePabrik"
             class="inp"
             style="width: 90px"
-            :disabled="terkunci"
             @change="onPabrikChange"
           >
             <option value="" disabled>Pilih...</option>
@@ -434,12 +414,8 @@ const tutupSetelahSimpan = () => {
           />
         </div>
 
-        <div v-if="terkunci" class="warn">
-          {{ formData.jmlDiscan }} koli sudah discan di STBJ. LHK tidak bisa
-          diubah.
-        </div>
-        <div v-else class="hint">
-          Label QR dicetak per koli setelah LHK disimpan.
+        <div class="hint">
+          J Koli hanya pencatatan. Label QR koli dicetak dari menu STBJ.
         </div>
       </div>
     </template>
@@ -449,12 +425,7 @@ const tutupSetelahSimpan = () => {
       <div class="lhk-right">
         <div class="tbl-header">
           <span class="tbl-title">Rincian SPK</span>
-          <button
-            type="button"
-            class="btn-add"
-            :disabled="terkunci"
-            @click="addRow"
-          >
+          <button type="button" class="btn-add" @click="addRow">
             + Tambah Baris
           </button>
         </div>
@@ -480,8 +451,6 @@ const tutupSetelahSimpan = () => {
                     <input
                       :value="row.spk"
                       class="ci"
-                      :class="{ ro: terkunci }"
-                      :readonly="terkunci"
                       placeholder="Ketik nomor + Enter / F1 cari"
                       autocomplete="off"
                       :ref="(el) => simpanRef(el, `${idx}_spk`)"
@@ -493,7 +462,6 @@ const tutupSetelahSimpan = () => {
                       type="button"
                       class="ci-btn"
                       title="Cari SPK"
-                      :disabled="terkunci"
                       @click="openLookupSpk(idx)"
                     >
                       <IconSearch :size="11" />
@@ -522,23 +490,17 @@ const tutupSetelahSimpan = () => {
                     v-model.number="row.koli"
                     type="number"
                     min="1"
-                    max="999"
+                    max="9999"
                     step="1"
-                    class="ci tr fw"
-                    :class="terkunci ? 'ro' : 'bg-yellow-light'"
-                    :readonly="terkunci"
-                    :ref="(el) => simpanRef(el, `${idx}_koli`)"
-                    @keydown.enter.prevent="onEnterKoli(idx)"
-                    v-select-on-focus
+                    i
+                    class="ci tr fw bg-yellow-light :ref="
+                    (el)=""
                   />
+                  simpanRef(el, `${idx}_koli`)"
+                  @keydown.enter.prevent="onEnterKoli(idx)" v-select-on-focus />
                 </td>
                 <td class="tc">
-                  <button
-                    type="button"
-                    class="btn-del"
-                    :disabled="terkunci"
-                    @click="removeRow(idx)"
-                  >
+                  <button type="button" class="btn-del" @click="removeRow(idx)">
                     ✕
                   </button>
                 </td>
@@ -575,12 +537,9 @@ const tutupSetelahSimpan = () => {
         <div class="text-body-1 mb-2">
           LHK Koli <b>{{ nomorTerakhir }}</b> telah disimpan.
         </div>
-        <div class="text-body-2 text-grey-darken-1 mb-3">
-          Cetak label QR sekarang untuk ditempel di tiap koli.
+        <div class="text-body-2 text-grey-darken-1">
+          Label QR koli dicetak dari menu STBJ.
         </div>
-        <v-btn color="deep-orange" variant="elevated" @click="cetakLabel">
-          Cetak Label QR
-        </v-btn>
       </v-card-text>
       <v-card-actions class="pa-3 border-t">
         <v-btn variant="text" @click="tutupSetelahSimpan">Tutup</v-btn>
@@ -655,16 +614,6 @@ const tutupSetelahSimpan = () => {
   margin-top: 4px;
   font-size: 10px;
   color: #757575;
-}
-.warn {
-  margin-top: 6px;
-  padding: 6px 8px;
-  background: #fff3e0;
-  border: 1px solid #ffb74d;
-  border-radius: 4px;
-  font-size: 10px;
-  font-weight: 600;
-  color: #e65100;
 }
 .inp {
   height: 24px;

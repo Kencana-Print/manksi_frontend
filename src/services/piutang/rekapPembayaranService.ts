@@ -41,6 +41,10 @@ export interface RekapDetailRow {
   keterangan: string;
   vouNomor: string;
   pjtNomor: string;
+  bank: string;
+  rekening: string;
+  atasnama: string;
+  jumlahRekening: number;
 }
 
 export interface RekapRange {

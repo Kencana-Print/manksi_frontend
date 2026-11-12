@@ -708,7 +708,8 @@ const tutupSetelahSimpan = () => {
   box-sizing: border-box;
   min-height: 0;
   min-width: 0;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
   gap: 10px;
 }
 

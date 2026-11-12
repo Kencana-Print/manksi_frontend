@@ -38,6 +38,9 @@ const fmt = (v: number | null | undefined): string =>
 const fmtInt = (v: number | null | undefined): string =>
   Number(v ?? 0).toLocaleString("id-ID", { maximumFractionDigits: 0 });
 
+const apvLabel = (s: string | null | undefined): string =>
+  s === "W" ? "Menunggu" : s === "Y" ? "Disetujui" : s === "N" ? "Ditolak" : "";
+
 const rows = computed(() => data.value?.Detail ?? []);
 
 const totalCetak = computed(() =>
@@ -87,6 +90,13 @@ const totalKain = computed(() =>
           <tr v-if="data.Sesi">
             <td>Sesi</td>
             <td>: {{ data.Sesi === "PAGI" ? "Pagi" : "Siang" }}</td>
+          </tr>
+          <tr v-if="data.Apv_Status">
+            <td>Approval</td>
+            <td>
+              : {{ apvLabel(data.Apv_Status) }}
+              <template v-if="data.Apv_User">({{ data.Apv_User }})</template>
+            </td>
           </tr>
           <tr>
             <td>Akumulasi Total</td>

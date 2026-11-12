@@ -99,7 +99,8 @@ const {
       mkb_nomor: d.mkb_nomor ?? "",
       mkb_tanggal:
         formatDateLocal(d.mkb_tanggal) || formatDateLocal(new Date()),
-      mkb_spk_nomor: d.mkb_spk_nomor ?? "",
+      // Tampilkan nomor SO; SPK legacy tanpa SO tetap menampilkan nomor SPK
+      mkb_spk_nomor: d.so_nomor || d.mkb_spk_nomor || "",
       mkb_note: d.mkb_note ?? "",
       spk_nama: d.spk_nama ?? "",
       spk_jumlah: Number(d.spk_jumlah) || 0,
@@ -192,7 +193,7 @@ const doResolveSpk = async (spkNomor: string) => {
     const result = res.data;
 
     if (!result.exists) {
-      toast.error(result.error ?? "SPK tidak ditemukan");
+      toast.error(result.error ?? "SO tidak ditemukan");
       formData.value.mkb_spk_nomor = "";
       lastResolvedSpk.value = "";
       return;
@@ -201,11 +202,12 @@ const doResolveSpk = async (spkNomor: string) => {
     if (result.hasExisting && result.existing) {
       // SPK sudah punya MKA → load existing & redirect ke edit
       toast.info(
-        `SPK ini sudah punya MKA ${result.existing.mkb_nomor}, data dimuat.`,
+        `SO ini sudah punya MKA ${result.existing.mkb_nomor}, data dimuat.`,
       );
       const ex = result.existing;
       formData.value = {
         ...ex,
+        mkb_spk_nomor: ex.so_nomor || ex.mkb_spk_nomor || "",
         detail: (ex.detail ?? []).map((d: Omit<MkaDetailRow, "_key">) => ({
           ...d,
           _key: newKey(),
@@ -235,7 +237,7 @@ const doResolveSpk = async (spkNomor: string) => {
       );
     }
   } catch (e: any) {
-    toast.error(e.response?.data?.message ?? "Gagal cek SPK");
+    toast.error(e.response?.data?.message ?? "Gagal cek SO");
     formData.value.mkb_spk_nomor = "";
     lastResolvedSpk.value = "";
   } finally {
@@ -503,7 +505,7 @@ const onKodeEnter = async (idx: number) => {
 // ─── Validasi (Delphi: VK_F10 handler) ───────────────────────────────────────
 const validateSave = () => {
   if (!formData.value.mkb_spk_nomor?.trim()) {
-    return toast.warning("SPK harus diisi");
+    return toast.warning("SO harus diisi");
   }
   const validDetail = formData.value.detail.filter((d: MkaDetailRow) => d.nama);
   if (!validDetail.length) {
@@ -568,7 +570,7 @@ const validateSave = () => {
         <div class="sep mt-2 mb-2" />
 
         <div class="fr">
-          <label class="lbl">Nomor SPK</label>
+          <label class="lbl">Nomor SO</label>
           <div class="inp-grp" style="flex: 1">
             <input
               v-model="formData.mkb_spk_nomor"
@@ -589,7 +591,7 @@ const validateSave = () => {
               type="button"
               class="btn-lkp"
               :disabled="isEdit || spkLoading"
-              title="Cari SPK (F1)"
+              title="Cari SO (F1)"
               @click="openSpkModal"
             >
               <IconSearch :size="13" />
@@ -601,7 +603,7 @@ const validateSave = () => {
           <input :value="formData.spk_nama" class="inp ro" readonly />
         </div>
         <div class="fr mt-1">
-          <label class="lbl">Jumlah SPK</label>
+          <label class="lbl">Jumlah SO</label>
           <input
             :value="formData.spk_jumlah"
             class="inp ro"
@@ -795,7 +797,7 @@ const validateSave = () => {
                 </tr>
                 <tr v-if="!formData.detail.length">
                   <td colspan="11" class="empty-row">
-                    Pilih SPK terlebih dahulu, lalu tambah aksesoris
+                    Pilih SO terlebih dahulu, lalu tambah aksesoris
                   </td>
                 </tr>
               </tbody>
@@ -809,7 +811,8 @@ const validateSave = () => {
   <!-- Pakai komponen modal yang sudah ada -->
   <SpkSearchModal
     v-model="showSpkModal"
-    filter-mode="spk-ppic"
+    filter-mode="so"
+    divisi="3,4"
     @selected="onSpkSelected"
   />
 

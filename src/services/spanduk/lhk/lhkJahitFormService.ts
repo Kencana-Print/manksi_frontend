@@ -38,7 +38,6 @@ export interface LhkJahitDetail {
   Qty_Jahit: number | null;
   Tambah_Jahit: number | null;
   Tambah_Tali: number | null;
-  BS_Jahit: number | null;
   Karyawan: LhkJahitKaryawan[];
 }
 
@@ -67,7 +66,6 @@ export interface LhkJahitPayload {
     Qty_Jahit: number;
     Tambah_Jahit: number;
     Tambah_Tali: number;
-    BS_Jahit: number;
     Karyawan: { NIK: string; Qty: number }[];
   }[];
 }

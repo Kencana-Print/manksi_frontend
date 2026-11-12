@@ -404,10 +404,10 @@ export const createMenuItems = (): NavItem[] => {
           menuId: 70,
         },
         {
-          title: "Pengajuan Transfer",
-          to: "/pembelian/pengajuan-transfer",
-          icon: IconTransfer,
-          menuId: 958,
+          title: "Rekap Pembayaran",
+          to: "/piutang/rekap-pembayaran",
+          icon: IconCalendarDue,
+          menuId: 970,
         },
         {
           title: "Tindak Lanjut QC Bahan",
@@ -573,6 +573,11 @@ export const createMenuItems = (): NavItem[] => {
               to: "/spanduk/lhk/lhk-koli",
               icon: IconBox,
             },
+            {
+              title: "LHK BS (Bad Stock)",
+              to: "/spanduk/lhk/lhk-bs",
+              icon: IconAlertTriangle,
+            },
           ],
         },
         { divider: true },
@@ -583,7 +588,7 @@ export const createMenuItems = (): NavItem[] => {
           // Tanpa menuId, mengikuti hak akses parent (4)
         },
         {
-          title: "Mutasi Marketing",
+          title: "Form Mutasi (Sampel)",
           to: "/spanduk/mutasi-marketing",
           icon: IconTruckDelivery,
           menuId: 1327,
@@ -658,6 +663,12 @@ export const createMenuItems = (): NavItem[] => {
             },
             { divider: true },
             {
+              title: "Permintaan Pembelian Bahan",
+              to: "/garmen/bahan-baku/permintaan-pembelian-bahan",
+              icon: IconShoppingCart,
+              menuId: 190,
+            },
+            {
               title: "QC Bahan",
               to: "/garmen/bahan-baku/qc-bahan",
               icon: IconClipboardCheck,
@@ -706,7 +717,6 @@ export const createMenuItems = (): NavItem[] => {
               to: "/garmen/bahan-jadi/cetak-barcode-koli",
               icon: IconQrcode,
               menuId: 188,
-              sembunyikanCabang: ["P02"],
             },
             {
               title: "Surat Terima Barang Jadi (STBJ)",
@@ -1398,6 +1408,12 @@ export const createMenuItems = (): NavItem[] => {
               icon: IconTruckDelivery,
               menuId: 155,
             },
+            {
+              title: "Terima Mutasi dari Produksi",
+              to: "/penjualan/terima-mutasi",
+              icon: IconClipboardCheck,
+              menuId: 191,
+            },
             // Tiga menu di bawah dicabut ke Lintas Divisi oleh komposisi di akhir
             // createMenuItems; tetap ditulis di sini sebagai sumbernya.
             {
@@ -1604,10 +1620,10 @@ export const createMenuItems = (): NavItem[] => {
           menuId: 959,
         },
         {
-          title: "Rekap Pembayaran",
-          to: "/piutang/rekap-pembayaran",
-          icon: IconCalendarDue,
-          menuId: 970,
+          title: "Pengajuan Transfer",
+          to: "/pembelian/pengajuan-transfer",
+          icon: IconTransfer,
+          menuId: 958,
         },
         {
           title: "Voucher Pembayaran",
@@ -2407,7 +2423,7 @@ export const createMenuItems = (): NavItem[] => {
     cabut(
       spanduk.items,
       (i) => i.to === "/spanduk/mutasi-marketing",
-      "Mutasi Marketing",
+      "Form Mutasi (Sample)",
     ),
     cabut(garmen.items, (i) => i.to === "/garmen/bahan-jadi/stbj", "STBJ"),
     cabut(
@@ -2432,6 +2448,7 @@ export const createMenuItems = (): NavItem[] => {
     ),
     cabut(garmen.items, (i) => i.menuId === 59, "Barang (Garmen)"),
     cabut(garmen.items, (i) => i.menuId === 920, "Bahan Baku (Garmen)"),
+    cabut(garmen.items, (i) => i.menuId === 188, "Cetak Barcode Koli"),
   ].filter((i): i is NavItem => i !== null);
 
   // Satu modul menjadi satu bagian, membawa menuId pintu lamanya

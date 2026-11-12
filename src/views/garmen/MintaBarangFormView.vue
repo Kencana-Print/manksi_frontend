@@ -26,6 +26,7 @@ const jenisSlugReverseMap: Record<string, string> = {
   OBAT: "OBAT",
   SPAREPART: "SPAREPART",
   "ATK-RTK": "ATK/RTK",
+  ASET: "ASET",
 };
 const jenisFromParam = computed(() => {
   const raw = route.params.jenis as string;
@@ -122,7 +123,13 @@ const initialData = {
   ] as any[],
 };
 
-const jenisOptions = ["ACCESORIES", "OBAT", "SPAREPART", "ATK/RTK"];
+// [KONFIRMASI] daftar bagian harus sama dengan showFilterAset di GarmenBarangView
+const BAGIAN_ASET = ["GA", "FINANCE", "AUDIT", "DIREKSI", "EDP", "ADMIN"];
+const jenisOptions = computed(() => {
+  const bagian = (authStore.user?.bagian || "").toUpperCase();
+  const base = ["ACCESORIES", "OBAT", "SPAREPART", "ATK/RTK"];
+  return BAGIAN_ASET.includes(bagian) ? [...base, "ASET"] : base;
+});
 
 const {
   formData,

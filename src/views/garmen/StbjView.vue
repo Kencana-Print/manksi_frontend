@@ -54,6 +54,11 @@ const gudangTetap = computed(
 const modeSpanduk = computed(() => !!gudangTetap.value);
 const filterGudang = ref((gudangTetap.value ?? GUDANG_DEFAULT).kode);
 const filterGudangNama = ref((gudangTetap.value ?? GUDANG_DEFAULT).nama);
+const KODE_GUDANG_SPANDUK = "WH002";
+// Tampilan (judul, kolom Size): menu Spanduk ATAU gudang WH002 dipilih
+const tampilSpanduk = computed(
+  () => modeSpanduk.value || filterGudang.value === KODE_GUDANG_SPANDUK,
+);
 const showGudangModal = ref(false);
 
 const selectGudang = (item: any) => {
@@ -300,6 +305,7 @@ const headers = [
   { title: "Dari", key: "Dari", width: "160px" },
   { title: "No. Terima", key: "NomorTerima", width: "150px" },
   { title: "Tgl Terima", key: "TglTerima", width: "95px" },
+  { title: "Koli QR", key: "KoliQr", width: "70px", align: "end" },
   { title: "User", key: "Usr", width: "70px" },
 ];
 
@@ -310,7 +316,7 @@ const totalRows = computed(() => items.value?.length ?? 0);
 <template>
   <BaseBrowse
     :title="
-      modeSpanduk
+      tampilSpanduk
         ? 'Surat Terima Barang Jadi (Spanduk)'
         : 'Surat Terima Barang Jadi'
     "
@@ -449,7 +455,7 @@ const totalRows = computed(() => items.value?.length ?? 0);
             <th style="width: 130px">SPK</th>
             <th style="min-width: 180px">Nama</th>
             <th style="width: 120px">Ukuran</th>
-            <th v-if="!modeSpanduk" style="width: 80px">Size</th>
+            <th v-if="!tampilSpanduk" style="width: 80px">Size</th>
             <th style="width: 80px; text-align: right">Jumlah</th>
             <th style="width: 70px; text-align: right">Koli</th>
             <th>Keterangan</th>
@@ -468,7 +474,7 @@ const totalRows = computed(() => items.value?.length ?? 0);
               </td>
               <td>{{ d.Nama }}</td>
               <td>{{ d.Ukuran }}</td>
-              <td v-if="!modeSpanduk" style="text-align: center">
+              <td v-if="!tampilSpanduk" style="text-align: center">
                 {{ d.Size }}
               </td>
               <td style="text-align: right">{{ num(d.Jumlah) }}</td>
@@ -478,7 +484,7 @@ const totalRows = computed(() => items.value?.length ?? 0);
           </template>
           <tr v-else-if="loadingDetail.has(item.Nomor)">
             <td
-              :colspan="modeSpanduk ? 7 : 8"
+              :colspan="tampilSpanduk ? 7 : 8"
               style="text-align: center; padding: 8px; color: #9e9e9e"
             >
               Memuat...
@@ -486,7 +492,7 @@ const totalRows = computed(() => items.value?.length ?? 0);
           </tr>
           <tr v-else>
             <td
-              :colspan="modeSpanduk ? 7 : 8"
+              :colspan="tampilSpanduk ? 7 : 8"
               style="
                 text-align: center;
                 padding: 8px;

@@ -3,10 +3,7 @@ import { ref, onMounted, computed } from "vue";
 import { useRoute } from "vue-router";
 import { useToast } from "vue-toastification";
 import * as lhkForm from "@/services/spanduk/lhk/lhkTintaFormService";
-import type {
-  LhkTintaBahan,
-  LhkTintaForm,
-} from "@/services/spanduk/lhk/lhkTintaFormService";
+import type { LhkTintaForm } from "@/services/spanduk/lhk/lhkTintaFormService";
 
 const route = useRoute();
 const toast = useToast();
@@ -50,15 +47,6 @@ const fmtQty = (v: number | null | undefined): string =>
 // Satuan master "0" (data master belum benar) tidak ditampilkan
 const satuanTampil = (s: string | null | undefined): string =>
   s && s !== "0" ? s : "";
-
-// Kolom "Setara" hanya terisi bila satuan yang diketik beda dari satuan master
-const setara = (b: LhkTintaBahan): string => {
-  const dari = (b.Satuan_Input ?? "").toUpperCase();
-  const master = (b.Satuan ?? "").toUpperCase();
-  return dari && master && dari !== master
-    ? `${fmtQty(b.Qty)} ${b.Satuan}`
-    : "";
-};
 </script>
 
 <template>
@@ -115,24 +103,22 @@ const setara = (b: LhkTintaBahan): string => {
         </tbody>
       </table>
 
-      <div class="sub-title">Pemakaian Tinta/Cat</div>
+      <div class="sub-title">Pemakaian Obat</div>
       <table class="detail-table pemakaian">
         <thead>
           <tr>
             <th width="28">No</th>
-            <th>Bahan</th>
-            <th width="70">Jumlah</th>
-            <th width="46">Satuan</th>
-            <th width="90">Setara</th>
+            <th>Obat</th>
+            <th width="80">Jumlah</th>
+            <th width="50">Satuan</th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="(b, i) in bahan" :key="b.Kode_Bahan">
             <td class="tc">{{ i + 1 }}</td>
             <td>{{ b.Nama_Bahan }}</td>
-            <td class="tr">{{ fmtQty(b.Qty_Input) }}</td>
-            <td>{{ satuanTampil(b.Satuan_Input) }}</td>
-            <td class="tr">{{ setara(b) }}</td>
+            <td class="tr">{{ fmtQty(b.Qty) }}</td>
+            <td>{{ satuanTampil(b.Satuan) }}</td>
           </tr>
         </tbody>
       </table>

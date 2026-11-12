@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, onMounted } from "vue";
+import { ref, watch, onMounted, computed } from "vue";
 import { useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
 import BaseBrowse from "@/components/BaseBrowse.vue";
@@ -10,8 +10,14 @@ import type {
   LhkCetakRow,
   LhkCetakDetailRow,
   LhkCetakKainRow,
+  AksiApproval,
 } from "@/services/spanduk/lhk/lhkCetakService";
-import { IconPrinter, IconFileExport } from "@tabler/icons-vue";
+import {
+  IconPrinter,
+  IconFileExport,
+  IconCircleCheck,
+  IconCircleX,
+} from "@tabler/icons-vue";
 import { formatTanggal } from "@/utils/dateFormat";
 
 interface ExportMasterRow {
@@ -24,6 +30,11 @@ interface ExportMasterRow {
   Kar_Harian: number;
   Jml_Meter: number;
   Jml_Kain: number | null;
+  Approval: string;
+  Disetujui_Oleh: string;
+  Tgl_Approval: string;
+  Alasan_Approval: string;
+  Input_Terlambat: string;
 }
 
 interface ExportKainRow {
@@ -135,6 +146,7 @@ const headers = [
   { title: "Nomor", key: "Nomor", width: "170px" },
   { title: "Tanggal", key: "Tanggal", width: "110px", align: "center" },
   { title: "Sesi", key: "Sesi", width: "90px", align: "center" },
+  { title: "Input", key: "Input_Terlambat", width: "110px", align: "center" },
   { title: "Kode Pabrik", key: "Kode_Pabrik", width: "120px" },
   { title: "Nama Pabrik", key: "Nama_Pabrik", width: "260px" },
   { title: "Kar Borongan", key: "Kar_Borongan", width: "120px", align: "end" },
@@ -146,6 +158,7 @@ const headers = [
     width: "150px",
     align: "end",
   },
+  { title: "Approval", key: "Apv_Status", width: "110px", align: "center" },
 ];
 
 const INT = "#,##0";
@@ -153,6 +166,21 @@ const NUM = "#,##0.00";
 
 const sesiLabel = (s: string | null | undefined): string =>
   s === "PAGI" ? "Pagi" : s === "SIANG" ? "Siang" : "-";
+
+const apvLabel = (s: string | null | undefined): string =>
+  s === "W" ? "Menunggu" : s === "Y" ? "Disetujui" : s === "N" ? "Ditolak" : "";
+
+const apvColor = (s: string | null | undefined): string =>
+  s === "W" ? "orange-darken-2" : s === "Y" ? "green-darken-1" : "red-darken-1";
+
+// 'YYYY-MM-DD HH:mm' dari server -> 'DD-MM-YYYY HH:mm' (tanpa Date, anti geser zona)
+const fmtApvTgl = (v: string | null | undefined): string => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}:\d{2})/.exec(String(v ?? ""));
+  return m ? `${m[3]}-${m[2]}-${m[1]} ${m[4]}` : "";
+};
+
+const selisihKain = (r: LhkCetakRow): number =>
+  (Number(r.Jml_Kain) || 0) - (Number(r.Jml_Meter) || 0);
 
 // Output Produksi = panjang x J. Cetak (dihitung, tidak disimpan)
 const outputProduksi = (
@@ -195,6 +223,11 @@ const kolomMaster: ExcelColumn[] = [
     align: "right",
     numFmt: NUM,
   },
+  { header: "Approval", key: "Approval", width: 12 },
+  { header: "Disetujui Oleh", key: "Disetujui_Oleh", width: 16 },
+  { header: "Tgl Approval", key: "Tgl_Approval", width: 18 },
+  { header: "Alasan Approval", key: "Alasan_Approval", width: 30 },
+  { header: "Input Terlambat", key: "Terlambat", width: 14 },
 ];
 
 const kolomDetail: ExcelColumn[] = [
@@ -299,13 +332,64 @@ const onPrint = () => {
   window.open(url, "_blank");
 };
 
+// --- APPROVAL kelebihan kain ---
+const dlgApv = ref(false);
+const apvAksi = ref<AksiApproval>("APPROVE");
+const apvItem = ref<LhkCetakRow | null>(null);
+const apvAlasan = ref("");
+const apvBusy = ref(false);
+
+const bisaApprove = computed(
+  () =>
+    selectedItem.value?.Apv_Status === "W" ||
+    selectedItem.value?.Apv_Status === "N",
+);
+const bisaTolak = computed(() => selectedItem.value?.Apv_Status === "W");
+
+const bukaApproval = (aksi: AksiApproval) => {
+  const item = selectedItem.value;
+  if (!item) {
+    return toast.warning("Pilih data LHK Cetak terlebih dahulu.");
+  }
+  apvAksi.value = aksi;
+  apvItem.value = item;
+  apvAlasan.value = "";
+  dlgApv.value = true;
+};
+
+const kirimApproval = async () => {
+  const item = apvItem.value;
+  const alasan = apvAlasan.value.trim();
+  if (!item) {
+    return;
+  }
+  if (apvAksi.value === "TOLAK" && !alasan) {
+    return toast.warning("Alasan penolakan wajib diisi.");
+  }
+  apvBusy.value = true;
+  try {
+    await lhkService.approve(item.Nomor, apvAksi.value, alasan);
+    toast.success(
+      apvAksi.value === "TOLAK"
+        ? `LHK Cetak ${item.Nomor} ditolak.`
+        : `LHK Cetak ${item.Nomor} disetujui.`,
+    );
+    dlgApv.value = false;
+    await fetchData();
+  } catch (e) {
+    toast.error(lhkService.pesanError(e, "Gagal memproses approval."));
+  } finally {
+    apvBusy.value = false;
+  }
+};
+
 // --- EXPORT ---
 const exportMaster = () =>
   exportToExcel("LHK_Cetak_Header", {
     columns: kolomMaster,
-    getData: (): ExportMasterRow[] =>
+    getData: () =>
       dataTampil().map((r) => ({
-        Nomor: r.Nomor,
+        ...r,
         Tanggal: formatTanggal(r.Tanggal),
         Sesi: sesiLabel(r.Sesi),
         Kode_Pabrik: r.Kode_Pabrik ?? "",
@@ -314,6 +398,11 @@ const exportMaster = () =>
         Kar_Harian: Number(r.Kar_Harian) || 0,
         Jml_Meter: Number(r.Jml_Meter) || 0,
         Jml_Kain: r.Jml_Kain === null ? null : Number(r.Jml_Kain) || 0,
+        Approval: apvLabel(r.Apv_Status) || "-",
+        Disetujui_Oleh: r.Apv_User ?? "",
+        Tgl_Approval: fmtApvTgl(r.Apv_Tgl),
+        Alasan_Approval: r.Apv_Alasan ?? "",
+        Terlambat: r.Input_Terlambat ? "Ya" : "",
       })),
   });
 
@@ -353,9 +442,9 @@ const exportDetail = async () => {
         Tanggal: formatTanggal(item.Tanggal),
         Kode_Pabrik: item.Kode_Pabrik ?? "",
         Nama_Pabrik: item.Nama_Pabrik ?? "",
-        Kode_Bahan: String(k.Kode_Bahan),
+        Kode_Bahan: k.Kode_Bahan,
         Nama_Bahan: k.Nama_Bahan ?? "",
-        Lebar: k.Lebar ?? "",
+        Lebar: k.Lebar === null ? "" : String(k.Lebar),
         Qty_Meter: Number(k.Qty_Meter) || 0,
       });
     }
@@ -434,20 +523,52 @@ const numFmt = (v: number | string | null) =>
       }}
     </template>
 
+    <template #item.Input_Terlambat="{ item }">
+      <v-chip
+        v-if="item.Input_Terlambat"
+        size="x-small"
+        label
+        color="deep-orange-darken-1"
+      >
+        Lewat 13.00
+      </v-chip>
+    </template>
+
     <template #item.Jml_Kain="{ item }">
-      {{
-        item.Jml_Kain === null
-          ? "-"
-          : Number(item.Jml_Kain).toLocaleString("id-ID", {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
-            })
-      }}
+      <span :class="{ 'kain-lebih': !!item.Apv_Status }">
+        {{
+          item.Jml_Kain === null
+            ? "-"
+            : Number(item.Jml_Kain).toLocaleString("id-ID", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })
+        }}
+      </span>
+    </template>
+
+    <template #item.Apv_Status="{ item }">
+      <v-chip
+        v-if="item.Apv_Status"
+        size="x-small"
+        label
+        :color="apvColor(item.Apv_Status)"
+      >
+        {{ apvLabel(item.Apv_Status) }}
+      </v-chip>
     </template>
 
     <!-- Detail Expand -->
     <template #detail="{ item }">
       <div class="expand-wrap">
+        <div v-if="item.Apv_Status" class="apv-info mb-2">
+          Approval kelebihan kain:
+          <b>{{ apvLabel(item.Apv_Status) }}</b>
+          <template v-if="item.Apv_User">
+            oleh {{ item.Apv_User }} ({{ fmtApvTgl(item.Apv_Tgl) }})
+          </template>
+          <template v-if="item.Apv_Alasan"> - {{ item.Apv_Alasan }}</template>
+        </div>
         <div class="expand-title mb-2">Detail SPK - {{ item.Nomor }}</div>
         <table class="detail-table">
           <thead>
@@ -521,9 +642,78 @@ const numFmt = (v: number | string | null) =>
       >
         <template #prepend><IconPrinter :size="15" /></template>Cetak
       </v-btn>
+      <v-btn
+        size="small"
+        color="green-darken-1"
+        :disabled="!bisaApprove"
+        @click="bukaApproval('APPROVE')"
+      >
+        <template #prepend><IconCircleCheck :size="15" /></template>Approve
+      </v-btn>
+      <v-btn
+        size="small"
+        color="red-darken-1"
+        :disabled="!bisaTolak"
+        @click="bukaApproval('TOLAK')"
+      >
+        <template #prepend><IconCircleX :size="15" /></template>Tolak
+      </v-btn>
       <v-btn size="small" color="deep-purple-darken-1" @click="exportDetail">
         <template #prepend><IconFileExport :size="15" /></template>Export Detail
       </v-btn>
+
+      <v-dialog v-model="dlgApv" max-width="460" persistent>
+        <v-card v-if="apvItem">
+          <v-card-title class="dlg-title">
+            {{ apvAksi === "TOLAK" ? "Tolak" : "Setujui" }} Kelebihan Kain -
+            {{ apvItem.Nomor }}
+          </v-card-title>
+          <v-card-text class="dlg-body">
+            <div class="dlg-row">
+              <span>Output produksi (kebutuhan)</span>
+              <b>{{ numFmt(apvItem.Jml_Meter) }} m</b>
+            </div>
+            <div class="dlg-row">
+              <span>Pemakaian kain</span>
+              <b>{{ numFmt(apvItem.Jml_Kain) }} m</b>
+            </div>
+            <div class="dlg-row">
+              <span>Selisih</span>
+              <b>{{ numFmt(selisihKain(apvItem)) }} m</b>
+            </div>
+            <v-textarea
+              v-model="apvAlasan"
+              :label="
+                apvAksi === 'TOLAK'
+                  ? 'Alasan penolakan *'
+                  : 'Catatan (opsional)'
+              "
+              rows="2"
+              maxlength="200"
+              counter
+              density="compact"
+              variant="outlined"
+              hide-details="auto"
+              class="mt-3"
+            />
+          </v-card-text>
+          <v-card-actions>
+            <v-spacer />
+            <v-btn size="small" :disabled="apvBusy" @click="dlgApv = false">
+              Batal
+            </v-btn>
+            <v-btn
+              size="small"
+              variant="flat"
+              :color="apvAksi === 'TOLAK' ? 'red-darken-1' : 'green-darken-1'"
+              :loading="apvBusy"
+              @click="kirimApproval"
+            >
+              {{ apvAksi === "TOLAK" ? "Tolak" : "Setujui" }}
+            </v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-dialog>
     </template>
   </BaseBrowse>
 </template>
@@ -586,5 +776,25 @@ const numFmt = (v: number | string | null) =>
 }
 .tr {
   text-align: right !important;
+}
+.kain-lebih {
+  color: #c62828;
+  font-weight: 700;
+}
+.apv-info {
+  font-size: 11px;
+  color: #37474f;
+}
+.dlg-title {
+  font-size: 13px;
+  font-weight: 700;
+}
+.dlg-body {
+  font-size: 11px;
+}
+.dlg-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 2px 0;
 }
 </style>

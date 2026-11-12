@@ -92,21 +92,23 @@ const showFilterSparepart = computed(() =>
     "AUDIT",
     "DIREKSI",
     "EDP",
-    "ADMIN",
     ...BAGIAN_PEMBELIAN,
   ].includes(userBagian.value),
 );
 const showFilterAtk = computed(() =>
-  [
-    "GA",
-    "FINANCE",
-    "AUDIT",
-    "DIREKSI",
-    "EDP",
-    "ADMIN",
-    ...BAGIAN_PEMBELIAN,
-  ].includes(userBagian.value),
+  ["GA", "FINANCE", "AUDIT", "DIREKSI", "EDP", ...BAGIAN_PEMBELIAN].includes(
+    userBagian.value,
+  ),
 );
+
+// Bagian yang boleh melihat PO Aset; samakan dengan BAGIAN_PO_ASET di backend
+const showFilterAset = computed(() =>
+  ["GA", "EDP", "FINANCE", "AUDIT", "DIREKSI", ...BAGIAN_PEMBELIAN].includes(
+    userBagian.value,
+  ),
+);
+// Jenis yang memakai kolom Spesifikasi dan Kegunaan
+const JENIS_RINCI = ["SPAREPART", "ATK/RTK", "ASET"];
 
 // Fallback: kalau bagian tidak cocok dengan daftar mana pun, tampilkan semua
 const noJenisMatched = computed(
@@ -143,7 +145,7 @@ const baseHeaders = [
   { title: "Nomor", key: "Nomor", width: "160px", fixed: true },
   { title: "Jenis", key: "Jenis", width: "100px" },
   { title: "Tanggal", key: "Tanggal", width: "90px", align: "center" },
-  { title: "No. Minta", key: "NoMinta", width: "140px" },
+  { title: "No. Minta", key: "NoMinta", minWidth: "170px" },
 ];
 const supHeaders = [
   { title: "Kd Sup", key: "KdSup", width: "90px" },
@@ -152,6 +154,7 @@ const supHeaders = [
 const tailHeaders = [
   { title: "Keterangan", key: "Keterangan", minWidth: "200px" },
   { title: "Status", key: "Status", width: "90px", align: "center" },
+  { title: "Qty BPB", key: "QtyBpb", width: "90px", align: "end" },
   { title: "Cab", key: "Cab", width: "60px", align: "center" },
   { title: "KeCab", key: "KeCab", width: "60px", align: "center" },
   { title: "Usr", key: "Usr", width: "80px" },
@@ -276,7 +279,7 @@ const onExportDetail = () => {
       Spesifikasi: "",
       Satuan: "",
       Jumlah: "",
-      "Qty BPB": "",
+      "Qty BPB": Number(master.QtyBpb) || 0,
       Harga: "",
       "PPN %": "",
       Total: "",
@@ -288,7 +291,7 @@ const onExportDetail = () => {
         Nomor: "",
         Jenis: "",
         Tanggal: "",
-        "No Minta": "",
+        "No Minta": det.NoMinta || "",
         Supplier: "",
         Keterangan: "",
         Status: "",
@@ -459,6 +462,15 @@ const rowPropsFn = (data: any) => {
             />
             ATK
           </label>
+          <label class="radio-label" v-if="showFilterAset">
+            <input
+              type="radio"
+              v-model="filterState.jenis"
+              value="ASET"
+              @change="fetchData"
+            />
+            ASET
+          </label>
         </div>
       </div>
 
@@ -547,6 +559,12 @@ const rowPropsFn = (data: any) => {
       <span :class="getStatusColor(item.Status)">{{ item.Status }}</span>
     </template>
 
+    <template #item.QtyBpb="{ item }">
+      <span class="font-weight-bold text-success">{{
+        formatQty(item.QtyBpb)
+      }}</span>
+    </template>
+
     <template #detail="{ item }">
       <div class="det-wrap">
         <div class="d-flex flex-column gap-3">
@@ -562,21 +580,16 @@ const rowPropsFn = (data: any) => {
                   <tr>
                     <th style="width: 100px">Kode</th>
                     <th style="min-width: 250px">Nama Barang</th>
+                    <th style="width: 140px">No. Minta</th>
                     <th style="width: 80px" class="text-center">Satuan</th>
                     <th
-                      v-if="
-                        filterState.jenis === 'SPAREPART' ||
-                        filterState.jenis === 'ATK/RTK'
-                      "
+                      v-if="JENIS_RINCI.includes(filterState.jenis)"
                       style="min-width: 150px"
                     >
                       Spesifikasi
                     </th>
                     <th
-                      v-if="
-                        filterState.jenis === 'SPAREPART' ||
-                        filterState.jenis === 'ATK/RTK'
-                      "
+                      v-if="JENIS_RINCI.includes(filterState.jenis)"
                       style="min-width: 150px"
                     >
                       Kegunaan
@@ -610,21 +623,12 @@ const rowPropsFn = (data: any) => {
                   <tr v-for="(dtl, i) in getDetailItems(item.Nomor)" :key="i">
                     <td class="fw-mono text-primary">{{ dtl.Kode }}</td>
                     <td class="font-weight-bold">{{ dtl.Nama }}</td>
+                    <td class="fw-mono">{{ dtl.NoMinta || "-" }}</td>
                     <td class="text-center">{{ dtl.Satuan }}</td>
-                    <td
-                      v-if="
-                        filterState.jenis === 'SPAREPART' ||
-                        filterState.jenis === 'ATK/RTK'
-                      "
-                    >
+                    <td v-if="JENIS_RINCI.includes(filterState.jenis)">
                       {{ dtl.Spesifikasi }}
                     </td>
-                    <td
-                      v-if="
-                        filterState.jenis === 'SPAREPART' ||
-                        filterState.jenis === 'ATK/RTK'
-                      "
-                    >
+                    <td v-if="JENIS_RINCI.includes(filterState.jenis)">
                       {{ dtl.Kegunaan }}
                     </td>
                     <td class="text-right font-weight-bold">
@@ -648,7 +652,7 @@ const rowPropsFn = (data: any) => {
                   </tr>
                   <tr v-if="getDetailItems(item.Nomor).length === 0">
                     <td
-                      colspan="10"
+                      colspan="11"
                       class="text-center text-grey py-3 font-italic"
                     >
                       Tidak ada detail barang.

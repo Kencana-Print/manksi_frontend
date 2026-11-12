@@ -3,6 +3,7 @@
  */
 
 // Composables
+import "./polyfills";
 import { createApp } from "vue";
 
 // Plugins

@@ -24,6 +24,7 @@ export interface LhkProofDetail {
   Lebar: number | null;
   J_Plangkan: number | null;
   J_Proof: number | null;
+  Jumlah_Meter: number;
   U1: string | null;
   U2: string | null;
   U3: string | null;
@@ -44,7 +45,6 @@ export interface LhkProofForm {
   Nama_Pabrik: string | null;
   Detail: LhkProofDetail[];
   Resep: ResepItem[];
-  Resep_Terkunci: boolean;
 }
 
 export interface LhkProofPayloadRow {
@@ -68,7 +68,7 @@ export interface LhkProofPayload {
   Tanggal: string;
   Kode_Pabrik: string;
   Detail: LhkProofPayloadRow[];
-  Resep: { Brg_Kode: number; Qty_Resep: number; Qty_Actual: number }[];
+  Resep: { Kode_Bahan: string; Kg: number; Ons: number; Gram: number }[];
 }
 
 export interface InfoSpk {
@@ -92,17 +92,17 @@ export interface UkuranOption {
 }
 
 export interface ResepItem {
-  Kode: number;
+  Kode: string;
   Nama: string;
   Satuan: string;
-  Qty_Resep: number;
   Qty_Actual: number;
 }
 
 export interface ResepOption {
-  Kode: number;
+  Kode: string;
   Nama: string;
   Satuan: string;
+  Stok: number | null;
 }
 
 export type SaveResponse = AxiosResponse<ApiResponse<{ Nomor: string }>>;
@@ -135,9 +135,13 @@ export const getLookupUkuran = async (): Promise<UkuranOption[]> => {
   return res.data.data ?? [];
 };
 
-export const getLookupResep = async (): Promise<ResepOption[]> => {
+export const getLookupResep = async (
+  pabrik?: string,
+  nomor?: string,
+): Promise<ResepOption[]> => {
   const res = await api.get<ApiResponse<ResepOption[]>>(
     `${BASE}/lookups/resep`,
+    { params: { pabrik, nomor } },
   );
   return res.data.data ?? [];
 };

@@ -6,7 +6,11 @@ import { useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
 import BaseForm from "@/components/BaseForm.vue";
 import { useForm } from "@/composables/useForm";
-import { poBahanFormService } from "@/services/pembelian/poBahanFormService";
+import {
+  poBahanFormService,
+  type MbbOutstandingRow,
+} from "@/services/pembelian/poBahanFormService";
+import { pesanError } from "@/services/piutang/rekapPembayaranService";
 import {
   IconShoppingCartPlus,
   IconPlus,
@@ -20,6 +24,7 @@ import PoGreigeSearchModal from "@/components/lookups/PoGreigeSearchModal.vue";
 import BahanSearchModal from "@/components/lookups/BahanSearchModal.vue";
 import SpkSearchModal from "@/components/lookups/SpkSearchModal.vue";
 import MkbSearchModal from "@/components/lookups/MkbSearchModal.vue";
+import MbbSearchModal from "@/components/lookups/MbbSearchModal.vue";
 
 const authStore = useAuthStore();
 const route = useRoute();
@@ -57,6 +62,7 @@ const showPoGreigeModal = ref(false);
 const showBahanModal = ref(false);
 const showSpkModal = ref(false);
 const showMkbModal = ref(false);
+const showMbbModal = ref(false);
 const showSupRowModal = ref(false);
 const activeSupIdx = ref(-1);
 const activeGridIndex = ref(-1);
@@ -81,6 +87,7 @@ const defaultData = {
   header: {
     po_nomor: "",
     po_greige: "",
+    po_mbb_nomor: "",
     po_tanggal: todayLocal,
     po_jenis: 3,
     po_keterangan: "",
@@ -88,9 +95,6 @@ const defaultData = {
     sup_nama: "",
     sup_alamat: "",
     sup_kota: "",
-    po_mppb_nomor: "",
-    tgl_mppb: "",
-    jmlmppb: 0,
     po_status_ppn: 0,
     po_ppn: 0,
     po_note: "",
@@ -102,6 +106,7 @@ const defaultData = {
   statusNgedit: "AMAN",
   urutPin: 0,
   isTutupBuku: false,
+  sudahBpb: false,
 };
 
 interface BarisHitung {
@@ -144,8 +149,6 @@ const {
         sup_nama: d.header.sup_nama || "",
         sup_alamat: d.header.sup_alamat || "",
         sup_kota: d.header.sup_kota || "",
-        tgl_mppb: d.header.tgl_mppb || "",
-        jmlmppb: d.header.jmlmppb || 0,
         no_bpb: d.noBPB || "",
       },
       items: (d.items || []).map((row: any) => ({
@@ -161,17 +164,15 @@ const {
         jumlah: Number(row.pod_Jumlah) || 0,
         harga: Number(row.pod_hargabeli) || 0,
         diskon: Number(row.pod_disc) || 0,
-        total: hitungTotal({
-          jumlah: Number(row.pod_Jumlah),
-          harga: Number(row.pod_hargabeli),
-          diskon: Number(row.pod_disc),
-        }),
         spk: row.pod_spk_nomor || "",
         mkb: row.pod_mkb_nomor || "",
         ppn: Number(row.pod_ppn) || 0,
         supKode: row.pod_sup_kode || "",
         supNama: row.pod_sup_nama || "",
         keterangan: row.pod_keterangan || "",
+        mppb: row.pod_mppb_nomor || "",
+        tglMppb: row.tgl_mppb || "",
+        jmlMppb: Number(row.jmlmppb) || 0,
       })),
       delivery: (d.delivery || []).map((row: any) => ({
         tanggal: formatDateLocal(row.pod2_tanggal || new Date()),
@@ -191,6 +192,7 @@ const {
       statusNgedit: d.statusNgedit || "AMAN",
       urutPin: d.urutPin || 0,
       isTutupBuku: d.isTutupBuku || false,
+      sudahBpb: !!d.sudahBpb,
     };
   },
   submitApi: async (data: any) => {
@@ -231,6 +233,8 @@ watch(
   () => formData.value.header.po_jenis,
   (v, lama) => {
     if (v !== 2) formData.value.header.po_greige = "";
+    // PO Celup mewarisi PO Greige, tidak punya permintaan sendiri
+    if (v === 2) formData.value.header.po_mbb_nomor = "";
     // PO Lain-lain: supplier ada di baris, bukan di header
     if (v === 4) {
       formData.value.header.po_sup_kode = "";
@@ -249,6 +253,7 @@ watch(
       formData.value.items = [];
       formData.value.delivery = [];
       formData.value.rolls = [];
+      formData.value.header.po_mbb_nomor = "";
       if (adaIsi)
         toast.info("Daftar bahan dikosongkan karena jenis PO berubah.");
     }
@@ -294,8 +299,9 @@ const fmt = (n: number) => n.toLocaleString("id-ID");
 // columns + kolom kondisional (Gramasi Awal, Roll, Harga/Disc/Total)
 const colSpanCount = computed(() => {
   // Spanduk: No, Kode, Nama, Nama External, Sat, Qty, SPK/MAP, Keterangan, Aksi
-  if (isSpanduk.value) return 9 + (canLihatBeli.value ? 2 : 0);
-  let n = 13; // No, Kode, Nama Bahan, Nama External, Sat, Gramasi Awal, Gramasi, Setting, Jenis, Jumlah, SPK, MKB, Aksi
+  // + MPPB, Jml MPPB
+  if (isSpanduk.value) return 11 + (canLihatBeli.value ? 2 : 0);
+  let n = 15; // 13 kolom dasar + MPPB, Jml MPPB
   if (isCelup.value) n += 1; // Roll
   if (showSupCol.value) n += 1; // Supplier per baris
   if (canLihatBeli.value) n += 3; // Harga Beli, Disc, Total
@@ -304,8 +310,8 @@ const colSpanCount = computed(() => {
 });
 const tblMinWidth = computed(() =>
   isSpanduk.value
-    ? 960
-    : 1300 + (showSupCol.value ? 170 : 0) + (showPpnCol.value ? 60 : 0),
+    ? 1260
+    : 1600 + (showSupCol.value ? 170 : 0) + (showPpnCol.value ? 60 : 0),
 );
 
 // ── Header lookups ──
@@ -314,27 +320,6 @@ const setSup = (v: any) => {
   formData.value.header.sup_nama = v.Nama || v.sup_nama;
   formData.value.header.sup_alamat = v.Alamat || v.sup_alamat || "";
   formData.value.header.sup_kota = v.Kota || v.sup_kota || "";
-};
-const setMppb = async (v: any) => {
-  formData.value.header.po_mppb_nomor = v.Nomor || v.mpb_nomor;
-  try {
-    const res = await poBahanFormService.validateField(
-      "mppb",
-      formData.value.header.po_mppb_nomor,
-    );
-
-    // PERBAIKAN DI SINI: Tambahkan satu tingkat .data lagi
-    // Karena struktur backend-mu: data { data { jumlah } }
-    formData.value.header.tgl_mppb = formatDateLocal(
-      res.data.data.data.tanggal,
-    );
-    formData.value.header.jmlmppb = res.data.data.data.jumlah;
-  } catch (e: any) {
-    toast.error(e.response?.data?.message || "Gagal memvalidasi MPPB.");
-    formData.value.header.po_mppb_nomor = "";
-    formData.value.header.tgl_mppb = "";
-    formData.value.header.jmlmppb = 0;
-  }
 };
 const setPoGreige = async (v: any) => {
   const nomor = v.Nomor || v.po_nomor;
@@ -349,7 +334,6 @@ const setPoGreige = async (v: any) => {
     formData.value.header.sup_nama = d.header.sup_nama || "";
     formData.value.header.sup_alamat = d.header.sup_alamat || "";
     formData.value.header.sup_kota = d.header.sup_kota || "";
-    formData.value.header.po_mppb_nomor = d.header.po_mppb_nomor || "";
     formData.value.header.po_note = d.header.po_note || "";
     formData.value.header.po_status_ppn = Number(d.header.po_status_ppn) || 0;
     formData.value.header.po_ppn = Number(d.header.po_ppn) || 0;
@@ -368,47 +352,18 @@ const setPoGreige = async (v: any) => {
       jumlah: it.sisa_jumlah,
       harga: it.harga,
       diskon: it.diskon || 0,
-      total: it.sisa_jumlah * it.harga * (1 - (it.diskon || 0) / 100),
       spk: it.spk || "",
       mkb: it.mkb || "",
+      mppb: it.mppb || "",
+      tglMppb: it.tglmppb || "",
+      jmlMppb: Number(it.jmlmppb) || 0,
+      mbb: "",
     }));
 
     toast.success("Berhasil memuat sisa detail PO Greige.");
   } catch (e: any) {
     toast.error(e.response?.data?.message || "Gagal menarik data PO Greige.");
     formData.value.header.po_greige = "";
-  }
-};
-
-// ─────────────────────────────────────────────
-// KEYBOARD HANDLERS: MPPB FIELD
-// ─────────────────────────────────────────────
-
-const onMppbKeydown = (e: KeyboardEvent) => {
-  if (e.key === "F1") {
-    e.preventDefault();
-    showMppbModal.value = true;
-  }
-};
-
-const onMppbEnter = async () => {
-  const nomor = (formData.value.header.po_mppb_nomor || "").trim();
-  if (!nomor) return;
-
-  try {
-    isLoading.value = true;
-    const res = await poBahanFormService.validateField("mppb", nomor);
-    formData.value.header.tgl_mppb = formatDateLocal(
-      res.data.data.data.tanggal,
-    );
-    formData.value.header.jmlmppb = res.data.data.data.jumlah;
-  } catch (e: any) {
-    toast.error(e.response?.data?.message || "No. MPPB tidak ditemukan.");
-    formData.value.header.po_mppb_nomor = "";
-    formData.value.header.tgl_mppb = "";
-    formData.value.header.jmlmppb = 0;
-  } finally {
-    isLoading.value = false;
   }
 };
 
@@ -444,28 +399,31 @@ const onSupEnter = async () => {
 };
 
 // ── Items grid ──
-const addItem = () =>
-  formData.value.items.push({
-    kode: "",
-    nama: "",
-    namaext: "",
-    satuan: "",
-    gramasiAwal: "",
-    gramasi: "",
-    setting: "",
-    jenis: "",
-    roll: 0,
-    jumlah: 0,
-    harga: 0,
-    diskon: 0,
-    total: 0,
-    spk: "",
-    mkb: "",
-    ppn: 0,
-    supKode: "",
-    supNama: "",
-    keterangan: "",
-  });
+const barisKosong = () => ({
+  kode: "",
+  nama: "",
+  namaext: "",
+  satuan: "",
+  gramasiAwal: "",
+  gramasi: "",
+  setting: "",
+  jenis: "",
+  roll: 0,
+  jumlah: 0,
+  harga: 0,
+  diskon: 0,
+  spk: "",
+  mkb: "",
+  ppn: 0,
+  supKode: "",
+  supNama: "",
+  keterangan: "",
+  mppb: "",
+  tglMppb: "",
+  jmlMppb: 0,
+});
+
+const addItem = () => formData.value.items.push(barisKosong());
 
 // ─────────────────────────────────────────────
 // AUTO TRAILING ROW — selalu ada 1 baris kosong
@@ -510,6 +468,7 @@ const openLookupBahan = (i: number) => {
 const setBahan = (v: any) => {
   const i = activeGridIndex.value;
   if (i < 0) return;
+
   formData.value.items[i].kode = v.Kode || v.bhn_kode;
   formData.value.items[i].nama = v.Nama || v.bhn_name;
   formData.value.items[i].namaext = isGreige.value
@@ -612,6 +571,96 @@ const recalcRow = (i: number) => {
           jumlah: 0,
         });
   }
+};
+// ── MPPB per baris ──
+const resetMppbInfo = (i: number) => {
+  const r = formData.value.items[i];
+  r.tglMppb = "";
+  r.jmlMppb = 0;
+};
+
+const cekMppbRow = async (i: number, nomorInput?: string) => {
+  const r = formData.value.items[i];
+  const nomor = String(nomorInput ?? r.mppb ?? "").trim();
+  if (!nomor) {
+    r.mppb = "";
+    resetMppbInfo(i);
+    return;
+  }
+  try {
+    const res = await poBahanFormService.validateField(
+      "mppb",
+      nomor,
+      formData.value.header.po_nomor,
+    );
+    r.mppb = nomor;
+    r.tglMppb = formatDateLocal(res.data.data.data.tanggal);
+    r.jmlMppb = Number(res.data.data.data.jumlah) || 0;
+    const spkOtomatis = String(res.data.data.data.spk || "");
+    if (!String(r.spk || "").trim() && spkOtomatis) r.spk = spkOtomatis;
+  } catch (e) {
+    toast.error(pesanError(e, "Gagal memvalidasi MPPB."));
+    r.mppb = "";
+    resetMppbInfo(i);
+  }
+};
+
+const openLookupMppb = (i: number) => {
+  activeGridIndex.value = i;
+  showMppbModal.value = true;
+};
+
+const onMppbRowKeydown = (e: KeyboardEvent, i: number) => {
+  if (e.key === "F1") {
+    e.preventDefault();
+    openLookupMppb(i);
+  }
+};
+
+const setMppbRow = (v: { Nomor?: string; mpb_nomor?: string }) => {
+  const i = activeGridIndex.value;
+  const nomor = v.Nomor || v.mpb_nomor || "";
+  if (i < 0 || !nomor) return;
+  cekMppbRow(i, nomor);
+};
+
+// ── Permintaan Pembelian Bahan (header): satu PO satu permintaan ──
+const onMbbSelected = (rows: MbbOutstandingRow[]) => {
+  if (rows.length === 0) return;
+  const adaIsi = formData.value.items.some((r: { kode?: string }) => !!r.kode);
+  if (
+    adaIsi &&
+    !window.confirm(
+      "Baris bahan yang sudah ada akan diganti dengan isi permintaan. Lanjutkan?",
+    )
+  )
+    return;
+
+  formData.value.header.po_mbb_nomor = rows[0].nomor;
+  formData.value.items = rows.map((m) => {
+    const row = barisKosong();
+    row.kode = m.kode;
+    row.nama = m.nama;
+    row.namaext = isGreige.value ? `GREIGE ${m.nama}` : m.nama;
+    row.satuan = m.satuan;
+    row.gramasiAwal = isBahanLike.value ? m.gramasi : "";
+    row.gramasi = m.gramasi;
+    row.setting = m.setting;
+    row.jenis = m.jenis;
+    row.harga = Number(m.harga) || 0;
+    row.jumlah = Number(m.sisa) || 0;
+    return row;
+  });
+  // Delivery commitment merujuk kode bahan, jadi ikut dikosongkan
+  formData.value.delivery = [];
+  toast.success(
+    `${rows.length} baris diambil dari permintaan ${rows[0].nomor}.`,
+  );
+};
+
+const clearMbb = () => {
+  formData.value.header.po_mbb_nomor = "";
+  toast.info("Tautan ke permintaan dilepas. Baris bahan tetap ada.");
 };
 
 // Supplier yang memesan bahan ini di baris PO (untuk dropdown Delivery PO Lain-lain)
@@ -837,7 +886,16 @@ const validateSave = () => {
             v-model="formData.header.po_tanggal"
             class="idate"
             style="width: 160px"
-            :disabled="isEditMode"
+            :disabled="
+              isEditMode && (formData.isTutupBuku || formData.sudahBpb)
+            "
+            :title="
+              formData.sudahBpb
+                ? 'Sudah ada BPB, tanggal tidak bisa diubah'
+                : formData.isTutupBuku
+                  ? 'Periode sudah tutup buku'
+                  : ''
+            "
           />
         </div>
         <div class="fr">
@@ -848,46 +906,34 @@ const validateSave = () => {
           />
         </div>
 
-        <div class="sep mt-1 mb-1" />
-
-        <div class="fr">
-          <label class="lbl">No. MPPB</label>
+        <div v-if="!isCelup" class="fr">
+          <label class="lbl">Permintaan</label>
           <div class="igrp" style="width: 160px">
             <input
-              v-model="formData.header.po_mppb_nomor"
-              class="inp"
-              style="background: #ddeeff; text-transform: uppercase"
-              placeholder="F1 / ketik + Enter"
-              @keydown="onMppbKeydown"
-              @keydown.enter.prevent="onMppbEnter"
+              v-model="formData.header.po_mbb_nomor"
+              class="inp ro"
+              readonly
+              placeholder="Opsional"
             />
             <button
               type="button"
               class="blkp"
-              title="Cari MPPB (F1)"
-              @click="showMppbModal = true"
+              title="Pilih Permintaan Pembelian Bahan"
+              :disabled="isEditMode"
+              @click="showMbbModal = true"
             >
               <IconSearch :size="13" />
             </button>
           </div>
-        </div>
-        <div class="fr">
-          <label class="lbl">Jml MPPB</label>
-          <input
-            :value="formData.header.jmlmppb"
-            readonly
-            class="inp ro text-right"
-            style="width: 80px"
-          />
-        </div>
-        <div class="fr">
-          <label class="lbl">Tgl MPPB</label>
-          <input
-            :value="formData.header.tgl_mppb"
-            readonly
-            class="inp ro"
-            style="width: 120px"
-          />
+          <button
+            v-if="formData.header.po_mbb_nomor && !isEditMode"
+            type="button"
+            class="btn-del"
+            title="Lepas permintaan"
+            @click="clearMbb"
+          >
+            ✕
+          </button>
         </div>
 
         <div class="sep mt-1 mb-1" />
@@ -1014,9 +1060,11 @@ const validateSave = () => {
       <div class="po-right desktop-form-section">
         <div class="tbl-header">
           <span class="tbl-title">Detail Item Pembelian</span>
-          <button type="button" class="btn-add" @click="addItem">
-            + Tambah Baris
-          </button>
+          <div>
+            <button type="button" class="btn-add" @click="addItem">
+              + Tambah Baris
+            </button>
+          </div>
         </div>
         <div
           class="tbl-wrap"
@@ -1072,6 +1120,8 @@ const validateSave = () => {
                 </th>
                 <th v-if="!isSpanduk" style="width: 90px">MKB</th>
                 <th v-if="isSpanduk" style="width: 150px">Keterangan</th>
+                <th style="width: 110px">MPPB</th>
+                <th style="width: 70px" class="tr">Jml MPPB</th>
                 <th v-if="showSupCol" style="width: 170px">Supplier</th>
                 <th style="width: 35px" class="tc">Aksi</th>
               </tr>
@@ -1169,7 +1219,7 @@ const validateSave = () => {
                 </td>
                 <td v-if="canLihatBeli && !isSpanduk" class="p0">
                   <input
-                    :value="fmt(Number(row.total))"
+                    :value="fmt(hitungTotal(row))"
                     readonly
                     class="ci tr fw ro"
                   />
@@ -1200,6 +1250,31 @@ const validateSave = () => {
                 </td>
                 <td v-if="isSpanduk" class="p0">
                   <input v-model="row.keterangan" class="ci" maxlength="150" />
+                </td>
+                <td class="p0">
+                  <div class="cell-grp">
+                    <input
+                      v-model="row.mppb"
+                      class="ci"
+                      :class="{ ro: isCelup }"
+                      :readonly="isCelup"
+                      :title="row.tglMppb ? `Tgl MPPB: ${row.tglMppb}` : ''"
+                      @input="resetMppbInfo(Number(idx))"
+                      @keydown="onMppbRowKeydown($event, Number(idx))"
+                      @keydown.enter.prevent="cekMppbRow(Number(idx))"
+                    />
+                    <button
+                      type="button"
+                      class="ci-btn"
+                      :disabled="isCelup"
+                      @click="openLookupMppb(Number(idx))"
+                    >
+                      <IconSearch :size="12" />
+                    </button>
+                  </div>
+                </td>
+                <td class="p0">
+                  <input :value="row.jmlMppb || ''" readonly class="ci tr ro" />
                 </td>
                 <td v-if="showSupCol" class="p0">
                   <div class="cell-grp">
@@ -1427,7 +1502,13 @@ const validateSave = () => {
 
   <SupplierSearchModal v-model="showSupModal" @selected="setSup" />
   <SupplierSearchModal v-model="showSupRowModal" @selected="setSupRow" />
-  <MppbSearchModal v-model="showMppbModal" @selected="setMppb" />
+  <MppbSearchModal v-model="showMppbModal" @selected="setMppbRow" />
+  <MbbSearchModal
+    v-model="showMbbModal"
+    :jenis="formData.header.po_jenis"
+    :exclude="formData.header.po_nomor"
+    @selected="onMbbSelected"
+  />
   <PoGreigeSearchModal v-model="showPoGreigeModal" @selected="setPoGreige" />
   <BahanSearchModal
     v-model="showBahanModal"

@@ -44,6 +44,13 @@ interface ExportDetailItem {
 const router = useRouter();
 const toast = useToast();
 const authStore = useAuthStore();
+// Bagian yang boleh melihat/membuat Permintaan Pembelian Aset; samakan dengan BAGIAN_ASET di backend
+const BAGIAN_ASET = ["GA", "EDP"];
+const bolehAset = computed(() =>
+  BAGIAN_ASET.includes((authStore.user?.bagian || "").toUpperCase()),
+);
+// Jenis yang memakai kolom Spesifikasi dan Kegunaan [KONFIRMASI untuk ASET]
+const JENIS_RINCI = ["SPAREPART", "ATK/RTK", "ASET"];
 
 const getCabangDefault = () => {
   const bagian = (authStore.user?.bagian || "").toUpperCase();
@@ -517,6 +524,15 @@ const submitEstimasi = async () => {
             />
             ATK
           </label>
+          <label v-if="bolehAset" class="radio-label">
+            <input
+              type="radio"
+              v-model="filterState.jenis"
+              value="ASET"
+              @change="fetchData"
+            />
+            ASET
+          </label>
         </div>
       </div>
 
@@ -650,13 +666,13 @@ const submitEstimasi = async () => {
                 <th style="width: 90px; text-align: right">Terima</th>
                 <th style="width: 200px; text-align: left">Ket Pembelian</th>
                 <th
-                  v-if="['SPAREPART', 'ATK/RTK'].includes(item.Jenis)"
+                  v-if="JENIS_RINCI.includes(item.Jenis)"
                   style="width: 150px; text-align: left"
                 >
                   Spesifikasi
                 </th>
                 <th
-                  v-if="['SPAREPART', 'ATK/RTK'].includes(item.Jenis)"
+                  v-if="JENIS_RINCI.includes(item.Jenis)"
                   style="width: 150px; text-align: left"
                 >
                   Kegunaan
@@ -682,10 +698,10 @@ const submitEstimasi = async () => {
                 <td class="text-caption" style="color: #666">
                   {{ dtl.KetPembelian }}
                 </td>
-                <td v-if="['SPAREPART', 'ATK/RTK'].includes(item.Jenis)">
+                <td v-if="JENIS_RINCI.includes(item.Jenis)">
                   {{ dtl.Spesifikasi }}
                 </td>
-                <td v-if="['SPAREPART', 'ATK/RTK'].includes(item.Jenis)">
+                <td v-if="JENIS_RINCI.includes(item.Jenis)">
                   {{ dtl.Kegunaan }}
                 </td>
               </tr>

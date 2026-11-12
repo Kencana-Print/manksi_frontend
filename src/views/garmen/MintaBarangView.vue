@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref, computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
 import BaseBrowse from "@/components/BaseBrowse.vue";
@@ -55,8 +55,15 @@ const jenisSlugMap: Record<string, string> = {
   OBAT: "OBAT",
   SPAREPART: "SPAREPART",
   "ATK/RTK": "ATK-RTK",
+  ASET: "ASET",
 };
-const jenisOptions = ["ACCESORIES", "OBAT", "SPAREPART", "ATK/RTK"];
+// [KONFIRMASI] daftar bagian harus sama dengan showFilterAset di GarmenBarangView
+const BAGIAN_ASET = ["GA", "FINANCE", "AUDIT", "DIREKSI", "EDP"];
+const jenisOptions = computed(() => {
+  const bagian = (authStore.user?.bagian || "").toUpperCase();
+  const base = ["ACCESORIES", "OBAT", "SPAREPART", "ATK/RTK"];
+  return BAGIAN_ASET.includes(bagian) ? [...base, "ASET"] : base;
+});
 
 onMounted(async () => {
   // 1. Set default Jenis berdasarkan Bagian User

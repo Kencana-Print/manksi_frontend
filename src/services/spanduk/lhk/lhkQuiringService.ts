@@ -15,6 +15,8 @@ export interface LhkQuiringRow {
   Tanggal: string;
   Kode_Pabrik: string | null;
   Nama_Pabrik: string | null;
+  Sesi: string | null;
+  Jumlah_Karyawan: number;
 }
 
 export interface LhkQuiringDetailRow {
@@ -27,9 +29,6 @@ export interface LhkQuiringDetailRow {
   J_Oven: number | null;
   J_Jemuran: number | null;
   J_Potong: number | null;
-  BS_Quiring: number | null;
-  BS_Cetak: number | null;
-  BS_Bahan: number | null;
 }
 
 export const getBrowse = async (

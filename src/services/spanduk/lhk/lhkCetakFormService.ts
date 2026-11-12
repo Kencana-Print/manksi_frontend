@@ -19,6 +19,7 @@ export interface LhkCetakDetail {
   Lebar: number | null;
   Qty_Cetak: number;
   Jml_Plangkan: number;
+  Plangkan_Otomatis: boolean;
 }
 
 export interface LhkCetakKaryawan {
@@ -48,6 +49,10 @@ export interface LhkCetakForm {
   Kar_Harian: number;
   Sesi: string;
   Jam_Input: string | null;
+  Apv_Status: string; // '' tidak perlu, W menunggu, Y disetujui, N ditolak
+  Apv_User: string | null;
+  Apv_Tgl: string | null;
+  Apv_Alasan: string | null;
   Detail: LhkCetakDetail[];
   Karyawan: LhkCetakKaryawan[];
   Kain: LhkCetakKain[];
@@ -70,6 +75,11 @@ export interface InfoSpk {
   Jumlah_Order: number | null;
   Panjang: number | null;
   Lebar: number | null;
+  Kode_Bahan: string;
+  Plangkan_Otomatis: boolean;
+  Plangkan: number;
+  Plangkan_Total: number;
+  Plangkan_Terpakai: number;
 }
 
 export interface PabrikOption {
@@ -95,7 +105,9 @@ export interface KaryawanOption {
   Jam_Lembur: string;
 }
 
-export type SaveResponse = AxiosResponse<ApiResponse<{ Nomor: string }>>;
+export type SaveResponse = AxiosResponse<
+  ApiResponse<{ Nomor: string; Menunggu_Approval: boolean }>
+>;
 
 export const getById = async (nomor: string): Promise<LhkCetakForm> => {
   const res = await api.get<ApiResponse<LhkCetakForm>>(
@@ -119,11 +131,8 @@ export const getLookupPabrik = async (): Promise<PabrikOption[]> => {
 };
 
 export const getLookupKain = async (): Promise<KainOption[]> => {
-  const res = await api.get<
-    ApiResponse<(Omit<KainOption, "Kode"> & { Kode: number | string })[]>
-  >(`${BASE}/lookups/kain`);
-  // Kode dari DB bertipe angka; form memakai string
-  return (res.data.data ?? []).map((k) => ({ ...k, Kode: String(k.Kode) }));
+  const res = await api.get<ApiResponse<KainOption[]>>(`${BASE}/lookups/kain`);
+  return res.data.data ?? [];
 };
 
 export const getLookupKaryawan = async (
@@ -139,13 +148,16 @@ export const getLookupKaryawan = async (
 };
 
 export const create = (payload: LhkCetakPayload): Promise<SaveResponse> =>
-  api.post<ApiResponse<{ Nomor: string }>>(BASE, payload);
+  api.post<ApiResponse<{ Nomor: string; Menunggu_Approval: boolean }>>(
+    BASE,
+    payload,
+  );
 
 export const update = (
   nomor: string,
   payload: LhkCetakPayload,
 ): Promise<SaveResponse> =>
-  api.put<ApiResponse<{ Nomor: string }>>(
+  api.put<ApiResponse<{ Nomor: string; Menunggu_Approval: boolean }>>(
     `${BASE}/${encodeURIComponent(nomor)}`,
     payload,
   );

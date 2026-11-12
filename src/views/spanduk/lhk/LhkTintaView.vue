@@ -23,11 +23,19 @@ interface ExportDetailRow {
   Jml_Bahan: number | null;
   Kode_Bahan: string;
   Nama_Bahan: string;
-  Qty_Input: number;
-  Satuan_Input: string;
   Qty: number;
   Satuan: string;
 }
+
+// Baris browse + Status (kolom tampil dan ikut pencarian/filter)
+type BrowseRow = LhkTintaRow & { Status: string };
+
+const statusTeks = (r: LhkTintaRow): string => {
+  if (r.Outstanding === 1) {
+    return r.Lewat_Batas === 1 ? "Belum diinput · lewat h+7" : "Belum diinput";
+  }
+  return r.Lewat_Batas === 1 ? "Input terlambat" : "";
+};
 
 const toast = useToast();
 const router = useRouter();
@@ -54,7 +62,7 @@ const filterState = ref({
 const detailMap = ref<Record<string, LhkTintaDetailRow[]>>({});
 const expandedRows = ref<unknown[]>([]);
 
-const muatData = async (): Promise<LhkTintaRow[]> => {
+const muatData = async (): Promise<BrowseRow[]> => {
   const { dtAwal, dtAkhir } = filterState.value;
   if (!dtAwal || !dtAkhir) {
     toast.warning("Periode tanggal harus diisi.");
@@ -76,7 +84,7 @@ const muatData = async (): Promise<LhkTintaRow[]> => {
   }
   detailMap.value = peta;
   expandedRows.value = [];
-  return master;
+  return master.map((r) => ({ ...r, Status: statusTeks(r) }));
 };
 
 // --- BROWSE SETUP ---
@@ -91,7 +99,7 @@ const {
   selectedItem,
   fetchData,
   exportToExcel,
-} = useBrowse<LhkTintaRow>({
+} = useBrowse<BrowseRow>({
   menuId: "4",
   fetchApi: muatData,
   immediate: false, // dipanggil manual setelah mount
@@ -104,10 +112,11 @@ const headers = [
   { title: "Tanggal", key: "Tanggal", width: "110px", align: "center" },
   { title: "LHK Cetak", key: "Nomor_Cetak", width: "170px" },
   { title: "Tgl Cetak", key: "Tanggal_Cetak", width: "110px", align: "center" },
+  { title: "Status", key: "Status", width: "200px" },
   { title: "Kode Pabrik", key: "Kode_Pabrik", width: "120px" },
   { title: "Nama Pabrik", key: "Nama_Pabrik", width: "240px" },
   { title: "Jml SPK", key: "Jml_SPK", width: "90px", align: "end" },
-  { title: "Jml Bahan", key: "Jml_Bahan", width: "100px", align: "end" },
+  { title: "Jml Obat", key: "Jml_Bahan", width: "100px", align: "end" },
 ];
 
 const INT = "#,##0";
@@ -118,11 +127,12 @@ const kolomMaster: ExcelColumn[] = [
   { header: "Tanggal", key: "Tanggal", width: 14, align: "center" },
   { header: "LHK Cetak", key: "Nomor_Cetak", width: 20 },
   { header: "Tgl Cetak", key: "Tanggal_Cetak", width: 14, align: "center" },
+  { header: "Status", key: "Status", width: 26 },
   { header: "Kode Pabrik", key: "Kode_Pabrik", width: 14 },
   { header: "Nama Pabrik", key: "Nama_Pabrik", width: 30 },
   { header: "Jml SPK", key: "Jml_SPK", width: 10, align: "right", numFmt: INT },
   {
-    header: "Jml Bahan",
+    header: "Jml Obat",
     key: "Jml_Bahan",
     width: 11,
     align: "right",
@@ -138,22 +148,14 @@ const kolomDetail: ExcelColumn[] = [
   { header: "Nama Pabrik", key: "Nama_Pabrik", width: 28 },
   { header: "Jml SPK", key: "Jml_SPK", width: 10, align: "right", numFmt: INT },
   {
-    header: "Jml Bahan",
+    header: "Jml Obat",
     key: "Jml_Bahan",
     width: 11,
     align: "right",
     numFmt: INT,
   },
-  { header: "Kode Bahan", key: "Kode_Bahan", width: 12 },
-  { header: "Nama Bahan", key: "Nama_Bahan", width: 36 },
-  {
-    header: "Qty Input",
-    key: "Qty_Input",
-    width: 12,
-    align: "right",
-    numFmt: "#,##0.0000",
-  },
-  { header: "Satuan Input", key: "Satuan_Input", width: 13 },
+  { header: "Kode Obat", key: "Kode_Bahan", width: 12 },
+  { header: "Nama Obat", key: "Nama_Bahan", width: 36 },
   {
     header: "Qty",
     key: "Qty",
@@ -165,7 +167,7 @@ const kolomDetail: ExcelColumn[] = [
 ];
 
 // Data master yang sedang tampil (ikut search + filter kolom BaseBrowse)
-const dataTampil = (): LhkTintaRow[] =>
+const dataTampil = (): BrowseRow[] =>
   baseBrowseRef.value?.getFilteredItems() ?? items.value ?? [];
 
 onMounted(() => fetchData());
@@ -173,12 +175,38 @@ onMounted(() => fetchData());
 watch(() => filterState.value.dtAwal, fetchData);
 watch(() => filterState.value.dtAkhir, fetchData);
 
+// --- HELPER ---
+// Detail LHK Tinta; baris merah (belum ada Nomor) tidak punya detail
+const detailDari = (item: BrowseRow): LhkTintaDetailRow[] =>
+  item.Nomor ? (detailMap.value[item.Nomor] ?? []) : [];
+
+// Baris merah = LHK Cetak belum punya LHK Pemakaian Obat. Gaya inline karena
+// scoped style tidak menjangkau baris di dalam BaseBrowse.
+const rowPropsFn = ({ item }: { item: BrowseRow }) =>
+  item.Outstanding === 1
+    ? { style: "background-color: #ffebee; color: #b71c1c;" }
+    : {};
+
 // --- HANDLERS ---
 const onAdd = () => {
   router.push({ name: "SpandukLhkTintaCreate" });
 };
 
-const onEdit = (item: LhkTintaRow) => {
+const onEdit = (item: BrowseRow) => {
+  // Baris merah: buka form baru dengan LHK Cetak terisi
+  if (item?.Outstanding === 1) {
+    if (!canInsert.value) {
+      toast.error(
+        "Akses ditolak: Anda tidak memiliki izin untuk menambah data.",
+      );
+      return;
+    }
+    router.push({
+      name: "SpandukLhkTintaCreate",
+      query: { cetak: item.Nomor_Cetak ?? "" },
+    });
+    return;
+  }
   if (!item?.Nomor) {
     return;
   }
@@ -188,7 +216,13 @@ const onEdit = (item: LhkTintaRow) => {
   });
 };
 
-const onDelete = async (item: LhkTintaRow) => {
+const onDelete = async (item: BrowseRow) => {
+  if (!item.Nomor) {
+    toast.warning(
+      "Baris merah belum punya LHK Pemakaian Obat, tidak ada yang dihapus.",
+    );
+    return;
+  }
   try {
     await lhkService.remove(item.Nomor);
     toast.success(`LHK Tinta ${item.Nomor} berhasil dihapus.`);
@@ -202,6 +236,11 @@ const onPrint = () => {
   const item = selectedItem.value;
   if (!item) {
     return toast.warning("Pilih data LHK Tinta terlebih dahulu.");
+  }
+  if (!item.Nomor) {
+    return toast.warning(
+      "Baris merah belum punya LHK Pemakaian Obat untuk dicetak.",
+    );
   }
   const url = router.resolve({
     name: "SpandukLhkTintaPrint",
@@ -217,7 +256,8 @@ const exportMaster = () =>
     getData: () =>
       dataTampil().map((r) => ({
         ...r,
-        Tanggal: formatTanggal(r.Tanggal),
+        Nomor: r.Nomor ?? "",
+        Tanggal: r.Tanggal ? formatTanggal(r.Tanggal) : "",
         Tanggal_Cetak: r.Tanggal_Cetak ? formatTanggal(r.Tanggal_Cetak) : "",
       })),
   });
@@ -235,21 +275,19 @@ const exportDetail = async () => {
 
   const rows: ExportDetailRow[] = [];
   for (const item of master) {
-    (detailMap.value[item.Nomor] ?? []).forEach((r, idx) => {
+    detailDari(item).forEach((r, idx) => {
       // Data LHK (header) hanya di baris pertama tiap LHK
       const pertama = idx === 0;
       rows.push({
-        Nomor: pertama ? item.Nomor : "",
-        Tanggal: pertama ? formatTanggal(item.Tanggal) : "",
+        Nomor: pertama ? (item.Nomor ?? "") : "",
+        Tanggal: pertama && item.Tanggal ? formatTanggal(item.Tanggal) : "",
         Nomor_Cetak: pertama ? (item.Nomor_Cetak ?? "") : "",
         Kode_Pabrik: pertama ? (item.Kode_Pabrik ?? "") : "",
         Nama_Pabrik: pertama ? (item.Nama_Pabrik ?? "") : "",
         Jml_SPK: pertama ? Number(item.Jml_SPK) || 0 : null,
         Jml_Bahan: pertama ? Number(item.Jml_Bahan) || 0 : null,
-        Kode_Bahan: String(r.Kode_Bahan),
+        Kode_Bahan: r.Kode_Bahan,
         Nama_Bahan: r.Nama_Bahan ?? "",
-        Qty_Input: Number(r.Qty_Input) || 0,
-        Satuan_Input: r.Satuan_Input ?? "",
         Qty: Number(r.Qty) || 0,
         Satuan: r.Satuan ?? "",
       });
@@ -294,7 +332,8 @@ const numFmt = (v: number | null) =>
     :can-edit="canEdit"
     :can-delete="canDelete"
     :can-export="canExport"
-    item-value="Nomor"
+    item-value="Kunci"
+    :row-props-fn="rowPropsFn"
     @add="onAdd"
     @edit="onEdit"
     @delete="onDelete"
@@ -309,11 +348,15 @@ const numFmt = (v: number | null) =>
         <input type="date" v-model="filterState.dtAwal" class="f-date" />
         <span class="f-sep">s/d</span>
         <input type="date" v-model="filterState.dtAkhir" class="f-date" />
+        <span class="f-hint">
+          Baris merah = LHK Cetak belum punya LHK Pemakaian Obat (tidak terikat
+          periode)
+        </span>
       </div>
     </template>
 
     <template #item.Tanggal="{ item }">
-      {{ formatTanggal(item.Tanggal) }}
+      {{ item.Tanggal ? formatTanggal(item.Tanggal) : "" }}
     </template>
 
     <template #item.Tanggal_Cetak="{ item }">
@@ -323,37 +366,38 @@ const numFmt = (v: number | null) =>
     <!-- Detail Expand -->
     <template #detail="{ item }">
       <div class="expand-wrap">
-        <div class="expand-title mb-2">
-          Pemakaian Tinta/Cat - {{ item.Nomor }} (LHK Cetak
-          {{ item.Nomor_Cetak }})
+        <div v-if="item.Outstanding === 1" class="expand-title">
+          LHK Cetak {{ item.Nomor_Cetak }} belum punya LHK Pemakaian Obat. Klik
+          Ubah untuk menginput.
         </div>
-        <table class="detail-table">
-          <thead>
-            <tr>
-              <th width="80">Kode</th>
-              <th>Bahan</th>
-              <th width="100" class="tr">Qty Input</th>
-              <th width="90">Satuan Input</th>
-              <th width="100" class="tr">Qty</th>
-              <th width="70">Satuan</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="r in detailMap[item.Nomor]" :key="r.Kode_Bahan">
-              <td>{{ r.Kode_Bahan }}</td>
-              <td class="font-weight-bold">{{ r.Nama_Bahan }}</td>
-              <td class="tr">{{ numFmt(r.Qty_Input) }}</td>
-              <td>{{ r.Satuan_Input ?? "" }}</td>
-              <td class="tr">{{ numFmt(r.Qty) }}</td>
-              <td>{{ r.Satuan ?? "" }}</td>
-            </tr>
-            <tr v-if="!detailMap[item.Nomor]?.length">
-              <td colspan="6" class="text-center text-grey py-3 font-italic">
-                Detail LHK Tinta tidak ditemukan.
-              </td>
-            </tr>
-          </tbody>
-        </table>
+        <template v-else>
+          <div class="expand-title mb-2">
+            Pemakaian Obat - {{ item.Nomor }} (LHK Cetak {{ item.Nomor_Cetak }})
+          </div>
+          <table class="detail-table">
+            <thead>
+              <tr>
+                <th width="80">Kode</th>
+                <th>Obat</th>
+                <th width="110" class="tr">Qty</th>
+                <th width="80">Satuan</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="r in detailDari(item)" :key="r.Kode_Bahan">
+                <td>{{ r.Kode_Bahan }}</td>
+                <td class="font-weight-bold">{{ r.Nama_Bahan }}</td>
+                <td class="tr">{{ numFmt(r.Qty) }}</td>
+                <td>{{ r.Satuan ?? "" }}</td>
+              </tr>
+              <tr v-if="detailDari(item).length === 0">
+                <td colspan="4" class="text-center text-grey py-3 font-italic">
+                  Detail LHK Tinta tidak ditemukan.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </template>
       </div>
     </template>
 
@@ -397,6 +441,12 @@ const numFmt = (v: number | null) =>
 .f-sep {
   font-size: 11px;
   color: #777;
+}
+.f-hint {
+  margin-left: 8px;
+  font-size: 11px;
+  color: #b71c1c;
+  white-space: nowrap;
 }
 
 .expand-wrap {

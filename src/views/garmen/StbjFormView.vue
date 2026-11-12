@@ -32,6 +32,8 @@ interface DetailRow {
   Jadi: number;
   Kurang: number;
   Keterangan: string;
+  Lipat?: number; // total LHK Lipat SPK (info, hanya Spanduk)
+  Batas?: number | null; // sisa Lipat; null = belum memblokir (masa toleransi)
 }
 
 interface Detail2Row {
@@ -69,7 +71,6 @@ interface GudangTetap {
 const gudangTetap = computed(
   () => route.meta.gudangTetap as GudangTetap | undefined,
 );
-const modeSpanduk = computed(() => !!gudangTetap.value);
 const browseRouteName = computed(
   () => (route.meta.browseRoute as string) || "StbjBrowse",
 );
@@ -223,6 +224,12 @@ const {
 
 const fd = formData;
 const isWH003 = computed(() => fd.value.GudangKode === "WH003");
+// Mode Spanduk: dibuka dari menu Spanduk (gudang tetap) ATAU gudang WH002
+// dipilih dari menu lintas divisi
+const KODE_GUDANG_SPANDUK = "WH002";
+const modeSpanduk = computed(
+  () => !!gudangTetap.value || fd.value.GudangKode === KODE_GUDANG_SPANDUK,
+);
 
 // ── Lookup Modals ──────────────────────────────────────────────────────
 const showGdgPModal = ref(false);
@@ -405,7 +412,10 @@ const addSpkToGrid = async (spkNomor: string) => {
       fd.value.GudangKode,
       (route.params.nomor as string) || "",
     );
-    const { detail, detail2 } = res.data.data;
+    const { detail, detail2, peringatan } = res.data.data;
+    if (Array.isArray(peringatan) && peringatan.length) {
+      toast.warning(peringatan.join("\n"));
+    }
 
     // Tambah ke Grid 1 — cek duplikat per size
     for (const r of detail) {
@@ -701,6 +711,16 @@ const validateSave = () => {
     toast.warning("Jumlah belum diisi.");
     return;
   }
+  const lewatLipat = validDtl.find(
+    (r) => r.Batas != null && Number(r.Jumlah) > r.Batas,
+  );
+  if (lewatLipat) {
+    toast.warning(
+      `SPK ${lewatLipat.SpkNomor}: jumlah ${lewatLipat.Jumlah} melebihi sisa LHK Lipat (${lewatLipat.Batas}).`,
+    );
+    return;
+  }
+
   const jumlahMelebihi = validDtl.filter(
     (r) => Number(r.Jumlah) > Number(r.Kurang),
   ).length;

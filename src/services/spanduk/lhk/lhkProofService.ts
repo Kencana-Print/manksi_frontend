@@ -41,10 +41,9 @@ export interface LhkProofDetailRow {
 
 export interface LhkProofResepRow {
   Nomor: string;
-  Kode: number;
+  Kode: string;
   Nama: string;
   Satuan: string;
-  Qty_Resep: number;
   Qty_Actual: number;
 }
 

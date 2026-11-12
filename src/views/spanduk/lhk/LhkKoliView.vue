@@ -10,12 +10,7 @@ import type {
   LhkKoliRow,
   LhkKoliDetailRow,
 } from "@/services/spanduk/lhk/lhkKoliService";
-import {
-  IconBox,
-  IconFileExport,
-  IconQrcode,
-  IconPrinter,
-} from "@tabler/icons-vue";
+import { IconBox, IconFileExport, IconPrinter } from "@tabler/icons-vue";
 import { formatTanggal } from "@/utils/dateFormat";
 
 interface ExportDetailRow {
@@ -165,19 +160,6 @@ const onDelete = async (item: LhkKoliRow) => {
   }
 };
 
-// Cetak label QR per koli
-const onPrint = () => {
-  const item = selectedItem.value;
-  if (!item) {
-    return toast.warning("Pilih data LHK Koli terlebih dahulu.");
-  }
-  const url = router.resolve({
-    name: "SpandukLhkKoliPrint",
-    params: { nomor: item.Nomor },
-  }).href;
-  window.open(url, "_blank");
-};
-
 // Cetak lembar LHK (arsip, tanda tangan)
 const onPrintLembar = () => {
   const item = selectedItem.value;
@@ -318,14 +300,6 @@ const numFmt = (v: number | null) =>
     </template>
 
     <template #extra-actions="{ selected }">
-      <v-btn
-        size="small"
-        color="grey-darken-3"
-        :disabled="selected.length === 0"
-        @click="onPrint"
-      >
-        <template #prepend><IconQrcode :size="15" /></template>Cetak Label QR
-      </v-btn>
       <v-btn
         size="small"
         color="grey-darken-3"

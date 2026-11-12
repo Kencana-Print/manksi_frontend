@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, nextTick } from "vue";
+import { ref, computed, watch, onMounted, nextTick } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
 import BaseForm from "@/components/BaseForm.vue";
@@ -9,6 +9,8 @@ import { useAuthStore } from "@/stores/authStore";
 import { IconFlame, IconSearch } from "@tabler/icons-vue";
 import * as lhkForm from "@/services/spanduk/lhk/lhkQuiringFormService";
 import type {
+  KaryawanForm,
+  KaryawanOption,
   LhkQuiringPayload,
   PabrikOption,
   SaveResponse,
@@ -39,9 +41,16 @@ interface FormRow {
   oven: number;
   jemuran: number;
   potong: number;
-  bsQuiring: number | "";
-  bsCetak: number | "";
-  bsBahan: number | "";
+}
+
+interface KaryawanRow {
+  nik: string;
+  nama: string;
+  jamMasuk: string;
+  jamPulang: string;
+  jamKerja: string;
+  jamLembur: string;
+  pilih: boolean;
 }
 
 interface FormState {
@@ -50,20 +59,16 @@ interface FormState {
     tanggal: string;
     kodePabrik: string;
     namaPabrik: string;
+    sesi: string; // '' = belum dipilih, atau LHK lama (sebelum ada sesi)
   };
   items: FormRow[];
+  karyawan: KaryawanRow[];
 }
 
 const KOLOM_JUMLAH = [
-  { key: "oven", label: "J Oven" },
-  { key: "jemuran", label: "J Jemuran" },
-  { key: "potong", label: "J Potong" },
-] as const;
-
-const KOLOM_BS = [
-  { key: "bsQuiring", label: "BS Quiring" },
-  { key: "bsCetak", label: "BS Cetak" },
-  { key: "bsBahan", label: "BS Bahan" },
+  { key: "oven", label: "J Oven (m)" },
+  { key: "jemuran", label: "J Jemuran (m)" },
+  { key: "potong", label: "J Potong (pcs)" },
 ] as const;
 
 const num = (v: unknown) => Number(v) || 0;
@@ -77,14 +82,42 @@ const barisKosong = (): FormRow => ({
   oven: 0,
   jemuran: 0,
   potong: 0,
-  bsQuiring: "",
-  bsCetak: "",
-  bsBahan: "",
 });
 
 const defaultData = (): FormState => ({
-  header: { nomor: "", tanggal: todayLocal, kodePabrik: "", namaPabrik: "" },
+  header: {
+    nomor: "",
+    tanggal: todayLocal,
+    kodePabrik: "",
+    namaPabrik: "",
+    sesi: "",
+  },
   items: [barisKosong()],
+  karyawan: [],
+});
+
+// Karyawan tersimpan: jam masuk/pulang tidak disimpan, hanya jam kerja dan lembur
+const karyawanDariServer = (k: KaryawanForm): KaryawanRow => ({
+  nik: k.Nik,
+  nama: k.Nama ?? "",
+  jamMasuk: "",
+  jamPulang: "",
+  jamKerja: k.Jam_Kerja,
+  jamLembur: k.Jam_Lembur,
+  pilih: true,
+});
+
+const karyawanDariLookup = (
+  d: KaryawanOption,
+  pilih: boolean,
+): KaryawanRow => ({
+  nik: d.Nik,
+  nama: d.Nama,
+  jamMasuk: d.Jam_Masuk,
+  jamPulang: d.Jam_Pulang,
+  jamKerja: d.Jam_Kerja,
+  jamLembur: d.Jam_Lembur,
+  pilih,
 });
 
 // ── State UI ──
@@ -94,9 +127,26 @@ const showSelesai = ref(false);
 const nomorTerakhir = ref("");
 const pabrikOpts = ref<PabrikOption[]>([]);
 
+// Snapshot LHK tersimpan (mode ubah). Karyawan tersimpan memakai jam tersimpan
+// hanya bila tanggal dan lokasi tidak berubah (aturan server); selain itu
+// dihitung ulang dari absensi.
+let karyawanTersimpan: KaryawanRow[] = [];
+let asal: { tanggal: string; pabrik: string } | null = null;
+
+const resetKaryawanAsal = () => {
+  karyawanTersimpan = [];
+  asal = null;
+};
+
+// LHK lama (dibuat sebelum ada sesi): karyawan tidak dicatat dan tidak diubah
+const isLegacy = computed(
+  () => isEditMode.value && formData.value.header.sesi === "",
+);
+
 const bangunPayload = (data: FormState): LhkQuiringPayload => ({
   Tanggal: data.header.tanggal,
   Kode_Pabrik: data.header.kodePabrik,
+  Sesi: data.header.sesi,
   // Delphi: baris tanpa nomor SPK tidak disimpan
   Detail: data.items
     .filter((r) => r.spk.trim() !== "")
@@ -105,10 +155,8 @@ const bangunPayload = (data: FormState): LhkQuiringPayload => ({
       J_Oven: num(r.oven),
       J_Jemuran: num(r.jemuran),
       J_Potong: num(r.potong),
-      BS_Quiring: num(r.bsQuiring),
-      BS_Cetak: num(r.bsCetak),
-      BS_Bahan: num(r.bsBahan),
     })),
+  Karyawan: data.karyawan.filter((k) => k.pilih).map((k) => ({ Nik: k.nik })),
 });
 
 const {
@@ -136,18 +184,20 @@ const {
       oven: num(r.J_Oven),
       jemuran: num(r.J_Jemuran),
       potong: num(r.J_Potong),
-      bsQuiring: num(r.BS_Quiring),
-      bsCetak: num(r.BS_Cetak),
-      bsBahan: num(r.BS_Bahan),
     }));
+    const karyawan = d.Karyawan.map(karyawanDariServer);
+    karyawanTersimpan = karyawan;
+    asal = { tanggal: d.Tanggal, pabrik: d.Kode_Pabrik ?? "" };
     return {
       header: {
         nomor: d.Nomor,
         tanggal: d.Tanggal,
         kodePabrik: d.Kode_Pabrik ?? "",
         namaPabrik: d.Nama_Pabrik ?? "",
+        sesi: d.Sesi ?? "",
       },
       items: items.length > 0 ? items : [barisKosong()],
+      karyawan: karyawan.map((k) => ({ ...k })),
     };
   },
   submitApi: async (data: FormState): Promise<SaveResponse> => {
@@ -164,6 +214,7 @@ const {
     showSelesai.value = true;
   },
   onFormReset: () => {
+    resetKaryawanAsal();
     isiLokasiDefault();
   },
 });
@@ -209,6 +260,99 @@ onMounted(async () => {
   } catch (e) {
     toast.error(lhkForm.pesanError(e, "Gagal memuat daftar lokasi."));
   }
+});
+
+// ── Karyawan quiring (absensi HRD) ──
+let reqKaryawan = 0;
+
+const muatKaryawan = async () => {
+  if (isLegacy.value) {
+    return;
+  }
+  const h = formData.value.header;
+  if (!h.sesi || !h.kodePabrik || !h.tanggal) {
+    formData.value.karyawan = [];
+    return;
+  }
+  const no = ++reqKaryawan;
+  try {
+    const daftar = await lhkForm.getLookupKaryawan(
+      h.kodePabrik,
+      h.sesi,
+      h.tanggal,
+    );
+    if (no !== reqKaryawan) {
+      return;
+    }
+    const pilihan = new Map(
+      formData.value.karyawan.map((k) => [k.nik, k.pilih]),
+    );
+    const sah =
+      asal !== null &&
+      asal.tanggal === h.tanggal &&
+      asal.pabrik.toUpperCase() === h.kodePabrik.toUpperCase();
+    const simpanan = new Map(karyawanTersimpan.map((k) => [k.nik, k]));
+
+    const baris = daftar.map((d) => {
+      const s = sah ? simpanan.get(d.Nik) : undefined;
+      const pilih = pilihan.get(d.Nik) ?? true;
+      return s ? { ...s, pilih } : karyawanDariLookup(d, pilih);
+    });
+    if (sah) {
+      const ada = new Set(daftar.map((d) => d.Nik));
+      for (const s of karyawanTersimpan) {
+        if (!ada.has(s.nik)) {
+          baris.push({ ...s, pilih: pilihan.get(s.nik) ?? true });
+        }
+      }
+    }
+    formData.value.karyawan = baris;
+  } catch (e) {
+    if (no !== reqKaryawan) {
+      return;
+    }
+    if (!isEditMode.value) {
+      formData.value.karyawan = [];
+    }
+    toast.error(lhkForm.pesanError(e, "Gagal memuat daftar karyawan."));
+  }
+};
+
+// Muat ulang saat tanggal, lokasi, atau sesi berubah (juga setelah data ubah dimuat)
+watch(
+  () => {
+    const h = formData.value.header;
+    return `${h.tanggal}|${h.kodePabrik}|${h.sesi}`;
+  },
+  () => {
+    muatKaryawan();
+  },
+);
+
+const jumlahDipilih = computed(
+  () => formData.value.karyawan.filter((k) => k.pilih).length,
+);
+
+const semuaDipilih = computed({
+  get: () =>
+    formData.value.karyawan.length > 0 &&
+    jumlahDipilih.value === formData.value.karyawan.length,
+  set: (v: boolean) => {
+    for (const k of formData.value.karyawan) {
+      k.pilih = v;
+    }
+  },
+});
+
+const pesanKaryawanKosong = computed(() => {
+  const h = formData.value.header;
+  if (isLegacy.value) {
+    return "LHK lama (tanpa sesi): karyawan tidak dicatat.";
+  }
+  if (!h.sesi || !h.kodePabrik) {
+    return "Pilih Lokasi dan Sesi untuk menampilkan karyawan.";
+  }
+  return "Tidak ada karyawan yang memenuhi syarat sesi pada tanggal ini.";
 });
 
 // ── Grid ──
@@ -263,14 +407,7 @@ const isiBarisDariSpk = async (
 };
 
 // Enter → kolom berikutnya (Delphi: SelectNext), akhir baris → baris berikutnya
-const KOLOM_EDIT = [
-  "oven",
-  "jemuran",
-  "potong",
-  "bsQuiring",
-  "bsCetak",
-  "bsBahan",
-] as const;
+const KOLOM_EDIT = ["oven", "jemuran", "potong"] as const;
 type KolomEdit = (typeof KOLOM_EDIT)[number];
 
 const fieldRefs = ref<Record<string, HTMLInputElement>>({});
@@ -328,13 +465,17 @@ const onBlurSpk = (e: FocusEvent, idx: number) => {
 
 // ── Validasi sebelum konfirmasi simpan (sama dengan validasi server) ──
 const validateSave = () => {
-  const { tanggal, kodePabrik } = formData.value.header;
+  const { tanggal, kodePabrik, sesi } = formData.value.header;
   if (!tanggal) {
     toast.warning("Tanggal tidak boleh kosong.");
     return;
   }
   if (!kodePabrik) {
     toast.warning("Lokasi belum dipilih.");
+    return;
+  }
+  if (!isLegacy.value && !sesi) {
+    toast.warning("Sesi belum dipilih.");
     return;
   }
 
@@ -355,18 +496,6 @@ const validateSave = () => {
       return;
     }
     sudah.set(kunci, no);
-
-    const bs = [r.bsQuiring, r.bsCetak, r.bsBahan];
-    if (bs.some((v) => v === "" || v === null)) {
-      toast.warning(
-        `Baris ${no}: BS Quiring, BS Cetak, dan BS Bahan wajib diisi (isi 0 bila tidak ada).`,
-      );
-      return;
-    }
-    if (bs.some((v) => !Number.isInteger(num(v)) || num(v) < 0)) {
-      toast.warning(`Baris ${no}: BS harus bilangan bulat tidak negatif.`);
-      return;
-    }
 
     const angkaInput = [r.oven, r.jemuran, r.potong];
     if (angkaInput.some((v) => !Number.isInteger(num(v)))) {
@@ -396,6 +525,7 @@ const resetBaru = () => {
     return;
   }
   formData.value = defaultData();
+  resetKaryawanAsal();
   isiLokasiDefault();
 };
 
@@ -466,120 +596,179 @@ const tutupSetelahSimpan = () => {
             style="flex: 1"
           />
         </div>
+
+        <div class="fr">
+          <label class="lbl">Sesi</label>
+          <select
+            v-model="formData.header.sesi"
+            class="inp"
+            style="width: 120px"
+            :disabled="isEditMode"
+          >
+            <option value="" disabled>Pilih...</option>
+            <option value="PAGI">Pagi</option>
+            <option value="SIANG">Siang</option>
+          </select>
+        </div>
+        <div class="catatan">
+          Pagi: jam kerja sampai 13.00. Siang: dari 13.00 sampai scan pulang.
+          <template v-if="isEditMode">
+            Sesi tidak dapat diubah setelah disimpan.
+          </template>
+        </div>
       </div>
     </template>
 
     <!-- ══ KOLOM KANAN ══ -->
     <template #right-column>
       <div class="lhk-right">
-        <div class="tbl-header">
-          <span class="tbl-title">Rincian SPK</span>
-          <button type="button" class="btn-add" @click="addRow">
-            + Tambah Baris
-          </button>
-        </div>
-        <div class="tbl-wrap" style="flex: 1; min-height: 240px">
-          <table class="gt" style="min-width: 1270px">
-            <thead>
-              <tr>
-                <th style="width: 32px" class="tc">No</th>
-                <th style="width: 170px">Nomor SPK</th>
-                <th style="width: 280px">Nama Order</th>
-                <th style="width: 90px" class="tr">Jml Order</th>
-                <th style="width: 80px" class="tr">Panjang</th>
-                <th style="width: 80px" class="tr">Lebar</th>
-                <th
-                  v-for="k in KOLOM_JUMLAH"
-                  :key="k.key"
-                  style="width: 85px"
-                  class="tr bg-yellow"
-                >
-                  {{ k.label }}
-                </th>
-                <th
-                  v-for="k in KOLOM_BS"
-                  :key="k.key"
-                  style="width: 90px"
-                  class="tr bg-yellow"
-                >
-                  {{ k.label }}
-                </th>
-                <th style="width: 32px" class="tc"></th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="(row, idx) in formData.items" :key="idx">
-                <td class="tc gt-lbl">{{ idx + 1 }}</td>
-                <td class="p0">
-                  <div class="cell-grp">
+        <div class="sec-spk">
+          <div class="tbl-header">
+            <span class="tbl-title">Rincian SPK</span>
+            <button type="button" class="btn-add" @click="addRow">
+              + Tambah Baris
+            </button>
+          </div>
+          <div class="tbl-wrap" style="flex: 1; min-height: 240px">
+            <table class="gt" style="min-width: 1070px">
+              <thead>
+                <tr>
+                  <th style="width: 32px" class="tc">No</th>
+                  <th style="width: 170px">Nomor SPK</th>
+                  <th style="width: 280px">Nama Order</th>
+                  <th style="width: 90px" class="tr">Jml Order</th>
+                  <th style="width: 80px" class="tr">Panjang</th>
+                  <th style="width: 80px" class="tr">Lebar</th>
+                  <th
+                    v-for="k in KOLOM_JUMLAH"
+                    :key="k.key"
+                    style="width: 100px"
+                    class="tr bg-yellow"
+                  >
+                    {{ k.label }}
+                  </th>
+                  <th style="width: 32px" class="tc"></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(row, idx) in formData.items" :key="idx">
+                  <td class="tc gt-lbl">{{ idx + 1 }}</td>
+                  <td class="p0">
+                    <div class="cell-grp">
+                      <input
+                        :value="row.spk"
+                        class="ci"
+                        placeholder="Ketik nomor + Enter / F1 cari"
+                        autocomplete="off"
+                        @keydown.enter.prevent="onEnterSpk($event, idx)"
+                        @keydown.f1.prevent="openLookupSpk(idx)"
+                        @blur="onBlurSpk($event, idx)"
+                      />
+                      <button
+                        type="button"
+                        class="ci-btn"
+                        title="Cari SPK"
+                        @click="openLookupSpk(idx)"
+                      >
+                        <IconSearch :size="11" />
+                      </button>
+                    </div>
+                  </td>
+                  <td class="p0">
                     <input
-                      :value="row.spk"
-                      class="ci"
-                      placeholder="Ketik nomor + Enter / F1 cari"
-                      autocomplete="off"
-                      @keydown.enter.prevent="onEnterSpk($event, idx)"
-                      @keydown.f1.prevent="openLookupSpk(idx)"
-                      @blur="onBlurSpk($event, idx)"
+                      :value="row.nama"
+                      class="ci ro"
+                      readonly
+                      :title="row.nama"
                     />
+                  </td>
+                  <td class="p0">
+                    <input :value="row.jumlahOrder" class="ci tr ro" readonly />
+                  </td>
+                  <td class="p0">
+                    <input :value="row.panjang" class="ci tr ro" readonly />
+                  </td>
+                  <td class="p0">
+                    <input :value="row.lebar" class="ci tr ro" readonly />
+                  </td>
+                  <td v-for="k in KOLOM_JUMLAH" :key="k.key" class="p0">
+                    <input
+                      v-model.number="row[k.key]"
+                      type="number"
+                      min="0"
+                      step="1"
+                      class="ci tr fw bg-yellow-light"
+                      :ref="(el) => setFieldRef(el, idx, k.key)"
+                      @keydown.enter.prevent="onEnter(idx, k.key)"
+                      v-select-on-focus
+                    />
+                  </td>
+                  <td class="tc">
                     <button
                       type="button"
-                      class="ci-btn"
-                      title="Cari SPK"
-                      @click="openLookupSpk(idx)"
+                      class="btn-del"
+                      @click="removeRow(idx)"
                     >
-                      <IconSearch :size="11" />
+                      ✕
                     </button>
-                  </div>
-                </td>
-                <td class="p0">
-                  <input
-                    :value="row.nama"
-                    class="ci ro"
-                    readonly
-                    :title="row.nama"
-                  />
-                </td>
-                <td class="p0">
-                  <input :value="row.jumlahOrder" class="ci tr ro" readonly />
-                </td>
-                <td class="p0">
-                  <input :value="row.panjang" class="ci tr ro" readonly />
-                </td>
-                <td class="p0">
-                  <input :value="row.lebar" class="ci tr ro" readonly />
-                </td>
-                <td v-for="k in KOLOM_JUMLAH" :key="k.key" class="p0">
-                  <input
-                    v-model.number="row[k.key]"
-                    type="number"
-                    min="0"
-                    step="1"
-                    class="ci tr fw bg-yellow-light"
-                    :ref="(el) => setFieldRef(el, idx, k.key)"
-                    @keydown.enter.prevent="onEnter(idx, k.key)"
-                    v-select-on-focus
-                  />
-                </td>
-                <td v-for="k in KOLOM_BS" :key="k.key" class="p0">
-                  <input
-                    v-model.number="row[k.key]"
-                    type="number"
-                    min="0"
-                    step="1"
-                    class="ci tr fw bg-yellow-light"
-                    :ref="(el) => setFieldRef(el, idx, k.key)"
-                    @keydown.enter.prevent="onEnter(idx, k.key)"
-                    v-select-on-focus
-                  />
-                </td>
-                <td class="tc">
-                  <button type="button" class="btn-del" @click="removeRow(idx)">
-                    ✕
-                  </button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Karyawan quiring dari absensi HRD -->
+        <div class="sec-kar">
+          <div class="tbl-header tbl-header-sub">
+            <span class="tbl-title">Karyawan Quiring (absensi)</span>
+            <span class="hint">
+              {{ jumlahDipilih }} dipilih dari {{ formData.karyawan.length }}
+            </span>
+          </div>
+          <div class="tbl-wrap kar-wrap">
+            <table class="gt" style="min-width: 560px">
+              <thead>
+                <tr>
+                  <th style="width: 32px" class="tc">
+                    <input
+                      v-model="semuaDipilih"
+                      type="checkbox"
+                      :disabled="isLegacy || formData.karyawan.length === 0"
+                    />
+                  </th>
+                  <th style="width: 110px">NIK</th>
+                  <th>Nama</th>
+                  <th style="width: 70px" class="tc">Masuk</th>
+                  <th style="width: 70px" class="tc">Pulang</th>
+                  <th style="width: 80px" class="tc">Jam Kerja</th>
+                  <th style="width: 80px" class="tc">Lembur</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="k in formData.karyawan" :key="k.nik">
+                  <td class="tc">
+                    <input
+                      v-model="k.pilih"
+                      type="checkbox"
+                      :disabled="isLegacy"
+                    />
+                  </td>
+                  <td class="gt-ro">{{ k.nik }}</td>
+                  <td class="gt-ro" :title="k.nama">{{ k.nama }}</td>
+                  <td class="gt-lbl tc">{{ k.jamMasuk || "-" }}</td>
+                  <td class="gt-lbl tc">{{ k.jamPulang || "-" }}</td>
+                  <td class="gt-lbl tc">{{ k.jamKerja }}</td>
+                  <td class="gt-lbl tc">{{ k.jamLembur }}</td>
+                </tr>
+                <tr v-if="formData.karyawan.length === 0">
+                  <td colspan="7" class="kar-kosong">
+                    {{ pesanKaryawanKosong }}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </template>
@@ -642,6 +831,7 @@ const tutupSetelahSimpan = () => {
   min-height: 0;
   min-width: 0;
   overflow: hidden;
+  gap: 10px;
 }
 
 .fr {
@@ -692,6 +882,10 @@ const tutupSetelahSimpan = () => {
 }
 .inp:focus {
   border-color: #1565c0;
+}
+.inp:disabled {
+  background: #dde8f0;
+  color: #444;
 }
 .ro {
   background: #dde8f0 !important;
@@ -859,5 +1053,42 @@ const tutupSetelahSimpan = () => {
 .btn-del:hover {
   background: #ffebee;
   border-radius: 2px;
+}
+.sec-spk {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+.sec-kar {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+.kar-wrap {
+  max-height: 180px;
+}
+.tbl-header-sub {
+  background: #546e7a;
+}
+.hint {
+  font-size: 10px;
+  opacity: 0.85;
+}
+.catatan {
+  margin-top: 4px;
+  font-size: 10px;
+  color: #757575;
+  font-style: italic;
+}
+.gt-ro {
+  padding: 0 6px;
+  font-size: 11px;
+}
+.kar-kosong {
+  padding: 12px 10px;
+  color: #757575;
+  font-style: italic;
+  text-align: center;
 }
 </style>

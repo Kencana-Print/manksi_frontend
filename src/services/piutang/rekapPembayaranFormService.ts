@@ -6,6 +6,10 @@ const BASE = "/piutang/rekap-pembayaran-form";
 export interface SupplierRekap {
   kode: string;
   nama: string;
+  bank: string;
+  rekening: string;
+  atasnama: string;
+  jumlahRekening: number;
 }
 
 export interface InfoNota {
@@ -48,6 +52,10 @@ export interface VoucherOption {
   nominal: number;
   kategori: string;
   kategoriUrut: number;
+  bank: string;
+  rekening: string;
+  atasnama: string;
+  jumlahRekening: number;
 }
 
 export interface RekapDetailPayload {
@@ -94,6 +102,7 @@ export interface RekapDetailLoaded {
   keterangan: string;
   vouNomor: string;
   pjtNomor: string;
+  jumlahRekening: number;
 }
 
 export interface RekapLoaded {

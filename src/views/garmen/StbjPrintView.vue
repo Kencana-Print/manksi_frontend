@@ -93,6 +93,11 @@ const totalJumlah = (dtl: any[]) =>
               <td class="sep">:</td>
               <td class="val">{{ data.header.stbj_keterangan }}</td>
             </tr>
+            <tr v-if="data.header.kch_nomor">
+              <td class="lbl">No. CBK</td>
+              <td class="sep">:</td>
+              <td class="val mono">{{ data.header.kch_nomor }}</td>
+            </tr>
           </table>
         </div>
         <div class="kop-right">
@@ -118,7 +123,7 @@ const totalJumlah = (dtl: any[]) =>
             <th>Nama</th>
             <th style="width: 80px">Ukuran</th>
             <th style="width: 55px; text-align: right">Jumlah</th>
-            <th style="width: 45px; text-align: right">Jumlah<br />Koli</th>
+            <th style="width: 70px; text-align: right">Jumlah<br />Koli</th>
             <th style="width: 80px">Keterangan</th>
           </tr>
         </thead>
@@ -130,7 +135,10 @@ const totalJumlah = (dtl: any[]) =>
             <td>{{ r.spk_nama }}</td>
             <td>{{ isSpanduk ? r.spk_ukuran : r.stbjd_size }}</td>
             <td class="tr">{{ num(r.stbjd_jumlah) }}</td>
-            <td class="tr">{{ r.stbjd_koli || "" }}</td>
+            <td class="tr">
+              {{ r.stbjd_koli || "" }}
+              <div v-if="r.no_koli" class="no-koli">No. {{ r.no_koli }}</div>
+            </td>
             <td>{{ r.stbjd_keterangan }}</td>
           </tr>
         </tbody>
@@ -309,6 +317,12 @@ body {
 }
 .tr {
   text-align: right;
+}
+.no-koli {
+  font-size: 6.5pt;
+  color: #444;
+  white-space: normal;
+  word-break: break-word;
 }
 
 /* TTD */

@@ -17,6 +17,7 @@ import {
   type ExcelSheetConfig,
 } from "@/utils/excelExport";
 import { formatTanggal } from "@/utils/dateFormat";
+import { useAuthStore } from "@/stores/authStore";
 import {
   rekapPembayaranService,
   pesanError,
@@ -35,6 +36,36 @@ interface KelompokKategori {
 
 const toast = useToast();
 const router = useRouter();
+const authStore = useAuthStore();
+
+// Harus sama dengan BAGIAN_LIHAT_REKENING di backend (backend yang menentukan
+// data terkirim atau tidak; ini hanya mengatur tampilan kolom).
+const BAGIAN_LIHAT_REKENING = [
+  "PEMBELIAN",
+  "FINANCE",
+  "EDP",
+  "DIREKSI",
+  "AUDIT",
+];
+const canLihatRekening = computed(() =>
+  BAGIAN_LIHAT_REKENING.includes((authStore.user?.bagian || "").toUpperCase()),
+);
+// Kolom rekening supplier di Excel (hanya bagian berhak)
+const kolomRekening = (): ExcelColumn[] =>
+  canLihatRekening.value
+    ? [
+        { header: "Bank", key: "bank", width: 16 },
+        { header: "No. Rekening", key: "rekening", width: 24 },
+        { header: "Atas Nama", key: "atasnama", width: 28 },
+        {
+          header: "Rekening Lain",
+          key: "rekeningLain",
+          width: 14,
+          align: "right",
+          numFmt: "#,##0",
+        },
+      ]
+    : [];
 const browseRef = ref<InstanceType<typeof BaseBrowse> | null>(null);
 
 // ─── Helpers ──────────────────────────────────────────────
@@ -395,6 +426,7 @@ const doExportDetail = async () => {
         { header: "Kategori", key: "kategori", width: 18 },
         { header: "Kode Supplier", key: "kodeSupplier", width: 14 },
         { header: "Nama Supplier", key: "namaSupplier", width: 32 },
+        ...kolomRekening(),
         { header: "Bulan Tagihan", key: "bulanTagihan", width: 16 },
         { header: "No", key: "noUrut", align: "right", width: 6 },
         { header: "Tipe", key: "tipe", width: 8 },
@@ -428,6 +460,10 @@ const doExportDetail = async () => {
         kategori: r.kategori,
         kodeSupplier: r.kodeSupplier,
         namaSupplier: r.namaSupplier,
+        bank: r.bank,
+        rekening: r.rekening,
+        atasnama: r.atasnama,
+        rekeningLain: Math.max(0, r.jumlahRekening - 1),
         bulanTagihan: formatBulan(r.bulanTagihan),
         noUrut: r.noUrut,
         tipe: r.tipe,
@@ -487,6 +523,10 @@ interface BarisBulanan {
   tanggal: string;
   kodeSupplier: string;
   namaSupplier: string;
+  bank: string;
+  rekening: string;
+  atasnama: string;
+  rekeningLain: number;
   status: string;
   tipe: string;
   nota: string;
@@ -500,12 +540,13 @@ interface BarisBulanan {
   isTotal: boolean;
 }
 
-const kolomBulanan: ExcelColumn[] = [
+const kolomBulanan = (): ExcelColumn[] => [
   { header: "Kategori", key: "kategori", width: 18 },
   { header: "Nomor Rekap", key: "nomor", width: 22 },
   { header: "Tanggal", key: "tanggal", width: 12 },
   { header: "Kode Supplier", key: "kodeSupplier", width: 14 },
   { header: "Nama Supplier", key: "namaSupplier", width: 32 },
+  ...kolomRekening(),
   { header: "Status", key: "status", width: 10 },
   { header: "Tipe", key: "tipe", width: 8 },
   { header: "Nomor Nota", key: "nota", width: 20 },
@@ -571,6 +612,10 @@ const doExportBulanan = async () => {
           tanggal: formatTanggal(r.tanggal),
           kodeSupplier: r.kodeSupplier,
           namaSupplier: r.namaSupplier,
+          bank: r.bank,
+          rekening: r.rekening,
+          atasnama: r.atasnama,
+          rekeningLain: Math.max(0, r.jumlahRekening - 1),
           status: r.status,
           tipe: r.tipe,
           nota: r.nota,
@@ -596,6 +641,10 @@ const doExportBulanan = async () => {
           tanggal: "",
           kodeSupplier: "",
           namaSupplier: "",
+          bank: "",
+          rekening: "",
+          atasnama: "",
+          rekeningLain: 0,
           status: "",
           tipe: "",
           nota: "",
@@ -610,7 +659,7 @@ const doExportBulanan = async () => {
         });
         return {
           sheetName: formatBulan(bulan).slice(0, 31),
-          columns: kolomBulanan,
+          columns: kolomBulanan(),
           rows,
           rowStyleFn: (row: BarisBulanan) => {
             if (row.isTotal) {
@@ -767,6 +816,7 @@ fetchData();
             <thead>
               <tr>
                 <th style="width: 230px">SUPPLIER</th>
+                <th v-if="canLihatRekening" style="width: 300px">REKENING</th>
                 <th style="width: 140px">BULAN TAGIHAN</th>
                 <th style="width: 60px">TIPE</th>
                 <th style="width: 170px">NOMOR NOTA</th>
@@ -786,12 +836,27 @@ fetchData();
               :key="g.kategori"
             >
               <tr class="grp-row">
-                <td colspan="6">{{ g.kategori }}</td>
+                <td :colspan="canLihatRekening ? 7 : 6">{{ g.kategori }}</td>
                 <td class="num">{{ fmtNominal(g.subtotal) }}</td>
                 <td colspan="6"></td>
               </tr>
               <tr v-for="d in g.rows" :key="d.noUrut">
                 <td>{{ d.namaSupplier }}</td>
+                <td v-if="canLihatRekening">
+                  <template v-if="d.rekening">
+                    {{ d.bank }} {{ d.rekening }}
+                    <span v-if="d.atasnama" class="rek-an"
+                      >a.n. {{ d.atasnama }}</span
+                    >
+                    <span
+                      v-if="d.jumlahRekening > 1"
+                      class="rek-banyak"
+                      title="Supplier punya lebih dari satu rekening; rekening dipilih saat Pengajuan Transfer"
+                      >+{{ d.jumlahRekening - 1 }}</span
+                    >
+                  </template>
+                  <span v-else class="rek-kosong">Belum ada</span>
+                </td>
                 <td>{{ formatBulan(d.bulanTagihan) }}</td>
                 <td>{{ d.tipe }}</td>
                 <td>{{ d.nota }}</td>
@@ -812,7 +877,7 @@ fetchData();
             </tbody>
             <tbody v-if="!(kelompokByNomor[item.nomor] ?? []).length">
               <tr>
-                <td colspan="13" class="empty-row">
+                <td :colspan="canLihatRekening ? 14 : 13" class="empty-row">
                   &lt;Tidak ada transaksi&gt;
                 </td>
               </tr>
@@ -994,6 +1059,23 @@ fetchData();
   font-weight: 700;
   font-size: 11px;
   border-bottom: 1px solid #b0bec5;
+}
+.rek-an {
+  margin-left: 6px;
+  color: #616161;
+}
+.rek-banyak {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: #fff3e0;
+  color: #e65100;
+  font-size: 10px;
+  font-weight: 700;
+}
+.rek-kosong {
+  color: #c62828;
+  font-style: italic;
 }
 .empty-row {
   text-align: center;

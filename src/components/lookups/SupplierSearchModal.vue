@@ -35,6 +35,12 @@ const visiblePages = computed(() => {
   if (end - start < 4) start = Math.max(1, end - 4);
   return Array.from({ length: end - start + 1 }, (_, i) => start + i);
 });
+// Kolom rekening hanya muncul kalau hasil memang membawa data rekening
+const adaRekening = computed(() => items.value.some((i) => i.Rekening));
+
+// Baris lanjutan = supplier sama dengan baris di atasnya (supplier dengan >1 rekening)
+const isLanjutan = (idx: number) =>
+  idx > 0 && items.value[idx - 1].Kode === items.value[idx].Kode;
 
 let debounce: ReturnType<typeof setTimeout> | null = null;
 
@@ -96,7 +102,7 @@ const selectItem = (item: any) => {
   <v-dialog
     :model-value="modelValue"
     @update:model-value="emit('update:modelValue', $event)"
-    max-width="900px"
+    max-width="1100px"
   >
     <div class="lookup-card">
       <div class="lookup-header">
@@ -141,6 +147,11 @@ const selectItem = (item: any) => {
               <th>NAMA SUPPLIER</th>
               <th>ALAMAT</th>
               <th style="width: 120px">KOTA</th>
+              <template v-if="adaRekening">
+                <th style="width: 120px">BANK</th>
+                <th>ATAS NAMA</th>
+                <th style="width: 160px">NO. REKENING</th>
+              </template>
               <template v-if="showRiwayat">
                 <th style="width: 100px">TRX TERAKHIR</th>
                 <th style="width: 120px" class="text-right">NOMINAL</th>
@@ -150,23 +161,32 @@ const selectItem = (item: any) => {
           <tbody>
             <tr
               v-for="(item, idx) in items"
-              :key="item.Kode + '|' + (item.Rekening || idx)"
+              :key="item.Kode + '|' + idx"
               class="lookup-row"
               @click="selectItem(item)"
             >
-              <td class="td-kode">{{ item.Kode }}</td>
-              <td class="font-weight-bold">{{ item.Nama }}</td>
-              <td>{{ item.Alamat || "-" }}</td>
-              <td>{{ item.Kota || "-" }}</td>
+              <td class="td-kode">{{ isLanjutan(idx) ? "" : item.Kode }}</td>
+              <td class="font-weight-bold">
+                {{ isLanjutan(idx) ? "" : item.Nama }}
+              </td>
+              <td>{{ isLanjutan(idx) ? "" : item.Alamat || "-" }}</td>
+              <td>{{ isLanjutan(idx) ? "" : item.Kota || "-" }}</td>
+              <template v-if="adaRekening">
+                <td>{{ item.Bank || "-" }}</td>
+                <td>{{ item.AtasNama || "-" }}</td>
+                <td class="td-rek">{{ item.Rekening || "-" }}</td>
+              </template>
               <template v-if="showRiwayat">
-                <td>{{ item.TglTrx || "-" }}</td>
+                <td>{{ isLanjutan(idx) ? "" : item.TglTrx || "-" }}</td>
                 <td class="text-right">
                   {{
-                    item.Nominal == null
-                      ? "-"
-                      : new Intl.NumberFormat("id-ID", {
-                          maximumFractionDigits: 0,
-                        }).format(Number(item.Nominal))
+                    isLanjutan(idx)
+                      ? ""
+                      : item.Nominal == null
+                        ? "-"
+                        : new Intl.NumberFormat("id-ID", {
+                            maximumFractionDigits: 0,
+                          }).format(Number(item.Nominal))
                   }}
                 </td>
               </template>
@@ -354,6 +374,9 @@ const selectItem = (item: any) => {
   font-weight: 600;
   font-size: 12px;
   color: #1565c0;
+}
+.td-rek {
+  font-family: monospace;
 }
 .lookup-footer {
   display: flex;

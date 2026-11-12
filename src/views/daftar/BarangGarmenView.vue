@@ -22,7 +22,7 @@ const selectedJenis = ref("ACCESORIES");
 const selectedCabang = ref(authStore.userCabang || "HO-");
 const cabangOptions = ref<string[]>([]); // Sekarang dinamis
 // Sama dengan CABANG_SPANDUK di backend (garmenBrgService)
-const CABANG_SPANDUK = ["P02", "P05"];
+const CABANG_SPANDUK = ["P02"];
 const isSpandukCabang = computed(() =>
   CABANG_SPANDUK.includes(selectedCabang.value),
 );
@@ -83,12 +83,19 @@ const showFilterAtk = computed(() => {
   return ["GA", "FINANCE", "AUDIT", "DIREKSI", "EDP", "ADMIN"].includes(b);
 });
 
+// ASET: daftar bagian sementara disamakan dengan ATK/RTK [KONFIRMASI]
+const showFilterAset = computed(() => {
+  const b = authStore.user?.bagian || "";
+  return ["GA", "FINANCE", "AUDIT", "DIREKSI", "EDP", "ADMIN"].includes(b);
+});
+
 // Menentukan Default Check (Migrasi rbacc.Checked:=True dll)
 onMounted(async () => {
   // 1. Set Default Radio Button
   if (showFilterAcc.value) selectedJenis.value = "ACCESORIES";
   else if (showFilterAtk.value) selectedJenis.value = "ATK/RTK";
   else if (showFilterSparepart.value) selectedJenis.value = "SPAREPART";
+  else if (showFilterAset.value) selectedJenis.value = "ASET";
 
   // 2. Daftar cabang sepenuhnya dari backend
   try {
@@ -157,14 +164,23 @@ const headers = computed(() => {
     base.push({ title: "NOTE", key: "Note", width: "150px" });
   }
 
+  const akhir = [
+    { title: "AKTIF", key: "Aktif", width: "70px", align: "center" },
+    { title: "USER CREATE", key: "Usr", width: "110px" },
+    { title: "DATE CREATE", key: "Created", width: "160px" },
+  ];
+
+  // Aset belum punya stok: Buffer, Stok, dan Safety tidak ditampilkan
+  if (selectedJenis.value === "ASET") {
+    return [...base, ...akhir];
+  }
+
   return [
     ...base,
     { title: "BUFFER", key: "Buffer", width: "80px", align: "right" },
     { title: "STOK", key: "Stok", width: "80px", align: "right" },
     { title: "SAFETY", key: "Safety", width: "80px", align: "right" },
-    { title: "AKTIF", key: "Aktif", width: "70px", align: "center" },
-    { title: "USER CREATE", key: "Usr", width: "110px" },
-    { title: "DATE CREATE", key: "Created", width: "160px" },
+    ...akhir,
   ];
 });
 
@@ -268,6 +284,12 @@ const handleEdit = async (item: any) => {
           value="ATK/RTK"
           color="primary"
         ></v-radio>
+        <v-radio
+          v-if="showFilterAset"
+          label="ASET"
+          value="ASET"
+          color="primary"
+        ></v-radio>
       </v-radio-group>
 
       <v-divider vertical class="mx-3 my-2"></v-divider>
@@ -323,7 +345,7 @@ const handleEdit = async (item: any) => {
     :is-new-mode="isNewMode"
     :edit-data="editData"
     :jenis-garmen="selectedJenis"
-    :spanduk="isSpandukCabang"
+    :spanduk="isSpandukCabang && selectedJenis !== 'ASET'"
     @saved="fetchData"
   />
 

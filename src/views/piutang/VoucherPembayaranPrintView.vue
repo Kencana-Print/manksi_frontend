@@ -218,7 +218,7 @@ const grandTotal = computed(
             <span>Total</span
             ><span class="footer-val">{{ fmt(grandNet) }}</span>
           </div>
-          <div class="footer-row">
+          <div v-if="bahanTambahan" class="footer-row">
             <span>Bahan Tambahan</span
             ><span class="footer-val">{{ fmtBahan(bahanTambahan) }}</span>
           </div>

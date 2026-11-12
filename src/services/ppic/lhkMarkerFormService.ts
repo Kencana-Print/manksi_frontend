@@ -19,6 +19,7 @@ export interface AntreanMarkerItem {
   jmlSpkSelesai: number;
   totalJml: number | string;
   spkNomor: string | null;
+  spkList?: { nomor: string; nama: string | null }[];
   status: string;
 }
 

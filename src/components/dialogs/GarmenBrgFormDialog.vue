@@ -153,6 +153,7 @@ const loadOptions = async () => {
       OBAT: "satuan_obat",
       SPAREPART: "satuan_sparepart",
       "ATK/RTK": "satuan_atk",
+      ASET: "satuan_aset",
     };
     const [resSatuan, resProject] = await Promise.all([
       api.get(
@@ -514,7 +515,9 @@ const handleSave = async () => {
           </template>
 
           <!-- ── OBAT / SPAREPART / ATK ── -->
-          <template v-else-if="jenisGarmen !== 'ACCESORIES'">
+          <template
+            v-else-if="jenisGarmen !== 'ACCESORIES' && jenisGarmen !== 'ASET'"
+          >
             <div class="f-section-title">Kategori</div>
             <div class="kategori-group">
               <template v-if="isSpanduk">
@@ -592,7 +595,11 @@ const handleSave = async () => {
                 </option>
               </select>
             </div>
-            <div class="f-field" style="width: 130px">
+            <div
+              v-if="jenisGarmen !== 'ASET'"
+              class="f-field"
+              style="width: 130px"
+            >
               <label class="f-label">Buffer Stok</label>
               <input
                 v-model.number="formData.brg_buffer"

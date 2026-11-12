@@ -209,6 +209,7 @@ const defaultData = {
   spk_tipe: "Medium",
   spk_pen_nomor: "",
   spk_pen_id: "",
+  spk_bahan: "Y", // Y = pakai bahan (perlu MKB), N = Non Bahan
 
   // Array untuk Tabel Detail
   spk_repeat: "",
@@ -338,6 +339,7 @@ const {
       spk_pinjo: d.header.spk_pinjo || "",
 
       spk_alokasi: d.header.spk_alokasi || "N",
+      spk_bahan: d.header.spk_bahan === "N" ? "N" : "Y",
 
       spk_revisi: d.header.spk_revisi || "N",
       spk_ketrevisi: d.header.spk_ketrevisi || "",
@@ -384,6 +386,11 @@ const {
     };
   },
   submitApi: async (data: any) => {
+    // Divisi Spanduk (1): field ini disembunyikan di form. Untuk SO baru, kosongkan
+    // supaya nilai bawaan dari MAP / salin SO tidak ikut tersimpan.
+    const kosongkanSpanduk =
+      !isEditMode.value && String(data.spk_divisi).charAt(0) === "1";
+
     // Siapkan Payload ke Backend
     const payload = {
       isEdit: isEditMode.value,
@@ -400,13 +407,13 @@ const {
         spk_sal_kode: data.spk_sal_kode,
         spk_jo_kode: data.spk_jo_kode,
         spk_nama: data.spk_nama,
-        spk_ukuran: data.spk_ukuran,
+        spk_ukuran: kosongkanSpanduk ? "" : data.spk_ukuran,
         spk_jumlah: data.spk_jumlah,
         spk_kain: data.spk_kain,
         spk_finishing: data.spk_finishing,
         spk_panjang: data.spk_panjang,
         spk_lebar: data.spk_lebar,
-        spk_gramasi: data.spk_gramasi,
+        spk_gramasi: kosongkanSpanduk ? "" : data.spk_gramasi,
         spk_harga: data.spk_harga,
         spk_hargariil: data.spk_hargariil,
         spk_hargafee: data.spk_hargafee,
@@ -419,6 +426,7 @@ const {
         spk_ketpo: data.spk_ketpo,
         spk_lama: data.spk_lama,
         spk_alokasi: data.spk_alokasi || "N",
+        spk_bahan: data.spk_bahan === "N" ? "N" : "Y",
         spk_repeat: data.spk_repeat,
         spk_label: data.spk_label,
         spk_cmo: data.spk_cmo,
@@ -447,9 +455,9 @@ const {
         spk_sizekhusus: data.spk_sizekhusus,
         spk_standar_ukuran: data.spk_standar_ukuran,
         spk_varian_ukuran: data.spk_varian_ukuran,
-        spk_sablon: data.spk_sablon,
-        spk_bordir: data.spk_bordir,
-        spk_sublim: data.spk_sublim,
+        spk_sablon: kosongkanSpanduk ? "N" : data.spk_sablon,
+        spk_bordir: kosongkanSpanduk ? "N" : data.spk_bordir,
+        spk_sublim: kosongkanSpanduk ? "N" : data.spk_sublim,
         spk_acc_customer: data.spk_acc_customer,
         spk_acc_tanggal: data.spk_acc_tanggal || null,
         spk_desain: data.spk_desain || "",

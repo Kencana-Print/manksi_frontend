@@ -493,7 +493,12 @@ onMounted(async () => {
         .map((s: any) => `${s.size}=${s.qty}`)
         .join(", ");
     } else {
-      data.value.sizeStr = data.value.spk_ukuran;
+      const uk = String(data.value.spk_ukuran || "").trim();
+      data.value.sizeStr =
+        uk ||
+        (isSpandukMMT.value && data.value.spk_panjang && data.value.spk_lebar
+          ? `${formatUkuran(data.value.spk_panjang)} X ${formatUkuran(data.value.spk_lebar)} M`
+          : "");
     }
 
     isLoaded.value = true;

@@ -108,6 +108,7 @@ const baseHeaders = [
   { title: "Jenis PO", key: "JenisPO", width: "100px" },
   { title: "PO Greige", key: "PoGreige", width: "130px" },
   { title: "PO Celup", key: "PoCelup", width: "150px" },
+  { title: "Permintaan", key: "Permintaan", width: "130px" },
   { title: "Tanggal", key: "Tanggal", width: "100px", align: "center" },
   { title: "Delivery", key: "Comm_Delivery", width: "100px", align: "center" },
   { title: "Qty PO", key: "QtyPO", width: "100px", align: "right" },
@@ -356,6 +357,7 @@ const onExportDetail = async () => {
         Tanggal: tglExport(first.Tanggal),
         Comm_Delivery: tglExport(first.Comm_Delivery),
         JenisPO: first.JenisPO,
+        Permintaan: first.Permintaan || "",
         Keterangan: first.Keterangan || "",
         Note: noteByNomor.get(first.Nomor) ?? "",
         ...(canLihatSup.value && !isLainLain
@@ -389,6 +391,7 @@ const onExportDetail = async () => {
             : {}),
           Status_barang: r.Status_barang,
           MKB: r.MKB,
+          MPPB: r.MPPB || "",
           SPK: r.SPK,
           Nama_SPK: r.Nama_SPK,
           KetItem: r.KetItem || "",
@@ -401,6 +404,7 @@ const onExportDetail = async () => {
       { header: "Tanggal", key: "Tanggal", width: 12, align: "center" },
       { header: "Delivery", key: "Comm_Delivery", width: 12, align: "center" },
       { header: "Jenis PO", key: "JenisPO", width: 12, align: "center" },
+      { header: "Permintaan", key: "Permintaan", width: 18 },
       { header: "Keterangan", key: "Keterangan", width: 35 },
       { header: "Note", key: "Note", width: 30 },
       ...(canLihatSup.value
@@ -471,6 +475,7 @@ const onExportDetail = async () => {
         : []),
       { header: "Status", key: "Status_barang", width: 12, align: "center" },
       { header: "No. MKB", key: "MKB", width: 16 },
+      { header: "No. MPPB", key: "MPPB", width: 16 },
       { header: "No. SPK", key: "SPK", width: 16 },
       { header: "Nama SPK", key: "Nama_SPK", width: 28 },
       { header: "Ket. Item", key: "KetItem", width: 28 },
@@ -646,7 +651,7 @@ const summaryFormatters = {
             type="text"
             v-model="filterState.search"
             @input="onSearchInput"
-            placeholder="Cari Nama Bahan / Keterangan..."
+            placeholder="Cari Bahan / Ket / Permintaan / MPPB..."
             class="f-search-inp"
           />
         </div>
@@ -712,6 +717,7 @@ const summaryFormatters = {
                 <th v-if="canLihatBeli" width="70" class="tr">PPN (%)</th>
                 <th width="80" class="text-center">Status</th>
                 <th v-if="item.JenisPO !== 'SPANDUK'" width="120">No. MKB</th>
+                <th width="120">No. MPPB</th>
                 <th width="120">No. SPK</th>
                 <th width="200">Nama SPK</th>
                 <th v-if="item.JenisPO === 'SPANDUK'" width="220">
@@ -762,6 +768,7 @@ const summaryFormatters = {
                   </v-chip>
                 </td>
                 <td v-if="item.JenisPO !== 'SPANDUK'">{{ d.MKB || "-" }}</td>
+                <td>{{ d.MPPB || "-" }}</td>
                 <td>{{ d.SPK || "-" }}</td>
                 <td>{{ d.Nama_SPK || "-" }}</td>
                 <td v-if="item.JenisPO === 'SPANDUK'">

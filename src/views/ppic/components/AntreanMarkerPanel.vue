@@ -57,6 +57,25 @@ const dlClass = (sisaHari: number) => {
 const fmtJml = (v: number | string): string =>
   Number(v ?? 0).toLocaleString("id-ID");
 
+const MAX_SPK = 2;
+const expanded = ref<Set<string>>(new Set());
+
+const toggleSpk = (nomor: string) => {
+  const s = new Set(expanded.value);
+  if (!s.delete(nomor)) s.add(nomor);
+  expanded.value = s;
+};
+
+// Fallback ke spkNomor lama kalau backend belum kirim spkList
+const spkItems = (r: AntreanMarkerItem) =>
+  r.spkList ??
+  (r.spkNomor
+    ? r.spkNomor.split(", ").map((n) => ({ nomor: n, nama: null }))
+    : []);
+
+const spkTampil = (r: AntreanMarkerItem) =>
+  expanded.value.has(r.nomor) ? spkItems(r) : spkItems(r).slice(0, MAX_SPK);
+
 // ── Konfirmasi umum (Ambil, Ambil Alih, Lepas) ──
 const showConfirm = ref(false);
 const confirmTitle = ref("");
@@ -167,8 +186,25 @@ const inputLhk = (r: AntreanMarkerItem) => {
               <td :class="dlClass(r.sisaHari)">
                 {{ formatTanggal(r.deadline) }}
               </td>
-              <td class="cell-spk" :title="r.spkNomor ?? ''">
-                {{ r.spkNomor || "-" }}
+              <td class="cell-spk">
+                <div v-for="s in spkTampil(r)" :key="s.nomor" class="spk-line">
+                  <span class="mono">{{ s.nomor }}</span>
+                  <span v-if="s.nama" class="spk-nama" :title="s.nama">{{
+                    s.nama
+                  }}</span>
+                </div>
+                <button
+                  v-if="spkItems(r).length > MAX_SPK"
+                  type="button"
+                  class="spk-more"
+                  @click="toggleSpk(r.nomor)"
+                >
+                  {{
+                    expanded.has(r.nomor)
+                      ? "Ringkas"
+                      : `+${spkItems(r).length - MAX_SPK} SPK lainnya`
+                  }}
+                </button>
               </td>
               <td class="tr">{{ r.jmlSpk }}</td>
               <td class="tr fw">{{ fmtJml(r.totalJml) }}</td>
@@ -227,8 +263,25 @@ const inputLhk = (r: AntreanMarkerItem) => {
               <td :class="dlClass(r.sisaHari)">
                 {{ formatTanggal(r.deadline) }}
               </td>
-              <td class="cell-spk" :title="r.spkNomor ?? ''">
-                {{ r.spkNomor || "-" }}
+              <td class="cell-spk">
+                <div v-for="s in spkTampil(r)" :key="s.nomor" class="spk-line">
+                  <span class="mono">{{ s.nomor }}</span>
+                  <span v-if="s.nama" class="spk-nama" :title="s.nama">{{
+                    s.nama
+                  }}</span>
+                </div>
+                <button
+                  v-if="spkItems(r).length > MAX_SPK"
+                  type="button"
+                  class="spk-more"
+                  @click="toggleSpk(r.nomor)"
+                >
+                  {{
+                    expanded.has(r.nomor)
+                      ? "Ringkas"
+                      : `+${spkItems(r).length - MAX_SPK} SPK lainnya`
+                  }}
+                </button>
               </td>
               <td class="tc">{{ r.jmlSpkSelesai }} / {{ r.jmlSpk }}</td>
               <td class="tr fw">{{ fmtJml(r.totalJml) }}</td>
@@ -295,8 +348,25 @@ const inputLhk = (r: AntreanMarkerItem) => {
               <td :class="dlClass(r.sisaHari)">
                 {{ formatTanggal(r.deadline) }}
               </td>
-              <td class="cell-spk" :title="r.spkNomor ?? ''">
-                {{ r.spkNomor || "-" }}
+              <td class="cell-spk">
+                <div v-for="s in spkTampil(r)" :key="s.nomor" class="spk-line">
+                  <span class="mono">{{ s.nomor }}</span>
+                  <span v-if="s.nama" class="spk-nama" :title="s.nama">{{
+                    s.nama
+                  }}</span>
+                </div>
+                <button
+                  v-if="spkItems(r).length > MAX_SPK"
+                  type="button"
+                  class="spk-more"
+                  @click="toggleSpk(r.nomor)"
+                >
+                  {{
+                    expanded.has(r.nomor)
+                      ? "Ringkas"
+                      : `+${spkItems(r).length - MAX_SPK} SPK lainnya`
+                  }}
+                </button>
               </td>
               <td class="tc">{{ r.jmlSpkSelesai }} / {{ r.jmlSpk }}</td>
               <td>{{ r.tglAmbil }}</td>
@@ -435,10 +505,32 @@ const inputLhk = (r: AntreanMarkerItem) => {
   vertical-align: middle;
 }
 .cell-spk {
-  max-width: 260px;
+  max-width: 340px;
+}
+.spk-line {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.spk-line .mono {
+  font-size: 10px;
+  flex-shrink: 0;
+}
+.spk-nama {
+  color: #666;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
+}
+.spk-more {
+  border: none;
+  background: transparent;
+  color: #1565c0;
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
 }
 .sub {
   font-size: 10px;

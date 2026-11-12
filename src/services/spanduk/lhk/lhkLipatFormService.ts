@@ -36,9 +36,7 @@ export interface LhkLipatDetail {
   Panjang: number | null;
   Lebar: number | null;
   Qty_Lipat: number | null;
-  Tambah_Lipat: number | null;
   Mata_Ayam: number | null;
-  BS_Lipat: number | null;
   Karyawan: LhkLipatKaryawan[];
 }
 
@@ -65,9 +63,7 @@ export interface LhkLipatPayload {
   Detail: {
     Nomor_SPK: string;
     Qty_Lipat: number;
-    Tambah_Lipat: number;
     Mata_Ayam: number;
-    BS_Lipat: number;
     Karyawan: { NIK: string; Qty: number }[];
   }[];
 }

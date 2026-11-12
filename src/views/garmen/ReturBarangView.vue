@@ -42,8 +42,30 @@ const filterState = ref({
 const cabangOptions = ["P01", "P02", "P03", "P04", "P05", "HO-", "ALL"];
 const jenisOptions = ref<string[]>([]);
 
+const BAGIAN_ASET_LIHAT = [
+  "GA",
+  "EDP",
+  "FINANCE",
+  "AUDIT",
+  "DIREKSI",
+  "PEMBELIAN",
+  "PURCHASING",
+];
+const BAGIAN_ASET_PROSES = ["GA", "EDP", "PEMBELIAN", "PURCHASING"];
+const KECAB_ASET = "P04";
+
+const cabangUser = () => {
+  const c = authStore.user?.cabang || "";
+  return cabangOptions.includes(c) ? c : "ALL";
+};
+
+const onJenisChange = () => {
+  filterState.value.cabang =
+    filterState.value.jenis === "ASET" ? KECAB_ASET : cabangUser();
+  fetchData();
+};
+
 onMounted(() => {
-  // Replikasi persis FormCreate .pas — visibilitas jenis per bagian
   const bagian = (authStore.user?.bagian || "").toUpperCase();
 
   if (
@@ -71,14 +93,28 @@ onMounted(() => {
     jenisOptions.value = ["SPAREPART"];
     filterState.value.jenis = "SPAREPART";
   } else {
-    // Sesuai Delphi: bagian lain -> btnRefresh.Visible:=False (tidak ada akses)
     jenisOptions.value = [];
   }
 
-  // Default cabang: pakai cabang user kalau ada di daftar, else ALL
-  const userCab = authStore.user?.cabang || "";
-  filterState.value.cabang = cabangOptions.includes(userCab) ? userCab : "ALL";
+  // Aset: bagian yang boleh melihat. PEMBELIAN/PURCHASING hanya Aset.
+  if (BAGIAN_ASET_LIHAT.includes(bagian)) {
+    jenisOptions.value = [...jenisOptions.value, "ASET"];
+  }
+  // Hanya satu pilihan (mis. PEMBELIAN) -> jadikan default
+  if (jenisOptions.value.length === 1) {
+    filterState.value.jenis = jenisOptions.value[0];
+  }
+
+  filterState.value.cabang =
+    filterState.value.jenis === "ASET" ? KECAB_ASET : cabangUser();
 });
+
+// Tombol tambah/ubah/hapus untuk Aset hanya untuk bagian pemroses
+const bolehProsesJenis = computed(
+  () =>
+    filterState.value.jenis !== "ASET" ||
+    BAGIAN_ASET_PROSES.includes((authStore.user?.bagian || "").toUpperCase()),
+);
 
 const canBrowse = computed(() => jenisOptions.value.length > 0);
 const showApproveColumns = computed(() =>
@@ -349,9 +385,9 @@ const submitAjukan = async () => {
     v-model:expanded="expandedRows"
     v-model:selected="selected"
     v-model:filter-state="filterState"
-    :can-insert="canInsert && canBrowse"
-    :can-edit="canEdit && canBrowse"
-    :can-delete="canDelete && canBrowse"
+    :can-insert="canInsert && canBrowse && bolehProsesJenis"
+    :can-edit="canEdit && canBrowse && bolehProsesJenis"
+    :can-delete="canDelete && canBrowse && bolehProsesJenis"
     :can-export="canExport && canBrowse"
     :row-props-fn="handleRowProps"
     @refresh="fetchData"
@@ -401,7 +437,7 @@ const submitAjukan = async () => {
                 type="radio"
                 v-model="filterState.jenis"
                 :value="jns"
-                @change="fetchData"
+                @change="onJenisChange"
               />
               {{ jns }}
             </label>
@@ -429,7 +465,7 @@ const submitAjukan = async () => {
 
     <template #extra-actions="{ selected }">
       <v-btn
-        v-if="canEdit && canBrowse"
+        v-if="canEdit && canBrowse && bolehProsesJenis"
         size="small"
         color="orange-darken-3"
         :disabled="selected.length === 0"

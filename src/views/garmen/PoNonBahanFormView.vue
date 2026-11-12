@@ -34,14 +34,12 @@ const defaultData = {
     po_nomor: "",
     po_jenis: formJenis.value,
     po_tanggal: todayLocal,
-    po_mb_nomor: "",
-    tglminta: "",
-    mb_cab: "",
     po_kecab: "",
     po_sup_kode: "",
     sup_nama: "",
     sup_alamat: "",
     sup_kota: "",
+    po_ppn: 0,
     po_ket: "",
     po_status: "",
     pin_status: "",
@@ -50,6 +48,9 @@ const defaultData = {
   },
   items: [] as any[],
 };
+
+// Input "Panggil Permintaan" (bukan bagian formData)
+const mintaInput = ref("");
 
 const showPrintDialog = ref(false);
 const nomorToPrint = ref("");
@@ -67,16 +68,6 @@ const canSeeSup = computed(() => authStore.user?.flags.lihatSup === 1);
 const canSeeBeli = computed(() => authStore.user?.flags.lihatBeli === 1);
 
 // --- HELPER FORMATTING UTK METRIC DAN KATA DI TEMPLATE ---
-const formatDateLocal = (value?: string | Date) => {
-  if (!value) return "";
-  const d = new Date(value);
-  if (isNaN(d.getTime())) return "";
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${day}-${month}-${year}`; // Mengubah visual ke standar DD-MM-YYYY
-};
-
 const formatQty = (val: any) => {
   return Number(val || 0).toLocaleString("en-US", {
     minimumFractionDigits: 2,
@@ -84,12 +75,16 @@ const formatQty = (val: any) => {
   });
 };
 
-const grandTotal = computed(() =>
+const subtotal = computed(() =>
   formData.value.items.reduce(
     (sum: number, item: any) => sum + (Number(item.total) || 0),
     0,
   ),
 );
+const ppnNilai = computed(
+  () => (subtotal.value * (Number(formData.value.header.po_ppn) || 0)) / 100,
+);
+const grandTotal = computed(() => subtotal.value + ppnNilai.value);
 
 const formatCurrency = (val: number) =>
   new Intl.NumberFormat("id-ID", {
@@ -151,14 +146,12 @@ const {
       po_nomor: "",
       po_jenis: formJenis.value,
       po_tanggal: todayLocal,
-      po_mb_nomor: "",
-      tglminta: "",
-      mb_cab: "",
       po_kecab: "",
       po_sup_kode: "",
       sup_nama: "",
       sup_alamat: "",
       sup_kota: "",
+      po_ppn: 0,
       po_ket: "",
       po_status: "",
       pin_status: "",
@@ -166,6 +159,7 @@ const {
       hasBpb: false,
     };
     formData.value.items = [];
+    mintaInput.value = "";
     showMintaModal.value = false;
     showSupModal.value = false;
     showPrintDialog.value = false;
@@ -179,8 +173,9 @@ const {
     formJenis.value = d.header.po_jenis;
 
     return {
-      header: d.header,
+      header: { ...d.header, po_ppn: Number(d.header.po_ppn) || 0 },
       items: d.detail.map((item: any) => ({
+        mbNomor: item.mbNomor || "",
         Kode: item.Kode || item.kode || "",
         Nama: item.Nama,
         Satuan: item.Satuan,
@@ -192,11 +187,7 @@ const {
         bpb: item.bpb,
         jumlah: item.jumlah,
         harga: item.harga,
-        ppn: Number(item.ppn) || 0,
-        total:
-          (Number(item.jumlah) || 0) *
-          (Number(item.harga) || 0) *
-          (1 + (Number(item.ppn) || 0) / 100),
+        total: (Number(item.jumlah) || 0) * (Number(item.harga) || 0),
       })),
     };
   },
@@ -206,8 +197,8 @@ const {
       po_nomor: data.header.po_nomor,
       po_jenis: formJenis.value,
       po_tanggal: data.header.po_tanggal,
-      po_mb_nomor: data.header.po_mb_nomor,
       po_kecab: data.header.po_kecab,
+      po_ppn: Number(data.header.po_ppn) || 0,
       po_ket: data.header.po_ket,
       po_sup_kode: data.header.po_sup_kode,
       detail: data.items,
@@ -223,31 +214,55 @@ const {
 });
 
 const isDetailRinci = computed(() =>
-  ["SPAREPART", "ATK/RTK"].includes(String(formJenis.value)),
+  ["SPAREPART", "ATK/RTK", "ASET"].includes(String(formJenis.value)),
 );
 
 // --- LOOKUP CALLBACKS ---
-const setPermintaan = async (v: any) => {
-  formData.value.header.po_mb_nomor = v.Nomor;
-  formData.value.header.tglminta = v.Tanggal;
-  formData.value.header.mb_cab = v.Cab || v.mb_cab;
+const bolehPanggil = computed(
+  () => !formData.value.header.hasBpb && !formData.value.header.isTutupBuku,
+);
+
+// Tambah item satu nomor permintaan ke grid. Boleh berkali-kali dengan nomor
+// berbeda; item yang sudah ada di grid (permintaan + kode) dilewati.
+const tambahPermintaan = async (nomorInput: string) => {
+  const nomor = nomorInput.trim();
+  const hdr = formData.value.header;
+  if (!nomor || !bolehPanggil.value) return;
 
   try {
     isLoading.value = true;
     const res = await poNonBahanFormService.getPermintaanDetail(
-      v.Nomor,
-      formData.value.header.po_nomor,
+      nomor,
+      hdr.po_nomor,
     );
-    formData.value.items = res.data.data;
-    formData.value.header.po_kecab = res.data.data?.[0]?.kecab || "";
+    const rows: any[] = res.data.data || [];
+    const kecab = rows[0]?.kecab || "";
+    if (hdr.po_kecab && kecab && hdr.po_kecab !== kecab) {
+      toast.warning(
+        `Cabang tujuan permintaan ${nomor} (${kecab}) berbeda dengan PO ini (${hdr.po_kecab}). Tidak bisa digabung.`,
+      );
+      return;
+    }
+    const ada = new Set(
+      formData.value.items.map((i: any) => `${i.mbNomor}|${i.Kode}`),
+    );
+    const baru = rows.filter((r) => !ada.has(`${r.mbNomor}|${r.Kode}`));
+    if (!baru.length) {
+      toast.info("Semua item permintaan ini sudah ada di PO.");
+      return;
+    }
+    if (!hdr.po_kecab) hdr.po_kecab = kecab;
+    formData.value.items.push(...baru);
+    mintaInput.value = "";
   } catch (e: any) {
-    toast.error(
-      e.response?.data?.message || "Gagal memuat rincian permintaan.",
-    );
+    toast.error(e.response?.data?.message || "No. Permintaan tidak ditemukan.");
   } finally {
     isLoading.value = false;
   }
 };
+
+// Pilihan dari modal
+const setPermintaan = (v: any) => tambahPermintaan(v.Nomor);
 
 const setSupplier = (v: any) => {
   formData.value.header.po_sup_kode = v.Kode;
@@ -260,35 +275,17 @@ const setSupplier = (v: any) => {
 const onMintaKeydown = (e: KeyboardEvent) => {
   if (e.key === "F1") {
     e.preventDefault();
-    if (!isEditMode.value) showMintaModal.value = true;
+    if (bolehPanggil.value) showMintaModal.value = true;
   }
 };
 
-// Enter → fetch detail langsung dari input
-const onMintaEnter = async () => {
-  const nomor = formData.value.header.po_mb_nomor.trim();
-  if (!nomor || isEditMode.value) return;
+// Enter → panggil nomor yang diketik
+const onMintaEnter = () => tambahPermintaan(mintaInput.value);
 
-  try {
-    isLoading.value = true;
-    const res = await poNonBahanFormService.getPermintaanDetail(
-      nomor,
-      formData.value.header.po_nomor,
-    );
-    // Ambil header info dari baris pertama
-    const firstRow = res.data.data?.[0];
-    if (firstRow) {
-      formData.value.header.tglminta = firstRow.tglminta || "";
-      formData.value.header.mb_cab = firstRow.cab || "";
-      formData.value.header.po_kecab = firstRow.kecab || "";
-    }
-    formData.value.items = res.data.data;
-  } catch (e: any) {
-    toast.error(e.response?.data?.message || "No. Permintaan tidak ditemukan.");
-    formData.value.header.po_mb_nomor = "";
-  } finally {
-    isLoading.value = false;
-  }
+// Hapus baris; kalau grid kosong, cabang tujuan dilepas supaya bisa pilih permintaan cabang lain
+const removeRow = (idx: number) => {
+  formData.value.items.splice(idx, 1);
+  if (!formData.value.items.length) formData.value.header.po_kecab = "";
 };
 
 // F1 → buka modal supplier
@@ -323,35 +320,32 @@ const onSupEnter = async () => {
 
 const recalcTotal = (idx: number) => {
   const row = formData.value.items[idx];
-  row.total =
-    (Number(row.jumlah) || 0) *
-    (Number(row.harga) || 0) *
-    (1 + (Number(row.ppn) || 0) / 100);
+  row.total = (Number(row.jumlah) || 0) * (Number(row.harga) || 0);
 };
 
 // --- VALIDATION BEFORE SAVE (1:1 Delphi Logic) ---
 const validateSave = () => {
-  if (formData.value.header.isTutupBuku) {
+  const hdr = formData.value.header;
+  if (hdr.isTutupBuku) {
     return toast.error(
       "Transaksi tsb sudah diclose.\nSilahkan minta approve PIN untuk bisa menyimpan perubahan data.",
     );
   }
-  if (!formData.value.header.po_sup_kode) {
+  if (!hdr.po_sup_kode) {
     toast.warning("Supplier harus di isi. Tidak bisa disimpan.");
     return;
   }
-  if (
-    formData.value.header.po_status &&
-    formData.value.header.po_status.trim() !== ""
-  ) {
-    return toast.warning(
-      `Sudah ${formData.value.header.po_status}, tidak dapat diubah.`,
-    );
+  if (hdr.po_status && hdr.po_status.trim() !== "") {
+    return toast.warning(`Sudah ${hdr.po_status}, tidak dapat diubah.`);
   }
-  if (formData.value.header.hasBpb) {
+  if (hdr.hasBpb) {
     return toast.error(
       "PO tsb sudah ada penerimaan BPB.\nTidak bisa disimpan.",
     );
+  }
+  const ppn = Number(hdr.po_ppn) || 0;
+  if (ppn < 0 || ppn > 100) {
+    return toast.warning("PPN harus antara 0 sampai 100.");
   }
 
   const validDetails = formData.value.items.filter(
@@ -360,9 +354,14 @@ const validateSave = () => {
   if (validDetails.length === 0)
     return toast.warning("Detail jumlah barang harus diisi.");
 
-  for (let i = 0; i < formData.value.items.length; i++) {
-    const row = formData.value.items[i];
-    if (Number(row.jumlah) !== 0 && Number(row.harga) === 0) {
+  for (let i = 0; i < validDetails.length; i++) {
+    const row = validDetails[i];
+    if (!row.mbNomor) {
+      return toast.warning(
+        `Barang pada baris ke-${i + 1} tidak punya No. Permintaan. Panggil ulang permintaannya.`,
+      );
+    }
+    if (Number(row.harga) === 0) {
       return toast.warning(
         `Harga harus di isi untuk barang pada baris ke-${i + 1}`,
       );
@@ -439,35 +438,27 @@ const onPrintCancel = () => {
         <div class="sep mt-2 mb-2" />
 
         <div class="fr">
-          <label class="lbl">No. Permintaan</label>
+          <label class="lbl">Panggil Permintaan</label>
           <div class="cell-grp">
             <input
-              v-model="formData.header.po_mb_nomor"
+              v-model="mintaInput"
               class="inp"
-              :class="{ ro: isEditMode }"
+              :class="{ ro: !bolehPanggil }"
               placeholder="F1 / ketik + Enter"
-              :readonly="isEditMode"
+              :readonly="!bolehPanggil"
               @keydown="onMintaKeydown"
               @keydown.enter.prevent="onMintaEnter"
             />
             <button
               type="button"
               class="ci-btn"
-              :disabled="isEditMode"
+              :disabled="!bolehPanggil"
               @click="showMintaModal = true"
               title="Cari No. Permintaan (F1)"
             >
               <IconSearch :size="13" />
             </button>
           </div>
-        </div>
-        <div class="fr mt-1">
-          <label class="lbl">Tgl Permintaan</label>
-          <input
-            :value="formatDateLocal(formData.header.tglminta)"
-            class="inp ro"
-            readonly
-          />
         </div>
         <div class="fr mt-1">
           <label class="lbl">Cabang Tujuan</label>
@@ -517,6 +508,24 @@ const onPrintCancel = () => {
           </div>
         </template>
 
+        <template v-if="canSeeBeli">
+          <div class="fr mt-1">
+            <label class="lbl">PPN %</label>
+            <input
+              v-model.number="formData.header.po_ppn"
+              type="number"
+              min="0"
+              max="100"
+              step="any"
+              class="inp"
+              :class="{ ro: !bolehPanggil }"
+              style="max-width: 90px; flex: none"
+              :readonly="!bolehPanggil"
+              v-select-on-focus
+            />
+          </div>
+        </template>
+
         <div class="sep mt-2 mb-2" />
         <div class="fr" style="align-items: flex-start">
           <label class="lbl pt-1">Keterangan</label>
@@ -548,8 +557,9 @@ const onPrintCancel = () => {
             <thead>
               <tr>
                 <th style="width: 40px" class="text-center">No</th>
+                <th style="width: 130px">No. Permintaan</th>
                 <th style="width: 100px">Kode</th>
-                <th style="min-width: 200px">Nama Barang</th>
+                <th>Nama Barang</th>
                 <th style="width: 60px" class="text-center">Satuan</th>
                 <th style="width: 80px" class="text-right">Qty Minta</th>
                 <th style="width: 80px" class="text-right">Sudah PO</th>
@@ -568,13 +578,6 @@ const onPrintCancel = () => {
                 >
                   Harga
                 </th>
-                <th
-                  v-if="canSeeBeli"
-                  style="width: 70px; background: #ffeb3b"
-                  class="text-right text-dark"
-                >
-                  PPN %
-                </th>
                 <th v-if="canSeeBeli" style="width: 110px" class="text-right">
                   Total
                 </th>
@@ -582,15 +585,22 @@ const onPrintCancel = () => {
                   Spesifikasi
                 </th>
                 <th v-if="isDetailRinci" style="min-width: 130px">Kegunaan</th>
+                <th style="width: 36px" class="text-center">Aksi</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="(item, idx) in formData.items" :key="idx">
+              <tr
+                v-for="(item, idx) in formData.items"
+                :key="`${item.mbNomor}|${item.Kode}`"
+              >
                 <td class="text-center gt-lbl">{{ Number(idx) + 1 }}</td>
+                <td class="fw-mono px-2 text-grey-darken-2">
+                  {{ item.mbNomor }}
+                </td>
                 <td class="fw-mono text-primary px-2 font-weight-bold">
                   {{ item.Kode }}
                 </td>
-                <td class="px-2 font-weight-bold truncate">{{ item.Nama }}</td>
+                <td class="px-2 font-weight-bold nama-wrap">{{ item.Nama }}</td>
                 <td class="text-center text-grey-darken-1">
                   {{ item.Satuan }}
                 </td>
@@ -631,20 +641,6 @@ const onPrintCancel = () => {
                     @input="onHargaInput($event, Number(idx))"
                   />
                 </td>
-                <td v-if="canSeeBeli" class="p0">
-                  <input
-                    v-model.number="item.ppn"
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="any"
-                    class="ci text-right"
-                    :class="{ ro: item.bpb > 0 || formData.header.isTutupBuku }"
-                    :readonly="item.bpb > 0 || formData.header.isTutupBuku"
-                    @input="recalcTotal(Number(idx))"
-                    v-select-on-focus
-                  />
-                </td>
                 <td
                   v-if="canSeeBeli"
                   class="text-right px-2 font-weight-bold text-error ro"
@@ -658,23 +654,43 @@ const onPrintCancel = () => {
                 <td v-if="isDetailRinci" class="p0">
                   <input v-model="item.kegunaan" class="ci" placeholder="..." />
                 </td>
+
+                <td class="text-center p0">
+                  <button
+                    type="button"
+                    class="btn-del"
+                    title="Hapus baris (bisa dipanggil lagi dari permintaannya)"
+                    :disabled="
+                      item.bpb > 0 ||
+                      formData.header.isTutupBuku ||
+                      formData.header.hasBpb
+                    "
+                    @click="removeRow(Number(idx))"
+                  >
+                    ✕
+                  </button>
+                </td>
+              </tr>
+              <tr v-if="!formData.items.length">
+                <td colspan="15" class="empty-row">
+                  Panggil No. Permintaan terlebih dahulu (boleh lebih dari satu)
+                </td>
               </tr>
             </tbody>
-            <tfoot v-if="canSeeBeli">
-              <tr class="footer-row">
-                <td
-                  colspan="11"
-                  class="text-right font-weight-bold footer-lbl pr-3"
-                >
-                  GRAND TOTAL
-                </td>
-                <td class="text-right font-weight-bold footer-total px-2">
-                  {{ formatCurrency(grandTotal) }}
-                </td>
-                <td v-if="isDetailRinci" colspan="2" class="footer-empty"></td>
-              </tr>
-            </tfoot>
           </table>
+        </div>
+
+        <div v-if="canSeeBeli" class="sum-box">
+          <div>
+            <span>Subtotal</span><b>{{ formatCurrency(subtotal) }}</b>
+          </div>
+          <div>
+            <span>PPN {{ Number(formData.header.po_ppn) || 0 }}%</span
+            ><b>{{ formatCurrency(ppnNilai) }}</b>
+          </div>
+          <div class="sum-grand">
+            <span>GRAND TOTAL</span><b>{{ formatCurrency(grandTotal) }}</b>
+          </div>
         </div>
       </div>
     </template>
@@ -794,6 +810,7 @@ const onPrintCancel = () => {
   border-collapse: collapse;
   table-layout: fixed;
   font-size: 12px;
+  min-width: 1100px;
 }
 .gt thead th {
   background: #f5f5f5;
@@ -879,29 +896,54 @@ const onPrintCancel = () => {
   white-space: nowrap;
 }
 
-.footer-row {
-  position: sticky;
-  bottom: 0;
-  z-index: 2;
-  background: #e8f5e9;
+/* Nama barang wrap di layar kecil */
+.nama-wrap {
+  white-space: normal;
+  word-break: break-word;
+  line-height: 1.3;
+  padding-top: 3px;
+  padding-bottom: 3px;
 }
-.footer-lbl {
-  font-size: 12px;
-  color: #1b5e20;
+.btn-del {
+  width: 100%;
+  height: 27px;
+  background: transparent;
+  color: #d32f2f;
+  border: none;
+  cursor: pointer;
+  font-weight: bold;
+}
+.btn-del:hover:not(:disabled) {
+  background: #ffebee;
+}
+.btn-del:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.empty-row {
+  text-align: center;
+  color: #9e9e9e;
+  font-style: italic;
+  padding: 12px 8px;
+}
+.sum-box {
+  align-self: flex-end;
+  min-width: 280px;
   background: #e8f5e9;
   border: 1px solid #a5d6a7;
+  border-radius: 4px;
   padding: 6px 12px;
-  letter-spacing: 0.03em;
+  font-size: 12px;
 }
-.footer-total {
-  font-size: 13px;
+.sum-box > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+}
+.sum-grand {
+  border-top: 1px solid #a5d6a7;
+  margin-top: 3px;
+  padding-top: 3px;
   color: #b71c1c;
-  background: #e8f5e9;
-  border: 1px solid #a5d6a7;
-  white-space: nowrap;
-}
-.footer-empty {
-  background: #e8f5e9;
-  border: 1px solid #a5d6a7;
 }
 </style>

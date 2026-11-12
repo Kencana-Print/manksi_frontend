@@ -38,6 +38,7 @@ const jenisSlugMap: Record<string, string> = {
   OBAT: "OBAT",
   SPAREPART: "SPAREPART",
   "ATK/RTK": "ATK-RTK",
+  ASET: "ASET",
 };
 const cabangOptions = ref<string[]>(["ALL"]);
 const jenisOptions = ref<string[]>([]);
@@ -67,6 +68,10 @@ const baseBrowseRef = ref<InstanceType<typeof BaseBrowse> | null>(null);
 const getExportSource = () =>
   baseBrowseRef.value?.getFilteredItems() ?? items.value ?? [];
 
+// [KONFIRMASI] bagian yang boleh merealisasikan ASET. Sengaja lebih sempit
+// dari yang boleh meminta, supaya peminta tidak merealisasikan sendiri.
+const BAGIAN_REALISASI_ASET = ["GA", "EDP"];
+
 onMounted(async () => {
   // Penyesuaian Jenis berdasarkan Bagian/Role User (Sesuai FormCreate Delphi)
   const bagian = (authStore.user?.bagian || "").toUpperCase();
@@ -94,6 +99,10 @@ onMounted(async () => {
   } else {
     jenisOptions.value = ["ACCESORIES", "OBAT", "SPAREPART", "ATK/RTK"];
     filterState.value.jenis = "ACCESORIES";
+  }
+
+  if (BAGIAN_REALISASI_ASET.includes(bagian)) {
+    jenisOptions.value = [...jenisOptions.value, "ASET"];
   }
 
   try {

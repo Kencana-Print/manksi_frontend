@@ -89,6 +89,7 @@ const jumlahQtyBaris = (r: BarisCetak): number =>
 const total = computed(() => ({
   plangkan: rows.value.reduce((s, r) => s + Number(r.J_Plangkan ?? 0), 0),
   proof: rows.value.reduce((s, r) => s + Number(r.J_Proof ?? 0), 0),
+  meter: rows.value.reduce((s, r) => s + Number(r.Jumlah_Meter ?? 0), 0),
   qty: rows.value.reduce((s, r) => s + jumlahQtyBaris(r), 0),
 }));
 
@@ -98,18 +99,13 @@ const totalPerUkuran = computed(() =>
   ),
 );
 
-// Resep & Actual: hanya bahan yang terisi
+// Pemakaian obat: hanya bahan yang terisi
 const fmtQty4 = (v: number | null | undefined): string =>
   Number(v ?? 0).toLocaleString("id-ID", { maximumFractionDigits: 4 });
 
 const resepTampil = computed(() =>
-  (data.value?.Resep ?? []).filter(
-    (r) => Number(r.Qty_Resep) > 0 || Number(r.Qty_Actual) > 0,
-  ),
+  (data.value?.Resep ?? []).filter((r) => Number(r.Qty_Actual) > 0),
 );
-
-const selisihResep = (r: { Qty_Resep: number; Qty_Actual: number }): number =>
-  Math.round((Number(r.Qty_Actual) - Number(r.Qty_Resep)) * 10000) / 10000;
 </script>
 
 <template>
@@ -143,6 +139,7 @@ const selisihResep = (r: { Qty_Resep: number; Qty_Actual: number }): number =>
             <th colspan="2">Spesifikasi</th>
             <th rowspan="2" width="105">Nomor SPK</th>
             <th rowspan="2" width="55">J<br />Plangkan</th>
+            <th rowspan="2" width="60">J<br />Meter</th>
             <th rowspan="2" width="50">J<br />Proof</th>
             <th v-for="i in indeksWarna" :key="i" rowspan="2" width="62">
               Warna<br />{{ i + 1 }}
@@ -161,6 +158,7 @@ const selisihResep = (r: { Qty_Resep: number; Qty_Actual: number }): number =>
             <td class="tr">{{ fmt(r.Lebar) }}</td>
             <td class="tc">{{ r.Nomor_SPK }}</td>
             <td class="tr">{{ fmtInt(r.J_Plangkan) }}</td>
+            <td class="tr">{{ fmt(r.Jumlah_Meter) }}</td>
             <td class="tr">{{ fmtInt(r.J_Proof) }}</td>
             <td v-for="i in indeksWarna" :key="i" class="tc warna">
               {{ warna(r)[i] }}
@@ -169,6 +167,7 @@ const selisihResep = (r: { Qty_Resep: number; Qty_Actual: number }): number =>
           <tr class="row-total">
             <td colspan="5">Total</td>
             <td class="tr">{{ fmtInt(total.plangkan) }}</td>
+            <td class="tr">{{ fmt(total.meter) }}</td>
             <td class="tr">{{ fmtInt(total.proof) }}</td>
             <td :colspan="indeksWarna.length"></td>
           </tr>
@@ -203,18 +202,16 @@ const selisihResep = (r: { Qty_Resep: number; Qty_Actual: number }): number =>
         </tbody>
       </table>
 
-      <!-- Tabel 3: Resep & Actual Pemakaian Obat -->
+      <!-- Tabel 3: Pemakaian Obat (Actual) -->
       <template v-if="resepTampil.length > 0">
-        <div class="sub-title">Resep &amp; Actual Pemakaian Obat</div>
+        <div class="sub-title">Pemakaian Obat (Actual)</div>
         <table class="detail-table resep-table">
           <thead>
             <tr>
               <th width="30">No</th>
               <th>Nama Bahan</th>
               <th width="55">Satuan</th>
-              <th width="90">Resep</th>
-              <th width="90">Actual</th>
-              <th width="90">Selisih</th>
+              <th width="110">Jumlah</th>
             </tr>
           </thead>
           <tbody>
@@ -222,9 +219,7 @@ const selisihResep = (r: { Qty_Resep: number; Qty_Actual: number }): number =>
               <td class="tc">{{ i + 1 }}</td>
               <td>{{ r.Nama }}</td>
               <td class="tc">{{ r.Satuan }}</td>
-              <td class="tr">{{ fmtQty4(r.Qty_Resep) }}</td>
               <td class="tr">{{ fmtQty4(r.Qty_Actual) }}</td>
-              <td class="tr">{{ fmtQty4(selisihResep(r)) }}</td>
             </tr>
           </tbody>
         </table>
@@ -335,7 +330,7 @@ const selisihResep = (r: { Qty_Resep: number; Qty_Actual: number }): number =>
   border-bottom: 1px solid black;
 }
 .resep-table {
-  width: 60%;
+  width: 45%;
 }
 
 @media print {

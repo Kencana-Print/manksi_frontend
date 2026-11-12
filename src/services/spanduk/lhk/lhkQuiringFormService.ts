@@ -24,9 +24,28 @@ export interface LhkQuiringDetail {
   J_Oven: number | null;
   J_Jemuran: number | null;
   J_Potong: number | null;
-  BS_Quiring: number | null;
-  BS_Cetak: number | null;
-  BS_Bahan: number | null;
+}
+
+// Karyawan tersimpan di LHK (jam kerja = snapshot saat disimpan)
+export interface KaryawanForm {
+  Nik: string;
+  Nama: string | null;
+  Menit_Kerja: number;
+  Menit_Lembur: number;
+  Jam_Kerja: string;
+  Jam_Lembur: string;
+}
+
+// Karyawan yang memenuhi syarat sesi pada tanggal tertentu (pratinjau jam kerja)
+export interface KaryawanOption {
+  Nik: string;
+  Nama: string;
+  Jam_Masuk: string;
+  Jam_Pulang: string;
+  Menit_Kerja: number;
+  Menit_Lembur: number;
+  Jam_Kerja: string;
+  Jam_Lembur: string;
 }
 
 export interface LhkQuiringForm {
@@ -34,7 +53,10 @@ export interface LhkQuiringForm {
   Tanggal: string;
   Kode_Pabrik: string | null;
   Nama_Pabrik: string | null;
+  Sesi: string | null; // '' = LHK lama (sebelum ada sesi)
+  Jam_Input: string | null;
   Detail: LhkQuiringDetail[];
+  Karyawan: KaryawanForm[];
 }
 
 export interface InfoSpk {
@@ -48,15 +70,14 @@ export interface InfoSpk {
 export interface LhkQuiringPayload {
   Tanggal: string;
   Kode_Pabrik: string;
+  Sesi: string;
   Detail: {
     Nomor_SPK: string;
     J_Oven: number;
     J_Jemuran: number;
     J_Potong: number;
-    BS_Quiring: number;
-    BS_Cetak: number;
-    BS_Bahan: number;
   }[];
+  Karyawan: { Nik: string }[];
 }
 
 export interface SaveResponse {
@@ -81,6 +102,18 @@ export const getLookupPabrik = async (search = ""): Promise<PabrikOption[]> => {
   const res = await api.get<ApiResponse<PabrikOption[]>>(
     `${BASE}/lookups/pabrik`,
     { params: { search } },
+  );
+  return res.data.data;
+};
+
+export const getLookupKaryawan = async (
+  pabrik: string,
+  sesi: string,
+  tanggal: string,
+): Promise<KaryawanOption[]> => {
+  const res = await api.get<ApiResponse<KaryawanOption[]>>(
+    `${BASE}/lookups/karyawan`,
+    { params: { pabrik, sesi, tanggal } },
   );
   return res.data.data;
 };
