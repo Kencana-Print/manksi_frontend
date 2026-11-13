@@ -248,7 +248,7 @@ const onExportDetail = async () => {
             Setting: r.setting || "",
             "Lebar Marker": r.lebarMarker || "",
             For: r.untuk || "",
-            "Total (m)": r.rasio.length ? totalBlok(r) : "",
+            "Total (m)": r.rasio.length && totalBlok(r) > 0 ? totalBlok(r) : "",
             Keterangan: ketBlok(r),
           });
         });
@@ -446,7 +446,11 @@ const onExportDetail = async () => {
                   <td>{{ r.lebarMarker || "-" }}</td>
                   <td>{{ r.untuk || "-" }}</td>
                   <td class="tc">
-                    {{ r.rasio.length ? fmtM(totalBlok(r)) : "-" }}
+                    {{
+                      r.rasio.length && totalBlok(r) > 0
+                        ? fmtM(totalBlok(r))
+                        : "-"
+                    }}
                   </td>
                   <td>{{ ketBlok(r) || "-" }}</td>
                 </tr>

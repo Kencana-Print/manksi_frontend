@@ -34,10 +34,12 @@ const fmtTgl = (v: string | null | undefined) => {
 const fmtM = (v: number | null | undefined) =>
   v === null || v === undefined
     ? ""
-    : Number(v).toLocaleString("id-ID", {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      });
+    : v === 0
+      ? "-"
+      : Number(v).toLocaleString("id-ID", {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        });
 
 const ketBaris = (b: { keterangan: string; sizeLama: string }) =>
   [b.keterangan, b.sizeLama ? `Size lama: ${b.sizeLama}` : ""]

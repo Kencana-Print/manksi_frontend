@@ -398,9 +398,9 @@ const validateSave = () => {
     }
     for (const r of terisi) {
       const sp = num(r.spreading);
-      if (!Number.isInteger(sp) || sp < 1) {
+      if (!Number.isInteger(sp) || sp < 0) {
         toast.warning(
-          `${label} rasio ${r.rasio}: spreading harus bilangan bulat > 0.`,
+          `${label} rasio ${r.rasio}: spreading harus bilangan bulat >= 0.`,
         );
         return;
       }
@@ -496,7 +496,8 @@ const validateSave = () => {
               >{{ formData.marker.length }} blok bahan</span
             >
             <span class="sum-chip sum-total">
-              Total kebutuhan {{ fmt2(totalSemua) }} m
+              Total kebutuhan
+              {{ totalSemua > 0 ? `${fmt2(totalSemua)} m` : "-" }}
             </span>
           </div>
         </div>
@@ -626,12 +627,17 @@ const validateSave = () => {
                   <td class="num">
                     {{
                       hitung[bi].rasio[ri].terisi
-                        ? fmt2(hitung[bi].rasio[ri].total)
+                        ? num(r.spreading) > 0
+                          ? fmt2(hitung[bi].rasio[ri].total)
+                          : "-"
                         : ""
                     }}
                   </td>
                 </tr>
-                <tr v-if="hitung[bi].rasio[ri].terisi" class="r-sisa">
+                <tr
+                  v-if="hitung[bi].rasio[ri].terisi && num(r.spreading) > 0"
+                  class="r-sisa"
+                >
                   <th colspan="2" class="lbl-cell">Sisa</th>
                   <td
                     v-for="s in b.size"
@@ -651,7 +657,9 @@ const validateSave = () => {
                 <td :colspan="b.size.length + 5" class="tr">
                   Total kebutuhan (m)
                 </td>
-                <td class="num strong">{{ fmt2(hitung[bi].totalM) }}</td>
+                <td class="num strong">
+                  {{ hitung[bi].totalM > 0 ? fmt2(hitung[bi].totalM) : "-" }}
+                </td>
               </tr>
             </tfoot>
           </table>
