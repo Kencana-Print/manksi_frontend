@@ -7253,6 +7253,53 @@ const router = createRouter({
         menuId: "963",
       },
     },
+    {
+      path: "/laporan/produksi-spanduk/laporan-persediaan",
+      name: "LaporanSpandukLaporanPersediaan",
+      component: () =>
+        import("@/views/laporan/spanduk/LaporanPersediaanView.vue"),
+      meta: {
+        title: "Laporan Persediaan",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "963",
+      },
+    },
+    {
+      path: "/laporan/produksi-spanduk/kartu-stok-kain",
+      name: "LaporanSpandukKartuStokKain",
+      component: () => import("@/views/laporan/spanduk/KartuStokKainView.vue"),
+      meta: {
+        title: "Kartu Stok Kain",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "963",
+      },
+    },
+    {
+      path: "/laporan/produksi-spanduk/kartu-stok-bahan-penolong",
+      name: "LaporanSpandukKartuStokBahanPenolong",
+      component: () =>
+        import("@/views/laporan/spanduk/KartuStokBahanPenolongView.vue"),
+      meta: {
+        title: "Kartu Stok Bahan Penolong",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "963",
+      },
+    },
+    {
+      path: "/laporan/produksi-spanduk/laporan-lpk-bulanan",
+      name: "LaporanSpandukLpkBulanan",
+      component: () =>
+        import("@/views/laporan/spanduk/LaporanLpkBulananView.vue"),
+      meta: {
+        title: "Laporan LPK Bulanan",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "963",
+      },
+    },
 
     {
       path: "/laporan/marketing/laporan-desain",

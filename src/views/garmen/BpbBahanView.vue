@@ -20,6 +20,7 @@ import { formatTanggal } from "@/utils/dateFormat";
 interface ExportDetailRow {
   "No. BPB": string;
   "No. PO": string;
+  "No. QC": string;
   "Tanggal BPB": string;
   Gudang: string;
   Supplier: string;
@@ -103,6 +104,7 @@ const {
 const baseHeaders = [
   { title: "Nomor", key: "Nomor", width: "140px", fixed: true },
   { title: "Nomor PO", key: "Nomor_PO", width: "140px" },
+  { title: "Nomor QC", key: "NomorQc", width: "150px" },
   { title: "Tanggal", key: "Tanggal", width: "100px", align: "center" },
   { title: "Jatuh Tempo", key: "Jatuhtempo", width: "100px", align: "center" },
   { title: "Barcode", key: "BuatBarcode", width: "90px", align: "center" },
@@ -257,6 +259,7 @@ const exportDetail = async () => {
           const row: any = {
             "No. BPB": item.Nomor,
             "No. PO": item.Nomor_PO || "-",
+            "No. QC": item.NomorQc || "-",
             "Tanggal BPB": formatTanggal(item.Tanggal),
             Gudang: item.Gudang,
           };

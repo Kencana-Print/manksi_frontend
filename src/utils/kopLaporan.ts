@@ -9,11 +9,18 @@ const WARNA_KOP = "1A237E";
 export const buatKopPreLines = (
   judul: string,
   periode: string,
+  barisTambahan: string[] = [],
 ): ExcelPreLine[] => [
   { text: KOP_NAMA, bold: true, size: 11, color: WARNA_KOP },
   { text: KOP_ALAMAT, bold: true, size: 10, color: WARNA_KOP },
   { text: KOP_TELP, bold: true, size: 10, color: WARNA_KOP },
   { text: "" },
   { text: judul, bold: true, size: 10, color: WARNA_KOP },
+  ...barisTambahan.map((text) => ({
+    text,
+    bold: true,
+    size: 10,
+    color: WARNA_KOP,
+  })),
   { text: periode, bold: true, size: 10, color: WARNA_KOP },
 ];

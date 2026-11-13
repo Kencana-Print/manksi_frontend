@@ -778,6 +778,11 @@ const validateSave = () => {
   showSaveDialog.value = true;
 };
 
+const tutupTanpaCetak = () => {
+  showPrintConfirm.value = false;
+  goBack();
+};
+
 // ── Cetak ──
 const doPrint = () => {
   showPrintConfirm.value = false;
@@ -1503,7 +1508,7 @@ const nilaiClass = (n: number) =>
         </div>
       </v-card-text>
       <v-card-actions class="pa-3 border-t">
-        <v-btn variant="text" @click="goBack">Tidak, Tutup</v-btn>
+        <v-btn variant="text" @click="tutupTanpaCetak">Tidak, Tutup</v-btn>
         <v-spacer />
         <v-btn color="primary" variant="elevated" @click="doPrint">
           <IconPrinter :size="16" class="mr-1" /> Ya, Cetak
