@@ -85,7 +85,7 @@ const num = (v: string | undefined) => {
 const rasioTerisi = (r: RasioForm) =>
   num(r.spreading) > 0 ||
   num(r.pMarkerCm) > 0 ||
-  Object.values(r.qty).some((v) => num(v) > 0);
+  Object.values(r.qty).some((v) => num(v) !== 0);
 
 const hitungBlok = (b: BlokForm): HasilBlok => {
   const sisa: Record<string, number> = {};
@@ -156,7 +156,7 @@ const rasioDariTersimpan = (
       qty: Object.fromEntries(
         size.map((s) => {
           const q = t.qty[s.size] ?? 0;
-          return [s.size, q > 0 ? String(q) : ""];
+          return [s.size, q !== 0 ? String(q) : ""];
         }),
       ),
     };
@@ -242,6 +242,7 @@ const {
       marker: data.marker.map(
         (b): BlokPayload => ({
           pmNomor: b.pmNomor,
+          spkNomor: b.spkNomor,
           kode: b.kode,
           setting: b.setting,
           lebarMarker: b.lebarMarker.trim(),
@@ -411,17 +412,17 @@ const validateSave = () => {
       let adaQty = false;
       for (const s of b.size) {
         const q = num(r.qty[s.size]);
-        if (!Number.isInteger(q) || q < 0) {
+        if (!Number.isInteger(q)) {
           toast.warning(
-            `${label} rasio ${r.rasio}: qty size ${s.size} harus bilangan bulat >= 0.`,
+            `${label} rasio ${r.rasio}: qty size ${s.size} harus bilangan bulat.`,
           );
           return;
         }
-        if (q > 0) adaQty = true;
+        if (q !== 0) adaQty = true;
       }
       if (!adaQty) {
         toast.warning(
-          `${label} rasio ${r.rasio}: isi qty minimal di satu size.`,
+          `${label} rasio ${r.rasio}: isi qty (selain 0) minimal di satu size.`,
         );
         return;
       }
@@ -598,7 +599,7 @@ const validateSave = () => {
                     <input
                       v-model="r.qty[s.size]"
                       class="ci"
-                      inputmode="numeric"
+                      :class="{ 'ci-neg': num(r.qty[s.size]) < 0 }"
                       :disabled="bacaSaja"
                     />
                   </td>
@@ -920,6 +921,11 @@ const validateSave = () => {
 .ci:disabled {
   background: #f5f5f5;
   color: #757575;
+}
+.ci-neg {
+  color: #c62828;
+  background: #fff3e0;
+  border-color: #ef9a9a;
 }
 .btn-del {
   background: #ffebee;

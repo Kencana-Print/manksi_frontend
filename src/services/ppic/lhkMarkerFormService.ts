@@ -102,6 +102,7 @@ export interface RasioPayload {
 
 export interface BlokPayload {
   pmNomor: string;
+  spkNomor: string;
   kode: string;
   setting: string;
   lebarMarker: string;
