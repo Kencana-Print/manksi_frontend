@@ -31,6 +31,19 @@ const fmtTgl = (v: string | null | undefined) => {
   return `${d}-${m}-${y}${jam ? " " + jam : ""}`;
 };
 
+const fmtM = (v: number | null | undefined) =>
+  v === null || v === undefined
+    ? ""
+    : Number(v).toLocaleString("id-ID", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+
+const ketBaris = (b: { keterangan: string; sizeLama: string }) =>
+  [b.keterangan, b.sizeLama ? `Size lama: ${b.sizeLama}` : ""]
+    .filter(Boolean)
+    .join(" · ");
+
 const teksStatus = (tt: TandaTerimaItem) => {
   if (tt.tglTerima)
     return `Diterima ${fmtTgl(tt.tglTerima)} (validasi digital oleh ${tt.userTerima || "-"})`;
@@ -192,9 +205,11 @@ const onToggle = (v: boolean) => {
                   <th class="tt-nw">No</th>
                   <th class="tt-nw">No. SPK</th>
                   <th class="tt-nama">Nama SPK</th>
-                  <th class="tt-nw">Lebar Kain</th>
-                  <th class="tt-nw">Size</th>
-                  <th class="tt-nw">Tujuan Proses</th>
+                  <th class="tt-nama">Bahan</th>
+                  <th class="tt-nw">Setting</th>
+                  <th class="tt-nw">Lebar Marker</th>
+                  <th class="tt-nw">For</th>
+                  <th class="tt-nw">Total (m)</th>
                   <th class="tt-ket">Keterangan</th>
                 </tr>
               </thead>
@@ -203,26 +218,14 @@ const onToggle = (v: boolean) => {
                   <td class="tt-nw tt-c">{{ b.urut }}</td>
                   <td class="tt-nw">{{ b.spkNomor }}</td>
                   <td>{{ b.namaSpk }}</td>
-                  <td class="tt-nw">{{ b.lebarKain ?? "" }}</td>
-                  <td class="tt-nw">{{ b.size || "" }}</td>
-                  <td class="tt-nw">{{ b.tujuanProses || "" }}</td>
-                  <td>{{ b.keterangan || "" }}</td>
-                </tr>
-              </tbody>
-            </table>
-            <table class="tt-ttd">
-              <tbody>
-                <tr>
                   <td>
-                    Diserahkan oleh,
-                    <div class="tt-ttd-spasi"></div>
-                    ( {{ data.lhk.pembuatMarker || "........" }} )
+                    {{ b.namaBahan || (b.kodeBahan ? b.kodeBahan : "-") }}
                   </td>
-                  <td>
-                    Diterima oleh,
-                    <div class="tt-ttd-spasi"></div>
-                    ( {{ tt.peminta }} )
-                  </td>
+                  <td class="tt-nw">{{ b.setting || "" }}</td>
+                  <td class="tt-nw">{{ b.lebarMarker ?? "" }}</td>
+                  <td class="tt-nw">{{ b.untuk || "" }}</td>
+                  <td class="tt-nw">{{ fmtM(b.totalKebutuhan) }}</td>
+                  <td>{{ ketBaris(b) }}</td>
                 </tr>
               </tbody>
             </table>

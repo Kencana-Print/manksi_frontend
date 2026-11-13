@@ -17,14 +17,10 @@ import {
 } from "@/services/garmen/permintaanMarkerFormService";
 
 interface MarkerRow {
-  spkNomor: string;
-  spkNama: string;
   kode: string;
   namaBahan: string;
   satuan: string;
   setting: string;
-  jml: number | null;
-  alasan: string;
 }
 
 interface MarkerHeader {
@@ -33,6 +29,9 @@ interface MarkerHeader {
   deadline: string;
   keterangan: string;
   asalNomor: string;
+  spkNomor: string;
+  spkNama: string;
+  spkLama: string[];
   status: string;
   statusManual: string;
   statusKeterangan: string;
@@ -72,18 +71,13 @@ const todayLocal = (() => {
 })();
 
 const newRow = (): MarkerRow => ({
-  spkNomor: "",
-  spkNama: "",
   kode: "",
   namaBahan: "",
   satuan: "",
   setting: "",
-  jml: null,
-  alasan: "",
 });
 
-const isBlank = (r: MarkerRow): boolean =>
-  !r.spkNomor && !r.kode && !(Number(r.jml) > 0) && !r.alasan.trim();
+const isBlank = (r: MarkerRow): boolean => !r.kode && !r.setting.trim();
 
 const defaultData: MarkerFormData = {
   header: {
@@ -92,6 +86,9 @@ const defaultData: MarkerFormData = {
     deadline: todayLocal,
     keterangan: "",
     asalNomor: "",
+    spkNomor: "",
+    spkNama: "",
+    spkLama: [],
     status: "OPEN",
     statusManual: "",
     statusKeterangan: "",
@@ -102,15 +99,15 @@ const defaultData: MarkerFormData = {
 
 const toRows = (d: PermintaanMarkerLoaded): MarkerRow[] =>
   d.detail.map((x) => ({
-    spkNomor: x.spkNomor,
-    spkNama: x.spkNama ?? "",
     kode: x.kode,
     namaBahan: x.namaBahan,
     satuan: x.satuan,
     setting: x.setting,
-    jml: Number(x.jml),
-    alasan: x.alasan,
   }));
+
+const spkDariDetail = (d: PermintaanMarkerLoaded): string[] => [
+  ...new Set(d.detail.map((x) => x.spkNomor)),
+];
 
 const {
   isLoading,
@@ -131,6 +128,7 @@ const {
       String(route.params.nomor),
     );
     const d = res.data.data as PermintaanMarkerLoaded;
+    const rows = toRows(d);
     return {
       header: {
         nomor: d.nomor,
@@ -138,12 +136,15 @@ const {
         deadline: d.deadline,
         keterangan: d.keterangan,
         asalNomor: d.asalNomor ?? "",
+        spkNomor: d.detail[0]?.spkNomor ?? "",
+        spkNama: d.detail[0]?.spkNama ?? "",
+        spkLama: spkDariDetail(d),
         status: d.status,
         statusManual: d.statusManual,
         statusKeterangan: d.statusKeterangan,
         bisaUbah: d.bisaUbah,
       },
-      dtl: toRows(d).length ? toRows(d) : [newRow()],
+      dtl: rows.length ? rows : [newRow()],
     };
   },
   submitApi: async (data: MarkerFormData): Promise<unknown> => {
@@ -155,11 +156,9 @@ const {
       detail: data.dtl
         .filter((r) => !isBlank(r))
         .map((r) => ({
-          spkNomor: r.spkNomor,
+          spkNomor: data.header.spkNomor,
           kode: r.kode,
           setting: rapikanSetting(r.setting),
-          jml: Number(r.jml) || 0,
-          alasan: r.alasan.trim(),
         })),
     };
     return isEditMode.value
@@ -172,9 +171,13 @@ const {
   },
 });
 
-// ── Lookup: setting master + bahan MKB per SPK (cache) ──
+// Permintaan lama yang memuat lebih dari satu SPK: dikunci (aturan baru satu SPK)
+const multiSpkLama = computed(() => formData.value.header.spkLama.length > 1);
+
+// ── Lookup: setting master + bahan MKB milik SPK header ──
 const settingList = ref<SettingBahan[]>([]);
-const mkbCache = ref<Record<string, BahanMkb[]>>({});
+const mkbList = ref<BahanMkb[]>([]);
+const mkbSpk = ref(""); // SPK yang daftar MKB-nya sudah termuat
 
 const muatSetting = async () => {
   try {
@@ -186,12 +189,16 @@ const muatSetting = async () => {
 };
 
 const muatMkb = async (spk: string) => {
-  if (!spk || spk in mkbCache.value) return;
+  mkbList.value = [];
+  mkbSpk.value = "";
+  if (!spk) return;
   try {
     const res = await permintaanMarkerFormService.getBahanMkb(spk);
-    const list = res.data.data ?? [];
-    mkbCache.value[spk] = list;
-    if (list.length === 0) {
+    // SPK bisa berganti selama menunggu respons
+    if (formData.value.header.spkNomor !== spk) return;
+    mkbList.value = res.data.data ?? [];
+    mkbSpk.value = spk;
+    if (mkbList.value.length === 0) {
       toast.warning(
         `SPK ${spk} belum punya MKB. Pilih bahan manual lewat tombol cari.`,
         { timeout: 6000 },
@@ -202,25 +209,26 @@ const muatMkb = async (spk: string) => {
   }
 };
 
-// Muat bahan MKB untuk setiap SPK yang muncul di detail (edit, revisi, atau pilih manual)
 watch(
-  () =>
-    [...new Set(formData.value.dtl.map((r) => r.spkNomor).filter(Boolean))]
-      .sort()
-      .join("|"),
-  async (key) => {
-    for (const spk of key ? key.split("|") : []) {
-      await muatMkb(spk);
-    }
+  () => formData.value.header.spkNomor,
+  (spk) => {
+    void muatMkb(spk);
   },
   { immediate: true },
 );
 
+// SPK sudah termuat dan memang tidak punya MKB: bahan boleh dicari manual
+const spkTanpaMkb = computed(
+  () =>
+    !!mkbSpk.value &&
+    mkbSpk.value === formData.value.header.spkNomor &&
+    mkbList.value.length === 0,
+);
+
 const opsiBahan = (row: MarkerRow): BahanMkb[] => {
-  const list = mkbCache.value[row.spkNomor] ?? [];
-  if (row.kode && !list.some((b) => b.kode === row.kode)) {
+  if (row.kode && !mkbList.value.some((b) => b.kode === row.kode)) {
     return [
-      ...list,
+      ...mkbList.value,
       {
         kode: row.kode,
         nama: row.namaBahan,
@@ -229,15 +237,13 @@ const opsiBahan = (row: MarkerRow): BahanMkb[] => {
       },
     ];
   }
-  return list;
+  return mkbList.value;
 };
 
 // Saran setting: default dari MKB bahan itu lebih dulu, lalu master; teks bebas tetap boleh
 const saranSetting = (row: MarkerRow): string[] => {
   const hasil: string[] = [];
-  const dariMkb = (mkbCache.value[row.spkNomor] ?? []).find(
-    (b) => b.kode === row.kode,
-  )?.setting;
+  const dariMkb = mkbList.value.find((b) => b.kode === row.kode)?.setting;
   if (dariMkb) hasil.push(dariMkb);
   for (const s of settingList.value) {
     if (!hasil.includes(s.nama)) hasil.push(s.nama);
@@ -248,20 +254,18 @@ const saranSetting = (row: MarkerRow): string[] => {
 // Hanya spasi yang dirapikan; huruf besar/kecil tidak diubah
 const rapikanSetting = (v: string): string => v.trim().replace(/\s+/g, " ");
 
-// Di luar MKB hanya dinilai bila SPK punya MKB (dan sudah termuat)
-const luarMkb = (row: MarkerRow): boolean => {
-  if (!row.kode || !row.spkNomor) return false;
-  const list = mkbCache.value[row.spkNomor];
-  if (!list || list.length === 0) return false;
-  return !list.some((b) => b.kode === row.kode);
-};
-
-const spkTanpaMkb = (row: MarkerRow): boolean =>
-  !!row.spkNomor && mkbCache.value[row.spkNomor]?.length === 0;
+// Bahan di luar MKB hanya dinilai bila SPK punya MKB (dan sudah termuat)
+const luarMkb = (row: MarkerRow): boolean =>
+  !!row.kode &&
+  mkbSpk.value === formData.value.header.spkNomor &&
+  mkbList.value.length > 0 &&
+  !mkbList.value.some((b) => b.kode === row.kode);
 
 // ── Aksi baris ──
 const editable = computed(() =>
-  isEditMode.value ? formData.value.header.bisaUbah : true,
+  isEditMode.value
+    ? formData.value.header.bisaUbah && !multiSpkLama.value
+    : true,
 );
 
 const addRow = () => {
@@ -280,20 +284,22 @@ const showSpkModal = ref(false);
 const showBahanModal = ref(false);
 const modalIdx = ref(0);
 
-const openSpk = (idx: number) => {
-  modalIdx.value = idx;
-  showSpkModal.value = true;
-};
-
 const onSpkSelected = (item: SpkItem) => {
-  const row = formData.value.dtl[modalIdx.value];
-  if (!row) return;
-  row.spkNomor = item.Nomor;
-  row.spkNama = item.Nama ?? "";
+  const h = formData.value.header;
+  if (item.Nomor === h.spkNomor) return;
+  const adaIsi = formData.value.dtl.some((r) => !isBlank(r));
+  h.spkNomor = item.Nomor;
+  h.spkNama = item.Nama ?? "";
+  if (adaIsi) {
+    formData.value.dtl = [newRow()];
+    toast.info(
+      "SPK berganti, daftar bahan dikosongkan. Pilih bahan sesuai MKB SPK baru.",
+    );
+  }
 };
 
 const openBahan = (idx: number) => {
-  if (!formData.value.dtl[idx]?.spkNomor) {
+  if (!formData.value.header.spkNomor) {
     toast.warning("Pilih SPK terlebih dahulu.");
     return;
   }
@@ -303,35 +309,34 @@ const openBahan = (idx: number) => {
 
 // Pilih dari daftar MKB: nama, satuan, dan setting default ikut terisi
 const onPilihBahan = (row: MarkerRow) => {
-  const b = (mkbCache.value[row.spkNomor] ?? []).find(
-    (x) => x.kode === row.kode,
-  );
+  const b = mkbList.value.find((x) => x.kode === row.kode);
   if (!b) return;
   row.namaBahan = b.nama;
   row.satuan = b.satuan;
   row.setting = b.setting;
 };
 
-// Cari bahan lain (di luar MKB): default setting diambil dari server
+// Cari bahan manual (hanya untuk SPK tanpa MKB): default setting diambil dari server
 const onBahanDariModal = async (item: BahanItem) => {
   const row = formData.value.dtl[modalIdx.value];
   if (!row) return;
   try {
     const res = await permintaanMarkerFormService.getBahanInfo(
       item.Kode,
-      row.spkNomor,
+      formData.value.header.spkNomor,
     );
     const info = res.data.data;
     if (!info) return;
+    if (!info.diMkb && mkbList.value.length > 0) {
+      toast.error(
+        `Bahan ${info.kode} tidak ada di MKB SPK ${formData.value.header.spkNomor}.`,
+      );
+      return;
+    }
     row.kode = info.kode;
     row.namaBahan = info.nama;
     row.satuan = info.satuan;
     row.setting = info.setting;
-    if (!info.diMkb && (mkbCache.value[row.spkNomor]?.length ?? 0) > 0) {
-      toast.warning(
-        `Bahan ${info.kode} tidak ada di MKB SPK ${row.spkNomor}. Alasan wajib diisi.`,
-      );
-    }
   } catch (e) {
     toast.error(pesanError(e, "Gagal mengambil data bahan."));
   }
@@ -356,12 +361,6 @@ const onEnterNext = (e: KeyboardEvent) => {
 const rowsTerisi = computed(() =>
   formData.value.dtl.filter((r) => !isBlank(r)),
 );
-const totalJml = computed(() =>
-  rowsTerisi.value.reduce((s, r) => s + (Number(r.jml) || 0), 0),
-);
-const jmlSpk = computed(
-  () => new Set(rowsTerisi.value.map((r) => r.spkNomor).filter(Boolean)).size,
-);
 
 // ── Validasi (cermin aturan server; server tetap penentu) ──
 const validateSave = () => {
@@ -369,11 +368,17 @@ const validateSave = () => {
   if (isEditMode.value && !h.bisaUbah) {
     return toast.warning("Permintaan ini tidak dapat diubah.");
   }
+  if (multiSpkLama.value) {
+    return toast.warning(
+      "Permintaan lama memuat lebih dari satu SPK dan tidak bisa disimpan.",
+    );
+  }
   if (!h.tanggal) return toast.warning("Tanggal wajib diisi.");
   if (!h.deadline) return toast.warning("Deadline wajib diisi.");
   if (h.deadline < h.tanggal) {
     return toast.warning("Deadline tidak boleh lebih awal dari tanggal.");
   }
+  if (!h.spkNomor) return toast.warning("SPK wajib diisi.");
   if (rowsTerisi.value.length === 0) {
     return toast.warning("Minimal satu baris detail harus diisi.");
   }
@@ -381,24 +386,17 @@ const validateSave = () => {
   const seen = new Set<string>();
   for (const [i, r] of rowsTerisi.value.entries()) {
     const no = i + 1;
-    if (!r.spkNomor) return toast.warning(`Baris ${no}: SPK wajib diisi.`);
     if (!r.kode) return toast.warning(`Baris ${no}: bahan wajib diisi.`);
     if (!r.setting) return toast.warning(`Baris ${no}: setting wajib diisi.`);
-    const jml = Number(r.jml);
-    if (!Number.isInteger(jml) || jml <= 0) {
+    if (luarMkb(r)) {
       return toast.warning(
-        `Baris ${no}: jumlah marker harus bilangan bulat di atas 0.`,
+        `Baris ${no}: bahan ${r.kode} tidak ada di MKB SPK ${h.spkNomor}.`,
       );
     }
-    if (luarMkb(r) && !r.alasan.trim()) {
-      return toast.warning(
-        `Baris ${no}: bahan di luar MKB, alasan wajib diisi.`,
-      );
-    }
-    const key = `${r.spkNomor}|${r.kode}|${rapikanSetting(r.setting).toUpperCase()}`;
+    const key = `${r.kode}|${rapikanSetting(r.setting).toUpperCase()}`;
     if (seen.has(key)) {
       return toast.warning(
-        `Baris ${no}: SPK, bahan, dan setting yang sama sudah ada.`,
+        `Baris ${no}: bahan dan setting yang sama sudah ada.`,
       );
     }
     seen.add(key);
@@ -420,10 +418,21 @@ onMounted(async () => {
       goBack();
       return;
     }
+    if (spkDariDetail(d).length > 1) {
+      toast.error(
+        "Permintaan ini memuat lebih dari satu SPK. Buat permintaan baru per SPK, lalu batalkan permintaan ini.",
+        { timeout: 8000 },
+      );
+      goBack();
+      return;
+    }
+    const rows = toRows(d);
     formData.value.header.asalNomor = d.nomor;
     formData.value.header.deadline = d.deadline;
     formData.value.header.keterangan = d.keterangan;
-    formData.value.dtl = toRows(d).length ? toRows(d) : [newRow()];
+    formData.value.header.spkNomor = d.detail[0]?.spkNomor ?? "";
+    formData.value.header.spkNama = d.detail[0]?.spkNama ?? "";
+    formData.value.dtl = rows.length ? rows : [newRow()];
   } catch (e) {
     toast.error(pesanError(e, "Gagal memuat permintaan asal."));
     goBack();
@@ -497,6 +506,35 @@ const statusClass = (s: string) => `st-${s}`;
             :disabled="!editable"
           />
         </div>
+        <div class="fr">
+          <label class="lbl fw text-primary">SPK</label>
+          <div class="cell-flex" style="flex: 1">
+            <input
+              :value="formData.header.spkNomor"
+              readonly
+              class="inp ro"
+              style="flex: 1"
+              placeholder="Klik cari..."
+            />
+            <button
+              type="button"
+              class="btn-mini"
+              :disabled="!editable"
+              @click="showSpkModal = true"
+            >
+              <IconSearch :size="12" />
+            </button>
+          </div>
+        </div>
+        <div class="fr">
+          <label class="lbl">Nama SPK</label>
+          <input
+            :value="formData.header.spkNama"
+            readonly
+            class="inp ro"
+            style="flex: 1"
+          />
+        </div>
         <div v-if="formData.header.asalNomor" class="fr">
           <label class="lbl">Revisi Dari</label>
           <input
@@ -520,11 +558,9 @@ const statusClass = (s: string) => `st-${s}`;
         <div class="sep" />
 
         <div class="fr">
-          <label class="lbl">Jumlah SPK</label>
-          <input :value="jmlSpk" readonly class="inp ro" style="width: 80px" />
-          <label class="lbl" style="width: 85px">Total Marker</label>
+          <label class="lbl">Jumlah Baris</label>
           <input
-            :value="totalJml.toLocaleString('id-ID')"
+            :value="rowsTerisi.length"
             readonly
             class="inp ro"
             style="width: 80px"
@@ -535,7 +571,16 @@ const statusClass = (s: string) => `st-${s}`;
           {{ formData.header.statusManual }}:
           {{ formData.header.statusKeterangan }}
         </div>
-        <div v-if="isEditMode && !formData.header.bisaUbah" class="warn-box">
+        <div v-if="multiSpkLama" class="warn-box">
+          Permintaan lama ini memuat {{ formData.header.spkLama.length }} SPK
+          ({{ formData.header.spkLama.join(", ") }}). Aturan baru: satu
+          permintaan hanya satu SPK, jadi tidak bisa disimpan. Bila belum ada
+          pengambil, buat permintaan baru per SPK lalu batalkan permintaan ini.
+        </div>
+        <div
+          v-else-if="isEditMode && !formData.header.bisaUbah"
+          class="warn-box"
+        >
           Permintaan ini tidak dapat diubah (sudah punya LHK Marker atau
           dibatalkan).
         </div>
@@ -561,17 +606,13 @@ const statusClass = (s: string) => `st-${s}`;
           </button>
         </div>
         <div class="tbl-wrap" style="min-height: 50vh; max-height: 78vh">
-          <table class="gt" style="min-width: 1250px">
+          <table class="gt" style="min-width: 640px">
             <thead>
               <tr>
                 <th style="width: 32px" class="tc">No</th>
-                <th style="width: 150px">SPK</th>
-                <th style="width: 190px">Nama SPK</th>
-                <th style="width: 290px">Bahan</th>
+                <th style="width: 310px">Bahan</th>
                 <th style="width: 60px">Satuan</th>
-                <th style="width: 150px">Setting</th>
-                <th style="width: 80px" class="tr">Jml Marker</th>
-                <th style="width: 220px">Alasan (bahan di luar MKB)</th>
+                <th style="width: 170px">Setting</th>
                 <th style="width: 32px" class="tc"></th>
               </tr>
             </thead>
@@ -584,37 +625,20 @@ const statusClass = (s: string) => `st-${s}`;
                 <td class="tc gt-lbl">{{ idx + 1 }}</td>
                 <td class="p0">
                   <div class="cell-flex">
-                    <input
-                      :value="row.spkNomor"
-                      readonly
-                      class="ci ro"
-                      placeholder="Klik cari..."
-                    />
-                    <button
-                      type="button"
-                      class="btn-mini"
-                      :disabled="!editable"
-                      @click="openSpk(idx)"
-                    >
-                      <IconSearch :size="12" />
-                    </button>
-                  </div>
-                </td>
-                <td class="px-1" :title="row.spkNama">{{ row.spkNama }}</td>
-                <td class="p0">
-                  <div class="cell-flex">
                     <select
                       v-model="row.kode"
                       class="ci"
-                      :disabled="!editable || !row.spkNomor"
+                      :disabled="!editable || !formData.header.spkNomor"
                       @change="onPilihBahan(row)"
                       @keydown.enter.prevent="onEnterNext"
                     >
                       <option value="">
                         {{
-                          spkTanpaMkb(row)
-                            ? "-- SPK belum punya MKB, cari manual --"
-                            : "-- pilih bahan MKB --"
+                          !formData.header.spkNomor
+                            ? "-- pilih SPK dulu --"
+                            : spkTanpaMkb
+                              ? "-- SPK belum punya MKB, cari manual --"
+                              : "-- pilih bahan MKB --"
                         }}
                       </option>
                       <option
@@ -628,8 +652,8 @@ const statusClass = (s: string) => `st-${s}`;
                     <button
                       type="button"
                       class="btn-mini"
-                      title="Cari bahan lain (di luar MKB)"
-                      :disabled="!editable"
+                      title="Cari bahan manual (hanya untuk SPK tanpa MKB)"
+                      :disabled="!editable || !spkTanpaMkb"
                       @click="openBahan(idx)"
                     >
                       <IconSearch :size="12" />
@@ -658,28 +682,6 @@ const statusClass = (s: string) => `st-${s}`;
                     />
                   </datalist>
                 </td>
-                <td class="p0">
-                  <input
-                    v-model.number="row.jml"
-                    type="number"
-                    min="1"
-                    step="1"
-                    class="ci tr"
-                    :disabled="!editable"
-                    @keydown.enter.prevent="onEnterNext"
-                    v-select-on-focus
-                  />
-                </td>
-                <td class="p0">
-                  <input
-                    v-model="row.alasan"
-                    class="ci"
-                    maxlength="255"
-                    :disabled="!editable || !luarMkb(row)"
-                    :placeholder="luarMkb(row) ? 'Wajib diisi' : ''"
-                    @keydown.enter.prevent="onEnterNext"
-                  />
-                </td>
                 <td class="tc">
                   <button
                     type="button"
@@ -692,18 +694,11 @@ const statusClass = (s: string) => `st-${s}`;
                 </td>
               </tr>
             </tbody>
-            <tfoot>
-              <tr>
-                <td colspan="6" class="tr">TOTAL MARKER</td>
-                <td class="tr">{{ totalJml.toLocaleString("id-ID") }}</td>
-                <td colspan="2"></td>
-              </tr>
-            </tfoot>
           </table>
         </div>
         <div class="legend">
-          Baris berlatar kuning = bahan tidak ada di MKB SPK itu, alasan wajib
-          diisi.
+          Baris berlatar kuning = bahan tidak ada di MKB SPK ini; ganti bahannya
+          sebelum menyimpan.
         </div>
       </div>
     </template>
@@ -841,13 +836,17 @@ const statusClass = (s: string) => `st-${s}`;
   background: #e3f2fd;
   color: #1565c0;
 }
-.st-PROGRESS {
+.st-PROSES {
   background: #fff3e0;
   color: #e65100;
 }
 .st-DONE {
   background: #e8f5e9;
   color: #2e7d32;
+}
+.st-CLOSE {
+  background: #e0f2f1;
+  color: #00695c;
 }
 .st-PENDING {
   background: #f5f5f5;
@@ -924,19 +923,6 @@ const statusClass = (s: string) => `st-${s}`;
 .gt tbody tr.row-luar td {
   background: #fff8e1;
 }
-.gt tfoot td {
-  position: sticky;
-  bottom: 0;
-  z-index: 1;
-  background: #fff9c4;
-  border: 1px solid #bdbdbd;
-  height: 26px;
-  font-size: 11px;
-  font-weight: 700;
-  color: #37474f;
-  white-space: nowrap;
-  padding: 0 5px;
-}
 .p0 {
   padding: 0 !important;
 }
@@ -945,9 +931,6 @@ const statusClass = (s: string) => `st-${s}`;
 }
 .tc {
   text-align: center;
-}
-.tr {
-  text-align: right;
 }
 .gt-lbl {
   background: #f5f5f5 !important;
@@ -979,9 +962,6 @@ const statusClass = (s: string) => `st-${s}`;
   background: #e3f2fd !important;
   outline: 1px solid #1976d2;
   outline-offset: -1px;
-}
-.ci.tr {
-  text-align: right;
 }
 .btn-mini {
   width: 24px;

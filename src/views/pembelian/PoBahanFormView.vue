@@ -864,7 +864,6 @@ const validateSave = () => {
             <option :value="1">Greige</option>
             <option :value="2">Celup</option>
             <option :value="3">Bahan</option>
-            <option :value="4">Lain-lain</option>
             <option :value="5">Spanduk</option>
           </select>
         </div>

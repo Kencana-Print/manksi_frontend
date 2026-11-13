@@ -1,47 +1,183 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from "vue";
-import { permintaanMarkerFormService } from "@/services/garmen/permintaanMarkerFormService";
+import { ref, computed, onMounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
 import BaseForm from "@/components/BaseForm.vue";
 import { useForm } from "@/composables/useForm";
-import { lhkMarkerFormService } from "@/services/ppic/lhkMarkerFormService";
-import SpkPolaSearchModal from "@/components/lookups/SpkPolaSearchModal.vue";
-import { IconRuler2, IconSearch, IconTrash } from "@tabler/icons-vue";
-import api from "@/services/api";
-import TandaTerimaMarkerDialog from "@/components/dialogs/TandaTerimaMarkerDialog.vue";
+import { IconRuler2, IconTrash } from "@tabler/icons-vue";
+import { permintaanMarkerFormService } from "@/services/garmen/permintaanMarkerFormService";
+import {
+  lhkMarkerFormService,
+  type BlokPayload,
+  type LhkMarkerPayload,
+  type RasioLoaded,
+  type SizeSpk,
+} from "@/services/ppic/lhkMarkerFormService";
 
 const route = useRoute();
 const router = useRouter();
 const toast = useToast();
 const isEditMode = computed(() => !!route.params.nomor);
 
-const markerImageFiles = ref<Record<string, File>>({});
+const MAKS_RASIO = 7;
 
-const emptyMarkerRow = () => ({
-  spkNomor: "",
-  namaSpk: "",
-  lebarKain: "",
-  size: "",
-  tujuanProses: "",
-  keterangan: "",
-  gambar: "",
-  pmNomor: "",
-});
+// ── Tipe state form ──
+interface RasioForm {
+  rasio: number;
+  spreading: string;
+  pMarkerCm: string;
+  qty: Record<string, string>;
+}
 
-const defaultData = {
-  nomor: "",
-  tanggal: new Date().toISOString().substring(0, 10),
-  keterangan: "",
-  pembuatMarker: "",
-  marker: [emptyMarkerRow()],
+interface BlokForm {
+  key: string;
+  pmNomor: string;
+  kode: string;
+  setting: string;
+  namaBahan: string;
+  satuan: string;
+  spkNomor: string;
+  namaSpk: string;
+  untuk: string;
+  lebarMarker: string;
+  keterangan: string;
+  sizeLama: string;
+  formatLama: boolean;
+  size: SizeSpk[];
+  rasio: RasioForm[];
+}
+
+interface FormState {
+  nomor: string;
+  tanggal: string;
+  keterangan: string;
+  pembuatMarker: string;
+  marker: BlokForm[];
+}
+
+interface HasilRasio {
+  terisi: boolean;
+  sumQty: number;
+  m: number;
+  total: number;
+  sisa: Record<string, number>;
+  sisaSum: number;
+}
+
+interface HasilBlok {
+  rasio: HasilRasio[];
+  qtyOrderSum: number;
+  totalM: number;
+}
+
+// ── Helper hitung (hanya tampilan; angka final dihitung ulang di server) ──
+const bulat5 = (n: number) => Math.round(n * 1e5) / 1e5;
+
+const num = (v: string | undefined) => {
+  const n = Number(
+    String(v ?? "")
+      .trim()
+      .replace(",", "."),
+  );
+  return Number.isFinite(n) ? n : 0;
 };
 
-const showTandaTerima = ref(false);
-const punyaPermintaan = ref(false);
-const lhkTersimpan = ref("");
+const rasioTerisi = (r: RasioForm) =>
+  num(r.spreading) > 0 ||
+  num(r.pMarkerCm) > 0 ||
+  Object.values(r.qty).some((v) => num(v) > 0);
+
+const hitungBlok = (b: BlokForm): HasilBlok => {
+  const sisa: Record<string, number> = {};
+  for (const s of b.size) sisa[s.size] = s.qtyOrder;
+  let totalM = 0;
+
+  const rasio = b.rasio.map((r): HasilRasio => {
+    const terisi = rasioTerisi(r);
+    const spreading = num(r.spreading);
+    const sumQty = b.size.reduce((a, s) => a + num(r.qty[s.size]), 0);
+    const m = bulat5(num(r.pMarkerCm) / 100);
+    const total = bulat5(m * spreading);
+    if (terisi) {
+      for (const s of b.size) {
+        sisa[s.size] = bulat5(sisa[s.size] - spreading * num(r.qty[s.size]));
+      }
+      totalM = bulat5(totalM + total);
+    }
+    return {
+      terisi,
+      sumQty,
+      m,
+      total,
+      sisa: { ...sisa },
+      sisaSum: bulat5(Object.values(sisa).reduce((a, v) => a + v, 0)),
+    };
+  });
+
+  return {
+    rasio,
+    qtyOrderSum: b.size.reduce((a, s) => a + s.qtyOrder, 0),
+    totalM,
+  };
+};
+
+const fmt = (n: number, maks = 2) =>
+  n.toLocaleString("id-ID", { maximumFractionDigits: maks });
+const fmt2 = (n: number) =>
+  n.toLocaleString("id-ID", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+
+const todayLocal = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+
+const rasioKosong = (size: SizeSpk[]): RasioForm[] =>
+  Array.from({ length: MAKS_RASIO }, (_, i) => ({
+    rasio: i + 1,
+    spreading: "",
+    pMarkerCm: "",
+    qty: Object.fromEntries(size.map((s) => [s.size, ""])),
+  }));
+
+const rasioDariTersimpan = (
+  size: SizeSpk[],
+  tersimpan: RasioLoaded[],
+): RasioForm[] =>
+  rasioKosong(size).map((kosong) => {
+    const t = tersimpan.find((x) => x.rasio === kosong.rasio);
+    if (!t) return kosong;
+    return {
+      rasio: kosong.rasio,
+      spreading: String(t.spreading),
+      pMarkerCm: String(t.pMarkerCm),
+      qty: Object.fromEntries(
+        size.map((s) => {
+          const q = t.qty[s.size] ?? 0;
+          return [s.size, q > 0 ? String(q) : ""];
+        }),
+      ),
+    };
+  });
+
+const muatSize = async (spkNomor: string): Promise<SizeSpk[]> => {
+  const res = await lhkMarkerFormService.getSpkByNomor(spkNomor);
+  return res.data.data.size;
+};
+
+// ── State dialog & kunci ──
 const setelahSimpan = ref(false);
 const terkunci = ref(false);
+
+const defaultData: FormState = {
+  nomor: "",
+  tanggal: todayLocal(),
+  keterangan: "",
+  pembuatMarker: "",
+  marker: [],
+};
 
 const {
   isLoading,
@@ -56,123 +192,121 @@ const {
 } = useForm({
   menuId: "179",
   initialData: defaultData,
-  fetchApi: async () => {
-    const nomor = String(route.params.nomor);
-    const res = await lhkMarkerFormService.getDetail(nomor);
+  fetchApi: async (): Promise<FormState> => {
+    const res = await lhkMarkerFormService.getDetail(
+      String(route.params.nomor),
+    );
     const d = res.data.data;
+    const cache = new Map<string, SizeSpk[]>();
+    const marker: BlokForm[] = [];
+
+    for (const r of d.marker) {
+      let size: SizeSpk[] = [];
+      if (!r.formatLama) {
+        if (!cache.has(r.spkNomor)) {
+          cache.set(r.spkNomor, await muatSize(r.spkNomor));
+        }
+        size = cache.get(r.spkNomor) ?? [];
+      }
+      marker.push({
+        key: `${r.id}`,
+        pmNomor: r.pmNomor ?? "",
+        kode: r.kode ?? "",
+        setting: r.setting ?? "",
+        namaBahan: r.namaBahan ?? "",
+        satuan: r.satuan ?? "",
+        spkNomor: r.spkNomor,
+        namaSpk: r.namaSpk ?? "",
+        untuk: r.untuk ?? "",
+        lebarMarker: r.lebarMarker ?? "",
+        keterangan: r.keterangan ?? "",
+        sizeLama: r.sizeLama ?? "",
+        formatLama: r.formatLama,
+        size,
+        rasio: r.formatLama ? [] : rasioDariTersimpan(size, r.rasio),
+      });
+    }
+
     return {
       nomor: d.header.lhkp_nomor,
       tanggal: String(d.header.lhkp_tanggal).substring(0, 10),
       keterangan: d.header.lhkp_keterangan || "",
       pembuatMarker: d.header.pembuatMarker || "",
-      marker:
-        d.marker.length > 0
-          ? d.marker.map((r: any) => ({
-              spkNomor: r.spkNomor,
-              namaSpk: r.namaSpk || "",
-              lebarKain: r.lebarKain || "",
-              size: r.size || "",
-              tujuanProses: r.tujuanProses || "",
-              keterangan: r.keterangan || "",
-              gambar: r.gambar || "",
-              pmNomor: r.pmNomor || "",
-            }))
-          : [emptyMarkerRow()],
+      marker,
     };
   },
-  submitApi: async (data: any) => {
-    punyaPermintaan.value = data.marker.some((r: any) =>
-      String(r.pmNomor || "").trim(),
-    );
-    const payload = {
+  submitApi: async (data: FormState) => {
+    const payload: LhkMarkerPayload = {
       tanggal: data.tanggal,
       keterangan: data.keterangan,
-      pembuatMarker: data.pembuatMarker,
-      marker: data.marker,
+      marker: data.marker.map(
+        (b): BlokPayload => ({
+          pmNomor: b.pmNomor,
+          kode: b.kode,
+          setting: b.setting,
+          lebarMarker: b.lebarMarker.trim(),
+          keterangan: b.keterangan.trim(),
+          rasio: b.rasio.filter(rasioTerisi).map((r) => ({
+            rasio: r.rasio,
+            spreading: num(r.spreading),
+            pMarkerCm: num(r.pMarkerCm),
+            qty: Object.fromEntries(
+              b.size.map((s) => [s.size, num(r.qty[s.size])]),
+            ),
+          })),
+        }),
+      ),
     };
     const res = isEditMode.value
       ? await lhkMarkerFormService.update(String(route.params.nomor), payload)
       : await lhkMarkerFormService.create(payload);
-    const savedNomor = res.data.data.nomor;
-    lhkTersimpan.value = savedNomor;
-    try {
-      for (const [spkNomor, file] of Object.entries(markerImageFiles.value)) {
-        await lhkMarkerFormService.uploadGambar(file, savedNomor, spkNomor);
-      }
-    } catch (imgError: any) {
-      toast.warning(
-        `Data tersimpan, namun ada gambar gagal terupload: ${imgError.message}`,
-      );
-    }
     return res;
   },
   onSuccess: () => {
     toast.success("LHK Marker berhasil disimpan");
-    if (punyaPermintaan.value) {
-      setelahSimpan.value = true;
-      showTandaTerima.value = true; // dialog muncul, navigasi menunggu dialog ditutup
-      return;
-    }
     router.push({ name: "PpicLhkMarker" });
   },
 });
 
-const nomorTandaTerima = computed(
-  () => lhkTersimpan.value || String(route.params.nomor || ""),
+// ── Turunan ──
+const hitung = computed(() => formData.value.marker.map(hitungBlok));
+const adaFormatLama = computed(() =>
+  formData.value.marker.some((b) => b.formatLama),
 );
-const adaPermintaan = computed(() =>
-  formData.value.marker.some((r: any) => String(r.pmNomor || "").trim()),
-);
-
-const tutupTandaTerima = () => {
-  if (setelahSimpan.value) {
-    setelahSimpan.value = false;
-    router.push({ name: "PpicLhkMarker" });
-  }
-};
-
-onMounted(async () => {
-  const nomor = String(route.params.nomor || "");
-  if (!nomor) return; // mode tambah
-  try {
-    const res = await lhkMarkerFormService.getTandaTerima(nomor);
-    terkunci.value = res.data.data.tandaTerima.some((t) => !!t.tglTerima);
-  } catch {
-    terkunci.value = false; // backend tetap menjadi penentu saat simpan
-  }
-});
-
-watch(
-  () => formData.value.marker.map((r: any) => r.namaSpk).join("|"),
-  () => {
-    const namaList = formData.value.marker
-      .map((r: any) => r.namaSpk)
-      .filter((n: string) => n && n.trim());
-    const unique = [...new Set(namaList)];
-    if (unique.length > 0) {
-      formData.value.keterangan = unique.join(", ");
-    }
-  },
+const bacaSaja = computed(() => terkunci.value || adaFormatLama.value);
+const totalSemua = computed(() =>
+  hitung.value.reduce((a, h) => bulat5(a + h.totalM), 0),
 );
 
-const ensureTrailingMarkerRow = () => {
-  const list = formData.value.marker;
-  const last = list[list.length - 1];
-  if (list.length === 0 || (last && last.spkNomor.trim())) {
-    list.push(emptyMarkerRow());
-  }
-};
-const removeMarkerRow = (idx: number) => {
+const removeBlok = (idx: number) => {
   formData.value.marker.splice(idx, 1);
-  if (formData.value.marker.length === 0) ensureTrailingMarkerRow();
 };
-// ── Prefill dari Permintaan Marker (?pm=PMK...) ──
+
+// ── Muat awal: kunci (edit) atau prefill dari permintaan (create) ──
 const pmQuery = computed(() =>
   typeof route.query.pm === "string" ? route.query.pm : "",
 );
 
 onMounted(async () => {
-  if (isEditMode.value || !pmQuery.value) return;
+  const nomor = String(route.params.nomor || "");
+  if (nomor) {
+    try {
+      const res = await lhkMarkerFormService.getTandaTerima(nomor);
+      terkunci.value = res.data.data.tandaTerima.some((t) => !!t.tglTerima);
+    } catch {
+      terkunci.value = false; // backend tetap menjadi penentu saat simpan
+    }
+    return;
+  }
+
+  if (!pmQuery.value) {
+    toast.warning(
+      "LHK Marker dibuat dari Permintaan Marker, lewat tab Antrean Saya.",
+    );
+    router.push({ name: "PpicLhkMarker" });
+    return;
+  }
+
   try {
     const res = await permintaanMarkerFormService.getDetail(pmQuery.value);
     const d = res.data.data;
@@ -184,113 +318,114 @@ onMounted(async () => {
       router.push({ name: "PpicLhkMarker" });
       return;
     }
-    // SPK yang sudah punya LHK tidak diisi lagi
-    const sudahLhk = new Set(d.lhk.map((l) => l.spkNomor));
-    const baris = new Map<string, ReturnType<typeof emptyMarkerRow>>();
-    for (const r of d.detail) {
-      if (sudahLhk.has(r.spkNomor) || baris.has(r.spkNomor)) continue;
-      baris.set(r.spkNomor, {
-        ...emptyMarkerRow(),
-        spkNomor: r.spkNomor,
-        namaSpk: r.spkNama ?? "",
-        pmNomor: d.nomor,
-      });
-    }
-    if (baris.size === 0) {
-      toast.warning("Semua SPK di permintaan ini sudah punya LHK.");
+    if (d.detail.length === 0) {
+      toast.warning("Permintaan ini tidak punya bahan.");
       router.push({ name: "PpicLhkMarker" });
       return;
     }
-    formData.value.marker = [...baris.values(), emptyMarkerRow()];
+
+    const cache = new Map<string, SizeSpk[]>();
+    const marker: BlokForm[] = [];
+    for (const r of d.detail) {
+      if (!cache.has(r.spkNomor)) {
+        cache.set(r.spkNomor, await muatSize(r.spkNomor));
+      }
+      const size = cache.get(r.spkNomor) ?? [];
+      if (size.length === 0) {
+        toast.error(`SPK ${r.spkNomor} belum punya data size.`);
+        router.push({ name: "PpicLhkMarker" });
+        return;
+      }
+      marker.push({
+        key: `${d.nomor}|${r.kode}|${r.setting}|${r.spkNomor}`,
+        pmNomor: d.nomor,
+        kode: r.kode,
+        setting: r.setting,
+        namaBahan: r.namaBahan,
+        satuan: r.satuan,
+        spkNomor: r.spkNomor,
+        namaSpk: r.spkNama ?? "",
+        untuk: d.userCreate,
+        lebarMarker: "",
+        keterangan: "",
+        sizeLama: "",
+        formatLama: false,
+        size,
+        rasio: rasioKosong(size),
+      });
+    }
+
+    formData.value.marker = marker;
+    const namaList = [
+      ...new Set(marker.map((b) => b.namaSpk).filter((n) => n.trim())),
+    ];
+    if (namaList.length > 0 && !formData.value.keterangan.trim()) {
+      formData.value.keterangan = namaList.join(", ");
+    }
   } catch {
     toast.error("Gagal memuat permintaan marker.");
   }
 });
 
-const showSpkModal = ref(false);
-const spkModalIdx = ref<number>(-1);
-const openSpkModal = (idx: number) => {
-  spkModalIdx.value = idx;
-  showSpkModal.value = true;
-};
-const checkDuplicateSpk = (nomor: string, excludeIdx: number) =>
-  formData.value.marker.some(
-    (r: any, i: number) => i !== excludeIdx && r.spkNomor === nomor,
-  );
-const onSpkSelected = (item: any) => {
-  const idx = spkModalIdx.value;
-  if (idx < 0) return;
-  if (checkDuplicateSpk(item.Nomor, idx)) {
-    toast.warning(`SPK ${item.Nomor} sudah ada di baris lain.`);
-    return;
-  }
-  formData.value.marker[idx].spkNomor = item.Nomor;
-  formData.value.marker[idx].namaSpk = item.Nama;
-  ensureTrailingMarkerRow();
-};
-const onMarkerSpkEnter = async (idx: number) => {
-  const nomor = formData.value.marker[idx].spkNomor.trim();
-  if (!nomor) return;
-  if (checkDuplicateSpk(nomor, idx)) {
-    toast.warning(`SPK ${nomor} sudah ada di baris lain.`);
-    formData.value.marker[idx].spkNomor = "";
-    return;
-  }
-  try {
-    const res = await lhkMarkerFormService.getSpkByNomor(nomor);
-    formData.value.marker[idx].namaSpk = res.data.data.Nama;
-    ensureTrailingMarkerRow();
-  } catch {
-    toast.error(`SPK/MAP "${nomor}" tidak ditemukan.`);
-    formData.value.marker[idx].spkNomor = "";
-    formData.value.marker[idx].namaSpk = "";
-  }
-};
-
-const onMarkerImageChange = (e: Event, idx: number) => {
-  const file = (e.target as HTMLInputElement).files?.[0];
-  const row = formData.value.marker[idx];
-  if (!file || !row.spkNomor) return;
-  if (file.size > 1_000_000) {
-    toast.error("Ukuran gambar tidak boleh > 1 Mb.");
-    return;
-  }
-  markerImageFiles.value[row.spkNomor] = file;
-  row.gambar = URL.createObjectURL(file);
-};
-const getGambarUrl = (row: any) => {
-  if (!row.gambar) return "";
-  if (row.gambar.startsWith("blob:")) return row.gambar;
-  const base = api.defaults.baseURL?.replace(/\/api\/?$/, "") || "";
-  return `${base}/images/lhkpola/${encodeURIComponent(row.gambar)}`;
-};
-
-const showImagePreview = ref(false);
-const previewImageUrl = ref("");
-const openImagePreview = (row: any) => {
-  const url = getGambarUrl(row);
-  if (!url) return;
-  previewImageUrl.value = url;
-  showImagePreview.value = true;
-};
-
+// ── Validasi ──
 const validateSave = () => {
   if (terkunci.value) {
     toast.error(
       "LHK sudah divalidasi peminta (tanda terima diterima), tidak bisa diubah",
     );
-    return false;
+    return;
+  }
+  if (adaFormatLama.value) {
+    toast.error("LHK format lama tidak bisa diubah, hanya bisa dilihat.");
+    return;
   }
   if (!formData.value.tanggal) {
     toast.warning("Tanggal wajib diisi.");
     return;
   }
-  const markerFilled = formData.value.marker.filter((r: any) =>
-    r.spkNomor.trim(),
-  );
-  if (markerFilled.length === 0) {
-    toast.warning("Minimal harus ada 1 baris SPK terisi.");
+  if (formData.value.marker.length === 0) {
+    toast.warning("Minimal harus ada 1 blok bahan.");
     return;
+  }
+
+  for (let bi = 0; bi < formData.value.marker.length; bi++) {
+    const b = formData.value.marker[bi];
+    const label = `Blok ${bi + 1} (${b.namaBahan || b.kode})`;
+    const terisi = b.rasio.filter(rasioTerisi);
+    if (terisi.length === 0) {
+      toast.warning(`${label}: isi minimal 1 rasio.`);
+      return;
+    }
+    for (const r of terisi) {
+      const sp = num(r.spreading);
+      if (!Number.isInteger(sp) || sp < 1) {
+        toast.warning(
+          `${label} rasio ${r.rasio}: spreading harus bilangan bulat > 0.`,
+        );
+        return;
+      }
+      if (!(num(r.pMarkerCm) > 0)) {
+        toast.warning(`${label} rasio ${r.rasio}: p.marker (cm) harus > 0.`);
+        return;
+      }
+      let adaQty = false;
+      for (const s of b.size) {
+        const q = num(r.qty[s.size]);
+        if (!Number.isInteger(q) || q < 0) {
+          toast.warning(
+            `${label} rasio ${r.rasio}: qty size ${s.size} harus bilangan bulat >= 0.`,
+          );
+          return;
+        }
+        if (q > 0) adaQty = true;
+      }
+      if (!adaQty) {
+        toast.warning(
+          `${label} rasio ${r.rasio}: isi qty minimal di satu size.`,
+        );
+        return;
+      }
+    }
   }
   showSaveDialog.value = true;
 };
@@ -311,202 +446,223 @@ const validateSave = () => {
     @confirm-cancel="executeCancel"
     @confirm-close="executeClose"
   >
-    <div class="lp-container">
-      <div v-if="terkunci" class="banner-terkunci">
+    <div class="lm-container">
+      <div v-if="terkunci" class="banner banner-warn">
         LHK ini sudah divalidasi peminta. Data tidak bisa diubah atau dihapus.
       </div>
-      <div class="lp-header-card">
-        <div class="fr">
-          <label class="lbl">No. LHK Marker</label>
-          <input
-            :value="formData.nomor || '(Otomatis)'"
-            readonly
-            class="inp ro"
-            style="width: 180px"
-          />
-          <label class="lbl ml-3" style="width: 60px">Tanggal</label>
-          <input
-            type="date"
-            v-model="formData.tanggal"
-            class="inp"
-            style="width: 160px"
-          />
-          <v-btn
-            v-if="isEditMode && adaPermintaan"
-            size="small"
-            variant="outlined"
-            class="btn-tt"
-            @click="showTandaTerima = true"
+      <div v-if="adaFormatLama" class="banner banner-info">
+        LHK ini memakai format lama (tanpa bahan dan rasio). Hanya bisa dilihat
+        atau dihapus.
+      </div>
+
+      <!-- Header -->
+      <div class="card">
+        <div class="hdr-grid">
+          <div class="fld">
+            <label class="lbl">No. LHK Marker</label>
+            <input
+              :value="formData.nomor || '(Otomatis)'"
+              readonly
+              class="inp ro"
+            />
+          </div>
+          <div class="fld">
+            <label class="lbl">Tanggal</label>
+            <input
+              type="date"
+              v-model="formData.tanggal"
+              class="inp"
+              :disabled="bacaSaja"
+            />
+          </div>
+          <div class="fld">
+            <label class="lbl">Pembuat</label>
+            <input
+              :value="formData.pembuatMarker || '(Otomatis dari PIC)'"
+              readonly
+              class="inp ro"
+            />
+          </div>
+          <div class="fld fld-wide">
+            <label class="lbl">Keterangan</label>
+            <input
+              v-model="formData.keterangan"
+              class="inp"
+              :disabled="bacaSaja"
+            />
+          </div>
+          <div class="hdr-sum">
+            <span class="sum-chip"
+              >{{ formData.marker.length }} blok bahan</span
+            >
+            <span class="sum-chip sum-total">
+              Total kebutuhan {{ fmt2(totalSemua) }} m
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Blok bahan -->
+      <div v-for="(b, bi) in formData.marker" :key="b.key" class="card blok">
+        <div class="blok-head">
+          <span class="blok-no">{{ bi + 1 }}</span>
+          <div class="blok-title">
+            <div class="blok-bahan">
+              {{ b.namaBahan || b.kode || "Format lama" }}
+            </div>
+            <div class="blok-sub">
+              <span v-if="b.kode" class="mono">{{ b.kode }}</span>
+              <span v-if="b.setting" class="chip">Setting {{ b.setting }}</span>
+              <span v-if="b.satuan" class="chip">{{ b.satuan }}</span>
+              <span v-if="b.pmNomor" class="chip chip-pm">{{ b.pmNomor }}</span>
+            </div>
+          </div>
+          <div class="blok-meta">
+            <div>
+              SPK <b class="mono">{{ b.spkNomor }}</b>
+              <span v-if="b.namaSpk"> · {{ b.namaSpk }}</span>
+            </div>
+            <div>
+              For <b>{{ b.untuk || "-" }}</b>
+            </div>
+          </div>
+          <button
+            v-if="!bacaSaja && formData.marker.length > 1"
+            type="button"
+            class="btn-del"
+            title="Hapus blok ini dari LHK"
+            @click="removeBlok(bi)"
           >
-            Tanda Terima
-          </v-btn>
-        </div>
-        <div class="fr">
-          <label class="lbl">Keterangan</label>
-          <input v-model="formData.keterangan" class="inp" style="flex: 1" />
-        </div>
-        <div class="fr">
-          <label class="lbl">Pembuat</label>
-          <input
-            v-model="formData.pembuatMarker"
-            class="inp"
-            style="flex: 1"
-            placeholder="Nama pembuat marker..."
-          />
-        </div>
-      </div>
-
-      <div class="lp-tab-body">
-        <table class="lp-table">
-          <thead>
-            <tr>
-              <th style="width: 32px">No</th>
-              <th style="width: 150px">No. SPK</th>
-              <th>Nama SPK</th>
-              <th style="width: 140px">Permintaan</th>
-              <th style="width: 100px">Lebar Kain</th>
-              <th style="width: 110px">Size</th>
-              <th style="width: 100px">For</th>
-              <th style="width: 160px">Keterangan</th>
-              <th style="width: 90px">Gambar</th>
-              <th style="width: 36px"></th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="(row, idx) in formData.marker" :key="idx">
-              <td class="tc">{{ Number(idx) + 1 }}</td>
-              <td>
-                <div class="igrp">
-                  <input
-                    v-model="row.spkNomor"
-                    class="cell-inp"
-                    :readonly="!!row.pmNomor"
-                    placeholder="F1/Enter cari..."
-                    @keydown.enter.prevent="onMarkerSpkEnter(Number(idx))"
-                    @keydown.f1.prevent="openSpkModal(Number(idx))"
-                  />
-                  <button
-                    type="button"
-                    class="btn-lkp"
-                    :disabled="!!row.pmNomor"
-                    @click="openSpkModal(Number(idx))"
-                  >
-                    <IconSearch :size="12" color="#1565c0" />
-                  </button>
-                </div>
-              </td>
-              <td>
-                <input :value="row.namaSpk" readonly class="cell-inp ro" />
-              </td>
-              <td>
-                <input :value="row.pmNomor" readonly class="cell-inp ro" />
-              </td>
-              <td>
-                <input
-                  v-model="row.lebarKain"
-                  class="cell-inp"
-                  placeholder="147CM"
-                />
-              </td>
-              <td>
-                <input
-                  v-model="row.size"
-                  class="cell-inp"
-                  placeholder="M,L,XL"
-                />
-              </td>
-              <td>
-                <input
-                  v-model="row.tujuanProses"
-                  class="cell-inp"
-                  placeholder="CUTTING"
-                />
-              </td>
-              <td>
-                <input v-model="row.keterangan" class="cell-inp" />
-              </td>
-              <td>
-                <div class="cell-img-cell">
-                  <img
-                    v-if="getGambarUrl(row)"
-                    :src="getGambarUrl(row)"
-                    class="cell-thumb"
-                    style="cursor: pointer"
-                    @click="openImagePreview(row)"
-                    @error="
-                      (e) =>
-                        ((e.target as HTMLImageElement).style.display = 'none')
-                    "
-                  />
-                  <input
-                    type="file"
-                    accept="image/*"
-                    class="cell-file-inp"
-                    :disabled="!row.spkNomor"
-                    @change="onMarkerImageChange($event, Number(idx))"
-                  />
-                </div>
-              </td>
-              <td class="tc">
-                <button
-                  v-if="formData.marker.length > 1"
-                  type="button"
-                  class="btn-del"
-                  @click="removeMarkerRow(Number(idx))"
-                >
-                  <IconTrash :size="13" color="#c62828" />
-                </button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-    <TandaTerimaMarkerDialog
-      v-model="showTandaTerima"
-      :lhk-nomor="nomorTandaTerima"
-      @tutup="tutupTandaTerima"
-    />
-
-    <SpkPolaSearchModal v-model="showSpkModal" @selected="onSpkSelected" />
-
-    <v-dialog v-model="showImagePreview" max-width="800px">
-      <div class="preview-card">
-        <div class="preview-header">
-          <span>Preview Gambar</span>
-          <button class="preview-close" @click="showImagePreview = false">
-            ✕
+            <IconTrash :size="13" color="#c62828" />
           </button>
         </div>
-        <div class="preview-body">
-          <v-img
-            :src="previewImageUrl"
-            max-height="600"
-            contain
-            class="bg-white rounded"
-          >
-            <template #placeholder>
-              <div class="d-flex align-center justify-center fill-height">
-                <v-progress-circular indeterminate color="primary" />
-              </div>
-            </template>
-            <template #error>
-              <div
-                class="d-flex align-center justify-center fill-height text-grey"
-              >
-                Gambar tidak tersedia
-              </div>
-            </template>
-          </v-img>
+
+        <div class="blok-fields">
+          <div class="fld">
+            <label class="lbl">Lebar Marker</label>
+            <input
+              v-model="b.lebarMarker"
+              class="inp"
+              :disabled="bacaSaja"
+              placeholder="147CM"
+            />
+          </div>
+          <div class="fld fld-grow">
+            <label class="lbl">Keterangan</label>
+            <input v-model="b.keterangan" class="inp" :disabled="bacaSaja" />
+          </div>
+        </div>
+
+        <div v-if="b.formatLama" class="lama-info">
+          Size lama: <b>{{ b.sizeLama || "-" }}</b>
+        </div>
+
+        <div v-else class="tbl-wrap">
+          <table class="rt">
+            <thead>
+              <tr>
+                <th style="width: 40px">Rasio</th>
+                <th style="width: 64px">Spreading</th>
+                <th v-for="s in b.size" :key="s.size" class="th-size">
+                  {{ s.size }}
+                </th>
+                <th style="width: 56px">Qty</th>
+                <th style="width: 90px">P.Marker (cm)</th>
+                <th style="width: 80px">P.Marker (m)</th>
+                <th style="width: 90px">Total (m)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="r-order">
+                <th colspan="2" class="lbl-cell">Qty Order</th>
+                <td v-for="s in b.size" :key="s.size" class="num">
+                  {{ fmt(s.qtyOrder) }}
+                </td>
+                <td class="num strong">{{ fmt(hitung[bi].qtyOrderSum) }}</td>
+                <td colspan="3"></td>
+              </tr>
+
+              <template v-for="(r, ri) in b.rasio" :key="r.rasio">
+                <tr class="r-in">
+                  <td class="tc strong">{{ r.rasio }}</td>
+                  <td>
+                    <input
+                      v-model="r.spreading"
+                      class="ci"
+                      inputmode="numeric"
+                      :disabled="bacaSaja"
+                    />
+                  </td>
+                  <td v-for="s in b.size" :key="s.size">
+                    <input
+                      v-model="r.qty[s.size]"
+                      class="ci"
+                      inputmode="numeric"
+                      :disabled="bacaSaja"
+                    />
+                  </td>
+                  <td class="num">
+                    {{
+                      hitung[bi].rasio[ri].terisi
+                        ? fmt(hitung[bi].rasio[ri].sumQty)
+                        : ""
+                    }}
+                  </td>
+                  <td>
+                    <input
+                      v-model="r.pMarkerCm"
+                      class="ci ci-wide"
+                      inputmode="decimal"
+                      :disabled="bacaSaja"
+                    />
+                  </td>
+                  <td class="num">
+                    {{
+                      hitung[bi].rasio[ri].terisi
+                        ? fmt(hitung[bi].rasio[ri].m, 4)
+                        : ""
+                    }}
+                  </td>
+                  <td class="num">
+                    {{
+                      hitung[bi].rasio[ri].terisi
+                        ? fmt2(hitung[bi].rasio[ri].total)
+                        : ""
+                    }}
+                  </td>
+                </tr>
+                <tr v-if="hitung[bi].rasio[ri].terisi" class="r-sisa">
+                  <th colspan="2" class="lbl-cell">Sisa</th>
+                  <td
+                    v-for="s in b.size"
+                    :key="s.size"
+                    class="num"
+                    :class="{ neg: hitung[bi].rasio[ri].sisa[s.size] < 0 }"
+                  >
+                    {{ fmt(hitung[bi].rasio[ri].sisa[s.size]) }}
+                  </td>
+                  <td class="num">{{ fmt(hitung[bi].rasio[ri].sisaSum) }}</td>
+                  <td colspan="3"></td>
+                </tr>
+              </template>
+            </tbody>
+            <tfoot>
+              <tr class="r-total">
+                <td :colspan="b.size.length + 5" class="tr">
+                  Total kebutuhan (m)
+                </td>
+                <td class="num strong">{{ fmt2(hitung[bi].totalM) }}</td>
+              </tr>
+            </tfoot>
+          </table>
         </div>
       </div>
-    </v-dialog>
+    </div>
   </BaseForm>
 </template>
 
 <style scoped>
-.lp-container {
+.lm-container {
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -516,30 +672,46 @@ const validateSave = () => {
   font-family: "Segoe UI", system-ui, sans-serif;
   font-size: 11px;
 }
-.lp-header-card {
+.card {
   background: white;
   border: 1px solid #e0e0e0;
   border-radius: 6px;
   padding: 10px 14px;
 }
-.fr {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 6px;
-  min-height: 26px;
+.banner {
+  font-size: 11px;
+  padding: 6px 10px;
+  border-radius: 4px;
 }
-.fr:last-child {
-  margin-bottom: 0;
+.banner-warn {
+  background: #fff3e0;
+  border: 1px solid #ffb74d;
+}
+.banner-info {
+  background: #e3f2fd;
+  border: 1px solid #90caf9;
+}
+.hdr-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px 14px;
+  align-items: end;
+}
+.fld {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.fld-wide {
+  grid-column: 1 / -1;
+}
+.fld-grow {
+  flex: 1;
 }
 .lbl {
-  width: 90px;
-  flex-shrink: 0;
   font-weight: 600;
   color: #424242;
-}
-.ml-3 {
-  margin-left: 12px;
 }
 .inp {
   height: 26px;
@@ -548,83 +720,198 @@ const validateSave = () => {
   padding: 0 6px;
   font-size: 11px;
   outline: none;
+  box-sizing: border-box;
+  width: 100%;
 }
 .inp:focus {
   border-color: #1565c0;
+}
+.inp:disabled {
+  background: #f5f5f5;
+  color: #757575;
 }
 .ro {
   background: #f0f0f0;
   color: #616161;
 }
-.lp-tab-body {
-  background: white;
-  border: 1px solid #e0e0e0;
-  border-radius: 6px;
-  padding: 8px;
-  flex: 1;
-  overflow: auto;
+.hdr-sum {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
-.lp-table {
-  width: 100%;
+.sum-chip {
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: #eceff1;
+  color: #455a64;
+  font-weight: 600;
+}
+.sum-total {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+.btn-tt {
+  font-size: 11px;
+  text-transform: none;
+  margin-left: auto;
+}
+.blok-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 8px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid #eee;
+}
+.blok-no {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #1565c0;
+  color: white;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.blok-title {
+  min-width: 0;
+  flex: 1;
+}
+.blok-bahan {
+  font-size: 12px;
+  font-weight: 700;
+  color: #263238;
+}
+.blok-sub {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 2px;
+  align-items: center;
+}
+.chip {
+  padding: 0 6px;
+  border-radius: 8px;
+  background: #eceff1;
+  color: #546e7a;
+  font-size: 10px;
+}
+.chip-pm {
+  background: #e3f2fd;
+  color: #1565c0;
+}
+.blok-meta {
+  text-align: right;
+  color: #455a64;
+  line-height: 1.5;
+}
+.mono {
+  font-family: monospace;
+  color: #1565c0;
+  font-weight: 600;
+}
+.blok-fields {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.blok-fields .fld:first-child {
+  width: 160px;
+}
+.lama-info {
+  padding: 6px 8px;
+  background: #fafafa;
+  border: 1px dashed #bdbdbd;
+  border-radius: 4px;
+}
+.tbl-wrap {
+  overflow-x: auto;
+}
+.rt {
   border-collapse: collapse;
   font-size: 11px;
+  min-width: 100%;
 }
-.lp-table thead th {
+.rt th,
+.rt td {
+  border: 1px solid #e0e0e0;
+  padding: 2px 4px;
+}
+.rt thead th {
   background: #f5f5f5;
-  padding: 6px 8px;
   font-weight: 700;
-  text-align: left;
-  border-bottom: 1px solid #e0e0e0;
+  text-align: center;
   white-space: nowrap;
 }
-.lp-table tbody td {
-  padding: 3px 6px;
-  border-bottom: 1px solid #eee;
+.th-size {
+  min-width: 52px;
+}
+.lbl-cell {
+  text-align: left;
+  padding-left: 8px;
+  font-weight: 700;
+}
+.num {
+  text-align: right;
+  padding-right: 8px;
+  font-variant-numeric: tabular-nums;
 }
 .tc {
   text-align: center;
 }
-.cell-inp {
+.tr {
+  text-align: right;
+  padding-right: 8px;
+  font-weight: 700;
+}
+.strong {
+  font-weight: 700;
+}
+.r-order,
+.r-order th {
+  background: #fff9c4;
+}
+.r-in {
+  background: #e3f2fd;
+}
+.r-sisa,
+.r-sisa th {
+  background: #e8f5e9;
+}
+.r-sisa td {
+  color: #c62828;
+}
+.r-sisa td.neg {
+  background: #ffcdd2;
+  font-weight: 700;
+}
+.r-total td {
+  background: #eceff1;
+}
+.ci {
   width: 100%;
-  height: 26px;
+  min-width: 44px;
+  height: 22px;
   border: 1px solid #bdbdbd;
   border-radius: 3px;
-  padding: 0 6px;
+  text-align: center;
   font-size: 11px;
   outline: none;
   box-sizing: border-box;
+  background: white;
 }
-.cell-inp:focus {
+.ci-wide {
+  min-width: 80px;
+}
+.ci:focus {
   border-color: #1565c0;
 }
-.cell-inp.ro {
-  background: #f0f0f0;
-  color: #616161;
-}
-.igrp {
-  display: flex;
-  border: 1px solid #bdbdbd;
-  border-radius: 3px;
-  overflow: hidden;
-  height: 26px;
-}
-.igrp .cell-inp {
-  border: none;
-  height: 24px;
-}
-.btn-lkp {
-  width: 24px;
-  min-width: 24px;
-  background: #e3f2fd;
-  border: none;
-  border-left: 1px solid #bdbdbd;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.btn-lkp:hover {
-  background: #bbdefb;
+.ci:disabled {
+  background: #f5f5f5;
+  color: #757575;
 }
 .btn-del {
   background: #ffebee;
@@ -635,64 +922,5 @@ const validateSave = () => {
 }
 .btn-del:hover {
   background: #ffcdd2;
-}
-.cell-img-cell {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-}
-.cell-thumb {
-  width: 40px;
-  height: 40px;
-  object-fit: cover;
-  border: 1px solid #ddd;
-  border-radius: 3px;
-}
-.cell-file-inp {
-  font-size: 9px;
-  width: 90px;
-}
-.preview-card {
-  background: white;
-  border-radius: 8px;
-  overflow: hidden;
-}
-.preview-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background: #1565c0;
-  color: white;
-  padding: 9px 14px;
-  font-size: 13px;
-  font-weight: 700;
-}
-.preview-close {
-  background: transparent;
-  border: none;
-  color: rgba(255, 255, 255, 0.8);
-  font-size: 16px;
-  cursor: pointer;
-}
-.preview-close:hover {
-  color: white;
-}
-.preview-body {
-  padding: 16px;
-  background: #f5f5f5;
-}
-.btn-tt {
-  font-size: 11px;
-  text-transform: none;
-  margin-left: auto;
-}
-.banner-terkunci {
-  font-size: 11px;
-  padding: 6px 10px;
-  margin-bottom: 8px;
-  background: #fff3e0;
-  border: 1px solid #ffb74d;
-  border-radius: 4px;
 }
 </style>

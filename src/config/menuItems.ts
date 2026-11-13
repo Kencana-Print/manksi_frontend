@@ -380,6 +380,12 @@ export const createMenuItems = (): NavItem[] => {
           menuId: 52,
         },
         {
+          title: "Rekap Belanja",
+          to: "/pembelian/rekap-belanja",
+          icon: IconFileText,
+          menuId: 972,
+        },
+        {
           title: "PO Non Bahan",
           to: "/garmen/barang/po-nonbahan",
           icon: IconFileInvoice,
@@ -396,6 +402,12 @@ export const createMenuItems = (): NavItem[] => {
           icon: IconCashBanknote,
           to: "/pembelian/uang-muka",
           menuId: 315,
+        },
+        {
+          title: "Petty Cash",
+          icon: IconCash,
+          to: "/pembelian/petty-cash",
+          menuId: 973,
         },
         {
           title: "Mutasi Out Garmen",

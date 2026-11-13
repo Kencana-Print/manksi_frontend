@@ -5,6 +5,7 @@ export const poBahanService = {
     startDate: string;
     endDate: string;
     search?: string;
+    mode?: "rekap";
   }) => api.get("/pembelian/po-bahan", { params }),
 
   getBrowseDetail: (nomor: string) =>
@@ -26,5 +27,6 @@ export const poBahanService = {
     startDate: string;
     endDate: string;
     search?: string;
+    mode?: "rekap";
   }) => api.get("/pembelian/po-bahan/all-detail", { params }),
 };

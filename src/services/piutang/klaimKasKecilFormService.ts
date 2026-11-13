@@ -9,10 +9,14 @@ export interface RekeningInfo {
   rekening: string;
 }
 
+export interface KasOpsi extends RekeningInfo {
+  jenis: string;
+}
+
 export interface KlaimDefaults {
   cabang: string;
   jenis: string;
-  kasOpsi: RekeningInfo[];
+  kasOpsi: KasOpsi[];
   tanggalMulai: string;
   cabangOpsi: string[];
 }
@@ -97,6 +101,7 @@ export interface KlaimPrint {
   nomor: string;
   tanggal: string;
   cabang: string;
+  jenis?: string;
   rekTujuan: RekeningInfo;
   keterangan: string;
   kasir: string;

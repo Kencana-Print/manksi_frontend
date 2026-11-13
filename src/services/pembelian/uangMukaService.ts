@@ -23,4 +23,19 @@ export const uangMukaService = {
       `/pembelian/uang-muka/history/${encodeURIComponent(nomor)}`,
     );
   },
+  getOutstandingPetty(
+    params: { search?: string; startDate?: string; endDate?: string } = {},
+  ) {
+    return api.get("/pembelian/uang-muka/outstanding-petty", {
+      params: { page: 1, limit: 1000, ...params },
+    });
+  },
+  getOutstandingPettyDetail(sumber: string, nomor: string) {
+    return api.get("/pembelian/uang-muka/outstanding-petty/detail", {
+      params: { sumber, nomor },
+    });
+  },
+  getHistoryPetty(params: { startDate?: string; endDate?: string } = {}) {
+    return api.get("/pembelian/uang-muka/history-petty", { params });
+  },
 };

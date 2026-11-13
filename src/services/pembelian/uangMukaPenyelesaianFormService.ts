@@ -2,12 +2,17 @@ import api from "@/services/api";
 
 const base = "/pembelian/uang-muka-penyelesaian";
 
+// Penyelesaian Dana Belanja (PD) lewat /petty (hak menu 973)
+const path = (pd: boolean) => (pd ? `${base}/petty` : base);
+
 export const uangMukaPenyelesaianFormService = {
-  getFormData: (nomor: string) =>
-    api.get(`${base}/${encodeURIComponent(nomor)}`).then((r) => r.data.data),
-  cekBatas: (nomor: string) =>
+  getFormData: (nomor: string, pd = false) =>
     api
-      .get(`${base}/${encodeURIComponent(nomor)}/cek-batas`)
+      .get(`${path(pd)}/${encodeURIComponent(nomor)}`)
+      .then((r) => r.data.data),
+  cekBatas: (nomor: string, pd = false) =>
+    api
+      .get(`${path(pd)}/${encodeURIComponent(nomor)}/cek-batas`)
       .then((r) => r.data),
   getAccountOptions: (jenis: string, cabang: string) =>
     api
@@ -59,8 +64,8 @@ export const uangMukaPenyelesaianFormService = {
     nourut: number,
     status: string | null,
   ) => api.patch(`${base}/status-finance`, { pmtNomor, nourut, status }),
-  save: (payload: any) =>
+  save: (payload: any, pd = false) =>
     api
-      .post(`${base}/${encodeURIComponent(payload.nomor)}/save`, payload)
+      .post(`${path(pd)}/${encodeURIComponent(payload.nomor)}/save`, payload)
       .then((r) => r.data),
 };

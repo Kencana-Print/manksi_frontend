@@ -61,8 +61,6 @@ export interface MarkerDetailPayload {
   spkNomor: string;
   kode: string;
   setting: string;
-  jml: number;
-  alasan: string;
 }
 
 export interface PermintaanMarkerPayload {

@@ -144,21 +144,27 @@ onMounted(async () => {
         <div class="spk-list-so">
           <h2 class="spk-list-title-so">
             DETAIL SPK &amp; BAHAN
-            <span class="total-so">(Total {{ num(totalMarker) }} marker)</span>
+            <span v-if="totalMarker > 0" class="total-so"
+              >(Total {{ num(totalMarker) }} marker)</span
+            >
             :
           </h2>
 
           <div v-for="g in kelompok" :key="g.spkNomor" class="spk-block-so">
             <div class="spk-title-so">
               {{ g.spkNomor }}<span v-if="g.spkNama"> — {{ g.spkNama }}</span>
-              <span class="spk-qty-so">({{ num(g.subtotal) }} marker)</span>
+              <span v-if="g.subtotal > 0" class="spk-qty-so"
+                >({{ num(g.subtotal) }} marker)</span
+              >
             </div>
 
             <div v-for="d in g.rows" :key="d.id" class="bahan-line-so">
               <div class="bahan-kode-so">{{ d.kode }} — {{ d.namaBahan }}</div>
               <div class="bahan-meta-so">
-                Setting: {{ d.setting }} &nbsp;·&nbsp; Jml Marker:
-                <b>{{ num(d.jml) }}</b>
+                Setting: {{ d.setting }}
+                <span v-if="Number(d.jml) > 0">
+                  &nbsp;·&nbsp; Jml Marker: <b>{{ num(d.jml) }}</b></span
+                >
                 <span v-if="d.satuan">
                   &nbsp;·&nbsp; Satuan: {{ d.satuan }}</span
                 >

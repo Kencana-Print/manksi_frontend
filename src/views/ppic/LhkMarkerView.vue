@@ -5,17 +5,28 @@ import { useRouter } from "vue-router";
 import BaseBrowse from "@/components/BaseBrowse.vue";
 import { useBrowse } from "@/composables/useBrowse";
 import { lhkMarkerService } from "@/services/ppic/lhkMarkerService";
-import { lhkMarkerFormService } from "@/services/ppic/lhkMarkerFormService";
-import { IconRuler2, IconFileSpreadsheet } from "@tabler/icons-vue";
+import {
+  lhkMarkerFormService,
+  type BlokLoaded,
+} from "@/services/ppic/lhkMarkerFormService";
+import {
+  IconRuler2,
+  IconFileSpreadsheet,
+  IconFileText,
+} from "@tabler/icons-vue";
 import { formatTanggal, formatTanggalJam } from "@/utils/dateFormat";
 import { exportExcelSingle, type ExcelColumn } from "@/utils/excelExport";
 import AntreanMarkerPanel from "./components/AntreanMarkerPanel.vue";
+import TandaTerimaMarkerDialog from "@/components/dialogs/TandaTerimaMarkerDialog.vue";
 
 const toast = useToast();
 const router = useRouter();
 
 // ── Filter periode ───────────────────────────────────────────────────
-const today = new Date().toISOString().substring(0, 10);
+const today = (() => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+})();
 const SESSION_KEY = "lhk_marker_browse_filter";
 const savedFilter = (() => {
   try {
@@ -72,7 +83,10 @@ watch(
   { immediate: true },
 );
 
-const onAdd = () => router.push({ name: "PpicLhkMarkerCreate" });
+const onAdd = () => {
+  activeTab.value = "antrean";
+  toast.info("LHK Marker dibuat dari permintaan di tab Antrean Saya.");
+};
 const onEdit = (item: any) =>
   router.push({ name: "PpicLhkMarkerEdit", params: { nomor: item.Nomor } });
 const onDelete = async (item: any) => {
@@ -85,6 +99,16 @@ const onDelete = async (item: any) => {
   }
 };
 
+// ── Tanda Terima Marker (serah terima) ──
+const showTandaTerima = ref(false);
+const bukaTandaTerima = () => {
+  if (!selectedItem.value) {
+    toast.warning("Pilih satu LHK dulu.");
+    return;
+  }
+  showTandaTerima.value = true;
+};
+
 onMounted(fetchData);
 
 // ── Headers — read-only browse, khusus sisi Marker ──────────────────
@@ -95,14 +119,25 @@ const headers = [
   { title: "SPK", key: "SpkNomor", minWidth: "160px" },
   { title: "Permintaan", key: "PermintaanNomor", minWidth: "160px" },
   { title: "Pembuat", key: "Pembuat", width: "140px" },
-  { title: "Jml Marker", key: "JmlMarker", width: "100px", align: "right" },
+  { title: "Jml Bahan", key: "JmlMarker", width: "100px", align: "right" },
   { title: "User", key: "UserCreate", width: "90px" },
   { title: "Created", key: "DateCreate", width: "140px", align: "center" },
 ];
 
 // ── Expand row — cuma tabel Marker (bukan Grading) ──────────────────
 const expandedRows = ref<any[]>([]);
-const detailCache = ref<Record<string, any[]>>({});
+const detailCache = ref<Record<string, BlokLoaded[]>>({});
+
+const totalBlok = (r: BlokLoaded) => r.rasio.reduce((a, x) => a + x.totalM, 0);
+const fmtM = (v: number) =>
+  v.toLocaleString("id-ID", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+const ketBlok = (r: BlokLoaded) =>
+  [r.keterangan, r.sizeLama ? `Size lama: ${r.sizeLama}` : ""]
+    .filter(Boolean)
+    .join(" · ");
 const expandedLoading = ref<Record<string, boolean>>({});
 
 const onUpdateExpanded = async (newExpanded: any[]) => {
@@ -142,7 +177,7 @@ const onExport = async () => {
     { header: "Permintaan", key: "PermintaanNomor", width: 22 },
     { header: "Pembuat", key: "Pembuat", width: 20 },
     {
-      header: "Jml Marker",
+      header: "Jml Bahan",
       key: "JmlMarker",
       width: 12,
       align: "right",
@@ -202,17 +237,19 @@ const onExportDetail = async () => {
       );
 
       if (det.length > 0) {
-        det.forEach((r: any, idx: number) => {
+        det.forEach((r: BlokLoaded, idx: number) => {
           rows.push({
             ...(idx === 0 ? masterCells : blankMaster),
-            NomorUlang: master.Nomor, // ⬅ tetap terisi tiap baris, buat filter/sort
+            NomorUlang: master.Nomor,
             "No SPK": r.spkNomor,
             "Nama SPK": r.namaSpk || "",
             Permintaan: r.pmNomor || "",
-            "Lebar Kain": r.lebarKain || "",
-            Size: r.size || "",
-            For: r.tujuanProses || "",
-            Keterangan: r.keterangan || "",
+            Bahan: r.namaBahan || r.kode || "",
+            Setting: r.setting || "",
+            "Lebar Marker": r.lebarMarker || "",
+            For: r.untuk || "",
+            "Total (m)": r.rasio.length ? totalBlok(r) : "",
+            Keterangan: ketBlok(r),
           });
         });
       } else {
@@ -221,9 +258,12 @@ const onExportDetail = async () => {
           NomorUlang: master.Nomor,
           "No SPK": "",
           "Nama SPK": "(Tidak ada data marker)",
-          "Lebar Kain": "",
-          Size: "",
+          Permintaan: "",
+          Bahan: "",
+          Setting: "",
+          "Lebar Marker": "",
           For: "",
+          "Total (m)": "",
           Keterangan: "",
         });
       }
@@ -238,10 +278,19 @@ const onExportDetail = async () => {
       { header: "Nomor", key: "NomorUlang", width: 16 },
       { header: "No SPK", key: "No SPK", width: 14 },
       { header: "Nama SPK", key: "Nama SPK", width: 26 },
-      { header: "Lebar Kain", key: "Lebar Kain", width: 12 },
-      { header: "Size", key: "Size", width: 10 },
+      { header: "Permintaan", key: "Permintaan", width: 20 },
+      { header: "Bahan", key: "Bahan", width: 28 },
+      { header: "Setting", key: "Setting", width: 12 },
+      { header: "Lebar Marker", key: "Lebar Marker", width: 12 },
       { header: "For", key: "For", width: 12 },
-      { header: "Keterangan", key: "Keterangan", width: 20 },
+      {
+        header: "Total (m)",
+        key: "Total (m)",
+        width: 12,
+        align: "right",
+        numFmt: "#,##0.00",
+      },
+      { header: "Keterangan", key: "Keterangan", width: 24 },
     ];
 
     await exportExcelSingle(
@@ -330,6 +379,19 @@ const onExportDetail = async () => {
         <template #extra-actions>
           <v-btn
             size="small"
+            color="primary"
+            variant="outlined"
+            class="mr-2"
+            :disabled="!selectedItem"
+            @click="bukaTandaTerima"
+          >
+            <template #prepend>
+              <IconFileText :size="15" :stroke-width="1.7" />
+            </template>
+            Tanda Terima Marker
+          </v-btn>
+          <v-btn
+            size="small"
             color="green-darken-3"
             variant="outlined"
             :loading="isExportingDetail"
@@ -365,10 +427,12 @@ const onExportDetail = async () => {
                   <th style="width: 100px">No SPK</th>
                   <th>Nama SPK</th>
                   <th style="width: 140px">Permintaan</th>
-                  <th style="width: 90px">Lebar Kain</th>
-                  <th style="width: 90px">Size</th>
+                  <th>Bahan</th>
+                  <th style="width: 70px">Setting</th>
+                  <th style="width: 90px">Lebar Marker</th>
                   <th style="width: 80px">For</th>
-                  <th style="width: 130px">Keterangan</th>
+                  <th style="width: 80px">Total (m)</th>
+                  <th style="width: 150px">Keterangan</th>
                 </tr>
               </thead>
               <tbody>
@@ -377,13 +441,17 @@ const onExportDetail = async () => {
                   <td class="mono">{{ r.spkNomor }}</td>
                   <td>{{ r.namaSpk || "-" }}</td>
                   <td class="mono">{{ r.pmNomor || "-" }}</td>
-                  <td>{{ r.lebarKain || "-" }}</td>
-                  <td>{{ r.size || "-" }}</td>
-                  <td>{{ r.tujuanProses || "-" }}</td>
-                  <td>{{ r.keterangan || "-" }}</td>
+                  <td>{{ r.namaBahan || r.kode || "-" }}</td>
+                  <td>{{ r.setting || "-" }}</td>
+                  <td>{{ r.lebarMarker || "-" }}</td>
+                  <td>{{ r.untuk || "-" }}</td>
+                  <td class="tc">
+                    {{ r.rasio.length ? fmtM(totalBlok(r)) : "-" }}
+                  </td>
+                  <td>{{ ketBlok(r) || "-" }}</td>
                 </tr>
                 <tr v-if="!detailCache[item.Nomor]?.length">
-                  <td colspan="8" class="empty-row">Tidak ada data</td>
+                  <td colspan="10" class="empty-row">Tidak ada data</td>
                 </tr>
               </tbody>
             </table>
@@ -391,6 +459,11 @@ const onExportDetail = async () => {
         </template>
       </BaseBrowse>
     </div>
+
+    <TandaTerimaMarkerDialog
+      v-model="showTandaTerima"
+      :lhk-nomor="selectedItem?.Nomor ?? ''"
+    />
   </div>
 </template>
 
