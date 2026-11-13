@@ -118,6 +118,8 @@ const versiBaru = computed(
   () => Number(data.value?.header?.qc_versi_nilai) === 2,
 );
 
+const isSpanduk = computed(() => data.value?.header?.jenis_po === "SPANDUK");
+
 const nilaiRollText = (rl: QcRollRow): string =>
   versiBaru.value ? (rl.nilai ? String(rl.nilai) : "-") : sesuaiText(rl);
 </script>
@@ -163,8 +165,15 @@ const nilaiRollText = (rl: QcRollRow): string =>
             <td>Qty Kedatangan</td>
             <td>
               : {{ numFmt(data.header.qc_qty_datang) }}
-              {{ data.po?.satuan || "Kg" }} ({{ data.header.qc_jml_lot }} lot)
+              {{ data.po?.satuan || "Kg" }}
+              <template v-if="!isSpanduk">
+                ({{ data.header.qc_jml_lot }} lot)
+              </template>
             </td>
+          </tr>
+          <tr v-if="isSpanduk">
+            <td>Konstruksi</td>
+            <td colspan="3">: {{ data.po?.konstruksi || "-" }}</td>
           </tr>
           <tr>
             <td>Catatan</td>
@@ -173,8 +182,8 @@ const nilaiRollText = (rl: QcRollRow): string =>
         </table>
       </div>
 
-      <div class="section-title">RINGKASAN PER LOT</div>
-      <table class="detail-table">
+      <div v-if="!isSpanduk" class="section-title">RINGKASAN PER LOT</div>
+      <table v-if="!isSpanduk" class="detail-table">
         <thead>
           <tr>
             <th rowspan="2" width="24">No</th>
@@ -222,7 +231,7 @@ const nilaiRollText = (rl: QcRollRow): string =>
         </tfoot>
       </table>
 
-      <div v-if="versiBaru" class="note">
+      <div v-if="!isSpanduk && versiBaru" class="note">
         Nilai roll = nilai terendah dari gramasi atas/bawah (rentang PO
         &plusmn;{{ data.toleransi.gramasi }} gram), setting (&plusmn;{{
           data.toleransi.setting
@@ -232,7 +241,7 @@ const nilaiRollText = (rl: QcRollRow): string =>
         lot: 3 bila semua roll yang dicek bernilai 3 (otomatis lanjut), 1 bila
         semua bernilai 1, selain itu 2.
       </div>
-      <div v-else class="note">
+      <div v-else-if="!isSpanduk" class="note">
         Nilai 1: semua roll yang dicek di luar toleransi (diputuskan Pembelian)
         &nbsp;|&nbsp; Nilai 2: sebagian roll sesuai (diputuskan Pembelian, atau
         dilanjutkan Gudang dengan alasan) &nbsp;|&nbsp; Nilai 3: semua roll
@@ -241,8 +250,8 @@ const nilaiRollText = (rl: QcRollRow): string =>
         &plusmn;{{ data.toleransi.setting }}.
       </div>
 
-      <div class="section-title">PENGECEKAN ROLL</div>
-      <table class="detail-table">
+      <div v-if="!isSpanduk" class="section-title">PENGECEKAN ROLL</div>
+      <table v-if="!isSpanduk" class="detail-table">
         <thead>
           <tr>
             <th width="24">No</th>
@@ -274,8 +283,10 @@ const nilaiRollText = (rl: QcRollRow): string =>
         </tbody>
       </table>
 
-      <div class="section-title">HASIL CEK DETAIL PER ROLL</div>
-      <table class="detail-table">
+      <div v-if="!isSpanduk" class="section-title">
+        HASIL CEK DETAIL PER ROLL
+      </div>
+      <table v-if="!isSpanduk" class="detail-table">
         <thead>
           <tr>
             <th width="24">No</th>
@@ -310,6 +321,69 @@ const nilaiRollText = (rl: QcRollRow): string =>
           </tr>
         </tbody>
       </table>
+
+      <template v-if="isSpanduk">
+        <div class="section-title">RINGKASAN PENGECEKAN</div>
+        <table class="detail-table">
+          <thead>
+            <tr>
+              <th>Qty ({{ data.po?.satuan || "Yard" }})</th>
+              <th width="70">Roll</th>
+              <th width="80">Roll Dicek</th>
+              <th width="50">Nilai</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(d, i) in data.dtl" :key="i">
+              <td class="tr">{{ numFmt(d.qty_kg) }}</td>
+              <td class="tc">{{ d.qty_roll }}</td>
+              <td class="tc">{{ d.rolls.length }}</td>
+              <td class="tc fw-bold">{{ d.nilai || "" }}</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="note">
+          Nilai roll: semua OK = 3; NO pada handfeel = 2; NO pada konstruksi,
+          kerataan, atau lebar = 1. Nilai lot: 3 bila semua roll yang dicek
+          bernilai 3 (otomatis lanjut), 1 bila semua bernilai 1, selain itu 2.
+          Panjang actual dicatat, belum dinilai.
+        </div>
+
+        <div class="section-title">HASIL CEK PER ROLL</div>
+        <table class="detail-table">
+          <thead>
+            <tr>
+              <th width="24">No</th>
+              <th>No. Roll</th>
+              <th>Panjang Label (yd)</th>
+              <th>Panjang Actual (yd)</th>
+              <th>Konstruksi</th>
+              <th>Handfeel</th>
+              <th>Kerataan</th>
+              <th>Lebar Stabil</th>
+              <th width="34">Nilai</th>
+              <th>Catatan</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(r, i) in rollList" :key="i">
+              <td class="tc">{{ i + 1 }}</td>
+              <td class="tc">{{ r.rl.no_roll || r.ke }}</td>
+              <td class="tr">{{ numFmt(r.rl.qty) }}</td>
+              <td class="tr">{{ numFmt(r.rl.panjang_aktual) }}</td>
+              <td class="tc">{{ r.rl.hasil.konstruksi }}</td>
+              <td class="tc">{{ r.rl.hasil.handfeel }}</td>
+              <td class="tc">{{ r.rl.hasil.kerataan }}</td>
+              <td class="tc">{{ r.rl.hasil.lebar }}</td>
+              <td class="tc fw-bold">{{ r.rl.nilai || "-" }}</td>
+              <td>{{ r.rl.catatan }}</td>
+            </tr>
+            <tr v-if="rollList.length === 0">
+              <td colspan="10" class="tc">Belum ada roll yang dicek.</td>
+            </tr>
+          </tbody>
+        </table>
+      </template>
 
       <div class="section-title">DOKUMENTASI FOTO</div>
       <table class="foto-table">
@@ -379,7 +453,7 @@ const nilaiRollText = (rl: QcRollRow): string =>
         <thead>
           <tr>
             <th width="24">No</th>
-            <th>Lot No.</th>
+            <th>{{ isSpanduk ? "Pengecekan" : "Lot No." }}</th>
             <th width="40">Nilai</th>
             <th>Lanjut Produksi</th>
             <th>Reject</th>
@@ -389,7 +463,7 @@ const nilaiRollText = (rl: QcRollRow): string =>
         <tbody>
           <tr v-for="(d, i) in data.dtl" :key="i">
             <td class="tc">{{ i + 1 }}</td>
-            <td class="fw-bold">{{ d.lot }}</td>
+            <td class="fw-bold">{{ isSpanduk ? "Kedatangan ini" : d.lot }}</td>
             <td class="tc">{{ d.nilai || "" }}</td>
             <td class="tc">{{ d.keputusan === "LANJUT" ? "☑" : "☐" }}</td>
             <td class="tc">{{ d.keputusan === "REJECT" ? "☑" : "☐" }}</td>

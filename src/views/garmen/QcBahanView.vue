@@ -28,6 +28,7 @@ interface QcBahanRow {
   JenisKain: string;
   VendorCelup: string;
   Status: string;
+  JenisCek: string;
   Keterangan: string | null;
   JumlahLot: number;
   TotalKg: number;
@@ -54,6 +55,10 @@ interface QcBahanRollRow {
   Bowing: string;
   Shrinkage: string;
   Kelunturan: string;
+  Konstruksi: string;
+  Kerataan: string;
+  Lebar: string;
+  PanjangAktual: number;
   Nilai: number;
   Catatan: string | null;
 }
@@ -273,6 +278,10 @@ interface QcBahanExportDetailRow {
   Bowing: string | null;
   Shrinkage: string | null;
   Kelunturan: string | null;
+  Konstruksi: string | null;
+  Kerataan: string | null;
+  Lebar: string | null;
+  PanjangAktual: number | null;
   NilaiRoll: number | null;
   CatatanRoll: string | null;
 }
@@ -339,6 +348,10 @@ const onExportDetail = async () => {
         Bowing: r.Bowing || "",
         Shrinkage: r.Shrinkage || "",
         Kelunturan: r.Kelunturan || "",
+        Konstruksi: r.Konstruksi || "",
+        Kerataan: r.Kerataan || "",
+        Lebar: r.Lebar || "",
+        PanjangAktual: Number(r.PanjangAktual) || "",
         NilaiRoll: Number(r.NilaiRoll) || "",
         CatatanRoll: r.CatatanRoll || "",
       };
@@ -438,6 +451,16 @@ const onExportDetail = async () => {
       { header: "Bowing", key: "Bowing", width: 10, align: "center" },
       { header: "Shrinkage", key: "Shrinkage", width: 10, align: "center" },
       { header: "Kelunturan", key: "Kelunturan", width: 10, align: "center" },
+      { header: "Konstruksi", key: "Konstruksi", width: 11, align: "center" },
+      { header: "Kerataan", key: "Kerataan", width: 10, align: "center" },
+      { header: "Lebar Stabil", key: "Lebar", width: 11, align: "center" },
+      {
+        header: "Panjang Actual (yd)",
+        key: "PanjangAktual",
+        width: 14,
+        align: "right",
+        numFmt: "#,##0.00",
+      },
       { header: "Nilai Roll", key: "NilaiRoll", width: 9, align: "center" },
       { header: "Catatan Roll", key: "CatatanRoll", width: 30 },
     ];
@@ -864,7 +887,8 @@ const diLuarSpec = (h: string) => /RENDAH|TINGGI/i.test(String(h ?? ""));
           class="status-chip"
           :class="nilaiClass(l.Nilai)"
         >
-          {{ l.Lot }}: {{ l.Nilai || "-"
+          <template v-if="item.JenisCek !== 'SPANDUK'">{{ l.Lot }}: </template
+          >{{ l.Nilai || "-"
           }}<template v-if="l.Keputusan"> · {{ l.Keputusan }}</template>
         </span>
       </div>
@@ -929,7 +953,68 @@ const diLuarSpec = (h: string) => /RENDAH|TINGGI/i.test(String(h ?? ""));
                 </tr>
                 <tr v-if="d.Rolls && d.Rolls.length">
                   <td colspan="11" class="roll-cell">
-                    <table class="roll-table">
+                    <table
+                      v-if="item.JenisCek === 'SPANDUK'"
+                      class="roll-table"
+                    >
+                      <thead>
+                        <tr>
+                          <th width="50">Roll</th>
+                          <th width="100">Panjang Label (yd)</th>
+                          <th width="110">Panjang Actual (yd)</th>
+                          <th width="90">Konstruksi</th>
+                          <th width="80">Handfeel</th>
+                          <th width="80">Kerataan</th>
+                          <th width="90">Lebar Stabil</th>
+                          <th width="60">Nilai</th>
+                          <th>Catatan</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr v-for="r in d.Rolls" :key="r.Nourut">
+                          <td>{{ r.NoRoll || r.Nourut }}</td>
+                          <td>{{ angka(r.Qty) }}</td>
+                          <td>{{ angka(r.PanjangAktual) }}</td>
+                          <td>
+                            <span
+                              class="status-chip"
+                              :class="okNoClass(r.Konstruksi)"
+                              >{{ r.Konstruksi || "-" }}</span
+                            >
+                          </td>
+                          <td>
+                            <span
+                              class="status-chip"
+                              :class="okNoClass(r.Handfeel)"
+                              >{{ r.Handfeel || "-" }}</span
+                            >
+                          </td>
+                          <td>
+                            <span
+                              class="status-chip"
+                              :class="okNoClass(r.Kerataan)"
+                              >{{ r.Kerataan || "-" }}</span
+                            >
+                          </td>
+                          <td>
+                            <span
+                              class="status-chip"
+                              :class="okNoClass(r.Lebar)"
+                              >{{ r.Lebar || "-" }}</span
+                            >
+                          </td>
+                          <td>
+                            <span
+                              class="status-chip"
+                              :class="nilaiClass(r.Nilai)"
+                              >{{ r.Nilai || "-" }}</span
+                            >
+                          </td>
+                          <td class="tl">{{ r.Catatan || "-" }}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                    <table v-else class="roll-table">
                       <thead>
                         <tr>
                           <th width="50">Roll</th>

@@ -8,6 +8,9 @@ export interface QcRollHasil {
   bowing: string;
   shrinkage: string;
   kelunturan: string;
+  konstruksi: string;
+  kerataan: string;
+  lebar: string;
 }
 
 export interface QcRollRow {
@@ -16,6 +19,7 @@ export interface QcRollRow {
   gramasi_atas: number;
   gramasi_bawah: number;
   setting_cek: number;
+  panjang_aktual: number;
   sesuai: boolean;
   nilai?: number;
   catatan: string;
@@ -74,6 +78,7 @@ export interface QcPoInfo {
   setting_max: number;
   spec_terbaca: boolean;
   warna: string;
+  konstruksi: string;
 }
 
 export interface QcToleransi {
@@ -91,7 +96,7 @@ export interface QcFormData {
 }
 
 export interface QcDetailResponse {
-  header: Omit<QcFormHeader, "jenis_po"> & {
+  header: QcFormHeader & {
     user_create?: string;
     date_create?: string;
     qc_versi_nilai?: number;
@@ -133,6 +138,7 @@ export interface QcSaveRoll {
   gramasi_atas: number;
   gramasi_bawah: number;
   setting_cek: number;
+  panjang_aktual: number;
   catatan: string;
   hasil: QcRollHasil;
 }

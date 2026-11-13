@@ -49,6 +49,9 @@ const emptyHasil = (): QcRollHasil => ({
   bowing: "",
   shrinkage: "",
   kelunturan: "",
+  konstruksi: "",
+  kerataan: "",
+  lebar: "",
 });
 
 const newRoll = (): QcRollRow => ({
@@ -57,6 +60,7 @@ const newRoll = (): QcRollRow => ({
   gramasi_atas: 0,
   gramasi_bawah: 0,
   setting_cek: 0,
+  panjang_aktual: 0,
   sesuai: false,
   catatan: "",
   hasil: emptyHasil(),
@@ -72,6 +76,8 @@ const rataPositif = (vals: number[]): number => {
 
 const OK_NO = ["OK", "NO"];
 const PARAM_OKNO = ["handfeel", "bowing", "shrinkage", "kelunturan"] as const;
+const PARAM_SPANDUK = ["konstruksi", "handfeel", "kerataan", "lebar"] as const;
+const LOT_SPANDUK = "1"; // spanduk tanpa lot: satu lot internal (sama dengan server)
 
 // null = kosong / bukan angka
 const parseWarna = (v: string): number | null => {
@@ -101,6 +107,9 @@ const bersihHasil = (h: QcRollHasil): QcRollHasil => {
     bowing: okNoBersih(h.bowing),
     shrinkage: okNoBersih(h.shrinkage),
     kelunturan: okNoBersih(h.kelunturan),
+    konstruksi: okNoBersih(h.konstruksi),
+    kerataan: okNoBersih(h.kerataan),
+    lebar: okNoBersih(h.lebar),
   };
 };
 
@@ -114,6 +123,7 @@ const isRollBlank = (x: QcRollRow): boolean =>
   !(Number(x.gramasi_atas) > 0) &&
   !(Number(x.gramasi_bawah) > 0) &&
   !(Number(x.setting_cek) > 0) &&
+  !(Number(x.panjang_aktual) > 0) &&
   !x.catatan.trim() &&
   Object.values(x.hasil).every((v) => !v.trim());
 
@@ -131,6 +141,13 @@ const settingPoAda = (): boolean => {
 // Kolom yang belum lengkap pada satu roll
 const rollKurang = (x: QcRollRow): string[] => {
   const kurang: string[] = [];
+  if (isSpanduk.value) {
+    if (!(Number(x.panjang_aktual) > 0)) kurang.push("panjang actual");
+    for (const k of PARAM_SPANDUK) {
+      if (!OK_NO.includes(x.hasil[k])) kurang.push(k);
+    }
+    return kurang;
+  }
   if (gramasiPoAda()) {
     if (!(Number(x.gramasi_atas) > 0)) kurang.push("gramasi atas");
     if (!(Number(x.gramasi_bawah) > 0)) kurang.push("gramasi bawah");
@@ -192,6 +209,7 @@ const defaultData: QcFormData = {
     setting_max: 0,
     spec_terbaca: false,
     warna: "",
+    konstruksi: "",
   },
   toleransi: { gramasi: 5, setting: 0.5, warna_nilai3: 1.5, warna_nilai2: 2 },
 };
@@ -223,7 +241,6 @@ const {
       header: {
         ...d.header,
         qc_keterangan: d.header.qc_keterangan || "",
-        jenis_po: "",
       },
       dtl: d.dtl.map((r) => {
         const row: QcLotRow = {
@@ -248,6 +265,7 @@ const {
         setting_max: d.po?.setting_max ?? 0,
         spec_terbaca: d.po?.spec_terbaca ?? false,
         warna: first?.warna ?? "",
+        konstruksi: d.po?.konstruksi ?? "",
       },
       toleransi: d.toleransi,
     };
@@ -275,6 +293,7 @@ const {
           gramasi_atas: Number(x.gramasi_atas) || 0,
           gramasi_bawah: Number(x.gramasi_bawah) || 0,
           setting_cek: Number(x.setting_cek) || 0,
+          panjang_aktual: Number(x.panjang_aktual) || 0,
           catatan: x.catatan,
           hasil: x.hasil,
         })),
@@ -301,6 +320,28 @@ const {
     showPrintConfirm.value = true;
   },
 });
+
+// Spanduk (PO jenis 5): satu lot internal, penilaian OK/NO, tanpa gramasi/setting/warna
+const isSpanduk = computed(() => formData.value.header.jenis_po === "SPANDUK");
+const spandukLot = computed<QcLotRow | null>(
+  () => formData.value.dtl[0] ?? null,
+);
+const namaLot = (r: QcLotRow): string =>
+  isSpanduk.value ? "Pengecekan" : `Lot ${r.lot}`;
+
+// Qty lot spanduk selalu = qty kedatangan
+watch(
+  () =>
+    [
+      isSpanduk.value,
+      formData.value.header.qc_qty_datang,
+      formData.value.dtl.length,
+    ] as const,
+  ([sp, qty]) => {
+    const lot = formData.value.dtl[0];
+    if (sp && lot) lot.qty_kg = Number(qty) || 0;
+  },
+);
 
 const forceSubmit = computed<boolean>(
   () => isEditMode.value && formData.value.header.qc_status !== "DRAFT",
@@ -445,6 +486,15 @@ const rollsTersimpan = (row: QcLotRow): QcRollRow[] =>
 // Server tetap penentu; ini hanya tampilan.
 const rollNilai = (x: QcRollRow): number => {
   if (!rollTerisi(x)) return 0;
+  if (isSpanduk.value) {
+    const h = x.hasil;
+    return Math.min(
+      h.konstruksi === "OK" ? 3 : 1,
+      h.handfeel === "OK" ? 3 : 2,
+      h.kerataan === "OK" ? 3 : 1,
+      h.lebar === "OK" ? 3 : 1,
+    );
+  }
   const p = formData.value.po;
   const t = formData.value.toleransi;
   const w = parseWarna(x.hasil.warna) ?? 0;
@@ -514,7 +564,7 @@ const prediksi = (i: number): string => {
 };
 
 const newLot = (): QcLotRow => ({
-  lot: "",
+  lot: isSpanduk.value ? LOT_SPANDUK : "",
   qty_kg: 0,
   qty_roll: 0,
   roll_cek: 0,
@@ -638,7 +688,9 @@ const onPoSelected = async (item: QcPoLookupItem) => {
 
 // ── Ringkasan ──
 const totalQty = computed(() =>
-  formData.value.dtl.reduce((s, r) => s + (Number(r.qty_kg) || 0), 0),
+  isSpanduk.value
+    ? Number(formData.value.header.qc_qty_datang) || 0
+    : formData.value.dtl.reduce((s, r) => s + (Number(r.qty_kg) || 0), 0),
 );
 const totalRoll = computed(() =>
   formData.value.dtl.reduce((s, r) => s + (Number(r.qty_roll) || 0), 0),
@@ -679,8 +731,8 @@ const cekSubmit = (): string => {
   const persen = formData.value.header.qc_persen_cek;
   for (const [i, r] of formData.value.dtl.entries()) {
     const c = calcOf(i);
-    if (!(Number(r.qty_kg) > 0)) return `Lot ${r.lot}: qty wajib diisi.`;
-    if (!(Number(r.qty_roll) > 0)) return `Lot ${r.lot}: roll wajib diisi.`;
+    if (!(Number(r.qty_kg) > 0)) return `${namaLot(r)}: qty wajib diisi.`;
+    if (!(Number(r.qty_roll) > 0)) return `${namaLot(r)}: roll wajib diisi.`;
 
     const rolls = rollsTersimpan(r);
     const idxKurang = r.rolls.findIndex(
@@ -688,16 +740,16 @@ const cekSubmit = (): string => {
     );
     if (idxKurang >= 0) {
       const rl = r.rolls[idxKurang];
-      return `Lot ${r.lot}, baris roll ke-${idxKurang + 1}: ${rl ? rollKurang(rl).join(", ") : "data"} harus diisi lengkap.`;
+      return `${namaLot(r)}, baris roll ke-${idxKurang + 1}: ${rl ? rollKurang(rl).join(", ") : "data"} harus diisi lengkap.`;
     }
     if (rolls.length < c.rollCek) {
-      return `Lot ${r.lot}: minimal ${c.rollCek} roll harus dicek (${persen}% dari ${r.qty_roll} roll). Baru ${rolls.length}.`;
+      return `${namaLot(r)}: minimal ${c.rollCek} roll harus dicek (${persen}% dari ${r.qty_roll} roll). Baru ${rolls.length}.`;
     }
     if (rolls.length > Number(r.qty_roll)) {
-      return `Lot ${r.lot}: roll yang dicek (${rolls.length}) melebihi jumlah roll lot.`;
+      return `${namaLot(r)}: roll yang dicek (${rolls.length}) melebihi jumlah roll lot.`;
     }
     if (!c.nilai) {
-      return `Lot ${r.lot}: nilai belum dapat dihitung. Lengkapi hasil cek roll.`;
+      return `${namaLot(r)}: nilai belum dapat dihitung. Lengkapi hasil cek roll.`;
     }
   }
   return "";
@@ -860,7 +912,16 @@ const nilaiClass = (n: number) =>
 
         <div class="sep" />
 
-        <div class="fr">
+        <div v-if="isSpanduk" class="fr">
+          <label class="lbl">Konstruksi</label>
+          <input
+            :value="formData.po.konstruksi"
+            readonly
+            class="inp ro"
+            style="flex: 1"
+          />
+        </div>
+        <div v-else class="fr">
           <label class="lbl">Gramasi PO</label>
           <input
             :value="formData.po.gramasi"
@@ -914,7 +975,9 @@ const nilaiClass = (n: number) =>
         </div>
         <div
           v-if="
-            formData.header.qc_po_nomor && (!gramasiPoAda() || !settingPoAda())
+            !isSpanduk &&
+            formData.header.qc_po_nomor &&
+            (!gramasiPoAda() || !settingPoAda())
           "
           class="warn-box"
         >
@@ -935,21 +998,36 @@ const nilaiClass = (n: number) =>
             style="width: 110px"
             v-select-on-focus
           />
-          <label class="lbl fw text-primary" style="width: 70px"
-            >Jumlah Lot</label
-          >
-          <input
-            v-model.number="jmlLotInput"
-            type="number"
-            min="1"
-            :max="MAX_LOT"
-            class="inp"
-            style="width: 70px"
-            @change="onJmlLotChange"
-            v-select-on-focus
-          />
+          <template v-if="!isSpanduk">
+            <label class="lbl fw text-primary" style="width: 70px"
+              >Jumlah Lot</label
+            >
+            <input
+              v-model.number="jmlLotInput"
+              type="number"
+              min="1"
+              :max="MAX_LOT"
+              class="inp"
+              style="width: 70px"
+              @change="onJmlLotChange"
+              v-select-on-focus
+            />
+          </template>
+          <template v-else-if="spandukLot">
+            <label class="lbl fw text-primary" style="width: 70px"
+              >Jumlah Roll</label
+            >
+            <input
+              v-model.number="spandukLot.qty_roll"
+              type="number"
+              min="0"
+              class="inp"
+              style="width: 70px"
+              v-select-on-focus
+            />
+          </template>
         </div>
-        <div class="fr">
+        <div v-if="!isSpanduk" class="fr">
           <label class="lbl">Total Qty</label>
           <input
             :value="`${totalQty.toFixed(2)} ${formData.po.satuan}`"
@@ -1004,7 +1082,7 @@ const nilaiClass = (n: number) =>
 
     <!-- ══ KOLOM KANAN: DETAIL ══ -->
     <template #right-column>
-      <div class="qc-right">
+      <div v-if="!isSpanduk" class="qc-right">
         <div class="tbl-header">
           <span class="tbl-title">Lot dan Pengecekan Roll</span>
           <button type="button" class="btn-add" @click="addLot">
@@ -1236,6 +1314,114 @@ const nilaiClass = (n: number) =>
           <b>1</b> bila semua roll bernilai 1, selain itu <b>2</b>
           (diputuskan Pembelian, atau dilanjutkan Gudang lewat Tindakan &gt;
           Submit di browse dengan alasan).
+        </div>
+      </div>
+
+      <!-- Spanduk: satu lot internal, hanya baris roll -->
+      <div v-else class="qc-right">
+        <div class="tbl-header">
+          <span class="tbl-title">Pengecekan Roll Spanduk</span>
+          <span class="tbl-title">
+            Dicek {{ calcOf(0).dicek }} (min {{ calcOf(0).rollCek }}) · Nilai
+            {{ calcOf(0).nilai || "-" }} · {{ prediksi(0) }}
+          </span>
+        </div>
+        <div class="tbl-wrap" style="min-height: 50vh; max-height: 78vh">
+          <table class="gt" style="min-width: 940px">
+            <thead>
+              <tr>
+                <th style="width: 40px" class="tc">Roll</th>
+                <th style="width: 110px">No. Roll</th>
+                <th style="width: 110px" class="tr">Panjang Label (yd)</th>
+                <th style="width: 110px" class="tr bg-yellow">
+                  Panjang Actual (yd)
+                </th>
+                <th style="width: 85px" class="tc bg-yellow">Konstruksi</th>
+                <th style="width: 80px" class="tc bg-yellow">Handfeel</th>
+                <th style="width: 80px" class="tc bg-yellow">Kerataan</th>
+                <th style="width: 90px" class="tc bg-yellow">Lebar Stabil</th>
+                <th style="width: 60px" class="tc">Nilai</th>
+                <th style="width: 200px">Catatan Roll</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="(rl, ri) in spandukLot?.rolls ?? []"
+                :key="ri"
+                class="roll-row"
+              >
+                <td class="tc gt-lbl">{{ ri + 1 }}</td>
+                <td class="p0">
+                  <input
+                    v-model="rl.no_roll"
+                    class="ci"
+                    @keydown.enter.prevent="onEnterNext"
+                  />
+                </td>
+                <td class="p0">
+                  <input
+                    v-model.number="rl.qty"
+                    type="number"
+                    step="0.01"
+                    class="ci tr"
+                    @keydown.enter.prevent="onEnterNext"
+                    v-select-on-focus
+                  />
+                </td>
+                <td class="p0">
+                  <input
+                    v-model.number="rl.panjang_aktual"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    class="ci tr fw bg-yellow-light"
+                    @keydown.enter.prevent="onEnterNext"
+                    v-select-on-focus
+                  />
+                </td>
+                <td v-for="k in PARAM_SPANDUK" :key="k" class="p0">
+                  <select
+                    v-model="rl.hasil[k]"
+                    class="ci fw bg-yellow-light"
+                    @keydown.enter.prevent="onEnterNext"
+                  >
+                    <option value="">-</option>
+                    <option value="OK">OK</option>
+                    <option value="NO">NO</option>
+                  </select>
+                </td>
+                <td class="tc">
+                  <span class="status-chip" :class="nilaiClass(rollNilai(rl))">
+                    {{ rollNilai(rl) || "-" }}
+                  </span>
+                </td>
+                <td class="p0">
+                  <input
+                    v-model="rl.catatan"
+                    class="ci"
+                    @keydown.enter.prevent="onEnterNext"
+                  />
+                </td>
+              </tr>
+              <tr v-if="!spandukLot || spandukLot.rolls.length === 0">
+                <td colspan="10" class="empty-row">
+                  Pilih PO Spanduk di kiri, lalu isi Qty Datang dan Jumlah Roll.
+                  Baris roll muncul otomatis.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="legend">
+          Isi semua kolom kuning hanya pada roll yang dicek (minimal sesuai
+          kolom Dicek); baris kosong tidak dihitung. Konstruksi, handfeel,
+          kerataan, dan lebar stabil dinilai OK / NO. Panjang actual wajib diisi
+          tetapi belum dinilai. Nilai roll: semua OK bernilai 3; NO pada
+          handfeel bernilai 2; NO pada parameter lain bernilai 1. Nilai lot:
+          <b>3</b> bila semua roll bernilai 3 (otomatis LANJUT), <b>1</b> bila
+          semua roll bernilai 1, selain itu <b>2</b> (diputuskan Pembelian, atau
+          dilanjutkan Gudang lewat Tindakan &gt; Submit di browse dengan
+          alasan).
         </div>
       </div>
     </template>
