@@ -698,8 +698,8 @@ const validateSave = () => {
       return toast.warning(
         `${no}: supplier ${r.supNama || r.supKode} sudah punya PO yang terkunci di rekap ini.`,
       );
-    if (!r.spk.trim())
-      return toast.warning(`${no}: Nomor SPK/MAP harus diisi.`);
+    if (!r.spk.trim() && !r.mppb.trim())
+      return toast.warning(`${no}: Isi Nomor SPK/MAP, atau isi Nomor MPPB.`);
     if ((Number(r.jumlah) || 0) <= 0)
       return toast.warning(`${no}: Jumlah PO harus diisi.`);
     if ((Number(r.harga) || 0) <= 0)
@@ -710,7 +710,9 @@ const validateSave = () => {
     const p = Number(r.ppn) || 0;
     if (p < 0 || p > 100)
       return toast.warning(`${no}: PPN harus antara 0 dan 100.`);
-    const kunci = `${r.kode}|${r.supKode}|${r.spk.trim().toUpperCase()}`;
+    const kunci = `${r.kode}|${r.supKode}|${
+      r.spk.trim().toUpperCase() || `MPPB:${r.mppb.trim().toUpperCase()}`
+    }`;
     if (seen.has(kunci))
       return toast.warning(
         `${no}: Bahan ${r.kode} dengan supplier dan SPK/MAP yang sama dobel.`,
@@ -889,7 +891,12 @@ const validateSave = () => {
                 <th style="width: 50px" class="tr bg-yellow">Disc(%)</th>
                 <th style="width: 60px" class="tr bg-yellow">PPN(%)</th>
                 <th style="width: 100px" class="tr bg-blue">Total</th>
-                <th style="width: 90px">SPK/MAP *</th>
+                <th
+                  style="width: 90px"
+                  title="Boleh kosong jika MPPB sudah diisi"
+                >
+                  SPK/MAP
+                </th>
                 <th style="width: 90px">MKB</th>
                 <th style="width: 110px">MPPB</th>
                 <th style="width: 70px" class="tr">Jml MPPB</th>
@@ -1037,6 +1044,7 @@ const validateSave = () => {
                       v-model="row.spk"
                       class="ci"
                       :readonly="row.terkunci"
+                      :placeholder="row.mppb ? 'Dari MPPB' : ''"
                     />
                     <button
                       type="button"
