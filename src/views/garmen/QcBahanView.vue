@@ -28,6 +28,7 @@ interface QcBahanRow {
   JenisKain: string;
   VendorCelup: string;
   Status: string;
+  JenisCek: string;
   Keterangan: string | null;
   JumlahLot: number;
   TotalKg: number;
@@ -54,6 +55,10 @@ interface QcBahanRollRow {
   Bowing: string;
   Shrinkage: string;
   Kelunturan: string;
+  Konstruksi: string;
+  Kerataan: string;
+  Lebar: string;
+  PanjangAktual: number;
   Nilai: number;
   Catatan: string | null;
 }
@@ -162,6 +167,21 @@ const getExportSource = (): QcBahanRow[] =>
     items.value ??
     []) as QcBahanRow[];
 
+// Semua baris Spanduk → kolom "Vendor Greige" dinamai "Vendor", "Vendor Celup" dibuang.
+// Campuran garmen + Spanduk → judul tetap, Vendor Celup dikosongkan per baris Spanduk.
+const semuaSpanduk = (rows: QcBahanRow[]): boolean =>
+  rows.length > 0 && rows.every((r) => r.JenisCek === "SPANDUK");
+
+const sesuaikanKolomVendor = (
+  cols: ExcelColumn[],
+  rows: QcBahanRow[],
+): ExcelColumn[] =>
+  semuaSpanduk(rows)
+    ? cols
+        .filter((c) => c.key !== "VendorCelup")
+        .map((c) => (c.key === "VendorGreige" ? { ...c, header: "Vendor" } : c))
+    : cols;
+
 // "YYYY-MM-DD" -> Date UTC-midnight, supaya Excel tidak geser tanggal
 const toExcelDate = (val: string | null): Date | "" => {
   if (!val) return "";
@@ -214,6 +234,7 @@ const onExportHeader = async () => {
 
   const rows = source.map((r) => ({
     ...r,
+    VendorCelup: r.JenisCek === "SPANDUK" ? "" : r.VendorCelup,
     TglDatang: toExcelDate(r.TglDatang),
     JumlahLot: Number(r.JumlahLot) || 0,
     TotalKg: Number(r.TotalKg) || 0,
@@ -230,7 +251,7 @@ const onExportHeader = async () => {
     await exportExcelSingle(
       `QC_Bahan_${filterState.value.dtAwal}_sd_${filterState.value.dtAkhir}.xlsx`,
       "QC Bahan",
-      columns,
+      sesuaikanKolomVendor(columns, source),
       rows,
       `QC Bahan Periode ${periodeJudul()}`,
     );
@@ -273,6 +294,10 @@ interface QcBahanExportDetailRow {
   Bowing: string | null;
   Shrinkage: string | null;
   Kelunturan: string | null;
+  Konstruksi: string | null;
+  Kerataan: string | null;
+  Lebar: string | null;
+  PanjangAktual: number | null;
   NilaiRoll: number | null;
   CatatanRoll: string | null;
 }
@@ -301,6 +326,10 @@ const onExportDetail = async () => {
     // Satu baris per roll. Data header hanya di baris pertama dokumen, metrik lot
     // hanya di baris pertama lot (agar SUM di Excel tidak dobel). Lot No. diulang
     // di setiap baris supaya mudah difilter.
+    const sumber = getExportSource();
+    const nomorSpanduk = new Set(
+      sumber.filter((x) => x.JenisCek === "SPANDUK").map((x) => x.Nomor),
+    );
     let prevNomor = "";
     let prevLot = "";
     const rows = allDetail.map((r) => {
@@ -316,7 +345,8 @@ const onExportDetail = async () => {
         Nomor_PO: firstDoc ? r.Nomor_PO : "",
         JenisKain: firstDoc ? r.JenisKain : "",
         VendorGreige: firstDoc ? r.VendorGreige : "",
-        VendorCelup: firstDoc ? r.VendorCelup : "",
+        VendorCelup:
+          firstDoc && !nomorSpanduk.has(r.Nomor) ? r.VendorCelup : "",
         Lot: r.Lot,
         Kg: firstLot ? Number(r.Kg) || 0 : "",
         Satuan: firstLot ? r.Satuan : "",
@@ -339,6 +369,10 @@ const onExportDetail = async () => {
         Bowing: r.Bowing || "",
         Shrinkage: r.Shrinkage || "",
         Kelunturan: r.Kelunturan || "",
+        Konstruksi: r.Konstruksi || "",
+        Kerataan: r.Kerataan || "",
+        Lebar: r.Lebar || "",
+        PanjangAktual: Number(r.PanjangAktual) || "",
         NilaiRoll: Number(r.NilaiRoll) || "",
         CatatanRoll: r.CatatanRoll || "",
       };
@@ -438,6 +472,16 @@ const onExportDetail = async () => {
       { header: "Bowing", key: "Bowing", width: 10, align: "center" },
       { header: "Shrinkage", key: "Shrinkage", width: 10, align: "center" },
       { header: "Kelunturan", key: "Kelunturan", width: 10, align: "center" },
+      { header: "Konstruksi", key: "Konstruksi", width: 11, align: "center" },
+      { header: "Kerataan", key: "Kerataan", width: 10, align: "center" },
+      { header: "Lebar Stabil", key: "Lebar", width: 11, align: "center" },
+      {
+        header: "Panjang Actual (yd)",
+        key: "PanjangAktual",
+        width: 14,
+        align: "right",
+        numFmt: "#,##0.00",
+      },
       { header: "Nilai Roll", key: "NilaiRoll", width: 9, align: "center" },
       { header: "Catatan Roll", key: "CatatanRoll", width: 30 },
     ];
@@ -445,7 +489,10 @@ const onExportDetail = async () => {
     await exportExcelSingle(
       `Detail_QC_Bahan_${filterState.value.dtAwal}_sd_${filterState.value.dtAkhir}.xlsx`,
       "Detail QC Bahan",
-      columns,
+      sesuaikanKolomVendor(
+        columns,
+        sumber.filter((x) => visible.has(x.Nomor)),
+      ),
       rows,
       `Rincian Lot dan Roll QC Bahan | Periode: ${periodeJudul()}`,
     );
@@ -459,22 +506,31 @@ const onExportDetail = async () => {
 };
 
 // --- HEADERS ---
-const headers = [
-  { title: "Nomor", key: "Nomor", width: "150px", fixed: true },
-  { title: "Tgl Datang", key: "TglDatang", width: "100px", align: "center" },
-  { title: "Status", key: "Status", width: "110px", align: "center" },
-  { title: "Nilai per Lot", key: "Lots", width: "280px", sortable: false },
-  { title: "Nomor PO", key: "Nomor_PO", width: "140px" },
-  { title: "Jenis Kain", key: "JenisKain", width: "260px" },
-  { title: "Vendor Greige", key: "VendorGreige", width: "170px" },
-  { title: "Vendor Celup", key: "VendorCelup", width: "170px" },
-  { title: "Lot", key: "JumlahLot", width: "60px", align: "right" },
-  { title: "Total Qty", key: "TotalKg", width: "110px", align: "right" },
-  { title: "Total Roll", key: "TotalRoll", width: "80px", align: "right" },
-  { title: "Keterangan", key: "Keterangan", width: "200px" },
-  { title: "User", key: "Usr", width: "100px" },
-  { title: "Dibuat", key: "Created", width: "140px", align: "center" },
-];
+const headers = computed(() => {
+  const spanduk = semuaSpanduk(filteredItems.value);
+  return [
+    { title: "Nomor", key: "Nomor", width: "150px", fixed: true },
+    { title: "Tgl Datang", key: "TglDatang", width: "100px", align: "center" },
+    { title: "Status", key: "Status", width: "110px", align: "center" },
+    { title: "Nilai per Lot", key: "Lots", width: "280px", sortable: false },
+    { title: "Nomor PO", key: "Nomor_PO", width: "140px" },
+    { title: "Jenis Kain", key: "JenisKain", width: "260px" },
+    {
+      title: spanduk ? "Vendor" : "Vendor Greige",
+      key: "VendorGreige",
+      width: "170px",
+    },
+    ...(spanduk
+      ? []
+      : [{ title: "Vendor Celup", key: "VendorCelup", width: "170px" }]),
+    { title: "Lot", key: "JumlahLot", width: "60px", align: "right" },
+    { title: "Total Qty", key: "TotalKg", width: "110px", align: "right" },
+    { title: "Total Roll", key: "TotalRoll", width: "80px", align: "right" },
+    { title: "Keterangan", key: "Keterangan", width: "200px" },
+    { title: "User", key: "Usr", width: "100px" },
+    { title: "Dibuat", key: "Created", width: "140px", align: "center" },
+  ];
+});
 
 // --- EXPAND LOGIC (DETAIL LOT) ---
 const expandedRows = ref<QcBahanRow[]>([]);
@@ -864,7 +920,8 @@ const diLuarSpec = (h: string) => /RENDAH|TINGGI/i.test(String(h ?? ""));
           class="status-chip"
           :class="nilaiClass(l.Nilai)"
         >
-          {{ l.Lot }}: {{ l.Nilai || "-"
+          <template v-if="item.JenisCek !== 'SPANDUK'">{{ l.Lot }}: </template
+          >{{ l.Nilai || "-"
           }}<template v-if="l.Keputusan"> · {{ l.Keputusan }}</template>
         </span>
       </div>
@@ -872,6 +929,9 @@ const diLuarSpec = (h: string) => /RENDAH|TINGGI/i.test(String(h ?? ""));
 
     <template #item.TotalKg="{ item }">
       {{ numFmt(item.TotalKg) }} {{ item.Satuan }}
+    </template>
+    <template #item.VendorCelup="{ item }">
+      {{ item.JenisCek === "SPANDUK" ? "" : item.VendorCelup }}
     </template>
     <template #item.TotalRoll="{ item }">{{ numFmt(item.TotalRoll) }}</template>
 
@@ -929,7 +989,68 @@ const diLuarSpec = (h: string) => /RENDAH|TINGGI/i.test(String(h ?? ""));
                 </tr>
                 <tr v-if="d.Rolls && d.Rolls.length">
                   <td colspan="11" class="roll-cell">
-                    <table class="roll-table">
+                    <table
+                      v-if="item.JenisCek === 'SPANDUK'"
+                      class="roll-table"
+                    >
+                      <thead>
+                        <tr>
+                          <th width="50">Roll</th>
+                          <th width="100">Panjang Label (yd)</th>
+                          <th width="110">Panjang Actual (yd)</th>
+                          <th width="90">Konstruksi</th>
+                          <th width="80">Handfeel</th>
+                          <th width="80">Kerataan</th>
+                          <th width="90">Lebar Stabil</th>
+                          <th width="60">Nilai</th>
+                          <th>Catatan</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr v-for="r in d.Rolls" :key="r.Nourut">
+                          <td>{{ r.NoRoll || r.Nourut }}</td>
+                          <td>{{ angka(r.Qty) }}</td>
+                          <td>{{ angka(r.PanjangAktual) }}</td>
+                          <td>
+                            <span
+                              class="status-chip"
+                              :class="okNoClass(r.Konstruksi)"
+                              >{{ r.Konstruksi || "-" }}</span
+                            >
+                          </td>
+                          <td>
+                            <span
+                              class="status-chip"
+                              :class="okNoClass(r.Handfeel)"
+                              >{{ r.Handfeel || "-" }}</span
+                            >
+                          </td>
+                          <td>
+                            <span
+                              class="status-chip"
+                              :class="okNoClass(r.Kerataan)"
+                              >{{ r.Kerataan || "-" }}</span
+                            >
+                          </td>
+                          <td>
+                            <span
+                              class="status-chip"
+                              :class="okNoClass(r.Lebar)"
+                              >{{ r.Lebar || "-" }}</span
+                            >
+                          </td>
+                          <td>
+                            <span
+                              class="status-chip"
+                              :class="nilaiClass(r.Nilai)"
+                              >{{ r.Nilai || "-" }}</span
+                            >
+                          </td>
+                          <td class="tl">{{ r.Catatan || "-" }}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                    <table v-else class="roll-table">
                       <thead>
                         <tr>
                           <th width="50">Roll</th>

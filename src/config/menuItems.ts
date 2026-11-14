@@ -60,6 +60,7 @@ import {
   IconClipboardCheck,
   IconFileCheck,
   IconReceipt2,
+  IconPackages,
   IconFileDots,
   IconTruckOff,
   IconReceiptTax,
@@ -380,6 +381,12 @@ export const createMenuItems = (): NavItem[] => {
           menuId: 52,
         },
         {
+          title: "Rekap Belanja",
+          to: "/pembelian/rekap-belanja",
+          icon: IconFileText,
+          menuId: 972,
+        },
+        {
           title: "PO Non Bahan",
           to: "/garmen/barang/po-nonbahan",
           icon: IconFileInvoice,
@@ -396,6 +403,12 @@ export const createMenuItems = (): NavItem[] => {
           icon: IconCashBanknote,
           to: "/pembelian/uang-muka",
           menuId: 315,
+        },
+        {
+          title: "Petty Cash",
+          icon: IconCash,
+          to: "/pembelian/petty-cash",
+          menuId: 973,
         },
         {
           title: "Mutasi Out Garmen",
@@ -2054,10 +2067,31 @@ export const createMenuItems = (): NavItem[] => {
                   to: "/laporan/produksi-spanduk/rekap-monitoring-by-gudang",
                   icon: IconBuildingWarehouse,
                 },
+                { divider: true },
+                {
+                  title: "Laporan Persediaan",
+                  to: "/laporan/produksi-spanduk/laporan-persediaan",
+                  icon: IconPackages,
+                },
+                {
+                  title: "Kartu Stok Kain",
+                  to: "/laporan/produksi-spanduk/kartu-stok-kain",
+                  icon: IconNotebook,
+                },
+                {
+                  title: "Kartu Stok Bahan Penolong",
+                  to: "/laporan/produksi-spanduk/kartu-stok-bahan-penolong",
+                  icon: IconClipboardList,
+                },
+                {
+                  title: "Laporan LPK",
+                  to: "/laporan/produksi-spanduk/laporan-lpk-bulanan",
+                  icon: IconReportAnalytics,
+                },
               ],
             },
             {
-              title: "Pemakaian Bahan",
+              title: "Rekap Pemakaian Kain",
               to: "/laporan/produksi-spanduk/pemakaian-bahan",
               icon: IconRuler,
             },

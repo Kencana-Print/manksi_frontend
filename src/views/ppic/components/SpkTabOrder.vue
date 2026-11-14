@@ -10,6 +10,7 @@ import { IconSearch, IconX, IconPhoto, IconMaximize } from "@tabler/icons-vue";
 const props = defineProps<{
   formData: any;
   isEdit: boolean;
+  bahanWajib: boolean;
 }>();
 
 const emit = defineEmits(["so-loaded"]);
@@ -43,11 +44,28 @@ const STATUS_WAJIB_EST = [
 const fmtQty = (n: number) =>
   new Intl.NumberFormat("id-ID", { maximumFractionDigits: 3 }).format(n);
 
-// Pemakaian bahan = Panjang x Jumlah SO (meter lari, lebar tidak dihitung)
+// Toleransi per jenis order (meter). Jenis order di luar daftar = 0.
+const TOLERANSI_JO: Record<string, number> = {
+  LT: 0.08,
+  VB: 0.14,
+  BD: 0.01,
+  UM: 0.06,
+  SP: 0.14,
+};
+const toleransiBahan = computed(
+  () =>
+    TOLERANSI_JO[
+      String(props.formData.so_jo_kode || "")
+        .trim()
+        .toUpperCase()
+    ] ?? 0,
+);
+
+// Kebutuhan bahan = (Panjang + Toleransi) x Jumlah SO (meter lari, lebar tidak dihitung)
 const kebutuhanBahan = computed(
   () =>
     Math.round(
-      (Number(props.formData.so_panjang) || 0) *
+      ((Number(props.formData.so_panjang) || 0) + toleransiBahan.value) *
         (Number(props.formData.so_jumlah) || 0) *
         1000,
     ) / 1000,
@@ -325,6 +343,7 @@ const loadSoDetail = async (nomor: string) => {
     props.formData.so_customer = h.cus_nama || "";
     props.formData.so_cust_perfect = h.cus_perfect || "N";
     props.formData.so_jo_kode = h.spk_jo_kode || "";
+    props.formData.so_jo_nama = h.jo_nama || "";
     props.formData.so_divisi = h.spk_divisi || "";
     props.formData.so_nomor_po = h.spk_nomor_po || "";
     props.formData.so_tipe = h.spk_tipe || "";
@@ -407,6 +426,7 @@ const clearSo = () => {
   props.formData.so_customer = "";
   props.formData.so_cust_perfect = "N";
   props.formData.so_jo_kode = "";
+  props.formData.so_jo_nama = "";
   props.formData.so_bhn_kode = "";
   props.formData.so_bhn_nama = "";
   props.formData.so_bhn_stok = 0;
@@ -590,8 +610,20 @@ onMounted(async () => {
             </div>
           </template>
 
+          <div v-if="isDivisiSpanduk && !isPremiumFlow" class="fr">
+            <label class="lbl">Kain (SO)</label>
+            <input
+              :value="formData.so_kain"
+              readonly
+              class="inp ro"
+              style="flex: 1; max-width: 420px"
+            />
+          </div>
+
           <div v-if="isDivisiSpanduk" class="fr">
-            <label class="lbl">Bahan</label>
+            <label class="lbl"
+              >Bahan <b v-if="bahanWajib" class="req-star">*</b></label
+            >
             <v-autocomplete
               :model-value="formData.so_bhn_kode"
               :items="bahanSpandukOptions"
@@ -626,6 +658,13 @@ onMounted(async () => {
               readonly
               class="inp ro"
               style="width: 70px"
+            />
+            <input
+              v-if="isDivisiSpanduk"
+              :value="formData.so_jo_nama"
+              readonly
+              class="inp ro"
+              style="flex: 1; min-width: 120px"
             />
             <template v-if="!isDivisiSpanduk">
               <label class="lbl ml-2" style="width: 50px">Tipe</label>
@@ -893,24 +932,35 @@ onMounted(async () => {
         class="section-card mt-2"
       >
         <div class="sec-title">Pemakaian Bahan</div>
-        <table v-if="formData.so_bhn_kode" class="pb-table">
-          <thead>
-            <tr>
-              <th>Bahan</th>
-              <th class="tr">Panjang</th>
-              <th class="tr">Jml SO</th>
-              <th class="tr">Butuh (Mtr)</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td>{{ formData.so_bhn_kode }} - {{ formData.so_bhn_nama }}</td>
-              <td class="tr">{{ fmtQty(Number(formData.so_panjang) || 0) }}</td>
-              <td class="tr">{{ fmtQty(Number(formData.so_jumlah) || 0) }}</td>
-              <td class="tr fw-bold">{{ fmtQty(kebutuhanBahan) }}</td>
-            </tr>
-          </tbody>
-        </table>
+        <template v-if="formData.so_bhn_kode">
+          <table class="pb-table">
+            <thead>
+              <tr>
+                <th>Bahan</th>
+                <th class="tr">Panjang</th>
+                <th class="tr">Toleransi</th>
+                <th class="tr">Jml SO</th>
+                <th class="tr">Butuh (Mtr)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>{{ formData.so_bhn_kode }} - {{ formData.so_bhn_nama }}</td>
+                <td class="tr">
+                  {{ fmtQty(Number(formData.so_panjang) || 0) }}
+                </td>
+                <td class="tr">{{ fmtQty(toleransiBahan) }}</td>
+                <td class="tr">
+                  {{ fmtQty(Number(formData.so_jumlah) || 0) }}
+                </td>
+                <td class="tr fw-bold">{{ fmtQty(kebutuhanBahan) }}</td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="mkb-empty" style="padding: 6px 0 0; text-align: left">
+            Butuh = (Panjang + Toleransi) × Jml SO
+          </div>
+        </template>
         <div v-else class="mkb-empty">Bahan belum dipilih.</div>
       </div>
 

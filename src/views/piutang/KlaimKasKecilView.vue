@@ -72,8 +72,8 @@ const endDate = ref(getToday());
 const cabang = ref("HO-");
 const listCabang = ref<CabangOption[]>([]);
 
-// Klaim saat ini hanya dibuat oleh P04
-const ALLOWED_CABANG = ["P04"];
+// Klaim dibuat oleh P04 (kas kecil) dan P01 (ATM, Petty Cash)
+const ALLOWED_CABANG = ["P01", "P04"];
 
 const loadCabang = async () => {
   try {
@@ -150,14 +150,13 @@ const headers: HeaderDef[] = [
   { title: "Rekening Tujuan", key: "RekTujuan", width: "210px" },
   { title: "Jml Baris", key: "JumlahBkk", width: "75px", align: "center" },
   { title: "Total", key: "Total", width: "130px", align: "end" },
-  { title: "Status", key: "Status", width: "85px", align: "center" },
   {
-    title: "Pengajuan Transfer",
+    title: "Status Pembayaran",
     key: "StatusTransfer",
     width: "130px",
     align: "center",
   },
-  { title: "No. Pengajuan Transfer", key: "NomorPjt", width: "160px" },
+  { title: "No. Pengajuan Transfer / BBK", key: "NomorPjt", width: "190px" },
   { title: "Keterangan", key: "Keterangan", width: "220px" },
   { title: "Dibuat", key: "Dibuat", width: "90px" },
 ];
@@ -196,7 +195,9 @@ const bisaDibatalkan = computed(
   () =>
     !!selectedRow.value &&
     selectedRow.value.Status === "AKTIF" &&
-    selectedRow.value.StatusTransfer === "Belum diajukan",
+    ["Belum diajukan", "Belum dibayar"].includes(
+      selectedRow.value.StatusTransfer,
+    ),
 );
 
 const openBatalDialog = () => {
@@ -339,14 +340,13 @@ const onExportDetail = async () => {
         align: "right",
         numFmt: "#,##0",
       },
-      { header: "Status", key: "Status", width: 11, align: "center" },
       {
-        header: "Pengajuan Transfer",
+        header: "Status Pembayaran",
         key: "StatusTransfer",
         width: 18,
         align: "center",
       },
-      { header: "No. Pengajuan Transfer", key: "NomorPjt", width: 22 },
+      { header: "No. Pengajuan Transfer / BBK", key: "NomorPjt", width: 26 },
       { header: "Keterangan", key: "Keterangan", width: 30 },
       { header: "Dibuat", key: "Dibuat", width: 12 },
     ];
@@ -533,9 +533,13 @@ const onExportDetail = async () => {
         v-if="rowOf(item).StatusTransfer !== '-'"
         class="kk-badge"
         :class="{
-          'badge-grey': rowOf(item).StatusTransfer === 'Belum diajukan',
+          'badge-grey': ['Belum diajukan', 'Belum dibayar'].includes(
+            rowOf(item).StatusTransfer,
+          ),
           'badge-blue': rowOf(item).StatusTransfer === 'Diajukan',
-          'badge-green': rowOf(item).StatusTransfer === 'Terealisasi',
+          'badge-green': ['Terealisasi', 'Dibayar'].includes(
+            rowOf(item).StatusTransfer,
+          ),
         }"
       >
         {{ rowOf(item).StatusTransfer }}

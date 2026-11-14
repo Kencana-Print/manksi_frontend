@@ -6,10 +6,18 @@ import { useAuthStore } from "@/stores/authStore";
 import BaseBrowse from "@/components/BaseBrowse.vue";
 import { useBrowse } from "@/composables/useBrowse";
 import { stbjService as svc } from "@/services/garmen/stbjService";
-import { exportExcelSingle } from "@/utils/excelExport";
-import { IconClipboardCheck, IconSearch, IconRefresh } from "@tabler/icons-vue";
+import { exportExcel, exportExcelSingle } from "@/utils/excelExport";
+import {
+  IconClipboardCheck,
+  IconSearch,
+  IconRefresh,
+  IconCalendar,
+  IconFileExport,
+  IconPrinter,
+  IconSettings,
+} from "@tabler/icons-vue";
 import GudangJadiSearchModal from "@/components/lookups/GudangJadiSearchModal.vue";
-import { formatTanggal } from "@/utils/dateFormat";
+import { formatTanggalSingkat } from "@/utils/dateFormat";
 
 const MENU_ID = "105";
 const router = useRouter();
@@ -40,6 +48,9 @@ const num = (v: any, d = 0) =>
 // ── Filter ─────────────────────────────────────────────────
 const tglAwal = ref(firstOfMonth());
 const tglAkhir = ref(todayLocal());
+const inpAwal = ref<HTMLInputElement | null>(null);
+const inpAkhir = ref<HTMLInputElement | null>(null);
+const bukaPicker = (el: HTMLInputElement | null) => el?.showPicker();
 interface GudangTetap {
   kode: string;
   nama: string;
@@ -196,6 +207,45 @@ const doCetakBrowse = (mode: string) => {
   window.open(url, "_blank");
 };
 
+interface StbjExportHeader {
+  Nomor: string;
+  Tanggal: string;
+  Dari: string | null;
+  Usr: string | null;
+}
+interface StbjExportDetail {
+  Nomor: string;
+  Spk_Nomor: string | null;
+  Nama: string | null;
+  Panjang: number | string | null;
+  Lebar: number | string | null;
+  Jumlah: number | string | null;
+  Koli: number | string | null;
+  Keterangan: string | null;
+}
+interface BarisExportStbj {
+  _awal: boolean;
+  Nomor: string;
+  Tanggal: string;
+  GudangAsal: string;
+  Spk_Nomor: string;
+  Nama: string;
+  Panjang: number | null;
+  Lebar: number | null;
+  Jumlah: number;
+  Koli: number;
+  Usr: string;
+  Keterangan: string;
+}
+
+// P/L harus berupa angka supaya bisa dikalikan di Excel; 0/kosong = sel kosong
+const angkaAtauNull = (
+  v: number | string | null | undefined,
+): number | null => {
+  const n = Number(v);
+  return Number.isFinite(n) && n > 0 ? n : null;
+};
+
 // ── Export ─────────────────────────────────────────────────
 const onExport = async () => {
   try {
@@ -226,7 +276,131 @@ const onExport = async () => {
   }
 };
 
+// Export Detail Spanduk: header + detail digabung, data header hanya di baris
+// pertama tiap nomor STBJ.
+const onExportDetailSpanduk = async () => {
+  try {
+    const [resHdr, resDtl] = await Promise.all([
+      svc.getExportData(tglAwal.value, tglAkhir.value, filterGudang.value),
+      svc.getExportDetail(tglAwal.value, tglAkhir.value, filterGudang.value),
+    ]);
+    const hdrRows: StbjExportHeader[] = resHdr.data.data ?? [];
+    const dtlRows: StbjExportDetail[] = resDtl.data.data ?? [];
+
+    const headerPerNomor = new Map<string, StbjExportHeader>(
+      hdrRows.map((h) => [h.Nomor, h]),
+    );
+    const detailPerNomor = new Map<string, StbjExportDetail[]>();
+    for (const d of dtlRows) {
+      const daftar = detailPerNomor.get(d.Nomor) ?? [];
+      daftar.push(d);
+      detailPerNomor.set(d.Nomor, daftar);
+    }
+
+    // Urutan mengikuti header; nomor yang hanya ada di detail ditaruh di akhir
+    // supaya tidak ada baris yang hilang diam-diam.
+    const urutan = [
+      ...hdrRows.map((h) => h.Nomor),
+      ...[...detailPerNomor.keys()].filter((n) => !headerPerNomor.has(n)),
+    ];
+
+    const rows: BarisExportStbj[] = urutan.flatMap((nomor) => {
+      const h = headerPerNomor.get(nomor);
+      const daftar = detailPerNomor.get(nomor) ?? [];
+      const dataHeader = {
+        Nomor: nomor,
+        Tanggal: h?.Tanggal ? formatTanggalSingkat(h.Tanggal) : "",
+        GudangAsal: h?.Dari ?? "",
+        Usr: h?.Usr ?? "",
+      };
+      const kosongHeader = { Nomor: "", Tanggal: "", GudangAsal: "", Usr: "" };
+
+      if (daftar.length === 0) {
+        return [
+          {
+            _awal: true,
+            ...dataHeader,
+            Spk_Nomor: "",
+            Nama: "",
+            Panjang: null,
+            Lebar: null,
+            Jumlah: 0,
+            Koli: 0,
+            Keterangan: "",
+          },
+        ];
+      }
+      return daftar.map((d, i) => ({
+        _awal: i === 0,
+        ...(i === 0 ? dataHeader : kosongHeader),
+        Spk_Nomor: d.Spk_Nomor ?? "",
+        Nama: d.Nama ?? "",
+        Panjang: angkaAtauNull(d.Panjang),
+        Lebar: angkaAtauNull(d.Lebar),
+        Jumlah: Number(d.Jumlah) || 0,
+        Koli: Number(d.Koli) || 0,
+        Keterangan: d.Keterangan ?? "",
+      }));
+    });
+
+    const KUNCI_HEADER = ["Nomor", "Tanggal", "GudangAsal", "Usr"];
+
+    await exportExcel(`STBJ_Detail_${tglAwal.value}_${tglAkhir.value}.xlsx`, [
+      {
+        sheetName: "STBJ Detail",
+        title: "Detail Surat Terima Barang Jadi",
+        columns: [
+          { header: "Nomor", key: "Nomor", width: 20 },
+          { header: "Tanggal", key: "Tanggal", width: 12 },
+          { header: "Gudang Asal", key: "GudangAsal", width: 22 },
+          { header: "SPK", key: "Spk_Nomor", width: 20 },
+          { header: "Nama", key: "Nama", width: 34 },
+          {
+            header: "P",
+            key: "Panjang",
+            width: 9,
+            numFmt: "#,##0.00",
+            align: "right",
+          },
+          {
+            header: "L",
+            key: "Lebar",
+            width: 9,
+            numFmt: "#,##0.00",
+            align: "right",
+          },
+          {
+            header: "Jumlah",
+            key: "Jumlah",
+            width: 12,
+            numFmt: "#,##0",
+            align: "right",
+          },
+          {
+            header: "Koli",
+            key: "Koli",
+            width: 10,
+            numFmt: "#,##0",
+            align: "right",
+          },
+          { header: "User", key: "Usr", width: 10 },
+          { header: "Keterangan", key: "Keterangan", width: 30 },
+        ],
+        rows,
+        cellStyleFn: (row: BarisExportStbj, key: string) =>
+          row._awal && KUNCI_HEADER.includes(key) ? { bold: true } : null,
+      },
+    ]);
+  } catch {
+    toast.error("Gagal export detail.");
+  }
+};
+
 const onExportDetail = async () => {
+  if (tampilSpanduk.value) {
+    await onExportDetailSpanduk();
+    return;
+  }
   try {
     const res = await svc.getExportDetail(
       tglAwal.value,
@@ -309,6 +483,17 @@ const headers = [
   { title: "User", key: "Usr", width: "70px" },
 ];
 
+// Spanduk: tanpa No./Tgl Terima (hanya berlaku untuk Kaosan) dan Keterangan di paling kanan
+const KUNCI_TERIMA = ["NomorTerima", "TglTerima"];
+const headersAktif = computed(() => {
+  if (!tampilSpanduk.value) return headers;
+  const dasar = headers.filter((h) => !KUNCI_TERIMA.includes(h.key));
+  return [
+    ...dasar.filter((h) => h.key !== "Keterangan"),
+    ...dasar.filter((h) => h.key === "Keterangan"),
+  ];
+});
+
 // Summary
 const totalRows = computed(() => items.value?.length ?? 0);
 </script>
@@ -323,13 +508,13 @@ const totalRows = computed(() => items.value?.length ?? 0);
     menu-id="105"
     :icon="IconClipboardCheck"
     :is-loading="isLoading"
-    :headers="headers"
+    :headers="headersAktif"
     :items="items ?? []"
     item-value="Nomor"
     :can-insert="canInsert"
     :can-edit="canEdit"
     :can-delete="canDelete"
-    :can-export="canExport"
+    :can-export="canExport && !tampilSpanduk"
     :selected="selected"
     :show-expand="true"
     :loading-details="loadingDetail"
@@ -345,9 +530,41 @@ const totalRows = computed(() => items.value?.length ?? 0);
     <!-- Filter -->
     <template #filter-left>
       <label class="flbl">Tanggal</label>
-      <input type="date" v-model="tglAwal" class="finp" />
+      <div
+        class="date-box"
+        role="button"
+        tabindex="0"
+        @click="bukaPicker(inpAwal)"
+        @keydown.enter.prevent="bukaPicker(inpAwal)"
+      >
+        <span>{{ formatTanggalSingkat(tglAwal) }}</span>
+        <IconCalendar :size="14" :stroke-width="1.7" />
+        <input
+          ref="inpAwal"
+          type="date"
+          v-model="tglAwal"
+          class="date-native"
+          tabindex="-1"
+        />
+      </div>
       <span class="flbl">s.d.</span>
-      <input type="date" v-model="tglAkhir" class="finp" />
+      <div
+        class="date-box"
+        role="button"
+        tabindex="0"
+        @click="bukaPicker(inpAkhir)"
+        @keydown.enter.prevent="bukaPicker(inpAkhir)"
+      >
+        <span>{{ formatTanggalSingkat(tglAkhir) }}</span>
+        <IconCalendar :size="14" :stroke-width="1.7" />
+        <input
+          ref="inpAkhir"
+          type="date"
+          v-model="tglAkhir"
+          class="date-native"
+          tabindex="-1"
+        />
+      </div>
 
       <label class="flbl" style="margin-left: 8px">Gudang</label>
       <div class="ig">
@@ -384,6 +601,7 @@ const totalRows = computed(() => items.value?.length ?? 0);
     <!-- Extra buttons -->
     <template #extra-actions>
       <v-btn
+        v-if="!tampilSpanduk"
         size="small"
         color="green"
         :disabled="!canExport"
@@ -397,6 +615,7 @@ const totalRows = computed(() => items.value?.length ?? 0);
         :disabled="!canExport"
         @click="onExportDetail"
       >
+        <IconFileExport :size="16" :stroke-width="1.7" class="mr-1" />
         Export Detail
       </v-btn>
       <v-btn
@@ -405,11 +624,15 @@ const totalRows = computed(() => items.value?.length ?? 0);
         :disabled="!selectedItem"
         @click="onCetak"
       >
+        <IconPrinter :size="16" :stroke-width="1.7" class="mr-1" />
         Cetak
       </v-btn>
       <v-menu v-if="selectedItem">
         <template #activator="{ props }">
-          <v-btn size="small" color="purple" v-bind="props">Tindakan ▾</v-btn>
+          <v-btn size="small" color="purple" v-bind="props">
+            <IconSettings :size="16" :stroke-width="1.7" class="mr-1" />
+            Tindakan ▾
+          </v-btn>
         </template>
         <v-list density="compact" style="font-size: 12px; min-width: 200px">
           <v-list-item @click="openPengajuan">
@@ -427,11 +650,11 @@ const totalRows = computed(() => items.value?.length ?? 0);
     </template>
 
     <template #item.Tanggal="{ item }">
-      {{ formatTanggal(item.Tanggal) }}
+      {{ formatTanggalSingkat(item.Tanggal) }}
     </template>
 
     <template #item.TglTerima="{ item }">
-      {{ item.TglTerima ? formatTanggal(item.TglTerima) : "-" }}
+      {{ item.TglTerima ? formatTanggalSingkat(item.TglTerima) : "-" }}
     </template>
 
     <template #item.NomorTerima="{ item }">
@@ -618,6 +841,33 @@ const totalRows = computed(() => items.value?.length ?? 0);
 }
 .finp:focus {
   border-color: #1565c0;
+}
+.date-box {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  height: 26px;
+  min-width: 108px;
+  border: 1px solid #bdbdbd;
+  border-radius: 3px;
+  padding: 0 6px;
+  font-size: 12px;
+  background: white;
+  cursor: pointer;
+  user-select: none;
+}
+.date-box:focus-visible {
+  outline: 2px solid #1565c0;
+}
+.date-native {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .legend-wrap {

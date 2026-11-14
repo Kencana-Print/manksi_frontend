@@ -23,6 +23,7 @@ const alasanBatal = ref("");
 
 // ?mode=layar -> halaman validasi: tanpa prompt dan tanpa auto-print
 const modeLayar = computed(() => route.query.mode === "layar");
+const isPd = computed(() => route.name === "PettyCashPenyelesaianPrint");
 const nomorBon = computed(() =>
   decodeURIComponent(route.params.nomor as string),
 );
@@ -51,7 +52,10 @@ const cetak = async () => {
 
 onMounted(async () => {
   try {
-    const res = await uangMukaPenyelesaianApi.getFormData(nomorBon.value);
+    const res = await uangMukaPenyelesaianApi.getFormData(
+      nomorBon.value,
+      isPd.value,
+    );
     data.value = res;
     isLoading.value = false;
     try {

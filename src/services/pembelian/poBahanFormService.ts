@@ -18,6 +18,47 @@ export interface MbbOutstandingRow {
   keterangan: string | null;
 }
 
+export interface RekapHeaderPayload {
+  po_tanggal: string;
+  po_keterangan: string;
+  po_note: string;
+  po_mbb_nomor: string;
+}
+
+export interface RekapItemPayload {
+  nomor?: string;
+  nourut?: number;
+  kode: string;
+  namaext: string;
+  satuan: string;
+  gramasi: string;
+  gramasiAwal: string;
+  setting: string;
+  jumlah: number;
+  harga: number;
+  diskon: number;
+  ppn: number;
+  spk: string;
+  mkb: string;
+  mppb: string;
+  supKode: string;
+}
+
+export interface RekapDeliveryPayload {
+  tanggal: string;
+  jumlah: number;
+  kode: string;
+  supKode: string;
+}
+
+export interface RekapSavePayload {
+  isEdit: boolean;
+  nomor?: string;
+  header: RekapHeaderPayload;
+  items: RekapItemPayload[];
+  delivery: RekapDeliveryPayload[];
+}
+
 export const poBahanFormService = {
   validateField: (type: string, value: string, exclude = "") =>
     api.get("/pembelian/po-bahan/form/validate", {
@@ -43,4 +84,10 @@ export const poBahanFormService = {
 
   saveData: (payload: any) =>
     api.post("/pembelian/po-bahan/form/save", payload),
+
+  getRekap: (nomor: string) =>
+    api.get(`/pembelian/po-bahan/form/rekap/${encodeURIComponent(nomor)}`),
+
+  saveRekap: (payload: RekapSavePayload) =>
+    api.post("/pembelian/po-bahan/form/rekap/save", payload),
 };

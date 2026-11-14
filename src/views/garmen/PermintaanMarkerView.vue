@@ -124,7 +124,7 @@ const detailByNomor = computed<Record<string, PermintaanMarkerDetailRow[]>>(
   },
 );
 
-// Per dokumen: dikelompokkan per SPK, subtotal marker dan nomor LHK per SPK
+// Per dokumen: dikelompokkan per SPK, subtotal marker (data lama) dan nomor LHK per SPK
 const kelompokByNomor = computed<Record<string, KelompokSpk[]>>(() => {
   const hasil: Record<string, KelompokSpk[]> = {};
   for (const [nomor, rows] of Object.entries(detailByNomor.value)) {
@@ -146,13 +146,35 @@ const kelompokByNomor = computed<Record<string, KelompokSpk[]>>(() => {
   return hasil;
 });
 
+// Kolom Jml Marker / Alasan hanya tampil bila permintaan itu punya isinya (data lama)
+const adaJmlByNomor = computed<Record<string, boolean>>(() => {
+  const hasil: Record<string, boolean> = {};
+  for (const [nomor, rows] of Object.entries(detailByNomor.value)) {
+    hasil[nomor] = rows.some((r) => Number(r.jml) > 0);
+  }
+  return hasil;
+});
+const adaAlasanByNomor = computed<Record<string, boolean>>(() => {
+  const hasil: Record<string, boolean> = {};
+  for (const [nomor, rows] of Object.entries(detailByNomor.value)) {
+    hasil[nomor] = rows.some((r) => !!r.alasan);
+  }
+  return hasil;
+});
+const jumlahKolom = (nomor: string): number =>
+  4 +
+  (adaJmlByNomor.value[nomor] ? 1 : 0) +
+  (adaAlasanByNomor.value[nomor] ? 1 : 0);
+
 const isActioning = ref(false);
 const isExportingDetail = ref(false);
 const modeMenunggu = ref(false);
 
-// ─── Headers (SPK ada di detail → tampil di expand) ───────
+// ─── Headers (SPK satu per permintaan → tampil di baris utama; bahan di expand) ───
 const headers = [
   { title: "NOMOR", key: "nomor", width: "170px" },
+  { title: "SPK", key: "spkNomor", width: "180px" },
+  { title: "NAMA SPK", key: "spkNama", width: "360px" },
   { title: "TANGGAL", key: "tanggal", width: "100px", align: "center" },
   { title: "DEADLINE", key: "deadline", width: "100px", align: "center" },
   {
@@ -433,6 +455,8 @@ const doExport = async () => {
       "Permintaan Marker",
       [
         { header: "Nomor", key: "nomor", width: 22 },
+        { header: "SPK", key: "spkNomor", width: 20 },
+        { header: "Nama SPK", key: "spkNama", width: 36 },
         { header: "Tanggal", key: "tanggal", width: 12 },
         { header: "Deadline", key: "deadline", width: 12 },
         { header: "Tgl Dikerjakan", key: "tglDikerjakan", width: 14 },
@@ -463,6 +487,8 @@ const doExport = async () => {
       ],
       rows.map((r) => ({
         nomor: r.nomor,
+        spkNomor: r.spkNomor ?? "",
+        spkNama: r.spkNama ?? "",
         tanggal: formatTanggal(r.tanggal),
         deadline: formatTanggal(r.deadline),
         tglDikerjakan: r.tglDikerjakan ? tgl(r.tglDikerjakan) : "",
@@ -471,7 +497,7 @@ const doExport = async () => {
         tglTerima: r.tglTerima ? tgl(r.tglTerima) : "",
         jmlSpkSelesai: Number(r.jmlSpkSelesai),
         jmlSpk: Number(r.jmlSpk),
-        totalJml: Number(r.totalJml),
+        totalJml: Number(r.totalJml) > 0 ? Number(r.totalJml) : "",
         asalNomor: r.asalNomor ?? "",
         status: r.status,
         keterangan: r.keterangan ?? "",
@@ -535,7 +561,7 @@ const doExportDetail = async () => {
           namaBahan: r.namaBahan,
           satuan: r.satuan,
           setting: r.setting,
-          jml: Number(r.jml),
+          jml: Number(r.jml) > 0 ? Number(r.jml) : "",
           alasan: r.alasan,
           lhkNomor: r.lhkNomor,
         };
@@ -582,7 +608,7 @@ fetchData();
   >
     <!-- ─── Filter ─── -->
     <template #filter-left>
-            <div class="date-filter">
+      <div class="date-filter">
         <span class="f-label">Tanggal</span>
         <input
           type="date"
@@ -621,7 +647,7 @@ fetchData();
     </template>
 
     <!-- ─── Extra actions ─── -->
-       <template #extra-actions="{ selected }">
+    <template #extra-actions="{ selected }">
       <v-btn
         size="small"
         color="green-darken-2"
@@ -658,7 +684,7 @@ fetchData();
       {{ formatTanggal(item.deadline) }}
     </template>
 
-        <template #item.tglDikerjakan="{ item }">
+    <template #item.tglDikerjakan="{ item }">
       {{ tgl(item.tglDikerjakan) }}
     </template>
 
@@ -678,8 +704,27 @@ fetchData();
       {{ item.jmlSpkSelesai }} / {{ item.jmlSpk }}
     </template>
 
+    <template #item.spkNomor="{ item }">
+      <template v-if="item.spkNomor">
+        <span :title="item.spkNomor">{{ item.spkNomor.split(", ")[0] }}</span>
+        <span
+          v-if="item.jmlSpk > 1"
+          class="spk-more-chip"
+          :title="item.spkNomor"
+          >+{{ item.jmlSpk - 1 }}</span
+        >
+      </template>
+      <template v-else>-</template>
+    </template>
+
+    <template #item.spkNama="{ item }">
+      <span class="cell-clip" :title="item.spkNama ?? ''">{{
+        item.spkNama || "-"
+      }}</span>
+    </template>
+
     <template #item.totalJml="{ item }">
-      {{ fmtJml(item.totalJml) }}
+      {{ Number(item.totalJml) > 0 ? fmtJml(item.totalJml) : "-" }}
     </template>
 
     <template #item.asalNomor="{ item }">
@@ -717,8 +762,16 @@ fetchData();
                 <th style="width: 280px">NAMA BAHAN</th>
                 <th style="width: 70px">SATUAN</th>
                 <th style="width: 130px">SETTING</th>
-                <th style="width: 110px" class="num">JML MARKER</th>
-                <th>ALASAN (BAHAN DI LUAR MKB)</th>
+                <th
+                  v-if="adaJmlByNomor[item.nomor]"
+                  style="width: 110px"
+                  class="num"
+                >
+                  JML MARKER
+                </th>
+                <th v-if="adaAlasanByNomor[item.nomor]">
+                  ALASAN (BAHAN DI LUAR MKB)
+                </th>
               </tr>
             </thead>
             <tbody
@@ -726,15 +779,20 @@ fetchData();
               :key="g.spkNomor"
             >
               <tr class="grp-row">
-                <td colspan="4">
+                <td :colspan="jumlahKolom(item.nomor)">
                   {{ g.spkNomor
                   }}<span v-if="g.spkNama"> - {{ g.spkNama }}</span>
-                </td>
-                <td class="num">{{ fmtJml(g.subtotal) }}</td>
-                <td :class="g.lhkNomor ? 'txt-ok' : 'txt-belum'">
-                  {{
-                    g.lhkNomor ? `LHK: ${g.lhkNomor}` : "Belum ada LHK Marker"
-                  }}
+                  <span v-if="g.subtotal > 0" class="grp-sub"
+                    >{{ fmtJml(g.subtotal) }} marker</span
+                  >
+                  <span
+                    class="grp-lhk"
+                    :class="g.lhkNomor ? 'txt-ok' : 'txt-belum'"
+                  >
+                    {{
+                      g.lhkNomor ? `LHK: ${g.lhkNomor}` : "Belum ada LHK Marker"
+                    }}
+                  </span>
                 </td>
               </tr>
               <tr v-for="d in g.rows" :key="d.id">
@@ -742,13 +800,19 @@ fetchData();
                 <td>{{ d.namaBahan }}</td>
                 <td>{{ d.satuan }}</td>
                 <td>{{ d.setting }}</td>
-                <td class="num">{{ fmtJml(d.jml) }}</td>
-                <td class="cell-wrap">{{ d.alasan || "-" }}</td>
+                <td v-if="adaJmlByNomor[item.nomor]" class="num">
+                  {{ Number(d.jml) > 0 ? fmtJml(d.jml) : "-" }}
+                </td>
+                <td v-if="adaAlasanByNomor[item.nomor]" class="cell-wrap">
+                  {{ d.alasan || "-" }}
+                </td>
               </tr>
             </tbody>
             <tbody v-if="!(kelompokByNomor[item.nomor] ?? []).length">
               <tr>
-                <td colspan="6" class="empty-row">&lt;Tidak ada detail&gt;</td>
+                <td :colspan="jumlahKolom(item.nomor)" class="empty-row">
+                  &lt;Tidak ada detail&gt;
+                </td>
               </tr>
             </tbody>
           </table>
@@ -765,7 +829,7 @@ fetchData();
     </template>
   </BaseBrowse>
 
-   <!-- ─── Dialog Tanda Terima ─── -->
+  <!-- ─── Dialog Tanda Terima ─── -->
   <v-dialog v-model="showTtDialog" max-width="820">
     <v-card class="rounded-lg">
       <v-card-title class="bg-success text-white pa-3 text-subtitle-1">
@@ -884,6 +948,24 @@ fetchData();
   font-size: 11px;
   color: #757575;
 }
+.cell-clip {
+  display: inline-block;
+  max-width: 360px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+.spk-more-chip {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 0 6px;
+  border-radius: 9px;
+  background: #fff3e0;
+  color: #e65100;
+  font-size: 10px;
+  font-weight: 700;
+}
 
 /* ─── Expand ─── */
 .expand-wrap {
@@ -965,6 +1047,15 @@ fetchData();
   font-weight: 700;
   font-size: 11px;
   border-bottom: 1px solid #b0bec5;
+}
+.dt .grp-row .grp-sub {
+  margin-left: 12px;
+  font-weight: 400;
+  color: #455a64;
+}
+.dt .grp-row .grp-lhk {
+  margin-left: 16px;
+  font-weight: 400;
 }
 .empty-row {
   text-align: center;

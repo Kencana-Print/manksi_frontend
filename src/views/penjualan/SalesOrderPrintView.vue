@@ -369,10 +369,15 @@ const sizeDetailList = computed<string[]>(() => {
     ["pl_panjang", "pb"],
   ];
   const rows = data.value.sizeDetails;
-  const [lKey, pKey] =
-    pairs.find(([lK, pK]) =>
-      rows.some((r: any) => Number(r[lK]) > 0 || Number(r[pK]) > 0),
-    ) || pairs[0];
+  const JO_BAWAHAN = ["CL"]; // tambah kode JO bawahan lain kalau ada
+
+  const [lKey, pKey] = JO_BAWAHAN.includes(
+    String(data.value.spk_jo_kode || "").toUpperCase(),
+  )
+    ? ["l_pinggang", "p_celana"]
+    : pairs.find(([lK, pK]) =>
+        rows.some((r: any) => Number(r[lK]) > 0 || Number(r[pK]) > 0),
+      ) || pairs[0];
   return rows.map(
     (sz: any) => `${sz.size}= L: ${sz[lKey] || 0} P: ${sz[pKey] || 0}`,
   );

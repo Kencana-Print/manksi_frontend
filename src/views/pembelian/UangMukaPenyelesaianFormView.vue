@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
+import { useAuthStore } from "@/stores/authStore";
 import BaseForm from "@/components/BaseForm.vue";
 import GenericPickerModal from "@/components/lookups/GenericPickerModal.vue";
 import AccountSearchModal from "@/components/lookups/AccountSearchModal.vue";
@@ -68,6 +69,8 @@ interface RealisasiFormState {
   is_edit: boolean;
   info_permintaan: any;
   mode_laci: boolean;
+  mode_pd: boolean;
+  pum_user_create: string;
   laci_asal: string;
   detail: PenyelesaianDetail[];
   sisa: {
@@ -82,8 +85,11 @@ interface RealisasiFormState {
 const route = useRoute();
 const router = useRouter();
 const toast = useToast();
+const authStore = useAuthStore();
 
-const MENU_ID = "315";
+// Mode PD dari nama route (dikenali sebelum data dimuat); hak menu ikut route
+const isPd = computed(() => route.name === "PettyCashPenyelesaian");
+const MENU_ID = computed(() => (isPd.value ? "973" : "315"));
 const isLoading = ref(false);
 const isSaving = ref(false);
 const originalForm = ref<any>(null);
@@ -131,6 +137,8 @@ const form = ref<RealisasiFormState>({
   is_edit: false,
   info_permintaan: null,
   mode_laci: false,
+  mode_pd: false,
+  pum_user_create: "",
   laci_asal: "",
   detail: [],
   sisa: { wajib: false, ambang: 100, rek_kode: "", nominal: 0, jur_no: "" },
@@ -197,8 +205,8 @@ onMounted(async () => {
   isLoading.value = true;
   try {
     const nomor = decodeURIComponent(route.params.nomor as string);
-    await uangMukaPenyelesaianApi.cekBatas(nomor);
-    const d = await uangMukaPenyelesaianApi.getFormData(nomor);
+    await uangMukaPenyelesaianApi.cekBatas(nomor, isPd.value);
+    const d = await uangMukaPenyelesaianApi.getFormData(nomor, isPd.value);
 
     Object.assign(form.value, d);
     originalForm.value = JSON.parse(JSON.stringify(d));
@@ -700,6 +708,24 @@ const validateSave = () => {
     return;
   }
 
+  if (form.value.mode_pd) {
+    if (
+      form.value.pum_user_create.toUpperCase() !==
+      (authStore.user?.kode || "").toUpperCase()
+    ) {
+      toast.warning(
+        `Penyelesaian Dana Belanja hanya dapat dilakukan oleh pemilik laci ${form.value.rek_kode}.`,
+      );
+      return;
+    }
+    if (totalSisa.value < 0) {
+      toast.warning(
+        `Total terpakai melebihi dana yang diserahkan (${fmt(totalKasbon.value)}). Kelebihan diproses lewat Penyerahan Dana Belanja baru.`,
+      );
+      return;
+    }
+  }
+
   // Verified sekarang otomatis mengikuti qty — baris dengan qty > 0
   // dianggap ikut direalisasi, qty 0 di-skip dari jurnal/qty_buyed.
   form.value.detail.forEach((d) => {
@@ -759,11 +785,14 @@ const validateSave = () => {
 const confirmSave = async () => {
   isSaving.value = true;
   try {
-    const res = await uangMukaPenyelesaianApi.save({
-      ...form.value,
-      no_bkk_lama: form.value.no_bkk,
-      sisa_rek_kode: perluSisa.value ? sisaRekKode.value : "",
-    });
+    const res = await uangMukaPenyelesaianApi.save(
+      {
+        ...form.value,
+        no_bkk_lama: form.value.no_bkk,
+        sisa_rek_kode: perluSisa.value ? sisaRekKode.value : "",
+      },
+      isPd.value,
+    );
     savedNoBkk.value = res.data.no_bkk || "";
     showSaveDialog.value = false;
     showPrintDialog.value = true;
@@ -774,18 +803,20 @@ const confirmSave = async () => {
   }
 };
 
+const kembaliKe = () =>
+  router.push({ name: isPd.value ? "PettyCash" : "UangMuka" });
 const cetakSelesai = () => {
   window.open(
-    `/pembelian/uang-muka/print-penyelesaian/${encodeURIComponent(form.value.nomor)}`,
+    `/pembelian/${isPd.value ? "petty-cash" : "uang-muka"}/print-penyelesaian/${encodeURIComponent(form.value.nomor)}`,
     "_blank",
   );
   showPrintDialog.value = false;
-  router.push({ name: "UangMuka" });
+  kembaliKe();
 };
 
 const skipCetak = () => {
   showPrintDialog.value = false;
-  router.push({ name: "UangMuka" });
+  kembaliKe();
 };
 
 const confirmCancel = () => {
@@ -798,7 +829,7 @@ const confirmCancel = () => {
 
 const confirmClose = () => {
   showCloseDialog.value = false;
-  router.push({ name: "UangMuka" });
+  kembaliKe();
 };
 
 const fmt = (v: number) => new Intl.NumberFormat("id-ID").format(v || 0);
@@ -942,6 +973,10 @@ const onStatusFinanceChange = async (d: PenyelesaianDetail, idx: number) => {
         </div>
         <div class="info-row">
           <span>Kas</span><b class="mono">{{ form.rek_kode }}</b>
+        </div>
+        <div v-if="form.mode_pd" class="laci-info">
+          Dana berasal dari laci {{ form.rek_kode }}. Sisa yang tidak terpakai
+          tetap di laci, tidak dikembalikan lewat transfer.
         </div>
       </div>
 

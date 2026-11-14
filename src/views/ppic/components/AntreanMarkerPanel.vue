@@ -76,6 +76,33 @@ const spkItems = (r: AntreanMarkerItem) =>
 const spkTampil = (r: AntreanMarkerItem) =>
   expanded.value.has(r.nomor) ? spkItems(r) : spkItems(r).slice(0, MAX_SPK);
 
+// ── Status bahan (stok gudang barcode) ──
+const MAX_BHN = 2;
+
+const bhnLabel = (r: AntreanMarkerItem): string => {
+  if (r.statusBahan === "READY") return "Ready";
+  if (r.statusBahan === "BELUM") return "Belum ready";
+  return `Sebagian (${r.bahanBelumReady.length} dari ${r.jmlBahan} belum)`;
+};
+
+const bhnClass = (r: AntreanMarkerItem): string => `bhn-${r.statusBahan}`;
+
+const bhnTampil = (r: AntreanMarkerItem) => r.bahanBelumReady.slice(0, MAX_BHN);
+
+const bhnTitle = (r: AntreanMarkerItem): string =>
+  r.bahanBelumReady
+    .map((b) => `${b.kode}${b.nama ? ` - ${b.nama}` : ""} (stok ${b.stok})`)
+    .join("\n");
+
+// Bisa diambil / diambil alih bila minimal satu bahan ready
+const bisaDiambil = (r: AntreanMarkerItem): boolean =>
+  r.statusBahan !== "BELUM";
+
+const pesanBelumReady = (r: AntreanMarkerItem): string =>
+  r.bahanBelumReady.length
+    ? ` Bahan belum ready: ${r.bahanBelumReady.map((b) => b.kode).join(", ")}.`
+    : "";
+
 // ── Konfirmasi umum (Ambil, Ambil Alih, Lepas) ──
 const showConfirm = ref(false);
 const confirmTitle = ref("");
@@ -110,7 +137,7 @@ const runConfirm = async () => {
 const ambil = (r: AntreanMarkerItem) =>
   askConfirm(
     "Ambil permintaan",
-    `Ambil permintaan ${r.nomor} (${r.jmlSpk} SPK, ${fmtJml(r.totalJml)} marker)?`,
+    `Ambil permintaan ${r.nomor} (${r.jmlSpk} SPK${Number(r.totalJml) > 0 ? `, ${fmtJml(r.totalJml)} marker` : ""})?${pesanBelumReady(r)}`,
     async () => {
       await svc.ambilPermintaan(r.nomor);
       toast.success("Permintaan diambil.");
@@ -121,7 +148,7 @@ const ambil = (r: AntreanMarkerItem) =>
 const ambilAlih = (r: AntreanMarkerItem) =>
   askConfirm(
     "Ambil alih permintaan",
-    `Ambil alih permintaan ${r.nomor} dari ${r.picNama ?? r.pic}?`,
+    `Ambil alih permintaan ${r.nomor} dari ${r.picNama ?? r.pic}?${pesanBelumReady(r)}`,
     async () => {
       await svc.ambilAlihPermintaan(r.nomor);
       toast.success("Permintaan diambil alih.");
@@ -175,7 +202,7 @@ const inputLhk = (r: AntreanMarkerItem) => {
               <th>Deadline</th>
               <th>SPK</th>
               <th class="tr">Jml SPK</th>
-              <th class="tr">Total Marker</th>
+              <th>Status Bahan</th>
               <th>Keterangan</th>
               <th style="width: 80px"></th>
             </tr>
@@ -207,11 +234,27 @@ const inputLhk = (r: AntreanMarkerItem) => {
                 </button>
               </td>
               <td class="tr">{{ r.jmlSpk }}</td>
-              <td class="tr fw">{{ fmtJml(r.totalJml) }}</td>
+              <td>
+                <span
+                  class="bhn-chip"
+                  :class="bhnClass(r)"
+                  :title="bhnTitle(r)"
+                  >{{ bhnLabel(r) }}</span
+                >
+                <div v-for="b in bhnTampil(r)" :key="b.kode" class="sub">
+                  {{ b.kode }}<span v-if="b.nama"> - {{ b.nama }}</span>
+                </div>
+                <div v-if="r.bahanBelumReady.length > MAX_BHN" class="sub">
+                  +{{ r.bahanBelumReady.length - MAX_BHN }} bahan lain
+                </div>
+              </td>
               <td>
                 {{ r.keterangan || "-" }}
                 <div v-if="r.asalNomor" class="sub">
                   revisi dari {{ r.asalNomor }}
+                </div>
+                <div v-if="Number(r.totalJml) > 0" class="sub">
+                  {{ fmtJml(r.totalJml) }} marker
                 </div>
                 <div v-if="r.jmlSpkSelesai > 0" class="sub">
                   {{ r.jmlSpkSelesai }} dari {{ r.jmlSpk }} SPK sudah ber-LHK
@@ -222,6 +265,10 @@ const inputLhk = (r: AntreanMarkerItem) => {
                   size="x-small"
                   color="teal"
                   variant="flat"
+                  :disabled="!bisaDiambil(r)"
+                  :title="
+                    bisaDiambil(r) ? '' : 'Semua bahan belum ready di gudang'
+                  "
                   @click="ambil(r)"
                   >Ambil</v-btn
                 >
@@ -251,7 +298,7 @@ const inputLhk = (r: AntreanMarkerItem) => {
               <th>Deadline</th>
               <th>SPK</th>
               <th class="tc">SPK Ber-LHK</th>
-              <th class="tr">Total Marker</th>
+              <th>Status Bahan</th>
               <th>Diambil</th>
               <th>Keterangan</th>
               <th style="width: 150px"></th>
@@ -284,14 +331,32 @@ const inputLhk = (r: AntreanMarkerItem) => {
                 </button>
               </td>
               <td class="tc">{{ r.jmlSpkSelesai }} / {{ r.jmlSpk }}</td>
-              <td class="tr fw">{{ fmtJml(r.totalJml) }}</td>
+              <td>
+                <span
+                  class="bhn-chip"
+                  :class="bhnClass(r)"
+                  :title="bhnTitle(r)"
+                  >{{ bhnLabel(r) }}</span
+                >
+                <div v-for="b in bhnTampil(r)" :key="b.kode" class="sub">
+                  {{ b.kode }}<span v-if="b.nama"> - {{ b.nama }}</span>
+                </div>
+                <div v-if="r.bahanBelumReady.length > MAX_BHN" class="sub">
+                  +{{ r.bahanBelumReady.length - MAX_BHN }} bahan lain
+                </div>
+              </td>
               <td>
                 {{ r.tglAmbil }}
                 <div v-if="r.picAsalNama" class="sub">
                   diambil alih dari {{ r.picAsalNama }}
                 </div>
               </td>
-              <td>{{ r.keterangan || "-" }}</td>
+              <td>
+                {{ r.keterangan || "-" }}
+                <div v-if="Number(r.totalJml) > 0" class="sub">
+                  {{ fmtJml(r.totalJml) }} marker
+                </div>
+              </td>
               <td class="tc">
                 <v-btn
                   size="x-small"
@@ -337,6 +402,7 @@ const inputLhk = (r: AntreanMarkerItem) => {
               <th>Deadline</th>
               <th>SPK</th>
               <th class="tc">SPK Ber-LHK</th>
+              <th>Status Bahan</th>
               <th>Diambil</th>
               <th style="width: 100px"></th>
             </tr>
@@ -369,19 +435,37 @@ const inputLhk = (r: AntreanMarkerItem) => {
                 </button>
               </td>
               <td class="tc">{{ r.jmlSpkSelesai }} / {{ r.jmlSpk }}</td>
+              <td>
+                <span
+                  class="bhn-chip"
+                  :class="bhnClass(r)"
+                  :title="bhnTitle(r)"
+                  >{{ bhnLabel(r) }}</span
+                >
+                <div v-for="b in bhnTampil(r)" :key="b.kode" class="sub">
+                  {{ b.kode }}<span v-if="b.nama"> - {{ b.nama }}</span>
+                </div>
+                <div v-if="r.bahanBelumReady.length > MAX_BHN" class="sub">
+                  +{{ r.bahanBelumReady.length - MAX_BHN }} bahan lain
+                </div>
+              </td>
               <td>{{ r.tglAmbil }}</td>
               <td class="tc">
                 <v-btn
                   size="x-small"
                   variant="tonal"
                   color="orange-darken-2"
+                  :disabled="!bisaDiambil(r)"
+                  :title="
+                    bisaDiambil(r) ? '' : 'Semua bahan belum ready di gudang'
+                  "
                   @click="ambilAlih(r)"
                   >Ambil Alih</v-btn
                 >
               </td>
             </tr>
             <tr v-if="!data.lain.length">
-              <td colspan="7" class="empty">Tidak ada.</td>
+              <td colspan="8" class="empty">Tidak ada.</td>
             </tr>
           </tbody>
         </table>
@@ -536,6 +620,26 @@ const inputLhk = (r: AntreanMarkerItem) => {
   font-size: 10px;
   color: #888;
 }
+.bhn-chip {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.bhn-READY {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+.bhn-SEBAGIAN {
+  background: #fff3e0;
+  color: #e65100;
+}
+.bhn-BELUM {
+  background: #ffebee;
+  color: #c62828;
+}
 .dl-late {
   color: #c62828;
   font-weight: 700;
@@ -558,8 +662,5 @@ const inputLhk = (r: AntreanMarkerItem) => {
 }
 .tr {
   text-align: right;
-}
-.fw {
-  font-weight: 700;
 }
 </style>

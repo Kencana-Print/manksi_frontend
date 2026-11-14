@@ -14,8 +14,9 @@ import {
   IconCheck,
   IconChecks,
   IconAlertTriangle,
+  IconCalendar,
 } from "@tabler/icons-vue";
-import { formatTanggal } from "@/utils/dateFormat";
+import { formatTanggalSingkat } from "@/utils/dateFormat";
 
 const toast = useToast();
 const auth = useAuthStore();
@@ -51,6 +52,14 @@ const num = (v: any) => Number(v || 0).toLocaleString("id-ID");
 const tglAwal = ref(firstOfMonth());
 const tglAkhir = ref(todayLocal());
 const showAllMode = ref(false); // toggle "Show All Not Approved"
+
+const inpAwal = ref<HTMLInputElement | null>(null);
+const inpAkhir = ref<HTMLInputElement | null>(null);
+
+const bukaPicker = (el: HTMLInputElement | null) => {
+  if (!el || showAllMode.value) return;
+  el.showPicker();
+};
 
 // ── useBrowse ──────────────────────────────────────────────
 const baseBrowseRef = ref<InstanceType<typeof BaseBrowse> | null>(null);
@@ -361,7 +370,7 @@ const onExport = async () => {
   try {
     const dataToExport = rawData.map((r: any) => ({
       ...r,
-      Tanggal: formatTanggal(r.Tanggal),
+      Tanggal: formatTanggalSingkat(r.Tanggal),
     }));
 
     const cols: ExcelColumn[] = [
@@ -439,7 +448,7 @@ const onExportDetail = async () => {
         Approved: first.Approved,
         Divisi: first.Divisi,
         Nomor: first.Nomor,
-        Tanggal: formatTanggal(first.Tanggal),
+        Tanggal: formatTanggalSingkat(first.Tanggal),
         KodeGdg: first.KodeGdg,
         Gudang: first.Gudang,
         ...(canLihatCus.value
@@ -534,19 +543,43 @@ const onExportDetail = async () => {
     <!-- ── Filter ── -->
     <template #filter-left>
       <label class="flbl">Tanggal</label>
-      <input
-        type="date"
-        v-model="tglAwal"
-        class="finp"
-        :disabled="showAllMode"
-      />
+      <div
+        class="date-box"
+        :class="{ 'date-box-off': showAllMode }"
+        role="button"
+        tabindex="0"
+        @click="bukaPicker(inpAwal)"
+        @keydown.enter.prevent="bukaPicker(inpAwal)"
+      >
+        <span>{{ formatTanggalSingkat(tglAwal) }}</span>
+        <IconCalendar :size="14" :stroke-width="1.7" />
+        <input
+          ref="inpAwal"
+          type="date"
+          v-model="tglAwal"
+          class="date-native"
+          tabindex="-1"
+        />
+      </div>
       <span class="fsep">s.d.</span>
-      <input
-        type="date"
-        v-model="tglAkhir"
-        class="finp"
-        :disabled="showAllMode"
-      />
+      <div
+        class="date-box"
+        :class="{ 'date-box-off': showAllMode }"
+        role="button"
+        tabindex="0"
+        @click="bukaPicker(inpAkhir)"
+        @keydown.enter.prevent="bukaPicker(inpAkhir)"
+      >
+        <span>{{ formatTanggalSingkat(tglAkhir) }}</span>
+        <IconCalendar :size="14" :stroke-width="1.7" />
+        <input
+          ref="inpAkhir"
+          type="date"
+          v-model="tglAkhir"
+          class="date-native"
+          tabindex="-1"
+        />
+      </div>
     </template>
 
     <template #filter-right>
@@ -647,7 +680,7 @@ const onExportDetail = async () => {
     </template>
 
     <template #item.Tanggal="{ item }">
-      {{ formatTanggal(item.Tanggal) }}
+      {{ formatTanggalSingkat(item.Tanggal) }}
     </template>
 
     <!-- ── Expanded detail ── -->
@@ -869,7 +902,7 @@ const onExportDetail = async () => {
                   <td class="mono" style="color: #1565c0; font-weight: 600">
                     {{ row.Nomor }}
                   </td>
-                  <td>{{ formatTanggal(row.Tanggal) }}</td>
+                  <td>{{ formatTanggalSingkat(row.Tanggal) }}</td>
                   <td>{{ row.Gudang }}</td>
                   <td v-if="canLihatCus">{{ row.KdCus }}</td>
                   <td v-if="canLihatCus">{{ row.Nama }}</td>
@@ -990,20 +1023,37 @@ const onExportDetail = async () => {
   color: #444;
   white-space: nowrap;
 }
-.finp {
+.date-box {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   height: 28px;
+  min-width: 108px;
   border: 1px solid #bdbdbd;
   border-radius: 4px;
-  padding: 0 6px;
+  padding: 0 8px;
   font-size: 12px;
-  outline: none;
+  background: white;
+  cursor: pointer;
+  user-select: none;
 }
-.finp:focus {
-  border-color: #1565c0;
+.date-box:focus-visible {
+  outline: 2px solid #1565c0;
 }
-.finp:disabled {
+.date-box-off {
   background: #f0f0f0;
   color: #999;
+  cursor: not-allowed;
+}
+.date-native {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  pointer-events: none;
 }
 .fsep {
   font-size: 11px;

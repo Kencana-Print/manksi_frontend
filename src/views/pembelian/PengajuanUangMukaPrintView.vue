@@ -25,6 +25,7 @@ const modeLayar = computed(() => route.query.mode === "layar");
 const nomorPum = computed(() =>
   decodeURIComponent(route.params.nomor as string),
 );
+const isPettyCash = computed(() => nomorPum.value.startsWith("PC."));
 const adaStamp = computed(
   () =>
     validasi.value?.status === "VALID" ||
@@ -224,8 +225,12 @@ const cetak = () => window.print();
       </v-card>
     </v-dialog>
     <div class="header-row">
-      <div class="doc-title-wrapper">
-        <div class="doc-title">BUKTI PENGAJUAN UANG MUKA</div>
+      <div class="doc-title">
+        {{
+          isPettyCash
+            ? "BUKTI PENGAJUAN PETTY CASH"
+            : "BUKTI PENGAJUAN UANG MUKA"
+        }}
       </div>
       <img :src="logoUrl" alt="Logo" class="logo" />
     </div>
@@ -233,7 +238,9 @@ const cetak = () => window.print();
     <div class="info-grid">
       <div class="info-col">
         <div class="info-row">
-          <span class="lbl">No. PUM</span>
+          <span class="lbl">{{
+            isPettyCash ? "No. Petty Cash" : "No. PUM"
+          }}</span>
           <span class="sep">:</span>
           <span class="val">{{ data.nomor }}</span>
         </div>
@@ -263,7 +270,7 @@ const cetak = () => window.print();
       <span class="val">{{ data.keterangan || "-" }}</span>
     </div>
 
-    <table class="detail-table">
+    <table v-if="!isPettyCash" class="detail-table">
       <thead>
         <tr>
           <th style="width: 25px">No</th>

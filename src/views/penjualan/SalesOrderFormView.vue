@@ -472,7 +472,7 @@ const {
       },
       alokasi: data.Alokasi,
       dtlKaosan: data.Kaosan,
-      dtlSize: data.Sizes,
+      dtlSize: sanitizeSizes(data.Sizes),
       dtlKetKomponen: data.Komponen,
     };
 
@@ -763,6 +763,37 @@ const kategoriUkuran = computed(() => {
   if (JO_KATEGORI_WEARPACK.includes(jo)) return "WEARPACK";
   return "ATASAN";
 });
+const DIM_ATASAN = [
+  "ld",
+  "pb",
+  "pl_pendek",
+  "pl_panjang",
+  "p_bahu",
+  "l_lengan",
+  "l_manset",
+];
+const DIM_BAWAHAN = [
+  "l_pinggang",
+  "p_celana",
+  "l_panggul",
+  "l_paha",
+  "pesak",
+  "l_lutut",
+  "l_bawah",
+];
+
+// Kosongkan kolom ukuran yang tidak tampil di form sesuai kategori JO
+const sanitizeSizes = (rows: any[]) => {
+  if (isJoBebasUkuran.value) return rows || [];
+  const kat = kategoriUkuran.value;
+  const kosong =
+    kat === "BAWAHAN" ? DIM_ATASAN : kat === "ATASAN" ? DIM_BAWAHAN : [];
+  return (rows || []).map((r: any) => {
+    const c = { ...r };
+    kosong.forEach((f) => (c[f] = 0));
+    return c;
+  });
+};
 
 // Reset varian ke default yang VALID untuk kategori baru — mencegah
 // varian atasan (LENGAN_PENDEK dst) ke-carry-over saat JO diganti ke

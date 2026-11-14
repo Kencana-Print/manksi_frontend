@@ -124,12 +124,23 @@ const gantiCabang = async (cabang: string) => {
   await muatDefaults(cabang);
 };
 
-// Ganti ATM / kas -> daftar BKK dikosongkan (satu klaim = satu kas), baris manual dipertahankan
+// Ganti kas -> daftar BKK dikosongkan (satu klaim = satu kas).
+// Baris manual hanya sah untuk ATM: dipertahankan bila kas baru ATM, dibuang bila bukan.
 const gantiKas = (kode: string) => {
   if (rekPilih.value === kode) return;
-  if (form.value.detail.some((b) => !b.manual)) {
-    toast.info("Kas diganti, daftar BKK dikosongkan.");
-    form.value.detail = form.value.detail.filter((b) => b.manual);
+  const jenisBaru =
+    defaults.value?.kasOpsi.find((k) => k.kode === kode)?.jenis ?? "";
+  const buangManual =
+    jenisBaru !== "ATM" && form.value.detail.some((b) => b.manual);
+  if (buangManual || form.value.detail.some((b) => !b.manual)) {
+    toast.info(
+      buangManual
+        ? "Kas diganti, daftar BKK dan baris manual dikosongkan."
+        : "Kas diganti, daftar BKK dikosongkan.",
+    );
+    form.value.detail = buangManual
+      ? []
+      : form.value.detail.filter((b) => b.manual);
   }
   rekPilih.value = kode;
 };
@@ -223,12 +234,23 @@ const tampilTujuan = computed<RekeningInfo>(() =>
       rekKosong()),
 );
 
-// Mode halaman: ATM (pusat) atau Kas Kecil (cabang), ditentukan server
-const isAtm = computed(
-  () => (nomorEdit.value ? form.value.jenis : defaults.value?.jenis) === "ATM",
-);
+// Jenis dibaca dari kas terpilih (satu cabang bisa campuran: ATM dan Petty Cash)
+const jenisAktif = computed(() => {
+  if (nomorEdit.value) return form.value.jenis;
+  return (
+    defaults.value?.kasOpsi.find((k) => k.kode === rekPilih.value)?.jenis ??
+    defaults.value?.jenis ??
+    ""
+  );
+});
+const isAtm = computed(() => jenisAktif.value === "ATM");
+const isPc = computed(() => jenisAktif.value === "PC");
 const labelJenis = computed(() =>
-  isAtm.value ? "Klaim ATM" : "Klaim Kas Kecil",
+  isAtm.value
+    ? "Klaim ATM"
+    : isPc.value
+      ? "Klaim Petty Cash"
+      : "Klaim Kas Kecil",
 );
 const labelRek = (r: RekeningInfo): string =>
   r.kode ? `${r.kode} - ${r.nama}` : "";
@@ -544,7 +566,11 @@ const validateSave = () => {
 
           <div class="f-field">
             <label class="f-lbl">{{
-              isAtm ? "ATM yang diisi" : "Rekening Tujuan (kas kecil)"
+              isAtm
+                ? "ATM yang diisi"
+                : isPc
+                  ? "Laci Finance yang diisi"
+                  : "Rekening Tujuan (kas kecil)"
             }}</label>
             <input :value="labelRek(tampilTujuan)" readonly class="f-inp" />
             <div v-if="tampilTujuan.rekening" class="f-sub">
@@ -567,10 +593,18 @@ const validateSave = () => {
             <div class="kk-ringkas-row">
               <span>Jumlah BKK</span><b>{{ jumlahBkk }}</b>
             </div>
-            <div v-if="isAtm" class="kk-ringkas-row">
-              <span>Baris Manual</span
-              ><b>{{ jumlahManual }} ({{ numFmt(totalManual) }})</b>
-            </div>
+            <template v-if="isAtm">
+              BKK/BBK diklaim utuh. Hanya pengeluaran dari ATM ini yang belum
+              diklaim yang bisa dipilih.
+            </template>
+            <template v-else-if="isPc">
+              BKK penyelesaian dana belanja diklaim utuh. Klaim ini dibayar
+              lewat BBK dari bank, bukan lewat Pengajuan Transfer.
+            </template>
+            <template v-else>
+              BKK diklaim utuh. Hanya BKK penyelesaian kas yang sudah selesai
+              dan belum diklaim yang bisa dipilih.
+            </template>
             <div class="kk-ringkas-row kk-ringkas-total">
               <span>Total Klaim</span><b>{{ numFmt(total) }}</b>
             </div>

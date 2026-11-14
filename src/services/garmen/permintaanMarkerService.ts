@@ -33,6 +33,7 @@ export interface PermintaanMarkerBrowseItem {
   totalJml: number | string;
   jmlSpk: number;
   spkNomor: string | null;
+  spkNama: string | null;
   jmlSpkSelesai: number;
   tglDikerjakan: string | null;
   tglLhk: string | null;

@@ -1140,13 +1140,17 @@ const executeClose = () => {
                       <table class="item-tbl">
                         <thead>
                           <tr>
-                            <th style="width: 28px" class="text-center">
+                            <th
+                              style="width: 28px"
+                              class="text-center"
+                              @click.stop="toggleSemuaItem(d)"
+                            >
                               <input
                                 v-if="d.rekapBatas == null"
                                 type="checkbox"
                                 :checked="semuaTercentang(d)"
                                 :disabled="!itemBisa(d).length"
-                                @click.stop.prevent="toggleSemuaItem(d)"
+                                style="pointer-events: none"
                               />
                             </th>
                             <th style="width: 90px">Kode</th>
@@ -1179,7 +1183,7 @@ const executeClose = () => {
                                 type="checkbox"
                                 :checked="i.checked"
                                 :disabled="!!i.vouLain"
-                                @click.stop.prevent="toggleItem(d, i)"
+                                style="pointer-events: none"
                               />
                             </td>
                             <td>{{ i.kode }}</td>

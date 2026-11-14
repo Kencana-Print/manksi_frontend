@@ -31,6 +31,10 @@ onMounted(async () => {
 const fmt = (v: number): string =>
   new Intl.NumberFormat("id-ID", { maximumFractionDigits: 2 }).format(v || 0);
 
+const judul = computed<string>(() =>
+  data.value?.jenis === "PC" ? "KLAIM PETTY CASH" : "KLAIM KAS KECIL",
+);
+
 const total = computed<number>(() =>
   (data.value?.detail ?? []).reduce((s, d) => s + (Number(d.nominal) || 0), 0),
 );
@@ -42,7 +46,7 @@ const total = computed<number>(() =>
   <div v-else-if="data" class="print-page">
     <div class="header-row">
       <div class="doc-title-wrapper">
-        <div class="doc-title">KLAIM KAS KECIL</div>
+        <div class="doc-title">{{ judul }}</div>
       </div>
       <img :src="logoUrl" alt="Logo" class="logo" />
     </div>

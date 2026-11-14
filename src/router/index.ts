@@ -550,6 +550,41 @@ const router = createRouter({
       },
     },
     {
+      path: "/pembelian/rekap-belanja",
+      name: "RekapBelanja",
+      component: () => import("@/views/pembelian/RekapBelanjaView.vue"),
+      meta: {
+        title: "Rekap Belanja",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "972",
+      },
+    },
+    {
+      path: "/pembelian/rekap-belanja/create",
+      name: "RekapBelanjaCreate",
+      component: () => import("@/views/pembelian/RekapBelanjaFormView.vue"),
+      meta: {
+        title: "Buat Rekap Belanja",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "972",
+        browseRoute: "RekapBelanja",
+      },
+    },
+    {
+      path: "/pembelian/rekap-belanja/edit/:nomor",
+      name: "RekapBelanjaEdit",
+      component: () => import("@/views/pembelian/RekapBelanjaFormView.vue"),
+      meta: {
+        title: "Ubah Rekap Belanja",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "972",
+        browseRoute: "RekapBelanja",
+      },
+    },
+    {
       path: "/pembelian/po-external-garmen",
       name: "PoExternalGarmenBrowse",
       component: () => import("@/views/pembelian/PoExternalGarmenView.vue"),
@@ -604,6 +639,54 @@ const router = createRouter({
         layout: "DefaultLayout",
         requiresAuth: true,
         menuId: "315",
+      },
+    },
+    {
+      path: "/pembelian/petty-cash",
+      name: "PettyCash",
+      component: () => import("@/views/pembelian/PettyCashView.vue"),
+      meta: {
+        title: "Petty Cash",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "973",
+      },
+    },
+    {
+      path: "/pembelian/petty-cash/realisasi/:nomor",
+      name: "PettyCashRealisasiForm",
+      component: () =>
+        import("@/views/pembelian/PettyCashRealisasiFormView.vue"),
+      meta: {
+        title: "Realisasi Petty Cash",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "973",
+        browseRoute: "PettyCash",
+      },
+    },
+    {
+      path: "/pembelian/petty-cash/penyelesaian/:nomor",
+      name: "PettyCashPenyelesaian",
+      component: () =>
+        import("@/views/pembelian/UangMukaPenyelesaianFormView.vue"),
+      meta: {
+        title: "Penyelesaian Dana Belanja",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "973",
+        browseRoute: "PettyCash",
+      },
+    },
+    {
+      path: "/pembelian/petty-cash/print-penyelesaian/:nomor",
+      name: "PettyCashPenyelesaianPrint",
+      component: () =>
+        import("@/views/pembelian/UangMukaPenyelesaianPrintView.vue"),
+      meta: {
+        title: "Cetak Penyelesaian Dana Belanja",
+        layout: "BlankLayout",
+        requiresAuth: true,
       },
     },
     {
@@ -7549,7 +7632,7 @@ const router = createRouter({
       name: "LaporanSpandukPemakaianBahan",
       component: () => import("@/views/laporan/spanduk/PemakaianBahanView.vue"),
       meta: {
-        title: "Laporan Pemakaian Bahan",
+        title: "Rekap Pemakaian Kain",
         layout: "DefaultLayout",
         requiresAuth: true,
         menuId: "963",
@@ -7562,6 +7645,53 @@ const router = createRouter({
         import("@/views/laporan/spanduk/KetercapaianKomitmenKirimView.vue"),
       meta: {
         title: "Laporan Ketercapaian Komitmen Kirim",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "963",
+      },
+    },
+    {
+      path: "/laporan/produksi-spanduk/laporan-persediaan",
+      name: "LaporanSpandukLaporanPersediaan",
+      component: () =>
+        import("@/views/laporan/spanduk/LaporanPersediaanView.vue"),
+      meta: {
+        title: "Laporan Persediaan",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "963",
+      },
+    },
+    {
+      path: "/laporan/produksi-spanduk/kartu-stok-kain",
+      name: "LaporanSpandukKartuStokKain",
+      component: () => import("@/views/laporan/spanduk/KartuStokKainView.vue"),
+      meta: {
+        title: "Kartu Stok Kain",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "963",
+      },
+    },
+    {
+      path: "/laporan/produksi-spanduk/kartu-stok-bahan-penolong",
+      name: "LaporanSpandukKartuStokBahanPenolong",
+      component: () =>
+        import("@/views/laporan/spanduk/KartuStokBahanPenolongView.vue"),
+      meta: {
+        title: "Kartu Stok Bahan Penolong",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "963",
+      },
+    },
+    {
+      path: "/laporan/produksi-spanduk/laporan-lpk-bulanan",
+      name: "LaporanSpandukLpkBulanan",
+      component: () =>
+        import("@/views/laporan/spanduk/LaporanLpkBulananView.vue"),
+      meta: {
+        title: "Laporan LPK",
         layout: "DefaultLayout",
         requiresAuth: true,
         menuId: "963",

@@ -1,31 +1,36 @@
+// services/laporan/spanduk/pemakaianBahanService.ts
 import api from "@/services/api";
+
+export interface PemakaianBahanGudang {
+  kode: string;
+  nama: string;
+}
 
 export interface PemakaianBahanRow {
   Kunci: string;
   Tanggal: string;
   Nomor_LHK: string;
-  Sesi: string | null;
-  Kode_Pabrik: string | null;
-  Kode_Bahan: number | string;
-  Nama_Bahan: string | null;
-  Lebar: string | null;
+  Sesi: number | string;
+  Kode_Pabrik: string;
+  Kode_Bahan: string;
+  Kode_Supplier: string;
+  Nama_Bahan: string;
+  Nama_Supplier: string;
+  Konstruksi: string;
+  Satuan: string;
+  Lebar: number | null;
   Qty_Meter: number;
+  Gudang: Record<string, number>; // kode gudang -> saldo akhir periode (bukan pemakaian)
 }
 
-export interface PemakaianBahanParams {
-  tglAwal: string;
-  tglAkhir: string;
-}
-
-interface ApiResult<T> {
-  success: boolean;
-  data: T;
-  message?: string;
+export interface PemakaianBahanData {
+  rows: PemakaianBahanRow[];
+  gudang: PemakaianBahanGudang[];
 }
 
 const BASE = "/laporan/spanduk/pemakaian-bahan";
 
 export const pemakaianBahanService = {
-  getBrowse: (params: PemakaianBahanParams) =>
-    api.get<ApiResult<PemakaianBahanRow[]>>(BASE, { params }),
+  getBrowse: (params: { tglAwal: string; tglAkhir: string }) =>
+    api.get<{ success: boolean; data: PemakaianBahanData }>(BASE, { params }),
 };

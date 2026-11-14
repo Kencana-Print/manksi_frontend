@@ -11,6 +11,14 @@ const satuanPilihan = String(route.query.satuan || "METER");
 const dataPO = ref<any>(null);
 const isLoading = ref(true);
 
+interface SupplierCetak {
+  nama: string;
+  alamat: string;
+  kota: string;
+  cp: string;
+}
+const supLain = ref<SupplierCetak | null>(null);
+
 const terbilang = (angka: number): string => {
   const bilangan = [
     "",
@@ -189,6 +197,33 @@ onMounted(async () => {
       );
     }
 
+    // PO Lain-lain hasil Rekap Belanja: 1 PO = 1 supplier. Header tidak menyimpan
+    // supplier, jadi ambil dari baris lalu tarik alamatnya.
+    if (isLain) {
+      const kodeSup = [
+        ...new Set(
+          itemsConverted
+            .map((r: any) => String(r.pod_sup_kode || ""))
+            .filter(Boolean),
+        ),
+      ] as string[];
+      if (kodeSup.length === 1) {
+        const namaBaris = String(itemsConverted[0].pod_sup_nama || kodeSup[0]);
+        try {
+          const rs = await poBahanFormService.getSupplierByKode(kodeSup[0]);
+          const s = rs.data.data;
+          supLain.value = {
+            nama: s.Nama || s.sup_nama || namaBaris,
+            alamat: s.Alamat || s.sup_alamat || "",
+            kota: s.Kota || s.sup_kota || "",
+            cp: s.sup_cp || s.Cp || "",
+          };
+        } catch {
+          supLain.value = { nama: namaBaris, alamat: "", kota: "", cp: "" };
+        }
+      }
+    }
+
     const rollsConverted = (d.rolls || []).map((row: any) => ({
       no: Number(row.pod3_no) || 0,
       kode: row.pod3_bhn_kode || "",
@@ -225,6 +260,19 @@ const isBahan = computed(
 const isLainLain = computed(() => dataPO.value?.header?.po_jenis === 4);
 const isSpanduk = computed(() => Number(dataPO.value?.header?.po_jenis) === 5);
 
+// PO Lain-lain satu supplier → tampil seperti PO biasa; multi supplier (PL lama) → per baris
+const tampilKolomSupplier = computed(() => isLainLain.value && !supLain.value);
+const supCetak = computed<SupplierCetak | null>(() => {
+  const h = dataPO.value?.header;
+  if (isLainLain.value) return supLain.value;
+  return {
+    nama: h?.sup_nama || "",
+    alamat: h?.sup_alamat || "",
+    kota: h?.sup_kota || "",
+    cp: h?.sup_cp || "",
+  };
+});
+
 const groupedRolls = computed(() => {
   if (!dataPO.value?.rolls) return [];
   const groups: Record<string, any[]> = {};
@@ -255,7 +303,7 @@ const totalColumns = computed(() => {
   let n = 8; // No, Nama, Satuan, Qty, Gramasi(kedua), Setting, Harga Dpp, Harga
   if (isBahan.value) n += 1; // Kode
   if (!isBahan.value) n += 1; // Gramasi Awal
-  if (isLainLain.value) n += 1; // Supplier
+  if (tampilKolomSupplier.value) n += 1; // Supplier
   n += 2; // Disc, Total
   return n;
 });
@@ -278,16 +326,16 @@ const totalColumns = computed(() => {
 
       <div class="info-box">
         <div class="info-left">
-          <template v-if="isLainLain">
+          <template v-if="!supCetak">
             <p>Kepada YTH :</p>
             <p class="supplier-name">Sesuai kolom Supplier</p>
           </template>
           <template v-else>
             <p>Kepada YTH :</p>
-            <p class="supplier-name">{{ dataPO.header.sup_nama }}</p>
-            <p>{{ dataPO.header.sup_alamat }}</p>
-            <p>{{ dataPO.header.sup_kota }}</p>
-            <p>Up. {{ dataPO.header.sup_cp || "" }}</p>
+            <p class="supplier-name">{{ supCetak.nama }}</p>
+            <p>{{ supCetak.alamat }}</p>
+            <p>{{ supCetak.kota }}</p>
+            <p>Up. {{ supCetak.cp }}</p>
           </template>
         </div>
         <div class="info-right">
@@ -307,7 +355,7 @@ const totalColumns = computed(() => {
                     : dataPO.header.po_jenis === 2
                       ? "PO CELUP"
                       : dataPO.header.po_jenis === 4
-                        ? "PO LAIN-LAIN"
+                        ? "REKAP BELANJA"
                         : dataPO.header.po_jenis === 5
                           ? "PO SPANDUK"
                           : "PO BAHAN"
@@ -330,7 +378,7 @@ const totalColumns = computed(() => {
             <!-- Kolom Kode muncul khusus untuk PO Bahan -->
             <th width="70" v-if="isBahan">Kode</th>
             <th>Nama</th>
-            <th width="110" v-if="isLainLain">Supplier</th>
+            <th width="110" v-if="tampilKolomSupplier">Supplier</th>
             <th width="40">Satuan</th>
             <th width="55">Qty</th>
             <th width="120" v-if="isSpanduk">Keterangan</th>
@@ -350,7 +398,7 @@ const totalColumns = computed(() => {
             <td class="tc">{{ Number(index) + 1 }}.</td>
             <td class="tc" v-if="isBahan">{{ item.pod_bhn_kode }}</td>
             <td class="nama-cell">{{ item.pod_namaext || item.bhn_name }}</td>
-            <td v-if="isLainLain">
+            <td v-if="tampilKolomSupplier">
               {{ item.pod_sup_nama || item.pod_sup_kode }}
             </td>
             <td class="tc">{{ item.satuan_print }}</td>
