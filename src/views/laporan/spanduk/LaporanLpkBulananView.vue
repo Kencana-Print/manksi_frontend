@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { useToast } from "vue-toastification";
 import { IconReportAnalytics } from "@tabler/icons-vue";
 import LaporanTable from "@/components/laporan/LaporanTable.vue";
@@ -13,12 +13,17 @@ import {
   laporanLpkBulananService,
   type LpkBulananCatatan,
   type LpkBulananRow,
+  type LpkGrain,
 } from "@/services/laporan/spanduk/laporanLpkBulananService";
 import { formatTanggal } from "@/utils/dateFormat";
 
 const toast = useToast();
 
-type BarisLpk = LpkBulananRow & { id: string; bulanLabel: string };
+type BarisLpk = LpkBulananRow & {
+  id: string;
+  bulanLabel: string;
+  hari: string;
+};
 
 interface FilterState {
   dtAwal: string;
@@ -39,41 +44,72 @@ const NAMA_BULAN = [
   "November",
   "Desember",
 ];
+const NAMA_HARI = [
+  "Minggu",
+  "Senin",
+  "Selasa",
+  "Rabu",
+  "Kamis",
+  "Jumat",
+  "Sabtu",
+];
 
 const pad = (n: number): string => String(n).padStart(2, "0");
 const ymd = (d: Date): string =>
   `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 
 // Default: awal bulan s.d. hari ini
-const sekarang = new Date();
-const filter = ref<FilterState>({
-  dtAwal: ymd(new Date(sekarang.getFullYear(), sekarang.getMonth(), 1)),
-  dtAkhir: ymd(sekarang),
-});
+const periodeDefault = (): FilterState => {
+  const s = new Date();
+  return {
+    dtAwal: ymd(new Date(s.getFullYear(), s.getMonth(), 1)),
+    dtAkhir: ymd(s),
+  };
+};
+
+// ── State per tab (Harian / Bulanan) ──
+const tab = ref<LpkGrain>("hari");
 const tabel = ref<LaporanTableApi<BarisLpk> | null>(null);
-const catatan = ref<LpkBulananCatatan>({ returTanpaSpk: 0 });
 
+const filter = ref<Record<LpkGrain, FilterState>>({
+  hari: periodeDefault(),
+  bulan: periodeDefault(),
+});
 // Periode yang dipakai saat data diambil (bukan nilai input yang sedang diubah)
-const periodeTampil = ref({
-  awal: filter.value.dtAwal,
-  akhir: filter.value.dtAkhir,
+const periodeTampil = ref<Record<LpkGrain, { awal: string; akhir: string }>>({
+  hari: { awal: filter.value.hari.dtAwal, akhir: filter.value.hari.dtAkhir },
+  bulan: { awal: filter.value.bulan.dtAwal, akhir: filter.value.bulan.dtAkhir },
+});
+const catatan = ref<Record<LpkGrain, LpkBulananCatatan>>({
+  hari: { returTanpaSpk: 0 },
+  bulan: { returTanpaSpk: 0 },
 });
 
-const { items, isLoading, canExport, fetchData } = useBrowse<LpkBulananRow>({
-  menuId: "963",
-  fetchApi: async () => {
-    const res = await laporanLpkBulananService.getData({
-      tglAwal: periodeTampil.value.awal,
-      tglAkhir: periodeTampil.value.akhir,
-    });
-    catatan.value = res.data?.data?.catatan ?? { returTanpaSpk: 0 };
-    return res.data?.data?.rows ?? [];
-  },
-  immediate: false,
-});
+const buatBrowse = (grain: LpkGrain) =>
+  useBrowse<LpkBulananRow>({
+    menuId: "963",
+    fetchApi: async () => {
+      const res = await laporanLpkBulananService.getData({
+        tglAwal: periodeTampil.value[grain].awal,
+        tglAkhir: periodeTampil.value[grain].akhir,
+        grain,
+      });
+      catatan.value[grain] = res.data?.data?.catatan ?? { returTanpaSpk: 0 };
+      return res.data?.data?.rows ?? [];
+    },
+    immediate: false,
+  });
+
+const browse = { hari: buatBrowse("hari"), bulan: buatBrowse("bulan") };
+
+const isLoading = computed(() => browse[tab.value].isLoading.value);
+const canExport = computed(() => browse[tab.value].canExport.value);
+const catatanAktif = computed(() => catatan.value[tab.value]);
 
 const lintasTahun = computed(
-  () => new Set((items.value ?? []).map((r) => r.bulan.slice(0, 4))).size > 1,
+  () =>
+    new Set((browse.bulan.items.value ?? []).map((r) => r.periode.slice(0, 4)))
+      .size > 1,
 );
 
 const labelBulan = (ym: string): string => {
@@ -82,16 +118,20 @@ const labelBulan = (ym: string): string => {
   return lintasTahun.value ? `${nama} ${tahun}` : nama;
 };
 
+const namaHari = (tgl: string): string =>
+  NAMA_HARI[new Date(`${tgl}T00:00:00`).getDay()] ?? "";
+
 const itemsTampil = computed<BarisLpk[]>(() =>
-  (items.value ?? []).map((r) => ({
+  (browse[tab.value].items.value ?? []).map((r) => ({
     ...r,
-    id: `${r.bulan}|${r.spk}`,
-    bulanLabel: labelBulan(r.bulan),
+    id: `${r.periode}|${r.spk}`,
+    bulanLabel: tab.value === "bulan" ? labelBulan(r.periode) : "",
+    hari: tab.value === "hari" ? namaHari(r.periode) : "",
   })),
 );
 
-const muatData = async () => {
-  const f = filter.value;
+const muatData = async (grain: LpkGrain = tab.value) => {
+  const f = filter.value[grain];
   if (!f.dtAwal || !f.dtAkhir) {
     toast.warning("Periode wajib diisi.");
     return;
@@ -100,10 +140,20 @@ const muatData = async () => {
     toast.warning("Tanggal awal tidak boleh melebihi tanggal akhir.");
     return;
   }
-  periodeTampil.value = { awal: f.dtAwal, akhir: f.dtAkhir };
-  await fetchData();
+  periodeTampil.value[grain] = { awal: f.dtAwal, akhir: f.dtAkhir };
+  await browse[grain].fetchData();
 };
 
+// Komponen tabel dibuat ulang saat tab berganti (key), lalu data tab itu dimuat.
+// nextTick: beri kesempatan filter tersimpan tab itu dipulihkan komponen.
+watch(tab, async (grain) => {
+  await nextTick();
+  await muatData(grain);
+});
+
+onMounted(() => muatData());
+
+// ── Kolom ──
 const angka = (
   key: string,
   title: string,
@@ -123,9 +173,26 @@ const angka = (
 
 const PCS = { numFmt: "#,##0" };
 
-const columns: LaporanKolom[] = [
-  { key: "lokasi", title: "Lokasi", width: 110, excelWidth: 12 },
-  { key: "bulanLabel", title: "Bulan", width: 105, excelWidth: 12 },
+// Kolom di depan berbeda per tab; mulai Kd Produk sampai Waste sama.
+const kolomDepan: Record<LpkGrain, LaporanKolom[]> = {
+  hari: [
+    {
+      key: "periode",
+      title: "Tanggal",
+      tipe: "date",
+      width: 110,
+      excelWidth: 12,
+    },
+    { key: "lokasi", title: "Lokasi", width: 110, excelWidth: 12 },
+    { key: "hari", title: "Hari", width: 90, excelWidth: 10 },
+  ],
+  bulan: [
+    { key: "lokasi", title: "Lokasi", width: 110, excelWidth: 12 },
+    { key: "bulanLabel", title: "Bulan", width: 105, excelWidth: 12 },
+  ],
+};
+
+const kolomBersama: LaporanKolom[] = [
   { key: "kodeProduk", title: "Kd Produk", width: 135, excelWidth: 10 },
   angka("yardToleransi", "Yard", "Toleransi", { width: 85 }),
   angka("toleransiPersen", "Persen", "Toleransi", {
@@ -160,6 +227,11 @@ const columns: LaporanKolom[] = [
   }),
 ];
 
+const columns = computed<LaporanKolom[]>(() => [
+  ...kolomDepan[tab.value],
+  ...kolomBersama,
+]);
+
 // % total = (Σ waste + Σ loss) / Σ yard order × 100 (rumus footer Delphi);
 // mengikuti pencarian dan filter kolom karena memakai total dari komponen.
 const footerTambahan = (
@@ -181,25 +253,25 @@ const footerTambahan = (
 };
 
 const onExport = () => {
-  const p = periodeTampil.value;
+  const p = periodeTampil.value[tab.value];
+  const nama = tab.value === "hari" ? "Harian" : "Bulanan";
   tabel.value?.exportToExcel({
-    fileName: `Laporan_LPK_Bulanan_${p.awal}_${p.akhir}`,
-    sheetName: "LPK Bulanan",
-    judul: "LAPORAN LPK BULANAN",
+    fileName: `Laporan_LPK_${nama}_${p.awal}_${p.akhir}`,
+    sheetName: `LPK ${nama}`,
+    judul: `LAPORAN LPK ${nama.toUpperCase()}`,
     periode: `Periode: ${formatTanggal(p.awal)} s.d ${formatTanggal(p.akhir)}`,
   });
 };
-
-onMounted(() => muatData());
 </script>
 
 <template>
   <LaporanTable
+    :key="tab"
     ref="tabel"
-    v-model:filter-state="filter"
-    title="Laporan LPK Bulanan"
+    v-model:filter-state="filter[tab]"
+    title="Laporan LPK"
     menu-id="963"
-    storage-id="spanduk-laporan-lpk-bulanan"
+    :storage-id="`spanduk-laporan-lpk-${tab}`"
     :icon="IconReportAnalytics"
     :columns="columns"
     :items="itemsTampil"
@@ -209,35 +281,47 @@ onMounted(() => muatData());
     :is-loading="isLoading"
     :can-export="canExport"
     :footer-tambahan="footerTambahan"
-    @refresh="muatData"
+    @refresh="muatData(tab)"
     @export="onExport"
   >
     <template #filter-left>
-      <span class="lb-lbl">Periode</span>
-      <input v-model="filter.dtAwal" type="date" class="lb-inp" />
-      <span class="lb-lbl">s.d</span>
-      <input v-model="filter.dtAkhir" type="date" class="lb-inp" />
+      <v-btn-toggle
+        v-model="tab"
+        mandatory
+        divided
+        density="compact"
+        variant="outlined"
+        color="primary"
+        class="lk-tab"
+      >
+        <v-btn value="hari">Harian</v-btn>
+        <v-btn value="bulan">Bulanan</v-btn>
+      </v-btn-toggle>
+      <span class="lk-lbl">Periode</span>
+      <input v-model="filter[tab].dtAwal" type="date" class="lk-inp" />
+      <span class="lk-lbl">s.d</span>
+      <input v-model="filter[tab].dtAkhir" type="date" class="lk-inp" />
     </template>
 
     <template #filter-right>
       <v-chip
-        v-if="catatan.returTanpaSpk > 0"
+        v-if="catatanAktif.returTanpaSpk > 0"
         size="small"
         color="warning"
         variant="tonal"
       >
-        Retur tanpa SPK {{ catatan.returTanpaSpk }} yd tidak ikut dihitung
+        Retur tanpa SPK {{ catatanAktif.returTanpaSpk }} yd tidak ikut dihitung
       </v-chip>
     </template>
   </LaporanTable>
 </template>
 
 <style scoped>
-.lb-lbl {
+.lk-lbl {
   font-size: 11px;
   font-weight: 500;
 }
-.lb-inp {
+.lk-inp {
   height: 28px;
   padding: 0 8px;
   font-size: 11px;
@@ -247,7 +331,15 @@ onMounted(() => muatData());
   color: rgb(var(--v-theme-on-surface));
   outline: none;
 }
-.lb-inp:focus {
+.lk-inp:focus {
   border-color: rgb(var(--v-theme-primary));
+}
+.lk-tab {
+  height: 28px;
+}
+.lk-tab :deep(.v-btn) {
+  font-size: 11px;
+  height: 28px;
+  padding: 0 12px;
 }
 </style>

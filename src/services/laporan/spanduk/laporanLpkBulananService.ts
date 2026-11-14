@@ -1,6 +1,9 @@
 import api from "@/services/api";
 
+export type LpkGrain = "hari" | "bulan";
+
 export interface LpkBulananRow {
+  periode: string; // YYYY-MM (bulan) atau YYYY-MM-DD (hari)
   bulan: string; // YYYY-MM
   spk: string;
   nama: string;
@@ -38,6 +41,7 @@ export interface LpkBulananData {
 export interface LpkBulananParams {
   tglAwal: string;
   tglAkhir: string;
+  grain: LpkGrain;
 }
 
 interface ApiResponse<T> {

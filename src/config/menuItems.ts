@@ -2084,14 +2084,14 @@ export const createMenuItems = (): NavItem[] => {
                   icon: IconClipboardList,
                 },
                 {
-                  title: "Laporan LPK Bulanan",
+                  title: "Laporan LPK",
                   to: "/laporan/produksi-spanduk/laporan-lpk-bulanan",
                   icon: IconReportAnalytics,
                 },
               ],
             },
             {
-              title: "Pemakaian Bahan",
+              title: "Rekap Pemakaian Kain",
               to: "/laporan/produksi-spanduk/pemakaian-bahan",
               icon: IconRuler,
             },

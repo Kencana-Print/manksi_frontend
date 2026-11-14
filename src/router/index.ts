@@ -7235,7 +7235,7 @@ const router = createRouter({
       name: "LaporanSpandukPemakaianBahan",
       component: () => import("@/views/laporan/spanduk/PemakaianBahanView.vue"),
       meta: {
-        title: "Laporan Pemakaian Bahan",
+        title: "Rekap Pemakaian Kain",
         layout: "DefaultLayout",
         requiresAuth: true,
         menuId: "963",
@@ -7294,7 +7294,7 @@ const router = createRouter({
       component: () =>
         import("@/views/laporan/spanduk/LaporanLpkBulananView.vue"),
       meta: {
-        title: "Laporan LPK Bulanan",
+        title: "Laporan LPK",
         layout: "DefaultLayout",
         requiresAuth: true,
         menuId: "963",
