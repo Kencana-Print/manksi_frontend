@@ -54,6 +54,7 @@ interface BahanRow {
   kode: string;
   nama: string;
   satuan: string;
+  lebar: number | null;
 }
 
 interface FormState {
@@ -113,6 +114,7 @@ const bangunState = (d: BastMapFormData): FormState => ({
     kode: String(b.Kode),
     nama: b.Nama ?? "",
     satuan: b.Satuan ?? "",
+    lebar: b.Lebar ?? null,
   })),
 });
 
@@ -293,6 +295,7 @@ const pilihBahan = (b: BahanOption) => {
     kode,
     nama: b.Nama ?? "",
     satuan: b.Satuan ?? "",
+    lebar: b.Lebar ?? null,
   });
 };
 
@@ -468,14 +471,6 @@ const cetakSekarang = () => {
           />
         </div>
         <div class="f-row">
-          <label class="f-lbl">Nama Ext</label>
-          <input
-            :value="formData.header.mspk_nama2"
-            readonly
-            class="f-inp f-ro"
-          />
-        </div>
-        <div class="f-row">
           <label class="f-lbl">Ukuran</label>
           <input
             :value="formData.header.mspk_ukuran"
@@ -619,9 +614,9 @@ const cetakSekarang = () => {
                         v-for="(b, bi) in formData.bahan"
                         :key="b.kode"
                         class="bhn-chip"
-                        :title="`${b.nama} (${b.satuan})`"
+                        :title="`${b.kode} - ${b.nama}, lebar ${b.lebar ?? '-'} (${b.satuan})`"
                       >
-                        {{ b.nama }}
+                        {{ b.nama }} · {{ b.lebar ?? "-" }}
                         <button type="button" @click="removeBahan(bi)">
                           ✕
                         </button>

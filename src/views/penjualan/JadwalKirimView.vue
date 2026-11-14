@@ -17,8 +17,9 @@ import {
   IconTableExport,
   IconPrinter,
   IconClockPause,
+  IconCalendar,
 } from "@tabler/icons-vue";
-import { formatTanggal } from "@/utils/dateFormat";
+import { formatTanggalSingkat } from "@/utils/dateFormat";
 
 // ── Tipe data ──────────────────────────────────────────────────────────
 interface JadwalKirimRow {
@@ -41,6 +42,10 @@ interface JadwalKirimRow {
   jk_alasan_tunda?: string;
   jk_tunda_dari_nomor?: string;
   jk_tunda_ke_nomor?: string;
+  Panjang?: number | null;
+  Lebar?: number | null;
+  Keterangan?: string | null;
+  Bahan?: string | null;
 }
 
 interface DetailRow {
@@ -115,6 +120,13 @@ const filterState = ref({
   gudang: "",
   gudangNama: "",
 });
+
+const inpAwal = ref<HTMLInputElement | null>(null);
+const inpAkhir = ref<HTMLInputElement | null>(null);
+
+const bukaPicker = (el: HTMLInputElement | null) => {
+  el?.showPicker();
+};
 
 // ── List gudang untuk dropdown search ─────────────────────────────────
 const gudangList = ref<Array<{ Kode: string; Nama: string }>>([]);
@@ -210,6 +222,32 @@ const headers = [
   { title: "Status", key: "jk_status", width: "90px" },
   { title: "User", key: "usr_create", width: "90px" },
 ];
+
+// Mode Spanduk: Ukuran dipecah jadi Panjang dan Lebar, plus kolom Keterangan
+const headersAktif = computed(() => {
+  if (!modeSpanduk.value) return headers;
+  const hasil: typeof headers = [];
+  for (const h of headers) {
+    if (h.key === "Ukuran") {
+      hasil.push(
+        { title: "Panjang", key: "Panjang", width: "80px", align: "end" },
+        { title: "Lebar", key: "Lebar", width: "80px", align: "end" },
+      );
+    } else if (h.key === "Kain") {
+      hasil.push(
+        h,
+        { title: "Bahan", key: "Bahan", width: "170px" },
+        { title: "Keterangan", key: "Keterangan", width: "220px" },
+      );
+    } else {
+      hasil.push(h);
+    }
+  }
+  return hasil;
+});
+
+const fmtUkur = (v: number | null | undefined) =>
+  v ? Number(v).toLocaleString("id-ID", { maximumFractionDigits: 2 }) : "-";
 
 // ── Headers detail (tabel dalam expanded row) ──────────────────────────
 const detailHeaders = [
@@ -308,21 +346,57 @@ const masterColumns: ExcelColumn[] = [
   { header: "User", key: "usr_create", width: 10, align: "left" },
 ];
 
-// Kolom export detail
-const detailColumns: ExcelColumn[] = [
-  { header: "Nomor Kirim", key: "Nomor", width: 20, align: "left" },
+const masterColumnsAktif = computed<ExcelColumn[]>(() => {
+  if (!modeSpanduk.value) return masterColumns;
+  return masterColumns.flatMap((c) => {
+    if (c.key === "Ukuran") {
+      return [
+        {
+          header: "Panjang",
+          key: "Panjang",
+          width: 10,
+          align: "right",
+          numFmt: "#,##0.00",
+        },
+        {
+          header: "Lebar",
+          key: "Lebar",
+          width: 10,
+          align: "right",
+          numFmt: "#,##0.00",
+        },
+      ];
+    }
+    if (c.key === "Kain") {
+      return [
+        c,
+        { header: "Bahan", key: "Bahan", width: 24, align: "left" },
+        { header: "Keterangan", key: "Keterangan", width: 40, align: "left" },
+      ];
+    }
+    return [c];
+  });
+});
+
+// Kolom bagian detail pada export gabungan (header diambil dari masterColumnsAktif)
+const detailGabungColumns: ExcelColumn[] = [
   { header: "No", key: "No_urut", width: 6, align: "center" },
   { header: "Kota", key: "Kota", width: 14, align: "left" },
   { header: "Uraian", key: "Uraian", width: 36, align: "left" },
-  { header: "Size", key: "Size", width: 14, align: "left" },
   {
     header: "Jumlah",
-    key: "Jumlah",
+    key: "d_Jumlah",
     width: 10,
     align: "right",
     numFmt: "#,##0",
   },
-  { header: "Koli", key: "Koli", width: 8, align: "right", numFmt: "#,##0" },
+  {
+    header: "Koli",
+    key: "d_Koli",
+    width: 8,
+    align: "right",
+    numFmt: "#,##0",
+  },
   { header: "Jam Input", key: "Jam_Input", width: 10, align: "center" },
   { header: "Jam Ready", key: "Jam_Ready", width: 10, align: "center" },
   { header: "Nomor SJ", key: "Nomor_SJ", width: 16, align: "left" },
@@ -339,18 +413,23 @@ const detailColumns: ExcelColumn[] = [
 ];
 
 const onExport = async () => {
-  const rows = items.value ?? [];
+  const rows = (items.value ?? []).map((r) => ({
+    ...r,
+    Tanggal: formatTanggalSingkat(r.Tanggal),
+    Panjang: r.Panjang || "",
+    Lebar: r.Lebar || "",
+  }));
   if (!rows.length) {
     toast.warning("Tidak ada data untuk diexport.");
     return;
   }
   isExporting.value = true;
   try {
-    const title = `Jadwal Kirim — ${filterState.value.tglAwal} s.d. ${filterState.value.tglAkhir}${filterState.value.gudang ? " | Gudang: " + filterState.value.gudang : ""}`;
+    const title = `Jadwal Kirim — ${formatTanggalSingkat(filterState.value.tglAwal)} s.d. ${formatTanggalSingkat(filterState.value.tglAkhir)}${filterState.value.gudang ? " | Gudang: " + filterState.value.gudang : ""}`;
     await exportExcelSingle(
       `JadwalKirim_${filterState.value.tglAwal}_${filterState.value.tglAkhir}.xlsx`,
       "Jadwal Kirim",
-      masterColumns,
+      masterColumnsAktif.value,
       rows,
       title,
     );
@@ -365,26 +444,87 @@ const onExport = async () => {
 const onExportDetail = async () => {
   isExportingDetail.value = true;
   try {
-    // Fetch semua detail sesuai filter dari backend
-    const res = await jadwalKirimService.getDetailByFilter({
+    // Header dan detail diambil dengan filter yang sama, supaya konsisten
+    const params = {
       tglAwal: filterState.value.tglAwal,
       tglAkhir: filterState.value.tglAkhir,
       gudang: filterState.value.gudang,
-    });
-    const detailRows = res.data.data || [];
+    };
+    const [resHeader, resDetail] = await Promise.all([
+      jadwalKirimService.getBrowse(params),
+      jadwalKirimService.getDetailByFilter(params),
+    ]);
+    const headerRows: JadwalKirimRow[] = resHeader.data.data || [];
+    const detailRows: DetailRow[] = resDetail.data.data || [];
 
-    if (!detailRows.length) {
-      toast.warning("Tidak ada data detail untuk diexport.");
+    if (!headerRows.length) {
+      toast.warning("Tidak ada data untuk diexport.");
       return;
     }
 
-    const title = `Detail Jadwal Kirim — ${filterState.value.tglAwal} s.d. ${filterState.value.tglAkhir}${filterState.value.gudang ? " | Gudang: " + filterState.value.gudang : ""}`;
-    await exportExcelSingle(
+    const detailPerNomor = new Map<string, DetailRow[]>();
+    for (const d of detailRows) {
+      const list = detailPerNomor.get(d.Nomor) ?? [];
+      list.push(d);
+      detailPerNomor.set(d.Nomor, list);
+    }
+
+    // Kolom header: Jumlah/Koli diberi label "Total" agar tidak ambigu dengan detail
+    const kolomHeader: ExcelColumn[] = masterColumnsAktif.value.map((c) => {
+      if (c.key === "Jumlah") return { ...c, header: "Total Jumlah" };
+      if (c.key === "Koli") return { ...c, header: "Total Koli" };
+      return c;
+    });
+    const kunciHeader = new Set(kolomHeader.map((c) => c.key));
+
+    const rows: Record<string, unknown>[] = [];
+    for (const h of headerRows) {
+      const dataHeader = {
+        ...h,
+        Tanggal: formatTanggalSingkat(h.Tanggal),
+        Panjang: h.Panjang || "",
+        Lebar: h.Lebar || "",
+      };
+      const detail = detailPerNomor.get(h.Nomor) ?? [];
+      if (detail.length === 0) {
+        rows.push({ ...dataHeader, _awal: true });
+        continue;
+      }
+      detail.forEach((d, i) => {
+        rows.push({
+          // header hanya dirender di baris pertama tiap nomor kirim
+          ...(i === 0 ? dataHeader : {}),
+          _awal: i === 0,
+          No_urut: d.No_urut,
+          Kota: d.Kota,
+          Uraian: d.Uraian,
+          d_Jumlah: d.Jumlah,
+          d_Koli: d.Koli,
+          Jam_Input: d.Jam_Input,
+          Jam_Ready: d.Jam_Ready,
+          Nomor_SJ: d.Nomor_SJ,
+          Realisasi_Kirim: d.Realisasi_Kirim,
+          Jam_Kirim: d.Jam_Kirim,
+          Jam_Ambil: d.Jam_Ambil,
+          Expedisi: d.Expedisi,
+        });
+      });
+    }
+
+    const title = `Detail Jadwal Kirim — ${formatTanggalSingkat(filterState.value.tglAwal)} s.d. ${formatTanggalSingkat(filterState.value.tglAkhir)}${filterState.value.gudang ? " | Gudang: " + filterState.value.gudang : ""}`;
+    await exportExcel(
       `JadwalKirimDetail_${filterState.value.tglAwal}_${filterState.value.tglAkhir}.xlsx`,
-      "Detail Jadwal Kirim",
-      detailColumns,
-      detailRows,
-      title,
+      [
+        {
+          sheetName: "Detail Jadwal Kirim",
+          columns: [...kolomHeader, ...detailGabungColumns],
+          rows,
+          title,
+          // Baris pertama tiap nomor kirim: bagian header ditebalkan
+          cellStyleFn: (row, key) =>
+            row._awal && kunciHeader.has(key) ? { bold: true } : null,
+        },
+      ],
     );
     toast.success("Export detail berhasil.");
   } catch {
@@ -548,7 +688,7 @@ watch(
     menu-id="119"
     :storage-id="modeSpanduk ? '119-spanduk' : '119'"
     :icon="IconTruckDelivery"
-    :headers="headers"
+    :headers="headersAktif"
     :items="items ?? []"
     :is-loading="isLoading"
     item-value="Nomor"
@@ -576,13 +716,44 @@ watch(
       <!-- Periode Awal -->
       <div class="f-grp">
         <label class="f-lbl">Dari</label>
-        <input type="date" v-model="filterState.tglAwal" class="f-date" />
+        <div
+          class="f-datebox"
+          role="button"
+          tabindex="0"
+          @click="bukaPicker(inpAwal)"
+          @keydown.enter.prevent="bukaPicker(inpAwal)"
+        >
+          <span>{{ formatTanggalSingkat(filterState.tglAwal) }}</span>
+          <IconCalendar :size="14" :stroke-width="1.7" />
+          <input
+            ref="inpAwal"
+            type="date"
+            v-model="filterState.tglAwal"
+            class="f-date-native"
+            tabindex="-1"
+          />
+        </div>
       </div>
 
-      <!-- Periode Akhir -->
       <div class="f-grp">
         <label class="f-lbl">S/D</label>
-        <input type="date" v-model="filterState.tglAkhir" class="f-date" />
+        <div
+          class="f-datebox"
+          role="button"
+          tabindex="0"
+          @click="bukaPicker(inpAkhir)"
+          @keydown.enter.prevent="bukaPicker(inpAkhir)"
+        >
+          <span>{{ formatTanggalSingkat(filterState.tglAkhir) }}</span>
+          <IconCalendar :size="14" :stroke-width="1.7" />
+          <input
+            ref="inpAkhir"
+            type="date"
+            v-model="filterState.tglAkhir"
+            class="f-date-native"
+            tabindex="-1"
+          />
+        </div>
       </div>
 
       <!-- Filter Gudang -->
@@ -670,7 +841,19 @@ watch(
     </template>
 
     <template #item.Tanggal="{ item }">
-      {{ formatTanggal(item.Tanggal) }}
+      {{ formatTanggalSingkat(item.Tanggal) }}
+    </template>
+
+    <template #item.Nama_Spk="{ item }">
+      <div class="wrap2" :title="item.Nama_Spk">{{ item.Nama_Spk }}</div>
+    </template>
+
+    <template #item.Panjang="{ item }">{{ fmtUkur(item.Panjang) }}</template>
+    <template #item.Lebar="{ item }">{{ fmtUkur(item.Lebar) }}</template>
+    <template #item.Keterangan="{ item }">
+      <div class="wrap2" :title="item.Keterangan ?? ''">
+        {{ item.Keterangan }}
+      </div>
     </template>
 
     <!-- ── Expanded detail ── -->
@@ -843,17 +1026,32 @@ watch(
   color: #555;
   white-space: nowrap;
 }
-.f-date {
+.f-datebox {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   height: 30px;
+  min-width: 108px;
   border: 1px solid #bdbdbd;
   border-radius: 4px;
-  padding: 0 6px;
+  padding: 0 8px;
   font-size: 12px;
-  outline: none;
   background: white;
+  cursor: pointer;
+  user-select: none;
 }
-.f-date:focus {
-  border-color: #1565c0;
+.f-datebox:focus-visible {
+  outline: 2px solid #1565c0;
+}
+.f-date-native {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  pointer-events: none;
 }
 .f-inp-grp {
   display: flex;
@@ -1006,5 +1204,15 @@ watch(
   text-align: center;
   color: #9e9e9e;
   font-size: 11px;
+}
+.wrap2 {
+  white-space: normal;
+  line-height: 1.3;
+  word-break: break-word;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 </style>

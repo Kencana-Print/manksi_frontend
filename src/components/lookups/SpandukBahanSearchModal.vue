@@ -62,11 +62,18 @@ watch(search, () => {
 
 const filteredItems = computed(() => {
   const q = search.value.trim().toLowerCase();
-  if (!q) return items.value;
-  return items.value.filter(
-    (i) =>
-      String(i.Kode).toLowerCase().includes(q) ||
-      (i.Nama ?? "").toLowerCase().includes(q),
+  const hasil = q
+    ? items.value.filter(
+        (i) =>
+          String(i.Kode).toLowerCase().includes(q) ||
+          (i.Nama ?? "").toLowerCase().includes(q) ||
+          String(i.Lebar ?? "").includes(q),
+      )
+    : items.value;
+  return [...hasil].sort(
+    (a, b) =>
+      (a.Nama ?? "").localeCompare(b.Nama ?? "") ||
+      (Number(a.Lebar) || 0) - (Number(b.Lebar) || 0),
   );
 });
 
@@ -96,7 +103,7 @@ const selectItem = (item: BahanOption) => {
   <v-dialog
     :model-value="modelValue"
     @update:model-value="emit('update:modelValue', $event)"
-    max-width="640px"
+    max-width="720px"
   >
     <div class="lookup-card">
       <div class="lookup-header">
@@ -113,7 +120,7 @@ const selectItem = (item: BahanOption) => {
         <input
           v-model="search"
           type="text"
-          placeholder="Cari kode atau nama bahan..."
+          placeholder="Cari kode, nama, atau lebar bahan..."
           class="search-input"
           autofocus
         />
@@ -138,6 +145,7 @@ const selectItem = (item: BahanOption) => {
             <tr>
               <th style="width: 120px">KODE</th>
               <th>NAMA BAHAN</th>
+              <th style="width: 80px; text-align: right">LEBAR</th>
               <th style="width: 90px">SATUAN</th>
             </tr>
           </thead>
@@ -150,6 +158,7 @@ const selectItem = (item: BahanOption) => {
             >
               <td class="td-kode">{{ item.Kode }}</td>
               <td class="font-weight-bold">{{ item.Nama }}</td>
+              <td style="text-align: right">{{ item.Lebar ?? "-" }}</td>
               <td>{{ item.Satuan }}</td>
             </tr>
           </tbody>

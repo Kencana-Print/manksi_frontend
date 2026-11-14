@@ -9,10 +9,10 @@ import {
   pesanError,
   type BastMapRow,
 } from "@/services/spanduk/bastMapSpandukService";
-import { IconPrinter } from "@tabler/icons-vue";
-import { formatTanggal } from "@/utils/dateFormat";
+import { IconPrinter, IconCalendar } from "@tabler/icons-vue";
 import { exportExcelSingle, type ExcelColumn } from "@/utils/excelExport";
 import { setKeputusan } from "@/services/spanduk/bastMapSpandukFormService";
+import { formatTanggalSingkat } from "@/utils/dateFormat";
 
 const toast = useToast();
 const router = useRouter();
@@ -32,6 +32,14 @@ const filterState = ref({
   endDate: getLocalDate(),
   onProgress: false,
 });
+
+const inpAwal = ref<HTMLInputElement | null>(null);
+const inpAkhir = ref<HTMLInputElement | null>(null);
+
+const bukaPicker = (el: HTMLInputElement | null) => {
+  if (!el || filterState.value.onProgress) return;
+  el.showPicker();
+};
 
 const {
   items,
@@ -61,7 +69,7 @@ const headers = [
   { title: "Tanggal", key: "Tanggal", width: "100px" },
   { title: "Status BAST", key: "CetakBAST", width: "100px", align: "center" },
   { title: "Keputusan", key: "Keputusan", width: "120px", align: "center" },
-  { title: "LHK Proof", key: "NomorProof", width: "150px" },
+  { title: "LHK Proof", key: "NomorProof", width: "190px" },
   {
     title: "Umur MAP (hari kerja)",
     key: "HariBAST",
@@ -145,14 +153,6 @@ const simpanKeputusan = async () => {
   }
 };
 
-// OnProgres 'N' = merah, 'Y' = biru (sama dengan Delphi garmen)
-const getRowTextColor = (item: { raw?: BastMapRow } | BastMapRow) => {
-  const row = "raw" in item && item.raw ? item.raw : (item as BastMapRow);
-  if (row.OnProgres === "N") return "text-red-darken-2";
-  if (row.OnProgres === "Y") return "text-blue-darken-2";
-  return "";
-};
-
 // ── HAPUS ── (konfirmasi sudah ditangani BaseBrowse)
 const goDelete = async (item: BastMapRow) => {
   try {
@@ -176,9 +176,6 @@ const onExport = async () => {
       { header: "Nomor", key: "Nomor", width: 18 },
       { header: "Tipe", key: "Tipe", width: 10, align: "center" },
       { header: "Tanggal", key: "Tanggal", width: 12, align: "center" },
-      { header: "Status BAST", key: "CetakBAST", width: 14, align: "center" },
-      { header: "Keputusan", key: "Keputusan", width: 12, align: "center" },
-      { header: "Alasan Keputusan", key: "AlasanKeputusan", width: 30 },
       {
         header: "Umur MAP (hari kerja)",
         key: "HariBAST",
@@ -186,7 +183,6 @@ const onExport = async () => {
         align: "center",
       },
       { header: "Nama Pekerjaan", key: "NamaPekerjaan", width: 30 },
-      { header: "Nama Ext", key: "NamaExt", width: 30 },
       { header: "Ukuran", key: "Ukuran", width: 16 },
       {
         header: "Jumlah",
@@ -197,17 +193,20 @@ const onExport = async () => {
       },
       { header: "Keterangan", key: "Keterangan", width: 24 },
       { header: "Kendala", key: "kendalaProduksi", width: 24 },
+      { header: "Status BAST", key: "CetakBAST", width: 14, align: "center" },
+      { header: "Keputusan", key: "Keputusan", width: 12, align: "center" },
+      { header: "Alasan Keputusan", key: "AlasanKeputusan", width: 30 },
     ];
     const rows = items.value.map((r) => ({
       ...r,
-      Tanggal: formatTanggal(r.Tanggal),
+      Tanggal: formatTanggalSingkat(r.Tanggal),
     }));
     await exportExcelSingle(
       `BAST_MAP_Spanduk_${filterState.value.startDate}_to_${filterState.value.endDate}.xlsx`,
       "BAST MAP",
       columns,
       rows,
-      `BAST MAP SPANDUK | Periode: ${formatTanggal(filterState.value.startDate)} s.d ${formatTanggal(filterState.value.endDate)}`,
+      `BAST MAP SPANDUK | Periode: ${formatTanggalSingkat(filterState.value.startDate)} s.d ${formatTanggalSingkat(filterState.value.endDate)}`,
     );
     toast.success("Berhasil export.");
   } catch {
@@ -231,7 +230,6 @@ const onExport = async () => {
     :can-edit="canEdit"
     :can-delete="canDelete"
     :can-export="canExport"
-    :row-text-color-fn="getRowTextColor"
     @refresh="fetchData"
     @add="goAdd"
     @edit="goEdit"
@@ -241,21 +239,45 @@ const onExport = async () => {
     <template #filter-left>
       <div class="filter-group">
         <span class="filter-label">Tanggal MAP</span>
-        <input
-          type="date"
-          v-model="filterState.startDate"
-          class="date-inp"
-          @change="fetchData"
-          :disabled="filterState.onProgress"
-        />
+        <div
+          class="date-box"
+          :class="{ 'date-box-off': filterState.onProgress }"
+          role="button"
+          tabindex="0"
+          @click="bukaPicker(inpAwal)"
+          @keydown.enter.prevent="bukaPicker(inpAwal)"
+        >
+          <span>{{ formatTanggalSingkat(filterState.startDate) }}</span>
+          <IconCalendar :size="14" :stroke-width="1.7" />
+          <input
+            ref="inpAwal"
+            type="date"
+            v-model="filterState.startDate"
+            class="date-native"
+            tabindex="-1"
+            @change="fetchData"
+          />
+        </div>
         <span class="filter-sep">s/d</span>
-        <input
-          type="date"
-          v-model="filterState.endDate"
-          class="date-inp"
-          @change="fetchData"
-          :disabled="filterState.onProgress"
-        />
+        <div
+          class="date-box"
+          :class="{ 'date-box-off': filterState.onProgress }"
+          role="button"
+          tabindex="0"
+          @click="bukaPicker(inpAkhir)"
+          @keydown.enter.prevent="bukaPicker(inpAkhir)"
+        >
+          <span>{{ formatTanggalSingkat(filterState.endDate) }}</span>
+          <IconCalendar :size="14" :stroke-width="1.7" />
+          <input
+            ref="inpAkhir"
+            type="date"
+            v-model="filterState.endDate"
+            class="date-native"
+            tabindex="-1"
+            @change="fetchData"
+          />
+        </div>
       </div>
 
       <v-checkbox
@@ -266,19 +288,6 @@ const onExport = async () => {
         class="ml-4 cust-cb"
         @change="fetchData"
       ></v-checkbox>
-
-      <div class="filter-divider"></div>
-
-      <div class="legend-group">
-        <div class="legend-item">
-          <div class="legend-box bg-red"></div>
-          <span>= On Progress</span>
-        </div>
-        <div class="legend-item">
-          <div class="legend-box bg-blue"></div>
-          <span>= Sudah Approval</span>
-        </div>
-      </div>
     </template>
 
     <template #extra-actions>
@@ -306,7 +315,7 @@ const onExport = async () => {
     </template>
 
     <template #item.Tanggal="{ item }">
-      {{ formatTanggal(item.Tanggal) }}
+      {{ formatTanggalSingkat(item.Tanggal) }}
     </template>
     <template #item.CetakBAST="{ item }">
       <v-chip
@@ -337,7 +346,14 @@ const onExport = async () => {
       </span>
     </template>
     <template #item.NomorProof="{ item }">
-      <span v-if="item.NomorProof">{{ item.NomorProof }}</span>
+      <span v-if="item.NomorProof" class="proof-wrap">
+        <span
+          v-for="(no, i) in item.NomorProof.split(',')"
+          :key="`${no}-${i}`"
+          class="proof-item"
+          >{{ no.trim() }}</span
+        >
+      </span>
       <span v-else class="text-red-darken-2 text-caption">Belum ada</span>
     </template>
     <template #item.HariBAST="{ item }">
@@ -419,44 +435,38 @@ const onExport = async () => {
   font-weight: 700;
   color: #555;
 }
-.date-inp {
+.date-box {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   height: 28px;
+  min-width: 108px;
   border: 1px solid #ccc;
   border-radius: 4px;
-  padding: 0 6px;
+  padding: 0 8px;
   font-size: 12px;
   background: white;
-  outline: none;
+  cursor: pointer;
+  user-select: none;
 }
-.filter-divider {
-  width: 1px;
-  height: 24px;
-  background-color: #d0d0d0;
-  margin: 0 12px;
+.date-box:focus-visible {
+  outline: 2px solid #1565c0;
 }
-.legend-group {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font-size: 11px;
-  font-weight: 500;
+.date-box-off {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
-.legend-item {
-  display: flex;
-  align-items: center;
-  gap: 4px;
+.date-native {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  pointer-events: none;
 }
-.legend-box {
-  width: 14px;
-  height: 14px;
-  border-radius: 2px;
-}
-.bg-red {
-  background-color: #d32f2f;
-}
-.bg-blue {
-  background-color: #1976d2;
-}
+
 .cust-cb :deep(.v-label) {
   font-size: 11px !important;
   font-weight: 600;
@@ -465,5 +475,16 @@ const onExport = async () => {
 }
 .cust-cb :deep(.v-selection-control) {
   min-height: unset;
+}
+.proof-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 8px;
+  white-space: normal;
+  line-height: 1.3;
+  padding: 2px 0;
+}
+.proof-item {
+  white-space: nowrap;
 }
 </style>

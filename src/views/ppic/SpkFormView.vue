@@ -35,6 +35,7 @@ const defaultData = {
   so_jumlah: 0,
   so_cab: "",
   so_jo_kode: "",
+  so_jo_nama: "",
   so_kepentingan: "",
   so_divisi: "",
   so_nomor_po: "",
@@ -205,6 +206,7 @@ function mapHeaderToFormData(h: any) {
     so_jumlah: Number(h.spk_jumlah) || 0,
     so_cab: h.spk_cab || "",
     so_jo_kode: h.spk_jo_kode || "",
+    so_jo_nama: h.jo_nama || "",
     so_kepentingan: h.spk_statuskerja || "",
     so_divisi: h.spk_divisi || "",
     so_nomor_po: h.spk_nomor_po || "",
@@ -246,6 +248,11 @@ const validateSave = () => {
     toast.warning("Sales Order harus dipilih terlebih dahulu.");
     return;
   }
+  if (bahanWajib.value && !formData.value.so_bhn_kode) {
+    activeTab.value = 0;
+    toast.warning("Bahan wajib dipilih untuk jenis order selain LN.");
+    return;
+  }
   showSaveDialog.value = true;
 };
 
@@ -254,6 +261,14 @@ const isDivisiTiga = computed(() =>
 );
 const isDivisiSpanduk = computed(
   () => String(formData.value.so_divisi).charAt(0) === "1",
+);
+// Bahan wajib untuk Spanduk, kecuali jenis order LN (aturan yang sama di backend)
+const bahanWajib = computed(
+  () =>
+    isDivisiSpanduk.value &&
+    String(formData.value.so_jo_kode || "")
+      .trim()
+      .toUpperCase() !== "LN",
 );
 
 const showBarangKaosanModal = ref(false);
@@ -365,6 +380,7 @@ watch(tabs, (newTabs) => {
           <SpkTabOrder
             :form-data="formData"
             :is-edit="isEditMode"
+            :bahan-wajib="bahanWajib"
             @so-loaded="handleSoLoaded"
           />
         </div>

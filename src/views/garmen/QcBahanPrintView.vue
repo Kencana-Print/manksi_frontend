@@ -154,10 +154,12 @@ const nilaiRollText = (rl: QcRollRow): string =>
             <td>: {{ data.header.qc_jenis_kain }}</td>
           </tr>
           <tr>
-            <td>Vendor Greige</td>
+            <td>{{ isSpanduk ? "Vendor" : "Vendor Greige" }}</td>
             <td>: {{ data.header.qc_vendor_greige || "-" }}</td>
-            <td>Vendor Celup</td>
-            <td>: {{ data.header.qc_vendor_celup || "-" }}</td>
+            <td>{{ isSpanduk ? "" : "Vendor Celup" }}</td>
+            <td>
+              {{ isSpanduk ? "" : `: ${data.header.qc_vendor_celup || "-"}` }}
+            </td>
           </tr>
           <tr>
             <td>No. PO</td>

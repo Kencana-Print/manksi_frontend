@@ -16,6 +16,7 @@ export interface BahanOption {
   Kode: string | number;
   Nama: string | null;
   Satuan: string | null;
+  Lebar: number | null;
 }
 
 export interface BastMapHeader {

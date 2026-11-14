@@ -219,6 +219,7 @@ const onExportHeader = async () => {
 
   const rows = source.map((r) => ({
     ...r,
+    VendorCelup: r.JenisCek === "SPANDUK" ? "" : r.VendorCelup,
     TglDatang: toExcelDate(r.TglDatang),
     JumlahLot: Number(r.JumlahLot) || 0,
     TotalKg: Number(r.TotalKg) || 0,
@@ -896,6 +897,9 @@ const diLuarSpec = (h: string) => /RENDAH|TINGGI/i.test(String(h ?? ""));
 
     <template #item.TotalKg="{ item }">
       {{ numFmt(item.TotalKg) }} {{ item.Satuan }}
+    </template>
+    <template #item.VendorCelup="{ item }">
+      {{ item.JenisCek === "SPANDUK" ? "" : item.VendorCelup }}
     </template>
     <template #item.TotalRoll="{ item }">{{ numFmt(item.TotalRoll) }}</template>
 

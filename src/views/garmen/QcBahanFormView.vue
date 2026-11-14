@@ -897,7 +897,9 @@ const nilaiClass = (n: number) =>
           />
         </div>
         <div class="fr">
-          <label class="lbl">Vendor Greige</label>
+          <label class="lbl">{{
+            isSpanduk ? "Vendor" : "Vendor Greige"
+          }}</label>
           <input
             :value="formData.header.qc_vendor_greige"
             readonly
@@ -905,7 +907,7 @@ const nilaiClass = (n: number) =>
             style="flex: 1"
           />
         </div>
-        <div class="fr">
+        <div v-if="!isSpanduk" class="fr">
           <label class="lbl">Vendor Celup</label>
           <input
             :value="formData.header.qc_vendor_celup"

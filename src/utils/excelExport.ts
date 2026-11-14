@@ -122,13 +122,16 @@ export const exportExcel = async (
           pattern: "solid",
           fgColor: { argb: "FF" + hdrColor },
         };
+        const rata: ExcelJS.Alignment["horizontal"] = headerDuaBaris
+          ? "center"
+          : ((cfg.columns[colIdx - 1]
+              ?.align as ExcelJS.Alignment["horizontal"]) ?? "left");
         cell.alignment = {
-          horizontal: headerDuaBaris
-            ? "center"
-            : ((cfg.columns[colIdx - 1]
-                ?.align as ExcelJS.Alignment["horizontal"]) ?? "left"),
+          horizontal: rata,
           vertical: "middle",
           wrapText: false,
+          // Tombol filter menutupi ujung kanan sel: geser teks header rata kanan ke kiri
+          indent: rata === "right" && cfg.autoFilter !== false ? 2 : 0,
         };
         cell.border = {
           bottom: { style: "thin", color: { argb: "FFFFFFFF" } },
