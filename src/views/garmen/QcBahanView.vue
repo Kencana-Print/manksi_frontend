@@ -167,6 +167,21 @@ const getExportSource = (): QcBahanRow[] =>
     items.value ??
     []) as QcBahanRow[];
 
+// Semua baris Spanduk → kolom "Vendor Greige" dinamai "Vendor", "Vendor Celup" dibuang.
+// Campuran garmen + Spanduk → judul tetap, Vendor Celup dikosongkan per baris Spanduk.
+const semuaSpanduk = (rows: QcBahanRow[]): boolean =>
+  rows.length > 0 && rows.every((r) => r.JenisCek === "SPANDUK");
+
+const sesuaikanKolomVendor = (
+  cols: ExcelColumn[],
+  rows: QcBahanRow[],
+): ExcelColumn[] =>
+  semuaSpanduk(rows)
+    ? cols
+        .filter((c) => c.key !== "VendorCelup")
+        .map((c) => (c.key === "VendorGreige" ? { ...c, header: "Vendor" } : c))
+    : cols;
+
 // "YYYY-MM-DD" -> Date UTC-midnight, supaya Excel tidak geser tanggal
 const toExcelDate = (val: string | null): Date | "" => {
   if (!val) return "";
@@ -236,7 +251,7 @@ const onExportHeader = async () => {
     await exportExcelSingle(
       `QC_Bahan_${filterState.value.dtAwal}_sd_${filterState.value.dtAkhir}.xlsx`,
       "QC Bahan",
-      columns,
+      sesuaikanKolomVendor(columns, source),
       rows,
       `QC Bahan Periode ${periodeJudul()}`,
     );
@@ -311,6 +326,10 @@ const onExportDetail = async () => {
     // Satu baris per roll. Data header hanya di baris pertama dokumen, metrik lot
     // hanya di baris pertama lot (agar SUM di Excel tidak dobel). Lot No. diulang
     // di setiap baris supaya mudah difilter.
+    const sumber = getExportSource();
+    const nomorSpanduk = new Set(
+      sumber.filter((x) => x.JenisCek === "SPANDUK").map((x) => x.Nomor),
+    );
     let prevNomor = "";
     let prevLot = "";
     const rows = allDetail.map((r) => {
@@ -326,7 +345,8 @@ const onExportDetail = async () => {
         Nomor_PO: firstDoc ? r.Nomor_PO : "",
         JenisKain: firstDoc ? r.JenisKain : "",
         VendorGreige: firstDoc ? r.VendorGreige : "",
-        VendorCelup: firstDoc ? r.VendorCelup : "",
+        VendorCelup:
+          firstDoc && !nomorSpanduk.has(r.Nomor) ? r.VendorCelup : "",
         Lot: r.Lot,
         Kg: firstLot ? Number(r.Kg) || 0 : "",
         Satuan: firstLot ? r.Satuan : "",
@@ -469,7 +489,10 @@ const onExportDetail = async () => {
     await exportExcelSingle(
       `Detail_QC_Bahan_${filterState.value.dtAwal}_sd_${filterState.value.dtAkhir}.xlsx`,
       "Detail QC Bahan",
-      columns,
+      sesuaikanKolomVendor(
+        columns,
+        sumber.filter((x) => visible.has(x.Nomor)),
+      ),
       rows,
       `Rincian Lot dan Roll QC Bahan | Periode: ${periodeJudul()}`,
     );
@@ -483,22 +506,31 @@ const onExportDetail = async () => {
 };
 
 // --- HEADERS ---
-const headers = [
-  { title: "Nomor", key: "Nomor", width: "150px", fixed: true },
-  { title: "Tgl Datang", key: "TglDatang", width: "100px", align: "center" },
-  { title: "Status", key: "Status", width: "110px", align: "center" },
-  { title: "Nilai per Lot", key: "Lots", width: "280px", sortable: false },
-  { title: "Nomor PO", key: "Nomor_PO", width: "140px" },
-  { title: "Jenis Kain", key: "JenisKain", width: "260px" },
-  { title: "Vendor Greige", key: "VendorGreige", width: "170px" },
-  { title: "Vendor Celup", key: "VendorCelup", width: "170px" },
-  { title: "Lot", key: "JumlahLot", width: "60px", align: "right" },
-  { title: "Total Qty", key: "TotalKg", width: "110px", align: "right" },
-  { title: "Total Roll", key: "TotalRoll", width: "80px", align: "right" },
-  { title: "Keterangan", key: "Keterangan", width: "200px" },
-  { title: "User", key: "Usr", width: "100px" },
-  { title: "Dibuat", key: "Created", width: "140px", align: "center" },
-];
+const headers = computed(() => {
+  const spanduk = semuaSpanduk(filteredItems.value);
+  return [
+    { title: "Nomor", key: "Nomor", width: "150px", fixed: true },
+    { title: "Tgl Datang", key: "TglDatang", width: "100px", align: "center" },
+    { title: "Status", key: "Status", width: "110px", align: "center" },
+    { title: "Nilai per Lot", key: "Lots", width: "280px", sortable: false },
+    { title: "Nomor PO", key: "Nomor_PO", width: "140px" },
+    { title: "Jenis Kain", key: "JenisKain", width: "260px" },
+    {
+      title: spanduk ? "Vendor" : "Vendor Greige",
+      key: "VendorGreige",
+      width: "170px",
+    },
+    ...(spanduk
+      ? []
+      : [{ title: "Vendor Celup", key: "VendorCelup", width: "170px" }]),
+    { title: "Lot", key: "JumlahLot", width: "60px", align: "right" },
+    { title: "Total Qty", key: "TotalKg", width: "110px", align: "right" },
+    { title: "Total Roll", key: "TotalRoll", width: "80px", align: "right" },
+    { title: "Keterangan", key: "Keterangan", width: "200px" },
+    { title: "User", key: "Usr", width: "100px" },
+    { title: "Dibuat", key: "Created", width: "140px", align: "center" },
+  ];
+});
 
 // --- EXPAND LOGIC (DETAIL LOT) ---
 const expandedRows = ref<QcBahanRow[]>([]);
