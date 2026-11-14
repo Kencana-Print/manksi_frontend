@@ -1,1025 +1,1794 @@
+<template>
+  <PageLayout :title="formTitle" icon="mdi-basket-fill">
+    <template #header-actions>
+      <v-btn
+        v-if="isEditMode && user.user_manager === 1 && formData.poAcc === 'N'"
+        size="x-small"
+        color="success"
+        @click="handleAccManager"
+        :disabled="isSaving"
+      >
+        <v-icon start>mdi-check-decagram</v-icon>
+        ACC Manager
+      </v-btn>
+
+      <v-btn
+        size="x-small"
+        color="primary"
+        @click="handleSave(false)"
+        :loading="isSaving"
+        :disabled="isSaving || !isFormValid"
+      >
+        <v-icon start>mdi-content-save</v-icon> Simpan (F10)
+      </v-btn>
+      <v-btn size="x-small" @click="handleCancel" :disabled="isSaving">
+        <v-icon start>mdi-close</v-icon> Batal (F7)
+      </v-btn>
+      <v-btn
+        v-if="isEditMode"
+        size="x-small"
+        color="teal"
+        @click="handlePrint"
+        :disabled="isSaving"
+      >
+        <v-icon start>mdi-printer</v-icon> Cetak (F3)
+      </v-btn>
+      <v-btn size="x-small" @click="closeForm">
+        <v-icon start>mdi-close</v-icon> Tutup
+      </v-btn>
+    </template>
+
+    <div class="form-grid-container">
+      <div class="left-column">
+        <v-card class="desktop-form-section mb-4" flat>
+          <v-card-title class="text-subtitle-1 d-flex align-center pa-2">
+            Data Header
+            <v-spacer />
+            <v-chip
+              size="small"
+              :color="getPinStatusColor(formData.pinStatus)"
+              label
+            >
+              {{ formData.pinStatus || formData.status }}
+            </v-chip>
+          </v-card-title>
+          <v-card-text>
+            <v-row dense>
+              <v-col cols="12">
+                <v-text-field
+                  label="Nomor PO"
+                  v-model="formData.nomor"
+                  :readonly="isEditMode || isNewEntry"
+                  :filled="isEditMode || isNewEntry"
+                  :hint="
+                    isEditMode
+                      ? 'Nomor sudah terdaftar.'
+                      : 'AUTO dihasilkan saat simpan.'
+                  "
+                  persistent-hint
+                  density="compact"
+                  variant="outlined"
+                  @keyup.enter="handleNomorExit"
+                />
+              </v-col>
+
+              <v-col cols="12">
+                <v-text-field
+                  label="Tanggal PO"
+                  v-model="formData.tanggal"
+                  type="date"
+                  variant="outlined"
+                  density="compact"
+                  hide-details
+                />
+              </v-col>
+            </v-row>
+            <v-row dense class="my-2">
+              <v-col cols="12">
+                <v-text-field
+                  label="Nomor Permintaan"
+                  v-model="formData.nomorPermintaan"
+                  density="compact"
+                  variant="outlined"
+                  clearable
+                  hide-details
+                  append-inner-icon="mdi-magnify"
+                  @click="openPermintaanSearch"
+                  @keyup.f1.prevent="openPermintaanSearch"
+                  style="cursor: pointer"
+                />
+              </v-col>
+              <v-col cols="4">
+                <v-text-field
+                  label="Kode Sup"
+                  v-model="formData.supKode"
+                  @click="openSupplierSearch"
+                  @keyup.f1.prevent="openSupplierSearch"
+                  @blur="handleSupKodeExit"
+                  append-inner-icon="mdi-magnify"
+                  density="compact"
+                  variant="outlined"
+                  hide-details
+                  style="cursor: pointer"
+                />
+              </v-col>
+              <v-col cols="8">
+                <v-text-field
+                  label="Supplier"
+                  v-model="formData.supNama"
+                  readonly
+                  filled
+                  density="compact"
+                  hide-details
+                />
+              </v-col>
+              <v-col cols="12">
+                <v-text-field
+                  label="Alamat"
+                  v-model="formData.supAlamat"
+                  readonly
+                  filled
+                  density="compact"
+                  hide-details
+                />
+              </v-col>
+              <v-col cols="12">
+                <v-text-field
+                  label="Kota"
+                  v-model="formData.supKota"
+                  readonly
+                  filled
+                  density="compact"
+                  hide-details
+                />
+              </v-col>
+
+              <v-col cols="12" class="mt-2">
+                <v-text-field
+                  label="Kirim Ke (Pabrik)"
+                  v-model="formData.pabrikNama"
+                  readonly
+                  @click="isPabrikModalVisible = true"
+                  variant="outlined"
+                  density="compact"
+                  hide-details
+                  append-inner-icon="mdi-magnify"
+                  style="cursor: pointer"
+                  placeholder="Pilih Lokasi Tujuan..."
+                />
+              </v-col>
+
+              <v-col cols="12">
+                <v-text-field
+                  label="Alamat Kirim"
+                  v-model="formData.AlamatPabrik"
+                  variant="outlined"
+                  density="compact"
+                  hide-details
+                  class="mt-4"
+                />
+              </v-col>
+            </v-row>
+            <div v-if="formData.jenisPo === 0" class="mt-4">
+              <v-divider class="mb-2"></v-divider>
+              <div class="text-caption font-weight-bold mb-1 text-primary">
+                <v-icon size="small" class="mr-1">mdi-calendar-clock</v-icon>
+                DATELINE / DELIVERY COMMITMENT
+              </div>
+              <v-text-field
+                v-model="formData.commitments[0].tanggal"
+                type="date"
+                density="compact"
+                variant="outlined"
+                color="primary"
+                hide-details
+              />
+            </div>
+          </v-card-text>
+        </v-card>
+      </div>
+
+      <div class="right-column">
+        <!-- ===================== DETAIL ITEM PO ===================== -->
+        <v-card border flat class="mb-3 d-flex flex-column">
+          <v-card-title class="text-subtitle-1 pa-2">
+            Detail Item PO
+          </v-card-title>
+
+          <v-card-text class="pa-0" style="overflow-x: auto">
+            <v-data-table
+              :headers="detailHeaders"
+              :items="formData.detail"
+              :items-per-page="-1"
+              density="compact"
+              hide-default-footer
+              fixed-header
+              height="calc(100vh - 400px)"
+              class="detail-entry-table"
+              style="min-width: 1300px"
+            >
+              <!-- INDEX -->
+              <template #[`item.index`]="{ index }">
+                <span class="text-grey text-caption">{{ index + 1 }}</span>
+              </template>
+
+              <!-- KODE -->
+              <template #[`item.kode`]="{ item, index }">
+                <v-text-field
+                  v-model="item.kode"
+                  @click="openBahanSearch(index)"
+                  append-inner-icon="mdi-magnify"
+                  readonly
+                  variant="plain"
+                  density="compact"
+                  hide-details
+                  class="cursor-pointer"
+                />
+              </template>
+
+              <!-- NAMA -->
+              <template #[`item.namaext`]="{ item }">
+                <v-text-field
+                  v-model="item.namaext"
+                  variant="plain"
+                  density="compact"
+                  hide-details
+                />
+              </template>
+
+              <!-- SATUAN -->
+              <template #[`item.satuan`]="{ item }">
+                <v-text-field
+                  v-model="item.satuan"
+                  variant="plain"
+                  density="compact"
+                  hide-details
+                />
+              </template>
+
+              <!-- ROLL -->
+              <template #[`item.roll`]="{ item }">
+                <v-text-field
+                  v-model.number="item.roll"
+                  type="number"
+                  :disabled="formData.jenisPo !== 2"
+                  @update:modelValue="handleRollChange(item)"
+                  variant="plain"
+                  density="compact"
+                  hide-details
+                  class="text-right-input"
+                />
+              </template>
+
+              <template #[`item.panjang`]="{ item }">
+                <div class="text-right cell-text px-2">
+                  {{ item.panjang || "-" }}
+                </div>
+              </template>
+
+              <template #[`item.lebar`]="{ item }">
+                <div class="text-right cell-text px-2">
+                  {{ item.lebar || "-" }}
+                </div>
+              </template>
+
+              <template #[`item.m2`]="{ item }">
+                <div class="text-right cell-text px-2 font-weight-bold">
+                  {{
+                    (Number(item.m2) || (Number(item.panjang || 0) * Number(item.lebar || 0)) || 0) > 0
+                      ? (Number(item.m2) || (Number(item.panjang || 0) * Number(item.lebar || 0))).toFixed(2)
+                      : "-"
+                  }}
+                </div>
+              </template>
+
+              <template #[`item.jumlah`]="{ item }">
+                <v-text-field
+                  v-model.number="item.jumlah"
+                  type="number"
+                  min="0"
+                  @input="onItemChange(item)"
+                  @update:modelValue="onItemChange(item)"
+                  variant="plain"
+                  density="compact"
+                  hide-details
+                  class="text-right-input font-weight-bold"
+                />
+              </template>
+
+              <!-- HARGA -->
+              <template #[`item.harga`]="{ item }">
+                <v-text-field
+                  v-model.number="item.harga"
+                  type="number"
+                  :suffix="(Number(item.m2) || (Number(item.panjang || 0) * Number(item.lebar || 0)) || 0) > 0 ? '/m²' : '/qty'"
+                  @input="onItemChange(item)"
+                  @update:modelValue="onItemChange(item)"
+                  variant="plain"
+                  density="compact"
+                  hide-details
+                  class="text-right-input"
+                />
+              </template>
+
+              <!-- DISKON -->
+              <template #[`item.diskon`]="{ item }">
+                <v-text-field
+                  v-model.number="item.diskon"
+                  type="number"
+                  @input="onItemChange(item)"
+                  @update:modelValue="onItemChange(item)"
+                  variant="plain"
+                  density="compact"
+                  hide-details
+                  class="text-right-input"
+                />
+              </template>
+
+              <!-- TOTAL -->
+              <template #[`item.total`]="{ item }">
+                <div class="text-right font-weight-bold pr-2">
+                  {{ formatCurrency(calculateTotal(item)) }}
+                </div>
+              </template>
+
+              <!-- SPK -->
+              <template #[`item.spk`]="{ item, index }">
+                <v-text-field
+                  v-model="item.spk"
+                  @click="openSPKSearch(index)"
+                  append-inner-icon="mdi-magnify"
+                  readonly
+                  variant="plain"
+                  density="compact"
+                  hide-details
+                />
+              </template>
+
+              <!-- ACTION -->
+              <template #[`item.actions`]="{ index }">
+                <v-btn
+                  icon="mdi-delete"
+                  size="x-small"
+                  color="error"
+                  variant="text"
+                  @click="removeDetail(index)"
+                  :disabled="
+                    formData.detail.length === 1 && !formData.detail[0].kode
+                  "
+                />
+              </template>
+
+              <!-- FOOTER -->
+              <template #bottom>
+                <v-container class="py-2">
+                  <v-row justify="space-between" class="px-4">
+                    <v-col cols="auto">
+                      <v-btn
+                        size="x-small"
+                        color="primary"
+                        prepend-icon="mdi-plus"
+                        @click="addDetail"
+                      >
+                        Tambah Item
+                      </v-btn>
+                    </v-col>
+                    <v-col cols="auto">
+                      <v-label class="font-weight-bold">
+                        Total QTY Item:
+                        {{ calculatedItemTotal.toFixed(2) }}
+                      </v-label>
+                    </v-col>
+                  </v-row>
+                </v-container>
+              </template>
+            </v-data-table>
+          </v-card-text>
+        </v-card>
+
+        <!-- ===================== ROLL DETAIL ===================== -->
+        <v-card
+          v-if="formData.jenisPo === 2"
+          flat
+          class="desktop-form-section mb-3"
+        >
+          <v-card-title class="text-subtitle-1">
+            Roll Detail (PO Celup)
+          </v-card-title>
+
+          <v-card-text class="pa-0">
+            <v-data-table
+              :headers="rollHeaders"
+              :items="formData.rolls"
+              :items-per-page="-1"
+              hide-default-footer
+              class="detail-entry-table"
+            >
+              <template #[`item.no`]="{ item }">{{ item.no }}</template>
+
+              <template #[`item.kode`]="{ item }">
+                <v-text-field
+                  v-model="item.kode"
+                  readonly
+                  density="compact"
+                  hide-details
+                />
+              </template>
+
+              <template #[`item.nama`]="{ item }">
+                <v-text-field
+                  v-model="item.nama"
+                  readonly
+                  density="compact"
+                  hide-details
+                />
+              </template>
+
+              <template #[`item.jumlah`]="{ item }">
+                <v-text-field
+                  v-model.number="item.jumlah"
+                  type="number"
+                  density="compact"
+                  hide-details
+                  class="text-end"
+                />
+              </template>
+
+              <template #bottom>
+                <v-container class="py-2 px-4">
+                  <div class="text-caption font-weight-bold">
+                    Total Roll Qty: {{ calculatedRollTotal.toFixed(2) }}
+                  </div>
+                </v-container>
+              </template>
+            </v-data-table>
+          </v-card-text>
+        </v-card>
+
+        <!-- ===================== SUMMARY ===================== -->
+        <v-card flat class="desktop-form-section">
+          <v-card-text>
+            <v-row dense>
+              <v-col cols="6">
+                <v-textarea
+                  label="Note (mmNote)"
+                  v-model="formData.note"
+                  rows="2"
+                  variant="outlined"
+                  density="compact"
+                  hide-details
+                />
+              </v-col>
+
+              <v-col cols="6">
+                <v-row dense>
+                  <v-col cols="6">
+                    <v-checkbox
+                      label="PPN"
+                      v-model="formData.isPpn"
+                      @change="handlePpnToggle"
+                      density="compact"
+                      hide-details
+                    />
+                  </v-col>
+
+                  <v-col cols="6">
+                    <v-text-field
+                      label="Rate PPN (%)"
+                      v-model.number="formData.ppnRate"
+                      type="number"
+                      :readonly="!formData.isPpn"
+                      @update:modelValue="hitung"
+                      density="compact"
+                      hide-details
+                      class="text-right"
+                    />
+                  </v-col>
+
+                  <v-col cols="6">
+                    <v-text-field
+                      label="Total Subtotal"
+                      :model-value="formatCurrency(calculatedSubTotal)"
+                      readonly
+                      density="compact"
+                      hide-details
+                      class="text-right"
+                    />
+                  </v-col>
+
+                  <v-col cols="6">
+                    <v-text-field
+                      label="Total PPN"
+                      :model-value="formatCurrency(calculatedPpnTotal)"
+                      readonly
+                      density="compact"
+                      hide-details
+                      class="text-right"
+                    />
+                  </v-col>
+
+                  <v-col cols="12">
+                    <v-text-field
+                      label="Grand Total"
+                      :model-value="formatCurrency(calculatedGrandTotal)"
+                      readonly
+                      density="compact"
+                      hide-details
+                      class="text-right font-weight-bold"
+                    />
+                  </v-col>
+                </v-row>
+              </v-col>
+            </v-row>
+          </v-card-text>
+        </v-card>
+      </div>
+    </div>
+
+    <SupplierLookupModal
+      v-if="isSupplierModalVisible"
+      :isVisible="isSupplierModalVisible"
+      @close="() => (isSupplierModalVisible = false)"
+      @select="handleSupplierSelect"
+    />
+    <PoGreigeLookupModal
+      v-if="isPoGreigeModalVisible"
+      :isVisible="isPoGreigeModalVisible"
+      @close="() => (isPoGreigeModalVisible = false)"
+      @select="handlePoGreigeSelect"
+    />
+    <MppbLookupView
+      v-if="isMppbModalVisible"
+      :isVisible="isMppbModalVisible"
+      @close="() => (isMppbModalVisible = false)"
+      @select="handleMppbSelect"
+    />
+    <MkbLookupModal
+      v-if="isMkbModalVisible"
+      :isVisible="isMkbModalVisible"
+      @close="() => (isMkbModalVisible = false)"
+      @select="handleMkbSelect"
+    />
+    <MasterBahanModal
+      :isVisible="isBahanModalVisible"
+      mode="mmt"
+      @close="closeBahanModal"
+      @select="handleBahanSelect"
+    />
+    <PermintaanBahanLookupView
+      v-if="isPermintaanSearchVisible"
+      :isVisible="isPermintaanSearchVisible"
+      @close="isPermintaanSearchVisible = false"
+      @select="handleSelectPermintaan"
+    />
+    <SPKLookupModal
+      v-if="isSPKModalVisible"
+      :isVisible="isSPKModalVisible"
+      @close="() => (isSPKModalVisible = false)"
+      @select="handleSPKSelect"
+    />
+    <PabrikLookupModal
+      :isVisible="isPabrikModalVisible"
+      @close="isPabrikModalVisible = false"
+      @select="handlePabrikSelect"
+    />
+  </PageLayout>
+</template>
+
 <script setup lang="ts">
-import { ref, computed, onMounted } from "vue";
-import { useRoute } from "vue-router";
-import { useToast } from "vue-toastification";
-import BaseForm from "@/components/BaseForm.vue";
-import { useForm } from "@/composables/useForm";
-import {
-    IconShoppingCart,
-    IconSearch,
-    IconPlus,
-    IconTrash,
-} from "@tabler/icons-vue";
+import { ref, onMounted, computed, reactive, watch } from "vue";
+import { useRouter, useRoute } from "vue-router";
 import api from "@/services/api";
+import { AxiosError } from "axios";
+import PageLayout from "@/components/PageLayout.vue";
+import { format, parseISO, isValid } from "date-fns";
+import { useToast } from "vue-toastification";
+import SupplierLookupModal from "@/modal/SupplierLookupModal.vue";
+import MasterBahanModal from "@/modal/MasterBahanModal.vue";
+// import PoGreigeLookupModal from "@/components/lookups/PoGreigeSearchModal.vue";
+// import MppbLookupView from "@/modal/MppbLookupView.vue";
+// import MkbLookupModal from "@/components/lookups/MkbSearchModal.vue";
+// import BahanLookupModal from "@/components/lookups/BahanMmtSearchModal.vue";
+import SPKLookupModal from "@/modal/SpkLookupModal.vue";
+import PermintaanBahanLookupView from "@/modal/PermintaanBahanLookupView.vue";
+import PabrikLookupModal from "@/modal/PabrikLookupModal.vue";
 
-import SupplierSearchModal from "@/components/lookups/SupplierSearchModal.vue";
-import BahanMmtSearchModal from "@/components/lookups/BahanMmtSearchModal.vue";
-import PabrikSearchModal from "@/components/lookups/PabrikSearchModal.vue";
-import SpkSearchModal from "@/components/lookups/SpkSearchModal.vue";
-import PermintaanBahanMmtSearchModal from "@/components/lookups/PermintaanBahanMmtSearchModal.vue";
+// --- Interfaces ---
 
+interface MasterBahan {
+  Kode: string;
+  Nama: string;
+  Satuan: string;
+  Panjang: number;
+  Lebar: number;
+  brg_satuan_harga?: string;
+  [key: string]: string | number | undefined;
+}
+
+interface DetailItem {
+  no: number;
+  mkb: string;
+  kode: string;
+  nama: string;
+  namaext: string;
+  satuan: string;
+  roll: number;
+  panjang: number;
+  lebar: number;
+  m2: number; // ✅ luas per roll
+
+  jumlah: number; // ✅ qty roll
+  harga: number;
+  diskon: number;
+  total: number;
+  spk: string;
+  mb_nomor?: string;
+  satuanHarga: string;
+}
+
+interface CommitmentItem {
+  no: number;
+  tanggal: string;
+  jumlah: number;
+  nama?: string;
+  kode?: string;
+}
+
+interface RollItem {
+  no: number;
+  kode: string;
+  nama: string;
+  satuan: string;
+  jumlah: number;
+}
+
+interface FormDataState {
+  nomor: string;
+  tanggal: string;
+  supKode: string;
+  supNama: string;
+  supAlamat: string;
+  supKota: string;
+  jenisPo: 0 | 1 | 2; // 1=Greige, 2=Celup, 0=Bahan
+  nomorPermintaan: string;
+  pabrikKode: string; // Kode Pabrik untuk backend
+  pabrikNama: string;
+  AlamatPabrik: string;
+  poGreige: string;
+  mppbNomor: string;
+  mppbTanggal: string;
+  mppbJumlah: number;
+  keterangan: string;
+  note: string;
+  isPpn: boolean;
+  ppnRate: number;
+  status: "OPEN" | "CLOSE" | "ONPROSES"; // lblbpb status
+  poAcc: "Y" | "N";
+  detail: DetailItem[];
+  commitments: CommitmentItem[];
+  rolls: RollItem[];
+}
+
+interface LookupItem {
+  Kode?: string;
+  Nomor?: string;
+  Nama?: string;
+  Alamat?: string;
+  Kota?: string;
+  Tanggal?: string;
+  Jumlah?: number;
+  Panjang?: number;
+  Lebar?: number;
+  [key: string]: string | number | undefined;
+}
+
+// --- Setup & State ---
+const router = useRouter();
 const route = useRoute();
 const toast = useToast();
 
-interface DetailItem {
-    no: number;
-    kode: string;
-    nama: string;
-    satuan: string;
-    qty: number;
-    harga: number;
-    discPr: number;
-    spk: string;
-    keterangan: string;
-}
+// ASUMSI: Konstanta dari Delphi
+const API_BASE_URL = "/mmt/po-bahan-mmt";
+const API_SUPPLIER_DETAIL = "/supplier/detail";
+const API_UNFULFILLED_MB_DETAIL = `${API_BASE_URL}/unfulfilled-mb-detail`;
+const API_MASTER_BAHAN_DETAIL_SINGLE = "/master/bahan/mmt";
+const USER_KD = "ADMIN_PPIC";
 
-interface PoBahanForm {
-    nomor: string;
-    tanggal: string;
-    dateline: string;
-    nomorPermintaan: string;
-    supKode: string;
-    supNama: string;
-    supAlamat: string;
-    supKota: string;
-    pabrikNama: string;
-    alamatPabrik: string;
-    isPpn: boolean;
-    keterangan: string;
-    note: string;
-    items: DetailItem[];
-}
+const user = reactive({
+  canSeePrice: true,
+  defaultPpn: 11,
+  KDUSER: USER_KD,
+  user_manager: 1, // 🔥 1 = manager, 0 = bukan
+});
 
-const initialData: PoBahanForm = {
+const isEditMode = ref(!!route.params.nomor);
+const isNewEntry = computed(() => !isEditMode.value);
+const isSaving = ref(false);
+const currentDetailIndex = ref<number | null>(null);
+
+// Modal visibility state
+const isSupplierModalVisible = ref(false);
+const isPoGreigeModalVisible = ref(false);
+const isMppbModalVisible = ref(false);
+const isMkbModalVisible = ref(false);
+const isBahanModalVisible = ref(false);
+const isPabrikModalVisible = ref(false);
+const isSPKModalVisible = ref(false);
+const isPermintaanSearchVisible = ref(false);
+
+const createEmptyDetail = (): DetailItem => ({
+  no: 0,
+  mkb: "",
+  kode: "",
+  nama: "",
+  namaext: "",
+  satuan: "",
+  gramasia: "",
+  gramasi: "",
+  seting: "",
+  jenis: "",
+  roll: 0,
+
+  panjang: 0,
+  lebar: 0,
+  m2: 0,
+
+  jumlah: 0, // qty roll
+  harga: 0,
+  diskon: 0,
+  total: 0,
+  spk: "",
+});
+
+const createEmptyCommitment = (): CommitmentItem => ({
+  no: 0,
+  tanggal: format(new Date(), "yyyy-MM-dd"),
+  jumlah: 0,
+});
+
+const formData = reactive<FormDataState>({
+  nomor: "AUTO",
+  tanggal: format(new Date(), "yyyy-MM-dd"),
+  supKode: "",
+  supNama: "",
+  supAlamat: "",
+  supKota: "",
+  jenisPo: 0, // Default Bahan
+  poGreige: "",
+  mppbNomor: "",
+  mppbTanggal: "",
+  mppbJumlah: 0,
+  keterangan: "",
+  AlamatPabrik: "",
+  note: "",
+  isPpn: false,
+  ppnRate: user.defaultPpn,
+  status: "OPEN",
+  poAcc: "N",
+  detail: [createEmptyDetail()],
+  commitments: [createEmptyCommitment()],
+  rolls: [],
+});
+
+const formTitle = computed(() =>
+  isEditMode.value
+    ? `Ubah PO Bahan MMT: ${formData.nomor}`
+    : "Input Baru PO Bahan MMT",
+);
+
+const handleAccManager = async () => {
+  if (!isEditMode.value || !formData.nomor) return;
+
+  // Konfirmasi keamanan
+  if (!confirm(`ACC PO ${formData.nomor}?`)) return;
+
+  try {
+    isSaving.value = true;
+
+    // Mengirim permintaan PUT ke endpoint spesifik
+    await api.put(`${API_BASE_URL}/${formData.nomor}/acc-manager`, {
+      po_acc: "Y",
+      user: user.KDUSER,
+    });
+
+    toast.success("PO berhasil di-ACC Manager");
+
+    // Update state lokal agar UI langsung merespon (tombol hilang)
+    formData.poAcc = "Y";
+    formData.pinStatus = "ACC";
+  } catch (err) {
+    console.error(err);
+    toast.error("Gagal ACC PO. Silakan ulangi.");
+  } finally {
+    isSaving.value = false;
+  }
+};
+
+const calculateTotal = (item: DetailItem): number => {
+  const qty = Number(item.jumlah) || 0;
+  const panjang = Number(item.panjang) || 0;
+  const lebar = Number(item.lebar) || 0;
+  const m2Luas =
+    Number(item.m2) ||
+    (panjang * lebar > 0 ? panjang * lebar : 0);
+  const harga = Number(item.harga) || 0;
+  const diskon = Number(item.diskon) || 0;
+
+  // Rumus PO Bahan MMT:
+  // Jika luas per roll m2 > 0: (m2/roll * qty roll) * harga * (1 - diskon/100)
+  // Jika non-roll (m2 <= 0): qty * harga * (1 - diskon/100)
+  const faktor = m2Luas > 0 ? m2Luas * qty : qty;
+  const bruto = faktor * harga;
+  const total = bruto * (1 - diskon / 100);
+
+  return Math.round(total * 100) / 100;
+};
+
+const hitung = () => {
+  formData.detail.forEach((item) => {
+    item.total = calculateTotal(item);
+  });
+};
+
+const onItemChange = (item: DetailItem) => {
+  item.total = calculateTotal(item);
+};
+
+const calculatedSubTotal = computed(() =>
+  formData.detail.reduce(
+    (sum, d) => sum + (Number(calculateTotal(d)) || 0),
+    0,
+  ),
+);
+
+const calculatedPpnTotal = computed(() =>
+  formData.isPpn
+    ? calculatedSubTotal.value * ((Number(formData.ppnRate) || 0) / 100)
+    : 0,
+);
+
+const calculatedGrandTotal = computed(
+  () => calculatedSubTotal.value + calculatedPpnTotal.value,
+);
+
+const calculatedItemTotal = computed(() => {
+  return formData.detail.reduce((sum, d) => sum + d.jumlah, 0);
+});
+
+const calculatedRollTotal = computed(() => {
+  return formData.rolls.reduce((sum, r) => sum + r.jumlah, 0);
+});
+
+const isFormValid = computed(() => {
+  if (!formData.supKode) return false;
+
+  const validDetail = formData.detail.some(
+    (d) => d.kode && d.jumlah > 0 && d.harga >= 0,
+  );
+
+  if (!validDetail) return false;
+
+  // PO Bahan wajib dateline
+  if (formData.jenisPo === 0) {
+    if (!formData.commitments[0]?.tanggal) return false;
+  }
+
+  // PO Celup wajib roll detail kalau ada roll
+  if (formData.jenisPo === 2) {
+    const adaRoll = formData.detail.some((d) => d.roll > 0);
+    if (adaRoll && calculatedRollTotal.value === 0) return false;
+  }
+
+  return true;
+});
+
+// Menentukan apakah radio button jenis PO harus di-disable
+const isJenisPoEnabled = (jenis: 0 | 1 | 2) => {
+  if (!isNewEntry.value) {
+    // Hanya jenis PO yang sudah dipilih yang boleh aktif di mode edit
+    return formData.jenisPo === jenis;
+  }
+  // Jika New Entry, semua aktif
+  return true;
+};
+
+const getPinStatusColor = (status: string) => {
+  switch (status) {
+    case "WAIT":
+      return "blue";
+    case "ACC":
+      return "green";
+    case "TOLAK":
+      return "red";
+    case "MINTA":
+      return "grey";
+    default:
+      return "transparent";
+  }
+};
+const openPermintaanSearch = () => {
+  // Hanya izinkan pencarian jika form masih mode baru (tidak edit mode)
+  // if (isEditMode.value) return;
+  isPermintaanSearchVisible.value = true;
+};
+
+// --- Headers Sesuai Delphi Grid ---
+const detailHeaders = [
+  { title: "No", key: "index", width: "50px", align: "center" as const },
+  { title: "Kode", key: "kode", width: "120px" },
+  { title: "Nama", key: "namaext", width: "220px" },
+  { title: "Sat", key: "satuan", width: "70px" },
+
+  { title: "P (m)", key: "panjang", width: "70px", align: "end" as const },
+  { title: "L (m)", key: "lebar", width: "70px", align: "end" as const },
+  { title: "M²/Roll", key: "m2", width: "90px", align: "end" as const },
+
+  { title: "Qty Roll", key: "jumlah", width: "90px", align: "end" as const },
+
+  { title: "Harga", key: "harga", width: "130px", align: "end" as const },
+  { title: "Diskon%", key: "diskon", width: "80px", align: "end" as const },
+  { title: "Total", key: "total", width: "150px", align: "end" as const },
+  { title: "SPK", key: "spk", width: "130px" },
+  { title: "Aksi", key: "actions", width: "60px", sortable: false },
+] as const;
+
+const commitmentHeaders = [
+  {
+    title: "No",
+    key: "index",
+    width: "10%",
+    sortable: false,
+    align: "center" as const,
+  },
+  { title: "Tanggal", key: "tanggal", width: "30%" },
+  { title: "Jumlah", key: "jumlah", width: "30%", align: "end" as const },
+] as const;
+
+const rollHeaders = [
+  {
+    title: "No Roll",
+    key: "no",
+    width: "10%",
+    sortable: false,
+    align: "center" as const,
+  },
+  { title: "Kode Bahan", key: "kode", width: "20%" },
+  { title: "Nama Bahan", key: "nama", width: "30%" },
+  {
+    title: "Jumlah (Roll)",
+    key: "jumlah",
+    width: "20%",
+    align: "end" as const,
+  },
+] as const;
+
+// --- Helpers ---
+
+const formatCurrency = (value: number) => {
+  if (typeof value !== "number" || isNaN(value)) return "0.00";
+  return value.toLocaleString("id-ID", { minimumFractionDigits: 2 });
+};
+
+const handleSupKodeExit = async () => {
+  if (!formData.supKode) return;
+  try {
+    const response = await api.get(
+      `${API_SUPPLIER_DETAIL}/${formData.supKode}`,
+    );
+    const detail = response.data;
+    formData.supNama = detail.Nama;
+    formData.supAlamat = detail.Alamat;
+    formData.supKota = detail.Kota;
+  } catch (error) {
+    toast.error("Kode Supplier tidak ditemukan.");
+    formData.supKode = "";
+    formData.supNama = "";
+  }
+};
+
+const handleNomorExit = () => {
+  if (formData.nomor && formData.nomor !== "AUTO" && !isEditMode.value) {
+    // Asumsi loaddataall dipicu di sini
+    loaddataall(formData.nomor);
+  }
+};
+
+const handlePpnToggle = () => {
+  // ufrmPO.cbbPPNClick
+  if (formData.isPpn) {
+    formData.ppnRate = user.defaultPpn;
+  } else {
+    formData.ppnRate = 0;
+  }
+  hitung();
+};
+
+const handleJenisPoChange = (jenis: 0 | 1 | 2) => {
+  // ufrmPO.rbBahanClick (Logic utama untuk visibility)
+  if (!isNewEntry.value && formData.jenisPo !== jenis) return; // Stop jika edit dan mencoba ganti jenis
+
+  formData.jenisPo = jenis;
+
+  // Clear detail/komitmen yang tidak relevan saat berganti jenis
+  formData.detail = [createEmptyDetail()];
+  formData.commitments = [createEmptyCommitment()];
+  formData.rolls = [];
+  formData.poGreige = "";
+};
+
+const closeForm = () => {
+  router.push({ name: 'PoBahanMmtBrowse' });
+};
+
+const handlePabrikSelect = (pabrik: { Kode: string; Nama: string }) => {
+  formData.pabrikKode = pabrik.Kode;
+  formData.pabrikNama = pabrik.Nama;
+  formData.cabang = pabrik.Nama;
+  formData.AlamatPabrik = pabrik.AlamatPabrik;
+  isPabrikModalVisible.value = false;
+};
+const handlePoGreigeExit = async () => {
+  // ufrmPO.edtpoGreigeExit logic
+  if (formData.jenisPo !== 2 || !formData.poGreige) return;
+
+  try {
+    // ASUMSI: Backend API menghandle load detail, cek jenis=1, dan hitung sisa QTY Celup
+    const response = await api.get(
+      `${API_BASE_URL}/load-greige-for-celup/${formData.poGreige}`,
+    );
+    const data = response.data;
+
+    // Update header fields dari PO Greige
+    formData.supKode = data.Header.KodeSup;
+    formData.supNama = data.Header.Nama;
+    formData.keterangan = data.Header.Keterangan;
+
+    // Update detail
+    formData.detail = data.Detail.map((d: any) => ({
+      ...createEmptyDetail(),
+      ...d,
+      total: calculateTotal(d),
+      roll: 0,
+    }));
+
+    // Tambah baris kosong di akhir
+    formData.detail.push(createEmptyDetail());
+    hitung();
+  } catch (error) {
+    toast.error("Gagal memuat detail PO Greige atau PO tidak valid.");
+    formData.poGreige = "";
+    formData.detail = [createEmptyDetail()];
+  }
+};
+
+const handleMppbExit = async () => {
+  // ufrmPO.edtmppbExit logic
+  if (!formData.mppbNomor) return;
+
+  try {
+    // ASUMSI: Backend API menghandle cek approve dan cek sudah di link PO
+    const response = await api.get(
+      `${API_BASE_URL}/load-mppb/${formData.mppbNomor}`,
+    );
+    const data = response.data;
+
+    formData.mppbTanggal = format(parseISO(data.Tanggal), "yyyy-MM-dd");
+    formData.mppbJumlah = data.Jumlah;
+    toast.success(`MPPB ${formData.mppbNomor} dimuat.`);
+  } catch (error) {
+    toast.error("No. MPPB tidak valid atau belum di-approve.");
+    formData.mppbNomor = "";
+    formData.mppbTanggal = "";
+    formData.mppbJumlah = 0;
+  }
+};
+
+const handleRollChange = (item: DetailItem) => {
+  if (formData.jenisPo !== 2 || !item.kode) return;
+
+  // hapus roll lama milik item ini
+  formData.rolls = formData.rolls.filter((r) => r.kode !== item.kode);
+
+  for (let i = 1; i <= (item.roll || 0); i++) {
+    formData.rolls.push({
+      no: formData.rolls.length + 1,
+      kode: item.kode,
+      nama: item.namaext || item.nama,
+      satuan: item.satuan,
+      jumlah: 0,
+    });
+  }
+};
+
+const addDetail = () => {
+  const lastItem = formData.detail[formData.detail.length - 1];
+  if (lastItem && lastItem.kode) {
+    formData.detail.push(createEmptyDetail());
+  } else {
+    toast.warning("Isi detail baris terakhir sebelum menambah baris baru.");
+  }
+};
+
+const removeDetail = (index: number) => {
+  if (formData.detail.length > 1) {
+    formData.detail.splice(index, 1);
+  } else {
+    // Jika hanya satu baris, clear saja
+    Object.assign(formData.detail[0], createEmptyDetail());
+  }
+};
+
+const addCommitment = () => {
+  // cljumlah2PropertiesEditValueChanged logic: Menggunakan data dari detail pertama
+  const item = formData.detail.find((d) => d.kode) || createEmptyDetail();
+
+  const newCommitment = createEmptyCommitment();
+  newCommitment.kode = item.kode;
+  newCommitment.nama = item.nama;
+
+  formData.commitments.push(newCommitment);
+};
+
+const handleSelectPermintaan = async (permintaanItem: LookupItem) => {
+  const nomorPermintaan = permintaanItem.Nomor;
+  if (!nomorPermintaan) return;
+
+  try {
+    const response = await api.get(
+      `${API_UNFULFILLED_MB_DETAIL}/${encodeURIComponent(nomorPermintaan)}`,
+    );
+
+    const rawData = response.data;
+    const resData = Array.isArray(rawData) ? rawData[0] : rawData;
+
+    if (!resData || !resData.Detail) {
+      toast.error("Data detail tidak ditemukan.");
+      return;
+    }
+
+    formData.nomorPermintaan = nomorPermintaan;
+
+    // Bersihkan detail lama, isi dengan yang baru
+    formData.detail = resData.Detail.map((d: any) => {
+      const p = parseFloat(d.Panjang || d.brg_panjang) || 0;
+      const l = parseFloat(d.Lebar || d.brg_lebar) || 0;
+      const qty = parseFloat(d.Jumlah) || 0; // Ini qty roll
+
+      // Objek item baru
+      const newItem = {
+        ...createEmptyDetail(),
+        kode: d.Kode,
+        nama: d.Nama_Bahan,
+        namaext: d.Nama_Bahan,
+        satuan: d.Satuan,
+        satuanHarga: (d.brg_satuan_harga || "roll").toLowerCase(),
+        panjang: p,
+        lebar: l,
+        m2: p * l, // Hitung luas per roll
+
+        jumlah: qty, // Qty Roll
+        spk: d.Nomor_SPK || "",
+        mb_nomor: nomorPermintaan,
+
+        // Harga biasanya 0 atau ambil dari master
+        harga: parseFloat(d.Harga_Master || d.brg_hrgbeli) || 0,
+        total: 0,
+      };
+
+      // Hitung total awal untuk baris ini
+      newItem.total = calculateTotal(newItem as DetailItem);
+
+      return newItem;
+    });
+
+    // Tambahkan baris kosong di akhir untuk input baru
+    formData.detail.push(createEmptyDetail());
+
+    // Trigger hitung grand total
+    hitung();
+
+    toast.success("Data permintaan berhasil ditarik.");
+  } catch (error) {
+    console.error("Error Load Detail Permintaan:", error);
+    toast.error("Gagal memuat detail permintaan.");
+  }
+  isPermintaanSearchVisible.value = false;
+};
+
+const handleCancel = () => {
+  // ufrmPO.FormKeyDown (VK_F7)
+  if (confirm("Ingin membatalkan transaksi?")) {
+    refreshData();
+    toast.info("Transaksi dibatalkan.");
+  }
+};
+
+const handleClose = () => {
+  // ufrmPO.FormKeyDown (VK_F8)
+  if (confirm("Ingin Keluar dari Modul?")) {
+    router.push({ name: 'PoBahanMmtBrowse' }); // Kembali ke browse view
+  }
+};
+
+const handlePrint = () => {
+  if (!formData.nomor || formData.nomor === "AUTO") {
+    toast.error("Nomor PO belum ada untuk dicetak.");
+    return;
+  }
+
+  // Arahkan ke rute cetak (Sesuaikan nama route 'PoPrint' dengan konfigurasi router Anda)
+  // Biasanya rute ini akan membuka tab baru yang berisi tampilan PDF/Laporan
+  const routeData = router.resolve({
+    name: 'PoBahanMmtPrint',
+    params: { nomor: formData.nomor },
+  });
+
+  window.open(routeData.href, "_blank");
+
+  // Opsional: Jika PO Celup (jenisPo === 2), tawarkan cetak Roll Detail
+  if (formData.jenisPo === 2 && formData.rolls.length > 0) {
+    if (confirm("Cetak Detail Roll juga?")) {
+      // Contoh rute cetak roll (sesuaikan dengan sistem Anda)
+      const rollRoute = router.resolve({
+        name: 'PoBahanMmtPrint',
+        params: { nomor: formData.nomor },
+      });
+      window.open(rollRoute.href, "_blank");
+    }
+  }
+};
+
+const handleSave = async (isSaveAndNew: boolean) => {
+  // 1. Validasi awal
+  if (!isFormValid.value) {
+    toast.error(
+      "Validasi gagal: Pastikan Header, Supplier, Detail, dan Dateline terisi.",
+    );
+    return;
+  }
+
+  if (formData.status !== "OPEN") {
+    toast.warning(
+      `PO sudah berstatus ${formData.status}. Tidak bisa disimpan.`,
+    );
+    return;
+  }
+
+  if (!confirm(`Yakin ingin simpan PO?`)) return;
+
+  try {
+    isSaving.value = true;
+
+    // 2. Bersihkan detail (hanya item yang valid)
+    const cleanDetail = formData.detail
+      .filter((d) => d && d.kode && Number(d.jumlah) > 0)
+      .map((d) => {
+        const m2Val =
+          Number(d.m2) ||
+          (Number(d.panjang || 0) * Number(d.lebar || 0)) ||
+          0;
+        return {
+          kode: d.kode,
+          satuan: d.satuan,
+          m2: m2Val,
+          jumlah: Number(d.jumlah) || 0,
+          harga: Number(d.harga) || 0,
+          diskon: Number(d.diskon) || 0,
+          total: calculateTotal(d),
+          namaext: d.namaext || d.nama,
+          spk: d.spk || null,
+          mb_nomor: d.mb_nomor || null,
+        };
+      });
+
+    // 3. Ambil nilai dateline dari commitments array
+    const datelineValue =
+      formData.commitments.length > 0 ? formData.commitments[0].tanggal : null;
+
+    // 4. Susun Payload
+    const payload = {
+      tanggal: formData.tanggal,
+      supKode: formData.supKode,
+      keterangan: formData.note || "",
+      isPpn: formData.isPpn,
+      ppnRate: formData.ppnRate,
+      detail: cleanDetail,
+      dateline: datelineValue,
+      jenisPo: formData.jenisPo,
+      AlamatPabrik: formData.AlamatPabrik,
+      nomorToEdit:
+        isEditMode.value && formData.nomor !== "AUTO" ? formData.nomor : null, // 👈 FIX: Proteksi String AUTO
+    };
+
+    let response;
+
+    // 5. Eksekusi EndPoint Sesuai Mode
+    if (isEditMode.value && formData.nomor !== "AUTO") {
+      response = await api.put(
+        `${API_BASE_URL}/${encodeURIComponent(formData.nomor)}`,
+        payload,
+      );
+    } else {
+      response = await api.post(API_BASE_URL, payload);
+    }
+
+    const newNomor = response.data.nomor || response.data.Nomor;
+
+    if (!newNomor) {
+      throw new Error("Backend tidak mengembalikan nomor PO.");
+    }
+
+    toast.success(`Data berhasil disimpan dengan nomor: ${newNomor}`);
+
+    if (confirm(`Akan di Cetak?`)) {
+      router.push({ name: 'PoBahanMmtPrint', params: { nomor: newNomor } });
+    }
+
+    if (isSaveAndNew) {
+      refreshData();
+    } else {
+      // PENTING: Paksa mode ke edit setelah insert sukses pertama kali
+      isEditMode.value = true;
+      await loaddataall(newNomor);
+    }
+  } catch (error) {
+    const err = error as AxiosError;
+    console.error("Save Error Detail:", err.response?.data);
+    toast.error(
+      (err.response?.data as any)?.message ||
+        "Gagal menyimpan data. Pastikan semua field terisi.",
+    );
+  } finally {
+    isSaving.value = false;
+  }
+};
+
+// --- Pastikan properti Pabrik ter-reset di fungsi refreshData ---
+const refreshData = () => {
+  Object.assign(formData, {
     nomor: "AUTO",
-    tanggal: new Date().toISOString().substring(0, 10),
-    dateline: new Date().toISOString().substring(0, 10),
-    nomorPermintaan: "",
+    tanggal: format(new Date(), "yyyy-MM-dd"),
     supKode: "",
     supNama: "",
     supAlamat: "",
     supKota: "",
-    pabrikNama: "",
-    alamatPabrik: "",
-    isPpn: true,
+    jenisPo: 0 as 0,
+    nomorPermintaan: "",
+    pabrikKode: "", // 👈 Tambahkan reset ini
+    pabrikNama: "", // 👈 Tambahkan reset ini
+    AlamatPabrik: "", // 👈 Tambahkan reset ini
+    poGreige: "",
+    mppbNomor: "",
+    mppbTanggal: "",
+    mppbJumlah: 0,
     keterangan: "",
     note: "",
-    items: [],
+    isPpn: false,
+    ppnRate: user.defaultPpn,
+    status: "OPEN" as "OPEN",
+    pinStatus: "" as "",
+    detail: [createEmptyDetail()],
+    commitments: [createEmptyCommitment()],
+    rolls: [],
+  });
+  isEditMode.value = false;
+  currentDetailIndex.value = null;
 };
 
-const toDateInputValue = (val: any): string => {
-    if (!val) return "";
-    const s = String(val);
-    if (s.includes("T")) {
-        const d = new Date(s);
-        if (!isNaN(d.getTime())) {
-            const yyyy = d.getFullYear();
-            const mm = String(d.getMonth() + 1).padStart(2, "0");
-            const dd = String(d.getDate()).padStart(2, "0");
-            return `${yyyy}-${mm}-${dd}`;
-        }
+// --- Lookup Handlers ---
+
+const handleSupplierSelect = async (sup: LookupItem) => {
+  // ufrmPO.edtSupKodeExit logic
+  if (!sup.Kode) return;
+  formData.supKode = sup.Kode;
+  formData.supNama = sup.Nama || "";
+  formData.supAlamat = sup.Alamat || "";
+  formData.supKota = sup.Kota || "";
+  isSupplierModalVisible.value = false;
+};
+
+const handlePoGreigeSelect = async (po: LookupItem) => {
+  if (!po.Nomor) return;
+  formData.poGreige = po.Nomor;
+  // Panggil handler blur untuk memuat data
+  await handlePoGreigeExit();
+  isPoGreigeModalVisible.value = false;
+};
+
+const handleMppbSelect = async (mppb: LookupItem) => {
+  if (!mppb.Nomor) return;
+  formData.mppbNomor = mppb.Nomor;
+  await handleMppbExit();
+  isMppbModalVisible.value = false;
+};
+
+const handleMkbSelect = async (mkb: LookupItem) => {
+  const index = currentDetailIndex.value;
+  if (index === null || !mkb.Nomor) return;
+
+  try {
+    const response = await api.get(`${API_BASE_URL}/load-mkb/${mkb.Nomor}`);
+    if (response.data.Detail && response.data.Detail.length > 0) {
+      formData.detail = response.data.Detail.map((d: any) => ({
+        ...createEmptyDetail(),
+        ...d,
+        total: calculateTotal(d),
+      }));
+      formData.detail.push(createEmptyDetail());
+      hitung();
+      toast.success(`Detail dari MKB ${mkb.Nomor} dimuat.`);
+    } else {
+      toast.warning("MKB tidak memiliki detail bahan yang valid.");
     }
-    return s.substring(0, 10);
+  } catch (error) {
+    toast.error("Gagal memuat detail MKB.");
+  }
+  isMkbModalVisible.value = false;
+};
+const closeBahanModal = () => {
+  // 👈 Handler yang benar
+  isBahanModalVisible.value = false;
 };
 
-// Modal State
-const showSupplierModal = ref(false);
-const showBahanModal = ref(false);
-const showPabrikModal = ref(false);
-const showSpkModal = ref(false);
-const showPermintaanModal = ref(false);
-const activeRowIndex = ref<number | null>(null);
+const handleBahanSelect = async (bahan: MasterBahan) => {
+  const index = currentDetailIndex.value;
 
-const {
-    isEditMode,
-    isLoading,
-    isSaving,
-    formData,
-    showSaveDialog,
-    showCancelDialog,
-    showCloseDialog,
-    executeSave,
-    executeCancel,
-    executeClose,
-} = useForm<PoBahanForm>({
-    menuId: "5504",
-    initialData,
-    fetchApi: async () => {
-        const nomor = route.params.nomor || route.query.nomor;
-        if (!nomor) return { ...initialData };
+  // 1. Validasi Kritis
+  if (index === null || !bahan.Kode || formData.detail.length === 0) {
+    toast.error("Gagal memproses data bahan: Baris tidak ditemukan.");
+    closeBahanModal();
+    return;
+  }
 
-        const res = await api.get(
-            `/mmt/po-bahan-mmt/${encodeURIComponent(String(nomor))}`,
-        );
-        const data = res.data?.data || res.data;
-        if (!data) return { ...initialData };
+  // 2. Akses elemen array
+  const currentItem = formData.detail[index];
+  let targetIndex = index;
 
-        const header = data.header || data;
-        const details =
-            data.Detail || data.detail || data.details || data.items || [];
+  // Jika baris yang diklik sudah ada isinya (kode berbeda), tambah baris baru
+  if (currentItem.kode && currentItem.kode !== bahan.Kode) {
+    addDetail();
+    targetIndex = formData.detail.length - 1;
+  }
 
-        return {
-            nomor: header.Nomor || header.nomor || String(nomor),
-            tanggal:
-                toDateInputValue(header.Tanggal || header.tanggal) ||
-                initialData.tanggal,
-            dateline:
-                toDateInputValue(header.Dateline || header.dateline) ||
-                initialData.dateline,
-            nomorPermintaan:
-                header.NomorPermintaan ||
-                header.po_mppb_nomor ||
-                header.nomorPermintaan ||
-                "",
-            supKode:
-                header.KodeSup || header.supKode || header.po_sup_kode || "",
-            supNama: header.SupNama || header.Nama || header.supNama || "",
-            supAlamat:
-                header.SupAlamat || header.Alamat || header.supAlamat || "",
-            supKota: header.SupKota || header.Kota || header.supKota || "",
-            pabrikNama: header.Pabrik || header.pabrikNama || "",
-            alamatPabrik:
-                header.AlamatPabrik ||
-                header.alamatPabrik ||
-                header.po_kirim ||
-                "",
-            isPpn:
-                header.IsPpn === 1 ||
-                header.IsTax === 1 ||
-                header.isPpn === true ||
-                String(header.IsPpn) === "1" ||
-                String(header.IsTax) === "1",
-            keterangan:
-                header.Keterangan || header.keterangan || header.po_memo || "",
-            note: header.Note || header.note || "",
-            items: details.map((d: any, idx: number) => ({
-                no: d.no || idx + 1,
-                kode: d.kode || d.Kode || d.pod_brg_kode || "",
-                nama: d.nama || d.Nama || d.namaext || "",
-                satuan: d.satuan || d.Satuan || d.pod_brg_satuan || "MTR",
-                qty: Number(
-                    d.jumlah ?? d.qty ?? d.Qty ?? d.QTY ?? d.pod_qty ?? 0,
-                ),
-                harga: Number(d.harga ?? d.Harga ?? d.pod_harga ?? 0),
-                discPr: Number(
-                    d.diskon ?? d.discPr ?? d.DiscPr ?? d.pod_discpr ?? 0,
-                ),
-                spk: d.spk || d.Spk || d.pod_spk_nomor || "",
-                keterangan:
-                    d.namaext ||
-                    d.keterangan ||
-                    d.Keterangan ||
-                    d.pod_keterangan ||
-                    "",
-            })),
-        };
-    },
-    submitApi: async (dataToSave) => {
-        const payload = {
-            ...dataToSave,
-            AlamatPabrik: dataToSave.alamatPabrik,
-            ppnRate: dataToSave.isPpn ? 11 : 0,
-            jenisPo: 0,
-            detail: dataToSave.items.map((it) => {
-                const qty = Number(it.qty) || 0;
-                const harga = Number(it.harga) || 0;
-                const discPr = Number(it.discPr) || 0;
-                const net = qty * harga * (1 - discPr / 100);
-                return {
-                    ...it,
-                    jumlah: qty,
-                    harga: harga,
-                    diskon: discPr,
-                    namaext: it.keterangan || it.nama,
-                    mb_nomor: dataToSave.nomorPermintaan || null,
-                    total: net,
-                };
-            }),
-        };
-        if (isEditMode.value) {
-            return await api.put(
-                `/mmt/po-bahan-mmt/${encodeURIComponent(dataToSave.nomor)}`,
-                payload,
-            );
-        }
-        return await api.post("/mmt/po-bahan-mmt", payload);
-    },
-    onSuccessRoute: "/mmt/finance/po-bahan",
-});
+  const targetItem = formData.detail[targetIndex];
+  if (!targetItem) return;
 
-// Lookup Handlers
-const loadPermintaanDetail = async (mbNomor: string) => {
-    if (!mbNomor) return;
-    try {
-        const res = await api.get(
-            `/mmt/po-bahan-mmt/unfulfilled-mb-detail/${encodeURIComponent(mbNomor)}`,
-        );
-        const data = res.data;
-        const details = data?.Detail || data?.details || [];
-        if (details.length > 0) {
-            formData.value.nomorPermintaan = mbNomor;
-            formData.value.items = details.map((d: any, idx: number) => ({
-                no: idx + 1,
-                kode: d.Kode || "",
-                nama: d.Nama_Bahan || d.Nama || "",
-                satuan: d.Satuan || "MTR",
-                qty: Number(d.Jumlah || d.Qty || 0),
-                harga: Number(d.Harga || 0),
-                discPr: Number(d.Diskon || 0),
-                spk: d.Nomor_SPK || "",
-                keterangan: d.Keterangan || "",
-            }));
-            if (data.Keterangan && !formData.value.keterangan) {
-                formData.value.keterangan = data.Keterangan;
-            }
-            toast.success(`Data permintaan ${mbNomor} berhasil dimuat.`);
-        } else {
-            toast.warning(
-                `Tidak ada item bahan yang belum di-PO pada permintaan ${mbNomor}.`,
-            );
-        }
-    } catch (err: any) {
-        console.error("Gagal load detail permintaan:", err);
-        toast.error(
-            err.response?.data?.message ||
-                "Gagal memuat detail permintaan bahan.",
-        );
-    }
+  // 3. Isi Data Form (Sinkronisasi property agar Nama tampil & Perhitungan M2 jalan)
+  targetItem.kode = bahan.Kode;
+  targetItem.nama = bahan.Nama || "";
+
+  // FIX NAMA: Isi namaext karena template menggunakan v-model="item.namaext"
+  targetItem.namaext =
+    formData.jenisPo === 1 ? `GREIGE ${bahan.Nama || ""}` : bahan.Nama || "";
+
+  targetItem.satuan = bahan.Satuan || "";
+
+  // FIX PERHITUNGAN: Ambil mode harga dari database (M2 atau ROLL)
+  // Ini yang menentukan apakah nanti dikali Luas (P*L) atau cuma kali Qty
+  targetItem.satuanHarga = bahan.brg_satuan_harga;
+
+  // Dimensi untuk perhitungan M2
+  targetItem.panjang = Number(bahan.Panjang) || 0;
+  targetItem.lebar = Number(bahan.Lebar) || 0;
+  targetItem.m2 = targetItem.panjang * targetItem.lebar; // Luas per roll
+
+  // Info tambahan
+  targetItem.gramasi = (bahan as any).Gramasi || "";
+  targetItem.seting = (bahan as any).Setting || "";
+
+  // Harga & Qty
+  targetItem.harga = (bahan as any).Harga || (bahan as any).HrgBeli || 0;
+  targetItem.jumlah = 1; // Default 1 roll
+  targetItem.diskon = 0;
+
+  // 4. Hitung Total (Fungsi ini sekarang akan otomatis cek targetItem.satuanHarga)
+  targetItem.total = calculateTotal(targetItem);
+
+  // 5. Cleanup baris terakhir
+  if (targetIndex === formData.detail.length - 1 && targetItem.kode) {
+    addDetail();
+  }
+
+  currentDetailIndex.value = targetIndex;
+  toast.success(`Bahan ${bahan.Nama} berhasil ditambahkan.`);
+  closeBahanModal();
 };
 
-const onSelectPermintaan = (item: any) => {
-    if (item && item.Nomor) {
-        loadPermintaanDetail(item.Nomor);
-    }
+const handleSPKSelect = (spk: { Spk: string; Nama: string }) => {
+  // ufrmPO.cxGrdMainEditKeyDown (VK_F1, AItem=clspk) logic
+  const i = currentDetailIndex.value;
+  if (i !== null) {
+    formData.detail[i].spk = spk.Spk;
+  }
+  isSPKModalVisible.value = false;
 };
 
-const onPermintaanEnter = () => {
-    const no = formData.value.nomorPermintaan.trim();
-    if (no) {
-        loadPermintaanDetail(no);
-    }
+// --- Opening Modals ---
+const openSupplierSearch = () => {
+  isSupplierModalVisible.value = true;
 };
-
-const onSelectSupplier = (sup: any) => {
-    formData.value.supKode = sup.Kode;
-    formData.value.supNama = sup.Nama;
-    formData.value.supAlamat = sup.Alamat || "";
-    formData.value.supKota = sup.Kota || "";
+const openPoGreigeSearch = () => {
+  isPoGreigeModalVisible.value = true;
 };
-
-const pabrikList = ref<any[]>([]);
-
-const loadPabrikList = async () => {
-    try {
-        const res = await api.get("/lookups/cabang-pabrik");
-        pabrikList.value = res.data?.data?.items || res.data?.data || [];
-
-        // Jika form baru dibuka dan alamatPabrik masih kosong, coba sinkronkan dengan default pabrik
-        if (
-            !isEditMode.value &&
-            !formData.value.alamatPabrik &&
-            formData.value.pabrikNama
-        ) {
-            const q = formData.value.pabrikNama.trim().toLowerCase();
-            const match = pabrikList.value.find(
-                (p: any) =>
-                    (p.Kode && p.Kode.toLowerCase() === q) ||
-                    (p.Nama && p.Nama.toLowerCase() === q) ||
-                    (p.Nama && q.includes(p.Nama.toLowerCase())) ||
-                    (p.Kode && q.includes(p.Kode.toLowerCase())),
-            );
-            if (match) {
-                const alamat = match.Alamat || match.pab_alamat;
-                if (
-                    alamat &&
-                    String(alamat).trim() !== "" &&
-                    String(alamat).trim().toLowerCase() !== "null"
-                ) {
-                    formData.value.alamatPabrik = String(alamat).trim();
-                }
-            }
-        }
-    } catch (e) {
-        console.error("Gagal memuat list pabrik:", e);
-    }
+const openMppbSearch = () => {
+  isMppbModalVisible.value = true;
 };
-
-const onSelectPabrik = (pab: any) => {
-    formData.value.pabrikNama = pab.Nama || pab.pab_nama || pab.Kode || "";
-    const alamat = pab.Alamat || pab.pab_alamat || pab.alamat;
-    if (
-        alamat &&
-        String(alamat).trim() !== "" &&
-        String(alamat).trim().toLowerCase() !== "null"
-    ) {
-        formData.value.alamatPabrik = String(alamat).trim();
-    }
+const openMkbSearch = (index: number) => {
+  currentDetailIndex.value = index;
+  isMkbModalVisible.value = true;
 };
-
-const onPabrikInput = () => {
-    const query = formData.value.pabrikNama;
-    if (!query || !pabrikList.value.length) return;
-    const q = query.trim().toLowerCase();
-    const match = pabrikList.value.find(
-        (p: any) =>
-            (p.Kode && p.Kode.toLowerCase() === q) ||
-            (p.Nama && p.Nama.toLowerCase() === q) ||
-            (p.Nama && q.includes(p.Nama.toLowerCase())) ||
-            (p.Kode && q.includes(p.Kode.toLowerCase())),
+const openBahanSearch = (index: number) => {
+  // Logic: Cek apakah PO Celup dan Greige kosong
+  if (formData.jenisPo === 2 && !formData.poGreige) {
+    toast.warning(
+      "Anda membuat PO Celup. Harap isi No. PO Greige terlebih dahulu.",
     );
-    if (match) {
-        const alamat = match.Alamat || match.pab_alamat;
-        if (
-            alamat &&
-            String(alamat).trim() !== "" &&
-            String(alamat).trim().toLowerCase() !== "null"
-        ) {
-            formData.value.alamatPabrik = String(alamat).trim();
-        }
-    }
+    return;
+  }
+  currentDetailIndex.value = index;
+  isBahanModalVisible.value = true; // 👈 Panggil state yang benar
+};
+const openSPKSearch = (index: number) => {
+  currentDetailIndex.value = index;
+  isSPKModalVisible.value = true;
 };
 
-onMounted(() => {
-    loadPabrikList();
-});
+const loaddataall = async (nomor: string) => {
+  if (!nomor) return;
 
-const openBahanLookup = (idx: number) => {
-    activeRowIndex.value = idx;
-    showBahanModal.value = true;
-};
+  try {
+    const response = await api.get(
+      `${API_BASE_URL}/${encodeURIComponent(nomor)}`,
+    );
+    const data = response.data;
 
-const onSelectBahan = (bhn: any) => {
-    if (
-        activeRowIndex.value !== null &&
-        formData.value.items[activeRowIndex.value]
-    ) {
-        const row = formData.value.items[activeRowIndex.value];
-        row.kode = bhn.Kode;
-        row.nama = bhn.Nama;
-        row.satuan = bhn.Satuan || "MTR";
-    }
-};
+    const safeDate = (v: any) => {
+      if (!v) return "";
+      const d = parseISO(v);
+      return isValid(d) ? format(d, "yyyy-MM-dd") : "";
+    };
 
-const openSpkLookup = (idx: number) => {
-    activeRowIndex.value = idx;
-    showSpkModal.value = true;
-};
+    // --- Header Data ---
+    formData.nomor = data.Nomor;
+    formData.tanggal = safeDate(data.Tanggal);
+    formData.supKode = data.KodeSup;
+    formData.supNama = data.SupNama;
+    formData.supAlamat = data.SupAlamat;
+    formData.supKota = data.SupKota;
 
-const onSelectSpk = (spk: any) => {
-    if (
-        activeRowIndex.value !== null &&
-        formData.value.items[activeRowIndex.value]
-    ) {
-        const row = formData.value.items[activeRowIndex.value];
-        row.spk = spk.Nomor || spk.spk_nomor || "";
-    }
-};
+    formData.jenisPo = data.JenisPo;
+    formData.poGreige = data.PoGreige || "";
 
-const addItem = () => {
-    formData.value.items.push({
-        no: formData.value.items.length + 1,
-        kode: "",
-        nama: "",
-        satuan: "MTR",
-        qty: 1,
-        harga: 0,
-        discPr: 0,
-        spk: "",
-        keterangan: "",
+    // FIX NOMOR PERMINTAAN: Ambil dari key baru hasil mapping backend
+    formData.nomorPermintaan = data.NomorPermintaan || "";
+
+    formData.mppbNomor = data.MppbNomor || "";
+    formData.mppbTanggal = safeDate(data.MppbTanggal);
+    formData.mppbJumlah = data.MppbJumlah || 0;
+
+    // FIX PABRIK & ALAMAT KIRIM: Sinkronisasi field alamat tujuan pabrik
+    formData.AlamatPabrik = data.AlamatPabrik || "";
+    formData.pabrikNama = data.AlamatPabrik ? "Lokasi Terdaftar" : "";
+
+    formData.note = data.Note || data.Keterangan || ""; // Sesuaikan mapping note
+    formData.keterangan = data.Keterangan || "";
+
+    formData.isPpn = data.IsPpn === 1 || data.isPpn === true;
+    formData.ppnRate = data.PpnRate || user.defaultPpn;
+
+    formData.status = data.Status;
+    formData.poAcc = data.po_acc || data.PoAcc || "N";
+
+    // --- DETAIL ITEM ---
+    formData.detail = (data.Detail || []).map((d: any) => {
+      const p = Number(d.panjang || d.Panjang || 0);
+      const l = Number(d.lebar || d.Lebar || 0);
+
+      const m2Calculated = p * l;
+      const m2Value = Number(d.m2 || d.M2) || m2Calculated;
+
+      let sHrg = (d.satuanHarga || d.brg_satuan_harga || d.sat_hrg || "")
+        .toLowerCase()
+        .trim();
+      if (!sHrg && m2Value > 0) {
+        sHrg = "m2";
+      }
+
+      const item: DetailItem = {
+        ...createEmptyDetail(),
+        ...d,
+        satuanHarga: sHrg || "roll",
+        panjang: p,
+        lebar: l,
+        m2: m2Value,
+        jumlah: Number(d.jumlah || d.Jumlah || 0),
+        harga: Number(d.harga || d.Harga || 0),
+        diskon: Number(d.diskon || d.Diskon || 0),
+      };
+
+      item.total = calculateTotal(item);
+      return item;
     });
+
+    // Tambahkan baris kosong di akhir untuk input baru
+    formData.detail.push(createEmptyDetail());
+
+    // --- COMMITMENT & ROLL ---
+    formData.commitments = [
+      {
+        no: 1,
+        tanggal: safeDate(
+          data.Dateline || data.po_dateline || data.po_tglkirim,
+        ),
+        jumlah: 0,
+      },
+    ];
+    formData.rolls = data.Rolls || [];
+
+    isEditMode.value = true;
+
+    // RE-CALCULATE ALL
+    hitung();
+  } catch (err) {
+    console.error("Load Data Error:", err);
+    toast.error("Gagal memuat data PO.");
+    router.push({ name: 'PoBahanMmtBrowse' });
+  }
 };
 
-const removeItem = (idx: number) => {
-    formData.value.items.splice(idx, 1);
-    formData.value.items.forEach((it, i) => (it.no = i + 1));
-};
-
-const subTotal = computed(() => {
-    return formData.value.items.reduce((sum, it) => {
-        const net = it.qty * it.harga * (1 - (it.discPr || 0) / 100);
-        return sum + net;
-    }, 0);
+onMounted(async () => {
+  if (route.params.nomor) {
+    await loaddataall(route.params.nomor as string);
+  } else {
+    refreshData();
+  }
 });
 
-const ppnNominal = computed(() => {
-    return formData.value.isPpn ? Math.round(subTotal.value * 0.11) : 0;
-});
-
-const grandTotal = computed(() => subTotal.value + ppnNominal.value);
-const fmt = (v: number) =>
-    new Intl.NumberFormat("id-ID").format(Math.round(v || 0));
+// Watcher untuk re-hitung total ketika ada perubahan di detail
+watch(formData.detail, hitung, { deep: true });
 </script>
 
-<template>
-    <BaseForm
-        :title="
-            isEditMode
-                ? `Ubah PO Bahan MMT (${formData.nomor})`
-                : 'Tambah PO Bahan MMT Baru'
-        "
-        menu-id="5504"
-        :icon="IconShoppingCart"
-        :is-loading="isLoading"
-        :is-saving="isSaving"
-        item-name="PO Bahan MMT"
-        desktop-mode
-        v-model:show-save-dialog="showSaveDialog"
-        v-model:show-cancel-dialog="showCancelDialog"
-        v-model:show-close-dialog="showCloseDialog"
-        @validate-save="showSaveDialog = true"
-        @confirm-save="executeSave"
-        @confirm-cancel="executeCancel"
-        @confirm-close="executeClose"
-    >
-        <!-- ── KOLOM KIRI (HEADER & SUPPLIER SESUAI MMT) ── -->
-        <template #left-column>
-            <div class="desktop-form-section header-section">
-                <div class="section-label">Data Header PO</div>
-
-                <div class="fr">
-                    <label class="lbl">Nomor PO</label>
-                    <input
-                        :value="formData.nomor"
-                        readonly
-                        class="inp ro"
-                        style="width: 150px"
-                        placeholder="← Auto"
-                    />
-                </div>
-
-                <div class="fr">
-                    <label class="lbl">Tanggal PO</label>
-                    <input
-                        type="date"
-                        v-model="formData.tanggal"
-                        class="idate"
-                        style="width: 150px"
-                    />
-                </div>
-
-                <div class="fr">
-                    <label class="lbl">Dateline Kirim</label>
-                    <input
-                        type="date"
-                        v-model="formData.dateline"
-                        class="idate"
-                        style="width: 150px"
-                    />
-                </div>
-
-                <!-- No. Permintaan Lookup -->
-                <div class="fr">
-                    <label class="lbl">No. Permintaan</label>
-                    <div class="igrp flex-grow-1">
-                        <input
-                            v-model="formData.nomorPermintaan"
-                            class="inp"
-                            placeholder="Cari..."
-                            @click="showPermintaanModal = true"
-                            @keydown.enter.prevent="onPermintaanEnter"
-                        />
-                        <button
-                            type="button"
-                            class="blkp"
-                            title="Cari Permintaan Bahan"
-                            @click="showPermintaanModal = true"
-                        >
-                            <IconSearch :size="13" />
-                        </button>
-                    </div>
-                </div>
-
-                <div class="fr">
-                    <label class="lbl">PPN (11%)</label>
-                    <label class="ck">
-                        <input type="checkbox" v-model="formData.isPpn" />
-                    </label>
-                </div>
-            </div>
-
-            <div class="desktop-form-section">
-                <div class="section-label">Supplier & Pabrik</div>
-
-                <!-- Supplier Lookup -->
-                <div class="fr">
-                    <label class="lbl">Kode Sup</label>
-                    <div class="igrp" style="width: 130px">
-                        <input
-                            v-model="formData.supKode"
-                            class="inp"
-                            placeholder="Cari..."
-                            @click="showSupplierModal = true"
-                        />
-                        <button
-                            type="button"
-                            class="blkp"
-                            title="Cari Supplier"
-                            @click="showSupplierModal = true"
-                        >
-                            <IconSearch :size="13" />
-                        </button>
-                    </div>
-                </div>
-
-                <div class="fr">
-                    <label class="lbl">Supplier</label>
-                    <input
-                        :value="formData.supNama"
-                        readonly
-                        class="inp ro flex-grow-1"
-                        placeholder="Otomatis dari supplier..."
-                    />
-                </div>
-
-                <div class="fr">
-                    <label class="lbl">Alamat</label>
-                    <input
-                        :value="formData.supAlamat"
-                        readonly
-                        class="inp ro flex-grow-1"
-                        placeholder="Otomatis dari supplier..."
-                    />
-                </div>
-
-                <div class="fr">
-                    <label class="lbl">Kota</label>
-                    <input
-                        :value="formData.supKota"
-                        readonly
-                        class="inp ro flex-grow-1"
-                        placeholder="Otomatis dari supplier..."
-                    />
-                </div>
-
-                <div class="sep my-1" />
-
-                <!-- Pabrik / Lokasi Kirim Lookup -->
-                <div class="fr">
-                    <label class="lbl">Kirim Ke</label>
-                    <div class="igrp flex-grow-1">
-                        <input
-                            v-model="formData.pabrikNama"
-                            class="inp"
-                            placeholder="Cari..."
-                            @input="onPabrikInput"
-                            @click="showPabrikModal = true"
-                        />
-                        <button
-                            type="button"
-                            class="blkp"
-                            title="Pilih Pabrik"
-                            @click="showPabrikModal = true"
-                        >
-                            <IconSearch :size="13" />
-                        </button>
-                    </div>
-                </div>
-
-                <div class="fr">
-                    <label class="lbl">Alamat Kirim</label>
-                    <input
-                        v-model="formData.alamatPabrik"
-                        class="inp flex-grow-1"
-                        placeholder="Alamat Kirim..."
-                    />
-                </div>
-
-                <div class="fr">
-                    <label class="lbl">Keterangan</label>
-                    <input
-                        v-model="formData.keterangan"
-                        class="inp flex-grow-1"
-                        placeholder="Keterangan..."
-                    />
-                </div>
-
-                <div class="fr">
-                    <label class="lbl">Note</label>
-                    <textarea
-                        v-model="formData.note"
-                        class="ta flex-grow-1"
-                        rows="2"
-                        placeholder="Catatan tambahan..."
-                    ></textarea>
-                </div>
-            </div>
-        </template>
-
-        <!-- ── KOLOM KANAN (GRID BAHAN & KALKULASI SESUAI MMT) ── -->
-        <template #right-column>
-            <div class="desktop-form-section d-flex flex-column h-100 pa-0">
-                <div class="tbl-header">
-                    <span class="tbl-title">Rincian Item Bahan MMT</span>
-                    <button type="button" class="btn-add" @click="addItem">
-                        <IconPlus :size="13" class="mr-1" /> Tambah Baris
-                    </button>
-                </div>
-
-                <div
-                    class="tbl-wrap flex-grow-1"
-                    style="min-height: 280px; max-height: calc(100vh - 350px)"
-                >
-                    <table class="gt">
-                        <thead>
-                            <tr>
-                                <th style="width: 35px" class="tc">No</th>
-                                <th style="width: 140px">Kode Bahan</th>
-                                <th>Nama Bahan</th>
-                                <th style="width: 70px" class="tc">Satuan</th>
-                                <th style="width: 80px" class="tr">Qty</th>
-                                <th style="width: 110px" class="tr">Harga</th>
-                                <th style="width: 65px" class="tr">Disc %</th>
-                                <th style="width: 120px" class="tr">
-                                    Subtotal
-                                </th>
-                                <th style="width: 130px">No. SPK</th>
-                                <th style="width: 130px">Keterangan</th>
-                                <th style="width: 35px" class="tc"></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr v-for="(it, idx) in formData.items" :key="idx">
-                                <td class="tc">{{ it.no }}</td>
-                                <td class="p0">
-                                    <div
-                                        class="igrp w-100"
-                                        style="border: none; height: 100%"
-                                    >
-                                        <input
-                                            type="text"
-                                            v-model="it.kode"
-                                            class="ci"
-                                            placeholder="Kode..."
-                                            @click="openBahanLookup(idx)"
-                                        />
-                                        <button
-                                            type="button"
-                                            class="blkp"
-                                            style="height: 100%; border: none"
-                                            @click="openBahanLookup(idx)"
-                                        >
-                                            <IconSearch :size="11" />
-                                        </button>
-                                    </div>
-                                </td>
-                                <td class="p0">
-                                    <input
-                                        type="text"
-                                        :value="it.nama"
-                                        readonly
-                                        class="ci ro"
-                                        placeholder="Auto..."
-                                    />
-                                </td>
-                                <td class="p0">
-                                    <input
-                                        type="text"
-                                        :value="it.satuan"
-                                        readonly
-                                        class="ci tc ro"
-                                    />
-                                </td>
-                                <td class="p0">
-                                    <input
-                                        type="number"
-                                        v-model.number="it.qty"
-                                        class="ci tr fw"
-                                    />
-                                </td>
-                                <td class="p0">
-                                    <input
-                                        type="number"
-                                        v-model.number="it.harga"
-                                        class="ci tr"
-                                    />
-                                </td>
-                                <td class="p0">
-                                    <input
-                                        type="number"
-                                        v-model.number="it.discPr"
-                                        class="ci tr"
-                                    />
-                                </td>
-                                <td class="tr fw ro">
-                                    {{
-                                        fmt(
-                                            it.qty *
-                                                it.harga *
-                                                (1 - (it.discPr || 0) / 100),
-                                        )
-                                    }}
-                                </td>
-                                <td class="p0">
-                                    <div
-                                        class="igrp w-100"
-                                        style="border: none; height: 100%"
-                                    >
-                                        <input
-                                            type="text"
-                                            v-model="it.spk"
-                                            class="ci"
-                                            placeholder="SPK..."
-                                            @click="openSpkLookup(idx)"
-                                        />
-                                        <button
-                                            type="button"
-                                            class="blkp"
-                                            style="height: 100%; border: none"
-                                            @click="openSpkLookup(idx)"
-                                        >
-                                            <IconSearch :size="11" />
-                                        </button>
-                                    </div>
-                                </td>
-                                <td class="p0">
-                                    <input
-                                        type="text"
-                                        v-model="it.keterangan"
-                                        class="ci"
-                                        placeholder="Ket..."
-                                    />
-                                </td>
-                                <td class="tc p0">
-                                    <button
-                                        type="button"
-                                        class="btn-del"
-                                        @click="removeItem(idx)"
-                                    >
-                                        <IconTrash :size="13" />
-                                    </button>
-                                </td>
-                            </tr>
-                            <tr v-if="formData.items.length === 0">
-                                <td
-                                    colspan="11"
-                                    class="tc py-4 text-grey text-caption"
-                                >
-                                    Belum ada item bahan. Klik '+ Tambah Baris'
-                                    di atas.
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-
-                <!-- Summary Footer Kanan Bawah -->
-                <div class="summary-footer">
-                    <div class="sum-item">
-                        <span>Subtotal:</span>
-                        <b>Rp {{ fmt(subTotal) }}</b>
-                    </div>
-                    <div v-if="formData.isPpn" class="sum-item">
-                        <span>PPN (11%):</span>
-                        <b>Rp {{ fmt(ppnNominal) }}</b>
-                    </div>
-                    <div class="sum-item grand">
-                        <span>Grand Total:</span>
-                        <b>Rp {{ fmt(grandTotal) }}</b>
-                    </div>
-                </div>
-            </div>
-        </template>
-    </BaseForm>
-
-    <!-- Modals Lookup -->
-    <PermintaanBahanMmtSearchModal
-        v-model="showPermintaanModal"
-        @selected="onSelectPermintaan"
-    />
-
-    <SupplierSearchModal
-        v-model="showSupplierModal"
-        @selected="onSelectSupplier"
-    />
-
-    <PabrikSearchModal v-model="showPabrikModal" @selected="onSelectPabrik" />
-
-    <BahanMmtSearchModal v-model="showBahanModal" @selected="onSelectBahan" />
-
-    <SpkSearchModal v-model="showSpkModal" @selected="onSelectSpk" />
-</template>
-
 <style scoped>
-/* ── Form Section Standar Manksi ── */
+/* =============================================================
+   1. GRID STRUCTURE & BASE STYLES
+   ============================================================= */
+.form-grid-container {
+  display: grid;
+  grid-template-columns: 350px 1fr;
+  gap: 10px;
+  padding: 5px;
+  align-items: flex-start;
+}
+
+.detail-entry-table :deep(table) {
+  table-layout: fixed;
+  width: 100%;
+}
+
+/* Header */
+.detail-entry-table :deep(th) {
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  padding: 4px 6px !important;
+  background: #fafafa;
+}
+
+/* Cell */
+.detail-entry-table :deep(td) {
+  padding: 2px 6px !important;
+  height: 28px !important;
+  vertical-align: middle;
+}
+
+.text-right-input {
+  width: 100%;
+}
+
+.text-right-input :deep(.v-field) {
+  min-height: 20px !important;
+  height: 20px !important;
+  padding: 0 !important;
+}
+
+.text-right-input :deep(input) {
+  text-align: right;
+  font-size: 10px;
+  padding: 0 !important;
+  line-height: 20px;
+}
+
+.cell-text {
+  font-size: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cell-number {
+  text-align: right;
+  font-weight: 500;
+  font-size: 10px;
+}
+
+.left-column,
+.right-column {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
 .desktop-form-section {
-    background: white;
-    border: 1px solid #e0e0e0;
-    border-radius: 6px;
-    padding: 12px;
-    margin-bottom: 10px;
-    font-family: "Segoe UI", system-ui, sans-serif;
-    font-size: 11px;
-}
-.section-label {
-    font-size: 11px;
-    font-weight: 700;
-    color: #1565c0;
-    text-transform: uppercase;
-    margin-bottom: 8px;
-    border-bottom: 1px solid #f0f0f0;
-    padding-bottom: 4px;
-}
-.fr {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin-bottom: 6px;
-}
-.lbl {
-    width: 95px;
-    flex-shrink: 0;
-    font-weight: 600;
-    color: #444;
-    font-size: 11px;
-}
-.inp {
-    height: 24px;
-    border: 1px solid #ccc;
-    border-radius: 3px;
-    padding: 0 6px;
-    font-size: 11px;
-    background: white;
-    outline: none;
-    min-width: 0;
-}
-.inp:focus,
-.idate:focus,
-.ta:focus {
-    border-color: #1976d2;
-}
-.ro {
-    background: #f5f5f5 !important;
-    color: #555 !important;
-}
-.idate {
-    height: 24px;
-    border: 1px solid #ccc;
-    border-radius: 3px;
-    padding: 0 4px;
-    font-size: 11px;
-    background: white;
-    outline: none;
-}
-.ta {
-    border: 1px solid #ccc;
-    border-radius: 3px;
-    padding: 4px 6px;
-    font-size: 11px;
-    outline: none;
-    font-family: inherit;
-}
-.ck {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 11px;
-    cursor: pointer;
-}
-.sep {
-    height: 1px;
-    background: #eee;
-    width: 100%;
-}
-.tc {
-    text-align: center;
-}
-.tr {
-    text-align: right;
-}
-.fw {
-    font-weight: 700;
-}
-.p0 {
-    padding: 0 !important;
+  width: 100%;
 }
 
-/* ── Input Group Lookup ── */
-.igrp {
-    display: flex;
-    align-items: center;
-    border: 1px solid #ccc;
-    border-radius: 3px;
-    background: white;
-    height: 24px;
-    overflow: hidden;
-}
-.igrp .inp {
-    border: none;
-    border-radius: 0;
-    flex: 1;
-}
-.blkp {
-    background: #f0f0f0;
-    border: none;
-    border-left: 1px solid #ccc;
-    height: 100%;
-    padding: 0 6px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #555;
-}
-.blkp:hover {
-    background: #e0e0e0;
-    color: #1565c0;
+/* Styling Umum Tabel */
+.v-table,
+.detail-table {
+  font-size: 11px; /* Font size detail */
 }
 
-/* ── Grid Table Kanan ── */
-.tbl-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    background: #1565c0;
-    color: white;
-    padding: 6px 12px;
-    border-radius: 6px 6px 0 0;
-}
-.tbl-title {
-    font-size: 11px;
-    font-weight: 700;
-    text-transform: uppercase;
-}
-.btn-add {
-    background: rgba(255, 255, 255, 0.2);
-    color: white;
-    border: 1px solid rgba(255, 255, 255, 0.4);
-    padding: 3px 8px;
-    font-size: 11px;
-    font-weight: 600;
-    cursor: pointer;
-    border-radius: 3px;
-}
-.btn-add:hover {
-    background: rgba(255, 255, 255, 0.3);
-}
-.tbl-wrap {
-    overflow: auto;
-    border: 1px solid #ccc;
-    border-top: none;
-    background: white;
-}
-.gt {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 11px;
-}
-.gt th {
-    background: #f5f5f5;
-    border-bottom: 2px solid #ddd;
-    border-right: 1px solid #e0e0e0;
-    padding: 5px 6px;
-    text-align: left;
-    font-weight: 700;
-    white-space: nowrap;
-}
-.gt td {
-    border-bottom: 1px solid #eee;
-    border-right: 1px solid #f0f0f0;
-    padding: 4px 6px;
-}
-.ci {
-    width: 100%;
-    height: 24px;
-    border: none;
-    outline: none;
-    padding: 0 4px;
-    font-size: 11px;
-    background: transparent;
-}
-.ci:focus {
-    background: #e3f2fd;
-}
-.btn-del {
-    background: transparent;
-    border: none;
-    color: #e53935;
-    cursor: pointer;
-    padding: 2px;
-}
-.btn-del:hover {
-    color: #b71c1c;
+/* Wrapper untuk Scroll pada Detail */
+.detail-table-wrapper {
+  max-height: calc(100vh - 300px);
+  overflow-y: auto;
 }
 
-/* ── Summary Footer ── */
-.summary-footer {
-    display: flex;
-    justify-content: flex-end;
-    gap: 16px;
-    padding: 8px 12px;
-    background: #fafafa;
-    border: 1px solid #ccc;
-    border-top: none;
-    border-radius: 0 0 6px 6px;
-    font-size: 11px;
+/* =============================================================
+   2. INPUT HEADER (LEFT COLUMN) - LONGGAR
+   ============================================================= */
+/* Menargetkan Input utama di kolom kiri */
+.left-column :deep(.v-field__input) {
+  /* Padding Vertikal lebih besar (Membuat input lebih tinggi) */
+  padding-top: 15px !important;
+  padding-bottom: 7px !important;
+  min-height: 25px;
+  font-size: 12px;
 }
-.sum-item {
-    display: flex;
-    align-items: center;
-    gap: 6px;
+
+.left-column :deep(.v-field__field) {
+  /* Padding di wrapper agar elemen lain (seperti ikon) sejajar */
+  padding-top: 2px !important;
+  padding-bottom: 2px !important;
 }
-.sum-item.grand {
-    color: #1565c0;
-    font-size: 12px;
+
+/* =============================================================
+   3. DETAIL TABLE (RIGHT COLUMN) - RINGKAS
+   ============================================================= */
+
+/* A. Padding Cell (td) */
+.detail-entry-table :deep(.v-data-table__td) {
+  /* Mengurangi padding cell secara keseluruhan */
+  padding: 1px 3px !important;
+  height: 30px !important; /* Tinggi baris minimum */
+  vertical-align: middle;
+}
+
+/* B. Padding Input Field di dalam Cell */
+.detail-entry-table :deep(.v-field__input),
+.detail-entry-table :deep(.v-field__field) {
+  min-height: 22px !important;
+  height: 22px !important; /* Memaksa tinggi */
+  font-size: 10px;
+  padding-top: 3px !important;
+  padding-bottom: 3px !important;
+  padding-left: 3px !important;
+  padding-right: 5px !important;
+}
+
+/* C. Fix untuk Combobox/Select agar dropdown ikon sejajar */
+.detail-entry-table
+  :deep(.v-input--density-compact .v-field__clearable ~ .v-field__append-inner),
+.detail-entry-table :deep(.v-input--density-compact .v-field__append-inner) {
+  /* Menggeser ikon append/dropdown agar center di baris yang sangat sempit */
+  padding-top: 0px !important;
+}
+
+/* D. Perataan Angka */
+.text-right :deep(input) {
+  text-align: right !important;
 }
 </style>

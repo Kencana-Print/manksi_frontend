@@ -1,64 +1,55 @@
+// Tipe node & metadata khusus Relationship Map MMT
+// (pengganti versi garmen yang belum ada di repo ini).
+
+export type NodeType =
+  | "MAP"
+  | "SPK"
+  | "SO"
+  | "LHK_CETAK"
+  | "LHK_TEKSTIL"
+  | "LHK_PROOF"
+  | "LHK_PAPERPRINT"
+  | "LHK_SUBLIM"
+  | "LHK_FINISHING"
+  | "STBJ"
+  | "JADWAL_KIRIM"
+  | "SJ";
+
+export interface DocNode {
+  type: NodeType;
+  nomor: string;
+  label?: string;
+  tanggal?: string;
+  jumlah?: number;
+  kategori?: string;
+  approveStatus?: string;
+  isProforma?: boolean;
+  hasBast?: boolean;
+  jumlahJadi?: number;
+  isSelesai?: boolean;
+  isDiterima?: boolean;
+  cabangAsal?: string;
+  cabangTujuan?: string;
+  gdgAsal?: string;
+  gdgTujuan?: string;
+  statusPengiriman?: string;
+  noFakturPajak?: string;
+  hasKuitansi?: boolean;
+  isExportedPpn?: boolean;
+  [key: string]: any;
+}
+
 export const TYPE_META: Record<string, { label: string; color: string }> = {
-  PRA_ORDER: { label: "Pra Order", color: "#795548" },
-  KONFIRMASI_PRA_ORDER: { label: "Konfirmasi Pra Order", color: "#5d4037" },
-  PERMINTAAN_HARGA: { label: "Permintaan Harga", color: "#9b59b6" },
-  PENAWARAN: { label: "Penawaran", color: "#8e44ad" },
-  MAP: { label: "MAP", color: "#2980b9" },
-  SPK: { label: "SPK", color: "#16a085" },
-  SO: { label: "SO", color: "#1abc9c" },
-  PROOF: { label: "Proof Garmen", color: "#f39c12" },
-  SJ_MEMO: { label: "SJ Memo", color: "#34495e" },
-  MPPB: { label: "MPPB", color: "#0e6655" },
-  MKB: { label: "MKB", color: "#e67e22" },
-  PO: { label: "PO", color: "#d35400" },
-  QC_BAHAN: { label: "QC BAHAN", color: "#00838f" },
-  TINDAK_LANJUT_QC: { label: "TINDAK LANJUT QC", color: "#006064" },
-  BPB: { label: "BPB", color: "#7f8c8d" },
-  BPB_NON_BAHAN: { label: "BPB Non Bahan", color: "#95a5a6" },
-  STBJ: { label: "STBJ", color: "#c0392b" },
-  SJ: { label: "Surat Jalan", color: "#2c3e50" },
-  INVOICE: { label: "Invoice", color: "#27ae60" },
-  VOUCHER: { label: "Voucher", color: "#1565c0" },
-  PLANNING_PPIC: { label: "Planning PPIC", color: "#8e44ad" },
-  PERMINTAAN_BAHAN: { label: "Permintaan Bahan", color: "#d68910" },
-  REALISASI_MINTA_BAHAN: { label: "Realisasi Minta Bahan", color: "#ca6f1e" },
-  RETUR_LOG: { label: "Retur (Log)", color: "#a04000" },
-  RETUR_BAHAN: { label: "Retur (Approved)", color: "#784212" },
-  MKA: { label: "MKA", color: "#16a5a0" },
-  PERMINTAAN_GARMEN: { label: "Permintaan Garmen", color: "#af601a" },
-  REALISASI_GARMEN: { label: "Realisasi Garmen", color: "#935116" },
-  PERMINTAAN_PEMBELIAN: { label: "Permintaan Pembelian", color: "#6c3483" },
-  KASBON: { label: "REALISASI UANG MUKA", color: "#1e8449" },
-  PENGAJUAN_DANA: { label: "PENGAJUAN DANA", color: "#00796b" },
-  PENGAJUAN_UANG_MUKA: { label: "PENGAJUAN UANG MUKA", color: "#00695c" },
-  PENYELESAIAN_UANG_MUKA: { label: "PENYELESAIAN UANG MUKA", color: "#004d40" },
-  BKK: { label: "BKK", color: "#37474f" },
-  BBK: { label: "BBK", color: "#455a64" },
-  KLAIM_KAS_KECIL: { label: "KLAIM KAS KECIL", color: "#6a1b9a" },
-  PENGAJUAN_TRANSFER: { label: "PENGAJUAN TRANSFER", color: "#0277bd" },
-  REALISASI_PENGAJUAN_TRANSFER: {
-    label: "REALISASI PENGAJUAN TRANSFER",
-    color: "#01579b",
-  },
-  BKM: { label: "BKM", color: "#2e7d32" },
-  REKAP_PEMBAYARAN: { label: "REKAP PEMBAYARAN", color: "#8d6e63" },
-  MUTASI_OUT: { label: "Mutasi Out", color: "#b9770e" },
-  PO_NON_BAHAN: { label: "PO Non Bahan", color: "#a04000" },
-  MUTASI_PRODUKSI: { label: "Mutasi Produksi", color: "#7d6608" },
-  PO_JASA: { label: "PO Jasa", color: "#6e2c00" },
-  BPJ: { label: "BPJ", color: "#873600" },
-  PO_INTERNAL: { label: "PO Internal SPK", color: "#5b2c6f" },
-  SJ_PO_INTERNAL: { label: "SJ PO Internal", color: "#4a235a" },
-  JADWAL_KIRIM: { label: "Jadwal Kirim", color: "#117864" },
-  SJ_TAK_NORMAL: { label: "SJ Tak Normal", color: "#1b2631" },
-  INVOICE_TAK_NORMAL: { label: "Invoice Tak Normal", color: "#7b241c" },
-  PENERIMAAN_PIUTANG: { label: "Penerimaan Piutang", color: "#1f618d" },
-  PELUNASAN_PIUTANG: { label: "Pelunasan Piutang", color: "#154360" },
-  MAKLON: { label: "MAKLON BARANG", color: "#5e35b1" },
-  SJ_KELUAR_MAKLON: { label: "SJ KELUAR MAKLON", color: "#7e57c2" },
-  LHK_MAKLON: { label: "LHK MAKLON", color: "#4527a0" },
-  SJ_HASIL_MAKLON: { label: "SJ HASIL MAKLON", color: "#9575cd" },
-  TERIMA_MAKLON: { label: "TERIMA HASIL MAKLON", color: "#311b92" },
-  COMPLAIN_CUSTOMER: { label: "COMPLAIN CUSTOMER", color: "#c62828" },
-  BAP_PRODUKSI: { label: "BAP PRODUKSI", color: "#ef6c00" },
+  MAP: { label: "MAP", color: "#1565c0" },
+  SPK: { label: "SPK", color: "#009688" },
+  SO: { label: "SO", color: "#00acc1" },
+  LHK_CETAK: { label: "LHK Cetak", color: "#7b1fa2" },
+  LHK_TEKSTIL: { label: "LHK Tekstil", color: "#6a1b9a" },
+  LHK_PROOF: { label: "LHK Proof", color: "#5e35b1" },
+  LHK_PAPERPRINT: { label: "LHK Paperprint", color: "#4527a0" },
+  LHK_SUBLIM: { label: "LHK Sublim", color: "#3949ab" },
+  LHK_FINISHING: { label: "LHK Finishing", color: "#00838f" },
+  STBJ: { label: "STBJ", color: "#ef6c00" },
+  JADWAL_KIRIM: { label: "Jadwal Kirim", color: "#00695c" },
+  SJ: { label: "Surat Jalan", color: "#37474f" },
 };

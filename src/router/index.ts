@@ -4034,6 +4034,44 @@ const router = createRouter({
       },
     },
     {
+      path: "/mmt/bahan-baku-produksi/pengajuan-koreksi-stok",
+      name: "PengajuanKoreksiStokBrowse",
+      component: () =>
+        import("@/views/mmt/bahan-baku-produksi/PengajuanKoreksiStokView.vue"),
+      meta: {
+        title: "Pengajuan Koreksi Stok",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5535",
+      },
+    },
+    {
+      path: "/mmt/bahan-baku-produksi/pengajuan-koreksi-stok/create",
+      name: "PengajuanKoreksiStokCreate",
+      component: () =>
+        import("@/views/mmt/bahan-baku-produksi/PengajuanKoreksiStokFormView.vue"),
+      meta: {
+        title: "Baru Pengajuan Koreksi Stok",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5535",
+        browseRoute: "PengajuanKoreksiStokBrowse",
+      },
+    },
+    {
+      path: "/mmt/bahan-baku-produksi/pengajuan-koreksi-stok/edit/:nomor",
+      name: "PengajuanKoreksiStokEdit",
+      component: () =>
+        import("@/views/mmt/bahan-baku-produksi/PengajuanKoreksiStokFormView.vue"),
+      meta: {
+        title: "Ubah Pengajuan Koreksi Stok",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5535",
+        browseRoute: "PengajuanKoreksiStokBrowse",
+      },
+    },
+    {
       path: "/mmt/bahan-baku-produksi/permintaan-produksi",
       name: "PermintaanProduksiBrowse",
       component: () =>
@@ -4453,12 +4491,71 @@ const router = createRouter({
       },
     },
     {
+      path: "/mmt/lhk/cetak-mmt/create",
+      name: "LhkApprovalCetakCreate",
+      component: () => import("@/views/mmt/lhk/LhkApprovalCetakFormView.vue"),
+      meta: {
+        title: "Baru LHK Approval Cetak",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5508",
+        browseRoute: "LhkApprovalCetakBrowse",
+      },
+    },
+    {
+      path: "/mmt/lhk/cetak-mmt/edit/:nomor",
+      name: "LhkApprovalCetakEdit",
+      component: () => import("@/views/mmt/lhk/LhkApprovalCetakFormView.vue"),
+      meta: {
+        title: "Ubah LHK Approval Cetak",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5508",
+        browseRoute: "LhkApprovalCetakBrowse",
+      },
+    },
+    {
       path: "/mmt/lhk/tekstil",
       name: "LhkTekstilBrowse",
       component: () => import("@/views/mmt/lhk/LhkTekstilView.vue"),
       meta: {
         title: "LHK Tekstil",
         layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5509",
+      },
+    },
+    {
+      path: "/mmt/lhk/tekstil/create",
+      name: "LhkTekstilCreate",
+      component: () => import("@/views/mmt/lhk/LhkTekstilFormView.vue"),
+      meta: {
+        title: "Baru LHK Tekstil",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5509",
+        browseRoute: "LhkTekstilBrowse",
+      },
+    },
+    {
+      path: "/mmt/lhk/tekstil/edit/:nomor",
+      name: "LhkTekstilEdit",
+      component: () => import("@/views/mmt/lhk/LhkTekstilFormView.vue"),
+      meta: {
+        title: "Ubah LHK Tekstil",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5509",
+        browseRoute: "LhkTekstilBrowse",
+      },
+    },
+    {
+      path: "/mmt/lhk/tekstil/print/:nomor",
+      name: "LhkTekstilPrint",
+      component: () => import("@/views/mmt/lhk/LhkTekstilPrintView.vue"),
+      meta: {
+        title: "Cetak LHK Tekstil",
+        layout: "BlankLayout",
         requiresAuth: true,
         menuId: "5509",
       },
@@ -4475,6 +4572,30 @@ const router = createRouter({
       },
     },
     {
+      path: "/mmt/lhk/tekstil/approve/create",
+      name: "LhkApprovalTekstilCreate",
+      component: () => import("@/views/mmt/lhk/LhkApprovalTekstilFormView.vue"),
+      meta: {
+        title: "Baru Approval Tekstil",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5510",
+        browseRoute: "LhkApprovalTekstilBrowse",
+      },
+    },
+    {
+      path: "/mmt/lhk/tekstil/approve/edit/:nomor",
+      name: "LhkApprovalTekstilEdit",
+      component: () => import("@/views/mmt/lhk/LhkApprovalTekstilFormView.vue"),
+      meta: {
+        title: "Ubah Approval Tekstil",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5510",
+        browseRoute: "LhkApprovalTekstilBrowse",
+      },
+    },
+    {
       path: "/mmt/lhk/finishing",
       name: "LhkFinishingBrowse",
       component: () => import("@/views/mmt/lhk/LhkFinishingView.vue"),
@@ -4483,6 +4604,54 @@ const router = createRouter({
         layout: "DefaultLayout",
         requiresAuth: true,
         menuId: "5511",
+      },
+    },
+    {
+      path: "/mmt/lhk/finishing/create",
+      name: "LhkFinishingCreate",
+      component: () => import("@/views/mmt/lhk/LhkFinishingFormView.vue"),
+      meta: {
+        title: "Baru LHK Finishing",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5511",
+        browseRoute: "LhkFinishingBrowse",
+      },
+    },
+    {
+      path: "/mmt/lhk/finishing/edit/:nomor",
+      name: "LhkFinishingEdit",
+      component: () => import("@/views/mmt/lhk/LhkFinishingFormView.vue"),
+      meta: {
+        title: "Ubah LHK Finishing",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5511",
+        browseRoute: "LhkFinishingBrowse",
+      },
+    },
+    {
+      path: "/mmt/lhk/finishing/rekap",
+      name: "LhkFinishingRekap",
+      component: () => import("@/views/mmt/lhk/LhkFinishingRekapFormView.vue"),
+      meta: {
+        title: "Rekap LHK Finishing",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5511",
+        browseRoute: "LhkFinishingBrowse",
+      },
+    },
+    {
+      path: "/mmt/lhk/finishing/acc/:nomor",
+      name: "LhkFinishingAcc",
+      component: () => import("@/views/mmt/lhk/LhkFinishingAccFormView.vue"),
+      meta: {
+        title: "ACC LHK Finishing",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5511",
+        browseRoute: "LhkFinishingBrowse",
       },
     },
     {
@@ -4497,6 +4666,30 @@ const router = createRouter({
       },
     },
     {
+      path: "/mmt/lhk/proof/create",
+      name: "LhkProofCreate",
+      component: () => import("@/views/mmt/lhk/LhkProofFormView.vue"),
+      meta: {
+        title: "Baru LHK Proof",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5512",
+        browseRoute: "LhkProofBrowse",
+      },
+    },
+    {
+      path: "/mmt/lhk/proof/edit/:nomor",
+      name: "LhkProofEdit",
+      component: () => import("@/views/mmt/lhk/LhkProofFormView.vue"),
+      meta: {
+        title: "Ubah LHK Proof",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5512",
+        browseRoute: "LhkProofBrowse",
+      },
+    },
+    {
       path: "/mmt/lhk/paperprint",
       name: "LhkPaperprintBrowse",
       component: () => import("@/views/mmt/lhk/LhkPaperprintView.vue"),
@@ -4505,6 +4698,30 @@ const router = createRouter({
         layout: "DefaultLayout",
         requiresAuth: true,
         menuId: "5513",
+      },
+    },
+    {
+      path: "/mmt/lhk/paperprint/create",
+      name: "LhkPaperprintCreate",
+      component: () => import("@/views/mmt/lhk/LhkPaperprintFormView.vue"),
+      meta: {
+        title: "Baru LHK Paperprint",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5513",
+        browseRoute: "LhkPaperprintBrowse",
+      },
+    },
+    {
+      path: "/mmt/lhk/paperprint/edit/:nomor",
+      name: "LhkPaperprintEdit",
+      component: () => import("@/views/mmt/lhk/LhkPaperprintFormView.vue"),
+      meta: {
+        title: "Ubah LHK Paperprint",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5513",
+        browseRoute: "LhkPaperprintBrowse",
       },
     },
     {
@@ -4519,6 +4736,30 @@ const router = createRouter({
       },
     },
     {
+      path: "/mmt/lhk/sublim/create",
+      name: "LhkSublimCreate",
+      component: () => import("@/views/mmt/lhk/LhkSublimFormView.vue"),
+      meta: {
+        title: "Baru LHK Sublim",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5514",
+        browseRoute: "LhkSublimBrowse",
+      },
+    },
+    {
+      path: "/mmt/lhk/sublim/edit/:nomor",
+      name: "LhkSublimEdit",
+      component: () => import("@/views/mmt/lhk/LhkSublimFormView.vue"),
+      meta: {
+        title: "Ubah LHK Sublim",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5514",
+        browseRoute: "LhkSublimBrowse",
+      },
+    },
+    {
       path: "/mmt/lhk/layout",
       name: "LhkLayoutBrowse",
       component: () => import("@/views/mmt/lhk/LhkLayoutView.vue"),
@@ -4529,178 +4770,334 @@ const router = createRouter({
         menuId: "5515",
       },
     },
+    {
+      path: "/mmt/lhk/layout/create",
+      name: "LhkLayoutCreate",
+      component: () => import("@/views/mmt/lhk/LhkLayoutFormView.vue"),
+      meta: {
+        title: "Baru LHK Layout",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5515",
+        browseRoute: "LhkLayoutBrowse",
+      },
+    },
+    {
+      path: "/mmt/lhk/layout/edit/:nomor",
+      name: "LhkLayoutEdit",
+      component: () => import("@/views/mmt/lhk/LhkLayoutFormView.vue"),
+      meta: {
+        title: "Ubah LHK Layout",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5515",
+        browseRoute: "LhkLayoutBrowse",
+      },
+    },
 
-    // ── MMT > Menu Mandiri (5516 - 5530) ─────────────────────────────────
+    // ── MMT > Menu Transaksi Khusus (5516 - 5530) ─────────────────────────────────
+    // 1. Maklon Barang
     {
       path: "/mmt/maklon/barang",
       name: "MaklonBarangMmtBrowse",
       component: () => import("@/views/mmt/transaksi/MaklonBarangMmtView.vue"),
-      meta: {
-        title: "Maklon Barang MMT",
-        layout: "DefaultLayout",
-        requiresAuth: true,
-        menuId: "5516",
-      },
+      meta: { title: "Maklon Barang MMT", layout: "DefaultLayout", requiresAuth: true, menuId: "5516" },
     },
+    {
+      path: "/mmt/maklon/barang/print/:nomor(.*)*",
+      name: "MaklonBarangMmtPrint",
+      component: () => import("@/views/mmt/transaksi/MaklonBarangPrintView.vue"),
+      meta: { title: "Cetak Maklon Barang", layout: "BlankLayout", requiresAuth: true, menuId: "5516" },
+    },
+    {
+      path: "/mmt/maklon/barang/print-gabungan/:nomor/:sjkNomor?",
+      name: "MaklonGabunganMmtPrint",
+      component: () => import("@/views/mmt/transaksi/MaklonGabunganPrintView.vue"),
+      meta: { title: "Cetak Maklon Gabungan", layout: "BlankLayout", requiresAuth: true, menuId: "5516" },
+    },
+
+    // 2. SJ Hasil Maklon
     {
       path: "/mmt/sj-hasil-maklon",
       name: "SjHasilMaklonMmtBrowse",
       component: () => import("@/views/mmt/transaksi/SjHasilMaklonMmtView.vue"),
-      meta: {
-        title: "SJ Hasil Maklon MMT",
-        layout: "DefaultLayout",
-        requiresAuth: true,
-        menuId: "5517",
-      },
+      meta: { title: "SJ Hasil Maklon MMT", layout: "DefaultLayout", requiresAuth: true, menuId: "5517" },
     },
+    {
+      path: "/mmt/sj-hasil-maklon/create",
+      name: "SjHasilMaklonMmtCreate",
+      component: () => import("@/views/mmt/transaksi/SjHasilMaklonFormView.vue"),
+      meta: { title: "Input SJ Hasil Maklon", layout: "DefaultLayout", requiresAuth: true, menuId: "5517" },
+    },
+    {
+      path: "/mmt/sj-hasil-maklon/print/:nomor(.*)*",
+      name: "SjHasilMaklonMmtPrint",
+      component: () => import("@/views/mmt/transaksi/SjHasilMaklonPrintView.vue"),
+      meta: { title: "Cetak SJ Hasil Maklon", layout: "BlankLayout", requiresAuth: true, menuId: "5517" },
+    },
+
+    // 3. Planning Produksi
     {
       path: "/mmt/planning-produksi",
       name: "PlanningProduksiMmtBrowse",
-      component: () =>
-        import("@/views/mmt/transaksi/PlanningProduksiMmtView.vue"),
-      meta: {
-        title: "Planning Produksi MMT",
-        layout: "DefaultLayout",
-        requiresAuth: true,
-        menuId: "5518",
-      },
+      component: () => import("@/views/mmt/transaksi/PlanningProduksiMmtView.vue"),
+      meta: { title: "Planning Produksi MMT", layout: "DefaultLayout", requiresAuth: true, menuId: "5518" },
     },
+    {
+      path: "/mmt/planning-produksi-form",
+      alias: ["/mmt/planning-produksi/create", "/mmt/planning-produksi/edit/:nomor(.*)*"],
+      name: "PlanningProduksiMmtForm",
+      component: () => import("@/views/mmt/transaksi/FormPlanningProduksiView.vue"),
+      meta: { title: "Form Planning Produksi", layout: "DefaultLayout", requiresAuth: true, menuId: "5518" },
+    },
+
+    // 4. Komitmen Kirim
     {
       path: "/mmt/komitmen-kirim",
       name: "KomitmenKirimMmtBrowse",
       component: () => import("@/views/mmt/transaksi/KomitmenKirimMmtView.vue"),
-      meta: {
-        title: "Komitmen Kirim MMT",
-        layout: "DefaultLayout",
-        requiresAuth: true,
-        menuId: "5519",
-      },
+      meta: { title: "Komitmen Kirim MMT", layout: "DefaultLayout", requiresAuth: true, menuId: "5519" },
     },
+    {
+      path: "/mmt/komitmen-kirim/new",
+      alias: ["/mmt/komitmen-kirim/create", "/mmt/komitmen-kirim/:nomor"],
+      name: "KomitmenKirimMmtForm",
+      component: () => import("@/views/mmt/transaksi/FormKomitmenKirimView.vue"),
+      meta: { title: "Form Komitmen Kirim", layout: "DefaultLayout", requiresAuth: true, menuId: "5519" },
+    },
+
+    // 5. MAP (Memo Approval Produk)
     {
       path: "/mmt/map",
       name: "MapMmtBrowse",
       component: () => import("@/views/mmt/transaksi/MapMmtView.vue"),
-      meta: {
-        title: "Memo Approval Produk (MAP) MMT",
-        layout: "DefaultLayout",
-        requiresAuth: true,
-        menuId: "5520",
-      },
+      meta: { title: "Memo Approval Produk (MAP) MMT", layout: "DefaultLayout", requiresAuth: true, menuId: "5520" },
     },
+    {
+      path: "/mmt/map/print/:nomor(.*)*",
+      name: "MapMmtPrint",
+      component: () => import("@/views/mmt/transaksi/MapPrintView.vue"),
+      meta: { title: "Cetak MAP", layout: "BlankLayout", requiresAuth: true, menuId: "5520" },
+    },
+
+    // 6. BAST-MAP
     {
       path: "/mmt/bast-map",
       name: "BastMapMmtBrowse",
       component: () => import("@/views/mmt/transaksi/BastMapMmtView.vue"),
-      meta: {
-        title: "BAST-MAP MMT",
-        layout: "DefaultLayout",
-        requiresAuth: true,
-        menuId: "5521",
-      },
+      meta: { title: "BAST-MAP MMT", layout: "DefaultLayout", requiresAuth: true, menuId: "5521" },
     },
+    {
+      path: "/mmt/bast-map/new",
+      alias: "/mmt/bast-map/create",
+      name: "BastMmtNew",
+      component: () => import("@/views/mmt/transaksi/FormBastMmtView.vue"),
+      meta: { title: "Input BAST-MAP", layout: "DefaultLayout", requiresAuth: true, menuId: "5521" },
+    },
+    {
+      path: "/mmt/bast-map/edit/:nomor(.*)*",
+      name: "BastMmtEdit",
+      component: () => import("@/views/mmt/transaksi/FormBastMmtView.vue"),
+      meta: { title: "Edit BAST-MAP", layout: "DefaultLayout", requiresAuth: true, menuId: "5521" },
+    },
+    {
+      path: "/mmt/bast-map/print/:nomor(.*)*",
+      name: "BastMmtPrint",
+      component: () => import("@/views/mmt/transaksi/BastMmtPrintView.vue"),
+      meta: { title: "Cetak BAST-MAP", layout: "BlankLayout", requiresAuth: true, menuId: "5521" },
+    },
+
+    // 7. Relationship Map
     {
       path: "/mmt/relationship-map",
       name: "RelationshipMapMmtBrowse",
-      component: () =>
-        import("@/views/mmt/transaksi/RelationshipMapMmtView.vue"),
-      meta: {
-        title: "Relationship Map MMT",
-        layout: "DefaultLayout",
-        requiresAuth: true,
-        menuId: "5522",
-      },
+      component: () => import("@/views/mmt/transaksi/RelationshipMapMmtView.vue"),
+      meta: { title: "Relationship Map MMT", layout: "DefaultLayout", requiresAuth: true, menuId: "5522" },
     },
+
+    // 8. SO to SPK
     {
       path: "/mmt/so-spk",
       name: "SoToSpkMmtBrowse",
       component: () => import("@/views/mmt/transaksi/SoToSpkMmtView.vue"),
-      meta: {
-        title: "SO TO SPK (Surat Perintah Kerja) MMT",
-        layout: "DefaultLayout",
-        requiresAuth: true,
-        menuId: "5523",
-      },
+      meta: { title: "SO TO SPK (Surat Perintah Kerja) MMT", layout: "DefaultLayout", requiresAuth: true, menuId: "5523" },
     },
+    {
+      path: "/mmt/so-spk/new",
+      alias: "/mmt/so-spk/create",
+      name: "SoToSpkMmtNew",
+      component: () => import("@/views/mmt/transaksi/FormSoToSpkView.vue"),
+      meta: { title: "Input SPK Produksi", layout: "DefaultLayout", requiresAuth: true, menuId: "5523" },
+    },
+    {
+      path: "/mmt/so-spk/edit/:nomor(.*)*",
+      name: "SoToSpkMmtEdit",
+      component: () => import("@/views/mmt/transaksi/FormSoToSpkView.vue"),
+      meta: { title: "Edit SPK Produksi", layout: "DefaultLayout", requiresAuth: true, menuId: "5523" },
+    },
+    {
+      path: "/mmt/so-spk/print/:nomor(.*)*",
+      name: "SoToSpkMmtPrint",
+      component: () => import("@/views/mmt/transaksi/SoToSpkPrintView.vue"),
+      meta: { title: "Cetak SPK Produksi", layout: "BlankLayout", requiresAuth: true, menuId: "5523" },
+    },
+    {
+      path: "/mmt/spk/print/:nomor(.*)*",
+      name: "SpkPrintView",
+      component: () => import("@/views/mmt/transaksi/SpkPrintView.vue"),
+      meta: { title: "Cetak SPK Ringkas", layout: "BlankLayout", requiresAuth: true, menuId: "5523" },
+    },
+
+    // 9. STBJ
     {
       path: "/mmt/stbj",
       name: "StbjMmtBrowse",
       component: () => import("@/views/mmt/transaksi/StbjMmtView.vue"),
-      meta: {
-        title: "STBJ MMT",
-        layout: "DefaultLayout",
-        requiresAuth: true,
-        menuId: "5524",
-      },
+      meta: { title: "STBJ MMT", layout: "DefaultLayout", requiresAuth: true, menuId: "5524" },
     },
+    {
+      path: "/mmt/stbj/new",
+      alias: "/mmt/stbj/create",
+      name: "StbjMmtNew",
+      component: () => import("@/views/mmt/transaksi/FormStbjView.vue"),
+      meta: { title: "Input STBJ", layout: "DefaultLayout", requiresAuth: true, menuId: "5524" },
+    },
+    {
+      path: "/mmt/stbj/edit/:nomor(.*)*",
+      name: "StbjMmtEdit",
+      component: () => import("@/views/mmt/transaksi/FormStbjView.vue"),
+      meta: { title: "Edit STBJ", layout: "DefaultLayout", requiresAuth: true, menuId: "5524" },
+    },
+
+    // 10. Surat Jalan
     {
       path: "/mmt/surat-jalan",
       name: "SuratJalanMmtBrowse",
       component: () => import("@/views/mmt/transaksi/SuratJalanMmtView.vue"),
-      meta: {
-        title: "Surat Jalan MMT",
-        layout: "DefaultLayout",
-        requiresAuth: true,
-        menuId: "5525",
-      },
+      meta: { title: "Surat Jalan MMT", layout: "DefaultLayout", requiresAuth: true, menuId: "5525" },
     },
+    {
+      path: "/mmt/surat-jalan/print/:nomor(.*)*",
+      name: "SuratJalanMmtPrint",
+      component: () => import("@/views/mmt/transaksi/SuratJalanPrintView.vue"),
+      meta: { title: "Cetak Surat Jalan MMT", layout: "BlankLayout", requiresAuth: true, menuId: "5525" },
+    },
+
+    // 11. Surat Jalan Approve
     {
       path: "/mmt/surat-jalan/approve",
       name: "SuratJalanApproveMmtBrowse",
-      component: () =>
-        import("@/views/mmt/transaksi/SuratJalanApproveMmtView.vue"),
-      meta: {
-        title: "Surat Jalan Approve MMT",
-        layout: "DefaultLayout",
-        requiresAuth: true,
-        menuId: "5526",
-      },
+      component: () => import("@/views/mmt/transaksi/SuratJalanApproveMmtView.vue"),
+      meta: { title: "Surat Jalan Approve MMT", layout: "DefaultLayout", requiresAuth: true, menuId: "5526" },
     },
+    {
+      path: "/mmt/surat-jalan/approve/new",
+      alias: "/mmt/surat-jalan/approve/:nomor(.*)*",
+      name: "SuratJalanApproveMmtForm",
+      component: () => import("@/views/mmt/transaksi/FormSuratJalanApvView.vue"),
+      meta: { title: "Form Surat Jalan Approve", layout: "DefaultLayout", requiresAuth: true, menuId: "5526" },
+    },
+
+    // 12. Jadwal Kirim
     {
       path: "/mmt/jadwal-kirim",
       name: "JadwalKirimMmtBrowse",
       component: () => import("@/views/mmt/transaksi/JadwalKirimMmtView.vue"),
-      meta: {
-        title: "Jadwal Kirim MMT",
-        layout: "DefaultLayout",
-        requiresAuth: true,
-        menuId: "5527",
-      },
+      meta: { title: "Jadwal Kirim MMT", layout: "DefaultLayout", requiresAuth: true, menuId: "5527" },
     },
+    {
+      path: "/mmt/jadwal-kirim/new",
+      alias: "/mmt/jadwal-kirim/create",
+      name: "JadwalKirimMmtNew",
+      component: () => import("@/views/mmt/transaksi/FormJadwalKirimView.vue"),
+      meta: { title: "Input Jadwal Kirim", layout: "DefaultLayout", requiresAuth: true, menuId: "5527" },
+    },
+    {
+      path: "/mmt/jadwal-kirim/edit/:nomor(.*)*",
+      name: "JadwalKirimMmtEdit",
+      component: () => import("@/views/mmt/transaksi/FormJadwalKirimView.vue"),
+      meta: { title: "Edit Jadwal Kirim", layout: "DefaultLayout", requiresAuth: true, menuId: "5527" },
+    },
+    {
+      path: "/mmt/jadwal-kirim/print/:nomor(.*)*",
+      name: "JadwalKirimMmtPrint",
+      component: () => import("@/views/mmt/transaksi/JadwalKirimPrintView.vue"),
+      meta: { title: "Cetak Jadwal Kirim", layout: "BlankLayout", requiresAuth: true, menuId: "5527" },
+    },
+
+    // 13. PO Internal (Paperprint)
     {
       path: "/mmt/po-paperprint",
       name: "PoInternalPaperprintMmtBrowse",
-      component: () =>
-        import("@/views/mmt/transaksi/PoInternalPaperprintMmtView.vue"),
-      meta: {
-        title: "PO Internal MMT",
-        layout: "DefaultLayout",
-        requiresAuth: true,
-        menuId: "5528",
-      },
+      component: () => import("@/views/mmt/transaksi/PoInternalPaperprintMmtView.vue"),
+      meta: { title: "PO Internal MMT", layout: "DefaultLayout", requiresAuth: true, menuId: "5528" },
     },
+    {
+      path: "/mmt/po-paperprint/new",
+      alias: "/mmt/po-paperprint/create",
+      name: "PoPaperprintNew",
+      component: () => import("@/views/mmt/transaksi/FormPoPaperprintView.vue"),
+      meta: { title: "Input PO Paperprint", layout: "DefaultLayout", requiresAuth: true, menuId: "5528" },
+    },
+    {
+      path: "/mmt/po-paperprint/edit/:nomor(.*)*",
+      name: "PoPaperprintEdit",
+      component: () => import("@/views/mmt/transaksi/FormPoPaperprintView.vue"),
+      meta: { title: "Edit PO Paperprint", layout: "DefaultLayout", requiresAuth: true, menuId: "5528" },
+    },
+    {
+      path: "/mmt/po-paperprint/print/:nomor(.*)*",
+      name: "PoPaperprintPrint",
+      component: () => import("@/views/mmt/transaksi/PoInternalPrintView.vue"),
+      meta: { title: "Cetak PO Paperprint", layout: "BlankLayout", requiresAuth: true, menuId: "5528" },
+    },
+
+    // 14. Mutasi Internal
     {
       path: "/mmt/mutasi-internal",
       name: "MutasiInternalMmtBrowse",
-      component: () =>
-        import("@/views/mmt/transaksi/MutasiInternalMmtView.vue"),
-      meta: {
-        title: "Mutasi Internal MMT",
-        layout: "DefaultLayout",
-        requiresAuth: true,
-        menuId: "5529",
-      },
+      component: () => import("@/views/mmt/transaksi/MutasiInternalMmtView.vue"),
+      meta: { title: "Mutasi Internal MMT", layout: "DefaultLayout", requiresAuth: true, menuId: "5529" },
     },
+    {
+      path: "/mmt/mutasi-internal/new",
+      alias: "/mmt/mutasi-internal/create",
+      name: "MutasiInternalMmtNew",
+      component: () => import("@/views/mmt/transaksi/FormMutasiInternalView.vue"),
+      meta: { title: "Input Mutasi Internal", layout: "DefaultLayout", requiresAuth: true, menuId: "5529" },
+    },
+    {
+      path: "/mmt/mutasi-internal/edit/:nomor(.*)*",
+      name: "MutasiInternalMmtEdit",
+      component: () => import("@/views/mmt/transaksi/FormMutasiInternalView.vue"),
+      meta: { title: "Edit Mutasi Internal", layout: "DefaultLayout", requiresAuth: true, menuId: "5529" },
+    },
+    {
+      path: "/mmt/mutasi-internal/print/:nomor(.*)*",
+      name: "MutasiInternalMmtPrint",
+      component: () => import("@/views/mmt/transaksi/MutasiInternalPrintView.vue"),
+      meta: { title: "Cetak Mutasi Internal", layout: "BlankLayout", requiresAuth: true, menuId: "5529" },
+    },
+
+    // 15. Penerimaan PO External
     {
       path: "/mmt/penerimaan-po-external",
       name: "PenerimaanPoExtMmtBrowse",
-      component: () =>
-        import("@/views/mmt/transaksi/PenerimaanPoExtMmtView.vue"),
-      meta: {
-        title: "Penerimaan PO External MMT",
-        layout: "DefaultLayout",
-        requiresAuth: true,
-        menuId: "5530",
-      },
+      component: () => import("@/views/mmt/transaksi/PenerimaanPoExtMmtView.vue"),
+      meta: { title: "Penerimaan PO External MMT", layout: "DefaultLayout", requiresAuth: true, menuId: "5530" },
+    },
+    {
+      path: "/mmt/penerimaan-po-external/new",
+      alias: "/mmt/penerimaan-po-external/create",
+      name: "PenerimaanPoExtMmtNew",
+      component: () => import("@/views/mmt/transaksi/FormPenerimaanPoExtMmtView.vue"),
+      meta: { title: "Input Penerimaan PO External", layout: "DefaultLayout", requiresAuth: true, menuId: "5530" },
+    },
+    {
+      path: "/mmt/penerimaan-po-external/edit/:nomor(.*)*",
+      name: "PenerimaanPoExtMmtEdit",
+      component: () => import("@/views/mmt/transaksi/FormPenerimaanPoExtMmtView.vue"),
+      meta: { title: "Edit Penerimaan PO External", layout: "DefaultLayout", requiresAuth: true, menuId: "5530" },
     },
 
     // ── Penjualan ───────────────────────────────────────────────────────

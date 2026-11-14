@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Handle, Position } from "@vue-flow/core";
-import { IconDots, IconLock, IconMinus } from "@tabler/icons-vue";
+import { IconDots } from "@tabler/icons-vue";
 import type { NodeProps } from "@vue-flow/core";
 import { TYPE_META } from "@/constants/relationshipMapTypes";
 
@@ -12,10 +12,6 @@ interface DocNodeData {
   jumlah?: number;
   isCenter?: boolean;
   expanded?: boolean;
-  collapsible?: boolean;
-  locked?: boolean;
-  statusPpic?: string;
-  statusKlien?: string;
   isProforma?: boolean;
   jenis?: number | string;
   hasBast?: boolean;
@@ -54,13 +50,19 @@ interface DocNodeData {
       qtyJadwal: number;
       lineKelompok: string;
     }[];
+    koli: {
+      spk: string;
+      tglJadwal: string;
+      wip: number;
+      qtyPo: number;
+      qtyJadwal: number;
+      lineKelompok: string;
+    }[];
   };
 }
-const props = defineProps<
-  NodeProps<DocNodeData> & { dimmed?: boolean; loading?: boolean }
->();
+const props = defineProps<NodeProps<DocNodeData>>();
 
-const emit = defineEmits(["expand", "collapse", "view-detail"]);
+const emit = defineEmits(["expand", "view-detail"]);
 
 const meta = TYPE_META[props.data.type] || {
   label: props.data.type,
@@ -74,22 +76,14 @@ const numFmt = (v: any) =>
 <template>
   <div
     class="doc-node"
-    :class="{
-      'doc-node-center': data.isCenter,
-      'doc-node-locked': data.locked,
-      'doc-node-dim': dimmed,
-    }"
-    :style="{ borderTopColor: data.locked ? '#9e9e9e' : meta.color }"
+    :class="{ 'doc-node-center': data.isCenter }"
+    :style="{ borderTopColor: meta.color }"
     @click="emit('view-detail', data)"
   >
     <Handle type="target" :position="Position.Left" class="node-handle" />
 
-    <div
-      class="doc-node-type"
-      :style="{ color: data.locked ? '#9e9e9e' : meta.color }"
-    >
+    <div class="doc-node-type" :style="{ color: meta.color }">
       {{ meta.label }}
-      <IconLock v-if="data.locked" :size="11" :stroke-width="2" />
       <span
         v-if="data.type === 'INVOICE' && data.isProforma"
         class="doc-node-badge"
@@ -109,13 +103,7 @@ const numFmt = (v: any) =>
         BAST
       </span>
       <span
-        v-if="
-          (data.type === 'MUTASI_OUT' ||
-            data.type === 'MAKLON' ||
-            data.type === 'SJ_KELUAR_MAKLON') &&
-          data.cabangAsal &&
-          data.cabangTujuan
-        "
+        v-if="data.type === 'MUTASI_OUT' && data.isDiterima"
         class="doc-node-badge doc-node-badge-diterima"
       >
         DITERIMA
@@ -145,7 +133,6 @@ const numFmt = (v: any) =>
       </span>
     </div>
     <div class="doc-node-nomor">{{ data.nomor }}</div>
-    <div v-if="data.locked" class="doc-node-locked-note">Tanpa hak akses</div>
     <div
       v-if="data.label && data.label !== data.nomor"
       class="doc-node-label"
@@ -172,6 +159,7 @@ const numFmt = (v: any) =>
       C:{{ data.planningDetail.cutting.length }} S:{{
         data.planningDetail.sewing.length
       }}
+      K:{{ data.planningDetail.koli.length }}
       <span v-if="data.filteredBySpk" class="doc-node-plan-filter"
         >(khusus SPK ini)</span
       >
@@ -179,14 +167,24 @@ const numFmt = (v: any) =>
     <span
       v-if="
         (data.type === 'PERMINTAAN_GARMEN' ||
-          data.type === 'REALISASI_GARMEN' ||
-          data.type === 'COMPLAIN_CUSTOMER' ||
-          data.type === 'BAP_PRODUKSI') &&
+          data.type === 'REALISASI_GARMEN') &&
         data.kategori
       "
       class="doc-node-badge doc-node-badge-kategori"
     >
       {{ data.kategori }}
+    </span>
+    <span
+      v-if="data.type === 'INVOICE' && data.hasKuitansi"
+      class="doc-node-badge doc-node-badge-selesai"
+    >
+      KUITANSI
+    </span>
+    <span
+      v-if="data.type === 'INVOICE' && data.noFakturPajak"
+      class="doc-node-badge"
+    >
+      FP
     </span>
     <div
       v-if="data.type === 'MUTASI_OUT' && data.cabangAsal && data.cabangTujuan"
@@ -206,51 +204,17 @@ const numFmt = (v: any) =>
     >
       {{ data.statusPengiriman }}
     </div>
-    <div
-      v-if="
-        (data.type === 'PRA_ORDER' ||
-          data.type === 'PERMINTAAN_DESAIN' ||
-          data.type === 'LHK_DESAIN' ||
-          data.type === 'REKAP_PEMBAYARAN' ||
-          data.type === 'QC_BAHAN' ||
-          data.type === 'TINDAK_LANJUT_QC' ||
-          data.type === 'MAKLON' ||
-          data.type === 'PENGAJUAN_UANG_MUKA') &&
-        data.status
-      "
-      class="doc-node-mutasi-info"
-    >
-      {{ data.status
-      }}<template v-if="data.statusKlien"> · {{ data.statusKlien }}</template>
-    </div>
-    <div
-      v-if="data.type === 'KONFIRMASI_PRA_ORDER' && data.statusPpic"
-      class="doc-node-mutasi-info"
-    >
-      PPIC: {{ data.statusPpic }}
-    </div>
 
     <button
-      v-if="!data.expanded && !data.locked"
+      v-if="!data.expanded"
       class="doc-node-expand"
       title="Lihat relasi"
-      :disabled="loading"
       @click.stop="emit('expand', { type: data.type, nomor: data.nomor })"
     >
-      <v-progress-circular v-if="loading" indeterminate :size="12" :width="2" />
-      <IconDots v-else :size="14" :stroke-width="2.5" />
+      <IconDots :size="12" :stroke-width="2.5" />
     </button>
 
     <Handle type="source" :position="Position.Right" class="node-handle" />
-
-    <button
-      v-if="data.expanded && data.collapsible && !data.locked"
-      class="doc-node-expand"
-      title="Sembunyikan turunan"
-      @click.stop="emit('collapse', { type: data.type, nomor: data.nomor })"
-    >
-      <IconMinus :size="14" :stroke-width="2.5" />
-    </button>
   </div>
 </template>
 
@@ -274,7 +238,7 @@ const numFmt = (v: any) =>
   box-shadow: 0 2px 8px rgba(241, 196, 15, 0.4);
 }
 .doc-node-type {
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -321,10 +285,10 @@ const numFmt = (v: any) =>
 }
 .doc-node-expand {
   position: absolute;
-  right: -10px;
-  bottom: -10px;
-  width: 24px;
-  height: 24px;
+  right: -8px;
+  bottom: -8px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
   background: #e0e0e0;
   border: 1px solid #bbb;
@@ -333,9 +297,6 @@ const numFmt = (v: any) =>
   justify-content: center;
   cursor: pointer;
   color: #555;
-}
-.doc-node-expand:disabled {
-  cursor: progress;
 }
 .doc-node-expand:hover {
   background: #1565c0;
@@ -383,25 +344,5 @@ const numFmt = (v: any) =>
 }
 .doc-node-badge-batal {
   background: #922b21;
-}
-.doc-node-locked {
-  background: #f3f3f3;
-  border-style: dashed;
-  border-top-style: solid;
-}
-.doc-node-locked .doc-node-nomor {
-  color: #757575;
-}
-.doc-node-locked-note {
-  font-size: 10px;
-  font-style: italic;
-  color: #9e9e9e;
-  margin-top: 3px;
-}
-.doc-node {
-  transition: opacity 0.15s;
-}
-.doc-node-dim {
-  opacity: 0.25;
 }
 </style>

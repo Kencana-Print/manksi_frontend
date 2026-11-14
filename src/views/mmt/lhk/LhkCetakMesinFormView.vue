@@ -1950,6 +1950,15 @@ const handleBsLebarInput = (event: any) => {
   formData.value.lebar_bs = val;
 };
 
+const clearBahan = () => {
+  formData.value.barcode_input = "";
+  formData.value.sku_aktif = "";
+  formData.value.kode_bahan_aktif = "";
+  formData.value.Lebar_bahan = 0;
+  formData.value.Panjang_bahan = 0;
+  recalculateCombine();
+};
+
 const handleBarcodeScan = async (fromLoad = false) => {
   const rawCode = String(formData.value.barcode_input || "");
   if (!rawCode.trim()) return;

@@ -197,6 +197,27 @@ const {
     },
 });
 
+
+const barcodeInputs = ref<{ [key: number]: any }>({});
+const setBarcodeRef = (el: any, index: number) => {
+    if (el) barcodeInputs.value[index] = el;
+};
+const focusNextBarcode = async (currentIndex: number) => {
+    await nextTick();
+    if (currentIndex >= formData.value.items.length - 1) {
+        addRow();
+    }
+    await nextTick();
+    const nextInput = barcodeInputs.value[currentIndex + 1];
+    if (nextInput) {
+        if (typeof nextInput.focus === "function") nextInput.focus();
+        else if (nextInput.$el?.querySelector) {
+            const inputEl = nextInput.$el.querySelector("input");
+            if (inputEl) inputEl.focus();
+        }
+    }
+};
+
 // Barcode Scan Handler
 const onBarcodeScan = async (idx: number) => {
     const item = formData.value.items[idx];
@@ -231,6 +252,7 @@ const onBarcodeScan = async (idx: number) => {
                     ? b.Nomor_SPK
                     : b.mst_spk_nomor || "";
             toast.success(`Barcode cocok: ${item.Nama_Bahan}`);
+            focusNextBarcode(idx);
 
             // Jika scan pada baris terakhir, otomatis tambah baris baru untuk scan berikutnya
             if (idx === formData.value.items.length - 1) {

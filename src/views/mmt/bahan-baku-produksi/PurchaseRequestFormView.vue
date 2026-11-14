@@ -546,6 +546,7 @@ const removeItem = (idx: number) => {
     formData.value.items.forEach((it, i) => (it.no = i + 1));
 };
 
+const approveData = async (role: "SPV" | "MANAGER" = "SPV") => handleApprove(role);
 const handleApprove = async (role: "SPV" | "MANAGER") => {
     if (
         role === "MANAGER" &&

@@ -1,66 +1,52 @@
-<script setup lang="ts">
-import { ref, computed, onMounted } from "vue";
-import { useRoute } from "vue-router";
-import BaseForm from "@/components/BaseForm.vue";
-import { useForm } from "@/composables/useForm";
-import { IconTexture, IconSearch } from "@tabler/icons-vue";
+<script setup>
+import { ref, computed, onMounted, onBeforeUnmount } from "vue";
+import { useRouter, useRoute } from "vue-router";
+import { useToast } from "vue-toastification";
 import api from "@/services/api";
-import SupplierSearchModal from "@/components/lookups/SupplierSearchModal.vue";
-import GudangMmtSearchModal from "@/components/lookups/GudangMmtSearchModal.vue";
+import PageLayout from "@/components/PageLayout.vue";
+import GudangLookupView from "@/modal/GudangLookupView.vue";
+import SupplierLookupModal from "@/modal/SupplierLookupModal.vue";
 
+const router = useRouter();
 const route = useRoute();
+const toast = useToast();
+const API_MASTERBAHAN = "/master/bahan";
 
-interface MasterBahanForm {
-    Kode: string;
-    Nama: string;
-    Satuan: string;
-    Gramasi: string;
-    Panjang: number;
-    Lebar: number;
-    KtgKode: string;
-    GdgDefault: string;
-    GdgNama: string;
-    SupKode: string;
-    SupNama: string;
-    HrgJual: number;
-    HrgBeli: number;
-    isAktif: boolean;
-    isStok: boolean;
-    isExpired: boolean;
-    Status: string;
-    Jenis: string;
-    Divisi: number;
-}
+const isEditMode = ref(false);
+const isSaving = ref(false);
+const initialLoadComplete = ref(false);
 
-const initialData: MasterBahanForm = {
-    Kode: "",
-    Nama: "",
-    Satuan: "",
-    Gramasi: "",
-    Panjang: 0,
-    Lebar: 0,
-    KtgKode: "",
-    GdgDefault: "",
-    GdgNama: "",
-    SupKode: "",
-    SupNama: "",
-    HrgJual: 0,
-    HrgBeli: 0,
+const formData = ref({
+    kode: "",
+    nama: "",
+    divisiKode: null,
+    tipeKode: null,
+    jenisKode: null,
+    gudangKode: "WH-16",
+    gudangNama: "",
+    supplierKode: null,
+    supplierNama: "",
+    satuan: "ROLL",
+    lebar: 0,
+    panjang: 0,
     isAktif: true,
     isStok: true,
     isExpired: false,
-    Status: "",
-    Jenis: "",
-    Divisi: 5,
-};
+    status: "S",
+});
 
-const showSupplierModal = ref(false);
-const showGudangModal = ref(false);
+const formTitle = computed(() =>
+    isEditMode.value
+        ? `Edit Master Barang: ${formData.value.kode || ""}`
+        : "Tambah Master Barang",
+);
 
-const divisiOptions = ref<{ Kode: number; Nama: string }[]>([]);
-const kategoriOptions = ref<{ Kode: string; Nama: string }[]>([]);
-const jenisOptions = ref<{ Kode: string; Nama: string }[]>([]);
-const satuanOptions = [
+const divisiOptions = ref([]);
+const kategoriOptions = ref([]);
+const jenisOptions = ref([]);
+const gudangOptions = ref([]);
+const supplierOptions = ref([]);
+const satuanOptions = ref([
     "ROLL",
     "M",
     "Y",
@@ -69,499 +55,899 @@ const satuanOptions = [
     "BOTOL",
     "MILILITER",
     "BOX",
-];
+]);
 
-const isRollOrMeter = computed(() => {
-    return ["ROLL", "M", "Y"].includes(formData.value.Satuan);
+const isGudangLookupOpen = ref(false);
+const isSupplierLookupOpen = ref(false);
+const extraRows = ref([]);
+const activeGudangExtraRowIndex = ref(null);
+const activeSupplierExtraRowIndex = ref(null);
+
+function createExtraRow() {
+    return {
+        kode: "",
+        nama: "",
+        satuan: "ROLL",
+        gudangKode: "WH-16",
+        gudangNama: "",
+        supplierKode: null,
+        supplierNama: "",
+        lebar: 0,
+        panjang: 0,
+    };
+}
+
+function isRowValid(row) {
+    return (
+        String(row?.kode || "").trim().length >= 3 &&
+        String(row?.nama || "").trim() !== ""
+    );
+}
+
+const isFormValid = computed(() => {
+    const mainValid =
+        formData.value.kode.trim().length >= 3 &&
+        formData.value.nama.trim() !== "";
+
+    if (isEditMode.value) return mainValid;
+    return mainValid || extraRows.value.some((row) => isRowValid(row));
 });
 
-const loadDropdowns = async () => {
+function normalizeLookupCode(value) {
+    const v = String(value ?? "").trim();
+    return v === "" ? null : v;
+}
+
+function findByKode(items, kode) {
+    return items.find((x) => String(x?.Kode ?? "") === String(kode ?? ""));
+}
+
+function syncGudangNama() {
+    const found = findByKode(gudangOptions.value, formData.value.gudangKode);
+    formData.value.gudangNama = found?.Nama ?? "";
+}
+
+function syncSupplierNama() {
+    const found = findByKode(
+        supplierOptions.value,
+        formData.value.supplierKode,
+    );
+    formData.value.supplierNama =
+        found?.Nama ?? formData.value.supplierNama ?? "";
+}
+
+async function ensureSupplierNamaFromKode() {
+    const kode = normalizeLookupCode(formData.value.supplierKode);
+    if (!kode || formData.value.supplierNama) return;
+
     try {
-        const [resDivisi, resKtg, resJenis] = await Promise.all([
-            api.get("/mmt/daftar/bahan/lookup/divisi"),
-            api.get("/mmt/daftar/bahan/lookup/kategori"),
-            api.get("/mmt/daftar/bahan/lookup/jenis"),
-        ]);
-        divisiOptions.value = resDivisi.data?.data || [];
-        kategoriOptions.value = resKtg.data?.data || [];
-        jenisOptions.value = resJenis.data?.data || [];
-    } catch (err) {
-        console.error("Gagal load dropdown master bahan:", err);
+        const res = await api.get(`${API_MASTERBAHAN}/lookup/supplier`, {
+            params: { q: kode },
+        });
+
+        const items = Array.isArray(res.data?.data) ? res.data.data : [];
+        const exact = items.find((x) => String(x?.Kode ?? "") === String(kode));
+        const found = exact ?? items[0];
+
+        if (found?.Nama) {
+            formData.value.supplierNama = String(found.Nama);
+            supplierOptions.value = [found];
+        }
+    } catch {
+        // biarkan kosong jika lookup gagal
     }
-};
+}
 
-const {
-    isEditMode,
-    isLoading,
-    isSaving,
-    formData,
-    showSaveDialog,
-    showCancelDialog,
-    showCloseDialog,
-    executeSave,
-    executeCancel,
-    executeClose,
-} = useForm<MasterBahanForm>({
-    menuId: "5501",
-    initialData,
-    fetchApi: async () => {
-        const kode = route.params.kode;
-        const res = await api.get(
-            `/mmt/daftar/bahan/${encodeURIComponent(String(kode))}`,
-        );
-        const d = res.data?.data || res.data || {};
-        return {
-            Kode: d.Kode || d.brg_kode || String(kode),
-            Nama: d.Nama || d.brg_nama || "",
-            Satuan: d.Satuan || d.brg_satuan || "ROLL",
-            Gramasi: d.Gramasi || d.brg_gramasi || "",
-            Panjang: Number(d.Panjang || d.brg_panjang || 0),
-            Lebar: Number(d.Lebar || d.brg_lebar || 0),
-            KtgKode: d.KtgKode || d.brg_ktg_kode || "BU",
-            GdgDefault: d.GdgDefault || d.brg_gdg_default || "WH-16",
-            GdgNama:
-                d.GudangNama || d.GdgNama || d.gdg_nama || "GUDANG UTAMA MMT",
-            SupKode: d.SupKode || d.brg_sup_kode || "",
-            SupNama: d.SupNama || "",
-            HrgJual: Number(d.HrgJual || d.brg_hrgjual || 0),
-            HrgBeli: Number(d.HrgBeli || d.brg_hrgbeli || 0),
-            isAktif: d.isAktif !== undefined ? Boolean(d.isAktif) : true,
-            isStok: d.isStok !== undefined ? Boolean(d.isStok) : true,
-            isExpired: d.isExpired !== undefined ? Boolean(d.isExpired) : false,
-            Status: d.Status || d.brg_status || "S",
-            Jenis: d.Jenis || d.brg_jenis || "GY",
-            Divisi: Number(d.Divisi || d.brg_divisi || 5),
-        };
-    },
-    submitApi: async (dataToSave: MasterBahanForm) => {
-        const isEdit = Boolean(
-            route.params.kode ||
-            (dataToSave.Kode && dataToSave.Kode.trim() !== ""),
-        );
-        const payload = {
-            ...dataToSave,
-            isEditMode: isEdit,
-        };
-        return await api.post("/mmt/daftar/bahan/save", payload);
-    },
-    onSuccessRoute: "/mmt/daftar/bahan",
+function resetForm() {
+    formData.value = {
+        kode: "",
+        nama: "",
+        divisiKode: null,
+        tipeKode: null,
+        jenisKode: null,
+        gudangKode: "WH-16",
+        gudangNama: "",
+        supplierKode: null,
+        supplierNama: "",
+        satuan: "ROLL",
+        lebar: 0,
+        panjang: 0,
+        isAktif: true,
+        isStok: true,
+        isExpired: false,
+        status: "S",
+    };
+    supplierOptions.value = [];
+    extraRows.value = [];
+    activeGudangExtraRowIndex.value = null;
+    activeSupplierExtraRowIndex.value = null;
+    isEditMode.value = false;
+}
+
+function onLookupChange(field, value) {
+    formData.value[field] = normalizeLookupCode(value);
+
+    const findByKode = (items, kode) =>
+        items.find((x) => String(x?.Kode ?? "") === String(kode ?? ""));
+
+    if (field === "gudangKode") {
+        syncGudangNama();
+    }
+    if (field === "supplierKode") {
+        syncSupplierNama();
+    }
+}
+
+function openGudangLookup(extraRowIndex = null) {
+    activeGudangExtraRowIndex.value = extraRowIndex;
+    isGudangLookupOpen.value = true;
+}
+
+function openSupplierLookup(extraRowIndex = null) {
+    activeSupplierExtraRowIndex.value = extraRowIndex;
+    isSupplierLookupOpen.value = true;
+}
+
+function selectGudang(item) {
+    const idx = activeGudangExtraRowIndex.value;
+    if (idx === null) {
+        formData.value.gudangKode = normalizeLookupCode(item?.Kode) ?? "WH-16";
+        formData.value.gudangNama = String(item?.Nama ?? "");
+    } else if (extraRows.value[idx]) {
+        extraRows.value[idx].gudangKode =
+            normalizeLookupCode(item?.Kode) ?? "WH-16";
+        extraRows.value[idx].gudangNama = String(item?.Nama ?? "");
+    }
+    activeGudangExtraRowIndex.value = null;
+    isGudangLookupOpen.value = false;
+}
+
+function selectSupplier(item) {
+    const idx = activeSupplierExtraRowIndex.value;
+    if (idx === null) {
+        formData.value.supplierKode = normalizeLookupCode(item?.Kode);
+        formData.value.supplierNama = String(item?.Nama ?? "");
+    } else if (extraRows.value[idx]) {
+        extraRows.value[idx].supplierKode = normalizeLookupCode(item?.Kode);
+        extraRows.value[idx].supplierNama = String(item?.Nama ?? "");
+    }
+    activeSupplierExtraRowIndex.value = null;
+    isSupplierLookupOpen.value = false;
+}
+
+function addRow() {
+    if (isEditMode.value) return;
+    extraRows.value.push(createExtraRow());
+}
+
+function removeRow(index) {
+    if (isEditMode.value) return;
+    extraRows.value.splice(index, 1);
+}
+
+function buildPayloadFromRow(row, editMode = false) {
+    return {
+        Kode: String(row?.kode || "").trim(),
+        Nama: String(row?.nama || "").trim(),
+        Satuan: String(row?.satuan || formData.value.satuan || "ROLL").trim(),
+        Panjang: Number(row?.panjang || 0),
+        Lebar: Number(row?.lebar || 0),
+        Stok: 0,
+        KtgKode: String(formData.value.tipeKode || ""),
+        GdgDefault: String(row?.gudangKode || "WH-16"),
+        SupKode: String(row?.supplierKode || ""),
+        HrgJual: 0,
+        HrgBeli: 0,
+        isAktif: formData.value.isAktif ? 1 : 0,
+        isStok: formData.value.isStok ? 1 : 0,
+        isExpired: formData.value.isExpired ? 1 : 0,
+        Status: String(formData.value.status || "S"),
+        Jenis: String(formData.value.jenisKode || ""),
+        Divisi: String(formData.value.divisiKode || ""),
+        isEditMode: editMode,
+    };
+}
+
+async function loadMasterData() {
+    try {
+        const [divisi, kategori, jenis, gudang] = await Promise.all([
+            api.get(`${API_MASTERBAHAN}/lookup/divisi`),
+            api.get(`${API_MASTERBAHAN}/lookup/kategori`),
+            api.get(`${API_MASTERBAHAN}/lookup/jenis`),
+            api.get(`${API_MASTERBAHAN}/lookup/gudang`),
+        ]);
+
+        divisiOptions.value = Array.isArray(divisi.data?.data)
+            ? divisi.data.data.map((item) => ({
+                  ...item,
+                  // Samakan tipe dengan v-model (string) agar label yang tampil adalah Nama, bukan Kode
+                  Kode: String(item?.Kode ?? ""),
+              }))
+            : [];
+        kategoriOptions.value = Array.isArray(kategori.data?.data)
+            ? kategori.data.data
+            : [];
+        jenisOptions.value = Array.isArray(jenis.data?.data)
+            ? jenis.data.data
+            : [];
+        gudangOptions.value = Array.isArray(gudang.data?.data)
+            ? gudang.data.data
+            : [];
+
+        if (formData.value.gudangKode) {
+            syncGudangNama();
+        }
+    } catch (_error) {
+        toast.error("Gagal memuat data lookup.");
+    }
+}
+
+async function loadFormData(kode) {
+    if (!kode) return;
+    const res = await api.get(
+        `${API_MASTERBAHAN}/mmt/${encodeURIComponent(kode)}`,
+    );
+    const data = res.data?.data;
+    if (!data?.Kode) return;
+
+    isEditMode.value = true;
+    formData.value = {
+        ...formData.value,
+        kode: String(data.Kode ?? kode),
+        nama: String(data.Nama ?? ""),
+        satuan: String(data.Satuan ?? "ROLL"),
+        panjang: Number(data.Panjang ?? 0),
+        lebar: Number(data.Lebar ?? 0),
+        gudangKode: normalizeLookupCode(data.GdgDefault) ?? "WH-16",
+        gudangNama: String(data.GudangNama ?? ""),
+        supplierKode: normalizeLookupCode(data.SupKode),
+        supplierNama: String(data.SupplierNama ?? ""),
+        jenisKode: normalizeLookupCode(data.Jenis),
+        tipeKode: normalizeLookupCode(data.KtgKode),
+        divisiKode: normalizeLookupCode(data.Divisi),
+        isAktif: Number(data.isAktif ?? 0) === 1,
+        isStok: Number(data.isStok ?? 0) === 1,
+        isExpired: Number(data.isExpired ?? 0) === 1,
+        status: String(data.Status ?? "S"),
+    };
+
+    if (formData.value.supplierKode && formData.value.supplierNama) {
+        supplierOptions.value = [
+            {
+                Kode: formData.value.supplierKode,
+                Nama: formData.value.supplierNama,
+            },
+        ];
+    }
+
+    await ensureSupplierNamaFromKode();
+    syncGudangNama();
+}
+
+async function handleKodeExit() {
+    const kode = String(formData.value.kode || "").trim();
+    if (kode.length < 3 || !initialLoadComplete.value || isEditMode.value)
+        return;
+    try {
+        await loadFormData(kode);
+    } catch {}
+}
+
+async function saveForm(andNew) {
+    if (!isFormValid.value) return;
+    isSaving.value = true;
+    try {
+        if (isEditMode.value) {
+            const payload = buildPayloadFromRow(
+                {
+                    kode: formData.value.kode,
+                    nama: formData.value.nama,
+                    satuan: formData.value.satuan,
+                    gudangKode: formData.value.gudangKode,
+                    supplierKode: formData.value.supplierKode,
+                    panjang: formData.value.panjang,
+                    lebar: formData.value.lebar,
+                },
+                true,
+            );
+            const res = await api.post(`${API_MASTERBAHAN}/save`, payload);
+            toast.success(
+                `Data berhasil disimpan. Kode: ${res.data?.kode || formData.value.kode}`,
+            );
+        } else {
+            const rowsToSave = [
+                {
+                    kode: formData.value.kode,
+                    nama: formData.value.nama,
+                    satuan: formData.value.satuan,
+                    gudangKode: formData.value.gudangKode,
+                    supplierKode: formData.value.supplierKode,
+                    panjang: formData.value.panjang,
+                    lebar: formData.value.lebar,
+                },
+                ...extraRows.value,
+            ].filter((row) => isRowValid(row));
+
+            for (const row of rowsToSave) {
+                const payload = buildPayloadFromRow(row, false);
+                await api.post(`${API_MASTERBAHAN}/save`, payload);
+            }
+
+            toast.success(
+                `Data berhasil disimpan (${rowsToSave.length} baris).`,
+            );
+        }
+
+        if (andNew) resetForm();
+        else closeForm();
+    } catch (error) {
+        toast.error(error?.response?.data?.message || "Gagal menyimpan data.");
+    } finally {
+        isSaving.value = false;
+    }
+}
+
+function closeForm() {
+    router.back();
+}
+
+onMounted(async () => {
+    await loadMasterData();
+
+    const kodeParam = String(
+        route.query.kode || route.params.kode || "",
+    ).trim();
+    const modeParam = String(route.query.mode || "").toLowerCase();
+    if (
+        kodeParam &&
+        (modeParam === "edit" ||
+            modeParam === "ubah" ||
+            Boolean(route.params.kode))
+    ) {
+        try {
+            await loadFormData(kodeParam);
+        } catch {
+            toast.error("Gagal memuat data edit.");
+        }
+    }
+
+    initialLoadComplete.value = true;
 });
 
-const onSelectSupplier = (sup: any) => {
-    formData.value.SupKode = sup.Kode;
-    formData.value.SupNama = sup.Nama;
-};
-
-const onSelectGudang = (gdg: any) => {
-    formData.value.GdgDefault = gdg.Kode;
-    formData.value.GdgNama = gdg.Nama;
-};
-
-onMounted(() => {
-    loadDropdowns();
-});
+onBeforeUnmount(() => {});
 </script>
 
 <template>
-    <BaseForm
-        :title="
-            isEditMode
-                ? `Ubah Master Bahan MMT (${formData.Kode})`
-                : 'Tambah Master Bahan MMT Baru'
-        "
-        menu-id="5501"
-        :icon="IconTexture"
-        :is-loading="isLoading"
-        :is-saving="isSaving"
-        item-name="Master Bahan MMT"
-        desktop-mode
-        v-model:show-save-dialog="showSaveDialog"
-        v-model:show-cancel-dialog="showCancelDialog"
-        v-model:show-close-dialog="showCloseDialog"
-        @validate-save="showSaveDialog = true"
-        @confirm-save="executeSave"
-        @confirm-cancel="executeCancel"
-        @confirm-close="executeClose"
-    >
-        <!-- ── KOLOM KIRI (KATEGORI & STATUS) ── -->
-        <template #left-column>
-            <div class="desktop-form-section header-section">
-                <div class="section-label">Klasifikasi Bahan</div>
-
-                <div class="fr">
-                    <label class="lbl">Divisi</label>
-                    <select
-                        v-model.number="formData.Divisi"
-                        class="inp flex-grow-1"
-                    >
-                        <option
-                            v-for="d in divisiOptions"
-                            :key="d.Kode"
-                            :value="d.Kode"
-                        >
-                            {{ d.Nama }}
-                        </option>
-                    </select>
-                </div>
-
-                <div class="fr">
-                    <label class="lbl">Kategori</label>
-                    <select v-model="formData.KtgKode" class="inp flex-grow-1">
-                        <option
-                            v-for="k in kategoriOptions"
-                            :key="k.Kode"
-                            :value="k.Kode"
-                        >
-                            {{ k.Kode }} - {{ k.Nama }}
-                        </option>
-                    </select>
-                </div>
-
-                <div class="fr">
-                    <label class="lbl">Jenis Bahan</label>
-                    <select v-model="formData.Jenis" class="inp flex-grow-1">
-                        <option
-                            v-for="j in jenisOptions"
-                            :key="j.Kode"
-                            :value="j.Kode"
-                        >
-                            {{ j.Kode }} - {{ j.Nama }}
-                        </option>
-                    </select>
-                </div>
-            </div>
-
-            <div class="desktop-form-section">
-                <div class="section-label">Status & Pengaturan</div>
-
-                <div class="fr">
-                    <label class="lbl">Pergerakan</label>
-                    <select v-model="formData.Status" class="inp flex-grow-1">
-                        <option value="F">Fast Moving (FM)</option>
-                        <option value="S">Slow Moving (SM)</option>
-                        <option value="N">Non Flexy (NF)</option>
-                        <option value="-">- Standar -</option>
-                    </select>
-                </div>
-
-                <div class="fr align-start">
-                    <label class="lbl pt-1">Opsi Bahan</label>
-                    <div class="ck-wrap pt-1">
-                        <label class="ck">
-                            <input type="checkbox" v-model="formData.isAktif" />
-                            <span>Aktif</span>
-                        </label>
-                        <label class="ck">
-                            <input type="checkbox" v-model="formData.isStok" />
-                            <span>Kelola Stok</span>
-                        </label>
-                        <label class="ck">
-                            <input
-                                type="checkbox"
-                                v-model="formData.isExpired"
-                            />
-                            <span>Expired</span>
-                        </label>
-                    </div>
-                </div>
-
-                <div class="fr mt-2 align-start">
-                    <label class="lbl pt-1">Gudang Default</label>
-                    <div
-                        class="d-flex flex-column flex-grow-1 ga-1"
-                        style="min-width: 0"
-                    >
-                        <div class="igrp" style="width: 90px">
-                            <input
-                                v-model="formData.GdgDefault"
-                                class="inp"
-                                placeholder="Cari..."
-                                readonly
-                                @click="showGudangModal = true"
-                            />
-                            <button
-                                type="button"
-                                class="blkp"
-                                title="Pilih Gudang Default"
-                                @click="showGudangModal = true"
-                            >
-                                <IconSearch :size="13" />
-                            </button>
-                        </div>
-                        <input
-                            :value="formData.GdgNama"
-                            readonly
-                            class="inp ro w-100"
-                            style="min-width: 0"
-                            placeholder=""
-                            tabindex="-1"
-                        />
-                    </div>
-                </div>
-            </div>
+    <PageLayout :title="formTitle" icon="mdi-tools">
+        <template #header-actions>
+            <v-btn
+                size="x-small"
+                color="primary"
+                :loading="isSaving"
+                :disabled="isSaving || !isFormValid"
+                @click="saveForm(false)"
+            >
+                <v-icon start>mdi-check-circle</v-icon> Simpan
+            </v-btn>
+            <v-btn
+                size="x-small"
+                color="success"
+                class="ml-1"
+                :disabled="isSaving || !isFormValid"
+                @click="saveForm(true)"
+            >
+                <v-icon start>mdi-content-save-all</v-icon> Simpan & Baru
+            </v-btn>
+            <v-btn size="x-small" class="ml-1" @click="closeForm">
+                <v-icon start>mdi-close</v-icon> Tutup
+            </v-btn>
         </template>
 
-        <!-- ── KOLOM KANAN (DETAIL BARANG & HARGA) ── -->
-        <template #right-column>
-            <div class="desktop-form-section header-section">
-                <div class="section-label">Identitas Bahan MMT</div>
+        <div class="main-form-wrapper">
+            <!-- ==================== SIDEBAR KIRI ==================== -->
+            <aside class="sidebar-header">
+                <div class="section-title">Data Header</div>
 
-                <div class="fr">
-                    <label class="lbl">Kode Bahan</label>
-                    <input
-                        v-model="formData.Kode"
-                        class="inp"
-                        style="width: 180px; text-transform: uppercase"
-                        :readonly="isEditMode"
-                        :class="{ ro: isEditMode }"
-                        placeholder="..."
-                    />
-                </div>
-
-                <div class="fr">
-                    <label class="lbl">Nama Bahan</label>
-                    <input
-                        v-model="formData.Nama"
-                        class="inp flex-grow-1"
-                        placeholder="..."
-                    />
-                </div>
-
-                <div class="fr">
-                    <label class="lbl">Satuan</label>
-                    <select
-                        v-model="formData.Satuan"
-                        class="inp"
-                        style="width: 140px"
-                    >
-                        <option v-for="s in satuanOptions" :key="s" :value="s">
-                            {{ s }}
-                        </option>
-                    </select>
-                </div>
-
-                <div class="fr">
-                    <label class="lbl">
-                        {{ isRollOrMeter ? "Ukuran Roll" : "Dimensi Fisik" }}
-                    </label>
-                    <div class="d-flex align-center ga-2">
-                        <span>P:</span>
-                        <input
-                            type="number"
-                            step="0.01"
-                            v-model.number="formData.Panjang"
-                            class="inp tr"
-                            style="width: 70px"
-                            :placeholder="isRollOrMeter ? '50' : '0'"
-                        />
-                        <span>m</span>
-                        <span class="ml-2">L:</span>
-                        <input
-                            type="number"
-                            step="0.01"
-                            v-model.number="formData.Lebar"
-                            class="inp tr"
-                            style="width: 70px"
-                            :placeholder="isRollOrMeter ? '3.2' : '0'"
-                        />
-                        <span>m</span>
-                        <span
-                            v-if="!isRollOrMeter"
-                            class="text-caption text-grey ml-1"
-                        >
-                            (Opsional / isi 0)
-                        </span>
-                    </div>
-                </div>
-
-                <div class="fr">
-                    <label class="lbl">Gramasi</label>
-                    <input
-                        v-model="formData.Gramasi"
-                        class="inp"
-                        style="width: 160px"
-                        :placeholder="
-                            isRollOrMeter
-                                ? 'Contoh: 340 GR'
-                                : 'Opsional (misal: 3 mm)...'
+                <!-- Divisi -->
+                <div class="field-group">
+                    <label class="field-label">Divisi</label>
+                    <v-select
+                        v-model="formData.divisiKode"
+                        :items="divisiOptions"
+                        item-title="Nama"
+                        item-value="Kode"
+                        density="compact"
+                        variant="outlined"
+                        hide-details
+                        @update:modelValue="
+                            onLookupChange('divisiKode', $event)
                         "
                     />
                 </div>
-            </div>
 
-            <div class="desktop-form-section">
-                <div class="section-label">Supplier & Informasi Harga</div>
-
-                <div class="fr">
-                    <label class="lbl">Supplier</label>
-                    <div class="igrp" style="width: 120px">
-                        <input
-                            v-model="formData.SupKode"
-                            class="inp"
-                            placeholder="Cari..."
-                            @click="showSupplierModal = true"
-                        />
-                        <button
-                            type="button"
-                            class="blkp"
-                            @click="showSupplierModal = true"
-                        >
-                            <IconSearch :size="13" />
-                        </button>
-                    </div>
-                    <input
-                        :value="formData.SupNama"
-                        readonly
-                        class="inp ro flex-grow-1 ml-1"
-                        placeholder="Nama Supplier..."
+                <!-- Kategori / Tipe -->
+                <div class="field-group">
+                    <label class="field-label">Kategori / Tipe</label>
+                    <v-select
+                        v-model="formData.tipeKode"
+                        :items="kategoriOptions"
+                        item-title="Nama"
+                        item-value="Kode"
+                        density="compact"
+                        variant="outlined"
+                        hide-details
+                        @update:modelValue="onLookupChange('tipeKode', $event)"
                     />
                 </div>
 
-                <div class="fr">
-                    <label class="lbl">Harga Beli</label>
-                    <div class="igrp" style="width: 160px">
-                        <span class="addon">Rp</span>
-                        <input
-                            type="number"
-                            v-model.number="formData.HrgBeli"
-                            class="inp tr"
-                            placeholder="0"
-                        />
+                <!-- Jenis Bahan -->
+                <div class="field-group">
+                    <label class="field-label">Jenis Bahan</label>
+                    <v-select
+                        v-model="formData.jenisKode"
+                        :items="jenisOptions"
+                        item-title="Nama"
+                        item-value="Kode"
+                        density="compact"
+                        variant="outlined"
+                        hide-details
+                        @update:modelValue="onLookupChange('jenisKode', $event)"
+                    />
+                </div>
+            </aside>
+
+            <!-- ==================== AREA TABEL KANAN ==================== -->
+            <main class="table-content-area">
+                <div class="table-card">
+                    <!-- Header Tabel -->
+                    <div class="table-header-blue">
+                        <v-row no-gutters align="center">
+                            <v-col cols="1" class="text-center th-col"
+                                >No</v-col
+                            >
+                            <v-col cols="1" class="px-2 th-col"
+                                >Kode Barang</v-col
+                            >
+                            <v-col cols="3" class="px-2 th-col"
+                                >Nama Bahan</v-col
+                            >
+                            <v-col cols="2" class="px-2 th-col"
+                                >Gudang Default</v-col
+                            >
+                            <v-col cols="2" class="px-2 th-col">Supplier</v-col>
+                            <v-col cols="1" class="text-center th-col"
+                                >Satuan</v-col
+                            >
+
+                            <v-col cols="1" class="text-center th-col"
+                                >Panjang</v-col
+                            >
+
+                            <v-col cols="1" class="text-center th-col"
+                                >Lebar</v-col
+                            >
+                        </v-row>
+                    </div>
+
+                    <!-- Baris Data -->
+                    <div class="table-row-item">
+                        <v-row no-gutters align="center">
+                            <v-col cols="1" class="text-center td-col row-num"
+                                >1</v-col
+                            >
+
+                            <!-- kode barang -->
+                            <v-col cols="1" class="px-1 td-col">
+                                <v-text-field
+                                    v-model="formData.kode"
+                                    :readonly="isEditMode"
+                                    variant="plain"
+                                    density="compact"
+                                    hide-details
+                                    class="plain-input"
+                                />
+                            </v-col>
+
+                            <!-- nama bahan -->
+                            <v-col cols="3" class="px-1 td-col">
+                                <v-text-field
+                                    v-model="formData.nama"
+                                    variant="plain"
+                                    density="compact"
+                                    hide-details
+                                    class="plain-input"
+                                />
+                            </v-col>
+
+                            <!-- gudang -->
+                            <v-col cols="2" class="px-1 td-col">
+                                <v-text-field
+                                    placeholder="Cari gudang..."
+                                    persistent-placeholder
+                                    :model-value="formData.gudangKode"
+                                    variant="plain"
+                                    density="compact"
+                                    hide-details
+                                    class="plain-input"
+                                    append-inner-icon="mdi-magnify"
+                                    readonly
+                                    @click="openGudangLookup()"
+                                />
+                            </v-col>
+
+                            <!-- supplier -->
+                            <v-col cols="2" class="px-1 td-col">
+                                <v-text-field
+                                    :model-value="formData.supplierNama || ''"
+                                    placeholder="Cari supplier..."
+                                    variant="plain"
+                                    density="compact"
+                                    hide-details
+                                    class="plain-input"
+                                    append-inner-icon="mdi-magnify"
+                                    readonly
+                                    @click="openSupplierLookup()"
+                                />
+                            </v-col>
+
+                            <!-- satuan -->
+                            <v-col cols="1" class="px-1 td-col">
+                                <v-select
+                                    v-model="formData.satuan"
+                                    :items="satuanOptions"
+                                    variant="plain"
+                                    density="compact"
+                                    hide-details
+                                    class="plain-input text-center"
+                                />
+                            </v-col>
+
+                            <!-- panjang -->
+                            <v-col cols="1" class="px-1 td-col">
+                                <v-text-field
+                                    v-model.number="formData.panjang"
+                                    type="number"
+                                    variant="plain"
+                                    density="compact"
+                                    hide-details
+                                    class="plain-input text-center"
+                                />
+                            </v-col>
+
+                            <!-- lebar -->
+                            <v-col cols="1" class="px-1 td-col">
+                                <v-text-field
+                                    v-model.number="formData.lebar"
+                                    type="number"
+                                    variant="plain"
+                                    density="compact"
+                                    hide-details
+                                    class="plain-input text-center"
+                                />
+                            </v-col>
+                        </v-row>
+                    </div>
+
+                    <div
+                        v-for="(row, rowIndex) in extraRows"
+                        :key="`extra-row-${rowIndex}`"
+                        class="table-row-item"
+                    >
+                        <v-row no-gutters align="center">
+                            <v-col cols="1" class="text-center td-col row-num">
+                                <div
+                                    class="d-flex align-center justify-center ga-1"
+                                >
+                                    <span>{{ rowIndex + 2 }}</span>
+                                    <v-btn
+                                        icon="mdi-delete"
+                                        size="x-small"
+                                        color="error"
+                                        variant="text"
+                                        @click="removeRow(rowIndex)"
+                                    />
+                                </div>
+                            </v-col>
+
+                            <v-col cols="1" class="px-1 td-col">
+                                <v-text-field
+                                    v-model="row.kode"
+                                    variant="plain"
+                                    density="compact"
+                                    hide-details
+                                    class="plain-input"
+                                />
+                            </v-col>
+
+                            <v-col cols="3" class="px-1 td-col">
+                                <v-text-field
+                                    v-model="row.nama"
+                                    variant="plain"
+                                    density="compact"
+                                    hide-details
+                                    class="plain-input"
+                                />
+                            </v-col>
+
+                            <v-col cols="2" class="px-1 td-col">
+                                <v-text-field
+                                    :model-value="
+                                        row.gudangNama || row.gudangKode
+                                    "
+                                    placeholder="Cari gudang..."
+                                    persistent-placeholder
+                                    variant="plain"
+                                    density="compact"
+                                    hide-details
+                                    class="plain-input"
+                                    append-inner-icon="mdi-magnify"
+                                    readonly
+                                    @click="openGudangLookup(rowIndex)"
+                                />
+                            </v-col>
+
+                            <v-col cols="2" class="px-1 td-col">
+                                <v-text-field
+                                    :model-value="
+                                        row.supplierNama ||
+                                        row.supplierKode ||
+                                        ''
+                                    "
+                                    placeholder="Cari supplier..."
+                                    variant="plain"
+                                    density="compact"
+                                    hide-details
+                                    class="plain-input"
+                                    append-inner-icon="mdi-magnify"
+                                    readonly
+                                    @click="openSupplierLookup(rowIndex)"
+                                />
+                            </v-col>
+
+                            <v-col cols="1" class="px-1 td-col">
+                                <v-select
+                                    v-model="row.satuan"
+                                    :items="satuanOptions"
+                                    variant="plain"
+                                    density="compact"
+                                    hide-details
+                                    class="plain-input text-center"
+                                />
+                            </v-col>
+
+                            <v-col cols="1" class="px-1 td-col">
+                                <v-text-field
+                                    v-model.number="row.panjang"
+                                    type="number"
+                                    variant="plain"
+                                    density="compact"
+                                    hide-details
+                                    class="plain-input text-center"
+                                />
+                            </v-col>
+
+                            <v-col cols="1" class="px-1 td-col">
+                                <v-text-field
+                                    v-model.number="row.lebar"
+                                    type="number"
+                                    variant="plain"
+                                    density="compact"
+                                    hide-details
+                                    class="plain-input text-center"
+                                />
+                            </v-col>
+                        </v-row>
+                    </div>
+
+                    <!-- Ruang kosong bergaris -->
+                    <div class="empty-table-space"></div>
+
+                    <!-- Footer Tabel -->
+                    <div class="table-footer pa-2">
+                        <v-btn
+                            prepend-icon="mdi-plus"
+                            size="small"
+                            variant="text"
+                            color="primary"
+                            :disabled="isEditMode"
+                            @click="addRow"
+                        >
+                            Tambah Baris
+                        </v-btn>
                     </div>
                 </div>
+            </main>
+        </div>
 
-                <div class="fr">
-                    <label class="lbl">Harga Jual</label>
-                    <div class="igrp" style="width: 160px">
-                        <span class="addon">Rp</span>
-                        <input
-                            type="number"
-                            v-model.number="formData.HrgJual"
-                            class="inp tr"
-                            placeholder="0"
-                        />
-                    </div>
-                </div>
-            </div>
-        </template>
-    </BaseForm>
+        <GudangLookupView
+            :isVisible="isGudangLookupOpen"
+            @close="isGudangLookupOpen = false"
+            @select="selectGudang"
+        />
 
-    <SupplierSearchModal
-        v-model="showSupplierModal"
-        @selected="onSelectSupplier"
-    />
-
-    <GudangMmtSearchModal
-        v-model="showGudangModal"
-        @selected="onSelectGudang"
-    />
+        <SupplierLookupModal
+            v-if="isSupplierLookupOpen"
+            :isVisible="isSupplierLookupOpen"
+            @close="isSupplierLookupOpen = false"
+            @select="selectSupplier"
+        />
+    </PageLayout>
 </template>
 
 <style scoped>
-.desktop-form-section {
-    background: white;
-    border: 1px solid #e0e0e0;
-    border-radius: 6px;
-    padding: 12px;
-    margin-bottom: 10px;
-    font-family: "Segoe UI", system-ui, sans-serif;
-    font-size: 11px;
+/* ================================================================
+   LAYOUT UTAMA
+   ================================================================ */
+.main-form-wrapper {
+    display: flex;
+    gap: 16px;
+    padding: 16px;
+    background-color: #f5f5f5;
+    height: calc(100vh - 100px);
+    box-sizing: border-box;
 }
-.section-label {
+
+/* ================================================================
+   SIDEBAR KIRI
+   ================================================================ */
+.sidebar-header {
+    width: 320px;
+    min-width: 280px;
+    flex-shrink: 0;
+    background: #ffffff;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+}
+
+.section-title {
+    font-weight: 700;
+    font-size: 15px;
+    color: #1a1a1a;
+    margin-bottom: 14px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+/* ── Field Group ── */
+.field-group {
+    margin-bottom: 10px;
+}
+
+.field-label {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    color: #666666;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    margin-bottom: 3px;
+}
+
+/* ── Status Approval Box ── */
+.status-approval-box {
+    border-top: 1px solid #eeeeee;
+    padding-top: 12px;
+    margin-top: 6px;
+    margin-bottom: 16px;
+}
+
+.status-approval-label {
     font-size: 11px;
     font-weight: 700;
-    color: #1565c0;
-    text-transform: uppercase;
-    margin-bottom: 8px;
-    border-bottom: 1px solid #f0f0f0;
-    padding-bottom: 4px;
+    color: #999999;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
 }
-.fr {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin-bottom: 6px;
+
+.compact-cb :deep(.v-label) {
+    font-size: 13px !important;
 }
-.lbl {
-    width: 95px;
-    flex-shrink: 0;
-    font-weight: 600;
-    color: #444;
-    font-size: 11px;
-}
-.inp {
-    height: 24px;
-    border: 1px solid #ccc;
-    border-radius: 3px;
-    padding: 0 6px;
-    font-size: 11px;
-    background: white;
-    outline: none;
-    min-width: 0;
-}
-.inp:focus {
-    border-color: #1976d2;
-}
-.ro {
-    background: #f5f5f5 !important;
-    color: #555 !important;
-}
-.ck {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 11px;
-    cursor: pointer;
-}
-.ck-wrap {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px 12px;
-}
-.tr {
+
+/* ── Total Box ── */
+.total-qty-box {
+    background-color: #e3f2fd;
+    border: 1px solid #bbdefb;
+    border-radius: 6px;
+    padding: 14px 16px;
     text-align: right;
+    margin-top: auto;
 }
-.igrp {
-    display: flex;
-    align-items: center;
-    border: 1px solid #ccc;
-    border-radius: 3px;
-    background: white;
-    height: 24px;
-    overflow: hidden;
-}
-.igrp .inp {
-    border: none;
-    border-radius: 0;
-    flex: 1;
-}
-.addon {
-    background: #f5f5f5;
-    color: #666;
+
+.total-label {
     font-size: 11px;
+    font-weight: 700;
+    color: #1976d2;
+    letter-spacing: 0.5px;
+    margin-bottom: 2px;
+}
+
+.total-value {
+    font-size: 30px;
+    font-weight: 800;
+    color: #0d47a1;
+    line-height: 1.1;
+}
+
+/* ================================================================
+   AREA TABEL KANAN
+   ================================================================ */
+.table-content-area {
+    flex: 1;
+    min-width: 0;
+    background: #ffffff;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.table-card {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+/* ── Header Tabel Biru ── */
+.table-header-blue {
+    background-color: #64b5f6;
+    color: #ffffff;
     font-weight: 600;
+    font-size: 12px;
+    padding: 8px 0;
+    flex-shrink: 0;
+}
+
+/* Border kolom header (putih transparan) */
+.th-col {
+    border-right: 1px solid rgba(255, 255, 255, 0.35);
     padding: 0 8px;
-    height: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-right: 1px solid #ccc;
-    user-select: none;
 }
-.blkp {
-    background: #f0f0f0;
-    border: none;
-    border-left: 1px solid #ccc;
-    height: 100%;
-    padding: 0 6px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #555;
+
+/* ── Baris Data ── */
+.table-row-item {
+    border-bottom: 1px solid #eeeeee;
+    min-height: 40px;
+    flex-shrink: 0;
 }
-.blkp:hover {
-    background: #e0e0e0;
-    color: #1565c0;
+
+/* Border kolom baris data (abu-abu) */
+.td-col {
+    border-right: 1px solid #eeeeee;
+}
+
+.row-num {
+    font-size: 13px;
+    color: #555555;
+    padding: 0 8px;
+}
+
+/* ── Input Plain Dalam Tabel ── */
+.plain-input :deep(.v-field__input) {
+    padding: 2px 5px !important;
+    min-height: 32px !important;
+    font-size: 13px;
+}
+
+/* ── Ruang Kosong Bergaris ── */
+.empty-table-space {
+    flex: 1;
+    background-image: repeating-linear-gradient(
+        to bottom,
+        #ffffff 0px,
+        #ffffff 39px,
+        #f7f7f7 39px,
+        #f7f7f7 40px
+    );
+}
+
+/* ── Footer Tabel ── */
+.table-footer {
+    border-top: 1px solid #eeeeee;
+    flex-shrink: 0;
 }
 </style>
