@@ -150,7 +150,7 @@ const emptyRow = (defaultTgl: string): TabRow => ({
   plan_keterangan: "",
   supplierKode: "",
   supplierNama: "",
-  plan_hari: 5,
+  plan_hari: 6,
   plan_jam: 6.5,
   plan_target_output: 0,
   plan_smv: 0,
