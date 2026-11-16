@@ -43,7 +43,7 @@ const fetchData = async () => {
       po_nomor: header.po_nomor,
       po_tanggal: header.po_tanggal,
       po_ket: header.po_ket,
-      // ASUMSI nama field, sesuaikan dengan service kamu
+      ppn: Number(header.po_ppn) || 0,
       cabang: header.po_cab || header.po_cabang || header.cab || "",
       kurs: header.po_kurs || header.kurs || "",
       vendor:
@@ -58,7 +58,7 @@ const fetchData = async () => {
     reportData.value = detail.map((item: any) => {
       const qty = Number(item.pod_jumlah ?? item.jumlah ?? 0);
       const harga = Number(item.pod_harga ?? item.harga ?? 0);
-      const ppnPct = Number(item.pod_ppn ?? item.ppn ?? 0); // ASUMSI: persen
+      const ppnPct = master.value.ppn;
       const subtotal = qty * harga;
       return {
         kode: item.pod_brg_kode || item.Kode,
@@ -140,9 +140,6 @@ onMounted(fetchData);
             <td class="tc">{{ it.kode }}</td>
             <td>
               <div class="nm">{{ it.nama }}</div>
-              <div v-if="it.ppnPct > 0" class="ppn-line">
-                PPN {{ it.ppnPct }}%
-              </div>
             </td>
             <td class="qty">
               <span class="qty-n">{{ fmt(it.qty) }}</span>
@@ -151,9 +148,6 @@ onMounted(fetchData);
             <td class="tr">{{ fmt(it.harga) }}</td>
             <td class="tr">
               <div>{{ fmt(it.subtotal) }}</div>
-              <div v-if="it.ppnPct > 0" class="ppn-line">
-                {{ fmt(it.ppnNilai) }}
-              </div>
             </td>
           </tr>
         </template>
@@ -166,6 +160,16 @@ onMounted(fetchData);
         </tr>
       </tbody>
       <tfoot>
+        <tr>
+          <td colspan="3" class="no-b"></td>
+          <td class="total-lbl">SUBTOTAL</td>
+          <td class="tr total-val">{{ fmt(totalSub) }}</td>
+        </tr>
+        <tr v-if="totalPpn > 0">
+          <td colspan="3" class="no-b"></td>
+          <td class="total-lbl">PPN {{ master.ppn }}%</td>
+          <td class="tr total-val">{{ fmt(totalPpn) }}</td>
+        </tr>
         <tr>
           <td colspan="3" class="no-b"></td>
           <td class="total-lbl">TOTAL</td>
