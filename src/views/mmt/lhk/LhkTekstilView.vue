@@ -7,7 +7,7 @@
     :items="masterData"
     :can-insert="true"
     :can-edit="true"
-    :can-delete="true"
+    :can-delete="canDelete"
     :is-loading="loading.master"
     :loading="loading.master"
     v-model:selected="selected"
@@ -32,22 +32,19 @@
   >
     <!-- Keterangan Warna Status di atas tabel -->
     <template #prepend-content>
-      <div
-        class="d-flex align-center px-4 py-2 bg-grey-lighten-4 mb-2 rounded text-caption border"
-      >
-        <span class="font-weight-bold mr-4">Keterangan Warna Status:</span>
-        <span class="d-flex align-center mr-4">
-          <span class="color-indicator bg-error rounded-circle mr-1"></span>
-          Merah = Draft
+      <div class="d-flex align-center flex-wrap ga-2 mb-2 text-caption">
+        <span class="text-medium-emphasis d-flex align-center font-weight-medium">
+          <v-icon size="14" class="me-1">mdi-information-outline</v-icon>
+          Keterangan:
         </span>
-        <span class="d-flex align-center mr-4">
-          <span class="color-indicator bg-black rounded-circle mr-1"></span>
+        <v-chip size="x-small" variant="tonal" color="error" class="font-weight-medium">
+          <span class="status-dot bg-error me-1"></span>
+          Merah = Draft / Belum Lengkap
+        </v-chip>
+        <v-chip size="x-small" variant="tonal" color="grey-darken-3" class="font-weight-medium">
+          <span class="status-dot bg-grey-darken-3 me-1"></span>
           Hitam = Posted / Approve
-        </span>
-        <span class="d-flex align-center text-red">
-          <span class="color-indicator bg-error rounded-circle mr-1"></span>
-          Merah (Garis/Teks) = Belum Lengkap (Lengkap !== 'Y')
-        </span>
+        </v-chip>
       </div>
     </template>
 
@@ -231,10 +228,27 @@ import { useToast } from "vue-toastification";
 import { format, subDays, parseISO, isValid } from "date-fns";
 import BaseBrowse from "@/components/BaseBrowse.vue";
 import api from "@/services/api";
+import { useAuthStore } from "@/stores/authStore";
 import * as XLSX from "xlsx";
 
 const router = useRouter();
 const toast = useToast();
+const authStore = useAuthStore();
+
+const canDelete = computed(() => {
+  const code = String(
+    authStore.user?.kode || authStore.user?.kdUser || authStore.user?.username || "",
+  ).toUpperCase();
+  const role = String(
+    authStore.user?.role || authStore.user?.level || authStore.user?.bagian || "",
+  ).toUpperCase();
+  const isAdmin = code === "ADMIN" || role === "ADMIN";
+  return (
+    isAdmin ||
+    authStore.can("1292", "delete") ||
+    authStore.can("5509", "delete")
+  );
+});
 
 // --- State ---
 const masterData = ref<any[]>([]);
@@ -256,16 +270,17 @@ const selectedItem = computed(() => selected.value[0]);
 
 const getRowTextColor = (item: any) => {
   const status = (item.Status || "DRAFT").toUpperCase();
-  // Jika status DRAFT, berikan warna merah. Jika POSTED / APPROVE, gunakan warna hitam (default).
-  if (status === "DRAFT") {
+  const isLengkap = item.Lengkap === "Y";
+  if (status === "DRAFT" || !isLengkap) {
     return "text-red font-weight-bold";
   }
-  return ""; // Hitam untuk POSTED / APPROVE
+  return "";
 };
 
 // --- Headers ---
 const masterHeaders = [
-  { title: "Nomor", key: "Nomor", width: "250px", minWidth: "250px" },
+  { title: "", key: "data-table-expand", width: "48px", fixed: true },
+  { title: "Nomor", key: "Nomor", width: "250px", minWidth: "250px", fixed: true },
   { title: "Status", key: "Status", width: "100px", align: "center" },
   { title: "Shift", key: "Shift", minWidth: "50px" },
   { title: "Tanggal", key: "Tanggal" },
@@ -384,15 +399,21 @@ const handleEdit = () => {
   });
 };
 
-const handleDelete = async () => {
-  if (!selectedItem.value) return;
-  if (confirm(`Yakin ingin menghapus LHK nomor ${selectedItem.value.Nomor}?`)) {
+const handleDelete = async (item?: any) => {
+  if (!canDelete.value) {
+    toast.error("Akses ditolak: Anda tidak memiliki izin untuk menghapus data LHK Tekstil.");
+    return;
+  }
+  const target = item || selectedItem.value;
+  const nomor = target?.Nomor || target;
+  if (!nomor) return;
+  if (confirm(`Yakin ingin menghapus LHK nomor ${nomor}?`)) {
     try {
-      await api.delete(`/lhk-tekstil-mmt/${selectedItem.value.Nomor}`);
+      await api.delete(`/mmt/lhk-tekstil-mmt/${encodeURIComponent(nomor)}`);
       toast.success("Berhasil dihapus.");
       await fetchMasterData();
-    } catch (e) {
-      toast.error("Gagal Hapus.");
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message || "Gagal Hapus.");
     }
   }
 };
@@ -810,16 +831,17 @@ watch(filters, fetchMasterData, { deep: true });
   color: #1976d2;
 }
 
-.color-indicator {
-  width: 10px;
-  height: 10px;
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
   display: inline-block;
 }
 .bg-error {
   background-color: #f44336 !important;
 }
-.bg-black {
-  background-color: #000000 !important;
+.bg-grey-darken-3 {
+  background-color: #424242 !important;
 }
 .color-badge {
   font-size: 9px;

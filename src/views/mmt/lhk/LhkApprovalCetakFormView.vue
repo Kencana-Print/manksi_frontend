@@ -71,7 +71,7 @@
 
     <!-- CONTENT -->
     <template #default>
-      <div class="pa-2">
+      <div class="pa-2 approval-form-wrapper">
         <!-- Section 1: Informasi Header Rekap Cetak -->
         <div class="desktop-form-section mb-3">
           <div class="section-label">Informasi Utama Approval Cetak</div>
@@ -297,8 +297,10 @@
             :headers="detailHeaders"
             :items="detailData"
             :items-per-page="-1"
+            item-value="_rowId"
             density="compact"
-            class="border rounded desktop-table"
+            fixed-header
+            class="border rounded desktop-table table-scrollable"
             hide-default-footer
           >
             <template #[`item.no`]="{ index }">
@@ -307,23 +309,23 @@
 
             <template #[`item.lhk_rekap`]="{ item }">
               <span class="text-caption font-weight-bold text-grey-darken-2">
-                {{ isEditMode ? (item.lhk_rekap || formData.nomor) : "NEW" }}
+                {{ isEditMode ? ((item.raw || item).lhk_rekap || formData.nomor) : "NEW" }}
               </span>
             </template>
 
             <template #[`item.lhkmesin`]="{ item }">
               <v-chip
                 size="x-small"
-                :color="item.isManual ? 'grey-darken-1' : 'primary'"
+                :color="(item.raw || item).isManual ? 'grey-darken-1' : 'primary'"
                 variant="tonal"
                 class="font-weight-medium"
               >
-                {{ item.lhkmesin || "MANUAL" }}
+                {{ (item.raw || item).lhkmesin || "MANUAL" }}
               </v-chip>
             </template>
 
             <template #[`item.shift`]="{ item }">
-              <span class="text-caption">{{ item.shift }}</span>
+              <span class="text-caption">{{ (item.raw || item).shift }}</span>
             </template>
 
             <template #[`item.mesin`]="{ item, index }">
@@ -331,22 +333,30 @@
                 class="d-flex align-center cursor-pointer text-primary text-caption font-weight-medium"
                 @click="openMesinSearch(index)"
               >
-                <span>{{ item.mesin || "-" }}</span>
+                <span>{{ (item.raw || item).mesin || "-" }}</span>
                 <IconSearch :size="12" class="ml-1 opacity-70" />
               </div>
             </template>
 
             <template #[`item.spk_nomor`]="{ item }">
-              <span class="font-weight-bold text-primary text-caption">{{ item.spk_nomor }}</span>
+              <span class="font-weight-bold text-primary text-caption">{{ (item.raw || item).spk_nomor }}</span>
             </template>
 
             <template #[`item.spk_nama`]="{ item }">
-              <span class="text-caption" :title="item.spk_nama">{{ item.spk_nama }}</span>
+              <span class="text-caption" :title="(item.raw || item).spk_nama">{{ (item.raw || item).spk_nama }}</span>
+            </template>
+
+            <template #[`item.panjang_spk`]="{ item }">
+              <span class="text-caption">{{ Number((item.raw || item).panjang_spk || 0).toFixed(2) }}</span>
+            </template>
+
+            <template #[`item.lebar_spk`]="{ item }">
+              <span class="text-caption">{{ Number((item.raw || item).lebar_spk || 0).toFixed(2) }}</span>
             </template>
 
             <template #[`item.jumlah_cetak`]="{ item, index }">
               <v-text-field
-                v-model.number="item.jumlah_cetak"
+                v-model.number="detailData[index].jumlah_cetak"
                 type="number"
                 density="compact"
                 variant="outlined"
@@ -358,16 +368,16 @@
             </template>
 
             <template #[`item.toleransi`]="{ item }">
-              <span class="text-caption font-weight-medium">{{ Number(item.toleransi || 0).toFixed(4) }}</span>
+              <span class="text-caption font-weight-medium">{{ Number((item.raw || item).toleransi || 0).toFixed(4) }}</span>
             </template>
 
             <template #[`item.toleransi2`]="{ item }">
-              <span class="text-caption font-weight-medium">{{ Number(item.toleransi2 || 0).toFixed(4) }}</span>
+              <span class="text-caption font-weight-medium">{{ Number((item.raw || item).toleransi2 || 0).toFixed(4) }}</span>
             </template>
 
             <template #[`item.total_m2`]="{ item }">
               <span class="font-weight-bold text-caption text-blue-darken-2">
-                {{ Number(item.total_m2 || 0).toFixed(2) }} m²
+                {{ Number((item.raw || item).total_m2 || 0).toFixed(2) }} m²
               </span>
             </template>
 
@@ -386,7 +396,7 @@
             <!-- Total Baris Bawah -->
             <template #body.append v-if="detailData.length > 0">
               <tr class="bg-blue-lighten-5 font-weight-bold">
-                <td colspan="7" class="text-end text-uppercase pr-4">Total:</td>
+                <td colspan="9" class="text-end text-uppercase pr-4">Total:</td>
                 <td class="text-right text-primary">
                   {{
                     detailData
@@ -494,6 +504,8 @@ const detailHeaders = [
   { title: "Mesin", key: "mesin", width: "95px" },
   { title: "No. SPK", key: "spk_nomor", width: "140px" },
   { title: "Nama Produk / Order", key: "spk_nama", minWidth: "180px" },
+  { title: "Panjang", key: "panjang_spk", width: "80px", align: "end" as const },
+  { title: "Lebar", key: "lebar_spk", width: "80px", align: "end" as const },
   { title: "Qty Cetak", key: "jumlah_cetak", width: "100px", align: "end" as const },
   { title: "Tol 1 (m)", key: "toleransi", width: "90px", align: "end" as const },
   { title: "Tol 2 (m)", key: "toleransi2", width: "90px", align: "end" as const },
@@ -519,6 +531,27 @@ const removeInkRow = (index: number) => {
   if (inkDetails.value.length > 1) {
     inkDetails.value.splice(index, 1);
   }
+};
+
+const syncInkMachines = () => {
+  const machines = Array.from(
+    new Set(
+      detailData.value
+        .map((d) => d.mesin)
+        .filter((m) => m && m !== "-" && m !== "MANUAL")
+    )
+  );
+
+  machines.forEach((m) => {
+    const exists = inkDetails.value.some((ink) => ink.msn_kode === m);
+    if (!exists) {
+      if (inkDetails.value.length === 1 && !inkDetails.value[0].msn_kode) {
+        inkDetails.value[0].msn_kode = m;
+      } else {
+        inkDetails.value.push({ msn_kode: m, c: 0, m: 0, y: 0, k: 0 });
+      }
+    }
+  });
 };
 
 // --- Handlers Lookup ---
@@ -549,23 +582,33 @@ const handleMesinSelect = (mesin: any) => {
   }
   isMesinLookupVisible.value = false;
   activeRowIndex.value = null;
+  syncInkMachines();
 };
 
-const handleSpkSelect = (spk: any) => {
-  const p = parseFloat(spk.Panjang || 0);
-  const l = parseFloat(spk.Lebar || 0);
+const handleSpkSelect = (rawSpk: any) => {
+  const spk = rawSpk?.raw || rawSpk;
+  const p = parseFloat(spk.Panjang || spk.panjang || 0);
+  const l = parseFloat(spk.Lebar || spk.lebar || 0);
+  const padAtas = Number(spk.padding_atas ?? spk.Padding ?? 0);
+  const padSamping = Number(spk.padding_samping ?? 0);
+  const { toleransi, toleransi2 } = calculateToleransi(padAtas, padSamping);
+  const effP = p + toleransi;
+  const effL = l + toleransi2;
+
   const newRow = {
+    _rowId: `spk-${Date.now()}-${Math.random()}`,
+    lhk_rekap: isEditMode.value ? formData.nomor : "NEW",
     lhkmesin: "MANUAL",
     shift: formData.shift,
     mesin: formData.mesin || "-",
-    spk_nomor: spk.SPK || spk.spk_nomor,
-    spk_nama: spk.Nama || spk.spk_nama,
+    spk_nomor: spk.SPK || spk.Spk || spk.spk_nomor || spk.Nomor || spk.NomorSPK || "-",
+    spk_nama: spk.Nama || spk.spk_nama || spk.NamaOrder || spk.nama_spk || "-",
     panjang_spk: p,
     lebar_spk: l,
     jumlah_cetak: 1,
-    toleransi: 0,
-    toleransi2: 0,
-    total_m2: Number((p * l).toFixed(2)),
+    toleransi,
+    toleransi2,
+    total_m2: Number((effP * effL * 1).toFixed(2)),
     isManual: true,
   };
 
@@ -574,68 +617,127 @@ const handleSpkSelect = (spk: any) => {
       ...detailData.value[activeRowIndex.value],
       ...newRow,
     };
+    detailData.value = [...detailData.value];
   } else {
-    detailData.value.push(newRow);
+    detailData.value = [...detailData.value, newRow];
   }
   isSpkLookupVisible.value = false;
+  activeRowIndex.value = null;
+  syncInkMachines();
+  toast.success("SPK Manual berhasil ditambahkan.");
 };
 
 const handleLhkSelect = async (selectedNomors: string[]) => {
   if (!selectedNomors.length) return;
+
+  // Filter nomor yang sudah ada agar tidak terjadi duplikasi input
+  const newNomors = selectedNomors.filter(
+    (nomor) => !detailData.value.some((d) => d.lhkmesin === nomor)
+  );
+
+  const duplicateCount = selectedNomors.length - newNomors.length;
+  if (duplicateCount > 0) {
+    toast.info(`${duplicateCount} dokumen LHK sudah ada di daftar pengerjaan.`);
+  }
+
+  if (newNomors.length === 0) {
+    isLhkLookupVisible.value = false;
+    return;
+  }
+
   isLoading.value = true;
   try {
-    const response = await api.get(`/mmt/lhk-cetak/detail-lookup`, {
-      params: { nomor: selectedNomors.join(",") },
-    });
-
-    const res = response.data?.data || response.data;
-
-    if (res?.header) {
-      formData.operator = res.header.Operator || formData.operator;
-      formData.mesin = res.header.Mesin || formData.mesin;
-      formData.gdg_kode = res.header.Gudang || formData.gdg_kode;
+    let res: any = null;
+    try {
+      const response = await api.get(`/mmt/lhk-cetak/detail-lookup`, {
+        params: { nomor: newNomors.join(",") },
+      });
+      res = response.data?.data || response.data;
+    } catch {
+      // Fallback: ambil detail LHK per nomor jika endpoint batch lookup berbeda
+      const detailsList: any[] = [];
+      let headerData: any = null;
+      for (const nomor of newNomors) {
+        try {
+          const singleRes = await api.get(`/mmt/lhk-cetak/details`, {
+            params: { nomor },
+          });
+          const dtls =
+            singleRes.data?.details ||
+            singleRes.data?.data?.details ||
+            singleRes.data ||
+            [];
+          if (Array.isArray(dtls)) {
+            dtls.forEach((d: any) => {
+              detailsList.push({
+                ...d,
+                referensi_lhk: nomor,
+                spk_nomor: d.nomor_spk || d.Nomor_SPK || d.spk_nomor,
+                nama_spk: d.nama_spk || d.Nama_SPK || d.spk_nama,
+                totalcetak: d.totalcetak ?? d.Jml_Cetak ?? d.qty_cetak,
+              });
+            });
+          }
+        } catch (e) {
+          console.warn(`Gagal memuat detail LHK ${nomor}:`, e);
+        }
+      }
+      res = { header: headerData, details: detailsList };
     }
 
-    if (res && Array.isArray(res.details)) {
+    if (res?.header) {
+      if (!formData.operator) formData.operator = res.header.Operator || "";
+      if (!formData.mesin) formData.mesin = res.header.Mesin || "";
+      if (res.header.Gudang) formData.gdg_kode = res.header.Gudang;
+      if (res.header.Shift) formData.shift = Number(res.header.Shift) || formData.shift;
+    }
+
+    if (res && Array.isArray(res.details) && res.details.length > 0) {
       res.details.forEach((d: any) => {
         const pAtas = Number(d.padding_atas ?? d.Padding ?? 3);
         const pSamping = Number(d.padding_samping ?? 1);
         const { toleransi, toleransi2 } = calculateToleransi(pAtas, pSamping);
 
-        const existingIndex = detailData.value.findIndex(
-          (ex) =>
-            `${ex.lhkmesin}-${ex.spk_nomor}`.toUpperCase() ===
-            `${d.referensi_lhk}-${d.spk_nomor}`.toUpperCase()
-        );
+        const p = Number(d.panjang ?? d.Panjang ?? d.spk_panjang ?? 0);
+        const l = Number(d.lebar ?? d.Lebar ?? d.spk_lebar ?? 0);
+        const qty = Number(d.totalcetak ?? d.Jml_Cetak ?? d.qty_cetak ?? 0);
 
-        if (existingIndex !== -1) {
-          detailData.value[existingIndex].jumlah_cetak = Number(d.totalcetak) || 0;
-          detailData.value[existingIndex].toleransi = toleransi;
-          detailData.value[existingIndex].toleransi2 = toleransi2;
-          detailData.value[existingIndex].total_m2 = Number(d.ld_luas_m2) || 0;
-          detailData.value[existingIndex].shift = d.shift || formData.shift;
-          detailData.value[existingIndex].mesin = d.mesin || "-";
-          detailData.value[existingIndex].operator = d.operator || "";
-          detailData.value[existingIndex].isManual = false;
-        } else {
-          detailData.value.push({
-            lhkmesin: d.referensi_lhk,
-            shift: d.shift || formData.shift,
-            mesin: d.mesin || "-",
-            spk_nomor: d.spk_nomor,
-            spk_nama: d.nama_spk,
-            operator: d.operator || "",
-            jumlah_cetak: Number(d.totalcetak) || 0,
-            toleransi,
-            toleransi2,
-            total_m2: Number(d.ld_luas_m2) || 0,
-            isManual: false,
-          });
-        }
+        const rowM2 =
+          d.ld_luas_m2 !== undefined && d.ld_luas_m2 !== null
+            ? Number(d.ld_luas_m2)
+            : Number(((p + toleransi) * (l + toleransi2) * qty).toFixed(2));
+
+        const itemShift = Number(d.shift ?? d.Shift ?? formData.shift) || formData.shift;
+        const itemMesin = d.mesin || d.Mesin || formData.mesin || "-";
+        const itemOperator = d.operator || d.Operator || formData.operator || "";
+
+        if (!formData.mesin && itemMesin !== "-") formData.mesin = itemMesin;
+        if (!formData.operator && itemOperator) formData.operator = itemOperator;
+
+        detailData.value.push({
+          _rowId: `lhk-${d.referensi_lhk || d.Nomor_LHK || Date.now()}-${Math.random()}`,
+          lhk_rekap: isEditMode.value ? formData.nomor : "NEW",
+          lhkmesin: d.referensi_lhk || d.Nomor_LHK || d.nomor || "MANUAL",
+          shift: itemShift,
+          mesin: itemMesin,
+          spk_nomor: d.spk_nomor || d.Nomor_SPK || "-",
+          spk_nama: d.nama_spk || d.Nama_SPK || d.NamaOrder || "-",
+          panjang_spk: p,
+          lebar_spk: l,
+          operator: itemOperator,
+          jumlah_cetak: qty,
+          toleransi,
+          toleransi2,
+          total_m2: rowM2,
+          isManual: false,
+        });
       });
-    }
 
-    toast.success("Data LHK berhasil ditambahkan.");
+      syncInkMachines();
+      toast.success(`${newNomors.length} dokumen LHK berhasil ditambahkan.`);
+    } else {
+      toast.warning("Tidak ada rincian data pada LHK yang dipilih.");
+    }
   } catch (error) {
     console.error("Lookup Detail Error:", error);
     toast.error("Gagal menarik data rincian LHK.");
@@ -651,11 +753,14 @@ const calculateRowM2 = (index: number) => {
   const p = Number(row.panjang_spk) || 0;
   const l = Number(row.lebar_spk) || 0;
   const qty = Number(row.jumlah_cetak) || 0;
-  row.total_m2 = Number((p * l * qty).toFixed(2));
+  const tol1 = Number(row.toleransi) || 0;
+  const tol2 = Number(row.toleransi2) || 0;
+  row.total_m2 = Number(((p + tol1) * (l + tol2) * qty).toFixed(2));
 };
 
 const removeRow = (idx: number) => {
   detailData.value.splice(idx, 1);
+  syncInkMachines();
 };
 
 // --- Validation & Save ---
@@ -703,6 +808,12 @@ const executeSave = async () => {
         toleransi2: Number(d.toleransi2) || 0,
         lcd_toleransi: Number(d.toleransi) || 0,
         lcd_toleransi2: Number(d.toleransi2) || 0,
+        panjang: Number(d.panjang_spk) || 0,
+        lebar: Number(d.lebar_spk) || 0,
+        jumlah_cetak: Number(d.jumlah_cetak) || 0,
+        Jml_Cetak: Number(d.jumlah_cetak) || 0,
+        total_m2: Number(d.total_m2) || 0,
+        m2_cetak: Number(d.total_m2) || 0,
       })),
       inkData: inkDetails.value
         .filter((ink) => ink.msn_kode !== "")
@@ -761,7 +872,8 @@ const loadDataAll = async (nomor: string) => {
       formData.mesin = res.details?.[0]?.Mesin || res.Mesin || "";
 
       if (res.details && Array.isArray(res.details)) {
-        detailData.value = res.details.map((d: any) => ({
+        detailData.value = res.details.map((d: any, idx: number) => ({
+          _rowId: `loaded-${d.Nomor || idx}-${Date.now()}-${idx}`,
           lhk_rekap: d.Nomor || res.Nomor,
           lhkmesin: d.Nomor_lhk_mesin || "MANUAL",
           shift: Number(d.Shift) || formData.shift,
@@ -802,7 +914,13 @@ const loadDataAll = async (nomor: string) => {
 const handleKeydown = (e: KeyboardEvent) => {
   if (e.key === "F1") {
     e.preventDefault();
-    openLhkLookup();
+    if (
+      !isLhkLookupVisible.value &&
+      !isMesinLookupVisible.value &&
+      !isSpkLookupVisible.value
+    ) {
+      openLhkLookup();
+    }
   }
 };
 
@@ -820,6 +938,26 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+.approval-form-wrapper {
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-bottom: 24px;
+}
+
+.table-scrollable :deep(.v-table__wrapper) {
+  max-height: 420px;
+  overflow-y: auto !important;
+  overflow-x: auto !important;
+}
+
+.table-scrollable :deep(thead th) {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 2 !important;
+  background-color: #f1f5f9 !important;
+}
+
 .desktop-form-section {
   background: #ffffff;
   border: 1px solid #e0e0e0;

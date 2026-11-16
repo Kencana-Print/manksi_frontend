@@ -99,11 +99,11 @@
                       >
                         <thead>
                           <tr class="bg-grey-lighten-3">
-                            <th>Nomor SPK</th>
+                            <th style="min-width: 170px">Nomor SPK</th>
                             <th>Nama Pekerjaan</th>
-                            <th class="text-right">Qty Order</th>
-                            <th class="text-right">Qty Produksi LHK</th>
-                            <th class="text-right">Kurang Cetak</th>
+                            <th class="text-right" style="min-width: 110px">Qty Order</th>
+                            <th class="text-right" style="min-width: 130px">Qty Produksi LHK</th>
+                            <th class="text-right" style="min-width: 110px">Kurang Cetak</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -111,8 +111,8 @@
                             v-for="spk in lhkDetailsCache[item.Nomor]"
                             :key="spk.urut"
                           >
-                            <td class="font-weight-bold text-primary">
-                              {{ truncateString(spk.Nomor_SPK, 12) }}
+                            <td class="font-weight-bold text-primary text-no-wrap">
+                              {{ spk.Nomor_SPK || spk.nomor_spk }}
                             </td>
 
                             <td>
@@ -177,8 +177,8 @@
                   RETAIL ({{ item.JumlahSPK }})
                 </v-chip>
               </template>
-              <span v-else class="font-weight-medium">
-                {{ truncateString(item.NomorSPK, 12) }}
+              <span v-else class="font-weight-medium text-no-wrap">
+                {{ item.NomorSPK }}
               </span>
             </div>
           </template>
@@ -242,13 +242,23 @@ import api from "@/services/api";
 import { format } from "date-fns";
 
 // Menyesuaikan interface prop ke TypeScript jika menggunakan compiler TS
-const props = defineProps<{ isVisible: boolean }>();
+const props = withDefaults(
+  defineProps<{
+    isVisible: boolean;
+    initialTanggal?: string;
+    initialShift?: number | string;
+  }>(),
+  {
+    initialTanggal: "",
+    initialShift: "Semua",
+  }
+);
 const emit = defineEmits(["close", "select"]);
 
 const loading = ref(false);
-const lhkList = ref([]);
-const selectedItems = ref([]);
-const expanded = ref([]);
+const lhkList = ref<any[]>([]);
+const selectedItems = ref<any[]>([]);
+const expanded = ref<any[]>([]);
 const lhkDetailsCache = reactive<Record<string, any>>({});
 
 const filters = reactive({
@@ -278,11 +288,20 @@ const truncateString = (str: string, num: number) => {
 const loadDetail = async (nomor: string) => {
   if (lhkDetailsCache[nomor]) return;
   try {
-    // Menghubungi API detail (bisa disesuaikan setelah Anda mengirimkan struktur backend nanti)
-    const response = await api.get("/mmt/lhk-tekstil-mmt/details", {
-      params: { nomor },
-    });
-    lhkDetailsCache[nomor] = response.data.details || response.data;
+    try {
+      const response = await api.get("/mmt/lhk-tekstil-mmt/details", {
+        params: { nomor },
+      });
+      lhkDetailsCache[nomor] = response.data?.details || response.data?.data?.details || response.data || [];
+    } catch {
+      try {
+        const res2 = await api.get(`/mmt/lhk-tekstil-mmt/detail/${encodeURIComponent(nomor)}`);
+        lhkDetailsCache[nomor] = res2.data?.details || res2.data?.data?.details || res2.data || [];
+      } catch {
+        const res3 = await api.get(`/mmt/lhk-tekstil-mmt/${encodeURIComponent(nomor)}`);
+        lhkDetailsCache[nomor] = res3.data?.data?.details || res3.data?.details || [];
+      }
+    }
   } catch (error) {
     console.error("Gagal mengambil detail SPK:", error);
   }
@@ -299,7 +318,6 @@ const fetchLhkData = async () => {
   selectedItems.value = [];
 
   try {
-    // Menggunakan endpoint LHK Tekstil lama namun dengan format parameter LHK Cetak
     const response = await api.get("/mmt/lhk-tekstil-mmt/lookup", {
       params: {
         tanggal: filters.tanggal,
@@ -307,7 +325,7 @@ const fetchLhkData = async () => {
       },
     });
 
-    lhkList.value = response.data.data || response.data;
+    lhkList.value = response.data?.data || response.data || [];
   } catch (error) {
     console.error("Fetch Error:", error);
   } finally {
@@ -348,7 +366,15 @@ const submitSelection = () => {
 watch(
   () => props.isVisible,
   (val) => {
-    if (val) fetchLhkData();
+    if (val) {
+      if (props.initialTanggal) {
+        filters.tanggal = props.initialTanggal;
+      }
+      if (props.initialShift !== undefined && props.initialShift !== null) {
+        filters.shift = String(props.initialShift);
+      }
+      fetchLhkData();
+    }
   },
   { immediate: true },
 );

@@ -91,7 +91,7 @@ export const cetakInsentifExcel = async (nomor: string) => {
       }
       cell.border = fullBorder;
     });
-    ws.getCell(jRow, 14).value = { formula: `J${jRow}*M${jRow}` };
+    ws.getCell(jRow, 14).value = { formula: `J${jRow}*M${jRow}` } as any;
     ws.getCell(jRow, 14).border = fullBorder;
     cNomor = r.Nomor;
     jRow++;
@@ -117,7 +117,7 @@ export const cetakInsentifExcel = async (nomor: string) => {
     ws.getCell(`${col}${totalRow}`).border = fullBorder;
   });
   const totalCell = ws.getCell(`N${totalRow}`);
-  totalCell.value = { formula: `SUM(N5:N${lastDataRow})` };
+  totalCell.value = { formula: `SUM(N5:N${lastDataRow})` } as any;
   totalCell.fill = YELLOW;
   totalCell.font = { bold: true };
   totalCell.numFmt = "#,##0";

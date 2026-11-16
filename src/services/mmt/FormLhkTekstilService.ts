@@ -26,7 +26,7 @@ export const lhkTekstilMmtService = {
   // 5. Menghapus data LHK berdasarkan nomor dokumen
   // Sesuai route backend: router.delete('/:nomor', ...)
   deleteData: (nomor: string) =>
-    api.get(`/mmt/lhk-tekstil-mmt/${encodeURIComponent(nomor)}`),
+    api.delete(`/mmt/lhk-tekstil-mmt/${encodeURIComponent(nomor)}`),
 
   // --- Tambahan Endpoint Approval Sesuai Route Backend Anda ---
   

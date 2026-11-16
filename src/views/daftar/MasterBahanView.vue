@@ -33,18 +33,22 @@ const {
 // 1. Konfigurasi Header (kolom mengikuti tipe bahan yang tampil)
 interface BahanRow {
   Kode: string;
-  Tipe: "GARMEN" | "SPANDUK";
+  Tipe: "GARMEN" | "SPANDUK" | "MMT";
 }
 
 const rows = computed(() => (items.value ?? []) as BahanRow[]);
 const adaSpanduk = computed(() => rows.value.some((r) => r.Tipe === "SPANDUK"));
+const adaMmt = computed(() => rows.value.some((r) => r.Tipe === "MMT"));
 const adaGarmen = computed(
-  () => rows.value.some((r) => r.Tipe === "GARMEN") || !adaSpanduk.value,
+  () =>
+    rows.value.some((r) => r.Tipe === "GARMEN") ||
+    (!adaSpanduk.value && !adaMmt.value),
 );
 
 const headers = computed(() => [
   { title: "KODE", key: "Kode", width: "100px", sortable: true },
-  { title: "NAMA", key: "Nama", width: "300px" },
+  { title: "NAMA", key: "Nama", width: "280px" },
+  { title: "TIPE", key: "Tipe", width: "90px", align: "center" },
   { title: "SATUAN", key: "Satuan", width: "70px", align: "center" },
   ...(adaGarmen.value
     ? [
@@ -53,11 +57,19 @@ const headers = computed(() => [
         { title: "SETTING", key: "Setting", width: "70px" },
       ]
     : []),
-  ...(adaSpanduk.value
+  ...(adaSpanduk.value || adaMmt.value
     ? [
-        { title: "KONSTRUKSI", key: "Konstruksi", width: "90px" },
-        { title: "PANJANG", key: "Panjang", width: "80px", align: "end" },
-        { title: "LEBAR", key: "Lebar", width: "80px", align: "end" },
+        { title: "LEBAR", key: "Lebar", width: "70px", align: "end" },
+        { title: "PANJANG", key: "Panjang", width: "70px", align: "end" },
+      ]
+    : []),
+  ...(adaSpanduk.value
+    ? [{ title: "KONSTRUKSI", key: "Konstruksi", width: "90px" }]
+    : []),
+  ...(adaMmt.value
+    ? [
+        { title: "STATUS", key: "Status", width: "70px", align: "center" },
+        { title: "KATEGORI", key: "Kategori", width: "110px" },
       ]
     : []),
   { title: "DEADSTOCK", key: "DeadStock", width: "80px", align: "center" },
@@ -158,6 +170,24 @@ const handleDelete = async (item: any) => {
         hide-details
         class="mt-0 pt-0 mr-4"
       ></v-checkbox>
+    </template>
+
+    <template #item.Tipe="{ value }">
+      <v-chip
+        size="x-small"
+        label
+        :color="
+          value === 'MMT'
+            ? 'deep-purple-darken-1'
+            : value === 'SPANDUK'
+              ? 'orange-darken-3'
+              : 'blue-darken-3'
+        "
+        variant="tonal"
+        class="font-weight-bold"
+      >
+        {{ value }}
+      </v-chip>
     </template>
 
     <template #item.Panjang="{ value }">{{ fmtUkuran(value) }}</template>

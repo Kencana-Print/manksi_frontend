@@ -13,6 +13,23 @@
     @confirm-close="executeClose"
   >
     <template #header-actions>
+      <!-- Simpan Draft -->
+      <v-btn
+        size="small"
+        color="orange-darken-3"
+        variant="tonal"
+        class="mr-2 text-none font-weight-medium"
+        :loading="isSaving"
+        :disabled="detailData.length === 0"
+        @click="validateBeforeSave('DRAFT')"
+      >
+        <template #prepend>
+          <IconDeviceFloppy :size="16" />
+        </template>
+        Simpan Draft
+      </v-btn>
+
+      <!-- Simpan & Approve -->
       <v-btn
         size="small"
         color="primary"
@@ -52,7 +69,7 @@
     </template>
 
     <template #default>
-      <div class="pa-2">
+      <div class="pa-2 approval-form-wrapper">
         <!-- Informasi Header Rekap -->
         <div class="desktop-form-section mb-3">
           <div class="section-label mb-2">Informasi Utama Approval Tekstil</div>
@@ -254,8 +271,10 @@
             :headers="headers"
             :items="detailData"
             :items-per-page="-1"
+            item-value="_rowId"
             density="compact"
-            class="border rounded desktop-table"
+            fixed-header
+            class="border rounded desktop-table table-scrollable"
             hide-default-footer
           >
             <template #[`item.no`]="{ index }">
@@ -264,24 +283,24 @@
 
             <template #[`item.lhk_nomor`]="{ item }">
               <v-chip
-                v-if="item.lhk_nomor && item.lhk_nomor !== 'MANUAL'"
+                v-if="(item.raw || item).lhk_nomor && (item.raw || item).lhk_nomor !== 'MANUAL'"
                 size="x-small"
                 color="primary"
                 variant="tonal"
               >
-                {{ item.lhk_nomor }}
+                {{ (item.raw || item).lhk_nomor }}
               </v-chip>
               <span v-else class="text-caption text-grey italic">MANUAL</span>
             </template>
 
             <template #[`item.lhk_mesin`]="{ item }">
               <span class="font-weight-bold text-blue-darken-3 text-caption">
-                {{ item.lhk_mesin || "-" }}
+                {{ (item.raw || item).lhk_mesin || "-" }}
               </span>
             </template>
 
             <template #[`item.shift`]="{ item }">
-              <span class="text-caption">{{ item.shift }}</span>
+              <span class="text-caption">{{ (item.raw || item).shift }}</span>
             </template>
 
             <template #[`item.mesin`]="{ item, index }">
@@ -289,22 +308,22 @@
                 class="d-flex align-center cursor-pointer text-primary text-caption font-weight-medium"
                 @click="openMesinSearch(index)"
               >
-                <span>{{ item.mesin || "-" }}</span>
+                <span>{{ (item.raw || item).mesin || "-" }}</span>
                 <IconSearch :size="12" class="ml-1 opacity-70" />
               </div>
             </template>
 
             <template #[`item.nomor_spk`]="{ item }">
-              <span class="font-weight-bold text-primary text-caption">{{ item.nomor_spk }}</span>
+              <span class="font-weight-bold text-primary text-caption">{{ (item.raw || item).nomor_spk }}</span>
             </template>
 
             <template #[`item.keterangan`]="{ item }">
-              <span class="text-caption" :title="item.keterangan">{{ item.keterangan }}</span>
+              <span class="text-caption" :title="(item.raw || item).keterangan">{{ (item.raw || item).keterangan }}</span>
             </template>
 
             <template #[`item.qty`]="{ item, index }">
               <v-text-field
-                v-model.number="item.qty"
+                v-model.number="detailData[index].qty"
                 type="number"
                 density="compact"
                 variant="outlined"
@@ -317,7 +336,7 @@
 
             <template #[`item.total_m2`]="{ item }">
               <span class="font-weight-bold text-caption text-blue-darken-2">
-                {{ Number(item.total_m2 || 0).toFixed(2) }} m²
+                {{ Number((item.raw || item).total_m2 || 0).toFixed(2) }} m²
               </span>
             </template>
 
@@ -375,6 +394,8 @@
 
   <LhkTekstilLookupModal
     :is-visible="isLhkTekstilVisible"
+    :initial-tanggal="formData.tanggal"
+    :initial-shift="formData.shift"
     @close="isLhkTekstilVisible = false"
     @select="handleLhkTekstilSelect"
   />
@@ -399,6 +420,7 @@ import {
   IconTrash,
   IconSearch,
   IconPalette,
+  IconDeviceFloppy,
 } from "@tabler/icons-vue";
 
 const toast = useToast();
@@ -475,16 +497,18 @@ const openSpkSearch = () => {
   isSpkLookupVisible.value = true;
 };
 
-const handleSpkSelect = (spk: any) => {
-  const p = parseFloat(spk.Panjang || 0);
-  const l = parseFloat(spk.Lebar || 0);
+const handleSpkSelect = (rawSpk: any) => {
+  const spk = rawSpk?.raw || rawSpk;
+  const p = parseFloat(spk.Panjang || spk.panjang || 0);
+  const l = parseFloat(spk.Lebar || spk.lebar || 0);
 
-  detailData.value.push({
+  const newRow = {
+    _rowId: `tekstil-manual-${Date.now()}-${Math.random()}`,
     lhk_nomor: "MANUAL",
     lhk_mesin: "MANUAL",
     shift: formData.shift,
-    nomor_spk: spk.SPK || spk.spk_nomor,
-    keterangan: spk.Nama || spk.spk_nama || "Input Manual",
+    nomor_spk: spk.SPK || spk.spk_nomor || spk.Nomor || spk.NomorSPK || "-",
+    keterangan: spk.Nama || spk.spk_nama || spk.NamaOrder || "Input Manual",
     qty: 1,
     lebar: l,
     panjang: p,
@@ -492,9 +516,10 @@ const handleSpkSelect = (spk: any) => {
     isManual: true,
     brg_kode: spk.brg_kode || spk.Kode_Bahan || "",
     barcode: spk.Barcode || "",
-    mesin: "",
-  });
+    mesin: formData.mesin || "",
+  };
 
+  detailData.value = [...detailData.value, newRow];
   isSpkLookupVisible.value = false;
   toast.success("SPK Manual berhasil ditambahkan.");
 };
@@ -512,62 +537,124 @@ const calculateRowM2 = (index: number) => {
 
 const handleLhkTekstilSelect = async (selectedItems: any[]) => {
   for (const item of selectedItems) {
+    if (item.Gudang || item.gdg_kode) {
+      formData.gdg_kode = item.Gudang || item.gdg_kode;
+    }
+
     const isExist = detailData.value.some((d) => d.lhk_mesin === item.Nomor);
     if (!isExist) {
       try {
-        const res = await api.get("/mmt/lhk-tekstil-mmt/details", {
-          params: { nomor: item.Nomor },
-        });
-
-        const targetDetails = res.data?.details || res.data?.data?.details || res.data || [];
+        let targetDetails: any[] = [];
+        try {
+          const res = await api.get("/mmt/lhk-tekstil-mmt/details", {
+            params: { nomor: item.Nomor },
+          });
+          targetDetails =
+            res.data?.details || res.data?.data?.details || res.data || [];
+        } catch {
+          try {
+            const res2 = await api.get(
+              `/mmt/lhk-tekstil-mmt/detail/${encodeURIComponent(item.Nomor)}`,
+            );
+            targetDetails =
+              res2.data?.details || res2.data?.data?.details || res2.data || [];
+          } catch {
+            const res3 = await api.get(
+              `/mmt/lhk-tekstil-mmt/${encodeURIComponent(item.Nomor)}`,
+            );
+            targetDetails =
+              res3.data?.data?.details || res3.data?.details || [];
+          }
+        }
 
         if (Array.isArray(targetDetails) && targetDetails.length > 0) {
           targetDetails.forEach((dtl: any) => {
-            const rowQty = Number(dtl.totalcetak || dtl.Jml_Cetak || 0);
-            const rowPanjang = Number(dtl.Panjang || 0);
-            const rowLebar = Number(dtl.Lebar || 0);
+            const rowQty = Number(
+              dtl.totalcetak || dtl.Jml_Cetak || dtl.ltd_totalcetak || dtl.qty || 0,
+            );
+            const rowPanjang = Number(
+              dtl.panjang_spk || dtl.Panjang || dtl.ltd_panjang_spk || dtl.panjang || 0,
+            );
+            const rowLebar = Number(
+              dtl.lebar_spk || dtl.Lebar || dtl.ltd_lebar_spk || dtl.lebar || 0,
+            );
+            const rowM2 = Number(
+              dtl.total_m2 ||
+                (rowPanjang > 0 && rowLebar > 0 && rowQty > 0
+                  ? (rowPanjang * rowLebar * rowQty).toFixed(2)
+                  : 0),
+            );
 
+            const msn = dtl.Mesin || dtl.mesin || item.Mesin || "";
             detailData.value.push({
+              _rowId: `tekstil-${item.Nomor}-${dtl.Nomor_SPK || Date.now()}-${Math.random()}`,
               lhk_nomor: "",
               lhk_mesin: item.Nomor,
-              shift: item.Shift || formData.shift,
-              mesin: dtl.Mesin || item.Mesin,
+              shift: dtl.Shift || item.Shift || formData.shift,
+              mesin: msn,
               nomor_spk: dtl.Nomor_SPK || dtl.nomor_spk || "-",
               keterangan:
                 dtl.Nama_SPK ||
                 dtl.nama_spk ||
+                dtl.brg_nama ||
                 `${item.Nama_Bahan || "-"} (${item.Barcode || "-"})`,
               qty: rowQty,
               lebar: rowLebar,
               panjang: rowPanjang,
-              total_m2: Number((rowPanjang * rowLebar * rowQty).toFixed(2)),
-              brg_kode: dtl.Kode_Bahan || item.Kode_Bahan,
+              total_m2: rowM2,
+              brg_kode: dtl.Kode_Bahan || dtl.brg_kode || item.Kode_Bahan || "",
               barcode: item.Barcode || "",
               isManual: false,
             });
+
+            // Otomatis daftarkan mesin ke tabel tinta jika belum ada
+            if (msn && !inkDetails.value.some((ink) => ink.msn_kode === msn)) {
+              if (inkDetails.value.length === 1 && !inkDetails.value[0].msn_kode) {
+                inkDetails.value[0].msn_kode = msn;
+              } else {
+                inkDetails.value.push({ msn_kode: msn, c: 0, m: 0, y: 0, k: 0 });
+              }
+            }
           });
         } else {
+          const rowQty = Number(item.TotalCetak || item.qty || 1);
+          const rowLebar = Number(item.Lebar || 0);
+          const rowKurang = Number(item.KurangCetak || 0);
+          const rowPanjang =
+            rowQty > 0 && rowKurang > 0 && rowLebar > 0
+              ? Number((rowKurang / (rowQty * rowLebar)).toFixed(2))
+              : 0;
+
+          const msn = item.Mesin || "";
           detailData.value.push({
             lhk_nomor: "",
             lhk_mesin: item.Nomor,
             shift: item.Shift || formData.shift,
             keterangan: `${item.Nama_Bahan || "-"} (${item.Barcode || "-"})`,
-            total_m2: Number(item.KurangCetak || 0),
-            brg_kode: item.Kode_Bahan,
-            barcode: item.Barcode,
-            mesin: item.Mesin || "",
-            nomor_spk: item.NomorSPK || "-",
-            qty: Number(item.TotalCetak || 0),
-            lebar: Number(item.Lebar || 0),
-            panjang:
-              Number(item.TotalCetak) > 0
-                ? Number(item.KurangCetak) / Number(item.TotalCetak)
-                : 0,
+            total_m2: rowKurang > 0 ? rowKurang : 0,
+            brg_kode: item.Kode_Bahan || "",
+            barcode: item.Barcode || "",
+            mesin: msn,
+            nomor_spk: item.NomorSPK || item.nomor_spk || "-",
+            qty: rowQty,
+            lebar: rowLebar,
+            panjang: rowPanjang,
             isManual: false,
           });
+
+          if (msn && !inkDetails.value.some((ink) => ink.msn_kode === msn)) {
+            if (inkDetails.value.length === 1 && !inkDetails.value[0].msn_kode) {
+              inkDetails.value[0].msn_kode = msn;
+            } else {
+              inkDetails.value.push({ msn_kode: msn, c: 0, m: 0, y: 0, k: 0 });
+            }
+          }
         }
       } catch (err) {
-        console.error(`Gagal memuat rincian SPK untuk dokumen ${item.Nomor}:`, err);
+        console.error(
+          `Gagal memuat rincian SPK untuk dokumen ${item.Nomor}:`,
+          err,
+        );
         toast.error(`Gagal memuat rincian SPK untuk dokumen ${item.Nomor}`);
       }
     }
@@ -611,8 +698,9 @@ const executeSave = async () => {
         nomor: isEditMode.value && formData.nomor !== "AUTO" ? formData.nomor : "AUTO",
         tanggal: formData.tanggal,
         shift: Number(formData.shift) || 1,
-        admin: formData.admin || authStore.user?.kdUser || "ADMIN",
+        admin: authStore.user?.kode || authStore.user?.nama || "ADMIN",
         gdgKode: formData.gdg_kode || "GPM",
+        luser_modified: authStore.user?.kode || "SYSTEM",
         lstatus: pendingStatus.value,
       },
       details: detailData.value.map((d) => ({
@@ -697,6 +785,7 @@ const loadDataAll = async (nomor: string) => {
             d.Nomor_Lhk_Mesin === "MANUAL";
 
           return {
+            _rowId: `loaded-${d.Nomor_App || d.Nomor_SPK || nomor}-${Date.now()}`,
             lhk_nomor: d.Nomor_App || header.Nomor || nomor,
             lhk_mesin: isManualRow ? "MANUAL" : d.Nomor_Lhk_Mesin,
             shift: d.ShiftDetail || d.Shift || header.Shift || 1,
@@ -755,6 +844,26 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+.approval-form-wrapper {
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-bottom: 24px;
+}
+
+.table-scrollable :deep(.v-table__wrapper) {
+  max-height: 420px;
+  overflow-y: auto !important;
+  overflow-x: auto !important;
+}
+
+.table-scrollable :deep(thead th) {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 2 !important;
+  background-color: #f1f5f9 !important;
+}
+
 .desktop-form-section {
   background: #ffffff;
   border: 1px solid #e0e0e0;
@@ -770,6 +879,14 @@ onUnmounted(() => {
 }
 .desktop-table {
   font-size: 11px;
+}
+.desktop-table :deep(table) {
+  width: 100%;
+}
+.desktop-table :deep(th),
+.desktop-table :deep(td) {
+  font-size: 11px !important;
+  white-space: nowrap;
 }
 .cursor-pointer {
   cursor: pointer;

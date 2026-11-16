@@ -1,13 +1,13 @@
 <template>
   <BaseBrowse
-    title="Hasil Kerja Tekstil MMT"
+    title="LHK Approval Tekstil"
     icon="mdi-factory"
-    menu-id="5508"
+    menu-id="5510"
     :headers="masterHeaders"
     :items="filteredMasterData"
     :can-insert="true"
     :can-edit="true"
-    :can-delete="true"
+    :can-delete="canDelete"
     :is-loading="loading.master"
     :loading="loading.master"
     :search="filters.search"
@@ -178,9 +178,23 @@ import api from "@/services/api";
 import { format, subDays, parseISO } from "date-fns";
 import * as XLSX from "xlsx";
 import BaseBrowse from "@/components/BaseBrowse.vue";
+import { useAuthStore } from "@/stores/authStore";
 
 const router = useRouter();
 const toast = useToast();
+const authStore = useAuthStore();
+
+const canDelete = computed(() => {
+  const u = authStore.user as any;
+  const code = String(u?.kode || u?.kdUser || u?.username || "").toUpperCase();
+  const role = String(u?.role || u?.level || u?.bagian || "").toUpperCase();
+  const isAdmin = code === "ADMIN" || role === "ADMIN";
+  return (
+    isAdmin ||
+    authStore.can("1292", "delete") ||
+    authStore.can("5510", "delete")
+  );
+});
 
 const selected = ref<any[]>([]);
 const expanded = ref<any[]>([]);
@@ -203,7 +217,7 @@ const masterHeaders = [
   { title: "Cetak (m)", key: "Total_Meter", align: "end", minWidth: "120px" },
 ];
 
-const detailHeaders = [
+const detailHeaders: any[] = [
   { title: "Mesin", key: "Mesin", minWidth: "120px" },
   { title: "SPK", key: "Nomor_SPK", minWidth: "150px" },
   { title: "Nama SPK", key: "Nama_SPK", minWidth: "250px" },
@@ -339,16 +353,21 @@ const handleBahan = () => {
   if (!selectedItem.value?.Nomor) return;
   toast.info("Fitur rincian pemakaian bahan tekstil sedang disiapkan.");
 };
-const handleDelete = async () => {
-  if (!selectedItem.value?.Nomor) return;
-  const nomor = selectedItem.value.Nomor;
+const handleDelete = async (item?: any) => {
+  if (!canDelete.value) {
+    toast.error("Akses ditolak: Anda tidak memiliki izin untuk menghapus data.");
+    return;
+  }
+  const target = item || selectedItem.value;
+  const nomor = target?.Nomor || target;
+  if (!nomor) return;
   if (confirm(`Yakin ingin menghapus LHK nomor ${nomor}?`)) {
     try {
-      await api.delete(`/lhk-tekstil-mmt/${nomor}`);
+      await api.delete(`/mmt/lhk-tekstil-mmt/${encodeURIComponent(nomor)}`);
       toast.success("Berhasil dihapus.");
       fetchMasterData();
-    } catch (e) {
-      toast.error("Gagal Hapus.");
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message || "Gagal Hapus.");
     }
   }
 };

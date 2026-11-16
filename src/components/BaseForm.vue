@@ -336,6 +336,10 @@ const isLeftCollapsed = ref(false);
   width: 100%;
   display: flex;
   flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 :deep(.desktop-form-section) {
