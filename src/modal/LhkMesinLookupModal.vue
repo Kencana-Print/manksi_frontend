@@ -83,51 +83,51 @@
             <tr>
               <td :colspan="columns.length" class="bg-grey-lighten-5 pa-0">
                 <v-expand-transition>
-                  <div v-if="expanded.includes(item.Nomor)">
+                  <div v-if="expanded.includes(item.Nomor)" class="detail-sticky-wrapper">
                     <v-linear-progress
                       v-if="!lhkDetailsCache[item.Nomor]"
                       indeterminate
                       color="primary"
                     ></v-linear-progress>
 
-                    <v-card v-else variant="flat" class="ma-3 border">
+                    <v-card v-else variant="flat" class="ma-2 border detail-card">
                       <v-table
                         density="compact"
                         class="bg-transparent detail-table"
                       >
                         <thead>
                           <tr class="bg-grey-lighten-3">
-                            <th>Nomor SPK</th>
-                            <th>Nama Pekerjaan</th>
-                            <th class="text-right">Qty Order</th>
-                            <th class="text-right">Qty Produksi LHK</th>
-                            <th class="text-right">Kurang Cetak</th>
+                            <th class="spk-col-header" style="width: 220px; min-width: 200px">Nomor SPK</th>
+                            <th style="min-width: 250px">Nama Pekerjaan</th>
+                            <th class="text-right" style="min-width: 110px">Qty Order</th>
+                            <th class="text-right" style="min-width: 130px">Qty Produksi LHK</th>
+                            <th class="text-right" style="min-width: 110px">Kurang Cetak</th>
                           </tr>
                         </thead>
                         <tbody>
                           <tr
                             v-for="spk in lhkDetailsCache[item.Nomor]"
-                            :key="spk.urut"
+                            :key="spk.urut || spk.nomor_spk || spk.Nomor_SPK"
                           >
-                            <td class="font-weight-bold text-primary">
-                              {{ truncateString(spk.nomor_spk, 12) }}
+                            <td class="font-weight-bold text-primary spk-col-cell text-no-wrap">
+                              {{ spk.nomor_spk || spk.Nomor_SPK || spk.spk_nomor || spk.NomorSPK || spk.SPK || spk.Spk || "-" }}
                             </td>
                             <td>
-                              {{ truncateString(spk.nama_spk || "-", 40) }}
+                              {{ spk.nama_spk || spk.Nama_SPK || spk.NamaOrder || "-" }}
                             </td>
-                            <td class="text-right">{{ spk.qty_order }} Pcs</td>
+                            <td class="text-right">{{ spk.qty_order ?? spk.Jumlah_SPK ?? spk.JumlahOrder ?? 0 }} Pcs</td>
                             <td class="text-right font-weight-bold">
-                              {{ spk.totalcetak }} Pcs
+                              {{ spk.totalcetak ?? spk.Jml_Cetak ?? spk.TotalCetak ?? 0 }} Pcs
                             </td>
                             <td class="text-right font-weight-bold">
                               <span
                                 :class="
-                                  spk.kurang_cetak > 0
+                                  (Number(spk.kurang_cetak ?? spk.KurangCetak ?? 0) > 0)
                                     ? 'text-red'
                                     : 'text-green'
                                 "
                               >
-                                {{ spk.kurang_cetak }} Pcs
+                                {{ spk.kurang_cetak ?? spk.KurangCetak ?? 0 }} Pcs
                               </span>
                             </td>
                           </tr>
@@ -180,8 +180,8 @@
                   RETAIL ({{ item.JumlahSPK }})
                 </v-chip>
               </template>
-              <span v-else class="font-weight-medium">
-                {{ truncateString(item.NomorSPK, 12) }}
+              <span v-else class="font-weight-medium text-no-wrap">
+                {{ item.NomorSPK }}
               </span>
             </div>
           </template>
@@ -418,6 +418,17 @@ watch(
 </script>
 
 <style scoped>
+.detail-sticky-wrapper {
+  position: sticky;
+  left: 0;
+  max-width: 100%;
+}
+
+.detail-card {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
 /* Standarisasi Font Size 11px untuk semua elemen tabel */
 :deep(.v-data-table .v-table__wrapper table th),
 :deep(.v-data-table .v-table__wrapper table td),
@@ -426,6 +437,23 @@ watch(
   font-size: 11px !important;
   height: 36px !important; /* Baris lebih padat */
   white-space: nowrap;
+}
+
+/* Sticky kolom Nomor SPK di detail dropdown agar selalu terlihat full */
+:deep(.detail-table th.spk-col-header) {
+  position: sticky !important;
+  left: 0 !important;
+  z-index: 3 !important;
+  background-color: #e2e8f0 !important;
+  box-shadow: 2px 0 4px rgba(0, 0, 0, 0.06);
+}
+
+:deep(.detail-table td.spk-col-cell) {
+  position: sticky !important;
+  left: 0 !important;
+  z-index: 2 !important;
+  background-color: #f8fafc !important;
+  box-shadow: 2px 0 4px rgba(0, 0, 0, 0.06);
 }
 
 /* Header styling */

@@ -91,6 +91,19 @@ const toDateInputValue = (val: any): string => {
     return s.substring(0, 10);
 };
 
+
+const showPrintSelection = ref(false);
+const savedNomor = ref("");
+
+const openPrintBpb = () => {
+    if (!savedNomor.value) return;
+    const url = router.resolve({
+        name: 'PenerimaanBahanPrint',
+        params: { nomor: savedNomor.value }
+    }).href;
+    window.open(url, "_blank");
+};
+
 const showSupplierModal = ref(false);
 const showBahanModal = ref(false);
 const showPoModal = ref(false);
@@ -193,6 +206,10 @@ const {
                     d.Keterangan || d.KeteranganItem || d.keterangan || "",
             })),
         };
+    },
+    onSuccess: async (res: any) => {
+        savedNomor.value = formData.value.nomor;
+        showPrintSelection.value = true;
     },
     submitApi: async (dataToSave) => {
         if (!dataToSave.supplierKode || !dataToSave.supplierKode.trim()) {

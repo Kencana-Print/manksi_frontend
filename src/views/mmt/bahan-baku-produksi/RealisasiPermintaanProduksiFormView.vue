@@ -291,6 +291,27 @@ const clearPermintaan = () => {
     formData.value.permintaan = "";
 };
 
+
+const barcodeInputs = ref<{ [key: number]: any }>({});
+const setBarcodeRef = (el: any, index: number) => {
+    if (el) barcodeInputs.value[index] = el;
+};
+const focusNextBarcode = async (currentIndex: number) => {
+    await nextTick();
+    if (currentIndex >= formData.value.items.length - 1) {
+        addRow();
+    }
+    await nextTick();
+    const nextInput = barcodeInputs.value[currentIndex + 1];
+    if (nextInput) {
+        if (typeof nextInput.focus === "function") nextInput.focus();
+        else if (nextInput.$el?.querySelector) {
+            const inputEl = nextInput.$el.querySelector("input");
+            if (inputEl) inputEl.focus();
+        }
+    }
+};
+
 // Barcode Scan Handler
 const onBarcodeScan = async (idx: number) => {
     const item = formData.value.items[idx];
@@ -362,6 +383,7 @@ const onBarcodeScan = async (idx: number) => {
             item.qty = 1;
             item.spk = b.Nomor_SPK && b.Nomor_SPK !== "0" ? b.Nomor_SPK : "";
 
+            focusNextBarcode(idx);
             toast.success(`Barcode terbaca: ${item.nama} (P: ${b.Panjang}m)`);
 
             // Jika scan pada baris terakhir, otomatis tambah baris baru

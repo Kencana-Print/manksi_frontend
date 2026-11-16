@@ -1,8 +1,11 @@
 // src/composables/useKomitmenKirimSocket.ts
+// Port dari MANKSI WEB (kolaborasi realtime Komitmen Kirim), disesuaikan:
+// - URL socket diturunkan dari api.defaults.baseURL (MMT tak punya VITE_API_URL).
+// - Identitas user MMT { kdUser, nmUser } dipetakan ke { kode, nama }.
 import { ref, onUnmounted } from "vue";
-import type { Socket } from "socket.io-client";
+import { io, Socket } from "socket.io-client";
 import { useAuthStore } from "@/stores/authStore";
-import { getAppSocket } from "@/composables/useAppSocket";
+import api from "@/services/api";
 
 interface PresenceUser {
   kode: string;
@@ -10,32 +13,36 @@ interface PresenceUser {
   bagian: string;
 }
 
-// ── State presence singleton di level module. Koneksi socket sendiri
-// kini dibagi lewat useAppSocket; listener presence dipasang sekali
-// per instance socket (instance baru muncul setelah logout/login). ──
+// ── Semua state koneksi jadi singleton di level module — supaya
+// konsisten di mana pun/berapa kali pun composable ini dipanggil,
+// tidak terikat ke instance komponen tertentu. ──
 let socket: Socket | null = null;
-let boundTo: Socket | null = null;
 const presenceList = ref<PresenceUser[]>([]);
 const isConnected = ref(false);
 
+const socketBaseUrl = () =>
+  (api.defaults.baseURL || "").replace(/\/api\/?$/, "");
+
 const connect = () => {
-  const s = getAppSocket();
-  socket = s;
-  if (boundTo !== s) {
-    boundTo = s;
-    isConnected.value = s.connected;
-    s.on("connect", () => {
-      isConnected.value = true;
-    });
-    s.on("disconnect", () => {
-      isConnected.value = false;
-      presenceList.value = []; // ⬅ reset saat koneksi putus, biar tidak stale
-    });
-    s.on("pjw:presence", (list: PresenceUser[]) => {
-      presenceList.value = list;
-    });
-  }
-  return s;
+  if (socket) return socket;
+  const authStore = useAuthStore();
+  socket = io(socketBaseUrl(), {
+    auth: { token: authStore.token },
+    transports: ["websocket", "polling"],
+  });
+
+  socket.on("connect", () => {
+    isConnected.value = true;
+  });
+  socket.on("disconnect", () => {
+    isConnected.value = false;
+    presenceList.value = []; // ⬅ reset saat koneksi putus, biar tidak stale
+  });
+  socket.on("pjw:presence", (list: PresenceUser[]) => {
+    presenceList.value = list;
+  });
+
+  return socket;
 };
 
 export function useKomitmenKirimSocket() {
@@ -59,8 +66,11 @@ export function useKomitmenKirimSocket() {
   const leaveRoom = () => {
     if (socket && joinedRoom) {
       socket.emit("pjw:leave", joinedRoom);
+      const authStore = useAuthStore();
+      const myKode =
+        (authStore.user as any)?.kode || (authStore.user as any)?.kdUser;
       presenceList.value = presenceList.value.filter(
-        (u) => u.kode !== useAuthStore().user?.kode,
+        (u) => u.kode !== myKode,
       ); // ⬅ optimistic clear diri sendiri, server akan koreksi lewat broadcast
       joinedRoom = null;
     }
@@ -97,3 +107,5 @@ export function useKomitmenKirimSocket() {
     emitFieldBlur,
   };
 }
+
+export default useKomitmenKirimSocket;

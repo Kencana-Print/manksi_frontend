@@ -11,6 +11,8 @@ import {
   IconSearch,
   IconHelpCircle,
   IconAlertTriangle,
+  IconCheck,
+  IconAlertCircle,
 } from "@tabler/icons-vue";
 
 const props = defineProps<{
@@ -37,6 +39,16 @@ const projectOptions = ref<any[]>([]);
 const satuanOptions = ref<string[]>([]);
 const tipeOptions = ref<{ Kode: string; Nama: string }[]>([]);
 
+// MMT Options
+const kategoriOptions = ref<any[]>([]);
+const jenisBarangOptions = ref<any[]>([]);
+const gudangOptions = ref<any[]>([]);
+
+// Realtime check kode duplicate state
+const isCheckingKode = ref(false);
+const kodeCheckResult = ref<{ exists: boolean; message: string } | null>(null);
+let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
 // --- LOOKUP STATES ---
 const lookupState = ref({
   show: false,
@@ -45,8 +57,13 @@ const lookupState = ref({
   targetKey: "",
 });
 
-const openLookup = (category: string, title: string, target: string) => {
-  if (!props.isNewMode) return;
+const openLookup = (
+  category: string,
+  title: string,
+  target: string,
+  allowInEdit = false,
+) => {
+  if (!props.isNewMode && !allowInEdit) return;
   lookupState.value = { show: true, title, category, targetKey: target };
 };
 
@@ -64,6 +81,9 @@ const handleLookupSelect = (item: any) => {
   } else if (key === "setting") {
     formData.value.kdSetting = item.Kode;
     formData.value.nmSetting = item.Nama;
+  } else if (key === "supplier") {
+    formData.value.bhn_sup_kode = item.Kode;
+    formData.value.nmSupplier = item.Nama;
   }
 };
 
@@ -77,6 +97,7 @@ const buatFormKosong = () => ({
   Bhn_buffer: 0,
   Bhn_dead: 0,
   Bhn_hargabeli: 0,
+  bhn_hrgjual: 0,
   Bhn_avgcost: 0,
   kdJenis: "",
   nmJenis: "",
@@ -90,10 +111,26 @@ const buatFormKosong = () => ({
   Bhn_konstruksi: "",
   Bhn_panjang: "",
   Bhn_lebar: "",
+  // MMT Fields
+  bhn_divisi: "GARMEN",
+  bhn_ktg_kode: "",
+  nmKategori: "",
+  bhn_gdg_default: "WH-16",
+  nmGudang: "",
+  bhn_sup_kode: "",
+  nmSupplier: "",
+  Bhn_jb_kode: "BB",
+  nmJenisBarang: "",
+  bhn_status: "S",
+  isAktif: true,
+  isStok: true,
+  isExpired: false,
 });
 
 const formData = ref(buatFormKosong());
+const isGarmen = computed(() => formData.value.Tipe === "GARMEN");
 const isSpanduk = computed(() => formData.value.Tipe === "SPANDUK");
+const isMmt = computed(() => formData.value.Tipe === "MMT");
 
 const wajibIsi = (v: string | number) =>
   (v !== "" && v !== null && v !== undefined) || "Wajib diisi";
@@ -101,12 +138,65 @@ const lebihDariNol = (v: string | number) => Number(v) > 0 || "Harus > 0";
 const panjangValid = (v: string | number) =>
   v === "" || Number(v) > 0 || "Harus > 0";
 
+const kodeMin3 = (v: string) =>
+  String(v || "").trim().length >= 3 || "Minimal 3 karakter";
+
+const kodeTidakBolehDuplikat = () => {
+  if (isMmt.value && props.isNewMode && kodeCheckResult.value?.exists) {
+    return kodeCheckResult.value.message || "Kode bahan sudah digunakan";
+  }
+  return true;
+};
+
 const generatedName = computed(() => {
   const p = formData.value.project === "REGULER" ? "" : formData.value.project;
   return `${formData.value.nmJenis} ${formData.value.nmWarna} ${formData.value.nmGramasi} ${formData.value.nmSetting} ${p}`
     .trim()
     .toUpperCase();
 });
+
+const cekDuplikatKodeMmt = async (kode: string) => {
+  const k = String(kode || "").trim();
+  if (!k || k.length < 3) {
+    kodeCheckResult.value = null;
+    return;
+  }
+  isCheckingKode.value = true;
+  try {
+    const res = await api.get(
+      `/master/bahan/check-kode/${encodeURIComponent(k)}`,
+    );
+    if (res.data?.data) {
+      kodeCheckResult.value = {
+        exists: res.data.data.exists,
+        message: res.data.data.message,
+      };
+      if (res.data.data.exists) {
+        toast.warning(res.data.data.message);
+      }
+    }
+  } catch (err: any) {
+    console.error("Gagal cek duplikat kode:", err);
+  } finally {
+    isCheckingKode.value = false;
+  }
+};
+
+const handleKodeInput = (val: string) => {
+  if (!isMmt.value || !props.isNewMode) return;
+  formData.value.Bhn_kode = String(val || "").toUpperCase().trim();
+
+  if (debounceTimer) clearTimeout(debounceTimer);
+
+  if (formData.value.Bhn_kode.length < 3) {
+    kodeCheckResult.value = null;
+    return;
+  }
+
+  debounceTimer = setTimeout(async () => {
+    await cekDuplikatKodeMmt(formData.value.Bhn_kode);
+  }, 450);
+};
 
 const loadSatuan = async (tipe: string) => {
   try {
@@ -119,6 +209,28 @@ const loadSatuan = async (tipe: string) => {
   }
 };
 
+const loadMmtLookups = async () => {
+  if (kategoriOptions.value.length > 0) return;
+  try {
+    const [resKat, resGdg, resJb] = await Promise.all([
+      api.get("/master/bahan/lookups/kategori"),
+      api.get("/master/bahan/lookups/gudang"),
+      api.get("/master/bahan/lookups/jenis_mmt"),
+    ]);
+    kategoriOptions.value = resKat.data.data || [];
+    gudangOptions.value = (resGdg.data.data || []).map((g: any) => ({
+      Kode: g.Kode,
+      Nama: `${g.Kode} - ${g.Nama}`,
+    }));
+    jenisBarangOptions.value = (resJb.data.data || []).map((j: any) => ({
+      Kode: j.Kode,
+      Nama: `${j.Kode} - ${j.Nama}`,
+    }));
+  } catch (e) {
+    console.error("Gagal memuat lookup MMT:", e);
+  }
+};
+
 const loadOptions = async () => {
   try {
     const [resProject, resTipe] = await Promise.all([
@@ -127,21 +239,40 @@ const loadOptions = async () => {
     ]);
     projectOptions.value = resProject.data.data;
     tipeOptions.value = resTipe.data.data;
+    await loadMmtLookups();
   } catch (e) {
     toast.error("Gagal memuat opsi referensi");
   }
 };
 
-// Dipanggil saat HO- memilih tipe di mode tambah
+// Dipanggil saat memilih tipe di mode tambah
 const gantiTipe = async (tipe: string | null) => {
   if (!tipe) return;
-  formData.value.Bhn_satuan = tipe === "SPANDUK" ? "YARD" : "KG";
+  kodeCheckResult.value = null;
+  if (tipe === "SPANDUK") {
+    formData.value.Bhn_satuan = "YARD";
+    formData.value.Bhn_kode = "";
+  } else if (tipe === "MMT") {
+    formData.value.Bhn_satuan = "ROLL";
+    formData.value.Bhn_kode = "";
+    formData.value.bhn_gdg_default = "WH-16";
+    formData.value.Bhn_jb_kode = "BB";
+    formData.value.bhn_status = "S";
+    formData.value.isAktif = true;
+    formData.value.isStok = true;
+    formData.value.isExpired = false;
+    await loadMmtLookups();
+  } else {
+    formData.value.Bhn_satuan = "KG";
+    formData.value.Bhn_kode = "";
+  }
   await loadSatuan(tipe);
   formRef.value?.resetValidation();
 };
 
 const resetForm = () => {
   formData.value = buatFormKosong();
+  kodeCheckResult.value = null;
 };
 
 watch(
@@ -151,16 +282,37 @@ watch(
     if (props.isNewMode) {
       resetForm();
     } else if (props.bahanData) {
+      const b = props.bahanData;
+      const t =
+        b.Tipe ||
+        b.Divisi ||
+        b.bhn_divisi ||
+        (b.Bhn_kode?.startsWith("SB") ? "SPANDUK" : "GARMEN");
       formData.value = {
         ...buatFormKosong(),
-        ...props.bahanData,
-        Bhn_ket: props.bahanData.Bhn_ket || "",
-        Bhn_hargabeli: Number(props.bahanData.Bhn_hargabeli) || 0,
-        Bhn_buffer: Number(props.bahanData.Bhn_buffer) || 0,
-        Bhn_dead: props.bahanData.Bhn_dead ?? 0,
-        Bhn_konstruksi: props.bahanData.Bhn_konstruksi ?? "",
-        Bhn_panjang: String(props.bahanData.Bhn_panjang ?? ""),
-        Bhn_lebar: String(props.bahanData.Bhn_lebar ?? ""),
+        ...b,
+        Tipe: t,
+        Bhn_ket: b.Bhn_ket || "",
+        Bhn_hargabeli: Number(b.Bhn_hargabeli) || 0,
+        bhn_hrgjual: Number(b.bhn_hrgjual || b.Bhn_hrgjual) || 0,
+        Bhn_buffer: Number(b.Bhn_buffer) || 0,
+        Bhn_dead: b.Bhn_dead ?? 0,
+        Bhn_konstruksi: b.Bhn_konstruksi ?? "",
+        Bhn_panjang: String(b.Bhn_panjang ?? ""),
+        Bhn_lebar: String(b.Bhn_lebar ?? ""),
+        bhn_ktg_kode: b.bhn_ktg_kode || "",
+        nmKategori: b.KategoriNama || b.Kategori || "",
+        bhn_gdg_default: b.bhn_gdg_default || "WH-16",
+        nmGudang: b.GudangNama || b.GudangDefault || "WH-16",
+        bhn_sup_kode: b.bhn_sup_kode || "",
+        nmSupplier: b.SupplierNama || b.Supplier || "",
+        Bhn_jb_kode: b.Bhn_jb_kode || "BB",
+        nmJenisBarang: b.JenisNama || "",
+        bhn_status: b.bhn_status || b.Bhn_status || b.Status || "S",
+        isAktif:
+          b.isAktif !== undefined ? Boolean(b.isAktif) : b.bhn_aktif === 0,
+        isStok: b.isStok !== undefined ? Boolean(b.isStok) : b.bhn_isstok !== 0,
+        isExpired: Boolean(b.isExpired ?? b.bhn_isexpired),
       };
     }
     await loadOptions();
@@ -170,7 +322,11 @@ watch(
     ) {
       formData.value.Tipe = tipeOptions.value[0]?.Kode ?? "GARMEN";
       formData.value.Bhn_satuan =
-        formData.value.Tipe === "SPANDUK" ? "YARD" : "KG";
+        formData.value.Tipe === "SPANDUK"
+          ? "YARD"
+          : formData.value.Tipe === "MMT"
+            ? "ROLL"
+            : "KG";
     }
     await loadSatuan(formData.value.Tipe);
     formRef.value?.resetValidation();
@@ -180,13 +336,34 @@ watch(
 const handleSave = async () => {
   const { valid } = await formRef.value!.validate();
   if (!valid) return toast.warning("Lengkapi data yang diwajibkan.");
+
+  if (isMmt.value && props.isNewMode && kodeCheckResult.value?.exists) {
+    return toast.error(
+      kodeCheckResult.value.message ||
+        "Kode bahan sudah ada, silakan ganti kode lain.",
+    );
+  }
+
   confirmDialogVisible.value = true;
 };
 
 const executeSave = async () => {
   isSaving.value = true;
   try {
-    if (!isSpanduk.value) {
+    if (isMmt.value) {
+      if (props.isNewMode) {
+        // Cek kembali duplikat sebelum simpan
+        const resCheck = await api.get(
+          `/master/bahan/check-kode/${encodeURIComponent(formData.value.Bhn_kode)}`,
+        );
+        if (resCheck.data?.data?.exists) {
+          toast.error(resCheck.data.data.message);
+          isSaving.value = false;
+          confirmDialogVisible.value = false;
+          return;
+        }
+      }
+    } else if (isGarmen.value) {
       const selectedProj = projectOptions.value.find(
         (p) => p.Nama === formData.value.project,
       );
@@ -225,7 +402,7 @@ const executeSave = async () => {
 </script>
 
 <template>
-  <v-dialog v-model="dialogVisible" persistent max-width="800px">
+  <v-dialog v-model="dialogVisible" persistent max-width="850px">
     <v-card class="dialog-card">
       <v-form ref="formRef" @submit.prevent="handleSave">
         <v-card-title
@@ -239,6 +416,7 @@ const executeSave = async () => {
           />
           <span class="text-subtitle-2 font-weight-bold">
             {{ isNewMode ? "TAMBAH MASTER BAHAN" : "UBAH MASTER BAHAN" }}
+            <span v-if="formData.Tipe"> ({{ formData.Tipe }})</span>
           </span>
           <v-spacer></v-spacer>
           <v-btn
@@ -252,28 +430,7 @@ const executeSave = async () => {
 
         <v-card-text class="pa-4">
           <v-row dense>
-            <v-col cols="12" md="4">
-              <v-text-field
-                v-model="formData.Bhn_kode"
-                label="Kode Bahan"
-                variant="outlined"
-                density="compact"
-                readonly
-                bg-color="grey-lighten-4"
-                hide-details="auto"
-              />
-            </v-col>
-            <v-col cols="12" md="8" class="d-flex align-center">
-              <span class="text-error text-caption font-italic" v-if="isNewMode"
-                >*
-                {{
-                  isSpanduk
-                    ? "Terbentuk otomatis (SB + nomor urut)"
-                    : "Terbentuk otomatis"
-                }}</span
-              >
-            </v-col>
-
+            <!-- Tipe Bahan (Radio) -->
             <v-col cols="12" v-if="isNewMode && tipeOptions.length > 1">
               <v-radio-group
                 v-model="formData.Tipe"
@@ -293,10 +450,40 @@ const executeSave = async () => {
               </v-radio-group>
             </v-col>
 
-            <v-col cols="12" v-if="!isSpanduk">
+            <!-- Kode Bahan -->
+            <v-col cols="12" md="5">
               <v-text-field
-                :model-value="generatedName"
-                label="Nama Bahan (Otomatis)"
+                v-if="isMmt && isNewMode"
+                v-model="formData.Bhn_kode"
+                label="Kode Bahan MMT *"
+                variant="outlined"
+                density="compact"
+                :rules="[wajibIsi, kodeMin3, kodeTidakBolehDuplikat]"
+                :loading="isCheckingKode"
+                placeholder="Masukkan kode custom (min 3 huruf)..."
+                maxlength="20"
+                hide-details="auto"
+                @input="handleKodeInput(formData.Bhn_kode)"
+                @blur="cekDuplikatKodeMmt(formData.Bhn_kode)"
+              >
+                <template #append-inner>
+                  <IconCheck
+                    v-if="kodeCheckResult && !kodeCheckResult.exists"
+                    :size="18"
+                    color="#2e7d32"
+                  />
+                  <IconAlertCircle
+                    v-else-if="kodeCheckResult && kodeCheckResult.exists"
+                    :size="18"
+                    color="#c62828"
+                  />
+                </template>
+              </v-text-field>
+
+              <v-text-field
+                v-else
+                v-model="formData.Bhn_kode"
+                label="Kode Bahan"
                 variant="outlined"
                 density="compact"
                 readonly
@@ -304,54 +491,54 @@ const executeSave = async () => {
                 hide-details="auto"
               />
             </v-col>
-            <template v-else>
+
+            <v-col cols="12" md="7" class="d-flex align-center">
+              <div v-if="isNewMode">
+                <div v-if="isMmt">
+                  <span
+                    v-if="kodeCheckResult?.exists"
+                    class="text-error font-weight-bold text-caption d-flex align-center"
+                  >
+                    <IconAlertTriangle :size="16" class="mr-1" />
+                    {{ kodeCheckResult.message }}
+                  </span>
+                  <span
+                    v-else-if="kodeCheckResult && !kodeCheckResult.exists"
+                    class="text-success font-weight-bold text-caption d-flex align-center"
+                  >
+                    <IconCheck :size="16" class="mr-1" />
+                    Kode bahan tersedia
+                  </span>
+                  <span v-else class="text-caption text-grey-darken-1 font-italic">
+                    * Kode custom (min 3 karakter). Sistem akan mengecek duplikasi otomatis.
+                  </span>
+                </div>
+                <span
+                  v-else-if="isSpanduk"
+                  class="text-error text-caption font-italic"
+                >
+                  * Terbentuk otomatis (SB + nomor urut)
+                </span>
+                <span v-else class="text-error text-caption font-italic">
+                  * Terbentuk otomatis dari kombinasi atribut
+                </span>
+              </div>
+            </v-col>
+
+            <!-- ================= GARMEN FIELDS ================= -->
+            <template v-if="isGarmen">
               <v-col cols="12">
                 <v-text-field
-                  v-model="formData.Bhn_name"
-                  label="Nama Bahan"
+                  :model-value="generatedName"
+                  label="Nama Bahan (Otomatis)"
                   variant="outlined"
                   density="compact"
+                  readonly
+                  bg-color="grey-lighten-4"
                   hide-details="auto"
-                  :rules="[wajibIsi]"
                 />
               </v-col>
-              <v-col cols="12" md="4">
-                <v-text-field
-                  v-model="formData.Bhn_konstruksi"
-                  label="Konstruksi"
-                  variant="outlined"
-                  density="compact"
-                  hide-details="auto"
-                  maxlength="20"
-                />
-              </v-col>
-              <v-col cols="6" md="4">
-                <v-text-field
-                  v-model="formData.Bhn_panjang"
-                  label="Panjang (opsional)"
-                  type="number"
-                  variant="outlined"
-                  density="compact"
-                  hide-details="auto"
-                  :rules="[panjangValid]"
-                  v-select-on-focus
-                />
-              </v-col>
-              <v-col cols="6" md="4">
-                <v-text-field
-                  v-model="formData.Bhn_lebar"
-                  label="Lebar"
-                  type="number"
-                  variant="outlined"
-                  density="compact"
-                  hide-details="auto"
-                  :rules="[wajibIsi, lebihDariNol]"
-                  v-select-on-focus
-                />
-              </v-col>
-            </template>
 
-            <template v-if="!isSpanduk">
               <v-col cols="6" md="3">
                 <v-text-field
                   v-model="formData.kdJenis"
@@ -446,20 +633,241 @@ const executeSave = async () => {
                   :readonly="!isNewMode"
                 />
               </v-col>
+
+              <v-col cols="12" md="6">
+                <v-select
+                  v-model="formData.Bhn_satuan"
+                  :items="satuanOptions"
+                  label="Satuan"
+                  variant="outlined"
+                  density="compact"
+                  hide-details="auto"
+                />
+              </v-col>
             </template>
 
-            <v-col cols="12" md="6">
-              <v-select
-                v-model="formData.Bhn_satuan"
-                :items="satuanOptions"
-                label="Satuan"
-                variant="outlined"
-                density="compact"
-                hide-details="auto"
-              />
-            </v-col>
+            <!-- ================= SPANDUK FIELDS ================= -->
+            <template v-else-if="isSpanduk">
+              <v-col cols="12">
+                <v-text-field
+                  v-model="formData.Bhn_name"
+                  label="Nama Bahan"
+                  variant="outlined"
+                  density="compact"
+                  hide-details="auto"
+                  :rules="[wajibIsi]"
+                />
+              </v-col>
+              <v-col cols="12" md="4">
+                <v-text-field
+                  v-model="formData.Bhn_konstruksi"
+                  label="Konstruksi"
+                  variant="outlined"
+                  density="compact"
+                  hide-details="auto"
+                  maxlength="20"
+                />
+              </v-col>
+              <v-col cols="6" md="4">
+                <v-text-field
+                  v-model="formData.Bhn_panjang"
+                  label="Panjang (opsional)"
+                  type="number"
+                  variant="outlined"
+                  density="compact"
+                  hide-details="auto"
+                  :rules="[panjangValid]"
+                  v-select-on-focus
+                />
+              </v-col>
+              <v-col cols="6" md="4">
+                <v-text-field
+                  v-model="formData.Bhn_lebar"
+                  label="Lebar"
+                  type="number"
+                  variant="outlined"
+                  density="compact"
+                  hide-details="auto"
+                  :rules="[wajibIsi, lebihDariNol]"
+                  v-select-on-focus
+                />
+              </v-col>
+              <v-col cols="12" md="6">
+                <v-select
+                  v-model="formData.Bhn_satuan"
+                  :items="satuanOptions"
+                  label="Satuan"
+                  variant="outlined"
+                  density="compact"
+                  hide-details="auto"
+                />
+              </v-col>
+            </template>
 
-            <v-col cols="12">
+            <!-- ================= MMT FIELDS ================= -->
+            <template v-else-if="isMmt">
+              <v-col cols="12">
+                <v-text-field
+                  v-model="formData.Bhn_name"
+                  label="Nama Bahan MMT *"
+                  variant="outlined"
+                  density="compact"
+                  hide-details="auto"
+                  :rules="[wajibIsi]"
+                  placeholder="Contoh: FLEXY CHINA 280 GR 3.2M"
+                />
+              </v-col>
+
+              <v-col cols="12" md="6">
+                <v-select
+                  v-model="formData.bhn_ktg_kode"
+                  :items="kategoriOptions"
+                  item-title="Nama"
+                  item-value="Kode"
+                  label="Kategori MMT"
+                  variant="outlined"
+                  density="compact"
+                  clearable
+                  hide-details="auto"
+                />
+              </v-col>
+
+              <v-col cols="12" md="6">
+                <v-select
+                  v-model="formData.Bhn_jb_kode"
+                  :items="jenisBarangOptions"
+                  item-title="Nama"
+                  item-value="Kode"
+                  label="Jenis Barang"
+                  variant="outlined"
+                  density="compact"
+                  clearable
+                  hide-details="auto"
+                />
+              </v-col>
+
+              <v-col cols="12" md="6">
+                <v-select
+                  v-model="formData.bhn_gdg_default"
+                  :items="gudangOptions"
+                  item-title="Nama"
+                  item-value="Kode"
+                  label="Gudang Default"
+                  variant="outlined"
+                  density="compact"
+                  hide-details="auto"
+                />
+              </v-col>
+
+              <v-col cols="12" md="6">
+                <v-text-field
+                  v-model="formData.nmSupplier"
+                  label="Supplier"
+                  variant="outlined"
+                  density="compact"
+                  readonly
+                  placeholder="Pilih Supplier..."
+                  hide-details="auto"
+                  clearable
+                  @click:clear="
+                    formData.bhn_sup_kode = '';
+                    formData.nmSupplier = '';
+                  "
+                >
+                  <template #append-inner>
+                    <IconSearch
+                      :size="15"
+                      :stroke-width="1.7"
+                      color="#1565c0"
+                      style="cursor: pointer"
+                      @click="
+                        openLookup('supplier', 'Daftar Supplier', 'supplier', true)
+                      "
+                    />
+                  </template>
+                </v-text-field>
+              </v-col>
+
+              <v-col cols="6" md="4">
+                <v-text-field
+                  v-model="formData.Bhn_lebar"
+                  label="Lebar"
+                  type="number"
+                  variant="outlined"
+                  density="compact"
+                  hide-details="auto"
+                  v-select-on-focus
+                />
+              </v-col>
+
+              <v-col cols="6" md="4">
+                <v-text-field
+                  v-model="formData.Bhn_panjang"
+                  label="Panjang"
+                  type="number"
+                  variant="outlined"
+                  density="compact"
+                  hide-details="auto"
+                  v-select-on-focus
+                />
+              </v-col>
+
+              <v-col cols="12" md="4">
+                <v-select
+                  v-model="formData.Bhn_satuan"
+                  :items="satuanOptions"
+                  label="Satuan"
+                  variant="outlined"
+                  density="compact"
+                  hide-details="auto"
+                />
+              </v-col>
+
+              <v-col cols="12">
+                <v-radio-group
+                  v-model="formData.bhn_status"
+                  inline
+                  label="Status Moving"
+                  density="compact"
+                  hide-details
+                >
+                  <v-radio label="Fast Moving" value="F" color="success" />
+                  <v-radio label="Slow Moving" value="S" color="primary" />
+                  <v-radio label="Non Flexy" value="N" color="grey" />
+                </v-radio-group>
+              </v-col>
+
+              <v-col cols="12">
+                <div class="d-flex align-center gap-4 py-1">
+                  <v-checkbox
+                    v-model="formData.isAktif"
+                    label="Aktif"
+                    color="success"
+                    density="compact"
+                    hide-details
+                    class="mr-4"
+                  />
+                  <v-checkbox
+                    v-model="formData.isStok"
+                    label="Hitung Stok"
+                    color="primary"
+                    density="compact"
+                    hide-details
+                    class="mr-4"
+                  />
+                  <v-checkbox
+                    v-model="formData.isExpired"
+                    label="Ada Expired"
+                    color="warning"
+                    density="compact"
+                    hide-details
+                  />
+                </div>
+              </v-col>
+            </template>
+
+            <!-- Reguler vs Dead Stock Radio (Garmen & Spanduk) -->
+            <v-col cols="12" v-if="!isMmt">
               <v-radio-group
                 v-model="formData.Bhn_dead"
                 inline
@@ -472,6 +880,7 @@ const executeSave = async () => {
               </v-radio-group>
             </v-col>
 
+            <!-- Keterangan & Buffer Stok (Semua Tipe) -->
             <v-col cols="12">
               <v-text-field
                 v-model="formData.Bhn_ket"
@@ -481,6 +890,7 @@ const executeSave = async () => {
                 hide-details="auto"
               />
             </v-col>
+
             <v-col cols="12" md="4">
               <v-text-field
                 v-model.number="formData.Bhn_buffer"
@@ -493,10 +903,11 @@ const executeSave = async () => {
               />
             </v-col>
 
+            <!-- Bagian Harga -->
             <v-col cols="12" v-if="authStore.canLihatHarga">
               <div class="pa-3 bg-blue-lighten-5 rounded border mt-2">
                 <v-row dense>
-                  <v-col cols="12" md="6">
+                  <v-col cols="12" :md="isMmt ? 4 : 6">
                     <v-text-field
                       v-model="formData.Bhn_avgcost"
                       label="Avg Cost"
@@ -507,10 +918,20 @@ const executeSave = async () => {
                       hide-details
                     />
                   </v-col>
-                  <v-col cols="12" md="6">
+                  <v-col cols="12" :md="isMmt ? 4 : 6">
                     <v-text-field
                       v-model.number="formData.Bhn_hargabeli"
                       label="Harga Beli Terakhir"
+                      prefix="Rp"
+                      variant="outlined"
+                      density="compact"
+                      hide-details
+                    />
+                  </v-col>
+                  <v-col cols="12" md="4" v-if="isMmt">
+                    <v-text-field
+                      v-model.number="formData.bhn_hrgjual"
+                      label="Harga Jual"
                       prefix="Rp"
                       variant="outlined"
                       density="compact"
@@ -537,6 +958,7 @@ const executeSave = async () => {
             variant="elevated"
             :loading="isSaving"
             class="px-6"
+            :disabled="isMmt && isNewMode && Boolean(kodeCheckResult?.exists)"
             >Simpan Data (F10)</v-btn
           >
         </v-card-actions>

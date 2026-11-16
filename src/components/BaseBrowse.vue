@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from "vue";
+import { ref, computed, onMounted, watch, useAttrs, useSlots } from "vue";
 import PageLayout from "@/components/PageLayout.vue";
+import DateRangeFilter from "@/components/DateRangeFilter.vue";
 import {
   IconPlus,
   IconPencil,
   IconTrash,
+  IconPrinter,
   IconTable,
   IconFileSpreadsheet,
   IconX,
@@ -29,21 +31,29 @@ import { useTabsStore } from "@/stores/tabsStore";
 const props = withDefaults(
   defineProps<{
     title: string;
-    menuId: string;
+    menuId?: string;
     // Opsional: kunci penyimpanan state browse bila beberapa halaman berbagi menuId
     storageId?: string;
     icon?: any;
     headers: any[];
     items: any[];
     isLoading?: boolean;
+    loading?: boolean;
     searchPlaceholder?: string;
     itemValue?: string;
     canInsert?: boolean;
     canEdit?: boolean;
     canDelete?: boolean;
     canExport?: boolean;
+    showActions?: boolean;
+    hasPrint?: boolean;
+    startDate?: string;
+    endDate?: string;
+    filters?: any;
+    hasDateFilter?: boolean;
     selectStrategy?: "single" | "page" | "all";
     rowPropsFn?: (data: any) => any;
+    rowProps?: (data: any) => any;
     showExpand?: boolean;
     expanded?: any[];
     selected?: any[];
@@ -62,18 +72,17 @@ const props = withDefaults(
     editIcon?: any;
     deleteText?: string;
     deleteIcon?: any;
+    height?: string | number;
+    fixedHeader?: boolean;
   }>(),
   {
     icon: () => IconTable,
     isLoading: false,
+    loading: false,
     editText: "Ubah",
     deleteText: "Hapus",
     searchPlaceholder: "Cari data...",
     itemValue: "Kode",
-    canInsert: false,
-    canEdit: false,
-    canDelete: false,
-    canExport: false,
     selectStrategy: "single",
     selected: () => [],
     showExpand: false,
@@ -90,14 +99,111 @@ const emit = defineEmits([
   "edit",
   "delete",
   "export",
+  "print",
   "row-click",
+  "dblclick:row",
+  "row-dblclick",
   "update:expanded",
   "update:selected",
   "update:filterState",
+  "update:startDate",
+  "update:endDate",
+  "update:filters",
+  "update:filteredItems",
+  "action:new",
+  "action:add",
+  "action:edit",
+  "action:delete",
+  "action:export",
+  "action:refresh",
+  "action:print",
 ]);
 
 const route = useRoute();
 const tabsStore = useTabsStore();
+const attrs = useAttrs();
+const slots = useSlots();
+
+const effectiveMenuId = computed(
+  () =>
+    props.storageId ??
+    props.menuId ??
+    (props.title ? props.title.toLowerCase().replace(/[^a-z0-9]/g, "_") : "browse_default"),
+);
+
+const canShowInsert = computed(() => {
+  if (props.canInsert !== undefined && props.canInsert !== null) return Boolean(props.canInsert);
+  if (props.showActions !== undefined && props.showActions !== null) return Boolean(props.showActions);
+  if ("onAction:new" in attrs || "onAdd" in attrs) return true;
+  return false;
+});
+
+const canShowEdit = computed(() => {
+  if (props.canEdit !== undefined && props.canEdit !== null) return Boolean(props.canEdit);
+  if (props.showActions !== undefined && props.showActions !== null) return Boolean(props.showActions);
+  if ("onAction:edit" in attrs || "onEdit" in attrs) return true;
+  return false;
+});
+
+const canShowDelete = computed(() => {
+  if (props.canDelete !== undefined && props.canDelete !== null) return Boolean(props.canDelete);
+  if (props.showActions !== undefined && props.showActions !== null) return Boolean(props.showActions);
+  if ("onAction:delete" in attrs || "onDelete" in attrs) return true;
+  return false;
+});
+
+const canShowPrint = computed(() => {
+  if (props.hasPrint !== undefined && props.hasPrint !== null) return Boolean(props.hasPrint);
+  if ("onAction:print" in attrs || "onPrint" in attrs) return true;
+  return false;
+});
+
+const canShowExport = computed(() => {
+  if (props.canExport !== undefined && props.canExport !== null) return Boolean(props.canExport);
+  if ("onExport" in attrs || "onAction:export" in attrs) return true;
+  return false;
+});
+
+const effectiveLoading = computed(() => Boolean(props.isLoading || props.loading));
+
+const effectiveShowExpand = computed(() => {
+  return (
+    props.showExpand ||
+    Boolean(slots["expanded-row"]) ||
+    Boolean(slots["expanded-content"]) ||
+    Boolean(slots["detail"])
+  );
+});
+
+const handleAdd = () => {
+  emit("add");
+  emit("action:new");
+  emit("action:add");
+};
+
+const handleEdit = (item: any) => {
+  emit("edit", item);
+  emit("action:edit", item);
+};
+
+const handleDelete = (item: any) => {
+  requestDelete(item);
+};
+
+const handlePrint = (item: any) => {
+  emit("print", item);
+  emit("action:print", item);
+};
+
+const handleRefresh = () => {
+  emit("refresh");
+  emit("action:refresh");
+};
+
+const handleExport = (items: any) => {
+  emit("export", items);
+  emit("action:export", items);
+};
 
 const closeCurrentTab = () => {
   tabsStore.closeTab(route.path);
@@ -105,7 +211,7 @@ const closeCurrentTab = () => {
 
 // ── Session storage key — unik per halaman berdasarkan menuId ──────────
 const storageKey = computed(
-  () => `browse_filter_${props.storageId ?? props.menuId}`,
+  () => `browse_filter_${effectiveMenuId.value}`,
 );
 
 const loadState = () => {
@@ -179,9 +285,24 @@ watch(
 );
 
 // ── Selection ──────────────────────────────────────────────────────────
+const localSelected = ref<any[]>(props.selected ?? []);
+
+watch(
+  () => props.selected,
+  (val) => {
+    if (val !== undefined) {
+      localSelected.value = val ?? [];
+    }
+  },
+  { deep: true },
+);
+
 const internalSelected = computed({
-  get: () => props.selected || [],
-  set: (val) => emit("update:selected", val),
+  get: () => (props.selected !== undefined ? props.selected : localSelected.value),
+  set: (val) => {
+    localSelected.value = val;
+    emit("update:selected", val);
+  },
 });
 const isSingleSelected = computed(() => internalSelected.value.length === 1);
 
@@ -203,7 +324,7 @@ const onTableUpdateExpanded = (val: any[]) => {
 
 // ── Column Order (Drag & Drop) ──────────────────────────────────────
 const colOrderKey = computed(
-  () => `browse_colorder_${props.storageId ?? props.menuId}`,
+  () => `browse_colorder_${effectiveMenuId.value}`,
 );
 
 const loadColOrder = (): string[] => {
@@ -243,7 +364,10 @@ const resetColOrder = () => {
 
 // ── Headers ────────────────────────────────────────────────────────────
 const finalHeaders = computed(() => {
-  if (!props.showExpand) return orderedHeaders.value;
+  if (!effectiveShowExpand.value) return orderedHeaders.value;
+  if (orderedHeaders.value.some((h: any) => h.key === "data-table-expand")) {
+    return orderedHeaders.value;
+  }
   return [
     { title: "", key: "data-table-expand", width: "48px", sortable: false },
     ...orderedHeaders.value,
@@ -578,52 +702,144 @@ const pagedItems = computed(() => {
   return filteredItems.value.slice(start, start + perPage.value);
 });
 
+// ── Helper getItemKey untuk identifikasi baris unik yang robust ──────────
+const getItemKey = (item: any): any => {
+  if (!item || typeof item !== "object") return item;
+  const raw = item?.raw || item;
+  if (props.itemValue && raw[props.itemValue] !== undefined && raw[props.itemValue] !== null) {
+    return raw[props.itemValue];
+  }
+  const candidates = [
+    "Nomor",
+    "nomor",
+    "Kode",
+    "kode",
+    "mkl_nomor",
+    "Nomor_Mutasi",
+    "SO",
+    "SPK",
+    "id",
+    "ID",
+    "Id",
+    "DtfMaklonHasilId",
+  ];
+  for (const c of candidates) {
+    if (raw[c] !== undefined && raw[c] !== null) return raw[c];
+  }
+  const keys = Object.keys(raw);
+  return keys.length > 0 ? raw[keys[0]] : item;
+};
+
 // ── Row props ──────────────────────────────────────────────────────────
 const handleRowClick = (event: PointerEvent, { item }: { item: any }) => {
   const raw = item?.raw || item;
+  const rawKey = getItemKey(raw);
+  const wasSelected = internalSelected.value.some((s) => getItemKey(s) === rawKey);
 
-  if (props.selectStrategy === "single") {
-    // Mode Single Select
-    if (
-      internalSelected.value.length > 0 &&
-      internalSelected.value[0][props.itemValue] === raw[props.itemValue]
-    ) {
-      internalSelected.value = []; // Deselect jika diklik lagi
-    } else {
-      internalSelected.value = [raw]; // Select baru
+  const rowPayload = { item: raw, raw, event, detail: event?.detail ?? 1, target: event?.target };
+  if (raw && typeof raw === "object") {
+    if (!("item" in raw)) {
+      try {
+        Object.defineProperty(raw, "item", {
+          value: raw,
+          configurable: true,
+          enumerable: false,
+          writable: true,
+        });
+      } catch {}
     }
-  } else {
-    // Mode Multi Select (page / all)
-    const index = internalSelected.value.findIndex(
-      (s) => s[props.itemValue] === raw[props.itemValue],
-    );
-
-    if (index !== -1) {
-      // Hapus dari selection jika sudah ada (toggle off)
-      internalSelected.value = internalSelected.value.filter(
-        (s) => s[props.itemValue] !== raw[props.itemValue],
-      );
-    } else {
-      // Tambah ke selection (toggle on)
-      internalSelected.value = [...internalSelected.value, raw];
+    if (!("raw" in raw)) {
+      try {
+        Object.defineProperty(raw, "raw", {
+          value: raw,
+          configurable: true,
+          enumerable: false,
+          writable: true,
+        });
+      } catch {}
+    }
+    if (!("detail" in raw)) {
+      try {
+        Object.defineProperty(raw, "detail", {
+          value: event?.detail ?? 1,
+          configurable: true,
+          enumerable: false,
+          writable: true,
+        });
+      } catch {}
+    }
+    if (!("target" in raw) && event?.target) {
+      try {
+        Object.defineProperty(raw, "target", {
+          value: event.target,
+          configurable: true,
+          enumerable: false,
+          writable: true,
+        });
+      } catch {}
     }
   }
 
-  emit("row-click", raw);
+  // Pancarkan event row-click terlebih dahulu ke parent
+  emit("row-click", raw, rowPayload);
+
+  // Jika parent mengikat v-model:selected dan memiliki handler row-click sendiri,
+  // serahkan sepenuhnya manajemen selection kepada parent agar tidak terjadi double-toggle
+  const hasCustomRowClick = "onRow-click" in attrs || "onRowClick" in attrs;
+  if (hasCustomRowClick && props.selected !== undefined) {
+    return;
+  }
+
+  // Fallback auto-toggle oleh BaseBrowse
+  if (props.selectStrategy === "single") {
+    if (wasSelected) {
+      internalSelected.value = [];
+    } else {
+      internalSelected.value = [raw];
+    }
+  } else {
+    const idx = internalSelected.value.findIndex((s) => getItemKey(s) === rawKey);
+    if (idx !== -1) {
+      internalSelected.value = internalSelected.value.filter((s) => getItemKey(s) !== rawKey);
+    } else {
+      internalSelected.value = [...internalSelected.value, raw];
+    }
+  }
+};
+
+const handleRowDblClick = (event: PointerEvent, { item }: { item: any }) => {
+  const raw = item?.raw || item;
+  const rowPayload = { item: raw, raw, event, detail: event?.detail ?? 2, target: event?.target };
+  emit("dblclick:row", event, rowPayload);
+  emit("row-dblclick", event, rowPayload);
 };
 
 const resolvedRowProps = (data: any) => {
   let customProps: any = {};
-  if (props.rowPropsFn) customProps = props.rowPropsFn(data);
-  const raw = data.item?.raw || data.item;
+  const fn = props.rowPropsFn || props.rowProps;
+  if (fn) customProps = fn(data) || {};
+  const raw = data?.item?.raw || data?.item || data;
+  const rawKey = getItemKey(raw);
   const isSelected = internalSelected.value.some(
-    (s) => s[props.itemValue] === raw[props.itemValue],
+    (s) => getItemKey(s) === rawKey,
   );
-  let classes = customProps.class || "";
-  if (isSelected) classes += " row-selected"; // Ini yang memberikan warna pada baris
+  let customClass = customProps.class;
+  let classList: string[] = [];
+  if (typeof customClass === "string") {
+    if (customClass.trim()) classList.push(customClass.trim());
+  } else if (Array.isArray(customClass)) {
+    classList.push(...customClass.filter(Boolean));
+  } else if (customClass && typeof customClass === "object") {
+    for (const [k, v] of Object.entries(customClass)) {
+      if (v) classList.push(k);
+    }
+  }
+  if (isSelected && !classList.includes("row-selected")) {
+    classList.push("row-selected");
+  }
   return {
     ...customProps,
-    class: classes,
+    class: classList.join(" ").trim(),
     style: "cursor: pointer; " + (customProps.style || ""),
   };
 };
@@ -639,9 +855,18 @@ const requestDelete = async (item: any) => {
 };
 const confirmDelete = () => {
   emit("delete", pendingDeleteItem.value);
+  emit("action:delete", pendingDeleteItem.value);
   deleteDialog.value = false;
   pendingDeleteItem.value = null;
 };
+
+watch(
+  filteredItems,
+  (val) => {
+    emit("update:filteredItems", val);
+  },
+  { immediate: true },
+);
 
 // ── Empty state ────────────────────────────────────────────────────────
 const emptyStateText = computed(() =>
@@ -778,48 +1003,77 @@ watch(
 </script>
 
 <template>
-  <PageLayout :title="title" :menu-id="menuId" :icon="icon">
+  <PageLayout :title="title" :menu-id="effectiveMenuId" :icon="icon">
     <!-- Tombol aksi di header PageLayout — tidak ikut scroll -->
     <template #header-actions>
-      <v-btn v-if="canInsert" size="small" color="primary" @click="emit('add')">
-        <template #prepend><IconPlus :size="15" :stroke-width="2" /></template>
-        Baru
-      </v-btn>
-      <v-btn
-        v-if="canEdit"
-        size="small"
-        :disabled="!isSingleSelected"
-        @click="emit('edit', internalSelected[0])"
+      <slot
+        name="header-actions"
+        :selected="internalSelected"
+        :is-single-selected="isSingleSelected"
+        :isSingleSelected="isSingleSelected"
       >
-        <template #prepend>
-          <component :is="editIcon || IconPencil" :size="15" :stroke-width="1.7" />
-        </template>
-        {{ editText || "Ubah" }}
-      </v-btn>
-      <v-btn
-        v-if="canDelete"
-        size="small"
-        color="error"
-        :disabled="!isSingleSelected"
-        @click="requestDelete(internalSelected[0])"
-      >
-        <template #prepend>
-          <component :is="deleteIcon || IconTrash" :size="15" :stroke-width="1.7" />
-        </template>
-        {{ deleteText || "Hapus" }}
-      </v-btn>
-      <v-btn
-        v-if="canExport"
-        size="small"
-        color="green"
-        @click="emit('export', filteredItems)"
-      >
-        <template #prepend
-          ><IconFileSpreadsheet :size="15" :stroke-width="1.7"
-        /></template>
-        Export
-      </v-btn>
-      <slot name="extra-actions" :selected="internalSelected" />
+        <v-btn
+          v-if="canShowInsert"
+          size="small"
+          color="primary"
+          @click="handleAdd"
+        >
+          <template #prepend><IconPlus :size="15" :stroke-width="2" /></template>
+          Baru
+        </v-btn>
+        <v-btn
+          v-if="canShowEdit"
+          size="small"
+          :disabled="!isSingleSelected"
+          @click="handleEdit(internalSelected[0])"
+        >
+          <template #prepend>
+            <component :is="editIcon || IconPencil" :size="15" :stroke-width="1.7" />
+          </template>
+          {{ editText || "Ubah" }}
+        </v-btn>
+        <v-btn
+          v-if="canShowDelete"
+          size="small"
+          color="error"
+          :disabled="!isSingleSelected"
+          @click="handleDelete(internalSelected[0])"
+        >
+          <template #prepend>
+            <component :is="deleteIcon || IconTrash" :size="15" :stroke-width="1.7" />
+          </template>
+          {{ deleteText || "Hapus" }}
+        </v-btn>
+        <v-btn
+          v-if="canShowPrint"
+          size="small"
+          color="info"
+          :disabled="!isSingleSelected"
+          @click="handlePrint(internalSelected[0])"
+        >
+          <template #prepend>
+            <IconPrinter :size="15" :stroke-width="1.7" />
+          </template>
+          Cetak
+        </v-btn>
+        <v-btn
+          v-if="canShowExport"
+          size="small"
+          color="green"
+          @click="handleExport(filteredItems)"
+        >
+          <template #prepend
+            ><IconFileSpreadsheet :size="15" :stroke-width="1.7"
+          /></template>
+          Export
+        </v-btn>
+      </slot>
+      <slot
+        name="extra-actions"
+        :selected="internalSelected"
+        :is-single-selected="isSingleSelected"
+        :isSingleSelected="isSingleSelected"
+      />
       <v-btn size="small" variant="text" @click="closeCurrentTab">
         <template #prepend><IconX :size="15" :stroke-width="2" /></template>
         Tutup
@@ -830,7 +1084,33 @@ watch(
     <div class="browse-content">
       <!-- Filter Bar -->
       <div class="filter-bar">
+        <template
+          v-if="
+            hasDateFilter ||
+            startDate !== undefined ||
+            (filters && filters.startDate !== undefined)
+          "
+        >
+          <DateRangeFilter
+            :start-date="(filters?.startDate ?? startDate) || ''"
+            :end-date="(filters?.endDate ?? endDate) || ''"
+            @update:start-date="
+              (val: string) => {
+                if (filters) emit('update:filters', { ...filters, startDate: val });
+                emit('update:startDate', val);
+              }
+            "
+            @update:end-date="
+              (val: string) => {
+                if (filters) emit('update:filters', { ...filters, endDate: val });
+                emit('update:endDate', val);
+              }
+            "
+          />
+        </template>
         <slot name="filter-left" />
+        <slot name="filter-fields" />
+        <slot name="extra-filters" />
         <slot name="filter-right-prepend" />
         <v-text-field
           :model-value="search"
@@ -851,10 +1131,10 @@ watch(
           </template>
         </v-text-field>
         <v-btn
-          @click="emit('refresh')"
+          @click="handleRefresh"
           color="primary"
           variant="text"
-          :loading="isLoading"
+          :loading="effectiveLoading"
           size="small"
           icon
         >
@@ -889,6 +1169,9 @@ watch(
         <slot name="filter-right" />
       </div>
 
+      <!-- Prepend Content (Status Legends, alert bars, etc.) -->
+      <slot name="prepend-content" />
+
       <!-- Table + Summary wrapper -->
       <div class="table-section">
         <div
@@ -901,7 +1184,7 @@ watch(
             v-model="internalSelected"
             :headers="finalHeaders"
             :items="pagedItems"
-            :loading="isLoading"
+            :loading="effectiveLoading"
             :item-value="itemValue"
             :select-strategy="selectStrategy"
             :show-select="selectStrategy !== 'single'"
@@ -915,6 +1198,7 @@ watch(
             class="base-table"
             :row-props="resolvedRowProps"
             @click:row="handleRowClick"
+            @dblclick:row="handleRowDblClick"
             sort-asc-icon=""
             sort-desc-icon=""
             :cell-props="({ value }) => ({ title: value ?? '' })"
@@ -1002,12 +1286,19 @@ watch(
               v-for="slotName in Object.keys($slots).filter(
                 (k) =>
                   ![
+                    'header-actions',
                     'extra-actions',
                     'filter-left',
+                    'filter-fields',
+                    'extra-filters',
                     'filter-right-prepend',
                     'filter-right',
+                    'prepend-content',
+                    'expanded-row',
+                    'expanded-content',
                     'detail',
                     'summary-row',
+                    'delete-warning',
                   ].includes(k),
               )"
               v-slot:[slotName]="slotProps"
@@ -1050,15 +1341,38 @@ watch(
 
             <!-- Expanded row -->
             <template #expanded-row="{ columns, item }">
-              <tr>
-                <td :colspan="columns.length" class="expanded-cell">
-                  <div class="expanded-inner">
-                    <div class="expanded-wrapper">
-                      <slot name="detail" :item="item.raw || item" />
+              <slot name="expanded-row" :columns="columns" :item="item">
+                <tr v-if="$slots['expanded-content']">
+                  <td :colspan="columns.length" class="pa-3 bg-grey-lighten-4">
+                    <div
+                      class="expanded-container ml-0 pa-3 bg-white rounded-lg elevation-2 border"
+                      style="
+                        position: sticky;
+                        left: 12px;
+                        width: fit-content;
+                        max-width: calc(100% - 24px);
+                        border-left: 4px solid #1976d2 !important;
+                      "
+                    >
+                      <div class="d-flex align-center mb-2 px-1">
+                        <span class="text-caption font-weight-bold text-grey-darken-3">
+                          Detail Items: {{ item?.raw?.Nomor || item?.Nomor || '' }}
+                        </span>
+                      </div>
+                      <slot name="expanded-content" :columns="columns" :item="item" />
                     </div>
-                  </div>
-                </td>
-              </tr>
+                  </td>
+                </tr>
+                <tr v-else>
+                  <td :colspan="columns.length" class="expanded-cell">
+                    <div class="expanded-inner">
+                      <div class="expanded-wrapper">
+                        <slot name="detail" :item="item.raw || item" />
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              </slot>
             </template>
 
             <template

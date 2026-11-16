@@ -1,0 +1,2212 @@
+﻿<script setup lang="ts">
+import {
+  ref,
+  computed,
+  onMounted,
+  onUnmounted,
+  onActivated,
+  onDeactivated,
+  watch,
+  reactive,
+  nextTick,
+} from "vue";
+import { useAuthStore } from "@/stores/authStore";
+import { useRoute, useRouter } from "vue-router";
+import { useTabStore } from "@/stores/tabStore";
+import { komitmenKirimService } from "@/services/mmt/komitmenKirimService";
+import { useKomitmenKirimSocket } from "@/composables/useKomitmenKirimSocket";
+import { useToast } from "vue-toastification";
+import BaseForm from "@/components/BaseForm.vue";
+import {
+  IconCalendarWeek,
+  IconDownload,
+  IconTrash,
+  IconSearch,
+  IconX,
+} from "@tabler/icons-vue";
+import { formatTanggal } from "@/utils/dateFormat";
+
+const authStore = useAuthStore();
+const toast = useToast();
+const tabsStore = useTabStore();
+const route = useRoute();
+const router = useRouter();
+
+const showQtyWarning = (warning: any) => {
+  if (!warning) return;
+  toast.info(
+    `Total Qty periode ini sudah ${Number(warning.totalSetelah).toLocaleString("id-ID")}, melebihi batas ${Number(warning.batas).toLocaleString("id-ID")}.`,
+  );
+};
+
+const pad = (n: number) => String(n).padStart(2, "0");
+const toLocalDate = (d: Date) =>
+  `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const getMondayOfWeek = (d: Date) => {
+  const day = d.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  const mon = new Date(d);
+  mon.setDate(d.getDate() + diff);
+  return mon;
+};
+
+const todayMonday = getMondayOfWeek(new Date());
+const todaySaturday = new Date(todayMonday);
+todaySaturday.setDate(todayMonday.getDate() + 5);
+
+interface DetailRow {
+  PjwdId: number | null;
+  Tipe: "SO" | "MAP";
+  SoNomor: string;
+  NomorPraOrder: string;
+  MapNomor: string;
+  MhNomor: string;
+  PenNomor: string;
+  PenId: string;
+  Sumber: string;
+  Nama: string;
+  Tanggal: string;
+  Pesan: number;
+  Kirim: number;
+  Kurang: number;
+  Rencana: number;
+  KetRencana: string;
+  Realisasi: number;
+  PermintaanKirim: string;
+  StatusPermintaan: string;
+  Kesepakatan: string;
+  KetKesepakatan: string;
+}
+
+const showCloseDialog = ref(false);
+const executeClose = () => {
+  showCloseDialog.value = false;
+  const currentPath = route.path; // snapshot SEBELUM push, sesuai pola form lain
+  router
+    .push("/mmt/komitmen-kirim")
+    .catch(() => {})
+    .then(() => {
+      tabsStore.closeTab(currentPath);
+    });
+};
+
+// â”€â”€ State lokal â€” pengganti formData dari useForm â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+const isLoading = ref(false);
+const isEditMode = ref(false);
+
+const header = reactive({
+  pjw_nomor: "",
+  pjw_tgl1: toLocalDate(todayMonday),
+  pjw_tgl2: toLocalDate(todaySaturday),
+  pjw_cab: "",
+  pjw_divisi: "",
+  pjw_keterangan: "",
+  pjw_close: "N",
+});
+
+const detail = ref<DetailRow[]>([]);
+
+// â”€â”€ Socket & presence â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+const {
+  presenceList,
+  isConnected,
+  joinRoom,
+  leaveRoom,
+  on,
+  emitFieldFocus,
+  emitFieldBlur,
+} = useKomitmenKirimSocket();
+
+const myUserKode = computed(() => authStore.user?.kode || "");
+
+const fieldFocusMap = reactive<Record<string, { kode: string; nama: string }>>(
+  {},
+);
+const focusKey = (pjwdId: number | null, field: string) => `${pjwdId}:${field}`;
+
+const onFieldFocus = (row: DetailRow, field: string) => {
+  if (!row.PjwdId) return;
+  emitFieldFocus(header.pjw_nomor, row.PjwdId, field);
+};
+const onFieldBlur = (row: DetailRow, field: string) => {
+  if (!row.PjwdId) return;
+  emitFieldBlur(header.pjw_nomor, row.PjwdId, field);
+};
+
+const MANUAL_ADD_KEY = focusKey(0, "manual-add"); // 0 = sentinel, bukan pjwd_id asli (auto_increment mulai dari 1)
+
+const onManualFocus = () => {
+  if (!header.pjw_nomor) return;
+  emitFieldFocus(header.pjw_nomor, 0, "manual-add");
+};
+const onManualBlur = () => {
+  if (!header.pjw_nomor) return;
+  emitFieldBlur(header.pjw_nomor, 0, "manual-add");
+};
+
+const isManualRow = (d: DetailRow) =>
+  !d.SoNomor &&
+  !d.NomorPraOrder &&
+  !d.MapNomor &&
+  !d.MhNomor &&
+  !d.PenNomor &&
+  d.Sumber === "MANUAL";
+
+// â”€â”€ Role permissions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+const isAdmin = computed(() => authStore.user?.kode?.toUpperCase() === "ADMIN");
+const canEditMarketing = computed(
+  () =>
+    isAdmin.value ||
+    authStore.user?.bagian?.toUpperCase() === "MARKETING" ||
+    authStore.user?.bagian?.toUpperCase() === "AUDIT",
+);
+const canEditKesepakatan = computed(
+  () => isAdmin.value || authStore.user?.bagian?.toUpperCase() !== "MARKETING",
+);
+
+// â”€â”€ Cabang â†’ Divisi mapping tetap â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+const CABANG_DIVISI_MAP: Record<string, string> = {
+  P01: "4",
+  P04: "4",
+  P02: "1",
+  P05: "5",
+};
+
+const cabangOptions = ref<{ value: string; title: string }[]>([]);
+const divisiOptions = ref<{ value: string; title: string }[]>([
+  { value: "0", title: "Semua Divisi" },
+]);
+
+const loadCabang = async () => {
+  try {
+    const res = await komitmenKirimService.getCabang();
+    cabangOptions.value = res.data.data.map((c: any) => ({
+      value: c.Kode,
+      title: `${c.Kode} - ${c.Nama}`,
+    }));
+  } catch {
+    console.error("Gagal load cabang");
+  }
+};
+const loadDivisi = async () => {
+  try {
+    const res = await komitmenKirimService.getDivisi();
+    divisiOptions.value = [
+      { value: "0", title: "Semua Divisi" },
+      ...res.data.data.map((d: any) => ({
+        value: String(d.Kode),
+        title: `${d.Kode} - ${d.Nama}`,
+      })),
+    ];
+  } catch {
+    console.error("Gagal load divisi");
+  }
+};
+
+const totalRencanaSo = computed(() =>
+  detailSo.value.reduce((s, d) => s + (Number(d.Rencana) || 0), 0),
+);
+const totalRencanaMap = computed(() =>
+  detailMap.value.reduce((s, d) => s + (Number(d.Rencana) || 0), 0),
+);
+const totalRencanaVisible = computed(() =>
+  activeFormTab.value === "MAP" ? totalRencanaMap.value : totalRencanaSo.value,
+);
+
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// DEBOUNCE HELPER â€” generik, dipakai untuk auto-save header & field
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+const debounceTimers: Record<string, ReturnType<typeof setTimeout>> = {};
+const debounce = (key: string, fn: () => void, delay = 700) => {
+  if (debounceTimers[key]) clearTimeout(debounceTimers[key]);
+  debounceTimers[key] = setTimeout(fn, delay);
+};
+
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// HEADER â€” auto-save per field, debounced
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+const savingHeaderField = ref<string | null>(null);
+
+const saveHeaderField = async (field: string, value: any) => {
+  if (!header.pjw_nomor) return;
+  savingHeaderField.value = field;
+  try {
+    await komitmenKirimService.updateHeaderField(
+      header.pjw_nomor,
+      field,
+      value,
+    );
+  } catch (e: any) {
+    toast.error(e.response?.data?.message || `Gagal menyimpan ${field}.`);
+  } finally {
+    savingHeaderField.value = null;
+  }
+};
+
+const onHeaderFieldInput = (field: string, value: any) => {
+  debounce(`header:${field}`, () => saveHeaderField(field, value), 700);
+};
+
+// Periode berubah â€” langsung save (tidak perlu debounce lama, type=date jarang berubah cepat)
+watch(
+  () => header.pjw_tgl1,
+  (val) => {
+    if (isInitialLoad.value) return;
+    onHeaderFieldInput("pjw_tgl1", val);
+  },
+);
+watch(
+  () => header.pjw_tgl2,
+  (val) => {
+    if (isInitialLoad.value) return;
+    onHeaderFieldInput("pjw_tgl2", val);
+  },
+);
+watch(
+  () => header.pjw_keterangan,
+  (val) => {
+    if (isInitialLoad.value) return;
+    onHeaderFieldInput("pjw_keterangan", val);
+  },
+);
+watch(
+  () => header.pjw_cab,
+  (kode) => {
+    header.pjw_divisi = CABANG_DIVISI_MAP[kode] || "";
+    if (isInitialLoad.value) return;
+    onHeaderFieldInput("pjw_cab", kode);
+    onHeaderFieldInput("pjw_divisi", header.pjw_divisi);
+  },
+);
+
+const divisiTarik = computed(() => header.pjw_divisi || "0");
+
+const activeFormTab = ref<"SO" | "MAP">("SO");
+
+const detailSo = computed(() => detail.value.filter((d) => d.Tipe !== "MAP"));
+const detailMap = computed(() => detail.value.filter((d) => d.Tipe === "MAP"));
+const visibleDetail = computed(() =>
+  activeFormTab.value === "MAP" ? detailMap.value : detailSo.value,
+);
+
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// LOAD DATA â€” mode edit (fetch existing) atau mode baru (create langsung)
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+const mapDetailRow = (r: any): DetailRow => ({
+  PjwdId: r.PjwdId ?? null,
+  Tipe: r.PjwdTipe === "MAP" ? "MAP" : "SO",
+  SoNomor: r.Nomor || "",
+  NomorPraOrder: r.NomorPraOrder || "",
+  MapNomor: r.NomorMap || "",
+  MhNomor: r.NomorMh || "",
+  PenNomor: r.NomorPen || "",
+  PenId: r.PenId || "",
+  Sumber: r.Sumber || (r.Nomor ? "SO" : r.NomorMap ? "MAP" : "PRA ORDER"),
+  Nama: r.Nama,
+  Tanggal: r.Tanggal,
+  Pesan: Number(r.Pesan) || 0,
+  Kirim: Number(r.Kirim) || 0,
+  Kurang: Number(r.Kurang) || 0,
+  Rencana: Number(r.Rencana) || 0,
+  KetRencana: r.KetRencana || "",
+  Realisasi: Number(r.Realisasi) || 0,
+  PermintaanKirim: r.PermintaanKirim || "",
+  StatusPermintaan: r.StatusPermintaan || "CLOSE",
+  Kesepakatan: r.Kesepakatan || "",
+  KetKesepakatan: r.KetKesepakatan || "",
+});
+
+const loadExisting = async (nomor: string) => {
+  isLoading.value = true;
+  try {
+    const res = await komitmenKirimService.getFormDetail(nomor);
+    const d = res.data.data;
+    header.pjw_nomor = d.header.pjw_nomor;
+    header.pjw_tgl1 = d.header.pjw_tgl1;
+    header.pjw_tgl2 = d.header.pjw_tgl2;
+    header.pjw_cab = d.header.pjw_cab || "";
+    header.pjw_divisi = String(d.header.pjw_divisi || "");
+    header.pjw_keterangan = d.header.pjw_keterangan || "";
+    header.pjw_close = d.header.pjw_close;
+    detail.value = (d.detail || []).map(mapDetailRow);
+  } catch (e: any) {
+    toast.error(e.response?.data?.message || "Gagal memuat data.");
+    router.push("/mmt/komitmen-kirim");
+  } finally {
+    isLoading.value = false;
+    await nextTick(); // â¬… pastikan watcher yang sudah kepicu selesai diproses dulu
+    isInitialLoad.value = false; // â¬… baru matikan guard
+  }
+};
+
+const isCreating = ref(false);
+
+const createNew = async () => {
+  if (!header.pjw_tgl1 || !header.pjw_tgl2) {
+    toast.warning("Isi periode terlebih dahulu.");
+    return;
+  }
+  isCreating.value = true;
+  try {
+    const res = await komitmenKirimService.createHeader({
+      pjw_tgl1: header.pjw_tgl1,
+      pjw_tgl2: header.pjw_tgl2,
+      pjw_cab: header.pjw_cab,
+      pjw_divisi: header.pjw_divisi,
+      pjw_keterangan: header.pjw_keterangan,
+    });
+    header.pjw_nomor = res.data.data.nomor;
+    isEditMode.value = true;
+    await nextTick();
+    isInitialLoad.value = false;
+    router.replace(
+      `/mmt/komitmen-kirim/${encodeURIComponent(header.pjw_nomor)}`,
+    );
+    joinRoom(header.pjw_nomor);
+    toast.success(`Komitmen Kirim ${header.pjw_nomor} berhasil dibuat.`);
+  } catch (e: any) {
+    toast.error(
+      e.response?.data?.message || "Gagal membuat Komitmen Kirim baru.",
+    );
+  } finally {
+    isCreating.value = false;
+  }
+};
+
+const isInitialLoad = ref(false); // â¬… default false, bukan true
+
+onMounted(async () => {
+  await Promise.all([loadCabang(), loadDivisi()]);
+
+  const nomorParam = route.params.nomor as string | undefined;
+  if (nomorParam) {
+    isEditMode.value = true;
+    isInitialLoad.value = true; // â¬… guard baru diaktifkan HANYA saat load existing
+    await loadExisting(decodeURIComponent(nomorParam));
+    if (header.pjw_nomor) {
+      joinRoom(header.pjw_nomor);
+    }
+  }
+});
+
+// â”€â”€ KeepAlive tidak memicu onUnmounted saat tab ditutup/dipindah â€”
+// dia cuma deactivate. Socket join/leave HARUS mengikuti siklus
+// activate/deactivate, bukan mount/unmount, supaya presence akurat
+// tanpa perlu refresh.
+onDeactivated(() => {
+  leaveRoom();
+});
+
+onActivated(() => {
+  if (header.pjw_nomor) {
+    joinRoom(header.pjw_nomor);
+  }
+});
+
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// TARIK SO / PRA ORDER / MAP â€” langsung POST ke server (bukan cuma push lokal)
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+const isTarikLoading = ref(false);
+const isTarikPraOrderLoading = ref(false);
+const isTarikMapLoading = ref(false);
+const isManualLoading = ref(false);
+const manualSoNomor = ref("");
+const showPenawaranPicker = ref(false);
+const penawaranPickerNomor = ref("");
+const penawaranPickerItems = ref<any[]>([]);
+const penawaranPickerDivisi = ref("");
+const isPenawaranPickerLoading = ref(false);
+
+const pushRowFromServer = (pjwdId: number, rowInput: any) => {
+  if (detail.value.some((d) => d.PjwdId === pjwdId)) return;
+  detail.value.push({
+    PjwdId: pjwdId,
+    Tipe: rowInput.Tipe === "MAP" ? "MAP" : "SO",
+    SoNomor: rowInput.SoNomor || "",
+    NomorPraOrder: rowInput.NomorPraOrder || "",
+    MapNomor: rowInput.MapNomor || "",
+    MhNomor: rowInput.MhNomor || "",
+    PenNomor: rowInput.PenNomor || "",
+    PenId: rowInput.PenId || "",
+    Sumber:
+      rowInput.Sumber ||
+      (rowInput.SoNomor ? "SO" : rowInput.MapNomor ? "MAP" : "PRA ORDER"),
+    Nama: rowInput.Nama,
+    Tanggal: rowInput.Tanggal,
+    Pesan: Number(rowInput.Pesan) || 0,
+    Kirim: Number(rowInput.Kirim) || 0,
+    Kurang: Number(rowInput.Kurang) || 0,
+    Rencana: Number(rowInput.Rencana) || 0,
+    KetRencana: "",
+    Realisasi: Number(rowInput.Realisasi) || 0,
+    PermintaanKirim: rowInput.PermintaanKirim || "",
+    StatusPermintaan: "CLOSE",
+    Kesepakatan: "",
+    KetKesepakatan: "",
+  });
+};
+
+const isDuplicate = (sumber: string, nomor: string, penId?: string) => {
+  const matches = (d: DetailRow) => {
+    if (sumber === "SO") return d.SoNomor === nomor;
+    if (sumber === "MAP") return d.MapNomor === nomor;
+    if (sumber === "PERMINTAAN HARGA") return d.MhNomor === nomor;
+    if (sumber === "PENAWARAN")
+      return d.PenNomor === nomor && d.PenId === penId;
+    return d.NomorPraOrder === nomor;
+  };
+  const rows = detail.value.filter(matches);
+  if (rows.length === 0) return false;
+  // Boleh nambah baris lagi HANYA kalau semua baris existing untuk
+  // nomor ini sudah PARTIAL dan sudah punya Tanggal Kesepakatan â€”
+  // batch sebelumnya sudah "dikunci", baris baru jadi batch berikutnya.
+  const semuaSiapDipecah = rows.every(
+    (d) => d.StatusPermintaan === "PARTIAL" && !!d.Kesepakatan,
+  );
+  return !semuaSiapDipecah;
+};
+
+const tarikSo = async () => {
+  if (!header.pjw_cab) return toast.warning("Pilih Cabang terlebih dahulu.");
+  if (!header.pjw_tgl1 || !header.pjw_tgl2)
+    return toast.warning("Isi periode terlebih dahulu.");
+
+  isTarikLoading.value = true;
+  try {
+    const res = await komitmenKirimService.searchKandidatSo(
+      header.pjw_tgl1,
+      header.pjw_tgl2,
+      divisiTarik.value,
+      header.pjw_nomor,
+    );
+    const kandidat = res.data.data || [];
+    if (!kandidat.length) {
+      toast.info(
+        "Tidak ada SO baru yang perlu dijadwalkan di periode/divisi ini.",
+      );
+      return;
+    }
+    let ditambah = 0;
+    for (const k of kandidat) {
+      if (isDuplicate("SO", k.Nomor)) continue;
+      const rowInput = {
+        SoNomor: k.Nomor,
+        NomorPraOrder: "",
+        MapNomor: "",
+        Sumber: "SO",
+        Nama: k.Nama,
+        Tanggal: k.Tanggal,
+        Pesan: k.Pesan,
+        Kirim: k.Kirim,
+        Kurang: k.Kurang,
+        Rencana: Number(k.Kurang) || 0,
+        PermintaanKirim: k.DatelineAsli || "",
+      };
+      const saveRes = await komitmenKirimService.addDetailRow(
+        header.pjw_nomor,
+        rowInput,
+      );
+      pushRowFromServer(saveRes.data.data.pjwd_id, rowInput);
+      showQtyWarning(saveRes.data.data.warning);
+      ditambah++;
+    }
+    toast.success(`${ditambah} SO baru ditambahkan ke daftar.`);
+  } catch (e: any) {
+    toast.error(e.response?.data?.message || "Gagal menarik data SO.");
+  } finally {
+    isTarikLoading.value = false;
+  }
+};
+
+const tarikPraOrder = async () => {
+  if (!header.pjw_cab) return toast.warning("Pilih Cabang terlebih dahulu.");
+  if (!header.pjw_tgl1 || !header.pjw_tgl2)
+    return toast.warning("Isi periode terlebih dahulu.");
+
+  isTarikPraOrderLoading.value = true;
+  try {
+    const res = await komitmenKirimService.searchKandidatPraOrder(
+      header.pjw_tgl1,
+      header.pjw_tgl2,
+      divisiTarik.value,
+      header.pjw_nomor,
+    );
+    const kandidat = res.data.data || [];
+    if (!kandidat.length) {
+      toast.info("Tidak ada rencana Pra Order di periode/divisi ini.");
+      return;
+    }
+    let ditambah = 0;
+    for (const k of kandidat) {
+      if (isDuplicate("PRA ORDER", k.Nomor)) continue;
+      const isMapTab = activeFormTab.value === "MAP";
+      const rowInput = {
+        Tipe: activeFormTab.value,
+        SoNomor: "",
+        NomorPraOrder: k.Nomor,
+        MapNomor: "",
+        Sumber: "PRA ORDER",
+        Nama: k.Nama,
+        Tanggal: k.Tanggal,
+        Pesan: isMapTab ? 0 : k.QtyRencana,
+        Kirim: 0,
+        Kurang: isMapTab ? 0 : k.QtyRencana,
+        Rencana: isMapTab ? 0 : Number(k.QtyRencana) || 0,
+        PermintaanKirim: k.TglKirim || "",
+      };
+      const saveRes = await komitmenKirimService.addDetailRow(
+        header.pjw_nomor,
+        rowInput,
+      );
+      pushRowFromServer(saveRes.data.data.pjwd_id, rowInput);
+      showQtyWarning(saveRes.data.data.warning);
+      ditambah++;
+    }
+    toast.success(`${ditambah} rencana Pra Order ditambahkan ke daftar.`);
+  } catch (e: any) {
+    toast.error(e.response?.data?.message || "Gagal menarik data Pra Order.");
+  } finally {
+    isTarikPraOrderLoading.value = false;
+  }
+};
+
+const tarikMap = async () => {
+  if (!header.pjw_tgl1 || !header.pjw_tgl2)
+    return toast.warning("Isi periode terlebih dahulu.");
+
+  isTarikMapLoading.value = true;
+  try {
+    const res = await komitmenKirimService.searchKandidatMap(
+      header.pjw_tgl1,
+      header.pjw_tgl2,
+      header.pjw_divisi,
+      header.pjw_nomor,
+    );
+    const kandidat = res.data.data || [];
+    if (!kandidat.length) {
+      toast.info("Tidak ada MAP yang perlu dijadwalkan di periode/divisi ini.");
+      return;
+    }
+    let ditambah = 0;
+    for (const k of kandidat) {
+      if (isDuplicate("MAP", k.Nomor)) continue;
+      const rowInput = {
+        SoNomor: "",
+        NomorPraOrder: "",
+        MapNomor: k.Nomor,
+        Sumber: "MAP",
+        Nama: k.Nama,
+        Tanggal: k.Tanggal,
+        Pesan: k.Pesan,
+        Kirim: k.Kirim,
+        Kurang: k.Kurang,
+        Rencana: Number(k.Kurang) || 0,
+        PermintaanKirim: k.DatelineAsli || "",
+      };
+      const saveRes = await komitmenKirimService.addDetailRow(
+        header.pjw_nomor,
+        rowInput,
+      );
+      pushRowFromServer(saveRes.data.data.pjwd_id, rowInput);
+      showQtyWarning(saveRes.data.data.warning);
+      ditambah++;
+    }
+    toast.success(`${ditambah} MAP baru ditambahkan ke daftar.`);
+  } catch (e: any) {
+    toast.error(e.response?.data?.message || "Gagal menarik data MAP.");
+  } finally {
+    isTarikMapLoading.value = false;
+  }
+};
+
+const detectSumberFromNomor = (
+  nomor: string,
+): "MH" | "MAP" | "PENAWARAN" | "SO" => {
+  const upper = nomor.toUpperCase();
+  if (upper.startsWith("MH.")) return "MH";
+  if (upper.startsWith("MAP-") || upper.startsWith("MAP/")) return "MAP";
+  // Format Penawaran: NNNNN/KODE/TAHUN, misal 00023/KP/2026 â€” ada 2 slash
+  if ((nomor.match(/\//g) || []).length >= 2) return "PENAWARAN";
+  return "SO";
+};
+
+const tambahManual = async () => {
+  const nomor = manualSoNomor.value.trim();
+  if (!nomor) return;
+  if (!header.pjw_cab) return toast.warning("Pilih Cabang terlebih dahulu.");
+
+  const jenis = detectSumberFromNomor(nomor);
+
+  // â”€â”€ Penawaran: buka picker baris detail dulu, bukan langsung add â”€â”€
+  if (jenis === "PENAWARAN") {
+    isManualLoading.value = true;
+    try {
+      const res = await komitmenKirimService.getPenawaranDetailList(nomor);
+      const d = res.data.data;
+      if (!d || !d.items?.length) {
+        toast.warning(
+          "Penawaran ini tidak punya baris detail yang bisa dipilih.",
+        );
+        return;
+      }
+      penawaranPickerNomor.value = nomor;
+      penawaranPickerDivisi.value = String(d.divisi || "");
+      penawaranPickerItems.value = d.items;
+      showPenawaranPicker.value = true;
+    } catch (e: any) {
+      toast.error(e.response?.data?.message || "Penawaran tidak ditemukan.");
+    } finally {
+      isManualLoading.value = false;
+    }
+    return;
+  }
+
+  if (isDuplicate(jenis === "MH" ? "PERMINTAAN HARGA" : jenis, nomor)) {
+    toast.warning(
+      `${jenis} ${nomor} sudah ada di daftar. Isi Rencana sebagian (PARTIAL) dan ` +
+        `Tanggal Kesepakatan pada baris yang ada dulu sebelum menambahkan batch/tanggal kirim lain.`,
+    );
+    return;
+  }
+
+  isManualLoading.value = true;
+  try {
+    let rowInput: any;
+
+    if (jenis === "MH") {
+      const res = await komitmenKirimService.getMhInfo(
+        nomor,
+        header.pjw_divisi,
+        header.pjw_nomor,
+      );
+      const k = res.data.data;
+      const isMapTab = activeFormTab.value === "MAP";
+      rowInput = {
+        Tipe: activeFormTab.value,
+        SoNomor: "",
+        NomorPraOrder: "",
+        MapNomor: "",
+        MhNomor: k.Nomor,
+        PenNomor: "",
+        PenId: "",
+        Sumber: "PERMINTAAN HARGA",
+        Nama: k.Nama,
+        Tanggal: k.Tanggal,
+        Pesan: isMapTab ? 0 : k.Pesan,
+        Kirim: isMapTab ? 0 : k.Kirim,
+        Kurang: isMapTab ? 0 : k.Kurang,
+        Rencana: isMapTab ? 0 : Number(k.Kurang) || 0,
+        PermintaanKirim: "",
+      };
+    } else if (jenis === "MAP") {
+      const res = await komitmenKirimService.getMapInfo(
+        nomor,
+        header.pjw_divisi,
+        header.pjw_nomor,
+        header.pjw_tgl1,
+        header.pjw_tgl2,
+      );
+      const k = res.data.data;
+      rowInput = {
+        Tipe: activeFormTab.value,
+        SoNomor: "",
+        NomorPraOrder: "",
+        MapNomor: k.Nomor,
+        MhNomor: "",
+        PenNomor: "",
+        PenId: "",
+        Sumber: "MAP",
+        Nama: k.Nama,
+        Tanggal: k.Tanggal,
+        Pesan: k.Pesan,
+        Kirim: k.Kirim,
+        Kurang: k.Kurang,
+        Rencana: Number(k.Pesan) || 0,
+        Realisasi: activeFormTab.value === "MAP" ? k.Realisasi : 0,
+        PermintaanKirim: k.DatelineAsli || "",
+      };
+    } else {
+      const res = await komitmenKirimService.getSoInfo(
+        nomor,
+        header.pjw_divisi,
+        header.pjw_nomor,
+      );
+      const k = res.data.data;
+      rowInput = {
+        Tipe: "SO",
+        SoNomor: k.Nomor,
+        NomorPraOrder: "",
+        MapNomor: "",
+        MhNomor: "",
+        PenNomor: "",
+        PenId: "",
+        Sumber: "SO",
+        Nama: k.Nama,
+        Tanggal: k.Tanggal,
+        Pesan: k.Pesan,
+        Kirim: k.Kirim,
+        Kurang: k.Kurang,
+        Rencana: Number(k.Kurang) || 0,
+        PermintaanKirim: k.DatelineAsli || "",
+      };
+    }
+
+    const saveRes = await komitmenKirimService.addDetailRow(
+      header.pjw_nomor,
+      rowInput,
+    );
+    pushRowFromServer(saveRes.data.data.pjwd_id, rowInput);
+    showQtyWarning(saveRes.data.data.warning);
+    manualSoNomor.value = "";
+    toast.success(`${jenis} ${nomor} ditambahkan.`);
+  } catch (e: any) {
+    toast.error(e.response?.data?.message || `${jenis} tidak ditemukan.`);
+  } finally {
+    isManualLoading.value = false;
+  }
+};
+
+const pilihBarisPenawaran = async (item: any) => {
+  if (item.Status === "BATAL") {
+    toast.warning("Baris ini sudah BATAL, tidak bisa ditambahkan.");
+    return;
+  }
+  if (item.SudahJadiSo) {
+    toast.warning(
+      `Baris ini sudah jadi SO (${item.SudahJadiSo}) â€” tambahkan lewat "Tarik SO Periode Ini" saja.`,
+    );
+    return;
+  }
+  if (
+    isDuplicate("PENAWARAN", penawaranPickerNomor.value, String(item.PendId))
+  ) {
+    toast.warning("Baris ini sudah ada di daftar.");
+    return;
+  }
+
+  isManualLoading.value = true;
+  try {
+    const res = await komitmenKirimService.getPenawaranItemInfo(
+      penawaranPickerNomor.value,
+      item.PendId,
+      header.pjw_divisi,
+      header.pjw_nomor,
+    );
+    const k = res.data.data;
+    const isMapTab = activeFormTab.value === "MAP";
+    const rowInput = {
+      Tipe: activeFormTab.value,
+      SoNomor: "",
+      NomorPraOrder: "",
+      MapNomor: "",
+      MhNomor: "",
+      PenNomor: k.PenNomor,
+      PenId: String(k.PendId),
+      Sumber: "PENAWARAN",
+      Nama: k.Nama,
+      Tanggal: k.Tanggal,
+      Pesan: isMapTab ? 0 : k.Pesan,
+      Kirim: isMapTab ? 0 : k.Kirim,
+      Kurang: isMapTab ? 0 : k.Kurang,
+      Rencana: isMapTab ? 0 : Number(k.Kurang) || 0,
+      PermintaanKirim: "",
+    };
+    const saveRes = await komitmenKirimService.addDetailRow(
+      header.pjw_nomor,
+      rowInput,
+    );
+    pushRowFromServer(saveRes.data.data.pjwd_id, rowInput);
+    showQtyWarning(saveRes.data.data.warning);
+    toast.success(`Penawaran ${k.PenNomor} (baris ${k.PendId}) ditambahkan.`);
+    showPenawaranPicker.value = false;
+    manualSoNomor.value = "";
+  } catch (e: any) {
+    toast.error(
+      e.response?.data?.message || "Gagal menambahkan baris Penawaran.",
+    );
+  } finally {
+    isManualLoading.value = false;
+  }
+};
+
+const isManualAddLoading = ref(false);
+const tambahBarisManual = async () => {
+  if (!header.pjw_cab) return toast.warning("Pilih Cabang terlebih dahulu.");
+  isManualAddLoading.value = true;
+  try {
+    const rowInput = {
+      Tipe: activeFormTab.value,
+      SoNomor: "",
+      NomorPraOrder: "",
+      MapNomor: "",
+      Sumber: "MANUAL",
+      Nama: "Baris Baru",
+      Tanggal: "",
+      Pesan: 0,
+      Kirim: 0,
+      Kurang: 0,
+      Rencana: 0,
+      PermintaanKirim: "",
+      NamaManual: "Baris Baru",
+      PesanManual: 0,
+      KirimManual: 0,
+      RealisasiManual: 0,
+    };
+    const saveRes = await komitmenKirimService.addDetailRow(
+      header.pjw_nomor,
+      rowInput,
+    );
+    pushRowFromServer(saveRes.data.data.pjwd_id, rowInput);
+    toast.success("Baris manual ditambahkan â€” silakan isi datanya.");
+  } catch (e: any) {
+    toast.error(e.response?.data?.message || "Gagal menambah baris manual.");
+  } finally {
+    isManualAddLoading.value = false;
+  }
+};
+
+const onManualNamaChange = (row: DetailRow) =>
+  onDetailFieldChange(row, "Nama", "pjwd_nama_manual");
+const onManualPesanChange = (row: DetailRow) =>
+  onDetailFieldChange(row, "Pesan", "pjwd_pesan_manual");
+const onManualKirimChange = (row: DetailRow) =>
+  onDetailFieldChange(row, "Kirim", "pjwd_kirim_manual");
+const onManualRealisasiChange = (row: DetailRow) =>
+  onDetailFieldChange(row, "Realisasi", "pjwd_realisasi_manual");
+
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// UPDATE FIELD PER-BARIS â€” debounced auto-save
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+const onDetailFieldChange = (
+  row: DetailRow,
+  field: keyof DetailRow,
+  dbField: string,
+) => {
+  if (!row.PjwdId) return;
+  const previousValue = (row as any)[field];
+  debounce(
+    `row:${row.PjwdId}:${dbField}`,
+    async () => {
+      try {
+        const res = await komitmenKirimService.updateDetailField(
+          header.pjw_nomor,
+          row.PjwdId!,
+          dbField,
+          (row as any)[field],
+        );
+        showQtyWarning(res.data?.data?.warning);
+      } catch (e: any) {
+        toast.error(e.response?.data?.message || "Gagal menyimpan perubahan.");
+        (row as any)[field] = previousValue;
+      }
+    },
+    700,
+  );
+};
+
+const moveCursorToEnd = (e: Event) => {
+  const input = e.target as HTMLInputElement;
+  nextTick(() => {
+    const len = input.value.length;
+    input.setSelectionRange(len, len);
+  });
+};
+
+const onRencanaInput = (row: DetailRow, raw: string, e: Event) => {
+  const val = raw.replace(/[^0-9]/g, "");
+  row.Rencana = val ? Number(val) : 0;
+  if (row.StatusPermintaan !== "NECESSARY") {
+    row.StatusPermintaan = row.Rencana >= row.Kurang ? "CLOSE" : "PARTIAL";
+    onDetailFieldChange(row, "StatusPermintaan", "pjwd_status_permintaan");
+  }
+  onDetailFieldChange(row, "Rencana", "pjwd_rencana");
+  moveCursorToEnd(e);
+};
+
+const onManualPesanInput = (row: DetailRow, raw: string, e: Event) => {
+  const val = raw.replace(/[^0-9]/g, "");
+  row.Pesan = val ? Number(val) : 0;
+  row.Kurang = Math.max(row.Pesan - row.Kirim, 0);
+  onManualPesanChange(row);
+  moveCursorToEnd(e);
+};
+
+const onManualKirimInput = (row: DetailRow, raw: string, e: Event) => {
+  const val = raw.replace(/[^0-9]/g, "");
+  row.Kirim = val ? Number(val) : 0;
+  row.Kurang = Math.max(row.Pesan - row.Kirim, 0);
+  onManualKirimChange(row);
+  moveCursorToEnd(e);
+};
+
+const onPermintaanKirimChange = (row: DetailRow) =>
+  onDetailFieldChange(row, "PermintaanKirim", "pjwd_tgl_permintaan_kirim");
+const onStatusPermintaanChange = (row: DetailRow) =>
+  onDetailFieldChange(row, "StatusPermintaan", "pjwd_status_permintaan");
+const onKetRencanaChange = (row: DetailRow) =>
+  onDetailFieldChange(row, "KetRencana", "pjwd_ket_rencana");
+const onKesepakatanChange = (row: DetailRow) =>
+  onDetailFieldChange(row, "Kesepakatan", "pjwd_tgl_kesepakatan");
+const onKetKesepakatanChange = (row: DetailRow) =>
+  onDetailFieldChange(row, "KetKesepakatan", "pjwd_ket_kesepakatan");
+const showMoveDialog = ref(false);
+const moveTargetInfo = ref<any>(null);
+const moveRowRef = ref<DetailRow | null>(null);
+const movePendingTanggal = ref("");
+const previousKesepakatan = reactive<Record<number, string>>({});
+const isMoving = ref(false);
+
+const doMove = async (row: DetailRow, tanggalBaru: string) => {
+  if (!row.PjwdId) return;
+  isMoving.value = true;
+  try {
+    const res = await komitmenKirimService.moveDetailRow(
+      header.pjw_nomor,
+      row.PjwdId,
+      tanggalBaru,
+    );
+    if (res.data.data.moved) {
+      const idx = detail.value.findIndex((d) => d.PjwdId === row.PjwdId);
+      if (idx !== -1) detail.value.splice(idx, 1);
+      if (res.data.data.arah === "MAJU") {
+        toast.success(
+          `Dimajukan ke periode ${res.data.data.nomor} â€” dicatat sebagai Tambahan Pencapaian.`,
+        );
+      } else {
+        toast.success(`Dipindahkan ke periode ${res.data.data.nomor}.`);
+      }
+    }
+  } catch (e: any) {
+    toast.error(e.response?.data?.message || "Gagal memindahkan baris.");
+    row.Kesepakatan = previousKesepakatan[row.PjwdId] || "";
+  } finally {
+    isMoving.value = false;
+  }
+};
+
+const onKesepakatanFocus = (row: DetailRow) => {
+  if (row.PjwdId) previousKesepakatan[row.PjwdId] = row.Kesepakatan;
+  onFieldFocus(row, "pjwd_tgl_kesepakatan");
+};
+
+const onKesepakatanBlur = async (row: DetailRow) => {
+  onFieldBlur(row, "pjwd_tgl_kesepakatan");
+  if (!row.PjwdId || !row.Kesepakatan) return;
+
+  const prev = previousKesepakatan[row.PjwdId];
+  if (prev === row.Kesepakatan) return;
+
+  if (
+    row.Kesepakatan >= header.pjw_tgl1 &&
+    row.Kesepakatan <= header.pjw_tgl2
+  ) {
+    onKesepakatanChange(row);
+    return;
+  }
+
+  try {
+    const res = await komitmenKirimService.checkTargetPeriod(
+      row.PjwdId,
+      row.Kesepakatan,
+    );
+    const info = res.data.data;
+    if (!info.needMove) {
+      onKesepakatanChange(row);
+      return;
+    }
+
+    if (info.arah === "MAJU") {
+      // Maju: langsung eksekusi, tanpa dialog konfirmasi
+      await doMove(row, row.Kesepakatan);
+      return;
+    }
+
+    // Mundur: tetap lewat dialog konfirmasi seperti sebelumnya
+    moveTargetInfo.value = info;
+    moveRowRef.value = row;
+    movePendingTanggal.value = row.Kesepakatan;
+    showMoveDialog.value = true;
+  } catch (e: any) {
+    toast.error(e.response?.data?.message || "Gagal mengecek periode tujuan.");
+    row.Kesepakatan = prev;
+  }
+};
+
+const cancelMove = () => {
+  if (moveRowRef.value?.PjwdId) {
+    moveRowRef.value.Kesepakatan =
+      previousKesepakatan[moveRowRef.value.PjwdId] || "";
+  }
+  showMoveDialog.value = false;
+  moveRowRef.value = null;
+  moveTargetInfo.value = null;
+};
+
+const confirmMove = async () => {
+  const row = moveRowRef.value;
+  if (!row) return;
+  await doMove(row, movePendingTanggal.value);
+  showMoveDialog.value = false;
+  moveRowRef.value = null;
+  moveTargetInfo.value = null;
+};
+
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// HAPUS BARIS
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+const removeDetail = async (row: DetailRow) => {
+  if (!row.PjwdId) {
+    const idx = detail.value.indexOf(row);
+    if (idx !== -1) detail.value.splice(idx, 1);
+    return;
+  }
+  try {
+    await komitmenKirimService.deleteDetailRow(header.pjw_nomor, row.PjwdId);
+    const idx = detail.value.findIndex((d) => d.PjwdId === row.PjwdId);
+    if (idx !== -1) detail.value.splice(idx, 1);
+  } catch (e: any) {
+    toast.error(e.response?.data?.message || "Gagal menghapus baris.");
+  }
+};
+
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// SOCKET LISTENERS â€” perubahan dari user lain
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+onMounted(() => {
+  on("pjw:row-added", (payload: any) => {
+    // Hindari duplikasi kalau event ini justru echo dari aksi saya sendiri
+    // (server broadcast ke SEMUA anggota room termasuk pengirim)
+    if (detail.value.some((d) => d.PjwdId === payload.pjwd_id)) return;
+    pushRowFromServer(payload.pjwd_id, payload.row);
+  });
+
+  on("pjw:row-moved-in", (payload: any) => {
+    if (detail.value.some((d) => d.PjwdId === payload.PjwdId)) return;
+    detail.value.push(mapDetailRow(payload));
+  });
+
+  on("pjw:field-updated", (payload: any) => {
+    const row = detail.value.find((d) => d.PjwdId === payload.pjwd_id);
+    if (!row) return;
+    const fieldMap: Record<string, keyof DetailRow> = {
+      pjwd_rencana: "Rencana",
+      pjwd_ket_rencana: "KetRencana",
+      pjwd_tgl_permintaan_kirim: "PermintaanKirim",
+      pjwd_status_permintaan: "StatusPermintaan",
+      pjwd_tgl_kesepakatan: "Kesepakatan",
+      pjwd_ket_kesepakatan: "KetKesepakatan",
+    };
+    const localField = fieldMap[payload.field];
+    if (localField) (row as any)[localField] = payload.value;
+  });
+
+  on("pjw:row-deleted", (payload: any) => {
+    const idx = detail.value.findIndex((d) => d.PjwdId === payload.pjwd_id);
+    if (idx !== -1) detail.value.splice(idx, 1);
+  });
+
+  on("pjw:header-updated", (payload: any) => {
+    if ((header as any)[payload.field] !== undefined) {
+      (header as any)[payload.field] = payload.value;
+    }
+  });
+
+  on("pjw:field-focus", (payload: any) => {
+    fieldFocusMap[focusKey(payload.pjwdId, payload.field)] = {
+      kode: payload.kode,
+      nama: payload.nama,
+    };
+  });
+  on("pjw:field-blur", (payload: any) => {
+    delete fieldFocusMap[focusKey(payload.pjwdId, payload.field)];
+  });
+  on("pjw:user-disconnected", (payload: any) => {
+    // Bersihkan semua badge milik user yang disconnect, di field manapun
+    Object.keys(fieldFocusMap).forEach((key) => {
+      if (fieldFocusMap[key]?.kode === payload.kode) delete fieldFocusMap[key];
+    });
+  });
+});
+
+const fmt = (n: number) => (n ?? 0).toLocaleString("id-ID");
+const sel = (e: FocusEvent) => (e.target as HTMLInputElement).select();
+
+const rowClass = (d: DetailRow) => {
+  if (d.StatusPermintaan === "NECESSARY") return "row-necessary";
+  if (d.StatusPermintaan === "PARTIAL") return "row-partial";
+  if (Number(d.Kurang) <= 0) return "row-done";
+  return "";
+};
+</script>
+
+<template>
+  <BaseForm
+    :title="isEditMode ? 'Ubah Komitmen Kirim' : 'Tambah Komitmen Kirim'"
+    menu-id="176"
+    :icon="IconCalendarWeek"
+    :is-loading="isLoading"
+    item-name="Komitmen Kirim"
+    v-model:show-close-dialog="showCloseDialog"
+    @confirm-close="executeClose"
+  >
+    <template #header-actions>
+      <v-btn
+        size="small"
+        variant="tonal"
+        color="error"
+        @click="showCloseDialog = true"
+      >
+        <template #prepend>
+          <IconX :size="15" :stroke-width="2" />
+        </template>
+        Tutup
+      </v-btn>
+    </template>
+    <div class="pjw-form">
+      <!-- Presence bar -->
+      <div class="pjw-presence-bar">
+        <span class="presence-status" :class="{ on: isConnected }">
+          {{ isConnected ? "â— Terhubung" : "â—‹ Menghubungkan..." }}
+        </span>
+        <div class="presence-users">
+          <span
+            v-for="u in presenceList"
+            :key="u.kode"
+            class="presence-chip"
+            :class="{ me: u.kode === myUserKode }"
+          >
+            {{ u.nama }} <small>({{ u.bagian }})</small>
+          </span>
+        </div>
+      </div>
+
+      <div class="pjw-tab-switch">
+        <button
+          type="button"
+          :class="{ active: activeFormTab === 'SO' }"
+          @click="activeFormTab = 'SO'"
+        >
+          Komitmen Kirim SO ({{ detailSo.length }})
+        </button>
+        <button
+          type="button"
+          :class="{ active: activeFormTab === 'MAP' }"
+          @click="activeFormTab = 'MAP'"
+        >
+          Komitmen Kirim MAP â€” Sampel ({{ detailMap.length }})
+        </button>
+      </div>
+
+      <div class="pjw-hdr-section">
+        <div class="pjw-hdr-row">
+          <label class="pjw-lbl">Nomor</label>
+          <input
+            :value="header.pjw_nomor || '(Belum dibuat)'"
+            readonly
+            class="pjw-inp-ro"
+            style="width: 200px"
+          />
+
+          <label class="pjw-lbl" style="margin-left: 16px">Periode</label>
+          <input
+            type="date"
+            v-model="header.pjw_tgl1"
+            class="pjw-date"
+            :disabled="isEditMode || !canEditMarketing"
+          />
+          <span class="pjw-sep">s/d</span>
+          <input
+            type="date"
+            v-model="header.pjw_tgl2"
+            class="pjw-date"
+            :disabled="isEditMode || !canEditMarketing"
+          />
+
+          <label class="pjw-lbl" style="margin-left: 16px">Cabang</label>
+          <select
+            v-model="header.pjw_cab"
+            class="pjw-select"
+            style="width: 160px"
+            :disabled="!canEditMarketing"
+          >
+            <option value="">- Pilih Cabang -</option>
+            <option v-for="c in cabangOptions" :key="c.value" :value="c.value">
+              {{ c.title }}
+            </option>
+          </select>
+
+          <button
+            v-if="!header.pjw_nomor && canEditMarketing"
+            type="button"
+            class="pjw-tarik-btn"
+            style="margin-left: 16px"
+            :disabled="isCreating"
+            @click="createNew"
+          >
+            {{ isCreating ? "Membuat..." : "Buat Komitmen Kirim" }}
+          </button>
+        </div>
+        <div class="pjw-hdr-row">
+          <label class="pjw-lbl">Keterangan</label>
+          <input
+            v-model="header.pjw_keterangan"
+            class="pjw-inp flex-1"
+            placeholder="Catatan periode ini..."
+            :disabled="!canEditMarketing"
+          />
+        </div>
+      </div>
+
+      <div class="pjw-toolbar">
+        <input
+          :value="
+            divisiOptions.find((d) => d.value === header.pjw_divisi)?.title ||
+            'Pilih Cabang dulu'
+          "
+          readonly
+          class="pjw-inp-ro"
+          style="width: 170px"
+        />
+        <button
+          v-if="activeFormTab === 'SO'"
+          type="button"
+          class="pjw-tarik-btn"
+          :disabled="isTarikLoading || !canEditMarketing"
+          @click="tarikSo"
+        >
+          <IconDownload :size="14" class="mr-1" />{{
+            isTarikLoading ? "Menarik..." : "Tarik SO Periode Ini"
+          }}
+        </button>
+        <button
+          type="button"
+          class="pjw-tarik-btn pra-order"
+          :disabled="isTarikPraOrderLoading || !canEditMarketing"
+          @click="tarikPraOrder"
+        >
+          <IconDownload :size="14" class="mr-1" />{{
+            isTarikPraOrderLoading ? "Menarik..." : "Tarik dari Pra Order"
+          }}
+        </button>
+        <button
+          v-if="activeFormTab === 'SO'"
+          type="button"
+          class="pjw-tarik-btn map"
+          :disabled="isTarikMapLoading || !canEditMarketing"
+          @click="tarikMap"
+        >
+          <IconDownload :size="14" class="mr-1" />{{
+            isTarikMapLoading ? "Menarik..." : "Tarik dari MAP"
+          }}
+        </button>
+        <button
+          type="button"
+          class="pjw-tarik-btn manual"
+          :disabled="isManualAddLoading || !canEditMarketing"
+          @click="tambahBarisManual"
+        >
+          <IconDownload :size="14" class="mr-1" />{{
+            isManualAddLoading ? "Menambah..." : "Tambah Baris Manual"
+          }}
+        </button>
+        <div class="pjw-manual-wrap">
+          <span v-if="fieldFocusMap[MANUAL_ADD_KEY]" class="field-focus-badge">
+            {{ fieldFocusMap[MANUAL_ADD_KEY].nama }} sedang mengetik...
+          </span>
+          <div class="pjw-manual-add">
+            <input
+              v-model="manualSoNomor"
+              type="text"
+              class="pjw-manual-inp"
+              placeholder="Ketik nomor SO atau MAP..."
+              :disabled="!canEditMarketing"
+              @focus="onManualFocus"
+              @blur="onManualBlur"
+              @keydown.enter.prevent="tambahManual"
+            />
+            <button
+              type="button"
+              class="pjw-manual-btn"
+              :disabled="isManualLoading || !canEditMarketing"
+              @click="tambahManual"
+            >
+              <IconSearch :size="13" />
+            </button>
+          </div>
+        </div>
+        <span class="pjw-total-info"
+          >Total: <strong>{{ detail.length }}</strong></span
+        >
+      </div>
+
+      <div class="pjw-table-wrap">
+        <table class="pjw-dt">
+          <thead>
+            <tr>
+              <th style="width: 90px">Tanggal</th>
+              <th>Nomor / Nama SO</th>
+              <th style="width: 80px" class="tr">Pesan</th>
+              <th style="width: 80px" class="tr">Kirim</th>
+              <th style="width: 80px" class="tr">Kurang</th>
+              <th style="width: 80px" class="tr">Rencana</th>
+              <th style="width: 80px" class="tr">Realisasi</th>
+              <th style="width: 130px" class="tc">Permintaan Kirim</th>
+              <th style="width: 100px" class="tc">Permintaan</th>
+              <th style="width: 200px">Kesepakatan</th>
+              <th style="width: 36px"></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="(d, idx) in visibleDetail"
+              :key="d.PjwdId ?? idx"
+              :class="rowClass(d)"
+            >
+              <td>{{ formatTanggal(d.Tanggal) }}</td>
+              <td>
+                <div class="mono" v-if="!isManualRow(d)">
+                  {{ d.SoNomor || d.MapNomor || d.NomorPraOrder }}
+                </div>
+                <input
+                  v-if="isManualRow(d)"
+                  type="text"
+                  v-model="d.Nama"
+                  class="pjw-cell-text"
+                  placeholder="Nama..."
+                  :disabled="!canEditMarketing"
+                  @focus="onFieldFocus(d, 'pjwd_nama_manual')"
+                  @blur="
+                    () => {
+                      onFieldBlur(d, 'pjwd_nama_manual');
+                      onManualNamaChange(d);
+                    }
+                  "
+                />
+                <div v-else>{{ d.Nama }}</div>
+                <span
+                  class="sumber-badge"
+                  :class="{
+                    'is-pra': d.Sumber === 'PRA ORDER',
+                    'is-map': d.Sumber === 'MAP',
+                    'is-so': d.Sumber === 'SO',
+                    'is-manual': d.Sumber === 'MANUAL',
+                    'is-mh': d.Sumber === 'PERMINTAAN HARGA',
+                    'is-pen': d.Sumber === 'PENAWARAN',
+                  }"
+                  >{{ d.Sumber }}</span
+                >
+              </td>
+              <td class="tr">
+                <input
+                  v-if="isManualRow(d)"
+                  type="text"
+                  inputmode="numeric"
+                  class="pjw-cell-num"
+                  :value="d.Pesan"
+                  :disabled="!canEditMarketing"
+                  @input="
+                    onManualPesanInput(
+                      d,
+                      ($event.target as HTMLInputElement).value,
+                      $event,
+                    )
+                  "
+                />
+                <template v-else>{{ fmt(d.Pesan) }}</template>
+              </td>
+              <td class="tr">
+                <input
+                  v-if="isManualRow(d)"
+                  type="text"
+                  inputmode="numeric"
+                  class="pjw-cell-num"
+                  :value="d.Kirim"
+                  :disabled="!canEditMarketing"
+                  @input="
+                    onManualKirimInput(
+                      d,
+                      ($event.target as HTMLInputElement).value,
+                      $event,
+                    )
+                  "
+                />
+                <template v-else>{{ fmt(d.Kirim) }}</template>
+              </td>
+              <td class="tr" :class="{ 'text-red fw': d.Kurang > 0 }">
+                {{ fmt(d.Kurang) }}
+              </td>
+              <td class="tr" style="position: relative">
+                <span
+                  v-if="fieldFocusMap[focusKey(d.PjwdId, 'pjwd_rencana')]"
+                  class="field-focus-badge"
+                >
+                  {{ fieldFocusMap[focusKey(d.PjwdId, "pjwd_rencana")].nama }}
+                </span>
+                <input
+                  type="text"
+                  inputmode="numeric"
+                  class="pjw-cell-num"
+                  :value="d.Rencana"
+                  :disabled="!canEditMarketing"
+                  @focus="
+                    (e) => {
+                      sel(e);
+                      onFieldFocus(d, 'pjwd_rencana');
+                    }
+                  "
+                  @blur="onFieldBlur(d, 'pjwd_rencana')"
+                  @input="
+                    onRencanaInput(
+                      d,
+                      ($event.target as HTMLInputElement).value,
+                      $event,
+                    )
+                  "
+                />
+                <input
+                  v-if="d.Rencana < d.Kurang"
+                  type="text"
+                  v-model="d.KetRencana"
+                  class="pjw-cell-text pjw-ket-rencana"
+                  placeholder="Catatan, mis. tanpa size S"
+                  :disabled="!canEditMarketing"
+                  @focus="onFieldFocus(d, 'pjwd_ket_rencana')"
+                  @blur="
+                    () => {
+                      onFieldBlur(d, 'pjwd_ket_rencana');
+                      onKetRencanaChange(d);
+                    }
+                  "
+                />
+              </td>
+              <td class="tr">
+                <input
+                  v-if="isManualRow(d)"
+                  type="text"
+                  inputmode="numeric"
+                  class="pjw-cell-num"
+                  v-model.number="d.Realisasi"
+                  :disabled="!canEditMarketing"
+                  @blur="onManualRealisasiChange(d)"
+                />
+                <template v-else>{{ fmt(d.Realisasi) }}</template>
+              </td>
+              <td class="tc" style="position: relative">
+                <span
+                  v-if="
+                    fieldFocusMap[
+                      focusKey(d.PjwdId, 'pjwd_tgl_permintaan_kirim')
+                    ]
+                  "
+                  class="field-focus-badge"
+                >
+                  {{
+                    fieldFocusMap[
+                      focusKey(d.PjwdId, "pjwd_tgl_permintaan_kirim")
+                    ].nama
+                  }}
+                </span>
+                <input
+                  type="date"
+                  v-model="d.PermintaanKirim"
+                  class="pjw-cell-date"
+                  :disabled="!canEditMarketing"
+                  @focus="onFieldFocus(d, 'pjwd_tgl_permintaan_kirim')"
+                  @blur="
+                    () => {
+                      onFieldBlur(d, 'pjwd_tgl_permintaan_kirim');
+                      onPermintaanKirimChange(d);
+                    }
+                  "
+                />
+              </td>
+              <td class="tc" style="position: relative">
+                <span
+                  v-if="
+                    fieldFocusMap[focusKey(d.PjwdId, 'pjwd_status_permintaan')]
+                  "
+                  class="field-focus-badge"
+                >
+                  {{
+                    fieldFocusMap[focusKey(d.PjwdId, "pjwd_status_permintaan")]
+                      .nama
+                  }}
+                </span>
+                <select
+                  v-model="d.StatusPermintaan"
+                  class="pjw-cell-select"
+                  :disabled="!canEditMarketing"
+                  @focus="onFieldFocus(d, 'pjwd_status_permintaan')"
+                  @blur="onFieldBlur(d, 'pjwd_status_permintaan')"
+                  @change="onStatusPermintaanChange(d)"
+                >
+                  <option value="CLOSE">CLOSE</option>
+                  <option value="PARTIAL">PARTIAL</option>
+                  <option value="NECESSARY">NECESSARY</option>
+                </select>
+              </td>
+              <td style="position: relative">
+                <span
+                  v-if="
+                    fieldFocusMap[focusKey(d.PjwdId, 'pjwd_tgl_kesepakatan')]
+                  "
+                  class="field-focus-badge"
+                >
+                  {{
+                    fieldFocusMap[focusKey(d.PjwdId, "pjwd_tgl_kesepakatan")]
+                      .nama
+                  }}
+                </span>
+                <div class="pjw-kesepakatan-cell">
+                  <input
+                    type="date"
+                    v-model="d.Kesepakatan"
+                    class="pjw-cell-date"
+                    :disabled="!canEditKesepakatan"
+                    @focus="onKesepakatanFocus(d)"
+                    @blur="onKesepakatanBlur(d)"
+                  />
+                  <input
+                    type="text"
+                    v-model="d.KetKesepakatan"
+                    class="pjw-cell-text"
+                    :disabled="!canEditKesepakatan"
+                    @focus="onFieldFocus(d, 'pjwd_ket_kesepakatan')"
+                    @blur="onFieldBlur(d, 'pjwd_ket_kesepakatan')"
+                    @change="onKetKesepakatanChange(d)"
+                  />
+                </div>
+              </td>
+              <td class="tc">
+                <button
+                  v-if="canEditMarketing"
+                  type="button"
+                  class="pjw-row-del"
+                  @click="removeDetail(d)"
+                >
+                  <IconTrash :size="13" />
+                </button>
+              </td>
+            </tr>
+            <tr v-if="!detail.length">
+              <td colspan="11" class="pjw-empty">
+                Belum ada SO/MAP/Pra Order. Klik tombol Tarik atau tambahkan
+                manual di atas.
+              </td>
+            </tr>
+          </tbody>
+          <tfoot>
+            <tr class="pjw-footer-row">
+              <td colspan="5" class="pjw-footer-label">
+                Total Rencana{{ activeFormTab === "MAP" ? " (Sampel)" : "" }}
+              </td>
+              <td class="tr pjw-footer-val">{{ fmt(totalRencanaVisible) }}</td>
+              <td colspan="5"></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+  </BaseForm>
+
+  <v-dialog v-model="showMoveDialog" max-width="420" persistent>
+    <v-card class="rounded-lg">
+      <v-card-title class="bg-orange-darken-2 text-white pa-3 text-subtitle-1">
+        Konfirmasi Pindah Periode
+      </v-card-title>
+      <v-card-text class="pa-4" style="font-size: 13px">
+        <p>
+          Tanggal Kesepakatan baru (<b>{{
+            formatTanggal(movePendingTanggal)
+          }}</b
+          >) berada di luar periode <b>{{ header.pjw_nomor }}</b
+          >.
+        </p>
+        <p class="mt-2">
+          Baris
+          <b>{{
+            moveRowRef?.SoNomor ||
+            moveRowRef?.MapNomor ||
+            moveRowRef?.NomorPraOrder ||
+            moveRowRef?.Nama
+          }}</b>
+          akan dipindahkan ke:
+        </p>
+        <p class="mt-2">
+          <template v-if="moveTargetInfo?.willCreateNew">
+            Periode baru
+            <b
+              >({{ formatTanggal(moveTargetInfo.targetTgl1) }} s/d
+              {{ formatTanggal(moveTargetInfo.targetTgl2) }})</b
+            >
+            â€” nomor akan dibuat otomatis.
+          </template>
+          <template v-else>
+            Periode <b>{{ moveTargetInfo?.targetNomor }}</b> ({{
+              formatTanggal(moveTargetInfo?.targetTgl1)
+            }}
+            s/d {{ formatTanggal(moveTargetInfo?.targetTgl2) }})
+          </template>
+        </p>
+      </v-card-text>
+      <v-card-actions class="pa-3 border-t bg-grey-lighten-4">
+        <v-btn variant="text" :disabled="isMoving" @click="cancelMove"
+          >Batal</v-btn
+        >
+        <v-spacer />
+        <v-btn
+          color="orange-darken-2"
+          variant="elevated"
+          :loading="isMoving"
+          @click="confirmMove"
+          >Ya, Pindahkan</v-btn
+        >
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
+
+  <v-dialog v-model="showPenawaranPicker" max-width="640" scrollable>
+    <v-card class="rounded-lg">
+      <v-card-title class="bg-purple-darken-2 text-white pa-3 text-subtitle-1">
+        Pilih Baris â€” Penawaran {{ penawaranPickerNomor }}
+      </v-card-title>
+      <v-card-text class="pa-0" style="max-height: 420px">
+        <table class="pen-picker-table">
+          <thead>
+            <tr>
+              <th>Nama Barang</th>
+              <th class="tc">Ukuran</th>
+              <th class="tr">Qty</th>
+              <th class="tc">Status</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="item in penawaranPickerItems"
+              :key="item.PendId"
+              :class="{
+                'row-disabled': item.Status === 'BATAL' || item.SudahJadiSo,
+              }"
+            >
+              <td>{{ item.Nama }}</td>
+              <td class="tc">{{ item.Ukuran }}</td>
+              <td class="tr">{{ fmt(item.Qty) }}</td>
+              <td class="tc">
+                <span v-if="item.SudahJadiSo" class="pen-status-badge done">
+                  Sudah SO: {{ item.SudahJadiSo }}
+                </span>
+                <span
+                  v-else-if="item.Status === 'BATAL'"
+                  class="pen-status-badge batal"
+                >
+                  Batal
+                </span>
+                <span v-else class="pen-status-badge open">Open</span>
+              </td>
+              <td>
+                <v-btn
+                  size="x-small"
+                  color="purple-darken-2"
+                  variant="flat"
+                  :disabled="
+                    item.Status === 'BATAL' ||
+                    !!item.SudahJadiSo ||
+                    isManualLoading
+                  "
+                  @click="pilihBarisPenawaran(item)"
+                >
+                  Pilih
+                </v-btn>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </v-card-text>
+      <v-card-actions class="pa-3 border-t bg-grey-lighten-4">
+        <v-spacer />
+        <v-btn variant="text" @click="showPenawaranPicker = false">Batal</v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
+</template>
+
+<style scoped>
+.pjw-form {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  font-family: "Segoe UI", system-ui, sans-serif;
+  font-size: 12px;
+}
+
+.pjw-tab-switch {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+.pjw-tab-switch button {
+  padding: 6px 14px;
+  border: 1px solid #bdbdbd;
+  border-radius: 4px;
+  background: white;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  color: #555;
+}
+.pjw-tab-switch button.active {
+  background: #1565c0;
+  color: white;
+  border-color: #1565c0;
+}
+.pjw-tab-switch button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.pjw-hdr-section {
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  flex-shrink: 0;
+}
+.pjw-hdr-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.pjw-hdr-row:last-child {
+  margin-bottom: 0;
+}
+.pjw-lbl {
+  font-size: 11px;
+  font-weight: 600;
+  color: #333;
+  white-space: nowrap;
+}
+.pjw-inp-ro {
+  height: 28px;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  padding: 0 8px;
+  font-size: 12px;
+  background: #f5f5f5;
+  color: #555;
+}
+.pjw-inp {
+  height: 28px;
+  border: 1px solid #bdbdbd;
+  border-radius: 4px;
+  padding: 0 8px;
+  font-size: 12px;
+  outline: none;
+}
+.pjw-inp:focus {
+  border-color: #1976d2;
+}
+.pjw-date {
+  height: 28px;
+  border: 1px solid #bdbdbd;
+  border-radius: 4px;
+  padding: 0 6px;
+  font-size: 12px;
+  outline: none;
+  background: white;
+}
+.pjw-date:focus {
+  border-color: #1976d2;
+}
+.pjw-date:disabled {
+  background: #f5f5f5;
+}
+.pjw-sep {
+  font-size: 11px;
+  color: #757575;
+}
+.flex-1 {
+  flex: 1;
+  min-width: 0;
+}
+
+.pjw-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  margin-bottom: 8px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+.pjw-tarik-btn {
+  display: inline-flex;
+  align-items: center;
+  background: #1565c0;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.pjw-tarik-btn:hover:not(:disabled) {
+  background: #0d47a1;
+}
+.pjw-tarik-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.pjw-tarik-btn.manual {
+  background: #455a64;
+}
+.pjw-tarik-btn.manual:hover:not(:disabled) {
+  background: #263238;
+}
+.sumber-badge.is-manual {
+  background: #455a64;
+}
+
+.pjw-manual-add {
+  display: flex;
+  height: 28px;
+  border: 1px solid #bdbdbd;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.pjw-manual-inp {
+  width: 220px;
+  border: none;
+  padding: 0 8px;
+  font-size: 12px;
+  outline: none;
+}
+.pjw-manual-btn {
+  width: 30px;
+  background: #f0f0f0;
+  border: none;
+  border-left: 1px solid #bdbdbd;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #1565c0;
+}
+.pjw-manual-btn:hover {
+  background: #e3f2fd;
+}
+
+.pjw-total-info {
+  margin-left: auto;
+  font-size: 11px;
+  color: #555;
+}
+
+.pjw-table-wrap {
+  flex: 1;
+  overflow: auto;
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+}
+.pjw-dt {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.pjw-dt thead th {
+  padding: 6px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #212121;
+  text-align: left;
+  background: #ffeb3b;
+  border: 1px solid #e0d840;
+  white-space: nowrap;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+.pjw-dt tbody td {
+  padding: 4px 8px;
+  border: 1px solid #eeeeee;
+  vertical-align: top;
+}
+.tr {
+  text-align: right !important;
+}
+.tc {
+  text-align: center !important;
+}
+.fw {
+  font-weight: 700;
+}
+.mono {
+  font-weight: 700;
+  font-size: 11px;
+}
+
+.row-done td {
+  background: #e3f2fd;
+}
+.row-close td {
+  background: #ffebee;
+  opacity: 0.8;
+}
+
+.praorder-badge {
+  display: inline-block;
+  margin-top: 2px;
+  font-size: 9px;
+  background: #1565c0;
+  color: white;
+  padding: 1px 6px;
+  border-radius: 8px;
+}
+
+.pjw-cell-date {
+  width: 100%;
+  height: 24px;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  padding: 0 4px;
+  font-size: 11px;
+}
+.pjw-cell-select {
+  width: 100%;
+  height: 24px;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  padding: 0 4px;
+  font-size: 11px;
+  background: white;
+}
+.pjw-kesepakatan-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.pjw-ket-rencana {
+  margin-top: 3px;
+  text-align: left !important;
+  font-style: italic;
+  font-size: 10px;
+  border-color: #ffb74d;
+}
+.pjw-cell-text {
+  width: 100%;
+  height: 24px;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  padding: 0 4px;
+  font-size: 11px;
+}
+
+.pjw-row-del {
+  background: transparent;
+  border: none;
+  color: #e53935;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.pjw-row-del:hover {
+  color: #b71c1c;
+}
+
+.pjw-empty {
+  text-align: center;
+  padding: 24px;
+  color: #9e9e9e;
+  font-style: italic;
+  font-size: 12px;
+}
+
+.pjw-select {
+  height: 28px;
+  border: 1px solid #bdbdbd;
+  border-radius: 4px;
+  padding: 0 6px;
+  font-size: 12px;
+  background: white;
+}
+.pjw-select:focus {
+  border-color: #1976d2;
+}
+
+.pjw-tarik-btn.pra-order {
+  background: #6a1b9a;
+}
+.pjw-tarik-btn.pra-order:hover:not(:disabled) {
+  background: #4a148c;
+}
+
+.sumber-badge {
+  display: inline-block;
+  margin-top: 2px;
+  font-size: 9px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  color: white;
+}
+.sumber-badge.is-so {
+  background: #1565c0;
+}
+.sumber-badge.is-pra {
+  background: #6a1b9a;
+}
+.sumber-badge.is-map {
+  background: #ef6c00;
+}
+.pjw-tarik-btn.map {
+  background: #ef6c00;
+}
+.pjw-tarik-btn.map:hover:not(:disabled) {
+  background: #e65100;
+}
+.row-necessary td {
+  background: #b71c1c !important;
+  color: white;
+  font-weight: 700;
+}
+.row-partial td {
+  background: #fff3e0;
+}
+.pjw-cell-num {
+  width: 100%;
+  height: 24px;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  padding: 0 4px;
+  font-size: 11px;
+  text-align: right;
+}
+.pjw-dt tfoot {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+}
+.pjw-footer-row td {
+  background: #212121;
+  color: white;
+  font-weight: 700;
+  padding: 6px 8px;
+  border: 1px solid #424242;
+}
+.pjw-footer-label {
+  text-align: right;
+}
+.pjw-footer-val {
+  font-size: 13px;
+}
+.pjw-presence-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 12px;
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  margin-bottom: 8px;
+  flex-shrink: 0;
+  font-size: 11px;
+}
+.presence-status {
+  font-weight: 700;
+  color: #9e9e9e;
+}
+.presence-status.on {
+  color: #2e7d32;
+}
+.presence-users {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.presence-chip {
+  background: #e3f2fd;
+  color: #1565c0;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-weight: 600;
+}
+.presence-chip.me {
+  background: #1565c0;
+  color: white;
+}
+.presence-chip small {
+  opacity: 0.75;
+  font-weight: 400;
+}
+.field-focus-badge {
+  position: absolute;
+  top: -8px;
+  left: 2px;
+  font-size: 8px;
+  font-weight: 700;
+  background: #ff9800;
+  color: white;
+  padding: 1px 5px;
+  border-radius: 6px;
+  z-index: 3;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.pjw-manual-wrap {
+  position: relative;
+}
+.sumber-badge.is-mh {
+  background: #00838f;
+}
+.sumber-badge.is-pen {
+  background: #ad1457;
+}
+
+.pen-picker-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+.pen-picker-table thead th {
+  background: #f5f5f5;
+  padding: 6px 8px;
+  text-align: left;
+  border-bottom: 1px solid #e0e0e0;
+  position: sticky;
+  top: 0;
+}
+.pen-picker-table tbody td {
+  padding: 6px 8px;
+  border-bottom: 1px solid #eee;
+}
+.pen-picker-table .row-disabled {
+  opacity: 0.55;
+}
+.pen-status-badge {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 8px;
+  white-space: nowrap;
+}
+.pen-status-badge.open {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+.pen-status-badge.done {
+  background: #e3f2fd;
+  color: #1565c0;
+}
+.pen-status-badge.batal {
+  background: #ffebee;
+  color: #c62828;
+}
+</style>
+

@@ -280,6 +280,7 @@ const removeItem = (idx: number) => {
     formData.value.items.forEach((it, i) => (it.no = i + 1));
 };
 
+const approvePengajuan = async () => handleApproveSpv();
 const handleApproveSpv = async () => {
     if (
         !confirm(
