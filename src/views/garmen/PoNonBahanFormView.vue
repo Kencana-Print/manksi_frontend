@@ -94,34 +94,32 @@ const formatCurrency = (val: number) =>
 
 // Format angka dengan separator ribuan untuk display
 const formatHarga = (val: any) => {
-  const num = Number(val) || 0;
-  if (num === 0) return "";
-  return new Intl.NumberFormat("id-ID").format(num);
+  if (val === null || val === undefined || val === "") return "";
+  return new Intl.NumberFormat("id-ID").format(Number(val) || 0);
 };
 
 // Saat input harga — simpan nilai mentah ke item, recalc total
 const onHargaInput = (e: Event, idx: number) => {
   const raw = (e.target as HTMLInputElement).value
     .replace(/\./g, "")
-    .replace(/,/g, "");
-  const num = Number(raw) || 0;
-  formData.value.items[idx].harga = num;
+    .replace(/,/g, "")
+    .trim();
+  formData.value.items[idx].harga = raw === "" ? null : Number(raw) || 0;
   recalcTotal(idx);
 };
 
 // Saat focus — tampilkan angka polos tanpa separator
 const onHargaFocus = (e: Event, idx: number) => {
   const input = e.target as HTMLInputElement;
-  const num = Number(formData.value.items[idx].harga) || 0;
-  input.value = num === 0 ? "" : String(num);
+  const h = formData.value.items[idx].harga;
+  input.value = h === null || h === undefined ? "" : String(h);
   input.select();
 };
 
 // Saat blur — format ulang dengan separator
 const onHargaBlur = (e: Event, idx: number) => {
   const input = e.target as HTMLInputElement;
-  const num = Number(formData.value.items[idx].harga) || 0;
-  input.value = num === 0 ? "" : new Intl.NumberFormat("id-ID").format(num);
+  input.value = formatHarga(formData.value.items[idx].harga);
 };
 
 const {
@@ -361,9 +359,10 @@ const validateSave = () => {
         `Barang pada baris ke-${i + 1} tidak punya No. Permintaan. Panggil ulang permintaannya.`,
       );
     }
-    if (Number(row.harga) === 0) {
+    const h = row.harga;
+    if (h === null || h === undefined || h === "" || Number(h) < 0) {
       return toast.warning(
-        `Harga harus di isi untuk barang pada baris ke-${i + 1}`,
+        `Harga harus di isi untuk barang pada baris ke-${i + 1} (isi 0 jika barang gratis)`,
       );
     }
   }

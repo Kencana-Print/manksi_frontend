@@ -15,7 +15,11 @@ import {
   IconPencil,
 } from "@tabler/icons-vue";
 import { formatTanggal, formatTanggalJam } from "@/utils/dateFormat";
-import { exportExcelSingle } from "@/utils/excelExport";
+import {
+  exportExcel,
+  exportExcelSingle,
+  type ExcelColumn,
+} from "@/utils/excelExport";
 
 const router = useRouter();
 const toast = useToast();
@@ -277,51 +281,67 @@ const onExport = async () => {
   );
 };
 
-const onExportDetail = () => {
+const onExportDetail = async () => {
   const source = getExportSource();
   if (!source.length) return toast.warning("Tidak ada data untuk diexport.");
 
-  const rows: any[] = [];
+  const columns: ExcelColumn[] = [
+    { header: "Nomor Realisasi", key: "nomor", width: 18 },
+    { header: "No Minta", key: "noMinta", width: 16 },
+    { header: "Tanggal", key: "tanggal", width: 12, align: "center" },
+    { header: "Jenis", key: "jenis", width: 14 },
+    { header: "SPK", key: "spk", width: 16 },
+    { header: "Nama SPK", key: "namaSpk", width: 28 },
+    { header: "Kode Barang", key: "kode", width: 16 },
+    { header: "Nama Barang", key: "nama", width: 40 },
+    { header: "Satuan", key: "satuan", width: 9, align: "center" },
+    {
+      header: "Jumlah",
+      key: "jumlah",
+      width: 11,
+      align: "right",
+      numFmt: "#,##0.##",
+    },
+    { header: "Keterangan", key: "ket", width: 28 },
+  ];
+
+  const rows: Record<string, any>[] = [];
   source.forEach((master: any) => {
-    if (master.details?.length > 0) {
-      master.details.forEach((dtl: any) => {
-        rows.push({
-          "Nomor Realisasi": master.Nomor,
-          "No Minta": master.NoMinta,
-          Tanggal: formatTanggal(master.Tanggal),
-          Jenis: master.Jenis,
-          SPK: master.SPK,
-          "Nama SPK": master.NamaSpk,
-          "Kode Barang": dtl.Kode,
-          "Nama Barang": dtl.Nama,
-          Satuan: dtl.Satuan,
-          Jumlah: dtl.Jumlah,
-          Keterangan: dtl.Keterangan || "",
-        });
+    (master.details ?? []).forEach((dtl: any, i: number) => {
+      const pertama = i === 0;
+      rows.push({
+        _awal: pertama,
+        nomor: pertama ? master.Nomor : "",
+        noMinta: pertama ? master.NoMinta : "",
+        tanggal: pertama ? formatTanggal(master.Tanggal) : "",
+        jenis: pertama ? master.Jenis : "",
+        spk: pertama ? master.SPK : "",
+        namaSpk: pertama ? master.NamaSpk : "",
+        kode: dtl.Kode,
+        nama: dtl.Nama,
+        satuan: dtl.Satuan,
+        jumlah: Number(dtl.Jumlah) || 0,
+        ket: dtl.Keterangan || "",
       });
-    }
+    });
   });
 
-  if (rows.length === 0)
-    return toast.warning("Tidak ada rincian untuk diexport.");
+  if (!rows.length) return toast.warning("Tidak ada rincian untuk diexport.");
 
-  const headersStr = Object.keys(rows[0]).join(",");
-  const csvContent = [
-    headersStr,
-    ...rows.map((row) =>
-      Object.keys(rows[0])
-        .map((f) => `"${String(row[f] ?? "").replace(/"/g, '""')}"`)
-        .join(","),
-    ),
-  ].join("\n");
-
-  const blob = new Blob(["\uFEFF" + csvContent], {
-    type: "text/csv;charset=utf-8;",
-  });
-  const link = document.createElement("a");
-  link.href = URL.createObjectURL(blob);
-  link.download = `Detail_Realisasi_${filterState.value.startDate}.csv`;
-  link.click();
+  await exportExcel(
+    `Detail_Realisasi_${filterState.value.startDate}_${filterState.value.endDate}.xlsx`,
+    [
+      {
+        sheetName: "Detail Realisasi",
+        title: `Detail Realisasi Permintaan Barang Garmen Periode ${filterState.value.startDate} s/d ${filterState.value.endDate}`,
+        columns,
+        rows,
+        zebra: false,
+        rowStyleFn: (r) =>
+          r._awal ? { bold: true, fillColor: "E0F2F1" } : null,
+      },
+    ],
+  );
   toast.success("Berhasil export detail data.");
 };
 
