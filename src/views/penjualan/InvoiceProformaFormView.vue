@@ -417,9 +417,11 @@ const validateSave = () => {
   if (valid.length === 0)
     return toast.warning("Detail barang masih kosong / jumlah 0.");
 
-  if (["MINTA", "WAIT", "TOLAK"].includes(formData.value.pin_status)) {
+  if (["MINTA", "WAIT", "TOLAK", "PAKAI"].includes(formData.value.pin_status)) {
     return toast.error(
-      "Transaksi sudah diclose.\nSilahkan minta approve perubahan data (PIN 5).",
+      formData.value.pin_status === "PAKAI"
+        ? "PIN 5 sudah terpakai.\nSilahkan ajukan PIN 5 baru."
+        : "Transaksi sudah diclose.\nSilahkan minta approve perubahan data (PIN 5).",
     );
   }
 
@@ -481,6 +483,12 @@ const num = (val: any) => Math.round(Number(val) || 0).toLocaleString("id-ID");
             color="red"
             size="x-small"
             >PIN REJECTED</v-chip
+          >
+          <v-chip
+            v-else-if="formData.pin_status === 'PAKAI'"
+            color="grey"
+            size="x-small"
+            >PIN SUDAH DIPAKAI</v-chip
           >
         </div>
 

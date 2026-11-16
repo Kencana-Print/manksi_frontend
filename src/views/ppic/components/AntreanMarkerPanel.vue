@@ -6,6 +6,7 @@ import {
   IconRefresh,
   IconChevronDown,
   IconChevronRight,
+  IconFileSpreadsheet,
 } from "@tabler/icons-vue";
 import { lhkMarkerService } from "@/services/ppic/lhkMarkerService";
 import {
@@ -14,6 +15,11 @@ import {
   type AntreanMarkerItem,
 } from "@/services/ppic/lhkMarkerFormService";
 import { formatTanggal } from "@/utils/dateFormat";
+import {
+  exportExcel,
+  type ExcelColumn,
+  type ExcelSheetConfig,
+} from "@/utils/excelExport";
 
 const emit = defineEmits<{
   (e: "count", n: number): void;
@@ -171,22 +177,176 @@ const lepas = (r: AntreanMarkerItem) =>
 const inputLhk = (r: AntreanMarkerItem) => {
   router.push({ name: "PpicLhkMarkerCreate", query: { pm: r.nomor } });
 };
+
+// ── Export Detail (Excel) ──
+type BarisExport = Record<string, string | number | boolean>;
+const isExporting = ref(false);
+
+const kolomSpk: ExcelColumn[] = [
+  { header: "No SPK", key: "NomorSPK", width: 22 },
+  { header: "Nama SPK", key: "NamaSPK", width: 34 },
+];
+
+const kolomSiap: ExcelColumn[] = [
+  { header: "No. Permintaan", key: "Nomor", width: 20 },
+  { header: "Deadline", key: "Deadline", width: 12, align: "center" },
+  { header: "Status Bahan", key: "StatusBahan", width: 22 },
+  { header: "Bahan Belum Ready", key: "BahanBelum", width: 44 },
+  {
+    header: "Jml SPK",
+    key: "JmlSpk",
+    width: 9,
+    align: "right",
+    numFmt: "#,##0",
+  },
+  {
+    header: "Total Marker",
+    key: "TotalMarker",
+    width: 12,
+    align: "right",
+    numFmt: "#,##0",
+  },
+  { header: "Revisi Dari", key: "RevisiDari", width: 20 },
+  { header: "Keterangan", key: "Keterangan", width: 30 },
+  ...kolomSpk,
+];
+
+const kolomSaya: ExcelColumn[] = [
+  { header: "No. Permintaan", key: "Nomor", width: 20 },
+  { header: "Deadline", key: "Deadline", width: 12, align: "center" },
+  { header: "Diambil", key: "Diambil", width: 16 },
+  { header: "SPK Ber-LHK", key: "SpkLhk", width: 12, align: "center" },
+  { header: "Status Bahan", key: "StatusBahan", width: 22 },
+  { header: "Bahan Belum Ready", key: "BahanBelum", width: 44 },
+  {
+    header: "Total Marker",
+    key: "TotalMarker",
+    width: 12,
+    align: "right",
+    numFmt: "#,##0",
+  },
+  { header: "Keterangan", key: "Keterangan", width: 30 },
+  ...kolomSpk,
+];
+
+const kolomLain: ExcelColumn[] = [
+  { header: "PIC", key: "Pic", width: 20 },
+  ...kolomSaya,
+];
+
+const bahanBelumText = (r: AntreanMarkerItem): string =>
+  r.bahanBelumReady
+    .map((b) => `${b.kode}${b.nama ? ` - ${b.nama}` : ""} (stok ${b.stok})`)
+    .join("; ");
+
+// 1 permintaan = beberapa baris (1 per SPK); sel induk hanya di baris pertama
+const barisDetail = (list: AntreanMarkerItem[]): BarisExport[] => {
+  const rows: BarisExport[] = [];
+  for (const r of list) {
+    const induk: BarisExport = {
+      Pic: r.picNama ?? r.pic ?? "",
+      Nomor: r.nomor,
+      Deadline: formatTanggal(r.deadline),
+      Diambil: r.tglAmbil ?? "",
+      SpkLhk: `${r.jmlSpkSelesai} / ${r.jmlSpk}`,
+      StatusBahan: bhnLabel(r),
+      BahanBelum: bahanBelumText(r),
+      JmlSpk: Number(r.jmlSpk) || 0,
+      TotalMarker: Number(r.totalJml) || 0,
+      RevisiDari: r.asalNomor ?? "",
+      Keterangan: r.keterangan ?? "",
+    };
+    const kosong: BarisExport = Object.fromEntries(
+      Object.keys(induk).map((k) => [k, ""]),
+    );
+    const spk = spkItems(r);
+    if (!spk.length) {
+      rows.push({ ...induk, NomorSPK: "", NamaSPK: "" });
+      continue;
+    }
+    spk.forEach((s, i) =>
+      rows.push({
+        ...(i === 0 ? induk : kosong),
+        NomorSPK: s.nomor,
+        NamaSPK: s.nama ?? "",
+      }),
+    );
+  }
+  return rows;
+};
+
+const onExportDetail = async () => {
+  const { siap, saya, lain } = data.value;
+  if (!siap.length && !saya.length && !lain.length) {
+    toast.warning("Tidak ada data untuk diekspor.");
+    return;
+  }
+
+  isExporting.value = true;
+  try {
+    const sheets: ExcelSheetConfig[] = [];
+    if (siap.length)
+      sheets.push({
+        sheetName: "Siap Diambil",
+        columns: kolomSiap,
+        rows: barisDetail(siap),
+        headerColor: "37474F",
+      });
+    if (saya.length)
+      sheets.push({
+        sheetName: "Saya Kerjakan",
+        columns: kolomSaya,
+        rows: barisDetail(saya),
+        headerColor: "37474F",
+      });
+    if (lain.length)
+      sheets.push({
+        sheetName: "PIC Lain",
+        columns: kolomLain,
+        rows: barisDetail(lain),
+        headerColor: "37474F",
+      });
+
+    const d = new Date();
+    const tgl = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    await exportExcel(`Antrean_Marker_Detail_${tgl}.xlsx`, sheets);
+    toast.success("Berhasil export detail antrean.");
+  } catch (e) {
+    console.error(e);
+    toast.error("Gagal melakukan export detail.");
+  } finally {
+    isExporting.value = false;
+  }
+};
 </script>
 
 <template>
   <div class="ant-wrap">
     <div class="ant-top">
       <span class="ant-title">Antrean Marker</span>
-      <v-btn
-        size="small"
-        variant="outlined"
-        color="primary"
-        :loading="isLoading"
-        @click="fetchAntrean"
-      >
-        <template #prepend><IconRefresh :size="15" /></template>
-        Refresh
-      </v-btn>
+      <div>
+        <v-btn
+          size="small"
+          variant="outlined"
+          color="green-darken-3"
+          class="mr-2"
+          :loading="isExporting"
+          @click="onExportDetail"
+        >
+          <template #prepend><IconFileSpreadsheet :size="15" /></template>
+          Export Detail
+        </v-btn>
+        <v-btn
+          size="small"
+          variant="outlined"
+          color="primary"
+          :loading="isLoading"
+          @click="fetchAntrean"
+        >
+          <template #prepend><IconRefresh :size="15" /></template>
+          Refresh
+        </v-btn>
+      </div>
     </div>
 
     <!-- 1. Siap diambil -->

@@ -1185,8 +1185,8 @@ onMounted(async () => {
   align-items: center;
 }
 .jk-section-detail {
-  flex: 1;
-  min-height: 0;
+  flex: 1 0 320px;
+  min-height: 320px;
   display: flex;
   flex-direction: column;
 }
@@ -1211,15 +1211,19 @@ onMounted(async () => {
   min-width: 0;
 }
 .jk-plan-section {
-  flex: 1;
-  min-height: 120px;
+  flex: 0 1 auto;
+  min-height: 0;
   display: flex;
   flex-direction: column;
 }
 .plan-table-wrap {
-  flex: 1;
+  max-height: clamp(160px, 28vh, 260px);
   overflow: auto;
-  min-height: 0;
+}
+.plan-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
 }
 .plan-empty {
   padding: 16px;
@@ -1235,6 +1239,30 @@ onMounted(async () => {
 @media (max-width: 1100px) {
   .jk-top {
     grid-template-columns: 1fr;
+  }
+  .plan-table-wrap {
+    max-height: 200px;
+  }
+}
+@media (max-width: 900px) {
+  .info-grid {
+    grid-template-columns: 1fr;
+    gap: 8px 0;
+  }
+  .info-divider {
+    display: none;
+  }
+  .f-lbl {
+    width: 95px;
+  }
+}
+@media (max-width: 600px) {
+  .jk-form {
+    padding: 6px;
+    gap: 6px;
+  }
+  .jk-section {
+    padding: 8px;
   }
 }
 
