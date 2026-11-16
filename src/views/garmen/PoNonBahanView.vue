@@ -58,8 +58,10 @@ const canLihatSup = computed(() => authStore.user?.flags.lihatSup === 1);
 const canLihatBeli = computed(() => authStore.user?.flags.lihatBeli === 1);
 
 const isAllCabangAllowed = computed(() => {
-  return ["FINANCE", "AUDIT", "EDP", "DIREKSI", "ADMIN"].includes(
-    userBagian.value,
+  return (
+    ["FINANCE", "AUDIT", "EDP", "DIREKSI", "ADMIN"].includes(
+      userBagian.value,
+    ) || userCabang.value === "HO-"
   );
 });
 
