@@ -4,7 +4,9 @@ import { useBrowse } from "@/composables/useBrowse";
 import BaseBrowse from "@/components/BaseBrowse.vue";
 import { poBahanVsBpbService } from "@/services/laporan/gudang-garmen/poBahanVsBpbService";
 import { IconReportAnalytics } from "@tabler/icons-vue";
-import * as XLSX from "xlsx";
+import { exportExcel, type ExcelColumn } from "@/utils/excelExport";
+
+const baseBrowseRef = ref<InstanceType<typeof BaseBrowse> | null>(null);
 
 // ── Tanggal lokal (hindari UTC shift) ──
 const toLocalDate = (d: Date) => {
@@ -185,12 +187,101 @@ const getRowTextColor = (data: any) => {
 // ── Export ──
 const isExporting = ref(false);
 
+const exportColumns: ExcelColumn[] = [
+  { header: "Nomor PO", key: "nomor", width: 18 },
+  { header: "Tanggal PO", key: "tanggal", width: 12, align: "center" },
+  { header: "Keterangan", key: "keterangan", width: 30 },
+  { header: "Kode Supplier", key: "kodeSup", width: 12 },
+  { header: "Supplier", key: "supplier", width: 28 },
+  { header: "Status", key: "status", width: 12, align: "center" },
+  {
+    header: "Qty PO",
+    key: "qtyPO",
+    width: 12,
+    align: "right",
+    numFmt: "#,##0.##",
+  },
+  {
+    header: "Qty Commit",
+    key: "qtyCommit",
+    width: 12,
+    align: "right",
+    numFmt: "#,##0.##",
+  },
+  {
+    header: "Qty BPB",
+    key: "qtyBPB",
+    width: 12,
+    align: "right",
+    numFmt: "#,##0.##",
+  },
+  {
+    header: "Qty Retur",
+    key: "qtyRetur",
+    width: 12,
+    align: "right",
+    numFmt: "#,##0.##",
+  },
+  { header: "Kode Bahan", key: "kode", width: 14 },
+  { header: "Nama Bahan", key: "nama", width: 30 },
+  { header: "Satuan", key: "satuan", width: 9, align: "center" },
+  { header: "Supplier Item", key: "supItem", width: 24 },
+  { header: "SPK", key: "spk", width: 18 },
+  { header: "Nama SPK", key: "namaSpk", width: 26 },
+  {
+    header: "Jml PO",
+    key: "jmlPO",
+    width: 11,
+    align: "right",
+    numFmt: "#,##0.##",
+  },
+  {
+    header: "Sisa",
+    key: "sisa",
+    width: 11,
+    align: "right",
+    numFmt: "#,##0.##",
+  },
+  { header: "Tgl Commit", key: "tglCommit", width: 12, align: "center" },
+  {
+    header: "Jml Commit",
+    key: "jmlCommit",
+    width: 11,
+    align: "right",
+    numFmt: "#,##0.##",
+  },
+  { header: "No BPB", key: "noBpb", width: 18 },
+  { header: "Tgl BPB", key: "tglBpb", width: 12, align: "center" },
+  {
+    header: "Jml BPB",
+    key: "jmlBpb",
+    width: 11,
+    align: "right",
+    numFmt: "#,##0.##",
+  },
+  { header: "No Retur", key: "noRetur", width: 18 },
+  { header: "Tgl Retur", key: "tglRetur", width: 12, align: "center" },
+  {
+    header: "Jml Retur",
+    key: "jmlRetur",
+    width: 11,
+    align: "right",
+    numFmt: "#,##0.##",
+  },
+];
+
 const onExport = async () => {
   if (!canExport.value || isExporting.value) return;
-  const masters = (items.value ?? []) as MasterRow[];
+
+  // Data yang sedang tampil: sudah kena search box + filter kolom BaseBrowse
+  const masters = (baseBrowseRef.value?.getFilteredItems() ??
+    items.value ??
+    []) as MasterRow[];
+  if (!masters.length) return;
+
   isExporting.value = true;
   try {
-    // Muat rincian semua PO yang belum ada di cache (5 request paralel)
+    // Muat rincian PO yang belum ada di cache (5 request paralel)
     const belum = masters
       .map((m) => m.Nomor)
       .filter((n) => !detailData.value[n]);
@@ -198,80 +289,55 @@ const onExport = async () => {
       await Promise.all(belum.slice(i, i + 5).map(loadDetail));
     }
 
-    const blankMaster = {
-      "Nomor PO": "",
-      "Tanggal PO": "",
-      Keterangan: "",
-      "Kode Supplier": "",
-      Supplier: "",
-      "Qty PO (Master)": "",
-      "Qty Commit (Master)": "",
-      "Qty BPB (Master)": "",
-      "Qty Retur (Master)": "",
-      Status: "",
-    };
-    const blankDetail = {
-      "Kode Bahan": "",
-      "Nama Bahan": "",
-      Satuan: "",
-      "Supplier Item": "",
-      SPK: "",
-      "Nama SPK": "",
-      "Jml PO": "",
-      Sisa: "",
-      "Tgl Commit": "",
-      "Jml Commit": "",
-      "No BPB": "",
-      "Tgl BPB": "",
-      "Jml BPB": "",
-      "No Retur": "",
-      "Tgl Retur": "",
-      "Jml Retur": "",
-    };
-
-    const rows: Record<string, string | number>[] = [];
-    masters.forEach((master) => {
+    const rows: Record<string, any>[] = [];
+    for (const m of masters) {
       rows.push({
-        "Nomor PO": master.Nomor,
-        "Tanggal PO": formatTgl(master.Tanggal),
-        Keterangan: master.Keterangan,
-        "Kode Supplier": master.KodeSupplier,
-        Supplier: master.Supplier,
-        "Qty PO (Master)": master.QtyPO,
-        "Qty Commit (Master)": master.QtyCommit,
-        "Qty BPB (Master)": master.QtyBPB,
-        "Qty Retur (Master)": master.QtyRetur,
-        Status: master.Status,
-        ...blankDetail,
+        _master: true,
+        nomor: m.Nomor,
+        tanggal: formatTgl(m.Tanggal),
+        keterangan: m.Keterangan,
+        kodeSup: m.KodeSupplier,
+        supplier: m.Supplier,
+        status: m.Status,
+        qtyPO: Number(m.QtyPO) || 0,
+        qtyCommit: Number(m.QtyCommit) || 0,
+        qtyBPB: Number(m.QtyBPB) || 0,
+        qtyRetur: Number(m.QtyRetur) || 0,
       });
 
-      (detailData.value[master.Nomor] ?? []).forEach((det) => {
+      for (const d of detailData.value[m.Nomor] ?? []) {
         rows.push({
-          ...blankMaster,
-          "Kode Bahan": det.Kode,
-          "Nama Bahan": det.Nama,
-          Satuan: det.Satuan,
-          "Supplier Item": det.Supplier,
-          SPK: det.SPK,
-          "Nama SPK": det.NamaSPK,
-          "Jml PO": det.Awal ? det.QtyPO : "",
-          Sisa: det.Awal ? det.Sisa : "",
-          "Tgl Commit": formatTgl(det.TglCommit),
-          "Jml Commit": det.QtyCommit || "",
-          "No BPB": det.NoBPB,
-          "Tgl BPB": formatTgl(det.TglBPB),
-          "Jml BPB": det.QtyBPB || "",
-          "No Retur": det.NoRetur,
-          "Tgl Retur": formatTgl(det.TglRetur),
-          "Jml Retur": det.QtyRetur || "",
+          kode: d.Kode,
+          nama: d.Nama,
+          satuan: d.Satuan,
+          supItem: d.Supplier,
+          spk: d.SPK,
+          namaSpk: d.NamaSPK,
+          jmlPO: d.Awal ? Number(d.QtyPO) || 0 : "",
+          sisa: d.Awal ? Number(d.Sisa) || 0 : "",
+          tglCommit: formatTgl(d.TglCommit),
+          jmlCommit: d.QtyCommit ? Number(d.QtyCommit) : "",
+          noBpb: d.NoBPB,
+          tglBpb: formatTgl(d.TglBPB),
+          jmlBpb: d.QtyBPB ? Number(d.QtyBPB) : "",
+          noRetur: d.NoRetur,
+          tglRetur: formatTgl(d.TglRetur),
+          jmlRetur: d.QtyRetur ? Number(d.QtyRetur) : "",
         });
-      });
-    });
+      }
+    }
 
-    const ws = XLSX.utils.json_to_sheet(rows);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "PO vs BPB");
-    XLSX.writeFile(wb, "Laporan_PO_vs_BPB.xlsx");
+    await exportExcel("Laporan_PO_vs_BPB.xlsx", [
+      {
+        sheetName: "PO vs BPB",
+        title: `Laporan PO Bahan vs BPB (${formatTgl(filters.value.startDate)} s/d ${formatTgl(filters.value.endDate)})`,
+        columns: exportColumns,
+        rows,
+        zebra: false,
+        rowStyleFn: (r) =>
+          r._master ? { bold: true, fillColor: "E3F2FD" } : null,
+      },
+    ]);
   } finally {
     isExporting.value = false;
   }
@@ -280,6 +346,7 @@ const onExport = async () => {
 
 <template>
   <BaseBrowse
+    ref="baseBrowseRef"
     title="PO Bahan vs BPB"
     menu-id="512"
     :icon="IconReportAnalytics"
