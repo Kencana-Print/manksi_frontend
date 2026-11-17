@@ -365,20 +365,34 @@ const resetColOrder = () => {
 // ── Headers ────────────────────────────────────────────────────────────
 const finalHeaders = computed(() => {
   const hasFixedCol = orderedHeaders.value.some((h: any) => h.fixed);
-  if (!effectiveShowExpand.value) return orderedHeaders.value;
-  if (orderedHeaders.value.some((h: any) => h.key === "data-table-expand")) {
-    return orderedHeaders.value;
+  const result: any[] = [];
+
+  if (
+    props.selectStrategy !== "single" &&
+    !orderedHeaders.value.some((h: any) => h.key === "data-table-select")
+  ) {
+    result.push({
+      key: "data-table-select",
+      width: "48px",
+      sortable: false,
+      fixed: hasFixedCol,
+    });
   }
-  return [
-    {
+
+  if (
+    effectiveShowExpand.value &&
+    !orderedHeaders.value.some((h: any) => h.key === "data-table-expand")
+  ) {
+    result.push({
       title: "",
       key: "data-table-expand",
       width: "48px",
       sortable: false,
       fixed: hasFixedCol,
-    },
-    ...orderedHeaders.value,
-  ];
+    });
+  }
+
+  return [...result, ...orderedHeaders.value];
 });
 
 // ── Column Filter (ala Excel/desktop app) ─────────────────────────────
@@ -575,9 +589,6 @@ const isColFixed = (col: any) => {
 const fixedLeftOffsets = computed(() => {
   const map: Record<string, number> = {};
   let currentLeft = 0;
-  if (props.selectStrategy !== "single") {
-    currentLeft += 48;
-  }
   for (const col of finalHeaders.value) {
     if (isColFixed(col)) {
       map[col.key] = currentLeft;
@@ -616,6 +627,15 @@ const colStyle = (col: any) => {
     style.left = `${fixedLeftOffsets.value[key]}px`;
   }
 
+  return style;
+};
+
+// Hitung style khusus header th: wajib sticky top 0 dan elevated z-index
+const colHeaderStyle = (col: any) => {
+  const style = colStyle(col);
+  style.position = "sticky";
+  style.top = "0px";
+  style.zIndex = isColFixed(col) ? "30" : "20";
   return style;
 };
 
@@ -950,7 +970,7 @@ let pointerDragKey: string | null = null;
 let autoScrollTimer: number | null = null;
 
 const onColPointerDown = (key: string | null | undefined, e: PointerEvent) => {
-  if (!key || key === "data-table-expand") return;
+  if (!key || key === "data-table-expand" || key === "data-table-select") return;
   // Hanya dari drag handle (class col-drag-handle)
   const target = e.target as HTMLElement;
   if (!target.classList.contains("col-drag-handle")) return;
@@ -1019,7 +1039,7 @@ const onColPointerUp = () => {
   ) {
     const currentOrder = orderedHeaders.value
       .map((h) => h.key)
-      .filter((k) => k && k !== "data-table-expand");
+      .filter((k) => k && k !== "data-table-expand" && k !== "data-table-select");
 
     const srcIdx = currentOrder.indexOf(pointerDragKey);
     const tgtIdx = currentOrder.indexOf(dragOverKey.value);
@@ -1252,7 +1272,17 @@ watch(
             :cell-props="({ value }) => ({ title: value ?? '' })"
           >
             <!-- Custom header dengan tombol filter + resize per kolom -->
-            <template #headers="{ columns, isSorted, getSortIcon, toggleSort }">
+            <template
+              #headers="{
+                columns,
+                isSorted,
+                getSortIcon,
+                toggleSort,
+                allSelected,
+                someSelected,
+                selectAll,
+              }"
+            >
               <tr>
                 <template
                   v-for="col in columns"
@@ -1260,7 +1290,7 @@ watch(
                 >
                   <th
                     :data-col-key="col.key"
-                    :style="colStyle(col)"
+                    :style="colHeaderStyle(col)"
                     :class="[
                       'base-th',
                       isColFixed(col) ? 'base-th-fixed' : '',
@@ -1275,56 +1305,72 @@ watch(
                     @pointerup="onColPointerUp"
                     @pointercancel="onColPointerUp"
                   >
-                    <div class="th-inner">
-                      <!-- Drag handle icon -->
-                      <span
-                        v-if="col.key && col.key !== 'data-table-expand'"
-                        class="col-drag-handle"
-                        title="Drag untuk pindah kolom"
-                        >⠿</span
-                      >
-                      <span
-                        class="th-title"
-                        :class="{ sortable: col.sortable !== false }"
-                        @click="col.sortable !== false && toggleSort(col)"
-                      >
-                        {{ col.title }}
-                        <IconChevronUp
-                          v-if="
-                            isSorted(col) && getSortIcon(col) === '$sortAsc'
-                          "
-                          :size="11"
-                          style="display: inline; vertical-align: middle"
+                    <template v-if="col.key === 'data-table-select'">
+                      <div class="d-flex align-center justify-center">
+                        <v-checkbox-btn
+                          :model-value="allSelected"
+                          :indeterminate="someSelected && !allSelected"
+                          density="compact"
+                          color="white"
+                          @update:model-value="selectAll(!allSelected)"
                         />
-                        <IconChevronDown
-                          v-else-if="isSorted(col)"
-                          :size="11"
-                          style="display: inline; vertical-align: middle"
-                        />
-                      </span>
-                      <button
-                        v-if="col.key && col.key !== 'data-table-expand'"
-                        class="col-filter-btn"
-                        :class="{ active: colHasFilter(col.key) }"
-                        @click.stop="openColFilter(col.key, $event)"
-                      >
-                        <IconFilter
-                          v-if="colHasFilter(col.key)"
-                          :size="10"
-                          :stroke-width="2"
-                        />
-                        <IconAdjustmentsHorizontal
-                          v-else
-                          :size="10"
-                          :stroke-width="2"
-                        />
-                      </button>
-                    </div>
-                    <div
-                      v-if="col.key && col.key !== 'data-table-expand'"
-                      class="col-resize-handle"
-                      @mousedown.stop="onResizeStart(col.key, $event)"
-                    />
+                      </div>
+                    </template>
+                    <template v-else-if="col.key === 'data-table-expand'">
+                      <!-- Expand header empty -->
+                    </template>
+                    <template v-else>
+                      <div class="th-inner">
+                        <!-- Drag handle icon -->
+                        <span
+                          v-if="col.key"
+                          class="col-drag-handle"
+                          title="Drag untuk pindah kolom"
+                          >⠿</span
+                        >
+                        <span
+                          class="th-title"
+                          :class="{ sortable: col.sortable !== false }"
+                          @click="col.sortable !== false && toggleSort(col)"
+                        >
+                          {{ col.title }}
+                          <IconChevronUp
+                            v-if="
+                              isSorted(col) && getSortIcon(col) === '$sortAsc'
+                            "
+                            :size="11"
+                            style="display: inline; vertical-align: middle"
+                          />
+                          <IconChevronDown
+                            v-else-if="isSorted(col)"
+                            :size="11"
+                            style="display: inline; vertical-align: middle"
+                          />
+                        </span>
+                        <button
+                          v-if="col.key"
+                          class="col-filter-btn"
+                          :class="{ active: colHasFilter(col.key) }"
+                          @click.stop="openColFilter(col.key, $event)"
+                        >
+                          <IconFilter
+                            v-if="colHasFilter(col.key)"
+                            :size="10"
+                            :stroke-width="2"
+                          />
+                          <IconAdjustmentsHorizontal
+                            v-else
+                            :size="10"
+                            :stroke-width="2"
+                          />
+                        </button>
+                      </div>
+                      <div
+                        v-if="col.key"
+                        class="col-resize-handle"
+                        @mousedown.stop="onResizeStart(col.key, $event)"
+                      />
+                    </template>
                   </th>
                 </template>
               </tr>
@@ -1430,11 +1476,6 @@ watch(
             >
               <tr class="summary-inline-row">
                 <td
-                  v-if="selectStrategy !== 'single'"
-                  class="summary-td-inline"
-                  style="width: 48px; min-width: 48px"
-                />
-                <td
                   v-for="col in finalHeaders"
                   :key="'sum-' + col.key"
                   :style="colStyle(col)"
@@ -1444,7 +1485,12 @@ watch(
                     isColFixed(col) ? 'summary-td-fixed' : '',
                   ]"
                 >
-                  <template v-if="col.key === 'data-table-expand'"></template>
+                  <template
+                    v-if="
+                      col.key === 'data-table-select' ||
+                      col.key === 'data-table-expand'
+                    "
+                  ></template>
                   <template v-else-if="summaryFormatters?.[col.key]">
                     {{ summaryFormatters[col.key](filteredItems) }}
                   </template>
@@ -1799,6 +1845,11 @@ watch(
   display: flex !important;
   flex-direction: column !important;
 }
+.base-table :deep(thead) {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 20 !important;
+}
 .base-table :deep(thead th) {
   background-color: #1565c0 !important;
   color: white !important;
@@ -1812,7 +1863,7 @@ watch(
   text-overflow: ellipsis;
   position: sticky !important;
   top: 0 !important;
-  z-index: 5 !important;
+  z-index: 20 !important;
 }
 .base-table :deep(tbody td) {
   font-size: 12px;
@@ -2119,14 +2170,14 @@ watch(
   user-select: none;
   position: sticky !important;
   top: 0 !important;
-  z-index: 5 !important;
+  z-index: 20 !important;
   overflow: visible !important;
 }
 
 .base-th-fixed {
   position: sticky !important;
   top: 0 !important;
-  z-index: 10 !important;
+  z-index: 30 !important;
   background-color: #1565c0 !important;
   box-shadow: 2px 0 4px rgba(0, 0, 0, 0.08);
 }

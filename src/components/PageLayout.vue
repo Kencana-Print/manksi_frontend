@@ -102,9 +102,12 @@ const loadingModel = computed({
 }
 
 .desktop-mode {
-  height: calc(100vh - 64px);
+  height: 100%;
+  max-height: 100%;
   padding: 8px 12px;
   gap: 6px;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .modern-mode {
