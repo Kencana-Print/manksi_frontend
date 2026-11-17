@@ -361,6 +361,7 @@ interface RekapPanggilOption {
   total: number;
 }
 interface RekapPanggilRow {
+  jenis: "VOU" | "PCK";
   trs: string;
   kode: string;
   nama: string;
@@ -368,8 +369,10 @@ interface RekapPanggilRow {
   rekening: string;
   atasnama: string;
   nominal: number;
+  ket: string;
+  namaStore?: string; // hanya PCK
   rekapNomor: string;
-  cekRekening: "" | "BANYAK" | "KOSONG";
+  cekRekening: "" | "BANYAK" | "KOSONG" | "ISI";
 }
 const showPanggilModal = ref(false);
 const panggilState =
@@ -449,7 +452,7 @@ const tambahkanPanggil = () => {
     (r) => panggilTerpilih.value.includes(r.trs) && !panggilSudahAda(r.trs),
   );
   if (!pilih.length) {
-    toast.warning("Pilih minimal satu voucher.");
+    toast.warning("Pilih minimal satu transaksi.");
     return;
   }
   for (const r of pilih) {
@@ -466,14 +469,21 @@ const tambahkanPanggil = () => {
     d.bank = r.bank;
     d.rekening = r.rekening;
     d.atasnama = r.atasnama;
-    d.sumber = "RKP";
+    d.sumber = r.jenis === "PCK" ? "PC" : "RKP";
     d.trs = r.trs;
     d.nominal = Number(r.nominal) || 0;
-    if (!String(d.ket || "").trim()) d.ket = r.trs;
+    if (!String(d.ket || "").trim()) d.ket = r.ket || r.trs;
   }
   showPanggilModal.value = false;
-  toast.success(`${pilih.length} voucher ditambahkan dari rekap.`);
-  const cek = pilih.filter((r) => r.cekRekening);
+  toast.success(`${pilih.length} transaksi ditambahkan dari rekap.`);
+
+  const perluSupplier = pilih.filter((r) => r.jenis === "PCK");
+  if (perluSupplier.length)
+    toast.warning(
+      `${perluSupplier.length} baris petty cash belum ada supplier tujuan. Isi lewat tombol cari di kolom Kode Sup, kalau tidak, baris tidak bisa disimpan.`,
+      { timeout: 10000 },
+    );
+  const cek = pilih.filter((r) => r.jenis === "VOU" && r.cekRekening);
   if (cek.length)
     toast.warning(
       `${cek.length} baris perlu cek rekening (supplier punya lebih dari satu rekening atau belum punya): ${cek
@@ -901,6 +911,18 @@ const validateSave = () => {
   if (!form.value.rek_kode || !form.value.rek_nama) {
     toast.warning("Rekening Asal harus diisi.");
     return;
+  }
+  if (!isRealisasi.value) {
+    const tanpaSupplier = form.value.detail.findIndex(
+      (d) => !d.nama && (d.trs || Number(d.nominal) > 0),
+    );
+    if (tanpaSupplier >= 0) {
+      const d = form.value.detail[tanpaSupplier];
+      toast.warning(
+        `Supplier belum diisi pada baris ${tanpaSupplier + 1}${d.trs ? ` (${d.trs})` : ""}.`,
+      );
+      return;
+    }
   }
   const filled = form.value.detail.filter((d: any) => d.nama);
   if (!filled.length) {
@@ -1643,7 +1665,7 @@ const skipCetak = () => {
                   <th style="width: 160px">Rekap</th>
                   <th style="width: 100px">Tanggal</th>
                   <th>Keterangan</th>
-                  <th style="width: 90px" class="text-right">Voucher</th>
+                  <th style="width: 90px" class="text-right">Transaksi</th>
                   <th style="width: 130px" class="text-right">Total</th>
                 </tr>
               </thead>
@@ -1662,7 +1684,7 @@ const skipCetak = () => {
                 </tr>
                 <tr v-if="panggilState.allItems.length === 0">
                   <td colspan="5" class="text-center text-grey py-3">
-                    Tidak ada rekap dengan voucher yang belum diajukan
+                    Tidak ada rekap dengan transaksi yang belum diajukan
                   </td>
                 </tr>
               </tbody>
@@ -1683,7 +1705,7 @@ const skipCetak = () => {
                       @change="togglePanggilAll"
                     />
                   </th>
-                  <th style="width: 130px">Voucher</th>
+                  <th style="width: 150px">No. Transaksi</th>
                   <th>Supplier</th>
                   <th style="width: 80px">Bank</th>
                   <th>Atas Nama</th>
@@ -1710,7 +1732,13 @@ const skipCetak = () => {
                     />
                   </td>
                   <td>{{ r.trs }}</td>
-                  <td>{{ r.nama }}</td>
+                  <td>
+                    {{
+                      r.jenis === "PCK"
+                        ? `Petty Cash ${r.namaStore || ""}`
+                        : r.nama
+                    }}
+                  </td>
                   <td>{{ r.bank || "-" }}</td>
                   <td>{{ r.atasnama || "-" }}</td>
                   <td>{{ r.rekening || "-" }}</td>
@@ -1721,14 +1749,18 @@ const skipCetak = () => {
                       style="color: #e65100; font-weight: 700"
                     >
                       {{
-                        r.cekRekening === "BANYAK" ? "Rek. >1" : "Tanpa rek."
+                        r.cekRekening === "BANYAK"
+                          ? "Rek. >1"
+                          : r.cekRekening === "ISI"
+                            ? "Isi supplier"
+                            : "Tanpa rek."
                       }}
                     </span>
                   </td>
                 </tr>
                 <tr v-if="panggilRows.length === 0">
                   <td colspan="8" class="text-center text-grey py-3">
-                    Semua voucher rekap ini sudah diajukan
+                    Semua transaksi rekap ini sudah diajukan
                   </td>
                 </tr>
               </tbody>
@@ -1741,7 +1773,7 @@ const skipCetak = () => {
           >Kembali</v-btn
         >
         <span v-if="panggilRekap" class="text-caption text-grey-darken-1 ml-2">
-          {{ panggilTerpilih.length }} voucher dipilih
+          {{ panggilTerpilih.length }} dipilih
         </span>
         <v-spacer />
         <v-btn
