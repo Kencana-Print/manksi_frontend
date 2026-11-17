@@ -80,7 +80,8 @@ const blok = computed<BlokCetak[]>(() => {
   const peta = new Map<string, Map<string, GrupCetak>>();
   for (const r of urut) {
     const perKategori = peta.get(r.kategori) ?? new Map<string, GrupCetak>();
-    const k = `${r.supKode}|${r.bulanTagihan}`;
+    // Baris petty cash (PCK) tidak punya supplier: grup per nama store
+    const k = `${r.tipe === "PCK" ? r.supNama : r.supKode}|${r.bulanTagihan}`;
     const g: GrupCetak = perKategori.get(k) ?? {
       supNama: r.supNama,
       rekening: r.supRekening,

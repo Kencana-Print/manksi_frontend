@@ -58,6 +58,17 @@ export interface VoucherOption {
   jumlahRekening: number;
 }
 
+export interface PettyCashOption {
+  nomor: string;
+  tanggal: string;
+  store: string;
+  namaStore: string;
+  keterangan: string;
+  nominal: number;
+  kategori: string;
+  kategoriUrut: number;
+}
+
 export interface RekapDetailPayload {
   supKode: string;
   bulanTagihan: string;
@@ -139,6 +150,11 @@ export const rekapPembayaranFormService = {
 
   getVoucherOptions: (search: string, excludeNomor: string) =>
     api.get<ApiResult<VoucherOption[]>>(`${BASE}/lookups/voucher`, {
+      params: { search, excludeNomor },
+    }),
+
+  getPettyCashOptions: (search: string, excludeNomor: string) =>
+    api.get<ApiResult<PettyCashOption[]>>(`${BASE}/lookups/petty-cash`, {
       params: { search, excludeNomor },
     }),
 
