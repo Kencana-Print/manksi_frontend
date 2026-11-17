@@ -138,8 +138,8 @@ onMounted(async () => {
             <td class="tr">{{ i + 1 }}</td>
             <td>{{ k.Nik }}</td>
             <td class="nama">{{ k.Nama }}</td>
-            <td class="tr">{{ desimal(k.Jam_Kerja) }}</td>
-            <td class="tr">{{ desimal(k.Jam_Lembur) }}</td>
+            <td class="tr">{{ k.Jam_Kerja }}</td>
+            <td class="tr">{{ k.Jam_Lembur }}</td>
           </tr>
         </tbody>
       </table>
