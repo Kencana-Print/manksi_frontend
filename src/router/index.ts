@@ -7698,6 +7698,356 @@ const router = createRouter({
       },
     },
 
+    // ── Laporan Produksi MMT ──
+    {
+      path: "/laporan/produksi-mmt/monitoring-cetak",
+      name: "LaporanMonitoringCetakMmt",
+      component: () =>
+        import("@/views/laporan/produksi-mmt/MonitoringCetakMmtView.vue"),
+      meta: {
+        title: "Monitoring Cetak MMT",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5551",
+      },
+    },
+    {
+      path: "/laporan/produksi-mmt/monitoring-cetak/print",
+      name: "LaporanMonitoringCetakMmtPrint",
+      component: () =>
+        import("@/views/laporan/produksi-mmt/MonitoringCetakMmtPrintView.vue"),
+      meta: {
+        title: "Cetak Monitoring Cetak MMT",
+        layout: "BlankLayout",
+        requiresAuth: true,
+        menuId: "5551",
+      },
+    },
+    {
+      path: "/laporan/produksi-mmt/monitoring-tekstil",
+      name: "LaporanMonitoringTekstilMmt",
+      component: () =>
+        import("@/views/laporan/produksi-mmt/MonitoringTekstilMmtView.vue"),
+      meta: {
+        title: "Monitoring Tekstil MMT",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5552",
+      },
+    },
+    {
+      path: "/laporan/produksi-mmt/monitoring-tekstil/print",
+      name: "LaporanMonitoringTekstilMmtPrint",
+      component: () =>
+        import("@/views/laporan/produksi-mmt/MonitoringTekstilMmtPrintView.vue"),
+      meta: {
+        title: "Cetak Monitoring Tekstil MMT",
+        layout: "BlankLayout",
+        requiresAuth: true,
+        menuId: "5552",
+      },
+    },
+    {
+      path: "/laporan/produksi-mmt/monitoring-paperprint",
+      name: "LaporanMonitoringPaperprintMmt",
+      component: () =>
+        import("@/views/laporan/produksi-mmt/MonitoringPaperprintMmtView.vue"),
+      meta: {
+        title: "Monitoring Paperprint MMT",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5553",
+      },
+    },
+    {
+      path: "/laporan/produksi-mmt/monitoring-paperprint/print",
+      name: "LaporanMonitoringPaperprintMmtPrint",
+      component: () =>
+        import("@/views/laporan/produksi-mmt/MonitoringPaperprintMmtPrintView.vue"),
+      meta: {
+        title: "Cetak Monitoring Paperprint MMT",
+        layout: "BlankLayout",
+        requiresAuth: true,
+        menuId: "5553",
+      },
+    },
+    {
+      path: "/laporan/produksi-mmt/monitoring-sublim",
+      name: "LaporanMonitoringSublimMmt",
+      component: () =>
+        import("@/views/laporan/produksi-mmt/MonitoringSublimMmtView.vue"),
+      meta: {
+        title: "Monitoring Sublim / RTR MMT",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5554",
+      },
+    },
+    {
+      path: "/laporan/produksi-mmt/monitoring-sublim/print",
+      name: "LaporanMonitoringSublimMmtPrint",
+      component: () =>
+        import("@/views/laporan/produksi-mmt/MonitoringSublimMmtPrintView.vue"),
+      meta: {
+        title: "Cetak Monitoring Sublim / RTR MMT",
+        layout: "BlankLayout",
+        requiresAuth: true,
+        menuId: "5554",
+      },
+    },
+    {
+      path: "/laporan/produksi-mmt/monitoring-proof",
+      name: "LaporanMonitoringProofMmt",
+      component: () =>
+        import("@/views/laporan/produksi-mmt/MonitoringProofMmtView.vue"),
+      meta: {
+        title: "Monitoring Proof MMT",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5555",
+      },
+    },
+    {
+      path: "/laporan/produksi-mmt/monitoring-proof/print",
+      name: "LaporanMonitoringProofMmtPrint",
+      component: () =>
+        import("@/views/laporan/produksi-mmt/MonitoringProofMmtPrintView.vue"),
+      meta: {
+        title: "Cetak Monitoring Proof MMT",
+        layout: "BlankLayout",
+        requiresAuth: true,
+        menuId: "5555",
+      },
+    },
+    {
+      path: "/laporan/produksi-mmt/monitoring-finishing",
+      name: "LaporanMonitoringFinishingMmt",
+      component: () =>
+        import("@/views/laporan/produksi-mmt/MonitoringFinishingMmtView.vue"),
+      meta: {
+        title: "Monitoring Finishing MMT",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5556",
+      },
+    },
+    {
+      path: "/laporan/produksi-mmt/monitoring-finishing/print",
+      name: "LaporanMonitoringFinishingMmtPrint",
+      component: () =>
+        import("@/views/laporan/produksi-mmt/MonitoringFinishingMmtPrintView.vue"),
+      meta: {
+        title: "Cetak Monitoring Finishing MMT",
+        layout: "BlankLayout",
+        requiresAuth: true,
+        menuId: "5556",
+      },
+    },
+    {
+      path: "/laporan/produksi-mmt/monitoring-bs",
+      name: "LaporanMonitoringBsMmt",
+      component: () =>
+        import("@/views/laporan/produksi-mmt/MonitoringBsMmtView.vue"),
+      meta: {
+        title: "BS & Afal Produksi MMT",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5557",
+      },
+    },
+    {
+      path: "/laporan/produksi-mmt/monitoring-bs/print",
+      name: "LaporanMonitoringBsMmtPrint",
+      component: () =>
+        import("@/views/laporan/produksi-mmt/MonitoringBsMmtPrintView.vue"),
+      meta: {
+        title: "Cetak BS & Afal Produksi MMT",
+        layout: "BlankLayout",
+        requiresAuth: true,
+        menuId: "5557",
+      },
+    },
+    {
+      path: "/laporan/produksi-mmt/monitoring-jadwal-kirim",
+      name: "LaporanMonitoringJadwalKirimMmt",
+      component: () =>
+        import("@/views/laporan/produksi-mmt/MonitoringJadwalKirimMmtView.vue"),
+      meta: {
+        title: "Jadwal Kirim MMT (WH-010)",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5558",
+      },
+    },
+    {
+      path: "/laporan/produksi-mmt/monitoring-jadwal-kirim/print",
+      name: "LaporanMonitoringJadwalKirimMmtPrint",
+      component: () =>
+        import("@/views/laporan/produksi-mmt/MonitoringJadwalKirimMmtPrintView.vue"),
+      meta: {
+        title: "Cetak Jadwal Kirim MMT (WH-010)",
+        layout: "BlankLayout",
+        requiresAuth: true,
+        menuId: "5558",
+      },
+    },
+    {
+      path: "/laporan/produksi-mmt/monitoring-lmkp",
+      alias: "/laporan/produksi-mmt/lmkp",
+      name: "LaporanMonitoringLmkpMmt",
+      component: () =>
+        import("@/views/laporan/produksi-mmt/MonitoringLmkpMmtView.vue"),
+      meta: {
+        title: "Monitoring LMKP MMT",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5559",
+      },
+    },
+    {
+      path: "/laporan/produksi-mmt/monitoring-lmkp/print",
+      alias: "/laporan/produksi-mmt/lmkp/print",
+      name: "LaporanMonitoringLmkpMmtPrint",
+      component: () =>
+        import("@/views/laporan/produksi-mmt/MonitoringLmkpMmtPrintView.vue"),
+      meta: {
+        title: "Cetak Monitoring LMKP MMT",
+        layout: "BlankLayout",
+        requiresAuth: true,
+        menuId: "5559",
+      },
+    },
+    {
+      path: "/laporan/produksi-mmt/ls-bahan-utama",
+      alias: "/laporan/mmt/ls-bahan-utama",
+      name: "LaporanLsBahanUtamaMmt",
+      component: () =>
+        import("@/views/laporan/produksi-mmt/LsBahanUtamaMmtView.vue"),
+      meta: {
+        title: "LS Bahan Utama",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5560",
+      },
+    },
+    {
+      path: "/laporan/produksi-mmt/ls-bahan-utama/print",
+      alias: "/laporan/mmt/ls-bahan-utama/print",
+      name: "LaporanLsBahanUtamaMmtPrint",
+      component: () =>
+        import("@/views/laporan/produksi-mmt/LsBahanUtamaMmtPrintView.vue"),
+      meta: {
+        title: "Cetak LS Bahan Utama",
+        layout: "BlankLayout",
+        requiresAuth: true,
+        menuId: "5560",
+      },
+    },
+    {
+      path: "/laporan/produksi-mmt/ls-bahan-penolong",
+      alias: "/laporan/mmt/ls-bahan-penolong",
+      name: "LaporanLsBahanPenolongMmt",
+      component: () =>
+        import("@/views/laporan/produksi-mmt/LsBahanPenolongMmtView.vue"),
+      meta: {
+        title: "LS Bahan Penolong",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5561",
+      },
+    },
+    {
+      path: "/laporan/produksi-mmt/ls-bahan-penolong/print",
+      alias: "/laporan/mmt/ls-bahan-penolong/print",
+      name: "LaporanLsBahanPenolongMmtPrint",
+      component: () =>
+        import("@/views/laporan/produksi-mmt/LsBahanPenolongMmtPrintView.vue"),
+      meta: {
+        title: "Cetak LS Bahan Penolong",
+        layout: "BlankLayout",
+        requiresAuth: true,
+        menuId: "5561",
+      },
+    },
+    {
+      path: "/laporan/produksi-mmt/lap-pemakaian-bahan",
+      alias: "/laporan/mmt/lap-pemakaian-bahan",
+      name: "LapPemakaianBahanMmt",
+      component: () =>
+        import("@/views/laporan/produksi-mmt/LapPemakaianBahanMmtView.vue"),
+      meta: {
+        title: "Lap. Pemakaian Bahan",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5562",
+      },
+    },
+    {
+      path: "/laporan/produksi-mmt/lap-pemakaian-bahan/print",
+      alias: "/laporan/mmt/lap-pemakaian-bahan/print",
+      name: "LapPemakaianBahanMmtPrint",
+      component: () =>
+        import("@/views/laporan/produksi-mmt/LapPemakaianBahanMmtPrintView.vue"),
+      meta: {
+        title: "Cetak Lap. Pemakaian Bahan",
+        layout: "BlankLayout",
+        requiresAuth: true,
+        menuId: "5562",
+      },
+    },
+    {
+      path: "/laporan/produksi-mmt/lap-spk-mmt",
+      alias: "/laporan/mmt/lap-spk-mmt",
+      name: "LaporanSpkMmt",
+      component: () =>
+        import("@/views/laporan/produksi-mmt/LaporanSpkMmtView.vue"),
+      meta: {
+        title: "Laporan SPK MMT",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5563",
+      },
+    },
+    {
+      path: "/laporan/produksi-mmt/lap-spk-mmt/print",
+      alias: "/laporan/mmt/lap-spk-mmt/print",
+      name: "LaporanSpkMmtPrint",
+      component: () =>
+        import("@/views/laporan/produksi-mmt/LaporanSpkMmtPrintView.vue"),
+      meta: {
+        title: "Cetak Laporan SPK MMT",
+        layout: "BlankLayout",
+        requiresAuth: true,
+        menuId: "5563",
+      },
+    },
+    {
+      path: "/laporan/produksi-mmt/lap-lhk",
+      alias: "/laporan/mmt/lap-lhk",
+      name: "LaporanLhkMmt",
+      component: () =>
+        import("@/views/laporan/produksi-mmt/LaporanLhkMmtView.vue"),
+      meta: {
+        title: "Laporan LHK",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5564",
+      },
+    },
+    {
+      path: "/laporan/produksi-mmt/lap-lhk/print",
+      alias: "/laporan/mmt/lap-lhk/print",
+      name: "LaporanLhkMmtPrint",
+      component: () =>
+        import("@/views/laporan/produksi-mmt/LaporanLhkMmtPrintView.vue"),
+      meta: {
+        title: "Cetak Laporan LHK",
+        layout: "BlankLayout",
+        requiresAuth: true,
+        menuId: "5564",
+      },
+    },
+
     {
       path: "/laporan/marketing/laporan-desain",
       name: "LapDesainMarketing",

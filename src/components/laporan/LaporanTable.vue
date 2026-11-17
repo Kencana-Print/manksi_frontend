@@ -62,6 +62,7 @@ const props = withDefaults(
     detailKey?: string;
   }>(),
   {
+    items: () => [],
     isLoading: false,
     canExport: false,
     searchPlaceholder: "Cari data...",
