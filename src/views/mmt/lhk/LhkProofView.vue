@@ -18,12 +18,8 @@
     item-value="nomor"
     show-expand
     has-print
-    :summary-fields="[
-      'Panjang_Awal',
-      'Panjang_Terpakai',
-      'Sisa_Bahan',
-      'Total_J_Meter',
-    ]"
+    :summary-columns="summaryColumns"
+    :summary-formatters="summaryFormatters"
     @refresh="fetchMasterData"
     @add="handleCreate"
     @edit="handleEdit"
@@ -137,7 +133,7 @@ const filters = reactive({
 
 // --- Table Headers ---
 const masterHeaders = [
-  { title: "Nomor LHK", key: "nomor", width: "150px" },
+  { title: "Nomor LHK", key: "nomor", width: "150px", fixed: true },
   { title: "Tanggal", key: "Tanggal", width: "110px" },
   { title: "Gudang", key: "Nama_Gudang", width: "120px" },
   { title: "Jenis", key: "Jenis", width: "90px" },
@@ -165,6 +161,42 @@ const detailHeaders = [
   { title: "J_Proof", key: "J_Proof", align: "end" as const },
   { title: "Keterangan", key: "Keterangan" },
 ];
+
+const formatNum = (v: number) =>
+  new Intl.NumberFormat("id-ID", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(v);
+
+const summaryColumns = [
+  "Panjang_Awal",
+  "Panjang_Terpakai",
+  "Sisa_Bahan",
+  "Total_J_Meter",
+];
+
+const summaryFormatters = {
+  nomor: () => "TOTAL :",
+  Panjang_Awal: (items: any[]) =>
+    formatNum(
+      items.reduce((sum, item) => sum + (Number(item.Panjang_Awal) || 0), 0),
+    ),
+  Panjang_Terpakai: (items: any[]) =>
+    formatNum(
+      items.reduce(
+        (sum, item) => sum + (Number(item.Panjang_Terpakai) || 0),
+        0,
+      ),
+    ),
+  Sisa_Bahan: (items: any[]) =>
+    formatNum(
+      items.reduce((sum, item) => sum + (Number(item.Sisa_Bahan) || 0), 0),
+    ),
+  Total_J_Meter: (items: any[]) =>
+    formatNum(
+      items.reduce((sum, item) => sum + (Number(item.Total_J_Meter) || 0), 0),
+    ),
+};
 
 // --- Computed ---
 const isSingleSelected = computed(() => selected.value.length === 1);

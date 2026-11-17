@@ -972,7 +972,34 @@ onUnmounted(() => {
   padding-bottom: 4px;
 }
 .desktop-table {
-  font-size: 12px;
+  font-size: 11px;
+}
+:deep(.desktop-table th),
+:deep(.desktop-table td) {
+  font-size: 11px !important;
+  white-space: nowrap;
+}
+:deep(.desktop-table thead tr) {
+  background-color: #f5f5f5 !important;
+}
+:deep(.desktop-table thead th) {
+  font-weight: 700 !important;
+  color: #333 !important;
+}
+:deep(.v-table th),
+:deep(.v-table td) {
+  font-size: 11px !important;
+}
+:deep(.v-table thead tr) {
+  background-color: #f5f5f5 !important;
+}
+:deep(.v-table thead th) {
+  font-weight: 700 !important;
+  color: #333 !important;
+}
+:deep(.v-chip) {
+  font-size: 10px !important;
+  height: 22px !important;
 }
 .cursor-pointer {
   cursor: pointer;

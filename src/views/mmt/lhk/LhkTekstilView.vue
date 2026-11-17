@@ -808,8 +808,20 @@ watch(filters, fetchMasterData, { deep: true });
 :deep(.detail-table),
 .detail-table {
   background-color: white !important;
-  font-size: 0.8rem !important;
+  font-size: 11px !important;
   width: auto !important;
+}
+:deep(.detail-table th),
+:deep(.detail-table td) {
+  font-size: 11px !important;
+  white-space: nowrap;
+}
+:deep(.detail-table thead tr) {
+  background-color: #f5f5f5 !important;
+}
+:deep(.detail-table thead th) {
+  font-weight: 700 !important;
+  color: #333 !important;
 }
 .text-red {
   color: #f44336 !important;

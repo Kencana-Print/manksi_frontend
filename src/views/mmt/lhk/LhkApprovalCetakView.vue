@@ -626,4 +626,16 @@ const handleExportExcel = async () => {
 .desktop-table {
     font-size: 11px;
 }
+:deep(.desktop-table th),
+:deep(.desktop-table td) {
+    font-size: 11px !important;
+    white-space: nowrap;
+}
+:deep(.desktop-table thead tr) {
+    background-color: #f5f5f5 !important;
+}
+:deep(.desktop-table thead th) {
+    font-weight: 700 !important;
+    color: #333 !important;
+}
 </style>

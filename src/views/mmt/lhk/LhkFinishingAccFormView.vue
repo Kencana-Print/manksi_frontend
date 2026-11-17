@@ -616,11 +616,11 @@ onMounted(() => {
 }
 
 :deep(thead th) {
-  background-color: #87cefa !important; /* Biru muda sesuai LHK Cetak */
+  background-color: #1976d2 !important; /* Biru MMT */
   color: white !important;
   font-weight: 600 !important;
   font-size: 11px !important;
-  height: 48px !important;
+  height: 32px !important;
 }
 
 :deep(tbody td) {
