@@ -6,11 +6,15 @@ import {
   IconUpload,
   IconTrash,
   IconEye,
+  IconEdit,
+  IconUsers,
 } from "@tabler/icons-vue";
 import { useMemoInternal } from "@/composables/useMemoInternal";
 import {
   memoInternalService,
   type MemoItem,
+  type MemoOpsi,
+  type MemoTarget,
 } from "@/services/tools/memoInternalService";
 import { formatTanggal } from "@/utils/dateFormat";
 // pdf.js hanya diunduh saat memo pertama dibuka (dialog ini global di Navbar)
@@ -19,7 +23,7 @@ const PdfViewer = defineAsyncComponent(
 );
 
 const toast = useToast();
-const { isOpen, closeMemoDialog, refreshUnread } = useMemoInternal();
+const { isOpen, closeMemoDialog, refreshUnread, versiMemo } = useMemoInternal();
 
 const MAKS_BYTE = 10 * 1024 * 1024;
 
@@ -27,6 +31,7 @@ const items = ref<MemoItem[]>([]);
 const bolehUpload = ref(false);
 const isLoading = ref(false);
 const bukaId = ref<number | null>(null);
+const bodyEl = ref<HTMLElement | null>(null);
 
 // Pesan error; respons blob (saat gagal mengambil PDF) dibaca sebagai JSON
 const errMsg = async (e: unknown, fallback: string): Promise<string> => {
@@ -50,12 +55,40 @@ const daftar = computed(() => [
   ...items.value.filter((m) => !isBaru(m)),
 ]);
 
+// ── Pilihan bagian/jabatan dari HRD (hanya untuk yang boleh mengelola) ──
+const opsi = ref<MemoOpsi>({ bagian: [], jabatan: [] });
+let opsiDimuat = false;
+
+const ensureOpsi = async () => {
+  if (opsiDimuat) return;
+  try {
+    const res = await memoInternalService.getOpsi();
+    opsi.value = res.data.data ?? { bagian: [], jabatan: [] };
+    opsiDimuat = true;
+  } catch (e) {
+    toast.error(await errMsg(e, "Gagal memuat daftar bagian/jabatan HRD."));
+  }
+};
+
+const namaJabatan = (kode: string) =>
+  opsi.value.jabatan.find((j) => j.kode === kode)?.nama ?? kode;
+
+const adaTarget = (m: MemoItem) =>
+  !!m.target && (m.target.bagian.length > 0 || m.target.jabatan.length > 0);
+
+const ringkasTarget = (m: MemoItem): string => {
+  const t = m.target;
+  if (!t) return "";
+  return [...t.bagian, ...t.jabatan.map(namaJabatan)].join(", ");
+};
+
 const fetchList = async () => {
   isLoading.value = true;
   try {
     const res = await memoInternalService.getList();
     items.value = res.data.data?.items ?? [];
     bolehUpload.value = !!res.data.data?.bolehUpload;
+    if (bolehUpload.value) void ensureOpsi();
   } catch (e) {
     toast.error(await errMsg(e, "Gagal memuat memo internal."));
   } finally {
@@ -105,10 +138,12 @@ const bukaPdf = async (m: MemoItem) => {
   }
 };
 
-// ── Unggah (hanya bila server mengizinkan) ──
+// ── Unggah / ubah target (hanya bila server mengizinkan) ──
 const showUpload = ref(false);
 const isUploading = ref(false);
 const fileInput = ref<HTMLInputElement | null>(null);
+// Terisi = form dipakai untuk mengubah target memo itu, bukan unggah baru
+const editTarget = ref<MemoItem | null>(null);
 
 const hariIni = () => {
   const d = new Date();
@@ -122,6 +157,9 @@ const form = ref({
   keterangan: "",
   notif: true,
   file: null as File | null,
+  batasi: false,
+  bagian: [] as string[],
+  jabatan: [] as string[],
 });
 
 const resetForm = () => {
@@ -132,8 +170,23 @@ const resetForm = () => {
     keterangan: "",
     notif: true,
     file: null,
+    batasi: false,
+    bagian: [],
+    jabatan: [],
   };
+  editTarget.value = null;
   if (fileInput.value) fileInput.value.value = "";
+};
+
+const batalForm = () => {
+  showUpload.value = false;
+  resetForm();
+};
+
+const bukaFormBaru = async () => {
+  resetForm();
+  await ensureOpsi();
+  showUpload.value = true;
 };
 
 const onPilihFile = (e: Event) => {
@@ -152,11 +205,33 @@ const onPilihFile = (e: Event) => {
   form.value.file = f;
 };
 
+const targetPayload = (): MemoTarget =>
+  form.value.batasi
+    ? { bagian: [...form.value.bagian], jabatan: [...form.value.jabatan] }
+    : { bagian: [], jabatan: [] };
+
+// Memilih "Batasi" tapi tidak mengisi apa pun akan menjadi memo untuk semua
+// (bukan yang dimaksud), jadi ditolak di sini.
+const targetValid = (): boolean => {
+  const f = form.value;
+  if (f.batasi && !f.bagian.length && !f.jabatan.length) {
+    toast.warning("Pilih minimal satu bagian atau jabatan, atau pilih Semua.");
+    return false;
+  }
+  return true;
+};
+
+// Memo terbatas yang diubah jadi "Semua" akan terbuka untuk seluruh user
+const akanDibukaUmum = computed(
+  () => !!editTarget.value && adaTarget(editTarget.value) && !form.value.batasi,
+);
+
 const unggah = async () => {
   const f = form.value;
   if (!f.judul.trim()) return toast.warning("Judul memo wajib diisi.");
   if (!f.tanggal) return toast.warning("Tanggal memo wajib diisi.");
   if (!f.file) return toast.warning("Pilih file PDF terlebih dahulu.");
+  if (!targetValid()) return;
   isUploading.value = true;
   try {
     await memoInternalService.upload({
@@ -165,11 +240,12 @@ const unggah = async () => {
       tanggal: f.tanggal,
       keterangan: f.keterangan.trim(),
       notif: f.notif,
+      target: targetPayload(),
       file: f.file,
     });
     toast.success(
       f.notif
-        ? "Memo diunggah dan notifikasi dikirim ke semua user."
+        ? "Memo diunggah dan notifikasi dikirim ke user yang berhak."
         : "Memo diunggah tanpa notifikasi.",
     );
     resetForm();
@@ -178,6 +254,36 @@ const unggah = async () => {
     await refreshUnread();
   } catch (e) {
     toast.error(await errMsg(e, "Gagal mengunggah memo."));
+  } finally {
+    isUploading.value = false;
+  }
+};
+
+const mulaiUbahTarget = async (m: MemoItem) => {
+  await ensureOpsi();
+  resetForm();
+  const t = m.target;
+  form.value.batasi = adaTarget(m);
+  form.value.bagian = [...(t?.bagian ?? [])];
+  form.value.jabatan = [...(t?.jabatan ?? [])];
+  editTarget.value = m;
+  showUpload.value = true;
+  bodyEl.value?.scrollTo({ top: 0, behavior: "smooth" });
+};
+
+const simpanUbahTarget = async () => {
+  const m = editTarget.value;
+  if (!m || !targetValid()) return;
+  isUploading.value = true;
+  try {
+    await memoInternalService.ubahTarget(m.id, targetPayload());
+    toast.success("Target memo diperbarui.");
+    resetForm();
+    showUpload.value = false;
+    await fetchList();
+    await refreshUnread();
+  } catch (e) {
+    toast.error(await errMsg(e, "Gagal mengubah target memo."));
   } finally {
     isUploading.value = false;
   }
@@ -209,8 +315,14 @@ watch(isOpen, (val) => {
   if (val) {
     resetForm();
     showUpload.value = false;
+    opsiDimuat = false;
     void fetchList();
   }
+});
+
+// Ada memo baru / dihapus / diubah targetnya saat dialog terbuka
+watch(versiMemo, () => {
+  if (isOpen.value && !aktif.value) void fetchList();
 });
 </script>
 
@@ -235,14 +347,14 @@ watch(isOpen, (val) => {
       <div v-if="aktif" class="mid-body mid-body-viewer">
         <PdfViewer :data="pdfData" @error="onPdfError" />
       </div>
-      <div v-else class="mid-body">
+      <div v-else ref="bodyEl" class="mid-body">
         <!-- Unggah -->
         <div v-if="bolehUpload" class="mid-upload">
           <button
             v-if="!showUpload"
             type="button"
             class="mid-btn-primary"
-            @click="showUpload = true"
+            @click="bukaFormBaru"
           >
             <IconUpload
               :size="13"
@@ -253,63 +365,136 @@ watch(isOpen, (val) => {
           </button>
 
           <div v-else class="mid-form">
-            <div class="mid-form-title">Unggah Memo Baru</div>
-            <div class="mid-row">
-              <label class="mid-lbl">Judul *</label>
-              <input
-                v-model="form.judul"
-                class="mid-inp"
-                maxlength="200"
-                :disabled="isUploading"
-              />
+            <div class="mid-form-title">
+              {{ editTarget ? "Ubah Target Memo" : "Unggah Memo Baru" }}
             </div>
-            <div class="mid-row">
-              <label class="mid-lbl">No. Memo</label>
-              <input
-                v-model="form.nomor"
-                class="mid-inp"
-                style="max-width: 200px"
-                maxlength="50"
-                :disabled="isUploading"
-              />
-              <label class="mid-lbl" style="width: 60px; margin-left: 8px"
-                >Tanggal *</label
-              >
-              <input
-                v-model="form.tanggal"
-                type="date"
-                class="mid-inp"
-                style="max-width: 150px"
-                :disabled="isUploading"
-              />
+            <div v-if="editTarget" class="mid-item-judul">
+              {{ editTarget.judul }}
             </div>
-            <div class="mid-row">
-              <label class="mid-lbl">Keterangan</label>
-              <input
-                v-model="form.keterangan"
-                class="mid-inp"
-                maxlength="255"
-                :disabled="isUploading"
-              />
+
+            <template v-if="!editTarget">
+              <div class="mid-row">
+                <label class="mid-lbl">Judul *</label>
+                <input
+                  v-model="form.judul"
+                  class="mid-inp"
+                  maxlength="200"
+                  :disabled="isUploading"
+                />
+              </div>
+              <div class="mid-row">
+                <label class="mid-lbl">No. Memo</label>
+                <input
+                  v-model="form.nomor"
+                  class="mid-inp"
+                  style="max-width: 200px"
+                  maxlength="50"
+                  :disabled="isUploading"
+                />
+                <label class="mid-lbl" style="width: 60px; margin-left: 8px"
+                  >Tanggal *</label
+                >
+                <input
+                  v-model="form.tanggal"
+                  type="date"
+                  class="mid-inp"
+                  style="max-width: 150px"
+                  :disabled="isUploading"
+                />
+              </div>
+              <div class="mid-row">
+                <label class="mid-lbl">Keterangan</label>
+                <input
+                  v-model="form.keterangan"
+                  class="mid-inp"
+                  maxlength="255"
+                  :disabled="isUploading"
+                />
+              </div>
+              <div class="mid-row">
+                <label class="mid-lbl">File PDF *</label>
+                <input
+                  ref="fileInput"
+                  type="file"
+                  accept="application/pdf,.pdf"
+                  :disabled="isUploading"
+                  @change="onPilihFile"
+                />
+                <span class="mid-hint">maks. 10 MB</span>
+              </div>
+            </template>
+
+            <!-- Siapa yang boleh membaca -->
+            <div class="mid-target">
+              <div class="mid-lbl" style="width: auto">Boleh dibaca oleh</div>
+              <label class="mid-radio">
+                <input
+                  v-model="form.batasi"
+                  type="radio"
+                  :value="false"
+                  :disabled="isUploading"
+                />
+                Semua user
+              </label>
+              <label class="mid-radio">
+                <input
+                  v-model="form.batasi"
+                  type="radio"
+                  :value="true"
+                  :disabled="isUploading"
+                />
+                Batasi ke bagian / jabatan tertentu (data HRD)
+              </label>
+              <template v-if="form.batasi">
+                <v-autocomplete
+                  v-model="form.bagian"
+                  :items="opsi.bagian"
+                  label="Bagian"
+                  multiple
+                  chips
+                  closable-chips
+                  clearable
+                  density="compact"
+                  variant="outlined"
+                  hide-details
+                  :disabled="isUploading"
+                  :menu-props="{ contentClass: 'mid-menu' }"
+                />
+                <v-autocomplete
+                  v-model="form.jabatan"
+                  :items="opsi.jabatan"
+                  item-title="nama"
+                  item-value="kode"
+                  label="Jabatan"
+                  multiple
+                  chips
+                  closable-chips
+                  clearable
+                  density="compact"
+                  variant="outlined"
+                  hide-details
+                  :disabled="isUploading"
+                  :menu-props="{ contentClass: 'mid-menu' }"
+                />
+                <div class="mid-hint">
+                  Terlihat oleh user yang bagiannya ATAU jabatannya terpilih.
+                  Audit, Direksi, dan EDP selalu bisa melihat semua memo. Akun
+                  tanpa data HRD tidak bisa membaca memo terbatas.
+                </div>
+              </template>
+              <div v-if="akanDibukaUmum" class="mid-warn">
+                Memo ini sekarang terbatas. Menyimpan dengan pilihan "Semua
+                user" akan membukanya untuk seluruh user.
+              </div>
             </div>
-            <div class="mid-row">
-              <label class="mid-lbl">File PDF *</label>
-              <input
-                ref="fileInput"
-                type="file"
-                accept="application/pdf,.pdf"
-                :disabled="isUploading"
-                @change="onPilihFile"
-              />
-              <span class="mid-hint">maks. 10 MB</span>
-            </div>
-            <label class="mid-check">
+
+            <label v-if="!editTarget" class="mid-check">
               <input
                 v-model="form.notif"
                 type="checkbox"
                 :disabled="isUploading"
               />
-              Kirim notifikasi ke semua user
+              Kirim notifikasi ke user yang berhak
               <span class="mid-hint"
                 >(matikan untuk mengunggah arsip lama)</span
               >
@@ -319,10 +504,7 @@ watch(isOpen, (val) => {
                 type="button"
                 class="mid-btn-cancel"
                 :disabled="isUploading"
-                @click="
-                  showUpload = false;
-                  resetForm();
-                "
+                @click="batalForm"
               >
                 Batal
               </button>
@@ -330,10 +512,16 @@ watch(isOpen, (val) => {
                 type="button"
                 class="mid-btn-primary"
                 :disabled="isUploading"
-                @click="unggah"
+                @click="editTarget ? simpanUbahTarget() : unggah()"
               >
                 <span v-if="isUploading" class="mid-spinner" />
-                {{ isUploading ? "Mengunggah..." : "Unggah" }}
+                {{
+                  isUploading
+                    ? "Menyimpan..."
+                    : editTarget
+                      ? "Simpan Target"
+                      : "Unggah"
+                }}
               </button>
             </div>
           </div>
@@ -364,6 +552,10 @@ watch(isOpen, (val) => {
               <div v-if="m.keterangan" class="mid-item-ket">
                 {{ m.keterangan }}
               </div>
+              <div v-if="adaTarget(m)" class="mid-item-target">
+                <IconUsers :size="12" :stroke-width="2" />
+                Khusus: {{ ringkasTarget(m) }}
+              </div>
             </div>
             <div class="mid-item-act">
               <button
@@ -378,6 +570,15 @@ watch(isOpen, (val) => {
                   style="margin-right: 4px"
                 />
                 {{ bukaId === m.id ? "Memuat..." : "Lihat" }}
+              </button>
+              <button
+                v-if="bolehUpload"
+                type="button"
+                class="mid-btn-edit"
+                title="Ubah target pembaca"
+                @click="mulaiUbahTarget(m)"
+              >
+                <IconEdit :size="14" :stroke-width="1.8" />
               </button>
               <button
                 v-if="bolehUpload"
@@ -711,6 +912,52 @@ watch(isOpen, (val) => {
 .mid-btn-del:hover {
   background: #ffcdd2;
 }
+.mid-btn-edit {
+  width: 30px;
+  height: 30px;
+  border: 1.5px solid #bbdefb;
+  border-radius: 8px;
+  background: #e3f2fd;
+  color: #1565c0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.mid-btn-edit:hover {
+  background: #bbdefb;
+}
+
+/* ── Target pembaca ── */
+.mid-target {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.mid-radio {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  color: #424242;
+}
+.mid-warn {
+  color: #e65100;
+  font-weight: 600;
+}
+.mid-item-target {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 3px;
+  color: #1565c0;
+  font-weight: 600;
+}
+.mid-target :deep(.v-field__input),
+.mid-target :deep(.v-label),
+.mid-target :deep(.v-chip) {
+  font-size: 11px;
+}
 .mid-spinner {
   width: 12px;
   height: 12px;
@@ -724,5 +971,11 @@ watch(isOpen, (val) => {
   to {
     transform: rotate(360deg);
   }
+}
+</style>
+
+<style>
+.mid-menu .v-list-item-title {
+  font-size: 11px;
 }
 </style>

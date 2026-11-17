@@ -3,6 +3,16 @@ import type { ApiResult } from "@/services/piutang/rekapPembayaranService";
 
 const BASE = "/tools/memo-internal";
 
+export interface MemoTarget {
+  bagian: string[];
+  jabatan: string[];
+}
+
+export interface MemoOpsi {
+  bagian: string[];
+  jabatan: { kode: string; nama: string }[];
+}
+
 export interface MemoItem {
   id: number;
   nomor: string;
@@ -16,6 +26,8 @@ export interface MemoItem {
   userNama: string;
   dateCreate: string;
   sudahBaca: boolean;
+  // Hanya terisi untuk bagian yang boleh mengelola memo (null untuk user biasa)
+  target: MemoTarget | null;
 }
 
 export interface MemoListData {
@@ -34,6 +46,7 @@ export interface MemoUploadInput {
   judul: string;
   keterangan: string;
   notif: boolean;
+  target: MemoTarget;
   file: File;
 }
 
@@ -42,6 +55,8 @@ export const memoInternalService = {
 
   getUnread: () => api.get<ApiResult<MemoUnreadData>>(`${BASE}/unread`),
 
+  getOpsi: () => api.get<ApiResult<MemoOpsi>>(`${BASE}/opsi`),
+
   upload: (input: MemoUploadInput) => {
     const fd = new FormData();
     fd.append("nomor", input.nomor);
@@ -49,11 +64,15 @@ export const memoInternalService = {
     fd.append("judul", input.judul);
     fd.append("keterangan", input.keterangan);
     fd.append("notif", input.notif ? "1" : "0");
+    fd.append("target", JSON.stringify(input.target));
     fd.append("file", input.file);
     return api.post<ApiResult<{ id: number }>>(BASE, fd, {
       headers: { "Content-Type": "multipart/form-data" },
     });
   },
+
+  ubahTarget: (id: number, target: MemoTarget) =>
+    api.put<ApiResult<{ id: number }>>(`${BASE}/${id}/target`, target),
 
   hapus: (id: number) => api.delete<ApiResult<null>>(`${BASE}/${id}`),
 

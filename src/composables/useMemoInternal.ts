@@ -3,21 +3,25 @@ import { useToast } from "vue-toastification";
 import type { Socket } from "socket.io-client";
 import { useAuthStore } from "@/stores/authStore";
 import { getAppSocket } from "@/composables/useAppSocket";
-import { memoInternalService } from "@/services/tools/memoInternalService";
+import {
+  memoInternalService,
+  type MemoUnreadData,
+} from "@/services/tools/memoInternalService";
 
 const SESSION_KEY = "hasSeenMemoInternal";
 
 interface MemoBerubah {
-  aksi: "baru" | "hapus";
+  aksi: "baru" | "hapus" | "ubah";
   id: number;
-  judul?: string;
-  tanggal?: string;
   userKode?: string;
   userNama?: string;
 }
 
 const isOpen = ref(false);
 const unreadJumlah = ref(0);
+const unreadTerbaru = ref<MemoUnreadData["terbaru"]>([]);
+// Naik setiap ada siaran memo; dialog yang sedang terbuka memuat ulang daftarnya
+const versiMemo = ref(0);
 let started = false;
 let boundSocket: Socket | null = null;
 
@@ -25,6 +29,7 @@ const refreshUnread = async (): Promise<number> => {
   try {
     const res = await memoInternalService.getUnread();
     unreadJumlah.value = res.data.data?.jumlah ?? 0;
+    unreadTerbaru.value = res.data.data?.terbaru ?? [];
   } catch {
     // hitungan badge tidak kritis; gagal diam saja
   }
@@ -57,24 +62,29 @@ export function useMemoInternal() {
     const s = getAppSocket();
     if (boundSocket !== s) {
       boundSocket = s;
-      s.on("memo:berubah", (p: MemoBerubah) => {
-        void refreshUnread();
+      s.on("memo:berubah", async (p: MemoBerubah) => {
+        await refreshUnread();
+        versiMemo.value++;
         // Pengunggah tidak perlu diberi tahu memonya sendiri
-        if (p.aksi === "baru" && p.userKode !== authStore.user?.kode) {
-          toast.info(
-            `Memo Internal baru: ${p.judul ?? ""}${p.userNama ? ` (oleh ${p.userNama})` : ""}. Klik untuk membuka.`,
-            {
-              timeout: false,
-              onClick: () => {
-                isOpen.value = true;
-              },
+        if (p.aksi !== "baru" || p.userKode === authStore.user?.kode) return;
+        // Siaran sampai ke semua klien; hanya memo yang muncul di daftar belum
+        // dibaca milik user ini (sudah difilter server) yang boleh ditampilkan.
+        const memo = unreadTerbaru.value.find((m) => m.id === p.id);
+        if (!memo) return;
+        toast.info(
+          `Memo Internal baru: ${memo.judul}${p.userNama ? ` (oleh ${p.userNama})` : ""}. Klik untuk membuka.`,
+          {
+            timeout: false,
+            onClick: () => {
+              isOpen.value = true;
             },
-          );
-        }
+          },
+        );
       });
       // Setelah koneksi pulih, sinkronkan hitungan (ada yang terlewat saat putus)
       s.on("connect", () => {
         void refreshUnread();
+        versiMemo.value++;
       });
     }
   };
@@ -85,11 +95,13 @@ export function useMemoInternal() {
     boundSocket = null;
     isOpen.value = false;
     unreadJumlah.value = 0;
+    unreadTerbaru.value = [];
   };
 
   return {
     isOpen,
     unreadJumlah,
+    versiMemo,
     openMemoDialog,
     closeMemoDialog,
     refreshUnread,
