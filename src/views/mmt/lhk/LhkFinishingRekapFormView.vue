@@ -613,4 +613,28 @@ onMounted(() => {
 .custom-input-end :deep(input) {
   text-align: right;
 }
+
+/* Standarisasi tabel detail compact 11px */
+:deep(.v-data-table th),
+:deep(.v-data-table td) {
+  font-size: 11px !important;
+  white-space: nowrap;
+}
+:deep(.v-data-table thead tr) {
+  background-color: #f5f5f5 !important;
+}
+:deep(.v-data-table thead th) {
+  font-weight: 700 !important;
+  color: #333 !important;
+}
+:deep(.v-chip) {
+  font-size: 10px !important;
+  height: 22px !important;
+}
+:deep(.v-field__input) {
+  font-size: 11px !important;
+  min-height: 28px !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
 </style>

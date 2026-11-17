@@ -364,12 +364,19 @@ const resetColOrder = () => {
 
 // ── Headers ────────────────────────────────────────────────────────────
 const finalHeaders = computed(() => {
+  const hasFixedCol = orderedHeaders.value.some((h: any) => h.fixed);
   if (!effectiveShowExpand.value) return orderedHeaders.value;
   if (orderedHeaders.value.some((h: any) => h.key === "data-table-expand")) {
     return orderedHeaders.value;
   }
   return [
-    { title: "", key: "data-table-expand", width: "48px", sortable: false },
+    {
+      title: "",
+      key: "data-table-expand",
+      width: "48px",
+      sortable: false,
+      fixed: hasFixedCol,
+    },
     ...orderedHeaders.value,
   ];
 });
@@ -558,19 +565,58 @@ const onResizeStart = (key: string, e: MouseEvent) => {
   window.addEventListener("mouseup", onUp);
 };
 
-// Hitung style width kolom: override > prop > auto
-const colStyle = (col: any) => {
-  const key = col.key;
-  if (colWidths.value[key]) {
-    return {
-      width: `${colWidths.value[key]}px`,
-      minWidth: `${colWidths.value[key]}px`,
-    };
+const isColFixed = (col: any) => {
+  if (col?.fixed) return true;
+  if (!col?.key) return false;
+  const found = finalHeaders.value.find((h: any) => h.key === col.key);
+  return Boolean(found?.fixed);
+};
+
+const fixedLeftOffsets = computed(() => {
+  const map: Record<string, number> = {};
+  let currentLeft = 0;
+  if (props.selectStrategy !== "single") {
+    currentLeft += 48;
   }
-  if (col.width)
-    return { width: col.width, minWidth: col.minWidth ?? col.width };
-  if (col.minWidth) return { minWidth: col.minWidth };
-  return {};
+  for (const col of finalHeaders.value) {
+    if (isColFixed(col)) {
+      map[col.key] = currentLeft;
+      const key = col.key;
+      let w = 100;
+      if (key && colWidths.value[key]) {
+        w = Number(colWidths.value[key]);
+      } else if (col.width) {
+        w = parseInt(String(col.width), 10) || 100;
+      } else if (col.minWidth) {
+        w = parseInt(String(col.minWidth), 10) || 100;
+      }
+      currentLeft += w;
+    }
+  }
+  return map;
+});
+
+// Hitung style width dan sticky kolom: override > prop > auto
+const colStyle = (col: any) => {
+  const key = col?.key;
+  const style: Record<string, string> = {};
+
+  if (key && colWidths.value[key]) {
+    style.width = `${colWidths.value[key]}px`;
+    style.minWidth = `${colWidths.value[key]}px`;
+  } else if (col?.width) {
+    style.width = String(col.width);
+    style.minWidth = String(col.minWidth ?? col.width);
+  } else if (col?.minWidth) {
+    style.minWidth = String(col.minWidth);
+  }
+
+  if (isColFixed(col) && key && fixedLeftOffsets.value[key] !== undefined) {
+    style.position = "sticky";
+    style.left = `${fixedLeftOffsets.value[key]}px`;
+  }
+
+  return style;
 };
 
 const filteredItems = computed(() => {
@@ -602,12 +648,14 @@ const filteredItems = computed(() => {
 const tableWrapRef = ref<HTMLElement | null>(null);
 const summaryBarRef = ref<HTMLElement | null>(null);
 
-const onTableScroll = () => {
+const onTableScroll = (e?: Event) => {
   if (!tableWrapRef.value || !summaryBarRef.value) return;
   // Cari elemen scroll aktual dari Vuetify (.v-table__wrapper)
-  const scroller = tableWrapRef.value.querySelector(
-    ".v-table__wrapper",
-  ) as HTMLElement | null;
+  const scroller =
+    ((e?.target as HTMLElement)?.classList?.contains("v-table__wrapper")
+      ? (e.target as HTMLElement)
+      : null) ||
+    (tableWrapRef.value.querySelector(".v-table__wrapper") as HTMLElement | null);
   if (!scroller) return;
   summaryBarRef.value.scrollLeft = scroller.scrollLeft;
 };
@@ -1178,7 +1226,7 @@ watch(
           class="table-wrap"
           ref="tableWrapRef"
           @click="onTableWrapClick"
-          @scroll.passive="onTableScroll"
+          @scroll.capture.passive="onTableScroll"
         >
           <v-data-table
             v-model="internalSelected"
@@ -1215,6 +1263,7 @@ watch(
                     :style="colStyle(col)"
                     :class="[
                       'base-th',
+                      isColFixed(col) ? 'base-th-fixed' : '',
                       col.align ? `text-${col.align}` : '',
                       dragOverKey === col.key && dragSrcKey !== col.key
                         ? 'col-drag-over'
@@ -1381,20 +1430,22 @@ watch(
             >
               <tr class="summary-inline-row">
                 <td
-                  v-if="showExpand"
+                  v-if="selectStrategy !== 'single'"
                   class="summary-td-inline"
                   style="width: 48px; min-width: 48px"
                 />
                 <td
-                  v-for="col in orderedHeaders"
+                  v-for="col in finalHeaders"
                   :key="'sum-' + col.key"
                   :style="colStyle(col)"
                   :class="[
                     'summary-td-inline',
                     col.align ? `text-${col.align}` : '',
+                    isColFixed(col) ? 'summary-td-fixed' : '',
                   ]"
                 >
-                  <template v-if="summaryFormatters?.[col.key]">
+                  <template v-if="col.key === 'data-table-expand'"></template>
+                  <template v-else-if="summaryFormatters?.[col.key]">
                     {{ summaryFormatters[col.key](filteredItems) }}
                   </template>
                   <template v-else-if="summaryColumns.includes(col.key)">
@@ -1721,7 +1772,7 @@ watch(
   flex-direction: column;
   border: 1px solid #e0e0e0;
   border-radius: 6px;
-  overflow: auto;
+  overflow: hidden;
   flex: 1; /* isi sisa ruang vertikal */
   min-height: 0; /* wajib agar flex child bisa scroll */
 }
@@ -1730,18 +1781,23 @@ watch(
 .table-wrap {
   flex: 1;
   min-height: 0;
-  overflow: auto; /* scroll vertikal DAN horizontal ada di sini */
+  height: 100%;
+  overflow: hidden;
+  position: relative;
 }
 
 .base-table :deep(.v-table__wrapper) {
-  overflow: auto;
-  flex: 1;
+  overflow: auto !important;
+  flex: 1 1 auto;
+  height: 100%;
   min-height: 0;
 }
 
 .base-table {
   font-size: 12px;
-  height: 100%; /* isi penuh table-wrap */
+  height: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
 }
 .base-table :deep(thead th) {
   background-color: #1565c0 !important;
@@ -1754,6 +1810,9 @@ watch(
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 5 !important;
 }
 .base-table :deep(tbody td) {
   font-size: 12px;
@@ -1778,6 +1837,29 @@ watch(
 }
 .base-table :deep(tbody tr.row-selected:hover) {
   background-color: rgba(var(--v-theme-primary), 0.22) !important;
+}
+
+.base-table :deep(tbody td.v-data-table-column--fixed),
+.base-table :deep(tbody td.v-data-table__td--fixed) {
+  position: sticky !important;
+  background-color: #ffffff !important;
+  z-index: 2 !important;
+  box-shadow: 2px 0 4px rgba(0, 0, 0, 0.06);
+}
+
+.base-table :deep(tbody tr:nth-of-type(odd) td.v-data-table-column--fixed),
+.base-table :deep(tbody tr:nth-of-type(odd) td.v-data-table__td--fixed) {
+  background-color: #fbfcfe !important;
+}
+
+.base-table :deep(tbody tr:hover td.v-data-table-column--fixed),
+.base-table :deep(tbody tr:hover td.v-data-table__td--fixed) {
+  background-color: #eff6ff !important;
+}
+
+.base-table :deep(tbody tr.row-selected td.v-data-table-column--fixed),
+.base-table :deep(tbody tr.row-selected td.v-data-table__td--fixed) {
+  background-color: #e0f2fe !important;
 }
 
 /* ── Empty state ── */
@@ -1906,6 +1988,14 @@ watch(
   padding: 0 8px !important;
 }
 
+.summary-td-fixed {
+  position: sticky !important;
+  bottom: 0 !important;
+  z-index: 10 !important;
+  background-color: #1565c0 !important;
+  box-shadow: 2px 0 4px rgba(0, 0, 0, 0.08);
+}
+
 /* ── Pagination bar ── */
 .pagination-bar {
   display: flex;
@@ -2027,8 +2117,18 @@ watch(
   white-space: nowrap;
   padding: 0 8px !important;
   user-select: none;
-  position: relative; /* penting untuk resize handle */
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 5 !important;
   overflow: visible !important;
+}
+
+.base-th-fixed {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 10 !important;
+  background-color: #1565c0 !important;
+  box-shadow: 2px 0 4px rgba(0, 0, 0, 0.08);
 }
 
 .th-inner {

@@ -562,7 +562,7 @@ const {
   initialData,
   fetchApi,
   submitApi,
-  successRouteName: "LhkSublim",
+  successRouteName: "LhkSublimBrowse",
 });
 
 const formTitle = computed(() =>

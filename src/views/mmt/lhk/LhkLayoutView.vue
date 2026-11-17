@@ -1,143 +1,117 @@
 <template>
-  <PageLayout title="LHK Layout MMT" icon="mdi-shape-outline">
-    <template #header-actions>
-      <v-btn size="x-small" color="success" @click="handleNewEdit('new')">
-        <v-icon start>mdi-plus</v-icon> Baru
-      </v-btn>
-      <v-btn
-        size="x-small"
-        color="warning"
-        :disabled="!isSingleSelected"
-        @click="handleEditClick"
-      >
-        <v-icon start>mdi-pencil</v-icon> Ubah
-      </v-btn>
-      <v-btn
-        size="x-small"
-        color="error"
-        :disabled="!isSingleSelected"
-        @click="handleDelete"
-      >
-        <v-icon start>mdi-trash-can</v-icon> Hapus
-      </v-btn>
+  <BaseBrowse
+    title="LHK Layout MMT"
+    menu-id="5515"
+    icon="mdi-shape-outline"
+    :headers="masterHeaders"
+    :items="masterData"
+    :can-insert="true"
+    :can-edit="true"
+    :can-delete="true"
+    :is-loading="loading.headers"
+    :loading="loading.headers"
+    v-model:selected="selected"
+    v-model:expanded="expanded"
+    v-model:startDate="filters.startDate"
+    v-model:endDate="filters.endDate"
+    item-value="Nomor"
+    show-expand
+    :summary-columns="summaryColumns"
+    :summary-formatters="summaryFormatters"
+    @refresh="fetchMasterData"
+    @add="handleNewEdit('new')"
+    @edit="handleEditClick"
+    @delete="handleDelete"
+    @row-click="handleRowClick"
+  >
+    <!-- Filter Tambahan di Toolbar -->
+    <template #filter-fields>
+      <v-text-field
+        v-model="filters.search"
+        prepend-inner-icon="mdi-magnify"
+        placeholder="Cari Nomor LHK / SPK..."
+        density="compact"
+        hide-details
+        variant="outlined"
+        clearable
+        style="width: 220px"
+        @keyup.enter="fetchMasterData"
+      />
+    </template>
 
-      <v-divider vertical class="mx-2" />
-
+    <!-- Tombol Ekstra (Export Excel) -->
+    <template #extra-actions>
       <v-btn
         size="x-small"
-        color="info"
+        color="success"
         :disabled="masterData.length === 0"
         @click="exportToExcel"
+        :loading="loading.headers"
       >
-        <v-icon start>mdi-download</v-icon> Export Detail
+        <v-icon start size="14">mdi-file-excel</v-icon> Export Detail
       </v-btn>
     </template>
 
-    <div class="browse-content">
-      <v-card flat class="mb-4">
-        <v-card-text>
-          <div class="filter-section d-flex align-center flex-wrap ga-4">
-            <DateRangeFilter
-              v-model:start-date="filters.startDate"
-              v-model:end-date="filters.endDate"
-            />
+    <!-- Custom Template Kolom Tabel Utama -->
+    <template #item.Tanggal="{ item }">
+      {{ safeFormatDate(item.Tanggal) }}
+    </template>
 
-            <v-text-field
-              v-model="filters.search"
-              prepend-inner-icon="mdi-magnify"
-              label="Cari Nomor LHK / SPK"
-              density="compact"
-              hide-details
-              variant="outlined"
-              clearable
-              style="max-width: 300px"
-              @keyup.enter="fetchMasterData"
-            />
+    <template #item.TotalPola="{ item }">
+      <span class="font-weight-bold">
+        {{ num(item.TotalPola ?? item.TotalLayout) }} pcs
+      </span>
+    </template>
 
-            <v-btn variant="text" size="x-small" @click="fetchMasterData">
-              <v-icon>mdi-refresh</v-icon> Refresh
-            </v-btn>
+    <!-- Slot Detail Expansion Row -->
+    <template #expanded-content="{ item }">
+      <div class="detail-container">
+        <div class="detail-table-wrapper">
+          <div
+            v-if="isLoadingDetails(item.Nomor)"
+            class="text-center pa-4"
+          >
+            <v-progress-circular indeterminate size="20" color="primary" />
+            <span class="ml-2 text-caption">Memuat data...</span>
           </div>
-        </v-card-text>
-      </v-card>
 
-      <div class="table-container">
-        <v-data-table
-          v-model:selected="selected"
-          :headers="masterHeaders"
-          :items="masterData || []"
-          :loading="loading.headers"
-          item-value="Nomor"
-          density="compact"
-          class="desktop-table elevation-1"
-          fixed-header
-          return-object
-          show-expand
-          @click:row="handleRowClick"
-          @update:expanded="loadDetails"
-          :row-props="getRowProps"
-        >
-          <template #item.Tanggal="{ item }">
-            {{ safeFormatDate(item.Tanggal) }}
-          </template>
+          <v-data-table
+            v-else-if="details[item.Nomor] && details[item.Nomor].length"
+            :headers="detailHeaders"
+            :items="details[item.Nomor]"
+            density="compact"
+            hide-default-footer
+            class="detail-table border"
+            :items-per-page="-1"
+          >
+            <template #item.panjang="{ value }">
+              {{ num(value).toFixed(2) }} m
+            </template>
+            <template #item.lebar="{ value }">
+              {{ num(value).toFixed(2) }} m
+            </template>
+            <template #item.jml_pola="{ item }">
+              <strong class="total-bold">
+                {{ num(item.jml_pola ?? item.jml_layout) }}
+              </strong>
+            </template>
+          </v-data-table>
 
-          <template #item.Nomor="{ item }">
-            <span>{{ item.Nomor }}</span>
-          </template>
-
-          <template #item.TotalLayout="{ item }">
-            <span>{{ num(item.TotalLayout) }} pcs</span>
-          </template>
-
-          <template #expanded-row="{ columns, item }">
-            <tr>
-              <td :colspan="columns.length" class="pa-0">
-                <div class="detail-container">
-                  <div class="detail-table-wrapper">
-                    <div
-                      v-if="isLoadingDetails(item.Nomor)"
-                      class="text-center pa-4"
-                    >
-                      <v-progress-circular indeterminate size="20" />
-                      <span class="ml-2 text-caption">Memuat data...</span>
-                    </div>
-
-                    <v-data-table
-                      v-else-if="
-                        details[item.Nomor] && details[item.Nomor].length
-                      "
-                      :headers="detailHeaders"
-                      :items="details[item.Nomor]"
-                      density="compact"
-                      hide-default-footer
-                      class="detail-table border"
-                    >
-                      <template #item.jml_layout="{ value }">
-                        <strong class="total-bold">{{ value }}</strong>
-                      </template>
-                    </v-data-table>
-
-                    <div v-else class="text-center pa-4 text-caption">
-                      Data detail tidak ditemukan atau gagal dimuat.
-                    </div>
-                  </div>
-                </div>
-              </td>
-            </tr>
-          </template>
-        </v-data-table>
+          <div v-else class="text-center pa-4 text-caption text-grey">
+            Data detail tidak ditemukan atau gagal dimuat.
+          </div>
+        </div>
       </div>
-    </div>
-  </PageLayout>
+    </template>
+  </BaseBrowse>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed, nextTick, watch } from "vue";
+import { ref, reactive, onMounted, computed, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
 import { format, subDays, parseISO, isValid } from "date-fns";
-import PageLayout from "@/components/PageLayout.vue";
-import DateRangeFilter from "@/components/DateRangeFilter.vue";
+import BaseBrowse from "@/components/BaseBrowse.vue";
 import api from "@/services/api";
 import * as XLSX from "xlsx";
 
@@ -149,6 +123,7 @@ interface LhkLayoutHeader {
   NomorSPK?: string;
   NamaOrder?: string;
   TotalPola?: number;
+  TotalLayout?: number;
   Keterangan?: string;
 }
 
@@ -159,6 +134,7 @@ interface LhkLayoutDetail {
   panjang?: number;
   lebar?: number;
   jml_pola?: number;
+  jml_layout?: number;
   keterangan?: string;
 }
 
@@ -168,9 +144,10 @@ const toast = useToast();
 
 const masterData = ref<LhkLayoutHeader[]>([]);
 const details = ref<Record<string, LhkLayoutDetail[]>>({});
-const loading = ref({ headers: true, details: false });
+const loading = ref({ headers: false, details: false });
 const loadingDetails = ref<Set<string>>(new Set());
 const selected = ref<LhkLayoutHeader[]>([]);
+const expanded = ref<any[]>([]);
 
 const filters = reactive({
   startDate: format(subDays(new Date(), 30), "yyyy-MM-dd"),
@@ -182,7 +159,6 @@ const isSingleSelected = computed(() => selected.value.length === 1);
 const selectedRow = computed(() =>
   isSingleSelected.value ? selected.value[0] : null,
 );
-const selectedNomor = computed(() => selected.value[0]?.Nomor || null);
 
 const num = (val: any) => {
   const parsed = Number(val);
@@ -191,10 +167,10 @@ const num = (val: any) => {
 
 const handleNewEdit = (mode: "new" | "edit") => {
   if (mode === "new") {
-    router.push({ name: 'LhkLayoutCreate' });
+    router.push({ name: "LhkLayoutCreate" });
   } else if (mode === "edit" && selectedRow.value) {
     router.push({
-      name: 'LhkLayoutEdit',
+      name: "LhkLayoutEdit",
       params: { nomor: selectedRow.value.Nomor },
     });
   }
@@ -202,55 +178,76 @@ const handleNewEdit = (mode: "new" | "edit") => {
 
 const handleEditClick = () => handleNewEdit("edit");
 
-const handleRowClick = (event: any, { item }: { item: LhkLayoutHeader }) => {
-  selected.value = selected.value.some((s) => s.Nomor === item.Nomor)
-    ? []
-    : [item];
+const handleRowClick = (_event: any, row: any) => {
+  const item = row.item || row;
+  selected.value = [item];
 };
-
-const getRowProps = ({ item }: any) => ({
-  class: item?.Nomor === selectedNomor.value ? "row-selected" : "",
-});
 
 const safeFormatDate = (dateString: string | undefined): string => {
   if (!dateString) return "";
   const parsed = parseISO(dateString);
-  return isValid(parsed) ? format(parsed, "dd/MM/yyyy") : "";
+  return isValid(parsed) ? format(parsed, "dd/MM/yyyy") : dateString;
 };
 
 const isLoadingDetails = (nomor: string) => loadingDetails.value.has(nomor);
 
 const masterHeaders = [
-  { title: "Nomor LHK", key: "Nomor", minWidth: "200px", fixed: true },
-  { title: "Tanggal", key: "Tanggal", minWidth: "120px" },
-  { title: "Shift", key: "Shift", minWidth: "80px" },
-  { title: "Operator Pola", key: "Operator", minWidth: "150px" },
-  { title: "Nomor SPK", key: "NomorSPK", minWidth: "180px" },
-  { title: "Nama Order", key: "NamaOrder", minWidth: "250px" },
-  { title: "Total Pola", key: "TotalPola", align: "end", minWidth: "120px" },
-  { title: "Keterangan", key: "Keterangan", minWidth: "200px" },
+  { title: "Nomor LHK", key: "Nomor", width: "200px", minWidth: "200px" },
+  { title: "Tanggal", key: "Tanggal", width: "120px", minWidth: "120px" },
+  { title: "Shift", key: "Shift", width: "80px", minWidth: "80px" },
+  { title: "Operator Pola", key: "Operator", width: "160px", minWidth: "160px" },
+  { title: "Nomor SPK", key: "NomorSPK", width: "180px", minWidth: "180px" },
+  { title: "Nama Order", key: "NamaOrder", width: "250px", minWidth: "250px" },
+  {
+    title: "Total Pola",
+    key: "TotalPola",
+    align: "end" as const,
+    width: "120px",
+    minWidth: "120px",
+  },
+  { title: "Keterangan", key: "Keterangan", width: "200px", minWidth: "200px" },
 ];
 
+const summaryColumns = ["TotalPola"];
+
+const summaryFormatters = {
+  Nomor: () => "TOTAL :",
+  TotalPola: (items: any[]) =>
+    `${num(
+      items.reduce(
+        (sum, item) =>
+          sum + (Number(item.TotalPola ?? item.TotalLayout) || 0),
+        0,
+      ),
+    )} pcs`,
+};
+
 const detailHeaders = [
-  { title: "Nomor SPK", key: "nomor_spk", minWidth: "150px" },
-  { title: "Nama SPK / Komponen", key: "nama_spk", minWidth: "250px" },
-  { title: "Jenis Pola", key: "jenis_pola", minWidth: "150px" },
-  { title: "Pjg (m)", key: "panjang", align: "end", minWidth: "100px" },
-  { title: "Lbr (m)", key: "lebar", align: "end", minWidth: "100px" },
-  { title: "Jml Pola (Pcs)", key: "jml_pola", align: "end", minWidth: "120px" },
-  { title: "Keterangan Detail", key: "keterangan", minWidth: "200px" },
+  { title: "Nomor SPK", key: "nomor_spk", width: "150px" },
+  { title: "Nama SPK / Komponen", key: "nama_spk", width: "250px" },
+  { title: "Jenis Pola", key: "jenis_pola", width: "140px" },
+  { title: "Pjg (m)", key: "panjang", align: "end" as const, width: "90px" },
+  { title: "Lbr (m)", key: "lebar", align: "end" as const, width: "90px" },
+  {
+    title: "Jml Pola (Pcs)",
+    key: "jml_pola",
+    align: "end" as const,
+    width: "120px",
+  },
+  { title: "Keterangan Detail", key: "keterangan", width: "200px" },
 ];
 
 const fetchMasterData = async () => {
   loading.value.headers = true;
   try {
-    const res = await api.get<LhkLayoutHeader[]>(API_BASE_URL, {
+    const res = await api.get(API_BASE_URL, {
       params: filters,
     });
-    masterData.value = res.data || [];
+    masterData.value = Array.isArray(res.data)
+      ? res.data
+      : res.data?.data || [];
     selected.value = [];
-    await nextTick();
-    resizeTable(".desktop-table");
+    expanded.value = [];
   } catch {
     toast.error("Gagal mengambil data LHK Layout.");
   } finally {
@@ -258,91 +255,50 @@ const fetchMasterData = async () => {
   }
 };
 
-const loadDetails = async (newlyExpandedItems: LhkLayoutHeader[]) => {
-  const itemToLoad = newlyExpandedItems?.find(
-    (it) =>
-      it && !details.value[it.Nomor] && !loadingDetails.value.has(it.Nomor),
-  );
-  if (!itemToLoad) return;
+const loadDetails = async (expandedKeys: any[]) => {
+  if (!expandedKeys || expandedKeys.length === 0) return;
+  const lastExpanded = expandedKeys[expandedKeys.length - 1];
+  const nomor =
+    typeof lastExpanded === "object" ? lastExpanded.Nomor : lastExpanded;
 
-  loadingDetails.value.add(itemToLoad.Nomor);
-  try {
-    const res = await api.get(`${API_BASE_URL}/details`, {
-      params: { nomor: itemToLoad.Nomor },
-    });
-    details.value[itemToLoad.Nomor] = res.data.details || res.data || [];
-  } catch {
-    toast.error(`Gagal memuat detail ${itemToLoad.Nomor}`);
-    details.value[itemToLoad.Nomor] = [];
-  } finally {
-    loadingDetails.value.delete(itemToLoad.Nomor);
+  if (nomor && !details.value[nomor] && !loadingDetails.value.has(nomor)) {
+    loadingDetails.value.add(nomor);
+    try {
+      const res = await api.get(`${API_BASE_URL}/details`, {
+        params: { nomor },
+      });
+      details.value[nomor] = res.data.details || res.data || [];
+    } catch {
+      toast.error(`Gagal memuat detail ${nomor}`);
+      details.value[nomor] = [];
+    } finally {
+      loadingDetails.value.delete(nomor);
+    }
   }
 };
 
-const handleDelete = async () => {
+watch(
+  expanded,
+  (newVal) => {
+    loadDetails(newVal);
+  },
+  { deep: true },
+);
+
+const handleDelete = async (row?: any) => {
+  const item = row || selectedRow.value;
   if (
-    !selectedRow.value ||
-    !confirm(`Hapus LHK Pola nomor ${selectedRow.value.Nomor}?`)
+    !item ||
+    !confirm(`Hapus LHK Pola nomor ${item.Nomor}?`)
   )
     return;
   try {
-    await api.delete(`${API_BASE_URL}/${selectedRow.value.Nomor}`);
+    await api.delete(`${API_BASE_URL}/${item.Nomor}`);
     toast.success("Data berhasil dihapus.");
     fetchMasterData();
   } catch {
     toast.error("Gagal menghapus data.");
   }
-};
-
-const resizeTable = (tableSelector: string) => {
-  const wrapper = document.querySelector(tableSelector);
-  if (!wrapper) return;
-  const thead = wrapper.querySelector("thead");
-  const tbody = wrapper.querySelector("tbody");
-  if (!thead || !tbody) return;
-
-  thead.querySelectorAll("th").forEach((header, index) => {
-    if (header.querySelector(".resizer"))
-      header.querySelector(".resizer")?.remove();
-    if (
-      header.classList.contains("v-data-table__th--select") ||
-      header.classList.contains("v-data-table__th--group")
-    )
-      return;
-
-    const resizer = document.createElement("div");
-    resizer.className = "resizer";
-    header.style.position = "relative";
-
-    resizer.addEventListener("mousedown", (e: MouseEvent) => {
-      e.stopPropagation();
-      let startX = e.clientX;
-      let startWidth = header.offsetWidth;
-      const columnCells = Array.from(
-        tbody.querySelectorAll(`tr td:nth-child(${index + 1})`),
-      ) as HTMLElement[];
-
-      const handleMouseMove = (moveEvent: MouseEvent) => {
-        const newWidth = startWidth + (moveEvent.clientX - startX);
-        header.style.width = `${newWidth}px`;
-        header.style.minWidth = `${newWidth}px`;
-        columnCells.forEach((cell) => {
-          cell.style.width = `${newWidth}px`;
-          cell.style.minWidth = `${newWidth}px`;
-        });
-      };
-
-      const handleMouseUp = () => {
-        document.removeEventListener("mousemove", handleMouseMove);
-        document.removeEventListener("mouseup", handleMouseUp);
-        document.body.classList.remove("col-resize-active");
-      };
-      document.body.classList.add("col-resize-active");
-      document.addEventListener("mousemove", handleMouseMove);
-      document.addEventListener("mouseup", handleMouseUp);
-    });
-    header.appendChild(resizer);
-  });
 };
 
 const exportToExcel = async () => {
@@ -358,7 +314,7 @@ const exportToExcel = async () => {
     }
 
     const styleHeaderMain = {
-      fill: { fgColor: { rgb: "C8E6C9" } }, // Hijau Muda Pastel khusus Pola
+      fill: { fgColor: { rgb: "C8E6C9" } },
       font: { bold: true, sz: 10 },
       alignment: { horizontal: "center", vertical: "center", wrapText: true },
       border: {
@@ -429,7 +385,7 @@ const exportToExcel = async () => {
       if (targetDetails.length > 0) {
         targetDetails.forEach((dtl, idx) => {
           const isFirst = idx === 0;
-          const qLayout = num(dtl.jml_layout);
+          const qLayout = num(dtl.jml_pola ?? dtl.jml_layout);
           grandTotalLayout += qLayout;
 
           worksheetData.push([
@@ -501,42 +457,11 @@ const exportToExcel = async () => {
   }
 };
 
-onMounted(() => fetchMasterData());
-watch(filters, fetchMasterData, { deep: true });
+onMounted(fetchMasterData);
+watch([() => filters.startDate, () => filters.endDate], fetchMasterData);
 </script>
 
 <style scoped>
-/* Sinkronisasi warna baris master terpilih */
-.desktop-table :deep(.v-data-table__tr.row-selected) {
-  background-color: rgb(216, 239, 255) !important;
-}
-.desktop-table :deep(.v-data-table__tr.row-selected td) {
-  background-color: transparent !important;
-  color: #0d47a1 !important;
-}
-.desktop-table :deep(.v-data-table__tr.row-selected:hover) {
-  background-color: rgb(200, 230, 255) !important;
-}
-
-/* Penanganan Drag Resizer Batas Kolom */
-.resizer {
-  position: absolute;
-  right: 0;
-  top: 0;
-  height: 100%;
-  width: 8px;
-  transform: translateX(50%);
-  background-color: transparent;
-  cursor: col-resize;
-  z-index: 10;
-  transition: background-color 0.1s;
-}
-.resizer:hover,
-body.col-resize-active .resizer {
-  background-color: rgba(0, 0, 0, 0.2);
-}
-
-/* Detail Expanded Container */
 :deep(.detail-container),
 .detail-container {
   display: flex !important;
@@ -559,30 +484,23 @@ body.col-resize-active .resizer {
 :deep(.detail-table),
 .detail-table {
   background-color: white !important;
-  font-size: 0.8rem !important;
+  font-size: 11px !important;
   width: auto !important;
 }
-:deep(.detail-table .v-data-table__td) {
+:deep(.detail-table th),
+:deep(.detail-table td) {
+  font-size: 11px !important;
   white-space: nowrap;
   padding: 0 8px !important;
 }
+:deep(.detail-table thead tr) {
+  background-color: #f5f5f5 !important;
+}
+:deep(.detail-table thead th) {
+  font-weight: 700 !important;
+  color: #333 !important;
+}
 .total-bold {
   font-weight: 700;
-  color: #1976d2;
-}
-
-/* Master Layout */
-.desktop-table :deep(.v-data-table-header__th),
-.desktop-table :deep(tbody tr td) {
-  position: relative;
-  white-space: nowrap;
-  overflow: hidden;
-}
-:deep(.v-data-table tbody tr:hover) {
-  background-color: #f1f8ff !important;
-  cursor: pointer;
-}
-.table-container {
-  height: 100%;
 }
 </style>

@@ -673,4 +673,18 @@ onMounted(() => {
 :deep(.row-selected td) {
   background-color: #d8efff !important;
 }
+
+/* Standarisasi sub-tabel detail compact 11px */
+:deep(.detail-table th),
+:deep(.detail-table td) {
+  font-size: 11px !important;
+  white-space: nowrap;
+}
+:deep(.detail-table thead tr) {
+  background-color: #f5f5f5 !important;
+}
+:deep(.detail-table thead th) {
+  font-weight: 700 !important;
+  color: #333 !important;
+}
 </style>

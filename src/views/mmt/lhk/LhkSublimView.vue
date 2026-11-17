@@ -17,7 +17,8 @@
     item-value="nomor"
     has-print
     show-expand
-    :summary-fields="['total_meter']"
+    :summary-columns="summaryColumns"
+    :summary-formatters="summaryFormatters"
     @refresh="fetchMasterData"
     @add="handleNewEdit('new')"
     @edit="handleEditClick"
@@ -127,6 +128,22 @@ const masterHeaders = [
   },
 ];
 
+const formatNum = (v: number) =>
+  new Intl.NumberFormat("id-ID", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(v);
+
+const summaryColumns = ["total_meter"];
+
+const summaryFormatters = {
+  nomor: () => "TOTAL :",
+  total_meter: (items: any[]) =>
+    `${formatNum(
+      items.reduce((sum, item) => sum + (Number(item.total_meter) || 0), 0),
+    )} m²`,
+};
+
 const detailHeaders = [
   { title: "No. Urut", key: "No_Urut", width: "80px" },
   { title: "PO Internal", key: "No_PO_Internal", width: "170px" },
@@ -195,7 +212,7 @@ const handleRowClick = (_event: any, row: any) => {
 
 const handleNewEdit = (mode: "new" | "edit") => {
   if (mode === "new") {
-    router.push("/mmt/lhk/sublim/new");
+    router.push("/mmt/lhk/sublim/create");
   } else {
     router.push(`/mmt/lhk/sublim/edit/${selectedNomor.value}`);
   }
@@ -516,7 +533,19 @@ onMounted(fetchMasterData);
 :deep(.detail-table),
 .detail-table {
   background-color: white !important;
-  font-size: 0.8rem !important;
+  font-size: 11px !important;
   width: auto !important;
+}
+:deep(.detail-table th),
+:deep(.detail-table td) {
+  font-size: 11px !important;
+  white-space: nowrap;
+}
+:deep(.detail-table thead tr) {
+  background-color: #f5f5f5 !important;
+}
+:deep(.detail-table thead th) {
+  font-weight: 700 !important;
+  color: #333 !important;
 }
 </style>

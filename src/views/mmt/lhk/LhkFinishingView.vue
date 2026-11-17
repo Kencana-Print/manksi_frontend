@@ -912,4 +912,18 @@ watch(filters, fetchHeaders, { deep: true });
 :deep(.v-data-table__tr.row-selected:hover > td) {
   background-color: #c0e4ff !important;
 }
+
+/* Standarisasi sub-tabel detail compact 11px */
+:deep(.detail-table th),
+:deep(.detail-table td) {
+  font-size: 11px !important;
+  white-space: nowrap;
+}
+:deep(.detail-table thead tr) {
+  background-color: #f5f5f5 !important;
+}
+:deep(.detail-table thead th) {
+  font-weight: 700 !important;
+  color: #333 !important;
+}
 </style>

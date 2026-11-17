@@ -17,12 +17,8 @@
     item-value="Nomor"
     has-print
     show-expand
-    :summary-fields="[
-      'Total_Item',
-      'Total_Qty',
-      'PanjangBahanAwal',
-      'total_meter',
-    ]"
+    :summary-columns="summaryColumns"
+    :summary-formatters="summaryFormatters"
     @refresh="fetchMasterData"
     @add="handleCreate"
     @edit="handleEdit"
@@ -235,7 +231,13 @@ const getRowTextColor = (item: any) => {
 
 // --- Table Headers ---
 const masterHeaders = [
-  { title: "Nomor", key: "Nomor", width: "150px" },
+  {
+    title: "Nomor",
+    key: "Nomor",
+    width: "180px",
+    minWidth: "180px",
+    fixed: true,
+  },
   { title: "Status", key: "Status", width: "100px", align: "center" as const },
   { title: "Tanggal", key: "Tanggal", width: "110px" },
   { title: "ACC", key: "Status_Acc", width: "90px", align: "center" as const },
@@ -284,6 +286,42 @@ const detailHeaders = [
   { title: "J. Hasil", key: "Jumlah", align: "end" as const, width: "80px" },
   { title: "Mtr²", key: "Jumlah_Meter", align: "end" as const, width: "90px" },
 ];
+
+const summaryColumns = [
+  "Total_Item",
+  "Total_Qty",
+  "PanjangBahanAwal",
+  "total_meter",
+];
+
+const summaryFormatters = {
+  Nomor: () => "TOTAL :",
+  Total_Item: (items: any[]) =>
+    new Intl.NumberFormat("id-ID").format(
+      items.reduce((sum, item) => sum + (Number(item.Total_Item) || 0), 0),
+    ),
+  Total_Qty: (items: any[]) =>
+    new Intl.NumberFormat("id-ID").format(
+      items.reduce((sum, item) => sum + (Number(item.Total_Qty) || 0), 0),
+    ),
+  PanjangBahanAwal: (items: any[]) =>
+    new Intl.NumberFormat("id-ID", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(
+      items.reduce(
+        (sum, item) => sum + (Number(item.PanjangBahanAwal) || 0),
+        0,
+      ),
+    ),
+  total_meter: (items: any[]) =>
+    new Intl.NumberFormat("id-ID", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(
+      items.reduce((sum, item) => sum + (Number(item.total_meter) || 0), 0),
+    ),
+};
 
 const isSingleSelected = computed(() => selected.value.length === 1);
 
@@ -524,6 +562,12 @@ const exportToExcel = async () => {
       alignment: { horizontal: "right", vertical: "center" },
     };
 
+    const styleFooter = {
+      ...styleDataCell,
+      fill: { fgColor: { rgb: "F0F4F8" } },
+      font: { bold: true, sz: 10 },
+    };
+
     const formatTglManual = (dateStr: string) => {
       if (!dateStr) return "-";
       try {
@@ -578,6 +622,11 @@ const exportToExcel = async () => {
     ];
     worksheetData.push(headersTable);
 
+    let grandTotalM2Master = 0;
+    let grandTotalOrder = 0;
+    let grandTotalHasil = 0;
+    let grandTotalM2Detail = 0;
+
     masterData.value.forEach((header: any) => {
       const targetDetails = details.value[header.Nomor] || [];
       const tglHeader = header.Tanggal ? formatTglManual(header.Tanggal) : "";
@@ -587,6 +636,12 @@ const exportToExcel = async () => {
       if (targetDetails.length > 0) {
         targetDetails.forEach((dtl: any, index: number) => {
           const isFirstRow = index === 0;
+          if (isFirstRow) {
+            grandTotalM2Master += Number(header.total_meter || 0);
+          }
+          grandTotalOrder += Number(dtl.J_Order || 0);
+          grandTotalHasil += Number(dtl.Jumlah || 0);
+          grandTotalM2Detail += Number(dtl.Jumlah_Meter || 0);
 
           const row = [
             { v: isFirstRow ? header.Nomor : "", s: styleDataCellCenter },
@@ -655,6 +710,7 @@ const exportToExcel = async () => {
           worksheetData.push(row);
         });
       } else {
+        grandTotalM2Master += Number(header.total_meter || 0);
         const row = [
           { v: header.Nomor, s: styleDataCellCenter },
           { v: tglHeader, s: styleDataCellCenter },
@@ -670,7 +726,7 @@ const exportToExcel = async () => {
           },
           { v: "-", s: styleDataCellCenter },
           { v: "-", s: styleDataCellCenter },
-          { v: "Tidak ada data detail pekerjaan sublim", s: styleDataCell },
+          { v: "Tidak ada data detail pekerjaan paperprint", s: styleDataCell },
           { v: "-", s: styleDataCellCenter },
           { v: 0, t: "n", z: "#,##0.00", s: styleDataCellRight },
           { v: 0, t: "n", z: "#,##0.00", s: styleDataCellRight },
@@ -683,8 +739,48 @@ const exportToExcel = async () => {
       }
     });
 
+    const footerRow = [
+      {
+        v: "GRAND TOTAL",
+        s: { ...styleFooter, alignment: { horizontal: "right" } },
+      },
+      ...Array(5).fill({ v: "", s: styleFooter }),
+      {
+        v: grandTotalM2Master,
+        t: "n",
+        z: "#,##0.00",
+        s: { ...styleFooter, alignment: { horizontal: "right" } },
+      },
+      ...Array(7).fill({ v: "", s: styleFooter }),
+      {
+        v: grandTotalOrder,
+        t: "n",
+        z: "#,##0",
+        s: { ...styleFooter, alignment: { horizontal: "right" } },
+      },
+      {
+        v: grandTotalHasil,
+        t: "n",
+        z: "#,##0",
+        s: { ...styleFooter, alignment: { horizontal: "right" } },
+      },
+      {
+        v: grandTotalM2Detail,
+        t: "n",
+        z: "#,##0.00",
+        s: { ...styleFooter, alignment: { horizontal: "right" } },
+      },
+    ];
+    worksheetData.push(footerRow);
+
     const ws = XLSX.utils.aoa_to_sheet(worksheetData);
-    ws["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 16 } }];
+    ws["!merges"] = [
+      { s: { r: 0, c: 0 }, e: { r: 0, c: 16 } },
+      {
+        s: { r: worksheetData.length - 1, c: 0 },
+        e: { r: worksheetData.length - 1, c: 5 },
+      },
+    ];
     ws["!cols"] = [
       { wch: 22 },
       { wch: 12 },
@@ -756,8 +852,20 @@ onMounted(() => {
 :deep(.detail-table),
 .detail-table {
   background-color: white !important;
-  font-size: 0.8rem !important;
+  font-size: 11px !important;
   width: auto !important;
+}
+:deep(.detail-table th),
+:deep(.detail-table td) {
+  font-size: 11px !important;
+  white-space: nowrap;
+}
+:deep(.detail-table thead tr) {
+  background-color: #f5f5f5 !important;
+}
+:deep(.detail-table thead th) {
+  font-weight: 700 !important;
+  color: #333 !important;
 }
 .text-error {
   color: #ff5252 !important;

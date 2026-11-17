@@ -32,17 +32,17 @@
       </v-btn>
     </template>
 
-    <div class="form-grid-container">
+    <div class="form-grid-container pb-8 mb-6">
       <div class="left-column">
-        <v-card class="mb-3" flat border>
+        <v-card class="mb-2" flat border>
           <v-card-title
             class="text-subtitle-2 pa-2 custom-header-blue text-white"
           >
             Informasi LHK Proofing
           </v-card-title>
-          <v-card-text class="pa-3">
+          <v-card-text class="pa-2">
             <v-row dense>
-              <v-col cols="12">
+              <v-col cols="6">
                 <v-text-field
                   label="Nomor LHK"
                   v-model="formData.nomor"
@@ -50,11 +50,11 @@
                   variant="outlined"
                   density="compact"
                   hide-details
-                  class="mb-3 bg-grey-lighten-4 custom-label-blue"
+                  class="mb-1.5 bg-grey-lighten-4 custom-label-blue"
                 />
               </v-col>
 
-              <v-col cols="12">
+              <v-col cols="6">
                 <v-text-field
                   label="Tanggal"
                   v-model="formData.tanggal"
@@ -62,11 +62,11 @@
                   variant="outlined"
                   density="compact"
                   hide-details
-                  class="mb-3 custom-label-blue"
+                  class="mb-1.5 custom-label-blue"
                 />
               </v-col>
 
-              <v-col cols="6">
+              <v-col cols="4">
                 <v-text-field
                   label="Shift"
                   v-model.number="formData.shift"
@@ -74,22 +74,22 @@
                   variant="outlined"
                   density="compact"
                   hide-details
-                  class="mb-3 custom-label-blue"
+                  class="mb-1.5 custom-label-blue"
                 />
               </v-col>
 
-              <v-col cols="6">
+              <v-col cols="8">
                 <v-text-field
                   label="Operator"
                   v-model="formData.operator"
                   variant="outlined"
                   density="compact"
                   hide-details
-                  class="mb-3 custom-label-blue"
+                  class="mb-1.5 custom-label-blue"
                 />
               </v-col>
 
-              <v-col cols="12">
+              <v-col cols="6">
                 <v-select
                   label="Jenis LHK"
                   v-model="formData.jenis"
@@ -99,12 +99,12 @@
                   variant="outlined"
                   density="compact"
                   hide-details
-                  class="mb-3 custom-label-blue"
+                  class="mb-1.5 custom-label-blue"
                   @update:modelValue="recalculateCombine"
                 />
               </v-col>
 
-              <v-col cols="12">
+              <v-col cols="6">
                 <v-text-field
                   label="Mesin"
                   v-model="formData.mesin"
@@ -115,10 +115,11 @@
                   hide-details
                   readonly
                   style="cursor: pointer"
-                  class="mb-3 custom-label-blue cell-yellow-input"
-                  placeholder="Klik kaca pembesar untuk pilih mesin..."
+                  class="mb-1.5 custom-label-blue cell-yellow-input"
+                  placeholder="Pilih mesin..."
                 />
               </v-col>
+
               <v-col cols="12">
                 <v-text-field
                   label="Keterangan LHK"
@@ -127,21 +128,21 @@
                   variant="outlined"
                   density="compact"
                   hide-details
-                  class="mb-3 custom-label-blue"
+                  class="custom-label-blue"
                 />
               </v-col>
             </v-row>
           </v-card-text>
         </v-card>
 
-        <v-card class="mb-3" flat border>
+        <v-card class="mb-2" flat border>
           <v-card-title
             class="text-subtitle-2 pa-2 custom-header-blue text-white"
           >
             Scan Material (Roll Bahan)
           </v-card-title>
 
-          <v-card-text class="pa-3">
+          <v-card-text class="pa-2">
             <v-row dense>
               <v-col cols="12">
                 <v-text-field
@@ -153,7 +154,7 @@
                   density="compact"
                   color="primary"
                   hide-details
-                  class="mb-3 custom-label-blue cell-yellow-input"
+                  class="mb-1.5 custom-label-blue cell-yellow-input"
                   @keyup.enter="handleBarcodeScan"
                   autocomplete="off"
                 />
@@ -190,7 +191,7 @@
       <div class="right-column">
         <v-card flat border class="d-flex flex-column mb-4">
           <v-card-title
-            class="text-subtitle-1 d-flex align-center pa-2 custom-header-blue text-white"
+            class="text-subtitle-2 d-flex align-center pa-2 custom-header-blue text-white"
           >
             Daftar Produksi Gabungan SPK
             <v-spacer />
@@ -199,7 +200,7 @@
                 size="small"
                 color="success"
                 prepend-icon="mdi-plus"
-                style="height: 30px !important; text-transform: none"
+                style="height: 28px !important; text-transform: none; font-size: 11px"
                 @click="openSpkSearch"
               >
                 Tambah SPK
@@ -213,7 +214,7 @@
                 density="compact"
                 hide-details
                 flat
-                class="bg-white rounded text-xs"
+                class="bg-white rounded header-spk-search"
                 style="width: 200px"
                 @keyup.enter="handleSpkScan"
               />
@@ -229,6 +230,7 @@
               hide-default-footer
               density="compact"
               fixed-header
+              height="200px"
             >
               <template #[`item.no`]="{ index }">{{ index + 1 }}</template>
 
@@ -313,7 +315,6 @@
                   variant="underlined"
                   hide-details
                   @update:modelValue="recalculateCombine"
-                  class="text-xs"
                 />
               </template>
 
@@ -386,19 +387,19 @@
               </template>
 
               <template #bottom>
-                <div class="pa-3 bg-slate-50 border-t footer-container">
+                <div class="pa-2 bg-slate-50 border-t footer-container">
                   <v-row dense align="center">
-                    <v-col cols="12" sm="4" class="border-e px-3">
+                    <v-col cols="12" sm="4" class="border-e px-2">
                       <v-row no-gutters>
                         <v-col cols="6" class="border-e pr-2">
                           <span
                             class="text-caption text-slate-500 font-weight-bold"
                             >Sisa Sistem (Otomatis):</span
                           >
-                          <div class="text-h6 text-green-600 font-weight-black">
+                          <div class="text-subtitle-1 text-green-600 font-weight-black">
                             {{ sisaStokOtomatis.toFixed(2) }} M
                           </div>
-                          <span class="text-xxs text-slate-400 block"
+                          <span class="stat-subtext text-slate-500 d-block"
                             >P. Pakai:
                             {{ totalPanjangTerpakai.toFixed(2) }} M</span
                           >
@@ -420,7 +421,7 @@
                             suffix="M"
                           />
                           <span
-                            class="text-xxs font-weight-bold text-primary block mt-1"
+                            class="stat-subtext font-weight-bold text-primary d-block mt-0.5"
                           >
                             P. Pakai Final:
                             {{ displayPanjangTerpakai.toFixed(2) }} M
@@ -429,13 +430,13 @@
                       </v-row>
                     </v-col>
 
-                    <v-col cols="12" sm="3" class="px-3 border-e">
+                    <v-col cols="12" sm="3" class="px-2 border-e">
                       <div class="d-flex flex-column">
                         <span
                           class="text-caption text-slate-500 font-weight-bold"
                           >Sisa Samping (Lebar):</span
                         >
-                        <span class="text-h6 text-teal-700 font-weight-black">
+                        <span class="text-subtitle-1 text-teal-700 font-weight-black">
                           {{
                             (formData.Lebar_bahan - totalLebarGabungan).toFixed(
                               2,
@@ -454,9 +455,9 @@
                       </div>
                     </v-col>
 
-                    <v-col cols="12" sm="5" class="px-3">
+                    <v-col cols="12" sm="5" class="px-2">
                       <v-row dense>
-                        <v-col cols="6" class="text-right border-e pr-3">
+                        <v-col cols="6" class="text-right border-e pr-2">
                           <span
                             class="text-caption text-amber-800 font-weight-bold"
                             >Estimasi Afal:</span
@@ -485,7 +486,7 @@
                           </div>
                         </v-col>
 
-                        <v-col cols="6" class="pl-3">
+                        <v-col cols="6" class="pl-2">
                           <span class="text-caption font-weight-bold text-red"
                             >Bahan Rusak (BS):</span
                           >
@@ -517,7 +518,7 @@
           </v-card-text>
         </v-card>
 
-        <v-card flat border class="overflow-hidden">
+        <v-card flat border class="overflow-hidden mb-6">
           <v-card-title
             class="text-subtitle-2 bg-slate-100 pa-2 d-flex align-center text-slate-700 border-b"
           >
@@ -545,7 +546,7 @@
             </v-btn>
           </v-card-title>
 
-          <v-card-text class="pa-4 bg-slate-50">
+          <v-card-text class="pa-2 bg-slate-50">
             <div class="roll-horizontal-wrapper">
               <div class="roll-material" :style="rollStyle">
                 <div
@@ -1304,7 +1305,7 @@ onMounted(() => {
   align-items: flex-start;
 }
 .left-column {
-  width: 310px;
+  width: 330px;
   flex-shrink: 0;
 }
 .right-column {
@@ -1321,7 +1322,28 @@ onMounted(() => {
   font-weight: 600;
   color: #334155 !important;
 }
+.left-column :deep(.v-field__input),
+.left-column :deep(input),
+.left-column :deep(.v-select__selection-text) {
+  font-size: 11px !important;
+}
+.header-spk-search :deep(input) {
+  font-size: 11px !important;
+}
+.modern-blue-table :deep(.v-table__wrapper) {
+  max-height: 200px;
+  overflow-y: auto !important;
+  overflow-x: auto !important;
+}
+.modern-blue-table :deep(thead) {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 10 !important;
+}
 .modern-blue-table :deep(thead th) {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 10 !important;
   background-color: #f0f9ff !important;
   border: 1px solid #bae6fd !important;
   color: #0369a1 !important;
@@ -1329,12 +1351,25 @@ onMounted(() => {
   font-size: 11px !important;
   text-transform: uppercase !important;
   height: 34px !important;
+  white-space: nowrap;
 }
 .modern-blue-table :deep(td) {
   border: 0.5px solid #e2e8f0 !important;
-  padding: 0 !important;
-  height: 32px !important;
+  padding: 0 4px !important;
+  height: 30px !important;
   color: #0f172a !important;
+  font-size: 11px !important;
+  white-space: nowrap;
+}
+.modern-blue-table :deep(.v-field__input),
+.modern-blue-table :deep(input) {
+  font-size: 11px !important;
+  padding: 2px 4px !important;
+  min-height: 24px !important;
+  height: 24px !important;
+}
+.modern-blue-table :deep(.v-select__selection-text) {
+  font-size: 11px !important;
 }
 .cell-yellow {
   background-color: #fef08a !important;
@@ -1343,9 +1378,9 @@ onMounted(() => {
   background-color: #fef08a/20 !important;
 }
 .table-input-inline :deep(.v-field__input) {
-  padding: 4px 8px !important;
-  min-height: 28px !important;
-  font-size: 11.5px !important;
+  padding: 2px 4px !important;
+  min-height: 24px !important;
+  font-size: 11px !important;
 }
 .cetak-field {
   width: 45px;
@@ -1355,6 +1390,25 @@ onMounted(() => {
   bottom: 0;
   z-index: 2;
   border-top: 2px solid #cbd5e1 !important;
+}
+.footer-container :deep(.v-field__input),
+.footer-container :deep(input) {
+  font-size: 11px !important;
+  min-height: 26px !important;
+  height: 26px !important;
+  padding: 2px 6px !important;
+}
+.stat-subtext {
+  font-size: 10px !important;
+}
+.roll-horizontal-wrapper {
+  max-height: 180px;
+  overflow-x: auto;
+  overflow-y: auto;
+  border: 1px dashed #cbd5e1;
+  border-radius: 4px;
+  background-color: #f8fafc;
+  padding: 4px;
 }
 .roll-material {
   height: v-bind('formData.Lebar_bahan * SCALE + "px"');
