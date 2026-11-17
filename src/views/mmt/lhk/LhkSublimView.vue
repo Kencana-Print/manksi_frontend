@@ -17,7 +17,8 @@
     item-value="nomor"
     has-print
     show-expand
-    :summary-fields="['total_meter']"
+    :summary-columns="summaryColumns"
+    :summary-formatters="summaryFormatters"
     @refresh="fetchMasterData"
     @add="handleNewEdit('new')"
     @edit="handleEditClick"
@@ -139,6 +140,23 @@ const detailHeaders = [
   { title: "Total (m²)", key: "Jumlah_meter", align: "end" as const },
   { title: "Size", key: "Size", align: "center" as const },
 ];
+
+// --- Summary Footer ---
+const summaryColumns = ["total_meter"];
+
+const summaryFormatters = {
+  nomor: () => "GRAND TOTAL",
+  total_meter: (items: any[]) => {
+    const total = items.reduce(
+      (sum, r) => sum + (Number(r.total_meter) || 0),
+      0,
+    );
+    return `${Number(total.toFixed(2)).toLocaleString("id-ID", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })} m²`;
+  },
+};
 
 const isSingleSelected = computed(() => selected.value.length === 1);
 const selectedNomor = computed(() => selected.value[0]?.nomor || null);

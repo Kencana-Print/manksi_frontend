@@ -17,12 +17,8 @@
     item-value="Nomor"
     has-print
     show-expand
-    :summary-fields="[
-      'Total_Item',
-      'Total_Qty',
-      'PanjangBahanAwal',
-      'total_meter',
-    ]"
+    :summary-columns="summaryColumns"
+    :summary-formatters="summaryFormatters"
     @refresh="fetchMasterData"
     @add="handleCreate"
     @edit="handleEdit"
@@ -284,6 +280,52 @@ const detailHeaders = [
   { title: "J. Hasil", key: "Jumlah", align: "end" as const, width: "80px" },
   { title: "Mtr²", key: "Jumlah_Meter", align: "end" as const, width: "90px" },
 ];
+
+// --- Summary Footer ---
+const summaryColumns = [
+  "Total_Item",
+  "Total_Qty",
+  "PanjangBahanAwal",
+  "total_meter",
+];
+
+const summaryFormatters = {
+  Nomor: () => "GRAND TOTAL",
+  Total_Item: (items: any[]) => {
+    const total = items.reduce(
+      (sum, r) => sum + (Number(r.Total_Item) || 0),
+      0,
+    );
+    return Math.round(total).toLocaleString("id-ID");
+  },
+  Total_Qty: (items: any[]) => {
+    const total = items.reduce(
+      (sum, r) => sum + (Number(r.Total_Qty) || 0),
+      0,
+    );
+    return Math.round(total).toLocaleString("id-ID");
+  },
+  PanjangBahanAwal: (items: any[]) => {
+    const total = items.reduce(
+      (sum, r) => sum + (Number(r.PanjangBahanAwal) || 0),
+      0,
+    );
+    return Number(total.toFixed(2)).toLocaleString("id-ID", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  },
+  total_meter: (items: any[]) => {
+    const total = items.reduce(
+      (sum, r) => sum + (Number(r.total_meter) || 0),
+      0,
+    );
+    return Number(total.toFixed(2)).toLocaleString("id-ID", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  },
+};
 
 const isSingleSelected = computed(() => selected.value.length === 1);
 

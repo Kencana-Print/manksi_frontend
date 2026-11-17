@@ -17,12 +17,8 @@
     item-value="Nomor"
     has-print
     show-expand
-    :summary-fields="[
-      'JumlahOrder',
-      'jumlah_cetak',
-      'PanjangBahanAwal',
-      'SisaMeterAkhir',
-    ]"
+    :summary-columns="summaryColumns"
+    :summary-formatters="summaryFormatters"
     @refresh="fetchMasterData"
     @add="handleCreate"
     @edit="handleEdit"
@@ -279,7 +275,6 @@ const getRowTextColor = (item: any) => {
 
 // --- Headers ---
 const masterHeaders = [
-  { title: "", key: "data-table-expand", width: "48px", fixed: true },
   { title: "Nomor", key: "Nomor", width: "250px", minWidth: "250px", fixed: true },
   { title: "Status", key: "Status", width: "100px", align: "center" },
   { title: "Shift", key: "Shift", minWidth: "50px" },
@@ -384,6 +379,46 @@ const truncateString = (str: string, num: number) => {
     return str.slice(0, num) + "...";
   }
   return str;
+};
+
+// --- Summary Footer ---
+const summaryColumns = [
+  "JumlahOrder",
+  "jumlah_cetak",
+  "PanjangBahanAwal",
+  "SisaMeterAkhir",
+];
+
+const summaryFormatters = {
+  Nomor: () => "GRAND TOTAL",
+  JumlahOrder: (items: any[]) => {
+    const total = items.reduce(
+      (sum, r) => sum + (Number(r.JumlahOrder) || 0),
+      0,
+    );
+    return Math.round(total).toLocaleString("id-ID");
+  },
+  jumlah_cetak: (items: any[]) => {
+    const total = items.reduce(
+      (sum, r) => sum + (Number(r.jumlah_cetak) || 0),
+      0,
+    );
+    return `${Math.round(total).toLocaleString("id-ID")} pcs`;
+  },
+  PanjangBahanAwal: (items: any[]) => {
+    const total = items.reduce(
+      (sum, r) => sum + (Number(r.PanjangBahanAwal) || 0) * 0.9,
+      0,
+    );
+    return `${formatMeter(total)} m`;
+  },
+  SisaMeterAkhir: (items: any[]) => {
+    const total = items.reduce(
+      (sum, r) => sum + (Number(r.SisaMeterAkhir) || 0) * 0.9,
+      0,
+    );
+    return total.toFixed(2);
+  },
 };
 
 // --- Actions ---
