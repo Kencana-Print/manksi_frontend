@@ -15,11 +15,13 @@ import {
   IconChevronDown,
   IconChevronRight,
   IconReceipt,
+  IconCash,
 } from "@tabler/icons-vue";
 import { pesanError } from "@/services/piutang/rekapPembayaranService";
 import {
   rekapPembayaranFormService as svc,
   type InfoNota,
+  type PettyCashOption,
   type RekapPayload,
   type SaveHasil,
   type TagihanItem,
@@ -141,11 +143,16 @@ const isBulan = (v: string) => /^\d{4}-(0[1-9]|1[0-2])$/.test(v);
 const TIPE_MINUS = ["RET", "PJG"];
 const isMinus = (tipe: string) => TIPE_MINUS.includes(tipe);
 const TIPE_VOUCHER = "VOU";
+const TIPE_PCK = "PCK";
 
-// Terkunci: baris transaksi yang sudah divoucher, atau baris voucher yang
-// sudah masuk Pengajuan Transfer. Baris VOU lain masih bebas diubah/dihapus.
+// Terkunci: baris transaksi yang sudah divoucher, atau baris voucher / petty
+// cash yang sudah masuk Pengajuan Transfer. Sisanya masih bebas diubah/dihapus.
 const isKunci = (b: BarisForm): boolean =>
-  b.tipe === TIPE_VOUCHER ? !!b.pjtNomor : !!b.vouNomor;
+  b.tipe === TIPE_VOUCHER || b.tipe === TIPE_PCK ? !!b.pjtNomor : !!b.vouNomor;
+
+// Nominal baris voucher dan petty cash selalu dari server, tidak bisa diubah
+const nominalTetap = (b: BarisForm): boolean =>
+  !!b.vouNomor || b.tipe === TIPE_PCK;
 
 let seq = 0;
 
@@ -188,7 +195,7 @@ const {
       const unik = [
         ...new Map(
           d.detail
-            .filter((r) => !r.vouNomor)
+            .filter((r) => !r.vouNomor && r.tipe !== TIPE_PCK)
             .map((r) => [`${r.tipe}|${r.nota}|${r.supKode}`, r]),
         ).values(),
       ];
@@ -238,7 +245,10 @@ const {
           nota: r.nota,
           tglNota: r.tglNota ?? "",
           sisaNota: info?.sisaNota ?? Number(r.nilaiNota),
-          tersedia: r.vouNomor ? 0 : (info?.tersedia ?? Number(r.nilaiNota)),
+          tersedia:
+            r.vouNomor || r.tipe === TIPE_PCK
+              ? 0
+              : (info?.tersedia ?? Number(r.nilaiNota)),
           nominal: Math.abs(Number(r.nominal)),
           tglRencana: r.tglRencana ?? "",
           fakturPajak: r.fakturPajak,
@@ -301,8 +311,9 @@ const skipCetak = () => {
 
 const ro = computed(() => !form.value.bisaUbah);
 
+// Baris PCK tidak punya supplier: dikelompokkan per store (nama store)
 const kunciGrup = (b: BarisForm): string =>
-  `${b.supKode}|${b.bulanTagihan}|${b.tipe}`;
+  `${b.tipe === TIPE_PCK ? b.supNama : b.supKode}|${b.bulanTagihan}|${b.tipe}`;
 
 // Kategori (urutan Excel) > kelompok supplier + bulan tagihan + tipe > nota
 const kelompok = computed<Kelompok[]>(() => {
@@ -361,7 +372,7 @@ const total = computed(() =>
   ),
 );
 const jumlahSupplier = computed(
-  () => new Set(form.value.detail.map((b) => b.supKode)).size,
+  () => new Set(form.value.detail.map((b) => b.supKode).filter(Boolean)).size,
 );
 
 const hapusBaris = (key: number) => {
@@ -394,7 +405,8 @@ const onBulanGrup = (g: Grup, e: Event) => {
   if (tertutup.value.has(lama)) {
     const s = new Set(tertutup.value);
     s.delete(lama);
-    s.add(`${g.supKode}|${bulan}|${g.tipe}`);
+    const pertama = g.rows[0];
+    if (pertama) s.add(kunciGrup(pertama));
     tertutup.value = s;
   }
 };
@@ -683,6 +695,106 @@ const tambahkanVoucher = () => {
   toast.success(`${pilih.length} voucher ditambahkan.`);
 };
 
+// ── Rekap Pengajuan (sementara: Petty Cash Kaosan) ──
+const showPengajuan = ref(false);
+const pckLoading = ref(false);
+const pckSearch = ref("");
+const pckList = ref<PettyCashOption[]>([]);
+const pckTerpilih = ref<string[]>([]);
+let pckReq = 0;
+let pckDebounce: ReturnType<typeof setTimeout> | null = null;
+
+const pckSudahAda = (p: PettyCashOption): boolean =>
+  form.value.detail.some((b) => b.tipe === TIPE_PCK && b.nota === p.nomor);
+const pckSelectable = computed(() =>
+  pckList.value.filter((p) => !pckSudahAda(p)),
+);
+const pckAllSelected = computed(
+  () =>
+    pckSelectable.value.length > 0 &&
+    pckSelectable.value.every((p) => pckTerpilih.value.includes(p.nomor)),
+);
+const pckTotalTerpilih = computed(() =>
+  round2(
+    pckList.value
+      .filter((p) => pckTerpilih.value.includes(p.nomor))
+      .reduce((s, p) => s + p.nominal, 0),
+  ),
+);
+
+const loadPettyCash = async () => {
+  const myReq = ++pckReq;
+  pckLoading.value = true;
+  try {
+    const res = await svc.getPettyCashOptions(pckSearch.value, nomorEdit.value);
+    if (myReq !== pckReq) return;
+    pckList.value = res.data.data ?? [];
+  } catch (e) {
+    if (myReq === pckReq) {
+      toast.error(pesanError(e, "Gagal memuat petty cash."));
+      pckList.value = [];
+    }
+  } finally {
+    if (myReq === pckReq) pckLoading.value = false;
+  }
+};
+const cariPettyCashDebounced = () => {
+  if (pckDebounce) clearTimeout(pckDebounce);
+  pckDebounce = setTimeout(loadPettyCash, 350);
+};
+const openPengajuan = async () => {
+  pckSearch.value = "";
+  pckList.value = [];
+  pckTerpilih.value = [];
+  showPengajuan.value = true;
+  await loadPettyCash();
+};
+const togglePckAll = () => {
+  pckTerpilih.value = pckAllSelected.value
+    ? []
+    : pckSelectable.value.map((p) => p.nomor);
+};
+const togglePckOne = (p: PettyCashOption) => {
+  if (pckSudahAda(p)) return;
+  pckTerpilih.value = pckTerpilih.value.includes(p.nomor)
+    ? pckTerpilih.value.filter((x) => x !== p.nomor)
+    : [...pckTerpilih.value, p.nomor];
+};
+const tambahkanPettyCash = () => {
+  const pilih = pckList.value.filter(
+    (p) => pckTerpilih.value.includes(p.nomor) && !pckSudahAda(p),
+  );
+  if (!pilih.length) {
+    toast.warning("Pilih minimal satu petty cash.");
+    return;
+  }
+  for (const p of pilih) {
+    form.value.detail.push({
+      key: ++seq,
+      kategori: p.kategori,
+      kategoriUrut: p.kategoriUrut,
+      supKode: "",
+      supNama: p.namaStore || p.store,
+      bulanTagihan: (p.tanggal || hariIni()).slice(0, 7),
+      tipe: TIPE_PCK,
+      nota: p.nomor,
+      tglNota: p.tanggal,
+      sisaNota: p.nominal,
+      tersedia: 0,
+      nominal: p.nominal,
+      tglRencana: "",
+      fakturPajak: "",
+      invoice: "",
+      keterangan: "",
+      vouNomor: "",
+      pjtNomor: "",
+      ...REK_KOSONG,
+    });
+  }
+  showPengajuan.value = false;
+  toast.success(`${pilih.length} petty cash ditambahkan.`);
+};
+
 // ── Validasi (server tetap validasi ulang) ──
 const validateSave = () => {
   if (!form.value.bisaUbah) {
@@ -790,6 +902,16 @@ const validateSave = () => {
           <template #prepend><IconReceipt :size="14" /></template>
           Tambah Voucher
         </v-btn>
+        <v-btn
+          v-if="!ro"
+          size="small"
+          color="primary"
+          variant="tonal"
+          @click="openPengajuan"
+        >
+          <template #prepend><IconCash :size="14" /></template>
+          Rekap Pengajuan
+        </v-btn>
         <v-spacer />
         <v-btn size="small" variant="text" @click="bukaSemua">Buka Semua</v-btn>
         <v-btn size="small" variant="text" @click="tutupSemua"
@@ -831,7 +953,10 @@ const validateSave = () => {
                 </td>
                 <td class="td-txt">
                   <b>{{ g.supNama }}</b>
-                  <div v-if="canLihatRekening" class="rk-rek">
+                  <div
+                    v-if="canLihatRekening && g.tipe !== TIPE_PCK"
+                    class="rk-rek"
+                  >
                     <template v-if="g.rekening">
                       {{ g.bank }} {{ g.rekening }}
                       <span v-if="g.atasnama"> a.n. {{ g.atasnama }}</span>
@@ -920,7 +1045,7 @@ const validateSave = () => {
                         </td>
                         <td class="td-txt tr">{{ numFmt(b.sisaNota) }}</td>
                         <td class="td-txt tr">
-                          {{ b.vouNomor ? "-" : numFmt(b.tersedia) }}
+                          {{ nominalTetap(b) ? "-" : numFmt(b.tersedia) }}
                         </td>
                         <td class="td-inp">
                           <input
@@ -928,7 +1053,7 @@ const validateSave = () => {
                             type="text"
                             inputmode="decimal"
                             class="cell tr"
-                            :disabled="ro || !!b.vouNomor"
+                            :disabled="ro || nominalTetap(b)"
                             @focus="onNominalFocus(b)"
                             @input="onNominalInput(b, $event)"
                             @blur="onNominalBlur(b)"
@@ -987,8 +1112,8 @@ const validateSave = () => {
             <tr>
               <td colspan="7" class="text-center text-grey py-4 font-italic">
                 Belum ada transaksi. Klik "Tarik Tagihan" untuk memuat tagihan
-                supplier, atau "Tambah Voucher" untuk memilih voucher yang sudah
-                ada.
+                supplier, "Tambah Voucher" untuk memilih voucher yang sudah ada,
+                atau "Rekap Pengajuan" untuk memanggil pengajuan.
               </td>
             </tr>
           </tbody>
@@ -1233,6 +1358,101 @@ const validateSave = () => {
           @click="tambahkanVoucher"
         >
           Tambahkan ({{ vouTerpilih.length }})
+        </v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
+
+  <!-- Dialog Rekap Pengajuan (Petty Cash Kaosan) -->
+  <v-dialog v-model="showPengajuan" max-width="1000px" scrollable>
+    <v-card class="rounded-lg">
+      <v-card-title class="pa-3 text-subtitle-1 text-white bg-primary">
+        Rekap Pengajuan: Petty Cash Kaosan
+      </v-card-title>
+      <v-card-text class="pa-3">
+        <input
+          v-model="pckSearch"
+          class="f-inp"
+          placeholder="Cari nomor petty cash atau store"
+          @input="cariPettyCashDebounced"
+        />
+        <div style="max-height: 380px; overflow-y: auto; margin-top: 10px">
+          <div v-if="pckLoading" class="text-center py-4 text-grey">
+            Memuat...
+          </div>
+          <table v-else class="mini-table">
+            <thead>
+              <tr>
+                <th style="width: 32px" class="text-center">
+                  <input
+                    type="checkbox"
+                    :checked="pckAllSelected"
+                    :disabled="!pckSelectable.length"
+                    @change="togglePckAll"
+                  />
+                </th>
+                <th style="width: 170px">Nomor</th>
+                <th style="width: 105px">Tanggal</th>
+                <th>Store</th>
+                <th>Keterangan</th>
+                <th style="width: 130px" class="text-right">Nominal</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="p in pckList"
+                :key="p.nomor"
+                class="mini-row"
+                :class="{
+                  'mini-row--selected': pckTerpilih.includes(p.nomor),
+                  'mini-row--used': pckSudahAda(p),
+                }"
+                @click="togglePckOne(p)"
+              >
+                <td class="text-center">
+                  <input
+                    type="checkbox"
+                    :checked="pckTerpilih.includes(p.nomor)"
+                    :disabled="pckSudahAda(p)"
+                    @click.stop
+                    @change="togglePckOne(p)"
+                  />
+                </td>
+                <td>{{ p.nomor }}</td>
+                <td>{{ fmtTgl(p.tanggal) }}</td>
+                <td>{{ p.namaStore || p.store }}</td>
+                <td>{{ p.keterangan }}</td>
+                <td class="text-right">{{ numFmt(p.nominal) }}</td>
+              </tr>
+              <tr v-if="!pckList.length">
+                <td colspan="6" class="text-center text-grey py-3">
+                  Tidak ada petty cash yang tersedia
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </v-card-text>
+      <v-card-actions class="pa-3 border-t bg-grey-lighten-4">
+        <span class="text-caption text-grey-darken-1">
+          {{ pckTerpilih.length }} petty cash dipilih ({{
+            numFmt(pckTotalTerpilih)
+          }})
+        </span>
+        <v-spacer />
+        <v-btn
+          variant="text"
+          color="grey-darken-1"
+          @click="showPengajuan = false"
+          >Batal</v-btn
+        >
+        <v-btn
+          variant="flat"
+          color="primary"
+          :disabled="!pckTerpilih.length"
+          @click="tambahkanPettyCash"
+        >
+          Tambahkan ({{ pckTerpilih.length }})
         </v-btn>
       </v-card-actions>
     </v-card>

@@ -67,6 +67,7 @@ const kolomRekening = (): ExcelColumn[] =>
       ]
     : [];
 const browseRef = ref<InstanceType<typeof BaseBrowse> | null>(null);
+const TIPE_PCK = "PCK";
 
 // ─── Helpers ──────────────────────────────────────────────
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -855,6 +856,7 @@ fetchData();
                       >+{{ d.jumlahRekening - 1 }}</span
                     >
                   </template>
+                  <span v-else-if="d.tipe === TIPE_PCK">-</span>
                   <span v-else class="rek-kosong">Belum ada</span>
                 </td>
                 <td>{{ formatBulan(d.bulanTagihan) }}</td>
