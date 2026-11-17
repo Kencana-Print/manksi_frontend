@@ -504,17 +504,32 @@ const onEdit = () => {
   router.push({ name: "RekapPembayaranEdit", params: { nomor: it.nomor } });
 };
 
-// ─── Cetak: halaman cetak dibuka di tab baru ──────────────
+// ─── Cetak: pilih mode, lalu halaman cetak dibuka di tab baru ───
+const showCetakDialog = ref(false);
+const modeCetak = ref<"gabung" | "pisah">("gabung");
+const nomorCetak = ref("");
+
 const onCetak = () => {
   const it = selected.value[0];
   if (!it) {
     return;
   }
+  nomorCetak.value = it.nomor;
+  modeCetak.value = "gabung";
+  showCetakDialog.value = true;
+};
+
+const konfirmasiCetak = () => {
+  if (!nomorCetak.value) {
+    return;
+  }
   const href = router.resolve({
     name: "RekapPembayaranPrint",
-    params: { nomor: it.nomor },
+    params: { nomor: nomorCetak.value },
+    query: { mode: modeCetak.value },
   }).href;
   window.open(href, "_blank");
+  showCetakDialog.value = false;
 };
 
 // ─── Export Bulanan: satu sheet per bulan tagihan ─────────
@@ -929,6 +944,56 @@ fetchData();
     </v-card>
   </v-dialog>
 
+  <!-- ─── Dialog Cetak ─── -->
+  <v-dialog v-model="showCetakDialog" max-width="440">
+    <v-card class="rounded-lg cetak-dlg">
+      <v-card-title class="bg-primary text-white pa-3 cetak-judul">
+        Cetak Rekap Pembayaran
+      </v-card-title>
+      <v-card-text class="pa-4">
+        <div class="mb-2">
+          Rekap <b>{{ nomorCetak }}</b>
+        </div>
+        <v-radio-group v-model="modeCetak" hide-details density="compact">
+          <v-radio value="gabung">
+            <template #label>
+              <div>
+                <b>Digabung</b>
+                <div class="cetak-ket">
+                  Satu baris per supplier, nominal dijumlah (dipecah per tanggal
+                  rencana).
+                </div>
+              </div>
+            </template>
+          </v-radio>
+          <v-radio value="pisah">
+            <template #label>
+              <div>
+                <b>Dipisah per transaksi</b>
+                <div class="cetak-ket">
+                  Satu baris per nomor voucher / nota, lengkap dengan nomornya.
+                </div>
+              </div>
+            </template>
+          </v-radio>
+        </v-radio-group>
+      </v-card-text>
+      <v-card-actions class="pa-3 border-t bg-grey-lighten-4">
+        <v-btn variant="text" size="small" @click="showCetakDialog = false"
+          >Batal</v-btn
+        >
+        <v-spacer />
+        <v-btn
+          color="primary"
+          variant="elevated"
+          size="small"
+          @click="konfirmasiCetak"
+          >Cetak</v-btn
+        >
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
+
   <!-- ─── Dialog Hapus ─── -->
   <v-dialog v-model="showDeleteDialog" max-width="400" persistent>
     <v-card class="rounded-lg">
@@ -1085,5 +1150,20 @@ fetchData();
   font-style: italic;
   padding: 10px;
   font-size: 11px;
+}
+
+.cetak-dlg,
+.cetak-dlg :deep(.v-card-title),
+.cetak-dlg :deep(.v-label),
+.cetak-dlg :deep(.v-btn) {
+  font-size: 11px;
+}
+.cetak-judul {
+  font-weight: 600;
+  letter-spacing: normal;
+}
+.cetak-ket {
+  font-size: 11px;
+  color: #757575;
 }
 </style>

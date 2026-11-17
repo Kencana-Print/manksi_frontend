@@ -11,6 +11,7 @@ import { pesanError } from "@/services/piutang/rekapPembayaranService";
 interface BarisCetak {
   tanggal: string; // sudah diformat, kosong bila belum ada rencana
   nominal: number;
+  nota: string; // hanya terisi pada mode "pisah"
 }
 interface GrupCetak {
   supNama: string;
@@ -28,6 +29,10 @@ interface BlokCetak {
 
 const route = useRoute();
 const toast = useToast();
+// ?mode=pisah: satu baris per nomor nota/voucher. Selain itu: digabung.
+const mode = computed<"gabung" | "pisah">(() =>
+  route.query.mode === "pisah" ? "pisah" : "gabung",
+);
 const isLoading = ref(true);
 const data = ref<RekapLoaded | null>(null);
 
@@ -64,10 +69,11 @@ const fmt = (v: number): string =>
 const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
 // Satu kelompok = supplier + bulan tagihan di dalam satu kategori (seperti Excel).
-// Di dalamnya dipecah per tanggal rencana, masing-masing dengan nominalnya.
+// Mode gabung: dipecah per tanggal rencana. Mode pisah: satu baris per nota.
 const blok = computed<BlokCetak[]>(() => {
   const d = data.value;
   if (!d) return [];
+  const pisah = mode.value === "pisah";
   const urut = [...d.detail].sort(
     (a, b) =>
       a.kategoriUrut - b.kategoriUrut ||
@@ -75,7 +81,8 @@ const blok = computed<BlokCetak[]>(() => {
       a.bulanTagihan.localeCompare(b.bulanTagihan) ||
       (a.tglRencana ?? "9999-99-99").localeCompare(
         b.tglRencana ?? "9999-99-99",
-      ),
+      ) ||
+      a.nota.localeCompare(b.nota),
   );
   const peta = new Map<string, Map<string, GrupCetak>>();
   for (const r of urut) {
@@ -92,9 +99,13 @@ const blok = computed<BlokCetak[]>(() => {
       baris: [],
     };
     const tgl = r.tglRencana ? fmtTgl(r.tglRencana) : "";
-    const ada = g.baris.find((x) => x.tanggal === tgl);
-    if (ada) ada.nominal = round2(ada.nominal + r.nominal);
-    else g.baris.push({ tanggal: tgl, nominal: r.nominal });
+    if (pisah) {
+      g.baris.push({ tanggal: tgl, nominal: r.nominal, nota: r.nota });
+    } else {
+      const ada = g.baris.find((x) => x.tanggal === tgl);
+      if (ada) ada.nominal = round2(ada.nominal + r.nominal);
+      else g.baris.push({ tanggal: tgl, nominal: r.nominal, nota: "" });
+    }
     g.total = round2(g.total + r.nominal);
     perKategori.set(k, g);
     peta.set(r.kategori, perKategori);
@@ -182,13 +193,14 @@ onMounted(async () => {
             <th>NAMA</th>
             <th width="220" class="tc">NO REKENING</th>
             <th width="120" class="tc">BULAN TAGIHAN</th>
+            <th v-if="mode === 'pisah'" width="170" class="tc">NOMOR NOTA</th>
             <th width="130" class="tr">NOMINAL</th>
             <th width="140" class="tc">RENCANA PEMBAYARAN</th>
           </tr>
         </thead>
         <tbody v-for="b in blok" :key="b.kategori">
           <tr class="grp-row">
-            <td colspan="5">{{ b.kategori }}</td>
+            <td :colspan="mode === 'pisah' ? 6 : 5">{{ b.kategori }}</td>
           </tr>
           <template v-for="(g, gi) in b.grup" :key="gi">
             <tr v-for="(r, i) in g.baris" :key="i">
@@ -202,11 +214,14 @@ onMounted(async () => {
               <td v-if="i === 0" :rowspan="g.baris.length" class="tc">
                 {{ g.bulan }}
               </td>
+              <td v-if="mode === 'pisah'" class="tc">{{ r.nota }}</td>
               <td class="tr">{{ fmt(r.nominal) }}</td>
               <td class="tc">{{ r.tanggal }}</td>
             </tr>
             <tr v-if="g.baris.length > 1" class="sub-row">
-              <td colspan="3" class="tr">Subtotal {{ g.supNama }}</td>
+              <td :colspan="mode === 'pisah' ? 4 : 3" class="tr">
+                Subtotal {{ g.supNama }}
+              </td>
               <td class="tr">{{ fmt(g.total) }}</td>
               <td></td>
             </tr>
@@ -214,7 +229,9 @@ onMounted(async () => {
         </tbody>
         <tfoot>
           <tr>
-            <td colspan="3" class="tr fw-bold">TOTAL</td>
+            <td :colspan="mode === 'pisah' ? 4 : 3" class="tr fw-bold">
+              TOTAL
+            </td>
             <td class="tr fw-bold">{{ fmt(data.total) }}</td>
             <td></td>
           </tr>
