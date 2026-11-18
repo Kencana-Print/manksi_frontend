@@ -15,6 +15,7 @@ export interface RekapBrowseItem {
   jumlahTransaksi: number;
   totalNominal: number;
   status: string;
+  statusTampil: string;
   keterangan: string;
   alasanBatal: string;
   userCreate: string;

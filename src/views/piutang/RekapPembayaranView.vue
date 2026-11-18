@@ -196,7 +196,7 @@ const headers = [
   },
   { title: "TOTAL NOMINAL", key: "totalNominal", width: "170px", align: "end" },
   { title: "KETERANGAN", key: "keterangan" },
-  { title: "STATUS", key: "status", width: "90px", align: "center" },
+  { title: "STATUS", key: "statusTampil", width: "100px", align: "center" },
 ];
 
 // ─── Fetch ────────────────────────────────────────────────
@@ -284,6 +284,16 @@ const rowPropsFn = (data: RowCtx) => {
   }
   return {};
 };
+
+// Warna chip status turunan (statusTampil dihitung backend)
+const warnaStatus = (s: string): string =>
+  s === "AKTIF"
+    ? "success"
+    : s === "SEBAGIAN"
+      ? "warning"
+      : s === "DIAJUKAN"
+        ? "info"
+        : "grey";
 
 // ─── Batal ────────────────────────────────────────────────
 const openBatalDialog = () => {
@@ -391,7 +401,7 @@ const doExportMaster = async () => {
         jumlahSupplier: Number(r.jumlahSupplier),
         jumlahTransaksi: Number(r.jumlahTransaksi),
         totalNominal: Number(r.totalNominal),
-        status: r.status,
+        status: r.statusTampil || r.status,
         keterangan: r.keterangan,
       })),
     );
@@ -802,14 +812,14 @@ fetchData();
       {{ fmtNominal(item.totalNominal) }}
     </template>
 
-    <template #item.status="{ item }">
+    <template #item.statusTampil="{ item }">
       <v-chip
         size="x-small"
-        :color="item.status === 'AKTIF' ? 'success' : 'grey'"
+        :color="warnaStatus(item.statusTampil || item.status)"
         variant="flat"
         class="font-weight-bold"
       >
-        {{ item.status }}
+        {{ item.statusTampil || item.status }}
       </v-chip>
     </template>
 

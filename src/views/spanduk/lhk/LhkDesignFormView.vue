@@ -72,16 +72,14 @@ interface TabMap {
   ada: boolean;
   status: StatusRow[];
   komponen: KomponenRow[];
+  sesi: SesiTimer | null;
+  sesiMs: number; // waktu browser saat sesi terakhir diterima
+  catatan: string;
 }
 
 interface FormState {
   tanggal: string; // sama untuk semua tab
   tabs: TabMap[];
-}
-
-interface PorsiRow {
-  nomor: string;
-  persen: number;
 }
 
 const num = (v: unknown) => Number(v) || 0;
@@ -134,6 +132,9 @@ const mapTab = (d: LhkDesignForm): TabMap => {
     ada: d.Ada,
     status: d.Status.map(mapStatus),
     komponen: komponen.length > 0 ? komponen : [komponenKosong()],
+    sesi: null,
+    sesiMs: 0,
+    catatan: "",
   };
 };
 
@@ -148,22 +149,24 @@ function barisKosong(r: KomponenRow): boolean {
 
 const bangunPayload = (data: FormState): LhkDesignBatchPayload => ({
   Tanggal: data.tanggal,
-  Daftar: data.tabs.map((t) => ({
-    Nomor_SPK: t.nomor,
-    Komponen: t.komponen
-      .filter((r) => !barisKosong(r))
-      .map((r) => ({
-        Bahan: r.bahan,
-        Panjang: num(r.panjang),
-        Jumlah: num(r.jumlah),
-        C: num(r.c),
-        M: num(r.m),
-        Y: num(r.y),
-        K: num(r.k),
-        Mesin: r.mesin,
-        Keterangan: r.keterangan.trim(),
-      })),
-  })),
+  Daftar: data.tabs
+    .filter((t) => t.ada)
+    .map((t) => ({
+      Nomor_SPK: t.nomor,
+      Komponen: t.komponen
+        .filter((r) => !barisKosong(r))
+        .map((r) => ({
+          Bahan: r.bahan,
+          Panjang: num(r.panjang),
+          Jumlah: num(r.jumlah),
+          C: num(r.c),
+          M: num(r.m),
+          Y: num(r.y),
+          K: num(r.k),
+          Mesin: r.mesin,
+          Keterangan: r.keterangan.trim(),
+        })),
+    })),
 });
 
 // ── State UI ──
@@ -176,7 +179,6 @@ const designerOpts = ref<DesignerOption[]>([]);
 const mesinOpts = ref<MesinOption[]>([]);
 const bahanOpts = ref<BahanOption[]>([]);
 const designerIdx = ref(-1);
-const catatanAksi = ref("");
 
 const showSpk = ref(false);
 
@@ -184,7 +186,6 @@ const showDlgPause = ref(false);
 const alasanPause = ref("");
 const showDlgSelesai = ref(false);
 const showDlgBatal = ref(false);
-const porsiInput = ref<PorsiRow[]>([]);
 
 const {
   isLoading,
@@ -211,7 +212,6 @@ const {
   },
   onFormReset: () => {
     inputNomor.value = "";
-    catatanAksi.value = "";
     tabIdx.value = 0;
   },
 });
@@ -226,7 +226,7 @@ const statusAkhirTab = computed<StatusRow | null>(() => {
 });
 
 const hasilSimpan = computed(() =>
-  formData.value.tabs.map((t) => t.nomorLhk || t.nomor),
+  formData.value.tabs.filter((t) => t.ada).map((t) => t.nomorLhk || t.nomor),
 );
 
 // ── Lookup ──
@@ -273,38 +273,59 @@ const catatDesigner = () => {
   }
 };
 
-// ── Timer sesi ──
-// Server memberi durasi bersih pada saat respons; browser hanya menambah
-// selisih jam lokal sejak respons diterima.
-const sesi = ref<SesiTimer | null>(null);
-const sesiDiterimaMs = ref(0);
+// ── Timer sesi: satu timer per tab SPK/MAP ──
+// Server memberi durasi bersih pada saat respons; browser menambah selisih
+// jam lokal sejak respons diterima (sesiMs, per tab).
 const sekarangMs = ref(Date.now());
 let pewaktu: ReturnType<typeof setInterval> | null = null;
 
-const setSesi = (s: SesiTimer | null) => {
-  sesi.value = s;
-  sesiDiterimaMs.value = Date.now();
+const catatanTab = computed({
+  get: () => tabAktif.value?.catatan ?? "",
+  set: (v: string) => {
+    if (tabAktif.value) {
+      tabAktif.value.catatan = v;
+    }
+  },
+});
+
+const setSesiTab = (t: TabMap, s: SesiTimer | null) => {
+  t.sesi = s;
+  t.sesiMs = Date.now();
 };
 
-const berjalan = computed(() => sesi.value?.Status === "BERJALAN");
-const dipause = computed(() => sesi.value?.Status === "PAUSE");
-const sesiAktif = computed(() => berjalan.value || dipause.value);
+// Timer lama yang memuat beberapa MAP dipakai bersama oleh tab-tabnya
+const sinkronSesi = (s: SesiTimer | null, id: SesiTimer["Sesi_Id"]) => {
+  for (const t of formData.value.tabs) {
+    if (t.sesi?.Sesi_Id === id) {
+      setSesiTab(t, s);
+    }
+  }
+};
 
-const selisihDetik = computed(() =>
-  Math.max(0, Math.floor((sekarangMs.value - sesiDiterimaMs.value) / 1000)),
-);
+const aktifTab = (t: TabMap) =>
+  t.sesi?.Status === "BERJALAN" || t.sesi?.Status === "PAUSE";
 
-const detikBersih = computed(() => {
-  const s = sesi.value;
+const lewatDetik = (t: TabMap) =>
+  Math.max(0, Math.floor((sekarangMs.value - t.sesiMs) / 1000));
+
+const detikTab = (t: TabMap) => {
+  const s = t.sesi;
   if (!s || s.Durasi_Bersih_Detik === null) {
     return 0;
   }
-  return s.Durasi_Bersih_Detik + (berjalan.value ? selisihDetik.value : 0);
-});
+  return s.Durasi_Bersih_Detik + (s.Status === "BERJALAN" ? lewatDetik(t) : 0);
+};
+
+const sesi = computed(() => tabAktif.value?.sesi ?? null);
+const berjalan = computed(() => sesi.value?.Status === "BERJALAN");
+const dipause = computed(() => sesi.value?.Status === "PAUSE");
+const sesiAktif = computed(() => berjalan.value || dipause.value);
+const adaSesiAktif = computed(() => formData.value.tabs.some(aktifTab));
 
 const sisaPauseDetik = computed(() => {
-  const p = sesi.value?.Pause_Aktif;
-  return p ? Math.max(0, p.Sisa_Detik - selisihDetik.value) : 0;
+  const t = tabAktif.value;
+  const p = t?.sesi?.Pause_Aktif;
+  return t && p ? Math.max(0, p.Sisa_Detik - lewatDetik(t)) : 0;
 });
 
 const pauseHabis = computed(() => dipause.value && sisaPauseDetik.value <= 0);
@@ -319,11 +340,13 @@ const formatDurasi = (detik: number) => {
 const formatMenitDetik = (detik: number) =>
   `${pad(Math.floor(detik / 60))}:${pad(detik % 60)}`;
 
-const lamaTeks = computed(() => formatDurasi(detikBersih.value));
+const lamaTeks = computed(() =>
+  formatDurasi(tabAktif.value ? detikTab(tabAktif.value) : 0),
+);
 
 const bisaMulai = computed(
   () =>
-    formData.value.tabs.length > 0 &&
+    !!tabAktif.value &&
     !sesiAktif.value &&
     !sedangAksi.value &&
     !!designerTerpilih.value,
@@ -354,7 +377,11 @@ const segarkanSemuaTab = async () => {
 
 const mulaiTimer = () =>
   jalankan(async () => {
+    const t = tabAktif.value;
     const pelaku = designerTerpilih.value;
+    if (!t) {
+      return;
+    }
     if (!pelaku) {
       toast.warning("Pilih designer terlebih dahulu.");
       return;
@@ -362,19 +389,19 @@ const mulaiTimer = () =>
     const s = await lhkForm.mulaiSesi({
       Kode_Cabang: pelaku.Kode,
       Designer: pelaku.Designer,
-      Catatan: catatanAksi.value.trim(),
-      Daftar_Spk: formData.value.tabs.map((t) => t.nomor),
+      Catatan: t.catatan.trim(),
+      Daftar_Spk: [t.nomor],
     });
-    setSesi(s);
+    setSesiTab(t, s);
     catatDesigner();
-    catatanAksi.value = "";
+    t.catatan = "";
     await segarkanSemuaTab();
-    toast.success("Timer dimulai.");
+    toast.success(`Timer ${t.nomor} dimulai.`);
   }, "Gagal memulai timer.");
 
 const konfirmasiPause = () =>
   jalankan(async () => {
-    const s = sesi.value;
+    const s = tabAktif.value?.sesi;
     if (!s) {
       return;
     }
@@ -383,7 +410,7 @@ const konfirmasiPause = () =>
       toast.warning("Alasan pause wajib diisi.");
       return;
     }
-    setSesi(await lhkForm.pauseSesi(s.Sesi_Id, alasan));
+    sinkronSesi(await lhkForm.pauseSesi(s.Sesi_Id, alasan), s.Sesi_Id);
     showDlgPause.value = false;
     alasanPause.value = "";
     toast.success("Timer di-pause.");
@@ -391,74 +418,49 @@ const konfirmasiPause = () =>
 
 const lanjutTimer = () =>
   jalankan(async () => {
-    const s = sesi.value;
+    const s = tabAktif.value?.sesi;
     if (!s) {
       return;
     }
-    setSesi(await lhkForm.resumeSesi(s.Sesi_Id));
+    sinkronSesi(await lhkForm.resumeSesi(s.Sesi_Id), s.Sesi_Id);
     toast.success("Timer dilanjutkan.");
   }, "Gagal melanjutkan timer.");
 
-// Porsi awal dibagi rata; designer yang mengatur per tab
 const bukaSelesai = () => {
-  const tabs = formData.value.tabs;
-  const n = tabs.length;
-  if (n === 0) {
-    return;
+  if (tabAktif.value?.sesi) {
+    showDlgSelesai.value = true;
   }
-  const dasar = Math.floor(10000 / n) / 100;
-  porsiInput.value = tabs.map((t, i) => ({
-    nomor: t.nomor,
-    persen: i === n - 1 ? round2(100 - dasar * (n - 1)) : dasar,
-  }));
-  showDlgSelesai.value = true;
 };
-
-const totalPorsi = computed(() =>
-  round2(porsiInput.value.reduce((a, p) => a + num(p.persen), 0)),
-);
-const porsiValid = computed(() => Math.abs(totalPorsi.value - 100) <= 0.01);
-
-const estimasiDurasi = (persen: number) =>
-  formatDurasi((detikBersih.value * num(persen)) / 100);
 
 const konfirmasiSelesai = () =>
   jalankan(async () => {
-    const s = sesi.value;
-    if (!s) {
+    const t = tabAktif.value;
+    const s = t?.sesi;
+    if (!t || !s) {
       return;
     }
-    if (!porsiValid.value) {
-      toast.warning("Total porsi harus 100%.");
-      return;
-    }
-    const banyak = porsiInput.value.length > 1;
     const hasil = await lhkForm.selesaiSesi(s.Sesi_Id, {
-      Catatan: catatanAksi.value.trim(),
-      Porsi: banyak
-        ? porsiInput.value.map((p) => ({
-            Nomor_SPK: p.nomor,
-            Persen: num(p.persen),
-          }))
-        : undefined,
+      Catatan: t.catatan.trim(),
+      Porsi: undefined,
     });
     showDlgSelesai.value = false;
-    setSesi(hasil);
-    catatanAksi.value = "";
+    sinkronSesi(hasil, s.Sesi_Id);
+    t.catatan = "";
     await segarkanSemuaTab();
-    toast.success("Pekerjaan selesai.");
+    toast.success(`${t.nomor} selesai.`);
   }, "Gagal menyelesaikan timer.");
 
 const konfirmasiBatal = () =>
   jalankan(async () => {
-    const s = sesi.value;
-    if (!s) {
+    const t = tabAktif.value;
+    const s = t?.sesi;
+    if (!t || !s) {
       return;
     }
     const hasil = await lhkForm.batalSesi(s.Sesi_Id);
     showDlgBatal.value = false;
-    setSesi(null);
-    catatanAksi.value = "";
+    sinkronSesi(null, s.Sesi_Id);
+    t.catatan = "";
     await segarkanSemuaTab();
     const tahan = hasil.Header_Dipertahankan ?? [];
     if (tahan.length > 0) {
@@ -470,21 +472,31 @@ const konfirmasiBatal = () =>
     }
   }, "Gagal membatalkan timer.");
 
-// Memulihkan timer yang masih aktif setelah halaman dimuat ulang
+// Memulihkan semua timer aktif setelah halaman dimuat ulang: satu tab per MAP
 const pulihkanSesi = async () => {
-  const s = await lhkForm.getSesiAktif();
-  if (!s) {
+  const daftarSesi = await lhkForm.getSesiAktif();
+  if (daftarSesi.length === 0) {
     return;
   }
-  const daftar = await Promise.all(
-    s.Daftar.map((m) => lhkForm.getById(m.Nomor_SPK)),
+  const peta = new Map<string, { nomor: string; sesi: SesiTimer }>();
+  for (const s of daftarSesi) {
+    for (const m of s.Daftar) {
+      peta.set(m.Nomor_SPK.toUpperCase(), { nomor: m.Nomor_SPK, sesi: s });
+    }
+  }
+  const hasil = await Promise.all(
+    [...peta.values()].map((p) => lhkForm.getById(p.nomor)),
   );
-  formData.value.tabs = daftar.map(mapTab);
+  formData.value.tabs = hasil.map((d) => {
+    const t = mapTab(d);
+    setSesiTab(t, peta.get(d.Nomor.toUpperCase())?.sesi ?? null);
+    return t;
+  });
   formData.value.tanggal = todayLocal;
   tabIdx.value = 0;
-  setSesi(s);
+  const pertama = daftarSesi[0];
   const idx = designerOpts.value.findIndex(
-    (d) => d.Kode === s.Kode_Cabang && d.Designer === s.Designer,
+    (d) => d.Kode === pertama.Kode_Cabang && d.Designer === pertama.Designer,
   );
   if (idx >= 0) {
     designerIdx.value = idx;
@@ -529,12 +541,6 @@ const tambahTab = async (nomorInput: string) => {
   if (!nomor) {
     return;
   }
-  if (sesiAktif.value) {
-    toast.warning(
-      "Daftar SPK/MAP dikunci selama timer berjalan atau di-pause.",
-    );
-    return;
-  }
   const tabs = formData.value.tabs;
   const sudahAda = (n: string) =>
     tabs.some((t) => t.nomor.toUpperCase() === n.toUpperCase());
@@ -544,7 +550,7 @@ const tambahTab = async (nomorInput: string) => {
     return;
   }
   if (tabs.length >= MAKS_TAB) {
-    toast.warning(`Maksimal ${MAKS_TAB} SPK/MAP dalam satu timer.`);
+    toast.warning(`Maksimal ${MAKS_TAB} SPK/MAP dalam satu form.`);
     return;
   }
   isLoading.value = true;
@@ -566,9 +572,10 @@ const tambahTab = async (nomorInput: string) => {
 };
 
 const hapusTab = (idx: number) => {
-  if (sesiAktif.value) {
+  const t = formData.value.tabs[idx];
+  if (t && aktifTab(t)) {
     toast.warning(
-      "Daftar SPK/MAP dikunci selama timer berjalan atau di-pause.",
+      "Timer SPK/MAP ini masih aktif. Selesaikan atau batalkan dulu.",
     );
     return;
   }
@@ -579,9 +586,6 @@ const hapusTab = (idx: number) => {
 };
 
 const bukaLookupSpk = () => {
-  if (sesiAktif.value) {
-    return;
-  }
   showSpk.value = true;
 };
 
@@ -634,6 +638,16 @@ const validateSave = () => {
     return;
   }
 
+  const dimulai = f.tabs.filter((t) => t.ada);
+  if (dimulai.length === 0) {
+    toast.warning("Tekan Mulai pada minimal satu SPK/MAP sebelum menyimpan.");
+    return;
+  }
+  const belum = f.tabs.filter((t) => !t.ada).map((t) => t.nomor);
+  if (belum.length > 0) {
+    toast.info(`Belum dimulai, tidak ikut disimpan: ${belum.join(", ")}.`);
+  }
+
   const kolom = (r: KomponenRow) =>
     [
       ["Panjang Output", r.panjang],
@@ -644,13 +658,7 @@ const validateSave = () => {
       ["K", r.k],
     ] as const;
 
-  for (const t of f.tabs) {
-    if (!t.ada) {
-      toast.warning(
-        `${t.nomor}: tekan Mulai terlebih dahulu sebelum menyimpan.`,
-      );
-      return;
-    }
+  for (const t of dimulai) {
     for (const [i, r] of t.komponen.entries()) {
       if (barisKosong(r)) {
         continue;
@@ -684,8 +692,8 @@ const validateSave = () => {
 // ── Setelah simpan ──
 const resetBaru = () => {
   showHasilSimpan.value = false;
-  if (sesiAktif.value) {
-    toast.warning("Timer masih aktif. Selesaikan atau batalkan dulu.");
+  if (adaSesiAktif.value) {
+    toast.warning("Masih ada timer aktif. Selesaikan atau batalkan dulu.");
     return;
   }
   if (isEditMode.value) {
@@ -694,9 +702,7 @@ const resetBaru = () => {
   }
   formData.value = defaultData();
   inputNomor.value = "";
-  catatanAksi.value = "";
   tabIdx.value = 0;
-  setSesi(null);
 };
 
 const tutupSetelahSimpan = () => {
@@ -728,9 +734,7 @@ const tutupSetelahSimpan = () => {
           <div class="cell-grp inp-grp" style="flex: 1">
             <input
               v-model="inputNomor"
-              :readonly="sesiAktif"
               class="ci"
-              :class="{ ro: sesiAktif }"
               placeholder="Nomor + Enter / F1 cari"
               autocomplete="off"
               @keydown.enter.prevent="tambahTab(inputNomor)"
@@ -740,7 +744,6 @@ const tutupSetelahSimpan = () => {
               type="button"
               class="ci-btn"
               title="Cari SPK/MAP"
-              :disabled="sesiAktif"
               @click="bukaLookupSpk"
             >
               <IconSearch :size="11" />
@@ -876,7 +879,8 @@ const tutupSetelahSimpan = () => {
               </option>
             </select>
             <input
-              v-model="catatanAksi"
+              v-model="catatanTab"
+              :disabled="!tabAktif"
               class="inp"
               style="flex: 1"
               maxlength="100"
@@ -951,13 +955,21 @@ const tutupSetelahSimpan = () => {
               :key="t.nomor"
               type="button"
               class="tab-btn"
-              :class="{ aktif: i === tabIdx }"
+              :class="{
+                aktif: i === tabIdx,
+                jalan: t.sesi?.Status === 'BERJALAN',
+                jeda: t.sesi?.Status === 'PAUSE',
+              }"
               @click="tabIdx = i"
             >
+              <span v-if="aktifTab(t)" class="tab-dot">●</span>
               <span>{{ t.nomor }}</span>
               <span v-if="t.nomorLhk" class="tab-lhk">{{ t.nomorLhk }}</span>
+              <span v-if="aktifTab(t)" class="tab-waktu">
+                {{ formatDurasi(detikTab(t)) }}
+              </span>
               <span
-                v-if="!sesiAktif"
+                v-else
                 class="tab-x"
                 title="Hapus dari daftar"
                 @click.stop="hapusTab(i)"
@@ -1207,62 +1219,18 @@ const tutupSetelahSimpan = () => {
     </v-card>
   </v-dialog>
 
-  <!-- Selesai + porsi durasi -->
-  <v-dialog v-model="showDlgSelesai" max-width="560" persistent>
+  <!-- Selesai -->
+  <v-dialog v-model="showDlgSelesai" max-width="440" persistent>
     <v-card class="rounded-lg">
       <v-card-title class="bg-warning text-white pa-3"
         >Tandai DONE?</v-card-title
       >
       <v-card-text class="pa-4">
-        <div class="text-body-2 mb-3">
-          Status DONE dan durasi dicatat dengan jam server dan
-          <b>tidak dapat dibatalkan</b>. Durasi bersih
-          <b>{{ lamaTeks }}</b>
-          <span v-if="porsiInput.length > 1">
-            dibagi ke tiap LHK sesuai porsi di bawah.
-          </span>
-        </div>
-        <table
-          v-if="porsiInput.length > 1"
-          class="gt"
-          style="table-layout: auto"
-        >
-          <thead>
-            <tr>
-              <th>SPK/MAP</th>
-              <th style="width: 110px" class="tr">Porsi (%)</th>
-              <th style="width: 100px" class="tc">Durasi</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="p in porsiInput" :key="p.nomor">
-              <td class="pad">{{ p.nomor }}</td>
-              <td class="p0">
-                <input
-                  v-model.number="p.persen"
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="any"
-                  class="ci tr bg-yellow-light"
-                  v-select-on-focus
-                />
-              </td>
-              <td class="tc">{{ estimasiDurasi(p.persen) }}</td>
-            </tr>
-          </tbody>
-          <tfoot>
-            <tr>
-              <td class="fw">Total</td>
-              <td class="tr fw" :class="porsiValid ? 'st-done' : 'st-open'">
-                {{ fmt(totalPorsi) }}
-              </td>
-              <td />
-            </tr>
-          </tfoot>
-        </table>
-        <div v-if="porsiInput.length > 1 && !porsiValid" class="hint-err">
-          Total porsi harus 100%.
+        <div class="text-body-2">
+          {{ tabAktif?.nomor }}: status DONE dan durasi dicatat dengan jam
+          server dan <b>tidak dapat dibatalkan</b>. Durasi bersih
+          <b>{{ lamaTeks }}</b
+          >.
         </div>
       </v-card-text>
       <v-card-actions class="pa-3 border-t">
@@ -1271,7 +1239,7 @@ const tutupSetelahSimpan = () => {
         <v-btn
           color="warning"
           variant="elevated"
-          :disabled="sedangAksi || !porsiValid"
+          :disabled="sedangAksi"
           @click="konfirmasiSelesai"
         >
           Ya, Selesai
@@ -1618,6 +1586,24 @@ const tutupSetelahSimpan = () => {
 .tab-x {
   color: #c62828;
   font-size: 10px;
+}
+.tab-btn.jalan {
+  border-color: #c62828;
+}
+.tab-btn.jeda {
+  border-color: #ef6c00;
+}
+.tab-dot {
+  font-size: 9px;
+  color: #c62828;
+}
+.tab-btn.jeda .tab-dot {
+  color: #ef6c00;
+}
+.tab-waktu {
+  font-family: "Consolas", monospace;
+  font-size: 10px;
+  color: #546e7a;
 }
 .tab-kosong {
   padding: 4px 6px;

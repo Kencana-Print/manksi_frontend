@@ -163,11 +163,12 @@ export const simpanBatch = (
   api.put<ApiResponse<string[]>>(`${BASE}/simpan`, payload);
 
 // ── Sesi timer ──
-export const getSesiAktif = async (): Promise<SesiTimer | null> => {
-  const res = await api.get<ApiResponse<SesiTimer | null>>(
+// Semua sesi aktif milik user yang login (satu per tab SPK/MAP)
+export const getSesiAktif = async (): Promise<SesiTimer[]> => {
+  const res = await api.get<ApiResponse<SesiTimer[] | null>>(
     `${BASE}/sesi/aktif`,
   );
-  return res.data.data ?? null;
+  return res.data.data ?? [];
 };
 
 export const mulaiSesi = async (payload: MulaiPayload): Promise<SesiTimer> => {
