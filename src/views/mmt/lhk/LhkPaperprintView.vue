@@ -287,10 +287,7 @@ const detailHeaders = [
   { title: "Mtr²", key: "Jumlah_Meter", align: "end" as const, width: "90px" },
 ];
 
-<<<<<<< HEAD
-=======
 // --- Summary Footer ---
->>>>>>> mmt
 const summaryColumns = [
   "Total_Item",
   "Total_Qty",
@@ -299,7 +296,6 @@ const summaryColumns = [
 ];
 
 const summaryFormatters = {
-<<<<<<< HEAD
   Nomor: () => "TOTAL :",
   Total_Item: (items: any[]) =>
     new Intl.NumberFormat("id-ID").format(
@@ -326,7 +322,6 @@ const summaryFormatters = {
     }).format(
       items.reduce((sum, item) => sum + (Number(item.total_meter) || 0), 0),
     ),
-=======
   Nomor: () => "GRAND TOTAL",
   Total_Item: (items: any[]) => {
     const total = items.reduce(
@@ -336,10 +331,7 @@ const summaryFormatters = {
     return Math.round(total).toLocaleString("id-ID");
   },
   Total_Qty: (items: any[]) => {
-    const total = items.reduce(
-      (sum, r) => sum + (Number(r.Total_Qty) || 0),
-      0,
-    );
+    const total = items.reduce((sum, r) => sum + (Number(r.Total_Qty) || 0), 0);
     return Math.round(total).toLocaleString("id-ID");
   },
   PanjangBahanAwal: (items: any[]) => {
@@ -362,7 +354,6 @@ const summaryFormatters = {
       maximumFractionDigits: 2,
     });
   },
->>>>>>> mmt
 };
 
 const isSingleSelected = computed(() => selected.value.length === 1);
@@ -435,7 +426,7 @@ const handleRowClick = (_event: any, row: any) => {
 };
 
 const handleCreate = () => {
-  router.push({ name: 'LhkPaperprintCreate' });
+  router.push({ name: "LhkPaperprintCreate" });
 };
 
 const handleEdit = () => {
@@ -444,7 +435,7 @@ const handleEdit = () => {
     return;
   }
   router.push({
-    name: 'LhkPaperprintEdit',
+    name: "LhkPaperprintEdit",
     params: { nomor: selectedItemNomor.value },
   });
 };
