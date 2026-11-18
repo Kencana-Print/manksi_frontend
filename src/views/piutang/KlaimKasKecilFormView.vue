@@ -36,6 +36,8 @@ interface BarisForm {
   cc: string;
   dc: string;
   ccNama: string;
+  akunInfo: string;
+  ccInfo: string;
 }
 
 interface KlaimForm {
@@ -187,6 +189,8 @@ const {
         cc: r.cc ?? "",
         dc: r.dc ?? "",
         ccNama: r.ccNama ?? "",
+        akunInfo: r.akunInfo ?? "",
+        ccInfo: r.ccInfo ?? "",
       })),
     };
   },
@@ -290,6 +294,8 @@ const tambahManual = () => {
     cc: "",
     dc: "",
     ccNama: "",
+    akunInfo: "",
+    ccInfo: "",
   });
 };
 
@@ -340,6 +346,7 @@ const showPilih = ref(false);
 const cari = ref("");
 const loadingOpsi = ref(false);
 const opsi = ref<BkkOption[]>([]);
+const errOpsi = ref("");
 const terpilih = ref<string[]>([]);
 let opsiReq = 0;
 
@@ -349,6 +356,7 @@ const sudahAda = (o: BkkOption) =>
 const loadOpsi = async () => {
   const myReq = ++opsiReq;
   loadingOpsi.value = true;
+  errOpsi.value = "";
   try {
     const res = await svc.getBkkOptions(
       cari.value.trim(),
@@ -361,7 +369,8 @@ const loadOpsi = async () => {
     terpilih.value = [];
   } catch (e) {
     if (myReq === opsiReq) {
-      toast.error(pesanError(e, "Gagal memuat daftar BKK."));
+      errOpsi.value = pesanError(e, "Gagal memuat daftar BKK.");
+      toast.error(errOpsi.value);
       opsi.value = [];
     }
   } finally {
@@ -423,6 +432,8 @@ const tambahkanTerpilih = () => {
       cc: "",
       dc: "",
       ccNama: "",
+      akunInfo: o.akunInfo,
+      ccInfo: o.ccInfo,
     });
   }
   showPilih.value = false;
@@ -593,18 +604,18 @@ const validateSave = () => {
             <div class="kk-ringkas-row">
               <span>Jumlah BKK</span><b>{{ jumlahBkk }}</b>
             </div>
-            <template v-if="isAtm">
-              BKK/BBK diklaim utuh. Hanya pengeluaran dari ATM ini yang belum
+            <div v-if="isAtm" class="kk-hint">
+              BKK/BBK diklaim utuh. Hanya BKK dari laci kas Anda yang belum
               diklaim yang bisa dipilih.
-            </template>
-            <template v-else-if="isPc">
+            </div>
+            <div v-else-if="isPc" class="kk-hint">
               BKK penyelesaian dana belanja diklaim utuh. Klaim ini dibayar
               lewat BBK dari bank, bukan lewat Pengajuan Transfer.
-            </template>
-            <template v-else>
+            </div>
+            <div v-else class="kk-hint">
               BKK diklaim utuh. Hanya BKK penyelesaian kas yang sudah selesai
               dan belum diklaim yang bisa dipilih.
-            </template>
+            </div>
             <div class="kk-ringkas-row kk-ringkas-total">
               <span>Total Klaim</span><b>{{ numFmt(total) }}</b>
             </div>
@@ -629,14 +640,14 @@ const validateSave = () => {
           <template #prepend><IconPlus :size="14" /></template>
           Baris Manual
         </v-btn>
-        <template v-if="isAtm">
-          BKK/BBK diklaim utuh. Hanya pengeluaran dari ATM ini yang belum
-          diklaim yang bisa dipilih.
-        </template>
-        <template v-else>
-          BKK diklaim utuh. Hanya BKK penyelesaian kas yang sudah selesai dan
-          belum diklaim yang bisa dipilih.
-        </template>
+        <span v-if="isAtm" class="kk-hint">
+          BKK/BBK diklaim utuh. Hanya BKK dari laci kas Anda yang belum diklaim
+          yang bisa dipilih.
+        </span>
+        <span v-else class="kk-hint">
+          BKK diklaim utuh. Hanya BKK yang sudah selesai dan belum diklaim yang
+          bisa dipilih.
+        </span>
       </div>
 
       <div class="kk-table-wrap">
@@ -689,6 +700,7 @@ const validateSave = () => {
                   />
                   <template v-else>{{ b.akun }} - {{ b.akunNama }}</template>
                 </template>
+                <template v-else>{{ b.akunInfo }}</template>
               </td>
               <td v-if="isAtm" class="td-txt">
                 <template v-if="b.manual">
@@ -702,6 +714,7 @@ const validateSave = () => {
                   />
                   <template v-else>{{ b.ccNama }} - {{ b.dc }}</template>
                 </template>
+                <template v-else>{{ b.ccInfo }}</template>
               </td>
               <td class="td-txt">
                 <input
@@ -834,8 +847,12 @@ const validateSave = () => {
                 <td class="text-right">{{ numFmt(o.nominal) }}</td>
               </tr>
               <tr v-if="!opsi.length">
-                <td colspan="7" class="text-center text-grey py-3">
-                  Tidak ada BKK yang memenuhi syarat klaim
+                <td
+                  colspan="7"
+                  class="text-center py-3"
+                  :class="errOpsi ? 'text-error' : 'text-grey'"
+                >
+                  {{ errOpsi || "Tidak ada BKK yang memenuhi syarat klaim" }}
                 </td>
               </tr>
             </tbody>
