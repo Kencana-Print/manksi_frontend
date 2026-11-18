@@ -43,8 +43,10 @@ interface BahanItem {
   Setting?: string;
 }
 
-// Cermin aturan server: cabang spanduk hanya bahan SB, cabang lain hanya non-SB
+// Cermin aturan server: P02/P05 hanya bahan SB; HO- boleh SB dan non-SB;
+// cabang lain hanya non-SB
 const CAB_SPANDUK = ["P02", "P05"];
+const CAB_SEMUA_JENIS = ["HO-"];
 const MAX_JUMLAH = 999999.99;
 
 const route = useRoute();
@@ -151,12 +153,16 @@ const {
 
 // ── Cabang dokumen & aturan jenis bahan ──
 const cabDokumen = computed(() =>
-  isEditMode.value
+  (isEditMode.value
     ? formData.value.header.cab
-    : String(authStore.user?.cabang || "HO-"),
+    : String(authStore.user?.cabang || "HO-")
+  )
+    .trim()
+    .toUpperCase(),
 );
 
 const jenisSesuai = (kode: string): boolean =>
+  CAB_SEMUA_JENIS.includes(cabDokumen.value) ||
   kode.startsWith("SB") === CAB_SPANDUK.includes(cabDokumen.value);
 
 // ── Aksi baris ──

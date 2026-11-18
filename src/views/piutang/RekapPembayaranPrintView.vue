@@ -63,7 +63,7 @@ const fmtBulan = (ym: string): string => {
 };
 const fmt = (v: number): string =>
   Number(v ?? 0).toLocaleString("id-ID", {
-    minimumFractionDigits: 0,
+    minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
 const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
@@ -115,6 +115,11 @@ const blok = computed<BlokCetak[]>(() => {
     grup: [...grup.values()],
   }));
 });
+
+// Total dijumlahkan dari baris detail yang dicetak (subtotal tidak ikut)
+const totalCetak = computed(() =>
+  round2((data.value?.detail ?? []).reduce((s, r) => s + r.nominal, 0)),
+);
 
 const printedAt = new Date().toLocaleString("id-ID", {
   day: "2-digit",
@@ -232,7 +237,7 @@ onMounted(async () => {
             <td :colspan="mode === 'pisah' ? 4 : 3" class="tr fw-bold">
               TOTAL
             </td>
-            <td class="tr fw-bold">{{ fmt(data.total) }}</td>
+            <td class="tr fw-bold">{{ fmt(totalCetak) }}</td>
             <td></td>
           </tr>
         </tfoot>
