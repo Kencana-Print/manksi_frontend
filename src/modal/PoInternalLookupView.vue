@@ -30,7 +30,7 @@
                 </v-toolbar>
 
                 <!-- Content Area -->
-                <v-card-text class="pa-4 d-flex flex-column flex-grow-1">
+                <v-card-text class="pa-4 d-flex flex-column grow">
                     <v-text-field
                         v-model="search"
                         label="Cari Nomor PO, SPK, Nama Order, atau Supplier..."
@@ -38,7 +38,7 @@
                         variant="outlined"
                         density="compact"
                         clearable
-                        class="mb-3 flex-shrink-0"
+                        class="mb-3 shrink-0"
                         hide-details
                         @keyup.enter="fetchData"
                     >
@@ -60,7 +60,7 @@
                         :items="groupedPos"
                         :loading="loading"
                         hover
-                        class="desktop-table flex-grow-1 clickable-row border rounded"
+                        class="desktop-table grow clickable-row border rounded"
                         density="compact"
                         item-key="poi_nomor"
                         fixed-header
@@ -280,7 +280,9 @@
                                 <template #prepend>
                                     <v-checkbox-btn
                                         :model-value="
-                                            selectedSizes.includes(item.raw)
+                                            selectedSizes.includes(
+                                                (item as any).raw ?? item,
+                                            )
                                         "
                                         color="primary"
                                         density="compact"
@@ -289,7 +291,7 @@
                                     ></v-checkbox-btn>
                                 </template>
                                 <v-list-item-title class="font-weight-medium">{{
-                                    item.raw
+                                    (item as any).raw ?? item
                                 }}</v-list-item-title>
                             </v-list-item>
                         </template>
@@ -770,6 +772,12 @@ watch(
 </script>
 
 <style scoped>
+.grow {
+    flex-grow: 1 !important;
+}
+.shrink-0 {
+    flex-shrink: 0 !important;
+}
 .dialog-card {
     font-size: 13px;
 }
