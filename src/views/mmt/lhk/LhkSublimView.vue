@@ -134,16 +134,6 @@ const formatNum = (v: number) =>
     maximumFractionDigits: 2,
   }).format(v);
 
-const summaryColumns = ["total_meter"];
-
-const summaryFormatters = {
-  nomor: () => "TOTAL :",
-  total_meter: (items: any[]) =>
-    `${formatNum(
-      items.reduce((sum, item) => sum + (Number(item.total_meter) || 0), 0),
-    )} m²`,
-};
-
 const detailHeaders = [
   { title: "No. Urut", key: "No_Urut", width: "80px" },
   { title: "PO Internal", key: "No_PO_Internal", width: "170px" },

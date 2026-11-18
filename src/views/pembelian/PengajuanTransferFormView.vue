@@ -643,6 +643,9 @@ const doSearchKlaim = async () => {
       form.value.nomor,
     );
     klaimState.value.allItems = res.data.data || [];
+  } catch (e: any) {
+    klaimState.value.allItems = [];
+    toast.error(e.response?.data?.message || "Gagal memuat daftar klaim.");
   } finally {
     klaimState.value.loading = false;
   }
