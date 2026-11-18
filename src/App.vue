@@ -21,6 +21,7 @@ import { computed } from "vue";
 import { useRoute } from "vue-router";
 import DefaultLayout from "@/layouts/DefaultLayout.vue";
 import BlankLayout from "@/layouts/BlankLayout.vue";
+import AuthLayout from "@/layouts/AuthLayout.vue";
 import { usePwaUpdate } from "@/composables/usePwaUpdate";
 
 const route = useRoute();
@@ -29,6 +30,7 @@ const route = useRoute();
 const layouts: any = {
   DefaultLayout,
   BlankLayout,
+  AuthLayout,
 };
 
 // Default ke DefaultLayout jika tidak ditentukan di router
