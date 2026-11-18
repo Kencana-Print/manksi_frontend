@@ -1,5 +1,34 @@
 import api from "@/services/api";
 
+export interface StatusBeliInfo {
+  label: string;
+  color: string;
+  bg: string;
+}
+
+export const STATUS_BELI_LABEL: Record<string, StatusBeliInfo> = {
+  PENDING: { label: "Pending", color: "#e65100", bg: "#fff3e0" },
+  PARTIAL: { label: "Partial", color: "#00695c", bg: "#e0f2f1" },
+  CANCEL: { label: "Cancel", color: "#616161", bg: "#eeeeee" },
+  CLOSE: { label: "Close", color: "#37474f", bg: "#eceff1" },
+  MENUNGGU_PEMBELIAN: {
+    label: "Menunggu Pembelian",
+    color: "#1565c0",
+    bg: "#e3f2fd",
+  },
+  SUDAH_DIPENUHI: { label: "Sudah Dipenuhi", color: "#2e7d32", bg: "#e8f5e9" },
+  BELUM_DIPENUHI: { label: "Belum Dipenuhi", color: "#c62828", bg: "#ffebee" },
+  BULAN_DEPAN: { label: "Bulan Depan", color: "#7b1fa2", bg: "#f3e5f5" },
+  OTORISASI: { label: "Otorisasi", color: "#c2185b", bg: "#fce4ec" },
+};
+
+export const STATUS_BELI_PILIHAN: readonly string[] = [
+  "PENDING",
+  "PARTIAL",
+  "CANCEL",
+  "CLOSE",
+];
+
 export const dashboardService = {
   getSpkUrgent: () => api.get("/dashboard/spk-urgent"),
   getSaldoKas: () => api.get("/dashboard/saldo-kas"),
@@ -296,6 +325,25 @@ export const dashboardService = {
     nourut: number;
     catatan: string;
   }) => api.post("/dashboard/outstanding-beli/catatan", payload),
+  setEstimasiOutstandingBeli: (payload: {
+    tab: string;
+    nomor: string;
+    nourut: number;
+    estimasi: string;
+  }) => api.post("/dashboard/outstanding-beli/estimasi", payload),
+  setStatusOutstandingBeli: (payload: {
+    tab: string;
+    nomor: string;
+    nourut: number;
+    status: string;
+    alasan?: string;
+  }) => api.post("/dashboard/outstanding-beli/status", payload),
+  setProgressOutstandingBeli: (payload: {
+    tab: string;
+    nomor: string;
+    nourut: number;
+    progress: string;
+  }) => api.post("/dashboard/outstanding-beli/progress", payload),
   getPpicOutstandingSpk: (jenis: "CORPORATE" | "KAOSAN") =>
     api.get("/dashboard/ppic-outstanding-spk", { params: { jenis } }),
   getInkasoDashboard: () => api.get("/dashboard/inkaso-dashboard"),

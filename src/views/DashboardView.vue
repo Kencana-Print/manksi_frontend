@@ -12,7 +12,11 @@ import {
 } from "vue";
 import { useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/authStore";
-import { dashboardService } from "@/services/dashboard/dashboardService";
+import {
+  dashboardService,
+  STATUS_BELI_LABEL,
+  STATUS_BELI_PILIHAN,
+} from "@/services/dashboard/dashboardService";
 import {
   IconX,
   IconFileAlert,
@@ -42,7 +46,7 @@ import ProductionFlow from "@/components/dashboard/ProductionFlow.vue";
 import api from "@/services/api";
 import { exportExcelSingle } from "@/utils/excelExport";
 import { exportExcelMulti } from "@/utils/excelExportMulti";
-import { formatTanggalJam } from "@/utils/dateFormat";
+import { formatTanggalJam, formatTglIso } from "@/utils/dateFormat";
 import { swr, setSnapshotScope, hasSnapshot } from "@/utils/snapshot";
 import { runFresh } from "@/utils/freshMode";
 
@@ -4385,6 +4389,14 @@ interface OutstandingBeliItem {
   QtyBeli: number;
   Kekurangan: number;
   Catatan: string;
+  Estimasi: string | null;
+  AsumsiTanggal: string | null;
+  AsumsiHari: number | null;
+  AsumsiSampel: number | null;
+  AsumsiPo: string | null;
+  AsumsiSupplier: string | null;
+  Status: string | null;
+  Progress: string | null;
 }
 const OB_TABS = [
   { value: "ATK", label: "ATK" },
@@ -4453,6 +4465,164 @@ const saveCatatanOb = async (r: OutstandingBeliItem, ev: Event) => {
     obCatatanSaving.value = next;
   }
 };
+
+const obEstimasiSaving = ref<Set<string>>(new Set());
+
+const saveEstimasiOb = async (r: OutstandingBeliItem, ev: Event) => {
+  const el = ev.target as HTMLInputElement;
+  const nilai = el.value; // "YYYY-MM-DD" atau "" (hapus)
+  if (nilai === (r.Estimasi || "")) return;
+
+  const key = obRowKey(r);
+  obEstimasiSaving.value = new Set(obEstimasiSaving.value).add(key);
+  try {
+    await dashboardService.setEstimasiOutstandingBeli({
+      tab: obTab.value,
+      nomor: r.Nomor,
+      nourut: r.Nourut,
+      estimasi: nilai,
+    });
+    r.Estimasi = nilai || null;
+  } catch (e: unknown) {
+    el.value = r.Estimasi || "";
+    showObError(
+      (e as { response?: { data?: { message?: string } } })?.response?.data
+        ?.message || "Gagal menyimpan estimasi.",
+    );
+  } finally {
+    const next = new Set(obEstimasiSaving.value);
+    next.delete(key);
+    obEstimasiSaving.value = next;
+  }
+};
+
+const STATUS_MENUTUP = ["CANCEL", "CLOSE"];
+const obStatusSaving = ref<Set<string>>(new Set());
+const obProgressSaving = ref<Set<string>>(new Set());
+const obStatusDialog = ref(false);
+const obStatusAlasan = ref("");
+const obStatusTarget = ref<{ row: OutstandingBeliItem; status: string } | null>(
+  null,
+);
+let obStatusEl: HTMLSelectElement | null = null;
+
+const statusAdaDiPilihan = (s: string | null): boolean =>
+  !!s && STATUS_BELI_PILIHAN.includes(s);
+
+const pilihanStatusOb = computed(() =>
+  obTab.value === "PENGAJUAN_DANA"
+    ? STATUS_BELI_PILIHAN.filter((s) => s !== "PARTIAL")
+    : STATUS_BELI_PILIHAN,
+);
+
+const saveProgressOb = async (r: OutstandingBeliItem, ev: Event) => {
+  const el = ev.target as HTMLInputElement;
+  const teks = el.value.trim();
+  if (teks === (r.Progress || "")) return;
+
+  const key = obRowKey(r);
+  obProgressSaving.value = new Set(obProgressSaving.value).add(key);
+  try {
+    await dashboardService.setProgressOutstandingBeli({
+      tab: obTab.value,
+      nomor: r.Nomor,
+      nourut: r.Nourut,
+      progress: teks,
+    });
+    r.Progress = teks || null;
+    el.value = teks;
+  } catch (e: unknown) {
+    el.value = r.Progress || "";
+    showObError(
+      (e as { response?: { data?: { message?: string } } })?.response?.data
+        ?.message || "Gagal menyimpan progress.",
+    );
+  } finally {
+    const next = new Set(obProgressSaving.value);
+    next.delete(key);
+    obProgressSaving.value = next;
+  }
+};
+
+const simpanStatusOb = async (
+  r: OutstandingBeliItem,
+  status: string,
+  alasan: string,
+  el: HTMLSelectElement | null,
+) => {
+  const key = obRowKey(r);
+  obStatusSaving.value = new Set(obStatusSaving.value).add(key);
+  try {
+    await dashboardService.setStatusOutstandingBeli({
+      tab: obTab.value,
+      nomor: r.Nomor,
+      nourut: r.Nourut,
+      status,
+      alasan,
+    });
+    if (STATUS_MENUTUP.includes(status)) {
+      // item ditutup di server → keluar dari Outstanding
+      obList.value = obList.value.filter((x) => obRowKey(x) !== key);
+      obTotal.value = Math.max(0, obTotal.value - 1);
+      obOffset.value = Math.max(0, obOffset.value - 1);
+      const t = obTab.value;
+      obSummary.value = {
+        ...obSummary.value,
+        [t]: Math.max(0, Number(obSummary.value[t] || 0) - 1),
+      };
+    } else {
+      r.Status = status || null;
+    }
+  } catch (e: unknown) {
+    if (el) el.value = r.Status || "";
+    showObError(
+      (e as { response?: { data?: { message?: string } } })?.response?.data
+        ?.message || "Gagal menyimpan status.",
+    );
+  } finally {
+    const next = new Set(obStatusSaving.value);
+    next.delete(key);
+    obStatusSaving.value = next;
+  }
+};
+
+const onChangeStatusOb = (r: OutstandingBeliItem, ev: Event) => {
+  const el = ev.target as HTMLSelectElement;
+  const status = el.value;
+  if (status === (r.Status || "")) return;
+  if (STATUS_MENUTUP.includes(status)) {
+    obStatusEl = el;
+    obStatusTarget.value = { row: r, status };
+    obStatusAlasan.value = "";
+    obStatusDialog.value = true;
+    return;
+  }
+  void simpanStatusOb(r, status, "", el);
+};
+
+const konfirmasiStatusOb = async () => {
+  const t = obStatusTarget.value;
+  const alasan = obStatusAlasan.value.trim();
+  if (!t || !alasan) return;
+  obStatusDialog.value = false;
+  await simpanStatusOb(t.row, t.status, alasan, obStatusEl);
+  obStatusTarget.value = null;
+  obStatusEl = null;
+};
+
+const batalStatusOb = () => {
+  if (obStatusTarget.value && obStatusEl) {
+    obStatusEl.value = obStatusTarget.value.row.Status || "";
+  }
+  obStatusDialog.value = false;
+  obStatusTarget.value = null;
+  obStatusEl = null;
+};
+
+const asumsiTitle = (r: OutstandingBeliItem): string =>
+  r.AsumsiTanggal
+    ? `Median ${r.AsumsiHari} hari dari tgl PO, ${r.AsumsiSampel} PO terakhir supplier ${r.AsumsiSupplier}. PO: ${r.AsumsiPo}`
+    : "";
 
 const loadMoreOb = async () => {
   if (!obHasMore.value || isLoadingMoreOb.value) return;
@@ -4761,6 +4931,10 @@ const exportObExcel = async () => {
           numFmt: "#,##0",
           align: "right" as const,
         },
+        { header: "Asumsi Datang", key: "asumsi", width: 16 },
+        { header: "Estimasi Datang", key: "estimasi", width: 16 },
+        { header: "Status", key: "status", width: 14 },
+        { header: "Progress", key: "progress", width: 30 },
         { header: "Catatan", key: "catatan", width: 36 },
       ],
       rows: rows.map((r) => ({
@@ -4773,6 +4947,10 @@ const exportObExcel = async () => {
         qtyBeli: Number(r.QtyBeli) || 0,
         kekurangan: Number(r.Kekurangan) || 0,
         waktuTunggu: Number(r.WaktuTunggu) || 0,
+        asumsi: formatTglIso(r.AsumsiTanggal) || "-",
+        estimasi: formatTglIso(r.Estimasi) || "-",
+        status: (r.Status && STATUS_BELI_LABEL[r.Status]?.label) || "",
+        progress: r.Progress || "",
         catatan: r.Catatan || "",
       })),
     }));
@@ -11635,7 +11813,7 @@ const sisaClass = (item: any) => {
           <div class="panel-body">
             <DashState v-if="isLoadingPembelian" kind="loading" />
             <div v-else style="overflow: auto; max-height: 560px">
-              <table class="gb-tbl" style="min-width: 1200px">
+              <table class="gb-tbl" style="min-width: 1800px">
                 <thead>
                   <tr>
                     <th style="width: 150px">No. Pengajuan</th>
@@ -11646,6 +11824,10 @@ const sisaClass = (item: any) => {
                     <th class="tr" style="width: 90px">Qty Beli</th>
                     <th class="tr" style="width: 100px">Kekurangan</th>
                     <th class="tc" style="width: 110px">Waktu Tunggu</th>
+                    <th class="tc" style="width: 140px">Asumsi Datang</th>
+                    <th style="width: 140px">Estimasi Datang</th>
+                    <th class="tc" style="width: 130px">Status</th>
+                    <th style="width: 220px">Progress</th>
                     <th style="width: 240px">Catatan</th>
                   </tr>
                 </thead>
@@ -11678,6 +11860,83 @@ const sisaClass = (item: any) => {
                         >{{ r.WaktuTunggu }} hari</span
                       >
                     </td>
+                    <td class="tc" style="white-space: nowrap">
+                      <span
+                        v-if="r.AsumsiTanggal"
+                        :title="asumsiTitle(r)"
+                        style="cursor: help"
+                      >
+                        {{ formatTglIso(r.AsumsiTanggal) }}
+                        <span class="text-grey">(~{{ r.AsumsiHari }} hr)</span>
+                      </span>
+                      <span v-else class="text-grey">-</span>
+                    </td>
+                    <td>
+                      <input
+                        v-if="canEditCatatanOb"
+                        type="date"
+                        :value="r.Estimasi ?? ''"
+                        class="ob-note-inp"
+                        :class="{
+                          'ob-note-inp--busy': obEstimasiSaving.has(
+                            obRowKey(r),
+                          ),
+                        }"
+                        :disabled="obEstimasiSaving.has(obRowKey(r))"
+                        @change="saveEstimasiOb(r, $event)"
+                      />
+                      <span v-else>{{ formatTglIso(r.Estimasi) || "-" }}</span>
+                    </td>
+                    <td class="tc">
+                      <select
+                        v-if="canEditCatatanOb"
+                        :value="r.Status ?? ''"
+                        class="ob-note-inp"
+                        :class="{
+                          'ob-note-inp--busy': obStatusSaving.has(obRowKey(r)),
+                        }"
+                        :disabled="obStatusSaving.has(obRowKey(r))"
+                        @change="onChangeStatusOb(r, $event)"
+                      >
+                        <option value="">-</option>
+                        <option
+                          v-if="r.Status && !statusAdaDiPilihan(r.Status)"
+                          :value="r.Status"
+                          disabled
+                        >
+                          {{ STATUS_BELI_LABEL[r.Status]?.label ?? r.Status }}
+                        </option>
+                        <option
+                          v-for="s in pilihanStatusOb"
+                          :key="s"
+                          :value="s"
+                        >
+                          {{ STATUS_BELI_LABEL[s].label }}
+                        </option>
+                      </select>
+                      <span v-else>{{
+                        (r.Status && STATUS_BELI_LABEL[r.Status]?.label) || "-"
+                      }}</span>
+                    </td>
+                    <td>
+                      <input
+                        v-if="canEditCatatanOb"
+                        :value="r.Progress ?? ''"
+                        class="ob-note-inp"
+                        :class="{
+                          'ob-note-inp--busy': obProgressSaving.has(
+                            obRowKey(r),
+                          ),
+                        }"
+                        :disabled="obProgressSaving.has(obRowKey(r))"
+                        maxlength="255"
+                        placeholder="Progress..."
+                        @change="saveProgressOb(r, $event)"
+                      />
+                      <span v-else style="color: var(--dsh-ink-2)">{{
+                        r.Progress || "-"
+                      }}</span>
+                    </td>
                     <td>
                       <input
                         v-if="canEditCatatanOb"
@@ -11697,7 +11956,7 @@ const sisaClass = (item: any) => {
                     </td>
                   </tr>
                   <tr v-if="!obList.length && !isLoadingMoreOb">
-                    <td colspan="9" class="text-center text-grey py-3">
+                    <td colspan="13" class="text-center text-grey py-3">
                       Tidak ada outstanding untuk tab ini
                     </td>
                   </tr>
@@ -12961,7 +13220,7 @@ const sisaClass = (item: any) => {
             border-top: 3px solid #c62828;
           "
         >
-          Catatan Tidak Tersimpan
+          Tidak Tersimpan
         </v-card-title>
         <v-card-text class="pa-4 pt-2" style="font-size: 12px">
           {{ obErrorMsg }}
@@ -12970,6 +13229,54 @@ const sisaClass = (item: any) => {
           <v-spacer />
           <v-btn color="primary" variant="flat" @click="obErrorDialog = false">
             OK
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <v-dialog v-model="obStatusDialog" max-width="400" persistent>
+      <v-card rounded="lg">
+        <v-card-title
+          class="pa-4 pb-2"
+          style="
+            font-size: 13px;
+            font-weight: 700;
+            border-top: 3px solid #c62828;
+          "
+        >
+          {{ obStatusTarget?.status === "CANCEL" ? "Cancel" : "Close" }} Item
+        </v-card-title>
+        <v-card-text class="pa-4 pt-2" style="font-size: 12px">
+          <div class="mb-2">
+            <b>{{ obStatusTarget?.row.Nomor }}</b> ·
+            {{ obStatusTarget?.row.Item }}
+          </div>
+          <div class="mb-3" style="color: #c62828">
+            Item akan hilang dari Outstanding Beli dan tidak bisa dibuka kembali
+            dari sini.
+          </div>
+          <v-textarea
+            v-model="obStatusAlasan"
+            label="Alasan (wajib)"
+            variant="outlined"
+            density="compact"
+            rows="2"
+            maxlength="255"
+            counter
+            hide-details="auto"
+            autofocus
+          />
+        </v-card-text>
+        <v-card-actions class="pa-3">
+          <v-spacer />
+          <v-btn variant="text" @click="batalStatusOb">Batal</v-btn>
+          <v-btn
+            color="error"
+            variant="flat"
+            :disabled="!obStatusAlasan.trim()"
+            @click="konfirmasiStatusOb"
+          >
+            Ya, {{ obStatusTarget?.status === "CANCEL" ? "Cancel" : "Close" }}
           </v-btn>
         </v-card-actions>
       </v-card>

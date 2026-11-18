@@ -18,7 +18,12 @@ import {
   IconCalendarEvent,
   IconPhoto,
 } from "@tabler/icons-vue";
-import { formatTanggal, formatTanggalJam } from "@/utils/dateFormat";
+import {
+  formatTanggal,
+  formatTanggalJam,
+  formatDaftarTanggal,
+} from "@/utils/dateFormat";
+import { STATUS_BELI_LABEL } from "@/services/dashboard/dashboardService";
 
 interface ExportDetailItem {
   Nomor: string;
@@ -113,6 +118,8 @@ const headers = [
   { title: "Nomor", key: "Nomor", width: "140px", fixed: true },
   { title: "Jenis", key: "Jenis", width: "100px" },
   { title: "Tanggal", key: "Tanggal", width: "95px", align: "center" },
+  { title: "Estimasi", key: "Estimasi", width: "150px" },
+  { title: "Status Beli", key: "StatusBeli", width: "110px", align: "center" },
   { title: "Keterangan", key: "Keterangan", minWidth: "220px" },
   { title: "Minta Ke", key: "MintaKe", width: "90px", align: "center" },
   { title: "Priority", key: "Priority", width: "90px", align: "center" },
@@ -638,6 +645,33 @@ const submitEstimasi = async () => {
       {{ item.Status === "" || !item.Status ? "OPEN" : item.Status }}
     </template>
 
+    <template #item.StatusBeli="{ item }">
+      <v-chip
+        v-if="item.StatusBeli && STATUS_BELI_LABEL[item.StatusBeli]"
+        size="x-small"
+        :style="{
+          backgroundColor: STATUS_BELI_LABEL[item.StatusBeli].bg,
+          color: STATUS_BELI_LABEL[item.StatusBeli].color,
+        }"
+        class="font-weight-bold"
+      >
+        {{ STATUS_BELI_LABEL[item.StatusBeli].label }}
+      </v-chip>
+      <span v-else class="text-grey">-</span>
+    </template>
+
+    <template #item.Estimasi="{ item }">
+      <div v-if="item.Estimasi" class="est-wrap">
+        <span
+          v-for="t in formatDaftarTanggal(item.Estimasi)"
+          :key="t"
+          class="est-chip"
+          >{{ t }}</span
+        >
+      </div>
+      <span v-else class="text-grey">-</span>
+    </template>
+
     <template #item.Nomor="{ item }">
       <span :class="getNomorClass(item)">{{ item.Nomor }}</span>
     </template>
@@ -944,6 +978,21 @@ const submitEstimasi = async () => {
 }
 .badge-tolak {
   background: #c62828;
+}
+
+/* Estimasi (beberapa tanggal, wrap) */
+.est-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  white-space: normal;
+  padding: 2px 0;
+}
+.est-chip {
+  font-size: 11px;
+  font-weight: 600;
+  color: #1565c0;
+  white-space: nowrap;
 }
 
 /* Expand Detail Styling */

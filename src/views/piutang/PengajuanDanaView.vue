@@ -15,12 +15,13 @@ import {
   IconFileSpreadsheet,
   IconCircleCheck,
 } from "@tabler/icons-vue";
-import { formatTanggal } from "@/utils/dateFormat";
+import { formatTanggal, formatDaftarTanggal } from "@/utils/dateFormat";
 import {
   exportExcel,
   exportExcelSingle,
   type ExcelColumn,
 } from "@/utils/excelExport";
+import { STATUS_BELI_LABEL } from "@/services/dashboard/dashboardService";
 
 const authStore = useAuthStore();
 const toast = useToast();
@@ -51,6 +52,7 @@ const masterHeaders = [
     width: "150px",
     align: "center",
   },
+  { title: "Estimasi", key: "Estimasi", width: "150px" },
   { title: "Nomor", key: "Nomor", width: "150px" },
   { title: "Tanggal", key: "Tanggal", width: "95px", align: "center" },
   { title: "Nik", key: "Nik", width: "70px" },
@@ -134,23 +136,8 @@ const getStatusInfo = (
   return { label: "Menunggu Close", color: "#00838F", bg: "#E0F7FA" };
 };
 
-const STATUS_FINANCE_LABEL: Record<
-  string,
-  { label: string; color: string; bg: string }
-> = {
-  PENDING: { label: "Pending", color: "#e65100", bg: "#fff3e0" },
-  MENUNGGU_PEMBELIAN: {
-    label: "Menunggu Pembelian",
-    color: "#1565c0",
-    bg: "#e3f2fd",
-  },
-  SUDAH_DIPENUHI: { label: "Sudah Dipenuhi", color: "#2e7d32", bg: "#e8f5e9" },
-  BELUM_DIPENUHI: { label: "Belum Dipenuhi", color: "#c62828", bg: "#ffebee" },
-  BULAN_DEPAN: { label: "Bulan Depan", color: "#7b1fa2", bg: "#f3e5f5" },
-  OTORISASI: { label: "Otorisasi", color: "#c2185b", bg: "#fce4ec" },
-};
 const getStatusFinanceInfo = (row: any) =>
-  STATUS_FINANCE_LABEL[row.StatusFinance] || null;
+  STATUS_BELI_LABEL[row.StatusFinance] || null;
 
 const getRowProps = (data: any) => {
   const row = data.item?.raw || data.item;
@@ -285,6 +272,7 @@ const onExportMaster = async () => {
   const columns: ExcelColumn[] = [
     { header: "Nomor", key: "Nomor", width: 18 },
     { header: "Tanggal", key: "Tanggal", width: 13, align: "center" },
+    { header: "Estimasi", key: "Estimasi", width: 24 },
     { header: "Nik", key: "Nik", width: 10 },
     { header: "Nama", key: "Nama", width: 20 },
     { header: "Lokasi", key: "Lokasi", width: 10 },
@@ -306,6 +294,7 @@ const onExportMaster = async () => {
     items.value.map((r: any) => ({
       ...r,
       Tanggal: formatTanggal(r.Tanggal),
+      Estimasi: formatDaftarTanggal(r.Estimasi).join(", "),
     })),
     "HISTORI PENGAJUAN DANA",
   );
@@ -612,6 +601,18 @@ const fmtNum = (val: number) =>
       {{ formatTanggal(item.Tanggal) }}
     </template>
 
+    <template #item.Estimasi="{ item }">
+      <div v-if="item.Estimasi" class="est-wrap">
+        <span
+          v-for="t in formatDaftarTanggal(item.Estimasi)"
+          :key="t"
+          class="est-chip"
+          >{{ t }}</span
+        >
+      </div>
+      <span v-else class="text-grey">-</span>
+    </template>
+
     <template #detail="{ item }">
       <div class="detail-wrap">
         <div v-if="detailLoading[item.Nomor]" class="detail-loading">
@@ -851,6 +852,19 @@ const fmtNum = (val: number) =>
   height: 10px;
   border-radius: 50%;
   flex-shrink: 0;
+}
+.est-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  white-space: normal;
+  padding: 2px 0;
+}
+.est-chip {
+  font-size: 11px;
+  font-weight: 600;
+  color: #1565c0;
+  white-space: nowrap;
 }
 
 .detail-wrap {

@@ -49,6 +49,7 @@ interface PenyelesaianDetail {
   mb: string;
   jenis_item: string;
   cab_item: string;
+  bpb: string;
 }
 
 interface RealisasiFormState {
@@ -67,6 +68,7 @@ interface RealisasiFormState {
   keterangan: string;
   cabang: string;
   is_edit: boolean;
+  wajib_bpb: boolean;
   info_permintaan: any;
   mode_laci: boolean;
   mode_pd: boolean;
@@ -135,6 +137,7 @@ const form = ref<RealisasiFormState>({
   keterangan: "",
   cabang: "P01",
   is_edit: false,
+  wajib_bpb: false,
   info_permintaan: null,
   mode_laci: false,
   mode_pd: false,
@@ -169,6 +172,7 @@ const columns = [
   { key: "jenis_item", label: "Jenis" },
   { key: "cab_item", label: "Cab" },
   { key: "kdbrg", label: "Kd.Brg" },
+  { key: "bpb", label: "No. BPB" },
   { key: "aksi", label: "" },
 ];
 
@@ -366,6 +370,49 @@ const selectMb = (item: any) => {
 const selectIv = (item: any) => {
   loadDetailBaru(item.invoice, "invoice-garmen");
   showModalIv.value = false;
+};
+
+// ── BPB Non Bahan ─────────────────────────────────────────────────────
+// Nomor permintaan pembelian (MBA/MBO/MBS/MBK) yang terkait baris ini.
+// ga=2: dari kasbon item (d.mb); ga=0: dari link baris (d.pjh).
+const mbTerkait = (d: PenyelesaianDetail): string => {
+  if (d.ga === 2) return d.mb || "";
+  if (d.ga === 0 && /^MB[AOSK]/.test(d.pjh || "")) return d.pjh;
+  return "";
+};
+
+const showModalBpb = ref(false);
+const activeBpbIdx = ref(-1);
+const optBpb = ref<{ bpb: string; qty: number; nama: string }[]>([]);
+
+// Pakai ulang endpoint detail permintaan garmen: hasilnya satu baris per BPB-item
+const openBpbModal = async (idx: number) => {
+  const d = form.value.detail[idx];
+  const mb = mbTerkait(d);
+  if (!mb) return;
+  activeBpbIdx.value = idx;
+  try {
+    const rows: PenyelesaianDetail[] =
+      await uangMukaPenyelesaianApi.getDetailPermintaanGarmen(mb);
+    optBpb.value = rows
+      .filter((r) => r.kdbrg === d.kdbrg)
+      .map((r) => ({ bpb: r.bpb, qty: r.qty, nama: r.uraian }));
+    if (!optBpb.value.length) {
+      toast.warning(
+        "Belum ada BPB non bahan untuk barang ini. Minta Gudang menyimpan BPB-nya dahulu.",
+      );
+      return;
+    }
+    showModalBpb.value = true;
+  } catch {
+    toast.error("Gagal memuat BPB.");
+  }
+};
+
+const selectBpb = (item: { bpb: string }) => {
+  if (activeBpbIdx.value < 0) return;
+  form.value.detail[activeBpbIdx.value].bpb = item.bpb;
+  showModalBpb.value = false;
 };
 
 // ── Search Modal: Account ─────────────────────────────────────────────
@@ -665,6 +712,7 @@ const addRow = () => {
     mb: "",
     jenis_item: "",
     cab_item: "",
+    bpb: "",
   });
 };
 
@@ -767,6 +815,12 @@ const validateSave = () => {
     if (d.mb && !d.kdsup) {
       toast.warning(
         `Supplier harus diisi untuk Permintaan Garmen: ${d.uraian}`,
+      );
+      return;
+    }
+    if (form.value.wajib_bpb && mbTerkait(d) && !d.bpb) {
+      toast.warning(
+        `No. BPB non bahan wajib diisi untuk: ${d.uraian}. Minta Gudang menyimpan BPB-nya dahulu.`,
       );
       return;
     }
@@ -887,6 +941,7 @@ const onQtyFocus = (d: PenyelesaianDetail, e: Event) => {
 const rowClass = (d: PenyelesaianDetail) => {
   if (!d.verified) return "row-unverified";
   if (d.verified && d.reknama === "") return "row-warn";
+  if (form.value.wajib_bpb && mbTerkait(d) && !d.bpb) return "row-warn";
   return "";
 };
 
@@ -1332,6 +1387,25 @@ const onStatusFinanceChange = async (d: PenyelesaianDetail, idx: number) => {
                 <td>
                   <span class="cell-text">{{ d.kdbrg || "-" }}</span>
                 </td>
+                <td>
+                  <div
+                    v-if="mbTerkait(d)"
+                    class="d-flex align-center gap-1"
+                    @click.stop
+                  >
+                    <span class="cell-text mono">{{ d.bpb || "-" }}</span>
+                    <button
+                      v-if="d.ga === 2"
+                      type="button"
+                      class="sup-btn"
+                      title="Pilih BPB"
+                      @click.stop.prevent="openBpbModal(idx)"
+                    >
+                      <IconSearch :size="11" />
+                    </button>
+                  </div>
+                  <span v-else class="cell-text">-</span>
+                </td>
 
                 <td class="tc">
                   <button
@@ -1345,7 +1419,7 @@ const onStatusFinanceChange = async (d: PenyelesaianDetail, idx: number) => {
                 </td>
               </tr>
               <tr v-if="!form.detail.length">
-                <td colspan="24" class="empty-td">Belum ada item.</td>
+                <td colspan="25" class="empty-td">Belum ada item.</td>
               </tr>
             </tbody>
           </table>
@@ -1839,6 +1913,20 @@ const onStatusFinanceChange = async (d: PenyelesaianDetail, idx: number) => {
     search-placeholder="Cari Invoice..."
     :search-keys="['invoice', 'jenis']"
   />
+
+  <GenericPickerModal
+    v-model="showModalBpb"
+    title="BPB Non Bahan"
+    :columns="[
+      { key: 'bpb', title: 'No. BPB' },
+      { key: 'nama', title: 'Barang' },
+      { key: 'qty', title: 'Qty BPB', align: 'right' },
+    ]"
+    :items="optBpb"
+    @selected="selectBpb"
+    search-placeholder="Cari BPB..."
+    :search-keys="['bpb', 'nama']"
+  />
 </template>
 
 <style scoped>
@@ -2316,11 +2404,58 @@ const onStatusFinanceChange = async (d: PenyelesaianDetail, idx: number) => {
 }
 .rl-table th:nth-child(24),
 .rl-table td:nth-child(24) {
-  width: 80px;
+  width: 130px;
 }
 .rl-table th:nth-child(25),
 .rl-table td:nth-child(25) {
   width: 28px;
+}
+/* ── Freeze kolom 1–7 (Kode s/d Qty Beli) ── */
+.rl-table th:nth-child(-n + 7),
+.rl-table td:nth-child(-n + 7) {
+  position: sticky;
+}
+.rl-table th:nth-child(1),
+.rl-table td:nth-child(1) {
+  left: 0;
+}
+.rl-table th:nth-child(2),
+.rl-table td:nth-child(2) {
+  left: 35px;
+}
+.rl-table th:nth-child(3),
+.rl-table td:nth-child(3) {
+  left: 155px;
+}
+.rl-table th:nth-child(4),
+.rl-table td:nth-child(4) {
+  left: 305px;
+}
+.rl-table th:nth-child(5),
+.rl-table td:nth-child(5) {
+  left: 395px;
+}
+.rl-table th:nth-child(6),
+.rl-table td:nth-child(6) {
+  left: 450px;
+}
+.rl-table th:nth-child(7),
+.rl-table td:nth-child(7) {
+  left: 540px;
+}
+/* sel beku wajib berlatar solid supaya kolom yang digulir tidak tembus */
+.rl-table tbody td:nth-child(-n + 7) {
+  background: #fff;
+  z-index: 1;
+}
+/* header beku harus di atas header yang ikut tergulir (z-index 2) */
+.rl-table thead th:nth-child(-n + 7) {
+  z-index: 4;
+}
+/* garis pemisah di tepi kanan Qty Beli (border collapse hilang saat sticky) */
+.rl-table th:nth-child(7),
+.rl-table td:nth-child(7) {
+  box-shadow: 2px 0 4px -2px rgba(0, 0, 0, 0.3);
 }
 
 .sisa-radio-row {

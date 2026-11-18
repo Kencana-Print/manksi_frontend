@@ -628,6 +628,11 @@ onMounted(async () => {
                     <td class="w-colon">:</td>
                     <td>{{ data.spk_kain }}</td>
                   </tr>
+                  <tr v-if="data.spk_mppb">
+                    <td class="w-label">No. MPPB</td>
+                    <td class="w-colon">:</td>
+                    <td class="fw">{{ data.spk_mppb }}</td>
+                  </tr>
                   <tr>
                     <td class="w-label">Gramasi</td>
                     <td class="w-colon">:</td>
@@ -875,6 +880,11 @@ onMounted(async () => {
                 <td class="w-label">Bahan</td>
                 <td class="w-colon">:</td>
                 <td colspan="3">{{ data.spk_kain }}</td>
+              </tr>
+              <tr v-if="data.spk_mppb">
+                <td class="w-label">No. MPPB</td>
+                <td class="w-colon">:</td>
+                <td colspan="3" class="fw">{{ data.spk_mppb }}</td>
               </tr>
               <tr>
                 <td class="w-label">Gramasi</td>

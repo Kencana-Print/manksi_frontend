@@ -27,18 +27,41 @@ export const formatTanggal = (v: string | null | undefined): string => {
 
   // dd-Month-yyyy / dd Month yyyy (e.g. 02-November-2026, 02-Nov-2026, 2-May-2024)
   const monthMap: Record<string, string> = {
-    jan: "01", january: "01", januari: "01",
-    feb: "02", february: "02", februari: "02",
-    mar: "03", march: "03", maret: "03",
-    apr: "04", april: "04",
-    may: "05", mei: "05",
-    jun: "06", june: "06", juni: "06",
-    jul: "07", july: "07", juli: "07",
-    aug: "08", august: "08", agustus: "08", agu: "08",
-    sep: "09", september: "09",
-    oct: "10", october: "10", oktober: "10", okt: "10",
-    nov: "11", november: "11",
-    dec: "12", december: "12", desember: "12", des: "12",
+    jan: "01",
+    january: "01",
+    januari: "01",
+    feb: "02",
+    february: "02",
+    februari: "02",
+    mar: "03",
+    march: "03",
+    maret: "03",
+    apr: "04",
+    april: "04",
+    may: "05",
+    mei: "05",
+    jun: "06",
+    june: "06",
+    juni: "06",
+    jul: "07",
+    july: "07",
+    juli: "07",
+    aug: "08",
+    august: "08",
+    agustus: "08",
+    agu: "08",
+    sep: "09",
+    september: "09",
+    oct: "10",
+    october: "10",
+    oktober: "10",
+    okt: "10",
+    nov: "11",
+    november: "11",
+    dec: "12",
+    december: "12",
+    desember: "12",
+    des: "12",
   };
   const textMonthMatch = s.match(/^(\d{1,2})[- /]([A-Za-z]+)[- /](\d{4})/);
   if (textMonthMatch) {
@@ -223,3 +246,14 @@ export const formatTanggalSingkat = (v: string | null | undefined): string => {
   if (!y || !m || !d) return "-";
   return `${d} ${BULAN_SINGKAT[m - 1]} ${String(y).slice(2)}`;
 };
+
+export const formatTglIso = (iso: string | null | undefined): string => {
+  const [y, m, d] = (iso ?? "").slice(0, 10).split("-");
+  return y && m && d ? `${d}/${m}/${y}` : "";
+};
+
+export const formatDaftarTanggal = (csv: string | null | undefined): string[] =>
+  (csv ?? "")
+    .split(",")
+    .map((s) => formatTglIso(s.trim()))
+    .filter(Boolean);
