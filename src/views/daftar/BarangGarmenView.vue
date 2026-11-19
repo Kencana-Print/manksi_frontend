@@ -70,6 +70,7 @@ const showFilterSparepart = computed(() => {
   return [
     "TEKNISI",
     "IT",
+    "GA",
     "FINANCE",
     "AUDIT",
     "DIREKSI",

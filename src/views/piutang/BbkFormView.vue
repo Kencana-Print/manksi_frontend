@@ -12,6 +12,9 @@ import RekapPanggilModal, {
   type RekapOption,
   type RekapRow,
 } from "@/components/lookups/RekapPanggilModal.vue";
+import VoucherPanggilModal, {
+  type VoucherRow,
+} from "@/components/lookups/VoucherPanggilModal.vue";
 import KlaimPanggilModal, {
   type KlaimOption,
 } from "@/components/lookups/KlaimPanggilModal.vue";
@@ -22,6 +25,7 @@ import {
   IconSearch,
   IconShoppingCartPlus,
   IconSettings,
+  IconReceipt,
 } from "@tabler/icons-vue";
 
 const route = useRoute();
@@ -433,12 +437,27 @@ const pilihRekapRows = (rows: RekapRow[]) => {
     });
     tambah++;
   });
-  toast.success(`${tambah} voucher dari rekap ditambahkan.`);
+  toast.success(`${tambah} voucher ditambahkan.`);
   if (perluCek > 0)
     toast.warning(
       `${perluCek} voucher perlu cek rekening (kosong atau lebih dari satu). Periksa lewat tombol Detail.`,
     );
 };
+
+// ── Panggil Voucher langsung (tanpa Rekap/PJT) ──
+const showVoucherModal = ref(false);
+const fetchVoucherOptions = async (search: string): Promise<VoucherRow[]> => {
+  const res = await bbkFormService.getVoucherOptions(
+    search,
+    isEditMode.value ? String(route.params.nomor || "") : "",
+  );
+  return res.data.data || [];
+};
+const voucherTerpakai = computed<string[]>(() =>
+  formData.value.Detail.map((d: { vou?: string }) => d.vou || "").filter(
+    Boolean,
+  ),
+);
 
 // ── Panggil Klaim Kas Kecil ──
 const showKlaimModal = ref(false);
@@ -736,6 +755,19 @@ const pilihCetak = () => {
               @click="showRekapModal = true"
             >
               <IconSearch :size="14" class="mr-1" /> Panggil Rekap
+            </button>
+            <button
+              type="button"
+              class="btn-add btn-secondary"
+              :disabled="formData.Cabang !== 'P01'"
+              :title="
+                formData.Cabang !== 'P01'
+                  ? 'Voucher hanya untuk cabang P01'
+                  : ''
+              "
+              @click="showVoucherModal = true"
+            >
+              <IconReceipt :size="14" class="mr-1" /> Panggil Voucher
             </button>
             <button
               type="button"
@@ -1128,6 +1160,12 @@ const pilihCetak = () => {
     :fetch-rows="fetchRekapRows"
     @pilih="pilihRekapRows"
   />
+  <VoucherPanggilModal
+    v-model="showVoucherModal"
+    :fetch-options="fetchVoucherOptions"
+    :exclude-nomor="voucherTerpakai"
+    @pilih="pilihRekapRows"
+  />
   <KlaimPanggilModal
     v-model="showKlaimModal"
     :fetch-options="fetchKlaimOptions"
@@ -1262,7 +1300,7 @@ const pilihCetak = () => {
           <v-divider class="my-3" />
           <div class="dr-section-title">Referensi</div>
           <div class="dr-hint">
-            Dari Rekap Pembayaran, voucher <b>{{ activeDetailRow.vou }}</b
+            Voucher <b>{{ activeDetailRow.vou }}</b
             >. Supplier dan nominal mengikuti voucher dan tidak bisa diubah.
             Bank/rekening boleh dipilih.
           </div>

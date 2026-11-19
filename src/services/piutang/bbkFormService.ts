@@ -51,6 +51,8 @@ export const bbkFormService = {
   getRekapOptions(search: string) {
     return api.get("/piutang/bbk-form/rekap-options", { params: { search } });
   },
+  getVoucherOptions: (search: string, nomor = "") =>
+    api.get("/piutang/bbk-form/voucher-options", { params: { search, nomor } }),
   getRekapRows(nomor: string) {
     return api.get("/piutang/bbk-form/rekap-rows", { params: { nomor } });
   },
