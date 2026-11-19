@@ -139,7 +139,9 @@ const xtotalDetail = computed(() =>
   detail.value.reduce((s, d) => {
     if (!d.tipe) return s;
     if (
-      ["BPB", "BPJ", "POE", "MMT", "BPE", "BPG", "POL", "POB"].includes(d.tipe)
+      ["BPB", "BPJ", "POE", "MMT", "BPE", "BPG", "POL", "POB", "PON"].includes(
+        d.tipe,
+      )
     )
       return s + (Number(d.total) || 0);
     if (["RET", "PJG"].includes(d.tipe)) return s - (Number(d.total) || 0);
@@ -488,6 +490,7 @@ const notaTypeConfig = computed(() => {
     BPG: { title: "BPB Non Bahan", color: "#6a1b9a" },
     POL: { title: "PO Lain-lain", color: "#ef6c00" },
     POB: { title: "PO Bahan, Greige, Celup", color: "#ad1457" },
+    PON: { title: "PO Non Bahan", color: "#00838f" },
   };
   return map[notaModalType.value] ?? { title: "Cari Nota", color: "#1565c0" };
 });
@@ -661,6 +664,7 @@ onMounted(async () => {
         BPG: "BPG",
         POL: "POL",
         POB: "POB",
+        PON: "PON",
       };
       detail.value = (d.detail || []).map((row: any) => ({
         ...row,
@@ -1052,6 +1056,7 @@ const executeClose = () => {
                           <option value="BPG">BPB Non Bahan</option>
                           <option value="POL">PO Lain-lain</option>
                           <option value="POB">PO Bahan</option>
+                          <option value="PON">PO Non Bahan</option>
                         </select>
                         <button
                           type="button"
@@ -1970,6 +1975,10 @@ const executeClose = () => {
 .type-pob {
   background: #fce4ec;
   color: #ad1457;
+}
+.type-pon {
+  background: #e0f7fa;
+  color: #00838f;
 }
 .btn-del {
   background: transparent;
