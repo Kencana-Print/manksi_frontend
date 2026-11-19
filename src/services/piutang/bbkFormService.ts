@@ -62,4 +62,10 @@ export const bbkFormService = {
     });
     return res.data.data;
   },
+  getPengajuanDanaOptions: async (search = "", nomor = "") => {
+    const res = await api.get("/piutang/bbk-form/pengajuan-dana-options", {
+      params: { search, nomor },
+    });
+    return res.data.data;
+  },
 };

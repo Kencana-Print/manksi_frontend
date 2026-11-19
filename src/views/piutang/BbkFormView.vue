@@ -18,6 +18,9 @@ import VoucherPanggilModal, {
 import KlaimPanggilModal, {
   type KlaimOption,
 } from "@/components/lookups/KlaimPanggilModal.vue";
+import PengajuanDanaPanggilModal, {
+  type PengajuanDanaRow,
+} from "@/components/lookups/PengajuanDanaPanggilModal.vue";
 import {
   IconBuildingBank,
   IconPlus,
@@ -503,6 +506,54 @@ const pilihKlaim = (o: KlaimOption) => {
   });
 };
 
+// ── Panggil Pengajuan Dana (per item) ──
+const showPgjModal = ref(false);
+const fetchPgjOptions = (search: string): Promise<PengajuanDanaRow[]> =>
+  bbkFormService.getPengajuanDanaOptions(
+    search,
+    isEditMode.value ? String(route.params.nomor || "") : "",
+  );
+const pgjTerpakai = computed<string[]>(() =>
+  formData.value.Detail.map((d: { pgj?: string }) => d.pgj || "").filter(
+    Boolean,
+  ),
+);
+const pilihPgj = (rows: PengajuanDanaRow[]) => {
+  const emptyIdx = formData.value.Detail.findIndex(
+    (d: any) => !d.uraian && !d.mb && !d.vou && !d.klaim && !d.pgj,
+  );
+  if (emptyIdx !== -1) formData.value.Detail.splice(emptyIdx, 1);
+
+  rows.forEach((r) => {
+    formData.value.Detail.push({
+      no: formData.value.Detail.length + 1,
+      uraian: r.spesifikasi ? `${r.nama} - ${r.spesifikasi}` : r.nama,
+      satuan: "",
+      qty: 1,
+      harga: r.nominal,
+      total: r.nominal,
+      rekkode: "",
+      reknama: "",
+      cckode: r.ccKode || 0,
+      ccnama: r.ccNama || "",
+      dcnama: r.dcNama || "",
+      kdsup: "",
+      supplier: "",
+      bank: "",
+      rekening: "",
+      atasnama: "",
+      kdbrg: "",
+      mb: "",
+      vou: "",
+      klaim: "",
+      pgj: r.pgj,
+      jenis_item: "",
+      cab_item: "",
+    });
+  });
+  toast.success(`${rows.length} item Pengajuan Dana ditambahkan.`);
+};
+
 // ── Detail grid ──
 const addRow = () => {
   formData.value.Detail.push({
@@ -526,6 +577,7 @@ const addRow = () => {
     mb: "",
     vou: "",
     klaim: "",
+    pgj: "",
     jenis_item: "",
     cab_item: "",
   });
@@ -596,11 +648,11 @@ const validateSave = () => {
     return;
   }
   if (
-    validRows.some((d: any) => d.vou || d.klaim) &&
+    validRows.some((d: any) => d.vou || d.klaim || d.pgj) &&
     formData.value.Cabang !== "P01"
   ) {
     toast.warning(
-      "Baris Rekap Pembayaran / Klaim Kas Kecil hanya untuk BBK cabang P01.",
+      "Baris Rekap Pembayaran / Klaim Kas Kecil / Pengajuan Dana hanya untuk BBK cabang P01.",
     );
     return;
   }
@@ -781,6 +833,19 @@ const pilihCetak = () => {
             <button
               type="button"
               class="btn-add btn-secondary"
+              :disabled="formData.Cabang !== 'P01'"
+              :title="
+                formData.Cabang !== 'P01'
+                  ? 'Pengajuan Dana hanya untuk cabang P01'
+                  : ''
+              "
+              @click="showPgjModal = true"
+            >
+              <IconReceipt :size="14" class="mr-1" /> Panggil Pengajuan Dana
+            </button>
+            <button
+              type="button"
+              class="btn-add btn-secondary"
               @click="openMbSearchModal"
             >
               <IconShoppingCartPlus :size="14" class="mr-1" /> Ambil dari Minta
@@ -814,7 +879,7 @@ const pilihCetak = () => {
                 <td class="td-ctr">{{ Number(idx) + 1 }}</td>
                 <td class="td-inp">
                   <span class="cell-val-ro" style="font-size: 10px">{{
-                    row.mb || row.vou || row.klaim || "-"
+                    row.mb || row.vou || row.klaim || row.pgj || "-"
                   }}</span>
                 </td>
                 <td class="td-inp">
@@ -829,7 +894,7 @@ const pilihCetak = () => {
                     type="number"
                     v-model.number="row.qty"
                     class="cell tr"
-                    :disabled="!!row.vou || !!row.klaim"
+                    :disabled="!!row.vou || !!row.klaim || !!row.pgj"
                     v-select-on-focus
                     @input="recalcRowTotal(row)"
                   />
@@ -1172,6 +1237,12 @@ const pilihCetak = () => {
     :exclude-nomor="klaimTerpakai"
     @pilih="pilihKlaim"
   />
+  <PengajuanDanaPanggilModal
+    v-model="showPgjModal"
+    :fetch-options="fetchPgjOptions"
+    :exclude-key="pgjTerpakai"
+    @pilih="pilihPgj"
+  />
 
   <v-dialog v-model="showRemoveRowDialog" max-width="440px" persistent>
     <v-card class="rounded-lg">
@@ -1303,6 +1374,15 @@ const pilihCetak = () => {
             Voucher <b>{{ activeDetailRow.vou }}</b
             >. Supplier dan nominal mengikuti voucher dan tidak bisa diubah.
             Bank/rekening boleh dipilih.
+          </div>
+        </template>
+        <template v-if="activeDetailRow.pgj">
+          <v-divider class="my-3" />
+          <div class="dr-section-title">Referensi</div>
+          <div class="dr-hint">
+            Pengajuan Dana
+            <b>{{ activeDetailRow.pgj.replace("|", " item ") }}</b
+            >. Nominal boleh diubah; supplier tidak wajib.
           </div>
         </template>
       </v-card-text>
