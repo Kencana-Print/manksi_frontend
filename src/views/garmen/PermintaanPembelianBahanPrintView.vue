@@ -69,9 +69,9 @@ onMounted(async () => {
           <td>Tanggal</td>
           <td>:</td>
           <td>{{ data.header.Tanggal }}</td>
-          <td></td>
-          <td></td>
-          <td></td>
+          <td>Jenis</td>
+          <td>:</td>
+          <td>{{ data.header.Buffer === "Y" ? "Buffer" : "Berdasar SPK" }}</td>
         </tr>
         <tr>
           <td>Keterangan</td>
@@ -95,6 +95,7 @@ onMounted(async () => {
             <th width="50">Satuan</th>
             <th width="70" class="tr">Jumlah</th>
             <th width="120">Keterangan</th>
+            <th v-if="data.header.Buffer !== 'Y'" width="130">SPK</th>
           </tr>
         </thead>
         <tbody>
@@ -111,6 +112,10 @@ onMounted(async () => {
             <td class="tc">{{ item.Satuan }}</td>
             <td class="tr fw">{{ fmtUkuran(item.Jumlah) }}</td>
             <td>{{ item.Keterangan }}</td>
+            <td v-if="data.header.Buffer !== 'Y'">
+              {{ item.Spk }}
+              <div class="spk-nama">{{ item.SpkNama }}</div>
+            </td>
           </tr>
         </tbody>
       </table>
@@ -214,6 +219,10 @@ onMounted(async () => {
 }
 .fw {
   font-weight: bold;
+}
+.spk-nama {
+  font-size: 9px;
+  color: #444;
 }
 
 .spacer {

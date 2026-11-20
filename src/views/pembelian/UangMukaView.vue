@@ -679,7 +679,7 @@ const SUMBER_META: Record<string, { label: string; color: string }> = {
   PENGAJUAN_DANA: { label: "Pengajuan Dana", color: "blue" },
   PERMINTAAN_PEMBELIAN: { label: "Permintaan Pembelian", color: "orange" },
   INSENTIF: { label: "Insentif", color: "purple" },
-  PO_LAIN_LAIN: { label: "PO Lain-lain", color: "teal" },
+  PO_LAIN_LAIN: { label: "Rekap Belanja", color: "teal" },
   BKK_P04: { label: "BKK Kas Kecil P04", color: "indigo" },
 };
 const sumberLabel = (v: string) => SUMBER_META[v]?.label ?? v;

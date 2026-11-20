@@ -638,6 +638,7 @@ const onMbbSelected = (rows: MbbOutstandingRow[]) => {
     row.jenis = m.jenis;
     row.harga = Number(m.harga) || 0;
     row.jumlah = Number(m.sisa) || 0;
+    row.spk = m.spk || "";
     return row;
   });
   formData.value.delivery = [];

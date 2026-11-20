@@ -51,12 +51,50 @@ const expanded = ref<any[]>([]);
 
 const selectedItem = computed(() => selected.value[0] ?? null);
 
+// --- Filter Jenis (voud_type) ---
+// Opsi dibangun dari data yang dimuat. Voucher campuran muncul di tiap tipenya.
+const filterJenis = ref("ALL");
+const pecahJenis = (v: string | undefined) =>
+  String(v ?? "")
+    .split(", ")
+    .filter(Boolean);
+
+const jenisOptions = computed(() =>
+  [
+    ...new Set(
+      items.value.flatMap((r: { Jenis?: string }) => pecahJenis(r.Jenis)),
+    ),
+  ].sort(),
+);
+
+const filteredItems = computed(() =>
+  filterJenis.value === "ALL"
+    ? items.value
+    : items.value.filter((r: { Jenis?: string }) =>
+        pecahJenis(r.Jenis).includes(filterJenis.value),
+      ),
+);
+
+// Tipe yang dipilih hilang setelah refresh (ganti periode): kembali ke SEMUA
+watch(jenisOptions, (opts) => {
+  if (filterJenis.value !== "ALL" && !opts.includes(filterJenis.value)) {
+    filterJenis.value = "ALL";
+  }
+});
+// Pilihan baris bisa tersembunyi oleh filter, jadi dikosongkan
+watch(filterJenis, () => {
+  selected.value = [];
+  expanded.value = [];
+});
+
 const headers = [
   { title: "Nomor", key: "Nomor", width: "190px", fixed: true },
   { title: "Tanggal", key: "Tanggal", width: "100px", align: "center" },
+  { title: "Jenis", key: "Jenis", width: "130px", align: "center" },
   { title: "Kode Sup", key: "KodeSupplier", width: "90px" },
   { title: "Supplier", key: "Supplier", width: "260px" },
   { title: "No. Pajak", key: "NomorPajak", width: "130px" },
+  { title: "No. Invoice", key: "NomorInvoice", width: "150px" },
   { title: "Total", key: "Total", width: "140px", align: "end" },
   {
     title: "Bahan Tambahan",
@@ -64,6 +102,7 @@ const headers = [
     width: "140px",
     align: "end",
   },
+  { title: "Potongan", key: "Potongan", width: "120px", align: "end" },
   { title: "Net", key: "Net", width: "140px", align: "end" },
   { title: "Disc", key: "Disc", width: "60px", align: "end" },
   { title: "Status", key: "Status", width: "80px", align: "center" },
@@ -100,6 +139,12 @@ const summaryFormatters = {
     numFmt(
       Math.round(
         filteredItems.reduce((s, r) => s + (Number(r.BahanTambahan) || 0), 0),
+      ),
+    ),
+  Potongan: (filteredItems: any[]) =>
+    numFmt(
+      Math.round(
+        filteredItems.reduce((s, r) => s + (Number(r.Potongan) || 0), 0),
       ),
     ),
   Net: (filteredItems: any[]) =>
@@ -334,6 +379,7 @@ const HEADER_COLS_DETAIL = [
   "KodeSupplier",
   "Supplier",
   "NomorPajak",
+  "NomorInvoice",
   "Total",
   "Status",
 ];
@@ -344,6 +390,7 @@ const detailExportColumns: ExcelColumn[] = [
   { header: "Kode Sup", key: "KodeSupplier", width: 12 },
   { header: "Supplier", key: "Supplier", width: 26 },
   { header: "No. Pajak", key: "NomorPajak", width: 16 },
+  { header: "No. Invoice", key: "NomorInvoice", width: 20 },
   {
     header: "Total",
     key: "Total",
@@ -425,6 +472,7 @@ const onExportDetail = async () => {
         KodeSupplier: m.KodeSupplier || "",
         Supplier: m.Supplier || "",
         NomorPajak: m.NomorPajak || "",
+        NomorInvoice: m.NomorInvoice || "",
         Total: Number(m.Total) || 0,
         Status: m.Status || "",
         Nota: d.Nota || "",
@@ -480,7 +528,7 @@ const onExportDetail = async () => {
     menu-id="201"
     :icon="IconFileInvoice"
     :headers="headers"
-    :items="items ?? []"
+    :items="filteredItems"
     :is-loading="isLoading"
     v-model:selected="selected"
     v-model:filter-state="filterState"
@@ -525,6 +573,16 @@ const onExportDetail = async () => {
         >
           ⚠ Belum PT (Semua) · ✕ Reset
         </span>
+      </div>
+      <div class="f-divider" />
+      <div class="f-group">
+        <span class="f-label">Jenis</span>
+        <select v-model="filterJenis" class="f-date font-weight-bold">
+          <option value="ALL">SEMUA</option>
+          <option v-for="j in jenisOptions" :key="j" :value="j">
+            {{ j }}
+          </option>
+        </select>
       </div>
       <div class="f-divider" />
       <div class="legend-wrap">

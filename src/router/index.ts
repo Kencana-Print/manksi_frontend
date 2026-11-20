@@ -642,6 +642,17 @@ const router = createRouter({
       },
     },
     {
+      path: "/pembelian/input-faktur-pajak",
+      name: "InputFakturPajak",
+      component: () => import("@/views/pembelian/InputFakturPajakView.vue"),
+      meta: {
+        title: "Input Faktur Pajak Voucher",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "974",
+      },
+    },
+    {
       path: "/pembelian/petty-cash",
       name: "PettyCash",
       component: () => import("@/views/pembelian/PettyCashView.vue"),
@@ -4884,19 +4895,36 @@ const router = createRouter({
       path: "/mmt/maklon/barang",
       name: "MaklonBarangMmtBrowse",
       component: () => import("@/views/mmt/transaksi/MaklonBarangMmtView.vue"),
-      meta: { title: "Maklon Barang MMT", layout: "DefaultLayout", requiresAuth: true, menuId: "5516" },
+      meta: {
+        title: "Maklon Barang MMT",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5516",
+      },
     },
     {
       path: "/mmt/maklon/barang/print/:nomor(.*)*",
       name: "MaklonBarangMmtPrint",
-      component: () => import("@/views/mmt/transaksi/MaklonBarangPrintView.vue"),
-      meta: { title: "Cetak Maklon Barang", layout: "BlankLayout", requiresAuth: true, menuId: "5516" },
+      component: () =>
+        import("@/views/mmt/transaksi/MaklonBarangPrintView.vue"),
+      meta: {
+        title: "Cetak Maklon Barang",
+        layout: "BlankLayout",
+        requiresAuth: true,
+        menuId: "5516",
+      },
     },
     {
       path: "/mmt/maklon/barang/print-gabungan/:nomor/:sjkNomor?",
       name: "MaklonGabunganMmtPrint",
-      component: () => import("@/views/mmt/transaksi/MaklonGabunganPrintView.vue"),
-      meta: { title: "Cetak Maklon Gabungan", layout: "BlankLayout", requiresAuth: true, menuId: "5516" },
+      component: () =>
+        import("@/views/mmt/transaksi/MaklonGabunganPrintView.vue"),
+      meta: {
+        title: "Cetak Maklon Gabungan",
+        layout: "BlankLayout",
+        requiresAuth: true,
+        menuId: "5516",
+      },
     },
 
     // 2. SJ Hasil Maklon
@@ -4904,34 +4932,66 @@ const router = createRouter({
       path: "/mmt/sj-hasil-maklon",
       name: "SjHasilMaklonMmtBrowse",
       component: () => import("@/views/mmt/transaksi/SjHasilMaklonMmtView.vue"),
-      meta: { title: "SJ Hasil Maklon MMT", layout: "DefaultLayout", requiresAuth: true, menuId: "5517" },
+      meta: {
+        title: "SJ Hasil Maklon MMT",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5517",
+      },
     },
     {
       path: "/mmt/sj-hasil-maklon/create",
       name: "SjHasilMaklonMmtCreate",
-      component: () => import("@/views/mmt/transaksi/SjHasilMaklonFormView.vue"),
-      meta: { title: "Input SJ Hasil Maklon", layout: "DefaultLayout", requiresAuth: true, menuId: "5517" },
+      component: () =>
+        import("@/views/mmt/transaksi/SjHasilMaklonFormView.vue"),
+      meta: {
+        title: "Input SJ Hasil Maklon",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5517",
+      },
     },
     {
       path: "/mmt/sj-hasil-maklon/print/:nomor(.*)*",
       name: "SjHasilMaklonMmtPrint",
-      component: () => import("@/views/mmt/transaksi/SjHasilMaklonPrintView.vue"),
-      meta: { title: "Cetak SJ Hasil Maklon", layout: "BlankLayout", requiresAuth: true, menuId: "5517" },
+      component: () =>
+        import("@/views/mmt/transaksi/SjHasilMaklonPrintView.vue"),
+      meta: {
+        title: "Cetak SJ Hasil Maklon",
+        layout: "BlankLayout",
+        requiresAuth: true,
+        menuId: "5517",
+      },
     },
 
     // 3. Planning Produksi
     {
       path: "/mmt/planning-produksi",
       name: "PlanningProduksiMmtBrowse",
-      component: () => import("@/views/mmt/transaksi/PlanningProduksiMmtView.vue"),
-      meta: { title: "Planning Produksi MMT", layout: "DefaultLayout", requiresAuth: true, menuId: "5518" },
+      component: () =>
+        import("@/views/mmt/transaksi/PlanningProduksiMmtView.vue"),
+      meta: {
+        title: "Planning Produksi MMT",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5518",
+      },
     },
     {
       path: "/mmt/planning-produksi-form",
-      alias: ["/mmt/planning-produksi/create", "/mmt/planning-produksi/edit/:nomor(.*)*"],
+      alias: [
+        "/mmt/planning-produksi/create",
+        "/mmt/planning-produksi/edit/:nomor(.*)*",
+      ],
       name: "PlanningProduksiMmtForm",
-      component: () => import("@/views/mmt/transaksi/FormPlanningProduksiView.vue"),
-      meta: { title: "Form Planning Produksi", layout: "DefaultLayout", requiresAuth: true, menuId: "5518" },
+      component: () =>
+        import("@/views/mmt/transaksi/FormPlanningProduksiView.vue"),
+      meta: {
+        title: "Form Planning Produksi",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5518",
+      },
     },
 
     // 4. Komitmen Kirim
@@ -4939,14 +4999,25 @@ const router = createRouter({
       path: "/mmt/komitmen-kirim",
       name: "KomitmenKirimMmtBrowse",
       component: () => import("@/views/mmt/transaksi/KomitmenKirimMmtView.vue"),
-      meta: { title: "Komitmen Kirim MMT", layout: "DefaultLayout", requiresAuth: true, menuId: "5519" },
+      meta: {
+        title: "Komitmen Kirim MMT",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5519",
+      },
     },
     {
       path: "/mmt/komitmen-kirim/new",
       alias: ["/mmt/komitmen-kirim/create", "/mmt/komitmen-kirim/:nomor"],
       name: "KomitmenKirimMmtForm",
-      component: () => import("@/views/mmt/transaksi/FormKomitmenKirimView.vue"),
-      meta: { title: "Form Komitmen Kirim", layout: "DefaultLayout", requiresAuth: true, menuId: "5519" },
+      component: () =>
+        import("@/views/mmt/transaksi/FormKomitmenKirimView.vue"),
+      meta: {
+        title: "Form Komitmen Kirim",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5519",
+      },
     },
 
     // 5. MAP (Memo Approval Produk)
@@ -4954,13 +5025,23 @@ const router = createRouter({
       path: "/mmt/map",
       name: "MapMmtBrowse",
       component: () => import("@/views/mmt/transaksi/MapMmtView.vue"),
-      meta: { title: "Memo Approval Produk (MAP) MMT", layout: "DefaultLayout", requiresAuth: true, menuId: "5520" },
+      meta: {
+        title: "Memo Approval Produk (MAP) MMT",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5520",
+      },
     },
     {
       path: "/mmt/map/print/:nomor(.*)*",
       name: "MapMmtPrint",
       component: () => import("@/views/mmt/transaksi/MapPrintView.vue"),
-      meta: { title: "Cetak MAP", layout: "BlankLayout", requiresAuth: true, menuId: "5520" },
+      meta: {
+        title: "Cetak MAP",
+        layout: "BlankLayout",
+        requiresAuth: true,
+        menuId: "5520",
+      },
     },
 
     // 6. BAST-MAP
@@ -4968,34 +5049,60 @@ const router = createRouter({
       path: "/mmt/bast-map",
       name: "BastMapMmtBrowse",
       component: () => import("@/views/mmt/transaksi/BastMapMmtView.vue"),
-      meta: { title: "BAST-MAP MMT", layout: "DefaultLayout", requiresAuth: true, menuId: "5521" },
+      meta: {
+        title: "BAST-MAP MMT",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5521",
+      },
     },
     {
       path: "/mmt/bast-map/new",
       alias: "/mmt/bast-map/create",
       name: "BastMmtNew",
       component: () => import("@/views/mmt/transaksi/FormBastMmtView.vue"),
-      meta: { title: "Input BAST-MAP", layout: "DefaultLayout", requiresAuth: true, menuId: "5521" },
+      meta: {
+        title: "Input BAST-MAP",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5521",
+      },
     },
     {
       path: "/mmt/bast-map/edit/:nomor(.*)*",
       name: "BastMmtEdit",
       component: () => import("@/views/mmt/transaksi/FormBastMmtView.vue"),
-      meta: { title: "Edit BAST-MAP", layout: "DefaultLayout", requiresAuth: true, menuId: "5521" },
+      meta: {
+        title: "Edit BAST-MAP",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5521",
+      },
     },
     {
       path: "/mmt/bast-map/print/:nomor(.*)*",
       name: "BastMmtPrint",
       component: () => import("@/views/mmt/transaksi/BastMmtPrintView.vue"),
-      meta: { title: "Cetak BAST-MAP", layout: "BlankLayout", requiresAuth: true, menuId: "5521" },
+      meta: {
+        title: "Cetak BAST-MAP",
+        layout: "BlankLayout",
+        requiresAuth: true,
+        menuId: "5521",
+      },
     },
 
     // 7. Relationship Map
     {
       path: "/mmt/relationship-map",
       name: "RelationshipMapMmtBrowse",
-      component: () => import("@/views/mmt/transaksi/RelationshipMapMmtView.vue"),
-      meta: { title: "Relationship Map MMT", layout: "DefaultLayout", requiresAuth: true, menuId: "5522" },
+      component: () =>
+        import("@/views/mmt/transaksi/RelationshipMapMmtView.vue"),
+      meta: {
+        title: "Relationship Map MMT",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5522",
+      },
     },
 
     // 8. SO to SPK
@@ -5003,32 +5110,57 @@ const router = createRouter({
       path: "/mmt/so-spk",
       name: "SoToSpkMmtBrowse",
       component: () => import("@/views/mmt/transaksi/SoToSpkMmtView.vue"),
-      meta: { title: "SO TO SPK (Surat Perintah Kerja) MMT", layout: "DefaultLayout", requiresAuth: true, menuId: "5523" },
+      meta: {
+        title: "SO TO SPK (Surat Perintah Kerja) MMT",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5523",
+      },
     },
     {
       path: "/mmt/so-spk/new",
       alias: "/mmt/so-spk/create",
       name: "SoToSpkMmtNew",
       component: () => import("@/views/mmt/transaksi/FormSoToSpkView.vue"),
-      meta: { title: "Input SPK Produksi", layout: "DefaultLayout", requiresAuth: true, menuId: "5523" },
+      meta: {
+        title: "Input SPK Produksi",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5523",
+      },
     },
     {
       path: "/mmt/so-spk/edit/:nomor(.*)*",
       name: "SoToSpkMmtEdit",
       component: () => import("@/views/mmt/transaksi/FormSoToSpkView.vue"),
-      meta: { title: "Edit SPK Produksi", layout: "DefaultLayout", requiresAuth: true, menuId: "5523" },
+      meta: {
+        title: "Edit SPK Produksi",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5523",
+      },
     },
     {
       path: "/mmt/so-spk/print/:nomor(.*)*",
       name: "SoToSpkMmtPrint",
       component: () => import("@/views/mmt/transaksi/SoToSpkPrintView.vue"),
-      meta: { title: "Cetak SPK Produksi", layout: "BlankLayout", requiresAuth: true, menuId: "5523" },
+      meta: {
+        title: "Cetak SPK Produksi",
+        layout: "BlankLayout",
+        requiresAuth: true,
+        menuId: "5523",
+      },
     },
     {
       path: "/mmt/spk/print/:nomor(.*)*",
       name: "SpkPrintView",
       component: () => import("@/views/mmt/transaksi/SpkPrintView.vue"),
-      meta: { title: "Cetak SPK Ringkas", layout: "BlankLayout", requiresAuth: true, menuId: "5523" },
+      meta: {
+        title: "Cetak SPK Ringkas",
+        layout: "BlankLayout",
+        requiresAuth: true,
+        menuId: "5523",
+      },
     },
 
     // 9. STBJ
@@ -5036,20 +5168,35 @@ const router = createRouter({
       path: "/mmt/stbj",
       name: "StbjMmtBrowse",
       component: () => import("@/views/mmt/transaksi/StbjMmtView.vue"),
-      meta: { title: "STBJ MMT", layout: "DefaultLayout", requiresAuth: true, menuId: "5524" },
+      meta: {
+        title: "STBJ MMT",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5524",
+      },
     },
     {
       path: "/mmt/stbj/new",
       alias: "/mmt/stbj/create",
       name: "StbjMmtNew",
       component: () => import("@/views/mmt/transaksi/FormStbjView.vue"),
-      meta: { title: "Input STBJ", layout: "DefaultLayout", requiresAuth: true, menuId: "5524" },
+      meta: {
+        title: "Input STBJ",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5524",
+      },
     },
     {
       path: "/mmt/stbj/edit/:nomor(.*)*",
       name: "StbjMmtEdit",
       component: () => import("@/views/mmt/transaksi/FormStbjView.vue"),
-      meta: { title: "Edit STBJ", layout: "DefaultLayout", requiresAuth: true, menuId: "5524" },
+      meta: {
+        title: "Edit STBJ",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5524",
+      },
     },
 
     // 10. Surat Jalan
@@ -5057,28 +5204,50 @@ const router = createRouter({
       path: "/mmt/surat-jalan",
       name: "SuratJalanMmtBrowse",
       component: () => import("@/views/mmt/transaksi/SuratJalanMmtView.vue"),
-      meta: { title: "Surat Jalan MMT", layout: "DefaultLayout", requiresAuth: true, menuId: "5525" },
+      meta: {
+        title: "Surat Jalan MMT",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5525",
+      },
     },
     {
       path: "/mmt/surat-jalan/print/:nomor(.*)*",
       name: "SuratJalanMmtPrint",
       component: () => import("@/views/mmt/transaksi/SuratJalanPrintView.vue"),
-      meta: { title: "Cetak Surat Jalan MMT", layout: "BlankLayout", requiresAuth: true, menuId: "5525" },
+      meta: {
+        title: "Cetak Surat Jalan MMT",
+        layout: "BlankLayout",
+        requiresAuth: true,
+        menuId: "5525",
+      },
     },
 
     // 11. Surat Jalan Approve
     {
       path: "/mmt/surat-jalan/approve",
       name: "SuratJalanApproveMmtBrowse",
-      component: () => import("@/views/mmt/transaksi/SuratJalanApproveMmtView.vue"),
-      meta: { title: "Surat Jalan Approve MMT", layout: "DefaultLayout", requiresAuth: true, menuId: "5526" },
+      component: () =>
+        import("@/views/mmt/transaksi/SuratJalanApproveMmtView.vue"),
+      meta: {
+        title: "Surat Jalan Approve MMT",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5526",
+      },
     },
     {
       path: "/mmt/surat-jalan/approve/new",
       alias: "/mmt/surat-jalan/approve/:nomor(.*)*",
       name: "SuratJalanApproveMmtForm",
-      component: () => import("@/views/mmt/transaksi/FormSuratJalanApvView.vue"),
-      meta: { title: "Form Surat Jalan Approve", layout: "DefaultLayout", requiresAuth: true, menuId: "5526" },
+      component: () =>
+        import("@/views/mmt/transaksi/FormSuratJalanApvView.vue"),
+      meta: {
+        title: "Form Surat Jalan Approve",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5526",
+      },
     },
 
     // 12. Jadwal Kirim
@@ -5086,101 +5255,184 @@ const router = createRouter({
       path: "/mmt/jadwal-kirim",
       name: "JadwalKirimMmtBrowse",
       component: () => import("@/views/mmt/transaksi/JadwalKirimMmtView.vue"),
-      meta: { title: "Jadwal Kirim MMT", layout: "DefaultLayout", requiresAuth: true, menuId: "5527" },
+      meta: {
+        title: "Jadwal Kirim MMT",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5527",
+      },
     },
     {
       path: "/mmt/jadwal-kirim/new",
       alias: "/mmt/jadwal-kirim/create",
       name: "JadwalKirimMmtNew",
       component: () => import("@/views/mmt/transaksi/FormJadwalKirimView.vue"),
-      meta: { title: "Input Jadwal Kirim", layout: "DefaultLayout", requiresAuth: true, menuId: "5527" },
+      meta: {
+        title: "Input Jadwal Kirim",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5527",
+      },
     },
     {
       path: "/mmt/jadwal-kirim/edit/:nomor(.*)*",
       name: "JadwalKirimMmtEdit",
       component: () => import("@/views/mmt/transaksi/FormJadwalKirimView.vue"),
-      meta: { title: "Edit Jadwal Kirim", layout: "DefaultLayout", requiresAuth: true, menuId: "5527" },
+      meta: {
+        title: "Edit Jadwal Kirim",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5527",
+      },
     },
     {
       path: "/mmt/jadwal-kirim/print/:nomor(.*)*",
       name: "JadwalKirimMmtPrint",
       component: () => import("@/views/mmt/transaksi/JadwalKirimPrintView.vue"),
-      meta: { title: "Cetak Jadwal Kirim", layout: "BlankLayout", requiresAuth: true, menuId: "5527" },
+      meta: {
+        title: "Cetak Jadwal Kirim",
+        layout: "BlankLayout",
+        requiresAuth: true,
+        menuId: "5527",
+      },
     },
 
     // 13. PO Internal (Paperprint)
     {
       path: "/mmt/po-paperprint",
       name: "PoInternalPaperprintMmtBrowse",
-      component: () => import("@/views/mmt/transaksi/PoInternalPaperprintMmtView.vue"),
-      meta: { title: "PO Internal MMT", layout: "DefaultLayout", requiresAuth: true, menuId: "5528" },
+      component: () =>
+        import("@/views/mmt/transaksi/PoInternalPaperprintMmtView.vue"),
+      meta: {
+        title: "PO Internal MMT",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5528",
+      },
     },
     {
       path: "/mmt/po-paperprint/new",
       alias: "/mmt/po-paperprint/create",
       name: "PoPaperprintNew",
       component: () => import("@/views/mmt/transaksi/FormPoPaperprintView.vue"),
-      meta: { title: "Input PO Paperprint", layout: "DefaultLayout", requiresAuth: true, menuId: "5528" },
+      meta: {
+        title: "Input PO Paperprint",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5528",
+      },
     },
     {
       path: "/mmt/po-paperprint/edit/:nomor(.*)*",
       name: "PoPaperprintEdit",
       component: () => import("@/views/mmt/transaksi/FormPoPaperprintView.vue"),
-      meta: { title: "Edit PO Paperprint", layout: "DefaultLayout", requiresAuth: true, menuId: "5528" },
+      meta: {
+        title: "Edit PO Paperprint",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5528",
+      },
     },
     {
       path: "/mmt/po-paperprint/print/:nomor(.*)*",
       name: "PoPaperprintPrint",
       component: () => import("@/views/mmt/transaksi/PoInternalPrintView.vue"),
-      meta: { title: "Cetak PO Paperprint", layout: "BlankLayout", requiresAuth: true, menuId: "5528" },
+      meta: {
+        title: "Cetak PO Paperprint",
+        layout: "BlankLayout",
+        requiresAuth: true,
+        menuId: "5528",
+      },
     },
 
     // 14. Mutasi Internal
     {
       path: "/mmt/mutasi-internal",
       name: "MutasiInternalMmtBrowse",
-      component: () => import("@/views/mmt/transaksi/MutasiInternalMmtView.vue"),
-      meta: { title: "Mutasi Internal MMT", layout: "DefaultLayout", requiresAuth: true, menuId: "5529" },
+      component: () =>
+        import("@/views/mmt/transaksi/MutasiInternalMmtView.vue"),
+      meta: {
+        title: "Mutasi Internal MMT",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5529",
+      },
     },
     {
       path: "/mmt/mutasi-internal/new",
       alias: "/mmt/mutasi-internal/create",
       name: "MutasiInternalMmtNew",
-      component: () => import("@/views/mmt/transaksi/FormMutasiInternalView.vue"),
-      meta: { title: "Input Mutasi Internal", layout: "DefaultLayout", requiresAuth: true, menuId: "5529" },
+      component: () =>
+        import("@/views/mmt/transaksi/FormMutasiInternalView.vue"),
+      meta: {
+        title: "Input Mutasi Internal",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5529",
+      },
     },
     {
       path: "/mmt/mutasi-internal/edit/:nomor(.*)*",
       name: "MutasiInternalMmtEdit",
-      component: () => import("@/views/mmt/transaksi/FormMutasiInternalView.vue"),
-      meta: { title: "Edit Mutasi Internal", layout: "DefaultLayout", requiresAuth: true, menuId: "5529" },
+      component: () =>
+        import("@/views/mmt/transaksi/FormMutasiInternalView.vue"),
+      meta: {
+        title: "Edit Mutasi Internal",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5529",
+      },
     },
     {
       path: "/mmt/mutasi-internal/print/:nomor(.*)*",
       name: "MutasiInternalMmtPrint",
-      component: () => import("@/views/mmt/transaksi/MutasiInternalPrintView.vue"),
-      meta: { title: "Cetak Mutasi Internal", layout: "BlankLayout", requiresAuth: true, menuId: "5529" },
+      component: () =>
+        import("@/views/mmt/transaksi/MutasiInternalPrintView.vue"),
+      meta: {
+        title: "Cetak Mutasi Internal",
+        layout: "BlankLayout",
+        requiresAuth: true,
+        menuId: "5529",
+      },
     },
 
     // 15. Penerimaan PO External
     {
       path: "/mmt/penerimaan-po-external",
       name: "PenerimaanPoExtMmtBrowse",
-      component: () => import("@/views/mmt/transaksi/PenerimaanPoExtMmtView.vue"),
-      meta: { title: "Penerimaan PO External MMT", layout: "DefaultLayout", requiresAuth: true, menuId: "5530" },
+      component: () =>
+        import("@/views/mmt/transaksi/PenerimaanPoExtMmtView.vue"),
+      meta: {
+        title: "Penerimaan PO External MMT",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5530",
+      },
     },
     {
       path: "/mmt/penerimaan-po-external/new",
       alias: "/mmt/penerimaan-po-external/create",
       name: "PenerimaanPoExtMmtNew",
-      component: () => import("@/views/mmt/transaksi/FormPenerimaanPoExtMmtView.vue"),
-      meta: { title: "Input Penerimaan PO External", layout: "DefaultLayout", requiresAuth: true, menuId: "5530" },
+      component: () =>
+        import("@/views/mmt/transaksi/FormPenerimaanPoExtMmtView.vue"),
+      meta: {
+        title: "Input Penerimaan PO External",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5530",
+      },
     },
     {
       path: "/mmt/penerimaan-po-external/edit/:nomor(.*)*",
       name: "PenerimaanPoExtMmtEdit",
-      component: () => import("@/views/mmt/transaksi/FormPenerimaanPoExtMmtView.vue"),
-      meta: { title: "Edit Penerimaan PO External", layout: "DefaultLayout", requiresAuth: true, menuId: "5530" },
+      component: () =>
+        import("@/views/mmt/transaksi/FormPenerimaanPoExtMmtView.vue"),
+      meta: {
+        title: "Edit Penerimaan PO External",
+        layout: "DefaultLayout",
+        requiresAuth: true,
+        menuId: "5530",
+      },
     },
 
     // ── Penjualan ───────────────────────────────────────────────────────

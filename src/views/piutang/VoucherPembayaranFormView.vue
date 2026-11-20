@@ -5,6 +5,7 @@ import { useToast } from "vue-toastification";
 import { useTabsStore } from "@/stores/tabsStore";
 import BaseForm from "@/components/BaseForm.vue";
 import SupplierSearchModal from "@/components/lookups/SupplierSearchModal.vue";
+import AccountSearchModal from "@/components/lookups/AccountSearchModal.vue";
 import { voucherPembayaranFormService } from "@/services/piutang/voucherPembayaranFormService";
 import type { RekapUnit } from "@/services/piutang/voucherPembayaranFormService";
 import {
@@ -49,6 +50,7 @@ const form = ref({
   supCabang: "",
   supAtasnama: "",
   nomorPajak: "",
+  nomorInvoice: "",
   statusPpn: false,
   ppn: 0,
   disc: 0,
@@ -103,9 +105,17 @@ interface BahanRow {
   nilai: number;
   tambah: boolean;
 }
+interface PotonganRow {
+  rekKode: string;
+  rekNama: string;
+  keterangan: string;
+  persen: number;
+  nilai: number;
+}
 
 const detail = ref<DetailRow[]>([]);
 const bahanTambahan = ref<BahanRow[]>([]);
+const potongan = ref<PotonganRow[]>([]);
 const originalState = ref<any>(null);
 
 const pin5Config = computed(() => {
@@ -139,9 +149,18 @@ const xtotalDetail = computed(() =>
   detail.value.reduce((s, d) => {
     if (!d.tipe) return s;
     if (
-      ["BPB", "BPJ", "POE", "MMT", "BPE", "BPG", "POL", "POB", "PON"].includes(
-        d.tipe,
-      )
+      [
+        "BPB",
+        "BPJ",
+        "POE",
+        "MMT",
+        "BPE",
+        "BPG",
+        "POL",
+        "POB",
+        "PON",
+        "RES",
+      ].includes(d.tipe)
     )
       return s + (Number(d.total) || 0);
     if (["RET", "PJG"].includes(d.tipe)) return s - (Number(d.total) || 0);
@@ -149,8 +168,23 @@ const xtotalDetail = computed(() =>
   }, 0),
 );
 const displayTotal = computed(() => xtotalDetail.value - xpotonganBahan.value);
+
+// Potongan: persen > 0 → nilai = persen × total nota (sama dengan server);
+// persen 0 → nominal manual.
+const nilaiPotongan = (p: PotonganRow) =>
+  Number(p.persen) > 0
+    ? Math.round(xtotalDetail.value * Number(p.persen)) / 100
+    : Number(p.nilai) || 0;
+const potonganTerisi = computed(() =>
+  potongan.value.filter(
+    (p) => p.rekKode || Number(p.nilai) > 0 || Number(p.persen) > 0,
+  ),
+);
+const xpotongan = computed(() =>
+  potonganTerisi.value.reduce((s, p) => s + nilaiPotongan(p), 0),
+);
 const grandTotal = computed(
-  () => displayTotal.value - (Number(form.value.disc) || 0),
+  () => displayTotal.value - (Number(form.value.disc) || 0) - xpotongan.value,
 );
 
 const numFmt = (v: number) => new Intl.NumberFormat("id-ID").format(v || 0);
@@ -216,11 +250,11 @@ const toggleSemuaItem = (d: DetailRow) => {
 };
 
 const onNilaiFocus = (d: DetailRow, e: Event) => {
-  if (d.tipe === "RET" || d.breakdown) return;
+  if (d.tipe === "RET" || d.tipe === "RES" || d.breakdown) return;
   (e.target as HTMLInputElement).value = rawNum(d.nilai);
 };
 const onNilaiInput = (d: DetailRow, e: Event) => {
-  if (d.tipe === "RET" || d.breakdown) return;
+  if (d.tipe === "RET" || d.tipe === "RES" || d.breakdown) return;
   d.nilai = parseNum((e.target as HTMLInputElement).value);
 };
 const onNilaiBlur = (d: DetailRow, e: Event) => {
@@ -370,6 +404,7 @@ const pakaiRekap = async () => {
   showRekapModal.value = false;
 
   form.value.nomorPajak = u.fakturPajak;
+  form.value.nomorInvoice = u.invoice || "";
   form.value.statusPpn = await tentukanPpn(u.baris);
 
   detail.value = u.baris.map((b) => ({
@@ -414,6 +449,41 @@ const addBahanRow = () =>
     tambah: false,
   });
 const removeBahanRow = (idx: number) => bahanTambahan.value.splice(idx, 1);
+
+// ── Potongan ops ──
+const addPotonganRow = () =>
+  potongan.value.push({
+    rekKode: "",
+    rekNama: "",
+    keterangan: "",
+    persen: 0,
+    nilai: 0,
+  });
+const removePotonganRow = (idx: number) => potongan.value.splice(idx, 1);
+
+const showAkunModal = ref(false);
+const akunIdx = ref(-1);
+const openAkunModal = (idx: number) => {
+  akunIdx.value = idx;
+  showAkunModal.value = true;
+};
+const onAkunSelected = (a: { Kode: string; Nama: string }) => {
+  const p = potongan.value[akunIdx.value];
+  if (p) {
+    p.rekKode = a.Kode;
+    p.rekNama = a.Nama;
+  }
+};
+const onPotFocus = (p: PotonganRow, f: "persen" | "nilai", e: Event) => {
+  (e.target as HTMLInputElement).value = rawNum(p[f]);
+};
+const onPotInput = (p: PotonganRow, f: "persen" | "nilai", e: Event) => {
+  p[f] = parseNum((e.target as HTMLInputElement).value);
+};
+const onPotBlur = (p: PotonganRow, f: "persen" | "nilai", e: Event) => {
+  if (f === "persen" && p.persen > 100) p.persen = 100;
+  (e.target as HTMLInputElement).value = numFmt(p[f]);
+};
 
 const onBahanJumlahFocus = (b: BahanRow, e: Event) => {
   (e.target as HTMLInputElement).value = rawNum(b.jumlah);
@@ -488,15 +558,16 @@ const notaTypeConfig = computed(() => {
     MMT: { title: "BPB MMT", color: "#00695c" },
     BPE: { title: "BPB PO External MMT", color: "#0277bd" },
     BPG: { title: "BPB Non Bahan", color: "#6a1b9a" },
-    POL: { title: "PO Lain-lain", color: "#ef6c00" },
+    POL: { title: "Rekap Belanja", color: "#ef6c00" },
     POB: { title: "PO Bahan, Greige, Celup", color: "#ad1457" },
     PON: { title: "PO Non Bahan", color: "#00838f" },
+    RES: { title: "Resi Surat Jalan", color: "#546e7a" },
   };
   return map[notaModalType.value] ?? { title: "Cari Nota", color: "#1565c0" };
 });
 
 const openNotaModal = async (type: string, idx: number) => {
-  if (!form.value.supKode && type !== "BPG") {
+  if (!form.value.supKode && !["BPG", "RES"].includes(type)) {
     toast.warning("Pilih supplier dahulu.");
     return;
   }
@@ -647,6 +718,7 @@ onMounted(async () => {
         supCabang: d.supCabang,
         supAtasnama: d.supAtasnama,
         nomorPajak: d.nomorPajak,
+        nomorInvoice: d.nomorInvoice,
         statusPpn: d.statusPpn,
         ppn: d.ppn,
         disc: d.disc,
@@ -665,6 +737,7 @@ onMounted(async () => {
         POL: "POL",
         POB: "POB",
         PON: "PON",
+        RES: "RES",
       };
       detail.value = (d.detail || []).map((row: any) => ({
         ...row,
@@ -672,6 +745,7 @@ onMounted(async () => {
         buka: !!row.breakdown,
       }));
       bahanTambahan.value = d.bahanTambahan?.length ? d.bahanTambahan : [];
+      potongan.value = d.potongan?.length ? d.potongan : [];
       originalSupRekening.value = d.supRekening || "";
       originalSupBank.value = d.supBank || "";
       originalSupCabang.value = d.supCabang || "";
@@ -681,11 +755,13 @@ onMounted(async () => {
           form: form.value,
           detail: detail.value,
           bahan: bahanTambahan.value,
+          potongan: potongan.value,
         }),
       );
     } else {
       addDetailRow();
       addBahanRow();
+      addPotonganRow();
     }
   } catch (e: any) {
     toast.error(e.response?.data?.message ?? "Gagal memuat data.");
@@ -721,6 +797,17 @@ const validateSave = () => {
     );
     return;
   }
+  const potBelumLengkap = potonganTerisi.value.find(
+    (p) => !p.rekKode || !(nilaiPotongan(p) > 0),
+  );
+  if (potBelumLengkap) {
+    toast.warning("Potongan: account dan nilai harus diisi lengkap.");
+    return;
+  }
+  if (grandTotal.value < 0) {
+    toast.warning("Total potongan melebihi nilai voucher.");
+    return;
+  }
   const belumCentang = filled.find(
     (d) => d.breakdown && !itemDipilih(d).length,
   );
@@ -741,12 +828,19 @@ const executeSave = async () => {
       tanggal: form.value.tanggal,
       supKode: form.value.supKode,
       nomorPajak: form.value.nomorPajak,
+      nomorInvoice: form.value.nomorInvoice,
       statusPpn: form.value.statusPpn,
       ppn: form.value.ppn,
       disc: Number(form.value.disc) || 0,
       keterangan: form.value.keterangan,
       detail: detail.value.filter((d) => d.tipe && d.nomor),
       bahanTambahan: bahanTambahan.value.filter((b) => b.nama),
+      potongan: potonganTerisi.value.map((p) => ({
+        rekKode: p.rekKode,
+        keterangan: p.keterangan,
+        persen: Number(p.persen) || 0,
+        nilai: nilaiPotongan(p),
+      })),
       pin5Status: form.value.pin5Status,
       pin5Urut: form.value.pin5Urut,
     };
@@ -799,6 +893,7 @@ const executeCancel = () => {
     );
     detail.value = JSON.parse(JSON.stringify(originalState.value.detail));
     bahanTambahan.value = JSON.parse(JSON.stringify(originalState.value.bahan));
+    potongan.value = JSON.parse(JSON.stringify(originalState.value.potongan));
   } else {
     Object.assign(form.value, {
       tanggal: hariIni(),
@@ -809,6 +904,7 @@ const executeCancel = () => {
       supCabang: "",
       supAtasnama: "",
       nomorPajak: "",
+      nomorInvoice: "",
       statusPpn: false,
       ppn: 0,
       disc: 0,
@@ -816,8 +912,10 @@ const executeCancel = () => {
     });
     detail.value = [];
     bahanTambahan.value = [];
+    potongan.value = [];
     addDetailRow();
     addBahanRow();
+    addPotonganRow();
     originalSupRekening.value = "";
     originalSupBank.value = "";
     originalSupCabang.value = "";
@@ -908,6 +1006,15 @@ const executeClose = () => {
                 :disabled="!form.statusPpn"
               />
             </div>
+          </div>
+          <div class="f-field">
+            <label class="f-lbl">No. Invoice</label>
+            <input
+              v-model="form.nomorInvoice"
+              class="f-inp"
+              maxlength="50"
+              placeholder="Nomor invoice supplier"
+            />
           </div>
         </div>
 
@@ -1054,9 +1161,10 @@ const executeClose = () => {
                           <option value="MMT">BPB MMT</option>
                           <option value="BPE">BPB PO Ext MMT</option>
                           <option value="BPG">BPB Non Bahan</option>
-                          <option value="POL">PO Lain-lain</option>
+                          <option value="POL">Rekap Belanja</option>
                           <option value="POB">PO Bahan</option>
                           <option value="PON">PO Non Bahan</option>
+                          <option value="RES">Resi Surat Jalan</option>
                         </select>
                         <button
                           type="button"
@@ -1097,7 +1205,7 @@ const executeClose = () => {
                         type="text"
                         inputmode="numeric"
                         class="cell tr"
-                        :readonly="d.tipe === 'RET'"
+                        :readonly="d.tipe === 'RET' || d.tipe === 'RES'"
                         @focus="onNilaiFocus(d, $event)"
                         @input="onNilaiInput(d, $event)"
                         @blur="onNilaiBlur(d, $event)"
@@ -1109,6 +1217,7 @@ const executeClose = () => {
                         type="text"
                         inputmode="numeric"
                         class="cell tr"
+                        :readonly="d.tipe === 'RES'"
                         @focus="onBsFocus(d, $event)"
                         @input="onBsInput(d, $event)"
                         @blur="onBsBlur(d, $event)"
@@ -1120,6 +1229,7 @@ const executeClose = () => {
                         type="text"
                         inputmode="numeric"
                         class="cell tr"
+                        :readonly="d.tipe === 'RES'"
                         @focus="onTarifFocus(d, $event)"
                         @input="onTarifInput(d, $event)"
                         @blur="onTarifBlur(d, $event)"
@@ -1367,6 +1477,112 @@ const executeClose = () => {
           </div>
         </div>
 
+        <!-- Potongan (akun UM PAJAK / HUTANG PAJAK, tanpa jurnal otomatis) -->
+        <div class="vp-detail-section vp-detail-section--compact">
+          <div class="vp-sec-header">
+            <span class="vp-sec-title">Potongan</span>
+            <button
+              type="button"
+              class="btn-add"
+              style="background: #6a1b9a"
+              @click="addPotonganRow"
+            >
+              <IconPlus :size="14" class="mr-1" /> Tambah
+            </button>
+          </div>
+          <div class="vp-table-wrap">
+            <table class="vp-table">
+              <thead>
+                <tr>
+                  <th style="width: 30px" class="text-center">No</th>
+                  <th style="min-width: 220px">Account</th>
+                  <th style="min-width: 160px">Keterangan</th>
+                  <th style="width: 80px" class="text-right">%</th>
+                  <th style="width: 120px" class="text-right">Nilai</th>
+                  <th style="width: 30px"></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(p, idx) in potongan" :key="idx">
+                  <td class="td-ctr">{{ idx + 1 }}</td>
+                  <td class="td-inp">
+                    <input
+                      :value="p.rekKode ? `${p.rekKode} - ${p.rekNama}` : ''"
+                      class="cell"
+                      readonly
+                      placeholder="Pilih account..."
+                      style="cursor: pointer"
+                      @click="openAkunModal(idx)"
+                    />
+                  </td>
+                  <td class="td-inp">
+                    <input
+                      v-model="p.keterangan"
+                      class="cell"
+                      maxlength="100"
+                      placeholder="PPh 23 / PPN ..."
+                    />
+                  </td>
+                  <td class="td-inp">
+                    <input
+                      :value="numFmt(p.persen)"
+                      type="text"
+                      inputmode="decimal"
+                      class="cell tr"
+                      title="Isi untuk menghitung dari total nota; kosongkan (0) untuk nominal manual"
+                      @focus="onPotFocus(p, 'persen', $event)"
+                      @input="onPotInput(p, 'persen', $event)"
+                      @blur="onPotBlur(p, 'persen', $event)"
+                    />
+                  </td>
+                  <td class="td-inp">
+                    <input
+                      v-if="p.persen > 0"
+                      :value="numFmt(nilaiPotongan(p))"
+                      class="cell tr"
+                      readonly
+                    />
+                    <input
+                      v-else
+                      :value="numFmt(p.nilai)"
+                      type="text"
+                      inputmode="numeric"
+                      class="cell tr"
+                      @focus="onPotFocus(p, 'nilai', $event)"
+                      @input="onPotInput(p, 'nilai', $event)"
+                      @blur="onPotBlur(p, 'nilai', $event)"
+                    />
+                  </td>
+                  <td class="td-ctr">
+                    <button
+                      type="button"
+                      class="btn-del"
+                      @click="removePotonganRow(idx)"
+                    >
+                      <IconTrash :size="14" />
+                    </button>
+                  </td>
+                </tr>
+                <tr v-if="!potongan.length">
+                  <td
+                    colspan="6"
+                    class="text-center text-grey py-4 font-italic"
+                  >
+                    Belum ada potongan.
+                  </td>
+                </tr>
+              </tbody>
+              <tfoot v-if="potongan.length">
+                <tr>
+                  <td colspan="4" class="foot-lbl">Total Potongan</td>
+                  <td class="foot-val tr">{{ numFmt(xpotongan) }}</td>
+                  <td></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+
         <!-- Summary bar -->
         <div class="summary-bar">
           <div class="sbar-item">
@@ -1387,6 +1603,11 @@ const executeClose = () => {
             />
           </div>
           <div class="sbar-div"></div>
+          <div class="sbar-item">
+            <span class="sbar-lbl">Potongan</span>
+            <span class="sbar-val">{{ numFmt(xpotongan) }}</span>
+          </div>
+          <div class="sbar-div"></div>
           <div class="sbar-item sbar-grand">
             <span class="sbar-lbl-grand">Grand Total</span>
             <span class="sbar-val-grand">{{ numFmt(grandTotal) }}</span>
@@ -1397,6 +1618,11 @@ const executeClose = () => {
   </BaseForm>
 
   <SupplierSearchModal v-model="showSupplierModal" @selected="selectSupplier" />
+  <AccountSearchModal
+    v-model="showAkunModal"
+    filter-mode="pajak"
+    @selected="onAkunSelected"
+  />
 
   <!-- Modal Nota Search -->
   <v-dialog v-model="showNotaModal" max-width="700px" scrollable>
@@ -1451,7 +1677,9 @@ const executeClose = () => {
                 </th>
                 <th v-if="['POE', 'BPE'].includes(notaModalType)">SPK</th>
                 <th v-if="notaModalType === 'POE'">Nama SPK</th>
-                <th>Supplier</th>
+                <th>
+                  {{ notaModalType === "RES" ? "Ekspedisi" : "Supplier" }}
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -1979,6 +2207,10 @@ const executeClose = () => {
 .type-pon {
   background: #e0f7fa;
   color: #00838f;
+}
+.type-res {
+  background: #eceff1;
+  color: #546e7a;
 }
 .btn-del {
   background: transparent;

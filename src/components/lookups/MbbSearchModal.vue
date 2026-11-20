@@ -51,10 +51,10 @@ const docs = computed<MbbDoc[]>(() => {
     d.rows.push(r);
   }
   return [...peta.values()].map((d) => {
-    const nama = d.rows.slice(0, 3).map((r) => r.nama);
+    const unik = [...new Set(d.rows.map((r) => r.nama))];
     return {
       ...d,
-      ringkas: nama.join(", ") + (d.rows.length > 3 ? ", ..." : ""),
+      ringkas: unik.slice(0, 3).join(", ") + (unik.length > 3 ? ", ..." : ""),
     };
   });
 });

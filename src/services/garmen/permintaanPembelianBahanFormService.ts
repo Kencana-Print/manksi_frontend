@@ -12,12 +12,14 @@ export interface PermintaanPembelianBahanLoaded {
     Cab: string;
     Bagian: string;
     Status: string;
+    Buffer: string;
   };
   detail: PermintaanPembelianBahanDetailRow[];
 }
 
 export interface PermintaanPembelianBahanPayloadItem {
   kode: string;
+  spk: string;
   jumlah: number;
   keterangan: string;
 }
@@ -25,6 +27,7 @@ export interface PermintaanPembelianBahanPayloadItem {
 export interface PermintaanPembelianBahanPayload {
   tanggal: string;
   keterangan: string;
+  buffer: boolean;
   items: PermintaanPembelianBahanPayloadItem[];
 }
 

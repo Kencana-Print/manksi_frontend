@@ -5,6 +5,7 @@ import { useToast } from "vue-toastification";
 import BaseForm from "@/components/BaseForm.vue";
 import { useForm } from "@/composables/useForm";
 import BahanSearchModal from "@/components/lookups/BahanSearchModal.vue";
+import SpkSearchModal from "@/components/lookups/SpkSearchModal.vue";
 import { IconShoppingCart, IconSearch } from "@tabler/icons-vue";
 import { pesanError } from "@/services/piutang/rekapPembayaranService";
 import { useAuthStore } from "@/stores/authStore";
@@ -16,6 +17,8 @@ import {
 
 interface BahanRow {
   kode: string;
+  spk: string;
+  spkNama: string;
   nama: string;
   setting: string;
   satuan: string;
@@ -27,6 +30,7 @@ interface PembelianHeader {
   nomor: string;
   tanggal: string;
   keterangan: string;
+  buffer: boolean;
   cab: string;
   status: string;
 }
@@ -41,6 +45,11 @@ interface BahanItem {
   Nama: string;
   Satuan: string;
   Setting?: string;
+}
+
+interface SpkItem {
+  Nomor: string;
+  Nama?: string;
 }
 
 // Cermin aturan server: P02/P05 hanya bahan SB; HO- boleh SB dan non-SB;
@@ -64,6 +73,8 @@ const todayLocal = (() => {
 
 const newRow = (): BahanRow => ({
   kode: "",
+  spk: "",
+  spkNama: "",
   nama: "",
   setting: "",
   satuan: "",
@@ -72,13 +83,14 @@ const newRow = (): BahanRow => ({
 });
 
 const isBlank = (r: BahanRow): boolean =>
-  !r.kode && !(Number(r.jumlah) > 0) && !r.keterangan.trim();
+  !r.kode && !r.spk && !(Number(r.jumlah) > 0) && !r.keterangan.trim();
 
 const defaultData: PembelianFormData = {
   header: {
     nomor: "",
     tanggal: todayLocal,
     keterangan: "",
+    buffer: false,
     cab: "",
     status: "",
   },
@@ -88,6 +100,8 @@ const defaultData: PembelianFormData = {
 const toRows = (d: PermintaanPembelianBahanLoaded): BahanRow[] =>
   d.detail.map((x) => ({
     kode: x.Kode,
+    spk: x.Spk ?? "",
+    spkNama: x.SpkNama ?? "",
     nama: x.Nama,
     setting: x.Setting ?? "",
     satuan: x.Satuan,
@@ -120,6 +134,7 @@ const {
         nomor: d.header.Nomor,
         tanggal: d.header.Tanggal,
         keterangan: d.header.Keterangan ?? "",
+        buffer: d.header.Buffer === "Y",
         cab: d.header.Cab,
         status: d.header.Status,
       },
@@ -130,10 +145,12 @@ const {
     const payload: PermintaanPembelianBahanPayload = {
       tanggal: data.header.tanggal,
       keterangan: data.header.keterangan.trim(),
+      buffer: data.header.buffer,
       items: data.dtl
         .filter((r) => !isBlank(r))
         .map((r) => ({
           kode: r.kode,
+          spk: data.header.buffer ? "" : r.spk.trim(),
           jumlah: Number(r.jumlah) || 0,
           keterangan: r.keterangan.trim(),
         })),
@@ -200,16 +217,59 @@ const onBahanSelected = (item: BahanItem) => {
     return;
   }
   const dobel = formData.value.dtl.some(
-    (r, i) => i !== modalIdx.value && r.kode === item.Kode,
+    (r, i) => i !== modalIdx.value && r.kode === item.Kode && r.spk === row.spk,
   );
   if (dobel) {
-    toast.warning(`Bahan ${item.Kode} sudah ada di baris lain.`);
+    toast.warning(
+      row.spk
+        ? `Bahan ${item.Kode} dengan SPK ${row.spk} sudah ada di baris lain.`
+        : `Bahan ${item.Kode} sudah ada di baris lain.`,
+    );
     return;
   }
   row.kode = item.Kode;
   row.nama = item.Nama;
   row.satuan = item.Satuan;
   row.setting = item.Setting ?? "";
+};
+
+// ── Buffer & SPK ──
+const showSpkModal = ref(false);
+const spkIdx = ref(0);
+
+const openSpk = (idx: number) => {
+  spkIdx.value = idx;
+  showSpkModal.value = true;
+};
+
+const onSpkSelected = (item: SpkItem) => {
+  const row = formData.value.dtl[spkIdx.value];
+  if (!row) return;
+  const dobel = formData.value.dtl.some(
+    (r, i) =>
+      i !== spkIdx.value &&
+      r.kode !== "" &&
+      r.kode === row.kode &&
+      r.spk === item.Nomor,
+  );
+  if (dobel) {
+    toast.warning(
+      `Bahan ${row.kode} dengan SPK ${item.Nomor} sudah ada di baris lain.`,
+    );
+    return;
+  }
+  row.spk = item.Nomor;
+  row.spkNama = item.Nama ?? "";
+};
+
+// Buffer diceklis → SPK semua baris dikosongkan
+const onBufferChange = () => {
+  if (formData.value.header.buffer) {
+    formData.value.dtl.forEach((r) => {
+      r.spk = "";
+      r.spkNama = "";
+    });
+  }
 };
 
 const onEnterNext = (e: KeyboardEvent) => {
@@ -246,10 +306,16 @@ const validateSave = () => {
     return toast.warning("Minimal satu baris bahan harus diisi.");
   }
 
+  const buffer = h.buffer;
   const seen = new Set<string>();
   for (const [i, r] of rowsTerisi.value.entries()) {
     const no = i + 1;
     if (!r.kode) return toast.warning(`Baris ${no}: bahan wajib diisi.`);
+    if (!buffer && !r.spk) {
+      return toast.warning(
+        `Baris ${no}: nomor SPK wajib dipilih (atau ceklis Buffer).`,
+      );
+    }
     if (!jenisSesuai(r.kode)) {
       return toast.warning(
         `Baris ${no}: bahan tidak sesuai jenis bahan cabang ${cabDokumen.value}.`,
@@ -262,10 +328,15 @@ const validateSave = () => {
     if (jml > MAX_JUMLAH) {
       return toast.warning(`Baris ${no}: jumlah melebihi batas.`);
     }
-    if (seen.has(r.kode)) {
-      return toast.warning(`Baris ${no}: bahan ${r.kode} sudah ada.`);
+    const kunci = `${r.kode}|${buffer ? "" : r.spk}`;
+    if (seen.has(kunci)) {
+      return toast.warning(
+        buffer
+          ? `Baris ${no}: bahan ${r.kode} sudah ada.`
+          : `Baris ${no}: bahan ${r.kode} dengan SPK ${r.spk} sudah ada.`,
+      );
     }
-    seen.add(r.kode);
+    seen.add(kunci);
   }
   showSaveDialog.value = true;
 };
@@ -329,6 +400,19 @@ void pesanError;
             :disabled="!editable"
           />
         </div>
+        <div class="fr">
+          <label class="lbl fw">Buffer</label>
+          <input
+            id="chk-buffer"
+            type="checkbox"
+            v-model="formData.header.buffer"
+            :disabled="!editable"
+            @change="onBufferChange"
+          />
+          <label for="chk-buffer" class="chk-note">
+            Stok buffer (tanpa SPK)
+          </label>
+        </div>
         <div class="fr" style="align-items: flex-start">
           <label class="lbl" style="padding-top: 4px">Keterangan</label>
           <textarea
@@ -381,7 +465,10 @@ void pesanError;
           </button>
         </div>
         <div class="tbl-wrap" style="min-height: 50vh; max-height: 78vh">
-          <table class="gt" style="min-width: 950px">
+          <table
+            class="gt"
+            :style="{ minWidth: formData.header.buffer ? '950px' : '1340px' }"
+          >
             <thead>
               <tr>
                 <th style="width: 32px" class="tc">No</th>
@@ -391,6 +478,12 @@ void pesanError;
                 <th style="width: 70px">Satuan</th>
                 <th style="width: 100px" class="tr">Jumlah</th>
                 <th style="width: 240px">Keterangan</th>
+                <th v-if="!formData.header.buffer" style="width: 150px">
+                  No. SPK
+                </th>
+                <th v-if="!formData.header.buffer" style="width: 240px">
+                  Nama SPK
+                </th>
                 <th style="width: 32px" class="tc"></th>
               </tr>
             </thead>
@@ -439,6 +532,31 @@ void pesanError;
                     @keydown.enter.prevent="onEnterNext"
                   />
                 </td>
+                <td v-if="!formData.header.buffer" class="p0">
+                  <div class="cell-flex">
+                    <input
+                      :value="row.spk"
+                      readonly
+                      class="ci ro"
+                      placeholder="Klik cari..."
+                    />
+                    <button
+                      type="button"
+                      class="btn-mini"
+                      :disabled="!editable"
+                      @click="openSpk(idx)"
+                    >
+                      <IconSearch :size="12" />
+                    </button>
+                  </div>
+                </td>
+                <td
+                  v-if="!formData.header.buffer"
+                  class="px-1"
+                  :title="row.spkNama"
+                >
+                  {{ row.spkNama }}
+                </td>
                 <td class="tc">
                   <button
                     type="button"
@@ -455,14 +573,14 @@ void pesanError;
               <tr>
                 <td colspan="5" class="tr">TOTAL</td>
                 <td class="tr">{{ fmtJml(totalJumlah) }}</td>
-                <td colspan="2"></td>
+                <td :colspan="formData.header.buffer ? 2 : 4"></td>
               </tr>
             </tfoot>
           </table>
         </div>
         <div class="legend">
-          Satuan mengikuti master bahan. Satu bahan hanya boleh satu baris per
-          dokumen.
+          Satuan mengikuti master bahan. Mode Buffer: satu bahan satu baris.
+          Mode SPK: satu bahan boleh banyak baris asal SPK-nya berbeda.
         </div>
       </div>
     </template>
@@ -472,6 +590,11 @@ void pesanError;
     v-model="showBahanModal"
     :tipe="CAB_SPANDUK.includes(cabDokumen) ? 'SPANDUK' : undefined"
     @selected="onBahanSelected"
+  />
+  <SpkSearchModal
+    v-model="showSpkModal"
+    filter-mode="spk-ppic"
+    @selected="onSpkSelected"
   />
 </template>
 
@@ -735,5 +858,10 @@ void pesanError;
   font-size: 10px;
   color: #555;
   margin-top: 4px;
+}
+.chk-note {
+  font-size: 11px;
+  color: #555;
+  cursor: pointer;
 }
 </style>

@@ -224,9 +224,9 @@ const isLainLain = computed(() => formData.value.header.po_jenis === 4);
 const isSpanduk = computed(() => formData.value.header.po_jenis === 5);
 // Bahan & Lain-lain berbagi perilaku kolom gramasi dan Delivery Commitment
 const isBahanLike = computed(() => isBahan.value || isLainLain.value);
-// Kolom supplier per baris: hanya PO Lain-lain, dan hanya untuk user yang boleh lihat supplier
+// Kolom supplier per baris: hanya Rekap Belanja, dan hanya untuk user yang boleh lihat supplier
 const showSupCol = computed(() => isLainLain.value && canLihatSup.value);
-// PPN per baris: hanya PO Lain-lain, dan hanya untuk user yang boleh lihat harga
+// PPN per baris: hanya Rekap Belanja, dan hanya untuk user yang boleh lihat harga
 const showPpnCol = computed(() => isLainLain.value && canLihatBeli.value);
 
 watch(
@@ -235,7 +235,7 @@ watch(
     if (v !== 2) formData.value.header.po_greige = "";
     // PO Celup mewarisi PO Greige, tidak punya permintaan sendiri
     if (v === 2) formData.value.header.po_mbb_nomor = "";
-    // PO Lain-lain: supplier ada di baris, bukan di header
+    // Rekap Belanja: supplier ada di baris, bukan di header
     if (v === 4) {
       formData.value.header.po_sup_kode = "";
       formData.value.header.sup_nama = "";
@@ -281,7 +281,7 @@ const subTotal = computed(() =>
   ),
 );
 const ppnValue = computed(() => {
-  // PO Lain-lain: PPN per baris (beda supplier beda ketentuan)
+  // Rekap Belanja: PPN per baris (beda supplier beda ketentuan)
   if (isLainLain.value) {
     return formData.value.items.reduce(
       (s: number, r: BarisHitung) =>
@@ -649,6 +649,7 @@ const onMbbSelected = (rows: MbbOutstandingRow[]) => {
     row.jenis = m.jenis;
     row.harga = Number(m.harga) || 0;
     row.jumlah = Number(m.sisa) || 0;
+    row.spk = m.spk || "";
     return row;
   });
   // Delivery commitment merujuk kode bahan, jadi ikut dikosongkan
@@ -663,7 +664,7 @@ const clearMbb = () => {
   toast.info("Tautan ke permintaan dilepas. Baris bahan tetap ada.");
 };
 
-// Supplier yang memesan bahan ini di baris PO (untuk dropdown Delivery PO Lain-lain)
+// Supplier yang memesan bahan ini di baris PO (untuk dropdown Delivery Rekap Belanja)
 const supplierOptions = (kodeBahan: string) => {
   const peta = new Map<string, string>();
   for (const r of formData.value.items) {
@@ -703,7 +704,7 @@ const setBahanHandler = (v: any) => {
   }
 };
 
-// ── Supplier per baris (PO Lain-lain) ──
+// ── Supplier per baris (Rekap Belanja) ──
 const openLookupSupRow = (i: number) => {
   activeSupIdx.value = i;
   showSupRowModal.value = true;
@@ -746,7 +747,7 @@ const validateSave = () => {
       return toast.warning("Sudah ONPROSES. Tidak bisa disimpan.");
   }
 
-  // 3. Validasi Header (PO Lain-lain: supplier ada di baris)
+  // 3. Validasi Header (Rekap Belanja: supplier ada di baris)
   if (!isLainLain.value && !formData.value.header.po_sup_kode)
     return toast.warning("Supplier belum diisi.");
   if (isCelup.value && !formData.value.header.po_greige)
@@ -782,7 +783,7 @@ const validateSave = () => {
       return toast.warning(`Baris ${idx + 1}: PO Celup Roll harus diisi.`);
   }
 
-  // PO Lain-lain: satu bahan boleh ke beberapa supplier. Baris dobel hanya kalau
+  // Rekap Belanja: satu bahan boleh ke beberapa supplier. Baris dobel hanya kalau
   // bahan + supplier + SPK/MAP sama persis. SPK/MAP wajib (keberadaan dicek server).
   if (isLainLain.value) {
     const seen = new Set<string>();

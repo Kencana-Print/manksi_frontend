@@ -136,8 +136,32 @@ const getStatusInfo = (
   return { label: "Menunggu Close", color: "#00838F", bg: "#E0F7FA" };
 };
 
+const STATUS_TRANSFER_LABEL: Record<
+  string,
+  { label: string; color: string; bg: string }
+> = {
+  DIAJUKAN_TRANSFER: {
+    label: "Diajukan Transfer",
+    color: "#00695C",
+    bg: "#E0F2F1",
+  },
+  SEBAGIAN_TRANSFER: {
+    label: "Sebagian Transfer",
+    color: "#6A1B9A",
+    bg: "#F3E5F5",
+  },
+};
+
 const getStatusFinanceInfo = (row: any) =>
-  STATUS_BELI_LABEL[row.StatusFinance] || null;
+  STATUS_TRANSFER_LABEL[row.StatusFinance] ||
+  STATUS_BELI_LABEL[row.StatusFinance] ||
+  null;
+
+const getStatusFinanceHint = (row: any) => {
+  if (row.PjtNomor) return `Pengajuan Transfer: ${row.PjtNomor}`;
+  if (row.BbkNomor) return `BBK: ${row.BbkNomor}`;
+  return "";
+};
 
 const getRowProps = (data: any) => {
   const row = data.item?.raw || data.item;
@@ -586,6 +610,7 @@ const fmtNum = (val: number) =>
       <v-chip
         v-if="getStatusFinanceInfo(item)"
         size="x-small"
+        :title="getStatusFinanceHint(item)"
         :style="{
           backgroundColor: getStatusFinanceInfo(item)!.bg,
           color: getStatusFinanceInfo(item)!.color,

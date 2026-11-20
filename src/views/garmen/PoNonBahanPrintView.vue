@@ -62,7 +62,7 @@ const fetchData = async () => {
       const subtotal = qty * harga;
       return {
         kode: item.pod_brg_kode || item.Kode,
-        nama: item.Nama,
+        nama: item.namaExt || item.Nama,
         satuan: item.Satuan,
         qty,
         harga,

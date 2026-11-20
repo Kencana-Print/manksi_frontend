@@ -16,6 +16,8 @@ export interface MbbOutstandingRow {
   dipesan: number | string;
   sisa: number | string;
   keterangan: string | null;
+  spk: string;
+  spkNama: string;
 }
 
 export interface RekapHeaderPayload {
