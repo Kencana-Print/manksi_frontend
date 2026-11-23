@@ -58,6 +58,8 @@ const BAGIAN_ASET = [
   "DIREKSI",
   "PEMBELIAN",
   "PURCHASING",
+  "IT",
+  "TEKNISI",
 ];
 const bolehAset = computed(() =>
   BAGIAN_ASET.includes((authStore.user?.bagian || "").toUpperCase()),

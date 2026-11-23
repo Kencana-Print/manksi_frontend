@@ -64,10 +64,10 @@ onMounted(() => {
     jenisOptions.value = ["ACCESORIES", "OBAT"];
     filterState.value.jenis = "ACCESORIES";
   } else if (bagian === "GA") {
-    jenisOptions.value = ["ATK/RTK"];
+    jenisOptions.value = ["SPAREPART", "ATK/RTK", "ASET"];
     filterState.value.jenis = "ATK/RTK";
   } else if (bagian === "TEKNISI" || bagian === "IT") {
-    jenisOptions.value = ["SPAREPART"];
+    jenisOptions.value = ["SPAREPART", "ATK/RTK", "ASET"];
     filterState.value.jenis = "SPAREPART";
   } else if (["FINANCE", "AUDIT", "DIREKSI", "EDP"].includes(bagian)) {
     jenisOptions.value = ["ACCESORIES", "OBAT", "SPAREPART", "ATK/RTK"];

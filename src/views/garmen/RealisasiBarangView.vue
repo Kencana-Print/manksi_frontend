@@ -74,7 +74,7 @@ const getExportSource = () =>
 
 // [KONFIRMASI] bagian yang boleh merealisasikan ASET. Sengaja lebih sempit
 // dari yang boleh meminta, supaya peminta tidak merealisasikan sendiri.
-const BAGIAN_REALISASI_ASET = ["GA", "EDP"];
+const BAGIAN_REALISASI_ASET = ["GA", "EDP", "IT", "TEKNISI"];
 
 onMounted(async () => {
   // Penyesuaian Jenis berdasarkan Bagian/Role User (Sesuai FormCreate Delphi)
@@ -95,10 +95,10 @@ onMounted(async () => {
     jenisOptions.value = ["ACCESORIES", "OBAT", "SPAREPART", "ATK/RTK"];
     filterState.value.jenis = "ACCESORIES";
   } else if (bagian === "GA") {
-    jenisOptions.value = ["ATK/RTK"];
+    jenisOptions.value = ["SPAREPART", "ATK/RTK"];
     filterState.value.jenis = "ATK/RTK";
   } else if (bagian === "TEKNISI" || bagian === "IT") {
-    jenisOptions.value = ["SPAREPART"];
+    jenisOptions.value = ["SPAREPART", "ATK/RTK"];
     filterState.value.jenis = "SPAREPART";
   } else {
     jenisOptions.value = ["ACCESORIES", "OBAT", "SPAREPART", "ATK/RTK"];

@@ -24,6 +24,8 @@ const showFilterAset = computed(() =>
     "DIREKSI",
     "PEMBELIAN",
     "PURCHASING",
+    "IT",
+    "TEKNISI",
   ].includes(userBagian.value),
 );
 // Jenis yang memakai kolom Spesifikasi dan Kegunaan
