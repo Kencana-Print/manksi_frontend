@@ -90,7 +90,12 @@ onMounted(() => {
           <td class="val">{{ header.min_nomor }}</td>
           <td class="lbl2">Cabang</td>
           <td class="sep">:</td>
-          <td class="val">{{ header.min_cab }}</td>
+          <td class="val">
+            {{ header.min_cab }}
+            <template v-if="header.min_mintake || header.min_tujuan">
+              &rarr; {{ header.min_mintake || header.min_tujuan }}
+            </template>
+          </td>
         </tr>
         <tr>
           <td class="lbl">Tanggal</td>

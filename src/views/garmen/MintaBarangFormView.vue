@@ -85,11 +85,25 @@ const formatDateLocal = (value?: string | Date) => {
 };
 
 // Initial Data Structure (Tambah field Jumlah, Divisi, MKA)
+const MINTA_KE_DEFAULT: Record<string, string> = { P02: "P04" };
+
+const mintaKeOptions = [
+  { title: "P04 (Garmen)", value: "P04" },
+  { title: "P05 (MMT)", value: "P05" },
+  { title: "HO", value: "HO" },
+  { title: "P01", value: "P01" },
+  { title: "P02", value: "P02" },
+  { title: "P03", value: "P03" },
+];
+
 const initialData = {
   nomor: "",
   tanggal: formatDateLocal(new Date()),
   jenis: jenisFromParam.value || "ACCESORIES",
   cabang: authStore.userCabang === "ALL" ? "" : authStore.userCabang,
+  mintaKe:
+    MINTA_KE_DEFAULT[authStore.userCabang || ""] ||
+    (authStore.userCabang === "ALL" ? "P04" : authStore.userCabang || "P04"),
   gudangPeminta: "",
   namaGudangPeminta: "",
   spk: "",
@@ -155,6 +169,9 @@ const {
     showPrintDialog.value = false;
     savedNomor.value = "";
     detailFieldRefs.value = {};
+    previousMintaKe.value =
+      MINTA_KE_DEFAULT[authStore.userCabang || ""] ||
+      (authStore.userCabang === "ALL" ? "P04" : authStore.userCabang || "P04");
   },
   fetchApi: async () => {
     const res = await mintaBarangFormService.getDetail(nomorParam.value);
@@ -165,6 +182,13 @@ const {
       tanggal: formatDateLocal(header.min_tanggal),
       jenis: header.min_jenis,
       cabang: header.min_cab,
+      mintaKe:
+        header.min_mintake ||
+        header.min_cab_tujuan ||
+        header.min_tujuan ||
+        MINTA_KE_DEFAULT[header.min_cab] ||
+        header.min_cab ||
+        "P04",
       gudangPeminta: header.min_gp,
       namaGudangPeminta: header.nama_gdg,
       spk: header.min_spk_nomor,
@@ -203,7 +227,12 @@ const {
     };
   },
   submitApi: async (payload) => {
-    return await mintaBarangFormService.saveData(payload);
+    const finalPayload = {
+      ...payload,
+      mintake: formData.value.mintaKe,
+      min_mintake: formData.value.mintaKe,
+    };
+    return await mintaBarangFormService.saveData(finalPayload);
   },
   onSuccess: (res: any) => {
     toast.success("Permintaan barang berhasil disimpan.");
@@ -223,8 +252,49 @@ onMounted(() => {
       formData.value.jenis = "SPAREPART";
       formData.value.bagian = bag;
     }
+
+    if (!formData.value.mintaKe) {
+      formData.value.mintaKe =
+        MINTA_KE_DEFAULT[formData.value.cabang] ||
+        (formData.value.cabang === "ALL" ? "P04" : formData.value.cabang || "P04");
+      previousMintaKe.value = formData.value.mintaKe;
+    }
   }
 });
+
+const targetCabang = computed(
+  () => formData.value.mintaKe || formData.value.cabang || "P04",
+);
+
+const previousMintaKe = ref(initialData.mintaKe);
+
+const onMintaKeChange = (val: string) => {
+  const hasDetailContent = formData.value.details.some(
+    (d: any) => d.kode && d.kode.trim() !== "",
+  );
+  if (hasDetailContent) {
+    const confirmed = confirm(
+      "Mengubah cabang tujuan 'Minta Ke' akan mereset rincian barang. Lanjutkan?",
+    );
+    if (!confirmed) {
+      formData.value.mintaKe = previousMintaKe.value;
+      return;
+    }
+    formData.value.details = [
+      {
+        kode: "",
+        nama: "",
+        satuan: "",
+        butuh: 0,
+        pemakaian: 0,
+        pcs: 0,
+        jumlah: 0,
+        ket: "",
+      },
+    ];
+  }
+  previousMintaKe.value = val;
+};
 
 const isAccesories = computed(() => formData.value.jenis === "ACCESORIES");
 const isSparepart = computed(() => formData.value.jenis === "SPAREPART");
@@ -567,7 +637,7 @@ const onBarangEnter = async (index: number) => {
     const res = await mintaBarangFormService.getBarangByKode(
       kode,
       formData.value.jenis,
-      formData.value.cabang,
+      targetCabang.value,
       authStore.user?.bagian || "",
     );
     const item = res.data.data;
@@ -789,6 +859,20 @@ const numFormat = (val: any) =>
             style="flex: 1"
           />
         </div>
+
+        <v-select
+          v-model="formData.mintaKe"
+          :items="mintaKeOptions"
+          item-title="title"
+          item-value="value"
+          label="Minta Ke"
+          :readonly="isEdit"
+          hide-details
+          variant="outlined"
+          density="compact"
+          :class="['mb-2', isEdit ? 'bg-grey-lighten-4' : '']"
+          @update:modelValue="onMintaKeChange"
+        />
 
         <v-select
           v-model="formData.jenis"
@@ -1075,7 +1159,7 @@ const numFormat = (val: any) =>
   <BarangGarmenSearchModal
     v-model="showBarangModal"
     :jenis="formData.jenis"
-    :cabang="formData.cabang"
+    :cabang="targetCabang"
     multiple
     @selected="onBarangSelected"
     @selected-multiple="onBarangMultiSelected"
