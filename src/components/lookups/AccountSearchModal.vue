@@ -11,7 +11,7 @@ interface Account {
 
 const props = defineProps<{
   modelValue: boolean;
-  filterMode?: "potongan";
+  filterMode?: "potongan" | "pajak";
   jenis?: "KAS" | "BANK" | "ALL";
 }>();
 const emit = defineEmits(["update:modelValue", "selected"]);
@@ -113,11 +113,11 @@ const selectItem = (item: Account) => {
           CARI DATA ACCOUNT
         </span>
         <span
-          v-if="filterMode === 'potongan'"
+          v-if="filterMode === 'potongan' || filterMode === 'pajak'"
           class="text-caption ml-2"
           style="opacity: 0.8"
         >
-          (Khusus Potongan)
+          {{ filterMode === "pajak" ? "(Akun Pajak)" : "(Khusus Potongan)" }}
         </span>
         <v-spacer></v-spacer>
         <v-btn

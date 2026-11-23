@@ -28,6 +28,8 @@ export interface BkkOption {
   penerima: string;
   keterangan: string;
   nominal: number;
+  akunInfo: string;
+  ccInfo: string;
 }
 
 export interface KlaimDetailLoaded {
@@ -37,6 +39,8 @@ export interface KlaimDetailLoaded {
   cc: string;
   dc: string;
   ccNama: string;
+  akunInfo: string;
+  ccInfo: string;
   bkk: string;
   bon: string;
   tanggal: string;

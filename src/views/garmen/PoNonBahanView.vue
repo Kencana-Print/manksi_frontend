@@ -90,6 +90,7 @@ const showFilterSparepart = computed(() =>
   [
     "TEKNISI",
     "IT",
+    "GA",
     "FINANCE",
     "AUDIT",
     "DIREKSI",
@@ -98,14 +99,14 @@ const showFilterSparepart = computed(() =>
   ].includes(userBagian.value),
 );
 const showFilterAtk = computed(() =>
-  ["GA", "FINANCE", "AUDIT", "DIREKSI", "EDP", ...BAGIAN_PEMBELIAN].includes(
+  ["GA", "IT", "TEKNISI", "FINANCE", "AUDIT", "DIREKSI", "EDP", ...BAGIAN_PEMBELIAN].includes(
     userBagian.value,
   ),
 );
 
 // Bagian yang boleh melihat PO Aset; samakan dengan BAGIAN_PO_ASET di backend
 const showFilterAset = computed(() =>
-  ["GA", "EDP", "FINANCE", "AUDIT", "DIREKSI", ...BAGIAN_PEMBELIAN].includes(
+  ["GA", "EDP", "FINANCE", "AUDIT", "DIREKSI", "IT", "TEKNISI", ...BAGIAN_PEMBELIAN].includes(
     userBagian.value,
   ),
 );
@@ -278,6 +279,7 @@ const onExportDetail = () => {
       Status: master.Status,
       "Kode Barang": "",
       "Nama Barang": "",
+      "Nama External": "",
       Spesifikasi: "",
       Satuan: "",
       Jumlah: "",
@@ -299,6 +301,7 @@ const onExportDetail = () => {
         Status: "",
         "Kode Barang": det.Kode,
         "Nama Barang": det.Nama,
+        "Nama External": det.NamaExt || "",
         Spesifikasi: det.Spesifikasi || det.Kegunaan,
         Satuan: det.Satuan,
         Jumlah: Number(det.Jumlah) || 0,
@@ -582,6 +585,7 @@ const rowPropsFn = (data: any) => {
                   <tr>
                     <th style="width: 100px">Kode</th>
                     <th style="min-width: 250px">Nama Barang</th>
+                    <th style="min-width: 200px">Nama External</th>
                     <th style="width: 140px">No. Minta</th>
                     <th style="width: 80px" class="text-center">Satuan</th>
                     <th
@@ -625,6 +629,7 @@ const rowPropsFn = (data: any) => {
                   <tr v-for="(dtl, i) in getDetailItems(item.Nomor)" :key="i">
                     <td class="fw-mono text-primary">{{ dtl.Kode }}</td>
                     <td class="font-weight-bold">{{ dtl.Nama }}</td>
+                    <td>{{ dtl.NamaExt || "-" }}</td>
                     <td class="fw-mono">{{ dtl.NoMinta || "-" }}</td>
                     <td class="text-center">{{ dtl.Satuan }}</td>
                     <td v-if="JENIS_RINCI.includes(filterState.jenis)">

@@ -184,7 +184,9 @@ const cekDuplikatKodeMmt = async (kode: string) => {
 
 const handleKodeInput = (val: string) => {
   if (!isMmt.value || !props.isNewMode) return;
-  formData.value.Bhn_kode = String(val || "").toUpperCase().trim();
+  formData.value.Bhn_kode = String(val || "")
+    .toUpperCase()
+    .trim();
 
   if (debounceTimer) clearTimeout(debounceTimer);
 
@@ -509,8 +511,12 @@ const executeSave = async () => {
                     <IconCheck :size="16" class="mr-1" />
                     Kode bahan tersedia
                   </span>
-                  <span v-else class="text-caption text-grey-darken-1 font-italic">
-                    * Kode custom (min 3 karakter). Sistem akan mengecek duplikasi otomatis.
+                  <span
+                    v-else
+                    class="text-caption text-grey-darken-1 font-italic"
+                  >
+                    * Kode custom (min 3 karakter). Sistem akan mengecek
+                    duplikasi otomatis.
                   </span>
                 </div>
                 <span
@@ -602,11 +608,12 @@ const executeSave = async () => {
               <v-col cols="6" md="3">
                 <v-text-field
                   v-model="formData.kdSetting"
-                  label="Setting"
+                  label="Setting *"
                   variant="outlined"
                   density="compact"
                   readonly
                   hide-details="auto"
+                  :rules="isNewMode ? [wajibIsi] : []"
                 >
                   <template #append-inner>
                     <IconSearch
@@ -781,7 +788,12 @@ const executeSave = async () => {
                       color="#1565c0"
                       style="cursor: pointer"
                       @click="
-                        openLookup('supplier', 'Daftar Supplier', 'supplier', true)
+                        openLookup(
+                          'supplier',
+                          'Daftar Supplier',
+                          'supplier',
+                          true,
+                        )
                       "
                     />
                   </template>

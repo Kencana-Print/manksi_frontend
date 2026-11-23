@@ -58,8 +58,14 @@ const rincianList = computed<RincianPrint[]>(
 // Positif = mengurangi tagihan, negatif = menambah
 const fmtBahan = (v: number) => (v < 0 ? `+${fmt(Math.abs(v))}` : fmt(v));
 const disc = computed(() => Number(rows.value[0]?.vou_disc || 0));
+const potonganList = computed<
+  { rekKode: string; rekNama: string; keterangan: string; nilai: number }[]
+>(() => rows.value[0]?.potongan ?? []);
+const potonganTotal = computed(() =>
+  potonganList.value.reduce((s, p) => s + Number(p.nilai || 0), 0),
+);
 const grandTotal = computed(
-  () => grandNet.value - bahanTambahan.value - disc.value,
+  () => grandNet.value - bahanTambahan.value - disc.value - potonganTotal.value,
 );
 </script>
 
@@ -119,6 +125,12 @@ const grandTotal = computed(
             <td class="lbl">An/Cabang</td>
             <td class="sep">:</td>
             <td class="val">{{ hdr.sup_atasnama }} - {{ hdr.sup_cabang }}</td>
+          </tr>
+          <tr v-if="hdr.vou_nomor_invoice">
+            <td class="lbl">No. Invoice</td>
+            <td class="sep">:</td>
+            <td class="val">{{ hdr.vou_nomor_invoice }}</td>
+            <td colspan="4"></td>
           </tr>
         </table>
       </div>
@@ -224,6 +236,10 @@ const grandTotal = computed(
           </div>
           <div v-if="disc" class="footer-row">
             <span>Discount</span><span class="footer-val">{{ fmt(disc) }}</span>
+          </div>
+          <div v-for="(p, i) in potonganList" :key="i" class="footer-row">
+            <span>Potongan {{ p.rekNama }}</span
+            ><span class="footer-val">{{ fmt(p.nilai) }}</span>
           </div>
           <div class="footer-row grand">
             <span>Grand Total</span

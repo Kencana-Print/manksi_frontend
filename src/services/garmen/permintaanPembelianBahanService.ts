@@ -19,6 +19,8 @@ export interface PermintaanPembelianBahanBrowseItem {
 export interface PermintaanPembelianBahanDetailRow {
   Nomor: string;
   Kode: string;
+  Spk: string;
+  SpkNama: string;
   Nama: string;
   Setting: string;
   Satuan: string;
@@ -48,11 +50,14 @@ export interface PermintaanPembelianBahanPrintHeader {
   Cabang: string;
   Bagian: string;
   Status: string;
+  Buffer: string;
   Pembuat: string;
 }
 
 export interface PermintaanPembelianBahanPrintDetail {
   Kode: string;
+  Spk: string;
+  SpkNama: string;
   Nama: string;
   Setting: string;
   Konstruksi: string;

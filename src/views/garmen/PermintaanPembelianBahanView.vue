@@ -344,6 +344,8 @@ const doExportDetail = async () => {
         { header: "Sisa", key: "sisa", align: "right", numFmt: "#,##0.00" },
         { header: "PO", key: "po", width: 30 },
         { header: "Keterangan", key: "keterangan", width: 40 },
+        { header: "SPK", key: "spk", width: 18 },
+        { header: "Nama SPK", key: "spkNama", width: 36 },
       ],
       rows.map((r) => ({
         nomor: r.Nomor,
@@ -359,6 +361,8 @@ const doExportDetail = async () => {
         sisa: Number(r.Sisa),
         po: r.PO,
         keterangan: r.Keterangan ?? "",
+        spk: r.Spk,
+        spkNama: r.SpkNama,
       })),
     );
   } catch (e) {
@@ -506,10 +510,12 @@ onActivated(() => {
               <th style="width: 90px" class="num">SISA</th>
               <th style="width: 200px">PO</th>
               <th>KETERANGAN</th>
+              <th style="width: 120px">SPK</th>
+              <th style="width: 260px">NAMA SPK</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="d in detailMap[item.Nomor]" :key="d.Kode">
+            <tr v-for="d in detailMap[item.Nomor]" :key="`${d.Kode}|${d.Spk}`">
               <td>{{ d.Kode }}</td>
               <td>{{ d.Nama }}</td>
               <td>{{ d.Setting || "-" }}</td>
@@ -519,9 +525,11 @@ onActivated(() => {
               <td class="num">{{ fmtJml(d.Sisa) }}</td>
               <td class="cell-wrap">{{ d.PO || "-" }}</td>
               <td class="cell-wrap">{{ d.Keterangan || "-" }}</td>
+              <td>{{ d.Spk || "Buffer" }}</td>
+              <td class="cell-wrap">{{ d.SpkNama || "-" }}</td>
             </tr>
             <tr v-if="!detailMap[item.Nomor].length">
-              <td colspan="9" class="empty-row">&lt;Tidak ada detail&gt;</td>
+              <td colspan="11" class="empty-row">&lt;Tidak ada detail&gt;</td>
             </tr>
           </tbody>
         </table>

@@ -164,7 +164,7 @@ const totalOf = (nomor: string) => {
   return t;
 };
 
-// Kolom Supplier & SPK hanya muncul bila PO punya data itu (PO Lain-lain)
+// Kolom Supplier & SPK hanya muncul bila PO punya data itu (Rekap Belanja)
 const adaSupplier = (nomor: string): boolean =>
   (detailData.value[nomor] ?? []).some((r) => !!r.Supplier);
 

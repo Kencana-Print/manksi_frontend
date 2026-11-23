@@ -61,6 +61,17 @@ export const pengajuanTransferFormService = {
     api.get("/pembelian/pengajuan-transfer-form/klaim-kas-kecil-options", {
       params: { search, nomor },
     }),
+  getSisaCarryOver() {
+    return api.get("/pembelian/pengajuan-transfer-form/sisa-carryover");
+  },
+  getPengajuanDanaOptions(search: string) {
+    return api.get(
+      "/pembelian/pengajuan-transfer-form/pengajuan-dana-options",
+      {
+        params: { search },
+      },
+    );
+  },
   getDetailForm(nomor: string) {
     return api.get("/pembelian/pengajuan-transfer-form/detail", {
       params: { nomor },

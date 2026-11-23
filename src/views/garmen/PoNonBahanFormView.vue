@@ -122,6 +122,17 @@ const onHargaBlur = (e: Event, idx: number) => {
   input.value = formatHarga(formData.value.items[idx].harga);
 };
 
+// Enter di kolom Harga → pindah ke Harga baris berikutnya yang bisa diedit
+const onHargaEnter = (e: KeyboardEvent) => {
+  const inputs = Array.from(
+    document.querySelectorAll<HTMLInputElement>(
+      "input.harga-inp:not([readonly])",
+    ),
+  );
+  const i = inputs.indexOf(e.target as HTMLInputElement);
+  if (i >= 0 && i < inputs.length - 1) inputs[i + 1].focus();
+};
+
 const {
   isLoading,
   isSaving,
@@ -177,6 +188,7 @@ const {
         Kode: item.Kode || item.kode || "",
         Nama: item.Nama,
         Satuan: item.Satuan,
+        namaExt: item.namaExt || item.Nama,
         ket: item.ket,
         kegunaan: item.kegunaan,
         minta: item.minta,
@@ -559,6 +571,7 @@ const onPrintCancel = () => {
                 <th style="width: 130px">No. Permintaan</th>
                 <th style="width: 100px">Kode</th>
                 <th>Nama Barang</th>
+                <th style="width: 200px">Nama External</th>
                 <th style="width: 60px" class="text-center">Satuan</th>
                 <th style="width: 80px" class="text-right">Qty Minta</th>
                 <th style="width: 80px" class="text-right">Sudah PO</th>
@@ -600,6 +613,20 @@ const onPrintCancel = () => {
                   {{ item.Kode }}
                 </td>
                 <td class="px-2 font-weight-bold nama-wrap">{{ item.Nama }}</td>
+                <td class="p0">
+                  <input
+                    v-model="item.namaExt"
+                    class="ci"
+                    :class="{
+                      ro: formData.header.hasBpb || formData.header.isTutupBuku,
+                    }"
+                    :readonly="
+                      formData.header.hasBpb || formData.header.isTutupBuku
+                    "
+                    maxlength="100"
+                    placeholder="Nama di PO..."
+                  />
+                </td>
                 <td class="text-center text-grey-darken-1">
                   {{ item.Satuan }}
                 </td>
@@ -632,12 +659,13 @@ const onPrintCancel = () => {
                     :value="formatHarga(item.harga)"
                     type="text"
                     inputmode="numeric"
-                    class="ci text-right"
+                    class="ci text-right harga-inp"
                     :class="{ ro: item.bpb > 0 || formData.header.isTutupBuku }"
                     :readonly="item.bpb > 0 || formData.header.isTutupBuku"
                     @focus="onHargaFocus($event, Number(idx))"
                     @blur="onHargaBlur($event, Number(idx))"
                     @input="onHargaInput($event, Number(idx))"
+                    @keydown.enter.prevent="onHargaEnter"
                   />
                 </td>
                 <td
@@ -671,7 +699,7 @@ const onPrintCancel = () => {
                 </td>
               </tr>
               <tr v-if="!formData.items.length">
-                <td colspan="15" class="empty-row">
+                <td colspan="16" class="empty-row">
                   Panggil No. Permintaan terlebih dahulu (boleh lebih dari satu)
                 </td>
               </tr>
@@ -809,7 +837,7 @@ const onPrintCancel = () => {
   border-collapse: collapse;
   table-layout: fixed;
   font-size: 12px;
-  min-width: 1100px;
+  min-width: 1300px;
 }
 .gt thead th {
   background: #f5f5f5;

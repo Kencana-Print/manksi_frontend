@@ -29,65 +29,46 @@ const isSpandukCabang = computed(() =>
 
 // --- KONFIGURASI AKSES FILTER (MIGRASI FormCreate DELPHI) ---
 // Di Delphi: if (zbagian='ADMIN') or (zbagian='PPIC') or ...
-const showFilterAcc = computed(() => {
-  const b = authStore.user?.bagian || "";
-  return [
-    "ADMIN",
-    "PPIC",
-    "GUDANG",
-    "PRODUKSI",
-    "POTONG",
-    "CETAK",
-    "JAHIT",
-    "LIPAT",
-    "FINANCE",
-    "AUDIT",
-    "DIREKSI",
-    "EDP",
-  ].includes(b);
-});
+const BAGIAN_PRODUKSI = [
+  "ADMIN",
+  "PPIC",
+  "GUDANG",
+  "PRODUKSI",
+  "POTONG",
+  "CETAK",
+  "JAHIT",
+  "LIPAT",
+  "FINANCE",
+  "PEMBELIAN",
+  "AUDIT",
+  "DIREKSI",
+  "EDP",
+];
+const BAGIAN_UMUM = [
+  "GA",
+  "FINANCE",
+  "PEMBELIAN",
+  "AUDIT",
+  "DIREKSI",
+  "EDP",
+  "ADMIN",
+];
+const BAGIAN_SPAREPART = ["TEKNISI", "IT", ...BAGIAN_UMUM];
 
-const showFilterObat = computed(() => {
-  const b = authStore.user?.bagian || "";
-  return [
-    "ADMIN",
-    "PPIC",
-    "GUDANG",
-    "PRODUKSI",
-    "POTONG",
-    "CETAK",
-    "JAHIT",
-    "LIPAT",
-    "FINANCE",
-    "AUDIT",
-    "DIREKSI",
-    "EDP",
-  ].includes(b);
-});
+const bagianUser = computed(() => authStore.user?.bagian || "");
 
-const showFilterSparepart = computed(() => {
-  const b = authStore.user?.bagian || "";
-  return [
-    "TEKNISI",
-    "IT",
-    "FINANCE",
-    "AUDIT",
-    "DIREKSI",
-    "EDP",
-    "ADMIN",
-  ].includes(b);
-});
-
-const showFilterAtk = computed(() => {
-  const b = authStore.user?.bagian || "";
-  return ["GA", "FINANCE", "AUDIT", "DIREKSI", "EDP", "ADMIN"].includes(b);
-});
-
+const showFilterAcc = computed(() =>
+  BAGIAN_PRODUKSI.includes(bagianUser.value),
+);
+const showFilterObat = computed(() =>
+  BAGIAN_PRODUKSI.includes(bagianUser.value),
+);
+const showFilterSparepart = computed(() =>
+  BAGIAN_SPAREPART.includes(bagianUser.value),
+);
+const showFilterAtk = computed(() => BAGIAN_UMUM.includes(bagianUser.value));
 // ASET: daftar bagian sementara disamakan dengan ATK/RTK [KONFIRMASI]
-const showFilterAset = computed(() => {
-  const b = authStore.user?.bagian || "";
-  return ["GA", "FINANCE", "AUDIT", "DIREKSI", "EDP", "ADMIN"].includes(b);
-});
+const showFilterAset = computed(() => BAGIAN_UMUM.includes(bagianUser.value));
 
 // Menentukan Default Check (Migrasi rbacc.Checked:=True dll)
 onMounted(async () => {

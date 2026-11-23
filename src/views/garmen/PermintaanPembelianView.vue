@@ -49,8 +49,18 @@ interface ExportDetailItem {
 const router = useRouter();
 const toast = useToast();
 const authStore = useAuthStore();
-// Bagian yang boleh melihat/membuat Permintaan Pembelian Aset; samakan dengan BAGIAN_ASET di backend
-const BAGIAN_ASET = ["GA", "EDP"];
+// Bagian yang boleh melihat Permintaan Pembelian Aset; samakan dengan BAGIAN_PO_ASET_LIHAT di poNonBahanFormService
+const BAGIAN_ASET = [
+  "GA",
+  "EDP",
+  "FINANCE",
+  "AUDIT",
+  "DIREKSI",
+  "PEMBELIAN",
+  "PURCHASING",
+  "IT",
+  "TEKNISI",
+];
 const bolehAset = computed(() =>
   BAGIAN_ASET.includes((authStore.user?.bagian || "").toUpperCase()),
 );

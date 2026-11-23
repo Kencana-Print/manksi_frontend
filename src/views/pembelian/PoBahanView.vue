@@ -348,7 +348,7 @@ const onExportDetail = async () => {
     order.forEach((key) => {
       const rowsInGroup = groups[key];
       const first = rowsInGroup[0];
-      // PO Lain-lain: supplier berbeda per baris, jadi tidak ditaruh di master
+      // Rekap Belanja: supplier berbeda per baris, jadi tidak ditaruh di master
       const isLainLain = first.JenisPO === "LAIN-LAIN";
 
       // Data Header/Master yang hanya muncul di baris pertama

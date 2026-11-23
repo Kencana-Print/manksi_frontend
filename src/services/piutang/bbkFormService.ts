@@ -51,11 +51,19 @@ export const bbkFormService = {
   getRekapOptions(search: string) {
     return api.get("/piutang/bbk-form/rekap-options", { params: { search } });
   },
+  getVoucherOptions: (search: string, nomor = "") =>
+    api.get("/piutang/bbk-form/voucher-options", { params: { search, nomor } }),
   getRekapRows(nomor: string) {
     return api.get("/piutang/bbk-form/rekap-rows", { params: { nomor } });
   },
   getKlaimOptions: async (search = "", nomor = "") => {
     const res = await api.get("/piutang/bbk-form/klaim-options", {
+      params: { search, nomor },
+    });
+    return res.data.data;
+  },
+  getPengajuanDanaOptions: async (search = "", nomor = "") => {
+    const res = await api.get("/piutang/bbk-form/pengajuan-dana-options", {
       params: { search, nomor },
     });
     return res.data.data;

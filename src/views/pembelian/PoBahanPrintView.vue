@@ -146,7 +146,7 @@ onMounted(async () => {
     const res = await poBahanFormService.getDetail(nomorPO);
     const d = res.data.data;
 
-    // PO Lain-lain: PPN per baris (pod_ppn); jenis lain: PPN header
+    // Rekap Belanja: PPN per baris (pod_ppn); jenis lain: PPN header
     const isLain = Number(d.header?.po_jenis) === 4;
     const ppnHeader =
       Number(d.header?.po_status_ppn) === 1 ? Number(d.header?.po_ppn) || 0 : 0;
@@ -197,7 +197,7 @@ onMounted(async () => {
       );
     }
 
-    // PO Lain-lain hasil Rekap Belanja: 1 PO = 1 supplier. Header tidak menyimpan
+    // Rekap Belanja hasil Rekap Belanja: 1 PO = 1 supplier. Header tidak menyimpan
     // supplier, jadi ambil dari baris lalu tarik alamatnya.
     if (isLain) {
       const kodeSup = [
@@ -260,7 +260,7 @@ const isBahan = computed(
 const isLainLain = computed(() => dataPO.value?.header?.po_jenis === 4);
 const isSpanduk = computed(() => Number(dataPO.value?.header?.po_jenis) === 5);
 
-// PO Lain-lain satu supplier → tampil seperti PO biasa; multi supplier (PL lama) → per baris
+// Rekap Belanja satu supplier → tampil seperti PO biasa; multi supplier (PL lama) → per baris
 const tampilKolomSupplier = computed(() => isLainLain.value && !supLain.value);
 const supCetak = computed<SupplierCetak | null>(() => {
   const h = dataPO.value?.header;

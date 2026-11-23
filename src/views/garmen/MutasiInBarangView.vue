@@ -53,6 +53,7 @@ const showFilterSparepart = computed(() => {
   return [
     "TEKNISI",
     "IT",
+    "GA",
     "FINANCE",
     "AUDIT",
     "DIREKSI",
@@ -61,7 +62,12 @@ const showFilterSparepart = computed(() => {
   ].includes(userBagian.value);
 });
 const showFilterAtk = computed(() => {
-  return ["GA", "FINANCE", "AUDIT", "DIREKSI", "EDP", "ADMIN"].includes(
+  return ["GA", "IT", "TEKNISI", "FINANCE", "AUDIT", "DIREKSI", "EDP", "ADMIN"].includes(
+    userBagian.value,
+  );
+});
+const showFilterAset = computed(() => {
+  return ["GA", "IT", "TEKNISI", "FINANCE", "AUDIT", "DIREKSI", "EDP", "ADMIN"].includes(
     userBagian.value,
   );
 });
@@ -355,6 +361,15 @@ const confirmTerimaMutasi = async () => {
               @change="fetchData"
             />
             ATK
+          </label>
+          <label class="radio-label" v-if="showFilterAset">
+            <input
+              type="radio"
+              v-model="filterState.jenis"
+              value="ASET"
+              @change="fetchData"
+            />
+            ASET
           </label>
         </div>
       </div>

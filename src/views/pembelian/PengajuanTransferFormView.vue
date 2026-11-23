@@ -55,9 +55,29 @@ const form = ref({
 const originalForm = ref<any>(null);
 const accountOptions = ref<any[]>([]);
 
+// Hanya baris yang diceklis masuk total pengajuan; sisanya ditunda
+const barisAktif = (d: any) => !d.jurnal && !d.batal;
 const totalNominal = computed(() =>
-  form.value.detail.reduce((s, d) => s + (Number(d.nominal) || 0), 0),
+  form.value.detail
+    .filter((d) => d.diajukan !== false)
+    .reduce((s, d) => s + (Number(d.nominal) || 0), 0),
 );
+const barisTunda = computed(() =>
+  form.value.detail.filter((d) => d.nama && d.diajukan === false),
+);
+const totalTunda = computed(() =>
+  barisTunda.value.reduce((s, d) => s + (Number(d.nominal) || 0), 0),
+);
+const semuaDiajukan = computed(() => {
+  const target = form.value.detail.filter((d) => d.nama && barisAktif(d));
+  return target.length > 0 && target.every((d) => d.diajukan !== false);
+});
+const toggleSemuaDiajukan = () => {
+  const nilai = !semuaDiajukan.value;
+  for (const d of form.value.detail) {
+    if (d.nama && barisAktif(d)) d.diajukan = nilai;
+  }
+};
 const numFmt = (v: any) => (v ? Number(v).toLocaleString("id-ID") : "0");
 const parseNum = (v: string) =>
   Number(String(v).replace(/\./g, "").replace(",", ".")) || 0;
@@ -80,7 +100,7 @@ onMounted(async () => {
         form.value.rek_nama = accountOptions.value[0].nama;
         form.value.rek_rekening = accountOptions.value[0].rekening;
       }
-      addRow();
+      await muatSisa();
     } else {
       const res = await pengajuanTransferFormService.getDetailForm(
         String(route.params.nomor),
@@ -563,7 +583,7 @@ const selectPc = (p: any) => {
   showPcModal.value = false;
 };
 
-// ── PO Lain-lain (F6) ──
+// ── Rekap Belanja (F6) ──
 const showPoLainModal = ref(false);
 const poLainState = ref<ModalState<any>>(createModalState());
 let poLainDebounce: ReturnType<typeof setTimeout> | null = null;
@@ -596,7 +616,7 @@ const selectPoLain = async (p: any) => {
       i !== activeTrsIdx.value && d.trs === p.nomor && d.kode === p.supKode,
   );
   if (exists) {
-    toast.warning("PO Lain-lain tsb untuk supplier ini sudah di input.");
+    toast.warning("Rekap Belanja tsb untuk supplier ini sudah di input.");
     return;
   }
   const idx = activeTrsIdx.value;
@@ -690,8 +710,81 @@ const selectKlaim = (k: KlaimKasKecilOption) => {
   showKlaimModal.value = false;
 };
 
+// ── Pengajuan Dana (F5) ──
+interface PengajuanDanaOption {
+  pgj: string;
+  pjhNomor: string;
+  tanggal: string;
+  pemohon: string;
+  keterangan: string;
+  itemNourut: number;
+  nama: string;
+  spesifikasi: string;
+  satuan: string;
+  qtySisa: number;
+  harga: number;
+  nominal: number;
+}
+const showPgjModal = ref(false);
+const pgjState =
+  ref<ModalState<PengajuanDanaOption>>(createModalState<PengajuanDanaOption>());
+let pgjDebounce: ReturnType<typeof setTimeout> | null = null;
+
+const doSearchPgj = async () => {
+  pgjState.value.loading = true;
+  try {
+    const res = await pengajuanTransferFormService.getPengajuanDanaOptions(
+      pgjState.value.search,
+    );
+    pgjState.value.allItems = res.data.data || [];
+  } catch (e: any) {
+    pgjState.value.allItems = [];
+    toast.error(
+      e.response?.data?.message || "Gagal memuat daftar Pengajuan Dana.",
+    );
+  } finally {
+    pgjState.value.loading = false;
+  }
+};
+const searchPgjDebounced = () => {
+  if (pgjDebounce) clearTimeout(pgjDebounce);
+  pgjDebounce = setTimeout(doSearchPgj, 350);
+};
+const openPgjModal = async (idx: number) => {
+  activeTrsIdx.value = idx;
+  pgjState.value = createModalState<PengajuanDanaOption>();
+  showPgjModal.value = true;
+  await doSearchPgj();
+};
+const selectPgj = (p: PengajuanDanaOption) => {
+  const exists = form.value.detail.some(
+    (d, i) => i !== activeTrsIdx.value && d.pgj === p.pgj,
+  );
+  if (exists) {
+    toast.warning("Item Pengajuan Dana tsb sudah di input.");
+    return;
+  }
+  const d = form.value.detail[activeTrsIdx.value];
+  d.trs = p.pjhNomor;
+  d.pgj = p.pgj;
+  d.nominal = Number(p.nominal) || 0;
+  d.klaim = false;
+  if (!String(d.ket || "").trim()) d.ket = String(p.nama || "").slice(0, 80);
+  showPgjModal.value = false;
+  toast.info("Isi supplier dan rekening tujuan secara manual.");
+};
+
 // ── Sumber No. Transaksi (dropdown + satu tombol cari, pola Voucher) ──
-type SumberTrs = "" | "BKK" | "VOU" | "POE" | "PC" | "POL" | "RKP" | "KKK";
+type SumberTrs =
+  | ""
+  | "BKK"
+  | "VOU"
+  | "POE"
+  | "PC"
+  | "POL"
+  | "RKP"
+  | "KKK"
+  | "PGJ";
 
 const bukaModalSumber = (sumber: SumberTrs, idx: number) => {
   switch (sumber) {
@@ -716,6 +809,9 @@ const bukaModalSumber = (sumber: SumberTrs, idx: number) => {
     case "KKK":
       openKlaimModal(idx);
       break;
+    case "PGJ":
+      openPgjModal(idx);
+      break;
     default:
       toast.warning("Pilih sumber transaksi dahulu.");
   }
@@ -724,7 +820,7 @@ const bukaModalSumber = (sumber: SumberTrs, idx: number) => {
 // Dipakai pintasan F1-F7: set sumber di dropdown lalu buka modalnya.
 const pilihSumber = (sumber: SumberTrs, idx: number) => {
   const d = form.value.detail[idx];
-  if (d.jurnal || isRealisasi.value) return;
+  if (d.jurnal || isRealisasi.value || d.pgj) return;
   d.sumber = sumber;
   bukaModalSumber(sumber, idx);
 };
@@ -849,7 +945,31 @@ const addRow = () => {
     jurnal: "",
     batal: "",
     klaim: false,
+    pgj: "",
+    diajukan: true,
+    asalNomor: "",
+    asalNourut: 0,
   });
+};
+// Sisa pengajuan sebelumnya (baris yang tidak diceklis, belum direalisasi)
+// otomatis dimuat di form Tambah. Gagal memuat tidak boleh menutup form.
+const muatSisa = async () => {
+  try {
+    const res = await pengajuanTransferFormService.getSisaCarryOver();
+    const sisa = (res.data.data || []) as any[];
+    form.value.detail = sisa;
+    if (sisa.length)
+      toast.info(
+        `${sisa.length} baris sisa pengajuan sebelumnya dimuat. Hilangkan ceklis pada yang tidak diajukan sekarang.`,
+        { timeout: 8000 },
+      );
+  } catch (e: any) {
+    form.value.detail = [];
+    toast.warning(
+      e.response?.data?.message || "Gagal memuat sisa pengajuan sebelumnya.",
+    );
+  }
+  addRow();
 };
 const removeRow = (idx: number) => {
   const d = form.value.detail[idx];
@@ -932,6 +1052,10 @@ const validateSave = () => {
     toast.warning("Detail harus diisi.");
     return;
   }
+  if (!isRealisasi.value && !filled.some((d: any) => d.diajukan !== false)) {
+    toast.warning("Minimal satu baris harus diceklis untuk diajukan.");
+    return;
+  }
 
   if (!isRealisasi.value) {
     for (const d of filled) {
@@ -948,6 +1072,7 @@ const validateSave = () => {
     for (const d of filled) {
       if (d.jurnal) continue;
       if (d.batal) continue;
+      if (d.diajukan === false) continue;
 
       if (d.tglRealisasi) {
         if (!d.rekkode) {
@@ -1023,8 +1148,7 @@ const executeCancel = () => {
     Object.assign(form.value, JSON.parse(JSON.stringify(originalForm.value)));
   } else {
     form.value.tanggal = today;
-    form.value.detail = [];
-    addRow();
+    muatSisa();
   }
 };
 const executeClose = () => {
@@ -1126,8 +1250,15 @@ const skipCetak = () => {
           </div>
 
           <div class="total-box">
-            <span>Total Nominal</span>
+            <span>Total Diajukan</span>
             <span>{{ numFmt(totalNominal) }}</span>
+          </div>
+
+          <div v-if="barisTunda.length" class="tunda-box">
+            Ditunda: {{ barisTunda.length }} baris · {{ numFmt(totalTunda) }}
+            <div>
+              Otomatis masuk pengajuan berikutnya selama belum direalisasi.
+            </div>
           </div>
 
           <div class="hint-box">
@@ -1143,7 +1274,7 @@ const skipCetak = () => {
               <span class="hint-key">F4</span> Petty Cash
             </div>
             <div class="hint-row">
-              <span class="hint-key">F6</span> PO Lain-lain
+              <span class="hint-key">F6</span> Rekap Belanja
             </div>
             <div class="hint-row">
               <span class="hint-key">F7</span> Voucher dari Rekap
@@ -1179,6 +1310,16 @@ const skipCetak = () => {
             <thead>
               <tr>
                 <th style="width: 35px" class="text-center">No</th>
+                <th style="width: 55px" class="text-center">
+                  <input
+                    type="checkbox"
+                    :checked="semuaDiajukan"
+                    :disabled="isRealisasi"
+                    title="Ceklis / hapus ceklis semua"
+                    @change="toggleSemuaDiajukan"
+                  />
+                  <div>Ajukan</div>
+                </th>
                 <th style="width: 100px">Kode Sup</th>
                 <th style="min-width: 200px">Nama Supplier</th>
                 <th style="width: 80px">Bank</th>
@@ -1204,10 +1345,33 @@ const skipCetak = () => {
                     ? 'color:#cc0000'
                     : d.tglRealisasi
                       ? 'color:#1565c0'
-                      : ''
+                      : d.diajukan === false
+                        ? 'color:#9e9e9e;font-style:italic'
+                        : ''
                 "
               >
-                <td class="td-ctr">{{ idx + 1 }}</td>
+                <td class="td-ctr">
+                  {{ idx + 1 }}
+                  <span
+                    v-if="d.asalNomor"
+                    class="tag-sisa"
+                    :title="`Sisa dari ${d.asalNomor}`"
+                    >SISA</span
+                  >
+                </td>
+
+                <td class="td-ctr">
+                  <input
+                    v-model="d.diajukan"
+                    type="checkbox"
+                    :disabled="isRealisasi || !!d.jurnal || !!d.batal"
+                    :title="
+                      d.diajukan === false
+                        ? 'Ditunda: masuk pengajuan berikutnya'
+                        : 'Diajukan di dokumen ini'
+                    "
+                  />
+                </td>
 
                 <td class="td-inp">
                   <div class="cell-igrp">
@@ -1265,23 +1429,25 @@ const skipCetak = () => {
                       class="cell"
                       style="min-width: 110px"
                       placeholder="No. transaksi (opsional)"
-                      :readonly="!!d.jurnal || isRealisasi"
+                      :readonly="!!d.jurnal || isRealisasi || !!d.pgj"
                       @keydown.f1.prevent="pilihSumber('BKK', idx)"
                       @keydown.f2.prevent="pilihSumber('VOU', idx)"
                       @keydown.f3.prevent="pilihSumber('POE', idx)"
                       @keydown.f4.prevent="pilihSumber('PC', idx)"
+                      @keydown.f5.prevent="pilihSumber('PGJ', idx)"
                       @keydown.f6.prevent="pilihSumber('POL', idx)"
                       @keydown.f7.prevent="pilihSumber('RKP', idx)"
                       @keydown.f8.prevent="pilihSumber('KKK', idx)"
                     />
-                    <template v-if="!d.jurnal && !isRealisasi">
+                    <template v-if="!d.jurnal && !isRealisasi && !d.pgj">
                       <select v-model="d.sumber" class="type-select">
                         <option value="">—</option>
                         <option value="BKK">BKK</option>
                         <option value="VOU">Voucher</option>
                         <option value="POE">PO External</option>
                         <option value="PC">Petty Cash</option>
-                        <option value="POL">PO Lain-lain</option>
+                        <option value="PGJ">Pengajuan Dana</option>
+                        <option value="POL">Rekap Belanja</option>
                         <option value="RKP">Voucher Rekap</option>
                         <option value="KKK">Klaim Kas Kecil</option>
                       </select>
@@ -1316,7 +1482,12 @@ const skipCetak = () => {
 
                 <td class="td-inp">
                   <input
-                    v-if="isRealisasi && !d.jurnal && !d.batal"
+                    v-if="
+                      isRealisasi &&
+                      !d.jurnal &&
+                      !d.batal &&
+                      d.diajukan !== false
+                    "
                     v-model="d.tglRealisasi"
                     type="date"
                     class="cell"
@@ -1326,7 +1497,13 @@ const skipCetak = () => {
                     class="cell-val-ro"
                     :style="{ color: d.tglRealisasi ? '#1565c0' : '#9e9e9e' }"
                   >
-                    {{ d.tglRealisasi ? fmtDate(d.tglRealisasi) : "-" }}
+                    {{
+                      d.tglRealisasi
+                        ? fmtDate(d.tglRealisasi)
+                        : d.diajukan === false
+                          ? "Ditunda"
+                          : "-"
+                    }}
                   </span>
                 </td>
 
@@ -1390,7 +1567,9 @@ const skipCetak = () => {
                     >
                       {{ d.batal || "-" }}
                     </span>
-                    <template v-if="isRealisasi && !d.jurnal">
+                    <template
+                      v-if="isRealisasi && !d.jurnal && d.diajukan !== false"
+                    >
                       <button
                         v-if="!d.batal"
                         type="button"
@@ -1425,14 +1604,14 @@ const skipCetak = () => {
                 </td>
               </tr>
               <tr v-if="!form.detail.length">
-                <td colspan="15" class="text-center text-grey py-4 font-italic">
+                <td colspan="16" class="text-center text-grey py-4 font-italic">
                   Belum ada item. Klik "Tambah Baris".
                 </td>
               </tr>
             </tbody>
             <tfoot v-if="form.detail.length">
               <tr>
-                <td colspan="7" class="foot-lbl">Total</td>
+                <td colspan="8" class="foot-lbl">Total Diajukan</td>
                 <td class="foot-val tr">{{ numFmt(totalNominal) }}</td>
                 <td colspan="7"></td>
               </tr>
@@ -1965,13 +2144,77 @@ const skipCetak = () => {
     </v-card>
   </v-dialog>
 
-  <!-- Modal PO Lain-lain (F6) -->
+  <!-- Modal Pengajuan Dana (F5) -->
+  <v-dialog v-model="showPgjModal" max-width="1100px" scrollable>
+    <v-card class="rounded-lg">
+      <v-card-title
+        class="pa-3 text-subtitle-1 text-white"
+        style="background: #1565c0"
+        >F5 — Pengajuan Dana</v-card-title
+      >
+      <v-card-text class="pa-3">
+        <input
+          v-model="pgjState.search"
+          class="f-inp mb-2"
+          placeholder="Cari nomor pengajuan atau nama item..."
+          autofocus
+          @input="searchPgjDebounced"
+        />
+        <div style="max-height: 360px; overflow-y: auto">
+          <div v-if="pgjState.loading" class="text-center py-4 text-grey">
+            Memuat...
+          </div>
+          <table v-else class="mini-table klaim-table">
+            <thead>
+              <tr>
+                <th style="width: 130px">Nomor</th>
+                <th style="width: 40px" class="text-right">No</th>
+                <th style="width: 90px">Tanggal</th>
+                <th style="width: 120px">Pemohon</th>
+                <th>Item</th>
+                <th style="width: 70px" class="text-right">Sisa Qty</th>
+                <th style="width: 100px" class="text-right">Harga</th>
+                <th style="width: 110px" class="text-right">Nominal</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="p in pgjState.allItems"
+                :key="p.pgj"
+                class="mini-row"
+                @click="selectPgj(p)"
+              >
+                <td>{{ p.pjhNomor }}</td>
+                <td class="text-right">{{ p.itemNourut }}</td>
+                <td>{{ p.tanggal }}</td>
+                <td>{{ p.pemohon }}</td>
+                <td style="white-space: normal">
+                  {{ p.nama
+                  }}<span v-if="p.spesifikasi"> — {{ p.spesifikasi }}</span>
+                </td>
+                <td class="text-right">{{ p.qtySisa }} {{ p.satuan }}</td>
+                <td class="text-right">{{ numFmt(p.harga) }}</td>
+                <td class="text-right">{{ numFmt(p.nominal) }}</td>
+              </tr>
+              <tr v-if="pgjState.allItems.length === 0">
+                <td colspan="8" class="text-center text-grey py-3">
+                  Tidak ada item Pengajuan Dana yang bisa diajukan
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </v-card-text>
+    </v-card>
+  </v-dialog>
+
+  <!-- Modal Rekap Belanja (F6) -->
   <v-dialog v-model="showPoLainModal" max-width="820px" scrollable>
     <v-card class="rounded-lg">
       <v-card-title
         class="pa-3 text-subtitle-1 text-white"
         style="background: #455a64"
-        >F6 — PO Lain-lain</v-card-title
+        >F6 — Rekap Belanja</v-card-title
       >
       <v-card-text class="pa-3">
         <input
@@ -2539,5 +2782,30 @@ const skipCetak = () => {
 .klaim-table th,
 .klaim-table td {
   white-space: nowrap;
+}
+
+.tag-sisa {
+  display: inline-block;
+  margin-left: 3px;
+  padding: 0 4px;
+  font-size: 9px;
+  font-weight: 700;
+  color: #e65100;
+  background: #fff3e0;
+  border: 1px solid #ffcc80;
+  border-radius: 3px;
+}
+.tunda-box {
+  background: #fff3e0;
+  border: 1px solid #ffcc80;
+  border-radius: 4px;
+  padding: 8px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #e65100;
+}
+.tunda-box div {
+  margin-top: 2px;
+  font-weight: 400;
 }
 </style>

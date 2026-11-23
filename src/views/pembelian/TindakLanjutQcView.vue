@@ -28,6 +28,8 @@ interface TlQcRow {
   VendorGreige: string;
   VendorCelup: string;
   JenisKain: string;
+  Penilaian: number;
+  AlasanNilai: string;
   Status: string;
   Keterangan: string | null;
   JumlahLot: number;
@@ -114,6 +116,7 @@ const filteredItems = computed<TlQcRow[]>(() => {
       r.Nomor_SPK,
       r.Nama_SPK,
       r.JenisKain,
+      r.AlasanNilai,
       r.VendorGreige,
       r.VendorCelup,
       r.Keterangan,
@@ -132,6 +135,8 @@ const headers = [
   { title: "Nomor SPK/SO", key: "Nomor_SPK", width: "150px" },
   { title: "Nama SPK/SO", key: "Nama_SPK", width: "220px" },
   { title: "Jenis Kain", key: "JenisKain", width: "240px" },
+  { title: "Penilaian", key: "Penilaian", width: "80px", align: "center" },
+  { title: "Alasan Penilaian", key: "AlasanNilai", width: "300px" },
   { title: "Vendor Greige", key: "VendorGreige", width: "160px" },
   { title: "Vendor Celup", key: "VendorCelup", width: "160px" },
   { title: "Lot", key: "JumlahLot", width: "50px", align: "right" },
@@ -520,6 +525,18 @@ const submitPin = async () => {
     <template #item.Status="{ item }">
       <span class="status-chip" :class="statusClass(item.Status)">
         {{ item.Status }}
+      </span>
+    </template>
+
+    <template #item.Penilaian="{ item }">
+      <span class="status-chip" :class="nilaiClass(item.Penilaian)">
+        {{ item.Penilaian || "-" }}
+      </span>
+    </template>
+
+    <template #item.AlasanNilai="{ item }">
+      <span class="alasan-cell" :title="item.AlasanNilai">
+        {{ item.AlasanNilai || "-" }}
       </span>
     </template>
 
@@ -963,6 +980,13 @@ const submitPin = async () => {
 .chip-hold {
   background: #f3e5f5;
   color: #6a1b9a;
+}
+.alasan-cell {
+  display: block;
+  max-width: 290px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .expand-wrap {

@@ -50,6 +50,8 @@ const BAGIAN_ASET_LIHAT = [
   "DIREKSI",
   "PEMBELIAN",
   "PURCHASING",
+  "IT",
+  "TEKNISI",
 ];
 const BAGIAN_ASET_PROSES = ["GA", "EDP", "PEMBELIAN", "PURCHASING"];
 const KECAB_ASET = "P04";
@@ -87,10 +89,10 @@ onMounted(() => {
     jenisOptions.value = ["ACCESORIES", "OBAT", "SPAREPART", "ATK/RTK"];
     filterState.value.jenis = "ACCESORIES";
   } else if (bagian === "GA") {
-    jenisOptions.value = ["ATK/RTK"];
+    jenisOptions.value = ["SPAREPART", "ATK/RTK"];
     filterState.value.jenis = "ATK/RTK";
   } else if (bagian === "TEKNISI" || bagian === "IT") {
-    jenisOptions.value = ["SPAREPART"];
+    jenisOptions.value = ["SPAREPART", "ATK/RTK"];
     filterState.value.jenis = "SPAREPART";
   } else {
     jenisOptions.value = [];

@@ -203,7 +203,16 @@ const {
   initialData: defaultData(),
   fetchApi: async (): Promise<FormState> => {
     const d = await lhkForm.getById(String(route.params.nomor));
-    return { tanggal: d.Tanggal_LHK ?? todayLocal, tabs: [mapTab(d)] };
+    const tab = mapTab(d);
+    const daftarSesi = await lhkForm.getSesiAktif();
+    const milik = daftarSesi.find((s) =>
+      s.Daftar.some((m) => m.Nomor_SPK.toUpperCase() === d.Nomor.toUpperCase()),
+    );
+    if (milik) {
+      tab.sesi = milik;
+      tab.sesiMs = Date.now();
+    }
+    return { tanggal: d.Tanggal_LHK ?? todayLocal, tabs: [tab] };
   },
   submitApi: async (data: FormState): Promise<SaveResponse> =>
     lhkForm.simpanBatch(bangunPayload(data)),
