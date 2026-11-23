@@ -3007,6 +3007,11 @@ const router = createRouter({
     },
     {
       path: "/garmen/maklon/makloon-barang",
+      alias: [
+        "/garmen/makloon/makloon-barang",
+        "/garmen/maklon/maklon-barang",
+        "/garmen/makloon/maklon-barang",
+      ],
       name: "MaklonBarangBrowse",
       component: () => import("@/views/garmen/MaklonBarangView.vue"),
       meta: {
@@ -3019,6 +3024,11 @@ const router = createRouter({
     },
     {
       path: "/garmen/maklon/makloon-barang/create",
+      alias: [
+        "/garmen/makloon/makloon-barang/create",
+        "/garmen/maklon/maklon-barang/create",
+        "/garmen/makloon/maklon-barang/create",
+      ],
       name: "MaklonBarangCreate",
       component: () => import("@/views/garmen/MaklonBarangFormView.vue"),
       meta: {
@@ -3032,6 +3042,11 @@ const router = createRouter({
     },
     {
       path: "/garmen/maklon/makloon-barang/edit/:nomor",
+      alias: [
+        "/garmen/makloon/makloon-barang/edit/:nomor",
+        "/garmen/maklon/maklon-barang/edit/:nomor",
+        "/garmen/makloon/maklon-barang/edit/:nomor",
+      ],
       name: "MaklonBarangEdit",
       component: () => import("@/views/garmen/MaklonBarangFormView.vue"),
       meta: {
@@ -3045,6 +3060,8 @@ const router = createRouter({
     },
     {
       path: "/garmen/maklon/makloon-barang/print-gabungan/:nomor/:sjkNomor",
+      alias:
+        "/garmen/makloon/makloon-barang/print-gabungan/:nomor/:sjkNomor",
       name: "MaklonGabunganPrint",
       component: () => import("@/views/garmen/MaklonGabunganPrintView.vue"),
       meta: {
@@ -3055,6 +3072,7 @@ const router = createRouter({
     },
     {
       path: "/garmen/maklon/makloon-barang/print/:nomor",
+      alias: "/garmen/makloon/makloon-barang/print/:nomor",
       name: "MaklonBarangPrint",
       component: () => import("@/views/garmen/MaklonBarangPrintView.vue"),
       meta: {
@@ -3065,6 +3083,7 @@ const router = createRouter({
     },
     {
       path: "/garmen/maklon/sj-keluar/print/:sjkNomor",
+      alias: "/garmen/makloon/sj-keluar/print/:sjkNomor",
       name: "MaklonSjKeluarPrint",
       component: () => import("@/views/garmen/MaklonSjKeluarPrintView.vue"),
       meta: {
@@ -3075,6 +3094,11 @@ const router = createRouter({
     },
     {
       path: "/garmen/makloon/sj-hasil-makloon",
+      alias: [
+        "/garmen/maklon/sj-hasil-makloon",
+        "/garmen/maklon/sj-hasil-maklon",
+        "/garmen/makloon/sj-hasil-maklon",
+      ],
       name: "SjHasilMakloonBrowse",
       component: () => import("@/views/garmen/SjHasilMakloonView.vue"),
       meta: {
@@ -3087,6 +3111,11 @@ const router = createRouter({
     },
     {
       path: "/garmen/makloon/sj-hasil-makloon/create",
+      alias: [
+        "/garmen/maklon/sj-hasil-makloon/create",
+        "/garmen/maklon/sj-hasil-maklon/create",
+        "/garmen/makloon/sj-hasil-maklon/create",
+      ],
       name: "SjHasilMakloonCreate",
       component: () => import("@/views/garmen/SjHasilMakloonFormView.vue"),
       meta: {
@@ -3099,6 +3128,11 @@ const router = createRouter({
     },
     {
       path: "/garmen/makloon/sj-hasil-makloon/print/:nomor",
+      alias: [
+        "/garmen/maklon/sj-hasil-makloon/print/:nomor",
+        "/garmen/maklon/sj-hasil-maklon/print/:nomor",
+        "/garmen/makloon/sj-hasil-maklon/print/:nomor",
+      ],
       name: "SjHasilMakloonPrint",
       component: () => import("@/views/garmen/SjHasilMakloonPrintView.vue"),
       meta: {
