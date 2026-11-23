@@ -83,7 +83,7 @@ const selectItem = (item: PermintaanItem) => {
       <!-- Header Dialog -->
       <div class="lookup-header">
         <IconClipboardList :size="16" :stroke-width="1.8" color="white" />
-        <span>Pilih Dokumen Permintaan Produksi</span>
+        <span>Pilih Dokumen Permintaan Bahan Baku MMT</span>
         <v-spacer />
         <button class="lookup-close" @click="emit('update:modelValue', false)">
           ✕
@@ -114,7 +114,7 @@ const selectItem = (item: PermintaanItem) => {
 
         <div v-else-if="items.length === 0" class="lookup-empty">
           <IconDatabaseOff :size="28" :stroke-width="1.3" />
-          <span>Tidak ada dokumen permintaan produksi ditemukan.</span>
+          <span>Tidak ada dokumen permintaan bahan baku MMT ditemukan.</span>
         </div>
 
         <table v-else class="lookup-table">

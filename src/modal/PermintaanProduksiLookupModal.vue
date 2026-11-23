@@ -53,7 +53,7 @@ function getStatusColor(status) {
     <v-card>
       <v-card-title class="bg-indigo-darken-2 text-white d-flex align-center">
         <v-icon start>mdi-file-find</v-icon>
-        <span>Cari Dokumen Permintaan Produksi</span>
+        <span>Cari Dokumen Permintaan Bahan Baku MMT</span>
         <v-spacer></v-spacer>
         <v-btn icon="mdi-close" variant="text" @click="emit('close')"></v-btn>
       </v-card-title>

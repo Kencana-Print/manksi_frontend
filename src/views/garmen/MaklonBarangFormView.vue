@@ -454,7 +454,7 @@ const numFmt = (v: any) =>
           <label class="lbl">Cabang Asal</label>
           <select
             v-model="formData.CabAsal"
-            class="inp flex-grow-1"
+            class="inp grow"
             :disabled="isLockedByStatus"
           >
             <option value="" disabled>Pilih cabang...</option>
@@ -467,7 +467,7 @@ const numFmt = (v: any) =>
           <label class="lbl">Cabang Tujuan</label>
           <select
             v-model="formData.CabTujuan"
-            class="inp flex-grow-1"
+            class="inp grow"
             :disabled="isLockedByStatus"
           >
             <option value="" disabled>Pilih cabang...</option>
@@ -483,7 +483,7 @@ const numFmt = (v: any) =>
           <label class="lbl">Keterangan</label>
           <textarea
             v-model="formData.Keterangan"
-            class="ta flex-grow-1"
+            class="ta grow"
             rows="5"
             :disabled="isLockedByStatus"
           />
@@ -601,7 +601,7 @@ const numFmt = (v: any) =>
                 <label class="lbl-sm">Keterangan Baris</label>
                 <input
                   v-model="row.keterangan"
-                  class="inp flex-grow-1"
+                  class="inp grow"
                   :disabled="isLockedByStatus"
                 />
               </div>
@@ -787,6 +787,7 @@ const numFmt = (v: any) =>
 .tr {
   text-align: right;
 }
+.grow,
 .flex-grow-1 {
   flex: 1;
 }

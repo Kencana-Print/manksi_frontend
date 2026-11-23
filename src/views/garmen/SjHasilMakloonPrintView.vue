@@ -11,41 +11,9 @@ const data = ref<any>(null);
 const isLoading = ref(true);
 const isError = ref(false);
 
-onMounted(async () => {
-  try {
-    const res = await sjHasilMakloonService.getPrintData(nomor);
-    data.value = res.data.data;
-    isLoading.value = false;
-
-    await nextTick();
-
-    const style = document.createElement("style");
-    style.textContent = "@page { size: A4 portrait; margin: 12mm; }";
-    document.head.appendChild(style);
-
-    await waitForImages();
-    window.print();
-  } catch (error) {
-    isError.value = true;
-    isLoading.value = false;
-  }
-});
-
-const waitForImages = () => {
-  const imgs = Array.from(document.querySelectorAll("img"));
-  return Promise.all(
-    imgs.map((img) => {
-      if (img.complete) return Promise.resolve();
-      return new Promise<void>((resolve) => {
-        img.onload = () => resolve();
-        img.onerror = () => resolve(); // tetap lanjut walau 1 gambar gagal load
-      });
-    }),
-  );
-};
-
 const num = (val: any) =>
   new Intl.NumberFormat("id-ID").format(Number(val) || 0);
+
 const tglIndo = (dateStr: string) => {
   if (!dateStr) return "";
   const d = new Date(dateStr);
@@ -54,6 +22,34 @@ const tglIndo = (dateStr: string) => {
   const month = String(d.getMonth() + 1).padStart(2, "0");
   return `${day}/${month}/${d.getFullYear()}`;
 };
+
+const waitForImages = () => {
+  const imgs = Array.from(document.querySelectorAll("img"));
+  return Promise.all(
+    imgs.map((img) => {
+      if ((img as HTMLImageElement).complete) return Promise.resolve();
+      return new Promise<void>((resolve) => {
+        img.addEventListener("load", () => resolve());
+        img.addEventListener("error", () => resolve());
+      });
+    }),
+  );
+};
+
+onMounted(async () => {
+  try {
+    const res = await sjHasilMakloonService.getPrintData(nomor);
+    data.value = res.data?.data ?? res.data;
+    isLoading.value = false;
+
+    await nextTick();
+    await waitForImages();
+    setTimeout(() => window.print(), 350);
+  } catch (error) {
+    isError.value = true;
+    isLoading.value = false;
+  }
+});
 </script>
 
 <template>
@@ -68,7 +64,7 @@ const tglIndo = (dateStr: string) => {
         <div class="company-info">
           <div class="font-weight-bold">CV. Kencana Print</div>
           <div>Padokan RT 04 / 04 Sawahan Ngemplak, Boyolali</div>
-          <div>0271-740634/0271-740634</div>
+          <div>0271-740634 / 0271-740634</div>
         </div>
         <img :src="logoKP" alt="Logo" class="company-logo" />
       </div>
@@ -79,12 +75,12 @@ const tglIndo = (dateStr: string) => {
         <tr>
           <td class="lbl">No. Maklon</td>
           <td class="sep">:</td>
-          <td class="val">{{ data.header.sjm_mkl_nomor }}</td>
+          <td class="val mono font-weight-bold">{{ data.header.sjm_mkl_nomor }}</td>
         </tr>
         <tr>
           <td class="lbl">No. Surat Jalan</td>
           <td class="sep">:</td>
-          <td class="val">{{ data.header.sjm_nomor }}</td>
+          <td class="val mono font-weight-bold">{{ data.header.sjm_nomor }}</td>
         </tr>
         <tr>
           <td class="lbl">Tanggal Terima</td>
@@ -110,43 +106,55 @@ const tglIndo = (dateStr: string) => {
       <table class="detail-table">
         <thead>
           <tr>
-            <th style="width: 28px">No.</th>
+            <th style="width: 28px" class="tc">No.</th>
             <th>Item Barang Jadi</th>
-            <th style="width: 70px">Qty Diterima</th>
-            <th style="width: 60px">BS</th>
-            <th style="width: 60px">Satuan</th>
-            <th>No. LHK DTF</th>
+            <th style="width: 85px" class="tr">Qty Diterima</th>
+            <th style="width: 65px" class="tr">BS</th>
+            <th style="width: 60px" class="tc">Satuan</th>
+            <th style="width: 140px">No. LHK</th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="(d, i) in data.details" :key="i">
             <td class="tc">{{ Number(i) + 1 }}</td>
-            <td>{{ d.sjmd_kode_jadi }} - {{ d.NamaJadi }}</td>
-            <td class="tr">{{ num(d.sjmd_qty_terima) }}</td>
+            <td>
+              {{ d.NamaJadi && d.NamaJadi !== d.sjmd_kode_jadi ? `${d.sjmd_kode_jadi} - ${d.NamaJadi}` : d.sjmd_kode_jadi }}
+            </td>
+            <td class="tr font-weight-bold">{{ num(d.sjmd_qty_terima) }}</td>
             <td class="tr">{{ num(d.sjmd_qty_bs) }}</td>
-            <td class="tc">{{ d.Satuan }}</td>
+            <td class="tc">{{ d.Satuan || "-" }}</td>
             <td class="mono">{{ d.LhkNomor || "-" }}</td>
           </tr>
         </tbody>
+        <tfoot>
+          <tr class="font-weight-bold" style="background: #f9f9f9">
+            <td colspan="2" class="tr">TOTAL:</td>
+            <td class="tr">{{ num(data.details.reduce((s: number, r: any) => s + Number(r.sjmd_qty_terima || 0), 0)) }}</td>
+            <td class="tr">{{ num(data.details.reduce((s: number, r: any) => s + Number(r.sjmd_qty_bs || 0), 0)) }}</td>
+            <td colspan="2"></td>
+          </tr>
+        </tfoot>
       </table>
 
       <div class="footer-note">
-        DOKUMEN INI MENJADI BUKTI PENERIMAAN HASIL MAKLON DAN DASAR PENAMBAHAN
-        STOCK ITEM DI ATAS.
+        DOKUMEN INI MENJADI BUKTI PENERIMAAN HASIL MAKLON DAN DASAR PENAMBAHAN STOCK ITEM DI ATAS.
       </div>
 
       <div class="sign-row">
         <div class="sign-col">
-          <div class="sign-lbl">Dibuat oleh,</div>
+          <div class="sign-lbl">Diserahkan Oleh,</div>
           <div class="sign-space"></div>
-          <div class="sign-name">
-            ( {{ data.header.sjm_user_create || "-" }} )
-          </div>
+          <div class="sign-name">(&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;)</div>
         </div>
         <div class="sign-col">
-          <div class="sign-lbl">Diterima oleh,</div>
+          <div class="sign-lbl">Driver / Ekspedisi,</div>
           <div class="sign-space"></div>
-          <div class="sign-name">( &#160; )</div>
+          <div class="sign-name">(&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;)</div>
+        </div>
+        <div class="sign-col">
+          <div class="sign-lbl">Diterima Oleh,</div>
+          <div class="sign-space"></div>
+          <div class="sign-name">(&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;)</div>
         </div>
       </div>
     </div>
@@ -168,43 +176,46 @@ const tglIndo = (dateStr: string) => {
 }
 .print-wrapper {
   width: 100%;
-  max-width: 210mm;
   margin: 0 auto;
+  box-sizing: border-box;
 }
 .print-container {
-  border: 2px solid #2e7d32;
-  padding: 14px 18px;
+  width: 190mm;
+  margin: 0 auto;
   background: white;
-  font-family: Arial, sans-serif;
-  font-size: 11px;
-  color: #000;
+  border: 1px solid #1565c0;
+  padding: 14px 18px;
   box-sizing: border-box;
+  font-family: Arial, sans-serif;
+  font-size: 10px;
+  color: #000;
 }
 .header-row {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
 }
 .company-info {
-  font-size: 10px;
+  font-size: 9.5px;
   line-height: 1.4;
   color: #000;
 }
 .company-logo {
-  max-height: 40px;
+  max-height: 36px;
   width: auto;
   object-fit: contain;
 }
 .doc-title {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: bold;
   text-align: center;
   margin-bottom: 10px;
+  text-decoration: underline;
 }
 .info-table {
   border-collapse: collapse;
-  font-size: 10px;
+  font-size: 9.5px;
   margin-bottom: 10px;
   width: 100%;
 }
@@ -213,7 +224,7 @@ const tglIndo = (dateStr: string) => {
   vertical-align: top;
 }
 .info-table .lbl {
-  width: 130px;
+  width: 140px;
   font-weight: 600;
 }
 .info-table .sep {
@@ -222,8 +233,8 @@ const tglIndo = (dateStr: string) => {
 .detail-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 10px;
-  margin-bottom: 12px;
+  font-size: 9.5px;
+  margin-bottom: 8px;
 }
 .detail-table th,
 .detail-table td {
@@ -244,32 +255,57 @@ const tglIndo = (dateStr: string) => {
 .mono {
   font-family: monospace;
 }
-.footer-note {
-  font-size: 10px;
+.font-weight-bold {
   font-weight: bold;
-  color: #2e7d32;
+}
+.footer-note {
+  font-size: 8.5px;
+  font-weight: bold;
+  color: #c62828;
   margin-bottom: 14px;
 }
 .sign-row {
   display: flex;
   justify-content: space-between;
-  gap: 10px;
+  gap: 20px;
 }
 .sign-col {
   flex: 1;
   text-align: center;
-  font-size: 10px;
+  font-size: 9.5px;
 }
 .sign-space {
-  height: 34px;
+  height: 40px;
 }
-.font-weight-bold {
+.sign-name {
   font-weight: bold;
 }
+
+@media screen {
+  body {
+    background: #555;
+    padding: 20px;
+  }
+  .print-container {
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+  }
+}
 @media print {
+  @page {
+    size: A4 portrait;
+    margin: 12mm;
+  }
   body {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
+  }
+  .print-wrapper {
+    margin: 0;
+    padding: 0;
+  }
+  .print-container {
+    border: none;
+    padding: 0;
   }
 }
 </style>

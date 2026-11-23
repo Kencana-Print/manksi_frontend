@@ -173,12 +173,12 @@ const handleDelete = async (item: any) => {
   const nomor = getItemNomor(target);
   if (!nomor) return;
 
-  if (!confirm(`Hapus data retur permintaan produksi nomor ${nomor}?`)) return;
+  if (!confirm(`Hapus data retur permintaan bahan baku MMT nomor ${nomor}?`)) return;
   try {
     await api.delete(
       `/mmt/bahan-baku-produksi/retur-produksi/${encodeURIComponent(nomor)}`,
     );
-    toast.success("Retur permintaan produksi berhasil dihapus.");
+    toast.success("Retur permintaan bahan baku MMT berhasil dihapus.");
     fetchData();
   } catch (err: any) {
     toast.error(err.response?.data?.message || "Gagal menghapus data.");

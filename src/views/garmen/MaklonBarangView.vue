@@ -7,11 +7,13 @@ import { useBrowse } from "@/composables/useBrowse";
 import { maklonBarangService } from "@/services/garmen/maklonBarangService";
 import { maklonBarangFormService } from "@/services/garmen/maklonBarangFormService";
 import { maklonTerimaService } from "@/services/garmen/maklonTerimaService";
+import { useAuthStore } from "@/stores/authStore";
 import {
-  IconArrowsExchange,
-  IconTruckDelivery,
-  IconPrinter,
-  IconPackageImport,
+    IconArrowsExchange,
+    IconTruckDelivery,
+    IconPrinter,
+    IconPackageImport,
+    IconChevronDown,
 } from "@tabler/icons-vue";
 import { formatTanggal, formatTanggalJam } from "@/utils/dateFormat";
 
@@ -21,95 +23,132 @@ const router = useRouter();
 const today = new Date();
 const padDate = (n: number) => String(n).padStart(2, "0");
 const toLocalDate = (d: Date) =>
-  `${d.getFullYear()}-${padDate(d.getMonth() + 1)}-${padDate(d.getDate())}`;
+    `${d.getFullYear()}-${padDate(d.getMonth() + 1)}-${padDate(d.getDate())}`;
 
 const firstDayOfMonth = toLocalDate(
-  new Date(today.getFullYear(), today.getMonth(), 1),
+    new Date(today.getFullYear(), today.getMonth(), 1),
 );
 const todayStr = toLocalDate(today);
 
 const SESSION_KEY = "maklon_barang_browse_filter";
+const authStore = useAuthStore();
+const userCab = computed(() =>
+    String(authStore.userCabang || authStore.user?.cabang || "")
+        .replace(/-/g, "")
+        .trim()
+        .toUpperCase(),
+);
+const isHoOrAdmin = computed(() => {
+    const c = userCab.value;
+    const kode = String(authStore.user?.kode || "").toUpperCase();
+    return (
+        !c ||
+        c === "HO" ||
+        c === "ALL" ||
+        kode === "ADMIN" ||
+        kode === "DEVELOPER"
+    );
+});
+
 const savedFilter = (() => {
-  try {
-    return JSON.parse(sessionStorage.getItem(SESSION_KEY) || "{}");
-  } catch {
-    return {};
-  }
+    try {
+        return JSON.parse(sessionStorage.getItem(SESSION_KEY) || "{}");
+    } catch {
+        return {};
+    }
 })();
 
 const dtAwal = ref(savedFilter.dtAwal || firstDayOfMonth);
 const dtAkhir = ref(savedFilter.dtAkhir || todayStr);
+const semuaCabang = ref(
+    isHoOrAdmin.value
+        ? savedFilter.semuaCabang !== undefined
+            ? savedFilter.semuaCabang
+            : true
+        : false,
+);
 const keyword = ref("");
 
-watch([dtAwal, dtAkhir], () => {
-  sessionStorage.setItem(
-    SESSION_KEY,
-    JSON.stringify({ dtAwal: dtAwal.value, dtAkhir: dtAkhir.value }),
-  );
-  fetchData();
+watch([dtAwal, dtAkhir, semuaCabang], () => {
+    sessionStorage.setItem(
+        SESSION_KEY,
+        JSON.stringify({
+            dtAwal: dtAwal.value,
+            dtAkhir: dtAkhir.value,
+            semuaCabang: semuaCabang.value,
+        }),
+    );
+    fetchData();
 });
 
 const {
-  items,
-  isLoading,
-  selected,
-  canInsert,
-  canEdit,
-  canDelete,
-  selectedItem,
-  fetchData,
+    items,
+    isLoading,
+    selected,
+    canInsert,
+    canEdit,
+    canDelete,
+    selectedItem,
+    fetchData,
 } = useBrowse({
-  menuId: "181",
-  fetchApi: async () => {
-    const res = await maklonBarangService.getBrowse({
-      startDate: dtAwal.value,
-      endDate: dtAkhir.value,
-      keyword: keyword.value,
-    });
-    return res.data.data;
-  },
-  immediate: false,
+    menuId: "181",
+    fetchApi: async () => {
+        const res = await maklonBarangService.getBrowse({
+            startDate: dtAwal.value,
+            endDate: dtAkhir.value,
+            cab: userCab.value,
+            semuaCabang: semuaCabang.value,
+            keyword: keyword.value,
+        });
+        return res.data.data;
+    },
+    immediate: false,
 });
 
 const headers = [
-  { title: "Nomor", key: "mkl_nomor", width: "150px", fixed: true },
-  { title: "Tanggal", key: "mkl_tanggal", width: "100px", align: "center" },
-  { title: "Deadline", key: "mkl_deadline", width: "100px", align: "center" },
-  { title: "Cab. Asal", key: "mkl_cab_asal", width: "90px", align: "center" },
-  {
-    title: "Cab. Tujuan",
-    key: "mkl_cab_tujuan",
-    width: "90px",
-    align: "center",
-  },
-  { title: "Jml Item", key: "JmlItem", width: "80px", align: "center" },
-  { title: "Total Kirim", key: "TotalKirim", width: "110px", align: "end" },
-  { title: "Total Terima", key: "TotalTerima", width: "110px", align: "end" },
-  { title: "Total BS", key: "TotalBs", width: "90px", align: "end" },
-  { title: "Status", key: "mkl_status", width: "140px", align: "center" },
-  { title: "Keterangan", key: "mkl_keterangan", width: "200px" },
-  { title: "User", key: "mkl_user_create", width: "80px" },
-  { title: "Created", key: "mkl_date_create", width: "140px", align: "center" },
+    { title: "Nomor", key: "mkl_nomor", width: "150px", fixed: true },
+    { title: "Tanggal", key: "mkl_tanggal", width: "100px", align: "center" },
+    { title: "Deadline", key: "mkl_deadline", width: "100px", align: "center" },
+    { title: "Cab. Asal", key: "mkl_cab_asal", width: "90px", align: "center" },
+    {
+        title: "Cab. Tujuan",
+        key: "mkl_cab_tujuan",
+        width: "90px",
+        align: "center",
+    },
+    { title: "Jml Item", key: "JmlItem", width: "80px", align: "center" },
+    { title: "Total Kirim", key: "TotalKirim", width: "110px", align: "end" },
+    { title: "Total Terima", key: "TotalTerima", width: "110px", align: "end" },
+    { title: "Total BS", key: "TotalBs", width: "90px", align: "end" },
+    { title: "Status", key: "mkl_status", width: "140px", align: "center" },
+    { title: "Keterangan", key: "mkl_keterangan", width: "200px" },
+    { title: "User", key: "mkl_user_create", width: "80px" },
+    {
+        title: "Created",
+        key: "mkl_date_create",
+        width: "140px",
+        align: "center",
+    },
 ];
 
 const statusColor = (status: string) => {
-  switch (status) {
-    case "SELESAI":
-      return "#2e7d32";
-    case "DITERIMA SEBAGIAN":
-      return "#7cb342";
-    case "OTW GUDANG":
-      return "#f9a825";
-    case "SELESAI DTF":
-      return "#8e24aa";
-    case "DIKIRIM":
-      return "#1565c0";
-    case "SEBAGIAN DIKIRIM":
-      return "#fb8c00";
-    case "DRAFT":
-    default:
-      return "#546e7a";
-  }
+    switch (status) {
+        case "SELESAI":
+            return "#2e7d32";
+        case "DITERIMA SEBAGIAN":
+            return "#7cb342";
+        case "OTW GUDANG":
+            return "#f9a825";
+        case "SELESAI DTF":
+            return "#8e24aa";
+        case "DIKIRIM":
+            return "#1565c0";
+        case "SEBAGIAN DIKIRIM":
+            return "#fb8c00";
+        case "DRAFT":
+        default:
+            return "#546e7a";
+    }
 };
 
 const expandedRows = ref<any[]>([]);
@@ -117,47 +156,47 @@ const detailCache = ref<Record<string, any>>({});
 const detailLoading = ref<Record<string, boolean>>({});
 
 const onUpdateExpanded = async (newExpanded: any[]) => {
-  expandedRows.value = newExpanded;
-  const newlyExpanded = newExpanded.filter(
-    (item) =>
-      !detailCache.value[item.mkl_nomor] &&
-      !detailLoading.value[item.mkl_nomor],
-  );
-  for (const item of newlyExpanded) {
-    const nomor = item.mkl_nomor;
-    detailLoading.value[nomor] = true;
-    try {
-      const res = await maklonBarangService.getDetail(nomor);
-      detailCache.value[nomor] = res.data.data;
-    } catch {
-      toast.error(`Gagal memuat detail ${nomor}`);
-    } finally {
-      detailLoading.value[nomor] = false;
+    expandedRows.value = newExpanded;
+    const newlyExpanded = newExpanded.filter(
+        (item) =>
+            !detailCache.value[item.mkl_nomor] &&
+            !detailLoading.value[item.mkl_nomor],
+    );
+    for (const item of newlyExpanded) {
+        const nomor = item.mkl_nomor;
+        detailLoading.value[nomor] = true;
+        try {
+            const res = await maklonBarangService.getDetail(nomor);
+            detailCache.value[nomor] = res.data.data;
+        } catch {
+            toast.error(`Gagal memuat detail ${nomor}`);
+        } finally {
+            detailLoading.value[nomor] = false;
+        }
     }
-  }
 };
 
 const numFmt = (v: any) =>
-  v != null ? Number(v).toLocaleString("id-ID") : "0";
+    v != null ? Number(v).toLocaleString("id-ID") : "0";
 
 const openImage = (url: string) => window.open(url, "_blank");
 const tglFmt = (v: any) => {
-  if (!v) return "-";
-  const d = new Date(v);
-  if (isNaN(d.getTime())) return v;
-  return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
+    if (!v) return "-";
+    const d = new Date(v);
+    if (isNaN(d.getTime())) return v;
+    return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
 };
 
 onMounted(() => fetchData());
 
 const onAdd = () => {
-  router.push("/garmen/maklon/makloon-barang/create");
+    router.push("/garmen/maklon/makloon-barang/create");
 };
 
 const onEdit = (item: any) => {
-  router.push(
-    `/garmen/maklon/makloon-barang/edit/${encodeURIComponent(item.mkl_nomor)}`,
-  );
+    router.push(
+        `/garmen/maklon/makloon-barang/edit/${encodeURIComponent(item.mkl_nomor)}`,
+    );
 };
 
 const showSjKeluarDialog = ref(false);
@@ -169,121 +208,147 @@ const sjKeluarTanggal = ref(new Date().toISOString().slice(0, 10));
 const sjKeluarQty = ref<Record<number, number>>({});
 
 const canBuatSjKeluar = (item: any) =>
-  ["DRAFT", "SEBAGIAN DIKIRIM"].includes(item.mkl_status);
+    ["DRAFT", "SEBAGIAN DIKIRIM"].includes(item.mkl_status);
 
 const openSjKeluarDialog = async (item: any) => {
-  if (!item) return;
-  sjKeluarLoading.value = true;
-  showSjKeluarDialog.value = true;
-  sjKeluarTanggal.value = new Date().toISOString().slice(0, 10);
-  try {
-    const res = await maklonBarangFormService.getSjKeluarDialog(item.mkl_nomor);
-    sjKeluarHeader.value = res.data.data.header;
-    sjKeluarDetails.value = res.data.data.details;
-    sjKeluarQty.value = {};
-    for (const d of sjKeluarDetails.value) {
-      sjKeluarQty.value[d.mkld_id] = Number(d.Sisa);
+    if (!item) return;
+    sjKeluarLoading.value = true;
+    showSjKeluarDialog.value = true;
+    sjKeluarTanggal.value = new Date().toISOString().slice(0, 10);
+    try {
+        const res = await maklonBarangFormService.getSjKeluarDialog(
+            item.mkl_nomor,
+        );
+        sjKeluarHeader.value = res.data.data.header;
+        sjKeluarDetails.value = res.data.data.details;
+        sjKeluarQty.value = {};
+        for (const d of sjKeluarDetails.value) {
+            sjKeluarQty.value[d.mkld_id] = Number(d.Sisa);
+        }
+    } catch (e: any) {
+        toast.error(e.response?.data?.message || "Gagal memuat data.");
+        showSjKeluarDialog.value = false;
+    } finally {
+        sjKeluarLoading.value = false;
     }
-  } catch (e: any) {
-    toast.error(e.response?.data?.message || "Gagal memuat data.");
-    showSjKeluarDialog.value = false;
-  } finally {
-    sjKeluarLoading.value = false;
-  }
 };
 
 const totalQtySjKeluar = computed(() =>
-  Object.values(sjKeluarQty.value).reduce((s, v) => s + (Number(v) || 0), 0),
+    Object.values(sjKeluarQty.value).reduce((s, v) => s + (Number(v) || 0), 0),
 );
 
 const submitSjKeluar = async () => {
-  const items = sjKeluarDetails.value
-    .filter((d) => Number(sjKeluarQty.value[d.mkld_id]) > 0)
-    .map((d) => ({
-      mkld_id: d.mkld_id,
-      qty: Number(sjKeluarQty.value[d.mkld_id]),
-    }));
+    const items = sjKeluarDetails.value
+        .filter((d) => Number(sjKeluarQty.value[d.mkld_id]) > 0)
+        .map((d) => ({
+            mkld_id: d.mkld_id,
+            qty: Number(sjKeluarQty.value[d.mkld_id]),
+        }));
 
-  if (!items.length) {
-    return toast.warning("Minimal 1 baris harus diisi qty kirim.");
-  }
-  for (const d of sjKeluarDetails.value) {
-    const qty = Number(sjKeluarQty.value[d.mkld_id]) || 0;
-    if (qty > Number(d.Sisa)) {
-      return toast.warning(
-        `Qty pada barang ${d.mkld_kode_polos} melebihi sisa yang belum dikirim (${d.Sisa}).`,
-      );
+    if (!items.length) {
+        return toast.warning("Minimal 1 baris harus diisi qty kirim.");
     }
-  }
+    for (const d of sjKeluarDetails.value) {
+        const qty = Number(sjKeluarQty.value[d.mkld_id]) || 0;
+        if (qty > Number(d.Sisa)) {
+            return toast.warning(
+                `Qty pada barang ${d.mkld_kode_polos} melebihi sisa yang belum dikirim (${d.Sisa}).`,
+            );
+        }
+    }
 
-  sjKeluarSaving.value = true;
-  try {
-    const res = await maklonBarangFormService.createSjKeluar(
-      sjKeluarHeader.value.mkl_nomor,
-      {
-        tanggal: sjKeluarTanggal.value,
-        items,
-      },
-    );
-    toast.success(`SJ Keluar ${res.data.data.nomor} berhasil dibuat.`);
-    showSjKeluarDialog.value = false;
-    const url = router.resolve({
-      name: "MaklonSjKeluarPrint",
-      params: { sjkNomor: res.data.data.nomor },
-    }).href;
-    window.open(url, "_blank");
-    fetchData();
-  } catch (e: any) {
-    toast.error(e.response?.data?.message || "Gagal membuat SJ Keluar.");
-  } finally {
-    sjKeluarSaving.value = false;
-  }
+    sjKeluarSaving.value = true;
+    try {
+        const res = await maklonBarangFormService.createSjKeluar(
+            sjKeluarHeader.value.mkl_nomor,
+            {
+                tanggal: sjKeluarTanggal.value,
+                items,
+            },
+        );
+        toast.success(`SJ Keluar ${res.data.data.nomor} berhasil dibuat.`);
+        showSjKeluarDialog.value = false;
+        const url = router.resolve({
+            name: "MaklonSjKeluarPrint",
+            params: { sjkNomor: res.data.data.nomor },
+        }).href;
+        window.open(url, "_blank");
+        fetchData();
+    } catch (e: any) {
+        toast.error(e.response?.data?.message || "Gagal membuat SJ Keluar.");
+    } finally {
+        sjKeluarSaving.value = false;
+    }
 };
 
 const STATUS_BISA_HAPUS = ["DRAFT", "SEBAGIAN DIKIRIM", "DIKIRIM"];
 
 // Cermin guard backend: belum diproses workshop tujuan
 const beforeHapus = (item: any) => {
-  const diproses =
-    item.mkl_tgl_selesai_dtf ||
-    item.mkl_tgl_otw_gudang ||
-    Number(item.TotalTerima) > 0 ||
-    Number(item.TotalBs) > 0;
-  if (!STATUS_BISA_HAPUS.includes(item.mkl_status) || diproses) {
-    toast.warning(
-      "Maklon sudah diproses workshop tujuan (selesai DTF / OTW gudang / diterima), tidak bisa dihapus.",
-    );
-    return false;
-  }
-  return true;
+    const diproses =
+        item.mkl_tgl_selesai_dtf ||
+        item.mkl_tgl_otw_gudang ||
+        Number(item.TotalTerima) > 0 ||
+        Number(item.TotalBs) > 0;
+    if (!STATUS_BISA_HAPUS.includes(item.mkl_status) || diproses) {
+        toast.warning(
+            "Maklon sudah diproses workshop tujuan (selesai DTF / OTW gudang / diterima), tidak bisa dihapus.",
+        );
+        return false;
+    }
+    return true;
 };
 
 const onHapus = async (item: any) => {
-  try {
-    await maklonBarangService.deleteData(item.mkl_nomor);
-    toast.success(`Maklon ${item.mkl_nomor} berhasil dihapus.`);
-    delete detailCache.value[item.mkl_nomor];
-    selected.value = []; // kalau tidak, baris terhapus masih "terpilih" dan Hapus tetap aktif
-    await fetchData();
-  } catch (e: any) {
-    toast.error(e.response?.data?.message || "Gagal menghapus Maklon.");
-  }
+    try {
+        await maklonBarangService.deleteData(item.mkl_nomor);
+        toast.success(`Maklon ${item.mkl_nomor} berhasil dihapus.`);
+        delete detailCache.value[item.mkl_nomor];
+        selected.value = []; // kalau tidak, baris terhapus masih "terpilih" dan Hapus tetap aktif
+        await fetchData();
+    } catch (e: any) {
+        toast.error(e.response?.data?.message || "Gagal menghapus Maklon.");
+    }
 };
 
-const openPrintTab = () => {
-  if (!selectedItem.value) return;
-  if (!selectedItem.value.SjkNomorPertama) {
-    toast.warning("Belum ada SJ Keluar untuk Maklon ini.");
-    return;
-  }
-  const url = router.resolve({
-    name: "MaklonGabunganPrint",
-    params: {
-      nomor: selectedItem.value.mkl_nomor,
-      sjkNomor: selectedItem.value.SjkNomorPertama,
-    },
-  }).href;
-  window.open(url, "_blank");
+const summaryColumns = ["TotalKirim", "TotalTerima", "TotalBs"];
+const summaryFormatters = {
+    mkl_nomor: () => "TOTAL :",
+    TotalKirim: (items: any[]) =>
+        numFmt(items.reduce((s, r) => s + (Number(r.TotalKirim) || 0), 0)),
+    TotalTerima: (items: any[]) =>
+        numFmt(items.reduce((s, r) => s + (Number(r.TotalTerima) || 0), 0)),
+    TotalBs: (items: any[]) =>
+        numFmt(items.reduce((s, r) => s + (Number(r.TotalBs) || 0), 0)),
+};
+
+const openPrintGabungan = (item?: any) => {
+    const target = item || selectedItem.value;
+    if (!target) return;
+    if (!target.SjkNomorPertama) {
+        toast.warning("Belum ada SJ Keluar untuk Maklon ini.");
+        return;
+    }
+    const url = router.resolve({
+        name: "MaklonGabunganPrint",
+        params: {
+            nomor: target.mkl_nomor,
+            sjkNomor: target.SjkNomorPertama,
+        },
+    }).href;
+    window.open(url, "_blank");
+};
+
+const openPrintMaklonSaja = (item?: any) => {
+    const target = item || selectedItem.value;
+    if (!target) return;
+    const url = router.resolve({
+        name: "MaklonBarangPrint",
+        params: {
+            nomor: target.mkl_nomor,
+        },
+    }).href;
+    window.open(url, "_blank");
 };
 
 const showTerimaDialog = ref(false);
@@ -295,733 +360,897 @@ const terimaTanggal = ref(new Date().toISOString().slice(0, 10));
 const terimaQty = ref<Record<number, { terima: number; bs: number }>>({});
 
 const canTerimaHasil = (item: any) =>
-  ["OTW GUDANG", "DITERIMA SEBAGIAN"].includes(item.mkl_status);
+    ["OTW GUDANG", "DITERIMA SEBAGIAN"].includes(item.mkl_status);
 
 const openTerimaDialog = async (item: any) => {
-  if (!item) return;
-  terimaLoading.value = true;
-  showTerimaDialog.value = true;
-  terimaTanggal.value = new Date().toISOString().slice(0, 10);
-  try {
-    const res = await maklonTerimaService.getOutstandingByMkl(item.mkl_nomor);
-    terimaHeader.value = res.data.data.header;
-    terimaItems.value = res.data.data.items;
-    terimaQty.value = {};
-    for (const d of terimaItems.value) {
-      terimaQty.value[d.SjmdId] = {
-        terima: Number(d.SisaTerima),
-        bs: Number(d.SisaBs),
-      };
+    if (!item) return;
+    terimaLoading.value = true;
+    showTerimaDialog.value = true;
+    terimaTanggal.value = new Date().toISOString().slice(0, 10);
+    try {
+        const res = await maklonTerimaService.getOutstandingByMkl(
+            item.mkl_nomor,
+        );
+        terimaHeader.value = res.data.data.header;
+        terimaItems.value = res.data.data.items;
+        terimaQty.value = {};
+        for (const d of terimaItems.value) {
+            terimaQty.value[d.SjmdId] = {
+                terima: Number(d.SisaTerima),
+                bs: Number(d.SisaBs),
+            };
+        }
+        if (!terimaItems.value.length) {
+            toast.info(
+                "Tidak ada sisa qty yang perlu divalidasi untuk Maklon ini.",
+            );
+            showTerimaDialog.value = false;
+        }
+    } catch (e: any) {
+        toast.error(e.response?.data?.message || "Gagal memuat data.");
+        showTerimaDialog.value = false;
+    } finally {
+        terimaLoading.value = false;
     }
-    if (!terimaItems.value.length) {
-      toast.info("Tidak ada sisa qty yang perlu divalidasi untuk Maklon ini.");
-      showTerimaDialog.value = false;
-    }
-  } catch (e: any) {
-    toast.error(e.response?.data?.message || "Gagal memuat data.");
-    showTerimaDialog.value = false;
-  } finally {
-    terimaLoading.value = false;
-  }
 };
 
 const totalTerima = computed(() =>
-  Object.values(terimaQty.value).reduce(
-    (s, v) => s + (Number(v.terima) || 0),
-    0,
-  ),
+    Object.values(terimaQty.value).reduce(
+        (s, v) => s + (Number(v.terima) || 0),
+        0,
+    ),
 );
 const totalBs = computed(() =>
-  Object.values(terimaQty.value).reduce((s, v) => s + (Number(v.bs) || 0), 0),
+    Object.values(terimaQty.value).reduce((s, v) => s + (Number(v.bs) || 0), 0),
 );
 
 const submitTerima = async () => {
-  const items = terimaItems.value
-    .map((d) => ({
-      sjmd_id: d.SjmdId,
-      qty_terima: Number(terimaQty.value[d.SjmdId]?.terima) || 0,
-      qty_bs: Number(terimaQty.value[d.SjmdId]?.bs) || 0,
-    }))
-    .filter((it) => it.qty_terima > 0 || it.qty_bs > 0);
+    const items = terimaItems.value
+        .map((d) => ({
+            sjmd_id: d.SjmdId,
+            qty_terima: Number(terimaQty.value[d.SjmdId]?.terima) || 0,
+            qty_bs: Number(terimaQty.value[d.SjmdId]?.bs) || 0,
+        }))
+        .filter((it) => it.qty_terima > 0 || it.qty_bs > 0);
 
-  if (!items.length) return toast.warning("Minimal 1 baris harus diisi qty.");
+    if (!items.length) return toast.warning("Minimal 1 baris harus diisi qty.");
 
-  for (const d of terimaItems.value) {
-    const q = terimaQty.value[d.SjmdId];
-    if (Number(q.terima) > Number(d.SisaTerima)) {
-      return toast.warning(
-        `Qty Terima ${d.KodeJadi} melebihi sisa (${d.SisaTerima}).`,
-      );
+    for (const d of terimaItems.value) {
+        const q = terimaQty.value[d.SjmdId];
+        if (Number(q.terima) > Number(d.SisaTerima)) {
+            return toast.warning(
+                `Qty Terima ${d.KodeJadi} melebihi sisa (${d.SisaTerima}).`,
+            );
+        }
+        if (Number(q.bs) > Number(d.SisaBs)) {
+            return toast.warning(
+                `Qty BS ${d.KodeJadi} melebihi sisa (${d.SisaBs}).`,
+            );
+        }
     }
-    if (Number(q.bs) > Number(d.SisaBs)) {
-      return toast.warning(`Qty BS ${d.KodeJadi} melebihi sisa (${d.SisaBs}).`);
-    }
-  }
 
-  terimaSaving.value = true;
-  try {
-    const res = await maklonTerimaService.save({
-      mklNomor: terimaHeader.value.mkl_nomor,
-      tanggal: terimaTanggal.value,
-      items,
-    });
-    toast.success(
-      `Terima Hasil Maklon ${res.data.data.nomor} berhasil disimpan.`,
-    );
-    showTerimaDialog.value = false;
-    fetchData();
-  } catch (e: any) {
-    toast.error(e.response?.data?.message || "Gagal menyimpan.");
-  } finally {
-    terimaSaving.value = false;
-  }
+    terimaSaving.value = true;
+    try {
+        const res = await maklonTerimaService.save({
+            mklNomor: terimaHeader.value.mkl_nomor,
+            tanggal: terimaTanggal.value,
+            items,
+        });
+        toast.success(
+            `Terima Hasil Maklon ${res.data.data.nomor} berhasil disimpan.`,
+        );
+        showTerimaDialog.value = false;
+        fetchData();
+    } catch (e: any) {
+        toast.error(e.response?.data?.message || "Gagal menyimpan.");
+    } finally {
+        terimaSaving.value = false;
+    }
 };
 </script>
 
 <template>
-  <BaseBrowse
-    title="Maklon Barang"
-    menu-id="180"
-    :icon="IconArrowsExchange"
-    :headers="headers"
-    :items="items ?? []"
-    show-expand
-    :expanded="expandedRows"
-    @update:expanded="onUpdateExpanded"
-    :is-loading="isLoading"
-    v-model:selected="selected"
-    :can-insert="canInsert"
-    :can-edit="canEdit"
-    :can-delete="canDelete"
-    :before-delete="beforeHapus"
-    :can-export="false"
-    item-value="mkl_nomor"
-    @add="onAdd"
-    @edit="onEdit"
-    @delete="onHapus"
-    @refresh="fetchData"
-  >
-    <template #filter-left>
-      <div class="f-group">
-        <span class="f-label">Periode</span>
-        <input type="date" v-model="dtAwal" class="f-inp" />
-        <span class="f-sep">s/d</span>
-        <input type="date" v-model="dtAkhir" class="f-inp" />
-      </div>
-    </template>
-
-    <template #extra-actions>
-      <!-- <v-btn
-        size="small"
-        color="primary"
-        :disabled="!selectedItem || !canBuatSjKeluar(selectedItem)"
-        @click="openSjKeluarDialog(selectedItem)"
-      >
-        <template #prepend><IconTruckDelivery :size="15" /></template>
-        Buat SJ Keluar
-      </v-btn> -->
-      <v-btn
-        size="small"
-        color="grey-darken-3"
-        :disabled="!selectedItem || !selectedItem.SjkNomorPertama"
-        @click="openPrintTab"
-      >
-        <template #prepend><IconPrinter :size="15" /></template>
-        Cetak
-      </v-btn>
-      <v-btn
-        size="small"
-        color="teal"
-        :disabled="!selectedItem || !canTerimaHasil(selectedItem)"
-        @click="openTerimaDialog(selectedItem)"
-      >
-        <template #prepend><IconPackageImport :size="15" /></template>
-        Terima Hasil Maklon
-      </v-btn>
-    </template>
-
-    <template #item.mkl_tanggal="{ item }">
-      {{ formatTanggal(item.mkl_tanggal) }}
-    </template>
-    <template #item.mkl_deadline="{ item }">
-      {{ item.mkl_deadline ? formatTanggal(item.mkl_deadline) : "-" }}
-    </template>
-    <template #item.mkl_date_create="{ item }">
-      {{ formatTanggalJam(item.mkl_date_create) }}
-    </template>
-    <template #item.TotalKirim="{ item }">
-      {{ numFmt(item.TotalKirim) }}
-    </template>
-    <template #item.TotalTerima="{ item }">
-      {{ numFmt(item.TotalTerima) }}
-    </template>
-    <template #item.TotalBs="{ item }">
-      {{ numFmt(item.TotalBs) }}
-    </template>
-    <template #item.mkl_status="{ item }">
-      <v-chip
-        size="small"
-        :color="statusColor(item.mkl_status)"
-        variant="flat"
-        text-color="white"
-      >
-        {{ item.mkl_status }}
-      </v-chip>
-    </template>
-
-    <template #delete-warning="{ item }">
-      <template v-if="item">
-        <div class="text-body-2 font-weight-black text-decoration-underline">
-          {{ item.mkl_nomor }}
-        </div>
-        <div v-if="item.SjkNomorPertama" class="text-caption text-error mt-2">
-          SJ Keluar dan mutasi stok polos ke cabang tujuan ikut dibatalkan.
-        </div>
-      </template>
-    </template>
-
-    <template #detail="{ item }">
-      <div class="expand-wrap">
-        <v-progress-linear
-          v-if="detailLoading[item.mkl_nomor]"
-          indeterminate
-          color="primary"
-          height="2"
-        />
-        <div v-else-if="detailCache[item.mkl_nomor]">
-          <div class="expand-title mb-2">
-            Detail Maklon — {{ item.mkl_nomor }}
-            <span v-if="item.mkl_deadline" class="expand-deadline">
-              · Deadline: {{ tglFmt(item.mkl_deadline) }}
-            </span>
-          </div>
-
-          <div class="timeline-row mb-2">
-            <div class="tl-item" :class="{ done: item.mkl_tgl_kirim }">
-              <span class="tl-lbl">Dikirim</span>
-              <span class="tl-val">{{
-                item.mkl_tgl_kirim ? tglFmt(item.mkl_tgl_kirim) : "-"
-              }}</span>
+    <BaseBrowse
+        title="Maklon Barang"
+        menu-id="181"
+        :icon="IconArrowsExchange"
+        :headers="headers"
+        :items="items ?? []"
+        show-expand
+        :expanded="expandedRows"
+        @update:expanded="onUpdateExpanded"
+        :is-loading="isLoading"
+        v-model:selected="selected"
+        :can-insert="canInsert"
+        :can-edit="canEdit"
+        :can-delete="canDelete"
+        :before-delete="beforeHapus"
+        :can-export="false"
+        item-value="mkl_nomor"
+        :summary-columns="summaryColumns"
+        :summary-formatters="summaryFormatters"
+        @add="onAdd"
+        @edit="onEdit"
+        @delete="onHapus"
+        @refresh="fetchData"
+    >
+        <template #filter-left>
+            <div class="f-group">
+                <span class="f-label">Periode</span>
+                <input type="date" v-model="dtAwal" class="f-inp" />
+                <span class="f-sep">s/d</span>
+                <input type="date" v-model="dtAkhir" class="f-inp" />
             </div>
-            <div class="tl-item" :class="{ done: item.mkl_tgl_selesai_dtf }">
-              <span class="tl-lbl">Selesai DTF</span>
-              <span class="tl-val">{{
-                item.mkl_tgl_selesai_dtf
-                  ? tglFmt(item.mkl_tgl_selesai_dtf)
-                  : "-"
-              }}</span>
+            <div v-if="isHoOrAdmin" class="f-group ml-3">
+                <label class="d-flex align-center cursor-pointer mb-0">
+                    <input
+                        type="checkbox"
+                        v-model="semuaCabang"
+                        style="margin-right: 5px"
+                    />
+                    <span class="f-label">Semua Cabang</span>
+                </label>
             </div>
-            <div class="tl-item" :class="{ done: item.mkl_tgl_otw_gudang }">
-              <span class="tl-lbl">OTW Gudang</span>
-              <span class="tl-val">{{
-                item.mkl_tgl_otw_gudang ? tglFmt(item.mkl_tgl_otw_gudang) : "-"
-              }}</span>
-            </div>
-            <div class="tl-item" :class="{ done: item.mkl_tgl_selesai }">
-              <span class="tl-lbl">Diterima Gudang</span>
-              <span class="tl-val">{{
-                item.mkl_tgl_selesai ? tglFmt(item.mkl_tgl_selesai) : "-"
-              }}</span>
-            </div>
-          </div>
+        </template>
 
-          <table class="detail-table">
-            <thead>
-              <tr>
-                <th>Barang Polos</th>
-                <th class="tr">Qty Kirim</th>
-                <th class="tr">Sudah Kirim</th>
-                <th class="tr">Terima</th>
-                <th class="tr">BS</th>
-                <th>Keterangan</th>
-                <th>Target Barang Jadi</th>
-              </tr>
-            </thead>
-            <tbody>
-              <template
-                v-for="(d, i) in detailCache[item.mkl_nomor].details"
-                :key="i"
-              >
-                <tr>
-                  <td :rowspan="d.target_jadi?.length || 1">
-                    <div class="mono">{{ d.mkld_kode_polos }}</div>
-                    <div class="row-subtext">{{ d.NamaPolos }}</div>
-                  </td>
-                  <td class="tr fw" :rowspan="d.target_jadi?.length || 1">
-                    {{ numFmt(d.mkld_qty_kirim) }}
-                  </td>
-                  <td class="tr" :rowspan="d.target_jadi?.length || 1">
-                    {{ numFmt(d.mkld_qty_sudah_kirim) }}
-                  </td>
-                  <td class="tr" :rowspan="d.target_jadi?.length || 1">
-                    {{ numFmt(d.mkld_qty_terima) }}
-                  </td>
-                  <td class="tr" :rowspan="d.target_jadi?.length || 1">
-                    {{ numFmt(d.mkld_qty_bs) }}
-                  </td>
-                  <td :rowspan="d.target_jadi?.length || 1">
-                    {{ d.mkld_keterangan || "-" }}
-                  </td>
-
-                  <td v-if="d.target_jadi?.length">
-                    <div class="mono">
-                      {{ d.target_jadi[0].mkldj_kode_jadi }}
-                    </div>
-                    <div class="row-subtext">
-                      {{ d.target_jadi[0].NamaJadi }}
-                    </div>
-                    <div class="row-subtext">
-                      Est. {{ numFmt(d.target_jadi[0].mkldj_estimasi_qty) }}
-                    </div>
-                    <div
-                      v-if="d.target_jadi[0].gambar?.length"
-                      class="thumb-row"
+        <template #extra-actions>
+            <!-- Cetak Maklon Dropdown -->
+            <v-menu>
+                <template #activator="{ props: menuProps }">
+                    <v-btn
+                        size="small"
+                        color="grey-darken-3"
+                        :disabled="!selectedItem"
+                        v-bind="menuProps"
+                        class="mr-2"
                     >
-                      <img
-                        v-for="(g, gi) in d.target_jadi[0].gambar"
-                        :key="gi"
-                        :src="g.mklg_file_path"
-                        class="thumb-img-sm"
-                        @click="openImage(g.mklg_file_path)"
-                      />
-                    </div>
-                  </td>
-                  <td v-else class="text-grey">-</td>
-                </tr>
-                <tr
-                  v-for="(t, ti) in (d.target_jadi || []).slice(1)"
-                  :key="`${i}-${ti}`"
-                >
-                  <td>
-                    <div class="mono">{{ t.mkldj_kode_jadi }}</div>
-                    <div class="row-subtext">{{ t.NamaJadi }}</div>
-                    <div class="row-subtext">
-                      Est. {{ numFmt(t.mkldj_estimasi_qty) }}
-                    </div>
-                    <div v-if="t.gambar?.length" class="thumb-row">
-                      <img
-                        v-for="(g, gi) in t.gambar"
-                        :key="gi"
-                        :src="g.mklg_file_path"
-                        class="thumb-img-sm"
-                        @click="openImage(g.mklg_file_path)"
-                      />
-                    </div>
-                  </td>
-                </tr>
-              </template>
-              <tr v-if="!detailCache[item.mkl_nomor].details?.length">
-                <td
-                  colspan="7"
-                  class="tc text-grey pa-3"
-                  style="font-size: 11px"
-                >
-                  Tidak ada detail.
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </template>
-  </BaseBrowse>
+                        <template #prepend><IconPrinter :size="15" /></template>
+                        Cetak
+                        <template #append
+                            ><IconChevronDown :size="14"
+                        /></template>
+                    </v-btn>
+                </template>
+                <v-list density="compact">
+                    <v-list-item
+                        @click="openPrintGabungan()"
+                        :disabled="!selectedItem?.SjkNomorPertama"
+                    >
+                        <v-list-item-title
+                            >Cetak Gabungan (SJ + Maklon)</v-list-item-title
+                        >
+                        <v-list-item-subtitle
+                            v-if="!selectedItem?.SjkNomorPertama"
+                        >
+                            (Belum ada SJ Keluar)
+                        </v-list-item-subtitle>
+                    </v-list-item>
+                    <v-list-item @click="openPrintMaklonSaja()">
+                        <v-list-item-title>Cetak Maklon Saja</v-list-item-title>
+                    </v-list-item>
+                </v-list>
+            </v-menu>
 
-  <v-dialog v-model="showSjKeluarDialog" max-width="650px" persistent>
-    <v-card class="rounded-lg">
-      <v-card-title
-        class="bg-primary text-white pa-3"
-        style="font-size: 13px; font-weight: 700"
-      >
-        Buat SJ Keluar — {{ sjKeluarHeader?.mkl_nomor }}
-      </v-card-title>
-      <v-card-text class="pa-4">
-        <v-progress-linear
-          v-if="sjKeluarLoading"
-          indeterminate
-          color="primary"
-          class="mb-3"
-        />
-        <template v-else-if="sjKeluarHeader">
-          <div class="d-flex flex-wrap ga-4 mb-3" style="font-size: 12px">
-            <div>
-              <b>Cabang Asal:</b> {{ sjKeluarHeader.mkl_cab_asal }} —
-              {{ sjKeluarHeader.NamaCabAsal }}
-            </div>
-            <div>
-              <b>Cabang Tujuan:</b> {{ sjKeluarHeader.mkl_cab_tujuan }} —
-              {{ sjKeluarHeader.NamaCabTujuan }}
-            </div>
-          </div>
-          <v-text-field
-            v-model="sjKeluarTanggal"
-            type="date"
-            label="Tanggal SJ"
-            density="compact"
-            variant="outlined"
-            hide-details
-            style="max-width: 200px"
-            class="mb-3"
-          />
-          <table class="sjk-table">
-            <thead>
-              <tr>
-                <th>Barang Polos</th>
-                <th class="tr">Sisa</th>
-                <th class="tr" style="width: 110px">Qty Kirim</th>
-                <th style="width: 60px">Satuan</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="d in sjKeluarDetails" :key="d.mkld_id">
-                <td>
-                  <div class="mono">{{ d.mkld_kode_polos }}</div>
-                  <div class="subtext">{{ d.NamaPolos }}</div>
-                </td>
-                <td class="tr">{{ Number(d.Sisa).toLocaleString("id-ID") }}</td>
-                <td class="p0">
-                  <input
-                    type="number"
-                    min="0"
-                    :max="d.Sisa"
-                    v-model.number="sjKeluarQty[d.mkld_id]"
-                    class="qty-inp"
-                    :disabled="Number(d.Sisa) <= 0"
-                  />
-                </td>
-                <td>{{ d.mkld_satuan_kirim }}</td>
-              </tr>
-            </tbody>
-            <tfoot>
-              <tr>
-                <td colspan="2" class="tr fw">Total</td>
-                <td class="tr fw">
-                  {{ totalQtySjKeluar.toLocaleString("id-ID") }}
-                </td>
-                <td></td>
-              </tr>
-            </tfoot>
-          </table>
-        </template>
-      </v-card-text>
-      <v-card-actions class="pa-3 border-t bg-grey-lighten-4">
-        <v-spacer />
-        <v-btn
-          variant="text"
-          @click="showSjKeluarDialog = false"
-          :disabled="sjKeluarSaving"
-          >Batal</v-btn
-        >
-        <v-btn
-          variant="elevated"
-          color="primary"
-          :loading="sjKeluarSaving"
-          @click="submitSjKeluar"
-        >
-          Simpan & Kirim
-        </v-btn>
-      </v-card-actions>
-    </v-card>
-  </v-dialog>
+            <!-- Tombol Pintas SJ Hasil Maklon -->
+            <v-btn
+                size="small"
+                color="purple-darken-1"
+                variant="tonal"
+                @click="router.push('/garmen/makloon/sj-hasil-makloon')"
+                class="mr-2"
+            >
+                <template #prepend><IconTruckDelivery :size="15" /></template>
+                SJ Hasil Maklon
+            </v-btn>
 
-  <v-dialog v-model="showTerimaDialog" max-width="700px" persistent>
-    <v-card class="rounded-lg">
-      <v-card-title
-        class="bg-teal text-white pa-3"
-        style="font-size: 13px; font-weight: 700"
-      >
-        Terima Hasil Maklon — {{ terimaHeader?.mkl_nomor }}
-      </v-card-title>
-      <v-card-text class="pa-4">
-        <v-progress-linear
-          v-if="terimaLoading"
-          indeterminate
-          color="teal"
-          class="mb-3"
-        />
-        <template v-else-if="terimaHeader">
-          <div class="d-flex flex-wrap ga-4 mb-3" style="font-size: 12px">
-            <div>
-              <b>Cabang Asal:</b> {{ terimaHeader.mkl_cab_asal }} —
-              {{ terimaHeader.NamaCabAsal }}
-            </div>
-          </div>
-          <v-text-field
-            v-model="terimaTanggal"
-            type="date"
-            label="Tanggal"
-            density="compact"
-            variant="outlined"
-            hide-details
-            style="max-width: 200px"
-            class="mb-3"
-          />
-          <table class="sjk-table">
-            <thead>
-              <tr>
-                <th>No. SJ</th>
-                <th>Barang Jadi</th>
-                <th class="tr">Qty SJ (Baik/BS)</th>
-                <th class="tr" style="width: 100px">Qty Terima</th>
-                <th class="tr" style="width: 100px">Qty BS</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="d in terimaItems" :key="d.SjmdId">
-                <td class="mono">{{ d.SjmNomor }}</td>
-                <td>
-                  <div class="mono">{{ d.KodeJadi }}</div>
-                  <div class="subtext">{{ d.NamaJadi }}</div>
-                </td>
-                <td class="tr">
-                  {{ Number(d.SisaTerima).toLocaleString("id-ID") }} /
-                  {{ Number(d.SisaBs).toLocaleString("id-ID") }}
-                </td>
-                <td class="p0">
-                  <input
-                    type="number"
-                    min="0"
-                    :max="d.SisaTerima"
-                    v-model.number="terimaQty[d.SjmdId].terima"
-                    class="qty-inp"
-                  />
-                </td>
-                <td class="p0">
-                  <input
-                    type="number"
-                    min="0"
-                    :max="d.SisaBs"
-                    v-model.number="terimaQty[d.SjmdId].bs"
-                    class="qty-inp"
-                  />
-                </td>
-              </tr>
-            </tbody>
-            <tfoot>
-              <tr>
-                <td colspan="2" class="tr fw">Total</td>
-                <td></td>
-                <td class="tr fw">{{ totalTerima.toLocaleString("id-ID") }}</td>
-                <td class="tr fw">{{ totalBs.toLocaleString("id-ID") }}</td>
-              </tr>
-            </tfoot>
-          </table>
+            <v-btn
+                size="small"
+                color="teal"
+                :disabled="!selectedItem || !canTerimaHasil(selectedItem)"
+                @click="openTerimaDialog(selectedItem)"
+            >
+                <template #prepend><IconPackageImport :size="15" /></template>
+                Terima Hasil Maklon
+            </v-btn>
         </template>
-      </v-card-text>
-      <v-card-actions class="pa-3 border-t bg-grey-lighten-4">
-        <v-spacer />
-        <v-btn
-          variant="text"
-          @click="showTerimaDialog = false"
-          :disabled="terimaSaving"
-          >Batal</v-btn
-        >
-        <v-btn
-          variant="elevated"
-          color="teal"
-          :loading="terimaSaving"
-          @click="submitTerima"
-        >
-          Simpan
-        </v-btn>
-      </v-card-actions>
-    </v-card>
-  </v-dialog>
+
+        <template #item.mkl_cab_asal="{ item }">
+            {{ item.mkl_cab_asal }}
+            <span v-if="item.NamaCabAsal" class="row-subtext"
+                >({{ item.NamaCabAsal }})</span
+            >
+        </template>
+        <template #item.mkl_cab_tujuan="{ item }">
+            {{ item.mkl_cab_tujuan }}
+            <span v-if="item.NamaCabTujuan" class="row-subtext"
+                >({{ item.NamaCabTujuan }})</span
+            >
+        </template>
+
+        <template #item.mkl_tanggal="{ item }">
+            {{ formatTanggal(item.mkl_tanggal) }}
+        </template>
+        <template #item.mkl_deadline="{ item }">
+            {{ item.mkl_deadline ? formatTanggal(item.mkl_deadline) : "-" }}
+        </template>
+        <template #item.mkl_date_create="{ item }">
+            {{ formatTanggalJam(item.mkl_date_create) }}
+        </template>
+        <template #item.TotalKirim="{ item }">
+            {{ numFmt(item.TotalKirim) }}
+        </template>
+        <template #item.TotalTerima="{ item }">
+            {{ numFmt(item.TotalTerima) }}
+        </template>
+        <template #item.TotalBs="{ item }">
+            {{ numFmt(item.TotalBs) }}
+        </template>
+        <template #item.mkl_status="{ item }">
+            <v-chip
+                size="small"
+                :color="statusColor(item.mkl_status)"
+                variant="flat"
+                text-color="white"
+            >
+                {{ item.mkl_status }}
+            </v-chip>
+        </template>
+
+        <template #delete-warning="{ item }">
+            <template v-if="item">
+                <div
+                    class="text-body-2 font-weight-black text-decoration-underline"
+                >
+                    {{ item.mkl_nomor }}
+                </div>
+                <div
+                    v-if="item.SjkNomorPertama"
+                    class="text-caption text-error mt-2"
+                >
+                    SJ Keluar dan mutasi stok polos ke cabang tujuan ikut
+                    dibatalkan.
+                </div>
+            </template>
+        </template>
+
+        <template #detail="{ item }">
+            <div class="expand-wrap">
+                <v-progress-linear
+                    v-if="detailLoading[item.mkl_nomor]"
+                    indeterminate
+                    color="primary"
+                    height="2"
+                />
+                <div v-else-if="detailCache[item.mkl_nomor]">
+                    <div class="expand-title mb-2">
+                        Detail Maklon — {{ item.mkl_nomor }}
+                        <span v-if="item.mkl_deadline" class="expand-deadline">
+                            · Deadline: {{ tglFmt(item.mkl_deadline) }}
+                        </span>
+                    </div>
+
+                    <div class="timeline-row mb-2">
+                        <div
+                            class="tl-item"
+                            :class="{ done: item.mkl_tgl_kirim }"
+                        >
+                            <span class="tl-lbl">Dikirim</span>
+                            <span class="tl-val">{{
+                                item.mkl_tgl_kirim
+                                    ? tglFmt(item.mkl_tgl_kirim)
+                                    : "-"
+                            }}</span>
+                        </div>
+                        <div
+                            class="tl-item"
+                            :class="{ done: item.mkl_tgl_selesai_dtf }"
+                        >
+                            <span class="tl-lbl">Selesai DTF</span>
+                            <span class="tl-val">{{
+                                item.mkl_tgl_selesai_dtf
+                                    ? tglFmt(item.mkl_tgl_selesai_dtf)
+                                    : "-"
+                            }}</span>
+                        </div>
+                        <div
+                            class="tl-item"
+                            :class="{ done: item.mkl_tgl_otw_gudang }"
+                        >
+                            <span class="tl-lbl">OTW Gudang</span>
+                            <span class="tl-val">{{
+                                item.mkl_tgl_otw_gudang
+                                    ? tglFmt(item.mkl_tgl_otw_gudang)
+                                    : "-"
+                            }}</span>
+                        </div>
+                        <div
+                            class="tl-item"
+                            :class="{ done: item.mkl_tgl_selesai }"
+                        >
+                            <span class="tl-lbl">Diterima Gudang</span>
+                            <span class="tl-val">{{
+                                item.mkl_tgl_selesai
+                                    ? tglFmt(item.mkl_tgl_selesai)
+                                    : "-"
+                            }}</span>
+                        </div>
+                    </div>
+
+                    <table class="detail-table">
+                        <thead>
+                            <tr>
+                                <th>Barang Polos</th>
+                                <th class="tr">Qty Kirim</th>
+                                <th class="tr">Sudah Kirim</th>
+                                <th class="tr">Terima</th>
+                                <th class="tr">BS</th>
+                                <th>Keterangan</th>
+                                <th>Target Barang Jadi</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <template
+                                v-for="(d, i) in detailCache[item.mkl_nomor]
+                                    .details"
+                                :key="i"
+                            >
+                                <tr>
+                                    <td :rowspan="d.target_jadi?.length || 1">
+                                        <div class="mono">
+                                            {{ d.mkld_kode_polos }}
+                                        </div>
+                                        <div class="row-subtext">
+                                            {{ d.NamaPolos }}
+                                        </div>
+                                    </td>
+                                    <td
+                                        class="tr fw"
+                                        :rowspan="d.target_jadi?.length || 1"
+                                    >
+                                        {{ numFmt(d.mkld_qty_kirim) }}
+                                    </td>
+                                    <td
+                                        class="tr"
+                                        :rowspan="d.target_jadi?.length || 1"
+                                    >
+                                        {{ numFmt(d.mkld_qty_sudah_kirim) }}
+                                    </td>
+                                    <td
+                                        class="tr"
+                                        :rowspan="d.target_jadi?.length || 1"
+                                    >
+                                        {{ numFmt(d.mkld_qty_terima) }}
+                                    </td>
+                                    <td
+                                        class="tr"
+                                        :rowspan="d.target_jadi?.length || 1"
+                                    >
+                                        {{ numFmt(d.mkld_qty_bs) }}
+                                    </td>
+                                    <td :rowspan="d.target_jadi?.length || 1">
+                                        {{ d.mkld_keterangan || "-" }}
+                                    </td>
+
+                                    <td v-if="d.target_jadi?.length">
+                                        <div class="mono">
+                                            {{
+                                                d.target_jadi[0].mkldj_kode_jadi
+                                            }}
+                                        </div>
+                                        <div class="row-subtext">
+                                            {{ d.target_jadi[0].NamaJadi }}
+                                        </div>
+                                        <div class="row-subtext">
+                                            Est.
+                                            {{
+                                                numFmt(
+                                                    d.target_jadi[0]
+                                                        .mkldj_estimasi_qty,
+                                                )
+                                            }}
+                                        </div>
+                                        <div
+                                            v-if="
+                                                d.target_jadi[0].gambar?.length
+                                            "
+                                            class="thumb-row"
+                                        >
+                                            <img
+                                                v-for="(g, gi) in d
+                                                    .target_jadi[0].gambar"
+                                                :key="gi"
+                                                :src="g.mklg_file_path"
+                                                class="thumb-img-sm"
+                                                @click="
+                                                    openImage(g.mklg_file_path)
+                                                "
+                                            />
+                                        </div>
+                                    </td>
+                                    <td v-else class="text-grey">-</td>
+                                </tr>
+                                <tr
+                                    v-for="(t, ti) in (
+                                        d.target_jadi || []
+                                    ).slice(1)"
+                                    :key="`${i}-${ti}`"
+                                >
+                                    <td>
+                                        <div class="mono">
+                                            {{ t.mkldj_kode_jadi }}
+                                        </div>
+                                        <div class="row-subtext">
+                                            {{ t.NamaJadi }}
+                                        </div>
+                                        <div class="row-subtext">
+                                            Est.
+                                            {{ numFmt(t.mkldj_estimasi_qty) }}
+                                        </div>
+                                        <div
+                                            v-if="t.gambar?.length"
+                                            class="thumb-row"
+                                        >
+                                            <img
+                                                v-for="(g, gi) in t.gambar"
+                                                :key="gi"
+                                                :src="g.mklg_file_path"
+                                                class="thumb-img-sm"
+                                                @click="
+                                                    openImage(g.mklg_file_path)
+                                                "
+                                            />
+                                        </div>
+                                    </td>
+                                </tr>
+                            </template>
+                            <tr
+                                v-if="
+                                    !detailCache[item.mkl_nomor].details?.length
+                                "
+                            >
+                                <td
+                                    colspan="7"
+                                    class="tc text-grey pa-3"
+                                    style="font-size: 11px"
+                                >
+                                    Tidak ada detail.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </template>
+    </BaseBrowse>
+
+    <v-dialog v-model="showSjKeluarDialog" max-width="650px" persistent>
+        <v-card class="rounded-lg">
+            <v-card-title
+                class="bg-primary text-white pa-3"
+                style="font-size: 13px; font-weight: 700"
+            >
+                Buat SJ Keluar — {{ sjKeluarHeader?.mkl_nomor }}
+            </v-card-title>
+            <v-card-text class="pa-4">
+                <v-progress-linear
+                    v-if="sjKeluarLoading"
+                    indeterminate
+                    color="primary"
+                    class="mb-3"
+                />
+                <template v-else-if="sjKeluarHeader">
+                    <div
+                        class="d-flex flex-wrap ga-4 mb-3"
+                        style="font-size: 12px"
+                    >
+                        <div>
+                            <b>Cabang Asal:</b>
+                            {{ sjKeluarHeader.mkl_cab_asal }} —
+                            {{ sjKeluarHeader.NamaCabAsal }}
+                        </div>
+                        <div>
+                            <b>Cabang Tujuan:</b>
+                            {{ sjKeluarHeader.mkl_cab_tujuan }} —
+                            {{ sjKeluarHeader.NamaCabTujuan }}
+                        </div>
+                    </div>
+                    <v-text-field
+                        v-model="sjKeluarTanggal"
+                        type="date"
+                        label="Tanggal SJ"
+                        density="compact"
+                        variant="outlined"
+                        hide-details
+                        style="max-width: 200px"
+                        class="mb-3"
+                    />
+                    <table class="sjk-table">
+                        <thead>
+                            <tr>
+                                <th>Barang Polos</th>
+                                <th class="tr">Sisa</th>
+                                <th class="tr" style="width: 110px">
+                                    Qty Kirim
+                                </th>
+                                <th style="width: 60px">Satuan</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="d in sjKeluarDetails" :key="d.mkld_id">
+                                <td>
+                                    <div class="mono">
+                                        {{ d.mkld_kode_polos }}
+                                    </div>
+                                    <div class="subtext">{{ d.NamaPolos }}</div>
+                                </td>
+                                <td class="tr">
+                                    {{ Number(d.Sisa).toLocaleString("id-ID") }}
+                                </td>
+                                <td class="p0">
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        :max="d.Sisa"
+                                        v-model.number="sjKeluarQty[d.mkld_id]"
+                                        class="qty-inp"
+                                        :disabled="Number(d.Sisa) <= 0"
+                                    />
+                                </td>
+                                <td>{{ d.mkld_satuan_kirim }}</td>
+                            </tr>
+                        </tbody>
+                        <tfoot>
+                            <tr>
+                                <td colspan="2" class="tr fw">Total</td>
+                                <td class="tr fw">
+                                    {{
+                                        totalQtySjKeluar.toLocaleString("id-ID")
+                                    }}
+                                </td>
+                                <td></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </template>
+            </v-card-text>
+            <v-card-actions class="pa-3 border-t bg-grey-lighten-4">
+                <v-spacer />
+                <v-btn
+                    variant="text"
+                    @click="showSjKeluarDialog = false"
+                    :disabled="sjKeluarSaving"
+                    >Batal</v-btn
+                >
+                <v-btn
+                    variant="elevated"
+                    color="primary"
+                    :loading="sjKeluarSaving"
+                    @click="submitSjKeluar"
+                >
+                    Simpan & Kirim
+                </v-btn>
+            </v-card-actions>
+        </v-card>
+    </v-dialog>
+
+    <v-dialog v-model="showTerimaDialog" max-width="700px" persistent>
+        <v-card class="rounded-lg">
+            <v-card-title
+                class="bg-teal text-white pa-3"
+                style="font-size: 13px; font-weight: 700"
+            >
+                Terima Hasil Maklon — {{ terimaHeader?.mkl_nomor }}
+            </v-card-title>
+            <v-card-text class="pa-4">
+                <v-progress-linear
+                    v-if="terimaLoading"
+                    indeterminate
+                    color="teal"
+                    class="mb-3"
+                />
+                <template v-else-if="terimaHeader">
+                    <div
+                        class="d-flex flex-wrap ga-4 mb-3"
+                        style="font-size: 12px"
+                    >
+                        <div>
+                            <b>Cabang Asal:</b>
+                            {{ terimaHeader.mkl_cab_asal }} —
+                            {{ terimaHeader.NamaCabAsal }}
+                        </div>
+                    </div>
+                    <v-text-field
+                        v-model="terimaTanggal"
+                        type="date"
+                        label="Tanggal"
+                        density="compact"
+                        variant="outlined"
+                        hide-details
+                        style="max-width: 200px"
+                        class="mb-3"
+                    />
+                    <table class="sjk-table">
+                        <thead>
+                            <tr>
+                                <th>No. SJ</th>
+                                <th>Barang Jadi</th>
+                                <th class="tr">Qty SJ (Baik/BS)</th>
+                                <th class="tr" style="width: 100px">
+                                    Qty Terima
+                                </th>
+                                <th class="tr" style="width: 100px">Qty BS</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="d in terimaItems" :key="d.SjmdId">
+                                <td class="mono">{{ d.SjmNomor }}</td>
+                                <td>
+                                    <div class="mono">{{ d.KodeJadi }}</div>
+                                    <div class="subtext">{{ d.NamaJadi }}</div>
+                                </td>
+                                <td class="tr">
+                                    {{
+                                        Number(d.SisaTerima).toLocaleString(
+                                            "id-ID",
+                                        )
+                                    }}
+                                    /
+                                    {{
+                                        Number(d.SisaBs).toLocaleString("id-ID")
+                                    }}
+                                </td>
+                                <td class="p0">
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        :max="d.SisaTerima"
+                                        v-model.number="
+                                            terimaQty[d.SjmdId].terima
+                                        "
+                                        class="qty-inp"
+                                    />
+                                </td>
+                                <td class="p0">
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        :max="d.SisaBs"
+                                        v-model.number="terimaQty[d.SjmdId].bs"
+                                        class="qty-inp"
+                                    />
+                                </td>
+                            </tr>
+                        </tbody>
+                        <tfoot>
+                            <tr>
+                                <td colspan="2" class="tr fw">Total</td>
+                                <td></td>
+                                <td class="tr fw">
+                                    {{ totalTerima.toLocaleString("id-ID") }}
+                                </td>
+                                <td class="tr fw">
+                                    {{ totalBs.toLocaleString("id-ID") }}
+                                </td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </template>
+            </v-card-text>
+            <v-card-actions class="pa-3 border-t bg-grey-lighten-4">
+                <v-spacer />
+                <v-btn
+                    variant="text"
+                    @click="showTerimaDialog = false"
+                    :disabled="terimaSaving"
+                    >Batal</v-btn
+                >
+                <v-btn
+                    variant="elevated"
+                    color="teal"
+                    :loading="terimaSaving"
+                    @click="submitTerima"
+                >
+                    Simpan
+                </v-btn>
+            </v-card-actions>
+        </v-card>
+    </v-dialog>
 </template>
 
 <style scoped>
 .f-group {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
 }
 .f-label {
-  font-size: 11px;
-  font-weight: 700;
-  color: #555;
-  white-space: nowrap;
+    font-size: 11px;
+    font-weight: 700;
+    color: #555;
+    white-space: nowrap;
 }
 .f-inp {
-  height: 28px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  padding: 0 6px;
-  font-size: 12px;
-  outline: none;
-  background: white;
+    height: 28px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    padding: 0 6px;
+    font-size: 12px;
+    outline: none;
+    background: white;
 }
 .f-sep {
-  font-size: 11px;
-  color: #555;
+    font-size: 11px;
+    color: #555;
 }
 .sjk-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 12px;
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
 }
 .sjk-table th {
-  background: #f5f5f5;
-  border: 1px solid #e0e0e0;
-  padding: 6px 8px;
-  text-align: left;
-  font-weight: 700;
+    background: #f5f5f5;
+    border: 1px solid #e0e0e0;
+    padding: 6px 8px;
+    text-align: left;
+    font-weight: 700;
 }
 .sjk-table th.tr {
-  text-align: right;
+    text-align: right;
 }
 .sjk-table td {
-  border: 1px solid #e0e0e0;
-  padding: 4px 8px;
+    border: 1px solid #e0e0e0;
+    padding: 4px 8px;
 }
 .sjk-table td.tr {
-  text-align: right;
+    text-align: right;
 }
 .sjk-table td.p0 {
-  padding: 0;
+    padding: 0;
 }
 .sjk-table .mono {
-  font-family: monospace;
-  font-weight: 600;
+    font-family: monospace;
+    font-weight: 600;
 }
 .sjk-table .subtext {
-  font-size: 10px;
-  color: #888;
+    font-size: 10px;
+    color: #888;
 }
 .sjk-table .fw {
-  font-weight: 700;
+    font-weight: 700;
 }
 .qty-inp {
-  width: 100%;
-  height: 28px;
-  border: none;
-  outline: none;
-  text-align: right;
-  padding: 0 8px;
-  font-size: 12px;
+    width: 100%;
+    height: 28px;
+    border: none;
+    outline: none;
+    text-align: right;
+    padding: 0 8px;
+    font-size: 12px;
 }
 .qty-inp:focus {
-  background: #e3f2fd;
+    background: #e3f2fd;
 }
 .qty-inp:disabled {
-  background: #f5f5f5;
-  color: #bbb;
+    background: #f5f5f5;
+    color: #bbb;
 }
 .expand-wrap {
-  padding: 10px 10px 10px 50px;
-  background: #eceff1;
+    padding: 10px 10px 10px 50px;
+    background: #eceff1;
 }
 .expand-title {
-  font-size: 12px;
-  font-weight: 700;
-  color: #1565c0;
+    font-size: 12px;
+    font-weight: 700;
+    color: #1565c0;
 }
 .mb-2 {
-  margin-bottom: 8px;
+    margin-bottom: 8px;
 }
 .detail-table {
-  width: 100%;
-  border-collapse: collapse;
-  background: white;
-  border-radius: 4px;
-  overflow: hidden;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.08);
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+    border-radius: 4px;
+    overflow: hidden;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.08);
 }
 .detail-table th {
-  background: #546e7a;
-  color: white;
-  text-align: left;
-  padding: 6px 10px;
-  font-size: 11px;
-  font-weight: 600;
+    background: #546e7a;
+    color: white;
+    text-align: left;
+    padding: 6px 10px;
+    font-size: 11px;
+    font-weight: 600;
 }
 .detail-table th.tr {
-  text-align: right;
+    text-align: right;
 }
 .detail-table th.tc {
-  text-align: center;
+    text-align: center;
 }
 .detail-table td {
-  padding: 4px 10px;
-  border-bottom: 1px solid #eee;
-  font-size: 11px;
+    padding: 4px 10px;
+    border-bottom: 1px solid #eee;
+    font-size: 11px;
 }
 .detail-table td.tr {
-  text-align: right;
+    text-align: right;
 }
 .detail-table td.tc {
-  text-align: center;
+    text-align: center;
 }
 .detail-table td.fw {
-  font-weight: 700;
+    font-weight: 700;
 }
 .mono {
-  font-family: monospace;
-  font-size: 10px;
+    font-family: monospace;
+    font-size: 10px;
 }
 .row-subtext {
-  font-size: 9px;
-  color: #888;
+    font-size: 9px;
+    color: #888;
 }
 .thumb-row {
-  display: flex;
-  gap: 3px;
-  justify-content: center;
+    display: flex;
+    gap: 3px;
+    justify-content: center;
 }
 .thumb-img-sm {
-  width: 24px;
-  height: 24px;
-  object-fit: cover;
-  border-radius: 3px;
-  border: 1px solid #ccc;
-  cursor: pointer;
+    width: 24px;
+    height: 24px;
+    object-fit: cover;
+    border-radius: 3px;
+    border: 1px solid #ccc;
+    cursor: pointer;
 }
 .thumb-row {
-  display: flex;
-  gap: 3px;
-  margin-top: 2px;
+    display: flex;
+    gap: 3px;
+    margin-top: 2px;
 }
 .thumb-img-sm {
-  width: 22px;
-  height: 22px;
-  object-fit: cover;
-  border-radius: 3px;
-  border: 1px solid #ccc;
-  cursor: pointer;
+    width: 22px;
+    height: 22px;
+    object-fit: cover;
+    border-radius: 3px;
+    border: 1px solid #ccc;
+    cursor: pointer;
 }
 .expand-deadline {
-  font-weight: 400;
-  color: #666;
-  font-size: 11px;
+    font-weight: 400;
+    color: #666;
+    font-size: 11px;
 }
 .timeline-row {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
 }
 .tl-item {
-  flex: 1;
-  min-width: 110px;
-  background: white;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  padding: 5px 8px;
-  opacity: 0.5;
+    flex: 1;
+    min-width: 110px;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 5px 8px;
+    opacity: 0.5;
 }
 .tl-item.done {
-  opacity: 1;
-  border-color: #2e7d32;
-  background: #f1f8f2;
+    opacity: 1;
+    border-color: #2e7d32;
+    background: #f1f8f2;
 }
 .tl-lbl {
-  display: block;
-  font-size: 9px;
-  color: #666;
-  font-weight: 700;
-  text-transform: uppercase;
+    display: block;
+    font-size: 9px;
+    color: #666;
+    font-weight: 700;
+    text-transform: uppercase;
 }
 .tl-val {
-  display: block;
-  font-size: 11px;
-  font-weight: 600;
-  color: #333;
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    color: #333;
 }
 </style>

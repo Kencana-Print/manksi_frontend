@@ -4,6 +4,8 @@ export const maklonBarangService = {
   getBrowse: (params: {
     startDate: string;
     endDate: string;
+    cab?: string;
+    semuaCabang?: boolean;
     keyword?: string;
   }) => api.get("/garmen/maklon/makloon-barang/browse", { params }),
   getDetail: (nomor: string) =>

@@ -1,77 +1,239 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
 import BaseBrowse from "@/components/BaseBrowse.vue";
 import { useBrowse } from "@/composables/useBrowse";
+import { useAuthStore } from "@/stores/authStore";
 import { bastService } from "@/services/garmen/bastService";
-import { IconPrinter, IconFileSpreadsheet } from "@tabler/icons-vue";
+import { bastMapSpandukService } from "@/services/spanduk/bastMapSpandukService";
+import { bastMapMmtService } from "@/services/mmt/bastMapMmtService";
+import {
+  IconClipboardCheck,
+  IconPrinter,
+  IconFileSpreadsheet,
+} from "@tabler/icons-vue";
 import { formatTanggal } from "@/utils/dateFormat";
 import { exportExcelSingle, type ExcelColumn } from "@/utils/excelExport";
 
 const router = useRouter();
 const toast = useToast();
-const menuId = "117";
+const authStore = useAuthStore();
+const baseBrowseRef = ref<InstanceType<typeof BaseBrowse> | null>(null);
 
-const getLocalDate = () => new Date().toISOString().substring(0, 10);
+const MENU_ID = "117";
+
+const getLocalDate = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+
+type DivisiType = "GARMEN" | "SPANDUK" | "MMT";
+
+interface DivisiOption {
+  label: string;
+  value: DivisiType;
+}
+
+const divisiOptions: DivisiOption[] = [
+  { label: "Garmen / Kaosan", value: "GARMEN" },
+  { label: "Spanduk", value: "SPANDUK" },
+  { label: "MMT / Sublim", value: "MMT" },
+];
 
 const filterState = ref({
   startDate: getLocalDate(),
   endDate: getLocalDate(),
+  divisi: "GARMEN" as DivisiType,
   onProgress: false,
+  cabangFilter: "",
+  workshopFilter: "",
+  sublimFilter: "",
 });
 
-const { items, isLoading, selected, canInsert, canEdit, canDelete, fetchData } =
-  useBrowse({
-    menuId,
-    fetchApi: async () => {
-      // MENGGUNAKAN SERVICE
-      const res = await bastService.getBrowseList({
+onMounted(() => {
+  const userDivisi = String(authStore.user?.divisi || "").toUpperCase();
+  const userBagian = String(authStore.user?.bagian || "").toUpperCase();
+  const userCabang = String(authStore.user?.cabang || "").toUpperCase();
+
+  if (userDivisi.includes("SPANDUK") || userBagian.includes("SPANDUK")) {
+    filterState.value.divisi = "SPANDUK";
+  } else if (
+    userDivisi.includes("MMT") ||
+    userBagian.includes("MMT") ||
+    userCabang === "P05"
+  ) {
+    filterState.value.divisi = "MMT";
+  } else {
+    filterState.value.divisi = "GARMEN";
+  }
+});
+
+const {
+  items,
+  isLoading,
+  selected,
+  fetchData,
+  canInsert,
+  canEdit,
+  canDelete,
+  canExport,
+} = useBrowse({
+  menuId: MENU_ID,
+  fetchApi: async () => {
+    const div = filterState.value.divisi;
+    if (div === "SPANDUK") {
+      const res = await bastMapSpandukService.getBrowse({
+        startDate: filterState.value.startDate,
+        endDate: filterState.value.endDate,
+        onProgressOnly: filterState.value.onProgress,
+      });
+      return res.data.data || [];
+    }
+
+    if (div === "MMT") {
+      const res = await bastMapMmtService.getBrowseList({
         startDate: filterState.value.startDate,
         endDate: filterState.value.endDate,
         onProgress: filterState.value.onProgress,
+        cabang: filterState.value.cabangFilter,
+        workshop: filterState.value.workshopFilter,
+        sublim: filterState.value.sublimFilter,
       });
-      return res.data.data || [];
-    },
-    immediate: true,
-  });
+      return res.data.data || res.data || [];
+    }
 
-const headers = [
-  { title: "Nomor", key: "Nomor", width: "160px" },
-  { title: "Divisi", key: "Divisi", width: "100px" },
-  { title: "Tipe", key: "Tipe", width: "80px" },
-  { title: "Tanggal", key: "Tanggal", width: "100px" },
-  { title: "Status BAST", key: "CetakBAST", width: "100px", align: "center" },
-  { title: "Nama Pekerjaan", key: "NamaPekerjaan", width: "250px" },
-  { title: "Nama Ext", key: "NamaExt", width: "250px" },
-  { title: "Ukuran", key: "Ukuran", width: "150px" },
-  { title: "Gramasi", key: "Gramasi", width: "130px" },
-  { title: "Gramasi Aktual", key: "GramasiSetting_Aktual", width: "150px" },
-  { title: "Kain", key: "Kain", width: "180px" },
-  { title: "Finishing", key: "Finishing", width: "150px" },
-  { title: "Jumlah", key: "Jumlah", width: "80px", align: "right" },
-  { title: "Keterangan", key: "Keterangan", width: "200px" },
-  { title: "Kendala", key: "kendalaProduksi", width: "200px" },
-];
+    // Default: GARMEN
+    const res = await bastService.getBrowseList({
+      startDate: filterState.value.startDate,
+      endDate: filterState.value.endDate,
+      onProgress: filterState.value.onProgress,
+    });
+    return res.data.data || [];
+  },
+});
 
-const getRowTextColor = (item: any) => {
-  const row = item?.raw || item;
-  // Delphi logic: OnProgres='N' -> Red, OnProgres='Y' -> Blue
-  if (row.OnProgres === "N") return "text-red-darken-2";
-  if (row.OnProgres === "Y") return "text-blue-darken-2";
-  return "";
+// Dynamic Headers per Divisi
+const headers = computed(() => {
+  const div = filterState.value.divisi;
+
+  if (div === "SPANDUK") {
+    return [
+      { title: "Nomor", key: "Nomor", width: "160px" },
+      { title: "Tipe", key: "Tipe", width: "80px" },
+      { title: "Tanggal", key: "Tanggal", width: "100px" },
+      { title: "Status BAST", key: "CetakBAST", width: "100px", align: "center" as const },
+      { title: "Keputusan", key: "Keputusan", width: "120px", align: "center" as const },
+      { title: "LHK Proof", key: "NomorProof", width: "180px" },
+      { title: "Umur MAP", key: "HariBAST", width: "100px", align: "center" as const },
+      { title: "Nama Pekerjaan", key: "NamaPekerjaan", width: "240px" },
+      { title: "Nama Ext", key: "NamaExt", width: "200px" },
+      { title: "Ukuran", key: "Ukuran", width: "140px" },
+      { title: "Jumlah", key: "Jumlah", width: "80px", align: "end" as const },
+      { title: "Keterangan", key: "Keterangan", width: "200px" },
+      { title: "Kendala", key: "kendalaProduksi", width: "200px" },
+    ];
+  }
+
+  if (div === "MMT") {
+    return [
+      { title: "Status BAST", key: "CetakBAST", width: "110px", align: "center" as const },
+      { title: "Nomor", key: "Nomor", width: "160px" },
+      { title: "Cabang", key: "Cabang", width: "80px", align: "center" as const },
+      { title: "Workshop", key: "Workshop", width: "100px" },
+      { title: "Sublim", key: "Sublim", width: "80px", align: "center" as const },
+      { title: "Divisi", key: "Divisi", width: "90px" },
+      { title: "Tipe", key: "Tipe", width: "80px" },
+      { title: "Tanggal", key: "Tanggal", width: "100px" },
+      { title: "Nama Pekerjaan", key: "NamaPekerjaan", width: "240px" },
+      { title: "Nama Ext", key: "NamaExt", width: "200px" },
+      { title: "Ukuran", key: "Ukuran", width: "140px" },
+      { title: "Gramasi", key: "Gramasi", width: "120px" },
+      { title: "Gramasi Aktual", key: "GramasiSetting_Aktual", width: "140px" },
+      { title: "Kain", key: "Kain", width: "160px" },
+      { title: "Finishing", key: "Finishing", width: "140px" },
+      { title: "Jumlah", key: "Jumlah", width: "80px", align: "end" as const },
+      { title: "Keterangan", key: "Keterangan", width: "200px" },
+      { title: "Kendala", key: "kendalaProduksi", width: "200px" },
+    ];
+  }
+
+  // GARMEN
+  return [
+    { title: "Nomor", key: "Nomor", width: "160px" },
+    { title: "Divisi", key: "Divisi", width: "100px" },
+    { title: "Tipe", key: "Tipe", width: "80px" },
+    { title: "Tanggal", key: "Tanggal", width: "100px" },
+    { title: "Status BAST", key: "CetakBAST", width: "100px", align: "center" as const },
+    { title: "Nama Pekerjaan", key: "NamaPekerjaan", width: "250px" },
+    { title: "Nama Ext", key: "NamaExt", width: "200px" },
+    { title: "Ukuran", key: "Ukuran", width: "140px" },
+    { title: "Gramasi", key: "Gramasi", width: "120px" },
+    { title: "Gramasi Aktual", key: "GramasiSetting_Aktual", width: "140px" },
+    { title: "Kain", key: "Kain", width: "160px" },
+    { title: "Finishing", key: "Finishing", width: "140px" },
+    { title: "Jumlah", key: "Jumlah", width: "80px", align: "end" as const },
+    { title: "Keterangan", key: "Keterangan", width: "200px" },
+    { title: "Kendala", key: "kendalaProduksi", width: "200px" },
+  ];
+});
+
+const handleRowProps = (data: any) => {
+  const row = data.item?.raw || data.item;
+  if (filterState.value.divisi === "GARMEN") {
+    if (row.OnProgres === "N") return { class: "text-red-darken-2" };
+    if (row.OnProgres === "Y") return { class: "text-blue-darken-2" };
+  }
+  return {};
 };
 
-// ── AKSI ──
-const goAdd = () => router.push({ name: "CetakBastFormCreate" });
-const goEdit = (item: any) =>
-  router.push({ name: "CetakBastFormEdit", params: { nomor: item.Nomor } });
+// ── Smart Navigation ──
+const onAdd = () => {
+  const div = filterState.value.divisi;
+  if (div === "SPANDUK") {
+    router.push({ name: "SpandukBastMapCreate" });
+  } else if (div === "MMT") {
+    router.push({ name: "BastMmtNew" });
+  } else {
+    router.push({ name: "CetakBastFormCreate" });
+  }
+};
 
-const goDelete = async (item: any) => {
+const onEdit = (item: any) => {
+  const div = filterState.value.divisi;
+  if (div === "SPANDUK") {
+    if (!item.CetakBAST && !item.NomorProof) {
+      toast.warning(
+        `MAP ${item.Nomor} belum punya LHK Proof. Jika bukan MAP lama, BAST akan ditolak.`,
+        { timeout: 5000 },
+      );
+    }
+    router.push({ name: "SpandukBastMapEdit", params: { nomor: item.Nomor } });
+  } else if (div === "MMT") {
+    router.push({
+      name: "BastMmtEdit",
+      params: { nomor: encodeURIComponent(item.Nomor) },
+    });
+  } else {
+    router.push({
+      name: "CetakBastFormEdit",
+      params: { nomor: encodeURIComponent(item.Nomor) },
+    });
+  }
+};
+
+const onDelete = async (item: any) => {
   if (!confirm(`Yakin hapus BAST untuk MAP ${item.Nomor}?`)) return;
+
   try {
-    // MENGGUNAKAN SERVICE
-    await bastService.deleteBast(item.Nomor);
+    const div = filterState.value.divisi;
+    if (div === "SPANDUK") {
+      await bastMapSpandukService.remove(item.Nomor);
+    } else if (div === "MMT") {
+      await bastMapMmtService.deleteBast(item.Nomor);
+    } else {
+      await bastService.deleteBast(item.Nomor);
+    }
     toast.success("Berhasil dihapus.");
     fetchData();
   } catch (e: any) {
@@ -79,219 +241,110 @@ const goDelete = async (item: any) => {
   }
 };
 
-const cetak = () => {
-  if (selected.value.length === 0) return;
+const onPrint = () => {
+  if (selected.value.length === 0) {
+    toast.warning("Pilih salah satu data terlebih dahulu.");
+    return;
+  }
   const nomor = selected.value[0].Nomor;
-  window.open(
-    `/garmen/cetak-bast/print/${encodeURIComponent(nomor)}`,
-    "_blank",
-  );
+  const div = filterState.value.divisi;
+
+  if (div === "SPANDUK") {
+    window.open(
+      `/spanduk/bast-map/print/${encodeURIComponent(nomor)}`,
+      "_blank",
+    );
+  } else if (div === "MMT") {
+    window.open(
+      `/mmt/bast-map/print/${encodeURIComponent(nomor)}`,
+      "_blank",
+    );
+  } else {
+    window.open(
+      `/garmen/cetak-bast/print/${encodeURIComponent(nomor)}`,
+      "_blank",
+    );
+  }
 };
 
-// ── EXPORT HEADER (MASTER) ──
-const isExportingHeader = ref(false);
-const onExportHeader = async () => {
-  if (!items.value || items.value.length === 0) {
-    return toast.warning("Tidak ada data untuk diexport.");
+// ── Export Excel ──
+const isExporting = ref(false);
+const onExport = async () => {
+  const currentItems = items.value ?? [];
+  if (!currentItems.length) {
+    toast.warning("Tidak ada data untuk diekspor.");
+    return;
   }
-  isExportingHeader.value = true;
-  try {
-    const columns: ExcelColumn[] = [
-      { header: "Nomor", key: "Nomor", width: 18 },
-      { header: "Divisi", key: "Divisi", width: 12 },
-      { header: "Tipe", key: "Tipe", width: 10, align: "center" },
-      { header: "Tanggal", key: "Tanggal", width: 12, align: "center" },
-      { header: "Status BAST", key: "CetakBAST", width: 14, align: "center" },
-      { header: "Nama Pekerjaan", key: "NamaPekerjaan", width: 30 },
-      { header: "Nama Ext", key: "NamaExt", width: 30 },
-      { header: "Ukuran", key: "Ukuran", width: 16 },
-      { header: "Gramasi", key: "Gramasi", width: 14 },
-      { header: "Gramasi Aktual", key: "GramasiSetting_Aktual", width: 16 },
-      { header: "Kain", key: "Kain", width: 22 },
-      { header: "Finishing", key: "Finishing", width: 20 },
-      {
-        header: "Jumlah",
-        key: "Jumlah",
-        width: 10,
-        align: "right",
-        numFmt: "#,##0",
-      },
-      { header: "Keterangan", key: "Keterangan", width: 24 },
-      { header: "Kendala", key: "kendalaProduksi", width: 24 },
-    ];
 
-    const formattedData = items.value.map((item) => ({
+  isExporting.value = true;
+  try {
+    const div = filterState.value.divisi;
+    const exportColumns: ExcelColumn[] = headers.value.map((h) => ({
+      header: h.title,
+      key: h.key,
+      width: 18,
+      align: h.align === "end" ? "right" : h.align === "center" ? "center" : "left",
+      numFmt: h.align === "end" ? "#,##0" : undefined,
+    }));
+
+    const formattedData = currentItems.map((item: any) => ({
       ...item,
       Tanggal: formatTanggal(item.Tanggal),
     }));
 
     await exportExcelSingle(
-      `BAST_Header_${filterState.value.startDate}_to_${filterState.value.endDate}.xlsx`,
-      "Data BAST",
-      columns,
+      `BAST_MAP_${div}_${filterState.value.startDate}_sd_${filterState.value.endDate}.xlsx`,
+      `BAST ${div}`,
+      exportColumns,
       formattedData,
-      `LAPORAN BAST MAP (HEADER) | Periode: ${formatTanggal(filterState.value.startDate)} s.d ${formatTanggal(filterState.value.endDate)}`,
+      `DATA BAST MAP DIVISI ${div} | Periode: ${formatTanggal(filterState.value.startDate)} s.d ${formatTanggal(filterState.value.endDate)}`,
     );
-    toast.success("Berhasil export header BAST.");
+    toast.success("Berhasil export data BAST.");
   } catch {
-    toast.error("Gagal export header.");
+    toast.error("Gagal export data Excel.");
   } finally {
-    isExportingHeader.value = false;
+    isExporting.value = false;
   }
 };
 
-// ── EXPORT DETAIL ──
-const isExportingDetail = ref(false);
-const onExportDetail = async () => {
-  isExportingDetail.value = true;
-  try {
-    const res = await bastService.getExportDetail({
-      startDate: filterState.value.startDate,
-      endDate: filterState.value.endDate,
-      onProgress: filterState.value.onProgress,
-    });
-
-    const allData: any[] = res.data.data || [];
-    if (!allData.length) {
-      toast.warning("Tidak ada data detail pada filter ini.");
-      return;
-    }
-
-    const combinedRows: any[] = [];
-
-    allData.forEach((master) => {
-      // Data Header/Master yang hanya muncul di baris pertama
-      const masterCells = {
-        Nomor: master.Nomor,
-        Divisi: master.Divisi,
-        Tipe: master.Tipe,
-        Tanggal: formatTanggal(master.Tanggal),
-        CetakBAST: master.CetakBAST,
-        NamaPekerjaan: master.NamaPekerjaan,
-        NamaExt: master.NamaExt,
-        Ukuran: master.Ukuran,
-        Gramasi: master.Gramasi,
-        GramasiSetting_Aktual: master.GramasiSetting_Aktual,
-        Kain: master.Kain,
-        Finishing: master.Finishing,
-        Jumlah: Number(master.Jumlah) || 0,
-        Keterangan: master.Keterangan,
-        kendalaProduksi: master.kendalaProduksi,
-      };
-
-      // Baris blanko untuk detail kedua dan seterusnya
-      const blankMaster = Object.fromEntries(
-        Object.keys(masterCells).map((k) => [k, ""]),
-      );
-
-      if (master.details && master.details.length > 0) {
-        master.details.forEach((dtl: any, idx: number) => {
-          combinedRows.push({
-            ...(idx === 0 ? masterCells : blankMaster),
-            JenisDetail: dtl.Jenis,
-            KodeBahan: dtl.Kode,
-            NamaBahan: dtl.Nama,
-            Satuan: dtl.Satuan,
-            Qty: Number(dtl.Qty) || 0,
-          });
-        });
-      } else {
-        // Jika BAST tidak punya detail bahan sama sekali
-        combinedRows.push({
-          ...masterCells,
-          JenisDetail: "",
-          KodeBahan: "",
-          NamaBahan: "",
-          Satuan: "",
-          Qty: "",
-        });
-      }
-    });
-
-    const columns: ExcelColumn[] = [
-      { header: "Nomor", key: "Nomor", width: 16 },
-      { header: "Divisi", key: "Divisi", width: 12 },
-      { header: "Tipe", key: "Tipe", width: 10, align: "center" },
-      { header: "Tanggal", key: "Tanggal", width: 12, align: "center" },
-      { header: "Status BAST", key: "CetakBAST", width: 12, align: "center" },
-      { header: "Nama Pekerjaan", key: "NamaPekerjaan", width: 26 },
-      { header: "Nama Ext", key: "NamaExt", width: 26 },
-      { header: "Ukuran", key: "Ukuran", width: 14 },
-      { header: "Gramasi", key: "Gramasi", width: 12 },
-      { header: "Gramasi Aktual", key: "GramasiSetting_Aktual", width: 14 },
-      { header: "Kain", key: "Kain", width: 18 },
-      { header: "Finishing", key: "Finishing", width: 18 },
-      {
-        header: "Jumlah",
-        key: "Jumlah",
-        width: 10,
-        align: "right",
-        numFmt: "#,##0",
-      },
-      {
-        header: "Jenis Rincian",
-        key: "JenisDetail",
-        width: 14,
-        align: "center",
-      },
-      { header: "Kode Bahan", key: "KodeBahan", width: 14 },
-      { header: "Nama Bahan", key: "NamaBahan", width: 26 },
-      { header: "Sat", key: "Satuan", width: 8, align: "center" },
-      {
-        header: "Qty",
-        key: "Qty",
-        width: 10,
-        align: "right",
-        numFmt: "#,##0.00",
-      },
-    ];
-
-    await exportExcelSingle(
-      `BAST_Detail_${filterState.value.startDate}_to_${filterState.value.endDate}.xlsx`,
-      "Detail BAST",
-      columns,
-      combinedRows,
-      `RINCIAN BAST MAP | Periode: ${formatTanggal(filterState.value.startDate)} s.d ${formatTanggal(filterState.value.endDate)}`,
-    );
-    toast.success("Berhasil export detail BAST.");
-  } catch {
-    toast.error("Gagal export detail.");
-  } finally {
-    isExportingDetail.value = false;
-  }
+const onDivisiChange = () => {
+  selected.value = [];
+  fetchData();
 };
 </script>
 
 <template>
   <BaseBrowse
-    title="Cetak BAST MAP"
-    :menu-id="menuId"
-    :icon="IconPrinter"
+    ref="baseBrowseRef"
+    title="CETAK BAST-MAP"
+    :menu-id="MENU_ID"
+    :icon="IconClipboardCheck"
     :headers="headers"
     :items="items ?? []"
-    item-value="Nomor"
     :is-loading="isLoading"
+    item-value="Nomor"
     v-model:selected="selected"
-    v-model:filterState="filterState"
+    v-model:filter-state="filterState"
     :can-insert="canInsert"
     :can-edit="canEdit"
     :can-delete="canDelete"
-    :row-text-color-fn="getRowTextColor"
+    :can-export="canExport"
+    :row-props-fn="handleRowProps"
     @refresh="fetchData"
-    @add="goAdd"
-    @edit="goEdit"
-    @delete="goDelete"
-    @export="onExportHeader"
+    @add="onAdd"
+    @edit="onEdit"
+    @delete="onDelete"
+    @export="onExport"
   >
+    <!-- Filter bar -->
     <template #filter-left>
       <div class="filter-group">
-        <span class="filter-label">Tanggal MAP</span>
+        <span class="filter-label">Periode</span>
         <input
           type="date"
           v-model="filterState.startDate"
           class="date-inp"
           @change="fetchData"
-          :disabled="filterState.onProgress"
         />
         <span class="filter-sep">s/d</span>
         <input
@@ -299,72 +352,101 @@ const onExportDetail = async () => {
           v-model="filterState.endDate"
           class="date-inp"
           @change="fetchData"
-          :disabled="filterState.onProgress"
         />
       </div>
 
-      <v-checkbox
-        v-model="filterState.onProgress"
-        label="Tampilkan saja BAST MAP On Progress"
-        density="compact"
-        hide-details
-        class="ml-4 cust-cb"
-        @change="fetchData"
-      ></v-checkbox>
+      <div class="filter-divider" />
 
-      <div class="filter-divider"></div>
-
-      <div class="legend-group">
-        <div class="legend-item">
-          <div class="legend-box bg-red"></div>
-          <span>= On Progress</span>
-        </div>
-        <div class="legend-item">
-          <div class="legend-box bg-blue"></div>
-          <span>= Sudah Approval</span>
+      <!-- Radio Box Divisi (mirip MintaBarangView.vue) -->
+      <div class="filter-group">
+        <span class="filter-label">Divisi</span>
+        <div class="radio-wrap">
+          <label
+            v-for="d in divisiOptions"
+            :key="d.value"
+            class="radio-label"
+          >
+            <input
+              type="radio"
+              v-model="filterState.divisi"
+              :value="d.value"
+              @change="onDivisiChange"
+            />
+            {{ d.label }}
+          </label>
         </div>
       </div>
+
+      <div class="filter-divider" />
+
+      <div class="filter-group">
+        <label class="radio-label">
+          <input
+            type="checkbox"
+            v-model="filterState.onProgress"
+            @change="fetchData"
+          />
+          On Progress
+        </label>
+      </div>
+
+      <!-- Filter Tambahan Khusus MMT -->
+      <template v-if="filterState.divisi === 'MMT'">
+        <div class="filter-divider" />
+        <div class="filter-group">
+          <span class="filter-label">Sublim</span>
+          <select
+            v-model="filterState.sublimFilter"
+            class="date-inp"
+            style="width: 80px"
+            @change="fetchData"
+          >
+            <option value="">ALL</option>
+            <option value="Y">Y</option>
+            <option value="N">Tidak</option>
+          </select>
+        </div>
+      </template>
     </template>
 
-    <template #extra-actions>
+    <template #extra-actions="{ selected }">
       <v-btn
         size="small"
-        variant="flat"
-        color="blue-grey"
+        color="grey-darken-3"
+        class="ml-2"
         :disabled="selected.length === 0"
-        @click="cetak"
+        @click="onPrint"
       >
-        <template #prepend
-          ><IconPrinter :size="15" :stroke-width="1.7"
-        /></template>
+        <template #prepend>
+          <IconPrinter :size="15" :stroke-width="1.7" />
+        </template>
         Cetak
       </v-btn>
-      <v-btn
-        size="small"
-        variant="flat"
-        color="green-darken-1"
-        :loading="isExportingDetail"
-        @click="onExportDetail"
-      >
-        <template #prepend
-          ><IconFileSpreadsheet :size="15" :stroke-width="1.7"
-        /></template>
-        Export Detail
-      </v-btn>
     </template>
 
+    <!-- Custom Render Kolom -->
     <template #item.Tanggal="{ item }">
       {{ formatTanggal(item.Tanggal) }}
     </template>
+
     <template #item.CetakBAST="{ item }">
-      <v-chip
+      <span
         v-if="item.CetakBAST"
-        color="success"
-        size="x-small"
-        label
-        class="font-weight-bold"
-        >SUDAH</v-chip
+        class="badge-bast-sudah"
       >
+        SUDAH
+      </span>
+      <span v-else class="badge-bast-belum">BELUM</span>
+    </template>
+
+    <template #item.Sublim="{ item }">
+      <span
+        v-if="item.Sublim === 'Y'"
+        class="badge-sublim"
+      >
+        Sublim
+      </span>
+      <span v-else class="text-grey">-</span>
     </template>
   </BaseBrowse>
 </template>
@@ -379,6 +461,18 @@ const onExportDetail = async () => {
   font-size: 11px;
   font-weight: 700;
   color: #555;
+  white-space: nowrap;
+}
+.filter-sep {
+  font-size: 11px;
+  color: #888;
+}
+.filter-divider {
+  width: 1px;
+  height: 22px;
+  background: #d0d0d0;
+  margin: 0 10px;
+  flex-shrink: 0;
 }
 .date-inp {
   height: 28px;
@@ -388,45 +482,63 @@ const onExportDetail = async () => {
   font-size: 12px;
   background: white;
   outline: none;
+  color: #212121;
 }
-.filter-divider {
-  width: 1px;
-  height: 24px;
-  background-color: #d0d0d0;
-  margin: 0 12px;
+.date-inp:focus {
+  border-color: #1976d2;
 }
-.legend-group {
+
+.radio-wrap {
   display: flex;
   align-items: center;
-  gap: 12px;
-  font-size: 11px;
-  font-weight: 500;
+  gap: 8px;
+  background: white;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  padding: 0 8px;
+  height: 28px;
 }
-.legend-item {
+.radio-label {
   display: flex;
   align-items: center;
   gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #424242;
+  cursor: pointer;
+  white-space: nowrap;
 }
-.legend-box {
-  width: 14px;
-  height: 14px;
-  border-radius: 2px;
-}
-.bg-red {
-  background-color: #d32f2f;
-}
-.bg-blue {
-  background-color: #1976d2;
+.radio-label input[type="radio"],
+.radio-label input[type="checkbox"] {
+  accent-color: #1565c0;
+  cursor: pointer;
+  width: 13px;
+  height: 13px;
+  margin: 0;
 }
 
-/* Menyesuaikan ukuran font checkbox agar serasi */
-.cust-cb :deep(.v-label) {
-  font-size: 11px !important;
-  font-weight: 600;
-  opacity: 1;
-  color: #333;
+.badge-bast-sudah {
+  background: #2e7d32;
+  color: white;
+  border-radius: 3px;
+  padding: 2px 6px;
+  font-size: 10px;
+  font-weight: 700;
 }
-.cust-cb :deep(.v-selection-control) {
-  min-height: unset;
+.badge-bast-belum {
+  background: #fdd835;
+  color: #333;
+  border-radius: 3px;
+  padding: 2px 6px;
+  font-size: 10px;
+  font-weight: 700;
+}
+.badge-sublim {
+  background: #6a1b9a;
+  color: white;
+  border-radius: 3px;
+  padding: 2px 6px;
+  font-size: 10px;
+  font-weight: 700;
 }
 </style>

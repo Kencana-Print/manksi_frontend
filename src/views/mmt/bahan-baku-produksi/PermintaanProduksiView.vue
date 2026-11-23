@@ -156,12 +156,12 @@ const handleDelete = async (item: any) => {
   const nomor = getItemNomor(target);
   if (!nomor) return;
 
-  if (!confirm(`Hapus data permintaan produksi nomor ${nomor}?`)) return;
+  if (!confirm(`Hapus data permintaan bahan baku MMT nomor ${nomor}?`)) return;
   try {
     await api.delete(
       `/mmt/bahan-baku-produksi/permintaan-produksi/${encodeURIComponent(nomor)}`
     );
-    toast.success("Permintaan produksi berhasil dihapus.");
+    toast.success("Permintaan bahan baku MMT berhasil dihapus.");
     fetchData();
   } catch (err: any) {
     toast.error(err.response?.data?.message || "Gagal menghapus data.");
@@ -172,7 +172,7 @@ const handlePrint = (item?: any) => {
   const target = item || selected.value[0];
   const nomor = getItemNomor(target);
   if (!nomor) {
-    toast.warning("Silakan pilih data permintaan produksi terlebih dahulu.");
+    toast.warning("Silakan pilih data permintaan bahan baku MMT terlebih dahulu.");
     return;
   }
   router.push(
@@ -183,7 +183,7 @@ const handlePrint = (item?: any) => {
 
 <template>
   <BaseBrowse
-    title="Permintaan Produksi"
+    title="Permintaan Bahan Baku MMT"
     menu-id="5536"
     item-value="Nomor"
     :icon="IconBuildingFactory2"

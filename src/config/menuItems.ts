@@ -417,6 +417,18 @@ export const createMenuItems = (): NavItem[] => {
           menuId: 70,
         },
         {
+          title: "Voucher Pembayaran",
+          to: "/piutang/voucher-pembayaran",
+          icon: IconFileInvoice,
+          menuId: 201,
+        },
+        {
+          title: "Input Faktur Pajak Voucher",
+          to: "/pembelian/input-faktur-pajak",
+          icon: IconReceiptTax,
+          menuId: 974,
+        },
+        {
           title: "Rekap Pembayaran",
           to: "/piutang/rekap-pembayaran",
           icon: IconCalendarDue,
@@ -838,10 +850,10 @@ export const createMenuItems = (): NavItem[] => {
           menuId: 181,
           subItems: [
             {
-              title: "Makloon Barang",
+              title: "Maklon Barang",
               to: "/garmen/maklon/makloon-barang",
               icon: IconArrowsExchange,
-              menuId: 180,
+              menuId: 181,
             },
             {
               title: "SJ Hasil Maklon",
@@ -1637,12 +1649,6 @@ export const createMenuItems = (): NavItem[] => {
           to: "/pembelian/pengajuan-transfer",
           icon: IconTransfer,
           menuId: 958,
-        },
-        {
-          title: "Voucher Pembayaran",
-          to: "/piutang/voucher-pembayaran",
-          icon: IconFileInvoice,
-          menuId: 201,
         },
       ],
     },

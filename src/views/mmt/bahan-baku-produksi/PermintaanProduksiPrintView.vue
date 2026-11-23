@@ -44,9 +44,9 @@ const fetchPrintData = async (nomor: string) => {
       header.value = data.header || data;
       details.value = data.details || data.Details || [];
     }
-    document.title = `Print Permintaan Produksi - ${nomor}`;
+    document.title = `Print Permintaan Bahan Baku MMT - ${nomor}`;
   } catch (error) {
-    console.error("Gagal memuat data cetak permintaan produksi:", error);
+    console.error("Gagal memuat data cetak permintaan bahan baku MMT:", error);
   } finally {
     isLoading.value = false;
   }
@@ -73,7 +73,7 @@ onMounted(() => {
     <div v-if="isLoading" class="text-center pt-10">Memuat data cetak...</div>
 
     <div v-else-if="header" class="print-page">
-      <h2 class="form-title">FORM PERMINTAAN BAHAN PRODUKSI (SPK)</h2>
+      <h2 class="form-title">FORM PERMINTAAN BAHAN BAKU MMT (SPK)</h2>
 
       <div class="header-info">
         <div class="left-column">

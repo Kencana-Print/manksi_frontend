@@ -437,14 +437,14 @@ const totalJumlah = computed(() => {
     <BaseForm
         :title="
             isEditMode
-                ? `Ubah Permintaan Produksi (${formData.nomor})`
-                : 'Tambah Permintaan Produksi Baru'
+                ? `Ubah Permintaan Bahan Baku MMT (${formData.nomor})`
+                : 'Tambah Permintaan Bahan Baku MMT Baru'
         "
         menu-id="5536"
         :icon="IconBuildingFactory2"
         :is-loading="isLoading"
         :is-saving="isSaving"
-        item-name="Permintaan Produksi"
+        item-name="Permintaan Bahan Baku MMT"
         desktop-mode
         v-model:show-save-dialog="showSaveDialog"
         v-model:show-cancel-dialog="showCancelDialog"

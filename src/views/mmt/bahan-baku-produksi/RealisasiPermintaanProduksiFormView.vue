@@ -667,7 +667,7 @@ const totalItem = computed(() => {
                             type="button"
                             class="blkp"
                             @click="showPermintaanModal = true"
-                            title="Cari Dokumen Permintaan Produksi"
+                            title="Cari Dokumen Permintaan Bahan Baku MMT"
                         >
                             <IconSearch :size="13" />
                         </button>

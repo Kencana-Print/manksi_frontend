@@ -10,7 +10,7 @@ import { exportExcelSingle, type ExcelColumn } from "@/utils/excelExport";
 
 const router = useRouter();
 const toast = useToast();
-const menuId = "118";
+const menuId = "5521";
 const API_BAST = "/mmt/bast-map";
 
 // --- State Management ---

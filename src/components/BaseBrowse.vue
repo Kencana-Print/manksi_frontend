@@ -580,10 +580,10 @@ const onResizeStart = (key: string, e: MouseEvent) => {
 };
 
 const isColFixed = (col: any) => {
-  if (col?.fixed) return true;
+  if (col?.fixed && col.fixed !== "none") return true;
   if (!col?.key) return false;
   const found = finalHeaders.value.find((h: any) => h.key === col.key);
-  return Boolean(found?.fixed);
+  return Boolean(found?.fixed && found.fixed !== "none");
 };
 
 const fixedLeftOffsets = computed(() => {
@@ -622,9 +622,15 @@ const colStyle = (col: any) => {
     style.minWidth = String(col.minWidth);
   }
 
-  if (isColFixed(col) && key && fixedLeftOffsets.value[key] !== undefined) {
-    style.position = "sticky";
-    style.left = `${fixedLeftOffsets.value[key]}px`;
+  if (isColFixed(col) && key) {
+    const leftOffset =
+      col?.fixedOffset !== undefined
+        ? col.fixedOffset
+        : fixedLeftOffsets.value[key];
+    if (leftOffset !== undefined) {
+      style.position = "sticky";
+      style.left = `${leftOffset}px`;
+    }
   }
 
   return style;
@@ -635,7 +641,7 @@ const colHeaderStyle = (col: any) => {
   const style = colStyle(col);
   style.position = "sticky";
   style.top = "0px";
-  style.zIndex = isColFixed(col) ? "30" : "20";
+  style.zIndex = isColFixed(col) ? "35" : "20";
   return style;
 };
 
@@ -1293,7 +1299,9 @@ watch(
                     :style="colHeaderStyle(col)"
                     :class="[
                       'base-th',
-                      isColFixed(col) ? 'base-th-fixed' : '',
+                      isColFixed(col)
+                        ? 'base-th-fixed v-data-table-column--fixed v-data-table__th--fixed'
+                        : '',
                       col.align ? `text-${col.align}` : '',
                       dragOverKey === col.key && dragSrcKey !== col.key
                         ? 'col-drag-over'
@@ -1845,10 +1853,11 @@ watch(
   display: flex !important;
   flex-direction: column !important;
 }
-.base-table :deep(thead) {
-  position: sticky !important;
-  top: 0 !important;
-  z-index: 20 !important;
+.base-table :deep(table > thead),
+.base-table.v-table--fixed-header :deep(.v-table__wrapper > table > thead),
+.base-table.v-table--fixed-header > :deep(.v-table__wrapper > table > thead) {
+  position: static !important;
+  top: auto !important;
 }
 .base-table :deep(thead th) {
   background-color: #1565c0 !important;
@@ -1864,6 +1873,15 @@ watch(
   position: sticky !important;
   top: 0 !important;
   z-index: 20 !important;
+}
+.base-table :deep(thead th.base-th-fixed),
+.base-table :deep(thead th.v-data-table-column--fixed),
+.base-table :deep(thead th.v-data-table__th--fixed) {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 35 !important;
+  background-color: #1565c0 !important;
+  box-shadow: 2px 0 4px rgba(0, 0, 0, 0.12);
 }
 .base-table :deep(tbody td) {
   font-size: 12px;
@@ -2177,9 +2195,9 @@ watch(
 .base-th-fixed {
   position: sticky !important;
   top: 0 !important;
-  z-index: 30 !important;
+  z-index: 35 !important;
   background-color: #1565c0 !important;
-  box-shadow: 2px 0 4px rgba(0, 0, 0, 0.08);
+  box-shadow: 2px 0 4px rgba(0, 0, 0, 0.12);
 }
 
 .th-inner {

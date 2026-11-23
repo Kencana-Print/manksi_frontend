@@ -144,7 +144,7 @@ const handleDelete = async (item: any) => {
   const nomor = getItemNomor(target);
   if (!nomor) return;
 
-  if (!confirm(`Hapus data realisasi permintaan produksi nomor ${nomor}?`)) return;
+  if (!confirm(`Hapus data realisasi permintaan bahan baku MMT nomor ${nomor}?`)) return;
   try {
     await api.delete(
       `/mmt/bahan-baku-produksi/realisasi-produksi/${encodeURIComponent(nomor)}`
