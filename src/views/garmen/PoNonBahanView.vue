@@ -90,6 +90,7 @@ const showFilterSparepart = computed(() =>
   [
     "TEKNISI",
     "IT",
+    "GA",
     "FINANCE",
     "AUDIT",
     "DIREKSI",
@@ -98,14 +99,14 @@ const showFilterSparepart = computed(() =>
   ].includes(userBagian.value),
 );
 const showFilterAtk = computed(() =>
-  ["GA", "FINANCE", "AUDIT", "DIREKSI", "EDP", ...BAGIAN_PEMBELIAN].includes(
+  ["GA", "IT", "TEKNISI", "FINANCE", "AUDIT", "DIREKSI", "EDP", ...BAGIAN_PEMBELIAN].includes(
     userBagian.value,
   ),
 );
 
 // Bagian yang boleh melihat PO Aset; samakan dengan BAGIAN_PO_ASET di backend
 const showFilterAset = computed(() =>
-  ["GA", "EDP", "FINANCE", "AUDIT", "DIREKSI", ...BAGIAN_PEMBELIAN].includes(
+  ["GA", "EDP", "FINANCE", "AUDIT", "DIREKSI", "IT", "TEKNISI", ...BAGIAN_PEMBELIAN].includes(
     userBagian.value,
   ),
 );

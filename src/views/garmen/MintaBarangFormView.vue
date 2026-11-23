@@ -124,7 +124,7 @@ const initialData = {
 };
 
 // [KONFIRMASI] daftar bagian harus sama dengan showFilterAset di GarmenBarangView
-const BAGIAN_ASET = ["GA", "FINANCE", "AUDIT", "DIREKSI", "EDP", "ADMIN"];
+const BAGIAN_ASET = ["GA", "FINANCE", "AUDIT", "DIREKSI", "EDP", "ADMIN", "IT", "TEKNISI"];
 const jenisOptions = computed(() => {
   const bagian = (authStore.user?.bagian || "").toUpperCase();
   const base = ["ACCESORIES", "OBAT", "SPAREPART", "ATK/RTK"];
