@@ -188,7 +188,15 @@ const kembaliKeBrowse = () => {
     });
 };
 
+const canSaveActive = computed(
+  () => authStore.can("182", "insert") || authStore.can("5517", "insert"),
+);
+
 const onClickSave = () => {
+  if (!canSaveActive.value) {
+    toast.error("Akses ditolak: Anda tidak memiliki izin untuk menyimpan data.");
+    return;
+  }
   if (!formData.MklNomor) {
     toast.warning("Silakan pilih No. Maklon terlebih dahulu.");
     return;

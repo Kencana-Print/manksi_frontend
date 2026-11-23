@@ -3,7 +3,7 @@ import { ref, onMounted } from "vue";
 import api from "@/services/api";
 import { useAuthStore } from "@/stores/authStore";
 import { useToast } from "vue-toastification";
-import { useRouter } from "vue-router";
+import { useRouter, useRoute } from "vue-router";
 import { AxiosError } from "axios";
 import { useTheme } from "vuetify";
 import {
@@ -22,6 +22,7 @@ import heroImage from "@/assets/login-hero.jpg"; // Pastikan aset ini ada
 
 const toast = useToast();
 const router = useRouter();
+const route = useRoute();
 const theme = useTheme();
 const authStore = useAuthStore();
 
@@ -72,11 +73,11 @@ const handleLogin = async () => {
       toast.warning(loginData.specialMessage, { timeout: 8000 });
     }
 
-    // LOGIC BARU: Langsung lempar ke Dashboard (Kecuali pakai password 123)
+    // Arahkan ke redirect URL rute asal atau Dashboard
     if (loginData.isDefaultPassword) {
       isDefaultPasswordVisible.value = true;
     } else {
-      router.push("/");
+      navigateAfterLogin();
     }
   } catch (err) {
     const error = err as AxiosError<{ message: string }>;
@@ -88,9 +89,20 @@ const handleLogin = async () => {
   }
 };
 
+const navigateAfterLogin = () => {
+  const redirect = (route.query.redirect as string) || "/";
+  const target =
+    redirect.startsWith("/") &&
+    !redirect.startsWith("//") &&
+    redirect !== "/login"
+      ? redirect
+      : "/";
+  router.push(target);
+};
+
 const proceedFromDefaultPassword = () => {
   isDefaultPasswordVisible.value = false;
-  router.push("/"); // Langsung pindah ke dashboard
+  navigateAfterLogin();
 };
 </script>
 

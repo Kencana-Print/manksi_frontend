@@ -7,7 +7,8 @@ import { useTabsStore } from "@/stores/tabsStore";
 import type { AxiosError } from "axios";
 
 interface UseFormOptions<T> {
-  menuId: string;
+  menuId: string | string[];
+  altMenuIds?: string[];
   initialData: T;
   fetchApi?: () => Promise<T>;
   submitApi: (data: T) => Promise<unknown>;
@@ -58,9 +59,23 @@ export function useForm<
     { deep: true },
   );
 
+  const menuIds = computed(() => {
+    const ids: string[] = [];
+    if (Array.isArray(options.menuId)) {
+      ids.push(...options.menuId);
+    } else if (options.menuId) {
+      ids.push(options.menuId);
+    }
+    if (options.altMenuIds?.length) {
+      ids.push(...options.altMenuIds);
+    }
+    return ids.filter(Boolean);
+  });
+
   const canSave = computed(() => {
     const permission = isEditMode.value ? "edit" : "insert";
-    return authStore.can(options.menuId, permission);
+    if (!menuIds.value.length) return true;
+    return menuIds.value.some((id) => authStore.can(id, permission));
   });
 
   const goBack = () => {

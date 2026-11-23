@@ -92,6 +92,7 @@ const {
     fetchData,
 } = useBrowse({
     menuId: "181",
+    altMenuIds: ["5516"],
     fetchApi: async () => {
         const res = await maklonBarangService.getBrowse({
             startDate: dtAwal.value,

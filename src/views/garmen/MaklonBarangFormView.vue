@@ -104,6 +104,7 @@ const {
   executeClose,
 } = useForm<MaklonFormData>({
   menuId: "181",
+  altMenuIds: ["5516"],
   initialData: defaultData,
   fetchApi: async (): Promise<MaklonFormData> => {
     const res = await maklonBarangFormService.getById(

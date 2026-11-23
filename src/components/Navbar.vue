@@ -75,8 +75,12 @@ const hasAccess = (item: NavItem): boolean => {
   if (item.sembunyikanCabang?.includes(authStore.user?.cabang ?? ""))
     return false;
   if (item.adminOnly && !isAdmin.value) return false; // Cek admin
-  if (item.menuId && !authStore.can(item.menuId.toString(), "view"))
-    return false;
+  if (item.menuId || item.altMenuIds?.length) {
+    const ids = [item.menuId, ...(item.altMenuIds ?? [])].filter(
+      (id): id is number => typeof id === "number",
+    );
+    if (!ids.some((id) => authStore.can(id.toString(), "view"))) return false;
+  }
   if (item.subItems?.length) return item.subItems.some((s) => hasAccess(s));
   if (item.items?.length) return item.items.some((c) => hasAccess(c));
   return true;

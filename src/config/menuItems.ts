@@ -126,6 +126,7 @@ export interface NavItem {
   divider?: boolean;
   onClick?: () => void;
   menuId?: number;
+  altMenuIds?: number[];
   items?: NavItem[];
   subItems?: NavItem[];
   model?: { value: boolean };
@@ -1224,16 +1225,18 @@ export const createMenuItems = (): NavItem[] => {
           ],
         },
         {
-          title: "Maklon Barang",
+          title: "Maklon Barang (OFF)",
           to: "/mmt/maklon/barang",
           icon: IconPackage,
           menuId: 5516,
+          adminOnly: true,
         },
         {
-          title: "SJ Hasil Maklon",
+          title: "SJ Hasil Maklon (OFF)",
           to: "/mmt/sj-hasil-maklon",
           icon: IconTruckDelivery,
           menuId: 5517,
+          adminOnly: true,
         },
         {
           title: "Planning Produksi",
@@ -2549,6 +2552,31 @@ export const createMenuItems = (): NavItem[] => {
   );
 
   // Menu Lintas Divisi: dicabut dari modul asalnya
+  const maklonBarang = cabut(
+    garmen.items,
+    (i) => i.to === "/garmen/maklon/makloon-barang",
+    "Maklon Barang",
+  );
+  if (maklonBarang) {
+    maklonBarang.altMenuIds = [5516];
+  }
+
+  const sjHasilMaklon = cabut(
+    garmen.items,
+    (i) => i.to === "/garmen/makloon/sj-hasil-makloon",
+    "SJ Hasil Maklon",
+  );
+  if (sjHasilMaklon) {
+    sjHasilMaklon.altMenuIds = [5517];
+  }
+
+  // Bersihkan folder pembungkus "Maklon Barang" di Garmen jika sudah kosong
+  cabut(
+    garmen.items,
+    (i) => i.title === "Maklon Barang" && (!i.subItems || i.subItems.length === 0),
+    "Maklon Barang (Parent Garmen)",
+  );
+
   const lintasDivisi: NavItem[] = [
     cabut(ppic.items, (i) => i.to === "/garmen/cetak-bast", "Cetak BAST MAP"),
     cabut(
@@ -2577,6 +2605,8 @@ export const createMenuItems = (): NavItem[] => {
       (i) => i.to === "/ppic/penjadwalan",
       "Komitmen Kirim",
     ),
+    maklonBarang,
+    sjHasilMaklon,
     cabut(garmen.items, (i) => i.menuId === 59, "Barang (Garmen)"),
     cabut(garmen.items, (i) => i.menuId === 920, "Bahan Baku (Garmen)"),
     cabut(garmen.items, (i) => i.menuId === 188, "Cetak Barcode Koli"),

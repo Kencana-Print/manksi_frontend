@@ -3013,7 +3013,8 @@ const router = createRouter({
         title: "Maklon Barang",
         layout: "DefaultLayout",
         requiresAuth: true,
-        menuId: "180",
+        menuId: "181",
+        altMenuIds: ["5516"],
       },
     },
     {
@@ -3024,7 +3025,8 @@ const router = createRouter({
         title: "Buat Maklon Barang",
         layout: "DefaultLayout",
         requiresAuth: true,
-        menuId: "180",
+        menuId: "181",
+        altMenuIds: ["5516"],
         browseRoute: "MaklonBarangBrowse",
       },
     },
@@ -3036,7 +3038,8 @@ const router = createRouter({
         title: "Ubah Maklon Barang",
         layout: "DefaultLayout",
         requiresAuth: true,
-        menuId: "180",
+        menuId: "181",
+        altMenuIds: ["5516"],
         browseRoute: "MaklonBarangBrowse",
       },
     },
@@ -3079,6 +3082,7 @@ const router = createRouter({
         layout: "DefaultLayout",
         requiresAuth: true,
         menuId: "182",
+        altMenuIds: ["5517"],
       },
     },
     {
@@ -3090,6 +3094,7 @@ const router = createRouter({
         layout: "DefaultLayout",
         requiresAuth: true,
         menuId: "182",
+        altMenuIds: ["5517"],
       },
     },
     {
@@ -4890,17 +4895,10 @@ const router = createRouter({
     },
 
     // ── MMT > Menu Transaksi Khusus (5516 - 5530) ─────────────────────────────────
-    // 1. Maklon Barang
+    // 1. Maklon Barang (OFF -> dialihkan ke Lintas Divisi)
     {
       path: "/mmt/maklon/barang",
-      name: "MaklonBarangMmtBrowse",
-      component: () => import("@/views/mmt/transaksi/MaklonBarangMmtView.vue"),
-      meta: {
-        title: "Maklon Barang MMT",
-        layout: "DefaultLayout",
-        requiresAuth: true,
-        menuId: "5516",
-      },
+      redirect: "/garmen/maklon/makloon-barang",
     },
     {
       path: "/mmt/maklon/barang/print/:nomor(.*)*",
@@ -4927,29 +4925,14 @@ const router = createRouter({
       },
     },
 
-    // 2. SJ Hasil Maklon
+    // 2. SJ Hasil Maklon (OFF -> dialihkan ke Lintas Divisi)
     {
       path: "/mmt/sj-hasil-maklon",
-      name: "SjHasilMaklonMmtBrowse",
-      component: () => import("@/views/mmt/transaksi/SjHasilMaklonMmtView.vue"),
-      meta: {
-        title: "SJ Hasil Maklon MMT",
-        layout: "DefaultLayout",
-        requiresAuth: true,
-        menuId: "5517",
-      },
+      redirect: "/garmen/makloon/sj-hasil-makloon",
     },
     {
       path: "/mmt/sj-hasil-maklon/create",
-      name: "SjHasilMaklonMmtCreate",
-      component: () =>
-        import("@/views/mmt/transaksi/SjHasilMaklonFormView.vue"),
-      meta: {
-        title: "Input SJ Hasil Maklon",
-        layout: "DefaultLayout",
-        requiresAuth: true,
-        menuId: "5517",
-      },
+      redirect: "/garmen/makloon/sj-hasil-makloon/create",
     },
     {
       path: "/mmt/sj-hasil-maklon/print/:nomor(.*)*",
@@ -8894,19 +8877,33 @@ router.beforeEach((to, _from) => {
 
   // 1. Belum login → ke Login
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
-    return { name: "Login" }; // Gunakan return object, bukan next()
+    return { name: "Login", query: { redirect: to.fullPath } };
   }
 
-  // 2. Sudah login tapi buka halaman Login → ke Dashboard
+  // 2. Sudah login tapi buka halaman Login → ke rute redirect atau Dashboard
   if (to.name === "Login" && authStore.isAuthenticated) {
+    const target = (to.query.redirect as string) || "/";
+    if (
+      target.startsWith("/") &&
+      !target.startsWith("//") &&
+      target !== "/login"
+    ) {
+      return target;
+    }
     return { name: "Dashboard" };
   }
 
   // 3. Punya menuId tapi tidak ada hak akses → ke 403
   // Perhatikan: Karena menu Master User tidak punya to.meta.menuId, blok ini akan dilewati.
   // Ini aman karena Master User tidak mewajibkan menuId, melainkan cukup proteksi Admin dari backend/URL
-  if (to.meta.menuId && !authStore.can(to.meta.menuId as string, "view")) {
-    return { name: "Unauthorized", query: { from: to.fullPath } };
+  if (to.meta.menuId) {
+    const ids = [
+      String(to.meta.menuId),
+      ...(((to.meta.altMenuIds as string[]) || []).map(String)),
+    ];
+    if (!ids.some((id) => authStore.can(id, "view"))) {
+      return { name: "Unauthorized", query: { from: to.fullPath } };
+    }
   }
 
   // Jika semua kondisi aman, router otomatis melanjutkan perjalanan tanpa return apa pun

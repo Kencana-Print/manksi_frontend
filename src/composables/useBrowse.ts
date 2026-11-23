@@ -6,7 +6,8 @@ import { useToast } from "vue-toastification";
 import { exportExcelSingle, type ExcelColumn } from "@/utils/excelExport";
 
 interface UseBrowseOptions<T> {
-  menuId: string;
+  menuId: string | string[];
+  altMenuIds?: string[];
   fetchApi: () => Promise<T[]>;
   immediate?: boolean;
   deleteApi?: (id: string) => Promise<void>;
@@ -26,23 +27,31 @@ export function useBrowse<T = any>(options: UseBrowseOptions<T>) {
   // thakuser/checkPermission (misal: Master User yang di-gate via
   // requireAdmin di backend). Untuk kasus ini, composable tidak boleh
   // menolak — biarkan backend yang jadi satu-satunya penjaga akses.
-  const hasMenuId = computed(() => !!options.menuId);
+  const menuIds = computed(() => {
+    const ids: string[] = [];
+    if (Array.isArray(options.menuId)) {
+      ids.push(...options.menuId);
+    } else if (options.menuId) {
+      ids.push(options.menuId);
+    }
+    if (options.altMenuIds?.length) {
+      ids.push(...options.altMenuIds);
+    }
+    return ids.filter(Boolean);
+  });
 
-  const canView = computed(() =>
-    hasMenuId.value ? authStore.can(options.menuId, "view") : true,
-  );
-  const canInsert = computed(() =>
-    hasMenuId.value ? authStore.can(options.menuId, "insert") : true,
-  );
-  const canEdit = computed(() =>
-    hasMenuId.value ? authStore.can(options.menuId, "edit") : true,
-  );
-  const canDelete = computed(() =>
-    hasMenuId.value ? authStore.can(options.menuId, "delete") : true,
-  );
-  const canExport = computed(() =>
-    hasMenuId.value ? authStore.can(options.menuId, "view") : true,
-  );
+  const hasMenuId = computed(() => menuIds.value.length > 0);
+
+  const checkPerm = (action: "view" | "insert" | "edit" | "delete") => {
+    if (!hasMenuId.value) return true;
+    return menuIds.value.some((id) => authStore.can(id, action));
+  };
+
+  const canView = computed(() => checkPerm("view"));
+  const canInsert = computed(() => checkPerm("insert"));
+  const canEdit = computed(() => checkPerm("edit"));
+  const canDelete = computed(() => checkPerm("delete"));
+  const canExport = computed(() => checkPerm("view"));
 
   const isSingleSelected = computed(() => selected.value.length === 1);
   const selectedItem = computed(() => selected.value[0] || null);
