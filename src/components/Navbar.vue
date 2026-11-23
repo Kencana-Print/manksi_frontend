@@ -411,11 +411,13 @@ onUnmounted(() => {
     <v-spacer />
 
     <button
-      class="nav-btn mr-2"
+      class="nav-search-btn mr-2"
       title="Cari menu (Ctrl+K)"
       @click="cariOpen = true"
     >
-      <IconSearch :size="16" :stroke-width="1.6" class="nav-btn-icon" />
+      <IconSearch :size="15" :stroke-width="1.8" class="search-pill-icon" />
+      <span class="search-pill-text">Cari menu...</span>
+      <kbd class="search-pill-kbd">Ctrl K</kbd>
     </button>
 
     <!-- User Menu -->
@@ -515,6 +517,16 @@ onUnmounted(() => {
           {{ authStore.userCabang }} · {{ authStore.user?.bagian || "STAFF" }}
         </div>
       </div>
+    </div>
+    <div class="drw-search px-3 py-2">
+      <button
+        class="nav-search-btn w-100"
+        title="Cari menu"
+        @click="drawer = false; cariOpen = true"
+      >
+        <IconSearch :size="15" :stroke-width="1.8" class="search-pill-icon" />
+        <span class="search-pill-text">Cari menu...</span>
+      </button>
     </div>
     <v-divider />
 
@@ -679,6 +691,82 @@ onUnmounted(() => {
 .ic {
   color: rgba(var(--v-theme-on-surface), 0.5);
   flex-shrink: 0;
+}
+
+/* ── Search Pill ── */
+.nav-search-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 34px;
+  padding: 0 10px;
+  min-width: 170px;
+  max-width: 220px;
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.08);
+  background: rgba(var(--v-theme-on-surface), 0.025);
+  border-radius: 7px;
+  cursor: pointer;
+  font-family: inherit;
+  color: rgba(var(--v-theme-on-surface), 0.55);
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+.nav-search-btn:hover {
+  background: rgba(var(--v-theme-primary), 0.05);
+  border-color: rgba(var(--v-theme-primary), 0.25);
+  color: rgb(var(--v-theme-primary));
+}
+.search-pill-icon {
+  color: inherit;
+  opacity: 0.7;
+  flex-shrink: 0;
+  transition: opacity 0.2s ease;
+}
+.nav-search-btn:hover .search-pill-icon {
+  opacity: 1;
+}
+.search-pill-text {
+  font-size: 0.82rem;
+  font-weight: 400;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.search-pill-kbd {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.65rem;
+  font-family: inherit;
+  font-weight: 500;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(var(--v-theme-on-surface), 0.035);
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.08);
+  color: rgba(var(--v-theme-on-surface), 0.45);
+  letter-spacing: 0.02em;
+  transition: all 0.2s ease;
+}
+.nav-search-btn:hover .search-pill-kbd {
+  background: rgba(var(--v-theme-primary), 0.06);
+  border-color: rgba(var(--v-theme-primary), 0.2);
+  color: rgb(var(--v-theme-primary));
+}
+.drw-search .nav-search-btn {
+  width: 100%;
+  max-width: unset;
+}
+@media (max-width: 600px) {
+  .desktop-navbar .nav-search-btn {
+    min-width: unset;
+    padding: 0 8px;
+    border: none;
+    background: transparent;
+  }
+  .desktop-navbar .search-pill-text,
+  .desktop-navbar .search-pill-kbd {
+    display: none;
+  }
 }
 
 /* ── User Button ── */
