@@ -9,6 +9,28 @@ const POLL_INTERVAL_MS = 5 * 60 * 1000; // 5 menit
 const SEEN_KEY = "manksi-changelog-seen";
 const DISMISSED_KEY = "manksi-update-dismissed";
 
+export function isVersionNewer(remoteVersion: string, localVersion: string): boolean {
+  if (!remoteVersion || !localVersion) return false;
+  const parse = (v: string) =>
+    v
+      .replace(/^[vV]/, "")
+      .split(/[-+]/)[0]
+      .split(".")
+      .map((n) => parseInt(n, 10) || 0);
+
+  const r = parse(remoteVersion);
+  const l = parse(localVersion);
+  const len = Math.max(r.length, l.length);
+
+  for (let i = 0; i < len; i++) {
+    const rPart = r[i] ?? 0;
+    const lPart = l[i] ?? 0;
+    if (rPart > lPart) return true;
+    if (rPart < lPart) return false;
+  }
+  return false;
+}
+
 export function useVersionCheck() {
   // Versi & changelog terbaru yang dikonfirmasi backend
   const latestVersion = ref<string>(buildVersion);
@@ -38,10 +60,9 @@ export function useVersionCheck() {
       changelog.value = data.changelog || [];
       isLoaded.value = true;
 
-      // ⚠️ BARU: kalau user sudah pernah "Nanti Saja"-kan versi ini,
-      // jangan nyalakan snackbar lagi sampai versi backend berubah lagi.
+      // Hanya nyalakan update kalau versi backend LEBIH BARU daripada bundle frontend
       const dismissedVersion = localStorage.getItem(DISMISSED_KEY);
-      if (data.version && data.version !== buildVersion) {
+      if (data.version && isVersionNewer(data.version, buildVersion)) {
         updateAvailable.value = dismissedVersion !== data.version;
       } else {
         updateAvailable.value = false;
@@ -62,7 +83,28 @@ export function useVersionCheck() {
     updateAvailable.value = false;
   };
 
-  const reloadApp = () => {
+  const reloadApp = async () => {
+    // Bersihkan cache worker agar bundle JS hasil build terbaru langsung diambil
+    if ("serviceWorker" in navigator) {
+      try {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        for (const reg of regs) {
+          await reg.update();
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+    if ("caches" in window) {
+      try {
+        const keys = await caches.keys();
+        for (const key of keys) {
+          await caches.delete(key);
+        }
+      } catch {
+        /* ignore */
+      }
+    }
     window.location.reload();
   };
 
