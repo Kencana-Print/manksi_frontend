@@ -32,17 +32,72 @@ const filterState = ref({
 });
 
 const gudangList = ref<GudangItem[]>([]);
+const semuaJenis = ref<string[]>([]);
 const periodeTampil = ref({ awal: "", akhir: "" });
+
+let lastFetchKey = "";
+let cachedRaw: any[] = [];
 
 const loadGudang = async () => {
   try {
     const res = await lsBahanUtamaService.getGudangList();
-    gudangList.value = res.data || [];
-    const wh16 = gudangList.value.find((g) => g.kode === "WH-16");
-    if (wh16) filterState.value.gdgNama = wh16.nama;
-  } catch {
-    // fallback default WH-16
+    const raw = Array.isArray(res.data)
+      ? res.data
+      : Array.isArray((res.data as any)?.data)
+        ? (res.data as any).data
+        : Array.isArray((res.data as any)?.rows)
+          ? (res.data as any).rows
+          : [];
+
+    const mapped: GudangItem[] = raw.map((g: any) => ({
+      kode: String(g.kode ?? g.Kode ?? g.gdg_kode ?? g.gdgKode ?? "").trim(),
+      nama: String(g.nama ?? g.Nama ?? g.gdg_nama ?? g.gdgNama ?? "").trim(),
+      aktif: g.aktif ?? g.Aktif ?? g.status ?? g.Status ?? g.is_aktif ?? g.isActive,
+    }));
+
+    // Ambil gudang aktif saja
+    const active = mapped.filter((g: any) => {
+      if (!g.kode) return false;
+      if (g.aktif !== undefined && g.aktif !== null && g.aktif !== "") {
+        const a = String(g.aktif).toUpperCase();
+        return a === "1" || a === "TRUE" || a === "AKTIF" || a === "Y";
+      }
+      return true;
+    });
+
+    gudangList.value = active.length > 0 ? active : mapped;
+
+    // Pastikan gudang terpilih valid
+    const adaGudang = gudangList.value.find(
+      (g) => g.kode === filterState.value.gdgKode,
+    );
+    if (!adaGudang) {
+      const wh16 = gudangList.value.find((g) => g.kode === "WH-16");
+      if (wh16) {
+        filterState.value.gdgKode = wh16.kode;
+        filterState.value.gdgNama = wh16.nama;
+      } else if (gudangList.value.length > 0) {
+        filterState.value.gdgKode = gudangList.value[0].kode;
+        filterState.value.gdgNama = gudangList.value[0].nama;
+      }
+    } else {
+      filterState.value.gdgNama = adaGudang.nama;
+    }
+  } catch (err) {
+    console.error("Gagal mengambil daftar gudang:", err);
   }
+};
+
+const onGudangChange = () => {
+  const wh = gudangList.value.find((g) => g.kode === filterState.value.gdgKode);
+  if (wh) filterState.value.gdgNama = wh.nama;
+  lastFetchKey = ""; // Reset cache saat gudang berganti
+  fetchData();
+};
+
+const onTanggalChange = () => {
+  lastFetchKey = ""; // Reset cache saat tanggal berganti
+  fetchData();
 };
 
 const muatData = async (): Promise<LsBahanUtamaRow[]> => {
@@ -56,42 +111,120 @@ const muatData = async (): Promise<LsBahanUtamaRow[]> => {
     return [];
   }
 
-  const res = await lsBahanUtamaService.getReport({
-    startDate: dtAwal,
-    endDate: dtAkhir,
-    gdgKode: gdgKode || "WH-16",
-  });
+  const fetchKey = `${dtAwal}_${dtAkhir}_${gdgKode || "WH-16"}`;
+  let raw: any[] = [];
 
-  const raw = Array.isArray(res.data) ? res.data : [];
+  if (fetchKey === lastFetchKey && cachedRaw.length > 0) {
+    raw = cachedRaw;
+  } else {
+    const res = await lsBahanUtamaService.getReport({
+      startDate: dtAwal,
+      endDate: dtAkhir,
+      gdgKode: gdgKode || "WH-16",
+    });
+
+    raw = Array.isArray(res.data)
+      ? res.data
+      : Array.isArray((res.data as any)?.data)
+        ? (res.data as any).data
+        : Array.isArray((res.data as any)?.rows)
+          ? (res.data as any).rows
+          : [];
+
+    cachedRaw = raw;
+    lastFetchKey = fetchKey;
+  }
+
   periodeTampil.value = { awal: dtAwal, akhir: dtAkhir };
 
-  let data = raw.map((r: any) => ({
-    ...r,
-    Panjang: Number(r.Panjang || 0),
-    Lebar: Number(r.Lebar || 0),
-    m2: Number(r.m2 || 0),
-    stok_awal_q: Number(r.stok_awal_q || 0),
-    stok_awal_m: Number(r.stok_awal_m || 0),
-    stok_awal_nominal: Number(r.stok_awal_nominal || 0),
-    terima_q: Number(r.terima_q || 0),
-    terima_m: Number(r.terima_m || 0),
-    terima_nominal: Number(r.terima_nominal || 0),
-    keluar_q: Number(r.keluar_q || 0),
-    keluar_m: Number(r.keluar_m || 0),
-    keluar_nominal: Number(r.keluar_nominal || 0),
-    retur_q: Number(r.retur_q || 0),
-    retur_m: Number(r.retur_m || 0),
-    retur_nominal: Number(r.retur_nominal || 0),
-    stok_akhir_q: Number(r.stok_akhir_q || 0),
-    stok_akhir_m: Number(r.stok_akhir_m || 0),
-    stok_akhir_nominal: Number(r.stok_akhir_nominal || 0),
-  }));
-
-  if (jenis && jenis !== "SEMUA") {
-    data = data.filter((d) => String(d.jb_nama || "").toUpperCase() === jenis.toUpperCase());
+  // Ambil semua opsi jenis unik dari data mentah sebelum filter
+  const jSet = new Set<string>();
+  for (const r of raw) {
+    const j = String(
+      r.jb_nama ?? r.jenis ?? r.Jenis ?? r.brg_jenis ?? r.kategori ?? "",
+    ).trim();
+    if (j) jSet.add(j);
   }
+  semuaJenis.value = Array.from(jSet).sort();
+
+  // Normalisasi data dan status
+  let data = raw.map((r: any) => {
+    const rawStatus = String(
+      r.status_barang ?? r.status ?? r.Status ?? "",
+    ).trim().toUpperCase();
+
+    let statusBrg = "";
+    if (
+      rawStatus === "AKTIF" ||
+      rawStatus === "A" ||
+      rawStatus === "1" ||
+      r.is_aktif === 1 ||
+      r.is_aktif === true ||
+      r.is_aktif === "1"
+    ) {
+      statusBrg = "AKTIF";
+    } else if (
+      rawStatus === "NON AKTIF" ||
+      rawStatus === "NONAKTIF" ||
+      rawStatus === "NON_AKTIF" ||
+      rawStatus === "NA" ||
+      rawStatus === "N" ||
+      rawStatus === "0" ||
+      r.is_aktif === 0 ||
+      r.is_aktif === false ||
+      r.is_aktif === "0"
+    ) {
+      statusBrg = "NON AKTIF";
+    } else {
+      statusBrg = rawStatus || "AKTIF";
+    }
+
+    const jb = String(
+      r.jb_nama ?? r.jenis ?? r.Jenis ?? r.brg_jenis ?? r.kategori ?? "",
+    ).trim();
+
+    return {
+      ...r,
+      kode: String(r.kode ?? r.Kode ?? r.brg_kode ?? ""),
+      Nama: String(r.Nama ?? r.nama ?? r.brg_nama ?? ""),
+      jb_nama: jb,
+      status_barang: statusBrg,
+      type_barang: String(
+        r.type_barang ?? r.type ?? r.Type ?? r.tipe ?? "",
+      ).trim(),
+      Panjang: Number(r.Panjang || 0),
+      Lebar: Number(r.Lebar || 0),
+      m2: Number(r.m2 || 0),
+      stok_awal_q: Number(r.stok_awal_q || 0),
+      stok_awal_m: Number(r.stok_awal_m || 0),
+      stok_awal_nominal: Number(r.stok_awal_nominal || 0),
+      terima_q: Number(r.terima_q || 0),
+      terima_m: Number(r.terima_m || 0),
+      terima_nominal: Number(r.terima_nominal || 0),
+      keluar_q: Number(r.keluar_q || 0),
+      keluar_m: Number(r.keluar_m || 0),
+      keluar_nominal: Number(r.keluar_nominal || 0),
+      retur_q: Number(r.retur_q || 0),
+      retur_m: Number(r.retur_m || 0),
+      retur_nominal: Number(r.retur_nominal || 0),
+      stok_akhir_q: Number(r.stok_akhir_q || 0),
+      stok_akhir_m: Number(r.stok_akhir_m || 0),
+      stok_akhir_nominal: Number(r.stok_akhir_nominal || 0),
+    };
+  });
+
+  // Filter jenis
+  if (jenis && jenis !== "SEMUA") {
+    data = data.filter(
+      (d) => d.jb_nama.toUpperCase() === jenis.toUpperCase(),
+    );
+  }
+
+  // Filter status
   if (status && status !== "SEMUA") {
-    data = data.filter((d) => String(d.status_barang || "").toUpperCase() === status.toUpperCase());
+    data = data.filter(
+      (d) => d.status_barang.toUpperCase() === status.toUpperCase(),
+    );
   }
 
   return data;
@@ -102,6 +235,11 @@ const { items, isLoading, canExport, fetchData } = useBrowse<LsBahanUtamaRow>({
   fetchApi: muatData,
   immediate: false,
 });
+
+const onRefresh = () => {
+  lastFetchKey = "";
+  fetchData();
+};
 
 onMounted(async () => {
   await loadGudang();
@@ -116,43 +254,161 @@ const kolom: LaporanKolom[] = [
   { key: "status_barang", title: "Status", width: 105 },
 
   // Spesifikasi
-  { key: "Panjang", title: "Panjang", group: "Spesifikasi", width: 75, tipe: "number", desimal: 2 },
-  { key: "Lebar", title: "Lebar", group: "Spesifikasi", width: 75, tipe: "number", desimal: 2 },
-  { key: "m2", title: "M2/Roll", group: "Spesifikasi", width: 80, tipe: "number", desimal: 2 },
+  {
+    key: "Panjang",
+    title: "Panjang",
+    group: "Spesifikasi",
+    width: 75,
+    tipe: "number",
+  },
+  {
+    key: "Lebar",
+    title: "Lebar",
+    group: "Spesifikasi",
+    width: 75,
+    tipe: "number",
+  },
+  {
+    key: "m2",
+    title: "M2/Roll",
+    group: "Spesifikasi",
+    width: 80,
+    tipe: "number",
+  },
 
   // Stok Awal
-  { key: "stok_awal_q", title: "Roll", group: "Stok Awal", width: 70, tipe: "number", total: true },
-  { key: "stok_awal_m", title: "M2", group: "Stok Awal", width: 85, tipe: "number", desimal: 2, total: true },
-  { key: "stok_awal_nominal", title: "Nominal (Rp)", group: "Stok Awal", width: 115, tipe: "currency", total: true },
+  {
+    key: "stok_awal_q",
+    title: "Roll",
+    group: "Stok Awal",
+    width: 70,
+    tipe: "number",
+    total: true,
+  },
+  {
+    key: "stok_awal_m",
+    title: "M2",
+    group: "Stok Awal",
+    width: 85,
+    tipe: "number",
+    total: true,
+  },
+  {
+    key: "stok_awal_nominal",
+    title: "Nominal (Rp)",
+    group: "Stok Awal",
+    width: 115,
+    tipe: "currency",
+    total: true,
+  },
 
   // Terima
-  { key: "terima_q", title: "Roll", group: "Terima", width: 70, tipe: "number", total: true },
-  { key: "terima_m", title: "M2", group: "Terima", width: 85, tipe: "number", desimal: 2, total: true },
-  { key: "terima_nominal", title: "Nominal (Rp)", group: "Terima", width: 115, tipe: "currency", total: true },
+  {
+    key: "terima_q",
+    title: "Roll",
+    group: "Terima",
+    width: 70,
+    tipe: "number",
+    total: true,
+  },
+  {
+    key: "terima_m",
+    title: "M2",
+    group: "Terima",
+    width: 85,
+    tipe: "number",
+    total: true,
+  },
+  {
+    key: "terima_nominal",
+    title: "Nominal (Rp)",
+    group: "Terima",
+    width: 115,
+    tipe: "currency",
+    total: true,
+  },
 
   // Keluar
-  { key: "keluar_q", title: "Roll", group: "Keluar", width: 70, tipe: "number", total: true },
-  { key: "keluar_m", title: "M2", group: "Keluar", width: 85, tipe: "number", desimal: 2, total: true },
-  { key: "keluar_nominal", title: "Nominal (Rp)", group: "Keluar", width: 115, tipe: "currency", total: true },
+  {
+    key: "keluar_q",
+    title: "Roll",
+    group: "Keluar",
+    width: 70,
+    tipe: "number",
+    total: true,
+  },
+  {
+    key: "keluar_m",
+    title: "M2",
+    group: "Keluar",
+    width: 85,
+    tipe: "number",
+    total: true,
+  },
+  {
+    key: "keluar_nominal",
+    title: "Nominal (Rp)",
+    group: "Keluar",
+    width: 115,
+    tipe: "currency",
+    total: true,
+  },
 
   // Retur
-  { key: "retur_q", title: "Roll", group: "Retur", width: 70, tipe: "number", total: true },
-  { key: "retur_m", title: "M2", group: "Retur", width: 85, tipe: "number", desimal: 2, total: true },
+  {
+    key: "retur_q",
+    title: "Roll",
+    group: "Retur",
+    width: 70,
+    tipe: "number",
+    total: true,
+  },
+  {
+    key: "retur_m",
+    title: "M2",
+    group: "Retur",
+    width: 85,
+    tipe: "number",
+    total: true,
+  },
 
   // Stok Akhir
-  { key: "stok_akhir_q", title: "Roll", group: "Stok Akhir", width: 70, tipe: "number", total: true },
-  { key: "stok_akhir_m", title: "M2", group: "Stok Akhir", width: 85, tipe: "number", desimal: 2, total: true },
-  { key: "stok_akhir_nominal", title: "Nominal (Rp)", group: "Stok Akhir", width: 115, tipe: "currency", total: true },
+  {
+    key: "stok_akhir_q",
+    title: "Roll",
+    group: "Stok Akhir",
+    width: 70,
+    tipe: "number",
+    total: true,
+  },
+  {
+    key: "stok_akhir_m",
+    title: "M2",
+    group: "Stok Akhir",
+    width: 85,
+    tipe: "number",
+    total: true,
+  },
+  {
+    key: "stok_akhir_nominal",
+    title: "Nominal (Rp)",
+    group: "Stok Akhir",
+    width: 115,
+    tipe: "currency",
+    total: true,
+  },
 ];
 
-const tableRef = ref<LaporanTableApi | null>(null);
+const tableRef = ref<LaporanTableApi<LsBahanUtamaRow> | null>(null);
 
 const bukaPrint = () => {
-  const { dtAwal, dtAkhir, gdgKode } = filterState.value;
+  const { dtAwal, dtAkhir, gdgKode, jenis, status } = filterState.value;
   const p = new URLSearchParams({
     startDate: dtAwal,
     endDate: dtAkhir,
     gdgKode: gdgKode || "WH-16",
+    jenis: jenis || "SEMUA",
+    status: status || "SEMUA",
   });
   window.open(
     `/laporan/produksi-mmt/ls-bahan-utama/print?${p.toString()}`,
@@ -196,60 +452,130 @@ const onExport = () => {
     row-key="kode"
     search-placeholder="Cari kode, nama bahan, jenis..."
     satuan="item"
-    @refresh="fetchData"
+    @refresh="onRefresh"
     @export="onExport"
   >
-    <template #filter="{ filter, updateFilter }">
-      <div class="d-flex align-center flex-wrap ga-2">
-        <v-text-field
-          :model-value="filter.dtAwal"
-          type="date"
-          label="Mulai"
-          density="compact"
-          variant="outlined"
-          hide-details
-          style="width: 145px"
-          @update:model-value="(v: string) => updateFilter({ dtAwal: v })"
-        />
-        <v-text-field
-          :model-value="filter.dtAkhir"
-          type="date"
-          label="Sampai"
-          density="compact"
-          variant="outlined"
-          hide-details
-          style="width: 145px"
-          @update:model-value="(v: string) => updateFilter({ dtAkhir: v })"
-        />
-
-        <v-select
-          :model-value="filter.gdgKode"
-          :items="gudangList"
-          item-title="nama"
-          item-value="kode"
-          label="Gudang"
-          density="compact"
-          variant="outlined"
-          hide-details
-          style="min-width: 200px"
-          @update:model-value="(v: string) => {
-            const gd = gudangList.find(g => g.kode === v);
-            updateFilter({ gdgKode: v, gdgNama: gd ? gd.nama : v });
-          }"
-        />
-      </div>
-    </template>
-
-    <template #actions-trailing>
-      <v-btn
-        color="secondary"
-        variant="tonal"
-        size="small"
-        prepend-icon="mdi-printer"
+    <template #extra-actions>
+      <button
+        type="button"
+        class="lap-btn lap-btn-print"
+        title="Buka halaman cetak laporan"
         @click="bukaPrint"
       >
-        Cetak
-      </v-btn>
+        <IconPrinter :size="14" :stroke-width="1.8" />
+        <span>Cetak</span>
+      </button>
+    </template>
+
+    <template #filter-left>
+      <div class="f-group">
+        <span class="f-label">Periode</span>
+        <input
+          v-model="filterState.dtAwal"
+          type="date"
+          class="f-inp"
+          @change="onTanggalChange"
+        />
+        <span class="f-sep">s/d</span>
+        <input
+          v-model="filterState.dtAkhir"
+          type="date"
+          class="f-inp"
+          @change="onTanggalChange"
+        />
+      </div>
+
+      <div class="f-group">
+        <span class="f-label">Gudang</span>
+        <select
+          v-model="filterState.gdgKode"
+          class="f-inp f-select"
+          @change="onGudangChange"
+        >
+          <option
+            v-for="g in gudangList"
+            :key="g.kode"
+            :value="g.kode"
+          >
+            {{ g.nama }}
+          </option>
+        </select>
+      </div>
+
+      <div class="f-group">
+        <span class="f-label">Jenis</span>
+        <select
+          v-model="filterState.jenis"
+          class="f-inp f-select"
+          @change="fetchData"
+        >
+          <option value="SEMUA">SEMUA</option>
+          <option v-for="j in semuaJenis" :key="j" :value="j">{{ j }}</option>
+        </select>
+      </div>
+
+      <div class="f-group">
+        <span class="f-label">Status</span>
+        <select
+          v-model="filterState.status"
+          class="f-inp f-select"
+          @change="fetchData"
+        >
+          <option value="SEMUA">SEMUA</option>
+          <option value="AKTIF">AKTIF</option>
+          <option value="NON AKTIF">NON AKTIF</option>
+        </select>
+      </div>
     </template>
   </LaporanTable>
 </template>
+
+<style scoped>
+.f-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.f-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #555;
+  white-space: nowrap;
+}
+.f-sep {
+  font-size: 11px;
+  color: #777;
+}
+.f-inp {
+  height: 28px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  padding: 0 6px;
+  font-size: 11px;
+  background: white;
+  outline: none;
+}
+.f-select {
+  cursor: pointer;
+  min-width: 120px;
+}
+.lap-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 4px;
+  cursor: pointer;
+  border: 1px solid #ccc;
+  background: #fff;
+  color: #333;
+}
+.lap-btn-print:hover {
+  background: #f0f7ff;
+  border-color: #1976d2;
+  color: #1976d2;
+}
+</style>

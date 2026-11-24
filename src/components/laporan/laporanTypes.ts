@@ -1,6 +1,7 @@
 export type LaporanTipe =
   | "text"
   | "number"
+  | "currency"
   | "date"
   | "dateSingkat"
   | "datetime";
@@ -27,6 +28,8 @@ export interface LaporanKolom {
   excelWidth?: number;
   /** Format angka Excel, mis. "#,##0" atau "#,##0.00". Kosong = default komponen. */
   numFmt?: string;
+  // Kolom beku di kiri saat scroll horizontal
+  sticky?: "left" | "right" | boolean;
 }
 
 // Baris footer tambahan di bawah TOTAL (layar dan Excel)
@@ -52,6 +55,7 @@ export interface LaporanExportOpsi {
 // API yang dibuka LaporanTable ke view lewat ref
 export interface LaporanTableApi<T> {
   getFilteredItems: () => T[];
+  getPagedItems?: () => T[];
   exportToExcel: (opsi: LaporanExportOpsi) => Promise<void>;
   clearSelection: () => void;
 }

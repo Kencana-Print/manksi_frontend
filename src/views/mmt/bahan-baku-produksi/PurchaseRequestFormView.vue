@@ -13,6 +13,7 @@ import {
     IconX,
 } from "@tabler/icons-vue";
 import api from "@/services/api";
+import { useAuthStore } from "@/stores/authStore";
 
 import BahanMmtSearchModal from "@/components/lookups/BahanMmtSearchModal.vue";
 import SpkSearchModal from "@/components/lookups/SpkSearchModal.vue";
@@ -24,6 +25,12 @@ import MppbLookupView from "@/modal/MppbLookupView.vue";
 const route = useRoute();
 const router = useRouter();
 const toast = useToast();
+const authStore = useAuthStore();
+
+const canApproveManager = computed(() => {
+    if (!authStore.user) return true;
+    return authStore.isManager || authStore.user?.flags?.isManager === 1;
+});
 
 interface DetailItem {
     no: number;
@@ -573,10 +580,12 @@ const handleApprove = async (role: "SPV" | "MANAGER") => {
         toast.success(`Permintaan berhasil di-ACC oleh ${role}!`);
         if (role === "SPV") {
             formData.value.statusAccSpv = "Y";
-            formData.value.accSpvUser = "ACC";
+            formData.value.accSpvUser =
+                authStore.user?.nama || authStore.user?.kode || "ACC";
         } else {
             formData.value.statusAccManager = "Y";
-            formData.value.accManagerUser = "ACC";
+            formData.value.accManagerUser =
+                authStore.user?.nama || authStore.user?.kode || "ACC";
         }
     } catch (err: any) {
         toast.error(err.response?.data?.message || `Gagal ACC ${role}.`);
@@ -604,6 +613,7 @@ const totalQty = computed(() => {
         :icon="IconPackageImport"
         :is-loading="isLoading"
         :is-saving="isSaving"
+        :disabled-save="isLocked"
         item-name="Purchase Request (PR)"
         desktop-mode
         v-model:show-save-dialog="showSaveDialog"
@@ -614,6 +624,48 @@ const totalQty = computed(() => {
         @confirm-cancel="executeCancel"
         @confirm-close="executeClose"
     >
+        <!-- ── HEADER ACTIONS PREPEND (APPROVAL & STATUS SESUAI SISTEM MMT) ── -->
+        <template #header-actions-prepend>
+            <!-- Badge Status ACC di Toolbar -->
+            <div v-if="isEditMode" class="d-flex align-center ga-1 mr-2">
+                <v-chip
+                    size="x-small"
+                    :color="formData.statusAccSpv === 'Y' ? 'success' : 'warning'"
+                    class="font-weight-bold"
+                >
+                    SPV: {{ formData.statusAccSpv === 'Y' ? (formData.accSpvUser || 'ACC') : 'Pending' }}
+                </v-chip>
+                <v-chip
+                    size="x-small"
+                    :color="formData.statusAccManager === 'Y' ? 'success' : 'grey-darken-1'"
+                    class="font-weight-bold"
+                >
+                    MGR: {{ formData.statusAccManager === 'Y' ? (formData.accManagerUser || 'ACC') : 'Pending' }}
+                </v-chip>
+            </div>
+
+            <!-- Tombol ACC Manager di Atas Sesuai Sistem MMT -->
+            <v-btn
+                v-if="isEditMode && formData.statusAccManager !== 'Y' && canApproveManager"
+                size="small"
+                color="success"
+                variant="elevated"
+                class="mr-2 text-none font-weight-bold"
+                :disabled="formData.statusAccSpv !== 'Y' || isApproving"
+                :loading="isApproving"
+                :title="
+                    formData.statusAccSpv !== 'Y'
+                        ? 'SPV harus melakukan ACC terlebih dahulu'
+                        : 'Lakukan Approval Manager'
+                "
+                @click="handleApprove('MANAGER')"
+            >
+                <template #prepend>
+                    <IconCheck :size="16" />
+                </template>
+                ACC Manager
+            </v-btn>
+        </template>
         <!-- ══════════════════════════════════════════════════════════
          ── KOLOM KIRI (SIDEBAR UNTUK HEADER, TUJUAN & KETERANGAN) ──
          ══════════════════════════════════════════════════════════ -->

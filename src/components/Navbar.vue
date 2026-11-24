@@ -317,21 +317,21 @@ onUnmounted(() => {
     fixed
     :class="['desktop-navbar', { 'navbar-scrolled': isScrolled }]"
   >
-    <v-app-bar-nav-icon
-      v-if="!showDesktopNav"
-      class="ml-1"
-      @click="drawer = !drawer"
-      color="primary"
-      size="small"
-    >
-      <IconMenu2 :size="20" :stroke-width="1.5" />
-    </v-app-bar-nav-icon>
+    <div class="nav-left">
+      <v-app-bar-nav-icon
+        v-if="!showDesktopNav"
+        class="ml-1"
+        @click="drawer = !drawer"
+        color="primary"
+        size="small"
+      >
+        <IconMenu2 :size="20" :stroke-width="1.5" />
+      </v-app-bar-nav-icon>
 
-    <RouterLink to="/" class="logo-section">
-      <img :src="logoSrc" alt="Logo" class="brand-logo" />
-    </RouterLink>
-
-    <v-spacer />
+      <RouterLink to="/" class="logo-section">
+        <img :src="logoSrc" alt="Logo" class="brand-logo" />
+      </RouterLink>
+    </div>
 
     <!-- Desktop Nav -->
     <nav v-if="showDesktopNav" class="main-nav">
@@ -408,96 +408,96 @@ onUnmounted(() => {
       </template>
     </nav>
 
-    <v-spacer />
+    <div class="nav-right">
+      <button
+        class="nav-search-btn mr-2"
+        title="Cari menu (Ctrl+K)"
+        @click="cariOpen = true"
+      >
+        <IconSearch :size="15" :stroke-width="1.8" class="search-pill-icon" />
+        <span class="search-pill-text">Cari menu...</span>
+        <kbd class="search-pill-kbd">Ctrl K</kbd>
+      </button>
 
-    <button
-      class="nav-search-btn mr-2"
-      title="Cari menu (Ctrl+K)"
-      @click="cariOpen = true"
-    >
-      <IconSearch :size="15" :stroke-width="1.8" class="search-pill-icon" />
-      <span class="search-pill-text">Cari menu...</span>
-      <kbd class="search-pill-kbd">Ctrl K</kbd>
-    </button>
-
-    <!-- User Menu -->
-    <v-menu location="bottom end" transition="fade-transition">
-      <template #activator="{ props }">
-        <button v-bind="props" class="user-btn">
-          <v-avatar :color="userRoleConfig.color" size="27">
-            <component
-              :is="userRoleConfig.icon"
-              :size="15"
-              :stroke-width="1.6"
-              color="white"
-            />
-          </v-avatar>
-          <span class="user-name">{{ authStore.userName }}</span>
-          <IconChevronDown :size="12" :stroke-width="2.2" class="user-chev" />
-        </button>
-      </template>
-
-      <v-card class="user-dropdown" elevation="6">
-        <v-list class="user-list">
-          <div class="user-profile">
-            <v-avatar :color="userRoleConfig.color" size="32" class="mr-3">
+      <!-- User Menu -->
+      <v-menu location="bottom end" transition="fade-transition">
+        <template #activator="{ props }">
+          <button v-bind="props" class="user-btn">
+            <v-avatar :color="userRoleConfig.color" size="27">
               <component
                 :is="userRoleConfig.icon"
-                :size="17"
-                :stroke-width="1.5"
+                :size="15"
+                :stroke-width="1.6"
                 color="white"
               />
             </v-avatar>
-            <div>
-              <div class="up-name">{{ authStore.userName }}</div>
-              <div class="up-sub">
-                {{ authStore.userCabang }} ·
-                {{ authStore.user?.bagian || "STAFF" }}
+            <span class="user-name">{{ authStore.userName }}</span>
+            <IconChevronDown :size="12" :stroke-width="2.2" class="user-chev" />
+          </button>
+        </template>
+
+        <v-card class="user-dropdown" elevation="6">
+          <v-list class="user-list">
+            <div class="user-profile">
+              <v-avatar :color="userRoleConfig.color" size="32" class="mr-3">
+                <component
+                  :is="userRoleConfig.icon"
+                  :size="17"
+                  :stroke-width="1.5"
+                  color="white"
+                />
+              </v-avatar>
+              <div>
+                <div class="up-name">{{ authStore.userName }}</div>
+                <div class="up-sub">
+                  {{ authStore.userCabang }} ·
+                  {{ authStore.user?.bagian || "STAFF" }}
+                </div>
               </div>
             </div>
-          </div>
-          <v-divider class="my-1" />
-          <template v-if="authStore.cabangBoleh.length > 1">
-            <div class="cb-judul">Cabang aktif</div>
-            <v-list-item
-              v-for="cab in authStore.cabangBoleh"
-              :key="cab"
-              class="um-item"
-              :active="cab === authStore.userCabang"
-              :disabled="gantiBusy"
-              @click="gantiCabang(cab)"
-            >
-              <v-list-item-title>{{ cab }}</v-list-item-title>
+            <v-divider class="my-1" />
+            <template v-if="authStore.cabangBoleh.length > 1">
+              <div class="cb-judul">Cabang aktif</div>
+              <v-list-item
+                v-for="cab in authStore.cabangBoleh"
+                :key="cab"
+                class="um-item"
+                :active="cab === authStore.userCabang"
+                :disabled="gantiBusy"
+                @click="gantiCabang(cab)"
+              >
+                <v-list-item-title>{{ cab }}</v-list-item-title>
+              </v-list-item>
+              <v-divider class="my-1" />
+            </template>
+            <v-list-item class="drw-item" @click="openPasswordDialogHandler">
+              <template #prepend>
+                <IconLock :size="15" :stroke-width="1.5" class="ic mr-2" />
+              </template>
+              <v-list-item-title class="nav-item-title"
+                >Ganti Password</v-list-item-title
+              >
             </v-list-item>
             <v-divider class="my-1" />
-          </template>
-          <v-list-item class="drw-item" @click="openPasswordDialogHandler">
-            <template #prepend>
-              <IconLock :size="15" :stroke-width="1.5" class="ic mr-2" />
-            </template>
-            <v-list-item-title class="nav-item-title"
-              >Ganti Password</v-list-item-title
+            <v-list-item
+              class="um-item"
+              style="color: #dc2626"
+              @click="handleLogout"
             >
-          </v-list-item>
-          <v-divider class="my-1" />
-          <v-list-item
-            class="um-item"
-            style="color: #dc2626"
-            @click="handleLogout"
-          >
-            <template #prepend>
-              <IconLogout
-                :size="15"
-                :stroke-width="1.5"
-                style="color: #dc2626"
-                class="mr-2"
-              />
-            </template>
-            <v-list-item-title class="nav-item-title">Logout</v-list-item-title>
-          </v-list-item>
-        </v-list>
-      </v-card>
-    </v-menu>
+              <template #prepend>
+                <IconLogout
+                  :size="15"
+                  :stroke-width="1.5"
+                  style="color: #dc2626"
+                  class="mr-2"
+                />
+              </template>
+              <v-list-item-title class="nav-item-title">Logout</v-list-item-title>
+            </v-list-item>
+          </v-list>
+        </v-card>
+      </v-menu>
+    </div>
   </v-app-bar>
 
   <!-- ── MOBILE DRAWER ── -->
@@ -644,14 +644,28 @@ onUnmounted(() => {
   object-fit: contain;
 }
 
-/* ── Nav ── */
+/* ── Nav Layout ── */
+.nav-left {
+  display: flex;
+  align-items: center;
+  flex: 1 1 0;
+  min-width: 0;
+}
+
 .main-nav {
   display: flex;
   align-items: center;
-  flex: 1 1 auto;
-  overflow: hidden;
-  min-width: 0;
   justify-content: center;
+  flex: 0 0 auto;
+  gap: 2px;
+}
+
+.nav-right {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex: 1 1 0;
+  min-width: 0;
 }
 
 .nav-btn {

@@ -27,6 +27,8 @@ const q = route.query;
 const startDate = String(q.startDate || getAwalBulan());
 const endDate = String(q.endDate || getLocalDate());
 const gdgKode = String(q.gdgKode || "WH-16");
+const jenisFilter = String(q.jenis || "SEMUA");
+const statusFilter = String(q.status || "SEMUA");
 
 const waktuCetak = computed(() => {
   const d = new Date();
@@ -88,7 +90,73 @@ onMounted(async () => {
       endDate,
       gdgKode,
     });
-    rows.value = Array.isArray(res.data) ? res.data : [];
+    const raw = Array.isArray(res.data)
+      ? res.data
+      : Array.isArray((res.data as any)?.data)
+        ? (res.data as any).data
+        : Array.isArray((res.data as any)?.rows)
+          ? (res.data as any).rows
+          : [];
+
+    let mapped = raw.map((r: any) => {
+      const rawStatus = String(
+        r.status_barang ?? r.status ?? r.Status ?? "",
+      ).trim().toUpperCase();
+
+      let statusBrg = "";
+      if (
+        rawStatus === "AKTIF" ||
+        rawStatus === "A" ||
+        rawStatus === "1" ||
+        r.is_aktif === 1 ||
+        r.is_aktif === true ||
+        r.is_aktif === "1"
+      ) {
+        statusBrg = "AKTIF";
+      } else if (
+        rawStatus === "NON AKTIF" ||
+        rawStatus === "NONAKTIF" ||
+        rawStatus === "NON_AKTIF" ||
+        rawStatus === "NA" ||
+        rawStatus === "N" ||
+        rawStatus === "0" ||
+        r.is_aktif === 0 ||
+        r.is_aktif === false ||
+        r.is_aktif === "0"
+      ) {
+        statusBrg = "NON AKTIF";
+      } else {
+        statusBrg = rawStatus || "AKTIF";
+      }
+
+      const jb = String(
+        r.jb_nama ?? r.jenis ?? r.Jenis ?? r.brg_jenis ?? r.kategori ?? "",
+      ).trim();
+
+      return {
+        ...r,
+        kode: String(r.kode ?? r.Kode ?? r.brg_kode ?? ""),
+        Nama: String(r.Nama ?? r.nama ?? r.brg_nama ?? ""),
+        jb_nama: jb,
+        status_barang: statusBrg,
+        type_barang: String(
+          r.type_barang ?? r.type ?? r.Type ?? r.tipe ?? "",
+        ).trim(),
+      };
+    });
+
+    if (jenisFilter && jenisFilter !== "SEMUA") {
+      mapped = mapped.filter(
+        (d: any) => d.jb_nama.toUpperCase() === jenisFilter.toUpperCase(),
+      );
+    }
+    if (statusFilter && statusFilter !== "SEMUA") {
+      mapped = mapped.filter(
+        (d: any) => d.status_barang.toUpperCase() === statusFilter.toUpperCase(),
+      );
+    }
+
+    rows.value = mapped;
     isLoaded.value = true;
   } catch {
     isError.value = true;

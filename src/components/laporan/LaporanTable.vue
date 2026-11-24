@@ -16,6 +16,9 @@ import {
   IconChevronUp,
   IconChevronDown,
   IconChevronRight,
+  IconChevronsLeft,
+  IconChevronLeft,
+  IconChevronsRight,
   IconDatabaseOff,
 } from "@tabler/icons-vue";
 import { exportExcel, type ExcelColumn } from "@/utils/excelExport";
@@ -60,6 +63,9 @@ const props = withDefaults(
     // Excel: satu baris per baris detail; kolom induk ber-total tidak ikut.
     detailColumns?: LaporanKolom[];
     detailKey?: string;
+    // Pagination (seperti template BaseBrowse)
+    pagination?: boolean;
+    itemsPerPage?: number;
   }>(),
   {
     items: () => [],
@@ -69,6 +75,8 @@ const props = withDefaults(
     satuan: "baris",
     showNo: true,
     selectedKey: null,
+    pagination: true,
+    itemsPerPage: 50,
   },
 );
 
@@ -109,14 +117,16 @@ const teks = (row: object, k: LaporanKolom): string => {
     const s = String(v);
     return `${formatTanggal(s.slice(0, 10))} ${s.slice(11, 16)}`.trim();
   }
-  if (k.tipe === "number") return fmtAngka(Number(v));
+  if (k.tipe === "number" || k.tipe === "currency") return fmtAngka(Number(v));
   return String(v);
 };
 
 const kunciBaris = (row: T): string => String(baca(row, props.rowKey));
 
 const kelasSel = (k: LaporanKolom): string => {
-  const a = k.align ?? (k.tipe === "number" ? "right" : "left");
+  const a =
+    k.align ??
+    (k.tipe === "number" || k.tipe === "currency" ? "right" : "left");
   return `a-${a}`;
 };
 
@@ -258,7 +268,10 @@ const barisHeader = computed<SelHeader[][]>(() => {
 });
 
 const rataHeader = (s: SelHeader): string => {
-  if (s.kolom) return s.kolom.tipe === "number" ? "a-center" : "a-left";
+  if (s.kolom)
+    return s.kolom.tipe === "number" || s.kolom.tipe === "currency"
+      ? "a-center"
+      : "a-left";
   return "a-center";
 };
 
@@ -271,6 +284,58 @@ const lebarTabel = computed(
     (props.showNo ? LEBAR_NO : 0) +
     kolomDaun.value.reduce((s, k) => s + lebarKolom(k), 0),
 );
+
+// ── Kolom sticky (beku di kiri) ──
+const stickyLeftMap = computed<Record<string, number>>(() => {
+  const map: Record<string, number> = {};
+  const hasSticky = props.columns.some(
+    (c) => c.sticky === "left" || c.sticky === true,
+  );
+  if (!hasSticky) return map;
+
+  let cur = 0;
+  if (adaDetail.value) {
+    map["__exp"] = cur;
+    cur += LEBAR_EXPAND;
+  }
+  if (props.showNo) {
+    map["__no"] = cur;
+    cur += LEBAR_NO;
+  }
+  for (const k of kolomDaun.value) {
+    if (k.sticky === "left" || k.sticky === true) {
+      map[k.key] = cur;
+      cur += lebarKolom(k);
+    }
+  }
+  return map;
+});
+
+const lastStickyKey = computed<string | null>(() => {
+  let last: string | null = null;
+  for (const k of kolomDaun.value) {
+    if (k.sticky === "left" || k.sticky === true) {
+      last = k.key;
+    }
+  }
+  return last;
+});
+
+const getStickyLeft = (s: SelHeader): number | undefined => {
+  if (s.id === "__exp") return stickyLeftMap.value["__exp"];
+  if (s.id === "__no") return stickyLeftMap.value["__no"];
+  if (s.kolom) return stickyLeftMap.value[s.kolom.key];
+  return undefined;
+};
+
+const isLastStickyHeader = (s: SelHeader): boolean => {
+  if (s.kolom) return s.kolom.key === lastStickyKey.value;
+  if (!lastStickyKey.value) {
+    if (props.showNo) return s.id === "__no";
+    if (adaDetail.value) return s.id === "__exp";
+  }
+  return false;
+};
 
 let resizing: { key: string; startX: number; startW: number } | null = null;
 const mulaiResize = (key: string, e: MouseEvent) => {
@@ -341,6 +406,8 @@ interface StateTersimpan {
   search: string;
   filterState: unknown;
   sembunyi: Record<string, string[]>;
+  currentPage?: number;
+  perPage?: number;
 }
 const keyState = computed(() => `laporan_state_${props.storageId}`);
 const muatState = (): StateTersimpan | null => {
@@ -354,6 +421,9 @@ const muatState = (): StateTersimpan | null => {
 const tersimpan = muatState();
 
 const cari = ref<string>(tersimpan?.search ?? "");
+const currentPage = ref<number>(tersimpan?.currentPage ?? 1);
+const perPage = ref<number>(tersimpan?.perPage ?? props.itemsPerPage);
+
 // Nilai yang DISEMBUNYIKAN per kolom (nilai baru setelah refresh tampil otomatis)
 const sembunyiKolom = ref<Record<string, Set<string>>>(
   Object.fromEntries(
@@ -371,16 +441,22 @@ const simpanState = () => {
         sembunyi: Object.fromEntries(
           Object.entries(sembunyiKolom.value).map(([k, v]) => [k, [...v]]),
         ),
+        currentPage: currentPage.value,
+        perPage: perPage.value,
       }),
     );
   } catch {
     /* abaikan */
   }
 };
-watch([cari, () => props.filterState, sembunyiKolom], simpanState, {
-  deep: true,
-  flush: "post",
-});
+watch(
+  [cari, () => props.filterState, sembunyiKolom, currentPage, perPage],
+  simpanState,
+  {
+    deep: true,
+    flush: "post",
+  },
+);
 
 // Pulihkan filter milik view sebelum view melakukan fetch pertamanya
 onMounted(() => {
@@ -537,6 +613,77 @@ const tampil = computed<T[]>(() => {
   });
 });
 
+// ── Pagination (Identik dengan BaseBrowse) ──
+const totalItems = computed(() => tampil.value.length);
+const totalPages = computed(() => {
+  if (!props.pagination || perPage.value === -1) return 1;
+  return Math.max(1, Math.ceil(totalItems.value / perPage.value));
+});
+const pageStart = computed(() => {
+  if (totalItems.value === 0) return 0;
+  if (!props.pagination || perPage.value === -1) return 1;
+  return (currentPage.value - 1) * perPage.value + 1;
+});
+const pageEnd = computed(() => {
+  if (!props.pagination || perPage.value === -1) return totalItems.value;
+  return Math.min(currentPage.value * perPage.value, totalItems.value);
+});
+
+const visiblePages = computed(() => {
+  const total = totalPages.value;
+  const cur = currentPage.value;
+  if (total <= 5) return Array.from({ length: total }, (_, i) => i + 1);
+  let start = Math.max(1, cur - 2);
+  let end = Math.min(total, start + 4);
+  if (end - start < 4) start = Math.max(1, end - 4);
+  return Array.from({ length: end - start + 1 }, (_, i) => start + i);
+});
+
+const goToPage = (p: number) => {
+  currentPage.value = Math.max(1, Math.min(p, totalPages.value));
+};
+
+const jumpPageInput = ref<number | null>(null);
+const onJumpPage = () => {
+  if (jumpPageInput.value) {
+    goToPage(jumpPageInput.value);
+    jumpPageInput.value = null;
+  }
+};
+
+const pagedItems = computed(() => {
+  if (!props.pagination || perPage.value === -1) return tampil.value;
+  const start = (currentPage.value - 1) * perPage.value;
+  return tampil.value.slice(start, start + perPage.value);
+});
+
+const getNoUrut = (index: number) => {
+  if (!props.pagination || perPage.value === -1) return index + 1;
+  return (currentPage.value - 1) * perPage.value + index + 1;
+};
+
+watch(cari, () => {
+  currentPage.value = 1;
+});
+watch(
+  sembunyiKolom,
+  () => {
+    currentPage.value = 1;
+  },
+  { deep: true },
+);
+watch(
+  () => props.items,
+  () => {
+    currentPage.value = 1;
+  },
+);
+watch(totalPages, (tp) => {
+  if (currentPage.value > tp) {
+    currentPage.value = Math.max(1, tp);
+  }
+});
+
 // ── Master-detail ──
 const jumlahKolomTabel = computed(
   () =>
@@ -618,6 +765,13 @@ const spanLabel = computed(
 );
 const sisaFooter = computed(() =>
   awalTotal.value === -1 ? [] : kolomDaun.value.slice(awalTotal.value),
+);
+const stickyDataCols = computed(() =>
+  kolomDaun.value.filter((k) => k.sticky === "left" || k.sticky === true),
+);
+const hasStickyDataCols = computed(() => stickyDataCols.value.length > 0);
+const sisaFooterSticky = computed(() =>
+  kolomDaun.value.slice(stickyDataCols.value.length),
 );
 const labelTotal = computed(
   () => `TOTAL (${terfilter.value.length} ${props.satuan})`,
@@ -747,8 +901,15 @@ const exportToExcel = async (opsi: LaporanExportOpsi) => {
   }
 };
 
+const updateFilter = (patch: Record<string, any>) => {
+  if (props.filterState) {
+    emit("update:filterState", { ...props.filterState, ...patch } as F);
+  }
+};
+
 defineExpose({
   getFilteredItems: () => tampil.value,
+  getPagedItems: () => pagedItems.value,
   exportToExcel,
   clearSelection,
 });
@@ -769,6 +930,7 @@ defineExpose({
         Export
       </v-btn>
       <slot name="extra-actions" :selected-key="selectedKey" />
+      <slot name="actions-trailing" />
       <v-btn size="small" variant="text" @click="tutup">
         <template #prepend><IconX :size="15" :stroke-width="2" /></template>
         Tutup
@@ -779,6 +941,12 @@ defineExpose({
       <!-- Filter bar -->
       <div class="lp-filter">
         <slot name="filter-left" />
+        <slot
+          name="filter"
+          :filter="filterState"
+          :update-filter="updateFilter"
+          :updateFilter="updateFilter"
+        />
         <v-text-field
           :model-value="cari"
           :placeholder="searchPlaceholder"
@@ -877,8 +1045,11 @@ defineExpose({
                       dragOver === s.blokId &&
                       dragSrc !== s.blokId,
                     'lp-dragging': !!s.blokId && dragSrc === s.blokId,
+                    'lp-th-sticky': getStickyLeft(s) !== undefined,
+                    'lp-sticky-last': isLastStickyHeader(s),
                   },
                 ]"
+                :style="getStickyLeft(s) !== undefined ? { left: getStickyLeft(s) + 'px' } : undefined"
                 @pointerdown="onHeaderPointerDown(s, $event)"
                 @pointermove="onHeaderPointerMove"
                 @pointerup="onHeaderPointerUp"
@@ -954,13 +1125,18 @@ defineExpose({
               </td>
             </tr>
             <template v-else>
-              <template v-for="(r, i) in tampil" :key="kunciBaris(r)">
+              <template v-for="(r, i) in pagedItems" :key="kunciBaris(r)">
                 <tr
                   :class="{ 'lp-sel': selectedKey === kunciBaris(r) }"
                   @click="onKlikBaris(r)"
                   @dblclick="emit('row-dblclick', r)"
                 >
-                  <td v-if="adaDetail" class="lp-exp">
+                  <td
+                    v-if="adaDetail"
+                    class="lp-exp"
+                    :class="{ 'lp-td-sticky': stickyLeftMap['__exp'] !== undefined }"
+                    :style="stickyLeftMap['__exp'] !== undefined ? { left: stickyLeftMap['__exp'] + 'px' } : undefined"
+                  >
                     <button
                       type="button"
                       class="lp-exp-btn"
@@ -974,7 +1150,17 @@ defineExpose({
                       <IconChevronRight v-else :size="14" />
                     </button>
                   </td>
-                  <td v-if="showNo" class="lp-no">{{ i + 1 }}</td>
+                  <td
+                    v-if="showNo"
+                    class="lp-no"
+                    :class="{
+                      'lp-td-sticky': stickyLeftMap['__no'] !== undefined,
+                      'lp-sticky-last': !lastStickyKey && stickyLeftMap['__no'] !== undefined,
+                    }"
+                    :style="stickyLeftMap['__no'] !== undefined ? { left: stickyLeftMap['__no'] + 'px' } : undefined"
+                  >
+                    {{ getNoUrut(i) }}
+                  </td>
                   <td
                     v-for="k in kolomDaun"
                     :key="k.key"
@@ -985,7 +1171,12 @@ defineExpose({
                         'lp-kurang':
                           k.sorotPositif && Number(baca(r, k.key)) > 0,
                       },
+                      {
+                        'lp-td-sticky': stickyLeftMap[k.key] !== undefined,
+                        'lp-sticky-last': k.key === lastStickyKey,
+                      },
                     ]"
+                    :style="stickyLeftMap[k.key] !== undefined ? { left: stickyLeftMap[k.key] + 'px' } : undefined"
                     :title="teks(r, k)"
                   >
                     {{ teks(r, k) }}
@@ -1046,23 +1237,89 @@ defineExpose({
 
           <tfoot>
             <tr :style="{ '--bt': footerExtra.length * 28 + 'px' }">
-              <td v-if="spanLabel > 0" :colspan="spanLabel" class="a-right">
-                {{ labelTotal }}
-              </td>
-              <td v-for="k in sisaFooter" :key="k.key" class="a-right">
-                <template v-if="k.total">{{
-                  fmtAngka(totalKolom[k.key] ?? 0)
-                }}</template>
-              </td>
+              <template v-if="hasStickyDataCols">
+                <td
+                  v-if="adaDetail"
+                  class="lp-exp lp-td-sticky lp-tfoot-sticky"
+                  :style="{ left: (stickyLeftMap['__exp'] ?? 0) + 'px' }"
+                />
+                <td
+                  v-if="showNo"
+                  class="lp-no lp-td-sticky lp-tfoot-sticky"
+                  :style="{ left: (stickyLeftMap['__no'] ?? 0) + 'px' }"
+                />
+                <td
+                  :colspan="stickyDataCols.length"
+                  class="lp-td-sticky lp-sticky-last lp-tfoot-sticky a-left"
+                  :style="{
+                    left: (stickyLeftMap[stickyDataCols[0].key] ?? 0) + 'px',
+                  }"
+                >
+                  {{ labelTotal }}
+                </td>
+                <td
+                  v-for="k in sisaFooterSticky"
+                  :key="k.key"
+                  class="a-right"
+                >
+                  <template v-if="k.total">{{
+                    fmtAngka(totalKolom[k.key] ?? 0)
+                  }}</template>
+                </td>
+              </template>
+              <template v-else>
+                <td
+                  v-if="spanLabel > 0"
+                  :colspan="spanLabel"
+                  class="a-right"
+                >
+                  {{ labelTotal }}
+                </td>
+                <td v-for="k in sisaFooter" :key="k.key" class="a-right">
+                  <template v-if="k.total">{{
+                    fmtAngka(totalKolom[k.key] ?? 0)
+                  }}</template>
+                </td>
+              </template>
             </tr>
             <tr
               v-for="(f, fi) in footerExtra"
               :key="fi"
               :style="{ '--bt': (footerExtra.length - 1 - fi) * 28 + 'px' }"
             >
-              <td v-if="adaDetail"></td>
-              <td v-if="showNo"></td>
-              <td v-for="k in kolomDaun" :key="k.key" class="a-right">
+              <td
+                v-if="adaDetail"
+                class="lp-td-sticky lp-tfoot-sticky"
+                :style="
+                  stickyLeftMap['__exp'] !== undefined
+                    ? { left: stickyLeftMap['__exp'] + 'px' }
+                    : undefined
+                "
+              />
+              <td
+                v-if="showNo"
+                class="lp-td-sticky lp-tfoot-sticky"
+                :style="
+                  stickyLeftMap['__no'] !== undefined
+                    ? { left: stickyLeftMap['__no'] + 'px' }
+                    : undefined
+                "
+              />
+              <td
+                v-for="k in kolomDaun"
+                :key="k.key"
+                class="a-right"
+                :class="{
+                  'lp-td-sticky lp-tfoot-sticky':
+                    stickyLeftMap[k.key] !== undefined,
+                  'lp-sticky-last': k.key === lastStickyKey,
+                }"
+                :style="
+                  stickyLeftMap[k.key] !== undefined
+                    ? { left: stickyLeftMap[k.key] + 'px' }
+                    : undefined
+                "
+              >
                 <template v-if="k.key === f.labelKey">{{ f.label }}</template>
                 <template v-else-if="k.key === f.nilaiKey">{{
                   fmtDesimal(f.nilai, f.desimal ?? 2)
@@ -1071,6 +1328,94 @@ defineExpose({
             </tr>
           </tfoot>
         </table>
+      </div>
+
+      <!-- ── Custom Pagination (Identik dengan BaseBrowse) ── -->
+      <div v-if="pagination" class="pagination-bar">
+        <!-- Kiri: range info -->
+        <span class="page-info">
+          {{ pageStart }}–{{ pageEnd }} dari {{ totalItems }} {{ satuan || "data" }}
+        </span>
+
+        <v-spacer />
+
+        <!-- Tengah: navigasi halaman -->
+        <div class="page-controls">
+          <button
+            class="page-btn icon-btn"
+            :disabled="currentPage === 1"
+            title="Halaman pertama"
+            @click="goToPage(1)"
+          >
+            <IconChevronsLeft :size="15" :stroke-width="2" />
+          </button>
+          <button
+            class="page-btn icon-btn"
+            :disabled="currentPage === 1"
+            title="Sebelumnya"
+            @click="goToPage(currentPage - 1)"
+          >
+            <IconChevronLeft :size="15" :stroke-width="2" />
+          </button>
+
+          <button
+            v-for="p in visiblePages"
+            :key="p"
+            class="page-btn"
+            :class="{ active: p === currentPage }"
+            @click="goToPage(p)"
+          >
+            {{ p }}
+          </button>
+
+          <button
+            class="page-btn icon-btn"
+            :disabled="currentPage === totalPages"
+            title="Berikutnya"
+            @click="goToPage(currentPage + 1)"
+          >
+            <IconChevronRight :size="15" :stroke-width="2" />
+          </button>
+          <button
+            class="page-btn icon-btn"
+            :disabled="currentPage === totalPages"
+            title="Halaman terakhir"
+            @click="goToPage(totalPages)"
+          >
+            <IconChevronsRight :size="15" :stroke-width="2" />
+          </button>
+
+          <!-- Jump input -->
+          <input
+            v-model.number="jumpPageInput"
+            type="number"
+            class="jump-input"
+            :placeholder="String(currentPage)"
+            :min="1"
+            :max="totalPages"
+            title="Ketik nomor halaman lalu Enter"
+            @keydown.enter="onJumpPage"
+            @blur="onJumpPage"
+          />
+          <span class="page-of">dari {{ totalPages }}</span>
+        </div>
+
+        <v-spacer />
+
+        <!-- Kanan: per page -->
+        <div class="per-page-wrap">
+          <span class="page-info">Per halaman</span>
+          <select
+            v-model.number="perPage"
+            class="per-page-select"
+            @change="currentPage = 1"
+          >
+            <option v-for="n in [25, 50, 100, 200]" :key="n" :value="n">
+              {{ n }}
+            </option>
+            <option :value="-1">Semua</option>
+          </select>
+        </div>
       </div>
     </div>
   </PageLayout>
@@ -1316,6 +1661,7 @@ defineExpose({
   text-overflow: ellipsis;
   border-bottom: 1px solid #f0f0f0;
   font-variant-numeric: tabular-nums;
+  background: #fff;
 }
 .lp-table td.a-left {
   text-align: left;
@@ -1341,6 +1687,45 @@ defineExpose({
 }
 .lp-table tbody tr.lp-sel td {
   background: #bbdefb;
+}
+/* Sticky columns */
+.lp-th.lp-th-sticky {
+  z-index: 5;
+}
+.lp-td-sticky {
+  position: sticky;
+  z-index: 2;
+  background: #fff;
+}
+.lp-table tbody tr:nth-child(even) td.lp-td-sticky {
+  background: #fafafa;
+}
+.lp-table tbody tr:hover td.lp-td-sticky {
+  background: #e3f2fd;
+}
+.lp-table tbody tr.lp-sel td.lp-td-sticky {
+  background: #bbdefb;
+}
+.lp-table tbody tr td.lp-kurang.lp-td-sticky {
+  background: #fdb5d3;
+}
+.lp-sticky-last {
+  border-right: 2px solid #b0bec5 !important;
+  box-shadow: 2px 0 5px -1px rgba(0, 0, 0, 0.12);
+}
+.lp-th.lp-sticky-last {
+  border-right: 2px solid rgba(255, 255, 255, 0.6) !important;
+  box-shadow: 2px 0 5px -1px rgba(0, 0, 0, 0.2);
+}
+.lp-table tfoot td.lp-tfoot-sticky,
+.lp-table tfoot td.lp-td-sticky {
+  background: #1565c0 !important;
+  color: #fff;
+  z-index: 6;
+}
+.lp-table tfoot td.lp-sticky-last {
+  border-right: 2px solid rgba(255, 255, 255, 0.6) !important;
+  box-shadow: 2px 0 5px -1px rgba(0, 0, 0, 0.2);
 }
 /* Sorot nilai > 0 (mis. kekurangan produksi): pink + merah, tetap saat hover/pilih */
 .lp-table tbody tr td.lp-kurang {
@@ -1530,5 +1915,134 @@ defineExpose({
   border: none;
   border-radius: 4px;
   cursor: pointer;
+}
+
+/* ── Pagination bar (Identik dengan BaseBrowse) ── */
+.pagination-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 2px;
+  flex-shrink: 0;
+  flex-grow: 0;
+  border-top: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+}
+
+.page-info {
+  font-size: 12px;
+  color: rgba(var(--v-theme-on-surface), 0.5);
+  white-space: nowrap;
+}
+
+.page-controls {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.page-btn {
+  min-width: 30px;
+  height: 30px;
+  padding: 0 7px;
+  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+  border-radius: 6px;
+  background: rgb(var(--v-theme-surface));
+  font-size: 12px;
+  font-weight: 500;
+  color: rgb(var(--v-theme-on-surface));
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+.page-btn:hover:not(:disabled) {
+  background-color: rgba(var(--v-theme-primary), 0.1);
+  border-color: rgba(var(--v-theme-primary), 0.4);
+  color: rgb(var(--v-theme-primary));
+}
+.page-btn.active {
+  background-color: rgb(var(--v-theme-primary));
+  border-color: rgb(var(--v-theme-primary));
+  color: white;
+  font-weight: 700;
+}
+.page-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.jump-input {
+  width: 46px;
+  height: 30px;
+  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+  border-radius: 6px;
+  text-align: center;
+  font-size: 12px;
+  color: rgb(var(--v-theme-on-surface));
+  background: rgb(var(--v-theme-surface));
+  outline: none;
+  margin-left: 6px;
+  transition: border-color 0.15s;
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+.jump-input::-webkit-inner-spin-button,
+.jump-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+}
+.jump-input:focus {
+  border-color: rgb(var(--v-theme-primary));
+}
+
+.page-of {
+  font-size: 12px;
+  color: rgba(var(--v-theme-on-surface), 0.4);
+  white-space: nowrap;
+  margin-left: 4px;
+}
+
+.per-page-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.per-page-select {
+  height: 30px;
+  padding: 0 4px;
+  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+  border-radius: 6px;
+  font-size: 12px;
+  color: rgb(var(--v-theme-on-surface));
+  background: rgb(var(--v-theme-surface));
+  cursor: pointer;
+  outline: none;
+}
+.per-page-select:focus {
+  border-color: rgb(var(--v-theme-primary));
+}
+
+@media (max-width: 768px) {
+  .pagination-bar {
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 4px 6px;
+  }
+  .page-info {
+    font-size: 11px;
+  }
+  .per-page-select {
+    height: 26px;
+    font-size: 11px;
+  }
+  .page-btn {
+    min-width: 26px;
+    height: 26px;
+    font-size: 11px;
+  }
 }
 </style>
