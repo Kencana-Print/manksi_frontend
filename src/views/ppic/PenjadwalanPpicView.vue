@@ -18,6 +18,8 @@ import {
   IconEye,
   IconX,
   IconReportAnalytics,
+  IconFilter,
+  IconFilterOff,
 } from "@tabler/icons-vue";
 import { exportExcelSingle, exportExcel } from "@/utils/excelExport";
 import { formatTanggalSingkat as formatTanggal } from "@/utils/dateFormat";
@@ -275,13 +277,130 @@ const loadAllDetails = async () => {
   detailCache.value = next;
 };
 
-const displayItems = computed(() => {
-  const q = globalSearch.value.trim();
-  if (!q || isSearching.value) return items.value;
-  return items.value.filter((i) =>
-    (detailCache.value[i.Nomor] || []).some((d) => matchSearch(d, q)),
+// ── Filter Lanjutan (Popover Client-Side) ──
+const showAdvFilterMenu = ref(false);
+const advFilter = ref({
+  statusDokumen: "",
+  tipeItem: "",
+  statusKirim: "",
+  statusKesepakatan: "",
+});
+
+const advFilterActiveCount = computed(() => {
+  let count = 0;
+  if (advFilter.value.statusDokumen) count++;
+  if (advFilter.value.tipeItem) count++;
+  if (advFilter.value.statusKirim) count++;
+  if (advFilter.value.statusKesepakatan) count++;
+  return count;
+});
+
+const isAdvDetailFilterActive = computed(() => {
+  return (
+    Boolean(advFilter.value.tipeItem) ||
+    Boolean(advFilter.value.statusKirim) ||
+    Boolean(advFilter.value.statusKesepakatan)
   );
 });
+
+const resetAdvFilter = () => {
+  advFilter.value = {
+    statusDokumen: "",
+    tipeItem: "",
+    statusKirim: "",
+    statusKesepakatan: "",
+  };
+};
+
+const matchAdvDetail = (d: DetailRow): boolean => {
+  if (advFilter.value.tipeItem) {
+    if (advFilter.value.tipeItem === "MAP") {
+      if (d.PjwdTipe !== "MAP") return false;
+    } else if (advFilter.value.tipeItem === "PRAORDER") {
+      if (d.PjwdTipe !== "PRAORDER" && !d.NomorPraOrder) return false;
+    } else if (advFilter.value.tipeItem === "SO") {
+      if (d.PjwdTipe === "MAP" || d.PjwdTipe === "PRAORDER" || Boolean(d.NomorPraOrder))
+        return false;
+    }
+  }
+
+  if (advFilter.value.statusKirim) {
+    const kirim = Number(d.Kirim) || 0;
+    const kurang = Number(d.Kurang) || 0;
+    if (advFilter.value.statusKirim === "BELUM") {
+      if (kirim > 0) return false;
+    } else if (advFilter.value.statusKirim === "SEBAGIAN") {
+      if (kirim <= 0 || kurang <= 0) return false;
+    } else if (advFilter.value.statusKirim === "LENGKAP") {
+      if (kurang > 0) return false;
+    }
+  }
+
+  if (advFilter.value.statusKesepakatan) {
+    const hasSepakat = Boolean(d.Kesepakatan && d.Kesepakatan.trim());
+    const hasBd = Array.isArray(d.KesepakatanBd) && d.KesepakatanBd.length > 0;
+    if (advFilter.value.statusKesepakatan === "SUDAH") {
+      if (!hasSepakat && !hasBd) return false;
+    } else if (advFilter.value.statusKesepakatan === "BELUM") {
+      if (hasSepakat || hasBd) return false;
+    } else if (advFilter.value.statusKesepakatan === "BREAKDOWN") {
+      if (!hasBd) return false;
+    }
+  }
+
+  return true;
+};
+
+const displayItems = computed(() => {
+  let list = items.value;
+
+  if (advFilter.value.statusDokumen === "OPEN") {
+    list = list.filter((i) => i.Close !== "Y");
+  } else if (advFilter.value.statusDokumen === "CLOSED") {
+    list = list.filter((i) => i.Close === "Y");
+  }
+
+  const q = globalSearch.value.trim();
+  const needDetail = Boolean(q) || isAdvDetailFilterActive.value;
+  if (!needDetail || isSearching.value) return list;
+
+  return list.filter((i) => {
+    const rows = detailCache.value[i.Nomor] || [];
+    return rows.some((d) => matchSearch(d, q) && matchAdvDetail(d));
+  });
+});
+
+let advTimer: ReturnType<typeof setTimeout> | null = null;
+watch(
+  advFilter,
+  () => {
+    if (advTimer) clearTimeout(advTimer);
+    advTimer = setTimeout(async () => {
+      if (isAdvDetailFilterActive.value) {
+        isSearching.value = true;
+        try {
+          await loadAllDetails();
+          for (const i of items.value) {
+            const rows = detailCache.value[i.Nomor] || [];
+            if (
+              !filterDetail(rows, "SO", globalSearch.value).length &&
+              filterDetail(rows, "MAP", globalSearch.value).length
+            ) {
+              setExpandTab(i.Nomor, "MAP");
+            } else {
+              setExpandTab(i.Nomor, "SO");
+            }
+          }
+        } catch {
+          toast.error("Gagal memuat detail untuk filter.");
+        } finally {
+          isSearching.value = false;
+        }
+      }
+    }, 250);
+  },
+  { deep: true },
+);
 
 watch(globalSearch, (q) => {
   if (searchTimer) clearTimeout(searchTimer);
@@ -329,7 +448,9 @@ const matchSearch = (d: DetailRow, q: string) => {
 };
 
 const filterDetail = (rows: DetailRow[], tipe: "SO" | "MAP", q = "") =>
-  filterByTipe(rows, tipe).filter((d) => matchSearch(d, q));
+  filterByTipe(rows, tipe)
+    .filter((d) => matchSearch(d, q))
+    .filter((d) => matchAdvDetail(d));
 
 const activePreviewTab = ref<"SO" | "MAP">("SO");
 
@@ -416,6 +537,9 @@ const fetchData = async () => {
         a.Cabang.localeCompare(b.Cabang) ||
         a.Nomor.localeCompare(b.Nomor),
     );
+    if (globalSearch.value.trim() || isAdvDetailFilterActive.value) {
+      await loadAllDetails();
+    }
   } catch (e: any) {
     toast.error(e.response?.data?.message || "Gagal memuat data");
   } finally {
@@ -693,24 +817,145 @@ const onExport = async () => {
   }
   isExporting.value = true;
   try {
+    const detailPerNomor: Record<string, DetailRow[]> = {
+      ...detailCache.value,
+    };
+    const belumAda = rawData.filter(
+      (r: BrowseItem) => !detailPerNomor[r.Nomor],
+    );
+    if (belumAda.length) {
+      const results = await Promise.all(
+        belumAda.map((r: BrowseItem) =>
+          penjadwalanPpicService.getDetail(r.Nomor).then((res) => ({
+            nomor: r.Nomor,
+            data: res.data.data ?? [],
+          })),
+        ),
+      );
+      results.forEach((r) => (detailPerNomor[r.nomor] = r.data));
+      detailCache.value = { ...detailCache.value, ...detailPerNomor };
+    }
+
+    const allRows: DetailRow[] = [];
+    for (const periode of rawData as BrowseItem[]) {
+      const rows = detailPerNomor[periode.Nomor] || [];
+      allRows.push(...rows);
+    }
+
+    const uniqueSpks = Array.from(
+      new Set(
+        allRows
+          .map((d) => d.SpkRef)
+          .filter((s): s is string => Boolean(s)),
+      ),
+    );
+
+    const riwayatMap: Record<string, RiwayatKirim[]> = {};
+    const BATCH_SIZE = 15;
+    for (let i = 0; i < uniqueSpks.length; i += BATCH_SIZE) {
+      const batch = uniqueSpks.slice(i, i + BATCH_SIZE);
+      await Promise.all(
+        batch.map((spk) =>
+          penjadwalanPpicService
+            .getRiwayatKirim(spk)
+            .then((res) => {
+              riwayatMap[spk] = res.data.data ?? [];
+            })
+            .catch(() => {
+              riwayatMap[spk] = [];
+            }),
+        ),
+      );
+    }
+
+    // ponytail: tabel flat 1 sheet per SJ/SO; tanpa SJ tetap 1 baris
+    const exportRows: any[] = [];
+    for (const periode of rawData as BrowseItem[]) {
+      const rows = (detailPerNomor[periode.Nomor] || []).filter((d) =>
+        matchAdvDetail(d),
+      );
+      if (!rows.length) {
+        exportRows.push({
+          PeriodeNomor: periode.Nomor,
+          Cabang: periode.Cabang,
+          TglAwal: formatTanggal(periode.TglAwal),
+          TglAkhir: formatTanggal(periode.TglAkhir),
+          Tipe: "",
+          Nomor: "",
+          Nama: "",
+          Pesan: "",
+          Kirim: "",
+          Kurang: "",
+          Rencana: "",
+          NoSj: "",
+          QtySj: "",
+          TglSj: "",
+        });
+        continue;
+      }
+
+      for (const d of rows) {
+        const riwayat = d.SpkRef ? riwayatMap[d.SpkRef] || [] : [];
+        if (riwayat.length > 0) {
+          for (const rw of riwayat) {
+            exportRows.push({
+              PeriodeNomor: periode.Nomor,
+              Cabang: periode.Cabang,
+              TglAwal: formatTanggal(periode.TglAwal),
+              TglAkhir: formatTanggal(periode.TglAkhir),
+              Tipe: d.PjwdTipe === "MAP" ? "MAP" : "SO",
+              Nomor: nomorTampil(d),
+              Nama: d.Nama,
+              Pesan: Number(d.Pesan) || 0,
+              Kirim: Number(d.Kirim) || 0,
+              Kurang: Number(d.Kurang) || 0,
+              Rencana: Number(d.Rencana) || 0,
+              NoSj: rw.Nomor,
+              QtySj: Number(rw.Qty) || 0,
+              TglSj: formatTanggal(rw.Tanggal),
+            });
+          }
+        } else {
+          exportRows.push({
+            PeriodeNomor: periode.Nomor,
+            Cabang: periode.Cabang,
+            TglAwal: formatTanggal(periode.TglAwal),
+            TglAkhir: formatTanggal(periode.TglAkhir),
+            Tipe: d.PjwdTipe === "MAP" ? "MAP" : "SO",
+            Nomor: nomorTampil(d),
+            Nama: d.Nama,
+            Pesan: Number(d.Pesan) || 0,
+            Kirim: Number(d.Kirim) || 0,
+            Kurang: Number(d.Kurang) || 0,
+            Rencana: Number(d.Rencana) || 0,
+            NoSj: "",
+            QtySj: "",
+            TglSj: "",
+          });
+        }
+      }
+    }
+
     await exportExcelSingle(
       `Komitmen_Kirim_${filterStart.value}_${filterEnd.value}.xlsx`,
       "Komitmen Kirim",
       [
+        { header: "No. Periode", key: "PeriodeNomor" },
+        { header: "Cabang", key: "Cabang", align: "center" },
+        { header: "Tgl Awal", key: "TglAwal", align: "center" },
+        { header: "Tgl Akhir", key: "TglAkhir", align: "center" },
+        { header: "Tipe", key: "Tipe", align: "center" },
         { header: "Nomor", key: "Nomor" },
-        { header: "Tgl Awal", key: "TglAwal" },
-        { header: "Tgl Akhir", key: "TglAkhir" },
-        { header: "Cabang", key: "Cabang" },
-        { header: "Status", key: "Status" },
-        { header: "Jumlah SO", key: "JumlahSO", align: "right" },
-        { header: "Keterangan", key: "Keterangan" },
+        { header: "Nama", key: "Nama" },
+        { header: "Pesan", key: "Pesan", align: "right", numFmt: "#,##0" },
+        { header: "Kirim", key: "Kirim", align: "right", numFmt: "#,##0" },
+        { header: "Kurang", key: "Kurang", align: "right", numFmt: "#,##0" },
+        { header: "Rencana", key: "Rencana", align: "right", numFmt: "#,##0" },
+        { header: "NO SJ", key: "NoSj" },
+        { header: "QTY", key: "QtySj", align: "right", numFmt: "#,##0" },
+        { header: "TANGGAL", key: "TglSj", align: "center" },
       ],
-      rawData.map((r: BrowseItem) => ({
-        ...r,
-        TglAwal: formatTanggal(r.TglAwal),
-        TglAkhir: formatTanggal(r.TglAkhir),
-        Status: r.Close === "Y" ? "Closed" : "Open",
-      })),
+      exportRows,
     );
   } catch {
     toast.error("Gagal export.");
@@ -816,7 +1061,7 @@ const onExportDetail = async (tipe: "SO" | "MAP") => {
       const detailRows = filterByTipe(
         detailPerNomor[periode.Nomor] || [],
         tipe,
-      );
+      ).filter((d) => matchAdvDetail(d));
       if (!detailRows.length) continue;
 
       const columns = buildDetailColumns(periode.Cabang);
@@ -1000,15 +1245,104 @@ checkUnnotifiedMap();
             {{ c.title }}
           </option>
         </select>
-        <v-btn
-          color="primary"
-          variant="tonal"
-          size="small"
-          height="26"
-          class="px-2"
-          @click="fetchData"
-          >Filter</v-btn
+
+        <v-menu
+          v-model="showAdvFilterMenu"
+          :close-on-content-click="false"
+          location="bottom start"
+          offset="6"
         >
+          <template #activator="{ props }">
+            <v-btn
+              v-bind="props"
+              size="small"
+              height="26"
+              variant="outlined"
+              :color="advFilterActiveCount > 0 ? 'primary' : 'grey-darken-1'"
+              class="px-2 ml-1"
+            >
+              <IconFilter :size="14" style="margin-right: 4px" />
+              Filter Lanjutan
+              <span v-if="advFilterActiveCount > 0" class="adv-badge">
+                {{ advFilterActiveCount }}
+              </span>
+            </v-btn>
+          </template>
+
+          <v-card class="pa-3 rounded-lg" width="300" elevation="6">
+            <div
+              class="d-flex align-center justify-space-between mb-2 pb-1 border-b"
+            >
+              <div class="adv-pop-title">
+                <IconFilter :size="15" class="mr-1 text-primary" />
+                Filter Lanjutan
+              </div>
+              <v-btn
+                v-if="advFilterActiveCount > 0"
+                variant="text"
+                color="error"
+                size="x-small"
+                density="compact"
+                @click="resetAdvFilter"
+              >
+                <IconFilterOff :size="12" class="mr-1" />
+                Reset ({{ advFilterActiveCount }})
+              </v-btn>
+            </div>
+
+            <div class="adv-pop-body">
+              <div class="adv-group">
+                <label class="adv-lbl">Status Dokumen</label>
+                <select v-model="advFilter.statusDokumen" class="adv-sel">
+                  <option value="">Semua (Open & Closed)</option>
+                  <option value="OPEN">Open (Belum Selesai)</option>
+                  <option value="CLOSED">Closed (Selesai)</option>
+                </select>
+              </div>
+
+              <div class="adv-group">
+                <label class="adv-lbl">Tipe Item</label>
+                <select v-model="advFilter.tipeItem" class="adv-sel">
+                  <option value="">Semua Tipe</option>
+                  <option value="SO">Sales Order (SO)</option>
+                  <option value="MAP">MAP (Sampel)</option>
+                  <option value="PRAORDER">Pra Order</option>
+                </select>
+              </div>
+
+              <div class="adv-group">
+                <label class="adv-lbl">Status Pengiriman</label>
+                <select v-model="advFilter.statusKirim" class="adv-sel">
+                  <option value="">Semua Status Kirim</option>
+                  <option value="BELUM">Belum Kirim (Kirim = 0)</option>
+                  <option value="SEBAGIAN">Kirim Sebagian</option>
+                  <option value="LENGKAP">Lengkap (Tuntas)</option>
+                </select>
+              </div>
+
+              <div class="adv-group">
+                <label class="adv-lbl">Status Kesepakatan</label>
+                <select v-model="advFilter.statusKesepakatan" class="adv-sel">
+                  <option value="">Semua Status Kesepakatan</option>
+                  <option value="SUDAH">Sudah Ada Kesepakatan</option>
+                  <option value="BELUM">Belum Ada Kesepakatan</option>
+                  <option value="BREAKDOWN">Punya Breakdown</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="d-flex justify-end pt-2 mt-2 border-t">
+              <v-btn
+                size="x-small"
+                variant="tonal"
+                color="primary"
+                @click="showAdvFilterMenu = false"
+              >
+                Selesai
+              </v-btn>
+            </div>
+          </v-card>
+        </v-menu>
         <input
           v-model="globalSearch"
           type="text"
@@ -2297,5 +2631,54 @@ checkUnnotifiedMap();
   padding-left: 20px;
   font-size: 11px;
   line-height: 1.7;
+}
+.adv-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #1976d2;
+  color: #fff;
+  border-radius: 10px;
+  min-width: 16px;
+  height: 16px;
+  font-size: 10px;
+  font-weight: 700;
+  margin-left: 4px;
+  padding: 0 4px;
+}
+.adv-pop-title {
+  display: flex;
+  align-items: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: #212121;
+}
+.adv-pop-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.adv-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.adv-lbl {
+  font-size: 11px;
+  font-weight: 600;
+  color: #616161;
+}
+.adv-sel {
+  height: 28px;
+  font-size: 11px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  padding: 0 6px;
+  background-color: #fff;
+  color: #212121;
+}
+.adv-sel:focus {
+  outline: none;
+  border-color: #1976d2;
 }
 </style>
