@@ -87,6 +87,7 @@ const items = ref<any[]>([]);
 const isLoading = ref(false);
 const hasSearched = ref(false);
 const canExport = computed(() => authStore.can(MENU_ID, "view"));
+const baseTableRef = ref<InstanceType<typeof BaseTable> | null>(null);
 
 // ── Fetch — HANYA dipanggil manual lewat tombol Tampilkan, tidak ada
 // auto-fetch saat mount maupun saat filter berubah. ──
@@ -285,7 +286,7 @@ const onExport = async () => {
       { header: "Size", key: "Size", width: 10 },
       { header: "Cab", key: "Cab", width: 10 },
     ],
-    items.value,
+    baseTableRef.value?.getFilteredItems?.() ?? items.value,
     `Laporan Mutasi Produksi Detail — ${startDate.value} s.d. ${endDate.value}`,
   );
 };
@@ -797,6 +798,7 @@ const rowPropsFn = (data: any) => {
           </div>
         </div>
         <BaseTable
+          ref="baseTableRef"
           v-else
           :headers="headers"
           :items="items"
